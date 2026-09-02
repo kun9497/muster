@@ -15,3 +15,7 @@ docs/reference/kisa/pages*.json
 # local snapshots captured while developing
 /*.json
 !/.*.json
+
+# harness worktrees and subagent-driven-development scratch
+/.claude/worktrees/
+/.superpowers/
