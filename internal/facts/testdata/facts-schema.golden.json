@@ -1,0 +1,375 @@
+{
+  "schema_version": 1,
+  "run": {
+    "CollectorRun": [
+      {
+        "json": "name",
+        "type": "string"
+      },
+      {
+        "json": "status",
+        "type": "string"
+      },
+      {
+        "json": "ms",
+        "type": "int64"
+      },
+      {
+        "json": "cmd",
+        "type": "string"
+      },
+      {
+        "json": "reason",
+        "type": "string"
+      }
+    ],
+    "Env": [
+      {
+        "json": "container",
+        "type": "string"
+      },
+      {
+        "json": "virt",
+        "type": "string"
+      },
+      {
+        "json": "wsl",
+        "type": "bool"
+      },
+      {
+        "json": "chroot",
+        "type": "bool"
+      },
+      {
+        "json": "has_systemd",
+        "type": "bool"
+      },
+      {
+        "json": "sysctl_writable",
+        "type": "bool"
+      },
+      {
+        "json": "cloud_init",
+        "type": "bool"
+      }
+    ],
+    "Host": [
+      {
+        "json": "hostname",
+        "type": "string"
+      },
+      {
+        "json": "machine_id_hash",
+        "type": "string"
+      },
+      {
+        "json": "kernel",
+        "type": "string"
+      },
+      {
+        "json": "os_release",
+        "type": "facts.OSRelease"
+      },
+      {
+        "json": "boot_id",
+        "type": "string"
+      },
+      {
+        "json": "uptime_s",
+        "type": "int64"
+      }
+    ],
+    "OSRelease": [
+      {
+        "json": "id",
+        "type": "string"
+      },
+      {
+        "json": "version_id",
+        "type": "string"
+      },
+      {
+        "json": "family",
+        "type": "string"
+      }
+    ],
+    "Redaction": [
+      {
+        "json": "profile",
+        "type": "string"
+      },
+      {
+        "json": "include_secrets",
+        "type": "bool"
+      },
+      {
+        "json": "redacted_fields",
+        "type": "[]string"
+      }
+    ],
+    "Run": [
+      {
+        "json": "muster_version",
+        "type": "string"
+      },
+      {
+        "json": "commit",
+        "type": "string"
+      },
+      {
+        "json": "controls_version",
+        "type": "string"
+      },
+      {
+        "json": "controls_digest",
+        "type": "string"
+      },
+      {
+        "json": "guide_edition",
+        "type": "string"
+      },
+      {
+        "json": "collected_at",
+        "type": "string"
+      },
+      {
+        "json": "host",
+        "type": "facts.Host"
+      },
+      {
+        "json": "euid",
+        "type": "int"
+      },
+      {
+        "json": "capabilities",
+        "type": "[]string"
+      },
+      {
+        "json": "env",
+        "type": "facts.Env"
+      },
+      {
+        "json": "collectors",
+        "type": "[]facts.CollectorRun"
+      },
+      {
+        "json": "redaction",
+        "type": "facts.Redaction"
+      },
+      {
+        "json": "deep",
+        "type": "bool"
+      },
+      {
+        "json": "complete",
+        "type": "bool"
+      },
+      {
+        "json": "partial_failures",
+        "type": "[]string"
+      }
+    ]
+  },
+  "keys": [
+    {
+      "Key": "services.ssh.installed",
+      "Type": "bool",
+      "Description": "An SSH server package or unit exists on the host.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.ssh.active",
+      "Type": "bool",
+      "Description": "The SSH service is running or socket-activated.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.telnet.installed",
+      "Type": "bool",
+      "Description": "A telnet server package, unit or inetd entry exists on the host.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.telnet.reachable",
+      "Type": "bool",
+      "Description": "A telnet server would accept a connection from off the host (active unit or listening socket unit, non-loopback).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "sockets.listening",
+      "Type": "list\u003crecord\u003e",
+      "Description": "Listening TCP/UDP sockets with proto, address, port, inode, pid and executable.",
+      "Since": 1,
+      "Sensitivity": "internal",
+      "Collector": "sockets",
+      "DefaultOn": "",
+      "SubjectKind": "port"
+    },
+    {
+      "Key": "sshd.collect_method",
+      "Type": "string",
+      "Description": "How sshd options were obtained - G, T or parse.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sshd",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "sshd.personas_collected",
+      "Type": "bool",
+      "Description": "Whether per-persona (Match) values were collected; false means options hold global values only.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sshd",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "sshd.options.permit_root_login",
+      "Type": "setting\u003cstring\u003e",
+      "Description": "Effective PermitRootLogin value (daemon-reported versus parsed files).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sshd",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_securetty",
+      "Type": "record",
+      "Description": "Presence and permission facts of /etc/securetty (absent on RHEL 8+ and Debian-family).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_securetty.lines",
+      "Type": "list\u003cstring\u003e",
+      "Description": "Non-comment lines of /etc/securetty.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_passwd.mode",
+      "Type": "int",
+      "Description": "Permission bits of /etc/passwd as an integer (e.g. 420 for 0644).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_passwd.uid",
+      "Type": "int",
+      "Description": "Owner uid of /etc/passwd.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_passwd.gid",
+      "Type": "int",
+      "Description": "Group gid of /etc/passwd.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_passwd.acl_present",
+      "Type": "bool",
+      "Description": "Whether a POSIX ACL xattr is present on /etc/passwd.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "accounts.login_defs.pass_max_days",
+      "Type": "setting\u003cint\u003e",
+      "Description": "PASS_MAX_DAYS - persisted in login.defs, effective as the maximum over existing accounts' shadow fields.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "accounts",
+      "DefaultOn": "both",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "accounts.login_defs.pass_min_days",
+      "Type": "setting\u003cint\u003e",
+      "Description": "PASS_MIN_DAYS - persisted in login.defs, effective as the minimum over existing accounts' shadow fields.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "accounts",
+      "DefaultOn": "both",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "accounts.login_defs.pass_min_len",
+      "Type": "int",
+      "Description": "PASS_MIN_LEN from login.defs (ignored by PAM when pwquality is present; stage 2 adds the pwquality side).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "accounts",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "accounts.users",
+      "Type": "list\u003crecord\u003e",
+      "Description": "Local accounts with name, uid, gid, shell, password_status and ageing fields; no hashes.",
+      "Since": 1,
+      "Sensitivity": "internal",
+      "Collector": "accounts",
+      "DefaultOn": "",
+      "SubjectKind": "user"
+    },
+    {
+      "Key": "walk.world_writable",
+      "Type": "list\u003crecord\u003e",
+      "Description": "World-writable files found by the deep walk, with path, sticky, uid, gid, package_declared.",
+      "Since": 1,
+      "Sensitivity": "internal",
+      "Collector": "walk",
+      "DefaultOn": "",
+      "SubjectKind": "file"
+    },
+    {
+      "Key": "walk.complete",
+      "Type": "bool",
+      "Description": "Whether the deep walk finished within its budget.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "walk",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    }
+  ]
+}
