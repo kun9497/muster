@@ -162,11 +162,17 @@ func Lint(s *Set, reg *facts.Registry, opts LintOptions) []Problem {
 			}
 		}
 	}
+	// M13: several rules range over a map (params, references.kisa), whose
+	// iteration order Go randomises, so the message has to be part of the
+	// sort key or two problems of the same rule swap places between runs.
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].Path != out[j].Path {
 			return out[i].Path < out[j].Path
 		}
-		return out[i].Rule < out[j].Rule
+		if out[i].Rule != out[j].Rule {
+			return out[i].Rule < out[j].Rule
+		}
+		return out[i].Message < out[j].Message
 	})
 	if out == nil {
 		out = []Problem{}
@@ -308,9 +314,42 @@ func lintExpected(cl Clause, add func(string, string, ...any), where string) {
 	}
 }
 
-// FixtureDirExists is a small helper for the CLI: lint the fixture pair only
-// when the directory is present on disk.
+// FixtureDirExists reports whether dir is a directory the CLI can lint
+// fixtures against. A missing directory is an error there (R35), never a
+// silently skipped rule.
 func FixtureDirExists(dir string) bool {
 	st, err := os.Stat(dir)
 	return err == nil && st.IsDir()
+}
+
+// UnusedKeys returns the registered fact keys no control in s references, in
+// registry order (spec §5.5). It is a note rather than a lint failure: some
+// keys are read by the evaluator itself (walk.complete gates the walk,
+// sshd.collect_method and sshd.personas_collected decide degradation) and
+// others are collected for stage 2 controls that do not exist yet.
+func UnusedKeys(s *Set, reg *facts.Registry) []string {
+	used := map[string]bool{}
+	mark := func(cls []Clause) {
+		for _, cl := range cls {
+			if cl.Fact != "" {
+				used[cl.Fact] = true
+			}
+		}
+	}
+	for i := range s.Controls {
+		c := &s.Controls[i]
+		mark(c.AppliesWhen)
+		mark(c.Checks)
+		for _, m := range c.Mechanisms {
+			mark(m.When)
+			mark(m.Checks)
+		}
+	}
+	var out []string
+	for _, e := range reg.Keys {
+		if !used[e.Key] {
+			out = append(out, e.Key)
+		}
+	}
+	return out
 }

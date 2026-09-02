@@ -50,6 +50,11 @@ func Load(r io.Reader, path string) (*File, error) {
 	if err := dec.Decode(&f); err != nil && err != io.EOF {
 		return nil, fmt.Errorf("%w: %s: %v", ErrInvalid, path, err)
 	}
+	// I8/R33: (control, subject) is the identity of a waiver. A repeated pair
+	// used to be dropped without a word, which contradicts D12: a waiver is
+	// counted and reasoned, never silent. Refusing the file at load is the
+	// same treatment as the other rules of spec §6.7.
+	seen := map[string]int{}
 	for i, w := range f.Waivers {
 		if strings.TrimSpace(w.Control) == "" {
 			return nil, fmt.Errorf("%w: %s: waiver %d names no control", ErrInvalid, path, i+1)
@@ -62,10 +67,25 @@ func Load(r io.Reader, path string) (*File, error) {
 				return nil, fmt.Errorf("%w: %s: waiver %d expires %q is not YYYY-MM-DD", ErrInvalid, path, i+1, w.Expires)
 			}
 		}
+		key := w.Control + "\x00" + w.Subject
+		if first, dup := seen[key]; dup {
+			return nil, fmt.Errorf("%w: %s: waiver %d repeats %s%s, already waived by waiver %d",
+				ErrInvalid, path, i+1, w.Control, subjectSuffix(w.Subject), first)
+		}
+		seen[key] = i + 1
 	}
 	sum := sha256.Sum256(data)
 	f.Path, f.Digest = path, "sha256:"+hex.EncodeToString(sum[:])
 	return &f, nil
+}
+
+// subjectSuffix renders a waiver's subject the way the docs address one
+// observation: muster.file.world_writable#file:/var/tmp/x (spec §6.4).
+func subjectSuffix(subject string) string {
+	if subject == "" {
+		return ""
+	}
+	return "#" + subject
 }
 
 func (w Waiver) expired(now time.Time) bool {

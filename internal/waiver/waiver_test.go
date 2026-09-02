@@ -25,6 +25,59 @@ func TestLoadRefusesReasonlessUnknownKeyAndBadDate(t *testing.T) {
 	}
 }
 
+// I8/R33: two entries for the same (control, subject) meant the second was
+// silently dropped, which D12 forbids -- a waiver is counted and reasoned,
+// never silent. Load refuses the file instead.
+func TestLoadRefusesDuplicateControlAndSubjectPairs(t *testing.T) {
+	dup := []string{
+		"waivers:\n  - control: muster.a.b\n    reason: one\n  - control: muster.a.b\n    reason: two\n",
+		"waivers:\n  - control: muster.a.b\n    subject: file:/a\n    reason: one\n  - control: muster.a.b\n    subject: file:/a\n    reason: two\n",
+	}
+	for _, in := range dup {
+		_, err := Load(strings.NewReader(in), "w.yaml")
+		if !errors.Is(err, ErrInvalid) {
+			t.Errorf("%q: err=%v want ErrInvalid", in, err)
+			continue
+		}
+		if !strings.Contains(err.Error(), "muster.a.b") {
+			t.Errorf("error must name the control: %v", err)
+		}
+	}
+	// A control-level entry next to subject entries, and two different
+	// subjects, are all distinct pairs and stay legal.
+	ok := "waivers:\n  - control: muster.a.b\n    reason: whole\n" +
+		"  - control: muster.a.b\n    subject: file:/a\n    reason: one\n" +
+		"  - control: muster.a.b\n    subject: file:/b\n    reason: two\n" +
+		"  - control: muster.c.d\n    reason: other\n"
+	if _, err := Load(strings.NewReader(ok), "w.yaml"); err != nil {
+		t.Errorf("distinct pairs must load: %v", err)
+	}
+}
+
+// M16: expiry is inclusive of the named day (spec §6.7), so a waiver that
+// expires today still applies today.
+func TestWaiverExpiringTodayStillApplies(t *testing.T) {
+	f, err := Load(strings.NewReader("waivers:\n  - control: muster.a.fail\n    reason: r\n    expires: 2026-09-02\n"), "w.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rs := results()
+	var warnings []string
+	a := f.Apply(rs, map[string]bool{"muster.a.fail": true}, now, func(s string) { warnings = append(warnings, s) })
+	if rs[0].Status != check.WAIVED {
+		t.Errorf("a waiver expiring today still applies: %+v (warnings %v)", rs[0], warnings)
+	}
+	if a.Applied != 1 || a.Expired != 0 {
+		t.Errorf("applied=%d expired=%d, want 1 and 0", a.Applied, a.Expired)
+	}
+	// One day later it has expired.
+	rs = results()
+	a = f.Apply(rs, map[string]bool{"muster.a.fail": true}, now.AddDate(0, 0, 1), func(string) {})
+	if rs[0].Status != check.FAIL || a.Expired != 1 {
+		t.Errorf("the day after expiry it must stop waiving: %+v tally=%+v", rs[0], a)
+	}
+}
+
 func TestLoadGoodFileHasDigest(t *testing.T) {
 	f, err := Load(strings.NewReader("waivers:\n  - control: muster.a.b\n    reason: because\n    expires: 2026-12-31\n"), "w.yaml")
 	if err != nil {

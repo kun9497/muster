@@ -3,6 +3,7 @@ package controls
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/kun9497/muster/internal/facts"
@@ -278,6 +279,85 @@ remediation: { text_en: t, text_ko: 조치, risk: none }
 				t.Fatalf("want rule %q among %v", c.rule, got)
 			}
 		})
+	}
+}
+
+// M13: lint ranges over c.Params and References.KISA, whose iteration order
+// Go randomises, and sorted only on (path, rule) -- so two problems sharing a
+// rule came out in a different order on every run.
+func TestLintProblemOrderIsDeterministic(t *testing.T) {
+	const twoOfEachRule = `id: muster.account.x
+title_en: t
+title_ko: 제목
+category: account
+importance: 상
+automation: manual
+manual_reason: r
+requires_facts: ">=1"
+references:
+  kisa: { "2026": ["U-1"], "2021": ["U-2"] }
+`
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "VERSION"), []byte("t+1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "account"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "account", "c.yaml"), []byte(twoOfEachRule), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	set, err := LoadFS(os.DirFS(dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	reg, err := facts.LoadRegistry()
+	if err != nil {
+		t.Fatal(err)
+	}
+	render := func() string {
+		var b strings.Builder
+		for _, p := range Lint(set, reg, LintOptions{}) {
+			b.WriteString(p.String())
+			b.WriteString("\n")
+		}
+		return b.String()
+	}
+	want := render()
+	if strings.Count(want, "references_kisa") != 2 {
+		t.Fatalf("the fixture must produce two problems of one rule:\n%s", want)
+	}
+	for i := 0; i < 200; i++ {
+		if got := render(); got != want {
+			t.Fatalf("lint output differs between runs:\n--- want ---\n%s--- got ---\n%s", want, got)
+		}
+	}
+}
+
+// R35: spec §5.5 -- lint reports registered keys no control uses. It is a
+// note, not a failure: some keys are read by the evaluator itself.
+func TestUnusedKeysNamesRegisteredKeysNoControlReferences(t *testing.T) {
+	set, err := LoadDefault()
+	if err != nil {
+		t.Fatal(err)
+	}
+	reg, err := facts.LoadRegistry()
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]bool{}
+	for _, k := range UnusedKeys(set, reg) {
+		got[k] = true
+	}
+	for _, k := range []string{"sockets.listening", "accounts.users", "services.ssh.active"} {
+		if !got[k] {
+			t.Errorf("%s is referenced by no control and must be reported", k)
+		}
+	}
+	for _, k := range []string{"services.telnet.reachable", "files.etc_securetty_lines", "walk.world_writable"} {
+		if got[k] {
+			t.Errorf("%s is referenced by a control and must not be reported", k)
+		}
 	}
 }
 
