@@ -1,0 +1,200 @@
+package controls
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/kun9497/muster/internal/facts"
+)
+
+func lintOne(t *testing.T, yamlText string, opts LintOptions) []Problem {
+	t.Helper()
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "VERSION"), []byte("t+1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "account"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "account", "c.yaml"), []byte(yamlText), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	set, err := LoadFS(os.DirFS(dir))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	reg, err := facts.LoadRegistry()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return Lint(set, reg, opts)
+}
+
+func rules(ps []Problem) map[string]bool {
+	m := map[string]bool{}
+	for _, p := range ps {
+		m[p.Rule] = true
+	}
+	return m
+}
+
+const goodControl = `id: muster.account.good
+title_en: Good
+title_ko: 좋음
+description_en: d
+description_ko: 설명
+category: account
+importance: 상
+automation: auto
+references:
+  kisa: { "2026": ["U-01"] }
+  cis: [{ benchmark: ubuntu-22.04, version: "2.0.0", rec: "5.1.20" }]
+requires_facts: ">=1"
+absent_means: not_applicable
+params:
+  allowed: { type: list<string>, default: ["no"], description: d }
+checks:
+  - { fact: sshd.options.permit_root_login, on: effective, persona: root, op: in, expected: "${allowed}" }
+remediation: { text_en: t, text_ko: 조치, risk: lockout_risk, idempotent: true }
+`
+
+func TestLintCleanControlHasNoProblems(t *testing.T) {
+	if ps := lintOne(t, goodControl, LintOptions{}); len(ps) != 0 {
+		t.Fatalf("unexpected problems: %v", ps)
+	}
+}
+
+func TestLintRules(t *testing.T) {
+	cases := []struct {
+		name string
+		yaml string
+		rule string
+	}{
+		{"bad id", `id: U-01
+title_en: t
+title_ko: 제목
+category: account
+importance: 상
+automation: manual
+manual_reason: r
+`, "id_format"},
+		{"manual without reason", `id: muster.account.x
+title_en: t
+title_ko: 제목
+category: account
+importance: 상
+automation: manual
+`, "manual_reason"},
+		{"auto without remediation", `id: muster.account.x
+title_en: t
+title_ko: 제목
+category: account
+importance: 상
+automation: auto
+absent_means: fail
+checks: [{ fact: services.ssh.installed, op: eq, expected: true }]
+`, "remediation"},
+		{"unregistered fact", `id: muster.account.x
+title_en: t
+title_ko: 제목
+category: account
+importance: 상
+automation: auto
+absent_means: fail
+checks: [{ fact: nope.key, op: eq, expected: true }]
+remediation: { text_en: t, text_ko: 조치, risk: none }
+`, "fact_key"},
+		{"present with expected", `id: muster.account.x
+title_en: t
+title_ko: 제목
+category: account
+importance: 상
+automation: auto
+absent_means: fail
+checks: [{ fact: services.ssh.installed, op: present, expected: true }]
+remediation: { text_en: t, text_ko: 조치, risk: none }
+`, "clause_grammar"},
+		{"bad regex", `id: muster.account.x
+title_en: t
+title_ko: 제목
+category: account
+importance: 상
+automation: auto
+absent_means: fail
+checks: [{ fact: files.etc_securetty.lines, op: none, where: { op: matches, expected: "(" } }]
+remediation: { text_en: t, text_ko: 조치, risk: none }
+`, "clause_grammar"},
+		{"on without setting", `id: muster.account.x
+title_en: t
+title_ko: 제목
+category: account
+importance: 상
+automation: auto
+absent_means: fail
+checks: [{ fact: services.ssh.installed, on: runtime, op: eq, expected: true }]
+remediation: { text_en: t, text_ko: 조치, risk: none }
+`, "clause_grammar"},
+		{"undeclared param", `id: muster.account.x
+title_en: t
+title_ko: 제목
+category: account
+importance: 상
+automation: auto
+absent_means: fail
+checks: [{ fact: services.ssh.installed, op: eq, expected: "${nope}" }]
+remediation: { text_en: t, text_ko: 조치, risk: none }
+`, "param"},
+		{"kisa ref format", `id: muster.account.x
+title_en: t
+title_ko: 제목
+category: account
+importance: 상
+automation: manual
+manual_reason: r
+references: { kisa: { "2026": ["U-1"] } }
+`, "references_kisa"},
+		{"missing absent_means", `id: muster.account.x
+title_en: t
+title_ko: 제목
+category: account
+importance: 상
+automation: auto
+checks: [{ fact: services.ssh.installed, op: eq, expected: true }]
+remediation: { text_en: t, text_ko: 조치, risk: none }
+`, "absent_means"},
+		{"two judgments", `id: muster.account.x
+title_en: t
+title_ko: 제목
+category: account
+importance: 상
+automation: auto
+absent_means: fail
+checks: [{ fact: services.ssh.installed, op: eq, expected: true }]
+custom: Whatever
+remediation: { text_en: t, text_ko: 조치, risk: none }
+`, "judgment"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got := rules(lintOne(t, c.yaml, LintOptions{CustomFuncs: map[string]bool{}}))
+			if !got[c.rule] {
+				t.Fatalf("want rule %q among %v", c.rule, got)
+			}
+		})
+	}
+}
+
+func TestLintFixturePairRule(t *testing.T) {
+	fx := t.TempDir()
+	os.MkdirAll(filepath.Join(fx, "muster.account.good"), 0o755)
+	os.WriteFile(filepath.Join(fx, "muster.account.good", "pass-one.json"), []byte("{}"), 0o644)
+	ps := lintOne(t, goodControl, LintOptions{FixtureDir: fx})
+	if !rules(ps)["fixtures"] {
+		t.Fatalf("missing fail fixture must be reported: %v", ps)
+	}
+	os.WriteFile(filepath.Join(fx, "muster.account.good", "fail-one.json"), []byte("{}"), 0o644)
+	if ps := lintOne(t, goodControl, LintOptions{FixtureDir: fx}); len(ps) != 0 {
+		t.Fatalf("unexpected: %v", ps)
+	}
+}
