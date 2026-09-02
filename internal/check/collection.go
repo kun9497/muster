@@ -21,7 +21,7 @@ func (e *env) evalCollection(cl controls.Clause, entry facts.Entry, list []any, 
 		switch cl.Op {
 		case "each":
 			if cl.Where != nil {
-				sel, err := fieldClause(cl.Where, elem)
+				sel, err := fieldClause(cl.Where, elem, e.params)
 				if err != nil {
 					return clauseOutcome{Err: err}
 				}
@@ -29,7 +29,7 @@ func (e *env) evalCollection(cl controls.Clause, entry facts.Entry, list []any, 
 					continue
 				}
 			}
-			ok, err := fieldClause(cl.Require, elem)
+			ok, err := fieldClause(cl.Require, elem, e.params)
 			if err != nil {
 				return clauseOutcome{Err: err}
 			}
@@ -40,7 +40,7 @@ func (e *env) evalCollection(cl controls.Clause, entry facts.Entry, list []any, 
 			}
 			out.Observations = append(out.Observations, obs)
 		case "none":
-			hit, err := fieldClause(cl.Where, elem)
+			hit, err := fieldClause(cl.Where, elem, e.params)
 			if err != nil {
 				return clauseOutcome{Err: err}
 			}
@@ -53,14 +53,12 @@ func (e *env) evalCollection(cl controls.Clause, entry facts.Entry, list []any, 
 	return out
 }
 
-// subjectValue picks the element field named by `subject`, or the element
-// itself for scalars; the index is the fallback so subjects stay unique.
+// subjectValue picks the element field named by `subject` for a record
+// element, or the element itself for a scalar (string) element regardless of
+// `subject`; the index is the fallback so subjects stay unique.
 func subjectValue(field string, elem any, i int) string {
-	if field == "" {
-		if s, ok := elem.(string); ok {
-			return s
-		}
-		return fmt.Sprint(i)
+	if s, ok := elem.(string); ok {
+		return s
 	}
 	if m, ok := elem.(map[string]any); ok {
 		if v, ok := m[field]; ok {
@@ -81,8 +79,9 @@ func fieldValue(field string, elem any) any {
 }
 
 // fieldClause evaluates a where/require sub-clause against one element. The
-// field's type is inferred from the decoded JSON value.
-func fieldClause(sub *controls.Clause, elem any) (bool, error) {
+// field's type is inferred from the decoded JSON value. params resolves any
+// `${name}` in sub.Expected (spec §6.3); an unknown parameter is an error.
+func fieldClause(sub *controls.Clause, elem any, params map[string]any) (bool, error) {
 	if sub == nil {
 		return false, fmt.Errorf("sub-clause is nil")
 	}
@@ -96,6 +95,10 @@ func fieldClause(sub *controls.Clause, elem any) (bool, error) {
 		}
 		return false, fmt.Errorf("element has no field %q", sub.Field)
 	}
+	expected, err := substitute(sub.Expected, params)
+	if err != nil {
+		return false, err
+	}
 	typ := "string"
 	switch x := v.(type) {
 	case bool:
@@ -107,5 +110,5 @@ func fieldClause(sub *controls.Clause, elem any) (bool, error) {
 	case []any:
 		typ = "list<string>"
 	}
-	return compare(sub.Op, v, sub.Expected, typ)
+	return compare(sub.Op, v, expected, typ)
 }
