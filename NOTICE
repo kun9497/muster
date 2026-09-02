@@ -1,0 +1,18 @@
+muster
+Copyright 2026 seonggyun.seo (kun9497)
+
+Licensed under the Apache License, Version 2.0. See LICENSE.
+
+muster is an unofficial personal project. It is not affiliated with, endorsed by,
+or certified by the Korea Internet & Security Agency (KISA) or the Center for
+Internet Security (CIS), and it does not replace an official assessment.
+
+From the KISA guide (주요정보통신기반시설 기술적 취약점 분석·평가 방법 상세가이드) this
+repository reproduces only item codes, item names, categories, importance levels
+and page numbers, as a cross-reference index. Control titles, descriptions and
+rationale are muster's own wording; no inspection, criterion or remediation text
+from the guide is included, and the guide itself is not included.
+
+CIS Benchmark references are benchmark name, version and recommendation number
+only. No CIS Benchmark text is included and no CIS compliance level is claimed.
+See ATTRIBUTION.md.

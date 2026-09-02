@@ -1,0 +1,653 @@
+{
+  "_notice": "This directory reproduces only the item codes, item names, categories, importance levels and page numbers of the KISA guide; all other text is the maintainer's own paraphrase and the guide itself is not included.",
+  "mapping": [
+    {
+      "latest_id": "U-01",
+      "latest_name": "root 계정 원격 접속 제한",
+      "from_2021": [
+        "U-01"
+      ],
+      "relation": "same",
+      "note": ""
+    },
+    {
+      "latest_id": "U-02",
+      "latest_name": "비밀번호 관리정책 설정",
+      "from_2021": [
+        "U-02",
+        "U-46",
+        "U-47",
+        "U-48"
+      ],
+      "relation": "merged",
+      "note": "PDF 확인: 2026 U-02의 참고와 조치 방법이 비밀번호의 복잡성·길이·사용 기간·재사용 제한을 하나의 정책으로 묶어 다룬다. 2021의 복잡성/최소길이/최대사용기간/최소사용기간 4개 항목이 1개로 통합된 것으로 판단"
+    },
+    {
+      "latest_id": "U-03",
+      "latest_name": "계정 잠금 임계값 설정",
+      "from_2021": [
+        "U-03"
+      ],
+      "relation": "same",
+      "note": ""
+    },
+    {
+      "latest_id": "U-04",
+      "latest_name": "비밀번호 파일 보호",
+      "from_2021": [
+        "U-04"
+      ],
+      "relation": "same",
+      "note": "항목코드·점검 내용 동일. 판본 전반의 용어 변경으로 '패스워드' -> '비밀번호' 표기만 달라짐"
+    },
+    {
+      "latest_id": "U-05",
+      "latest_name": "root 이외의 UID가 ‘0’ 금지",
+      "from_2021": [
+        "U-44"
+      ],
+      "relation": "renumbered",
+      "note": "점검 내용 동일"
+    },
+    {
+      "latest_id": "U-06",
+      "latest_name": "사용자 계정 su 기능 제한",
+      "from_2021": [
+        "U-45"
+      ],
+      "relation": "renumbered",
+      "note": "항목명 'root 계정 su 제한' -> '사용자 계정 su 기능 제한'. PDF 대조 결과 두 판 모두 su 사용을 허용할 그룹의 설정 여부를 보므로 점검 대상은 동일"
+    },
+    {
+      "latest_id": "U-07",
+      "latest_name": "불필요한 계정 제거",
+      "from_2021": [
+        "U-49"
+      ],
+      "relation": "renumbered",
+      "note": ""
+    },
+    {
+      "latest_id": "U-08",
+      "latest_name": "관리자 그룹에 최소한의 계정 포함",
+      "from_2021": [
+        "U-50"
+      ],
+      "relation": "renumbered",
+      "note": "중요도 하 -> 중 상향"
+    },
+    {
+      "latest_id": "U-09",
+      "latest_name": "계정이 존재하지 않는 GID 금지",
+      "from_2021": [
+        "U-51"
+      ],
+      "relation": "renumbered",
+      "note": ""
+    },
+    {
+      "latest_id": "U-10",
+      "latest_name": "동일한 UID 금지",
+      "from_2021": [
+        "U-52"
+      ],
+      "relation": "renumbered",
+      "note": ""
+    },
+    {
+      "latest_id": "U-11",
+      "latest_name": "사용자 Shell 점검",
+      "from_2021": [
+        "U-53"
+      ],
+      "relation": "renumbered",
+      "note": ""
+    },
+    {
+      "latest_id": "U-12",
+      "latest_name": "세션 종료 시간 설정",
+      "from_2021": [
+        "U-54"
+      ],
+      "relation": "renumbered",
+      "note": "항목명 'Session Timeout 설정' -> '세션 종료 시간 설정'"
+    },
+    {
+      "latest_id": "U-13",
+      "latest_name": "안전한 비밀번호 암호화 알고리즘 사용",
+      "from_2021": [],
+      "relation": "new",
+      "note": "2021 대응 항목 없음. 안전한 비밀번호 암호화(해시) 알고리즘 사용 점검 신설"
+    },
+    {
+      "latest_id": "U-14",
+      "latest_name": "root 홈, 패스 디렉터리 권한 및 패스 설정",
+      "from_2021": [
+        "U-05"
+      ],
+      "relation": "renumbered",
+      "note": ""
+    },
+    {
+      "latest_id": "U-15",
+      "latest_name": "파일 및 디렉터리 소유자 설정",
+      "from_2021": [
+        "U-06"
+      ],
+      "relation": "renumbered",
+      "note": ""
+    },
+    {
+      "latest_id": "U-16",
+      "latest_name": "/etc/passwd 파일 소유자 및 권한 설정",
+      "from_2021": [
+        "U-07"
+      ],
+      "relation": "renumbered",
+      "note": ""
+    },
+    {
+      "latest_id": "U-17",
+      "latest_name": "시스템 시작 스크립트 권한 설정",
+      "from_2021": [
+        "U-14"
+      ],
+      "relation": "split",
+      "note": "[불확실] 2021 U-14 '사용자, 시스템 시작파일 및 환경파일 소유자 및 권한 설정' 중 시스템 시작파일에 해당하는 부분이 독립 항목이 된 것으로 추정. 다만 PDF 대조 결과 2026 U-17의 점검 내용은 시작 스크립트의 권한만 다루고 2021 U-14 쪽은 환경변수 파일 위주여서 서술이 직접 겹치지는 않으므로 'new'로 볼 여지도 있음"
+    },
+    {
+      "latest_id": "U-18",
+      "latest_name": "/etc/shadow 파일 소유자 및 권한 설정",
+      "from_2021": [
+        "U-08"
+      ],
+      "relation": "renumbered",
+      "note": ""
+    },
+    {
+      "latest_id": "U-19",
+      "latest_name": "/etc/hosts 파일 소유자 및 권한 설정",
+      "from_2021": [
+        "U-09"
+      ],
+      "relation": "renumbered",
+      "note": ""
+    },
+    {
+      "latest_id": "U-20",
+      "latest_name": "/etc/(x)inetd.conf 파일 소유자 및 권한 설정",
+      "from_2021": [
+        "U-10"
+      ],
+      "relation": "renumbered",
+      "note": ""
+    },
+    {
+      "latest_id": "U-21",
+      "latest_name": "/etc/(r)syslog.conf 파일 소유자 및 권한 설정",
+      "from_2021": [
+        "U-11"
+      ],
+      "relation": "renumbered",
+      "note": "항목명 /etc/syslog.conf -> /etc/(r)syslog.conf (rsyslog 포함)"
+    },
+    {
+      "latest_id": "U-22",
+      "latest_name": "/etc/services 파일 소유자 및 권한 설정",
+      "from_2021": [
+        "U-12"
+      ],
+      "relation": "renumbered",
+      "note": ""
+    },
+    {
+      "latest_id": "U-23",
+      "latest_name": "SUID, SGID, Sticky bit 설정 파일 점검",
+      "from_2021": [
+        "U-13"
+      ],
+      "relation": "renumbered",
+      "note": "항목명 동일(2021 항목표에도 Sticky bit 포함)"
+    },
+    {
+      "latest_id": "U-24",
+      "latest_name": "사용자, 시스템 환경변수 파일 소유자 및 권한 설정",
+      "from_2021": [
+        "U-14"
+      ],
+      "relation": "split",
+      "note": "2021 U-14 중 환경파일에 해당하는 부분. PDF 대조 결과 두 판의 점검 내용이 홈 디렉터리 내 환경변수 파일의 소유자·접근 권한을 같은 방식으로 다루어 사실상 같은 점검"
+    },
+    {
+      "latest_id": "U-25",
+      "latest_name": "world writable 파일 점검",
+      "from_2021": [
+        "U-15"
+      ],
+      "relation": "renumbered",
+      "note": ""
+    },
+    {
+      "latest_id": "U-26",
+      "latest_name": "/dev에 존재하지 않는 device 파일 점검",
+      "from_2021": [
+        "U-16"
+      ],
+      "relation": "renumbered",
+      "note": "[PDF 편집 오류] 2026 PDF p.53의 U-26 '점검 내용'/'점검 목적' 칸에 U-28(접속 IP 및 포트 제한)의 문구가 잘못 인쇄되어 있음. 항목명/보안 위협/참고/판단 기준/조치 방법은 정상적으로 /dev device 파일 내용"
+    },
+    {
+      "latest_id": "U-27",
+      "latest_name": "$HOME/.rhosts, hosts.equiv 사용 금지",
+      "from_2021": [
+        "U-17"
+      ],
+      "relation": "renumbered",
+      "note": ""
+    },
+    {
+      "latest_id": "U-28",
+      "latest_name": "접속 IP 및 포트 제한",
+      "from_2021": [
+        "U-18"
+      ],
+      "relation": "renumbered",
+      "note": ""
+    },
+    {
+      "latest_id": "U-29",
+      "latest_name": "hosts.lpd 파일 소유자 및 권한 설정",
+      "from_2021": [
+        "U-55"
+      ],
+      "relation": "renumbered",
+      "note": ""
+    },
+    {
+      "latest_id": "U-30",
+      "latest_name": "UMASK 설정 관리",
+      "from_2021": [
+        "U-56"
+      ],
+      "relation": "renumbered",
+      "note": ""
+    },
+    {
+      "latest_id": "U-31",
+      "latest_name": "홈 디렉토리 소유자 및 권한 설정",
+      "from_2021": [
+        "U-57"
+      ],
+      "relation": "renumbered",
+      "note": ""
+    },
+    {
+      "latest_id": "U-32",
+      "latest_name": "홈 디렉토리로 지정한 디렉토리의 존재 관리",
+      "from_2021": [
+        "U-58"
+      ],
+      "relation": "renumbered",
+      "note": ""
+    },
+    {
+      "latest_id": "U-33",
+      "latest_name": "숨겨진 파일 및 디렉토리 검색 및 제거",
+      "from_2021": [
+        "U-59"
+      ],
+      "relation": "renumbered",
+      "note": ""
+    },
+    {
+      "latest_id": "U-34",
+      "latest_name": "Finger 서비스 비활성화",
+      "from_2021": [
+        "U-19"
+      ],
+      "relation": "renumbered",
+      "note": ""
+    },
+    {
+      "latest_id": "U-35",
+      "latest_name": "공유 서비스에 대한 익명 접근 제한 설정",
+      "from_2021": [
+        "U-20"
+      ],
+      "relation": "renumbered",
+      "note": "항목명 'Anonymous FTP 비활성화' -> '공유 서비스에 대한 익명 접근 제한 설정'으로 일반화. 점검 및 조치 사례는 여전히 익명 FTP(기본 FTP/vsFTP 등) 중심 (PDF p.70 확인)"
+    },
+    {
+      "latest_id": "U-36",
+      "latest_name": "r 계열 서비스 비활성화",
+      "from_2021": [
+        "U-21"
+      ],
+      "relation": "renumbered",
+      "note": ""
+    },
+    {
+      "latest_id": "U-37",
+      "latest_name": "crontab 설정파일 권한 설정 미흡",
+      "from_2021": [
+        "U-22",
+        "U-65"
+      ],
+      "relation": "merged",
+      "note": "PDF 확인: 2026 U-37의 점검 내용과 판단 기준이 cron 관련 파일과 at 관련 파일의 권한을 함께 다룬다. 2021 U-22(cron 파일)+U-65(at 파일) 통합"
+    },
+    {
+      "latest_id": "U-38",
+      "latest_name": "DoS 공격에 취약한 서비스 비활성화",
+      "from_2021": [
+        "U-23"
+      ],
+      "relation": "renumbered",
+      "note": ""
+    },
+    {
+      "latest_id": "U-39",
+      "latest_name": "불필요한 NFS 서비스 비활성화",
+      "from_2021": [
+        "U-24"
+      ],
+      "relation": "renumbered",
+      "note": ""
+    },
+    {
+      "latest_id": "U-40",
+      "latest_name": "NFS 접근 통제",
+      "from_2021": [
+        "U-25",
+        "U-69"
+      ],
+      "relation": "merged",
+      "note": "PDF 확인: 2026 U-40의 판단 기준이 NFS 접근 통제 설정 여부와 NFS 설정 파일의 접근 권한을 함께 요구한다. 2021 U-25(NFS 접근 통제)+U-69(NFS 설정파일 접근 제한) 통합"
+    },
+    {
+      "latest_id": "U-41",
+      "latest_name": "불필요한 automountd 제거",
+      "from_2021": [
+        "U-26"
+      ],
+      "relation": "renumbered",
+      "note": ""
+    },
+    {
+      "latest_id": "U-42",
+      "latest_name": "불필요한 RPC 서비스 비활성화",
+      "from_2021": [
+        "U-27"
+      ],
+      "relation": "renumbered",
+      "note": ""
+    },
+    {
+      "latest_id": "U-43",
+      "latest_name": "NIS, NIS+ 점검",
+      "from_2021": [
+        "U-28"
+      ],
+      "relation": "renumbered",
+      "note": ""
+    },
+    {
+      "latest_id": "U-44",
+      "latest_name": "tftp, talk 서비스 비활성화",
+      "from_2021": [
+        "U-29"
+      ],
+      "relation": "renumbered",
+      "note": "2026 점검 내용에 ntalk 추가"
+    },
+    {
+      "latest_id": "U-45",
+      "latest_name": "메일 서비스 버전 점검",
+      "from_2021": [
+        "U-30"
+      ],
+      "relation": "renumbered",
+      "note": "항목명 'Sendmail 버전 점검' -> '메일 서비스 버전 점검'(벤더 중립화)"
+    },
+    {
+      "latest_id": "U-46",
+      "latest_name": "일반 사용자의 메일 서비스 실행 방지",
+      "from_2021": [
+        "U-32"
+      ],
+      "relation": "renumbered",
+      "note": "항목명 '일반사용자의 Sendmail 실행 방지' -> '일반 사용자의 메일 서비스 실행 방지'. 2021 U-31/U-32의 상대 순서가 2026에서 U-47/U-46으로 뒤바뀜"
+    },
+    {
+      "latest_id": "U-47",
+      "latest_name": "스팸 메일 릴레이 제한",
+      "from_2021": [
+        "U-31"
+      ],
+      "relation": "renumbered",
+      "note": "2021 U-31 '스팸 메일 릴레이 제한'"
+    },
+    {
+      "latest_id": "U-48",
+      "latest_name": "expn, vrfy 명령어 제한",
+      "from_2021": [
+        "U-70"
+      ],
+      "relation": "renumbered",
+      "note": ""
+    },
+    {
+      "latest_id": "U-49",
+      "latest_name": "DNS 보안 버전 패치",
+      "from_2021": [
+        "U-33"
+      ],
+      "relation": "renumbered",
+      "note": ""
+    },
+    {
+      "latest_id": "U-50",
+      "latest_name": "DNS Zone Transfer 설정",
+      "from_2021": [
+        "U-34"
+      ],
+      "relation": "renumbered",
+      "note": ""
+    },
+    {
+      "latest_id": "U-51",
+      "latest_name": "DNS 서비스의 취약한 동적 업데이트 설정 금지",
+      "from_2021": [],
+      "relation": "new",
+      "note": "DNS 서비스의 동적 업데이트(dynamic update) 설정 점검 신설"
+    },
+    {
+      "latest_id": "U-52",
+      "latest_name": "Telnet 서비스 비활성화",
+      "from_2021": [
+        "U-60"
+      ],
+      "relation": "renumbered",
+      "note": "[주의] 관점이 반전됨. 2021 U-60 'ssh 원격접속 허용'은 원격 접속에 SSH를 쓰는지를 보고, 2026 U-52 'Telnet 서비스 비활성화'는 평문 Telnet이 열려 있는지를 본다. 동일 리스크를 서로 반대 방향에서 기술한 것으로 판단"
+    },
+    {
+      "latest_id": "U-53",
+      "latest_name": "FTP 서비스 정보 노출 제한",
+      "from_2021": [],
+      "relation": "new",
+      "note": "FTP 접속 배너를 통한 정보 노출 점검 신설. 2021 U-71(Apache 웹 서비스 정보 숨김)과는 점검 대상이 다름"
+    },
+    {
+      "latest_id": "U-54",
+      "latest_name": "암호화되지 않는 FTP 서비스 비활성화",
+      "from_2021": [
+        "U-61"
+      ],
+      "relation": "renumbered",
+      "note": "항목명 'ftp 서비스 확인' -> '암호화되지 않는 FTP 서비스 비활성화'로 범위 명확화"
+    },
+    {
+      "latest_id": "U-55",
+      "latest_name": "FTP 계정 Shell 제한",
+      "from_2021": [
+        "U-62"
+      ],
+      "relation": "renumbered",
+      "note": ""
+    },
+    {
+      "latest_id": "U-56",
+      "latest_name": "FTP 서비스 접근 제어 설정",
+      "from_2021": [
+        "U-63"
+      ],
+      "relation": "renumbered",
+      "note": "항목명 'Ftpusers 파일 소유자 및 권한 설정' -> 'FTP 서비스 접근 제어 설정'. PDF 대조 결과 두 판 모두 FTP 접근제어 설정 파일을 인가받지 않은 사용자가 읽거나 고치지 못하게 하는지를 보므로 같은 계열의 점검"
+    },
+    {
+      "latest_id": "U-57",
+      "latest_name": "Ftpusers 파일 설정",
+      "from_2021": [
+        "U-64"
+      ],
+      "relation": "renumbered",
+      "note": ""
+    },
+    {
+      "latest_id": "U-58",
+      "latest_name": "불필요한 SNMP 서비스 구동 점검",
+      "from_2021": [
+        "U-66"
+      ],
+      "relation": "renumbered",
+      "note": ""
+    },
+    {
+      "latest_id": "U-59",
+      "latest_name": "안전한 SNMP 버전 사용",
+      "from_2021": [],
+      "relation": "new",
+      "note": "안전한 SNMP 버전(v3 등) 사용 점검 신설"
+    },
+    {
+      "latest_id": "U-60",
+      "latest_name": "SNMP Community String 복잡성 설정",
+      "from_2021": [
+        "U-67"
+      ],
+      "relation": "renumbered",
+      "note": ""
+    },
+    {
+      "latest_id": "U-61",
+      "latest_name": "SNMP Access Control 설정",
+      "from_2021": [],
+      "relation": "new",
+      "note": "SNMP Access Control(접근 제어) 설정 점검 신설"
+    },
+    {
+      "latest_id": "U-62",
+      "latest_name": "로그인 시 경고 메시지 설정",
+      "from_2021": [
+        "U-68"
+      ],
+      "relation": "renumbered",
+      "note": ""
+    },
+    {
+      "latest_id": "U-63",
+      "latest_name": "sudo 명령어 접근 관리",
+      "from_2021": [],
+      "relation": "new",
+      "note": "/etc/sudoers 파일 권한 점검(sudo 명령어 접근 관리) 신설"
+    },
+    {
+      "latest_id": "U-64",
+      "latest_name": "주기적 보안 패치 및 벤더 권고사항 적용",
+      "from_2021": [
+        "U-42"
+      ],
+      "relation": "renumbered",
+      "note": ""
+    },
+    {
+      "latest_id": "U-65",
+      "latest_name": "NTP 및 시각 동기화 설정",
+      "from_2021": [],
+      "relation": "new",
+      "note": "NTP 및 시각 동기화 설정 점검 신설"
+    },
+    {
+      "latest_id": "U-66",
+      "latest_name": "정책에 따른 시스템 로깅 설정",
+      "from_2021": [
+        "U-72"
+      ],
+      "relation": "renumbered",
+      "note": "중요도 하 -> 중 상향"
+    },
+    {
+      "latest_id": "U-67",
+      "latest_name": "로그 디렉터리 소유자 및 권한 설정",
+      "from_2021": [],
+      "relation": "new",
+      "note": "로그에 대한 접근 통제 및 관리(로그 디렉터리 소유자/권한) 점검 신설"
+    }
+  ],
+  "removed_2021": [
+    {
+      "id": "U-35",
+      "name_ko": "웹서비스 디렉토리 리스팅 제거",
+      "relation": "moved_to_web",
+      "note": "2026 신설 'III. 웹 서비스'(WEB-01~WEB-26) 장으로 이동. WEB-04 '웹 서비스 디렉터리 리스팅 방지 설정'에 대응하는 것으로 추정(항목명 기준, 본문 대조 미수행)"
+    },
+    {
+      "id": "U-36",
+      "name_ko": "웹서비스 웹 프로세스 권한 제한",
+      "relation": "moved_to_web",
+      "note": "WEB-09 '웹 서비스 프로세스 권한 제한'에 대응 추정"
+    },
+    {
+      "id": "U-37",
+      "name_ko": "웹서비스 상위 디렉토리 접근 금지",
+      "relation": "moved_to_web",
+      "note": "WEB-06 '웹 서비스 상위 디렉터리 접근 제한 설정'에 대응 추정"
+    },
+    {
+      "id": "U-38",
+      "name_ko": "웹서비스 불필요한 파일 제거",
+      "relation": "moved_to_web",
+      "note": "WEB-07 '웹 서비스 경로 내 불필요한 파일 제거'에 대응 추정"
+    },
+    {
+      "id": "U-39",
+      "name_ko": "웹서비스 링크 사용 금지",
+      "relation": "moved_to_web",
+      "note": "WEB-12 '웹 서비스 링크 사용 금지'에 대응 추정"
+    },
+    {
+      "id": "U-40",
+      "name_ko": "웹서비스 파일 업로드 및 다운로드 제한",
+      "relation": "moved_to_web",
+      "note": "WEB-08 '웹 서비스 파일 업로드 및 다운로드 용량 제한'에 대응 추정"
+    },
+    {
+      "id": "U-41",
+      "name_ko": "웹서비스 영역의 분리",
+      "relation": "moved_to_web",
+      "note": "[불확실] WEB-11 '웹 서비스 경로 설정' 또는 WEB-14 '웹 서비스 경로 내 파일의 접근 통제'에 대응 추정"
+    },
+    {
+      "id": "U-43",
+      "name_ko": "로그의 정기적 검토 및 보고",
+      "relation": "removed",
+      "note": "2026 Unix 로그 관리(U-65~U-67)에 대응 항목 없음. 관리적 점검 영역으로 이관된 것으로 추정되나 별도 '관리·물리적 취약점 분석·평가 방법 안내서'는 미확인"
+    },
+    {
+      "id": "U-71",
+      "name_ko": "Apache 웹 서비스 정보 숨김",
+      "relation": "moved_to_web",
+      "note": "[불확실] WEB-16 '웹 서비스 헤더 정보 노출 제한' 또는 WEB-22 '에러 페이지 관리'에 대응 추정"
+    }
+  ]
+}

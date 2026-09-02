@@ -1,0 +1,506 @@
+[
+  {
+    "id": "U-01",
+    "name_ko": "root 계정 원격 접속 제한",
+    "category": "계정 관리",
+    "importance": "상",
+    "page": 5
+  },
+  {
+    "id": "U-02",
+    "name_ko": "패스워드 복잡성 설정",
+    "category": "계정 관리",
+    "importance": "상",
+    "page": 9
+  },
+  {
+    "id": "U-03",
+    "name_ko": "계정 잠금 임계값 설정",
+    "category": "계정 관리",
+    "importance": "상",
+    "page": 13
+  },
+  {
+    "id": "U-04",
+    "name_ko": "패스워드 파일 보호",
+    "category": "계정 관리",
+    "importance": "상",
+    "page": 16
+  },
+  {
+    "id": "U-05",
+    "name_ko": "root 홈, 패스 디렉터리 권한 및 패스 설정",
+    "category": "파일 및 디렉터리 관리",
+    "importance": "상",
+    "page": 18
+  },
+  {
+    "id": "U-06",
+    "name_ko": "파일 및 디렉터리 소유자 설정",
+    "category": "파일 및 디렉터리 관리",
+    "importance": "상",
+    "page": 20
+  },
+  {
+    "id": "U-07",
+    "name_ko": "/etc/passwd 파일 소유자 및 권한 설정",
+    "category": "파일 및 디렉터리 관리",
+    "importance": "상",
+    "page": 21
+  },
+  {
+    "id": "U-08",
+    "name_ko": "/etc/shadow 파일 소유자 및 권한 설정",
+    "category": "파일 및 디렉터리 관리",
+    "importance": "상",
+    "page": 22
+  },
+  {
+    "id": "U-09",
+    "name_ko": "/etc/hosts 파일 소유자 및 권한 설정",
+    "category": "파일 및 디렉터리 관리",
+    "importance": "상",
+    "page": 24
+  },
+  {
+    "id": "U-10",
+    "name_ko": "/etc/(x)inetd.conf 파일 소유자 및 권한 설정",
+    "category": "파일 및 디렉터리 관리",
+    "importance": "상",
+    "page": 25
+  },
+  {
+    "id": "U-11",
+    "name_ko": "/etc/syslog.conf 파일 소유자 및 권한 설정",
+    "category": "파일 및 디렉터리 관리",
+    "importance": "상",
+    "page": 27
+  },
+  {
+    "id": "U-12",
+    "name_ko": "/etc/services 파일 소유자 및 권한 설정",
+    "category": "파일 및 디렉터리 관리",
+    "importance": "상",
+    "page": 28
+  },
+  {
+    "id": "U-13",
+    "name_ko": "SUID, SGID, Sticky bit 설정 파일 점검",
+    "category": "파일 및 디렉터리 관리",
+    "importance": "상",
+    "page": 29
+  },
+  {
+    "id": "U-14",
+    "name_ko": "사용자, 시스템 시작파일 및 환경파일 소유자 및 권한 설정",
+    "category": "파일 및 디렉터리 관리",
+    "importance": "상",
+    "page": 31
+  },
+  {
+    "id": "U-15",
+    "name_ko": "world writable 파일 점검",
+    "category": "파일 및 디렉터리 관리",
+    "importance": "상",
+    "page": 32
+  },
+  {
+    "id": "U-16",
+    "name_ko": "/dev에 존재하지 않는 device 파일 점검",
+    "category": "파일 및 디렉터리 관리",
+    "importance": "상",
+    "page": 33
+  },
+  {
+    "id": "U-17",
+    "name_ko": "$HOME/.rhosts, hosts.equiv 사용 금지",
+    "category": "파일 및 디렉터리 관리",
+    "importance": "상",
+    "page": 34
+  },
+  {
+    "id": "U-18",
+    "name_ko": "접속 IP 및 포트 제한",
+    "category": "파일 및 디렉터리 관리",
+    "importance": "상",
+    "page": 36
+  },
+  {
+    "id": "U-19",
+    "name_ko": "finger 서비스 비활성화",
+    "category": "서비스 관리",
+    "importance": "상",
+    "page": 39
+  },
+  {
+    "id": "U-20",
+    "name_ko": "Anonymous FTP 비활성화",
+    "category": "서비스 관리",
+    "importance": "상",
+    "page": 41
+  },
+  {
+    "id": "U-21",
+    "name_ko": "r 계열 서비스 비활성화",
+    "category": "서비스 관리",
+    "importance": "상",
+    "page": 43
+  },
+  {
+    "id": "U-22",
+    "name_ko": "cron 파일 소유자 및 권한설정",
+    "category": "서비스 관리",
+    "importance": "상",
+    "page": 46
+  },
+  {
+    "id": "U-23",
+    "name_ko": "Dos 공격에 취약한 서비스 비활성화",
+    "category": "서비스 관리",
+    "importance": "상",
+    "page": 48
+  },
+  {
+    "id": "U-24",
+    "name_ko": "NFS 서비스 비활성화",
+    "category": "서비스 관리",
+    "importance": "상",
+    "page": 52
+  },
+  {
+    "id": "U-25",
+    "name_ko": "NFS 접근 통제",
+    "category": "서비스 관리",
+    "importance": "상",
+    "page": 54
+  },
+  {
+    "id": "U-26",
+    "name_ko": "automountd 제거",
+    "category": "서비스 관리",
+    "importance": "상",
+    "page": 56
+  },
+  {
+    "id": "U-27",
+    "name_ko": "RPC 서비스 확인",
+    "category": "서비스 관리",
+    "importance": "상",
+    "page": 58
+  },
+  {
+    "id": "U-28",
+    "name_ko": "NIS, NIS+ 점검",
+    "category": "서비스 관리",
+    "importance": "상",
+    "page": 60
+  },
+  {
+    "id": "U-29",
+    "name_ko": "tftp, talk 서비스 비활성화",
+    "category": "서비스 관리",
+    "importance": "상",
+    "page": 63
+  },
+  {
+    "id": "U-30",
+    "name_ko": "Sendmail 버전 점검",
+    "category": "서비스 관리",
+    "importance": "상",
+    "page": 66
+  },
+  {
+    "id": "U-31",
+    "name_ko": "스팸 메일 릴레이 제한",
+    "category": "서비스 관리",
+    "importance": "상",
+    "page": 67
+  },
+  {
+    "id": "U-32",
+    "name_ko": "일반사용자의 Sendmail 실행 방지",
+    "category": "서비스 관리",
+    "importance": "상",
+    "page": 69
+  },
+  {
+    "id": "U-33",
+    "name_ko": "DNS 보안 버전 패치",
+    "category": "서비스 관리",
+    "importance": "상",
+    "page": 70
+  },
+  {
+    "id": "U-34",
+    "name_ko": "DNS Zone Transfer 설정",
+    "category": "서비스 관리",
+    "importance": "상",
+    "page": 72
+  },
+  {
+    "id": "U-35",
+    "name_ko": "웹서비스 디렉토리 리스팅 제거",
+    "category": "서비스 관리",
+    "importance": "상",
+    "page": 74
+  },
+  {
+    "id": "U-36",
+    "name_ko": "웹서비스 웹 프로세스 권한 제한",
+    "category": "서비스 관리",
+    "importance": "상",
+    "page": 76
+  },
+  {
+    "id": "U-37",
+    "name_ko": "웹서비스 상위 디렉토리 접근 금지",
+    "category": "서비스 관리",
+    "importance": "상",
+    "page": 77
+  },
+  {
+    "id": "U-38",
+    "name_ko": "웹서비스 불필요한 파일 제거",
+    "category": "서비스 관리",
+    "importance": "상",
+    "page": 79
+  },
+  {
+    "id": "U-39",
+    "name_ko": "웹서비스 링크 사용 금지",
+    "category": "서비스 관리",
+    "importance": "상",
+    "page": 80
+  },
+  {
+    "id": "U-40",
+    "name_ko": "웹서비스 파일 업로드 및 다운로드 제한",
+    "category": "서비스 관리",
+    "importance": "상",
+    "page": 82
+  },
+  {
+    "id": "U-41",
+    "name_ko": "웹서비스 영역의 분리",
+    "category": "서비스 관리",
+    "importance": "상",
+    "page": 84
+  },
+  {
+    "id": "U-42",
+    "name_ko": "최신 보안패치 및 벤더 권고사항 적용",
+    "category": "패치 관리",
+    "importance": "상",
+    "page": 85
+  },
+  {
+    "id": "U-43",
+    "name_ko": "로그의 정기적 검토 및 보고",
+    "category": "로그 관리",
+    "importance": "상",
+    "page": 89
+  },
+  {
+    "id": "U-44",
+    "name_ko": "root 이외의 UID가 ‘0’금지",
+    "category": "계정 관리",
+    "importance": "중",
+    "page": 90
+  },
+  {
+    "id": "U-45",
+    "name_ko": "root 계정 su 제한",
+    "category": "계정 관리",
+    "importance": "하",
+    "page": 92
+  },
+  {
+    "id": "U-46",
+    "name_ko": "패스워드 최소 길이 설정",
+    "category": "계정 관리",
+    "importance": "중",
+    "page": 95
+  },
+  {
+    "id": "U-47",
+    "name_ko": "패스워드 최대 사용기간 설정",
+    "category": "계정 관리",
+    "importance": "중",
+    "page": 98
+  },
+  {
+    "id": "U-48",
+    "name_ko": "패스워드 최소 사용기간 설정",
+    "category": "계정 관리",
+    "importance": "중",
+    "page": 100
+  },
+  {
+    "id": "U-49",
+    "name_ko": "불필요한 계정 제거",
+    "category": "계정 관리",
+    "importance": "하",
+    "page": 102
+  },
+  {
+    "id": "U-50",
+    "name_ko": "관리자 그룹에 최소한의 계정 포함",
+    "category": "계정 관리",
+    "importance": "하",
+    "page": 104
+  },
+  {
+    "id": "U-51",
+    "name_ko": "계정이 존재하지 않는 GID 금지",
+    "category": "계정 관리",
+    "importance": "하",
+    "page": 106
+  },
+  {
+    "id": "U-52",
+    "name_ko": "동일한 UID 금지",
+    "category": "계정 관리",
+    "importance": "중",
+    "page": 108
+  },
+  {
+    "id": "U-53",
+    "name_ko": "사용자 shell 점검",
+    "category": "계정 관리",
+    "importance": "하",
+    "page": 109
+  },
+  {
+    "id": "U-54",
+    "name_ko": "Session Timeout 설정",
+    "category": "계정 관리",
+    "importance": "하",
+    "page": 111
+  },
+  {
+    "id": "U-55",
+    "name_ko": "hosts.lpd 파일 소유자 및 권한 설정",
+    "category": "파일 및 디렉터리 관리",
+    "importance": "하",
+    "page": 113
+  },
+  {
+    "id": "U-56",
+    "name_ko": "UMASK 설정 관리",
+    "category": "파일 및 디렉터리 관리",
+    "importance": "중",
+    "page": 114
+  },
+  {
+    "id": "U-57",
+    "name_ko": "홈디렉토리 소유자 및 권한 설정",
+    "category": "파일 및 디렉터리 관리",
+    "importance": "중",
+    "page": 116
+  },
+  {
+    "id": "U-58",
+    "name_ko": "홈디렉토리로 지정한 디렉토리의 존재 관리",
+    "category": "파일 및 디렉터리 관리",
+    "importance": "중",
+    "page": 117
+  },
+  {
+    "id": "U-59",
+    "name_ko": "숨겨진 파일 및 디렉토리 검색 및 제거",
+    "category": "파일 및 디렉터리 관리",
+    "importance": "하",
+    "page": 118
+  },
+  {
+    "id": "U-60",
+    "name_ko": "ssh 원격접속 허용",
+    "category": "서비스 관리",
+    "importance": "중",
+    "page": 119
+  },
+  {
+    "id": "U-61",
+    "name_ko": "ftp 서비스 확인",
+    "category": "서비스 관리",
+    "importance": "하",
+    "page": 120
+  },
+  {
+    "id": "U-62",
+    "name_ko": "ftp 계정 shell 제한",
+    "category": "서비스 관리",
+    "importance": "중",
+    "page": 122
+  },
+  {
+    "id": "U-63",
+    "name_ko": "Ftpusers 파일 소유자 및 권한 설정",
+    "category": "서비스 관리",
+    "importance": "하",
+    "page": 123
+  },
+  {
+    "id": "U-64",
+    "name_ko": "Ftpusers 파일 설정",
+    "category": "서비스 관리",
+    "importance": "중",
+    "page": 125
+  },
+  {
+    "id": "U-65",
+    "name_ko": "at 파일 소유자 및 권한 설정",
+    "category": "서비스 관리",
+    "importance": "중",
+    "page": 127
+  },
+  {
+    "id": "U-66",
+    "name_ko": "SNMP 서비스 구동 점검",
+    "category": "서비스 관리",
+    "importance": "중",
+    "page": 129
+  },
+  {
+    "id": "U-67",
+    "name_ko": "SNMP 서비스 커뮤니티스트링의 복잡성 설정",
+    "category": "서비스 관리",
+    "importance": "중",
+    "page": 131
+  },
+  {
+    "id": "U-68",
+    "name_ko": "로그온 시 경고 메시지 제공",
+    "category": "서비스 관리",
+    "importance": "하",
+    "page": 134
+  },
+  {
+    "id": "U-69",
+    "name_ko": "NFS 설정파일 접근 제한",
+    "category": "서비스 관리",
+    "importance": "중",
+    "page": 137
+  },
+  {
+    "id": "U-70",
+    "name_ko": "expn, vrfy 명령어 제한",
+    "category": "서비스 관리",
+    "importance": "중",
+    "page": 138
+  },
+  {
+    "id": "U-71",
+    "name_ko": "Apache 웹 서비스 정보 숨김",
+    "category": "서비스 관리",
+    "importance": "중",
+    "page": 140
+  },
+  {
+    "id": "U-72",
+    "name_ko": "정책에 따른 시스템 로깅 설정",
+    "category": "로그 관리",
+    "importance": "하",
+    "page": 142
+  }
+]

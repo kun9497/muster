@@ -1,0 +1,17 @@
+# build output
+/bin/
+/dist/
+
+# IDE and editor state
+/.idea/
+/.vscode/
+*.swp
+
+# never commit the KISA guide PDFs or raw page dumps (licensing); only the item inventory JSON/MD is tracked
+docs/reference/kisa/*.pdf
+docs/reference/kisa/*_text.txt
+docs/reference/kisa/pages*.json
+
+# local snapshots captured while developing
+/*.json
+!/.*.json
