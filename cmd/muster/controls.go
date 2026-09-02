@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/kun9497/muster/internal/check"
 	"github.com/kun9497/muster/internal/controls"
 	"github.com/kun9497/muster/internal/facts"
 )
@@ -25,7 +26,7 @@ func runControls(args []string, stdout, stderr io.Writer) int {
 	}
 	switch args[0] {
 	case "lint":
-		opts := controls.LintOptions{CustomFuncs: map[string]bool{}}
+		opts := controls.LintOptions{CustomFuncs: check.CustomFuncs()}
 		if controls.FixtureDirExists("controls/testdata") {
 			opts.FixtureDir = "controls/testdata"
 		}
