@@ -81,7 +81,7 @@ func (w Waiver) expiringSoon(now time.Time) bool {
 		return false
 	}
 	exp, _ := time.Parse("2006-01-02", w.Expires)
-	return exp.Before(now.AddDate(0, 0, 30))
+	return !exp.After(now.AddDate(0, 0, 30))
 }
 
 // Apply mutates results in place. Only FAIL and WARN are waivable; a waiver
@@ -110,50 +110,103 @@ func (f *File) Apply(results []check.Result, known map[string]bool, now time.Tim
 			continue
 		}
 		if r.Status != check.FAIL && r.Status != check.WARN {
-			r.Waiver = &check.WaiverNote{Applied: false, Reason: ws[0].Reason, NotAppliedBecause: fmt.Sprintf("status %s is not waivable", r.Status)}
-			tally.NotApplied++
+			// Non-waivable status: mark all entries as NotApplied
+			for _, w := range ws {
+				r.Waiver = &check.WaiverNote{Applied: false, Reason: w.Reason, NotAppliedBecause: fmt.Sprintf("status %s is not waivable", r.Status)}
+				tally.NotApplied++
+			}
 			continue
 		}
-		whole := false
-		for _, w := range ws {
+
+		// Check for control-level waiver (subject == "")
+		var controlWaiver *Waiver
+		for j, w := range ws {
 			if w.Subject == "" {
-				whole = true
-				r.Waiver = &check.WaiverNote{Applied: true, Reason: w.Reason, Expires: w.Expires}
-				if w.expiringSoon(now) {
-					tally.ExpiringSoon++
-				}
+				controlWaiver = &ws[j]
 				break
 			}
 		}
-		if whole {
+
+		if controlWaiver != nil {
+			// Control-level waiver applies
 			r.Status = check.WAIVED
+			r.Waiver = &check.WaiverNote{Applied: true, Reason: controlWaiver.Reason, Expires: controlWaiver.Expires}
 			tally.Applied++
-			continue
-		}
-		remaining := 0
-		for oi := range r.Observations {
-			o := &r.Observations[oi]
-			if o.Verdict != "fail" {
-				continue
+			if controlWaiver.expiringSoon(now) {
+				tally.ExpiringSoon++
 			}
+
+			// All subject-level entries are shadowed
 			for _, w := range ws {
-				if w.Subject == o.Subject {
-					o.Verdict = "waived"
-					r.Waiver = &check.WaiverNote{Applied: true, Reason: w.Reason, Expires: w.Expires, Subject: w.Subject}
-					if w.expiringSoon(now) {
-						tally.ExpiringSoon++
-					}
-					break
+				if w.Subject != "" {
+					tally.NotApplied++
+					warn(fmt.Sprintf("waiver for %s#%s is shadowed by the control-level waiver", w.Control, w.Subject))
 				}
 			}
-			if o.Verdict == "fail" {
-				remaining++
+		} else {
+			// No control-level waiver, process subject-level entries
+			appliedSubjects := []string{}
+			var earliestExpiry string
+			var firstAppliedReason string
+			matchedWaiversBySubject := make(map[string]bool)
+
+			// Apply subject-level waivers to observations
+			for oi := range r.Observations {
+				o := &r.Observations[oi]
+				if o.Verdict != "fail" {
+					continue
+				}
+
+				for _, w := range ws {
+					if w.Subject == o.Subject {
+						o.Verdict = "waived"
+						appliedSubjects = append(appliedSubjects, o.Subject)
+						matchedWaiversBySubject[w.Subject] = true
+
+						tally.Applied++
+						if w.expiringSoon(now) {
+							tally.ExpiringSoon++
+						}
+
+						if firstAppliedReason == "" {
+							firstAppliedReason = w.Reason
+						}
+
+						if w.Expires != "" && (earliestExpiry == "" || w.Expires < earliestExpiry) {
+							earliestExpiry = w.Expires
+						}
+						break
+					}
+				}
 			}
-		}
-		if r.Waiver != nil && r.Waiver.Applied {
-			tally.Applied++
-			if remaining == 0 {
-				r.Status = check.WAIVED
+
+			// Check for unmatched subject-level waivers
+			for _, w := range ws {
+				if !matchedWaiversBySubject[w.Subject] {
+					tally.NotApplied++
+					warn(fmt.Sprintf("waiver for %s#%s matched no failing observation", w.Control, w.Subject))
+				}
+			}
+
+			// Set WaiverNote if any subject-level entry applied
+			if len(appliedSubjects) > 0 {
+				r.Waiver = &check.WaiverNote{
+					Applied: true,
+					Subject: strings.Join(appliedSubjects, ", "),
+					Reason:  firstAppliedReason,
+					Expires: earliestExpiry,
+				}
+
+				// Check if all observations are waived
+				remaining := 0
+				for _, o := range r.Observations {
+					if o.Verdict == "fail" {
+						remaining++
+					}
+				}
+				if remaining == 0 {
+					r.Status = check.WAIVED
+				}
 			}
 		}
 	}

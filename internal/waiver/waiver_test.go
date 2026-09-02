@@ -88,3 +88,59 @@ func TestApplyWaivesResultWhenAllObservationsWaived(t *testing.T) {
 		t.Errorf("%+v", rs[2])
 	}
 }
+
+func TestApplyTwoSubjectWaivers(t *testing.T) {
+	f, _ := Load(strings.NewReader("waivers:\n  - control: muster.a.obs\n    subject: file:/a\n    reason: r1\n    expires: 2026-09-20\n  - control: muster.a.obs\n    subject: file:/b\n    reason: r2\n    expires: 2026-09-20\n"), "w.yaml")
+	rs := results()
+	a := f.Apply(rs, map[string]bool{"muster.a.obs": true}, now, func(string) {})
+	if rs[2].Status != check.WAIVED || rs[2].Waiver == nil || rs[2].Waiver.Subject != "file:/a, file:/b" {
+		t.Errorf("two subject waivers: %+v", rs[2])
+	}
+	if a.Applied != 2 || a.ExpiringSoon != 2 {
+		t.Errorf("applied=%d expiring=%d", a.Applied, a.ExpiringSoon)
+	}
+}
+
+func TestApplyControlAndSubjectWaivers(t *testing.T) {
+	f, _ := Load(strings.NewReader("waivers:\n  - control: muster.a.fail\n    reason: r1\n  - control: muster.a.fail\n    subject: file:/a\n    reason: r2\n"), "w.yaml")
+	rs := results()
+	var warnings []string
+	a := f.Apply(rs, map[string]bool{"muster.a.fail": true, "muster.a.err": true, "muster.a.obs": true}, now, func(s string) { warnings = append(warnings, s) })
+	if rs[0].Status != check.WAIVED {
+		t.Errorf("should be waived: %+v", rs[0])
+	}
+	if a.Applied != 1 || a.NotApplied != 1 {
+		t.Errorf("applied=%d notapplied=%d", a.Applied, a.NotApplied)
+	}
+	joined := strings.Join(warnings, "\n")
+	if !strings.Contains(joined, "shadowed") {
+		t.Errorf("warnings: %v", warnings)
+	}
+}
+
+func TestApplyNoMatchingObservation(t *testing.T) {
+	f, _ := Load(strings.NewReader("waivers:\n  - control: muster.a.obs\n    subject: file:/zzz\n    reason: r\n"), "w.yaml")
+	rs := results()
+	var warnings []string
+	a := f.Apply(rs, map[string]bool{"muster.a.fail": true, "muster.a.err": true, "muster.a.obs": true}, now, func(s string) { warnings = append(warnings, s) })
+	if rs[2].Status != check.WARN {
+		t.Errorf("status should still be WARN: %+v", rs[2])
+	}
+	if a.NotApplied != 1 {
+		t.Errorf("notapplied=%d", a.NotApplied)
+	}
+	joined := strings.Join(warnings, "\n")
+	if !strings.Contains(joined, "matched no failing observation") {
+		t.Errorf("warnings: %v", warnings)
+	}
+}
+
+func TestApplyExpiringSoonBoundary(t *testing.T) {
+	// Expires exactly 30 days from now should count as expiring soon
+	f, _ := Load(strings.NewReader("waivers:\n  - control: muster.a.fail\n    reason: r\n    expires: 2026-10-02\n"), "w.yaml")
+	rs := results()
+	a := f.Apply(rs, map[string]bool{"muster.a.fail": true, "muster.a.err": true, "muster.a.obs": true}, now, func(string) {})
+	if a.ExpiringSoon != 1 {
+		t.Errorf("entry expiring exactly 30 days should count as expiring soon: %d", a.ExpiringSoon)
+	}
+}
