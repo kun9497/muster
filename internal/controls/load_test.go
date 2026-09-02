@@ -48,6 +48,20 @@ func TestLoadFSRejectsUnknownKeys(t *testing.T) {
 	}
 }
 
+func TestLoadFSRejectsUnknownKeyInAppliesWhen(t *testing.T) {
+	_, err := LoadFS(os.DirFS("testdata/unknown_key_applies_when"))
+	if err == nil || !strings.Contains(err.Error(), "bogus_key") || !strings.Contains(err.Error(), "account/bad.yaml") {
+		t.Fatalf("err=%v, want a strict-decoding error naming the key and file", err)
+	}
+}
+
+func TestLoadFSRejectsUnknownKeyInMechanismWhen(t *testing.T) {
+	_, err := LoadFS(os.DirFS("testdata/unknown_key_mechanism_when"))
+	if err == nil || !strings.Contains(err.Error(), "bogus_key") || !strings.Contains(err.Error(), "account/bad.yaml") {
+		t.Fatalf("err=%v, want a strict-decoding error naming the key and file", err)
+	}
+}
+
 func TestLoadDefaultEmbeddedSet(t *testing.T) {
 	set, err := LoadDefault()
 	if err != nil {

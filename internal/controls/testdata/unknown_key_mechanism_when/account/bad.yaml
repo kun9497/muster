@@ -1,0 +1,12 @@
+id: muster.account.bad_mechanism_when
+title_en: Bad
+title_ko: 나쁨
+category: account
+importance: 상
+automation: auto
+absent_means: fail
+mechanisms:
+  - when:
+      - { fact: sshd.options.permit_root_login, op: present, bogus_key: true }
+    checks:
+      - { fact: sshd.options.permit_root_login, op: eq, expected: true }

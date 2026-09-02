@@ -3,6 +3,7 @@
 package controls
 
 import (
+	"bytes"
 	"fmt"
 	"sort"
 
@@ -32,14 +33,14 @@ func (l *ClauseList) UnmarshalYAML(n *yaml.Node) error {
 	switch n.Kind {
 	case yaml.MappingNode:
 		var c Clause
-		if err := n.Decode(&c); err != nil {
+		if err := decodeStrict(n, &c); err != nil {
 			return err
 		}
 		*l = ClauseList{c}
 		return nil
 	case yaml.SequenceNode:
 		var cs []Clause
-		if err := n.Decode(&cs); err != nil {
+		if err := decodeStrict(n, &cs); err != nil {
 			return err
 		}
 		*l = ClauseList(cs)
@@ -47,6 +48,21 @@ func (l *ClauseList) UnmarshalYAML(n *yaml.Node) error {
 	default:
 		return fmt.Errorf("line %d: clause list must be a mapping or a sequence", n.Line)
 	}
+}
+
+// decodeStrict decodes n into out with KnownFields(true). Node.Decode always
+// builds a decoder with knownFields false, which would let an unknown key
+// anywhere under applies_when or mechanisms[].when pass silently (spec §6.8),
+// so we re-encode the node and run it back through a fresh strict decoder
+// instead of calling n.Decode directly.
+func decodeStrict(n *yaml.Node, out any) error {
+	data, err := yaml.Marshal(n)
+	if err != nil {
+		return err
+	}
+	dec := yaml.NewDecoder(bytes.NewReader(data))
+	dec.KnownFields(true)
+	return dec.Decode(out)
 }
 
 type Mechanism struct {

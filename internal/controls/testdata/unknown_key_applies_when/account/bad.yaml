@@ -1,0 +1,10 @@
+id: muster.account.bad_applies_when
+title_en: Bad
+title_ko: 나쁨
+category: account
+importance: 상
+automation: auto
+absent_means: fail
+applies_when: { fact: services.ssh.installed, op: eq, expected: true, bogus_key: true }
+checks:
+  - { fact: services.ssh.installed, op: eq, expected: true }
