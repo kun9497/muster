@@ -158,6 +158,12 @@ func compareList(op string, actual, expected any) (bool, error) {
 	if !ok {
 		return false, fmt.Errorf("actual %#v is not a list", actual)
 	}
+	// Validate all elements are strings for contains and matches.
+	for i, x := range xs {
+		if _, ok := x.(string); !ok {
+			return false, fmt.Errorf("list element %d is not a string", i)
+		}
+	}
 	switch op {
 	case "eq", "ne":
 		ys, ok := expected.([]any)
@@ -170,8 +176,12 @@ func compareList(op string, actual, expected any) (bool, error) {
 		}
 		return !eq, nil
 	case "contains":
+		e, ok := expected.(string)
+		if !ok {
+			return false, fmt.Errorf("expected %#v is not a string", expected)
+		}
 		for _, x := range xs {
-			if x == expected {
+			if x == e {
 				return true, nil
 			}
 		}
@@ -186,8 +196,8 @@ func compareList(op string, actual, expected any) (bool, error) {
 			return false, err
 		}
 		for _, x := range xs {
-			s, ok := x.(string)
-			if !ok || !re.MatchString(s) {
+			s := x.(string) // Safe cast; elements already validated as strings
+			if !re.MatchString(s) {
 				return false, nil
 			}
 		}

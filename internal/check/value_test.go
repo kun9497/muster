@@ -63,6 +63,20 @@ func TestCompareLists(t *testing.T) {
 	if ok, _ := compare("eq", list, []any{"aes256-gcm@openssh.com", "chacha20-poly1305@openssh.com"}, "list<string>"); !ok {
 		t.Error("eq on lists compares elements in order")
 	}
+
+	// Test error cases: non-string expected for contains
+	if _, err := compare("contains", list, 5, "list<string>"); err == nil {
+		t.Error("contains with non-string expected must error")
+	}
+
+	// Test error cases: list with non-string element (nested []any)
+	mixedList := []any{"aes256-gcm@openssh.com", []any{"nested"}}
+	if _, err := compare("contains", mixedList, "aes256-gcm@openssh.com", "list<string>"); err == nil {
+		t.Error("contains on list with non-string element must error, not panic")
+	}
+	if _, err := compare("matches", mixedList, "aes", "list<string>"); err == nil {
+		t.Error("matches on list with non-string element must error, not panic")
+	}
 }
 
 func TestSubstituteWholeValueOnly(t *testing.T) {
