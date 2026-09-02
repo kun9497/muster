@@ -26,6 +26,13 @@ func TestCompareTypedScalars(t *testing.T) {
 		{"in", "prohibit-password", []any{"no", "prohibit-password"}, "string", true, false},
 		{"not_in", "yes", []any{"no", "prohibit-password"}, "string", true, false},
 		{"in", "x", "not-a-list", "string", false, true},
+		// R22: "in"/"not_in" over an int fact against an int list, as used by
+		// files.etc_passwd.mode's 16 bit-subsets of 0644. The actual value
+		// arrives as float64 (JSON decoding); the expected list's elements
+		// decode from YAML as int.
+		{"in", float64(420), []any{0, 4, 32, 36, 128, 132, 160, 164, 256, 260, 288, 292, 384, 388, 416, 420}, "int", true, false},
+		{"in", float64(418), []any{0, 4, 32, 36, 128, 132, 160, 164, 256, 260, 288, 292, 384, 388, 416, 420}, "int", false, false},
+		{"not_in", float64(418), []any{0, 4, 32, 36, 128, 132, 160, 164, 256, 260, 288, 292, 384, 388, 416, 420}, "int", true, false},
 		{"contains", "PermitRootLogin no", "RootLogin", "string", true, false},
 		{"matches", "pts/0", "^pts/", "string", true, false},
 		{"matches", "PTS/0", "^pts/", "string", false, false}, // case-sensitive

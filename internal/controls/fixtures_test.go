@@ -120,6 +120,12 @@ func checkInvariants(t *testing.T, name string, r check.Result) {
 		if r.ReasonCode == "" || r.Reason == "" {
 			t.Errorf("%s: ERROR without reason code and text: %+v", name, r)
 		}
+		// R25: every ERROR must carry evidence for the fact(s) it errored on,
+		// except missing_fact when the fact is not in the snapshot at all —
+		// there is nothing on disk to show.
+		if r.ReasonCode != check.MissingFact && len(r.Evidence) == 0 {
+			t.Errorf("%s: ERROR without evidence: %+v", name, r)
+		}
 	case check.MANUAL:
 		if r.Reason == "" {
 			t.Errorf("%s: MANUAL without reason", name)
@@ -127,6 +133,9 @@ func checkInvariants(t *testing.T, name string, r check.Result) {
 	case check.NotApplicable:
 		if r.Reason == "" {
 			t.Errorf("%s: NOT_APPLICABLE without reason", name)
+		}
+		if r.ReasonCode != check.MissingFact && len(r.Evidence) == 0 {
+			t.Errorf("%s: NOT_APPLICABLE without evidence: %+v", name, r)
 		}
 	}
 }

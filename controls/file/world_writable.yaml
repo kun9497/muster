@@ -9,7 +9,7 @@ automation: partial
 references:
   kisa: { "2026": ["U-25"], "2021": ["U-15"] }
 requires_facts: ">=1"
-absent_means: pass
+absent_means: manual
 checks:
   - fact: walk.world_writable
     op: each

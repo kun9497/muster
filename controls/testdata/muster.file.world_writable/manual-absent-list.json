@@ -1,0 +1,1 @@
+{"schema_version":1,"run":{"deep":true},"facts":{"walk":{"world_writable":{"status":"absent"},"complete":{"status":"ok","value":true}}}}

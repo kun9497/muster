@@ -56,6 +56,21 @@ func passMaxDaysControl(automation string) controls.Control {
 	}
 }
 
+// evidenceHasFact returns a verify func asserting r.Evidence names fact with
+// status (R25: the hard/unsupported ERROR and NOT_APPLICABLE paths must
+// carry evidence for the fact that actually screened, not just whatever
+// applies_when evidence happened to accumulate earlier).
+func evidenceHasFact(fact string, status facts.Status) func(t *testing.T, r Result) {
+	return func(t *testing.T, r Result) {
+		for _, ev := range r.Evidence {
+			if ev.Fact == fact && ev.Status == status {
+				return
+			}
+		}
+		t.Errorf("want evidence for %s (%s), got %+v", fact, status, r.Evidence)
+	}
+}
+
 func TestDerivationTable(t *testing.T) {
 	cases := []struct {
 		name   string
@@ -70,8 +85,10 @@ func TestDerivationTable(t *testing.T) {
 		{"11 partial warn", `{"services":{"telnet":{"reachable":{"status":"ok","value":true}}}}`, telnetControl("partial", "pass"), WARN, "", nil},
 		{"8 absent means pass", `{"services":{"telnet":{"reachable":{"status":"absent"}}}}`, telnetControl("auto", "pass"), PASS, "", nil},
 		{"8 absent means na", `{"services":{"telnet":{"reachable":{"status":"absent"}}}}`, telnetControl("auto", "not_applicable"), NotApplicable, "", nil},
-		{"7 unsupported", `{"services":{"telnet":{"reachable":{"status":"unsupported","reason":"container"}}}}`, telnetControl("auto", "pass"), NotApplicable, UnsupportedEnv, nil},
-		{"6 denied", `{"services":{"telnet":{"reachable":{"status":"denied","reason":"needs root"}}}}`, telnetControl("auto", "pass"), ERROR, PermissionDenied, nil},
+		{"7 unsupported", `{"services":{"telnet":{"reachable":{"status":"unsupported","reason":"container"}}}}`, telnetControl("auto", "pass"), NotApplicable, UnsupportedEnv,
+			evidenceHasFact("services.telnet.reachable", facts.StatusUnsupported)}, // R25
+		{"6 denied", `{"services":{"telnet":{"reachable":{"status":"denied","reason":"needs root"}}}}`, telnetControl("auto", "pass"), ERROR, PermissionDenied,
+			evidenceHasFact("services.telnet.reachable", facts.StatusDenied)}, // R25
 		{"6 truncated", `{"services":{"telnet":{"reachable":{"status":"ok","value":false,"truncated":true}}}}`, telnetControl("auto", "pass"), ERROR, Truncated, nil},
 		{"6 missing key never absent_means", `{}`, telnetControl("auto", "pass"), ERROR, MissingFact, nil},
 		{"1 requires_facts unmet", `{"services":{"telnet":{"reachable":{"status":"ok","value":false}}}}`, func() controls.Control { c := telnetControl("auto", "pass"); c.RequiresFacts = ">=2"; return c }(), ERROR, MissingFact, nil},
@@ -87,7 +104,15 @@ func TestDerivationTable(t *testing.T) {
 				c := telnetControl("auto", "pass")
 				c.AppliesWhen = controls.ClauseList{{Fact: "services.ssh.installed", Op: "eq", Expected: true}}
 				return c
-			}(), ERROR, PermissionDenied, nil},
+			}(), ERROR, PermissionDenied, evidenceHasFact("services.ssh.installed", facts.StatusDenied)}, // R25
+		{"R25 mechanism-selection hard error carries evidence for the denied fact, not only applies_when's",
+			`{"services":{"ssh":{"installed":{"status":"ok","value":true}}},"sshd":{"options":{"permit_root_login":{"effective":{"status":"denied","reason":"sshd -T needs root"}}}}}`,
+			controls.Control{ID: "muster.account.root_remote_login", Importance: "상", Category: "account", Automation: "auto", AbsentMeans: "manual", Remediation: &controls.Remediation{Risk: "lockout_risk"},
+				AppliesWhen: controls.ClauseList{{Fact: "services.ssh.installed", Op: "eq", Expected: true}},
+				Mechanisms: []controls.Mechanism{
+					{When: controls.ClauseList{{Fact: "sshd.options.permit_root_login", Op: "present"}}, Checks: []controls.Clause{{Fact: "sshd.options.permit_root_login", On: "effective", Op: "eq", Expected: "no"}}},
+				}},
+			ERROR, PermissionDenied, evidenceHasFact("sshd.options.permit_root_login", facts.StatusDenied)},
 		{"9 walk not run", `{"walk":{"world_writable":{"status":"ok","value":[]}}}`,
 			controls.Control{ID: "muster.file.world_writable", Importance: "상", Category: "file", Automation: "partial", AbsentMeans: "pass", Remediation: &controls.Remediation{Risk: "none"},
 				Checks: []controls.Clause{{Fact: "walk.world_writable", Op: "each", Subject: "path", Require: &controls.Clause{Field: "package_declared", Op: "eq", Expected: true}}}},
@@ -176,6 +201,64 @@ func TestDerivationTable(t *testing.T) {
 				c.verify(t, r)
 			}
 		})
+	}
+}
+
+// R27: a reason string must name the substituted parameter value, not the
+// literal "${name}" token.
+func TestReasonRendersSubstitutedParamsNotTheToken(t *testing.T) {
+	c := controls.Control{
+		ID: "muster.account.root_remote_login", Importance: "상", Category: "account", Automation: "auto", AbsentMeans: "manual",
+		Params:      map[string]controls.Param{"allowed": {Type: "list<string>", Default: []any{"no", "prohibit-password"}}},
+		Checks:      []controls.Clause{{Fact: "sshd.options.permit_root_login", On: "effective", Op: "in", Expected: "${allowed}"}},
+		Remediation: &controls.Remediation{Risk: "lockout_risk"},
+	}
+	res := Evaluate(snap(t, `{"sshd":{"options":{"permit_root_login":{"effective":{"status":"ok","value":"yes"}}}}}`), one(c), reg, Options{})
+	r := res[0]
+	if r.Status != FAIL {
+		t.Fatalf("status=%s, want FAIL: %+v", r.Status, r)
+	}
+	if strings.Contains(r.Reason, "${") {
+		t.Errorf("reason must not contain a literal param token: %q", r.Reason)
+	}
+	if !strings.Contains(r.Reason, "no") || !strings.Contains(r.Reason, "prohibit-password") {
+		t.Errorf("reason must name the substituted list: %q", r.Reason)
+	}
+}
+
+// R27: an each/none reason must name the operative where/require sub-clause,
+// never Go's zero-value rendering of a nil pointer ("<nil>").
+func TestReasonForEachAndNoneNamesTheSubClauseNotNil(t *testing.T) {
+	eachCtl := controls.Control{
+		ID: "muster.file.world_writable", Importance: "상", Category: "file", Automation: "partial", AbsentMeans: "manual",
+		Remediation: &controls.Remediation{Risk: "none"},
+		Checks: []controls.Clause{{Fact: "walk.world_writable", Op: "each", Subject: "path",
+			Where:   &controls.Clause{Field: "sticky", Op: "eq", Expected: false},
+			Require: &controls.Clause{Field: "package_declared", Op: "eq", Expected: true}}},
+	}
+	eachFacts := `{"walk":{"world_writable":{"status":"ok","value":[{"path":"/opt/x","sticky":false,"package_declared":false}]},"complete":{"status":"ok","value":true}}}`
+	res := Evaluate(snap(t, eachFacts), one(eachCtl), reg, Options{})
+	r := res[0]
+	if r.Reason == "" || strings.Contains(r.Reason, "<nil>") {
+		t.Fatalf("each reason must be non-empty and free of <nil>: %q (%+v)", r.Reason, r)
+	}
+	if !strings.Contains(r.Reason, "require") || !strings.Contains(r.Reason, "package_declared") {
+		t.Errorf("each reason must name the require sub-clause: %q", r.Reason)
+	}
+
+	noneCtl := controls.Control{
+		ID: "muster.account.root_remote_login", Importance: "상", Category: "account", Automation: "auto", AbsentMeans: "manual",
+		Remediation: &controls.Remediation{Risk: "lockout_risk"},
+		Checks:      []controls.Clause{{Fact: "files.etc_securetty.lines", Op: "none", Where: &controls.Clause{Op: "matches", Expected: "^pts/"}}},
+	}
+	noneFacts := `{"files":{"etc_securetty":{"status":"ok","value":{},"lines":{"status":"ok","value":["pts/0"]}}}}`
+	res2 := Evaluate(snap(t, noneFacts), one(noneCtl), reg, Options{})
+	r2 := res2[0]
+	if r2.Reason == "" || strings.Contains(r2.Reason, "<nil>") {
+		t.Fatalf("none reason must be non-empty and free of <nil>: %q (%+v)", r2.Reason, r2)
+	}
+	if !strings.Contains(r2.Reason, "where") || !strings.Contains(r2.Reason, "^pts/") {
+		t.Errorf("none reason must name the where sub-clause: %q", r2.Reason)
 	}
 }
 

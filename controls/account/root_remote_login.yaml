@@ -1,8 +1,8 @@
 id: muster.account.root_remote_login
 title_en: Root cannot log in directly over SSH
 title_ko: root 계정이 SSH로 직접 로그인할 수 없다
-description_en: The SSH daemon's effective PermitRootLogin must not allow a root password login. Where sshd is absent, the legacy /etc/securetty list must not allow pseudo-terminals.
-description_ko: sshd의 유효 PermitRootLogin 값이 root 패스워드 로그인을 허용하면 안 됩니다. sshd가 없는 경우 구형 /etc/securetty 목록이 가상 터미널을 허용하면 안 됩니다.
+description_en: The SSH daemon's effective PermitRootLogin must not allow a root password login. Where the sshd option cannot be read, the legacy /etc/securetty list must not allow pseudo-terminals.
+description_ko: sshd의 유효 PermitRootLogin 값이 root 패스워드 로그인을 허용하면 안 됩니다. sshd 옵션을 읽을 수 없는 경우 구형 /etc/securetty 목록이 가상 터미널을 허용하면 안 됩니다.
 category: account
 importance: 상
 automation: auto
@@ -12,7 +12,7 @@ references:
 requires_facts: ">=1"
 applies_when:
   - { fact: services.ssh.installed, op: eq, expected: true }
-absent_means: not_applicable
+absent_means: manual
 params:
   allowed: { type: list<string>, default: ["no", "prohibit-password"], description: PermitRootLogin values that count as disabled }
 mechanisms:
@@ -25,11 +25,18 @@ mechanisms:
     checks:
       - { fact: files.etc_securetty.lines, op: none, where: { op: matches, expected: "^pts/" } }
 remediation:
-  text_en: Set PermitRootLogin no in a file under /etc/ssh/sshd_config.d/, validate with sshd -t, then restart sshd while keeping a second session open.
-  text_ko: /etc/ssh/sshd_config.d/ 아래 파일에 PermitRootLogin no 를 넣고 sshd -t 로 검증한 뒤, 다른 세션을 열어 둔 채 sshd 를 재시작합니다.
+  text_en: Set PermitRootLogin no in a file under /etc/ssh/sshd_config.d/, validate with sshd -t, then restart sshd while keeping a second session open. Where /etc/securetty lists pts/* entries instead, remove those lines so no pseudo-terminal can be used for a securetty-gated root login.
+  text_ko: /etc/ssh/sshd_config.d/ 아래 파일에 PermitRootLogin no 를 넣고 sshd -t 로 검증한 뒤, 다른 세션을 열어 둔 채 sshd 를 재시작합니다. 대신 /etc/securetty 에 pts/* 항목이 있다면 그 줄을 제거하여 securetty 로 통제되는 root 로그인에 가상 터미널을 쓸 수 없게 합니다.
   risk: lockout_risk
   idempotent: true
   script: |
-    printf 'PermitRootLogin no\n' > /etc/ssh/sshd_config.d/90-muster.conf && sshd -t
-  rollback: rm -f /etc/ssh/sshd_config.d/90-muster.conf && sshd -t
+    if command -v sshd >/dev/null 2>&1; then
+      printf 'PermitRootLogin no\n' > /etc/ssh/sshd_config.d/90-muster.conf && sshd -t
+    fi
+    if [ -f /etc/securetty ]; then
+      sed -i '/^pts\//d' /etc/securetty
+    fi
+  rollback: |
+    rm -f /etc/ssh/sshd_config.d/90-muster.conf
+    command -v sshd >/dev/null 2>&1 && sshd -t || true
 decision: D09

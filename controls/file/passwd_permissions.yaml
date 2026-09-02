@@ -13,7 +13,7 @@ absent_means: fail
 checks:
   - { fact: files.etc_passwd.uid, op: eq, expected: 0 }
   - { fact: files.etc_passwd.gid, op: eq, expected: 0 }
-  - { fact: files.etc_passwd.mode, op: lte, expected: 420 }
+  - { fact: files.etc_passwd.mode, op: in, expected: [0, 4, 32, 36, 128, 132, 160, 164, 256, 260, 288, 292, 384, 388, 416, 420] } # 0644 or any subset of its bits; any group/other write or any execute bit fails
   - { fact: files.etc_passwd.acl_present, op: eq, expected: false }
 remediation:
   text_en: chown root:root /etc/passwd; chmod 644 /etc/passwd; setfacl -b /etc/passwd

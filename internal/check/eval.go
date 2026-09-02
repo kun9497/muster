@@ -62,7 +62,7 @@ func evalOne(e *env, c *controls.Control) (r Result) {
 			}
 			r.Evidence = append(r.Evidence, out.Evidence...)
 			if !out.Holds {
-				return fail(r, NotApplicable, "", "applies_when does not hold: "+describe(cl))
+				return fail(r, NotApplicable, "", "applies_when does not hold: "+e.describe(cl))
 			}
 		}
 	}
@@ -73,7 +73,12 @@ func evalOne(e *env, c *controls.Control) (r Result) {
 		for mi, m := range c.Mechanisms {
 			st := e.worstStatus(m.When)
 			if st.hard {
-				return fail(r, ERROR, st.code, st.reason)
+				// R25: a hard status on a mechanism's `when` fact must carry
+				// evidence for that fact, not only whatever applies_when
+				// evidence happened to accumulate before this loop.
+				res := fail(r, ERROR, st.code, st.reason)
+				res.Evidence = append(res.Evidence, e.evidenceFor(clauseFacts(m.When))...)
+				return res
 			}
 			if st.status == facts.StatusAbsent || st.status == facts.StatusUnsupported {
 				continue
@@ -141,11 +146,17 @@ func evalOne(e *env, c *controls.Control) (r Result) {
 			return res
 		}
 	}
-	// Steps 6-8.
+	// Steps 6-8. R25: the hard (ERROR) and unsupported (NOT_APPLICABLE)
+	// branches must carry evidence for the checks' facts, same as
+	// absentMeans already does for the absent branch below.
 	if st := e.worstStatus(checks); st.hard {
-		return fail(r, ERROR, st.code, st.reason)
+		res := fail(r, ERROR, st.code, st.reason)
+		res.Evidence = append(res.Evidence, e.evidenceFor(keys)...)
+		return res
 	} else if st.status == facts.StatusUnsupported {
-		return fail(r, NotApplicable, UnsupportedEnv, st.reason)
+		res := fail(r, NotApplicable, UnsupportedEnv, st.reason)
+		res.Evidence = append(res.Evidence, e.evidenceFor(keys)...)
+		return res
 	} else if st.status == facts.StatusAbsent {
 		return e.absentMeans(r, c, keys, st.reason)
 	}
@@ -165,7 +176,7 @@ func evalOne(e *env, c *controls.Control) (r Result) {
 			}
 			all.Err = nil
 			if r.Reason == "" {
-				r.Reason = "clause does not hold: " + describe(cl)
+				r.Reason = "clause does not hold: " + e.describe(cl)
 			}
 		}
 		if out.Degraded != "" && all.Degraded == "" {
@@ -352,7 +363,12 @@ func screenApplies(st screening) (Status, ReasonCode) {
 func (e *env) screen(cls []controls.Clause, r *Result, _ func(screening) (Status, ReasonCode)) (Result, bool) {
 	st := e.worstStatus(cls)
 	if st.hard {
-		return fail(*r, ERROR, st.code, st.reason), true
+		// R25: applies_when's hard (ERROR) path must carry evidence for the
+		// fact that screened hard, same as the absent/unsupported branch
+		// below already does.
+		res := fail(*r, ERROR, st.code, st.reason)
+		res.Evidence = append(res.Evidence, e.evidenceFor(clauseFacts(cls))...)
+		return res, true
 	}
 	if st.status == facts.StatusAbsent || st.status == facts.StatusUnsupported {
 		res := fail(*r, NotApplicable, "", "applies_when: "+st.reason)
@@ -470,6 +486,43 @@ func requiredVersion(s string) (int, bool) {
 	return n, err == nil
 }
 
-func describe(cl controls.Clause) string {
-	return fmt.Sprintf("%s %s %v", cl.Fact, cl.Op, cl.Expected)
+// describe renders a clause for a human-readable reason string (spec §6.3).
+// R27: two things it must not show verbatim: a "${name}" token — expected is
+// substituted with the parameter values in force, so the reason names the
+// resolved value; and, for `each`/`none` (whose own Expected is always nil
+// per the clause grammar), the collection clause itself — the reason names
+// the operative sub-clause instead (require for each, since an element that
+// fails `where` is skipped rather than judged; where for none, since a
+// matching element is what fails the clause).
+func (e *env) describe(cl controls.Clause) string {
+	switch cl.Op {
+	case "each":
+		return describeSub(cl.Fact, cl.Op, "require", cl.Require, e.params)
+	case "none":
+		return describeSub(cl.Fact, cl.Op, "where", cl.Where, e.params)
+	default:
+		expected, err := substitute(cl.Expected, e.params)
+		if err != nil {
+			expected = cl.Expected
+		}
+		return fmt.Sprintf("%s %s %v", cl.Fact, cl.Op, expected)
+	}
+}
+
+// describeSub renders the where/require sub-clause that decided an each/none
+// verdict. field falls back to "value" for a scalar (list<string>) element,
+// which has no field name of its own.
+func describeSub(fact, op, keyword string, sub *controls.Clause, params map[string]any) string {
+	if sub == nil {
+		return fmt.Sprintf("%s %s", fact, op)
+	}
+	field := sub.Field
+	if field == "" {
+		field = "value"
+	}
+	expected, err := substitute(sub.Expected, params)
+	if err != nil {
+		expected = sub.Expected
+	}
+	return fmt.Sprintf("%s %s %s %s %s %v", fact, op, keyword, field, sub.Op, expected)
 }
