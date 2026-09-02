@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/kun9497/muster/internal/check"
+	"github.com/kun9497/muster/internal/facts"
 )
 
 type TableOptions struct {
@@ -90,8 +91,12 @@ func WriteTable(w io.Writer, r *Report, o TableOptions) error {
 		o.MaxObservations = 5
 	}
 	s := r.Summary
+	// C1/R20: every string on this line is snapshot- or file-derived and a
+	// snapshot from a compromised host is a normal input (spec §7.4), so all
+	// of them go through escape, not only the hostname.
 	fmt.Fprintf(w, "muster %s · controls %s · guide %s · host %s · collected %s\n",
-		r.Check.MusterVersion, r.Check.ControlsVersion, r.Check.GuideEdition, escape(r.Run.Host.Hostname), r.Run.CollectedAt)
+		escape(r.Check.MusterVersion), escape(r.Check.ControlsVersion), escape(r.Check.GuideEdition),
+		escape(r.Run.Host.Hostname), escape(r.Run.CollectedAt))
 	fmt.Fprintf(w, "automatic  high %d/%d/%d  medium %d/%d/%d  low %d/%d/%d  (pass/fail/warn)\n",
 		s.Automatic.High.Pass, s.Automatic.High.Fail, s.Automatic.High.Warn,
 		s.Automatic.Medium.Pass, s.Automatic.Medium.Fail, s.Automatic.Medium.Warn,
@@ -101,7 +106,7 @@ func WriteTable(w io.Writer, r *Report, o TableOptions) error {
 
 	idWidth := 12
 	for _, row := range r.Results {
-		if l := displayWidth(row.ID); l > idWidth {
+		if l := displayWidth(escape(row.ID)); l > idWidth {
 			idWidth = l
 		}
 	}
@@ -117,21 +122,27 @@ func WriteTable(w io.Writer, r *Report, o TableOptions) error {
 		if title == "" {
 			title = row.TitleEn
 		}
-		status := paint(o.Color, statusColor[row.Status], padRight(string(row.Status), 14))
-		fmt.Fprintf(w, "%s %s %s  %s\n", status, padRight(row.Severity, 6), padRight(row.ID, idWidth), truncateWidth(escape(title), titleWidth))
+		status := paint(o.Color, statusColor[row.Status], padRight(escape(string(row.Status)), 14))
+		fmt.Fprintf(w, "%s %s %s  %s\n", status, padRight(escape(row.Severity), 6), padRight(escape(row.ID), idWidth), truncateWidth(escape(title), titleWidth))
 		if row.Reason != "" {
 			fmt.Fprintf(w, "    reason: %s\n", escape(reasonLine(row)))
 		}
 		if row.Waiver != nil {
 			if row.Waiver.Applied {
-				fmt.Fprintf(w, "    waived: %s (expires %s)\n", escape(row.Waiver.Reason), escape(orNone(row.Waiver.Expires)))
+				fmt.Fprintf(w, "    waived: %s (expires %s)\n", escape(row.Waiver.Reason), orNone(escape(row.Waiver.Expires)))
 			} else {
 				fmt.Fprintf(w, "    waiver not applied: %s\n", escape(row.Waiver.NotAppliedBecause))
 			}
 		}
 		if row.Status == check.FAIL || row.Status == check.WARN || row.Status == check.ERROR {
 			for _, ev := range row.Evidence {
-				fmt.Fprintf(w, "    %s%s = %s%s\n", ev.Fact, sideSuffix(ev.Side), escape(fmt.Sprint(ev.Value)), sourceSuffix(ev))
+				// M9: a fact that is not ok has no value; naming the status is
+				// the honest rendering, "= <nil>" is not.
+				if ev.Status != facts.StatusOK {
+					fmt.Fprintf(w, "    %s%s: %s%s\n", escape(ev.Fact), sideSuffix(ev.Side), escape(string(ev.Status)), sourceSuffix(ev))
+					continue
+				}
+				fmt.Fprintf(w, "    %s%s = %s%s\n", escape(ev.Fact), sideSuffix(ev.Side), escape(fmt.Sprint(ev.Value)), sourceSuffix(ev))
 			}
 			shown := 0
 			failing := 0
@@ -141,7 +152,7 @@ func WriteTable(w io.Writer, r *Report, o TableOptions) error {
 				}
 				failing++
 				if shown < o.MaxObservations {
-					fmt.Fprintf(w, "    %s: expected %v, actual %v (%s)\n", escape(ob.Subject), escape(fmt.Sprint(ob.Expected)), escape(fmt.Sprint(ob.Actual)), ob.Verdict)
+					fmt.Fprintf(w, "    %s: expected %v, actual %v (%s)\n", escape(ob.Subject), escape(fmt.Sprint(ob.Expected)), escape(fmt.Sprint(ob.Actual)), escape(ob.Verdict))
 					shown++
 				}
 			}
@@ -171,20 +182,22 @@ func sideSuffix(side string) string {
 	if side == "" {
 		return ""
 	}
-	return "@" + side
+	return "@" + escape(side)
 }
 
+// sourceSuffix names the file and line, or the command, a value came from.
+// C1: path and cmd are snapshot-controlled strings, so both are escaped.
 func sourceSuffix(ev check.Evidence) string {
 	if ev.Source == nil {
 		return ""
 	}
 	switch {
 	case ev.Source.Path != "" && ev.Source.Line > 0:
-		return fmt.Sprintf("  (%s:%d)", ev.Source.Path, ev.Source.Line)
+		return fmt.Sprintf("  (%s:%d)", escape(ev.Source.Path), ev.Source.Line)
 	case ev.Source.Path != "":
-		return "  (" + ev.Source.Path + ")"
+		return "  (" + escape(ev.Source.Path) + ")"
 	case ev.Source.Cmd != "":
-		return "  (" + ev.Source.Cmd + ")"
+		return "  (" + escape(ev.Source.Cmd) + ")"
 	}
 	return ""
 }
