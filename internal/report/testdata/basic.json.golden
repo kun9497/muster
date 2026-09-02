@@ -1,0 +1,191 @@
+{
+  "schema_version": 1,
+  "run": {
+    "muster_version": "0.1.0",
+    "commit": "",
+    "controls_version": "",
+    "controls_digest": "",
+    "guide_edition": "",
+    "collected_at": "2026-09-02T06:00:00Z",
+    "host": {
+      "hostname": "web-01",
+      "machine_id_hash": "",
+      "kernel": "",
+      "os_release": {
+        "id": "",
+        "version_id": "",
+        "family": ""
+      },
+      "boot_id": "",
+      "uptime_s": 0
+    },
+    "euid": 0,
+    "capabilities": null,
+    "env": {
+      "container": "",
+      "virt": "",
+      "wsl": false,
+      "chroot": false,
+      "has_systemd": false,
+      "sysctl_writable": false,
+      "cloud_init": false
+    },
+    "collectors": [
+      {
+        "name": "sshd",
+        "status": "ok",
+        "ms": 41
+      },
+      {
+        "name": "walk",
+        "status": "skipped",
+        "ms": 0
+      }
+    ],
+    "redaction": {
+      "profile": "",
+      "include_secrets": false
+    },
+    "deep": false,
+    "complete": true,
+    "partial_failures": []
+  },
+  "check": {
+    "muster_version": "0.1.0",
+    "commit": "abc1234",
+    "controls_version": "kisa-unix-2026+2026.09.02",
+    "controls_digest": "sha256:c",
+    "snapshot_digest": "sha256:3ca89c25dccde2eb154173d105a799bd6a025f3521885e1514dfbd43cee113f7",
+    "guide_edition": "kisa-unix-2026",
+    "waivers": {
+      "path": "w.yaml",
+      "digest": "sha256:w",
+      "applied": 1,
+      "not_applied": 0,
+      "expired": 0,
+      "unknown": 0,
+      "expiring_soon": 1
+    }
+  },
+  "summary": {
+    "automatic": {
+      "high": {
+        "pass": 0,
+        "fail": 1,
+        "warn": 0
+      },
+      "medium": {
+        "pass": 1,
+        "fail": 0,
+        "warn": 0
+      },
+      "low": {
+        "pass": 0,
+        "fail": 0,
+        "warn": 0
+      }
+    },
+    "manual_review": 2,
+    "undecidable": {
+      "error": 1,
+      "not_applicable": 0,
+      "waived": 1
+    },
+    "facts_failed": 1,
+    "waivers_expiring_soon": 1
+  },
+  "results": [
+    {
+      "id": "muster.account.password_policy",
+      "title_en": "",
+      "title_ko": "",
+      "category": "",
+      "importance": "상",
+      "automation": "auto",
+      "status": "WAIVED",
+      "waiver": {
+        "applied": true,
+        "reason": "r",
+        "expires": "2026-09-20"
+      },
+      "severity": "high"
+    },
+    {
+      "id": "muster.account.root_remote_login",
+      "title_en": "",
+      "title_ko": "",
+      "category": "",
+      "importance": "상",
+      "automation": "auto",
+      "status": "FAIL",
+      "reason": "clause does not hold",
+      "evidence": [
+        {
+          "fact": "sshd.options.permit_root_login",
+          "status": "ok",
+          "value": "yes",
+          "source": {
+            "kind": "file",
+            "path": "/etc/ssh/sshd_config",
+            "line": 40,
+            "raw": "PermitRootLogin yes"
+          },
+          "side": "effective"
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "muster.file.passwd_permissions",
+      "title_en": "",
+      "title_ko": "",
+      "category": "",
+      "importance": "상",
+      "automation": "auto",
+      "status": "ERROR",
+      "reason_code": "permission_denied",
+      "reason": "needs root",
+      "severity": "high"
+    },
+    {
+      "id": "muster.file.world_writable",
+      "title_en": "",
+      "title_ko": "",
+      "category": "",
+      "importance": "상",
+      "automation": "partial",
+      "status": "WARN",
+      "reason": "observations need human review",
+      "observations": [
+        {
+          "subject": "file:/var/tmp/x",
+          "expected": true,
+          "actual": false,
+          "verdict": "fail"
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "muster.service.telnet_disabled",
+      "title_en": "",
+      "title_ko": "",
+      "category": "",
+      "importance": "중",
+      "automation": "auto",
+      "status": "PASS",
+      "severity": "medium"
+    },
+    {
+      "id": "muster.log.review",
+      "title_en": "",
+      "title_ko": "",
+      "category": "",
+      "importance": "하",
+      "automation": "manual",
+      "status": "MANUAL",
+      "reason": "interview",
+      "severity": "low"
+    }
+  ]
+}
