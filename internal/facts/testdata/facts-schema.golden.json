@@ -262,9 +262,9 @@
       "SubjectKind": ""
     },
     {
-      "Key": "files.etc_securetty.lines",
+      "Key": "files.etc_securetty_lines",
       "Type": "list\u003cstring\u003e",
-      "Description": "Non-comment lines of /etc/securetty.",
+      "Description": "Non-comment lines of /etc/securetty. A sibling leaf, not a member of files.etc_securetty, because every leaf under facts is an envelope of its own.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "files",

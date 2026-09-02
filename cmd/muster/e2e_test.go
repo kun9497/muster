@@ -48,6 +48,23 @@ func TestCheckEndToEndJSONAndTable(t *testing.T) {
 	if rep["schema_version"].(float64) != 1 || rep["check"].(map[string]any)["guide_edition"] != "kisa-unix-2026" {
 		t.Errorf("report header: %v", rep["check"])
 	}
+	// I5/R30: the result records the parameter values in force (spec §6.6,
+	// §9), so a reader can tell which threshold produced the verdict.
+	params, ok := rep["check"].(map[string]any)["params"].(map[string]any)
+	if !ok {
+		t.Fatalf("check.params is missing: %v", rep["check"])
+	}
+	rrl, ok := params["muster.account.root_remote_login"].(map[string]any)
+	if !ok {
+		t.Fatalf("check.params lacks muster.account.root_remote_login: %v", params)
+	}
+	allowed, ok := rrl["allowed"].([]any)
+	if !ok || len(allowed) != 2 || allowed[0] != "no" || allowed[1] != "prohibit-password" {
+		t.Errorf("check.params[...].allowed = %v, want the control's declared default", rrl["allowed"])
+	}
+	if _, declared := params["muster.service.telnet_disabled"]; declared {
+		t.Errorf("only controls that declare params belong in check.params: %v", params)
+	}
 	// R26: full-pass.json must produce exactly the five stage-1 controls'
 	// documented statuses (spec §10.2's five-controls list), not merely
 	// "some PASS rows appear somewhere in the output".

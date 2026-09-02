@@ -122,7 +122,7 @@ category: account
 importance: 상
 automation: auto
 absent_means: fail
-checks: [{ fact: files.etc_securetty.lines, op: none, where: { op: matches, expected: "(" } }]
+checks: [{ fact: files.etc_securetty_lines, op: none, where: { op: matches, expected: "(" } }]
 remediation: { text_en: t, text_ko: 조치, risk: none }
 `, "clause_grammar"},
 		{"on without setting", `id: muster.account.x
@@ -204,7 +204,7 @@ importance: 상
 automation: auto
 absent_means: fail
 requires_facts: ">=1"
-checks: [{ fact: files.etc_securetty.lines, op: none, where: { field: something, op: matches, expected: "^pts/" } }]
+checks: [{ fact: files.etc_securetty_lines, op: none, where: { field: something, op: matches, expected: "^pts/" } }]
 remediation: { text_en: t, text_ko: 조치, risk: none }
 `, "clause_grammar"},
 		{"missing title_ko", `id: muster.account.x

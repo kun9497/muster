@@ -112,8 +112,8 @@ func TestEvalCollectionEachProducesObservations(t *testing.T) {
 }
 
 func TestEvalCollectionNoneOnScalarList(t *testing.T) {
-	e := newEnv(t, `{"schema_version":1,"run":{},"facts":{"files":{"etc_securetty":{"status":"ok","value":{},"lines":{"status":"ok","value":["console","tty1","pts/0"]}}}}}`)
-	cl := controls.Clause{Fact: "files.etc_securetty.lines", Op: "none", Where: &controls.Clause{Op: "matches", Expected: "^pts/"}}
+	e := newEnv(t, `{"schema_version":1,"run":{},"facts":{"files":{"etc_securetty":{"status":"ok","value":{}},"etc_securetty_lines":{"status":"ok","value":["console","tty1","pts/0"]}}}}`)
+	cl := controls.Clause{Fact: "files.etc_securetty_lines", Op: "none", Where: &controls.Clause{Op: "matches", Expected: "^pts/"}}
 	out := e.evalClause(cl)
 	if out.Err != nil || out.Holds {
 		t.Fatalf("holds=%v err=%v", out.Holds, out.Err)
@@ -147,8 +147,8 @@ func TestFieldClauseSubstitutesRequireExpectedParam(t *testing.T) {
 }
 
 func TestEvalCollectionScalarSubjectUsesElementValue(t *testing.T) {
-	e := newEnv(t, `{"schema_version":1,"run":{},"facts":{"files":{"etc_securetty":{"status":"ok","value":{},"lines":{"status":"ok","value":["console","tty1"]}}}}}`)
-	cl := controls.Clause{Fact: "files.etc_securetty.lines", Op: "each", Subject: "line",
+	e := newEnv(t, `{"schema_version":1,"run":{},"facts":{"files":{"etc_securetty":{"status":"ok","value":{}},"etc_securetty_lines":{"status":"ok","value":["console","tty1"]}}}}`)
+	cl := controls.Clause{Fact: "files.etc_securetty_lines", Op: "each", Subject: "line",
 		Require: &controls.Clause{Op: "eq", Expected: "console"}}
 	out := e.evalClause(cl)
 	if out.Err != nil {
@@ -158,7 +158,7 @@ func TestEvalCollectionScalarSubjectUsesElementValue(t *testing.T) {
 		t.Fatalf("two elements → two observations, got %+v", out.Observations)
 	}
 	if out.Observations[0].Subject != "item:console" {
-		t.Errorf("subject=%q, want item:console (etc_securetty.lines has no subject_kind, so kind is item)", out.Observations[0].Subject)
+		t.Errorf("subject=%q, want item:console (etc_securetty_lines has no subject_kind, so kind is item)", out.Observations[0].Subject)
 	}
 	if out.Observations[1].Subject != "item:tty1" {
 		t.Errorf("subject=%q, want item:tty1", out.Observations[1].Subject)

@@ -56,9 +56,9 @@ keys:
     since: 1
     sensitivity: public
     collector: files
-  - key: files.etc_securetty.lines
+  - key: files.etc_securetty_lines
     type: list<string>
-    description: Non-comment lines of /etc/securetty.
+    description: Non-comment lines of /etc/securetty. A sibling leaf, not a member of files.etc_securetty, because every leaf under facts is an envelope of its own.
     since: 1
     sensitivity: public
     collector: files

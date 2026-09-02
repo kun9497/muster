@@ -243,7 +243,7 @@ mechanisms:                      # first mechanism whose `when` holds is the one
   - when:
       - { fact: files.etc_securetty, op: present }          # legacy fallback
     checks:
-      - { fact: files.etc_securetty.lines, op: none,
+      - { fact: files.etc_securetty_lines, op: none,
           where: { op: matches, expected: "^pts/" } }
 remediation:
   text_en: Set PermitRootLogin no in sshd_config(.d), validate with sshd -t, restart sshd.

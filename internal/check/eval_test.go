@@ -144,11 +144,11 @@ func TestDerivationTable(t *testing.T) {
 			controls.Control{ID: "muster.account.root_remote_login", Importance: "상", Category: "account", Automation: "auto", AbsentMeans: "not_applicable", Remediation: &controls.Remediation{Risk: "lockout_risk"},
 				Checks: []controls.Clause{{Fact: "sshd.options.permit_root_login", On: "effective", Persona: "root", Op: "eq", Expected: "no"}}},
 			WARN, "", nil},
-		{"5 mechanisms fallback", `{"files":{"etc_securetty":{"status":"ok","value":{},"lines":{"status":"ok","value":["console"]}}},"sshd":{"options":{"permit_root_login":{"effective":{"status":"absent"}}}}}`,
+		{"5 mechanisms fallback", `{"files":{"etc_securetty":{"status":"ok","value":{}},"etc_securetty_lines":{"status":"ok","value":["console"]}},"sshd":{"options":{"permit_root_login":{"effective":{"status":"absent"}}}}}`,
 			controls.Control{ID: "muster.account.root_remote_login", Importance: "상", Category: "account", Automation: "auto", AbsentMeans: "not_applicable", Remediation: &controls.Remediation{Risk: "lockout_risk"},
 				Mechanisms: []controls.Mechanism{
 					{When: controls.ClauseList{{Fact: "sshd.options.permit_root_login", Op: "present"}}, Checks: []controls.Clause{{Fact: "sshd.options.permit_root_login", On: "effective", Op: "eq", Expected: "no"}}},
-					{When: controls.ClauseList{{Fact: "files.etc_securetty", Op: "present"}}, Checks: []controls.Clause{{Fact: "files.etc_securetty.lines", Op: "none", Where: &controls.Clause{Op: "matches", Expected: "^pts/"}}}},
+					{When: controls.ClauseList{{Fact: "files.etc_securetty", Op: "present"}}, Checks: []controls.Clause{{Fact: "files.etc_securetty_lines", Op: "none", Where: &controls.Clause{Op: "matches", Expected: "^pts/"}}}},
 				}},
 			PASS, "", func(t *testing.T, r Result) {
 				if r.Mechanism != 2 {
@@ -162,7 +162,7 @@ func TestDerivationTable(t *testing.T) {
 			controls.Control{ID: "muster.account.root_remote_login", Importance: "상", Category: "account", Automation: "auto", AbsentMeans: "not_applicable", Remediation: &controls.Remediation{Risk: "lockout_risk"},
 				Mechanisms: []controls.Mechanism{
 					{When: controls.ClauseList{{Fact: "sshd.options.permit_root_login", Op: "present"}}, Checks: []controls.Clause{{Fact: "sshd.options.permit_root_login", On: "effective", Op: "eq", Expected: "no"}}},
-					{When: controls.ClauseList{{Fact: "files.etc_securetty", Op: "present"}}, Checks: []controls.Clause{{Fact: "files.etc_securetty.lines", Op: "none", Where: &controls.Clause{Op: "matches", Expected: "^pts/"}}}},
+					{When: controls.ClauseList{{Fact: "files.etc_securetty", Op: "present"}}, Checks: []controls.Clause{{Fact: "files.etc_securetty_lines", Op: "none", Where: &controls.Clause{Op: "matches", Expected: "^pts/"}}}},
 				}},
 			NotApplicable, "", nil},
 		// R15/R16 fix-round cases.
@@ -279,7 +279,7 @@ func TestDerivationTable(t *testing.T) {
 				AppliesWhen: controls.ClauseList{{Fact: "services.ssh.installed", Op: "eq", Expected: true}},
 				Mechanisms: []controls.Mechanism{
 					{When: controls.ClauseList{{Fact: "sshd.options.permit_root_login", Op: "present"}}, Checks: []controls.Clause{{Fact: "sshd.options.permit_root_login", On: "effective", Op: "eq", Expected: "no"}}},
-					{When: controls.ClauseList{{Fact: "files.etc_securetty", Op: "present"}}, Checks: []controls.Clause{{Fact: "files.etc_securetty.lines", Op: "none", Where: &controls.Clause{Op: "matches", Expected: "^pts/"}}}},
+					{When: controls.ClauseList{{Fact: "files.etc_securetty", Op: "present"}}, Checks: []controls.Clause{{Fact: "files.etc_securetty_lines", Op: "none", Where: &controls.Clause{Op: "matches", Expected: "^pts/"}}}},
 				}},
 			MANUAL, "", evidenceHasFact("services.ssh.installed", facts.StatusOK)},
 		// I4: a snapshot that forges the reader-only "missing" on one side of
@@ -356,9 +356,9 @@ func TestReasonForEachAndNoneNamesTheSubClauseNotNil(t *testing.T) {
 	noneCtl := controls.Control{
 		ID: "muster.account.root_remote_login", Importance: "상", Category: "account", Automation: "auto", AbsentMeans: "manual",
 		Remediation: &controls.Remediation{Risk: "lockout_risk"},
-		Checks:      []controls.Clause{{Fact: "files.etc_securetty.lines", Op: "none", Where: &controls.Clause{Op: "matches", Expected: "^pts/"}}},
+		Checks:      []controls.Clause{{Fact: "files.etc_securetty_lines", Op: "none", Where: &controls.Clause{Op: "matches", Expected: "^pts/"}}},
 	}
-	noneFacts := `{"files":{"etc_securetty":{"status":"ok","value":{},"lines":{"status":"ok","value":["pts/0"]}}}}`
+	noneFacts := `{"files":{"etc_securetty":{"status":"ok","value":{}},"etc_securetty_lines":{"status":"ok","value":["pts/0"]}}}`
 	res2 := Evaluate(snap(t, noneFacts), one(noneCtl), reg, Options{})
 	r2 := res2[0]
 	if r2.Reason == "" || strings.Contains(r2.Reason, "<nil>") {

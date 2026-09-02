@@ -1454,7 +1454,7 @@ git commit -m "Add the snapshot writer, naming, lock and latest symlink"
 | `services` | commands `/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState <unit>` for units `ssh.service`, `sshd.service`, `ssh.socket`, `telnet.socket`, `telnet.service`, `telnetd.service`, `inetd.service`, `xinetd.service`; reads `/etc/inetd.conf`, `/etc/xinetd.d/*` | `services.ssh.installed`, `services.ssh.active`, `services.telnet.installed`, `services.telnet.reachable` | `installed` = any mapped unit `LoadState=loaded` (not `not-found`) or an inetd/xinetd entry; `active` = any `ActiveState=active`; `reachable` = active or a listening `ssh.socket`/`telnet.socket` **and** the sockets collector saw port 22/23 on a non-loopback address — computed in `services` from `sockets.listening` via the builder (run order: sockets before services; `All()` sorts by name, so name the collectors `10-sockets` and `20-services`? No — keep names plain and let `services` read `/proc/net/tcp*` itself through its declaration; do not depend on run order). Without systemd (`/run/systemd/system` missing) → `unsupported` with reason "no systemd" |
 | `sockets` | `/proc/net/tcp`, `/proc/net/tcp6`, `/proc/net/udp`, `/proc/net/udp6` | `sockets.listening` | records `{proto, addr, port, inode, loopback}`; `pid`/`exe` left absent in stage 1 (registry description allows it) |
 | `sshd` | commands `/usr/sbin/sshd -T`; reads `/etc/ssh/sshd_config`, `/etc/ssh/sshd_config.d/*.conf` | `sshd.collect_method`, `sshd.personas_collected` (=false), `sshd.options.permit_root_login` | runtime from `-T` (`permitrootlogin <v>` line); persisted from the files with `Include` expanded in order (a directive's first occurrence wins, as sshd does) recording file/line/raw; `effective` = runtime when `-T` succeeded, else persisted with `Reason: "parsed files; sshd -T unavailable"`; `-T` missing binary → `collect_method: parse`; both unavailable → `absent` |
-| `files` | `/etc/passwd`, `/etc/securetty` | `files.etc_passwd.{mode,uid,gid,acl_present}`, `files.etc_securetty`, `files.etc_securetty.lines` | `Stat` for mode/uid/gid; `acl_present` = `unix.Llistxattr` contains `system.posix_acl_access` (EOPNOTSUPP → false); securetty lines exclude blank and `#` lines |
+| `files` | `/etc/passwd`, `/etc/securetty` | `files.etc_passwd.{mode,uid,gid,acl_present}`, `files.etc_securetty`, `files.etc_securetty_lines` | `Stat` for mode/uid/gid; `acl_present` = `unix.Llistxattr` contains `system.posix_acl_access` (EOPNOTSUPP → false); securetty lines exclude blank and `#` lines |
 | `accounts` | `/etc/login.defs`, `/etc/passwd`, `/etc/shadow` | `accounts.login_defs.pass_max_days` (setting), `accounts.login_defs.pass_min_days` (setting), `accounts.login_defs.pass_min_len`, `accounts.users` | persisted from `login.defs` with line/raw; runtime = max (for max_days) / min (for min_days) over `shadow` entries whose field 2 is a hash (`$`-prefixed), source `derived` with inputs `/etc/shadow`; `accounts.users` records `{name, uid, gid, shell, password_status, last_change, min, max, warn, inactive, expire, hash_algo}` where `password_status` is `locked` (`!`/`*` prefix), `nopass` (empty) or `hashed`, `hash_algo` is the `$id$` prefix only, and **no hash is ever stored**; `shadow` unreadable → the two runtime sides `denied` and `accounts.users` rows without shadow fields |
 | `walk` | none | `walk.complete` only when `--deep` | stage 1: with `--deep` the collector records `walk.complete` as `unsupported` with reason "deep walk arrives in stage 3" and marks itself `skipped`; without `--deep` it sets nothing (the keys stay absent → U-25 is `MANUAL`) |
 
@@ -2298,7 +2298,7 @@ func runFiles(ctx context.Context, a collect.Access, b *collect.Builder) error {
 	if err != nil {
 		e := collect.FromReadError(err, smeta)
 		b.Set("files.etc_securetty", e)
-		b.Set("files.etc_securetty.lines", e)
+		b.Set("files.etc_securetty_lines", e)
 		return nil
 	}
 	var lines []any
@@ -2310,7 +2310,7 @@ func runFiles(ctx context.Context, a collect.Access, b *collect.Builder) error {
 	}
 	ssrc := &facts.Source{Kind: "file", Path: "/etc/securetty"}
 	b.Set("files.etc_securetty", collect.OK(map[string]any{"mode": int(smeta.Mode.Perm())}, ssrc))
-	b.Set("files.etc_securetty.lines", collect.OK(lines, ssrc))
+	b.Set("files.etc_securetty_lines", collect.OK(lines, ssrc))
 	return nil
 }
 ```
@@ -3220,4 +3220,4 @@ git commit -m "Add Linux collect CI: root, non-root, containers, network-less re
 
 **Placeholder scan:** none; every code step has code. `collect_other.go`'s `--bogus` special case is called out as a temporary shortcut to keep one shared test green — replace with a shared flag parser when convenient.
 
-**Type consistency:** `collect.Command`/`Output` (T2) are what `Access.Run` (T3) and the collectors (T5) use; `Builder.Set/SetSetting/Header` (T3, T6) match every collector; `facts.CollectorRun` fields (plan 1A T3) match what `Run` writes (T6); `WriteOptions` (T4) matches `Run` (T6); registry keys in plan 1A T4 match every `b.Set` key in T5 (`services.ssh.installed`, `services.ssh.active`, `services.telnet.installed`, `services.telnet.reachable`, `sockets.listening`, `sshd.collect_method`, `sshd.personas_collected`, `sshd.options.permit_root_login`, `files.etc_securetty`, `files.etc_securetty.lines`, `files.etc_passwd.{mode,uid,gid,acl_present}`, `accounts.login_defs.{pass_max_days,pass_min_days,pass_min_len}`, `accounts.users`, `walk.complete`).
+**Type consistency:** `collect.Command`/`Output` (T2) are what `Access.Run` (T3) and the collectors (T5) use; `Builder.Set/SetSetting/Header` (T3, T6) match every collector; `facts.CollectorRun` fields (plan 1A T3) match what `Run` writes (T6); `WriteOptions` (T4) matches `Run` (T6); registry keys in plan 1A T4 match every `b.Set` key in T5 (`services.ssh.installed`, `services.ssh.active`, `services.telnet.installed`, `services.telnet.reachable`, `sockets.listening`, `sshd.collect_method`, `sshd.personas_collected`, `sshd.options.permit_root_login`, `files.etc_securetty`, `files.etc_securetty_lines`, `files.etc_passwd.{mode,uid,gid,acl_present}`, `accounts.login_defs.{pass_max_days,pass_min_days,pass_min_len}`, `accounts.users`, `walk.complete`).

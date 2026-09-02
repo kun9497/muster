@@ -243,7 +243,7 @@ mechanisms:                      # `when`이 성립하는 첫 메커니즘이 �
   - when:
       - { fact: files.etc_securetty, op: present }          # 레거시 폴백
     checks:
-      - { fact: files.etc_securetty.lines, op: none,
+      - { fact: files.etc_securetty_lines, op: none,
           where: { op: matches, expected: "^pts/" } }
 remediation:
   text_en: Set PermitRootLogin no in sshd_config(.d), validate with sshd -t, restart sshd.

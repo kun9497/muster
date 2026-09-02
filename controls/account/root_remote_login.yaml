@@ -23,7 +23,7 @@ mechanisms:
   - when:
       - { fact: files.etc_securetty, op: present }
     checks:
-      - { fact: files.etc_securetty.lines, op: none, where: { op: matches, expected: "^pts/" } }
+      - { fact: files.etc_securetty_lines, op: none, where: { op: matches, expected: "^pts/" } }
 remediation:
   text_en: Set PermitRootLogin no in a file under /etc/ssh/sshd_config.d/, validate with sshd -t, then restart sshd while keeping a second session open. Where /etc/securetty lists pts/* entries instead, remove those lines so no pseudo-terminal can be used for a securetty-gated root login.
   text_ko: /etc/ssh/sshd_config.d/ 아래 파일에 PermitRootLogin no 를 넣고 sshd -t 로 검증한 뒤, 다른 세션을 열어 둔 채 sshd 를 재시작합니다. 대신 /etc/securetty 에 pts/* 항목이 있다면 그 줄을 제거하여 securetty 로 통제되는 root 로그인에 가상 터미널을 쓸 수 없게 합니다.

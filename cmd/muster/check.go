@@ -141,11 +141,25 @@ func runCheck(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "muster: warning: check does not need root")
 	}
 
-	results := check.Evaluate(snap, set, reg, check.Options{})
+	opts := check.Options{}
+	results := check.Evaluate(snap, set, reg, opts)
 	cb := report.CheckBlock{
 		MusterVersion: version, Commit: commit,
 		ControlsVersion: set.Version, ControlsDigest: set.Digest,
 		SnapshotDigest: snap.Digest(), GuideEdition: "kisa-unix-2026",
+	}
+	// I5/R30: record the parameter values that were actually in force, for
+	// every control that declares any (spec §6.6, §9). encoding/json sorts
+	// map keys, so this stays byte-identical for identical input.
+	for i := range set.Controls {
+		c := &set.Controls[i]
+		if len(c.Params) == 0 {
+			continue
+		}
+		if cb.Params == nil {
+			cb.Params = make(map[string]map[string]any, len(set.Controls))
+		}
+		cb.Params[c.ID] = check.ParamValues(c, opts.Params[c.ID])
 	}
 	if snap.Run.ControlsDigest != "" && snap.Run.ControlsDigest != set.Digest {
 		fmt.Fprintf(stderr, "muster: warning: snapshot was collected with control set %s; evaluating with %s\n", snap.Run.ControlsVersion, set.Version)

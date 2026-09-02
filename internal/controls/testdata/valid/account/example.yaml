@@ -21,7 +21,7 @@ mechanisms:
       - { fact: sshd.options.permit_root_login, on: effective, persona: root, op: in, expected: "${allowed}" }
   - when: { fact: files.etc_securetty, op: present }
     checks:
-      - { fact: files.etc_securetty.lines, op: none, where: { op: matches, expected: "^pts/" } }
+      - { fact: files.etc_securetty_lines, op: none, where: { op: matches, expected: "^pts/" } }
 remediation:
   text_en: Set PermitRootLogin no.
   text_ko: PermitRootLogin no 로 설정합니다.
