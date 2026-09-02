@@ -17,8 +17,12 @@ type env struct {
 }
 
 // clauseOutcome is what one clause decided and the evidence it used.
+// HardFail is set by the caller as it folds clause outcomes together: it
+// marks that at least one clause failed on every side it selected, which no
+// side-mismatch degradation may soften (C2, spec §6.5 step 12).
 type clauseOutcome struct {
 	Holds        bool
+	HardFail     bool
 	Evidence     []Evidence
 	Observations []Observation
 	Degraded     string
@@ -80,7 +84,7 @@ func (e *env) evalSetting(cl controls.Clause, r facts.Resolved, expected any) cl
 	}
 	var degraded string
 	if cl.Persona != "" && !e.personas {
-		degraded = "personas not collected"
+		degraded = degradedPersonas
 	}
 	side := func(name string, env *facts.Envelope) (bool, Evidence, error) {
 		// R15/R16: a side that is nil (never collected) and a side that is
@@ -128,9 +132,9 @@ func (e *env) evalSetting(cl controls.Clause, r facts.Resolved, expected any) cl
 		out := clauseOutcome{Holds: rh && ph, Evidence: []Evidence{rev, pev}, Degraded: degraded}
 		switch {
 		case rh && !ph:
-			out.Degraded = "reverts on reboot"
+			out.Degraded = degradedRevertsOnReboot
 		case ph && !rh:
-			out.Degraded = "not applied"
+			out.Degraded = degradedNotApplied
 		}
 		return out
 	}

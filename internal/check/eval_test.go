@@ -56,6 +56,21 @@ func passMaxDaysControl(automation string) controls.Control {
 	}
 }
 
+// passwordPolicyControl checks two `both` settings at once, which is what
+// makes cross-clause degradation shadowing (C2) visible: one clause can fail
+// on both sides while another carries a side mismatch.
+func passwordPolicyControl() controls.Control {
+	return controls.Control{
+		ID: "muster.account.password_policy", Importance: "상", Category: "account", Automation: "auto", AbsentMeans: "fail",
+		RequiresFacts: ">=1",
+		Checks: []controls.Clause{
+			{Fact: "accounts.login_defs.pass_max_days", Op: "lte", Expected: 90},
+			{Fact: "accounts.login_defs.pass_min_days", Op: "gte", Expected: 1},
+		},
+		Remediation: &controls.Remediation{Risk: "none"},
+	}
+}
+
 // evidenceHasFact returns a verify func asserting r.Evidence names fact with
 // status (R25: the hard/unsupported ERROR and NOT_APPLICABLE paths must
 // carry evidence for the fact that actually screened, not just whatever
@@ -139,6 +154,9 @@ func TestDerivationTable(t *testing.T) {
 				if r.Mechanism != 2 {
 					t.Errorf("want mechanism 2 chosen, got %d", r.Mechanism)
 				}
+				// M10: the `when` clause that selected this mechanism is part
+				// of the decision, so its evidence must be kept.
+				evidenceHasFact("files.etc_securetty", facts.StatusOK)(t, r)
 			}},
 		{"5 no mechanism applies", `{"files":{"etc_securetty":{"status":"absent"}},"sshd":{"options":{"permit_root_login":{"effective":{"status":"absent"}}}}}`,
 			controls.Control{ID: "muster.account.root_remote_login", Importance: "상", Category: "account", Automation: "auto", AbsentMeans: "not_applicable", Remediation: &controls.Remediation{Risk: "lockout_risk"},
@@ -180,6 +198,90 @@ func TestDerivationTable(t *testing.T) {
 					t.Errorf("want Degraded=%q, got %q (%+v)", "reverts on reboot", r.Degraded, r)
 				}
 			}},
+		// C2: a clause failing on BOTH sides is a hard failure; another
+		// clause's side mismatch must not soften it into WARN (step 12).
+		{"12 hard failure is not shadowed by another clause's side mismatch",
+			`{"accounts":{"login_defs":{"pass_max_days":{"runtime":{"status":"ok","value":99999},"persisted":{"status":"ok","value":99999}},` +
+				`"pass_min_days":{"runtime":{"status":"ok","value":1},"persisted":{"status":"ok","value":0}}}}}`,
+			passwordPolicyControl(), FAIL, "",
+			func(t *testing.T, r Result) {
+				if !strings.Contains(r.Reason, "pass_max_days") {
+					t.Errorf("reason must name the clause that failed outright: %q", r.Reason)
+				}
+				if !strings.Contains(r.Reason, "reverts on reboot") {
+					t.Errorf("reason must keep the degradation as secondary: %q", r.Reason)
+				}
+				if r.Degraded != "reverts on reboot" {
+					t.Errorf("want Degraded=%q, got %q", "reverts on reboot", r.Degraded)
+				}
+			}},
+		{"12 side mismatch alone still warns when every failing clause is a mismatch",
+			`{"accounts":{"login_defs":{"pass_max_days":{"runtime":{"status":"ok","value":90},"persisted":{"status":"ok","value":90}},` +
+				`"pass_min_days":{"runtime":{"status":"ok","value":1},"persisted":{"status":"ok","value":0}}}}}`,
+			passwordPolicyControl(), WARN, "", nil},
+		// M11: the key is present; the side the clause selected is not.
+		{"6 selected side absent from the snapshot names the side",
+			`{"sshd":{"options":{"permit_root_login":{"effective":{"status":"ok","value":"no"}}}}}`,
+			func() controls.Control {
+				c := permitRootLoginControl("auto", "fail")
+				c.Checks = []controls.Clause{{Fact: "sshd.options.permit_root_login", On: "runtime", Op: "eq", Expected: "no"}}
+				return c
+			}(), ERROR, MissingFact,
+			func(t *testing.T, r Result) {
+				if !strings.Contains(r.Reason, "side runtime of sshd.options.permit_root_login is not present in this snapshot") {
+					t.Errorf("reason must name the missing side: %q", r.Reason)
+				}
+			}},
+		// M12: walk.complete carrying something that is not a bool is a type
+		// error, not "the walk did not finish".
+		{"10 non-bool walk.complete is a type error",
+			`{"walk":{"world_writable":{"status":"ok","value":[]},"complete":{"status":"ok","value":"yes"}}}`,
+			controls.Control{ID: "muster.file.world_writable", Importance: "상", Category: "file", Automation: "partial", AbsentMeans: "pass", Remediation: &controls.Remediation{Risk: "none"},
+				Checks: []controls.Clause{{Fact: "walk.world_writable", Op: "each", Subject: "path", Require: &controls.Clause{Field: "package_declared", Op: "eq", Expected: true}}}},
+			ERROR, InternalError,
+			func(t *testing.T, r Result) {
+				if !strings.Contains(r.Reason, "walk.complete") {
+					t.Errorf("reason must name the key: %q", r.Reason)
+				}
+			}},
+		// M12: a reason is user text; Go's %#v syntax must never appear in it.
+		{"6 type mismatch reason carries no Go syntax",
+			`{"services":{"telnet":{"reachable":{"status":"ok","value":{"a":1}}}}}`,
+			telnetControl("auto", "pass"), ERROR, InternalError,
+			func(t *testing.T, r Result) {
+				if strings.Contains(r.Reason, "interface {}") || strings.Contains(r.Reason, "map[string]") {
+					t.Errorf("reason must not leak Go syntax: %q", r.Reason)
+				}
+			}},
+		// S1/R34: step 13's parse fallback for a daemon-reported setting.
+		{"13 sshd parse fallback degrades a holding result to WARN",
+			`{"sshd":{"collect_method":{"status":"ok","value":"parse"},"personas_collected":{"status":"ok","value":true},` +
+				`"options":{"permit_root_login":{"effective":{"status":"ok","value":"no"}}}}}`,
+			permitRootLoginControl("auto", "fail"), WARN, "",
+			func(t *testing.T, r Result) {
+				if r.Degraded != degradedParseFallback {
+					t.Errorf("want Degraded=%q, got %q", degradedParseFallback, r.Degraded)
+				}
+				if !strings.Contains(r.Reason, "sshd -T unavailable") {
+					t.Errorf("reason must name the fallback: %q", r.Reason)
+				}
+			}},
+		{"13 sshd parse fallback leaves a failing result at FAIL",
+			`{"sshd":{"collect_method":{"status":"ok","value":"parse"},"personas_collected":{"status":"ok","value":true},` +
+				`"options":{"permit_root_login":{"effective":{"status":"ok","value":"yes"}}}}}`,
+			permitRootLoginControl("auto", "fail"), FAIL, "", nil},
+		// M10: applies_when evidence must survive absent_means, and a
+		// mechanism's `when` evidence must not be discarded.
+		{"5 no mechanism applies keeps applies_when evidence",
+			`{"services":{"ssh":{"installed":{"status":"ok","value":true}}},"files":{"etc_securetty":{"status":"absent"}},` +
+				`"sshd":{"options":{"permit_root_login":{"effective":{"status":"absent"}}}}}`,
+			controls.Control{ID: "muster.account.root_remote_login", Importance: "상", Category: "account", Automation: "auto", AbsentMeans: "manual", Remediation: &controls.Remediation{Risk: "lockout_risk"},
+				AppliesWhen: controls.ClauseList{{Fact: "services.ssh.installed", Op: "eq", Expected: true}},
+				Mechanisms: []controls.Mechanism{
+					{When: controls.ClauseList{{Fact: "sshd.options.permit_root_login", Op: "present"}}, Checks: []controls.Clause{{Fact: "sshd.options.permit_root_login", On: "effective", Op: "eq", Expected: "no"}}},
+					{When: controls.ClauseList{{Fact: "files.etc_securetty", Op: "present"}}, Checks: []controls.Clause{{Fact: "files.etc_securetty.lines", Op: "none", Where: &controls.Clause{Op: "matches", Expected: "^pts/"}}}},
+				}},
+			MANUAL, "", evidenceHasFact("services.ssh.installed", facts.StatusOK)},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

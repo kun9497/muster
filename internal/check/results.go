@@ -30,6 +30,27 @@ const (
 	InternalError    ReasonCode = "internal_error"
 )
 
+// The degradation vocabulary (spec §6.3, §6.5 step 13, §7.3). These are the
+// exact strings a Result's Degraded field carries; the evaluator compares
+// against these constants, never against a literal, so a reworded message
+// cannot silently change a verdict (C2).
+const (
+	// A `both` setting satisfied on the runtime side only.
+	degradedRevertsOnReboot = "reverts on reboot"
+	// A `both` setting satisfied on the persisted side only.
+	degradedNotApplied = "not applied"
+	// A persona clause judged against the global value.
+	degradedPersonas = "personas not collected"
+	// sshd options judged from muster's parse instead of the daemon's answer.
+	degradedParseFallback = "sshd -T unavailable; judged from parsed configuration"
+)
+
+// sideMismatch reports whether d is the "holds on one side only" degradation
+// of spec §6.3, the only kind that can soften a failing clause to WARN.
+func sideMismatch(d string) bool {
+	return d == degradedRevertsOnReboot || d == degradedNotApplied
+}
+
 // Evidence is one fact the verdict was decided on (D08).
 type Evidence struct {
 	Fact   string        `json:"fact"`

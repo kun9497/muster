@@ -89,6 +89,9 @@ func evalOne(e *env, c *controls.Control) (r Result) {
 				if out.Err != nil {
 					return fail(r, ERROR, InternalError, out.Err.Error())
 				}
+				// M10: the `when` clauses decide which mechanism judges the
+				// host, so their evidence is part of the record, not scratch.
+				r.Evidence = append(r.Evidence, out.Evidence...)
 				if !out.Holds {
 					holds = false
 					break
@@ -135,7 +138,16 @@ func evalOne(e *env, c *controls.Control) (r Result) {
 			res.Evidence = append(res.Evidence, ev)
 			return res
 		case wc.Envelope.Status == facts.StatusOK:
-			if done, _ := wc.Envelope.Value.(bool); !done {
+			done, isBool := wc.Envelope.Value.(bool)
+			if !isBool {
+				// M12: a walk.complete that is not a bool is a malformed fact,
+				// not a walk that ran out of budget (spec §6.3: a type
+				// mismatch is an error, never a guess).
+				res := fail(r, ERROR, InternalError, fmt.Sprintf("walk.complete: expected a bool, got %v", wc.Envelope.Value))
+				res.Evidence = append(res.Evidence, ev)
+				return res
+			}
+			if !done {
 				res := fail(r, ERROR, WalkIncomplete, "the deep walk did not finish within its budget")
 				res.Evidence = append(res.Evidence, ev)
 				return res
@@ -171,8 +183,13 @@ func evalOne(e *env, c *controls.Control) (r Result) {
 		all.Observations = append(all.Observations, out.Observations...)
 		if !out.Holds {
 			all.Holds = false
-			if all.Degraded == "" {
-				all.Degraded = out.Degraded
+			// C2: a clause that fails without a side-mismatch degradation
+			// fails outright — on every side the clause selected. Recording
+			// it separately from Degraded is what stops another clause's
+			// "holds on one side only" from softening the whole control to
+			// WARN (spec §6.5 step 12).
+			if !sideMismatch(out.Degraded) {
+				all.HardFail = true
 			}
 			all.Err = nil
 			if r.Reason == "" {
@@ -183,7 +200,34 @@ func evalOne(e *env, c *controls.Control) (r Result) {
 			all.Degraded = out.Degraded
 		}
 	}
+	// Step 13 (S1/R34): sshd options judged from muster's parse of the files
+	// rather than the daemon's own answer are a degraded judgment.
+	if all.Degraded == "" && e.parseFallback(checks) {
+		all.Degraded = degradedParseFallback
+	}
 	return finish(r, c, all)
+}
+
+// parseFallback reports whether any clause reads a daemon-reported sshd
+// option while the snapshot says the options were obtained by parsing the
+// configuration instead of asking sshd (spec §5.3, §6.5 step 13, §7.3).
+func (e *env) parseFallback(cls []controls.Clause) bool {
+	reads := false
+	for _, cl := range cls {
+		if strings.HasPrefix(cl.Fact, "sshd.options.") {
+			reads = true
+			break
+		}
+	}
+	if !reads {
+		return false
+	}
+	res, err := e.reg.Resolve(e.snap, "sshd.collect_method")
+	if err != nil || res.Envelope == nil || res.Envelope.Status != facts.StatusOK {
+		return false
+	}
+	method, _ := res.Envelope.Value.(string)
+	return method == "parse"
 }
 
 // finish applies steps 11-14 to the combined clause outcome.
@@ -194,24 +238,29 @@ func finish(r Result, c *controls.Control, all clauseOutcome) Result {
 		return fail(r, ERROR, InternalError, all.Err.Error())
 	}
 	if !all.Holds {
-		if all.Degraded != "" {
-			r.Degraded = all.Degraded
-			if all.Degraded == "reverts on reboot" || all.Degraded == "not applied" {
-				r.Status = WARN
-				r.Reason = "setting holds on one side only: " + all.Degraded
-				return r
-			}
+		r.Degraded = all.Degraded
+		// C2: "holds on one side only" is a verdict of its own only when
+		// every failing clause was a side mismatch. One clause failing on
+		// every side it selected is step 12, and the degradation survives
+		// as secondary text rather than as the verdict.
+		if !all.HardFail && sideMismatch(all.Degraded) {
+			r.Status = WARN
+			r.Reason = "setting holds on one side only: " + all.Degraded
+			return r
 		}
 		if c.Automation == "partial" {
 			r.Status = WARN
 			if r.Reason == "" {
 				r.Reason = "observations need human review"
 			}
-			return r
+		} else {
+			r.Status = FAIL
+			if r.Reason == "" {
+				r.Reason = "a clause does not hold"
+			}
 		}
-		r.Status = FAIL
-		if r.Reason == "" {
-			r.Reason = "a clause does not hold"
+		if all.Degraded != "" {
+			r.Reason += "; collection was degraded: " + all.Degraded
 		}
 		return r
 	}
@@ -263,7 +312,10 @@ func (e *env) worstStatus(cls []controls.Clause) screening {
 		if on != "both" {
 			side := selectSide(res.Setting, on)
 			if side == nil {
-				side = facts.Missing(cl.Fact)
+				// M11: the key is in the snapshot; the side this clause
+				// selected is not. Say which side, not "key X is missing".
+				return screening{hard: true, status: facts.StatusMissing, code: MissingFact,
+					reason: fmt.Sprintf("side %s of %s is not present in this snapshot", on, cl.Fact)}
 			}
 			if s, hard := screenEnvelope(cl.Fact, side); hard {
 				return s
@@ -382,7 +434,9 @@ func (e *env) screen(cls []controls.Clause, r *Result, _ func(screening) (Status
 // FAIL/WARN a control can end in must carry evidence, so the caller's keys
 // (the facts the decision was based on) are attached before the switch.
 func (e *env) absentMeans(r Result, c *controls.Control, keys []string, why string) Result {
-	r.Evidence = e.evidenceFor(keys)
+	// M10: append, never assign — whatever applies_when and the mechanism
+	// `when` clauses already recorded is part of the same decision.
+	r.Evidence = append(r.Evidence, e.evidenceFor(keys)...)
 	switch c.AbsentMeans {
 	case "pass":
 		r.Status, r.Reason = PASS, "absent counts as pass: "+why

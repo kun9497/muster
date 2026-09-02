@@ -101,11 +101,11 @@ func compare(op string, actual, expected any, typ string) (bool, error) {
 	case "bool":
 		a, ok := actual.(bool)
 		if !ok {
-			return false, fmt.Errorf("actual %#v is not a bool", actual)
+			return false, fmt.Errorf("actual %v is not a bool", actual)
 		}
 		e, ok := expected.(bool)
 		if !ok {
-			return false, fmt.Errorf("expected %#v is not a bool", expected)
+			return false, fmt.Errorf("expected %v is not a bool", expected)
 		}
 		switch op {
 		case "eq":
@@ -117,13 +117,13 @@ func compare(op string, actual, expected any, typ string) (bool, error) {
 	case "string":
 		a, ok := actual.(string)
 		if !ok {
-			return false, fmt.Errorf("actual %#v is not a string", actual)
+			return false, fmt.Errorf("actual %v is not a string", actual)
 		}
 		switch op {
 		case "eq", "ne", "contains", "matches":
 			e, ok := expected.(string)
 			if !ok {
-				return false, fmt.Errorf("expected %#v is not a string", expected)
+				return false, fmt.Errorf("expected %v is not a string", expected)
 			}
 			switch op {
 			case "eq":
@@ -143,7 +143,7 @@ func compare(op string, actual, expected any, typ string) (bool, error) {
 			return inList(op, a, expected, func(x any) (any, error) {
 				s, ok := x.(string)
 				if !ok {
-					return nil, fmt.Errorf("%#v is not a string", x)
+					return nil, fmt.Errorf("%v is not a string", x)
 				}
 				return s, nil
 			})
@@ -156,7 +156,7 @@ func compare(op string, actual, expected any, typ string) (bool, error) {
 func compareList(op string, actual, expected any) (bool, error) {
 	xs, ok := actual.([]any)
 	if !ok {
-		return false, fmt.Errorf("actual %#v is not a list", actual)
+		return false, fmt.Errorf("actual %v is not a list", actual)
 	}
 	// Validate all elements are strings for contains and matches.
 	for i, x := range xs {
@@ -168,7 +168,7 @@ func compareList(op string, actual, expected any) (bool, error) {
 	case "eq", "ne":
 		ys, ok := expected.([]any)
 		if !ok {
-			return false, fmt.Errorf("expected %#v is not a list", expected)
+			return false, fmt.Errorf("expected %v is not a list", expected)
 		}
 		eq := reflect.DeepEqual(xs, ys)
 		if op == "eq" {
@@ -178,7 +178,7 @@ func compareList(op string, actual, expected any) (bool, error) {
 	case "contains":
 		e, ok := expected.(string)
 		if !ok {
-			return false, fmt.Errorf("expected %#v is not a string", expected)
+			return false, fmt.Errorf("expected %v is not a string", expected)
 		}
 		for _, x := range xs {
 			if x == e {
@@ -189,7 +189,7 @@ func compareList(op string, actual, expected any) (bool, error) {
 	case "matches":
 		pat, ok := expected.(string)
 		if !ok {
-			return false, fmt.Errorf("expected %#v is not a pattern", expected)
+			return false, fmt.Errorf("expected %v is not a pattern", expected)
 		}
 		re, err := regexp.Compile(pat)
 		if err != nil {
@@ -209,7 +209,7 @@ func compareList(op string, actual, expected any) (bool, error) {
 func inList(op string, a any, expected any, conv func(any) (any, error)) (bool, error) {
 	xs, ok := expected.([]any)
 	if !ok {
-		return false, fmt.Errorf("expected %#v is not a list", expected)
+		return false, fmt.Errorf("expected %v is not a list", expected)
 	}
 	found := false
 	for _, x := range xs {
@@ -239,5 +239,5 @@ func toInt(v any) (int64, error) {
 		}
 		return int64(n), nil
 	}
-	return 0, fmt.Errorf("%#v is not an int", v)
+	return 0, fmt.Errorf("%v is not an int", v)
 }
