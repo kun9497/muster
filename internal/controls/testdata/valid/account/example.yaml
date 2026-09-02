@@ -1,0 +1,32 @@
+id: muster.account.example
+title_en: Example control
+title_ko: 예시 컨트롤
+description_en: Exercises every schema field.
+description_ko: 스키마의 모든 필드를 사용합니다.
+category: account
+importance: 상
+automation: auto
+references:
+  kisa: { "2026": ["U-01"], "2021": ["U-01"] }
+  cis: [{ benchmark: ubuntu-22.04, version: "2.0.0", rec: "5.1.20" }]
+requires_facts: ">=1"
+applies_when: { fact: services.ssh.installed, op: eq, expected: true }
+absent_means: not_applicable
+params:
+  allowed: { type: list<string>, default: ["no", "prohibit-password"], description: Allowed values }
+mechanisms:
+  - when:
+      - { fact: sshd.options.permit_root_login, op: present }
+    checks:
+      - { fact: sshd.options.permit_root_login, on: effective, persona: root, op: in, expected: "${allowed}" }
+  - when: { fact: files.etc_securetty, op: present }
+    checks:
+      - { fact: files.etc_securetty.lines, op: none, where: { op: matches, expected: "^pts/" } }
+remediation:
+  text_en: Set PermitRootLogin no.
+  text_ko: PermitRootLogin no 로 설정합니다.
+  risk: lockout_risk
+  idempotent: true
+  script: "printf 'PermitRootLogin no\n' > /etc/ssh/sshd_config.d/90-muster.conf && sshd -t"
+  rollback: rm -f /etc/ssh/sshd_config.d/90-muster.conf && sshd -t
+decision: D09

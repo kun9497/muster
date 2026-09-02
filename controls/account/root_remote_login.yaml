@@ -1,0 +1,35 @@
+id: muster.account.root_remote_login
+title_en: Root cannot log in directly over SSH
+title_ko: root 계정이 SSH로 직접 로그인할 수 없다
+description_en: The SSH daemon's effective PermitRootLogin must not allow a root password login. Where sshd is absent, the legacy /etc/securetty list must not allow pseudo-terminals.
+description_ko: sshd의 유효 PermitRootLogin 값이 root 패스워드 로그인을 허용하면 안 됩니다. sshd가 없는 경우 구형 /etc/securetty 목록이 가상 터미널을 허용하면 안 됩니다.
+category: account
+importance: 상
+automation: auto
+references:
+  kisa: { "2026": ["U-01"], "2021": ["U-01"] }
+  cis: [{ benchmark: ubuntu-22.04, version: "2.0.0", rec: "5.1.20" }]
+requires_facts: ">=1"
+applies_when:
+  - { fact: services.ssh.installed, op: eq, expected: true }
+absent_means: not_applicable
+params:
+  allowed: { type: list<string>, default: ["no", "prohibit-password"], description: PermitRootLogin values that count as disabled }
+mechanisms:
+  - when:
+      - { fact: sshd.options.permit_root_login, op: present }
+    checks:
+      - { fact: sshd.options.permit_root_login, on: effective, persona: root, op: in, expected: "${allowed}" }
+  - when:
+      - { fact: files.etc_securetty, op: present }
+    checks:
+      - { fact: files.etc_securetty.lines, op: none, where: { op: matches, expected: "^pts/" } }
+remediation:
+  text_en: Set PermitRootLogin no in a file under /etc/ssh/sshd_config.d/, validate with sshd -t, then restart sshd while keeping a second session open.
+  text_ko: /etc/ssh/sshd_config.d/ 아래 파일에 PermitRootLogin no 를 넣고 sshd -t 로 검증한 뒤, 다른 세션을 열어 둔 채 sshd 를 재시작합니다.
+  risk: lockout_risk
+  idempotent: true
+  script: |
+    printf 'PermitRootLogin no\n' > /etc/ssh/sshd_config.d/90-muster.conf && sshd -t
+  rollback: rm -f /etc/ssh/sshd_config.d/90-muster.conf && sshd -t
+decision: D09
