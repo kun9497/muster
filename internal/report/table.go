@@ -101,7 +101,7 @@ func WriteTable(w io.Writer, r *Report, o TableOptions) error {
 
 	idWidth := 12
 	for _, row := range r.Results {
-		if l := len(row.ID); l > idWidth {
+		if l := displayWidth(row.ID); l > idWidth {
 			idWidth = l
 		}
 	}
@@ -124,7 +124,7 @@ func WriteTable(w io.Writer, r *Report, o TableOptions) error {
 		}
 		if row.Waiver != nil {
 			if row.Waiver.Applied {
-				fmt.Fprintf(w, "    waived: %s (expires %s)\n", escape(row.Waiver.Reason), orNone(row.Waiver.Expires))
+				fmt.Fprintf(w, "    waived: %s (expires %s)\n", escape(row.Waiver.Reason), escape(orNone(row.Waiver.Expires)))
 			} else {
 				fmt.Fprintf(w, "    waiver not applied: %s\n", escape(row.Waiver.NotAppliedBecause))
 			}
@@ -141,7 +141,7 @@ func WriteTable(w io.Writer, r *Report, o TableOptions) error {
 				}
 				failing++
 				if shown < o.MaxObservations {
-					fmt.Fprintf(w, "    %s: expected %v, actual %v (%s)\n", escape(ob.Subject), ob.Expected, escape(fmt.Sprint(ob.Actual)), ob.Verdict)
+					fmt.Fprintf(w, "    %s: expected %v, actual %v (%s)\n", escape(ob.Subject), escape(fmt.Sprint(ob.Expected)), escape(fmt.Sprint(ob.Actual)), ob.Verdict)
 					shown++
 				}
 			}

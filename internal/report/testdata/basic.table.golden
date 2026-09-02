@@ -4,12 +4,12 @@ manual review 2  ·  undecidable error 1 / n-a 0 / waived 1  ·  facts failed 1 
 
 WAIVED         high   muster.account.password_policy    
     waived: r (expires 2026-09-20)
-FAIL           high   muster.account.root_remote_login  
+FAIL           high   muster.account.root_remote_login  원격 root 로그인 제한
     reason: clause does not hold
     sshd.options.permit_root_login@effective = yes  (/etc/ssh/sshd_config:40)
 ERROR          high   muster.file.passwd_permissions    
     reason: [permission_denied] needs root
-WARN           high   muster.file.world_writable        
+WARN           high   muster.file.world_writable        World-writable files must not exist in system d…
     reason: observations need human review
     file:/var/tmp/x: expected true, actual false (fail)
 PASS           medium muster.service.telnet_disabled    
