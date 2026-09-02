@@ -14,8 +14,11 @@ build:
 test:
 	go test -race ./...
 
+# `gofmt -l` exits 0 whether or not it lists a file, so the target has to
+# check for output the way CI does, or a badly formatted tree lints clean.
 lint:
-	gofmt -l . && go vet ./...
+	@test -z "$$(gofmt -l .)" || { gofmt -l .; exit 1; }
+	go vet ./...
 
 lint-controls:
 	go run $(PKG) controls lint

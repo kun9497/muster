@@ -1,1 +1,1 @@
-{"_expect":{"reason_code":"walk_incomplete","exit_code":2},"schema_version":1,"run":{"deep":true},"facts":{"walk":{"world_writable":{"status":"ok","value":[]},"complete":{"status":"ok","value":false}}}}
+{"synthetic": true, "_expect":{"reason_code":"walk_incomplete","exit_code":2},"schema_version":1,"run":{"deep":true},"facts":{"walk":{"world_writable":{"status":"ok","value":[]},"complete":{"status":"ok","value":false}}}}

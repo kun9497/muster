@@ -1,1 +1,1 @@
-{"_expect":{"exit_code":0},"schema_version":1,"run":{"deep":true},"facts":{"walk":{"world_writable":{"status":"ok","value":[{"path":"/opt/app/data","sticky":false,"package_declared":false}]},"complete":{"status":"ok","value":true}}}}
+{"synthetic": true, "_expect":{"exit_code":0},"schema_version":1,"run":{"deep":true},"facts":{"walk":{"world_writable":{"status":"ok","value":[{"path":"/opt/app/data","sticky":false,"package_declared":false}]},"complete":{"status":"ok","value":true}}}}

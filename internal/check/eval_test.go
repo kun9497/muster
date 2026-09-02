@@ -369,6 +369,38 @@ func TestReasonForEachAndNoneNamesTheSubClauseNotNil(t *testing.T) {
 	}
 }
 
+// M10 follow-on: keeping a mechanism's `when` evidence must not print the
+// same fact reading twice, because a `when` clause and the checks it selects
+// usually read the same key.
+func TestEvidenceDoesNotRepeatTheSameReading(t *testing.T) {
+	c := controls.Control{
+		ID: "muster.account.root_remote_login", Importance: "상", Category: "account", Automation: "auto", AbsentMeans: "manual",
+		Remediation: &controls.Remediation{Risk: "lockout_risk"},
+		AppliesWhen: controls.ClauseList{{Fact: "services.ssh.installed", Op: "eq", Expected: true}},
+		Mechanisms: []controls.Mechanism{
+			{When: controls.ClauseList{{Fact: "sshd.options.permit_root_login", Op: "present"}},
+				Checks: []controls.Clause{{Fact: "sshd.options.permit_root_login", On: "effective", Op: "eq", Expected: "no"}}},
+		}}
+	res := Evaluate(snap(t, `{"services":{"ssh":{"installed":{"status":"ok","value":true}}},"sshd":{"options":{"permit_root_login":{"effective":{"status":"ok","value":"yes"}}}}}`),
+		one(c), reg, Options{})
+	r := res[0]
+	if r.Status != FAIL {
+		t.Fatalf("status=%s, want FAIL: %+v", r.Status, r)
+	}
+	seen := map[string]int{}
+	for _, ev := range r.Evidence {
+		seen[ev.Fact+"@"+ev.Side]++
+	}
+	for k, n := range seen {
+		if n > 1 {
+			t.Errorf("evidence repeats %s %d times: %+v", k, n, r.Evidence)
+		}
+	}
+	// The `when` evidence is still what keeps the fact in the record.
+	evidenceHasFact("sshd.options.permit_root_login", facts.StatusOK)(t, r)
+	evidenceHasFact("services.ssh.installed", facts.StatusOK)(t, r)
+}
+
 func TestEvaluateIsolatesPanics(t *testing.T) {
 	customs["__panic"] = func(e *env, c *controls.Control) clauseOutcome { panic("boom") }
 	defer delete(customs, "__panic")

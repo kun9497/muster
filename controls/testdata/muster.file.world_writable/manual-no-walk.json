@@ -1,1 +1,1 @@
-{"schema_version":1,"run":{"deep":false},"facts":{"walk":{"world_writable":{"status":"absent"}}}}
+{"synthetic": true, "schema_version":1,"run":{"deep":false},"facts":{"walk":{"world_writable":{"status":"absent"}}}}

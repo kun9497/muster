@@ -1,6 +1,11 @@
 # build output
 /bin/
 /dist/
+# `go build ./cmd/muster` and `go test -c` drop these at the repository root
+/muster
+/muster.exe
+*.test
+*.test.exe
 
 # IDE and editor state
 /.idea/

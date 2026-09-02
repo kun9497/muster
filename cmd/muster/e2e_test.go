@@ -3,8 +3,92 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 )
+
+// M15/spec §11: every snapshot in this repository is synthetic and says so,
+// so nobody has to guess whether a fixture came off somebody's host (D02).
+func TestEndToEndFixturesAreMarkedSynthetic(t *testing.T) {
+	files, err := filepath.Glob(filepath.Join("testdata", "*.json"))
+	if err != nil || len(files) == 0 {
+		t.Fatalf("no fixtures found: %v", err)
+	}
+	for _, f := range files {
+		raw, err := os.ReadFile(f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var meta struct {
+			Synthetic *bool `json:"synthetic"`
+		}
+		if err := json.Unmarshal(raw, &meta); err != nil {
+			t.Fatalf("%s: %v", f, err)
+		}
+		if meta.Synthetic == nil || !*meta.Synthetic {
+			t.Errorf(`%s: fixture must carry a top-level "synthetic": true marker`, f)
+		}
+	}
+}
+
+// M16: waivers end to end — the exit code drops from 1 to 0, the result
+// counts the waiver, the table shows a WAIVED row, and every warning is on
+// stderr (spec §6.7, §7.4).
+func TestCheckEndToEndWaiversTurnFailIntoWaived(t *testing.T) {
+	var out, errb bytes.Buffer
+	code := run([]string{"check", "--facts", "testdata/full-fail.json", "--waivers", "testdata/waivers.yaml", "--format", "json"}, &out, &errb)
+	if code != exitOK {
+		t.Fatalf("exit %d, want 0 once the only FAIL is waived; stderr %q", code, errb.String())
+	}
+	assertStatuses(t, out.Bytes(), map[string]string{
+		"muster.account.root_remote_login": "WAIVED",
+		"muster.account.password_policy":   "PASS",
+	})
+	var rep struct {
+		Check struct {
+			Waivers struct {
+				Path    string `json:"path"`
+				Digest  string `json:"digest"`
+				Applied int    `json:"applied"`
+				Unknown int    `json:"unknown"`
+			} `json:"waivers"`
+		} `json:"check"`
+		Summary struct {
+			Undecidable struct {
+				Waived int `json:"waived"`
+			} `json:"undecidable"`
+		} `json:"summary"`
+	}
+	if err := json.Unmarshal(out.Bytes(), &rep); err != nil {
+		t.Fatal(err)
+	}
+	if rep.Check.Waivers.Applied != 1 || rep.Check.Waivers.Unknown != 1 {
+		t.Errorf("waiver tally applied=%d unknown=%d, want 1 and 1", rep.Check.Waivers.Applied, rep.Check.Waivers.Unknown)
+	}
+	if rep.Check.Waivers.Path == "" || !strings.HasPrefix(rep.Check.Waivers.Digest, "sha256:") {
+		t.Errorf("the result must name the waiver file and its digest: %+v", rep.Check.Waivers)
+	}
+	if rep.Summary.Undecidable.Waived != 1 {
+		t.Errorf("summary must count the waived control: %d", rep.Summary.Undecidable.Waived)
+	}
+	// The unknown-control warning is on stderr, never on stdout (spec §7.4).
+	if !strings.Contains(errb.String(), "unknown control") {
+		t.Errorf("stderr %q lacks the unknown-control warning", errb.String())
+	}
+	if strings.Contains(out.String(), "warning") {
+		t.Errorf("stdout must carry the report only: %s", out.String())
+	}
+
+	var table, tableErr bytes.Buffer
+	if code := run([]string{"check", "--facts", "testdata/full-fail.json", "--waivers", "testdata/waivers.yaml", "--color", "never"}, &table, &tableErr); code != exitOK {
+		t.Fatalf("exit %d, want 0; stderr %q", code, tableErr.String())
+	}
+	if !strings.Contains(table.String(), "WAIVED") || !strings.Contains(table.String(), "migration to key-only access") {
+		t.Errorf("table must show the WAIVED row and its reason:\n%s", table.String())
+	}
+}
 
 // assertStatuses parses a --format json report and checks each named
 // control's status (R26).

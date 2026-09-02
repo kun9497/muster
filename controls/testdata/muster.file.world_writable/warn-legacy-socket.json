@@ -1,1 +1,1 @@
-{"schema_version":1,"run":{"deep":true},"facts":{"walk":{"world_writable":{"status":"ok","value":[{"path":"/var/tmp/legacy.sock","sticky":false,"package_declared":false},{"path":"/tmp","sticky":true,"package_declared":true}]},"complete":{"status":"ok","value":true}}}}
+{"synthetic": true, "schema_version":1,"run":{"deep":true},"facts":{"walk":{"world_writable":{"status":"ok","value":[{"path":"/var/tmp/legacy.sock","sticky":false,"package_declared":false},{"path":"/tmp","sticky":true,"package_declared":true}]},"complete":{"status":"ok","value":true}}}}

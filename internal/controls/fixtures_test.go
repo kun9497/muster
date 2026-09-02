@@ -33,14 +33,23 @@ func loadFixture(t *testing.T, path string) (*facts.Snapshot, expect) {
 		t.Fatal(err)
 	}
 	var meta struct {
-		Expect expect `json:"_expect"`
+		Expect    expect `json:"_expect"`
+		Synthetic *bool  `json:"synthetic"`
 	}
 	json.Unmarshal(raw, &meta)
+	// Spec §11 and CLAUDE.md: a fixture is captured from a public image with
+	// a provenance header, or it is synthetic and says so. Every fixture in
+	// this repository is synthetic (D02).
+	if meta.Synthetic == nil || !*meta.Synthetic {
+		t.Errorf(`%s: fixture must carry a top-level "synthetic": true marker`, path)
+	}
 	var tree map[string]any
 	if err := json.Unmarshal(raw, &tree); err != nil {
 		t.Fatalf("%s: %v", path, err)
 	}
 	delete(tree, "_expect")
+	// "synthetic" is deliberately left in: facts.Load must ignore a top-level
+	// key it does not know, the same way a real snapshot may gain one.
 	cleaned, _ := json.Marshal(tree)
 	s, err := facts.Load(strings.NewReader(string(cleaned)))
 	if err != nil {
@@ -129,6 +138,11 @@ func checkInvariants(t *testing.T, name string, r check.Result) {
 	case check.MANUAL:
 		if r.Reason == "" {
 			t.Errorf("%s: MANUAL without reason", name)
+		}
+		// Spec §11: "MANUAL carries evidence" — a human asked to decide must
+		// be shown the facts the engine could read.
+		if len(r.Evidence) == 0 && len(r.Observations) == 0 {
+			t.Errorf("%s: MANUAL without evidence or observations: %+v", name, r)
 		}
 	case check.NotApplicable:
 		if r.Reason == "" {

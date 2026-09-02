@@ -1,0 +1,7 @@
+# Synthetic waiver file for the end-to-end test (spec §6.7).
+waivers:
+  - control: muster.account.root_remote_login
+    reason: migration to key-only access is scheduled for 2026-Q4
+    expires: 2099-12-31
+  - control: muster.account.no_such_control
+    reason: names a control id the set does not carry, so the run must warn

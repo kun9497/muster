@@ -1,1 +1,1 @@
-{"schema_version":1,"run":{},"facts":{"files":{"etc_passwd":{"mode":{"status":"absent"},"uid":{"status":"absent"},"gid":{"status":"absent"},"acl_present":{"status":"absent"}}}}}
+{"synthetic": true, "schema_version":1,"run":{},"facts":{"files":{"etc_passwd":{"mode":{"status":"absent"},"uid":{"status":"absent"},"gid":{"status":"absent"},"acl_present":{"status":"absent"}}}}}

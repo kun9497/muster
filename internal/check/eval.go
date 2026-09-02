@@ -23,7 +23,29 @@ func Evaluate(snap *facts.Snapshot, set *controls.Set, reg *facts.Registry, opts
 	for i := range set.Controls {
 		c := &set.Controls[i]
 		e := &env{snap: snap, reg: reg, params: ParamValues(c, opts.Params[c.ID]), personas: personas}
-		out = append(out, evalOne(e, c))
+		r := evalOne(e, c)
+		r.Evidence = dedupeEvidence(r.Evidence)
+		out = append(out, r)
+	}
+	return out
+}
+
+// dedupeEvidence keeps the first of each repeated fact reading. A mechanism's
+// `when` clause and the checks it selects usually read the same key, and both
+// record evidence (M10); the reader should see that key once.
+func dedupeEvidence(evs []Evidence) []Evidence {
+	if len(evs) < 2 {
+		return evs
+	}
+	seen := make(map[string]bool, len(evs))
+	out := make([]Evidence, 0, len(evs))
+	for _, ev := range evs {
+		key := fmt.Sprintf("%s\x00%s\x00%s\x00%v", ev.Fact, ev.Side, ev.Status, ev.Value)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		out = append(out, ev)
 	}
 	return out
 }
