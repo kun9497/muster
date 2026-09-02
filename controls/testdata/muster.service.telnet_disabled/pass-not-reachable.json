@@ -1,0 +1,1 @@
+{"schema_version":1,"run":{},"facts":{"services":{"telnet":{"installed":{"status":"ok","value":true},"reachable":{"status":"ok","value":false,"source":{"kind":"command","cmd":"/usr/bin/systemctl show telnet.socket"}}}}}}

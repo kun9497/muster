@@ -239,7 +239,7 @@ mechanisms:                      # first mechanism whose `when` holds is the one
       - { fact: sshd.options.permit_root_login, op: present }
     checks:
       - { fact: sshd.options.permit_root_login, on: effective, persona: root,
-          op: in, expected: ${allowed} }
+          op: in, expected: "${allowed}" }
   - when:
       - { fact: files.etc_securetty, op: present }          # legacy fallback
     checks:
@@ -311,6 +311,8 @@ The rows below are evaluated in order and the first that applies decides. Fact s
 | 12 | a clause fails | `FAIL` |
 | 13 | all clauses hold but collection was degraded (parse fallback for a daemon-reported setting, personas requested but not collected, firewall confidence below full, a remote NSS source for account facts) | `WARN` naming the degradation |
 | 14 | all clauses hold | `PASS` |
+
+The evaluator runs the walk gate (steps 9–10) before the fact-status screening (steps 6–8) for walk-based controls, so a walk that was not run yields `MANUAL`, not `ERROR` for the absent walk facts.
 
 Waivers are applied after the table, to `FAIL` and `WARN` only: a matching, valid waiver turns the result into `WAIVED`, counted and shown. A waiver never applies to `ERROR`, `NOT_APPLICABLE` or `MANUAL`; when one matches such a control it is recorded as not applied, with the reason, and the exit code is unchanged.
 
@@ -423,7 +425,7 @@ Against the 2026 list this gives **51 auto, 7 partial, 9 deferred, 0 manual-only
 
 - `U-01` (sshd, `mechanisms`, `persona`): `sshd -T` global values only, `personas_collected: false`, no include tracing — so the control evaluates and reports `WARN` (degraded) until stage 2 adds personas.
 - `U-02` (password policy, two-home settings, `params`): `login.defs` and per-account `shadow` ageing fields; the pwquality clauses join in stage 2 with the PAM collector.
-- `U-16` (`/etc/passwd`, permission fact): mode, owner, group and `acl_present` from the ACL xattr; ACL entries are parsed in stage 2, so a file with an ACL present is `WARN` in stage 1.
+- `U-16` (`/etc/passwd`, permission fact): mode, owner, group and `acl_present` from the ACL xattr; ACL entries are parsed in stage 2, so a file with an ACL present is `FAIL` in stage 1 with the reason naming the unparsed ACL.
 - `U-52` (Telnet, service normalisation, `absent_means: pass`): `systemctl show` for the mapped units and listening sockets from `/proc/net/tcp`; socket-activation and `masked`/`static` handling complete in stage 2.
 - `U-25` (world-writable, walk, `each`, partial): judged only against synthetic fixtures in stage 1 — the walk that populates `walk.world_writable` arrives in stage 3, so on a real stage-1 snapshot U-25 is `MANUAL` ("run collect --deep"). Its purpose in stage 1 is to fix the `each`, observation and subject-waiver contracts.
 

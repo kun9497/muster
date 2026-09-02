@@ -1,0 +1,1 @@
+{"schema_version":1,"run":{"deep":true},"facts":{"walk":{"world_writable":{"status":"ok","value":[{"path":"/tmp","sticky":true,"package_declared":true},{"path":"/var/lib/x/spool","sticky":false,"package_declared":true}]},"complete":{"status":"ok","value":true}}}}

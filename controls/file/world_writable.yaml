@@ -1,0 +1,24 @@
+id: muster.file.world_writable
+title_en: No unexpected world-writable files
+title_ko: 예상치 못한 world-writable 파일이 없다
+description_en: World-writable files without the sticky bit that no package declares that way need a human decision. Requires the deep walk.
+description_ko: sticky bit 가 없고 어떤 패키지도 그렇게 배포하지 않은 world-writable 파일은 사람의 판단이 필요합니다. deep walk 가 필요합니다.
+category: file
+importance: 상
+automation: partial
+references:
+  kisa: { "2026": ["U-25"], "2021": ["U-15"] }
+requires_facts: ">=1"
+absent_means: pass
+checks:
+  - fact: walk.world_writable
+    op: each
+    subject: path
+    where:   { field: sticky, op: eq, expected: false }
+    require: { field: package_declared, op: eq, expected: true }
+remediation:
+  text_en: Review each listed path; remove the world-writable bit with chmod o-w unless the application requires it, and record a waiver with the reason if it does.
+  text_ko: 나열된 경로를 검토합니다. 애플리케이션이 요구하지 않으면 chmod o-w 로 world-writable 비트를 제거하고, 요구한다면 사유를 적은 waiver 를 남깁니다.
+  risk: none
+  idempotent: true
+decision: D20

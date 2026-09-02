@@ -1,0 +1,17 @@
+{"schema_version":1,
+ "run":{"muster_version":"0.1.0","commit":"abc1234","controls_version":"kisa-unix-2026+2026.09.02","controls_digest":"","guide_edition":"kisa-unix-2026",
+        "collected_at":"2026-09-02T06:00:00Z","host":{"hostname":"fixture-host","os_release":{"id":"ubuntu","version_id":"22.04","family":"debian"}},
+        "euid":0,"capabilities":[],"env":{"container":"none","virt":"kvm","has_systemd":true,"sysctl_writable":true},
+        "collectors":[{"name":"services","status":"ok","ms":3},{"name":"sshd","status":"ok","ms":41,"cmd":"/usr/sbin/sshd -T"},{"name":"files","status":"ok","ms":1},{"name":"accounts","status":"ok","ms":2}],
+        "redaction":{"profile":"default","include_secrets":false},"deep":false,"complete":true,"partial_failures":[]},
+ "facts":{
+  "services":{"ssh":{"installed":{"status":"ok","value":true},"active":{"status":"ok","value":true}},
+              "telnet":{"installed":{"status":"ok","value":false},"reachable":{"status":"absent"}}},
+  "sshd":{"collect_method":{"status":"ok","value":"T"},"personas_collected":{"status":"ok","value":true},
+          "options":{"permit_root_login":{"effective":{"status":"ok","value":"yes","source":{"kind":"file","path":"/etc/ssh/sshd_config","line":40,"raw":"PermitRootLogin yes"}}}}},
+  "files":{"etc_passwd":{"mode":{"status":"ok","value":420,"source":{"kind":"sys","path":"/etc/passwd"}},"uid":{"status":"ok","value":0},"gid":{"status":"ok","value":0},"acl_present":{"status":"ok","value":false}}},
+  "accounts":{"login_defs":{"pass_max_days":{"runtime":{"status":"ok","value":90},"persisted":{"status":"ok","value":90,"source":{"kind":"file","path":"/etc/login.defs","line":160}}},
+                            "pass_min_days":{"runtime":{"status":"ok","value":1},"persisted":{"status":"ok","value":1}},
+                            "pass_min_len":{"status":"ok","value":8}}},
+  "walk":{"world_writable":{"status":"absent"}}
+ }}

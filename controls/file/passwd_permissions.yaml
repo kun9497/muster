@@ -1,0 +1,24 @@
+id: muster.file.passwd_permissions
+title_en: /etc/passwd is owned by root and not writable by others
+title_ko: /etc/passwd 가 root 소유이고 다른 사용자가 쓸 수 없다
+description_en: Owner and group must be root, mode must be 0644 or stricter, and no POSIX ACL may widen access. In stage 1 an ACL that is present cannot be parsed, so its presence fails the control.
+description_ko: 소유자와 그룹이 root 여야 하고 모드가 0644 이하여야 하며 POSIX ACL 이 접근을 넓히면 안 됩니다. 1단계에서는 ACL 을 해석하지 못하므로 ACL 이 있으면 실패로 봅니다.
+category: file
+importance: 상
+automation: auto
+references:
+  kisa: { "2026": ["U-16"], "2021": ["U-07"] }
+requires_facts: ">=1"
+absent_means: fail
+checks:
+  - { fact: files.etc_passwd.uid, op: eq, expected: 0 }
+  - { fact: files.etc_passwd.gid, op: eq, expected: 0 }
+  - { fact: files.etc_passwd.mode, op: lte, expected: 420 }
+  - { fact: files.etc_passwd.acl_present, op: eq, expected: false }
+remediation:
+  text_en: chown root:root /etc/passwd; chmod 644 /etc/passwd; setfacl -b /etc/passwd
+  text_ko: chown root:root /etc/passwd; chmod 644 /etc/passwd; setfacl -b /etc/passwd
+  risk: none
+  idempotent: true
+  script: chown root:root /etc/passwd && chmod 644 /etc/passwd && setfacl -b /etc/passwd
+decision: D26

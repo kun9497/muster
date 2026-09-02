@@ -1,0 +1,22 @@
+id: muster.service.telnet_disabled
+title_en: Telnet is not reachable
+title_ko: Telnet 서비스에 접속할 수 없다
+description_en: No telnet server may be active, socket-activated or listening on a non-loopback address. A host without any telnet server passes.
+description_ko: telnet 서버가 활성이거나 소켓 활성화되어 있거나 루프백 외 주소에서 대기하면 안 됩니다. telnet 서버가 전혀 없는 호스트는 통과합니다.
+category: service
+importance: 중
+automation: auto
+references:
+  kisa: { "2026": ["U-52"], "2021": ["U-60"] }
+requires_facts: ">=1"
+absent_means: pass
+checks:
+  - { fact: services.telnet.reachable, op: eq, expected: false }
+remediation:
+  text_en: Stop and mask the telnet socket and service, or remove the telnet server package; use SSH instead.
+  text_ko: telnet 소켓과 서비스를 중지·mask 하거나 telnet 서버 패키지를 제거하고, 대신 SSH 를 사용합니다.
+  risk: restart_service
+  idempotent: true
+  script: systemctl disable --now telnet.socket telnet.service 2>/dev/null; systemctl mask telnet.socket telnet.service
+  rollback: systemctl unmask telnet.socket telnet.service
+decision: D19

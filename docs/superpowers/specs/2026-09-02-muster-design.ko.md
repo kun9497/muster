@@ -239,7 +239,7 @@ mechanisms:                      # `when`이 성립하는 첫 메커니즘이 �
       - { fact: sshd.options.permit_root_login, op: present }
     checks:
       - { fact: sshd.options.permit_root_login, on: effective, persona: root,
-          op: in, expected: ${allowed} }
+          op: in, expected: "${allowed}" }
   - when:
       - { fact: files.etc_securetty, op: present }          # 레거시 폴백
     checks:
@@ -311,6 +311,8 @@ checks:
 | 12 | 절이 실패 | `FAIL` |
 | 13 | 모든 절이 성립하지만 수집이 저하됨(데몬이 보고하는 설정에 대한 파싱 폴백, 페르소나를 요청했으나 수집되지 않음, 방화벽 신뢰도가 full 미만, 계정 팩트의 원격 NSS 소스) | 저하 내용을 명시한 `WARN` |
 | 14 | 모든 절이 성립 | `PASS` |
+
+평가기는 워크 기반 컨트롤에 대해 사실 상태 스크리닝(6~8단계)보다 워크 게이트(9~10단계)를 먼저 실행하므로, 워크를 실행하지 않았다면 부재한 워크 팩트에 대해 `ERROR`가 아니라 `MANUAL`이 됩니다.
 
 waiver는 표를 거친 뒤에, `FAIL`과 `WARN`에만 적용합니다. 일치하는 유효한 waiver는 결과를 `WAIVED`로 바꾸며, 집계하고 표시합니다. waiver는 `ERROR`, `NOT_APPLICABLE`, `MANUAL`에는 결코 적용되지 않습니다. 그런 컨트롤에 waiver가 일치하면 적용되지 않았다고 사유와 함께 기록하고, 종료 코드는 그대로입니다.
 
@@ -423,7 +425,7 @@ muster는 남의 프로덕션 호스트에서 root로 돌고, 그 출력은 공�
 
 - `U-01`(sshd, `mechanisms`, `persona`): `sshd -T`의 전역 값만, `personas_collected: false`, include 추적 없음. 그래서 2단계가 페르소나를 더하기 전까지 이 컨트롤은 평가되어 `WARN`(저하됨)을 보고합니다.
 - `U-02`(비밀번호 정책, 두 곳에 사는 설정, `params`): `login.defs`와 계정별 `shadow` 만료 필드. pwquality 절은 2단계에서 PAM 수집기와 함께 합류합니다.
-- `U-16`(`/etc/passwd`, 권한 팩트): 모드, 소유자, 그룹, 그리고 ACL xattr에서 얻는 `acl_present`. ACL 항목은 2단계에서 파싱하므로, 1단계에서 ACL이 있는 파일은 `WARN`입니다.
+- `U-16`(`/etc/passwd`, 권한 팩트): 모드, 소유자, 그룹, 그리고 ACL xattr에서 얻는 `acl_present`. ACL 항목은 2단계에서 파싱하므로, 1단계에서 ACL이 있는 파일은 파싱되지 않은 ACL을 사유로 명시한 `FAIL`입니다.
 - `U-52`(Telnet, 서비스 정규화, `absent_means: pass`): 매핑된 유닛에 대한 `systemctl show`와 `/proc/net/tcp`의 리스닝 소켓. 소켓 활성화와 `masked`/`static` 처리는 2단계에서 완성됩니다.
 - `U-25`(world-writable, 워크, `each`, partial): 1단계에서는 합성 픽스처에 대해서만 판정합니다. `walk.world_writable`을 채우는 워크는 3단계에 오므로, 실제 1단계 스냅샷에서 U-25는 `MANUAL`("collect --deep을 실행하십시오")입니다. 1단계에서의 목적은 `each`와 관찰과 대상 단위 waiver의 계약을 확정하는 것입니다.
 
