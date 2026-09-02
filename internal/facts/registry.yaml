@@ -1,0 +1,128 @@
+schema_version: 1
+keys:
+  - key: services.ssh.installed
+    type: bool
+    description: An SSH server package or unit exists on the host.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.ssh.active
+    type: bool
+    description: The SSH service is running or socket-activated.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.telnet.installed
+    type: bool
+    description: A telnet server package, unit or inetd entry exists on the host.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.telnet.reachable
+    type: bool
+    description: A telnet server would accept a connection from off the host (active unit or listening socket unit, non-loopback).
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: sockets.listening
+    type: list<record>
+    description: Listening TCP/UDP sockets with proto, address, port, inode, pid and executable.
+    since: 1
+    sensitivity: internal
+    collector: sockets
+    subject_kind: port
+  - key: sshd.collect_method
+    type: string
+    description: How sshd options were obtained - G, T or parse.
+    since: 1
+    sensitivity: public
+    collector: sshd
+  - key: sshd.personas_collected
+    type: bool
+    description: Whether per-persona (Match) values were collected; false means options hold global values only.
+    since: 1
+    sensitivity: public
+    collector: sshd
+  - key: sshd.options.permit_root_login
+    type: setting<string>
+    description: Effective PermitRootLogin value (daemon-reported versus parsed files).
+    since: 1
+    sensitivity: public
+    collector: sshd
+    default_on: effective
+  - key: files.etc_securetty
+    type: record
+    description: Presence and permission facts of /etc/securetty (absent on RHEL 8+ and Debian-family).
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_securetty.lines
+    type: list<string>
+    description: Non-comment lines of /etc/securetty.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_passwd.mode
+    type: int
+    description: Permission bits of /etc/passwd as an integer (e.g. 420 for 0644).
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_passwd.uid
+    type: int
+    description: Owner uid of /etc/passwd.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_passwd.gid
+    type: int
+    description: Group gid of /etc/passwd.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_passwd.acl_present
+    type: bool
+    description: Whether a POSIX ACL xattr is present on /etc/passwd.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: accounts.login_defs.pass_max_days
+    type: setting<int>
+    description: PASS_MAX_DAYS - persisted in login.defs, effective as the maximum over existing accounts' shadow fields.
+    since: 1
+    sensitivity: public
+    collector: accounts
+    default_on: both
+  - key: accounts.login_defs.pass_min_days
+    type: setting<int>
+    description: PASS_MIN_DAYS - persisted in login.defs, effective as the minimum over existing accounts' shadow fields.
+    since: 1
+    sensitivity: public
+    collector: accounts
+    default_on: both
+  - key: accounts.login_defs.pass_min_len
+    type: int
+    description: PASS_MIN_LEN from login.defs (ignored by PAM when pwquality is present; stage 2 adds the pwquality side).
+    since: 1
+    sensitivity: public
+    collector: accounts
+  - key: accounts.users
+    type: list<record>
+    description: Local accounts with name, uid, gid, shell, password_status and ageing fields; no hashes.
+    since: 1
+    sensitivity: internal
+    collector: accounts
+    subject_kind: user
+  - key: walk.world_writable
+    type: list<record>
+    description: World-writable files found by the deep walk, with path, sticky, uid, gid, package_declared.
+    since: 1
+    sensitivity: internal
+    collector: walk
+    subject_kind: file
+  - key: walk.complete
+    type: bool
+    description: Whether the deep walk finished within its budget.
+    since: 1
+    sensitivity: public
+    collector: walk
