@@ -174,6 +174,102 @@ checks: [{ fact: services.ssh.installed, op: eq, expected: true }]
 custom: Whatever
 remediation: { text_en: t, text_ko: 조치, risk: none }
 `, "judgment"},
+		{"sub-clause param not declared", `id: muster.account.x
+title_en: t
+title_ko: 제목
+category: account
+importance: 상
+automation: auto
+absent_means: fail
+requires_facts: ">=1"
+checks: [{ fact: walk.world_writable, op: each, subject: path, require: { field: package_declared, op: eq, expected: "${nope}" } }]
+remediation: { text_en: t, text_ko: 조치, risk: none }
+`, "param"},
+		{"record element sub-clause needs field", `id: muster.account.x
+title_en: t
+title_ko: 제목
+category: account
+importance: 상
+automation: auto
+absent_means: fail
+requires_facts: ">=1"
+checks: [{ fact: walk.world_writable, op: each, subject: path, require: { op: eq, expected: true } }]
+remediation: { text_en: t, text_ko: 조치, risk: none }
+`, "clause_grammar"},
+		{"scalar element sub-clause has no field", `id: muster.account.x
+title_en: t
+title_ko: 제목
+category: account
+importance: 상
+automation: auto
+absent_means: fail
+requires_facts: ">=1"
+checks: [{ fact: files.etc_securetty.lines, op: none, where: { field: something, op: matches, expected: "^pts/" } }]
+remediation: { text_en: t, text_ko: 조치, risk: none }
+`, "clause_grammar"},
+		{"missing title_ko", `id: muster.account.x
+title_en: t
+category: account
+importance: 상
+automation: manual
+manual_reason: r
+requires_facts: ">=1"
+`, "titles"},
+		{"bad category", `id: muster.account.x
+title_en: t
+title_ko: 제목
+category: bogus
+importance: 상
+automation: manual
+manual_reason: r
+requires_facts: ">=1"
+`, "category"},
+		{"bad importance", `id: muster.account.x
+title_en: t
+title_ko: 제목
+category: account
+importance: high
+automation: manual
+manual_reason: r
+requires_facts: ">=1"
+`, "importance"},
+		{"bad automation", `id: muster.account.x
+title_en: t
+title_ko: 제목
+category: account
+importance: 상
+automation: maybe
+requires_facts: ">=1"
+`, "automation"},
+		{"missing requires_facts", `id: muster.account.x
+title_en: t
+title_ko: 제목
+category: account
+importance: 상
+automation: manual
+manual_reason: r
+`, "requires_facts"},
+		{"cis missing rec", `id: muster.account.x
+title_en: t
+title_ko: 제목
+category: account
+importance: 상
+automation: manual
+manual_reason: r
+requires_facts: ">=1"
+references: { cis: [{ benchmark: ubuntu-22.04, version: "2.0.0" }] }
+`, "references_cis"},
+		{"unknown custom func", `id: muster.account.x
+title_en: t
+title_ko: 제목
+category: account
+importance: 상
+automation: auto
+absent_means: fail
+requires_facts: ">=1"
+custom: NotRegistered
+remediation: { text_en: t, text_ko: 조치, risk: none }
+`, "custom_func"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

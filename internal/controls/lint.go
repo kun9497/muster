@@ -109,7 +109,9 @@ func Lint(s *Set, reg *facts.Registry, opts LintOptions) []Problem {
 		if hasJudgment && !validAbsentMeans[c.AbsentMeans] {
 			add("absent_means", "absent_means must be pass, fail, not_applicable or manual; got %q", c.AbsentMeans)
 		}
-		if c.RequiresFacts != "" && !requiresFactsRe.MatchString(c.RequiresFacts) {
+		if c.RequiresFacts == "" {
+			add("requires_facts", "requires_facts is required; use >=1")
+		} else if !requiresFactsRe.MatchString(c.RequiresFacts) {
 			add("requires_facts", "requires_facts must be >=N; got %q", c.RequiresFacts)
 		}
 		if c.Custom != "" && !opts.CustomFuncs[c.Custom] {
@@ -244,7 +246,14 @@ func lintClause(c *Control, cl Clause, reg *facts.Registry, add func(string, str
 			if !scalarOps[sub.Op] {
 				add("clause_grammar", "%s: sub-clause op %q is not a scalar operator", where, sub.Op)
 			}
+			if entry.Type == "list<record>" && sub.Field == "" {
+				add("clause_grammar", "%s: sub-clause needs field for a record element", where)
+			}
+			if entry.Type == "list<string>" && sub.Field != "" {
+				add("clause_grammar", "%s: scalar elements have no fields", where)
+			}
 			lintExpected(*sub, add, where)
+			checkParamRef(c, sub.Expected, add, where)
 		}
 	default:
 		add("clause_grammar", "%s: unknown op %q", where, cl.Op)
@@ -258,7 +267,13 @@ func lintClause(c *Control, cl Clause, reg *facts.Registry, add func(string, str
 	if orderedOps[cl.Op] && entry.Type != "int" && entry.Type != "setting<int>" {
 		add("clause_grammar", "%s: %s needs an int fact", where, cl.Op)
 	}
-	if s, ok := cl.Expected.(string); ok {
+	checkParamRef(c, cl.Expected, add, where)
+}
+
+// checkParamRef reports an undeclared ${name} reference in expected, whether
+// it comes from a top-level clause or a where/require sub-clause (Ruling R7).
+func checkParamRef(c *Control, expected any, add func(string, string, ...any), where string) {
+	if s, ok := expected.(string); ok {
 		if m := paramRefRe.FindStringSubmatch(s); m != nil {
 			if _, declared := c.Params[m[1]]; !declared {
 				add("param", "%s: parameter %q is not declared", where, m[1])
