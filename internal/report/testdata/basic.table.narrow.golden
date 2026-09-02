@@ -1,0 +1,17 @@
+muster 0.1.0 · controls kisa-unix-2026+2026.09.02 · guide kisa-unix-2026 · host web-01 · collected 2026-09-02T06:00:00Z
+automatic  high 0/1/0  medium 1/0/0  low 0/0/0  (pass/fail/warn)
+manual review 2  ·  undecidable error 1 / n-a 0 / waived 1  ·  facts failed 1  ·  waivers expiring within 30d 1
+
+WAIVED         high   muster.account.password_policy    
+    waived: r (expires 2026-09-20)
+FAIL           high   muster.account.root_remote_login  
+    reason: clause does not hold
+    sshd.options.permit_root_login@effective = yes  (/etc/ssh/sshd_config:40)
+ERROR          high   muster.file.passwd_permissions    
+    reason: [permission_denied] needs root
+WARN           high   muster.file.world_writable        
+    reason: observations need human review
+    file:/var/tmp/x: expected true, actual false (fail)
+PASS           medium muster.service.telnet_disabled    
+MANUAL         low    muster.log.review                 
+    reason: interview
