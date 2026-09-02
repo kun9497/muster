@@ -83,7 +83,12 @@ func (e *env) evalSetting(cl controls.Clause, r facts.Resolved, expected any) cl
 		degraded = "personas not collected"
 	}
 	side := func(name string, env *facts.Envelope) (bool, Evidence, error) {
-		if env == nil {
+		// R15/R16: a side that is nil (never collected) and a side that is
+		// explicitly "absent" (collected, found nothing) are equivalent
+		// here — worstStatus's `both` exception lets either reach this
+		// point paired with an ok side, and both must degrade rather than
+		// error.
+		if env == nil || env.Status == facts.StatusAbsent {
 			return false, Evidence{Fact: cl.Fact, Status: facts.StatusAbsent, Side: name}, nil
 		}
 		if env.Status != facts.StatusOK {

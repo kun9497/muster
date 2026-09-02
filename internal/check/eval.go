@@ -52,7 +52,7 @@ func evalOne(e *env, c *controls.Control) (r Result) {
 	}
 	// Steps 3-4.
 	if len(c.AppliesWhen) > 0 {
-		if res, done := e.screen(clauseFacts(c.AppliesWhen), &r, screenApplies); done {
+		if res, done := e.screen(c.AppliesWhen, &r, screenApplies); done {
 			return res
 		}
 		for _, cl := range c.AppliesWhen {
@@ -71,8 +71,7 @@ func evalOne(e *env, c *controls.Control) (r Result) {
 	if len(c.Mechanisms) > 0 {
 		chosen := -1
 		for mi, m := range c.Mechanisms {
-			keys := clauseFacts(m.When)
-			st := e.worstStatus(keys)
+			st := e.worstStatus(m.When)
 			if st.hard {
 				return fail(r, ERROR, st.code, st.reason)
 			}
@@ -123,19 +122,27 @@ func evalOne(e *env, c *controls.Control) (r Result) {
 	// contradicting step 9's MANUAL "run collect --deep".
 	if walkBased(keys) {
 		wc, _ := e.reg.Resolve(e.snap, "walk.complete")
+		// R16: every branch below carries evidence for walk.complete itself.
+		ev := walkCompleteEvidence(wc)
 		switch {
 		case wc.Envelope == nil || wc.Envelope.Status == facts.StatusMissing || wc.Envelope.Status == facts.StatusAbsent:
-			return fail(r, MANUAL, "", "the deep walk was not run; run collect --deep")
+			res := fail(r, MANUAL, "", "the deep walk was not run; run collect --deep")
+			res.Evidence = append(res.Evidence, ev)
+			return res
 		case wc.Envelope.Status == facts.StatusOK:
 			if done, _ := wc.Envelope.Value.(bool); !done {
-				return fail(r, ERROR, WalkIncomplete, "the deep walk did not finish within its budget")
+				res := fail(r, ERROR, WalkIncomplete, "the deep walk did not finish within its budget")
+				res.Evidence = append(res.Evidence, ev)
+				return res
 			}
 		default:
-			return fail(r, ERROR, codeFor(wc.Envelope), "walk.complete: "+wc.Envelope.Reason)
+			res := fail(r, ERROR, codeFor(wc.Envelope), "walk.complete: "+wc.Envelope.Reason)
+			res.Evidence = append(res.Evidence, ev)
+			return res
 		}
 	}
 	// Steps 6-8.
-	if st := e.worstStatus(keys); st.hard {
+	if st := e.worstStatus(checks); st.hard {
 		return fail(r, ERROR, st.code, st.reason)
 	} else if st.status == facts.StatusUnsupported {
 		return fail(r, NotApplicable, UnsupportedEnv, st.reason)
@@ -212,48 +219,125 @@ type screening struct {
 	reason string
 }
 
-// worstStatus screens the facts a step references (spec §6.5 steps 3 and 6):
-// hard failures first, then unsupported, then absent.
-func (e *env) worstStatus(keys []string) screening {
+// worstStatus screens the facts cls reference (spec §6.5 steps 3-4 and
+// 6-8), one clause at a time so a two-home setting is screened by the
+// side(s) its own clause actually selects (R15): a plain fact (or a key the
+// snapshot doesn't carry at all — Resolve synthesises "missing" before it
+// ever looks at whether the entry is a setting) is screened by its single
+// envelope, same as before; a setting is screened by `on` (defaulting to
+// the registry's default_on) — runtime/persisted/effective pick that one
+// side, both considers the pair. This means a setting with one absent side
+// and one ok side is left to reach the clause instead of being folded into
+// absent_means, because the clause (not this screening pass) is what
+// decides a mixed-sides judgment.
+func (e *env) worstStatus(cls []controls.Clause) screening {
 	var soft screening
-	for _, k := range keys {
-		res, err := e.reg.Resolve(e.snap, k)
+	for _, cl := range cls {
+		res, err := e.reg.Resolve(e.snap, cl.Fact)
 		if err != nil {
 			return screening{hard: true, code: InternalError, reason: err.Error()}
 		}
-		envs := []*facts.Envelope{}
-		if res.Setting != nil {
-			for _, side := range []*facts.Envelope{res.Setting.Runtime, res.Setting.Persisted, res.Setting.Effective} {
-				if side != nil {
-					envs = append(envs, side)
-				}
+		if res.Setting == nil {
+			if s, hard := screenEnvelope(cl.Fact, res.Envelope); hard {
+				return s
+			} else if s.status != "" {
+				soft = mergeSoft(soft, s)
 			}
-			if len(envs) == 0 {
-				envs = append(envs, facts.Missing(k))
-			}
-		} else {
-			envs = append(envs, res.Envelope)
+			continue
 		}
-		for _, env := range envs {
-			switch env.Status {
-			case facts.StatusMissing, facts.StatusDenied, facts.StatusTimeout, facts.StatusError:
-				return screening{hard: true, status: env.Status, code: codeFor(env), reason: k + ": " + env.Reason}
-			case facts.StatusOK:
-				if env.Truncated {
-					return screening{hard: true, status: env.Status, code: Truncated, reason: k + " was truncated at the read limit"}
-				}
-			case facts.StatusUnsupported:
-				if soft.status != facts.StatusUnsupported {
-					soft = screening{status: facts.StatusUnsupported, reason: k + ": " + env.Reason}
-				}
-			case facts.StatusAbsent:
-				if soft.status == "" {
-					soft = screening{status: facts.StatusAbsent, reason: k + " is absent on this host"}
-				}
+		on := cl.On
+		if on == "" {
+			on = res.Entry.DefaultOn
+		}
+		if on != "both" {
+			side := selectSide(res.Setting, on)
+			if side == nil {
+				side = facts.Missing(cl.Fact)
 			}
+			if s, hard := screenEnvelope(cl.Fact, side); hard {
+				return s
+			} else if s.status != "" {
+				soft = mergeSoft(soft, s)
+			}
+			continue
+		}
+		// on == "both": a nil or explicitly absent side does not, on its
+		// own, screen the clause away — only when NEITHER side is usable
+		// does the pair count as absent/unsupported. A genuinely hard
+		// status (denied/timeout/error, or ok-but-truncated) on either
+		// side still screens immediately.
+		var anyOK, anyUnsupported bool
+		for _, side := range []*facts.Envelope{res.Setting.Runtime, res.Setting.Persisted} {
+			if side == nil || side.Status == facts.StatusAbsent {
+				continue
+			}
+			switch side.Status {
+			case facts.StatusDenied, facts.StatusTimeout, facts.StatusError:
+				return screening{hard: true, status: side.Status, code: codeFor(side), reason: cl.Fact + ": " + side.Reason}
+			case facts.StatusOK:
+				if side.Truncated {
+					return screening{hard: true, status: side.Status, code: Truncated, reason: cl.Fact + " was truncated at the read limit"}
+				}
+				anyOK = true
+			case facts.StatusUnsupported:
+				anyUnsupported = true
+			}
+		}
+		if anyOK {
+			continue // at least one side is usable; let the clause decide
+		}
+		if anyUnsupported {
+			soft = mergeSoft(soft, screening{status: facts.StatusUnsupported, reason: cl.Fact + ": setting is unsupported on every selected side"})
+		} else {
+			soft = mergeSoft(soft, screening{status: facts.StatusAbsent, reason: cl.Fact + " is absent on this host"})
 		}
 	}
 	return soft
+}
+
+// screenEnvelope classifies one envelope as hard, soft (absent/unsupported)
+// or fine (zero-value screening, status ""). It never inspects more than
+// the one side the caller selected.
+func screenEnvelope(fact string, env *facts.Envelope) (screening, bool) {
+	switch env.Status {
+	case facts.StatusMissing, facts.StatusDenied, facts.StatusTimeout, facts.StatusError:
+		return screening{hard: true, status: env.Status, code: codeFor(env), reason: fact + ": " + env.Reason}, true
+	case facts.StatusOK:
+		if env.Truncated {
+			return screening{hard: true, status: env.Status, code: Truncated, reason: fact + " was truncated at the read limit"}, true
+		}
+	case facts.StatusUnsupported:
+		return screening{status: facts.StatusUnsupported, reason: fact + ": " + env.Reason}, false
+	case facts.StatusAbsent:
+		return screening{status: facts.StatusAbsent, reason: fact + " is absent on this host"}, false
+	}
+	return screening{}, false
+}
+
+// mergeSoft keeps the first soft status found, except unsupported always
+// wins over absent (spec §6.5).
+func mergeSoft(have, found screening) screening {
+	if have.status == facts.StatusUnsupported {
+		return have
+	}
+	if found.status == facts.StatusUnsupported || have.status == "" {
+		return found
+	}
+	return have
+}
+
+// selectSide picks the envelope a clause's `on` names; "both" is handled by
+// the caller since it needs both sides at once.
+func selectSide(s *facts.Setting, on string) *facts.Envelope {
+	switch on {
+	case "runtime":
+		return s.Runtime
+	case "persisted":
+		return s.Persisted
+	case "effective":
+		return s.Effective
+	}
+	return nil
 }
 
 func screenApplies(st screening) (Status, ReasonCode) {
@@ -263,14 +347,17 @@ func screenApplies(st screening) (Status, ReasonCode) {
 	return NotApplicable, ""
 }
 
-// screen applies worstStatus to applies_when facts (steps 3-4).
-func (e *env) screen(keys []string, r *Result, _ func(screening) (Status, ReasonCode)) (Result, bool) {
-	st := e.worstStatus(keys)
+// screen applies worstStatus to applies_when facts (steps 3-4). R16: the
+// NOT_APPLICABLE it can return must carry evidence for the facts it judged.
+func (e *env) screen(cls []controls.Clause, r *Result, _ func(screening) (Status, ReasonCode)) (Result, bool) {
+	st := e.worstStatus(cls)
 	if st.hard {
 		return fail(*r, ERROR, st.code, st.reason), true
 	}
 	if st.status == facts.StatusAbsent || st.status == facts.StatusUnsupported {
-		return fail(*r, NotApplicable, "", "applies_when: "+st.reason), true
+		res := fail(*r, NotApplicable, "", "applies_when: "+st.reason)
+		res.Evidence = e.evidenceFor(clauseFacts(cls))
+		return res, true
 	}
 	return *r, false
 }
@@ -315,6 +402,10 @@ func fail(r Result, s Status, code ReasonCode, reason string) Result {
 	return r
 }
 
+// evidenceFor resolves keys for display, not judgment: a plain fact gets
+// one Evidence entry, a setting gets one per side actually present in the
+// snapshot (R16) — regardless of which side any particular clause selects,
+// since this is the transparency record, not the screening pass.
 func (e *env) evidenceFor(keys []string) []Evidence {
 	var out []Evidence
 	for _, k := range keys {
@@ -322,11 +413,32 @@ func (e *env) evidenceFor(keys []string) []Evidence {
 		if err != nil {
 			continue
 		}
+		if res.Setting != nil {
+			for _, sd := range []struct {
+				name string
+				env  *facts.Envelope
+			}{{"runtime", res.Setting.Runtime}, {"persisted", res.Setting.Persisted}, {"effective", res.Setting.Effective}} {
+				if sd.env == nil {
+					continue
+				}
+				out = append(out, Evidence{Fact: k, Status: sd.env.Status, Value: sd.env.Value, Source: sd.env.Source, Side: sd.name})
+			}
+			continue
+		}
 		if res.Envelope != nil {
 			out = append(out, Evidence{Fact: k, Status: res.Envelope.Status, Value: res.Envelope.Value, Source: res.Envelope.Source})
 		}
 	}
 	return out
+}
+
+// walkCompleteEvidence builds the Evidence entry the walk gate attaches for
+// walk.complete (R16); a key the snapshot doesn't carry reads as "missing".
+func walkCompleteEvidence(wc facts.Resolved) Evidence {
+	if wc.Envelope == nil {
+		return Evidence{Fact: "walk.complete", Status: facts.StatusMissing}
+	}
+	return Evidence{Fact: "walk.complete", Status: wc.Envelope.Status, Value: wc.Envelope.Value, Source: wc.Envelope.Source}
 }
 
 func clauseFacts(cls []controls.Clause) []string {
