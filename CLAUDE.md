@@ -4,6 +4,16 @@ Design: `docs/superpowers/specs/2026-09-02-muster-design.md` (English canonical,
 decision log (D01–D28). Read it before changing any contract: facts schema, control ids, exit codes,
 waiver keys, output format.
 
+## Build and test
+
+- `go build ./...` (or `CGO_ENABLED=0 go build -trimpath ./cmd/muster` to match the CI build step) —
+  compile everything.
+- `make test` — `go test -race ./...` (needs a C toolchain for `-race`; on a host without one, run
+  `go test ./...` and rely on CI, which runs on Linux, for the race build).
+- `make lint` — `gofmt -l .` then `go vet ./...`.
+- `make lint-controls` — `go run ./cmd/muster controls lint`.
+- `make fmt` — `gofmt -l -w .` to fix formatting in place.
+
 ## Layout
 
 `cmd/muster` dispatch only. `internal/facts` snapshot types and the key registry. `internal/controls`
