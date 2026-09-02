@@ -122,6 +122,9 @@ func (r *Registry) Resolve(s *Snapshot, key string) (Resolved, error) {
 		if err := json.Unmarshal(raw, &st); err != nil || (st.Runtime == nil && st.Persisted == nil && st.Effective == nil) {
 			return Resolved{Entry: e, Envelope: &Envelope{Status: StatusError, Reason: "malformed fact: setting has no sides"}}, nil
 		}
+		for _, side := range []*Envelope{st.Runtime, st.Persisted, st.Effective} {
+			screenStatus(side)
+		}
 		return Resolved{Entry: e, Setting: &st}, nil
 	}
 	if _, hasStatus := obj["status"]; !hasStatus {
@@ -131,7 +134,18 @@ func (r *Registry) Resolve(s *Snapshot, key string) (Resolved, error) {
 	if err := json.Unmarshal(raw, &env); err != nil {
 		return Resolved{Entry: e, Envelope: &Envelope{Status: StatusError, Reason: "malformed fact: " + err.Error()}}, nil
 	}
+	screenStatus(&env)
 	return Resolved{Entry: e, Envelope: &env}, nil
+}
+
+// screenStatus turns a status no collector may write — a forged value, or
+// the reader-only "missing" — into an error envelope, so it can never be
+// mistaken for "absent" and resolved by absent_means (spec §5.2, §6.5).
+func screenStatus(env *Envelope) {
+	if env == nil || env.Status.Valid() {
+		return
+	}
+	*env = Envelope{Status: StatusError, Reason: fmt.Sprintf("malformed fact: unknown status %q", env.Status)}
 }
 
 // walk descends a decoded JSON tree by path segments. A segment that lands on

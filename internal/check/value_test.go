@@ -1,10 +1,59 @@
 package check
 
 import (
+	"errors"
+	"math"
+	"strings"
 	"testing"
 
 	"github.com/kun9497/muster/internal/controls"
 )
+
+// I3: a float64 outside int64's range must be an error, never a silent wrap.
+// int64(1e300) is implementation-defined and int64(9.3e18) wraps negative,
+// which would let `lte 90` hold for a password age of 1e300 days.
+func TestToIntRefusesValuesOutsideInt64(t *testing.T) {
+	for _, v := range []any{1e300, -1e300, 9.3e18, -9.3e18, math.Inf(1), math.Inf(-1), math.NaN(), 1.5, "90", true, nil} {
+		got, err := toInt(v)
+		if err == nil {
+			t.Errorf("toInt(%v) = %d, want an error", v, got)
+			continue
+		}
+		if !errors.Is(err, ErrTypeMismatch) {
+			t.Errorf("toInt(%v): err=%v, want it to wrap ErrTypeMismatch", v, err)
+		}
+	}
+	for _, c := range []struct {
+		in   any
+		want int64
+	}{
+		{float64(90), 90}, {float64(0), 0}, {float64(-90), -90},
+		{int(7), 7}, {int64(-7), -7},
+		{float64(math.MinInt64), math.MinInt64},             // -2^63 is exactly representable
+		{float64(4611686018427387904), 1 << 62},             // well inside the range
+		{float64(9007199254740992), 9007199254740992},       // 2^53
+		{float64(9223372036854774784), 9223372036854774784}, // the largest float64 below 2^63
+	} {
+		got, err := toInt(c.in)
+		if err != nil || got != c.want {
+			t.Errorf("toInt(%v) = %d, %v; want %d, nil", c.in, got, err, c.want)
+		}
+	}
+}
+
+// I3, end to end: an out-of-range number in the snapshot must make the
+// control ERROR(internal_error) naming the key, not produce a verdict.
+func TestOutOfRangeNumberIsAnErrorNamingTheKey(t *testing.T) {
+	res := Evaluate(snap(t, `{"accounts":{"login_defs":{"pass_max_days":{"runtime":{"status":"ok","value":1e300},"persisted":{"status":"ok","value":1e300}}}}}`),
+		one(passMaxDaysControl("auto")), reg, Options{})
+	r := res[0]
+	if r.Status != ERROR || r.ReasonCode != InternalError {
+		t.Fatalf("status=%s code=%q reason=%q, want ERROR internal_error", r.Status, r.ReasonCode, r.Reason)
+	}
+	if !strings.Contains(r.Reason, "accounts.login_defs.pass_max_days") {
+		t.Errorf("reason must name the key: %q", r.Reason)
+	}
+}
 
 func TestCompareTypedScalars(t *testing.T) {
 	cases := []struct {

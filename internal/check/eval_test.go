@@ -282,6 +282,11 @@ func TestDerivationTable(t *testing.T) {
 					{When: controls.ClauseList{{Fact: "files.etc_securetty", Op: "present"}}, Checks: []controls.Clause{{Fact: "files.etc_securetty.lines", Op: "none", Where: &controls.Clause{Op: "matches", Expected: "^pts/"}}}},
 				}},
 			MANUAL, "", evidenceHasFact("services.ssh.installed", facts.StatusOK)},
+		// I4: a snapshot that forges the reader-only "missing" on one side of
+		// a `both` setting must not read as absent and fall to absent_means.
+		{"6 forged status on a both side is an error, never absent_means",
+			`{"accounts":{"login_defs":{"pass_max_days":{"runtime":{"status":"ok","value":90},"persisted":{"status":"missing"}}}}}`,
+			passMaxDaysControl("auto"), ERROR, ParseError, nil},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

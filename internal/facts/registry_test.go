@@ -65,6 +65,45 @@ func TestResolveMalformedLeafIsError(t *testing.T) {
 	}
 }
 
+// I4: `status` is a closed vocabulary of six values a collector may write
+// (spec §5.2). Anything else — a forged value, or the reader-only "missing"
+// — is a malformed fact, not something the derivation table may interpret.
+func TestResolveRejectsAStatusNoCollectorMayWrite(t *testing.T) {
+	r, _ := LoadRegistry()
+	for _, c := range []struct{ name, status string }{{"forged", "bogus"}, {"reader-side only", "missing"}, {"empty", ""}} {
+		s, err := Load(strings.NewReader(`{"schema_version":1,"run":{},"facts":{"walk":{"complete":{"status":"` + c.status + `","value":true}}}}`))
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, err := r.Resolve(s, "walk.complete")
+		if err != nil {
+			t.Fatalf("%s: %v", c.name, err)
+		}
+		if got.Envelope.Status != StatusError || !strings.Contains(got.Envelope.Reason, "unknown status") {
+			t.Errorf("%s status %q: %+v", c.name, c.status, got.Envelope)
+		}
+	}
+}
+
+func TestResolveRejectsAnUnknownStatusOnEitherSettingSide(t *testing.T) {
+	r, _ := LoadRegistry()
+	s, err := Load(strings.NewReader(`{"schema_version":1,"run":{},"facts":{"accounts":{"login_defs":{"pass_max_days":{
+	  "runtime":{"status":"ok","value":90},"persisted":{"status":"missing"}}}}}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := r.Resolve(s, "accounts.login_defs.pass_max_days")
+	if err != nil || got.Setting == nil {
+		t.Fatalf("%+v err=%v", got, err)
+	}
+	if got.Setting.Runtime.Status != StatusOK {
+		t.Errorf("a good side must survive: %+v", got.Setting.Runtime)
+	}
+	if got.Setting.Persisted.Status != StatusError || !strings.Contains(got.Setting.Persisted.Reason, "unknown status") {
+		t.Errorf("forged side: %+v", got.Setting.Persisted)
+	}
+}
+
 func TestResolveMissingWhenIntermediateIsNotObject(t *testing.T) {
 	r, _ := LoadRegistry()
 	s, _ := Load(strings.NewReader(`{"schema_version":1,"run":{},"facts":{"walk": 5}}`))

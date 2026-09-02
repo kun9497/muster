@@ -335,7 +335,11 @@ func (e *env) worstStatus(cls []controls.Clause) screening {
 				continue
 			}
 			switch side.Status {
-			case facts.StatusDenied, facts.StatusTimeout, facts.StatusError:
+			// I4: StatusMissing is reader-side only and Resolve now refuses
+			// it from a snapshot, but listing it here keeps this switch a
+			// closed set: a status this branch does not name would otherwise
+			// fall through and read as absent.
+			case facts.StatusDenied, facts.StatusTimeout, facts.StatusError, facts.StatusMissing:
 				return screening{hard: true, status: side.Status, code: codeFor(side), reason: cl.Fact + ": " + side.Reason}
 			case facts.StatusOK:
 				if side.Truncated {

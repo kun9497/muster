@@ -99,6 +99,11 @@ func (e *env) evalSetting(cl controls.Clause, r facts.Resolved, expected any) cl
 			return false, Evidence{Fact: cl.Fact, Status: env.Status, Side: name, Source: env.Source}, fmt.Errorf("fact %s side %s has status %s", cl.Fact, name, env.Status)
 		}
 		ok, err := compare(cl.Op, env.Value, expected, r.Entry.Type)
+		if err != nil {
+			// I3: an ERROR(internal_error) must name the key it came from,
+			// the same way the plain-fact path does.
+			err = fmt.Errorf("%s side %s: %w", cl.Fact, name, err)
+		}
 		return ok, Evidence{Fact: cl.Fact, Status: facts.StatusOK, Value: env.Value, Source: env.Source, Side: name}, err
 	}
 	switch on {

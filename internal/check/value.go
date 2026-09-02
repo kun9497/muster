@@ -1,6 +1,7 @@
 package check
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"reflect"
@@ -11,6 +12,11 @@ import (
 )
 
 var paramRef = regexp.MustCompile(`^\$\{([a-z][a-z0-9_]*)\}$`)
+
+// ErrTypeMismatch marks a value that does not match the type the registry
+// declares for its key. Spec §6.3: a type mismatch is an error the evaluator
+// turns into ERROR(internal_error) naming the key, never a guess.
+var ErrTypeMismatch = errors.New("type mismatch")
 
 // ParamValues merges a control's defaults with overrides (stage 3 tuning);
 // stage 1 passes nil overrides.
@@ -158,10 +164,12 @@ func compareList(op string, actual, expected any) (bool, error) {
 	if !ok {
 		return false, fmt.Errorf("actual %v is not a list", actual)
 	}
-	// Validate all elements are strings for contains and matches.
+	// list<string> is the only list type a clause compares (spec §5.5), so
+	// every element must be a string for every op below, not only for the
+	// ones that reach into an element.
 	for i, x := range xs {
 		if _, ok := x.(string); !ok {
-			return false, fmt.Errorf("list element %d is not a string", i)
+			return false, fmt.Errorf("list element %d is not a string: %w", i, ErrTypeMismatch)
 		}
 	}
 	switch op {
@@ -227,6 +235,11 @@ func inList(op string, a any, expected any, conv func(any) (any, error)) (bool, 
 	return !found, nil
 }
 
+// twoTo63 is the first float64 above int64's range. A conversion at or
+// beyond it (and below -twoTo63) is undefined in Go and in practice wraps to
+// the minimum int64, which would let `lte 90` hold for 1e300 (I3).
+const twoTo63 = 9223372036854775808.0
+
 func toInt(v any) (int64, error) {
 	switch n := v.(type) {
 	case int:
@@ -234,10 +247,15 @@ func toInt(v any) (int64, error) {
 	case int64:
 		return n, nil
 	case float64:
+		// NaN fails this test too, which is what we want: it is not an
+		// integer, and every comparison against it would be false.
 		if n != math.Trunc(n) {
-			return 0, fmt.Errorf("%v is not an integer", n)
+			return 0, fmt.Errorf("%v is not an integer: %w", n, ErrTypeMismatch)
+		}
+		if n < -twoTo63 || n >= twoTo63 {
+			return 0, fmt.Errorf("%v is outside the range of a 64-bit integer: %w", n, ErrTypeMismatch)
 		}
 		return int64(n), nil
 	}
-	return 0, fmt.Errorf("%v is not an int", v)
+	return 0, fmt.Errorf("%v is not an int: %w", v, ErrTypeMismatch)
 }
