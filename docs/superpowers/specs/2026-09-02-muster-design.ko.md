@@ -47,7 +47,7 @@
 
 **muster는 2026년판을 따릅니다.** 모든 스냅샷과 보고서에 `guide_edition: kisa-unix-2026`이 들어갑니다. 항목 번호는 판본 사이에서 안정적이지 않으므로 무엇의 기본 키도 되지 않습니다. 컨트롤은 muster 고유의 id를 갖고, KISA 번호는 판본별로 `references.kisa` 아래에 담습니다 (D16). 예전 평가서를 읽는 사람이 해당 컨트롤을 찾을 수 있도록 2021년 번호도 기록합니다.
 
-**글로벌 참조.** `references.cis`(벤치마크 이름, 버전, 권고 번호)는 1단계부터 있습니다. 2단계에서 매핑이 있는 곳마다 `references.stig`(해당 OS 릴리스의 DISA STIG id와 rule)와 `references.nist_800_53`(통제 id)을 더합니다. `references` 아래에 키를 추가해도 컨트롤 스키마 버전은 바뀌지 않습니다. 참조는 번호뿐이며 CIS Benchmark나 STIG 본문은 담지 않고, muster는 자기 컨트롤을 판정할 뿐 벤치마크의 공식 준수 수준을 판정하지 않습니다 (D24).
+**글로벌 참조.** `references.cis`(벤치마크 이름, 버전, 권고 번호)는 1단계부터 있습니다. CIS Ubuntu Linux 22.04 LTS v2.0.0, CIS Ubuntu Linux 24.04 LTS v1.0.0, CIS AlmaLinux OS 9 v2.0.0(Rocky Linux 9에도 같이 씁니다)입니다. 2단계에서 매핑이 있는 곳마다 `references.stig`와 `references.nist_800_53`을 더합니다. 출처는 DISA가 공개한 STIG로, Canonical Ubuntu 22.04 LTS STIG V2R9, Canonical Ubuntu 24.04 LTS STIG V1R6, 그리고 Rocky와 AlmaLinux 9에 추론으로 적용함을 명시한 Red Hat Enterprise Linux 9 STIG V2R9이며, NIST SP 800-53 통제 id는 각 STIG 규칙의 CCI를 DISA의 CCI 목록으로 변환해 얻습니다. 커밋된 생성기가 URL과 다이제스트로 고정한 원본에서 `docs/reference/stig/` 아래 인덱스(rule id, group id, 심각도, 제목, CCI, NIST 통제)를 만들고, lint는 인덱스에 있는 id만 받아들입니다. `references` 아래에 키를 추가해도 컨트롤 스키마 버전은 바뀌지 않습니다. 참조는 식별자와 제목뿐이며 CIS Benchmark나 STIG의 점검 본문은 담지 않고, muster는 자기 컨트롤을 판정할 뿐 벤치마크의 공식 준수 수준을 판정하지 않습니다 (D24).
 
 2026년판 유닉스 절을 분류와 중요도별로 보면 다음과 같습니다.
 
@@ -203,7 +203,7 @@ source = {kind: file|command|proc|sys|derived, path, line, raw, cmd, exit_code}
 
 ### 5.7 버저닝
 
-`schema_version`은 정수입니다. 키를 추가하는 것은 버전을 올리지 않습니다(키가 언제 생겼는지는 그 키의 `since`가 기록합니다). 키의 타입이나 의미를 바꾸거나 키를 제거하는 것은 버전을 올립니다. `check`는 더 높은 버전의 스냅샷을 거부하고(`exit 2`, `schema_mismatch`), 더 낮은 버전은 읽습니다. 스냅샷이 담고 있지 않은 등록된 키는 `missing`으로 읽히고(5.2절), 그 키를 참조하는 모든 컨트롤은 `ERROR(missing_fact)`가 됩니다. 결코 `PASS`가 아니며, `absent_means`로 해결되지도 않습니다. 컨트롤은 정수 N에 대해 `requires_facts: ">=N"`을 선언합니다(허용되는 유일한 형태입니다). 스냅샷이 그 요구를 충족하지 못하는 컨트롤은 평가 없이, 버전을 명시한 `ERROR(missing_fact)`가 됩니다. 리플렉션으로 생성한 스키마 골든 파일과 `testdata/snapshots/v<N>/` 아래의 옛 스냅샷 코퍼스가 이 규칙을 지키게 합니다 (D17).
+`schema_version`은 정수입니다. 키를 추가하는 것은 버전을 올리지 않습니다(키가 언제 생겼는지는 그 키의 `since`가 기록합니다). 키의 타입이나 의미를 바꾸거나 키를 제거하는 것은 버전을 올립니다. 기존 `record`나 `list<record>` 원소에 필드를 더하는 것도 추가이므로 버전을 올리지 않습니다. 옛 스냅샷에 없는 필드를 이름 짓는 절은 그 필드를 명시한 사유와 함께 실패하며, 결코 `PASS`가 아닙니다. `check`는 더 높은 버전의 스냅샷을 거부하고(`exit 2`, `schema_mismatch`), 더 낮은 버전은 읽습니다. 스냅샷이 담고 있지 않은 등록된 키는 `missing`으로 읽히고(5.2절), 그 키를 참조하는 모든 컨트롤은 `ERROR(missing_fact)`가 됩니다. 결코 `PASS`가 아니며, `absent_means`로 해결되지도 않습니다. 컨트롤은 정수 N에 대해 `requires_facts: ">=N"`을 선언합니다(허용되는 유일한 형태입니다). 스냅샷이 그 요구를 충족하지 못하는 컨트롤은 평가 없이, 버전을 명시한 `ERROR(missing_fact)`가 됩니다. 리플렉션으로 생성한 스키마 골든 파일과 `testdata/snapshots/v<N>/` 아래의 옛 스냅샷 코퍼스가 이 규칙을 지키게 합니다 (D17).
 
 ### 5.8 한도
 
@@ -266,7 +266,7 @@ decision: D09
 
 **절 문법.** 모든 절은 — `checks`, `when`, `applies_when`, `where`, `require` 아래에서 똑같이 — 키 `{fact, op, expected}`와 선택적 수식어 `on`, `persona`만 씁니다. `where`와 `require` 안에서는 `fact` 대신 `field`가 오며, 검사 대상 원소의 필드 이름을 가리킵니다. 원소가 스칼라이면 생략합니다. 엄격한 디코딩은 그 밖의 키를 모두 거부합니다. `applies_when`과 `when`은 모두 성립해야 하는 절의 리스트입니다. 인라인 절 하나는 원소가 하나인 리스트의 약식 표기입니다. `or`는 없습니다. 대안은 `mechanisms`로 표현합니다.
 
-**연산자.** 스칼라 연산자 열두 개(`eq ne in not_in lt lte gt gte matches contains present absent`)와 컬렉션 연산자 두 개(`each`, `none`)가 있습니다. `present`와 `absent`는 `expected`를 받지 않습니다. `matches`는 Go `regexp`(RE2) 패턴을 받습니다. 앵커 없이 대소문자를 구분해, 스칼라의 값 전체 또는 리스트의 각 원소에 대해 매칭하며, `.`은 개행에 매칭하지 않습니다. lint는 로드 시점에 모든 패턴을 컴파일합니다. 비교는 레지스트리가 타입을 정하므로 `"0"`과 `0`을 혼동할 수 없습니다. `lt`…`gte`는 숫자 타입을 요구합니다.
+**연산자.** 스칼라 연산자 열세 개(`eq ne in not_in lt lte gt gte matches not_matches contains present absent`)와 컬렉션 연산자 두 개(`each`, `none`)가 있습니다. `present`와 `absent`는 `expected`를 받지 않습니다. `not_matches`는 스칼라에 대해서만 쓰이며 `matches`가 성립하지 않을 때 정확히 성립합니다. `matches`는 Go `regexp`(RE2) 패턴을 받습니다. 앵커 없이 대소문자를 구분해, 스칼라의 값 전체 또는 리스트의 각 원소에 대해 매칭하며, `.`은 개행에 매칭하지 않습니다. lint는 로드 시점에 모든 패턴을 컴파일합니다. 비교는 레지스트리가 타입을 정하므로 `"0"`과 `0`을 혼동할 수 없습니다. `lt`…`gte`는 숫자 타입을 요구합니다.
 
 **파라미터.** `expected`는 리터럴이거나 `${name}`입니다. 치환은 값 전체 단위로만 이루어집니다. `expected` 전체가 정확히 `${name}`이어야 합니다. 파라미터의 값은 선언된 타입을 유지한 채 삽입되므로 리스트 파라미터는 리스트를 내놓습니다. `params` 아래의 각 항목은 `{type, default, description}`을 선언합니다. lint는 선언되지 않은 파라미터에 대한 참조와 타입이 맞지 않는 기본값을 거부합니다.
 
@@ -293,7 +293,7 @@ checks:
     require: { field: package_declared, op: eq, expected: true }   # 패키지가 원래 그렇게 배포한 경우
 ```
 
-각 관찰은 `{subject, expected, actual, verdict, source}`로 보고됩니다. 대상 키는 `<kind>:<value>` 형태입니다. 컬렉션의 레지스트리 항목이 kind(`file`, `dir`, `user`, `group`, `unit`, `port`, `module`, `mount`, `key`)를 정하고, `subject:` 필드가 `<value>`를 채울 원소 필드의 이름을 가리킵니다. 컨트롤의 상태는 그 관찰들에서 따라 나옵니다. `each`에서는 모든 관찰이 성립해야 하고, `none`에서는 관찰이 하나도 존재해서는 안 됩니다. 실패한 관찰이 하나만 있어도 절이 실패하며, 테이블은 실패한 관찰 중 앞의 N개를 보여 주고 나머지는 `--all`로 봅니다. waiver는 컨트롤 전체를 지정할 수도 있고 관찰 하나를 지정할 수도 있습니다(`muster.file.world_writable#file:/var/tmp/x`) (D08, D20).
+각 관찰은 `{subject, expected, actual, verdict, source}`로 보고됩니다. 대상 키는 `<kind>:<value>` 형태입니다. 컬렉션의 레지스트리 항목이 kind(`file`, `dir`, `user`, `group`, `unit`, `port`, `module`, `mount`, `key`, `facility`, `zone`)를 정하고, `subject:` 필드가 `<value>`를 채울 원소 필드의 이름을 가리킵니다. 컨트롤의 상태는 그 관찰들에서 따라 나옵니다. `each`에서는 모든 관찰이 성립해야 하고, `none`에서는 관찰이 하나도 존재해서는 안 됩니다. 실패한 관찰이 하나만 있어도 절이 실패하며, 테이블은 실패한 관찰 중 앞의 N개를 보여 주고 나머지는 `--all`로 봅니다. waiver는 컨트롤 전체를 지정할 수도 있고 관찰 하나를 지정할 수도 있습니다(`muster.file.world_writable#file:/var/tmp/x`) (D08, D20).
 
 ### 6.5 상태 도출 (고정)
 
@@ -302,9 +302,9 @@ checks:
 | 단계 | 상황 | 상태 |
 |---|---|---|
 | 1 | 스냅샷이 `requires_facts`를 충족하지 못함 | `ERROR(missing_fact)`, 평가하지 않음 |
-| 2 | `automation: manual` | 수집한 근거와 함께 `MANUAL` |
-| 3 | `applies_when`이 참조한 팩트가 `missing`, `denied`, `timeout`, `error`, `truncated` | 해당 팩트를 명시한 `ERROR` |
-| 4 | `applies_when`이 참조한 팩트가 `absent`나 `unsupported`이거나, `applies_when`이 거짓으로 평가됨 | 근거를 붙인 `NOT_APPLICABLE` |
+| 2 | `applies_when`이 참조한 팩트가 `missing`, `denied`, `timeout`, `error`, `truncated` | 해당 팩트를 명시한 `ERROR` |
+| 3 | `applies_when`이 참조한 팩트가 `absent`나 `unsupported`이거나, `applies_when`이 거짓으로 평가됨 | 근거를 붙인 `NOT_APPLICABLE` |
+| 4 | `automation: manual` | 수집한 근거와 함께 `MANUAL`. 따라서 `applies_when`이 성립하지 않는 manual 컨트롤은 영구적인 `MANUAL` 줄이 아니라 `NOT_APPLICABLE`입니다 |
 | 5 | `mechanisms`를 쓰는데 후보 팩트가 모두 `absent`나 `unsupported`여서 성립하는 `when`이 없음 | `absent_means`에 따름(`pass`, `fail`, `not_applicable`, `manual`) |
 | 6 | 선택된 `checks`가 참조한 팩트가 `missing`, `denied`, `timeout`, `error`, `truncated` | 권한, 한도, 키를 명시한 `ERROR` |
 | 7 | 선택된 `checks`가 참조한 팩트가 `unsupported` | 환경을 명시한 `NOT_APPLICABLE` |
@@ -324,7 +324,7 @@ waiver는 표를 거친 뒤에, `FAIL`과 `WARN`에만 적용합니다. 일치�
 
 ### 6.6 파라미터와 프로파일
 
-`params`는 타입과 기본값과 함께 임계값을 선언하고, 판정이 이를 참조합니다(6.3절). 1단계에는 기본값만 존재합니다. `--tuning <file>`(조직의 값)과 프로파일(`{extends, include, exclude, params, severity}`, `default`라는 이름의 내장 프로파일 포함)은 3단계에 도착합니다. 실제로 적용된 파라미터 값은 결과에 기록됩니다 (D18).
+`params`는 타입과 기본값과 함께 임계값을 선언하고, 판정이 이를 참조합니다(6.3절). 1단계에는 기본값만 존재합니다. 기본값은 배포판이 다른 값을 배포하더라도 가이드의 기준값입니다. 컨트롤 설명이 배포판 기본값과 이를 완화하는 파라미터를 밝힙니다. `--tuning <file>`(조직의 값)과 프로파일(`{extends, include, exclude, params, severity}`, `default`라는 이름의 내장 프로파일 포함)은 3단계에 도착합니다. 실제로 적용된 파라미터 값은 결과에 기록됩니다 (D18).
 
 ### 6.7 Waiver
 
@@ -421,7 +421,7 @@ muster는 남의 프로덕션 호스트에서 root로 돌고, 그 출력은 공�
 - **deferred (service)** — 판정에 v1이 제공하지 않는, 특정 데몬 고유 설정의 파서가 필요합니다. 메일(postfix, sendmail), DNS(bind), FTP 데몬 설정(vsftpd, proftpd)이 그렇습니다. 평범한 파일이나 서비스 상태를 읽는 항목(`ftpusers`, telnet, NFS export, `snmpd.conf`의 커뮤니티)은 미루지 않습니다. v1에서 미룬 항목들은 muster가 수집할 수 있는 근거(설치 여부, 구동 여부, 버전 문자열)와 함께 `manual`로 등록하고, `manual_reason`에 미룬 사유를 적습니다.
 - **not_applicable** — 지원 플랫폼에 그 메커니즘이 없습니다. 컨트롤이 그 이유를 말합니다.
 
-2026년판 목록에 대입하면 **auto 51, partial 7, deferred 9, manual 전용 0, not-applicable 0**이 됩니다. 67개 중 58개를 어떤 형태로든 자동 판정합니다. 항목별 표는 부록 A입니다. 2단계부터는 컨트롤 세트(id, `automation`)와 `docs/reference/kisa/`의 참조 인벤토리(항목명)를 조인해 재생성하고, 커밋된 표와 일치하는지 CI가 확인합니다.
+2026년판 목록에 대입하면 **auto 50, partial 8, deferred 9, manual 전용 0, not-applicable 0**이 됩니다. 67개 중 58개를 어떤 형태로든 자동 판정합니다. 항목별 표는 부록 A입니다. 2단계부터는 컨트롤 세트(id, `automation`)와 `docs/reference/kisa/`의 참조 인벤토리(항목명)를 조인해 재생성하고, 커밋된 표와 일치하는지 CI가 확인합니다.
 
 ### 10.2 단계
 
@@ -433,7 +433,7 @@ muster는 남의 프로덕션 호스트에서 root로 돌고, 그 출력은 공�
 - `U-52`(Telnet, 서비스 정규화, `absent_means: pass`): 매핑된 유닛에 대한 `systemctl show`와 `/proc/net/tcp`의 리스닝 소켓. 소켓 활성화와 `masked`/`static` 처리는 2단계에서 완성됩니다.
 - `U-25`(world-writable, 워크, `each`, partial): 1단계에서는 합성 픽스처에 대해서만 판정합니다. `walk.world_writable`을 채우는 워크는 3단계에 오므로, 실제 1단계 스냅샷에서 U-25는 `MANUAL`("collect --deep을 실행하십시오")입니다. 1단계에서의 목적은 `each`와 관찰과 대상 단위 waiver의 계약을 확정하는 것입니다.
 
-**2단계 — 두 배포판, 자동화 가능한 모든 항목.** 수집기를 완성합니다. sshd(`-G` → `-T` → 파싱 폴백. 사용한 방법을 기록. Match 페르소나. include 소스), 서비스(소켓 활성화, masked/static/indirect, 논리 이름), PAM(authselect / pam-auth-update / 수동 설정 탐지, 스택 확장, 소스를 갖춘 파생 pwquality와 faillock), 방화벽(백엔드 탐지, 원본 덤프, 신뢰도를 갖춘 최소한의 정규화 모델), 함수로서의 로깅(journald만 있는 호스트), 네트워크 sysctl(커널이 파라미터마다 `all`과 인터페이스별 값을 합성하는 방식을 반영합니다. `rp_filter`는 최댓값, `send_redirects`는 논리 OR, `accept_redirects`는 해당 인터페이스의 forwarding에 따라 달라집니다. `default`는 앞으로 생길 인터페이스를 위한 템플릿으로 수집하며 유효 값으로 접어 넣지 않고, IPv6 쌍도 함께 다룹니다), `/proc/sys` 트리 전체, MAC 상태(SELinux/AppArmor, 런타임 대 설정), NSS 원격 소스 탐지, inetd/xinetd, 배너, 시각 동기화, `snmpd.conf`(활성화된 버전, 기본값 여부·길이·출처 제한으로 편집한 커뮤니티), 캐시된 메타데이터로 보는 패치 위생, 계정 상태(해시 알고리즘, 빈 비밀번호), `env` 블록, ACL 항목. auto와 partial 58개 항목 전부를 픽스처와 함께 등록하고, deferred 9개 항목을 근거를 갖춘 manual로 등록합니다. 매핑이 있는 모든 컨트롤에 `references.stig`와 `references.nist_800_53`을 더합니다(3절). CI 매트릭스(`ubuntu:22.04`, `ubuntu:24.04`, `rockylinux/rockylinux:9-ubi-init`, `almalinux/9-init`, 카나리아로 `debian:12`), GitHub 러너 VM에서의 `sudo muster collect`, 능력 매트릭스 테스트, 비 root 잡. 커버리지 표를 생성해 커밋합니다. 파서 오라클 테스트. 공개 이미지에서 뜬 예시 스냅샷. `snapshot extract`, `controls new`, `CONTRIBUTING.md`.
+**2단계 — 두 배포판, 자동화 가능한 모든 항목.** 수집기를 완성합니다. sshd(`-G` → `-T` → 파싱 폴백. 사용한 방법을 기록. Match 페르소나. include 소스), 서비스(소켓 활성화, masked/static/indirect, 논리 이름), PAM(authselect / pam-auth-update / 수동 설정 탐지, 스택 확장, 소스를 갖춘 파생 pwquality와 faillock), 방화벽(백엔드 탐지, 원본 덤프, 신뢰도를 갖춘 최소한의 정규화 모델), 함수로서의 로깅(journald만 있는 호스트), 네트워크 sysctl(커널이 파라미터마다 `all`과 인터페이스별 값을 합성하는 방식을 반영합니다. `rp_filter`는 최댓값, `send_redirects`는 논리 OR, `accept_redirects`는 해당 인터페이스의 forwarding에 따라 달라집니다. `default`는 앞으로 생길 인터페이스를 위한 템플릿으로 수집하며 유효 값으로 접어 넣지 않고, IPv6 쌍도 함께 다룹니다), `/proc/sys` 트리 전체, MAC 상태(SELinux/AppArmor, 런타임 대 설정), NSS 원격 소스 탐지, inetd/xinetd, 배너, 시각 동기화, `snmpd.conf`(활성화된 버전, 기본값 여부·길이·출처 제한으로 편집한 커뮤니티), 캐시된 메타데이터로 보는 패치 위생, 계정 상태(해시 알고리즘, 빈 비밀번호), `env` 블록, ACL 항목. auto와 partial 58개 항목 전부를 픽스처와 함께 등록하고, deferred 9개 항목을 근거를 갖춘 manual로 등록합니다. 매핑이 있는 모든 컨트롤에 `references.stig`와 `references.nist_800_53`을 더합니다(3절). 2단계는 열두 개의 플랜으로 실행합니다. 2A 기반(파일 권한 팩트 템플릿, 드롭인 병합 헬퍼, 커버리지 표 생성기, CI 매트릭스 뼈대, 참조 인덱스 생성기, 어휘 추가), 2B 계정, 2C PAM, 2D sshd와 배너, 2E 홈 디렉터리와 셸 환경, 2G 서비스와 슈퍼서버, 2F 시스템 파일·시작 스크립트·cron, 2H 방화벽, 2I 로깅과 시각 동기화, 2J NFS·SNMP·패치 위생, 2L FTP/메일/DNS 근거와 deferred 항목 등재, 2M 커버리지·참조 게이트입니다. 워크에 의존하는 U-15, U-23, U-25, U-33은 3단계에 남습니다. Rocky와 AlmaLinux는 2단계 동안 CI의 init 컨테이너로 검증하고, 실제 VM 실행은 공개 릴리스 전에 합니다. CI 매트릭스(`ubuntu:22.04`, `ubuntu:24.04`, `rockylinux/rockylinux:9-ubi-init`, `almalinux/9-init`, 카나리아로 `debian:12`), GitHub 러너 VM에서의 `sudo muster collect`, 능력 매트릭스 테스트, 비 root 잡. 커버리지 표를 생성해 커밋합니다. 파서 오라클 테스트. 공개 이미지에서 뜬 예시 스냅샷. `snapshot extract`, `controls new`, `CONTRIBUTING.md`.
 
 **3단계 — 같은 수집기로 얻는, 목록 너머의 고가치 점검.** 워크 자체와, 패키지가 선언한 권한과의 결합(`rpm -V` / `dpkg --verify`. 잡음은 걸러 내고 필터를 기록). 워크에서의 파일 capability와 ACL. 커널 자기 보호 sysctl과 세 소스를 보는 코어 덤프 정책. 부트 체인(grub.cfg 권한, 시큐어 부트 상태). 마운트 옵션, 분리된 파티션, 스왑 암호화, 빌트인 탐지를 포함한 모듈 블랙리스트. 감사 파이프라인 건전성(auditd 규칙 존재와 불변 설정, journald 영속화, 원격 전달, sudo 로깅, 파일 무결성 도구의 설치와 스케줄). 노출 교차 점검(소켓 → 프로세스 → 패키지 대 방화벽. 방화벽 신뢰도가 full일 때만). root와 동등한 경로(컨테이너 런타임 소켓과 그 그룹, `ld.so.preload`, root 유닛의 쓰기 가능한 `ExecStart`, root의 `PATH`). 휴면 계정. U-63의 권한 점검을 넘어서는 `sudoers`의 `NOPASSWD`/`ALL`. 삭제된 실행 파일로 도는 프로세스. `authorized_keys` 인벤토리. 위험도 순서, 백업, 검증 명령, 롤백을 갖춘 `fix --dry-run`. 프로파일의 실현(6.6절). `kisa-unix-2026`이 기본으로 남고, `cis-<배포판>-l1` 프로파일이 같은 수집기 위에서 대상 배포판의 CIS Level 1 서버 권고에 해당하는 컨트롤과 파라미터를 고르며, 그 컨트롤들의 1차 참조는 `references.cis`입니다. 튜닝. 불변식 테스트를 갖춘 `--anonymize`. `--max-age`. 컨트롤 YAML 뮤테이션 테스트. 파서 퍼징.
 
@@ -583,7 +583,7 @@ assay에서 얻은 두 교훈은 "헬퍼는 커버되는데 아무도 호출하�
 | U-53 | FTP 서비스 정보 노출 제한 | 하 | deferred |
 | U-54 | 암호화되지 않는 FTP 서비스 비활성화 | 중 | auto |
 | U-55 | FTP 계정 Shell 제한 | 중 | auto |
-| U-56 | FTP 서비스 접근 제어 설정 | 하 | auto |
+| U-56 | FTP 서비스 접근 제어 설정 | 하 | partial (사용자 목록이 허용인지 거부인지는 v1이 파싱하지 않는 설정에 달려 있음) |
 | U-57 | Ftpusers 파일 설정 | 중 | auto |
 | U-58 | 불필요한 SNMP 서비스 구동 점검 | 중 | auto |
 | U-59 | 안전한 SNMP 버전 사용 | 상 | auto |
@@ -596,4 +596,4 @@ assay에서 얻은 두 교훈은 "헬퍼는 커버되는데 아무도 호출하�
 | U-66 | 정책에 따른 시스템 로깅 설정 | 중 | auto |
 | U-67 | 로그 디렉터리 소유자 및 권한 설정 | 중 | auto |
 
-합계: auto 51, partial 7, deferred 9.
+합계: auto 50, partial 8, deferred 9.
