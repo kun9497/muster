@@ -7,6 +7,7 @@
 package collectors
 
 import (
+	"os"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -14,6 +15,11 @@ import (
 	"github.com/kun9497/muster/internal/collect"
 	"github.com/kun9497/muster/internal/facts"
 )
+
+// euid is os.Geteuid; tests substitute it so the privilege rule below can be
+// exercised from a suite that runs as whichever account started it (R84).
+// Production code never assigns to it.
+var euid = os.Geteuid
 
 // readLimit caps an ordinary configuration file. The kernel socket tables
 // are larger and have their own limit (procNetLimit).
@@ -70,9 +76,19 @@ func firstLine(b []byte) string {
 }
 
 // commandFailure classifies a command that ran but did not succeed: denied
-// when the command said so, error otherwise, with the first stderr line as
-// the reason and the command itself as the source (R59).
-func commandFailure(what string, out collect.Output, src *facts.Source) facts.Envelope {
+// when the privilege was the problem, error otherwise, with the first
+// stderr line as the reason and the command itself as the source (R59).
+//
+// needsRoot is the declaring collector's Needs == "root". R84: a root-only
+// command that fails while this process is not root failed for want of the
+// privilege, whatever it printed — `sshd -T` as a normal user says "Could
+// not load host key" or "no hostkeys available", never "Permission denied",
+// and filing that as an error would have the run header report "facts with
+// status error" where spec §7.1/D25 wants denied with the privilege named.
+// The stderr substring stays as the rule for everything else, including a
+// root-only command that failed while this process WAS root: there the
+// message is the only evidence there is.
+func commandFailure(what string, out collect.Output, src *facts.Source, needsRoot bool) facts.Envelope {
 	reason := firstLine(out.Stderr)
 	if reason == "" {
 		if out.Err != nil {
@@ -81,9 +97,14 @@ func commandFailure(what string, out collect.Output, src *facts.Source) facts.En
 			reason = what + " exited " + strconv.Itoa(out.ExitCode)
 		}
 	}
-	e := collect.ErrorEnv(reason)
-	if strings.Contains(string(out.Stderr), "Permission denied") {
+	var e facts.Envelope
+	switch {
+	case needsRoot && euid() != 0:
+		e = collect.Denied(what + " requires root: " + reason)
+	case strings.Contains(string(out.Stderr), "Permission denied"):
 		e = collect.Denied(reason)
+	default:
+		e = collect.ErrorEnv(reason)
 	}
 	e.Source = src
 	return withTruncation(e, out.Truncated)

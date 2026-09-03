@@ -150,7 +150,11 @@ func probeUnits(ctx context.Context, a collect.Access, units []unitRef) groupSta
 			g.fail(withTruncation(e, out.Truncated))
 			continue
 		case out.Err != nil, out.ExitCode != 0:
-			g.fail(commandFailure("systemctl show "+u.name, out, src))
+			// services declares Needs: none — systemctl answers for any
+			// user — so a failure here is never a privilege problem by
+			// virtue of this process's euid (R84); only what systemctl
+			// itself said can make it denied.
+			g.fail(commandFailure("systemctl show "+u.name, out, src, false))
 			continue
 		}
 		g.truncated = g.truncated || out.Truncated

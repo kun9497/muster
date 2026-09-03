@@ -3,6 +3,7 @@
 package collect
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -13,6 +14,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"golang.org/x/sys/unix"
 
 	"github.com/kun9497/muster/internal/facts"
 )
@@ -222,7 +225,7 @@ func Run(ctx context.Context, o Options, stdout io.Writer) (Outcome, error) {
 	if hdr.Host.Hostname == "" {
 		// The os collector normally fills this from /etc/hostname; fall
 		// back so the generated file name is never "-<time>-<digest>".
-		hdr.Host.Hostname, _ = os.Hostname()
+		hdr.Host.Hostname = unameNodename()
 	}
 
 	snap := facts.Snapshot{SchemaVersion: facts.SchemaVersion, Run: *hdr, Facts: b.Tree()}
@@ -247,6 +250,22 @@ func Run(ctx context.Context, o Options, stdout io.Writer) (Outcome, error) {
 		return Outcome{}, err
 	}
 	return out, nil
+}
+
+// unameNodename is the kernel's node name, taken from uname(2) (M12).
+// os.Hostname() would answer the same question by reading
+// /proc/sys/kernel/hostname — a path no collector declares, that the guard
+// never authorised and the no-follow read primitive never opened, taken
+// behind the back of the discipline the whole package exists to keep.
+// uname is a plain syscall with no path at all, so the fallback reads
+// nothing. An empty result is left empty: SnapshotName sanitises it and the
+// file is still written, just without a host part.
+func unameNodename() string {
+	var u unix.Utsname
+	if err := unix.Uname(&u); err != nil {
+		return ""
+	}
+	return string(bytes.TrimRight(u.Nodename[:], "\x00"))
 }
 
 // acquire takes the lock that guards this run's destination (R44/R73): the

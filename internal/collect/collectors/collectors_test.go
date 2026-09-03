@@ -417,6 +417,96 @@ func TestSshdCollectMethodCitesACommandThatRanAndFailed(t *testing.T) {
 	}
 }
 
+// withEUID installs a fake effective uid for one test (R84). The seam is
+// the only way to exercise the privilege rule from a suite that runs as
+// whichever account happens to have started it.
+func withEUID(t *testing.T, id int) {
+	t.Helper()
+	orig := euid
+	euid = func() int { return id }
+	t.Cleanup(func() { euid = orig })
+}
+
+// I3 (R84). sshd -T run by a non-root process fails with "Could not load
+// host key" or "no hostkeys available" — never "Permission denied" — so the
+// substring rule on its own files a privilege problem as an error, and the
+// run header then says "facts with status error" where spec §7.1/D25 wants
+// denied with the privilege named. A root-only collector's failed command
+// is denied whenever this process is not root; as root the substring rule
+// still decides.
+func TestRootOnlyCommandFailureIsDeniedForANonRootProcess(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		euid int
+		want facts.Status
+	}{
+		{"non-root", 1000, facts.StatusDenied},
+		{"root", 0, facts.StatusError},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			withEUID(t, tc.euid)
+			a := &fsAccess{
+				files: map[string]string{"/etc/ssh/sshd_config": "sshd_config"},
+				cmds: map[string]cmdResult{"/usr/sbin/sshd -T": {
+					exitCode: 255,
+					stderr:   "sshd: no hostkeys available -- exiting.\n",
+				}},
+			}
+			s := setting(t, build(t, "sshd", a), "sshd.options.permit_root_login")
+			if s.Runtime == nil || s.Runtime.Status != tc.want {
+				t.Fatalf("runtime %+v, want %s", s.Runtime, tc.want)
+			}
+			if tc.want == facts.StatusDenied {
+				if want := "sshd -T requires root: sshd: no hostkeys available -- exiting."; s.Runtime.Reason != want {
+					t.Errorf("reason %q, want %q", s.Runtime.Reason, want)
+				}
+			} else if s.Runtime.Reason != "sshd: no hostkeys available -- exiting." {
+				t.Errorf("reason %q must stay the first stderr line for root", s.Runtime.Reason)
+			}
+			if s.Runtime.Source == nil || s.Runtime.Source.Cmd != "/usr/sbin/sshd -T" {
+				t.Errorf("source %+v", s.Runtime.Source)
+			}
+		})
+	}
+}
+
+// ...and a collector that does NOT need root keeps the old rule whatever
+// this process's euid is: systemctl failing for a normal user is an error,
+// because nothing about that command required a privilege it lacked.
+func TestNonRootCollectorCommandFailureStaysAnError(t *testing.T) {
+	withEUID(t, 1000)
+	cmds := allUnitsNotFound()
+	cmds[showLine("ssh.service")] = cmdResult{exitCode: 1, stderr: "Failed to connect to bus\n"}
+	a := servicesAccess(map[string]string{"/proc/self/net/tcp": "proc_net_tcp"}, cmds)
+	if e := env(t, build(t, "services", a), "services.ssh.installed"); e.Status != facts.StatusError {
+		t.Errorf("%+v, want error: services declares Needs: none", e)
+	}
+}
+
+// M16. A single-token value is a word like "yes" or "prohibit-password". A
+// token past 4 KiB is a file's contents arriving through a value slot, and
+// the snapshot is evidence for a finding, not a copy of the host — so it is
+// reported as an error and none of it is stored, on either side.
+func TestSshdOversizedValueIsAnErrorNotAStoredBlob(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{"/etc/ssh/sshd_config": "sshd_config_long_value"},
+		cmds:  map[string]cmdResult{"/usr/sbin/sshd -T": {file: "sshd_T_long_value.txt"}},
+	}
+	s := setting(t, build(t, "sshd", a), "sshd.options.permit_root_login")
+	for _, side := range []struct {
+		name string
+		e    *facts.Envelope
+	}{{"runtime", s.Runtime}, {"persisted", s.Persisted}} {
+		if side.e == nil || side.e.Status != facts.StatusError || side.e.Reason != "value exceeds 4 KiB" {
+			t.Errorf("%s %+v, want error \"value exceeds 4 KiB\"", side.name, side.e)
+			continue
+		}
+		if v, _ := side.e.Value.(string); v != "" {
+			t.Errorf("%s stored %d bytes of the oversized value", side.name, len(v))
+		}
+	}
+}
+
 // --- accounts -----------------------------------------------------------
 
 func TestAccountsDerivesRuntimeAgeingWithoutStoringHashes(t *testing.T) {

@@ -20,6 +20,14 @@ const (
 	sshdConfigDir   = "/etc/ssh/sshd_config.d/*.conf"
 	permitRootLogin = "permitrootlogin"
 	maxIncludeDepth = 8
+
+	// maxTokenValue caps a single keyword value muster stores (M16). A
+	// keyword's value is a word — "yes", "prohibit-password" — and the read
+	// and output limits above it are megabytes, so without this cap one
+	// pathological line of a file or of a command's output would be copied
+	// whole into the snapshot. A longer token is not a value that was
+	// misread; it is not a value at all, so none of it is stored.
+	maxTokenValue = 4 << 10
 )
 
 var sshdT = collect.Command{Path: "/usr/sbin/sshd", Args: []string{"-T"}}
@@ -56,7 +64,9 @@ func runSshd(ctx context.Context, a collect.Access, b *collect.Builder) error {
 	case out.ExitCode != 0:
 		// R59: a daemon that refused to print its configuration is an
 		// error (denied when it said so), never a missing value.
-		e := commandFailure("sshd -T", out, src)
+		// R84: sshd declares Needs: root, so a -T that failed while this
+		// process is not root is a privilege problem, not a parse error.
+		e := commandFailure("sshd -T", out, src, true)
 		s.Runtime = &e
 	default:
 		method = "T" // R59: the method records whether -T answered
@@ -64,6 +74,10 @@ func runSshd(ctx context.Context, a collect.Access, b *collect.Builder) error {
 		for _, line := range splitLines(out.Stdout) {
 			f := configTokens(line)
 			if len(f) >= 2 && strings.ToLower(f[0]) == permitRootLogin {
+				if oversized(f[1]) {
+					e = collect.ErrorEnv(oversizedReason)
+					break
+				}
 				e = collect.OK(f[1], src)
 				break
 			}
@@ -163,6 +177,9 @@ func parseSshdConfig(a collect.Access, file, keyword string, depth int) (facts.E
 			continue
 		}
 		if key == keyword && len(f) >= 2 {
+			if oversized(f[1]) {
+				return collect.ErrorEnv(oversizedReason), true
+			}
 			return collect.OKRead(f[1], &facts.Source{
 				Kind: "file", Path: file, Line: i + 1, Raw: sourceRaw(raw),
 			}, meta), true
@@ -170,6 +187,16 @@ func parseSshdConfig(a collect.Access, file, keyword string, depth int) (facts.E
 	}
 	return facts.Envelope{}, false
 }
+
+// oversizedReason is the reason an over-long value carries. It names the
+// limit rather than the value, because the value is exactly what must not
+// be stored (M16).
+const oversizedReason = "value exceeds 4 KiB"
+
+// oversized reports whether a single parsed value is too long to be one —
+// the same rule for a value read out of a file and one printed by a
+// command, so the two sides of a setting cannot disagree about it.
+func oversized(v string) bool { return len(v) > maxTokenValue }
 
 // configTokens splits an sshd_config line into its keyword and arguments.
 // sshd's own tokenizer treats "=" as a separator, so "PermitRootLogin=yes"

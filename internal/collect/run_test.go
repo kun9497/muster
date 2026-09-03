@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/sys/unix"
+
 	"github.com/kun9497/muster/internal/facts"
 )
 
@@ -389,6 +391,35 @@ func TestRunDefaultDestinationTakesTheLockFile(t *testing.T) {
 	_, err = Run(context.Background(), Options{LockPath: lockPath, Access: quietAccess{}}, nil)
 	if !errors.Is(err, ErrLocked) {
 		t.Fatalf("err=%v", err)
+	}
+}
+
+// M12. When no collector filled the header's hostname, the fallback comes
+// from uname(2) — a plain syscall — rather than os.Hostname(), which reads
+// /proc/sys/kernel/hostname: a path no collector declares, that the guard
+// never sees and the no-follow read primitive never opened. Reset leaves
+// only the muster pseudo-collector, which fills no host block, so this run
+// takes the fallback.
+func TestRunFallbackHostnameComesFromUname(t *testing.T) {
+	Reset()
+	defer Reset()
+	var u unix.Utsname
+	if err := unix.Uname(&u); err != nil {
+		t.Fatal(err)
+	}
+	want := string(bytes.TrimRight(u.Nodename[:], "\x00"))
+	if want == "" {
+		t.Skip("this kernel reports no nodename")
+	}
+	if got := unameNodename(); got != want {
+		t.Errorf("unameNodename() = %q, want %q", got, want)
+	}
+	out, err := Run(context.Background(), Options{Out: filepath.Join(t.TempDir(), "s.json"), Access: quietAccess{}}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out.Header.Host.Hostname != want {
+		t.Errorf("hostname %q, want the uname nodename %q", out.Header.Host.Hostname, want)
 	}
 }
 
