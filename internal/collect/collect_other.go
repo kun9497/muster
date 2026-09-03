@@ -11,3 +11,4 @@ var errPlatform = errors.New("muster collect requires Linux")
 
 func ReadFile(string, int64) ([]byte, ReadMeta, error) { return nil, ReadMeta{}, errPlatform }
 func Stat(string) (ReadMeta, error)                    { return ReadMeta{}, errPlatform }
+func DeniedReason(error) (string, bool)                { return "", false }

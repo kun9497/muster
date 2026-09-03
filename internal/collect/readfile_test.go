@@ -4,12 +4,15 @@ package collect
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"syscall"
 	"testing"
 	"time"
+
+	"golang.org/x/sys/unix"
 )
 
 func mkfile(t *testing.T, path, content string, mode os.FileMode) {
@@ -174,5 +177,140 @@ func TestReadFileComponentwiseGivesSameGuarantees(t *testing.T) {
 	os.Symlink(filepath.Join(dir, "a"), filepath.Join(dir, "b"))
 	if _, meta, err := ReadFile(filepath.Join(dir, "a"), 1<<20); !errors.Is(err, ErrSymlink) || meta.Tier != "componentwise" {
 		t.Errorf("loop: err=%v tier=%q", err, meta.Tier)
+	}
+}
+
+// TestParentUntrustedFalseForRootOwnedNonWritableParent is R68: a root-owned,
+// non-group/world-writable parent must report ParentUntrusted=false for both
+// Stat and ReadFile, once the parent is resolved through the no-follow
+// primitive instead of a second, racy unix.Lstat. The world-writable ->
+// true case is already covered by TestStatReportsSymlinkAndParentTrust.
+func TestParentUntrustedFalseForRootOwnedNonWritableParent(t *testing.T) {
+	if os.Geteuid() != 0 {
+		t.Skip("requires root to guarantee a root-owned parent; the lab host runs as root")
+	}
+	dir := t.TempDir()
+	if err := os.Chmod(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	p := filepath.Join(dir, "f")
+	mkfile(t, p, "x", 0o644)
+
+	meta, err := Stat(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if meta.ParentUntrusted {
+		t.Error("Stat: root-owned 0755 parent must not be untrusted")
+	}
+
+	_, rmeta, err := ReadFile(p, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rmeta.ParentUntrusted {
+		t.Error("ReadFile: root-owned 0755 parent must not be untrusted")
+	}
+}
+
+// TestReadFileRecordsRawModeBits is R69: ReadMeta.Mode carries the raw POSIX
+// bits including setuid/setgid/sticky, which os.FileMode cannot represent.
+// The chmod below goes through unix.Chmod, not os.Chmod: os.Chmod interprets
+// its argument as an os.FileMode, whose special bits (os.ModeSetuid = 1<<23,
+// ...) live at entirely different positions than the raw 0o4000/0o2000/
+// 0o1000 — os.Chmod(p, 0o4755) would silently keep only Perm() (0o755) and
+// drop the setuid request.
+func TestReadFileRecordsRawModeBits(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "setuid")
+	mkfile(t, p, "x", 0o755)
+	if err := unix.Chmod(p, 0o4755); err != nil {
+		t.Fatal(err)
+	}
+	_, meta, err := ReadFile(p, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if meta.Mode != 0o4755 {
+		t.Errorf("meta.Mode = %o, want 4755", meta.Mode)
+	}
+}
+
+func TestReadFileRejectsNegativeLimit(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "f")
+	mkfile(t, p, "x", 0o644)
+	if _, _, err := ReadFile(p, -1); err == nil {
+		t.Error("negative limit must be refused")
+	}
+}
+
+// TestReadFileRootPathIsNotRegular covers "/" under tier 1 (openat2).
+func TestReadFileRootPathIsNotRegular(t *testing.T) {
+	if _, _, err := ReadFile("/", 10); !errors.Is(err, ErrNotRegular) {
+		t.Errorf("err=%v want ErrNotRegular", err)
+	}
+}
+
+// TestReadFileRootPathIsNotRegularComponentwise is item 4: tier 2's normal
+// component split turns "/" into a single empty component, which openat
+// rejects with ENOENT rather than the ErrNotRegular tier 1 gives; "/" is
+// special-cased so both tiers agree.
+func TestReadFileRootPathIsNotRegularComponentwise(t *testing.T) {
+	old := forceComponentwise
+	forceComponentwise = true
+	defer func() { forceComponentwise = old }()
+	if _, meta, err := ReadFile("/", 10); !errors.Is(err, ErrNotRegular) || meta.Tier != "componentwise" {
+		t.Errorf("err=%v tier=%q want ErrNotRegular/componentwise", err, meta.Tier)
+	}
+}
+
+func TestDeniedReasonClassifiesPermissionErrors(t *testing.T) {
+	if _, ok := DeniedReason(fmt.Errorf("wrap: %w", unix.EACCES)); !ok {
+		t.Error("wrapped EACCES must be denied")
+	}
+	if _, ok := DeniedReason(os.ErrPermission); !ok {
+		t.Error("os.ErrPermission must be denied")
+	}
+	if _, ok := DeniedReason(errors.New("boom")); ok {
+		t.Error("unrelated error must not be denied")
+	}
+}
+
+func TestReadFileRefusesDirectory(t *testing.T) {
+	dir := t.TempDir()
+	if _, _, err := ReadFile(dir, 10); !errors.Is(err, ErrNotRegular) {
+		t.Errorf("err=%v want ErrNotRegular", err)
+	}
+}
+
+func TestReadFileRejectsDotDotAndTrailingSlash(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "f")
+	mkfile(t, p, "x", 0o644)
+	if _, _, err := ReadFile(dir+"/sub/../f", 10); err == nil {
+		t.Error("path with .. must be refused")
+	}
+	if _, _, err := ReadFile(dir+"/", 10); err == nil {
+		t.Error("trailing slash must be refused")
+	}
+}
+
+// TestReadFileTruncatedSizeIsFullFileSize: Size comes from fstat before the
+// read and must reflect the whole file, not the (possibly truncated) number
+// of bytes ReadFile actually returns.
+func TestReadFileTruncatedSizeIsFullFileSize(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "big")
+	mkfile(t, p, strings.Repeat("a", 1000), 0o644)
+	data, meta, err := ReadFile(p, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(data) != 100 || !meta.Truncated {
+		t.Fatalf("len=%d meta=%+v", len(data), meta)
+	}
+	if meta.Size != 1000 {
+		t.Errorf("meta.Size = %d, want 1000 (full file size, not the truncated read length)", meta.Size)
 	}
 }
