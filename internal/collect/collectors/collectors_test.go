@@ -38,6 +38,7 @@ type fsAccess struct {
 	dirs        map[string]bool              // host path -> exists, but is not a readable file
 	cmds        map[string]cmdResult         // command line -> canned outcome
 	fails       map[string]error             // host path -> error returned instead of content
+	truncated   map[string]bool              // host path -> ReadFile reports the read hit the cap (R70)
 	modes       map[string]uint32            // host path -> raw 0o7777 bits (fallback consulted when stats has no entry)
 	stats       map[string]statResult        // host path -> full Stat() shape (R93; Task 5 relies on this)
 	xattrs      map[string][]string          // host path -> extended attribute names
@@ -83,7 +84,7 @@ func (a *fsAccess) ReadFile(p string, _ int64) ([]byte, collect.ReadMeta, error)
 		return nil, collect.ReadMeta{}, os.ErrNotExist
 	}
 	b, err := a.read(name)
-	return b, collect.ReadMeta{Tier: "openat2", Size: int64(len(b)), Mode: a.mode(p, 0o644)}, err
+	return b, collect.ReadMeta{Tier: "openat2", Size: int64(len(b)), Mode: a.mode(p, 0o644), Truncated: a.truncated[p]}, err
 }
 
 func (a *fsAccess) Stat(p string) (collect.ReadMeta, error) {
