@@ -261,7 +261,10 @@ func setTelnetReachable(b *collect.Builder, a collect.Access) {
 	t, err := listeningSockets(a)
 	switch {
 	case err != nil:
-		b.Set("services.telnet.reachable", collect.FromReadError(err, collect.ReadMeta{}))
+		// R82: the same failure the sockets collector would report, filed
+		// the same way — a masked procfs is unsupported here too, never an
+		// absent that U-52's absent_means: pass could read as a PASS.
+		b.Set("services.telnet.reachable", socketReadEnvelope(err))
 	case t.truncated:
 		b.Set("services.telnet.reachable", collect.ErrorEnv("the listening-socket table was truncated at its read limit"))
 	default:

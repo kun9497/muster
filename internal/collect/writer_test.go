@@ -238,3 +238,88 @@ func TestFinalizeRenameFallsBackWhenRenameNoReplaceUnsupported(t *testing.T) {
 		}
 	})
 }
+
+// TestWriteSnapshotRefusesASymlinkedOutputPath is I2 (R83). Spec §7.1
+// refuses an output path that is a symbolic link and writes nothing — and
+// says so with no exception for --force, which only licenses replacing a
+// snapshot muster itself wrote. Without the check the rename swaps the link
+// for the new file and leaves the operator's intended target untouched.
+func TestWriteSnapshotRefusesASymlinkedOutputPath(t *testing.T) {
+	for _, force := range []bool{false, true} {
+		dir := t.TempDir()
+		target := filepath.Join(dir, "s.json")
+		if err := os.WriteFile(target, []byte("original"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		link := filepath.Join(dir, "link.json")
+		if err := os.Symlink(target, link); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := WriteSnapshot([]byte(`{"a":1}`), WriteOptions{Out: link, Force: force}, nil); !errors.Is(err, ErrOutputSymlink) {
+			t.Errorf("force=%v: err = %v, want ErrOutputSymlink", force, err)
+		}
+		if got, _ := os.ReadFile(target); string(got) != "original" {
+			t.Errorf("force=%v: the link's target was written: %q", force, got)
+		}
+		fi, err := os.Lstat(link)
+		if err != nil || fi.Mode()&os.ModeSymlink == 0 {
+			t.Errorf("force=%v: the output path is no longer a symbolic link: %v %v", force, fi, err)
+		}
+		entries, _ := os.ReadDir(dir)
+		if len(entries) != 2 {
+			t.Errorf("force=%v: %d entries, want only the target and the link", force, len(entries))
+		}
+	}
+}
+
+// TestLockHolderTextIsStrippedToPrintableASCII is M9. The holder line comes
+// out of a file some other process wrote, and the message it lands in goes
+// to a terminal, so everything outside printable ASCII is stripped first.
+func TestLockHolderTextIsStrippedToPrintableASCII(t *testing.T) {
+	lp := filepath.Join(t.TempDir(), "d", ".lock")
+	l1, err := AcquireLock(lp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer l1.Release()
+	// flock is advisory: holding it does not stop another writer from
+	// putting whatever it likes in the file the holder text is read from.
+	if err := os.WriteFile(lp, []byte("31337 \x1b[31m\x00\x07evil\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_, err = AcquireLock(lp)
+	switch {
+	case !errors.Is(err, ErrLocked):
+		t.Fatalf("err = %v, want ErrLocked", err)
+	case strings.ContainsAny(err.Error(), "\x00\x07\x1b"):
+		t.Errorf("holder text keeps control bytes: %q", err.Error())
+	case !strings.Contains(err.Error(), "31337"):
+		t.Errorf("holder text lost its printable part: %q", err.Error())
+	}
+}
+
+// TestAcquireLockRefusesAnUntrustedDirectory is M9's second half: the lock
+// file's parent is held to the same rule as the snapshot directory, so a
+// world-writable one is refused rather than locked.
+func TestAcquireLockRefusesAnUntrustedDirectory(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "ww")
+	if err := os.Mkdir(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(dir, 0o777); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := AcquireLock(filepath.Join(dir, ".lock")); !errors.Is(err, ErrUntrustedDir) {
+		t.Errorf("err = %v, want ErrUntrustedDir", err)
+	}
+}
+
+// TestSnapshotNameCapsTheHostname is M11: the hostname is read off the host
+// and lands in a file name, so its sanitised form is capped.
+func TestSnapshotNameCapsTheHostname(t *testing.T) {
+	n := SnapshotName(strings.Repeat("h", 200), "2026-09-02T06:00:00Z", "sha256:0123456789abcdef")
+	host, _, _ := strings.Cut(n, "-")
+	if len(host) != 64 {
+		t.Errorf("host part is %d bytes, want 64: %q", len(host), n)
+	}
+}

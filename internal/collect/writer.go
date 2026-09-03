@@ -33,12 +33,21 @@ var (
 	ErrNoSpace          = errors.New("not enough free space for a snapshot")
 	ErrLocked           = errors.New("another muster collect is running")
 	ErrLatestNotUpdated = errors.New("snapshot written but the latest link was not updated")
+	ErrOutputSymlink    = errors.New("output path is a symbolic link")
 )
 
+// maxHostnameInName caps the sanitised hostname a generated file name
+// carries. A hostname is at most 253 bytes and every byte of it survives
+// sanitising, so without a cap one host could name a file three times as
+// long as any other; 64 bytes is longer than any real node name and keeps
+// the generated name comfortably inside every filesystem's limit.
+const maxHostnameInName = 64
+
 // SnapshotName is <host>-<utc time>-<short digest>.json (spec §5.9): the
-// hostname sanitised to [A-Za-z0-9._-] (anything else becomes '_'), the
-// collectedAt timestamp with ':' removed, and the first 12 hex characters
-// of digest after its "sha256:" prefix.
+// hostname sanitised to [A-Za-z0-9._-] (anything else becomes '_') and
+// capped at maxHostnameInName bytes, the collectedAt timestamp with ':'
+// removed, and the first 12 hex characters of digest after its "sha256:"
+// prefix.
 //
 // digest is expected to be the sha256 of the exact bytes being written to
 // disk (WriteSnapshot computes it that way via digestOf, over data as
@@ -55,6 +64,11 @@ func SnapshotName(hostname, collectedAt, digest string) string {
 		}
 		return '_'
 	}, hostname)
+	if len(h) > maxHostnameInName {
+		// Every rune the map kept is one ASCII byte, so a byte cut can
+		// never land inside a multi-byte sequence here.
+		h = h[:maxHostnameInName]
+	}
 	d := strings.TrimPrefix(digest, "sha256:")
 	if len(d) > 12 {
 		d = d[:12]
@@ -144,6 +158,17 @@ func WriteSnapshot(data []byte, o WriteOptions, stdout io.Writer) (string, error
 		return "", ErrNoSpace
 	}
 	final := filepath.Join(dir, name)
+	// Spec §7.1 lists "output path is a symlink" beside "in a world-writable
+	// directory" as a refusal that writes nothing, with no exception for
+	// --force: --force licenses replacing a snapshot, not following a link
+	// somebody else planted. Lstat here, before the temp file exists, so a
+	// refused run leaves the directory exactly as it found it — the rename
+	// would otherwise swap the link for the new file and leave the target
+	// the operator meant to write silently untouched.
+	var lst unix.Stat_t
+	if err := unix.Lstat(final, &lst); err == nil && lst.Mode&unix.S_IFMT == unix.S_IFLNK {
+		return "", fmt.Errorf("%s: %w", final, ErrOutputSymlink)
+	}
 	tmp := filepath.Join(dir, fmt.Sprintf(".%s.tmp-%d", name, os.Getpid()))
 	fd, err := unix.Open(tmp, unix.O_CREAT|unix.O_EXCL|unix.O_WRONLY|unix.O_NOFOLLOW|unix.O_CLOEXEC, 0o600)
 	if err != nil {
@@ -230,10 +255,30 @@ func finalizeRename(tmp, final string, force bool) error {
 // through AcquireLock or AcquireDirLock, never a Lock{} literal.
 type Lock struct{ fd int }
 
+// printableASCII drops every byte outside the printable ASCII range, so
+// text that came out of a file another process wrote cannot carry control
+// characters — terminal escape sequences above all — into a message muster
+// prints. It is applied to the lock holder line for exactly that reason.
+func printableASCII(s string) string {
+	return strings.Map(func(r rune) rune {
+		if r >= ' ' && r <= '~' {
+			return r
+		}
+		return -1
+	}, s)
+}
+
 // AcquireLock takes an exclusive, non-blocking lock on the lock file at
-// path and records the holder.
+// path and records the holder. The lock file's directory is held to the
+// same rule as the snapshot directory (trustedDir): a world-writable or
+// symlinked parent would let anyone plant the file whose contents this
+// function reads back and reports.
 func AcquireLock(path string) (*Lock, error) {
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return nil, err
+	}
+	if err := trustedDir(dir); err != nil {
 		return nil, err
 	}
 	fd, err := unix.Open(path, unix.O_CREAT|unix.O_RDWR|unix.O_CLOEXEC|unix.O_NOFOLLOW, 0o600)
@@ -252,7 +297,7 @@ func AcquireLock(path string) (*Lock, error) {
 			n = 0
 		}
 		unix.Close(fd)
-		return nil, fmt.Errorf("%w (holder: pid %s)", ErrLocked, strings.TrimSpace(string(holder[:n])))
+		return nil, fmt.Errorf("%w (holder: pid %s)", ErrLocked, printableASCII(strings.TrimSpace(string(holder[:n]))))
 	}
 	unix.Ftruncate(fd, 0)
 	unix.Pwrite(fd, []byte(fmt.Sprintf("%d %s\n", os.Getpid(), time.Now().UTC().Format(time.RFC3339))), 0)

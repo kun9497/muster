@@ -13,6 +13,8 @@ import (
 	"strings"
 	"testing"
 
+	"golang.org/x/sys/unix"
+
 	"github.com/kun9497/muster/internal/collect"
 	"github.com/kun9497/muster/internal/facts"
 )
@@ -562,6 +564,43 @@ func TestSocketsUnreadableTableIsNotAnEmptyList(t *testing.T) {
 	b := build(t, "sockets", a)
 	if e := env(t, b, "sockets.listening"); e.Status != facts.StatusDenied {
 		t.Errorf("%+v", e)
+	}
+}
+
+// I1 (R82). A mandatory /proc/self/net/tcp that is not there at all —
+// procfs masked, or never mounted (ENOENT), or /proc/self/net turning out
+// not to be a directory (ENOTDIR) — is an environment without a socket
+// table, which spec §7.1 files as unsupported. As "absent" it would resolve
+// through U-52's absent_means: pass to a PASS on a table nobody ever saw
+// (D07), so both facts that rest on the table say unsupported instead.
+func TestMaskedProcfsIsUnsupportedNotAbsent(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		err  error
+	}{
+		{"enoent", os.ErrNotExist},
+		{"enotdir", unix.ENOTDIR},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			e := env(t, build(t, "sockets", &fsAccess{
+				fails: map[string]error{"/proc/self/net/tcp": tc.err},
+			}), "sockets.listening")
+			if e.Status != facts.StatusUnsupported {
+				t.Errorf("sockets.listening %+v, want unsupported", e)
+			}
+			if !strings.Contains(e.Reason, "/proc/self/net/tcp") {
+				t.Errorf("reason %q must name the table that was not there", e.Reason)
+			}
+			svc := servicesAccess(nil, allUnitsNotFound())
+			svc.fails = map[string]error{"/proc/self/net/tcp": tc.err}
+			r := env(t, build(t, "services", svc), "services.telnet.reachable")
+			if r.Status != facts.StatusUnsupported {
+				t.Errorf("services.telnet.reachable %+v, want unsupported", r)
+			}
+			if !strings.Contains(r.Reason, "/proc/self/net/tcp") {
+				t.Errorf("reason %q must name the table that was not there", r.Reason)
+			}
+		})
 	}
 }
 

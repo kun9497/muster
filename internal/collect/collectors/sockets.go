@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 
+	"golang.org/x/sys/unix"
+
 	"github.com/kun9497/muster/internal/collect"
 	"github.com/kun9497/muster/internal/facts"
 )
@@ -38,11 +40,14 @@ const (
 // table must exist — without it procfs is telling us nothing at all, and
 // reporting an empty list would be a PASS on no evidence (R41). An
 // unreadable table, as opposed to a missing one, is always an error.
+// procNetTCP is the one table that must be there; see procNetTables.
+const procNetTCP = "/proc/self/net/tcp"
+
 var procNetTables = []struct {
 	path, proto string
 	optional    bool
 }{
-	{"/proc/self/net/tcp", "tcp", false},
+	{procNetTCP, "tcp", false},
 	{"/proc/self/net/tcp6", "tcp6", true},
 	{"/proc/self/net/udp", "udp", true},
 	{"/proc/self/net/udp6", "udp6", true},
@@ -63,6 +68,16 @@ var socketsCollector = collect.Collector{
 	Declare: collect.Declaration{Reads: procNetPaths(), Needs: "none"},
 	Run:     runSockets,
 }
+
+// ErrProcfsMasked is what listeningSockets returns when the mandatory
+// table is not there at all: procfs masked (a container that hides it), or
+// never mounted, or /proc/self/net turning out not to be a directory. R82:
+// that is an environment with no socket table to read, which spec §7.1
+// files as unsupported — not an absent file. Reported as absent it would
+// resolve through U-52's `absent_means: pass` into a PASS on a table nobody
+// ever saw, which D07 forbids. An unreadable table (EACCES) is a different
+// thing and still classifies through FromReadError.
+var ErrProcfsMasked = errors.New("procfs is masked or not mounted: no " + procNetTCP)
 
 // socketTables is what one pass over the kernel tables produced.
 type socketTables struct {
@@ -88,8 +103,13 @@ func listeningSockets(a collect.Access) (socketTables, error) {
 	for _, tbl := range procNetTables {
 		data, meta, err := a.ReadFile(tbl.path, procNetLimit)
 		if err != nil {
-			if tbl.optional && errors.Is(err, fs.ErrNotExist) {
+			switch {
+			case tbl.optional && errors.Is(err, fs.ErrNotExist):
 				continue
+			case !tbl.optional && (errors.Is(err, fs.ErrNotExist) || errors.Is(err, unix.ENOTDIR)):
+				// R82: the table is not there at all, so this host has no
+				// socket table to read — unsupported, not absent.
+				return socketTables{}, ErrProcfsMasked
 			}
 			return socketTables{}, fmt.Errorf("%s: %w", tbl.path, err)
 		}
@@ -165,10 +185,20 @@ func parseProcAddr(s string) (addr string, port int, loopback, ok bool) {
 	return ip.String(), int(p), ip.IsLoopback(), true
 }
 
+// socketReadEnvelope turns a listeningSockets failure into the envelope
+// both facts that rest on the socket table carry (R82), so sockets.listening
+// and services.telnet.reachable can never disagree about the same failure.
+func socketReadEnvelope(err error) facts.Envelope {
+	if errors.Is(err, ErrProcfsMasked) {
+		return collect.Unsupported(err.Error())
+	}
+	return collect.FromReadError(err, collect.ReadMeta{})
+}
+
 func runSockets(_ context.Context, a collect.Access, b *collect.Builder) error {
 	t, err := listeningSockets(a)
 	if err != nil {
-		b.Set("sockets.listening", collect.FromReadError(err, collect.ReadMeta{}))
+		b.Set("sockets.listening", socketReadEnvelope(err))
 		return nil
 	}
 	// R70: the truncation flag rides along, so the check side can tell an

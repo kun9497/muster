@@ -72,6 +72,41 @@ func TestCollectWritesASnapshotOnLinux(t *testing.T) {
 	}
 }
 
+// I2 (R83): an --out path that is a symbolic link is refused before
+// anything is written, with --force exactly as without it, and the command
+// reports it the way it reports the writer's other refusals — exit 2 and a
+// "muster:" line that names the path and what it is, not a generic
+// "collect failed".
+func TestCollectRefusesASymlinkedOutPath(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("linux only")
+	}
+	dir := t.TempDir()
+	target := filepath.Join(dir, "s.json")
+	if err := os.WriteFile(target, []byte("original"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(dir, "link.json")
+	if err := os.Symlink(target, link); err != nil {
+		t.Fatal(err)
+	}
+	for _, args := range [][]string{
+		{"collect", "--out", link},
+		{"collect", "--out", link, "--force"},
+	} {
+		var out, errb bytes.Buffer
+		if code := run(args, &out, &errb); code != exitError {
+			t.Errorf("%v: code %d, want %d (stderr %q)", args, code, exitError, errb.String())
+		}
+		if want := "muster: " + link + ": output path is a symbolic link"; !strings.Contains(errb.String(), want) {
+			t.Errorf("%v: stderr %q lacks %q", args, errb.String(), want)
+		}
+		if got, _ := os.ReadFile(target); string(got) != "original" {
+			t.Errorf("%v: the link's target was written: %q", args, got)
+		}
+	}
+}
+
 func TestCollectListActionsOnLinux(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip("linux only")

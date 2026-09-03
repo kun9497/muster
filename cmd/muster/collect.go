@@ -54,7 +54,11 @@ func runCollect(args []string, stdout, stderr io.Writer) int {
 		ControlsVersion: set.Version, ControlsDigest: set.Digest,
 	}, stdout)
 	if err != nil {
-		if errors.Is(err, collect.ErrLocked) || errors.Is(err, collect.ErrNotRoot) || errors.Is(err, collect.ErrExists) {
+		// The writer's own refusals already say what happened and which
+		// path it happened to; "collect failed:" in front of them would
+		// only bury the sentence the operator has to act on (R83).
+		if errors.Is(err, collect.ErrLocked) || errors.Is(err, collect.ErrNotRoot) ||
+			errors.Is(err, collect.ErrExists) || errors.Is(err, collect.ErrOutputSymlink) {
 			fmt.Fprintf(stderr, "muster: %v\n", err)
 		} else {
 			fmt.Fprintf(stderr, "muster: collect failed: %v\n", err)
