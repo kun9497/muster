@@ -5,6 +5,7 @@ package collect
 import (
 	"errors"
 	"io/fs"
+	"slices"
 	"sort"
 	"strings"
 
@@ -15,7 +16,9 @@ import (
 
 // Builder accumulates facts by registry key and renders the nested tree.
 // Setting an unregistered key panics: it is a programming error the
-// collector tests must catch, never a runtime condition.
+// collector tests must catch, never a runtime condition. Builder is not
+// safe for concurrent use — collectors run sequentially against one
+// Builder, never in parallel.
 type Builder struct {
 	reg     *facts.Registry
 	tree    map[string]any
@@ -36,6 +39,14 @@ func (b *Builder) Header() *facts.Run { return b.header }
 // so Keys and Worst can later be asked about it (R71).
 func (b *Builder) Begin(name string) { b.current = name }
 
+// place descends b.tree by key's dotted segments and stores leaf at the
+// end. A key whose path collides with a leaf already set at a shorter or
+// longer prefix panics rather than silently replacing it — checked
+// internal/facts/registry.go: LoadRegistry only rejects an exact duplicate
+// key string ("registry.yaml: duplicate key %q"), it does not forbid one
+// registered key's path being a dotted prefix of another's, so nothing
+// upstream of Builder guarantees this can't happen; place is the only place
+// that can catch it, at the point the tree is actually built.
 func (b *Builder) place(key string, leaf any) {
 	e, ok := b.reg.Lookup(key)
 	if !ok {
@@ -48,14 +59,26 @@ func (b *Builder) place(key string, leaf any) {
 	segs := strings.Split(key, ".")
 	cur := b.tree
 	for _, s := range segs[:len(segs)-1] {
-		next, ok := cur[s].(map[string]any)
-		if !ok {
-			next = map[string]any{}
+		existing, present := cur[s]
+		if !present {
+			next := map[string]any{}
 			cur[s] = next
+			cur = next
+			continue
+		}
+		next, ok := existing.(map[string]any)
+		if !ok {
+			panic("collect: fact key " + key + " collides with a leaf already set at a shorter prefix")
 		}
 		cur = next
 	}
-	cur[segs[len(segs)-1]] = leaf
+	last := segs[len(segs)-1]
+	if existing, present := cur[last]; present {
+		if _, isMap := existing.(map[string]any); isMap {
+			panic("collect: fact key " + key + " collides with keys already set beneath it")
+		}
+	}
+	cur[last] = leaf
 	b.keys[b.current] = append(b.keys[b.current], key)
 }
 
@@ -89,11 +112,13 @@ func (b *Builder) SetSetting(key string, s facts.Setting) { b.place(key, s) }
 // Tree returns the nested facts tree for the snapshot.
 func (b *Builder) Tree() map[string]any { return b.tree }
 
-// Keys returns, sorted, every key set for collector name.
+// Keys returns, sorted and deduplicated, every key set for collector name
+// (a key set twice — e.g. Set called again to correct an earlier value —
+// appears once).
 func (b *Builder) Keys(name string) []string {
 	ks := append([]string(nil), b.keys[name]...)
 	sort.Strings(ks)
-	return ks
+	return slices.Compact(ks)
 }
 
 // leaf walks the tree already built by place, by dotted key.

@@ -10,13 +10,19 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
+	"unsafe"
 
 	"golang.org/x/sys/unix"
 
 	"github.com/kun9497/muster/internal/facts"
 )
+
+// noopRun is a placeholder Collector.Run for tests that only exercise
+// registration/declaration behaviour and never actually run the collector.
+func noopRun(context.Context, Access, *Builder) error { return nil }
 
 // fakeAccess implements all six Access methods (R46/R60); ReadFile, Stat,
 // Llistxattr and Writable each record the path they were asked about so
@@ -123,6 +129,68 @@ func TestGuardCommandRequiresExactArgsNotPrefix(t *testing.T) {
 	}
 }
 
+// R72(a): allowedPath matches an unclean path against the declaration on
+// its cleaned form, but every read-like guard method must go on to hand
+// THAT cleaned form to inner, never the original string — otherwise a
+// declaration for "/etc/login.defs" would authorise a request for
+// "/etc/ssh/../login.defs" while handing the unclean original to inner,
+// which (for hostAccess.Writable pre-fix, or any future Access
+// implementation that isn't as careful as the read primitive) could
+// resolve through whatever "/etc/ssh" happens to be instead of the
+// declared file itself.
+func TestGuardPassesCleanedPathToInnerForAllReadLikeMethods(t *testing.T) {
+	c := Collector{Name: "t", Declare: Declaration{Reads: []string{"/etc/login.defs"}}}
+	const unclean = "/etc/ssh/../login.defs"
+	const want = "/etc/login.defs"
+
+	fa := &fakeAccess{}
+	g := Guard(fa, c)
+	if _, _, err := g.ReadFile(unclean, 10); err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if _, err := g.Stat(unclean); err != nil {
+		t.Fatalf("Stat: %v", err)
+	}
+	if _, err := g.Llistxattr(unclean); err != nil {
+		t.Fatalf("Llistxattr: %v", err)
+	}
+	if !g.Writable(unclean) {
+		t.Fatal("Writable must pass for the cleaned form")
+	}
+	if len(fa.reads) != 4 {
+		t.Fatalf("inner saw %d calls, want 4: %v", len(fa.reads), fa.reads)
+	}
+	for _, got := range fa.reads {
+		if got != want {
+			t.Errorf("inner received %q, want the cleaned path %q", got, want)
+		}
+	}
+}
+
+// R72: Register rejects a Needs outside {root, none} and a nil Run, both
+// programming errors caught at registration time.
+func TestRegisterPanicsOnInvalidNeeds(t *testing.T) {
+	Reset()
+	defer Reset()
+	defer func() {
+		if recover() == nil {
+			t.Error("expected panic for Needs outside {root, none}")
+		}
+	}()
+	Register(Collector{Name: "x", Declare: Declaration{Needs: "sometimes"}, Run: noopRun})
+}
+
+func TestRegisterPanicsOnNilRun(t *testing.T) {
+	Reset()
+	defer Reset()
+	defer func() {
+		if recover() == nil {
+			t.Error("expected panic for a nil Run")
+		}
+	}()
+	Register(Collector{Name: "x", Declare: Declaration{Needs: "none"}})
+}
+
 func TestBuilderSetsEnvelopesAndSettingsByRegistryKey(t *testing.T) {
 	reg, err := facts.LoadRegistry()
 	if err != nil {
@@ -182,6 +250,73 @@ func TestBuilderNormalizesNilListsToEmptyArray(t *testing.T) {
 	}
 }
 
+// injectSyntheticKeys pokes synthetic entries directly into reg's private
+// index. There is no public constructor for a Registry with custom keys —
+// facts.LoadRegistry only ever parses the embedded registry.yaml, and
+// facts.Registry.byKey is unexported — so this reaches it via reflection,
+// entirely within this test file, rather than adding a test-only
+// constructor to internal/facts (out of Task 3's file list). It exists
+// solely to test Builder.place's key-prefix-collision guard (item 8) with a
+// pair of keys the real registry.yaml doesn't happen to contain: checked
+// internal/facts/registry.go — LoadRegistry only rejects an exact duplicate
+// key string, it never forbids one key's path being a dotted prefix of
+// another's, so Builder.place is the only layer that can catch this.
+func injectSyntheticKeys(t *testing.T, reg *facts.Registry, entries ...facts.Entry) {
+	t.Helper()
+	rv := reflect.ValueOf(reg).Elem().FieldByName("byKey")
+	rv = reflect.NewAt(rv.Type(), unsafe.Pointer(rv.UnsafeAddr())).Elem()
+	m, ok := rv.Interface().(map[string]facts.Entry)
+	if !ok {
+		t.Fatalf("facts.Registry.byKey has unexpected type %v", rv.Type())
+	}
+	for _, e := range entries {
+		m[e.Key] = e
+	}
+}
+
+// item 8: setting a leaf then a key that descends past it must panic
+// instead of silently replacing the leaf with an empty map.
+func TestBuilderPlacePanicsOnLeafThenChildCollision(t *testing.T) {
+	reg, err := facts.LoadRegistry()
+	if err != nil {
+		t.Fatal(err)
+	}
+	injectSyntheticKeys(t, reg,
+		facts.Entry{Key: "synthetic.leaf", Type: "bool", Since: 1, Sensitivity: "public"},
+		facts.Entry{Key: "synthetic.leaf.child", Type: "bool", Since: 1, Sensitivity: "public"},
+	)
+	b := NewBuilder(reg)
+	b.Set("synthetic.leaf", OK(true, nil))
+	defer func() {
+		if recover() == nil {
+			t.Error("expected panic: synthetic.leaf.child collides with the leaf already set at synthetic.leaf")
+		}
+	}()
+	b.Set("synthetic.leaf.child", OK(true, nil))
+}
+
+// item 8, reverse direction: setting keys beneath a prefix and then setting
+// the prefix itself as a leaf must also panic, not silently overwrite the
+// map of children with a leaf.
+func TestBuilderPlacePanicsOnChildThenLeafCollision(t *testing.T) {
+	reg, err := facts.LoadRegistry()
+	if err != nil {
+		t.Fatal(err)
+	}
+	injectSyntheticKeys(t, reg,
+		facts.Entry{Key: "synthetic2.leaf", Type: "bool", Since: 1, Sensitivity: "public"},
+		facts.Entry{Key: "synthetic2.leaf.child", Type: "bool", Since: 1, Sensitivity: "public"},
+	)
+	b := NewBuilder(reg)
+	b.Set("synthetic2.leaf.child", OK(true, nil))
+	defer func() {
+		if recover() == nil {
+			t.Error("expected panic: synthetic2.leaf collides with keys already set beneath it")
+		}
+	}()
+	b.Set("synthetic2.leaf", OK(true, nil))
+}
+
 // R71: Begin/Keys/Worst give a collector its own bookkeeping.
 func TestBuilderPerCollectorBookkeeping(t *testing.T) {
 	reg, err := facts.LoadRegistry()
@@ -213,6 +348,22 @@ func TestBuilderPerCollectorBookkeeping(t *testing.T) {
 	}
 	if got := b.Worst("never-began"); got != facts.StatusOK {
 		t.Errorf("Worst(no keys) = %v, want ok", got)
+	}
+}
+
+// item 4: Keys deduplicates as well as sorts — a key set twice (e.g.
+// corrected by a second Set call) appears once.
+func TestBuilderKeysDeduplicates(t *testing.T) {
+	reg, err := facts.LoadRegistry()
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := NewBuilder(reg)
+	b.Begin("services")
+	b.Set("services.ssh.installed", OK(true, nil))
+	b.Set("services.ssh.installed", OK(false, nil))
+	if keys := b.Keys("services"); len(keys) != 1 || keys[0] != "services.ssh.installed" {
+		t.Errorf("Keys(services) = %v, want exactly one entry", keys)
 	}
 }
 
@@ -250,8 +401,8 @@ func TestBuilderHeaderStartsEmpty(t *testing.T) {
 func TestListActionsIncludesEveryDeclarationAndTheWrite(t *testing.T) {
 	Reset()
 	defer Reset()
-	Register(Collector{Name: "a", Declare: Declaration{Reads: []string{"/etc/passwd"}, Needs: "none"}})
-	Register(Collector{Name: "b", Declare: Declaration{Commands: []Command{{Path: "/usr/sbin/sshd", Args: []string{"-T"}}}, Needs: "root"}})
+	Register(Collector{Name: "a", Declare: Declaration{Reads: []string{"/etc/passwd"}, Needs: "none"}, Run: noopRun})
+	Register(Collector{Name: "b", Declare: Declaration{Commands: []Command{{Path: "/usr/sbin/sshd", Args: []string{"-T"}}}, Needs: "root"}, Run: noopRun})
 	acts := ListActions()
 	var kinds []string
 	for _, a := range acts {
@@ -269,12 +420,36 @@ func TestListActionsIncludesEveryDeclarationAndTheWrite(t *testing.T) {
 	}
 }
 
+// item 5: ListActions sorts by (collector, kind, target), independent of
+// the order collectors were registered in or declared their reads/commands
+// in.
+func TestListActionsSortsByCollectorKindTarget(t *testing.T) {
+	Reset()
+	defer Reset()
+	Register(Collector{Name: "zzz", Declare: Declaration{Reads: []string{"/etc/z", "/etc/a"}, Needs: "none"}, Run: noopRun})
+	Register(Collector{Name: "aaa", Declare: Declaration{Commands: []Command{{Path: "/usr/bin/y"}, {Path: "/usr/bin/b"}}, Needs: "none"}, Run: noopRun})
+
+	acts := ListActions()
+	for i := 1; i < len(acts); i++ {
+		prev, cur := acts[i-1], acts[i]
+		outOfOrder := prev.Collector > cur.Collector ||
+			(prev.Collector == cur.Collector && prev.Kind > cur.Kind) ||
+			(prev.Collector == cur.Collector && prev.Kind == cur.Kind && prev.Target > cur.Target)
+		if outOfOrder {
+			t.Fatalf("not sorted at index %d: %+v then %+v (full: %+v)", i, prev, cur, acts)
+		}
+	}
+	if acts[0].Collector != "aaa" || acts[len(acts)-1].Collector != "zzz" {
+		t.Errorf("unexpected boundary collectors: first=%q last=%q", acts[0].Collector, acts[len(acts)-1].Collector)
+	}
+}
+
 // R40: the table lists the declared "/proc/self/..." form and appends the
 // legend line only when it appears.
 func TestWriteActionsAddsProcSelfLegendWhenDeclared(t *testing.T) {
 	Reset()
 	defer Reset()
-	Register(Collector{Name: "netstat", Declare: Declaration{Reads: []string{"/proc/self/net/tcp"}, Needs: "none"}})
+	Register(Collector{Name: "netstat", Declare: Declaration{Reads: []string{"/proc/self/net/tcp"}, Needs: "none"}, Run: noopRun})
 	acts := ListActions()
 	var buf bytes.Buffer
 	if err := WriteActions(&buf, acts, "table"); err != nil {
@@ -292,7 +467,7 @@ func TestWriteActionsAddsProcSelfLegendWhenDeclared(t *testing.T) {
 func TestWriteActionsOmitsLegendWithoutProcSelf(t *testing.T) {
 	Reset()
 	defer Reset()
-	Register(Collector{Name: "a", Declare: Declaration{Reads: []string{"/etc/passwd"}, Needs: "none"}})
+	Register(Collector{Name: "a", Declare: Declaration{Reads: []string{"/etc/passwd"}, Needs: "none"}, Run: noopRun})
 	acts := ListActions()
 	var buf bytes.Buffer
 	if err := WriteActions(&buf, acts, "table"); err != nil {
@@ -300,6 +475,15 @@ func TestWriteActionsOmitsLegendWithoutProcSelf(t *testing.T) {
 	}
 	if strings.Contains(buf.String(), "self =") {
 		t.Errorf("unexpected legend: %s", buf.String())
+	}
+}
+
+// item 7: an unknown format is rejected rather than silently falling back
+// to the table renderer.
+func TestWriteActionsRejectsUnknownFormat(t *testing.T) {
+	var buf bytes.Buffer
+	if err := WriteActions(&buf, nil, "yaml"); err == nil {
+		t.Error("expected an error for an unknown format")
 	}
 }
 
@@ -387,5 +571,51 @@ func TestHostAccessLlistxattrDoesNotFollow(t *testing.T) {
 	g := Guard(hostAccess{}, c)
 	if _, err := g.Llistxattr(link); !errors.Is(err, ErrSymlink) {
 		t.Errorf("expected ErrSymlink, got %v", err)
+	}
+}
+
+// R72(b): a non-absolute or unclean path is refused outright, with no probe
+// against the host at all — proven here by using a path that, if the
+// unclean/relative check were skipped and the file were probed instead,
+// would come back writable (root, existing, mode 0644 file): the unclean
+// form must still report false.
+func TestHostAccessWritableRejectsUncleanOrRelativePath(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "f")
+	mkfile(t, target, "x", 0o644)
+	cases := []string{
+		dir + "/./f",    // unclean: contains a "." component
+		"relative/path", // not absolute
+	}
+	for _, p := range cases {
+		if (hostAccess{}).Writable(p) {
+			t.Errorf("Writable(%q) = true, want false (unclean/relative, no probe)", p)
+		}
+	}
+}
+
+// R72(b): a plain writable file reports true, as root.
+func TestHostAccessWritableTrueForWritableFile(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "f")
+	mkfile(t, target, "x", 0o644)
+	if !(hostAccess{}).Writable(target) {
+		t.Errorf("expected Writable(%q) = true", target)
+	}
+}
+
+// R72(b): a symlink target is refused, never resolved — hostAccess.Writable
+// goes through the same no-follow primitive ReadFile/Stat use
+// (openNoFollow), not unix.Access, which would happily follow it.
+func TestHostAccessWritableRefusesSymlink(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "f")
+	mkfile(t, target, "x", 0o644)
+	link := filepath.Join(dir, "link")
+	if err := os.Symlink(target, link); err != nil {
+		t.Fatal(err)
+	}
+	if (hostAccess{}).Writable(link) {
+		t.Error("Writable on a symlink must be refused, not resolved")
 	}
 }

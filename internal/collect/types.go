@@ -5,8 +5,9 @@
 // /proc/self and other magic links are refused by both read-primitive
 // tiers (RESOLVE_NO_MAGICLINKS on tier 1; tier 2 never resolves a magic
 // link because it never resolves anything but plain directory entries).
-// Collectors must build /proc/<pid>/... with a numeric pid (see Access in
-// Task 3).
+// Collectors declare and request the "/proc/self/..." form; Access (Task 3)
+// rewrites it to the real numeric pid immediately before calling the
+// primitive, so collector code never builds /proc/<pid>/... itself.
 package collect
 
 // ReadMeta describes how a file was read and what it looked like.

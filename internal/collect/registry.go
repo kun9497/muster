@@ -28,6 +28,10 @@ type Access interface {
 	Glob(pattern string) ([]string, error)
 	Llistxattr(path string) ([]string, error)
 	Run(ctx context.Context, c Command) Output
+
+	// Writable is an environment probe — answers whether this process may
+	// write here (read-only mounts, namespaces); for root that is true
+	// unless the mount forbids it; not a permission-bit check.
 	Writable(path string) bool
 }
 
@@ -48,10 +52,18 @@ type Collector struct {
 
 var registry = map[string]Collector{}
 
-// Register adds a collector; a duplicate name is a programming error.
+// Register adds a collector. A duplicate name, a Needs outside {root, none}
+// and a nil Run are all programming errors caught here rather than at
+// collection time.
 func Register(c Collector) {
 	if _, dup := registry[c.Name]; dup {
 		panic("collector registered twice: " + c.Name)
+	}
+	if c.Declare.Needs != "root" && c.Declare.Needs != "none" {
+		panic(fmt.Sprintf("collector %s: Needs must be %q or %q, got %q", c.Name, "root", "none", c.Declare.Needs))
+	}
+	if c.Run == nil {
+		panic("collector " + c.Name + ": Run must not be nil")
 	}
 	registry[c.Name] = c
 }
@@ -142,7 +154,41 @@ func splitXattrNames(buf []byte) []string {
 	return out
 }
 
-func (hostAccess) Writable(p string) bool { return unix.Access(rewriteProcSelf(p), unix.W_OK) == nil }
+// Writable is an environment probe — answers whether this process may
+// write here (read-only mounts, namespaces); for root that is true unless
+// the mount forbids it; not a permission-bit check (R72). It goes through
+// the same no-follow primitive as ReadFile/Stat rather than unix.Access,
+// which accepts an unclean path and follows every symlink in it: probing
+// "/etc/ssh/../login.defs" as writable must answer for /etc/login.defs
+// itself, never for whatever /etc/ssh happens to resolve to. A relative or
+// unclean path is refused outright, before anything is opened.
+//
+// The final component still needs its own check, the same way Stat does:
+// opening it with O_PATH|O_NOFOLLOW succeeds and returns an fd referring to
+// the symlink itself rather than ELOOPing (confirmed on the lab host — a
+// symlink's own permission bits are typically 0777, so without this check
+// Faccessat would report the link "writable" regardless of its target), so
+// a final-component symlink is refused by fstat-ing the fd and rejecting
+// S_IFLNK before ever asking Faccessat.
+func (hostAccess) Writable(p string) bool {
+	p = rewriteProcSelf(p)
+	if !path.IsAbs(p) || path.Clean(p) != p {
+		return false
+	}
+	fd, _, err := openNoFollow(p, unix.O_PATH|unix.O_NOFOLLOW|unix.O_CLOEXEC)
+	if err != nil {
+		return false
+	}
+	defer unix.Close(fd)
+	var st unix.Stat_t
+	if err := unix.Fstat(fd, &st); err != nil {
+		return false
+	}
+	if st.Mode&unix.S_IFMT == unix.S_IFLNK {
+		return false
+	}
+	return unix.Faccessat(fd, "", unix.W_OK, unix.AT_EMPTY_PATH|unix.AT_EACCESS) == nil
+}
 
 func (hostAccess) Run(ctx context.Context, c Command) Output { return RunCommand(ctx, c) }
 
@@ -177,16 +223,27 @@ func (g *guardedAccess) Violations() []string { return g.violations }
 // without recording a violation (R55) — for a collector that wants to
 // probe optionally (e.g. "does this alternate config exist") without that
 // probe itself counting as a violation when it doesn't.
-func (g *guardedAccess) Allowed(p string) bool { return g.allowedPath(p) }
+func (g *guardedAccess) Allowed(p string) bool {
+	_, ok := g.allowedPath(p)
+	return ok
+}
 
-func (g *guardedAccess) allowedPath(p string) bool {
-	p = path.Clean(p)
+// allowedPath matches p against the declared Reads globs after cleaning it,
+// and returns the CLEANED path alongside the verdict (R72): the match
+// itself is decided on the cleaned form, so the caller must go on to use
+// that same cleaned form for the actual access — matching "/etc/ssh/../login.defs"
+// against a declaration for "/etc/login.defs" and then handing the ORIGINAL,
+// unclean string to inner would let the kernel resolve it through whatever
+// "/etc/ssh" happens to be, defeating the declaration the match just
+// approved.
+func (g *guardedAccess) allowedPath(p string) (string, bool) {
+	clean := path.Clean(p)
 	for _, r := range g.decl.Reads {
-		if ok, _ := path.Match(r, p); ok || r == p {
-			return true
+		if ok, _ := path.Match(r, clean); ok || r == clean {
+			return clean, true
 		}
 	}
-	return false
+	return clean, false
 }
 
 // allowedCommand requires an exact match: the same path and exactly the
@@ -208,42 +265,54 @@ func (g *guardedAccess) violate(what string) error {
 }
 
 func (g *guardedAccess) ReadFile(p string, limit int64) ([]byte, ReadMeta, error) {
-	if !g.allowedPath(p) {
+	clean, ok := g.allowedPath(p)
+	if !ok {
 		return nil, ReadMeta{}, g.violate("read " + p)
 	}
-	return g.inner.ReadFile(p, limit)
+	return g.inner.ReadFile(clean, limit)
 }
 
 // Stat, Llistxattr and Writable are guarded the same way ReadFile is: a
 // path must match a declared Reads entry, and a violation is recorded the
-// same way (R46/R60).
+// same way (R46/R60). All four pass the CLEANED path to inner (R72), not
+// the original string the collector supplied — see allowedPath.
 func (g *guardedAccess) Stat(p string) (ReadMeta, error) {
-	if !g.allowedPath(p) {
+	clean, ok := g.allowedPath(p)
+	if !ok {
 		return ReadMeta{}, g.violate("stat " + p)
 	}
-	return g.inner.Stat(p)
+	return g.inner.Stat(clean)
 }
 
 func (g *guardedAccess) Glob(pattern string) ([]string, error) {
-	if !g.allowedPath(pattern) {
+	if _, ok := g.allowedPath(pattern); !ok {
 		return nil, g.violate("glob " + pattern)
 	}
 	return g.inner.Glob(pattern)
 }
 
 func (g *guardedAccess) Llistxattr(p string) ([]string, error) {
-	if !g.allowedPath(p) {
+	clean, ok := g.allowedPath(p)
+	if !ok {
 		return nil, g.violate("llistxattr " + p)
 	}
-	return g.inner.Llistxattr(p)
+	return g.inner.Llistxattr(clean)
 }
 
+// Writable is authorised against the same Declaration.Reads a read would
+// be — a collector that wants to probe writability of a path must declare
+// it as a read, so --list-actions prints a "read" row for it like any other
+// declared target.
 func (g *guardedAccess) Writable(p string) bool {
-	if !g.allowedPath(p) {
+	clean, ok := g.allowedPath(p)
+	if !ok {
+		// g.violate's returned error is discarded: Writable's signature
+		// (bool only, per the Access interface) can't surface it, but the
+		// violation is still recorded in g.violations by the call itself.
 		g.violate("writable " + p)
 		return false
 	}
-	return g.inner.Writable(p)
+	return g.inner.Writable(clean)
 }
 
 func (g *guardedAccess) Run(ctx context.Context, c Command) Output {
@@ -264,7 +333,9 @@ type Action struct {
 // ListActions renders the registry as the document a change-control
 // reviewer reads: every path read, every command run, the single write. A
 // /proc/self target is printed in its declared form, never the pid muster
-// substitutes at run time (R40).
+// substitutes at run time (R40). The result is sorted by (collector, kind,
+// target) so the document is deterministic regardless of the order a
+// collector declared its reads and commands in.
 func ListActions() []Action {
 	var out []Action
 	for _, c := range All() {
@@ -276,32 +347,46 @@ func ListActions() []Action {
 		}
 	}
 	out = append(out, Action{Collector: "muster", Kind: "write", Target: DefaultSnapshotDir + "/<hostname>-<time>-<digest>.json", Needs: "root"})
+	sort.Slice(out, func(i, j int) bool {
+		a, b := out[i], out[j]
+		if a.Collector != b.Collector {
+			return a.Collector < b.Collector
+		}
+		if a.Kind != b.Kind {
+			return a.Kind < b.Kind
+		}
+		return a.Target < b.Target
+	})
 	return out
 }
 
-// WriteActions prints actions as a table or JSON. The table ends with a
-// legend line whenever any target starts with /proc/self, since that is
-// the declared form printed above, not the pid substituted at run time
-// (R40).
+// WriteActions prints actions as a table or JSON; any other format is
+// rejected. The table ends with a legend line whenever any target starts
+// with /proc/self, since that is the declared form printed above, not the
+// pid substituted at run time (R40).
 func WriteActions(w io.Writer, actions []Action, format string) error {
-	if format == "json" {
+	switch format {
+	case "json":
 		enc := json.NewEncoder(w)
 		enc.SetIndent("", "  ")
 		return enc.Encode(actions)
-	}
-	hasProcSelf := false
-	for _, a := range actions {
-		if _, err := fmt.Fprintf(w, "%-10s %-8s %-5s %s\n", a.Collector, a.Kind, a.Needs, a.Target); err != nil {
-			return err
+	case "table":
+		hasProcSelf := false
+		for _, a := range actions {
+			if _, err := fmt.Fprintf(w, "%-10s %-8s %-5s %s\n", a.Collector, a.Kind, a.Needs, a.Target); err != nil {
+				return err
+			}
+			if strings.HasPrefix(a.Target, "/proc/self/") {
+				hasProcSelf = true
+			}
 		}
-		if strings.HasPrefix(a.Target, "/proc/self/") {
-			hasProcSelf = true
+		if hasProcSelf {
+			if _, err := fmt.Fprintln(w, "self = the collector's own pid"); err != nil {
+				return err
+			}
 		}
+		return nil
+	default:
+		return fmt.Errorf("collect: unknown --list-actions format %q (want %q or %q)", format, "table", "json")
 	}
-	if hasProcSelf {
-		if _, err := fmt.Fprintln(w, "self = the collector's own pid"); err != nil {
-			return err
-		}
-	}
-	return nil
 }
