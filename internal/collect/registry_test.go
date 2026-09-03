@@ -119,6 +119,11 @@ func TestGuardTreatsGetxattrAsARead(t *testing.T) {
 	}
 	if v := g.Violations(); len(v) != 1 {
 		t.Errorf("violations = %v", v)
+	} else if !strings.Contains(v[0], "getxattr") {
+		// The violation has to name the operation, not just the path: a
+		// reader of the report must be able to tell an undeclared
+		// getxattr from an undeclared read of the same file.
+		t.Errorf("violation %q does not name the getxattr operation", v[0])
 	}
 }
 

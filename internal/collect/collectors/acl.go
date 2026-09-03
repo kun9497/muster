@@ -77,10 +77,17 @@ func rwx(perm uint16) string {
 	return string(s)
 }
 
-// aclEntries lists p's access ACL. present is false when the attribute is
-// not set or the filesystem has no xattr support; any other failure
-// propagates so the fact becomes denied or error rather than a confident
-// "no ACL".
+// aclEntries lists p's access ACL. present answers "does the attribute
+// exist" and is independent of err: it is false when the attribute is not
+// set or the filesystem has no xattr support, and true once the name was
+// listed — including when reading or decoding its value then failed. Such
+// a failure propagates, so the fact becomes denied or error rather than a
+// confident "no ACL".
+//
+// R46: the names come from Access.Llistxattr and the value from
+// Access.Getxattr, which go through the same no-follow open the reads use —
+// never unix.Llistxattr or unix.Getxattr on the path, which resolve every
+// component but the last.
 func aclEntries(a collect.Access, p string) ([]string, bool, error) {
 	names, err := a.Llistxattr(p)
 	if err != nil {
@@ -104,7 +111,9 @@ func aclEntries(a collect.Access, p string) ([]string, bool, error) {
 		if errors.Is(err, unix.ENODATA) {
 			return nil, false, nil
 		}
-		return nil, false, err
+		// The name was listed, so the attribute exists; only its value
+		// could not be read.
+		return nil, true, err
 	}
 	entries, err := decodeACL(raw)
 	if err != nil {

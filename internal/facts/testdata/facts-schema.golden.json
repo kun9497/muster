@@ -312,6 +312,336 @@
       "SubjectKind": ""
     },
     {
+      "Key": "files.etc_passwd.group",
+      "Type": "string",
+      "Description": "Group name for the gid of /etc/passwd from /etc/group; empty when the gid has no name.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_passwd.group_readable",
+      "Type": "bool",
+      "Description": "Whether the group permission bits of /etc/passwd include read (derived from mode).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_passwd.group_writable",
+      "Type": "bool",
+      "Description": "Whether the group permission bits of /etc/passwd include write (derived from mode).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_passwd.other_readable",
+      "Type": "bool",
+      "Description": "Whether the other permission bits of /etc/passwd include read (derived from mode).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_passwd.other_writable",
+      "Type": "bool",
+      "Description": "Whether the other permission bits of /etc/passwd include write (derived from mode).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_passwd.acl_entries",
+      "Type": "list\u003cstring\u003e",
+      "Description": "Access ACL entries of /etc/passwd in setfacl form with numeric ids (user::rw-, user:1000:rw-, group::r--, mask::rw-, other::r--); empty when no ACL is set.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_hosts.mode",
+      "Type": "int",
+      "Description": "Permission bits of /etc/hosts as an integer (e.g. 384 for 0600).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_hosts.uid",
+      "Type": "int",
+      "Description": "Owner uid of /etc/hosts.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_hosts.gid",
+      "Type": "int",
+      "Description": "Group gid of /etc/hosts.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_hosts.group",
+      "Type": "string",
+      "Description": "Group name for the gid of /etc/hosts from /etc/group; empty when the gid has no name.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_hosts.group_readable",
+      "Type": "bool",
+      "Description": "Whether the group permission bits of /etc/hosts include read (derived from mode).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_hosts.group_writable",
+      "Type": "bool",
+      "Description": "Whether the group permission bits of /etc/hosts include write (derived from mode).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_hosts.other_readable",
+      "Type": "bool",
+      "Description": "Whether the other permission bits of /etc/hosts include read (derived from mode).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_hosts.other_writable",
+      "Type": "bool",
+      "Description": "Whether the other permission bits of /etc/hosts include write (derived from mode).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_hosts.acl_present",
+      "Type": "bool",
+      "Description": "Whether a POSIX ACL xattr is present on /etc/hosts.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_services.mode",
+      "Type": "int",
+      "Description": "Permission bits of /etc/services as an integer (e.g. 384 for 0600).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_services.uid",
+      "Type": "int",
+      "Description": "Owner uid of /etc/services.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_services.gid",
+      "Type": "int",
+      "Description": "Group gid of /etc/services.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_services.group",
+      "Type": "string",
+      "Description": "Group name for the gid of /etc/services from /etc/group; empty when the gid has no name.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_services.group_readable",
+      "Type": "bool",
+      "Description": "Whether the group permission bits of /etc/services include read (derived from mode).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_services.group_writable",
+      "Type": "bool",
+      "Description": "Whether the group permission bits of /etc/services include write (derived from mode).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_services.other_readable",
+      "Type": "bool",
+      "Description": "Whether the other permission bits of /etc/services include read (derived from mode).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_services.other_writable",
+      "Type": "bool",
+      "Description": "Whether the other permission bits of /etc/services include write (derived from mode).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_services.acl_present",
+      "Type": "bool",
+      "Description": "Whether a POSIX ACL xattr is present on /etc/services.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_hosts_lpd.mode",
+      "Type": "int",
+      "Description": "Permission bits of /etc/hosts.lpd as an integer (e.g. 384 for 0600).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_hosts_lpd.uid",
+      "Type": "int",
+      "Description": "Owner uid of /etc/hosts.lpd.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_hosts_lpd.gid",
+      "Type": "int",
+      "Description": "Group gid of /etc/hosts.lpd.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_hosts_lpd.group",
+      "Type": "string",
+      "Description": "Group name for the gid of /etc/hosts.lpd from /etc/group; empty when the gid has no name.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_hosts_lpd.group_readable",
+      "Type": "bool",
+      "Description": "Whether the group permission bits of /etc/hosts.lpd include read (derived from mode).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_hosts_lpd.group_writable",
+      "Type": "bool",
+      "Description": "Whether the group permission bits of /etc/hosts.lpd include write (derived from mode).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_hosts_lpd.other_readable",
+      "Type": "bool",
+      "Description": "Whether the other permission bits of /etc/hosts.lpd include read (derived from mode).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_hosts_lpd.other_writable",
+      "Type": "bool",
+      "Description": "Whether the other permission bits of /etc/hosts.lpd include write (derived from mode).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_hosts_lpd.acl_present",
+      "Type": "bool",
+      "Description": "Whether a POSIX ACL xattr is present on /etc/hosts.lpd.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
       "Key": "accounts.login_defs.pass_max_days",
       "Type": "setting\u003cint\u003e",
       "Description": "PASS_MAX_DAYS - persisted in login.defs, effective as the maximum over existing accounts' shadow fields.",

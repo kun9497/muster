@@ -859,10 +859,14 @@ func TestFilesPasswdModeKeepsTheHighBits(t *testing.T) {
 	}
 }
 
+// R111: xattrs pins the Llistxattr union path — the ACL name arrives among
+// other attributes — while xattrValues gives Getxattr something to answer
+// with, since a listed name whose value reads back ENODATA is "no ACL".
 func TestFilesAclPresentFromXattr(t *testing.T) {
 	a := &fsAccess{
-		files:  map[string]string{"/etc/passwd": "passwd"},
-		xattrs: map[string][]string{"/etc/passwd": {"security.selinux", "system.posix_acl_access"}},
+		files:       map[string]string{"/etc/passwd": "passwd"},
+		xattrs:      map[string][]string{"/etc/passwd": {"security.selinux", "system.posix_acl_access"}},
+		xattrValues: map[string]map[string][]byte{"/etc/passwd": {"system.posix_acl_access": fiveEntryACL()}},
 	}
 	b := build(t, "files", a)
 	if env(t, b, "files.etc_passwd.acl_present").Value != true {
@@ -1385,6 +1389,16 @@ func TestSmokeOnTheRealHost(t *testing.T) {
 	}
 	if m, ok := mode.Value.(int); !ok || m < 0 || m > 0o7777 {
 		t.Fatal("files.etc_passwd.mode must be permission bits in 0..0o7777")
+	}
+	// The same shape through writePermFacts on a second fixed path, so the
+	// template is exercised against the real filesystem and not only the
+	// double.
+	hostsMode := env(t, b, "files.etc_hosts.mode")
+	if hostsMode.Status != facts.StatusOK {
+		t.Fatalf("files.etc_hosts.mode status %s (%s)", hostsMode.Status, hostsMode.Reason)
+	}
+	if m, ok := hostsMode.Value.(int); !ok || m < 0 || m > 0o7777 {
+		t.Fatal("files.etc_hosts.mode must be permission bits in 0..0o7777")
 	}
 	if b.Header().Host.OSRelease.ID == "" {
 		t.Fatal("run.host.os_release.id must not be empty")
