@@ -157,7 +157,11 @@ func checkInvariants(t *testing.T, name string, r check.Result) {
 func TestLintOfEmbeddedSetIsClean(t *testing.T) {
 	set, _ := controls.LoadDefault()
 	reg, _ := facts.LoadRegistry()
-	problems := controls.Lint(set, reg, controls.LintOptions{CustomFuncs: check.CustomFuncs(), FixtureDir: fixtureRoot})
+	idx, err := controls.LoadReferenceIndex("../../docs/reference")
+	if err != nil {
+		t.Fatal(err)
+	}
+	problems := controls.Lint(set, reg, controls.LintOptions{CustomFuncs: check.CustomFuncs(), FixtureDir: fixtureRoot, References: idx})
 	for _, p := range problems {
 		t.Error(p)
 	}

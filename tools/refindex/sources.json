@@ -1,0 +1,33 @@
+[
+  {
+    "product": "ubuntu2204",
+    "benchmark": "Canonical Ubuntu 22.04 LTS Security Technical Implementation Guide",
+    "version": "V2R9",
+    "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_CAN_Ubuntu_22-04_LTS_V2R9_STIG.zip",
+    "sha256": "a533fd2758a1832bd4c81e4f2a11497d5331c3148ee8bcf88e81800843a86ffb",
+    "member": "U_CAN_Ubuntu_22-04_LTS_V2R9_Manual_STIG/U_CAN_Ubuntu_22-04_LTS_STIG_V2R9_Manual-xccdf.xml"
+  },
+  {
+    "product": "ubuntu2404",
+    "benchmark": "Canonical Ubuntu 24.04 LTS Security Technical Implementation Guide",
+    "version": "V1R6",
+    "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_CAN_Ubuntu_24-04_LTS_V1R6_STIG.zip",
+    "sha256": "2468e7fc35dc9e70ed6d1b7c87f5354b0cc9632882afafed6bad43cf49f2b837",
+    "member": "U_CAN_Ubuntu_24-04_LTS_V1R6_Manual_STIG/U_CAN_Ubuntu_24-04_LTS_STIG_V1R6_Manual-xccdf.xml"
+  },
+  {
+    "product": "rhel9",
+    "benchmark": "Red Hat Enterprise Linux 9 Security Technical Implementation Guide",
+    "version": "V2R9",
+    "applies_to": ["rocky9", "alma9"],
+    "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_RHEL_9_V2R9_STIG.zip",
+    "sha256": "1875de2543d01695c5a346c51888cc336113e9199bfe6726d74a08de286ca1ae",
+    "member": "U_RHEL_9_V2R9_Manual_STIG/U_RHEL_9_STIG_V2R9_Manual-xccdf.xml"
+  },
+  {
+    "product": "cci",
+    "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_CCI_List.zip",
+    "sha256": "077cbb6d2ae5f8fdbaaf416d87a34a8621767cdba490f3283feb0c5c35892700",
+    "member": "U_CCI_List.xml"
+  }
+]

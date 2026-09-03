@@ -22,10 +22,13 @@ type Problem struct {
 func (p Problem) String() string { return fmt.Sprintf("%s: %s: %s", p.Path, p.Rule, p.Message) }
 
 // LintOptions carries what lint cannot know on its own: the registered
-// custom functions (owned by check) and where fixtures live.
+// custom functions (owned by check), where fixtures live, and the generated
+// STIG/NIST reference index (nil means references are checked for shape
+// only, never for existence).
 type LintOptions struct {
 	CustomFuncs map[string]bool
 	FixtureDir  string
+	References  *ReferenceIndex
 }
 
 var (
@@ -42,8 +45,8 @@ var (
 	validRisk        = set("none", "restart_service", "reboot_required", "lockout_risk")
 	validOn          = set("runtime", "persisted", "effective", "both")
 	validPersona     = set("root", "user", "invalid")
-	validParamType   = set("string", "int", "bool", "list<string>")
-	scalarOps        = set("eq", "ne", "in", "not_in", "lt", "lte", "gt", "gte", "matches", "contains", "present", "absent")
+	validParamType   = set("string", "int", "bool", "list<string>", "list<int>")
+	scalarOps        = set("eq", "ne", "in", "not_in", "lt", "lte", "gt", "gte", "matches", "not_matches", "contains", "present", "absent")
 	orderedOps       = set("lt", "lte", "gt", "gte")
 	collectionOps    = set("each", "none")
 )
@@ -139,6 +142,25 @@ func Lint(s *Set, reg *facts.Registry, opts LintOptions) []Problem {
 				add("references_cis", "cis references need benchmark, version and rec")
 			}
 		}
+		for _, r := range c.References.STIG {
+			switch {
+			case r.Benchmark == "" || r.Version == "" || r.ID == "":
+				add("references_stig", "stig references need benchmark, version and id")
+			case opts.References == nil:
+				add("references_stig", "no reference index loaded; %s@%s %s cannot be verified", r.Benchmark, r.Version, r.ID)
+			case !opts.References.HasSTIG(r.Benchmark, r.Version, r.ID):
+				add("references_stig", "stig reference %s@%s %s is not in docs/reference/stig", r.Benchmark, r.Version, r.ID)
+			}
+		}
+		for _, n := range c.References.NIST80053 {
+			if !ValidNISTID(n) {
+				add("references_nist", "nist_800_53 reference %q must look like AC-6 or AC-6(10)", n)
+				continue
+			}
+			if opts.References != nil && !opts.References.HasNIST(n) {
+				add("references_nist", "nist_800_53 reference %q appears in no indexed STIG rule", n)
+			}
+		}
 		for _, cl := range c.AppliesWhen {
 			lintClause(c, cl, reg, add, "applies_when")
 		}
@@ -198,6 +220,17 @@ func paramDefaultMatches(p Param) bool {
 		}
 		for _, x := range xs {
 			if _, ok := x.(string); !ok {
+				return false
+			}
+		}
+		return true
+	case "list<int>":
+		xs, ok := p.Default.([]any)
+		if !ok {
+			return false
+		}
+		for _, x := range xs {
+			if _, ok := x.(int); !ok {
 				return false
 			}
 		}
@@ -273,6 +306,9 @@ func lintClause(c *Control, cl Clause, reg *facts.Registry, add func(string, str
 	if orderedOps[cl.Op] && entry.Type != "int" && entry.Type != "setting<int>" {
 		add("clause_grammar", "%s: %s needs an int fact", where, cl.Op)
 	}
+	if cl.Op == "not_matches" && isList {
+		add("clause_grammar", "%s: not_matches is scalar-only; use none with a where clause", where)
+	}
 	checkParamRef(c, cl.Expected, add, where)
 }
 
@@ -298,10 +334,10 @@ func lintExpected(cl Clause, add func(string, string, ...any), where string) {
 		if cl.Expected != nil {
 			add("clause_grammar", "%s: %s takes no expected", where, cl.Op)
 		}
-	case "matches":
+	case "matches", "not_matches":
 		s, ok := cl.Expected.(string)
 		if !ok {
-			add("clause_grammar", "%s: matches needs a string pattern", where)
+			add("clause_grammar", "%s: %s needs a string pattern", where, cl.Op)
 			return
 		}
 		if _, err := regexp.Compile(s); err != nil {

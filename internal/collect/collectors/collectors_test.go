@@ -31,21 +31,36 @@ type cmdResult struct {
 }
 
 // fsAccess serves declared paths from testdata and commands from canned
-// outcomes. It implements all six Access methods (R46/R60), so a collector
+// outcomes. It implements all seven Access methods (R46/R60), so a collector
 // under test can never reach the real host.
 type fsAccess struct {
-	files    map[string]string    // host path -> testdata file name
-	dirs     map[string]bool      // host path -> exists, but is not a readable file
-	cmds     map[string]cmdResult // command line -> canned outcome
-	fails    map[string]error     // host path -> error returned instead of content
-	modes    map[string]uint32    // host path -> raw 0o7777 bits
-	xattrs   map[string][]string  // host path -> extended attribute names
-	writable map[string]bool      // host path -> Writable answer
-	globErr  error                // when set, every Glob fails with it
+	files       map[string]string            // host path -> testdata file name
+	dirs        map[string]bool              // host path -> exists, but is not a readable file
+	cmds        map[string]cmdResult         // command line -> canned outcome
+	fails       map[string]error             // host path -> error returned instead of content
+	truncated   map[string]bool              // host path -> ReadFile reports the read hit the cap (R70)
+	modes       map[string]uint32            // host path -> raw 0o7777 bits (fallback consulted when stats has no entry)
+	stats       map[string]statResult        // host path -> full Stat() shape (R93; Task 5 relies on this)
+	xattrs      map[string][]string          // host path -> extended attribute names
+	xattrValues map[string]map[string][]byte // host path -> attribute name -> value, served by Getxattr
+	writable    map[string]bool              // host path -> Writable answer
+	globErr     error                        // when set, every Glob fails with it
 
 	// reads records every path ReadFile was asked for, so a test can assert
 	// that a collector did NOT go looking for something it did not need.
 	reads []string
+}
+
+// statResult is the one shape fsAccess.Stat renders into a collect.ReadMeta
+// when a path has an entry in stats: mode, ownership and file kind, the
+// fields collectors that need more than "does this path exist" (e.g. the
+// ACL decoder in Task 5) inspect. A path without a stats entry falls back to
+// today's files/dirs/modes-derived behaviour, so every existing literal
+// keeps compiling unchanged.
+type statResult struct {
+	mode     uint32
+	uid, gid uint32
+	kind     string
 }
 
 func (a *fsAccess) read(name string) ([]byte, error) {
@@ -69,12 +84,15 @@ func (a *fsAccess) ReadFile(p string, _ int64) ([]byte, collect.ReadMeta, error)
 		return nil, collect.ReadMeta{}, os.ErrNotExist
 	}
 	b, err := a.read(name)
-	return b, collect.ReadMeta{Tier: "openat2", Size: int64(len(b)), Mode: a.mode(p, 0o644)}, err
+	return b, collect.ReadMeta{Tier: "openat2", Size: int64(len(b)), Mode: a.mode(p, 0o644), Truncated: a.truncated[p]}, err
 }
 
 func (a *fsAccess) Stat(p string) (collect.ReadMeta, error) {
 	if err, ok := a.fails[p]; ok {
 		return collect.ReadMeta{}, err
+	}
+	if s, ok := a.stats[p]; ok {
+		return collect.ReadMeta{Tier: "openat2", Mode: s.mode, UID: s.uid, GID: s.gid, Kind: s.kind}, nil
 	}
 	if _, ok := a.files[p]; ok {
 		return collect.ReadMeta{Tier: "openat2", Mode: a.mode(p, 0o644)}, nil
@@ -107,11 +125,42 @@ func (a *fsAccess) Glob(pattern string) ([]string, error) {
 	return out, nil
 }
 
+// Llistxattr lists the union of a.xattrs[p] (names with no set value) and
+// the keys of a.xattrValues[p] (names Getxattr can actually answer), sorted
+// so the result is deterministic regardless of which map a test populated.
 func (a *fsAccess) Llistxattr(p string) ([]string, error) {
 	if err, ok := a.fails[p]; ok {
 		return nil, err
 	}
-	return a.xattrs[p], nil
+	seen := map[string]bool{}
+	var out []string
+	for _, n := range a.xattrs[p] {
+		if !seen[n] {
+			seen[n] = true
+			out = append(out, n)
+		}
+	}
+	for n := range a.xattrValues[p] {
+		if !seen[n] {
+			seen[n] = true
+			out = append(out, n)
+		}
+	}
+	slices.Sort(out)
+	return out, nil
+}
+
+// Getxattr answers from xattrValues; a name not present there — whether or
+// not it appears in xattrs — is ENODATA, matching hostAccess.Getxattr's
+// propagation of the raw errno.
+func (a *fsAccess) Getxattr(p, name string) ([]byte, error) {
+	if err, ok := a.fails[p]; ok {
+		return nil, err
+	}
+	if v, ok := a.xattrValues[p][name]; ok {
+		return v, nil
+	}
+	return nil, unix.ENODATA
 }
 
 func (a *fsAccess) Writable(p string) bool { return a.writable[p] }
@@ -811,10 +860,14 @@ func TestFilesPasswdModeKeepsTheHighBits(t *testing.T) {
 	}
 }
 
+// R111: xattrs pins the Llistxattr union path — the ACL name arrives among
+// other attributes — while xattrValues gives Getxattr something to answer
+// with, since a listed name whose value reads back ENODATA is "no ACL".
 func TestFilesAclPresentFromXattr(t *testing.T) {
 	a := &fsAccess{
-		files:  map[string]string{"/etc/passwd": "passwd"},
-		xattrs: map[string][]string{"/etc/passwd": {"security.selinux", "system.posix_acl_access"}},
+		files:       map[string]string{"/etc/passwd": "passwd"},
+		xattrs:      map[string][]string{"/etc/passwd": {"security.selinux", "system.posix_acl_access"}},
+		xattrValues: map[string]map[string][]byte{"/etc/passwd": {"system.posix_acl_access": fiveEntryACL()}},
 	}
 	b := build(t, "files", a)
 	if env(t, b, "files.etc_passwd.acl_present").Value != true {
@@ -1173,10 +1226,27 @@ func osAccess() *fsAccess {
 	}
 }
 
+func osDoubleWithDockerAndSystemd(t *testing.T) *fsAccess {
+	a := osAccess()
+	a.dirs["/.dockerenv"] = true
+	return a
+}
+
 func TestOSFillsTheRunHeader(t *testing.T) {
 	b := build(t, "os", osAccess())
-	if len(b.Tree()) != 0 {
-		t.Errorf("os writes no fact keys, got %v", b.Tree())
+	tree := b.Tree()
+	if len(tree) != 1 {
+		t.Errorf("os writes exactly env.container and env.has_systemd under env, got %v top-level keys: %v", len(tree), tree)
+	}
+	envMap, ok := tree["env"].(map[string]any)
+	if !ok || len(envMap) != 2 {
+		t.Errorf("env should have exactly 2 keys (container, has_systemd), got %v", envMap)
+	}
+	if v := env(t, b, "env.container"); v.Status != facts.StatusOK || v.Value != "none" {
+		t.Errorf("env.container = %+v", v)
+	}
+	if v := env(t, b, "env.has_systemd"); v.Status != facts.StatusOK || v.Value != true {
+		t.Errorf("env.has_systemd = %+v", v)
 	}
 	h := b.Header().Host
 	if h.Hostname != "fixture-host" || h.Kernel != "6.8.0-31-generic" || h.UptimeS != 12345 {
@@ -1212,8 +1282,7 @@ func TestOSFallsBackToUsrLibOSRelease(t *testing.T) {
 }
 
 func TestOSDetectsDockerAndWSL(t *testing.T) {
-	a := osAccess()
-	a.dirs["/.dockerenv"] = true
+	a := osDoubleWithDockerAndSystemd(t)
 	a.files["/proc/version"] = "proc-version-wsl"
 	b := build(t, "os", a)
 	if b.Header().Env.Container != "docker" {
@@ -1230,6 +1299,20 @@ func TestOSVirtIsUnknownWhenDMIIsUnreadable(t *testing.T) {
 	b := build(t, "os", a)
 	if b.Header().Env.Virt != "unknown" {
 		t.Errorf("virt %q", b.Header().Env.Virt)
+	}
+}
+
+func TestOSWritesEnvContainerAndSystemdAsFacts(t *testing.T) {
+	a := osDoubleWithDockerAndSystemd(t)
+	b := build(t, "os", a)
+	if v := env(t, b, "env.container"); v.Status != facts.StatusOK || v.Value != "docker" {
+		t.Errorf("env.container = %+v", v)
+	}
+	if v := env(t, b, "env.has_systemd"); v.Status != facts.StatusOK || v.Value != true {
+		t.Errorf("env.has_systemd = %+v", v)
+	}
+	if h := b.Header(); h.Env.Container != "docker" || !h.Env.HasSystemd {
+		t.Errorf("header must agree with the facts: %+v", h.Env)
 	}
 }
 
@@ -1337,6 +1420,16 @@ func TestSmokeOnTheRealHost(t *testing.T) {
 	}
 	if m, ok := mode.Value.(int); !ok || m < 0 || m > 0o7777 {
 		t.Fatal("files.etc_passwd.mode must be permission bits in 0..0o7777")
+	}
+	// The same shape through writePermFacts on a second fixed path, so the
+	// template is exercised against the real filesystem and not only the
+	// double.
+	hostsMode := env(t, b, "files.etc_hosts.mode")
+	if hostsMode.Status != facts.StatusOK {
+		t.Fatalf("files.etc_hosts.mode status %s (%s)", hostsMode.Status, hostsMode.Reason)
+	}
+	if m, ok := hostsMode.Value.(int); !ok || m < 0 || m > 0o7777 {
+		t.Fatal("files.etc_hosts.mode must be permission bits in 0..0o7777")
 	}
 	if b.Header().Host.OSRelease.ID == "" {
 		t.Fatal("run.host.os_release.id must not be empty")

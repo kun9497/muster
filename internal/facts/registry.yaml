@@ -86,6 +86,204 @@ keys:
     since: 1
     sensitivity: public
     collector: files
+  - key: files.etc_passwd.group
+    type: string
+    description: Group name for the gid of /etc/passwd from /etc/group; empty when the gid has no name.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_passwd.group_readable
+    type: bool
+    description: Whether the group permission bits of /etc/passwd include read (derived from mode).
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_passwd.group_writable
+    type: bool
+    description: Whether the group permission bits of /etc/passwd include write (derived from mode).
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_passwd.other_readable
+    type: bool
+    description: Whether the other permission bits of /etc/passwd include read (derived from mode).
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_passwd.other_writable
+    type: bool
+    description: Whether the other permission bits of /etc/passwd include write (derived from mode).
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_passwd.acl_entries
+    type: list<string>
+    description: Access ACL entries of /etc/passwd in setfacl form with numeric ids (user::rw-, user:1000:rw-, group::r--, mask::rw-, other::r--); empty when no ACL is set.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_hosts.mode
+    type: int
+    description: Permission bits of /etc/hosts as an integer (e.g. 384 for 0600).
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_hosts.uid
+    type: int
+    description: Owner uid of /etc/hosts.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_hosts.gid
+    type: int
+    description: Group gid of /etc/hosts.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_hosts.group
+    type: string
+    description: Group name for the gid of /etc/hosts from /etc/group; empty when the gid has no name.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_hosts.group_readable
+    type: bool
+    description: Whether the group permission bits of /etc/hosts include read (derived from mode).
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_hosts.group_writable
+    type: bool
+    description: Whether the group permission bits of /etc/hosts include write (derived from mode).
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_hosts.other_readable
+    type: bool
+    description: Whether the other permission bits of /etc/hosts include read (derived from mode).
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_hosts.other_writable
+    type: bool
+    description: Whether the other permission bits of /etc/hosts include write (derived from mode).
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_hosts.acl_present
+    type: bool
+    description: Whether a POSIX ACL xattr is present on /etc/hosts.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_services.mode
+    type: int
+    description: Permission bits of /etc/services as an integer (e.g. 384 for 0600).
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_services.uid
+    type: int
+    description: Owner uid of /etc/services.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_services.gid
+    type: int
+    description: Group gid of /etc/services.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_services.group
+    type: string
+    description: Group name for the gid of /etc/services from /etc/group; empty when the gid has no name.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_services.group_readable
+    type: bool
+    description: Whether the group permission bits of /etc/services include read (derived from mode).
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_services.group_writable
+    type: bool
+    description: Whether the group permission bits of /etc/services include write (derived from mode).
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_services.other_readable
+    type: bool
+    description: Whether the other permission bits of /etc/services include read (derived from mode).
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_services.other_writable
+    type: bool
+    description: Whether the other permission bits of /etc/services include write (derived from mode).
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_services.acl_present
+    type: bool
+    description: Whether a POSIX ACL xattr is present on /etc/services.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_hosts_lpd.mode
+    type: int
+    description: Permission bits of /etc/hosts.lpd as an integer (e.g. 384 for 0600).
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_hosts_lpd.uid
+    type: int
+    description: Owner uid of /etc/hosts.lpd.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_hosts_lpd.gid
+    type: int
+    description: Group gid of /etc/hosts.lpd.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_hosts_lpd.group
+    type: string
+    description: Group name for the gid of /etc/hosts.lpd from /etc/group; empty when the gid has no name.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_hosts_lpd.group_readable
+    type: bool
+    description: Whether the group permission bits of /etc/hosts.lpd include read (derived from mode).
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_hosts_lpd.group_writable
+    type: bool
+    description: Whether the group permission bits of /etc/hosts.lpd include write (derived from mode).
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_hosts_lpd.other_readable
+    type: bool
+    description: Whether the other permission bits of /etc/hosts.lpd include read (derived from mode).
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_hosts_lpd.other_writable
+    type: bool
+    description: Whether the other permission bits of /etc/hosts.lpd include write (derived from mode).
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_hosts_lpd.acl_present
+    type: bool
+    description: Whether a POSIX ACL xattr is present on /etc/hosts.lpd.
+    since: 1
+    sensitivity: public
+    collector: files
   - key: accounts.login_defs.pass_max_days
     type: setting<int>
     description: PASS_MAX_DAYS - persisted in login.defs, effective as the maximum over existing accounts' shadow fields.
@@ -113,6 +311,18 @@ keys:
     sensitivity: internal
     collector: accounts
     subject_kind: user
+  - key: env.container
+    type: string
+    description: Container runtime detected from filesystem markers (none, docker, podman, lxc, other); the same value the run header carries.
+    since: 1
+    sensitivity: public
+    collector: os
+  - key: env.has_systemd
+    type: bool
+    description: Whether /run/systemd/system exists, so unit state can be asked of systemd.
+    since: 1
+    sensitivity: public
+    collector: os
   - key: walk.world_writable
     type: list<record>
     description: World-writable files found by the deep walk, with path, sticky, uid, gid, package_declared.

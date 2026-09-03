@@ -27,7 +27,9 @@ jobs:
       - name: test
         run: go test -race ./...
       - name: controls lint
-        run: go run ./cmd/muster controls lint
+        run: go run ./cmd/muster controls lint --references docs/reference
+      - name: coverage table is current
+        run: go run ./tools/coverage -check
       - name: build
         run: CGO_ENABLED=0 go build -trimpath ./...
   secrets:
@@ -106,24 +108,34 @@ jobs:
           set -e
           echo "check exit $code"
           test "$code" -eq 2
-          jq -e '[.results[] | select(.status=="PASS") | .evidence[]? | select(.status!="ok")] | length == 0' "$RUNNER_TEMP/muster/user-report.json"
+          # A PASS carries only ok evidence, except that a control with absent_means: pass
+          # (its reason starts "absent counts as pass") may carry absent evidence.
+          jq -e '[.results[] | select(.status=="PASS") | . as $r | .evidence[]? | select(.status != "ok" and (.status != "absent" or (($r.reason // "") | startswith("absent counts as pass") | not)))] | length == 0' "$RUNNER_TEMP/muster/user-report.json"
           jq -e '[.results[] | select(.status=="ERROR")] | length > 0' "$RUNNER_TEMP/muster/user-report.json"
 
   collect-containers:
     runs-on: ubuntu-24.04
     needs: test
+    continue-on-error: ${{ matrix.canary == 'true' }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - image: ubuntu:22.04
             init: "false"
+            canary: "false"
           - image: ubuntu:24.04
             init: "false"
+            canary: "false"
           - image: rockylinux/rockylinux:9-ubi-init
             init: "true"
+            canary: "false"
           - image: almalinux/9-init
             init: "true"
+            canary: "false"
+          - image: debian:12
+            init: "false"
+            canary: "true"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -159,7 +171,8 @@ jobs:
           set +e
           ./bin/muster check --facts "$RUNNER_TEMP/muster/containers/c.json" --format json > "$RUNNER_TEMP/muster/containers/report.json"
           set -e
-          jq -e '[.results[] | select(.status=="PASS") | .evidence[]? | select(.status != "ok")] | length == 0' "$RUNNER_TEMP/muster/containers/report.json"
+          # Same rule as the non-root job: absent evidence is allowed only under absent_means: pass.
+          jq -e '[.results[] | select(.status=="PASS") | . as $r | .evidence[]? | select(.status != "ok" and (.status != "absent" or (($r.reason // "") | startswith("absent counts as pass") | not)))] | length == 0' "$RUNNER_TEMP/muster/containers/report.json"
 
   collect-contract:
     runs-on: ubuntu-24.04

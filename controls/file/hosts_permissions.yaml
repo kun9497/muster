@@ -1,0 +1,23 @@
+id: muster.file.hosts_permissions
+title_en: /etc/hosts is owned by root and readable by root only
+title_ko: /etc/hosts 가 root 소유이고 root 만 읽을 수 있다
+description_en: The guide's criterion is owner root and mode 0600 or stricter. Ubuntu and Rocky ship /etc/hosts as 0644, so a stock host fails until the mode is tightened or allowed_modes is widened deliberately.
+description_ko: 가이드 기준은 소유자 root, 모드 0600 이하입니다. Ubuntu 와 Rocky 는 /etc/hosts 를 0644 로 배포하므로, 모드를 조이거나 allowed_modes 를 의도적으로 넓히기 전까지 기본 설치는 실패합니다.
+category: file
+importance: 상
+automation: auto
+references:
+  kisa: { "2026": ["U-19"], "2021": ["U-09"] }
+requires_facts: ">=1"
+absent_means: fail
+params:
+  allowed_modes: { type: list<int>, default: [0, 128, 256, 384], description: Modes that count as 0600 or stricter (0600 and every subset of its bits) }
+checks:
+  - { fact: files.etc_hosts.uid, op: eq, expected: 0 }
+  - { fact: files.etc_hosts.mode, op: in, expected: "${allowed_modes}" }
+remediation:
+  text_en: chown root:root /etc/hosts; chmod 600 /etc/hosts
+  text_ko: chown root:root /etc/hosts; chmod 600 /etc/hosts
+  risk: none
+  idempotent: true
+  script: chown root:root /etc/hosts && chmod 600 /etc/hosts

@@ -1,0 +1,23 @@
+id: muster.file.services_permissions
+title_en: /etc/services is owned by root and not writable by group or others
+title_ko: /etc/services 가 root 소유이고 그룹과 다른 사용자가 쓸 수 없다
+description_en: The guide's criterion is owner root and mode 0644 or stricter, so group and other members may read the file but never write it.
+description_ko: 가이드 기준은 소유자 root, 모드 0644 이하로, 그룹과 다른 사용자는 파일을 읽을 수는 있지만 쓸 수는 없습니다.
+category: file
+importance: 상
+automation: auto
+references:
+  kisa: { "2026": ["U-22"], "2021": ["U-12"] }
+requires_facts: ">=1"
+absent_means: fail
+params:
+  allowed_modes: { type: list<int>, default: [0, 4, 32, 36, 128, 132, 160, 164, 256, 260, 288, 292, 384, 388, 416, 420], description: Modes that count as 0644 or stricter (0644 and every subset of its bits) }
+checks:
+  - { fact: files.etc_services.uid, op: eq, expected: 0 }
+  - { fact: files.etc_services.mode, op: in, expected: "${allowed_modes}" }
+remediation:
+  text_en: chown root:root /etc/services; chmod 644 /etc/services
+  text_ko: chown root:root /etc/services; chmod 644 /etc/services
+  risk: none
+  idempotent: true
+  script: chown root:root /etc/services && chmod 644 /etc/services

@@ -11,8 +11,14 @@ waiver keys, output format.
 - `make test` — `go test -race ./...` (needs a C toolchain for `-race`; on a host without one, run
   `go test ./...` and rely on CI, which runs on Linux, for the race build).
 - `make lint` — `gofmt -l .` then `go vet ./...`.
-- `make lint-controls` — `go run ./cmd/muster controls lint`.
+- `make lint-controls` — `go run ./cmd/muster controls lint` (passes `--references docs/reference`, so
+  STIG/NIST ids must be in the generated index).
 - `make fmt` — `gofmt -l -w .` to fix formatting in place.
+- `make coverage` — `go run ./tools/coverage` regenerates `docs/reference/coverage.md`; CI runs
+  `go run ./tools/coverage -check` and fails when it is stale. `make refindex` — `go run ./tools/refindex`
+  regenerates `docs/reference/stig/*.json` from the pinned DISA files (network; caches downloads under
+  `.cache/refindex/`, git-ignored). `make refindex-check` — `go run ./tools/refindex -check`; CI does not
+  run either `refindex` target and instead lints against the committed index (see `make lint-controls`).
 
 ## Layout
 
@@ -21,6 +27,15 @@ schema, strict loader, lint. `internal/check` the pure evaluator — it must nev
 or touch the host (a test enforces it). `internal/waiver` waivers, applied after evaluation. `internal/report`
 renderers and the exit code. `controls/` the embedded control set and its fixtures. `collect` is Linux-only
 and lives behind build tags.
+
+## Stage-2 conventions
+
+- **C1** — `files.*` owns permission facts of a fixed candidate path list (`/etc/passwd`, `/etc/hosts`, …). A path that must be discovered from a daemon's configuration belongs to that daemon's collector.
+- **C2** — every leaf a clause judges is its own dotted key; a `record` fact is evidence for `present`/`absent` only. Adding a key or a record field keeps `schema_version` (spec §5.7).
+- Permission facts of a fixed path are written by `writePermFacts` in `internal/collect/collectors/permfacts.go`: `mode, uid, gid, group, group_readable, group_writable, other_readable, other_writable, acl_present` (+ `acl_entries` where the control judges the ACL). Register the nine (or ten) leaves per path; a stat failure reaches every leaf.
+- "Mode ≤ NNN" is written as `op: in` over the subsets of NNN (there is no bit operator); the default is the guide's value (spec §6.6) and a `params.allowed_modes` relaxes it.
+- `go run ./tools/coverage` regenerates `docs/reference/coverage.md`; CI fails when it is stale. `go run ./tools/refindex` regenerates `docs/reference/stig/*.json` from the pinned DISA files (network; cache in `.cache/refindex`, git-ignored); CI only reads the committed index.
+- `references.stig` entries are `{benchmark, version, id}`; `benchmark` is `ubuntu2204`, `ubuntu2404`, `rhel9`, `rocky9` or `alma9`; lint rejects anything not in the index.
 
 ## Rules that are contracts
 

@@ -24,9 +24,9 @@ import (
 // registration/declaration behaviour and never actually run the collector.
 func noopRun(context.Context, Access, *Builder) error { return nil }
 
-// fakeAccess implements all six Access methods (R46/R60); ReadFile, Stat,
-// Llistxattr and Writable each record the path they were asked about so
-// tests can assert on what actually reached the host.
+// fakeAccess implements all seven Access methods (R46/R60); ReadFile, Stat,
+// Llistxattr, Getxattr and Writable each record the path they were asked
+// about so tests can assert on what actually reached the host.
 type fakeAccess struct{ reads []string }
 
 func (f *fakeAccess) ReadFile(p string, _ int64) ([]byte, ReadMeta, error) {
@@ -41,6 +41,10 @@ func (f *fakeAccess) Glob(p string) ([]string, error) { return []string{p}, nil 
 func (f *fakeAccess) Llistxattr(p string) ([]string, error) {
 	f.reads = append(f.reads, p)
 	return nil, nil
+}
+func (f *fakeAccess) Getxattr(p, name string) ([]byte, error) {
+	f.reads = append(f.reads, p)
+	return nil, unix.ENODATA
 }
 func (f *fakeAccess) Writable(p string) bool {
 	f.reads = append(f.reads, p)
@@ -101,6 +105,28 @@ func TestGuardTreatsStatLlistxattrWritableAsReads(t *testing.T) {
 	}
 }
 
+// Getxattr is guarded the same way: a declared path passes through to
+// inner (fakeAccess.Getxattr, which answers ENODATA), an undeclared one is
+// refused with ErrUndeclared and recorded as a violation.
+func TestGuardTreatsGetxattrAsARead(t *testing.T) {
+	c := Collector{Name: "t", Declare: Declaration{Reads: []string{"/etc/passwd"}, Needs: "none"}, Run: noopRun}
+	g := Guard(&fakeAccess{}, c)
+	if _, err := g.Getxattr("/etc/passwd", "system.posix_acl_access"); err != nil && !errors.Is(err, unix.ENODATA) {
+		t.Errorf("declared: %v", err)
+	}
+	if _, err := g.Getxattr("/etc/shadow", "system.posix_acl_access"); !errors.Is(err, ErrUndeclared) {
+		t.Errorf("undeclared: err=%v", err)
+	}
+	if v := g.Violations(); len(v) != 1 {
+		t.Errorf("violations = %v", v)
+	} else if !strings.Contains(v[0], "getxattr") {
+		// The violation has to name the operation, not just the path: a
+		// reader of the report must be able to tell an undeclared
+		// getxattr from an undeclared read of the same file.
+		t.Errorf("violation %q does not name the getxattr operation", v[0])
+	}
+}
+
 // R55: Allowed answers the same declared-reads question as the guarded
 // methods but never records a violation.
 func TestAllowedDoesNotRecordViolation(t *testing.T) {
@@ -154,11 +180,14 @@ func TestGuardPassesCleanedPathToInnerForAllReadLikeMethods(t *testing.T) {
 	if _, err := g.Llistxattr(unclean); err != nil {
 		t.Fatalf("Llistxattr: %v", err)
 	}
+	if _, err := g.Getxattr(unclean, "system.posix_acl_access"); err != nil && !errors.Is(err, unix.ENODATA) {
+		t.Fatalf("Getxattr: %v", err)
+	}
 	if !g.Writable(unclean) {
 		t.Fatal("Writable must pass for the cleaned form")
 	}
-	if len(fa.reads) != 4 {
-		t.Fatalf("inner saw %d calls, want 4: %v", len(fa.reads), fa.reads)
+	if len(fa.reads) != 5 {
+		t.Fatalf("inner saw %d calls, want 5: %v", len(fa.reads), fa.reads)
 	}
 	for _, got := range fa.reads {
 		if got != want {

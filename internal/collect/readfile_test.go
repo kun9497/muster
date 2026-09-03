@@ -314,3 +314,33 @@ func TestReadFileTruncatedSizeIsFullFileSize(t *testing.T) {
 		t.Errorf("meta.Size = %d, want 1000 (full file size, not the truncated read length)", meta.Size)
 	}
 }
+
+func TestStatReportsTheFileKind(t *testing.T) {
+	dir := t.TempDir()
+	mkfile(t, filepath.Join(dir, "f"), "x", 0o644)
+	if err := os.Mkdir(filepath.Join(dir, "d"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	fifo := filepath.Join(dir, "p")
+	if err := syscall.Mkfifo(fifo, 0o600); err != nil {
+		t.Skip("mkfifo unavailable:", err)
+	}
+	cases := map[string]string{filepath.Join(dir, "f"): "regular", filepath.Join(dir, "d"): "dir", fifo: "fifo", "/dev/null": "chardev"}
+	for p, want := range cases {
+		meta, err := Stat(p)
+		if err != nil {
+			t.Fatalf("Stat(%s): %v", p, err)
+		}
+		if meta.Kind != want {
+			t.Errorf("Stat(%s).Kind = %q, want %q", p, meta.Kind, want)
+		}
+	}
+	null, _ := Stat("/dev/null")
+	if null.Rdev == 0 {
+		t.Error("/dev/null must report a non-zero rdev")
+	}
+	_, meta, err := ReadFile(filepath.Join(dir, "d"), 10)
+	if !errors.Is(err, ErrNotRegular) || meta.Kind != "dir" {
+		t.Errorf("ReadFile on a dir: err=%v kind=%q", err, meta.Kind)
+	}
+}

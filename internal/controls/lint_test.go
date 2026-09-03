@@ -282,6 +282,65 @@ remediation: { text_en: t, text_ko: 조치, risk: none }
 	}
 }
 
+// R114: list<int> params default-check every element as an integer, the
+// same way the int case checks a scalar default.
+func TestLintListIntParamDefaultMustBeAllIntegers(t *testing.T) {
+	bad := `id: muster.file.list_int_test
+title_en: t
+title_ko: t
+description_en: d
+description_ko: d
+category: file
+importance: 상
+automation: auto
+references: { kisa: { "2026": ["U-19"] } }
+requires_facts: ">=1"
+absent_means: fail
+params:
+  allowed_modes: { type: list<int>, default: [0, "128"], description: d }
+checks:
+  - { fact: files.etc_hosts.mode, op: in, expected: "${allowed_modes}" }
+remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true }
+`
+	if r := rules(lintOne(t, bad, LintOptions{})); !r["param"] {
+		t.Errorf("list<int> default with a non-integer element must be a param problem: %v", r)
+	}
+	good := strings.Replace(bad, `default: [0, "128"]`, `default: [0, 128]`, 1)
+	if ps := lintOne(t, good, LintOptions{}); len(ps) != 0 {
+		t.Fatalf("all-integer list<int> default must lint clean: %v", ps)
+	}
+}
+
+func TestLintAcceptsNotMatchesWithAPatternAndRejectsItOnLists(t *testing.T) {
+	ok := `
+id: muster.file.banner_test
+title_en: t
+title_ko: t
+description_en: d
+description_ko: d
+category: file
+importance: 하
+automation: auto
+references: { kisa: { "2026": ["U-53"] } }
+requires_facts: ">=1"
+absent_means: pass
+checks:
+  - { fact: sshd.collect_method, op: not_matches, expected: "(?i)parse" }
+remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true }
+`
+	if r := rules(lintOne(t, ok, LintOptions{})); len(r) != 0 {
+		t.Fatalf("not_matches with a pattern must lint clean: %v", r)
+	}
+	bad := strings.Replace(ok, `expected: "(?i)parse"`, `expected: 3`, 1)
+	if r := rules(lintOne(t, bad, LintOptions{})); !r["clause_grammar"] {
+		t.Errorf("not_matches without a string pattern must be a clause_grammar problem: %v", r)
+	}
+	onList := strings.Replace(ok, "fact: sshd.collect_method", "fact: files.etc_securetty_lines", 1)
+	if r := rules(lintOne(t, onList, LintOptions{})); !r["clause_grammar"] {
+		t.Errorf("not_matches on a list fact must be a clause_grammar problem: %v", r)
+	}
+}
+
 // M13: lint ranges over c.Params and References.KISA, whose iteration order
 // Go randomises, and sorted only on (path, rule) -- so two problems sharing a
 // rule came out in a different order on every run.
@@ -358,6 +417,51 @@ func TestUnusedKeysNamesRegisteredKeysNoControlReferences(t *testing.T) {
 		if got[k] {
 			t.Errorf("%s is referenced by a control and must not be reported", k)
 		}
+	}
+}
+
+func TestLintValidatesSTIGAndNISTReferencesAgainstTheIndex(t *testing.T) {
+	x, err := LoadReferenceIndex("testdata/refs")
+	if err != nil {
+		t.Fatal(err)
+	}
+	base := `
+id: muster.file.ref_test
+title_en: t
+title_ko: t
+description_en: d
+description_ko: d
+category: file
+importance: 하
+automation: auto
+references:
+  kisa: { "2026": ["U-19"] }
+  stig: [{ benchmark: mini, version: V1R1, id: MINI-00-000010 }]
+  nist_800_53: ["CM-6"]
+requires_facts: ">=1"
+absent_means: fail
+checks:
+  - { fact: files.etc_hosts.uid, op: eq, expected: 0 }
+remediation: { text_en: t, text_ko: t, risk: none, idempotent: true }
+`
+	if probs := lintOne(t, base, LintOptions{References: x}); len(probs) != 0 {
+		t.Fatalf("valid references must lint clean: %v", probs)
+	}
+	cases := map[string]string{
+		"unknown benchmark": strings.Replace(base, "benchmark: mini", "benchmark: nope", 1),
+		"wrong version":     strings.Replace(base, "version: V1R1", "version: V9R9", 1),
+		"unknown id":        strings.Replace(base, "MINI-00-000010", "MINI-00-777777", 1),
+		"nist not indexed":  strings.Replace(base, `["CM-6"]`, `["AC-99"]`, 1),
+		"nist bad format":   strings.Replace(base, `["CM-6"]`, `["cm6"]`, 1),
+	}
+	for name, y := range cases {
+		got := rules(lintOne(t, y, LintOptions{References: x}))
+		if !got["references_stig"] && !got["references_nist"] {
+			t.Errorf("%s: want a references problem, got %v", name, got)
+		}
+	}
+	if got := rules(lintOne(t, base, LintOptions{References: nil})); !got["references_stig"] {
+		t.Errorf("without an index a stig reference must be a problem, got %v", got)
 	}
 }
 

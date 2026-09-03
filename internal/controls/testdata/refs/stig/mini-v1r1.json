@@ -1,0 +1,13 @@
+{
+  "product": "mini",
+  "applies_to": ["mini-clone"],
+  "benchmark": "Mini STIG",
+  "version": "V1R1",
+  "release_info": "Release: 1",
+  "source": {"url": "u", "sha256": "s", "member": "m"},
+  "cci_list": {"version": "2025-01-23", "sha256": "c"},
+  "rules": [
+    {"stig_id": "MINI-00-000010", "group_id": "V-000001", "rule_id": "SV-000001r1_rule", "severity": "high", "title": "First rule", "ccis": ["CCI-000366"], "nist": ["CM-6"]},
+    {"stig_id": "MINI-00-000020", "group_id": "V-000002", "rule_id": "SV-000002r2_rule", "severity": "medium", "title": "Second rule", "ccis": ["CCI-000068", "CCI-000366"], "nist": ["AC-17(2)", "CM-6"]}
+  ]
+}

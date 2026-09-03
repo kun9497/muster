@@ -1,0 +1,1 @@
+{"synthetic":true,"schema_version":1,"run":{},"facts":{"files":{"etc_services":{"uid":{"status":"ok","value":0,"source":{"kind":"file","path":"/etc/services"}},"mode":{"status":"ok","value":436,"source":{"kind":"file","path":"/etc/services"}}}}}}

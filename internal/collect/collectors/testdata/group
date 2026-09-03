@@ -1,0 +1,5 @@
+root:x:0:
+shadow:x:42:
+adm:x:4:syslog,alice
+broken line without fields
+dupshadow:x:42:

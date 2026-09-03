@@ -1,1 +1,1 @@
-{"synthetic": true, "schema_version":1,"run":{},"facts":{"files":{"etc_passwd":{"mode":{"status":"ok","value":420,"source":{"kind":"sys","path":"/etc/passwd"}},"uid":{"status":"ok","value":0},"gid":{"status":"ok","value":0},"acl_present":{"status":"ok","value":false}}}}}
+{"synthetic": true, "schema_version":1,"run":{},"facts":{"files":{"etc_passwd":{"mode":{"status":"ok","value":420,"source":{"kind":"sys","path":"/etc/passwd"}},"uid":{"status":"ok","value":0},"gid":{"status":"ok","value":0},"acl_entries":{"status":"ok","value":[]}}}}}

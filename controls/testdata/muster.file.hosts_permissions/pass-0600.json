@@ -1,0 +1,1 @@
+{"synthetic":true,"schema_version":1,"run":{},"facts":{"files":{"etc_hosts":{"uid":{"status":"ok","value":0,"source":{"kind":"file","path":"/etc/hosts"}},"mode":{"status":"ok","value":384,"source":{"kind":"file","path":"/etc/hosts"}}}}}}

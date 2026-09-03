@@ -27,7 +27,7 @@ type Entry struct {
 	Sensitivity string `yaml:"sensitivity"` // public | internal | secret
 	Collector   string `yaml:"collector"`
 	DefaultOn   string `yaml:"default_on,omitempty"`   // settings only: runtime | persisted | effective | both
-	SubjectKind string `yaml:"subject_kind,omitempty"` // list types only: file | dir | user | group | unit | port | module | mount | key
+	SubjectKind string `yaml:"subject_kind,omitempty"` // list types only: file | dir | user | group | unit | port | module | mount | key | facility | zone
 }
 
 // Registry is the single truth for fact keys, their types and sensitivity.
@@ -40,7 +40,7 @@ type Registry struct {
 var validTypes = map[string]bool{"string": true, "int": true, "bool": true, "list<string>": true, "record": true, "list<record>": true}
 var validSensitivity = map[string]bool{"public": true, "internal": true, "secret": true}
 var validOn = map[string]bool{"runtime": true, "persisted": true, "effective": true, "both": true}
-var validSubjectKind = map[string]bool{"file": true, "dir": true, "user": true, "group": true, "unit": true, "port": true, "module": true, "mount": true, "key": true}
+var validSubjectKind = map[string]bool{"file": true, "dir": true, "user": true, "group": true, "unit": true, "port": true, "module": true, "mount": true, "key": true, "facility": true, "zone": true}
 
 // LoadRegistry parses the embedded registry strictly and validates it.
 func LoadRegistry() (*Registry, error) {

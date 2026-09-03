@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/kun9497/muster/internal/collect"
+	"github.com/kun9497/muster/internal/facts"
 )
 
 // osReadLimit caps the small identity files this collector reads; none of
@@ -27,7 +28,7 @@ const (
 )
 
 // osCollector fills the run header — the host and env blocks of spec §5.1 —
-// rather than any registry key, so it writes nothing through Set.
+// and writes env.container and env.has_systemd to the registry.
 //
 // R40: the read primitive refuses every symlink, and on Ubuntu 22.04/24.04
 // and Rocky/Alma 9 both /etc/os-release (→ ../usr/lib/os-release) and
@@ -86,25 +87,28 @@ func osReleaseText(a collect.Access) string {
 	return ""
 }
 
-// containerKind names what this process is running inside, or "none". A
-// docker container has /.dockerenv and a podman one /run/.containerenv; an
-// LXC container has neither, only "lxc" in pid 1's cgroup. pid 1's own name
-// is the last resort: on a host it is the init system, so anything else
-// means we are inside something this list does not name.
-func containerKind(a collect.Access) string {
+// containerKind names what this process is running inside, or "none", and
+// returns the marker path that determined the value. A docker container has
+// /.dockerenv and a podman one /run/.containerenv; an LXC container has
+// neither, only "lxc" in pid 1's cgroup. pid 1's own name is the last resort:
+// on a host it is the init system, so anything else means we are inside
+// something this list does not name. The marker is the file that decided:
+// dockerMarker, podmanMarker, procOneCgroup for lxc, or procOneComm for
+// none/other.
+func containerKind(a collect.Access) (string, string) {
 	switch {
 	case exists(a, dockerMarker):
-		return "docker"
+		return "docker", dockerMarker
 	case exists(a, podmanMarker):
-		return "podman"
+		return "podman", podmanMarker
 	case strings.Contains(readTrim(a, procOneCgroup), "lxc"):
-		return "lxc"
+		return "lxc", procOneCgroup
 	}
 	switch readTrim(a, procOneComm) {
 	case "", "systemd", "init":
-		return "none"
+		return "none", procOneComm
 	}
-	return "other"
+	return "other", procOneComm
 }
 
 // virtOf maps a DMI product name to the hypervisor it identifies. An empty
@@ -183,9 +187,12 @@ func runOS(_ context.Context, a collect.Access, b *collect.Builder) error {
 	}
 	h.OSRelease.Family = osFamily(h.OSRelease.ID, idLike)
 
-	e.Container = containerKind(a)
+	kind, marker := containerKind(a)
+	e.Container = kind
 	e.WSL = strings.Contains(strings.ToLower(readTrim(a, "/proc/version")), "microsoft")
 	e.HasSystemd = exists(a, systemdMarker)
+	b.Set("env.container", collect.OK(kind, &facts.Source{Kind: "file", Path: marker}))
+	b.Set("env.has_systemd", collect.OK(e.HasSystemd, &facts.Source{Kind: "file", Path: systemdMarker}))
 	// R46: whether this process may write sysctls is an environment probe,
 	// answered by Access so the guard sees it, never by unix.Access.
 	e.SysctlWritable = a.Writable(sysctlNetDir)

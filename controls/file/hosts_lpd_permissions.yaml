@@ -1,0 +1,23 @@
+id: muster.file.hosts_lpd_permissions
+title_en: /etc/hosts.lpd, when present, is owned by root and readable by root only
+title_ko: /etc/hosts.lpd 가 존재하면 root 소유이고 root 만 읽을 수 있다
+description_en: The guide's criterion is owner root and mode 0600 or stricter. The file need not exist; an absent file passes.
+description_ko: 가이드 기준은 소유자 root, 모드 0600 이하입니다. 파일이 없어도 되며, 파일이 없으면 통과합니다.
+category: file
+importance: 하
+automation: auto
+references:
+  kisa: { "2026": ["U-29"], "2021": ["U-55"] }
+requires_facts: ">=1"
+absent_means: pass
+params:
+  allowed_modes: { type: list<int>, default: [0, 128, 256, 384], description: Modes that count as 0600 or stricter (0600 and every subset of its bits) }
+checks:
+  - { fact: files.etc_hosts_lpd.uid, op: eq, expected: 0 }
+  - { fact: files.etc_hosts_lpd.mode, op: in, expected: "${allowed_modes}" }
+remediation:
+  text_en: chown root:root /etc/hosts.lpd; chmod 600 /etc/hosts.lpd
+  text_ko: chown root:root /etc/hosts.lpd; chmod 600 /etc/hosts.lpd
+  risk: none
+  idempotent: true
+  script: chown root:root /etc/hosts.lpd && chmod 600 /etc/hosts.lpd

@@ -107,19 +107,48 @@ func TestDerivationTable(t *testing.T) {
 		{"6 truncated", `{"services":{"telnet":{"reachable":{"status":"ok","value":false,"truncated":true}}}}`, telnetControl("auto", "pass"), ERROR, Truncated, nil},
 		{"6 missing key never absent_means", `{}`, telnetControl("auto", "pass"), ERROR, MissingFact, nil},
 		{"1 requires_facts unmet", `{"services":{"telnet":{"reachable":{"status":"ok","value":false}}}}`, func() controls.Control { c := telnetControl("auto", "pass"); c.RequiresFacts = ">=2"; return c }(), ERROR, MissingFact, nil},
-		{"2 manual", `{}`, controls.Control{ID: "muster.log.review", Importance: "하", Category: "log", Automation: "manual", ManualReason: "interview"}, MANUAL, "", nil},
-		{"4 applies_when false", `{"services":{"ssh":{"installed":{"status":"ok","value":false}},"telnet":{"reachable":{"status":"ok","value":true}}}}`,
+		{"4 manual", `{}`, controls.Control{ID: "muster.log.review", Importance: "하", Category: "log", Automation: "manual", ManualReason: "interview"}, MANUAL, "", nil},
+		{"3 applies_when false", `{"services":{"ssh":{"installed":{"status":"ok","value":false}},"telnet":{"reachable":{"status":"ok","value":true}}}}`,
 			func() controls.Control {
 				c := telnetControl("auto", "pass")
 				c.AppliesWhen = controls.ClauseList{{Fact: "services.ssh.installed", Op: "eq", Expected: true}}
 				return c
 			}(), NotApplicable, "", nil},
-		{"3 applies_when denied", `{"services":{"ssh":{"installed":{"status":"denied","reason":"root"}},"telnet":{"reachable":{"status":"ok","value":true}}}}`,
+		{"2 applies_when denied", `{"services":{"ssh":{"installed":{"status":"denied","reason":"root"}},"telnet":{"reachable":{"status":"ok","value":true}}}}`,
 			func() controls.Control {
 				c := telnetControl("auto", "pass")
 				c.AppliesWhen = controls.ClauseList{{Fact: "services.ssh.installed", Op: "eq", Expected: true}}
 				return c
 			}(), ERROR, PermissionDenied, evidenceHasFact("services.ssh.installed", facts.StatusDenied)}, // R25
+		// spec §6.5 rows 2-4 (amended 2026-09-03): a manual control's
+		// applies_when is screened and evaluated before the automation
+		// class is looked at, so MANUAL is reached only when applies_when
+		// holds (or is absent).
+		{"2 manual control whose applies_when fact is denied is ERROR",
+			`{"services":{"ssh":{"installed":{"status":"denied","reason":"needs root"}}}}`,
+			controls.Control{ID: "muster.service.mail_version", Importance: "하", Category: "service", Automation: "manual",
+				ManualReason:  "needs the MTA configuration parser",
+				AppliesWhen:   controls.ClauseList{{Fact: "services.ssh.installed", Op: "eq", Expected: true}},
+				RequiresFacts: ">=1"},
+			ERROR, PermissionDenied, nil},
+		{"3 manual control whose applies_when is false is NOT_APPLICABLE, not MANUAL",
+			`{"services":{"ssh":{"installed":{"status":"ok","value":false}}}}`,
+			controls.Control{ID: "muster.service.mail_version", Importance: "하", Category: "service", Automation: "manual",
+				ManualReason:  "needs the MTA configuration parser",
+				AppliesWhen:   controls.ClauseList{{Fact: "services.ssh.installed", Op: "eq", Expected: true}},
+				RequiresFacts: ">=1"},
+			NotApplicable, "", func(t *testing.T, r Result) {
+				if !strings.Contains(r.Reason, "applies_when does not hold") {
+					t.Errorf("reason must say applies_when does not hold: %q", r.Reason)
+				}
+			}},
+		{"4 manual control whose applies_when holds is MANUAL with evidence",
+			`{"services":{"ssh":{"installed":{"status":"ok","value":true}}}}`,
+			controls.Control{ID: "muster.service.mail_version", Importance: "하", Category: "service", Automation: "manual",
+				ManualReason:  "needs the MTA configuration parser",
+				AppliesWhen:   controls.ClauseList{{Fact: "services.ssh.installed", Op: "eq", Expected: true}},
+				RequiresFacts: ">=1"},
+			MANUAL, "", evidenceHasFact("services.ssh.installed", facts.StatusOK)},
 		{"R25 mechanism-selection hard error carries evidence for the denied fact, not only applies_when's",
 			`{"services":{"ssh":{"installed":{"status":"ok","value":true}}},"sshd":{"options":{"permit_root_login":{"effective":{"status":"denied","reason":"sshd -T needs root"}}}}}`,
 			controls.Control{ID: "muster.account.root_remote_login", Importance: "상", Category: "account", Automation: "auto", AbsentMeans: "manual", Remediation: &controls.Remediation{Risk: "lockout_risk"},

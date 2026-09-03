@@ -27,6 +27,12 @@ type Access interface {
 	Stat(path string) (ReadMeta, error)
 	Glob(pattern string) ([]string, error)
 	Llistxattr(path string) ([]string, error)
+
+	// Getxattr returns the value of one extended attribute of path, read
+	// through the same no-follow open Llistxattr uses. ENODATA and
+	// EOPNOTSUPP propagate unchanged so the caller can classify them.
+	Getxattr(path, name string) ([]byte, error)
+
 	Run(ctx context.Context, c Command) Output
 
 	// Writable is an environment probe — answers whether this process may
@@ -171,6 +177,25 @@ func splitXattrNames(buf []byte) []string {
 	return out
 }
 
+// Getxattr returns the value of one extended attribute of p, opened through
+// the same no-follow primitive Llistxattr uses. ENODATA/EOPNOTSUPP propagate
+// unchanged so the caller (aclEntries) can tell "not set" from a real
+// failure. A value larger than the 64 KiB buffer returns ERANGE, which the
+// caller reports as an error envelope, never a silently truncated value.
+func (hostAccess) Getxattr(p, name string) ([]byte, error) {
+	fd, _, err := openNoFollow(rewriteProcSelf(p), openFlags)
+	if err != nil {
+		return nil, err
+	}
+	defer unix.Close(fd)
+	buf := make([]byte, 64<<10)
+	n, err := unix.Fgetxattr(fd, name, buf)
+	if err != nil {
+		return nil, err
+	}
+	return buf[:n], nil
+}
+
 // Writable is an environment probe — answers whether this process may
 // write here (read-only mounts, namespaces); for root that is true unless
 // the mount forbids it; not a permission-bit check (R72). It goes through
@@ -289,9 +314,9 @@ func (g *guardedAccess) ReadFile(p string, limit int64) ([]byte, ReadMeta, error
 	return g.inner.ReadFile(clean, limit)
 }
 
-// Stat, Llistxattr and Writable are guarded the same way ReadFile is: a
-// path must match a declared Reads entry, and a violation is recorded the
-// same way (R46/R60). All four pass the CLEANED path to inner (R72), not
+// Stat, Llistxattr, Getxattr and Writable are guarded the same way ReadFile
+// is: a path must match a declared Reads entry, and a violation is recorded
+// the same way (R46/R60). All five pass the CLEANED path to inner (R72), not
 // the original string the collector supplied — see allowedPath.
 func (g *guardedAccess) Stat(p string) (ReadMeta, error) {
 	clean, ok := g.allowedPath(p)
@@ -314,6 +339,14 @@ func (g *guardedAccess) Llistxattr(p string) ([]string, error) {
 		return nil, g.violate("llistxattr " + p)
 	}
 	return g.inner.Llistxattr(clean)
+}
+
+func (g *guardedAccess) Getxattr(p, name string) ([]byte, error) {
+	clean, ok := g.allowedPath(p)
+	if !ok {
+		return nil, g.violate("getxattr " + p)
+	}
+	return g.inner.Getxattr(clean, name)
 }
 
 // Writable is authorised against the same Declaration.Reads a read would

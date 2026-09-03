@@ -1,6 +1,8 @@
 # build output
 /bin/
 /dist/
+# tools/refindex downloads the pinned DISA STIG and CCI zips here
+/.cache/
 # `go build ./cmd/muster` and `go test -c` drop these at the repository root
 /muster
 /muster.exe
