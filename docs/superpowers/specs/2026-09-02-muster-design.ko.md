@@ -131,7 +131,7 @@ JSON 파일 하나, UTF-8, 구조체에서 직렬화하므로 키 순서가 고�
     "collected_at": "2026-09-02T06:00:00Z",
     "host": {"hostname": "web-01", "machine_id_hash": "…", "kernel": "5.14.0-…",
              "os_release": {"id": "rocky", "version_id": "9.4"}, "boot_id": "…", "uptime_s": 12345},
-    "euid": 0, "capabilities": ["CAP_DAC_READ_SEARCH"],
+    "euid": 0, "capabilities": ["CAP_DAC_READ_SEARCH", "raw:0000000000000004"],
     "env": {"container": "none", "virt": "kvm", "wsl": false, "chroot": false,
             "has_systemd": true, "sysctl_writable": true, "cloud_init": false},
     "collectors": [{"name": "sshd", "status": "ok", "ms": 41, "cmd": "/usr/sbin/sshd -T"}],
@@ -427,7 +427,7 @@ muster는 남의 프로덕션 호스트에서 root로 돌고, 그 출력은 공�
 
 **1단계 — 뼈대.** `collect`와 `check`. 봉투, 설정, 레지스트리, 출처 정보를 갖춘 팩트 스키마. 읽기 프리미티브, exec 규율, `--list-actions`를 갖춘 수집기 레지스트리. 워크 없는 워크 뼈대(`--deep` 플래그, 경계, 예산, `complete`). 결정성 계약을 갖춘 테이블과 JSON 출력. 종료 코드. waiver. 스냅샷 수명 주기(경로, 이름, 잠금). 편집 정책. 컨트롤 lint. 픽스처 규약과 레지스트리 테스트. 결과 불변식. `testdata/`의 시크릿 스캔. 최상위 recover 가드. `THREAT_MODEL.md`, `SECURITY.md`, `ATTRIBUTION.md`. README 한 쌍. 다섯 개의 컨트롤이 끝에서 끝까지 흐르며, 기계 장치를 두루 시험하도록 골랐습니다. 각각에 대해 1단계가 반드시 내놓아야 하는 최소 수집 능력은 이렇습니다.
 
-- `U-01`(sshd, `mechanisms`, `persona`): `sshd -T`의 전역 값만, `personas_collected: false`, include 추적 없음. 그래서 2단계가 페르소나를 더하기 전까지 이 컨트롤은 평가되어 `WARN`(저하됨)을 보고합니다.
+- `U-01`(sshd, `mechanisms`, `persona`): `sshd -T`의 전역 값만, `personas_collected: false`, include 추적 없음. 그래서 2단계가 페르소나를 더하기 전까지 이 컨트롤은 평가되어, 절이 성립하면 `PASS` 대신 `WARN`(저하됨)을 보고합니다. 절이 성립하지 않으면 먼저 `FAIL`입니다(6.5절 12단계).
 - `U-02`(비밀번호 정책, 두 곳에 사는 설정, `params`): `login.defs`와 계정별 `shadow` 만료 필드. pwquality 절은 2단계에서 PAM 수집기와 함께 합류합니다.
 - `U-16`(`/etc/passwd`, 권한 팩트): 모드, 소유자, 그룹, 그리고 ACL xattr에서 얻는 `acl_present`. ACL 항목은 2단계에서 파싱하므로, 1단계에서 ACL이 있는 파일은 파싱되지 않은 ACL을 사유로 명시한 `FAIL`입니다.
 - `U-52`(Telnet, 서비스 정규화, `absent_means: pass`): 매핑된 유닛에 대한 `systemctl show`와 `/proc/net/tcp`의 리스닝 소켓. 소켓 활성화와 `masked`/`static` 처리는 2단계에서 완성됩니다.

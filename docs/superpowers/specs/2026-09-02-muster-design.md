@@ -131,7 +131,7 @@ One JSON file, UTF-8, serialised from structs so key order is fixed. Three top-l
     "collected_at": "2026-09-02T06:00:00Z",
     "host": {"hostname": "web-01", "machine_id_hash": "…", "kernel": "5.14.0-…",
              "os_release": {"id": "rocky", "version_id": "9.4"}, "boot_id": "…", "uptime_s": 12345},
-    "euid": 0, "capabilities": ["CAP_DAC_READ_SEARCH"],
+    "euid": 0, "capabilities": ["CAP_DAC_READ_SEARCH", "raw:0000000000000004"],
     "env": {"container": "none", "virt": "kvm", "wsl": false, "chroot": false,
             "has_systemd": true, "sysctl_writable": true, "cloud_init": false},
     "collectors": [{"name": "sshd", "status": "ok", "ms": 41, "cmd": "/usr/sbin/sshd -T"}],
@@ -427,7 +427,7 @@ Against the 2026 list this gives **51 auto, 7 partial, 9 deferred, 0 manual-only
 
 **Stage 1 — skeleton.** `collect` and `check`; the facts schema with envelope, settings, registry and provenance; the read primitive, exec discipline and collector registry with `--list-actions`; the walk skeleton (`--deep` flag, boundaries, budget, `complete`) without the walk; table and JSON output with the determinism contract; exit codes; waivers; snapshot lifecycle (path, naming, lock); redaction policy; controls lint; fixture convention and registry test; result invariants; secret scanning of `testdata/`; the top-level recover guard; `THREAT_MODEL.md`, `SECURITY.md`, `ATTRIBUTION.md`; README pair. Five controls flow end to end, chosen to exercise the machinery, each with the minimum collector capability stage 1 must deliver:
 
-- `U-01` (sshd, `mechanisms`, `persona`): `sshd -T` global values only, `personas_collected: false`, no include tracing — so the control evaluates and reports `WARN` (degraded) until stage 2 adds personas.
+- `U-01` (sshd, `mechanisms`, `persona`): `sshd -T` global values only, `personas_collected: false`, no include tracing — so the control evaluates and, when its clause holds, reports `WARN` (degraded) rather than `PASS` until stage 2 adds personas; a failing clause is `FAIL` first (section 6.5, step 12).
 - `U-02` (password policy, two-home settings, `params`): `login.defs` and per-account `shadow` ageing fields; the pwquality clauses join in stage 2 with the PAM collector.
 - `U-16` (`/etc/passwd`, permission fact): mode, owner, group and `acl_present` from the ACL xattr; ACL entries are parsed in stage 2, so a file with an ACL present is `FAIL` in stage 1 with the reason naming the unparsed ACL.
 - `U-52` (Telnet, service normalisation, `absent_means: pass`): `systemctl show` for the mapped units and listening sockets from `/proc/net/tcp`; socket-activation and `masked`/`static` handling complete in stage 2.
