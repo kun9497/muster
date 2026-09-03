@@ -55,8 +55,15 @@ func TestRunCommandTimeoutKillsProcessGroup(t *testing.T) {
 
 func TestRunCommandCapsOutputWithoutDeadlock(t *testing.T) {
 	o := RunCommand(context.Background(), Command{Path: sh(t), Args: []string{"-c", "yes | head -c 5000000"}, MaxOutput: 1024, Timeout: 10 * time.Second})
-	if o.TimedOut || !o.Truncated || len(o.Stdout) != 1024 {
+	if o.TimedOut || !o.Truncated || len(o.Stdout) != 1024 || o.ExitCode != 0 || o.Err != nil {
 		t.Fatalf("%+v len=%d", o, len(o.Stdout))
+	}
+}
+
+func TestRunCommandCapsStderrWithoutDeadlock(t *testing.T) {
+	o := RunCommand(context.Background(), Command{Path: sh(t), Args: []string{"-c", "yes | head -c 5000000 >&2"}, MaxOutput: 1024, Timeout: 10 * time.Second})
+	if o.TimedOut || !o.Truncated || len(o.Stderr) != 1024 || o.ExitCode != 0 {
+		t.Fatalf("%+v len=%d", o, len(o.Stderr))
 	}
 }
 
@@ -69,5 +76,34 @@ func TestRunCommandExitCodeAndSource(t *testing.T) {
 	src := o.Source(c)
 	if src.Kind != "command" || *src.ExitCode != 3 || !strings.HasPrefix(src.Cmd, c.Path) {
 		t.Fatalf("%+v", src)
+	}
+}
+
+func TestRunCommandPreCancelledContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	o := RunCommand(ctx, Command{Path: sh(t), Args: []string{"-c", "true"}})
+	if o.Err == nil || o.ExitCode != -1 || o.TimedOut {
+		t.Fatalf("%+v", o)
+	}
+}
+
+// TestRunCommandExpiredParentContext covers a parent context whose deadline
+// had already passed before RunCommand was even called: Cmd.Start fails
+// without spawning anything, so Err must be set (the command never started)
+// even though the failure is reported via the timeout path.
+func TestRunCommandExpiredParentContext(t *testing.T) {
+	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
+	defer cancel()
+	o := RunCommand(ctx, Command{Path: sh(t), Args: []string{"-c", "true"}})
+	if o.Err == nil {
+		t.Fatalf("expected Err set for a context that expired before the command could start: %+v", o)
+	}
+}
+
+func TestRunCommandMissingExecutable(t *testing.T) {
+	o := RunCommand(context.Background(), Command{Path: "/nonexistent/bin/x"})
+	if o.Err == nil || o.ExitCode != -1 {
+		t.Fatalf("%+v", o)
 	}
 }

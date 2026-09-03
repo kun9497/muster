@@ -88,6 +88,15 @@ func RunCommand(ctx context.Context, c Command) Output {
 	switch {
 	case ctx.Err() == context.DeadlineExceeded:
 		o.TimedOut, o.ExitCode = true, -1
+		if cmd.Process == nil {
+			// The deadline (or an already-cancelled parent context) had
+			// already expired before the process could be started, so
+			// nothing ever ran: report it as the start failure it is,
+			// per the Output doc ("Err is set only when the command could
+			// not be started at all"). A real mid-run timeout still
+			// leaves Err nil here — the process did start.
+			o.Err = err
+		}
 	case err == nil:
 		o.ExitCode = 0
 	default:
