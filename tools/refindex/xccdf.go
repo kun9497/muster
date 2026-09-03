@@ -74,6 +74,15 @@ func parseXCCDF(data []byte) (*benchmark, error) {
 		sort.Strings(rule.CCIs)
 		b.Rules = append(b.Rules, rule)
 	}
-	sort.Slice(b.Rules, func(i, j int) bool { return b.Rules[i].StigID < b.Rules[j].StigID })
+	// SliceStable with a two-field key: StigID is unique in practice, but a
+	// tie would otherwise fall back to sort.Slice's unspecified order, which
+	// go test -race -shuffle=on and reruns could turn up as nondeterministic
+	// output bytes.
+	sort.SliceStable(b.Rules, func(i, j int) bool {
+		if b.Rules[i].StigID != b.Rules[j].StigID {
+			return b.Rules[i].StigID < b.Rules[j].StigID
+		}
+		return b.Rules[i].RuleID < b.Rules[j].RuleID
+	})
 	return b, nil
 }

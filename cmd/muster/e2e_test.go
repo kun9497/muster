@@ -161,8 +161,8 @@ func TestCheckEndToEndJSONAndTable(t *testing.T) {
 	if _, declared := params["muster.service.telnet_disabled"]; declared {
 		t.Errorf("only controls that declare params belong in check.params: %v", params)
 	}
-	// R26: full-pass.json must produce exactly the five stage-1 controls'
-	// documented statuses (spec §10.2's five-controls list), not merely
+	// R26: full-pass.json must produce exactly the eight controls'
+	// documented statuses (spec §10.2's eight-controls list), not merely
 	// "some PASS rows appear somewhere in the output".
 	assertStatuses(t, out1.Bytes(), map[string]string{
 		"muster.account.root_remote_login":  "PASS",
@@ -184,7 +184,7 @@ func TestCheckEndToEndJSONAndTable(t *testing.T) {
 	}
 
 	// R26: full-fail.json flips only root_remote_login to FAIL; the other
-	// four controls are unchanged from full-pass.json.
+	// seven controls are unchanged from full-pass.json.
 	var failJSON bytes.Buffer
 	if code := run([]string{"check", "--facts", "testdata/full-fail.json", "--format", "json"}, &failJSON, &errb); code != exitFindings {
 		t.Fatalf("exit %d, want 1 for a FAIL; stderr %q", code, errb.String())

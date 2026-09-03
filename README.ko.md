@@ -107,7 +107,9 @@ CIS 벤치마크 권고 번호를 달고, 2단계에서 DISA STIG와 NIST SP 800
 파라미터를 고를 수 있습니다. muster는 번호만 기록하고 벤치마크 본문은 담지 않으며,
 CIS나 STIG 준수 여부를 인증하지 않습니다. 컨트롤이 인용할 수 있는 STIG·NIST
 식별자는 DISA의 공개 파일로부터 `tools/refindex`가 `docs/reference/stig/`에
-생성합니다. [ATTRIBUTION.md](ATTRIBUTION.md)를 보세요.
+생성합니다. 이 저장소가 옮겨 오는 것은 STIG와 CCI 식별자, 심각도, 제목뿐이며,
+점검 내용·판단 기준·조치 방법 문구는 담지 않습니다.
+[ATTRIBUTION.md](ATTRIBUTION.md)를 보세요.
 
 ## 로드맵
 

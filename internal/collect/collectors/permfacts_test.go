@@ -140,6 +140,64 @@ func TestPasswdACLEntriesAreListed(t *testing.T) {
 	}
 }
 
+// R95: a listed ACL whose value cannot be decoded is not "no ACL" — it is
+// a failure to know, and both leaves that describe the ACL must carry it,
+// never just acl_present while acl_entries quietly goes missing.
+//
+// Mutation check: delete the `b.Set(prefix+".acl_entries", e)` line in the
+// error branch of writePermFacts (permfacts.go) and this test must fail;
+// restore it and the test must pass again.
+func TestPasswdUndecodableACLIsAnErrorOnBothLeaves(t *testing.T) {
+	a := &fsAccess{
+		files:       map[string]string{"/etc/group": "group"},
+		stats:       map[string]statResult{"/etc/passwd": {mode: 0o644, uid: 0, gid: 0, kind: "regular"}},
+		xattrValues: map[string]map[string][]byte{"/etc/passwd": {"system.posix_acl_access": {1, 2, 3}}},
+	}
+	b := build(t, "files", a)
+	if v := env(t, b, "files.etc_passwd.acl_present"); v.Status != facts.StatusError {
+		t.Errorf("acl_present %+v, want error", v)
+	}
+	if v := env(t, b, "files.etc_passwd.acl_entries"); v.Status != facts.StatusError {
+		t.Errorf("acl_entries %+v, want error", v)
+	}
+	// Stat succeeded independently of the ACL decode, so mode must stay ok.
+	if v := env(t, b, "files.etc_passwd.mode"); v.Status != facts.StatusOK {
+		t.Errorf("mode %+v, want ok", v)
+	}
+}
+
+// TestPasswdListedACLWithoutAValueIsNoACL covers the ENODATA race: the name
+// was listed by Llistxattr, but by the time Getxattr ran the attribute was
+// gone (or the double simply has no value for it). aclEntries reads that as
+// "not set" (present=false, no error), so acl_present is an ok false and
+// acl_entries is an ok, non-nil empty list — never absent, denied or error.
+func TestPasswdListedACLWithoutAValueIsNoACL(t *testing.T) {
+	a := &fsAccess{
+		files:  map[string]string{"/etc/group": "group"},
+		stats:  map[string]statResult{"/etc/passwd": {mode: 0o644, uid: 0, gid: 0, kind: "regular"}},
+		xattrs: map[string][]string{"/etc/passwd": {"system.posix_acl_access"}},
+	}
+	b := build(t, "files", a)
+	present := env(t, b, "files.etc_passwd.acl_present")
+	if present.Status != facts.StatusOK || present.Value != false {
+		t.Errorf("acl_present %+v, want ok false", present)
+	}
+	entriesEnv := env(t, b, "files.etc_passwd.acl_entries")
+	if entriesEnv.Status != facts.StatusOK {
+		t.Fatalf("acl_entries %+v, want ok", entriesEnv)
+	}
+	list, ok := entriesEnv.Value.([]any)
+	if !ok {
+		t.Fatalf("acl_entries value = %#v, want []any", entriesEnv.Value)
+	}
+	if list == nil {
+		t.Error("acl_entries must be an empty slice, not nil (R50)")
+	}
+	if len(list) != 0 {
+		t.Errorf("acl_entries = %v, want empty", list)
+	}
+}
+
 func TestGroupFailureDoesNotHideThePermissionFacts(t *testing.T) {
 	a := &fsAccess{
 		fails: map[string]error{"/etc/group": os.ErrPermission},

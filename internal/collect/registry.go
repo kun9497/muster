@@ -180,7 +180,8 @@ func splitXattrNames(buf []byte) []string {
 // Getxattr returns the value of one extended attribute of p, opened through
 // the same no-follow primitive Llistxattr uses. ENODATA/EOPNOTSUPP propagate
 // unchanged so the caller (aclEntries) can tell "not set" from a real
-// failure.
+// failure. A value larger than the 64 KiB buffer returns ERANGE, which the
+// caller reports as an error envelope, never a silently truncated value.
 func (hostAccess) Getxattr(p, name string) ([]byte, error) {
 	fd, _, err := openNoFollow(rewriteProcSelf(p), openFlags)
 	if err != nil {

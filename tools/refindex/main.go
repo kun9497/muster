@@ -223,8 +223,9 @@ func fetchMember(cache string, s source) ([]byte, string, error) {
 }
 
 // download GETs url with a browser-like User-Agent; the DoD CDN answers
-// Go's default agent with a 403.
-func download(url string) ([]byte, error) {
+// Go's default agent with a 403. A package-level var, not a func, so a test
+// can replace it and drive fetchMember without reaching the network.
+var download = func(url string) ([]byte, error) {
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", url, err)
