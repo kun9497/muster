@@ -26,6 +26,7 @@ var (
 const usage = `usage: muster <command> [flags]
 
 commands:
+  collect    gather host facts as root and write a snapshot (Linux)
   check      evaluate a facts snapshot against the embedded controls
   controls   lint or list the embedded controls
   version    print version, commit and build date
@@ -57,6 +58,8 @@ func run(args []string, stdout, stderr io.Writer) (code int) {
 	case "help", "-h", "--help":
 		fmt.Fprint(stdout, usage)
 		return exitOK
+	case "collect":
+		return runCollect(args[1:], stdout, stderr)
 	case "check":
 		return runCheck(args[1:], stdout, stderr)
 	case "controls":

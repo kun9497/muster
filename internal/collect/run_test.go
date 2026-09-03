@@ -1,0 +1,319 @@
+//go:build linux
+
+package collect
+
+import (
+	"bytes"
+	"context"
+	"errors"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/kun9497/muster/internal/facts"
+)
+
+// quietAccess answers "nothing here" to every access, so a Run test
+// exercises the orchestration and never the host.
+type quietAccess struct{}
+
+func (quietAccess) ReadFile(string, int64) ([]byte, ReadMeta, error) {
+	return nil, ReadMeta{}, os.ErrNotExist
+}
+func (quietAccess) Stat(string) (ReadMeta, error)       { return ReadMeta{}, os.ErrNotExist }
+func (quietAccess) Glob(string) ([]string, error)       { return nil, nil }
+func (quietAccess) Llistxattr(string) ([]string, error) { return nil, nil }
+func (quietAccess) Writable(string) bool                { return false }
+func (quietAccess) Run(context.Context, Command) Output {
+	return Output{ExitCode: 127, Err: os.ErrNotExist}
+}
+
+// capAccess serves one canned /proc/self/status and nothing else.
+type capAccess struct {
+	quietAccess
+	status string
+}
+
+func (a capAccess) ReadFile(p string, limit int64) ([]byte, ReadMeta, error) {
+	if p == procSelfStatus {
+		return []byte(a.status), ReadMeta{}, nil
+	}
+	return a.quietAccess.ReadFile(p, limit)
+}
+
+func TestRunWritesSnapshotWithHeaderAndCollectorLog(t *testing.T) {
+	Reset()
+	defer Reset()
+	Register(Collector{Name: "good", Declare: Declaration{Needs: "none"}, Run: func(ctx context.Context, a Access, b *Builder) error {
+		b.Set("services.ssh.installed", OK(true, nil))
+		return nil
+	}})
+	Register(Collector{Name: "bad", Declare: Declaration{Needs: "none"}, Run: func(ctx context.Context, a Access, b *Builder) error {
+		return errors.New("boom")
+	}})
+	Register(Collector{Name: "skip", Declare: Declaration{Needs: "none"}, Run: func(ctx context.Context, a Access, b *Builder) error { return ErrSkipped }})
+	Register(Collector{Name: "panics", Declare: Declaration{Needs: "none"}, Run: func(ctx context.Context, a Access, b *Builder) error { panic("x") }})
+	dir := t.TempDir()
+	out, err := Run(context.Background(), Options{Out: filepath.Join(dir, "s.json"), Access: quietAccess{},
+		Version: "0.1.0", Commit: "abc", ControlsVersion: "cv", ControlsDigest: "sha256:cd",
+		Now: func() time.Time { return time.Date(2026, 9, 2, 6, 0, 0, 0, time.UTC) }}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out.Complete {
+		t.Error("a failing collector must make the run partial")
+	}
+	if strings.Join(out.Partial, ",") != "bad,panics" {
+		t.Errorf("partial %v", out.Partial)
+	}
+	f, _ := os.Open(out.Path)
+	defer f.Close()
+	snap, err := facts.Load(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if snap.SchemaVersion != facts.SchemaVersion || snap.Run.CollectedAt != "2026-09-02T06:00:00Z" || snap.Run.GuideEdition != "kisa-unix-2026" || snap.Run.ControlsDigest != "sha256:cd" {
+		t.Errorf("header %+v", snap.Run)
+	}
+	if snap.Run.MusterVersion != "0.1.0" || snap.Run.Commit != "abc" || snap.Run.ControlsVersion != "cv" {
+		t.Errorf("versions %+v", snap.Run)
+	}
+	// R52: stage 1 stores no original secret, so the profile is always
+	// "default" and include_secrets always false. R47/R76: --deep is
+	// accepted by the command but the walk is stage 3, so deep stays false.
+	if r := snap.Run.Redaction; r.Profile != "default" || r.IncludeSecrets || len(r.RedactedFields) != 0 || snap.Run.Deep {
+		t.Errorf("redaction %+v deep %v", r, snap.Run.Deep)
+	}
+	statuses := map[string]string{}
+	for _, c := range snap.Run.Collectors {
+		statuses[c.Name] = c.Status
+	}
+	if statuses["good"] != "ok" || statuses["bad"] != "error" || statuses["skip"] != "skipped" || statuses["panics"] != "error" {
+		t.Errorf("collector log %v", statuses)
+	}
+	reg, _ := facts.LoadRegistry()
+	if r, _ := reg.Resolve(snap, "services.ssh.installed"); r.Envelope.Value != true {
+		t.Errorf("fact lost: %+v", r)
+	}
+}
+
+// R66: a collector that declares a command records it in the run header, so
+// a reader of the snapshot sees which invocation produced the facts.
+func TestRunRecordsTheDeclaredCommand(t *testing.T) {
+	Reset()
+	defer Reset()
+	Register(Collector{Name: "withcmd", Declare: Declaration{
+		Commands: []Command{{Path: "/usr/sbin/sshd", Args: []string{"-T"}}},
+		Needs:    "none",
+	}, Run: func(ctx context.Context, a Access, b *Builder) error { return nil }})
+	Register(Collector{Name: "nocmd", Declare: Declaration{Needs: "none"},
+		Run: func(ctx context.Context, a Access, b *Builder) error { return nil }})
+	dir := t.TempDir()
+	out, err := Run(context.Background(), Options{Out: filepath.Join(dir, "s.json"), Access: quietAccess{}}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmds := map[string]string{}
+	for _, c := range out.Header.Collectors {
+		cmds[c.Name] = c.Cmd
+	}
+	if cmds["withcmd"] != "/usr/sbin/sshd -T" || cmds["nocmd"] != "" {
+		t.Errorf("cmd %v", cmds)
+	}
+}
+
+func TestRunDeniedFactMakesPartial(t *testing.T) {
+	Reset()
+	defer Reset()
+	Register(Collector{Name: "d", Declare: Declaration{Needs: "root"}, Run: func(ctx context.Context, a Access, b *Builder) error {
+		b.Set("files.etc_passwd.mode", Denied("requires root"))
+		return nil
+	}})
+	dir := t.TempDir()
+	out, err := Run(context.Background(), Options{Out: filepath.Join(dir, "s.json"), Access: quietAccess{}}, nil)
+	if err != nil || out.Complete {
+		t.Fatalf("%+v %v", out, err)
+	}
+	// R56/R71: the collector returned nil, so its status is the worst
+	// status among the facts it wrote — denied, not ok.
+	if len(out.Header.Collectors) != 1 || out.Header.Collectors[0].Status != "denied" {
+		t.Errorf("collector log %+v", out.Header.Collectors)
+	}
+	if ExitCodeFor(out, nil, false) != 1 || ExitCodeFor(out, nil, true) != 2 || ExitCodeFor(out, errors.New("x"), false) != 2 {
+		t.Error("exit code mapping")
+	}
+}
+
+func TestRunCompleteRunExitsZero(t *testing.T) {
+	Reset()
+	defer Reset()
+	Register(Collector{Name: "ok", Declare: Declaration{Needs: "none"}, Run: func(ctx context.Context, a Access, b *Builder) error {
+		b.Set("services.ssh.installed", OK(true, nil))
+		return nil
+	}})
+	Register(Collector{Name: "skip", Declare: Declaration{Needs: "none"},
+		Run: func(ctx context.Context, a Access, b *Builder) error { return ErrSkipped }})
+	dir := t.TempDir()
+	out, err := Run(context.Background(), Options{Out: filepath.Join(dir, "s.json"), Access: quietAccess{}}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A skipped collector is not a failure: complete stays true.
+	if !out.Complete || len(out.Partial) != 0 {
+		t.Errorf("%+v", out)
+	}
+	if ExitCodeFor(out, nil, true) != 0 {
+		t.Error("a complete run must exit 0 even with --require-complete")
+	}
+}
+
+func TestRunRequireRootRefusesWithoutWriting(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("running as root")
+	}
+	Reset()
+	defer Reset()
+	dir := t.TempDir()
+	p := filepath.Join(dir, "s.json")
+	_, err := Run(context.Background(), Options{Out: p, RequireRoot: true, Access: quietAccess{}}, nil)
+	if !errors.Is(err, ErrNotRoot) {
+		t.Fatalf("err=%v", err)
+	}
+	if _, statErr := os.Stat(p); statErr == nil {
+		t.Error("nothing may be written when --require-root fails")
+	}
+}
+
+func TestRunGuardViolationIsRecorded(t *testing.T) {
+	Reset()
+	defer Reset()
+	Register(Collector{Name: "sneaky", Declare: Declaration{Reads: []string{"/etc/hostname"}, Needs: "none"}, Run: func(ctx context.Context, a Access, b *Builder) error {
+		a.ReadFile("/etc/shadow", 10)
+		return nil
+	}})
+	dir := t.TempDir()
+	out, err := Run(context.Background(), Options{Out: filepath.Join(dir, "s.json"), Access: quietAccess{}}, nil)
+	if err != nil || out.Complete || strings.Join(out.Partial, ",") != "sneaky" {
+		t.Fatalf("%+v %v", out, err)
+	}
+	// The violation is reported as an error whose reason names the access,
+	// so the snapshot says what the collector reached for.
+	c := out.Header.Collectors[0]
+	if c.Status != "error" || !strings.Contains(c.Reason, "/etc/shadow") {
+		t.Errorf("collector log %+v", c)
+	}
+}
+
+// R44/R73: an explicit --out path locks the destination DIRECTORY, so a
+// second collect writing beside the first is refused and writes nothing.
+func TestRunOutPathLocksItsDirectory(t *testing.T) {
+	Reset()
+	defer Reset()
+	dir := t.TempDir()
+	held, err := AcquireDirLock(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer held.Release()
+	p := filepath.Join(dir, "s.json")
+	_, err = Run(context.Background(), Options{Out: p, Access: quietAccess{}}, nil)
+	if !errors.Is(err, ErrLocked) {
+		t.Fatalf("err=%v", err)
+	}
+	if _, statErr := os.Stat(p); statErr == nil {
+		t.Error("nothing may be written when the destination is locked")
+	}
+}
+
+// R44: --out - writes to a pipe, so there is no destination to guard and no
+// lock is taken — a held lock file does not stop it.
+func TestRunToStdoutTakesNoLock(t *testing.T) {
+	Reset()
+	defer Reset()
+	var buf bytes.Buffer
+	dir := t.TempDir()
+	lockPath := filepath.Join(dir, ".lock")
+	held, err := AcquireLock(lockPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer held.Release()
+	out, err := Run(context.Background(), Options{Out: "-", LockPath: lockPath, Access: quietAccess{}}, &buf)
+	if err != nil || out.Path != "-" || !strings.HasPrefix(buf.String(), "{") {
+		t.Fatalf("%+v %v %q", out, err, buf.String())
+	}
+	if !strings.HasSuffix(buf.String(), "}\n") {
+		t.Error("the snapshot written to stdout must end with a newline")
+	}
+}
+
+// R44/R73: the default destination is the shared snapshot directory, so
+// that run takes the lock file, and a second one is refused.
+func TestRunDefaultDestinationTakesTheLockFile(t *testing.T) {
+	Reset()
+	defer Reset()
+	dir := t.TempDir()
+	lockPath := filepath.Join(dir, ".lock")
+	held, err := AcquireLock(lockPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer held.Release()
+	// Out is empty: the default lifecycle, which is what LockPath guards.
+	// The lock is refused before anything is collected or written, so this
+	// never reaches the default snapshot directory.
+	_, err = Run(context.Background(), Options{LockPath: lockPath, Access: quietAccess{}}, nil)
+	if !errors.Is(err, ErrLocked) {
+		t.Fatalf("err=%v", err)
+	}
+}
+
+// R53/R60: capabilities come from a fixed, sorted table plus the raw mask,
+// and are never nil — the header field has no omitempty and "null" would be
+// a third meaning next to "none" and "some".
+func TestCapabilitiesDecodeInTableOrder(t *testing.T) {
+	// 0x200004 = CAP_DAC_READ_SEARCH (bit 2) | CAP_SYS_ADMIN (bit 21).
+	got := capabilities(capAccess{status: "Name:\tmuster\nCapEff:\t0000000000200004\n"})
+	if strings.Join(got, ",") != "CAP_DAC_READ_SEARCH,CAP_SYS_ADMIN,raw:0000000000200004" {
+		t.Errorf("capabilities %v", got)
+	}
+	if got := capabilities(quietAccess{}); got == nil || len(got) != 0 {
+		t.Errorf("an unreadable status file must give an empty list, got %#v", got)
+	}
+	if got := capabilities(capAccess{status: "Name:\tmuster\n"}); got == nil || len(got) != 0 {
+		t.Errorf("a status file without CapEff must give an empty list, got %#v", got)
+	}
+	if got := capabilities(capAccess{status: "CapEff:\tnothex\n"}); strings.Join(got, ",") != "raw:nothex" {
+		t.Errorf("an undecodable mask must still be recorded raw, got %v", got)
+	}
+}
+
+// R60: the read of /proc/self/status is a registered collector like any
+// other — declared, guarded and listed by --list-actions. Its Run is
+// exercised directly rather than through the registry because the registry
+// tests reset it and the suite runs shuffled.
+func TestMusterCollectorFillsEUIDAndCapabilities(t *testing.T) {
+	if reads := musterCollector.Declare.Reads; len(reads) != 1 || reads[0] != procSelfStatus {
+		t.Fatalf("declaration %+v", musterCollector.Declare)
+	}
+	reg, err := facts.LoadRegistry()
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := NewBuilder(reg)
+	g := Guard(capAccess{status: "CapEff:\t0000000000000004\n"}, musterCollector)
+	if err := musterCollector.Run(context.Background(), g, b); err != nil {
+		t.Fatal(err)
+	}
+	if v := g.Violations(); len(v) != 0 {
+		t.Errorf("the pseudo-collector must stay inside its declaration: %v", v)
+	}
+	if strings.Join(b.Header().Capabilities, ",") != "CAP_DAC_READ_SEARCH,raw:0000000000000004" {
+		t.Errorf("capabilities %v", b.Header().Capabilities)
+	}
+	if b.Header().EUID != os.Geteuid() {
+		t.Errorf("euid %d, want %d", b.Header().EUID, os.Geteuid())
+	}
+}
