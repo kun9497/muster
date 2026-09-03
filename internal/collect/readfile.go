@@ -155,7 +155,9 @@ func ReadFile(p string, limit int64) ([]byte, ReadMeta, error) {
 }
 
 // Stat resolves like ReadFile but only stats the final component; a final
-// symlink is ErrSymlink, never followed.
+// symlink is ErrSymlink, never followed. Kind and Rdev are filled for any
+// file type before that check, so Kind == "symlink" is only ever seen
+// alongside the ErrSymlink return, never on a nil-error result.
 func Stat(p string) (ReadMeta, error) {
 	fd, tier, err := openNoFollow(p, unix.O_PATH|unix.O_NOFOLLOW|unix.O_CLOEXEC)
 	meta := ReadMeta{Tier: tier}
@@ -179,6 +181,30 @@ func fillMeta(m *ReadMeta, st *unix.Stat_t) {
 	m.Size = st.Size
 	m.Mode = uint32(st.Mode & 0o7777)
 	m.UID, m.GID = st.Uid, st.Gid
+	m.Kind = kindOf(st.Mode)
+	m.Rdev = uint64(st.Rdev)
+}
+
+// kindOf names the S_IFMT file type so collectors never compare mode bits
+// themselves.
+func kindOf(mode uint32) string {
+	switch mode & unix.S_IFMT {
+	case unix.S_IFREG:
+		return "regular"
+	case unix.S_IFDIR:
+		return "dir"
+	case unix.S_IFLNK:
+		return "symlink"
+	case unix.S_IFCHR:
+		return "chardev"
+	case unix.S_IFBLK:
+		return "blockdev"
+	case unix.S_IFIFO:
+		return "fifo"
+	case unix.S_IFSOCK:
+		return "socket"
+	}
+	return "unknown"
 }
 
 // parentUntrusted reports whether p's parent directory is not root-owned or

@@ -33,6 +33,12 @@ type ReadMeta struct {
 	// os.FileMode; collectors store int(meta.Mode).
 	Mode uint32
 
+	// Kind is the file type from st_mode's S_IFMT bits: regular | dir |
+	// symlink | chardev | blockdev | fifo | socket | unknown. Rdev is the raw
+	// st_rdev, meaningful for chardev and blockdev only.
+	Kind string
+	Rdev uint64
+
 	UID, GID        uint32
 	ParentUntrusted bool
 }
