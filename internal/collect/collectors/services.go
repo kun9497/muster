@@ -192,18 +192,37 @@ func runServices(ctx context.Context, a collect.Access, b *collect.Builder) erro
 	return nil
 }
 
-func setSSH(b *collect.Builder, g groupState) {
-	if !g.complete {
-		b.Set("services.ssh.installed", g.firstFailure)
-		b.Set("services.ssh.active", g.firstFailure)
-		return
+// verdict turns one proven/not-proven question into an envelope (R80).
+//
+// Proven true is ok:true whatever else happened during the sweep: a sibling
+// unit that timed out cannot make a unit that answered "loaded" unloaded,
+// so positive evidence never needs the sweep to have been complete.
+//
+// Not proven is ok:false only when every queried unit answered or was
+// not-found, because "false" is the claim that nothing anywhere was found —
+// and the unit that never answered is exactly the one that might have said
+// yes. Otherwise the first failing unit's envelope is the answer.
+func (g groupState) verdict(proven bool) facts.Envelope {
+	switch {
+	case proven:
+		return withTruncation(collect.OK(true, g.src), g.truncated)
+	case !g.complete:
+		return g.firstFailure
+	default:
+		return withTruncation(collect.OK(false, g.src), g.truncated)
 	}
-	b.Set("services.ssh.installed", withTruncation(collect.OK(g.installed, g.src), g.truncated))
-	if !g.installed {
+}
+
+func setSSH(b *collect.Builder, g groupState) {
+	b.Set("services.ssh.installed", g.verdict(g.installed))
+	if g.complete && !g.installed {
+		// The sweep was complete and found no ssh unit at all: there is
+		// nothing here that could be running, which is a different fact
+		// from "it is installed and stopped".
 		b.Set("services.ssh.active", collect.Absent("no ssh unit is loaded on this host"))
 		return
 	}
-	b.Set("services.ssh.active", withTruncation(collect.OK(g.active, g.src), g.truncated))
+	b.Set("services.ssh.active", g.verdict(g.active))
 }
 
 func setTelnet(b *collect.Builder, a collect.Access, g groupState) {
@@ -212,10 +231,10 @@ func setTelnet(b *collect.Builder, a collect.Access, g groupState) {
 }
 
 func setTelnetInstalled(b *collect.Builder, a collect.Access, g groupState) {
-	// systemd swept every telnet unit and found one loaded: the legacy
-	// super-server configuration cannot make that less true, so it is not
-	// read at all.
-	if g.complete && g.installed {
+	// systemd found a telnet unit loaded: R80 says that proves it whether
+	// or not every sibling unit answered, and the legacy super-server
+	// configuration cannot make it less true, so it is not read at all.
+	if g.installed {
 		b.Set("services.telnet.installed", withTruncation(collect.OK(true, g.src), g.truncated))
 		return
 	}
@@ -224,14 +243,14 @@ func setTelnetInstalled(b *collect.Builder, a collect.Access, g groupState) {
 	case found != nil:
 		// Positive evidence stands on its own, whatever systemd managed.
 		b.Set("services.telnet.installed", *found)
-	case !g.complete:
-		b.Set("services.telnet.installed", g.firstFailure)
-	case problem != nil:
+	case problem != nil && g.complete:
 		// A super-server configuration we could not read might have named
-		// telnet, so "not installed" would be a guess, not a fact.
+		// telnet, so "not installed" would be a guess, not a fact. When
+		// the unit sweep was ALSO incomplete, verdict below reports that
+		// instead, since the unit query failed first.
 		b.Set("services.telnet.installed", *problem)
 	default:
-		b.Set("services.telnet.installed", withTruncation(collect.OK(false, g.src), g.truncated))
+		b.Set("services.telnet.installed", g.verdict(false))
 	}
 }
 

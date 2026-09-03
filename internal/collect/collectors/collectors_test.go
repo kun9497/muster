@@ -833,6 +833,53 @@ func TestServicesMarksTruncatedCommandOutput(t *testing.T) {
 	}
 }
 
+// R80. Positive evidence stands on its own: a sibling unit that never
+// answered cannot make a loaded, running unit unloaded or inactive.
+func TestServicesPositiveEvidenceSurvivesAnIncompleteSweep(t *testing.T) {
+	cmds := allUnitsNotFound()
+	cmds[showLine("ssh.service")] = cmdResult{file: "systemctl.loaded.active"}
+	cmds[showLine("sshd.service")] = cmdResult{timedOut: true, exitCode: -1}
+	a := servicesAccess(map[string]string{"/proc/self/net/tcp": "proc_net_tcp"}, cmds)
+	b := build(t, "services", a)
+	if e := env(t, b, "services.ssh.installed"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("installed %+v, want ok:true", e)
+	}
+	if e := env(t, b, "services.ssh.active"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("active %+v, want ok:true", e)
+	}
+}
+
+// ...but a negative still needs the whole sweep: nothing proved anything,
+// and the unit that never answered is exactly the one that might have.
+func TestServicesNegativeStillNeedsTheWholeSweep(t *testing.T) {
+	cmds := allUnitsNotFound()
+	cmds[showLine("sshd.service")] = cmdResult{timedOut: true, exitCode: -1}
+	a := servicesAccess(map[string]string{"/proc/self/net/tcp": "proc_net_tcp"}, cmds)
+	b := build(t, "services", a)
+	if e := env(t, b, "services.ssh.installed"); e.Status != facts.StatusTimeout {
+		t.Errorf("installed %+v, want timeout", e)
+	}
+}
+
+// Telnet the same way: a loaded unit proves it even though a sibling failed,
+// and the legacy files are not consulted at all.
+func TestServicesTelnetPositiveEvidenceSurvivesAnIncompleteSweep(t *testing.T) {
+	cmds := allUnitsNotFound()
+	cmds[showLine("telnet.socket")] = cmdResult{file: "systemctl.loaded.active"}
+	cmds[showLine("telnet.service")] = cmdResult{timedOut: true, exitCode: -1}
+	a := servicesAccess(map[string]string{
+		"/proc/self/net/tcp": "proc_net_tcp",
+		"/etc/inetd.conf":    "inetd.conf.telnet",
+	}, cmds)
+	b := build(t, "services", a)
+	if e := env(t, b, "services.telnet.installed"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("installed %+v, want ok:true", e)
+	}
+	if slices.Contains(a.reads, "/etc/inetd.conf") {
+		t.Errorf("systemd already proved it; /etc/inetd.conf must not be read: %v", a.reads)
+	}
+}
+
 // Fix 10. Once systemd has proved telnet is installed, the legacy files
 // cannot change the answer, so they are not read at all.
 func TestServicesSkipsLegacyFilesWhenSystemdProvesTelnet(t *testing.T) {
