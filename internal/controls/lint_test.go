@@ -282,6 +282,35 @@ remediation: { text_en: t, text_ko: 조치, risk: none }
 	}
 }
 
+// R114: list<int> params default-check every element as an integer, the
+// same way the int case checks a scalar default.
+func TestLintListIntParamDefaultMustBeAllIntegers(t *testing.T) {
+	bad := `id: muster.file.list_int_test
+title_en: t
+title_ko: t
+description_en: d
+description_ko: d
+category: file
+importance: 상
+automation: auto
+references: { kisa: { "2026": ["U-19"] } }
+requires_facts: ">=1"
+absent_means: fail
+params:
+  allowed_modes: { type: list<int>, default: [0, "128"], description: d }
+checks:
+  - { fact: files.etc_hosts.mode, op: in, expected: "${allowed_modes}" }
+remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true }
+`
+	if r := rules(lintOne(t, bad, LintOptions{})); !r["param"] {
+		t.Errorf("list<int> default with a non-integer element must be a param problem: %v", r)
+	}
+	good := strings.Replace(bad, `default: [0, "128"]`, `default: [0, 128]`, 1)
+	if ps := lintOne(t, good, LintOptions{}); len(ps) != 0 {
+		t.Fatalf("all-integer list<int> default must lint clean: %v", ps)
+	}
+}
+
 func TestLintAcceptsNotMatchesWithAPatternAndRejectsItOnLists(t *testing.T) {
 	ok := `
 id: muster.file.banner_test

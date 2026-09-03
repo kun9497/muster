@@ -165,11 +165,14 @@ func TestCheckEndToEndJSONAndTable(t *testing.T) {
 	// documented statuses (spec §10.2's five-controls list), not merely
 	// "some PASS rows appear somewhere in the output".
 	assertStatuses(t, out1.Bytes(), map[string]string{
-		"muster.account.root_remote_login": "PASS",
-		"muster.account.password_policy":   "PASS",
-		"muster.file.passwd_permissions":   "PASS",
-		"muster.service.telnet_disabled":   "PASS",
-		"muster.file.world_writable":       "MANUAL",
+		"muster.account.root_remote_login":  "PASS",
+		"muster.account.password_policy":    "PASS",
+		"muster.file.passwd_permissions":    "PASS",
+		"muster.file.hosts_permissions":     "PASS",
+		"muster.file.services_permissions":  "PASS",
+		"muster.file.hosts_lpd_permissions": "PASS",
+		"muster.service.telnet_disabled":    "PASS",
+		"muster.file.world_writable":        "MANUAL",
 	})
 
 	var table bytes.Buffer
@@ -187,11 +190,14 @@ func TestCheckEndToEndJSONAndTable(t *testing.T) {
 		t.Fatalf("exit %d, want 1 for a FAIL; stderr %q", code, errb.String())
 	}
 	assertStatuses(t, failJSON.Bytes(), map[string]string{
-		"muster.account.root_remote_login": "FAIL",
-		"muster.account.password_policy":   "PASS",
-		"muster.file.passwd_permissions":   "PASS",
-		"muster.service.telnet_disabled":   "PASS",
-		"muster.file.world_writable":       "MANUAL",
+		"muster.account.root_remote_login":  "FAIL",
+		"muster.account.password_policy":    "PASS",
+		"muster.file.passwd_permissions":    "PASS",
+		"muster.file.hosts_permissions":     "PASS",
+		"muster.file.services_permissions":  "PASS",
+		"muster.file.hosts_lpd_permissions": "PASS",
+		"muster.service.telnet_disabled":    "PASS",
+		"muster.file.world_writable":        "MANUAL",
 	})
 
 	// R26: every run() call's exit code is asserted, including --quiet's,

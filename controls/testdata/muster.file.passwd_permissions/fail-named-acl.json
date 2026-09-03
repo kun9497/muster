@@ -1,0 +1,1 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{"files":{"etc_passwd":{"mode":{"status":"ok","value":420,"source":{"kind":"sys","path":"/etc/passwd"}},"uid":{"status":"ok","value":0},"gid":{"status":"ok","value":0},"acl_entries":{"status":"ok","value":["user::rw-","user:1000:rw-","group::r--","mask::rw-","other::r--"],"source":{"kind":"sys","path":"/etc/passwd"}}}}}}

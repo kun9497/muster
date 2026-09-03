@@ -42,7 +42,7 @@ var (
 	validRisk        = set("none", "restart_service", "reboot_required", "lockout_risk")
 	validOn          = set("runtime", "persisted", "effective", "both")
 	validPersona     = set("root", "user", "invalid")
-	validParamType   = set("string", "int", "bool", "list<string>")
+	validParamType   = set("string", "int", "bool", "list<string>", "list<int>")
 	scalarOps        = set("eq", "ne", "in", "not_in", "lt", "lte", "gt", "gte", "matches", "not_matches", "contains", "present", "absent")
 	orderedOps       = set("lt", "lte", "gt", "gte")
 	collectionOps    = set("each", "none")
@@ -202,6 +202,17 @@ func paramDefaultMatches(p Param) bool {
 			}
 		}
 		return true
+	case "list<int>":
+		xs, ok := p.Default.([]any)
+		if !ok {
+			return false
+		}
+		for _, x := range xs {
+			if _, ok := x.(int); !ok {
+				return false
+			}
+		}
+		return true
 	}
 	return false
 }
@@ -255,7 +266,7 @@ func lintClause(c *Control, cl Clause, reg *facts.Registry, add func(string, str
 			if entry.Type == "list<record>" && sub.Field == "" {
 				add("clause_grammar", "%s: sub-clause needs field for a record element", where)
 			}
-			if entry.Type == "list<string>" && sub.Field != "" {
+			if (entry.Type == "list<string>" || entry.Type == "list<int>") && sub.Field != "" {
 				add("clause_grammar", "%s: scalar elements have no fields", where)
 			}
 			lintExpected(*sub, add, where)
