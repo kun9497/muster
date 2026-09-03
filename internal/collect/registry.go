@@ -81,10 +81,6 @@ func All() []Collector {
 // Reset clears the registry (tests only).
 func Reset() { registry = map[string]Collector{} }
 
-// DefaultSnapshotDir is where collect writes snapshots. It is declared here
-// only as a placeholder; Task 4 moves it to writer.go.
-const DefaultSnapshotDir = "/var/lib/muster/snapshots"
-
 // rewriteProcSelf turns a declared "/proc/self/..." target into the real
 // path for this process (R40): the read primitive refuses magic links
 // outright (RESOLVE_NO_MAGICLINKS on tier 1; tier 2 never resolves anything
