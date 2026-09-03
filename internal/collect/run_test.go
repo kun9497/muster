@@ -258,6 +258,44 @@ func TestRunCompleteRunExitsZero(t *testing.T) {
 	}
 }
 
+// R88: sshd -T being unavailable for a reason other than privilege (a fresh
+// or socket-activated sshd that has never created /run/sshd, say) is a
+// parse-fallback degradation, not a failed collector — the setting's
+// runtime side is absent while its persisted/effective sides stay ok. This
+// reproduces that outcome's shape with a synthetic collector (the existing
+// quietAccess double; no host access needed) and proves that a run built on
+// it is complete, the way the real sshd collector's now is.
+func TestRunAbsentSshdTKeepsTheRunComplete(t *testing.T) {
+	Reset()
+	defer Reset()
+	Register(Collector{Name: "sshd", Declare: Declaration{Needs: "none"}, Run: func(ctx context.Context, a Access, b *Builder) error {
+		runtime := Absent("sshd -T unavailable: Missing privilege separation directory: /run/sshd")
+		persisted := OK("yes", nil)
+		effective := OK("yes", nil)
+		effective.Reason = "parsed files; sshd -T unavailable"
+		b.SetSetting("sshd.options.permit_root_login", facts.Setting{
+			Runtime: &runtime, Persisted: &persisted, Effective: &effective,
+		})
+		b.Set("sshd.collect_method", OK("parse", nil))
+		return nil
+	}})
+	dir := t.TempDir()
+	out, err := Run(context.Background(), Options{Out: filepath.Join(dir, "s.json"), Access: quietAccess{}}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sshd := collectorRun(t, out, "sshd")
+	if sshd.Status != "ok" {
+		t.Errorf("collector log %+v, want ok: an absent runtime side must not fail the collector", sshd)
+	}
+	if !out.Complete || len(out.Partial) != 0 {
+		t.Errorf("%+v, want a complete run built on this sshd outcome", out)
+	}
+	if ExitCodeFor(out, nil, true) != 0 {
+		t.Error("--require-complete must exit 0 on this outcome")
+	}
+}
+
 func TestRunRequireRootRefusesWithoutWriting(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("running as root")

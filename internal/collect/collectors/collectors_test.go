@@ -254,11 +254,15 @@ func TestSshdFallsBackToParseWhenTUnavailable(t *testing.T) {
 	}
 }
 
-// R59: a non-zero sshd -T exit is an error runtime side carrying the first
-// stderr line and the command as its source, and the method is "parse"
-// because -T did not answer.
-func TestSshdNonZeroExitIsAnErrorRuntimeSide(t *testing.T) {
-	// R84: this test's expectation (error, not denied) is the root-side
+// R88 (spec §6.5 step 13): a non-zero sshd -T exit that is not a privilege
+// failure is a parse-fallback degradation, not a failed collector — the
+// runtime side is absent (not error), naming the command as its source and
+// carrying the first stderr line in its reason; the method is "parse"
+// because -T did not answer, cited to the command that ran and failed; and
+// the collector's own status stays ok, so a run built on this outcome is
+// complete.
+func TestSshdNonZeroExitIsAnAbsentRuntimeSide(t *testing.T) {
+	// R84: this test's expectation (absent, not denied) is the root-side
 	// outcome of commandFailure's privilege rule, so the seam must be
 	// pinned to root rather than left to whichever account runs the suite.
 	withEUID(t, 0)
@@ -266,25 +270,32 @@ func TestSshdNonZeroExitIsAnErrorRuntimeSide(t *testing.T) {
 		files: map[string]string{"/etc/ssh/sshd_config": "sshd_config"},
 		cmds: map[string]cmdResult{"/usr/sbin/sshd -T": {
 			exitCode: 255,
-			stderr:   "/etc/ssh/sshd_config line 3: Bad configuration option\nsecond line\n",
+			stderr:   "Missing privilege separation directory: /run/sshd\nsecond line\n",
 		}},
 	}
 	b := build(t, "sshd", a)
 	s := setting(t, b, "sshd.options.permit_root_login")
-	if s.Runtime == nil || s.Runtime.Status != facts.StatusError {
+	if s.Runtime == nil || s.Runtime.Status != facts.StatusAbsent {
 		t.Fatalf("runtime %+v", s.Runtime)
 	}
-	if s.Runtime.Reason != "/etc/ssh/sshd_config line 3: Bad configuration option" {
-		t.Errorf("reason must be the first stderr line: %q", s.Runtime.Reason)
+	if !strings.HasPrefix(s.Runtime.Reason, "sshd -T unavailable: ") ||
+		!strings.Contains(s.Runtime.Reason, "Missing privilege separation directory: /run/sshd") {
+		t.Errorf("reason must name the degradation and carry the first stderr line: %q", s.Runtime.Reason)
 	}
 	if s.Runtime.Source == nil || s.Runtime.Source.Cmd != "/usr/sbin/sshd -T" {
 		t.Errorf("source %+v", s.Runtime.Source)
 	}
-	if env(t, b, "sshd.collect_method").Value != "parse" {
-		t.Error("method must be parse when -T exited non-zero")
+	if m := env(t, b, "sshd.collect_method"); m.Value != "parse" || m.Source == nil || m.Source.Cmd != "/usr/sbin/sshd -T" {
+		t.Errorf("method must be parse, cited to the command that ran and failed: %+v", m)
 	}
-	if s.Effective.Status != facts.StatusOK || s.Effective.Value != "yes" {
+	if s.Effective.Status != facts.StatusOK || s.Effective.Value != "yes" || !strings.Contains(s.Effective.Reason, "sshd -T unavailable") {
 		t.Errorf("effective must fall back to the ok persisted value: %+v", s.Effective)
+	}
+	// Absent ranks as ok in Builder.Worst (R71), so this failure must not
+	// make the sshd collector itself worse than ok — which is what keeps a
+	// run built on this outcome complete (see TestRunAbsentSshdTKeepsTheRunComplete).
+	if worst := b.Worst("sshd"); worst != facts.StatusOK {
+		t.Errorf("Worst(sshd) = %s, want ok", worst)
 	}
 }
 
@@ -499,8 +510,9 @@ func withEUID(t *testing.T, id int) {
 // substring rule on its own files a privilege problem as an error, and the
 // run header then says "facts with status error" where spec §7.1/D25 wants
 // denied with the privilege named. A root-only collector's failed command
-// is denied whenever this process is not root; as root the substring rule
-// still decides.
+// is denied whenever this process is not root; as root the same failure is
+// R88's parse-fallback degradation instead (absent, not error) — commandFailure
+// itself is unchanged, sshd.go only turns its error outcome into absent.
 func TestRootOnlyCommandFailureIsDeniedForANonRootProcess(t *testing.T) {
 	for _, tc := range []struct {
 		name string
@@ -508,7 +520,7 @@ func TestRootOnlyCommandFailureIsDeniedForANonRootProcess(t *testing.T) {
 		want facts.Status
 	}{
 		{"non-root", 1000, facts.StatusDenied},
-		{"root", 0, facts.StatusError},
+		{"root", 0, facts.StatusAbsent},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			withEUID(t, tc.euid)
@@ -523,12 +535,15 @@ func TestRootOnlyCommandFailureIsDeniedForANonRootProcess(t *testing.T) {
 			if s.Runtime == nil || s.Runtime.Status != tc.want {
 				t.Fatalf("runtime %+v, want %s", s.Runtime, tc.want)
 			}
-			if tc.want == facts.StatusDenied {
+			switch tc.want {
+			case facts.StatusDenied:
 				if want := "sshd -T requires root: sshd: no hostkeys available -- exiting."; s.Runtime.Reason != want {
 					t.Errorf("reason %q, want %q", s.Runtime.Reason, want)
 				}
-			} else if s.Runtime.Reason != "sshd: no hostkeys available -- exiting." {
-				t.Errorf("reason %q must stay the first stderr line for root", s.Runtime.Reason)
+			case facts.StatusAbsent:
+				if want := "sshd -T unavailable: sshd: no hostkeys available -- exiting."; s.Runtime.Reason != want {
+					t.Errorf("reason %q, want %q", s.Runtime.Reason, want)
+				}
 			}
 			if s.Runtime.Source == nil || s.Runtime.Source.Cmd != "/usr/sbin/sshd -T" {
 				t.Errorf("source %+v", s.Runtime.Source)

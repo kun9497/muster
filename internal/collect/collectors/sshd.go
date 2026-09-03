@@ -67,6 +67,18 @@ func runSshd(ctx context.Context, a collect.Access, b *collect.Builder) error {
 		// R84: sshd declares Needs: root, so a -T that failed while this
 		// process is not root is a privilege problem, not a parse error.
 		e := commandFailure("sshd -T", out, src, true)
+		if e.Status == facts.StatusError {
+			// R88 (spec §6.5 step 13): sshd -T can fail for reasons that
+			// are not a parse error at all — most commonly a socket-
+			// activated or freshly installed sshd that has never created
+			// /run/sshd ("Missing privilege separation directory"). The
+			// parsed sshd_config still answers the question, so this is
+			// the same degradation as -T never having run: absent, not
+			// error, and the run stays complete. A privilege failure
+			// (Denied, above) is unchanged by this — R84 still applies.
+			e.Status = facts.StatusAbsent
+			e.Reason = "sshd -T unavailable: " + e.Reason
+		}
 		s.Runtime = &e
 	default:
 		method = "T" // R59: the method records whether -T answered

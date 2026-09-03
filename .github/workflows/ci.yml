@@ -63,7 +63,7 @@ jobs:
           code=$?
           set -e
           sudo chown "$(id -u)" "$RUNNER_TEMP/muster/root.json"
-          jq -r '.run.partial_failures, (.run.collectors[] | select(.status != "ok") | "\(.name): \(.status) \(.reason)")' "$RUNNER_TEMP/muster/root.json"
+          jq -r '.run.partial_failures, (.run.collectors[] | select(.status != "ok") | "\(.name): \(.status) \(.reason)"), .facts.sshd.collect_method.value, .facts.sshd.options.permit_root_login.runtime.status' "$RUNNER_TEMP/muster/root.json"
           test "$code" -eq 0
       - name: check the root snapshot
         run: |
