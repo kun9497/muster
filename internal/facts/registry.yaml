@@ -311,6 +311,18 @@ keys:
     sensitivity: internal
     collector: accounts
     subject_kind: user
+  - key: env.container
+    type: string
+    description: Container runtime detected from filesystem markers (none, docker, podman, lxc, other); the same value the run header carries.
+    since: 1
+    sensitivity: public
+    collector: os
+  - key: env.has_systemd
+    type: bool
+    description: Whether /run/systemd/system exists, so unit state can be asked of systemd.
+    since: 1
+    sensitivity: public
+    collector: os
   - key: walk.world_writable
     type: list<record>
     description: World-writable files found by the deep walk, with path, sticky, uid, gid, package_declared.

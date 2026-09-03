@@ -682,6 +682,26 @@
       "SubjectKind": "user"
     },
     {
+      "Key": "env.container",
+      "Type": "string",
+      "Description": "Container runtime detected from filesystem markers (none, docker, podman, lxc, other); the same value the run header carries.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "os",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "env.has_systemd",
+      "Type": "bool",
+      "Description": "Whether /run/systemd/system exists, so unit state can be asked of systemd.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "os",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
       "Key": "walk.world_writable",
       "Type": "list\u003crecord\u003e",
       "Description": "World-writable files found by the deep walk, with path, sticky, uid, gid, package_declared.",

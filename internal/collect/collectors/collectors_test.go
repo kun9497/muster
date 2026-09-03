@@ -1226,10 +1226,27 @@ func osAccess() *fsAccess {
 	}
 }
 
+func osDoubleWithDockerAndSystemd(t *testing.T) *fsAccess {
+	a := osAccess()
+	a.dirs["/.dockerenv"] = true
+	return a
+}
+
 func TestOSFillsTheRunHeader(t *testing.T) {
 	b := build(t, "os", osAccess())
-	if len(b.Tree()) != 0 {
-		t.Errorf("os writes no fact keys, got %v", b.Tree())
+	tree := b.Tree()
+	if len(tree) != 1 {
+		t.Errorf("os writes exactly env.container and env.has_systemd under env, got %v top-level keys: %v", len(tree), tree)
+	}
+	envMap, ok := tree["env"].(map[string]any)
+	if !ok || len(envMap) != 2 {
+		t.Errorf("env should have exactly 2 keys (container, has_systemd), got %v", envMap)
+	}
+	if v := env(t, b, "env.container"); v.Status != facts.StatusOK || v.Value != "none" {
+		t.Errorf("env.container = %+v", v)
+	}
+	if v := env(t, b, "env.has_systemd"); v.Status != facts.StatusOK || v.Value != true {
+		t.Errorf("env.has_systemd = %+v", v)
 	}
 	h := b.Header().Host
 	if h.Hostname != "fixture-host" || h.Kernel != "6.8.0-31-generic" || h.UptimeS != 12345 {
@@ -1265,8 +1282,7 @@ func TestOSFallsBackToUsrLibOSRelease(t *testing.T) {
 }
 
 func TestOSDetectsDockerAndWSL(t *testing.T) {
-	a := osAccess()
-	a.dirs["/.dockerenv"] = true
+	a := osDoubleWithDockerAndSystemd(t)
 	a.files["/proc/version"] = "proc-version-wsl"
 	b := build(t, "os", a)
 	if b.Header().Env.Container != "docker" {
@@ -1283,6 +1299,20 @@ func TestOSVirtIsUnknownWhenDMIIsUnreadable(t *testing.T) {
 	b := build(t, "os", a)
 	if b.Header().Env.Virt != "unknown" {
 		t.Errorf("virt %q", b.Header().Env.Virt)
+	}
+}
+
+func TestOSWritesEnvContainerAndSystemdAsFacts(t *testing.T) {
+	a := osDoubleWithDockerAndSystemd(t)
+	b := build(t, "os", a)
+	if v := env(t, b, "env.container"); v.Status != facts.StatusOK || v.Value != "docker" {
+		t.Errorf("env.container = %+v", v)
+	}
+	if v := env(t, b, "env.has_systemd"); v.Status != facts.StatusOK || v.Value != true {
+		t.Errorf("env.has_systemd = %+v", v)
+	}
+	if h := b.Header(); h.Env.Container != "docker" || !h.Env.HasSystemd {
+		t.Errorf("header must agree with the facts: %+v", h.Env)
 	}
 }
 
