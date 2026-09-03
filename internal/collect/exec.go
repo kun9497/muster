@@ -8,7 +8,6 @@ import (
 	"errors"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"syscall"
 	"time"
 
@@ -110,8 +109,12 @@ func RunCommand(ctx context.Context, c Command) Output {
 	return o
 }
 
-// Source describes the command for evidence (spec §5.2).
+// Source describes the command for evidence (spec §5.2). It renders the
+// command with commandString, the one renderer --list-actions and the run
+// header's CollectorRun.Cmd also use (M6), so the evidence in a fact, the
+// document a change-control reviewer approved and the record of what ran
+// are the same string by construction rather than by coincidence.
 func (o Output) Source(c Command) *facts.Source {
 	code := o.ExitCode
-	return &facts.Source{Kind: "command", Cmd: strings.TrimSpace(c.Path + " " + strings.Join(c.Args, " ")), ExitCode: &code}
+	return &facts.Source{Kind: "command", Cmd: commandString(c), ExitCode: &code}
 }

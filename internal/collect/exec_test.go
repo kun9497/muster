@@ -101,6 +101,24 @@ func TestRunCommandExpiredParentContext(t *testing.T) {
 	}
 }
 
+// TestOutputSourceUsesTheSharedCommandRenderer is M6. A command's evidence
+// line, the --list-actions document and the run header's CollectorRun.Cmd
+// are the same string by construction: Source renders through
+// commandString rather than repeating its logic, so the record of what ran
+// and the document a reviewer approved cannot drift. The no-argument case
+// is the one a second implementation gets wrong — a trailing space.
+func TestOutputSourceUsesTheSharedCommandRenderer(t *testing.T) {
+	for _, c := range []Command{
+		{Path: "/usr/sbin/sshd", Args: []string{"-T"}},
+		{Path: "/bin/true"},
+		{Path: "/usr/bin/systemctl", Args: []string{"show", "-p", "LoadState", "ssh.service"}},
+	} {
+		if got, want := (Output{}).Source(c).Cmd, commandString(c); got != want {
+			t.Errorf("Source(%+v).Cmd = %q, want %q", c, got, want)
+		}
+	}
+}
+
 func TestRunCommandMissingExecutable(t *testing.T) {
 	o := RunCommand(context.Background(), Command{Path: "/nonexistent/bin/x"})
 	if o.Err == nil || o.ExitCode != -1 {

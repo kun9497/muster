@@ -1,6 +1,11 @@
 // Package collect gathers host facts as root and writes the snapshot
-// (spec §4, §5, §8). Everything but this file and collect_other.go is
-// Linux-only.
+// (spec §4, §5, §8). Everything but this file is Linux-only: this one
+// carries no build tag purely so the package still compiles elsewhere for
+// `go build ./...` and `go vet ./...` on a developer's machine. There are
+// deliberately no non-Linux stubs of the read primitive (R58/M7) — off
+// Linux there is nothing to collect, the collect command says so in
+// cmd/muster, and a stub that answered "not supported" would be a second
+// place for that sentence to live and drift.
 //
 // /proc/self and other magic links are refused by both read-primitive
 // tiers (RESOLVE_NO_MAGICLINKS on tier 1; tier 2 never resolves a magic
