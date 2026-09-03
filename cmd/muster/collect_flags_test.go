@@ -50,6 +50,7 @@ func TestParseCollectFlagsRejections(t *testing.T) {
 		{"missing value", "needs a value", []string{"--out"}},
 		{"bad duration", "--timeout", []string{"--timeout", "soon"}},
 		{"bad format", "--format", []string{"--format", "yaml"}},
+		{"format without list-actions", "only meaningful with --list-actions", []string{"--format", "json"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := parseCollectFlags(tc.args)

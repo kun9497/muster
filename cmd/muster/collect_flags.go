@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"time"
 )
@@ -35,6 +36,7 @@ type collectOpts struct {
 
 func parseCollectFlags(args []string) (collectOpts, error) {
 	o := collectOpts{format: "table"}
+	formatGiven := false
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		next := func() (string, error) {
@@ -49,6 +51,7 @@ func parseCollectFlags(args []string) (collectOpts, error) {
 		case "--out":
 			o.out, err = next()
 		case "--format":
+			formatGiven = true
 			o.format, err = next()
 		case "--timeout":
 			var v string
@@ -76,6 +79,12 @@ func parseCollectFlags(args []string) (collectOpts, error) {
 	}
 	if o.format != "table" && o.format != "json" {
 		return o, fmt.Errorf("--format must be table or json, got %q", o.format)
+	}
+	// The snapshot has one format. --format elsewhere would silently do
+	// nothing, and silently doing nothing is how a CI job ends up trusting
+	// output it never got.
+	if formatGiven && !o.listActions {
+		return o, errors.New("--format is only meaningful with --list-actions")
 	}
 	return o, nil
 }

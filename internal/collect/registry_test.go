@@ -464,11 +464,12 @@ func TestWriteActionsAddsProcSelfLegendWhenDeclared(t *testing.T) {
 	}
 }
 
+// The action list always carries the built-in "muster" collector's
+// /proc/self/status read (R60), so this renderer test feeds WriteActions
+// its rows directly rather than through the registry — the legend is a
+// property of the rows it is given, which is what is under test here.
 func TestWriteActionsOmitsLegendWithoutProcSelf(t *testing.T) {
-	Reset()
-	defer Reset()
-	Register(Collector{Name: "a", Declare: Declaration{Reads: []string{"/etc/passwd"}, Needs: "none"}, Run: noopRun})
-	acts := ListActions()
+	acts := []Action{{Collector: "a", Kind: "read", Target: "/etc/passwd", Needs: "none"}}
 	var buf bytes.Buffer
 	if err := WriteActions(&buf, acts, "table"); err != nil {
 		t.Fatal(err)

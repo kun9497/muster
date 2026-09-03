@@ -78,8 +78,22 @@ func All() []Collector {
 	return out
 }
 
-// Reset clears the registry (tests only).
-func Reset() { registry = map[string]Collector{} }
+// Reset clears the registry (tests only) and puts the built-ins back, so
+// the default registry is never silently empty: the "muster"
+// pseudo-collector reads /proc/self/status for the run header's privilege
+// block (R60) and belongs to every run, not to whichever test registered
+// last.
+func Reset() {
+	registry = map[string]Collector{}
+	registerBuiltins()
+}
+
+// commandString renders a declared command the way both --list-actions and
+// the run header's CollectorRun.Cmd show it, so the document a reviewer
+// approves and the record of what ran cannot drift apart.
+func commandString(c Command) string {
+	return strings.TrimSpace(c.Path + " " + strings.Join(c.Args, " "))
+}
 
 // rewriteProcSelf turns a declared "/proc/self/..." target into the real
 // path for this process (R40): the read primitive refuses magic links
@@ -346,7 +360,7 @@ func ListActions() []Action {
 			out = append(out, Action{Collector: c.Name, Kind: "read", Target: r, Needs: c.Declare.Needs})
 		}
 		for _, cmd := range c.Declare.Commands {
-			out = append(out, Action{Collector: c.Name, Kind: "command", Target: strings.TrimSpace(cmd.Path + " " + strings.Join(cmd.Args, " ")), Needs: c.Declare.Needs})
+			out = append(out, Action{Collector: c.Name, Kind: "command", Target: commandString(cmd), Needs: c.Declare.Needs})
 		}
 	}
 	out = append(out, Action{Collector: "muster", Kind: "write", Target: DefaultSnapshotDir + "/<hostname>-<time>-<digest>.json", Needs: "root"})

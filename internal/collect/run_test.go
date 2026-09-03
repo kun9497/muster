@@ -124,11 +124,31 @@ func TestRunRecordsTheDeclaredCommand(t *testing.T) {
 	}
 }
 
+// collectorRun finds one collector's entry in the run header. The registry
+// always carries the built-in "muster" collector (R60), so a test that
+// registered one collector still sees more than one entry.
+func collectorRun(t *testing.T, out Outcome, name string) facts.CollectorRun {
+	t.Helper()
+	for _, c := range out.Header.Collectors {
+		if c.Name == name {
+			return c
+		}
+	}
+	t.Fatalf("collector %s is missing from the run header: %+v", name, out.Header.Collectors)
+	return facts.CollectorRun{}
+}
+
 func TestRunDeniedFactMakesPartial(t *testing.T) {
 	Reset()
 	defer Reset()
-	Register(Collector{Name: "d", Declare: Declaration{Needs: "root"}, Run: func(ctx context.Context, a Access, b *Builder) error {
+	Register(Collector{Name: "one", Declare: Declaration{Needs: "root"}, Run: func(ctx context.Context, a Access, b *Builder) error {
 		b.Set("files.etc_passwd.mode", Denied("requires root"))
+		b.Set("files.etc_passwd.uid", OK(0, nil))
+		return nil
+	}})
+	Register(Collector{Name: "two", Declare: Declaration{Needs: "root"}, Run: func(ctx context.Context, a Access, b *Builder) error {
+		b.Set("files.etc_passwd.gid", Denied("requires root"))
+		b.Set("services.ssh.installed", Denied("requires root"))
 		return nil
 	}})
 	dir := t.TempDir()
@@ -137,12 +157,79 @@ func TestRunDeniedFactMakesPartial(t *testing.T) {
 		t.Fatalf("%+v %v", out, err)
 	}
 	// R56/R71: the collector returned nil, so its status is the worst
-	// status among the facts it wrote — denied, not ok.
-	if len(out.Header.Collectors) != 1 || out.Header.Collectors[0].Status != "denied" {
-		t.Errorf("collector log %+v", out.Header.Collectors)
+	// status among the facts it wrote — denied, not ok. Spec §7.1 wants a
+	// reason with it, and "denied" alone does not say which fact was.
+	one := collectorRun(t, out, "one")
+	if one.Status != "denied" || one.Reason != "facts with status denied: files.etc_passwd.mode" {
+		t.Errorf("collector log %+v", one)
+	}
+	// The ok fact must not be counted, and the second denial of the
+	// collector that has two must be.
+	two := collectorRun(t, out, "two")
+	if two.Status != "denied" || two.Reason != "facts with status denied: files.etc_passwd.gid (+1 more)" {
+		t.Errorf("collector log %+v", two)
+	}
+	if strings.Join(out.Partial, ",") != "one,two" {
+		t.Errorf("partial %v", out.Partial)
 	}
 	if ExitCodeFor(out, nil, false) != 1 || ExitCodeFor(out, nil, true) != 2 || ExitCodeFor(out, errors.New("x"), false) != 2 {
 		t.Error("exit code mapping")
+	}
+}
+
+// A collector that runs past the global deadline is a timeout, its own
+// error text is kept, and the snapshot is still written with everything
+// that did succeed.
+func TestRunGlobalDeadlineMakesTimeout(t *testing.T) {
+	Reset()
+	defer Reset()
+	Register(Collector{Name: "slow", Declare: Declaration{Needs: "none"}, Run: func(ctx context.Context, a Access, b *Builder) error {
+		<-ctx.Done()
+		return ctx.Err()
+	}})
+	dir := t.TempDir()
+	out, err := Run(context.Background(), Options{Out: filepath.Join(dir, "s.json"), Timeout: 50 * time.Millisecond, Access: quietAccess{}}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	slow := collectorRun(t, out, "slow")
+	if slow.Status != "timeout" || !strings.Contains(slow.Reason, "global deadline exceeded") || !strings.Contains(slow.Reason, "collector reported: context deadline exceeded") {
+		t.Errorf("collector log %+v", slow)
+	}
+	if out.Complete || strings.Join(out.Partial, ",") != "slow" {
+		t.Errorf("%+v", out)
+	}
+	if _, statErr := os.Stat(out.Path); statErr != nil {
+		t.Errorf("the snapshot must still be written: %v", statErr)
+	}
+}
+
+// Once the deadline has passed, the collectors that never started say so
+// rather than being run to completion and labelled as if they had hung —
+// reads and commands are not all ctx-aware.
+func TestRunSkipsCollectorsAfterTheDeadline(t *testing.T) {
+	Reset()
+	defer Reset()
+	ran := 0
+	Register(Collector{Name: "a_eats_the_budget", Declare: Declaration{Needs: "none"}, Run: func(ctx context.Context, a Access, b *Builder) error {
+		<-ctx.Done()
+		return nil
+	}})
+	Register(Collector{Name: "b_never_starts", Declare: Declaration{Needs: "none"}, Run: func(ctx context.Context, a Access, b *Builder) error {
+		ran++
+		return nil
+	}})
+	dir := t.TempDir()
+	out, err := Run(context.Background(), Options{Out: filepath.Join(dir, "s.json"), Timeout: 50 * time.Millisecond, Access: quietAccess{}}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ran != 0 {
+		t.Errorf("the collector after the deadline ran %d times", ran)
+	}
+	never := collectorRun(t, out, "b_never_starts")
+	if never.Status != "timeout" || never.Reason != "deadline expired before this collector started" || never.Ms != 0 {
+		t.Errorf("collector log %+v", never)
 	}
 }
 
@@ -200,9 +287,44 @@ func TestRunGuardViolationIsRecorded(t *testing.T) {
 	}
 	// The violation is reported as an error whose reason names the access,
 	// so the snapshot says what the collector reached for.
-	c := out.Header.Collectors[0]
+	c := collectorRun(t, out, "sneaky")
 	if c.Status != "error" || !strings.Contains(c.Reason, "/etc/shadow") {
 		t.Errorf("collector log %+v", c)
+	}
+}
+
+// A collector that panics AND reaches outside its declaration reports both:
+// the panic is why it stopped, the violation is what it tried.
+func TestRunKeepsPanicTextBesideAViolation(t *testing.T) {
+	Reset()
+	defer Reset()
+	Register(Collector{Name: "both", Declare: Declaration{Reads: []string{"/etc/hostname"}, Needs: "none"}, Run: func(ctx context.Context, a Access, b *Builder) error {
+		a.ReadFile("/etc/shadow", 10)
+		panic("x")
+	}})
+	dir := t.TempDir()
+	out, err := Run(context.Background(), Options{Out: filepath.Join(dir, "s.json"), Access: quietAccess{}}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := collectorRun(t, out, "both")
+	if c.Status != "error" || !strings.Contains(c.Reason, "panic: x") || !strings.Contains(c.Reason, "/etc/shadow") {
+		t.Errorf("collector log %+v", c)
+	}
+}
+
+// R60: Reset is for tests, but the built-in pseudo-collector belongs to
+// every run — a registry without it silently drops the header's privilege
+// block, so Reset puts it back.
+func TestResetKeepsTheBuiltInCollector(t *testing.T) {
+	Reset()
+	defer Reset()
+	var names []string
+	for _, c := range All() {
+		names = append(names, c.Name)
+	}
+	if strings.Join(names, ",") != "muster" {
+		t.Errorf("registry after Reset: %v", names)
 	}
 }
 
