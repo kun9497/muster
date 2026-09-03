@@ -108,7 +108,9 @@ jobs:
           set -e
           echo "check exit $code"
           test "$code" -eq 2
-          jq -e '[.results[] | select(.status=="PASS") | .evidence[]? | select(.status!="ok")] | length == 0' "$RUNNER_TEMP/muster/user-report.json"
+          # A PASS carries only ok evidence, except that a control with absent_means: pass
+          # (its reason starts "absent counts as pass") may carry absent evidence.
+          jq -e '[.results[] | select(.status=="PASS") | . as $r | .evidence[]? | select(.status != "ok" and (.status != "absent" or (($r.reason // "") | startswith("absent counts as pass") | not)))] | length == 0' "$RUNNER_TEMP/muster/user-report.json"
           jq -e '[.results[] | select(.status=="ERROR")] | length > 0' "$RUNNER_TEMP/muster/user-report.json"
 
   collect-containers:
@@ -169,7 +171,8 @@ jobs:
           set +e
           ./bin/muster check --facts "$RUNNER_TEMP/muster/containers/c.json" --format json > "$RUNNER_TEMP/muster/containers/report.json"
           set -e
-          jq -e '[.results[] | select(.status=="PASS") | .evidence[]? | select(.status != "ok")] | length == 0' "$RUNNER_TEMP/muster/containers/report.json"
+          # Same rule as the non-root job: absent evidence is allowed only under absent_means: pass.
+          jq -e '[.results[] | select(.status=="PASS") | . as $r | .evidence[]? | select(.status != "ok" and (.status != "absent" or (($r.reason // "") | startswith("absent counts as pass") | not)))] | length == 0' "$RUNNER_TEMP/muster/containers/report.json"
 
   collect-contract:
     runs-on: ubuntu-24.04
