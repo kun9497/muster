@@ -14,12 +14,13 @@ the Linux server asset class: KISA is the primary standard, and global
 benchmarks (CIS Benchmarks, DISA STIG, NIST SP 800-53) are attached as
 references and, later, offered as selectable profiles.
 
-> **Status: stage 1 in progress (September 2026).** The check side (`check`,
-> controls, waivers, reports) is merged; the Linux collect side is being built.
-> The architecture, contracts and first-release scope are written up in
+> **Status: stage 1 complete, stage 2 starting (September 2026).** `collect`
+> and `check` work end to end with the first five controls (U-01, U-02, U-16,
+> U-25, U-52); CI exercises them as root, as a normal user, and inside Ubuntu
+> 22.04/24.04 and Rocky/Alma 9 containers. Stage 2 enrolls every automatable
+> KISA item. The architecture, contracts and release scope are written up in
 > [the design specification](docs/superpowers/specs/2026-09-02-muster-design.md).
-> This README describes what the tool is meant to be; commands and flags below
-> are the plan, not a promise.
+> Facts and flags described below beyond stage 1 are the plan, not a promise.
 
 > **Not affiliated.** muster is an unofficial personal project. It is not
 > endorsed by KISA or by the Center for Internet Security, it contains no CIS
