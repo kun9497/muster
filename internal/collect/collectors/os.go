@@ -52,6 +52,17 @@ var osCollector = collect.Collector{
 	Run: runOS,
 }
 
+// readTrim reads one small identity file for the run header.
+//
+// It collapses every failure to "": the header is not a fact tree, it has
+// no envelopes, and Host/Env are plain struct fields with nowhere to put a
+// status or a reason. So a denied /etc/machine-id and an empty one are
+// indistinguishable in the snapshot, by design. That is acceptable for
+// stage 1 because the header is provenance rather than anything a control
+// evaluates - no control reads Host or Env, and a missing field degrades
+// the report's labelling, never a PASS/FAIL. Stage 2, which puts host
+// identity behind fact keys, has to carry the status instead of dropping
+// it here.
 func readTrim(a collect.Access, p string) string {
 	data, _, err := a.ReadFile(p, osReadLimit)
 	if err != nil {

@@ -1,0 +1,2 @@
+# drop-in style with the equals form sshd also accepts
+PermitRootLogin=yes

@@ -19,11 +19,12 @@ import (
 
 // cmdResult is one canned command outcome for fsAccess.
 type cmdResult struct {
-	file     string // testdata file served as stdout
-	stderr   string
-	exitCode int
-	timedOut bool
-	err      error // set only when the command could not be started at all
+	file      string // testdata file served as stdout
+	stderr    string
+	exitCode  int
+	timedOut  bool
+	truncated bool  // the capture hit the output cap
+	err       error // set only when the command could not be started at all
 }
 
 // fsAccess serves declared paths from testdata and commands from canned
@@ -37,6 +38,10 @@ type fsAccess struct {
 	modes    map[string]uint32    // host path -> raw 0o7777 bits
 	xattrs   map[string][]string  // host path -> extended attribute names
 	writable map[string]bool      // host path -> Writable answer
+
+	// reads records every path ReadFile was asked for, so a test can assert
+	// that a collector did NOT go looking for something it did not need.
+	reads []string
 }
 
 func (a *fsAccess) read(name string) ([]byte, error) {
@@ -51,6 +56,7 @@ func (a *fsAccess) mode(p string, def uint32) uint32 {
 }
 
 func (a *fsAccess) ReadFile(p string, _ int64) ([]byte, collect.ReadMeta, error) {
+	a.reads = append(a.reads, p)
 	if err, ok := a.fails[p]; ok {
 		return nil, collect.ReadMeta{}, err
 	}
@@ -107,7 +113,9 @@ func (a *fsAccess) Run(_ context.Context, c collect.Command) collect.Output {
 	line := strings.TrimSpace(c.Path + " " + strings.Join(c.Args, " "))
 	r, ok := a.cmds[line]
 	if !ok {
-		return collect.Output{ExitCode: 127, Err: os.ErrNotExist} // no such binary here
+		// RunCommand reports a command that never started as ExitCode -1
+		// with Err set; the double has to say the same thing.
+		return collect.Output{ExitCode: -1, Err: os.ErrNotExist}
 	}
 	var stdout []byte
 	if r.file != "" {
@@ -118,11 +126,12 @@ func (a *fsAccess) Run(_ context.Context, c collect.Command) collect.Output {
 		stdout = b
 	}
 	return collect.Output{
-		Stdout:   stdout,
-		Stderr:   []byte(r.stderr),
-		ExitCode: r.exitCode,
-		TimedOut: r.timedOut,
-		Err:      r.err,
+		Stdout:    stdout,
+		Stderr:    []byte(r.stderr),
+		ExitCode:  r.exitCode,
+		TimedOut:  r.timedOut,
+		Truncated: r.truncated,
+		Err:       r.err,
 	}
 }
 
@@ -303,6 +312,109 @@ func TestSshdIncludeOutsideDeclarationIsRecordedNotViolated(t *testing.T) {
 	}
 }
 
+// Fix 1 (Critical). An Include'd drop-in that cannot be READ — a symlink the
+// primitive refuses, a non-regular file, EACCES — must never be skipped: the
+// main file's lower-priority value would then be published as ok, a PASS on
+// evidence that was never seen. Only a drop-in that is not there may be
+// skipped.
+func TestSshdUnreadableDropInIsNeverSkipped(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		err  error
+		want facts.Status
+	}{
+		{"symlink", collect.ErrSymlink, facts.StatusError},
+		{"denied", os.ErrPermission, facts.StatusDenied},
+		{"not regular", collect.ErrNotRegular, facts.StatusError},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			a := &fsAccess{
+				files: map[string]string{
+					"/etc/ssh/sshd_config":                      "sshd_config",
+					"/etc/ssh/sshd_config.d/50-cloud-init.conf": "sshd_config.d_50-cloud-init.conf",
+				},
+				fails: map[string]error{"/etc/ssh/sshd_config.d/50-cloud-init.conf": tc.err},
+			}
+			b := build(t, "sshd", a)
+			s := setting(t, b, "sshd.options.permit_root_login")
+			if s.Persisted == nil || s.Persisted.Status == facts.StatusOK {
+				t.Fatalf("an unreadable drop-in must not leave the main file's value ok: %+v", s.Persisted)
+			}
+			if s.Persisted.Status != tc.want {
+				t.Errorf("persisted status %s, want %s (%+v)", s.Persisted.Status, tc.want, s.Persisted)
+			}
+			// R59: effective copies a non-ok persisted side unchanged.
+			if s.Effective.Status != s.Persisted.Status || s.Effective.Reason != s.Persisted.Reason {
+				t.Errorf("effective %+v must copy persisted %+v unchanged", s.Effective, s.Persisted)
+			}
+		})
+	}
+}
+
+// A drop-in that is simply absent is still skipped, so the main file answers.
+func TestSshdMissingDropInStillFallsThroughToTheMainFile(t *testing.T) {
+	a := &fsAccess{files: map[string]string{"/etc/ssh/sshd_config": "sshd_config"}}
+	b := build(t, "sshd", a)
+	s := setting(t, b, "sshd.options.permit_root_login")
+	if s.Persisted.Status != facts.StatusOK || s.Persisted.Value != "yes" {
+		t.Errorf("%+v", s.Persisted)
+	}
+}
+
+// Fix 3. sshd accepts "Keyword=value" as well as "Keyword value".
+func TestSshdParsesTheEqualsForm(t *testing.T) {
+	a := &fsAccess{files: map[string]string{"/etc/ssh/sshd_config": "sshd_config_equals"}}
+	b := build(t, "sshd", a)
+	s := setting(t, b, "sshd.options.permit_root_login")
+	if s.Persisted == nil || s.Persisted.Value != "yes" {
+		t.Errorf("PermitRootLogin=yes must parse: %+v", s.Persisted)
+	}
+	if s.Persisted.Source.Line != 2 {
+		t.Errorf("line %d, want 2", s.Persisted.Source.Line)
+	}
+}
+
+// Fix 4. A value parsed out of a capped capture is not the whole answer.
+func TestSshdMarksTruncatedCommandOutput(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{"/etc/ssh/sshd_config": "sshd_config"},
+		cmds:  map[string]cmdResult{"/usr/sbin/sshd -T": {file: "sshd_T.txt", truncated: true}},
+	}
+	b := build(t, "sshd", a)
+	s := setting(t, b, "sshd.options.permit_root_login")
+	if s.Runtime == nil || !s.Runtime.Truncated {
+		t.Errorf("runtime must carry truncated: %+v", s.Runtime)
+	}
+	if !env(t, b, "sshd.collect_method").Truncated {
+		t.Errorf("collect_method must carry truncated: %+v", env(t, b, "sshd.collect_method"))
+	}
+}
+
+// Fix 7. "parse" chosen because the binary never started cites no command:
+// there is no exit code to point at.
+func TestSshdCollectMethodHasNoSourceWhenTheBinaryNeverStarted(t *testing.T) {
+	a := &fsAccess{files: map[string]string{"/etc/ssh/sshd_config": "sshd_config"}}
+	b := build(t, "sshd", a)
+	m := env(t, b, "sshd.collect_method")
+	if m.Value != "parse" || m.Source != nil {
+		t.Errorf("collect_method %+v source %+v", m, m.Source)
+	}
+}
+
+// ...but a -T that ran and failed is cited, because its exit code is the
+// reason "parse" was chosen.
+func TestSshdCollectMethodCitesACommandThatRanAndFailed(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{"/etc/ssh/sshd_config": "sshd_config"},
+		cmds:  map[string]cmdResult{"/usr/sbin/sshd -T": {exitCode: 255, stderr: "boom\n"}},
+	}
+	b := build(t, "sshd", a)
+	m := env(t, b, "sshd.collect_method")
+	if m.Value != "parse" || m.Source == nil || m.Source.Cmd != "/usr/sbin/sshd -T" {
+		t.Errorf("collect_method %+v source %+v", m, m.Source)
+	}
+}
+
 // --- accounts -----------------------------------------------------------
 
 func TestAccountsDerivesRuntimeAgeingWithoutStoringHashes(t *testing.T) {
@@ -364,6 +476,33 @@ func TestAccountsShadowDeniedIsDeniedNotAbsent(t *testing.T) {
 	}
 	if _, present := users[0].(map[string]any)["password_status"]; present {
 		t.Errorf("a shadow field appeared without shadow: %v", users[0])
+	}
+}
+
+// Fix 5. Only a plausible crypt id is kept. A 200-byte "id" is not an
+// algorithm name, it is hash material, and none of it may be stored.
+func TestAccountsRejectsAnImplausibleHashId(t *testing.T) {
+	a := &fsAccess{files: map[string]string{
+		"/etc/login.defs": "login.defs",
+		"/etc/shadow":     "shadow_longid",
+		"/etc/passwd":     "passwd",
+	}}
+	b := build(t, "accounts", a)
+	users := okList(t, b, "accounts.users")
+	root := users[0].(map[string]any)
+	if root["hash_algo"] != "" {
+		t.Errorf("hash_algo %q must be empty for an implausible id", root["hash_algo"])
+	}
+	for _, u := range users {
+		for k, v := range u.(map[string]any) {
+			if str, ok := v.(string); ok && (strings.Contains(str, "hashhash") || len(str) > 32) {
+				t.Fatalf("hash material leaked into %s=%q", k, str)
+			}
+		}
+	}
+	// The well-formed row beside it still yields its id.
+	if users[1].(map[string]any)["hash_algo"] != "$6$" {
+		t.Errorf("%v", users[1])
 	}
 }
 
@@ -650,6 +789,80 @@ func TestServicesUnitQueryFailureIsNotASilentFalse(t *testing.T) {
 	// reachable is still answerable from the socket table alone.
 	if e := env(t, b, "services.telnet.reachable"); e.Status != facts.StatusOK || e.Value != false {
 		t.Errorf("reachable %+v", e)
+	}
+}
+
+// Fix 2 (Important). One unit that never answered means the sweep never
+// covered it, so "not installed" would rest on evidence that does not exist.
+func TestServicesOneUnitTimingOutIsNotOkFalse(t *testing.T) {
+	cmds := allUnitsNotFound()
+	cmds[showLine("ssh.service")] = cmdResult{timedOut: true, exitCode: -1}
+	a := servicesAccess(map[string]string{"/proc/self/net/tcp": "proc_net_tcp"}, cmds)
+	b := build(t, "services", a)
+	if e := env(t, b, "services.ssh.installed"); e.Status != facts.StatusTimeout {
+		t.Errorf("installed %+v, want timeout", e)
+	}
+	if e := env(t, b, "services.ssh.active"); e.Status != facts.StatusTimeout {
+		t.Errorf("active %+v, want timeout", e)
+	}
+}
+
+// The same for telnet, and the failing unit's own envelope is the one kept.
+func TestServicesTelnetOneUnitDeniedIsNotOkFalse(t *testing.T) {
+	cmds := allUnitsNotFound()
+	cmds[showLine("telnet.socket")] = cmdResult{exitCode: 1, stderr: "Permission denied\n"}
+	a := servicesAccess(map[string]string{"/proc/self/net/tcp": "proc_net_tcp"}, cmds)
+	b := build(t, "services", a)
+	if e := env(t, b, "services.telnet.installed"); e.Status != facts.StatusDenied {
+		t.Errorf("installed %+v, want denied", e)
+	}
+	// ssh answered completely, so it is unaffected.
+	if e := env(t, b, "services.ssh.installed"); e.Status != facts.StatusOK {
+		t.Errorf("ssh installed %+v", e)
+	}
+}
+
+// Fix 4, command side: a capped systemctl capture marks the value.
+func TestServicesMarksTruncatedCommandOutput(t *testing.T) {
+	cmds := allUnitsNotFound()
+	cmds[showLine("ssh.service")] = cmdResult{file: "systemctl.loaded.active", truncated: true}
+	a := servicesAccess(map[string]string{"/proc/self/net/tcp": "proc_net_tcp"}, cmds)
+	b := build(t, "services", a)
+	if e := env(t, b, "services.ssh.installed"); !e.Truncated {
+		t.Errorf("%+v", e)
+	}
+}
+
+// Fix 10. Once systemd has proved telnet is installed, the legacy files
+// cannot change the answer, so they are not read at all.
+func TestServicesSkipsLegacyFilesWhenSystemdProvesTelnet(t *testing.T) {
+	cmds := allUnitsNotFound()
+	cmds[showLine("telnet.socket")] = cmdResult{file: "systemctl.loaded.active"}
+	a := servicesAccess(map[string]string{
+		"/proc/self/net/tcp": "proc_net_tcp",
+		"/etc/inetd.conf":    "inetd.conf.telnet",
+	}, cmds)
+	b := build(t, "services", a)
+	if e := env(t, b, "services.telnet.installed"); e.Value != true {
+		t.Errorf("%+v", e)
+	}
+	if slices.Contains(a.reads, "/etc/inetd.conf") {
+		t.Errorf("systemd already proved it; /etc/inetd.conf must not be read: %v", a.reads)
+	}
+}
+
+// ...and it IS read when systemd did not prove it.
+func TestServicesReadsLegacyFilesWhenSystemdDidNotProveTelnet(t *testing.T) {
+	a := servicesAccess(map[string]string{
+		"/proc/self/net/tcp": "proc_net_tcp",
+		"/etc/inetd.conf":    "inetd.conf.telnet",
+	}, allUnitsNotFound())
+	b := build(t, "services", a)
+	if e := env(t, b, "services.telnet.installed"); e.Value != true {
+		t.Errorf("%+v", e)
+	}
+	if !slices.Contains(a.reads, "/etc/inetd.conf") {
+		t.Errorf("/etc/inetd.conf should have been read: %v", a.reads)
 	}
 }
 

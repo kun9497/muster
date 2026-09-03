@@ -110,33 +110,50 @@ func showValues(stdout []byte) (load, active string) {
 
 // groupState is what systemd said about one logical service.
 type groupState struct {
-	// answered is false when not one query ran. Reporting "not installed"
-	// on no answer at all would be a PASS on no evidence, so the caller
-	// writes failure instead.
-	answered  bool
+	// complete is false as soon as ONE queried unit did not answer. The
+	// judgement has to be made unit by unit, not over the group as a
+	// whole: if ssh.service times out and sshd.service answers not-found,
+	// a group-level "something answered" would publish installed=false on
+	// evidence that never covered ssh.service — the unit most likely to
+	// have been the one that mattered. Any gap therefore means the caller
+	// writes firstFailure instead of a value.
+	complete  bool
 	installed bool
 	active    bool
+	truncated bool
 	src       *facts.Source
-	failure   facts.Envelope
+
+	// firstFailure is the FIRST unit that did not answer: the one whose
+	// absence from the evidence a reader has to know about. Later failures
+	// are usually the same cause repeated.
+	firstFailure facts.Envelope
+}
+
+// fail records a unit that did not answer, keeping the first one only.
+func (g *groupState) fail(e facts.Envelope) {
+	if g.complete {
+		g.complete, g.firstFailure = false, e
+	}
 }
 
 // probeUnits asks systemctl about each unit of a logical service in turn.
 func probeUnits(ctx context.Context, a collect.Access, units []unitRef) groupState {
-	g := groupState{failure: collect.ErrorEnv("systemctl show did not run")}
+	g := groupState{complete: true}
 	for _, u := range units {
 		cmd := showCmd(u.name)
 		out := a.Run(ctx, cmd)
 		src := out.Source(cmd)
 		switch {
 		case out.TimedOut:
-			g.failure = collect.TimeoutEnv("systemctl show " + u.name + " timed out")
-			g.failure.Source = src
+			e := collect.TimeoutEnv("systemctl show " + u.name + " timed out")
+			e.Source = src
+			g.fail(withTruncation(e, out.Truncated))
 			continue
 		case out.Err != nil, out.ExitCode != 0:
-			g.failure = commandFailure("systemctl show "+u.name, out, src)
+			g.fail(commandFailure("systemctl show "+u.name, out, src))
 			continue
 		}
-		g.answered = true
+		g.truncated = g.truncated || out.Truncated
 		if g.src == nil {
 			g.src = src
 		}
@@ -176,36 +193,49 @@ func runServices(ctx context.Context, a collect.Access, b *collect.Builder) erro
 }
 
 func setSSH(b *collect.Builder, g groupState) {
-	if !g.answered {
-		b.Set("services.ssh.installed", g.failure)
-		b.Set("services.ssh.active", g.failure)
+	if !g.complete {
+		b.Set("services.ssh.installed", g.firstFailure)
+		b.Set("services.ssh.active", g.firstFailure)
 		return
 	}
-	b.Set("services.ssh.installed", collect.OK(g.installed, g.src))
+	b.Set("services.ssh.installed", withTruncation(collect.OK(g.installed, g.src), g.truncated))
 	if !g.installed {
 		b.Set("services.ssh.active", collect.Absent("no ssh unit is loaded on this host"))
 		return
 	}
-	b.Set("services.ssh.active", collect.OK(g.active, g.src))
+	b.Set("services.ssh.active", withTruncation(collect.OK(g.active, g.src), g.truncated))
 }
 
 func setTelnet(b *collect.Builder, a collect.Access, g groupState) {
+	setTelnetInstalled(b, a, g)
+	setTelnetReachable(b, a)
+}
+
+func setTelnetInstalled(b *collect.Builder, a collect.Access, g groupState) {
+	// systemd swept every telnet unit and found one loaded: the legacy
+	// super-server configuration cannot make that less true, so it is not
+	// read at all.
+	if g.complete && g.installed {
+		b.Set("services.telnet.installed", withTruncation(collect.OK(true, g.src), g.truncated))
+		return
+	}
 	found, problem := telnetFromLegacy(a)
 	switch {
-	case g.answered && g.installed:
-		b.Set("services.telnet.installed", collect.OK(true, g.src))
 	case found != nil:
+		// Positive evidence stands on its own, whatever systemd managed.
 		b.Set("services.telnet.installed", *found)
-	case !g.answered:
-		b.Set("services.telnet.installed", g.failure)
+	case !g.complete:
+		b.Set("services.telnet.installed", g.firstFailure)
 	case problem != nil:
 		// A super-server configuration we could not read might have named
 		// telnet, so "not installed" would be a guess, not a fact.
 		b.Set("services.telnet.installed", *problem)
 	default:
-		b.Set("services.telnet.installed", collect.OK(false, g.src))
+		b.Set("services.telnet.installed", withTruncation(collect.OK(false, g.src), g.truncated))
 	}
+}
 
+func setTelnetReachable(b *collect.Builder, a collect.Access) {
 	// R41: reachable is decided by the listening-socket table alone and is
 	// written as false only when that table was actually read. An unseen
 	// table is never a PASS.

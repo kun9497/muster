@@ -344,7 +344,7 @@
     {
       "Key": "accounts.users",
       "Type": "list\u003crecord\u003e",
-      "Description": "Local accounts with name, uid, gid, shell, password_status and ageing fields; no hashes. Ageing fields are -1 when the shadow field is empty.",
+      "Description": "Local accounts with name, uid, gid, shell, password_status and ageing fields; no hashes. Ageing fields are -1 when the shadow field is empty, and uid/gid are -1 when the passwd field is unparsable.",
       "Since": 1,
       "Sensitivity": "internal",
       "Collector": "accounts",

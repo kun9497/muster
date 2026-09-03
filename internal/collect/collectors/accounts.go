@@ -88,18 +88,36 @@ func passwordStatus(pw string) string {
 }
 
 // hashAlgo returns the "$id$" prefix of a crypt hash and nothing else: no
-// salt, no digest, not one byte of either. The prefix is cloned rather than
-// sliced so the returned string does not keep the whole shadow line alive
-// behind it.
+// salt, no digest, not one byte of either.
+//
+// The id has to look like one — 1 to 8 alphanumeric characters, which
+// covers every crypt scheme in use ("1", "5", "6", "y", "2b", "gy",
+// "argon2id") — because a malformed password field is not evidence of an
+// algorithm, it is hash material. Without that check a line whose second
+// "$" lands far into the digest would copy the digest into the snapshot
+// under the name "hash_algo". The result is built from the id rather than
+// sliced out of pw, so it cannot keep the whole shadow line alive behind
+// it either.
 func hashAlgo(pw string) string {
 	if !strings.HasPrefix(pw, "$") {
 		return ""
 	}
-	end := strings.Index(pw[1:], "$")
-	if end <= 0 {
+	id, _, ok := strings.Cut(pw[1:], "$")
+	if !ok || len(id) == 0 || len(id) > 8 || !isAlphanumeric(id) {
 		return ""
 	}
-	return strings.Clone(pw[:end+2])
+	return "$" + id + "$"
+}
+
+func isAlphanumeric(s string) bool {
+	for _, r := range s {
+		switch {
+		case r >= '0' && r <= '9', r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z':
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 func parseShadow(data []byte) []shadowRow {

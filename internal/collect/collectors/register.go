@@ -86,6 +86,16 @@ func commandFailure(what string, out collect.Output, src *facts.Source) facts.En
 		e = collect.Denied(reason)
 	}
 	e.Source = src
+	return withTruncation(e, out.Truncated)
+}
+
+// withTruncation marks an envelope built from a command whose capture hit
+// the output cap. It is the command-side counterpart of the read
+// primitive's ReadMeta.Truncated that OKRead carries (R70): a value parsed
+// out of a partial stream must never be read as the whole answer, and a
+// reason taken from a partial stderr may itself be cut short.
+func withTruncation(e facts.Envelope, truncated bool) facts.Envelope {
+	e.Truncated = e.Truncated || truncated
 	return e
 }
 

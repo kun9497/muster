@@ -56,3 +56,24 @@ regexes = [
   '''@users\.noreply\.github\.com''',
   '''@example\.(com|org|net)''',
 ]
+
+# R79. gitleaks' own `generic-api-key` rule fires on the synthetic fact-key
+# literal that commit 04d93f8 introduced in internal/collect/registry_test.go
+# to test Builder.place's prefix-collision panic. The working tree no longer
+# contains it (renamed to "prefixcollision.leaf" in 90d815d), but it stays in
+# this branch's history, which is what CI's secrets job scans - so the
+# allowlist names the exact literal rather than a path or a whole file.
+[[rules]]
+id = "generic-api-key"
+description = "gitleaks' built-in generic key rule, with muster's synthetic fixtures allowed"
+[rules.allowlist]
+regexes = [
+  # synthetic test token from 04d93f8, never a secret
+  '''synthetic2\.leaf''',
+]
+# Parity with internal-hostname-shape and private-ipv4-address above:
+# .superpowers/ holds the git-ignored SDD working notes and review diffs for
+# the branch in progress. They are never committed, so the CI scan over git
+# history cannot see them; only a local --no-git scan of the working tree
+# reaches them, and a review diff necessarily quotes the code it reviews.
+paths = ['''^\.superpowers[/\\]''']
