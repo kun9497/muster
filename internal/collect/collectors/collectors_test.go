@@ -31,21 +31,35 @@ type cmdResult struct {
 }
 
 // fsAccess serves declared paths from testdata and commands from canned
-// outcomes. It implements all six Access methods (R46/R60), so a collector
+// outcomes. It implements all seven Access methods (R46/R60), so a collector
 // under test can never reach the real host.
 type fsAccess struct {
-	files    map[string]string    // host path -> testdata file name
-	dirs     map[string]bool      // host path -> exists, but is not a readable file
-	cmds     map[string]cmdResult // command line -> canned outcome
-	fails    map[string]error     // host path -> error returned instead of content
-	modes    map[string]uint32    // host path -> raw 0o7777 bits
-	xattrs   map[string][]string  // host path -> extended attribute names
-	writable map[string]bool      // host path -> Writable answer
-	globErr  error                // when set, every Glob fails with it
+	files       map[string]string            // host path -> testdata file name
+	dirs        map[string]bool              // host path -> exists, but is not a readable file
+	cmds        map[string]cmdResult         // command line -> canned outcome
+	fails       map[string]error             // host path -> error returned instead of content
+	modes       map[string]uint32            // host path -> raw 0o7777 bits (fallback consulted when stats has no entry)
+	stats       map[string]statResult        // host path -> full Stat() shape (R93; Task 5 relies on this)
+	xattrs      map[string][]string          // host path -> extended attribute names
+	xattrValues map[string]map[string][]byte // host path -> attribute name -> value, served by Getxattr
+	writable    map[string]bool              // host path -> Writable answer
+	globErr     error                        // when set, every Glob fails with it
 
 	// reads records every path ReadFile was asked for, so a test can assert
 	// that a collector did NOT go looking for something it did not need.
 	reads []string
+}
+
+// statResult is the one shape fsAccess.Stat renders into a collect.ReadMeta
+// when a path has an entry in stats: mode, ownership and file kind, the
+// fields collectors that need more than "does this path exist" (e.g. the
+// ACL decoder in Task 5) inspect. A path without a stats entry falls back to
+// today's files/dirs/modes-derived behaviour, so every existing literal
+// keeps compiling unchanged.
+type statResult struct {
+	mode     uint32
+	uid, gid uint32
+	kind     string
 }
 
 func (a *fsAccess) read(name string) ([]byte, error) {
@@ -75,6 +89,9 @@ func (a *fsAccess) ReadFile(p string, _ int64) ([]byte, collect.ReadMeta, error)
 func (a *fsAccess) Stat(p string) (collect.ReadMeta, error) {
 	if err, ok := a.fails[p]; ok {
 		return collect.ReadMeta{}, err
+	}
+	if s, ok := a.stats[p]; ok {
+		return collect.ReadMeta{Tier: "openat2", Mode: s.mode, UID: s.uid, GID: s.gid, Kind: s.kind}, nil
 	}
 	if _, ok := a.files[p]; ok {
 		return collect.ReadMeta{Tier: "openat2", Mode: a.mode(p, 0o644)}, nil
@@ -107,11 +124,42 @@ func (a *fsAccess) Glob(pattern string) ([]string, error) {
 	return out, nil
 }
 
+// Llistxattr lists the union of a.xattrs[p] (names with no set value) and
+// the keys of a.xattrValues[p] (names Getxattr can actually answer), sorted
+// so the result is deterministic regardless of which map a test populated.
 func (a *fsAccess) Llistxattr(p string) ([]string, error) {
 	if err, ok := a.fails[p]; ok {
 		return nil, err
 	}
-	return a.xattrs[p], nil
+	seen := map[string]bool{}
+	var out []string
+	for _, n := range a.xattrs[p] {
+		if !seen[n] {
+			seen[n] = true
+			out = append(out, n)
+		}
+	}
+	for n := range a.xattrValues[p] {
+		if !seen[n] {
+			seen[n] = true
+			out = append(out, n)
+		}
+	}
+	slices.Sort(out)
+	return out, nil
+}
+
+// Getxattr answers from xattrValues; a name not present there — whether or
+// not it appears in xattrs — is ENODATA, matching hostAccess.Getxattr's
+// propagation of the raw errno.
+func (a *fsAccess) Getxattr(p, name string) ([]byte, error) {
+	if err, ok := a.fails[p]; ok {
+		return nil, err
+	}
+	if v, ok := a.xattrValues[p][name]; ok {
+		return v, nil
+	}
+	return nil, unix.ENODATA
 }
 
 func (a *fsAccess) Writable(p string) bool { return a.writable[p] }

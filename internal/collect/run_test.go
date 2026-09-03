@@ -27,7 +27,10 @@ func (quietAccess) ReadFile(string, int64) ([]byte, ReadMeta, error) {
 func (quietAccess) Stat(string) (ReadMeta, error)       { return ReadMeta{}, os.ErrNotExist }
 func (quietAccess) Glob(string) ([]string, error)       { return nil, nil }
 func (quietAccess) Llistxattr(string) ([]string, error) { return nil, nil }
-func (quietAccess) Writable(string) bool                { return false }
+func (quietAccess) Getxattr(string, string) ([]byte, error) {
+	return nil, unix.ENODATA
+}
+func (quietAccess) Writable(string) bool { return false }
 func (quietAccess) Run(context.Context, Command) Output {
 	return Output{ExitCode: 127, Err: os.ErrNotExist}
 }
