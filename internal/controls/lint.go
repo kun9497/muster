@@ -22,10 +22,13 @@ type Problem struct {
 func (p Problem) String() string { return fmt.Sprintf("%s: %s: %s", p.Path, p.Rule, p.Message) }
 
 // LintOptions carries what lint cannot know on its own: the registered
-// custom functions (owned by check) and where fixtures live.
+// custom functions (owned by check), where fixtures live, and the generated
+// STIG/NIST reference index (nil means references are checked for shape
+// only, never for existence).
 type LintOptions struct {
 	CustomFuncs map[string]bool
 	FixtureDir  string
+	References  *ReferenceIndex
 }
 
 var (
@@ -137,6 +140,25 @@ func Lint(s *Set, reg *facts.Registry, opts LintOptions) []Problem {
 		for _, r := range c.References.CIS {
 			if r.Benchmark == "" || r.Version == "" || r.Rec == "" {
 				add("references_cis", "cis references need benchmark, version and rec")
+			}
+		}
+		for _, r := range c.References.STIG {
+			switch {
+			case r.Benchmark == "" || r.Version == "" || r.ID == "":
+				add("references_stig", "stig references need benchmark, version and id")
+			case opts.References == nil:
+				add("references_stig", "no reference index loaded; %s@%s %s cannot be verified", r.Benchmark, r.Version, r.ID)
+			case !opts.References.HasSTIG(r.Benchmark, r.Version, r.ID):
+				add("references_stig", "stig reference %s@%s %s is not in docs/reference/stig", r.Benchmark, r.Version, r.ID)
+			}
+		}
+		for _, n := range c.References.NIST80053 {
+			if !ValidNISTID(n) {
+				add("references_nist", "nist_800_53 reference %q must look like AC-6 or AC-6(10)", n)
+				continue
+			}
+			if opts.References != nil && !opts.References.HasNIST(n) {
+				add("references_nist", "nist_800_53 reference %q appears in no indexed STIG rule", n)
 			}
 		}
 		for _, cl := range c.AppliesWhen {

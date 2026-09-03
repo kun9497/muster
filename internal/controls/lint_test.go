@@ -420,6 +420,51 @@ func TestUnusedKeysNamesRegisteredKeysNoControlReferences(t *testing.T) {
 	}
 }
 
+func TestLintValidatesSTIGAndNISTReferencesAgainstTheIndex(t *testing.T) {
+	x, err := LoadReferenceIndex("testdata/refs")
+	if err != nil {
+		t.Fatal(err)
+	}
+	base := `
+id: muster.file.ref_test
+title_en: t
+title_ko: t
+description_en: d
+description_ko: d
+category: file
+importance: 하
+automation: auto
+references:
+  kisa: { "2026": ["U-19"] }
+  stig: [{ benchmark: mini, version: V1R1, id: MINI-00-000010 }]
+  nist_800_53: ["CM-6"]
+requires_facts: ">=1"
+absent_means: fail
+checks:
+  - { fact: files.etc_hosts.uid, op: eq, expected: 0 }
+remediation: { text_en: t, text_ko: t, risk: none, idempotent: true }
+`
+	if probs := lintOne(t, base, LintOptions{References: x}); len(probs) != 0 {
+		t.Fatalf("valid references must lint clean: %v", probs)
+	}
+	cases := map[string]string{
+		"unknown benchmark": strings.Replace(base, "benchmark: mini", "benchmark: nope", 1),
+		"wrong version":     strings.Replace(base, "version: V1R1", "version: V9R9", 1),
+		"unknown id":        strings.Replace(base, "MINI-00-000010", "MINI-00-777777", 1),
+		"nist not indexed":  strings.Replace(base, `["CM-6"]`, `["AC-99"]`, 1),
+		"nist bad format":   strings.Replace(base, `["CM-6"]`, `["cm6"]`, 1),
+	}
+	for name, y := range cases {
+		got := rules(lintOne(t, y, LintOptions{References: x}))
+		if !got["references_stig"] && !got["references_nist"] {
+			t.Errorf("%s: want a references problem, got %v", name, got)
+		}
+	}
+	if got := rules(lintOne(t, base, LintOptions{References: nil})); !got["references_stig"] {
+		t.Errorf("without an index a stig reference must be a problem, got %v", got)
+	}
+}
+
 func TestLintFixturePairRule(t *testing.T) {
 	fx := t.TempDir()
 	os.MkdirAll(filepath.Join(fx, "muster.account.good"), 0o755)

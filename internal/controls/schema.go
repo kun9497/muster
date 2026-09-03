@@ -82,9 +82,21 @@ type CISRef struct {
 	Rec       string `yaml:"rec"`
 }
 
+// STIGRef points at one rule in a generated reference index under
+// docs/reference/stig (tools/refindex). Benchmark is the index's product or
+// one of its applies_to aliases (rhel9, rocky9, alma9, ubuntu2204,
+// ubuntu2404); Version is the indexed release, e.g. V2R9; ID is the STIG id,
+// e.g. RHEL-09-232010.
+type STIGRef struct {
+	Benchmark string `yaml:"benchmark"`
+	Version   string `yaml:"version"`
+	ID        string `yaml:"id"`
+}
+
 type References struct {
 	KISA      map[string][]string `yaml:"kisa,omitempty"`
 	CIS       []CISRef            `yaml:"cis,omitempty"`
+	STIG      []STIGRef           `yaml:"stig,omitempty"`
 	ISMSP     []string            `yaml:"isms_p,omitempty"`
 	NIST80053 []string            `yaml:"nist_800_53,omitempty"`
 }
