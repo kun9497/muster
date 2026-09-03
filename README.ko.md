@@ -105,7 +105,9 @@ AlmaLinux 9**를 대상으로 합니다. 처음부터 둘 다 지원해야 배�
 CIS 벤치마크 권고 번호를 달고, 2단계에서 DISA STIG와 NIST SP 800-53 참조를
 더하며, 3단계부터는 같은 수집기 위에서 `cis-<배포판>-l1` 프로파일이 컨트롤과
 파라미터를 고를 수 있습니다. muster는 번호만 기록하고 벤치마크 본문은 담지 않으며,
-CIS나 STIG 준수 여부를 인증하지 않습니다.
+CIS나 STIG 준수 여부를 인증하지 않습니다. 컨트롤이 인용할 수 있는 STIG·NIST
+식별자는 DISA의 공개 파일로부터 `tools/refindex`가 `docs/reference/stig/`에
+생성합니다. [ATTRIBUTION.md](ATTRIBUTION.md)를 보세요.
 
 ## 로드맵
 

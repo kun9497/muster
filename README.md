@@ -116,7 +116,9 @@ carries CIS Benchmark recommendation numbers today, gains DISA STIG and NIST
 SP 800-53 references in stage 2, and from stage 3 a `cis-<distro>-l1` profile
 can select controls and parameters from the same collector. muster records the
 numbers, never the benchmark text, and certifies no level of CIS or STIG
-compliance.
+compliance. The STIG and NIST identifiers a control may cite are generated
+into `docs/reference/stig/` from DISA's public files by `tools/refindex`; see
+[ATTRIBUTION.md](ATTRIBUTION.md).
 
 ## Roadmap
 

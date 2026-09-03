@@ -114,18 +114,26 @@ jobs:
   collect-containers:
     runs-on: ubuntu-24.04
     needs: test
+    continue-on-error: ${{ matrix.canary == 'true' }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - image: ubuntu:22.04
             init: "false"
+            canary: "false"
           - image: ubuntu:24.04
             init: "false"
+            canary: "false"
           - image: rockylinux/rockylinux:9-ubi-init
             init: "true"
+            canary: "false"
           - image: almalinux/9-init
             init: "true"
+            canary: "false"
+          - image: debian:12
+            init: "false"
+            canary: "true"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5

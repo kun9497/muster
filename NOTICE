@@ -16,3 +16,8 @@ from the guide is included, and the guide itself is not included.
 CIS Benchmark references are benchmark name, version and recommendation number
 only. No CIS Benchmark text is included and no CIS compliance level is claimed.
 See ATTRIBUTION.md.
+
+DISA STIG and CCI identifiers are drawn from works of the United States
+Government, not subject to copyright in the United States (17 U.S.C. § 105).
+This repository reproduces only STIG and CCI identifiers, severities and
+titles, never their discussion, check and fix text. See ATTRIBUTION.md.
