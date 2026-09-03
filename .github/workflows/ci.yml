@@ -28,6 +28,8 @@ jobs:
         run: go test -race ./...
       - name: controls lint
         run: go run ./cmd/muster controls lint
+      - name: coverage table is current
+        run: go run ./tools/coverage -check
       - name: build
         run: CGO_ENABLED=0 go build -trimpath ./...
   secrets:
