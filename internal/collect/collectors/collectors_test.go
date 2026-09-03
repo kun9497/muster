@@ -258,6 +258,10 @@ func TestSshdFallsBackToParseWhenTUnavailable(t *testing.T) {
 // stderr line and the command as its source, and the method is "parse"
 // because -T did not answer.
 func TestSshdNonZeroExitIsAnErrorRuntimeSide(t *testing.T) {
+	// R84: this test's expectation (error, not denied) is the root-side
+	// outcome of commandFailure's privilege rule, so the seam must be
+	// pinned to root rather than left to whichever account runs the suite.
+	withEUID(t, 0)
 	a := &fsAccess{
 		files: map[string]string{"/etc/ssh/sshd_config": "sshd_config"},
 		cmds: map[string]cmdResult{"/usr/sbin/sshd -T": {
