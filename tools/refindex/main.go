@@ -100,6 +100,12 @@ func main() {
 		if err != nil {
 			fatal(fmt.Errorf("%s: %w", s.Product, err))
 		}
+		// A warning, not a failure: the index is still correct, but the
+		// affected rules carry an empty "nist" for a reason worth naming.
+		if missing := unresolvedCCIs(bench, cci); len(missing) > 0 {
+			fmt.Fprintf(os.Stderr, "refindex: %s: %d CCI(s) not in the CCI list: %s\n",
+				s.Product, len(missing), strings.Join(missing, ", "))
+		}
 		got, err := renderIndex(s, bench, cci, cciSHA)
 		if err != nil {
 			fatal(err)
@@ -124,6 +130,28 @@ func main() {
 	if stale {
 		os.Exit(1)
 	}
+}
+
+// unresolvedCCIs returns the sorted, de-duplicated CCI ids the benchmark's
+// rules cite that the pinned CCI list does not define. Such a rule still
+// renders, with an empty "nist" array indistinguishable from a rule that
+// genuinely maps to no control — so the tally is returned for the caller to
+// warn about rather than being swallowed.
+func unresolvedCCIs(b *benchmark, cci *cciList) []string {
+	missing := map[string]bool{}
+	for _, r := range b.Rules {
+		for _, c := range r.CCIs {
+			if _, ok := cci.NIST[c]; !ok {
+				missing[c] = true
+			}
+		}
+	}
+	out := make([]string, 0, len(missing))
+	for c := range missing {
+		out = append(out, c)
+	}
+	sort.Strings(out)
+	return out
 }
 
 // renderIndex joins the parsed benchmark with the CCI list and encodes it

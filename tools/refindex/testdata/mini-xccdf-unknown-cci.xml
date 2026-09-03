@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Benchmark xmlns="http://checklists.nist.gov/xccdf/1.1" id="MINI_STIG_UNKNOWN_CCI">
+<plain-text id="release-info">Release: 1 Benchmark Date: 01 Jan 2026</plain-text>
+<version>1</version>
+<Group id="V-000005"><title>SRG-OS-000005</title><description>x</description>
+<Rule id="SV-000005r1_rule" weight="10.0" severity="low"><version>MINI-00-000050</version><title>Fifth rule</title>
+<ident system="http://cyber.mil/cci">CCI-000366</ident><ident system="http://cyber.mil/cci">CCI-999999</ident></Rule></Group>
+<Group id="V-000006"><title>SRG-OS-000006</title><description>x</description>
+<Rule id="SV-000006r1_rule" weight="10.0" severity="low"><version>MINI-00-000060</version><title>Sixth rule</title>
+<ident system="http://cyber.mil/cci">CCI-888888</ident><ident system="http://cyber.mil/cci">CCI-999999</ident></Rule></Group>
+</Benchmark>

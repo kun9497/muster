@@ -31,8 +31,8 @@ func parseXCCDF(data []byte) (*benchmark, error) {
 			Text string `xml:",chardata"`
 		} `xml:"plain-text"`
 		Groups []struct {
-			ID   string `xml:"id,attr"`
-			Rule struct {
+			ID    string `xml:"id,attr"`
+			Rules []struct {
 				ID       string `xml:"id,attr"`
 				Severity string `xml:"severity,attr"`
 				Version  string `xml:"version"`
@@ -54,7 +54,14 @@ func parseXCCDF(data []byte) (*benchmark, error) {
 		}
 	}
 	for _, g := range doc.Groups {
-		r := g.Rule
+		// Every DISA group carries exactly one rule. Decoding into a slice
+		// and insisting on that keeps a group with two rules from silently
+		// losing one: the rule count is the only thing a reader checks, and
+		// a drop would not change it.
+		if len(g.Rules) != 1 {
+			return nil, fmt.Errorf("xccdf: group %s: expected exactly 1 <Rule>, got %d", g.ID, len(g.Rules))
+		}
+		r := g.Rules[0]
 		if r.Version == "" {
 			return nil, fmt.Errorf("xccdf: group %s: rule %s has no <version> (STIG id)", g.ID, r.ID)
 		}

@@ -35,6 +35,57 @@ func TestNistIDNormalisation(t *testing.T) {
 	}
 }
 
+// A CCI a rule cites but the pinned CCI list does not define yields an empty
+// "nist" array that looks exactly like a rule with no NIST mapping, so the
+// tally is what tells the two apart. It is returned, not printed, so this
+// test does not have to scrape stderr.
+func TestUnresolvedCCIsTalliesMissingIDs(t *testing.T) {
+	x, err := os.ReadFile("testdata/mini-xccdf-unknown-cci.xml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, err := os.ReadFile("testdata/mini-cci.xml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bench, err := parseXCCDF(x)
+	if err != nil {
+		t.Fatal(err)
+	}
+	list, err := parseCCI(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := unresolvedCCIs(bench, list)
+	// CCI-999999 is cited by both rules and must be reported once;
+	// CCI-000366 is in the list and must not be reported at all.
+	if len(got) != 2 || got[0] != "CCI-888888" || got[1] != "CCI-999999" {
+		t.Errorf("unresolvedCCIs = %v, want sorted de-duplicated [CCI-888888 CCI-999999]", got)
+	}
+}
+
+func TestUnresolvedCCIsIsEmptyWhenEveryCCIResolves(t *testing.T) {
+	x, err := os.ReadFile("testdata/mini-xccdf.xml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, err := os.ReadFile("testdata/mini-cci.xml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bench, err := parseXCCDF(x)
+	if err != nil {
+		t.Fatal(err)
+	}
+	list, err := parseCCI(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := unresolvedCCIs(bench, list); len(got) != 0 {
+		t.Errorf("unresolvedCCIs = %v, want none", got)
+	}
+}
+
 func TestIndexJSONIsDeterministic(t *testing.T) {
 	x, err := os.ReadFile("testdata/mini-xccdf.xml")
 	if err != nil {
