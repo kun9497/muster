@@ -1,0 +1,2658 @@
+{
+  "product": "ubuntu2204",
+  "benchmark": "Canonical Ubuntu 22.04 LTS Security Technical Implementation Guide",
+  "version": "V2R9",
+  "release_info": "Release: 9 Benchmark Date: 01 Jul 2026",
+  "source": {
+    "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_CAN_Ubuntu_22-04_LTS_V2R9_STIG.zip",
+    "sha256": "a533fd2758a1832bd4c81e4f2a11497d5331c3148ee8bcf88e81800843a86ffb",
+    "member": "U_CAN_Ubuntu_22-04_LTS_V2R9_Manual_STIG/U_CAN_Ubuntu_22-04_LTS_STIG_V2R9_Manual-xccdf.xml"
+  },
+  "cci_list": {
+    "version": "2025-01-23",
+    "sha256": "077cbb6d2ae5f8fdbaaf416d87a34a8621767cdba490f3283feb0c5c35892700"
+  },
+  "rules": [
+    {
+      "stig_id": "UBTU-22-211000",
+      "group_id": "V-278951",
+      "rule_id": "SV-278951r1155215_rule",
+      "severity": "high",
+      "title": "Ubuntu 22.04 LTS must be a vendor-supported release.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-211015",
+      "group_id": "V-260469",
+      "rule_id": "SV-260469r991589_rule",
+      "severity": "high",
+      "title": "Ubuntu 22.04 LTS must disable the x86 Ctrl-Alt-Delete key sequence.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-212010",
+      "group_id": "V-260470",
+      "rule_id": "SV-260470r1137691_rule",
+      "severity": "high",
+      "title": "Ubuntu 22.04 LTS, when booted, must require authentication upon booting into single-user and maintenance modes.",
+      "ccis": [
+        "CCI-000213"
+      ],
+      "nist": [
+        "AC-3"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-212015",
+      "group_id": "V-260471",
+      "rule_id": "SV-260471r1155214_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must initiate session audits at system startup.",
+      "ccis": [
+        "CCI-001464"
+      ],
+      "nist": [
+        "AU-14(1)"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-213010",
+      "group_id": "V-260472",
+      "rule_id": "SV-260472r1137695_rule",
+      "severity": "low",
+      "title": "Ubuntu 22.04 LTS must restrict access to the kernel message buffer.",
+      "ccis": [
+        "CCI-001090"
+      ],
+      "nist": [
+        "SC-4"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-213015",
+      "group_id": "V-260473",
+      "rule_id": "SV-260473r1155207_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must disable kernel core dumps so that it can fail to a secure state if system initialization fails, shutdown fails or aborts fail.",
+      "ccis": [
+        "CCI-001190"
+      ],
+      "nist": [
+        "SC-24"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-213020",
+      "group_id": "V-260474",
+      "rule_id": "SV-260474r958928_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must implement address space layout randomization to protect its memory from unauthorized code execution.",
+      "ccis": [
+        "CCI-002824"
+      ],
+      "nist": [
+        "SI-16"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-213025",
+      "group_id": "V-260475",
+      "rule_id": "SV-260475r958928_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must implement nonexecutable data to protect its memory from unauthorized code execution.",
+      "ccis": [
+        "CCI-002824"
+      ],
+      "nist": [
+        "SI-16"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-214010",
+      "group_id": "V-260476",
+      "rule_id": "SV-260476r1015003_rule",
+      "severity": "low",
+      "title": "Ubuntu 22.04 LTS must be configured so that the Advance Package Tool (APT) prevents the installation of patches, service packs, device drivers, or operating system components without verification they have been digitally signed using a certificate that is recognized and approved by the organization.",
+      "ccis": [
+        "CCI-001749",
+        "CCI-003992"
+      ],
+      "nist": [
+        "CM-14",
+        "CM-5(3)"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-214015",
+      "group_id": "V-260477",
+      "rule_id": "SV-260477r1044773_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must be configured so that the Advance Package Tool (APT) removes all software components after updated versions have been installed.",
+      "ccis": [
+        "CCI-002617"
+      ],
+      "nist": [
+        "SI-2(6)"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-215010",
+      "group_id": "V-260478",
+      "rule_id": "SV-260478r991587_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must have the \"libpam-pwquality\" package installed.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-215015",
+      "group_id": "V-260479",
+      "rule_id": "SV-260479r991589_rule",
+      "severity": "low",
+      "title": "Ubuntu 22.04 LTS must have the \"chrony\" package installed.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-215020",
+      "group_id": "V-260480",
+      "rule_id": "SV-260480r991589_rule",
+      "severity": "low",
+      "title": "Ubuntu 22.04 LTS must not have the \"systemd-timesyncd\" package installed.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-215025",
+      "group_id": "V-260481",
+      "rule_id": "SV-260481r991589_rule",
+      "severity": "low",
+      "title": "Ubuntu 22.04 LTS must not have the \"ntp\" package installed.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-215030",
+      "group_id": "V-260482",
+      "rule_id": "SV-260482r958478_rule",
+      "severity": "high",
+      "title": "Ubuntu 22.04 LTS must not have the \"rsh-server\" package installed.",
+      "ccis": [
+        "CCI-000381"
+      ],
+      "nist": [
+        "CM-7"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-215035",
+      "group_id": "V-260483",
+      "rule_id": "SV-260483r987796_rule",
+      "severity": "high",
+      "title": "Ubuntu 22.04 LTS must not have the \"telnet\" package installed.",
+      "ccis": [
+        "CCI-000197"
+      ],
+      "nist": [
+        "IA-5(1)"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-215040",
+      "group_id": "V-279937",
+      "rule_id": "SV-279937r1208676_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must not have the nfs-kernel-server package installed.",
+      "ccis": [
+        "CCI-000381"
+      ],
+      "nist": [
+        "CM-7"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-231010",
+      "group_id": "V-260484",
+      "rule_id": "SV-260484r958552_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must implement cryptographic mechanisms to prevent unauthorized disclosure and modification of all information that requires protection at rest.",
+      "ccis": [
+        "CCI-001199",
+        "CCI-002475",
+        "CCI-002476"
+      ],
+      "nist": [
+        "SC-28",
+        "SC-28(1)"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-232010",
+      "group_id": "V-260485",
+      "rule_id": "SV-260485r991559_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must have directories that contain system commands set to a mode of \"755\" or less permissive.",
+      "ccis": [
+        "CCI-001495"
+      ],
+      "nist": [
+        "AU-9"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-232015",
+      "group_id": "V-260486",
+      "rule_id": "SV-260486r991560_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must have system commands set to a mode of \"755\" or less permissive.",
+      "ccis": [
+        "CCI-001499"
+      ],
+      "nist": [
+        "CM-5(6)"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-232020",
+      "group_id": "V-260487",
+      "rule_id": "SV-260487r1107262_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS library files must have mode \"755\" or less permissive.",
+      "ccis": [
+        "CCI-001499"
+      ],
+      "nist": [
+        "CM-5(6)"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-232025",
+      "group_id": "V-260488",
+      "rule_id": "SV-260488r958566_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must configure the \"/var/log\" directory to have mode \"755\" or less permissive.",
+      "ccis": [
+        "CCI-001314"
+      ],
+      "nist": [
+        "SI-11"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-232026",
+      "group_id": "V-260489",
+      "rule_id": "SV-260489r1134796_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must generate error messages that provide information necessary for corrective actions without revealing information that could be exploited by adversaries.",
+      "ccis": [
+        "CCI-001312"
+      ],
+      "nist": [
+        "SI-11"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-232027",
+      "group_id": "V-260490",
+      "rule_id": "SV-260490r1069105_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must generate system journal entries without revealing information that could be exploited by adversaries.",
+      "ccis": [
+        "CCI-001312"
+      ],
+      "nist": [
+        "SI-11"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-232030",
+      "group_id": "V-260491",
+      "rule_id": "SV-260491r958566_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must configure \"/var/log/syslog\" file with mode \"640\" or less permissive.",
+      "ccis": [
+        "CCI-001314"
+      ],
+      "nist": [
+        "SI-11"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-232035",
+      "group_id": "V-260492",
+      "rule_id": "SV-260492r991557_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must configure audit tools with a mode of \"755\" or less permissive.",
+      "ccis": [
+        "CCI-001493",
+        "CCI-001494"
+      ],
+      "nist": [
+        "AU-9"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-232040",
+      "group_id": "V-260493",
+      "rule_id": "SV-260493r991559_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must have directories that contain system commands owned by \"root\".",
+      "ccis": [
+        "CCI-001495"
+      ],
+      "nist": [
+        "AU-9"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-232045",
+      "group_id": "V-260494",
+      "rule_id": "SV-260494r991559_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must have directories that contain system commands group-owned by \"root\".",
+      "ccis": [
+        "CCI-001495"
+      ],
+      "nist": [
+        "AU-9"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-232050",
+      "group_id": "V-260495",
+      "rule_id": "SV-260495r991560_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must have system commands owned by \"root\" or a system account.",
+      "ccis": [
+        "CCI-001499"
+      ],
+      "nist": [
+        "CM-5(6)"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-232055",
+      "group_id": "V-260496",
+      "rule_id": "SV-260496r991560_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must have system commands group-owned by \"root\" or a system account.",
+      "ccis": [
+        "CCI-001499"
+      ],
+      "nist": [
+        "CM-5(6)"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-232060",
+      "group_id": "V-260497",
+      "rule_id": "SV-260497r991560_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS library directories must be owned by \"root\".",
+      "ccis": [
+        "CCI-001499"
+      ],
+      "nist": [
+        "CM-5(6)"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-232065",
+      "group_id": "V-260498",
+      "rule_id": "SV-260498r991560_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS library directories must be group-owned by \"root\".",
+      "ccis": [
+        "CCI-001499"
+      ],
+      "nist": [
+        "CM-5(6)"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-232070",
+      "group_id": "V-260499",
+      "rule_id": "SV-260499r1107264_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS library files must be owned by \"root\".",
+      "ccis": [
+        "CCI-001499"
+      ],
+      "nist": [
+        "CM-5(6)"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-232075",
+      "group_id": "V-260500",
+      "rule_id": "SV-260500r1107266_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS library files must be group-owned by \"root\".",
+      "ccis": [
+        "CCI-001499"
+      ],
+      "nist": [
+        "CM-5(6)"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-232080",
+      "group_id": "V-260501",
+      "rule_id": "SV-260501r1184052_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must configure the directories used by the system journal to be owned by \"root\".",
+      "ccis": [
+        "CCI-001314"
+      ],
+      "nist": [
+        "SI-11"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-232085",
+      "group_id": "V-260502",
+      "rule_id": "SV-260502r1184054_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must configure the directories used by the system journal to be group-owned by \"systemd-journal\".",
+      "ccis": [
+        "CCI-001314"
+      ],
+      "nist": [
+        "SI-11"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-232090",
+      "group_id": "V-260503",
+      "rule_id": "SV-260503r1184056_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must configure the files used by the system journal to be owned by \"root\".",
+      "ccis": [
+        "CCI-001314"
+      ],
+      "nist": [
+        "SI-11"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-232095",
+      "group_id": "V-260504",
+      "rule_id": "SV-260504r1184058_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must configure the files used by the system journal to be group-owned by \"systemd-journal\".",
+      "ccis": [
+        "CCI-001314"
+      ],
+      "nist": [
+        "SI-11"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-232100",
+      "group_id": "V-260505",
+      "rule_id": "SV-260505r958566_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must be configured so that the \"journalctl\" command is owned by \"root\".",
+      "ccis": [
+        "CCI-001314"
+      ],
+      "nist": [
+        "SI-11"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-232105",
+      "group_id": "V-260506",
+      "rule_id": "SV-260506r958566_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must be configured so that the \"journalctl\" command is group-owned by \"root\".",
+      "ccis": [
+        "CCI-001314"
+      ],
+      "nist": [
+        "SI-11"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-232110",
+      "group_id": "V-260507",
+      "rule_id": "SV-260507r1101725_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must configure audit tools to be owned by \"root\".",
+      "ccis": [
+        "CCI-001493",
+        "CCI-001494"
+      ],
+      "nist": [
+        "AU-9"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-232120",
+      "group_id": "V-260508",
+      "rule_id": "SV-260508r958566_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must configure the \"/var/log\" directory to be owned by \"root\".",
+      "ccis": [
+        "CCI-001314"
+      ],
+      "nist": [
+        "SI-11"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-232125",
+      "group_id": "V-260509",
+      "rule_id": "SV-260509r958566_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must configure the \"/var/log\" directory to be group-owned by \"syslog\".",
+      "ccis": [
+        "CCI-001314"
+      ],
+      "nist": [
+        "SI-11"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-232130",
+      "group_id": "V-260510",
+      "rule_id": "SV-260510r958566_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must configure \"/var/log/syslog\" file to be owned by \"syslog\".",
+      "ccis": [
+        "CCI-001314"
+      ],
+      "nist": [
+        "SI-11"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-232135",
+      "group_id": "V-260511",
+      "rule_id": "SV-260511r958566_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must configure the \"/var/log/syslog\" file to be group-owned by \"adm\".",
+      "ccis": [
+        "CCI-001314"
+      ],
+      "nist": [
+        "SI-11"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-232140",
+      "group_id": "V-260512",
+      "rule_id": "SV-260512r958564_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must be configured so that the \"journalctl\" command is not accessible by unauthorized users.",
+      "ccis": [
+        "CCI-001312"
+      ],
+      "nist": [
+        "SI-11"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-232145",
+      "group_id": "V-260513",
+      "rule_id": "SV-260513r1137695_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must set a sticky bit on all public directories to prevent unauthorized and unintended information transferred via shared system resources.",
+      "ccis": [
+        "CCI-001090"
+      ],
+      "nist": [
+        "SC-4"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-251010",
+      "group_id": "V-260514",
+      "rule_id": "SV-260514r958672_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must have an application firewall installed in order to control remote access methods.",
+      "ccis": [
+        "CCI-002314"
+      ],
+      "nist": [
+        "AC-17(1)"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-251015",
+      "group_id": "V-260515",
+      "rule_id": "SV-260515r958672_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must enable and run the Uncomplicated Firewall (ufw).",
+      "ccis": [
+        "CCI-002314"
+      ],
+      "nist": [
+        "AC-17(1)"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-251020",
+      "group_id": "V-260516",
+      "rule_id": "SV-260516r1184061_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must have an application firewall enabled.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-251025",
+      "group_id": "V-260517",
+      "rule_id": "SV-260517r958902_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must configure the Uncomplicated Firewall (ufw) to rate-limit impacted network interfaces.",
+      "ccis": [
+        "CCI-002385"
+      ],
+      "nist": [
+        "SC-5"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-251030",
+      "group_id": "V-260518",
+      "rule_id": "SV-260518r958480_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must be configured to prohibit or restrict the use of functions, ports, protocols, and/or services, as defined in the PPSM CAL and vulnerability assessments.",
+      "ccis": [
+        "CCI-000382"
+      ],
+      "nist": [
+        "CM-7"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-252010",
+      "group_id": "V-260519",
+      "rule_id": "SV-260519r1038944_rule",
+      "severity": "low",
+      "title": "Ubuntu 22.04 LTS must, for networked systems, compare internal information system clocks at least every 24 hours with a server synchronized to one of the redundant United States Naval Observatory (USNO) time servers, or a time server designated for the appropriate DOD network (NIPRNet/SIPRNet), and/or the Global Positioning System (GPS).",
+      "ccis": [
+        "CCI-001891",
+        "CCI-004923"
+      ],
+      "nist": [
+        "AU-8(1)",
+        "SC-45(1)"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-252015",
+      "group_id": "V-260520",
+      "rule_id": "SV-260520r1044776_rule",
+      "severity": "low",
+      "title": "Ubuntu 22.04 LTS must synchronize internal information system clocks to the authoritative time source when the time difference is greater than one second.",
+      "ccis": [
+        "CCI-002046",
+        "CCI-004926"
+      ],
+      "nist": [
+        "AU-8(1)",
+        "SC-45(1)"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-252020",
+      "group_id": "V-260521",
+      "rule_id": "SV-260521r958788_rule",
+      "severity": "low",
+      "title": "Ubuntu 22.04 LTS must record time stamps for audit records that can be mapped to Coordinated Universal Time (UTC).",
+      "ccis": [
+        "CCI-001890"
+      ],
+      "nist": [
+        "AU-8"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-253010",
+      "group_id": "V-260522",
+      "rule_id": "SV-260522r1069097_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must be configured to use TCP syncookies.",
+      "ccis": [
+        "CCI-001095"
+      ],
+      "nist": [
+        "SC-5(2)"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-254010",
+      "group_id": "V-274864",
+      "rule_id": "SV-274864r1155209_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must have the \"SSSD\" package installed.",
+      "ccis": [
+        "CCI-000765",
+        "CCI-000766",
+        "CCI-004046",
+        "CCI-004047"
+      ],
+      "nist": [
+        "IA-2(1)",
+        "IA-2(2)",
+        "IA-2(6)"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-254015",
+      "group_id": "V-274866",
+      "rule_id": "SV-274866r1101739_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must use the \"SSSD\" package for multifactor authentication services.",
+      "ccis": [
+        "CCI-000765",
+        "CCI-000766",
+        "CCI-004046",
+        "CCI-004047"
+      ],
+      "nist": [
+        "IA-2(1)",
+        "IA-2(2)",
+        "IA-2(6)"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-254020",
+      "group_id": "V-274867",
+      "rule_id": "SV-274867r1107270_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must ensure SSSD performs certificate path validation, including revocation checking, against a trusted anchor for PKI-based authentication.",
+      "ccis": [
+        "CCI-000185",
+        "CCI-004909"
+      ],
+      "nist": [
+        "IA-5(2)",
+        "SC-17"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-254030",
+      "group_id": "V-274865",
+      "rule_id": "SV-274865r1101731_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must map the authenticated identity to the user or group account for PKI-based authentication.",
+      "ccis": [
+        "CCI-000187"
+      ],
+      "nist": [
+        "IA-5(2)"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-255010",
+      "group_id": "V-260523",
+      "rule_id": "SV-260523r958908_rule",
+      "severity": "high",
+      "title": "Ubuntu 22.04 LTS must have SSH installed.",
+      "ccis": [
+        "CCI-002418",
+        "CCI-002420",
+        "CCI-002422"
+      ],
+      "nist": [
+        "SC-8",
+        "SC-8(2)"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-255015",
+      "group_id": "V-260524",
+      "rule_id": "SV-260524r958908_rule",
+      "severity": "high",
+      "title": "Ubuntu 22.04 LTS must use SSH to protect the confidentiality and integrity of transmitted information.",
+      "ccis": [
+        "CCI-002418",
+        "CCI-002420",
+        "CCI-002422"
+      ],
+      "nist": [
+        "SC-8",
+        "SC-8(2)"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-255020",
+      "group_id": "V-260525",
+      "rule_id": "SV-260525r1184064_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must display the Standard Mandatory DOD Notice and Consent Banner before granting any local or remote connection to the system.",
+      "ccis": [
+        "CCI-000048",
+        "CCI-001384",
+        "CCI-001385",
+        "CCI-001386",
+        "CCI-001387",
+        "CCI-001388"
+      ],
+      "nist": [
+        "AC-8"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-255025",
+      "group_id": "V-260526",
+      "rule_id": "SV-260526r1208678_rule",
+      "severity": "high",
+      "title": "Ubuntu 22.04 LTS must not allow unattended or automatic login via SSH.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-255030",
+      "group_id": "V-260527",
+      "rule_id": "SV-260527r1208681_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must be configured so that all network connections associated with SSH traffic terminate after becoming unresponsive.",
+      "ccis": [
+        "CCI-001133"
+      ],
+      "nist": [
+        "SC-10"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-255035",
+      "group_id": "V-260528",
+      "rule_id": "SV-260528r1208803_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must be configured so that all network connections associated with SSH traffic are terminated after 10 minutes of becoming unresponsive.",
+      "ccis": [
+        "CCI-001133"
+      ],
+      "nist": [
+        "SC-10"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-255040",
+      "group_id": "V-260529",
+      "rule_id": "SV-260529r1208685_rule",
+      "severity": "high",
+      "title": "Ubuntu 22.04 LTS must be configured so that remote X connections are disabled, unless to fulfill documented and validated mission requirements.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-255045",
+      "group_id": "V-260530",
+      "rule_id": "SV-260530r1208687_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS SSH daemon must prevent remote hosts from connecting to the proxy display.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-255050",
+      "group_id": "V-260531",
+      "rule_id": "SV-260531r1208689_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must configure the SSH daemon to use FIPS 140-3-approved ciphers to prevent the unauthorized disclosure of information and/or detect changes to information during transmission.",
+      "ccis": [
+        "CCI-000068",
+        "CCI-002421",
+        "CCI-003123"
+      ],
+      "nist": [
+        "AC-17(2)",
+        "MA-4(6)",
+        "SC-8(1)"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-255055",
+      "group_id": "V-260532",
+      "rule_id": "SV-260532r991554_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must configure the SSH daemon to use Message Authentication Codes (MACs) employing FIPS 140-3-approved cryptographic hashes to prevent the unauthorized disclosure of information and/or detect changes to information during transmission.",
+      "ccis": [
+        "CCI-001453",
+        "CCI-002421",
+        "CCI-002890"
+      ],
+      "nist": [
+        "AC-17(2)",
+        "MA-4(6)",
+        "SC-8(1)"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-255060",
+      "group_id": "V-260533",
+      "rule_id": "SV-260533r1208690_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS SSH server must be configured to use only FIPS-validated key exchange algorithms.",
+      "ccis": [
+        "CCI-000068"
+      ],
+      "nist": [
+        "AC-17(2)"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-255065",
+      "group_id": "V-260534",
+      "rule_id": "SV-260534r1208804_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must use strong authenticators in establishing nonlocal maintenance and diagnostic sessions.",
+      "ccis": [
+        "CCI-000877"
+      ],
+      "nist": [
+        "MA-4"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-271010",
+      "group_id": "V-260535",
+      "rule_id": "SV-260535r958390_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must enable the graphical user logon banner to display the Standard Mandatory DOD Notice and Consent Banner before granting local access to the system via a graphical user logon.",
+      "ccis": [
+        "CCI-000048"
+      ],
+      "nist": [
+        "AC-8"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-271015",
+      "group_id": "V-260536",
+      "rule_id": "SV-260536r958390_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must display the Standard Mandatory DOD Notice and Consent Banner before granting local access to the system via a graphical user logon.",
+      "ccis": [
+        "CCI-000048"
+      ],
+      "nist": [
+        "AC-8"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-271020",
+      "group_id": "V-260537",
+      "rule_id": "SV-260537r1069101_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must retain a user's session lock until that user reestablishes access using established identification and authentication procedures.",
+      "ccis": [
+        "CCI-000056"
+      ],
+      "nist": [
+        "AC-11"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-271025",
+      "group_id": "V-260538",
+      "rule_id": "SV-260538r1208695_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must initiate a graphical session lock after 10 minutes of inactivity.",
+      "ccis": [
+        "CCI-000057"
+      ],
+      "nist": [
+        "AC-11"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-271030",
+      "group_id": "V-260539",
+      "rule_id": "SV-260539r1184066_rule",
+      "severity": "high",
+      "title": "Ubuntu 22.04 LTS must disable the x86 Ctrl-Alt-Delete key sequence if a graphical user interface is installed.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-291010",
+      "group_id": "V-260540",
+      "rule_id": "SV-260540r986276_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must disable automatic mounting of Universal Serial Bus (USB) mass storage driver.",
+      "ccis": [
+        "CCI-001958",
+        "CCI-003959"
+      ],
+      "nist": [
+        "CM-7(9)",
+        "IA-3"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-291015",
+      "group_id": "V-260541",
+      "rule_id": "SV-260541r958358_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must disable all wireless network adapters.",
+      "ccis": [
+        "CCI-002418"
+      ],
+      "nist": [
+        "SC-8"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-411010",
+      "group_id": "V-260542",
+      "rule_id": "SV-260542r1015006_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must prevent direct login into the root account.",
+      "ccis": [
+        "CCI-000770",
+        "CCI-004045"
+      ],
+      "nist": [
+        "IA-2(5)"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-411015",
+      "group_id": "V-260543",
+      "rule_id": "SV-260543r958482_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must uniquely identify interactive users.",
+      "ccis": [
+        "CCI-000764",
+        "CCI-000804"
+      ],
+      "nist": [
+        "IA-2",
+        "IA-8"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-411025",
+      "group_id": "V-260545",
+      "rule_id": "SV-260545r1015007_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must enforce 24 hours/one day as the minimum password lifetime. Passwords for new users must have a 24 hours/one day minimum password lifetime restriction.",
+      "ccis": [
+        "CCI-000198",
+        "CCI-004066"
+      ],
+      "nist": [
+        "IA-5(1)"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-411030",
+      "group_id": "V-260546",
+      "rule_id": "SV-260546r1038967_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must enforce a 60-day maximum password lifetime restriction. Passwords for new users must have a 60-day maximum password lifetime restriction.",
+      "ccis": [
+        "CCI-000199",
+        "CCI-004066"
+      ],
+      "nist": [
+        "IA-5(1)"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-411035",
+      "group_id": "V-260547",
+      "rule_id": "SV-260547r1015009_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must disable account identifiers (individuals, groups, roles, and devices) after 35 days of inactivity.",
+      "ccis": [
+        "CCI-000795",
+        "CCI-003627",
+        "CCI-003628"
+      ],
+      "nist": [
+        "AC-2(3)",
+        "IA-4"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-411040",
+      "group_id": "V-260548",
+      "rule_id": "SV-260548r958364_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must automatically expire temporary accounts within 72 hours.",
+      "ccis": [
+        "CCI-000016",
+        "CCI-001682"
+      ],
+      "nist": [
+        "AC-2(2)"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-411045",
+      "group_id": "V-260549",
+      "rule_id": "SV-260549r958388_rule",
+      "severity": "low",
+      "title": "Ubuntu 22.04 LTS must automatically lock an account until the locked account is released by an administrator when three unsuccessful logon attempts have been made.",
+      "ccis": [
+        "CCI-000044",
+        "CCI-002238"
+      ],
+      "nist": [
+        "AC-7"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-412010",
+      "group_id": "V-260550",
+      "rule_id": "SV-260550r991588_rule",
+      "severity": "low",
+      "title": "Ubuntu 22.04 LTS must enforce a delay of at least four seconds between logon prompts following a failed logon attempt.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-412020",
+      "group_id": "V-260552",
+      "rule_id": "SV-260552r958398_rule",
+      "severity": "low",
+      "title": "Ubuntu 22.04 LTS must limit the number of concurrent sessions to ten for all accounts and/or account types.",
+      "ccis": [
+        "CCI-000054"
+      ],
+      "nist": [
+        "AC-10"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-412025",
+      "group_id": "V-260553",
+      "rule_id": "SV-260553r1015010_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must allow users to directly initiate a session lock for all connection types.",
+      "ccis": [
+        "CCI-000057",
+        "CCI-000058",
+        "CCI-000060"
+      ],
+      "nist": [
+        "AC-11",
+        "AC-11(1)"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-412030",
+      "group_id": "V-260554",
+      "rule_id": "SV-260554r958636_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must automatically exit interactive command shell user sessions after 15 minutes of inactivity.",
+      "ccis": [
+        "CCI-002361"
+      ],
+      "nist": [
+        "AC-12"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-412035",
+      "group_id": "V-260555",
+      "rule_id": "SV-260555r991590_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS default filesystem permissions must be defined in such a way that all authenticated users can read and modify only their own files.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-431010",
+      "group_id": "V-260556",
+      "rule_id": "SV-260556r958702_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must have the \"apparmor\" package installed.",
+      "ccis": [
+        "CCI-001764",
+        "CCI-001774",
+        "CCI-002165"
+      ],
+      "nist": [
+        "AC-3(4)",
+        "CM-7(2)",
+        "CM-7(5)"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-431015",
+      "group_id": "V-260557",
+      "rule_id": "SV-260557r958804_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must be configured to use AppArmor.",
+      "ccis": [
+        "CCI-001764",
+        "CCI-001774",
+        "CCI-002235"
+      ],
+      "nist": [
+        "AC-6(10)",
+        "CM-7(2)",
+        "CM-7(5)"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-432010",
+      "group_id": "V-260558",
+      "rule_id": "SV-260558r1208696_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must require users to reauthenticate for privilege escalation or when changing roles.",
+      "ccis": [
+        "CCI-002038",
+        "CCI-004895"
+      ],
+      "nist": [
+        "IA-11",
+        "SC-11"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-432011",
+      "group_id": "V-274860",
+      "rule_id": "SV-274860r1155210_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must require users to provide a password for privilege escalation.",
+      "ccis": [
+        "CCI-002038",
+        "CCI-004895"
+      ],
+      "nist": [
+        "IA-11",
+        "SC-11"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-432015",
+      "group_id": "V-260559",
+      "rule_id": "SV-260559r958518_rule",
+      "severity": "high",
+      "title": "Ubuntu 22.04 LTS must ensure only users who need access to security functions are part of sudo group.",
+      "ccis": [
+        "CCI-001084"
+      ],
+      "nist": [
+        "SC-3"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-611010",
+      "group_id": "V-260560",
+      "rule_id": "SV-260560r1015012_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must enforce password complexity by requiring at least one uppercase character be used.",
+      "ccis": [
+        "CCI-000192",
+        "CCI-004066"
+      ],
+      "nist": [
+        "IA-5(1)"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-611015",
+      "group_id": "V-260561",
+      "rule_id": "SV-260561r1015013_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must enforce password complexity by requiring at least one lowercase character be used.",
+      "ccis": [
+        "CCI-000193",
+        "CCI-004066"
+      ],
+      "nist": [
+        "IA-5(1)"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-611020",
+      "group_id": "V-260562",
+      "rule_id": "SV-260562r1015014_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must enforce password complexity by requiring that at least one numeric character be used.",
+      "ccis": [
+        "CCI-000194",
+        "CCI-004066"
+      ],
+      "nist": [
+        "IA-5(1)"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-611025",
+      "group_id": "V-260563",
+      "rule_id": "SV-260563r1015015_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must enforce password complexity by requiring that at least one special character be used.",
+      "ccis": [
+        "CCI-001619",
+        "CCI-004066"
+      ],
+      "nist": [
+        "IA-5(1)"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-611030",
+      "group_id": "V-260564",
+      "rule_id": "SV-260564r991587_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must prevent the use of dictionary words for passwords.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-611035",
+      "group_id": "V-260565",
+      "rule_id": "SV-260565r1015016_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must enforce a minimum 15-character password length.",
+      "ccis": [
+        "CCI-000205",
+        "CCI-004066"
+      ],
+      "nist": [
+        "IA-5(1)"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-611040",
+      "group_id": "V-260566",
+      "rule_id": "SV-260566r1015017_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must require the change of at least eight characters when passwords are changed.",
+      "ccis": [
+        "CCI-000195",
+        "CCI-004066"
+      ],
+      "nist": [
+        "IA-5(1)"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-611045",
+      "group_id": "V-260567",
+      "rule_id": "SV-260567r991587_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must be configured so that when passwords are changed or new passwords are established, pwquality must be used.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-611055",
+      "group_id": "V-260569",
+      "rule_id": "SV-260569r1101736_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must store only encrypted representations of passwords.",
+      "ccis": [
+        "CCI-000196",
+        "CCI-004062"
+      ],
+      "nist": [
+        "IA-5(1)"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-611060",
+      "group_id": "V-260570",
+      "rule_id": "SV-260570r1082233_rule",
+      "severity": "high",
+      "title": "Ubuntu 22.04 LTS must not allow accounts configured with blank or null passwords.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-611065",
+      "group_id": "V-260571",
+      "rule_id": "SV-260571r991589_rule",
+      "severity": "high",
+      "title": "Ubuntu 22.04 LTS must not have accounts configured with blank or null passwords.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-611070",
+      "group_id": "V-260572",
+      "rule_id": "SV-260572r971535_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must encrypt all stored passwords with a FIPS 140-3-approved cryptographic hashing algorithm.",
+      "ccis": [
+        "CCI-000803"
+      ],
+      "nist": [
+        "IA-7"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-612010",
+      "group_id": "V-260573",
+      "rule_id": "SV-260573r1015019_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must implement multifactor authentication for remote access to privileged accounts in such a way that one of the factors is provided by a device separate from the system gaining access.",
+      "ccis": [
+        "CCI-000765",
+        "CCI-000766",
+        "CCI-000767",
+        "CCI-000768",
+        "CCI-001948",
+        "CCI-004046",
+        "CCI-004047"
+      ],
+      "nist": [
+        "IA-2(1)",
+        "IA-2(11)",
+        "IA-2(2)",
+        "IA-2(3)",
+        "IA-2(4)",
+        "IA-2(6)"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-612015",
+      "group_id": "V-260574",
+      "rule_id": "SV-260574r958816_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must accept personal identity verification (PIV) credentials.",
+      "ccis": [
+        "CCI-001953"
+      ],
+      "nist": [
+        "IA-2(12)"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-612020",
+      "group_id": "V-260575",
+      "rule_id": "SV-260575r1044770_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must implement smart card logins for multifactor authentication for local and network access to privileged and nonprivileged accounts.",
+      "ccis": [
+        "CCI-000765",
+        "CCI-000766",
+        "CCI-000767",
+        "CCI-000768",
+        "CCI-004047"
+      ],
+      "nist": [
+        "IA-2(1)",
+        "IA-2(2)",
+        "IA-2(3)",
+        "IA-2(4)",
+        "IA-2(6)"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-612025",
+      "group_id": "V-260576",
+      "rule_id": "SV-260576r1069114_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must electronically verify personal identity verification (PIV) credentials.",
+      "ccis": [
+        "CCI-001954"
+      ],
+      "nist": [
+        "IA-2(12)"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-612030",
+      "group_id": "V-260577",
+      "rule_id": "SV-260577r1069112_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS, for PKI-based authentication, must validate certificates by constructing a certification path (which includes status information) to an accepted trust anchor.",
+      "ccis": [
+        "CCI-000185",
+        "CCI-004909"
+      ],
+      "nist": [
+        "IA-5(2)",
+        "SC-17"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-612035",
+      "group_id": "V-260578",
+      "rule_id": "SV-260578r1015021_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS for PKI-based authentication, must implement a local cache of revocation data in case of the inability to access revocation information via the network.",
+      "ccis": [
+        "CCI-001991",
+        "CCI-004068"
+      ],
+      "nist": [
+        "IA-5(2)"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-612040",
+      "group_id": "V-260579",
+      "rule_id": "SV-260579r958452_rule",
+      "severity": "high",
+      "title": "Ubuntu 22.04 LTS must map the authenticated identity to the user or group account for PKI-based authentication.",
+      "ccis": [
+        "CCI-000187"
+      ],
+      "nist": [
+        "IA-5(2)"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-631010",
+      "group_id": "V-260580",
+      "rule_id": "SV-260580r958868_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must use DOD PKI-established certificate authorities for verification of the establishment of protected sessions.",
+      "ccis": [
+        "CCI-002470"
+      ],
+      "nist": [
+        "SC-23(5)"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-631015",
+      "group_id": "V-260581",
+      "rule_id": "SV-260581r1155206_rule",
+      "severity": "low",
+      "title": "Ubuntu 22.04 LTS must be configured such that Pluggable Authentication Module (PAM) prohibits the use of cached authentications after one day.",
+      "ccis": [
+        "CCI-002007"
+      ],
+      "nist": [
+        "IA-5(13)"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-651010",
+      "group_id": "V-260582",
+      "rule_id": "SV-260582r958944_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must use a file integrity tool to verify correct operation of all security functions.",
+      "ccis": [
+        "CCI-002696"
+      ],
+      "nist": [
+        "SI-6"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-651015",
+      "group_id": "V-260583",
+      "rule_id": "SV-260583r1155208_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must configure Advanced Intrusion Detection Environment (AIDE) to perform file integrity checking on the file system.",
+      "ccis": [
+        "CCI-002696"
+      ],
+      "nist": [
+        "SI-6"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-651020",
+      "group_id": "V-260584",
+      "rule_id": "SV-260584r958794_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must notify designated personnel if baseline configurations are changed in an unauthorized manner. The file integrity tool must notify the system administrator when changes to the baseline configuration or anomalies in the operation of any security functions are discovered.",
+      "ccis": [
+        "CCI-001744",
+        "CCI-002702"
+      ],
+      "nist": [
+        "CM-3(5)",
+        "SI-6"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-651025",
+      "group_id": "V-260585",
+      "rule_id": "SV-260585r958946_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must be configured so that the script that runs each 30 days or less to check file integrity is the default.",
+      "ccis": [
+        "CCI-002699"
+      ],
+      "nist": [
+        "SI-6"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-651030",
+      "group_id": "V-260586",
+      "rule_id": "SV-260586r1069107_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must use cryptographic mechanisms to protect the integrity of audit tools.",
+      "ccis": [
+        "CCI-001496"
+      ],
+      "nist": [
+        "AU-9(3)"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-651035",
+      "group_id": "V-260587",
+      "rule_id": "SV-260587r959008_rule",
+      "severity": "low",
+      "title": "Ubuntu 22.04 LTS must have a crontab script running weekly to offload audit events of standalone systems.",
+      "ccis": [
+        "CCI-001851"
+      ],
+      "nist": [
+        "AU-4(1)"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-652010",
+      "group_id": "V-260588",
+      "rule_id": "SV-260588r991562_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must be configured to preserve log records from failure events.",
+      "ccis": [
+        "CCI-001665"
+      ],
+      "nist": [
+        "SC-24"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-652015",
+      "group_id": "V-260589",
+      "rule_id": "SV-260589r958406_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must monitor remote access methods.",
+      "ccis": [
+        "CCI-000067"
+      ],
+      "nist": [
+        "AC-17(1)"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-653010",
+      "group_id": "V-260590",
+      "rule_id": "SV-260590r1015022_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must have the \"auditd\" package installed.",
+      "ccis": [
+        "CCI-000130",
+        "CCI-000131",
+        "CCI-000132",
+        "CCI-000133",
+        "CCI-000134",
+        "CCI-000135",
+        "CCI-000154",
+        "CCI-000158",
+        "CCI-000169",
+        "CCI-000172",
+        "CCI-001814",
+        "CCI-001875",
+        "CCI-001876",
+        "CCI-001877",
+        "CCI-001878",
+        "CCI-001879",
+        "CCI-001880",
+        "CCI-001881",
+        "CCI-001882",
+        "CCI-001914",
+        "CCI-003938"
+      ],
+      "nist": [
+        "AU-12",
+        "AU-12(3)",
+        "AU-3",
+        "AU-3(1)",
+        "AU-6(4)",
+        "AU-7",
+        "AU-7(1)",
+        "CM-5(1)"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-653015",
+      "group_id": "V-260591",
+      "rule_id": "SV-260591r1015023_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must produce audit records and reports containing information to establish when, where, what type, the source, and the outcome for all DOD-defined auditable events and actions in near real time.",
+      "ccis": [
+        "CCI-000130",
+        "CCI-000131",
+        "CCI-000132",
+        "CCI-000133",
+        "CCI-000134",
+        "CCI-000135",
+        "CCI-000154",
+        "CCI-000158",
+        "CCI-000169",
+        "CCI-000172",
+        "CCI-001814",
+        "CCI-001875",
+        "CCI-001876",
+        "CCI-001877",
+        "CCI-001878",
+        "CCI-001879",
+        "CCI-001880",
+        "CCI-001881",
+        "CCI-001882",
+        "CCI-001914",
+        "CCI-003938"
+      ],
+      "nist": [
+        "AU-12",
+        "AU-12(3)",
+        "AU-3",
+        "AU-3(1)",
+        "AU-6(4)",
+        "AU-7",
+        "AU-7(1)",
+        "CM-5(1)"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-653020",
+      "group_id": "V-260592",
+      "rule_id": "SV-260592r1101709_rule",
+      "severity": "low",
+      "title": "Ubuntu 22.04 LTS audit event multiplexor must be configured to offload audit logs onto a different system from the system being audited.",
+      "ccis": [
+        "CCI-001851"
+      ],
+      "nist": [
+        "AU-4(1)"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-653025",
+      "group_id": "V-260593",
+      "rule_id": "SV-260593r958424_rule",
+      "severity": "low",
+      "title": "Ubuntu 22.04 LTS must alert the information system security officer (ISSO) and system administrator (SA) in the event of an audit processing failure.",
+      "ccis": [
+        "CCI-000139"
+      ],
+      "nist": [
+        "AU-5"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-653030",
+      "group_id": "V-260594",
+      "rule_id": "SV-260594r1038966_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must shut down by default upon audit failure.",
+      "ccis": [
+        "CCI-000140"
+      ],
+      "nist": [
+        "AU-5"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-653035",
+      "group_id": "V-260595",
+      "rule_id": "SV-260595r958752_rule",
+      "severity": "low",
+      "title": "Ubuntu 22.04 LTS must allocate audit record storage capacity to store at least one weeks' worth of audit records, when audit records are not immediately sent to a central audit record storage facility.",
+      "ccis": [
+        "CCI-001849"
+      ],
+      "nist": [
+        "AU-4"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-653040",
+      "group_id": "V-260596",
+      "rule_id": "SV-260596r971542_rule",
+      "severity": "low",
+      "title": "Ubuntu 22.04 LTS must immediately notify the system administrator (SA) and information system security officer (ISSO) when the audit record storage volume reaches 25 percent remaining of the allocated capacity.",
+      "ccis": [
+        "CCI-001855"
+      ],
+      "nist": [
+        "AU-5(1)"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-653045",
+      "group_id": "V-260597",
+      "rule_id": "SV-260597r958434_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must be configured so that audit log files are not read- or write-accessible by unauthorized users.",
+      "ccis": [
+        "CCI-000162",
+        "CCI-000163"
+      ],
+      "nist": [
+        "AU-9"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-653050",
+      "group_id": "V-260598",
+      "rule_id": "SV-260598r958434_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must be configured to permit only authorized users ownership of the audit log files.",
+      "ccis": [
+        "CCI-000162",
+        "CCI-000163",
+        "CCI-000164"
+      ],
+      "nist": [
+        "AU-9"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-653055",
+      "group_id": "V-260599",
+      "rule_id": "SV-260599r958434_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must permit only authorized groups ownership of the audit log files.",
+      "ccis": [
+        "CCI-000162",
+        "CCI-000163",
+        "CCI-000164"
+      ],
+      "nist": [
+        "AU-9"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-653060",
+      "group_id": "V-260600",
+      "rule_id": "SV-260600r958438_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must be configured so that the audit log directory is not write-accessible by unauthorized users.",
+      "ccis": [
+        "CCI-000164"
+      ],
+      "nist": [
+        "AU-9"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-653065",
+      "group_id": "V-260601",
+      "rule_id": "SV-260601r958444_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must be configured so that audit configuration files are not write-accessible by unauthorized users.",
+      "ccis": [
+        "CCI-000171"
+      ],
+      "nist": [
+        "AU-12"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-653070",
+      "group_id": "V-260602",
+      "rule_id": "SV-260602r958444_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must permit only authorized accounts to own the audit configuration files.",
+      "ccis": [
+        "CCI-000171"
+      ],
+      "nist": [
+        "AU-12"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-653075",
+      "group_id": "V-260603",
+      "rule_id": "SV-260603r958444_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must permit only authorized groups to own the audit configuration files.",
+      "ccis": [
+        "CCI-000171"
+      ],
+      "nist": [
+        "AU-12"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-654010",
+      "group_id": "V-260604",
+      "rule_id": "SV-260604r958446_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must generate audit records for successful/unsuccessful uses of the apparmor_parser command.",
+      "ccis": [
+        "CCI-000172"
+      ],
+      "nist": [
+        "AU-12"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-654015",
+      "group_id": "V-260605",
+      "rule_id": "SV-260605r958446_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must generate audit records for successful/unsuccessful uses of the chacl command.",
+      "ccis": [
+        "CCI-000172"
+      ],
+      "nist": [
+        "AU-12"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-654020",
+      "group_id": "V-260606",
+      "rule_id": "SV-260606r958446_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must generate audit records for successful/unsuccessful uses of the chage command.",
+      "ccis": [
+        "CCI-000172"
+      ],
+      "nist": [
+        "AU-12"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-654025",
+      "group_id": "V-260607",
+      "rule_id": "SV-260607r958446_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must generate audit records for successful/unsuccessful uses of the chcon command.",
+      "ccis": [
+        "CCI-000172"
+      ],
+      "nist": [
+        "AU-12"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-654030",
+      "group_id": "V-260608",
+      "rule_id": "SV-260608r958446_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must generate audit records for successful/unsuccessful uses of the chfn command.",
+      "ccis": [
+        "CCI-000172"
+      ],
+      "nist": [
+        "AU-12"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-654035",
+      "group_id": "V-260609",
+      "rule_id": "SV-260609r958446_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must generate audit records for successful/unsuccessful uses of the chsh command.",
+      "ccis": [
+        "CCI-000172"
+      ],
+      "nist": [
+        "AU-12"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-654040",
+      "group_id": "V-260610",
+      "rule_id": "SV-260610r958446_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must generate audit records for successful/unsuccessful uses of the crontab command.",
+      "ccis": [
+        "CCI-000172"
+      ],
+      "nist": [
+        "AU-12"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-654041",
+      "group_id": "V-274862",
+      "rule_id": "SV-274862r1155211_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must audit any script or executable called by cron as root or by any privileged user.",
+      "ccis": [
+        "CCI-000172"
+      ],
+      "nist": [
+        "AU-12"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-654045",
+      "group_id": "V-260611",
+      "rule_id": "SV-260611r991586_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must generate audit records for successful/unsuccessful attempts to use the fdisk command.",
+      "ccis": [
+        "CCI-000172"
+      ],
+      "nist": [
+        "AU-12"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-654050",
+      "group_id": "V-260612",
+      "rule_id": "SV-260612r958446_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must generate audit records for successful/unsuccessful uses of the gpasswd command.",
+      "ccis": [
+        "CCI-000172"
+      ],
+      "nist": [
+        "AU-12"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-654055",
+      "group_id": "V-260613",
+      "rule_id": "SV-260613r991586_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must generate audit records for successful/unsuccessful attempts to use the kmod command.",
+      "ccis": [
+        "CCI-000172"
+      ],
+      "nist": [
+        "AU-12"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-654060",
+      "group_id": "V-260614",
+      "rule_id": "SV-260614r991586_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must generate audit records for successful/unsuccessful attempts to use modprobe command.",
+      "ccis": [
+        "CCI-000172"
+      ],
+      "nist": [
+        "AU-12"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-654065",
+      "group_id": "V-260615",
+      "rule_id": "SV-260615r958446_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must generate audit records for successful/unsuccessful uses of the mount command.",
+      "ccis": [
+        "CCI-000172"
+      ],
+      "nist": [
+        "AU-12"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-654070",
+      "group_id": "V-260616",
+      "rule_id": "SV-260616r958446_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must generate audit records for successful/unsuccessful uses of the newgrp command.",
+      "ccis": [
+        "CCI-000172"
+      ],
+      "nist": [
+        "AU-12"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-654075",
+      "group_id": "V-260617",
+      "rule_id": "SV-260617r958446_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must generate audit records for successful/unsuccessful uses of the pam_timestamp_check command.",
+      "ccis": [
+        "CCI-000172"
+      ],
+      "nist": [
+        "AU-12"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-654080",
+      "group_id": "V-260618",
+      "rule_id": "SV-260618r958446_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must generate audit records for successful/unsuccessful uses of the passwd command.",
+      "ccis": [
+        "CCI-000172"
+      ],
+      "nist": [
+        "AU-12"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-654085",
+      "group_id": "V-260619",
+      "rule_id": "SV-260619r958446_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must generate audit records for successful/unsuccessful uses of the setfacl command.",
+      "ccis": [
+        "CCI-000172"
+      ],
+      "nist": [
+        "AU-12"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-654090",
+      "group_id": "V-260620",
+      "rule_id": "SV-260620r958446_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must generate audit records for successful/unsuccessful uses of the ssh-agent command.",
+      "ccis": [
+        "CCI-000172"
+      ],
+      "nist": [
+        "AU-12"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-654095",
+      "group_id": "V-260621",
+      "rule_id": "SV-260621r958446_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must generate audit records for successful/unsuccessful uses of the ssh-keysign command.",
+      "ccis": [
+        "CCI-000172"
+      ],
+      "nist": [
+        "AU-12"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-654100",
+      "group_id": "V-260622",
+      "rule_id": "SV-260622r958446_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must generate audit records for successful/unsuccessful uses of the su command.",
+      "ccis": [
+        "CCI-000172"
+      ],
+      "nist": [
+        "AU-12"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-654105",
+      "group_id": "V-260623",
+      "rule_id": "SV-260623r958446_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must generate audit records for successful/unsuccessful uses of the sudo command.",
+      "ccis": [
+        "CCI-000172"
+      ],
+      "nist": [
+        "AU-12"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-654110",
+      "group_id": "V-260624",
+      "rule_id": "SV-260624r958446_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must generate audit records for successful/unsuccessful uses of the sudoedit command.",
+      "ccis": [
+        "CCI-000172"
+      ],
+      "nist": [
+        "AU-12"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-654115",
+      "group_id": "V-260625",
+      "rule_id": "SV-260625r958446_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must generate audit records for successful/unsuccessful uses of the umount command.",
+      "ccis": [
+        "CCI-000172"
+      ],
+      "nist": [
+        "AU-12"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-654120",
+      "group_id": "V-260626",
+      "rule_id": "SV-260626r958446_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must generate audit records for successful/unsuccessful uses of the unix_update command.",
+      "ccis": [
+        "CCI-000172"
+      ],
+      "nist": [
+        "AU-12"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-654125",
+      "group_id": "V-260627",
+      "rule_id": "SV-260627r958446_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must generate audit records for successful/unsuccessful uses of the usermod command.",
+      "ccis": [
+        "CCI-000172"
+      ],
+      "nist": [
+        "AU-12"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-654130",
+      "group_id": "V-260628",
+      "rule_id": "SV-260628r958368_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must generate audit records for all account creations, modifications, disabling, and termination events that affect /etc/group.",
+      "ccis": [
+        "CCI-000018",
+        "CCI-000172",
+        "CCI-001403",
+        "CCI-001404",
+        "CCI-001405",
+        "CCI-002130"
+      ],
+      "nist": [
+        "AC-2(4)",
+        "AU-12"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-654135",
+      "group_id": "V-260629",
+      "rule_id": "SV-260629r958368_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must generate audit records for all account creations, modifications, disabling, and termination events that affect /etc/gshadow.",
+      "ccis": [
+        "CCI-000018",
+        "CCI-000172",
+        "CCI-001403",
+        "CCI-001404",
+        "CCI-001405",
+        "CCI-002130"
+      ],
+      "nist": [
+        "AC-2(4)",
+        "AU-12"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-654140",
+      "group_id": "V-260630",
+      "rule_id": "SV-260630r958368_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must generate audit records for all account creations, modifications, disabling, and termination events that affect /etc/opasswd.",
+      "ccis": [
+        "CCI-000018",
+        "CCI-000172",
+        "CCI-001403",
+        "CCI-001404",
+        "CCI-001405",
+        "CCI-002130"
+      ],
+      "nist": [
+        "AC-2(4)",
+        "AU-12"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-654145",
+      "group_id": "V-260631",
+      "rule_id": "SV-260631r958368_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must generate audit records for all account creations, modifications, disabling, and termination events that affect /etc/passwd.",
+      "ccis": [
+        "CCI-000018",
+        "CCI-000172",
+        "CCI-001403",
+        "CCI-001404",
+        "CCI-001405",
+        "CCI-002130"
+      ],
+      "nist": [
+        "AC-2(4)",
+        "AU-12"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-654150",
+      "group_id": "V-260632",
+      "rule_id": "SV-260632r958368_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must generate audit records for all account creations, modifications, disabling, and termination events that affect /etc/shadow.",
+      "ccis": [
+        "CCI-000018",
+        "CCI-000172",
+        "CCI-001403",
+        "CCI-001404",
+        "CCI-001405",
+        "CCI-002130"
+      ],
+      "nist": [
+        "AC-2(4)",
+        "AU-12"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-654155",
+      "group_id": "V-260633",
+      "rule_id": "SV-260633r958446_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must generate audit records for successful/unsuccessful uses of the chmod, fchmod, and fchmodat system calls.",
+      "ccis": [
+        "CCI-000172"
+      ],
+      "nist": [
+        "AU-12"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-654160",
+      "group_id": "V-260634",
+      "rule_id": "SV-260634r958446_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must generate audit records for successful/unsuccessful uses of the chown, fchown, fchownat, and lchown system calls.",
+      "ccis": [
+        "CCI-000172"
+      ],
+      "nist": [
+        "AU-12"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-654165",
+      "group_id": "V-260635",
+      "rule_id": "SV-260635r958446_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must generate audit records for successful/unsuccessful uses of the creat, open, openat, open_by_handle_at, truncate, and ftruncate system calls.",
+      "ccis": [
+        "CCI-000172"
+      ],
+      "nist": [
+        "AU-12"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-654170",
+      "group_id": "V-260636",
+      "rule_id": "SV-260636r958446_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must generate audit records for successful/unsuccessful uses of the delete_module system call.",
+      "ccis": [
+        "CCI-000172"
+      ],
+      "nist": [
+        "AU-12"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-654175",
+      "group_id": "V-260637",
+      "rule_id": "SV-260637r958446_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must generate audit records for successful/unsuccessful uses of the init_module and finit_module system calls.",
+      "ccis": [
+        "CCI-000172"
+      ],
+      "nist": [
+        "AU-12"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-654180",
+      "group_id": "V-260638",
+      "rule_id": "SV-260638r958446_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must generate audit records for any use of the setxattr, fsetxattr, lsetxattr, removexattr, fremovexattr, and lremovexattr system calls.",
+      "ccis": [
+        "CCI-000172"
+      ],
+      "nist": [
+        "AU-12"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-654185",
+      "group_id": "V-260639",
+      "rule_id": "SV-260639r991577_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must generate audit records for any successful/unsuccessful use of unlink, unlinkat, rename, renameat, and rmdir system calls.",
+      "ccis": [
+        "CCI-000172"
+      ],
+      "nist": [
+        "AU-12"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-654190",
+      "group_id": "V-260640",
+      "rule_id": "SV-260640r991589_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must generate audit records for all events that affect the systemd journal files.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-654195",
+      "group_id": "V-260641",
+      "rule_id": "SV-260641r991581_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must generate audit records for the /var/log/btmp file.",
+      "ccis": [
+        "CCI-000172"
+      ],
+      "nist": [
+        "AU-12"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-654200",
+      "group_id": "V-260642",
+      "rule_id": "SV-260642r991581_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must generate audit records for the /var/log/wtmp file.",
+      "ccis": [
+        "CCI-000172"
+      ],
+      "nist": [
+        "AU-12"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-654205",
+      "group_id": "V-260643",
+      "rule_id": "SV-260643r991581_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must generate audit records for the /var/run/utmp file.",
+      "ccis": [
+        "CCI-000172"
+      ],
+      "nist": [
+        "AU-12"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-654210",
+      "group_id": "V-260644",
+      "rule_id": "SV-260644r958446_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must generate audit records for the use and modification of faillog file.",
+      "ccis": [
+        "CCI-000172"
+      ],
+      "nist": [
+        "AU-12"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-654215",
+      "group_id": "V-260645",
+      "rule_id": "SV-260645r958446_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must generate audit records for the use and modification of the lastlog file.",
+      "ccis": [
+        "CCI-000172"
+      ],
+      "nist": [
+        "AU-12"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-654220",
+      "group_id": "V-260646",
+      "rule_id": "SV-260646r991575_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must generate audit records when successful/unsuccessful attempts to modify the /etc/sudoers file occur.",
+      "ccis": [
+        "CCI-000172"
+      ],
+      "nist": [
+        "AU-12"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-654224",
+      "group_id": "V-274861",
+      "rule_id": "SV-274861r1101704_rule",
+      "severity": "medium",
+      "title": "The operating system must restrict privilege elevation to authorized personnel.",
+      "ccis": [
+        "CCI-002038",
+        "CCI-004895"
+      ],
+      "nist": [
+        "IA-11",
+        "SC-11"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-654225",
+      "group_id": "V-260647",
+      "rule_id": "SV-260647r991575_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must generate audit records when successful/unsuccessful attempts to modify the /etc/sudoers.d directory occur.",
+      "ccis": [
+        "CCI-000172"
+      ],
+      "nist": [
+        "AU-12"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-654230",
+      "group_id": "V-260648",
+      "rule_id": "SV-260648r958730_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must prevent all software from executing at higher privilege levels than users executing the software and the audit system must be configured to audit the execution of privileged functions.",
+      "ccis": [
+        "CCI-002233",
+        "CCI-002234"
+      ],
+      "nist": [
+        "AC-6(8)",
+        "AC-6(9)"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-654235",
+      "group_id": "V-260649",
+      "rule_id": "SV-260649r986298_rule",
+      "severity": "medium",
+      "title": "Ubuntu 22.04 LTS must generate audit records for privileged activities, nonlocal maintenance, diagnostic sessions and other system-level access.",
+      "ccis": [
+        "CCI-000172",
+        "CCI-002884",
+        "CCI-004188"
+      ],
+      "nist": [
+        "AU-12",
+        "MA-3(5)",
+        "MA-4(1)"
+      ]
+    },
+    {
+      "stig_id": "UBTU-22-671010",
+      "group_id": "V-260650",
+      "rule_id": "SV-260650r987791_rule",
+      "severity": "high",
+      "title": "Ubuntu 22.04 LTS must implement NIST FIPS-validated cryptography to protect classified information and for the following: To provision digital signatures, to generate cryptographic hashes, and to protect unclassified information requiring confidentiality and cryptographic protection in accordance with applicable federal laws, Executive Orders, directives, policies, regulations, and standards.",
+      "ccis": [
+        "CCI-002450"
+      ],
+      "nist": [
+        "SC-13"
+      ]
+    }
+  ]
+}

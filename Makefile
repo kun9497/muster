@@ -6,7 +6,7 @@ DATE    := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 
 LDFLAGS := -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(DATE)
 
-.PHONY: build test lint fmt tidy lint-controls coverage clean
+.PHONY: build test lint fmt tidy lint-controls coverage refindex refindex-check clean
 
 build:
 	CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)" -o bin/$(BINARY) $(PKG)
@@ -25,6 +25,12 @@ lint-controls:
 
 coverage:
 	go run ./tools/coverage
+
+refindex:
+	go run ./tools/refindex
+
+refindex-check:
+	go run ./tools/refindex -check
 
 fmt:
 	gofmt -l -w .

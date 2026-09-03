@@ -1,0 +1,6551 @@
+{
+  "product": "rhel9",
+  "applies_to": [
+    "rocky9",
+    "alma9"
+  ],
+  "benchmark": "Red Hat Enterprise Linux 9 Security Technical Implementation Guide",
+  "version": "V2R9",
+  "release_info": "Release: 9 Benchmark Date: 01 Jul 2026",
+  "source": {
+    "url": "https://dl.dod.cyber.mil/wp-content/uploads/stigs/zip/U_RHEL_9_V2R9_STIG.zip",
+    "sha256": "1875de2543d01695c5a346c51888cc336113e9199bfe6726d74a08de286ca1ae",
+    "member": "U_RHEL_9_V2R9_Manual_STIG/U_RHEL_9_STIG_V2R9_Manual-xccdf.xml"
+  },
+  "cci_list": {
+    "version": "2025-01-23",
+    "sha256": "077cbb6d2ae5f8fdbaaf416d87a34a8621767cdba490f3283feb0c5c35892700"
+  },
+  "rules": [
+    {
+      "stig_id": "RHEL-09-171011",
+      "group_id": "V-270174",
+      "rule_id": "SV-270174r1044831_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must display the Standard Mandatory DOD Notice and Consent Banner before granting local or remote access to the system via a graphical user logon.",
+      "ccis": [
+        "CCI-000048"
+      ],
+      "nist": [
+        "AC-8"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-211010",
+      "group_id": "V-257777",
+      "rule_id": "SV-257777r1155676_rule",
+      "severity": "high",
+      "title": "RHEL 9 must be a vendor-supported release.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-211015",
+      "group_id": "V-257778",
+      "rule_id": "SV-257778r1134892_rule",
+      "severity": "medium",
+      "title": "RHEL 9 vendor packaged system security patches and updates must be installed and up to date.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-211020",
+      "group_id": "V-257779",
+      "rule_id": "SV-257779r958390_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must display the Standard Mandatory DOD Notice and Consent Banner before granting local or remote access to the system via a command line user logon.",
+      "ccis": [
+        "CCI-000048",
+        "CCI-001384",
+        "CCI-001385",
+        "CCI-001386",
+        "CCI-001387",
+        "CCI-001388"
+      ],
+      "nist": [
+        "AC-8"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-211030",
+      "group_id": "V-257781",
+      "rule_id": "SV-257781r991589_rule",
+      "severity": "medium",
+      "title": "The graphical display manager must not be the default target on RHEL 9 unless approved.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-211035",
+      "group_id": "V-257782",
+      "rule_id": "SV-257782r991589_rule",
+      "severity": "low",
+      "title": "RHEL 9 must enable the hardware random number generator entropy gatherer service.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-211040",
+      "group_id": "V-257783",
+      "rule_id": "SV-257783r991562_rule",
+      "severity": "medium",
+      "title": "RHEL 9 systemd-journald service must be enabled.",
+      "ccis": [
+        "CCI-001665"
+      ],
+      "nist": [
+        "SC-24"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-211045",
+      "group_id": "V-257784",
+      "rule_id": "SV-257784r1208766_rule",
+      "severity": "high",
+      "title": "The systemd Ctrl-Alt-Delete burst key sequence in RHEL 9 must be disabled.",
+      "ccis": [
+        "CCI-002235"
+      ],
+      "nist": [
+        "AC-6(10)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-211050",
+      "group_id": "V-257785",
+      "rule_id": "SV-257785r1044833_rule",
+      "severity": "high",
+      "title": "The x86 Ctrl-Alt-Delete key sequence must be disabled on RHEL 9.",
+      "ccis": [
+        "CCI-002235"
+      ],
+      "nist": [
+        "AC-6(10)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-211055",
+      "group_id": "V-257786",
+      "rule_id": "SV-257786r1044834_rule",
+      "severity": "medium",
+      "title": "RHEL 9 debug-shell systemd service must be disabled.",
+      "ccis": [
+        "CCI-002235"
+      ],
+      "nist": [
+        "AC-6(10)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-212010",
+      "group_id": "V-257787",
+      "rule_id": "SV-257787r1184288_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must require a boot loader superuser password.",
+      "ccis": [
+        "CCI-000213"
+      ],
+      "nist": [
+        "AC-3"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-212015",
+      "group_id": "V-257788",
+      "rule_id": "SV-257788r1044838_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must disable the ability of systemd to spawn an interactive boot process.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-212020",
+      "group_id": "V-257789",
+      "rule_id": "SV-257789r1137691_rule",
+      "severity": "high",
+      "title": "RHEL 9 must require a unique superusers name upon booting into single-user and maintenance modes.",
+      "ccis": [
+        "CCI-000213"
+      ],
+      "nist": [
+        "AC-3"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-212025",
+      "group_id": "V-257790",
+      "rule_id": "SV-257790r991589_rule",
+      "severity": "medium",
+      "title": "RHEL 9 /boot/grub2/grub.cfg file must be group-owned by root.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-212030",
+      "group_id": "V-257791",
+      "rule_id": "SV-257791r991589_rule",
+      "severity": "medium",
+      "title": "RHEL 9 /boot/grub2/grub.cfg file must be owned by root.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-212035",
+      "group_id": "V-257792",
+      "rule_id": "SV-257792r1184289_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must disable virtual system calls.",
+      "ccis": [
+        "CCI-001084"
+      ],
+      "nist": [
+        "SC-3"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-212040",
+      "group_id": "V-257793",
+      "rule_id": "SV-257793r1044843_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must clear the page allocator to prevent use-after-free attacks.",
+      "ccis": [
+        "CCI-001084"
+      ],
+      "nist": [
+        "SC-3"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-212045",
+      "group_id": "V-257794",
+      "rule_id": "SV-257794r1069362_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must clear memory when it is freed to prevent use-after-free attacks.",
+      "ccis": [
+        "CCI-001084",
+        "CCI-002824"
+      ],
+      "nist": [
+        "SC-3",
+        "SI-16"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-212050",
+      "group_id": "V-257795",
+      "rule_id": "SV-257795r1044845_rule",
+      "severity": "low",
+      "title": "RHEL 9 must enable mitigations against processor-based vulnerabilities.",
+      "ccis": [
+        "CCI-000381",
+        "CCI-002824"
+      ],
+      "nist": [
+        "CM-7",
+        "SI-16"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-212055",
+      "group_id": "V-257796",
+      "rule_id": "SV-257796r1044847_rule",
+      "severity": "low",
+      "title": "RHEL 9 must enable auditing of processes that start prior to the audit daemon.",
+      "ccis": [
+        "CCI-000130",
+        "CCI-000135",
+        "CCI-000169",
+        "CCI-000172",
+        "CCI-001464",
+        "CCI-002884"
+      ],
+      "nist": [
+        "AU-12",
+        "AU-14(1)",
+        "AU-3",
+        "AU-3(1)",
+        "MA-4(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-213010",
+      "group_id": "V-257797",
+      "rule_id": "SV-257797r1198253_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must restrict access to the kernel message buffer.",
+      "ccis": [
+        "CCI-001082",
+        "CCI-001090"
+      ],
+      "nist": [
+        "SC-2",
+        "SC-4"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-213015",
+      "group_id": "V-257798",
+      "rule_id": "SV-257798r1198253_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must prevent kernel profiling by nonprivileged users.",
+      "ccis": [
+        "CCI-001082",
+        "CCI-001090"
+      ],
+      "nist": [
+        "SC-2",
+        "SC-4"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-213020",
+      "group_id": "V-257799",
+      "rule_id": "SV-257799r1155697_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must prevent the loading of a new kernel for later execution.",
+      "ccis": [
+        "CCI-001749",
+        "CCI-003992"
+      ],
+      "nist": [
+        "CM-14",
+        "CM-5(3)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-213025",
+      "group_id": "V-257800",
+      "rule_id": "SV-257800r1198253_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must restrict exposed kernel pointer addresses access.",
+      "ccis": [
+        "CCI-001082",
+        "CCI-002824"
+      ],
+      "nist": [
+        "SC-2",
+        "SI-16"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-213030",
+      "group_id": "V-257801",
+      "rule_id": "SV-257801r1155703_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must enable kernel parameters to enforce discretionary access control (DAC) on hardlinks.",
+      "ccis": [
+        "CCI-002165",
+        "CCI-002235"
+      ],
+      "nist": [
+        "AC-3(4)",
+        "AC-6(10)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-213035",
+      "group_id": "V-257802",
+      "rule_id": "SV-257802r1155706_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must enable kernel parameters to enforce discretionary access (DAC) control on symlinks.",
+      "ccis": [
+        "CCI-002165",
+        "CCI-002235"
+      ],
+      "nist": [
+        "AC-3(4)",
+        "AC-6(10)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-213040",
+      "group_id": "V-257803",
+      "rule_id": "SV-257803r1155668_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must disable the kernel.core_pattern.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-213045",
+      "group_id": "V-257804",
+      "rule_id": "SV-257804r1044853_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must be configured to disable the Asynchronous Transfer Mode kernel module.",
+      "ccis": [
+        "CCI-000381"
+      ],
+      "nist": [
+        "CM-7"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-213050",
+      "group_id": "V-257805",
+      "rule_id": "SV-257805r1044856_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must be configured to disable the Controller Area Network kernel module.",
+      "ccis": [
+        "CCI-000381"
+      ],
+      "nist": [
+        "CM-7"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-213055",
+      "group_id": "V-257806",
+      "rule_id": "SV-257806r1044859_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must be configured to disable the FireWire kernel module.",
+      "ccis": [
+        "CCI-000381"
+      ],
+      "nist": [
+        "CM-7"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-213060",
+      "group_id": "V-257807",
+      "rule_id": "SV-257807r1044862_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must disable the Stream Control Transmission Protocol (SCTP) kernel module.",
+      "ccis": [
+        "CCI-000381"
+      ],
+      "nist": [
+        "CM-7"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-213065",
+      "group_id": "V-257808",
+      "rule_id": "SV-257808r1044865_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must disable the Transparent Inter Process Communication (TIPC) kernel module.",
+      "ccis": [
+        "CCI-000381"
+      ],
+      "nist": [
+        "CM-7"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-213070",
+      "group_id": "V-257809",
+      "rule_id": "SV-257809r1208769_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must implement address space layout randomization (ASLR) to protect its memory from unauthorized code execution.",
+      "ccis": [
+        "CCI-002824"
+      ],
+      "nist": [
+        "SI-16"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-213075",
+      "group_id": "V-257810",
+      "rule_id": "SV-257810r1198253_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must disable access to network bpf system call from nonprivileged processes.",
+      "ccis": [
+        "CCI-001082"
+      ],
+      "nist": [
+        "SC-2"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-213080",
+      "group_id": "V-257811",
+      "rule_id": "SV-257811r1198253_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must restrict usage of ptrace to descendant processes.",
+      "ccis": [
+        "CCI-001082"
+      ],
+      "nist": [
+        "SC-2"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-213085",
+      "group_id": "V-257812",
+      "rule_id": "SV-257812r1134897_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must disable core dump backtraces.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-213090",
+      "group_id": "V-257813",
+      "rule_id": "SV-257813r1134899_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must disable storing core dumps.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-213095",
+      "group_id": "V-257814",
+      "rule_id": "SV-257814r1156057_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must disable core dumps for all users.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-213100",
+      "group_id": "V-257815",
+      "rule_id": "SV-257815r1134903_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must disable acquiring, saving, and processing core dumps.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-213105",
+      "group_id": "V-257816",
+      "rule_id": "SV-257816r1155715_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must disable the use of user namespaces.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-213110",
+      "group_id": "V-257817",
+      "rule_id": "SV-257817r1069383_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must implement nonexecutable data to protect its memory from unauthorized code execution.",
+      "ccis": [
+        "CCI-002824"
+      ],
+      "nist": [
+        "SI-16"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-213115",
+      "group_id": "V-257818",
+      "rule_id": "SV-257818r1044876_rule",
+      "severity": "medium",
+      "title": "The kdump service on RHEL 9 must be disabled.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-214010",
+      "group_id": "V-257819",
+      "rule_id": "SV-257819r1015075_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must ensure cryptographic verification of vendor software packages.",
+      "ccis": [
+        "CCI-001749",
+        "CCI-003992"
+      ],
+      "nist": [
+        "CM-14",
+        "CM-5(3)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-214015",
+      "group_id": "V-257820",
+      "rule_id": "SV-257820r1044878_rule",
+      "severity": "high",
+      "title": "RHEL 9 must check the GPG signature of software packages originating from external software repositories before installation.",
+      "ccis": [
+        "CCI-001749",
+        "CCI-003992"
+      ],
+      "nist": [
+        "CM-14",
+        "CM-5(3)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-214020",
+      "group_id": "V-257821",
+      "rule_id": "SV-257821r1015077_rule",
+      "severity": "high",
+      "title": "RHEL 9 must check the GPG signature of locally installed software packages before installation.",
+      "ccis": [
+        "CCI-001749",
+        "CCI-003992"
+      ],
+      "nist": [
+        "CM-14",
+        "CM-5(3)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-214025",
+      "group_id": "V-257822",
+      "rule_id": "SV-257822r1155615_rule",
+      "severity": "high",
+      "title": "RHEL 9 must have GPG signature verification enabled for all software repositories.",
+      "ccis": [
+        "CCI-001749",
+        "CCI-003992"
+      ],
+      "nist": [
+        "CM-14",
+        "CM-5(3)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-214030",
+      "group_id": "V-257823",
+      "rule_id": "SV-257823r1155641_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must be configured so that the cryptographic hashes of system files match vendor values.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-214035",
+      "group_id": "V-257824",
+      "rule_id": "SV-257824r1044886_rule",
+      "severity": "low",
+      "title": "RHEL 9 must remove all software components after updated versions have been installed.",
+      "ccis": [
+        "CCI-002617"
+      ],
+      "nist": [
+        "SI-2(6)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-215010",
+      "group_id": "V-257825",
+      "rule_id": "SV-257825r1184291_rule",
+      "severity": "medium",
+      "title": "RHEL 9 subscription-manager package must be installed.",
+      "ccis": [
+        "CCI-001749",
+        "CCI-003992"
+      ],
+      "nist": [
+        "CM-14",
+        "CM-5(3)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-215015",
+      "group_id": "V-257826",
+      "rule_id": "SV-257826r1208770_rule",
+      "severity": "high",
+      "title": "RHEL 9 must not have a File Transfer Protocol (FTP) server package installed.",
+      "ccis": [
+        "CCI-000197",
+        "CCI-000381"
+      ],
+      "nist": [
+        "CM-7",
+        "IA-5(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-215020",
+      "group_id": "V-257827",
+      "rule_id": "SV-257827r1044892_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must not have the sendmail package installed.",
+      "ccis": [
+        "CCI-000381"
+      ],
+      "nist": [
+        "CM-7"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-215025",
+      "group_id": "V-257828",
+      "rule_id": "SV-257828r1044894_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must not have the nfs-utils package installed.",
+      "ccis": [
+        "CCI-000381"
+      ],
+      "nist": [
+        "CM-7"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-215030",
+      "group_id": "V-257829",
+      "rule_id": "SV-257829r1044896_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must not have the ypserv package installed.",
+      "ccis": [
+        "CCI-000381"
+      ],
+      "nist": [
+        "CM-7"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-215035",
+      "group_id": "V-257830",
+      "rule_id": "SV-257830r1134906_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must not install packages from the Extra Packages for Enterprise Linux (EPEL) repository.",
+      "ccis": [
+        "CCI-000381"
+      ],
+      "nist": [
+        "CM-7"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-215040",
+      "group_id": "V-257831",
+      "rule_id": "SV-257831r1044898_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must not have the telnet-server package installed.",
+      "ccis": [
+        "CCI-000381"
+      ],
+      "nist": [
+        "CM-7"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-215045",
+      "group_id": "V-257832",
+      "rule_id": "SV-257832r1155653_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must not have the gssproxy package installed.",
+      "ccis": [
+        "CCI-000381"
+      ],
+      "nist": [
+        "CM-7"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-215050",
+      "group_id": "V-257833",
+      "rule_id": "SV-257833r1044902_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must not have the iprutils package installed.",
+      "ccis": [
+        "CCI-000381"
+      ],
+      "nist": [
+        "CM-7"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-215055",
+      "group_id": "V-257834",
+      "rule_id": "SV-257834r1044904_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must not have the tuned package installed.",
+      "ccis": [
+        "CCI-000381"
+      ],
+      "nist": [
+        "CM-7"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-215060",
+      "group_id": "V-257835",
+      "rule_id": "SV-257835r1155679_rule",
+      "severity": "high",
+      "title": "The Trivial File Transfer Protocol (TFTP) server must not be installed unless it is required, and if required, the RHEL 9 TFTP daemon must be configured to operate in secure mode.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-215065",
+      "group_id": "V-257836",
+      "rule_id": "SV-257836r1044908_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must not have the quagga package installed.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-215070",
+      "group_id": "V-257837",
+      "rule_id": "SV-257837r1044910_rule",
+      "severity": "medium",
+      "title": "A graphical display manager must not be installed on RHEL 9 unless approved.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-215075",
+      "group_id": "V-257838",
+      "rule_id": "SV-257838r1044912_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must have the openssl-pkcs11 package installed.",
+      "ccis": [
+        "CCI-000765",
+        "CCI-001948",
+        "CCI-001953",
+        "CCI-001954",
+        "CCI-004046"
+      ],
+      "nist": [
+        "IA-2(1)",
+        "IA-2(11)",
+        "IA-2(12)",
+        "IA-2(6)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-215080",
+      "group_id": "V-257839",
+      "rule_id": "SV-257839r991589_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must have the gnutls-utils package installed.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-215085",
+      "group_id": "V-257840",
+      "rule_id": "SV-257840r991589_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must have the nss-tools package installed.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-215090",
+      "group_id": "V-257841",
+      "rule_id": "SV-257841r1044914_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must have the rng-tools package installed.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-215095",
+      "group_id": "V-257842",
+      "rule_id": "SV-257842r1044916_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must have the s-nail package installed.",
+      "ccis": [
+        "CCI-001744"
+      ],
+      "nist": [
+        "CM-3(5)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-215100",
+      "group_id": "V-258234",
+      "rule_id": "SV-258234r1184292_rule",
+      "severity": "high",
+      "title": "RHEL 9 must have the crypto-policies package installed.",
+      "ccis": [
+        "CCI-002450",
+        "CCI-002890",
+        "CCI-003123"
+      ],
+      "nist": [
+        "MA-4(6)",
+        "SC-13"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-215101",
+      "group_id": "V-272488",
+      "rule_id": "SV-272488r1155665_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must have the Postfix package installed.",
+      "ccis": [
+        "CCI-000015"
+      ],
+      "nist": [
+        "AC-2(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-215105",
+      "group_id": "V-258241",
+      "rule_id": "SV-258241r1184293_rule",
+      "severity": "high",
+      "title": "RHEL 9 must implement a FIPS 140-3-compliant systemwide cryptographic policy.",
+      "ccis": [
+        "CCI-002450",
+        "CCI-002890",
+        "CCI-003123"
+      ],
+      "nist": [
+        "MA-4(6)",
+        "SC-13"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-231010",
+      "group_id": "V-257843",
+      "rule_id": "SV-257843r991589_rule",
+      "severity": "medium",
+      "title": "A separate RHEL 9 file system must be used for user home directories (such as /home or an equivalent).",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-231015",
+      "group_id": "V-257844",
+      "rule_id": "SV-257844r1044918_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must use a separate file system for /tmp.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-231020",
+      "group_id": "V-257845",
+      "rule_id": "SV-257845r1044920_rule",
+      "severity": "low",
+      "title": "RHEL 9 must use a separate file system for /var.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-231025",
+      "group_id": "V-257846",
+      "rule_id": "SV-257846r1044922_rule",
+      "severity": "low",
+      "title": "RHEL 9 must use a separate file system for /var/log.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-231030",
+      "group_id": "V-257847",
+      "rule_id": "SV-257847r1044924_rule",
+      "severity": "low",
+      "title": "RHEL 9 must use a separate file system for the system audit data path.",
+      "ccis": [
+        "CCI-001849"
+      ],
+      "nist": [
+        "AU-4"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-231035",
+      "group_id": "V-257848",
+      "rule_id": "SV-257848r1044926_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must use a separate file system for /var/tmp.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-231040",
+      "group_id": "V-257849",
+      "rule_id": "SV-257849r1044928_rule",
+      "severity": "medium",
+      "title": "RHEL 9 file system automount function must be disabled unless required.",
+      "ccis": [
+        "CCI-000778",
+        "CCI-001958"
+      ],
+      "nist": [
+        "IA-3"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-231045",
+      "group_id": "V-257850",
+      "rule_id": "SV-257850r1044930_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must prevent device files from being interpreted on file systems that contain user home directories.",
+      "ccis": [
+        "CCI-001764"
+      ],
+      "nist": [
+        "CM-7(2)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-231050",
+      "group_id": "V-257851",
+      "rule_id": "SV-257851r1044932_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must prevent files with the setuid and setgid bit set from being executed on file systems that contain user home directories.",
+      "ccis": [
+        "CCI-001764"
+      ],
+      "nist": [
+        "CM-7(2)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-231055",
+      "group_id": "V-257852",
+      "rule_id": "SV-257852r991589_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must prevent code from being executed on file systems that contain user home directories.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-231065",
+      "group_id": "V-257854",
+      "rule_id": "SV-257854r1044934_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must prevent special devices on file systems that are imported via Network File System (NFS).",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-231070",
+      "group_id": "V-257855",
+      "rule_id": "SV-257855r1044936_rule",
+      "severity": "medium",
+      "title": "RHEL 9  must prevent code from being executed on file systems that are imported via Network File System (NFS).",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-231075",
+      "group_id": "V-257856",
+      "rule_id": "SV-257856r1044938_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must prevent files with the setuid and setgid bit set from being executed on file systems that are imported via Network File System (NFS).",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-231080",
+      "group_id": "V-257857",
+      "rule_id": "SV-257857r991589_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must prevent code from being executed on file systems that are used with removable media.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-231085",
+      "group_id": "V-257858",
+      "rule_id": "SV-257858r991589_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must prevent special devices on file systems that are used with removable media.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-231090",
+      "group_id": "V-257859",
+      "rule_id": "SV-257859r991589_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must prevent files with the setuid and setgid bit set from being executed on file systems that are used with removable media.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-231095",
+      "group_id": "V-257860",
+      "rule_id": "SV-257860r1044940_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must mount /boot with the nodev option.",
+      "ccis": [
+        "CCI-001764"
+      ],
+      "nist": [
+        "CM-7(2)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-231100",
+      "group_id": "V-257861",
+      "rule_id": "SV-257861r1044941_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must prevent files with the setuid and setgid bit set from being executed on the /boot directory.",
+      "ccis": [
+        "CCI-001764"
+      ],
+      "nist": [
+        "CM-7(2)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-231105",
+      "group_id": "V-257862",
+      "rule_id": "SV-257862r1184295_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must prevent files with the setuid and setgid bit set from being executed on the /boot/efi directory.",
+      "ccis": [
+        "CCI-001764"
+      ],
+      "nist": [
+        "CM-7(2)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-231110",
+      "group_id": "V-257863",
+      "rule_id": "SV-257863r1155633_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must mount /dev/shm with the nodev option.",
+      "ccis": [
+        "CCI-001764"
+      ],
+      "nist": [
+        "CM-7(2)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-231115",
+      "group_id": "V-257864",
+      "rule_id": "SV-257864r1155639_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must mount /dev/shm with the noexec option.",
+      "ccis": [
+        "CCI-001764"
+      ],
+      "nist": [
+        "CM-7(2)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-231120",
+      "group_id": "V-257865",
+      "rule_id": "SV-257865r1184297_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must mount /dev/shm with the nosuid option.",
+      "ccis": [
+        "CCI-001764"
+      ],
+      "nist": [
+        "CM-7(2)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-231125",
+      "group_id": "V-257866",
+      "rule_id": "SV-257866r958804_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must mount /tmp with the nodev option.",
+      "ccis": [
+        "CCI-001764"
+      ],
+      "nist": [
+        "CM-7(2)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-231130",
+      "group_id": "V-257867",
+      "rule_id": "SV-257867r958804_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must mount /tmp with the noexec option.",
+      "ccis": [
+        "CCI-001764"
+      ],
+      "nist": [
+        "CM-7(2)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-231135",
+      "group_id": "V-257868",
+      "rule_id": "SV-257868r958804_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must mount /tmp with the nosuid option.",
+      "ccis": [
+        "CCI-001764"
+      ],
+      "nist": [
+        "CM-7(2)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-231140",
+      "group_id": "V-257869",
+      "rule_id": "SV-257869r1102009_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must mount /var with the nodev option.",
+      "ccis": [
+        "CCI-001764"
+      ],
+      "nist": [
+        "CM-7(2)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-231145",
+      "group_id": "V-257870",
+      "rule_id": "SV-257870r958804_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must mount /var/log with the nodev option.",
+      "ccis": [
+        "CCI-001764"
+      ],
+      "nist": [
+        "CM-7(2)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-231150",
+      "group_id": "V-257871",
+      "rule_id": "SV-257871r958804_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must mount /var/log with the noexec option.",
+      "ccis": [
+        "CCI-001764"
+      ],
+      "nist": [
+        "CM-7(2)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-231155",
+      "group_id": "V-257872",
+      "rule_id": "SV-257872r958804_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must mount /var/log with the nosuid option.",
+      "ccis": [
+        "CCI-001764"
+      ],
+      "nist": [
+        "CM-7(2)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-231160",
+      "group_id": "V-257873",
+      "rule_id": "SV-257873r958804_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must mount /var/log/audit with the nodev option.",
+      "ccis": [
+        "CCI-001764"
+      ],
+      "nist": [
+        "CM-7(2)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-231165",
+      "group_id": "V-257874",
+      "rule_id": "SV-257874r958804_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must mount /var/log/audit with the noexec option.",
+      "ccis": [
+        "CCI-001764"
+      ],
+      "nist": [
+        "CM-7(2)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-231170",
+      "group_id": "V-257875",
+      "rule_id": "SV-257875r958804_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must mount /var/log/audit with the nosuid option.",
+      "ccis": [
+        "CCI-001764"
+      ],
+      "nist": [
+        "CM-7(2)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-231175",
+      "group_id": "V-257876",
+      "rule_id": "SV-257876r958804_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must mount /var/tmp with the nodev option.",
+      "ccis": [
+        "CCI-001764"
+      ],
+      "nist": [
+        "CM-7(2)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-231180",
+      "group_id": "V-257877",
+      "rule_id": "SV-257877r958804_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must mount /var/tmp with the noexec option.",
+      "ccis": [
+        "CCI-001764"
+      ],
+      "nist": [
+        "CM-7(2)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-231185",
+      "group_id": "V-257878",
+      "rule_id": "SV-257878r958804_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must mount /var/tmp with the nosuid option.",
+      "ccis": [
+        "CCI-001764"
+      ],
+      "nist": [
+        "CM-7(2)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-231190",
+      "group_id": "V-257879",
+      "rule_id": "SV-257879r1045454_rule",
+      "severity": "high",
+      "title": "RHEL 9 local disk partitions must implement cryptographic mechanisms to prevent unauthorized disclosure or modification of all information that requires at rest protection.",
+      "ccis": [
+        "CCI-001199",
+        "CCI-002475",
+        "CCI-002476"
+      ],
+      "nist": [
+        "SC-28",
+        "SC-28(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-231195",
+      "group_id": "V-257880",
+      "rule_id": "SV-257880r1044951_rule",
+      "severity": "low",
+      "title": "RHEL 9 must disable mounting of cramfs.",
+      "ccis": [
+        "CCI-000381"
+      ],
+      "nist": [
+        "CM-7"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-231200",
+      "group_id": "V-257881",
+      "rule_id": "SV-257881r1184299_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must prevent special devices on non-root local partitions.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-232010",
+      "group_id": "V-257882",
+      "rule_id": "SV-257882r991560_rule",
+      "severity": "medium",
+      "title": "RHEL 9 system commands must have mode 755 or less permissive.",
+      "ccis": [
+        "CCI-001499"
+      ],
+      "nist": [
+        "CM-5(6)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-232015",
+      "group_id": "V-257883",
+      "rule_id": "SV-257883r991560_rule",
+      "severity": "medium",
+      "title": "RHEL 9 library directories must have mode 755 or less permissive.",
+      "ccis": [
+        "CCI-001499"
+      ],
+      "nist": [
+        "CM-5(6)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-232020",
+      "group_id": "V-257884",
+      "rule_id": "SV-257884r1106306_rule",
+      "severity": "medium",
+      "title": "RHEL 9 library files must have mode 755 or less permissive.",
+      "ccis": [
+        "CCI-001499"
+      ],
+      "nist": [
+        "CM-5(6)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-232025",
+      "group_id": "V-257885",
+      "rule_id": "SV-257885r1044953_rule",
+      "severity": "medium",
+      "title": "RHEL 9 /var/log directory must have mode 0755 or less permissive.",
+      "ccis": [
+        "CCI-001314"
+      ],
+      "nist": [
+        "SI-11"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-232030",
+      "group_id": "V-257886",
+      "rule_id": "SV-257886r1044955_rule",
+      "severity": "medium",
+      "title": "RHEL 9 /var/log/messages file must have mode 0640 or less permissive.",
+      "ccis": [
+        "CCI-001314"
+      ],
+      "nist": [
+        "SI-11"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-232035",
+      "group_id": "V-257887",
+      "rule_id": "SV-257887r991557_rule",
+      "severity": "medium",
+      "title": "RHEL 9 audit tools must have a mode of 0755 or less permissive.",
+      "ccis": [
+        "CCI-001493"
+      ],
+      "nist": [
+        "AU-9"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-232040",
+      "group_id": "V-257888",
+      "rule_id": "SV-257888r1208771_rule",
+      "severity": "medium",
+      "title": "RHEL 9 permissions of cron configuration files and directories must not be modified from the operating system defaults.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-232045",
+      "group_id": "V-257889",
+      "rule_id": "SV-257889r1184302_rule",
+      "severity": "medium",
+      "title": "All RHEL 9 local initialization files must have mode 0740 or less permissive.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-232050",
+      "group_id": "V-257890",
+      "rule_id": "SV-257890r1184305_rule",
+      "severity": "medium",
+      "title": "All RHEL 9 local interactive user home directories must have mode 0750 or less permissive.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-232055",
+      "group_id": "V-257891",
+      "rule_id": "SV-257891r991589_rule",
+      "severity": "medium",
+      "title": "RHEL 9 /etc/group file must have mode 0644 or less permissive to prevent unauthorized access.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-232060",
+      "group_id": "V-257892",
+      "rule_id": "SV-257892r991589_rule",
+      "severity": "medium",
+      "title": "RHEL 9 /etc/group- file must have mode 0644 or less permissive to prevent unauthorized access.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-232065",
+      "group_id": "V-257893",
+      "rule_id": "SV-257893r991589_rule",
+      "severity": "medium",
+      "title": "RHEL 9 /etc/gshadow file must have mode 0000 or less permissive to prevent unauthorized access.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-232070",
+      "group_id": "V-257894",
+      "rule_id": "SV-257894r991589_rule",
+      "severity": "medium",
+      "title": "RHEL 9 /etc/gshadow- file must have mode 0000 or less permissive to prevent unauthorized access.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-232075",
+      "group_id": "V-257895",
+      "rule_id": "SV-257895r991589_rule",
+      "severity": "medium",
+      "title": "RHEL 9 /etc/passwd file must have mode 0644 or less permissive to prevent unauthorized access.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-232080",
+      "group_id": "V-257896",
+      "rule_id": "SV-257896r991589_rule",
+      "severity": "medium",
+      "title": "RHEL 9 /etc/passwd- file must have mode 0644 or less permissive to prevent unauthorized access.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-232085",
+      "group_id": "V-257897",
+      "rule_id": "SV-257897r991589_rule",
+      "severity": "medium",
+      "title": "RHEL 9 /etc/shadow- file must have mode 0000 or less permissive to prevent unauthorized access.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-232090",
+      "group_id": "V-257898",
+      "rule_id": "SV-257898r991589_rule",
+      "severity": "medium",
+      "title": "RHEL 9 /etc/group file must be owned by root.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-232095",
+      "group_id": "V-257899",
+      "rule_id": "SV-257899r991589_rule",
+      "severity": "medium",
+      "title": "RHEL 9 /etc/group file must be group-owned by root.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-232100",
+      "group_id": "V-257900",
+      "rule_id": "SV-257900r991589_rule",
+      "severity": "medium",
+      "title": "RHEL 9 /etc/group- file must be owned by root.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-232103",
+      "group_id": "V-270175",
+      "rule_id": "SV-270175r1137691_rule",
+      "severity": "medium",
+      "title": "RHEL 9 \"/etc/audit/\" must be owned by root.",
+      "ccis": [
+        "CCI-000162"
+      ],
+      "nist": [
+        "AU-9"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-232104",
+      "group_id": "V-270176",
+      "rule_id": "SV-270176r1137691_rule",
+      "severity": "medium",
+      "title": "RHEL 9 \"/etc/audit/\" must be group-owned by root.",
+      "ccis": [
+        "CCI-000162"
+      ],
+      "nist": [
+        "AU-9"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-232105",
+      "group_id": "V-257901",
+      "rule_id": "SV-257901r991589_rule",
+      "severity": "medium",
+      "title": "RHEL 9 /etc/group- file must be group-owned by root.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-232110",
+      "group_id": "V-257902",
+      "rule_id": "SV-257902r991589_rule",
+      "severity": "medium",
+      "title": "RHEL 9 /etc/gshadow file must be owned by root.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-232115",
+      "group_id": "V-257903",
+      "rule_id": "SV-257903r991589_rule",
+      "severity": "medium",
+      "title": "RHEL 9 /etc/gshadow file must be group-owned by root.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-232120",
+      "group_id": "V-257904",
+      "rule_id": "SV-257904r991589_rule",
+      "severity": "medium",
+      "title": "RHEL 9 /etc/gshadow- file must be owned by root.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-232125",
+      "group_id": "V-257905",
+      "rule_id": "SV-257905r991589_rule",
+      "severity": "medium",
+      "title": "RHEL 9 /etc/gshadow- file must be group-owned by root.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-232130",
+      "group_id": "V-257906",
+      "rule_id": "SV-257906r991589_rule",
+      "severity": "medium",
+      "title": "RHEL 9 /etc/passwd file must be owned by root.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-232135",
+      "group_id": "V-257907",
+      "rule_id": "SV-257907r991589_rule",
+      "severity": "medium",
+      "title": "RHEL 9 /etc/passwd file must be group-owned by root.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-232140",
+      "group_id": "V-257908",
+      "rule_id": "SV-257908r991589_rule",
+      "severity": "medium",
+      "title": "RHEL 9 /etc/passwd- file must be owned by root.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-232145",
+      "group_id": "V-257909",
+      "rule_id": "SV-257909r991589_rule",
+      "severity": "medium",
+      "title": "RHEL 9 /etc/passwd- file must be group-owned by root.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-232150",
+      "group_id": "V-257910",
+      "rule_id": "SV-257910r991589_rule",
+      "severity": "medium",
+      "title": "RHEL 9 /etc/shadow file must be owned by root.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-232155",
+      "group_id": "V-257911",
+      "rule_id": "SV-257911r991589_rule",
+      "severity": "medium",
+      "title": "RHEL 9 /etc/shadow file must be group-owned by root.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-232160",
+      "group_id": "V-257912",
+      "rule_id": "SV-257912r991589_rule",
+      "severity": "medium",
+      "title": "RHEL 9 /etc/shadow- file must be owned by root.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-232165",
+      "group_id": "V-257913",
+      "rule_id": "SV-257913r991589_rule",
+      "severity": "medium",
+      "title": "RHEL 9 /etc/shadow- file must be group-owned by root.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-232170",
+      "group_id": "V-257914",
+      "rule_id": "SV-257914r1044969_rule",
+      "severity": "medium",
+      "title": "RHEL 9 /var/log directory must be owned by root.",
+      "ccis": [
+        "CCI-001314"
+      ],
+      "nist": [
+        "SI-11"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-232175",
+      "group_id": "V-257915",
+      "rule_id": "SV-257915r1044971_rule",
+      "severity": "medium",
+      "title": "RHEL 9 /var/log directory must be group-owned by root.",
+      "ccis": [
+        "CCI-001314"
+      ],
+      "nist": [
+        "SI-11"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-232180",
+      "group_id": "V-257916",
+      "rule_id": "SV-257916r1101916_rule",
+      "severity": "medium",
+      "title": "RHEL 9 /var/log/messages file must be owned by root.",
+      "ccis": [
+        "CCI-001314"
+      ],
+      "nist": [
+        "SI-11"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-232185",
+      "group_id": "V-257917",
+      "rule_id": "SV-257917r1101914_rule",
+      "severity": "medium",
+      "title": "RHEL 9 /var/log/messages file must be group-owned by root.",
+      "ccis": [
+        "CCI-001314"
+      ],
+      "nist": [
+        "SI-11"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-232190",
+      "group_id": "V-257918",
+      "rule_id": "SV-257918r1044977_rule",
+      "severity": "medium",
+      "title": "RHEL 9 system commands must be owned by root.",
+      "ccis": [
+        "CCI-001499"
+      ],
+      "nist": [
+        "CM-5(6)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-232195",
+      "group_id": "V-257919",
+      "rule_id": "SV-257919r1044979_rule",
+      "severity": "medium",
+      "title": "RHEL 9 system commands must be group-owned by root or a system account.",
+      "ccis": [
+        "CCI-001499"
+      ],
+      "nist": [
+        "CM-5(6)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-232200",
+      "group_id": "V-257920",
+      "rule_id": "SV-257920r1101926_rule",
+      "severity": "medium",
+      "title": "RHEL 9 library files must be owned by root.",
+      "ccis": [
+        "CCI-001499"
+      ],
+      "nist": [
+        "CM-5(6)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-232205",
+      "group_id": "V-257921",
+      "rule_id": "SV-257921r1106308_rule",
+      "severity": "medium",
+      "title": "RHEL 9 library files must be group-owned by root or a system account.",
+      "ccis": [
+        "CCI-001499"
+      ],
+      "nist": [
+        "CM-5(6)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-232210",
+      "group_id": "V-257922",
+      "rule_id": "SV-257922r1044988_rule",
+      "severity": "medium",
+      "title": "RHEL 9 library directories must be owned by root.",
+      "ccis": [
+        "CCI-001499"
+      ],
+      "nist": [
+        "CM-5(6)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-232215",
+      "group_id": "V-257923",
+      "rule_id": "SV-257923r1044991_rule",
+      "severity": "medium",
+      "title": "RHEL 9 library directories must be group-owned by root or a system account.",
+      "ccis": [
+        "CCI-001499"
+      ],
+      "nist": [
+        "CM-5(6)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-232220",
+      "group_id": "V-257924",
+      "rule_id": "SV-257924r991557_rule",
+      "severity": "medium",
+      "title": "RHEL 9 audit tools must be owned by root.",
+      "ccis": [
+        "CCI-001493"
+      ],
+      "nist": [
+        "AU-9"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-232225",
+      "group_id": "V-257925",
+      "rule_id": "SV-257925r991557_rule",
+      "severity": "medium",
+      "title": "RHEL 9 audit tools must be group-owned by root.",
+      "ccis": [
+        "CCI-001493"
+      ],
+      "nist": [
+        "AU-9"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-232230",
+      "group_id": "V-257926",
+      "rule_id": "SV-257926r991589_rule",
+      "severity": "medium",
+      "title": "RHEL 9 cron configuration files directory must be owned by root.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-232235",
+      "group_id": "V-257927",
+      "rule_id": "SV-257927r991589_rule",
+      "severity": "medium",
+      "title": "RHEL 9 cron configuration files directory must be group-owned by root.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-232240",
+      "group_id": "V-257928",
+      "rule_id": "SV-257928r1155576_rule",
+      "severity": "medium",
+      "title": "All RHEL 9 world-writable directories must be owned by root, sys, bin, or an application user.",
+      "ccis": [
+        "CCI-001090"
+      ],
+      "nist": [
+        "SC-4"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-232245",
+      "group_id": "V-257929",
+      "rule_id": "SV-257929r1137695_rule",
+      "severity": "medium",
+      "title": "A sticky bit must be set on all RHEL 9 public directories.",
+      "ccis": [
+        "CCI-001090"
+      ],
+      "nist": [
+        "SC-4"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-232250",
+      "group_id": "V-257930",
+      "rule_id": "SV-257930r991589_rule",
+      "severity": "medium",
+      "title": "All RHEL 9 local files and directories must have a valid group owner.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-232255",
+      "group_id": "V-257931",
+      "rule_id": "SV-257931r991589_rule",
+      "severity": "medium",
+      "title": "All RHEL 9 local files and directories must have a valid owner.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-232260",
+      "group_id": "V-257932",
+      "rule_id": "SV-257932r1014838_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must be configured so that all system device files are correctly labeled to prevent unauthorized modification.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-232270",
+      "group_id": "V-257934",
+      "rule_id": "SV-257934r991589_rule",
+      "severity": "medium",
+      "title": "RHEL 9 /etc/shadow file must have mode 0000 to prevent unauthorized access.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-251010",
+      "group_id": "V-257935",
+      "rule_id": "SV-257935r1044994_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must have the firewalld package installed.",
+      "ccis": [
+        "CCI-000382",
+        "CCI-002314",
+        "CCI-002322"
+      ],
+      "nist": [
+        "AC-17(1)",
+        "AC-17(9)",
+        "CM-7"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-251015",
+      "group_id": "V-257936",
+      "rule_id": "SV-257936r1044995_rule",
+      "severity": "medium",
+      "title": "The firewalld service on RHEL 9 must be active.",
+      "ccis": [
+        "CCI-000382",
+        "CCI-002314"
+      ],
+      "nist": [
+        "AC-17(1)",
+        "CM-7"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-251020",
+      "group_id": "V-257937",
+      "rule_id": "SV-257937r1106310_rule",
+      "severity": "medium",
+      "title": "The RHEL 9 firewall must employ a deny-all, allow-by-exception policy for allowing connections to other systems.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-251030",
+      "group_id": "V-257939",
+      "rule_id": "SV-257939r1044997_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must protect against or limit the effects of denial-of-service (DoS) attacks by ensuring rate-limiting measures on impacted network interfaces are implemented.",
+      "ccis": [
+        "CCI-002385"
+      ],
+      "nist": [
+        "SC-5"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-251035",
+      "group_id": "V-257940",
+      "rule_id": "SV-257940r1106312_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must be configured to prohibit or restrict the use of functions, ports, protocols, and/or services, as defined in the Ports, Protocols, and Services Management (PPSM) Category Assignments List (CAL) and vulnerability assessments.",
+      "ccis": [
+        "CCI-000382"
+      ],
+      "nist": [
+        "CM-7"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-251040",
+      "group_id": "V-257941",
+      "rule_id": "SV-257941r991589_rule",
+      "severity": "medium",
+      "title": "RHEL 9 network interfaces must not be in promiscuous mode.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-251045",
+      "group_id": "V-257942",
+      "rule_id": "SV-257942r1155718_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must enable hardening for the Berkeley Packet Filter just-in-time compiler.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-252010",
+      "group_id": "V-257943",
+      "rule_id": "SV-257943r1045001_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must have the chrony package installed.",
+      "ccis": [
+        "CCI-001891",
+        "CCI-004923"
+      ],
+      "nist": [
+        "AU-8(1)",
+        "SC-45(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-252015",
+      "group_id": "V-257944",
+      "rule_id": "SV-257944r1038944_rule",
+      "severity": "medium",
+      "title": "RHEL 9 chronyd service must be enabled.",
+      "ccis": [
+        "CCI-001891",
+        "CCI-004923"
+      ],
+      "nist": [
+        "AU-8(1)",
+        "SC-45(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-252020",
+      "group_id": "V-257945",
+      "rule_id": "SV-257945r1038944_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must securely compare internal information system clocks at least every 24 hours.",
+      "ccis": [
+        "CCI-001890",
+        "CCI-001891",
+        "CCI-002046",
+        "CCI-004923",
+        "CCI-004926"
+      ],
+      "nist": [
+        "AU-8",
+        "AU-8(1)",
+        "SC-45(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-252025",
+      "group_id": "V-257946",
+      "rule_id": "SV-257946r1184307_rule",
+      "severity": "low",
+      "title": "RHEL 9 must disable the chrony daemon from acting as a server.",
+      "ccis": [
+        "CCI-000381",
+        "CCI-000382"
+      ],
+      "nist": [
+        "CM-7"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-252030",
+      "group_id": "V-257947",
+      "rule_id": "SV-257947r958480_rule",
+      "severity": "low",
+      "title": "RHEL 9 must disable network management of the chrony daemon.",
+      "ccis": [
+        "CCI-000381",
+        "CCI-000382"
+      ],
+      "nist": [
+        "CM-7"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-252035",
+      "group_id": "V-257948",
+      "rule_id": "SV-257948r1045004_rule",
+      "severity": "medium",
+      "title": "RHEL 9 systems using Domain Name Servers (DNS) resolution must have at least two name servers configured.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-252040",
+      "group_id": "V-257949",
+      "rule_id": "SV-257949r1134947_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must configure a DNS processing mode in Network Manager.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-252045",
+      "group_id": "V-257950",
+      "rule_id": "SV-257950r1045006_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must not have unauthorized IP tunnels configured.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-252050",
+      "group_id": "V-257951",
+      "rule_id": "SV-257951r1014843_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must be configured to prevent unrestricted mail relaying.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-252060",
+      "group_id": "V-257953",
+      "rule_id": "SV-257953r958424_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must forward mail from postmaster to the root account using a postfix alias.",
+      "ccis": [
+        "CCI-000139"
+      ],
+      "nist": [
+        "AU-5"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-252065",
+      "group_id": "V-257954",
+      "rule_id": "SV-257954r1106315_rule",
+      "severity": "medium",
+      "title": "RHEL 9 libreswan package must be installed.",
+      "ccis": [
+        "CCI-000803"
+      ],
+      "nist": [
+        "IA-7"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-252070",
+      "group_id": "V-257955",
+      "rule_id": "SV-257955r991589_rule",
+      "severity": "high",
+      "title": "There must be no shosts.equiv files on RHEL 9.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-252075",
+      "group_id": "V-257956",
+      "rule_id": "SV-257956r991589_rule",
+      "severity": "high",
+      "title": "There must be no .shosts files on RHEL 9.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-253010",
+      "group_id": "V-257957",
+      "rule_id": "SV-257957r1155618_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must be configured to use TCP syncookies.",
+      "ccis": [
+        "CCI-001095",
+        "CCI-002385"
+      ],
+      "nist": [
+        "SC-5",
+        "SC-5(2)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-253015",
+      "group_id": "V-257958",
+      "rule_id": "SV-257958r1155721_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must ignore Internet Protocol version 4 (IPv4) Internet Control Message Protocol (ICMP) redirect messages.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-253020",
+      "group_id": "V-257959",
+      "rule_id": "SV-257959r1155724_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must not forward Internet Protocol version 4 (IPv4) source-routed packets.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-253025",
+      "group_id": "V-257960",
+      "rule_id": "SV-257960r1155727_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must log IPv4 packets with impossible addresses.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-253030",
+      "group_id": "V-257961",
+      "rule_id": "SV-257961r1155730_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must log IPv4 packets with impossible addresses by default.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-253035",
+      "group_id": "V-257962",
+      "rule_id": "SV-257962r1155733_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must use reverse path filtering on all IPv4 interfaces.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-253040",
+      "group_id": "V-257963",
+      "rule_id": "SV-257963r1155736_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must prevent IPv4 Internet Control Message Protocol (ICMP) redirect messages from being accepted.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-253045",
+      "group_id": "V-257964",
+      "rule_id": "SV-257964r1155739_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must not forward IPv4 source-routed packets by default.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-253050",
+      "group_id": "V-257965",
+      "rule_id": "SV-257965r1155646_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must use a reverse-path filter for IPv4 network traffic when possible by default.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-253055",
+      "group_id": "V-257966",
+      "rule_id": "SV-257966r1155742_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must not respond to Internet Control Message Protocol (ICMP) echoes sent to a broadcast address.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-253060",
+      "group_id": "V-257967",
+      "rule_id": "SV-257967r1155745_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must limit the number of bogus Internet Control Message Protocol (ICMP) response errors logs.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-253065",
+      "group_id": "V-257968",
+      "rule_id": "SV-257968r1155748_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must not send Internet Control Message Protocol (ICMP) redirects.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-253070",
+      "group_id": "V-257969",
+      "rule_id": "SV-257969r1155623_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must not allow interfaces to perform Internet Control Message Protocol (ICMP) redirects by default.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-253075",
+      "group_id": "V-257970",
+      "rule_id": "SV-257970r1155751_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must not enable IPv4 packet forwarding unless the system is a router.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-254010",
+      "group_id": "V-257971",
+      "rule_id": "SV-257971r1155754_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must not accept router advertisements on all IPv6 interfaces.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-254015",
+      "group_id": "V-257972",
+      "rule_id": "SV-257972r1155757_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must ignore IPv6 Internet Control Message Protocol (ICMP) redirect messages.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-254020",
+      "group_id": "V-257973",
+      "rule_id": "SV-257973r1155760_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must not forward IPv6 source-routed packets.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-254025",
+      "group_id": "V-257974",
+      "rule_id": "SV-257974r1155763_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must not enable IPv6 packet forwarding unless the system is a router.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-254030",
+      "group_id": "V-257975",
+      "rule_id": "SV-257975r1155766_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must not accept router advertisements on all IPv6 interfaces by default.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-254035",
+      "group_id": "V-257976",
+      "rule_id": "SV-257976r1155769_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must prevent IPv6 Internet Control Message Protocol (ICMP) redirect messages from being accepted.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-254040",
+      "group_id": "V-257977",
+      "rule_id": "SV-257977r1155772_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must not forward IPv6 source-routed packets by default.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-255010",
+      "group_id": "V-257978",
+      "rule_id": "SV-257978r1045013_rule",
+      "severity": "medium",
+      "title": "All RHEL 9 networked systems must have SSH installed.",
+      "ccis": [
+        "CCI-002418",
+        "CCI-002420",
+        "CCI-002421",
+        "CCI-002422"
+      ],
+      "nist": [
+        "SC-8",
+        "SC-8(1)",
+        "SC-8(2)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-255015",
+      "group_id": "V-257979",
+      "rule_id": "SV-257979r958908_rule",
+      "severity": "medium",
+      "title": "All RHEL 9 networked systems must have and implement SSH to protect the confidentiality and integrity of transmitted and received information, as well as information during preparation for transmission.",
+      "ccis": [
+        "CCI-002418",
+        "CCI-002420",
+        "CCI-002421",
+        "CCI-002422"
+      ],
+      "nist": [
+        "SC-8",
+        "SC-8(1)",
+        "SC-8(2)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-255020",
+      "group_id": "V-257980",
+      "rule_id": "SV-257980r1045016_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must have the openssh-clients package installed.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-255025",
+      "group_id": "V-257981",
+      "rule_id": "SV-257981r1101970_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must display the Standard Mandatory DOD Notice and Consent Banner before granting local or remote access to the system via a SSH logon.",
+      "ccis": [
+        "CCI-000048",
+        "CCI-001384",
+        "CCI-001385",
+        "CCI-001386",
+        "CCI-001387",
+        "CCI-001388"
+      ],
+      "nist": [
+        "AC-8"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-255030",
+      "group_id": "V-257982",
+      "rule_id": "SV-257982r1045021_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must log SSH connection attempts and failures to the server.",
+      "ccis": [
+        "CCI-000067"
+      ],
+      "nist": [
+        "AC-17(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-255035",
+      "group_id": "V-257983",
+      "rule_id": "SV-257983r1045024_rule",
+      "severity": "medium",
+      "title": "RHEL 9 SSHD must accept public key authentication.",
+      "ccis": [
+        "CCI-000765",
+        "CCI-000766",
+        "CCI-000767",
+        "CCI-000768"
+      ],
+      "nist": [
+        "IA-2(1)",
+        "IA-2(2)",
+        "IA-2(3)",
+        "IA-2(4)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-255040",
+      "group_id": "V-257984",
+      "rule_id": "SV-257984r1045026_rule",
+      "severity": "high",
+      "title": "RHEL 9 SSHD must not allow blank passwords.",
+      "ccis": [
+        "CCI-000766"
+      ],
+      "nist": [
+        "IA-2(2)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-255045",
+      "group_id": "V-257985",
+      "rule_id": "SV-257985r1069364_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must not permit direct logons to the root account using remote access via SSH.",
+      "ccis": [
+        "CCI-000770",
+        "CCI-004045"
+      ],
+      "nist": [
+        "IA-2(5)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-255050",
+      "group_id": "V-257986",
+      "rule_id": "SV-257986r1045030_rule",
+      "severity": "high",
+      "title": "RHEL 9 must enable the Pluggable Authentication Module (PAM) interface for SSHD.",
+      "ccis": [
+        "CCI-000877"
+      ],
+      "nist": [
+        "MA-4"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-255064",
+      "group_id": "V-270177",
+      "rule_id": "SV-270177r1184308_rule",
+      "severity": "high",
+      "title": "The RHEL 9 SSH client must be configured to use only DOD-approved encryption ciphers employing FIPS 140-3 validated cryptographic hash algorithms to protect the confidentiality of SSH client connections.",
+      "ccis": [
+        "CCI-001453"
+      ],
+      "nist": [
+        "AC-17(2)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-255065",
+      "group_id": "V-257989",
+      "rule_id": "SV-257989r1184309_rule",
+      "severity": "high",
+      "title": "The RHEL 9 SSH server must be configured to use only DOD-approved encryption ciphers employing FIPS 140-3 validated cryptographic hash algorithms to protect the confidentiality of SSH server connections.",
+      "ccis": [
+        "CCI-001453"
+      ],
+      "nist": [
+        "AC-17(2)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-255070",
+      "group_id": "V-270178",
+      "rule_id": "SV-270178r1184310_rule",
+      "severity": "high",
+      "title": "The RHEL 9 SSH client must be configured to use only DOD-approved Message Authentication Codes (MACs) employing FIPS 140-3 validated cryptographic hash algorithms to protect the confidentiality of SSH client connections.",
+      "ccis": [
+        "CCI-001453"
+      ],
+      "nist": [
+        "AC-17(2)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-255075",
+      "group_id": "V-257991",
+      "rule_id": "SV-257991r1184311_rule",
+      "severity": "high",
+      "title": "The RHEL 9 SSH server must be configured to use only Message Authentication Codes (MACs) employing FIPS 140-3 validated cryptographic hash algorithms to protect the confidentiality of SSH server connections.",
+      "ccis": [
+        "CCI-001453"
+      ],
+      "nist": [
+        "AC-17(2)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-255080",
+      "group_id": "V-257992",
+      "rule_id": "SV-257992r1045047_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must not allow a noncertificate trusted host SSH logon to the system.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-255085",
+      "group_id": "V-257993",
+      "rule_id": "SV-257993r1045049_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must not allow users to override SSH environment variables.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-255090",
+      "group_id": "V-257994",
+      "rule_id": "SV-257994r1045051_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must force a frequent session key renegotiation for SSH connections to the server.",
+      "ccis": [
+        "CCI-000068",
+        "CCI-002418",
+        "CCI-002421"
+      ],
+      "nist": [
+        "AC-17(2)",
+        "SC-8",
+        "SC-8(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-255095",
+      "group_id": "V-257995",
+      "rule_id": "SV-257995r1045053_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must be configured so that all network connections associated with SSH traffic terminate after becoming unresponsive.",
+      "ccis": [
+        "CCI-001133",
+        "CCI-002361"
+      ],
+      "nist": [
+        "AC-12",
+        "SC-10"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-255100",
+      "group_id": "V-257996",
+      "rule_id": "SV-257996r1134915_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must be configured so that all network connections associated with SSH traffic are terminated after 10 minutes of becoming unresponsive.",
+      "ccis": [
+        "CCI-001133",
+        "CCI-002361",
+        "CCI-002891"
+      ],
+      "nist": [
+        "AC-12",
+        "MA-4(7)",
+        "SC-10"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-255105",
+      "group_id": "V-257997",
+      "rule_id": "SV-257997r1069370_rule",
+      "severity": "medium",
+      "title": "RHEL 9 SSH server configuration file must be group-owned by root.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-255110",
+      "group_id": "V-257998",
+      "rule_id": "SV-257998r1082181_rule",
+      "severity": "medium",
+      "title": "The RHEL 9 SSH server configuration file must be owned by root.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-255115",
+      "group_id": "V-257999",
+      "rule_id": "SV-257999r1155686_rule",
+      "severity": "medium",
+      "title": "RHEL 9 SSH server configuration files' permissions must not be modified.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-255120",
+      "group_id": "V-258000",
+      "rule_id": "SV-258000r1208772_rule",
+      "severity": "medium",
+      "title": "RHEL 9 SSH private host key files must have mode 0600 or less permissive.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-255125",
+      "group_id": "V-258001",
+      "rule_id": "SV-258001r991589_rule",
+      "severity": "medium",
+      "title": "RHEL 9 SSH public host key files must have mode 0644 or less permissive.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-255135",
+      "group_id": "V-258003",
+      "rule_id": "SV-258003r1045065_rule",
+      "severity": "medium",
+      "title": "RHEL 9 SSH daemon must not allow GSSAPI authentication.",
+      "ccis": [
+        "CCI-001813"
+      ],
+      "nist": [
+        "CM-5(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-255140",
+      "group_id": "V-258004",
+      "rule_id": "SV-258004r1045067_rule",
+      "severity": "medium",
+      "title": "RHEL 9 SSH daemon must not allow Kerberos authentication.",
+      "ccis": [
+        "CCI-001813"
+      ],
+      "nist": [
+        "CM-5(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-255145",
+      "group_id": "V-258005",
+      "rule_id": "SV-258005r1045069_rule",
+      "severity": "medium",
+      "title": "RHEL 9 SSH daemon must not allow rhosts authentication.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-255150",
+      "group_id": "V-258006",
+      "rule_id": "SV-258006r1045071_rule",
+      "severity": "medium",
+      "title": "RHEL 9 SSH daemon must not allow known hosts authentication.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-255155",
+      "group_id": "V-258007",
+      "rule_id": "SV-258007r1045073_rule",
+      "severity": "medium",
+      "title": "RHEL 9 SSH daemon must disable remote X connections for interactive users.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-255160",
+      "group_id": "V-258008",
+      "rule_id": "SV-258008r1045075_rule",
+      "severity": "medium",
+      "title": "RHEL 9 SSH daemon must perform strict mode checking of home directory configuration files.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-255165",
+      "group_id": "V-258009",
+      "rule_id": "SV-258009r1045077_rule",
+      "severity": "medium",
+      "title": "RHEL 9 SSH daemon must display the date and time of the last successful account logon upon an SSH logon.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-255175",
+      "group_id": "V-258011",
+      "rule_id": "SV-258011r1045079_rule",
+      "severity": "medium",
+      "title": "RHEL 9 SSH daemon must prevent remote hosts from connecting to the proxy display.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-271010",
+      "group_id": "V-258012",
+      "rule_id": "SV-258012r1014855_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must display the Standard Mandatory DOD Notice and Consent Banner before granting local or remote access to the system via a graphical user logon.",
+      "ccis": [
+        "CCI-000048",
+        "CCI-001384",
+        "CCI-001385",
+        "CCI-001386",
+        "CCI-001387",
+        "CCI-001388"
+      ],
+      "nist": [
+        "AC-8"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-271015",
+      "group_id": "V-258013",
+      "rule_id": "SV-258013r1045082_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must prevent a user from overriding the banner-message-enable setting for the graphical user interface.",
+      "ccis": [
+        "CCI-000048",
+        "CCI-001384",
+        "CCI-001385",
+        "CCI-001386",
+        "CCI-001387",
+        "CCI-001388"
+      ],
+      "nist": [
+        "AC-8"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-271020",
+      "group_id": "V-258014",
+      "rule_id": "SV-258014r1045084_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must disable the graphical user interface automount function unless required.",
+      "ccis": [
+        "CCI-000778",
+        "CCI-001958"
+      ],
+      "nist": [
+        "IA-3"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-271025",
+      "group_id": "V-258015",
+      "rule_id": "SV-258015r1045086_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must prevent a user from overriding the disabling of the graphical user interface automount function.",
+      "ccis": [
+        "CCI-000778",
+        "CCI-001958"
+      ],
+      "nist": [
+        "IA-3"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-271030",
+      "group_id": "V-258016",
+      "rule_id": "SV-258016r958804_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must disable the graphical user interface autorun function unless required.",
+      "ccis": [
+        "CCI-001764"
+      ],
+      "nist": [
+        "CM-7(2)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-271035",
+      "group_id": "V-258017",
+      "rule_id": "SV-258017r1155688_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must prevent a user from overriding the disabling of the graphical user interface autorun function.",
+      "ccis": [
+        "CCI-000778",
+        "CCI-001958"
+      ],
+      "nist": [
+        "IA-3"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-271040",
+      "group_id": "V-258018",
+      "rule_id": "SV-258018r1045090_rule",
+      "severity": "high",
+      "title": "RHEL 9 must not allow unattended or automatic logon via the graphical user interface.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-271045",
+      "group_id": "V-258019",
+      "rule_id": "SV-258019r1045092_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must be able to initiate directly a session lock for all connection types using smart card when the smart card is removed.",
+      "ccis": [
+        "CCI-000056",
+        "CCI-000057",
+        "CCI-000058"
+      ],
+      "nist": [
+        "AC-11"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-271050",
+      "group_id": "V-258020",
+      "rule_id": "SV-258020r1045094_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must prevent a user from overriding the disabling of the graphical user smart card removal action.",
+      "ccis": [
+        "CCI-000056",
+        "CCI-000057",
+        "CCI-000058"
+      ],
+      "nist": [
+        "AC-11"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-271055",
+      "group_id": "V-258021",
+      "rule_id": "SV-258021r1015088_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must enable a user session lock until that user re-establishes access using established identification and authentication procedures for graphical user sessions.",
+      "ccis": [
+        "CCI-000056",
+        "CCI-000057",
+        "CCI-000058"
+      ],
+      "nist": [
+        "AC-11"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-271060",
+      "group_id": "V-258022",
+      "rule_id": "SV-258022r1045097_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must prevent a user from overriding the screensaver lock-enabled setting for the graphical user interface.",
+      "ccis": [
+        "CCI-000056",
+        "CCI-000057",
+        "CCI-000058"
+      ],
+      "nist": [
+        "AC-11"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-271065",
+      "group_id": "V-258023",
+      "rule_id": "SV-258023r1155656_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must automatically lock graphical user sessions after 10 minutes of inactivity.",
+      "ccis": [
+        "CCI-000057",
+        "CCI-000060"
+      ],
+      "nist": [
+        "AC-11",
+        "AC-11(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-271070",
+      "group_id": "V-258024",
+      "rule_id": "SV-258024r1045100_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must prevent a user from overriding the session idle-delay setting for the graphical user interface.",
+      "ccis": [
+        "CCI-000057",
+        "CCI-000060"
+      ],
+      "nist": [
+        "AC-11",
+        "AC-11(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-271075",
+      "group_id": "V-258025",
+      "rule_id": "SV-258025r958402_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must initiate a session lock for graphical user interfaces when the screensaver is activated.",
+      "ccis": [
+        "CCI-000057"
+      ],
+      "nist": [
+        "AC-11"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-271080",
+      "group_id": "V-258026",
+      "rule_id": "SV-258026r1045103_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must prevent a user from overriding the session lock-delay setting for the graphical user interface.",
+      "ccis": [
+        "CCI-000057"
+      ],
+      "nist": [
+        "AC-11"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-271085",
+      "group_id": "V-258027",
+      "rule_id": "SV-258027r1045106_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must conceal, via the session lock, information previously visible on the display with a publicly viewable image.",
+      "ccis": [
+        "CCI-000060"
+      ],
+      "nist": [
+        "AC-11(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-271090",
+      "group_id": "V-258028",
+      "rule_id": "SV-258028r991589_rule",
+      "severity": "medium",
+      "title": "RHEL 9 effective dconf policy must match the policy keyfiles.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-271095",
+      "group_id": "V-258029",
+      "rule_id": "SV-258029r1045109_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must disable the ability of a user to restart the system from the login screen.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-271100",
+      "group_id": "V-258030",
+      "rule_id": "SV-258030r1045112_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must prevent a user from overriding the disable-restart-buttons setting for the graphical user interface.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-271105",
+      "group_id": "V-258031",
+      "rule_id": "SV-258031r1134920_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must disable the ability of a user to accidentally press Ctrl-Alt-Del and cause a system to shut down or reboot.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-271110",
+      "group_id": "V-258032",
+      "rule_id": "SV-258032r1045117_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must prevent a user from overriding the Ctrl-Alt-Del sequence settings for the graphical user interface.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-271115",
+      "group_id": "V-258033",
+      "rule_id": "SV-258033r1045120_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must disable the user list at logon for graphical user interfaces.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-291010",
+      "group_id": "V-258034",
+      "rule_id": "SV-258034r1051267_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must be configured to disable USB mass storage.",
+      "ccis": [
+        "CCI-000778",
+        "CCI-001958",
+        "CCI-003959"
+      ],
+      "nist": [
+        "CM-7(9)",
+        "IA-3"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-291015",
+      "group_id": "V-258035",
+      "rule_id": "SV-258035r1045125_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must have the USBGuard package installed.",
+      "ccis": [
+        "CCI-001958",
+        "CCI-003959"
+      ],
+      "nist": [
+        "CM-7(9)",
+        "IA-3"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-291020",
+      "group_id": "V-258036",
+      "rule_id": "SV-258036r1014861_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must have the USBGuard package enabled.",
+      "ccis": [
+        "CCI-001958",
+        "CCI-003959"
+      ],
+      "nist": [
+        "CM-7(9)",
+        "IA-3"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-291025",
+      "group_id": "V-258037",
+      "rule_id": "SV-258037r1014863_rule",
+      "severity": "low",
+      "title": "RHEL 9 must enable Linux audit logging for the USBGuard daemon.",
+      "ccis": [
+        "CCI-000169"
+      ],
+      "nist": [
+        "AU-12"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-291030",
+      "group_id": "V-258038",
+      "rule_id": "SV-258038r1045128_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must block unauthorized peripherals before establishing a connection.",
+      "ccis": [
+        "CCI-001958"
+      ],
+      "nist": [
+        "IA-3"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-291035",
+      "group_id": "V-258039",
+      "rule_id": "SV-258039r1045131_rule",
+      "severity": "medium",
+      "title": "RHEL 9 Bluetooth must be disabled.",
+      "ccis": [
+        "CCI-000381",
+        "CCI-001443"
+      ],
+      "nist": [
+        "AC-18(1)",
+        "CM-7"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-291040",
+      "group_id": "V-258040",
+      "rule_id": "SV-258040r991568_rule",
+      "severity": "medium",
+      "title": "RHEL 9 wireless network adapters must be disabled.",
+      "ccis": [
+        "CCI-001443",
+        "CCI-001444",
+        "CCI-002418",
+        "CCI-002421"
+      ],
+      "nist": [
+        "AC-18(1)",
+        "SC-8",
+        "SC-8(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-411010",
+      "group_id": "V-258041",
+      "rule_id": "SV-258041r1038967_rule",
+      "severity": "medium",
+      "title": "RHEL 9 user account passwords for new users or password changes must have a 60-day maximum password lifetime restriction in /etc/login.defs.",
+      "ccis": [
+        "CCI-000199",
+        "CCI-004066"
+      ],
+      "nist": [
+        "IA-5(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-411015",
+      "group_id": "V-258042",
+      "rule_id": "SV-258042r1045133_rule",
+      "severity": "medium",
+      "title": "RHEL 9 user account passwords must have a 60-day maximum password lifetime restriction.",
+      "ccis": [
+        "CCI-000199",
+        "CCI-004066"
+      ],
+      "nist": [
+        "IA-5(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-411020",
+      "group_id": "V-258043",
+      "rule_id": "SV-258043r991589_rule",
+      "severity": "medium",
+      "title": "All RHEL 9 local interactive user accounts must be assigned a home directory upon creation.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-411025",
+      "group_id": "V-258044",
+      "rule_id": "SV-258044r1184313_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must set the umask value to 077 for all local interactive user accounts.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-411030",
+      "group_id": "V-258045",
+      "rule_id": "SV-258045r958482_rule",
+      "severity": "medium",
+      "title": "RHEL 9 duplicate User IDs (UIDs) must not exist for interactive users.",
+      "ccis": [
+        "CCI-000135",
+        "CCI-000764",
+        "CCI-000804"
+      ],
+      "nist": [
+        "AU-3(1)",
+        "IA-2",
+        "IA-8"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-411035",
+      "group_id": "V-258046",
+      "rule_id": "SV-258046r991589_rule",
+      "severity": "medium",
+      "title": "RHEL 9 system accounts must not have an interactive login shell.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-411040",
+      "group_id": "V-258047",
+      "rule_id": "SV-258047r1101951_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must automatically expire temporary accounts within 72 hours.",
+      "ccis": [
+        "CCI-000016",
+        "CCI-001682"
+      ],
+      "nist": [
+        "AC-2(2)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-411045",
+      "group_id": "V-258048",
+      "rule_id": "SV-258048r1069380_rule",
+      "severity": "medium",
+      "title": "All RHEL 9 interactive users must have a primary group that exists.",
+      "ccis": [
+        "CCI-000764"
+      ],
+      "nist": [
+        "IA-2"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-411050",
+      "group_id": "V-258049",
+      "rule_id": "SV-258049r1015092_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must disable account identifiers (individuals, groups, roles, and devices) after 35 days of inactivity.",
+      "ccis": [
+        "CCI-000795",
+        "CCI-003627",
+        "CCI-003628"
+      ],
+      "nist": [
+        "AC-2(3)",
+        "IA-4"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-411055",
+      "group_id": "V-258050",
+      "rule_id": "SV-258050r1045137_rule",
+      "severity": "medium",
+      "title": "Executable search paths within the initialization files of all local interactive RHEL 9 users must only contain paths that resolve to the system default or the users home directory.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-411060",
+      "group_id": "V-258051",
+      "rule_id": "SV-258051r991589_rule",
+      "severity": "medium",
+      "title": "All RHEL 9 local interactive users must have a home directory assigned in the /etc/passwd file.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-411065",
+      "group_id": "V-258052",
+      "rule_id": "SV-258052r1184315_rule",
+      "severity": "medium",
+      "title": "All RHEL 9 local interactive user home directories defined in the /etc/passwd file must exist.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-411070",
+      "group_id": "V-258053",
+      "rule_id": "SV-258053r1208773_rule",
+      "severity": "medium",
+      "title": "All RHEL 9 local interactive user home directories must be group-owned by the home directory owner's primary group.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-411075",
+      "group_id": "V-258054",
+      "rule_id": "SV-258054r958736_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must automatically lock an account when three unsuccessful logon attempts occur.",
+      "ccis": [
+        "CCI-000044",
+        "CCI-002238"
+      ],
+      "nist": [
+        "AC-7"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-411080",
+      "group_id": "V-258055",
+      "rule_id": "SV-258055r1045140_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must automatically lock the root account until the root account is released by an administrator when three unsuccessful logon attempts occur during a 15-minute time period.",
+      "ccis": [
+        "CCI-000044",
+        "CCI-002238"
+      ],
+      "nist": [
+        "AC-7"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-411085",
+      "group_id": "V-258056",
+      "rule_id": "SV-258056r1045143_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must automatically lock an account when three unsuccessful logon attempts occur during a 15-minute time period.",
+      "ccis": [
+        "CCI-000044",
+        "CCI-002238"
+      ],
+      "nist": [
+        "AC-7"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-411090",
+      "group_id": "V-258057",
+      "rule_id": "SV-258057r1045146_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must maintain an account lock until the locked account is released by an administrator.",
+      "ccis": [
+        "CCI-000044",
+        "CCI-002238"
+      ],
+      "nist": [
+        "AC-7"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-411095",
+      "group_id": "V-258058",
+      "rule_id": "SV-258058r1045148_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must not have unauthorized accounts.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-411100",
+      "group_id": "V-258059",
+      "rule_id": "SV-258059r991589_rule",
+      "severity": "high",
+      "title": "The root account must be the only account having unrestricted access to RHEL 9 system.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-411105",
+      "group_id": "V-258060",
+      "rule_id": "SV-258060r1045150_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must ensure account lockouts persist.",
+      "ccis": [
+        "CCI-000044"
+      ],
+      "nist": [
+        "AC-7"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-411110",
+      "group_id": "V-258061",
+      "rule_id": "SV-258061r958482_rule",
+      "severity": "medium",
+      "title": "RHEL 9 groups must have unique Group ID (GID).",
+      "ccis": [
+        "CCI-000764"
+      ],
+      "nist": [
+        "IA-2"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-412035",
+      "group_id": "V-258068",
+      "rule_id": "SV-258068r1101950_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must automatically exit interactive command shell user sessions after 10 minutes of inactivity.",
+      "ccis": [
+        "CCI-000057",
+        "CCI-001133"
+      ],
+      "nist": [
+        "AC-11",
+        "SC-10"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-412040",
+      "group_id": "V-258069",
+      "rule_id": "SV-258069r958398_rule",
+      "severity": "low",
+      "title": "RHEL 9 must limit the number of concurrent sessions to ten for all accounts and/or account types.",
+      "ccis": [
+        "CCI-000054"
+      ],
+      "nist": [
+        "AC-10"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-412045",
+      "group_id": "V-258070",
+      "rule_id": "SV-258070r1045153_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must log username information when unsuccessful logon attempts occur.",
+      "ccis": [
+        "CCI-000044"
+      ],
+      "nist": [
+        "AC-7"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-412050",
+      "group_id": "V-258071",
+      "rule_id": "SV-258071r991588_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must enforce a delay of at least four seconds between logon prompts following a failed logon attempt.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-412055",
+      "group_id": "V-258072",
+      "rule_id": "SV-258072r1184320_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must define default permissions for the bash shell.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-412060",
+      "group_id": "V-258073",
+      "rule_id": "SV-258073r1184322_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must define default permissions for the c shell.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-412065",
+      "group_id": "V-258074",
+      "rule_id": "SV-258074r991590_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must define default permissions for all authenticated users in such a way that the user can only read and modify their own files.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-412070",
+      "group_id": "V-258075",
+      "rule_id": "SV-258075r1184324_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must define default permissions for the system default profile.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-412080",
+      "group_id": "V-258077",
+      "rule_id": "SV-258077r1155659_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must terminate idle user sessions.",
+      "ccis": [
+        "CCI-001133"
+      ],
+      "nist": [
+        "SC-10"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-431010",
+      "group_id": "V-258078",
+      "rule_id": "SV-258078r958944_rule",
+      "severity": "high",
+      "title": "RHEL 9 must use a Linux Security Module configured to enforce limits on system services.",
+      "ccis": [
+        "CCI-001084",
+        "CCI-002696"
+      ],
+      "nist": [
+        "SC-3",
+        "SI-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-431015",
+      "group_id": "V-258079",
+      "rule_id": "SV-258079r1045159_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must enable the SELinux targeted policy.",
+      "ccis": [
+        "CCI-002696"
+      ],
+      "nist": [
+        "SI-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-431016",
+      "group_id": "V-272496",
+      "rule_id": "SV-272496r1155582_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must elevate the SELinux context when an administrator calls the sudo command.",
+      "ccis": [
+        "CCI-002235"
+      ],
+      "nist": [
+        "AC-6(10)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-431020",
+      "group_id": "V-258080",
+      "rule_id": "SV-258080r1045162_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must configure SELinux context type to allow the use of a nondefault faillock tally directory.",
+      "ccis": [
+        "CCI-000044"
+      ],
+      "nist": [
+        "AC-7"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-431025",
+      "group_id": "V-258081",
+      "rule_id": "SV-258081r1045164_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must have policycoreutils package installed.",
+      "ccis": [
+        "CCI-001084"
+      ],
+      "nist": [
+        "SC-3"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-431030",
+      "group_id": "V-258082",
+      "rule_id": "SV-258082r1045166_rule",
+      "severity": "medium",
+      "title": "RHEL 9 policycoreutils-python-utils package must be installed.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-432010",
+      "group_id": "V-258083",
+      "rule_id": "SV-258083r1045168_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must have the sudo package installed.",
+      "ccis": [
+        "CCI-002235"
+      ],
+      "nist": [
+        "AC-6(10)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-432015",
+      "group_id": "V-258084",
+      "rule_id": "SV-258084r1050789_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must require reauthentication when using the \"sudo\" command.",
+      "ccis": [
+        "CCI-002038",
+        "CCI-004895"
+      ],
+      "nist": [
+        "IA-11",
+        "SC-11"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-432020",
+      "group_id": "V-258085",
+      "rule_id": "SV-258085r1045173_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must use the invoking user's password for privilege escalation when using \"sudo\".",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-432025",
+      "group_id": "V-258086",
+      "rule_id": "SV-258086r1102063_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must require users to reauthenticate for privilege escalation.",
+      "ccis": [
+        "CCI-002038",
+        "CCI-004895"
+      ],
+      "nist": [
+        "IA-11",
+        "SC-11"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-432030",
+      "group_id": "V-258087",
+      "rule_id": "SV-258087r1102071_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must restrict privilege elevation to authorized personnel.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-432035",
+      "group_id": "V-258088",
+      "rule_id": "SV-258088r1155643_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must restrict the use of the \"su\" command.",
+      "ccis": [
+        "CCI-002038",
+        "CCI-002165",
+        "CCI-004895"
+      ],
+      "nist": [
+        "AC-3(4)",
+        "IA-11",
+        "SC-11"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-433010",
+      "group_id": "V-258089",
+      "rule_id": "SV-258089r1045179_rule",
+      "severity": "medium",
+      "title": "RHEL 9 fapolicy module must be installed.",
+      "ccis": [
+        "CCI-001764",
+        "CCI-001774"
+      ],
+      "nist": [
+        "CM-7(2)",
+        "CM-7(5)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-433015",
+      "group_id": "V-258090",
+      "rule_id": "SV-258090r958808_rule",
+      "severity": "medium",
+      "title": "RHEL 9 fapolicy module must be enabled.",
+      "ccis": [
+        "CCI-001764",
+        "CCI-001774"
+      ],
+      "nist": [
+        "CM-7(2)",
+        "CM-7(5)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-433016",
+      "group_id": "V-270180",
+      "rule_id": "SV-270180r1184327_rule",
+      "severity": "medium",
+      "title": "The RHEL 9 fapolicy module must be configured to employ a deny-all, permit-by-exception policy to allow the execution of authorized software programs.",
+      "ccis": [
+        "CCI-001764"
+      ],
+      "nist": [
+        "CM-7(2)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-611010",
+      "group_id": "V-258091",
+      "rule_id": "SV-258091r1208774_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must ensure the password complexity module in the system-auth file is configured for three retries or less.",
+      "ccis": [
+        "CCI-000192",
+        "CCI-004066"
+      ],
+      "nist": [
+        "IA-5(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-611025",
+      "group_id": "V-258094",
+      "rule_id": "SV-258094r1045187_rule",
+      "severity": "high",
+      "title": "RHEL 9 must not allow blank or null passwords.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-611030",
+      "group_id": "V-258095",
+      "rule_id": "SV-258095r1045189_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must configure the use of the pam_faillock.so module in the /etc/pam.d/system-auth file.",
+      "ccis": [
+        "CCI-000044"
+      ],
+      "nist": [
+        "AC-7"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-611035",
+      "group_id": "V-258096",
+      "rule_id": "SV-258096r1045191_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must configure the use of the pam_faillock.so module in the /etc/pam.d/password-auth file.",
+      "ccis": [
+        "CCI-000044"
+      ],
+      "nist": [
+        "AC-7"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-611040",
+      "group_id": "V-258097",
+      "rule_id": "SV-258097r1045193_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must ensure the password complexity module is enabled in the password-auth file.",
+      "ccis": [
+        "CCI-000192",
+        "CCI-000193",
+        "CCI-004066"
+      ],
+      "nist": [
+        "IA-5(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-611045",
+      "group_id": "V-258098",
+      "rule_id": "SV-258098r1045195_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must ensure the password complexity module is enabled in the system-auth file.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-611050",
+      "group_id": "V-258099",
+      "rule_id": "SV-258099r1045198_rule",
+      "severity": "medium",
+      "title": "RHEL 9 password-auth must be configured to use a sufficient number of hashing rounds.",
+      "ccis": [
+        "CCI-000196",
+        "CCI-000803",
+        "CCI-004062"
+      ],
+      "nist": [
+        "IA-5(1)",
+        "IA-7"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-611055",
+      "group_id": "V-258100",
+      "rule_id": "SV-258100r1045201_rule",
+      "severity": "medium",
+      "title": "RHEL 9 system-auth must be configured to use a sufficient number of hashing rounds.",
+      "ccis": [
+        "CCI-000196",
+        "CCI-000803",
+        "CCI-004062"
+      ],
+      "nist": [
+        "IA-5(1)",
+        "IA-7"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-611060",
+      "group_id": "V-258101",
+      "rule_id": "SV-258101r1045204_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must enforce password complexity rules for the root account.",
+      "ccis": [
+        "CCI-000192",
+        "CCI-000193",
+        "CCI-000194",
+        "CCI-000195",
+        "CCI-000205",
+        "CCI-001619",
+        "CCI-004066"
+      ],
+      "nist": [
+        "IA-5(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-611065",
+      "group_id": "V-258102",
+      "rule_id": "SV-258102r1045207_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must enforce password complexity by requiring that at least one lowercase character be used.",
+      "ccis": [
+        "CCI-000193",
+        "CCI-004066"
+      ],
+      "nist": [
+        "IA-5(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-611070",
+      "group_id": "V-258103",
+      "rule_id": "SV-258103r1045210_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must enforce password complexity by requiring that at least one numeric character be used.",
+      "ccis": [
+        "CCI-000194",
+        "CCI-004066"
+      ],
+      "nist": [
+        "IA-5(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-611075",
+      "group_id": "V-258104",
+      "rule_id": "SV-258104r1015104_rule",
+      "severity": "medium",
+      "title": "RHEL 9 passwords for new users or password changes must have a 24 hours minimum password lifetime restriction in /etc/login.defs.",
+      "ccis": [
+        "CCI-000198",
+        "CCI-004066"
+      ],
+      "nist": [
+        "IA-5(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-611080",
+      "group_id": "V-258105",
+      "rule_id": "SV-258105r1045212_rule",
+      "severity": "medium",
+      "title": "RHEL 9 passwords must have a 24 hours minimum password lifetime restriction in /etc/shadow.",
+      "ccis": [
+        "CCI-000198",
+        "CCI-004066"
+      ],
+      "nist": [
+        "IA-5(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-611085",
+      "group_id": "V-258106",
+      "rule_id": "SV-258106r1102061_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must require users to provide a password for privilege escalation.",
+      "ccis": [
+        "CCI-002038",
+        "CCI-004895"
+      ],
+      "nist": [
+        "IA-11",
+        "SC-11"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-611090",
+      "group_id": "V-258107",
+      "rule_id": "SV-258107r1045218_rule",
+      "severity": "medium",
+      "title": "RHEL 9 passwords must be created with a minimum of 15 characters.",
+      "ccis": [
+        "CCI-000205",
+        "CCI-004066"
+      ],
+      "nist": [
+        "IA-5(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-611100",
+      "group_id": "V-258109",
+      "rule_id": "SV-258109r1045220_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must enforce password complexity by requiring that at least one special character be used.",
+      "ccis": [
+        "CCI-001619",
+        "CCI-004066"
+      ],
+      "nist": [
+        "IA-5(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-611105",
+      "group_id": "V-258110",
+      "rule_id": "SV-258110r1045223_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must prevent the use of dictionary words for passwords.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-611110",
+      "group_id": "V-258111",
+      "rule_id": "SV-258111r1045226_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must enforce password complexity by requiring that at least one uppercase character be used.",
+      "ccis": [
+        "CCI-000192",
+        "CCI-004066"
+      ],
+      "nist": [
+        "IA-5(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-611115",
+      "group_id": "V-258112",
+      "rule_id": "SV-258112r1045229_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must require the change of at least eight characters when passwords are changed.",
+      "ccis": [
+        "CCI-000195",
+        "CCI-004066"
+      ],
+      "nist": [
+        "IA-5(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-611120",
+      "group_id": "V-258113",
+      "rule_id": "SV-258113r1045232_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must require the maximum number of repeating characters of the same character class be limited to four when passwords are changed.",
+      "ccis": [
+        "CCI-000195",
+        "CCI-004066"
+      ],
+      "nist": [
+        "IA-5(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-611125",
+      "group_id": "V-258114",
+      "rule_id": "SV-258114r1045235_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must require the maximum number of repeating characters be limited to three when passwords are changed.",
+      "ccis": [
+        "CCI-000195",
+        "CCI-004066"
+      ],
+      "nist": [
+        "IA-5(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-611130",
+      "group_id": "V-258115",
+      "rule_id": "SV-258115r1045238_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must require the change of at least four character classes when passwords are changed.",
+      "ccis": [
+        "CCI-000195",
+        "CCI-004066"
+      ],
+      "nist": [
+        "IA-5(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-611135",
+      "group_id": "V-258116",
+      "rule_id": "SV-258116r1045240_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must be configured so that user and group account administration utilities are configured to store only encrypted representations of passwords.",
+      "ccis": [
+        "CCI-000196",
+        "CCI-004062"
+      ],
+      "nist": [
+        "IA-5(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-611140",
+      "group_id": "V-258117",
+      "rule_id": "SV-258117r1015116_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must be configured to use the shadow file to store only encrypted representations of passwords.",
+      "ccis": [
+        "CCI-000196",
+        "CCI-004062"
+      ],
+      "nist": [
+        "IA-5(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-611145",
+      "group_id": "V-258118",
+      "rule_id": "SV-258118r1050789_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must not be configured to bypass password requirements for privilege escalation.",
+      "ccis": [
+        "CCI-002038",
+        "CCI-004895"
+      ],
+      "nist": [
+        "IA-11",
+        "SC-11"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-611155",
+      "group_id": "V-258120",
+      "rule_id": "SV-258120r991589_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must not have accounts configured with blank or null passwords.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-611160",
+      "group_id": "V-258121",
+      "rule_id": "SV-258121r1155682_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must use the common access card (CAC) smart card driver.",
+      "ccis": [
+        "CCI-000764",
+        "CCI-000765",
+        "CCI-000766",
+        "CCI-000767",
+        "CCI-000768",
+        "CCI-000770",
+        "CCI-001941",
+        "CCI-001942",
+        "CCI-004045"
+      ],
+      "nist": [
+        "IA-2",
+        "IA-2(1)",
+        "IA-2(2)",
+        "IA-2(3)",
+        "IA-2(4)",
+        "IA-2(5)",
+        "IA-2(8)",
+        "IA-2(9)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-611165",
+      "group_id": "V-258122",
+      "rule_id": "SV-258122r1045246_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must enable certificate based smart card authentication.",
+      "ccis": [
+        "CCI-000765",
+        "CCI-001948",
+        "CCI-004046",
+        "CCI-004047"
+      ],
+      "nist": [
+        "IA-2(1)",
+        "IA-2(11)",
+        "IA-2(6)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-611170",
+      "group_id": "V-258123",
+      "rule_id": "SV-258123r1134923_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must implement certificate status checking for multifactor authentication.",
+      "ccis": [
+        "CCI-001948",
+        "CCI-001954",
+        "CCI-004046"
+      ],
+      "nist": [
+        "IA-2(11)",
+        "IA-2(12)",
+        "IA-2(6)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-611175",
+      "group_id": "V-258124",
+      "rule_id": "SV-258124r1045250_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must have the pcsc-lite package installed.",
+      "ccis": [
+        "CCI-001948",
+        "CCI-004046"
+      ],
+      "nist": [
+        "IA-2(11)",
+        "IA-2(6)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-611180",
+      "group_id": "V-258125",
+      "rule_id": "SV-258125r1208775_rule",
+      "severity": "medium",
+      "title": "The pcscd socket on RHEL 9 must be active.",
+      "ccis": [
+        "CCI-001948",
+        "CCI-004046"
+      ],
+      "nist": [
+        "IA-2(11)",
+        "IA-2(6)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-611185",
+      "group_id": "V-258126",
+      "rule_id": "SV-258126r1045255_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must have the opensc package installed.",
+      "ccis": [
+        "CCI-001948",
+        "CCI-001953",
+        "CCI-004046"
+      ],
+      "nist": [
+        "IA-2(11)",
+        "IA-2(12)",
+        "IA-2(6)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-611190",
+      "group_id": "V-258127",
+      "rule_id": "SV-258127r1155648_rule",
+      "severity": "medium",
+      "title": "RHEL 9, for PKI-based authentication, must enforce authorized access to the corresponding private key.",
+      "ccis": [
+        "CCI-000186"
+      ],
+      "nist": [
+        "IA-5(2)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-611195",
+      "group_id": "V-258128",
+      "rule_id": "SV-258128r1155626_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must require authentication to access emergency mode.",
+      "ccis": [
+        "CCI-000213"
+      ],
+      "nist": [
+        "AC-3"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-611200",
+      "group_id": "V-258129",
+      "rule_id": "SV-258129r1155628_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must require authentication to access single-user mode.",
+      "ccis": [
+        "CCI-000213"
+      ],
+      "nist": [
+        "AC-3"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-631010",
+      "group_id": "V-258131",
+      "rule_id": "SV-258131r1134927_rule",
+      "severity": "medium",
+      "title": "RHEL 9, for PKI-based authentication, must validate certificates by constructing a certification path (which includes status information) to an accepted trust anchor.",
+      "ccis": [
+        "CCI-000185",
+        "CCI-001991",
+        "CCI-004068"
+      ],
+      "nist": [
+        "IA-5(2)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-631015",
+      "group_id": "V-258132",
+      "rule_id": "SV-258132r1134929_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must map the authenticated identity to the user or group account for PKI-based authentication.",
+      "ccis": [
+        "CCI-000187"
+      ],
+      "nist": [
+        "IA-5(2)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-631020",
+      "group_id": "V-258133",
+      "rule_id": "SV-258133r1045263_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must prohibit the use of cached authenticators after one day.",
+      "ccis": [
+        "CCI-002007"
+      ],
+      "nist": [
+        "IA-5(13)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-651010",
+      "group_id": "V-258134",
+      "rule_id": "SV-258134r1155620_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must have the AIDE package installed.",
+      "ccis": [
+        "CCI-001744",
+        "CCI-002696"
+      ],
+      "nist": [
+        "CM-3(5)",
+        "SI-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-651015",
+      "group_id": "V-258135",
+      "rule_id": "SV-258135r1045267_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must routinely check the baseline configuration for unauthorized changes and notify the system administrator when anomalies in the operation of any security functions are discovered.",
+      "ccis": [
+        "CCI-001744",
+        "CCI-002699",
+        "CCI-002702"
+      ],
+      "nist": [
+        "CM-3(5)",
+        "SI-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-651020",
+      "group_id": "V-258136",
+      "rule_id": "SV-258136r1045270_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must use a file integrity tool that is configured to use FIPS 140-3-approved cryptographic hashes for validating file contents and directories.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-651025",
+      "group_id": "V-258137",
+      "rule_id": "SV-258137r1102081_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must use cryptographic mechanisms to protect the integrity of audit tools.",
+      "ccis": [
+        "CCI-001493",
+        "CCI-001494",
+        "CCI-001495",
+        "CCI-001496"
+      ],
+      "nist": [
+        "AU-9",
+        "AU-9(3)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-651030",
+      "group_id": "V-258138",
+      "rule_id": "SV-258138r1045274_rule",
+      "severity": "low",
+      "title": "RHEL 9 must be configured so that the file integrity tool verifies Access Control Lists (ACLs).",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-651035",
+      "group_id": "V-258139",
+      "rule_id": "SV-258139r1045276_rule",
+      "severity": "low",
+      "title": "RHEL 9 must be configured so that the file integrity tool verifies extended attributes.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-652010",
+      "group_id": "V-258140",
+      "rule_id": "SV-258140r1106460_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must have the rsyslog package installed.",
+      "ccis": [
+        "CCI-000154",
+        "CCI-001851"
+      ],
+      "nist": [
+        "AU-4(1)",
+        "AU-6(4)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-652015",
+      "group_id": "V-258141",
+      "rule_id": "SV-258141r1045280_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must have the packages required for encrypting offloaded audit logs installed.",
+      "ccis": [
+        "CCI-000803"
+      ],
+      "nist": [
+        "IA-7"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-652020",
+      "group_id": "V-258142",
+      "rule_id": "SV-258142r991589_rule",
+      "severity": "medium",
+      "title": "The rsyslog service on RHEL 9 must be active.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-652025",
+      "group_id": "V-258143",
+      "rule_id": "SV-258143r1184329_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must be configured so that the rsyslog daemon does not accept log messages from other servers unless the server is being used for log aggregation.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-652030",
+      "group_id": "V-258144",
+      "rule_id": "SV-258144r1045286_rule",
+      "severity": "medium",
+      "title": "All RHEL 9 remote access methods must be monitored.",
+      "ccis": [
+        "CCI-000067"
+      ],
+      "nist": [
+        "AC-17(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-652040",
+      "group_id": "V-258146",
+      "rule_id": "SV-258146r1045288_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must authenticate the remote logging server for offloading audit logs via rsyslog.",
+      "ccis": [
+        "CCI-001851"
+      ],
+      "nist": [
+        "AU-4(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-652045",
+      "group_id": "V-258147",
+      "rule_id": "SV-258147r1045290_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must encrypt the transfer of audit records offloaded onto a different system or media from the system being audited via rsyslog.",
+      "ccis": [
+        "CCI-001851"
+      ],
+      "nist": [
+        "AU-4(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-652050",
+      "group_id": "V-258148",
+      "rule_id": "SV-258148r1045292_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must encrypt via the gtls driver the transfer of audit records offloaded onto a different system or media from the system being audited via rsyslog.",
+      "ccis": [
+        "CCI-001851"
+      ],
+      "nist": [
+        "AU-4(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-652055",
+      "group_id": "V-258149",
+      "rule_id": "SV-258149r1155580_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must be configured to forward audit records via TCP to a different system or media from the system being audited via rsyslog.",
+      "ccis": [
+        "CCI-001851"
+      ],
+      "nist": [
+        "AU-4(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-652060",
+      "group_id": "V-258150",
+      "rule_id": "SV-258150r1045296_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must use cron logging.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-653010",
+      "group_id": "V-258151",
+      "rule_id": "SV-258151r1045298_rule",
+      "severity": "medium",
+      "title": "RHEL 9 audit package must be installed.",
+      "ccis": [
+        "CCI-000130",
+        "CCI-000131",
+        "CCI-000132",
+        "CCI-000133",
+        "CCI-000134",
+        "CCI-000135",
+        "CCI-000154",
+        "CCI-000158",
+        "CCI-000159",
+        "CCI-000169",
+        "CCI-000172",
+        "CCI-001464",
+        "CCI-001487",
+        "CCI-001814",
+        "CCI-001875",
+        "CCI-001876",
+        "CCI-001877",
+        "CCI-001878",
+        "CCI-001879",
+        "CCI-001880",
+        "CCI-001881",
+        "CCI-001882",
+        "CCI-001889",
+        "CCI-001914",
+        "CCI-002884",
+        "CCI-003938"
+      ],
+      "nist": [
+        "AU-12",
+        "AU-12(3)",
+        "AU-14(1)",
+        "AU-3",
+        "AU-3(1)",
+        "AU-6(4)",
+        "AU-7",
+        "AU-7(1)",
+        "AU-8",
+        "CM-5(1)",
+        "MA-4(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-653015",
+      "group_id": "V-258152",
+      "rule_id": "SV-258152r1015127_rule",
+      "severity": "medium",
+      "title": "RHEL 9 audit service must be enabled.",
+      "ccis": [
+        "CCI-000130",
+        "CCI-000131",
+        "CCI-000132",
+        "CCI-000133",
+        "CCI-000134",
+        "CCI-000135",
+        "CCI-000154",
+        "CCI-000158",
+        "CCI-000169",
+        "CCI-000172",
+        "CCI-001464",
+        "CCI-001487",
+        "CCI-001814",
+        "CCI-001875",
+        "CCI-001876",
+        "CCI-001877",
+        "CCI-001878",
+        "CCI-001879",
+        "CCI-001880",
+        "CCI-001881",
+        "CCI-001882",
+        "CCI-001889",
+        "CCI-001914",
+        "CCI-002884",
+        "CCI-003938",
+        "CCI-004188"
+      ],
+      "nist": [
+        "AU-12",
+        "AU-12(3)",
+        "AU-14(1)",
+        "AU-3",
+        "AU-3(1)",
+        "AU-6(4)",
+        "AU-7",
+        "AU-7(1)",
+        "AU-8",
+        "CM-5(1)",
+        "MA-3(5)",
+        "MA-4(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-653020",
+      "group_id": "V-258153",
+      "rule_id": "SV-258153r1038966_rule",
+      "severity": "medium",
+      "title": "RHEL 9 audit system must take appropriate action when an error writing to the audit storage volume occurs.",
+      "ccis": [
+        "CCI-000140"
+      ],
+      "nist": [
+        "AU-5"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-653025",
+      "group_id": "V-258154",
+      "rule_id": "SV-258154r1038966_rule",
+      "severity": "medium",
+      "title": "RHEL 9 audit system must take appropriate action when the audit storage volume is full.",
+      "ccis": [
+        "CCI-000140"
+      ],
+      "nist": [
+        "AU-5"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-653030",
+      "group_id": "V-258155",
+      "rule_id": "SV-258155r1045300_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must allocate audit record storage capacity to store at least one week's worth of audit records.",
+      "ccis": [
+        "CCI-001849",
+        "CCI-001851"
+      ],
+      "nist": [
+        "AU-4",
+        "AU-4(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-653035",
+      "group_id": "V-258156",
+      "rule_id": "SV-258156r1106364_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must take action when allocated audit record storage volume reaches 75 percent of the repository maximum audit record storage capacity.",
+      "ccis": [
+        "CCI-001855"
+      ],
+      "nist": [
+        "AU-5(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-653040",
+      "group_id": "V-258157",
+      "rule_id": "SV-258157r1134932_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must notify the system administrator (SA) and information system security officer (ISSO) (at a minimum) when allocated audit record storage volume reaches 75 percent utilization.",
+      "ccis": [
+        "CCI-001855"
+      ],
+      "nist": [
+        "AU-5(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-653045",
+      "group_id": "V-258158",
+      "rule_id": "SV-258158r971542_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must take action when allocated audit record storage volume reaches 95 percent of the audit record storage capacity.",
+      "ccis": [
+        "CCI-001855"
+      ],
+      "nist": [
+        "AU-5(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-653050",
+      "group_id": "V-258159",
+      "rule_id": "SV-258159r971542_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must take action when allocated audit record storage volume reaches 95 percent of the repository maximum audit record storage capacity.",
+      "ccis": [
+        "CCI-001855"
+      ],
+      "nist": [
+        "AU-5(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-653055",
+      "group_id": "V-258160",
+      "rule_id": "SV-258160r1038966_rule",
+      "severity": "medium",
+      "title": "RHEL 9 audit system must take appropriate action when the audit files have reached maximum size.",
+      "ccis": [
+        "CCI-000140"
+      ],
+      "nist": [
+        "AU-5"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-653060",
+      "group_id": "V-258161",
+      "rule_id": "SV-258161r958416_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must label all offloaded audit logs before sending them to the central log server.",
+      "ccis": [
+        "CCI-000132",
+        "CCI-001851"
+      ],
+      "nist": [
+        "AU-3",
+        "AU-4(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-653065",
+      "group_id": "V-258162",
+      "rule_id": "SV-258162r1184331_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must take appropriate action when the internal event queue is full.",
+      "ccis": [
+        "CCI-001851"
+      ],
+      "nist": [
+        "AU-4(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-653070",
+      "group_id": "V-258163",
+      "rule_id": "SV-258163r958424_rule",
+      "severity": "medium",
+      "title": "RHEL 9 System Administrator (SA) and/or information system security officer (ISSO) (at a minimum) must be alerted of an audit processing failure event.",
+      "ccis": [
+        "CCI-000139",
+        "CCI-001855"
+      ],
+      "nist": [
+        "AU-5",
+        "AU-5(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-653075",
+      "group_id": "V-258164",
+      "rule_id": "SV-258164r1045301_rule",
+      "severity": "medium",
+      "title": "RHEL 9 audit system must audit local events.",
+      "ccis": [
+        "CCI-000169"
+      ],
+      "nist": [
+        "AU-12"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-653080",
+      "group_id": "V-258165",
+      "rule_id": "SV-258165r958434_rule",
+      "severity": "medium",
+      "title": "RHEL 9 audit logs must be group-owned by root or by a restricted logging group to prevent unauthorized read access.",
+      "ccis": [
+        "CCI-000162",
+        "CCI-000163",
+        "CCI-000164",
+        "CCI-001314"
+      ],
+      "nist": [
+        "AU-9",
+        "SI-11"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-653085",
+      "group_id": "V-258166",
+      "rule_id": "SV-258166r1045303_rule",
+      "severity": "medium",
+      "title": "RHEL 9 audit log directory must be owned by root to prevent unauthorized read access.",
+      "ccis": [
+        "CCI-000162",
+        "CCI-000163",
+        "CCI-000164",
+        "CCI-001314"
+      ],
+      "nist": [
+        "AU-9",
+        "SI-11"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-653090",
+      "group_id": "V-258167",
+      "rule_id": "SV-258167r1155630_rule",
+      "severity": "medium",
+      "title": "RHEL 9 audit logs file must have mode 0600 or less permissive to prevent unauthorized access to the audit log.",
+      "ccis": [
+        "CCI-000162",
+        "CCI-000163",
+        "CCI-000164",
+        "CCI-001314"
+      ],
+      "nist": [
+        "AU-9",
+        "SI-11"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-653095",
+      "group_id": "V-258168",
+      "rule_id": "SV-258168r958428_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must periodically flush audit records to disk to prevent the loss of audit records.",
+      "ccis": [
+        "CCI-000154"
+      ],
+      "nist": [
+        "AU-6(4)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-653100",
+      "group_id": "V-258169",
+      "rule_id": "SV-258169r991556_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must produce audit records containing information to establish the identity of any individual or process associated with the event.",
+      "ccis": [
+        "CCI-000366",
+        "CCI-001487"
+      ],
+      "nist": [
+        "AU-3",
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-653105",
+      "group_id": "V-258170",
+      "rule_id": "SV-258170r991589_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must write audit records to disk.",
+      "ccis": [
+        "CCI-000366"
+      ],
+      "nist": [
+        "CM-6"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-653110",
+      "group_id": "V-258171",
+      "rule_id": "SV-258171r1208777_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must allow only the information system security manager (ISSM) (or individuals or roles appointed by the ISSM) to select which auditable events are to be audited.",
+      "ccis": [
+        "CCI-000171"
+      ],
+      "nist": [
+        "AU-12"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-653120",
+      "group_id": "V-258173",
+      "rule_id": "SV-258173r1101933_rule",
+      "severity": "low",
+      "title": "RHEL 9 must allocate an audit_backlog_limit of sufficient size to capture processes that start prior to the audit daemon.",
+      "ccis": [
+        "CCI-001464",
+        "CCI-001849"
+      ],
+      "nist": [
+        "AU-14(1)",
+        "AU-4"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-653125",
+      "group_id": "V-258174",
+      "rule_id": "SV-258174r958424_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must have mail aliases to notify the information system security officer (ISSO) and system administrator (SA) (at a minimum) in the event of an audit processing failure.",
+      "ccis": [
+        "CCI-000139"
+      ],
+      "nist": [
+        "AU-5"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-653130",
+      "group_id": "V-258175",
+      "rule_id": "SV-258175r1045310_rule",
+      "severity": "medium",
+      "title": "RHEL 9 audispd-plugins package must be installed.",
+      "ccis": [
+        "CCI-001851"
+      ],
+      "nist": [
+        "AU-4(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-654010",
+      "group_id": "V-258176",
+      "rule_id": "SV-258176r1155595_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must audit uses of the \"execve\" system call.",
+      "ccis": [
+        "CCI-002233",
+        "CCI-002234"
+      ],
+      "nist": [
+        "AC-6(8)",
+        "AC-6(9)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-654015",
+      "group_id": "V-258177",
+      "rule_id": "SV-258177r1155597_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must audit all uses of the chmod, fchmod, and fchmodat system calls.",
+      "ccis": [
+        "CCI-000130",
+        "CCI-000135",
+        "CCI-000169",
+        "CCI-000172",
+        "CCI-002884"
+      ],
+      "nist": [
+        "AU-12",
+        "AU-3",
+        "AU-3(1)",
+        "MA-4(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-654020",
+      "group_id": "V-258178",
+      "rule_id": "SV-258178r1155599_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must audit all uses of the chown, fchown, fchownat, and lchown system calls.",
+      "ccis": [
+        "CCI-000130",
+        "CCI-000135",
+        "CCI-000169",
+        "CCI-000172",
+        "CCI-002884"
+      ],
+      "nist": [
+        "AU-12",
+        "AU-3",
+        "AU-3(1)",
+        "MA-4(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-654025",
+      "group_id": "V-258179",
+      "rule_id": "SV-258179r1155601_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must audit all uses of the setxattr, fsetxattr, lsetxattr, removexattr, fremovexattr, and lremovexattr system calls.",
+      "ccis": [
+        "CCI-000130",
+        "CCI-000135",
+        "CCI-000169",
+        "CCI-000172",
+        "CCI-002884"
+      ],
+      "nist": [
+        "AU-12",
+        "AU-3",
+        "AU-3(1)",
+        "MA-4(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-654030",
+      "group_id": "V-258180",
+      "rule_id": "SV-258180r1045325_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must audit all uses of umount system calls.",
+      "ccis": [
+        "CCI-000130",
+        "CCI-000169",
+        "CCI-000172",
+        "CCI-002884"
+      ],
+      "nist": [
+        "AU-12",
+        "AU-3",
+        "MA-4(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-654035",
+      "group_id": "V-258181",
+      "rule_id": "SV-258181r1045328_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must audit all uses of the chacl command.",
+      "ccis": [
+        "CCI-000130",
+        "CCI-000135",
+        "CCI-000169",
+        "CCI-000172",
+        "CCI-002884"
+      ],
+      "nist": [
+        "AU-12",
+        "AU-3",
+        "AU-3(1)",
+        "MA-4(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-654040",
+      "group_id": "V-258182",
+      "rule_id": "SV-258182r1045331_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must audit all uses of the setfacl command.",
+      "ccis": [
+        "CCI-000130",
+        "CCI-000135",
+        "CCI-000169",
+        "CCI-000172",
+        "CCI-002884"
+      ],
+      "nist": [
+        "AU-12",
+        "AU-3",
+        "AU-3(1)",
+        "MA-4(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-654045",
+      "group_id": "V-258183",
+      "rule_id": "SV-258183r1045334_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must audit all uses of the chcon command.",
+      "ccis": [
+        "CCI-000130",
+        "CCI-000135",
+        "CCI-000169",
+        "CCI-000172",
+        "CCI-002884"
+      ],
+      "nist": [
+        "AU-12",
+        "AU-3",
+        "AU-3(1)",
+        "MA-4(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-654050",
+      "group_id": "V-258184",
+      "rule_id": "SV-258184r1045337_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must audit all uses of the semanage command.",
+      "ccis": [
+        "CCI-000130",
+        "CCI-000135",
+        "CCI-000169",
+        "CCI-000172",
+        "CCI-002884"
+      ],
+      "nist": [
+        "AU-12",
+        "AU-3",
+        "AU-3(1)",
+        "MA-4(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-654055",
+      "group_id": "V-258185",
+      "rule_id": "SV-258185r1045340_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must audit all uses of the setfiles command.",
+      "ccis": [
+        "CCI-000130",
+        "CCI-000135",
+        "CCI-000169",
+        "CCI-000172",
+        "CCI-002884"
+      ],
+      "nist": [
+        "AU-12",
+        "AU-3",
+        "AU-3(1)",
+        "MA-4(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-654060",
+      "group_id": "V-258186",
+      "rule_id": "SV-258186r1045343_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must audit all uses of the setsebool command.",
+      "ccis": [
+        "CCI-000130",
+        "CCI-000135",
+        "CCI-000169",
+        "CCI-000172",
+        "CCI-002884"
+      ],
+      "nist": [
+        "AU-12",
+        "AU-3",
+        "AU-3(1)",
+        "MA-4(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-654065",
+      "group_id": "V-258187",
+      "rule_id": "SV-258187r1155603_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must audit all uses of the rename, unlink, rmdir, renameat, and unlinkat system calls.",
+      "ccis": [
+        "CCI-000130",
+        "CCI-000135",
+        "CCI-000169",
+        "CCI-000172",
+        "CCI-002884"
+      ],
+      "nist": [
+        "AU-12",
+        "AU-3",
+        "AU-3(1)",
+        "MA-4(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-654070",
+      "group_id": "V-258188",
+      "rule_id": "SV-258188r1155605_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must audit all uses of the truncate, ftruncate, creat, open, openat, and open_by_handle_at system calls.",
+      "ccis": [
+        "CCI-000130",
+        "CCI-000135",
+        "CCI-000169",
+        "CCI-000172",
+        "CCI-002884"
+      ],
+      "nist": [
+        "AU-12",
+        "AU-3",
+        "AU-3(1)",
+        "MA-4(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-654075",
+      "group_id": "V-258189",
+      "rule_id": "SV-258189r1155607_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must audit all uses of the delete_module system call.",
+      "ccis": [
+        "CCI-000130",
+        "CCI-000135",
+        "CCI-000169",
+        "CCI-000172",
+        "CCI-002884"
+      ],
+      "nist": [
+        "AU-12",
+        "AU-3",
+        "AU-3(1)",
+        "MA-4(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-654080",
+      "group_id": "V-258190",
+      "rule_id": "SV-258190r1155609_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must audit all uses of the init_module and finit_module system calls.",
+      "ccis": [
+        "CCI-000130",
+        "CCI-000135",
+        "CCI-000169",
+        "CCI-000172",
+        "CCI-002884"
+      ],
+      "nist": [
+        "AU-12",
+        "AU-3",
+        "AU-3(1)",
+        "MA-4(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-654085",
+      "group_id": "V-258191",
+      "rule_id": "SV-258191r1045358_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must audit all uses of the chage command.",
+      "ccis": [
+        "CCI-000130",
+        "CCI-000135",
+        "CCI-000169",
+        "CCI-000172",
+        "CCI-002884"
+      ],
+      "nist": [
+        "AU-12",
+        "AU-3",
+        "AU-3(1)",
+        "MA-4(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-654090",
+      "group_id": "V-258192",
+      "rule_id": "SV-258192r1045361_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must audit all uses of the chsh command.",
+      "ccis": [
+        "CCI-000130",
+        "CCI-000135",
+        "CCI-000169",
+        "CCI-000172",
+        "CCI-002884"
+      ],
+      "nist": [
+        "AU-12",
+        "AU-3",
+        "AU-3(1)",
+        "MA-4(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-654095",
+      "group_id": "V-258193",
+      "rule_id": "SV-258193r1045364_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must audit all uses of the crontab command.",
+      "ccis": [
+        "CCI-000130",
+        "CCI-000135",
+        "CCI-000169",
+        "CCI-000172",
+        "CCI-002884"
+      ],
+      "nist": [
+        "AU-12",
+        "AU-3",
+        "AU-3(1)",
+        "MA-4(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-654097",
+      "group_id": "V-279936",
+      "rule_id": "SV-279936r1210929_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must audit any script or executable called by cron as root or by any privileged user.",
+      "ccis": [
+        "CCI-000172"
+      ],
+      "nist": [
+        "AU-12"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-654100",
+      "group_id": "V-258194",
+      "rule_id": "SV-258194r1045367_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must audit all uses of the gpasswd command.",
+      "ccis": [
+        "CCI-000130",
+        "CCI-000135",
+        "CCI-000169",
+        "CCI-000172",
+        "CCI-002884"
+      ],
+      "nist": [
+        "AU-12",
+        "AU-3",
+        "AU-3(1)",
+        "MA-4(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-654105",
+      "group_id": "V-258195",
+      "rule_id": "SV-258195r1045370_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must audit all uses of the kmod command.",
+      "ccis": [
+        "CCI-000130",
+        "CCI-000135",
+        "CCI-000169",
+        "CCI-000172",
+        "CCI-002884"
+      ],
+      "nist": [
+        "AU-12",
+        "AU-3",
+        "AU-3(1)",
+        "MA-4(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-654110",
+      "group_id": "V-258196",
+      "rule_id": "SV-258196r1045373_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must audit all uses of the newgrp command.",
+      "ccis": [
+        "CCI-000130",
+        "CCI-000135",
+        "CCI-000169",
+        "CCI-000172",
+        "CCI-002884"
+      ],
+      "nist": [
+        "AU-12",
+        "AU-3",
+        "AU-3(1)",
+        "MA-4(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-654115",
+      "group_id": "V-258197",
+      "rule_id": "SV-258197r1045376_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must audit all uses of the pam_timestamp_check command.",
+      "ccis": [
+        "CCI-000130",
+        "CCI-000135",
+        "CCI-000169",
+        "CCI-000172",
+        "CCI-002884"
+      ],
+      "nist": [
+        "AU-12",
+        "AU-3",
+        "AU-3(1)",
+        "MA-4(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-654120",
+      "group_id": "V-258198",
+      "rule_id": "SV-258198r1045379_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must audit all uses of the passwd command.",
+      "ccis": [
+        "CCI-000130",
+        "CCI-000135",
+        "CCI-000169",
+        "CCI-000172",
+        "CCI-002884"
+      ],
+      "nist": [
+        "AU-12",
+        "AU-3",
+        "AU-3(1)",
+        "MA-4(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-654125",
+      "group_id": "V-258199",
+      "rule_id": "SV-258199r1045382_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must audit all uses of the postdrop command.",
+      "ccis": [
+        "CCI-000130",
+        "CCI-000135",
+        "CCI-000169",
+        "CCI-000172",
+        "CCI-002884"
+      ],
+      "nist": [
+        "AU-12",
+        "AU-3",
+        "AU-3(1)",
+        "MA-4(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-654130",
+      "group_id": "V-258200",
+      "rule_id": "SV-258200r1045385_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must audit all uses of the postqueue command.",
+      "ccis": [
+        "CCI-000130",
+        "CCI-000135",
+        "CCI-000169",
+        "CCI-000172",
+        "CCI-002884"
+      ],
+      "nist": [
+        "AU-12",
+        "AU-3",
+        "AU-3(1)",
+        "MA-4(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-654135",
+      "group_id": "V-258201",
+      "rule_id": "SV-258201r1045388_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must audit all uses of the ssh-agent command.",
+      "ccis": [
+        "CCI-000130",
+        "CCI-000135",
+        "CCI-000169",
+        "CCI-000172",
+        "CCI-002884"
+      ],
+      "nist": [
+        "AU-12",
+        "AU-3",
+        "AU-3(1)",
+        "MA-4(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-654140",
+      "group_id": "V-258202",
+      "rule_id": "SV-258202r1045391_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must audit all uses of the ssh-keysign command.",
+      "ccis": [
+        "CCI-000130",
+        "CCI-000135",
+        "CCI-000169",
+        "CCI-000172",
+        "CCI-002884"
+      ],
+      "nist": [
+        "AU-12",
+        "AU-3",
+        "AU-3(1)",
+        "MA-4(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-654145",
+      "group_id": "V-258203",
+      "rule_id": "SV-258203r1045394_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must audit all uses of the su command.",
+      "ccis": [
+        "CCI-000130",
+        "CCI-000135",
+        "CCI-000169",
+        "CCI-000172",
+        "CCI-002884"
+      ],
+      "nist": [
+        "AU-12",
+        "AU-3",
+        "AU-3(1)",
+        "MA-4(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-654150",
+      "group_id": "V-258204",
+      "rule_id": "SV-258204r1045397_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must audit all uses of the sudo command.",
+      "ccis": [
+        "CCI-000130",
+        "CCI-000135",
+        "CCI-000169",
+        "CCI-000172",
+        "CCI-002884"
+      ],
+      "nist": [
+        "AU-12",
+        "AU-3",
+        "AU-3(1)",
+        "MA-4(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-654155",
+      "group_id": "V-258205",
+      "rule_id": "SV-258205r1045400_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must audit all uses of the sudoedit command.",
+      "ccis": [
+        "CCI-000130",
+        "CCI-000135",
+        "CCI-000169",
+        "CCI-000172",
+        "CCI-002884"
+      ],
+      "nist": [
+        "AU-12",
+        "AU-3",
+        "AU-3(1)",
+        "MA-4(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-654160",
+      "group_id": "V-258206",
+      "rule_id": "SV-258206r1045403_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must audit all uses of the unix_chkpwd command.",
+      "ccis": [
+        "CCI-000130",
+        "CCI-000135",
+        "CCI-000169",
+        "CCI-000172",
+        "CCI-002884"
+      ],
+      "nist": [
+        "AU-12",
+        "AU-3",
+        "AU-3(1)",
+        "MA-4(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-654165",
+      "group_id": "V-258207",
+      "rule_id": "SV-258207r1045406_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must audit all uses of the unix_update command.",
+      "ccis": [
+        "CCI-000130",
+        "CCI-000135",
+        "CCI-000169",
+        "CCI-000172",
+        "CCI-002884"
+      ],
+      "nist": [
+        "AU-12",
+        "AU-3",
+        "AU-3(1)",
+        "MA-4(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-654170",
+      "group_id": "V-258208",
+      "rule_id": "SV-258208r1045409_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must audit all uses of the userhelper command.",
+      "ccis": [
+        "CCI-000130",
+        "CCI-000135",
+        "CCI-000169",
+        "CCI-000172",
+        "CCI-002884"
+      ],
+      "nist": [
+        "AU-12",
+        "AU-3",
+        "AU-3(1)",
+        "MA-4(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-654175",
+      "group_id": "V-258209",
+      "rule_id": "SV-258209r1045412_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must audit all uses of the usermod command.",
+      "ccis": [
+        "CCI-000130",
+        "CCI-000135",
+        "CCI-000169",
+        "CCI-000172",
+        "CCI-002884"
+      ],
+      "nist": [
+        "AU-12",
+        "AU-3",
+        "AU-3(1)",
+        "MA-4(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-654180",
+      "group_id": "V-258210",
+      "rule_id": "SV-258210r1045415_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must audit all uses of the mount command.",
+      "ccis": [
+        "CCI-000130",
+        "CCI-000135",
+        "CCI-000169",
+        "CCI-000172",
+        "CCI-002884"
+      ],
+      "nist": [
+        "AU-12",
+        "AU-3",
+        "AU-3(1)",
+        "MA-4(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-654185",
+      "group_id": "V-258211",
+      "rule_id": "SV-258211r1045418_rule",
+      "severity": "medium",
+      "title": "Successful/unsuccessful uses of the init command in RHEL 9 must generate an audit record.",
+      "ccis": [
+        "CCI-000172"
+      ],
+      "nist": [
+        "AU-12"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-654190",
+      "group_id": "V-258212",
+      "rule_id": "SV-258212r1045421_rule",
+      "severity": "medium",
+      "title": "Successful/unsuccessful uses of the poweroff command in RHEL 9 must generate an audit record.",
+      "ccis": [
+        "CCI-000172"
+      ],
+      "nist": [
+        "AU-12"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-654195",
+      "group_id": "V-258213",
+      "rule_id": "SV-258213r1045424_rule",
+      "severity": "medium",
+      "title": "Successful/unsuccessful uses of the reboot command in RHEL 9 must generate an audit record.",
+      "ccis": [
+        "CCI-000172"
+      ],
+      "nist": [
+        "AU-12"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-654200",
+      "group_id": "V-258214",
+      "rule_id": "SV-258214r1045427_rule",
+      "severity": "medium",
+      "title": "Successful/unsuccessful uses of the shutdown command in RHEL 9 must generate an audit record.",
+      "ccis": [
+        "CCI-000172"
+      ],
+      "nist": [
+        "AU-12"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-654205",
+      "group_id": "V-258215",
+      "rule_id": "SV-258215r1155611_rule",
+      "severity": "medium",
+      "title": "Successful/unsuccessful uses of the umount system call in RHEL 9 must generate an audit record.",
+      "ccis": [
+        "CCI-000130",
+        "CCI-000169",
+        "CCI-000172",
+        "CCI-002884"
+      ],
+      "nist": [
+        "AU-12",
+        "AU-3",
+        "MA-4(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-654210",
+      "group_id": "V-258216",
+      "rule_id": "SV-258216r1155613_rule",
+      "severity": "medium",
+      "title": "Successful/unsuccessful uses of the umount2 system call in RHEL 9 must generate an audit record.",
+      "ccis": [
+        "CCI-000130",
+        "CCI-000169",
+        "CCI-000172",
+        "CCI-002884"
+      ],
+      "nist": [
+        "AU-12",
+        "AU-3",
+        "MA-4(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-654215",
+      "group_id": "V-258217",
+      "rule_id": "SV-258217r1210919_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must generate audit records for all account creations, modifications, disabling, and termination events that affect /etc/sudoers.",
+      "ccis": [
+        "CCI-000015",
+        "CCI-000018",
+        "CCI-000130",
+        "CCI-000135",
+        "CCI-000169",
+        "CCI-000172",
+        "CCI-001403",
+        "CCI-001404",
+        "CCI-001405",
+        "CCI-002130",
+        "CCI-002132",
+        "CCI-002884"
+      ],
+      "nist": [
+        "AC-2(1)",
+        "AC-2(4)",
+        "AU-12",
+        "AU-3",
+        "AU-3(1)",
+        "MA-4(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-654220",
+      "group_id": "V-258218",
+      "rule_id": "SV-258218r1210920_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must generate audit records for all account creations, modifications, disabling, and termination events that affect /etc/sudoers.d/directory.",
+      "ccis": [
+        "CCI-000015",
+        "CCI-000018",
+        "CCI-000130",
+        "CCI-000135",
+        "CCI-000169",
+        "CCI-000172",
+        "CCI-001403",
+        "CCI-001404",
+        "CCI-001405",
+        "CCI-002130",
+        "CCI-002132",
+        "CCI-002884"
+      ],
+      "nist": [
+        "AC-2(1)",
+        "AC-2(4)",
+        "AU-12",
+        "AU-3",
+        "AU-3(1)",
+        "MA-4(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-654225",
+      "group_id": "V-258219",
+      "rule_id": "SV-258219r1210921_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must generate audit records for all account creations, modifications, disabling, and termination events that affect /etc/group.",
+      "ccis": [
+        "CCI-000015",
+        "CCI-000018",
+        "CCI-000130",
+        "CCI-000135",
+        "CCI-000169",
+        "CCI-000172",
+        "CCI-001403",
+        "CCI-001404",
+        "CCI-001405",
+        "CCI-002130",
+        "CCI-002132",
+        "CCI-002884"
+      ],
+      "nist": [
+        "AC-2(1)",
+        "AC-2(4)",
+        "AU-12",
+        "AU-3",
+        "AU-3(1)",
+        "MA-4(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-654230",
+      "group_id": "V-258220",
+      "rule_id": "SV-258220r1210922_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must generate audit records for all account creations, modifications, disabling, and termination events that affect /etc/gshadow.",
+      "ccis": [
+        "CCI-000015",
+        "CCI-000018",
+        "CCI-000130",
+        "CCI-000135",
+        "CCI-000169",
+        "CCI-000172",
+        "CCI-001403",
+        "CCI-001404",
+        "CCI-001405",
+        "CCI-002130",
+        "CCI-002132",
+        "CCI-002884"
+      ],
+      "nist": [
+        "AC-2(1)",
+        "AC-2(4)",
+        "AU-12",
+        "AU-3",
+        "AU-3(1)",
+        "MA-4(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-654235",
+      "group_id": "V-258221",
+      "rule_id": "SV-258221r1210923_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must generate audit records for all account creations, modifications, disabling, and termination events that affect /etc/opasswd.",
+      "ccis": [
+        "CCI-000015",
+        "CCI-000018",
+        "CCI-000130",
+        "CCI-000135",
+        "CCI-000169",
+        "CCI-000172",
+        "CCI-001403",
+        "CCI-001404",
+        "CCI-001405",
+        "CCI-002130",
+        "CCI-002132",
+        "CCI-002884"
+      ],
+      "nist": [
+        "AC-2(1)",
+        "AC-2(4)",
+        "AU-12",
+        "AU-3",
+        "AU-3(1)",
+        "MA-4(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-654240",
+      "group_id": "V-258222",
+      "rule_id": "SV-258222r1210924_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must generate audit records for all account creations, modifications, disabling, and termination events that affect /etc/passwd.",
+      "ccis": [
+        "CCI-000015",
+        "CCI-000018",
+        "CCI-000130",
+        "CCI-000135",
+        "CCI-000169",
+        "CCI-000172",
+        "CCI-001403",
+        "CCI-001404",
+        "CCI-001405",
+        "CCI-001683",
+        "CCI-001684",
+        "CCI-001685",
+        "CCI-001686",
+        "CCI-002130",
+        "CCI-002132",
+        "CCI-002884"
+      ],
+      "nist": [
+        "AC-2(1)",
+        "AC-2(4)",
+        "AU-12",
+        "AU-3",
+        "AU-3(1)",
+        "MA-4(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-654245",
+      "group_id": "V-258223",
+      "rule_id": "SV-258223r1210925_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must generate audit records for all account creations, modifications, disabling, and termination events that affect /etc/shadow.",
+      "ccis": [
+        "CCI-000015",
+        "CCI-000018",
+        "CCI-000130",
+        "CCI-000135",
+        "CCI-000169",
+        "CCI-000172",
+        "CCI-001403",
+        "CCI-001404",
+        "CCI-001405",
+        "CCI-002130",
+        "CCI-002132",
+        "CCI-002884"
+      ],
+      "nist": [
+        "AC-2(1)",
+        "AC-2(4)",
+        "AU-12",
+        "AU-3",
+        "AU-3(1)",
+        "MA-4(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-654250",
+      "group_id": "V-258224",
+      "rule_id": "SV-258224r1210926_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must generate audit records for all account creations, modifications, disabling, and termination events that affect /var/log/faillock.",
+      "ccis": [
+        "CCI-000172",
+        "CCI-002884"
+      ],
+      "nist": [
+        "AU-12",
+        "MA-4(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-654255",
+      "group_id": "V-258225",
+      "rule_id": "SV-258225r1210927_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must generate audit records for all account creations, modifications, disabling, and termination events that affect /var/log/lastlog.",
+      "ccis": [
+        "CCI-000130",
+        "CCI-000135",
+        "CCI-000169",
+        "CCI-000172",
+        "CCI-002884"
+      ],
+      "nist": [
+        "AU-12",
+        "AU-3",
+        "AU-3(1)",
+        "MA-4(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-654265",
+      "group_id": "V-258227",
+      "rule_id": "SV-258227r1014992_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must take appropriate action when a critical audit processing failure occurs.",
+      "ccis": [
+        "CCI-000139",
+        "CCI-000140"
+      ],
+      "nist": [
+        "AU-5"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-654270",
+      "group_id": "V-258228",
+      "rule_id": "SV-258228r991572_rule",
+      "severity": "medium",
+      "title": "RHEL 9 audit system must protect logon UIDs from unauthorized change.",
+      "ccis": [
+        "CCI-000162",
+        "CCI-000163",
+        "CCI-000164",
+        "CCI-000172"
+      ],
+      "nist": [
+        "AU-12",
+        "AU-9"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-654275",
+      "group_id": "V-258229",
+      "rule_id": "SV-258229r958434_rule",
+      "severity": "medium",
+      "title": "RHEL 9 audit system must protect auditing rules from unauthorized change.",
+      "ccis": [
+        "CCI-000162",
+        "CCI-000163",
+        "CCI-000164"
+      ],
+      "nist": [
+        "AU-9"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-671010",
+      "group_id": "V-258230",
+      "rule_id": "SV-258230r1184334_rule",
+      "severity": "high",
+      "title": "RHEL 9 must enable FIPS mode.",
+      "ccis": [
+        "CCI-000068",
+        "CCI-000877",
+        "CCI-002418",
+        "CCI-002450"
+      ],
+      "nist": [
+        "AC-17(2)",
+        "MA-4",
+        "SC-13",
+        "SC-8"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-671015",
+      "group_id": "V-258231",
+      "rule_id": "SV-258231r1208790_rule",
+      "severity": "medium",
+      "title": "RHEL 9 must employ FIPS 140-3-approved cryptographic hashing algorithms for all stored passwords.",
+      "ccis": [
+        "CCI-000196",
+        "CCI-000803",
+        "CCI-004062"
+      ],
+      "nist": [
+        "IA-5(1)",
+        "IA-7"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-671020",
+      "group_id": "V-258232",
+      "rule_id": "SV-258232r1184335_rule",
+      "severity": "high",
+      "title": "RHEL 9 IP tunnels must use FIPS 140-3 approved cryptographic algorithms.",
+      "ccis": [
+        "CCI-000068"
+      ],
+      "nist": [
+        "AC-17(2)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-671025",
+      "group_id": "V-258233",
+      "rule_id": "SV-258233r1015136_rule",
+      "severity": "medium",
+      "title": "RHEL 9 pam_unix.so module must be configured in the password-auth file to use a FIPS 140-3 approved cryptographic hashing algorithm for system authentication.",
+      "ccis": [
+        "CCI-000196",
+        "CCI-004062"
+      ],
+      "nist": [
+        "IA-5(1)"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-672020",
+      "group_id": "V-258236",
+      "rule_id": "SV-258236r1101920_rule",
+      "severity": "high",
+      "title": "RHEL 9 cryptographic policy must not be overridden.",
+      "ccis": [
+        "CCI-002450",
+        "CCI-002890",
+        "CCI-003123"
+      ],
+      "nist": [
+        "MA-4(6)",
+        "SC-13"
+      ]
+    },
+    {
+      "stig_id": "RHEL-09-672050",
+      "group_id": "V-258242",
+      "rule_id": "SV-258242r1184336_rule",
+      "severity": "high",
+      "title": "RHEL 9 must implement DOD-approved encryption in the bind package.",
+      "ccis": [
+        "CCI-002418",
+        "CCI-002422"
+      ],
+      "nist": [
+        "SC-8",
+        "SC-8(2)"
+      ]
+    }
+  ]
+}
