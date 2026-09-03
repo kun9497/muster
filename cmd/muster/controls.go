@@ -16,7 +16,8 @@ flags (lint):
   --fixtures <dir>     directory holding the control fixtures (default controls/testdata)
   --references <dir>   directory holding the generated STIG/NIST reference index (dir/stig/*.json,
                         see docs/reference); without this flag, stig and nist_800_53 references are
-                        checked for shape only, never for existence in the index
+                        checked for shape only, never for existence in the index; with it, every id
+                        must exist in the index
 `
 
 // defaultFixtureDir is where the fixtures live relative to the repository

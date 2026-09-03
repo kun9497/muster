@@ -11,7 +11,8 @@ waiver keys, output format.
 - `make test` — `go test -race ./...` (needs a C toolchain for `-race`; on a host without one, run
   `go test ./...` and rely on CI, which runs on Linux, for the race build).
 - `make lint` — `gofmt -l .` then `go vet ./...`.
-- `make lint-controls` — `go run ./cmd/muster controls lint`.
+- `make lint-controls` — `go run ./cmd/muster controls lint` (passes `--references docs/reference`, so
+  STIG/NIST ids must be in the generated index).
 - `make fmt` — `gofmt -l -w .` to fix formatting in place.
 
 ## Layout

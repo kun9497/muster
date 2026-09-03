@@ -27,7 +27,7 @@ jobs:
       - name: test
         run: go test -race ./...
       - name: controls lint
-        run: go run ./cmd/muster controls lint
+        run: go run ./cmd/muster controls lint --references docs/reference
       - name: coverage table is current
         run: go run ./tools/coverage -check
       - name: build

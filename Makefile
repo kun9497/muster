@@ -21,7 +21,7 @@ lint:
 	go vet ./...
 
 lint-controls:
-	go run $(PKG) controls lint
+	go run $(PKG) controls lint --references docs/reference
 
 coverage:
 	go run ./tools/coverage
