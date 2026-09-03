@@ -1,0 +1,4 @@
+# /etc/securetty: list of terminals on which root is allowed to login
+console
+
+tty1

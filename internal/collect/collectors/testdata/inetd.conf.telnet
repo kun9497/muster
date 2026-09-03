@@ -1,0 +1,2 @@
+# ftp    stream tcp nowait root /usr/sbin/tcpd in.ftpd
+telnet stream tcp nowait root /usr/sbin/tcpd in.telnetd

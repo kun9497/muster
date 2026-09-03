@@ -1,0 +1,3 @@
+port 22
+permitrootlogin prohibit-password
+passwordauthentication yes
