@@ -40,3 +40,132 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_CONFIG: .gitleaks.toml
+
+  collect-root:
+    runs-on: ubuntu-24.04
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.5"
+      - run: CGO_ENABLED=0 go build -trimpath -o bin/muster ./cmd/muster
+      - name: list actions
+        run: ./bin/muster collect --list-actions
+      - name: prepare output directory
+        run: mkdir -m 700 "$RUNNER_TEMP/muster"
+      - name: collect as root
+        run: sudo ./bin/muster collect --out "$RUNNER_TEMP/muster/root.json" --require-root --require-complete
+      - name: check the root snapshot
+        run: |
+          sudo chown "$(id -u)" "$RUNNER_TEMP/muster/root.json"
+          set +e
+          ./bin/muster check --facts "$RUNNER_TEMP/muster/root.json" --format json > "$RUNNER_TEMP/muster/root-report.json"
+          code=$?
+          set -e
+          echo "check exit $code"
+          test "$code" -ne 2
+          jq -e '.results | map(select(.status=="ERROR")) | length == 0' "$RUNNER_TEMP/muster/root-report.json"
+          jq -e '.check.guide_edition == "kisa-unix-2026"' "$RUNNER_TEMP/muster/root-report.json"
+      - name: sudo-run linux tests
+        run: sudo env PATH="$PATH" GOFLAGS="$GOFLAGS" go test ./internal/collect/... ./cmd/muster/ -count=1
+
+  collect-nonroot:
+    runs-on: ubuntu-24.04
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.5"
+      - run: CGO_ENABLED=0 go build -trimpath -o bin/muster ./cmd/muster
+      - name: prepare output directory
+        run: mkdir -m 700 "$RUNNER_TEMP/muster"
+      - name: collect without root is partial (exit 1)
+        run: |
+          set +e
+          ./bin/muster collect --out "$RUNNER_TEMP/muster/user.json"
+          code=$?
+          set -e
+          test "$code" -eq 1
+          jq -e '.run.complete == false and .run.euid != 0' "$RUNNER_TEMP/muster/user.json"
+      - name: every PASS is clean and something is ERROR without root
+        run: |
+          set +e
+          ./bin/muster check --facts "$RUNNER_TEMP/muster/user.json" --format json > "$RUNNER_TEMP/muster/user-report.json"
+          code=$?
+          set -e
+          echo "check exit $code"
+          test "$code" -eq 2
+          jq -e '[.results[] | select(.status=="PASS") | .evidence[]? | select(.status!="ok")] | length == 0' "$RUNNER_TEMP/muster/user-report.json"
+          jq -e '[.results[] | select(.status=="ERROR")] | length > 0' "$RUNNER_TEMP/muster/user-report.json"
+
+  collect-containers:
+    runs-on: ubuntu-24.04
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: ubuntu:22.04
+            init: "false"
+          - image: ubuntu:24.04
+            init: "false"
+          - image: rockylinux/rockylinux:9-ubi-init
+            init: "true"
+          - image: almalinux/9-init
+            init: "true"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.5"
+      - run: CGO_ENABLED=0 go build -trimpath -o bin/muster ./cmd/muster
+      - name: collect inside ${{ matrix.image }}
+        run: |
+          mkdir -p out
+          if [ "${{ matrix.init }}" = "true" ]; then
+            cid=$(docker run -d --privileged --cgroupns=host -v "$PWD/bin:/m:ro" -v "$PWD/out:/out" ${{ matrix.image }} /sbin/init)
+            sleep 5
+            docker exec "$cid" /m/muster collect --out /out/c.json || true
+            docker rm -f "$cid"
+          else
+            docker run --rm -v "$PWD/bin:/m:ro" -v "$PWD/out:/out" ${{ matrix.image }} /m/muster collect --out /out/c.json || true
+          fi
+          sudo chown "$(id -u)" out/c.json
+          test -s out/c.json
+          jq -e '.run.env.container != "none"' out/c.json
+          if [ "${{ matrix.init }}" = "true" ]; then
+            jq -e '.facts.services.ssh.installed.status == "ok"' out/c.json
+          else
+            jq -e '.facts.services.ssh.installed.status == "unsupported"' out/c.json
+          fi
+      - name: unseen facts are ERROR or NOT_APPLICABLE, never PASS
+        run: |
+          set +e
+          ./bin/muster check --facts out/c.json --format json > out/report.json
+          set -e
+          jq -e '[.results[] | select(.status=="PASS") | .evidence[]? | select(.status != "ok")] | length == 0' out/report.json
+
+  collect-contract:
+    runs-on: ubuntu-24.04
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.5"
+      - run: CGO_ENABLED=0 go build -trimpath -o bin/muster ./cmd/muster
+      - name: no network, read-only root, one file written
+        run: |
+          mkdir -m 700 "$RUNNER_TEMP/muster"
+          mkdir -m 700 "$RUNNER_TEMP/muster/out"
+          docker run --rm --network none --read-only \
+            -v "$PWD":/src:ro \
+            -v "$RUNNER_TEMP/muster/out":/out \
+            ubuntu:24.04 /src/bin/muster collect --out /out/s.json
+          sudo chown "$(id -u)" "$RUNNER_TEMP/muster/out/s.json"
+          files=$(find "$RUNNER_TEMP/muster/out" -type f)
+          test "$files" = "$RUNNER_TEMP/muster/out/s.json"
+          test "$(stat -c '%a' "$RUNNER_TEMP/muster/out/s.json")" = "600"
+          jq -e '.run.complete == true and .run.env.container != "none"' "$RUNNER_TEMP/muster/out/s.json"
