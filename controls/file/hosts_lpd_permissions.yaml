@@ -4,7 +4,7 @@ title_ko: /etc/hosts.lpd 가 존재하면 root 소유이고 root 만 읽을 수 
 description_en: The guide's criterion is owner root and mode 0600 or stricter. The file need not exist; an absent file passes.
 description_ko: 가이드 기준은 소유자 root, 모드 0600 이하입니다. 파일이 없어도 되며, 파일이 없으면 통과합니다.
 category: file
-importance: 상
+importance: 하
 automation: auto
 references:
   kisa: { "2026": ["U-29"], "2021": ["U-55"] }

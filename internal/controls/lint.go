@@ -266,7 +266,7 @@ func lintClause(c *Control, cl Clause, reg *facts.Registry, add func(string, str
 			if entry.Type == "list<record>" && sub.Field == "" {
 				add("clause_grammar", "%s: sub-clause needs field for a record element", where)
 			}
-			if (entry.Type == "list<string>" || entry.Type == "list<int>") && sub.Field != "" {
+			if entry.Type == "list<string>" && sub.Field != "" {
 				add("clause_grammar", "%s: scalar elements have no fields", where)
 			}
 			lintExpected(*sub, add, where)

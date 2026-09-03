@@ -15,9 +15,11 @@ benchmarks (CIS Benchmarks, DISA STIG, NIST SP 800-53) are attached as
 references and, later, offered as selectable profiles.
 
 > **Status: stage 1 complete, stage 2 starting (September 2026).** `collect`
-> and `check` work end to end with the first five controls (U-01, U-02, U-16,
-> U-25, U-52); CI exercises them as root, as a normal user, and inside Ubuntu
-> 22.04/24.04 and Rocky/Alma 9 containers. Stage 2 enrolls every automatable
+> and `check` work end to end with eight controls (U-01, U-02, U-16, U-19,
+> U-22, U-25, U-29, U-52 — U-19/U-22/U-29 are the new `/etc/hosts`,
+> `/etc/services` and `/etc/hosts.lpd` permission controls); CI exercises
+> them as root, as a normal user, and inside Ubuntu 22.04/24.04 and
+> Rocky/Alma 9 containers. Stage 2 enrolls every automatable
 > KISA item. The architecture, contracts and release scope are written up in
 > [the design specification](docs/superpowers/specs/2026-09-02-muster-design.md).
 > Facts and flags described below beyond stage 1 are the plan, not a promise.
@@ -119,7 +121,7 @@ compliance.
 ## Roadmap
 
 1. **Skeleton.** `collect` and `check`, the facts schema, table and JSON
-   output, exit codes, waivers, and five controls flowing end to end.
+   output, exit codes, waivers, and eight controls flowing end to end.
 2. **Both distributions, every automatable KISA item.** Collectors for Ubuntu
    and Rocky; 58 of the 67 items judged automatically or with automatic
    evidence, the remaining 9 (mail, DNS and FTP daemon configuration) listed as
