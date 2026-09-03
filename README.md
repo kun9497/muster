@@ -8,7 +8,14 @@ server items (U-xx) of the KISA technical vulnerability assessment guide for
 critical information infrastructure, with CIS Benchmark recommendation numbers
 attached as cross-references.
 
-> **Status: design agreed, implementation not started (September 2026).**
+In Korean security practice this kind of check is called a CCE assessment
+(configuration vulnerabilities, as opposed to CVE). muster is a CCE checker for
+the Linux server asset class: KISA is the primary standard, and global
+benchmarks (CIS Benchmarks, DISA STIG, NIST SP 800-53) are attached as
+references and, later, offered as selectable profiles.
+
+> **Status: stage 1 in progress (September 2026).** The check side (`check`,
+> controls, waivers, reports) is merged; the Linux collect side is being built.
 > The architecture, contracts and first-release scope are written up in
 > [the design specification](docs/superpowers/specs/2026-09-02-muster-design.md).
 > This README describes what the tool is meant to be; commands and flags below
@@ -75,6 +82,9 @@ muster check --facts host.json --format json
   sockets, firewall rules, network sysctls, unnecessary services.
 - **Applying fixes.** muster can generate a remediation script for review, with
   risk levels and rollback, and will not execute it.
+- **Other asset classes.** Windows, DBMS, web/WAS, network and security devices
+  have their own sections of the KISA guide. They would be sibling tools sharing
+  muster's control and report contracts, never part of this codebase.
 
 ## Targets
 
@@ -82,7 +92,7 @@ Linux only, permanently. The first release targets **Ubuntu LTS (22.04, 24.04)**
 and **Rocky / AlmaLinux 9**; supporting both from the start forces the
 distribution-variance structure to exist rather than be retrofitted.
 
-## Standard
+## Standards
 
 The control set follows the structure and numbering of the Unix server section
 of the **2026 edition** of the KISA guide (주요정보통신기반시설 기술적 취약점
@@ -98,6 +108,13 @@ guide is included, and the guide itself is not included. CIS Benchmark
 references are benchmark name, version and recommendation number only, and
 muster judges no CIS compliance. See [ATTRIBUTION.md](ATTRIBUTION.md).
 
+Global benchmarks are cross-references, not a second rulebook. Every control
+carries CIS Benchmark recommendation numbers today, gains DISA STIG and NIST
+SP 800-53 references in stage 2, and from stage 3 a `cis-<distro>-l1` profile
+can select controls and parameters from the same collector. muster records the
+numbers, never the benchmark text, and certifies no level of CIS or STIG
+compliance.
+
 ## Roadmap
 
 1. **Skeleton.** `collect` and `check`, the facts schema, table and JSON
@@ -105,20 +122,24 @@ muster judges no CIS compliance. See [ATTRIBUTION.md](ATTRIBUTION.md).
 2. **Both distributions, every automatable KISA item.** Collectors for Ubuntu
    and Rocky; 58 of the 67 items judged automatically or with automatic
    evidence, the remaining 9 (mail, DNS and FTP daemon configuration) listed as
-   `MANUAL` with the reason recorded in the control.
-3. **High-value checks beyond the list**, from the same collector: package
+   `MANUAL` with the reason recorded in the control. Every control gains DISA
+   STIG and NIST SP 800-53 reference numbers where a mapping exists.
+3. **High-value checks beyond the list, and profiles**, from the same collector: package
    integrity, SUID/SGID and world-writable files, `sudoers`, file capabilities
    and ACLs, cron and timer inventory, `authorized_keys` inventory, processes
    running deleted binaries, kernel self-protection sysctls, mount options,
    audit pipeline health, patch hygiene, exposure of listening sockets versus
-   firewall rules.
+   firewall rules. Profiles select controls and parameters: `kisa-unix-2026`
+   stays the default, and a `cis-<distro>-l1` profile covers the CIS Level 1
+   server recommendations for the target distributions, with `references.cis`
+   as those controls' primary reference.
 4. **Public release.** Snapshot diff, SARIF, bilingual docs, signed reproducible
    builds with SBOM, deb/rpm packages, and a differential comparison against
    Lynis.
 
 Deferred to a later release: per-service configuration items (mail, DNS, FTP
-daemon configuration), multi-host aggregation, an agentless SSH mode,
-file-integrity baselines, certificate expiry, OS end-of-life detection, cloud VM
+daemon configuration), multi-host aggregation, an agentless SSH mode, an ISMS-P
+mapping, file-integrity baselines, certificate expiry, OS end-of-life detection, cloud VM
 items.
 
 ## Relationship to assay
