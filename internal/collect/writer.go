@@ -28,10 +28,11 @@ const (
 const MinFreeBytes uint64 = 64 << 20
 
 var (
-	ErrExists       = errors.New("snapshot exists; use --force")
-	ErrUntrustedDir = errors.New("output directory is a symlink or world-writable")
-	ErrNoSpace      = errors.New("not enough free space for a snapshot")
-	ErrLocked       = errors.New("another muster collect is running")
+	ErrExists           = errors.New("snapshot exists; use --force")
+	ErrUntrustedDir     = errors.New("output directory is a symlink or world-writable")
+	ErrNoSpace          = errors.New("not enough free space for a snapshot")
+	ErrLocked           = errors.New("another muster collect is running")
+	ErrLatestNotUpdated = errors.New("snapshot written but the latest link was not updated")
 )
 
 // SnapshotName is <host>-<utc time>-<short digest>.json (spec §5.9): the
@@ -96,8 +97,22 @@ func trustedDir(dir string) error {
 	return nil
 }
 
+// statfs is unix.Statfs by default; tests substitute it to make the
+// free-space check below fail deterministically without needing to fill a
+// real disk. A Statfs failure fails closed (the error is returned, the
+// write does not proceed) rather than silently skipping the free-space
+// check — an unreadable filesystem is exactly the situation the check
+// exists to guard against, not a reason to trust there's room anyway.
+var statfs = unix.Statfs
+
 // WriteSnapshot writes data atomically with 0600 (spec §5.9, §7.1). The
 // only file collect ever writes goes through here.
+//
+// A non-nil error that errors.Is(err, ErrLatestNotUpdated) means the
+// snapshot itself was written successfully at the returned path — only the
+// `latest` convenience symlink could not be updated. Callers report that
+// case as a warning, not a run failure: the returned path is real, 0600,
+// and complete either way.
 func WriteSnapshot(data []byte, o WriteOptions, stdout io.Writer) (string, error) {
 	if o.Out == "-" {
 		_, err := stdout.Write(data)
@@ -122,10 +137,11 @@ func WriteSnapshot(data []byte, o WriteOptions, stdout io.Writer) (string, error
 		return "", err
 	}
 	var fs unix.Statfs_t
-	if err := unix.Statfs(dir, &fs); err == nil {
-		if free := uint64(fs.Bavail) * uint64(fs.Bsize); free < MinFreeBytes+uint64(len(data)) {
-			return "", ErrNoSpace
-		}
+	if err := statfs(dir, &fs); err != nil {
+		return "", err
+	}
+	if free := uint64(fs.Bavail) * uint64(fs.Bsize); free < MinFreeBytes+uint64(len(data)) {
+		return "", ErrNoSpace
 	}
 	final := filepath.Join(dir, name)
 	tmp := filepath.Join(dir, fmt.Sprintf(".%s.tmp-%d", name, os.Getpid()))
@@ -154,29 +170,41 @@ func WriteSnapshot(data []byte, o WriteOptions, stdout io.Writer) (string, error
 	}
 	if generated {
 		latestTmp := filepath.Join(dir, fmt.Sprintf(".latest.tmp-%d", os.Getpid()))
-		os.Remove(latestTmp)
-		if err := os.Symlink(name, latestTmp); err == nil {
-			os.Rename(latestTmp, filepath.Join(dir, "latest"))
+		os.Remove(latestTmp) // best effort: clear a stale temp link from a previous failed run
+		if err := os.Symlink(name, latestTmp); err != nil {
+			return final, fmt.Errorf("symlink %s: %w", latestTmp, ErrLatestNotUpdated)
+		}
+		if err := os.Rename(latestTmp, filepath.Join(dir, "latest")); err != nil {
+			os.Remove(latestTmp) // best effort: don't leave the temp link behind
+			return final, fmt.Errorf("rename %s to latest: %w", latestTmp, ErrLatestNotUpdated)
 		}
 	}
 	return final, nil
 }
 
+// renameNoReplace is unix.Renameat2(...RENAME_NOREPLACE) by default; tests
+// substitute it to force the EINVAL/ENOSYS/ENOTSUP fallback path in
+// finalizeRename below without needing a filesystem that genuinely lacks
+// RENAME_NOREPLACE support.
+var renameNoReplace = func(tmp, dst string) error {
+	return unix.Renameat2(unix.AT_FDCWD, tmp, unix.AT_FDCWD, dst, unix.RENAME_NOREPLACE)
+}
+
 // finalizeRename places tmp at final (R62). When Force is false it uses
-// Renameat2 with RENAME_NOREPLACE: the existence check and the placement
-// are one atomic kernel operation, so there is no window between "check
-// final doesn't exist" and "rename onto it" for a second collect (or an
-// attacker) to race — unlike a separate Lstat-then-Rename, which is
-// exactly that race. On a filesystem whose kernel or overlay doesn't
-// support RENAME_NOREPLACE (EINVAL/ENOSYS/ENOTSUP) it falls back to
-// Lstat-then-Rename, accepting that narrower race only where the atomic
+// renameNoReplace (Renameat2 with RENAME_NOREPLACE): the existence check
+// and the placement are one atomic kernel operation, so there is no window
+// between "check final doesn't exist" and "rename onto it" for a second
+// collect (or an attacker) to race — unlike a separate Lstat-then-Rename,
+// which is exactly that race. On a filesystem whose kernel or overlay
+// doesn't support RENAME_NOREPLACE (EINVAL/ENOSYS/ENOTSUP) it falls back
+// to Lstat-then-Rename, accepting that narrower race only where the atomic
 // path is unavailable. Force always overwrites unconditionally, matching
 // the brief's "--force" contract.
 func finalizeRename(tmp, final string, force bool) error {
 	if force {
 		return os.Rename(tmp, final)
 	}
-	err := unix.Renameat2(unix.AT_FDCWD, tmp, unix.AT_FDCWD, final, unix.RENAME_NOREPLACE)
+	err := renameNoReplace(tmp, final)
 	switch {
 	case err == nil:
 		return nil
@@ -196,8 +224,10 @@ func finalizeRename(tmp, final string, force bool) error {
 
 // Lock is the flock that keeps two muster collects from interleaving.
 // AcquireLock (the default lock file) and AcquireDirLock (an explicit
-// --out directory, R73) both return one, and Release works identically
-// for either.
+// --out directory, R73) are its only constructors, and Release works
+// identically for either. A zero Lock must never be used directly: its fd
+// defaults to 0, which is stdin, not "no lock" — always obtain a *Lock
+// through AcquireLock or AcquireDirLock, never a Lock{} literal.
 type Lock struct{ fd int }
 
 // AcquireLock takes an exclusive, non-blocking lock on the lock file at
