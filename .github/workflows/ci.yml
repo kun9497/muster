@@ -54,8 +54,17 @@ jobs:
         run: ./bin/muster collect --list-actions
       - name: prepare output directory
         run: mkdir -m 700 "$RUNNER_TEMP/muster"
+      - name: install openssh-server
+        run: sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq openssh-server
       - name: collect as root
-        run: sudo ./bin/muster collect --out "$RUNNER_TEMP/muster/root.json" --require-root --require-complete
+        run: |
+          set +e
+          sudo ./bin/muster collect --out "$RUNNER_TEMP/muster/root.json" --require-root --require-complete
+          code=$?
+          set -e
+          sudo chown "$(id -u)" "$RUNNER_TEMP/muster/root.json"
+          jq -r '.run.partial_failures, (.run.collectors[] | select(.status != "ok") | "\(.name): \(.status) \(.reason)")' "$RUNNER_TEMP/muster/root.json"
+          test "$code" -eq 0
       - name: check the root snapshot
         run: |
           sudo chown "$(id -u)" "$RUNNER_TEMP/muster/root.json"
@@ -123,29 +132,34 @@ jobs:
       - run: CGO_ENABLED=0 go build -trimpath -o bin/muster ./cmd/muster
       - name: collect inside ${{ matrix.image }}
         run: |
-          mkdir -p out
+          mkdir -m 700 "$RUNNER_TEMP/muster"
+          mkdir -m 700 "$RUNNER_TEMP/muster/containers"
           if [ "${{ matrix.init }}" = "true" ]; then
-            cid=$(docker run -d --privileged --cgroupns=host -v "$PWD/bin:/m:ro" -v "$PWD/out:/out" ${{ matrix.image }} /sbin/init)
-            sleep 5
+            cid=$(docker run -d --privileged --cgroupns=host -v "$PWD/bin:/m:ro" -v "$RUNNER_TEMP/muster/containers:/out" ${{ matrix.image }} /sbin/init)
+            for i in $(seq 1 30); do
+              state=$(docker exec "$cid" systemctl is-system-running --wait 2>/dev/null || true)
+              case "$state" in running|degraded) break ;; esac
+              sleep 1
+            done
             docker exec "$cid" /m/muster collect --out /out/c.json || true
             docker rm -f "$cid"
           else
-            docker run --rm -v "$PWD/bin:/m:ro" -v "$PWD/out:/out" ${{ matrix.image }} /m/muster collect --out /out/c.json || true
+            docker run --rm -v "$PWD/bin:/m:ro" -v "$RUNNER_TEMP/muster/containers:/out" ${{ matrix.image }} /m/muster collect --out /out/c.json || true
           fi
-          sudo chown "$(id -u)" out/c.json
-          test -s out/c.json
-          jq -e '.run.env.container != "none"' out/c.json
+          sudo chown "$(id -u)" "$RUNNER_TEMP/muster/containers/c.json"
+          test -s "$RUNNER_TEMP/muster/containers/c.json"
+          jq -e '.run.env.container != "none"' "$RUNNER_TEMP/muster/containers/c.json"
           if [ "${{ matrix.init }}" = "true" ]; then
-            jq -e '.facts.services.ssh.installed.status == "ok"' out/c.json
+            jq -e '.facts.services.ssh.installed.status == "ok"' "$RUNNER_TEMP/muster/containers/c.json"
           else
-            jq -e '.facts.services.ssh.installed.status == "unsupported"' out/c.json
+            jq -e '.facts.services.ssh.installed.status == "unsupported"' "$RUNNER_TEMP/muster/containers/c.json"
           fi
       - name: unseen facts are ERROR or NOT_APPLICABLE, never PASS
         run: |
           set +e
-          ./bin/muster check --facts out/c.json --format json > out/report.json
+          ./bin/muster check --facts "$RUNNER_TEMP/muster/containers/c.json" --format json > "$RUNNER_TEMP/muster/containers/report.json"
           set -e
-          jq -e '[.results[] | select(.status=="PASS") | .evidence[]? | select(.status != "ok")] | length == 0' out/report.json
+          jq -e '[.results[] | select(.status=="PASS") | .evidence[]? | select(.status != "ok")] | length == 0' "$RUNNER_TEMP/muster/containers/report.json"
 
   collect-contract:
     runs-on: ubuntu-24.04
