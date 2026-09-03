@@ -43,7 +43,7 @@ var (
 	validOn          = set("runtime", "persisted", "effective", "both")
 	validPersona     = set("root", "user", "invalid")
 	validParamType   = set("string", "int", "bool", "list<string>")
-	scalarOps        = set("eq", "ne", "in", "not_in", "lt", "lte", "gt", "gte", "matches", "contains", "present", "absent")
+	scalarOps        = set("eq", "ne", "in", "not_in", "lt", "lte", "gt", "gte", "matches", "not_matches", "contains", "present", "absent")
 	orderedOps       = set("lt", "lte", "gt", "gte")
 	collectionOps    = set("each", "none")
 )
@@ -273,6 +273,9 @@ func lintClause(c *Control, cl Clause, reg *facts.Registry, add func(string, str
 	if orderedOps[cl.Op] && entry.Type != "int" && entry.Type != "setting<int>" {
 		add("clause_grammar", "%s: %s needs an int fact", where, cl.Op)
 	}
+	if cl.Op == "not_matches" && isList {
+		add("clause_grammar", "%s: not_matches is scalar-only; use none with a where clause", where)
+	}
 	checkParamRef(c, cl.Expected, add, where)
 }
 
@@ -298,10 +301,10 @@ func lintExpected(cl Clause, add func(string, string, ...any), where string) {
 		if cl.Expected != nil {
 			add("clause_grammar", "%s: %s takes no expected", where, cl.Op)
 		}
-	case "matches":
+	case "matches", "not_matches":
 		s, ok := cl.Expected.(string)
 		if !ok {
-			add("clause_grammar", "%s: matches needs a string pattern", where)
+			add("clause_grammar", "%s: %s needs a string pattern", where, cl.Op)
 			return
 		}
 		if _, err := regexp.Compile(s); err != nil {

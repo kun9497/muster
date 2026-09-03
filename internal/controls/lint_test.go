@@ -282,6 +282,36 @@ remediation: { text_en: t, text_ko: 조치, risk: none }
 	}
 }
 
+func TestLintAcceptsNotMatchesWithAPatternAndRejectsItOnLists(t *testing.T) {
+	ok := `
+id: muster.file.banner_test
+title_en: t
+title_ko: t
+description_en: d
+description_ko: d
+category: file
+importance: 하
+automation: auto
+references: { kisa: { "2026": ["U-53"] } }
+requires_facts: ">=1"
+absent_means: pass
+checks:
+  - { fact: sshd.collect_method, op: not_matches, expected: "(?i)parse" }
+remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true }
+`
+	if r := rules(lintOne(t, ok, LintOptions{})); len(r) != 0 {
+		t.Fatalf("not_matches with a pattern must lint clean: %v", r)
+	}
+	bad := strings.Replace(ok, `expected: "(?i)parse"`, `expected: 3`, 1)
+	if r := rules(lintOne(t, bad, LintOptions{})); !r["clause_grammar"] {
+		t.Errorf("not_matches without a string pattern must be a clause_grammar problem: %v", r)
+	}
+	onList := strings.Replace(ok, "fact: sshd.collect_method", "fact: files.etc_securetty_lines", 1)
+	if r := rules(lintOne(t, onList, LintOptions{})); !r["clause_grammar"] {
+		t.Errorf("not_matches on a list fact must be a clause_grammar problem: %v", r)
+	}
+}
+
 // M13: lint ranges over c.Params and References.KISA, whose iteration order
 // Go randomises, and sorted only on (path, rule) -- so two problems sharing a
 // rule came out in a different order on every run.

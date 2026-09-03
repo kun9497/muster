@@ -63,6 +63,9 @@ func baseType(typ string) string {
 // registry (spec §6.3). JSON numbers arrive as float64; for "int" they must
 // be integral. Returns an error for a type mismatch or an unknown op, which
 // the evaluator turns into ERROR(internal_error) rather than a guess.
+//
+// not_matches is scalar-only (spec §6.3): on a list, "no element matches" is
+// what none/where express.
 func compare(op string, actual, expected any, typ string) (bool, error) {
 	typ = baseType(typ)
 	switch op {
@@ -126,7 +129,7 @@ func compare(op string, actual, expected any, typ string) (bool, error) {
 			return false, fmt.Errorf("actual %v is not a string", actual)
 		}
 		switch op {
-		case "eq", "ne", "contains", "matches":
+		case "eq", "ne", "contains", "matches", "not_matches":
 			e, ok := expected.(string)
 			if !ok {
 				return false, fmt.Errorf("expected %v is not a string", expected)
@@ -138,12 +141,16 @@ func compare(op string, actual, expected any, typ string) (bool, error) {
 				return a != e, nil
 			case "contains":
 				return strings.Contains(a, e), nil
-			case "matches":
+			case "matches", "not_matches":
 				re, err := regexp.Compile(e)
 				if err != nil {
 					return false, err
 				}
-				return re.MatchString(a), nil
+				m := re.MatchString(a)
+				if op == "not_matches" {
+					return !m, nil
+				}
+				return m, nil
 			}
 		case "in", "not_in":
 			return inList(op, a, expected, func(x any) (any, error) {

@@ -112,3 +112,14 @@ func TestResolveMissingWhenIntermediateIsNotObject(t *testing.T) {
 		t.Fatalf("%+v err=%v", got, err)
 	}
 }
+
+func TestRegistryAcceptsFacilityAndZoneSubjectKinds(t *testing.T) {
+	for _, kind := range []string{"facility", "zone"} {
+		if !validSubjectKind[kind] {
+			t.Errorf("subject kind %q must be valid (spec §6.4)", kind)
+		}
+	}
+	if validSubjectKind["banana"] {
+		t.Error("unknown subject kinds must stay invalid")
+	}
+}

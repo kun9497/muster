@@ -158,6 +158,35 @@ func TestSubstituteWholeValueOnly(t *testing.T) {
 	}
 }
 
+func TestNotMatchesIsTheNegationOfMatchesOnStrings(t *testing.T) {
+	cases := []struct {
+		actual, pattern string
+		want            bool
+	}{
+		{"vsftpd 3.0.5", `(?i)vsftpd`, false},
+		{"Welcome", `(?i)vsftpd`, true},
+		{"", `.`, true},
+	}
+	for _, c := range cases {
+		got, err := compare("not_matches", c.actual, c.pattern, "string")
+		if err != nil {
+			t.Fatalf("%q not_matches %q: %v", c.actual, c.pattern, err)
+		}
+		if got != c.want {
+			t.Errorf("%q not_matches %q = %v, want %v", c.actual, c.pattern, got, c.want)
+		}
+	}
+	if _, err := compare("not_matches", "x", "(", "string"); err == nil {
+		t.Error("an invalid pattern must be an error, not false")
+	}
+	if _, err := compare("not_matches", []any{"a"}, "a", "list<string>"); err == nil {
+		t.Error("not_matches is scalar-only; a list must be an error")
+	}
+	if _, err := compare("not_matches", 3, "3", "int"); err == nil {
+		t.Error("not_matches on an int must be an error")
+	}
+}
+
 func TestParamValuesDefaultsAndOverrides(t *testing.T) {
 	c := &controls.Control{Params: map[string]controls.Param{
 		"days": {Type: "int", Default: 90},
