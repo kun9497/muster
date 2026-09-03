@@ -37,8 +37,20 @@ func TestEndToEndFixturesAreMarkedSynthetic(t *testing.T) {
 // counts the waiver, the table shows a WAIVED row, and every warning is on
 // stderr (spec §6.7, §7.4).
 func TestCheckEndToEndWaiversTurnFailIntoWaived(t *testing.T) {
+	// Copy waiver file to temp dir so the trust gate passes when running as root
+	// (spec D12: trustedFile refuses files not owned by root when euid=0).
+	tmpDir := t.TempDir()
+	waiverSrc, err := os.ReadFile("testdata/waivers.yaml")
+	if err != nil {
+		t.Fatalf("read source waiver: %v", err)
+	}
+	tmpWaiver := filepath.Join(tmpDir, "waivers.yaml")
+	if err := os.WriteFile(tmpWaiver, waiverSrc, 0o600); err != nil {
+		t.Fatalf("write temp waiver: %v", err)
+	}
+
 	var out, errb bytes.Buffer
-	code := run([]string{"check", "--facts", "testdata/full-fail.json", "--waivers", "testdata/waivers.yaml", "--format", "json"}, &out, &errb)
+	code := run([]string{"check", "--facts", "testdata/full-fail.json", "--waivers", tmpWaiver, "--format", "json"}, &out, &errb)
 	if code != exitOK {
 		t.Fatalf("exit %d, want 0 once the only FAIL is waived; stderr %q", code, errb.String())
 	}
@@ -82,7 +94,7 @@ func TestCheckEndToEndWaiversTurnFailIntoWaived(t *testing.T) {
 	}
 
 	var table, tableErr bytes.Buffer
-	if code := run([]string{"check", "--facts", "testdata/full-fail.json", "--waivers", "testdata/waivers.yaml", "--color", "never"}, &table, &tableErr); code != exitOK {
+	if code := run([]string{"check", "--facts", "testdata/full-fail.json", "--waivers", tmpWaiver, "--color", "never"}, &table, &tableErr); code != exitOK {
 		t.Fatalf("exit %d, want 0; stderr %q", code, tableErr.String())
 	}
 	if !strings.Contains(table.String(), "WAIVED") || !strings.Contains(table.String(), "migration to key-only access") {
