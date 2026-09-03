@@ -62,17 +62,10 @@ func evalOne(e *env, c *controls.Control) (r Result) {
 	if need, ok := requiredVersion(c.RequiresFacts); ok && e.snap.SchemaVersion < need {
 		return fail(r, ERROR, MissingFact, fmt.Sprintf("control requires facts schema >=%d; snapshot is %d", need, e.snap.SchemaVersion))
 	}
-	// Step 2.
-	if c.Automation == "manual" || c.Automation == "not_applicable" {
-		r.Evidence = e.evidenceFor(clauseFacts(c.AppliesWhen))
-		if c.Automation == "manual" {
-			r.Status, r.Reason = MANUAL, c.ManualReason
-		} else {
-			r.Status, r.Reason = NotApplicable, c.ManualReason
-		}
-		return r
-	}
-	// Steps 3-4.
+	// Steps 2-3 (spec §6.5 as amended 2026-09-03): applies_when is screened
+	// and evaluated before the automation class is looked at, so a manual
+	// control on a host where it does not apply is NOT_APPLICABLE rather
+	// than a permanent MANUAL row.
 	if len(c.AppliesWhen) > 0 {
 		if res, done := e.screen(c.AppliesWhen, &r, screenApplies); done {
 			return res
@@ -87,6 +80,15 @@ func evalOne(e *env, c *controls.Control) (r Result) {
 				return fail(r, NotApplicable, "", "applies_when does not hold: "+e.describe(cl))
 			}
 		}
+	}
+	// Step 4.
+	if c.Automation == "manual" || c.Automation == "not_applicable" {
+		if c.Automation == "manual" {
+			r.Status, r.Reason = MANUAL, c.ManualReason
+		} else {
+			r.Status, r.Reason = NotApplicable, c.ManualReason
+		}
+		return r
 	}
 	// Step 5: choose the judgment.
 	checks := c.Checks
@@ -301,7 +303,7 @@ type screening struct {
 	reason string
 }
 
-// worstStatus screens the facts cls reference (spec §6.5 steps 3-4 and
+// worstStatus screens the facts cls reference (spec §6.5 steps 2-3 and
 // 6-8), one clause at a time so a two-home setting is screened by the
 // side(s) its own clause actually selects (R15): a plain fact (or a key the
 // snapshot doesn't carry at all — Resolve synthesises "missing" before it
@@ -436,8 +438,9 @@ func screenApplies(st screening) (Status, ReasonCode) {
 	return NotApplicable, ""
 }
 
-// screen applies worstStatus to applies_when facts (steps 3-4). R16: the
-// NOT_APPLICABLE it can return must carry evidence for the facts it judged.
+// screen applies worstStatus to applies_when facts (spec §6.5 steps 2-3).
+// R16: the NOT_APPLICABLE it can return must carry evidence for the facts
+// it judged.
 func (e *env) screen(cls []controls.Clause, r *Result, _ func(screening) (Status, ReasonCode)) (Result, bool) {
 	st := e.worstStatus(cls)
 	if st.hard {
