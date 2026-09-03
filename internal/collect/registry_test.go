@@ -304,17 +304,17 @@ func TestBuilderPlacePanicsOnChildThenLeafCollision(t *testing.T) {
 		t.Fatal(err)
 	}
 	injectSyntheticKeys(t, reg,
-		facts.Entry{Key: "synthetic2.leaf", Type: "bool", Since: 1, Sensitivity: "public"},
-		facts.Entry{Key: "synthetic2.leaf.child", Type: "bool", Since: 1, Sensitivity: "public"},
+		facts.Entry{Key: "prefixcollision.leaf", Type: "bool", Since: 1, Sensitivity: "public"},
+		facts.Entry{Key: "prefixcollision.leaf.child", Type: "bool", Since: 1, Sensitivity: "public"},
 	)
 	b := NewBuilder(reg)
-	b.Set("synthetic2.leaf.child", OK(true, nil))
+	b.Set("prefixcollision.leaf.child", OK(true, nil))
 	defer func() {
 		if recover() == nil {
-			t.Error("expected panic: synthetic2.leaf collides with keys already set beneath it")
+			t.Error("expected panic: prefixcollision.leaf collides with keys already set beneath it")
 		}
 	}()
-	b.Set("synthetic2.leaf", OK(true, nil))
+	b.Set("prefixcollision.leaf", OK(true, nil))
 }
 
 // R71: Begin/Keys/Worst give a collector its own bookkeeping.

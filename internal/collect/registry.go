@@ -100,6 +100,13 @@ func rewriteProcSelf(p string) string {
 // hostAccess is the production Access.
 type hostAccess struct{}
 
+// Host is the real host; collectors run against it under Guard. It is the
+// only Access that touches this machine — everything else in a test is a
+// double — so an out-of-package integration test names it here rather than
+// re-implementing the read primitive, the /proc/self rewrite and the exec
+// discipline it wraps (R77).
+func Host() Access { return hostAccess{} }
+
 func (hostAccess) ReadFile(p string, limit int64) ([]byte, ReadMeta, error) {
 	return ReadFile(rewriteProcSelf(p), limit)
 }

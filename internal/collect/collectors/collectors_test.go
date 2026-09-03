@@ -10,7 +10,6 @@ import (
 	"path"
 	"path/filepath"
 	"slices"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -800,43 +799,10 @@ func TestNoCollectorDeclaresAKnownSymlink(t *testing.T) {
 
 // --- the real host ------------------------------------------------------
 
-// hostLike is the smoke test's Access. It delegates to the same exported
-// primitives the production hostAccess calls — collect.ReadFile,
-// collect.Stat and collect.RunCommand — and applies the same
-// /proc/self → /proc/<pid> rewrite, because internal/collect exports no
-// accessor for hostAccess itself and Task 5 does not modify that package.
-// Llistxattr and Writable cannot be reproduced from outside internal/collect
-// (both go through its unexported no-follow open), so they answer
-// conservatively here; none of the assertions below depends on either.
-type hostLike struct{}
-
-func (hostLike) rewrite(p string) string {
-	const prefix = "/proc/self/"
-	if strings.HasPrefix(p, prefix) {
-		return "/proc/" + strconv.Itoa(os.Getpid()) + "/" + strings.TrimPrefix(p, prefix)
-	}
-	return p
-}
-
-func (h hostLike) ReadFile(p string, limit int64) ([]byte, collect.ReadMeta, error) {
-	return collect.ReadFile(h.rewrite(p), limit)
-}
-
-func (h hostLike) Stat(p string) (collect.ReadMeta, error) { return collect.Stat(h.rewrite(p)) }
-
-func (h hostLike) Glob(pattern string) ([]string, error) { return filepath.Glob(h.rewrite(pattern)) }
-
-func (hostLike) Llistxattr(string) ([]string, error) { return nil, nil }
-
-func (hostLike) Writable(string) bool { return false }
-
-func (hostLike) Run(ctx context.Context, c collect.Command) collect.Output {
-	return collect.RunCommand(ctx, c)
-}
-
-// TestSmokeOnTheRealHost runs three collectors against the real filesystem
-// under the guard. It asserts shapes only: no host value is printed, logged
-// or stored anywhere.
+// TestSmokeOnTheRealHost runs three collectors against the production
+// Access — collect.Host(), the same one the collect command will use — with
+// the real filesystem underneath and the guard on top. It asserts shapes
+// only: no host value is printed, logged or stored anywhere.
 func TestSmokeOnTheRealHost(t *testing.T) {
 	if os.Geteuid() != 0 {
 		t.Skip("the smoke test collects as root")
@@ -851,7 +817,7 @@ func TestSmokeOnTheRealHost(t *testing.T) {
 	b := collect.NewBuilder(reg)
 	for _, name := range []string{"sockets", "os", "files"} {
 		c := collectorNamed(t, name)
-		g := collect.Guard(hostLike{}, c)
+		g := collect.Guard(collect.Host(), c)
 		if err := c.Run(context.Background(), g, b); err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}

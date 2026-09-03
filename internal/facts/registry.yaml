@@ -108,7 +108,7 @@ keys:
     collector: accounts
   - key: accounts.users
     type: list<record>
-    description: Local accounts with name, uid, gid, shell, password_status and ageing fields; no hashes.
+    description: Local accounts with name, uid, gid, shell, password_status and ageing fields; no hashes. Ageing fields are -1 when the shadow field is empty.
     since: 1
     sensitivity: internal
     collector: accounts
