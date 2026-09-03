@@ -1,0 +1,2 @@
+# an ftp service whose trailing comment mentions telnet
+ftp	stream	tcp	nowait	root	/usr/sbin/tcpd	in.ftpd	# not telnet

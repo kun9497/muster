@@ -194,6 +194,13 @@ func Run(ctx context.Context, o Options, stdout io.Writer) (Outcome, error) {
 	// null capability list.
 	hdr.EUID = os.Geteuid()
 	hdr.Capabilities = []string{}
+	// Run.Env is deliberately NOT seeded: the os collector fills it, and
+	// when that collector fails the block keeps its zero value — container
+	// "", virt "", every flag false. Those zeros are not claims about the
+	// host, and nothing reads them: the header is provenance, no control
+	// evaluates Env, and the facts that decide a verdict carry their own
+	// status. run.collectors[os] is where a reader sees the block was never
+	// filled (spec §5.1).
 	// Parked: run.deep stays false in stage 1 (R47/R76) — the walk.* keys
 	// are absent, which is not "the walk ran and found nothing".
 	// R52: stage 1 stores no original secret value.
@@ -413,6 +420,12 @@ func callRun(ctx context.Context, c Collector, a Access, b *Builder) (status, re
 // can never drift (R66). CollectorRun.Cmd holds one string, so a collector
 // that runs several is represented by the first it declared;
 // --list-actions is where the full set lives.
+//
+// Cmd is the DECLARED command, not a record that it ran or succeeded: sshd
+// still reports "/usr/sbin/sshd -T" when that command failed and the
+// collector fell back to parsing the configuration files. What actually
+// answered is in the facts — sshd.collect_method says "T" or "parse", and
+// each envelope's source names the command or the file it came from.
 func firstCommand(c Collector) string {
 	if len(c.Declare.Commands) == 0 {
 		return ""

@@ -1,0 +1,2 @@
+# sshd's strdelim: the "=" may trail the keyword
+PermitRootLogin= yes

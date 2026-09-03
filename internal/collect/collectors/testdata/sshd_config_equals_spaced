@@ -1,0 +1,2 @@
+# sshd's strdelim: whitespace around the "=" separates too
+PermitRootLogin = yes

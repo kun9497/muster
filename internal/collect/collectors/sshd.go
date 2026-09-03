@@ -78,7 +78,7 @@ func runSshd(ctx context.Context, a collect.Access, b *collect.Builder) error {
 					e = collect.ErrorEnv(oversizedReason)
 					break
 				}
-				e = collect.OK(f[1], src)
+				e = collect.OK(keywordValue(permitRootLogin, f[1]), src)
 				break
 			}
 		}
@@ -166,7 +166,16 @@ func parseSshdConfig(a collect.Access, file, keyword string, depth int) (facts.E
 				if !declared(a, pattern) {
 					return collect.ErrorEnv("Include " + pattern + " is outside the collector's declaration"), true
 				}
-				matches, _ := a.Glob(pattern)
+				matches, err := a.Glob(pattern)
+				if err != nil {
+					// A Glob that failed is not an Include that matched
+					// nothing: each drop-in it would have named could have
+					// carried a higher-priority value, so expanding to
+					// nothing and publishing the main file's value as ok
+					// would be a PASS on evidence never seen — the same rule
+					// an unreadable drop-in gets just below.
+					return collect.ErrorEnv("Include " + pattern + ": " + err.Error()), true
+				}
 				slices.Sort(matches)
 				for _, m := range matches {
 					if env, ok := parseSshdConfig(a, path.Clean(m), keyword, depth+1); ok {
@@ -180,7 +189,7 @@ func parseSshdConfig(a collect.Access, file, keyword string, depth int) (facts.E
 			if oversized(f[1]) {
 				return collect.ErrorEnv(oversizedReason), true
 			}
-			return collect.OKRead(f[1], &facts.Source{
+			return collect.OKRead(keywordValue(key, f[1]), &facts.Source{
 				Kind: "file", Path: file, Line: i + 1, Raw: sourceRaw(raw),
 			}, meta), true
 		}
@@ -199,18 +208,59 @@ const oversizedReason = "value exceeds 4 KiB"
 func oversized(v string) bool { return len(v) > maxTokenValue }
 
 // configTokens splits an sshd_config line into its keyword and arguments.
-// sshd's own tokenizer treats "=" as a separator, so "PermitRootLogin=yes"
-// is the same directive as "PermitRootLogin yes" and a lone field carrying
-// an "=" has to be split on the first one or the directive is missed
-// entirely — and a missed directive reads as "not configured".
+//
+// R85: sshd's own tokenizer (strdelim) counts "=" as a separator alongside
+// whitespace for the first separator on a line, so all four of
+//
+//	Keyword value    Keyword=value    Keyword = value
+//	Keyword =value   Keyword= value
+//
+// are one directive. Every spelling muster does not recognise reads as "the
+// keyword is not configured", which is a PASS on a directive that is right
+// there in the file — so the first "=" after the keyword is folded away
+// here, wherever the spaces around it fall. A later "=" is left alone: it
+// belongs to the value (an AuthorizedKeysCommand argument, say), not to the
+// keyword.
 func configTokens(line string) []string {
 	f := strings.Fields(line)
-	if len(f) == 1 {
-		if k, v, ok := strings.Cut(f[0], "="); ok {
-			return []string{k, v}
+	if len(f) == 0 {
+		return f
+	}
+	if k, v, ok := strings.Cut(f[0], "="); ok {
+		// "Keyword=value" and "Keyword= value": the keyword carries the
+		// separator, and the value may be empty (it is then the next field,
+		// or the directive has no value at all).
+		out := []string{k}
+		if v != "" {
+			out = append(out, v)
+		}
+		return append(out, f[1:]...)
+	}
+	if len(f) > 1 {
+		if f[1] == "=" { // "Keyword = value"
+			return append(f[:1], f[2:]...)
+		}
+		if v, ok := strings.CutPrefix(f[1], "="); ok { // "Keyword =value"
+			f[1] = v
 		}
 	}
 	return f
+}
+
+// multistate names the keywords whose value is one of a fixed set of words
+// rather than free text. sshd matches those case-insensitively, so
+// "PermitRootLogin No" and "permitrootlogin no" are one answer; the value
+// is folded here so a control never has to match both spellings and two
+// hosts that are configured identically cannot produce different facts.
+// Paths, ciphers and command lines are NOT folded — their case is theirs.
+var multistate = map[string]bool{permitRootLogin: true}
+
+// keywordValue is the value stored for one parsed keyword.
+func keywordValue(keyword, value string) string {
+	if multistate[strings.ToLower(keyword)] {
+		return strings.ToLower(value)
+	}
+	return value
 }
 
 // declared asks the guard whether pattern is inside the collector's

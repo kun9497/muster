@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"os"
 	"path"
 	"path/filepath"
@@ -40,6 +41,7 @@ type fsAccess struct {
 	modes    map[string]uint32    // host path -> raw 0o7777 bits
 	xattrs   map[string][]string  // host path -> extended attribute names
 	writable map[string]bool      // host path -> Writable answer
+	globErr  error                // when set, every Glob fails with it
 
 	// reads records every path ReadFile was asked for, so a test can assert
 	// that a collector did NOT go looking for something it did not need.
@@ -87,6 +89,9 @@ func (a *fsAccess) Stat(p string) (collect.ReadMeta, error) {
 // returns the matches sorted, so a collector that depends on Glob order —
 // sshd's Include expansion — is exercised deterministically.
 func (a *fsAccess) Glob(pattern string) ([]string, error) {
+	if a.globErr != nil {
+		return nil, a.globErr
+	}
 	var out []string
 	for p := range a.files {
 		if ok, _ := path.Match(pattern, p); ok {
@@ -373,6 +378,64 @@ func TestSshdParsesTheEqualsForm(t *testing.T) {
 	}
 	if s.Persisted.Source.Line != 2 {
 		t.Errorf("line %d, want 2", s.Persisted.Source.Line)
+	}
+}
+
+// M4 (R85). sshd's own tokenizer (strdelim) treats "=" as a separator like
+// whitespace, so all four spellings below are one directive, and it
+// compares a multistate value case-insensitively, so "No" is "no". A
+// spelling muster does not recognise reads as "the keyword is not
+// configured" — a PASS on a directive that is right there in the file.
+func TestSshdParsesEverySeparatorSpellingAndFoldsTheValue(t *testing.T) {
+	for _, tc := range []struct {
+		file, want string
+	}{
+		{"sshd_config_equals", "yes"},          // PermitRootLogin=yes
+		{"sshd_config_equals_spaced", "yes"},   // PermitRootLogin = yes
+		{"sshd_config_equals_leading", "yes"},  // PermitRootLogin =yes
+		{"sshd_config_equals_trailing", "yes"}, // PermitRootLogin= yes
+		{"sshd_config_mixed_case", "no"},       // PermitRootLogin No
+	} {
+		t.Run(tc.file, func(t *testing.T) {
+			a := &fsAccess{files: map[string]string{"/etc/ssh/sshd_config": tc.file}}
+			s := setting(t, build(t, "sshd", a), "sshd.options.permit_root_login")
+			if s.Persisted == nil || s.Persisted.Status != facts.StatusOK || s.Persisted.Value != tc.want {
+				t.Fatalf("persisted %+v, want ok %q", s.Persisted, tc.want)
+			}
+			if s.Persisted.Source.Line != 2 {
+				t.Errorf("line %d, want 2", s.Persisted.Source.Line)
+			}
+		})
+	}
+}
+
+// The same fold on the runtime side, so the two sides of the setting can
+// never disagree about the spelling of one answer.
+func TestSshdFoldsTheRuntimeValue(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{"/etc/ssh/sshd_config": "sshd_config"},
+		cmds:  map[string]cmdResult{"/usr/sbin/sshd -T": {file: "sshd_T_mixed_case.txt"}},
+	}
+	s := setting(t, build(t, "sshd", a), "sshd.options.permit_root_login")
+	if s.Runtime == nil || s.Runtime.Value != "no" || s.Effective.Value != "no" {
+		t.Errorf("runtime %+v effective %+v, want \"no\"", s.Runtime, s.Effective)
+	}
+}
+
+// M5. A Glob that fails is not an Include that matched nothing: the
+// drop-ins it would have named may each carry a higher-priority value, so
+// the failure is the answer rather than a silent expansion to nothing.
+func TestSshdIncludeGlobFailureIsRecorded(t *testing.T) {
+	a := &fsAccess{
+		files:   map[string]string{"/etc/ssh/sshd_config": "sshd_config"},
+		globErr: errors.New("glob boom"),
+	}
+	s := setting(t, build(t, "sshd", a), "sshd.options.permit_root_login")
+	if s.Persisted == nil || s.Persisted.Status != facts.StatusError {
+		t.Fatalf("persisted %+v, want error", s.Persisted)
+	}
+	if want := "Include /etc/ssh/sshd_config.d/*.conf: glob boom"; s.Persisted.Reason != want {
+		t.Errorf("reason %q, want %q", s.Persisted.Reason, want)
 	}
 }
 
@@ -872,6 +935,34 @@ func TestServicesTelnetInstalledFromInetdConf(t *testing.T) {
 	b := build(t, "services", a)
 	e := env(t, b, "services.telnet.installed")
 	if e.Value != true || e.Source == nil || e.Source.Path != "/etc/inetd.conf" || e.Source.Line != 2 {
+		t.Errorf("installed %+v %+v", e, e.Source)
+	}
+}
+
+// M14. An inetd line declares telnet by its FIRST field — the service name
+// — or by a server program that ends in "telnetd". The word appearing
+// anywhere on the line is not evidence: an unrelated service whose
+// arguments or trailing comment mention telnet would otherwise be reported
+// as a telnet daemon that is not installed at all.
+func TestServicesInetdTelnetIsNotASubstringMatch(t *testing.T) {
+	a := servicesAccess(map[string]string{
+		"/proc/self/net/tcp": "proc_net_tcp",
+		"/etc/inetd.conf":    "inetd.conf.ftp_mentions_telnet",
+	}, allUnitsNotFound())
+	e := env(t, build(t, "services", a), "services.telnet.installed")
+	if e.Status != facts.StatusOK || e.Value != false {
+		t.Errorf("%+v: an ftp line that merely mentions telnet must not count", e)
+	}
+}
+
+// ...and the server field still counts, whatever the service is called.
+func TestServicesInetdTelnetFromTheServerField(t *testing.T) {
+	a := servicesAccess(map[string]string{
+		"/proc/self/net/tcp": "proc_net_tcp",
+		"/etc/inetd.conf":    "inetd.conf.server_telnetd",
+	}, allUnitsNotFound())
+	e := env(t, build(t, "services", a), "services.telnet.installed")
+	if e.Value != true || e.Source == nil || e.Source.Line != 2 {
 		t.Errorf("installed %+v %+v", e, e.Source)
 	}
 }

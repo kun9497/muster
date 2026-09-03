@@ -1,0 +1,2 @@
+# a telnet server reached under another service name
+telnet-alt	stream	tcp	nowait	root	/usr/sbin/in.telnetd	in.telnetd

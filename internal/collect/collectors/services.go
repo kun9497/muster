@@ -91,6 +91,25 @@ var servicesCollector = collect.Collector{
 // an xinetd fragment (R63).
 var xinetdTelnet = regexp.MustCompile(`^service\s+telnet\b|^server\s*=.*telnetd`)
 
+// inetdServerField is where the server program sits on an /etc/inetd.conf
+// line: service, socket type, protocol, flags, user, server, arguments.
+const inetdServerField = 5
+
+// inetdTelnet reports whether one non-comment /etc/inetd.conf line declares
+// telnet (M14). Only two fields can say so: the service name, which is the
+// FIRST field, and the server program, which a wrapper like tcpd would
+// otherwise hide. The word appearing anywhere else on the line is not
+// evidence — an unrelated service whose arguments or trailing comment
+// mention telnet would be reported as a telnet daemon that is not installed
+// at all, which is a FAIL on a host that never had it.
+func inetdTelnet(line string) bool {
+	f := strings.Fields(line)
+	if len(f) == 0 {
+		return false
+	}
+	return f[0] == "telnet" || (len(f) > inetdServerField && strings.HasSuffix(f[inetdServerField], "telnetd"))
+}
+
 // showValues parses the "Key=Value" lines systemctl show prints.
 func showValues(stdout []byte) (load, active string) {
 	for _, line := range splitLines(stdout) {
@@ -294,7 +313,7 @@ func telnetFromLegacy(a collect.Access) (found, problem *facts.Envelope) {
 			if line == "" || strings.HasPrefix(line, "#") {
 				continue
 			}
-			if strings.Contains(line, "telnet") {
+			if inetdTelnet(line) {
 				e := collect.OKRead(true, &facts.Source{
 					Kind: "file", Path: inetdConf, Line: i + 1, Raw: sourceRaw(raw),
 				}, meta)

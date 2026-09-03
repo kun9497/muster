@@ -1,0 +1,2 @@
+# sshd's strdelim: the "=" may lead the value
+PermitRootLogin =yes

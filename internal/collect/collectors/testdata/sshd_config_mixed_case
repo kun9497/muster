@@ -1,0 +1,2 @@
+# sshd compares a multistate value case-insensitively
+PermitRootLogin No
