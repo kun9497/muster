@@ -229,6 +229,11 @@ func evalOne(e *env, c *controls.Control) (r Result) {
 	if all.Degraded == "" && e.parseFallback(checks) {
 		all.Degraded = degradedParseFallback
 	}
+	// Step 13 (spec §7.3): account facts come from the local files; when
+	// NSS also resolves accounts remotely, a holding judgment is partial.
+	if all.Degraded == "" && e.remoteNSS(checks) {
+		all.Degraded = degradedRemoteNSS
+	}
 	return finish(r, c, all)
 }
 
@@ -252,6 +257,35 @@ func (e *env) parseFallback(cls []controls.Clause) bool {
 	}
 	method, _ := res.Envelope.Value.(string)
 	return method == "parse"
+}
+
+// remoteNSS reports whether any clause is subject to a user or group record
+// (registry SubjectKind "user" or "group") or reads accounts.shadow_in_use,
+// while the snapshot says accounts.nss.remote is true (R127/R128, spec
+// §7.3). Those are the account facts a remote NSS source can actually add
+// entries to; accounts.login_defs.*, accounts.shells and
+// accounts.parse_failures are host-wide policy or bookkeeping rather than
+// account records, and accounts.nss.* itself never triggers its own
+// degradation. A missing, denied or absent accounts.nss.remote is not a
+// remote source.
+func (e *env) remoteNSS(cls []controls.Clause) bool {
+	reads := false
+	for _, cl := range cls {
+		entry, ok := e.reg.Lookup(cl.Fact)
+		if (ok && (entry.SubjectKind == "user" || entry.SubjectKind == "group")) || cl.Fact == "accounts.shadow_in_use" {
+			reads = true
+			break
+		}
+	}
+	if !reads {
+		return false
+	}
+	res, err := e.reg.Resolve(e.snap, "accounts.nss.remote")
+	if err != nil || res.Envelope == nil || res.Envelope.Status != facts.StatusOK {
+		return false
+	}
+	remote, _ := res.Envelope.Value.(bool)
+	return remote
 }
 
 // finish applies steps 11-14 to the combined clause outcome.

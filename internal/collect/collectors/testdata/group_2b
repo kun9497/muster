@@ -10,3 +10,4 @@ bob:x:1001:
 dupgid:x:1000:
 nogroup:x:65534:
 broken
+badg:x:notanumber:alice

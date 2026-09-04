@@ -405,6 +405,24 @@ keys:
     since: 1
     sensitivity: public
     collector: accounts
+  - key: accounts.nss.passwd_sources
+    type: list<string>
+    description: The sources on the passwd line of /etc/nsswitch.conf, in order, with bracketed actions removed; absent when the file or the line is missing (glibc then resolves from files).
+    since: 1
+    sensitivity: public
+    collector: accounts
+  - key: accounts.nss.group_sources
+    type: list<string>
+    description: The sources on the group line of /etc/nsswitch.conf, in order, with bracketed actions removed; absent when the file or the line is missing.
+    since: 1
+    sensitivity: public
+    collector: accounts
+  - key: accounts.nss.remote
+    type: bool
+    description: "Whether the passwd or group database names a remote source in use: any source other than files, compat, systemd or db, where sss counts only when /etc/sssd/sssd.conf exists (compat's NIS + entries are not detected); account controls judged on the local files report WARN while this is true (spec section 7.3)."
+    since: 1
+    sensitivity: public
+    collector: accounts
   - key: env.container
     type: string
     description: Container runtime detected from filesystem markers (none, docker, podman, lxc, other); the same value the run header carries.

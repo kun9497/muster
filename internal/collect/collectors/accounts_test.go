@@ -281,8 +281,8 @@ func record(t *testing.T, list []any, i int) map[string]any {
 func TestAccountsGroupsOrphansAndAdminMembers(t *testing.T) {
 	b := build(t, "accounts", accounts2BWithGroup())
 	groups := okList(t, b, "accounts.groups")
-	if len(groups) != 11 {
-		t.Fatalf("%d groups, want 11", len(groups))
+	if len(groups) != 12 {
+		t.Fatalf("%d groups, want 12", len(groups))
 	}
 	sudo := record(t, groups, 4)
 	if sudo["name"] != "sudo" || sudo["gid"] != 27 || sudo["member_count"] != 2 || sudo["gid_duplicate"] != false {
@@ -299,6 +299,13 @@ func TestAccountsGroupsOrphansAndAdminMembers(t *testing.T) {
 	}
 	if g := record(t, groups, 0); g["member_count"] != 0 || g["gid_duplicate"] != false {
 		t.Errorf("root group %v", g)
+	}
+	// R136: badg's gid "notanumber" is unparsable, so it is kept with
+	// gid -1, counted as a parse failure, and excluded from gid_duplicate
+	// (only gid >= 0 entries are compared) and from admin_group_members
+	// (badg is not an administrative group).
+	if badg := record(t, groups, 11); badg["name"] != "badg" || badg["gid"] != -1 || badg["gid_duplicate"] != false {
+		t.Errorf("badg %v", badg)
 	}
 	orphans := okList(t, b, "accounts.orphan_gids")
 	if len(orphans) != 1 || record(t, orphans, 0)["name"] != "carol" || record(t, orphans, 0)["gid"] != 4242 {
@@ -322,8 +329,11 @@ func TestAccountsGroupsOrphansAndAdminMembers(t *testing.T) {
 			}
 		}
 	}
-	if e := env(t, b, "accounts.parse_failures"); e.Value != 3 {
-		t.Errorf("parse_failures %+v, want 3 (two passwd, one group)", e)
+	if e := env(t, b, "accounts.parse_failures"); e.Value != 4 {
+		t.Errorf("parse_failures %+v, want 4 (two passwd, two group)", e)
+	}
+	if e := env(t, b, "accounts.parse_failures"); len(e.Source.Inputs) != 2 {
+		t.Errorf("parse_failures source inputs %+v, want 2 (passwd and group both readable)", e.Source.Inputs)
 	}
 }
 
@@ -364,6 +374,9 @@ func TestAccountsGroupDeniedReachesOnlyTheGroupJoins(t *testing.T) {
 	if e := env(t, b, "accounts.parse_failures"); e.Value != 2 {
 		t.Errorf("parse_failures %+v", e)
 	}
+	if e := env(t, b, "accounts.parse_failures"); len(e.Source.Inputs) != 1 {
+		t.Errorf("parse_failures source inputs %+v, want 1 (passwd alone; /etc/group is denied)", e.Source.Inputs)
+	}
 }
 
 // R135(a). The mirror of the group case: an unreadable /etc/passwd reaches
@@ -382,8 +395,8 @@ func TestAccountsPasswdDeniedReachesEveryPasswdJoin(t *testing.T) {
 			t.Errorf("%s = %+v, want denied", k, e)
 		}
 	}
-	if groups := okList(t, b, "accounts.groups"); len(groups) != 11 {
-		t.Errorf("%d groups, want 11 (/etc/group was readable)", len(groups))
+	if groups := okList(t, b, "accounts.groups"); len(groups) != 12 {
+		t.Errorf("%d groups, want 12 (/etc/group was readable)", len(groups))
 	}
 }
 
@@ -419,5 +432,95 @@ func TestAccountsParseFailuresCarryTruncation(t *testing.T) {
 		if e := env(t, b, k); e.Truncated {
 			t.Errorf("%s %+v is built from /etc/passwd and /etc/shadow alone", k, e)
 		}
+	}
+}
+
+// --- Task 4: NSS sources and the remote-source degradation --------------
+
+// Task 4: the NSS sources of the two account databases, bracketed actions
+// removed, and the derived "any remote source" flag.
+func TestAccountsNSSSourcesAndRemote(t *testing.T) {
+	a := accounts2BWithGroup()
+	a.files["/etc/nsswitch.conf"] = "nsswitch.conf"
+	b := build(t, "accounts", a)
+	if e := env(t, b, "accounts.nss.passwd_sources"); e.Status != facts.StatusOK || e.Source == nil || e.Source.Line != 2 {
+		t.Errorf("%+v", e)
+	} else if l := e.Value.([]any); len(l) != 2 || l[0] != "files" || l[1] != "systemd" {
+		t.Errorf("%v", l)
+	}
+	if e := env(t, b, "accounts.nss.remote"); e.Status != facts.StatusOK || e.Value != false || e.Source.Kind != "derived" {
+		t.Errorf("%+v", e)
+	}
+
+	a.files["/etc/nsswitch.conf"] = "nsswitch_sss.conf"
+	b = build(t, "accounts", a)
+	if l := okList(t, b, "accounts.nss.passwd_sources"); len(l) != 3 || l[1] != "sss" || l[2] != "ldap" {
+		t.Errorf("%v (the [NOTFOUND=return] action is not a source)", l)
+	}
+	if e := env(t, b, "accounts.nss.remote"); e.Value != true {
+		t.Errorf("%+v", e)
+	}
+}
+
+func TestAccountsNSSFileMissingMeansLocal(t *testing.T) {
+	b := build(t, "accounts", accounts2BWithGroup())
+	if e := env(t, b, "accounts.nss.passwd_sources"); e.Status != facts.StatusAbsent {
+		t.Errorf("%+v", e)
+	}
+	if e := env(t, b, "accounts.nss.remote"); e.Status != facts.StatusOK || e.Value != false {
+		t.Errorf("%+v (glibc resolves from files when nsswitch.conf is missing)", e)
+	}
+	a := accounts2BWithGroup()
+	a.fails = map[string]error{"/etc/nsswitch.conf": os.ErrPermission}
+	b = build(t, "accounts", a)
+	for _, k := range []string{"accounts.nss.passwd_sources", "accounts.nss.group_sources", "accounts.nss.remote"} {
+		if e := env(t, b, k); e.Status != facts.StatusDenied {
+			t.Errorf("%s = %+v (unknown is not local)", k, e)
+		}
+	}
+}
+
+func TestNSSSourcesParsing(t *testing.T) {
+	data := []byte("passwd: files sss [NOTFOUND=return] ldap\n# group: comment\ngroup:files\n")
+	if s, line, ok := nssSources(data, "passwd"); !ok || line != 1 || strings.Join(s, ",") != "files,sss,ldap" {
+		t.Errorf("%v %d %v", s, line, ok)
+	}
+	if s, line, ok := nssSources(data, "group"); !ok || line != 3 || strings.Join(s, ",") != "files" {
+		t.Errorf("%v %d %v", s, line, ok)
+	}
+	if _, _, ok := nssSources(data, "shadow"); ok {
+		t.Error("shadow is not listed")
+	}
+	if nssRemote([][]string{{"files", "systemd"}, {"compat"}}, false) {
+		t.Error("files/systemd/compat are local")
+	}
+	if !nssRemote([][]string{{"files"}, {"files", "winbind"}}, false) {
+		t.Error("winbind is remote")
+	}
+}
+
+// R127: authselect lists "sss" in nsswitch.conf on every RHEL-family host
+// whether or not sssd has a domain configured, so "sss" alone must not read
+// as a remote source — only /etc/sssd/sssd.conf existing makes it one.
+func TestAccountsNSSSssCountsOnlyWhenConfigured(t *testing.T) {
+	if !nssRemote([][]string{{"files", "sss"}}, true) {
+		t.Error("sss counts as remote once sssd is configured")
+	}
+	a := accounts2BWithGroup()
+	a.files["/etc/nsswitch.conf"] = "nsswitch_rhel.conf"
+	b := build(t, "accounts", a)
+	if e := env(t, b, "accounts.nss.remote"); e.Status != facts.StatusOK || e.Value != false {
+		t.Errorf("%+v (sss alone, sssd not configured, must not count as remote)", e)
+	} else if want := "sss listed but /etc/sssd/sssd.conf absent: not counted"; e.Reason != want {
+		t.Errorf("reason %q, want %q", e.Reason, want)
+	}
+	if l := okList(t, b, "accounts.nss.passwd_sources"); len(l) != 3 || l[0] != "sss" || l[1] != "files" || l[2] != "systemd" {
+		t.Errorf("%v", l)
+	}
+
+	a.files["/etc/sssd/sssd.conf"] = "nsswitch.conf" // any existing fixture; only Stat presence matters
+	b = build(t, "accounts", a)
+	if e := env(t, b, "accounts.nss.remote"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("%+v (sssd.conf present: sss now counts)", e)
 	}
 }

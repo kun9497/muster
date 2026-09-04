@@ -18,7 +18,7 @@ const (
 
 var accountsCollector = collect.Collector{
 	Name:    "accounts",
-	Declare: collect.Declaration{Reads: []string{loginDefsPath, passwdPath, shadowPath, groupPath, shellsPath}, Needs: "root"},
+	Declare: collect.Declaration{Reads: []string{loginDefsPath, passwdPath, shadowPath, groupPath, shellsPath, nsswitchPath, sssdConfPath}, Needs: "root"},
 	Run:     runAccounts,
 }
 
@@ -275,6 +275,7 @@ func runAccounts(_ context.Context, a collect.Access, b *collect.Builder) error 
 	pwData, pmeta, perr := a.ReadFile(passwdPath, readLimit)
 	shells, shellsEnv := loginShells(a)
 	b.Set("accounts.shells", shellsEnv)
+	writeNSS(a, b)
 	gData, gmeta, gerr := a.ReadFile(groupPath, readLimit)
 	var grows []groupRow
 	gfail := 0

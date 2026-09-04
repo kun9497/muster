@@ -33,7 +33,13 @@ func (e *env) evalCollection(cl controls.Clause, entry facts.Entry, list []any, 
 			if err != nil {
 				return clauseOutcome{Err: err}
 			}
-			obs := Observation{Subject: subject, Expected: cl.Require.Expected, Actual: fieldValue(cl.Require.Field, elem), Verdict: "pass"}
+			// R129: Expected must show the resolved value, never a raw
+			// "${param}" token (spec §6.3, R27).
+			expected, err := substitute(cl.Require.Expected, e.params)
+			if err != nil {
+				return clauseOutcome{Err: err}
+			}
+			obs := Observation{Subject: subject, Expected: expected, Actual: fieldValue(cl.Require.Field, elem), Verdict: "pass"}
 			if !ok {
 				obs.Verdict = "fail"
 				out.Holds = false
@@ -45,8 +51,12 @@ func (e *env) evalCollection(cl controls.Clause, entry facts.Entry, list []any, 
 				return clauseOutcome{Err: err}
 			}
 			if hit {
+				expected, err := substitute(cl.Where.Expected, e.params)
+				if err != nil {
+					return clauseOutcome{Err: err}
+				}
 				out.Holds = false
-				out.Observations = append(out.Observations, Observation{Subject: subject, Expected: fmt.Sprintf("not %s %v", cl.Where.Op, cl.Where.Expected), Actual: fieldValue(cl.Where.Field, elem), Verdict: "fail"})
+				out.Observations = append(out.Observations, Observation{Subject: subject, Expected: fmt.Sprintf("not %s %v", cl.Where.Op, expected), Actual: fieldValue(cl.Where.Field, elem), Verdict: "fail"})
 			}
 		}
 	}

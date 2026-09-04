@@ -1,6 +1,7 @@
 package check
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -144,6 +145,45 @@ func TestFieldClauseSubstitutesRequireExpectedParam(t *testing.T) {
 			t.Errorf("subject %s: verdict=%s, want %s (${want} must substitute to true, not compare against the literal string)", obs.Subject, obs.Verdict, wantVerdict)
 		}
 	}
+}
+
+// R129: Observation.Expected must carry the substituted value, never the
+// raw "${param}" token — the same rule describe() already enforces for a
+// plain clause's reason text (R27), now applied to each/none observations
+// too.
+func TestEvalCollectionObservationExpectedIsSubstituted(t *testing.T) {
+	e := newEnv(t, `{"schema_version":1,"run":{},"facts":{"accounts":{"users":{"status":"ok","value":[{"name":"lp"}]}}}}`)
+	e.params["names"] = []any{"lp"}
+
+	t.Run("none", func(t *testing.T) {
+		cl := controls.Clause{Fact: "accounts.users", Op: "none", Where: &controls.Clause{Field: "name", Op: "in", Expected: "${names}"}}
+		out := e.evalClause(cl)
+		if out.Err != nil {
+			t.Fatal(out.Err)
+		}
+		if len(out.Observations) != 1 {
+			t.Fatalf("%+v", out.Observations)
+		}
+		got := fmt.Sprint(out.Observations[0].Expected)
+		if !strings.Contains(got, "lp") || strings.Contains(got, "${") {
+			t.Errorf("Expected = %q, want the substituted value and no raw token", got)
+		}
+	})
+
+	t.Run("each", func(t *testing.T) {
+		cl := controls.Clause{Fact: "accounts.users", Op: "each", Require: &controls.Clause{Field: "name", Op: "in", Expected: "${names}"}}
+		out := e.evalClause(cl)
+		if out.Err != nil {
+			t.Fatal(out.Err)
+		}
+		if len(out.Observations) != 1 {
+			t.Fatalf("%+v", out.Observations)
+		}
+		got := fmt.Sprint(out.Observations[0].Expected)
+		if !strings.Contains(got, "lp") || strings.Contains(got, "${") {
+			t.Errorf("Expected = %q, want the substituted value and no raw token", got)
+		}
+	})
 }
 
 func TestEvalCollectionScalarSubjectUsesElementValue(t *testing.T) {

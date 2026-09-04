@@ -56,6 +56,16 @@ func passMaxDaysControl(automation string) controls.Control {
 	}
 }
 
+// nopassControl reads an accounts.* list fact, which is what makes the
+// step-13 remote-NSS degradation (spec §7.3) apply to it.
+func nopassControl() controls.Control {
+	return controls.Control{
+		ID: "muster.account.shadow_passwords", Importance: "상", Category: "account", Automation: "auto", AbsentMeans: "fail",
+		Checks:      []controls.Clause{{Fact: "accounts.users", Op: "none", Subject: "name", Where: &controls.Clause{Field: "password_status", Op: "eq", Expected: "nopass"}}},
+		Remediation: &controls.Remediation{Risk: "lockout_risk"},
+	}
+}
+
 // passwordPolicyControl checks two `both` settings at once, which is what
 // makes cross-clause degradation shadowing (C2) visible: one clause can fail
 // on both sides while another carries a side mismatch.
@@ -299,6 +309,33 @@ func TestDerivationTable(t *testing.T) {
 			`{"sshd":{"collect_method":{"status":"ok","value":"parse"},"personas_collected":{"status":"ok","value":true},` +
 				`"options":{"permit_root_login":{"effective":{"status":"ok","value":"yes"}}}}}`,
 			permitRootLoginControl("auto", "fail"), FAIL, "", nil},
+		// Spec §7.3: an account control judged while NSS names a remote
+		// source is a degraded judgment — local files are only part of it.
+		{"13 remote NSS source degrades a holding account control to WARN",
+			`{"accounts":{"nss":{"remote":{"status":"ok","value":true}},"users":{"status":"ok","value":[{"name":"root","password_status":"hashed"}]}}}`,
+			nopassControl(), WARN, "",
+			func(t *testing.T, r Result) {
+				if r.Degraded != degradedRemoteNSS {
+					t.Errorf("want Degraded=%q, got %q", degradedRemoteNSS, r.Degraded)
+				}
+				if !strings.Contains(r.Reason, "remote NSS") {
+					t.Errorf("reason must name the degradation: %q", r.Reason)
+				}
+			}},
+		{"13 remote NSS source leaves a failing account control at FAIL",
+			`{"accounts":{"nss":{"remote":{"status":"ok","value":true}},"users":{"status":"ok","value":[{"name":"bob","password_status":"nopass"}]}}}`,
+			nopassControl(), FAIL, "", nil},
+		{"13 remote NSS source does not touch a non-account control",
+			`{"accounts":{"nss":{"remote":{"status":"ok","value":true}}},"services":{"telnet":{"reachable":{"status":"ok","value":false}}}}`,
+			telnetControl("auto", "pass"), PASS, "", nil},
+		{"13 an unreadable nsswitch is not a remote source",
+			`{"accounts":{"nss":{"remote":{"status":"denied","reason":"/etc/nsswitch.conf: permission denied"}},"users":{"status":"ok","value":[{"name":"root","password_status":"hashed"}]}}}`,
+			nopassControl(), PASS, "", nil},
+		// R128: a login.defs control (no user/group subject_kind, and not
+		// accounts.shadow_in_use) is never degraded by a remote NSS source.
+		{"13 remote NSS source does not degrade a login.defs control",
+			`{"accounts":{"nss":{"remote":{"status":"ok","value":true}},"login_defs":{"pass_max_days":{"runtime":{"status":"ok","value":90},"persisted":{"status":"ok","value":90}}}}}`,
+			passMaxDaysControl("auto"), PASS, "", nil},
 		// M10: applies_when evidence must survive absent_means, and a
 		// mechanism's `when` evidence must not be discarded.
 		{"5 no mechanism applies keeps applies_when evidence",

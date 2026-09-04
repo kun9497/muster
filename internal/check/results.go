@@ -43,6 +43,9 @@ const (
 	degradedPersonas = "personas not collected"
 	// sshd options judged from muster's parse instead of the daemon's answer.
 	degradedParseFallback = "sshd -T unavailable; judged from parsed configuration"
+	// degradedRemoteNSS marks an account control judged on the local files
+	// while nsswitch names a remote source too (spec §7.3).
+	degradedRemoteNSS = "remote NSS account source; judged on local files only"
 )
 
 // sideMismatch reports whether d is the "holds on one side only" degradation
