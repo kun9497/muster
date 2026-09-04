@@ -361,11 +361,23 @@ keys:
     collector: accounts
   - key: accounts.users
     type: list<record>
-    description: Local accounts with name, uid, gid, shell, password_status and ageing fields; no hashes. Ageing fields are -1 when the shadow field is empty, and uid/gid are -1 when the passwd field is unparsable.
+    description: Local accounts in /etc/passwd order with name, uid, gid, home, shell, system (0 < uid < UID_MIN, where UID_MIN is login.defs' value or 1000 when it is unset or unreadable; nobody is not a system account), shadowed (passwd field is x), uid_duplicate, name_duplicate, shell_valid (shell listed in /etc/shells) and, when /etc/shadow was read, password_status (hashed | locked | nopass | noshadow), locked, hash_algo ("$6$"-style id, "legacy" for a hash without one, "" when there is no hash) and the ageing fields; no hashes. Ageing fields are -1 when the shadow field is empty, and uid/gid are -1 when the passwd field is unparsable.
     since: 1
     sensitivity: internal
     collector: accounts
     subject_kind: user
+  - key: accounts.shells
+    type: list<string>
+    description: The login shells listed in /etc/shells, in file order; when the file does not exist, the libc default (/bin/sh, /bin/csh) with a reason saying so; carries the read's status when the file is unreadable.
+    since: 1
+    sensitivity: public
+    collector: accounts
+  - key: accounts.parse_failures
+    type: int
+    description: Lines of /etc/passwd and /etc/group that could not be parsed as an account or group (too few fields, a non-numeric uid or gid); a mangled file must not read as a clean host.
+    since: 1
+    sensitivity: public
+    collector: accounts
   - key: env.container
     type: string
     description: Container runtime detected from filesystem markers (none, docker, podman, lxc, other); the same value the run header carries.

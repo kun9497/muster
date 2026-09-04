@@ -18,7 +18,7 @@ const (
 
 var accountsCollector = collect.Collector{
 	Name:    "accounts",
-	Declare: collect.Declaration{Reads: []string{loginDefsPath, passwdPath, shadowPath}, Needs: "root"},
+	Declare: collect.Declaration{Reads: []string{loginDefsPath, passwdPath, shadowPath, shellsPath}, Needs: "root"},
 	Run:     runAccounts,
 }
 
@@ -127,7 +127,11 @@ func passwordStatus(pw string) string {
 }
 
 // hashAlgo returns the "$id$" prefix of a crypt hash and nothing else: no
-// salt, no digest, not one byte of either.
+// salt, no digest, not one byte of either. The field is first stripped of
+// the "!" and "*" characters that lock an account, because a locked
+// account holding an MD5 hash still holds an MD5 hash — the lock is
+// reported as its own field. A non-empty remainder with no "$id$" prefix
+// is hash material of a legacy scheme (DES, BSDi) and is named "legacy".
 //
 // The id has to look like one — 1 to 8 alphanumeric characters, which
 // covers every crypt scheme in use ("1", "5", "6", "y", "2b", "gy",
@@ -138,8 +142,12 @@ func passwordStatus(pw string) string {
 // sliced out of pw, so it cannot keep the whole shadow line alive behind
 // it either.
 func hashAlgo(pw string) string {
-	if !strings.HasPrefix(pw, "$") {
+	pw = strings.TrimLeft(pw, "!*")
+	if pw == "" {
 		return ""
+	}
+	if !strings.HasPrefix(pw, "$") {
+		return "legacy"
 	}
 	id, _, ok := strings.Cut(pw[1:], "$")
 	if !ok || len(id) == 0 || len(id) > 8 || !isAlphanumeric(id) {
@@ -265,40 +273,28 @@ func runAccounts(_ context.Context, a collect.Access, b *collect.Builder) error 
 	b.SetSetting("accounts.login_defs.pass_warn_age", facts.Setting{Runtime: &warnR, Persisted: &warnP})
 
 	pwData, pmeta, perr := a.ReadFile(passwdPath, readLimit)
+	shells, shellsEnv := loginShells(a)
+	b.Set("accounts.shells", shellsEnv)
 	if perr != nil {
-		b.Set("accounts.users", collect.FromReadError(perr, pmeta))
+		e := collect.FromReadError(perr, pmeta)
+		b.Set("accounts.users", e)
+		b.Set("accounts.parse_failures", e)
 		return nil
 	}
+	prows, failures := parsePasswd(pwData)
 	byName := make(map[string]shadowRow, len(rows))
 	for _, r := range rows {
 		byName[r.name] = r
 	}
-	users := []any{} // R50: a host with no parsable accounts yields [], not null
-	for _, line := range splitLines(pwData) {
-		f := strings.Split(line, ":")
-		if len(f) < 7 || f[0] == "" || strings.HasPrefix(f[0], "#") {
-			continue
-		}
-		u := map[string]any{
-			"name":  f[0],
-			"uid":   intField(f[2]),
-			"gid":   intField(f[3]),
-			"shell": f[6],
-		}
-		// Without shadow the row simply has no ageing fields, rather than
-		// zeroes that would read as a policy nobody set.
-		if r, ok := byName[f[0]]; ok {
-			u["password_status"] = r.status
-			u["hash_algo"] = r.algo
-			u["last_change"] = r.lastChange
-			u["min"] = r.min
-			u["max"] = r.max
-			u["warn"] = r.warn
-			u["inactive"] = r.inactive
-			u["expire"] = r.expire
-		}
-		users = append(users, u)
-	}
-	b.Set("accounts.users", collect.OKRead(users, &facts.Source{Kind: "file", Path: passwdPath}, pmeta))
+	users := deriveUsers(prows, byName, serr == nil, defs.intOr("UID_MIN", 1000), shells)
+	// A record joins two files, so it is partial when either read was cut
+	// short: a truncated /etc/shadow leaves rows whose password_status was
+	// derived from a shadow this process never saw the end of (R131).
+	ue := collect.OKRead(users, &facts.Source{Kind: "file", Path: passwdPath}, pmeta)
+	ue.Truncated = ue.Truncated || (serr == nil && smeta.Truncated)
+	b.Set("accounts.users", ue)
+	fe := collect.OK(failures, &facts.Source{Kind: "derived", Inputs: []facts.Source{{Kind: "file", Path: passwdPath}}})
+	fe.Truncated = pmeta.Truncated
+	b.Set("accounts.parse_failures", fe)
 	return nil
 }

@@ -1,0 +1,15 @@
+root:x:0:0:root:/root:/bin/bash
+toor:x:0:0:alias:/root:/bin/bash
+daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin
+sync:x:4:65534:sync:/bin:/bin/sync
+lp:x:7:7:lp:/var/spool/lpd:/usr/sbin/nologin
+ftp:x:14:50:FTP User:/var/ftp:/bin/bash
+svc:x:998:998::/:/usr/sbin/nologin
+alice:x:1000:1000::/home/alice:/bin/bash
+bob:x:1000:1001::/home/bob:/bin/bash
+carol:x:1001:4242::/home/carol:/bin/bash
+alice:x:1002:1000::/home/alice2:/bin/sh
+dave:hashhashhashh:1003:1000::/home/dave:/bin/bash
+mangled line without fields
+badu:x:notanumber:1000::/home/badu:/bin/bash
+ghost:x:1004:1000::/home/ghost:/bin/bash
