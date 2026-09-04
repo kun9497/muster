@@ -1,0 +1,12 @@
+root:x:0:
+daemon:x:1:
+lp:x:7:
+wheel:x:10:carol
+sudo:x:27:alice,bob,alice
+users:x:50:
+svc:x:998:
+alice:x:1000:
+bob:x:1001:
+dupgid:x:1000:
+nogroup:x:65534:
+broken

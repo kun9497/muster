@@ -378,6 +378,33 @@ keys:
     since: 1
     sensitivity: public
     collector: accounts
+  - key: accounts.groups
+    type: list<record>
+    description: Local groups in /etc/group order with name, gid, members (the listed secondary members, duplicates removed), member_count and gid_duplicate.
+    since: 1
+    sensitivity: internal
+    collector: accounts
+    subject_kind: group
+  - key: accounts.orphan_gids
+    type: list<record>
+    description: Accounts whose primary gid names no group in /etc/group, as name and gid in /etc/passwd order; [] when every primary group exists; carries the read's status when /etc/passwd or /etc/group is unreadable.
+    since: 1
+    sensitivity: internal
+    collector: accounts
+    subject_kind: user
+  - key: accounts.admin_group_members
+    type: list<record>
+    description: Members of the administrative groups root, wheel, sudo and admin other than the root account itself - name, group and via (primary when the account's gid is the group's, secondary when listed in /etc/group) - in /etc/group order, primary members before secondary ones.
+    since: 1
+    sensitivity: internal
+    collector: accounts
+    subject_kind: user
+  - key: accounts.shadow_in_use
+    type: bool
+    description: Whether /etc/shadow exists and every /etc/passwd entry defers to it (password field x); a false names the first account that does not; carries the read's status when /etc/shadow or /etc/passwd is unreadable.
+    since: 1
+    sensitivity: public
+    collector: accounts
   - key: env.container
     type: string
     description: Container runtime detected from filesystem markers (none, docker, podman, lxc, other); the same value the run header carries.

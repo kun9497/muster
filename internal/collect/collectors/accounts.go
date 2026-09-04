@@ -18,7 +18,7 @@ const (
 
 var accountsCollector = collect.Collector{
 	Name:    "accounts",
-	Declare: collect.Declaration{Reads: []string{loginDefsPath, passwdPath, shadowPath, shellsPath}, Needs: "root"},
+	Declare: collect.Declaration{Reads: []string{loginDefsPath, passwdPath, shadowPath, groupPath, shellsPath}, Needs: "root"},
 	Run:     runAccounts,
 }
 
@@ -104,7 +104,7 @@ func (d loginDefs) intOr(key string, def int) int {
 // parseShadow, and no part of it is ever stored (spec §5.6).
 type shadowRow struct {
 	name       string
-	status     string // hashed | locked | nopass
+	status     string // hashed | locked | nopass (noshadow is assigned by deriveUsers for a passwd row without a shadow row)
 	algo       string // the "$id$" prefix, empty when there is no hash
 	lastChange int
 	min        int
@@ -275,9 +275,30 @@ func runAccounts(_ context.Context, a collect.Access, b *collect.Builder) error 
 	pwData, pmeta, perr := a.ReadFile(passwdPath, readLimit)
 	shells, shellsEnv := loginShells(a)
 	b.Set("accounts.shells", shellsEnv)
+	gData, gmeta, gerr := a.ReadFile(groupPath, readLimit)
+	var grows []groupRow
+	gfail := 0
+	if gerr == nil {
+		grows, gfail = parseGroup(gData)
+	}
+	groupErr := func() facts.Envelope {
+		e := collect.FromReadError(gerr, gmeta)
+		e.Reason = groupPath + ": " + e.Reason
+		return e
+	}
 	if perr != nil {
+		// Without /etc/passwd there are no accounts to report or to join;
+		// the groups themselves are still a fact when /etc/group was read.
 		e := collect.FromReadError(perr, pmeta)
 		b.Set("accounts.users", e)
+		if gerr != nil {
+			b.Set("accounts.groups", groupErr())
+		} else {
+			b.Set("accounts.groups", collect.OKRead(groupRecords(grows), &facts.Source{Kind: "file", Path: groupPath}, gmeta))
+		}
+		b.Set("accounts.orphan_gids", e)
+		b.Set("accounts.admin_group_members", e)
+		b.Set("accounts.shadow_in_use", e)
 		b.Set("accounts.parse_failures", e)
 		return nil
 	}
@@ -293,8 +314,32 @@ func runAccounts(_ context.Context, a collect.Access, b *collect.Builder) error 
 	ue := collect.OKRead(users, &facts.Source{Kind: "file", Path: passwdPath}, pmeta)
 	ue.Truncated = ue.Truncated || (serr == nil && smeta.Truncated)
 	b.Set("accounts.users", ue)
-	fe := collect.OK(failures, &facts.Source{Kind: "derived", Inputs: []facts.Source{{Kind: "file", Path: passwdPath}}})
-	fe.Truncated = pmeta.Truncated
+	joined := &facts.Source{Kind: "derived", Inputs: []facts.Source{{Kind: "file", Path: passwdPath}, {Kind: "file", Path: groupPath}}}
+	if gerr != nil {
+		b.Set("accounts.groups", groupErr())
+		b.Set("accounts.orphan_gids", groupErr())
+		b.Set("accounts.admin_group_members", groupErr())
+	} else {
+		b.Set("accounts.groups", collect.OKRead(groupRecords(grows), &facts.Source{Kind: "file", Path: groupPath}, gmeta))
+		// Both joins read the two files, so either read hitting the cap
+		// makes them partial: OKRead carries /etc/group's flag and the
+		// passwd one is ORed in (R131).
+		oe := collect.OKRead(orphanGIDs(prows, grows), joined, gmeta)
+		oe.Truncated = oe.Truncated || pmeta.Truncated
+		b.Set("accounts.orphan_gids", oe)
+		ae := collect.OKRead(adminGroupMembers(prows, grows), joined, gmeta)
+		ae.Truncated = ae.Truncated || pmeta.Truncated
+		b.Set("accounts.admin_group_members", ae)
+	}
+	b.Set("accounts.shadow_in_use", shadowInUse(prows, serr, smeta, pmeta))
+	inputs := []facts.Source{{Kind: "file", Path: passwdPath}}
+	if gerr == nil {
+		inputs = append(inputs, facts.Source{Kind: "file", Path: groupPath})
+	}
+	// The count sums both files, so it is partial when either was cut short
+	// — a truncated /etc/group hides the very lines that would not parse.
+	fe := collect.OK(failures+gfail, &facts.Source{Kind: "derived", Inputs: inputs})
+	fe.Truncated = pmeta.Truncated || (gerr == nil && gmeta.Truncated)
 	b.Set("accounts.parse_failures", fe)
 	return nil
 }

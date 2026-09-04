@@ -197,6 +197,9 @@ func TestAccountsShellsFallBackToTheLibcDefault(t *testing.T) {
 		if e.Status != facts.StatusOK || e.Source == nil || e.Source.Kind != "derived" {
 			t.Fatalf("shells %+v (source %+v)", e, e.Source)
 		}
+		if e.Reason != "libc default; /etc/shells does not exist" {
+			t.Errorf("shells reason %q must say where the list came from", e.Reason)
+		}
 		if l, ok := e.Value.([]any); !ok || len(l) != 2 || l[0] != "/bin/sh" || l[1] != "/bin/csh" {
 			t.Errorf("shells %#v, want the libc default", e.Value)
 		}
@@ -254,5 +257,167 @@ func TestAccountsUsersCarryShadowTruncation(t *testing.T) {
 	}
 	if e := env(t, b, "accounts.shells"); e.Truncated {
 		t.Errorf("accounts.shells %+v was read whole", e)
+	}
+}
+
+// --- Task 3: /etc/group, its joins with /etc/passwd and shadow-in-use ---
+
+func accounts2BWithGroup() *fsAccess {
+	a := accounts2B()
+	a.files["/etc/group"] = "group_2b"
+	return a
+}
+
+func record(t *testing.T, list []any, i int) map[string]any {
+	t.Helper()
+	if i >= len(list) {
+		t.Fatalf("element %d of %d", i, len(list))
+	}
+	return list[i].(map[string]any)
+}
+
+// Task 3: groups keep file order and count their listed members; the
+// primary-group join and the administrative membership are their own keys.
+func TestAccountsGroupsOrphansAndAdminMembers(t *testing.T) {
+	b := build(t, "accounts", accounts2BWithGroup())
+	groups := okList(t, b, "accounts.groups")
+	if len(groups) != 11 {
+		t.Fatalf("%d groups, want 11", len(groups))
+	}
+	sudo := record(t, groups, 4)
+	if sudo["name"] != "sudo" || sudo["gid"] != 27 || sudo["member_count"] != 2 || sudo["gid_duplicate"] != false {
+		t.Errorf("sudo %v (a member listed twice counts once)", sudo)
+	}
+	if m := sudo["members"].([]any); len(m) != 2 || m[0] != "alice" || m[1] != "bob" {
+		t.Errorf("sudo members %v", m)
+	}
+	if g := record(t, groups, 7); g["name"] != "alice" || g["gid_duplicate"] != true {
+		t.Errorf("alice group %v", g)
+	}
+	if g := record(t, groups, 9); g["name"] != "dupgid" || g["gid_duplicate"] != true {
+		t.Errorf("dupgid %v", g)
+	}
+	if g := record(t, groups, 0); g["member_count"] != 0 || g["gid_duplicate"] != false {
+		t.Errorf("root group %v", g)
+	}
+	orphans := okList(t, b, "accounts.orphan_gids")
+	if len(orphans) != 1 || record(t, orphans, 0)["name"] != "carol" || record(t, orphans, 0)["gid"] != 4242 {
+		t.Errorf("orphan_gids %v", orphans)
+	}
+	admins := okList(t, b, "accounts.admin_group_members")
+	want := []map[string]any{
+		{"name": "toor", "group": "root", "via": "primary"},
+		{"name": "carol", "group": "wheel", "via": "secondary"},
+		{"name": "alice", "group": "sudo", "via": "secondary"},
+		{"name": "bob", "group": "sudo", "via": "secondary"},
+	}
+	if len(admins) != len(want) {
+		t.Fatalf("admin_group_members %v", admins)
+	}
+	for i, w := range want {
+		got := record(t, admins, i)
+		for k, v := range w {
+			if got[k] != v {
+				t.Errorf("admin[%d] %v, want %v", i, got, w)
+			}
+		}
+	}
+	if e := env(t, b, "accounts.parse_failures"); e.Value != 3 {
+		t.Errorf("parse_failures %+v, want 3 (two passwd, one group)", e)
+	}
+}
+
+func TestAccountsShadowInUse(t *testing.T) {
+	b := build(t, "accounts", accounts2BWithGroup())
+	if e := env(t, b, "accounts.shadow_in_use"); e.Status != facts.StatusOK || e.Value != false || !strings.Contains(e.Reason, "dave") {
+		t.Errorf("%+v (dave keeps hash material in /etc/passwd)", e)
+	}
+	a := &fsAccess{files: map[string]string{"/etc/login.defs": "login.defs", "/etc/passwd": "passwd", "/etc/shadow": "shadow"}}
+	if e := env(t, build(t, "accounts", a), "accounts.shadow_in_use"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("stage-1 fixtures: %+v", e)
+	}
+	delete(a.files, "/etc/shadow")
+	if e := env(t, build(t, "accounts", a), "accounts.shadow_in_use"); e.Status != facts.StatusOK || e.Value != false || !strings.Contains(e.Reason, "/etc/shadow") {
+		t.Errorf("no shadow file: %+v", e)
+	}
+	a.fails = map[string]error{"/etc/shadow": os.ErrPermission}
+	if e := env(t, build(t, "accounts", a), "accounts.shadow_in_use"); e.Status != facts.StatusDenied || !strings.HasPrefix(e.Reason, "/etc/shadow: ") {
+		t.Errorf("denied shadow: %+v", e)
+	}
+}
+
+// A denied /etc/group costs the three group-derived keys and nothing else:
+// users and the passwd-only joins still come out, and parse_failures counts
+// what was parsed.
+func TestAccountsGroupDeniedReachesOnlyTheGroupJoins(t *testing.T) {
+	a := accounts2B()
+	a.fails = map[string]error{"/etc/group": os.ErrPermission}
+	b := build(t, "accounts", a)
+	for _, k := range []string{"accounts.groups", "accounts.orphan_gids", "accounts.admin_group_members"} {
+		if e := env(t, b, k); e.Status != facts.StatusDenied || !strings.HasPrefix(e.Reason, "/etc/group: ") {
+			t.Errorf("%s = %+v", k, e)
+		}
+	}
+	if users := okList(t, b, "accounts.users"); len(users) != 13 {
+		t.Errorf("%d users", len(users))
+	}
+	if e := env(t, b, "accounts.parse_failures"); e.Value != 2 {
+		t.Errorf("parse_failures %+v", e)
+	}
+}
+
+// R135(a). The mirror of the group case: an unreadable /etc/passwd reaches
+// every key the passwd read feeds — the user list, both joins, shadow-in-use
+// and the failure count — and stops at accounts.groups, which /etc/passwd
+// has no part in.
+func TestAccountsPasswdDeniedReachesEveryPasswdJoin(t *testing.T) {
+	a := accounts2BWithGroup()
+	a.fails = map[string]error{"/etc/passwd": os.ErrPermission}
+	b := build(t, "accounts", a)
+	for _, k := range []string{
+		"accounts.users", "accounts.orphan_gids", "accounts.admin_group_members",
+		"accounts.shadow_in_use", "accounts.parse_failures",
+	} {
+		if e := env(t, b, k); e.Status != facts.StatusDenied {
+			t.Errorf("%s = %+v, want denied", k, e)
+		}
+	}
+	if groups := okList(t, b, "accounts.groups"); len(groups) != 11 {
+		t.Errorf("%d groups, want 11 (/etc/group was readable)", len(groups))
+	}
+}
+
+// R131. Truncation crosses every join this collector makes: a count taken
+// from two files is partial when either was cut short, and a key built from
+// one of them stays whole when the other was truncated.
+func TestAccountsParseFailuresCarryTruncation(t *testing.T) {
+	a := accounts2BWithGroup()
+	a.truncated = map[string]bool{"/etc/passwd": true}
+	b := build(t, "accounts", a)
+	for _, k := range []string{
+		"accounts.users", "accounts.orphan_gids", "accounts.admin_group_members",
+		"accounts.shadow_in_use", "accounts.parse_failures",
+	} {
+		if e := env(t, b, k); !e.Truncated {
+			t.Errorf("%s %+v must be truncated when /etc/passwd was", k, e)
+		}
+	}
+	if e := env(t, b, "accounts.groups"); e.Truncated {
+		t.Errorf("accounts.groups %+v is built from /etc/group alone", e)
+	}
+	a = accounts2BWithGroup()
+	a.truncated = map[string]bool{"/etc/group": true}
+	b = build(t, "accounts", a)
+	for _, k := range []string{
+		"accounts.groups", "accounts.orphan_gids", "accounts.admin_group_members", "accounts.parse_failures",
+	} {
+		if e := env(t, b, k); !e.Truncated {
+			t.Errorf("%s %+v must be truncated when /etc/group was", k, e)
+		}
+	}
+	for _, k := range []string{"accounts.users", "accounts.shadow_in_use"} {
+		if e := env(t, b, k); e.Truncated {
+			t.Errorf("%s %+v is built from /etc/passwd and /etc/shadow alone", k, e)
+		}
 	}
 }

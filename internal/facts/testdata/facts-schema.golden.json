@@ -792,6 +792,46 @@
       "SubjectKind": ""
     },
     {
+      "Key": "accounts.groups",
+      "Type": "list\u003crecord\u003e",
+      "Description": "Local groups in /etc/group order with name, gid, members (the listed secondary members, duplicates removed), member_count and gid_duplicate.",
+      "Since": 1,
+      "Sensitivity": "internal",
+      "Collector": "accounts",
+      "DefaultOn": "",
+      "SubjectKind": "group"
+    },
+    {
+      "Key": "accounts.orphan_gids",
+      "Type": "list\u003crecord\u003e",
+      "Description": "Accounts whose primary gid names no group in /etc/group, as name and gid in /etc/passwd order; [] when every primary group exists; carries the read's status when /etc/passwd or /etc/group is unreadable.",
+      "Since": 1,
+      "Sensitivity": "internal",
+      "Collector": "accounts",
+      "DefaultOn": "",
+      "SubjectKind": "user"
+    },
+    {
+      "Key": "accounts.admin_group_members",
+      "Type": "list\u003crecord\u003e",
+      "Description": "Members of the administrative groups root, wheel, sudo and admin other than the root account itself - name, group and via (primary when the account's gid is the group's, secondary when listed in /etc/group) - in /etc/group order, primary members before secondary ones.",
+      "Since": 1,
+      "Sensitivity": "internal",
+      "Collector": "accounts",
+      "DefaultOn": "",
+      "SubjectKind": "user"
+    },
+    {
+      "Key": "accounts.shadow_in_use",
+      "Type": "bool",
+      "Description": "Whether /etc/shadow exists and every /etc/passwd entry defers to it (password field x); a false names the first account that does not; carries the read's status when /etc/shadow or /etc/passwd is unreadable.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "accounts",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
       "Key": "env.container",
       "Type": "string",
       "Description": "Container runtime detected from filesystem markers (none, docker, podman, lxc, other); the same value the run header carries.",
