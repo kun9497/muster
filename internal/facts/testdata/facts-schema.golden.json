@@ -672,6 +672,96 @@
       "SubjectKind": ""
     },
     {
+      "Key": "accounts.login_defs.pass_warn_age",
+      "Type": "setting\u003cint\u003e",
+      "Description": "PASS_WARN_AGE - persisted in login.defs, effective as the minimum warn field over existing accounts' shadow rows.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "accounts",
+      "DefaultOn": "both",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "accounts.login_defs.uid_min",
+      "Type": "int",
+      "Description": "UID_MIN from login.defs, the lowest uid of a regular (non-system) account.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "accounts",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "accounts.login_defs.sys_uid_max",
+      "Type": "int",
+      "Description": "SYS_UID_MAX from login.defs, the highest uid useradd assigns to a system account.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "accounts",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "accounts.login_defs.sha_crypt_min_rounds",
+      "Type": "int",
+      "Description": "SHA_CRYPT_MIN_ROUNDS from login.defs.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "accounts",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "accounts.login_defs.umask",
+      "Type": "string",
+      "Description": "UMASK from login.defs, verbatim (a mask, not a number).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "accounts",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "accounts.login_defs.home_mode",
+      "Type": "string",
+      "Description": "HOME_MODE from login.defs, verbatim.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "accounts",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "accounts.login_defs.encrypt_method",
+      "Type": "string",
+      "Description": "ENCRYPT_METHOD from login.defs, verbatim (SHA512, YESCRYPT, ...); PAM may override it.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "accounts",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "accounts.login_defs.env_supath",
+      "Type": "string",
+      "Description": "ENV_SUPATH from login.defs, verbatim (the PATH= assignment for root logins).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "accounts",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "accounts.login_defs.env_path",
+      "Type": "string",
+      "Description": "ENV_PATH from login.defs, verbatim (the PATH= assignment for other logins).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "accounts",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
       "Key": "accounts.users",
       "Type": "list\u003crecord\u003e",
       "Description": "Local accounts with name, uid, gid, shell, password_status and ageing fields; no hashes. Ageing fields are -1 when the shadow field is empty, and uid/gid are -1 when the passwd field is unparsable.",

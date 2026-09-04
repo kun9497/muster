@@ -1,0 +1,15 @@
+# synthetic login.defs for plan 2B
+PASS_MAX_DAYS	90
+PASS_MIN_DAYS	1
+PASS_WARN_AGE	7
+PASS_MIN_LEN	8
+UID_MIN 1000
+UID_MAX 60000
+SYS_UID_MAX 999
+UMASKX 077
+UMASK		022
+HOME_MODE	0750
+ENCRYPT_METHOD SHA512
+SHA_CRYPT_MIN_ROUNDS 5000
+ENV_SUPATH	PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ENV_PATH	PATH=/usr/local/bin:/usr/bin:/bin

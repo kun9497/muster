@@ -304,6 +304,61 @@ keys:
     since: 1
     sensitivity: public
     collector: accounts
+  - key: accounts.login_defs.pass_warn_age
+    type: setting<int>
+    description: PASS_WARN_AGE - persisted in login.defs, effective as the minimum warn field over existing accounts' shadow rows.
+    since: 1
+    sensitivity: public
+    collector: accounts
+    default_on: both
+  - key: accounts.login_defs.uid_min
+    type: int
+    description: UID_MIN from login.defs, the lowest uid of a regular (non-system) account.
+    since: 1
+    sensitivity: public
+    collector: accounts
+  - key: accounts.login_defs.sys_uid_max
+    type: int
+    description: SYS_UID_MAX from login.defs, the highest uid useradd assigns to a system account.
+    since: 1
+    sensitivity: public
+    collector: accounts
+  - key: accounts.login_defs.sha_crypt_min_rounds
+    type: int
+    description: SHA_CRYPT_MIN_ROUNDS from login.defs.
+    since: 1
+    sensitivity: public
+    collector: accounts
+  - key: accounts.login_defs.umask
+    type: string
+    description: UMASK from login.defs, verbatim (a mask, not a number).
+    since: 1
+    sensitivity: public
+    collector: accounts
+  - key: accounts.login_defs.home_mode
+    type: string
+    description: HOME_MODE from login.defs, verbatim.
+    since: 1
+    sensitivity: public
+    collector: accounts
+  - key: accounts.login_defs.encrypt_method
+    type: string
+    description: ENCRYPT_METHOD from login.defs, verbatim (SHA512, YESCRYPT, ...); PAM may override it.
+    since: 1
+    sensitivity: public
+    collector: accounts
+  - key: accounts.login_defs.env_supath
+    type: string
+    description: ENV_SUPATH from login.defs, verbatim (the PATH= assignment for root logins).
+    since: 1
+    sensitivity: public
+    collector: accounts
+  - key: accounts.login_defs.env_path
+    type: string
+    description: ENV_PATH from login.defs, verbatim (the PATH= assignment for other logins).
+    since: 1
+    sensitivity: public
+    collector: accounts
   - key: accounts.users
     type: list<record>
     description: Local accounts with name, uid, gid, shell, password_status and ageing fields; no hashes. Ageing fields are -1 when the shadow field is empty, and uid/gid are -1 when the passwd field is unparsable.
