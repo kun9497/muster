@@ -26,21 +26,36 @@ const (
 var localNSS = map[string]bool{"files": true, "compat": true, "systemd": true, "db": true}
 
 // nssSources returns the sources of database db from nsswitch.conf: the
-// words after "db:" that are not bracketed actions such as
-// [NOTFOUND=return]. found is false when no such line exists (comments do
-// not count), and line is the 1-based line of the one that does.
+// words after "db:" that are not part of a bracketed action such as
+// [NOTFOUND=return] or a multi-word one such as
+// [SUCCESS=return NOTFOUND=continue UNAVAIL=continue]. glibc truncates a
+// line at the first "#" wherever it appears, not only at the start, so a
+// trailing "# comment" is dropped the same way a whole-line comment is.
+// found is false when no such line exists (comments do not count), and
+// line is the 1-based line of the one that does.
 func nssSources(data []byte, db string) (sources []string, line int, found bool) {
 	for i, raw := range splitLines(data) {
-		l := strings.TrimSpace(raw)
-		if l == "" || strings.HasPrefix(l, "#") {
+		l := raw
+		if idx := strings.IndexByte(l, '#'); idx >= 0 {
+			l = l[:idx]
+		}
+		l = strings.TrimSpace(l)
+		if l == "" {
 			continue
 		}
 		name, rest, ok := strings.Cut(l, ":")
 		if !ok || strings.TrimSpace(name) != db {
 			continue
 		}
+		inAction := false
 		for _, w := range strings.Fields(rest) {
-			if strings.HasPrefix(w, "[") || strings.HasSuffix(w, "]") {
+			if strings.HasPrefix(w, "[") {
+				inAction = true
+			}
+			if inAction {
+				if strings.HasSuffix(w, "]") {
+					inAction = false
+				}
 				continue
 			}
 			sources = append(sources, w)
@@ -89,10 +104,12 @@ func nssListsSss(lists [][]string) bool {
 // the read's status on every key, because "could not read" is not "local".
 func writeNSS(a collect.Access, b *collect.Builder) {
 	data, meta, err := a.ReadFile(nsswitchPath, readLimit)
-	derived := &facts.Source{Kind: "derived", Inputs: []facts.Source{{Kind: "file", Path: nsswitchPath}}}
 	if err != nil {
 		e := collect.FromReadError(err, meta)
 		if e.Status == facts.StatusAbsent {
+			// sssd.conf is never consulted on this path: with nsswitch.conf
+			// itself missing there is nothing for "sss" to appear in.
+			derived := &facts.Source{Kind: "derived", Inputs: []facts.Source{{Kind: "file", Path: nsswitchPath}}}
 			for _, k := range []string{"accounts.nss.passwd_sources", "accounts.nss.group_sources"} {
 				b.Set(k, collect.Absent(nsswitchPath+" does not exist; libc resolves from files"))
 			}
@@ -127,8 +144,17 @@ func writeNSS(a collect.Access, b *collect.Builder) {
 	_, statErr := a.Stat(sssdConfPath)
 	sssConfigured := statErr == nil
 
-	remoteEnv := collect.OKRead(nssRemote(lists, sssConfigured), derived, meta)
-	if !sssConfigured && nssListsSss(lists) {
+	// The remote verdict is derived from both files this path actually
+	// consulted: the source lists parsed from nsswitch.conf, and the
+	// sssd.conf Stat that decided whether a listed "sss" counts.
+	derived := &facts.Source{Kind: "derived", Inputs: []facts.Source{{Kind: "file", Path: nsswitchPath}, {Kind: "file", Path: sssdConfPath}}}
+	remoteVal := nssRemote(lists, sssConfigured)
+	remoteEnv := collect.OKRead(remoteVal, derived, meta)
+	// Fix round 1: the caveat is attached only when it actually explains the
+	// answer — a false remote where "sss" alone was excluded. On a true
+	// remote (some other source already made it so) the caveat would invite
+	// the wrong inference that sss was the reason.
+	if !remoteVal && !sssConfigured && nssListsSss(lists) {
 		remoteEnv.Reason = "sss listed but " + sssdConfPath + " absent: not counted"
 	}
 	b.Set("accounts.nss.remote", remoteEnv)

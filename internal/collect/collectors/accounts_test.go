@@ -457,8 +457,10 @@ func TestAccountsNSSSourcesAndRemote(t *testing.T) {
 	if l := okList(t, b, "accounts.nss.passwd_sources"); len(l) != 3 || l[1] != "sss" || l[2] != "ldap" {
 		t.Errorf("%v (the [NOTFOUND=return] action is not a source)", l)
 	}
-	if e := env(t, b, "accounts.nss.remote"); e.Value != true {
-		t.Errorf("%+v", e)
+	// Fix round 1: ldap alone already makes remote true, so the sss caveat
+	// (which would wrongly imply sss was the reason) must not be attached.
+	if e := env(t, b, "accounts.nss.remote"); e.Value != true || e.Reason != "" {
+		t.Errorf("%+v (ldap makes remote true on its own; no sss caveat needed)", e)
 	}
 }
 
@@ -497,6 +499,16 @@ func TestNSSSourcesParsing(t *testing.T) {
 	if !nssRemote([][]string{{"files"}, {"files", "winbind"}}, false) {
 		t.Error("winbind is remote")
 	}
+	// Fix round 1: glibc truncates a line at the first '#' wherever it
+	// appears, not only at the start of the line.
+	if s, _, ok := nssSources([]byte("passwd: files systemd # local only\n"), "passwd"); !ok || strings.Join(s, ",") != "files,systemd" {
+		t.Errorf("%v %v (trailing comment must be dropped)", s, ok)
+	}
+	// Fix round 1: a multi-word bracketed action is skipped by bracket
+	// depth, not just a leading "[" or trailing "]" token.
+	if s, _, ok := nssSources([]byte("passwd: compat [SUCCESS=return NOTFOUND=continue UNAVAIL=continue] ldap\n"), "passwd"); !ok || strings.Join(s, ",") != "compat,ldap" {
+		t.Errorf("%v %v (multi-word action must be skipped entirely)", s, ok)
+	}
 }
 
 // R127: authselect lists "sss" in nsswitch.conf on every RHEL-family host
@@ -513,6 +525,10 @@ func TestAccountsNSSSssCountsOnlyWhenConfigured(t *testing.T) {
 		t.Errorf("%+v (sss alone, sssd not configured, must not count as remote)", e)
 	} else if want := "sss listed but /etc/sssd/sssd.conf absent: not counted"; e.Reason != want {
 		t.Errorf("reason %q, want %q", e.Reason, want)
+	} else if e.Source == nil || len(e.Source.Inputs) != 2 {
+		// Fix round 1: the derived source names both files this path
+		// actually consulted (nsswitch.conf and the sssd.conf Stat).
+		t.Errorf("source inputs %+v, want 2", e.Source)
 	}
 	if l := okList(t, b, "accounts.nss.passwd_sources"); len(l) != 3 || l[0] != "sss" || l[1] != "files" || l[2] != "systemd" {
 		t.Errorf("%v", l)
