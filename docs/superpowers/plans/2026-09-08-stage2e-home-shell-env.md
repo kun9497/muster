@@ -1496,7 +1496,7 @@ category: account
 importance: 상
 automation: auto
 references:
-  kisa: { "2026": ["U-14"], "2021": ["U-19"] }
+  kisa: { "2026": ["U-14"], "2021": ["U-05"] }
   stig:
     - { benchmark: rhel9, version: V2R9, id: RHEL-09-411055 }
   nist_800_53: ["CM-6"]
@@ -1590,7 +1590,7 @@ category: file
 importance: 상
 automation: auto
 references:
-  kisa: { "2026": ["U-24"], "2021": ["U-53"] }
+  kisa: { "2026": ["U-24"], "2021": ["U-14"] }
   stig:
     - { benchmark: rhel9, version: V2R9, id: RHEL-09-232045 }
   nist_800_53: ["CM-6"]
@@ -1618,7 +1618,7 @@ category: file
 importance: 상
 automation: auto
 references:
-  kisa: { "2026": ["U-26"], "2021": ["U-58"] }
+  kisa: { "2026": ["U-26"], "2021": ["U-16"] }
 requires_facts: ">=1"
 absent_means: manual
 checks:
@@ -1665,7 +1665,7 @@ category: file
 importance: 중
 automation: auto
 references:
-  kisa: { "2026": ["U-31"], "2021": ["U-59"] }
+  kisa: { "2026": ["U-31"], "2021": ["U-57"] }
   stig:
     - { benchmark: rhel9, version: V2R9, id: RHEL-09-232050 }
     - { benchmark: rhel9, version: V2R9, id: RHEL-09-411070 }
@@ -1694,7 +1694,7 @@ category: file
 importance: 중
 automation: auto
 references:
-  kisa: { "2026": ["U-32"], "2021": ["U-60"] }
+  kisa: { "2026": ["U-32"], "2021": ["U-58"] }
   stig:
     - { benchmark: rhel9, version: V2R9, id: RHEL-09-411065 }
     - { benchmark: rhel9, version: V2R9, id: RHEL-09-411020 }
