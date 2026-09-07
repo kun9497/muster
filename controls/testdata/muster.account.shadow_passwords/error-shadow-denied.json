@@ -1,0 +1,1 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{"accounts":{"shadow_in_use":{"status":"denied","reason":"/etc/shadow: needs root"},"users":{"status":"ok","value":[{"name":"root"}]}}}}

@@ -1,0 +1,24 @@
+id: muster.account.root_only_uid_zero
+title_en: root is the only account with uid 0
+title_ko: uid 0 인 계정은 root 뿐이다
+description_en: Any account whose uid is 0 is root under another name, with every privilege and none of the accountability. Only the account named root may carry uid 0.
+description_ko: uid 가 0 인 계정은 이름만 다른 root 이며 모든 권한을 갖지만 책임 추적이 되지 않습니다. root 라는 이름의 계정만 uid 0 을 가질 수 있습니다.
+category: account
+importance: 상
+automation: auto
+references:
+  kisa: { "2026": ["U-05"], "2021": ["U-44"] }
+  cis:
+    - { benchmark: ubuntu-22.04, version: "2.0.0", rec: "5.4.2.1" }
+  stig:
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-411100 }
+  nist_800_53: ["CM-6"]
+requires_facts: ">=1"
+absent_means: fail
+checks:
+  - { fact: accounts.users, op: each, subject: name, where: { field: uid, op: eq, expected: 0 }, require: { field: name, op: eq, expected: root } }
+remediation:
+  text_en: Give every non-root account that has uid 0 its own uid (usermod -u <new-uid> <name>) or delete it; check its files with find / -user <name> afterwards.
+  text_ko: uid 가 0 인 root 외 계정에 고유한 uid 를 부여하거나 (usermod -u <new-uid> <name>) 삭제하고, 이후 find / -user <name> 으로 소유 파일을 확인합니다.
+  risk: lockout_risk
+  idempotent: true

@@ -15,6 +15,13 @@
            "etc_hosts_lpd":{"mode":{"status":"absent"},"uid":{"status":"absent"}}},
   "accounts":{"login_defs":{"pass_max_days":{"runtime":{"status":"ok","value":90},"persisted":{"status":"ok","value":90,"source":{"kind":"file","path":"/etc/login.defs","line":160}}},
                             "pass_min_days":{"runtime":{"status":"ok","value":1},"persisted":{"status":"ok","value":1}},
-                            "pass_min_len":{"status":"ok","value":8}}},
+                            "pass_min_len":{"status":"ok","value":8}},
+              "shadow_in_use":{"status":"ok","value":true},
+              "orphan_gids":{"status":"ok","value":[]},
+              "shells":{"status":"ok","value":["/bin/sh","/bin/bash"]},
+              "users":{"status":"ok","value":[
+                {"name":"root","uid":0,"system":false,"shell_valid":true,"uid_duplicate":false,"shadowed":true,"password_status":"hashed"},
+                {"name":"daemon","uid":1,"system":true,"shell_valid":false,"uid_duplicate":false,"shadowed":true,"password_status":"locked"}
+              ]}},
   "walk":{"world_writable":{"status":"absent"}}
  }}

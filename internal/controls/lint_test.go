@@ -408,12 +408,12 @@ func TestUnusedKeysNamesRegisteredKeysNoControlReferences(t *testing.T) {
 	for _, k := range UnusedKeys(set, reg) {
 		got[k] = true
 	}
-	for _, k := range []string{"sockets.listening", "accounts.users", "services.ssh.active"} {
+	for _, k := range []string{"sockets.listening", "accounts.groups", "services.ssh.active"} {
 		if !got[k] {
 			t.Errorf("%s is referenced by no control and must be reported", k)
 		}
 	}
-	for _, k := range []string{"services.telnet.reachable", "files.etc_securetty_lines", "walk.world_writable"} {
+	for _, k := range []string{"services.telnet.reachable", "files.etc_securetty_lines", "walk.world_writable", "accounts.users", "accounts.shadow_in_use", "accounts.orphan_gids", "accounts.shells"} {
 		if got[k] {
 			t.Errorf("%s is referenced by a control and must not be reported", k)
 		}
