@@ -1,0 +1,4 @@
+{"synthetic": true, "_expect":{"status":"WARN"}, "schema_version":1,"run":{},"facts":{
+  "services":{"ssh":{"installed":{"status":"ok","value":true}}},
+  "sshd":{"collect_method":{"status":"ok","value":"parse"},
+    "banner_file":{"nonempty":{"status":"ok","value":true,"source":{"kind":"file","path":"/etc/issue.net"}}}}}}

@@ -3,4 +3,4 @@
   "sshd":{"collect_method":{"status":"ok","value":"parse"},
     "options":{
     "client_alive_interval":{"effective":{"status":"ok","value":300,"source":{"kind":"file","path":"/etc/ssh/sshd_config.d/90-hardening.conf","line":3,"raw":"ClientAliveInterval 300"}}},
-    "client_alive_count_max":{"effective":{"status":"ok","value":0,"source":{"kind":"file","path":"/etc/ssh/sshd_config.d/90-hardening.conf","line":4,"raw":"ClientAliveCountMax 0"}}}}}}}
+    "client_alive_count_max":{"effective":{"status":"ok","value":1,"source":{"kind":"file","path":"/etc/ssh/sshd_config.d/90-hardening.conf","line":4,"raw":"ClientAliveCountMax 1"}}}}}}}

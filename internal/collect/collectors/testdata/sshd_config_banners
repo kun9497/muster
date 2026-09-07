@@ -1,6 +1,6 @@
 # comment
 PermitRootLogin no
 ClientAliveInterval 300
-ClientAliveCountMax 0
+ClientAliveCountMax 1
 MaxAuthTries 4
 Banner /etc/issue.net

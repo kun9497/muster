@@ -147,6 +147,21 @@ func runSshd(ctx context.Context, a collect.Access, b *collect.Builder) error {
 
 	// 5. The Banner file: a discovered path, stat'd by the daemon's own
 	//    collector (C1). "none" is the default and means no pre-auth banner.
+	//    R172 (C3): when the daemon did not answer and the config that would
+	//    set Banner could not be read (denied/error/timeout), that read's
+	//    status — not a definite "no banner" — is the answer for both
+	//    banner_file leaves; a false here would hide the read failure and
+	//    publish the module's default as if it were the host's state.
+	if daemon == nil {
+		if e, ok := parsed["banner"]; ok {
+			switch e.Status {
+			case facts.StatusDenied, facts.StatusError, facts.StatusTimeout:
+				b.Set("sshd.banner_file.exists", e)
+				b.Set("sshd.banner_file.nonempty", e)
+				return nil
+			}
+		}
+	}
 	writeBannerFile(a, b, bannerPath(daemon, parsed))
 	return nil
 }
@@ -283,7 +298,11 @@ func sshdSetting(o sshdOption, daemon map[string]string, dsrc *facts.Source, dtr
 		// file source; an unparseable file value becomes an error side.
 		if o.numeric && p.Status == facts.StatusOK {
 			if str, ok := p.Value.(string); ok {
-				p = optionEnvelope(o, str, p.Source)
+				// R174: optionEnvelope rewraps through collect.OK, which drops
+				// the Truncated flag the parsed OKRead carried. Carry it across
+				// so a truncated numeric config read is never judged as a clean
+				// value.
+				p = withTruncation(optionEnvelope(o, str, p.Source), parsed.Truncated)
 			}
 		}
 		s.Persisted = &p

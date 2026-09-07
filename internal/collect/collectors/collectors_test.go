@@ -886,6 +886,37 @@ func TestSshdOversizedValueIsAnErrorNotAStoredBlob(t *testing.T) {
 	}
 }
 
+// R172 (C3): when the daemon does not answer and the sshd_config that would
+// name Banner cannot be read, the banner_file leaves must carry that read's
+// status — not a definite false, which would publish the module's default
+// "no banner" as if it were the host's state and hide the read failure.
+func TestSshdBannerFileUnreadableConfigCarriesTheReadError(t *testing.T) {
+	a := &fsAccess{fails: map[string]error{"/etc/ssh/sshd_config": os.ErrPermission}}
+	b := build(t, "sshd", a)
+	for _, k := range []string{"sshd.banner_file.exists", "sshd.banner_file.nonempty"} {
+		if e := env(t, b, k); e.Status != facts.StatusDenied {
+			t.Errorf("%s must be denied, not a quiet false: %+v", k, e)
+		}
+	}
+}
+
+// R174: a numeric option parsed from a truncated config read must stay marked
+// truncated after the R165 int rewrap; a value that arrived truncated cannot
+// be judged as a clean number.
+func TestSshdParsedNumericCarriesTruncation(t *testing.T) {
+	a := &fsAccess{
+		files:     map[string]string{"/etc/ssh/sshd_config": "sshd_config_banners"},
+		truncated: map[string]bool{"/etc/ssh/sshd_config": true},
+	}
+	s := setting(t, build(t, "sshd", a), "sshd.options.client_alive_interval")
+	if s.Persisted == nil || s.Persisted.Status != facts.StatusOK || !s.Persisted.Truncated {
+		t.Errorf("persisted %+v, want ok and truncated", s.Persisted)
+	}
+	if s.Effective == nil || !s.Effective.Truncated {
+		t.Errorf("effective %+v, want truncated (copied from persisted)", s.Effective)
+	}
+}
+
 // --- banners --------------------------------------------------------------
 
 func TestBannersContentAndEscapes(t *testing.T) {
@@ -928,12 +959,28 @@ func TestBannersMissingFileIsDefiniteEmpty(t *testing.T) {
 	}
 }
 
-// An unreadable banner carries the read error, never a quiet empty.
+// An unreadable banner carries the read error, never a quiet empty — on every
+// leaf that read would have set, not only nonempty (they all come from the one
+// read).
 func TestBannersUnreadableIsNotEmpty(t *testing.T) {
 	a := &fsAccess{fails: map[string]error{"/etc/issue.net": os.ErrPermission}}
 	b := build(t, "banners", a)
-	if e := env(t, b, "banners.issue_net.nonempty"); e.Status != facts.StatusDenied {
-		t.Errorf("denied read must be denied, not empty: %+v", e)
+	for _, k := range []string{"banners.issue_net.nonempty", "banners.issue_net.mode", "banners.issue_net.os_escapes"} {
+		if e := env(t, b, k); e.Status != facts.StatusDenied {
+			t.Errorf("%s: denied read must be denied, not empty: %+v", k, e)
+		}
+	}
+}
+
+// A Glob that fails is not an empty update-motd.d: motd_d and dynamic_motd
+// carry that error rather than reporting no scripts (spec §7.3 honesty).
+func TestBannersMotdGlobErrorCarriesTheError(t *testing.T) {
+	a := &fsAccess{globErr: errors.New("glob boom")}
+	b := build(t, "banners", a)
+	for _, k := range []string{"banners.motd_d", "banners.dynamic_motd"} {
+		if e := env(t, b, k); e.Status != facts.StatusError {
+			t.Errorf("%s: a failed Glob must carry the error, not an empty inventory: %+v", k, e)
+		}
 	}
 }
 

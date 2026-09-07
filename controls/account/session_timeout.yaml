@@ -1,8 +1,8 @@
 id: muster.account.session_timeout
 title_en: An idle SSH session is disconnected after a bounded time
 title_ko: 유휴 SSH 세션이 정해진 시간이 지나면 끊긴다
-description_en: sshd must disconnect an idle connection - ClientAliveInterval set to between one second and the parameter, and ClientAliveCountMax no larger than the parameter, so the daemon drops a session that stops answering. A stock host sets ClientAliveInterval to 0 (no keepalive) and so fails. This judges the interval and the count separately because the clause grammar has no product operator; the effective idle limit is their product, and treating the interval alone as the timeout is a policy equivalence, not a fact. The shell-environment TMOUT half of this item is added in a later plan; today only the SSH mechanism is judged, so the control applies only where sshd is installed.
-description_ko: sshd가 유휴 연결을 끊어야 합니다 - ClientAliveInterval 을 1초 이상 파라미터 이하로 두고 ClientAliveCountMax 를 파라미터 이하로 두어, 응답이 없는 세션을 데몬이 끊게 합니다. 기본 설치는 ClientAliveInterval 이 0(keepalive 없음)이라 실패합니다. 절 문법에 곱 연산자가 없어 간격과 횟수를 따로 판정하며, 실제 유휴 한도는 둘의 곱입니다. 간격만으로 세션 종료 시간을 보는 것은 사실이 아니라 정책적 등가입니다. 이 항목의 셸 환경 TMOUT 절반은 이후 플랜에서 추가되며, 지금은 SSH 방식만 판정하므로 sshd 가 설치된 곳에만 적용됩니다.
+description_en: sshd must disconnect an idle connection - ClientAliveInterval set to between one second and the parameter, and ClientAliveCountMax between one and the parameter, so the daemon drops a session that stops answering. On modern OpenSSH (8.2 and later) a ClientAliveCountMax of 0 disables connection termination entirely, so the count must be at least one; a host with a good interval but a count of 0 never times a session out. A stock host sets ClientAliveInterval to 0 (no keepalive) and so fails. This judges the interval and the count separately because the clause grammar has no product operator; the effective idle limit is their product, and treating the interval alone as the timeout is a policy equivalence, not a fact. The shell-environment TMOUT half of this item is added in a later plan; today only the SSH mechanism is judged, so the control applies only where sshd is installed.
+description_ko: sshd가 유휴 연결을 끊어야 합니다 - ClientAliveInterval 을 1초 이상 파라미터 이하로 두고 ClientAliveCountMax 를 1 이상 파라미터 이하로 두어, 응답이 없는 세션을 데몬이 끊게 합니다. 최신 OpenSSH(8.2 이상)에서는 ClientAliveCountMax 가 0 이면 연결 종료 자체가 비활성화되므로 횟수는 최소 1 이어야 합니다. 간격이 적절해도 횟수가 0 이면 세션이 결코 만료되지 않습니다. 기본 설치는 ClientAliveInterval 이 0(keepalive 없음)이라 실패합니다. 절 문법에 곱 연산자가 없어 간격과 횟수를 따로 판정하며, 실제 유휴 한도는 둘의 곱입니다. 간격만으로 세션 종료 시간을 보는 것은 사실이 아니라 정책적 등가입니다. 이 항목의 셸 환경 TMOUT 절반은 이후 플랜에서 추가되며, 지금은 SSH 방식만 판정하므로 sshd 가 설치된 곳에만 적용됩니다.
 category: account
 importance: 하
 automation: auto
@@ -27,9 +27,10 @@ mechanisms:
       - { fact: sshd.options.client_alive_interval, on: effective, op: gte, expected: 1 }
     checks:
       - { fact: sshd.options.client_alive_interval, on: effective, op: lte, expected: "${max_interval}" }
+      - { fact: sshd.options.client_alive_count_max, on: effective, op: gte, expected: 1 }
       - { fact: sshd.options.client_alive_count_max, on: effective, op: lte, expected: "${max_count}" }
 remediation:
-  text_en: Set ClientAliveInterval 300 and ClientAliveCountMax 0 in a file under /etc/ssh/sshd_config.d/, validate with sshd -t, then restart sshd.
-  text_ko: /etc/ssh/sshd_config.d/ 아래 파일에 ClientAliveInterval 300 과 ClientAliveCountMax 0 을 설정하고 sshd -t 로 검증한 뒤 sshd 를 재시작합니다.
+  text_en: Set ClientAliveInterval 300 and ClientAliveCountMax 1 in a file under /etc/ssh/sshd_config.d/, validate with sshd -t, then restart sshd.
+  text_ko: /etc/ssh/sshd_config.d/ 아래 파일에 ClientAliveInterval 300 과 ClientAliveCountMax 1 을 설정하고 sshd -t 로 검증한 뒤 sshd 를 재시작합니다.
   risk: none
   idempotent: true
