@@ -19,7 +19,10 @@ type ReferenceIndex struct {
 	nist     map[string]bool
 }
 
-var nistIDRe = regexp.MustCompile(`^[A-Z]{2}-\d+(\(\d+\))?$`)
+var (
+	nistIDRe = regexp.MustCompile(`^[A-Z]{2}-\d+(\(\d+\))?$`)
+	stigIDRe = regexp.MustCompile(`^[A-Z0-9]+-[0-9]+-[0-9]+$`)
+)
 
 // LoadReferenceIndex reads every dir/stig/*.json. A missing directory or an
 // empty one is an error: an index that silently has nothing in it would let
@@ -86,3 +89,6 @@ func (x *ReferenceIndex) HasNIST(id string) bool { return x.nist[id] }
 
 // ValidNISTID is the format check that runs even without an index.
 func ValidNISTID(id string) bool { return nistIDRe.MatchString(id) }
+
+// ValidSTIGID is the format check that runs even without an index.
+func ValidSTIGID(id string) bool { return stigIDRe.MatchString(id) }

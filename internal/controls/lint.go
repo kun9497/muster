@@ -146,9 +146,9 @@ func Lint(s *Set, reg *facts.Registry, opts LintOptions) []Problem {
 			switch {
 			case r.Benchmark == "" || r.Version == "" || r.ID == "":
 				add("references_stig", "stig references need benchmark, version and id")
-			case opts.References == nil:
-				add("references_stig", "no reference index loaded; %s@%s %s cannot be verified", r.Benchmark, r.Version, r.ID)
-			case !opts.References.HasSTIG(r.Benchmark, r.Version, r.ID):
+			case !ValidSTIGID(r.ID):
+				add("references_stig", "stig reference id %q must look like RHEL-09-211010", r.ID)
+			case opts.References != nil && !opts.References.HasSTIG(r.Benchmark, r.Version, r.ID):
 				add("references_stig", "stig reference %s@%s %s is not in docs/reference/stig", r.Benchmark, r.Version, r.ID)
 			}
 		}
