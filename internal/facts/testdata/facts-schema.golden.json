@@ -992,6 +992,126 @@
       "SubjectKind": ""
     },
     {
+      "Key": "pam.pwquality.enabled",
+      "Type": "bool",
+      "Description": "pam_pwquality.so is stacked in passwd's password stack with a control field other than optional; a false names why. Every other pam.pwquality.* key is absent while this is false.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pam",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "pam.pwquality.local_users_only",
+      "Type": "bool",
+      "Description": "The local_users_only argument or setting is present, so pwquality skips accounts that are not in /etc/passwd.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pam",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "pam.pwquality.minlen",
+      "Type": "int",
+      "Description": "Effective minlen - the default 8, then pwquality.conf, then pwquality.conf.d/*.conf in name order, then the module arguments, each overriding the last.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pam",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "pam.pwquality.minclass",
+      "Type": "int",
+      "Description": "Effective minclass (default 0), resolved like minlen.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pam",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "pam.pwquality.dcredit",
+      "Type": "int",
+      "Description": "Effective dcredit (default 0), resolved like minlen; a negative value is a minimum count of digits.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pam",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "pam.pwquality.ucredit",
+      "Type": "int",
+      "Description": "Effective ucredit (default 0), resolved like minlen.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pam",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "pam.pwquality.lcredit",
+      "Type": "int",
+      "Description": "Effective lcredit (default 0), resolved like minlen.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pam",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "pam.pwquality.ocredit",
+      "Type": "int",
+      "Description": "Effective ocredit (default 0), resolved like minlen.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pam",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "pam.pwquality.required_classes",
+      "Type": "int",
+      "Description": "The character classes a new password must contain - the larger of minclass and the number of credits set to -1 or lower.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pam",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "pam.pwquality.enforce_for_root",
+      "Type": "bool",
+      "Description": "enforce_for_root is set in a conf file or as a module argument.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pam",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "pam.password.unix_hash",
+      "Type": "string",
+      "Description": "The hashing argument on pam_unix.so in passwd's password stack (md5, bigcrypt, sha256, sha512, blowfish, gost_yescrypt or yescrypt); empty when none is given and login.defs ENCRYPT_METHOD decides; absent when the stack has no pam_unix line.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pam",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "pam.password.remember",
+      "Type": "int",
+      "Description": "How many previous passwords a new one is checked against - remember= on pam_pwhistory.so (argument, else pwhistory.conf, else the module default 10) or on pam_unix.so; absent when neither module sets it.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pam",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
       "Key": "env.container",
       "Type": "string",
       "Description": "Container runtime detected from filesystem markers (none, docker, podman, lxc, other); the same value the run header carries.",

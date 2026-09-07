@@ -3,6 +3,7 @@
 package collectors
 
 import (
+	"errors"
 	"os"
 	"slices"
 	"strings"
@@ -98,8 +99,19 @@ func TestPAMExpandsDebianIncludes(t *testing.T) {
 	if e := env(t, b, "pam.parse_complete"); e.Status != facts.StatusOK || e.Value != true {
 		t.Fatalf("parse_complete %+v", e)
 	}
-	if e := env(t, b, "pam.managing_layer"); e.Value != "pam-auth-update" {
-		t.Errorf("managing_layer %+v", e)
+	layer := env(t, b, "pam.managing_layer")
+	if layer.Value != "pam-auth-update" {
+		t.Errorf("managing_layer %+v", layer)
+	}
+	// R155: the marker file that decided the answer is cited, exactly once.
+	marker := 0
+	for _, p := range sourcePaths(t, layer) {
+		if p == pamDir+"/common-auth" {
+			marker++
+		}
+	}
+	if marker != 1 {
+		t.Errorf("common-auth is cited %d times: %v", marker, sourcePaths(t, layer))
 	}
 	auth := stackLines(t, b, "login", "auth")
 	// faildelay, nologin, then the three common-auth lines, then pam_group.
@@ -241,5 +253,266 @@ func TestPAMNoPamDirectoryIsAbsent(t *testing.T) {
 		if e := env(t, b, k); e.Status != facts.StatusAbsent {
 			t.Errorf("%s = %+v", k, e)
 		}
+	}
+}
+
+// globFailure breaks Glob for exactly one pattern, so a test can fail the
+// pwquality.conf.d listing without also failing the /etc/pam.d listing the
+// collector needs before it derives anything.
+type globFailure struct {
+	*fsAccess
+	pattern string
+	err     error
+}
+
+func (g *globFailure) Glob(p string) ([]string, error) {
+	if p == g.pattern {
+		return nil, g.err
+	}
+	return g.fsAccess.Glob(p)
+}
+
+func TestPAMParseKV(t *testing.T) {
+	kv := parseKV([]byte("# c\nminlen = 12\nenforce_for_root\n  dcredit=-1  \nbad line here\n"))
+	if kv["minlen"] != "12" || kv["dcredit"] != "-1" {
+		t.Errorf("%v", kv)
+	}
+	if v, ok := kv["enforce_for_root"]; !ok || v != "" {
+		t.Errorf("a bare flag is present with an empty value: %v", kv)
+	}
+	if _, ok := kv["bad line here"]; ok {
+		t.Errorf("a line without = and with spaces is not a key: %v", kv)
+	}
+}
+
+// Task 2 (the stock-Ubuntu trap): a perfect pwquality.conf enforces
+// nothing while pam_pwquality is not stacked — enabled is false and every
+// value is absent, never the conf file's numbers.
+func TestPAMPwqualityNotStackedIsNotEnabled(t *testing.T) {
+	a := ubuntuPAM()
+	a.files["/etc/security/pwquality.conf"] = "pam/ubuntu/pwquality.conf"
+	b := build(t, "pam", a)
+	if e := env(t, b, "pam.pwquality.enabled"); e.Status != facts.StatusOK || e.Value != false || !strings.Contains(e.Reason, "not stacked") {
+		t.Errorf("%+v", e)
+	}
+	for _, k := range []string{"minlen", "minclass", "dcredit", "ucredit", "lcredit", "ocredit", "required_classes", "enforce_for_root", "local_users_only"} {
+		if e := env(t, b, "pam.pwquality."+k); e.Status != facts.StatusAbsent {
+			t.Errorf("%s = %+v, want absent", k, e)
+		}
+	}
+	if e := env(t, b, "pam.password.unix_hash"); e.Status != facts.StatusOK || e.Value != "yescrypt" {
+		t.Errorf("unix_hash %+v", e)
+	}
+	if e := env(t, b, "pam.password.remember"); e.Status != facts.StatusAbsent {
+		t.Errorf("remember %+v", e)
+	}
+}
+
+func TestPAMPwqualityStackedOnDebian(t *testing.T) {
+	a := ubuntuPAM()
+	a.files["/etc/pam.d/common-password"] = "pam/ubuntu/common-password-pwquality"
+	a.files["/etc/security/pwquality.conf"] = "pam/ubuntu/pwquality.conf"
+	b := build(t, "pam", a)
+	if e := env(t, b, "pam.pwquality.enabled"); e.Value != true {
+		t.Errorf("%+v", e)
+	}
+	if e := env(t, b, "pam.pwquality.minlen"); e.Status != facts.StatusOK || e.Value != 14 || e.Source.Kind != "derived" || len(e.Source.Inputs) != 2 {
+		t.Errorf("minlen %+v (conf file, then the module line)", e)
+	}
+	if got := sourcePaths(t, env(t, b, "pam.pwquality.minlen")); len(got) != 2 || got[0] != pwqualityConf || got[1] != "/etc/pam.d/common-password" {
+		t.Errorf("inputs %v", got)
+	}
+	if e := env(t, b, "pam.pwquality.required_classes"); e.Value != 4 {
+		t.Errorf("required_classes %+v", e)
+	}
+	if e := env(t, b, "pam.password.remember"); e.Status != facts.StatusOK || e.Value != 7 {
+		t.Errorf("remember from pam_unix %+v", e)
+	}
+}
+
+// Module arguments override the conf files, and a conf.d drop-in
+// overrides pwquality.conf; a credit of -1 counts as a required class.
+func TestPAMPwqualityPrecedence(t *testing.T) {
+	a := rockyPAM()
+	a.files["/etc/security/pwquality.conf"] = "pam/rocky/pwquality.conf"
+	a.files["/etc/security/pwquality.conf.d/90-local.conf"] = "pam/rocky/90-local.conf"
+	b := build(t, "pam", a)
+	if e := env(t, b, "pam.pwquality.enabled"); e.Value != true {
+		t.Fatalf("%+v", e)
+	}
+	for k, want := range map[string]any{
+		"minlen": 12, "minclass": 4, "dcredit": 0, "ucredit": 0, "lcredit": 0, "ocredit": 0,
+		"required_classes": 4, "enforce_for_root": true, "local_users_only": true,
+	} {
+		if e := env(t, b, "pam.pwquality."+k); e.Status != facts.StatusOK || e.Value != want {
+			t.Errorf("%s = %+v, want %v", k, e, want)
+		}
+	}
+	if e := env(t, b, "pam.pwquality.minlen"); len(e.Source.Inputs) != 3 || e.Source.Inputs[0].Path != "/etc/security/pwquality.conf" || e.Source.Inputs[1].Path != "/etc/security/pwquality.conf.d/90-local.conf" || e.Source.Inputs[2].Path != "/etc/authselect/system-auth" {
+		t.Errorf("inputs %+v", e.Source.Inputs)
+	}
+	if e := env(t, b, "pam.password.unix_hash"); e.Value != "sha512" {
+		t.Errorf("%+v", e)
+	}
+	if e := env(t, b, "pam.password.remember"); e.Value != 5 {
+		t.Errorf("%+v", e)
+	}
+	// Without the module argument the drop-in's 15 wins over the conf's 8.
+	a = rockyPAM()
+	a.files["/etc/authselect/system-auth"] = "pam/rocky/authselect-password-auth"
+	a.files["/etc/security/pwquality.conf"] = "pam/rocky/pwquality.conf"
+	a.files["/etc/security/pwquality.conf.d/90-local.conf"] = "pam/rocky/90-local.conf"
+	if e := env(t, build(t, "pam", a), "pam.pwquality.minlen"); e.Value != 15 {
+		t.Errorf("drop-in must override the conf: %+v", e)
+	}
+	// A credit of -1 is a required class even when minclass is lower.
+	a = rockyPAM()
+	a.files["/etc/security/pwquality.conf"] = "pam/rocky/credits.conf"
+	if e := env(t, build(t, "pam", a), "pam.pwquality.required_classes"); e.Value != 3 {
+		t.Errorf("three negative credits: %+v", e)
+	}
+}
+
+// R148: a conf file that exists but cannot be read is the answer for every
+// value it could have set — never the defaults dressed up as ok. The stack
+// still says whether pwquality runs at all.
+func TestPAMPwqualityUnreadableConfIsTheAnswer(t *testing.T) {
+	a := rockyPAM()
+	a.fails[pwqualityConf] = os.ErrPermission
+	b := build(t, "pam", a)
+	if e := env(t, b, "pam.pwquality.enabled"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("enabled must still follow the stack: %+v", e)
+	}
+	for _, k := range passwordKeys[1:10] {
+		e := env(t, b, k)
+		if e.Status != facts.StatusDenied || !strings.HasPrefix(e.Reason, pwqualityConf+": ") {
+			t.Errorf("%s = %+v", k, e)
+		}
+	}
+	// The same for a drop-in listing that cannot even be made.
+	g := &globFailure{fsAccess: rockyPAM(), pattern: pwqualityConfD, err: errors.New("boom")}
+	b = build(t, "pam", g)
+	if e := env(t, b, "pam.pwquality.enabled"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("enabled %+v", e)
+	}
+	for _, k := range passwordKeys[1:10] {
+		e := env(t, b, k)
+		if e.Status != facts.StatusError || !strings.HasPrefix(e.Reason, pwqualityConfD+": ") {
+			t.Errorf("%s = %+v", k, e)
+		}
+	}
+}
+
+// R149: pam_pwhistory without remember= and without a pwhistory.conf still
+// remembers 10 passwords — the module's own default — cited to the line
+// that loads it.
+func TestPAMPwhistoryDefaultRemember(t *testing.T) {
+	a := ubuntuPAM()
+	a.files["/etc/pam.d/common-password"] = "pam/ubuntu/common-password-pwhistory"
+	e := env(t, build(t, "pam", a), "pam.password.remember")
+	if e.Status != facts.StatusOK || e.Value != 10 {
+		t.Errorf("%+v", e)
+	}
+	if e.Source == nil || len(e.Source.Inputs) != 1 || e.Source.Inputs[0].Path != "/etc/pam.d/common-password" {
+		t.Errorf("source %+v", e.Source)
+	}
+}
+
+// R152: the last hashing argument on the pam_unix line wins, as it does
+// for the module itself — not the first one the documentation lists.
+func TestPAMLastHashArgumentWins(t *testing.T) {
+	a := ubuntuPAM()
+	a.files["/etc/pam.d/common-password"] = "pam/ubuntu/common-password-twohashes"
+	if e := env(t, build(t, "pam", a), "pam.password.unix_hash"); e.Status != facts.StatusOK || e.Value != "sha512" {
+		t.Errorf("%+v", e)
+	}
+}
+
+// R154a: an include that points outside the collector's declaration is a
+// parse problem, and the file is never even asked for.
+func TestPAMIncludeOutsideDeclarationIsAProblem(t *testing.T) {
+	a := &fsAccess{files: map[string]string{"/etc/pam.d/login": "pam/outside"}}
+	b := build(t, "pam", a)
+	e := env(t, b, "pam.parse_complete")
+	if e.Status != facts.StatusOK || e.Value != false || !strings.Contains(e.Reason, "outside the collector's declaration") {
+		t.Errorf("%+v", e)
+	}
+	if slices.Contains(a.reads, "/etc/foo/bar") {
+		t.Errorf("the undeclared include was read: %v", a.reads)
+	}
+}
+
+// R154b: a module given as an absolute path is the same module, but the
+// published record keeps the path the file actually said.
+func TestPAMModuleMatchesByBasename(t *testing.T) {
+	a := ubuntuPAM()
+	a.files["/etc/pam.d/common-password"] = "pam/ubuntu/common-password-abspath"
+	b := build(t, "pam", a)
+	if e := env(t, b, "pam.password.unix_hash"); e.Status != facts.StatusOK || e.Value != "yescrypt" {
+		t.Errorf("%+v", e)
+	}
+	pw := stackLines(t, b, "passwd", "password")
+	if len(pw) != 3 || pw[0]["module"] != "/lib/x86_64-linux-gnu/security/pam_unix.so" {
+		t.Errorf("the record keeps the absolute path verbatim: %v", pw)
+	}
+}
+
+// R154c: a /etc/pam.d listing that fails is neither absent nor a value —
+// it is the read error, on every key the collector owns.
+func TestPAMGlobErrorIsReported(t *testing.T) {
+	b := build(t, "pam", &fsAccess{globErr: errors.New("boom")})
+	want := env(t, b, "pam.stacks")
+	if want.Status != facts.StatusError || !strings.HasPrefix(want.Reason, pamDir+": ") {
+		t.Fatalf("pam.stacks %+v", want)
+	}
+	for _, k := range append([]string{"pam.managing_layer", "pam.parse_complete"}, passwordKeys...) {
+		if e := env(t, b, k); e != want {
+			t.Errorf("%s = %+v, want %+v", k, e, want)
+		}
+	}
+}
+
+// Every derived password key is an error, not a number, when the stacks
+// are incomplete; and absent when there is no passwd service at all.
+func TestPAMPasswordFactsFollowTheStackStatus(t *testing.T) {
+	a := rockyPAM()
+	delete(a.files, "/etc/authselect/system-auth")
+	b := build(t, "pam", a)
+	for _, k := range passwordKeys {
+		if e := env(t, b, k); e.Status != facts.StatusError || !strings.Contains(e.Reason, "incomplete") {
+			t.Errorf("%s = %+v", k, e)
+		}
+	}
+	a = rockyPAM()
+	delete(a.files, "/etc/pam.d/passwd")
+	b = build(t, "pam", a)
+	for _, k := range passwordKeys {
+		if e := env(t, b, k); e.Status != facts.StatusAbsent {
+			t.Errorf("%s = %+v", k, e)
+		}
+	}
+}
+
+// R155: common-auth decides the pam-auth-update answer even when no
+// published service includes it. The expander then never read it — the
+// stacks do not cite it — so managing_layer has to cite it itself, after
+// the sorted inputs, which is where an appended citation can be told from
+// an expanded one.
+func TestPAMManagingLayerCitesTheMarkerFile(t *testing.T) {
+	a := &fsAccess{files: map[string]string{
+		"/etc/pam.d/login":       "pam/ubuntu/common-password",
+		"/etc/pam.d/common-auth": "pam/ubuntu/common-auth",
+	}}
+	b := build(t, "pam", a)
+	e := env(t, b, "pam.managing_layer")
+	if e.Value != "pam-auth-update" {
+		t.Fatalf("%+v", e)
+	}
+	want := []string{pamDir + "/login", pamDir + "/common-auth"}
+	if got := sourcePaths(t, e); !slices.Equal(got, want) {
+		t.Errorf("inputs %v, want %v", got, want)
+	}
+	if got := sourcePaths(t, env(t, b, "pam.stacks")); slices.Contains(got, pamDir+"/common-auth") {
+		t.Errorf("the expander did read common-auth, so this proves nothing: %v", got)
 	}
 }

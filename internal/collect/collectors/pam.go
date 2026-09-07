@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"io/fs"
+	"slices"
 	"strings"
 
 	"github.com/kun9497/muster/internal/collect"
@@ -59,7 +60,13 @@ func managingLayer(s pamStacks, a collect.Access) facts.Envelope {
 	if s.x.authselect {
 		return collect.OK("authselect", src)
 	}
-	if data, _, err := a.ReadFile(pamDir+"/common-auth", readLimit); err == nil && strings.Contains(string(data), "pam-auth-update") {
+	marker := pamDir + "/common-auth"
+	if data, _, err := a.ReadFile(marker, readLimit); err == nil && strings.Contains(string(data), "pam-auth-update") {
+		// R155: the file the answer was read out of is cited, even when no
+		// published service included it and the expander never read it.
+		if !slices.ContainsFunc(src.Inputs, func(in facts.Source) bool { return in.Path == marker }) {
+			src.Inputs = append(src.Inputs, facts.Source{Kind: "file", Path: marker})
+		}
 		return collect.OK("pam-auth-update", src)
 	}
 	return collect.OK("manual", src)
@@ -120,10 +127,38 @@ func runPAM(_ context.Context, a collect.Access, b *collect.Builder) error {
 	return nil
 }
 
-// derivePassword and deriveAccess are filled by Tasks 2 and 3; until then
-// they write nothing, and deriveAbsent has nothing to write either.
-func derivePassword(pamStacks, collect.Access, *collect.Builder) {}
+// derivePassword writes the password-stack keys in a fixed order: an
+// error naming the parse problem when the stacks are incomplete, absent
+// when there is no passwd service, the derived values otherwise.
+func derivePassword(s pamStacks, a collect.Access, b *collect.Builder) {
+	if e, bad := incomplete(s); bad {
+		for _, k := range passwordKeys {
+			b.Set(k, e)
+		}
+		return
+	}
+	if !s.has("passwd") {
+		for _, k := range passwordKeys {
+			b.Set(k, collect.Absent(pamDir+"/passwd does not exist"))
+		}
+		return
+	}
+	vals := pwqualityFacts(s, a)
+	for k, v := range passwordFacts(s, a) {
+		vals[k] = v
+	}
+	for _, k := range passwordKeys {
+		b.Set(k, vals[k])
+	}
+}
 
+// deriveAccess is filled by Task 3; until then it writes nothing.
 func deriveAccess(pamStacks, collect.Access, *collect.Builder) {}
 
-func deriveAbsent(*collect.Builder, facts.Envelope) {}
+// deriveAbsent writes every derived key as the given absent envelope
+// (no /etc/pam.d at all). It grows the access keys in Task 3.
+func deriveAbsent(b *collect.Builder, e facts.Envelope) {
+	for _, k := range passwordKeys {
+		b.Set(k, e)
+	}
+}

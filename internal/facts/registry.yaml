@@ -501,6 +501,78 @@ keys:
     since: 1
     sensitivity: public
     collector: pam
+  - key: pam.pwquality.enabled
+    type: bool
+    description: pam_pwquality.so is stacked in passwd's password stack with a control field other than optional; a false names why. Every other pam.pwquality.* key is absent while this is false.
+    since: 1
+    sensitivity: public
+    collector: pam
+  - key: pam.pwquality.local_users_only
+    type: bool
+    description: The local_users_only argument or setting is present, so pwquality skips accounts that are not in /etc/passwd.
+    since: 1
+    sensitivity: public
+    collector: pam
+  - key: pam.pwquality.minlen
+    type: int
+    description: Effective minlen - the default 8, then pwquality.conf, then pwquality.conf.d/*.conf in name order, then the module arguments, each overriding the last.
+    since: 1
+    sensitivity: public
+    collector: pam
+  - key: pam.pwquality.minclass
+    type: int
+    description: Effective minclass (default 0), resolved like minlen.
+    since: 1
+    sensitivity: public
+    collector: pam
+  - key: pam.pwquality.dcredit
+    type: int
+    description: Effective dcredit (default 0), resolved like minlen; a negative value is a minimum count of digits.
+    since: 1
+    sensitivity: public
+    collector: pam
+  - key: pam.pwquality.ucredit
+    type: int
+    description: Effective ucredit (default 0), resolved like minlen.
+    since: 1
+    sensitivity: public
+    collector: pam
+  - key: pam.pwquality.lcredit
+    type: int
+    description: Effective lcredit (default 0), resolved like minlen.
+    since: 1
+    sensitivity: public
+    collector: pam
+  - key: pam.pwquality.ocredit
+    type: int
+    description: Effective ocredit (default 0), resolved like minlen.
+    since: 1
+    sensitivity: public
+    collector: pam
+  - key: pam.pwquality.required_classes
+    type: int
+    description: The character classes a new password must contain - the larger of minclass and the number of credits set to -1 or lower.
+    since: 1
+    sensitivity: public
+    collector: pam
+  - key: pam.pwquality.enforce_for_root
+    type: bool
+    description: enforce_for_root is set in a conf file or as a module argument.
+    since: 1
+    sensitivity: public
+    collector: pam
+  - key: pam.password.unix_hash
+    type: string
+    description: The hashing argument on pam_unix.so in passwd's password stack (md5, bigcrypt, sha256, sha512, blowfish, gost_yescrypt or yescrypt); empty when none is given and login.defs ENCRYPT_METHOD decides; absent when the stack has no pam_unix line.
+    since: 1
+    sensitivity: public
+    collector: pam
+  - key: pam.password.remember
+    type: int
+    description: How many previous passwords a new one is checked against - remember= on pam_pwhistory.so (argument, else pwhistory.conf, else the module default 10) or on pam_unix.so; absent when neither module sets it.
+    since: 1
+    sensitivity: public
+    collector: pam
   - key: env.container
     type: string
     description: Container runtime detected from filesystem markers (none, docker, podman, lxc, other); the same value the run header carries.
