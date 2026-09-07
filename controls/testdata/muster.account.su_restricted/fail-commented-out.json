@@ -1,0 +1,1 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{"pam":{"su":{"wheel_required":{"status":"ok","value":false,"reason":"no pam_wheel.so line in su's auth stack"}}}}}

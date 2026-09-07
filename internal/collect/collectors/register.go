@@ -36,6 +36,7 @@ func init() {
 	collect.Register(sshdCollector)
 	collect.Register(filesCollector)
 	collect.Register(accountsCollector)
+	collect.Register(pamCollector)
 	collect.Register(walkCollector)
 }
 

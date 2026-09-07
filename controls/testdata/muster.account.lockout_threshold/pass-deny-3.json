@@ -1,0 +1,1 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{"pam":{"faillock":{"enabled":{"status":"ok","value":true},"deny":{"status":"ok","value":3}}}}}

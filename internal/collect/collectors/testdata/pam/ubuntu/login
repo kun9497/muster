@@ -1,0 +1,8 @@
+auth       optional   pam_faildelay.so  delay=3000000
+# auth [success=ok new_authtok_reqd=ok ignore=ignore user_unknown=bad default=die] pam_securetty.so
+auth       requisite  pam_nologin.so
+@include common-auth
+auth       optional   pam_group.so
+@include common-account
+@include common-session
+@include common-password

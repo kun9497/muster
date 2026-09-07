@@ -1,0 +1,33 @@
+id: muster.account.lockout_threshold
+title_en: Accounts lock after a bounded number of failed logins
+title_ko: 로그인 실패가 정해진 횟수를 넘으면 계정이 잠긴다
+description_en: pam_faillock must be stacked in every login-facing service (preauth and authfail in the auth phase, and either the module in the account phase or an authsucc line in the auth phase) and its deny value must be between 1 and the parameter; deny 0 disables the lockout. Neither distribution family stacks faillock by default, so a stock host fails until authselect's with-faillock feature or pam-auth-update's faillock profile is enabled. A pam_tally2 line, or a lockout stacked only under some other service, is not counted. DISA's rules require three attempts; the parameter tightens or relaxes the guide's five.
+description_ko: 모든 로그인 서비스에 pam_faillock 이 올라가 있어야 하고 (auth 단계의 preauth 와 authfail, 그리고 account 단계의 모듈 또는 auth 단계의 authsucc 줄) deny 값이 1 이상 파라미터 이하여야 하며, deny 0 은 잠금을 해제합니다. 두 배포판 계열 모두 기본으로는 faillock 을 올리지 않으므로 authselect 의 with-faillock 기능이나 pam-auth-update 의 faillock 프로파일을 켜기 전까지 기본 설치는 실패합니다. pam_tally2 줄이나 다른 서비스에만 올라간 잠금은 인정하지 않습니다. DISA 규칙은 3회를 요구하며, 파라미터로 가이드의 5회를 조이거나 넓힐 수 있습니다.
+category: account
+importance: 상
+automation: auto
+references:
+  kisa: { "2026": ["U-03"], "2021": ["U-03"] }
+  cis:
+    - { benchmark: ubuntu-22.04, version: "2.0.0", rec: "5.3.2.2" }
+    - { benchmark: ubuntu-22.04, version: "2.0.0", rec: "5.3.3.1.1" }
+  stig:
+    - { benchmark: ubuntu2204, version: V2R9, id: UBTU-22-411045 }
+    - { benchmark: ubuntu2404, version: V1R6, id: UBTU-24-200610 }
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-411075 }
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-611030 }
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-611035 }
+  nist_800_53: ["AC-7"]
+requires_facts: ">=1"
+absent_means: fail
+params:
+  max_attempts: { type: int, default: 5, description: The largest deny value that counts as a lockout threshold }
+checks:
+  - { fact: pam.faillock.enabled, op: eq, expected: true }
+  - { fact: pam.faillock.deny, op: gte, expected: 1 }
+  - { fact: pam.faillock.deny, op: lte, expected: "${max_attempts}" }
+remediation:
+  text_en: RHEL family - authselect enable-feature with-faillock and set deny in /etc/security/faillock.conf; Debian family - add pam_faillock.so preauth and authfail lines to common-auth and a pam_faillock.so line to common-account (or use a pam-auth-update profile), then set deny in /etc/security/faillock.conf.
+  text_ko: RHEL 계열은 authselect enable-feature with-faillock 을 실행하고 /etc/security/faillock.conf 에 deny 를 설정하며, Debian 계열은 common-auth 에 pam_faillock.so preauth 와 authfail 줄, common-account 에 pam_faillock.so 줄을 추가하거나 pam-auth-update 프로파일을 쓴 뒤 /etc/security/faillock.conf 에 deny 를 설정합니다.
+  risk: lockout_risk
+  idempotent: true

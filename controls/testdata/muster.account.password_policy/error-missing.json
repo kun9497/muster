@@ -1,1 +1,1 @@
-{"synthetic": true, "_expect":{"reason_code":"missing_fact","exit_code":2},"schema_version":1,"run":{},"facts":{}}
+{"synthetic": true, "_expect":{"reason_code":"missing_fact","exit_code":2},"schema_version":1,"run":{},"facts":{"pam":{"pwquality":{"enabled":{"status":"ok","value":true},"minlen":{"status":"ok","value":12},"required_classes":{"status":"ok","value":4}}}}}

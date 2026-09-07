@@ -1,0 +1,6 @@
+auth       sufficient pam_rootok.so
+auth       required   pam_wheel.so group=admins deny use_uid
+session    required   pam_limits.so
+@include common-auth
+@include common-account
+@include common-session

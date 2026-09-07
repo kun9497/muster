@@ -483,6 +483,174 @@ keys:
     since: 1
     sensitivity: public
     collector: accounts
+  - key: pam.stacks
+    type: list<record>
+    description: The expanded PAM stacks of login, sshd, su, sudo, passwd and other (those whose /etc/pam.d file exists) - service, type, control, module, args, path, line - with @include, include and substack spliced where they stand and authselect's symlinks resolved by name into /etc/authselect, never by following the link. Backslash line continuation and a pam.conf-only host are not handled.
+    since: 1
+    sensitivity: public
+    collector: pam
+  - key: pam.managing_layer
+    type: string
+    description: How the stacks are generated - authselect (a managed file is a symlink into /etc/authselect), pam-auth-update (the marker in common-auth) or manual.
+    since: 1
+    sensitivity: public
+    collector: pam
+  - key: pam.parse_complete
+    type: bool
+    description: Whether every include of every published service was read; a false names the first unreadable, missing, undeclared, looping or too-deep include in its reason, and every derived pam.* value then carries error instead of a number.
+    since: 1
+    sensitivity: public
+    collector: pam
+  - key: pam.pwquality.enabled
+    type: bool
+    description: pam_pwquality.so is stacked in passwd's password stack with a control field other than optional; a false names why. Every other pam.pwquality.* key is absent while this is false.
+    since: 1
+    sensitivity: public
+    collector: pam
+  - key: pam.pwquality.local_users_only
+    type: bool
+    description: The local_users_only argument or setting is present, so pwquality skips accounts that are not in /etc/passwd.
+    since: 1
+    sensitivity: public
+    collector: pam
+  - key: pam.pwquality.minlen
+    type: int
+    description: Effective minlen - the default 8, then pwquality.conf, then pwquality.conf.d/*.conf in name order, then the module arguments, each overriding the last.
+    since: 1
+    sensitivity: public
+    collector: pam
+  - key: pam.pwquality.minclass
+    type: int
+    description: Effective minclass (default 0), resolved like minlen.
+    since: 1
+    sensitivity: public
+    collector: pam
+  - key: pam.pwquality.dcredit
+    type: int
+    description: Effective dcredit (default 0), resolved like minlen; a negative value is a minimum count of digits.
+    since: 1
+    sensitivity: public
+    collector: pam
+  - key: pam.pwquality.ucredit
+    type: int
+    description: Effective ucredit (default 0), resolved like minlen.
+    since: 1
+    sensitivity: public
+    collector: pam
+  - key: pam.pwquality.lcredit
+    type: int
+    description: Effective lcredit (default 0), resolved like minlen.
+    since: 1
+    sensitivity: public
+    collector: pam
+  - key: pam.pwquality.ocredit
+    type: int
+    description: Effective ocredit (default 0), resolved like minlen.
+    since: 1
+    sensitivity: public
+    collector: pam
+  - key: pam.pwquality.required_classes
+    type: int
+    description: The character classes a new password must contain - the larger of minclass and the number of credits set to -1 or lower.
+    since: 1
+    sensitivity: public
+    collector: pam
+  - key: pam.pwquality.enforce_for_root
+    type: bool
+    description: enforce_for_root is set in a conf file or as a module argument.
+    since: 1
+    sensitivity: public
+    collector: pam
+  - key: pam.password.unix_hash
+    type: string
+    description: The hashing argument on pam_unix.so in passwd's password stack (md5, bigcrypt, sha256, sha512, blowfish, gost_yescrypt or yescrypt); empty when none is given and login.defs ENCRYPT_METHOD decides; absent when the stack has no pam_unix line.
+    since: 1
+    sensitivity: public
+    collector: pam
+  - key: pam.password.remember
+    type: int
+    description: How many previous passwords a new one is checked against - remember= on pam_pwhistory.so (argument, else pwhistory.conf, else the module default 10) or on pam_unix.so; absent when neither module sets it.
+    since: 1
+    sensitivity: public
+    collector: pam
+  - key: pam.faillock.enabled
+    type: bool
+    description: Every existing login-facing service (login, sshd) stacks pam_faillock.so with preauth and with authfail in its auth phase and, in its account phase, pam_faillock.so, or an authsucc line in the auth phase; a false names the first service that does not. The other pam.faillock.* keys are absent while this is false.
+    since: 1
+    sensitivity: public
+    collector: pam
+  - key: pam.faillock.deny
+    type: int
+    description: Effective deny - the default 3, then faillock.conf, then the preauth arguments, then the authfail arguments; 0 disables the lockout. What is published is the merge of faillock.conf, the preauth arguments and the authfail arguments, the authfail line applied last; when the two lines disagree pam.faillock.enabled says so in its reason. A conf= argument naming another file is not handled.
+    since: 1
+    sensitivity: public
+    collector: pam
+  - key: pam.faillock.unlock_time
+    type: int
+    description: Effective unlock_time in seconds (default 600), resolved like deny; 0 means the account stays locked until an administrator releases it.
+    since: 1
+    sensitivity: public
+    collector: pam
+  - key: pam.faillock.fail_interval
+    type: int
+    description: Effective fail_interval in seconds (default 900), resolved like deny.
+    since: 1
+    sensitivity: public
+    collector: pam
+  - key: pam.faillock.even_deny_root
+    type: bool
+    description: even_deny_root is set in faillock.conf or as a module argument (with or without a value), or root_unlock_time is set, which implies it.
+    since: 1
+    sensitivity: public
+    collector: pam
+  - key: pam.faillock.root_unlock_time
+    type: int
+    description: Effective root_unlock_time in seconds, resolved like deny; unlock_time when not set.
+    since: 1
+    sensitivity: public
+    collector: pam
+  - key: pam.su.wheel_required
+    type: bool
+    description: su's auth stack has a pam_wheel.so line whose control field is required or requisite and whose arguments do not include deny, so only the wheel group (or group=) may use su; a false names why.
+    since: 1
+    sensitivity: public
+    collector: pam
+  - key: pam.su.wheel_control
+    type: string
+    description: The control field of the first pam_wheel.so line in su's auth stack; absent when there is none.
+    since: 1
+    sensitivity: public
+    collector: pam
+  - key: pam.su.wheel_group
+    type: string
+    description: The group pam_wheel.so restricts su to - its group= argument, or wheel; absent when there is no pam_wheel line.
+    since: 1
+    sensitivity: public
+    collector: pam
+  - key: pam.su.wheel_args
+    type: list<string>
+    description: The arguments of that pam_wheel.so line; absent when there is none.
+    since: 1
+    sensitivity: public
+    collector: pam
+  - key: pam.umask_module.enabled
+    type: bool
+    description: pam_umask.so is in the session stack of login (else sshd, else other), which applies a umask where /etc/profile never runs.
+    since: 1
+    sensitivity: public
+    collector: pam
+  - key: pam.umask_module.args
+    type: list<string>
+    description: The arguments of the first pam_umask.so session line; absent when the module is not stacked.
+    since: 1
+    sensitivity: public
+    collector: pam
+  - key: pam.securetty_enabled
+    type: bool
+    description: login's auth stack has a pam_securetty.so line (any control), so /etc/securetty is consulted for root logins on a console; absent when there is no login service.
+    since: 1
+    sensitivity: public
+    collector: pam
   - key: env.container
     type: string
     description: Container runtime detected from filesystem markers (none, docker, podman, lxc, other); the same value the run header carries.

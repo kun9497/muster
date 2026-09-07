@@ -1,0 +1,1 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{"pam":{"faillock":{"enabled":{"status":"ok","value":false,"reason":"sshd's stack lacks pam_faillock.so preauth, authfail or a reset (the module in the account phase or an authsucc line)"},"deny":{"status":"absent","reason":"faillock is not enabled"}}}}}

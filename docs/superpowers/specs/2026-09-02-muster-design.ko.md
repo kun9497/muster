@@ -183,7 +183,7 @@ source = {kind: file|command|proc|sys|derived, path, line, raw, cmd, exit_code}
 
 네 면은 오직 컨트롤 절의 `on:`으로만 선택합니다. 어떤 팩트 키에도 면의 이름을 딴 세그먼트는 들어가지 않습니다. sysctl(`/proc/sys` 대 `/etc/sysctl.conf`와 `/etc/sysctl.d`, `/run/sysctl.d`, `/usr/local/lib/sysctl.d`, `/usr/lib/sysctl.d` 아래 모든 `*.conf`의 병합 결과. 앞선 디렉터리의 파일이 뒤 디렉터리의 같은 이름 파일을 가리고, 살아남은 파일들은 사전순으로 적용되며, 이긴 파일과 줄 번호를 `winner`에 기록), 서비스(active 상태 대 유닛 파일 상태), 방화벽(커널 룰셋 대 영속화된 설정), 커널 모듈(로드됨 대 블랙리스트됨), SELinux(`enforce` 대 `/etc/selinux/config`), 마운트(`mountinfo` 대 `fstab`), 비밀번호 정책(`login.defs` 대 `shadow`의 계정별 유효 필드. `PASS_MIN_LEN` 대 pwquality), 그리고 sshd와 PAM(데몬이 보고한 값 대 데몬이 읽는 파일에 대한 muster의 파싱 결과)에 씁니다.
 
-레지스트리는 각 설정의 기본 면을 선언합니다. 파일에도 함께 사는 커널·데몬 상태(sysctl, 서비스, 방화벽, 모듈, SELinux, 마운트, 비밀번호 만료)에서는 `both`입니다. 양쪽 모두 절을 충족해야 하고, 어긋나면 그 자체가 고유한 사유를 가진 별도의 판정이 됩니다. 영속화된 면이 데몬이 읽는 바로 그 파일들에 대한 muster 자신의 파싱 결과인 경우(sshd, PAM)에는 `effective`입니다. 이때 `effective`는 데몬이 보고한 값을 수집했으면 그 값이고, 수집하지 못했으면 저하됨으로 표시된 파싱 결과입니다 (D10).
+레지스트리는 각 설정의 기본 면을 선언합니다. 파일에도 함께 사는 커널·데몬 상태(sysctl, 서비스, 방화벽, 모듈, SELinux, 마운트, 비밀번호 만료)에서는 `both`입니다. 양쪽 모두 절을 충족해야 하고, 어긋나면 그 자체가 고유한 사유를 가진 별도의 판정이 됩니다. 영속화된 면이 데몬이 읽는 바로 그 파일들에 대한 muster 자신의 파싱 결과인 경우(sshd, PAM)에는 `effective`입니다. 이때 `effective`는 데몬이 보고한 값을 수집했으면 그 값이고, 수집하지 못했으면 저하됨으로 표시된 파싱 결과입니다 (D10). PAM 에는 데몬이 보고하는 쪽이 없으므로 2C 단계부터 그 키는 양면 설정이 아니라 계산에 쓴 파일을 입력으로 갖는 단순 파생 값입니다 (R142).
 
 ### 5.4 섹션
 

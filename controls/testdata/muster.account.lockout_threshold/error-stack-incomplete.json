@@ -1,0 +1,1 @@
+{"synthetic": true, "_expect":{"reason_code":"parse_error"}, "schema_version":1,"run":{},"facts":{"pam":{"faillock":{"enabled":{"status":"error","reason":"PAM stack incomplete: /etc/pam.d/password-auth: symbolic link in path"},"deny":{"status":"error","reason":"PAM stack incomplete: /etc/pam.d/password-auth: symbolic link in path"}}}}}

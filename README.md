@@ -15,10 +15,10 @@ benchmarks (CIS Benchmarks, DISA STIG, NIST SP 800-53) are attached as
 references and, later, offered as selectable profiles.
 
 > **Status: stage 1 complete, stage 2 starting (September 2026).** `collect`
-> and `check` work end to end with eighteen controls (U-01, U-02, U-16, U-19,
-> U-22, U-25, U-29, U-52, U-04, U-05, U-07, U-08, U-09, U-10, U-11, U-13,
-> U-18, U-55 — U-19/U-22/U-29 are the `/etc/hosts`, `/etc/services` and
-> `/etc/hosts.lpd` permission controls; U-04, U-05, U-07, U-08, U-09, U-10,
+> and `check` work end to end with twenty controls (U-01, U-02, U-16, U-19,
+> U-22, U-25, U-29, U-52, U-03, U-04, U-05, U-06, U-07, U-08, U-09, U-10,
+> U-11, U-13, U-18, U-55 — U-19/U-22/U-29 are the `/etc/hosts`, `/etc/services` and
+> `/etc/hosts.lpd` permission controls; U-03, U-04, U-05, U-06, U-07, U-08, U-09, U-10,
 > U-11, U-13, U-18 and U-55 are the account family added in stage 2);
 > CI exercises them as root, as a normal user, and inside Ubuntu 22.04/24.04
 > and Rocky/Alma 9 containers. Stage 2 enrolls every automatable

@@ -161,7 +161,7 @@ func TestCheckEndToEndJSONAndTable(t *testing.T) {
 	if _, declared := params["muster.service.telnet_disabled"]; declared {
 		t.Errorf("only controls that declare params belong in check.params: %v", params)
 	}
-	// R26: full-pass.json must produce exactly the eighteen embedded controls'
+	// R26: full-pass.json must produce exactly the twenty embedded controls'
 	// documented statuses, not merely "some PASS rows appear somewhere in the
 	// output".
 	assertStatuses(t, out1.Bytes(), map[string]string{
@@ -183,6 +183,8 @@ func TestCheckEndToEndJSONAndTable(t *testing.T) {
 		"muster.account.password_hash_algorithm": "PASS",
 		"muster.file.shadow_permissions":         "PASS",
 		"muster.service.ftp_account_shell":       "PASS",
+		"muster.account.lockout_threshold":       "PASS",
+		"muster.account.su_restricted":           "PASS",
 	})
 
 	var table bytes.Buffer
@@ -194,7 +196,7 @@ func TestCheckEndToEndJSONAndTable(t *testing.T) {
 	}
 
 	// R26: full-fail.json flips only root_remote_login to FAIL; the other
-	// seventeen controls are unchanged from full-pass.json.
+	// nineteen controls are unchanged from full-pass.json.
 	var failJSON bytes.Buffer
 	if code := run([]string{"check", "--facts", "testdata/full-fail.json", "--format", "json"}, &failJSON, &errb); code != exitFindings {
 		t.Fatalf("exit %d, want 1 for a FAIL; stderr %q", code, errb.String())
@@ -218,6 +220,8 @@ func TestCheckEndToEndJSONAndTable(t *testing.T) {
 		"muster.account.password_hash_algorithm": "PASS",
 		"muster.file.shadow_permissions":         "PASS",
 		"muster.service.ftp_account_shell":       "PASS",
+		"muster.account.lockout_threshold":       "PASS",
+		"muster.account.su_restricted":           "PASS",
 	})
 
 	// R26: every run() call's exit code is asserted, including --quiet's,

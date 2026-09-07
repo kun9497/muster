@@ -1,0 +1,2 @@
+session     optional                   pam_umask.so silent
+session     [default=1]                pam_lastlog.so nowtmp showfailed

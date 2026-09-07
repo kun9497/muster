@@ -962,6 +962,286 @@
       "SubjectKind": ""
     },
     {
+      "Key": "pam.stacks",
+      "Type": "list\u003crecord\u003e",
+      "Description": "The expanded PAM stacks of login, sshd, su, sudo, passwd and other (those whose /etc/pam.d file exists) - service, type, control, module, args, path, line - with @include, include and substack spliced where they stand and authselect's symlinks resolved by name into /etc/authselect, never by following the link. Backslash line continuation and a pam.conf-only host are not handled.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pam",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "pam.managing_layer",
+      "Type": "string",
+      "Description": "How the stacks are generated - authselect (a managed file is a symlink into /etc/authselect), pam-auth-update (the marker in common-auth) or manual.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pam",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "pam.parse_complete",
+      "Type": "bool",
+      "Description": "Whether every include of every published service was read; a false names the first unreadable, missing, undeclared, looping or too-deep include in its reason, and every derived pam.* value then carries error instead of a number.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pam",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "pam.pwquality.enabled",
+      "Type": "bool",
+      "Description": "pam_pwquality.so is stacked in passwd's password stack with a control field other than optional; a false names why. Every other pam.pwquality.* key is absent while this is false.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pam",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "pam.pwquality.local_users_only",
+      "Type": "bool",
+      "Description": "The local_users_only argument or setting is present, so pwquality skips accounts that are not in /etc/passwd.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pam",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "pam.pwquality.minlen",
+      "Type": "int",
+      "Description": "Effective minlen - the default 8, then pwquality.conf, then pwquality.conf.d/*.conf in name order, then the module arguments, each overriding the last.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pam",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "pam.pwquality.minclass",
+      "Type": "int",
+      "Description": "Effective minclass (default 0), resolved like minlen.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pam",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "pam.pwquality.dcredit",
+      "Type": "int",
+      "Description": "Effective dcredit (default 0), resolved like minlen; a negative value is a minimum count of digits.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pam",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "pam.pwquality.ucredit",
+      "Type": "int",
+      "Description": "Effective ucredit (default 0), resolved like minlen.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pam",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "pam.pwquality.lcredit",
+      "Type": "int",
+      "Description": "Effective lcredit (default 0), resolved like minlen.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pam",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "pam.pwquality.ocredit",
+      "Type": "int",
+      "Description": "Effective ocredit (default 0), resolved like minlen.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pam",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "pam.pwquality.required_classes",
+      "Type": "int",
+      "Description": "The character classes a new password must contain - the larger of minclass and the number of credits set to -1 or lower.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pam",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "pam.pwquality.enforce_for_root",
+      "Type": "bool",
+      "Description": "enforce_for_root is set in a conf file or as a module argument.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pam",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "pam.password.unix_hash",
+      "Type": "string",
+      "Description": "The hashing argument on pam_unix.so in passwd's password stack (md5, bigcrypt, sha256, sha512, blowfish, gost_yescrypt or yescrypt); empty when none is given and login.defs ENCRYPT_METHOD decides; absent when the stack has no pam_unix line.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pam",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "pam.password.remember",
+      "Type": "int",
+      "Description": "How many previous passwords a new one is checked against - remember= on pam_pwhistory.so (argument, else pwhistory.conf, else the module default 10) or on pam_unix.so; absent when neither module sets it.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pam",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "pam.faillock.enabled",
+      "Type": "bool",
+      "Description": "Every existing login-facing service (login, sshd) stacks pam_faillock.so with preauth and with authfail in its auth phase and, in its account phase, pam_faillock.so, or an authsucc line in the auth phase; a false names the first service that does not. The other pam.faillock.* keys are absent while this is false.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pam",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "pam.faillock.deny",
+      "Type": "int",
+      "Description": "Effective deny - the default 3, then faillock.conf, then the preauth arguments, then the authfail arguments; 0 disables the lockout. What is published is the merge of faillock.conf, the preauth arguments and the authfail arguments, the authfail line applied last; when the two lines disagree pam.faillock.enabled says so in its reason. A conf= argument naming another file is not handled.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pam",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "pam.faillock.unlock_time",
+      "Type": "int",
+      "Description": "Effective unlock_time in seconds (default 600), resolved like deny; 0 means the account stays locked until an administrator releases it.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pam",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "pam.faillock.fail_interval",
+      "Type": "int",
+      "Description": "Effective fail_interval in seconds (default 900), resolved like deny.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pam",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "pam.faillock.even_deny_root",
+      "Type": "bool",
+      "Description": "even_deny_root is set in faillock.conf or as a module argument (with or without a value), or root_unlock_time is set, which implies it.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pam",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "pam.faillock.root_unlock_time",
+      "Type": "int",
+      "Description": "Effective root_unlock_time in seconds, resolved like deny; unlock_time when not set.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pam",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "pam.su.wheel_required",
+      "Type": "bool",
+      "Description": "su's auth stack has a pam_wheel.so line whose control field is required or requisite and whose arguments do not include deny, so only the wheel group (or group=) may use su; a false names why.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pam",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "pam.su.wheel_control",
+      "Type": "string",
+      "Description": "The control field of the first pam_wheel.so line in su's auth stack; absent when there is none.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pam",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "pam.su.wheel_group",
+      "Type": "string",
+      "Description": "The group pam_wheel.so restricts su to - its group= argument, or wheel; absent when there is no pam_wheel line.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pam",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "pam.su.wheel_args",
+      "Type": "list\u003cstring\u003e",
+      "Description": "The arguments of that pam_wheel.so line; absent when there is none.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pam",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "pam.umask_module.enabled",
+      "Type": "bool",
+      "Description": "pam_umask.so is in the session stack of login (else sshd, else other), which applies a umask where /etc/profile never runs.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pam",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "pam.umask_module.args",
+      "Type": "list\u003cstring\u003e",
+      "Description": "The arguments of the first pam_umask.so session line; absent when the module is not stacked.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pam",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "pam.securetty_enabled",
+      "Type": "bool",
+      "Description": "login's auth stack has a pam_securetty.so line (any control), so /etc/securetty is consulted for root logins on a console; absent when there is no login service.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pam",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
       "Key": "env.container",
       "Type": "string",
       "Description": "Container runtime detected from filesystem markers (none, docker, podman, lxc, other); the same value the run header carries.",
