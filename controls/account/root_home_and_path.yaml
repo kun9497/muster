@@ -7,7 +7,7 @@ category: account
 importance: 상
 automation: auto
 references:
-  kisa: { "2026": ["U-14"], "2021": ["U-19"] }
+  kisa: { "2026": ["U-14"], "2021": ["U-05"] }
   stig:
     - { benchmark: rhel9, version: V2R9, id: RHEL-09-411055 }
   nist_800_53: ["CM-6"]
