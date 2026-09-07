@@ -17,7 +17,8 @@ references and, later, offered as selectable profiles.
 > **Status: stage 2 in progress (September 2026).** Stage 1 — the skeleton:
 > `collect`, `check`, waivers, exit codes, eight controls end to end — is
 > complete, and the first stage-2 plans are merged: the foundations with DISA
-> STIG and NIST SP 800-53 references, the account family, and the PAM stacks.
+> STIG and NIST SP 800-53 references, the account family, the PAM stacks, and
+> the completed sshd collector with login banners.
 > Which KISA items are enrolled today, with their control ids and automation
 > class, is generated into [the coverage table](docs/reference/coverage.md);
 > CI exercises the control set as root, as a normal user, and inside Ubuntu
