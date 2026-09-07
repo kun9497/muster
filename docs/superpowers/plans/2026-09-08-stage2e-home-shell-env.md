@@ -53,8 +53,8 @@ Key inventory this plan adds (13 keys):
 | `env.shell.tmout_settings` | `list<record>` | env | T1 | Every `TMOUT` assignment: `path`, `line`, `value`, `exported`, `readonly`, `conditional`. |
 | `env.shell.umask_settings` | `list<record>` | env | T1 | Every `umask` assignment: `path`, `line`, `value`, `symbolic`, `conditional`, `scope` (`system`\|`root`). |
 | `env.shell.root_path_raw` | `string` | env | T1 | The winning `PATH` assignment for root, verbatim, with the file and line as its source. |
-| `env.shell.root_path_entries` | `list<record>` | env | T1 | Each `PATH` element: `position`, `value`, `exists`, `mode`, `uid`, `gid`, `group_writable`, `world_writable`, `is_dot` (empty/`.`/relative), `unresolved`. |
-| `files.home_dirs` | `list<record>` | files | T2 | One row per `/etc/passwd` home: `user`, `uid`, `home`, `stat_status` (ok\|absent\|denied), `is_dir`, `mode`, `owner_uid`, `owner_matches`, `group_writable`, `other_writable`, `interactive`, `on_remote_fs`. `subject_kind: dir`. |
+| `env.shell.root_path_entries` | `list<record>` | env | T1 | Each `PATH` element: `position`, `value`, `exists`, `mode`, `uid`, `gid`, `group_writable`, `world_writable`, `is_dot` (empty/`.`/relative), `variable` (`$`/`~`), `unresolved`, `undeclared` (outside the declared PATH-dir set). |
+| `files.home_dirs` | `list<record>` | files | T2 | One row per `/etc/passwd` home: `user`, `uid`, `home`, `stat_status` (ok\|absent\|denied), `is_dir`, `mode`, `owner_uid`, `owner_matches`, `group_writable`, `other_writable`, `interactive`, `on_remote_fs`. `subject_kind: user`. |
 | `files.env_files` | `list<record>` | files | T2 | System and per-user shell-environment files present: `path`, `scope` (`system`\|`user`), `home_user`, `mode`, `owner_uid`, `owner_ok`, `group_writable`, `other_writable`, `is_symlink`. |
 | `files.user_rhosts` | `list<record>` | files | T2 | Per-home `.rhosts`/`.shosts` and `/etc/hosts.equiv` reach: `path`, `home_user`, `owner_ok`, `has_plus`, `entry_count`. Derived flags only, never the body. `sensitivity: internal`. |
 | `files.root_home.{mode,uid,gid,group_writable,other_writable,acl_present}` | int×3, bool×3 | files | T3 | Permission facts of `/root` from stat only. |
@@ -69,7 +69,7 @@ Not built here: `sudo.{installed,includedir,secure_path}` (2F — so U-14 judges
 
 **Files:**
 - Create: `internal/collect/collectors/env.go`, `internal/collect/collectors/env_parse.go`, and env tests in `collectors_test.go`
-- Create fixtures under `internal/collect/collectors/testdata/`: `profile`, `profile.d_10-muster.sh`, `profile.d_99-tmout.sh`, `bash.bashrc`, `root_bashrc`, `root_profile`, `csh.cshrc`
+- Create fixtures under `internal/collect/collectors/testdata/`: `profile`, `profile.d_10-muster.sh`, `profile.d_99-tmout.sh`, `bash.bashrc`, `root_bashrc`, `root_bashrc_badpath`, `root_profile`, `csh.cshrc`, `profile_tmout_oneline`, `profile_tmout_declare`
 - Modify: `internal/collect/collectors/register.go` (register `envCollector` after `osCollector`), `internal/facts/registry.yaml` (7 keys), golden regenerated
 
 **Interfaces:**
@@ -117,7 +117,14 @@ func TestEnvEffectiveTMOUT(t *testing.T) {
 Fixtures:
 - `profile` — a synthetic `/etc/profile`: a comment line, `TMOUT=600`, `export TMOUT`, `umask 022`, `PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin`, `export PATH`.
 - `profile.d_99-tmout.sh` — `readonly TMOUT`.
-- `profile.d_10-muster.sh` — `if [ "$UID" -ge 1000 ]; then umask 002; fi` (a conditional umask, scope system).
+- `profile.d_10-muster.sh` — a conditional umask (scope system), multi-line so the depth tracking is genuine:
+  ```
+  if [ "$UID" -ge 1000 ]; then
+      umask 002
+  fi
+  ```
+- `profile_tmout_oneline` — `TMOUT=600; export TMOUT` (two statements on one line; R184).
+- `profile_tmout_declare` — `declare -xr TMOUT=600` (a declaration keyword with -x/-r flags; R184).
 - `bash.bashrc` — `umask 022`.
 - `root_bashrc` — `PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin` (root scope).
 - `root_profile`, `csh.cshrc` — minimal.
@@ -136,7 +143,8 @@ package collectors
 
 import (
 	"context"
-	"path"
+	"errors"
+	"io/fs"
 	"sort"
 	"strconv"
 	"strings"
@@ -158,13 +166,30 @@ const (
 // last unconditional assignment wins, so it must be deterministic.
 var rootDotfiles = []string{"/root/.bash_profile", "/root/.bashrc", "/root/.profile"}
 
+// pathCandidateDirs is the fixed set of directories a system/root PATH may
+// name; pathEntries stats only an element that is in this declared set (R175),
+// so the collector never stats an arbitrary directory outside Declare.Reads.
+var pathCandidateDirs = []string{
+	"/usr/local/sbin", "/usr/local/bin", "/usr/sbin", "/usr/bin",
+	"/sbin", "/bin", "/snap/bin", "/root/bin", "/usr/games", "/usr/local/games",
+}
+
 var envCollector = collect.Collector{
 	Name: "env",
 	Declare: collect.Declaration{
-		Reads: append([]string{etcProfile, profileDGlob, bashBashrc, etcBashrc, cshCshrc}, rootDotfiles...),
+		Reads: append(append([]string{etcProfile, profileDGlob, bashBashrc, etcBashrc, cshCshrc}, rootDotfiles...), pathCandidateDirs...),
 		Needs: "none",
 	},
 	Run: runEnv,
+}
+
+// envShellKeys are the seven env.shell.* leaves this collector writes; a
+// profile file that is present but unreadable is the answer for every value it
+// could set, so the read error is written to all of them (C3, R183).
+var envShellKeys = []string{
+	"env.shell.tmout", "env.shell.tmout_exported", "env.shell.tmout_readonly",
+	"env.shell.tmout_settings", "env.shell.umask_settings",
+	"env.shell.root_path_raw", "env.shell.root_path_entries",
 }
 
 func runEnv(_ context.Context, a collect.Access, b *collect.Builder) error {
@@ -172,9 +197,18 @@ func runEnv(_ context.Context, a collect.Access, b *collect.Builder) error {
 	for _, p := range profileReadOrder(a) {
 		data, meta, err := a.ReadFile(p, readLimit)
 		if err != nil {
-			continue // a missing/denied profile file is not an env failure; the winner logic sees what it can
+			if errors.Is(err, fs.ErrNotExist) {
+				continue // a profile file that simply does not exist contributes nothing
+			}
+			// C3 (R183): a present-but-unreadable profile file — denied, or any
+			// other error — is the answer for every value it could set; write
+			// the path-prefixed read error to all seven keys and stop.
+			e := collect.FromReadError(err, meta)
+			for _, k := range envShellKeys {
+				b.Set(k, e)
+			}
+			return nil
 		}
-		_ = meta
 		all = append(all, parseShellFile(data, p)...)
 	}
 	writeTMOUT(b, all)
@@ -202,9 +236,8 @@ func profileReadOrder(a collect.Access) []string {
 
 ```go
 func writeTMOUT(b *collect.Builder, all []shellAssignment) {
-	var winner *shellAssignment
-	exported, readonly := false, false
 	rows := []any{}
+	winnerIdx := -1
 	for i := range all {
 		s := all[i]
 		if s.Kind != "tmout" {
@@ -214,23 +247,30 @@ func writeTMOUT(b *collect.Builder, all []shellAssignment) {
 			"path": s.Path, "line": s.Line, "value": s.Value,
 			"exported": s.Exported, "readonly": s.Readonly, "conditional": s.Conditional,
 		})
-		if s.Exported {
-			exported = true
-		}
-		if s.Readonly {
-			readonly = true
-		}
 		if !s.Conditional && s.Value != "" { // a bare `readonly TMOUT` has no value; it does not win
-			w := s
-			winner = &w
+			winnerIdx = i
 		}
 	}
 	src := &facts.Source{Kind: "derived"}
 	val := 0
-	if winner != nil {
-		if n, err := strconv.Atoi(strings.TrimSpace(winner.Value)); err == nil {
+	exported, readonly := false, false
+	if winnerIdx >= 0 {
+		w := all[winnerIdx]
+		// exported/readonly come from the winning assignment itself plus any
+		// LATER unconditional export/readonly of TMOUT — not OR'd across every
+		// row, so a conditional `export TMOUT` does not falsely mark it (L4).
+		exported, readonly = w.Exported, w.Readonly
+		for j := winnerIdx + 1; j < len(all); j++ {
+			s := all[j]
+			if s.Kind != "tmout" || s.Conditional {
+				continue
+			}
+			exported = exported || s.Exported
+			readonly = readonly || s.Readonly
+		}
+		if n, err := strconv.Atoi(strings.TrimSpace(w.Value)); err == nil {
 			val = n
-			src = &facts.Source{Kind: "file", Path: winner.Path, Line: winner.Line}
+			src = &facts.Source{Kind: "file", Path: w.Path, Line: w.Line}
 		}
 	}
 	b.Set("env.shell.tmout", collect.OK(val, src))
@@ -285,7 +325,6 @@ import (
 	"strings"
 
 	"github.com/kun9497/muster/internal/collect"
-	"github.com/kun9497/muster/internal/facts"
 )
 
 type shellAssignment struct {
@@ -310,33 +349,47 @@ func parseShellFile(data []byte, p string) []shellAssignment {
 		scope = "root"
 	}
 	for i, raw := range splitLines(data) {
-		line := strings.TrimSpace(cutComment(raw))
-		if line == "" {
+		full := strings.TrimSpace(cutComment(raw))
+		if full == "" {
 			continue
 		}
-		opens, closes := blockDelta(line)
+		// blockDelta is computed on the whole physical line; conditional depth
+		// applies to the statements on it.
+		opens, closes := blockDelta(full)
 		conditional := depth > 0
-		// TMOUT
-		if v, ok := assignmentValue(line, "TMOUT"); ok {
-			out = append(out, shellAssignment{Kind: "tmout", Value: v, Path: p, Line: i + 1,
-				Exported: strings.HasPrefix(line, "export "), Conditional: conditional})
-		}
-		if name, ok := readonlyName(line); ok && name == "TMOUT" {
-			out = append(out, shellAssignment{Kind: "tmout", Value: assignedInline(line, "TMOUT"), Path: p, Line: i + 1,
-				Readonly: true, Conditional: conditional})
-		}
-		if name, ok := exportName(line); ok && name == "TMOUT" {
-			out = append(out, shellAssignment{Kind: "tmout", Value: "", Path: p, Line: i + 1, Exported: true, Conditional: conditional})
-		}
-		// umask
-		if fields := strings.Fields(line); len(fields) >= 2 && (fields[0] == "umask" || (fields[0] == "builtin" && fields[1] == "umask")) {
-			val := fields[len(fields)-1]
-			out = append(out, shellAssignment{Kind: "umask", Value: val, Path: p, Line: i + 1,
-				Symbolic: !isOctalMask(val), Conditional: conditional, Scope: scope})
-		}
-		// PATH
-		if v, ok := assignmentValue(line, "PATH"); ok {
-			out = append(out, shellAssignment{Kind: "path", Value: v, Path: p, Line: i + 1, Conditional: conditional, Scope: scope})
+		// A single physical line may hold several statements separated by an
+		// unquoted `;` (e.g. `TMOUT=600; export TMOUT`); scan each (R184).
+		for _, line := range splitStatements(full) {
+			line = strings.TrimSpace(line)
+			if line == "" {
+				continue
+			}
+			// TMOUT: a declaration keyword (declare/typeset/export/readonly
+			// with optional -x/-r/-xr flags) assigning it, else a bare
+			// assignment, else a bare export/readonly of the name (R184).
+			if v, exported, readonly, ok := declAssignment(line, "TMOUT"); ok {
+				out = append(out, shellAssignment{Kind: "tmout", Value: v, Path: p, Line: i + 1,
+					Exported: exported, Readonly: readonly, Conditional: conditional})
+			} else if v, ok := assignmentValue(line, "TMOUT"); ok {
+				out = append(out, shellAssignment{Kind: "tmout", Value: v, Path: p, Line: i + 1,
+					Exported: strings.HasPrefix(line, "export "), Conditional: conditional})
+			} else if name, ok := exportName(line); ok && name == "TMOUT" {
+				out = append(out, shellAssignment{Kind: "tmout", Value: "", Path: p, Line: i + 1, Exported: true, Conditional: conditional})
+			} else if name, ok := readonlyName(line); ok && name == "TMOUT" {
+				out = append(out, shellAssignment{Kind: "tmout", Value: "", Path: p, Line: i + 1, Readonly: true, Conditional: conditional})
+			}
+			// umask
+			if fields := strings.Fields(line); len(fields) >= 2 && (fields[0] == "umask" || (fields[0] == "builtin" && fields[1] == "umask")) {
+				val := fields[len(fields)-1]
+				out = append(out, shellAssignment{Kind: "umask", Value: val, Path: p, Line: i + 1,
+					Symbolic: !isOctalMask(val), Conditional: conditional, Scope: scope})
+			}
+			// PATH: same declaration-keyword forms, then a bare assignment.
+			if v, exported, _, ok := declAssignment(line, "PATH"); ok {
+				out = append(out, shellAssignment{Kind: "path", Value: v, Path: p, Line: i + 1, Exported: exported, Conditional: conditional, Scope: scope})
+			} else if v, ok := assignmentValue(line, "PATH"); ok {
+				out = append(out, shellAssignment{Kind: "path", Value: v, Path: p, Line: i + 1, Conditional: conditional, Scope: scope})
+			}
 		}
 		depth += opens - closes
 		if depth < 0 {
@@ -347,9 +400,79 @@ func parseShellFile(data []byte, p string) []shellAssignment {
 }
 ```
 
+**Single-line `if …; then umask …; fi` (L5, noted):** splitting on `;` does not turn a
+`then umask 002` fragment into a recognised `umask` statement (its first field is
+`then`), and `blockDelta` nets to zero on such a line, so a umask set inside a
+one-line `if` is not recorded as conditional. This is an accepted coarse-scan
+limitation; the conditional-umask fixture uses the multi-line form (below) so its
+`conditional=true` is genuine.
+
 helpers in the same file:
 
 ```go
+// splitStatements splits a line on unquoted `;` so several statements on one
+// physical line are scanned independently, e.g. `TMOUT=600; export TMOUT` (R184).
+func splitStatements(line string) []string {
+	out := []string{}
+	inS, inD := false, false
+	start := 0
+	for i := 0; i < len(line); i++ {
+		switch line[i] {
+		case '\'':
+			if !inD {
+				inS = !inS
+			}
+		case '"':
+			if !inS {
+				inD = !inD
+			}
+		case ';':
+			if !inS && !inD {
+				out = append(out, line[start:i])
+				start = i + 1
+			}
+		}
+	}
+	return append(out, line[start:])
+}
+
+// declAssignment recognises a declaration keyword (declare, typeset, export or
+// readonly) with optional -x/-r/-xr flags assigning name — `declare -xr
+// TMOUT=600`, `export -r PATH=…`, `readonly TMOUT=600`, `export TMOUT=600` —
+// and reports the value plus whether the form exports (-x, or the `export`
+// keyword) and/or makes the name readonly (-r, or the `readonly` keyword) (R184).
+func declAssignment(line, name string) (value string, exported, readonly, ok bool) {
+	f := strings.Fields(line)
+	if len(f) == 0 {
+		return "", false, false, false
+	}
+	switch f[0] {
+	case "export":
+		exported = true
+	case "readonly":
+		readonly = true
+	case "declare", "typeset":
+	default:
+		return "", false, false, false
+	}
+	rest := f[1:]
+	for len(rest) > 0 && strings.HasPrefix(rest[0], "-") {
+		if strings.Contains(rest[0], "x") {
+			exported = true
+		}
+		if strings.Contains(rest[0], "r") {
+			readonly = true
+		}
+		rest = rest[1:]
+	}
+	prefix := name + "="
+	if len(rest) == 0 || !strings.HasPrefix(rest[0], prefix) {
+		return "", false, false, false
+	}
+	v := strings.Trim(strings.TrimSpace(strings.TrimPrefix(rest[0], prefix)), `"'`)
+	return v, exported, readonly, true
+}
+
 // cutComment drops an unquoted trailing comment. A `#` inside single or
 // double quotes is kept; this is a coarse scan, not a shell lexer, so a `#`
 // after an odd number of quotes is treated as literal.
@@ -384,8 +507,6 @@ func assignmentValue(line, name string) (string, bool) {
 	v = strings.Trim(v, `"'`)
 	return v, true
 }
-
-func assignedInline(line, name string) string { v, _ := assignmentValue(strings.TrimPrefix(line, "readonly "), name); return v }
 
 func exportName(line string) (string, bool) {
 	if !strings.HasPrefix(line, "export ") { return "", false }
@@ -425,28 +546,50 @@ func blockDelta(line string) (opens, closes int) {
 	return opens, closes
 }
 
-// pathEntries splits a PATH value and stats each element. An empty element,
-// ".", or a relative path is is_dot (a working-directory injection risk); a
-// stat failure is unresolved. Reads go through Access so the guard applies,
-// but a PATH element outside the declaration is simply marked unresolved
-// rather than read (it is a directory stat, not a file read).
+// pathEntries splits a PATH value and stats each element. Every row is first
+// initialised with all fields the controls judge, defaulted (R176), then a
+// branch overwrites what it learns:
+//   - an element beginning with $ or ~ is an unexpanded variable, recorded
+//     variable+unresolved, never is_dot (R180);
+//   - an empty element, ".", or a relative path is is_dot (a
+//     working-directory injection risk);
+//   - an element outside the declared PATH-dir set is NOT stat'd — it is
+//     unresolved+undeclared (R175), so the collector never stats an arbitrary
+//     directory (the guard would otherwise reject it);
+//   - a declared element is stat'd; a stat failure is unresolved.
 func pathEntries(a collect.Access, raw string) []any {
 	out := []any{}
 	for i, el := range strings.Split(raw, ":") {
-		rec := map[string]any{"position": i, "value": el}
-		if el == "" || el == "." || !strings.HasPrefix(el, "/") {
+		rec := map[string]any{
+			"position": i, "value": el,
+			"exists": false, "unresolved": false,
+			"is_dot": false, "variable": false, "undeclared": false,
+			"group_writable": false, "world_writable": false,
+			"mode": -1, "uid": -1, "gid": -1,
+		}
+		switch {
+		case strings.HasPrefix(el, "$") || strings.HasPrefix(el, "~"):
+			rec["variable"] = true
+			rec["unresolved"] = true
+			out = append(out, rec)
+			continue
+		case el == "" || el == "." || !strings.HasPrefix(el, "/"):
 			rec["is_dot"] = true
 			out = append(out, rec)
 			continue
 		}
-		rec["is_dot"] = false
+		if !declared(a, el) {
+			rec["unresolved"] = true
+			rec["undeclared"] = true
+			out = append(out, rec)
+			continue
+		}
 		meta, err := a.Stat(el)
 		if err != nil {
 			rec["unresolved"] = true
 			out = append(out, rec)
 			continue
 		}
-		rec["unresolved"] = false
 		rec["exists"] = true
 		rec["mode"] = int(meta.Mode)
 		rec["uid"] = int(meta.UID)
@@ -459,7 +602,8 @@ func pathEntries(a collect.Access, raw string) []any {
 }
 ```
 
-(`cutComment`/`sourceRaw` already exist for other collectors — if `cutComment` is not yet shared, define it here; a later plan can hoist it.)
+(`sourceRaw` already exists for other collectors and is reused; `cutComment` is
+*not* shared — it is defined in this file (L3).)
 
 - [ ] **Step 5: Run the TMOUT test — passes**
 
@@ -488,43 +632,73 @@ func TestEnvUmaskSettings(t *testing.T) {
 	}
 }
 
-// Root PATH is split into positioned entries; an empty element is is_dot, a
-// missing directory is unresolved, a world-writable one carries the flag.
+// Root PATH is split into positioned entries. An empty element is is_dot; a
+// declared world-writable directory carries world_writable=true; an element
+// outside the declared PATH-dir set is not stat'd but marked
+// unresolved+undeclared (R175); a $/~ element is variable+unresolved (R180).
 func TestEnvRootPathEntries(t *testing.T) {
 	a := &fsAccess{
-		files: map[string]string{"/root/.bashrc": "root_bashrc_badpath"}, // PATH=/usr/bin::/opt/x
+		files: map[string]string{"/root/.bashrc": "root_bashrc_badpath"}, // PATH=/usr/bin::/usr/local/games:/opt/x:$HOME/bin
 		stats: map[string]statResult{
-			"/usr/bin": {mode: 0o755, kind: "dir"},
-			"/opt/x":   {mode: 0o777, kind: "dir"},
+			"/usr/bin":         {mode: 0o755, kind: "dir"},
+			"/usr/local/games": {mode: 0o777, kind: "dir"}, // declared and world-writable
 		},
 	}
 	entries := okList(t, build(t, "env", a), "env.shell.root_path_entries")
-	if len(entries) != 3 {
-		t.Fatalf("entries %v, want 3 (/usr/bin, empty, /opt/x)", entries)
+	if len(entries) != 5 {
+		t.Fatalf("entries %v, want 5 (/usr/bin, empty, /usr/local/games, /opt/x, $HOME/bin)", entries)
 	}
 	if entries[1].(map[string]any)["is_dot"] != true {
 		t.Error("the empty element between :: must be is_dot")
 	}
 	if entries[2].(map[string]any)["world_writable"] != true {
-		t.Error("/opt/x is world-writable")
+		t.Error("/usr/local/games is world-writable")
+	}
+	if entries[3].(map[string]any)["undeclared"] != true || entries[3].(map[string]any)["unresolved"] != true {
+		t.Errorf("/opt/x is outside the declared PATH-dir set: unresolved+undeclared, never stat'd: %v", entries[3])
+	}
+	if entries[4].(map[string]any)["variable"] != true || entries[4].(map[string]any)["is_dot"] == true {
+		t.Errorf("$HOME/bin is an unexpanded variable, not is_dot: %v", entries[4])
 	}
 }
 
-// A profile file that cannot be read does not fail the collector; the winner
-// is computed from what was readable.
-func TestEnvUnreadableProfileIsSkipped(t *testing.T) {
+// A profile file that cannot be read (denied — not ENOENT) is the answer for
+// every value it could set: all seven env.shell.* keys carry the path-prefixed
+// read error (C3, R183), never a value salvaged from the other files.
+func TestEnvDeniedProfileIsAnError(t *testing.T) {
 	a := &fsAccess{
 		files: map[string]string{"/etc/profile": "profile"},
 		fails: map[string]error{"/etc/bash.bashrc": os.ErrPermission},
 	}
 	b := build(t, "env", a)
+	if e := env(t, b, "env.shell.tmout"); e.Status != facts.StatusDenied {
+		t.Errorf("a denied profile file must make env.shell.tmout denied, got %+v", e)
+	}
+}
+
+// A line may hold several statements separated by an unquoted `;`, and a
+// declaration keyword (declare/typeset/export/readonly) with -x/-r/-xr flags
+// assigns TMOUT just as a bare assignment does (R184).
+func TestEnvTMOUTDeclarationForms(t *testing.T) {
+	b := build(t, "env", &fsAccess{files: map[string]string{"/etc/profile": "profile_tmout_oneline"}})
 	if e := env(t, b, "env.shell.tmout"); e.Value != 600 {
-		t.Errorf("tmout from the readable profile %+v", e)
+		t.Errorf("tmout %+v, want 600 from `TMOUT=600; export TMOUT`", e)
+	}
+	if env(t, b, "env.shell.tmout_exported").Value != true {
+		t.Error("the trailing `export TMOUT` marks it exported")
+	}
+
+	b2 := build(t, "env", &fsAccess{files: map[string]string{"/etc/profile": "profile_tmout_declare"}})
+	if e := env(t, b2, "env.shell.tmout"); e.Value != 600 {
+		t.Errorf("tmout %+v, want 600 from `declare -xr TMOUT=600`", e)
+	}
+	if env(t, b2, "env.shell.tmout_readonly").Value != true {
+		t.Error("`declare -xr` makes TMOUT readonly")
 	}
 }
 ```
 
-Fixtures to add: `root_bashrc_badpath` (`PATH=/usr/bin::/opt/x` then `export PATH`).
+Fixtures to add: `root_bashrc_badpath` (`PATH=/usr/bin::/usr/local/games:/opt/x:$HOME/bin` then `export PATH`); `profile_tmout_oneline` (`TMOUT=600; export TMOUT`); `profile_tmout_declare` (`declare -xr TMOUT=600`).
 
 - [ ] **Step 7: Register the seven keys and regenerate the golden**
 
@@ -569,7 +743,7 @@ Add to `registry.yaml` an `env.shell.*` block — all `since: 1`, `sensitivity: 
     collector: env
   - key: env.shell.root_path_entries
     type: list<record>
-    description: Each root PATH element - position, value, exists, mode, uid, gid, group_writable, world_writable, is_dot, unresolved.
+    description: Each root PATH element - position, value, exists, mode, uid, gid, group_writable, world_writable, is_dot, variable, unresolved, undeclared.
     since: 1
     sensitivity: public
     collector: env
@@ -600,15 +774,16 @@ git commit -m "Add the env collector: TMOUT, umask and root PATH from the profil
 **Files:**
 - Create: `internal/collect/collectors/files_home.go`, tests in `collectors_test.go`
 - Modify: `internal/collect/collectors/files.go` (`Declare.Reads` and a call from `runFiles`), `internal/facts/registry.yaml` (3 keys), golden
-- Create fixtures: `passwd_home` (a synthetic /etc/passwd with root + one interactive user + one service account), `shells_home`, `mountinfo`, `home_alice_bashrc`, `home_alice_rhosts`
+- Create fixtures: `passwd_home` (a synthetic /etc/passwd with root + one interactive user + one service account), `shells_home`, `mountinfo`, `mountinfo_nfs`, `home_alice_bashrc`, `home_alice_rhosts`
 
 **Interfaces:**
 - Consumes: `collect.Access` (`ReadFile`, `Stat`, `Glob`, `Allowed`), `collect.Builder`, `facts.Source`; the in-package helpers `parsePasswd(data) ([]passwdRow, int)` (fields `name, uid, gid, home, shell, line`), `loginShells(a) (map[string]bool, facts.Envelope)`, `splitLines`, `readLimit`, `collect.OK`/`Absent`/`FromReadError`; `declared(a, path)` (the guard probe from sshd.go).
 - Produces:
   - `homeDirs(a, rows []passwdRow, shells map[string]bool, mounts mountTable) facts.Envelope` → `files.home_dirs`.
-  - `envFiles(a, rows []passwdRow, shells map[string]bool) facts.Envelope` → `files.env_files`.
+  - `envFiles(a, rows []passwdRow, shells map[string]bool) facts.Envelope` → `files.env_files`; the row helpers `envFileRow(p, scope, homeUser string, uid int, meta collect.ReadMeta)` and `envSymlinkRow(p, scope, homeUser string)`.
   - `userRhosts(a, rows []passwdRow, shells map[string]bool) facts.Envelope` → `files.user_rhosts`.
-  - `mountTable` and `readMounts(a) mountTable` with method `fstype(path string) string` (longest mount-point prefix wins; `""` when unknown).
+  - `passwdRows(a, b) ([]passwdRow, bool)` — reads/parses `/etc/passwd`, or writes the three enumeration keys as the read error and returns `false`.
+  - `mountTable` and `readMounts(a) mountTable` with methods `fstype(path string) string` and `mountPoint(path string) string` (longest mount-point prefix wins; `""` when unknown).
   - `interactive(shell string, shells map[string]bool) bool` — shell is in `shells` and is not a `*/nologin` or `*/false` path.
 
 - [ ] **Step 1: Write the failing test — interactive filter and stat tri-state**
@@ -677,8 +852,6 @@ import (
 	"github.com/kun9497/muster/internal/facts"
 )
 
-var interactiveHomeRoots = []string{"/home/*", "/root"}
-
 // interactive reports whether shell is a real login shell: present in the
 // /etc/shells set and not a nologin/false path. Service accounts on both
 // families use /usr/sbin/nologin (or /sbin/nologin) or /bin/false, which are
@@ -694,9 +867,19 @@ func interactive(shell string, shells map[string]bool) bool {
 func homeDirs(a collect.Access, rows []passwdRow, shells map[string]bool, mounts mountTable) facts.Envelope {
 	out := []any{}
 	for _, r := range rows {
+		// R176: initialise EVERY field the controls where/require on, defaulted,
+		// BEFORE the branch, so U-31/U-32's `each … require` never compares an
+		// absent field on a denied/absent row (which would ERROR, not FAIL).
 		rec := map[string]any{
 			"user": r.name, "uid": r.uid, "home": r.home,
-			"interactive": interactive(r.shell, shells),
+			"interactive":    interactive(r.shell, shells),
+			"is_dir":         false,
+			"owner_matches":  false,
+			"group_writable": false,
+			"other_writable": false,
+			"on_remote_fs":   false,
+			"mode":           -1,
+			"owner_uid":      -1,
 		}
 		// Only stat a home inside the declaration; an interactive home is
 		// essentially always /home/* or /root. An undeclared home cannot be
@@ -721,6 +904,12 @@ func homeDirs(a collect.Access, rows []passwdRow, shells map[string]bool, mounts
 			rec["on_remote_fs"] = isRemoteFS(mounts.fstype(r.home))
 		case errors.Is(err, fs.ErrNotExist):
 			rec["stat_status"] = "absent"
+		case errors.Is(err, collect.ErrSymlink):
+			// Stat returns ErrSymlink (an error) for a final symlink; it never
+			// reaches the ok branch, so a home that is a symlink is unexaminable
+			// and reported denied, not passed (R182).
+			rec["stat_status"] = "denied"
+			rec["reason"] = readReason(r.home, err)
 		default:
 			rec["stat_status"] = "denied"
 			rec["reason"] = readReason(r.home, err)
@@ -742,10 +931,20 @@ var userEnvNames = []string{".bashrc", ".bash_profile", ".profile", ".cshrc", ".
 
 func envFiles(a collect.Access, rows []passwdRow, shells map[string]bool) facts.Envelope {
 	out := []any{}
-	for _, p := range systemEnvFiles {
-		if meta, err := a.Stat(p); err == nil {
-			out = append(out, envFileRow(p, "system", "", meta))
+	stat := func(p, scope, homeUser string, uid int) {
+		meta, err := a.Stat(p)
+		switch {
+		case err == nil:
+			out = append(out, envFileRow(p, scope, homeUser, uid, meta))
+		case errors.Is(err, collect.ErrSymlink):
+			// Stat never returns a nil-error symlink (R182); a symlinked
+			// environment file surfaces here as an unowned, unexaminable row.
+			out = append(out, envSymlinkRow(p, scope, homeUser))
 		}
+		// absent/denied: no row (the file need not exist).
+	}
+	for _, p := range systemEnvFiles {
+		stat(p, "system", "", 0) // system files must be root-owned (uid 0)
 	}
 	for _, r := range rows {
 		if !interactive(r.shell, shells) {
@@ -756,27 +955,42 @@ func envFiles(a collect.Access, rows []passwdRow, shells map[string]bool) facts.
 			if !declared(a, p) {
 				continue
 			}
-			if meta, err := a.Stat(p); err == nil {
-				out = append(out, envFileRow(p, "user", r.name, meta))
-			}
+			stat(p, "user", r.name, r.uid)
 		}
 	}
 	return collect.OK(out, &facts.Source{Kind: "file", Path: passwdPath})
 }
 
-func envFileRow(p, scope, homeUser string, meta collect.ReadMeta) map[string]any {
+// envFileRow describes an environment file muster could stat. owner_ok means
+// the file is owned by the account whose home it sits in, or by root
+// (root-owned system files are fine); system-scope callers pass uid=0 (L3).
+func envFileRow(p, scope, homeUser string, uid int, meta collect.ReadMeta) map[string]any {
 	return map[string]any{
 		"path": p, "scope": scope, "home_user": homeUser,
 		"mode": int(meta.Mode), "owner_uid": int(meta.UID),
-		"owner_ok":       meta.Kind != "symlink" && (int(meta.UID) == 0 || homeUser == "" || true), // see note
+		"owner_ok":       int(meta.UID) == uid || int(meta.UID) == 0,
 		"group_writable": meta.Mode&0o020 != 0,
 		"other_writable": meta.Mode&0o002 != 0,
-		"is_symlink":     meta.Kind == "symlink",
+		"is_symlink":     false,
+	}
+}
+
+// envSymlinkRow is the row for a symlinked environment file: not correctly
+// owned, with the write flags defaulted false so U-24's `none where` clauses
+// have every field they read (R176/R182).
+func envSymlinkRow(p, scope, homeUser string) map[string]any {
+	return map[string]any{
+		"path": p, "scope": scope, "home_user": homeUser,
+		"mode": -1, "owner_uid": -1,
+		"owner_ok":       false,
+		"group_writable": false,
+		"other_writable": false,
+		"is_symlink":     true,
 	}
 }
 ```
 
-**owner_ok ruling (state in the report):** `owner_ok` means the file is owned by the account whose home it sits in, or by root (root-owned system files are fine). Compute it as `owner_uid == home account's uid || owner_uid == 0`; the placeholder `true` above is a stand-in — implement the real comparison by passing the account uid into `envFileRow` (system-scope files require `owner_uid == 0`). Do not ship the `|| true`.
+**owner_ok (L3, R182):** `owner_ok` means the file is owned by the account whose home it sits in, or by root (root-owned system files are fine). `envFileRow` takes the account uid and computes `owner_uid == uid || owner_uid == 0`; system-scope callers pass `uid = 0` (they must be root-owned). A symlinked environment file never reaches `envFileRow` — `Stat` returns `ErrSymlink`, and `envSymlinkRow` emits `is_symlink: true, owner_ok: false`. No stand-in expression remains.
 
 ```go
 // userRhosts records .rhosts/.shosts under each interactive home and
@@ -859,6 +1073,21 @@ func (t mountTable) fstype(p string) string {
 	return bestFS
 }
 
+// mountPoint returns the longest mount point that is a prefix of p — the mount
+// that actually serves p — or "" when unknown. U-26 uses it to keep only /dev
+// entries whose serving mount is exactly "/dev" (R181), so a node under a
+// deeper mount (/dev/shm, /dev/mqueue, /dev/pts, /dev/hugepages) is not judged
+// as a stray /dev file.
+func (t mountTable) mountPoint(p string) string {
+	best, bestMP := -1, ""
+	for mp := range t.points {
+		if (p == mp || strings.HasPrefix(p, strings.TrimSuffix(mp, "/")+"/")) && len(mp) > best {
+			best, bestMP = len(mp), mp
+		}
+	}
+	return bestMP
+}
+
 func isRemoteFS(fs string) bool {
 	switch fs {
 	case "nfs", "nfs4", "cifs", "smb3", "smbfs", "afs", "fuse.sshfs", "9p", "ceph", "glusterfs":
@@ -870,18 +1099,37 @@ func isRemoteFS(fs string) bool {
 
 - [ ] **Step 4: Wire into `runFiles` and extend `Declare.Reads`**
 
-In `files.go`, add to `Declare.Reads`: `shellsPath`, `"/proc/self/mountinfo"`, the home roots `"/home/*"`, `"/root"`, and the per-home dotfile globs for every name in `userEnvNames` plus `.rhosts`/`.shosts` under both `/home/*/` and `/root/` (e.g. `"/home/*/.bashrc"`, …, `"/root/.rhosts"`). Then in `runFiles`, after the existing permission facts:
+In `files.go`, add to `Declare.Reads`: `shellsPath`, `"/proc/self/mountinfo"`, the four `systemEnvFiles` (`etcProfile`, `bashBashrc`, `etcBashrc`, `cshCshrc` — R178, so `envFiles` may stat them), the home roots `"/home/*"`, `"/root"`, **the deeper home root `"/home/*/*"`** (R187, so a home one level down such as `/home/dept/alice` is declared rather than reported unexaminable), and the per-home dotfile globs for every name in `userEnvNames` plus `.rhosts`/`.shosts` under both `/home/*/` and `/root/` (e.g. `"/home/*/.bashrc"`, …, `"/root/.rhosts"`). Then in `runFiles`, after the existing permission facts (compute `mounts` once so Task 3's `devEntries` reuses it):
 
 ```go
-	prows, _ := parsePasswd(mustRead(a, passwdPath)) // reuse a small read helper; a denied passwd already surfaces via files.etc_passwd
-	shells, _ := loginShells(a)
 	mounts := readMounts(a)
-	b.Set("files.home_dirs", homeDirs(a, prows, shells, mounts))
-	b.Set("files.env_files", envFiles(a, prows, shells))
-	b.Set("files.user_rhosts", userRhosts(a, prows, shells))
+	if prows, ok := passwdRows(a, b); ok {
+		shells, _ := loginShells(a)
+		b.Set("files.home_dirs", homeDirs(a, prows, shells, mounts))
+		b.Set("files.env_files", envFiles(a, prows, shells))
+		b.Set("files.user_rhosts", userRhosts(a, prows, shells))
+	}
 ```
 
-If `/etc/passwd` cannot be read, set all three to the read error (they cannot be enumerated) rather than an empty list — a denied passwd must not read as "no homes". Add a helper that returns the passwd bytes or, on error, writes the three keys as `collect.FromReadError(...)` and returns early from the home block.
+`passwdRows` (L2) is the concrete passwd-read helper: a denied `/etc/passwd` must not read as "no homes", so it writes the three enumeration keys as the read error and returns `false`, and the caller skips the home block:
+
+```go
+// passwdRows reads and parses /etc/passwd. On a read error it writes the three
+// home-enumeration keys as the read error (a denied passwd must not read as an
+// empty enumeration) and returns ok=false so the caller skips the home block.
+func passwdRows(a collect.Access, b *collect.Builder) ([]passwdRow, bool) {
+	data, meta, err := a.ReadFile(passwdPath, readLimit)
+	if err != nil {
+		e := collect.FromReadError(err, meta)
+		b.Set("files.home_dirs", e)
+		b.Set("files.env_files", e)
+		b.Set("files.user_rhosts", e)
+		return nil, false
+	}
+	rows, _ := parsePasswd(data)
+	return rows, true
+}
+```
 
 - [ ] **Step 5: The remaining Task-2 tests**
 
@@ -925,13 +1173,40 @@ func TestFilesRhostsAndEnvFiles(t *testing.T) {
 		t.Errorf(".bashrc row %v", alicebashrc)
 	}
 }
+
+// A genuinely missing home is stat_status "absent" (ENOENT), distinct from a
+// denied one; root and an interactive user are interactive=true (the filter's
+// positive half); a home on an nfs mount carries on_remote_fs=true (R191).
+func TestFilesHomeDirsAbsentAndRemoteFS(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{"/etc/passwd": "passwd_home", "/etc/shells": "shells_home", "/proc/self/mountinfo": "mountinfo_nfs"},
+		dirs:  map[string]bool{"/root": true, "/home/alice": true},
+		stats: map[string]statResult{
+			"/root":       {mode: 0o700, uid: 0, gid: 0, kind: "dir"},
+			"/home/alice": {mode: 0o755, uid: 1000, gid: 1000, kind: "dir"}, // on the nfs /home
+		},
+		// /home/bob is declared but present nowhere -> Stat returns ENOENT -> absent
+	}
+	rows := okList(t, build(t, "files", a), "files.home_dirs")
+	byUser := map[string]map[string]any{}
+	for _, r := range rows { m := r.(map[string]any); byUser[m["user"].(string)] = m }
+	if byUser["root"]["interactive"] != true || byUser["alice"]["interactive"] != true {
+		t.Error("root and alice have real login shells -> interactive=true")
+	}
+	if byUser["bob"]["stat_status"] != "absent" {
+		t.Errorf("bob's missing home must be absent (ENOENT), not denied: %v", byUser["bob"])
+	}
+	if byUser["alice"]["on_remote_fs"] != true {
+		t.Errorf("alice's home on nfs must be on_remote_fs=true: %v", byUser["alice"])
+	}
+}
 ```
 
-Fixtures: `home_alice_rhosts` (`+`), `home_alice_bashrc` (`umask 022`). `home_alice_bashrc` is read? No — env_files only stats; `.rhosts` is read. Ensure the `files` map provides bytes for the read path and `stats` for the stat paths.
+Fixtures: `home_alice_rhosts` (`+`), `home_alice_bashrc` (`umask 022`). `home_alice_bashrc` is read? No — env_files only stats; `.rhosts` is read. Ensure the `files` map provides bytes for the read path and `stats` for the stat paths. `mountinfo_nfs` — like `mountinfo` but the `/home` line's fstype is `nfs`, so `on_remote_fs` is true for `/home/alice`.
 
 - [ ] **Step 6: Register the three keys, regenerate the golden**
 
-`files.home_dirs` (`list<record>`, `subject_kind: dir`, `sensitivity: public`), `files.env_files` (`list<record>`, `sensitivity: public`), `files.user_rhosts` (`list<record>`, `sensitivity: internal`). All `since: 1`, `collector: files`. Descriptions one line each, own words. Regenerate the golden and review.
+`files.home_dirs` (`list<record>`, `subject_kind: user` — the row's subject is the account from `/etc/passwd`, not the directory (R190); it feeds remote-NSS degradation and observation rendering), `files.env_files` (`list<record>`, `sensitivity: public`), `files.user_rhosts` (`list<record>`, `sensitivity: internal`). All `since: 1`, `collector: files`. Descriptions one line each, own words. Regenerate the golden and review.
 
 - [ ] **Step 7: Windows gates + lab host, commit**
 
@@ -964,14 +1239,20 @@ git commit -m "Enumerate home directories, shell environment files and .rhosts i
 // /dev) is a stale/planted file U-26 flags. A character/block device is not.
 func TestFilesDevNonDevice(t *testing.T) {
 	a := &fsAccess{
-		files: map[string]string{"/proc/self/mountinfo": "mountinfo_dev"}, // /dev -> devtmpfs
-		dirs:  map[string]bool{"/dev": true},
+		// fsAccess.Glob scans the files+dirs maps (not stats), so the /dev
+		// nodes must be present there for the walk to enumerate them (R188);
+		// stats supplies each node's kind.
+		files: map[string]string{
+			"/proc/self/mountinfo": "mountinfo_dev", // /dev -> devtmpfs
+			"/dev/null":            "",              // present so Glob("/dev/*") sees it
+			"/dev/planted":         "",
+		},
+		dirs: map[string]bool{"/dev": true},
 		stats: map[string]statResult{
 			"/dev/null":    {mode: 0o666, kind: "chardev"},
 			"/dev/planted": {mode: 0o644, kind: "regular"},
 		},
 	}
-	// Glob("/dev/*") over the fixture returns both entries.
 	b := build(t, "files", a)
 	nd := okList(t, b, "files.dev_nondevice")
 	if len(nd) != 1 || nd[0].(map[string]any)["name"] != "planted" {
@@ -1009,7 +1290,8 @@ const devMaxEntries = 4096 // a bound so a pathological /dev cannot blow the sna
 
 // devEntries walks /dev one and two levels deep (globs, sorted), stats each,
 // and records name/kind/fstype/mode/uid. dev_nondevice is the derived subset
-// that is a regular file on a devtmpfs/tmpfs mount — the planted-file case.
+// that is a regular file whose serving mount is exactly /dev (R181) — the
+// planted-file case; a file under a deeper mount such as /dev/shm is excluded.
 func devEntries(a collect.Access, mounts mountTable) (facts.Envelope, facts.Envelope) {
 	var paths []string
 	for _, g := range []string{"/dev/*", "/dev/*/*"} {
@@ -1018,8 +1300,10 @@ func devEntries(a collect.Access, mounts mountTable) (facts.Envelope, facts.Enve
 		}
 	}
 	sort.Strings(paths)
+	truncated := false
 	if len(paths) > devMaxEntries {
 		paths = paths[:devMaxEntries]
+		truncated = true
 	}
 	entries := []any{}
 	nondevice := []any{}
@@ -1028,18 +1312,29 @@ func devEntries(a collect.Access, mounts mountTable) (facts.Envelope, facts.Enve
 		if err != nil {
 			continue
 		}
-		fs := mounts.fstype(p)
 		rec := map[string]any{
 			"name": path.Base(p), "path": p, "kind": meta.Kind,
-			"fstype": fs, "mode": int(meta.Mode), "uid": int(meta.UID),
+			"fstype": mounts.fstype(p), "mode": int(meta.Mode), "uid": int(meta.UID),
 		}
 		entries = append(entries, rec)
-		if meta.Kind == "regular" && (fs == "devtmpfs" || fs == "tmpfs") {
+		// R181: a stray file counts only when the mount actually serving it is
+		// exactly /dev — never a deeper mount (/dev/shm, /dev/mqueue, /dev/pts,
+		// /dev/hugepages), whose tmpfs regular files are legitimate.
+		if meta.Kind == "regular" && mounts.mountPoint(p) == "/dev" {
 			nondevice = append(nondevice, rec)
 		}
 	}
 	src := &facts.Source{Kind: "file", Path: "/dev"}
-	return collect.OK(entries, src), collect.OK(nondevice, src)
+	de, nd := collect.OK(entries, src), collect.OK(nondevice, src)
+	if truncated {
+		// R189: a bounded walk that hit the cap must say so on BOTH envelopes,
+		// so a control screens rather than reading a silently-truncated /dev
+		// list as complete.
+		de.Truncated, nd.Truncated = true, true
+		de.Reason = "hit the devMaxEntries bound; the /dev listing is incomplete"
+		nd.Reason = de.Reason
+	}
+	return de, nd
 }
 ```
 
@@ -1048,7 +1343,7 @@ func devEntries(a collect.Access, mounts mountTable) (facts.Envelope, facts.Enve
 Add to `Declare.Reads`: `"/root"`, `"/etc/hosts.equiv"`, `"/dev/*"`, `"/dev/*/*"`. In `runFiles` (reuse the `mounts` from Task 2 — compute it once and pass it to both `homeDirs` and `devEntries`):
 
 - `/root`: **ruling** — `writePermFacts` registers ten leaves including `group`/`group_readable`/`acl_entries` that `/root` does not need; register only the six `root_home` leaves named in the key inventory. Either add a `writePermFactsSubset` or write the six leaves inline from a single `a.Stat("/root")` (mode/uid/gid + group_writable/other_writable/acl_present); a stat failure reaches all six. Prefer inline to avoid over-registering.
-- `/etc/hosts.equiv`: `files.etc_hosts_equiv.{mode,uid}` from stat, and `files.etc_hosts_equiv_lines` from a read (non-comment lines, `[]any{}` when empty, the read error on both keys when denied — the same shape `files.etc_hosts_lpd_lines` already uses).
+- `/etc/hosts.equiv`: `files.etc_hosts_equiv.{mode,uid}` and `files.etc_hosts_equiv_lines` from a single read (mode/uid from the read's `ReadMeta`, non-comment lines for the list). **Ruling (R177):** on ENOENT the file simply does not exist, which is compliant, so `files.etc_hosts_equiv_lines` is `collect.OK([]any{}, &facts.Source{Kind: "derived"})` with `Reason` `"/etc/hosts.equiv does not exist"` — **not** `absent` — so U-27's `none where {op: matches}` passes vacuously instead of screening to `absent_means`; the two perm leaves (`mode`, `uid`) are `absent` in that ENOENT case. A denied or other read error writes the read error (`collect.FromReadError(err, meta)`) to **all three** keys. This mirrors the `files.etc_securetty_lines` read shape — the real precedent for a line list (`files.etc_hosts_lpd` carries only permission leaves, no line list).
 - `/dev`: `de, nd := devEntries(a, mounts); b.Set("files.dev_entries", de); b.Set("files.dev_nondevice", nd)`.
 
 - [ ] **Step 5: The remaining Task-3 tests**
@@ -1068,14 +1363,25 @@ func TestFilesRootHome(t *testing.T) {
 	}
 }
 
-// /etc/hosts.equiv lines are recorded; an absent file yields absent leaves,
-// not an error.
+// /etc/hosts.equiv non-comment lines are recorded; a file that does not exist
+// (ENOENT) yields an OK empty line list — NOT absent (R177) — so U-27 passes
+// vacuously rather than screening to absent_means.
 func TestFilesHostsEquiv(t *testing.T) {
 	a := &fsAccess{files: map[string]string{"/etc/hosts.equiv": "hosts_equiv", "/proc/self/mountinfo": "mountinfo"},
 		stats: map[string]statResult{"/etc/hosts.equiv": {mode: 0o644, uid: 0, kind: "regular"}}}
 	lines := okList(t, build(t, "files", a), "files.etc_hosts_equiv_lines")
 	if len(lines) == 0 {
 		t.Error("hosts.equiv non-comment lines must be recorded")
+	}
+
+	// No /etc/hosts.equiv at all: the lines key is an OK empty list, not absent.
+	none := &fsAccess{files: map[string]string{"/proc/self/mountinfo": "mountinfo"}}
+	e := env(t, build(t, "files", none), "files.etc_hosts_equiv_lines")
+	if e.Status != facts.StatusOK {
+		t.Fatalf("a missing hosts.equiv must leave etc_hosts_equiv_lines OK, got %+v", e)
+	}
+	if l, _ := e.Value.([]any); len(l) != 0 {
+		t.Errorf("a missing hosts.equiv must yield [], got %v", e.Value)
 	}
 }
 ```
@@ -1107,11 +1413,11 @@ git commit -m "Add /root, /etc/hosts.equiv and the bounded /dev walk to the file
 - Consumes: `env.shell.tmout`/`.tmout_exported` (T1), `env.shell.root_path_raw`/`.root_path_entries` (T1), `accounts.login_defs.umask` (2B), `pam.umask_module.enabled` (2C), `files.root_home.*` (T3).
 - Produces: U-12 with two mechanisms; the U-30 and U-14 controls; count reaches 24 after this task (U-30, U-14 new).
 
-- [ ] **Step 1: Amend U-12 — add the shell-TMOUT mechanism and resolve 2D's S3**
+- [ ] **Step 1: Amend U-12 — add the shell-TMOUT mechanism**
 
 In `controls/account/session_timeout.yaml`:
 - Drop the `applies_when: [{fact: services.ssh.installed, ...}]` block (the control now applies to any host — a host with neither an sshd timeout nor a shell TMOUT genuinely has no idle timeout, and `absent_means: fail` states that).
-- **R (resolves 2D S3):** add `{ fact: sshd.options.client_alive_count_max, on: effective, op: present }` to mechanism 1's `when`, so a parse-fallback host whose config has `ClientAliveInterval` but no `ClientAliveCountMax` line falls through to the TMOUT mechanism (or `absent_means`) instead of FAILing where the daemon path would PASS.
+- **Do NOT add a `client_alive_count_max present` term to mechanism 1's `when` (R185).** That change was reverted: it does not fix 2D's S3, it only moves the FAIL to the fall-through. Mechanism 1's `when` stays `[{ fact: sshd.options.client_alive_interval, on: effective, op: gte, expected: 1 }]`. Under parse-fallback — a config with `ClientAliveInterval` set but no `ClientAliveCountMax` line — mechanism 1 is selected and its count checks FAIL, where a running daemon (which reports the documented default count) would PASS. This is a known parse-fallback limitation; the real fix (having the sshd collector report the documented default for an absent-but-defaulted directive) is **parked to a follow-up**, not done here.
 - Add mechanism 2 (shell TMOUT) and a `max_idle` param:
 ```yaml
 params:
@@ -1121,7 +1427,6 @@ params:
 mechanisms:
   - when:
       - { fact: sshd.options.client_alive_interval, on: effective, op: gte, expected: 1 }
-      - { fact: sshd.options.client_alive_count_max, on: effective, op: present }
     checks:
       - { fact: sshd.options.client_alive_interval, on: effective, op: lte, expected: "${max_interval}" }
       - { fact: sshd.options.client_alive_count_max, on: effective, op: gte, expected: 1 }
@@ -1138,12 +1443,16 @@ mechanisms:
     - { benchmark: ubuntu2404, version: V1R6, id: UBTU-24-200060 }
     - { benchmark: rhel9, version: V2R9, id: RHEL-09-412035 }
 ```
-- Rewrite the description (EN+KO) to say both mechanisms are now judged (SSH `ClientAlive` or a shell `TMOUT` that is set, at most `max_idle`, and exported), and drop the "applies only where sshd is installed / TMOUT added in a later plan" sentence.
+- Rewrite the description (EN+KO) to say both mechanisms are now judged (SSH `ClientAlive` or a shell `TMOUT` that is set, at most `max_idle`, and exported), and drop the "applies only where sshd is installed / TMOUT added in a later plan" sentence. **State honestly (R185)** that under parse-fallback — a config with `ClientAliveInterval` set but no `ClientAliveCountMax` line — U-12 FAILs where the running daemon would PASS, because muster judges the parsed config rather than the daemon's documented default; note this is a known parse-fallback limitation whose real fix is parked to a follow-up. Do **not** claim this amendment "resolves 2D's S3".
+
+**U-12 fixture-shape rule (R179).** Every U-12 fixture carries `sshd.options.client_alive_interval.effective` — it is mechanism 1's `when` fact, and a *missing* setting key is `ERROR(missing_fact)`, not a skipped mechanism. Fixtures that select mechanism 2 or fall through to `absent_means` also carry `env.shell.tmout` (ok `0` for "no timeout"). Fixtures that stay on mechanism 1 also carry `sshd.options.client_alive_count_max.effective` (the mechanism-1 checks read it).
 
 New U-12 fixtures in `controls/testdata/muster.account.session_timeout/`:
 - `pass-tmout.json` — `sshd.options.client_alive_interval.effective` 0 (mechanism 1 `when` fails), `env.shell.tmout` 600, `env.shell.tmout_exported` true → PASS (mechanism 2). (No `services.ssh.installed` needed now.)
-- `fail-tmout-not-exported.json` — tmout 600, exported false → mechanism 2 chosen, check fails → FAIL.
-- Update the existing `na-no-ssh.json`: it asserted NOT_APPLICABLE via the old `applies_when`. Now the control applies; rename/replace it with `fail-no-timeout.json` — ssh not installed (interval absent), tmout 0 → no mechanism → `absent_means: fail` → FAIL. (Confirm the other existing fixtures still hold: `pass-interval-300`/`pass-interval-60-count-3` still PASS via mechanism 1; `fail-count-0`/`fail-interval-too-long`/`fail-count-too-high` still FAIL; `warn-parse-fallback` — add `client_alive_count_max` effective present so mechanism 1 stays chosen and it stays WARN.)
+- `fail-tmout-not-exported.json` — `client_alive_interval.effective` 0, `env.shell.tmout` 600, exported false → mechanism 2 chosen, check fails → FAIL.
+- Update the existing `na-no-ssh.json`: it asserted NOT_APPLICABLE via the old `applies_when`. Now the control applies; rename/replace it with `fail-no-timeout.json` — `client_alive_interval.effective` 0 (no sshd timeout), `env.shell.tmout` 0 → no mechanism `when` matches → `absent_means: fail` → FAIL.
+- `fail-interval-0.json` (an existing/renamed fixture) gains `env.shell.tmout` ok `0`, so with `client_alive_interval.effective` 0 no mechanism matches → `absent_means: fail` → FAIL.
+- Confirm the other existing fixtures still hold: `pass-interval-300`/`pass-interval-60-count-3` still PASS via mechanism 1 (each carries `client_alive_count_max.effective`); `fail-count-0`/`fail-interval-too-long`/`fail-count-too-high` still FAIL; `warn-parse-fallback` carries `client_alive_interval.effective` (selects mechanism 1) and `client_alive_count_max.effective` (the mechanism-1 checks resolve against it) and stays WARN.
 
 - [ ] **Step 2: Write U-30 (`controls/account/umask_policy.yaml`)**
 
@@ -1151,8 +1460,8 @@ New U-12 fixtures in `controls/testdata/muster.account.session_timeout/`:
 id: muster.account.umask_policy
 title_en: The default file-creation mask denies group and other write
 title_ko: 기본 파일 생성 마스크가 그룹·기타 쓰기를 막는다
-description_en: The default UMASK in login.defs must be 022 or stricter so new files are not group- or world-writable, and pam_umask must be stacked so the mask applies to sessions that never read /etc/profile (cron, non-login SSH). The parameter lists the masks that count as strict enough; a host that sets a weaker mask, or that does not stack pam_umask, is reported. Every umask assignment muster found in the shell profile files is attached as evidence but not judged here, because a symbolic mask cannot be compared numerically by the clause grammar; a weak profile mask shows in the evidence for review.
-description_ko: login.defs 의 기본 UMASK 가 022 이상으로 엄격해 새 파일이 그룹·전체 쓰기 가능이 되지 않아야 하고, /etc/profile 을 읽지 않는 세션(cron, 비로그인 SSH)에도 마스크가 적용되도록 pam_umask 가 올라가 있어야 합니다. 파라미터는 충분히 엄격한 것으로 인정하는 마스크 목록이며, 더 약한 마스크를 설정했거나 pam_umask 를 올리지 않은 호스트는 보고됩니다. 셸 프로파일 파일에서 찾은 모든 umask 설정은 근거로 첨부되지만, 기호식 마스크는 절 문법으로 수치 비교를 할 수 없어 여기서 판정하지 않고 근거로만 검토에 제공됩니다.
+description_en: The default UMASK in login.defs must be 022 or stricter so new files are not group- or world-writable, and pam_umask must be stacked so the mask applies to sessions that never read /etc/profile (cron, non-login SSH). The parameter lists the masks that count as strict enough; a host that sets a weaker mask, or that does not stack pam_umask, is reported.
+description_ko: login.defs 의 기본 UMASK 가 022 이상으로 엄격해 새 파일이 그룹·전체 쓰기 가능이 되지 않아야 하고, /etc/profile 을 읽지 않는 세션(cron, 비로그인 SSH)에도 마스크가 적용되도록 pam_umask 가 올라가 있어야 합니다. 파라미터는 충분히 엄격한 것으로 인정하는 마스크 목록이며, 더 약한 마스크를 설정했거나 pam_umask 를 올리지 않은 호스트는 보고됩니다.
 category: account
 importance: 중
 automation: auto
@@ -1242,10 +1551,18 @@ go test ./internal/check/ -count=1
 ```
 Both lints must end `ok: 24 controls`. Confirm the reworked U-12 fixtures all behave.
 
+**Keep the whole `cmd/muster` package green at this commit (L10/L12).** Adding U-14 and U-30 (and the U-12 amendment) makes them evaluate in the end-to-end run, so the count test, the coverage table and the e2e snapshots must all move in this commit — not be deferred to Task 6 — or `go test ./cmd/muster/` goes red:
+- `cmd/muster/controls_test.go`: both `"ok: 22 controls"` → `"ok: 24 controls"`.
+- Extend both e2e snapshots (`cmd/muster/testdata/full-{pass,fail}.json`) with the facts these three controls read, so each resolves to PASS rather than `ERROR(missing_fact)`: under `facts.env.shell` — `tmout` 600 + `tmout_exported` true (or an sshd `ClientAlive` pair) so U-12 passes, `root_path_raw` "/usr/sbin:/usr/bin" and two clean `root_path_entries`; under `facts.files` — `root_home` (uid 0, not writable); under `facts.accounts.login_defs` — `umask` "022"; under `facts.pam` — `umask_module.enabled` true. **`accounts.login_defs.umask` and `pam.umask_module.enabled` are NOT in the snapshots today (L12) — without them U-30 `ERROR(missing_fact)`s.**
+- `cmd/muster/e2e_test.go`: add `muster.account.root_home_and_path` and `muster.account.umask_policy` to both expected-status maps as PASS (the fail map's only FAIL stays `root_remote_login`), and confirm U-12 stays PASS in both.
+- Regenerate the coverage table so it is not stale at this commit: `go run ./tools/coverage` then `go run ./tools/coverage -check` (exit 0); `docs/reference/coverage.md` now enrols U-14 and U-30 (24 items).
+- `go test ./cmd/muster/ -count=1` passes.
+
 - [ ] **Step 6: Commit**
 
 ```bash
-git add controls/account/session_timeout.yaml controls/account/umask_policy.yaml controls/account/root_home_and_path.yaml controls/testdata
+git add controls/account/session_timeout.yaml controls/account/umask_policy.yaml controls/account/root_home_and_path.yaml controls/testdata \
+        cmd/muster/testdata cmd/muster/e2e_test.go cmd/muster/controls_test.go docs/reference/coverage.md
 git commit -m "Add U-12's shell-TMOUT mechanism and the UMASK and root-home controls"
 ```
 
@@ -1295,8 +1612,8 @@ remediation:
 id: muster.file.dev_no_stale_files
 title_en: /dev holds no regular files
 title_ko: /dev 에 일반 파일이 없다
-description_en: /dev is served by devtmpfs and should hold only device nodes. A regular file living there is either a leftover or a planted file used to smuggle data past a device-only expectation, so any regular file on the /dev filesystem is reported. Device nodes, directories and symlinks are not flagged.
-description_ko: /dev 는 devtmpfs 가 제공하며 장치 노드만 있어야 합니다. 그곳의 일반 파일은 잔재이거나, 장치만 있으리라는 기대를 우회해 데이터를 숨기는 데 쓰이는 심어진 파일이므로, /dev 파일시스템의 일반 파일은 모두 보고합니다. 장치 노드·디렉터리·심볼릭 링크는 표시하지 않습니다.
+description_en: /dev is served by devtmpfs and should hold only device nodes. A regular file living there is either a leftover or a planted file used to smuggle data past a device-only expectation, so any regular file whose serving mount is exactly /dev is reported. Device nodes, directories and symlinks are not flagged, and neither is a regular file under a deeper mount such as /dev/shm, /dev/mqueue or /dev/pts (each its own tmpfs, where regular files are legitimate).
+description_ko: /dev 는 devtmpfs 가 제공하며 장치 노드만 있어야 합니다. 그곳의 일반 파일은 잔재이거나, 장치만 있으리라는 기대를 우회해 데이터를 숨기는 데 쓰이는 심어진 파일이므로, 서비스 마운트가 정확히 /dev 인 일반 파일은 모두 보고합니다. 장치 노드·디렉터리·심볼릭 링크는 표시하지 않으며, /dev/shm·/dev/mqueue·/dev/pts 같은 더 깊은 마운트(각자 tmpfs 로, 일반 파일이 정상) 아래의 일반 파일도 표시하지 않습니다.
 category: file
 importance: 상
 automation: auto
@@ -1342,8 +1659,8 @@ remediation:
 id: muster.file.home_dir_permissions
 title_en: Interactive home directories are owned by their user and not writable by others
 title_ko: 대화형 홈 디렉터리가 사용자 소유이며 타인이 쓸 수 없다
-description_en: Each interactive account's home directory must be owned by that account and must not be group- or world-writable. A home muster could not stat (an unreadable parent) is reported here rather than passed silently, since an unexaminable home could hide anything. Service accounts with a nologin shell are skipped so a host's thirty /nonexistent service homes do not each become a finding.
-description_ko: 각 대화형 계정의 홈 디렉터리는 해당 계정 소유여야 하고 그룹·전체 쓰기가 가능하면 안 됩니다. muster 가 stat 할 수 없었던 홈(상위 디렉터리를 읽을 수 없는 경우)은 조용히 통과시키지 않고 여기서 보고합니다. 점검 불가한 홈은 무엇이든 숨길 수 있기 때문입니다. nologin 셸의 서비스 계정은 건너뛰어, 호스트의 서른 개 /nonexistent 서비스 홈이 각각 findings 가 되지 않게 합니다.
+description_en: Each interactive account's home directory must be owned by that account and must not be group- or world-writable. A home muster could not stat (an unreadable parent) is reported here rather than passed silently, since an unexaminable home could hide anything. A home directory outside the declared home roots (not under /home, /home/*/ or /root) likewise cannot be examined under the collector's declaration and is reported as denied — a finding — rather than assumed compliant. Service accounts with a nologin shell are skipped so a host's thirty /nonexistent service homes do not each become a finding.
+description_ko: 각 대화형 계정의 홈 디렉터리는 해당 계정 소유여야 하고 그룹·전체 쓰기가 가능하면 안 됩니다. muster 가 stat 할 수 없었던 홈(상위 디렉터리를 읽을 수 없는 경우)은 조용히 통과시키지 않고 여기서 보고합니다. 점검 불가한 홈은 무엇이든 숨길 수 있기 때문입니다. 선언된 홈 루트(/home, /home/*/, /root) 밖의 홈 디렉터리도 수집기 선언으로는 점검할 수 없어 양호로 가정하지 않고 denied(발견 항목)로 보고합니다. nologin 셸의 서비스 계정은 건너뛰어, 호스트의 서른 개 /nonexistent 서비스 홈이 각각 findings 가 되지 않게 합니다.
 category: file
 importance: 중
 automation: auto
@@ -1371,8 +1688,8 @@ remediation:
 id: muster.file.home_dir_exists
 title_en: Every interactive account has a home directory that exists
 title_ko: 모든 대화형 계정이 실제 존재하는 홈 디렉터리를 가진다
-description_en: Each interactive account's home directory named in /etc/passwd must exist and be a directory. An account whose home is missing lands in / on login and may write into unexpected places; an account whose home muster could not stat is reported rather than assumed present. Service accounts with a nologin shell (whose home is often /nonexistent by design) are skipped.
-description_ko: /etc/passwd 에 적힌 각 대화형 계정의 홈 디렉터리가 실제로 존재하고 디렉터리여야 합니다. 홈이 없는 계정은 로그인 시 / 로 떨어져 예상치 못한 곳에 쓸 수 있으며, muster 가 stat 할 수 없었던 홈은 존재한다고 단정하지 않고 보고합니다. nologin 셸의 서비스 계정(홈이 흔히 의도적으로 /nonexistent)은 건너뜁니다.
+description_en: Each interactive account's home directory named in /etc/passwd must exist and be a directory. An account whose home is missing lands in / on login and may write into unexpected places; an account whose home muster could not stat is reported rather than assumed present. A home outside the declared home roots (not under /home, /home/*/ or /root) cannot be examined under the collector's declaration and is reported as denied — a finding — rather than assumed present. Service accounts with a nologin shell (whose home is often /nonexistent by design) are skipped.
+description_ko: /etc/passwd 에 적힌 각 대화형 계정의 홈 디렉터리가 실제로 존재하고 디렉터리여야 합니다. 홈이 없는 계정은 로그인 시 / 로 떨어져 예상치 못한 곳에 쓸 수 있으며, muster 가 stat 할 수 없었던 홈은 존재한다고 단정하지 않고 보고합니다. 선언된 홈 루트(/home, /home/*/, /root) 밖의 홈은 수집기 선언으로 점검할 수 없어 존재한다고 가정하지 않고 denied(발견 항목)로 보고합니다. nologin 셸의 서비스 계정(홈이 흔히 의도적으로 /nonexistent)은 건너뜁니다.
 category: file
 importance: 중
 automation: auto
@@ -1396,9 +1713,9 @@ remediation:
 
 - [ ] **Step 2: Fixtures**
 
-Each fixture is `{"synthetic": true, "schema_version": 1, "run": {}, "facts": {"files": {…}}}` with only the leaves the control reads. `home_dirs` rows must carry `user`, `interactive`, and the fields the control requires (`owner_matches`/`group_writable`/`other_writable`/`stat_status`/`is_dir`), with the collector's rule that a non-`ok` row still carries `owner_matches`/`group_writable`/`other_writable` as `false`.
+Each fixture is `{"synthetic": true, "schema_version": 1, "run": {}, "facts": {"files": {…}}}` with only the leaves the control reads. `home_dirs` rows must carry `user`, `interactive`, and the fields the control requires (`owner_matches`/`group_writable`/`other_writable`/`stat_status`/`is_dir`), with the collector's rule (R176) that a non-`ok` row still carries `owner_matches`/`group_writable`/`other_writable`/`is_dir` as `false` (and `mode`/`owner_uid` as `-1`), so `each … require` never compares an absent field.
 
-- `env_file_permissions/`: `pass-clean.json` (two env_files rows, owner_ok true, not writable → PASS); `fail-group-writable.json` (a row group_writable true → FAIL); `fail-not-owned.json` (owner_ok false → FAIL); `fail-symlink.json` (is_symlink true, owner_ok false → FAIL); `manual-empty.json` (`files.env_files` `{"status":"absent","reason":"…"}` → MANUAL). Note: an empty `[]` list PASSes vacuously, so use `absent` (not `[]`) for the manual case.
+- `env_file_permissions/`: `pass-clean.json` (two env_files rows, owner_ok true, not writable → PASS); `fail-group-writable.json` (a row group_writable true → FAIL); `fail-not-owned.json` (owner_ok false → FAIL); `fail-symlink.json` (one row matching the collector's `envSymlinkRow` shape (R182): `is_symlink` true, `owner_ok` false, `group_writable` false, `other_writable` false, `mode` -1, `owner_uid` -1 → FAIL on the owner_ok clause); `manual-empty.json` (`files.env_files` `{"status":"absent","reason":"…"}` → MANUAL). Note: an empty `[]` list PASSes vacuously, so use `absent` (not `[]`) for the manual case.
 - `dev_no_stale_files/`: `pass-clean.json` (`files.dev_nondevice` `[]` → PASS); `fail-regular.json` (one row `{name,kind:"regular"}` → FAIL); `manual-absent.json` (`dev_nondevice` absent → MANUAL).
 - `rhosts_forbidden/`: `pass-none.json` (`user_rhosts` `[]`, `etc_hosts_equiv_lines` `[]` → PASS); `pass-rhosts-no-plus.json` (a user_rhosts row has_plus false → PASS); `fail-plus.json` (a row has_plus true → FAIL); `fail-hosts-equiv-plus.json` (`etc_hosts_equiv_lines` `["+"]` → FAIL); `pass-absent.json` (`user_rhosts` `[]` and `etc_hosts_equiv_lines` `[]` — the compliant empty case is PASS, not absent; a genuinely absent `files.user_rhosts` → `absent_means: pass`). Confirm `etc_hosts_equiv_lines` is `[]` (not absent) when the file does not exist, per Task 3's ruling.
 - `home_dir_permissions/`: `pass-clean.json` (root + alice interactive, owner_matches true, not writable; a svc row interactive false is ignored → PASS); `fail-group-writable.json` (alice group_writable true → FAIL); `fail-not-owned.json` (owner_matches false → FAIL); `fail-denied.json` (alice interactive, stat_status "denied", owner_matches false → FAIL — the unreadable-home hazard surfaces as a finding); `manual-absent.json` (`files.home_dirs` absent → MANUAL).
@@ -1412,12 +1729,21 @@ go run ./cmd/muster controls lint --fixtures controls/testdata  # ok: 29 control
 go test ./internal/controls/ -run TestEveryControlHasFixturesThatBehave -v -count=1
 go test ./internal/check/ ./internal/controls/ -count=1
 ```
+
+**Keep the whole `cmd/muster` package green at this commit (L10).** These five controls now evaluate in the end-to-end run, so bump the count, extend the snapshots and update the e2e maps here, in this commit:
+- `cmd/muster/controls_test.go`: both `"ok: 24 controls"` → `"ok: 29 controls"`.
+- Extend both e2e snapshots (`cmd/muster/testdata/full-{pass,fail}.json`) with the facts these five controls read, so each resolves to PASS: under `facts.files` — `env_files` (two clean rows), `user_rhosts` `[]`, `etc_hosts_equiv_lines` `[]`, `home_dirs` (root + one interactive user, ok/owned/not-writable), `dev_nondevice` `[]`.
+- `cmd/muster/e2e_test.go`: add `muster.file.env_file_permissions`, `muster.file.dev_no_stale_files`, `muster.file.rhosts_forbidden`, `muster.file.home_dir_permissions`, `muster.file.home_dir_exists` to both expected-status maps as PASS (the fail map's only FAIL stays `root_remote_login`).
+- Regenerate the coverage table: `go run ./tools/coverage` then `go run ./tools/coverage -check` (exit 0); `docs/reference/coverage.md` now enrols U-24, U-26, U-27, U-31, U-32 (29 items).
+- `go test ./cmd/muster/ -count=1` passes.
+
 Then the lab host, root, stock Ubuntu 22.04: `bash lab-sync.sh <worktree>`, build, `collect --require-root --require-complete`, `check --format json`; report the `<id> <status>` lines for the seven new/amended controls and the leaves `.facts.env.shell.tmout.value`, `.facts.files.home_dirs` count, `.facts.files.dev_nondevice` count. Quote only those.
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add controls/file/env_file_permissions.yaml controls/file/dev_no_stale_files.yaml controls/file/rhosts_forbidden.yaml controls/file/home_dir_permissions.yaml controls/file/home_dir_exists.yaml controls/testdata
+git add controls/file/env_file_permissions.yaml controls/file/dev_no_stale_files.yaml controls/file/rhosts_forbidden.yaml controls/file/home_dir_permissions.yaml controls/file/home_dir_exists.yaml controls/testdata \
+        cmd/muster/testdata cmd/muster/e2e_test.go cmd/muster/controls_test.go docs/reference/coverage.md
 git commit -m "Add the environment-file, /dev, rhosts and home-directory controls"
 ```
 
@@ -1426,25 +1752,26 @@ git commit -m "Add the environment-file, /dev, rhosts and home-directory control
 ### Task 6: End-to-end snapshots, counts, coverage and the README
 
 **Files:**
-- Modify: `cmd/muster/testdata/full-{pass,fail}.json`, `cmd/muster/e2e_test.go`, `cmd/muster/controls_test.go` (`22` → `29`), `docs/reference/coverage.md` (regenerated), `README.md`, `README.ko.md`
+- Modify: `cmd/muster/testdata/full-{pass,fail}.json`, `cmd/muster/e2e_test.go` (count comments), `README.md`, `README.ko.md`, and verify `docs/reference/coverage.md`
 
-- [ ] **Step 1: Extend the snapshots**
+**Note on the count/coverage split (L10).** `cmd/muster/controls_test.go`'s `"22 controls"` string and `docs/reference/coverage.md` are already bumped incrementally — to `24` in Task 4 (U-14, U-30) and to `29` in Task 5 (U-24, U-26, U-27, U-31, U-32) — and each of those tasks also added its controls' facts and PASS map entries to the e2e snapshots, so no earlier commit carries a red `cmd/muster` test or a stale coverage table. Task 6 therefore only reconciles the snapshots as a whole, updates the e2e count comments, refreshes the README, and runs the final verification.
 
-Add to `full-pass.json` under `facts.env`: `shell.tmout` 0, `shell.tmout_exported` false, `shell.umask_settings` `[]`, `shell.root_path_raw` "/usr/sbin:/usr/bin", `shell.root_path_entries` two clean rows. Under `facts.accounts.login_defs`: `umask` "022" (if not already present from 2B — check; 2B added it). Under `facts.pam`: `umask_module.enabled` true (2C added the key; ensure the snapshot carries it). Under `facts.files`: `root_home` (uid 0, not writable), `env_files` (two clean rows), `user_rhosts` `[]`, `etc_hosts_equiv_lines` `[]`, `home_dirs` (root + one interactive user, ok/owned/not-writable), `dev_nondevice` `[]`. Make every new-control verdict a PASS. For `full-fail.json`, keep its single existing FAIL and add the SAME clean env/files values so the seven new controls PASS there too (a second FAIL would break the R26 invariant unless intended — keep root_remote_login the only FAIL).
+- [ ] **Step 1: Reconcile the snapshots**
 
-**U-12 in the snapshots:** the pass snapshot must satisfy U-12 now that it always applies — give `full-pass.json` a passing mechanism (either `sshd.options.client_alive_interval` 300 + `client_alive_count_max` 1, already present from 2D, or `env.shell.tmout` 600 exported). Confirm `full-fail.json` also passes U-12 (it has the sshd timeout from 2D). If either snapshot has sshd count 0 / interval 0 and no TMOUT, U-12 would now FAIL there — set a passing mechanism.
+Confirm both snapshots carry the complete set of new facts introduced across Tasks 4–5 and that every new control's verdict is correct. The full new-fact set each snapshot must carry: under `facts.env` — `shell.tmout` (600 exported, or 0 with a passing sshd pair), `shell.tmout_exported`, `shell.umask_settings` `[]`, `shell.root_path_raw` "/usr/sbin:/usr/bin", `shell.root_path_entries` two clean rows; under `facts.accounts.login_defs` — `umask` "022"; under `facts.pam` — `umask_module.enabled` true; under `facts.files` — `root_home` (uid 0, not writable), `env_files` (two clean rows), `user_rhosts` `[]`, `etc_hosts_equiv_lines` `[]`, `home_dirs` (root + one interactive user, ok/owned/not-writable), `dev_nondevice` `[]`. **`accounts.login_defs.umask` and `pam.umask_module.enabled` are NOT present in the snapshots today (L12); they must be added (in Task 4, with U-30) or U-30 `ERROR(missing_fact)`s.** Every new-control verdict is PASS. For `full-fail.json`, keep its single existing FAIL and the SAME clean env/files values so the seven new controls PASS there too (a second FAIL would break the R26 invariant — keep `root_remote_login` the only FAIL).
 
-- [ ] **Step 2: e2e maps and counts**
+**U-12 in the snapshots:** now that U-12 always applies, the pass snapshot must satisfy it — a passing mechanism (either `sshd.options.client_alive_interval` 300 + `client_alive_count_max` 1, already present from 2D, or `env.shell.tmout` 600 exported). Confirm `full-fail.json` also passes U-12 (it has the sshd timeout from 2D). If either snapshot has sshd count 0 / interval 0 and no TMOUT, U-12 would FAIL there — set a passing mechanism. (This U-12 reconciliation lands with the U-12 amendment in Task 4; Task 6 verifies it.)
 
-`e2e_test.go`: add the seven new controls to both expected-status maps as PASS (in the fail map the only FAIL stays `root_remote_login`). Update the count comments (twenty-nine). `controls_test.go`: both `"ok: 22 controls"` → `"ok: 29 controls"`.
+- [ ] **Step 2: e2e count comments**
 
-- [ ] **Step 3: Coverage**
+`e2e_test.go`: the seven new controls are already in both expected-status maps as PASS (added in Tasks 4–5; the fail map's only FAIL stays `root_remote_login`). Update the count comments to twenty-nine. `controls_test.go`'s `"ok: … controls"` strings are already at `29` from Task 5 — do not touch them again here.
+
+- [ ] **Step 3: Coverage verification**
 
 ```
-go run ./tools/coverage
 go run ./tools/coverage -check
 ```
-`docs/reference/coverage.md` now shows U-14, U-24, U-26, U-27, U-30, U-31, U-32 enrolled; header `29 of 67 items enrolled (auto 25, partial 4, manual 0)`.
+Exit 0: `docs/reference/coverage.md` is already at 29 items from Task 5 (U-14, U-24, U-26, U-27, U-30, U-31, U-32 enrolled; header `29 of 67 items enrolled (auto 25, partial 4, manual 0)`). Regenerate with `go run ./tools/coverage` only if `-check` reports drift.
 
 - [ ] **Step 4: README pair**
 
@@ -1457,9 +1784,10 @@ Windows: `gofmt -l .`; `GOOS=linux GOARCH=amd64 go vet ./...`; `go test ./intern
 - [ ] **Step 6: Commit**
 
 ```bash
-git add cmd/muster/testdata cmd/muster/e2e_test.go cmd/muster/controls_test.go docs/reference/coverage.md README.md README.ko.md
-git commit -m "Enrol the home and shell-environment controls end to end and regenerate the coverage table"
+git add cmd/muster/testdata cmd/muster/e2e_test.go README.md README.ko.md
+git commit -m "Reconcile the home and shell-environment controls end to end"
 ```
+(`cmd/muster/controls_test.go` and `docs/reference/coverage.md` were committed in Tasks 4–5; Task 6 adds only the snapshot reconciliation, the e2e count comments and the README.)
 
 ---
 
@@ -1467,7 +1795,7 @@ git commit -m "Enrol the home and shell-environment controls end to end and rege
 
 **Spec coverage.** §5.4 env `shell.*` → T1; files `home_dirs`/`env_files`/`user_rhosts`/`root_home`/`etc_hosts_equiv`/`dev_entries` → T2/T3. §6.5 screening and the mixed-absence hazard → U-12/U-14 use `mechanisms` so an absent PATH or count does not screen the whole control; U-27 relies on `etc_hosts_equiv_lines` being `[]` (not absent) when the file is missing (Task 3 ruling). §7.3 honesty → `stat_status` distinguishes `denied` from `absent`; a denied home is a finding, not a pass. §10.2 items U-12 (amended), U-14, U-24, U-26, U-27, U-30, U-31, U-32 → T4/T5. Every new control carries `references.stig`/`nist_800_53` where a mapping exists (U-26 and U-27 have no clean DISA rule and carry KISA only).
 
-**Placeholder scan.** The one `|| true` in `envFileRow` is explicitly flagged as a stand-in with the real computation specified in the owner_ok ruling — the implementer must not ship it. `mustRead` in Task 2 Step 4 is named and its behaviour (return bytes, or write the three keys as the read error and return) is specified. No other TBD/TODO.
+**Placeholder scan.** No stand-ins remain: `envFileRow` takes the account uid and computes `owner_ok` directly (the earlier disjunction stand-in is gone, L3), a symlinked environment file is handled by `envSymlinkRow` (R182), and the passwd read is the concrete `passwdRows(a, b) ([]passwdRow, bool)` helper (L2), which writes the three enumeration keys as the read error and returns `false` on a denied `/etc/passwd`. Nothing is deferred.
 
 **Type consistency.** `shellAssignment.Kind` ∈ `tmout|umask|path`; `home_dirs.stat_status` ∈ `ok|absent|denied`; `interactive` is a bool on every `home_dirs` row; `env.shell.tmout` is int, `tmout_exported`/`tmout_readonly` bool; control ids `muster.account.{umask_policy,root_home_and_path}` and `muster.file.{env_file_permissions,dev_no_stale_files,rhosts_forbidden,home_dir_permissions,home_dir_exists}`. Count 22 → 29 (7 new). The `each`/`where`/`require`/`subject` grammar matches spec §6.6; `none where {op: matches}` on `etc_hosts_equiv_lines` (a `list<string>`) omits `field` (scalar element), as the grammar requires.
 
