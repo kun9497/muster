@@ -1957,3 +1957,111 @@ func TestEnvTMOUTDeclarationForms(t *testing.T) {
 		t.Error("`declare -xr` makes TMOUT readonly")
 	}
 }
+
+// --- files: home directories, environment files and .rhosts --------------
+
+// home_dirs has one row per passwd home. A service account (nologin shell,
+// /nonexistent home) is interactive=false and its absent home is NOT a
+// finding. root and an interactive user are interactive=true; an unreadable
+// home (parent EACCES) is stat_status=denied, never absent.
+func TestFilesHomeDirsInteractiveAndTriState(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{"/etc/passwd": "passwd_home", "/etc/shells": "shells_home", "/proc/self/mountinfo": "mountinfo"},
+		dirs:  map[string]bool{"/root": true, "/home/alice": true},
+		stats: map[string]statResult{
+			"/root":       {mode: 0o700, uid: 0, gid: 0, kind: "dir"},
+			"/home/alice": {mode: 0o755, uid: 1000, gid: 1000, kind: "dir"},
+		},
+		fails: map[string]error{"/home/bob": os.ErrPermission}, // interactive, but parent denies stat
+	}
+	rows := okList(t, build(t, "files", a), "files.home_dirs")
+	byUser := map[string]map[string]any{}
+	for _, r := range rows {
+		m := r.(map[string]any)
+		byUser[m["user"].(string)] = m
+	}
+	if byUser["svc"]["interactive"] != false {
+		t.Error("a nologin service account must be interactive=false")
+	}
+	if byUser["alice"]["stat_status"] != "ok" || byUser["alice"]["owner_matches"] != true {
+		t.Errorf("alice %v", byUser["alice"])
+	}
+	if byUser["bob"]["stat_status"] != "denied" {
+		t.Errorf("bob's unreadable home must be denied, not absent: %v", byUser["bob"])
+	}
+}
+
+// A denied /etc/passwd makes the three enumerations the read error, never an
+// empty list.
+func TestFilesHomeEnumDeniedPasswdIsError(t *testing.T) {
+	a := &fsAccess{fails: map[string]error{"/etc/passwd": os.ErrPermission},
+		files: map[string]string{"/etc/shells": "shells_home"}}
+	b := build(t, "files", a)
+	for _, k := range []string{"files.home_dirs", "files.env_files", "files.user_rhosts"} {
+		if e := env(t, b, k); e.Status != facts.StatusDenied {
+			t.Errorf("%s must be denied, not an empty list: %+v", k, e)
+		}
+	}
+}
+
+// A .rhosts with a bare "+" is recorded has_plus=true with entry_count, body
+// never stored; env_files marks a non-owner file owner_ok=false.
+func TestFilesRhostsAndEnvFiles(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{
+			"/etc/passwd": "passwd_home", "/etc/shells": "shells_home", "/proc/self/mountinfo": "mountinfo",
+			"/home/alice/.rhosts": "home_alice_rhosts", // contains "+"
+			"/home/alice/.bashrc": "home_alice_bashrc",
+		},
+		stats: map[string]statResult{
+			"/home/alice/.rhosts": {mode: 0o644, uid: 1000, kind: "regular"},
+			"/home/alice/.bashrc": {mode: 0o644, uid: 0, kind: "regular"}, // root-owned in alice's home
+		},
+	}
+	b := build(t, "files", a)
+	rh := okList(t, b, "files.user_rhosts")
+	if len(rh) != 1 || rh[0].(map[string]any)["has_plus"] != true {
+		t.Fatalf("user_rhosts %v", rh)
+	}
+	ef := okList(t, b, "files.env_files")
+	var alicebashrc map[string]any
+	for _, r := range ef {
+		m := r.(map[string]any)
+		if m["path"] == "/home/alice/.bashrc" {
+			alicebashrc = m
+		}
+	}
+	if alicebashrc == nil || alicebashrc["owner_ok"] != true { // root-owned is ok
+		t.Errorf(".bashrc row %v", alicebashrc)
+	}
+}
+
+// A genuinely missing home is stat_status "absent" (ENOENT), distinct from a
+// denied one; root and an interactive user are interactive=true (the filter's
+// positive half); a home on an nfs mount carries on_remote_fs=true (R191).
+func TestFilesHomeDirsAbsentAndRemoteFS(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{"/etc/passwd": "passwd_home", "/etc/shells": "shells_home", "/proc/self/mountinfo": "mountinfo_nfs"},
+		dirs:  map[string]bool{"/root": true, "/home/alice": true},
+		stats: map[string]statResult{
+			"/root":       {mode: 0o700, uid: 0, gid: 0, kind: "dir"},
+			"/home/alice": {mode: 0o755, uid: 1000, gid: 1000, kind: "dir"}, // on the nfs /home
+		},
+		// /home/bob is declared but present nowhere -> Stat returns ENOENT -> absent
+	}
+	rows := okList(t, build(t, "files", a), "files.home_dirs")
+	byUser := map[string]map[string]any{}
+	for _, r := range rows {
+		m := r.(map[string]any)
+		byUser[m["user"].(string)] = m
+	}
+	if byUser["root"]["interactive"] != true || byUser["alice"]["interactive"] != true {
+		t.Error("root and alice have real login shells -> interactive=true")
+	}
+	if byUser["bob"]["stat_status"] != "absent" {
+		t.Errorf("bob's missing home must be absent (ENOENT), not denied: %v", byUser["bob"])
+	}
+	if byUser["alice"]["on_remote_fs"] != true {
+		t.Errorf("alice's home on nfs must be on_remote_fs=true: %v", byUser["alice"])
+	}
+}

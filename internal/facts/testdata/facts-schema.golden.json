@@ -922,6 +922,36 @@
       "SubjectKind": ""
     },
     {
+      "Key": "files.home_dirs",
+      "Type": "list\u003crecord\u003e",
+      "Description": "One row per /etc/passwd account with its home path, interactive flag, and the home's stat status, mode, ownership match, group/other write bits and whether it sits on a remote filesystem.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": "user"
+    },
+    {
+      "Key": "files.env_files",
+      "Type": "list\u003crecord\u003e",
+      "Description": "System-scope and per-home shell environment files that exist, with path, scope, owning account, mode, owner match, group/other write bits and whether the file is a symlink.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.user_rhosts",
+      "Type": "list\u003crecord\u003e",
+      "Description": ".rhosts and .shosts files under interactive homes, as derived flags only - owning account match, whether a wildcard \"+\" entry is present and the non-comment entry count, never the file body.",
+      "Since": 1,
+      "Sensitivity": "internal",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
       "Key": "accounts.login_defs.pass_max_days",
       "Type": "setting\u003cint\u003e",
       "Description": "PASS_MAX_DAYS - persisted in login.defs, effective as the maximum over existing accounts' shadow fields.",

@@ -1,0 +1,2 @@
+1 0 8:1 / / rw,relatime - ext4 /dev/sda1 rw
+2 1 0:45 / /home rw,relatime - nfs synthetic-server:/export rw

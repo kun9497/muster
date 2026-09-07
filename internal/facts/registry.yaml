@@ -456,6 +456,25 @@ keys:
     since: 1
     sensitivity: public
     collector: files
+  - key: files.home_dirs
+    type: list<record>
+    description: One row per /etc/passwd account with its home path, interactive flag, and the home's stat status, mode, ownership match, group/other write bits and whether it sits on a remote filesystem.
+    since: 1
+    sensitivity: public
+    collector: files
+    subject_kind: user
+  - key: files.env_files
+    type: list<record>
+    description: System-scope and per-home shell environment files that exist, with path, scope, owning account, mode, owner match, group/other write bits and whether the file is a symlink.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.user_rhosts
+    type: list<record>
+    description: .rhosts and .shosts files under interactive homes, as derived flags only - owning account match, whether a wildcard "+" entry is present and the non-comment entry count, never the file body.
+    since: 1
+    sensitivity: internal
+    collector: files
   - key: accounts.login_defs.pass_max_days
     type: setting<int>
     description: PASS_MAX_DAYS - persisted in login.defs, effective as the maximum over existing accounts' shadow fields.
