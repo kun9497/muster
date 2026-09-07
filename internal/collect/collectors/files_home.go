@@ -145,9 +145,9 @@ func envSymlinkRow(p, scope, homeUser string) map[string]any {
 	}
 }
 
-// userRhosts records .rhosts/.shosts under each interactive home and
-// /etc/hosts.equiv, as derived flags only (never the body): owner_ok,
-// has_plus (a line that is exactly "+" or begins "+ "), entry_count.
+// userRhosts records .rhosts/.shosts under each interactive home, as derived
+// flags only (never the body): owner_ok, has_plus (a line that is exactly "+"
+// or begins "+ "), entry_count.
 func userRhosts(a collect.Access, rows []passwdRow, shells map[string]bool) facts.Envelope {
 	out := []any{}
 	scan := func(p, homeUser string, ownerUID int) {

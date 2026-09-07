@@ -1989,6 +1989,13 @@ func TestFilesHomeDirsInteractiveAndTriState(t *testing.T) {
 	if byUser["bob"]["stat_status"] != "denied" {
 		t.Errorf("bob's unreadable home must be denied, not absent: %v", byUser["bob"])
 	}
+	// R176: every field the U-31/U-32 `each … require` clauses read must be
+	// present and defaulted on a denied row, or the clause compares an absent
+	// field and ERRORs instead of the intended FAIL. Lock the pre-fill so a
+	// refactor that moved the defaults into only the ok branch is caught.
+	if byUser["bob"]["owner_matches"] != false || byUser["bob"]["group_writable"] != false || byUser["bob"]["mode"] != -1 {
+		t.Errorf("bob's denied row must keep the pre-filled defaults (owner_matches:false, group_writable:false, mode:-1): %v", byUser["bob"])
+	}
 }
 
 // A denied /etc/passwd makes the three enumerations the read error, never an
@@ -2033,6 +2040,31 @@ func TestFilesRhostsAndEnvFiles(t *testing.T) {
 	}
 	if alicebashrc == nil || alicebashrc["owner_ok"] != true { // root-owned is ok
 		t.Errorf(".bashrc row %v", alicebashrc)
+	}
+}
+
+// R182: Stat returns collect.ErrSymlink for a final-component symlink, so a
+// symlinked environment file never reaches the nil-error branch; it must still
+// surface as a row, marked is_symlink=true and owner_ok=false, so U-24's
+// `none where` clauses see it rather than the file silently vanishing.
+func TestFilesEnvFilesSymlinkRow(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{"/etc/passwd": "passwd_home", "/etc/shells": "shells_home", "/proc/self/mountinfo": "mountinfo"},
+		fails: map[string]error{"/home/alice/.bashrc": collect.ErrSymlink},
+	}
+	ef := okList(t, build(t, "files", a), "files.env_files")
+	var row map[string]any
+	for _, r := range ef {
+		m := r.(map[string]any)
+		if m["path"] == "/home/alice/.bashrc" {
+			row = m
+		}
+	}
+	if row == nil {
+		t.Fatalf("a symlinked ~/.bashrc must still appear in env_files: %v", ef)
+	}
+	if row["is_symlink"] != true || row["owner_ok"] != false {
+		t.Errorf("symlink row must be is_symlink:true, owner_ok:false: %v", row)
 	}
 }
 
