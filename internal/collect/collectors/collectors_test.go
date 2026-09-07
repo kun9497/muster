@@ -436,6 +436,90 @@ func TestSshdIncludeSourcesRecorded(t *testing.T) {
 	}
 }
 
+// Two drop-ins match one Include glob: the records appear in sorted-Glob
+// expansion order, each at depth 1, so the order across entries is pinned
+// (not just a single match).
+func TestSshdIncludeSourcesRecordedInExpansionOrder(t *testing.T) {
+	a := &fsAccess{files: map[string]string{
+		"/etc/ssh/sshd_config":                      "sshd_config", // Include .../*.conf
+		"/etc/ssh/sshd_config.d/60-extra.conf":      "sshd_config.d_60-extra.conf",
+		"/etc/ssh/sshd_config.d/50-cloud-init.conf": "sshd_config.d_50-cloud-init.conf",
+	}}
+	list := okList(t, build(t, "sshd", a), "sshd.include_sources")
+	if len(list) != 2 {
+		t.Fatalf("include_sources %v, want two entries", list)
+	}
+	want := []string{
+		"/etc/ssh/sshd_config.d/50-cloud-init.conf",
+		"/etc/ssh/sshd_config.d/60-extra.conf",
+	}
+	for i, w := range want {
+		rec := list[i].(map[string]any)
+		if rec["path"] != w {
+			t.Errorf("entry %d path %v, want %s (records must be in sorted expansion order)", i, rec["path"], w)
+		}
+		if rec["depth"].(int) != 1 {
+			t.Errorf("entry %d depth %v, want 1", i, rec["depth"])
+		}
+	}
+}
+
+// R168: a Banner path outside Declare.Reads must be refused by the guard's
+// Allowed and recorded as an error, never read. build() wraps the access in
+// collect.Guard, so Allowed is live here (mirrors
+// TestSshdIncludeOutsideDeclarationIsRecordedNotViolated).
+func TestSshdBannerOutsideDeclarationIsRecordedNotRead(t *testing.T) {
+	a := &fsAccess{files: map[string]string{
+		"/etc/ssh/sshd_config": "sshd_config_banner_outside", // Banner /root/secret
+	}}
+	b := build(t, "sshd", a) // build fails the test on any guard violation
+	for _, key := range []string{"sshd.banner_file.exists", "sshd.banner_file.nonempty"} {
+		e := env(t, b, key)
+		if e.Status != facts.StatusError {
+			t.Errorf("%s %+v, want error", key, e)
+		}
+		if !strings.Contains(e.Reason, "/root/secret") || !strings.Contains(e.Reason, "outside the collector's declaration") {
+			t.Errorf("%s reason %q", key, e.Reason)
+		}
+	}
+	if slices.Contains(a.reads, "/root/secret") {
+		t.Errorf("an undeclared Banner path must never be read: reads = %v", a.reads)
+	}
+}
+
+// R165 negative branch: a numeric option whose parsed file value is not an
+// integer is an error on the persisted (and, on parse fallback, effective)
+// side, never a stored non-int.
+func TestSshdNumericOptionWithANonIntegerFileValueIsAnError(t *testing.T) {
+	a := &fsAccess{files: map[string]string{"/etc/ssh/sshd_config": "sshd_config_bad_int"}}
+	s := setting(t, build(t, "sshd", a), "sshd.options.max_auth_tries")
+	if s.Persisted == nil || s.Persisted.Status != facts.StatusError {
+		t.Fatalf("persisted %+v, want error", s.Persisted)
+	}
+	if !strings.Contains(s.Persisted.Reason, "not an integer") {
+		t.Errorf("reason %q, want it to name the non-integer value", s.Persisted.Reason)
+	}
+	if s.Effective.Status != facts.StatusError {
+		t.Errorf("effective %+v, want error copied from the persisted side", s.Effective)
+	}
+}
+
+// sshdVersion's no-version-found branch: sshd -V output that ran but carries
+// no OpenSSH_x.y string yields an absent version, not a bogus value.
+func TestSshdVersionAbsentWhenOutputHasNoVersion(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{"/etc/ssh/sshd_config": "sshd_config"},
+		cmds:  map[string]cmdResult{"/usr/sbin/sshd -V": {stderr: "usage: sshd [options]\n", exitCode: 1}},
+	}
+	v := env(t, build(t, "sshd", a), "sshd.version")
+	if v.Status != facts.StatusAbsent {
+		t.Errorf("version %+v, want absent", v)
+	}
+	if !strings.Contains(v.Reason, "no OpenSSH version") {
+		t.Errorf("reason %q", v.Reason)
+	}
+}
+
 func TestSshdRuntimeAndPersistedWithInclude(t *testing.T) {
 	a := &fsAccess{
 		files: map[string]string{
@@ -736,6 +820,34 @@ func withEUID(t *testing.T, id int) {
 // longer has a subject and has been removed. commandFailure and its euid
 // privilege rule are unchanged; the non-root case below still pins them
 // through the services collector.
+
+// R170 (R84/D25): commandFailure's needsRoot branch is kept for later
+// root-command collectors even though no collector currently reaches it, so
+// it is pinned directly here. A root-only command that failed while this
+// process is not root is denied with the privilege named, whatever it
+// printed; the same failure as root is an error carrying the stderr message.
+func TestCommandFailureNeedsRootBranch(t *testing.T) {
+	out := collect.Output{Stderr: []byte("no hostkeys available -- exiting.\n"), ExitCode: 255}
+	src := out.Source(collect.Command{Path: "/usr/sbin/sshd", Args: []string{"-T"}})
+
+	withEUID(t, 1000)
+	e := commandFailure("sshd -T", out, src, true)
+	if e.Status != facts.StatusDenied {
+		t.Fatalf("non-root %+v, want denied", e)
+	}
+	if !strings.Contains(e.Reason, "requires root") || !strings.Contains(e.Reason, "no hostkeys available -- exiting.") {
+		t.Errorf("denied reason %q must name the privilege and carry the stderr line", e.Reason)
+	}
+
+	withEUID(t, 0)
+	e = commandFailure("sshd -T", out, src, true)
+	if e.Status != facts.StatusError {
+		t.Fatalf("root %+v, want error", e)
+	}
+	if e.Reason != "no hostkeys available -- exiting." {
+		t.Errorf("root reason %q, want the stderr message", e.Reason)
+	}
+}
 
 // A collector that does NOT need root keeps commandFailure's rule whatever
 // this process's euid is: systemctl failing for a normal user is an error,
