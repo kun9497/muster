@@ -45,6 +45,18 @@ func permitRootLoginControl(automation, absentMeans string) controls.Control {
 	}
 }
 
+// permitRootLoginPersonaControl mirrors U-01's mechanism: it names a
+// persona ("root") on the same setting permitRootLoginControl checks, so the
+// step-13 persona branches (override judged directly, no-override falls
+// through to the global side) can be exercised end to end.
+func permitRootLoginPersonaControl() controls.Control {
+	return controls.Control{
+		ID: "muster.account.root_remote_login", Importance: "상", Category: "account", Automation: "auto", AbsentMeans: "not_applicable",
+		Checks:      []controls.Clause{{Fact: "sshd.options.permit_root_login", On: "effective", Persona: "root", Op: "eq", Expected: "no"}},
+		Remediation: &controls.Remediation{Risk: "lockout_risk"},
+	}
+}
+
 // passMaxDaysControl checks accounts.login_defs.pass_max_days without an
 // explicit `on`, so it screens/evaluates on the registry's default_on
 // ("both").
@@ -183,6 +195,32 @@ func TestDerivationTable(t *testing.T) {
 			controls.Control{ID: "muster.account.root_remote_login", Importance: "상", Category: "account", Automation: "auto", AbsentMeans: "not_applicable", Remediation: &controls.Remediation{Risk: "lockout_risk"},
 				Checks: []controls.Clause{{Fact: "sshd.options.permit_root_login", On: "effective", Persona: "root", Op: "eq", Expected: "no"}}},
 			WARN, "", nil},
+		// step 13, branch 2: personas were collected and the daemon reported
+		// a Match override for root that re-enables root login; the clause
+		// is judged against the override directly and fails hard — no
+		// degradation, because personas were collected.
+		{"13 personas collected with root override is a clean FAIL, not degraded",
+			`{"sshd":{"personas_collected":{"status":"ok","value":true},"options":{"permit_root_login":{"effective":{"status":"ok","value":"no"},"personas":{"root":{"status":"ok","value":"yes"}}}}}}`,
+			permitRootLoginPersonaControl(),
+			FAIL, "",
+			func(t *testing.T, r Result) {
+				if r.Degraded != "" {
+					t.Errorf("personas were collected; no degradation expected, got %q", r.Degraded)
+				}
+			}},
+		// step 13, branch 3: personas were collected but the daemon reported
+		// no Match override for root, so the persona value is the global
+		// value; the clause is judged on the global side with no
+		// degradation.
+		{"13 personas collected with no root override judges the global value and passes",
+			`{"sshd":{"personas_collected":{"status":"ok","value":true},"options":{"permit_root_login":{"effective":{"status":"ok","value":"no"}}}}}`,
+			permitRootLoginPersonaControl(),
+			PASS, "",
+			func(t *testing.T, r Result) {
+				if r.Degraded != "" {
+					t.Errorf("no override; no degradation expected, got %q", r.Degraded)
+				}
+			}},
 		{"5 mechanisms fallback", `{"files":{"etc_securetty":{"status":"ok","value":{}},"etc_securetty_lines":{"status":"ok","value":["console"]}},"sshd":{"options":{"permit_root_login":{"effective":{"status":"absent"}}}}}`,
 			controls.Control{ID: "muster.account.root_remote_login", Importance: "상", Category: "account", Automation: "auto", AbsentMeans: "not_applicable", Remediation: &controls.Remediation{Risk: "lockout_risk"},
 				Mechanisms: []controls.Mechanism{

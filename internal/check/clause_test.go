@@ -65,6 +65,51 @@ func TestEvalClauseBothSidesMismatchIsDegradedNotHolding(t *testing.T) {
 	}
 }
 
+// A Match root block that re-enables root login must FAIL a persona=root
+// clause even though the global value passes. The override lives in
+// Setting.Personas["root"]; personas_collected is true, so there is no
+// degradation and the verdict is a clean FAIL.
+func TestPersonaOverrideIsJudged(t *testing.T) {
+	e := newEnv(t, `{"schema_version":1,"run":{},"facts":{
+	  "sshd": {
+	    "personas_collected": {"status":"ok","value":true},
+	    "options": {"permit_root_login": {
+	      "effective": {"status":"ok","value":"no"},
+	      "personas": {"root": {"status":"ok","value":"yes"}}
+	    }}
+	  }}}`)
+	out := e.evalClause(controls.Clause{
+		Fact: "sshd.options.permit_root_login", On: "effective", Persona: "root",
+		Op: "in", Expected: []any{"no", "prohibit-password"},
+	})
+	if out.Err != nil {
+		t.Fatalf("err %v", out.Err)
+	}
+	if out.Holds {
+		t.Error("root persona value yes must not satisfy in[no, prohibit-password]")
+	}
+	if out.Degraded != "" {
+		t.Errorf("personas were collected; no degradation, got %q", out.Degraded)
+	}
+}
+
+// With no override for that persona, the global side is judged and there is
+// no degradation (the daemon reported no Match block for it).
+func TestPersonaWithoutOverrideUsesGlobal(t *testing.T) {
+	e := newEnv(t, `{"schema_version":1,"run":{},"facts":{
+	  "sshd": {
+	    "personas_collected": {"status":"ok","value":true},
+	    "options": {"permit_root_login": {"effective": {"status":"ok","value":"no"}}}
+	  }}}`)
+	out := e.evalClause(controls.Clause{
+		Fact: "sshd.options.permit_root_login", On: "effective", Persona: "root",
+		Op: "in", Expected: []any{"no", "prohibit-password"},
+	})
+	if !out.Holds || out.Degraded != "" {
+		t.Errorf("global no must hold with no degradation: holds=%v degraded=%q", out.Holds, out.Degraded)
+	}
+}
+
 func TestEvalClauseScalarAndParam(t *testing.T) {
 	e := newEnv(t, sshdSnap)
 	e.params["want"] = true
