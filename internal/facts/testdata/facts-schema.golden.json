@@ -1154,7 +1154,7 @@
     {
       "Key": "pam.faillock.even_deny_root",
       "Type": "bool",
-      "Description": "even_deny_root is set in faillock.conf or as a module argument.",
+      "Description": "even_deny_root is set in faillock.conf (any value) or as the bare module argument even_deny_root.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "pam",

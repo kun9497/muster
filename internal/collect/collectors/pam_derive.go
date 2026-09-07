@@ -370,7 +370,10 @@ func faillockFacts(s pamStacks, a collect.Access) map[string]facts.Envelope {
 		return out
 	}
 	if missing != "" {
-		e := collect.OK(false, &facts.Source{Kind: "derived", Inputs: []facts.Source{{Kind: "file", Path: pamDir + "/" + missing}}})
+		// R157/R158: the evidence for "the module is not stacked" is every
+		// file the stacks were expanded out of, not the service file, which
+		// on either family may hold nothing but includes.
+		e := collect.OK(false, pamSource(s.x))
 		e.Reason = missing + "'s stack lacks pam_faillock.so preauth, authfail or a reset (the module in the account phase or an authsucc line)"
 		out["pam.faillock.enabled"] = e
 		for _, k := range accessKeys[1:6] {
@@ -410,7 +413,11 @@ func faillockFacts(s pamStacks, a collect.Access) map[string]facts.Envelope {
 	inputs = append(inputs, lineSource(*preauth))
 	rootSet = applyFaillock(vals, argsKV(authfail.Args)) || rootSet
 	inputs = append(inputs, lineSource(*authfail))
-	evenDenyRoot = evenDenyRoot || hasArg(preauth.Args, "even_deny_root") || hasArg(authfail.Args, "even_deny_root")
+	// R158: pam_faillock compares this option's whole argument, so a bare
+	// even_deny_root sets it and even_deny_root=0 is an argument the module
+	// does not recognise and ignores. The conf file is the other way round:
+	// set_conf_opt ORs the flag in whatever value follows the name.
+	evenDenyRoot = evenDenyRoot || slices.Contains(preauth.Args, "even_deny_root") || slices.Contains(authfail.Args, "even_deny_root")
 	if !rootSet {
 		vals["root_unlock_time"] = vals["unlock_time"]
 	}
@@ -447,7 +454,7 @@ func suFacts(s pamStacks) map[string]facts.Envelope {
 	}
 	wheel := linesOf(s.byName["su"], "auth", "pam_wheel.so")
 	if len(wheel) == 0 {
-		e := collect.OK(false, &facts.Source{Kind: "derived", Inputs: []facts.Source{{Kind: "file", Path: pamDir + "/su"}}})
+		e := collect.OK(false, pamSource(s.x))
 		e.Reason = "no pam_wheel.so line in su's auth stack"
 		out["pam.su.wheel_required"] = e
 		for _, k := range accessKeys[7:10] {
@@ -485,7 +492,7 @@ func umaskFacts(s pamStacks) map[string]facts.Envelope {
 		}
 		lines := linesOf(s.byName[svc], "session", "pam_umask.so")
 		if len(lines) == 0 {
-			e := collect.OK(false, &facts.Source{Kind: "derived", Inputs: []facts.Source{{Kind: "file", Path: pamDir + "/" + svc}}})
+			e := collect.OK(false, pamSource(s.x))
 			e.Reason = "no pam_umask.so line in " + svc + "'s session stack"
 			out["pam.umask_module.enabled"] = e
 			out["pam.umask_module.args"] = collect.Absent("pam_umask.so is not stacked")
@@ -510,7 +517,7 @@ func securettyFact(s pamStacks) facts.Envelope {
 	}
 	lines := linesOf(s.byName["login"], "auth", "pam_securetty.so")
 	if len(lines) == 0 {
-		return collect.OK(false, &facts.Source{Kind: "derived", Inputs: []facts.Source{{Kind: "file", Path: pamDir + "/login"}}})
+		return collect.OK(false, pamSource(s.x))
 	}
 	return collect.OK(true, &facts.Source{Kind: "derived", Inputs: []facts.Source{lineSource(lines[0])}})
 }

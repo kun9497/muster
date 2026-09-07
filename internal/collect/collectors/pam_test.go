@@ -558,6 +558,11 @@ func TestPAMFaillockNotStackedOnDebian(t *testing.T) {
 	if e := env(t, b, "pam.faillock.enabled"); e.Status != facts.StatusOK || e.Value != false {
 		t.Errorf("%+v", e)
 	}
+	// R158: "not stacked" cites the files the stacks were expanded out of,
+	// not /etc/pam.d/login, which holds includes and no auth module line.
+	if got := sourcePaths(t, env(t, b, "pam.faillock.enabled")); !slices.Contains(got, "/etc/pam.d/common-auth") {
+		t.Errorf("inputs %v", got)
+	}
 	for _, k := range []string{"deny", "unlock_time", "fail_interval", "even_deny_root", "root_unlock_time"} {
 		if e := env(t, b, "pam.faillock."+k); e.Status != facts.StatusAbsent {
 			t.Errorf("%s = %+v", k, e)
@@ -649,6 +654,98 @@ func TestPAMSuWheel(t *testing.T) {
 	}
 	if e := env(t, b, "pam.su.wheel_control"); e.Value != "sufficient" {
 		t.Errorf("%+v", e)
+	}
+	// R158: an enforcing control with deny inverts the module - everyone in
+	// the group is refused instead of everyone outside it - and group= names
+	// the group the line really talks about.
+	a = ubuntuPAM()
+	a.files["/etc/pam.d/su"] = "pam/ubuntu/su-wheel-deny-group"
+	b = build(t, "pam", a)
+	if e := env(t, b, "pam.su.wheel_required"); e.Status != facts.StatusOK || e.Value != false || !strings.Contains(e.Reason, "deny") {
+		t.Errorf("%+v", e)
+	}
+	if e := env(t, b, "pam.su.wheel_control"); e.Value != "required" {
+		t.Errorf("%+v", e)
+	}
+	if e := env(t, b, "pam.su.wheel_group"); e.Value != "admins" {
+		t.Errorf("%+v", e)
+	}
+}
+
+// R158: pam_faillock recognises even_deny_root only as a bare argument, so
+// even_deny_root=0 on a stack line is an option it ignores, not a false.
+func TestPAMFaillockEvenDenyRootIsAnExactFlag(t *testing.T) {
+	a := rockyPAM()
+	a.files["/etc/authselect/system-auth"] = "pam/rocky/authselect-system-auth-evendenyroot0"
+	if e := env(t, build(t, "pam", a), "pam.faillock.even_deny_root"); e.Status != facts.StatusOK || e.Value != false {
+		t.Errorf("%+v (even_deny_root=0 is not the flag)", e)
+	}
+	a = rockyPAM()
+	a.files["/etc/authselect/system-auth"] = "pam/rocky/authselect-system-auth-evendenyroot"
+	if e := env(t, build(t, "pam", a), "pam.faillock.even_deny_root"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("%+v", e)
+	}
+	// The conf file is the other way round: any value sets it.
+	a = rockyPAM()
+	a.files["/etc/security/faillock.conf"] = "pam/rocky/faillock.conf"
+	if e := env(t, build(t, "pam", a), "pam.faillock.even_deny_root"); e.Value != true {
+		t.Errorf("%+v", e)
+	}
+}
+
+// R158: the branches a service file that does not exist reaches. Each group
+// answers for itself, so a host missing one service still answers for the
+// others.
+func TestPAMAccessFactsEdgeCases(t *testing.T) {
+	// (a) No login and no sshd: faillock has nothing to judge.
+	a := rockyPAM()
+	delete(a.files, "/etc/pam.d/login")
+	delete(a.files, "/etc/pam.d/sshd")
+	b := build(t, "pam", a)
+	for _, k := range accessKeys[:6] {
+		if e := env(t, b, k); e.Status != facts.StatusAbsent {
+			t.Errorf("%s = %+v", k, e)
+		}
+	}
+	if e := env(t, b, "pam.su.wheel_required"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("su is still judged: %+v", e)
+	}
+	// (b) No su file.
+	a = rockyPAM()
+	delete(a.files, "/etc/pam.d/su")
+	b = build(t, "pam", a)
+	for _, k := range accessKeys[6:10] {
+		if e := env(t, b, k); e.Status != facts.StatusAbsent {
+			t.Errorf("%s = %+v", k, e)
+		}
+	}
+	if e := env(t, b, "pam.faillock.enabled"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("faillock is still judged: %+v", e)
+	}
+	// (c) login exists but no session stack loads pam_umask.so.
+	a = ubuntuPAM()
+	a.files["/etc/pam.d/common-session"] = "pam/ubuntu/common-session-noumask"
+	b = build(t, "pam", a)
+	e := env(t, b, "pam.umask_module.enabled")
+	if e.Status != facts.StatusOK || e.Value != false || !strings.Contains(e.Reason, "login") {
+		t.Errorf("%+v", e)
+	}
+	if got := sourcePaths(t, e); !slices.Contains(got, "/etc/pam.d/common-session") {
+		t.Errorf("inputs %v", got)
+	}
+	if e := env(t, b, "pam.umask_module.args"); e.Status != facts.StatusAbsent {
+		t.Errorf("%+v", e)
+	}
+	// (d) No login, sshd or other: umask has nothing to judge.
+	a = rockyPAM()
+	delete(a.files, "/etc/pam.d/login")
+	delete(a.files, "/etc/pam.d/sshd")
+	delete(a.files, "/etc/pam.d/other")
+	b = build(t, "pam", a)
+	for _, k := range accessKeys[10:12] {
+		if e := env(t, b, k); e.Status != facts.StatusAbsent {
+			t.Errorf("%s = %+v", k, e)
+		}
 	}
 }
 
