@@ -1,0 +1,35 @@
+id: muster.account.root_home_and_path
+title_en: root's home directory and PATH are safe
+title_ko: root 홈 디렉터리와 PATH 가 안전하다
+description_en: root's home directory must be owned by root and not group- or world-writable, and root's PATH (as set in the system profile files) must not contain an empty element, ".", a relative directory, or a world-writable directory - any of which lets another user place a binary that root would run. When the profile files set no PATH for root, only the home-directory permissions are judged; the sudo secure_path is added in a later plan. A world-writable or non-root-owned home is a direct privilege-escalation path.
+description_ko: root 홈 디렉터리는 root 소유여야 하고 그룹·전체 쓰기가 가능하면 안 되며, (시스템 프로파일 파일에 설정된) root 의 PATH 에 빈 요소, ".", 상대 경로, 전체 쓰기 가능 디렉터리가 있으면 안 됩니다. 어느 것이든 다른 사용자가 root 가 실행할 바이너리를 심을 수 있게 합니다. 프로파일 파일이 root PATH 를 설정하지 않으면 홈 디렉터리 권한만 판정하며, sudo secure_path 는 이후 플랜에서 추가됩니다. 전체 쓰기 가능하거나 root 소유가 아닌 홈은 곧바로 권한 상승 경로가 됩니다.
+category: account
+importance: 상
+automation: auto
+references:
+  kisa: { "2026": ["U-14"], "2021": ["U-19"] }
+  stig:
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-411055 }
+  nist_800_53: ["CM-6"]
+requires_facts: ">=1"
+absent_means: fail
+mechanisms:
+  - when:
+      - { fact: env.shell.root_path_raw, op: present }
+    checks:
+      - { fact: files.root_home.uid, op: eq, expected: 0 }
+      - { fact: files.root_home.group_writable, op: eq, expected: false }
+      - { fact: files.root_home.other_writable, op: eq, expected: false }
+      - { fact: env.shell.root_path_entries, op: none, where: { field: is_dot, op: eq, expected: true } }
+      - { fact: env.shell.root_path_entries, op: none, where: { field: world_writable, op: eq, expected: true } }
+  - when:
+      - { fact: files.root_home.uid, op: present }
+    checks:
+      - { fact: files.root_home.uid, op: eq, expected: 0 }
+      - { fact: files.root_home.group_writable, op: eq, expected: false }
+      - { fact: files.root_home.other_writable, op: eq, expected: false }
+remediation:
+  text_en: chown root:root /root, chmod 700 /root, and remove any empty, ".", relative, or world-writable entry from root's PATH in /etc/profile and root's shell startup files.
+  text_ko: chown root:root /root, chmod 700 /root 를 적용하고, /etc/profile 과 root 의 셸 시작 파일에서 root PATH 의 빈 요소, ".", 상대 경로, 전체 쓰기 가능 항목을 제거합니다.
+  risk: none
+  idempotent: true

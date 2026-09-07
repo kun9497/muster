@@ -1,8 +1,8 @@
 id: muster.account.session_timeout
 title_en: An idle SSH session is disconnected after a bounded time
 title_ko: 유휴 SSH 세션이 정해진 시간이 지나면 끊긴다
-description_en: sshd must disconnect an idle connection - ClientAliveInterval set to between one second and the parameter, and ClientAliveCountMax between one and the parameter, so the daemon drops a session that stops answering. On modern OpenSSH (8.2 and later) a ClientAliveCountMax of 0 disables connection termination entirely, so the count must be at least one; a host with a good interval but a count of 0 never times a session out. A stock host sets ClientAliveInterval to 0 (no keepalive) and so fails. This judges the interval and the count separately because the clause grammar has no product operator; the effective idle limit is their product, and treating the interval alone as the timeout is a policy equivalence, not a fact. The shell-environment TMOUT half of this item is added in a later plan; today only the SSH mechanism is judged, so the control applies only where sshd is installed.
-description_ko: sshd가 유휴 연결을 끊어야 합니다 - ClientAliveInterval 을 1초 이상 파라미터 이하로 두고 ClientAliveCountMax 를 1 이상 파라미터 이하로 두어, 응답이 없는 세션을 데몬이 끊게 합니다. 최신 OpenSSH(8.2 이상)에서는 ClientAliveCountMax 가 0 이면 연결 종료 자체가 비활성화되므로 횟수는 최소 1 이어야 합니다. 간격이 적절해도 횟수가 0 이면 세션이 결코 만료되지 않습니다. 기본 설치는 ClientAliveInterval 이 0(keepalive 없음)이라 실패합니다. 절 문법에 곱 연산자가 없어 간격과 횟수를 따로 판정하며, 실제 유휴 한도는 둘의 곱입니다. 간격만으로 세션 종료 시간을 보는 것은 사실이 아니라 정책적 등가입니다. 이 항목의 셸 환경 TMOUT 절반은 이후 플랜에서 추가되며, 지금은 SSH 방식만 판정하므로 sshd 가 설치된 곳에만 적용됩니다.
+description_en: An idle session must be disconnected, by whichever of two mechanisms the host uses. Over SSH, ClientAliveInterval set to between one second and the parameter and ClientAliveCountMax between one and the parameter make sshd drop a session that stops answering; on modern OpenSSH (8.2 and later) a ClientAliveCountMax of 0 disables connection termination entirely, so the count must be at least one, and a host with a good interval but a count of 0 never times a session out. A stock host sets ClientAliveInterval to 0 (no keepalive) and so fails. This judges the interval and the count separately because the clause grammar has no product operator; the effective idle limit is their product, and treating the interval alone as the timeout is a policy equivalence, not a fact. Where no ClientAliveInterval is set, an interactive shell TMOUT that is set to at least one second, at most the parameter, and exported so child login shells inherit it, counts as the timeout instead; a TMOUT that is set but not exported does not reach a login shell and so does not count. A host with neither mechanism configured fails. Under parse-fallback collection - a config with ClientAliveInterval set but no ClientAliveCountMax line - muster judges the parsed config rather than the daemon's documented default count, so this item can FAIL where the running daemon would in fact PASS; the real fix (having the sshd collector report the documented default for an absent-but-defaulted directive) is a known parse-fallback limitation parked to a follow-up, not resolved here.
+description_ko: 유휴 세션은 두 방식 중 호스트가 쓰는 쪽으로 끊겨야 합니다. SSH 쪽은 ClientAliveInterval 을 1초 이상 파라미터 이하로, ClientAliveCountMax 를 1 이상 파라미터 이하로 두어 응답이 없는 세션을 sshd 가 끊게 합니다. 최신 OpenSSH(8.2 이상)에서는 ClientAliveCountMax 가 0 이면 연결 종료 자체가 비활성화되므로 횟수는 최소 1 이어야 하며, 간격이 적절해도 횟수가 0 이면 세션이 결코 만료되지 않습니다. 기본 설치는 ClientAliveInterval 이 0(keepalive 없음)이라 실패합니다. 절 문법에 곱 연산자가 없어 간격과 횟수를 따로 판정하며, 실제 유휴 한도는 둘의 곱입니다. 간격만으로 세션 종료 시간을 보는 것은 사실이 아니라 정책적 등가입니다. ClientAliveInterval 이 설정되어 있지 않으면, 대신 대화형 셸의 TMOUT 이 1초 이상 파라미터 이하로 설정되고 자식 로그인 셸이 물려받도록 export 되어 있으면 세션 종료로 인정합니다. TMOUT 이 설정되어도 export 되지 않으면 로그인 셸에 전달되지 않으므로 인정하지 않습니다. 두 방식 모두 설정되어 있지 않은 호스트는 실패합니다. parse-fallback 수집 하에서 - ClientAliveInterval 은 설정되어 있지만 ClientAliveCountMax 줄이 없는 설정 - muster 는 데몬의 문서화된 기본값이 아니라 파싱한 설정을 판정하므로, 실제로 구동 중인 데몬은 PASS 할 상황에서도 이 항목이 FAIL 할 수 있습니다. 이는 알려진 parse-fallback 한계이며, 실제 해결(설정되지 않았지만 기본값이 있는 지시자에 대해 sshd 수집기가 문서화된 기본값을 보고하게 하는 것)은 후속 플랜으로 미룹니다.
 category: account
 importance: 하
 automation: auto
@@ -14,14 +14,16 @@ references:
     - { benchmark: ubuntu2204, version: V2R9, id: UBTU-22-255035 }
     - { benchmark: ubuntu2404, version: V1R6, id: UBTU-24-600010 }
     - { benchmark: rhel9, version: V2R9, id: RHEL-09-255100 }
+    - { benchmark: ubuntu2204, version: V2R9, id: UBTU-22-412030 }
+    - { benchmark: ubuntu2404, version: V1R6, id: UBTU-24-200060 }
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-412035 }
   nist_800_53: ["SC-10"]
 requires_facts: ">=1"
-applies_when:
-  - { fact: services.ssh.installed, op: eq, expected: true }
 absent_means: fail
 params:
   max_interval: { type: int, default: 300, description: The largest ClientAliveInterval in seconds that counts as a session timeout }
   max_count: { type: int, default: 3, description: The largest ClientAliveCountMax that counts as a session timeout }
+  max_idle: { type: int, default: 600, description: The largest shell TMOUT in seconds that counts as a session timeout }
 mechanisms:
   - when:
       - { fact: sshd.options.client_alive_interval, on: effective, op: gte, expected: 1 }
@@ -29,6 +31,11 @@ mechanisms:
       - { fact: sshd.options.client_alive_interval, on: effective, op: lte, expected: "${max_interval}" }
       - { fact: sshd.options.client_alive_count_max, on: effective, op: gte, expected: 1 }
       - { fact: sshd.options.client_alive_count_max, on: effective, op: lte, expected: "${max_count}" }
+  - when:
+      - { fact: env.shell.tmout, op: gte, expected: 1 }
+    checks:
+      - { fact: env.shell.tmout, op: lte, expected: "${max_idle}" }
+      - { fact: env.shell.tmout_exported, op: eq, expected: true }
 remediation:
   text_en: Set ClientAliveInterval 300 and ClientAliveCountMax 1 in a file under /etc/ssh/sshd_config.d/, validate with sshd -t, then restart sshd.
   text_ko: /etc/ssh/sshd_config.d/ 아래 파일에 ClientAliveInterval 300 과 ClientAliveCountMax 1 을 설정하고 sshd -t 로 검증한 뒤 sshd 를 재시작합니다.
