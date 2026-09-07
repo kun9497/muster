@@ -75,11 +75,11 @@ Not built here: the shell-environment TMOUT half of U-12 (2E); `ClientAliveInter
 - Create fixtures under `internal/collect/collectors/testdata/`: `sshd_G.txt`, `sshd_T_full.txt`, `sshd_T_C_root.txt`, `sshd_T_C_user.txt`, `sshd_T_C_invalid.txt`, `sshd_V.txt`, `sshd_config_banners`, `sshd_config_with_include` (already covered by `sshd_config` + drop-in; add a two-Include file), `issue_for_sshd`
 
 **Interfaces:**
-- Consumes: `collect.Access` (`Run`, `ReadFile`, `Stat`, `Glob`, `Allowed`), `collect.Builder` (`Set`, `SetSetting`, `Worst`), `collect.Command`, `facts.Setting` (now with `Personas`, from T2 — but T1 writes it, so T1 adds the field if T2 has not landed; see the ruling below), `facts.Source`, the existing helpers `configTokens`, `keywordValue`, `multistate`, `oversized`, `declared`, `splitLines`, `sourceRaw`, `commandFailure`, `withTruncation`, `collect.OK`, `collect.OKRead`, `collect.Absent`, `collect.ErrorEnv`, `collect.FromReadError`, `collect.TimeoutEnv`.
+- Consumes: `collect.Access` (`Run`, `ReadFile`, `Stat`, `Glob`, `Allowed`), `collect.Builder` (`Set`, `SetSetting`, `Worst`), `collect.Command`, `facts.Setting` (now with `Personas`, from T2 — but T1 writes it, so T1 adds the field if T2 has not landed; see the ruling below), `facts.Source`, the existing helpers `configTokens`, `keywordValue`, `multistate`, `oversized`, `declared`, `splitLines`, `withTruncation`, `collect.OK`, `collect.OKRead`, `collect.Absent`, `collect.ErrorEnv`, `collect.FromReadError`. (The rewritten `runSshd` no longer calls `commandFailure`, `collect.Denied` or `collect.TimeoutEnv` — they remain used by other collectors.)
 - Produces:
   - `runSshd(ctx, a, b) error` — the collector entry, unchanged signature.
-  - `sshdCollector` with `Declare.Commands` = `sshdG`, `sshdT`, `sshdV`, `sshdCRoot`, `sshdCUser`, `sshdCInvalid` and `Declare.Reads` unchanged plus nothing new (the Banner file is stat'd, not read, and is a discovered path — see the declaration ruling).
-  - `parseSshdConfig(a, file, keyword, depth) (facts.Envelope, bool)` — unchanged signature, but the collector now also collects include sources via a new `collectIncludeSources(a, file, depth, seen) []map[string]any`.
+  - `sshdCollector` with `Declare.Commands` = `sshdG`, `sshdT`, `sshdV`, `sshdCRoot`, `sshdCUser`, `sshdCInvalid` and `Declare.Reads` = the two config paths **plus `/etc/issue.net` and `/etc/issue`** (R168), so the guard's `Allowed` lets `writeBannerFile` stat the file a stock `Banner` names; any other `Banner` path is refused and recorded.
+  - `parseSshdConfig(a, file, keyword, depth) (facts.Envelope, bool)` — unchanged signature, but the collector now also collects include sources via a new `collectIncludeSources(a, file) facts.Envelope` (with an inner `walk` closure carrying depth).
   - `sshdOption` table driving `MaxAuthTries`, `ClientAliveInterval`, `ClientAliveCountMax`, `Banner`, `PermitRootLogin`.
 
 **Ruling carried into this task (state it in the report):** `facts.Setting` gains a `Personas map[string]*Envelope` field. T2 owns the evaluator half, but the collector writes the field, so if T1 lands first it adds the field to `internal/facts/envelope.go` with the `json:"personas,omitempty"` tag and a one-line doc; T2 then only adds the reader. Either order compiles because the field is additive and `omitempty` keeps every existing golden and fixture byte-identical when the map is nil.
@@ -135,6 +135,15 @@ Expected: FAIL — `sshd.version` not present, method is not `G`.
 Replace the command/collector block and `runSshd` in `sshd.go`. Keep every existing helper (`parseSshdConfig`, `configTokens`, `keywordValue`, `multistate`, `oversized`, `declared`, `oversizedReason`, the constants) unchanged except as noted.
 
 ```go
+// R168: the conventional banner paths live here (T1 lands before the banners
+// collector), so the sshd guard can allow the Banner-file stat. T3's
+// banners.go reuses these two constants and defines only motdPath/motdDGlob;
+// it must NOT redeclare issuePath/issueNetPath (one package, one definition).
+const (
+	issuePath    = "/etc/issue"
+	issueNetPath = "/etc/issue.net"
+)
+
 var (
 	sshdG       = collect.Command{Path: "/usr/sbin/sshd", Args: []string{"-G"}}
 	sshdT       = collect.Command{Path: "/usr/sbin/sshd", Args: []string{"-T"}}
@@ -167,7 +176,10 @@ var personaOrder = []struct {
 var sshdCollector = collect.Collector{
 	Name: "sshd",
 	Declare: collect.Declaration{
-		Reads:    []string{sshdConfigPath, sshdConfigDir},
+		// R168: /etc/issue and /etc/issue.net are declared so the guard's
+		// Allowed lets writeBannerFile stat the file a stock Banner names;
+		// any other Banner path is refused and recorded (see writeBannerFile).
+		Reads:    []string{sshdConfigPath, sshdConfigDir, issueNetPath, issuePath},
 		Commands: []collect.Command{sshdG, sshdT, sshdV, sshdCRoot, sshdCUser, sshdCInvalid},
 		Needs:    "root",
 	},
@@ -368,6 +380,16 @@ func sshdSetting(o sshdOption, daemon map[string]string, dsrc *facts.Source, dtr
 	}
 	if parsed.Status != "" {
 		p := parsed
+		// R165: parseSshdConfig returns a string for every non-multistate
+		// keyword. A numeric option's persisted (and, on fallback, effective)
+		// side must be an int envelope, or compare()->toInt gives
+		// ERROR(internal_error). Re-wrap through the int branch, keeping the
+		// file source; an unparseable file value becomes an error side.
+		if o.numeric && p.Status == facts.StatusOK {
+			if str, ok := p.Value.(string); ok {
+				p = optionEnvelope(o, str, p.Source)
+			}
+		}
 		s.Persisted = &p
 	}
 	switch {
@@ -455,7 +477,7 @@ func writeBannerFile(a collect.Access, b *collect.Builder, p string) {
 }
 ```
 
-**Declaration ruling (state it in the report):** the `Banner` file is a *discovered* path, so it is not in `Declare.Reads` (which lists fixed candidate paths). The guard refuses an undeclared `ReadFile`. Follow the precedent the Include expansion already sets: `writeBannerFile` reads through `a` only after `declared(a, p)` says the path is inside the declaration, and records a definite `false`/error when it is not — a Banner pointing at `/root/secret` is recorded as "outside the collector's declaration", never read. Add to `Declare.Reads` the conventional banner locations so the ordinary case is allowed: `"/etc/issue.net"`, `"/etc/issue"`, `"/etc/ssh/*"` is too broad — instead declare `"/etc/issue.net"` and `"/etc/issue"` (the paths a stock `Banner` names) and treat any other path as undeclared-but-recorded. Implement the guard check inside `writeBannerFile`:
+**Declaration ruling (R168; state it in the report):** the `Banner` file is a *discovered* path. `Declare.Reads` therefore lists the two conventional banner locations `/etc/issue.net` and `/etc/issue` (added to the collector block above), so the guard's `Allowed` permits the ordinary case; any other `Banner` path is undeclared-but-recorded. Follow the precedent the Include expansion already sets: `writeBannerFile` reads through `a` only after `declared(a, p)` says the path is inside the declaration, and records a definite error when it is not — a Banner pointing at `/root/secret` is recorded as "outside the collector's declaration", never read. Implement the guard check inside `writeBannerFile`:
 
 ```go
 	if !declared(a, p) {
@@ -652,6 +674,14 @@ func TestSshdParseFallbackFillsEveryOption(t *testing.T) {
 	if s := setting(t, b, "sshd.options.banner"); s.Effective.Value != "/etc/issue.net" {
 		t.Errorf("banner from parse %+v", s.Effective)
 	}
+	// R165: a numeric option parsed from the files must be an int on the
+	// effective side, never the string parseSshdConfig returns, or a clause
+	// on it ERRORs. This is the assertion that catches the setting<int>
+	// parsed-side bug the daemon path (int already) hides.
+	ci := setting(t, b, "sshd.options.client_alive_interval")
+	if n, ok := ci.Effective.Value.(int); !ok || n != 300 {
+		t.Errorf("client_alive_interval effective %#v, want int 300", ci.Effective.Value)
+	}
 	if v := env(t, b, "sshd.version"); v.Status != facts.StatusAbsent {
 		t.Errorf("version %+v, want absent", v)
 	}
@@ -708,7 +738,9 @@ Fixtures to create:
 - [ ] **Step 7: Update the existing sshd tests for the new shape**
 
 The stage-1 tests (`TestSshdRuntimeAndPersistedWithInclude`, `TestSshdFallsBackToParseWhenTUnavailable`, `TestSshdNonZeroExitIsAnAbsentRuntimeSide`, `TestSshdPermissionDeniedIsDeniedAndCopiedToEffective`, `TestSshdIncludeOutsideDeclarationIsRecordedNotViolated`, `TestSshdUnreadableDropInIsNeverSkipped`, `TestSshdMissingDropInStillFallsThroughToTheMainFile`, the equals/separator and oversized tests, `TestSshdCollectMethod*`, `TestSshdMarksTruncatedCommandOutput`) still describe `permit_root_login`, which the option table keeps. Two behaviours changed and their tests must be updated, not deleted:
-  - `TestSshdNonZeroExitIsAnAbsentRuntimeSide` and `TestSshdPermissionDeniedIsDeniedAndCopiedToEffective` asserted the stage-1 behaviour that a non-zero/denied `-T` produced a `Runtime` envelope with status absent/denied. Under the ladder a non-zero `-T` (after a non-zero `-G`) drops to parse, so `permit_root_login` has **no** runtime side and the method is `parse`. Rewrite these two to assert: method `parse`; `Runtime == nil`; effective copied from the parsed file (absent case) or the persisted denied envelope (denied case). Add `sshd -V` and `sshd -G` canned outcomes to their `fsAccess`. Keep the R84 privilege intent: when `-T` is denied and the file is denied too, effective is denied and its reason is preserved.
+  - **R169:** the ladder accepts parse-fallback on any non-zero/denied daemon exit — a readable config answering is better for non-root collection than stage 1's `denied`. Rewrite the two stage-1 tests accordingly:
+    - `TestSshdNonZeroExitIsAnAbsentRuntimeSide` → the config is readable, so a non-zero `-T` (after a non-zero `-G`) drops to parse: assert method `parse`, `Runtime == nil`, effective = the parsed ok value. Add `sshd -V` and `sshd -G` canned outcomes to its `fsAccess`.
+    - `TestSshdPermissionDeniedIsDeniedAndCopiedToEffective` → to still prove the denied path, set **both** the `-T` exit denied **and** `/etc/ssh/sshd_config` denied (in the `fails` map): the daemon rung falls through, the parsed side is `denied`, so persisted is denied and effective copies it unchanged with its reason. Assert method `parse`, `Runtime == nil`, `Persisted.Status == denied`, `Effective.Status == denied`, `Effective.Reason == Persisted.Reason`.
   - `TestSshdCollectMethodCitesACommandThatRanAndFailed` — the method now cites the LAST command that ran and failed before parse (the `-T` exit), which is still `dsrc`. Adjust the expected command string if needed.
 
 Run each rewritten test in isolation to confirm it fails against the OLD assertion and passes against the new behaviour (delete-the-assertion check per CLAUDE.md).
@@ -884,7 +916,7 @@ In `internal/facts/envelope.go`, inside `type Setting struct`:
 
 - [ ] **Step 4: Select the persona value in `evalSetting`**
 
-In `internal/check/clause.go`, `evalSetting`, replace the existing persona-degradation block:
+In `internal/check/clause.go`, `evalSetting`: the current persona-degradation block
 
 ```go
 	var degraded string
@@ -893,7 +925,7 @@ In `internal/check/clause.go`, `evalSetting`, replace the existing persona-degra
 	}
 ```
 
-with a selection that also picks the override envelope when it exists:
+sits **above** the `side` closure. The new block **calls** `side`, so it cannot go there. **R167: delete the block above, and insert the block below immediately after the `side` closure is defined and before `switch on {`** — it re-declares `var degraded string`, so `degraded` is still in scope for the switch's `Degraded: degraded`:
 
 ```go
 	var degraded string
@@ -1021,11 +1053,11 @@ import (
 	"github.com/kun9497/muster/internal/facts"
 )
 
+// issuePath and issueNetPath are defined in sshd.go (R168) and reused here;
+// do NOT redeclare them (one package, one definition).
 const (
-	issuePath    = "/etc/issue"
-	issueNetPath = "/etc/issue.net"
-	motdPath     = "/etc/motd"
-	motdDGlob    = "/etc/update-motd.d/*"
+	motdPath  = "/etc/motd"
+	motdDGlob = "/etc/update-motd.d/*"
 )
 
 var bannersCollector = collect.Collector{
@@ -1293,7 +1325,10 @@ Add to `controls/testdata/muster.account.root_remote_login/`:
       "personas":{"root":{"status":"ok","value":"yes","source":{"kind":"command","cmd":"/usr/sbin/sshd -T -C user=root,host=localhost,addr=127.0.0.1,lport=22"}}}}}}}}
 ```
 
-The existing `warn-global-only.json` (personas false → WARN) and `pass-personas.json`, `fail-yes.json`, `fail-securetty-pts.json`, `pass-securetty-fallback.json`, `na-no-ssh.json`, `error-denied.json`, `manual-nothing-readable.json` stay. Note: `fail-securetty-pts.json` and `pass-securetty-fallback.json` exercise the securetty mechanism — they must now also carry `pam.securetty_enabled` ok true (so the gated mechanism is chosen) and have `sshd.options.permit_root_login` **absent** (so mechanism 1 is skipped and mechanism 2 is reached). Update those two fixtures accordingly; if either currently relies on mechanism 2 being chosen without a PAM gate, add `"pam":{"securetty_enabled":{"status":"ok","value":true}}` to its facts.
+The existing `warn-global-only.json` (personas false → WARN), `pass-personas.json`, `fail-yes.json`, `na-no-ssh.json` and `error-denied.json` stay unchanged. **R166 — every U-01 fixture that reaches mechanism 2 (i.e. `sshd.options.permit_root_login.effective` is absent, so mechanism 1 is skipped) MUST now carry `pam.securetty_enabled`, or the gated `when` resolves a missing key and the control becomes `ERROR(missing_fact)`.** Three fixtures reach mechanism 2 and must be edited (this is mandatory, not conditional — all three have an absent `permit_root_login`, verified in the pre-flight scan):
+  - `fail-securetty-pts.json` — add `"pam":{"securetty_enabled":{"status":"ok","value":true}}` (mechanism 2 chosen; its pts/ clause fails → FAIL, unchanged verdict).
+  - `pass-securetty-fallback.json` — add `"pam":{"securetty_enabled":{"status":"ok","value":true}}` (mechanism 2 chosen; clause holds → PASS, unchanged verdict).
+  - `manual-nothing-readable.json` — add `"pam":{"securetty_enabled":{"status":"ok","value":false}}` (mechanism 2's `when` fails cleanly → no mechanism applies → `absent_means: manual` → MANUAL, unchanged verdict). Without this leaf it would flip from MANUAL to ERROR.
 
 - [ ] **Step 3: Write U-12 (`controls/account/session_timeout.yaml`)**
 
