@@ -962,6 +962,36 @@
       "SubjectKind": ""
     },
     {
+      "Key": "pam.stacks",
+      "Type": "list\u003crecord\u003e",
+      "Description": "The expanded PAM stacks of login, sshd, su, sudo, passwd and other (those whose /etc/pam.d file exists) - service, type, control, module, args, path, line - with @include, include and substack spliced where they stand and authselect's symlinks resolved by name into /etc/authselect, never by following the link. Backslash line continuation, a",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pam",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "pam.managing_layer",
+      "Type": "string",
+      "Description": "How the stacks are generated - authselect (a managed file is a symlink into /etc/authselect), pam-auth-update (the marker in common-auth) or manual.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pam",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "pam.parse_complete",
+      "Type": "bool",
+      "Description": "Whether every include of every published service was read; a false names the first unreadable, missing, undeclared, looping or too-deep include in its reason, and every derived pam.* value then carries error instead of a number.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pam",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
       "Key": "env.container",
       "Type": "string",
       "Description": "Container runtime detected from filesystem markers (none, docker, podman, lxc, other); the same value the run header carries.",

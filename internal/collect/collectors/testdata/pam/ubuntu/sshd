@@ -1,0 +1,6 @@
+@include common-auth
+account    required     pam_nologin.so
+@include common-account
+session    required     pam_loginuid.so
+@include common-session
+@include common-password

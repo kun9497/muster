@@ -483,6 +483,24 @@ keys:
     since: 1
     sensitivity: public
     collector: accounts
+  - key: pam.stacks
+    type: list<record>
+    description: The expanded PAM stacks of login, sshd, su, sudo, passwd and other (those whose /etc/pam.d file exists) - service, type, control, module, args, path, line - with @include, include and substack spliced where they stand and authselect's symlinks resolved by name into /etc/authselect, never by following the link. Backslash line continuation, a # that starts a later token, and a pam.conf-only host are not handled.
+    since: 1
+    sensitivity: public
+    collector: pam
+  - key: pam.managing_layer
+    type: string
+    description: How the stacks are generated - authselect (a managed file is a symlink into /etc/authselect), pam-auth-update (the marker in common-auth) or manual.
+    since: 1
+    sensitivity: public
+    collector: pam
+  - key: pam.parse_complete
+    type: bool
+    description: Whether every include of every published service was read; a false names the first unreadable, missing, undeclared, looping or too-deep include in its reason, and every derived pam.* value then carries error instead of a number.
+    since: 1
+    sensitivity: public
+    collector: pam
   - key: env.container
     type: string
     description: Container runtime detected from filesystem markers (none, docker, podman, lxc, other); the same value the run header carries.

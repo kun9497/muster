@@ -1,0 +1,4 @@
+# managed by pam-auth-update (synthetic fixture for plan 2C)
+auth	[success=1 default=ignore]	pam_unix.so nullok
+auth	requisite			pam_deny.so
+auth	required			pam_permit.so
