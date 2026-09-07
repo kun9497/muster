@@ -4,6 +4,8 @@ package collectors
 
 import (
 	"context"
+	"errors"
+	"io/fs"
 	"strconv"
 	"strings"
 
@@ -308,7 +310,14 @@ func runAccounts(_ context.Context, a collect.Access, b *collect.Builder) error 
 	for _, r := range rows {
 		byName[r.name] = r
 	}
-	users := deriveUsers(prows, byName, serr == nil, defs.intOr("UID_MIN", 1000), shells)
+	// R138: a missing /etc/shadow (ENOENT) is a known state, not an unread
+	// one -- byName stays empty (rows was never populated when serr != nil),
+	// so every row falls through deriveUsers' noShadowRow path (R132) and
+	// carries password_status "noshadow" instead of no shadow fields at
+	// all. A denied or otherwise unreadable shadow is genuinely unread:
+	// haveShadow stays false and rows keep no shadow-derived fields.
+	haveShadow := serr == nil || errors.Is(serr, fs.ErrNotExist)
+	users := deriveUsers(prows, byName, haveShadow, defs.intOr("UID_MIN", 1000), shells)
 	// A record joins two files, so it is partial when either read was cut
 	// short: a truncated /etc/shadow leaves rows whose password_status was
 	// derived from a shadow this process never saw the end of (R131).

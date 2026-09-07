@@ -1,1 +1,1 @@
-{"synthetic": true, "schema_version":1,"run":{},"facts":{"accounts":{"orphan_gids":{"status":"denied","reason":"/etc/group: needs root"}}}}
+{"synthetic": true, "_expect":{"reason_code":"permission_denied"},"schema_version":1,"run":{},"facts":{"accounts":{"orphan_gids":{"status":"denied","reason":"/etc/group: needs root"}}}}

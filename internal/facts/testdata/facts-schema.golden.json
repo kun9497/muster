@@ -864,7 +864,7 @@
     {
       "Key": "accounts.users",
       "Type": "list\u003crecord\u003e",
-      "Description": "Local accounts in /etc/passwd order with name, uid, gid, home, shell, system (0 \u003c uid \u003c UID_MIN, where UID_MIN is login.defs' value or 1000 when it is unset or unreadable; nobody is not a system account), shadowed (passwd field is x), uid_duplicate, name_duplicate, shell_valid (shell listed in /etc/shells) and, when /etc/shadow was read, password_status (hashed | locked | nopass | noshadow), locked, hash_algo (\"$6$\"-style id, \"legacy\" for a hash without one, \"\" when there is no hash) and the ageing fields; no hashes. Ageing fields are -1 when the shadow field is empty, and uid/gid are -1 when the passwd field is unparsable.",
+      "Description": "Local accounts in /etc/passwd order with name, uid, gid, home, shell, system (0 \u003c uid \u003c UID_MIN, where UID_MIN is login.defs' value or 1000 when it is unset or unreadable; nobody is not a system account), shadowed (passwd field is x), uid_duplicate, name_duplicate, shell_valid (shell listed in /etc/shells) and, when /etc/shadow was read or does not exist, password_status (hashed | locked | nopass | noshadow), locked, hash_algo (\"$6$\"-style id, \"legacy\" for a hash without one, \"\" when there is no hash) and the ageing fields; no hashes. Ageing fields are -1 when the shadow field is empty, and uid/gid are -1 when the passwd field is unparsable.",
       "Since": 1,
       "Sensitivity": "internal",
       "Collector": "accounts",

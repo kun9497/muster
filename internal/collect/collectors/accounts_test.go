@@ -245,6 +245,34 @@ func TestAccountsPasswdRowWithoutShadowRowIsNoshadow(t *testing.T) {
 	}
 }
 
+// R138. A missing /etc/shadow (ENOENT) is a known state, not an unread one:
+// every row must still carry password_status "noshadow" the same way a
+// passwd row with no matching shadow row does (R132), rather than no shadow
+// fields at all, and accounts.shadow_in_use stays ok/false (never denied).
+func TestAccountsMissingShadowMarksEveryRowNoshadow(t *testing.T) {
+	a := accounts2B()
+	delete(a.files, "/etc/shadow")
+	b := build(t, "accounts", a)
+	users := okList(t, b, "accounts.users")
+	if len(users) == 0 {
+		t.Fatal("no users")
+	}
+	for _, u := range users {
+		m := u.(map[string]any)
+		if m["password_status"] != "noshadow" || m["locked"] != false || m["hash_algo"] != "" {
+			t.Errorf("%v", m)
+		}
+		for _, f := range [...]string{"last_change", "min", "max", "warn", "inactive", "expire"} {
+			if m[f] != -1 {
+				t.Errorf("%s %s = %v, want -1 (no shadow at all sets no policy)", m["name"], f, m[f])
+			}
+		}
+	}
+	if e := env(t, b, "accounts.shadow_in_use"); e.Status != facts.StatusOK || e.Value != false {
+		t.Errorf("accounts.shadow_in_use %+v, want ok/false", e)
+	}
+}
+
 // R131. Truncation crosses the join: a shadow read that hit the cap makes
 // accounts.users partial too, because the record carries shadow-derived
 // fields. A fact built from a file that was read whole stays whole.
