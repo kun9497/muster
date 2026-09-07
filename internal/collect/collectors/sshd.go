@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io/fs"
 	"path"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -30,110 +31,433 @@ const (
 	maxTokenValue = 4 << 10
 )
 
-var sshdT = collect.Command{Path: "/usr/sbin/sshd", Args: []string{"-T"}}
+// R168: the conventional banner paths live here (T1 lands before the banners
+// collector), so the sshd guard can allow the Banner-file stat. T3's
+// banners.go reuses these two constants and defines only motdPath/motdDGlob;
+// it must NOT redeclare issuePath/issueNetPath (one package, one definition).
+const (
+	issuePath    = "/etc/issue"
+	issueNetPath = "/etc/issue.net"
+)
+
+var (
+	sshdG        = collect.Command{Path: "/usr/sbin/sshd", Args: []string{"-G"}}
+	sshdT        = collect.Command{Path: "/usr/sbin/sshd", Args: []string{"-T"}}
+	sshdV        = collect.Command{Path: "/usr/sbin/sshd", Args: []string{"-V"}}
+	sshdCRoot    = personaCmd("root")
+	sshdCUser    = personaCmd("nobody")
+	sshdCInvalid = personaCmd("muster-nx-user")
+)
+
+// personaCmd builds `sshd -T -C user=<u>,host=localhost,addr=127.0.0.1,lport=22`.
+// The full tuple is given because some OpenSSH versions refuse a connection
+// spec that names only a user; the lab's 8.9 accepts either, and the extra
+// fields never change a Match that keys on the user.
+func personaCmd(user string) collect.Command {
+	return collect.Command{Path: "/usr/sbin/sshd", Args: []string{"-T", "-C",
+		"user=" + user + ",host=localhost,addr=127.0.0.1,lport=22"}}
+}
+
+// personaOrder is the fixed order personas are queried and recorded in, so a
+// snapshot is byte-stable. The names are the clause vocabulary (spec §6.6).
+var personaOrder = []struct {
+	name string
+	cmd  collect.Command
+}{
+	{"root", sshdCRoot},
+	{"user", sshdCUser},
+	{"invalid", sshdCInvalid},
+}
 
 var sshdCollector = collect.Collector{
 	Name: "sshd",
 	Declare: collect.Declaration{
-		Reads:    []string{sshdConfigPath, sshdConfigDir},
-		Commands: []collect.Command{sshdT},
+		// R168: /etc/issue and /etc/issue.net are declared so the guard's
+		// Allowed lets writeBannerFile stat the file a stock Banner names;
+		// any other Banner path is refused and recorded (see writeBannerFile).
+		Reads:    []string{sshdConfigPath, sshdConfigDir, issueNetPath, issuePath},
+		Commands: []collect.Command{sshdG, sshdT, sshdV, sshdCRoot, sshdCUser, sshdCInvalid},
 		Needs:    "root",
 	},
 	Run: runSshd,
 }
 
-// runSshd fills sshd.* (spec §10.2). Stage 1 reports the daemon's global
-// values only: sshd -T for the runtime side, the configuration files with
-// Include expanded for the persisted side, and no Match personas at all.
-func runSshd(ctx context.Context, a collect.Access, b *collect.Builder) error {
-	b.Set("sshd.personas_collected", collect.OK(false, nil))
+// sshdOption names one option muster stores and how its parsed value is
+// folded. `numeric` marks an int-typed setting; the rest are folded strings
+// (a multistate value case-insensitively, a path or command line verbatim).
+type sshdOption struct {
+	keyword string // lower-case sshd keyword
+	key     string // registry key under sshd.options
+	numeric bool
+}
 
-	var s facts.Setting
-	out := a.Run(ctx, sshdT)
-	src := out.Source(sshdT)
-	method := "parse"
-	switch {
-	case out.TimedOut:
-		e := collect.TimeoutEnv("sshd -T timed out")
-		e.Source = src
-		e = withTruncation(e, out.Truncated)
-		s.Runtime = &e
-	case out.Err != nil:
-		// The binary is not there, or not where it is declared: there is
-		// no runtime side at all and the files have to answer.
-	case out.ExitCode != 0:
-		// R59: a daemon that refused to print its configuration is an
-		// error (denied when it said so), never a missing value.
-		// R84: sshd declares Needs: root, so a -T that failed while this
-		// process is not root is a privilege problem, not a parse error.
-		e := commandFailure("sshd -T", out, src, true)
-		if e.Status == facts.StatusError {
-			// R88 (spec §6.5 step 13): sshd -T can fail for reasons that
-			// are not a parse error at all — most commonly a socket-
-			// activated or freshly installed sshd that has never created
-			// /run/sshd ("Missing privilege separation directory"). The
-			// parsed sshd_config still answers the question, so this is
-			// the same degradation as -T never having run: absent, not
-			// error, and the run stays complete. A privilege failure
-			// (Denied, above) is unchanged by this — R84 still applies.
-			e.Status = facts.StatusAbsent
-			e.Reason = "sshd -T unavailable: " + e.Reason
+var sshdOptions = []sshdOption{
+	{permitRootLogin, "sshd.options.permit_root_login", false},
+	{"maxauthtries", "sshd.options.max_auth_tries", true},
+	{"clientaliveinterval", "sshd.options.client_alive_interval", true},
+	{"clientalivecountmax", "sshd.options.client_alive_count_max", true},
+	{"banner", "sshd.options.banner", false},
+}
+
+// runSshd fills sshd.* (spec §10.2) by the method ladder: sshd -G, then
+// sshd -T, then parsing the files. When the daemon answered, three -T -C
+// persona queries record per-persona (Match) overrides, and the file
+// sshd's Banner names is stat'd (C1).
+func runSshd(ctx context.Context, a collect.Access, b *collect.Builder) error {
+	// 1. The daemon side, by the method ladder: -G, then -T. Each returns a
+	//    parsed map of keyword -> value and the command's source, or nil when
+	//    that rung did not answer.
+	daemon, method, dsrc, dtrunc := sshdDaemon(ctx, a)
+	b.Set("sshd.version", sshdVersion(ctx, a))
+
+	// 2. The parsed side and the include sources, always (they are the
+	//    persisted side and they answer when the daemon does not).
+	parsed := map[string]facts.Envelope{}
+	for _, o := range sshdOptions {
+		if env, found := parseSshdConfig(a, sshdConfigPath, o.keyword, 0); found {
+			parsed[o.keyword] = env
 		}
-		s.Runtime = &e
-	default:
-		method = "T" // R59: the method records whether -T answered
-		e := collect.ErrorEnv("sshd -T printed no " + permitRootLogin + " line")
-		for _, line := range splitLines(out.Stdout) {
-			f := configTokens(line)
-			if len(f) >= 2 && strings.ToLower(f[0]) == permitRootLogin {
-				if oversized(f[1]) {
-					e = collect.ErrorEnv(oversizedReason)
-					break
+	}
+	b.Set("sshd.include_sources", collectIncludeSources(a, sshdConfigPath))
+
+	// 3. Personas: only when the daemon answered (a parse cannot re-evaluate
+	//    Match). All three must succeed, or the flag stays false.
+	personas, personasOK := sshdPersonas(ctx, a, method)
+	b.Set("sshd.personas_collected", collect.OK(personasOK, dsrc))
+	b.Set("sshd.collect_method", withTruncation(collect.OK(method, methodSource(method, dsrc)), dtrunc))
+
+	// 4. Assemble each option as a setting with its per-persona overrides.
+	for _, o := range sshdOptions {
+		s := sshdSetting(o, daemon, dsrc, dtrunc, method, parsed[o.keyword])
+		if personasOK {
+			for _, p := range personaOrder {
+				if pv, ok := personas[p.name][o.keyword]; ok && daemon != nil {
+					if global, gok := daemon[o.keyword]; !gok || pv != global {
+						if s.Personas == nil {
+							s.Personas = map[string]*facts.Envelope{}
+						}
+						e := optionEnvelope(o, pv, personaSource(p.cmd))
+						s.Personas[p.name] = &e
+					}
 				}
-				e = collect.OK(keywordValue(permitRootLogin, f[1]), src)
-				break
 			}
 		}
-		// R70's command-side counterpart: a value read out of a capture
-		// that hit the output cap is not the daemon's whole answer.
-		e = withTruncation(e, out.Truncated)
-		s.Runtime = &e
-	}
-	// The command is the evidence for "T", and for a "parse" that was
-	// forced by a -T which ran and failed. A binary that never started has
-	// no exit code to cite, so that envelope carries no source at all.
-	methodSrc := src
-	if out.Err != nil && out.ExitCode == -1 {
-		methodSrc = nil
-	}
-	b.Set("sshd.collect_method", withTruncation(collect.OK(method, methodSrc), out.Truncated))
-
-	if persisted, found := parseSshdConfig(a, sshdConfigPath, permitRootLogin, 0); found {
-		s.Persisted = &persisted
+		b.SetSetting(o.key, s)
 	}
 
+	// 5. The Banner file: a discovered path, stat'd by the daemon's own
+	//    collector (C1). "none" is the default and means no pre-auth banner.
+	writeBannerFile(a, b, bannerPath(daemon, parsed))
+	return nil
+}
+
+// sshdDaemon runs the method ladder. It returns the daemon's option map
+// (keyword -> raw value), the method ("G", "T" or "parse"), the source of
+// the command that answered — or, on a fall to parse, the last command that
+// actually ran and failed, and nil when no command ever started (so the
+// method cites the failing exit that forced the fallback, matching the
+// stage-1 rule) — and whether that command's capture was truncated.
+func sshdDaemon(ctx context.Context, a collect.Access) (map[string]string, string, *facts.Source, bool) {
+	var lastSrc *facts.Source
+	for _, rung := range []struct {
+		method string
+		cmd    collect.Command
+	}{{"G", sshdG}, {"T", sshdT}} {
+		out := a.Run(ctx, rung.cmd)
+		src := out.Source(rung.cmd)
+		if out.Err == nil {
+			// The command started (a non-zero exit sets ExitCode, not Err),
+			// so it can be cited as the reason a later "parse" was chosen.
+			lastSrc = src
+		}
+		switch {
+		case out.Err != nil:
+			continue // the binary or that option is not there; try the next rung
+		case out.TimedOut:
+			continue
+		case out.ExitCode != 0:
+			// R84/R88/R169: a privilege failure or a socket-activated -T that
+			// cannot reach /run/sshd is not a value; drop to the next rung
+			// (and finally to parse), where the files answer.
+			continue
+		default:
+			m := parseDaemonDump(out.Stdout)
+			if len(m) == 0 {
+				continue
+			}
+			return m, rung.method, src, out.Truncated
+		}
+	}
+	return nil, "parse", lastSrc, false
+}
+
+// parseDaemonDump reads the `keyword value` lines -G and -T print (lower-case
+// keywords, one directive per line) into a map, keeping only the options
+// muster stores. The first line for a keyword wins, matching sshd's dump.
+func parseDaemonDump(stdout []byte) map[string]string {
+	want := map[string]bool{}
+	for _, o := range sshdOptions {
+		want[o.keyword] = true
+	}
+	m := map[string]string{}
+	for _, line := range splitLines(stdout) {
+		f := configTokens(line)
+		if len(f) < 2 {
+			continue
+		}
+		k := strings.ToLower(f[0])
+		if want[k] {
+			if _, seen := m[k]; !seen {
+				m[k] = f[1]
+			}
+		}
+	}
+	return m
+}
+
+// sshdVersion parses OpenSSH_<major>.<minor> from `sshd -V`. Every OpenSSH
+// prints its banner for -V — newer to stdout with exit 0, 8.9 to stderr as
+// part of the "unknown option" message — so both streams are searched and
+// the exit code is ignored.
+func sshdVersion(ctx context.Context, a collect.Access) facts.Envelope {
+	out := a.Run(ctx, sshdV)
+	src := out.Source(sshdV)
+	if out.Err != nil {
+		return withSource(collect.Absent("sshd -V could not be run: "+runErr(out)), src)
+	}
+	m := versionRe.FindSubmatch(append(append([]byte{}, out.Stdout...), out.Stderr...))
+	if m == nil {
+		return withSource(collect.Absent("no OpenSSH version in sshd -V output"), src)
+	}
+	return withTruncation(collect.OK(string(m[1]), src), out.Truncated)
+}
+
+var versionRe = regexp.MustCompile(`OpenSSH_(\d+\.\d+)`)
+
+// sshdPersonas runs the three -T -C queries when the daemon answered. It
+// returns a persona-name -> (keyword -> value) map and whether ALL three
+// succeeded; a single failure returns ok=false so the flag stays false
+// (a half-collected set would hide a Match block — spec §6.5 step 13).
+func sshdPersonas(ctx context.Context, a collect.Access, method string) (map[string]map[string]string, bool) {
+	if method == "parse" {
+		return nil, false
+	}
+	out := map[string]map[string]string{}
+	for _, p := range personaOrder {
+		r := a.Run(ctx, p.cmd)
+		if r.Err != nil || r.TimedOut || r.ExitCode != 0 {
+			return out, false
+		}
+		m := parseDaemonDump(r.Stdout)
+		if len(m) == 0 {
+			return out, false
+		}
+		out[p.name] = m
+	}
+	return out, true
+}
+
+// sshdSetting builds one option's setting from the daemon map and the parsed
+// envelope, following the effective-side rule (spec §5.3, R59): effective is
+// the daemon value when the daemon answered, else the parsed value marked so
+// the parse-fallback degradation fires, else absent.
+func sshdSetting(o sshdOption, daemon map[string]string, dsrc *facts.Source, dtrunc bool, method string, parsed facts.Envelope) facts.Setting {
+	var s facts.Setting
+	if daemon != nil {
+		if v, ok := daemon[o.keyword]; ok {
+			e := optionEnvelope(o, v, dsrc)
+			e = withTruncation(e, dtrunc)
+			s.Runtime = &e
+		} else {
+			e := collect.Absent(o.keyword + " not in sshd -" + method + " output")
+			e.Source = dsrc
+			s.Runtime = &e
+		}
+	}
+	if parsed.Status != "" {
+		p := parsed
+		// R165: parseSshdConfig returns a string for every non-multistate
+		// keyword. A numeric option's persisted (and, on fallback, effective)
+		// side must be an int envelope, or compare()->toInt gives
+		// ERROR(internal_error). Re-wrap through the int branch, keeping the
+		// file source; an unparseable file value becomes an error side.
+		if o.numeric && p.Status == facts.StatusOK {
+			if str, ok := p.Value.(string); ok {
+				p = optionEnvelope(o, str, p.Source)
+			}
+		}
+		s.Persisted = &p
+	}
 	switch {
 	case s.Runtime != nil && s.Runtime.Status == facts.StatusOK:
 		eff := *s.Runtime
 		s.Effective = &eff
 	case s.Persisted != nil:
-		// R59: a non-ok persisted side is copied UNCHANGED. Overwriting a
-		// denied or absent reason with "parsed files" would replace the
-		// explanation of why there is no value with a claim that there is.
 		eff := *s.Persisted
 		if eff.Status == facts.StatusOK {
-			eff.Reason = "parsed files; sshd -T unavailable"
+			eff.Reason = "parsed files; sshd -" + methodLabel(method) + " unavailable"
 		}
 		s.Effective = &eff
 	case s.Runtime != nil:
 		eff := *s.Runtime
 		s.Effective = &eff
 	default:
-		eff := collect.Absent("no sshd -T output and no readable sshd_config")
+		eff := collect.Absent("no sshd daemon output and no readable sshd_config for " + o.keyword)
 		s.Effective = &eff
 	}
-	b.SetSetting("sshd.options.permit_root_login", s)
-	return nil
+	return s
+}
+
+// optionEnvelope wraps a raw value as the right typed envelope: an int for a
+// numeric option (an unparseable number is an error, never a stored blob), a
+// folded string otherwise. oversized values are refused (M16).
+func optionEnvelope(o sshdOption, raw string, src *facts.Source) facts.Envelope {
+	if oversized(raw) {
+		return withSource(collect.ErrorEnv(oversizedReason), src)
+	}
+	if o.numeric {
+		n, err := strconv.Atoi(strings.TrimSpace(raw))
+		if err != nil {
+			return withSource(collect.ErrorEnv(o.keyword+": not an integer: "+raw), src)
+		}
+		return collect.OK(n, src)
+	}
+	return collect.OK(keywordValue(o.keyword, raw), src)
+}
+
+// bannerPath resolves the effective Banner value from the daemon map, then
+// the parsed file. "" means unknown; "none" is sshd's default (no banner).
+func bannerPath(daemon map[string]string, parsed map[string]facts.Envelope) string {
+	if daemon != nil {
+		if v, ok := daemon["banner"]; ok {
+			return v
+		}
+	}
+	if e, ok := parsed["banner"]; ok && e.Status == facts.StatusOK {
+		if v, isStr := e.Value.(string); isStr {
+			return v
+		}
+	}
+	return ""
+}
+
+// writeBannerFile stats the file Banner names. "none" or "" means the daemon
+// serves no pre-auth banner, so exists/nonempty are a definite false, not an
+// error. A path that cannot be stat'd carries the read error.
+func writeBannerFile(a collect.Access, b *collect.Builder, p string) {
+	if p == "" || strings.EqualFold(p, "none") {
+		src := &facts.Source{Kind: "derived"}
+		b.Set("sshd.banner_file.exists", collect.OK(false, src))
+		b.Set("sshd.banner_file.nonempty", collect.OK(false, src))
+		return
+	}
+	src := &facts.Source{Kind: "file", Path: p}
+	// R168: the Banner file is a discovered path. Reading a path outside the
+	// declaration is recorded, never requested (the same precedent the
+	// Include expansion sets); a stock Banner (/etc/issue.net, /etc/issue)
+	// is declared and read normally.
+	if !declared(a, p) {
+		e := collect.ErrorEnv("Banner " + p + " is outside the collector's declaration")
+		e.Source = src
+		b.Set("sshd.banner_file.exists", e)
+		b.Set("sshd.banner_file.nonempty", e)
+		return
+	}
+	data, meta, err := a.ReadFile(p, readLimit)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			b.Set("sshd.banner_file.exists", collect.OK(false, src))
+			b.Set("sshd.banner_file.nonempty", collect.OK(false, src))
+			return
+		}
+		e := collect.FromReadError(err, meta)
+		b.Set("sshd.banner_file.exists", e)
+		b.Set("sshd.banner_file.nonempty", e)
+		return
+	}
+	b.Set("sshd.banner_file.exists", collect.OKRead(true, src, meta))
+	b.Set("sshd.banner_file.nonempty", collect.OKRead(len(strings.TrimSpace(string(data))) > 0, src, meta))
+}
+
+// collectIncludeSources records every Include the parse followed, in
+// expansion order, as {path, line, depth} records. It walks the same way
+// parseSshdConfig does but gathers Include directives rather than a keyword,
+// and stops at the same depth bound. It never fails the collector: an
+// unreadable drop-in simply ends that branch (the option settings already
+// carry that read's error on their persisted side).
+func collectIncludeSources(a collect.Access, file string) facts.Envelope {
+	var out []any
+	var walk func(file string, depth int)
+	walk = func(file string, depth int) {
+		if depth > maxIncludeDepth {
+			return
+		}
+		data, _, err := a.ReadFile(file, readLimit)
+		if err != nil {
+			return
+		}
+		for i, raw := range splitLines(data) {
+			line := strings.TrimSpace(raw)
+			if line == "" || strings.HasPrefix(line, "#") {
+				continue
+			}
+			f := configTokens(line)
+			key := strings.ToLower(f[0])
+			if key == "match" {
+				break
+			}
+			if key == "include" && len(f) >= 2 {
+				for _, pattern := range f[1:] {
+					if !declared(a, pattern) {
+						continue
+					}
+					matches, err := a.Glob(pattern)
+					if err != nil {
+						continue
+					}
+					slices.Sort(matches)
+					for _, m := range matches {
+						out = append(out, map[string]any{
+							"path": path.Clean(m), "line": i + 1, "depth": depth + 1,
+						})
+						walk(path.Clean(m), depth+1)
+					}
+				}
+			}
+		}
+	}
+	walk(file, 0)
+	if out == nil {
+		out = []any{} // R50: an empty result is [], never null
+	}
+	return collect.OK(out, &facts.Source{Kind: "file", Path: file})
+}
+
+func withSource(e facts.Envelope, src *facts.Source) facts.Envelope { e.Source = src; return e }
+
+// methodSource cites the command that decided the method; a "parse" reached
+// because no command started has none, matching the stage-1 rule.
+func methodSource(method string, dsrc *facts.Source) *facts.Source {
+	if method == "parse" && dsrc == nil {
+		return nil
+	}
+	return dsrc
+}
+
+func personaSource(c collect.Command) *facts.Source { return collect.Output{}.Source(c) }
+
+func methodLabel(method string) string {
+	if method == "G" {
+		return "G"
+	}
+	return "T"
+}
+
+func runErr(out collect.Output) string {
+	if out.Err != nil {
+		return out.Err.Error()
+	}
+	return "exit " + strconv.Itoa(out.ExitCode)
 }
 
 // parseSshdConfig resolves keyword the way sshd itself does: an Include is
@@ -168,7 +492,7 @@ func parseSshdConfig(a collect.Access, file, keyword string, depth int) (facts.E
 		f := configTokens(line)
 		key := strings.ToLower(f[0])
 		if key == "match" {
-			break // stage 1 reports global values only; personas arrive in stage 2
+			break // global values only; per-persona Match values come from sshd -T -C
 		}
 		if key == "include" && len(f) >= 2 {
 			for _, pattern := range f[1:] {

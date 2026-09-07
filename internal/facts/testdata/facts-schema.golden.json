@@ -252,6 +252,86 @@
       "SubjectKind": ""
     },
     {
+      "Key": "sshd.version",
+      "Type": "string",
+      "Description": "OpenSSH version reported by sshd -V (major.minor); absent when it could not be read.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sshd",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "sshd.options.max_auth_tries",
+      "Type": "setting\u003cint\u003e",
+      "Description": "Effective MaxAuthTries (daemon-reported versus parsed files).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sshd",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "sshd.options.client_alive_interval",
+      "Type": "setting\u003cint\u003e",
+      "Description": "Effective ClientAliveInterval in seconds (daemon-reported versus parsed files); 0 disables the keepalive.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sshd",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "sshd.options.client_alive_count_max",
+      "Type": "setting\u003cint\u003e",
+      "Description": "Effective ClientAliveCountMax (daemon-reported versus parsed files).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sshd",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "sshd.options.banner",
+      "Type": "setting\u003cstring\u003e",
+      "Description": "Effective Banner path, or none for sshd's default of no pre-auth banner.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sshd",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "sshd.include_sources",
+      "Type": "list\u003crecord\u003e",
+      "Description": "Every Include the sshd_config parse followed, in expansion order - path, line, depth.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sshd",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "sshd.banner_file.exists",
+      "Type": "bool",
+      "Description": "Whether the file named by sshd's Banner exists; false when Banner is none.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sshd",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "sshd.banner_file.nonempty",
+      "Type": "bool",
+      "Description": "Whether the file named by sshd's Banner has non-whitespace content.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sshd",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
       "Key": "files.etc_securetty",
       "Type": "record",
       "Description": "Presence and permission facts of /etc/securetty (absent on RHEL 8+ and Debian-family).",

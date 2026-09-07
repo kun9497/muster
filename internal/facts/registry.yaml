@@ -50,6 +50,58 @@ keys:
     sensitivity: public
     collector: sshd
     default_on: effective
+  - key: sshd.version
+    type: string
+    description: OpenSSH version reported by sshd -V (major.minor); absent when it could not be read.
+    since: 1
+    sensitivity: public
+    collector: sshd
+  - key: sshd.options.max_auth_tries
+    type: setting<int>
+    description: Effective MaxAuthTries (daemon-reported versus parsed files).
+    since: 1
+    sensitivity: public
+    collector: sshd
+    default_on: effective
+  - key: sshd.options.client_alive_interval
+    type: setting<int>
+    description: Effective ClientAliveInterval in seconds (daemon-reported versus parsed files); 0 disables the keepalive.
+    since: 1
+    sensitivity: public
+    collector: sshd
+    default_on: effective
+  - key: sshd.options.client_alive_count_max
+    type: setting<int>
+    description: Effective ClientAliveCountMax (daemon-reported versus parsed files).
+    since: 1
+    sensitivity: public
+    collector: sshd
+    default_on: effective
+  - key: sshd.options.banner
+    type: setting<string>
+    description: Effective Banner path, or none for sshd's default of no pre-auth banner.
+    since: 1
+    sensitivity: public
+    collector: sshd
+    default_on: effective
+  - key: sshd.include_sources
+    type: list<record>
+    description: Every Include the sshd_config parse followed, in expansion order - path, line, depth.
+    since: 1
+    sensitivity: public
+    collector: sshd
+  - key: sshd.banner_file.exists
+    type: bool
+    description: Whether the file named by sshd's Banner exists; false when Banner is none.
+    since: 1
+    sensitivity: public
+    collector: sshd
+  - key: sshd.banner_file.nonempty
+    type: bool
+    description: Whether the file named by sshd's Banner has non-whitespace content.
+    since: 1
+    sensitivity: public
+    collector: sshd
   - key: files.etc_securetty
     type: record
     description: Presence and permission facts of /etc/securetty (absent on RHEL 8+ and Debian-family).

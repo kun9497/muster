@@ -270,6 +270,172 @@ func setting(t *testing.T, b *collect.Builder, key string) facts.Setting {
 
 // --- sshd ---------------------------------------------------------------
 
+// -G is the preferred method: it prints the daemon's configuration without
+// loading host keys or the privilege-separation directory, so a socket-
+// activated sshd that makes -T fail still answers. When -G answers, the
+// method is "G" and -T is never consulted.
+func TestSshdPrefersGOverT(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{"/etc/ssh/sshd_config": "sshd_config"},
+		cmds: map[string]cmdResult{
+			"/usr/sbin/sshd -G": {file: "sshd_G.txt"},
+			"/usr/sbin/sshd -V": {stderr: "OpenSSH_9.6p1 Ubuntu-3ubuntu13.5, OpenSSL 3.0.13\n", exitCode: 1},
+		},
+	}
+	b := build(t, "sshd", a)
+	if m := env(t, b, "sshd.collect_method"); m.Value != "G" {
+		t.Fatalf("method %+v, want G", m)
+	}
+	s := setting(t, b, "sshd.options.permit_root_login")
+	if s.Runtime == nil || s.Runtime.Value != "no" {
+		t.Errorf("runtime from -G %+v", s.Runtime)
+	}
+	if v := env(t, b, "sshd.version"); v.Value != "9.6" {
+		t.Errorf("version %+v, want 9.6", v)
+	}
+}
+
+// 8.9 and 8.7 have no -G: the ladder drops to -T and the method is "T".
+func TestSshdFallsFromGToT(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{"/etc/ssh/sshd_config": "sshd_config"},
+		cmds: map[string]cmdResult{
+			"/usr/sbin/sshd -G": {exitCode: 1, stderr: "unknown option -- G\n"},
+			"/usr/sbin/sshd -T": {file: "sshd_T_full.txt"},
+			"/usr/sbin/sshd -V": {stderr: "OpenSSH_8.9p1 Ubuntu-3ubuntu0.17\n", exitCode: 1},
+			"/usr/sbin/sshd -T -C user=root,host=localhost,addr=127.0.0.1,lport=22":           {file: "sshd_T_full.txt"},
+			"/usr/sbin/sshd -T -C user=nobody,host=localhost,addr=127.0.0.1,lport=22":         {file: "sshd_T_full.txt"},
+			"/usr/sbin/sshd -T -C user=muster-nx-user,host=localhost,addr=127.0.0.1,lport=22": {file: "sshd_T_full.txt"},
+		},
+	}
+	b := build(t, "sshd", a)
+	if m := env(t, b, "sshd.collect_method"); m.Value != "T" {
+		t.Fatalf("method %+v, want T", m)
+	}
+	if env(t, b, "sshd.personas_collected").Value != true {
+		t.Error("all three persona queries succeeded; flag must be true")
+	}
+	if s := setting(t, b, "sshd.options.client_alive_interval"); s.Effective.Value != 300 {
+		t.Errorf("client_alive_interval effective %+v, want int 300", s.Effective)
+	}
+	if s := setting(t, b, "sshd.options.max_auth_tries"); s.Effective.Value != 4 {
+		t.Errorf("max_auth_tries effective %+v, want int 4", s.Effective)
+	}
+}
+
+// A persona whose value differs from the global is recorded as an override;
+// personas that match the global are not stored (byte stability).
+func TestSshdRecordsAPersonaOverride(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{"/etc/ssh/sshd_config": "sshd_config"},
+		cmds: map[string]cmdResult{
+			"/usr/sbin/sshd -G": {exitCode: 1, stderr: "unknown option\n"},
+			"/usr/sbin/sshd -T": {file: "sshd_T_full.txt"}, // permitrootlogin no
+			"/usr/sbin/sshd -V": {stderr: "OpenSSH_8.9p1\n", exitCode: 1},
+			"/usr/sbin/sshd -T -C user=root,host=localhost,addr=127.0.0.1,lport=22":           {file: "sshd_T_C_root.txt"}, // permitrootlogin yes
+			"/usr/sbin/sshd -T -C user=nobody,host=localhost,addr=127.0.0.1,lport=22":         {file: "sshd_T_full.txt"},
+			"/usr/sbin/sshd -T -C user=muster-nx-user,host=localhost,addr=127.0.0.1,lport=22": {file: "sshd_T_full.txt"},
+		},
+	}
+	s := setting(t, build(t, "sshd", a), "sshd.options.permit_root_login")
+	if s.Effective.Value != "no" {
+		t.Fatalf("global effective %+v, want no", s.Effective)
+	}
+	if s.Personas == nil || s.Personas["root"] == nil || s.Personas["root"].Value != "yes" {
+		t.Fatalf("root persona override must be recorded as yes: %+v", s.Personas)
+	}
+	if _, ok := s.Personas["user"]; ok {
+		t.Error("a persona equal to the global must not be stored")
+	}
+}
+
+// One failed persona query leaves the flag false — a half-collected set is
+// worse than none.
+func TestSshdOnePersonaFailureLeavesFlagFalse(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{"/etc/ssh/sshd_config": "sshd_config"},
+		cmds: map[string]cmdResult{
+			"/usr/sbin/sshd -T": {file: "sshd_T_full.txt"},
+			"/usr/sbin/sshd -V": {stderr: "OpenSSH_8.9p1\n", exitCode: 1},
+			"/usr/sbin/sshd -T -C user=root,host=localhost,addr=127.0.0.1,lport=22":   {file: "sshd_T_full.txt"},
+			"/usr/sbin/sshd -T -C user=nobody,host=localhost,addr=127.0.0.1,lport=22": {exitCode: 255, stderr: "bad\n"},
+		},
+	}
+	b := build(t, "sshd", a)
+	if env(t, b, "sshd.personas_collected").Value != false {
+		t.Error("a failed persona query must leave the flag false")
+	}
+	if s := setting(t, b, "sshd.options.permit_root_login"); s.Personas != nil {
+		t.Error("no overrides recorded when personas are not fully collected")
+	}
+}
+
+// Parse fallback: no daemon output at all. Options come from the files, the
+// method is "parse", personas are not collected, version is absent.
+func TestSshdParseFallbackFillsEveryOption(t *testing.T) {
+	a := &fsAccess{files: map[string]string{"/etc/ssh/sshd_config": "sshd_config_banners"}}
+	b := build(t, "sshd", a)
+	if env(t, b, "sshd.collect_method").Value != "parse" {
+		t.Fatal("method must be parse")
+	}
+	if env(t, b, "sshd.personas_collected").Value != false {
+		t.Error("no daemon, no personas")
+	}
+	if s := setting(t, b, "sshd.options.banner"); s.Effective.Value != "/etc/issue.net" {
+		t.Errorf("banner from parse %+v", s.Effective)
+	}
+	// R165: a numeric option parsed from the files must be an int on the
+	// effective side, never the string parseSshdConfig returns, or a clause
+	// on it ERRORs. This is the assertion that catches the setting<int>
+	// parsed-side bug the daemon path (int already) hides.
+	ci := setting(t, b, "sshd.options.client_alive_interval")
+	if n, ok := ci.Effective.Value.(int); !ok || n != 300 {
+		t.Errorf("client_alive_interval effective %#v, want int 300", ci.Effective.Value)
+	}
+	if v := env(t, b, "sshd.version"); v.Status != facts.StatusAbsent {
+		t.Errorf("version %+v, want absent", v)
+	}
+}
+
+// The Banner file is stat'd, and "none" is a definite false, not an error.
+func TestSshdBannerFileStat(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{
+			"/etc/ssh/sshd_config": "sshd_config_banners", // Banner /etc/issue.net
+			"/etc/issue.net":       "issue_for_sshd",
+		},
+	}
+	b := build(t, "sshd", a)
+	if e := env(t, b, "sshd.banner_file.exists"); e.Value != true {
+		t.Errorf("exists %+v", e)
+	}
+	if e := env(t, b, "sshd.banner_file.nonempty"); e.Value != true {
+		t.Errorf("nonempty %+v", e)
+	}
+
+	none := &fsAccess{files: map[string]string{"/etc/ssh/sshd_config": "sshd_config"}} // no Banner -> none
+	nb := build(t, "sshd", none)
+	if e := env(t, nb, "sshd.banner_file.exists"); e.Status != facts.StatusOK || e.Value != false {
+		t.Errorf("Banner none must be a definite false: %+v", e)
+	}
+}
+
+// Include sources are recorded in expansion order with depth.
+func TestSshdIncludeSourcesRecorded(t *testing.T) {
+	a := &fsAccess{files: map[string]string{
+		"/etc/ssh/sshd_config":                      "sshd_config", // Include .../*.conf
+		"/etc/ssh/sshd_config.d/50-cloud-init.conf": "sshd_config.d_50-cloud-init.conf",
+	}}
+	list := okList(t, build(t, "sshd", a), "sshd.include_sources")
+	if len(list) != 1 {
+		t.Fatalf("include_sources %v, want one entry", list)
+	}
+	rec := list[0].(map[string]any)
+	if rec["path"] != "/etc/ssh/sshd_config.d/50-cloud-init.conf" || rec["depth"].(int) != 1 {
+		t.Errorf("record %v", rec)
+	}
+}
+
 func TestSshdRuntimeAndPersistedWithInclude(t *testing.T) {
 	a := &fsAccess{
 		files: map[string]string{
@@ -303,36 +469,29 @@ func TestSshdFallsBackToParseWhenTUnavailable(t *testing.T) {
 	}
 }
 
-// R88 (spec §6.5 step 13): a non-zero sshd -T exit that is not a privilege
-// failure is a parse-fallback degradation, not a failed collector — the
-// runtime side is absent (not error), naming the command as its source and
-// carrying the first stderr line in its reason; the method is "parse"
-// because -T did not answer, cited to the command that ran and failed; and
-// the collector's own status stays ok, so a run built on this outcome is
-// complete.
+// R169 (spec §6.5 step 13): a non-zero sshd -T exit (after a -G that also
+// did not answer) is a parse-fallback degradation, not a failed collector —
+// a readable config answering is better for non-root collection than a
+// denied runtime side. The daemon rungs fall through, so there is no runtime
+// side at all; the method is "parse", cited to the command that ran and
+// failed; the effective side is the parsed ok value; and the collector's own
+// status stays ok, so a run built on this outcome is complete.
 func TestSshdNonZeroExitIsAnAbsentRuntimeSide(t *testing.T) {
-	// R84: this test's expectation (absent, not denied) is the root-side
-	// outcome of commandFailure's privilege rule, so the seam must be
-	// pinned to root rather than left to whichever account runs the suite.
-	withEUID(t, 0)
 	a := &fsAccess{
 		files: map[string]string{"/etc/ssh/sshd_config": "sshd_config"},
-		cmds: map[string]cmdResult{"/usr/sbin/sshd -T": {
-			exitCode: 255,
-			stderr:   "Missing privilege separation directory: /run/sshd\nsecond line\n",
-		}},
+		cmds: map[string]cmdResult{
+			"/usr/sbin/sshd -G": {exitCode: 1, stderr: "unknown option -- G\n"},
+			"/usr/sbin/sshd -V": {stderr: "OpenSSH_8.9p1\n", exitCode: 1},
+			"/usr/sbin/sshd -T": {
+				exitCode: 255,
+				stderr:   "Missing privilege separation directory: /run/sshd\nsecond line\n",
+			},
+		},
 	}
 	b := build(t, "sshd", a)
 	s := setting(t, b, "sshd.options.permit_root_login")
-	if s.Runtime == nil || s.Runtime.Status != facts.StatusAbsent {
-		t.Fatalf("runtime %+v", s.Runtime)
-	}
-	if !strings.HasPrefix(s.Runtime.Reason, "sshd -T unavailable: ") ||
-		!strings.Contains(s.Runtime.Reason, "Missing privilege separation directory: /run/sshd") {
-		t.Errorf("reason must name the degradation and carry the first stderr line: %q", s.Runtime.Reason)
-	}
-	if s.Runtime.Source == nil || s.Runtime.Source.Cmd != "/usr/sbin/sshd -T" {
-		t.Errorf("source %+v", s.Runtime.Source)
+	if s.Runtime != nil {
+		t.Fatalf("a daemon that did not answer leaves no runtime side: %+v", s.Runtime)
 	}
 	if m := env(t, b, "sshd.collect_method"); m.Value != "parse" || m.Source == nil || m.Source.Cmd != "/usr/sbin/sshd -T" {
 		t.Errorf("method must be parse, cited to the command that ran and failed: %+v", m)
@@ -340,31 +499,46 @@ func TestSshdNonZeroExitIsAnAbsentRuntimeSide(t *testing.T) {
 	if s.Effective.Status != facts.StatusOK || s.Effective.Value != "yes" || !strings.Contains(s.Effective.Reason, "sshd -T unavailable") {
 		t.Errorf("effective must fall back to the ok persisted value: %+v", s.Effective)
 	}
-	// Absent ranks as ok in Builder.Worst (R71), so this failure must not
+	// Absent ranks as ok in Builder.Worst (R71), so this fallback must not
 	// make the sshd collector itself worse than ok — which is what keeps a
-	// run built on this outcome complete (see TestRunAbsentSshdTKeepsTheRunComplete).
+	// run built on this outcome complete.
 	if worst := b.Worst("sshd"); worst != facts.StatusOK {
 		t.Errorf("Worst(sshd) = %s, want ok", worst)
 	}
 }
 
+// R169: to still prove the denied path now that a -T exit drops to parse,
+// both the -T exit AND the config read fail. The daemon rungs fall through,
+// so the parsed side is denied, and effective copies that denied side
+// unchanged with its reason (R59) — the explanation of why there is no value
+// survives.
 func TestSshdPermissionDeniedIsDeniedAndCopiedToEffective(t *testing.T) {
 	a := &fsAccess{
 		fails: map[string]error{"/etc/ssh/sshd_config": os.ErrPermission},
-		cmds: map[string]cmdResult{"/usr/sbin/sshd -T": {
-			exitCode: 1,
-			stderr:   "/etc/ssh/sshd_config: Permission denied\n",
-		}},
+		cmds: map[string]cmdResult{
+			"/usr/sbin/sshd -G": {exitCode: 1, stderr: "unknown option -- G\n"},
+			"/usr/sbin/sshd -V": {stderr: "OpenSSH_8.9p1\n", exitCode: 1},
+			"/usr/sbin/sshd -T": {
+				exitCode: 1,
+				stderr:   "/etc/ssh/sshd_config: Permission denied\n",
+			},
+		},
 	}
 	b := build(t, "sshd", a)
 	s := setting(t, b, "sshd.options.permit_root_login")
-	if s.Runtime == nil || s.Runtime.Status != facts.StatusDenied {
-		t.Fatalf("runtime %+v", s.Runtime)
+	if env(t, b, "sshd.collect_method").Value != "parse" {
+		t.Fatalf("method must be parse")
+	}
+	if s.Runtime != nil {
+		t.Fatalf("a daemon that did not answer leaves no runtime side: %+v", s.Runtime)
 	}
 	// R59: a non-ok persisted side is copied to effective unchanged, so the
 	// reason still says why there is no value.
-	if s.Persisted.Status != facts.StatusDenied || s.Effective.Status != facts.StatusDenied || s.Effective.Reason != s.Persisted.Reason {
-		t.Errorf("persisted %+v effective %+v", s.Persisted, s.Effective)
+	if s.Persisted == nil || s.Persisted.Status != facts.StatusDenied {
+		t.Fatalf("persisted %+v, want denied", s.Persisted)
+	}
+	if s.Effective.Status != facts.StatusDenied || s.Effective.Reason != s.Persisted.Reason {
+		t.Errorf("effective %+v must copy the denied persisted side %+v unchanged", s.Effective, s.Persisted)
 	}
 }
 
@@ -554,54 +728,16 @@ func withEUID(t *testing.T, id int) {
 	t.Cleanup(func() { euid = orig })
 }
 
-// I3 (R84). sshd -T run by a non-root process fails with "Could not load
-// host key" or "no hostkeys available" — never "Permission denied" — so the
-// substring rule on its own files a privilege problem as an error, and the
-// run header then says "facts with status error" where spec §7.1/D25 wants
-// denied with the privilege named. A root-only collector's failed command
-// is denied whenever this process is not root; as root the same failure is
-// R88's parse-fallback degradation instead (absent, not error) — commandFailure
-// itself is unchanged, sshd.go only turns its error outcome into absent.
-func TestRootOnlyCommandFailureIsDeniedForANonRootProcess(t *testing.T) {
-	for _, tc := range []struct {
-		name string
-		euid int
-		want facts.Status
-	}{
-		{"non-root", 1000, facts.StatusDenied},
-		{"root", 0, facts.StatusAbsent},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			withEUID(t, tc.euid)
-			a := &fsAccess{
-				files: map[string]string{"/etc/ssh/sshd_config": "sshd_config"},
-				cmds: map[string]cmdResult{"/usr/sbin/sshd -T": {
-					exitCode: 255,
-					stderr:   "sshd: no hostkeys available -- exiting.\n",
-				}},
-			}
-			s := setting(t, build(t, "sshd", a), "sshd.options.permit_root_login")
-			if s.Runtime == nil || s.Runtime.Status != tc.want {
-				t.Fatalf("runtime %+v, want %s", s.Runtime, tc.want)
-			}
-			switch tc.want {
-			case facts.StatusDenied:
-				if want := "sshd -T requires root: sshd: no hostkeys available -- exiting."; s.Runtime.Reason != want {
-					t.Errorf("reason %q, want %q", s.Runtime.Reason, want)
-				}
-			case facts.StatusAbsent:
-				if want := "sshd -T unavailable: sshd: no hostkeys available -- exiting."; s.Runtime.Reason != want {
-					t.Errorf("reason %q, want %q", s.Runtime.Reason, want)
-				}
-			}
-			if s.Runtime.Source == nil || s.Runtime.Source.Cmd != "/usr/sbin/sshd -T" {
-				t.Errorf("source %+v", s.Runtime.Source)
-			}
-		})
-	}
-}
+// R169: the sshd collector no longer routes a failed sshd -T through
+// commandFailure — a non-zero/denied daemon exit drops to the parse
+// fallback (see TestSshdNonZeroExitIsAnAbsentRuntimeSide and
+// TestSshdPermissionDeniedIsDeniedAndCopiedToEffective), so the old
+// root-only-command test that exercised commandFailure through sshd no
+// longer has a subject and has been removed. commandFailure and its euid
+// privilege rule are unchanged; the non-root case below still pins them
+// through the services collector.
 
-// ...and a collector that does NOT need root keeps the old rule whatever
+// A collector that does NOT need root keeps commandFailure's rule whatever
 // this process's euid is: systemctl failing for a normal user is an error,
 // because nothing about that command required a privilege it lacked.
 func TestNonRootCollectorCommandFailureStaysAnError(t *testing.T) {
