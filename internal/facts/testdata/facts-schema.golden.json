@@ -926,7 +926,7 @@
       "Type": "bool",
       "Description": "Whether /etc/shadow exists and every /etc/passwd entry defers to it (password field x); a false names the first account that does not; carries the read's status when /etc/shadow or /etc/passwd is unreadable.",
       "Since": 1,
-      "Sensitivity": "public",
+      "Sensitivity": "internal",
       "Collector": "accounts",
       "DefaultOn": "",
       "SubjectKind": ""

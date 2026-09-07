@@ -463,7 +463,7 @@ keys:
     type: bool
     description: Whether /etc/shadow exists and every /etc/passwd entry defers to it (password field x); a false names the first account that does not; carries the read's status when /etc/shadow or /etc/passwd is unreadable.
     since: 1
-    sensitivity: public
+    sensitivity: internal
     collector: accounts
   - key: accounts.nss.passwd_sources
     type: list<string>

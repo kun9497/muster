@@ -1,8 +1,8 @@
 id: muster.account.system_account_shells
 title_en: System accounts have no login shell
 title_ko: 시스템 계정에 로그인 셸이 없다
-description_en: An account below UID_MIN exists to own a service, not to log in. Its shell must not be one of the login shells in /etc/shells; nologin, false and the single-purpose programs such as sync qualify.
-description_ko: UID_MIN 미만의 계정은 서비스를 소유하기 위한 것이지 로그인용이 아닙니다. 그 셸은 /etc/shells 에 있는 로그인 셸이면 안 되며, nologin, false 와 sync 같은 단일 목적 프로그램은 허용됩니다.
+description_en: An account below UID_MIN exists to own a service, not to log in. Its shell must not be one of the login shells in /etc/shells; nologin, false and the single-purpose programs such as sync qualify. Accounts at or above UID_MIN, including nobody, are not judged here; a shell counts as a login shell when /etc/shells lists it.
+description_ko: UID_MIN 미만의 계정은 서비스를 소유하기 위한 것이지 로그인용이 아닙니다. 그 셸은 /etc/shells 에 있는 로그인 셸이면 안 되며, nologin, false 와 sync 같은 단일 목적 프로그램은 허용됩니다. UID_MIN 이상의 계정(nobody 포함)은 여기서 판단하지 않으며, /etc/shells 에 나열된 셸을 로그인 셸로 봅니다.
 category: account
 importance: 하
 automation: auto

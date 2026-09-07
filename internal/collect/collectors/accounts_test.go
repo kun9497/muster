@@ -64,6 +64,10 @@ func TestLoginDefsIntOrFallsBack(t *testing.T) {
 	if got := d.intOr("UID_MAX", 60000); got != 60000 {
 		t.Errorf("unset UID_MAX must fall back, got %d", got)
 	}
+	unreadable := loginDefs{err: os.ErrPermission}
+	if got := unreadable.intOr("UID_MIN", 1000); got != 1000 {
+		t.Errorf("unreadable login.defs must fall back, got %d", got)
+	}
 }
 
 // --- Task 2: the user record's joins ------------------------------------
@@ -282,6 +286,9 @@ func TestAccountsUsersCarryShadowTruncation(t *testing.T) {
 	b := build(t, "accounts", a)
 	if e := env(t, b, "accounts.users"); !e.Truncated {
 		t.Errorf("accounts.users %+v must be truncated when /etc/shadow was", e)
+	}
+	if e := env(t, b, "accounts.shadow_in_use"); !e.Truncated {
+		t.Errorf("accounts.shadow_in_use %+v must be truncated when /etc/shadow was", e)
 	}
 	if e := env(t, b, "accounts.shells"); e.Truncated {
 		t.Errorf("accounts.shells %+v was read whole", e)

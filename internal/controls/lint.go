@@ -358,11 +358,20 @@ func FixtureDirExists(dir string) bool {
 	return err == nil && st.IsDir()
 }
 
+// engineReadKeys are registered fact keys the check engine (internal/check)
+// resolves directly against the registry rather than through a control's
+// declarative Checks/AppliesWhen clauses, so no control ever names them in a
+// Fact field: walk.complete gates the walk, sshd.collect_method decides the
+// sshd parse-fallback degradation, sshd.personas_collected decides persona
+// evaluation, and accounts.nss.remote decides the remote-NSS degradation
+// (eval.go, clause.go). UnusedKeys must not report these as unused; nothing
+// in a control file could ever make that report go away.
+var engineReadKeys = set("walk.complete", "sshd.collect_method", "sshd.personas_collected", "accounts.nss.remote")
+
 // UnusedKeys returns the registered fact keys no control in s references, in
 // registry order (spec §5.5). It is a note rather than a lint failure: some
-// keys are read by the evaluator itself (walk.complete gates the walk,
-// sshd.collect_method and sshd.personas_collected decide degradation) and
-// others are collected for stage 2 controls that do not exist yet.
+// keys are read by the evaluator itself (see engineReadKeys) and others are
+// collected for stage 2 controls that do not exist yet.
 func UnusedKeys(s *Set, reg *facts.Registry) []string {
 	used := map[string]bool{}
 	mark := func(cls []Clause) {
@@ -383,7 +392,7 @@ func UnusedKeys(s *Set, reg *facts.Registry) []string {
 	}
 	var out []string
 	for _, e := range reg.Keys {
-		if !used[e.Key] {
+		if !used[e.Key] && !engineReadKeys[e.Key] {
 			out = append(out, e.Key)
 		}
 	}

@@ -161,9 +161,9 @@ func TestCheckEndToEndJSONAndTable(t *testing.T) {
 	if _, declared := params["muster.service.telnet_disabled"]; declared {
 		t.Errorf("only controls that declare params belong in check.params: %v", params)
 	}
-	// R26: full-pass.json must produce exactly the eighteen controls'
-	// documented statuses (spec §10.2's eighteen-controls list), not merely
-	// "some PASS rows appear somewhere in the output".
+	// R26: full-pass.json must produce exactly the eighteen embedded controls'
+	// documented statuses, not merely "some PASS rows appear somewhere in the
+	// output".
 	assertStatuses(t, out1.Bytes(), map[string]string{
 		"muster.account.root_remote_login":       "PASS",
 		"muster.account.password_policy":         "PASS",

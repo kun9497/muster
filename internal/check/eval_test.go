@@ -336,6 +336,22 @@ func TestDerivationTable(t *testing.T) {
 		{"13 remote NSS source does not degrade a login.defs control",
 			`{"accounts":{"nss":{"remote":{"status":"ok","value":true}},"login_defs":{"pass_max_days":{"runtime":{"status":"ok","value":90},"persisted":{"status":"ok","value":90}}}}}`,
 			passMaxDaysControl("auto"), PASS, "", nil},
+		// R127: remoteNSS treats accounts.shadow_in_use as a remote-source
+		// clause explicitly (it has no registry SubjectKind), so a control
+		// that reads only that fact is degraded too, not just the
+		// user/group-subject ones above.
+		{"13 remote NSS source degrades a control that reads only shadow_in_use",
+			`{"accounts":{"nss":{"remote":{"status":"ok","value":true}},"shadow_in_use":{"status":"ok","value":true}}}`,
+			controls.Control{ID: "muster.account.shadow_only_probe", Importance: "중", Category: "account", Automation: "auto", AbsentMeans: "fail",
+				Checks:      []controls.Clause{{Fact: "accounts.shadow_in_use", Op: "eq", Expected: true}},
+				Remediation: &controls.Remediation{Risk: "none"},
+			},
+			WARN, "",
+			func(t *testing.T, r Result) {
+				if r.Degraded != degradedRemoteNSS {
+					t.Errorf("want Degraded=%q, got %q", degradedRemoteNSS, r.Degraded)
+				}
+			}},
 		// M10: applies_when evidence must survive absent_means, and a
 		// mechanism's `when` evidence must not be discarded.
 		{"5 no mechanism applies keeps applies_when evidence",

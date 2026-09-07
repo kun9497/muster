@@ -9,7 +9,9 @@ The contracts here are tested; the design specification (section 8) is the sourc
 - `collect` runs as root. It reads only paths its collector registry declares and runs only commands on a
   fixed whitelist (absolute path, fixed arguments, timeout, output cap, no shell, rebuilt environment).
   It never parses a control file, a waiver file or a previous snapshot. It writes exactly one file: the
-  snapshot. It makes no network connection.
+  snapshot. It makes no network connection. Reading a POSIX ACL requires opening the file, so without
+  root the `files` collector reports `/etc/shadow`'s ACL leaves as denied and the run is partial even
+  though its mode and owner were read.
 - `check` does not need root and warns when run as root. It treats the snapshot as untrusted input
   (size and nesting limits, no execution of anything it contains, escaped rendering) and, when root,
   refuses waiver and control files that are not root-owned or are group/other-writable.
