@@ -1918,8 +1918,22 @@ func TestEnvDeniedProfileIsAnError(t *testing.T) {
 		fails: map[string]error{"/etc/bash.bashrc": os.ErrPermission},
 	}
 	b := build(t, "env", a)
-	if e := env(t, b, "env.shell.tmout"); e.Status != facts.StatusDenied {
-		t.Errorf("a denied profile file must make env.shell.tmout denied, got %+v", e)
+	// All seven leaves the collector could set must carry the read's status —
+	// none may salvage a value from /etc/profile (C3, R183).
+	keys := []string{
+		"env.shell.tmout", "env.shell.tmout_exported", "env.shell.tmout_readonly",
+		"env.shell.tmout_settings", "env.shell.umask_settings",
+		"env.shell.root_path_raw", "env.shell.root_path_entries",
+	}
+	for _, k := range keys {
+		if e := env(t, b, k); e.Status != facts.StatusDenied {
+			t.Errorf("a denied profile file must make %s denied, got %+v", k, e)
+		}
+	}
+	// The read's status must be path-prefixed so the report names the file that
+	// could not be read (C3), matching readErrorEnv's shape.
+	if e := env(t, b, "env.shell.tmout"); !strings.HasPrefix(e.Reason, "/etc/bash.bashrc:") {
+		t.Errorf("reason %q must be prefixed with the unreadable path", e.Reason)
 	}
 }
 

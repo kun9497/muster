@@ -56,7 +56,7 @@ var envShellKeys = []string{
 func runEnv(_ context.Context, a collect.Access, b *collect.Builder) error {
 	var all []shellAssignment
 	for _, p := range profileReadOrder(a) {
-		data, meta, err := a.ReadFile(p, readLimit)
+		data, _, err := a.ReadFile(p, readLimit)
 		if err != nil {
 			if errors.Is(err, fs.ErrNotExist) {
 				continue // a profile file that simply does not exist contributes nothing
@@ -64,7 +64,9 @@ func runEnv(_ context.Context, a collect.Access, b *collect.Builder) error {
 			// C3 (R183): a present-but-unreadable profile file — denied, or any
 			// other error — is the answer for every value it could set; write
 			// the path-prefixed read error to all seven keys and stop.
-			e := collect.FromReadError(err, meta)
+			// readErrorEnv (shared with the pam collector) prefixes the reason
+			// with the path so the report names which file could not be read.
+			e := readErrorEnv(p, err)
 			for _, k := range envShellKeys {
 				b.Set(k, e)
 			}
