@@ -1825,3 +1825,121 @@ func TestSmokeOnTheRealHost(t *testing.T) {
 	}
 	t.Log("smoke: sockets, os and files collected under the guard with no violations")
 }
+
+// --- env ----------------------------------------------------------------
+
+// The winning TMOUT is the last unconditional assignment across the profile
+// files read in order; its exported/readonly flags come from that line (or a
+// later export/readonly of the same name). A value set only inside an `if`
+// block is recorded with conditional=true and does not win.
+func TestEnvEffectiveTMOUT(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{
+			"/etc/profile":               "profile",               // TMOUT=600; export TMOUT
+			"/etc/profile.d/99-tmout.sh": "profile.d_99-tmout.sh", // readonly TMOUT (no value)
+		},
+	}
+	b := build(t, "env", a)
+	if e := env(t, b, "env.shell.tmout"); e.Value != 600 {
+		t.Errorf("tmout %+v, want 600", e)
+	}
+	if env(t, b, "env.shell.tmout_exported").Value != true {
+		t.Error("TMOUT is exported")
+	}
+	if env(t, b, "env.shell.tmout_readonly").Value != true {
+		t.Error("TMOUT is readonly")
+	}
+	settings := okList(t, b, "env.shell.tmout_settings")
+	if len(settings) < 1 {
+		t.Fatalf("tmout_settings %v", settings)
+	}
+}
+
+// A conditional umask does not win and is flagged; a system-scope and a
+// root-scope umask are both recorded with the right scope.
+func TestEnvUmaskSettings(t *testing.T) {
+	a := &fsAccess{files: map[string]string{
+		"/etc/profile":                "profile",                // umask 022 (system, unconditional)
+		"/etc/profile.d/10-muster.sh": "profile.d_10-muster.sh", // umask 002 inside an if (conditional)
+		"/root/.bashrc":               "root_bashrc",
+	}}
+	rows := okList(t, build(t, "env", a), "env.shell.umask_settings")
+	var sawConditional, sawSystem bool
+	for _, r := range rows {
+		m := r.(map[string]any)
+		if m["value"] == "002" && m["conditional"] == true {
+			sawConditional = true
+		}
+		if m["value"] == "022" && m["scope"] == "system" && m["conditional"] == false {
+			sawSystem = true
+		}
+	}
+	if !sawConditional || !sawSystem {
+		t.Errorf("umask rows %v", rows)
+	}
+}
+
+// Root PATH is split into positioned entries. An empty element is is_dot; a
+// declared world-writable directory carries world_writable=true; an element
+// outside the declared PATH-dir set is not stat'd but marked
+// unresolved+undeclared (R175); a $/~ element is variable+unresolved (R180).
+func TestEnvRootPathEntries(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{"/root/.bashrc": "root_bashrc_badpath"}, // PATH=/usr/bin::/usr/local/games:/opt/x:$HOME/bin
+		stats: map[string]statResult{
+			"/usr/bin":         {mode: 0o755, kind: "dir"},
+			"/usr/local/games": {mode: 0o777, kind: "dir"}, // declared and world-writable
+		},
+	}
+	entries := okList(t, build(t, "env", a), "env.shell.root_path_entries")
+	if len(entries) != 5 {
+		t.Fatalf("entries %v, want 5 (/usr/bin, empty, /usr/local/games, /opt/x, $HOME/bin)", entries)
+	}
+	if entries[1].(map[string]any)["is_dot"] != true {
+		t.Error("the empty element between :: must be is_dot")
+	}
+	if entries[2].(map[string]any)["world_writable"] != true {
+		t.Error("/usr/local/games is world-writable")
+	}
+	if entries[3].(map[string]any)["undeclared"] != true || entries[3].(map[string]any)["unresolved"] != true {
+		t.Errorf("/opt/x is outside the declared PATH-dir set: unresolved+undeclared, never stat'd: %v", entries[3])
+	}
+	if entries[4].(map[string]any)["variable"] != true || entries[4].(map[string]any)["is_dot"] == true {
+		t.Errorf("$HOME/bin is an unexpanded variable, not is_dot: %v", entries[4])
+	}
+}
+
+// A profile file that cannot be read (denied — not ENOENT) is the answer for
+// every value it could set: all seven env.shell.* keys carry the path-prefixed
+// read error (C3, R183), never a value salvaged from the other files.
+func TestEnvDeniedProfileIsAnError(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{"/etc/profile": "profile"},
+		fails: map[string]error{"/etc/bash.bashrc": os.ErrPermission},
+	}
+	b := build(t, "env", a)
+	if e := env(t, b, "env.shell.tmout"); e.Status != facts.StatusDenied {
+		t.Errorf("a denied profile file must make env.shell.tmout denied, got %+v", e)
+	}
+}
+
+// A line may hold several statements separated by an unquoted `;`, and a
+// declaration keyword (declare/typeset/export/readonly) with -x/-r/-xr flags
+// assigns TMOUT just as a bare assignment does (R184).
+func TestEnvTMOUTDeclarationForms(t *testing.T) {
+	b := build(t, "env", &fsAccess{files: map[string]string{"/etc/profile": "profile_tmout_oneline"}})
+	if e := env(t, b, "env.shell.tmout"); e.Value != 600 {
+		t.Errorf("tmout %+v, want 600 from `TMOUT=600; export TMOUT`", e)
+	}
+	if env(t, b, "env.shell.tmout_exported").Value != true {
+		t.Error("the trailing `export TMOUT` marks it exported")
+	}
+
+	b2 := build(t, "env", &fsAccess{files: map[string]string{"/etc/profile": "profile_tmout_declare"}})
+	if e := env(t, b2, "env.shell.tmout"); e.Value != 600 {
+		t.Errorf("tmout %+v, want 600 from `declare -xr TMOUT=600`", e)
+	}
+	if env(t, b2, "env.shell.tmout_readonly").Value != true {
+		t.Error("`declare -xr` makes TMOUT readonly")
+	}
+}

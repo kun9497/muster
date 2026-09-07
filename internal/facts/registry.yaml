@@ -775,6 +775,48 @@ keys:
     since: 1
     sensitivity: public
     collector: os
+  - key: env.shell.tmout
+    type: int
+    description: Effective TMOUT in seconds from the system profile files; 0 when unset (bash reads 0 as no timeout).
+    since: 1
+    sensitivity: public
+    collector: env
+  - key: env.shell.tmout_exported
+    type: bool
+    description: Whether the winning TMOUT is exported so child login shells inherit it.
+    since: 1
+    sensitivity: public
+    collector: env
+  - key: env.shell.tmout_readonly
+    type: bool
+    description: Whether TMOUT is made readonly so a user cannot unset it.
+    since: 1
+    sensitivity: public
+    collector: env
+  - key: env.shell.tmout_settings
+    type: list<record>
+    description: Every TMOUT assignment - path, line, value, exported, readonly, conditional.
+    since: 1
+    sensitivity: public
+    collector: env
+  - key: env.shell.umask_settings
+    type: list<record>
+    description: Every umask assignment - path, line, value, symbolic, conditional, scope.
+    since: 1
+    sensitivity: public
+    collector: env
+  - key: env.shell.root_path_raw
+    type: string
+    description: The winning PATH assignment for root, verbatim, with its file and line.
+    since: 1
+    sensitivity: public
+    collector: env
+  - key: env.shell.root_path_entries
+    type: list<record>
+    description: Each root PATH element - position, value, exists, mode, uid, gid, group_writable, world_writable, is_dot, variable, unresolved, undeclared.
+    since: 1
+    sensitivity: public
+    collector: env
   - key: walk.world_writable
     type: list<record>
     description: World-writable files found by the deep walk, with path, sticky, uid, gid, package_declared.

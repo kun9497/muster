@@ -1,0 +1,6 @@
+# synthetic /etc/profile fixture for muster env-collector tests
+TMOUT=600
+export TMOUT
+umask 022
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+export PATH

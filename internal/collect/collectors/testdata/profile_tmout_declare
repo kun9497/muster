@@ -1,0 +1,2 @@
+# synthetic profile: a declaration keyword with combined flags
+declare -xr TMOUT=600
