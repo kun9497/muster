@@ -372,6 +372,106 @@
       "SubjectKind": ""
     },
     {
+      "Key": "files.etc_shadow.mode",
+      "Type": "int",
+      "Description": "Permission bits of /etc/shadow as an integer (e.g. 256 for 0400).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_shadow.uid",
+      "Type": "int",
+      "Description": "Owner uid of /etc/shadow.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_shadow.gid",
+      "Type": "int",
+      "Description": "Group gid of /etc/shadow.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_shadow.group",
+      "Type": "string",
+      "Description": "Group name for the gid of /etc/shadow from /etc/group; empty when the gid has no name.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_shadow.group_readable",
+      "Type": "bool",
+      "Description": "Whether the group permission bits of /etc/shadow include read (derived from mode).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_shadow.group_writable",
+      "Type": "bool",
+      "Description": "Whether the group permission bits of /etc/shadow include write (derived from mode).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_shadow.other_readable",
+      "Type": "bool",
+      "Description": "Whether the other permission bits of /etc/shadow include read (derived from mode).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_shadow.other_writable",
+      "Type": "bool",
+      "Description": "Whether the other permission bits of /etc/shadow include write (derived from mode).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_shadow.acl_present",
+      "Type": "bool",
+      "Description": "Whether a POSIX ACL xattr is present on /etc/shadow.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_shadow.acl_entries",
+      "Type": "list\u003cstring\u003e",
+      "Description": "Access ACL entries of /etc/shadow in setfacl form with numeric ids (user::rw-, user:1000:rw-, group::r--, mask::rw-, other::r--); empty when no ACL is set.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
       "Key": "files.etc_hosts.mode",
       "Type": "int",
       "Description": "Permission bits of /etc/hosts as an integer (e.g. 384 for 0600).",

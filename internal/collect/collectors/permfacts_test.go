@@ -217,3 +217,27 @@ func TestGroupFailureDoesNotHideThePermissionFacts(t *testing.T) {
 		t.Errorf("group reason = %q, want it to name /etc/group", v.Reason)
 	}
 }
+
+// Task 5 (2B): /etc/shadow gets the full template including ACL entries —
+// a named ACL entry on shadow defeats a 0400 mode just as it does on passwd.
+func TestFilesShadowPermissionFacts(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{"/etc/group": "group"},
+		stats: map[string]statResult{"/etc/shadow": {mode: 0o640, uid: 0, gid: 42, kind: "regular"}},
+	}
+	b := build(t, "files", a)
+	if v := env(t, b, "files.etc_shadow.mode"); v.Status != facts.StatusOK || v.Value != 0o640 {
+		t.Errorf("mode %+v", v)
+	}
+	if v := env(t, b, "files.etc_shadow.group"); v.Value != "shadow" {
+		t.Errorf("group %+v", v)
+	}
+	for k, want := range map[string]bool{"group_readable": true, "group_writable": false, "other_readable": false, "other_writable": false, "acl_present": false} {
+		if v := env(t, b, "files.etc_shadow."+k); v.Value != want {
+			t.Errorf("%s = %+v, want %v", k, v, want)
+		}
+	}
+	if l, ok := env(t, b, "files.etc_shadow.acl_entries").Value.([]any); !ok || len(l) != 0 {
+		t.Errorf("acl_entries %+v", env(t, b, "files.etc_shadow.acl_entries"))
+	}
+}

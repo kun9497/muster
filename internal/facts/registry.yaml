@@ -122,6 +122,66 @@ keys:
     since: 1
     sensitivity: public
     collector: files
+  - key: files.etc_shadow.mode
+    type: int
+    description: Permission bits of /etc/shadow as an integer (e.g. 256 for 0400).
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_shadow.uid
+    type: int
+    description: Owner uid of /etc/shadow.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_shadow.gid
+    type: int
+    description: Group gid of /etc/shadow.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_shadow.group
+    type: string
+    description: Group name for the gid of /etc/shadow from /etc/group; empty when the gid has no name.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_shadow.group_readable
+    type: bool
+    description: Whether the group permission bits of /etc/shadow include read (derived from mode).
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_shadow.group_writable
+    type: bool
+    description: Whether the group permission bits of /etc/shadow include write (derived from mode).
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_shadow.other_readable
+    type: bool
+    description: Whether the other permission bits of /etc/shadow include read (derived from mode).
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_shadow.other_writable
+    type: bool
+    description: Whether the other permission bits of /etc/shadow include write (derived from mode).
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_shadow.acl_present
+    type: bool
+    description: Whether a POSIX ACL xattr is present on /etc/shadow.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_shadow.acl_entries
+    type: list<string>
+    description: Access ACL entries of /etc/shadow in setfacl form with numeric ids (user::rw-, user:1000:rw-, group::r--, mask::rw-, other::r--); empty when no ACL is set.
+    since: 1
+    sensitivity: public
+    collector: files
   - key: files.etc_hosts.mode
     type: int
     description: Permission bits of /etc/hosts as an integer (e.g. 384 for 0600).
