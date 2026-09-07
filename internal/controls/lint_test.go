@@ -408,12 +408,12 @@ func TestUnusedKeysNamesRegisteredKeysNoControlReferences(t *testing.T) {
 	for _, k := range UnusedKeys(set, reg) {
 		got[k] = true
 	}
-	for _, k := range []string{"sockets.listening", "accounts.users", "services.ssh.active"} {
+	for _, k := range []string{"sockets.listening", "accounts.groups", "services.ssh.active"} {
 		if !got[k] {
 			t.Errorf("%s is referenced by no control and must be reported", k)
 		}
 	}
-	for _, k := range []string{"services.telnet.reachable", "files.etc_securetty_lines", "walk.world_writable"} {
+	for _, k := range []string{"services.telnet.reachable", "files.etc_securetty_lines", "walk.world_writable", "accounts.users", "accounts.shadow_in_use", "accounts.orphan_gids", "accounts.shells"} {
 		if got[k] {
 			t.Errorf("%s is referenced by a control and must not be reported", k)
 		}
@@ -460,8 +460,12 @@ remediation: { text_en: t, text_ko: t, risk: none, idempotent: true }
 			t.Errorf("%s: want a references problem, got %v", name, got)
 		}
 	}
-	if got := rules(lintOne(t, base, LintOptions{References: nil})); !got["references_stig"] {
-		t.Errorf("without an index a stig reference must be a problem, got %v", got)
+	if probs := lintOne(t, base, LintOptions{References: nil}); len(probs) != 0 {
+		t.Errorf("without an index a well-formed reference must lint clean, got %v", probs)
+	}
+	malformed := strings.Replace(base, "MINI-00-000010", "RHEL 9 bad", 1)
+	if got := rules(lintOne(t, malformed, LintOptions{References: nil})); !got["references_stig"] {
+		t.Errorf("without an index a malformed stig id must still be a problem, got %v", got)
 	}
 }
 

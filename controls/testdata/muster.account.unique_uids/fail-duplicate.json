@@ -1,0 +1,1 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{"accounts":{"users":{"status":"ok","value":[{"name":"root","uid_duplicate":false},{"name":"alice","uid_duplicate":true},{"name":"bob","uid_duplicate":true}]}}}}

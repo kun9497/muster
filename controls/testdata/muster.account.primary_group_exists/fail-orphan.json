@@ -1,0 +1,1 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{"accounts":{"orphan_gids":{"status":"ok","value":[{"name":"carol","gid":4242}]}}}}

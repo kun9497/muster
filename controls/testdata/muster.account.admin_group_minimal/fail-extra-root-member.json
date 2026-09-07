@@ -1,0 +1,1 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{"accounts":{"admin_group_members":{"status":"ok","value":[{"name":"toor","group":"root","via":"primary"},{"name":"alice","group":"sudo","via":"secondary"}]}}}}

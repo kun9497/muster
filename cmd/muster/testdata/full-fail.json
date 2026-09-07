@@ -12,9 +12,20 @@
   "files":{"etc_passwd":{"mode":{"status":"ok","value":420,"source":{"kind":"sys","path":"/etc/passwd"}},"uid":{"status":"ok","value":0},"gid":{"status":"ok","value":0},"acl_present":{"status":"ok","value":false},"acl_entries":{"status":"ok","value":[]}},
            "etc_hosts":{"mode":{"status":"ok","value":384,"source":{"kind":"file","path":"/etc/hosts"}},"uid":{"status":"ok","value":0}},
            "etc_services":{"mode":{"status":"ok","value":420,"source":{"kind":"file","path":"/etc/services"}},"uid":{"status":"ok","value":0}},
-           "etc_hosts_lpd":{"mode":{"status":"absent"},"uid":{"status":"absent"}}},
+           "etc_hosts_lpd":{"mode":{"status":"absent"},"uid":{"status":"absent"}},
+           "etc_shadow":{"uid":{"status":"ok","value":0},"mode":{"status":"ok","value":0,"source":{"kind":"sys","path":"/etc/shadow"}},"acl_entries":{"status":"ok","value":[]}}},
   "accounts":{"login_defs":{"pass_max_days":{"runtime":{"status":"ok","value":90},"persisted":{"status":"ok","value":90,"source":{"kind":"file","path":"/etc/login.defs","line":160}}},
                             "pass_min_days":{"runtime":{"status":"ok","value":1},"persisted":{"status":"ok","value":1}},
-                            "pass_min_len":{"status":"ok","value":8}}},
+                            "pass_min_len":{"status":"ok","value":8},
+                            "encrypt_method":{"status":"ok","value":"SHA512","source":{"kind":"file","path":"/etc/login.defs"}}},
+              "shadow_in_use":{"status":"ok","value":true},
+              "orphan_gids":{"status":"ok","value":[]},
+              "shells":{"status":"ok","value":["/bin/sh","/bin/bash"]},
+              "admin_group_members":{"status":"ok","value":[{"name":"alice","group":"sudo","via":"secondary"}]},
+              "users":{"status":"ok","value":[
+                {"name":"root","uid":0,"system":false,"shell_valid":true,"uid_duplicate":false,"shadowed":true,"password_status":"hashed","hash_algo":"$6$"},
+                {"name":"daemon","uid":1,"system":true,"shell_valid":false,"uid_duplicate":false,"shadowed":true,"password_status":"locked","hash_algo":""},
+                {"name":"alice","uid":1000,"gid":1000,"home":"/home/alice","shell":"/bin/bash","system":false,"shadowed":true,"uid_duplicate":false,"name_duplicate":false,"shell_valid":true,"password_status":"hashed","locked":false,"hash_algo":"$y$"}
+              ]}},
   "walk":{"world_writable":{"status":"absent"}}
  }}

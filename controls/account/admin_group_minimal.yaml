@@ -1,0 +1,23 @@
+id: muster.account.admin_group_minimal
+title_en: The root group holds no account other than root
+title_ko: root 그룹에 root 외의 계정이 없다
+description_en: Membership of the root group grants group access to everything root owns. No account other than root may have it as primary or secondary group; members of wheel, sudo and admin are listed in the snapshot under accounts.admin_group_members for the operator's review. The sudo-group STIG rules are cited as related, not as the same criterion.
+description_ko: root 그룹의 구성원은 root 소유 파일 전부에 그룹 권한을 갖습니다. root 외의 계정이 이를 기본 또는 보조 그룹으로 가져서는 안 되며, wheel·sudo·admin 의 구성원은 운영자 검토를 위해 스냅샷의 accounts.admin_group_members 에 나열됩니다. sudo 그룹에 관한 STIG 규칙은 동일 기준이 아니라 관련 항목으로 인용합니다.
+category: account
+importance: 중
+automation: partial
+references:
+  kisa: { "2026": ["U-08"], "2021": ["U-50"] }
+  stig:
+    - { benchmark: ubuntu2204, version: V2R9, id: UBTU-22-432015 }
+    - { benchmark: ubuntu2404, version: V1R6, id: UBTU-24-600130 }
+  nist_800_53: ["SC-3"]
+requires_facts: ">=1"
+absent_means: manual
+checks:
+  - { fact: accounts.admin_group_members, op: none, subject: name, where: { field: group, op: eq, expected: root } }
+remediation:
+  text_en: Remove the account from the root group (gpasswd -d <name> root) or give it another primary group (usermod -g <group> <name>).
+  text_ko: 계정을 root 그룹에서 제거하거나 (gpasswd -d <name> root) 다른 기본 그룹을 지정합니다 (usermod -g <group> <name>).
+  risk: none
+  idempotent: true

@@ -1,0 +1,23 @@
+id: muster.account.primary_group_exists
+title_en: Every account's primary group exists
+title_ko: 모든 계정의 기본 그룹이 존재한다
+description_en: An account whose primary gid names no group in /etc/group creates files owned by a group nobody administers, and a group later created with that gid inherits them. Every primary gid must exist.
+description_ko: 기본 gid 가 /etc/group 에 없는 계정은 아무도 관리하지 않는 그룹 소유의 파일을 만들며, 나중에 그 gid 로 생성되는 그룹이 이를 물려받습니다. 모든 기본 gid 가 존재해야 합니다.
+category: account
+importance: 하
+automation: auto
+references:
+  kisa: { "2026": ["U-09"], "2021": ["U-51"] }
+  cis:
+    - { benchmark: ubuntu-22.04, version: "2.0.0", rec: "7.2.3" }
+requires_facts: ">=1"
+absent_means: fail
+checks:
+  # N14: `none … gte 0` reads as "the list is non-empty": every element of
+  # orphan_gids has a non-negative gid, so any element is a hit.
+  - { fact: accounts.orphan_gids, op: none, subject: name, where: { field: gid, op: gte, expected: 0 } }
+remediation:
+  text_en: Create the missing group (groupadd -g <gid> <name>) or move the account to an existing one (usermod -g <group> <name>).
+  text_ko: 누락된 그룹을 만들거나 (groupadd -g <gid> <name>) 계정을 기존 그룹으로 옮깁니다 (usermod -g <group> <name>).
+  risk: none
+  idempotent: true

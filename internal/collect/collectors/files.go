@@ -20,7 +20,7 @@ const (
 
 var filesCollector = collect.Collector{
 	Name:    "files",
-	Declare: collect.Declaration{Reads: []string{passwdPath, securettyPath, groupPath, hostsPath, servicesPath, hostsLpdPath}, Needs: "none"},
+	Declare: collect.Declaration{Reads: []string{passwdPath, shadowPath, securettyPath, groupPath, hostsPath, servicesPath, hostsLpdPath}, Needs: "none"},
 	Run:     runFiles,
 }
 
@@ -31,6 +31,7 @@ func runFiles(_ context.Context, a collect.Access, b *collect.Builder) error {
 	// group-name leaf and nothing else.
 	groups, gmeta, gerr := groupNames(a)
 	writePermFacts(b, a, "files.etc_passwd", passwdPath, groups, gmeta, gerr, true)
+	writePermFacts(b, a, "files.etc_shadow", shadowPath, groups, gmeta, gerr, true)
 	writePermFacts(b, a, "files.etc_hosts", hostsPath, groups, gmeta, gerr, false)
 	writePermFacts(b, a, "files.etc_services", servicesPath, groups, gmeta, gerr, false)
 	writePermFacts(b, a, "files.etc_hosts_lpd", hostsLpdPath, groups, gmeta, gerr, false)

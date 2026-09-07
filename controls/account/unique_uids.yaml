@@ -1,0 +1,24 @@
+id: muster.account.unique_uids
+title_en: No two accounts share a uid
+title_ko: 두 계정이 같은 uid 를 갖지 않는다
+description_en: "Two accounts with one uid are one identity to the kernel: file ownership, process ownership and audit records cannot tell them apart. Every uid must belong to exactly one account."
+description_ko: uid 가 같은 두 계정은 커널에게 하나의 신원이어서 파일·프로세스 소유와 감사 기록으로 구분할 수 없습니다. 모든 uid 는 정확히 한 계정의 것이어야 합니다.
+category: account
+importance: 중
+automation: auto
+references:
+  kisa: { "2026": ["U-10"], "2021": ["U-52"] }
+  cis:
+    - { benchmark: ubuntu-22.04, version: "2.0.0", rec: "7.2.5" }
+  stig:
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-411030 }
+  nist_800_53: ["AU-3(1)", "IA-2", "IA-8"]
+requires_facts: ">=1"
+absent_means: fail
+checks:
+  - { fact: accounts.users, op: none, subject: name, where: { field: uid_duplicate, op: eq, expected: true } }
+remediation:
+  text_en: Assign a new uid to all but one of the accounts sharing it (usermod -u <new-uid> <name>) and re-own their files (find / -user <old-uid> -exec chown <name> {} +).
+  text_ko: uid 를 공유하는 계정 중 하나만 남기고 새 uid 를 부여한 뒤 (usermod -u <new-uid> <name>) 파일 소유를 다시 맞춥니다 (find / -user <old-uid> -exec chown <name> {} +).
+  risk: none
+  idempotent: true

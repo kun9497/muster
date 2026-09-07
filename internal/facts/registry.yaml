@@ -122,6 +122,66 @@ keys:
     since: 1
     sensitivity: public
     collector: files
+  - key: files.etc_shadow.mode
+    type: int
+    description: Permission bits of /etc/shadow as an integer (e.g. 256 for 0400).
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_shadow.uid
+    type: int
+    description: Owner uid of /etc/shadow.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_shadow.gid
+    type: int
+    description: Group gid of /etc/shadow.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_shadow.group
+    type: string
+    description: Group name for the gid of /etc/shadow from /etc/group; empty when the gid has no name.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_shadow.group_readable
+    type: bool
+    description: Whether the group permission bits of /etc/shadow include read (derived from mode).
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_shadow.group_writable
+    type: bool
+    description: Whether the group permission bits of /etc/shadow include write (derived from mode).
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_shadow.other_readable
+    type: bool
+    description: Whether the other permission bits of /etc/shadow include read (derived from mode).
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_shadow.other_writable
+    type: bool
+    description: Whether the other permission bits of /etc/shadow include write (derived from mode).
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_shadow.acl_present
+    type: bool
+    description: Whether a POSIX ACL xattr is present on /etc/shadow.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_shadow.acl_entries
+    type: list<string>
+    description: Access ACL entries of /etc/shadow in setfacl form with numeric ids (user::rw-, user:1000:rw-, group::r--, mask::rw-, other::r--); empty when no ACL is set.
+    since: 1
+    sensitivity: public
+    collector: files
   - key: files.etc_hosts.mode
     type: int
     description: Permission bits of /etc/hosts as an integer (e.g. 384 for 0600).
@@ -304,13 +364,125 @@ keys:
     since: 1
     sensitivity: public
     collector: accounts
+  - key: accounts.login_defs.pass_warn_age
+    type: setting<int>
+    description: PASS_WARN_AGE - persisted in login.defs, effective as the minimum warn field over existing accounts' shadow rows.
+    since: 1
+    sensitivity: public
+    collector: accounts
+    default_on: both
+  - key: accounts.login_defs.uid_min
+    type: int
+    description: UID_MIN from login.defs, the lowest uid of a regular (non-system) account.
+    since: 1
+    sensitivity: public
+    collector: accounts
+  - key: accounts.login_defs.sys_uid_max
+    type: int
+    description: SYS_UID_MAX from login.defs, the highest uid useradd assigns to a system account.
+    since: 1
+    sensitivity: public
+    collector: accounts
+  - key: accounts.login_defs.sha_crypt_min_rounds
+    type: int
+    description: SHA_CRYPT_MIN_ROUNDS from login.defs.
+    since: 1
+    sensitivity: public
+    collector: accounts
+  - key: accounts.login_defs.umask
+    type: string
+    description: UMASK from login.defs, verbatim (a mask, not a number).
+    since: 1
+    sensitivity: public
+    collector: accounts
+  - key: accounts.login_defs.home_mode
+    type: string
+    description: HOME_MODE from login.defs, verbatim.
+    since: 1
+    sensitivity: public
+    collector: accounts
+  - key: accounts.login_defs.encrypt_method
+    type: string
+    description: ENCRYPT_METHOD from login.defs, verbatim (SHA512, YESCRYPT, ...); PAM may override it.
+    since: 1
+    sensitivity: public
+    collector: accounts
+  - key: accounts.login_defs.env_supath
+    type: string
+    description: ENV_SUPATH from login.defs, verbatim (the PATH= assignment for root logins).
+    since: 1
+    sensitivity: public
+    collector: accounts
+  - key: accounts.login_defs.env_path
+    type: string
+    description: ENV_PATH from login.defs, verbatim (the PATH= assignment for other logins).
+    since: 1
+    sensitivity: public
+    collector: accounts
   - key: accounts.users
     type: list<record>
-    description: Local accounts with name, uid, gid, shell, password_status and ageing fields; no hashes. Ageing fields are -1 when the shadow field is empty, and uid/gid are -1 when the passwd field is unparsable.
+    description: Local accounts in /etc/passwd order with name, uid, gid, home, shell, system (0 < uid < UID_MIN, where UID_MIN is login.defs' value or 1000 when it is unset or unreadable; nobody is not a system account), shadowed (passwd field is x), uid_duplicate, name_duplicate, shell_valid (shell listed in /etc/shells) and, when /etc/shadow was read or does not exist, password_status (hashed | locked | nopass | noshadow), locked, hash_algo ("$6$"-style id, "legacy" for a hash without one, "" when there is no hash) and the ageing fields; no hashes. Ageing fields are -1 when the shadow field is empty, and uid/gid are -1 when the passwd field is unparsable.
     since: 1
     sensitivity: internal
     collector: accounts
     subject_kind: user
+  - key: accounts.shells
+    type: list<string>
+    description: The login shells listed in /etc/shells, in file order; when the file does not exist, the libc default (/bin/sh, /bin/csh) with a reason saying so; carries the read's status when the file is unreadable.
+    since: 1
+    sensitivity: public
+    collector: accounts
+  - key: accounts.parse_failures
+    type: int
+    description: Lines of /etc/passwd and /etc/group that could not be parsed as an account or group (too few fields, a non-numeric uid or gid); a mangled file must not read as a clean host.
+    since: 1
+    sensitivity: public
+    collector: accounts
+  - key: accounts.groups
+    type: list<record>
+    description: Local groups in /etc/group order with name, gid, members (the listed secondary members, duplicates removed), member_count and gid_duplicate.
+    since: 1
+    sensitivity: internal
+    collector: accounts
+    subject_kind: group
+  - key: accounts.orphan_gids
+    type: list<record>
+    description: Accounts whose primary gid names no group in /etc/group, as name and gid in /etc/passwd order; [] when every primary group exists; carries the read's status when /etc/passwd or /etc/group is unreadable.
+    since: 1
+    sensitivity: internal
+    collector: accounts
+    subject_kind: user
+  - key: accounts.admin_group_members
+    type: list<record>
+    description: Members of the administrative groups root, wheel, sudo and admin other than the root account itself - name, group and via (primary when the account's gid is the group's, secondary when listed in /etc/group) - in /etc/group order, primary members before secondary ones.
+    since: 1
+    sensitivity: internal
+    collector: accounts
+    subject_kind: user
+  - key: accounts.shadow_in_use
+    type: bool
+    description: Whether /etc/shadow exists and every /etc/passwd entry defers to it (password field x); a false names the first account that does not; carries the read's status when /etc/shadow or /etc/passwd is unreadable.
+    since: 1
+    sensitivity: internal
+    collector: accounts
+  - key: accounts.nss.passwd_sources
+    type: list<string>
+    description: The sources on the passwd line of /etc/nsswitch.conf, in order, with bracketed actions removed; absent when the file or the line is missing (glibc then resolves from files).
+    since: 1
+    sensitivity: public
+    collector: accounts
+  - key: accounts.nss.group_sources
+    type: list<string>
+    description: The sources on the group line of /etc/nsswitch.conf, in order, with bracketed actions removed; absent when the file or the line is missing.
+    since: 1
+    sensitivity: public
+    collector: accounts
+  - key: accounts.nss.remote
+    type: bool
+    description: "Whether the passwd or group database names a remote source in use: any source other than files, compat, systemd or db, where sss counts only when /etc/sssd/sssd.conf exists (compat's NIS + entries are not detected); account controls judged on the local files report WARN while this is true (spec section 7.3)."
+    since: 1
+    sensitivity: public
+    collector: accounts
   - key: env.container
     type: string
     description: Container runtime detected from filesystem markers (none, docker, podman, lxc, other); the same value the run header carries.

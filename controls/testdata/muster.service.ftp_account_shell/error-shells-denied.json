@@ -1,0 +1,1 @@
+{"synthetic": true, "_expect":{"reason_code":"permission_denied"},"schema_version":1,"run":{},"facts":{"accounts":{"shells":{"status":"denied","reason":"/etc/shells: permission denied"},"users":{"status":"ok","value":[{"name":"ftp","shell_valid":false}]}}}}

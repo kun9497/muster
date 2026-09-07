@@ -16,6 +16,24 @@ func (e *env) evalCollection(cl controls.Clause, entry facts.Entry, list []any, 
 	if kind == "" {
 		kind = "item"
 	}
+	// R129 (fix round 1): the sub-clause's Expected is the same for every
+	// element a clause examines, so it is substituted once per clause here
+	// rather than once per element inside the loop below.
+	var requireExpected, whereExpected any
+	switch cl.Op {
+	case "each":
+		var err error
+		requireExpected, err = substitute(cl.Require.Expected, e.params)
+		if err != nil {
+			return clauseOutcome{Err: err}
+		}
+	case "none":
+		var err error
+		whereExpected, err = substitute(cl.Where.Expected, e.params)
+		if err != nil {
+			return clauseOutcome{Err: err}
+		}
+	}
 	for i, elem := range list {
 		subject := fmt.Sprintf("%s:%s", kind, subjectValue(cl.Subject, elem, i))
 		switch cl.Op {
@@ -33,7 +51,7 @@ func (e *env) evalCollection(cl controls.Clause, entry facts.Entry, list []any, 
 			if err != nil {
 				return clauseOutcome{Err: err}
 			}
-			obs := Observation{Subject: subject, Expected: cl.Require.Expected, Actual: fieldValue(cl.Require.Field, elem), Verdict: "pass"}
+			obs := Observation{Subject: subject, Expected: requireExpected, Actual: fieldValue(cl.Require.Field, elem), Verdict: "pass"}
 			if !ok {
 				obs.Verdict = "fail"
 				out.Holds = false
@@ -46,7 +64,7 @@ func (e *env) evalCollection(cl controls.Clause, entry facts.Entry, list []any, 
 			}
 			if hit {
 				out.Holds = false
-				out.Observations = append(out.Observations, Observation{Subject: subject, Expected: fmt.Sprintf("not %s %v", cl.Where.Op, cl.Where.Expected), Actual: fieldValue(cl.Where.Field, elem), Verdict: "fail"})
+				out.Observations = append(out.Observations, Observation{Subject: subject, Expected: fmt.Sprintf("not %s %v", cl.Where.Op, whereExpected), Actual: fieldValue(cl.Where.Field, elem), Verdict: "fail"})
 			}
 		}
 	}

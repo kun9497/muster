@@ -1,0 +1,1 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{"accounts":{"shadow_in_use":{"status":"ok","value":true},"users":{"status":"ok","value":[{"name":"root","shadowed":true,"password_status":"hashed"},{"name":"alice","shadowed":true,"password_status":"hashed"},{"name":"svc","shadowed":true,"password_status":"locked"}]},"nss":{"remote":{"status":"ok","value":true}}}}}

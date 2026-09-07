@@ -1,0 +1,1 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{"files":{"etc_shadow":{"uid":{"status":"ok","value":0},"mode":{"status":"ok","value":256,"source":{"kind":"sys","path":"/etc/shadow"}},"acl_entries":{"status":"error","reason":"decode ACL: bad version"}}}}}

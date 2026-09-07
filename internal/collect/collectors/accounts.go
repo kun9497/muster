@@ -4,6 +4,8 @@ package collectors
 
 import (
 	"context"
+	"errors"
+	"io/fs"
 	"strconv"
 	"strings"
 
@@ -18,7 +20,7 @@ const (
 
 var accountsCollector = collect.Collector{
 	Name:    "accounts",
-	Declare: collect.Declaration{Reads: []string{loginDefsPath, passwdPath, shadowPath}, Needs: "root"},
+	Declare: collect.Declaration{Reads: []string{loginDefsPath, passwdPath, shadowPath, groupPath, shellsPath, nsswitchPath, sssdConfPath}, Needs: "root"},
 	Run:     runAccounts,
 }
 
@@ -60,12 +62,51 @@ func (d loginDefs) value(key string) facts.Envelope {
 	return collect.Absent(key + " is not set in " + loginDefsPath)
 }
 
+// str returns key's value verbatim — everything after the key, trimmed —
+// with the line as evidence. login.defs values such as ENV_SUPATH contain
+// "=" and ":" and UMASK is a mask, so nothing is parsed as a number here.
+// The key must be followed by whitespace: UMASKX is not UMASK.
+func (d loginDefs) str(key string) facts.Envelope {
+	if d.err != nil {
+		return collect.FromReadError(d.err, d.meta)
+	}
+	for i, raw := range d.lines {
+		line := strings.TrimSpace(raw)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		rest, ok := strings.CutPrefix(line, key)
+		if !ok || rest == "" || (rest[0] != ' ' && rest[0] != '\t') {
+			continue
+		}
+		return collect.OKRead(strings.TrimSpace(rest), &facts.Source{
+			Kind: "file", Path: loginDefsPath, Line: i + 1, Raw: sourceRaw(raw),
+		}, d.meta)
+	}
+	return collect.Absent(key + " is not set in " + loginDefsPath)
+}
+
+// intOr is value(key) for callers that need a number to work with rather
+// than a fact to report: the integer when the key is set and parses, def
+// otherwise (unset, unparsable or an unreadable file).
+func (d loginDefs) intOr(key string, def int) int {
+	e := d.value(key)
+	if e.Status != facts.StatusOK {
+		return def
+	}
+	n, ok := e.Value.(int)
+	if !ok {
+		return def
+	}
+	return n
+}
+
 // shadowRow is one /etc/shadow entry reduced to what a snapshot may hold:
 // the ageing fields and the hash ALGORITHM id. The hash itself never leaves
 // parseShadow, and no part of it is ever stored (spec §5.6).
 type shadowRow struct {
 	name       string
-	status     string // hashed | locked | nopass
+	status     string // hashed | locked | nopass (noshadow is assigned by deriveUsers for a passwd row without a shadow row)
 	algo       string // the "$id$" prefix, empty when there is no hash
 	lastChange int
 	min        int
@@ -88,7 +129,11 @@ func passwordStatus(pw string) string {
 }
 
 // hashAlgo returns the "$id$" prefix of a crypt hash and nothing else: no
-// salt, no digest, not one byte of either.
+// salt, no digest, not one byte of either. The field is first stripped of
+// the "!" and "*" characters that lock an account, because a locked
+// account holding an MD5 hash still holds an MD5 hash — the lock is
+// reported as its own field. A non-empty remainder with no "$id$" prefix
+// is hash material of a legacy scheme (DES, BSDi) and is named "legacy".
 //
 // The id has to look like one — 1 to 8 alphanumeric characters, which
 // covers every crypt scheme in use ("1", "5", "6", "y", "2b", "gy",
@@ -99,8 +144,12 @@ func passwordStatus(pw string) string {
 // sliced out of pw, so it cannot keep the whole shadow line alive behind
 // it either.
 func hashAlgo(pw string) string {
-	if !strings.HasPrefix(pw, "$") {
+	pw = strings.TrimLeft(pw, "!*")
+	if pw == "" {
 		return ""
+	}
+	if !strings.HasPrefix(pw, "$") {
+		return "legacy"
 	}
 	id, _, ok := strings.Cut(pw[1:], "$")
 	if !ok || len(id) == 0 || len(id) > 8 || !isAlphanumeric(id) {
@@ -171,62 +220,136 @@ func ageingExtremes(rows []shadowRow, meta collect.ReadMeta) (facts.Envelope, fa
 	return maxR, minR
 }
 
+// ageingWarn is the smallest PASS_WARN_AGE that applies to an account with
+// a password hash (shadow field 6), the runtime side of pass_warn_age.
+func ageingWarn(rows []shadowRow, meta collect.ReadMeta) facts.Envelope {
+	derived := &facts.Source{Kind: "derived", Inputs: []facts.Source{{Kind: "file", Path: shadowPath}}}
+	mn := -1
+	for _, r := range rows {
+		if r.status != "hashed" || r.warn < 0 {
+			continue
+		}
+		if mn < 0 || r.warn < mn {
+			mn = r.warn
+		}
+	}
+	if mn < 0 {
+		return collect.Absent("no account with a password hash carries this ageing field")
+	}
+	return collect.OKRead(mn, derived, meta)
+}
+
 func runAccounts(_ context.Context, a collect.Access, b *collect.Builder) error {
 	defs := readLoginDefs(a)
 	b.Set("accounts.login_defs.pass_min_len", defs.value("PASS_MIN_LEN"))
-	maxP, minP := defs.value("PASS_MAX_DAYS"), defs.value("PASS_MIN_DAYS")
+	maxP, minP, warnP := defs.value("PASS_MAX_DAYS"), defs.value("PASS_MIN_DAYS"), defs.value("PASS_WARN_AGE")
+	// Fixed order (same input, same bytes): the integer boundaries, then the
+	// verbatim strings.
+	b.Set("accounts.login_defs.uid_min", defs.value("UID_MIN"))
+	b.Set("accounts.login_defs.sys_uid_max", defs.value("SYS_UID_MAX"))
+	b.Set("accounts.login_defs.sha_crypt_min_rounds", defs.value("SHA_CRYPT_MIN_ROUNDS"))
+	for _, k := range [...]struct{ leaf, name string }{
+		{"umask", "UMASK"}, {"home_mode", "HOME_MODE"}, {"encrypt_method", "ENCRYPT_METHOD"},
+		{"env_supath", "ENV_SUPATH"}, {"env_path", "ENV_PATH"},
+	} {
+		b.Set("accounts.login_defs."+k.leaf, defs.str(k.name))
+	}
 
 	shadowData, smeta, serr := a.ReadFile(shadowPath, readLimit)
 	var rows []shadowRow
-	var maxR, minR facts.Envelope
+	var maxR, minR, warnR facts.Envelope
 	if serr != nil {
 		// Unreadable shadow means the runtime side is denied (or whatever
 		// the read said), never absent and never a value: without it we do
 		// not know what applies to existing accounts.
 		maxR = collect.FromReadError(serr, smeta)
 		minR = collect.FromReadError(serr, smeta)
+		warnR = collect.FromReadError(serr, smeta)
 	} else {
 		rows = parseShadow(shadowData)
 		maxR, minR = ageingExtremes(rows, smeta)
+		warnR = ageingWarn(rows, smeta)
 	}
 	b.SetSetting("accounts.login_defs.pass_max_days", facts.Setting{Runtime: &maxR, Persisted: &maxP})
 	b.SetSetting("accounts.login_defs.pass_min_days", facts.Setting{Runtime: &minR, Persisted: &minP})
+	b.SetSetting("accounts.login_defs.pass_warn_age", facts.Setting{Runtime: &warnR, Persisted: &warnP})
 
 	pwData, pmeta, perr := a.ReadFile(passwdPath, readLimit)
+	shells, shellsEnv := loginShells(a)
+	b.Set("accounts.shells", shellsEnv)
+	writeNSS(a, b)
+	gData, gmeta, gerr := a.ReadFile(groupPath, readLimit)
+	var grows []groupRow
+	gfail := 0
+	if gerr == nil {
+		grows, gfail = parseGroup(gData)
+	}
+	groupErr := func() facts.Envelope {
+		e := collect.FromReadError(gerr, gmeta)
+		e.Reason = groupPath + ": " + e.Reason
+		return e
+	}
 	if perr != nil {
-		b.Set("accounts.users", collect.FromReadError(perr, pmeta))
+		// Without /etc/passwd there are no accounts to report or to join;
+		// the groups themselves are still a fact when /etc/group was read.
+		e := collect.FromReadError(perr, pmeta)
+		b.Set("accounts.users", e)
+		if gerr != nil {
+			b.Set("accounts.groups", groupErr())
+		} else {
+			b.Set("accounts.groups", collect.OKRead(groupRecords(grows), &facts.Source{Kind: "file", Path: groupPath}, gmeta))
+		}
+		b.Set("accounts.orphan_gids", e)
+		b.Set("accounts.admin_group_members", e)
+		b.Set("accounts.shadow_in_use", e)
+		b.Set("accounts.parse_failures", e)
 		return nil
 	}
+	prows, failures := parsePasswd(pwData)
 	byName := make(map[string]shadowRow, len(rows))
 	for _, r := range rows {
 		byName[r.name] = r
 	}
-	users := []any{} // R50: a host with no parsable accounts yields [], not null
-	for _, line := range splitLines(pwData) {
-		f := strings.Split(line, ":")
-		if len(f) < 7 || f[0] == "" || strings.HasPrefix(f[0], "#") {
-			continue
-		}
-		u := map[string]any{
-			"name":  f[0],
-			"uid":   intField(f[2]),
-			"gid":   intField(f[3]),
-			"shell": f[6],
-		}
-		// Without shadow the row simply has no ageing fields, rather than
-		// zeroes that would read as a policy nobody set.
-		if r, ok := byName[f[0]]; ok {
-			u["password_status"] = r.status
-			u["hash_algo"] = r.algo
-			u["last_change"] = r.lastChange
-			u["min"] = r.min
-			u["max"] = r.max
-			u["warn"] = r.warn
-			u["inactive"] = r.inactive
-			u["expire"] = r.expire
-		}
-		users = append(users, u)
+	// R138: a missing /etc/shadow (ENOENT) is a known state, not an unread
+	// one -- byName stays empty (rows was never populated when serr != nil),
+	// so every row falls through deriveUsers' noShadowRow path (R132) and
+	// carries password_status "noshadow" instead of no shadow fields at
+	// all. A denied or otherwise unreadable shadow is genuinely unread:
+	// haveShadow stays false and rows keep no shadow-derived fields.
+	haveShadow := serr == nil || errors.Is(serr, fs.ErrNotExist)
+	users := deriveUsers(prows, byName, haveShadow, defs.intOr("UID_MIN", 1000), shells)
+	// A record joins two files, so it is partial when either read was cut
+	// short: a truncated /etc/shadow leaves rows whose password_status was
+	// derived from a shadow this process never saw the end of (R131).
+	ue := collect.OKRead(users, &facts.Source{Kind: "file", Path: passwdPath}, pmeta)
+	ue.Truncated = ue.Truncated || (serr == nil && smeta.Truncated)
+	b.Set("accounts.users", ue)
+	joined := &facts.Source{Kind: "derived", Inputs: []facts.Source{{Kind: "file", Path: passwdPath}, {Kind: "file", Path: groupPath}}}
+	if gerr != nil {
+		b.Set("accounts.groups", groupErr())
+		b.Set("accounts.orphan_gids", groupErr())
+		b.Set("accounts.admin_group_members", groupErr())
+	} else {
+		b.Set("accounts.groups", collect.OKRead(groupRecords(grows), &facts.Source{Kind: "file", Path: groupPath}, gmeta))
+		// Both joins read the two files, so either read hitting the cap
+		// makes them partial: OKRead carries /etc/group's flag and the
+		// passwd one is ORed in (R131).
+		oe := collect.OKRead(orphanGIDs(prows, grows), joined, gmeta)
+		oe.Truncated = oe.Truncated || pmeta.Truncated
+		b.Set("accounts.orphan_gids", oe)
+		ae := collect.OKRead(adminGroupMembers(prows, grows), joined, gmeta)
+		ae.Truncated = ae.Truncated || pmeta.Truncated
+		b.Set("accounts.admin_group_members", ae)
 	}
-	b.Set("accounts.users", collect.OKRead(users, &facts.Source{Kind: "file", Path: passwdPath}, pmeta))
+	b.Set("accounts.shadow_in_use", shadowInUse(prows, serr, smeta, pmeta))
+	inputs := []facts.Source{{Kind: "file", Path: passwdPath}}
+	if gerr == nil {
+		inputs = append(inputs, facts.Source{Kind: "file", Path: groupPath})
+	}
+	// The count sums both files, so it is partial when either was cut short
+	// — a truncated /etc/group hides the very lines that would not parse.
+	fe := collect.OK(failures+gfail, &facts.Source{Kind: "derived", Inputs: inputs})
+	fe.Truncated = pmeta.Truncated || (gerr == nil && gmeta.Truncated)
+	b.Set("accounts.parse_failures", fe)
 	return nil
 }
