@@ -5,6 +5,7 @@ package collectors
 import (
 	"errors"
 	"io/fs"
+	"maps"
 	"slices"
 	"strconv"
 	"strings"
@@ -125,7 +126,10 @@ func pwqualityFacts(s pamStacks, a collect.Access) map[string]facts.Envelope {
 		}
 	}
 	if enabled == nil {
-		e := collect.OK(false, &facts.Source{Kind: "derived", Inputs: []facts.Source{{Kind: "file", Path: pamDir + "/passwd"}}})
+		// R157: the evidence for "not stacked" is every file the stack was
+		// expanded out of, not /etc/pam.d/passwd, which on Debian holds one
+		// @include and none of the password lines that were searched.
+		e := collect.OK(false, pamSource(s.x))
 		e.Reason = "pam_pwquality.so is not stacked in passwd's password stack with an enforcing control"
 		out["pam.pwquality.enabled"] = e
 		for _, k := range passwordKeys[1:10] {
@@ -260,4 +264,253 @@ func rememberFact(pw, unix []pamLine, a collect.Access) facts.Envelope {
 		}
 	}
 	return collect.Absent("no remember= on pam_pwhistory.so, in pwhistory.conf or on pam_unix.so")
+}
+
+// accessKeys is the fixed order the access-control keys are written in.
+var accessKeys = []string{
+	"pam.faillock.enabled", "pam.faillock.deny", "pam.faillock.unlock_time", "pam.faillock.fail_interval",
+	"pam.faillock.even_deny_root", "pam.faillock.root_unlock_time",
+	"pam.su.wheel_required", "pam.su.wheel_control", "pam.su.wheel_group", "pam.su.wheel_args",
+	"pam.umask_module.enabled", "pam.umask_module.args", "pam.securetty_enabled",
+}
+
+// faillockServices are the services a lockout must cover to count.
+var faillockServices = []string{"login", "sshd"}
+
+// faillockInts are pam_faillock's numeric settings, in the order a
+// disagreement between the preauth and the authfail line names them.
+var faillockInts = []string{"deny", "unlock_time", "fail_interval", "root_unlock_time"}
+
+// argsList renders module arguments as a fact value: a list, never nil (R50).
+func argsList(args []string) []any {
+	out := []any{}
+	for _, a := range args {
+		out = append(out, a)
+	}
+	return out
+}
+
+// applyFaillock overrides the numeric settings from one conf file or one
+// line's arguments and reports whether root_unlock_time was among them.
+func applyFaillock(dst map[string]int, kv map[string]string) bool {
+	for _, k := range faillockInts {
+		applyInt(dst, kv, k)
+	}
+	_, ok := kv["root_unlock_time"]
+	return ok
+}
+
+// faillockEffective resolves one line's settings on top of base without
+// disturbing it: what that half of the lockout alone would enforce.
+// root_unlock_time falls back to the effective unlock_time when nothing
+// set it, which is what pam_faillock itself does.
+func faillockEffective(base map[string]int, rootSet bool, args []string) map[string]int {
+	v := maps.Clone(base)
+	if applyFaillock(v, argsKV(args)) {
+		rootSet = true
+	}
+	if !rootSet {
+		v["root_unlock_time"] = v["unlock_time"]
+	}
+	return v
+}
+
+// faillockComplete reports whether one service's stack is a whole lockout:
+// pam_faillock.so with preauth and with authfail in the auth phase, and a
+// reset half — the module in the account phase or an authsucc line in the
+// auth phase (R151). It returns the two lines the values are read from.
+func faillockComplete(lines []pamLine) (preauth, authfail *pamLine, ok bool) {
+	authsucc := false
+	for _, l := range linesOf(lines, "auth", "pam_faillock.so") {
+		l := l
+		if hasArg(l.Args, "preauth") && preauth == nil {
+			preauth = &l
+		}
+		if hasArg(l.Args, "authfail") && authfail == nil {
+			authfail = &l
+		}
+		if hasArg(l.Args, "authsucc") {
+			authsucc = true
+		}
+	}
+	reset := authsucc || len(linesOf(lines, "account", "pam_faillock.so")) > 0
+	return preauth, authfail, preauth != nil && authfail != nil && reset
+}
+
+// faillockFacts derives pam.faillock.* . enabled requires the whole set in
+// every existing login-facing service — a mention of the module is not a
+// lockout. Values come from faillock.conf, then the preauth arguments,
+// then the authfail arguments of the first complete service, each
+// overriding the last.
+func faillockFacts(s pamStacks, a collect.Access) map[string]facts.Envelope {
+	out := map[string]facts.Envelope{}
+	var preauth, authfail *pamLine
+	missing := ""
+	seen := false
+	for _, svc := range faillockServices {
+		if !s.has(svc) {
+			continue
+		}
+		seen = true
+		pre, fail, complete := faillockComplete(s.byName[svc])
+		if !complete {
+			if missing == "" {
+				missing = svc
+			}
+			continue
+		}
+		if preauth == nil {
+			preauth, authfail = pre, fail
+		}
+	}
+	if !seen {
+		for _, k := range accessKeys[:6] {
+			out[k] = collect.Absent("neither login nor sshd has a PAM service file")
+		}
+		return out
+	}
+	if missing != "" {
+		e := collect.OK(false, &facts.Source{Kind: "derived", Inputs: []facts.Source{{Kind: "file", Path: pamDir + "/" + missing}}})
+		e.Reason = missing + "'s stack lacks pam_faillock.so preauth, authfail or a reset (the module in the account phase or an authsucc line)"
+		out["pam.faillock.enabled"] = e
+		for _, k := range accessKeys[1:6] {
+			out[k] = collect.Absent("faillock is not enabled")
+		}
+		return out
+	}
+	vals := map[string]int{"deny": 3, "unlock_time": 600, "fail_interval": 900, "root_unlock_time": 0}
+	evenDenyRoot := false
+	rootSet := false
+	var inputs []facts.Source
+	// R148: faillock.conf exists and the module reads it, so a value taken
+	// from the defaults instead would be a guess about a file nobody here
+	// can see. enabled still follows the stacks.
+	var confErr *facts.Envelope
+	if kv, src, err := readKV(a, faillockConf); err != nil {
+		e := readErrorEnv(faillockConf, err)
+		confErr = &e
+	} else if kv != nil {
+		rootSet = applyFaillock(vals, kv) || rootSet
+		if _, ok := kv["even_deny_root"]; ok {
+			evenDenyRoot = true
+		}
+		inputs = append(inputs, *src)
+	}
+	// R150: each line resolved on its own, so a disagreement is about the
+	// values the two halves would enforce, not about the text.
+	preEff := faillockEffective(vals, rootSet, preauth.Args)
+	failEff := faillockEffective(vals, rootSet, authfail.Args)
+	var differ []string
+	for _, k := range faillockInts {
+		if preEff[k] != failEff[k] {
+			differ = append(differ, k)
+		}
+	}
+	rootSet = applyFaillock(vals, argsKV(preauth.Args)) || rootSet
+	inputs = append(inputs, lineSource(*preauth))
+	rootSet = applyFaillock(vals, argsKV(authfail.Args)) || rootSet
+	inputs = append(inputs, lineSource(*authfail))
+	evenDenyRoot = evenDenyRoot || hasArg(preauth.Args, "even_deny_root") || hasArg(authfail.Args, "even_deny_root")
+	if !rootSet {
+		vals["root_unlock_time"] = vals["unlock_time"]
+	}
+	// A fresh Source per key, so no two envelopes share one pointer (R147).
+	src := func() *facts.Source { return &facts.Source{Kind: "derived", Inputs: slices.Clone(inputs)} }
+	enabled := collect.OK(true, src())
+	if len(differ) > 0 {
+		enabled.Reason = "preauth and authfail disagree on " + strings.Join(differ, ", ")
+	}
+	out["pam.faillock.enabled"] = enabled
+	if confErr != nil {
+		for _, k := range accessKeys[1:6] {
+			out[k] = *confErr
+		}
+		return out
+	}
+	out["pam.faillock.deny"] = collect.OK(vals["deny"], src())
+	out["pam.faillock.unlock_time"] = collect.OK(vals["unlock_time"], src())
+	out["pam.faillock.fail_interval"] = collect.OK(vals["fail_interval"], src())
+	out["pam.faillock.even_deny_root"] = collect.OK(evenDenyRoot, src())
+	out["pam.faillock.root_unlock_time"] = collect.OK(vals["root_unlock_time"], src())
+	return out
+}
+
+// suFacts derives pam.su.* from su's auth stack: the first pam_wheel.so
+// line decides, by its control field and arguments, not by its presence.
+func suFacts(s pamStacks) map[string]facts.Envelope {
+	out := map[string]facts.Envelope{}
+	if !s.has("su") {
+		for _, k := range accessKeys[6:10] {
+			out[k] = collect.Absent(pamDir + "/su does not exist")
+		}
+		return out
+	}
+	wheel := linesOf(s.byName["su"], "auth", "pam_wheel.so")
+	if len(wheel) == 0 {
+		e := collect.OK(false, &facts.Source{Kind: "derived", Inputs: []facts.Source{{Kind: "file", Path: pamDir + "/su"}}})
+		e.Reason = "no pam_wheel.so line in su's auth stack"
+		out["pam.su.wheel_required"] = e
+		for _, k := range accessKeys[7:10] {
+			out[k] = collect.Absent("no pam_wheel.so line in su's auth stack")
+		}
+		return out
+	}
+	l := wheel[0]
+	src := func() *facts.Source {
+		return &facts.Source{Kind: "derived", Inputs: []facts.Source{lineSource(l)}}
+	}
+	required := (l.Control == "required" || l.Control == "requisite") && !hasArg(l.Args, "deny")
+	e := collect.OK(required, src())
+	if !required {
+		e.Reason = "pam_wheel.so is stacked with control " + l.Control + " and arguments " + strings.Join(l.Args, " ") + ", which does not restrict su"
+	}
+	out["pam.su.wheel_required"] = e
+	out["pam.su.wheel_control"] = collect.OK(l.Control, src())
+	group := "wheel"
+	if g, ok := argValue(l.Args, "group"); ok && g != "" {
+		group = g
+	}
+	out["pam.su.wheel_group"] = collect.OK(group, src())
+	out["pam.su.wheel_args"] = collect.OK(argsList(l.Args), src())
+	return out
+}
+
+// umaskFacts derives pam.umask_module.* from the first existing service
+// among login, sshd and other.
+func umaskFacts(s pamStacks) map[string]facts.Envelope {
+	out := map[string]facts.Envelope{}
+	for _, svc := range []string{"login", "sshd", "other"} {
+		if !s.has(svc) {
+			continue
+		}
+		lines := linesOf(s.byName[svc], "session", "pam_umask.so")
+		if len(lines) == 0 {
+			e := collect.OK(false, &facts.Source{Kind: "derived", Inputs: []facts.Source{{Kind: "file", Path: pamDir + "/" + svc}}})
+			e.Reason = "no pam_umask.so line in " + svc + "'s session stack"
+			out["pam.umask_module.enabled"] = e
+			out["pam.umask_module.args"] = collect.Absent("pam_umask.so is not stacked")
+			return out
+		}
+		src := func() *facts.Source {
+			return &facts.Source{Kind: "derived", Inputs: []facts.Source{lineSource(lines[0])}}
+		}
+		out["pam.umask_module.enabled"] = collect.OK(true, src())
+		out["pam.umask_module.args"] = collect.OK(argsList(lines[0].Args), src())
+		return out
+	}
+	out["pam.umask_module.enabled"] = collect.Absent("no login, sshd or other PAM service file")
+	out["pam.umask_module.args"] = collect.Absent("no login, sshd or other PAM service file")
+	return out
+}
+
+// securettyFact derives pam.securetty_enabled from login's auth stack.
+func securettyFact(s pamStacks) facts.Envelope {
+	if !s.has("login") {
+		return collect.Absent(pamDir + "/login does not exist")
+	}
+	lines := linesOf(s.byName["login"], "auth", "pam_securetty.so")
+	if len(lines) == 0 {
+		return collect.OK(false, &facts.Source{Kind: "derived", Inputs: []facts.Source{{Kind: "file", Path: pamDir + "/login"}}})
+	}
+	return collect.OK(true, &facts.Source{Kind: "derived", Inputs: []facts.Source{lineSource(lines[0])}})
 }

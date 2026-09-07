@@ -295,6 +295,12 @@ func TestPAMPwqualityNotStackedIsNotEnabled(t *testing.T) {
 	if e := env(t, b, "pam.pwquality.enabled"); e.Status != facts.StatusOK || e.Value != false || !strings.Contains(e.Reason, "not stacked") {
 		t.Errorf("%+v", e)
 	}
+	// R157: the not-enabled answer cites the files that were actually read,
+	// which is where the password stack really came from - not /etc/pam.d/passwd,
+	// which only @includes it.
+	if got := sourcePaths(t, env(t, b, "pam.pwquality.enabled")); !slices.Contains(got, "/etc/pam.d/common-password") {
+		t.Errorf("inputs %v", got)
+	}
 	for _, k := range []string{"minlen", "minclass", "dcredit", "ucredit", "lcredit", "ocredit", "required_classes", "enforce_for_root", "local_users_only"} {
 		if e := env(t, b, "pam.pwquality."+k); e.Status != facts.StatusAbsent {
 			t.Errorf("%s = %+v, want absent", k, e)
@@ -465,7 +471,8 @@ func TestPAMGlobErrorIsReported(t *testing.T) {
 	if want.Status != facts.StatusError || !strings.HasPrefix(want.Reason, pamDir+": ") {
 		t.Fatalf("pam.stacks %+v", want)
 	}
-	for _, k := range append([]string{"pam.managing_layer", "pam.parse_complete"}, passwordKeys...) {
+	all := append([]string{"pam.managing_layer", "pam.parse_complete"}, passwordKeys...)
+	for _, k := range append(all, accessKeys...) {
 		if e := env(t, b, k); e != want {
 			t.Errorf("%s = %+v, want %+v", k, e, want)
 		}
@@ -514,5 +521,182 @@ func TestPAMManagingLayerCitesTheMarkerFile(t *testing.T) {
 	}
 	if got := sourcePaths(t, env(t, b, "pam.stacks")); slices.Contains(got, pamDir+"/common-auth") {
 		t.Errorf("the expander did read common-auth, so this proves nothing: %v", got)
+	}
+}
+
+// Task 3: faillock is enabled only when every login-facing service stacks
+// preauth, authfail and a reset line; arguments override faillock.conf.
+func TestPAMFaillockEnabledWithPrecedence(t *testing.T) {
+	a := rockyPAM()
+	a.files["/etc/security/faillock.conf"] = "pam/rocky/faillock.conf"
+	b := build(t, "pam", a)
+	if e := env(t, b, "pam.faillock.enabled"); e.Status != facts.StatusOK || e.Value != true {
+		t.Fatalf("%+v", e)
+	}
+	for k, want := range map[string]any{"deny": 5, "unlock_time": 900, "fail_interval": 900, "root_unlock_time": 900, "even_deny_root": true} {
+		if e := env(t, b, "pam.faillock."+k); e.Status != facts.StatusOK || e.Value != want {
+			t.Errorf("%s = %+v, want %v", k, e, want)
+		}
+	}
+	if e := env(t, b, "pam.faillock.deny"); len(e.Source.Inputs) != 3 || e.Source.Inputs[0].Path != "/etc/security/faillock.conf" || e.Source.Inputs[1].Line != 3 || e.Source.Inputs[2].Line != 5 {
+		t.Errorf("inputs: conf, preauth line, authfail line - got %+v", e.Source.Inputs)
+	}
+	// sshd's stack (password-auth) without faillock: not enabled, values absent.
+	a = rockyPAM()
+	a.files["/etc/authselect/password-auth"] = "pam/rocky/authselect-password-auth-nofaillock"
+	b = build(t, "pam", a)
+	if e := env(t, b, "pam.faillock.enabled"); e.Value != false || !strings.Contains(e.Reason, "sshd") {
+		t.Errorf("%+v (the reason names the service that lacks it)", e)
+	}
+	if e := env(t, b, "pam.faillock.deny"); e.Status != facts.StatusAbsent {
+		t.Errorf("%+v", e)
+	}
+}
+
+func TestPAMFaillockNotStackedOnDebian(t *testing.T) {
+	b := build(t, "pam", ubuntuPAM())
+	if e := env(t, b, "pam.faillock.enabled"); e.Status != facts.StatusOK || e.Value != false {
+		t.Errorf("%+v", e)
+	}
+	for _, k := range []string{"deny", "unlock_time", "fail_interval", "even_deny_root", "root_unlock_time"} {
+		if e := env(t, b, "pam.faillock."+k); e.Status != facts.StatusAbsent {
+			t.Errorf("%s = %+v", k, e)
+		}
+	}
+}
+
+// R148: a faillock.conf that exists but cannot be read is the answer for
+// every value it could have set; enabled still follows the stacks.
+func TestPAMFaillockUnreadableConfIsTheAnswer(t *testing.T) {
+	a := rockyPAM()
+	a.fails[faillockConf] = os.ErrPermission
+	b := build(t, "pam", a)
+	if e := env(t, b, "pam.faillock.enabled"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("enabled must still follow the stack: %+v", e)
+	}
+	for _, k := range accessKeys[1:6] {
+		e := env(t, b, k)
+		if e.Status != facts.StatusDenied || !strings.HasPrefix(e.Reason, faillockConf+": ") {
+			t.Errorf("%s = %+v", k, e)
+		}
+	}
+}
+
+// R150: the preauth and authfail lines may carry different values. The
+// authfail line is the one reported, and enabled says they disagree.
+func TestPAMFaillockPreauthAndAuthfailDisagree(t *testing.T) {
+	a := rockyPAM()
+	a.files["/etc/authselect/system-auth"] = "pam/rocky/authselect-system-auth-mismatch"
+	b := build(t, "pam", a)
+	if e := env(t, b, "pam.faillock.deny"); e.Status != facts.StatusOK || e.Value != 5 {
+		t.Errorf("the authfail value is the one reported: %+v", e)
+	}
+	e := env(t, b, "pam.faillock.enabled")
+	if e.Status != facts.StatusOK || e.Value != true || !strings.Contains(e.Reason, "disagree on deny") {
+		t.Errorf("%+v", e)
+	}
+	if strings.Contains(e.Reason, "unlock_time") {
+		t.Errorf("only the keys that differ are named: %+v", e)
+	}
+}
+
+// R151: the reset half of the lockout may be an authsucc line in the auth
+// phase instead of pam_faillock.so in the account phase.
+func TestPAMFaillockAuthsuccIsAReset(t *testing.T) {
+	a := rockyPAM()
+	a.files["/etc/authselect/system-auth"] = "pam/rocky/authselect-system-auth-authsucc"
+	a.files["/etc/authselect/password-auth"] = "pam/rocky/authselect-system-auth-authsucc"
+	b := build(t, "pam", a)
+	if e := env(t, b, "pam.faillock.enabled"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("%+v (an authsucc line resets the counter)", e)
+	}
+	if e := env(t, b, "pam.faillock.deny"); e.Status != facts.StatusOK || e.Value != 5 {
+		t.Errorf("%+v", e)
+	}
+}
+
+func TestPAMSuWheel(t *testing.T) {
+	b := build(t, "pam", rockyPAM())
+	if e := env(t, b, "pam.su.wheel_required"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("%+v", e)
+	}
+	if e := env(t, b, "pam.su.wheel_control"); e.Value != "required" {
+		t.Errorf("%+v", e)
+	}
+	if e := env(t, b, "pam.su.wheel_group"); e.Value != "wheel" {
+		t.Errorf("%+v (group= absent means wheel)", e)
+	}
+	if l := env(t, b, "pam.su.wheel_args").Value.([]any); len(l) != 1 || l[0] != "use_uid" {
+		t.Errorf("%v", l)
+	}
+	// Commented out (the stock shape): not required, the details absent.
+	b = build(t, "pam", ubuntuPAM())
+	if e := env(t, b, "pam.su.wheel_required"); e.Status != facts.StatusOK || e.Value != false || !strings.Contains(e.Reason, "no pam_wheel") {
+		t.Errorf("%+v", e)
+	}
+	for _, k := range []string{"wheel_control", "wheel_group", "wheel_args"} {
+		if e := env(t, b, "pam.su."+k); e.Status != facts.StatusAbsent {
+			t.Errorf("%s = %+v", k, e)
+		}
+	}
+	// Present with a control that does not restrict: the details are
+	// reported, wheel_required is false and says why.
+	a := ubuntuPAM()
+	a.files["/etc/pam.d/su"] = "pam/ubuntu/su-wheel-sufficient"
+	b = build(t, "pam", a)
+	if e := env(t, b, "pam.su.wheel_required"); e.Value != false || !strings.Contains(e.Reason, "sufficient") {
+		t.Errorf("%+v", e)
+	}
+	if e := env(t, b, "pam.su.wheel_control"); e.Value != "sufficient" {
+		t.Errorf("%+v", e)
+	}
+}
+
+func TestPAMUmaskAndSecuretty(t *testing.T) {
+	b := build(t, "pam", ubuntuPAM())
+	if e := env(t, b, "pam.umask_module.enabled"); e.Value != true {
+		t.Errorf("%+v", e)
+	}
+	if l := env(t, b, "pam.umask_module.args").Value.([]any); len(l) != 0 {
+		t.Errorf("%v", l)
+	}
+	if e := env(t, b, "pam.securetty_enabled"); e.Status != facts.StatusOK || e.Value != false {
+		t.Errorf("%+v (the line is commented out)", e)
+	}
+	a := ubuntuPAM()
+	a.files["/etc/pam.d/login"] = "pam/ubuntu/login-securetty"
+	if e := env(t, build(t, "pam", a), "pam.securetty_enabled"); e.Value != true {
+		t.Errorf("%+v", e)
+	}
+	b = build(t, "pam", rockyPAM())
+	if l := env(t, b, "pam.umask_module.args").Value.([]any); len(l) != 1 || l[0] != "silent" {
+		t.Errorf("postlogin's pam_umask args: %v", l)
+	}
+	// No login service at all: securetty is absent, umask falls back to sshd.
+	a = rockyPAM()
+	delete(a.files, "/etc/pam.d/login")
+	b = build(t, "pam", a)
+	if e := env(t, b, "pam.securetty_enabled"); e.Status != facts.StatusAbsent {
+		t.Errorf("%+v", e)
+	}
+	if e := env(t, b, "pam.umask_module.enabled"); e.Value != true {
+		t.Errorf("%+v", e)
+	}
+}
+
+func TestPAMAccessFactsFollowTheStackStatus(t *testing.T) {
+	a := rockyPAM()
+	delete(a.files, "/etc/authselect/system-auth")
+	b := build(t, "pam", a)
+	for _, k := range accessKeys {
+		if e := env(t, b, k); e.Status != facts.StatusError {
+			t.Errorf("%s = %+v", k, e)
+		}
+	}
+	b = build(t, "pam", &fsAccess{})
+	for _, k := range append(append([]string{}, passwordKeys...), accessKeys...) {
+		if e := env(t, b, k); e.Status != facts.StatusAbsent {
+			t.Errorf("%s = %+v", k, e)
+		}
 	}
 }

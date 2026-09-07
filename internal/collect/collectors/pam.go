@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"io/fs"
+	"maps"
 	"slices"
 	"strings"
 
@@ -152,13 +153,33 @@ func derivePassword(s pamStacks, a collect.Access, b *collect.Builder) {
 	}
 }
 
-// deriveAccess is filled by Task 3; until then it writes nothing.
-func deriveAccess(pamStacks, collect.Access, *collect.Builder) {}
+// deriveAccess writes the access-control keys in a fixed order, under the
+// same incomplete-stack rule as derivePassword. Each of the four groups
+// decides for itself whether its service exists, so a host without a su
+// file still answers for faillock, umask and securetty.
+func deriveAccess(s pamStacks, a collect.Access, b *collect.Builder) {
+	if e, bad := incomplete(s); bad {
+		for _, k := range accessKeys {
+			b.Set(k, e)
+		}
+		return
+	}
+	vals := faillockFacts(s, a)
+	maps.Copy(vals, suFacts(s))
+	maps.Copy(vals, umaskFacts(s))
+	vals["pam.securetty_enabled"] = securettyFact(s)
+	for _, k := range accessKeys {
+		b.Set(k, vals[k])
+	}
+}
 
 // deriveAbsent writes every derived key as the given absent envelope
-// (no /etc/pam.d at all). It grows the access keys in Task 3.
+// (no /etc/pam.d at all).
 func deriveAbsent(b *collect.Builder, e facts.Envelope) {
 	for _, k := range passwordKeys {
+		b.Set(k, e)
+	}
+	for _, k := range accessKeys {
 		b.Set(k, e)
 	}
 }

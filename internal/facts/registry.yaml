@@ -573,6 +573,84 @@ keys:
     since: 1
     sensitivity: public
     collector: pam
+  - key: pam.faillock.enabled
+    type: bool
+    description: Every existing login-facing service (login, sshd) stacks pam_faillock.so with preauth and with authfail in its auth phase and, in its account phase, pam_faillock.so, or an authsucc line in the auth phase; a false names the first service that does not. The other pam.faillock.* keys are absent while this is false.
+    since: 1
+    sensitivity: public
+    collector: pam
+  - key: pam.faillock.deny
+    type: int
+    description: Effective deny - the default 3, then faillock.conf, then the preauth arguments, then the authfail arguments; 0 disables the lockout. When the preauth and authfail lines disagree, the authfail value is reported and pam.faillock.enabled says so in its reason.
+    since: 1
+    sensitivity: public
+    collector: pam
+  - key: pam.faillock.unlock_time
+    type: int
+    description: Effective unlock_time in seconds (default 600), resolved like deny; 0 means the account stays locked until an administrator releases it.
+    since: 1
+    sensitivity: public
+    collector: pam
+  - key: pam.faillock.fail_interval
+    type: int
+    description: Effective fail_interval in seconds (default 900), resolved like deny.
+    since: 1
+    sensitivity: public
+    collector: pam
+  - key: pam.faillock.even_deny_root
+    type: bool
+    description: even_deny_root is set in faillock.conf or as a module argument.
+    since: 1
+    sensitivity: public
+    collector: pam
+  - key: pam.faillock.root_unlock_time
+    type: int
+    description: Effective root_unlock_time in seconds, resolved like deny; unlock_time when not set.
+    since: 1
+    sensitivity: public
+    collector: pam
+  - key: pam.su.wheel_required
+    type: bool
+    description: su's auth stack has a pam_wheel.so line whose control field is required or requisite and whose arguments do not include deny, so only the wheel group (or group=) may use su; a false names why.
+    since: 1
+    sensitivity: public
+    collector: pam
+  - key: pam.su.wheel_control
+    type: string
+    description: The control field of the first pam_wheel.so line in su's auth stack; absent when there is none.
+    since: 1
+    sensitivity: public
+    collector: pam
+  - key: pam.su.wheel_group
+    type: string
+    description: The group pam_wheel.so restricts su to - its group= argument, or wheel; absent when there is no pam_wheel line.
+    since: 1
+    sensitivity: public
+    collector: pam
+  - key: pam.su.wheel_args
+    type: list<string>
+    description: The arguments of that pam_wheel.so line; absent when there is none.
+    since: 1
+    sensitivity: public
+    collector: pam
+  - key: pam.umask_module.enabled
+    type: bool
+    description: pam_umask.so is in the session stack of login (else sshd, else other), which applies a umask where /etc/profile never runs.
+    since: 1
+    sensitivity: public
+    collector: pam
+  - key: pam.umask_module.args
+    type: list<string>
+    description: The arguments of the first pam_umask.so session line; absent when the module is not stacked.
+    since: 1
+    sensitivity: public
+    collector: pam
+  - key: pam.securetty_enabled
+    type: bool
+    description: login's auth stack has a pam_securetty.so line (any control), so /etc/securetty is consulted for root logins on a console; absent when there is no login service.
+    since: 1
+    sensitivity: public
+    collector: pam
   - key: env.container
     type: string
     description: Container runtime detected from filesystem markers (none, docker, podman, lxc, other); the same value the run header carries.

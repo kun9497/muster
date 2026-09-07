@@ -1112,6 +1112,136 @@
       "SubjectKind": ""
     },
     {
+      "Key": "pam.faillock.enabled",
+      "Type": "bool",
+      "Description": "Every existing login-facing service (login, sshd) stacks pam_faillock.so with preauth and with authfail in its auth phase and, in its account phase, pam_faillock.so, or an authsucc line in the auth phase; a false names the first service that does not. The other pam.faillock.* keys are absent while this is false.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pam",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "pam.faillock.deny",
+      "Type": "int",
+      "Description": "Effective deny - the default 3, then faillock.conf, then the preauth arguments, then the authfail arguments; 0 disables the lockout. When the preauth and authfail lines disagree, the authfail value is reported and pam.faillock.enabled says so in its reason.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pam",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "pam.faillock.unlock_time",
+      "Type": "int",
+      "Description": "Effective unlock_time in seconds (default 600), resolved like deny; 0 means the account stays locked until an administrator releases it.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pam",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "pam.faillock.fail_interval",
+      "Type": "int",
+      "Description": "Effective fail_interval in seconds (default 900), resolved like deny.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pam",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "pam.faillock.even_deny_root",
+      "Type": "bool",
+      "Description": "even_deny_root is set in faillock.conf or as a module argument.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pam",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "pam.faillock.root_unlock_time",
+      "Type": "int",
+      "Description": "Effective root_unlock_time in seconds, resolved like deny; unlock_time when not set.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pam",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "pam.su.wheel_required",
+      "Type": "bool",
+      "Description": "su's auth stack has a pam_wheel.so line whose control field is required or requisite and whose arguments do not include deny, so only the wheel group (or group=) may use su; a false names why.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pam",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "pam.su.wheel_control",
+      "Type": "string",
+      "Description": "The control field of the first pam_wheel.so line in su's auth stack; absent when there is none.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pam",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "pam.su.wheel_group",
+      "Type": "string",
+      "Description": "The group pam_wheel.so restricts su to - its group= argument, or wheel; absent when there is no pam_wheel line.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pam",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "pam.su.wheel_args",
+      "Type": "list\u003cstring\u003e",
+      "Description": "The arguments of that pam_wheel.so line; absent when there is none.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pam",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "pam.umask_module.enabled",
+      "Type": "bool",
+      "Description": "pam_umask.so is in the session stack of login (else sshd, else other), which applies a umask where /etc/profile never runs.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pam",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "pam.umask_module.args",
+      "Type": "list\u003cstring\u003e",
+      "Description": "The arguments of the first pam_umask.so session line; absent when the module is not stacked.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pam",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "pam.securetty_enabled",
+      "Type": "bool",
+      "Description": "login's auth stack has a pam_securetty.so line (any control), so /etc/securetty is consulted for root logins on a console; absent when there is no login service.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pam",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
       "Key": "env.container",
       "Type": "string",
       "Description": "Container runtime detected from filesystem markers (none, docker, podman, lxc, other); the same value the run header carries.",
