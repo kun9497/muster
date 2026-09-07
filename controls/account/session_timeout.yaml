@@ -37,7 +37,7 @@ mechanisms:
       - { fact: env.shell.tmout, op: lte, expected: "${max_idle}" }
       - { fact: env.shell.tmout_exported, op: eq, expected: true }
 remediation:
-  text_en: Set ClientAliveInterval 300 and ClientAliveCountMax 1 in a file under /etc/ssh/sshd_config.d/, validate with sshd -t, then restart sshd.
-  text_ko: /etc/ssh/sshd_config.d/ 아래 파일에 ClientAliveInterval 300 과 ClientAliveCountMax 1 을 설정하고 sshd -t 로 검증한 뒤 sshd 를 재시작합니다.
+  text_en: Set ClientAliveInterval 300 and ClientAliveCountMax 1 in a file under /etc/ssh/sshd_config.d/, validate with sshd -t, then restart sshd. Alternatively, since this control accepts either mechanism, set and export an interactive-shell TMOUT in a system profile file - for example a file under /etc/profile.d/ containing "readonly TMOUT=600; export TMOUT".
+  text_ko: /etc/ssh/sshd_config.d/ 아래 파일에 ClientAliveInterval 300 과 ClientAliveCountMax 1 을 설정하고 sshd -t 로 검증한 뒤 sshd 를 재시작합니다. 이 컨트롤은 두 방식 중 어느 쪽이든 인정하므로, 대안으로 시스템 프로파일 파일에 대화형 셸 TMOUT 을 설정하고 export 할 수 있습니다 - 예를 들어 /etc/profile.d/ 아래 파일에 "readonly TMOUT=600; export TMOUT" 를 둡니다.
   risk: none
   idempotent: true

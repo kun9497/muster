@@ -1614,7 +1614,7 @@
     {
       "Key": "env.shell.tmout_settings",
       "Type": "list\u003crecord\u003e",
-      "Description": "Every TMOUT assignment - path, line, value, exported, readonly, conditional.",
+      "Description": "Every TMOUT assignment - path, line, value, exported, readonly, conditional, scope.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "env",

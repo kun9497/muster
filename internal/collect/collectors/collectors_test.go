@@ -1958,6 +1958,57 @@ func TestEnvTMOUTDeclarationForms(t *testing.T) {
 	}
 }
 
+// R196: a later `PATH=$PATH:…` must SPLICE in the PATH accumulated from the
+// earlier unconditional assignments, not mask them. Here /etc/profile.d/10-x.sh
+// sets `PATH=/usr/bin:.` (a "." is_dot element) and /root/.bash_profile then
+// sets `PATH=$PATH:$HOME/bin`; the spliced entry list must still carry the "."
+// so U-14 would FAIL, while root_path_raw stays the verbatim last winning line.
+func TestEnvRootPathSplicesSelfReference(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{
+			"/etc/profile.d/10-x.sh": "profile.d_10-path.sh",     // PATH=/usr/bin:.
+			"/root/.bash_profile":    "root_bash_profile_splice", // PATH=$PATH:$HOME/bin
+		},
+		stats: map[string]statResult{"/usr/bin": {mode: 0o755, kind: "dir"}},
+	}
+	b := build(t, "env", a)
+	if e := env(t, b, "env.shell.root_path_raw"); e.Value != "$PATH:$HOME/bin" {
+		t.Errorf("root_path_raw %+v, want the verbatim last winning line \"$PATH:$HOME/bin\"", e)
+	}
+	entries := okList(t, b, "env.shell.root_path_entries")
+	var sawDot bool
+	for _, r := range entries {
+		if r.(map[string]any)["is_dot"] == true {
+			sawDot = true
+		}
+	}
+	if !sawDot {
+		t.Errorf("the spliced PATH must still carry the \".\" from the earlier file (an is_dot row so U-14 FAILs): %v", entries)
+	}
+}
+
+// R197: env.shell.tmout is a system-scope fact. A TMOUT set ONLY in root's
+// dotfiles must not decide the host-wide value — otherwise a root-only TMOUT
+// would yield a host-wide U-12 PASS. With no system-scope TMOUT, the value is 0.
+func TestEnvTMOUTIsSystemScopeOnly(t *testing.T) {
+	a := &fsAccess{files: map[string]string{"/root/.bashrc": "root_bashrc_tmout"}} // TMOUT=600 in root scope only
+	b := build(t, "env", a)
+	if e := env(t, b, "env.shell.tmout"); e.Status != facts.StatusOK || e.Value != 0 {
+		t.Errorf("tmout %+v, want 0 — a root-scope TMOUT must not set the system value", e)
+	}
+	// The row is still recorded as evidence, marked root scope.
+	var sawRoot bool
+	for _, r := range okList(t, b, "env.shell.tmout_settings") {
+		m := r.(map[string]any)
+		if m["value"] == "600" && m["scope"] == "root" {
+			sawRoot = true
+		}
+	}
+	if !sawRoot {
+		t.Errorf("the root-scope TMOUT row must still be recorded with scope \"root\": %v", okList(t, b, "env.shell.tmout_settings"))
+	}
+}
+
 // --- files: home directories, environment files and .rhosts --------------
 
 // home_dirs has one row per passwd home. A service account (nologin shell,
@@ -2007,6 +2058,40 @@ func TestFilesHomeEnumDeniedPasswdIsError(t *testing.T) {
 	for _, k := range []string{"files.home_dirs", "files.env_files", "files.user_rhosts"} {
 		if e := env(t, b, k); e.Status != facts.StatusDenied {
 			t.Errorf("%s must be denied, not an empty list: %+v", k, e)
+		}
+	}
+}
+
+// S3: a denied /etc/shells cannot be trusted for the interactive-home
+// classification (the libc fallback omits /bin/bash, so every bash account
+// would read as non-interactive and U-24/U-27/U-31/U-32 would pass vacuously).
+// The three home enumerations must carry that read's status, never a clean
+// empty list.
+func TestFilesUntrustedShellsMakesEnumerationsDenied(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{"/etc/passwd": "passwd_home", "/proc/self/mountinfo": "mountinfo"},
+		fails: map[string]error{"/etc/shells": os.ErrPermission}, // passwd is fine; only /etc/shells is denied
+	}
+	b := build(t, "files", a)
+	for _, k := range []string{"files.home_dirs", "files.env_files", "files.user_rhosts"} {
+		if e := env(t, b, k); e.Status != facts.StatusDenied {
+			t.Errorf("a denied /etc/shells must make %s denied, not a vacuous enumeration: %+v", k, e)
+		}
+	}
+}
+
+// S4: an unreadable /proc/self/mountinfo makes the /dev stray-file detection
+// unreliable, so dev_entries and dev_nondevice must carry the read error, not a
+// clean empty list (which would be a vacuous PASS for U-26).
+func TestFilesDevUnreadableMountinfoIsNotACleanEmpty(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{"/etc/passwd": "passwd_home", "/etc/shells": "shells_home"},
+		fails: map[string]error{"/proc/self/mountinfo": os.ErrPermission},
+	}
+	b := build(t, "files", a)
+	for _, k := range []string{"files.dev_nondevice", "files.dev_entries"} {
+		if e := env(t, b, k); e.Status != facts.StatusDenied {
+			t.Errorf("an unreadable mountinfo must make %s denied, not an empty list: %+v", k, e)
 		}
 	}
 }

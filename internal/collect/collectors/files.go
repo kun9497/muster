@@ -65,21 +65,43 @@ func runFiles(_ context.Context, a collect.Access, b *collect.Builder) error {
 	// (C1: a path discovered from a daemon's configuration belongs to that
 	// daemon; a home named in /etc/passwd is this collector's). mounts is
 	// computed once here so Task 3's /dev walk reuses the same table.
-	mounts := readMounts(a)
+	mounts, mountsErr := readMounts(a)
 	if prows, ok := passwdRows(a, b); ok {
-		shells, _ := loginShells(a)
-		b.Set("files.home_dirs", homeDirs(a, prows, shells, mounts))
-		b.Set("files.env_files", envFiles(a, prows, shells))
-		b.Set("files.user_rhosts", userRhosts(a, prows, shells))
+		shells, shellsEnv := loginShells(a)
+		if e, untrusted := untrustedShells(shellsEnv); untrusted {
+			// S3: /etc/shells could not be read from the file (denied/error, or
+			// the libc-default fallback that omits /bin/bash). Every bash account
+			// would then wrongly read as non-interactive and U-24/U-27/U-31/U-32
+			// would pass vacuously, so the three enumerations carry that status
+			// instead of a clean empty enumeration — the same shape as the
+			// denied-passwd early return.
+			b.Set("files.home_dirs", e)
+			b.Set("files.env_files", e)
+			b.Set("files.user_rhosts", e)
+		} else {
+			b.Set("files.home_dirs", homeDirs(a, prows, shells, mounts))
+			b.Set("files.env_files", envFiles(a, prows, shells))
+			b.Set("files.user_rhosts", userRhosts(a, prows, shells))
+		}
 	}
 
 	// /root's own permission facts (U-14), /etc/hosts.equiv (U-27) and the
 	// bounded /dev stray-file walk (U-26). mounts is reused, not re-read.
 	writeRootHome(b, a, rootHome)
 	writeHostsEquiv(b, a)
-	de, nd := devEntries(a, mounts)
-	b.Set("files.dev_entries", de)
-	b.Set("files.dev_nondevice", nd)
+	if mountsErr != nil {
+		// S4: an unreadable /proc/self/mountinfo makes the /dev stray-file
+		// detection unreliable (no mount is known, so mountPoint answers "" and
+		// nothing is flagged). Surface that read error on both dev keys rather
+		// than publishing a clean empty dev_nondevice — a vacuous PASS for U-26.
+		e := collect.FromReadError(mountsErr, collect.ReadMeta{})
+		b.Set("files.dev_entries", e)
+		b.Set("files.dev_nondevice", e)
+	} else {
+		de, nd := devEntries(a, mounts)
+		b.Set("files.dev_entries", de)
+		b.Set("files.dev_nondevice", nd)
+	}
 
 	// /etc/securetty is absent on RHEL 8+ and on the Debian family; the
 	// control that reads it treats that as "this mechanism is not in use".
@@ -122,6 +144,32 @@ func passwdRows(a collect.Access, b *collect.Builder) ([]passwdRow, bool) {
 	}
 	rows, _ := parsePasswd(data)
 	return rows, true
+}
+
+// untrustedShells reports whether the /etc/shells enumeration can be trusted
+// for the interactive-home classification. It can only be trusted when it was
+// read from the file itself (StatusOK with a file source). A denied/error
+// read, or the libc-default fallback (StatusOK sourced "derived", which omits
+// /bin/bash), is not: every bash account would then read as non-interactive
+// and the home controls would pass vacuously (S3). When it is untrusted the
+// returned envelope carries a screening status — the read error unchanged for
+// a denied/error, or a denied envelope with the fallback's reason so the home
+// enumeration keys never publish a clean list from an untrusted shell set.
+func untrustedShells(shellsEnv facts.Envelope) (facts.Envelope, bool) {
+	fromFile := shellsEnv.Status == facts.StatusOK && shellsEnv.Source != nil && shellsEnv.Source.Kind == "file"
+	if fromFile {
+		return facts.Envelope{}, false
+	}
+	if shellsEnv.Status != facts.StatusOK {
+		e := shellsEnv
+		e.Value = nil // a read error carries no value; drop the source list too
+		e.Source = nil
+		return e, true
+	}
+	// The libc-default fallback: StatusOK but not from the file. Turn it into a
+	// denied envelope (never absent, which absent_means could excuse) carrying
+	// its reason, so the home controls screen rather than pass vacuously.
+	return collect.Denied(shellsEnv.Reason), true
 }
 
 // writeRootHome records /root's permission facts: only the six leaves U-14

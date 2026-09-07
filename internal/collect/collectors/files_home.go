@@ -188,12 +188,14 @@ func userRhosts(a collect.Access, rows []passwdRow, shells map[string]bool) fact
 type mountTable struct{ points map[string]string } // mount point -> fstype
 
 // readMounts parses /proc/self/mountinfo. Each line's field 5 is the mount
-// point and the token after " - " is the filesystem type.
-func readMounts(a collect.Access) mountTable {
+// point and the token after " - " is the filesystem type. The read error is
+// returned (not swallowed) so the /dev walk can surface it rather than
+// reporting a clean empty dev_nondevice for an unreadable mountinfo (S4).
+func readMounts(a collect.Access) (mountTable, error) {
 	t := mountTable{points: map[string]string{}}
 	data, _, err := a.ReadFile("/proc/self/mountinfo", readLimit)
 	if err != nil {
-		return t
+		return t, err
 	}
 	for _, line := range splitLines(data) {
 		sep := strings.Index(line, " - ")
@@ -207,7 +209,7 @@ func readMounts(a collect.Access) mountTable {
 		}
 		t.points[f[4]] = after[0]
 	}
-	return t
+	return t, nil
 }
 
 // fstype returns the fstype of the longest mount point that is a prefix of p.

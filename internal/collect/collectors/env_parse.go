@@ -51,14 +51,14 @@ func parseShellFile(data []byte, p string) []shellAssignment {
 			// assignment, else a bare export/readonly of the name (R184).
 			if v, exported, readonly, ok := declAssignment(line, "TMOUT"); ok {
 				out = append(out, shellAssignment{Kind: "tmout", Value: v, Path: p, Line: i + 1,
-					Exported: exported, Readonly: readonly, Conditional: conditional})
+					Exported: exported, Readonly: readonly, Conditional: conditional, Scope: scope})
 			} else if v, ok := assignmentValue(line, "TMOUT"); ok {
 				out = append(out, shellAssignment{Kind: "tmout", Value: v, Path: p, Line: i + 1,
-					Exported: strings.HasPrefix(line, "export "), Conditional: conditional})
+					Exported: strings.HasPrefix(line, "export "), Conditional: conditional, Scope: scope})
 			} else if name, ok := exportName(line); ok && name == "TMOUT" {
-				out = append(out, shellAssignment{Kind: "tmout", Value: "", Path: p, Line: i + 1, Exported: true, Conditional: conditional})
+				out = append(out, shellAssignment{Kind: "tmout", Value: "", Path: p, Line: i + 1, Exported: true, Conditional: conditional, Scope: scope})
 			} else if name, ok := readonlyName(line); ok && name == "TMOUT" {
-				out = append(out, shellAssignment{Kind: "tmout", Value: "", Path: p, Line: i + 1, Readonly: true, Conditional: conditional})
+				out = append(out, shellAssignment{Kind: "tmout", Value: "", Path: p, Line: i + 1, Readonly: true, Conditional: conditional, Scope: scope})
 			}
 			// umask
 			if fields := strings.Fields(line); len(fields) >= 2 && (fields[0] == "umask" || (fields[0] == "builtin" && fields[1] == "umask")) {

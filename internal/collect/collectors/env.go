@@ -105,8 +105,13 @@ func writeTMOUT(b *collect.Builder, all []shellAssignment) {
 		rows = append(rows, map[string]any{
 			"path": s.Path, "line": s.Line, "value": s.Value,
 			"exported": s.Exported, "readonly": s.Readonly, "conditional": s.Conditional,
+			"scope": s.Scope,
 		})
-		if !s.Conditional && s.Value != "" { // a bare `readonly TMOUT` has no value; it does not win
+		// env.shell.tmout is a SYSTEM-scope fact (R197): a TMOUT set only in
+		// root's dotfiles must not decide the host-wide value, so only an
+		// unconditional system-scope row with a value may win. Every row is
+		// still recorded (with its scope) as evidence.
+		if !s.Conditional && s.Value != "" && s.Scope == "system" {
 			winnerIdx = i
 		}
 	}
@@ -116,12 +121,13 @@ func writeTMOUT(b *collect.Builder, all []shellAssignment) {
 	if winnerIdx >= 0 {
 		w := all[winnerIdx]
 		// exported/readonly come from the winning assignment itself plus any
-		// LATER unconditional export/readonly of TMOUT — not OR'd across every
-		// row, so a conditional `export TMOUT` does not falsely mark it (L4).
+		// LATER unconditional system-scope export/readonly of TMOUT — not OR'd
+		// across every row, so a conditional or root-scope `export TMOUT` does
+		// not falsely mark the system value (L4, R197).
 		exported, readonly = w.Exported, w.Readonly
 		for j := winnerIdx + 1; j < len(all); j++ {
 			s := all[j]
-			if s.Kind != "tmout" || s.Conditional {
+			if s.Kind != "tmout" || s.Conditional || s.Scope != "system" {
 				continue
 			}
 			exported = exported || s.Exported
@@ -153,12 +159,23 @@ func writeUmask(b *collect.Builder, all []shellAssignment) {
 }
 
 func writeRootPath(a collect.Access, b *collect.Builder, all []shellAssignment) {
+	// Walk the unconditional PATH assignments in read order, splicing the
+	// accumulated value in for a $PATH/${PATH} self-reference (R196). Without
+	// this, a `PATH=$PATH:$HOME/bin` in /root/.bash_profile — the last winner
+	// on stock RHEL/Alma — would mask an earlier `PATH=/usr/bin:.` in an
+	// /etc/profile.d file, so U-14's `none where is_dot` / `world_writable`
+	// clauses would judge only the $PATH/$HOME rows and never see the "."
+	// element the item exists to catch. root_path_raw stays the VERBATIM last
+	// winning line (evidence); only root_path_entries reflects the spliced value.
 	var winner *shellAssignment
+	spliced := ""
 	for i := range all {
-		if all[i].Kind == "path" && !all[i].Conditional {
-			w := all[i]
-			winner = &w
+		if all[i].Kind != "path" || all[i].Conditional {
+			continue
 		}
+		w := all[i]
+		winner = &w
+		spliced = splicePath(spliced, w.Value)
 	}
 	if winner == nil {
 		e := collect.Absent("no PATH assignment in the system profile files")
@@ -168,5 +185,38 @@ func writeRootPath(a collect.Access, b *collect.Builder, all []shellAssignment) 
 	}
 	src := &facts.Source{Kind: "file", Path: winner.Path, Line: winner.Line, Raw: sourceRaw("PATH=" + winner.Value)}
 	b.Set("env.shell.root_path_raw", collect.OK(winner.Value, src))
-	b.Set("env.shell.root_path_entries", collect.OK(pathEntries(a, winner.Value), src))
+	b.Set("env.shell.root_path_entries", collect.OK(pathEntries(a, spliced), src))
+}
+
+// splicePath returns value with every $PATH / ${PATH} self-reference replaced
+// by acc, the PATH accumulated from the earlier unconditional assignments, so
+// a `PATH=$PATH:…` line extends rather than masks what came before (R196).
+// Only the $PATH token is expanded; a $HOME, other $var or ~ element is left
+// verbatim for pathEntries to record as an unresolved variable (R180).
+func splicePath(acc, value string) string {
+	value = strings.ReplaceAll(value, "${PATH}", acc)
+	var out strings.Builder
+	for {
+		i := strings.Index(value, "$PATH")
+		if i < 0 {
+			out.WriteString(value)
+			break
+		}
+		after := i + len("$PATH")
+		// Only a bare $PATH token, not the prefix of a longer name such as
+		// $PATHOLOGICAL: the following byte must not continue an identifier.
+		if after < len(value) && isIdentByte(value[after]) {
+			out.WriteString(value[:after])
+			value = value[after:]
+			continue
+		}
+		out.WriteString(value[:i])
+		out.WriteString(acc)
+		value = value[after:]
+	}
+	return out.String()
+}
+
+func isIdentByte(c byte) bool {
+	return c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
 }

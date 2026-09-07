@@ -880,7 +880,7 @@ keys:
     collector: env
   - key: env.shell.tmout_settings
     type: list<record>
-    description: Every TMOUT assignment - path, line, value, exported, readonly, conditional.
+    description: Every TMOUT assignment - path, line, value, exported, readonly, conditional, scope.
     since: 1
     sensitivity: public
     collector: env
