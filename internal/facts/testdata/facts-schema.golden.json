@@ -332,6 +332,106 @@
       "SubjectKind": ""
     },
     {
+      "Key": "banners.issue.nonempty",
+      "Type": "bool",
+      "Description": "Whether /etc/issue has non-whitespace content.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "banners",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "banners.issue.os_escapes",
+      "Type": "bool",
+      "Description": "Whether /etc/issue announces the distribution or release (an issue escape or the distro name).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "banners",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "banners.issue.mode",
+      "Type": "int",
+      "Description": "Permission bits of /etc/issue; 0 when the file is absent.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "banners",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "banners.issue_net.nonempty",
+      "Type": "bool",
+      "Description": "Whether /etc/issue.net has non-whitespace content.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "banners",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "banners.issue_net.os_escapes",
+      "Type": "bool",
+      "Description": "Whether /etc/issue.net announces the distribution or release (an issue escape or the distro name).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "banners",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "banners.issue_net.mode",
+      "Type": "int",
+      "Description": "Permission bits of /etc/issue.net; 0 when the file is absent.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "banners",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "banners.motd.nonempty",
+      "Type": "bool",
+      "Description": "Whether /etc/motd has non-whitespace content.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "banners",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "banners.motd.mode",
+      "Type": "int",
+      "Description": "Permission bits of /etc/motd; 0 when the file is absent.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "banners",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "banners.motd_d",
+      "Type": "list\u003crecord\u003e",
+      "Description": "Inventory of /etc/update-motd.d entries - name and whether each is executable.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "banners",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "banners.dynamic_motd",
+      "Type": "bool",
+      "Description": "Whether /etc/update-motd.d holds at least one executable script.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "banners",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
       "Key": "files.etc_securetty",
       "Type": "record",
       "Description": "Presence and permission facts of /etc/securetty (absent on RHEL 8+ and Debian-family).",

@@ -886,6 +886,100 @@ func TestSshdOversizedValueIsAnErrorNotAStoredBlob(t *testing.T) {
 	}
 }
 
+// --- banners --------------------------------------------------------------
+
+func TestBannersContentAndEscapes(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{
+			"/etc/issue":     "issue_os_escapes", // "Ubuntu 22.04 \n \l"
+			"/etc/issue.net": "issue_net",        // a plain warning, no escapes
+			"/etc/motd":      "motd_static",
+		},
+		modes: map[string]uint32{
+			"/etc/issue": 0o644, "/etc/issue.net": 0o644, "/etc/motd": 0o644,
+		},
+	}
+	b := build(t, "banners", a)
+	if e := env(t, b, "banners.issue.nonempty"); e.Value != true {
+		t.Errorf("issue.nonempty %+v", e)
+	}
+	if e := env(t, b, "banners.issue.os_escapes"); e.Value != true {
+		t.Errorf("issue with \\l/version must set os_escapes: %+v", e)
+	}
+	if e := env(t, b, "banners.issue_net.os_escapes"); e.Value != false {
+		t.Errorf("plain issue.net must not set os_escapes: %+v", e)
+	}
+	if e := env(t, b, "banners.issue.mode"); e.Value != 0o644 {
+		t.Errorf("issue.mode %+v, want 420", e)
+	}
+}
+
+// A missing file is a definite empty state, not an error.
+func TestBannersMissingFileIsDefiniteEmpty(t *testing.T) {
+	a := &fsAccess{files: map[string]string{}}
+	b := build(t, "banners", a)
+	for _, k := range []string{"banners.issue.nonempty", "banners.issue_net.nonempty", "banners.motd.nonempty"} {
+		if e := env(t, b, k); e.Status != facts.StatusOK || e.Value != false {
+			t.Errorf("%s must be a definite false: %+v", k, e)
+		}
+	}
+	if e := env(t, b, "banners.issue.mode"); e.Value != 0 {
+		t.Errorf("absent issue mode %+v, want 0", e)
+	}
+}
+
+// An unreadable banner carries the read error, never a quiet empty.
+func TestBannersUnreadableIsNotEmpty(t *testing.T) {
+	a := &fsAccess{fails: map[string]error{"/etc/issue.net": os.ErrPermission}}
+	b := build(t, "banners", a)
+	if e := env(t, b, "banners.issue_net.nonempty"); e.Status != facts.StatusDenied {
+		t.Errorf("denied read must be denied, not empty: %+v", e)
+	}
+}
+
+// update-motd.d with an executable script sets dynamic_motd and lists the
+// script; a non-executable entry does not make it dynamic.
+func TestBannersMotdInventory(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{
+			"/etc/update-motd.d/00-header": "motd_static",
+			"/etc/update-motd.d/99-readme": "motd_static",
+		},
+		modes: map[string]uint32{
+			"/etc/update-motd.d/00-header": 0o755,
+			"/etc/update-motd.d/99-readme": 0o644,
+		},
+	}
+	b := build(t, "banners", a)
+	if e := env(t, b, "banners.dynamic_motd"); e.Value != true {
+		t.Errorf("an executable script must set dynamic_motd: %+v", e)
+	}
+	list := okList(t, b, "banners.motd_d")
+	if len(list) != 2 {
+		t.Fatalf("motd_d %v, want two entries sorted by name", list)
+	}
+	first := list[0].(map[string]any)
+	if first["name"] != "00-header" || first["executable"] != true {
+		t.Errorf("first entry %v", first)
+	}
+	second := list[1].(map[string]any)
+	if second["executable"] != false {
+		t.Errorf("non-executable entry must be executable:false: %v", second)
+	}
+}
+
+// No update-motd.d at all: dynamic_motd false, motd_d an empty list.
+func TestBannersNoMotdD(t *testing.T) {
+	a := &fsAccess{files: map[string]string{}}
+	b := build(t, "banners", a)
+	if e := env(t, b, "banners.dynamic_motd"); e.Value != false {
+		t.Errorf("dynamic_motd %+v, want false", e)
+	}
+	if list := okList(t, b, "banners.motd_d"); len(list) != 0 {
+		t.Errorf("motd_d %v, want empty list", list)
+	}
+}
+
 // --- accounts -----------------------------------------------------------
 
 func TestAccountsDerivesRuntimeAgeingWithoutStoringHashes(t *testing.T) {

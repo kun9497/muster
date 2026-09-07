@@ -34,6 +34,7 @@ func init() {
 	collect.Register(servicesCollector)
 	collect.Register(socketsCollector)
 	collect.Register(sshdCollector)
+	collect.Register(bannersCollector)
 	collect.Register(filesCollector)
 	collect.Register(accountsCollector)
 	collect.Register(pamCollector)
