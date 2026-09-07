@@ -1,0 +1,1 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{"pam":{"su":{"wheel_required":{"status":"ok","value":true}}}}}

@@ -1,0 +1,1 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{"pam":{"su":{"wheel_required":{"status":"ok","value":false,"reason":"pam_wheel.so is stacked with control sufficient and arguments use_uid, which does not restrict su"}}}}}

@@ -28,6 +28,8 @@
                 {"name":"alice","uid":1000,"gid":1000,"home":"/home/alice","shell":"/bin/bash","system":false,"shadowed":true,"uid_duplicate":false,"name_duplicate":false,"shell_valid":true,"password_status":"hashed","locked":false,"hash_algo":"$y$"}
               ]}},
   "pam":{"pwquality":{"enabled":{"status":"ok","value":true},"minlen":{"status":"ok","value":12},"required_classes":{"status":"ok","value":4}},
-         "password":{"unix_hash":{"status":"ok","value":"sha512"}}},
+         "password":{"unix_hash":{"status":"ok","value":"sha512"}},
+         "faillock":{"enabled":{"status":"ok","value":true},"deny":{"status":"ok","value":5}},
+         "su":{"wheel_required":{"status":"ok","value":true}}},
   "walk":{"world_writable":{"status":"absent"}}
  }}

@@ -1,0 +1,1 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{"pam":{"su":{"wheel_required":{"status":"absent","reason":"/etc/pam.d/su does not exist"}}}}}

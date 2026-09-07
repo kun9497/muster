@@ -1,0 +1,21 @@
+id: muster.account.su_restricted
+title_en: su is restricted to the wheel group by PAM
+title_ko: PAM 이 su 를 wheel 그룹으로 제한한다
+description_en: su's auth stack must carry a pam_wheel.so line with control required or requisite (and without deny), so only members of the wheel group - or of the group named by group= - may become another user. Both families ship the line commented out, so a stock host fails; restricting su by the binary's mode and group instead of PAM is not judged here.
+description_ko: su 의 auth 스택에 control 이 required 또는 requisite 이고 deny 인자가 없는 pam_wheel.so 줄이 있어야 wheel 그룹 (또는 group= 으로 지정한 그룹) 구성원만 다른 사용자가 될 수 있습니다. 두 계열 모두 이 줄을 주석 처리한 채 배포하므로 기본 설치는 실패하며, PAM 대신 su 바이너리의 모드와 그룹으로 제한하는 방식은 여기서 판단하지 않습니다.
+category: account
+importance: 상
+automation: auto
+references:
+  kisa: { "2026": ["U-06"], "2021": ["U-45"] }
+  cis:
+    - { benchmark: ubuntu-22.04, version: "2.0.0", rec: "5.2.7" }
+requires_facts: ">=1"
+absent_means: fail
+checks:
+  - { fact: pam.su.wheel_required, op: eq, expected: true }
+remediation:
+  text_en: Uncomment or add "auth required pam_wheel.so use_uid" in /etc/pam.d/su and put the administrators in the wheel group (or name another group with group=).
+  text_ko: /etc/pam.d/su 에서 "auth required pam_wheel.so use_uid" 줄의 주석을 풀거나 추가하고, 관리자를 wheel 그룹 (또는 group= 으로 지정한 그룹) 에 넣습니다.
+  risk: lockout_risk
+  idempotent: true
