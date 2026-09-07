@@ -4,6 +4,7 @@ package collectors
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"path"
 	"slices"
@@ -88,6 +89,16 @@ func parsePAMFile(data []byte, service, filePath string) []pamDirective {
 			continue
 		}
 		f := pamTokens(l)
+		// R162, pam.d(5): a "#" starts a comment that runs to the end of the
+		// line, so no token from there on is a control field, a module or an
+		// argument. A "#" inside a bracketed control field is part of that
+		// token and is left alone.
+		for i, t := range f {
+			if strings.HasPrefix(t, "#") {
+				f = f[:i]
+				break
+			}
+		}
 		if len(f) < 3 {
 			continue
 		}
@@ -141,10 +152,15 @@ func (x *pamExpander) readService(p string) ([]byte, string, error) {
 	data, _, err := x.a.ReadFile(p, readLimit)
 	if err != nil && errors.Is(err, collect.ErrSymlink) && path.Dir(p) == pamDir && slices.Contains(authselectManaged, path.Base(p)) {
 		alt := authselectDir + "/" + path.Base(p)
-		if data2, _, err2 := x.a.ReadFile(alt, readLimit); err2 == nil {
+		data2, _, err2 := x.a.ReadFile(alt, readLimit)
+		if err2 == nil {
 			x.authselect = true
 			return data2, alt, nil
 		}
+		// R164: the fallback that was tried is named too, with its path written
+		// exactly once (D16), so a host whose /etc/authselect does not hold the
+		// original is diagnosable from the reason alone.
+		return nil, p, fmt.Errorf("%w; %s: %s", err, alt, readReason(alt, err2))
 	}
 	return data, p, err
 }

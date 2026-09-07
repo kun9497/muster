@@ -964,7 +964,7 @@
     {
       "Key": "pam.stacks",
       "Type": "list\u003crecord\u003e",
-      "Description": "The expanded PAM stacks of login, sshd, su, sudo, passwd and other (those whose /etc/pam.d file exists) - service, type, control, module, args, path, line - with @include, include and substack spliced where they stand and authselect's symlinks resolved by name into /etc/authselect, never by following the link. Backslash line continuation, a",
+      "Description": "The expanded PAM stacks of login, sshd, su, sudo, passwd and other (those whose /etc/pam.d file exists) - service, type, control, module, args, path, line - with @include, include and substack spliced where they stand and authselect's symlinks resolved by name into /etc/authselect, never by following the link. Backslash line continuation and a pam.conf-only host are not handled.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "pam",
@@ -1124,7 +1124,7 @@
     {
       "Key": "pam.faillock.deny",
       "Type": "int",
-      "Description": "Effective deny - the default 3, then faillock.conf, then the preauth arguments, then the authfail arguments; 0 disables the lockout. When the preauth and authfail lines disagree, the authfail value is reported and pam.faillock.enabled says so in its reason.",
+      "Description": "Effective deny - the default 3, then faillock.conf, then the preauth arguments, then the authfail arguments; 0 disables the lockout. What is published is the merge of faillock.conf, the preauth arguments and the authfail arguments, the authfail line applied last; when the two lines disagree pam.faillock.enabled says so in its reason. A conf= argument naming another file is not handled.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "pam",
@@ -1154,7 +1154,7 @@
     {
       "Key": "pam.faillock.even_deny_root",
       "Type": "bool",
-      "Description": "even_deny_root is set in faillock.conf (any value) or as the bare module argument even_deny_root.",
+      "Description": "even_deny_root is set in faillock.conf or as a module argument (with or without a value), or root_unlock_time is set, which implies it.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "pam",

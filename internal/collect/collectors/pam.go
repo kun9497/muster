@@ -55,14 +55,21 @@ func pamSource(x *pamExpander) *facts.Source {
 // managingLayer decides how the stacks are generated: a managed name that
 // was a symlink resolved into /etc/authselect means authselect; the
 // pam-auth-update marker in common-auth means pam-auth-update; otherwise
-// manual. Unreadable common-auth is simply not the marker.
+// manual. A common-auth that does not exist is not the marker, but one that
+// exists and cannot be read is the read error (R163): nothing here can say
+// whether the marker is in it, and "manual" would call the host unmanaged
+// on the strength of a file nobody read.
 func managingLayer(s pamStacks, a collect.Access) facts.Envelope {
 	src := pamSource(s.x)
 	if s.x.authselect {
 		return collect.OK("authselect", src)
 	}
 	marker := pamDir + "/common-auth"
-	if data, _, err := a.ReadFile(marker, readLimit); err == nil && strings.Contains(string(data), "pam-auth-update") {
+	data, _, err := a.ReadFile(marker, readLimit)
+	switch {
+	case err != nil && !errors.Is(err, fs.ErrNotExist):
+		return readErrorEnv(marker, err)
+	case err == nil && strings.Contains(string(data), "pam-auth-update"):
 		// R155: the file the answer was read out of is cited, even when no
 		// published service included it and the expander never read it.
 		if !slices.ContainsFunc(src.Inputs, func(in facts.Source) bool { return in.Path == marker }) {

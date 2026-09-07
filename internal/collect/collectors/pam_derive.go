@@ -413,11 +413,12 @@ func faillockFacts(s pamStacks, a collect.Access) map[string]facts.Envelope {
 	inputs = append(inputs, lineSource(*preauth))
 	rootSet = applyFaillock(vals, argsKV(authfail.Args)) || rootSet
 	inputs = append(inputs, lineSource(*authfail))
-	// R158: pam_faillock compares this option's whole argument, so a bare
-	// even_deny_root sets it and even_deny_root=0 is an argument the module
-	// does not recognise and ignores. The conf file is the other way round:
-	// set_conf_opt ORs the flag in whatever value follows the name.
-	evenDenyRoot = evenDenyRoot || slices.Contains(preauth.Args, "even_deny_root") || slices.Contains(authfail.Args, "even_deny_root")
+	// R160: args_parse splits every argument that is not preauth, authfail or
+	// authsucc at "=" and hands the name to set_conf_opt, which sets this flag
+	// for even_deny_root whatever value follows it - so even_deny_root=0 sets
+	// it, exactly as the conf file does. root_unlock_time, wherever it was
+	// set, implies even_deny_root as well (pam_faillock(8)).
+	evenDenyRoot = evenDenyRoot || hasArg(preauth.Args, "even_deny_root") || hasArg(authfail.Args, "even_deny_root") || rootSet
 	if !rootSet {
 		vals["root_unlock_time"] = vals["unlock_time"]
 	}

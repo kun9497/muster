@@ -92,6 +92,41 @@ func TestPAMTokensKeepABracketedControlWhole(t *testing.T) {
 	}
 }
 
+// R162: pam.d(5) - a "#" starts a comment that runs to the end of the line,
+// so nothing after one is a module argument. Without the cut, "# deny others"
+// would hand pam_wheel.so a deny argument and invert the fact.
+func TestPAMMidLineCommentIsNotAnArgument(t *testing.T) {
+	a := ubuntuPAM()
+	a.files["/etc/pam.d/su"] = "pam/ubuntu/su-comment"
+	b := build(t, "pam", a)
+	if e := env(t, b, "pam.su.wheel_required"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("%+v", e)
+	}
+	e := env(t, b, "pam.su.wheel_args")
+	if e.Status != facts.StatusOK {
+		t.Fatalf("wheel_args %+v", e)
+	}
+	if l := e.Value.([]any); len(l) != 1 || l[0] != "use_uid" {
+		t.Errorf("wheel_args %v, want [use_uid]", l)
+	}
+	// A bracketed control field still survives the cut.
+	var unix map[string]any
+	for _, m := range stackLines(t, b, "su", "auth") {
+		if m["path"] == pamDir+"/su" && m["module"] == "pam_unix.so" {
+			unix = m
+		}
+	}
+	if unix == nil {
+		t.Fatalf("no pam_unix.so line in su's auth stack: %v", stackLines(t, b, "su", "auth"))
+	}
+	if unix["control"] != "[success=1 default=ignore]" {
+		t.Errorf("control %v", unix["control"])
+	}
+	if args := unix["args"].([]any); len(args) != 1 || args[0] != "nullok" {
+		t.Errorf("args %v, want [nullok]", args)
+	}
+}
+
 // The Debian shape: @include splices every type of the named file where
 // the directive stands; the marker comment names pam-auth-update.
 func TestPAMExpandsDebianIncludes(t *testing.T) {
@@ -206,6 +241,12 @@ func TestPAMUnreadableIncludeIsIncomplete(t *testing.T) {
 	e := env(t, b, "pam.parse_complete")
 	if e.Status != facts.StatusOK || e.Value != false || !strings.Contains(e.Reason, "/etc/pam.d/password-auth") {
 		t.Errorf("%+v", e)
+	}
+	// R164: the fallback that was tried instead is named too, so a host whose
+	// /etc/authselect does not hold the original is diagnosable from the
+	// reason alone.
+	if !strings.Contains(e.Reason, "/etc/authselect/password-auth") {
+		t.Errorf("the reason must name the authselect original: %q", e.Reason)
 	}
 	if l := stackLines(t, b, "login", "auth"); len(l) != 7 {
 		t.Errorf("login still expands: %v", l)
@@ -422,6 +463,27 @@ func TestPAMPwhistoryDefaultRemember(t *testing.T) {
 	if e.Source == nil || len(e.Source.Inputs) != 1 || e.Source.Inputs[0].Path != "/etc/pam.d/common-password" {
 		t.Errorf("source %+v", e.Source)
 	}
+	// R164: a pwhistory.conf that sets remember beats the module default, and
+	// it is the file that is cited.
+	a = ubuntuPAM()
+	a.files["/etc/pam.d/common-password"] = "pam/ubuntu/common-password-pwhistory"
+	a.files[pwhistoryConf] = "pam/ubuntu/pwhistory.conf"
+	e = env(t, build(t, "pam", a), "pam.password.remember")
+	if e.Status != facts.StatusOK || e.Value != 12 {
+		t.Errorf("%+v", e)
+	}
+	if got := sourcePaths(t, e); len(got) != 1 || got[0] != pwhistoryConf {
+		t.Errorf("inputs %v, want [%s]", got, pwhistoryConf)
+	}
+	// C3: a pwhistory.conf that exists but cannot be read is the answer, never
+	// the module's default 10 dressed up as ok.
+	a = ubuntuPAM()
+	a.files["/etc/pam.d/common-password"] = "pam/ubuntu/common-password-pwhistory"
+	a.fails = map[string]error{pwhistoryConf: os.ErrPermission}
+	e = env(t, build(t, "pam", a), "pam.password.remember")
+	if e.Status != facts.StatusDenied || !strings.HasPrefix(e.Reason, pwhistoryConf+": ") {
+		t.Errorf("%+v", e)
+	}
 }
 
 // R152: the last hashing argument on the pam_unix line wins, as it does
@@ -521,6 +583,23 @@ func TestPAMManagingLayerCitesTheMarkerFile(t *testing.T) {
 	}
 	if got := sourcePaths(t, env(t, b, "pam.stacks")); slices.Contains(got, pamDir+"/common-auth") {
 		t.Errorf("the expander did read common-auth, so this proves nothing: %v", got)
+	}
+}
+
+// R163: common-auth exists but cannot be read, so nothing here can say
+// whether the pam-auth-update marker is in it. That read is the answer -
+// "manual" would claim the host is unmanaged on the strength of a file
+// nobody read.
+func TestPAMManagingLayerUnreadableCommonAuth(t *testing.T) {
+	a := ubuntuPAM()
+	a.fails = map[string]error{pamDir + "/common-auth": os.ErrPermission}
+	b := build(t, "pam", a)
+	e := env(t, b, "pam.managing_layer")
+	if e.Status != facts.StatusDenied || !strings.HasPrefix(e.Reason, pamDir+"/common-auth: ") {
+		t.Errorf("%+v", e)
+	}
+	if e := env(t, b, "pam.parse_complete"); e.Status != facts.StatusOK || e.Value != false {
+		t.Errorf("parse_complete %+v", e)
 	}
 }
 
@@ -672,23 +751,36 @@ func TestPAMSuWheel(t *testing.T) {
 	}
 }
 
-// R158: pam_faillock recognises even_deny_root only as a bare argument, so
-// even_deny_root=0 on a stack line is an option it ignores, not a false.
-func TestPAMFaillockEvenDenyRootIsAnExactFlag(t *testing.T) {
+// R160: pam_faillock's args_parse splits every argument at "=" and hands the
+// name to set_conf_opt, which sets the deny-root flag whatever value follows
+// it - so even_deny_root=0 names the option too - and root_unlock_time set
+// anywhere implies even_deny_root (pam_faillock(8)).
+func TestPAMFaillockEvenDenyRootFollowsTheModule(t *testing.T) {
 	a := rockyPAM()
 	a.files["/etc/authselect/system-auth"] = "pam/rocky/authselect-system-auth-evendenyroot0"
-	if e := env(t, build(t, "pam", a), "pam.faillock.even_deny_root"); e.Status != facts.StatusOK || e.Value != false {
-		t.Errorf("%+v (even_deny_root=0 is not the flag)", e)
+	if e := env(t, build(t, "pam", a), "pam.faillock.even_deny_root"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("%+v (even_deny_root=0 still names the option)", e)
 	}
 	a = rockyPAM()
 	a.files["/etc/authselect/system-auth"] = "pam/rocky/authselect-system-auth-evendenyroot"
 	if e := env(t, build(t, "pam", a), "pam.faillock.even_deny_root"); e.Status != facts.StatusOK || e.Value != true {
 		t.Errorf("%+v", e)
 	}
-	// The conf file is the other way round: any value sets it.
+	// The conf file names it the same way, with or without a value.
 	a = rockyPAM()
 	a.files["/etc/security/faillock.conf"] = "pam/rocky/faillock.conf"
 	if e := env(t, build(t, "pam", a), "pam.faillock.even_deny_root"); e.Value != true {
+		t.Errorf("%+v", e)
+	}
+	// root_unlock_time on the authfail line and even_deny_root nowhere: the
+	// module locks root out too, so the fact says so.
+	a = rockyPAM()
+	a.files["/etc/authselect/system-auth"] = "pam/rocky/authselect-system-auth-rootunlock"
+	b := build(t, "pam", a)
+	if e := env(t, b, "pam.faillock.even_deny_root"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("%+v (root_unlock_time implies even_deny_root)", e)
+	}
+	if e := env(t, b, "pam.faillock.root_unlock_time"); e.Status != facts.StatusOK || e.Value != 60 {
 		t.Errorf("%+v", e)
 	}
 }
