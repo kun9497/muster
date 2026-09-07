@@ -2097,3 +2097,124 @@ func TestFilesHomeDirsAbsentAndRemoteFS(t *testing.T) {
 		t.Errorf("alice's home on nfs must be on_remote_fs=true: %v", byUser["alice"])
 	}
 }
+
+// --- files: /root, /etc/hosts.equiv and the /dev walk (Task 3) ------------
+
+// /dev holds device nodes; a regular file living on devtmpfs (or tmpfs at
+// /dev) is a stale/planted file U-26 flags. A character/block device is not.
+func TestFilesDevNonDevice(t *testing.T) {
+	a := &fsAccess{
+		// fsAccess.Glob scans the files+dirs maps (not stats), so the /dev
+		// nodes must be present there for the walk to enumerate them (R188);
+		// stats supplies each node's kind.
+		files: map[string]string{
+			"/proc/self/mountinfo": "mountinfo_dev", // /dev -> devtmpfs
+			"/dev/null":            "",              // present so Glob("/dev/*") sees it
+			"/dev/planted":         "",
+		},
+		dirs: map[string]bool{"/dev": true},
+		stats: map[string]statResult{
+			"/dev/null":    {mode: 0o666, kind: "chardev"},
+			"/dev/planted": {mode: 0o644, kind: "regular"},
+		},
+	}
+	b := build(t, "files", a)
+	nd := okList(t, b, "files.dev_nondevice")
+	if len(nd) != 1 || nd[0].(map[string]any)["name"] != "planted" {
+		t.Fatalf("dev_nondevice %v, want just the regular file", nd)
+	}
+	all := okList(t, b, "files.dev_entries")
+	if len(all) < 2 {
+		t.Errorf("dev_entries should list every /dev node: %v", all)
+	}
+}
+
+// R181: a regular file under a DEEPER mount than /dev (a POSIX-shm file on the
+// /dev/shm tmpfs) is NOT dev_nondevice — that mount is a legitimate tmpfs, and
+// flagging its files would false-fail U-26. It still appears in dev_entries.
+func TestFilesDevExcludesDeeperMounts(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{
+			"/proc/self/mountinfo": "mountinfo_dev", // /dev devtmpfs, /dev/shm tmpfs
+			"/dev/planted":         "",              // regular file directly on /dev
+			"/dev/shm/sem.thing":   "",              // regular file on the /dev/shm tmpfs
+		},
+		dirs: map[string]bool{"/dev": true, "/dev/shm": true},
+		stats: map[string]statResult{
+			"/dev/planted":       {mode: 0o644, kind: "regular"},
+			"/dev/shm":           {mode: 0o1777, kind: "dir"},
+			"/dev/shm/sem.thing": {mode: 0o644, kind: "regular"},
+		},
+	}
+	b := build(t, "files", a)
+	nd := okList(t, b, "files.dev_nondevice")
+	if len(nd) != 1 || nd[0].(map[string]any)["path"] != "/dev/planted" {
+		t.Fatalf("dev_nondevice %v, want only the file served exactly by /dev", nd)
+	}
+	// The /dev/shm file is still enumerated, just not flagged as a stray.
+	var sawShm bool
+	for _, e := range okList(t, b, "files.dev_entries") {
+		if e.(map[string]any)["path"] == "/dev/shm/sem.thing" {
+			sawShm = true
+		}
+	}
+	if !sawShm {
+		t.Error("dev_entries must still list the /dev/shm file (it is excluded only from dev_nondevice)")
+	}
+}
+
+// /root permission facts come from stat only; a stat failure reaches all six
+// leaves.
+func TestFilesRootHome(t *testing.T) {
+	a := &fsAccess{stats: map[string]statResult{"/root": {mode: 0o700, uid: 0, gid: 0, kind: "dir"}},
+		files: map[string]string{"/proc/self/mountinfo": "mountinfo"}}
+	b := build(t, "files", a)
+	if env(t, b, "files.root_home.mode").Value != 0o700 {
+		t.Errorf("root_home.mode %+v", env(t, b, "files.root_home.mode"))
+	}
+	if env(t, b, "files.root_home.other_writable").Value != false {
+		t.Error("0700 /root is not other-writable")
+	}
+}
+
+// A stat failure on /root reaches all six root_home leaves with the same
+// envelope, so U-14 never compares a partial set (R176).
+func TestFilesRootHomeDeniedReachesEveryLeaf(t *testing.T) {
+	a := &fsAccess{
+		fails: map[string]error{"/root": os.ErrPermission},
+		files: map[string]string{"/proc/self/mountinfo": "mountinfo"},
+	}
+	b := build(t, "files", a)
+	for _, k := range []string{"mode", "uid", "gid", "group_writable", "other_writable", "acl_present"} {
+		if e := env(t, b, "files.root_home."+k); e.Status != facts.StatusDenied {
+			t.Errorf("files.root_home.%s must be denied, not a quiet value: %+v", k, e)
+		}
+	}
+}
+
+// /etc/hosts.equiv non-comment lines are recorded; a file that does not exist
+// (ENOENT) yields an OK empty line list — NOT absent (R177) — so U-27 passes
+// vacuously rather than screening to absent_means.
+func TestFilesHostsEquiv(t *testing.T) {
+	a := &fsAccess{files: map[string]string{"/etc/hosts.equiv": "hosts_equiv", "/proc/self/mountinfo": "mountinfo"},
+		stats: map[string]statResult{"/etc/hosts.equiv": {mode: 0o644, uid: 0, kind: "regular"}}}
+	lines := okList(t, build(t, "files", a), "files.etc_hosts_equiv_lines")
+	if len(lines) == 0 {
+		t.Error("hosts.equiv non-comment lines must be recorded")
+	}
+
+	// No /etc/hosts.equiv at all: the lines key is an OK empty list, not absent.
+	none := &fsAccess{files: map[string]string{"/proc/self/mountinfo": "mountinfo"}}
+	nb := build(t, "files", none)
+	e := env(t, nb, "files.etc_hosts_equiv_lines")
+	if e.Status != facts.StatusOK {
+		t.Fatalf("a missing hosts.equiv must leave etc_hosts_equiv_lines OK, got %+v", e)
+	}
+	if l, _ := e.Value.([]any); len(l) != 0 {
+		t.Errorf("a missing hosts.equiv must yield [], got %v", e.Value)
+	}
+	// ...while the two perm leaves are absent in that case.
+	if m := env(t, nb, "files.etc_hosts_equiv.mode"); m.Status != facts.StatusAbsent {
+		t.Errorf("a missing hosts.equiv must leave mode absent, got %+v", m)
+	}
+}

@@ -475,6 +475,72 @@ keys:
     since: 1
     sensitivity: internal
     collector: files
+  - key: files.root_home.mode
+    type: int
+    description: Permission bits of /root as an integer (e.g. 448 for 0700).
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.root_home.uid
+    type: int
+    description: Owner uid of /root.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.root_home.gid
+    type: int
+    description: Group gid of /root.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.root_home.group_writable
+    type: bool
+    description: Whether the group permission bits of /root include write (derived from mode).
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.root_home.other_writable
+    type: bool
+    description: Whether the other permission bits of /root include write (derived from mode).
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.root_home.acl_present
+    type: bool
+    description: Whether a POSIX ACL xattr is present on /root.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_hosts_equiv.mode
+    type: int
+    description: Permission bits of /etc/hosts.equiv as an integer; absent when the file does not exist.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_hosts_equiv.uid
+    type: int
+    description: Owner uid of /etc/hosts.equiv; absent when the file does not exist.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_hosts_equiv_lines
+    type: list<string>
+    description: Non-comment lines of /etc/hosts.equiv; an OK empty list when the file does not exist, since a host-based trust file that is absent grants no trust.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.dev_entries
+    type: list<record>
+    description: Every node one and two levels under /dev, each with name, path, kind, serving filesystem type, mode and owner uid; bounded and marked truncated if the bound is hit.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.dev_nondevice
+    type: list<record>
+    description: The subset of /dev entries that are regular files served by the /dev mount itself (not a deeper tmpfs such as /dev/shm) - the stale or planted files U-26 flags.
+    since: 1
+    sensitivity: public
+    collector: files
   - key: accounts.login_defs.pass_max_days
     type: setting<int>
     description: PASS_MAX_DAYS - persisted in login.defs, effective as the maximum over existing accounts' shadow fields.

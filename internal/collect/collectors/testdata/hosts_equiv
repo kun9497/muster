@@ -1,0 +1,3 @@
+# a synthetic hosts.equiv with a dangerous wildcard entry
++
+synthetic-host.example
