@@ -1,0 +1,30 @@
+id: muster.file.shadow_permissions
+title_en: /etc/shadow is owned by root and readable by root only
+title_ko: /etc/shadow 가 root 소유이고 root 만 읽을 수 있다
+description_en: The guide's criterion is owner root and mode 0400 or stricter, and no named POSIX ACL entry may widen it. Ubuntu ships /etc/shadow as root:shadow 0640 so that setgid helpers can read it; that host fails this control until the mode is tightened or allowed_modes is widened deliberately (0640 is 416).
+description_ko: 가이드 기준은 소유자 root, 모드 0400 이하이며 특정 사용자·그룹에 대한 POSIX ACL 항목이 이를 넓혀서는 안 됩니다. Ubuntu 는 setgid 도우미가 읽을 수 있도록 /etc/shadow 를 root:shadow 0640 으로 배포하므로, 모드를 조이거나 allowed_modes 를 의도적으로 넓히기 (0640 은 416) 전까지 그 호스트는 실패합니다.
+category: file
+importance: 상
+automation: auto
+references:
+  kisa: { "2026": ["U-18"], "2021": ["U-08"] }
+  cis:
+    - { benchmark: ubuntu-22.04, version: "2.0.0", rec: "7.1.5" }
+  stig:
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-232150 }
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-232270 }
+  nist_800_53: ["CM-6"]
+requires_facts: ">=1"
+absent_means: fail
+params:
+  allowed_modes: { type: list<int>, default: [0, 256], description: Modes that count as 0400 or stricter (0400 and every subset of its bits) }
+checks:
+  - { fact: files.etc_shadow.uid, op: eq, expected: 0 }
+  - { fact: files.etc_shadow.mode, op: in, expected: "${allowed_modes}" }
+  - { fact: files.etc_shadow.acl_entries, op: none, where: { op: matches, expected: "^(user|group):[^:]+:" } }
+remediation:
+  text_en: chown root /etc/shadow; chmod 400 /etc/shadow; setfacl -b /etc/shadow
+  text_ko: chown root /etc/shadow; chmod 400 /etc/shadow; setfacl -b /etc/shadow
+  risk: none
+  idempotent: true
+  script: chown root /etc/shadow && chmod 400 /etc/shadow && setfacl -b /etc/shadow

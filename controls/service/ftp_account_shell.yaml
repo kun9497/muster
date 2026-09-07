@@ -1,0 +1,22 @@
+id: muster.service.ftp_account_shell
+title_en: The ftp account cannot log in interactively
+title_ko: ftp 계정으로 대화형 로그인을 할 수 없다
+description_en: The account an FTP daemon runs anonymous sessions as exists to own the FTP tree, not to log in. When an account named ftp exists its shell must not be one of the login shells in /etc/shells; a host without such an account passes.
+description_ko: FTP 데몬이 익명 세션에 쓰는 계정은 FTP 트리를 소유하기 위한 것이지 로그인용이 아닙니다. ftp 라는 계정이 있으면 그 셸이 /etc/shells 의 로그인 셸이면 안 되며, 그런 계정이 없는 호스트는 통과합니다.
+category: service
+importance: 중
+automation: auto
+references:
+  kisa: { "2026": ["U-55"], "2021": ["U-62"] }
+requires_facts: ">=1"
+absent_means: fail
+checks:
+  # R126: screen on accounts.shells first so a denied /etc/shells becomes
+  # ERROR before any row is judged, rather than silently skipping rows.
+  - { fact: accounts.shells, op: present }
+  - { fact: accounts.users, op: each, subject: name, where: { field: name, op: eq, expected: ftp }, require: { field: shell_valid, op: eq, expected: false } }
+remediation:
+  text_en: usermod -s /usr/sbin/nologin ftp (Debian and Ubuntu) or usermod -s /sbin/nologin ftp (Rocky and AlmaLinux).
+  text_ko: usermod -s /usr/sbin/nologin ftp (Debian·Ubuntu) 또는 usermod -s /sbin/nologin ftp (Rocky·AlmaLinux).
+  risk: none
+  idempotent: true

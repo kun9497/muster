@@ -1,0 +1,1 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{"accounts":{"login_defs":{"encrypt_method":{"status":"absent","reason":"ENCRYPT_METHOD is not set in /etc/login.defs"}},"shadow_in_use":{"status":"ok","value":true},"users":{"status":"ok","value":[{"name":"root","hash_algo":"$6$"},{"name":"svc","hash_algo":""},{"name":"alice","hash_algo":"$y$"}]}}}}

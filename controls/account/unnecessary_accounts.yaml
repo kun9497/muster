@@ -1,0 +1,21 @@
+id: muster.account.unnecessary_accounts
+title_en: Accounts that are not needed have been removed
+title_ko: 불필요한 계정이 제거되어 있다
+description_en: Accounts created by packages that are not in use (printing, uucp) widen the attack surface for nothing. The parameter names the accounts the guide gives as examples; a stock Ubuntu or Rocky host keeps lp and uucp, so this reports WARN there until the operator removes them or adjusts the list.
+description_ko: 사용하지 않는 패키지가 만든 계정(인쇄, uucp)은 공격 표면만 넓힙니다. 파라미터는 가이드가 예로 드는 계정 이름이며, 기본 설치된 Ubuntu 와 Rocky 는 lp 와 uucp 를 갖고 있으므로 운영자가 제거하거나 목록을 조정하기 전까지 WARN 으로 보고됩니다.
+category: account
+importance: 하
+automation: partial
+references:
+  kisa: { "2026": ["U-07"], "2021": ["U-49"] }
+requires_facts: ">=1"
+absent_means: manual
+params:
+  unnecessary: { type: list<string>, default: ["lp", "uucp", "nuucp"], description: Account names that should not exist on this host }
+checks:
+  - { fact: accounts.users, op: none, subject: name, where: { field: name, op: in, expected: "${unnecessary}" } }
+remediation:
+  text_en: Remove each listed account with userdel <name> after confirming nothing on the host runs as it (ps -u <name>; find / -user <name>).
+  text_ko: 호스트에서 해당 계정으로 실행되는 것이 없음을 확인한 뒤 (ps -u <name>; find / -user <name>) userdel <name> 으로 제거합니다.
+  risk: none
+  idempotent: true

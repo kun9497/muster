@@ -1,0 +1,1 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{"accounts":{"shells":{"status":"ok","value":["/bin/sh","/bin/bash"]},"users":{"status":"ok","value":[{"name":"root"},{"name":"alice"}]}}}}

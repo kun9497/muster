@@ -1,0 +1,1 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{"files":{"etc_shadow":{"uid":{"status":"absent"},"mode":{"status":"absent"},"acl_entries":{"status":"absent"}}}}}
