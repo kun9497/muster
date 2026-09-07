@@ -9,6 +9,11 @@ automation: auto
 references:
   kisa: { "2026": ["U-01"], "2021": ["U-01"] }
   cis: [{ benchmark: ubuntu-22.04, version: "2.0.0", rec: "5.1.20" }]
+  stig:
+    - { benchmark: ubuntu2204, version: V2R9, id: UBTU-22-411010 }
+    - { benchmark: ubuntu2404, version: V1R6, id: UBTU-24-400110 }
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-255045 }
+  nist_800_53: ["IA-2(5)"]
 requires_facts: ">=1"
 applies_when:
   - { fact: services.ssh.installed, op: eq, expected: true }
@@ -21,6 +26,7 @@ mechanisms:
     checks:
       - { fact: sshd.options.permit_root_login, on: effective, persona: root, op: in, expected: "${allowed}" }
   - when:
+      - { fact: pam.securetty_enabled, op: eq, expected: true }
       - { fact: files.etc_securetty, op: present }
     checks:
       - { fact: files.etc_securetty_lines, op: none, where: { op: matches, expected: "^pts/" } }

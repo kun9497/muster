@@ -1,0 +1,5 @@
+permitrootlogin no
+maxauthtries 4
+clientaliveinterval 300
+clientalivecountmax 1
+banner /etc/issue.net

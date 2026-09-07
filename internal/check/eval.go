@@ -237,13 +237,16 @@ func evalOne(e *env, c *controls.Control) (r Result) {
 	return finish(r, c, all)
 }
 
-// parseFallback reports whether any clause reads a daemon-reported sshd
-// option while the snapshot says the options were obtained by parsing the
+// parseFallback reports whether any clause reads a daemon-derived sshd fact
+// while the snapshot says the options were obtained by parsing the
 // configuration instead of asking sshd (spec §5.3, §6.5 step 13, §7.3).
+// sshd.banner_file.* is derived from the parsed Banner path, so a mechanism
+// judged under collect_method "parse" is degraded (R173) exactly as an
+// sshd.options.* clause is.
 func (e *env) parseFallback(cls []controls.Clause) bool {
 	reads := false
 	for _, cl := range cls {
-		if strings.HasPrefix(cl.Fact, "sshd.options.") {
+		if strings.HasPrefix(cl.Fact, "sshd.options.") || strings.HasPrefix(cl.Fact, "sshd.banner_file.") {
 			reads = true
 			break
 		}

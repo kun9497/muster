@@ -1,0 +1,7 @@
+port 22
+permitrootlogin yes
+maxauthtries 4
+clientaliveinterval 300
+clientalivecountmax 1
+banner /etc/issue.net
+passwordauthentication no

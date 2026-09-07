@@ -1,0 +1,1 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{"services":{"ssh":{"installed":{"status":"ok","value":true}}},"sshd":{"personas_collected":{"status":"ok","value":true},"options":{"permit_root_login":{"effective":{"status":"ok","value":"no","source":{"kind":"command","cmd":"/usr/sbin/sshd -T"}}}}}}}

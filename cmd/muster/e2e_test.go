@@ -89,7 +89,10 @@ func TestCheckEndToEndWaiversTurnFailIntoWaived(t *testing.T) {
 	if !strings.Contains(errb.String(), "unknown control") {
 		t.Errorf("stderr %q lacks the unknown-control warning", errb.String())
 	}
-	if strings.Contains(out.String(), "warning") {
+	// A generic substring check on "warning" would false-positive on
+	// muster.service.login_banner's title, which legitimately contains that
+	// English word; assert on the actual warning content instead.
+	if strings.Contains(out.String(), "unknown control") {
 		t.Errorf("stdout must carry the report only: %s", out.String())
 	}
 
@@ -161,9 +164,9 @@ func TestCheckEndToEndJSONAndTable(t *testing.T) {
 	if _, declared := params["muster.service.telnet_disabled"]; declared {
 		t.Errorf("only controls that declare params belong in check.params: %v", params)
 	}
-	// R26: full-pass.json must produce exactly the twenty embedded controls'
-	// documented statuses, not merely "some PASS rows appear somewhere in the
-	// output".
+	// R26: full-pass.json must produce exactly the twenty-two embedded
+	// controls' documented statuses, not merely "some PASS rows appear
+	// somewhere in the output".
 	assertStatuses(t, out1.Bytes(), map[string]string{
 		"muster.account.root_remote_login":       "PASS",
 		"muster.account.password_policy":         "PASS",
@@ -185,6 +188,8 @@ func TestCheckEndToEndJSONAndTable(t *testing.T) {
 		"muster.service.ftp_account_shell":       "PASS",
 		"muster.account.lockout_threshold":       "PASS",
 		"muster.account.su_restricted":           "PASS",
+		"muster.account.session_timeout":         "PASS",
+		"muster.service.login_banner":            "PASS",
 	})
 
 	var table bytes.Buffer
@@ -196,7 +201,7 @@ func TestCheckEndToEndJSONAndTable(t *testing.T) {
 	}
 
 	// R26: full-fail.json flips only root_remote_login to FAIL; the other
-	// nineteen controls are unchanged from full-pass.json.
+	// twenty-one controls are unchanged from full-pass.json.
 	var failJSON bytes.Buffer
 	if code := run([]string{"check", "--facts", "testdata/full-fail.json", "--format", "json"}, &failJSON, &errb); code != exitFindings {
 		t.Fatalf("exit %d, want 1 for a FAIL; stderr %q", code, errb.String())
@@ -222,6 +227,8 @@ func TestCheckEndToEndJSONAndTable(t *testing.T) {
 		"muster.service.ftp_account_shell":       "PASS",
 		"muster.account.lockout_threshold":       "PASS",
 		"muster.account.su_restricted":           "PASS",
+		"muster.account.session_timeout":         "PASS",
+		"muster.service.login_banner":            "PASS",
 	})
 
 	// R26: every run() call's exit code is asserted, including --quiet's,

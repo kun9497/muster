@@ -252,6 +252,186 @@
       "SubjectKind": ""
     },
     {
+      "Key": "sshd.version",
+      "Type": "string",
+      "Description": "OpenSSH version reported by sshd -V (major.minor); absent when it could not be read.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sshd",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "sshd.options.max_auth_tries",
+      "Type": "setting\u003cint\u003e",
+      "Description": "Effective MaxAuthTries (daemon-reported versus parsed files).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sshd",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "sshd.options.client_alive_interval",
+      "Type": "setting\u003cint\u003e",
+      "Description": "Effective ClientAliveInterval in seconds (daemon-reported versus parsed files); 0 disables the keepalive.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sshd",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "sshd.options.client_alive_count_max",
+      "Type": "setting\u003cint\u003e",
+      "Description": "Effective ClientAliveCountMax (daemon-reported versus parsed files).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sshd",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "sshd.options.banner",
+      "Type": "setting\u003cstring\u003e",
+      "Description": "Effective Banner path, or none for sshd's default of no pre-auth banner.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sshd",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "sshd.include_sources",
+      "Type": "list\u003crecord\u003e",
+      "Description": "Every Include the sshd_config parse followed, in expansion order - path, line, depth.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sshd",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "sshd.banner_file.exists",
+      "Type": "bool",
+      "Description": "Whether the file named by sshd's Banner exists; false when Banner is none.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sshd",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "sshd.banner_file.nonempty",
+      "Type": "bool",
+      "Description": "Whether the file named by sshd's Banner has non-whitespace content.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sshd",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "banners.issue.nonempty",
+      "Type": "bool",
+      "Description": "Whether /etc/issue has non-whitespace content.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "banners",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "banners.issue.os_escapes",
+      "Type": "bool",
+      "Description": "Whether /etc/issue announces the distribution or release (an issue escape or the distro name).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "banners",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "banners.issue.mode",
+      "Type": "int",
+      "Description": "Permission bits of /etc/issue; 0 when the file is absent.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "banners",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "banners.issue_net.nonempty",
+      "Type": "bool",
+      "Description": "Whether /etc/issue.net has non-whitespace content.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "banners",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "banners.issue_net.os_escapes",
+      "Type": "bool",
+      "Description": "Whether /etc/issue.net announces the distribution or release (an issue escape or the distro name).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "banners",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "banners.issue_net.mode",
+      "Type": "int",
+      "Description": "Permission bits of /etc/issue.net; 0 when the file is absent.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "banners",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "banners.motd.nonempty",
+      "Type": "bool",
+      "Description": "Whether /etc/motd has non-whitespace content.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "banners",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "banners.motd.mode",
+      "Type": "int",
+      "Description": "Permission bits of /etc/motd; 0 when the file is absent.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "banners",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "banners.motd_d",
+      "Type": "list\u003crecord\u003e",
+      "Description": "Inventory of /etc/update-motd.d entries - name and whether each is executable.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "banners",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "banners.dynamic_motd",
+      "Type": "bool",
+      "Description": "Whether /etc/update-motd.d holds at least one executable script.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "banners",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
       "Key": "files.etc_securetty",
       "Type": "record",
       "Description": "Presence and permission facts of /etc/securetty (absent on RHEL 8+ and Debian-family).",

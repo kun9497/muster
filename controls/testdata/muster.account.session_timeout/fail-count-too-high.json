@@ -1,0 +1,5 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "services":{"ssh":{"installed":{"status":"ok","value":true}}},
+  "sshd":{"options":{
+    "client_alive_interval":{"effective":{"status":"ok","value":300,"source":{"kind":"command","cmd":"/usr/sbin/sshd -T"}}},
+    "client_alive_count_max":{"effective":{"status":"ok","value":10,"source":{"kind":"command","cmd":"/usr/sbin/sshd -T"}}}}}}}

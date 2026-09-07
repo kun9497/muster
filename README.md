@@ -14,17 +14,19 @@ the Linux server asset class: KISA is the primary standard, and global
 benchmarks (CIS Benchmarks, DISA STIG, NIST SP 800-53) are attached as
 references and, later, offered as selectable profiles.
 
-> **Status: stage 1 complete, stage 2 starting (September 2026).** `collect`
-> and `check` work end to end with twenty controls (U-01, U-02, U-16, U-19,
-> U-22, U-25, U-29, U-52, U-03, U-04, U-05, U-06, U-07, U-08, U-09, U-10,
-> U-11, U-13, U-18, U-55 — U-19/U-22/U-29 are the `/etc/hosts`, `/etc/services` and
-> `/etc/hosts.lpd` permission controls; U-03, U-04, U-05, U-06, U-07, U-08, U-09, U-10,
-> U-11, U-13, U-18 and U-55 are the account family added in stage 2);
-> CI exercises them as root, as a normal user, and inside Ubuntu 22.04/24.04
-> and Rocky/Alma 9 containers. Stage 2 enrolls every automatable
+> **Status: stage 2 in progress (September 2026).** Stage 1 — the skeleton:
+> `collect`, `check`, waivers, exit codes, eight controls end to end — is
+> complete, and the first stage-2 plans are merged: the foundations with DISA
+> STIG and NIST SP 800-53 references, the account family, the PAM stacks, and
+> the completed sshd collector with login banners.
+> Which KISA items are enrolled today, with their control ids and automation
+> class, is generated into [the coverage table](docs/reference/coverage.md);
+> CI exercises the control set as root, as a normal user, and inside Ubuntu
+> 22.04/24.04 and Rocky/Alma 9 containers. Stage 2 enrols every automatable
 > KISA item. The architecture, contracts and release scope are written up in
 > [the design specification](docs/superpowers/specs/2026-09-02-muster-design.md).
-> Facts and flags described below beyond stage 1 are the plan, not a promise.
+> Facts and flags described below beyond what is merged are the plan, not a
+> promise.
 
 > **Not affiliated.** muster is an unofficial personal project. It is not
 > endorsed by KISA or by the Center for Internet Security, it contains no CIS
@@ -114,9 +116,10 @@ references are benchmark name, version and recommendation number only, and
 muster judges no CIS compliance. See [ATTRIBUTION.md](ATTRIBUTION.md).
 
 Global benchmarks are cross-references, not a second rulebook. Every control
-carries CIS Benchmark recommendation numbers today, gains DISA STIG and NIST
-SP 800-53 references in stage 2, and from stage 3 a `cis-<distro>-l1` profile
-can select controls and parameters from the same collector. muster records the
+carries CIS Benchmark recommendation numbers and, where a mapping exists, DISA
+STIG rule ids and NIST SP 800-53 control ids; `muster controls lint` refuses a
+STIG id that is not in the committed index. From stage 3 a `cis-<distro>-l1`
+profile can select controls and parameters from the same collector. muster records the
 numbers, never the benchmark text, and certifies no level of CIS or STIG
 compliance. The STIG and NIST identifiers a control may cite are generated
 into `docs/reference/stig/` from DISA's public files by `tools/refindex`.

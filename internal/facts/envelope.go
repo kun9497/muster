@@ -65,6 +65,10 @@ type Setting struct {
 	Persisted *Envelope `json:"persisted,omitempty"`
 	Effective *Envelope `json:"effective,omitempty"`
 	Winner    *Source   `json:"winner,omitempty"`
+	// Personas holds a per-persona (sshd Match) daemon value, keyed by
+	// persona name, stored only where it differs from the global side; nil
+	// when personas were not collected or none override the global value.
+	Personas map[string]*Envelope `json:"personas,omitempty"`
 }
 
 // Missing builds the reader-side envelope for a registered key the snapshot

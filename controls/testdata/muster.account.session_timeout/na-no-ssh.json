@@ -1,0 +1,2 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "services":{"ssh":{"installed":{"status":"ok","value":false}}}}}

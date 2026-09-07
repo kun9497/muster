@@ -82,10 +82,6 @@ func (e *env) evalSetting(cl controls.Clause, r facts.Resolved, expected any) cl
 	if on == "" {
 		on = r.Entry.DefaultOn
 	}
-	var degraded string
-	if cl.Persona != "" && !e.personas {
-		degraded = degradedPersonas
-	}
 	side := func(name string, env *facts.Envelope) (bool, Evidence, error) {
 		// R15/R16: a side that is nil (never collected) and a side that is
 		// explicitly "absent" (collected, found nothing) are equivalent
@@ -105,6 +101,24 @@ func (e *env) evalSetting(cl controls.Clause, r facts.Resolved, expected any) cl
 			err = fmt.Errorf("%s side %s: %w", cl.Fact, name, err)
 		}
 		return ok, Evidence{Fact: cl.Fact, Status: facts.StatusOK, Value: env.Value, Source: env.Source, Side: name}, err
+	}
+	var degraded string
+	if cl.Persona != "" {
+		if !e.personas {
+			degraded = degradedPersonas
+		} else if r.Setting.Personas != nil {
+			if pv, ok := r.Setting.Personas[cl.Persona]; ok && pv != nil {
+				// The daemon reported a Match override for this persona:
+				// judge it directly, on whichever side the clause named is
+				// irrelevant (the override is the daemon's answer). No
+				// degradation — the personas were collected.
+				holds, ev, err := side(cl.Persona, pv)
+				if err != nil {
+					return clauseOutcome{Err: err}
+				}
+				return clauseOutcome{Holds: holds, Evidence: []Evidence{ev}}
+			}
+		}
 	}
 	switch on {
 	case "runtime", "persisted", "effective":

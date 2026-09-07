@@ -270,6 +270,256 @@ func setting(t *testing.T, b *collect.Builder, key string) facts.Setting {
 
 // --- sshd ---------------------------------------------------------------
 
+// -G is the preferred method: it prints the daemon's configuration without
+// loading host keys or the privilege-separation directory, so a socket-
+// activated sshd that makes -T fail still answers. When -G answers, the
+// method is "G" and -T is never consulted.
+func TestSshdPrefersGOverT(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{"/etc/ssh/sshd_config": "sshd_config"},
+		cmds: map[string]cmdResult{
+			"/usr/sbin/sshd -G": {file: "sshd_G.txt"},
+			"/usr/sbin/sshd -V": {stderr: "OpenSSH_9.6p1 Ubuntu-3ubuntu13.5, OpenSSL 3.0.13\n", exitCode: 1},
+		},
+	}
+	b := build(t, "sshd", a)
+	if m := env(t, b, "sshd.collect_method"); m.Value != "G" {
+		t.Fatalf("method %+v, want G", m)
+	}
+	s := setting(t, b, "sshd.options.permit_root_login")
+	if s.Runtime == nil || s.Runtime.Value != "no" {
+		t.Errorf("runtime from -G %+v", s.Runtime)
+	}
+	if v := env(t, b, "sshd.version"); v.Value != "9.6" {
+		t.Errorf("version %+v, want 9.6", v)
+	}
+}
+
+// 8.9 and 8.7 have no -G: the ladder drops to -T and the method is "T".
+func TestSshdFallsFromGToT(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{"/etc/ssh/sshd_config": "sshd_config"},
+		cmds: map[string]cmdResult{
+			"/usr/sbin/sshd -G": {exitCode: 1, stderr: "unknown option -- G\n"},
+			"/usr/sbin/sshd -T": {file: "sshd_T_full.txt"},
+			"/usr/sbin/sshd -V": {stderr: "OpenSSH_8.9p1 Ubuntu-3ubuntu0.17\n", exitCode: 1},
+			"/usr/sbin/sshd -T -C user=root,host=localhost,addr=127.0.0.1,lport=22":           {file: "sshd_T_full.txt"},
+			"/usr/sbin/sshd -T -C user=nobody,host=localhost,addr=127.0.0.1,lport=22":         {file: "sshd_T_full.txt"},
+			"/usr/sbin/sshd -T -C user=muster-nx-user,host=localhost,addr=127.0.0.1,lport=22": {file: "sshd_T_full.txt"},
+		},
+	}
+	b := build(t, "sshd", a)
+	if m := env(t, b, "sshd.collect_method"); m.Value != "T" {
+		t.Fatalf("method %+v, want T", m)
+	}
+	if env(t, b, "sshd.personas_collected").Value != true {
+		t.Error("all three persona queries succeeded; flag must be true")
+	}
+	if s := setting(t, b, "sshd.options.client_alive_interval"); s.Effective.Value != 300 {
+		t.Errorf("client_alive_interval effective %+v, want int 300", s.Effective)
+	}
+	if s := setting(t, b, "sshd.options.max_auth_tries"); s.Effective.Value != 4 {
+		t.Errorf("max_auth_tries effective %+v, want int 4", s.Effective)
+	}
+}
+
+// A persona whose value differs from the global is recorded as an override;
+// personas that match the global are not stored (byte stability).
+func TestSshdRecordsAPersonaOverride(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{"/etc/ssh/sshd_config": "sshd_config"},
+		cmds: map[string]cmdResult{
+			"/usr/sbin/sshd -G": {exitCode: 1, stderr: "unknown option\n"},
+			"/usr/sbin/sshd -T": {file: "sshd_T_full.txt"}, // permitrootlogin no
+			"/usr/sbin/sshd -V": {stderr: "OpenSSH_8.9p1\n", exitCode: 1},
+			"/usr/sbin/sshd -T -C user=root,host=localhost,addr=127.0.0.1,lport=22":           {file: "sshd_T_C_root.txt"}, // permitrootlogin yes
+			"/usr/sbin/sshd -T -C user=nobody,host=localhost,addr=127.0.0.1,lport=22":         {file: "sshd_T_full.txt"},
+			"/usr/sbin/sshd -T -C user=muster-nx-user,host=localhost,addr=127.0.0.1,lport=22": {file: "sshd_T_full.txt"},
+		},
+	}
+	s := setting(t, build(t, "sshd", a), "sshd.options.permit_root_login")
+	if s.Effective.Value != "no" {
+		t.Fatalf("global effective %+v, want no", s.Effective)
+	}
+	if s.Personas == nil || s.Personas["root"] == nil || s.Personas["root"].Value != "yes" {
+		t.Fatalf("root persona override must be recorded as yes: %+v", s.Personas)
+	}
+	if _, ok := s.Personas["user"]; ok {
+		t.Error("a persona equal to the global must not be stored")
+	}
+}
+
+// One failed persona query leaves the flag false — a half-collected set is
+// worse than none.
+func TestSshdOnePersonaFailureLeavesFlagFalse(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{"/etc/ssh/sshd_config": "sshd_config"},
+		cmds: map[string]cmdResult{
+			"/usr/sbin/sshd -T": {file: "sshd_T_full.txt"},
+			"/usr/sbin/sshd -V": {stderr: "OpenSSH_8.9p1\n", exitCode: 1},
+			"/usr/sbin/sshd -T -C user=root,host=localhost,addr=127.0.0.1,lport=22":   {file: "sshd_T_full.txt"},
+			"/usr/sbin/sshd -T -C user=nobody,host=localhost,addr=127.0.0.1,lport=22": {exitCode: 255, stderr: "bad\n"},
+		},
+	}
+	b := build(t, "sshd", a)
+	if env(t, b, "sshd.personas_collected").Value != false {
+		t.Error("a failed persona query must leave the flag false")
+	}
+	if s := setting(t, b, "sshd.options.permit_root_login"); s.Personas != nil {
+		t.Error("no overrides recorded when personas are not fully collected")
+	}
+}
+
+// Parse fallback: no daemon output at all. Options come from the files, the
+// method is "parse", personas are not collected, version is absent.
+func TestSshdParseFallbackFillsEveryOption(t *testing.T) {
+	a := &fsAccess{files: map[string]string{"/etc/ssh/sshd_config": "sshd_config_banners"}}
+	b := build(t, "sshd", a)
+	if env(t, b, "sshd.collect_method").Value != "parse" {
+		t.Fatal("method must be parse")
+	}
+	if env(t, b, "sshd.personas_collected").Value != false {
+		t.Error("no daemon, no personas")
+	}
+	if s := setting(t, b, "sshd.options.banner"); s.Effective.Value != "/etc/issue.net" {
+		t.Errorf("banner from parse %+v", s.Effective)
+	}
+	// R165: a numeric option parsed from the files must be an int on the
+	// effective side, never the string parseSshdConfig returns, or a clause
+	// on it ERRORs. This is the assertion that catches the setting<int>
+	// parsed-side bug the daemon path (int already) hides.
+	ci := setting(t, b, "sshd.options.client_alive_interval")
+	if n, ok := ci.Effective.Value.(int); !ok || n != 300 {
+		t.Errorf("client_alive_interval effective %#v, want int 300", ci.Effective.Value)
+	}
+	if v := env(t, b, "sshd.version"); v.Status != facts.StatusAbsent {
+		t.Errorf("version %+v, want absent", v)
+	}
+}
+
+// The Banner file is stat'd, and "none" is a definite false, not an error.
+func TestSshdBannerFileStat(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{
+			"/etc/ssh/sshd_config": "sshd_config_banners", // Banner /etc/issue.net
+			"/etc/issue.net":       "issue_for_sshd",
+		},
+	}
+	b := build(t, "sshd", a)
+	if e := env(t, b, "sshd.banner_file.exists"); e.Value != true {
+		t.Errorf("exists %+v", e)
+	}
+	if e := env(t, b, "sshd.banner_file.nonempty"); e.Value != true {
+		t.Errorf("nonempty %+v", e)
+	}
+
+	none := &fsAccess{files: map[string]string{"/etc/ssh/sshd_config": "sshd_config"}} // no Banner -> none
+	nb := build(t, "sshd", none)
+	if e := env(t, nb, "sshd.banner_file.exists"); e.Status != facts.StatusOK || e.Value != false {
+		t.Errorf("Banner none must be a definite false: %+v", e)
+	}
+}
+
+// Include sources are recorded in expansion order with depth.
+func TestSshdIncludeSourcesRecorded(t *testing.T) {
+	a := &fsAccess{files: map[string]string{
+		"/etc/ssh/sshd_config":                      "sshd_config", // Include .../*.conf
+		"/etc/ssh/sshd_config.d/50-cloud-init.conf": "sshd_config.d_50-cloud-init.conf",
+	}}
+	list := okList(t, build(t, "sshd", a), "sshd.include_sources")
+	if len(list) != 1 {
+		t.Fatalf("include_sources %v, want one entry", list)
+	}
+	rec := list[0].(map[string]any)
+	if rec["path"] != "/etc/ssh/sshd_config.d/50-cloud-init.conf" || rec["depth"].(int) != 1 {
+		t.Errorf("record %v", rec)
+	}
+}
+
+// Two drop-ins match one Include glob: the records appear in sorted-Glob
+// expansion order, each at depth 1, so the order across entries is pinned
+// (not just a single match).
+func TestSshdIncludeSourcesRecordedInExpansionOrder(t *testing.T) {
+	a := &fsAccess{files: map[string]string{
+		"/etc/ssh/sshd_config":                      "sshd_config", // Include .../*.conf
+		"/etc/ssh/sshd_config.d/60-extra.conf":      "sshd_config.d_60-extra.conf",
+		"/etc/ssh/sshd_config.d/50-cloud-init.conf": "sshd_config.d_50-cloud-init.conf",
+	}}
+	list := okList(t, build(t, "sshd", a), "sshd.include_sources")
+	if len(list) != 2 {
+		t.Fatalf("include_sources %v, want two entries", list)
+	}
+	want := []string{
+		"/etc/ssh/sshd_config.d/50-cloud-init.conf",
+		"/etc/ssh/sshd_config.d/60-extra.conf",
+	}
+	for i, w := range want {
+		rec := list[i].(map[string]any)
+		if rec["path"] != w {
+			t.Errorf("entry %d path %v, want %s (records must be in sorted expansion order)", i, rec["path"], w)
+		}
+		if rec["depth"].(int) != 1 {
+			t.Errorf("entry %d depth %v, want 1", i, rec["depth"])
+		}
+	}
+}
+
+// R168: a Banner path outside Declare.Reads must be refused by the guard's
+// Allowed and recorded as an error, never read. build() wraps the access in
+// collect.Guard, so Allowed is live here (mirrors
+// TestSshdIncludeOutsideDeclarationIsRecordedNotViolated).
+func TestSshdBannerOutsideDeclarationIsRecordedNotRead(t *testing.T) {
+	a := &fsAccess{files: map[string]string{
+		"/etc/ssh/sshd_config": "sshd_config_banner_outside", // Banner /root/secret
+	}}
+	b := build(t, "sshd", a) // build fails the test on any guard violation
+	for _, key := range []string{"sshd.banner_file.exists", "sshd.banner_file.nonempty"} {
+		e := env(t, b, key)
+		if e.Status != facts.StatusError {
+			t.Errorf("%s %+v, want error", key, e)
+		}
+		if !strings.Contains(e.Reason, "/root/secret") || !strings.Contains(e.Reason, "outside the collector's declaration") {
+			t.Errorf("%s reason %q", key, e.Reason)
+		}
+	}
+	if slices.Contains(a.reads, "/root/secret") {
+		t.Errorf("an undeclared Banner path must never be read: reads = %v", a.reads)
+	}
+}
+
+// R165 negative branch: a numeric option whose parsed file value is not an
+// integer is an error on the persisted (and, on parse fallback, effective)
+// side, never a stored non-int.
+func TestSshdNumericOptionWithANonIntegerFileValueIsAnError(t *testing.T) {
+	a := &fsAccess{files: map[string]string{"/etc/ssh/sshd_config": "sshd_config_bad_int"}}
+	s := setting(t, build(t, "sshd", a), "sshd.options.max_auth_tries")
+	if s.Persisted == nil || s.Persisted.Status != facts.StatusError {
+		t.Fatalf("persisted %+v, want error", s.Persisted)
+	}
+	if !strings.Contains(s.Persisted.Reason, "not an integer") {
+		t.Errorf("reason %q, want it to name the non-integer value", s.Persisted.Reason)
+	}
+	if s.Effective.Status != facts.StatusError {
+		t.Errorf("effective %+v, want error copied from the persisted side", s.Effective)
+	}
+}
+
+// sshdVersion's no-version-found branch: sshd -V output that ran but carries
+// no OpenSSH_x.y string yields an absent version, not a bogus value.
+func TestSshdVersionAbsentWhenOutputHasNoVersion(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{"/etc/ssh/sshd_config": "sshd_config"},
+		cmds:  map[string]cmdResult{"/usr/sbin/sshd -V": {stderr: "usage: sshd [options]\n", exitCode: 1}},
+	}
+	v := env(t, build(t, "sshd", a), "sshd.version")
+	if v.Status != facts.StatusAbsent {
+		t.Errorf("version %+v, want absent", v)
+	}
+	if !strings.Contains(v.Reason, "no OpenSSH version") {
+		t.Errorf("reason %q", v.Reason)
+	}
+}
+
 func TestSshdRuntimeAndPersistedWithInclude(t *testing.T) {
 	a := &fsAccess{
 		files: map[string]string{
@@ -303,36 +553,29 @@ func TestSshdFallsBackToParseWhenTUnavailable(t *testing.T) {
 	}
 }
 
-// R88 (spec §6.5 step 13): a non-zero sshd -T exit that is not a privilege
-// failure is a parse-fallback degradation, not a failed collector — the
-// runtime side is absent (not error), naming the command as its source and
-// carrying the first stderr line in its reason; the method is "parse"
-// because -T did not answer, cited to the command that ran and failed; and
-// the collector's own status stays ok, so a run built on this outcome is
-// complete.
+// R169 (spec §6.5 step 13): a non-zero sshd -T exit (after a -G that also
+// did not answer) is a parse-fallback degradation, not a failed collector —
+// a readable config answering is better for non-root collection than a
+// denied runtime side. The daemon rungs fall through, so there is no runtime
+// side at all; the method is "parse", cited to the command that ran and
+// failed; the effective side is the parsed ok value; and the collector's own
+// status stays ok, so a run built on this outcome is complete.
 func TestSshdNonZeroExitIsAnAbsentRuntimeSide(t *testing.T) {
-	// R84: this test's expectation (absent, not denied) is the root-side
-	// outcome of commandFailure's privilege rule, so the seam must be
-	// pinned to root rather than left to whichever account runs the suite.
-	withEUID(t, 0)
 	a := &fsAccess{
 		files: map[string]string{"/etc/ssh/sshd_config": "sshd_config"},
-		cmds: map[string]cmdResult{"/usr/sbin/sshd -T": {
-			exitCode: 255,
-			stderr:   "Missing privilege separation directory: /run/sshd\nsecond line\n",
-		}},
+		cmds: map[string]cmdResult{
+			"/usr/sbin/sshd -G": {exitCode: 1, stderr: "unknown option -- G\n"},
+			"/usr/sbin/sshd -V": {stderr: "OpenSSH_8.9p1\n", exitCode: 1},
+			"/usr/sbin/sshd -T": {
+				exitCode: 255,
+				stderr:   "Missing privilege separation directory: /run/sshd\nsecond line\n",
+			},
+		},
 	}
 	b := build(t, "sshd", a)
 	s := setting(t, b, "sshd.options.permit_root_login")
-	if s.Runtime == nil || s.Runtime.Status != facts.StatusAbsent {
-		t.Fatalf("runtime %+v", s.Runtime)
-	}
-	if !strings.HasPrefix(s.Runtime.Reason, "sshd -T unavailable: ") ||
-		!strings.Contains(s.Runtime.Reason, "Missing privilege separation directory: /run/sshd") {
-		t.Errorf("reason must name the degradation and carry the first stderr line: %q", s.Runtime.Reason)
-	}
-	if s.Runtime.Source == nil || s.Runtime.Source.Cmd != "/usr/sbin/sshd -T" {
-		t.Errorf("source %+v", s.Runtime.Source)
+	if s.Runtime != nil {
+		t.Fatalf("a daemon that did not answer leaves no runtime side: %+v", s.Runtime)
 	}
 	if m := env(t, b, "sshd.collect_method"); m.Value != "parse" || m.Source == nil || m.Source.Cmd != "/usr/sbin/sshd -T" {
 		t.Errorf("method must be parse, cited to the command that ran and failed: %+v", m)
@@ -340,31 +583,46 @@ func TestSshdNonZeroExitIsAnAbsentRuntimeSide(t *testing.T) {
 	if s.Effective.Status != facts.StatusOK || s.Effective.Value != "yes" || !strings.Contains(s.Effective.Reason, "sshd -T unavailable") {
 		t.Errorf("effective must fall back to the ok persisted value: %+v", s.Effective)
 	}
-	// Absent ranks as ok in Builder.Worst (R71), so this failure must not
+	// Absent ranks as ok in Builder.Worst (R71), so this fallback must not
 	// make the sshd collector itself worse than ok — which is what keeps a
-	// run built on this outcome complete (see TestRunAbsentSshdTKeepsTheRunComplete).
+	// run built on this outcome complete.
 	if worst := b.Worst("sshd"); worst != facts.StatusOK {
 		t.Errorf("Worst(sshd) = %s, want ok", worst)
 	}
 }
 
+// R169: to still prove the denied path now that a -T exit drops to parse,
+// both the -T exit AND the config read fail. The daemon rungs fall through,
+// so the parsed side is denied, and effective copies that denied side
+// unchanged with its reason (R59) — the explanation of why there is no value
+// survives.
 func TestSshdPermissionDeniedIsDeniedAndCopiedToEffective(t *testing.T) {
 	a := &fsAccess{
 		fails: map[string]error{"/etc/ssh/sshd_config": os.ErrPermission},
-		cmds: map[string]cmdResult{"/usr/sbin/sshd -T": {
-			exitCode: 1,
-			stderr:   "/etc/ssh/sshd_config: Permission denied\n",
-		}},
+		cmds: map[string]cmdResult{
+			"/usr/sbin/sshd -G": {exitCode: 1, stderr: "unknown option -- G\n"},
+			"/usr/sbin/sshd -V": {stderr: "OpenSSH_8.9p1\n", exitCode: 1},
+			"/usr/sbin/sshd -T": {
+				exitCode: 1,
+				stderr:   "/etc/ssh/sshd_config: Permission denied\n",
+			},
+		},
 	}
 	b := build(t, "sshd", a)
 	s := setting(t, b, "sshd.options.permit_root_login")
-	if s.Runtime == nil || s.Runtime.Status != facts.StatusDenied {
-		t.Fatalf("runtime %+v", s.Runtime)
+	if env(t, b, "sshd.collect_method").Value != "parse" {
+		t.Fatalf("method must be parse")
+	}
+	if s.Runtime != nil {
+		t.Fatalf("a daemon that did not answer leaves no runtime side: %+v", s.Runtime)
 	}
 	// R59: a non-ok persisted side is copied to effective unchanged, so the
 	// reason still says why there is no value.
-	if s.Persisted.Status != facts.StatusDenied || s.Effective.Status != facts.StatusDenied || s.Effective.Reason != s.Persisted.Reason {
-		t.Errorf("persisted %+v effective %+v", s.Persisted, s.Effective)
+	if s.Persisted == nil || s.Persisted.Status != facts.StatusDenied {
+		t.Fatalf("persisted %+v, want denied", s.Persisted)
+	}
+	if s.Effective.Status != facts.StatusDenied || s.Effective.Reason != s.Persisted.Reason {
+		t.Errorf("effective %+v must copy the denied persisted side %+v unchanged", s.Effective, s.Persisted)
 	}
 }
 
@@ -554,54 +812,44 @@ func withEUID(t *testing.T, id int) {
 	t.Cleanup(func() { euid = orig })
 }
 
-// I3 (R84). sshd -T run by a non-root process fails with "Could not load
-// host key" or "no hostkeys available" — never "Permission denied" — so the
-// substring rule on its own files a privilege problem as an error, and the
-// run header then says "facts with status error" where spec §7.1/D25 wants
-// denied with the privilege named. A root-only collector's failed command
-// is denied whenever this process is not root; as root the same failure is
-// R88's parse-fallback degradation instead (absent, not error) — commandFailure
-// itself is unchanged, sshd.go only turns its error outcome into absent.
-func TestRootOnlyCommandFailureIsDeniedForANonRootProcess(t *testing.T) {
-	for _, tc := range []struct {
-		name string
-		euid int
-		want facts.Status
-	}{
-		{"non-root", 1000, facts.StatusDenied},
-		{"root", 0, facts.StatusAbsent},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			withEUID(t, tc.euid)
-			a := &fsAccess{
-				files: map[string]string{"/etc/ssh/sshd_config": "sshd_config"},
-				cmds: map[string]cmdResult{"/usr/sbin/sshd -T": {
-					exitCode: 255,
-					stderr:   "sshd: no hostkeys available -- exiting.\n",
-				}},
-			}
-			s := setting(t, build(t, "sshd", a), "sshd.options.permit_root_login")
-			if s.Runtime == nil || s.Runtime.Status != tc.want {
-				t.Fatalf("runtime %+v, want %s", s.Runtime, tc.want)
-			}
-			switch tc.want {
-			case facts.StatusDenied:
-				if want := "sshd -T requires root: sshd: no hostkeys available -- exiting."; s.Runtime.Reason != want {
-					t.Errorf("reason %q, want %q", s.Runtime.Reason, want)
-				}
-			case facts.StatusAbsent:
-				if want := "sshd -T unavailable: sshd: no hostkeys available -- exiting."; s.Runtime.Reason != want {
-					t.Errorf("reason %q, want %q", s.Runtime.Reason, want)
-				}
-			}
-			if s.Runtime.Source == nil || s.Runtime.Source.Cmd != "/usr/sbin/sshd -T" {
-				t.Errorf("source %+v", s.Runtime.Source)
-			}
-		})
+// R169: the sshd collector no longer routes a failed sshd -T through
+// commandFailure — a non-zero/denied daemon exit drops to the parse
+// fallback (see TestSshdNonZeroExitIsAnAbsentRuntimeSide and
+// TestSshdPermissionDeniedIsDeniedAndCopiedToEffective), so the old
+// root-only-command test that exercised commandFailure through sshd no
+// longer has a subject and has been removed. commandFailure and its euid
+// privilege rule are unchanged; the non-root case below still pins them
+// through the services collector.
+
+// R170 (R84/D25): commandFailure's needsRoot branch is kept for later
+// root-command collectors even though no collector currently reaches it, so
+// it is pinned directly here. A root-only command that failed while this
+// process is not root is denied with the privilege named, whatever it
+// printed; the same failure as root is an error carrying the stderr message.
+func TestCommandFailureNeedsRootBranch(t *testing.T) {
+	out := collect.Output{Stderr: []byte("no hostkeys available -- exiting.\n"), ExitCode: 255}
+	src := out.Source(collect.Command{Path: "/usr/sbin/sshd", Args: []string{"-T"}})
+
+	withEUID(t, 1000)
+	e := commandFailure("sshd -T", out, src, true)
+	if e.Status != facts.StatusDenied {
+		t.Fatalf("non-root %+v, want denied", e)
+	}
+	if !strings.Contains(e.Reason, "requires root") || !strings.Contains(e.Reason, "no hostkeys available -- exiting.") {
+		t.Errorf("denied reason %q must name the privilege and carry the stderr line", e.Reason)
+	}
+
+	withEUID(t, 0)
+	e = commandFailure("sshd -T", out, src, true)
+	if e.Status != facts.StatusError {
+		t.Fatalf("root %+v, want error", e)
+	}
+	if e.Reason != "no hostkeys available -- exiting." {
+		t.Errorf("root reason %q, want the stderr message", e.Reason)
 	}
 }
 
-// ...and a collector that does NOT need root keeps the old rule whatever
+// A collector that does NOT need root keeps commandFailure's rule whatever
 // this process's euid is: systemctl failing for a normal user is an error,
 // because nothing about that command required a privilege it lacked.
 func TestNonRootCollectorCommandFailureStaysAnError(t *testing.T) {
@@ -635,6 +883,147 @@ func TestSshdOversizedValueIsAnErrorNotAStoredBlob(t *testing.T) {
 		if v, _ := side.e.Value.(string); v != "" {
 			t.Errorf("%s stored %d bytes of the oversized value", side.name, len(v))
 		}
+	}
+}
+
+// R172 (C3): when the daemon does not answer and the sshd_config that would
+// name Banner cannot be read, the banner_file leaves must carry that read's
+// status — not a definite false, which would publish the module's default
+// "no banner" as if it were the host's state and hide the read failure.
+func TestSshdBannerFileUnreadableConfigCarriesTheReadError(t *testing.T) {
+	a := &fsAccess{fails: map[string]error{"/etc/ssh/sshd_config": os.ErrPermission}}
+	b := build(t, "sshd", a)
+	for _, k := range []string{"sshd.banner_file.exists", "sshd.banner_file.nonempty"} {
+		if e := env(t, b, k); e.Status != facts.StatusDenied {
+			t.Errorf("%s must be denied, not a quiet false: %+v", k, e)
+		}
+	}
+}
+
+// R174: a numeric option parsed from a truncated config read must stay marked
+// truncated after the R165 int rewrap; a value that arrived truncated cannot
+// be judged as a clean number.
+func TestSshdParsedNumericCarriesTruncation(t *testing.T) {
+	a := &fsAccess{
+		files:     map[string]string{"/etc/ssh/sshd_config": "sshd_config_banners"},
+		truncated: map[string]bool{"/etc/ssh/sshd_config": true},
+	}
+	s := setting(t, build(t, "sshd", a), "sshd.options.client_alive_interval")
+	if s.Persisted == nil || s.Persisted.Status != facts.StatusOK || !s.Persisted.Truncated {
+		t.Errorf("persisted %+v, want ok and truncated", s.Persisted)
+	}
+	if s.Effective == nil || !s.Effective.Truncated {
+		t.Errorf("effective %+v, want truncated (copied from persisted)", s.Effective)
+	}
+}
+
+// --- banners --------------------------------------------------------------
+
+func TestBannersContentAndEscapes(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{
+			"/etc/issue":     "issue_os_escapes", // "Ubuntu 22.04 \n \l"
+			"/etc/issue.net": "issue_net",        // a plain warning, no escapes
+			"/etc/motd":      "motd_static",
+		},
+		modes: map[string]uint32{
+			"/etc/issue": 0o644, "/etc/issue.net": 0o644, "/etc/motd": 0o644,
+		},
+	}
+	b := build(t, "banners", a)
+	if e := env(t, b, "banners.issue.nonempty"); e.Value != true {
+		t.Errorf("issue.nonempty %+v", e)
+	}
+	if e := env(t, b, "banners.issue.os_escapes"); e.Value != true {
+		t.Errorf("issue with \\l/version must set os_escapes: %+v", e)
+	}
+	if e := env(t, b, "banners.issue_net.os_escapes"); e.Value != false {
+		t.Errorf("plain issue.net must not set os_escapes: %+v", e)
+	}
+	if e := env(t, b, "banners.issue.mode"); e.Value != 0o644 {
+		t.Errorf("issue.mode %+v, want 420", e)
+	}
+}
+
+// A missing file is a definite empty state, not an error.
+func TestBannersMissingFileIsDefiniteEmpty(t *testing.T) {
+	a := &fsAccess{files: map[string]string{}}
+	b := build(t, "banners", a)
+	for _, k := range []string{"banners.issue.nonempty", "banners.issue_net.nonempty", "banners.motd.nonempty"} {
+		if e := env(t, b, k); e.Status != facts.StatusOK || e.Value != false {
+			t.Errorf("%s must be a definite false: %+v", k, e)
+		}
+	}
+	if e := env(t, b, "banners.issue.mode"); e.Value != 0 {
+		t.Errorf("absent issue mode %+v, want 0", e)
+	}
+}
+
+// An unreadable banner carries the read error, never a quiet empty — on every
+// leaf that read would have set, not only nonempty (they all come from the one
+// read).
+func TestBannersUnreadableIsNotEmpty(t *testing.T) {
+	a := &fsAccess{fails: map[string]error{"/etc/issue.net": os.ErrPermission}}
+	b := build(t, "banners", a)
+	for _, k := range []string{"banners.issue_net.nonempty", "banners.issue_net.mode", "banners.issue_net.os_escapes"} {
+		if e := env(t, b, k); e.Status != facts.StatusDenied {
+			t.Errorf("%s: denied read must be denied, not empty: %+v", k, e)
+		}
+	}
+}
+
+// A Glob that fails is not an empty update-motd.d: motd_d and dynamic_motd
+// carry that error rather than reporting no scripts (spec §7.3 honesty).
+func TestBannersMotdGlobErrorCarriesTheError(t *testing.T) {
+	a := &fsAccess{globErr: errors.New("glob boom")}
+	b := build(t, "banners", a)
+	for _, k := range []string{"banners.motd_d", "banners.dynamic_motd"} {
+		if e := env(t, b, k); e.Status != facts.StatusError {
+			t.Errorf("%s: a failed Glob must carry the error, not an empty inventory: %+v", k, e)
+		}
+	}
+}
+
+// update-motd.d with an executable script sets dynamic_motd and lists the
+// script; a non-executable entry does not make it dynamic.
+func TestBannersMotdInventory(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{
+			"/etc/update-motd.d/00-header": "motd_static",
+			"/etc/update-motd.d/99-readme": "motd_static",
+		},
+		modes: map[string]uint32{
+			"/etc/update-motd.d/00-header": 0o755,
+			"/etc/update-motd.d/99-readme": 0o644,
+		},
+	}
+	b := build(t, "banners", a)
+	if e := env(t, b, "banners.dynamic_motd"); e.Value != true {
+		t.Errorf("an executable script must set dynamic_motd: %+v", e)
+	}
+	list := okList(t, b, "banners.motd_d")
+	if len(list) != 2 {
+		t.Fatalf("motd_d %v, want two entries sorted by name", list)
+	}
+	first := list[0].(map[string]any)
+	if first["name"] != "00-header" || first["executable"] != true {
+		t.Errorf("first entry %v", first)
+	}
+	second := list[1].(map[string]any)
+	if second["executable"] != false {
+		t.Errorf("non-executable entry must be executable:false: %v", second)
+	}
+}
+
+// No update-motd.d at all: dynamic_motd false, motd_d an empty list.
+func TestBannersNoMotdD(t *testing.T) {
+	a := &fsAccess{files: map[string]string{}}
+	b := build(t, "banners", a)
+	if e := env(t, b, "banners.dynamic_motd"); e.Value != false {
+		t.Errorf("dynamic_motd %+v, want false", e)
+	}
+	if list := okList(t, b, "banners.motd_d"); len(list) != 0 {
+		t.Errorf("motd_d %v, want empty list", list)
 	}
 }
 
