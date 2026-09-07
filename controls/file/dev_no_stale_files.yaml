@@ -1,0 +1,19 @@
+id: muster.file.dev_no_stale_files
+title_en: /dev holds no regular files
+title_ko: /dev 에 일반 파일이 없다
+description_en: /dev is served by devtmpfs and should hold only device nodes. A regular file living there is either a leftover or a planted file used to smuggle data past a device-only expectation, so any regular file whose serving mount is exactly /dev is reported. Device nodes, directories and symlinks are not flagged, and neither is a regular file under a deeper mount such as /dev/shm, /dev/mqueue or /dev/pts (each its own tmpfs, where regular files are legitimate).
+description_ko: /dev 는 devtmpfs 가 제공하며 장치 노드만 있어야 합니다. 그곳의 일반 파일은 잔재이거나, 장치만 있으리라는 기대를 우회해 데이터를 숨기는 데 쓰이는 심어진 파일이므로, 서비스 마운트가 정확히 /dev 인 일반 파일은 모두 보고합니다. 장치 노드·디렉터리·심볼릭 링크는 표시하지 않으며, /dev/shm·/dev/mqueue·/dev/pts 같은 더 깊은 마운트(각자 tmpfs 로, 일반 파일이 정상) 아래의 일반 파일도 표시하지 않습니다.
+category: file
+importance: 상
+automation: auto
+references:
+  kisa: { "2026": ["U-26"], "2021": ["U-16"] }
+requires_facts: ">=1"
+absent_means: manual
+checks:
+  - { fact: files.dev_nondevice, op: none, where: { field: name, op: present } }
+remediation:
+  text_en: Investigate each regular file under /dev; remove it once you have confirmed nothing legitimate created it (a package or an application writing to /dev is the exception to check first).
+  text_ko: /dev 아래의 각 일반 파일을 조사하고, 정당하게 생성된 것이 없음을 확인한 뒤 제거합니다(패키지나 애플리케이션이 /dev 에 쓰는 경우가 먼저 확인할 예외입니다).
+  risk: none
+  idempotent: false

@@ -1,0 +1,1 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{"files":{"dev_nondevice":{"status":"absent","reason":"the files collector did not run"}}}}

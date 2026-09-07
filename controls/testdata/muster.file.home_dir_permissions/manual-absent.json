@@ -1,0 +1,1 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{"files":{"home_dirs":{"status":"absent","reason":"the files collector did not run"}}}}

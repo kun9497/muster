@@ -1,0 +1,4 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{"files":{
+  "user_rhosts":{"status":"ok","value":[]},
+  "etc_hosts_equiv_lines":{"status":"ok","value":[]}
+}}}

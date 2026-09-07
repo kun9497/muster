@@ -192,6 +192,11 @@ func TestCheckEndToEndJSONAndTable(t *testing.T) {
 		"muster.service.login_banner":            "PASS",
 		"muster.account.root_home_and_path":      "PASS",
 		"muster.account.umask_policy":            "PASS",
+		"muster.file.env_file_permissions":       "PASS",
+		"muster.file.dev_no_stale_files":         "PASS",
+		"muster.file.rhosts_forbidden":           "PASS",
+		"muster.file.home_dir_permissions":       "PASS",
+		"muster.file.home_dir_exists":            "PASS",
 	})
 
 	var table bytes.Buffer
@@ -233,6 +238,11 @@ func TestCheckEndToEndJSONAndTable(t *testing.T) {
 		"muster.service.login_banner":            "PASS",
 		"muster.account.root_home_and_path":      "PASS",
 		"muster.account.umask_policy":            "PASS",
+		"muster.file.env_file_permissions":       "PASS",
+		"muster.file.dev_no_stale_files":         "PASS",
+		"muster.file.rhosts_forbidden":           "PASS",
+		"muster.file.home_dir_permissions":       "PASS",
+		"muster.file.home_dir_exists":            "PASS",
 	})
 
 	// R26: every run() call's exit code is asserted, including --quiet's,

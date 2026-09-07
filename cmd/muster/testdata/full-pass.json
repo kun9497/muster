@@ -21,7 +21,18 @@
            "etc_services":{"mode":{"status":"ok","value":420,"source":{"kind":"file","path":"/etc/services"}},"uid":{"status":"ok","value":0}},
            "etc_hosts_lpd":{"mode":{"status":"absent"},"uid":{"status":"absent"}},
            "etc_shadow":{"uid":{"status":"ok","value":0},"mode":{"status":"ok","value":0,"source":{"kind":"sys","path":"/etc/shadow"}},"acl_entries":{"status":"ok","value":[]}},
-           "root_home":{"uid":{"status":"ok","value":0},"group_writable":{"status":"ok","value":false},"other_writable":{"status":"ok","value":false}}},
+           "root_home":{"uid":{"status":"ok","value":0},"group_writable":{"status":"ok","value":false},"other_writable":{"status":"ok","value":false}},
+           "env_files":{"status":"ok","value":[
+             {"path":"/etc/profile","scope":"system","home_user":"","mode":420,"owner_uid":0,"owner_ok":true,"group_writable":false,"other_writable":false,"is_symlink":false},
+             {"path":"/home/alice/.bashrc","scope":"user","home_user":"alice","mode":420,"owner_uid":1000,"owner_ok":true,"group_writable":false,"other_writable":false,"is_symlink":false}
+           ]},
+           "user_rhosts":{"status":"ok","value":[]},
+           "etc_hosts_equiv_lines":{"status":"ok","value":[]},
+           "dev_nondevice":{"status":"ok","value":[]},
+           "home_dirs":{"status":"ok","value":[
+             {"user":"root","uid":0,"home":"/root","interactive":true,"stat_status":"ok","is_dir":true,"owner_matches":true,"group_writable":false,"other_writable":false,"on_remote_fs":false,"mode":448,"owner_uid":0},
+             {"user":"alice","uid":1000,"home":"/home/alice","interactive":true,"stat_status":"ok","is_dir":true,"owner_matches":true,"group_writable":false,"other_writable":false,"on_remote_fs":false,"mode":448,"owner_uid":1000}
+           ]}},
   "env":{"shell":{"tmout":{"status":"ok","value":600},"tmout_exported":{"status":"ok","value":true},
                   "root_path_raw":{"status":"ok","value":"/usr/sbin:/usr/bin","source":{"kind":"file","path":"/etc/profile","line":5,"raw":"PATH=/usr/sbin:/usr/bin"}},
                   "root_path_entries":{"status":"ok","value":[
