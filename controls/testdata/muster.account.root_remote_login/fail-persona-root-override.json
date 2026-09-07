@@ -1,0 +1,6 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "services":{"ssh":{"installed":{"status":"ok","value":true}}},
+  "sshd":{"personas_collected":{"status":"ok","value":true},
+    "options":{"permit_root_login":{
+      "effective":{"status":"ok","value":"no","source":{"kind":"command","cmd":"/usr/sbin/sshd -T"}},
+      "personas":{"root":{"status":"ok","value":"yes","source":{"kind":"command","cmd":"/usr/sbin/sshd -T -C user=root,host=localhost,addr=127.0.0.1,lport=22"}}}}}}}}
