@@ -36,7 +36,7 @@ var filesCollector = collect.Collector{
 // unexaminable), and the per-home dotfile globs for every env-file name plus
 // .rhosts/.shosts under both /home/*/ and /root/.
 func filesReads() []string {
-	reads := []string{passwdPath, shadowPath, securettyPath, groupPath, hostsPath, servicesPath, hostsLpdPath}
+	reads := []string{passwdPath, shadowPath, securettyPath, groupPath, hostsPath, servicesPath, hostsLpdPath, exportsPath}
 	reads = append(reads, hostsEquivPath, hostsAllowPath, hostsDenyPath, shellsPath, "/proc/self/mountinfo")
 	reads = append(reads, systemEnvFiles...)
 	reads = append(reads, "/home/*", "/home/*/*", rootHome)
@@ -72,6 +72,11 @@ func runFiles(_ context.Context, a collect.Access, b *collect.Builder) error {
 	writePermFacts(b, a, "files.etc_hosts", hostsPath, groups, gmeta, gerr, false)
 	writePermFacts(b, a, "files.etc_services", servicesPath, groups, gmeta, gerr, false)
 	writePermFacts(b, a, "files.etc_hosts_lpd", hostsLpdPath, groups, gmeta, gerr, false)
+	// /etc/exports' own permission facts (C1: a fixed path belongs here even
+	// though its CONTENT is the nfs collector's — U-40's merged 2021 U-69
+	// half). exportsPath is nfs.go's constant; declaring it in both
+	// collectors is harmless (the guard matches on the string).
+	writePermFacts(b, a, "files.etc_exports", exportsPath, groups, gmeta, gerr, false)
 
 	// The home, environment-file and .rhosts enumeration, keyed on /etc/passwd
 	// (C1: a path discovered from a daemon's configuration belongs to that

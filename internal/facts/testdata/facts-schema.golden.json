@@ -2810,6 +2810,126 @@
       "Collector": "logging",
       "DefaultOn": "",
       "SubjectKind": ""
+    },
+    {
+      "Key": "nfs.exports",
+      "Type": "list\u003crecord\u003e",
+      "Description": "Every NFS export as {path, client, options, wildcard, root_squash} parsed from /etc/exports and /etc/exports.d/*.exports; a path with no client spec exports to the world (client \"*\", wildcard true); root_squash is derived from the absence of no_root_squash in the client's options.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "nfs",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "nfs.exports_source",
+      "Type": "list\u003cstring\u003e",
+      "Description": "The export files actually read, in the order they were parsed.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "nfs",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "nfs.exports_runtime_collected",
+      "Type": "bool",
+      "Description": "Whether exportfs -v ran successfully to corroborate the parsed exports; exportfs is never the judged source, so its absence or a non-root failure is recorded as false, never an error.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "nfs",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_exports.mode",
+      "Type": "int",
+      "Description": "Permission bits of /etc/exports as an integer (e.g. 384 for 0600).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_exports.uid",
+      "Type": "int",
+      "Description": "Owner uid of /etc/exports.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_exports.gid",
+      "Type": "int",
+      "Description": "Group gid of /etc/exports.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_exports.group",
+      "Type": "string",
+      "Description": "Group name for the gid of /etc/exports from /etc/group; empty when the gid has no name.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_exports.group_readable",
+      "Type": "bool",
+      "Description": "Whether the group permission bits of /etc/exports include read (derived from mode).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_exports.group_writable",
+      "Type": "bool",
+      "Description": "Whether the group permission bits of /etc/exports include write (derived from mode).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_exports.other_readable",
+      "Type": "bool",
+      "Description": "Whether the other permission bits of /etc/exports include read (derived from mode).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_exports.other_writable",
+      "Type": "bool",
+      "Description": "Whether the other permission bits of /etc/exports include write (derived from mode).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_exports.acl_present",
+      "Type": "bool",
+      "Description": "Whether a POSIX ACL xattr is present on /etc/exports.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
     }
   ]
 }

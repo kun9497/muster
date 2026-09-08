@@ -1,0 +1,2 @@
+/srv/share
+/srv/data 192.0.2.0/24(rw,no_root_squash)

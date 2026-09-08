@@ -43,6 +43,7 @@ func init() {
 	collect.Register(firewallCollector)
 	collect.Register(loggingCollector)
 	collect.Register(timesyncCollector)
+	collect.Register(nfsCollector)
 	collect.Register(walkCollector)
 }
 
