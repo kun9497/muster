@@ -82,16 +82,17 @@ func TestFirewallCapturesRulesetWhenReadable(t *testing.T) {
 		t.Errorf("dump content must carry the captured ruleset text: %v", rec["content"])
 	}
 
-	// T1: restricts_inbound absent, normalization_confidence "none" (the real
-	// normalisation lands in Task 2); rules an empty ok list.
-	if e := env(t, b, "firewall.restricts_inbound"); e.Status != facts.StatusAbsent {
-		t.Errorf("restricts_inbound %+v, want absent in T1", e)
+	// T2: the drop-policy input base chain normalises to full confidence and a
+	// restricted verdict, and the rules the chain carries are parsed as
+	// evidence.
+	if e := env(t, b, "firewall.restricts_inbound"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("restricts_inbound %+v, want ok true (policy drop)", e)
 	}
-	if e := env(t, b, "firewall.normalization_confidence"); e.Status != facts.StatusOK || e.Value != "none" {
-		t.Errorf("normalization_confidence %+v, want ok \"none\" in T1", e)
+	if e := env(t, b, "firewall.normalization_confidence"); e.Status != facts.StatusOK || e.Value != "full" {
+		t.Errorf("normalization_confidence %+v, want ok \"full\"", e)
 	}
-	if r := okList(t, b, "firewall.rules"); len(r) != 0 {
-		t.Errorf("rules %v, want an empty list in T1", r)
+	if r := okList(t, b, "firewall.rules"); len(r) == 0 {
+		t.Errorf("rules %v, want the parsed input-chain rules as evidence", r)
 	}
 
 	// enabled: runtime from the non-empty ruleset, persisted from the config.
@@ -214,5 +215,95 @@ func TestFirewallTruncatedDumpIsPartialConfidence(t *testing.T) {
 	}
 	if e := env(t, b, "firewall.restricts_inbound"); e.Status != facts.StatusAbsent {
 		t.Errorf("restricts_inbound %+v, want absent (H-22)", e)
+	}
+}
+
+// H-16, the confident-restricted case: an nft input base chain with
+// "policy drop" → full confidence, restricts_inbound ok:true, and the runtime
+// default policy reads drop.
+func TestFirewallNftDropIsRestricted(t *testing.T) {
+	a := firewallAccess(
+		map[string]string{"/etc/nftables.conf": "nftables.conf"},
+		map[string]cmdResult{nftListRuleset: {file: "nft.ruleset.drop"}},
+	)
+	b := buildBegun(t, "firewall", a)
+	if e := env(t, b, "firewall.normalization_confidence"); e.Value != "full" {
+		t.Fatalf("confidence: %+v", e)
+	}
+	if e := env(t, b, "firewall.restricts_inbound"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("restricts_inbound: %+v", e)
+	}
+	if s := setting(t, b, "firewall.default_policy.input"); s.Runtime == nil || s.Runtime.Status != facts.StatusOK || s.Runtime.Value != "drop" {
+		t.Errorf("default_policy.input runtime %+v, want ok drop", s.Runtime)
+	}
+	if got := b.Worst("firewall"); got != facts.StatusOK {
+		t.Errorf(`Worst("firewall") = %s, want ok`, got)
+	}
+}
+
+// H-16, the confident-unrestricted case: an iptables *filter with
+// ":INPUT ACCEPT" carrying ZERO "-A INPUT" rules demonstrably does nothing
+// inbound → full confidence, restricts_inbound ok:false.
+func TestFirewallIptablesAcceptIsNotRestricted(t *testing.T) {
+	a := firewallAccess(
+		map[string]string{"/etc/iptables/rules.v4": "iptables-save.open"},
+		map[string]cmdResult{
+			nftListRuleset: {exitCode: 1, stderr: "sh: nft: command not found\n"},
+			iptablesSave:   {file: "iptables-save.open"},
+		},
+	)
+	b := buildBegun(t, "firewall", a)
+	if e := env(t, b, "firewall.normalization_confidence"); e.Value != "full" {
+		t.Fatalf("confidence %+v, want full (accept + zero rules is determinable)", e)
+	}
+	if e := env(t, b, "firewall.restricts_inbound"); e.Status != facts.StatusOK || e.Value != false {
+		t.Errorf("restricts_inbound %+v, want ok false", e)
+	}
+	if s := setting(t, b, "firewall.default_policy.input"); s.Runtime == nil || s.Runtime.Value != "accept" {
+		t.Errorf("default_policy.input runtime %+v, want ok accept", s.Runtime)
+	}
+}
+
+// H-16, the anti-false-FAIL case: a firewalld-shape nft input base chain with
+// "policy accept" that CARRIES rules (a jump into the zone dispatch and a
+// terminal reject) restricts inbound in practice even though its base policy
+// is accept. It must NEVER be a confident ok:false FAIL — it degrades to
+// partial confidence and restricts_inbound ABSENT (→ MANUAL).
+func TestFirewallAcceptWithRulesIsPartialAbsent(t *testing.T) {
+	a := firewallAccess(
+		map[string]string{"/etc/firewalld/firewalld.conf": "nftables.conf"},
+		map[string]cmdResult{nftListRuleset: {file: "nft.ruleset.firewalld"}},
+	)
+	b := buildBegun(t, "firewall", a)
+	if e := env(t, b, "firewall.normalization_confidence"); e.Value == "full" {
+		t.Fatalf("must not claim full on an unmodelled ruleset: %+v", e)
+	}
+	if e := env(t, b, "firewall.restricts_inbound"); e.Status != facts.StatusAbsent {
+		t.Errorf("restricts_inbound must be ABSENT at partial confidence (→ MANUAL): %+v", e)
+	}
+	// The absent reason must point a reviewer back at the raw evidence.
+	if e := env(t, b, "firewall.restricts_inbound"); !strings.Contains(e.Reason, "raw_dumps") {
+		t.Errorf("absent reason %q should reference firewall.raw_dumps", e.Reason)
+	}
+	if got := b.Worst("firewall"); got != facts.StatusOK {
+		t.Errorf(`Worst("firewall") = %s, want ok (partial is not a failure of the collector)`, got)
+	}
+}
+
+// H-16, multiple input base chains that AGREE: an nft ruleset with an ip and
+// an ip6 input base chain both "policy drop" stays full + restricts_inbound
+// ok:true (the old "exactly one input chain" rule would have made every
+// dual-stack host permanently MANUAL).
+func TestFirewallDualStackDropIsRestricted(t *testing.T) {
+	a := firewallAccess(
+		map[string]string{"/etc/nftables.conf": "nftables.conf"},
+		map[string]cmdResult{nftListRuleset: {file: "nft.ruleset.dualstack-drop"}},
+	)
+	b := buildBegun(t, "firewall", a)
+	if e := env(t, b, "firewall.normalization_confidence"); e.Value != "full" {
+		t.Fatalf("confidence %+v, want full (both families agree drop)", e)
+	}
+	if e := env(t, b, "firewall.restricts_inbound"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("restricts_inbound %+v, want ok true", e)
 	}
 }
