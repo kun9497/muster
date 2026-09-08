@@ -1404,7 +1404,11 @@ func TestFilesStartupScripts(t *testing.T) {
 			"/etc/systemd/system/muster.service": {mode: 0o644, uid: 0, gid: 0, kind: "regular"},
 		},
 		fails: map[string]error{"/etc/systemd/system/multi-user.target.wants/muster.service": collect.ErrSymlink},
+		// The .wants directory itself is matched by /etc/systemd/system/* and must
+		// be skipped by globRows (Kind=="dir"), not stat-errored into a row.
+		dirs: map[string]bool{"/etc/systemd/system/multi-user.target.wants": true},
 	}
+	a.stats["/etc/systemd/system/multi-user.target.wants"] = statResult{mode: 0o755, uid: 0, gid: 0, kind: "dir"}
 	// the wants-symlink is discoverable via Glob of /etc/systemd/system/*/*
 	a.files["/etc/systemd/system/multi-user.target.wants/muster.service"] = "" // present for Glob
 	rows := okList(t, build(t, "files", a), "files.startup_scripts")
@@ -1418,6 +1422,10 @@ func TestFilesStartupScripts(t *testing.T) {
 	}
 	if byPath["/etc/systemd/system/multi-user.target.wants/muster.service"]["is_symlink"] != true {
 		t.Errorf("an enabled-unit symlink must be is_symlink:true: %v", byPath["/etc/systemd/system/multi-user.target.wants/muster.service"])
+	}
+	// The .wants directory is a directory, not a startup file: globRows skips it.
+	if _, ok := byPath["/etc/systemd/system/multi-user.target.wants"]; ok {
+		t.Errorf("a directory matched by the glob must not be a startup_scripts row: %v", byPath["/etc/systemd/system/multi-user.target.wants"])
 	}
 }
 
@@ -1568,6 +1576,19 @@ func TestFilesSudoersDeniedRead(t *testing.T) {
 	}
 }
 
+// A Defaults line with spaces around the "=" (Rocky's shape,
+// `Defaults    secure_path = /usr/sbin:/usr/bin`) is parsed by the L2 regex.
+func TestFilesSudoSecurePathSpacedEquals(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{"/etc/sudoers": "sudoers_spaced_securepath", "/etc/group": "group"},
+		stats: map[string]statResult{"/etc/sudoers": {mode: 0o440, uid: 0, gid: 0, kind: "regular"}},
+	}
+	b := build(t, "files", a)
+	if e := env(t, b, "sudo.secure_path"); e.Value != "/usr/sbin:/usr/bin" {
+		t.Errorf("secure_path with spaces around = must parse to the trimmed value: %+v", e)
+	}
+}
+
 // /var/log rows carry the group name and writable flags, and /var/log itself is
 // a log_dirs row.
 func TestFilesLogTree(t *testing.T) {
@@ -1595,6 +1616,50 @@ func TestFilesLogTree(t *testing.T) {
 	}
 	if !haveVarLog {
 		t.Errorf("/var/log itself must be a log_dirs row: %v", ld)
+	}
+	// The syslog file row carries the group name (U-67 judges this leaf) and the
+	// group-writable flag: gid 104 = syslog, mode 0640 is not group-writable.
+	lf := okList(t, b, "files.log_files")
+	var syslogRow map[string]any
+	for _, r := range lf {
+		if m := r.(map[string]any); m["path"] == "/var/log/syslog" {
+			syslogRow = m
+		}
+	}
+	if syslogRow == nil {
+		t.Fatalf("the syslog file must be a log_files row: %v", lf)
+	}
+	if syslogRow["group"] != "syslog" {
+		t.Errorf("syslog row group name (evidence U-67 judges) = %v, want syslog", syslogRow["group"])
+	}
+	if syslogRow["group_writable"] != false {
+		t.Errorf("0640 syslog row must not be group_writable: %v", syslogRow)
+	}
+}
+
+// When /etc/group cannot be read, U-67 judges the log rows' group field, so a
+// silent group:"" would be fabricated evidence. Both log keys must carry the
+// read error (path-prefixed with /etc/group), never a clean list.
+func TestFilesLogTreeDeniedGroupIsError(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{},
+		fails: map[string]error{"/etc/group": os.ErrPermission},
+		dirs:  map[string]bool{"/var/log": true},
+		stats: map[string]statResult{
+			"/var/log":        {mode: 0o755, uid: 0, gid: 0, kind: "dir"},
+			"/var/log/syslog": {mode: 0o640, uid: 104, gid: 104, kind: "regular"},
+		},
+	}
+	a.files["/var/log/syslog"] = "" // present for Glob
+	b := build(t, "files", a)
+	for _, k := range []string{"files.log_dirs", "files.log_files"} {
+		e := env(t, b, k)
+		if e.Status == facts.StatusOK {
+			t.Errorf("%s: a denied /etc/group must not yield a clean list: %+v", k, e)
+		}
+		if !strings.Contains(e.Reason, groupPath) {
+			t.Errorf("%s: reason must name /etc/group: %+v", k, e)
+		}
 	}
 }
 

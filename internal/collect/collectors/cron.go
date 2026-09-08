@@ -22,9 +22,19 @@ const (
 // cronConfigGlobs are the fixed drop-in and access globs; cronSpoolGlobs are
 // the per-user spools (Rocky /var/spool/cron, Ubuntu /var/spool/cron/crontabs).
 var (
-	cronDropInGlobs = []string{
-		"/etc/cron.d/*", "/etc/cron.hourly/*", "/etc/cron.daily/*",
-		"/etc/cron.weekly/*", "/etc/cron.monthly/*",
+	// cronDropIns are the drop-in directories, each with the scope its files
+	// carry. /etc/cron.d holds crontab-FORMAT files, tagged "system"; the
+	// /etc/cron.{hourly,daily,weekly,monthly} directories hold executable
+	// run-parts SCRIPTS (0755), tagged "periodic" so the 0640 mode-subset check
+	// excludes them (an executable is never a bit-subset of 0640, and chmod
+	// 0640 would make run-parts skip them) — they are judged on ownership and
+	// writability instead.
+	cronDropIns = []struct{ glob, scope string }{
+		{"/etc/cron.d/*", "system"},
+		{"/etc/cron.hourly/*", "periodic"},
+		{"/etc/cron.daily/*", "periodic"},
+		{"/etc/cron.weekly/*", "periodic"},
+		{"/etc/cron.monthly/*", "periodic"},
 	}
 	cronAccessFiles = []string{"/etc/cron.allow", "/etc/cron.deny", "/etc/at.allow", "/etc/at.deny"}
 	// at-spool: /var/spool/cron/atjobs on the Debian family, /var/spool/at on RHEL.
@@ -49,7 +59,9 @@ var cronCollector = collect.Collector{
 func cronReads() []string {
 	reads := []string{etcCrontab, etcAnacrontab, groupPath}
 	reads = append(reads, cronAccessFiles...)
-	reads = append(reads, cronDropInGlobs...)
+	for _, d := range cronDropIns {
+		reads = append(reads, d.glob)
+	}
 	reads = append(reads, cronSpoolGlobs...)
 	reads = append(reads, cronDirs...)
 	return reads
@@ -69,9 +81,11 @@ func runCron(ctx context.Context, a collect.Access, b *collect.Builder) error {
 			files = append(files, row)
 		}
 	}
-	// Drop-in globs.
-	for _, g := range cronDropInGlobs {
-		matches, err := a.Glob(g)
+	// Drop-in globs. Each drop-in directory carries its own scope: /etc/cron.d
+	// is crontab-format ("system"); /etc/cron.{hourly,daily,weekly,monthly} are
+	// executable run-parts scripts ("periodic"), excluded from the mode check.
+	for _, d := range cronDropIns {
+		matches, err := a.Glob(d.glob)
 		if err != nil {
 			b.Set("cron.files", collect.FromReadError(err, collect.ReadMeta{}))
 			b.Set("cron.dirs", collect.FromReadError(err, collect.ReadMeta{}))
@@ -80,7 +94,7 @@ func runCron(ctx context.Context, a collect.Access, b *collect.Builder) error {
 		}
 		sort.Strings(matches)
 		for _, m := range matches {
-			if row, ok := cronRow(a, m, "system", "", groups); ok {
+			if row, ok := cronRow(a, m, d.scope, "", groups); ok {
 				files = append(files, row)
 			}
 		}
@@ -148,6 +162,9 @@ func cronRow(a collect.Access, p, scope, user string, groups map[int]string) (ma
 	return map[string]any{
 		"path": p, "scope": scope, "user": user,
 		"mode": int(meta.Mode), "uid": int(meta.UID), "gid": int(meta.GID),
+		// group is evidence only — no control judges a cron row's group name, so
+		// a truncated/denied /etc/group is not propagated here (unlike U-67's log
+		// rows, which do judge group and carry the read error).
 		"group":          groups[int(meta.GID)],
 		"owner_ok":       ownerOK,
 		"group_writable": meta.Mode&0o020 != 0,
@@ -169,6 +186,7 @@ func cronDirRows(a collect.Access, groups map[int]string) facts.Envelope {
 		}
 		rows = append(rows, map[string]any{
 			"path": d, "mode": int(meta.Mode), "uid": int(meta.UID), "gid": int(meta.GID),
+			// group is evidence only — no control judges a cron dir's group name.
 			"group":          groups[int(meta.GID)],
 			"group_writable": meta.Mode&0o020 != 0, "other_writable": meta.Mode&0o002 != 0,
 		})

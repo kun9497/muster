@@ -13,8 +13,10 @@ absent_means: manual
 checks:
   - { fact: files.startup_scripts, op: each, subject: path, where: { field: is_symlink, op: eq, expected: false }, require: { field: group_writable, op: eq, expected: false } }
   - { fact: files.startup_scripts, op: each, subject: path, where: { field: is_symlink, op: eq, expected: false }, require: { field: other_writable, op: eq, expected: false } }
+  - { fact: files.startup_scripts, op: each, subject: path, where: { field: is_symlink, op: eq, expected: false }, require: { field: uid, op: eq, expected: 0 } }
   - { fact: files.startup_scripts, op: none, where: { field: reason, op: present } }
   - { fact: files.startup_dirs, op: none, where: { field: other_writable, op: eq, expected: true } }
+  - { fact: files.startup_dirs, op: none, where: { field: reason, op: present } }
 remediation:
   text_en: chmod go-w each group- or world-writable startup script and its directory, and chown them to root; investigate any startup file that could not be read.
   text_ko: 그룹·전체 쓰기 가능한 시작 스크립트와 그 디렉터리에 chmod go-w 를 적용하고 root 로 chown 하며, 읽을 수 없었던 시작 파일은 조사합니다.

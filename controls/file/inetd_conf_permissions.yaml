@@ -18,6 +18,7 @@ mechanisms:
     checks:
       - { fact: files.etc_inetd_conf.group_writable, op: eq, expected: false }
       - { fact: files.etc_inetd_conf.other_readable, op: eq, expected: false }
+      - { fact: files.etc_inetd_conf.uid, op: eq, expected: 0 }
   - when:
       - { fact: files.etc_xinetd_conf.mode, op: present }
     checks:
@@ -25,6 +26,7 @@ mechanisms:
       - { fact: files.etc_xinetd_conf.uid, op: eq, expected: 0 }
       - { fact: files.xinetd_d, op: none, where: { field: other_writable, op: eq, expected: true } }
       - { fact: files.xinetd_d, op: none, where: { field: group_writable, op: eq, expected: true } }
+      - { fact: files.xinetd_d, op: none, where: { field: reason, op: present } }
 remediation:
   text_en: chmod 0600 /etc/inetd.conf or /etc/xinetd.conf and its fragments, chown them to root, and prefer removing the super-server if no service needs it.
   text_ko: /etc/inetd.conf 또는 /etc/xinetd.conf 와 그 조각에 chmod 0600 을 적용하고 root 로 chown 하며, 필요한 서비스가 없으면 슈퍼서버 제거를 우선합니다.

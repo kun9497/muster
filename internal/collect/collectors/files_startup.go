@@ -19,11 +19,16 @@ var (
 		"/etc/systemd/system/*", "/etc/systemd/system/*/*",
 		"/etc/rc0.d/*", "/etc/rc1.d/*", "/etc/rc2.d/*", "/etc/rc3.d/*",
 		"/etc/rc4.d/*", "/etc/rc5.d/*", "/etc/rc6.d/*",
+		// RHEL keeps the runlevel link trees under /etc/rc.d as well.
+		"/etc/rc.d/rc0.d/*", "/etc/rc.d/rc1.d/*", "/etc/rc.d/rc2.d/*", "/etc/rc.d/rc3.d/*",
+		"/etc/rc.d/rc4.d/*", "/etc/rc.d/rc5.d/*", "/etc/rc.d/rc6.d/*",
 	}
 	startupDirList = []string{
 		"/etc/init.d", "/etc/rc.d/init.d", "/etc/systemd/system",
 		"/etc/rc0.d", "/etc/rc1.d", "/etc/rc2.d", "/etc/rc3.d",
 		"/etc/rc4.d", "/etc/rc5.d", "/etc/rc6.d",
+		"/etc/rc.d/rc0.d", "/etc/rc.d/rc1.d", "/etc/rc.d/rc2.d", "/etc/rc.d/rc3.d",
+		"/etc/rc.d/rc4.d", "/etc/rc.d/rc5.d", "/etc/rc.d/rc6.d",
 	}
 	syslogConfGlobs   = []string{"/etc/rsyslog.conf", "/etc/rsyslog.d/*.conf", "/etc/syslog-ng/syslog-ng.conf", "/etc/syslog-ng/conf.d/*.conf"}
 	journaldConfGlobs = []string{"/etc/systemd/journald.conf", "/etc/systemd/journald.conf.d/*.conf"}
@@ -48,6 +53,9 @@ func permRow(a collect.Access, p string, groups map[int]string) (map[string]any,
 	switch {
 	case err == nil:
 		rec["mode"], rec["uid"], rec["gid"] = int(meta.Mode), int(meta.UID), int(meta.GID)
+		// group is evidence only — no control judges a permRow's group name, so a
+		// truncated/denied /etc/group is not propagated here (unlike U-67's log
+		// rows in logTree, which judge group and carry the read error).
 		rec["group"] = groups[int(meta.GID)]
 		rec["group_writable"] = meta.Mode&0o020 != 0
 		rec["other_writable"] = meta.Mode&0o002 != 0

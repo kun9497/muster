@@ -144,7 +144,22 @@ func writeSudoDerived(b *collect.Builder, a collect.Access) {
 // levels deep (bounded), recording each entry's group name and the
 // group/other-writable flags. U-67 owns the allowed-group policy, so no
 // "unexpected" flag is precomputed here (D09).
-func logTree(a collect.Access, groups map[int]string) (facts.Envelope, facts.Envelope) {
+//
+// gmeta and gerr are what groupNames returned. Unlike the cron rows, U-67
+// JUDGES the group field (`each where group_writable require group in
+// allowed`), so a group name built from an unreadable/truncated /etc/group
+// would be fabricated evidence: on gerr both keys carry that read error
+// (path-prefixed, C3/R70, mirroring writePermFacts), and a truncated read
+// marks the two envelopes so a name the cap may have dropped is honest.
+func logTree(a collect.Access, groups map[int]string, gmeta collect.ReadMeta, gerr error) (facts.Envelope, facts.Envelope) {
+	if gerr != nil {
+		// /etc/group could not be read; every log row's group name would be a
+		// silent "" that U-67 would then judge on. Surface the read error on
+		// both log keys instead (path-prefixed, since /etc/group is not the
+		// path these facts are about).
+		e := readErrorEnv(groupPath, gerr)
+		return e, e
+	}
 	var paths []string
 	for _, g := range []string{varLogGlob1, varLogGlob2} {
 		m, err := a.Glob(g)
@@ -201,7 +216,10 @@ func logTree(a collect.Access, groups map[int]string) (facts.Envelope, facts.Env
 		}
 	}
 	src := &facts.Source{Kind: "file", Path: varLogDir}
-	de := withTruncation(collect.OK(dirs, src), truncated)
-	fe := withTruncation(collect.OK(files, src), truncated)
+	// A truncated /etc/group read (gmeta.Truncated) marks the two envelopes too:
+	// the walk carries the group name it looked up, which the read cap may have
+	// missed (R70), just like the row-cap truncation of the walk itself.
+	de := withTruncation(collect.OK(dirs, src), truncated || gmeta.Truncated)
+	fe := withTruncation(collect.OK(files, src), truncated || gmeta.Truncated)
 	return de, fe
 }

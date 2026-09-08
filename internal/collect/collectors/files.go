@@ -126,7 +126,7 @@ func runFiles(_ context.Context, a collect.Access, b *collect.Builder) error {
 	// sudoers permission facts, the sudo.* derived keys (U-63) and the
 	// /var/log tree (U-67). groups is reused.
 	sudoersFacts(b, a, groups)
-	ld, lf := logTree(a, groups)
+	ld, lf := logTree(a, groups, gmeta, gerr)
 	b.Set("files.log_dirs", ld)
 	b.Set("files.log_files", lf)
 
