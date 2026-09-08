@@ -1,0 +1,5 @@
+# synthetic vendor journald configuration: systemd >= 254 ships this copy and
+# no /etc/systemd/journald.conf at all.
+[Journal]
+Storage=persistent
+ForwardToSyslog=yes

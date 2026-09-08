@@ -16,7 +16,9 @@
               "nis":{"active":{"status":"ok","value":false},"enabled":{"status":"ok","value":true}},
               "tftp":{"active":{"status":"ok","value":false},"enabled":{"status":"ok","value":false},"reachable":{"status":"ok","value":true}},
               "talk":{"active":{"status":"ok","value":false},"enabled":{"status":"ok","value":true},"reachable":{"status":"ok","value":false}},
-              "snmp":{"active":{"status":"ok","value":false},"enabled":{"status":"ok","value":false},"reachable":{"status":"ok","value":true}}},
+              "snmp":{"active":{"status":"ok","value":false},"enabled":{"status":"ok","value":false},"reachable":{"status":"ok","value":true}},
+              "ntp":{"installed":{"status":"ok","value":true},"active":{"status":"ok","value":true}},
+              "syslog":{"active":{"status":"ok","value":true}}},
   "sshd":{"collect_method":{"status":"ok","value":"T"},"version":{"status":"ok","value":"8.9"},"personas_collected":{"status":"ok","value":true},
           "options":{"permit_root_login":{"effective":{"status":"ok","value":"yes","source":{"kind":"file","path":"/etc/ssh/sshd_config","line":40,"raw":"PermitRootLogin yes"}}},
                      "client_alive_interval":{"effective":{"status":"ok","value":300}},
@@ -71,6 +73,19 @@
              {"path":"/var/log/syslog","mode":416,"uid":0,"gid":103,"group":"adm","group_writable":false,"other_writable":false}
            ]}},
   "firewall":{"backend":{"status":"ok","value":"nftables"},"restricts_inbound":{"status":"ok","value":true},"normalization_confidence":{"status":"ok","value":"full"}},
+  "time_sync":{"provider":{"status":"ok","value":"chrony"},
+               "servers":{"status":"ok","value":["ntp.example.org","pool.example.org"]},
+               "server_count":{"status":"ok","value":2},
+               "synchronized":{"status":"ok","value":true}},
+  "logging":{"syslog":{"implementation":{"status":"ok","value":"rsyslog"}},
+             "rsyslog":{"coverage":{"status":"ok","value":[
+               {"facility":"auth","logged":true,"priority_floor":"info","target":"/var/log/auth.log","persistent":true},
+               {"facility":"authpriv","logged":true,"priority_floor":"info","target":"/var/log/auth.log","persistent":true},
+               {"facility":"kern","logged":true,"priority_floor":"info","target":"/var/log/kern.log","persistent":true},
+               {"facility":"daemon","logged":true,"priority_floor":"info","target":"/var/log/syslog","persistent":true},
+               {"facility":"cron","logged":true,"priority_floor":"info","target":"/var/log/syslog","persistent":true}
+             ]}},
+             "journald":{"persistent":{"status":"ok","value":true}}},
   "sudo":{"installed":{"status":"ok","value":true},"includedir":{"status":"ok","value":"/etc/sudoers.d"},"secure_path":{"status":"ok","value":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"}},
   "cron":{"files":{"status":"ok","value":[
             {"path":"/etc/crontab","scope":"system","user":"","mode":416,"uid":0,"gid":0,"group":"root","owner_ok":true,"group_writable":false,"other_writable":false},

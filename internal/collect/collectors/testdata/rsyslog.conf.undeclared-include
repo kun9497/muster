@@ -1,0 +1,5 @@
+# synthetic configuration whose include names a path outside the collector's
+# declaration: it is recorded, never globbed or read (Ruling I-10).
+include(file="/opt/rsyslog/extra.conf" mode="optional")
+
+auth,authpriv.*			/var/log/auth.log

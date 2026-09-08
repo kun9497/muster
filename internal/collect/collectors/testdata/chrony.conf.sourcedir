@@ -1,0 +1,5 @@
+# synthetic chrony configuration: a reference clock plus a source directory
+refclock PHC /dev/ptp0 poll 0 dpoll -2
+sourcedir /run/chrony-dhcp
+confdir /etc/chrony/conf.d
+driftfile /var/lib/chrony/chrony.drift

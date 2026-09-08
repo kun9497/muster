@@ -1,0 +1,11 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "services":{"syslog":{"active":{"status":"ok","value":true}}},
+  "logging":{
+    "syslog":{"implementation":{"status":"ok","value":"rsyslog"}},
+    "rsyslog":{
+      "coverage":{"status":"absent","reason":"an unmodelled construct was seen; coverage cannot be derived"},
+      "unmodelled":{"status":"ok","value":3}
+    },
+    "journald":{"persistent":{"status":"ok","value":true}}
+  }
+}}

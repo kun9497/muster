@@ -1,0 +1,6 @@
+# synthetic Debian-shaped block whose selector is split over four lines: the
+# backslash continuation ends each fragment mid-selector, on a ";".
+*.=info;*.=notice;*.=warn;\
+	auth,authpriv.none;\
+	cron,daemon.none;\
+	mail,news.none		-/var/log/messages

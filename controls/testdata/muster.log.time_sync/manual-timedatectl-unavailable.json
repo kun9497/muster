@@ -1,0 +1,7 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "services":{"ntp":{"installed":{"status":"ok","value":true},"active":{"status":"ok","value":true}}},
+  "time_sync":{
+    "provider":{"status":"ok","value":"timesyncd"},
+    "server_count":{"status":"absent","reason":"timedatectl is unavailable; the effective server list cannot be read"}
+  }
+}}

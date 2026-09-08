@@ -1,0 +1,4 @@
+# synthetic configuration filtering on the facility PROPERTY, which can take a
+# whole facility out of the rules below it.
+:syslogfacility-text, isequal, "authpriv"	~
+*.*				-/var/log/syslog

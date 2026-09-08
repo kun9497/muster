@@ -1,0 +1,2 @@
+# synthetic chrony sources file reached only through the include directive
+pool ntp.example.net iburst maxsources 4

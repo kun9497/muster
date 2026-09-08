@@ -1,0 +1,9 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "services":{"ntp":{"installed":{"status":"ok","value":true},"active":{"status":"ok","value":true}}},
+  "time_sync":{
+    "provider":{"status":"ok","value":"timesyncd"},
+    "servers":{"status":"ok","value":["0.ubuntu.pool.ntp.org"]},
+    "server_count":{"status":"ok","value":1},
+    "synchronized":{"status":"ok","value":true}
+  }
+}}

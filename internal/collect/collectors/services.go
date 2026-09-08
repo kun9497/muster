@@ -81,6 +81,13 @@ var services = []logicalService{
 	{name: "tftp", units: []unitRef{{"tftp.socket", true}, {"tftp.service", true}, {"tftpd.service", true}, {"tftpd-hpa.service", true}, {"atftpd.socket", true}, {"atftpd.service", true}}, inetdNames: []string{"tftp"}, servers: []string{"in.tftpd", "atftpd"}, ports: []portSpec{{"udp", 69}}},
 	{name: "talk", units: []unitRef{{"talk.socket", true}, {"ntalk.socket", true}}, inetdNames: []string{"talk", "ntalk"}, servers: []string{"in.talkd", "in.ntalkd"}, ports: []portSpec{{"udp", 517}, {"udp", 518}}},
 	{name: "snmp", units: []unitRef{{"snmpd.service", true}}, ports: []portSpec{{"udp", 161}}},
+	// 2I (Ruling I-4). No inetdNames/servers (neither is ever super-server
+	// hosted) and no ports: 123/udp and 514 are not judged, and a firewalled
+	// or loopback-bound daemon would make a port probe a false negative. Which
+	// daemon a host runs is not judged either — U-65 asks only that SOME time
+	// source is active, so every implementation is one logical service.
+	{name: "ntp", units: []unitRef{{"chrony.service", true}, {"chronyd.service", true}, {"systemd-timesyncd.service", true}, {"ntpd.service", true}, {"ntp.service", true}, {"ntpsec.service", true}}},
+	{name: "syslog", units: []unitRef{{"rsyslog.service", true}, {"syslog-ng.service", true}}},
 }
 
 // declaredShowCommands lists every systemctl invocation the collector may

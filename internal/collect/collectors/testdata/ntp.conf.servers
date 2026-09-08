@@ -1,0 +1,5 @@
+# synthetic ntp.conf
+pool 0.pool.ntp.org iburst
+server 192.0.2.20 iburst
+driftfile /var/lib/ntp/ntp.drift
+restrict default kod nomodify notrap nopeer noquery

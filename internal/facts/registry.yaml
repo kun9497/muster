@@ -342,6 +342,54 @@ keys:
     since: 1
     sensitivity: public
     collector: services
+  - key: services.ntp.installed
+    type: bool
+    description: A time-synchronisation daemon unit (chrony, systemd-timesyncd, ntpd or ntpsec) exists on the host.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.ntp.active
+    type: bool
+    description: A time-synchronisation daemon is running.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.ntp.unit_file_state
+    type: string
+    description: UnitFileState of the first present time-synchronisation unit (evidence only; "not-found" when none).
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.ntp.enabled
+    type: bool
+    description: A time-synchronisation unit will start at boot.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.syslog.installed
+    type: bool
+    description: A syslog daemon unit (rsyslog or syslog-ng) exists on the host.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.syslog.active
+    type: bool
+    description: The syslog daemon is running.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.syslog.unit_file_state
+    type: string
+    description: UnitFileState of the first present syslog unit (evidence only; "not-found" when none).
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.syslog.enabled
+    type: bool
+    description: A syslog unit will start at boot.
+    since: 1
+    sensitivity: public
+    collector: services
   - key: sockets.listening
     type: list<record>
     description: Listening TCP/UDP sockets with proto, address, port, inode, pid and executable.
@@ -1481,3 +1529,89 @@ keys:
     since: 1
     sensitivity: internal
     collector: firewall
+  - key: time_sync.provider
+    type: string
+    description: Which time-synchronisation provider is configured on disk - chrony, timesyncd, ntpd or none; chosen from the persisted configuration in the order chrony, ntpd, systemd-timesyncd, so a leftover configuration file of a removed provider still decides and should be purged. Evidence only (which daemon is running is services.ntp.active).
+    since: 1
+    sensitivity: public
+    collector: timesync
+  - key: time_sync.servers
+    type: list<string>
+    description: The de-duplicated, sorted time sources the provider is configured with - server/pool/peer names, chrony reference clocks as refclock:<driver>:<arg>, and (timesyncd) the lists timedatectl show-timesync reports; absent when the effective list cannot be known (timedatectl unavailable on the timesyncd branch, or a chrony sourcedir/confdir outside the collector's declaration).
+    since: 1
+    sensitivity: public
+    collector: timesync
+  - key: time_sync.server_count
+    type: int
+    description: How many time sources time_sync.servers holds; 0 when no provider is configured, and absent under the same conditions as time_sync.servers.
+    since: 1
+    sensitivity: public
+    collector: timesync
+  - key: time_sync.synchronized
+    type: bool
+    description: Whether the host's clock is currently synchronised, from timedatectl NTPSynchronized; evidence only (a freshly booted or air-gapped host is not a finding), and unsupported wherever timedatectl cannot run.
+    since: 1
+    sensitivity: public
+    collector: timesync
+  - key: logging.syslog.implementation
+    type: string
+    description: Which syslog implementation is configured on disk - rsyslog, syslog-ng, journald-only or none; a daemon is named only when its binary is installed as well as its configuration file, so a conffile left behind by a removed package does not decide. Evidence only (which daemon is running is services.syslog.active).
+    since: 1
+    sensitivity: public
+    collector: logging
+  - key: logging.rsyslog.rules
+    type: list<record>
+    description: The rsyslog routing rules in file order, one record per selected facility and action, each with facility, priority, target and target_kind (file, device, remote, user, pipe, program, module or discard; a device is a /dev/ target, which is logged but keeps nothing); absent when the host has no rsyslog configuration, and the read's status when a configuration file exists but cannot be read.
+    since: 1
+    sensitivity: public
+    collector: logging
+  - key: logging.rsyslog.parse_complete
+    type: bool
+    description: Whether every rsyslog configuration file the main file includes was read; false when an include could not be read or named a path outside the collector's declaration, which makes logging.rsyslog.coverage absent.
+    since: 1
+    sensitivity: public
+    collector: logging
+  - key: logging.rsyslog.unmodelled
+    type: int
+    description: How many rsyslog constructs this version does not model - an if/then conditional, a ruleset() or call statement (and the legacy $RuleSet/$DefaultRuleset), an action that runs only when the previous one was suspended or only every Nth message, a property filter on the facility or severity, a discard restricted to some severities, a numeric facility or priority code, a ?TemplateName dynamic file target, and an omfile or omfwd action whose argument cannot be parsed; any of them makes logging.rsyslog.coverage absent.
+    since: 1
+    sensitivity: public
+    collector: logging
+  - key: logging.rsyslog.property_filters
+    type: int
+    description: How many property-based filter lines the configuration carries (the leading-colon msg/syslogtag form); they add a destination for a tagged subset of messages and can never un-log a facility, so they are evidence only and leave coverage untouched; a filter on the facility or severity property is counted in logging.rsyslog.unmodelled instead, since it can.
+    since: 1
+    sensitivity: public
+    collector: logging
+  - key: logging.rsyslog.coverage
+    type: list<record>
+    description: Per-facility routing derived from the rules in file order, each with facility, logged, priority_floor, target, persistent and reason; persistent means the winning target is a local file path, not that the file already exists - a remote collector and a /dev/ device are logged but never persistent. Absent when the parse was incomplete, when an unmodelled construct was seen, or when the host has no rsyslog configuration.
+    since: 1
+    sensitivity: public
+    collector: logging
+    subject_kind: facility
+  - key: logging.journald.storage
+    type: setting<string>
+    description: journald's Storage= from /etc/systemd/journald.conf (or the /usr/lib copy) merged with its drop-in directories - persisted as configured (auto when unset, journald's default), runtime as persistent or volatile from whether /var/log/journal is a directory; the read's status on both sides when a file in the chain exists but cannot be read, and unsupported on a host with no systemd.
+    since: 1
+    sensitivity: public
+    collector: logging
+    default_on: both
+  - key: logging.journald.forward_to_syslog
+    type: bool
+    description: journald's merged ForwardToSyslog=, false when unset (journald's default); evidence only, since forwarding neither adds nor removes journal storage.
+    since: 1
+    sensitivity: public
+    collector: logging
+  - key: logging.journald.persistent
+    type: bool
+    description: Whether the journal survives a reboot - true when Storage is persistent, or when it is auto (the default, and what journald falls back to for a value it cannot parse) and /var/log/journal is a directory; the read's status when a configuration file in the chain exists but cannot be read, and unsupported on a host with no systemd.
+    since: 1
+    sensitivity: public
+    collector: logging
+  - key: logging.log_targets
+    type: list<record>
+    description: The distinct local file targets the rules name, each with path, exists, persistent, mtime_age_s and stat_status (ok, absent, denied, error or undeclared); mtime_age_s is the whole seconds between the file's modification time and the run's collected_at and is omitted when either is unknown or the file was modified after the run started, and a path outside the collector's declaration is recorded with stat_status undeclared and never stat-ed. Evidence only.
+    since: 1
+    sensitivity: public
+    collector: logging

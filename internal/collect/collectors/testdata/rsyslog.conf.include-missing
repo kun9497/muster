@@ -1,0 +1,5 @@
+# synthetic configuration whose include exists but cannot be read.
+$IncludeConfig /etc/rsyslog.d/10-custom.conf
+
+auth,authpriv.*			/var/log/auth.log
+*.*;auth,authpriv.none		-/var/log/syslog

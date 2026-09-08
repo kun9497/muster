@@ -1,0 +1,14 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "services":{"syslog":{"active":{"status":"ok","value":true}}},
+  "logging":{
+    "syslog":{"implementation":{"status":"ok","value":"rsyslog"}},
+    "rsyslog":{"coverage":{"status":"ok","value":[
+      {"facility":"auth","logged":true,"priority_floor":"info","target":"/var/log/secure","persistent":true},
+      {"facility":"authpriv","logged":true,"priority_floor":"info","target":"/var/log/secure","persistent":true},
+      {"facility":"kern","logged":true,"priority_floor":"info","target":"/var/log/messages","persistent":true},
+      {"facility":"daemon","logged":true,"priority_floor":"info","target":"/var/log/messages","persistent":true},
+      {"facility":"cron","logged":true,"priority_floor":"info","target":"/var/log/messages","persistent":true}
+    ]}},
+    "journald":{"persistent":{"status":"ok","value":true}}
+  }
+}}

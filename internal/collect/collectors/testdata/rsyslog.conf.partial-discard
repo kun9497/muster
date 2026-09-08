@@ -1,0 +1,4 @@
+# synthetic configuration discarding ONE severity of a facility before the
+# rule that would otherwise log all of it.
+kern.=debug			~
+kern.*				-/var/log/kern.log

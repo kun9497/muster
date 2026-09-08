@@ -1,0 +1,5 @@
+# synthetic configuration using the legacy ruleset directives, which are the
+# old spelling of ruleset()/call.
+$RuleSet remote
+*.*				/var/log/remote.log
+$DefaultRuleset RSYSLOG_DefaultRuleset

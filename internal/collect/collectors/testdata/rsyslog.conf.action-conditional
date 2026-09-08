@@ -1,0 +1,3 @@
+# synthetic RainerScript spelling of the same failover buffer.
+*.*				@@primary.example.org:514
+action(type="omfile" file="/var/log/localbuffer" action.execOnlyWhenPreviousIsSuspended="on")

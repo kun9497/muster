@@ -1,0 +1,8 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "services":{"syslog":{"active":{"status":"ok","value":true}}},
+  "logging":{
+    "syslog":{"implementation":{"status":"ok","value":"syslog-ng"}},
+    "rsyslog":{"coverage":{"status":"absent","reason":"syslog-ng configuration is not parsed in this version"}},
+    "journald":{"persistent":{"status":"ok","value":true}}
+  }
+}}
