@@ -1,0 +1,9 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "services":{"ntp":{"installed":{"status":"ok","value":false},"active":{"status":"ok","value":false}}},
+  "time_sync":{
+    "provider":{"status":"ok","value":"none"},
+    "servers":{"status":"ok","value":[]},
+    "server_count":{"status":"ok","value":0},
+    "synchronized":{"status":"ok","value":false}
+  }
+}}

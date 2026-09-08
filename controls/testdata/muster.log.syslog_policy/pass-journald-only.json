@@ -1,0 +1,6 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "logging":{
+    "syslog":{"implementation":{"status":"ok","value":"journald-only"}},
+    "journald":{"persistent":{"status":"ok","value":true}}
+  }
+}}

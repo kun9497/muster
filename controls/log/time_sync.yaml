@@ -1,0 +1,26 @@
+id: muster.log.time_sync
+title_en: System time is synchronised from a configured source
+title_ko: 시스템 시각이 설정된 소스와 동기화된다
+description_en: A time-synchronisation daemon (chrony, systemd-timesyncd or ntpd) is running and has at least one configured time source. Whether the clock is currently in sync is recorded as evidence only — a freshly booted or air-gapped host is not a finding. The cited STIG rules require chrony specifically; this control accepts any of the three providers. On a systemd-timesyncd host whose daemon is stopped the effective server list cannot be read and the result is MANUAL rather than a failure — muster under-claims rather than guess. On a host without systemd the daemon state cannot be read and the result is not applicable.
+description_ko: 시각 동기화 데몬(chrony, systemd-timesyncd, ntpd)이 실행 중이고 설정된 시각 소스가 하나 이상 있다. 현재 동기화 여부는 증거로만 기록한다 — 막 부팅했거나 망분리된 호스트는 결함이 아니다. 인용한 STIG 규칙은 chrony 만 요구하지만 이 항목은 세 데몬을 모두 인정한다. systemd-timesyncd 가 멈춰 있는 호스트에서는 실제 서버 목록을 읽을 수 없어 실패가 아닌 MANUAL 로 처리한다 — 추정하지 않고 낮춰 판단한다. systemd 가 없는 호스트에서는 데몬 상태를 읽을 수 없어 해당 없음으로 처리한다.
+category: log
+importance: 중
+automation: auto
+references:
+  kisa: { "2026": ["U-65"], "2021": [] }
+  stig:
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-252010 }
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-252015 }
+requires_facts: ">=1"
+absent_means: manual
+applies_when:
+  - { fact: services.ntp.installed, op: present }
+checks:
+  - { fact: services.ntp.active, op: eq, expected: true }
+  - { fact: time_sync.server_count, op: gte, expected: 1 }
+remediation:
+  text_en: Install and enable a time-synchronisation daemon (chrony on RHEL-family, systemd-timesyncd or chrony on Ubuntu) and configure at least one reachable NTP server or pool.
+  text_ko: 시각 동기화 데몬을 설치·활성화하고(RHEL 계열은 chrony, Ubuntu 는 systemd-timesyncd 또는 chrony) 접근 가능한 NTP 서버나 pool 을 하나 이상 설정합니다.
+  risk: restart_service
+  idempotent: true
+decision: D09

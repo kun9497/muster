@@ -1,0 +1,8 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "services":{"syslog":{"active":{"status":"unsupported","reason":"no systemd on this host; service state cannot be read"}}},
+  "logging":{
+    "syslog":{"implementation":{"status":"ok","value":"none"}},
+    "rsyslog":{"coverage":{"status":"absent","reason":"the host has no rsyslog configuration"}},
+    "journald":{"persistent":{"status":"unsupported","reason":"no systemd on this host; journald state cannot be read"}}
+  }
+}}

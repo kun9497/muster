@@ -1,0 +1,13 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "services":{"syslog":{"active":{"status":"unsupported","reason":"no init system to query in this container"}}},
+  "logging":{
+    "syslog":{"implementation":{"status":"ok","value":"rsyslog"}},
+    "rsyslog":{"coverage":{"status":"ok","value":[
+      {"facility":"auth","logged":true,"priority_floor":"info","target":"/var/log/auth.log","persistent":true},
+      {"facility":"authpriv","logged":true,"priority_floor":"info","target":"/var/log/auth.log","persistent":true},
+      {"facility":"kern","logged":true,"priority_floor":"info","target":"/var/log/kern.log","persistent":true},
+      {"facility":"daemon","logged":true,"priority_floor":"info","target":"/var/log/syslog","persistent":true},
+      {"facility":"cron","logged":true,"priority_floor":"info","target":"/var/log/syslog","persistent":true}
+    ]}}
+  }
+}}

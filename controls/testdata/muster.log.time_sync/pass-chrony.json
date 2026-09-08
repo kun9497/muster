@@ -1,0 +1,9 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "services":{"ntp":{"installed":{"status":"ok","value":true},"active":{"status":"ok","value":true}}},
+  "time_sync":{
+    "provider":{"status":"ok","value":"chrony"},
+    "servers":{"status":"ok","value":["0.rhel.pool.ntp.org","1.rhel.pool.ntp.org"]},
+    "server_count":{"status":"ok","value":2},
+    "synchronized":{"status":"ok","value":true}
+  }
+}}
