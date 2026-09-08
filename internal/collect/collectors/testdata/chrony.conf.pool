@@ -1,0 +1,6 @@
+# synthetic chrony configuration
+pool ntp.example.net iburst maxsources 4
+server 192.0.2.10 iburst
+driftfile /var/lib/chrony/chrony.drift
+makestep 1.0 3
+rtcsync

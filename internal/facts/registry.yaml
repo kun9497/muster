@@ -342,6 +342,54 @@ keys:
     since: 1
     sensitivity: public
     collector: services
+  - key: services.ntp.installed
+    type: bool
+    description: A time-synchronisation daemon unit (chrony, systemd-timesyncd, ntpd or ntpsec) exists on the host.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.ntp.active
+    type: bool
+    description: A time-synchronisation daemon is running.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.ntp.unit_file_state
+    type: string
+    description: UnitFileState of the first present time-synchronisation unit (evidence only; "not-found" when none).
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.ntp.enabled
+    type: bool
+    description: A time-synchronisation unit will start at boot.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.syslog.installed
+    type: bool
+    description: A syslog daemon unit (rsyslog or syslog-ng) exists on the host.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.syslog.active
+    type: bool
+    description: The syslog daemon is running.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.syslog.unit_file_state
+    type: string
+    description: UnitFileState of the first present syslog unit (evidence only; "not-found" when none).
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.syslog.enabled
+    type: bool
+    description: A syslog unit will start at boot.
+    since: 1
+    sensitivity: public
+    collector: services
   - key: sockets.listening
     type: list<record>
     description: Listening TCP/UDP sockets with proto, address, port, inode, pid and executable.
@@ -1481,3 +1529,27 @@ keys:
     since: 1
     sensitivity: internal
     collector: firewall
+  - key: time_sync.provider
+    type: string
+    description: Which time-synchronisation provider is configured on disk - chrony, timesyncd, ntpd or none; evidence only (which daemon is running is services.ntp.active).
+    since: 1
+    sensitivity: public
+    collector: timesync
+  - key: time_sync.servers
+    type: list<string>
+    description: The de-duplicated, sorted time sources the provider is configured with - server/pool/peer names, chrony reference clocks as refclock:<driver>:<arg>, and (timesyncd) the lists timedatectl show-timesync reports; absent when the effective list cannot be known (timedatectl unavailable on the timesyncd branch, or a chrony sourcedir/confdir outside the collector's declaration).
+    since: 1
+    sensitivity: public
+    collector: timesync
+  - key: time_sync.server_count
+    type: int
+    description: How many time sources time_sync.servers holds; 0 when no provider is configured, and absent under the same conditions as time_sync.servers.
+    since: 1
+    sensitivity: public
+    collector: timesync
+  - key: time_sync.synchronized
+    type: bool
+    description: Whether the host's clock is currently synchronised, from timedatectl NTPSynchronized; evidence only (a freshly booted or air-gapped host is not a finding), and unsupported wherever timedatectl cannot run.
+    since: 1
+    sensitivity: public
+    collector: timesync

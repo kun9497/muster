@@ -1,0 +1,5 @@
+# synthetic timesyncd configuration: every setting left at its default
+[Time]
+#NTP=
+#FallbackNTP=ntp.example.net
+#RootDistanceMaxSec=5

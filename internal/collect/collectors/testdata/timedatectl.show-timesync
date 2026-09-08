@@ -1,0 +1,11 @@
+LinkNTPServers=
+SystemNTPServers=ntp1.example.net ntp2.example.net
+RuntimeNTPServers=
+FallbackNTPServers=ntp.example.org
+ServerName=ntp1.example.net
+ServerAddress=198.51.100.11
+RootDistanceMaxUSec=5s
+PollIntervalMinUSec=32s
+PollIntervalMaxUSec=34min 8s
+PollIntervalUSec=1min 4s
+Frequency=1234567

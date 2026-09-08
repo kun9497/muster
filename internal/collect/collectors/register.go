@@ -41,6 +41,7 @@ func init() {
 	collect.Register(accountsCollector)
 	collect.Register(pamCollector)
 	collect.Register(firewallCollector)
+	collect.Register(timesyncCollector)
 	collect.Register(walkCollector)
 }
 

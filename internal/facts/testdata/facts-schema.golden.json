@@ -742,6 +742,86 @@
       "SubjectKind": ""
     },
     {
+      "Key": "services.ntp.installed",
+      "Type": "bool",
+      "Description": "A time-synchronisation daemon unit (chrony, systemd-timesyncd, ntpd or ntpsec) exists on the host.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.ntp.active",
+      "Type": "bool",
+      "Description": "A time-synchronisation daemon is running.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.ntp.unit_file_state",
+      "Type": "string",
+      "Description": "UnitFileState of the first present time-synchronisation unit (evidence only; \"not-found\" when none).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.ntp.enabled",
+      "Type": "bool",
+      "Description": "A time-synchronisation unit will start at boot.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.syslog.installed",
+      "Type": "bool",
+      "Description": "A syslog daemon unit (rsyslog or syslog-ng) exists on the host.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.syslog.active",
+      "Type": "bool",
+      "Description": "The syslog daemon is running.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.syslog.unit_file_state",
+      "Type": "string",
+      "Description": "UnitFileState of the first present syslog unit (evidence only; \"not-found\" when none).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.syslog.enabled",
+      "Type": "bool",
+      "Description": "A syslog unit will start at boot.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
       "Key": "sockets.listening",
       "Type": "list\u003crecord\u003e",
       "Description": "Listening TCP/UDP sockets with proto, address, port, inode, pid and executable.",
@@ -2588,6 +2668,46 @@
       "Since": 1,
       "Sensitivity": "internal",
       "Collector": "firewall",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "time_sync.provider",
+      "Type": "string",
+      "Description": "Which time-synchronisation provider is configured on disk - chrony, timesyncd, ntpd or none; evidence only (which daemon is running is services.ntp.active).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "timesync",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "time_sync.servers",
+      "Type": "list\u003cstring\u003e",
+      "Description": "The de-duplicated, sorted time sources the provider is configured with - server/pool/peer names, chrony reference clocks as refclock:\u003cdriver\u003e:\u003carg\u003e, and (timesyncd) the lists timedatectl show-timesync reports; absent when the effective list cannot be known (timedatectl unavailable on the timesyncd branch, or a chrony sourcedir/confdir outside the collector's declaration).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "timesync",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "time_sync.server_count",
+      "Type": "int",
+      "Description": "How many time sources time_sync.servers holds; 0 when no provider is configured, and absent under the same conditions as time_sync.servers.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "timesync",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "time_sync.synchronized",
+      "Type": "bool",
+      "Description": "Whether the host's clock is currently synchronised, from timedatectl NTPSynchronized; evidence only (a freshly booted or air-gapped host is not a finding), and unsupported wherever timedatectl cannot run.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "timesync",
       "DefaultOn": "",
       "SubjectKind": ""
     }
