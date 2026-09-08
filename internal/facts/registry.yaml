@@ -541,6 +541,77 @@ keys:
     since: 1
     sensitivity: public
     collector: files
+  - key: files.startup_scripts
+    type: list<record>
+    description: SysV init scripts and systemd unit files under the startup roots, each with path, mode, owner, group, the group/other-writable flags and is_symlink - the enabled-unit symlinks U-17 filters out.
+    since: 1
+    sensitivity: public
+    collector: files
+    subject_kind: file
+  - key: files.startup_dirs
+    type: list<record>
+    description: The startup-script directories themselves (/etc/init.d, /etc/systemd/system, the rcN.d dirs), each with path, mode, owner, group and the group/other-writable flags.
+    since: 1
+    sensitivity: public
+    collector: files
+    subject_kind: file
+  - key: files.syslog_configs
+    type: list<record>
+    description: The rsyslog and syslog-ng configuration files, each with path, mode, owner, group and the group/other-writable flags.
+    since: 1
+    sensitivity: public
+    collector: files
+    subject_kind: file
+  - key: files.journald_configs
+    type: list<record>
+    description: The systemd-journald configuration files, each with path, mode, owner, group and the group/other-writable flags.
+    since: 1
+    sensitivity: public
+    collector: files
+    subject_kind: file
+  - key: files.etc_inetd_conf.mode
+    type: int
+    description: Mode bits of /etc/inetd.conf (0o7777); absent when the file does not exist, as it does not on either stock family.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_inetd_conf.uid
+    type: int
+    description: Owner uid of /etc/inetd.conf; absent when the file does not exist.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_inetd_conf.group_writable
+    type: bool
+    description: Whether /etc/inetd.conf is group-writable; absent when the file does not exist.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_inetd_conf.other_readable
+    type: bool
+    description: Whether /etc/inetd.conf is world-readable; absent when the file does not exist.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_xinetd_conf.mode
+    type: int
+    description: Mode bits of /etc/xinetd.conf (0o7777); absent when the file does not exist.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_xinetd_conf.uid
+    type: int
+    description: Owner uid of /etc/xinetd.conf; absent when the file does not exist.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.xinetd_d
+    type: list<record>
+    description: The /etc/xinetd.d fragment files, each with path, mode, owner, group and the group/other-writable flags; an ok empty list when the directory holds none.
+    since: 1
+    sensitivity: public
+    collector: files
+    subject_kind: file
   - key: accounts.login_defs.pass_max_days
     type: setting<int>
     description: PASS_MAX_DAYS - persisted in login.defs, effective as the maximum over existing accounts' shadow fields.

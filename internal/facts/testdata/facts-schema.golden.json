@@ -1062,6 +1062,116 @@
       "SubjectKind": ""
     },
     {
+      "Key": "files.startup_scripts",
+      "Type": "list\u003crecord\u003e",
+      "Description": "SysV init scripts and systemd unit files under the startup roots, each with path, mode, owner, group, the group/other-writable flags and is_symlink - the enabled-unit symlinks U-17 filters out.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": "file"
+    },
+    {
+      "Key": "files.startup_dirs",
+      "Type": "list\u003crecord\u003e",
+      "Description": "The startup-script directories themselves (/etc/init.d, /etc/systemd/system, the rcN.d dirs), each with path, mode, owner, group and the group/other-writable flags.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": "file"
+    },
+    {
+      "Key": "files.syslog_configs",
+      "Type": "list\u003crecord\u003e",
+      "Description": "The rsyslog and syslog-ng configuration files, each with path, mode, owner, group and the group/other-writable flags.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": "file"
+    },
+    {
+      "Key": "files.journald_configs",
+      "Type": "list\u003crecord\u003e",
+      "Description": "The systemd-journald configuration files, each with path, mode, owner, group and the group/other-writable flags.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": "file"
+    },
+    {
+      "Key": "files.etc_inetd_conf.mode",
+      "Type": "int",
+      "Description": "Mode bits of /etc/inetd.conf (0o7777); absent when the file does not exist, as it does not on either stock family.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_inetd_conf.uid",
+      "Type": "int",
+      "Description": "Owner uid of /etc/inetd.conf; absent when the file does not exist.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_inetd_conf.group_writable",
+      "Type": "bool",
+      "Description": "Whether /etc/inetd.conf is group-writable; absent when the file does not exist.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_inetd_conf.other_readable",
+      "Type": "bool",
+      "Description": "Whether /etc/inetd.conf is world-readable; absent when the file does not exist.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_xinetd_conf.mode",
+      "Type": "int",
+      "Description": "Mode bits of /etc/xinetd.conf (0o7777); absent when the file does not exist.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_xinetd_conf.uid",
+      "Type": "int",
+      "Description": "Owner uid of /etc/xinetd.conf; absent when the file does not exist.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.xinetd_d",
+      "Type": "list\u003crecord\u003e",
+      "Description": "The /etc/xinetd.d fragment files, each with path, mode, owner, group and the group/other-writable flags; an ok empty list when the directory holds none.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": "file"
+    },
+    {
       "Key": "accounts.login_defs.pass_max_days",
       "Type": "setting\u003cint\u003e",
       "Description": "PASS_MAX_DAYS - persisted in login.defs, effective as the maximum over existing accounts' shadow fields.",

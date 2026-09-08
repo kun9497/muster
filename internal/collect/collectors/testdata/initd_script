@@ -1,0 +1,3 @@
+#!/bin/sh
+# synthetic SysV init script fixture
+echo muster

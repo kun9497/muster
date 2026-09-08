@@ -1388,6 +1388,60 @@ func TestMaskedProcfsIsUnsupportedNotAbsent(t *testing.T) {
 
 // --- files --------------------------------------------------------------
 
+// startup_scripts lists SysV init scripts and systemd unit files with mode
+// and is_symlink. An enabled-unit symlink (Stat returns ErrSymlink) is
+// is_symlink:true so U-17 can filter it with `where is_symlink eq false`; a
+// world-writable regular init script is other_writable:true so U-17 fails it.
+func TestFilesStartupScripts(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{"/etc/init.d/muster": "initd_script", "/etc/systemd/system/muster.service": "systemd_unit", "/etc/group": "group"},
+		stats: map[string]statResult{
+			"/etc/init.d/muster":                 {mode: 0o755, uid: 0, gid: 0, kind: "regular"},
+			"/etc/systemd/system/muster.service": {mode: 0o644, uid: 0, gid: 0, kind: "regular"},
+		},
+		fails: map[string]error{"/etc/systemd/system/multi-user.target.wants/muster.service": collect.ErrSymlink},
+	}
+	// the wants-symlink is discoverable via Glob of /etc/systemd/system/*/*
+	a.files["/etc/systemd/system/multi-user.target.wants/muster.service"] = "" // present for Glob
+	rows := okList(t, build(t, "files", a), "files.startup_scripts")
+	byPath := map[string]map[string]any{}
+	for _, r := range rows {
+		m := r.(map[string]any)
+		byPath[m["path"].(string)] = m
+	}
+	if byPath["/etc/init.d/muster"]["other_writable"] != false || byPath["/etc/init.d/muster"]["is_symlink"] != false {
+		t.Errorf("regular init script %v", byPath["/etc/init.d/muster"])
+	}
+	if byPath["/etc/systemd/system/multi-user.target.wants/muster.service"]["is_symlink"] != true {
+		t.Errorf("an enabled-unit symlink must be is_symlink:true: %v", byPath["/etc/systemd/system/multi-user.target.wants/muster.service"])
+	}
+}
+
+// syslog config rows are recorded; a world-writable rsyslog.conf is flagged.
+func TestFilesSyslogConfigs(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{"/etc/rsyslog.conf": "rsyslog_conf", "/etc/group": "group"},
+		stats: map[string]statResult{"/etc/rsyslog.conf": {mode: 0o646, uid: 0, kind: "regular"}},
+	}
+	rows := okList(t, build(t, "files", a), "files.syslog_configs")
+	if len(rows) != 1 || rows[0].(map[string]any)["other_writable"] != true {
+		t.Fatalf("syslog rows %v", rows)
+	}
+}
+
+// inetd/xinetd are absent on a stock host: the fixed leaves are absent, the
+// fragment list an ok empty list.
+func TestFilesInetdAbsent(t *testing.T) {
+	a := &fsAccess{files: map[string]string{"/etc/group": "group"}}
+	b := build(t, "files", a)
+	if e := env(t, b, "files.etc_inetd_conf.mode"); e.Status != facts.StatusAbsent {
+		t.Errorf("absent inetd.conf → absent leaf: %+v", e)
+	}
+	if l := okList(t, b, "files.xinetd_d"); len(l) != 0 {
+		t.Errorf("no xinetd.d fragments → ok empty list, got %v", l)
+	}
+}
+
 func TestFilesPasswdPermissionFacts(t *testing.T) {
 	a := &fsAccess{files: map[string]string{"/etc/passwd": "passwd"}}
 	b := build(t, "files", a)

@@ -1,0 +1,6 @@
+# synthetic xinetd fragment fixture
+service echo
+{
+    disable = yes
+    type = INTERNAL
+}
