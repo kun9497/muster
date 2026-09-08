@@ -1,0 +1,22 @@
+id: muster.file.startup_script_permissions
+title_en: System startup scripts are not writable by group or others
+title_ko: 시스템 시작 스크립트가 그룹·기타 사용자에게 쓰기 불가능하다
+description_en: Every SysV init script and systemd unit file under the startup directories must be owned by root and not group- or world-writable, so no other user can alter what runs at boot. Enabled-unit symlinks are not judged (their target is judged where it lives); a startup file muster could not stat is reported. A world-writable startup script is a direct root-code-execution path.
+description_ko: 시작 디렉터리 아래의 모든 SysV init 스크립트와 systemd 유닛 파일은 root 소유여야 하고 그룹·전체 쓰기가 가능하면 안 되어, 다른 사용자가 부팅 시 실행되는 것을 바꿀 수 없어야 합니다. 활성화된 유닛 심볼릭 링크는 판정하지 않으며(대상 파일은 그 위치에서 판정), stat 할 수 없었던 시작 파일은 보고합니다. 전체 쓰기 가능한 시작 스크립트는 곧바로 root 코드 실행 경로가 됩니다.
+category: file
+importance: 상
+automation: auto
+references:
+  kisa: { "2026": ["U-17"], "2021": ["U-14"] }
+requires_facts: ">=1"
+absent_means: manual
+checks:
+  - { fact: files.startup_scripts, op: each, subject: path, where: { field: is_symlink, op: eq, expected: false }, require: { field: group_writable, op: eq, expected: false } }
+  - { fact: files.startup_scripts, op: each, subject: path, where: { field: is_symlink, op: eq, expected: false }, require: { field: other_writable, op: eq, expected: false } }
+  - { fact: files.startup_scripts, op: none, where: { field: reason, op: present } }
+  - { fact: files.startup_dirs, op: none, where: { field: other_writable, op: eq, expected: true } }
+remediation:
+  text_en: chmod go-w each group- or world-writable startup script and its directory, and chown them to root; investigate any startup file that could not be read.
+  text_ko: 그룹·전체 쓰기 가능한 시작 스크립트와 그 디렉터리에 chmod go-w 를 적용하고 root 로 chown 하며, 읽을 수 없었던 시작 파일은 조사합니다.
+  risk: none
+  idempotent: true

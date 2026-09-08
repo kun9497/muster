@@ -1,0 +1,1 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{"files":{"etc_inetd_conf":{"mode":{"status":"ok","value":420,"source":{"kind":"file","path":"/etc/inetd.conf"}},"group_writable":{"status":"ok","value":false},"other_readable":{"status":"ok","value":true}},"etc_xinetd_conf":{"mode":{"status":"absent"},"uid":{"status":"absent"}},"xinetd_d":{"status":"ok","value":[]}}}}

@@ -32,7 +32,21 @@
            "home_dirs":{"status":"ok","value":[
              {"user":"root","uid":0,"home":"/root","interactive":true,"stat_status":"ok","is_dir":true,"owner_matches":true,"group_writable":false,"other_writable":false,"on_remote_fs":false,"mode":448,"owner_uid":0},
              {"user":"alice","uid":1000,"home":"/home/alice","interactive":true,"stat_status":"ok","is_dir":true,"owner_matches":true,"group_writable":false,"other_writable":false,"on_remote_fs":false,"mode":448,"owner_uid":1000}
-           ]}},
+           ]},
+           "startup_scripts":{"status":"ok","value":[
+             {"path":"/etc/systemd/system/sshd.service","mode":420,"uid":0,"gid":0,"group":"root","group_writable":false,"other_writable":false,"is_symlink":false},
+             {"path":"/etc/systemd/system/multi-user.target.wants/sshd.service","mode":-1,"uid":-1,"gid":-1,"group":"","group_writable":false,"other_writable":false,"is_symlink":true}
+           ]},
+           "startup_dirs":{"status":"ok","value":[
+             {"path":"/etc/systemd/system","mode":493,"uid":0,"gid":0,"group":"root","group_writable":false,"other_writable":false,"is_symlink":false}
+           ]},
+           "syslog_configs":{"status":"ok","value":[
+             {"path":"/etc/rsyslog.conf","mode":416,"uid":0,"gid":0,"group":"adm","group_writable":false,"other_writable":false,"is_symlink":false}
+           ]},
+           "journald_configs":{"status":"ok","value":[]},
+           "etc_inetd_conf":{"mode":{"status":"absent"},"group_writable":{"status":"absent"},"other_readable":{"status":"absent"}},
+           "etc_xinetd_conf":{"mode":{"status":"absent"},"uid":{"status":"absent"}},
+           "xinetd_d":{"status":"ok","value":[]}},
   "env":{"shell":{"tmout":{"status":"ok","value":600},"tmout_exported":{"status":"ok","value":true},
                   "root_path_raw":{"status":"ok","value":"/usr/sbin:/usr/bin","source":{"kind":"file","path":"/etc/profile","line":5,"raw":"PATH=/usr/sbin:/usr/bin"}},
                   "root_path_entries":{"status":"ok","value":[

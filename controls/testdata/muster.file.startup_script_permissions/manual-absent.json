@@ -1,0 +1,1 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{"files":{"startup_scripts":{"status":"absent","reason":"the files collector did not run"},"startup_dirs":{"status":"absent","reason":"the files collector did not run"}}}}

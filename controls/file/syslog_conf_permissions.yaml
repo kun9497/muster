@@ -1,0 +1,26 @@
+id: muster.file.syslog_conf_permissions
+title_en: The syslog configuration is 0640 or stricter and owned by root
+title_ko: syslog 설정이 0640 이하로 엄격하며 root 소유이다
+description_en: The rsyslog/syslog-ng and systemd-journald configuration files must be mode 0640 or stricter and owned by root, so no other user can read or redirect the logging pipeline. Both distribution families ship /etc/rsyslog.conf at 0644, so a stock host fails this by the guide's 0640 criterion until an operator tightens it (params.allowed_modes relaxes the threshold where local policy differs).
+description_ko: rsyslog/syslog-ng 와 systemd-journald 설정 파일은 mode 0640 이하로 엄격하고 root 소유여야, 다른 사용자가 로깅 파이프라인을 읽거나 바꿀 수 없습니다. 두 배포판 계열 모두 /etc/rsyslog.conf 를 0644 로 배포하므로, 운영자가 조일 때까지 가이드의 0640 기준으로는 기본 설치가 실패합니다(로컬 정책이 다르면 params.allowed_modes 로 기준을 완화).
+category: file
+importance: 상
+automation: auto
+references:
+  kisa: { "2026": ["U-21"], "2021": ["U-11"] }
+requires_facts: ">=1"
+absent_means: manual
+params:
+  allowed_modes: { type: list<int>, default: [0, 32, 128, 160, 256, 288, 384, 416], description: syslog config modes at 0640 or stricter (bit-subsets of 0640) }
+checks:
+  - { fact: files.syslog_configs, op: each, subject: path, where: { field: mode, op: ne, expected: -1 }, require: { field: mode, op: in, expected: "${allowed_modes}" } }
+  - { fact: files.syslog_configs, op: each, subject: path, where: { field: mode, op: ne, expected: -1 }, require: { field: uid, op: eq, expected: 0 } }
+  - { fact: files.syslog_configs, op: none, where: { field: reason, op: present } }
+  - { fact: files.journald_configs, op: each, subject: path, where: { field: mode, op: ne, expected: -1 }, require: { field: mode, op: in, expected: "${allowed_modes}" } }
+  - { fact: files.journald_configs, op: each, subject: path, where: { field: mode, op: ne, expected: -1 }, require: { field: uid, op: eq, expected: 0 } }
+  - { fact: files.journald_configs, op: none, where: { field: reason, op: present } }
+remediation:
+  text_en: chmod 0640 /etc/rsyslog.conf and the files under /etc/rsyslog.d, and chown them to root; investigate any config that could not be read.
+  text_ko: /etc/rsyslog.conf 와 /etc/rsyslog.d 아래 파일에 chmod 0640 을 적용하고 root 로 chown 하며, 읽을 수 없었던 설정은 조사합니다.
+  risk: none
+  idempotent: true
