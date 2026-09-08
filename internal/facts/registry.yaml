@@ -1412,3 +1412,54 @@ keys:
     sensitivity: public
     collector: cron
     subject_kind: unit
+  - key: firewall.backend
+    type: string
+    description: The detected firewall backend (firewalld, ufw, nftables, iptables or none); unsupported/denied when the kernel ruleset could not be read.
+    since: 1
+    sensitivity: public
+    collector: firewall
+  - key: firewall.enabled
+    type: setting<bool>
+    description: Whether a host firewall is on - runtime from a non-empty kernel ruleset, persisted from the backend configuration on disk.
+    since: 1
+    sensitivity: public
+    collector: firewall
+    default_on: both
+  - key: firewall.default_policy.input
+    type: setting<string>
+    description: The default policy of the INPUT hook (accept/drop) - runtime from the base-chain policy, persisted from the backend configuration.
+    since: 1
+    sensitivity: public
+    collector: firewall
+    default_on: both
+  - key: firewall.default_policy.forward
+    type: setting<string>
+    description: The default policy of the FORWARD hook (accept/drop) - runtime from the base-chain policy, persisted from the backend configuration.
+    since: 1
+    sensitivity: public
+    collector: firewall
+    default_on: both
+  - key: firewall.restricts_inbound
+    type: bool
+    description: Whether the ruleset restricts inbound traffic by default (derived by normalisation); absent until the normaliser lands, and whenever a captured dump was truncated.
+    since: 1
+    sensitivity: public
+    collector: firewall
+  - key: firewall.normalization_confidence
+    type: string
+    description: Confidence in the normalised inbound judgement - none, partial (a dump was truncated) or full.
+    since: 1
+    sensitivity: public
+    collector: firewall
+  - key: firewall.rules
+    type: list<record>
+    description: The normalised inbound-affecting rules, each with chain, action, protocol, dport (a string, since ports may be ranges or sets) and source; empty until the normaliser lands.
+    since: 1
+    sensitivity: internal
+    collector: firewall
+  - key: firewall.raw_dumps
+    type: list<record>
+    description: The captured kernel ruleset dumps, each with source (the command), content (capped at 64 KiB) and truncated; the raw evidence the normaliser parses.
+    since: 1
+    sensitivity: internal
+    collector: firewall

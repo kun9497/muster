@@ -2480,6 +2480,86 @@
       "Collector": "cron",
       "DefaultOn": "",
       "SubjectKind": "unit"
+    },
+    {
+      "Key": "firewall.backend",
+      "Type": "string",
+      "Description": "The detected firewall backend (firewalld, ufw, nftables, iptables or none); unsupported/denied when the kernel ruleset could not be read.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "firewall",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "firewall.enabled",
+      "Type": "setting\u003cbool\u003e",
+      "Description": "Whether a host firewall is on - runtime from a non-empty kernel ruleset, persisted from the backend configuration on disk.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "firewall",
+      "DefaultOn": "both",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "firewall.default_policy.input",
+      "Type": "setting\u003cstring\u003e",
+      "Description": "The default policy of the INPUT hook (accept/drop) - runtime from the base-chain policy, persisted from the backend configuration.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "firewall",
+      "DefaultOn": "both",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "firewall.default_policy.forward",
+      "Type": "setting\u003cstring\u003e",
+      "Description": "The default policy of the FORWARD hook (accept/drop) - runtime from the base-chain policy, persisted from the backend configuration.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "firewall",
+      "DefaultOn": "both",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "firewall.restricts_inbound",
+      "Type": "bool",
+      "Description": "Whether the ruleset restricts inbound traffic by default (derived by normalisation); absent until the normaliser lands, and whenever a captured dump was truncated.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "firewall",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "firewall.normalization_confidence",
+      "Type": "string",
+      "Description": "Confidence in the normalised inbound judgement - none, partial (a dump was truncated) or full.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "firewall",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "firewall.rules",
+      "Type": "list\u003crecord\u003e",
+      "Description": "The normalised inbound-affecting rules, each with chain, action, protocol, dport (a string, since ports may be ranges or sets) and source; empty until the normaliser lands.",
+      "Since": 1,
+      "Sensitivity": "internal",
+      "Collector": "firewall",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "firewall.raw_dumps",
+      "Type": "list\u003crecord\u003e",
+      "Description": "The captured kernel ruleset dumps, each with source (the command), content (capped at 64 KiB) and truncated; the raw evidence the normaliser parses.",
+      "Since": 1,
+      "Sensitivity": "internal",
+      "Collector": "firewall",
+      "DefaultOn": "",
+      "SubjectKind": ""
     }
   ]
 }
