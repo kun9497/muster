@@ -1,0 +1,11 @@
+table inet filter {
+	chain input {
+		type filter hook input priority filter; policy accept;
+	}
+}
+table netdev filter {
+	chain ingress {
+		type filter hook ingress device "eth0" priority -500; policy accept;
+		ip saddr @blocklist drop
+	}
+}

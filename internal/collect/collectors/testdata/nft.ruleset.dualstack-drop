@@ -1,0 +1,13 @@
+table ip filter {
+	chain input {
+		type filter hook input priority filter; policy drop;
+		iif "lo" accept
+		tcp dport 22 accept
+	}
+}
+table ip6 filter {
+	chain input {
+		type filter hook input priority filter; policy drop;
+		ip6 saddr fe80::/10 accept
+	}
+}

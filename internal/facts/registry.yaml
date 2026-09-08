@@ -999,6 +999,24 @@ keys:
     sensitivity: public
     collector: files
     subject_kind: file
+  - key: files.etc_hosts_allow_lines
+    type: list<string>
+    description: Non-comment lines of /etc/hosts.allow; an OK empty list when the file does not exist.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_hosts_deny_lines
+    type: list<string>
+    description: Non-comment lines of /etc/hosts.deny; an OK empty list when the file does not exist.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_hosts_deny_all
+    type: bool
+    description: Whether /etc/hosts.deny contains an "ALL:ALL" daemon-to-client deny rule; an OK false when the file does not exist, since a host with no tcp_wrappers deny file is not restricted by it.
+    since: 1
+    sensitivity: public
+    collector: files
   - key: sudo.installed
     type: bool
     description: Whether /etc/sudoers exists (sudo is configured on the host).
@@ -1412,3 +1430,54 @@ keys:
     sensitivity: public
     collector: cron
     subject_kind: unit
+  - key: firewall.backend
+    type: string
+    description: The detected firewall backend (firewalld, ufw, nftables, iptables or none); unsupported/denied when the kernel ruleset could not be read.
+    since: 1
+    sensitivity: public
+    collector: firewall
+  - key: firewall.enabled
+    type: setting<bool>
+    description: Whether a host firewall is on - runtime from a non-empty kernel ruleset, persisted from the backend configuration on disk.
+    since: 1
+    sensitivity: public
+    collector: firewall
+    default_on: both
+  - key: firewall.default_policy.input
+    type: setting<string>
+    description: The default policy of the INPUT hook (accept/drop) - runtime from the base-chain policy, persisted from the backend configuration.
+    since: 1
+    sensitivity: public
+    collector: firewall
+    default_on: both
+  - key: firewall.default_policy.forward
+    type: setting<string>
+    description: The default policy of the FORWARD hook (accept/drop) - runtime from the base-chain policy, persisted from the backend configuration.
+    since: 1
+    sensitivity: public
+    collector: firewall
+    default_on: both
+  - key: firewall.restricts_inbound
+    type: bool
+    description: Whether the ruleset restricts inbound traffic by default (derived by normalisation); absent when confidence is below full (accept-with-rules, mixed policies, a missing policy, a non-input inbound chain with rules, or a truncated dump); the unsupported/denied envelope when the ruleset could not be read.
+    since: 1
+    sensitivity: public
+    collector: firewall
+  - key: firewall.normalization_confidence
+    type: string
+    description: Confidence in the normalised inbound judgement - full (every input filter chain is drop/reject, or every input filter chain is accept with zero rules) or partial (everything else - accept-with-rules, mixed policies, a missing policy, a non-input inbound chain with rules, or a truncated dump); the unsupported/denied envelope when the ruleset could not be read.
+    since: 1
+    sensitivity: public
+    collector: firewall
+  - key: firewall.rules
+    type: list<record>
+    description: The normalised inbound-affecting rules, each with chain, action, protocol, dport (a string, since ports may be ranges or sets) and source; the unsupported/denied envelope when the ruleset could not be read.
+    since: 1
+    sensitivity: internal
+    collector: firewall
+  - key: firewall.raw_dumps
+    type: list<record>
+    description: The captured kernel ruleset dumps, each with source (the command), content (capped at 64 KiB) and truncated; the raw evidence the normaliser parses.
+    since: 1
+    sensitivity: internal
+    collector: firewall

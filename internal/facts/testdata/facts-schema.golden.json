@@ -1812,6 +1812,36 @@
       "SubjectKind": "file"
     },
     {
+      "Key": "files.etc_hosts_allow_lines",
+      "Type": "list\u003cstring\u003e",
+      "Description": "Non-comment lines of /etc/hosts.allow; an OK empty list when the file does not exist.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_hosts_deny_lines",
+      "Type": "list\u003cstring\u003e",
+      "Description": "Non-comment lines of /etc/hosts.deny; an OK empty list when the file does not exist.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_hosts_deny_all",
+      "Type": "bool",
+      "Description": "Whether /etc/hosts.deny contains an \"ALL:ALL\" daemon-to-client deny rule; an OK false when the file does not exist, since a host with no tcp_wrappers deny file is not restricted by it.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
       "Key": "sudo.installed",
       "Type": "bool",
       "Description": "Whether /etc/sudoers exists (sudo is configured on the host).",
@@ -2480,6 +2510,86 @@
       "Collector": "cron",
       "DefaultOn": "",
       "SubjectKind": "unit"
+    },
+    {
+      "Key": "firewall.backend",
+      "Type": "string",
+      "Description": "The detected firewall backend (firewalld, ufw, nftables, iptables or none); unsupported/denied when the kernel ruleset could not be read.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "firewall",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "firewall.enabled",
+      "Type": "setting\u003cbool\u003e",
+      "Description": "Whether a host firewall is on - runtime from a non-empty kernel ruleset, persisted from the backend configuration on disk.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "firewall",
+      "DefaultOn": "both",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "firewall.default_policy.input",
+      "Type": "setting\u003cstring\u003e",
+      "Description": "The default policy of the INPUT hook (accept/drop) - runtime from the base-chain policy, persisted from the backend configuration.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "firewall",
+      "DefaultOn": "both",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "firewall.default_policy.forward",
+      "Type": "setting\u003cstring\u003e",
+      "Description": "The default policy of the FORWARD hook (accept/drop) - runtime from the base-chain policy, persisted from the backend configuration.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "firewall",
+      "DefaultOn": "both",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "firewall.restricts_inbound",
+      "Type": "bool",
+      "Description": "Whether the ruleset restricts inbound traffic by default (derived by normalisation); absent when confidence is below full (accept-with-rules, mixed policies, a missing policy, a non-input inbound chain with rules, or a truncated dump); the unsupported/denied envelope when the ruleset could not be read.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "firewall",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "firewall.normalization_confidence",
+      "Type": "string",
+      "Description": "Confidence in the normalised inbound judgement - full (every input filter chain is drop/reject, or every input filter chain is accept with zero rules) or partial (everything else - accept-with-rules, mixed policies, a missing policy, a non-input inbound chain with rules, or a truncated dump); the unsupported/denied envelope when the ruleset could not be read.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "firewall",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "firewall.rules",
+      "Type": "list\u003crecord\u003e",
+      "Description": "The normalised inbound-affecting rules, each with chain, action, protocol, dport (a string, since ports may be ranges or sets) and source; the unsupported/denied envelope when the ruleset could not be read.",
+      "Since": 1,
+      "Sensitivity": "internal",
+      "Collector": "firewall",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "firewall.raw_dumps",
+      "Type": "list\u003crecord\u003e",
+      "Description": "The captured kernel ruleset dumps, each with source (the command), content (capped at 64 KiB) and truncated; the raw evidence the normaliser parses.",
+      "Since": 1,
+      "Sensitivity": "internal",
+      "Collector": "firewall",
+      "DefaultOn": "",
+      "SubjectKind": ""
     }
   ]
 }

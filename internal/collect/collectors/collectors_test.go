@@ -2946,3 +2946,63 @@ func TestFilesHostsEquiv(t *testing.T) {
 		t.Errorf("a missing hosts.equiv must leave mode absent, got %+v", m)
 	}
 }
+
+// hosts.deny with an "ALL : ALL" daemon:client rule is detected as
+// etc_hosts_deny_all, and the comment/blank lines are excluded from both
+// line lists.
+func TestHostsDenyAllDetected(t *testing.T) {
+	a := &fsAccess{files: map[string]string{
+		"/etc/hosts.deny":  "hosts_deny_all",
+		"/etc/hosts.allow": "hosts_allow",
+	}}
+	b := build(t, "files", a)
+	if e := env(t, b, "files.etc_hosts_deny_all"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("deny_all: %+v", e)
+	}
+	lines := okList(t, b, "files.etc_hosts_deny_lines")
+	if len(lines) != 1 || lines[0] != "ALL: ALL" {
+		t.Errorf("deny_lines: %v", lines)
+	}
+	allow := okList(t, b, "files.etc_hosts_allow_lines")
+	if len(allow) != 1 || allow[0] != "sshd: 192.0.2.0/24" {
+		t.Errorf("allow_lines: %v", allow)
+	}
+}
+
+// Neither hosts.allow nor hosts.deny configured: a host with no tcp_wrappers
+// deny file is a definite "not restricted", not an unknown — deny_all is an
+// OK false (never absent, which absent_means could excuse), and both line
+// lists are an OK empty list, mirroring files.etc_hosts_equiv_lines (R177).
+func TestHostsFilesMissing(t *testing.T) {
+	a := &fsAccess{}
+	b := build(t, "files", a)
+	if e := env(t, b, "files.etc_hosts_deny_all"); e.Status != facts.StatusOK || e.Value != false {
+		t.Errorf("deny_all on missing files: %+v", e)
+	}
+	for _, k := range []string{"files.etc_hosts_deny_lines", "files.etc_hosts_allow_lines"} {
+		e := env(t, b, k)
+		if e.Status != facts.StatusOK {
+			t.Fatalf("%s: %+v", k, e)
+		}
+		if l, _ := e.Value.([]any); len(l) != 0 {
+			t.Errorf("%s: want [], got %v", k, e.Value)
+		}
+	}
+}
+
+// An existing-but-unreadable /etc/hosts.deny is a read error on all three
+// TCP-wrapper leaves (C3), never a silent false that would mis-screen U-28's
+// tcp_wrappers mechanism.
+func TestHostsDenyUnreadableIsNotSilentFalse(t *testing.T) {
+	a := &fsAccess{fails: map[string]error{"/etc/hosts.deny": os.ErrPermission}}
+	b := build(t, "files", a)
+	for _, k := range []string{"files.etc_hosts_deny_all", "files.etc_hosts_deny_lines"} {
+		if e := env(t, b, k); e.Status != facts.StatusDenied {
+			t.Errorf("%s must be denied, not a quiet value: %+v", k, e)
+		}
+	}
+	// hosts.allow is read independently and is unaffected.
+	if e := env(t, b, "files.etc_hosts_allow_lines"); e.Status != facts.StatusOK {
+		t.Errorf("etc_hosts_allow_lines should be unaffected: %+v", e)
+	}
+}

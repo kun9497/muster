@@ -40,6 +40,7 @@ func init() {
 	collect.Register(cronCollector)
 	collect.Register(accountsCollector)
 	collect.Register(pamCollector)
+	collect.Register(firewallCollector)
 	collect.Register(walkCollector)
 }
 

@@ -42,6 +42,12 @@ description = "an RFC 1918 address in tracked files (10/8, 172.16/12, 192.168/16
 regex = '''\b(?:10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3})\b'''
 [rules.allowlist]
 paths = ['''^\.superpowers[/\\]''']
+# The three RFC 1918 block network addresses (as in "10.0.0.0/8") are
+# documentation identifiers that can never name a host, so a synthetic
+# firewall or TCP-wrapper fixture may spell them. The allowlist names the exact
+# literal, not a path: a real host address such as 10.1.2.3 still trips the rule
+# everywhere. New fixtures should prefer the RFC 5737 documentation ranges.
+regexes = ['''^(?:10\.0\.0\.0|172\.16\.0\.0|192\.168\.0\.0)$''']
 
 [[rules]]
 id = "non-personal-email"

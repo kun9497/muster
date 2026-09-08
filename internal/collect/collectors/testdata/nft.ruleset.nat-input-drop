@@ -1,0 +1,11 @@
+table ip filter {
+	chain input {
+		type filter hook input priority filter; policy drop;
+		iif "lo" accept
+	}
+}
+table ip nat {
+	chain INPUT {
+		type nat hook input priority 100; policy accept;
+	}
+}

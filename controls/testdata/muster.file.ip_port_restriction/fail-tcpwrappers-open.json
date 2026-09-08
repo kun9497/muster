@@ -1,0 +1,1 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{"firewall":{"backend":{"status":"ok","value":"none"},"restricts_inbound":{"status":"ok","value":false}},"files":{"etc_hosts_deny_all":{"status":"ok","value":false}}}}

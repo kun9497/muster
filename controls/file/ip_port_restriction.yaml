@@ -1,0 +1,30 @@
+id: muster.file.ip_port_restriction
+title_en: Inbound access is restricted by IP and port
+title_ko: 접속 IP 및 포트가 제한되어 있다
+description_en: "The host restricts inbound access — a default-deny host firewall (nftables, iptables, ufw or firewalld) or a TCP-wrapper \"ALL: ALL\" deny in /etc/hosts.deny. tcp_wrappers only restricts daemons linked against libwrap; RHEL 8+ ships no libwrap, so an /etc/hosts.deny rule is inert there. When the firewall ruleset cannot be normalised with confidence the result is MANUAL with a pointer to firewall.raw_dumps in the snapshot, never a guessed pass or fail."
+description_ko: "호스트가 인바운드 접속을 제한한다 — 기본 차단(default-deny) 호스트 방화벽(nftables/iptables/ufw/firewalld) 또는 /etc/hosts.deny 의 \"ALL: ALL\" 차단. tcp_wrappers 는 libwrap 에 링크된 데몬만 제한하며, RHEL 8 이상은 libwrap 를 제공하지 않아 그 환경에서 /etc/hosts.deny 규칙은 동작하지 않는다. 방화벽 규칙을 신뢰도 있게 정규화할 수 없으면 스냅샷의 firewall.raw_dumps 를 가리키는 MANUAL 로 처리하며, 통과/실패를 추정하지 않는다."
+category: file
+importance: 상
+automation: auto
+references:
+  kisa: { "2026": ["U-28"], "2021": ["U-18"] }
+requires_facts: ">=1"
+absent_means: manual
+applies_when:
+  - { fact: firewall.backend, op: present }
+mechanisms:
+  # tcp_wrappers: a hosts.deny "ALL: ALL" satisfies U-28 regardless of the firewall backend
+  - when:   [{ fact: files.etc_hosts_deny_all, op: eq, expected: true }]
+    checks: [{ fact: files.etc_hosts_deny_all, op: eq, expected: true }]
+  # firewall: a host firewall backend is judged on its inbound restriction
+  - when:   [{ fact: firewall.backend, op: in, expected: [nftables, iptables, ufw, firewalld] }]
+    checks: [{ fact: firewall.restricts_inbound, op: eq, expected: true }]
+  # neither: no firewall backend and no tcp_wrappers deny-all → unrestricted
+  - when:   [{ fact: firewall.backend, op: eq, expected: none }]
+    checks: [{ fact: files.etc_hosts_deny_all, op: eq, expected: true }]
+remediation:
+  text_en: "Enable a host firewall with a default-deny inbound policy (ufw default deny incoming; firewalld default zone target DROP; or an nftables/iptables INPUT policy of drop with explicit allow rules), or deny by default in /etc/hosts.deny (ALL: ALL) and allow only required sources in /etc/hosts.allow."
+  text_ko: "기본 차단 인바운드 정책의 호스트 방화벽을 설정하거나(ufw default deny incoming; firewalld 기본 zone target DROP; nftables/iptables INPUT 정책 drop + 명시적 허용 규칙), /etc/hosts.deny 에서 기본 차단(ALL: ALL) 후 /etc/hosts.allow 에 필요한 출발지만 허용합니다."
+  risk: lockout_risk
+  idempotent: false
+decision: D09
