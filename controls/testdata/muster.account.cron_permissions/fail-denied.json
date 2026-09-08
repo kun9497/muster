@@ -1,0 +1,8 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{"cron":{
+  "files":{"status":"ok","value":[
+    {"path":"/etc/cron.d/nightly","scope":"system","user":"","mode":-1,"uid":-1,"gid":-1,"group":"","owner_ok":false,"group_writable":false,"other_writable":false,"reason":"stat /etc/cron.d/nightly: permission denied"}
+  ]},
+  "dirs":{"status":"ok","value":[
+    {"path":"/etc/cron.d","mode":493,"uid":0,"gid":0,"group":"root","group_writable":false,"other_writable":false}
+  ]}
+}}}

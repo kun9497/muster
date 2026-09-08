@@ -200,6 +200,9 @@ func TestCheckEndToEndJSONAndTable(t *testing.T) {
 		"muster.file.startup_script_permissions": "PASS",
 		"muster.file.syslog_conf_permissions":    "PASS",
 		"muster.file.inetd_conf_permissions":     "PASS",
+		"muster.account.cron_permissions":        "PASS",
+		"muster.account.sudoers_permissions":     "PASS",
+		"muster.file.log_dir_permissions":        "PASS",
 	})
 
 	var table bytes.Buffer
@@ -249,6 +252,9 @@ func TestCheckEndToEndJSONAndTable(t *testing.T) {
 		"muster.file.startup_script_permissions": "PASS",
 		"muster.file.syslog_conf_permissions":    "PASS",
 		"muster.file.inetd_conf_permissions":     "PASS",
+		"muster.account.cron_permissions":        "PASS",
+		"muster.account.sudoers_permissions":     "PASS",
+		"muster.file.log_dir_permissions":        "PASS",
 	})
 
 	// R26: every run() call's exit code is asserted, including --quiet's,

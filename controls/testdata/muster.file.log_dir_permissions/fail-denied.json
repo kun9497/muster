@@ -1,0 +1,8 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{"files":{
+  "log_dirs":{"status":"ok","value":[
+    {"path":"/var/log","mode":493,"uid":0,"gid":0,"group":"root","group_writable":false,"other_writable":false}
+  ]},
+  "log_files":{"status":"ok","value":[
+    {"path":"/var/log/secure","mode":-1,"uid":-1,"gid":-1,"group":"","group_writable":false,"other_writable":false,"reason":"stat /var/log/secure: permission denied"}
+  ]}
+}}}

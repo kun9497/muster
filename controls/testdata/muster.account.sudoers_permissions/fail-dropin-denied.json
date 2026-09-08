@@ -1,0 +1,9 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "sudo":{"installed":{"status":"ok","value":true}},
+  "files":{
+    "etc_sudoers":{"mode":{"status":"ok","value":288},"uid":{"status":"ok","value":0}},
+    "sudoers_d_entries":{"status":"ok","value":[
+      {"path":"/etc/sudoers.d/99-local","mode":-1,"uid":-1,"gid":-1,"group":"","group_writable":false,"other_writable":false,"is_symlink":false,"ignored":false,"reason":"stat /etc/sudoers.d/99-local: permission denied"}
+    ]}
+  }
+}}

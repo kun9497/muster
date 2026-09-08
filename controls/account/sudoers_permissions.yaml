@@ -1,0 +1,28 @@
+id: muster.account.sudoers_permissions
+title_en: sudoers and its drop-ins are 0440 and owned by root
+title_ko: sudoers 와 드롭인이 0440 이며 root 소유이다
+description_en: /etc/sudoers must be mode 0440 or stricter and owned by root, and every non-ignored file under /etc/sudoers.d must not be group- or world-writable, so no other user can grant themselves sudo. A drop-in sudo skips (a name ending in ~ or containing a dot) is not judged. The control applies only where sudo is installed; the effective secure_path is collected as evidence but not judged here.
+description_ko: /etc/sudoers 는 mode 0440 이하로 엄격하고 root 소유여야 하며, /etc/sudoers.d 아래 무시되지 않는 모든 파일은 그룹·전체 쓰기가 가능하면 안 되어, 다른 사용자가 스스로 sudo 를 부여할 수 없어야 합니다. sudo 가 건너뛰는 드롭인(이름이 ~ 로 끝나거나 점을 포함)은 판정하지 않습니다. 이 컨트롤은 sudo 가 설치된 곳에만 적용하며, 유효 secure_path 는 근거로 수집하되 여기서 판정하지 않습니다.
+category: account
+importance: 중
+automation: auto
+references:
+  kisa: { "2026": ["U-63"], "2021": [] }
+  nist_800_53: ["CM-6"]
+requires_facts: ">=1"
+applies_when:
+  - { fact: sudo.installed, op: eq, expected: true }
+absent_means: manual
+params:
+  allowed_modes: { type: list<int>, default: [0, 32, 256, 288], description: sudoers modes at 0440 or stricter (bit-subsets of 0440) }
+checks:
+  - { fact: files.etc_sudoers.mode, op: in, expected: "${allowed_modes}" }
+  - { fact: files.etc_sudoers.uid, op: eq, expected: 0 }
+  - { fact: files.sudoers_d_entries, op: each, subject: path, where: { field: ignored, op: eq, expected: false }, require: { field: other_writable, op: eq, expected: false } }
+  - { fact: files.sudoers_d_entries, op: each, subject: path, where: { field: ignored, op: eq, expected: false }, require: { field: group_writable, op: eq, expected: false } }
+  - { fact: files.sudoers_d_entries, op: none, where: { field: reason, op: present } }
+remediation:
+  text_en: chmod 0440 /etc/sudoers and chown it to root; chmod go-w each active file under /etc/sudoers.d.
+  text_ko: /etc/sudoers 에 chmod 0440 을 적용하고 root 로 chown 하며, /etc/sudoers.d 아래 활성 파일에 chmod go-w 를 적용합니다.
+  risk: none
+  idempotent: true

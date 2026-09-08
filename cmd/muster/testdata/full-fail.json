@@ -46,7 +46,27 @@
            "journald_configs":{"status":"ok","value":[]},
            "etc_inetd_conf":{"mode":{"status":"absent"},"group_writable":{"status":"absent"},"other_readable":{"status":"absent"}},
            "etc_xinetd_conf":{"mode":{"status":"absent"},"uid":{"status":"absent"}},
-           "xinetd_d":{"status":"ok","value":[]}},
+           "xinetd_d":{"status":"ok","value":[]},
+           "etc_sudoers":{"mode":{"status":"ok","value":288},"uid":{"status":"ok","value":0},"gid":{"status":"ok","value":0},"acl_present":{"status":"ok","value":false}},
+           "etc_sudoers_d":{"mode":{"status":"ok","value":493},"uid":{"status":"ok","value":0},"gid":{"status":"ok","value":0},"acl_present":{"status":"ok","value":false}},
+           "sudoers_d_entries":{"status":"ok","value":[
+             {"path":"/etc/sudoers.d/90-cloud-init-users","mode":288,"uid":0,"gid":0,"group":"root","group_writable":false,"other_writable":false,"is_symlink":false,"ignored":false}
+           ]},
+           "log_dirs":{"status":"ok","value":[
+             {"path":"/var/log","mode":493,"uid":0,"gid":0,"group":"root","group_writable":false,"other_writable":false},
+             {"path":"/var/log/journal","mode":509,"uid":0,"gid":103,"group":"adm","group_writable":true,"other_writable":false}
+           ]},
+           "log_files":{"status":"ok","value":[
+             {"path":"/var/log/syslog","mode":416,"uid":0,"gid":103,"group":"adm","group_writable":false,"other_writable":false}
+           ]}},
+  "sudo":{"installed":{"status":"ok","value":true},"includedir":{"status":"ok","value":"/etc/sudoers.d"},"secure_path":{"status":"ok","value":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"}},
+  "cron":{"files":{"status":"ok","value":[
+            {"path":"/etc/crontab","scope":"system","user":"","mode":416,"uid":0,"gid":0,"group":"root","owner_ok":true,"group_writable":false,"other_writable":false}
+          ]},
+          "dirs":{"status":"ok","value":[
+            {"path":"/etc/cron.d","mode":493,"uid":0,"gid":0,"group":"root","group_writable":false,"other_writable":false}
+          ]},
+          "timers":{"status":"ok","value":[]}},
   "env":{"shell":{"tmout":{"status":"ok","value":600},"tmout_exported":{"status":"ok","value":true},
                   "root_path_raw":{"status":"ok","value":"/usr/sbin:/usr/bin","source":{"kind":"file","path":"/etc/profile","line":5,"raw":"PATH=/usr/sbin:/usr/bin"}},
                   "root_path_entries":{"status":"ok","value":[
