@@ -1,0 +1,1 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{"firewall":{"backend":{"status":"unsupported","reason":"no readable kernel ruleset on this host (container/no NET_ADMIN)"},"restricts_inbound":{"status":"absent","reason":"firewall backend is unsupported; no ruleset to normalise"}}}}
