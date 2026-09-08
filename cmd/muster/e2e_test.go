@@ -44,19 +44,41 @@ func TestCheckEndToEndWaiversTurnFailIntoWaived(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read source waiver: %v", err)
 	}
+	// testdata/full-fail.json now also fails the nine 2G service controls
+	// (R230/R240: the fail fixture is the only proof of their positive path
+	// in CI, since no such daemon runs on the CI images). Waive them here too
+	// so this test keeps exercising only what it is named for: one FAIL
+	// (root_remote_login) turning into WAIVED, not a pile of unrelated ones.
+	extraWaivers := "\n"
+	for _, id := range []string{
+		"muster.service.finger_disabled",
+		"muster.service.rservices_disabled",
+		"muster.service.dos_services_disabled",
+		"muster.service.nfs_server_disabled",
+		"muster.service.automount_disabled",
+		"muster.service.rpcbind_disabled",
+		"muster.service.nis_disabled",
+		"muster.service.tftp_talk_disabled",
+		"muster.service.snmp_disabled",
+	} {
+		extraWaivers += "  - control: " + id + "\n" +
+			"    reason: synthetic 2G service fixture waived so this test isolates the root_remote_login waiver path\n" +
+			"    expires: 2099-12-31\n"
+	}
 	tmpWaiver := filepath.Join(tmpDir, "waivers.yaml")
-	if err := os.WriteFile(tmpWaiver, waiverSrc, 0o600); err != nil {
+	if err := os.WriteFile(tmpWaiver, append(waiverSrc, extraWaivers...), 0o600); err != nil {
 		t.Fatalf("write temp waiver: %v", err)
 	}
 
 	var out, errb bytes.Buffer
 	code := run([]string{"check", "--facts", "testdata/full-fail.json", "--waivers", tmpWaiver, "--format", "json"}, &out, &errb)
 	if code != exitOK {
-		t.Fatalf("exit %d, want 0 once the only FAIL is waived; stderr %q", code, errb.String())
+		t.Fatalf("exit %d, want 0 once every FAIL is waived; stderr %q", code, errb.String())
 	}
 	assertStatuses(t, out.Bytes(), map[string]string{
 		"muster.account.root_remote_login": "WAIVED",
 		"muster.account.password_policy":   "PASS",
+		"muster.service.finger_disabled":   "WAIVED",
 	})
 	var rep struct {
 		Check struct {
@@ -76,14 +98,14 @@ func TestCheckEndToEndWaiversTurnFailIntoWaived(t *testing.T) {
 	if err := json.Unmarshal(out.Bytes(), &rep); err != nil {
 		t.Fatal(err)
 	}
-	if rep.Check.Waivers.Applied != 1 || rep.Check.Waivers.Unknown != 1 {
-		t.Errorf("waiver tally applied=%d unknown=%d, want 1 and 1", rep.Check.Waivers.Applied, rep.Check.Waivers.Unknown)
+	if rep.Check.Waivers.Applied != 10 || rep.Check.Waivers.Unknown != 1 {
+		t.Errorf("waiver tally applied=%d unknown=%d, want 10 and 1", rep.Check.Waivers.Applied, rep.Check.Waivers.Unknown)
 	}
 	if rep.Check.Waivers.Path == "" || !strings.HasPrefix(rep.Check.Waivers.Digest, "sha256:") {
 		t.Errorf("the result must name the waiver file and its digest: %+v", rep.Check.Waivers)
 	}
-	if rep.Summary.Undecidable.Waived != 1 {
-		t.Errorf("summary must count the waived control: %d", rep.Summary.Undecidable.Waived)
+	if rep.Summary.Undecidable.Waived != 10 {
+		t.Errorf("summary must count the waived controls: %d", rep.Summary.Undecidable.Waived)
 	}
 	// The unknown-control warning is on stderr, never on stdout (spec §7.4).
 	if !strings.Contains(errb.String(), "unknown control") {
@@ -164,7 +186,7 @@ func TestCheckEndToEndJSONAndTable(t *testing.T) {
 	if _, declared := params["muster.service.telnet_disabled"]; declared {
 		t.Errorf("only controls that declare params belong in check.params: %v", params)
 	}
-	// R26: full-pass.json must produce exactly the thirty-five embedded
+	// R26: full-pass.json must produce exactly the forty-four embedded
 	// controls' documented statuses, not merely "some PASS rows appear
 	// somewhere in the output".
 	assertStatuses(t, out1.Bytes(), map[string]string{
@@ -203,6 +225,15 @@ func TestCheckEndToEndJSONAndTable(t *testing.T) {
 		"muster.account.cron_permissions":        "PASS",
 		"muster.account.sudoers_permissions":     "PASS",
 		"muster.file.log_dir_permissions":        "PASS",
+		"muster.service.finger_disabled":         "PASS",
+		"muster.service.rservices_disabled":      "PASS",
+		"muster.service.dos_services_disabled":   "PASS",
+		"muster.service.nfs_server_disabled":     "PASS",
+		"muster.service.automount_disabled":      "PASS",
+		"muster.service.rpcbind_disabled":        "PASS",
+		"muster.service.nis_disabled":            "PASS",
+		"muster.service.tftp_talk_disabled":      "PASS",
+		"muster.service.snmp_disabled":           "PASS",
 	})
 
 	var table bytes.Buffer
@@ -214,7 +245,7 @@ func TestCheckEndToEndJSONAndTable(t *testing.T) {
 	}
 
 	// R26: full-fail.json flips only root_remote_login to FAIL; the other
-	// thirty-four controls are unchanged from full-pass.json.
+	// forty-three controls are unchanged from full-pass.json.
 	var failJSON bytes.Buffer
 	if code := run([]string{"check", "--facts", "testdata/full-fail.json", "--format", "json"}, &failJSON, &errb); code != exitFindings {
 		t.Fatalf("exit %d, want 1 for a FAIL; stderr %q", code, errb.String())
@@ -255,6 +286,15 @@ func TestCheckEndToEndJSONAndTable(t *testing.T) {
 		"muster.account.cron_permissions":        "PASS",
 		"muster.account.sudoers_permissions":     "PASS",
 		"muster.file.log_dir_permissions":        "PASS",
+		"muster.service.finger_disabled":         "FAIL",
+		"muster.service.rservices_disabled":      "FAIL",
+		"muster.service.dos_services_disabled":   "FAIL",
+		"muster.service.nfs_server_disabled":     "FAIL",
+		"muster.service.automount_disabled":      "FAIL",
+		"muster.service.rpcbind_disabled":        "FAIL",
+		"muster.service.nis_disabled":            "FAIL",
+		"muster.service.tftp_talk_disabled":      "FAIL",
+		"muster.service.snmp_disabled":           "FAIL",
 	})
 
 	// R26: every run() call's exit code is asserted, including --quiet's,

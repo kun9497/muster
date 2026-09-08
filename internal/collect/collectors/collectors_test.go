@@ -1684,14 +1684,21 @@ func showLine(unit string) string {
 }
 
 // allUnitsNotFound cans a systemd that answers, and says every unit this
-// collector asks about is unknown to it.
+// collector asks about is unknown to it. It is built from the services table
+// so a unit added there turns into a "not-found" answer here rather than an
+// unmapped-command error that would fail every existing services test.
 func allUnitsNotFound() map[string]cmdResult {
 	out := map[string]cmdResult{}
-	for _, u := range []string{
-		"ssh.service", "sshd.service", "ssh.socket",
-		"telnet.socket", "telnet.service", "telnetd.service",
-		"inetd.service", "xinetd.service",
-	} {
+	for _, svc := range services {
+		for _, u := range svc.units {
+			out[showLine(u.name)] = cmdResult{file: "systemctl.notfound"}
+		}
+	}
+	// R243: the super-server host units are probed once per run too; without
+	// canned not-found answers they would return an unmapped-command error and
+	// register as a host-probe failure, so map them here alongside the table
+	// units.
+	for _, u := range superServerHostUnits {
 		out[showLine(u)] = cmdResult{file: "systemctl.notfound"}
 	}
 	return out
@@ -1750,14 +1757,17 @@ func TestServicesSshInstalledButInactive(t *testing.T) {
 	}
 }
 
-func TestServicesSshActiveIsAbsentWhenNoUnitIsLoaded(t *testing.T) {
+// R224: a complete sweep that found no unit publishes ok:false on the judged
+// leaves, never absent — an absent leaf would short-circuit a multi-fact
+// control through absent_means before its clauses ran (spec §6.5 step 8).
+func TestServicesSshActiveIsOkFalseWhenNoUnitIsLoaded(t *testing.T) {
 	a := servicesAccess(map[string]string{"/proc/self/net/tcp": "proc_net_tcp"}, allUnitsNotFound())
 	b := build(t, "services", a)
 	if env(t, b, "services.ssh.installed").Value != false {
 		t.Errorf("installed %+v", env(t, b, "services.ssh.installed"))
 	}
-	if env(t, b, "services.ssh.active").Status != facts.StatusAbsent {
-		t.Errorf("active %+v", env(t, b, "services.ssh.active"))
+	if e := env(t, b, "services.ssh.active"); e.Status != facts.StatusOK || e.Value != false {
+		t.Errorf("active %+v, want ok:false (R224)", e)
 	}
 }
 
@@ -1931,8 +1941,10 @@ func TestServicesNegativeStillNeedsTheWholeSweep(t *testing.T) {
 	}
 }
 
-// Telnet the same way: a loaded unit proves it even though a sibling failed,
-// and the legacy files are not consulted at all.
+// Telnet the same way: a loaded unit proves it even though a sibling failed.
+// R227: the shared super-server reader runs once per sweep regardless, so this
+// no longer asserts the legacy files went unread — only that positive systemd
+// evidence stands on its own through an incomplete sweep.
 func TestServicesTelnetPositiveEvidenceSurvivesAnIncompleteSweep(t *testing.T) {
 	cmds := allUnitsNotFound()
 	cmds[showLine("telnet.socket")] = cmdResult{file: "systemctl.loaded.active"}
@@ -1945,41 +1957,283 @@ func TestServicesTelnetPositiveEvidenceSurvivesAnIncompleteSweep(t *testing.T) {
 	if e := env(t, b, "services.telnet.installed"); e.Status != facts.StatusOK || e.Value != true {
 		t.Errorf("installed %+v, want ok:true", e)
 	}
-	if slices.Contains(a.reads, "/etc/inetd.conf") {
-		t.Errorf("systemd already proved it; /etc/inetd.conf must not be read: %v", a.reads)
-	}
 }
 
-// Fix 10. Once systemd has proved telnet is installed, the legacy files
-// cannot change the answer, so they are not read at all.
-func TestServicesSkipsLegacyFilesWhenSystemdProvesTelnet(t *testing.T) {
+// R227 (ledger): the shared super-server reader now runs once per sweep for
+// every inetdNames service, so /etc/inetd.conf is read whether or not systemd
+// already proved telnet — the old "must not be read" assertion is gone. What
+// still holds is that systemd evidence DOMINATES: when a telnet unit is
+// loaded+active, telnet's judged installed/active are true regardless of what
+// the legacy files say, so a live systemd telnet and a matching inetd.conf
+// entry produce the same verdict a live systemd telnet alone would.
+func TestServicesSystemdProvenTelnetIsUnchangedByLegacyFiles(t *testing.T) {
 	cmds := allUnitsNotFound()
 	cmds[showLine("telnet.socket")] = cmdResult{file: "systemctl.loaded.active"}
-	a := servicesAccess(map[string]string{
+	withLegacy := servicesAccess(map[string]string{
 		"/proc/self/net/tcp": "proc_net_tcp",
 		"/etc/inetd.conf":    "inetd.conf.telnet",
 	}, cmds)
-	b := build(t, "services", a)
-	if e := env(t, b, "services.telnet.installed"); e.Value != true {
-		t.Errorf("%+v", e)
-	}
-	if slices.Contains(a.reads, "/etc/inetd.conf") {
-		t.Errorf("systemd already proved it; /etc/inetd.conf must not be read: %v", a.reads)
+	withoutLegacy := servicesAccess(map[string]string{
+		"/proc/self/net/tcp": "proc_net_tcp",
+	}, cmds)
+	bWith := build(t, "services", withLegacy)
+	bWithout := build(t, "services", withoutLegacy)
+	for _, leaf := range []string{"installed", "active", "enabled"} {
+		got := env(t, bWith, "services.telnet."+leaf)
+		want := env(t, bWithout, "services.telnet."+leaf)
+		if got.Status != want.Status || got.Value != want.Value {
+			t.Errorf("systemd proves telnet: .%s differs with legacy files present (%+v) vs absent (%+v)", leaf, got, want)
+		}
+		if got.Value != true {
+			t.Errorf("live systemd telnet: .%s should be true, got %+v", leaf, got)
+		}
 	}
 }
 
-// ...and it IS read when systemd did not prove it.
-func TestServicesReadsLegacyFilesWhenSystemdDidNotProveTelnet(t *testing.T) {
+// ...and when systemd did NOT prove telnet, the legacy inetd.conf entry is the
+// evidence that makes it installed (the shared reader runs and matches).
+func TestServicesLegacyFilesProveTelnetWhenSystemdDidNot(t *testing.T) {
 	a := servicesAccess(map[string]string{
 		"/proc/self/net/tcp": "proc_net_tcp",
 		"/etc/inetd.conf":    "inetd.conf.telnet",
 	}, allUnitsNotFound())
 	b := build(t, "services", a)
-	if e := env(t, b, "services.telnet.installed"); e.Value != true {
-		t.Errorf("%+v", e)
+	e := env(t, b, "services.telnet.installed")
+	if e.Value != true || e.Source == nil || e.Source.Path != "/etc/inetd.conf" || e.Source.Line != 2 {
+		t.Errorf("installed from inetd.conf %+v %+v", e, e.Source)
 	}
 	if !slices.Contains(a.reads, "/etc/inetd.conf") {
 		t.Errorf("/etc/inetd.conf should have been read: %v", a.reads)
+	}
+}
+
+func TestSuperServerReaderMatchesByNameAndServer(t *testing.T) {
+	// openbsd-inetd running+enabled; a live 'shell' entry ⇒ r-services enabled+active.
+	cmds := allUnitsNotFound()
+	cmds[showLine("openbsd-inetd.service")] = cmdResult{file: "systemctl.loaded.active"}
+	s := readSuperServers(context.Background(), servicesAccess(map[string]string{inetdConf: "inetd.conf.rsh"}, cmds))
+	installed, enabled, active, found, ev := s.match([]string{"shell", "login", "exec"}, []string{"in.rshd", "in.rlogind", "in.rexecd"})
+	if ev != nil {
+		t.Fatalf("unexpected envelope: %+v", ev)
+	}
+	if !found || !installed || !enabled || !active {
+		t.Fatalf("live shell entry, inetd running: found=%v installed=%v enabled=%v active=%v, want all true", found, installed, enabled, active)
+	}
+}
+
+// Ruling R227: an entry does not become enabled/active when its host super-server is disabled/stopped.
+func TestSuperServerEntryGatedByHostState(t *testing.T) {
+	cmds := allUnitsNotFound()
+	cmds[showLine("openbsd-inetd.service")] = cmdResult{file: "systemctl.loaded.inactive"} // installed, disabled, stopped
+	s := readSuperServers(context.Background(), servicesAccess(map[string]string{inetdConf: "inetd.conf.rsh"}, cmds))
+	installed, enabled, active, found, _ := s.match([]string{"shell"}, []string{"in.rshd"})
+	if !found || !installed {
+		t.Fatalf("entry present: found=%v installed=%v", found, installed)
+	}
+	if enabled || active {
+		t.Errorf("host inetd disabled/stopped ⇒ entry not enabled/active: enabled=%v active=%v", enabled, active)
+	}
+}
+
+func TestSuperServerReaderIgnoresCommentsAndOtherNames(t *testing.T) {
+	s := readSuperServers(context.Background(), servicesAccess(map[string]string{inetdConf: "inetd.conf.finger.commented"}, allUnitsNotFound()))
+	installed, enabled, _, found, ev := s.match([]string{"finger"}, []string{"in.fingerd"})
+	if ev != nil {
+		t.Fatal(ev)
+	}
+	if found || installed || enabled {
+		t.Fatalf("commented finger: found=%v installed=%v enabled=%v, want false", found, installed, enabled)
+	}
+}
+
+// Ruling R242: a `server_args = …` line must not overwrite the parsed server
+// basename. The block sits under a non-matching service name, so only the
+// server-basename channel (in.tftpd) can find it — which it cannot if
+// server_args clobbered cur.server with path.Base("-s").
+func TestServicesXinetdServerArgsDoesNotClobberServerBasename(t *testing.T) {
+	cmds := allUnitsNotFound()
+	cmds[showLine("xinetd.service")] = cmdResult{file: "systemctl.loaded.active"}
+	s := readSuperServers(context.Background(), servicesAccess(map[string]string{
+		"/etc/xinetd.d/tftp-custom": "xinetd.tftp.server_args",
+	}, cmds))
+	installed, enabled, active, found, ev := s.match(nil, []string{"in.tftpd"})
+	if ev != nil {
+		t.Fatalf("unexpected envelope: %+v", ev)
+	}
+	if !found || !installed || !enabled || !active {
+		t.Fatalf("server_args must not hide the in.tftpd server field: found=%v installed=%v enabled=%v active=%v, want all true", found, installed, enabled, active)
+	}
+}
+
+// Ruling R243: a super-server host unit that fails to answer must not let a
+// live entry read as a silent disabled/inactive. Here a live `shell` r-services
+// entry sits in /etc/inetd.conf; inetd.service answers not-found but
+// openbsd-inetd.service — the unit that actually hosts it — fails. installed is
+// positive evidence and stays ok:true; enabled and active must carry the
+// host-probe failure, never ok:false.
+func TestServicesSuperServerHostProbeFailureIsNotASilentFalse(t *testing.T) {
+	cmds := allUnitsNotFound()
+	cmds[showLine("openbsd-inetd.service")] = cmdResult{exitCode: 1, stderr: "Failed to connect to bus\n"}
+	a := servicesAccess(map[string]string{
+		inetdConf:            "inetd.conf.rsh",
+		"/proc/self/net/tcp": "proc_net_tcp_empty",
+	}, cmds)
+	b := build(t, "services", a)
+	if e := env(t, b, "services.rservices.installed"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("rservices.installed = %+v, want ok:true (the inetd entry proves it)", e)
+	}
+	for _, leafName := range []string{"enabled", "active"} {
+		e := env(t, b, "services.rservices."+leafName)
+		if e.Status == facts.StatusOK {
+			t.Errorf("rservices.%s must not be ok when a host probe failed: %+v", leafName, e)
+		}
+	}
+}
+
+// Finding 5 / C3: an /etc/inetd.conf that exists but cannot be read is the
+// answer for every leaf it could set, path-prefixed, never a silent ok:false.
+// A service with no inetdNames (automount) is unaffected and stays ok:false.
+// Deleting any of the three superEv branches in setService turns this red.
+func TestServicesUnreadableInetdConfIsNotASilentFalse(t *testing.T) {
+	a := servicesAccess(map[string]string{"/proc/self/net/tcp": "proc_net_tcp_empty"}, allUnitsNotFound())
+	a.fails = map[string]error{inetdConf: os.ErrPermission}
+	b := build(t, "services", a)
+	for _, leafName := range []string{"installed", "active", "enabled"} {
+		e := env(t, b, "services.finger."+leafName)
+		if e.Status != facts.StatusDenied {
+			t.Errorf("services.finger.%s = %s, want denied on an unreadable inetd.conf: %+v", leafName, e.Status, e)
+		}
+		if !strings.HasPrefix(e.Reason, inetdConf+":") {
+			t.Errorf("services.finger.%s reason %q must be prefixed by %q", leafName, e.Reason, inetdConf)
+		}
+	}
+	for _, leafName := range []string{"installed", "active", "enabled"} {
+		if e := env(t, b, "services.automount."+leafName); e.Status != facts.StatusOK || e.Value != false {
+			t.Errorf("services.automount.%s = %+v, want ok:false (no inetdNames, unaffected by inetd.conf)", leafName, e)
+		}
+	}
+}
+
+func TestServicesTableEmitsAllLeavesPerService(t *testing.T) {
+	// finger.socket enabled but inactive → enabled==true, active==false.
+	// The socket table is seeded (empty) so the reachable channel reads
+	// cleanly and active reflects the systemd verdict, not a masked procfs.
+	cmds := allUnitsNotFound()
+	cmds[showLine("finger.socket")] = cmdResult{file: "systemctl.enabled.inactive"}
+	b := build(t, "services", servicesAccess(map[string]string{"/proc/self/net/tcp": "proc_net_tcp_empty"}, cmds))
+	if e := env(t, b, "services.finger.active"); e.Status != facts.StatusOK || e.Value != false {
+		t.Errorf("finger.active: %+v", e)
+	}
+	if e := env(t, b, "services.finger.enabled"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("finger.enabled (enabled-but-stopped is still enabled): %+v", e)
+	}
+	if e := env(t, b, "services.finger.unit_file_state"); e.Value != "enabled" {
+		t.Errorf("finger.unit_file_state: %+v", e)
+	}
+	if e := env(t, b, "services.finger.installed"); e.Value != true {
+		t.Errorf("finger.installed: %+v", e)
+	}
+}
+
+// Ruling R222: enabled is the OR over every probed unit, not the canonical one.
+func TestServicesEnabledOredAcrossUnits(t *testing.T) {
+	// NIS client: canonical ypserv.service not-found, sibling ypbind.service
+	// enabled-but-stopped ⇒ enabled==true (catches the NIS-client false-PASS class).
+	cmds := allUnitsNotFound()
+	cmds[showLine("ypbind.service")] = cmdResult{file: "systemctl.enabled.inactive"}
+	b := build(t, "services", servicesAccess(nil, cmds))
+	if e := env(t, b, "services.nis.enabled"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("nis.enabled must OR across units: %+v", e)
+	}
+	if e := env(t, b, "services.nis.active"); e.Value != false {
+		t.Errorf("nis.active: %+v", e)
+	}
+}
+
+// Ruling R228: alias must not count as enabled.
+func TestServicesAliasIsNotEnabled(t *testing.T) {
+	cmds := allUnitsNotFound()
+	cmds[showLine("nfs-kernel-server.service")] = cmdResult{file: "systemctl.alias.inactive"}
+	b := build(t, "services", servicesAccess(nil, cmds))
+	if e := env(t, b, "services.nfs_server.enabled"); e.Value != false {
+		t.Errorf("alias must not count as enabled: %+v", e)
+	}
+}
+
+// Ruling R231: masked IS installed, but not enabled and not active. The
+// socket table is seeded (empty) so active reflects the masked-unit verdict
+// (ok:false), not an unchecked socket channel.
+func TestServicesMaskedCountsAsInstalled(t *testing.T) {
+	cmds := allUnitsNotFound()
+	cmds[showLine("snmpd.service")] = cmdResult{file: "systemctl.masked"}
+	b := build(t, "services", servicesAccess(map[string]string{"/proc/self/net/tcp": "proc_net_tcp_empty"}, cmds))
+	if e := env(t, b, "services.snmp.installed"); e.Value != true {
+		t.Errorf("masked IS installed: %+v", e)
+	}
+	if e := env(t, b, "services.snmp.enabled"); e.Value != false {
+		t.Errorf("masked is not enabled: %+v", e)
+	}
+	if e := env(t, b, "services.snmp.active"); e.Value != false {
+		t.Errorf("masked is not active: %+v", e)
+	}
+}
+
+// Brief criterion #7: when the socket channel cannot be read (masked/erroring
+// /proc/net, plausible in a container) a fixed-port service's active must NOT
+// collapse to a silent ok:false — a (active==false AND enabled==false) control
+// would false-PASS on it. active carries the same non-ok status the reachable
+// leaf reports. Units all answer not-found, so systemd offers no positive
+// evidence and the socket channel is the only one that could.
+func TestServicesActiveSurfacesSocketReadFailure(t *testing.T) {
+	// servicesAccess(nil, …) seeds no /proc/self/net/tcp, so listeningSockets
+	// raises ErrProcfsMasked (sockets.go) — a masked procfs.
+	b := build(t, "services", servicesAccess(nil, allUnitsNotFound()))
+	reach := env(t, b, "services.snmp.reachable")
+	if reach.Status != facts.StatusUnsupported {
+		t.Fatalf("snmp.reachable = %+v, want unsupported on a masked procfs", reach)
+	}
+	active := env(t, b, "services.snmp.active")
+	if active.Status == facts.StatusOK {
+		t.Errorf("snmp.active must not be ok:false when the socket channel could not be read: %+v", active)
+	}
+	if active.Status != reach.Status {
+		t.Errorf("snmp.active status %s must match the reachable leaf's %s", active.Status, reach.Status)
+	}
+}
+
+// Ruling R221: a ::-bound daemon appears only in udp6/tcp6 (proto prefix match).
+// The mandatory /proc/self/net/tcp table must be present for listeningSockets
+// to run at all (sockets.go ErrProcfsMasked); an empty tcp table proves the
+// port-161 match comes from the udp6 table alone.
+func TestServicesReachableMatchesIPv6Listener(t *testing.T) {
+	a := servicesAccess(map[string]string{
+		"/proc/self/net/tcp":  "proc_net_tcp_empty",
+		"/proc/self/net/udp6": "proc_net_udp6_snmp",
+	}, allUnitsNotFound())
+	b := build(t, "services", a)
+	if e := env(t, b, "services.snmp.reachable"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("::-bound port 161 must be reachable: %+v", e)
+	}
+}
+
+func TestServicesNoSystemdDegradesEveryRegisteredKey(t *testing.T) {
+	b := build(t, "services", &fsAccess{}) // no /run/systemd/system
+	reg, err := facts.LoadRegistry()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Every services.* key the registry declares must be present and unsupported,
+	// so the run stays complete on a systemd-less container (R220).
+	for _, k := range reg.Keys {
+		if k.Collector != "services" {
+			continue
+		}
+		if e := env(t, b, k.Key); e.Status != facts.StatusUnsupported {
+			t.Errorf("%s = %s, want unsupported on no-systemd host", k.Key, e.Status)
+		}
+	}
+	if got := b.Worst("services"); got != facts.StatusOK {
+		t.Errorf(`Worst("services") = %s, want ok (unsupported ranks ok, run stays complete)`, got)
 	}
 }
 

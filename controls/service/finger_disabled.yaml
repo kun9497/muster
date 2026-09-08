@@ -1,0 +1,24 @@
+id: muster.service.finger_disabled
+title_en: The finger service is not enabled or reachable
+title_ko: finger 서비스가 활성화되어 있지 않다
+description_en: No finger server may be active, enabled at boot, hosted by inetd/xinetd, or listening on a non-loopback address. A host without any finger server passes.
+description_ko: finger 서버가 활성이거나 부팅 시 시작되도록 설정되어 있거나 inetd/xinetd 로 구동되거나 루프백 외 주소에서 대기하면 안 됩니다. finger 서버가 전혀 없는 호스트는 통과합니다.
+category: service
+importance: 상
+automation: auto
+references:
+  kisa: { "2026": ["U-34"], "2021": ["U-19"] }
+requires_facts: ">=1"
+absent_means: pass
+checks:
+  - { fact: services.finger.active, op: eq, expected: false }
+  - { fact: services.finger.enabled, op: eq, expected: false }
+  - { fact: services.finger.reachable, op: eq, expected: false }
+remediation:
+  text_en: Disable and mask the finger service or remove the finger server package, and remove any inetd/xinetd finger entry.
+  text_ko: finger 서비스를 비활성화·mask 하거나 finger 서버 패키지를 제거하고, inetd/xinetd 의 finger 항목을 제거합니다.
+  risk: restart_service
+  idempotent: true
+  script: systemctl disable --now finger.socket 2>/dev/null; systemctl mask finger.socket 2>/dev/null; true
+  rollback: systemctl unmask finger.socket 2>/dev/null; true
+decision: D19

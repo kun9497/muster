@@ -1,0 +1,9 @@
+# synthetic xinetd fragment: tftp under a non-standard service name, so only
+# the server-basename channel (in.tftpd) can find it. server_args must not
+# clobber the parsed server basename (R242).
+service tftp-custom
+{
+	server		= /usr/sbin/in.tftpd
+	server_args	= -s /var/lib/tftpboot
+	disable		= no
+}

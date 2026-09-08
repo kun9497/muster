@@ -1,0 +1,24 @@
+id: muster.service.snmp_disabled
+title_en: SNMP is not enabled or reachable
+title_ko: SNMP 가 활성화되어 있지 않고 접속할 수도 없다
+description_en: An SNMP agent that no one administers this host through must not be active, enabled at boot, or reachable on its fixed port (161/udp). This control only asks whether the agent runs at all; deeper SNMP hardening such as protocol version, community strings and source ACLs is out of scope here and belongs to the U-59/U-60/U-61 controls in a later stage. A host without a running SNMP agent passes.
+description_ko: 이 호스트를 관리하는 용도로 쓰이지 않는 SNMP 에이전트는 활성이거나 부팅 시 시작되도록 설정되어 있거나 고정 포트(161/udp)에서 접속 가능하면 안 됩니다. 이 점검은 에이전트가 아예 돌고 있는지만 확인하며, 프로토콜 버전·커뮤니티 문자열·소스 ACL 같은 심화된 SNMP 강화는 범위 밖으로 이후 단계의 U-59/U-60/U-61 점검이 다룹니다. SNMP 에이전트가 돌지 않는 호스트는 통과합니다.
+category: service
+importance: 중
+automation: auto
+references:
+  kisa: { "2026": ["U-58"], "2021": ["U-66"] }
+requires_facts: ">=1"
+absent_means: pass
+checks:
+  - { fact: services.snmp.active, op: eq, expected: false }
+  - { fact: services.snmp.enabled, op: eq, expected: false }
+  - { fact: services.snmp.reachable, op: eq, expected: false }
+remediation:
+  text_en: Stop and disable the SNMP agent (systemctl disable --now snmpd.service) unless it is required, in which case harden it under the U-59/U-60/U-61 controls.
+  text_ko: SNMP 에이전트가 필요하지 않다면 중지·비활성화하고 (systemctl disable --now snmpd.service), 필요하다면 U-59/U-60/U-61 점검에 따라 강화합니다.
+  risk: restart_service
+  idempotent: true
+  script: systemctl disable --now snmpd.service 2>/dev/null; true
+  rollback: systemctl enable --now snmpd.service 2>/dev/null; true
+decision: D19

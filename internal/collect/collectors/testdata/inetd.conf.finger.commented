@@ -1,0 +1,1 @@
+#finger	stream	tcp	nowait	nobody	/usr/sbin/in.fingerd

@@ -1,0 +1,1 @@
+{"synthetic": true, "schema_version":1,"run":{"env":{"container":"docker"}},"facts":{"services":{"dos_services":{"active":{"status":"unsupported","reason":"no init system inside the container"},"enabled":{"status":"unsupported","reason":"no init system inside the container"},"reachable":{"status":"unsupported","reason":"no init system inside the container"}}}}}

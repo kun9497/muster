@@ -1,0 +1,1 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{"services":{"rpcbind":{"active":{"status":"ok","value":false},"enabled":{"status":"ok","value":false},"reachable":{"status":"ok","value":true,"source":{"kind":"proc","path":"/proc/net/tcp","raw":"0.0.0.0:111 LISTEN"}}}}}}

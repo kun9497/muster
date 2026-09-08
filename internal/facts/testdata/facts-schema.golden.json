@@ -192,6 +192,26 @@
       "SubjectKind": ""
     },
     {
+      "Key": "services.ssh.unit_file_state",
+      "Type": "string",
+      "Description": "UnitFileState of the first present SSH unit (evidence only; \"not-found\" when none).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.ssh.enabled",
+      "Type": "bool",
+      "Description": "An SSH unit will start at boot or on socket activation.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
       "Key": "services.telnet.installed",
       "Type": "bool",
       "Description": "A telnet server package, unit or inetd entry exists on the host.",
@@ -202,9 +222,519 @@
       "SubjectKind": ""
     },
     {
+      "Key": "services.telnet.active",
+      "Type": "bool",
+      "Description": "The telnet service is running, socket-activated or reachable on its port.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.telnet.unit_file_state",
+      "Type": "string",
+      "Description": "UnitFileState of the first present telnet unit (evidence only; \"not-found\" when none).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.telnet.enabled",
+      "Type": "bool",
+      "Description": "A telnet unit will start at boot or on socket activation.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
       "Key": "services.telnet.reachable",
       "Type": "bool",
       "Description": "A telnet server would accept a connection from off the host (active unit or listening socket unit, non-loopback).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.finger.installed",
+      "Type": "bool",
+      "Description": "A finger server package, unit or inetd entry exists on the host.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.finger.active",
+      "Type": "bool",
+      "Description": "The finger service is running, socket-activated or reachable on its port.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.finger.unit_file_state",
+      "Type": "string",
+      "Description": "UnitFileState of the first present finger unit (evidence only; \"not-found\" when none).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.finger.enabled",
+      "Type": "bool",
+      "Description": "A finger unit will start at boot or on socket activation.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.finger.reachable",
+      "Type": "bool",
+      "Description": "A finger server would accept a connection from off the host (non-loopback listener).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.rservices.installed",
+      "Type": "bool",
+      "Description": "An r-services server (rsh/rlogin/rexec) unit or inetd entry exists on the host.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.rservices.active",
+      "Type": "bool",
+      "Description": "An r-services daemon is running, socket-activated or reachable on its port.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.rservices.unit_file_state",
+      "Type": "string",
+      "Description": "UnitFileState of the first present r-services unit (evidence only; \"not-found\" when none).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.rservices.enabled",
+      "Type": "bool",
+      "Description": "An r-services unit will start at boot or on socket activation.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.rservices.reachable",
+      "Type": "bool",
+      "Description": "An r-services daemon would accept a connection from off the host (non-loopback listener).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.dos_services.installed",
+      "Type": "bool",
+      "Description": "A simple TCP/IP service (echo/discard/daytime/chargen) unit or inetd entry exists on the host.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.dos_services.active",
+      "Type": "bool",
+      "Description": "A simple TCP/IP service is running, socket-activated or reachable on its port.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.dos_services.unit_file_state",
+      "Type": "string",
+      "Description": "UnitFileState of the first present simple-service unit (evidence only; \"not-found\" when none).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.dos_services.enabled",
+      "Type": "bool",
+      "Description": "A simple TCP/IP service unit will start at boot or on socket activation.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.dos_services.reachable",
+      "Type": "bool",
+      "Description": "A simple TCP/IP service would accept a connection from off the host (non-loopback listener).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.nfs_server.installed",
+      "Type": "bool",
+      "Description": "An NFS server unit exists on the host.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.nfs_server.active",
+      "Type": "bool",
+      "Description": "The NFS server is running or reachable on its port.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.nfs_server.unit_file_state",
+      "Type": "string",
+      "Description": "UnitFileState of the first present NFS server unit (evidence only; \"not-found\" when none).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.nfs_server.enabled",
+      "Type": "bool",
+      "Description": "An NFS server unit will start at boot.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.nfs_server.reachable",
+      "Type": "bool",
+      "Description": "The NFS server would accept a connection from off the host (non-loopback listener).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.automount.installed",
+      "Type": "bool",
+      "Description": "An autofs unit exists on the host.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.automount.active",
+      "Type": "bool",
+      "Description": "The autofs service is running.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.automount.unit_file_state",
+      "Type": "string",
+      "Description": "UnitFileState of the first present autofs unit (evidence only; \"not-found\" when none).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.automount.enabled",
+      "Type": "bool",
+      "Description": "An autofs unit will start at boot.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.rpcbind.installed",
+      "Type": "bool",
+      "Description": "An rpcbind unit exists on the host.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.rpcbind.active",
+      "Type": "bool",
+      "Description": "The rpcbind service is running, socket-activated or reachable on its port.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.rpcbind.unit_file_state",
+      "Type": "string",
+      "Description": "UnitFileState of the first present rpcbind unit (evidence only; \"not-found\" when none).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.rpcbind.enabled",
+      "Type": "bool",
+      "Description": "An rpcbind unit will start at boot or on socket activation.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.rpcbind.reachable",
+      "Type": "bool",
+      "Description": "The rpcbind service would accept a connection from off the host (non-loopback listener).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.nis.installed",
+      "Type": "bool",
+      "Description": "An NIS (ypserv/ypbind) unit exists on the host.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.nis.active",
+      "Type": "bool",
+      "Description": "An NIS daemon is running.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.nis.unit_file_state",
+      "Type": "string",
+      "Description": "UnitFileState of the first present NIS unit (evidence only; \"not-found\" when none).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.nis.enabled",
+      "Type": "bool",
+      "Description": "An NIS unit will start at boot.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.tftp.installed",
+      "Type": "bool",
+      "Description": "A TFTP server unit or inetd entry exists on the host.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.tftp.active",
+      "Type": "bool",
+      "Description": "The TFTP service is running, socket-activated or reachable on its port.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.tftp.unit_file_state",
+      "Type": "string",
+      "Description": "UnitFileState of the first present TFTP unit (evidence only; \"not-found\" when none).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.tftp.enabled",
+      "Type": "bool",
+      "Description": "A TFTP unit will start at boot or on socket activation.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.tftp.reachable",
+      "Type": "bool",
+      "Description": "The TFTP service would accept a connection from off the host (non-loopback listener).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.talk.installed",
+      "Type": "bool",
+      "Description": "A talk server unit or inetd entry exists on the host.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.talk.active",
+      "Type": "bool",
+      "Description": "The talk service is running, socket-activated or reachable on its port.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.talk.unit_file_state",
+      "Type": "string",
+      "Description": "UnitFileState of the first present talk unit (evidence only; \"not-found\" when none).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.talk.enabled",
+      "Type": "bool",
+      "Description": "A talk unit will start at boot or on socket activation.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.talk.reachable",
+      "Type": "bool",
+      "Description": "The talk service would accept a connection from off the host (non-loopback listener).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.snmp.installed",
+      "Type": "bool",
+      "Description": "An SNMP daemon unit exists on the host.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.snmp.active",
+      "Type": "bool",
+      "Description": "The SNMP service is running or reachable on its port.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.snmp.unit_file_state",
+      "Type": "string",
+      "Description": "UnitFileState of the first present SNMP unit (evidence only; \"not-found\" when none).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.snmp.enabled",
+      "Type": "bool",
+      "Description": "An SNMP unit will start at boot.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.snmp.reachable",
+      "Type": "bool",
+      "Description": "The SNMP service would accept a connection from off the host (non-loopback listener).",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "services",
