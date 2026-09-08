@@ -1988,9 +1988,11 @@ func TestServicesReadsLegacyFilesWhenSystemdDidNotProveTelnet(t *testing.T) {
 
 func TestServicesTableEmitsAllLeavesPerService(t *testing.T) {
 	// finger.socket enabled but inactive → enabled==true, active==false.
+	// The socket table is seeded (empty) so the reachable channel reads
+	// cleanly and active reflects the systemd verdict, not a masked procfs.
 	cmds := allUnitsNotFound()
 	cmds[showLine("finger.socket")] = cmdResult{file: "systemctl.enabled.inactive"}
-	b := build(t, "services", servicesAccess(nil, cmds))
+	b := build(t, "services", servicesAccess(map[string]string{"/proc/self/net/tcp": "proc_net_tcp_empty"}, cmds))
 	if e := env(t, b, "services.finger.active"); e.Status != facts.StatusOK || e.Value != false {
 		t.Errorf("finger.active: %+v", e)
 	}
@@ -2030,11 +2032,13 @@ func TestServicesAliasIsNotEnabled(t *testing.T) {
 	}
 }
 
-// Ruling R231: masked IS installed, but not enabled and not active.
+// Ruling R231: masked IS installed, but not enabled and not active. The
+// socket table is seeded (empty) so active reflects the masked-unit verdict
+// (ok:false), not an unchecked socket channel.
 func TestServicesMaskedCountsAsInstalled(t *testing.T) {
 	cmds := allUnitsNotFound()
 	cmds[showLine("snmpd.service")] = cmdResult{file: "systemctl.masked"}
-	b := build(t, "services", servicesAccess(nil, cmds))
+	b := build(t, "services", servicesAccess(map[string]string{"/proc/self/net/tcp": "proc_net_tcp_empty"}, cmds))
 	if e := env(t, b, "services.snmp.installed"); e.Value != true {
 		t.Errorf("masked IS installed: %+v", e)
 	}
@@ -2043,6 +2047,29 @@ func TestServicesMaskedCountsAsInstalled(t *testing.T) {
 	}
 	if e := env(t, b, "services.snmp.active"); e.Value != false {
 		t.Errorf("masked is not active: %+v", e)
+	}
+}
+
+// Brief criterion #7: when the socket channel cannot be read (masked/erroring
+// /proc/net, plausible in a container) a fixed-port service's active must NOT
+// collapse to a silent ok:false — a (active==false AND enabled==false) control
+// would false-PASS on it. active carries the same non-ok status the reachable
+// leaf reports. Units all answer not-found, so systemd offers no positive
+// evidence and the socket channel is the only one that could.
+func TestServicesActiveSurfacesSocketReadFailure(t *testing.T) {
+	// servicesAccess(nil, …) seeds no /proc/self/net/tcp, so listeningSockets
+	// raises ErrProcfsMasked (sockets.go) — a masked procfs.
+	b := build(t, "services", servicesAccess(nil, allUnitsNotFound()))
+	reach := env(t, b, "services.snmp.reachable")
+	if reach.Status != facts.StatusUnsupported {
+		t.Fatalf("snmp.reachable = %+v, want unsupported on a masked procfs", reach)
+	}
+	active := env(t, b, "services.snmp.active")
+	if active.Status == facts.StatusOK {
+		t.Errorf("snmp.active must not be ok:false when the socket channel could not be read: %+v", active)
+	}
+	if active.Status != reach.Status {
+		t.Errorf("snmp.active status %s must match the reachable leaf's %s", active.Status, reach.Status)
 	}
 }
 

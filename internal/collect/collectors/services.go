@@ -348,10 +348,20 @@ func setService(b *collect.Builder, a collect.Access, svc logicalService, g grou
 	}
 	b.Set(k+".installed", installedEnv)
 
-	// R224: on a complete sweep a judged leaf is ok:false, never absent — an
-	// absent leaf would short-circuit a multi-fact control through
-	// absent_means before its clauses ran (spec §6.5 step 8).
-	b.Set(k+".active", g.verdict(g.active || reachable))
+	// active ← a live systemd unit OR (for a fixed-port service) a reachable
+	// non-loopback port. R224: on a complete sweep a judged leaf is ok:false,
+	// never absent. But a reachable=false only means "no listener" when the
+	// socket table was actually read: when that read errored or was truncated
+	// (exactly when the reachable leaf carries socketReadEnvelope / the
+	// truncation ErrorEnv), the non-systemd channel could not be checked, so
+	// active must surface THAT failure — not a silent ok:false that a
+	// (active==false AND enabled==false) control would read as a PASS.
+	switch {
+	case len(svc.ports) > 0 && !g.active && reachEnv.Status != facts.StatusOK:
+		b.Set(k+".active", reachEnv)
+	default:
+		b.Set(k+".active", g.verdict(g.active || reachable))
+	}
 	b.Set(k+".enabled", g.verdict(g.enabled))
 
 	// unit_file_state is evidence only (R222); "not-found" when no unit was
