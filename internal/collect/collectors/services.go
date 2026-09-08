@@ -4,9 +4,6 @@ package collectors
 
 import (
 	"context"
-	"errors"
-	"io/fs"
-	"regexp"
 	"slices"
 	"strings"
 
@@ -96,6 +93,10 @@ func declaredShowCommands() []collect.Command {
 			units = append(units, u.name)
 		}
 	}
+	// R227: the shared super-server reader probes the host units once per run;
+	// the ones not already named by a service's unitRef list are declared here
+	// so the guard licenses those systemctl show invocations.
+	units = append(units, superServerExtraHostUnits...)
 	slices.Sort(units)
 	units = slices.Compact(units)
 	out := make([]collect.Command, 0, len(units))
@@ -115,28 +116,11 @@ var servicesCollector = collect.Collector{
 	Run: runServices,
 }
 
-// xinetdTelnet matches the two non-comment shapes a telnet service takes in
-// an xinetd fragment (R63).
-var xinetdTelnet = regexp.MustCompile(`^service\s+telnet\b|^server\s*=.*telnetd`)
-
 // inetdServerField is where the server program sits on an /etc/inetd.conf
-// line: service, socket type, protocol, flags, user, server, arguments.
+// line: service, socket type, protocol, flags, user, server, arguments. The
+// shared super-server reader (services_super.go) matches against its basename
+// (R233).
 const inetdServerField = 5
-
-// inetdTelnet reports whether one non-comment /etc/inetd.conf line declares
-// telnet (M14). Only two fields can say so: the service name, which is the
-// FIRST field, and the server program, which a wrapper like tcpd would
-// otherwise hide. The word appearing anywhere else on the line is not
-// evidence — an unrelated service whose arguments or trailing comment
-// mention telnet would be reported as a telnet daemon that is not installed
-// at all, which is a FAIL on a host that never had it.
-func inetdTelnet(line string) bool {
-	f := strings.Fields(line)
-	if len(f) == 0 {
-		return false
-	}
-	return f[0] == "telnet" || (len(f) > inetdServerField && strings.HasSuffix(f[inetdServerField], "telnetd"))
-}
 
 // showValues parses the "Key=Value" lines systemctl show prints. R235:
 // SubState is not parsed — nothing reads it — even though the show command
@@ -292,19 +276,30 @@ func runServices(ctx context.Context, a collect.Access, b *collect.Builder) erro
 	// it per service would be up to 48 procfs reads and 12 chances to disagree
 	// with sockets.listening about the same host.
 	t, sockErr := listeningSockets(a)
+	// R227: read /etc/inetd.conf and the xinetd.d fragments — and probe the
+	// super-server host units — ONCE for the whole sweep, not per service.
+	supers := readSuperServers(a)
 	for _, svc := range services {
 		g := probeUnits(ctx, a, svc.units)
-		setService(b, a, svc, g, t, sockErr)
+		setService(b, svc, g, t, sockErr, &supers)
 	}
 	return nil
 }
 
 // setService writes every leaf one logical service registers from the systemd
-// verdict, the shared listening-socket table and — for telnet in this task —
-// the legacy super-server files (Task 2 generalises the super-server read to
-// every service via inetdNames/servers).
-func setService(b *collect.Builder, a collect.Access, svc logicalService, g groupState, t socketTables, sockErr error) {
+// verdict, the shared listening-socket table and the shared super-server reader
+// (R227/R233): a service with inetdNames/servers folds the once-parsed
+// inetd.conf / xinetd entries — host-gated — into its installed/enabled/active.
+func setService(b *collect.Builder, svc logicalService, g groupState, t socketTables, sockErr error, supers *superServers) {
 	k := "services." + svc.name
+
+	// Super-server contribution (once-read entries + host gate). Only services
+	// that can be hosted by inetd/xinetd consult it.
+	var superInstalled, superEnabled, superActive bool
+	var superEv *facts.Envelope
+	if len(svc.inetdNames) > 0 || len(svc.servers) > 0 {
+		superInstalled, superEnabled, superActive, _, superEv = supers.match(svc.inetdNames, svc.servers)
+	}
 
 	// reachable (fixed-port services only). R41: written false only when the
 	// table was actually read; an unseen table is never a PASS.
@@ -326,43 +321,56 @@ func setService(b *collect.Builder, a collect.Access, svc logicalService, g grou
 	}
 
 	// installed ← a proving unit found (R231, masked counts) OR a reachable
-	// non-loopback port OR a super-server entry (telnet only in this task).
-	// Positive evidence stands on its own whatever the sweep managed (R80).
+	// non-loopback port OR a super-server entry (R227). Positive evidence
+	// stands on its own whatever the sweep managed (R80).
 	installedEnv := g.verdict(g.installed)
 	if !g.installed {
 		switch {
 		case reachable:
 			installedEnv = collect.OK(true, t.src)
-		case svc.name == "telnet":
-			found, problem := telnetFromLegacy(a)
-			switch {
-			case found != nil:
-				installedEnv = *found
-			case problem != nil && g.complete:
-				// A super-server file we could not read might have named it,
-				// so "not installed" would be a guess. verdict below reports
-				// an incomplete unit sweep instead, since that failed first.
-				installedEnv = *problem
-			}
+		case superInstalled:
+			installedEnv = collect.OKRead(true, supers.hit, collect.ReadMeta{Truncated: supers.hitTruncated})
+		case superEv != nil && g.complete:
+			// A super-server file we could not read might have named it, so
+			// "not installed" would be a guess. On a complete unit sweep the
+			// read error is the honest answer; on an incomplete one verdict
+			// below reports the unit failure, which came first.
+			installedEnv = *superEv
 		}
 	}
 	b.Set(k+".installed", installedEnv)
 
 	// active ← a live systemd unit OR (for a fixed-port service) a reachable
-	// non-loopback port. R224: on a complete sweep a judged leaf is ok:false,
-	// never absent. But a reachable=false only means "no listener" when the
-	// socket table was actually read: when that read errored or was truncated
-	// (exactly when the reachable leaf carries socketReadEnvelope / the
-	// truncation ErrorEnv), the non-systemd channel could not be checked, so
-	// active must surface THAT failure — not a silent ok:false that a
-	// (active==false AND enabled==false) control would read as a PASS.
+	// non-loopback port OR a host-active super-server entry (R227). R224: on a
+	// complete sweep a judged leaf is ok:false, never absent. But a
+	// reachable=false only means "no listener" when the socket table was
+	// actually read: when that read errored or was truncated (exactly when the
+	// reachable leaf carries socketReadEnvelope / the truncation ErrorEnv), the
+	// non-systemd channel could not be checked, so active must surface THAT
+	// failure — not a silent ok:false that a (active==false AND enabled==false)
+	// control would read as a PASS.
 	switch {
+	case superActive:
+		b.Set(k+".active", collect.OK(true, supers.hit))
 	case len(svc.ports) > 0 && !g.active && reachEnv.Status != facts.StatusOK:
 		b.Set(k+".active", reachEnv)
+	case superEv != nil && !g.active && !reachable && g.complete:
+		// The super-server read error could have hidden a live entry; do not
+		// pass a silent ok:false.
+		b.Set(k+".active", *superEv)
 	default:
 		b.Set(k+".active", g.verdict(g.active || reachable))
 	}
-	b.Set(k+".enabled", g.verdict(g.enabled))
+	switch {
+	case superEnabled:
+		b.Set(k+".enabled", collect.OK(true, supers.hit))
+	case superEv != nil && !g.enabled && g.complete:
+		// Likewise for enabled: an unreadable config might have named an
+		// enabled entry, so surface the read error rather than ok:false.
+		b.Set(k+".enabled", *superEv)
+	default:
+		b.Set(k+".enabled", g.verdict(g.enabled))
+	}
 
 	// unit_file_state is evidence only (R222); "not-found" when no unit was
 	// found (R231). It is never a judged leaf, so it is always an ok string.
@@ -401,65 +409,6 @@ func (g groupState) verdict(proven bool) facts.Envelope {
 	default:
 		return withTruncation(collect.OK(false, g.src), g.truncated)
 	}
-}
-
-// telnetFromLegacy looks for telnet where it lived before systemd:
-// /etc/inetd.conf and the xinetd fragment directory. Only a non-comment
-// line counts (R63).
-//
-// found is the ready-made "installed" envelope when there is positive
-// evidence, carrying the line it came from and that read's truncation flag
-// (R70). problem is set instead when a file that could have carried the
-// evidence was unreadable, so the caller does not report a "not installed"
-// it cannot stand behind.
-func telnetFromLegacy(a collect.Access) (found, problem *facts.Envelope) {
-	data, meta, err := a.ReadFile(inetdConf, readLimit)
-	switch {
-	case err == nil:
-		for i, raw := range splitLines(data) {
-			line := strings.TrimSpace(raw)
-			if line == "" || strings.HasPrefix(line, "#") {
-				continue
-			}
-			if inetdTelnet(line) {
-				e := collect.OKRead(true, &facts.Source{
-					Kind: "file", Path: inetdConf, Line: i + 1, Raw: sourceRaw(raw),
-				}, meta)
-				return &e, nil
-			}
-		}
-	case !errors.Is(err, fs.ErrNotExist):
-		e := collect.FromReadError(err, meta)
-		return nil, &e
-	}
-
-	paths, _ := a.Glob(xinetdGlob)
-	slices.Sort(paths)
-	for _, p := range paths {
-		data, meta, err := a.ReadFile(p, readLimit)
-		if err != nil {
-			// A directory or device the glob happened to name is not a
-			// fragment and carries no evidence either way.
-			if errors.Is(err, fs.ErrNotExist) || errors.Is(err, collect.ErrNotRegular) {
-				continue
-			}
-			e := collect.FromReadError(err, meta)
-			return nil, &e
-		}
-		for i, raw := range splitLines(data) {
-			line := strings.TrimSpace(raw)
-			if line == "" || strings.HasPrefix(line, "#") {
-				continue
-			}
-			if xinetdTelnet.MatchString(line) {
-				e := collect.OKRead(true, &facts.Source{
-					Kind: "file", Path: p, Line: i + 1, Raw: sourceRaw(raw),
-				}, meta)
-				return &e, nil
-			}
-		}
-	}
-	return nil, nil
 }
 
 // hasNonLoopbackPort reports whether any listening socket in the

@@ -1934,8 +1934,10 @@ func TestServicesNegativeStillNeedsTheWholeSweep(t *testing.T) {
 	}
 }
 
-// Telnet the same way: a loaded unit proves it even though a sibling failed,
-// and the legacy files are not consulted at all.
+// Telnet the same way: a loaded unit proves it even though a sibling failed.
+// R227: the shared super-server reader runs once per sweep regardless, so this
+// no longer asserts the legacy files went unread — only that positive systemd
+// evidence stands on its own through an incomplete sweep.
 func TestServicesTelnetPositiveEvidenceSurvivesAnIncompleteSweep(t *testing.T) {
 	cmds := allUnitsNotFound()
 	cmds[showLine("telnet.socket")] = cmdResult{file: "systemctl.loaded.active"}
@@ -1948,41 +1950,92 @@ func TestServicesTelnetPositiveEvidenceSurvivesAnIncompleteSweep(t *testing.T) {
 	if e := env(t, b, "services.telnet.installed"); e.Status != facts.StatusOK || e.Value != true {
 		t.Errorf("installed %+v, want ok:true", e)
 	}
-	if slices.Contains(a.reads, "/etc/inetd.conf") {
-		t.Errorf("systemd already proved it; /etc/inetd.conf must not be read: %v", a.reads)
-	}
 }
 
-// Fix 10. Once systemd has proved telnet is installed, the legacy files
-// cannot change the answer, so they are not read at all.
-func TestServicesSkipsLegacyFilesWhenSystemdProvesTelnet(t *testing.T) {
+// R227 (ledger): the shared super-server reader now runs once per sweep for
+// every inetdNames service, so /etc/inetd.conf is read whether or not systemd
+// already proved telnet — the old "must not be read" assertion is gone. What
+// still holds is that systemd evidence DOMINATES: when a telnet unit is
+// loaded+active, telnet's judged installed/active are true regardless of what
+// the legacy files say, so a live systemd telnet and a matching inetd.conf
+// entry produce the same verdict a live systemd telnet alone would.
+func TestServicesSystemdProvenTelnetIsUnchangedByLegacyFiles(t *testing.T) {
 	cmds := allUnitsNotFound()
 	cmds[showLine("telnet.socket")] = cmdResult{file: "systemctl.loaded.active"}
-	a := servicesAccess(map[string]string{
+	withLegacy := servicesAccess(map[string]string{
 		"/proc/self/net/tcp": "proc_net_tcp",
 		"/etc/inetd.conf":    "inetd.conf.telnet",
 	}, cmds)
-	b := build(t, "services", a)
-	if e := env(t, b, "services.telnet.installed"); e.Value != true {
-		t.Errorf("%+v", e)
-	}
-	if slices.Contains(a.reads, "/etc/inetd.conf") {
-		t.Errorf("systemd already proved it; /etc/inetd.conf must not be read: %v", a.reads)
+	withoutLegacy := servicesAccess(map[string]string{
+		"/proc/self/net/tcp": "proc_net_tcp",
+	}, cmds)
+	bWith := build(t, "services", withLegacy)
+	bWithout := build(t, "services", withoutLegacy)
+	for _, leaf := range []string{"installed", "active", "enabled"} {
+		got := env(t, bWith, "services.telnet."+leaf)
+		want := env(t, bWithout, "services.telnet."+leaf)
+		if got.Status != want.Status || got.Value != want.Value {
+			t.Errorf("systemd proves telnet: .%s differs with legacy files present (%+v) vs absent (%+v)", leaf, got, want)
+		}
+		if got.Value != true {
+			t.Errorf("live systemd telnet: .%s should be true, got %+v", leaf, got)
+		}
 	}
 }
 
-// ...and it IS read when systemd did not prove it.
-func TestServicesReadsLegacyFilesWhenSystemdDidNotProveTelnet(t *testing.T) {
+// ...and when systemd did NOT prove telnet, the legacy inetd.conf entry is the
+// evidence that makes it installed (the shared reader runs and matches).
+func TestServicesLegacyFilesProveTelnetWhenSystemdDidNot(t *testing.T) {
 	a := servicesAccess(map[string]string{
 		"/proc/self/net/tcp": "proc_net_tcp",
 		"/etc/inetd.conf":    "inetd.conf.telnet",
 	}, allUnitsNotFound())
 	b := build(t, "services", a)
-	if e := env(t, b, "services.telnet.installed"); e.Value != true {
-		t.Errorf("%+v", e)
+	e := env(t, b, "services.telnet.installed")
+	if e.Value != true || e.Source == nil || e.Source.Path != "/etc/inetd.conf" || e.Source.Line != 2 {
+		t.Errorf("installed from inetd.conf %+v %+v", e, e.Source)
 	}
 	if !slices.Contains(a.reads, "/etc/inetd.conf") {
 		t.Errorf("/etc/inetd.conf should have been read: %v", a.reads)
+	}
+}
+
+func TestSuperServerReaderMatchesByNameAndServer(t *testing.T) {
+	// openbsd-inetd running+enabled; a live 'shell' entry ⇒ r-services enabled+active.
+	cmds := allUnitsNotFound()
+	cmds[showLine("openbsd-inetd.service")] = cmdResult{file: "systemctl.loaded.active"}
+	s := readSuperServers(servicesAccess(map[string]string{inetdConf: "inetd.conf.rsh"}, cmds))
+	installed, enabled, active, found, ev := s.match([]string{"shell", "login", "exec"}, []string{"in.rshd", "in.rlogind", "in.rexecd"})
+	if ev != nil {
+		t.Fatalf("unexpected envelope: %+v", ev)
+	}
+	if !found || !installed || !enabled || !active {
+		t.Fatalf("live shell entry, inetd running: found=%v installed=%v enabled=%v active=%v, want all true", found, installed, enabled, active)
+	}
+}
+
+// Ruling R227: an entry does not become enabled/active when its host super-server is disabled/stopped.
+func TestSuperServerEntryGatedByHostState(t *testing.T) {
+	cmds := allUnitsNotFound()
+	cmds[showLine("openbsd-inetd.service")] = cmdResult{file: "systemctl.loaded.inactive"} // installed, disabled, stopped
+	s := readSuperServers(servicesAccess(map[string]string{inetdConf: "inetd.conf.rsh"}, cmds))
+	installed, enabled, active, found, _ := s.match([]string{"shell"}, []string{"in.rshd"})
+	if !found || !installed {
+		t.Fatalf("entry present: found=%v installed=%v", found, installed)
+	}
+	if enabled || active {
+		t.Errorf("host inetd disabled/stopped ⇒ entry not enabled/active: enabled=%v active=%v", enabled, active)
+	}
+}
+
+func TestSuperServerReaderIgnoresCommentsAndOtherNames(t *testing.T) {
+	s := readSuperServers(servicesAccess(map[string]string{inetdConf: "inetd.conf.finger.commented"}, allUnitsNotFound()))
+	installed, enabled, _, found, ev := s.match([]string{"finger"}, []string{"in.fingerd"})
+	if ev != nil {
+		t.Fatal(ev)
+	}
+	if found || installed || enabled {
+		t.Fatalf("commented finger: found=%v installed=%v enabled=%v, want false", found, installed, enabled)
 	}
 }
 
