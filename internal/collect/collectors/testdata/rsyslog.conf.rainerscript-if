@@ -1,0 +1,7 @@
+# synthetic configuration carrying a RainerScript conditional, which v1 does
+# not model: the rule set cannot be derived, so coverage is absent.
+*.info;mail.none			/var/log/messages
+
+if $programname == "sudo" then {
+	action(type="omfile" file="/var/log/sudo.log")
+}

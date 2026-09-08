@@ -15,6 +15,8 @@
 // primitive, so collector code never builds /proc/<pid>/... itself.
 package collect
 
+import "time"
+
 // ReadMeta describes how a file was read and what it looked like.
 type ReadMeta struct {
 	Tier string // openat2 | componentwise
@@ -41,4 +43,14 @@ type ReadMeta struct {
 
 	UID, GID        uint32
 	ParentUntrusted bool
+
+	// ModTime is st_mtim, the file's last modification time. It is
+	// provenance, not a fact: no registry key carries it, and a collector
+	// that turns it into an age must subtract it from the run header's
+	// CollectedAt (R54) rather than from time.Now(), so the same snapshot
+	// always renders the same bytes. The zero value means "not known" —
+	// a test double that seeds no time, or a path that was never stat-ed —
+	// and a caller must then omit the derived age rather than invent one
+	// (Ruling I-27).
+	ModTime time.Time
 }

@@ -11,6 +11,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"time"
 
 	"golang.org/x/sys/unix"
 )
@@ -183,6 +184,10 @@ func fillMeta(m *ReadMeta, st *unix.Stat_t) {
 	m.UID, m.GID = st.Uid, st.Gid
 	m.Kind = kindOf(st.Mode)
 	m.Rdev = uint64(st.Rdev)
+	// Timespec.Unix widens Sec/Nsec, which are 32-bit on some
+	// architectures, so this is the portable spelling (Ruling I-27).
+	sec, nsec := st.Mtim.Unix()
+	m.ModTime = time.Unix(sec, nsec)
 }
 
 // kindOf names the S_IFMT file type so collectors never compare mode bits

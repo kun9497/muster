@@ -2710,6 +2710,76 @@
       "Collector": "timesync",
       "DefaultOn": "",
       "SubjectKind": ""
+    },
+    {
+      "Key": "logging.syslog.implementation",
+      "Type": "string",
+      "Description": "Which syslog implementation is configured on disk - rsyslog, syslog-ng, journald-only or none; evidence only (which daemon is running is services.syslog.active).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "logging",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "logging.rsyslog.rules",
+      "Type": "list\u003crecord\u003e",
+      "Description": "The rsyslog routing rules in file order, one record per selected facility and action, each with facility, priority, target and target_kind (file, remote, user, pipe, module or discard); absent when the host has no rsyslog configuration, and the read's status when a configuration file exists but cannot be read.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "logging",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "logging.rsyslog.parse_complete",
+      "Type": "bool",
+      "Description": "Whether every rsyslog configuration file the main file includes was read; false when an include could not be read or named a path outside the collector's declaration, which makes logging.rsyslog.coverage absent.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "logging",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "logging.rsyslog.unmodelled",
+      "Type": "int",
+      "Description": "How many rsyslog constructs this version does not model - an if/then conditional, a ruleset() or call statement, a ?TemplateName dynamic file target, and an omfile or omfwd action whose argument cannot be parsed; any of them makes logging.rsyslog.coverage absent.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "logging",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "logging.rsyslog.property_filters",
+      "Type": "int",
+      "Description": "How many property-based filter lines the configuration carries (the leading-colon msg/syslogtag form); they add a destination for a tagged subset of messages and can never un-log a facility, so they are evidence only and leave coverage untouched.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "logging",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "logging.rsyslog.coverage",
+      "Type": "list\u003crecord\u003e",
+      "Description": "Per-facility routing derived from the rules in file order, each with facility, logged, priority_floor, target, persistent and reason; persistent means the winning target is a local file path, not that the file already exists. Absent when the parse was incomplete, when an unmodelled construct was seen, or when the host has no rsyslog configuration.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "logging",
+      "DefaultOn": "",
+      "SubjectKind": "facility"
+    },
+    {
+      "Key": "logging.log_targets",
+      "Type": "list\u003crecord\u003e",
+      "Description": "The distinct local file targets the rules name, each with path, exists, persistent, mtime_age_s and stat_status; mtime_age_s is the whole seconds between the file's modification time and the run's collected_at and is omitted when either is unknown or the file was modified after the run started, and a path outside the collector's declaration is recorded with stat_status undeclared and never stat-ed. Evidence only.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "logging",
+      "DefaultOn": "",
+      "SubjectKind": ""
     }
   ]
 }

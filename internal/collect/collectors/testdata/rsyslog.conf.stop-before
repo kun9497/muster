@@ -1,0 +1,5 @@
+# synthetic configuration that discards two facilities before the catch-all
+# that would otherwise log them: rules are ordered (Ruling I-13).
+auth.*				stop
+authpriv.*			~
+*.*				-/var/log/syslog

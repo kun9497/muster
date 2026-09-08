@@ -1,0 +1,24 @@
+# synthetic rsyslog main configuration, RHEL 9 shape.
+
+#### MODULES ####
+
+module(load="imuxsock"    # local system logging (e.g. via the logger command)
+       SysSock.Use="off") # local messages arrive through imjournal instead
+module(load="imjournal"             # access to the systemd journal
+       StateFile="imjournal.state") # file that stores the journal position
+
+#### GLOBAL DIRECTIVES ####
+
+global(workDirectory="/var/lib/rsyslog")
+module(load="builtin:omfile" Template="RSYSLOG_TraditionalFileFormat")
+include(file="/etc/rsyslog.d/*.conf" mode="optional")
+
+#### RULES ####
+
+*.info;mail.none;authpriv.none;cron.none		/var/log/messages
+authpriv.*						/var/log/secure
+mail.*							-/var/log/maillog
+cron.*							/var/log/cron
+*.emerg							:omusrmsg:*
+uucp,news.crit						/var/log/spooler
+local7.*						/var/log/boot.log

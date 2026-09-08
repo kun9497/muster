@@ -14,6 +14,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"golang.org/x/sys/unix"
 
@@ -62,6 +63,11 @@ type statResult struct {
 	mode     uint32
 	uid, gid uint32
 	kind     string
+	// mtime is the modification time Stat reports (Ruling I-27). A seed
+	// that leaves it zero makes ReadMeta.ModTime zero, which is how a
+	// collector learns the time is NOT known and must omit any age it
+	// would otherwise derive — never invent one.
+	mtime time.Time
 }
 
 func (a *fsAccess) read(name string) ([]byte, error) {
@@ -94,7 +100,7 @@ func (a *fsAccess) Stat(p string) (collect.ReadMeta, error) {
 	// content read is denied) — exactly a 0440 root-owned file seen by a
 	// non-root run. A path present only in fails still fails its Stat.
 	if s, ok := a.stats[p]; ok {
-		return collect.ReadMeta{Tier: "openat2", Mode: s.mode, UID: s.uid, GID: s.gid, Kind: s.kind}, nil
+		return collect.ReadMeta{Tier: "openat2", Mode: s.mode, UID: s.uid, GID: s.gid, Kind: s.kind, ModTime: s.mtime}, nil
 	}
 	if err, ok := a.fails[p]; ok {
 		return collect.ReadMeta{}, err

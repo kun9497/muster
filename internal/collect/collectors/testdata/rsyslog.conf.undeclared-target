@@ -1,0 +1,4 @@
+# synthetic configuration whose first target lies outside the collector's
+# declaration: it is recorded, never stat-ed (Ruling I-10).
+*.*				/opt/logs/app.log
+auth,authpriv.*			/var/log/auth.log
