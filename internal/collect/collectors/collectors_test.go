@@ -1197,10 +1197,24 @@ func TestCronTimersInventoryAndFailure(t *testing.T) {
 	bad := &fsAccess{
 		files: map[string]string{"/etc/crontab": "crontab", "/etc/group": "group"},
 		stats: map[string]statResult{"/etc/crontab": {mode: 0o644, kind: "regular"}},
-		cmds:  map[string]cmdResult{"/usr/bin/systemctl list-unit-files --type=timer --no-legend --no-pager": {exitCode: 1, stderr: "fail\n"}},
+		cmds:  map[string]cmdResult{"/usr/bin/systemctl list-unit-files --type=timer --no-legend --no-pager": {exitCode: 1, stderr: "System has not been booted with systemd\n"}},
 	}
-	if e := env(t, build(t, "cron", bad), "cron.timers"); e.Status == facts.StatusOK {
-		t.Errorf("a failed systemctl must not be an ok empty list: %+v", e)
+	b := build(t, "cron", bad)
+	// R220: a systemctl that cannot run (a container without PID-1 systemd) is
+	// an environment limitation, not a collection error — the timer inventory
+	// degrades to unsupported, never a clean empty ok list and never an error.
+	e := env(t, b, "cron.timers")
+	if e.Status != facts.StatusUnsupported {
+		t.Errorf("a failed systemctl must degrade to unsupported: %+v", e)
+	}
+	if !strings.Contains(e.Reason, "System has not been booted with systemd") {
+		t.Errorf("reason %q must carry the systemctl failure line", e.Reason)
+	}
+	// Unsupported ranks as ok in Builder.Worst (R71), so the failing timer
+	// command must NOT make the cron collector worse than ok — which is what
+	// keeps a run built in a no-systemd container complete (collect-contract CI).
+	if worst := b.Worst("cron"); worst != facts.StatusOK {
+		t.Errorf("Worst(cron) = %s, want ok", worst)
 	}
 }
 

@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"path"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/kun9497/muster/internal/collect"
@@ -195,18 +196,30 @@ func cronDirRows(a collect.Access, groups map[int]string) facts.Envelope {
 }
 
 // cronTimers is a best-effort systemd timer inventory. A systemctl that could
-// not run makes this the command's error (never a clean empty list), so the
-// absence of timers cannot be confused with an unreadable systemd.
+// not run is an ENVIRONMENT LIMITATION, not a collection error: a container
+// booted without PID-1 systemd has no timer inventory to read, and reporting
+// that as an error would make the whole run partial. So a failed command
+// degrades to unsupported (R220, mirroring the sshd R88 honest-degradation) —
+// unsupported ranks as ok in Builder.Worst (R71), so it keeps the run
+// complete, while still being distinct from a clean empty list.
 func cronTimers(ctx context.Context, a collect.Access) facts.Envelope {
 	out := a.Run(ctx, cronTimersCmd)
 	src := out.Source(cronTimersCmd)
 	if out.Err != nil || out.TimedOut || out.ExitCode != 0 {
-		// needsRoot=false: `systemctl list-unit-files` reads the unit-file
-		// inventory as any user, so a failure here is a genuine command error,
-		// not a root-only refusal — despite the collector's Needs: root (which
-		// only annotates, and does not gate, the run).
-		e := commandFailure("systemctl list-unit-files --type=timer", out, src, false)
-		return e
+		// needsRoot is irrelevant here: `systemctl list-unit-files` reads the
+		// unit-file inventory as any user, so a failure is never a root-only
+		// refusal — despite the collector's Needs: root (which only annotates,
+		// and does not gate, the run). Whatever the cause, an inventory this
+		// environment cannot produce is unsupported, not an error.
+		reason := firstLine(out.Stderr)
+		if reason == "" {
+			if out.Err != nil {
+				reason = out.Err.Error()
+			} else {
+				reason = "systemctl list-unit-files --type=timer exited " + strconv.Itoa(out.ExitCode)
+			}
+		}
+		return collect.Unsupported("systemd timer inventory unavailable: " + reason)
 	}
 	rows := []any{}
 	for _, line := range splitLines(out.Stdout) {
