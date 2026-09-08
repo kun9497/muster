@@ -4,7 +4,7 @@
 
 **Goal:** Add a `cron` collector (the crontab/spool/`at` configuration and the systemd timer inventory) and extend the `files` collector with the permission facts of system startup scripts, the syslog/journald configuration, the inetd/xinetd configuration, the sudoers file and its drop-ins (plus the `sudo.*` derived keys), and the `/var/log` tree, then judge six KISA items with them: U-17 (startup scripts), U-20 (inetd config), U-21 (syslog config), U-37 (crontab files), U-63 (sudoers), U-67 (log directory).
 
-**Architecture:** A new `cron` collector enumerates the cron and `at` configuration — `/etc/crontab`, `/etc/anacrontab`, the `/etc/cron.{d,hourly,daily,weekly,monthly}` drop-ins, the `cron.allow`/`cron.deny`/`at.allow`/`at.deny` access files, and the per-user spools under `/var/spool/cron` (Rocky) and `/var/spool/cron/crontabs` (Ubuntu) — as permission rows with a precomputed `owner_ok`, plus a best-effort systemd timer inventory; it declares `Needs: root` because the spools are root-only. The `files` collector gains, from stat over fixed paths and sorted globs, the startup-unit rows (with `is_symlink`/`target` so a link is filtered by a `where` clause, not judged), the syslog/journald and inetd/xinetd config rows, the sudoers file and drop-in rows (root-only read → `denied` for a non-root run), the `sudo.{installed,includedir,secure_path}` derived keys, and the `/var/log` tree with a per-row `group_writable_unexpected` precomputed against an allowed-group set. Every enumeration distinguishes a genuinely empty result (an `ok` empty list — a vacuous `each` correctly passes) from a failed one (the read's error status — never a silent empty), so a denied directory never reads as "nothing to check". Controls judge these with the existing `each`/`none`/`where`/`require` grammar; the guide's mode criteria are `params` defaults.
+**Architecture:** A new `cron` collector enumerates the cron and `at` configuration — `/etc/crontab`, `/etc/anacrontab`, the `/etc/cron.{d,hourly,daily,weekly,monthly}` drop-ins, the `cron.allow`/`cron.deny`/`at.allow`/`at.deny` access files, and the per-user spools under `/var/spool/cron` (Rocky) and `/var/spool/cron/crontabs` (Ubuntu) — as permission rows with a precomputed `owner_ok`, plus a best-effort systemd timer inventory; it declares `Needs: root` because the spools are root-only. `Needs: root` only annotates the collector (it is surfaced by `--list-actions`); `run.go` does not gate a collector on it, so the best-effort timer command — which `systemctl list-unit-files` runs fine as any user — still executes on a non-root run. The `files` collector gains, from stat over fixed paths and sorted globs, the startup-unit rows (with `is_symlink`/`target` so a link is filtered by a `where` clause, not judged), the syslog/journald and inetd/xinetd config rows, the sudoers file and drop-in rows (root-only read → `denied` for a non-root run), the `sudo.{installed,includedir,secure_path}` derived keys, and the `/var/log` tree with a per-row `group_writable_unexpected` precomputed against an allowed-group set. Every enumeration distinguishes a genuinely empty result (an `ok` empty list — a vacuous `each` correctly passes) from a failed one (the read's error status — never a silent empty), so a denied directory never reads as "nothing to check". Controls judge these with the existing `each`/`none`/`where`/`require` grammar; the guide's mode criteria are `params` defaults.
 
 **Tech Stack:** Go 1.25 stdlib, YAML controls decoded strictly, JSON fixtures, the lab host (Ubuntu 22.04) and CI's Ubuntu 24.04 plus the Rocky/Alma 9 init containers (different spool layouts, `/etc/init.d` a symlink on RHEL, `/var/log` group `syslog` vs `root`).
 
@@ -13,14 +13,14 @@
 ## Global Constraints
 
 - Every fact leaf is an envelope; a status other than `ok` never produces `PASS`; a registered key the snapshot lacks is `missing` → `ERROR(missing_fact)`, never resolved by `absent_means`.
-- **A failed enumeration is the read's error, never an empty list (spec §7.3; the shared 2F hazard).** A glob or directory read that FAILS (denied, error) makes the affected list fact carry that read's status — so a control's `each`/`none` over it screens to `ERROR`, not a vacuous PASS. A genuinely empty result (the directory exists and is readable but holds nothing to judge) is an `ok` empty list `[]any{}`; a vacuous `each` over it is a correct PASS ("no such file is unsafe"). Never emit `[]` for a read that failed.
+- **A glob that returns an error is surfaced as the read's error, not an empty list (spec §7.3).** When `a.Glob` returns a non-nil error, the affected list fact carries that read's status, so a control's `each`/`none` over it screens to `ERROR`, not a vacuous PASS; a genuinely empty result (the directory exists and is readable but holds nothing to judge) is an `ok` empty list `[]any{}` and a vacuous `each` over it is a correct PASS ("no such file is unsafe"). **Limitation:** `filepath.Glob` (which `hostAccess.Glob` wraps) does not report a denied enumeration directory — it returns no matches and a nil error — so a non-root run can read a root-only directory as empty rather than denied. This is a pre-existing, project-wide property shared by every glob-based collector in 2A–2E; muster's primary mode is a root `collect`, which reads these directories fully. **Carried forward (dedicated hardening / 2M):** the honest fix is a guarded `ReadDir` primitive on `collect.Access` that makes a denied enumeration directory an `ERROR`, then migrating the glob-based collectors to it; deferred.
 - **Mode "≤ NNN" is `op: in` over the bit-subsets of NNN (spec §6.6, C1 precedent).** There is no bit operator; the default is the guide's value and a `params.allowed_modes` relaxes it. Both distribution families ship `/etc/crontab`, `/etc/cron.d` and `/etc/rsyslog.conf` at `0644`, so where the guide wants `0640` a stock host FAILs and the control's description states the deviation.
 - **C1** — `files.*` owns the permission facts of fixed candidate paths and of paths reached by a fixed glob set; a path discovered from a daemon's own configuration belongs to that daemon's collector. Cron config lives in the `cron` collector because its spools and per-user layout are cron's own, not a fixed `files.*` candidate.
 - Permission facts of a fixed path use `writePermFacts` (`internal/collect/collectors/permfacts.go`); a per-row list uses the same mode/uid/gid/group-writable/other-writable shape inline. A stat failure reaches every leaf/field of that path or row.
 - No judgment in collectors (D09): the collector records mode/owner/`is_symlink`/`owner_ok`/`group_writable_unexpected`; whether `0644` is too permissive, which groups may own a writable log dir, or whether `cron.allow` must exist lives in the controls' `params`, whose defaults are the guide's criterion (§6.6) even where a stock host then fails; the deviation is stated in the control's description.
 - Every host touch goes through `Access` and every path a collector reads/stats/globs is in its `Declare.Reads`; `readLimit` on every `ReadFile`; a command a collector runs is in its `Declare.Commands`. No new module dependency. New Go files under `internal/collect/collectors` carry `//go:build linux`.
 - Same input, same bytes: fixed path order, sorted globs, list rows in a stable order (glob-sorted, or spool user order); no `map` iteration reaching a `Set` value's order (a `map[string]any` record is fine — `encoding/json` sorts its keys).
-- Control and waiver YAML decode strictly; every control has `pass-*`/`fail-*` fixtures (`fail-` on a `partial` control expects `WARN`; `warn-`/`error-`/`manual-`/`na-` prefixes exist), `synthetic: true`, and only the leaves the control reads; `controls lint --references docs/reference` must end `ok: 35 controls`; every `references.stig` id must exist in `docs/reference/stig/`, every NIST id in the index union.
+- Control and waiver YAML decode strictly; every control has `pass-*`/`fail-*` fixtures (`fail-` on a `partial` control expects `WARN`; `warn-`/`error-`/`manual-`/`na-` prefixes exist), `synthetic: true`, and **every leaf the control's `checks`/`mechanisms`/`applies_when` reference** — carried as an `absent` envelope where it is not the fixture's focus, because a registered key the snapshot lacks is a hard `missing` → `ERROR(missing_fact)` before any clause runs; `controls lint --references docs/reference` must end `ok: 35 controls`; every `references.stig` id must exist in `docs/reference/stig/`, every NIST id in the index union.
 - Never copy KISA guide text, CIS/DISA text or a distribution's packaged files verbatim: fixtures are synthetic (own wording, `synthetic: true`); titles/descriptions/remediation are muster's own words, English and Korean both; identifiers/flags/paths stay English on both sides. Nothing from the lab host is committed; no host name, address, alias or credential in any file.
 - Registry additions carry `since: 1`, `sensitivity: public`, and their `collector`; the facts schema golden is regenerated with `go test ./internal/facts -run TestFactsSchemaGolden -update` and reviewed (new keys get `since` lines; no type change, so no `schema_version` bump). Exit codes unchanged.
 
@@ -58,9 +58,11 @@ Key inventory this plan adds (20 keys):
 | `files.etc_sudoers.{mode,uid,gid,acl_present}` | int×3, bool | files | T3 | `/etc/sudoers` permission facts (root-only read → `denied` for a non-root run). |
 | `files.etc_sudoers_d.{mode,uid,gid,acl_present}` + `files.sudoers_d_entries` | int×3, bool, list<record> | files | T3 | The `/etc/sudoers.d` directory and its entries (`path`, `mode`, `uid`, `gid`, `group_writable`, `other_writable`, `ignored` for a name sudo skips — a `~` suffix or a `.`). |
 | `files.log_dirs` + `files.log_files` | list<record>×2 | files | T3 | `/var/log` tree rows: `path`, `mode`, `uid`, `gid`, `group` (name), `group_writable`, `other_writable`. No `group_writable_unexpected` flag — U-67 owns the log-group allowlist as a `params` value and judges `each where {group_writable} require {group in allowed}`, keeping the policy in the control (D09), not the collector. |
-| `sudo.installed` | `bool` | files | T3 | `/etc/sudoers` (or `/usr/bin/sudo`) exists. |
+| `sudo.installed` | `bool` | files | T3 | `/etc/sudoers` exists. |
 | `sudo.includedir` | `string` | files | T3 | The `@includedir`/`#includedir` directory named in `/etc/sudoers` (`""` when none — drop-ins are then inert). |
 | `sudo.secure_path` | `string` | files | T3 | The `Defaults secure_path=…` value (`""` when unset). |
+
+Every permission-row fact above (`cron.files`, `cron.dirs`, `files.startup_scripts`, `files.syslog_configs`, `files.journald_configs`, `files.xinetd_d`, `files.sudoers_d_entries`, `files.log_dirs`, `files.log_files`) additionally carries `is_symlink: true` on a final-component symlink row (numeric fields defaulted, no `reason`) and a `reason` field on a stat-error row; the controls screen the latter with a `none where {field: reason, op: present}` guard (a symlink row, carrying no `reason`, is left unjudged).
 
 `sudo.*` keys carry `collector: files` (the files collector reads `/etc/sudoers`, C1 for a fixed path). Not built here: cron *content* judgment (which jobs run — inventory only); the systemd timer *permission* rows (timer unit files are startup units, judged by `startup_scripts`); `files.bin_su`/`bin_sudo` setuid facts (2L/2M — U-06 already judges su via PAM). The `/var/log` walk is bounded by a row cap with `truncated`, like the `/dev` walk.
 
@@ -74,7 +76,7 @@ Key inventory this plan adds (20 keys):
 - Create fixtures under `internal/collect/collectors/testdata/`: `crontab`, `cron_d_entry`, `cron_allow`, `spool_user`, `systemctl_list_timers.txt`
 
 **Interfaces:**
-- Consumes: `collect.Access` (`ReadFile`, `Stat`, `Glob`, `Run`), `collect.Builder` (`Set`), `facts.Source`; the shared helpers `splitLines`, `readLimit`, `collect.OK`/`OKRead`/`Absent`/`FromReadError`; `groupNames(a)` (gid→name, from permfacts.go); the systemctl command shape from services.go (`systemctlPath`).
+- Consumes: `collect.Access` (`ReadFile`, `Stat`, `Glob`, `Run`), `collect.Builder` (`Set`), `facts.Source`, `collect.ErrSymlink`; the shared helpers `splitLines`, `readLimit`, `collect.OK`/`OKRead`/`Absent`/`FromReadError`; `groupNames(a)` (gid→name, from permfacts.go); the systemctl command shape from services.go (`systemctlPath`).
 - Produces:
   - `cronCollector` (`Name: "cron"`, `Declare.Reads` = the fixed cron/at config paths and spool globs below, `Declare.Commands` = the timer-list command, `Needs: "root"`).
   - `runCron(ctx, a, b) error`.
@@ -155,10 +157,11 @@ var (
 		"/etc/cron.weekly/*", "/etc/cron.monthly/*",
 	}
 	cronAccessFiles = []string{"/etc/cron.allow", "/etc/cron.deny", "/etc/at.allow", "/etc/at.deny"}
-	cronSpoolGlobs  = []string{"/var/spool/cron/*", "/var/spool/cron/crontabs/*", "/var/spool/atjobs/*"}
+	// at-spool: /var/spool/cron/atjobs on the Debian family, /var/spool/at on RHEL.
+	cronSpoolGlobs  = []string{"/var/spool/cron/*", "/var/spool/cron/crontabs/*", "/var/spool/cron/atjobs/*", "/var/spool/at/*"}
 	cronDirs        = []string{
 		"/etc/cron.d", "/etc/cron.hourly", "/etc/cron.daily", "/etc/cron.weekly",
-		"/etc/cron.monthly", "/var/spool/cron", "/var/spool/cron/crontabs", "/var/spool/atjobs",
+		"/etc/cron.monthly", "/var/spool/cron", "/var/spool/cron/crontabs", "/var/spool/cron/atjobs", "/var/spool/at",
 	}
 	cronTimersCmd = collect.Command{Path: systemctlPath, Args: []string{"list-unit-files", "--type=timer", "--no-legend", "--no-pager"}}
 )
@@ -249,16 +252,32 @@ func cronRow(a collect.Access, p, scope, user string, groups map[int]string) (ma
 		if errors.Is(err, fs.ErrNotExist) {
 			return nil, false
 		}
+		if errors.Is(err, collect.ErrSymlink) {
+			// A symlinked cron path is not itself a finding (its target is
+			// judged where it lives): flag is_symlink and carry no reason, so
+			// the reason-guard leaves it alone and it is not judged an anomaly.
+			return map[string]any{
+				"path": p, "scope": scope, "user": user, "mode": -1, "uid": -1, "gid": -1,
+				"group": "", "owner_ok": true, "group_writable": false, "other_writable": false,
+				"is_symlink": true,
+			}, true
+		}
 		return map[string]any{
 			"path": p, "scope": scope, "user": user, "mode": -1, "uid": -1, "gid": -1,
 			"group": "", "owner_ok": false, "group_writable": false, "other_writable": false,
 			"reason": readReason(p, err),
 		}, true
 	}
+	if meta.Kind != "regular" {
+		// A directory matched by a spool glob (e.g. /var/spool/cron/crontabs
+		// caught by /var/spool/cron/*) is not a cron file; cron.dirs covers it.
+		return nil, false
+	}
 	ownerOK := int(meta.UID) == 0
 	if scope == "user" && user != "" {
-		// A per-user spool file is legitimately owned by that user or by root.
-		ownerOK = int(meta.UID) == 0 || namedUID(groups, user) // see note
+		// A per-user spool file is legitimately owned by root or by any real
+		// (non-system) user, whose uid is >= 1000.
+		ownerOK = int(meta.UID) == 0 || int(meta.UID) >= 1000
 	}
 	return map[string]any{
 		"path": p, "scope": scope, "user": user,
@@ -271,7 +290,7 @@ func cronRow(a collect.Access, p, scope, user string, groups map[int]string) (ma
 }
 ```
 
-**owner_ok-for-a-user-spool ruling (state in the report):** a per-user spool file (`/var/spool/cron/crontabs/alice`) is correctly owned by `alice` or by `root`. muster does not have `alice`'s uid from `/etc/group` (that is `/etc/passwd`), and the cron collector does not read `/etc/passwd`. Rather than add a passwd read, treat `owner_ok` for a user spool as `uid == 0 || uid == <the file's own uid> matches a non-system uid` is unknowable here; **the simplest correct rule is `owner_ok = (uid == 0) || (the file's owner name via groups is empty AND uid >= 1000)`** — no: implement it as `owner_ok = uid == 0 || uid >= 1000` (a spool file owned by any real user is acceptable; a spool file owned by another *system* account is the anomaly U-37 cares about). Replace the `namedUID` placeholder above with `int(meta.UID) >= 1000`. Do not add a passwd read for this.
+**owner_ok-for-a-user-spool ruling (state in the report):** a per-user spool file is `owner_ok` when `uid == 0 || uid >= 1000` — owned by root or by any real (non-system) user — so the anomaly U-37 catches is a spool file owned by another *system* account, and no `/etc/passwd` read is added for this.
 
 ```go
 func cronDirRows(a collect.Access, groups map[int]string) facts.Envelope {
@@ -297,6 +316,10 @@ func cronTimers(ctx context.Context, a collect.Access) facts.Envelope {
 	out := a.Run(ctx, cronTimersCmd)
 	src := out.Source(cronTimersCmd)
 	if out.Err != nil || out.TimedOut || out.ExitCode != 0 {
+		// needsRoot=false: `systemctl list-unit-files` reads the unit-file
+		// inventory as any user, so a failure here is a genuine command error,
+		// not a root-only refusal — despite the collector's Needs: root (which
+		// only annotates, and does not gate, the run).
 		e := commandFailure("systemctl list-unit-files --type=timer", out, src, false)
 		return e
 	}
@@ -313,22 +336,34 @@ func cronTimers(ctx context.Context, a collect.Access) facts.Envelope {
 
 Add imports `errors`, `io/fs` (for the ENOENT check in `cronRow`). Reuse `readReason` (pam_parse.go), `commandFailure`/`withTruncation` (register.go), `systemctlPath`/`groupPath` (services.go/accounts).
 
-- [ ] **Step 4: Run the config-files test — passes**
+- [ ] **Step 4: Register the three keys and regenerate the golden**
+
+Add to `registry.yaml` a `cron.*` block — all `since: 1`, `sensitivity: public`, `collector: cron`: `cron.files` (list<record>), `cron.dirs` (list<record>), `cron.timers` (list<record>). Each `list<record>` key carries a `subject_kind`: `cron.files` and `cron.dirs` are `subject_kind: file`; `cron.timers` is `subject_kind: unit`. Descriptions one line each, own words. This step precedes the first green run because `Builder.place` panics on an unregistered key. Regenerate: `go test ./internal/facts -run TestFactsSchemaGolden -update`, review (3 keys, no bump).
+
+- [ ] **Step 5: Run the config-files test — passes**
 
 Run: `go test ./internal/collect/collectors/ -run TestCronConfigFiles -v` → PASS.
 
-- [ ] **Step 5: The remaining cron tests**
+- [ ] **Step 6: The remaining cron tests**
 
 ```go
-// A denied cron drop-in GLOB makes cron.files/dirs the read error, never an
-// empty list (the vacuous-each hazard).
-func TestCronDeniedGlobIsError(t *testing.T) {
-	a := &fsAccess{files: map[string]string{"/etc/crontab": "crontab", "/etc/group": "group"},
-		stats:   map[string]statResult{"/etc/crontab": {mode: 0o644, kind: "regular"}},
-		globErr: os.ErrPermission}
-	b := build(t, "cron", a)
-	if e := env(t, b, "cron.files"); e.Status != facts.StatusDenied {
-		t.Errorf("a denied glob must make cron.files denied, not []: %+v", e)
+// A spool directory caught by a spool glob (/var/spool/cron/crontabs matched by
+// /var/spool/cron/*) is not a cron.files row — directories are covered by
+// cron.dirs, and cronRow skips a non-regular Kind.
+func TestCronSpoolDirIsNotAFileRow(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{"/etc/crontab": "crontab", "/etc/group": "group"},
+		dirs:  map[string]bool{"/var/spool/cron/crontabs": true},
+		stats: map[string]statResult{
+			"/etc/crontab":             {mode: 0o644, uid: 0, kind: "regular"},
+			"/var/spool/cron/crontabs": {mode: 0o1730, uid: 0, gid: 0, kind: "dir"},
+		},
+	}
+	rows := okList(t, build(t, "cron", a), "cron.files")
+	for _, r := range rows {
+		if r.(map[string]any)["path"] == "/var/spool/cron/crontabs" {
+			t.Errorf("a spool directory must not be a cron.files row: %v", r)
+		}
 	}
 }
 
@@ -368,10 +403,6 @@ func TestCronWorldWritableCrontab(t *testing.T) {
 ```
 
 Fixture `systemctl_list_timers.txt`: two synthetic lines like `logrotate.timer enabled` / `fstrim.timer static`.
-
-- [ ] **Step 6: Register the three keys and regenerate the golden**
-
-Add to `registry.yaml` a `cron.*` block — all `since: 1`, `sensitivity: public`, `collector: cron`: `cron.files` (list<record>), `cron.dirs` (list<record>), `cron.timers` (list<record>). Descriptions one line each, own words. Regenerate: `go test ./internal/facts -run TestFactsSchemaGolden -update`, review (3 keys, no bump).
 
 - [ ] **Step 7: Windows gates and commit**
 
@@ -475,8 +506,10 @@ var (
 	syslogConfGlobs   = []string{"/etc/rsyslog.conf", "/etc/rsyslog.d/*.conf", "/etc/syslog-ng/syslog-ng.conf", "/etc/syslog-ng/conf.d/*.conf"}
 	journaldConfGlobs = []string{"/etc/systemd/journald.conf", "/etc/systemd/journald.conf.d/*.conf"}
 	xinetdConfPath    = "/etc/xinetd.conf"
-	inetdConfPath     = "/etc/inetd.conf"
-	xinetdDGlob       = "/etc/xinetd.d/*"
+	// inetd.conf (/etc/inetd.conf) and the xinetd.d glob (/etc/xinetd.d/*) reuse
+	// services.go's existing `inetdConf` and `xinetdGlob` consts — do not
+	// redeclare them here (a duplicate const in the same package is a compile
+	// error). Only /etc/xinetd.conf is new, declared above as xinetdConfPath.
 )
 
 // permRow stats one path into a permission row. ok is false only on ENOENT.
@@ -527,6 +560,14 @@ func globRows(a collect.Access, globs []string, groups map[int]string, src *fact
 	sort.Strings(paths)
 	rows := []any{}
 	for _, p := range paths {
+		// A directory matched by a glob (a `.wants`/`.d` subdirectory under
+		// /etc/systemd/system caught by /etc/systemd/system/*) is not a startup
+		// file — only its regular files and symlinks are rows. Stat that resolves
+		// to a dir is skipped; a final-component symlink returns ErrSymlink (not
+		// nil), so it is NOT skipped here and permRow records it is_symlink:true.
+		if meta, err := a.Stat(p); err == nil && meta.Kind == "dir" {
+			continue
+		}
 		if row, ok := permRow(a, p, groups); ok {
 			rows = append(rows, row)
 		}
@@ -565,13 +606,13 @@ The inetd/xinetd facts:
 // absent on both stock families, which is a definite state, not an error.
 func writeInetdPerm(b *collect.Builder, a collect.Access, groups map[int]string) {
 	// /etc/inetd.conf: mode, uid, group_writable, other_readable.
-	if meta, err := a.Stat(inetdConfPath); err == nil {
-		b.Set("files.etc_inetd_conf.mode", collect.OK(int(meta.Mode), permSrc(inetdConfPath)))
-		b.Set("files.etc_inetd_conf.uid", collect.OK(int(meta.UID), permSrc(inetdConfPath)))
-		b.Set("files.etc_inetd_conf.group_writable", collect.OK(meta.Mode&0o020 != 0, permSrc(inetdConfPath)))
-		b.Set("files.etc_inetd_conf.other_readable", collect.OK(meta.Mode&0o004 != 0, permSrc(inetdConfPath)))
+	if meta, err := a.Stat(inetdConf); err == nil {
+		b.Set("files.etc_inetd_conf.mode", collect.OK(int(meta.Mode), permSrc(inetdConf)))
+		b.Set("files.etc_inetd_conf.uid", collect.OK(int(meta.UID), permSrc(inetdConf)))
+		b.Set("files.etc_inetd_conf.group_writable", collect.OK(meta.Mode&0o020 != 0, permSrc(inetdConf)))
+		b.Set("files.etc_inetd_conf.other_readable", collect.OK(meta.Mode&0o004 != 0, permSrc(inetdConf)))
 	} else {
-		e := statAbsentOrError(inetdConfPath, err)
+		e := statAbsentOrError(inetdConf, err)
 		for _, k := range []string{"mode", "uid", "group_writable", "other_readable"} {
 			b.Set("files.etc_inetd_conf."+k, e)
 		}
@@ -585,10 +626,10 @@ func writeInetdPerm(b *collect.Builder, a collect.Access, groups map[int]string)
 		b.Set("files.etc_xinetd_conf.mode", e)
 		b.Set("files.etc_xinetd_conf.uid", e)
 	}
-	b.Set("files.xinetd_d", globRows(a, []string{xinetdDGlob}, groups, &facts.Source{Kind: "file", Path: "/etc/xinetd.d"}))
+	b.Set("files.xinetd_d", globRows(a, []string{xinetdGlob}, groups, &facts.Source{Kind: "file", Path: "/etc/xinetd.d"}))
 }
 
-func permSrc(p string) *facts.Source { return &facts.Source{Kind: "sys", Path: p} }
+func permSrc(p string) *facts.Source { return &facts.Source{Kind: "file", Path: p} }
 
 // statAbsentOrError maps a stat error to absent (ENOENT — a definite "not
 // configured") or the read error (anything else).
@@ -602,7 +643,7 @@ func statAbsentOrError(p string, err error) facts.Envelope {
 
 - [ ] **Step 4: Wire into `runFiles` and extend `filesReads()`**
 
-In `files.go`, add to `filesReads()`: `startupScriptGlobs...`, `startupDirList...`, `syslogConfGlobs...`, `journaldConfGlobs...`, `inetdConfPath`, `xinetdConfPath`, `xinetdDGlob`. In `runFiles`, after the `/dev` block and before the `securetty` block:
+In `files.go`, add to `filesReads()`: `startupScriptGlobs...`, `startupDirList...`, `syslogConfGlobs...`, `journaldConfGlobs...`, `inetdConf`, `xinetdConfPath`, `xinetdGlob` (`inetdConf` and `xinetdGlob` reuse services.go's consts; only `xinetdConfPath` is new — declaring a path in `filesReads()` that services.go also declares is harmless). In `runFiles`, after the `/dev` block and before the `securetty` block:
 
 ```go
 	b.Set("files.startup_scripts", startupScripts(a, groups))
@@ -612,17 +653,13 @@ In `files.go`, add to `filesReads()`: `startupScriptGlobs...`, `startupDirList..
 	writeInetdPerm(b, a, groups)
 ```
 
-- [ ] **Step 5: The remaining Task-2 tests**
+- [ ] **Step 5: Register the seven keys, regenerate the golden**
+
+`files.startup_scripts`, `files.startup_dirs`, `files.syslog_configs`, `files.journald_configs` (list<record>); `files.etc_inetd_conf.{mode,uid,group_writable,other_readable}` (int×2,bool×2); `files.etc_xinetd_conf.{mode,uid}` (int×2) + `files.xinetd_d` (list<record>). All `since: 1`, `sensitivity: public`, `collector: files`; every `list<record>` key (`startup_scripts`, `startup_dirs`, `syslog_configs`, `journald_configs`, `xinetd_d`) carries `subject_kind: file`. This step precedes the tests below because `Builder.place` panics on an unregistered key. Regenerate + review.
+
+- [ ] **Step 6: The remaining Task-2 tests**
 
 ```go
-// A denied startup glob makes files.startup_scripts the read error, not [].
-func TestFilesStartupDeniedGlobIsError(t *testing.T) {
-	a := &fsAccess{files: map[string]string{"/etc/group": "group"}, globErr: os.ErrPermission}
-	if e := env(t, build(t, "files", a), "files.startup_scripts"); e.Status != facts.StatusDenied {
-		t.Errorf("denied glob → denied, not []: %+v", e)
-	}
-}
-
 // syslog config rows are recorded; a world-writable rsyslog.conf is flagged.
 func TestFilesSyslogConfigs(t *testing.T) {
 	a := &fsAccess{
@@ -650,10 +687,6 @@ func TestFilesInetdAbsent(t *testing.T) {
 ```
 
 Fixture `rsyslog_conf` (a couple of synthetic rules), `xinetd_fragment`.
-
-- [ ] **Step 6: Register the seven keys, regenerate the golden**
-
-`files.startup_scripts`, `files.startup_dirs`, `files.syslog_configs`, `files.journald_configs` (list<record>); `files.etc_inetd_conf.{mode,uid,group_writable,other_readable}` (int×2,bool×2); `files.etc_xinetd_conf.{mode,uid}` (int×2) + `files.xinetd_d` (list<record>). All `since: 1`, `sensitivity: public`, `collector: files`. Regenerate + review.
 
 - [ ] **Step 7: Windows gates + lab host, commit**
 
@@ -730,6 +763,7 @@ import (
 	"errors"
 	"io/fs"
 	"path"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -745,7 +779,13 @@ const (
 	varLogGlob1  = "/var/log/*"
 	varLogGlob2  = "/var/log/*/*"
 	logMaxEntries = 4096
+	// sudoersReadLimit caps the /etc/sudoers content read (for the @includedir
+	// and secure_path parse); /etc/sudoers is small, so 256 KiB is ample and
+	// well under the 1 MiB readLimit used for larger files.
+	sudoersReadLimit = 256 * 1024
 )
+
+var securePathRe = regexp.MustCompile(`secure_path\s*=\s*(.*)`)
 
 // sudoersFacts writes the sudoers permission facts (stat only), the drop-in
 // entries, and the sudo.* derived keys parsed from /etc/sudoers content.
@@ -755,7 +795,15 @@ func sudoersFacts(b *collect.Builder, a collect.Access, groups map[int]string) {
 		b.Set("files.etc_sudoers.mode", collect.OK(int(meta.Mode), permSrc(sudoersPath)))
 		b.Set("files.etc_sudoers.uid", collect.OK(int(meta.UID), permSrc(sudoersPath)))
 		b.Set("files.etc_sudoers.gid", collect.OK(int(meta.GID), permSrc(sudoersPath)))
-		b.Set("files.etc_sudoers.acl_present", aclPresent(a, sudoersPath))
+		// acl_present follows writeRootHome/writePermFacts: the ACL probe's
+		// error is the answer for the leaf (denied on a non-root run, since the
+		// xattr read needs the file open O_RDONLY), never a quiet false.
+		_, present, aerr := aclEntries(a, sudoersPath)
+		if aerr != nil {
+			b.Set("files.etc_sudoers.acl_present", collect.FromReadError(aerr, meta))
+		} else {
+			b.Set("files.etc_sudoers.acl_present", collect.OK(present, permSrc(sudoersPath)))
+		}
 	} else {
 		e := statAbsentOrError(sudoersPath, err)
 		for _, k := range []string{"mode", "uid", "gid", "acl_present"} {
@@ -767,7 +815,12 @@ func sudoersFacts(b *collect.Builder, a collect.Access, groups map[int]string) {
 		b.Set("files.etc_sudoers_d.mode", collect.OK(int(meta.Mode), permSrc(sudoersDDir)))
 		b.Set("files.etc_sudoers_d.uid", collect.OK(int(meta.UID), permSrc(sudoersDDir)))
 		b.Set("files.etc_sudoers_d.gid", collect.OK(int(meta.GID), permSrc(sudoersDDir)))
-		b.Set("files.etc_sudoers_d.acl_present", aclPresent(a, sudoersDDir))
+		_, present, aerr := aclEntries(a, sudoersDDir)
+		if aerr != nil {
+			b.Set("files.etc_sudoers_d.acl_present", collect.FromReadError(aerr, meta))
+		} else {
+			b.Set("files.etc_sudoers_d.acl_present", collect.OK(present, permSrc(sudoersDDir)))
+		}
 	} else {
 		e := statAbsentOrError(sudoersDDir, err)
 		for _, k := range []string{"mode", "uid", "gid", "acl_present"} {
@@ -805,7 +858,7 @@ func sudoersDropIns(a collect.Access, groups map[int]string) facts.Envelope {
 // writeSudoDerived parses /etc/sudoers for the @includedir directory and the
 // Defaults secure_path. installed is whether /etc/sudoers exists at all.
 func writeSudoDerived(b *collect.Builder, a collect.Access) {
-	data, meta, err := a.ReadFile(sudoersPath, readLimit)
+	data, meta, err := a.ReadFile(sudoersPath, sudoersReadLimit)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			src := &facts.Source{Kind: "derived"}
@@ -831,8 +884,10 @@ func writeSudoDerived(b *collect.Builder, a collect.Access) {
 			}
 		}
 		if strings.HasPrefix(line, "Defaults") && strings.Contains(line, "secure_path") {
-			if _, v, ok := strings.Cut(line, "secure_path="); ok {
-				securePath = strings.Trim(strings.TrimSpace(v), `"`)
+			// secure_path may carry spaces around the "=" (Rocky ships
+			// `Defaults    secure_path = /sbin:...`), so match with a regex.
+			if m := securePathRe.FindStringSubmatch(line); m != nil {
+				securePath = strings.Trim(strings.TrimSpace(m[1]), `"`)
 			}
 		}
 	}
@@ -843,14 +898,15 @@ func writeSudoDerived(b *collect.Builder, a collect.Access) {
 }
 ```
 
-`aclPresent` — reuse the existing ACL helper the 2A permfacts uses (it reads the `system.posix_acl_access` xattr via `Getxattr`); if a standalone `aclPresent(a, path) facts.Envelope` does not already exist, factor the check `writePermFacts` already performs into one, or set `acl_present` from `a.Llistxattr(path)` containing `system.posix_acl_access`. Read `permfacts.go` first and reuse its exact mechanism so the two agree.
+`acl_present` reuses the existing `aclEntries(a, p) ([]string, bool, error)` helper from `acl.go` (the same one `writePermFacts` and `writeRootHome` call): `_, present, aerr := aclEntries(a, p)`, and on `aerr != nil` the leaf carries `collect.FromReadError(aerr, meta)` — exactly the pattern above. Because the ACL probe needs the file open, `acl_present` is **denied on a non-root run** even though the stat-based `mode`/`uid`/`gid` leaves still succeed.
 
 The `/var/log` tree:
 
 ```go
-// logTree walks /var/log one and two levels deep (bounded), recording each
-// entry's group name and the group/other-writable flags. U-67 owns the
-// allowed-group policy, so no "unexpected" flag is precomputed here (D09).
+// logTree records /var/log itself as a log_dirs row, then walks it one and two
+// levels deep (bounded), recording each entry's group name and the
+// group/other-writable flags. U-67 owns the allowed-group policy, so no
+// "unexpected" flag is precomputed here (D09).
 func logTree(a collect.Access, groups map[int]string) (facts.Envelope, facts.Envelope) {
 	var paths []string
 	for _, g := range []string{varLogGlob1, varLogGlob2} {
@@ -868,11 +924,29 @@ func logTree(a collect.Access, groups map[int]string) (facts.Envelope, facts.Env
 		truncated = true
 	}
 	dirs, files := []any{}, []any{}
+	// /var/log itself is a log_dirs row (its own perms matter to U-67/SI-11).
+	if meta, err := a.Stat(varLogDir); err == nil {
+		dirs = append(dirs, map[string]any{
+			"path": varLogDir, "mode": int(meta.Mode), "uid": int(meta.UID), "gid": int(meta.GID),
+			"group": groups[int(meta.GID)],
+			"group_writable": meta.Mode&0o020 != 0, "other_writable": meta.Mode&0o002 != 0,
+		})
+	}
 	for _, p := range paths {
 		meta, err := a.Stat(p)
+		if errors.Is(err, collect.ErrSymlink) {
+			// A symlinked log entry is not itself a finding (its target is
+			// judged where it lives): is_symlink:true and no reason, so the
+			// reason-guard leaves it alone.
+			files = append(files, map[string]any{
+				"path": p, "mode": -1, "uid": -1, "gid": -1, "group": "",
+				"group_writable": false, "other_writable": false, "is_symlink": true,
+			})
+			continue
+		}
 		if err != nil {
-			// a symlink or unreadable entry: record it as a finding row so a
-			// denied log path is visible, never silently dropped.
+			// an unreadable entry: record it as a finding row (carrying a
+			// reason) so a denied log path is visible, never silently dropped.
 			row := map[string]any{"path": p, "mode": -1, "uid": -1, "gid": -1, "group": "",
 				"group_writable": false, "other_writable": false, "reason": readReason(p, err)}
 			files = append(files, row)
@@ -907,11 +981,17 @@ func logTree(a collect.Access, groups map[int]string) (facts.Envelope, facts.Env
 	b.Set("files.log_files", lf)
 ```
 
-- [ ] **Step 5: The remaining Task-3 tests**
+- [ ] **Step 5: Register the ten keys, regenerate the golden**
+
+`files.etc_sudoers.{mode,uid,gid,acl_present}`, `files.etc_sudoers_d.{mode,uid,gid,acl_present}`, `files.sudoers_d_entries` (list<record>), `files.log_dirs`, `files.log_files` (list<record>) — all `collector: files`; `sudo.installed` (bool), `sudo.includedir` (string), `sudo.secure_path` (string) — `collector: files`. All `since: 1`, `sensitivity: public`; the three `list<record>` keys (`sudoers_d_entries`, `log_dirs`, `log_files`) carry `subject_kind: file`. This step precedes the tests below because `Builder.place` panics on an unregistered key. Regenerate + review.
+
+- [ ] **Step 6: The remaining Task-3 tests**
 
 ```go
-// A non-root run cannot read /etc/sudoers: sudo.secure_path is denied, but
-// the stat-based perm facts and sudo.installed still succeed.
+// A non-root run cannot read /etc/sudoers: sudo.secure_path is denied, but the
+// stat-based perm facts (mode/uid) and sudo.installed still succeed. acl_present
+// is legitimately denied on a non-root run (the ACL probe needs the file open),
+// so this test does NOT assert acl_present is ok.
 func TestFilesSudoersDeniedRead(t *testing.T) {
 	a := &fsAccess{
 		fails: map[string]error{"/etc/sudoers": os.ErrPermission},
@@ -922,13 +1002,16 @@ func TestFilesSudoersDeniedRead(t *testing.T) {
 	if env(t, b, "files.etc_sudoers.mode").Value != 0o440 {
 		t.Errorf("stat still works: %+v", env(t, b, "files.etc_sudoers.mode"))
 	}
+	if env(t, b, "files.etc_sudoers.uid").Value != 0 {
+		t.Errorf("uid stat still works: %+v", env(t, b, "files.etc_sudoers.uid"))
+	}
 	if e := env(t, b, "sudo.secure_path"); e.Status != facts.StatusDenied {
 		t.Errorf("a denied read → denied secure_path: %+v", e)
 	}
 }
 
-// /var/log rows carry the group name and writable flags; a denied log glob is
-// the read error, not an empty list.
+// /var/log rows carry the group name and writable flags, and /var/log itself is
+// a log_dirs row.
 func TestFilesLogTree(t *testing.T) {
 	a := &fsAccess{
 		files: map[string]string{"/etc/group": "group"},
@@ -936,7 +1019,7 @@ func TestFilesLogTree(t *testing.T) {
 		stats: map[string]statResult{
 			"/var/log":          {mode: 0o755, uid: 0, gid: 0, kind: "dir"},
 			"/var/log/journal":  {mode: 0o2755, uid: 0, gid: 4, kind: "dir"}, // gid 4 = adm in the group fixture
-			"/var/log/syslog":   {mode: 0o640, uid: 104, gid: 4, kind: "regular"},
+			"/var/log/syslog":   {mode: 0o640, uid: 104, gid: 104, kind: "regular"}, // gid 104 = syslog
 		},
 	}
 	a.files["/var/log/syslog"] = "" // present for Glob
@@ -945,18 +1028,20 @@ func TestFilesLogTree(t *testing.T) {
 	if len(ld) < 1 {
 		t.Fatalf("log_dirs %v", ld)
 	}
-	denied := &fsAccess{files: map[string]string{"/etc/group": "group"}, globErr: os.ErrPermission}
-	if e := env(t, build(t, "files", denied), "files.log_dirs"); e.Status != facts.StatusDenied {
-		t.Errorf("denied /var/log glob → denied, not []: %+v", e)
+	// /var/log itself is a row.
+	var haveVarLog bool
+	for _, r := range ld {
+		if r.(map[string]any)["path"] == "/var/log" {
+			haveVarLog = true
+		}
+	}
+	if !haveVarLog {
+		t.Errorf("/var/log itself must be a log_dirs row: %v", ld)
 	}
 }
 ```
 
-Ensure the `group` fixture maps gid 4 → `adm` and gid 104 → `syslog` (adjust the fixture or the test's gids to match the committed `group` fixture).
-
-- [ ] **Step 6: Register the ten keys, regenerate the golden**
-
-`files.etc_sudoers.{mode,uid,gid,acl_present}`, `files.etc_sudoers_d.{mode,uid,gid,acl_present}`, `files.sudoers_d_entries` (list<record>), `files.log_dirs`, `files.log_files` (list<record>) — all `collector: files`; `sudo.installed` (bool), `sudo.includedir` (string), `sudo.secure_path` (string) — `collector: files`. All `since: 1`, `sensitivity: public`. Regenerate + review.
+The committed `group` fixture must map gid 4 → `adm` and gid 104 → `syslog` (it carries the lines `adm:x:4:` and `syslog:x:104:`); the test's gids depend on those exact entries.
 
 - [ ] **Step 7: Windows gates + lab host, commit**
 
@@ -998,7 +1083,7 @@ absent_means: manual
 checks:
   - { fact: files.startup_scripts, op: each, subject: path, where: { field: is_symlink, op: eq, expected: false }, require: { field: group_writable, op: eq, expected: false } }
   - { fact: files.startup_scripts, op: each, subject: path, where: { field: is_symlink, op: eq, expected: false }, require: { field: other_writable, op: eq, expected: false } }
-  - { fact: files.startup_scripts, op: none, where: { field: mode, op: eq, expected: -1 } }
+  - { fact: files.startup_scripts, op: none, where: { field: reason, op: present } }
   - { fact: files.startup_dirs, op: none, where: { field: other_writable, op: eq, expected: true } }
 remediation:
   text_en: chmod go-w each group- or world-writable startup script and its directory, and chown them to root; investigate any startup file that could not be read.
@@ -1012,8 +1097,8 @@ remediation:
 id: muster.file.syslog_conf_permissions
 title_en: The syslog configuration is 0640 or stricter and owned by root
 title_ko: syslog 설정이 0640 이하로 엄격하며 root 소유이다
-description_en: The rsyslog/syslog-ng configuration files must be mode 0640 or stricter and owned by root, so no other user can read or redirect the logging pipeline. Both distribution families ship /etc/rsyslog.conf at 0644, so a stock host fails this by the guide's 0640 criterion until an operator tightens it (params.allowed_modes relaxes the threshold where local policy differs).
-description_ko: rsyslog/syslog-ng 설정 파일은 mode 0640 이하로 엄격하고 root 소유여야, 다른 사용자가 로깅 파이프라인을 읽거나 바꿀 수 없습니다. 두 배포판 계열 모두 /etc/rsyslog.conf 를 0644 로 배포하므로, 운영자가 조일 때까지 가이드의 0640 기준으로는 기본 설치가 실패합니다(로컬 정책이 다르면 params.allowed_modes 로 기준을 완화).
+description_en: The rsyslog/syslog-ng and systemd-journald configuration files must be mode 0640 or stricter and owned by root, so no other user can read or redirect the logging pipeline. Both distribution families ship /etc/rsyslog.conf at 0644, so a stock host fails this by the guide's 0640 criterion until an operator tightens it (params.allowed_modes relaxes the threshold where local policy differs).
+description_ko: rsyslog/syslog-ng 와 systemd-journald 설정 파일은 mode 0640 이하로 엄격하고 root 소유여야, 다른 사용자가 로깅 파이프라인을 읽거나 바꿀 수 없습니다. 두 배포판 계열 모두 /etc/rsyslog.conf 를 0644 로 배포하므로, 운영자가 조일 때까지 가이드의 0640 기준으로는 기본 설치가 실패합니다(로컬 정책이 다르면 params.allowed_modes 로 기준을 완화).
 category: file
 importance: 상
 automation: auto
@@ -1026,7 +1111,10 @@ params:
 checks:
   - { fact: files.syslog_configs, op: each, subject: path, where: { field: mode, op: ne, expected: -1 }, require: { field: mode, op: in, expected: "${allowed_modes}" } }
   - { fact: files.syslog_configs, op: each, subject: path, where: { field: mode, op: ne, expected: -1 }, require: { field: uid, op: eq, expected: 0 } }
-  - { fact: files.syslog_configs, op: none, where: { field: mode, op: eq, expected: -1 } }
+  - { fact: files.syslog_configs, op: none, where: { field: reason, op: present } }
+  - { fact: files.journald_configs, op: each, subject: path, where: { field: mode, op: ne, expected: -1 }, require: { field: mode, op: in, expected: "${allowed_modes}" } }
+  - { fact: files.journald_configs, op: each, subject: path, where: { field: mode, op: ne, expected: -1 }, require: { field: uid, op: eq, expected: 0 } }
+  - { fact: files.journald_configs, op: none, where: { field: reason, op: present } }
 remediation:
   text_en: chmod 0640 /etc/rsyslog.conf and the files under /etc/rsyslog.d, and chown them to root; investigate any config that could not be read.
   text_ko: /etc/rsyslog.conf 와 /etc/rsyslog.d 아래 파일에 chmod 0640 을 적용하고 root 로 chown 하며, 읽을 수 없었던 설정은 조사합니다.
@@ -1039,8 +1127,8 @@ remediation:
 id: muster.file.inetd_conf_permissions
 title_en: The inetd/xinetd configuration is owned by root and not exposed
 title_ko: inetd/xinetd 설정이 root 소유이며 노출되지 않는다
-description_en: Where an inetd or xinetd super-server is configured, /etc/inetd.conf must not be group-writable or world-readable, and /etc/xinetd.conf and its fragments must be mode 0600 or stricter and not writable by others. Neither super-server is installed on a stock Ubuntu or Rocky host, so the control passes by default and only judges a host that actually runs one.
-description_ko: inetd 또는 xinetd 슈퍼서버가 설정된 경우 /etc/inetd.conf 는 그룹 쓰기·전체 읽기가 가능하면 안 되고, /etc/xinetd.conf 와 그 조각은 mode 0600 이하로 엄격하며 타인이 쓸 수 없어야 합니다. 기본 Ubuntu·Rocky 에는 두 슈퍼서버 모두 설치되지 않으므로 기본적으로 통과하고, 실제로 슈퍼서버를 쓰는 호스트만 판정합니다.
+description_en: Where an inetd or xinetd super-server is configured, /etc/inetd.conf must not be group-writable or world-readable, and /etc/xinetd.conf and its fragments must be mode 0600 or stricter and not writable by others. Neither super-server is installed on a stock Ubuntu or Rocky host, so the control passes by default and only judges a host that actually runs one. A host that has both /etc/inetd.conf and /etc/xinetd.conf present is judged by the inetd mechanism alone, since the first matching mechanism wins.
+description_ko: inetd 또는 xinetd 슈퍼서버가 설정된 경우 /etc/inetd.conf 는 그룹 쓰기·전체 읽기가 가능하면 안 되고, /etc/xinetd.conf 와 그 조각은 mode 0600 이하로 엄격하며 타인이 쓸 수 없어야 합니다. 기본 Ubuntu·Rocky 에는 두 슈퍼서버 모두 설치되지 않으므로 기본적으로 통과하고, 실제로 슈퍼서버를 쓰는 호스트만 판정합니다. /etc/inetd.conf 와 /etc/xinetd.conf 가 모두 존재하는 호스트는 먼저 일치하는 메커니즘이 선택되므로 inetd 메커니즘으로만 판정합니다.
 category: file
 importance: 상
 automation: auto
@@ -1072,13 +1160,13 @@ remediation:
 
 - [ ] **Step 2: Fixtures**
 
-`startup_script_permissions/`: `pass-clean.json` (startup_scripts two rows: one is_symlink true skipped, one regular not writable; startup_dirs not other-writable → PASS), `fail-world-writable.json` (a non-symlink script other_writable true → FAIL), `fail-denied.json` (a row mode -1 → FAIL via the none-mode-eq-minus1 clause), `manual-absent.json` (`files.startup_scripts` absent → MANUAL).
-`syslog_conf_permissions/`: `pass-0640.json` (one row mode 416=0640, uid 0 → PASS), `fail-0644.json` (mode 420=0644 → FAIL, the stock case), `fail-not-root.json` (uid 100 → FAIL), `manual-absent.json`.
-`inetd_conf_permissions/`: `pass-absent.json` (`etc_inetd_conf.mode` absent AND `etc_xinetd_conf.mode` absent → absent_means pass), `pass-xinetd-clean.json` (etc_xinetd_conf.mode 384=0600 uid 0, xinetd_d rows not writable → PASS via mechanism 2), `fail-inetd-world-readable.json` (etc_inetd_conf.mode present, other_readable true → FAIL via mechanism 1), `fail-xinetd-fragment-writable.json` (a xinetd_d row other_writable true → FAIL). Every fixture carries only the leaves its mechanism reads.
+`startup_script_permissions/`: `pass-clean.json` (startup_scripts two rows: one is_symlink true skipped, one regular not writable; startup_dirs not other-writable → PASS), `fail-world-writable.json` (a non-symlink script other_writable true → FAIL), `fail-denied.json` (a row carrying a `reason` field → FAIL via the `none where reason present` clause), `manual-absent.json` (`files.startup_scripts` absent, and `files.startup_dirs` also carried as an absent envelope so no registered key is missing → MANUAL).
+`syslog_conf_permissions/`: every fixture carries both `files.syslog_configs` and `files.journald_configs` (the control now judges both, R207): `pass-0640.json` (one syslog row mode 416=0640 uid 0, journald_configs an ok empty list → PASS), `fail-0644.json` (a syslog row mode 420=0644 → FAIL, the stock case; journald_configs empty), `fail-not-root.json` (a syslog row uid 100 → FAIL; journald_configs empty), `fail-journald-0644.json` (syslog clean at 0640 uid 0, a journald_configs row mode 420 → FAIL, exercising the journald clauses), `manual-absent.json` (both `files.syslog_configs` and `files.journald_configs` absent → MANUAL).
+`inetd_conf_permissions/`: every fixture carries every leaf the mechanisms' `when`/`checks` reference (an absent envelope where not the focus), so mechanism selection is deterministic and no registered key is a hard `missing`: `pass-absent.json` (`etc_inetd_conf.mode` absent AND `etc_xinetd_conf.mode` absent → absent_means pass), `pass-xinetd-clean.json` (`etc_inetd_conf.mode` absent, `etc_xinetd_conf.mode` 384=0600 uid 0, xinetd_d rows not writable → PASS via mechanism 2), `fail-inetd-world-readable.json` (`etc_inetd_conf.mode` present with other_readable true, `etc_xinetd_conf.mode` absent → FAIL via mechanism 1), `fail-xinetd-fragment-writable.json` (`etc_inetd_conf.mode` absent, `etc_xinetd_conf.mode` present, a xinetd_d row other_writable true → FAIL via mechanism 2).
 
 - [ ] **Step 3: e2e, counts, coverage (L10 — keep cmd/muster green in this commit)**
 
-Add to `full-pass.json` and `full-fail.json` under `facts.files`: `startup_scripts` (a clean row + a symlink row), `startup_dirs` (clean), `syslog_configs` (a mode 0640 uid 0 row — so U-21 PASSes), `etc_inetd_conf`/`etc_xinetd_conf` absent + `xinetd_d` `[]` (so U-20 passes via absent_means). All three controls PASS in both snapshots (full-fail keeps root_remote_login as its only FAIL). `cmd/muster/controls_test.go`: both `"ok: 29 controls"` → `"ok: 32 controls"`. `e2e_test.go`: add the three controls to both maps as PASS. `docs/reference/coverage.md`: `go run ./tools/coverage`; `-check` exit 0 (U-17, U-20, U-21 enrolled, 32 items).
+Add to `full-pass.json` and `full-fail.json` under `facts.files`: `startup_scripts` (a clean row + a symlink row), `startup_dirs` (clean), `syslog_configs` (a mode 0640 uid 0 row) and `journald_configs` (an ok empty list) — so U-21 PASSes on both judged facts, `etc_inetd_conf`/`etc_xinetd_conf` absent + `xinetd_d` `[]` (so U-20 passes via absent_means). All three controls PASS in both snapshots (full-fail keeps root_remote_login as its only FAIL). `cmd/muster/controls_test.go`: both `"ok: 29 controls"` → `"ok: 32 controls"`. `e2e_test.go`: add the three controls to both maps as PASS. `docs/reference/coverage.md`: `go run ./tools/coverage`; `-check` exit 0 (U-17, U-20, U-21 enrolled, 32 items).
 
 - [ ] **Step 4: Lint, behaviour test, commit**
 
@@ -1114,8 +1202,8 @@ git commit -m "Add the startup-script, syslog and inetd permission controls"
 id: muster.account.cron_permissions
 title_en: Cron configuration files are 0640 or stricter and owned appropriately
 title_ko: cron 설정 파일이 0640 이하로 엄격하며 소유가 적절하다
-description_en: Every crontab and cron drop-in must be mode 0640 or stricter, must not be group- or world-writable, and a system or access file must be owned by root; the cron directories must not be world-writable. Both distribution families ship /etc/crontab and /etc/cron.d at 0644, so a stock host fails this by the guide's 0640 criterion until an operator tightens it. A file muster could not stat is reported rather than skipped.
-description_ko: 모든 crontab 과 cron 드롭인은 mode 0640 이하로 엄격하고 그룹·전체 쓰기가 가능하면 안 되며, 시스템·접근 제어 파일은 root 소유여야 하고, cron 디렉터리는 전체 쓰기가 가능하면 안 됩니다. 두 배포판 계열 모두 /etc/crontab 과 /etc/cron.d 를 0644 로 배포하므로 운영자가 조일 때까지 가이드의 0640 기준으로는 기본 설치가 실패합니다. stat 할 수 없었던 파일은 건너뛰지 않고 보고합니다.
+description_en: Every crontab and cron drop-in must be mode 0640 or stricter, must not be group- or world-writable, and a system or access file must be owned by root; the cron directories must not be world-writable. Both distribution families ship /etc/crontab and /etc/cron.d at 0644, so a stock host fails this by the guide's 0640 criterion until an operator tightens it. A file muster could not stat is reported rather than skipped. A host with no cron configuration at all yields cron.files as an ok empty list, which is a vacuous PASS.
+description_ko: 모든 crontab 과 cron 드롭인은 mode 0640 이하로 엄격하고 그룹·전체 쓰기가 가능하면 안 되며, 시스템·접근 제어 파일은 root 소유여야 하고, cron 디렉터리는 전체 쓰기가 가능하면 안 됩니다. 두 배포판 계열 모두 /etc/crontab 과 /etc/cron.d 를 0644 로 배포하므로 운영자가 조일 때까지 가이드의 0640 기준으로는 기본 설치가 실패합니다. stat 할 수 없었던 파일은 건너뛰지 않고 보고합니다. cron 설정이 전혀 없는 호스트는 cron.files 가 정상 빈 목록이 되어 공허하게 통과합니다.
 category: account
 importance: 상
 automation: auto
@@ -1131,10 +1219,11 @@ absent_means: fail
 params:
   allowed_modes: { type: list<int>, default: [0, 32, 128, 160, 256, 288, 384, 416], description: cron file modes at 0640 or stricter (bit-subsets of 0640) }
 checks:
-  - { fact: cron.files, op: none, where: { field: mode, op: eq, expected: -1 } }
+  - { fact: cron.files, op: none, where: { field: reason, op: present } }
   - { fact: cron.files, op: each, subject: path, where: { field: mode, op: ne, expected: -1 }, require: { field: mode, op: in, expected: "${allowed_modes}" } }
   - { fact: cron.files, op: none, where: { field: other_writable, op: eq, expected: true } }
   - { fact: cron.files, op: each, subject: path, where: { field: scope, op: in, expected: ["system", "access"] }, require: { field: owner_ok, op: eq, expected: true } }
+  - { fact: cron.files, op: each, subject: path, where: { field: scope, op: eq, expected: "user" }, require: { field: owner_ok, op: eq, expected: true } }
   - { fact: cron.dirs, op: none, where: { field: other_writable, op: eq, expected: true } }
 remediation:
   text_en: chmod 0640 the crontab files and cron drop-ins, chown the system files to root, and chmod o-w the cron directories.
@@ -1167,6 +1256,7 @@ checks:
   - { fact: files.etc_sudoers.uid, op: eq, expected: 0 }
   - { fact: files.sudoers_d_entries, op: each, subject: path, where: { field: ignored, op: eq, expected: false }, require: { field: other_writable, op: eq, expected: false } }
   - { fact: files.sudoers_d_entries, op: each, subject: path, where: { field: ignored, op: eq, expected: false }, require: { field: group_writable, op: eq, expected: false } }
+  - { fact: files.sudoers_d_entries, op: none, where: { field: reason, op: present } }
 remediation:
   text_en: chmod 0440 /etc/sudoers and chown it to root; chmod go-w each active file under /etc/sudoers.d.
   text_ko: /etc/sudoers 에 chmod 0440 을 적용하고 root 로 chown 하며, /etc/sudoers.d 아래 활성 파일에 chmod go-w 를 적용합니다.
@@ -1198,8 +1288,10 @@ params:
 checks:
   - { fact: files.log_dirs, op: none, where: { field: other_writable, op: eq, expected: true } }
   - { fact: files.log_dirs, op: each, subject: path, where: { field: group_writable, op: eq, expected: true }, require: { field: group, op: in, expected: "${allowed_groups}" } }
+  - { fact: files.log_dirs, op: none, where: { field: reason, op: present } }
   - { fact: files.log_files, op: none, where: { field: other_writable, op: eq, expected: true } }
   - { fact: files.log_files, op: each, subject: path, where: { field: group_writable, op: eq, expected: true }, require: { field: group, op: in, expected: "${allowed_groups}" } }
+  - { fact: files.log_files, op: none, where: { field: reason, op: present } }
 remediation:
   text_en: chmod o-w each world-writable log path; for a group-writable path owned by an unexpected group, chown it to root or a logging group, or add that group to the parameter if it is legitimate.
   text_ko: 전체 쓰기 가능한 로그 경로에 chmod o-w 를 적용하고, 예상치 못한 그룹이 소유한 그룹-쓰기 경로는 root 나 로깅 그룹으로 chown 하거나, 정당하면 그 그룹을 파라미터에 추가합니다.
@@ -1209,9 +1301,9 @@ remediation:
 
 - [ ] **Step 2: Fixtures**
 
-`cron_permissions/`: `pass-0640.json` (cron.files rows mode 416, owner_ok true, not writable; cron.dirs not other-writable → PASS), `fail-0644.json` (a row mode 420 → FAIL, the stock case), `fail-world-writable.json` (other_writable true → FAIL), `fail-denied.json` (a row mode -1 → FAIL), `fail-not-owned.json` (a system-scope row owner_ok false → FAIL), `fail-absent.json` (`cron.files` absent → absent_means fail).
-`sudoers_permissions/`: `pass-clean.json` (sudo.installed true, etc_sudoers mode 288=0440 uid 0, a sudoers_d_entries row ignored false not writable → PASS), `fail-mode.json` (etc_sudoers mode 420 → FAIL), `fail-dropin-writable.json` (a non-ignored drop-in group_writable true → FAIL), `pass-ignored-dropin.json` (a group-writable drop-in but ignored true → PASS, skipped), `na-no-sudo.json` (sudo.installed false → NOT_APPLICABLE), `error-denied.json` (etc_sudoers.mode denied → ERROR permission_denied; `_expect` reason_code permission_denied).
-`log_dir_permissions/`: `pass-clean.json` (log_dirs/log_files: a syslog-group-writable file with group "adm" in the allowed set → PASS), `fail-world-writable.json` (a log file other_writable true → FAIL), `fail-unexpected-group.json` (a group-writable dir owned by group "staff" not in allowed → FAIL), `manual-absent.json` (log_dirs absent → MANUAL).
+`cron_permissions/`: every fixture carries both `cron.files` and `cron.dirs`: `pass-0640.json` (cron.files rows mode 416, owner_ok true, not writable; cron.dirs not other-writable → PASS), `fail-0644.json` (a row mode 420 → FAIL, the stock case), `fail-world-writable.json` (other_writable true → FAIL), `fail-denied.json` (a row carrying a `reason` field → FAIL via the `none where reason present` clause), `fail-not-owned.json` (a system-scope row owner_ok false → FAIL), `fail-user-spool-not-owned.json` (a `scope: user` spool row owner_ok false → FAIL, exercising the user-spool owner_ok check, R212), `fail-absent.json` (`cron.files` absent, `cron.dirs` also carried as an absent envelope → absent_means fail).
+`sudoers_permissions/`: every fixture carries `sudo.installed`, `files.etc_sudoers.{mode,uid}` and `files.sudoers_d_entries`: `pass-clean.json` (sudo.installed true, etc_sudoers mode 288=0440 uid 0, a sudoers_d_entries row ignored false not writable → PASS), `fail-mode.json` (etc_sudoers mode 420 → FAIL), `fail-dropin-writable.json` (a non-ignored drop-in group_writable true → FAIL), `fail-dropin-denied.json` (a sudoers_d_entries row carrying a `reason` field → FAIL via the `none where reason present` clause, R208), `pass-ignored-dropin.json` (a group-writable drop-in but ignored true → PASS, skipped), `na-no-sudo.json` (sudo.installed false → NOT_APPLICABLE), `error-denied.json` (etc_sudoers.mode denied → ERROR permission_denied; `_expect` reason_code permission_denied).
+`log_dir_permissions/`: `pass-clean.json` (log_dirs including a /var/log row plus a group-writable dir with group "adm" in the allowed set; log_files clean → PASS), `fail-world-writable.json` (a log file other_writable true → FAIL), `fail-unexpected-group.json` (a group-writable dir owned by group "staff" not in allowed → FAIL), `fail-denied.json` (a log_files row carrying a `reason` field → FAIL via the `none where reason present` clause, R206), `manual-absent.json` (`files.log_dirs` absent, and `files.log_files` also carried as an absent envelope → MANUAL).
 
 - [ ] **Step 3: e2e, counts, coverage (L10)**
 
@@ -1254,13 +1346,13 @@ git commit -m "Reconcile the system-file, startup and cron controls end to end"
 
 ## Self-review
 
-**Spec coverage.** §5.4 `cron` section → T1; `files` startup/syslog/journald/inetd/sudoers/log rows and the `sudo` addition → T2/T3. §6.5 screening & mixed-absence → U-20 uses `mechanisms` (inetd vs xinetd), the other controls read one collector's list facts (no cross-fact absent screen). §7.3 honesty → a failed glob is the read error, never `[]`; a denied file is a `mode:-1`/reason row flagged by a `none where mode eq -1` clause; sudo content read failure is path-prefixed (C3). §10.2 items U-17/U-20/U-21/U-37/U-63/U-67 → T4/T5. STIG where a clean DISA rule exists (U-37 cron, U-67 log dir); U-17/U-20/U-21/U-63 carry KISA (and NIST where general). The 2021 ids match `kisa_mapping.json` (U-17←U-14, U-20←U-10, U-21←U-11, U-37←U-22/U-65, U-63←(none), U-67←(none)).
+**Spec coverage.** §5.4 `cron` section → T1; `files` startup/syslog/journald/inetd/sudoers/log rows and the `sudo` addition → T2/T3. §6.5 screening & mixed-absence → U-20 uses `mechanisms` (inetd vs xinetd), the other controls read one collector's list facts (no cross-fact absent screen). §7.3 honesty → a glob that returns an error is the read error, never `[]` (with the pre-existing `filepath.Glob` denied-directory limitation carried forward to 2M); a denied file is a `reason`-carrying row flagged by a `none where reason present` clause, while a symlink row carries `is_symlink:true` and no reason so the guard leaves it alone; sudo content read failure is path-prefixed (C3). §10.2 items U-17/U-20/U-21/U-37/U-63/U-67 → T4/T5. STIG where a clean DISA rule exists (U-37 cron, U-67 log dir); U-17/U-20/U-21/U-63 carry KISA (and NIST where general). The 2021 ids match `kisa_mapping.json` (U-17←U-14, U-20←U-10, U-21←U-11, U-37←U-22/U-65, U-63←(none), U-67←(none)).
 
-**Placeholder scan.** The `namedUID` placeholder in T1's `cronRow` is explicitly replaced by the owner_ok ruling (`uid >= 1000`); `aclPresent` is specified as "reuse permfacts.go's exact mechanism". No TBD/TODO.
+**Placeholder scan.** `cronRow`'s owner_ok rule is spelled out as `uid == 0 || uid >= 1000` (the earlier draft's placeholder is gone); `acl_present` uses the existing `aclEntries` helper from `acl.go`, mirroring `writeRootHome`. No TBD/TODO.
 
-**Type consistency.** `permRow` returns the shared row shape used by startup/syslog/xinetd/log; `cronRow` adds `scope`/`user`/`owner_ok`; mode-subset params are `list<int>`; `allowed_groups` is `list<string>`; the `none where {field: mode, op: eq, expected: -1}` clauses catch denied rows uniformly. Control ids: `muster.file.{startup_script_permissions,syslog_conf_permissions,inetd_conf_permissions,log_dir_permissions}`, `muster.account.{cron_permissions,sudoers_permissions}`. Count 29 → 35 (T4 +3, T5 +3).
+**Type consistency.** `permRow` returns the shared row shape used by startup/syslog/xinetd/log; `cronRow` adds `scope`/`user`/`owner_ok` (and `is_symlink` on a symlink row); mode-subset params are `list<int>`; `allowed_groups` is `list<string>`; the `none where {field: reason, op: present}` clauses catch denied rows uniformly. Control ids: `muster.file.{startup_script_permissions,syslog_conf_permissions,inetd_conf_permissions,log_dir_permissions}`, `muster.account.{cron_permissions,sudoers_permissions}`. Count 29 → 35 (T4 +3, T5 +3).
 
-**Risks called out.** (1) The vacuous-`each` / failed-glob hazard — every list fact carries the read error on a failed glob and a `mode:-1` row for a denied stat, with a `none where mode eq -1` guard clause. (2) The guide's 0640 vs the stock 0644 — U-21 and U-37 FAIL a stock host by design, stated in their descriptions; the e2e snapshots use 0640 so the suite is green. (3) U-67's log-group allowlist lives in the control (`params`, judged by `each where group_writable require group in allowed`), not precomputed in the collector (D09). (4) U-20's mixed-absence — `mechanisms` on inetd vs xinetd, `absent_means: pass` when neither is present.
+**Risks called out.** (1) The vacuous-`each` / failed-glob hazard — every list fact carries the read error when a glob returns an error, and a `reason`-carrying row for a denied stat, with a `none where reason present` guard clause; `filepath.Glob` cannot report a denied enumeration directory (pre-existing, carried forward to 2M). (2) The guide's 0640 vs the stock 0644 — U-21 and U-37 FAIL a stock host by design, stated in their descriptions; the e2e snapshots use 0640 so the suite is green. (3) U-67's log-group allowlist lives in the control (`params`, judged by `each where group_writable require group in allowed`), not precomputed in the collector (D09). (4) U-20's mixed-absence — `mechanisms` on inetd vs xinetd, `absent_means: pass` when neither is present.
 
 ## Execution notes
 
