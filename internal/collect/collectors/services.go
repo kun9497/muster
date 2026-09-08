@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"io/fs"
-	"maps"
 	"regexp"
 	"slices"
 	"strings"
@@ -20,7 +19,6 @@ const (
 	systemdMarker = "/run/systemd/system"
 	inetdConf     = "/etc/inetd.conf"
 	xinetdGlob    = "/etc/xinetd.d/*"
-	telnetPort    = 23
 )
 
 // showCmd is the single systemctl invocation this collector makes per unit.
@@ -46,33 +44,63 @@ type unitRef struct {
 	provesInstall bool
 }
 
-// logicalUnits maps the logical service a control asks about to the units
-// that may implement it. Every use iterates it in sorted key order (R48) so
-// the commands run, and the keys are written, in the same order each run.
-var logicalUnits = map[string][]unitRef{
-	"ssh": {
-		{"ssh.service", true},
-		{"sshd.service", true},
-		{"ssh.socket", true},
-	},
-	"telnet": {
-		{"telnet.socket", true},
-		{"telnet.service", true},
-		{"telnetd.service", true},
-		{"inetd.service", false},
-		{"xinetd.service", false},
-	},
+type portSpec struct {
+	proto string // "tcp" or "udp"
+	port  int
+}
+
+type logicalService struct {
+	name       string     // fact segment under services.
+	units      []unitRef  // systemd units; provesInstall keeps its established meaning (R223), NOT "canonical for unit_file_state"
+	inetdNames []string   // inetd.conf field-0 names / xinetd.d service names (super-server hosting)
+	servers    []string   // real server-program basenames to match against the inetd/xinetd server field (R233)
+	ports      []portSpec // fixed listening ports for the reachable leaf; empty ⇒ no reachable leaf
+}
+
+// services is the logical-service table. Order is the emission order; keep it
+// stable (same input, same bytes).
+//
+// Ruling R223: the ssh and telnet unitRef lists are verbatim from the former
+// logicalUnits map (ssh keeps ssh.service / sshd.service / ssh.socket; telnet
+// keeps telnet.socket / telnet.service / telnetd.service plus the
+// inetd.service / xinetd.service entries with their current provesInstall
+// flags per R63). Only the new logical services are appended. provesInstall
+// keeps its established meaning (proves-installed vs "systemd did not answer");
+// it is NOT "the canonical unit for unit_file_state" (that is R222's
+// first-loaded rule). Every genuinely new real unit gets provesInstall: true.
+var services = []logicalService{
+	// ssh and telnet: verbatim from the former logicalUnits map.
+	{name: "ssh", units: []unitRef{{"ssh.service", true}, {"sshd.service", true}, {"ssh.socket", true}}},
+	{name: "telnet", units: []unitRef{{"telnet.socket", true}, {"telnet.service", true}, {"telnetd.service", true}, {"inetd.service", false}, {"xinetd.service", false}}, inetdNames: []string{"telnet"}, servers: []string{"telnetd", "in.telnetd"}, ports: []portSpec{{"tcp", 23}}},
+	// New logical services (all real units provesInstall: true; R234 adds atftpd.service to tftp).
+	{name: "finger", units: []unitRef{{"finger.socket", true}, {"fingerd.service", true}}, inetdNames: []string{"finger"}, servers: []string{"in.fingerd"}, ports: []portSpec{{"tcp", 79}}},
+	{name: "rservices", units: []unitRef{{"rsh.socket", true}, {"rlogin.socket", true}, {"rexec.socket", true}}, inetdNames: []string{"shell", "login", "exec"}, servers: []string{"in.rshd", "in.rlogind", "in.rexecd"}, ports: []portSpec{{"tcp", 514}, {"tcp", 513}, {"tcp", 512}}},
+	{name: "dos_services", units: []unitRef{{"echo.socket", true}, {"discard.socket", true}, {"daytime.socket", true}, {"chargen.socket", true}}, inetdNames: []string{"echo", "discard", "daytime", "chargen"}, ports: []portSpec{{"tcp", 7}, {"udp", 7}, {"tcp", 9}, {"udp", 9}, {"tcp", 13}, {"udp", 13}, {"tcp", 19}, {"udp", 19}}},
+	{name: "nfs_server", units: []unitRef{{"nfs-server.service", true}, {"nfs-kernel-server.service", true}}, ports: []portSpec{{"tcp", 2049}, {"udp", 2049}}},
+	{name: "automount", units: []unitRef{{"autofs.service", true}}},
+	{name: "rpcbind", units: []unitRef{{"rpcbind.service", true}, {"rpcbind.socket", true}}, ports: []portSpec{{"tcp", 111}, {"udp", 111}}},
+	{name: "nis", units: []unitRef{{"ypserv.service", true}, {"ypbind.service", true}, {"ypxfrd.service", true}, {"yppasswdd.service", true}}},
+	{name: "tftp", units: []unitRef{{"tftp.socket", true}, {"tftpd.service", true}, {"tftpd-hpa.service", true}, {"atftpd.service", true}}, inetdNames: []string{"tftp"}, servers: []string{"in.tftpd", "atftpd"}, ports: []portSpec{{"udp", 69}}},
+	{name: "talk", units: []unitRef{{"talk.socket", true}, {"ntalk.socket", true}}, inetdNames: []string{"talk", "ntalk"}, servers: []string{"in.talkd", "in.ntalkd"}, ports: []portSpec{{"udp", 517}, {"udp", 518}}},
+	{name: "snmp", units: []unitRef{{"snmpd.service", true}}, ports: []portSpec{{"udp", 161}}},
 }
 
 // declaredShowCommands lists every systemctl invocation the collector may
-// make, derived from logicalUnits so the declaration can never drift from
-// the commands actually run.
+// make, derived from the services table so the declaration can never drift
+// from the commands actually run. The flattened unit names are sorted so the
+// declaration is deterministic (R48).
 func declaredShowCommands() []collect.Command {
-	var out []collect.Command
-	for _, name := range slices.Sorted(maps.Keys(logicalUnits)) {
-		for _, u := range logicalUnits[name] {
-			out = append(out, showCmd(u.name))
+	var units []string
+	for _, svc := range services {
+		for _, u := range svc.units {
+			units = append(units, u.name)
 		}
+	}
+	slices.Sort(units)
+	units = slices.Compact(units)
+	out := make([]collect.Command, 0, len(units))
+	for _, u := range units {
+		out = append(out, showCmd(u))
 	}
 	return out
 }
@@ -110,8 +138,10 @@ func inetdTelnet(line string) bool {
 	return f[0] == "telnet" || (len(f) > inetdServerField && strings.HasSuffix(f[inetdServerField], "telnetd"))
 }
 
-// showValues parses the "Key=Value" lines systemctl show prints.
-func showValues(stdout []byte) (load, active string) {
+// showValues parses the "Key=Value" lines systemctl show prints. R235:
+// SubState is not parsed — nothing reads it — even though the show command
+// still requests it so the declared invocation is unchanged.
+func showValues(stdout []byte) (load, active, unitFile string) {
 	for _, line := range splitLines(stdout) {
 		k, v, ok := strings.Cut(line, "=")
 		if !ok {
@@ -122,9 +152,33 @@ func showValues(stdout []byte) (load, active string) {
 			load = v
 		case "ActiveState":
 			active = v
+		case "UnitFileState":
+			unitFile = v
 		}
 	}
-	return load, active
+	return load, active, unitFile
+}
+
+// enabledFromUnitFile reports whether a unit's UnitFileState means "will start
+// at boot or on socket activation" (Ruling R228).
+//
+//	enabled, enabled-runtime → true
+//	indirect                 → active (a socket unit that is actually listening)
+//	generated                → active (sysv-generator stamps every init.d script
+//	                           "generated" whether or not an rcN.d/S* link exists)
+//	alias                    → false (e.g. Ubuntu nfs-kernel-server.service reports
+//	                           "alias" regardless of the target's enable state; the
+//	                           target unit is in the same list and answers for itself)
+//	static, disabled, masked, bad, "", not-found → false
+func enabledFromUnitFile(state string, active bool) bool {
+	switch state {
+	case "enabled", "enabled-runtime":
+		return true
+	case "indirect", "generated":
+		return active
+	default: // alias, static, disabled, masked, bad, "", not-found
+		return false
+	}
 }
 
 // groupState is what systemd said about one logical service.
@@ -139,8 +193,16 @@ type groupState struct {
 	complete  bool
 	installed bool
 	active    bool
+	enabled   bool
 	truncated bool
 	src       *facts.Source
+
+	// unitFileState is the UnitFileState of the FIRST unit in list order whose
+	// LoadState != "not-found" (R222); it is evidence only, never judged. R231:
+	// "not-found" (systemd's own LoadState word) when no unit was found — not
+	// "absent", which would collide with the envelope-status vocabulary.
+	unitFileState    string
+	unitFileStateSet bool
 
 	// firstFailure is the FIRST unit that did not answer: the one whose
 	// absence from the evidence a reader has to know about. Later failures
@@ -180,14 +242,29 @@ func probeUnits(ctx context.Context, a collect.Access, units []unitRef) groupSta
 		if g.src == nil {
 			g.src = src
 		}
-		load, active := showValues(out.Stdout)
-		if load == "loaded" && u.provesInstall && !g.installed {
+		load, active, unitFile := showValues(out.Stdout)
+		unitActive := active == "active"
+		// R231: a unit that is present at all (even masked) proves the logical
+		// service is installed, provided the unit is one that proves it (R223);
+		// the former rule required LoadState == "loaded".
+		if load != "not-found" && u.provesInstall && !g.installed {
 			g.installed, g.src = true, src
+		}
+		// R222: unit_file_state is the first present unit's UnitFileState, in
+		// list order — evidence only, whatever the enable verdict works out to.
+		if load != "not-found" && !g.unitFileStateSet {
+			g.unitFileState, g.unitFileStateSet = unitFile, true
 		}
 		// A socket unit that is listening reports ActiveState=active too,
 		// so there is nothing else to look at here.
-		if active == "active" {
+		if unitActive {
 			g.active = true
+		}
+		// R222: enabled is the OR over EVERY probed unit, not the canonical one
+		// — a sibling that is enabled-but-stopped still means the service will
+		// come up at boot.
+		if enabledFromUnitFile(unitFile, unitActive) {
+			g.enabled = true
 		}
 	}
 	return g
@@ -195,24 +272,104 @@ func probeUnits(ctx context.Context, a collect.Access, units []unitRef) groupSta
 
 func runServices(ctx context.Context, a collect.Access, b *collect.Builder) error {
 	if _, err := a.Stat(systemdMarker); err != nil {
-		for _, k := range []string{
-			"services.ssh.installed", "services.ssh.active",
-			"services.telnet.installed", "services.telnet.reachable",
-		} {
-			b.Set(k, collect.Unsupported("no systemd on this host or inside this container"))
+		// R239: with no systemd, every leaf the table registers degrades to
+		// unsupported — the reachable leaf too, even though /proc/net could
+		// answer it — so the collect contract stays "complete" on a
+		// systemd-less container and no leaf ever reads as a silent PASS.
+		reason := "no systemd on this host or inside this container"
+		for _, svc := range services {
+			b.Set("services."+svc.name+".installed", collect.Unsupported(reason))
+			b.Set("services."+svc.name+".active", collect.Unsupported(reason))
+			b.Set("services."+svc.name+".unit_file_state", collect.Unsupported(reason))
+			b.Set("services."+svc.name+".enabled", collect.Unsupported(reason))
+			if len(svc.ports) > 0 {
+				b.Set("services."+svc.name+".reachable", collect.Unsupported(reason))
+			}
 		}
 		return nil
 	}
-	for _, name := range slices.Sorted(maps.Keys(logicalUnits)) {
-		g := probeUnits(ctx, a, logicalUnits[name])
-		switch name {
-		case "ssh":
-			setSSH(b, g)
-		case "telnet":
-			setTelnet(b, a, g)
-		}
+	// R232: read the listening-socket table ONCE for the whole sweep — reading
+	// it per service would be up to 48 procfs reads and 12 chances to disagree
+	// with sockets.listening about the same host.
+	t, sockErr := listeningSockets(a)
+	for _, svc := range services {
+		g := probeUnits(ctx, a, svc.units)
+		setService(b, a, svc, g, t, sockErr)
 	}
 	return nil
+}
+
+// setService writes every leaf one logical service registers from the systemd
+// verdict, the shared listening-socket table and — for telnet in this task —
+// the legacy super-server files (Task 2 generalises the super-server read to
+// every service via inetdNames/servers).
+func setService(b *collect.Builder, a collect.Access, svc logicalService, g groupState, t socketTables, sockErr error) {
+	k := "services." + svc.name
+
+	// reachable (fixed-port services only). R41: written false only when the
+	// table was actually read; an unseen table is never a PASS.
+	var reachable bool
+	var reachEnv facts.Envelope
+	if len(svc.ports) > 0 {
+		switch {
+		case sockErr != nil:
+			// R82: the same failure the sockets collector would report, filed
+			// the same way — a masked procfs is unsupported, never an absent a
+			// control's absent_means: pass could read as a PASS.
+			reachEnv = socketReadEnvelope(sockErr)
+		case t.truncated:
+			reachEnv = collect.ErrorEnv("the listening-socket table was truncated at its read limit")
+		default:
+			reachable = hasNonLoopbackPort(t.list, svc.ports)
+			reachEnv = collect.OK(reachable, t.src)
+		}
+	}
+
+	// installed ← a proving unit found (R231, masked counts) OR a reachable
+	// non-loopback port OR a super-server entry (telnet only in this task).
+	// Positive evidence stands on its own whatever the sweep managed (R80).
+	installedEnv := g.verdict(g.installed)
+	if !g.installed {
+		switch {
+		case reachable:
+			installedEnv = collect.OK(true, t.src)
+		case svc.name == "telnet":
+			found, problem := telnetFromLegacy(a)
+			switch {
+			case found != nil:
+				installedEnv = *found
+			case problem != nil && g.complete:
+				// A super-server file we could not read might have named it,
+				// so "not installed" would be a guess. verdict below reports
+				// an incomplete unit sweep instead, since that failed first.
+				installedEnv = *problem
+			}
+		}
+	}
+	b.Set(k+".installed", installedEnv)
+
+	// R224: on a complete sweep a judged leaf is ok:false, never absent — an
+	// absent leaf would short-circuit a multi-fact control through
+	// absent_means before its clauses ran (spec §6.5 step 8).
+	b.Set(k+".active", g.verdict(g.active || reachable))
+	b.Set(k+".enabled", g.verdict(g.enabled))
+
+	// unit_file_state is evidence only (R222); "not-found" when no unit was
+	// found (R231). It is never a judged leaf, so it is always an ok string.
+	b.Set(k+".unit_file_state", withTruncation(collect.OK(g.unitFileStateOrNotFound(), g.src), g.truncated))
+
+	if len(svc.ports) > 0 {
+		b.Set(k+".reachable", reachEnv)
+	}
+}
+
+// unitFileStateOrNotFound is the first present unit's UnitFileState, or the
+// systemd word "not-found" when the sweep found no unit at all (R231).
+func (g groupState) unitFileStateOrNotFound() string {
+	if g.unitFileStateSet {
+		return g.unitFileState
+	}
+	return "not-found"
 }
 
 // verdict turns one proven/not-proven question into an envelope (R80).
@@ -233,65 +390,6 @@ func (g groupState) verdict(proven bool) facts.Envelope {
 		return g.firstFailure
 	default:
 		return withTruncation(collect.OK(false, g.src), g.truncated)
-	}
-}
-
-func setSSH(b *collect.Builder, g groupState) {
-	b.Set("services.ssh.installed", g.verdict(g.installed))
-	if g.complete && !g.installed {
-		// The sweep was complete and found no ssh unit at all: there is
-		// nothing here that could be running, which is a different fact
-		// from "it is installed and stopped".
-		b.Set("services.ssh.active", collect.Absent("no ssh unit is loaded on this host"))
-		return
-	}
-	b.Set("services.ssh.active", g.verdict(g.active))
-}
-
-func setTelnet(b *collect.Builder, a collect.Access, g groupState) {
-	setTelnetInstalled(b, a, g)
-	setTelnetReachable(b, a)
-}
-
-func setTelnetInstalled(b *collect.Builder, a collect.Access, g groupState) {
-	// systemd found a telnet unit loaded: R80 says that proves it whether
-	// or not every sibling unit answered, and the legacy super-server
-	// configuration cannot make it less true, so it is not read at all.
-	if g.installed {
-		b.Set("services.telnet.installed", withTruncation(collect.OK(true, g.src), g.truncated))
-		return
-	}
-	found, problem := telnetFromLegacy(a)
-	switch {
-	case found != nil:
-		// Positive evidence stands on its own, whatever systemd managed.
-		b.Set("services.telnet.installed", *found)
-	case problem != nil && g.complete:
-		// A super-server configuration we could not read might have named
-		// telnet, so "not installed" would be a guess, not a fact. When
-		// the unit sweep was ALSO incomplete, verdict below reports that
-		// instead, since the unit query failed first.
-		b.Set("services.telnet.installed", *problem)
-	default:
-		b.Set("services.telnet.installed", g.verdict(false))
-	}
-}
-
-func setTelnetReachable(b *collect.Builder, a collect.Access) {
-	// R41: reachable is decided by the listening-socket table alone and is
-	// written as false only when that table was actually read. An unseen
-	// table is never a PASS.
-	t, err := listeningSockets(a)
-	switch {
-	case err != nil:
-		// R82: the same failure the sockets collector would report, filed
-		// the same way — a masked procfs is unsupported here too, never an
-		// absent that U-52's absent_means: pass could read as a PASS.
-		b.Set("services.telnet.reachable", socketReadEnvelope(err))
-	case t.truncated:
-		b.Set("services.telnet.reachable", collect.ErrorEnv("the listening-socket table was truncated at its read limit"))
-	default:
-		b.Set("services.telnet.reachable", collect.OK(hasNonLoopbackTCPPort(t.list, telnetPort), t.src))
 	}
 }
 
@@ -354,20 +452,41 @@ func telnetFromLegacy(a collect.Access) (found, problem *facts.Envelope) {
 	return nil, nil
 }
 
-// hasNonLoopbackTCPPort reports whether a listening TCP socket on port is
-// bound somewhere reachable from off the host.
-func hasNonLoopbackTCPPort(list []any, port int) bool {
-	for _, s := range list {
-		m, ok := s.(map[string]any)
-		if !ok {
-			continue
-		}
-		proto, _ := m["proto"].(string)
-		p, _ := m["port"].(int)
-		loopback, _ := m["loopback"].(bool)
-		if strings.HasPrefix(proto, "tcp") && p == port && !loopback {
-			return true
+// hasNonLoopbackPort reports whether any listening socket in the
+// sockets.listening list matches one of the given proto+port pairs on a
+// non-loopback address.
+func hasNonLoopbackPort(list []any, ports []portSpec) bool {
+	for _, ps := range ports {
+		for _, row := range list {
+			m, ok := row.(map[string]any)
+			if !ok {
+				continue
+			}
+			// R221: compare proto by PREFIX, not equality — sockets.listening
+			// rows carry "tcp"/"tcp6"/"udp"/"udp6" (sockets.go), so a ::-bound
+			// daemon (snmpd/rpcbind/nfsd/fingerd) appears only in tcp6/udp6.
+			if strings.HasPrefix(asString(m["proto"]), ps.proto) && asInt(m["port"]) == ps.port && !asBool(m["loopback"]) {
+				return true
+			}
 		}
 	}
 	return false
+}
+
+// asString, asInt and asBool read the fields of a sockets.listening record
+// (sockets.go parseProcNet), tolerating a missing or wrongly-typed field
+// rather than panicking on a type assertion. R221: port is a Go int here.
+func asString(v any) string {
+	s, _ := v.(string)
+	return s
+}
+
+func asInt(v any) int {
+	n, _ := v.(int)
+	return n
+}
+
+func asBool(v any) bool {
+	b, _ := v.(bool)
+	return b
 }

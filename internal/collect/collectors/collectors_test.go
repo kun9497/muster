@@ -1684,15 +1684,15 @@ func showLine(unit string) string {
 }
 
 // allUnitsNotFound cans a systemd that answers, and says every unit this
-// collector asks about is unknown to it.
+// collector asks about is unknown to it. It is built from the services table
+// so a unit added there turns into a "not-found" answer here rather than an
+// unmapped-command error that would fail every existing services test.
 func allUnitsNotFound() map[string]cmdResult {
 	out := map[string]cmdResult{}
-	for _, u := range []string{
-		"ssh.service", "sshd.service", "ssh.socket",
-		"telnet.socket", "telnet.service", "telnetd.service",
-		"inetd.service", "xinetd.service",
-	} {
-		out[showLine(u)] = cmdResult{file: "systemctl.notfound"}
+	for _, svc := range services {
+		for _, u := range svc.units {
+			out[showLine(u.name)] = cmdResult{file: "systemctl.notfound"}
+		}
 	}
 	return out
 }
@@ -1750,14 +1750,17 @@ func TestServicesSshInstalledButInactive(t *testing.T) {
 	}
 }
 
-func TestServicesSshActiveIsAbsentWhenNoUnitIsLoaded(t *testing.T) {
+// R224: a complete sweep that found no unit publishes ok:false on the judged
+// leaves, never absent — an absent leaf would short-circuit a multi-fact
+// control through absent_means before its clauses ran (spec §6.5 step 8).
+func TestServicesSshActiveIsOkFalseWhenNoUnitIsLoaded(t *testing.T) {
 	a := servicesAccess(map[string]string{"/proc/self/net/tcp": "proc_net_tcp"}, allUnitsNotFound())
 	b := build(t, "services", a)
 	if env(t, b, "services.ssh.installed").Value != false {
 		t.Errorf("installed %+v", env(t, b, "services.ssh.installed"))
 	}
-	if env(t, b, "services.ssh.active").Status != facts.StatusAbsent {
-		t.Errorf("active %+v", env(t, b, "services.ssh.active"))
+	if e := env(t, b, "services.ssh.active"); e.Status != facts.StatusOK || e.Value != false {
+		t.Errorf("active %+v, want ok:false (R224)", e)
 	}
 }
 
@@ -1980,6 +1983,102 @@ func TestServicesReadsLegacyFilesWhenSystemdDidNotProveTelnet(t *testing.T) {
 	}
 	if !slices.Contains(a.reads, "/etc/inetd.conf") {
 		t.Errorf("/etc/inetd.conf should have been read: %v", a.reads)
+	}
+}
+
+func TestServicesTableEmitsAllLeavesPerService(t *testing.T) {
+	// finger.socket enabled but inactive → enabled==true, active==false.
+	cmds := allUnitsNotFound()
+	cmds[showLine("finger.socket")] = cmdResult{file: "systemctl.enabled.inactive"}
+	b := build(t, "services", servicesAccess(nil, cmds))
+	if e := env(t, b, "services.finger.active"); e.Status != facts.StatusOK || e.Value != false {
+		t.Errorf("finger.active: %+v", e)
+	}
+	if e := env(t, b, "services.finger.enabled"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("finger.enabled (enabled-but-stopped is still enabled): %+v", e)
+	}
+	if e := env(t, b, "services.finger.unit_file_state"); e.Value != "enabled" {
+		t.Errorf("finger.unit_file_state: %+v", e)
+	}
+	if e := env(t, b, "services.finger.installed"); e.Value != true {
+		t.Errorf("finger.installed: %+v", e)
+	}
+}
+
+// Ruling R222: enabled is the OR over every probed unit, not the canonical one.
+func TestServicesEnabledOredAcrossUnits(t *testing.T) {
+	// NIS client: canonical ypserv.service not-found, sibling ypbind.service
+	// enabled-but-stopped ⇒ enabled==true (catches the NIS-client false-PASS class).
+	cmds := allUnitsNotFound()
+	cmds[showLine("ypbind.service")] = cmdResult{file: "systemctl.enabled.inactive"}
+	b := build(t, "services", servicesAccess(nil, cmds))
+	if e := env(t, b, "services.nis.enabled"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("nis.enabled must OR across units: %+v", e)
+	}
+	if e := env(t, b, "services.nis.active"); e.Value != false {
+		t.Errorf("nis.active: %+v", e)
+	}
+}
+
+// Ruling R228: alias must not count as enabled.
+func TestServicesAliasIsNotEnabled(t *testing.T) {
+	cmds := allUnitsNotFound()
+	cmds[showLine("nfs-kernel-server.service")] = cmdResult{file: "systemctl.alias.inactive"}
+	b := build(t, "services", servicesAccess(nil, cmds))
+	if e := env(t, b, "services.nfs_server.enabled"); e.Value != false {
+		t.Errorf("alias must not count as enabled: %+v", e)
+	}
+}
+
+// Ruling R231: masked IS installed, but not enabled and not active.
+func TestServicesMaskedCountsAsInstalled(t *testing.T) {
+	cmds := allUnitsNotFound()
+	cmds[showLine("snmpd.service")] = cmdResult{file: "systemctl.masked"}
+	b := build(t, "services", servicesAccess(nil, cmds))
+	if e := env(t, b, "services.snmp.installed"); e.Value != true {
+		t.Errorf("masked IS installed: %+v", e)
+	}
+	if e := env(t, b, "services.snmp.enabled"); e.Value != false {
+		t.Errorf("masked is not enabled: %+v", e)
+	}
+	if e := env(t, b, "services.snmp.active"); e.Value != false {
+		t.Errorf("masked is not active: %+v", e)
+	}
+}
+
+// Ruling R221: a ::-bound daemon appears only in udp6/tcp6 (proto prefix match).
+// The mandatory /proc/self/net/tcp table must be present for listeningSockets
+// to run at all (sockets.go ErrProcfsMasked); an empty tcp table proves the
+// port-161 match comes from the udp6 table alone.
+func TestServicesReachableMatchesIPv6Listener(t *testing.T) {
+	a := servicesAccess(map[string]string{
+		"/proc/self/net/tcp":  "proc_net_tcp_empty",
+		"/proc/self/net/udp6": "proc_net_udp6_snmp",
+	}, allUnitsNotFound())
+	b := build(t, "services", a)
+	if e := env(t, b, "services.snmp.reachable"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("::-bound port 161 must be reachable: %+v", e)
+	}
+}
+
+func TestServicesNoSystemdDegradesEveryRegisteredKey(t *testing.T) {
+	b := build(t, "services", &fsAccess{}) // no /run/systemd/system
+	reg, err := facts.LoadRegistry()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Every services.* key the registry declares must be present and unsupported,
+	// so the run stays complete on a systemd-less container (R220).
+	for _, k := range reg.Keys {
+		if k.Collector != "services" {
+			continue
+		}
+		if e := env(t, b, k.Key); e.Status != facts.StatusUnsupported {
+			t.Errorf("%s = %s, want unsupported on no-systemd host", k.Key, e.Status)
+		}
+	}
+	if got := b.Worst("services"); got != facts.StatusOK {
+		t.Errorf(`Worst("services") = %s, want ok (unsupported ranks ok, run stays complete)`, got)
 	}
 }
 

@@ -12,15 +12,333 @@ keys:
     since: 1
     sensitivity: public
     collector: services
+  - key: services.ssh.unit_file_state
+    type: string
+    description: UnitFileState of the first present SSH unit (evidence only; "not-found" when none).
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.ssh.enabled
+    type: bool
+    description: An SSH unit will start at boot or on socket activation.
+    since: 1
+    sensitivity: public
+    collector: services
   - key: services.telnet.installed
     type: bool
     description: A telnet server package, unit or inetd entry exists on the host.
     since: 1
     sensitivity: public
     collector: services
+  - key: services.telnet.active
+    type: bool
+    description: The telnet service is running, socket-activated or reachable on its port.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.telnet.unit_file_state
+    type: string
+    description: UnitFileState of the first present telnet unit (evidence only; "not-found" when none).
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.telnet.enabled
+    type: bool
+    description: A telnet unit will start at boot or on socket activation.
+    since: 1
+    sensitivity: public
+    collector: services
   - key: services.telnet.reachable
     type: bool
     description: A telnet server would accept a connection from off the host (active unit or listening socket unit, non-loopback).
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.finger.installed
+    type: bool
+    description: A finger server package, unit or inetd entry exists on the host.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.finger.active
+    type: bool
+    description: The finger service is running, socket-activated or reachable on its port.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.finger.unit_file_state
+    type: string
+    description: UnitFileState of the first present finger unit (evidence only; "not-found" when none).
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.finger.enabled
+    type: bool
+    description: A finger unit will start at boot or on socket activation.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.finger.reachable
+    type: bool
+    description: A finger server would accept a connection from off the host (non-loopback listener).
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.rservices.installed
+    type: bool
+    description: An r-services server (rsh/rlogin/rexec) unit or inetd entry exists on the host.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.rservices.active
+    type: bool
+    description: An r-services daemon is running, socket-activated or reachable on its port.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.rservices.unit_file_state
+    type: string
+    description: UnitFileState of the first present r-services unit (evidence only; "not-found" when none).
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.rservices.enabled
+    type: bool
+    description: An r-services unit will start at boot or on socket activation.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.rservices.reachable
+    type: bool
+    description: An r-services daemon would accept a connection from off the host (non-loopback listener).
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.dos_services.installed
+    type: bool
+    description: A simple TCP/IP service (echo/discard/daytime/chargen) unit or inetd entry exists on the host.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.dos_services.active
+    type: bool
+    description: A simple TCP/IP service is running, socket-activated or reachable on its port.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.dos_services.unit_file_state
+    type: string
+    description: UnitFileState of the first present simple-service unit (evidence only; "not-found" when none).
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.dos_services.enabled
+    type: bool
+    description: A simple TCP/IP service unit will start at boot or on socket activation.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.dos_services.reachable
+    type: bool
+    description: A simple TCP/IP service would accept a connection from off the host (non-loopback listener).
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.nfs_server.installed
+    type: bool
+    description: An NFS server unit exists on the host.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.nfs_server.active
+    type: bool
+    description: The NFS server is running or reachable on its port.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.nfs_server.unit_file_state
+    type: string
+    description: UnitFileState of the first present NFS server unit (evidence only; "not-found" when none).
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.nfs_server.enabled
+    type: bool
+    description: An NFS server unit will start at boot.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.nfs_server.reachable
+    type: bool
+    description: The NFS server would accept a connection from off the host (non-loopback listener).
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.automount.installed
+    type: bool
+    description: An autofs unit exists on the host.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.automount.active
+    type: bool
+    description: The autofs service is running.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.automount.unit_file_state
+    type: string
+    description: UnitFileState of the first present autofs unit (evidence only; "not-found" when none).
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.automount.enabled
+    type: bool
+    description: An autofs unit will start at boot.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.rpcbind.installed
+    type: bool
+    description: An rpcbind unit exists on the host.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.rpcbind.active
+    type: bool
+    description: The rpcbind service is running, socket-activated or reachable on its port.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.rpcbind.unit_file_state
+    type: string
+    description: UnitFileState of the first present rpcbind unit (evidence only; "not-found" when none).
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.rpcbind.enabled
+    type: bool
+    description: An rpcbind unit will start at boot or on socket activation.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.rpcbind.reachable
+    type: bool
+    description: The rpcbind service would accept a connection from off the host (non-loopback listener).
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.nis.installed
+    type: bool
+    description: An NIS (ypserv/ypbind) unit exists on the host.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.nis.active
+    type: bool
+    description: An NIS daemon is running.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.nis.unit_file_state
+    type: string
+    description: UnitFileState of the first present NIS unit (evidence only; "not-found" when none).
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.nis.enabled
+    type: bool
+    description: An NIS unit will start at boot.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.tftp.installed
+    type: bool
+    description: A TFTP server unit or inetd entry exists on the host.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.tftp.active
+    type: bool
+    description: The TFTP service is running, socket-activated or reachable on its port.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.tftp.unit_file_state
+    type: string
+    description: UnitFileState of the first present TFTP unit (evidence only; "not-found" when none).
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.tftp.enabled
+    type: bool
+    description: A TFTP unit will start at boot or on socket activation.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.tftp.reachable
+    type: bool
+    description: The TFTP service would accept a connection from off the host (non-loopback listener).
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.talk.installed
+    type: bool
+    description: A talk server unit or inetd entry exists on the host.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.talk.active
+    type: bool
+    description: The talk service is running, socket-activated or reachable on its port.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.talk.unit_file_state
+    type: string
+    description: UnitFileState of the first present talk unit (evidence only; "not-found" when none).
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.talk.enabled
+    type: bool
+    description: A talk unit will start at boot or on socket activation.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.talk.reachable
+    type: bool
+    description: The talk service would accept a connection from off the host (non-loopback listener).
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.snmp.installed
+    type: bool
+    description: An SNMP daemon unit exists on the host.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.snmp.active
+    type: bool
+    description: The SNMP service is running or reachable on its port.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.snmp.unit_file_state
+    type: string
+    description: UnitFileState of the first present SNMP unit (evidence only; "not-found" when none).
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.snmp.enabled
+    type: bool
+    description: An SNMP unit will start at boot.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.snmp.reachable
+    type: bool
+    description: The SNMP service would accept a connection from off the host (non-loopback listener).
     since: 1
     sensitivity: public
     collector: services
