@@ -1,0 +1,24 @@
+id: muster.service.dos_services_disabled
+title_en: The DoS-prone small services are not enabled or reachable
+title_ko: DoS 취약 서비스가 활성화되어 있지 않다
+description_en: No echo, discard, daytime or chargen server may be active, enabled at boot, hosted by inetd/xinetd, or listening on a non-loopback address. A host without any of these servers passes.
+description_ko: echo, discard, daytime, chargen 서버가 활성이거나 부팅 시 시작되도록 설정되어 있거나 inetd/xinetd 로 구동되거나 루프백 외 주소에서 대기하면 안 됩니다. 이러한 서비스가 전혀 없는 호스트는 통과합니다.
+category: service
+importance: 상
+automation: auto
+references:
+  kisa: { "2026": ["U-38"], "2021": ["U-23"] }
+requires_facts: ">=1"
+absent_means: pass
+checks:
+  - { fact: services.dos_services.active, op: eq, expected: false }
+  - { fact: services.dos_services.enabled, op: eq, expected: false }
+  - { fact: services.dos_services.reachable, op: eq, expected: false }
+remediation:
+  text_en: Disable and mask the echo, discard, daytime and chargen services or remove their inetd/xinetd entries.
+  text_ko: echo, discard, daytime, chargen 서비스를 비활성화·mask 하거나 inetd/xinetd 의 해당 항목을 제거합니다.
+  risk: restart_service
+  idempotent: true
+  script: systemctl disable --now echo.socket discard.socket daytime.socket chargen.socket 2>/dev/null; systemctl mask echo.socket discard.socket daytime.socket chargen.socket 2>/dev/null; true
+  rollback: systemctl unmask echo.socket discard.socket daytime.socket chargen.socket 2>/dev/null; true
+decision: D19

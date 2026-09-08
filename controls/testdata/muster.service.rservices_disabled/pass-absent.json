@@ -1,0 +1,1 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{"services":{"rservices":{"active":{"status":"absent"},"enabled":{"status":"absent"},"reachable":{"status":"absent"}}}}}
