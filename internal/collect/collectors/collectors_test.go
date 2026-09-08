@@ -2964,7 +2964,7 @@ func TestHostsDenyAllDetected(t *testing.T) {
 		t.Errorf("deny_lines: %v", lines)
 	}
 	allow := okList(t, b, "files.etc_hosts_allow_lines")
-	if len(allow) != 1 || allow[0] != "sshd: 10.0.0.0/8" {
+	if len(allow) != 1 || allow[0] != "sshd: 192.0.2.0/24" {
 		t.Errorf("allow_lines: %v", allow)
 	}
 }
