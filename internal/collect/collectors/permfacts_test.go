@@ -23,7 +23,7 @@ func TestGroupNamesReadsEtcGroup(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got[0] != "root" || got[42] != "shadow" || got[4] != "adm" || len(got) != 3 {
+	if got[0] != "root" || got[42] != "shadow" || got[4] != "adm" || got[104] != "syslog" || len(got) != 4 {
 		t.Errorf("groups = %v", got)
 	}
 	// The fixture repeats gid 42 as dupshadow after shadow, and carries a

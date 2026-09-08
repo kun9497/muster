@@ -51,6 +51,9 @@ func filesReads() []string {
 	reads = append(reads, syslogConfGlobs...)
 	reads = append(reads, journaldConfGlobs...)
 	reads = append(reads, inetdConf, xinetdConfPath, xinetdGlob)
+	// sudoers permission facts and the sudo.* derivation, plus the /var/log tree.
+	reads = append(reads, sudoersPath, sudoersDDir, sudoersDGlob)
+	reads = append(reads, varLogDir, varLogGlob1, varLogGlob2)
 	dotfiles := append(append([]string{}, userEnvNames...), ".rhosts", ".shosts")
 	for _, name := range dotfiles {
 		reads = append(reads, "/home/*/"+name, "/root/"+name)
@@ -119,6 +122,13 @@ func runFiles(_ context.Context, a collect.Access, b *collect.Builder) error {
 	b.Set("files.syslog_configs", syslogConfigs(a, groups))
 	b.Set("files.journald_configs", journaldConfigs(a, groups))
 	writeInetdPerm(b, a, groups)
+
+	// sudoers permission facts, the sudo.* derived keys (U-63) and the
+	// /var/log tree (U-67). groups is reused.
+	sudoersFacts(b, a, groups)
+	ld, lf := logTree(a, groups)
+	b.Set("files.log_dirs", ld)
+	b.Set("files.log_files", lf)
 
 	// /etc/securetty is absent on RHEL 8+ and on the Debian family; the
 	// control that reads it treats that as "this mechanism is not in use".

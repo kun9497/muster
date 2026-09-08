@@ -1,0 +1,4 @@
+# This file MUST be edited with the visudo command as root.
+Defaults secure_path="/usr/sbin:/usr/bin:/sbin:/bin"
+@includedir /etc/sudoers.d
+root ALL=(ALL:ALL) ALL

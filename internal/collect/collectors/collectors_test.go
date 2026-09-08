@@ -89,11 +89,15 @@ func (a *fsAccess) ReadFile(p string, _ int64) ([]byte, collect.ReadMeta, error)
 }
 
 func (a *fsAccess) Stat(p string) (collect.ReadMeta, error) {
-	if err, ok := a.fails[p]; ok {
-		return collect.ReadMeta{}, err
-	}
+	// An explicit stat shape wins over a fails entry for the same path: a file
+	// can be stat-able (its parent directory is searchable) yet unreadable (the
+	// content read is denied) — exactly a 0440 root-owned file seen by a
+	// non-root run. A path present only in fails still fails its Stat.
 	if s, ok := a.stats[p]; ok {
 		return collect.ReadMeta{Tier: "openat2", Mode: s.mode, UID: s.uid, GID: s.gid, Kind: s.kind}, nil
+	}
+	if err, ok := a.fails[p]; ok {
+		return collect.ReadMeta{}, err
 	}
 	if _, ok := a.files[p]; ok {
 		return collect.ReadMeta{Tier: "openat2", Mode: a.mode(p, 0o644)}, nil
@@ -1511,6 +1515,86 @@ func TestFilesSecurettyLinesSkipBlanksAndComments(t *testing.T) {
 	rec, ok := env(t, b, "files.etc_securetty").Value.(map[string]any)
 	if !ok || rec["mode"] != 0o644 {
 		t.Errorf("%#v", env(t, b, "files.etc_securetty").Value)
+	}
+}
+
+// sudoers permission facts come from stat (works non-root); sudo.includedir
+// and secure_path are parsed from /etc/sudoers content (root-only read). A
+// drop-in ending in ~ or containing . is ignored:true (sudo skips it).
+func TestFilesSudoers(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{"/etc/sudoers": "sudoers", "/etc/sudoers.d/muster": "sudoers_d_entry", "/etc/group": "group"},
+		stats: map[string]statResult{
+			"/etc/sudoers":          {mode: 0o440, uid: 0, gid: 0, kind: "regular"},
+			"/etc/sudoers.d":        {mode: 0o750, uid: 0, gid: 0, kind: "dir"},
+			"/etc/sudoers.d/muster": {mode: 0o440, uid: 0, gid: 0, kind: "regular"},
+		},
+	}
+	b := build(t, "files", a)
+	if env(t, b, "files.etc_sudoers.mode").Value != 0o440 || env(t, b, "files.etc_sudoers.uid").Value != 0 {
+		t.Errorf("sudoers perms %+v", env(t, b, "files.etc_sudoers.mode"))
+	}
+	if env(t, b, "sudo.installed").Value != true {
+		t.Error("sudo.installed")
+	}
+	if env(t, b, "sudo.secure_path").Value != "/usr/sbin:/usr/bin:/sbin:/bin" {
+		t.Errorf("secure_path %+v", env(t, b, "sudo.secure_path"))
+	}
+	rows := okList(t, b, "files.sudoers_d_entries")
+	if len(rows) != 1 || rows[0].(map[string]any)["ignored"] != false {
+		t.Fatalf("drop-in rows %v", rows)
+	}
+}
+
+// A non-root run cannot read /etc/sudoers: sudo.secure_path is denied, but the
+// stat-based perm facts (mode/uid) and sudo.installed still succeed. acl_present
+// is legitimately denied on a non-root run (the ACL probe needs the file open),
+// so this test does NOT assert acl_present is ok.
+func TestFilesSudoersDeniedRead(t *testing.T) {
+	a := &fsAccess{
+		fails: map[string]error{"/etc/sudoers": os.ErrPermission},
+		stats: map[string]statResult{"/etc/sudoers": {mode: 0o440, uid: 0, kind: "regular"}},
+		files: map[string]string{"/etc/group": "group"},
+	}
+	b := build(t, "files", a)
+	if env(t, b, "files.etc_sudoers.mode").Value != 0o440 {
+		t.Errorf("stat still works: %+v", env(t, b, "files.etc_sudoers.mode"))
+	}
+	if env(t, b, "files.etc_sudoers.uid").Value != 0 {
+		t.Errorf("uid stat still works: %+v", env(t, b, "files.etc_sudoers.uid"))
+	}
+	if e := env(t, b, "sudo.secure_path"); e.Status != facts.StatusDenied {
+		t.Errorf("a denied read → denied secure_path: %+v", e)
+	}
+}
+
+// /var/log rows carry the group name and writable flags, and /var/log itself is
+// a log_dirs row.
+func TestFilesLogTree(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{"/etc/group": "group"},
+		dirs:  map[string]bool{"/var/log": true, "/var/log/journal": true},
+		stats: map[string]statResult{
+			"/var/log":         {mode: 0o755, uid: 0, gid: 0, kind: "dir"},
+			"/var/log/journal": {mode: 0o2755, uid: 0, gid: 4, kind: "dir"},        // gid 4 = adm in the group fixture
+			"/var/log/syslog":  {mode: 0o640, uid: 104, gid: 104, kind: "regular"}, // gid 104 = syslog
+		},
+	}
+	a.files["/var/log/syslog"] = "" // present for Glob
+	b := build(t, "files", a)
+	ld := okList(t, b, "files.log_dirs")
+	if len(ld) < 1 {
+		t.Fatalf("log_dirs %v", ld)
+	}
+	// /var/log itself is a row.
+	var haveVarLog bool
+	for _, r := range ld {
+		if r.(map[string]any)["path"] == "/var/log" {
+			haveVarLog = true
+		}
+	}
+	if !haveVarLog {
+		t.Errorf("/var/log itself must be a log_dirs row: %v", ld)
 	}
 }
 
