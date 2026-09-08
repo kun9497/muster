@@ -1,0 +1,1 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{"services":{"nis":{"active":{"status":"ok","value":false},"enabled":{"status":"ok","value":true,"source":{"kind":"command","cmd":"/usr/bin/systemctl show ypserv.service"}}}},"accounts":{"nss":{"passwd_sources":{"status":"ok","value":["files"]},"group_sources":{"status":"ok","value":["files"]}}}}}

@@ -1,0 +1,24 @@
+id: muster.service.rpcbind_disabled
+title_en: The RPC portmapper is not enabled or reachable
+title_ko: RPC 포트매퍼(rpcbind)가 활성화되어 있지 않다
+description_en: rpcbind must not be active, enabled at boot, or reachable on its fixed port (111). rpcbind advertises whatever RPC services are registered on the host to any client that asks, which is the reconnaissance step behind NFS and NIS attacks; a host with no RPC service running has no reason to run it. A host without rpcbind passes.
+description_ko: rpcbind 이 활성이거나 부팅 시 시작되도록 설정되어 있거나 고정 포트(111)에서 접속 가능하면 안 됩니다. rpcbind 는 호스트에 등록된 RPC 서비스 목록을 묻는 어떤 클라이언트에게든 알려주며, 이는 NFS·NIS 공격의 정찰 단계에 해당합니다. RPC 서비스를 전혀 쓰지 않는 호스트는 rpcbind 를 돌릴 이유가 없습니다. rpcbind 이 없는 호스트는 통과합니다.
+category: service
+importance: 상
+automation: auto
+references:
+  kisa: { "2026": ["U-42"], "2021": ["U-27"] }
+requires_facts: ">=1"
+absent_means: pass
+checks:
+  - { fact: services.rpcbind.active, op: eq, expected: false }
+  - { fact: services.rpcbind.enabled, op: eq, expected: false }
+  - { fact: services.rpcbind.reachable, op: eq, expected: false }
+remediation:
+  text_en: Stop and mask rpcbind (systemctl disable --now rpcbind.service rpcbind.socket) unless another RPC service on this host genuinely requires it.
+  text_ko: 이 호스트의 다른 RPC 서비스가 실제로 필요로 하지 않는다면 rpcbind 를 중지·mask 합니다 (systemctl disable --now rpcbind.service rpcbind.socket).
+  risk: restart_service
+  idempotent: true
+  script: systemctl disable --now rpcbind.service rpcbind.socket 2>/dev/null; true
+  rollback: systemctl enable --now rpcbind.service rpcbind.socket 2>/dev/null; true
+decision: D19

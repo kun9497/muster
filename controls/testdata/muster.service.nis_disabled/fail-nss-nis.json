@@ -1,0 +1,1 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{"services":{"nis":{"active":{"status":"ok","value":false},"enabled":{"status":"ok","value":false}}},"accounts":{"nss":{"passwd_sources":{"status":"ok","value":["files","nis"]},"group_sources":{"status":"ok","value":["files"]}}}}}

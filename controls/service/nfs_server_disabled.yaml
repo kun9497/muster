@@ -1,0 +1,24 @@
+id: muster.service.nfs_server_disabled
+title_en: The NFS server is not enabled or reachable
+title_ko: NFS 서버가 활성화되어 있지 않다
+description_en: The NFS server must not be active, enabled at boot, or reachable on its fixed port (2049). This judges only whether an NFS server is running on this host; whether its exports are safely scoped once a server does run is a separate control (U-40). A host without an NFS server passes.
+description_ko: NFS 서버가 활성이거나 부팅 시 시작되도록 설정되어 있거나 고정 포트(2049)에서 접속 가능하면 안 됩니다. 이 통제는 이 호스트에 NFS 서버가 떠 있는지만 판단하며, 서버가 떠 있을 때 공유(export) 범위가 안전한지는 별도 통제(U-40)의 몫입니다. NFS 서버가 없는 호스트는 통과합니다.
+category: service
+importance: 상
+automation: auto
+references:
+  kisa: { "2026": ["U-39"], "2021": ["U-24"] }
+requires_facts: ">=1"
+absent_means: pass
+checks:
+  - { fact: services.nfs_server.active, op: eq, expected: false }
+  - { fact: services.nfs_server.enabled, op: eq, expected: false }
+  - { fact: services.nfs_server.reachable, op: eq, expected: false }
+remediation:
+  text_en: Stop and disable the NFS server (systemctl disable --now nfs-server.service) unless the host must actually export filesystems over NFS.
+  text_ko: 이 호스트가 실제로 NFS 로 파일시스템을 공유해야 하는 것이 아니라면 NFS 서버를 중지·비활성화합니다 (systemctl disable --now nfs-server.service).
+  risk: restart_service
+  idempotent: true
+  script: systemctl disable --now nfs-server.service 2>/dev/null; true
+  rollback: systemctl enable --now nfs-server.service 2>/dev/null; true
+decision: D19

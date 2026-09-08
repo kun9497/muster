@@ -1,0 +1,23 @@
+id: muster.service.automount_disabled
+title_en: The automount service is not enabled
+title_ko: automount 서비스가 활성화되어 있지 않다
+description_en: The automountd service must not be active or enabled at boot. Automounting pulls in remote filesystems (NFS shares among them) on access without an administrator reviewing each mount, widening the host's exposure to whatever those remote servers hand back. A host without an automount service passes.
+description_ko: automountd 서비스가 활성이거나 부팅 시 시작되도록 설정되어 있으면 안 됩니다. automount 는 접근 시점에 관리자의 검토 없이 원격 파일시스템(NFS 공유 포함)을 자동으로 마운트하여, 그 원격 서버가 돌려주는 내용에 호스트가 그대로 노출되는 범위를 넓힙니다. automount 서비스가 없는 호스트는 통과합니다.
+category: service
+importance: 상
+automation: auto
+references:
+  kisa: { "2026": ["U-41"], "2021": ["U-26"] }
+requires_facts: ">=1"
+absent_means: pass
+checks:
+  - { fact: services.automount.active, op: eq, expected: false }
+  - { fact: services.automount.enabled, op: eq, expected: false }
+remediation:
+  text_en: Stop and disable autofs (systemctl disable --now autofs.service) unless the host genuinely relies on automounted shares.
+  text_ko: 이 호스트가 자동 마운트 공유에 실제로 의존하지 않는다면 autofs 를 중지·비활성화합니다 (systemctl disable --now autofs.service).
+  risk: restart_service
+  idempotent: true
+  script: systemctl disable --now autofs.service 2>/dev/null; true
+  rollback: systemctl enable --now autofs.service 2>/dev/null; true
+decision: D19

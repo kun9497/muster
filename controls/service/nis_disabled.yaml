@@ -1,0 +1,27 @@
+id: muster.service.nis_disabled
+title_en: NIS is not enabled and not used to resolve accounts
+title_ko: NIS 가 활성화되어 있지 않고 계정 조회에도 쓰이지 않는다
+description_en: Neither ypserv nor ypbind may be active or enabled at boot, and neither nsswitch.conf's passwd nor its group line may name nis or nisplus, since a host can still resolve accounts through a NIS server without running one locally. This does not detect a NIS client configured through nsswitch's legacy compat mode with a "+" entry in /etc/passwd or /etc/group; that idiom is out of scope here, the same way it is for accounts.nss.remote. A host that runs no NIS service and lists neither source passes.
+description_ko: ypserv 와 ypbind 모두 활성이거나 부팅 시 시작되도록 설정되어 있으면 안 되고, nsswitch.conf 의 passwd·group 줄에 nis 나 nisplus 가 들어 있어도 안 됩니다 — 로컬에 NIS 서비스를 띄우지 않고도 외부 NIS 서버로 계정을 조회할 수 있기 때문입니다. 다만 nsswitch 의 구형 compat 모드에서 /etc/passwd·/etc/group 의 "+" 항목으로 NIS 를 쓰는 클라이언트는 이 점검이 탐지하지 못합니다 — accounts.nss.remote 와 마찬가지로 이 방식은 범위 밖입니다. NIS 서비스를 전혀 돌리지 않고 두 소스 모두 나열하지 않는 호스트는 통과합니다.
+category: service
+importance: 상
+automation: auto
+references:
+  kisa: { "2026": ["U-43"], "2021": ["U-28"] }
+  stig:
+    - { benchmark: rhel9, version: "V2R9", id: "RHEL-09-215030" }
+requires_facts: ">=1"
+absent_means: pass
+checks:
+  - { fact: services.nis.active, op: eq, expected: false }
+  - { fact: services.nis.enabled, op: eq, expected: false }
+  - { fact: accounts.nss.passwd_sources, op: none, where: { op: in, expected: ["nis", "nisplus"] } }
+  - { fact: accounts.nss.group_sources, op: none, where: { op: in, expected: ["nis", "nisplus"] } }
+remediation:
+  text_en: Stop and disable ypserv and ypbind (systemctl disable --now ypserv.service ypbind.service) and remove nis/nisplus from the passwd and group lines of /etc/nsswitch.conf.
+  text_ko: ypserv 와 ypbind 를 중지·비활성화하고 (systemctl disable --now ypserv.service ypbind.service) /etc/nsswitch.conf 의 passwd·group 줄에서 nis·nisplus 를 제거합니다.
+  risk: restart_service
+  idempotent: true
+  script: systemctl disable --now ypserv.service ypbind.service 2>/dev/null; true
+  rollback: systemctl enable --now ypserv.service ypbind.service 2>/dev/null; true
+decision: D19
