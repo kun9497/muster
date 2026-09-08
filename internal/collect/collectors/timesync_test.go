@@ -259,3 +259,106 @@ func TestTimesyncUnreadableConfigPoisonsTheDerivedValues(t *testing.T) {
 		}
 	}
 }
+
+// IR-1: chrony's `include` brings more sources in exactly as sourcedir does.
+// The included glob here is /etc/chrony/sources.d/*.sources, which the scan
+// does NOT walk on its own — unlike /etc/chrony/conf.d/*.conf, which is read
+// on every chrony host — so the count can only come from having followed the
+// directive.
+func TestTimesyncChronyIncludeIsFollowed(t *testing.T) {
+	a := timesyncAccess(map[string]string{
+		"/etc/chrony/chrony.conf":            "chrony.conf.include-glob",
+		"/etc/chrony/sources.d/pool.sources": "chrony.sources.included",
+	}, map[string]cmdResult{timedatectlShowKey: {file: "timedatectl.show"}})
+	b := buildBegun(t, "timesync", a)
+
+	if e := env(t, b, "time_sync.provider"); e.Value != "chrony" {
+		t.Errorf("provider: %+v", e)
+	}
+	e := env(t, b, "time_sync.server_count")
+	if e.Status != facts.StatusOK || e.Value != 1 {
+		t.Errorf("server_count: %+v", e)
+	}
+	if !citesInput(env(t, b, "time_sync.servers"), "/etc/chrony/sources.d/pool.sources") {
+		t.Errorf("the included file must be cited as an input: %+v", env(t, b, "time_sync.servers").Source)
+	}
+}
+
+// citesInput reports whether a derived envelope names p among its inputs.
+func citesInput(e facts.Envelope, p string) bool {
+	if e.Source == nil {
+		return false
+	}
+	for _, in := range e.Source.Inputs {
+		if in.Path == p {
+			return true
+		}
+	}
+	return false
+}
+
+// IR-1 + Ruling I-10: an include naming a path outside the declaration is
+// RECORDED, never read — servers/server_count go absent (→ MANUAL) with the
+// path in the reason, and the path never reaches a.reads.
+func TestTimesyncUndeclaredChronyIncludeIsRecordedNotRead(t *testing.T) {
+	a := timesyncAccess(map[string]string{"/etc/chrony/chrony.conf": "chrony.conf.include-odd"},
+		map[string]cmdResult{timedatectlShowKey: {file: "timedatectl.show"}})
+	b := buildBegun(t, "timesync", a)
+
+	for _, k := range []string{"time_sync.servers", "time_sync.server_count"} {
+		e := env(t, b, k)
+		if e.Status != facts.StatusAbsent {
+			t.Errorf("%s = %+v, want absent", k, e)
+		}
+		if !strings.Contains(e.Reason, "/etc/chrony/servers.conf") {
+			t.Errorf("%s: the reason must name the path a reader has to check by hand: %+v", k, e)
+		}
+	}
+	for _, p := range a.reads {
+		if strings.HasPrefix(p, "/etc/chrony/servers.conf") {
+			t.Fatalf("read an undeclared path: %s", p)
+		}
+	}
+}
+
+// IR-1: the ntpd branch follows includefile under the same rule.
+func TestTimesyncUndeclaredNtpIncludefileIsRecordedNotRead(t *testing.T) {
+	a := timesyncAccess(map[string]string{"/etc/ntp.conf": "ntp.conf.includefile"},
+		map[string]cmdResult{timedatectlShowKey: {file: "timedatectl.show"}})
+	b := buildBegun(t, "timesync", a)
+
+	if e := env(t, b, "time_sync.provider"); e.Value != "ntpd" {
+		t.Errorf("provider: %+v", e)
+	}
+	e := env(t, b, "time_sync.servers")
+	if e.Status != facts.StatusAbsent || !strings.Contains(e.Reason, "/etc/ntp/extra.conf") {
+		t.Errorf("servers = %+v, want absent naming the include", e)
+	}
+	for _, p := range a.reads {
+		if strings.HasPrefix(p, "/etc/ntp/extra.conf") {
+			t.Fatalf("read an undeclared path: %s", p)
+		}
+	}
+}
+
+// IR-5: an ntp/ntpsec host keeps /etc/systemd/timesyncd.conf as a conffile
+// after the timesyncd package is removed, so an explicit ntp configuration
+// outranks that leftover file. The timesyncd-only oracle must not run here
+// either — on such a host it exits non-zero and would land in the run header.
+func TestTimesyncNtpdOutranksTheLeftoverTimesyncdConf(t *testing.T) {
+	a := timesyncAccess(map[string]string{
+		"/etc/ntp.conf":               "ntp.conf.pool",
+		"/etc/systemd/timesyncd.conf": "timesyncd.conf.commented",
+	}, map[string]cmdResult{timedatectlShowKey: {file: "timedatectl.show"}})
+	b := buildBegun(t, "timesync", a)
+
+	if e := env(t, b, "time_sync.provider"); e.Value != "ntpd" {
+		t.Errorf("provider = %+v, want ntpd: the persisted ntp configuration decides", e)
+	}
+	if e := env(t, b, "time_sync.server_count"); e.Status != facts.StatusOK || e.Value != 1 {
+		t.Errorf("server_count: %+v", e)
+	}
+	if a.ran[timedatectlShowTimesyncKey] {
+		t.Error("show-timesync must not run off the timesyncd branch")
+	}
+}

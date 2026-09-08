@@ -1,0 +1,4 @@
+# synthetic chrony configuration whose only sources arrive through an include
+include /etc/chrony/sources.d/*.sources
+driftfile /var/lib/chrony/chrony.drift
+makestep 1.0 3

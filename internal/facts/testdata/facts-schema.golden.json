@@ -2674,7 +2674,7 @@
     {
       "Key": "time_sync.provider",
       "Type": "string",
-      "Description": "Which time-synchronisation provider is configured on disk - chrony, timesyncd, ntpd or none; evidence only (which daemon is running is services.ntp.active).",
+      "Description": "Which time-synchronisation provider is configured on disk - chrony, timesyncd, ntpd or none; chosen from the persisted configuration in the order chrony, ntpd, systemd-timesyncd, so a leftover configuration file of a removed provider still decides and should be purged. Evidence only (which daemon is running is services.ntp.active).",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "timesync",

@@ -1531,7 +1531,7 @@ keys:
     collector: firewall
   - key: time_sync.provider
     type: string
-    description: Which time-synchronisation provider is configured on disk - chrony, timesyncd, ntpd or none; evidence only (which daemon is running is services.ntp.active).
+    description: Which time-synchronisation provider is configured on disk - chrony, timesyncd, ntpd or none; chosen from the persisted configuration in the order chrony, ntpd, systemd-timesyncd, so a leftover configuration file of a removed provider still decides and should be purged. Evidence only (which daemon is running is services.ntp.active).
     since: 1
     sensitivity: public
     collector: timesync

@@ -171,15 +171,20 @@ type timesyncScan struct {
 // run picks the provider and collects its sources. The order is the order a
 // host with two of them installed would be judged in: an explicit chrony or
 // ntpd configuration outranks the timesyncd file every systemd host ships.
+// IR-5: ntpd is asked BEFORE timesyncd, not after, because dpkg keeps
+// /etc/systemd/timesyncd.conf as a conffile once the timesyncd package is
+// removed — an ntp/ntpsec host carrying that leftover would otherwise be
+// judged on the timesyncd branch, where the timesyncd-only oracle fails and
+// the server list goes MANUAL.
 // Which daemon is RUNNING is services.ntp.* — this is the persisted view.
 func (s *timesyncScan) run(ctx context.Context) {
 	switch {
 	case s.chrony():
 		s.provider = "chrony"
-	case s.timesyncd(ctx):
-		s.provider = "timesyncd"
 	case s.ntpd():
 		s.provider = "ntpd"
+	case s.timesyncd(ctx):
+		s.provider = "timesyncd"
 	default:
 		s.provider = "none"
 	}
@@ -221,11 +226,25 @@ func (s *timesyncScan) glob(pattern string) []string {
 	return matches
 }
 
-// chronyDir is a directory of extra sources a chrony configuration named.
+// chronyDir is a directory or file of extra sources a chrony configuration
+// named: sourcedir, confdir or include (IR-1).
 type chronyDir struct {
-	directive string // sourcedir | confdir
+	directive string // sourcedir | confdir | include
 	dir       string
 	glob      string
+	depth     int // how many directives away from a main file this one is
+}
+
+// maxTimesyncIncludeDepth caps how deep a chain of include/sourcedir/confdir
+// directives is followed. The seen-set already makes a cycle terminate; the
+// cap bounds a legal but absurdly deep chain, and reaching it UNDER-claims —
+// the list goes absent — rather than publishing a list that may be short.
+const maxTimesyncIncludeDepth = 8
+
+// timesyncInclude is one file an ntp configuration named with includefile.
+type timesyncInclude struct {
+	path  string
+	depth int
 }
 
 // chrony reads every chrony configuration file this host has and returns
@@ -235,10 +254,13 @@ type chronyDir struct {
 func (s *timesyncScan) chrony() bool {
 	found := false
 	var queue []chronyDir
-	take := func(data []byte) {
+	take := func(data []byte, depth int) {
 		names, dirs := parseChronySources(data)
 		s.servers = append(s.servers, names...)
-		queue = append(queue, dirs...)
+		for _, d := range dirs {
+			d.depth = depth
+			queue = append(queue, d)
+		}
 	}
 	for _, p := range chronyMains {
 		data, exists := s.read(p)
@@ -246,13 +268,13 @@ func (s *timesyncScan) chrony() bool {
 			continue
 		}
 		found = true
-		take(data)
+		take(data, 1)
 	}
 	seen := map[string]bool{chronyConfDGlob: true}
 	for _, m := range s.glob(chronyConfDGlob) {
 		found = true
 		if data, _ := s.read(m); data != nil {
-			take(data)
+			take(data, 1)
 		}
 	}
 	if !found {
@@ -265,6 +287,11 @@ func (s *timesyncScan) chrony() bool {
 			continue
 		}
 		seen[d.glob] = true
+		if d.depth > maxTimesyncIncludeDepth {
+			s.absent = "effective NTP server list unknown: chrony " + d.directive + " " + d.dir +
+				" nests deeper than " + strconv.Itoa(maxTimesyncIncludeDepth) + " directives"
+			continue
+		}
 		// Ruling I-10: a directory outside the declaration is RECORDED, never
 		// touched — the sshd Include/Banner precedent (R55/R168). Reading it
 		// would be a guard violation, which makes the collector error and the
@@ -277,7 +304,7 @@ func (s *timesyncScan) chrony() bool {
 		}
 		for _, m := range s.glob(d.glob) {
 			if data, _ := s.read(m); data != nil {
-				take(data)
+				take(data, d.depth+1)
 			}
 		}
 	}
@@ -326,25 +353,69 @@ func (s *timesyncScan) timesyncd(ctx context.Context) bool {
 	return true
 }
 
+// ntpd reads ntp.conf (and ntpsec's copy) plus the files they pull in with
+// includefile, under the same rule as chrony's include (IR-1): a path outside
+// the declaration is RECORDED, never read.
 func (s *timesyncScan) ntpd() bool {
 	found := false
+	var queue []timesyncInclude
 	for _, p := range ntpMains {
 		data, exists := s.read(p)
 		if !exists {
 			continue
 		}
 		found = true
-		for _, raw := range splitLines(data) {
-			f := strings.Fields(configComment(raw))
-			if len(f) >= 2 {
-				switch strings.ToLower(f[0]) {
-				case "server", "pool":
-					s.servers = append(s.servers, f[1])
-				}
-			}
+		queue = append(queue, s.ntpFile(data, 1)...)
+	}
+	if !found {
+		return false
+	}
+	seen := map[string]bool{}
+	for len(queue) > 0 {
+		inc := queue[0]
+		queue = queue[1:]
+		if seen[inc.path] {
+			continue
+		}
+		seen[inc.path] = true
+		if inc.depth > maxTimesyncIncludeDepth {
+			s.absent = "effective NTP server list unknown: ntp includefile " + inc.path +
+				" nests deeper than " + strconv.Itoa(maxTimesyncIncludeDepth) + " directives"
+			continue
+		}
+		// Ruling I-10, as on the chrony branch: reading a file the collector
+		// never declared would be a guard violation, and guessing without it
+		// would be an over-claim, so the list goes absent and a human checks
+		// that path.
+		if !declared(s.a, inc.path) {
+			s.absent = "effective NTP server list unknown: ntp includefile " + inc.path +
+				" is outside the collector's declaration"
+			continue
+		}
+		if data, _ := s.read(inc.path); data != nil {
+			queue = append(queue, s.ntpFile(data, inc.depth+1)...)
 		}
 	}
-	return found
+	return true
+}
+
+// ntpFile parses one ntp configuration file: the sources it names, and the
+// files it includes, which are returned carrying the given depth.
+func (s *timesyncScan) ntpFile(data []byte, depth int) []timesyncInclude {
+	var out []timesyncInclude
+	for _, raw := range splitLines(data) {
+		f := strings.Fields(configComment(raw))
+		if len(f) < 2 {
+			continue
+		}
+		switch strings.ToLower(f[0]) {
+		case "server", "pool":
+			s.servers = append(s.servers, f[1])
+		case "includefile":
+			out = append(out, timesyncInclude{path: path.Clean(f[1]), depth: depth})
+		}
+	}
+	return out
 }
 
 // parseChronySources reads one chrony configuration or .sources file: the
@@ -372,13 +443,20 @@ func parseChronySources(data []byte) (servers []string, dirs []chronyDir) {
 		case "sourcedir":
 			for _, d := range f[1:] {
 				d = path.Clean(d)
-				dirs = append(dirs, chronyDir{"sourcedir", d, path.Join(d, "*.sources")})
+				dirs = append(dirs, chronyDir{directive: "sourcedir", dir: d, glob: path.Join(d, "*.sources")})
 			}
 		case "confdir":
 			for _, d := range f[1:] {
 				d = path.Clean(d)
-				dirs = append(dirs, chronyDir{"confdir", d, path.Join(d, "*.conf")})
+				dirs = append(dirs, chronyDir{directive: "confdir", dir: d, glob: path.Join(d, "*.conf")})
 			}
+		case "include":
+			// IR-1: chrony's include names one file or one glob of files, which
+			// carry sources exactly as a sourcedir's do. It is followed like any
+			// other directive, so an include of a path this collector never
+			// declared is recorded rather than read.
+			inc := path.Clean(f[1])
+			dirs = append(dirs, chronyDir{directive: "include", dir: inc, glob: inc})
 		}
 	}
 	return servers, dirs
