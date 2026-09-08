@@ -69,7 +69,8 @@ var services = []logicalService{
 	// ssh and telnet: verbatim from the former logicalUnits map.
 	{name: "ssh", units: []unitRef{{"ssh.service", true}, {"sshd.service", true}, {"ssh.socket", true}}},
 	{name: "telnet", units: []unitRef{{"telnet.socket", true}, {"telnet.service", true}, {"telnetd.service", true}, {"inetd.service", false}, {"xinetd.service", false}}, inetdNames: []string{"telnet"}, servers: []string{"telnetd", "in.telnetd"}, ports: []portSpec{{"tcp", 23}}},
-	// New logical services (all real units provesInstall: true; R234 adds atftpd.service to tftp).
+	// New logical services (all real units provesInstall: true; R234/R246 give
+	// tftp both the RHEL 9 tftp.service and the socket-activated Debian atftpd.socket).
 	{name: "finger", units: []unitRef{{"finger.socket", true}, {"fingerd.service", true}}, inetdNames: []string{"finger"}, servers: []string{"in.fingerd"}, ports: []portSpec{{"tcp", 79}}},
 	{name: "rservices", units: []unitRef{{"rsh.socket", true}, {"rlogin.socket", true}, {"rexec.socket", true}}, inetdNames: []string{"shell", "login", "exec"}, servers: []string{"in.rshd", "in.rlogind", "in.rexecd"}, ports: []portSpec{{"tcp", 514}, {"tcp", 513}, {"tcp", 512}}},
 	{name: "dos_services", units: []unitRef{{"echo.socket", true}, {"discard.socket", true}, {"daytime.socket", true}, {"chargen.socket", true}}, inetdNames: []string{"echo", "discard", "daytime", "chargen"}, ports: []portSpec{{"tcp", 7}, {"udp", 7}, {"tcp", 9}, {"udp", 9}, {"tcp", 13}, {"udp", 13}, {"tcp", 19}, {"udp", 19}}},
@@ -77,7 +78,7 @@ var services = []logicalService{
 	{name: "automount", units: []unitRef{{"autofs.service", true}}},
 	{name: "rpcbind", units: []unitRef{{"rpcbind.service", true}, {"rpcbind.socket", true}}, ports: []portSpec{{"tcp", 111}, {"udp", 111}}},
 	{name: "nis", units: []unitRef{{"ypserv.service", true}, {"ypbind.service", true}, {"ypxfrd.service", true}, {"yppasswdd.service", true}}},
-	{name: "tftp", units: []unitRef{{"tftp.socket", true}, {"tftpd.service", true}, {"tftpd-hpa.service", true}, {"atftpd.service", true}}, inetdNames: []string{"tftp"}, servers: []string{"in.tftpd", "atftpd"}, ports: []portSpec{{"udp", 69}}},
+	{name: "tftp", units: []unitRef{{"tftp.socket", true}, {"tftp.service", true}, {"tftpd.service", true}, {"tftpd-hpa.service", true}, {"atftpd.socket", true}, {"atftpd.service", true}}, inetdNames: []string{"tftp"}, servers: []string{"in.tftpd", "atftpd"}, ports: []portSpec{{"udp", 69}}},
 	{name: "talk", units: []unitRef{{"talk.socket", true}, {"ntalk.socket", true}}, inetdNames: []string{"talk", "ntalk"}, servers: []string{"in.talkd", "in.ntalkd"}, ports: []portSpec{{"udp", 517}, {"udp", 518}}},
 	{name: "snmp", units: []unitRef{{"snmpd.service", true}}, ports: []portSpec{{"udp", 161}}},
 }
@@ -278,7 +279,7 @@ func runServices(ctx context.Context, a collect.Access, b *collect.Builder) erro
 	t, sockErr := listeningSockets(a)
 	// R227: read /etc/inetd.conf and the xinetd.d fragments — and probe the
 	// super-server host units — ONCE for the whole sweep, not per service.
-	supers := readSuperServers(a)
+	supers := readSuperServers(ctx, a)
 	for _, svc := range services {
 		g := probeUnits(ctx, a, svc.units)
 		setService(b, svc, g, t, sockErr, &supers)
@@ -351,7 +352,7 @@ func setService(b *collect.Builder, svc logicalService, g groupState, t socketTa
 	// control would read as a PASS.
 	switch {
 	case superActive:
-		b.Set(k+".active", collect.OK(true, supers.hit))
+		b.Set(k+".active", collect.OK(true, supers.hitEnabled))
 	case len(svc.ports) > 0 && !g.active && reachEnv.Status != facts.StatusOK:
 		b.Set(k+".active", reachEnv)
 	case superEv != nil && !g.active && !reachable && g.complete:
@@ -363,7 +364,7 @@ func setService(b *collect.Builder, svc logicalService, g groupState, t socketTa
 	}
 	switch {
 	case superEnabled:
-		b.Set(k+".enabled", collect.OK(true, supers.hit))
+		b.Set(k+".enabled", collect.OK(true, supers.hitEnabled))
 	case superEv != nil && !g.enabled && g.complete:
 		// Likewise for enabled: an unreadable config might have named an
 		// enabled entry, so surface the read error rather than ok:false.
@@ -373,8 +374,15 @@ func setService(b *collect.Builder, svc logicalService, g groupState, t socketTa
 	}
 
 	// unit_file_state is evidence only (R222); "not-found" when no unit was
-	// found (R231). It is never a judged leaf, so it is always an ok string.
-	b.Set(k+".unit_file_state", withTruncation(collect.OK(g.unitFileStateOrNotFound(), g.src), g.truncated))
+	// found (R231). R249: on an incomplete sweep where no unit answered with a
+	// file state, the honest evidence is the first probe failure — not an
+	// "ok:not-found" that claims systemd said not-found for a sweep it never
+	// finished. Otherwise it is the first present unit's state (or "not-found").
+	if !g.complete && !g.unitFileStateSet {
+		b.Set(k+".unit_file_state", g.firstFailure)
+	} else {
+		b.Set(k+".unit_file_state", withTruncation(collect.OK(g.unitFileStateOrNotFound(), g.src), g.truncated))
+	}
 
 	if len(svc.ports) > 0 {
 		b.Set(k+".reachable", reachEnv)

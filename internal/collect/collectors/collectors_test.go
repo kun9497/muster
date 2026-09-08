@@ -1694,6 +1694,13 @@ func allUnitsNotFound() map[string]cmdResult {
 			out[showLine(u.name)] = cmdResult{file: "systemctl.notfound"}
 		}
 	}
+	// R243: the super-server host units are probed once per run too; without
+	// canned not-found answers they would return an unmapped-command error and
+	// register as a host-probe failure, so map them here alongside the table
+	// units.
+	for _, u := range superServerHostUnits {
+		out[showLine(u)] = cmdResult{file: "systemctl.notfound"}
+	}
 	return out
 }
 
@@ -2004,7 +2011,7 @@ func TestSuperServerReaderMatchesByNameAndServer(t *testing.T) {
 	// openbsd-inetd running+enabled; a live 'shell' entry ⇒ r-services enabled+active.
 	cmds := allUnitsNotFound()
 	cmds[showLine("openbsd-inetd.service")] = cmdResult{file: "systemctl.loaded.active"}
-	s := readSuperServers(servicesAccess(map[string]string{inetdConf: "inetd.conf.rsh"}, cmds))
+	s := readSuperServers(context.Background(), servicesAccess(map[string]string{inetdConf: "inetd.conf.rsh"}, cmds))
 	installed, enabled, active, found, ev := s.match([]string{"shell", "login", "exec"}, []string{"in.rshd", "in.rlogind", "in.rexecd"})
 	if ev != nil {
 		t.Fatalf("unexpected envelope: %+v", ev)
@@ -2018,7 +2025,7 @@ func TestSuperServerReaderMatchesByNameAndServer(t *testing.T) {
 func TestSuperServerEntryGatedByHostState(t *testing.T) {
 	cmds := allUnitsNotFound()
 	cmds[showLine("openbsd-inetd.service")] = cmdResult{file: "systemctl.loaded.inactive"} // installed, disabled, stopped
-	s := readSuperServers(servicesAccess(map[string]string{inetdConf: "inetd.conf.rsh"}, cmds))
+	s := readSuperServers(context.Background(), servicesAccess(map[string]string{inetdConf: "inetd.conf.rsh"}, cmds))
 	installed, enabled, active, found, _ := s.match([]string{"shell"}, []string{"in.rshd"})
 	if !found || !installed {
 		t.Fatalf("entry present: found=%v installed=%v", found, installed)
@@ -2029,13 +2036,81 @@ func TestSuperServerEntryGatedByHostState(t *testing.T) {
 }
 
 func TestSuperServerReaderIgnoresCommentsAndOtherNames(t *testing.T) {
-	s := readSuperServers(servicesAccess(map[string]string{inetdConf: "inetd.conf.finger.commented"}, allUnitsNotFound()))
+	s := readSuperServers(context.Background(), servicesAccess(map[string]string{inetdConf: "inetd.conf.finger.commented"}, allUnitsNotFound()))
 	installed, enabled, _, found, ev := s.match([]string{"finger"}, []string{"in.fingerd"})
 	if ev != nil {
 		t.Fatal(ev)
 	}
 	if found || installed || enabled {
 		t.Fatalf("commented finger: found=%v installed=%v enabled=%v, want false", found, installed, enabled)
+	}
+}
+
+// Ruling R242: a `server_args = …` line must not overwrite the parsed server
+// basename. The block sits under a non-matching service name, so only the
+// server-basename channel (in.tftpd) can find it — which it cannot if
+// server_args clobbered cur.server with path.Base("-s").
+func TestServicesXinetdServerArgsDoesNotClobberServerBasename(t *testing.T) {
+	cmds := allUnitsNotFound()
+	cmds[showLine("xinetd.service")] = cmdResult{file: "systemctl.loaded.active"}
+	s := readSuperServers(context.Background(), servicesAccess(map[string]string{
+		"/etc/xinetd.d/tftp-custom": "xinetd.tftp.server_args",
+	}, cmds))
+	installed, enabled, active, found, ev := s.match(nil, []string{"in.tftpd"})
+	if ev != nil {
+		t.Fatalf("unexpected envelope: %+v", ev)
+	}
+	if !found || !installed || !enabled || !active {
+		t.Fatalf("server_args must not hide the in.tftpd server field: found=%v installed=%v enabled=%v active=%v, want all true", found, installed, enabled, active)
+	}
+}
+
+// Ruling R243: a super-server host unit that fails to answer must not let a
+// live entry read as a silent disabled/inactive. Here a live `shell` r-services
+// entry sits in /etc/inetd.conf; inetd.service answers not-found but
+// openbsd-inetd.service — the unit that actually hosts it — fails. installed is
+// positive evidence and stays ok:true; enabled and active must carry the
+// host-probe failure, never ok:false.
+func TestServicesSuperServerHostProbeFailureIsNotASilentFalse(t *testing.T) {
+	cmds := allUnitsNotFound()
+	cmds[showLine("openbsd-inetd.service")] = cmdResult{exitCode: 1, stderr: "Failed to connect to bus\n"}
+	a := servicesAccess(map[string]string{
+		inetdConf:            "inetd.conf.rsh",
+		"/proc/self/net/tcp": "proc_net_tcp_empty",
+	}, cmds)
+	b := build(t, "services", a)
+	if e := env(t, b, "services.rservices.installed"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("rservices.installed = %+v, want ok:true (the inetd entry proves it)", e)
+	}
+	for _, leafName := range []string{"enabled", "active"} {
+		e := env(t, b, "services.rservices."+leafName)
+		if e.Status == facts.StatusOK {
+			t.Errorf("rservices.%s must not be ok when a host probe failed: %+v", leafName, e)
+		}
+	}
+}
+
+// Finding 5 / C3: an /etc/inetd.conf that exists but cannot be read is the
+// answer for every leaf it could set, path-prefixed, never a silent ok:false.
+// A service with no inetdNames (automount) is unaffected and stays ok:false.
+// Deleting any of the three superEv branches in setService turns this red.
+func TestServicesUnreadableInetdConfIsNotASilentFalse(t *testing.T) {
+	a := servicesAccess(map[string]string{"/proc/self/net/tcp": "proc_net_tcp_empty"}, allUnitsNotFound())
+	a.fails = map[string]error{inetdConf: os.ErrPermission}
+	b := build(t, "services", a)
+	for _, leafName := range []string{"installed", "active", "enabled"} {
+		e := env(t, b, "services.finger."+leafName)
+		if e.Status != facts.StatusDenied {
+			t.Errorf("services.finger.%s = %s, want denied on an unreadable inetd.conf: %+v", leafName, e.Status, e)
+		}
+		if !strings.HasPrefix(e.Reason, inetdConf+":") {
+			t.Errorf("services.finger.%s reason %q must be prefixed by %q", leafName, e.Reason, inetdConf)
+		}
+	}
+	for _, leafName := range []string{"installed", "active", "enabled"} {
+		if e := env(t, b, "services.automount."+leafName); e.Status != facts.StatusOK || e.Value != false {
+			t.Errorf("services.automount.%s = %+v, want ok:false (no inetdNames, unaffected by inetd.conf)", leafName, e)
+		}
 	}
 }
 

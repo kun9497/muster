@@ -65,22 +65,33 @@ type superServers struct {
 	hostProbed  bool // at least one host unit answered (state is known)
 	readErr     *facts.Envelope
 
+	// hostFailed is the FIRST host-unit probe that did not answer (timed out,
+	// could not run, or exited non-zero), kept as the envelope match surfaces
+	// on a found entry's enabled/active when the host state is not positively
+	// enabled/active (R243). A host unit that failed might have been the one
+	// hosting the entry, so "not enabled/active" would be a guess, not a fact.
+	hostFailed *facts.Envelope
+
 	// hit is scratch: match records the source (and truncation) of the entry
 	// it matched so the caller can attribute the installed leaf to that exact
-	// line. It is overwritten by every match call and read immediately after.
+	// line. hitEnabled is the source of the first ENABLED matching entry, used
+	// for the enabled/active leaves so their attribution never points at a
+	// `disable = yes` block (R248). Both are overwritten by every match call
+	// and read immediately after, in the same goroutine.
 	hit          *facts.Source
 	hitTruncated bool
+	hitEnabled   *facts.Source
 }
 
 // readSuperServers parses /etc/inetd.conf and every /etc/xinetd.d/* fragment
 // ONCE, and probes the four super-server host units ONCE (R227). It never
 // judges a service on its own — match does that per service — it only gathers
 // the shared evidence a whole sweep reuses.
-func readSuperServers(a collect.Access) superServers {
+func readSuperServers(ctx context.Context, a collect.Access) superServers {
 	var s superServers
 	s.readInetd(a)
 	s.readXinetd(a)
-	s.probeHosts(a)
+	s.probeHosts(ctx, a)
 	return s
 }
 
@@ -164,13 +175,24 @@ func (s *superServers) parseXinetd(p string, data []byte, truncated bool) {
 			// text outside any service block (e.g. a stray brace) — ignore
 		case strings.HasPrefix(line, "}"):
 			flush()
-		case strings.HasPrefix(f[0], "disable"):
-			if v, ok := attrValue(line); ok && v == "yes" {
-				cur.enabled = false
+		default:
+			// R242: match the attribute key EXACTLY, never by prefix — otherwise
+			// `server_args = -s …` overwrites cur.server with path.Base("-s"),
+			// silently disabling the R233 server-basename channel, and `disabled
+			// = …` would be read as `disable`.
+			key, _, ok := strings.Cut(line, "=")
+			if !ok {
+				break
 			}
-		case strings.HasPrefix(f[0], "server"):
-			if v, ok := attrValue(line); ok {
-				cur.server = path.Base(v)
+			switch strings.TrimSpace(key) {
+			case "disable":
+				if v, ok := attrValue(line); ok && v == "yes" {
+					cur.enabled = false
+				}
+			case "server":
+				if v, ok := attrValue(line); ok {
+					cur.server = path.Base(v)
+				}
 			}
 		}
 	}
@@ -200,16 +222,35 @@ func (s *superServers) noteReadError(p string, err error) {
 	}
 }
 
+// noteHostFailure keeps the FIRST host-unit probe failure only (R243).
+func (s *superServers) noteHostFailure(e facts.Envelope) {
+	if s.hostFailed == nil {
+		s.hostFailed = &e
+	}
+}
+
 // probeHosts runs systemctl show over the four host units once, folding their
 // answers into the aggregate host state (R227). A unit that never answered
-// (systemctl could not run, timed out, or is unknown to this build's command
-// map) is simply not counted; hostProbed stays false only when NONE answered.
-func (s *superServers) probeHosts(a collect.Access) {
-	ctx := context.Background()
+// (systemctl could not run, timed out, or exited non-zero) is not counted
+// toward the aggregate, but the FIRST such failure is kept in hostFailed so a
+// found entry does not silently read as disabled/inactive when the very unit
+// that might host it never answered (R243). hostProbed stays false only when
+// NONE answered. R247: the sweep ctx is threaded in, not context.Background().
+func (s *superServers) probeHosts(ctx context.Context, a collect.Access) {
 	for _, u := range superServerHostUnits {
-		out := a.Run(ctx, showCmd(u))
-		if out.TimedOut || out.Err != nil || out.ExitCode != 0 {
-			continue // this unit did not answer
+		cmd := showCmd(u)
+		out := a.Run(ctx, cmd)
+		switch {
+		case out.TimedOut:
+			e := collect.TimeoutEnv("systemctl show " + u + " timed out")
+			e.Source = out.Source(cmd)
+			s.noteHostFailure(withTruncation(e, out.Truncated))
+			continue
+		case out.Err != nil, out.ExitCode != 0:
+			// services declares Needs: none, so a failure here is never a
+			// privilege problem by virtue of this process's euid (R84).
+			s.noteHostFailure(commandFailure("systemctl show "+u, out, out.Source(cmd), false))
+			continue
 		}
 		s.hostProbed = true
 		load, active, unitFile := showValues(out.Stdout)
@@ -243,9 +284,11 @@ func (s *superServers) probeHosts(a collect.Access) {
 // server-program BASENAME equalling one of servers — no `<name>d`/`in.<name>d`
 // suffix heuristic (in.rshd is not "shelld").
 //
-// ev is the read error when a config file existed but could not be read: it is
-// never nil-laundered into a false, so the caller surfaces it on the leaves
-// that file could have set.
+// ev is the non-ok envelope the caller must surface rather than a silent false:
+// the read error when a config file existed but could not be read (R227), or —
+// when no read error stands — the first host-unit probe failure on a found,
+// file-enabled entry whose host did not come back positively enabled/active
+// (R243). It is never nil-laundered into a false.
 func (s *superServers) match(names, servers []string) (installed, enabled, active, found bool, ev *facts.Envelope) {
 	var enabledEntry bool
 	for _, e := range s.entries {
@@ -259,12 +302,25 @@ func (s *superServers) match(names, servers []string) (installed, enabled, activ
 		}
 		if e.enabled {
 			enabledEntry = true
+			// R248: attribute enabled/active to the first ENABLED entry, never a
+			// `disable = yes` block that merely matched by name/server.
+			if s.hitEnabled == nil {
+				s.hitEnabled = e.src
+			}
 		}
 	}
 	installed = found
 	enabled = enabledEntry && (s.hostEnabled || !s.hostProbed)
 	active = enabledEntry && s.hostActive
-	return installed, enabled, active, found, s.readErr
+	ev = s.readErr
+	// R243: a found, file-enabled entry that did not come back positively
+	// enabled/active while a host probe failed could be live behind the unit
+	// that never answered — surface that failure so enabled/active are not a
+	// silent ok:false.
+	if ev == nil && enabledEntry && s.hostFailed != nil && (!s.hostEnabled || !s.hostActive) {
+		ev = s.hostFailed
+	}
+	return installed, enabled, active, found, ev
 }
 
 // entryMatches applies R233's NAME-or-server-basename rule.
