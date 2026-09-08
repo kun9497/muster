@@ -1,8 +1,8 @@
 id: muster.service.tftp_talk_disabled
 title_en: tftp and talk are not enabled or reachable
 title_ko: tftp 와 talk 가 활성화되어 있지 않고 접속할 수도 없다
-description_en: Neither the tftp server nor the talk server may be active, enabled at boot, or reachable on their fixed ports (tftp 69/udp, talk 517/udp and 518/udp). The talk logical service already covers ntalk, the 2026 item's added target, since both share the same port 518/udp and inetd name; no separate key is needed. A host that runs neither service passes.
-description_ko: tftp 서버와 talk 서버 모두 활성이거나 부팅 시 시작되도록 설정되어 있거나 고정 포트(tftp 69/udp, talk 517·518/udp)에서 접속 가능하면 안 됩니다. talk 로지컬 서비스에는 2026년 항목이 추가한 ntalk 도 이미 포함되어 있습니다 — 둘 다 같은 518/udp 포트와 inetd 이름을 쓰기 때문에 별도의 키가 필요 없습니다. 두 서비스를 모두 돌리지 않는 호스트는 통과합니다.
+description_en: Neither the tftp server nor the talk server may be active, enabled at boot, or reachable on their fixed ports (tftp 69/udp, talk 517/udp and 518/udp). The talk logical service already covers ntalk, the 2026 item's added target, by judging both inetd names (talk, ntalk) and both ports (517/udp, 518/udp), so no separate key is needed. A host that runs neither service passes.
+description_ko: tftp 서버와 talk 서버 모두 활성이거나 부팅 시 시작되도록 설정되어 있거나 고정 포트(tftp 69/udp, talk 517·518/udp)에서 접속 가능하면 안 됩니다. talk 로지컬 서비스에는 2026년 항목이 추가한 ntalk 도 이미 포함되어 있습니다 — inetd 이름 두 개(talk, ntalk)와 포트 두 개(517/udp, 518/udp)를 모두 판정하므로 별도의 키가 필요 없습니다. 두 서비스를 모두 돌리지 않는 호스트는 통과합니다.
 category: service
 importance: 상
 automation: auto

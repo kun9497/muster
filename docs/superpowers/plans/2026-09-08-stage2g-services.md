@@ -227,7 +227,7 @@ var services = []logicalService{
 	// ssh and telnet: verbatim from services.go logicalUnits (do not change the unit lists or flags).
 	{name: "ssh", units: []unitRef{{"ssh.service", true}, {"sshd.service", true}, {"ssh.socket", true}}},
 	{name: "telnet", units: []unitRef{{"telnet.socket", true}, {"telnet.service", true}, {"telnetd.service", true}, {"inetd.service", false}, {"xinetd.service", false}}, inetdNames: []string{"telnet"}, servers: []string{"telnetd", "in.telnetd"}, ports: []portSpec{{"tcp", 23}}},
-	// New logical services (all real units provesInstall: true; R234 adds atftpd.service to tftp).
+	// New logical services (all real units provesInstall: true; R234/R246 give tftp both the RHEL 9 tftp.service and the socket-activated Debian atftpd.socket).
 	{name: "finger", units: []unitRef{{"finger.socket", true}, {"fingerd.service", true}}, inetdNames: []string{"finger"}, servers: []string{"in.fingerd"}, ports: []portSpec{{"tcp", 79}}},
 	{name: "rservices", units: []unitRef{{"rsh.socket", true}, {"rlogin.socket", true}, {"rexec.socket", true}}, inetdNames: []string{"shell", "login", "exec"}, servers: []string{"in.rshd", "in.rlogind", "in.rexecd"}, ports: []portSpec{{"tcp", 514}, {"tcp", 513}, {"tcp", 512}}},
 	{name: "dos_services", units: []unitRef{{"echo.socket", true}, {"discard.socket", true}, {"daytime.socket", true}, {"chargen.socket", true}}, inetdNames: []string{"echo", "discard", "daytime", "chargen"}, ports: []portSpec{{"tcp", 7}, {"udp", 7}, {"tcp", 9}, {"udp", 9}, {"tcp", 13}, {"udp", 13}, {"tcp", 19}, {"udp", 19}}},
@@ -235,7 +235,7 @@ var services = []logicalService{
 	{name: "automount", units: []unitRef{{"autofs.service", true}}},
 	{name: "rpcbind", units: []unitRef{{"rpcbind.service", true}, {"rpcbind.socket", true}}, ports: []portSpec{{"tcp", 111}, {"udp", 111}}},
 	{name: "nis", units: []unitRef{{"ypserv.service", true}, {"ypbind.service", true}, {"ypxfrd.service", true}, {"yppasswdd.service", true}}},
-	{name: "tftp", units: []unitRef{{"tftp.socket", true}, {"tftpd.service", true}, {"tftpd-hpa.service", true}, {"atftpd.service", true}}, inetdNames: []string{"tftp"}, servers: []string{"in.tftpd", "atftpd"}, ports: []portSpec{{"udp", 69}}},
+	{name: "tftp", units: []unitRef{{"tftp.socket", true}, {"tftp.service", true}, {"tftpd.service", true}, {"tftpd-hpa.service", true}, {"atftpd.socket", true}, {"atftpd.service", true}}, inetdNames: []string{"tftp"}, servers: []string{"in.tftpd", "atftpd"}, ports: []portSpec{{"udp", 69}}},
 	{name: "talk", units: []unitRef{{"talk.socket", true}, {"ntalk.socket", true}}, inetdNames: []string{"talk", "ntalk"}, servers: []string{"in.talkd", "in.ntalkd"}, ports: []portSpec{{"udp", 517}, {"udp", 518}}},
 	{name: "snmp", units: []unitRef{{"snmpd.service", true}}, ports: []portSpec{{"udp", 161}}},
 }
@@ -579,13 +579,15 @@ checks:
   - { fact: accounts.nss.group_sources,  op: none, where: { op: in, expected: ["nis", "nisplus"] } }
 ```
 
-**Ruling R225:** this nsswitch screen only bites given R224 — the `services.nis.*` leaves are `ok:false` (not `absent`) on a complete sweep, so §6.5 step 8 does not screen the control out before the clauses run. `accounts.nss.*_sources` are always present (2B guarantees they are never absent), so they do not need `absent_means`.
+**Ruling R225:** this nsswitch screen only bites given R224 — the `services.nis.*` leaves are `ok:false` (not `absent`) on a complete sweep, so §6.5 step 8 does not screen the control out before the clauses run.
+
+**Correction (R241, stage-2G whole-branch review).** The original claim here — that `accounts.nss.*_sources` "are always present (2B guarantees they are never absent)" — is FALSE. `registry.yaml` documents both keys as **absent** when the file or the `passwd:`/`group:` line is missing, and `accounts_nss.go` emits `collect.Absent(...)` in exactly those cases. With `absent_means: pass` this let a live NIS false-PASS: §6.5 step 8 screens the whole control on the first `absent` fact before the `services.nis.*` clauses run, and the "absent counts as pass" reason even satisfied the CI jq invariant. U-43 therefore uses **`absent_means: manual`** (the precedent of `controls/account/root_remote_login.yaml`, which judges these same two facts): a missing nsswitch source line yields MANUAL — never PASS — while `ok` still runs the clauses and `unsupported` is still NOT_APPLICABLE.
 
 **Ruling R236 — honesty note in the U-43 description.** The description must state that a NIS client resolving via nsswitch `compat` mode with `+` entries is NOT detected (mirrors the `accounts.nss.remote` registry warning) — so the control can pass a compat-mode NIS client.
 
 - [ ] **Step 3: Fixtures**
 
-Per control: `pass-absent`, `pass-disabled`, `fail-enabled` (enabled-but-stopped), plus `fail-reachable` for nfs_server/rpcbind, plus `na-container`. For `nis_disabled` add `fail-nss-nis.json` where `services.nis.*` are ok-false but `accounts.nss.passwd_sources` = `{"status":"ok","value":["files","nis"]}` (proves the nsswitch screen bites), and ensure `pass-*` fixtures set the sources to `["files"]`/`["files","systemd"]` so they don't trip it.
+Per control: `pass-absent`, `pass-disabled`, `fail-enabled` (enabled-but-stopped), plus `fail-reachable` for nfs_server/rpcbind, plus `na-container`. For `nis_disabled` add `fail-nss-nis.json` where `services.nis.*` are ok-false but `accounts.nss.passwd_sources` = `{"status":"ok","value":["files","nis"]}` (proves the nsswitch screen bites), and ensure `pass-*` fixtures set the sources to `["files"]`/`["files","systemd"]` so they don't trip it. (R241: because U-43 now uses `absent_means: manual`, its `pass-absent` fixture became `manual-absent`, and a `manual-nss-line-missing` fixture — a live NIS with `accounts.nss.group_sources` absent — asserts MANUAL, proving that path is not a PASS.)
 
 - [ ] **Step 4: Lint + evaluate + commit**
 
@@ -688,7 +690,7 @@ git commit -m "Enrol the nine 2G service controls in the coverage and e2e snapsh
 **3. Type consistency.** `services.<n>.installed/active/enabled/reachable` are `bool`; `unit_file_state` is `string`. `reachable` is registered and checked **only** for fixed-port services (finger, rservices, dos_services, nfs_server, rpcbind, tftp, talk, snmp, telnet) and omitted for automount, nis, ssh — the controls match (automount/nis check only active+enabled). `portSpec{proto,port}` and `hasNonLoopbackPort(list, []portSpec)` are used consistently in Task 1 Steps 5–6. `enabledFromUnitFile(state, active)` is defined once (Step 4) and used in Step 6 and folded with the super-server `enabled` (Task 2 Step 4).
 
 **Risks (for the pre-flight scan and reviews to probe):**
-- **R-a (unit name coverage, analysis "riskiest decision #1"):** one wrong unit name silently reads as "not installed" → a running service passes. The table's unit lists must cover both Debian/Ubuntu and RHEL/Rocky/Alma names (e.g. `nfs-server.service` vs `nfs-kernel-server.service`). **Ruling R234:** ALL systemd unit names in the Task 1 table must be verified against the real CI-image / lab-host units before the collector is considered done; the implementer runs the collector on the lab host and checks the real unit names for nfs/rpcbind/snmp/nis/tftp/autofs (`atftpd.service` added to `tftp` for the Debian atftpd package).
+- **R-a (unit name coverage, analysis "riskiest decision #1"):** one wrong unit name silently reads as "not installed" → a running service passes. The table's unit lists must cover both Debian/Ubuntu and RHEL/Rocky/Alma names (e.g. `nfs-server.service` vs `nfs-kernel-server.service`). **Ruling R234:** ALL systemd unit names in the Task 1 table must be verified against the real CI-image / lab-host units before the collector is considered done; the implementer runs the collector on the lab host and checks the real unit names for nfs/rpcbind/snmp/nis/tftp/autofs (`atftpd.service`/`atftpd.socket` added to `tftp` for the socket-activated Debian atftpd package, and `tftp.service` for RHEL 9 tftp-server — R246).
 - **R-b (enabled-but-stopped):** `active==false` alone must not pass; the `enabled` AND-term and the `fail-enabled` fixtures guard this. Verify `enabledFromUnitFile` returns true for `enabled` with `active=false`.
 - **R-c (masked-procfs → reachable):** every `reachable` leaf must be `unsupported` (not `absent`) when `/proc/net/tcp` is masked, or the container CI leg mis-passes; reuse `socketReadEnvelope`.
 - **R-d (no-systemd completeness):** the degrade loop must cover **every** registered leaf including `reachable`; the `collect-contract` leg fails otherwise. This is the R220 lesson made a first-class test.
