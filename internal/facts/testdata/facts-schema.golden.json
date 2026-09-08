@@ -2554,7 +2554,7 @@
     {
       "Key": "firewall.restricts_inbound",
       "Type": "bool",
-      "Description": "Whether the ruleset restricts inbound traffic by default (derived by normalisation); absent until the normaliser lands, and whenever a captured dump was truncated.",
+      "Description": "Whether the ruleset restricts inbound traffic by default (derived by normalisation); absent when confidence is below full (accept-with-rules, mixed policies, a missing policy, a non-input inbound chain with rules, or a truncated dump); the unsupported/denied envelope when the ruleset could not be read.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "firewall",
@@ -2564,7 +2564,7 @@
     {
       "Key": "firewall.normalization_confidence",
       "Type": "string",
-      "Description": "Confidence in the normalised inbound judgement - none, partial (a dump was truncated) or full.",
+      "Description": "Confidence in the normalised inbound judgement - full (every input filter chain is drop/reject, or every input filter chain is accept with zero rules) or partial (everything else - accept-with-rules, mixed policies, a missing policy, a non-input inbound chain with rules, or a truncated dump); the unsupported/denied envelope when the ruleset could not be read.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "firewall",
@@ -2574,7 +2574,7 @@
     {
       "Key": "firewall.rules",
       "Type": "list\u003crecord\u003e",
-      "Description": "The normalised inbound-affecting rules, each with chain, action, protocol, dport (a string, since ports may be ranges or sets) and source; empty until the normaliser lands.",
+      "Description": "The normalised inbound-affecting rules, each with chain, action, protocol, dport (a string, since ports may be ranges or sets) and source; the unsupported/denied envelope when the ruleset could not be read.",
       "Since": 1,
       "Sensitivity": "internal",
       "Collector": "firewall",

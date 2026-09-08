@@ -1,8 +1,8 @@
 id: muster.file.ip_port_restriction
 title_en: Inbound access is restricted by IP and port
 title_ko: 접속 IP 및 포트가 제한되어 있다
-description_en: "The host restricts inbound access — a default-deny host firewall (nftables, iptables, ufw or firewalld) or a TCP-wrapper \"ALL: ALL\" deny in /etc/hosts.deny. When the firewall ruleset cannot be normalised with confidence the result is MANUAL with the raw ruleset attached, never a guessed pass or fail."
-description_ko: "호스트가 인바운드 접속을 제한한다 — 기본 차단(default-deny) 호스트 방화벽(nftables/iptables/ufw/firewalld) 또는 /etc/hosts.deny 의 \"ALL: ALL\" 차단. 방화벽 규칙을 신뢰도 있게 정규화할 수 없으면 원본 규칙을 첨부한 MANUAL 로 처리하며, 통과/실패를 추정하지 않는다."
+description_en: "The host restricts inbound access — a default-deny host firewall (nftables, iptables, ufw or firewalld) or a TCP-wrapper \"ALL: ALL\" deny in /etc/hosts.deny. tcp_wrappers only restricts daemons linked against libwrap; RHEL 8+ ships no libwrap, so an /etc/hosts.deny rule is inert there. When the firewall ruleset cannot be normalised with confidence the result is MANUAL with a pointer to firewall.raw_dumps in the snapshot, never a guessed pass or fail."
+description_ko: "호스트가 인바운드 접속을 제한한다 — 기본 차단(default-deny) 호스트 방화벽(nftables/iptables/ufw/firewalld) 또는 /etc/hosts.deny 의 \"ALL: ALL\" 차단. tcp_wrappers 는 libwrap 에 링크된 데몬만 제한하며, RHEL 8 이상은 libwrap 를 제공하지 않아 그 환경에서 /etc/hosts.deny 규칙은 동작하지 않는다. 방화벽 규칙을 신뢰도 있게 정규화할 수 없으면 스냅샷의 firewall.raw_dumps 를 가리키는 MANUAL 로 처리하며, 통과/실패를 추정하지 않는다."
 category: file
 importance: 상
 automation: auto

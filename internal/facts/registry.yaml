@@ -1459,19 +1459,19 @@ keys:
     default_on: both
   - key: firewall.restricts_inbound
     type: bool
-    description: Whether the ruleset restricts inbound traffic by default (derived by normalisation); absent until the normaliser lands, and whenever a captured dump was truncated.
+    description: Whether the ruleset restricts inbound traffic by default (derived by normalisation); absent when confidence is below full (accept-with-rules, mixed policies, a missing policy, a non-input inbound chain with rules, or a truncated dump); the unsupported/denied envelope when the ruleset could not be read.
     since: 1
     sensitivity: public
     collector: firewall
   - key: firewall.normalization_confidence
     type: string
-    description: Confidence in the normalised inbound judgement - none, partial (a dump was truncated) or full.
+    description: Confidence in the normalised inbound judgement - full (every input filter chain is drop/reject, or every input filter chain is accept with zero rules) or partial (everything else - accept-with-rules, mixed policies, a missing policy, a non-input inbound chain with rules, or a truncated dump); the unsupported/denied envelope when the ruleset could not be read.
     since: 1
     sensitivity: public
     collector: firewall
   - key: firewall.rules
     type: list<record>
-    description: The normalised inbound-affecting rules, each with chain, action, protocol, dport (a string, since ports may be ranges or sets) and source; empty until the normaliser lands.
+    description: The normalised inbound-affecting rules, each with chain, action, protocol, dport (a string, since ports may be ranges or sets) and source; the unsupported/denied envelope when the ruleset could not be read.
     since: 1
     sensitivity: internal
     collector: firewall
