@@ -1,8 +1,8 @@
 id: muster.log.syslog_policy
 title_en: System logging covers the security-relevant facilities persistently
 title_ko: 시스템 로깅이 보안 관련 facility 를 영구 저장한다
-description_en: A syslog daemon (rsyslog or syslog-ng) or systemd-journald keeps the security-relevant facilities in persistent local storage. The judgment is by facility, never by file path, so Ubuntu's auth.log and RHEL's secure both count. Remote forwarding is recorded as evidence only. When the rsyslog configuration uses constructs muster does not model, or an include could not be read, the result is MANUAL with the parse evidence, never a guess; syslog-ng configurations are not parsed in this version and read MANUAL. A facility that only reaches a remote collector is recorded as logged but not persistent and does not satisfy the requirement. A host with neither a syslog daemon configuration nor systemd may still be running a logger this version does not detect, so it reads MANUAL rather than a failure.
-description_ko: syslog 데몬(rsyslog 또는 syslog-ng) 또는 systemd-journald 가 보안 관련 facility 를 로컬 영구 저장소에 남긴다. 파일 경로가 아니라 facility 로 판단하므로 Ubuntu 의 auth.log 와 RHEL 의 secure 가 모두 인정된다. 원격 전송은 증거로만 기록한다. rsyslog 설정에 muster 가 모델링하지 않는 구문이 있거나 include 를 읽을 수 없으면 파싱 증거를 첨부한 MANUAL 로 처리하며 추정하지 않는다. syslog-ng 설정은 이 버전에서 파싱하지 않아 MANUAL 로 처리한다. 원격 수집 서버로만 보내는 facility 는 기록은 되지만 영구 저장으로 인정하지 않는다. syslog 데몬 설정도 systemd 도 없는 호스트는 이 버전이 탐지하지 못하는 로거를 쓰고 있을 수 있어 실패가 아닌 MANUAL 로 처리한다.
+description_en: A syslog daemon (rsyslog or syslog-ng) or systemd-journald keeps the security-relevant facilities in persistent local storage. When a syslog daemon is installed - its binary as well as its configuration file - it is the logger this control judges, and a stopped daemon is a finding even if the journal is persistent, and a configuration file left behind by a removed daemon does not count as one. The judgment is by facility, never by file path, so Ubuntu's auth.log and RHEL's secure both count. Remote forwarding is recorded as evidence only. When the rsyslog configuration uses constructs muster does not model, or an include could not be read, the result is MANUAL with the parse evidence, never a guess; syslog-ng configurations are not parsed in this version and read MANUAL. A facility that only reaches a remote collector is recorded as logged but not persistent and does not satisfy the requirement. A host with neither a syslog daemon configuration nor systemd may still be running a logger this version does not detect, so it reads MANUAL rather than a failure.
+description_ko: syslog 데몬(rsyslog 또는 syslog-ng) 또는 systemd-journald 가 보안 관련 facility 를 로컬 영구 저장소에 남긴다. syslog 데몬이 설치되어 있으면 - 설정 파일뿐 아니라 실행 파일까지 - 이 항목은 그 데몬을 기준으로 판단한다. 저널이 영구 저장이더라도 데몬이 멈춰 있으면 결함이며, 제거된 데몬의 설정 파일만 남은 경우는 설치로 보지 않는다. 파일 경로가 아니라 facility 로 판단하므로 Ubuntu 의 auth.log 와 RHEL 의 secure 가 모두 인정된다. 원격 전송은 증거로만 기록한다. rsyslog 설정에 muster 가 모델링하지 않는 구문이 있거나 include 를 읽을 수 없으면 파싱 증거를 첨부한 MANUAL 로 처리하며 추정하지 않는다. syslog-ng 설정은 이 버전에서 파싱하지 않아 MANUAL 로 처리한다. 원격 수집 서버로만 보내는 facility 는 기록은 되지만 영구 저장으로 인정하지 않는다. syslog 데몬 설정도 systemd 도 없는 호스트는 이 버전이 탐지하지 못하는 로거를 쓰고 있을 수 있어 실패가 아닌 MANUAL 로 처리한다.
 category: log
 importance: 중
 automation: auto
@@ -15,7 +15,7 @@ params:
   facilities:
     type: list<string>
     default: ["auth", "authpriv", "kern", "daemon", "cron"]
-    description: The syslog facilities that must be logged to a persistent local target
+    description: The syslog facilities that must be logged to a persistent local target; the 20 standard facility names are accepted (auth, authpriv, cron, daemon, ftp, kern, lpr, mail, news, syslog, user, uucp and local0-local7), and any other name matches no record and is not judged
 requires_facts: ">=1"
 absent_means: manual
 applies_when:

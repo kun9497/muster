@@ -29,6 +29,15 @@ func loggingAccess(files map[string]string, targets []string) *fsAccess {
 		files = map[string]string{}
 	}
 	stats := map[string]statResult{"/run/systemd/system": {mode: 0o755, kind: "dir"}}
+	// IR-7: a configuration file names the implementation only when the
+	// daemon's binary is installed too, so a fixture that seeds one seeds the
+	// other. A test about a REMOVED package deletes the binary again.
+	if _, ok := files["/etc/rsyslog.conf"]; ok {
+		stats["/usr/sbin/rsyslogd"] = statResult{mode: 0o755, kind: "regular"}
+	}
+	if _, ok := files["/etc/syslog-ng/syslog-ng.conf"]; ok {
+		stats["/usr/sbin/syslog-ng"] = statResult{mode: 0o755, kind: "regular"}
+	}
 	for _, p := range targets {
 		stats[p] = statResult{mode: 0o640, kind: "regular"}
 	}
@@ -228,7 +237,9 @@ func TestLoggingJournaldOnlyImplementation(t *testing.T) {
 	if e := env(t, b, "logging.syslog.implementation"); e.Status != facts.StatusOK || e.Value != "journald-only" {
 		t.Fatalf("impl: %+v", e)
 	}
-	for _, k := range []string{"logging.rsyslog.rules", "logging.rsyslog.parse_complete", "logging.rsyslog.coverage"} {
+	// IR-18: the six leaves degrade together, so the list itself is iterated —
+	// a hand-picked subset would let a new leaf slip through as a default.
+	for _, k := range rsyslogLeafKeys {
 		if e := env(t, b, k); e.Status != facts.StatusAbsent {
 			t.Errorf("%s = %+v, want absent on a host with no rsyslog", k, e)
 		}
@@ -259,6 +270,12 @@ func TestLoggingSyslogNgIsDetectedButNotParsed(t *testing.T) {
 	e := env(t, b, "logging.rsyslog.coverage")
 	if e.Status != facts.StatusAbsent || !strings.Contains(e.Reason, "syslog-ng") {
 		t.Errorf("coverage must be absent naming syslog-ng: %+v", e)
+	}
+	// IR-18: every rsyslog leaf, not a hand-picked subset.
+	for _, k := range rsyslogLeafKeys {
+		if e := env(t, b, k); e.Status != facts.StatusAbsent {
+			t.Errorf("%s = %+v, want absent on a syslog-ng host", k, e)
+		}
 	}
 }
 
@@ -382,6 +399,8 @@ func TestLoggingNoCollectedAtInventsNoAge(t *testing.T) {
 func TestLoggingUnreadableMainConfigPoisonsTheRsyslogLeaves(t *testing.T) {
 	a := loggingAccess(nil, nil)
 	a.fails["/etc/rsyslog.conf"] = os.ErrPermission
+	// IR-7: the daemon is installed — only its configuration is unreadable.
+	a.stats["/usr/sbin/rsyslogd"] = statResult{mode: 0o755, kind: "regular"}
 	b := buildBegun(t, "logging", a)
 
 	if e := env(t, b, "logging.syslog.implementation"); e.Status != facts.StatusOK || e.Value != "rsyslog" {
@@ -667,5 +686,303 @@ func TestJournaldDeniedJournalDirIsNotVolatile(t *testing.T) {
 	}
 	if got := b.Worst("logging"); got != facts.StatusDenied {
 		t.Errorf("Worst(logging) = %s, want denied", got)
+	}
+}
+
+// --- the whole-branch fix wave (IR-2, IR-4, IR-7, IR-9 … IR-17) ----------
+
+// IR-7: Debian and Ubuntu keep /etc/rsyslog.conf as a conffile after
+// `apt remove rsyslog`, and `apt install syslog-ng` removes rsyslog through
+// the conflict. Judging such a host by the DEAD rsyslog rules is a
+// confidently wrong verdict either way, so the configuration file only names
+// the implementation when the daemon's binary is there too.
+func TestLoggingConffileWithoutItsBinaryIsNotRsyslog(t *testing.T) {
+	a := loggingAccess(map[string]string{"/etc/rsyslog.conf": "rsyslog.conf.ubuntu"}, nil)
+	delete(a.stats, "/usr/sbin/rsyslogd") // the package went; the conffile stayed
+	b := buildBegun(t, "logging", a)
+
+	if e := env(t, b, "logging.syslog.implementation"); e.Status != facts.StatusOK || e.Value != "journald-only" {
+		t.Fatalf("impl = %+v, want journald-only", e)
+	}
+	// IR-18: every rsyslog leaf degrades together, so the list itself is
+	// iterated rather than a hand-picked subset of it.
+	for _, k := range rsyslogLeafKeys {
+		e := env(t, b, k)
+		if e.Status != facts.StatusAbsent {
+			t.Errorf("%s = %+v, want absent on a host with no rsyslogd", k, e)
+		}
+		if !strings.Contains(e.Reason, "/etc/rsyslog.conf") {
+			t.Errorf("%s: the reason must name the leftover file: %+v", k, e)
+		}
+	}
+	if got := b.Worst("logging"); got != facts.StatusOK {
+		t.Errorf(`Worst("logging") = %s, want ok (absent ranks ok)`, got)
+	}
+}
+
+// IR-7: the same rule the other way round — a syslog-ng host that still
+// carries the rsyslog conffile the conflict left behind is judged as
+// syslog-ng, whose dialect this version does not parse.
+func TestLoggingSyslogNgNeedsItsBinaryToo(t *testing.T) {
+	a := loggingAccess(map[string]string{
+		"/etc/rsyslog.conf":             "rsyslog.conf.ubuntu", // left behind by the conflict
+		"/etc/syslog-ng/syslog-ng.conf": "syslog-ng.conf",
+	}, nil)
+	delete(a.stats, "/usr/sbin/rsyslogd")
+	b := buildBegun(t, "logging", a)
+
+	if e := env(t, b, "logging.syslog.implementation"); e.Value != "syslog-ng" {
+		t.Fatalf("impl = %+v, want syslog-ng", e)
+	}
+	for _, k := range rsyslogLeafKeys {
+		if e := env(t, b, k); e.Status != facts.StatusAbsent {
+			t.Errorf("%s = %+v, want absent", k, e)
+		}
+	}
+}
+
+// IR-2: /dev/console is a device — the message is shown on a terminal and
+// nothing is kept — so the facility is logged but not persistent, and the
+// device is not a log target to stat.
+func TestLoggingDeviceTargetIsNotPersistent(t *testing.T) {
+	a := loggingAccess(map[string]string{"/etc/rsyslog.conf": "rsyslog.conf.dev-console"},
+		[]string{"/var/log/messages"})
+	b := buildBegun(t, "logging", a)
+
+	rec := findFacility(t, okList(t, b, "logging.rsyslog.coverage"), "kern")
+	if rec["logged"] != true || rec["persistent"] != false || rec["target"] != "/dev/console" {
+		t.Errorf("kern = %+v, want logged, not persistent, on /dev/console", rec)
+	}
+	for _, v := range okList(t, b, "logging.log_targets") {
+		if p, _ := v.(map[string]any)["path"].(string); strings.HasPrefix(p, "/dev/") {
+			t.Errorf("a device is not a log file to stat: %v", v)
+		}
+	}
+	// The facility that DOES reach a file is unaffected.
+	if rec := findFacility(t, okList(t, b, "logging.rsyslog.coverage"), "daemon"); rec["persistent"] != true {
+		t.Errorf("daemon = %+v, want persistent", rec)
+	}
+}
+
+// IR-4: Debian's default block splits one selector over four backslash-
+// continued lines, each fragment ending on a ";". Joining them with a space
+// would make the parser read "auth,authpriv.none" as the ACTION of the first
+// fragment — a user-message rule — and /var/log/messages would vanish.
+func TestLoggingBackslashContinuationKeepsTheSelectorWhole(t *testing.T) {
+	a := loggingAccess(map[string]string{"/etc/rsyslog.conf": "rsyslog.conf.debian-continuation"},
+		[]string{"/var/log/messages"})
+	b := buildBegun(t, "logging", a)
+
+	files := 0
+	for _, v := range okList(t, b, "logging.rsyslog.rules") {
+		rec := v.(map[string]any)
+		if rec["target_kind"] == "user" {
+			t.Errorf("a selector fragment must not be read as a user action: %+v", rec)
+		}
+		if rec["target_kind"] == "file" && rec["target"] == "/var/log/messages" {
+			files++
+		}
+	}
+	if files == 0 {
+		t.Error("the block routes to /var/log/messages")
+	}
+	if rec := findFacility(t, okList(t, b, "logging.rsyslog.coverage"), "kern"); rec["persistent"] != true {
+		t.Errorf("kern = %+v, want persistent on /var/log/messages", rec)
+	}
+	if rec := findFacility(t, okList(t, b, "logging.rsyslog.coverage"), "mail"); rec["logged"] != false {
+		t.Errorf("mail = %+v: the block excludes it with .none", rec)
+	}
+}
+
+// IR-9: stat_status names the status the read primitive actually reported. A
+// target that is a symlink is an error, not a refusal — "denied" would send a
+// reader looking for a privilege that has nothing to do with it.
+func TestLoggingTargetStatStatusNamesTheRealStatus(t *testing.T) {
+	a := loggingAccess(map[string]string{"/etc/rsyslog.conf": "rsyslog.conf.two-targets"}, nil)
+	a.fails["/var/log/syslog"] = collect.ErrSymlink
+	b := buildBegun(t, "logging", a)
+
+	rec := findPath(t, okList(t, b, "logging.log_targets"), "/var/log/syslog")
+	if rec["stat_status"] != "error" {
+		t.Errorf("stat_status = %v, want error: %+v", rec["stat_status"], rec)
+	}
+	if r, _ := rec["reason"].(string); !strings.Contains(r, "symbolic link") {
+		t.Errorf("the reason must say what the stat hit: %+v", rec)
+	}
+}
+
+// IR-10: a bare `stop` line is not a global — it is `*.* stop`, and every
+// rule below it in the ruleset is unreachable. Reading it as a no-op made the
+// catch-all below it look like coverage for every facility.
+func TestLoggingBareStopDiscardsEverythingBelowIt(t *testing.T) {
+	a := loggingAccess(map[string]string{"/etc/rsyslog.conf": "rsyslog.conf.bare-stop"},
+		[]string{"/var/log/auth.log"})
+	b := buildBegun(t, "logging", a)
+	cov := okList(t, b, "logging.rsyslog.coverage")
+
+	rec := findFacility(t, cov, "kern")
+	if rec["logged"] != false || rec["persistent"] != false {
+		t.Errorf("kern = %+v: the catch-all below a bare stop is unreachable", rec)
+	}
+	if r, _ := rec["reason"].(string); !strings.Contains(r, "stop") {
+		t.Errorf("kern: the reason must cite the discarding line: %+v", rec)
+	}
+	// The rule ABOVE the stop still applies.
+	if rec := findFacility(t, cov, "auth"); rec["logged"] != true || rec["persistent"] != true {
+		t.Errorf("auth = %+v, want logged persistently by the line above the stop", rec)
+	}
+}
+
+// IR-11 (BLOCKING): the actions under $ActionExecOnlyWhenPreviousIsSuspended
+// run only when the one before them failed. Reading a failover buffer as
+// unconditional routing turns "the primary collector is unreachable" into
+// "this facility is logged locally" — the honest answer is MANUAL.
+func TestLoggingConditionalActionsAreUnmodelled(t *testing.T) {
+	cases := []struct {
+		name    string
+		fixture string
+		want    int
+	}{
+		{"legacy $ActionExecOnly directive", "rsyslog.conf.failover", 2},
+		{"RainerScript action.execOnly attribute", "rsyslog.conf.action-conditional", 1},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			a := loggingAccess(map[string]string{"/etc/rsyslog.conf": tc.fixture}, nil)
+			b := buildBegun(t, "logging", a)
+
+			if e := env(t, b, "logging.rsyslog.unmodelled"); e.Status != facts.StatusOK || e.Value != tc.want {
+				t.Errorf("unmodelled = %+v, want ok:%d", e, tc.want)
+			}
+			if e := env(t, b, "logging.rsyslog.coverage"); e.Status != facts.StatusAbsent {
+				t.Errorf("coverage = %+v, want absent", e)
+			}
+			for _, v := range okList(t, b, "logging.rsyslog.rules") {
+				if rec := v.(map[string]any); rec["target"] == "/var/log/localbuffer" {
+					t.Errorf("a conditional action must not be recorded as routing: %+v", rec)
+				}
+			}
+		})
+	}
+}
+
+// IR-12: $RuleSet and $DefaultRuleset are the legacy spelling of
+// ruleset()/call, which Ruling I-12 already counts — the rules below them
+// belong to a ruleset that may never be called.
+func TestLoggingLegacyRulesetIsUnmodelled(t *testing.T) {
+	a := loggingAccess(map[string]string{"/etc/rsyslog.conf": "rsyslog.conf.legacy-ruleset"}, nil)
+	b := buildBegun(t, "logging", a)
+
+	if e := env(t, b, "logging.rsyslog.unmodelled"); e.Status != facts.StatusOK || e.Value.(int) == 0 {
+		t.Errorf("unmodelled = %+v, want > 0", e)
+	}
+	if e := env(t, b, "logging.rsyslog.coverage"); e.Status != facts.StatusAbsent {
+		t.Errorf("coverage = %+v, want absent", e)
+	}
+}
+
+// IR-13: omdiscard is the RainerScript spelling of "~".
+func TestLoggingOmdiscardIsADiscard(t *testing.T) {
+	a := loggingAccess(map[string]string{"/etc/rsyslog.conf": "rsyslog.conf.omdiscard"},
+		[]string{"/var/log/syslog"})
+	b := buildBegun(t, "logging", a)
+	cov := okList(t, b, "logging.rsyslog.coverage")
+
+	if rec := findFacility(t, cov, "kern"); rec["logged"] != false {
+		t.Errorf("kern = %+v: omdiscard drops it before the catch-all", rec)
+	}
+	if rec := findFacility(t, cov, "daemon"); rec["logged"] != true || rec["persistent"] != true {
+		t.Errorf("daemon = %+v, want logged persistently", rec)
+	}
+}
+
+// IR-14: a property filter on the FACILITY or SEVERITY property can take a
+// whole facility out of everything below it, unlike the msg/syslogtag filters
+// Ruling I-12 counts as coverage-neutral evidence.
+func TestLoggingFacilityPropertyFilterIsUnmodelled(t *testing.T) {
+	a := loggingAccess(map[string]string{"/etc/rsyslog.conf": "rsyslog.conf.facility-filter"}, nil)
+	b := buildBegun(t, "logging", a)
+
+	if e := env(t, b, "logging.rsyslog.unmodelled"); e.Status != facts.StatusOK || e.Value != 1 {
+		t.Errorf("unmodelled = %+v, want ok:1", e)
+	}
+	if e := env(t, b, "logging.rsyslog.property_filters"); e.Status != facts.StatusOK || e.Value != 0 {
+		t.Errorf("property_filters = %+v: a facility filter is not neutral evidence", e)
+	}
+	if e := env(t, b, "logging.rsyslog.coverage"); e.Status != facts.StatusAbsent {
+		t.Errorf("coverage = %+v, want absent", e)
+	}
+}
+
+// IR-15: a discard restricted to one severity silences part of a facility —
+// possibly exactly the serious part — so it is neither a discard of the whole
+// facility nor something to ignore. A full discard still discards.
+func TestLoggingPriorityRestrictedDiscardIsUnmodelled(t *testing.T) {
+	a := loggingAccess(map[string]string{"/etc/rsyslog.conf": "rsyslog.conf.partial-discard"}, nil)
+	b := buildBegun(t, "logging", a)
+
+	if e := env(t, b, "logging.rsyslog.unmodelled"); e.Status != facts.StatusOK || e.Value != 1 {
+		t.Errorf("unmodelled = %+v, want ok:1", e)
+	}
+	if e := env(t, b, "logging.rsyslog.coverage"); e.Status != facts.StatusAbsent {
+		t.Errorf("coverage = %+v, want absent (never kern logged:false)", e)
+	}
+	for _, v := range okList(t, b, "logging.rsyslog.rules") {
+		if rec := v.(map[string]any); rec["target_kind"] == "discard" {
+			t.Errorf("a partial discard is not recorded as a discard: %+v", rec)
+		}
+	}
+	// A full discard is unchanged.
+	full := loggingAccess(map[string]string{"/etc/rsyslog.conf": "rsyslog.conf.stop-before"},
+		[]string{"/var/log/syslog"})
+	fb := buildBegun(t, "logging", full)
+	if e := env(t, fb, "logging.rsyslog.unmodelled"); e.Value != 0 {
+		t.Errorf("a full discard stays modelled: %+v", e)
+	}
+	if rec := findFacility(t, okList(t, fb, "logging.rsyslog.coverage"), "auth"); rec["logged"] != false {
+		t.Errorf("auth = %+v, want logged:false", rec)
+	}
+}
+
+// IR-16: "^program" hands the message to a program; it is not a user list,
+// and it is not persistent local storage either.
+func TestLoggingProgramActionIsRecordedAsItsOwnKind(t *testing.T) {
+	a := loggingAccess(map[string]string{"/etc/rsyslog.conf": "rsyslog.conf.program-action"},
+		[]string{"/var/log/syslog"})
+	b := buildBegun(t, "logging", a)
+
+	var found bool
+	for _, v := range okList(t, b, "logging.rsyslog.rules") {
+		rec := v.(map[string]any)
+		if rec["facility"] != "kern" || rec["target_kind"] != "program" {
+			continue
+		}
+		found = true
+		if rec["target"] != "/usr/local/bin/alerter" {
+			t.Errorf("the caret is not part of the program: %+v", rec)
+		}
+	}
+	if !found {
+		t.Errorf("no program rule in %v", okList(t, b, "logging.rsyslog.rules"))
+	}
+	for _, v := range okList(t, b, "logging.log_targets") {
+		if p, _ := v.(map[string]any)["path"].(string); strings.Contains(p, "alerter") {
+			t.Errorf("a program is not a log file to stat: %v", v)
+		}
+	}
+}
+
+// IR-17: rsyslog accepts numeric facility and priority codes. This version
+// does not map them, so such a line is counted rather than silently dropped —
+// "4.* ~" discards auth on a real host.
+func TestLoggingNumericSelectorIsUnmodelled(t *testing.T) {
+	a := loggingAccess(map[string]string{"/etc/rsyslog.conf": "rsyslog.conf.numeric-selector"}, nil)
+	b := buildBegun(t, "logging", a)
+
+	if e := env(t, b, "logging.rsyslog.unmodelled"); e.Status != facts.StatusOK || e.Value != 1 {
+		t.Errorf("unmodelled = %+v, want ok:1", e)
+	}
+	if e := env(t, b, "logging.rsyslog.coverage"); e.Status != facts.StatusAbsent {
+		t.Errorf("coverage = %+v, want absent", e)
 	}
 }

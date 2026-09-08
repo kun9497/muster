@@ -1,0 +1,5 @@
+# synthetic configuration with a bare stop line: everything below it in this
+# ruleset is unreachable.
+auth.*				/var/log/auth.log
+stop
+*.*				-/var/log/syslog

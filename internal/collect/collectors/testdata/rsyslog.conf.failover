@@ -1,0 +1,7 @@
+# synthetic failover block from the rsyslog documentation: the two actions
+# below the directive run only when the one before them was suspended.
+*.*				@@primary.example.org:514
+$ActionExecOnlyWhenPreviousIsSuspended on
+& @@secondary.example.org:514
+& /var/log/localbuffer
+$ActionExecOnlyWhenPreviousIsSuspended off
