@@ -1,0 +1,1 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{"services":{"tftp":{"active":{"status":"ok","value":false},"enabled":{"status":"ok","value":false},"reachable":{"status":"ok","value":false}},"talk":{"active":{"status":"ok","value":false},"enabled":{"status":"ok","value":false},"reachable":{"status":"ok","value":false}}}}}
