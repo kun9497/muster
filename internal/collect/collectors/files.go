@@ -37,7 +37,7 @@ var filesCollector = collect.Collector{
 // .rhosts/.shosts under both /home/*/ and /root/.
 func filesReads() []string {
 	reads := []string{passwdPath, shadowPath, securettyPath, groupPath, hostsPath, servicesPath, hostsLpdPath}
-	reads = append(reads, hostsEquivPath, shellsPath, "/proc/self/mountinfo")
+	reads = append(reads, hostsEquivPath, hostsAllowPath, hostsDenyPath, shellsPath, "/proc/self/mountinfo")
 	reads = append(reads, systemEnvFiles...)
 	reads = append(reads, "/home/*", "/home/*/*", rootHome)
 	// The bounded /dev walk (one and two levels deep) for the stray-file check.
@@ -101,6 +101,7 @@ func runFiles(_ context.Context, a collect.Access, b *collect.Builder) error {
 	// bounded /dev stray-file walk (U-26). mounts is reused, not re-read.
 	writeRootHome(b, a, rootHome)
 	writeHostsEquiv(b, a)
+	writeHostsWrappers(b, a)
 	if mountsErr != nil {
 		// S4: an unreadable /proc/self/mountinfo makes the /dev stray-file
 		// detection unreliable (no mount is known, so mountPoint answers "" and

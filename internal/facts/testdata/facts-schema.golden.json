@@ -1812,6 +1812,36 @@
       "SubjectKind": "file"
     },
     {
+      "Key": "files.etc_hosts_allow_lines",
+      "Type": "list\u003cstring\u003e",
+      "Description": "Non-comment lines of /etc/hosts.allow; an OK empty list when the file does not exist.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_hosts_deny_lines",
+      "Type": "list\u003cstring\u003e",
+      "Description": "Non-comment lines of /etc/hosts.deny; an OK empty list when the file does not exist.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_hosts_deny_all",
+      "Type": "bool",
+      "Description": "Whether /etc/hosts.deny contains an \"ALL:ALL\" daemon-to-client deny rule; an OK false when the file does not exist, since a host with no tcp_wrappers deny file is not restricted by it.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
       "Key": "sudo.installed",
       "Type": "bool",
       "Description": "Whether /etc/sudoers exists (sudo is configured on the host).",
