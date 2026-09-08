@@ -18,8 +18,9 @@ references and, later, offered as selectable profiles.
 > `collect`, `check`, waivers, exit codes, eight controls end to end — is
 > complete, and the first stage-2 plans are merged: the foundations with DISA
 > STIG and NIST SP 800-53 references, the account family, the PAM stacks, the
-> completed sshd collector with login banners, and the home-directory and
-> shell-environment checks.
+> completed sshd collector with login banners, the home-directory and
+> shell-environment checks, and the system-file, startup and cron permission
+> checks.
 > Which KISA items are enrolled today, with their control ids and automation
 > class, is generated into [the coverage table](docs/reference/coverage.md);
 > CI exercises the control set as root, as a normal user, and inside Ubuntu

@@ -1,0 +1,2 @@
+# alice per-user crontab (synthetic)
+30 6 * * 1  /home/alice/bin/weekly-backup

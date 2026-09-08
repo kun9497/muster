@@ -1,0 +1,31 @@
+id: muster.file.log_dir_permissions
+title_en: Log directories and files are not writable beyond their owning group
+title_ko: 로그 디렉터리·파일이 소유 그룹 밖에서 쓰기 불가능하다
+description_en: No entry under /var/log may be world-writable, and a group-writable entry must be owned by one of the groups permitted to write logs (root, syslog, adm, utmp). This lets the normal logging groups own their files while flagging a log path a non-log group can write. The permitted groups are a parameter, so a site with a different logging group can adjust it.
+description_ko: /var/log 아래의 어떤 항목도 전체 쓰기가 가능하면 안 되고, 그룹 쓰기가 가능한 항목은 로그 기록이 허용된 그룹(root, syslog, adm, utmp) 중 하나가 소유해야 합니다. 이렇게 하면 정상 로깅 그룹이 자기 파일을 소유하면서, 로그 그룹이 아닌 그룹이 쓸 수 있는 로그 경로를 표시합니다. 허용 그룹은 파라미터라 다른 로깅 그룹을 쓰는 사이트는 조정할 수 있습니다.
+category: file
+importance: 중
+automation: auto
+references:
+  kisa: { "2026": ["U-67"], "2021": [] }
+  stig:
+    - { benchmark: ubuntu2204, version: V2R9, id: UBTU-22-232025 }
+    - { benchmark: ubuntu2404, version: V1R6, id: UBTU-24-700120 }
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-232025 }
+  nist_800_53: ["SI-11"]
+requires_facts: ">=1"
+absent_means: manual
+params:
+  allowed_groups: { type: list<string>, default: ["root", "syslog", "adm", "utmp"], description: groups permitted to have group-write on a /var/log entry }
+checks:
+  - { fact: files.log_dirs, op: none, where: { field: other_writable, op: eq, expected: true } }
+  - { fact: files.log_dirs, op: each, subject: path, where: { field: group_writable, op: eq, expected: true }, require: { field: group, op: in, expected: "${allowed_groups}" } }
+  - { fact: files.log_dirs, op: none, where: { field: reason, op: present } }
+  - { fact: files.log_files, op: none, where: { field: other_writable, op: eq, expected: true } }
+  - { fact: files.log_files, op: each, subject: path, where: { field: group_writable, op: eq, expected: true }, require: { field: group, op: in, expected: "${allowed_groups}" } }
+  - { fact: files.log_files, op: none, where: { field: reason, op: present } }
+remediation:
+  text_en: chmod o-w each world-writable log path; for a group-writable path owned by an unexpected group, chown it to root or a logging group, or add that group to the parameter if it is legitimate.
+  text_ko: 전체 쓰기 가능한 로그 경로에 chmod o-w 를 적용하고, 예상치 못한 그룹이 소유한 그룹-쓰기 경로는 root 나 로깅 그룹으로 chown 하거나, 정당하면 그 그룹을 파라미터에 추가합니다.
+  risk: none
+  idempotent: true

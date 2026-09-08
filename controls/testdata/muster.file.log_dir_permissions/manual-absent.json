@@ -1,0 +1,4 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{"files":{
+  "log_dirs":{"status":"absent","reason":"the files collector did not run"},
+  "log_files":{"status":"absent","reason":"the files collector did not run"}
+}}}

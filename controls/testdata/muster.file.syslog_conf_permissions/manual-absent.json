@@ -1,0 +1,1 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{"files":{"syslog_configs":{"status":"absent","reason":"the files collector did not run"},"journald_configs":{"status":"absent","reason":"the files collector did not run"}}}}

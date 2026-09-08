@@ -541,6 +541,164 @@ keys:
     since: 1
     sensitivity: public
     collector: files
+  - key: files.startup_scripts
+    type: list<record>
+    description: SysV init scripts and systemd unit files under the startup roots, each with path, mode, owner, group, the group/other-writable flags and is_symlink - the enabled-unit symlinks U-17 filters out.
+    since: 1
+    sensitivity: public
+    collector: files
+    subject_kind: file
+  - key: files.startup_dirs
+    type: list<record>
+    description: The startup-script directories themselves (/etc/init.d, /etc/systemd/system, the rcN.d dirs), each with path, mode, owner, group and the group/other-writable flags.
+    since: 1
+    sensitivity: public
+    collector: files
+    subject_kind: file
+  - key: files.syslog_configs
+    type: list<record>
+    description: The rsyslog and syslog-ng configuration files, each with path, mode, owner, group and the group/other-writable flags.
+    since: 1
+    sensitivity: public
+    collector: files
+    subject_kind: file
+  - key: files.journald_configs
+    type: list<record>
+    description: The systemd-journald configuration files, each with path, mode, owner, group and the group/other-writable flags.
+    since: 1
+    sensitivity: public
+    collector: files
+    subject_kind: file
+  - key: files.etc_inetd_conf.mode
+    type: int
+    description: Mode bits of /etc/inetd.conf (0o7777); absent when the file does not exist, as it does not on either stock family.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_inetd_conf.uid
+    type: int
+    description: Owner uid of /etc/inetd.conf; absent when the file does not exist.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_inetd_conf.group_writable
+    type: bool
+    description: Whether /etc/inetd.conf is group-writable; absent when the file does not exist.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_inetd_conf.other_readable
+    type: bool
+    description: Whether /etc/inetd.conf is world-readable; absent when the file does not exist.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_xinetd_conf.mode
+    type: int
+    description: Mode bits of /etc/xinetd.conf (0o7777); absent when the file does not exist.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_xinetd_conf.uid
+    type: int
+    description: Owner uid of /etc/xinetd.conf; absent when the file does not exist.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.xinetd_d
+    type: list<record>
+    description: The /etc/xinetd.d fragment files, each with path, mode, owner, group and the group/other-writable flags; an ok empty list when the directory holds none.
+    since: 1
+    sensitivity: public
+    collector: files
+    subject_kind: file
+  - key: files.etc_sudoers.mode
+    type: int
+    description: Mode bits of /etc/sudoers (0o7777); absent when the file does not exist.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_sudoers.uid
+    type: int
+    description: Owner uid of /etc/sudoers; absent when the file does not exist.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_sudoers.gid
+    type: int
+    description: Owner gid of /etc/sudoers; absent when the file does not exist.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_sudoers.acl_present
+    type: bool
+    description: Whether /etc/sudoers carries a POSIX access ACL; denied on a non-root run, since the ACL probe needs the file open.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_sudoers_d.mode
+    type: int
+    description: Mode bits of the /etc/sudoers.d drop-in directory (0o7777); absent when it does not exist.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_sudoers_d.uid
+    type: int
+    description: Owner uid of /etc/sudoers.d; absent when the directory does not exist.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_sudoers_d.gid
+    type: int
+    description: Owner gid of /etc/sudoers.d; absent when the directory does not exist.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.etc_sudoers_d.acl_present
+    type: bool
+    description: Whether /etc/sudoers.d carries a POSIX access ACL; denied on a non-root run, since the ACL probe needs the directory open.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: files.sudoers_d_entries
+    type: list<record>
+    description: The /etc/sudoers.d drop-in files, each with path, mode, owner, group, the group/other-writable flags and an ignored flag (a name ending in ~ or containing a dot, which sudo skips).
+    since: 1
+    sensitivity: public
+    collector: files
+    subject_kind: file
+  - key: files.log_dirs
+    type: list<record>
+    description: /var/log itself and the directories one and two levels under it, each with path, mode, owner, group and the group/other-writable flags; bounded and marked truncated if the bound is hit.
+    since: 1
+    sensitivity: public
+    collector: files
+    subject_kind: file
+  - key: files.log_files
+    type: list<record>
+    description: The non-directory entries one and two levels under /var/log, each with path, mode, owner, group and the group/other-writable flags; a symlink is is_symlink:true and an unreadable entry carries a reason. Bounded and marked truncated if the bound is hit.
+    since: 1
+    sensitivity: public
+    collector: files
+    subject_kind: file
+  - key: sudo.installed
+    type: bool
+    description: Whether /etc/sudoers exists (sudo is configured on the host).
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: sudo.includedir
+    type: string
+    description: The directory named by the @includedir/#includedir directive in /etc/sudoers; an empty string when none is present.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: sudo.secure_path
+    type: string
+    description: The Defaults secure_path value from /etc/sudoers (quotes and surrounding spaces stripped); an empty string when unset.
+    since: 1
+    sensitivity: public
+    collector: files
   - key: accounts.login_defs.pass_max_days
     type: setting<int>
     description: PASS_MAX_DAYS - persisted in login.defs, effective as the maximum over existing accounts' shadow fields.
@@ -915,3 +1073,24 @@ keys:
     since: 1
     sensitivity: public
     collector: walk
+  - key: cron.files
+    type: list<record>
+    description: Every cron/at configuration and spool file - path, scope, user, mode, owner and the group/other-writable flags.
+    since: 1
+    sensitivity: public
+    collector: cron
+    subject_kind: file
+  - key: cron.dirs
+    type: list<record>
+    description: The cron and at directories - path, mode, owner and the group/other-writable flags.
+    since: 1
+    sensitivity: public
+    collector: cron
+    subject_kind: file
+  - key: cron.timers
+    type: list<record>
+    description: The systemd timer unit-file inventory - name and enablement state.
+    since: 1
+    sensitivity: public
+    collector: cron
+    subject_kind: unit

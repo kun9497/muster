@@ -1,0 +1,9 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "sudo":{"installed":{"status":"ok","value":true}},
+  "files":{
+    "etc_sudoers":{"mode":{"status":"ok","value":288},"uid":{"status":"ok","value":0}},
+    "sudoers_d_entries":{"status":"ok","value":[
+      {"path":"/etc/sudoers.d/99-local","mode":294,"uid":0,"gid":0,"group":"root","group_writable":false,"other_writable":true,"is_symlink":false,"ignored":false}
+    ]}
+  }
+}}

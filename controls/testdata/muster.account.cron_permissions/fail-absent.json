@@ -1,0 +1,4 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{"cron":{
+  "files":{"status":"absent","reason":"the cron collector did not run"},
+  "dirs":{"status":"absent","reason":"the cron collector did not run"}
+}}}

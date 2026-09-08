@@ -1,0 +1,3 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{"files":{"etc_inetd_conf":{"mode":{"status":"absent"},"group_writable":{"status":"absent"},"other_readable":{"status":"absent"},"uid":{"status":"absent"}},"etc_xinetd_conf":{"mode":{"status":"ok","value":384,"source":{"kind":"file","path":"/etc/xinetd.conf"}},"uid":{"status":"ok","value":0}},"xinetd_d":{"status":"ok","value":[
+  {"path":"/etc/xinetd.d/telnet","mode":386,"uid":0,"gid":0,"group":"root","group_writable":false,"other_writable":true,"is_symlink":false}
+]}}}}

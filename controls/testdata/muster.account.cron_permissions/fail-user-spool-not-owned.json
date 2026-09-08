@@ -1,0 +1,9 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{"cron":{
+  "files":{"status":"ok","value":[
+    {"path":"/etc/crontab","scope":"system","user":"","mode":416,"uid":0,"gid":0,"group":"root","owner_ok":true,"group_writable":false,"other_writable":false},
+    {"path":"/var/spool/cron/crontabs/bob","scope":"user","user":"bob","mode":416,"uid":2,"gid":2,"group":"daemon","owner_ok":false,"group_writable":false,"other_writable":false}
+  ]},
+  "dirs":{"status":"ok","value":[
+    {"path":"/etc/cron.d","mode":493,"uid":0,"gid":0,"group":"root","group_writable":false,"other_writable":false}
+  ]}
+}}}

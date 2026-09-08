@@ -1,0 +1,34 @@
+id: muster.file.inetd_conf_permissions
+title_en: The inetd/xinetd configuration is owned by root and not exposed
+title_ko: inetd/xinetd 설정이 root 소유이며 노출되지 않는다
+description_en: Where an inetd or xinetd super-server is configured, /etc/inetd.conf must not be group-writable or world-readable, and /etc/xinetd.conf and its fragments must be mode 0600 or stricter and not writable by others. Neither super-server is installed on a stock Ubuntu or Rocky host, so the control passes by default and only judges a host that actually runs one. A host that has both /etc/inetd.conf and /etc/xinetd.conf present is judged by the inetd mechanism alone, since the first matching mechanism wins.
+description_ko: inetd 또는 xinetd 슈퍼서버가 설정된 경우 /etc/inetd.conf 는 그룹 쓰기·전체 읽기가 가능하면 안 되고, /etc/xinetd.conf 와 그 조각은 mode 0600 이하로 엄격하며 타인이 쓸 수 없어야 합니다. 기본 Ubuntu·Rocky 에는 두 슈퍼서버 모두 설치되지 않으므로 기본적으로 통과하고, 실제로 슈퍼서버를 쓰는 호스트만 판정합니다. /etc/inetd.conf 와 /etc/xinetd.conf 가 모두 존재하는 호스트는 먼저 일치하는 메커니즘이 선택되므로 inetd 메커니즘으로만 판정합니다.
+category: file
+importance: 상
+automation: auto
+references:
+  kisa: { "2026": ["U-20"], "2021": ["U-10"] }
+requires_facts: ">=1"
+absent_means: pass
+params:
+  allowed_modes: { type: list<int>, default: [0, 128, 256, 384], description: config modes at 0600 or stricter (bit-subsets of 0600) }
+mechanisms:
+  - when:
+      - { fact: files.etc_inetd_conf.mode, op: present }
+    checks:
+      - { fact: files.etc_inetd_conf.group_writable, op: eq, expected: false }
+      - { fact: files.etc_inetd_conf.other_readable, op: eq, expected: false }
+      - { fact: files.etc_inetd_conf.uid, op: eq, expected: 0 }
+  - when:
+      - { fact: files.etc_xinetd_conf.mode, op: present }
+    checks:
+      - { fact: files.etc_xinetd_conf.mode, op: in, expected: "${allowed_modes}" }
+      - { fact: files.etc_xinetd_conf.uid, op: eq, expected: 0 }
+      - { fact: files.xinetd_d, op: none, where: { field: other_writable, op: eq, expected: true } }
+      - { fact: files.xinetd_d, op: none, where: { field: group_writable, op: eq, expected: true } }
+      - { fact: files.xinetd_d, op: none, where: { field: reason, op: present } }
+remediation:
+  text_en: chmod 0600 /etc/inetd.conf or /etc/xinetd.conf and its fragments, chown them to root, and prefer removing the super-server if no service needs it.
+  text_ko: /etc/inetd.conf 또는 /etc/xinetd.conf 와 그 조각에 chmod 0600 을 적용하고 root 로 chown 하며, 필요한 서비스가 없으면 슈퍼서버 제거를 우선합니다.
+  risk: none
+  idempotent: true

@@ -1,0 +1,31 @@
+id: muster.account.cron_permissions
+title_en: Cron configuration files are 0640 or stricter and owned appropriately
+title_ko: cron 설정 파일이 0640 이하로 엄격하며 소유가 적절하다
+description_en: Every crontab-format file — /etc/crontab, /etc/anacrontab, the /etc/cron.d drop-ins, the cron/at access files and the per-user spools — must be mode 0640 or stricter (relax the default with params.allowed_modes, spec §6.6), must not be group- or world-writable, and a system or access file must be owned by root; no cron file may be world-writable and the cron directories must not be world-writable. The /etc/cron.{hourly,daily,weekly,monthly} directories hold executable run-parts scripts (0755), which are never a bit-subset of 0640 and would break if chmod-ed to it, so those periodic scripts are judged only on ownership and writability, not on the 0640 mode. Both distribution families ship /etc/crontab and /etc/cron.d at 0644, so a stock host fails this by the guide's 0640 criterion until an operator tightens it. A file muster could not stat is reported rather than skipped. A host with no cron configuration at all yields cron.files as an ok empty list, which is a vacuous PASS.
+description_ko: 모든 crontab 형식 파일(/etc/crontab, /etc/anacrontab, /etc/cron.d 드롭인, cron/at 접근 제어 파일, 사용자별 스풀)은 mode 0640 이하로 엄격하고(기본값은 params.allowed_modes 로 완화, 스펙 §6.6) 그룹·전체 쓰기가 가능하면 안 되며, 시스템·접근 제어 파일은 root 소유여야 하고, 어떤 cron 파일도 전체 쓰기가 가능하면 안 되고 cron 디렉터리도 전체 쓰기가 가능하면 안 됩니다. /etc/cron.{hourly,daily,weekly,monthly} 디렉터리는 실행 가능한 run-parts 스크립트(0755)를 담고 있어 0640 의 비트 부분집합이 될 수 없고 0640 으로 바꾸면 오히려 동작이 깨지므로, 이 주기 스크립트는 0640 mode 가 아니라 소유·쓰기 가능성만으로 판정합니다. 두 배포판 계열 모두 /etc/crontab 과 /etc/cron.d 를 0644 로 배포하므로 운영자가 조일 때까지 가이드의 0640 기준으로는 기본 설치가 실패합니다. stat 할 수 없었던 파일은 건너뛰지 않고 보고합니다. cron 설정이 전혀 없는 호스트는 cron.files 가 정상 빈 목록이 되어 공허하게 통과합니다.
+category: account
+importance: 상
+automation: auto
+references:
+  kisa: { "2026": ["U-37"], "2021": ["U-22", "U-65"] }
+  stig:
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-232230 }
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-232235 }
+  nist_800_53: ["CM-6"]
+requires_facts: ">=1"
+absent_means: fail
+params:
+  allowed_modes: { type: list<int>, default: [0, 32, 128, 160, 256, 288, 384, 416], description: cron file modes at 0640 or stricter (bit-subsets of 0640) }
+checks:
+  - { fact: cron.files, op: none, where: { field: reason, op: present } }
+  - { fact: cron.files, op: each, subject: path, where: { field: scope, op: in, expected: ["system", "access", "user"] }, require: { field: mode, op: in, expected: "${allowed_modes}" } }
+  - { fact: cron.files, op: none, where: { field: other_writable, op: eq, expected: true } }
+  - { fact: cron.files, op: each, subject: path, where: { field: scope, op: in, expected: ["system", "access"] }, require: { field: owner_ok, op: eq, expected: true } }
+  - { fact: cron.files, op: each, subject: path, where: { field: scope, op: eq, expected: "user" }, require: { field: owner_ok, op: eq, expected: true } }
+  - { fact: cron.files, op: each, subject: path, where: { field: scope, op: eq, expected: "periodic" }, require: { field: owner_ok, op: eq, expected: true } }
+  - { fact: cron.dirs, op: none, where: { field: other_writable, op: eq, expected: true } }
+remediation:
+  text_en: chmod 0640 the crontab-FORMAT files (/etc/crontab, /etc/cron.d/* and the per-user spools), chown the system files to root, and chmod go-w (not 0640, which would break run-parts) the /etc/cron.{hourly,daily,weekly,monthly} periodic-script directories and their scripts; chmod o-w the cron directories.
+  text_ko: crontab 형식 파일(/etc/crontab, /etc/cron.d/*, 사용자별 스풀)에 chmod 0640 을 적용하고 시스템 파일을 root 로 chown 하며, /etc/cron.{hourly,daily,weekly,monthly} 주기 스크립트 디렉터리와 그 스크립트에는 (run-parts 를 깨뜨리는 0640 이 아니라) chmod go-w 를 적용하고, cron 디렉터리에 chmod o-w 를 적용합니다.
+  risk: none
+  idempotent: true

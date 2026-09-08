@@ -1,0 +1,11 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{"cron":{
+  "files":{"status":"ok","value":[
+    {"path":"/etc/crontab","scope":"system","user":"","mode":416,"uid":0,"gid":0,"group":"root","owner_ok":true,"group_writable":false,"other_writable":false},
+    {"path":"/etc/cron.allow","scope":"access","user":"","mode":416,"uid":0,"gid":0,"group":"root","owner_ok":true,"group_writable":false,"other_writable":false},
+    {"path":"/var/spool/cron/crontabs/alice","scope":"user","user":"alice","mode":416,"uid":1001,"gid":1001,"group":"alice","owner_ok":true,"group_writable":false,"other_writable":false}
+  ]},
+  "dirs":{"status":"ok","value":[
+    {"path":"/etc/cron.d","mode":493,"uid":0,"gid":0,"group":"root","group_writable":false,"other_writable":false},
+    {"path":"/var/spool/cron/crontabs","mode":448,"uid":0,"gid":0,"group":"root","group_writable":false,"other_writable":false}
+  ]}
+}}}

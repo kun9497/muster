@@ -1,0 +1,7 @@
+{"synthetic": true, "_expect":{"reason_code":"permission_denied"},"schema_version":1,"run":{},"facts":{
+  "sudo":{"installed":{"status":"ok","value":true}},
+  "files":{
+    "etc_sudoers":{"mode":{"status":"denied","reason":"/etc/sudoers: needs root"},"uid":{"status":"ok","value":0}},
+    "sudoers_d_entries":{"status":"ok","value":[]}
+  }
+}}

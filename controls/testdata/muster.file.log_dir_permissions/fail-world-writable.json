@@ -1,0 +1,8 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{"files":{
+  "log_dirs":{"status":"ok","value":[
+    {"path":"/var/log","mode":493,"uid":0,"gid":0,"group":"root","group_writable":false,"other_writable":false}
+  ]},
+  "log_files":{"status":"ok","value":[
+    {"path":"/var/log/syslog","mode":438,"uid":0,"gid":103,"group":"adm","group_writable":true,"other_writable":true}
+  ]}
+}}}

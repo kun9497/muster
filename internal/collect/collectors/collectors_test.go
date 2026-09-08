@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
@@ -88,11 +89,15 @@ func (a *fsAccess) ReadFile(p string, _ int64) ([]byte, collect.ReadMeta, error)
 }
 
 func (a *fsAccess) Stat(p string) (collect.ReadMeta, error) {
-	if err, ok := a.fails[p]; ok {
-		return collect.ReadMeta{}, err
-	}
+	// An explicit stat shape wins over a fails entry for the same path: a file
+	// can be stat-able (its parent directory is searchable) yet unreadable (the
+	// content read is denied) — exactly a 0440 root-owned file seen by a
+	// non-root run. A path present only in fails still fails its Stat.
 	if s, ok := a.stats[p]; ok {
 		return collect.ReadMeta{Tier: "openat2", Mode: s.mode, UID: s.uid, GID: s.gid, Kind: s.kind}, nil
+	}
+	if err, ok := a.fails[p]; ok {
+		return collect.ReadMeta{}, err
 	}
 	if _, ok := a.files[p]; ok {
 		return collect.ReadMeta{Tier: "openat2", Mode: a.mode(p, 0o644)}, nil
@@ -1118,6 +1123,191 @@ func TestAccountsRejectsAnImplausibleHashId(t *testing.T) {
 	}
 }
 
+// --- cron ---------------------------------------------------------------
+
+// cron.files lists every cron/at config file that exists, with a precomputed
+// owner_ok (root-owned, or the spool owner for a per-user spool file) and the
+// group/other-writable flags. A world-writable /etc/crontab is owner_ok true
+// but group/other-writable true, which U-37 will fail.
+func TestCronConfigFiles(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{
+			"/etc/crontab":                   "crontab",
+			"/etc/cron.d/muster":             "cron_d_entry",
+			"/etc/cron.allow":                "cron_allow",
+			"/var/spool/cron/crontabs/alice": "spool_user",
+			"/etc/group":                     "group",
+		},
+		stats: map[string]statResult{
+			"/etc/crontab":                   {mode: 0o644, uid: 0, gid: 0, kind: "regular"},
+			"/etc/cron.d/muster":             {mode: 0o644, uid: 0, gid: 0, kind: "regular"},
+			"/etc/cron.allow":                {mode: 0o644, uid: 0, gid: 0, kind: "regular"},
+			"/var/spool/cron/crontabs/alice": {mode: 0o600, uid: 1000, gid: 1000, kind: "regular"},
+		},
+	}
+	rows := okList(t, build(t, "cron", a), "cron.files")
+	byPath := map[string]map[string]any{}
+	for _, r := range rows {
+		m := r.(map[string]any)
+		byPath[m["path"].(string)] = m
+	}
+	if byPath["/etc/crontab"]["owner_ok"] != true || byPath["/etc/crontab"]["scope"] != "system" {
+		t.Errorf("crontab %v", byPath["/etc/crontab"])
+	}
+	if byPath["/var/spool/cron/crontabs/alice"]["owner_ok"] != true || byPath["/var/spool/cron/crontabs/alice"]["user"] != "alice" {
+		t.Errorf("a per-user spool file owned by that user is owner_ok: %v", byPath["/var/spool/cron/crontabs/alice"])
+	}
+	if byPath["/etc/cron.allow"]["scope"] != "access" {
+		t.Errorf("cron.allow is scope access: %v", byPath["/etc/cron.allow"])
+	}
+}
+
+// A spool directory caught by a spool glob (/var/spool/cron/crontabs matched by
+// /var/spool/cron/*) is not a cron.files row — directories are covered by
+// cron.dirs, and cronRow skips a non-regular Kind.
+func TestCronSpoolDirIsNotAFileRow(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{"/etc/crontab": "crontab", "/etc/group": "group"},
+		dirs:  map[string]bool{"/var/spool/cron/crontabs": true},
+		stats: map[string]statResult{
+			"/etc/crontab":             {mode: 0o644, uid: 0, kind: "regular"},
+			"/var/spool/cron/crontabs": {mode: 0o1730, uid: 0, gid: 0, kind: "dir"},
+		},
+	}
+	rows := okList(t, build(t, "cron", a), "cron.files")
+	for _, r := range rows {
+		if r.(map[string]any)["path"] == "/var/spool/cron/crontabs" {
+			t.Errorf("a spool directory must not be a cron.files row: %v", r)
+		}
+	}
+}
+
+// The systemd timer inventory parses the systemctl table; a systemctl failure
+// is the command's error, not an empty list.
+func TestCronTimersInventoryAndFailure(t *testing.T) {
+	ok := &fsAccess{
+		files: map[string]string{"/etc/crontab": "crontab", "/etc/group": "group"},
+		stats: map[string]statResult{"/etc/crontab": {mode: 0o644, kind: "regular"}},
+		cmds:  map[string]cmdResult{"/usr/bin/systemctl list-unit-files --type=timer --no-legend --no-pager": {file: "systemctl_list_timers.txt"}},
+	}
+	rows := okList(t, build(t, "cron", ok), "cron.timers")
+	if len(rows) == 0 || rows[0].(map[string]any)["name"] == "" {
+		t.Fatalf("timers %v", rows)
+	}
+	bad := &fsAccess{
+		files: map[string]string{"/etc/crontab": "crontab", "/etc/group": "group"},
+		stats: map[string]statResult{"/etc/crontab": {mode: 0o644, kind: "regular"}},
+		cmds:  map[string]cmdResult{"/usr/bin/systemctl list-unit-files --type=timer --no-legend --no-pager": {exitCode: 1, stderr: "System has not been booted with systemd\n"}},
+	}
+	b := build(t, "cron", bad)
+	// R220: a systemctl that cannot run (a container without PID-1 systemd) is
+	// an environment limitation, not a collection error — the timer inventory
+	// degrades to unsupported, never a clean empty ok list and never an error.
+	e := env(t, b, "cron.timers")
+	if e.Status != facts.StatusUnsupported {
+		t.Errorf("a failed systemctl must degrade to unsupported: %+v", e)
+	}
+	if !strings.Contains(e.Reason, "System has not been booted with systemd") {
+		t.Errorf("reason %q must carry the systemctl failure line", e.Reason)
+	}
+	// Unsupported ranks as ok in Builder.Worst (R71), so the failing timer
+	// command must NOT make the cron collector worse than ok — which is what
+	// keeps a run built in a no-systemd container complete (collect-contract CI).
+	if worst := b.Worst("cron"); worst != facts.StatusOK {
+		t.Errorf("Worst(cron) = %s, want ok", worst)
+	}
+}
+
+// A world-writable /etc/crontab is recorded group/other-writable so U-37 fails.
+func TestCronWorldWritableCrontab(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{"/etc/crontab": "crontab", "/etc/group": "group"},
+		stats: map[string]statResult{"/etc/crontab": {mode: 0o646, uid: 0, kind: "regular"}},
+	}
+	rows := okList(t, build(t, "cron", a), "cron.files")
+	if rows[0].(map[string]any)["other_writable"] != true {
+		t.Errorf("0646 crontab is other-writable: %v", rows[0])
+	}
+}
+
+// R202: a denied stat is a finding, not a silent skip — the row carries a
+// reason and owner_ok:false. A symlinked path is NOT a finding: is_symlink is
+// set, owner_ok is true, and no reason key is present, so the reason-guard
+// leaves it alone.
+func TestCronStatFailureBranches(t *testing.T) {
+	denied := &fsAccess{
+		files: map[string]string{"/etc/group": "group"},
+		fails: map[string]error{"/etc/crontab": fs.ErrPermission},
+	}
+	rows := okList(t, build(t, "cron", denied), "cron.files")
+	var row map[string]any
+	for _, r := range rows {
+		if m := r.(map[string]any); m["path"] == "/etc/crontab" {
+			row = m
+		}
+	}
+	if row == nil {
+		t.Fatalf("a denied stat must still yield a row: %v", rows)
+	}
+	if _, ok := row["reason"]; !ok {
+		t.Errorf("a denied cron file must carry a reason: %v", row)
+	}
+	if row["owner_ok"] != false {
+		t.Errorf("a denied cron file is owner_ok false: %v", row)
+	}
+
+	sym := &fsAccess{
+		files: map[string]string{"/etc/group": "group"},
+		fails: map[string]error{"/etc/crontab": collect.ErrSymlink},
+	}
+	srows := okList(t, build(t, "cron", sym), "cron.files")
+	var srow map[string]any
+	for _, r := range srows {
+		if m := r.(map[string]any); m["path"] == "/etc/crontab" {
+			srow = m
+		}
+	}
+	if srow == nil {
+		t.Fatalf("a symlinked path must still yield a row: %v", srows)
+	}
+	if srow["is_symlink"] != true || srow["owner_ok"] != true {
+		t.Errorf("a symlinked cron file is is_symlink true and owner_ok true: %v", srow)
+	}
+	if _, ok := srow["reason"]; ok {
+		t.Errorf("a symlinked cron file must carry no reason: %v", srow)
+	}
+}
+
+// R212: owner_ok is false when the owner is neither root nor a real (>=1000)
+// user. A system-scope file owned by a non-root system account, and a per-user
+// spool file owned by a system account (uid 500), are both the anomaly U-37
+// catches.
+func TestCronOwnerOkFalseForSystemAccount(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{
+			"/etc/crontab":                 "crontab",
+			"/var/spool/cron/crontabs/svc": "spool_user",
+			"/etc/group":                   "group",
+		},
+		stats: map[string]statResult{
+			"/etc/crontab":                 {mode: 0o644, uid: 500, gid: 0, kind: "regular"},
+			"/var/spool/cron/crontabs/svc": {mode: 0o600, uid: 500, gid: 500, kind: "regular"},
+		},
+	}
+	rows := okList(t, build(t, "cron", a), "cron.files")
+	byPath := map[string]map[string]any{}
+	for _, r := range rows {
+		m := r.(map[string]any)
+		byPath[m["path"].(string)] = m
+	}
+	if byPath["/etc/crontab"]["owner_ok"] != false {
+		t.Errorf("a system-scope file owned by uid 500 is owner_ok false: %v", byPath["/etc/crontab"])
+	}
+	if byPath["/var/spool/cron/crontabs/svc"]["owner_ok"] != false {
+		t.Errorf("a spool file owned by a system account is owner_ok false: %v", byPath["/var/spool/cron/crontabs/svc"])
+	}
+}
+
 // --- sockets ------------------------------------------------------------
 
 func TestSocketsParsesListeningAndLoopback(t *testing.T) {
@@ -1216,6 +1406,68 @@ func TestMaskedProcfsIsUnsupportedNotAbsent(t *testing.T) {
 
 // --- files --------------------------------------------------------------
 
+// startup_scripts lists SysV init scripts and systemd unit files with mode
+// and is_symlink. An enabled-unit symlink (Stat returns ErrSymlink) is
+// is_symlink:true so U-17 can filter it with `where is_symlink eq false`; a
+// world-writable regular init script is other_writable:true so U-17 fails it.
+func TestFilesStartupScripts(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{"/etc/init.d/muster": "initd_script", "/etc/systemd/system/muster.service": "systemd_unit", "/etc/group": "group"},
+		stats: map[string]statResult{
+			"/etc/init.d/muster":                 {mode: 0o755, uid: 0, gid: 0, kind: "regular"},
+			"/etc/systemd/system/muster.service": {mode: 0o644, uid: 0, gid: 0, kind: "regular"},
+		},
+		fails: map[string]error{"/etc/systemd/system/multi-user.target.wants/muster.service": collect.ErrSymlink},
+		// The .wants directory itself is matched by /etc/systemd/system/* and must
+		// be skipped by globRows (Kind=="dir"), not stat-errored into a row.
+		dirs: map[string]bool{"/etc/systemd/system/multi-user.target.wants": true},
+	}
+	a.stats["/etc/systemd/system/multi-user.target.wants"] = statResult{mode: 0o755, uid: 0, gid: 0, kind: "dir"}
+	// the wants-symlink is discoverable via Glob of /etc/systemd/system/*/*
+	a.files["/etc/systemd/system/multi-user.target.wants/muster.service"] = "" // present for Glob
+	rows := okList(t, build(t, "files", a), "files.startup_scripts")
+	byPath := map[string]map[string]any{}
+	for _, r := range rows {
+		m := r.(map[string]any)
+		byPath[m["path"].(string)] = m
+	}
+	if byPath["/etc/init.d/muster"]["other_writable"] != false || byPath["/etc/init.d/muster"]["is_symlink"] != false {
+		t.Errorf("regular init script %v", byPath["/etc/init.d/muster"])
+	}
+	if byPath["/etc/systemd/system/multi-user.target.wants/muster.service"]["is_symlink"] != true {
+		t.Errorf("an enabled-unit symlink must be is_symlink:true: %v", byPath["/etc/systemd/system/multi-user.target.wants/muster.service"])
+	}
+	// The .wants directory is a directory, not a startup file: globRows skips it.
+	if _, ok := byPath["/etc/systemd/system/multi-user.target.wants"]; ok {
+		t.Errorf("a directory matched by the glob must not be a startup_scripts row: %v", byPath["/etc/systemd/system/multi-user.target.wants"])
+	}
+}
+
+// syslog config rows are recorded; a world-writable rsyslog.conf is flagged.
+func TestFilesSyslogConfigs(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{"/etc/rsyslog.conf": "rsyslog_conf", "/etc/group": "group"},
+		stats: map[string]statResult{"/etc/rsyslog.conf": {mode: 0o646, uid: 0, kind: "regular"}},
+	}
+	rows := okList(t, build(t, "files", a), "files.syslog_configs")
+	if len(rows) != 1 || rows[0].(map[string]any)["other_writable"] != true {
+		t.Fatalf("syslog rows %v", rows)
+	}
+}
+
+// inetd/xinetd are absent on a stock host: the fixed leaves are absent, the
+// fragment list an ok empty list.
+func TestFilesInetdAbsent(t *testing.T) {
+	a := &fsAccess{files: map[string]string{"/etc/group": "group"}}
+	b := build(t, "files", a)
+	if e := env(t, b, "files.etc_inetd_conf.mode"); e.Status != facts.StatusAbsent {
+		t.Errorf("absent inetd.conf → absent leaf: %+v", e)
+	}
+	if l := okList(t, b, "files.xinetd_d"); len(l) != 0 {
+		t.Errorf("no xinetd.d fragments → ok empty list, got %v", l)
+	}
+}
+
 func TestFilesPasswdPermissionFacts(t *testing.T) {
 	a := &fsAccess{files: map[string]string{"/etc/passwd": "passwd"}}
 	b := build(t, "files", a)
@@ -1285,6 +1537,143 @@ func TestFilesSecurettyLinesSkipBlanksAndComments(t *testing.T) {
 	rec, ok := env(t, b, "files.etc_securetty").Value.(map[string]any)
 	if !ok || rec["mode"] != 0o644 {
 		t.Errorf("%#v", env(t, b, "files.etc_securetty").Value)
+	}
+}
+
+// sudoers permission facts come from stat (works non-root); sudo.includedir
+// and secure_path are parsed from /etc/sudoers content (root-only read). A
+// drop-in ending in ~ or containing . is ignored:true (sudo skips it).
+func TestFilesSudoers(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{"/etc/sudoers": "sudoers", "/etc/sudoers.d/muster": "sudoers_d_entry", "/etc/group": "group"},
+		stats: map[string]statResult{
+			"/etc/sudoers":          {mode: 0o440, uid: 0, gid: 0, kind: "regular"},
+			"/etc/sudoers.d":        {mode: 0o750, uid: 0, gid: 0, kind: "dir"},
+			"/etc/sudoers.d/muster": {mode: 0o440, uid: 0, gid: 0, kind: "regular"},
+		},
+	}
+	b := build(t, "files", a)
+	if env(t, b, "files.etc_sudoers.mode").Value != 0o440 || env(t, b, "files.etc_sudoers.uid").Value != 0 {
+		t.Errorf("sudoers perms %+v", env(t, b, "files.etc_sudoers.mode"))
+	}
+	if env(t, b, "sudo.installed").Value != true {
+		t.Error("sudo.installed")
+	}
+	if env(t, b, "sudo.secure_path").Value != "/usr/sbin:/usr/bin:/sbin:/bin" {
+		t.Errorf("secure_path %+v", env(t, b, "sudo.secure_path"))
+	}
+	rows := okList(t, b, "files.sudoers_d_entries")
+	if len(rows) != 1 || rows[0].(map[string]any)["ignored"] != false {
+		t.Fatalf("drop-in rows %v", rows)
+	}
+}
+
+// A non-root run cannot read /etc/sudoers: sudo.secure_path is denied, but the
+// stat-based perm facts (mode/uid) and sudo.installed still succeed. acl_present
+// is legitimately denied on a non-root run (the ACL probe needs the file open),
+// so this test does NOT assert acl_present is ok.
+func TestFilesSudoersDeniedRead(t *testing.T) {
+	a := &fsAccess{
+		fails: map[string]error{"/etc/sudoers": os.ErrPermission},
+		stats: map[string]statResult{"/etc/sudoers": {mode: 0o440, uid: 0, kind: "regular"}},
+		files: map[string]string{"/etc/group": "group"},
+	}
+	b := build(t, "files", a)
+	if env(t, b, "files.etc_sudoers.mode").Value != 0o440 {
+		t.Errorf("stat still works: %+v", env(t, b, "files.etc_sudoers.mode"))
+	}
+	if env(t, b, "files.etc_sudoers.uid").Value != 0 {
+		t.Errorf("uid stat still works: %+v", env(t, b, "files.etc_sudoers.uid"))
+	}
+	if e := env(t, b, "sudo.secure_path"); e.Status != facts.StatusDenied {
+		t.Errorf("a denied read → denied secure_path: %+v", e)
+	}
+}
+
+// A Defaults line with spaces around the "=" (Rocky's shape,
+// `Defaults    secure_path = /usr/sbin:/usr/bin`) is parsed by the L2 regex.
+func TestFilesSudoSecurePathSpacedEquals(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{"/etc/sudoers": "sudoers_spaced_securepath", "/etc/group": "group"},
+		stats: map[string]statResult{"/etc/sudoers": {mode: 0o440, uid: 0, gid: 0, kind: "regular"}},
+	}
+	b := build(t, "files", a)
+	if e := env(t, b, "sudo.secure_path"); e.Value != "/usr/sbin:/usr/bin" {
+		t.Errorf("secure_path with spaces around = must parse to the trimmed value: %+v", e)
+	}
+}
+
+// /var/log rows carry the group name and writable flags, and /var/log itself is
+// a log_dirs row.
+func TestFilesLogTree(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{"/etc/group": "group"},
+		dirs:  map[string]bool{"/var/log": true, "/var/log/journal": true},
+		stats: map[string]statResult{
+			"/var/log":         {mode: 0o755, uid: 0, gid: 0, kind: "dir"},
+			"/var/log/journal": {mode: 0o2755, uid: 0, gid: 4, kind: "dir"},        // gid 4 = adm in the group fixture
+			"/var/log/syslog":  {mode: 0o640, uid: 104, gid: 104, kind: "regular"}, // gid 104 = syslog
+		},
+	}
+	a.files["/var/log/syslog"] = "" // present for Glob
+	b := build(t, "files", a)
+	ld := okList(t, b, "files.log_dirs")
+	if len(ld) < 1 {
+		t.Fatalf("log_dirs %v", ld)
+	}
+	// /var/log itself is a row.
+	var haveVarLog bool
+	for _, r := range ld {
+		if r.(map[string]any)["path"] == "/var/log" {
+			haveVarLog = true
+		}
+	}
+	if !haveVarLog {
+		t.Errorf("/var/log itself must be a log_dirs row: %v", ld)
+	}
+	// The syslog file row carries the group name (U-67 judges this leaf) and the
+	// group-writable flag: gid 104 = syslog, mode 0640 is not group-writable.
+	lf := okList(t, b, "files.log_files")
+	var syslogRow map[string]any
+	for _, r := range lf {
+		if m := r.(map[string]any); m["path"] == "/var/log/syslog" {
+			syslogRow = m
+		}
+	}
+	if syslogRow == nil {
+		t.Fatalf("the syslog file must be a log_files row: %v", lf)
+	}
+	if syslogRow["group"] != "syslog" {
+		t.Errorf("syslog row group name (evidence U-67 judges) = %v, want syslog", syslogRow["group"])
+	}
+	if syslogRow["group_writable"] != false {
+		t.Errorf("0640 syslog row must not be group_writable: %v", syslogRow)
+	}
+}
+
+// When /etc/group cannot be read, U-67 judges the log rows' group field, so a
+// silent group:"" would be fabricated evidence. Both log keys must carry the
+// read error (path-prefixed with /etc/group), never a clean list.
+func TestFilesLogTreeDeniedGroupIsError(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{},
+		fails: map[string]error{"/etc/group": os.ErrPermission},
+		dirs:  map[string]bool{"/var/log": true},
+		stats: map[string]statResult{
+			"/var/log":        {mode: 0o755, uid: 0, gid: 0, kind: "dir"},
+			"/var/log/syslog": {mode: 0o640, uid: 104, gid: 104, kind: "regular"},
+		},
+	}
+	a.files["/var/log/syslog"] = "" // present for Glob
+	b := build(t, "files", a)
+	for _, k := range []string{"files.log_dirs", "files.log_files"} {
+		e := env(t, b, k)
+		if e.Status == facts.StatusOK {
+			t.Errorf("%s: a denied /etc/group must not yield a clean list: %+v", k, e)
+		}
+		if !strings.Contains(e.Reason, groupPath) {
+			t.Errorf("%s: reason must name /etc/group: %+v", k, e)
+		}
 	}
 }
 

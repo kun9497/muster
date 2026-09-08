@@ -1062,6 +1062,256 @@
       "SubjectKind": ""
     },
     {
+      "Key": "files.startup_scripts",
+      "Type": "list\u003crecord\u003e",
+      "Description": "SysV init scripts and systemd unit files under the startup roots, each with path, mode, owner, group, the group/other-writable flags and is_symlink - the enabled-unit symlinks U-17 filters out.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": "file"
+    },
+    {
+      "Key": "files.startup_dirs",
+      "Type": "list\u003crecord\u003e",
+      "Description": "The startup-script directories themselves (/etc/init.d, /etc/systemd/system, the rcN.d dirs), each with path, mode, owner, group and the group/other-writable flags.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": "file"
+    },
+    {
+      "Key": "files.syslog_configs",
+      "Type": "list\u003crecord\u003e",
+      "Description": "The rsyslog and syslog-ng configuration files, each with path, mode, owner, group and the group/other-writable flags.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": "file"
+    },
+    {
+      "Key": "files.journald_configs",
+      "Type": "list\u003crecord\u003e",
+      "Description": "The systemd-journald configuration files, each with path, mode, owner, group and the group/other-writable flags.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": "file"
+    },
+    {
+      "Key": "files.etc_inetd_conf.mode",
+      "Type": "int",
+      "Description": "Mode bits of /etc/inetd.conf (0o7777); absent when the file does not exist, as it does not on either stock family.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_inetd_conf.uid",
+      "Type": "int",
+      "Description": "Owner uid of /etc/inetd.conf; absent when the file does not exist.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_inetd_conf.group_writable",
+      "Type": "bool",
+      "Description": "Whether /etc/inetd.conf is group-writable; absent when the file does not exist.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_inetd_conf.other_readable",
+      "Type": "bool",
+      "Description": "Whether /etc/inetd.conf is world-readable; absent when the file does not exist.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_xinetd_conf.mode",
+      "Type": "int",
+      "Description": "Mode bits of /etc/xinetd.conf (0o7777); absent when the file does not exist.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_xinetd_conf.uid",
+      "Type": "int",
+      "Description": "Owner uid of /etc/xinetd.conf; absent when the file does not exist.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.xinetd_d",
+      "Type": "list\u003crecord\u003e",
+      "Description": "The /etc/xinetd.d fragment files, each with path, mode, owner, group and the group/other-writable flags; an ok empty list when the directory holds none.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": "file"
+    },
+    {
+      "Key": "files.etc_sudoers.mode",
+      "Type": "int",
+      "Description": "Mode bits of /etc/sudoers (0o7777); absent when the file does not exist.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_sudoers.uid",
+      "Type": "int",
+      "Description": "Owner uid of /etc/sudoers; absent when the file does not exist.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_sudoers.gid",
+      "Type": "int",
+      "Description": "Owner gid of /etc/sudoers; absent when the file does not exist.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_sudoers.acl_present",
+      "Type": "bool",
+      "Description": "Whether /etc/sudoers carries a POSIX access ACL; denied on a non-root run, since the ACL probe needs the file open.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_sudoers_d.mode",
+      "Type": "int",
+      "Description": "Mode bits of the /etc/sudoers.d drop-in directory (0o7777); absent when it does not exist.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_sudoers_d.uid",
+      "Type": "int",
+      "Description": "Owner uid of /etc/sudoers.d; absent when the directory does not exist.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_sudoers_d.gid",
+      "Type": "int",
+      "Description": "Owner gid of /etc/sudoers.d; absent when the directory does not exist.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_sudoers_d.acl_present",
+      "Type": "bool",
+      "Description": "Whether /etc/sudoers.d carries a POSIX access ACL; denied on a non-root run, since the ACL probe needs the directory open.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.sudoers_d_entries",
+      "Type": "list\u003crecord\u003e",
+      "Description": "The /etc/sudoers.d drop-in files, each with path, mode, owner, group, the group/other-writable flags and an ignored flag (a name ending in ~ or containing a dot, which sudo skips).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": "file"
+    },
+    {
+      "Key": "files.log_dirs",
+      "Type": "list\u003crecord\u003e",
+      "Description": "/var/log itself and the directories one and two levels under it, each with path, mode, owner, group and the group/other-writable flags; bounded and marked truncated if the bound is hit.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": "file"
+    },
+    {
+      "Key": "files.log_files",
+      "Type": "list\u003crecord\u003e",
+      "Description": "The non-directory entries one and two levels under /var/log, each with path, mode, owner, group and the group/other-writable flags; a symlink is is_symlink:true and an unreadable entry carries a reason. Bounded and marked truncated if the bound is hit.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": "file"
+    },
+    {
+      "Key": "sudo.installed",
+      "Type": "bool",
+      "Description": "Whether /etc/sudoers exists (sudo is configured on the host).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "sudo.includedir",
+      "Type": "string",
+      "Description": "The directory named by the @includedir/#includedir directive in /etc/sudoers; an empty string when none is present.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "sudo.secure_path",
+      "Type": "string",
+      "Description": "The Defaults secure_path value from /etc/sudoers (quotes and surrounding spaces stripped); an empty string when unset.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
       "Key": "accounts.login_defs.pass_max_days",
       "Type": "setting\u003cint\u003e",
       "Description": "PASS_MAX_DAYS - persisted in login.defs, effective as the maximum over existing accounts' shadow fields.",
@@ -1670,6 +1920,36 @@
       "Collector": "walk",
       "DefaultOn": "",
       "SubjectKind": ""
+    },
+    {
+      "Key": "cron.files",
+      "Type": "list\u003crecord\u003e",
+      "Description": "Every cron/at configuration and spool file - path, scope, user, mode, owner and the group/other-writable flags.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "cron",
+      "DefaultOn": "",
+      "SubjectKind": "file"
+    },
+    {
+      "Key": "cron.dirs",
+      "Type": "list\u003crecord\u003e",
+      "Description": "The cron and at directories - path, mode, owner and the group/other-writable flags.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "cron",
+      "DefaultOn": "",
+      "SubjectKind": "file"
+    },
+    {
+      "Key": "cron.timers",
+      "Type": "list\u003crecord\u003e",
+      "Description": "The systemd timer unit-file inventory - name and enablement state.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "cron",
+      "DefaultOn": "",
+      "SubjectKind": "unit"
     }
   ]
 }
