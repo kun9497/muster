@@ -33,7 +33,7 @@
 ## File Structure
 
 **Collector (Task 1 & 2) — modify:**
-- `internal/collect/collectors/services.go` — replace `logicalUnits map[string][]unitRef` and the `switch name` dispatch with a `[]logicalService` table and one generic per-service loop; parse `UnitFileState`/`SubState` (already on the wire); derive `enabled`; generalise `hasNonLoopbackTCPPort` to proto+multi-port; iterate the table in the no-systemd degrade path.
+- `internal/collect/collectors/services.go` — replace `logicalUnits map[string][]unitRef` and the `switch name` dispatch with a `[]logicalService` table and one generic per-service loop; parse `UnitFileState` (already on the wire; drop the `SubState` parse per R235); derive `enabled`; generalise `hasNonLoopbackTCPPort` to proto+multi-port; iterate the table in the no-systemd degrade path.
 - `internal/collect/collectors/services_super.go` — **new** file: the shared inetd/xinetd content reader extracted and generalised from `telnetFromLegacy` (a super-server entry lookup by service-name field / server-program suffix for a set of names).
 - `internal/collect/collectors/services_test.go` (or the existing `collectors_test.go` block for services) — table-driven collector tests incl. the no-systemd and masked-procfs degrade assertions.
 - `internal/facts/registry.yaml` + `internal/facts/testdata/schema_golden.json` (or the golden path the `-update` flag writes) — new `services.<n>.*` keys.
@@ -44,7 +44,7 @@
 - `tftp_talk_disabled.yaml` (U-44), `snmp_disabled.yaml` (U-58)
 
 **Reconciliation (Task 6) — modify:**
-- `cmd/muster/controls_test.go` (two `ok: 35 controls` → `ok: 44 controls`), `cmd/muster/e2e_test.go` (two control-id→status maps + the "thirty-four unchanged" comment), `cmd/muster/testdata/full-pass.json`, `cmd/muster/testdata/full-fail.json`, `docs/reference/coverage.md` (regenerated), `README.md`/`README.ko.md` (service coverage line).
+- `cmd/muster/controls_test.go` (two `ok: 35 controls` → `ok: 44 controls`), `cmd/muster/e2e_test.go` (two control-id→status maps + the two spelled-out count comments "thirty-five"→"forty-four" and "thirty-four"→"forty-three", R230), `cmd/muster/testdata/full-pass.json`, `cmd/muster/testdata/full-fail.json`, `docs/reference/coverage.md` (regenerated), `README.md`/`README.ko.md` (only if a service-coverage sentence exists — no count sentence to bump today, R230).
 
 ---
 
@@ -53,7 +53,7 @@
 New fact keys (collector `services`, all `since: 1`), per logical service `<n>`:
 - `services.<n>.installed` — `bool` — a unit or super-server entry proving the software is present.
 - `services.<n>.active` — `bool` — running now (systemd `ActiveState=active`, or a live inetd entry, or a non-loopback listener).
-- `services.<n>.unit_file_state` — `string` — the systemd `UnitFileState` of the proving unit (`enabled`, `disabled`, `masked`, `static`, `indirect`, `generated`, `alias`, `enabled-runtime`, or `absent` when no unit exists); evidence only.
+- `services.<n>.unit_file_state` — `string` — the systemd `UnitFileState` of the first unit in list order whose `LoadState != "not-found"` (R222); `"not-found"` when no unit is found (R231, not `"absent"`). Values: `enabled`, `disabled`, `masked`, `static`, `indirect`, `generated`, `alias`, `enabled-runtime`, `not-found`. Evidence only.
 - `services.<n>.enabled` — `bool` — **derived**: will start at boot / on socket activation, or is enabled in inetd/xinetd. Judged leaf.
 - `services.<n>.reachable` — `bool` — a non-loopback listening socket exists on one of `<n>`'s fixed ports. **Only registered for services with fixed ports** (finger, rservices, dos_services, nfs_server, rpcbind, tftp, talk, snmp, telnet). Absent for automount, nis, ssh.
 
@@ -76,41 +76,108 @@ For 2J: `services.nfs_server.installed`, `services.snmp.installed` are guarantee
 
 - [ ] **Step 1: Write the failing test — the table drives every service, and the no-systemd path degrades every key**
 
-Add to the services test file. The first test proves the collector emits the full leaf set for a service from the table (not a hard-coded switch); the second is the load-bearing degrade test.
+Add to the services test block in `collectors_test.go`. **Ruling R226 — use the REAL test helpers** (the ones the plan drafted, `newFakeAccess`/`showKey`/`cmdOut`/`reg(t)`/`snap.Lookup`/`mustBool`, do not exist): `servicesAccess(files, cmds)` (collectors_test.go:1700, pre-seeds `/run/systemd/system`), `&fsAccess{}` for the no-systemd case, `showLine(unit)` (1682), `cmdResult{file: "<testdata name>"}` (canned stdout comes from a testdata FILE), `build(t, "services", a)` (212), `env(t, b, key)` (243, returns `facts.Envelope`), `b.Keys("services")` and `b.Worst("services")` (facts.go:118,162), and enumerate registry keys via `facts.LoadRegistry()` then `reg.Keys[i].Collector == "services"` / `.Key` (registry.go:22-36). `readErrorEnv(p string, err error)` lives in pam_derive.go:63.
+
+**Ruling R226 — rebuild `allUnitsNotFound()` table-driven FIRST.** `allUnitsNotFound()` (collectors_test.go:1688-1698) is a hard-coded 8-unit list; `fsAccess.Run` returns `os.ErrNotExist` for any unmapped command, so once the table grows every new unit turns into an `Err` and every existing services test errors. Rebuild it from the table before adding the new tests:
+
+```go
+func allUnitsNotFound() map[string]cmdResult {
+	out := map[string]cmdResult{}
+	for _, svc := range services {
+		for _, u := range svc.units {
+			out[showLine(u.name)] = cmdResult{file: "systemctl.notfound"}
+		}
+	}
+	return out
+}
+```
+
+**Ruling R226 — new testdata files** the tests below need: `internal/collect/collectors/testdata/systemctl.enabled.inactive` (`LoadState=loaded\nActiveState=inactive\nUnitFileState=enabled\nSubState=dead\n`), `systemctl.alias.inactive` (`UnitFileState=alias`, R228), `systemctl.masked` (`LoadState=masked\nActiveState=inactive\nUnitFileState=masked\nSubState=dead\n`, R231), and `proc_net_udp6_snmp` (a non-loopback `::` listener on port 161 / `0x00A1`, R221).
 
 ```go
 func TestServicesTableEmitsAllLeavesPerService(t *testing.T) {
-	a := newFakeAccess() // systemd present: Stat("/run/systemd/system") ok
-	a.stat["/run/systemd/system"] = fakeStat{}
-	// finger.socket enabled but inactive → must be caught as enabled==true, active==false
-	a.cmd[showKey("finger.socket")] = cmdOut{stdout: "LoadState=loaded\nActiveState=inactive\nUnitFileState=enabled\nSubState=dead\n"}
-	b := facts.NewBuilder(reg(t))
-	if err := runServices(context.Background(), a, b); err != nil {
-		t.Fatal(err)
+	// finger.socket enabled but inactive → enabled==true, active==false.
+	cmds := allUnitsNotFound()
+	cmds[showLine("finger.socket")] = cmdResult{file: "systemctl.enabled.inactive"}
+	b := build(t, "services", servicesAccess(nil, cmds))
+	if e := env(t, b, "services.finger.active"); e.Status != facts.StatusOK || e.Value != false {
+		t.Errorf("finger.active: %+v", e)
 	}
-	snap := b.Snapshot()
-	mustBool(t, snap, "services.finger.active", false)
-	mustBool(t, snap, "services.finger.enabled", true) // enabled-but-stopped is still enabled
-	mustString(t, snap, "services.finger.unit_file_state", "enabled")
-	mustBool(t, snap, "services.finger.installed", true)
+	if e := env(t, b, "services.finger.enabled"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("finger.enabled (enabled-but-stopped is still enabled): %+v", e)
+	}
+	if e := env(t, b, "services.finger.unit_file_state"); e.Value != "enabled" {
+		t.Errorf("finger.unit_file_state: %+v", e)
+	}
+	if e := env(t, b, "services.finger.installed"); e.Value != true {
+		t.Errorf("finger.installed: %+v", e)
+	}
+}
+
+// Ruling R222: enabled is the OR over every probed unit, not the canonical one.
+func TestServicesEnabledOredAcrossUnits(t *testing.T) {
+	// NIS client: canonical ypserv.service not-found, sibling ypbind.service
+	// enabled-but-stopped ⇒ enabled==true (catches the NIS-client false-PASS class).
+	cmds := allUnitsNotFound()
+	cmds[showLine("ypbind.service")] = cmdResult{file: "systemctl.enabled.inactive"}
+	b := build(t, "services", servicesAccess(nil, cmds))
+	if e := env(t, b, "services.nis.enabled"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("nis.enabled must OR across units: %+v", e)
+	}
+	if e := env(t, b, "services.nis.active"); e.Value != false {
+		t.Errorf("nis.active: %+v", e)
+	}
+}
+
+// Ruling R228: alias must not count as enabled.
+func TestServicesAliasIsNotEnabled(t *testing.T) {
+	cmds := allUnitsNotFound()
+	cmds[showLine("nfs-kernel-server.service")] = cmdResult{file: "systemctl.alias.inactive"}
+	b := build(t, "services", servicesAccess(nil, cmds))
+	if e := env(t, b, "services.nfs_server.enabled"); e.Value != false {
+		t.Errorf("alias must not count as enabled: %+v", e)
+	}
+}
+
+// Ruling R231: masked IS installed, but not enabled and not active.
+func TestServicesMaskedCountsAsInstalled(t *testing.T) {
+	cmds := allUnitsNotFound()
+	cmds[showLine("snmpd.service")] = cmdResult{file: "systemctl.masked"}
+	b := build(t, "services", servicesAccess(nil, cmds))
+	if e := env(t, b, "services.snmp.installed"); e.Value != true {
+		t.Errorf("masked IS installed: %+v", e)
+	}
+	if e := env(t, b, "services.snmp.enabled"); e.Value != false {
+		t.Errorf("masked is not enabled: %+v", e)
+	}
+	if e := env(t, b, "services.snmp.active"); e.Value != false {
+		t.Errorf("masked is not active: %+v", e)
+	}
+}
+
+// Ruling R221: a ::-bound daemon appears only in udp6/tcp6 (proto prefix match).
+func TestServicesReachableMatchesIPv6Listener(t *testing.T) {
+	a := servicesAccess(map[string]string{"/proc/self/net/udp6": "proc_net_udp6_snmp"}, allUnitsNotFound())
+	b := build(t, "services", a)
+	if e := env(t, b, "services.snmp.reachable"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("::-bound port 161 must be reachable: %+v", e)
+	}
 }
 
 func TestServicesNoSystemdDegradesEveryRegisteredKey(t *testing.T) {
-	a := newFakeAccess() // Stat("/run/systemd/system") returns an error
-	b := facts.NewBuilder(reg(t))
-	if err := runServices(context.Background(), a, b); err != nil {
+	b := build(t, "services", &fsAccess{}) // no /run/systemd/system
+	reg, err := facts.LoadRegistry()
+	if err != nil {
 		t.Fatal(err)
 	}
-	snap := b.Snapshot()
 	// Every services.* key the registry declares must be present and unsupported,
 	// so the run stays complete on a systemd-less container (R220).
-	for _, key := range reg(t).KeysForCollector("services") {
-		env, ok := snap.Lookup(key)
-		if !ok {
-			t.Fatalf("%s missing on no-systemd host (would ERROR at check time)", key)
+	for _, k := range reg.Keys {
+		if k.Collector != "services" {
+			continue
 		}
-		if env.Status != facts.StatusUnsupported {
-			t.Errorf("%s = %s, want unsupported on no-systemd host", key, env.Status)
+		if e := env(t, b, k.Key); e.Status != facts.StatusUnsupported {
+			t.Errorf("%s = %s, want unsupported on no-systemd host", k.Key, e.Status)
 		}
 	}
 	if got := b.Worst("services"); got != facts.StatusOK {
@@ -119,7 +186,7 @@ func TestServicesNoSystemdDegradesEveryRegisteredKey(t *testing.T) {
 }
 ```
 
-If `reg(t).KeysForCollector(...)` does not exist, use the registry accessor that lists keys by collector (grep `internal/facts` for the method the golden test already uses to enumerate keys); if none exists, enumerate the expected key list literally from the table in the test. The intent — *every registered `services.*` key is `unsupported`, and `Worst("services")==ok`* — is the assertion that must hold. Mirror `TestCronTimersInventoryAndFailure`'s `Worst(...)==ok` shape from 2F.
+The intent — *every registered `services.*` key is `unsupported`, and `Worst("services")==ok`* — is the assertion that must hold. Mirror `TestCronTimersInventoryAndFailure`'s `Worst(...)==ok` shape from 2F.
 
 - [ ] **Step 2: Run the tests to confirm they fail**
 
@@ -138,51 +205,78 @@ type portSpec struct {
 
 type logicalService struct {
 	name       string     // fact segment under services.
-	units      []unitRef  // systemd units; the provesInstall unit is canonical for unit_file_state
+	units      []unitRef  // systemd units; provesInstall keeps its established meaning (R223), NOT "canonical for unit_file_state"
 	inetdNames []string   // inetd.conf field-0 names / xinetd.d service names (super-server hosting)
+	servers    []string   // real server-program basenames to match against the inetd/xinetd server field (R233)
 	ports      []portSpec // fixed listening ports for the reachable leaf; empty ⇒ no reachable leaf
 }
 
 // Order is the emission order; keep it stable (same input, same bytes).
+//
+// Ruling R223: reuse the existing ssh and telnet unitRef lists UNCHANGED —
+// verbatim from services.go:52-65 `logicalUnits` (ssh keeps ssh.service /
+// sshd.service / ssh.socket; telnet keeps telnet.socket / telnet.service /
+// telnetd.service plus the inetd.service / xinetd.service entries with their
+// CURRENT provesInstall flags per R63). Only APPEND the new logical services.
+// `provesInstall` keeps its established meaning (proves-installed vs the
+// "systemd did not answer" distinction); it is NOT "the canonical unit for
+// unit_file_state" (that is R222's first-loaded rule). Every genuinely new
+// real unit (finger/rservices/dos/nfs/automount/rpcbind/nis/tftp/talk/snmp)
+// gets provesInstall: true.
 var services = []logicalService{
-	{name: "ssh", units: []unitRef{{"ssh.service", true}, {"sshd.service", false}}},
-	{name: "telnet", units: []unitRef{{"telnet.socket", true}, {"telnet.service", false}, {"telnetd.service", false}}, inetdNames: []string{"telnet"}, ports: []portSpec{{"tcp", 23}}},
-	{name: "finger", units: []unitRef{{"finger.socket", true}, {"fingerd.service", false}}, inetdNames: []string{"finger"}, ports: []portSpec{{"tcp", 79}}},
-	{name: "rservices", units: []unitRef{{"rsh.socket", true}, {"rlogin.socket", false}, {"rexec.socket", false}}, inetdNames: []string{"shell", "login", "exec"}, ports: []portSpec{{"tcp", 514}, {"tcp", 513}, {"tcp", 512}}},
-	{name: "dos_services", units: []unitRef{{"echo.socket", true}, {"discard.socket", false}, {"daytime.socket", false}, {"chargen.socket", false}}, inetdNames: []string{"echo", "discard", "daytime", "chargen"}, ports: []portSpec{{"tcp", 7}, {"udp", 7}, {"tcp", 9}, {"udp", 9}, {"tcp", 13}, {"udp", 13}, {"tcp", 19}, {"udp", 19}}},
-	{name: "nfs_server", units: []unitRef{{"nfs-server.service", true}, {"nfs-kernel-server.service", false}}, ports: []portSpec{{"tcp", 2049}, {"udp", 2049}}},
+	// ssh and telnet: verbatim from services.go logicalUnits (do not change the unit lists or flags).
+	{name: "ssh", units: []unitRef{{"ssh.service", true}, {"sshd.service", true}, {"ssh.socket", true}}},
+	{name: "telnet", units: []unitRef{{"telnet.socket", true}, {"telnet.service", true}, {"telnetd.service", true}, {"inetd.service", false}, {"xinetd.service", false}}, inetdNames: []string{"telnet"}, servers: []string{"telnetd", "in.telnetd"}, ports: []portSpec{{"tcp", 23}}},
+	// New logical services (all real units provesInstall: true; R234 adds atftpd.service to tftp).
+	{name: "finger", units: []unitRef{{"finger.socket", true}, {"fingerd.service", true}}, inetdNames: []string{"finger"}, servers: []string{"in.fingerd"}, ports: []portSpec{{"tcp", 79}}},
+	{name: "rservices", units: []unitRef{{"rsh.socket", true}, {"rlogin.socket", true}, {"rexec.socket", true}}, inetdNames: []string{"shell", "login", "exec"}, servers: []string{"in.rshd", "in.rlogind", "in.rexecd"}, ports: []portSpec{{"tcp", 514}, {"tcp", 513}, {"tcp", 512}}},
+	{name: "dos_services", units: []unitRef{{"echo.socket", true}, {"discard.socket", true}, {"daytime.socket", true}, {"chargen.socket", true}}, inetdNames: []string{"echo", "discard", "daytime", "chargen"}, ports: []portSpec{{"tcp", 7}, {"udp", 7}, {"tcp", 9}, {"udp", 9}, {"tcp", 13}, {"udp", 13}, {"tcp", 19}, {"udp", 19}}},
+	{name: "nfs_server", units: []unitRef{{"nfs-server.service", true}, {"nfs-kernel-server.service", true}}, ports: []portSpec{{"tcp", 2049}, {"udp", 2049}}},
 	{name: "automount", units: []unitRef{{"autofs.service", true}}},
-	{name: "rpcbind", units: []unitRef{{"rpcbind.service", true}, {"rpcbind.socket", false}}, ports: []portSpec{{"tcp", 111}, {"udp", 111}}},
-	{name: "nis", units: []unitRef{{"ypserv.service", true}, {"ypbind.service", false}, {"ypxfrd.service", false}, {"yppasswdd.service", false}}},
-	{name: "tftp", units: []unitRef{{"tftp.socket", true}, {"tftpd.service", false}, {"tftpd-hpa.service", false}}, inetdNames: []string{"tftp"}, ports: []portSpec{{"udp", 69}}},
-	{name: "talk", units: []unitRef{{"talk.socket", true}, {"ntalk.socket", false}}, inetdNames: []string{"talk", "ntalk"}, ports: []portSpec{{"udp", 517}, {"udp", 518}}},
+	{name: "rpcbind", units: []unitRef{{"rpcbind.service", true}, {"rpcbind.socket", true}}, ports: []portSpec{{"tcp", 111}, {"udp", 111}}},
+	{name: "nis", units: []unitRef{{"ypserv.service", true}, {"ypbind.service", true}, {"ypxfrd.service", true}, {"yppasswdd.service", true}}},
+	{name: "tftp", units: []unitRef{{"tftp.socket", true}, {"tftpd.service", true}, {"tftpd-hpa.service", true}, {"atftpd.service", true}}, inetdNames: []string{"tftp"}, servers: []string{"in.tftpd", "atftpd"}, ports: []portSpec{{"udp", 69}}},
+	{name: "talk", units: []unitRef{{"talk.socket", true}, {"ntalk.socket", true}}, inetdNames: []string{"talk", "ntalk"}, servers: []string{"in.talkd", "in.ntalkd"}, ports: []portSpec{{"udp", 517}, {"udp", 518}}},
 	{name: "snmp", units: []unitRef{{"snmpd.service", true}}, ports: []portSpec{{"udp", 161}}},
 }
 ```
 
+**Ruling R234:** all systemd unit names in this table must be verified against the real CI-image / lab-host units before the collector is considered done — a wrong unit name silently reads as not-installed → false PASS. The implementer runs the collector on the lab host and checks the real unit names for nfs/rpcbind/snmp/nis/tftp/autofs.
+
 `declaredShowCommands()` must now iterate `services` (flattening `units`) instead of `logicalUnits`; keep the sorted-key determinism (sort the flattened unit names).
 
-- [ ] **Step 4: Parse UnitFileState/SubState and derive `enabled`**
+- [ ] **Step 4: Parse UnitFileState and derive `enabled`**
 
-`showValues` already receives `UnitFileState`/`SubState` on the wire (the command asks for them). Extend it to return them, and add:
+`showValues` already receives `UnitFileState` on the wire (the command asks for it). Extend it to return `UnitFileState`. **Ruling R235:** do NOT parse `SubState` — nothing reads it; the show command may still request it, only the parsing is dropped. Keep `active = (ActiveState == "active")` deliberately (unchanged from today; avoids regressing ssh/telnet).
 
 ```go
 // enabledFromUnitFile reports whether a unit's UnitFileState means "will start
-// at boot or on socket activation". masked/disabled/absent ⇒ false; static and
-// indirect ⇒ false unless the unit is also active (a dependency pulled it in).
+// at boot or on socket activation" (Ruling R228).
+//   enabled, enabled-runtime → true
+//   indirect                 → active (a socket unit that is actually listening)
+//   generated                → active (sysv-generator stamps every init.d script
+//                              "generated" whether or not an rcN.d/S* link exists)
+//   alias                    → false (e.g. Ubuntu nfs-kernel-server.service reports
+//                              "alias" regardless of the target's enable state; the
+//                              target unit is in the same list and answers for itself)
+//   static, disabled, masked, bad, "", not-found → false
 func enabledFromUnitFile(state string, active bool) bool {
 	switch state {
-	case "enabled", "enabled-runtime", "alias", "generated":
+	case "enabled", "enabled-runtime":
 		return true
-	case "indirect":
-		return active // a socket unit that is actually listening
-	default: // disabled, masked, static, bad, absent, ""
+	case "indirect", "generated":
+		return active
+	default: // alias, static, disabled, masked, bad, "", not-found
 		return false
 	}
 }
 ```
 
-Record `services.<n>.unit_file_state` as the canonical (provesInstall) unit's state, defaulting to `"absent"` when no unit is found.
+**Ruling R222 — `enabled` is the OR over EVERY probed unit** of the service: `enabled ← OR_{u in svc.units} enabledFromUnitFile(state_u, active_u)`, then OR'd with the super-server verdict (Task 2). It is NOT derived from the canonical/provesInstall unit alone (that class of bug false-PASSes the NIS-client / tftpd-hpa / rlogin.socket enabled-but-stopped sibling).
+
+**Ruling R222 — `unit_file_state` (evidence only)** = the `UnitFileState` of the FIRST unit in list order whose `LoadState != "not-found"`; **Ruling R231:** default `"not-found"` (systemd's own `LoadState` word) when no unit is found — NOT `"absent"`, which collides with the envelope-status vocabulary.
+
+**Ruling R231 — `installed` rule change:** `installed ← LoadState != "not-found"` (OR super-server entry OR reachable), which now counts `masked` as installed (differs from today's `== "loaded"`). This is intended — a masked unit IS installed. Add a `masked` collector fixture/test: `LoadState=masked`, `UnitFileState=masked` ⇒ `installed=true, enabled=false, active=false`.
 
 - [ ] **Step 5: Generalise the port helper**
 
@@ -198,7 +292,10 @@ func hasNonLoopbackPort(list []any, ports []portSpec) bool {
 			if !ok {
 				continue
 			}
-			if asString(m["proto"]) == ps.proto && asInt(m["port"]) == ps.port && !asBool(m["loopback"]) {
+			// Ruling R221: compare proto by PREFIX, not equality — sockets.listening
+			// rows carry "tcp"/"tcp6"/"udp"/"udp6" (sockets.go:46-54); a ::-bound
+			// daemon (snmpd/rpcbind/nfsd/fingerd) appears only in tcp6/udp6.
+			if strings.HasPrefix(asString(m["proto"]), ps.proto) && asInt(m["port"]) == ps.port && !asBool(m["loopback"]) {
 				return true
 			}
 		}
@@ -207,18 +304,20 @@ func hasNonLoopbackPort(list []any, ports []portSpec) bool {
 }
 ```
 
-Use the record field names actually present in `sockets.listening` (grep `sockets.go` `parseProcNet` for the exact keys — the scope brief lists `proto, addr, port, inode, loopback`). Keep any existing `asString`/`asInt` helpers; add minimal ones if absent.
+Use the record field names actually present in `sockets.listening` (grep `sockets.go` `parseProcNet` for the exact keys — the scope brief lists `proto, addr, port, inode, loopback`). Keep any existing `asString`/`asInt` helpers; add minimal ones if absent. **Ruling R221:** `port` is a Go `int` in this record path (`asInt` returns `int`, not `float64`).
 
 - [ ] **Step 6: One generic per-service loop + no-systemd degrade over the table**
 
-Replace the `switch name { case "ssh": …; case "telnet": … }` dispatch with a loop over `services`. For each service:
-- `installed` ← any unit found (LoadState≠not-found) OR a super-server entry (Task 2) OR (`reachable` true).
+Replace the `switch name { case "ssh": …; case "telnet": … }` dispatch with a loop over `services`. **Ruling R232:** call `listeningSockets(a)` ONCE before the per-service loop (not inside it — otherwise up to 48 procfs reads and 12 chances to disagree with `sockets.listening`); capture its error/truncation and file `socketReadEnvelope(err)` / the truncation `ErrorEnv` (services.go:284-295) on EVERY fixed-port service's `reachable` leaf. For each service:
+- `installed` ← any unit found (LoadState ≠ "not-found", so `masked` counts — R231) OR a super-server entry (Task 2) OR (`reachable` true).
 - `active` ← systemd `ActiveState=active` on any unit, OR a live super-server entry, OR (for a fixed-port service) `reachable`.
-- `unit_file_state` ← canonical unit's state (string).
-- `enabled` ← `enabledFromUnitFile(state, active)` OR the super-server entry is enabled (Task 2 folds in).
-- `reachable` (fixed-port services only) ← `hasNonLoopbackPort(listeningSockets(a), svc.ports)`, and `socketReadEnvelope`/`unsupported` when `/proc/net` is masked (reuse the telnet path at services.go line ~284/290).
+- `unit_file_state` ← first unit in list order whose `LoadState != "not-found"` (R222); `"not-found"` when no unit is found (R231). Evidence only.
+- `enabled` ← OR over EVERY probed unit's `enabledFromUnitFile(state_u, active_u)` (R222), OR the super-server entry is enabled (Task 2 folds in).
+- `reachable` (fixed-port services only) ← `hasNonLoopbackPort(t.listening, svc.ports)` from the single pre-loop `listeningSockets(a)`, and `socketReadEnvelope`/`unsupported` when `/proc/net` is masked (reuse the telnet path at services.go line ~284/290).
 
-The no-systemd branch must iterate the table and emit `unsupported` for **every** leaf the service registers (including `reachable` where applicable), replacing the hard-coded 4-key list:
+**Ruling R224 — a complete sweep never emits `absent` on a judged leaf.** When the unit sweep is COMPLETE (systemd answered, nothing loaded), every JUDGED leaf (`active`, `enabled`, `reachable`) is `ok:false` — NOT `absent`. Rationale: spec §6.5 step 8 (eval.go:187-197) screens the whole control on the first `absent` fact BEFORE clauses run, so an `absent` leaf on a multi-fact control (U-44 tftp+talk, U-43 service+nsswitch) would PASS via `absent_means` even when a sibling leaf proves a live service. `unit_file_state` (evidence) may still be `"not-found"`. Keep `absent_means: pass` on the controls as a belt-and-braces default only (for the incomplete-sweep / never-registered case).
+
+The no-systemd branch must iterate the table and emit `unsupported` for **every** leaf the service registers (including `reachable` where applicable), replacing the hard-coded 4-key list. **Ruling R239:** this branch deliberately pre-empts super-server and socket evidence — everything is `unsupported`, even the `reachable` that `/proc/net` could answer — consistent with today's telnet behaviour and required by the collect-contract leg:
 
 ```go
 if _, err := a.Stat(systemdMarker); err != nil {
@@ -240,7 +339,9 @@ Keep `setSSH`/`setTelnet` only if they still add value; otherwise delete them (t
 
 - [ ] **Step 7: Register the new keys**
 
-Add to `internal/facts/registry.yaml`, for each logical service, the leaves it emits (all `since: 1`, `collector: services`). `installed`/`active`/`enabled`/`reachable` are `type: bool`; `unit_file_state` is `type: string`. `ssh` gains `active`, `unit_file_state`, `enabled` (no `reachable`); `telnet` gains `active`, `unit_file_state`, `enabled` (keeps `reachable`). Keep entries grouped and sorted the way the file already groups `services.*`. Set `subject_kind`/`sensitivity` consistently with the existing `services.*` entries (they are not `internal`).
+Add to `internal/facts/registry.yaml`, for each logical service, the leaves it emits. `installed`/`active`/`enabled`/`reachable` are `type: bool`; `unit_file_state` is `type: string`. `ssh` gains `active`, `unit_file_state`, `enabled` (no `reachable`); `telnet` gains `active`, `unit_file_state`, `enabled` (keeps `reachable`). Keep entries grouped and sorted the way the file already groups `services.*`.
+
+**Ruling R229:** do NOT set `subject_kind` on the new scalar keys — registry.go:75-77 rejects it on non-`list<` types (`LoadRegistry` fails). Each new key carries exactly: `type`, `description`, `since: 1`, `sensitivity: public`, `collector: services` — nothing else.
 
 - [ ] **Step 8: Regenerate the facts golden and run gates**
 
@@ -264,34 +365,50 @@ git commit -m "Generalise the services collector to a logical-service table"
 - Test: `internal/collect/collectors/services_test.go`
 
 **Interfaces:**
-- Consumes: `collect.Access` (`ReadFile`, `Glob`), `inetdConf`, `xinetdGlob` (existing consts in `services.go`).
-- Produces: `superServerState(a, names []string) (enabled bool, active bool, found bool, ev *facts.Envelope)` — one lookup for a set of inetd/xinetd service names, folded into a logical service's `installed`/`active`/`enabled`.
+- Consumes: `collect.Access` (`ReadFile`, `Glob`, `Run`), `inetdConf`, `xinetdGlob` (existing consts in `services.go`).
+- Produces: a once-per-run super-server read and a per-service lookup. **Ruling R227:** `readSuperServers(a)` parses `inetdConf` and the `xinetdGlob` fragments ONCE per run and probes the super-server host units ONCE per run — `openbsd-inetd.service`, `inetutils-inetd.service`, `inetd.service`, `xinetd.service` (all `provesInstall:false`; Debian/Ubuntu have no `inetd.service`, only the first two). The per-service lookup `(s superServers) match(names, servers []string) (installed, enabled, active, found bool, ev *facts.Envelope)` returns: `installed` unconditionally when an entry is present; `enabled` only when its host super-server is enabled (or its state is unknown/unprobed); `active` only when the host super-server is active. **Ruling R233:** match by inetd NAME plus the explicit `servers []string` basenames against the server-program field — no `<name>d`/`in.<name>d` suffix heuristic.
 
 - [ ] **Step 1: Write the failing test**
 
+**Ruling R226 — use the real helpers.** `fsAccess.files` maps a host path to a **testdata FILE NAME** (collectors_test.go:38), not raw content, so add testdata files: `inetd.conf.rsh` (`shell\tstream\ttcp\tnowait\troot\t/usr/sbin/in.rshd\tin.rshd\n`) and `inetd.conf.finger.commented` (`#finger\tstream\ttcp\tnowait\tnobody\t/usr/sbin/in.fingerd\n`). `systemctl.loaded.inactive` (UnitFileState=disabled) already exists for the host-stopped case.
+
 ```go
-func TestSuperServerReaderMatchesAnyName(t *testing.T) {
-	a := newFakeAccess()
-	a.files[inetdConf] = "shell\tstream\ttcp\tnowait\troot\t/usr/sbin/in.rshd\tin.rshd\n" +
-		"#login\tstream\ttcp\tnowait\troot\t/usr/sbin/in.rlogind\n" // commented ⇒ not enabled
-	en, act, found, ev := superServerState(a, []string{"shell", "login", "exec"})
+func TestSuperServerReaderMatchesByNameAndServer(t *testing.T) {
+	// openbsd-inetd running+enabled; a live 'shell' entry ⇒ r-services enabled+active.
+	cmds := allUnitsNotFound()
+	cmds[showLine("openbsd-inetd.service")] = cmdResult{file: "systemctl.loaded.active"}
+	s := readSuperServers(servicesAccess(map[string]string{inetdConf: "inetd.conf.rsh"}, cmds))
+	installed, enabled, active, found, ev := s.match([]string{"shell", "login", "exec"}, []string{"in.rshd", "in.rlogind", "in.rexecd"})
 	if ev != nil {
 		t.Fatalf("unexpected envelope: %+v", ev)
 	}
-	if !found || !en || !act {
-		t.Fatalf("live 'shell' entry: found=%v enabled=%v active=%v, want all true", found, en, act)
+	if !found || !installed || !enabled || !active {
+		t.Fatalf("live shell entry, inetd running: found=%v installed=%v enabled=%v active=%v, want all true", found, installed, enabled, active)
+	}
+}
+
+// Ruling R227: an entry does not become enabled/active when its host super-server is disabled/stopped.
+func TestSuperServerEntryGatedByHostState(t *testing.T) {
+	cmds := allUnitsNotFound()
+	cmds[showLine("openbsd-inetd.service")] = cmdResult{file: "systemctl.loaded.inactive"} // installed, disabled, stopped
+	s := readSuperServers(servicesAccess(map[string]string{inetdConf: "inetd.conf.rsh"}, cmds))
+	installed, enabled, active, found, _ := s.match([]string{"shell"}, []string{"in.rshd"})
+	if !found || !installed {
+		t.Fatalf("entry present: found=%v installed=%v", found, installed)
+	}
+	if enabled || active {
+		t.Errorf("host inetd disabled/stopped ⇒ entry not enabled/active: enabled=%v active=%v", enabled, active)
 	}
 }
 
 func TestSuperServerReaderIgnoresCommentsAndOtherNames(t *testing.T) {
-	a := newFakeAccess()
-	a.files[inetdConf] = "#finger\tstream\ttcp\tnowait\tnobody\t/usr/sbin/in.fingerd\n"
-	en, _, found, ev := superServerState(a, []string{"finger"})
+	s := readSuperServers(servicesAccess(map[string]string{inetdConf: "inetd.conf.finger.commented"}, allUnitsNotFound()))
+	installed, enabled, _, found, ev := s.match([]string{"finger"}, []string{"in.fingerd"})
 	if ev != nil {
 		t.Fatal(ev)
 	}
-	if found || en {
-		t.Fatalf("commented finger: found=%v enabled=%v, want false", found, en)
+	if found || installed || enabled {
+		t.Fatalf("commented finger: found=%v installed=%v enabled=%v, want false", found, installed, enabled)
 	}
 }
 ```
@@ -303,11 +420,21 @@ Expected: FAIL — `superServerState` undefined.
 
 - [ ] **Step 3: Implement the shared reader**
 
-Generalise the logic in `telnetFromLegacy` (services.go lines ~307–355): read `inetdConf`, then glob `xinetdGlob`, and match by inetd service name. For `/etc/inetd.conf`: split each non-comment line on whitespace; field 0 is the service name; a `disable = yes` is not expressible in inetd.conf, so a present, uncommented line ⇒ enabled+active. For xinetd fragments: a `service <name>` block is enabled unless it contains `disable = yes` (and active if enabled — xinetd starts on demand). Match if `field0`/block-name equals any requested name **or** the server-program basename has the classic `in.<name>d`/`<name>d` suffix. Return a read-error envelope (`readErrorEnv`-style) when a file that exists cannot be read, mirroring the honest-degradation rule (a config that exists but is unreadable is not "absent"); a missing `inetd.conf`/no xinetd fragments ⇒ `found=false`, no envelope.
+Generalise the logic in `telnetFromLegacy` (services.go lines ~307–355) into a once-per-run `readSuperServers(a)`: read `inetdConf`, glob `xinetdGlob`, and probe the four super-server host units. Parse each source into `{name, serverBasename, entryEnabled}` entries.
+
+- `/etc/inetd.conf`: split each non-comment line on whitespace; field 0 is the service name; field 5 (`inetdServerField`) is the server program. A `disable = yes` is not expressible in inetd.conf, so an uncommented line is an **entry present** (`entryEnabled = true` at the file level).
+- xinetd fragments: a `service <name>` block is an entry; `entryEnabled = false` when it contains `disable = yes`.
+- **Ruling R233 — matching:** `(s superServers) match(names, servers)` matches an entry when `entry.name` equals any requested `name`, OR `entry.serverBasename` equals any requested `servers` basename. Do NOT use the `in.<name>d`/`<name>d` suffix heuristic — it does not fit r-services (`in.rshd` ≠ `shelld`) and only adds false positives. With tcpd wrapping, field 0 is still the service name, so name matching is complete for inetd.conf.
+- **Ruling R227 — host gating (the promotion to judged leaves):** a matched entry contributes `installed` unconditionally; `enabled` only when the host super-server is enabled (via `enabledFromUnitFile` over the four host units) OR the host state is unknown/unprobed; `active` only when a host super-server is `ActiveState=active`. A stale `/etc/inetd.conf` on a host whose inetd is stopped/disabled must not FAIL.
+- **Ruling R237 — over-strict note (comment only, no code):** note in the reader's comment that xinetd global `defaults { disabled = … }` / `enabled = …` in `/etc/xinetd.conf` are NOT read (a fragment with `disable = no` could still be globally disabled). This is over-strict, not a false PASS; do not add code for it now.
+
+Return a read-error envelope (`readErrorEnv(p, err)`, pam_derive.go:63) when a file that exists cannot be read, mirroring the honest-degradation rule (a config that exists but is unreadable is not "absent"); a missing `inetd.conf`/no xinetd fragments ⇒ `found=false`, no envelope.
 
 - [ ] **Step 4: Wire it into the per-service loop and delete `telnetFromLegacy`**
 
-In the Task 1 loop, for a service with `inetdNames`, call `superServerState`; OR its `enabled`/`active`/`installed` into the systemd-derived values; propagate any envelope onto that service's `enabled`/`active` leaves (a read error is not a silent pass). Delete `telnetFromLegacy`/`inetdTelnet`/`xinetdTelnet` and confirm telnet's own behaviour is unchanged by the existing telnet fixtures (Task 6 e2e) and its collector test.
+Call `readSuperServers(a)` ONCE before the per-service loop (alongside the single `listeningSockets(a)` from R232). In the loop, for a service with `inetdNames`/`servers`, call `s.match(svc.inetdNames, svc.servers)`; OR its `installed`/`enabled`/`active` into the systemd-derived values; propagate any envelope onto that service's `enabled`/`active` leaves (a read error is not a silent pass). Delete `telnetFromLegacy`/`inetdTelnet`/`xinetdTelnet`.
+
+**Ruling R227 — the reader now always runs, so `TestServicesSkipsLegacyFilesWhenSystemdProvesTelnet` (collectors_test.go:1955) must be replaced/rewritten.** That test asserts `/etc/inetd.conf` is NOT read once a telnet unit loaded — which conflicts with reading the config once per run for every `inetdNames` service. Rewrite it (and `TestServicesReadsLegacyFilesWhenSystemdDidNotProveTelnet`) so it no longer asserts on `a.reads` for `inetd.conf`; instead assert that telnet's **judged** result (`installed`/`enabled`/`active`) is unchanged when systemd proves telnet — systemd evidence dominates when present. Record this test change as a ledger ruling in the ledger's Task 2 entry. Telnet's behaviour is preserved by the telnet fixtures + e2e (Task 6).
 
 - [ ] **Step 5: Run tests + gates**
 
@@ -440,21 +567,21 @@ references:
     - { benchmark: rhel9, version: "V2R9", id: "RHEL-09-215030" }
 ```
 
-Primary checks are the service state (`services.nis.active`/`enabled` == false — ypserv/ypbind covered by the `nis` unit list). Add an nsswitch screen so a host resolving accounts through NIS FAILs even without a running local ypserv. Express it with the §6.3–6.6 `none` clause over the `list<string>` sources; **the implementer must confirm the exact clause shape against `internal/controls/schema.go` and the merged 2B/2C controls that already read list facts, and adjust keys/operators to match**:
+Primary checks are the service state (`services.nis.active`/`enabled` == false — ypserv/ypbind covered by the `nis` unit list). Add an nsswitch screen so a host resolving accounts through NIS FAILs even without a running local ypserv.
+
+**Ruling R225 — use the working clause shape.** The drafted `none:`/`value:` YAML does NOT decode (schema.go:16-26 uses `KnownFields(true)`; `none` is an OP, and the sub-key is `expected`, not `value`). Use the precedent shape (controls/account/root_remote_login.yaml:32), and drop `nis+` — it is not an nsswitch token (`nisplus` is):
 
 ```yaml
 checks:
   - { fact: services.nis.active, op: eq, expected: false }
   - { fact: services.nis.enabled, op: eq, expected: false }
-  - fact: accounts.nss.passwd_sources
-    none:
-      where: { op: in, value: ["nis", "nisplus", "nis+"] }
-  - fact: accounts.nss.group_sources
-    none:
-      where: { op: in, value: ["nis", "nisplus", "nis+"] }
+  - { fact: accounts.nss.passwd_sources, op: none, where: { op: in, expected: ["nis", "nisplus"] } }
+  - { fact: accounts.nss.group_sources,  op: none, where: { op: in, expected: ["nis", "nisplus"] } }
 ```
 
-If the grammar cannot express "the list contains none of these" cleanly, fall back to the service-state checks alone and record a ruling in the ledger (the nsswitch screen is a strengthening, not the core of U-43). `accounts.nss.*_sources` are always present (2B guarantees they are never absent), so they do not need `absent_means`.
+**Ruling R225:** this nsswitch screen only bites given R224 — the `services.nis.*` leaves are `ok:false` (not `absent`) on a complete sweep, so §6.5 step 8 does not screen the control out before the clauses run. `accounts.nss.*_sources` are always present (2B guarantees they are never absent), so they do not need `absent_means`.
+
+**Ruling R236 — honesty note in the U-43 description.** The description must state that a NIS client resolving via nsswitch `compat` mode with `+` entries is NOT detected (mirrors the `accounts.nss.remote` registry warning) — so the control can pass a compat-mode NIS client.
 
 - [ ] **Step 3: Fixtures**
 
@@ -527,7 +654,9 @@ Run: `go test ./cmd/muster/ -run TestControlsLint` → expected FAIL first if ru
 
 - [ ] **Step 2: Enrol the nine controls in the e2e snapshots**
 
-Add to `cmd/muster/testdata/full-pass.json` the nine services' passing facts (all judged leaves `ok:false`, or `absent` for a clean "never present" host — match how the other passing service facts are shaped there), and to `full-fail.json` the facts that make each new control FAIL (one enabled/reachable leaf `ok:true`). Update both control-id→expected-status maps in `cmd/muster/e2e_test.go` (add nine entries each) and the "thirty-four controls are unchanged" comment count.
+**Rulings R224/R240:** add to `cmd/muster/testdata/full-pass.json` the nine services' passing facts with the REAL live-host shape — every judged leaf `ok:false` (NOT `absent`), because a complete sweep never emits `absent` on a judged leaf (R224). This makes the e2e leg prove the live path a real host takes. The `pass-absent.json` control fixtures are kept as synthetic edge cases (they also pin the "absent counts as pass" CI reason contract). Add to `full-fail.json` the facts that make each new control FAIL (one enabled/reachable leaf `ok:true`).
+
+**Ruling R230 — two spelled-out count comments in `cmd/muster/e2e_test.go`, not one:** `:167` "the thirty-five embedded controls" → "forty-four" and `:217` "the other thirty-four controls are unchanged" → "forty-three". Update both control-id→expected-status maps (add nine entries each) and both comments.
 
 - [ ] **Step 3: Regenerate coverage**
 
@@ -535,7 +664,7 @@ Run: `go run ./tools/coverage` → `docs/reference/coverage.md` line 4 becomes `
 
 - [ ] **Step 4: README service coverage**
 
-Update the coverage sentence/table in `README.md` and its `README.ko.md` pair (same commit) to reflect 44 controls and the newly covered service items. Identifiers/paths stay English on both sides.
+**Ruling R230:** `README.md:25` / `README.ko.md:21` only LINK the generated coverage table — there is no "N controls" sentence to bump. Verify no control-count sentence exists in the READMEs; update only if a service-coverage sentence is present, else leave the READMEs unchanged (do NOT fabricate a sentence). If touched, keep the `.ko.md` pair in the same commit; identifiers/paths stay English on both sides.
 
 - [ ] **Step 5: Full suite + cross gates**
 
@@ -554,12 +683,12 @@ git commit -m "Enrol the nine 2G service controls in the coverage and e2e snapsh
 
 **1. Spec coverage.** §10.2's 2G subject "services and super-servers" → nine controls covering finger (U-34), r-services (U-36), DoS-prone (U-38), NFS server (U-39), automountd (U-41), RPC (U-42), NIS (U-43), tftp/talk (U-44), SNMP-running (U-58). NFS access control (U-40), SNMP config depth (U-59/60/61) and patch stay in 2J; 2G publishes the `services.nfs_server.installed`/`services.snmp.installed` evidence 2J's dependency line requires (Task 1 registers them). FTP (U-53/54/56/57) and U-35/U-45–U-51 are 2L. D09 logical-service map → the `services` table (Task 1). D19 service normalisation → `unit_file_state`/masked/static/indirect handling (Task 1 Step 4).
 
-**2. Placeholder scan.** Every control's full YAML or a complete template is given; every fixture has an example or an exact shape to copy from the merged telnet fixtures; the collector code blocks are concrete. The two soft spots are called out explicitly, not hidden: the U-43 nsswitch clause (implementer confirms the §6.3–6.6 shape, falls back to service-state and records a ruling) and the registry key enumeration in the no-systemd test (use the registry's collector-key accessor or a literal list). Both have a defined fallback.
+**2. Placeholder scan.** Every control's full YAML or a complete template is given; every fixture has an example or an exact shape to copy from the merged telnet fixtures; the collector code blocks are concrete. The two former soft spots are now pinned: the U-43 nsswitch clause is fixed to the working `op: none` / `where: { op: in, expected: [...] }` shape (R225), and the registry key enumeration in the no-systemd test uses `facts.LoadRegistry()` + `reg.Keys[i].Collector == "services"` / `.Key` (R226).
 
 **3. Type consistency.** `services.<n>.installed/active/enabled/reachable` are `bool`; `unit_file_state` is `string`. `reachable` is registered and checked **only** for fixed-port services (finger, rservices, dos_services, nfs_server, rpcbind, tftp, talk, snmp, telnet) and omitted for automount, nis, ssh — the controls match (automount/nis check only active+enabled). `portSpec{proto,port}` and `hasNonLoopbackPort(list, []portSpec)` are used consistently in Task 1 Steps 5–6. `enabledFromUnitFile(state, active)` is defined once (Step 4) and used in Step 6 and folded with the super-server `enabled` (Task 2 Step 4).
 
 **Risks (for the pre-flight scan and reviews to probe):**
-- **R-a (unit name coverage, analysis "riskiest decision #1"):** one wrong unit name silently reads as "not installed" → a running service passes. The table's unit lists must cover both Debian/Ubuntu and RHEL/Rocky/Alma names (e.g. `nfs-server.service` vs `nfs-kernel-server.service`). Pre-flight and the lab-host run should confirm the real unit names on the CI images.
+- **R-a (unit name coverage, analysis "riskiest decision #1"):** one wrong unit name silently reads as "not installed" → a running service passes. The table's unit lists must cover both Debian/Ubuntu and RHEL/Rocky/Alma names (e.g. `nfs-server.service` vs `nfs-kernel-server.service`). **Ruling R234:** ALL systemd unit names in the Task 1 table must be verified against the real CI-image / lab-host units before the collector is considered done; the implementer runs the collector on the lab host and checks the real unit names for nfs/rpcbind/snmp/nis/tftp/autofs (`atftpd.service` added to `tftp` for the Debian atftpd package).
 - **R-b (enabled-but-stopped):** `active==false` alone must not pass; the `enabled` AND-term and the `fail-enabled` fixtures guard this. Verify `enabledFromUnitFile` returns true for `enabled` with `active=false`.
 - **R-c (masked-procfs → reachable):** every `reachable` leaf must be `unsupported` (not `absent`) when `/proc/net/tcp` is masked, or the container CI leg mis-passes; reuse `socketReadEnvelope`.
 - **R-d (no-systemd completeness):** the degrade loop must cover **every** registered leaf including `reachable`; the `collect-contract` leg fails otherwise. This is the R220 lesson made a first-class test.
