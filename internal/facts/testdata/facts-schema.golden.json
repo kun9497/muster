@@ -922,6 +922,146 @@
       "SubjectKind": ""
     },
     {
+      "Key": "files.home_dirs",
+      "Type": "list\u003crecord\u003e",
+      "Description": "One row per /etc/passwd account with its home path, interactive flag, and the home's stat status, mode, ownership match, group/other write bits and whether it sits on a remote filesystem.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": "user"
+    },
+    {
+      "Key": "files.env_files",
+      "Type": "list\u003crecord\u003e",
+      "Description": "System-scope and per-home shell environment files that exist, with path, scope, owning account, mode, owner match, group/other write bits and whether the file is a symlink.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.user_rhosts",
+      "Type": "list\u003crecord\u003e",
+      "Description": ".rhosts and .shosts files under interactive homes, as derived flags only - owning account match, whether a wildcard \"+\" entry is present and the non-comment entry count, never the file body.",
+      "Since": 1,
+      "Sensitivity": "internal",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.root_home.mode",
+      "Type": "int",
+      "Description": "Permission bits of /root as an integer (e.g. 448 for 0700).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.root_home.uid",
+      "Type": "int",
+      "Description": "Owner uid of /root.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.root_home.gid",
+      "Type": "int",
+      "Description": "Group gid of /root.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.root_home.group_writable",
+      "Type": "bool",
+      "Description": "Whether the group permission bits of /root include write (derived from mode).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.root_home.other_writable",
+      "Type": "bool",
+      "Description": "Whether the other permission bits of /root include write (derived from mode).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.root_home.acl_present",
+      "Type": "bool",
+      "Description": "Whether a POSIX ACL xattr is present on /root.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_hosts_equiv.mode",
+      "Type": "int",
+      "Description": "Permission bits of /etc/hosts.equiv as an integer; absent when the file does not exist.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_hosts_equiv.uid",
+      "Type": "int",
+      "Description": "Owner uid of /etc/hosts.equiv; absent when the file does not exist.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_hosts_equiv_lines",
+      "Type": "list\u003cstring\u003e",
+      "Description": "Non-comment lines of /etc/hosts.equiv; an OK empty list when the file does not exist, since a host-based trust file that is absent grants no trust.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.dev_entries",
+      "Type": "list\u003crecord\u003e",
+      "Description": "Every node one and two levels under /dev, each with name, path, kind, serving filesystem type, mode and owner uid; bounded and marked truncated if the bound is hit.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.dev_nondevice",
+      "Type": "list\u003crecord\u003e",
+      "Description": "The subset of /dev entries that are regular files served by the /dev mount itself (not a deeper tmpfs such as /dev/shm) - the stale or planted files U-26 flags.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
       "Key": "accounts.login_defs.pass_max_days",
       "Type": "setting\u003cint\u003e",
       "Description": "PASS_MAX_DAYS - persisted in login.defs, effective as the maximum over existing accounts' shadow fields.",
@@ -1438,6 +1578,76 @@
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "os",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "env.shell.tmout",
+      "Type": "int",
+      "Description": "Effective TMOUT in seconds from the system profile files; 0 when unset (bash reads 0 as no timeout).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "env",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "env.shell.tmout_exported",
+      "Type": "bool",
+      "Description": "Whether the winning TMOUT is exported so child login shells inherit it.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "env",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "env.shell.tmout_readonly",
+      "Type": "bool",
+      "Description": "Whether TMOUT is made readonly so a user cannot unset it.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "env",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "env.shell.tmout_settings",
+      "Type": "list\u003crecord\u003e",
+      "Description": "Every TMOUT assignment - path, line, value, exported, readonly, conditional, scope.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "env",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "env.shell.umask_settings",
+      "Type": "list\u003crecord\u003e",
+      "Description": "Every umask assignment - path, line, value, symbolic, conditional, scope.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "env",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "env.shell.root_path_raw",
+      "Type": "string",
+      "Description": "The winning PATH assignment for root, verbatim, with its file and line.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "env",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "env.shell.root_path_entries",
+      "Type": "list\u003crecord\u003e",
+      "Description": "Each root PATH element - position, value, exists, mode, uid, gid, group_writable, world_writable, is_dot, variable, unresolved, undeclared.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "env",
       "DefaultOn": "",
       "SubjectKind": ""
     },

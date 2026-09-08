@@ -1,0 +1,6 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{"files":{
+  "user_rhosts":{"status":"ok","value":[
+    {"path":"/home/alice/.rhosts","home_user":"alice","owner_ok":true,"has_plus":true,"entry_count":1}
+  ]},
+  "etc_hosts_equiv_lines":{"status":"ok","value":[]}
+}}}

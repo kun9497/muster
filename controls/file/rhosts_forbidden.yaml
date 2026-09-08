@@ -1,0 +1,20 @@
+id: muster.file.rhosts_forbidden
+title_en: No .rhosts or hosts.equiv grants blanket trust
+title_ko: .rhosts 나 hosts.equiv 가 무조건 신뢰를 허용하지 않는다
+description_en: The r-command trust files must not grant blanket access - no interactive user's ~/.rhosts or ~/.shosts may contain a "+" entry, and /etc/hosts.equiv must not begin a line with "+". A "+" trusts every host or user, defeating authentication. This control judges the .rhosts, .shosts and hosts.equiv files muster could actually read; a .rhosts or .shosts muster could not read is a collection gap that is not yet judged here. The absence of any such file is compliant.
+description_ko: r-command 신뢰 파일이 무조건 접근을 허용하면 안 됩니다. 어떤 대화형 사용자의 ~/.rhosts 나 ~/.shosts 도 "+" 항목을 담으면 안 되고, /etc/hosts.equiv 도 줄을 "+" 로 시작하면 안 됩니다. "+" 는 모든 호스트나 사용자를 신뢰해 인증을 무력화합니다. 이 컨트롤은 muster 가 실제로 읽을 수 있었던 .rhosts, .shosts, hosts.equiv 파일을 판정하며, 읽을 수 없었던 .rhosts 나 .shosts 는 아직 여기서 판정하지 않는 수집 공백입니다. 그런 파일이 아예 없으면 양호입니다.
+category: file
+importance: 상
+automation: auto
+references:
+  kisa: { "2026": ["U-27"], "2021": ["U-17"] }
+requires_facts: ">=1"
+absent_means: pass
+checks:
+  - { fact: files.user_rhosts, op: none, where: { field: has_plus, op: eq, expected: true } }
+  - { fact: files.etc_hosts_equiv_lines, op: none, where: { op: matches, expected: "^\\+" } }
+remediation:
+  text_en: Remove the "+" entries from the offending ~/.rhosts, ~/.shosts and /etc/hosts.equiv, or remove the files entirely if r-command trust is not in use.
+  text_ko: 문제되는 ~/.rhosts, ~/.shosts, /etc/hosts.equiv 에서 "+" 항목을 제거하거나, r-command 신뢰를 쓰지 않으면 파일을 아예 삭제합니다.
+  risk: none
+  idempotent: true

@@ -1,0 +1,25 @@
+id: muster.account.umask_policy
+title_en: The default file-creation mask denies group and other write
+title_ko: 기본 파일 생성 마스크가 그룹·기타 쓰기를 막는다
+description_en: The default UMASK in login.defs must be 022 or stricter so new files are not group- or world-writable, and pam_umask must be stacked so the mask applies to sessions that never read /etc/profile (cron, non-login SSH). The parameter lists the masks that count as strict enough; a host that sets a weaker mask, or that does not stack pam_umask, is reported.
+description_ko: login.defs 의 기본 UMASK 가 022 이상으로 엄격해 새 파일이 그룹·전체 쓰기 가능이 되지 않아야 하고, /etc/profile 을 읽지 않는 세션(cron, 비로그인 SSH)에도 마스크가 적용되도록 pam_umask 가 올라가 있어야 합니다. 파라미터는 충분히 엄격한 것으로 인정하는 마스크 목록이며, 더 약한 마스크를 설정했거나 pam_umask 를 올리지 않은 호스트는 보고됩니다.
+category: account
+importance: 중
+automation: auto
+references:
+  kisa: { "2026": ["U-30"], "2021": ["U-56"] }
+  stig:
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-411025 }
+  nist_800_53: ["CM-6"]
+requires_facts: ">=1"
+absent_means: fail
+params:
+  acceptable: { type: list<string>, default: ["022", "027", "077", "0022", "0027", "0077"], description: UMASK values that deny at least group and other write }
+checks:
+  - { fact: accounts.login_defs.umask, op: in, expected: "${acceptable}" }
+  - { fact: pam.umask_module.enabled, op: eq, expected: true }
+remediation:
+  text_en: Set UMASK 027 in /etc/login.defs and ensure a "session optional pam_umask.so" line is present in the login and non-login PAM session stacks (pam-auth-update on Debian, authselect on RHEL).
+  text_ko: /etc/login.defs 에 UMASK 027 을 설정하고 로그인·비로그인 PAM 세션 스택에 "session optional pam_umask.so" 줄이 있게 합니다(Debian 은 pam-auth-update, RHEL 은 authselect).
+  risk: none
+  idempotent: true

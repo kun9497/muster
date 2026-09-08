@@ -1,0 +1,4 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{"files":{"home_dirs":{"status":"ok","value":[
+  {"user":"root","uid":0,"home":"/root","interactive":true,"stat_status":"ok","is_dir":true,"owner_matches":true,"group_writable":false,"other_writable":false,"on_remote_fs":false,"mode":448,"owner_uid":0},
+  {"user":"alice","uid":1000,"home":"/home/alice","interactive":true,"stat_status":"absent","is_dir":false,"owner_matches":false,"group_writable":false,"other_writable":false,"on_remote_fs":false,"mode":-1,"owner_uid":-1}
+]}}}}

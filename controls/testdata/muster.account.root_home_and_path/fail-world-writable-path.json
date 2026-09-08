@@ -1,0 +1,8 @@
+{"synthetic": true, "_expect":{"status":"FAIL"}, "schema_version":1,"run":{},"facts":{
+  "env":{"shell":{
+    "root_path_raw":{"status":"ok","value":"/usr/sbin:/usr/local/bin","source":{"kind":"file","path":"/etc/profile","line":5,"raw":"PATH=/usr/sbin:/usr/local/bin"}},
+    "root_path_entries":{"status":"ok","value":[
+      {"position":0,"value":"/usr/sbin","exists":true,"unresolved":false,"is_dot":false,"variable":false,"undeclared":false,"group_writable":false,"world_writable":false,"mode":365,"uid":0,"gid":0},
+      {"position":1,"value":"/usr/local/bin","exists":true,"unresolved":false,"is_dot":false,"variable":false,"undeclared":false,"group_writable":false,"world_writable":true,"mode":511,"uid":0,"gid":0}
+    ]}}},
+  "files":{"root_home":{"uid":{"status":"ok","value":0},"group_writable":{"status":"ok","value":false},"other_writable":{"status":"ok","value":false}}}}}

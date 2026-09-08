@@ -1,0 +1,24 @@
+id: muster.file.home_dir_exists
+title_en: Every interactive account has a home directory that exists
+title_ko: 모든 대화형 계정이 실제 존재하는 홈 디렉터리를 가진다
+description_en: Each interactive account's home directory named in /etc/passwd must exist and be a directory. An account whose home is missing lands in / on login and may write into unexpected places; an account whose home muster could not stat is reported rather than assumed present. A home outside the declared home roots (not under /home, /home/*/ or /root) cannot be examined under the collector's declaration and is reported as denied — a finding — rather than assumed present. Service accounts with a nologin shell (whose home is often /nonexistent by design) are skipped.
+description_ko: /etc/passwd 에 적힌 각 대화형 계정의 홈 디렉터리가 실제로 존재하고 디렉터리여야 합니다. 홈이 없는 계정은 로그인 시 / 로 떨어져 예상치 못한 곳에 쓸 수 있으며, muster 가 stat 할 수 없었던 홈은 존재한다고 단정하지 않고 보고합니다. 선언된 홈 루트(/home, /home/*/, /root) 밖의 홈은 수집기 선언으로 점검할 수 없어 존재한다고 가정하지 않고 denied(발견 항목)로 보고합니다. nologin 셸의 서비스 계정(홈이 흔히 의도적으로 /nonexistent)은 건너뜁니다.
+category: file
+importance: 중
+automation: auto
+references:
+  kisa: { "2026": ["U-32"], "2021": ["U-58"] }
+  stig:
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-411065 }
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-411020 }
+  nist_800_53: ["CM-6"]
+requires_facts: ">=1"
+absent_means: manual
+checks:
+  - { fact: files.home_dirs, op: each, subject: user, where: { field: interactive, op: eq, expected: true }, require: { field: stat_status, op: eq, expected: "ok" } }
+  - { fact: files.home_dirs, op: each, subject: user, where: { field: interactive, op: eq, expected: true }, require: { field: is_dir, op: eq, expected: true } }
+remediation:
+  text_en: Create the missing home directory (mkhomedir_helper or mkdir + chown + chmod 0750), or correct the home path in /etc/passwd. Where a home could not be stat'd, fix the parent directory's permissions.
+  text_ko: 없는 홈 디렉터리를 생성하거나(mkhomedir_helper 또는 mkdir + chown + chmod 0750) /etc/passwd 의 홈 경로를 바로잡습니다. stat 할 수 없었던 홈은 상위 디렉터리 권한을 고칩니다.
+  risk: none
+  idempotent: true

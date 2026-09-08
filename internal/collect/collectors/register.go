@@ -31,6 +31,7 @@ const rawCap = 256
 
 func init() {
 	collect.Register(osCollector)
+	collect.Register(envCollector)
 	collect.Register(servicesCollector)
 	collect.Register(socketsCollector)
 	collect.Register(sshdCollector)

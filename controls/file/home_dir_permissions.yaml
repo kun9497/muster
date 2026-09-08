@@ -1,0 +1,25 @@
+id: muster.file.home_dir_permissions
+title_en: Interactive home directories are owned by their user and not writable by others
+title_ko: 대화형 홈 디렉터리가 사용자 소유이며 타인이 쓸 수 없다
+description_en: Each interactive account's home directory must be owned by that account and must not be group- or world-writable. A home muster could not stat (an unreadable parent) is reported here rather than passed silently, since an unexaminable home could hide anything. A home directory outside the declared home roots (not under /home, /home/*/ or /root) likewise cannot be examined under the collector's declaration and is reported as denied — a finding — rather than assumed compliant. Service accounts with a nologin shell are skipped so a host's thirty /nonexistent service homes do not each become a finding.
+description_ko: 각 대화형 계정의 홈 디렉터리는 해당 계정 소유여야 하고 그룹·전체 쓰기가 가능하면 안 됩니다. muster 가 stat 할 수 없었던 홈(상위 디렉터리를 읽을 수 없는 경우)은 조용히 통과시키지 않고 여기서 보고합니다. 점검 불가한 홈은 무엇이든 숨길 수 있기 때문입니다. 선언된 홈 루트(/home, /home/*/, /root) 밖의 홈 디렉터리도 수집기 선언으로는 점검할 수 없어 양호로 가정하지 않고 denied(발견 항목)로 보고합니다. nologin 셸의 서비스 계정은 건너뛰어, 호스트의 서른 개 /nonexistent 서비스 홈이 각각 findings 가 되지 않게 합니다.
+category: file
+importance: 중
+automation: auto
+references:
+  kisa: { "2026": ["U-31"], "2021": ["U-57"] }
+  stig:
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-232050 }
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-411070 }
+  nist_800_53: ["CM-6"]
+requires_facts: ">=1"
+absent_means: manual
+checks:
+  - { fact: files.home_dirs, op: each, subject: user, where: { field: interactive, op: eq, expected: true }, require: { field: owner_matches, op: eq, expected: true } }
+  - { fact: files.home_dirs, op: each, subject: user, where: { field: interactive, op: eq, expected: true }, require: { field: group_writable, op: eq, expected: false } }
+  - { fact: files.home_dirs, op: each, subject: user, where: { field: interactive, op: eq, expected: true }, require: { field: other_writable, op: eq, expected: false } }
+remediation:
+  text_en: chown each interactive home to its account and chmod go-w (0750 or stricter). Where a home could not be stat'd, fix the parent directory's permissions so it can be audited.
+  text_ko: 각 대화형 홈을 해당 계정으로 chown 하고 chmod go-w(0750 이상 엄격)를 적용합니다. stat 할 수 없었던 홈은 상위 디렉터리 권한을 고쳐 점검할 수 있게 합니다.
+  risk: none
+  idempotent: true

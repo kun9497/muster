@@ -1,0 +1,4 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{"files":{"env_files":{"status":"ok","value":[
+  {"path":"/etc/profile","scope":"system","home_user":"","mode":420,"owner_uid":0,"owner_ok":true,"group_writable":false,"other_writable":false,"is_symlink":false},
+  {"path":"/home/alice/.bashrc","scope":"user","home_user":"alice","mode":420,"owner_uid":1001,"owner_ok":false,"group_writable":false,"other_writable":false,"is_symlink":false}
+]}}}}

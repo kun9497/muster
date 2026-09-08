@@ -1825,3 +1825,481 @@ func TestSmokeOnTheRealHost(t *testing.T) {
 	}
 	t.Log("smoke: sockets, os and files collected under the guard with no violations")
 }
+
+// --- env ----------------------------------------------------------------
+
+// The winning TMOUT is the last unconditional assignment across the profile
+// files read in order; its exported/readonly flags come from that line (or a
+// later export/readonly of the same name). A value set only inside an `if`
+// block is recorded with conditional=true and does not win.
+func TestEnvEffectiveTMOUT(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{
+			"/etc/profile":               "profile",               // TMOUT=600; export TMOUT
+			"/etc/profile.d/99-tmout.sh": "profile.d_99-tmout.sh", // readonly TMOUT (no value)
+		},
+	}
+	b := build(t, "env", a)
+	if e := env(t, b, "env.shell.tmout"); e.Value != 600 {
+		t.Errorf("tmout %+v, want 600", e)
+	}
+	if env(t, b, "env.shell.tmout_exported").Value != true {
+		t.Error("TMOUT is exported")
+	}
+	if env(t, b, "env.shell.tmout_readonly").Value != true {
+		t.Error("TMOUT is readonly")
+	}
+	settings := okList(t, b, "env.shell.tmout_settings")
+	if len(settings) < 1 {
+		t.Fatalf("tmout_settings %v", settings)
+	}
+}
+
+// A conditional umask does not win and is flagged; a system-scope and a
+// root-scope umask are both recorded with the right scope.
+func TestEnvUmaskSettings(t *testing.T) {
+	a := &fsAccess{files: map[string]string{
+		"/etc/profile":                "profile",                // umask 022 (system, unconditional)
+		"/etc/profile.d/10-muster.sh": "profile.d_10-muster.sh", // umask 002 inside an if (conditional)
+		"/root/.bashrc":               "root_bashrc",
+	}}
+	rows := okList(t, build(t, "env", a), "env.shell.umask_settings")
+	var sawConditional, sawSystem bool
+	for _, r := range rows {
+		m := r.(map[string]any)
+		if m["value"] == "002" && m["conditional"] == true {
+			sawConditional = true
+		}
+		if m["value"] == "022" && m["scope"] == "system" && m["conditional"] == false {
+			sawSystem = true
+		}
+	}
+	if !sawConditional || !sawSystem {
+		t.Errorf("umask rows %v", rows)
+	}
+}
+
+// Root PATH is split into positioned entries. An empty element is is_dot; a
+// declared world-writable directory carries world_writable=true; an element
+// outside the declared PATH-dir set is not stat'd but marked
+// unresolved+undeclared (R175); a $/~ element is variable+unresolved (R180).
+func TestEnvRootPathEntries(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{"/root/.bashrc": "root_bashrc_badpath"}, // PATH=/usr/bin::/usr/local/games:/opt/x:$HOME/bin
+		stats: map[string]statResult{
+			"/usr/bin":         {mode: 0o755, kind: "dir"},
+			"/usr/local/games": {mode: 0o777, kind: "dir"}, // declared and world-writable
+		},
+	}
+	entries := okList(t, build(t, "env", a), "env.shell.root_path_entries")
+	if len(entries) != 5 {
+		t.Fatalf("entries %v, want 5 (/usr/bin, empty, /usr/local/games, /opt/x, $HOME/bin)", entries)
+	}
+	if entries[1].(map[string]any)["is_dot"] != true {
+		t.Error("the empty element between :: must be is_dot")
+	}
+	if entries[2].(map[string]any)["world_writable"] != true {
+		t.Error("/usr/local/games is world-writable")
+	}
+	if entries[3].(map[string]any)["undeclared"] != true || entries[3].(map[string]any)["unresolved"] != true {
+		t.Errorf("/opt/x is outside the declared PATH-dir set: unresolved+undeclared, never stat'd: %v", entries[3])
+	}
+	if entries[4].(map[string]any)["variable"] != true || entries[4].(map[string]any)["is_dot"] == true {
+		t.Errorf("$HOME/bin is an unexpanded variable, not is_dot: %v", entries[4])
+	}
+}
+
+// A profile file that cannot be read (denied — not ENOENT) is the answer for
+// every value it could set: all seven env.shell.* keys carry the path-prefixed
+// read error (C3, R183), never a value salvaged from the other files.
+func TestEnvDeniedProfileIsAnError(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{"/etc/profile": "profile"},
+		fails: map[string]error{"/etc/bash.bashrc": os.ErrPermission},
+	}
+	b := build(t, "env", a)
+	// All seven leaves the collector could set must carry the read's status —
+	// none may salvage a value from /etc/profile (C3, R183).
+	keys := []string{
+		"env.shell.tmout", "env.shell.tmout_exported", "env.shell.tmout_readonly",
+		"env.shell.tmout_settings", "env.shell.umask_settings",
+		"env.shell.root_path_raw", "env.shell.root_path_entries",
+	}
+	for _, k := range keys {
+		if e := env(t, b, k); e.Status != facts.StatusDenied {
+			t.Errorf("a denied profile file must make %s denied, got %+v", k, e)
+		}
+	}
+	// The read's status must be path-prefixed so the report names the file that
+	// could not be read (C3), matching readErrorEnv's shape.
+	if e := env(t, b, "env.shell.tmout"); !strings.HasPrefix(e.Reason, "/etc/bash.bashrc:") {
+		t.Errorf("reason %q must be prefixed with the unreadable path", e.Reason)
+	}
+}
+
+// A line may hold several statements separated by an unquoted `;`, and a
+// declaration keyword (declare/typeset/export/readonly) with -x/-r/-xr flags
+// assigns TMOUT just as a bare assignment does (R184).
+func TestEnvTMOUTDeclarationForms(t *testing.T) {
+	b := build(t, "env", &fsAccess{files: map[string]string{"/etc/profile": "profile_tmout_oneline"}})
+	if e := env(t, b, "env.shell.tmout"); e.Value != 600 {
+		t.Errorf("tmout %+v, want 600 from `TMOUT=600; export TMOUT`", e)
+	}
+	if env(t, b, "env.shell.tmout_exported").Value != true {
+		t.Error("the trailing `export TMOUT` marks it exported")
+	}
+
+	b2 := build(t, "env", &fsAccess{files: map[string]string{"/etc/profile": "profile_tmout_declare"}})
+	if e := env(t, b2, "env.shell.tmout"); e.Value != 600 {
+		t.Errorf("tmout %+v, want 600 from `declare -xr TMOUT=600`", e)
+	}
+	if env(t, b2, "env.shell.tmout_readonly").Value != true {
+		t.Error("`declare -xr` makes TMOUT readonly")
+	}
+}
+
+// R196: a later `PATH=$PATH:…` must SPLICE in the PATH accumulated from the
+// earlier unconditional assignments, not mask them. Here /etc/profile.d/10-x.sh
+// sets `PATH=/usr/bin:.` (a "." is_dot element) and /root/.bash_profile then
+// sets `PATH=$PATH:$HOME/bin`; the spliced entry list must still carry the "."
+// so U-14 would FAIL, while root_path_raw stays the verbatim last winning line.
+func TestEnvRootPathSplicesSelfReference(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{
+			"/etc/profile.d/10-x.sh": "profile.d_10-path.sh",     // PATH=/usr/bin:.
+			"/root/.bash_profile":    "root_bash_profile_splice", // PATH=$PATH:$HOME/bin
+		},
+		stats: map[string]statResult{"/usr/bin": {mode: 0o755, kind: "dir"}},
+	}
+	b := build(t, "env", a)
+	if e := env(t, b, "env.shell.root_path_raw"); e.Value != "$PATH:$HOME/bin" {
+		t.Errorf("root_path_raw %+v, want the verbatim last winning line \"$PATH:$HOME/bin\"", e)
+	}
+	entries := okList(t, b, "env.shell.root_path_entries")
+	var sawDot bool
+	for _, r := range entries {
+		if r.(map[string]any)["is_dot"] == true {
+			sawDot = true
+		}
+	}
+	if !sawDot {
+		t.Errorf("the spliced PATH must still carry the \".\" from the earlier file (an is_dot row so U-14 FAILs): %v", entries)
+	}
+}
+
+// R197: env.shell.tmout is a system-scope fact. A TMOUT set ONLY in root's
+// dotfiles must not decide the host-wide value — otherwise a root-only TMOUT
+// would yield a host-wide U-12 PASS. With no system-scope TMOUT, the value is 0.
+func TestEnvTMOUTIsSystemScopeOnly(t *testing.T) {
+	a := &fsAccess{files: map[string]string{"/root/.bashrc": "root_bashrc_tmout"}} // TMOUT=600 in root scope only
+	b := build(t, "env", a)
+	if e := env(t, b, "env.shell.tmout"); e.Status != facts.StatusOK || e.Value != 0 {
+		t.Errorf("tmout %+v, want 0 — a root-scope TMOUT must not set the system value", e)
+	}
+	// The row is still recorded as evidence, marked root scope.
+	var sawRoot bool
+	for _, r := range okList(t, b, "env.shell.tmout_settings") {
+		m := r.(map[string]any)
+		if m["value"] == "600" && m["scope"] == "root" {
+			sawRoot = true
+		}
+	}
+	if !sawRoot {
+		t.Errorf("the root-scope TMOUT row must still be recorded with scope \"root\": %v", okList(t, b, "env.shell.tmout_settings"))
+	}
+}
+
+// --- files: home directories, environment files and .rhosts --------------
+
+// home_dirs has one row per passwd home. A service account (nologin shell,
+// /nonexistent home) is interactive=false and its absent home is NOT a
+// finding. root and an interactive user are interactive=true; an unreadable
+// home (parent EACCES) is stat_status=denied, never absent.
+func TestFilesHomeDirsInteractiveAndTriState(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{"/etc/passwd": "passwd_home", "/etc/shells": "shells_home", "/proc/self/mountinfo": "mountinfo"},
+		dirs:  map[string]bool{"/root": true, "/home/alice": true},
+		stats: map[string]statResult{
+			"/root":       {mode: 0o700, uid: 0, gid: 0, kind: "dir"},
+			"/home/alice": {mode: 0o755, uid: 1000, gid: 1000, kind: "dir"},
+		},
+		fails: map[string]error{"/home/bob": os.ErrPermission}, // interactive, but parent denies stat
+	}
+	rows := okList(t, build(t, "files", a), "files.home_dirs")
+	byUser := map[string]map[string]any{}
+	for _, r := range rows {
+		m := r.(map[string]any)
+		byUser[m["user"].(string)] = m
+	}
+	if byUser["svc"]["interactive"] != false {
+		t.Error("a nologin service account must be interactive=false")
+	}
+	if byUser["alice"]["stat_status"] != "ok" || byUser["alice"]["owner_matches"] != true {
+		t.Errorf("alice %v", byUser["alice"])
+	}
+	if byUser["bob"]["stat_status"] != "denied" {
+		t.Errorf("bob's unreadable home must be denied, not absent: %v", byUser["bob"])
+	}
+	// R176: every field the U-31/U-32 `each … require` clauses read must be
+	// present and defaulted on a denied row, or the clause compares an absent
+	// field and ERRORs instead of the intended FAIL. Lock the pre-fill so a
+	// refactor that moved the defaults into only the ok branch is caught.
+	if byUser["bob"]["owner_matches"] != false || byUser["bob"]["group_writable"] != false || byUser["bob"]["mode"] != -1 {
+		t.Errorf("bob's denied row must keep the pre-filled defaults (owner_matches:false, group_writable:false, mode:-1): %v", byUser["bob"])
+	}
+}
+
+// A denied /etc/passwd makes the three enumerations the read error, never an
+// empty list.
+func TestFilesHomeEnumDeniedPasswdIsError(t *testing.T) {
+	a := &fsAccess{fails: map[string]error{"/etc/passwd": os.ErrPermission},
+		files: map[string]string{"/etc/shells": "shells_home"}}
+	b := build(t, "files", a)
+	for _, k := range []string{"files.home_dirs", "files.env_files", "files.user_rhosts"} {
+		if e := env(t, b, k); e.Status != facts.StatusDenied {
+			t.Errorf("%s must be denied, not an empty list: %+v", k, e)
+		}
+	}
+}
+
+// S3: a denied /etc/shells cannot be trusted for the interactive-home
+// classification (the libc fallback omits /bin/bash, so every bash account
+// would read as non-interactive and U-24/U-27/U-31/U-32 would pass vacuously).
+// The three home enumerations must carry that read's status, never a clean
+// empty list.
+func TestFilesUntrustedShellsMakesEnumerationsDenied(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{"/etc/passwd": "passwd_home", "/proc/self/mountinfo": "mountinfo"},
+		fails: map[string]error{"/etc/shells": os.ErrPermission}, // passwd is fine; only /etc/shells is denied
+	}
+	b := build(t, "files", a)
+	for _, k := range []string{"files.home_dirs", "files.env_files", "files.user_rhosts"} {
+		if e := env(t, b, k); e.Status != facts.StatusDenied {
+			t.Errorf("a denied /etc/shells must make %s denied, not a vacuous enumeration: %+v", k, e)
+		}
+	}
+}
+
+// S4: an unreadable /proc/self/mountinfo makes the /dev stray-file detection
+// unreliable, so dev_entries and dev_nondevice must carry the read error, not a
+// clean empty list (which would be a vacuous PASS for U-26).
+func TestFilesDevUnreadableMountinfoIsNotACleanEmpty(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{"/etc/passwd": "passwd_home", "/etc/shells": "shells_home"},
+		fails: map[string]error{"/proc/self/mountinfo": os.ErrPermission},
+	}
+	b := build(t, "files", a)
+	for _, k := range []string{"files.dev_nondevice", "files.dev_entries"} {
+		if e := env(t, b, k); e.Status != facts.StatusDenied {
+			t.Errorf("an unreadable mountinfo must make %s denied, not an empty list: %+v", k, e)
+		}
+	}
+}
+
+// A .rhosts with a bare "+" is recorded has_plus=true with entry_count, body
+// never stored; env_files marks a non-owner file owner_ok=false.
+func TestFilesRhostsAndEnvFiles(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{
+			"/etc/passwd": "passwd_home", "/etc/shells": "shells_home", "/proc/self/mountinfo": "mountinfo",
+			"/home/alice/.rhosts": "home_alice_rhosts", // contains "+"
+			"/home/alice/.bashrc": "home_alice_bashrc",
+		},
+		stats: map[string]statResult{
+			"/home/alice/.rhosts": {mode: 0o644, uid: 1000, kind: "regular"},
+			"/home/alice/.bashrc": {mode: 0o644, uid: 0, kind: "regular"}, // root-owned in alice's home
+		},
+	}
+	b := build(t, "files", a)
+	rh := okList(t, b, "files.user_rhosts")
+	if len(rh) != 1 || rh[0].(map[string]any)["has_plus"] != true {
+		t.Fatalf("user_rhosts %v", rh)
+	}
+	ef := okList(t, b, "files.env_files")
+	var alicebashrc map[string]any
+	for _, r := range ef {
+		m := r.(map[string]any)
+		if m["path"] == "/home/alice/.bashrc" {
+			alicebashrc = m
+		}
+	}
+	if alicebashrc == nil || alicebashrc["owner_ok"] != true { // root-owned is ok
+		t.Errorf(".bashrc row %v", alicebashrc)
+	}
+}
+
+// R182: Stat returns collect.ErrSymlink for a final-component symlink, so a
+// symlinked environment file never reaches the nil-error branch; it must still
+// surface as a row, marked is_symlink=true and owner_ok=false, so U-24's
+// `none where` clauses see it rather than the file silently vanishing.
+func TestFilesEnvFilesSymlinkRow(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{"/etc/passwd": "passwd_home", "/etc/shells": "shells_home", "/proc/self/mountinfo": "mountinfo"},
+		fails: map[string]error{"/home/alice/.bashrc": collect.ErrSymlink},
+	}
+	ef := okList(t, build(t, "files", a), "files.env_files")
+	var row map[string]any
+	for _, r := range ef {
+		m := r.(map[string]any)
+		if m["path"] == "/home/alice/.bashrc" {
+			row = m
+		}
+	}
+	if row == nil {
+		t.Fatalf("a symlinked ~/.bashrc must still appear in env_files: %v", ef)
+	}
+	if row["is_symlink"] != true || row["owner_ok"] != false {
+		t.Errorf("symlink row must be is_symlink:true, owner_ok:false: %v", row)
+	}
+}
+
+// A genuinely missing home is stat_status "absent" (ENOENT), distinct from a
+// denied one; root and an interactive user are interactive=true (the filter's
+// positive half); a home on an nfs mount carries on_remote_fs=true (R191).
+func TestFilesHomeDirsAbsentAndRemoteFS(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{"/etc/passwd": "passwd_home", "/etc/shells": "shells_home", "/proc/self/mountinfo": "mountinfo_nfs"},
+		dirs:  map[string]bool{"/root": true, "/home/alice": true},
+		stats: map[string]statResult{
+			"/root":       {mode: 0o700, uid: 0, gid: 0, kind: "dir"},
+			"/home/alice": {mode: 0o755, uid: 1000, gid: 1000, kind: "dir"}, // on the nfs /home
+		},
+		// /home/bob is declared but present nowhere -> Stat returns ENOENT -> absent
+	}
+	rows := okList(t, build(t, "files", a), "files.home_dirs")
+	byUser := map[string]map[string]any{}
+	for _, r := range rows {
+		m := r.(map[string]any)
+		byUser[m["user"].(string)] = m
+	}
+	if byUser["root"]["interactive"] != true || byUser["alice"]["interactive"] != true {
+		t.Error("root and alice have real login shells -> interactive=true")
+	}
+	if byUser["bob"]["stat_status"] != "absent" {
+		t.Errorf("bob's missing home must be absent (ENOENT), not denied: %v", byUser["bob"])
+	}
+	if byUser["alice"]["on_remote_fs"] != true {
+		t.Errorf("alice's home on nfs must be on_remote_fs=true: %v", byUser["alice"])
+	}
+}
+
+// --- files: /root, /etc/hosts.equiv and the /dev walk (Task 3) ------------
+
+// /dev holds device nodes; a regular file living on devtmpfs (or tmpfs at
+// /dev) is a stale/planted file U-26 flags. A character/block device is not.
+func TestFilesDevNonDevice(t *testing.T) {
+	a := &fsAccess{
+		// fsAccess.Glob scans the files+dirs maps (not stats), so the /dev
+		// nodes must be present there for the walk to enumerate them (R188);
+		// stats supplies each node's kind.
+		files: map[string]string{
+			"/proc/self/mountinfo": "mountinfo_dev", // /dev -> devtmpfs
+			"/dev/null":            "",              // present so Glob("/dev/*") sees it
+			"/dev/planted":         "",
+		},
+		dirs: map[string]bool{"/dev": true},
+		stats: map[string]statResult{
+			"/dev/null":    {mode: 0o666, kind: "chardev"},
+			"/dev/planted": {mode: 0o644, kind: "regular"},
+		},
+	}
+	b := build(t, "files", a)
+	nd := okList(t, b, "files.dev_nondevice")
+	if len(nd) != 1 || nd[0].(map[string]any)["name"] != "planted" {
+		t.Fatalf("dev_nondevice %v, want just the regular file", nd)
+	}
+	all := okList(t, b, "files.dev_entries")
+	if len(all) < 2 {
+		t.Errorf("dev_entries should list every /dev node: %v", all)
+	}
+}
+
+// R181: a regular file under a DEEPER mount than /dev (a POSIX-shm file on the
+// /dev/shm tmpfs) is NOT dev_nondevice — that mount is a legitimate tmpfs, and
+// flagging its files would false-fail U-26. It still appears in dev_entries.
+func TestFilesDevExcludesDeeperMounts(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{
+			"/proc/self/mountinfo": "mountinfo_dev", // /dev devtmpfs, /dev/shm tmpfs
+			"/dev/planted":         "",              // regular file directly on /dev
+			"/dev/shm/sem.thing":   "",              // regular file on the /dev/shm tmpfs
+		},
+		dirs: map[string]bool{"/dev": true, "/dev/shm": true},
+		stats: map[string]statResult{
+			"/dev/planted":       {mode: 0o644, kind: "regular"},
+			"/dev/shm":           {mode: 0o1777, kind: "dir"},
+			"/dev/shm/sem.thing": {mode: 0o644, kind: "regular"},
+		},
+	}
+	b := build(t, "files", a)
+	nd := okList(t, b, "files.dev_nondevice")
+	if len(nd) != 1 || nd[0].(map[string]any)["path"] != "/dev/planted" {
+		t.Fatalf("dev_nondevice %v, want only the file served exactly by /dev", nd)
+	}
+	// The /dev/shm file is still enumerated, just not flagged as a stray.
+	var sawShm bool
+	for _, e := range okList(t, b, "files.dev_entries") {
+		if e.(map[string]any)["path"] == "/dev/shm/sem.thing" {
+			sawShm = true
+		}
+	}
+	if !sawShm {
+		t.Error("dev_entries must still list the /dev/shm file (it is excluded only from dev_nondevice)")
+	}
+}
+
+// /root permission facts come from stat only; a stat failure reaches all six
+// leaves.
+func TestFilesRootHome(t *testing.T) {
+	a := &fsAccess{stats: map[string]statResult{"/root": {mode: 0o700, uid: 0, gid: 0, kind: "dir"}},
+		files: map[string]string{"/proc/self/mountinfo": "mountinfo"}}
+	b := build(t, "files", a)
+	if env(t, b, "files.root_home.mode").Value != 0o700 {
+		t.Errorf("root_home.mode %+v", env(t, b, "files.root_home.mode"))
+	}
+	if env(t, b, "files.root_home.other_writable").Value != false {
+		t.Error("0700 /root is not other-writable")
+	}
+}
+
+// A stat failure on /root reaches all six root_home leaves with the same
+// envelope, so U-14 never compares a partial set (R176).
+func TestFilesRootHomeDeniedReachesEveryLeaf(t *testing.T) {
+	a := &fsAccess{
+		fails: map[string]error{"/root": os.ErrPermission},
+		files: map[string]string{"/proc/self/mountinfo": "mountinfo"},
+	}
+	b := build(t, "files", a)
+	for _, k := range []string{"mode", "uid", "gid", "group_writable", "other_writable", "acl_present"} {
+		if e := env(t, b, "files.root_home."+k); e.Status != facts.StatusDenied {
+			t.Errorf("files.root_home.%s must be denied, not a quiet value: %+v", k, e)
+		}
+	}
+}
+
+// /etc/hosts.equiv non-comment lines are recorded; a file that does not exist
+// (ENOENT) yields an OK empty line list — NOT absent (R177) — so U-27 passes
+// vacuously rather than screening to absent_means.
+func TestFilesHostsEquiv(t *testing.T) {
+	a := &fsAccess{files: map[string]string{"/etc/hosts.equiv": "hosts_equiv", "/proc/self/mountinfo": "mountinfo"},
+		stats: map[string]statResult{"/etc/hosts.equiv": {mode: 0o644, uid: 0, kind: "regular"}}}
+	lines := okList(t, build(t, "files", a), "files.etc_hosts_equiv_lines")
+	if len(lines) == 0 {
+		t.Error("hosts.equiv non-comment lines must be recorded")
+	}
+
+	// No /etc/hosts.equiv at all: the lines key is an OK empty list, not absent.
+	none := &fsAccess{files: map[string]string{"/proc/self/mountinfo": "mountinfo"}}
+	nb := build(t, "files", none)
+	e := env(t, nb, "files.etc_hosts_equiv_lines")
+	if e.Status != facts.StatusOK {
+		t.Fatalf("a missing hosts.equiv must leave etc_hosts_equiv_lines OK, got %+v", e)
+	}
+	if l, _ := e.Value.([]any); len(l) != 0 {
+		t.Errorf("a missing hosts.equiv must yield [], got %v", e.Value)
+	}
+	// ...while the two perm leaves are absent in that case.
+	if m := env(t, nb, "files.etc_hosts_equiv.mode"); m.Status != facts.StatusAbsent {
+		t.Errorf("a missing hosts.equiv must leave mode absent, got %+v", m)
+	}
+}
