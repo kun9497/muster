@@ -4,7 +4,7 @@
 
 **Goal:** Add a new `firewall` collector (backend detection, kernel-ruleset capture, a minimal normalised model with an explicit `normalization_confidence`) plus the TCP-wrapper `files.*` facts, and enrol the one KISA 2026 firewall control U-28 (접속 IP 및 포트 제한) — which passes on a host that restricts inbound access (a default-deny firewall or a `hosts.deny ALL`), fails when it can confidently see no restriction, and degrades to MANUAL (never a fabricated PASS/FAIL) when the ruleset cannot be normalised.
 
-**Architecture:** A new Linux-only `firewall` collector detects the backend from persisted config (ufw / firewalld / nftables / iptables / none, with evidence) and reads the kernel ruleset as the runtime oracle (`nft list ruleset`, else `iptables-save`/`ip6tables-save`) — it never shells out to `ufw`/`firewall-cmd` (dbus dependency). From the ruleset it derives the inbound default policy and a single judged boolean `firewall.restricts_inbound`, carrying a `normalization_confidence`. **Any command failure — missing `CAP_NET_ADMIN`, no netlink, tool absent — degrades to `unsupported`, never `denied`/`error`, so the run stays complete (the R220 lesson).** U-28 is a `mechanisms` control (firewall OR tcp_wrappers) whose judged leaf is `absent` when confidence is below `full`, so `absent_means: manual` yields MANUAL there — no new engine machinery.
+**Architecture:** A new Linux-only `firewall` collector detects the backend from persisted config (ufw / firewalld / nftables / iptables / none, with evidence) and reads the kernel ruleset as the runtime oracle (`nft list ruleset`, else `iptables-save`/`ip6tables-save`) — it never shells out to `ufw`/`firewall-cmd` (dbus dependency). From the ruleset it derives the inbound default policy and a single judged boolean `firewall.restricts_inbound`, carrying a `normalization_confidence`. **A command failure the collector classifies by euid (Ruling H-17): root-without-capability / no-netlink / tool-absent (`euid()==0`) → `unsupported`, so the container run stays complete (the R220 lesson); a non-root failure (`euid()!=0`) → `denied` (honestly ERROR).** U-28 is a `mechanisms` control (firewall OR tcp_wrappers) whose judged leaf is `absent` when confidence is below `full`, so `absent_means: manual` yields MANUAL there — no new engine machinery.
 
 **Tech Stack:** Go 1.25.x, Linux-only collector behind build tags; `nft`/`iptables-save`/`ip6tables-save` via the existing exec discipline; config files under `/etc/ufw`, `/etc/firewalld`, `/etc/nftables.conf`, `/etc/iptables/`; `/etc/hosts.allow` + `/etc/hosts.deny`; YAML control with `mechanisms` and `absent_means: manual`; fixtures as `controls/testdata/<id>/{pass,fail,manual,na}-*.json`.
 
@@ -15,7 +15,7 @@
 - **Control set count: 44 → 45** (one new `auto` control; coverage becomes `auto 41, partial 4, manual 0`). Every count seam in the final task lands on 45.
 - **Registry `schema_version` stays 1.** The whole `firewall.*` section and the three `files.etc_hosts_*` keys are pure additions (C2; spec §5.7). Regenerate the facts golden with `go test ./internal/facts -run TestFactsSchemaGolden -update`; the diff must be additions only, each `since: 1`.
 - **Every fact leaf is an envelope; a status other than `ok` never yields PASS.** A registered key the snapshot lacks is `missing` → `ERROR(missing_fact)`, never `absent_means`.
-- **No-capability / no-tool / no-netfilter degradation is mandatory and CI-enforced (R220).** The `collect-contract` CI leg runs `muster collect` in a `--network none --read-only` `ubuntu:24.04` container that runs as root **but without `CAP_NET_ADMIN`** (Docker drops it), and asserts `.run.complete == true`. A `nft`/`iptables-save` failure there must become `firewall.backend`/`firewall.restricts_inbound` = **`unsupported`** (confidence `none`), never `denied`/`error` — otherwise the firewall collector's `Worst()` is non-ok and the run goes partial. The collector must classify its own command failures (like `cronTimers` in `cron.go`), not rely on `Needs: root` denied-wrapping. Firewall collector `Needs: "none"`.
+- **No-capability / no-tool / no-netfilter degradation is mandatory and CI-enforced (R220).** The `collect-contract` CI leg runs `muster collect` in a `--network none --read-only` `ubuntu:24.04` container that runs as root **but without `CAP_NET_ADMIN`** (Docker drops it), and asserts `.run.complete == true`. Because that leg runs as **root** (`euid()==0`), a `nft`/`iptables-save` failure there must become `firewall.backend`/`firewall.restricts_inbound` = **`unsupported`** (confidence `none`), never `denied`/`error` — otherwise the firewall collector's `Worst()` is non-ok and the run goes partial. The collector must classify its own command failures **by euid (Ruling H-17)**, not rely on `Needs: root` denied-wrapping: `euid()==0` failure → `unsupported` (this container leg); `euid()!=0` failure → `denied` (a non-root run on a real host, honestly ERROR, which `collect-nonroot` expects). Firewall collector `Needs: "none"`.
 - **MANUAL-on-low-confidence via `absent_means: manual`, not new engine code (§7.3).** The collector emits the judged leaf `firewall.restricts_inbound` as `ok:true`/`ok:false` only at `normalization_confidence: full`; at `partial`/`none` (a backend was seen but the ruleset can't be normalised) it emits that leaf **`absent`** with a reason that references the raw dump, and U-28 carries `absent_means: manual` (precedent `controls/account/root_remote_login.yaml`). Confirm eval.go's step-8 absent-screening + `mechanisms` interaction during execution (see Task 4); if `absent_means: manual` cannot express this cleanly with `mechanisms`, fall back to a single-mechanism control and record a ruling.
 - **Same input, same bytes.** No `map` reaches the JSON/table renderer; sort rule records and raw-dump records deterministically.
 - **`references.stig` only cites ids in `docs/reference/stig/*.json`.** No firewall rule id exists in the committed index today, so **U-28 ships `references.kisa` only** (like `telnet_disabled.yaml`). Do NOT run `make refindex` or add STIG content in this plan.
@@ -55,7 +55,7 @@ New fact keys (all `since: 1`):
 - `firewall.default_policy.input` / `firewall.default_policy.forward` — `setting<string>`, `default_on: both` — base-chain policy / default-zone target (`drop`/`reject`/`accept`/…).
 - `firewall.restricts_inbound` — `bool` (the JUDGED leaf) — `ok:true` when full-confidence inbound is default-deny (or a full-confidence restricting ruleset); `ok:false` when full-confidence no restriction; **`absent`** (reason references the raw dump) when confidence is `partial`/`none` but a backend was seen; **`unsupported`** when no backend/ruleset is determinable (container/no-capability).
 - `firewall.normalization_confidence` — `string` — `full` / `partial` / `none` (evidence for the degradation).
-- `firewall.rules` — `list<record>` — normalised rules `{chain, proto, dport, saddr, action}` (evidence; a default policy alone is not restriction).
+- `firewall.rules` — `list<record>` — normalised rules `{chain, proto, dport, saddr, action}` (evidence; a default policy alone is not restriction). `dport` is a **string** (Ruling H-24 — ports may be ranges or sets like `"80-90"`), not an int.
 - `firewall.raw_dumps` — `list<record>` `{source, content, truncated}`, **`sensitivity: internal`** — the verbatim tool output the normalisation was derived from (content capped; see Task 1).
 - `files.etc_hosts_allow_lines` / `files.etc_hosts_deny_lines` — `list<string>` (collector `files`) — non-comment lines of `/etc/hosts.allow` / `/etc/hosts.deny`.
 - `files.etc_hosts_deny_all` — `bool` (collector `files`) — true when `/etc/hosts.deny` contains an `ALL: ALL` (deny-everything) line; the derived bool exists because `matches` on a list holds only when every element matches.
@@ -92,8 +92,11 @@ func TestFirewallCapturesRulesetWhenReadable(t *testing.T) {
 	}
 }
 
-// No CAP_NET_ADMIN / tool missing → unsupported, NOT denied/error; run stays complete (R220).
-func TestFirewallNoCapabilityDegradesToUnsupported(t *testing.T) {
+// Root without CAP_NET_ADMIN / tool missing → unsupported, NOT denied/error; run stays complete (R220).
+// H-17: this is the euid()==0 branch, so substitute the package euid helper to 0 (see collectors_test.go:815);
+// a companion test with euid()!=0 must assert the leaves are DENIED (collect-nonroot honesty), not unsupported.
+func TestFirewallRootNoCapabilityDegradesToUnsupported(t *testing.T) {
+	setEUID(t, 0) // substitute the register.go euid helper (root branch of H-17)
 	a := firewallAccess(/* nft AND iptables-save both fail with a permission/netlink error */)
 	b := build(t, "firewall", a)
 	for _, k := range []string{"firewall.backend", "firewall.restricts_inbound", "firewall.normalization_confidence"} {
@@ -120,15 +123,16 @@ Expected: FAIL — collector undefined.
 
 - [ ] **Step 3: Implement backend detection + ruleset capture + self-classified degradation**
 
-- Declare the commands (as `collect.Command` values, mirror `cron.go`'s `cronTimersCmd`): `nft -a list ruleset` (`/usr/sbin/nft`), `iptables-save`, `ip6tables-save`. Declare `Reads` for the persisted config files: `/etc/ufw/ufw.conf`, `/etc/ufw/user.rules`, `/etc/default/ufw`, `/etc/firewalld/firewalld.conf`, `/etc/firewalld/zones/*.xml`, `/etc/nftables.conf`, `/etc/iptables/rules.v4`.
-- **Runtime side (the oracle):** run `nft list ruleset`; if it fails (Err/TimedOut/non-zero exit), fall back to `iptables-save` (+`ip6tables-save`). Capture whatever succeeds into `firewall.raw_dumps` (one record per command, `{source, content, truncated}`; cap `content` at 64 KiB with `truncated:true` past that — do NOT reuse the 256-byte single-line cap). **If NO ruleset command succeeds**, set `firewall.backend`, `firewall.restricts_inbound`, `firewall.normalization_confidence` (= "none"), `firewall.default_policy.*`, `firewall.enabled` (runtime side) all to `collect.Unsupported("no readable kernel firewall ruleset: <first stderr line or exit>")` — NEVER `commandFailure`/denied/error. This is the R220-critical path.
+- Declare the commands (as `collect.Command` values, mirror `cron.go`'s `cronTimersCmd`): **`/usr/sbin/nft list ruleset` (NO `-a`; Ruling H-21)**, `iptables-save`, `ip6tables-save`. The declaration, the run, and the test double's command key must be byte-identical — the `allowedCommand` guard matches Path+Args exactly (`internal/collect/registry.go:291`), and handles from `-a` are noise in `raw_dumps` and the parser. Declare `Reads` for the persisted config files: `/etc/ufw/ufw.conf`, `/etc/ufw/user.rules`, `/etc/default/ufw`, `/etc/firewalld/firewalld.conf`, `/etc/firewalld/zones/*.xml`, `/etc/nftables.conf`, `/etc/iptables/rules.v4`.
+- **Runtime side (the oracle):** run `nft list ruleset`; if it fails (Err/TimedOut/non-zero exit), fall back to `iptables-save` (+`ip6tables-save`). Capture whatever succeeds into `firewall.raw_dumps` (one record per command, `{source, content, truncated}`; cap `content` at 64 KiB with `truncated:true` past that — do NOT reuse the 256-byte single-line cap). Also set the record's `truncated:true` when the exec layer set `Output.Truncated` (the independent 1 MiB exec cap; Ruling H-22) — T2 forces `partial` on any truncated dump.
+- **Ruling H-17 — the collector classifies its own command failure by euid (do NOT rely on `commandFailure`).** When NO ruleset command succeeds, split on `euid()` (the package helper `var euid = os.Geteuid` in `register.go:22`; tests substitute it — see `collectors_test.go:815`): `if euid() != 0 → collect.Denied("reading the kernel firewall ruleset requires root: <first stderr line or exit>")` (non-root is honestly denied → ERROR, which `collect-nonroot` expects); `if euid() == 0 → collect.Unsupported("no readable kernel firewall ruleset: <first stderr line or exit>")` (root-without-`CAP_NET_ADMIN`, a container, keeps `collect-contract` complete). Apply the same classified envelope to `firewall.backend`, `firewall.restricts_inbound`, `firewall.normalization_confidence` (= "none" on the unsupported branch), `firewall.default_policy.*` and `firewall.enabled` (runtime side). NEVER `ErrorEnv` on this path. This is the R220-critical path.
 - **Backend name** (evidence): detect from the persisted config that exists — `firewalld.conf`/zones → `firewalld`; `/etc/ufw/*` with `ENABLED=yes` → `ufw`; `/etc/nftables.conf` or a non-empty nft ruleset → `nftables`; `/etc/iptables/rules.v4` or iptables-save output → `iptables`; none of the above but a readable (empty) ruleset → `none`. Record the detection evidence in the source.
 - In T1, leave `firewall.restricts_inbound` = `collect.Absent("normalization pending")` and `firewall.normalization_confidence` = `"none"` when a ruleset WAS read (T2 fills in the real normalisation); leave `firewall.rules` an empty `ok` list. (This keeps T1 independently green and the collector safe.)
 - `firewall.enabled` (`setting<bool>`, both sides): runtime = ruleset non-empty; persisted = backend config present/enabled.
 
 - [ ] **Step 4: Register the keys**
 
-Add the `firewall.*` keys to `registry.yaml` (see Interfaces for names/types). `firewall.enabled` and `firewall.default_policy.{input,forward}` are `setting<…>` with `default_on: both` (follow the sysctl/services setting entries). `firewall.raw_dumps` carries `sensitivity: internal`; do NOT set `subject_kind` on scalar keys (registry rejects it on non-`list<` types — the R229 lesson). Register the collector at the assembly site.
+Add the `firewall.*` keys to `registry.yaml` (see Interfaces for names/types). `firewall.enabled` and `firewall.default_policy.{input,forward}` are `setting<…>` with `default_on: both` (follow the sysctl/services setting entries). `firewall.raw_dumps` carries `sensitivity: internal`. **Ruling H-25 — omit `subject_kind` on ALL new keys**, scalar and list alike: the registry rejects it on non-`list<` types (the R229 lesson), and no valid kind from the fixed set fits `firewall.rules`/`firewall.raw_dumps` either, so leave it off those list keys too. Register the collector at the assembly site.
 
 - [ ] **Step 5: Regenerate golden + gates**
 
@@ -136,7 +140,7 @@ Add the `firewall.*` keys to `registry.yaml` (see Interfaces for names/types). `
 
 - [ ] **Step 6: Lab-host verification (R220 reality check)**
 
-The lab host has a real ruleset. Sync + run the collector there via the READ-ONLY scratchpad scripts (`lab-sync.sh`/`lab-run.sh` at `C:\Users\ssk\AppData\Local\Temp\claude\C--Users-ssk-muster\b1637add-0c8f-4028-9be6-5e5664159bdd\scratchpad\`; run via the PowerShell tool with Git Bash explicitly; NEVER edit them). Confirm `muster collect` yields a complete run with `firewall.*` present and `firewall.raw_dumps` captured, and that a non-root run does not make the firewall collector `denied`/`error` (it should still capture or degrade to unsupported). Report what backend + default policy the host shows. **Never commit a snapshot from the host.** If unreachable after 2-3 tries, report and rely on CI.
+The lab host has a real ruleset. Sync + run the collector there via the READ-ONLY scratchpad scripts (`lab-sync.sh`/`lab-run.sh` at `C:\Users\ssk\AppData\Local\Temp\claude\C--Users-ssk-muster\b1637add-0c8f-4028-9be6-5e5664159bdd\scratchpad\`; run via the PowerShell tool with Git Bash explicitly; NEVER edit them). **The ROOT lab run is where full/complete is expected:** confirm `muster collect` as root yields a complete run with `firewall.*` present, `firewall.raw_dumps` captured, and a real backend + default policy — report them. **Ruling H-19 — the non-root run is honestly incomplete, and that is correct:** with the collector reading root-only config (`/etc/ufw/user.rules` 0640, firewalld zone XML 0600) and the euid split (H-17), a NON-ROOT run yields `denied` persisted sides AND a `denied` runtime side → the firewall collector's `Worst == denied` → run partial. Do NOT claim "non-root never denied", and do NOT swallow EACCES into `absent` — `collect-nonroot` expects the incompleteness. **Never commit a snapshot from the host.** If unreachable after 2-3 tries, report and rely on CI.
 
 - [ ] **Step 7: Commit**
 
@@ -171,12 +175,14 @@ func TestFirewallNftDropIsRestricted(t *testing.T) {
 	}
 }
 
-// iptables INPUT policy ACCEPT with no restricting rules → full confidence, restricts_inbound ok:false.
-func TestFirewallIptablesAcceptIsNotRestricted(t *testing.T) { /* :INPUT ACCEPT … */ }
+// iptables INPUT policy ACCEPT carrying ZERO rules (H-16) → full confidence, restricts_inbound ok:false.
+func TestFirewallIptablesAcceptIsNotRestricted(t *testing.T) { /* *filter :INPUT ACCEPT, no -A INPUT lines */ }
 
-// A ruleset shape we do not confidently model → partial confidence → restricts_inbound ABSENT (→ MANUAL).
-func TestFirewallUnparseableRulesetIsPartialAbsent(t *testing.T) {
-	a := firewallAccess(/* nft ruleset with multiple input hooks / forms the parser does not fully model */)
+// A realistic ambiguous ruleset (accept-policy WITH rules — firewalld/classic RHEL — or mixed policies
+// across the ip/ip6 families) → partial confidence → restricts_inbound ABSENT (→ MANUAL). This is the
+// H-16 case: an accept policy that carries a terminal REJECT must NOT be a confident FAIL.
+func TestFirewallAcceptWithRulesIsPartialAbsent(t *testing.T) {
+	a := firewallAccess(/* nft ruleset: input base chain "policy accept" with jump/reject rules (firewalld shape), or ip policy drop + ip6 policy accept */)
 	b := build(t, "firewall", a)
 	if e := env(t, b, "firewall.normalization_confidence"); e.Value == "full" {
 		t.Fatalf("must not claim full on an unmodelled ruleset: %+v", e)
@@ -189,19 +195,23 @@ func TestFirewallUnparseableRulesetIsPartialAbsent(t *testing.T) {
 
 - [ ] **Step 2: Run to confirm failure.** `GOOS=linux GOARCH=amd64 go test ./internal/collect/collectors/ -run TestFirewall`
 
-- [ ] **Step 3: Implement the minimal normaliser (H-4 scope)**
+- [ ] **Step 3: Implement the minimal normaliser (H-4 scope, H-16 boundary)**
 
-- Parse the kernel ruleset for the **inbound default policy**:
-  - nftables: find the base chain with `hook input`; read its `policy drop|accept`. If exactly one input base chain with a clear policy → determinable. Multiple input base chains, or no base chain policy line → not determinable → `partial`.
-  - iptables-save: the `:INPUT <POLICY>` line in `*filter`.
-- Set `firewall.default_policy.input`/`.forward` from what was parsed (setting: runtime = kernel, persisted = the config-file policy where cheaply readable — otherwise leave the persisted side degraded per the two-home rule).
-- Set `firewall.normalization_confidence = "full"` ONLY when the inbound default policy is unambiguously determined; else `"partial"`.
+- **Ruling H-16 — the `full`-confidence boundary (put this exact rule in the code comment the plan promises):**
+  - Collect EVERY base chain with `hook input` across the `ip`, `ip6` and `inet` families (nftables), or the `:INPUT <policy>` line of `*filter` in each of `iptables-save` and `ip6tables-save`.
+  - `full` + `restricts_inbound = ok:true`: every input base chain has policy `drop`/`reject` (a family with no table at all is fine — IPv6 may simply be absent).
+  - `full` + `restricts_inbound = ok:false`: every input base chain has policy `accept` AND carries zero rules (no `jump`/`goto`/verdict lines) — the ruleset demonstrably does nothing inbound; also the readable-empty backend `none` case.
+  - Everything else — an accept-policy chain WITH rules (firewalld / classic RHEL iptables with a terminal REJECT is exactly this), mixed policies across chains or families, a missing policy line, OR any truncated dump — → `partial` → `restricts_inbound` **absent** → MANUAL.
+  - Rationale for the comment: the old "policy accept ⇒ ok:false" rule gave a confident-wrong FAIL on firewalld / classic RHEL iptables (policy ACCEPT + terminal REJECT), and "exactly one input base chain" made every iptables-nft/ufw host (ip + ip6 input chains) permanently MANUAL. This boundary fixes both.
+- Set `firewall.default_policy.input`/`.forward` from what was parsed. This is a two-sided setting: runtime = the kernel ruleset; **persisted side (Ruling H-18):** `collect.Absent("no persisted firewall configuration found")` when none of the declared config files exists; `collect.Unsupported("<backend> configuration is not parsed for this value")` when a config file exists but v1 does not model that value (e.g. a firewalld zone XML `target=`); `collect.FromReadError(...)` ONLY for a genuine read failure. NEVER `ErrorEnv` for "not implemented". ALWAYS set BOTH sides of every setting — `registry.Resolve` requires at least one side present, so a sideless setting is malformed; an errored/denied persisted side flips `Builder.Worst` and would break `collect-root --require-complete`.
+- Set `firewall.normalization_confidence = "full"` ONLY when the boundary above is met (every input base chain agrees drop/reject, or every one is accept-with-no-rules); else `"partial"`.
 - Derive `firewall.restricts_inbound`:
-  - `full` + default input `drop`/`reject` → `ok:true`.
-  - `full` + default input `accept` (and no full-confidence restricting rule model) → `ok:false`.
+  - `full` all-deny → `ok:true`.
+  - `full` all-accept-with-no-rules (or readable-empty `none`) → `ok:false`.
   - `partial`/`none` → `collect.Absent("firewall confidence <level>: ruleset not normalisable; see firewall.raw_dumps")`.
+- **Ruling H-22 — truncated dump:** if any captured dump has `Output.Truncated` set (the 1 MiB exec cap), set `normalization_confidence = "partial"`, `restricts_inbound` **absent**, and mark that `raw_dumps` record `truncated: true`. (The separate 64 KiB stored-content cap is fine and independent.)
 - Populate `firewall.rules` with the records you do parse (evidence). Keep it minimal; do NOT let a rich ruleset you cannot fully model claim `full`.
-- Document in a code comment exactly what v1 treats as `full` (the H-4 boundary) so a reviewer can see the under-claim is deliberate.
+- Document in a code comment exactly what v1 treats as `full` (the H-16 boundary above) so a reviewer can see the under-claim is deliberate.
 
 - [ ] **Step 4: Gates + lab host.** Regenerate golden only if a key/type changed (it should not — values only). `GOOS=linux` test/vet/staticcheck; gofmt. Re-run on the lab host (Step 1.6) and report the real host's confidence + restricts_inbound.
 
@@ -255,7 +265,7 @@ Use the `files` collector's existing test harness + line-reading/`permRow` helpe
 
 Read `/etc/hosts.deny` and `/etc/hosts.allow`; strip comments (`#…`) and blank lines into the `*_lines` lists; `etc_hosts_deny_all` = true iff a deny line matches `ALL\s*:\s*ALL` (case-insensitive, tolerant of `PARANOID`/spacing). ENOENT → `deny_all` `ok:false`, lines `[] ok` (a host with no tcp_wrappers simply isn't restricting via it — `ok:false`, not `absent`, so U-28's tcp_wrappers mechanism reads a definite "no"). An existing-but-unreadable file → a read-error envelope on all three leaves (never a silent false — C3).
 
-- [ ] **Step 4: Register keys + golden + gates.** Add the three `files.*` keys (`sensitivity: public`; `since: 1`; `list<string>` may carry `subject_kind` if the file's other list keys do — match neighbours). Regenerate golden (additions-only). `GOOS=linux` test/vet/staticcheck; gofmt.
+- [ ] **Step 4: Register keys + golden + gates.** Add the three `files.*` keys (`sensitivity: public`; `since: 1`; **omit `subject_kind`** — Ruling H-25; no valid kind fits, and the neighbour `files.etc_hosts_equiv_lines` carries none). Regenerate golden (additions-only). `GOOS=linux` test/vet/staticcheck; gofmt.
 
 - [ ] **Step 5: Commit**
 
@@ -291,26 +301,29 @@ references:
   kisa: { "2026": ["U-28"], "2021": ["U-18"] }
 requires_facts: ">=1"
 absent_means: manual
+applies_when:
+  - { fact: firewall.backend, op: present }
 mechanisms:
-  - name: firewall
-    when: { fact: firewall.backend, op: in, expected: [nftables, iptables, ufw, firewalld] }
-    checks:
-      - { fact: firewall.restricts_inbound, op: eq, expected: true }
-  - name: tcp_wrappers
-    when: { fact: firewall.backend, op: eq, expected: none }
-    checks:
-      - { fact: files.etc_hosts_deny_all, op: eq, expected: true }
+  # tcp_wrappers: a hosts.deny "ALL: ALL" satisfies U-28 regardless of the firewall backend
+  - when:   [{ fact: files.etc_hosts_deny_all, op: eq, expected: true }]
+    checks: [{ fact: files.etc_hosts_deny_all, op: eq, expected: true }]
+  # firewall: a host firewall backend is judged on its inbound restriction
+  - when:   [{ fact: firewall.backend, op: in, expected: [nftables, iptables, ufw, firewalld] }]
+    checks: [{ fact: firewall.restricts_inbound, op: eq, expected: true }]
+  # neither: no firewall backend and no tcp_wrappers deny-all → unrestricted
+  - when:   [{ fact: firewall.backend, op: eq, expected: none }]
+    checks: [{ fact: files.etc_hosts_deny_all, op: eq, expected: true }]
 remediation:
   text_en: Enable a host firewall with a default-deny inbound policy (ufw default deny incoming; firewalld default zone target DROP; or an nftables/iptables INPUT policy of drop with explicit allow rules), or deny by default in /etc/hosts.deny (ALL: ALL) and allow only required sources in /etc/hosts.allow.
   text_ko: 기본 차단 인바운드 정책의 호스트 방화벽을 설정하거나(ufw default deny incoming; firewalld 기본 zone target DROP; nftables/iptables INPUT 정책 drop + 명시적 허용 규칙), /etc/hosts.deny 에서 기본 차단(ALL: ALL) 후 /etc/hosts.allow 에 필요한 출발지만 허용합니다.
-  risk: network_lockout
+  risk: lockout_risk
   idempotent: false
 decision: D09
 ```
 
-**Ruling H-5 / verify against eval.go:** the intended behaviour — firewall backend present but `firewall.restricts_inbound` `absent` (confidence below full) → the whole control is MANUAL via `absent_means: manual`; `unsupported` backend → NOT_APPLICABLE; `full` deny → PASS; `full` open + no `hosts.deny ALL` → FAIL. **Confirm the `mechanisms` + `absent_means` + step-8 interaction actually produces this** by reading `internal/check/eval.go` (steps 3/6/8, and how `mechanisms[].when`/`checks` and `absent_means` compose) and by the fixtures below. If `absent_means: manual` does not compose with `mechanisms` as intended, simplify to a single non-mechanism check on `firewall.restricts_inbound` (dropping the tcp_wrappers mechanism to a documented follow-up) and record the ruling in the ledger — a correct MANUAL-on-partial is more important than the second mechanism. Verify `risk: network_lockout` is an accepted `risk` enum value (grep the schema/lint); if not, use the closest accepted value.
+**Ruling H-5 / H-14 (four outcomes, definite):** the four outcomes are produced by three composing pieces — `applies_when` (NA when the backend is `unsupported`, i.e. no readable ruleset — a container/no-capability host), the `mechanisms` block (PASS/FAIL), and `absent_means: manual` (MANUAL when the chosen mechanism's judged leaf is `absent`, i.e. `firewall.restricts_inbound` at confidence below full). Concretely: `full` deny → PASS; `full` open + no `hosts.deny ALL` → FAIL; firewall backend present but `firewall.restricts_inbound` `absent` (confidence below full) → MANUAL; `unsupported` backend → NOT_APPLICABLE via `applies_when`. **Ruling H-20 (trace):** with the three-mechanism block above (first matching `when` wins): `deny_all` true → PASS on any backend; a backend in the firewall list → judge `restricts_inbound` (absent → MANUAL); backend `none` + no deny → FAIL; backend `unsupported` → NA via `applies_when`; an unreadable `hosts.deny` makes the first `when` screen hard → ERROR, which is honest. Confirm the `mechanisms` + `absent_means` + step-8 interaction produces this by reading `internal/check/eval.go` (steps 3/6/8) and by the fixtures below; if `absent_means: manual` does not compose with `mechanisms` as intended, simplify to a single non-mechanism check on `firewall.restricts_inbound` (dropping the tcp_wrappers mechanism to a documented follow-up) and record the ruling in the ledger — a correct MANUAL-on-partial is more important than the second mechanism. `risk: lockout_risk` is the accepted enum value (the only lockout value in `validRisk`, the same one `root_remote_login.yaml` uses) — definite, no verification needed.
 
-- [ ] **Step 2: Fixtures** (mirror an existing control's envelope shape; every fixture carries the leaves the selected mechanism checks)
+- [ ] **Step 2: Fixtures** (mirror an existing control's envelope shape; every fixture carries the leaves the selected mechanism checks). **Ruling H-26 — every fixture includes `firewall.restricts_inbound` as an explicit envelope, never omits it** (e.g. `{"status":"absent","reason":"…"}` for the manual case, `{"status":"ok","value":true}` for a pass): an omitted registered key resolves to `missing` → ERROR(missing_fact), not `absent_means`.
 
 - `pass-firewall-deny.json` — `firewall.backend` ok `"nftables"`, `firewall.restricts_inbound` ok:true → PASS.
 - `pass-tcpwrappers.json` — `firewall.backend` ok `"none"`, `files.etc_hosts_deny_all` ok:true → PASS.
@@ -341,7 +354,7 @@ git commit -m "Add the U-28 inbound access restriction control"
 
 - [ ] **Step 1: Count assertions.** Both `ok: 44 controls` → `ok: 45 controls` in `controls_test.go`.
 
-- [ ] **Step 2: e2e snapshots.** Update the two spelled-out count comments in `e2e_test.go` ("forty-four"→"forty-five", "forty-three"→"forty-four"). Add `muster.file.ip_port_restriction` to both control-id→status maps. In `full-pass.json` give U-28 a full-confidence PASS shape (`firewall.backend` ok `"nftables"`, `firewall.restricts_inbound` ok:true, `firewall.normalization_confidence` ok `"full"`, plus `files.etc_hosts_*` present); in `full-fail.json` give it a full-confidence FAIL (`firewall.restricts_inbound` ok:false, `files.etc_hosts_deny_all` ok:false, backend a real value). Keep confidence `full` in both so the "flip one thing" assertion holds (do NOT let U-28 read MANUAL in these shared fixtures). Every referenced judged leaf must be present.
+- [ ] **Step 2: e2e snapshots.** Update the two spelled-out count comments in `e2e_test.go` ("forty-four"→"forty-five", "forty-three"→"forty-four"). Add `muster.file.ip_port_restriction` to both control-id→status maps. **Ruling H-15:** in BOTH `full-pass.json` AND `full-fail.json`, give U-28 the same full-confidence PASS shape (`firewall.backend` ok `"nftables"`, `firewall.restricts_inbound` ok:true, `firewall.normalization_confidence` ok `"full"`, plus `files.etc_hosts_*` present). Do NOT make U-28 FAIL in `full-fail.json`: that would break the waiver e2e (`e2e_test.go` asserts `applied=10`/`waived=10` and exit 0 once every FAIL is waived, and the "flips only root_remote_login" comment). The FAIL path is proven by the per-control `fail-*.json` fixtures, not the shared e2e fixtures — so the counts stay 10/10 and **no `extraWaivers` change is needed**. Keep confidence `full` so the "flip one thing" assertion holds (never MANUAL in these shared fixtures). Every referenced judged leaf must be present.
 
 - [ ] **Step 3: Coverage.** `go run ./tools/coverage` → line 4 becomes `45 of 67 items enrolled (auto 41, partial 4, manual 0).` and the U-28 row shows the control id. `go run ./tools/coverage -check` passes.
 
@@ -371,4 +384,4 @@ git commit -m "Enrol the U-28 firewall control in the coverage and e2e snapshots
 - **R-b (MANUAL machinery):** if `absent_means: manual` does not compose with `mechanisms`, U-28 could mis-resolve a partial-confidence host to PASS/FAIL/NA instead of MANUAL. Verify against eval.go and the `manual-partial-confidence` fixture; fall back to a single-mechanism control if needed.
 - **R-c (over-claiming confidence):** a normaliser that claims `full` on a ruleset it half-understands produces a confident wrong PASS/FAIL. Keep the `full` boundary narrow (single clear input base-chain policy) and prefer `partial`→MANUAL.
 - **R-d (false FAIL from tcp_wrappers absence):** a host restricting only via tcp_wrappers with no firewall must not FAIL — the `firewall.backend == none` mechanism checks `files.etc_hosts_deny_all`, and a missing hosts.deny is `ok:false` only when we could read (ENOENT), so a host with neither firewall nor tcp_wrappers deny is a true FAIL, while an unreadable state degrades honestly.
-- **R-e (CI proves mostly the degrade path):** the non-privileged container legs see no netfilter → U-28 NOT_APPLICABLE; only `collect-root` (a real VM) and the `--privileged` rocky/alma legs exercise a real ruleset. The per-control fixtures are the proof of PASS/FAIL/MANUAL.
+- **R-e (CI proves mostly the degrade path):** the non-privileged container legs see no netfilter → `firewall.backend` `unsupported` → U-28 NOT_APPLICABLE via `applies_when`; only `collect-root` (a real VM) and the `--privileged` rocky/alma legs exercise a real ruleset. The four outcomes are produced by `applies_when` (NA when the backend is unsupported) + the `mechanisms` block (PASS/FAIL) + `absent_means: manual` (MANUAL when the chosen mechanism's judged leaf is absent). The per-control fixtures are the proof of PASS/FAIL/MANUAL.
