@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
@@ -1208,6 +1209,84 @@ func TestCronWorldWritableCrontab(t *testing.T) {
 	rows := okList(t, build(t, "cron", a), "cron.files")
 	if rows[0].(map[string]any)["other_writable"] != true {
 		t.Errorf("0646 crontab is other-writable: %v", rows[0])
+	}
+}
+
+// R202: a denied stat is a finding, not a silent skip — the row carries a
+// reason and owner_ok:false. A symlinked path is NOT a finding: is_symlink is
+// set, owner_ok is true, and no reason key is present, so the reason-guard
+// leaves it alone.
+func TestCronStatFailureBranches(t *testing.T) {
+	denied := &fsAccess{
+		files: map[string]string{"/etc/group": "group"},
+		fails: map[string]error{"/etc/crontab": fs.ErrPermission},
+	}
+	rows := okList(t, build(t, "cron", denied), "cron.files")
+	var row map[string]any
+	for _, r := range rows {
+		if m := r.(map[string]any); m["path"] == "/etc/crontab" {
+			row = m
+		}
+	}
+	if row == nil {
+		t.Fatalf("a denied stat must still yield a row: %v", rows)
+	}
+	if _, ok := row["reason"]; !ok {
+		t.Errorf("a denied cron file must carry a reason: %v", row)
+	}
+	if row["owner_ok"] != false {
+		t.Errorf("a denied cron file is owner_ok false: %v", row)
+	}
+
+	sym := &fsAccess{
+		files: map[string]string{"/etc/group": "group"},
+		fails: map[string]error{"/etc/crontab": collect.ErrSymlink},
+	}
+	srows := okList(t, build(t, "cron", sym), "cron.files")
+	var srow map[string]any
+	for _, r := range srows {
+		if m := r.(map[string]any); m["path"] == "/etc/crontab" {
+			srow = m
+		}
+	}
+	if srow == nil {
+		t.Fatalf("a symlinked path must still yield a row: %v", srows)
+	}
+	if srow["is_symlink"] != true || srow["owner_ok"] != true {
+		t.Errorf("a symlinked cron file is is_symlink true and owner_ok true: %v", srow)
+	}
+	if _, ok := srow["reason"]; ok {
+		t.Errorf("a symlinked cron file must carry no reason: %v", srow)
+	}
+}
+
+// R212: owner_ok is false when the owner is neither root nor a real (>=1000)
+// user. A system-scope file owned by a non-root system account, and a per-user
+// spool file owned by a system account (uid 500), are both the anomaly U-37
+// catches.
+func TestCronOwnerOkFalseForSystemAccount(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{
+			"/etc/crontab":                 "crontab",
+			"/var/spool/cron/crontabs/svc": "spool_user",
+			"/etc/group":                   "group",
+		},
+		stats: map[string]statResult{
+			"/etc/crontab":                 {mode: 0o644, uid: 500, gid: 0, kind: "regular"},
+			"/var/spool/cron/crontabs/svc": {mode: 0o600, uid: 500, gid: 500, kind: "regular"},
+		},
+	}
+	rows := okList(t, build(t, "cron", a), "cron.files")
+	byPath := map[string]map[string]any{}
+	for _, r := range rows {
+		m := r.(map[string]any)
+		byPath[m["path"].(string)] = m
+	}
+	if byPath["/etc/crontab"]["owner_ok"] != false {
+		t.Errorf("a system-scope file owned by uid 500 is owner_ok false: %v", byPath["/etc/crontab"])
+	}
+	if byPath["/var/spool/cron/crontabs/svc"]["owner_ok"] != false {
+		t.Errorf("a spool file owned by a system account is owner_ok false: %v", byPath["/var/spool/cron/crontabs/svc"])
 	}
 }
 

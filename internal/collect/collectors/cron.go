@@ -160,7 +160,12 @@ func cronDirRows(a collect.Access, groups map[int]string) facts.Envelope {
 	for _, d := range cronDirs {
 		meta, err := a.Stat(d)
 		if err != nil {
-			continue // a dir that is not there is not a finding; a denied one is caught by its glob above
+			// A dir that is not there is not a finding. A denied dir is NOT
+			// surfaced anywhere: filepath.Glob (hostAccess.Glob) swallows a
+			// directory-read error and returns an empty match with a nil error,
+			// so neither the glob above nor this stat reports it. Fixing that
+			// honestly needs a guarded ReadDir, carried forward per R204.
+			continue
 		}
 		rows = append(rows, map[string]any{
 			"path": d, "mode": int(meta.Mode), "uid": int(meta.UID), "gid": int(meta.GID),
