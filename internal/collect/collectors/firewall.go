@@ -28,6 +28,13 @@ const (
 	firewalldZone = "/etc/firewalld/zones/*.xml"
 	nftablesConf  = "/etc/nftables.conf"
 	iptablesRules = "/etc/iptables/rules.v4"
+	// RHEL-family persisted paths (N3): Rocky/Alma/RHEL keep nftables under
+	// /etc/sysconfig and /etc/nftables/*.nft, and iptables under
+	// /etc/sysconfig/iptables. Detection only — improves firewall.enabled
+	// persisted on those hosts; the runtime read still finds the backend.
+	nftablesConfRHEL   = "/etc/sysconfig/nftables.conf"
+	nftablesDropinRHEL = "/etc/nftables/*.nft"
+	iptablesRulesRHEL  = "/etc/sysconfig/iptables"
 )
 
 // rawDumpCap is how much of one ruleset dump firewall.raw_dumps carries. It
@@ -54,6 +61,7 @@ var firewallCollector = collect.Collector{
 			ufwConf, ufwUserRules, ufwDefault,
 			firewalldConf, firewalldZone,
 			nftablesConf, iptablesRules,
+			nftablesConfRHEL, nftablesDropinRHEL, iptablesRulesRHEL,
 		},
 		Commands: []collect.Command{nftListRulesetCmd, iptablesSaveCmd, ip6tablesSaveCmd},
 		// Needs: "none" — the collector classifies its OWN ruleset-read
@@ -110,18 +118,34 @@ func runFirewall(ctx context.Context, a collect.Access, b *collect.Builder) erro
 	b.Set("firewall.backend", collect.OK(name, nameSrc))
 	b.Set("firewall.raw_dumps", withTruncation(collect.OK(cr.dumps, cr.src), cr.truncated))
 
-	// Normalise the captured ruleset (Task 2). Parse EVERY base chain that
-	// hooks input or forward, across families, plus the inbound rules those
-	// chains carry (evidence).
+	// Normalise the captured ruleset (Task 2). Parse EVERY base chain on an
+	// inbound-relevant hook (input/forward, plus the earlier ingress/prerouting
+	// filter chains, S2), across families, plus the inbound rules those chains
+	// carry (evidence).
 	bases, rules := normalizeRuleset(cr)
 	b.Set("firewall.rules", collect.OK(rules, cr.src))
+	// Categorise the base chains. Only a filter chain can restrict inbound: a
+	// nat INPUT base chain (created by any iptables-nft save/restore, some
+	// Docker versions) is policy accept with zero rules and must NOT demote a
+	// hardened filter INPUT drop host to MANUAL (N1). A filter chain on an
+	// earlier inbound hook — ingress, or prerouting under the raw/mangle tables
+	// — that carries rules means the ruleset is NOT demonstrably inert inbound,
+	// so it blocks the confident ok:false path (S2).
 	var inputs, forwards []baseChain
+	inboundPathHasRules := false
 	for _, bc := range bases {
+		if bc.chainType != "filter" {
+			continue
+		}
 		switch bc.hook {
 		case "input":
 			inputs = append(inputs, bc)
 		case "forward":
 			forwards = append(forwards, bc)
+		case "ingress", "prerouting":
+			if bc.hasRules {
+				inboundPathHasRules = true
+			}
 		}
 	}
 
@@ -133,9 +157,11 @@ func runFirewall(ctx context.Context, a collect.Access, b *collect.Builder) erro
 	//   - full + restricts_inbound ok:true — every input base chain across the
 	//     ip/ip6/inet families has policy drop/reject (a family with no table
 	//     is fine; IPv6 may simply be absent).
-	//   - full + restricts_inbound ok:false — every input base chain has policy
-	//     accept AND carries ZERO rules (no jump/goto/verdict lines), so the
-	//     ruleset demonstrably does nothing inbound; also the readable-empty
+	//   - full + restricts_inbound ok:false — every input filter base chain has
+	//     policy accept AND carries ZERO rules (no jump/goto/verdict lines) AND
+	//     no earlier inbound-path filter chain (ingress, or a raw/mangle
+	//     prerouting) carries rules (S2), so the ruleset demonstrably does
+	//     nothing inbound; also the readable-empty
 	//     backend `none` case (nothing hooks input, netfilter accepts by
 	//     default).
 	//   - EVERYTHING ELSE → partial → restricts_inbound absent: an accept-policy
@@ -154,7 +180,7 @@ func runFirewall(ctx context.Context, a collect.Access, b *collect.Builder) erro
 		// H-22: a partial ruleset can never yield a confident answer.
 		confidence = "partial"
 		restricts = collect.Absent("firewall confidence partial: a captured dump was truncated; see firewall.raw_dumps")
-	case len(inputs) == 0 && name == "none":
+	case len(inputs) == 0 && name == "none" && !inboundPathHasRules:
 		confidence = "full"
 		restricts = collect.OK(false, cr.src)
 	case len(inputs) == 0:
@@ -169,6 +195,12 @@ func runFirewall(ctx context.Context, a collect.Access, b *collect.Builder) erro
 			if !(c.policy == "accept" && !c.hasRules) {
 				allAcceptNoRules = false
 			}
+		}
+		// S2: any filter chain on an earlier inbound hook (ingress or a
+		// raw/mangle prerouting) that carries rules means the ruleset is not
+		// demonstrably inert inbound — never a confident ok:false here.
+		if inboundPathHasRules {
+			allAcceptNoRules = false
 		}
 		switch {
 		case allDeny:
@@ -197,14 +229,17 @@ func runFirewall(ctx context.Context, a collect.Access, b *collect.Builder) erro
 }
 
 // baseChain is one parsed base chain (a chain that attaches to a netfilter
-// hook and therefore carries a default policy): its hook (input/forward), the
-// family it lives in, its default policy (drop/reject/accept, or "" when the
-// dump omitted the policy line) and whether it carries any rules.
+// hook and therefore carries a default policy): its hook
+// (input/forward/ingress/prerouting), the family it lives in, its chain type
+// (filter/nat/route — only a filter chain can restrict, N1), its default
+// policy (drop/reject/accept, or "" when the dump omitted the policy line) and
+// whether it carries any rules.
 type baseChain struct {
-	hook     string
-	family   string
-	policy   string
-	hasRules bool
+	hook      string
+	family    string
+	chainType string
+	policy    string
+	hasRules  bool
 }
 
 // normalizeRuleset parses the captured dumps into the base chains and the
@@ -261,17 +296,18 @@ func runtimePolicy(cr capture, chains []baseChain) facts.Envelope {
 
 // parseNftRuleset walks `nft list ruleset` output with an explicit block
 // stack, so a table's sets/maps/nested blocks never confuse the chain and
-// table boundaries. It returns every input/forward base chain and the rules
-// the input chains carry.
+// table boundaries. It returns every base chain on an inbound-relevant hook
+// (input/forward, plus ingress/prerouting so S2's earlier-hook filters are
+// seen) and the rules the input chains carry. Continuation lines of a wrapped
+// anonymous set are rejoined first (N2) so a wrapped rule is one record.
 func parseNftRuleset(content string) ([]baseChain, []any) {
 	bases := []baseChain{}
 	rules := []any{}
 	var stack []string // block kind per open brace: "table", "chain" or "other"
 	curFamily, curChain := "", ""
 	var cur baseChain
-	isBase := false // the current chain hooks input/forward
-	for _, raw := range splitLines([]byte(content)) {
-		line := trimSpaceASCII(raw)
+	isBase := false // the current chain hooks an inbound-relevant point
+	for _, line := range joinWrappedNftLines(splitLines([]byte(content))) {
 		if line == "" {
 			continue
 		}
@@ -316,10 +352,27 @@ func parseNftRuleset(content string) ([]baseChain, []any) {
 			continue
 		}
 		if f[0] == "type" && strings.Contains(line, "hook") {
-			if hook := nftHook(f); hook == "input" || hook == "forward" {
+			hook := nftHook(f)
+			ctype := ""
+			if len(f) >= 2 {
+				ctype = f[1]
+			}
+			switch hook {
+			case "input", "forward":
 				isBase = true
 				cur.hook = hook
+				cur.chainType = ctype
 				cur.policy = nftPolicy(f)
+			case "ingress", "prerouting":
+				// S2: an ingress or prerouting chain counts only when it is a
+				// filter chain; a type nat prerouting (Docker's DNAT) is not an
+				// inbound restriction and must not demote the host.
+				if ctype == "filter" {
+					isBase = true
+					cur.hook = hook
+					cur.chainType = ctype
+					cur.policy = nftPolicy(f)
+				}
 			}
 			continue
 		}
@@ -331,6 +384,54 @@ func parseNftRuleset(content string) ([]baseChain, []any) {
 		}
 	}
 	return bases, rules
+}
+
+// joinWrappedNftLines rejoins the continuation lines `nft list ruleset` emits
+// when a long anonymous set wraps (`tcp dport { 22, 80, …,\n 9007 } accept`),
+// so a wrapped rule is one logical line and not counted as a second
+// firewall.rules record (N2). A line is held open while its running brace
+// depth is unbalanced, EXCEPT a block-opener line that ends in `{` (a table or
+// chain header), whose body legitimately follows on later lines. Each returned
+// line is already trimmed of surrounding ASCII space.
+func joinWrappedNftLines(raw []string) []string {
+	out := []string{}
+	buf := ""
+	open := 0
+	for _, r := range raw {
+		line := trimSpaceASCII(r)
+		if line == "" {
+			continue
+		}
+		if buf == "" {
+			buf = line
+		} else {
+			buf += " " + line
+		}
+		open += braceDelta(line)
+		if open <= 0 || strings.HasSuffix(buf, "{") {
+			out = append(out, buf)
+			buf = ""
+			open = 0
+		}
+	}
+	if buf != "" {
+		out = append(out, buf)
+	}
+	return out
+}
+
+// braceDelta is the number of '{' minus the number of '}' in s.
+func braceDelta(s string) int {
+	d := 0
+	for i := 0; i < len(s); i++ {
+		switch s[i] {
+		case '{':
+			d++
+		case '}':
+			d--
+		}
+	}
+	return d
 }
 
 // nftHook returns the token following "hook" in a base-chain type line.
@@ -402,10 +503,14 @@ func nftPortSpec(f []string, i int) string {
 	return strings.Join(parts, " ")
 }
 
-// parseIptablesSave parses one iptables-save / ip6tables-save dump. Only the
-// `*filter` table's INPUT and FORWARD hooks are base chains with a default
+// parseIptablesSave parses one iptables-save / ip6tables-save dump. The
+// `*filter` table's INPUT and FORWARD hooks are the base chains with a default
 // policy; their `:CHAIN POLICY` line gives the policy and their `-A CHAIN`
 // lines both mark the chain as carrying rules and (for INPUT) become evidence.
+// A `-A PREROUTING`/`-A INPUT` line under the `*raw` or `*mangle` tables is an
+// earlier inbound-path rule (anti-spoof, blocklists): S2 records it as a
+// filter chain on the prerouting hook carrying rules so it blocks the
+// confident ok:false path, without giving it a policy of its own.
 func parseIptablesSave(family, content string) ([]baseChain, []any) {
 	bases := []baseChain{}
 	rules := []any{}
@@ -427,7 +532,7 @@ func parseIptablesSave(family, content string) ([]baseChain, []any) {
 			}
 			hook := iptablesHook(strings.TrimPrefix(f[0], ":"))
 			if hook != "" {
-				bases = append(bases, baseChain{hook: hook, family: family, policy: strings.ToLower(f[1])})
+				bases = append(bases, baseChain{hook: hook, family: family, chainType: "filter", policy: strings.ToLower(f[1])})
 			}
 		case strings.HasPrefix(line, "-A ") && table == "filter":
 			f := strings.Fields(line)
@@ -446,6 +551,12 @@ func parseIptablesSave(family, content string) ([]baseChain, []any) {
 			if hook == "input" {
 				rules = append(rules, parseIptablesRule(f[1], f))
 			}
+		case strings.HasPrefix(line, "-A ") && (table == "raw" || table == "mangle"):
+			f := strings.Fields(line)
+			if len(f) < 2 || (f[1] != "PREROUTING" && f[1] != "INPUT") {
+				continue
+			}
+			bases = append(bases, baseChain{hook: "prerouting", family: family, chainType: "filter", hasRules: true})
 		}
 	}
 	return bases, rules
@@ -582,8 +693,8 @@ func readFirewallConfig(a collect.Access) fwConfig {
 	var c fwConfig
 	c.hasFirewalld = statExists(a, firewalldConf) || globNonEmpty(a, firewalldZone)
 	c.hasUfw = statExists(a, ufwConf) || statExists(a, ufwDefault)
-	c.hasNftConf = statExists(a, nftablesConf)
-	c.hasIptables = statExists(a, iptablesRules)
+	c.hasNftConf = statExists(a, nftablesConf) || statExists(a, nftablesConfRHEL) || globNonEmpty(a, nftablesDropinRHEL)
+	c.hasIptables = statExists(a, iptablesRules) || statExists(a, iptablesRulesRHEL)
 	if statExists(a, ufwConf) {
 		data, meta, err := a.ReadFile(ufwConf, readLimit)
 		if err != nil {

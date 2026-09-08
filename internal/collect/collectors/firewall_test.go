@@ -290,6 +290,73 @@ func TestFirewallAcceptWithRulesIsPartialAbsent(t *testing.T) {
 	}
 }
 
+// S2, the anti-false-FAIL guard for earlier inbound hooks: a filter INPUT
+// chain that is policy accept with ZERO rules would be a confident ok:false on
+// its own, but a `type filter hook ingress` chain that carries a drop rule
+// means the ruleset does restrict inbound. It must NEVER be a confident
+// ok:false — it degrades to partial + restricts_inbound ABSENT (→ MANUAL).
+func TestFirewallNftIngressRulesBlockConfidentOpen(t *testing.T) {
+	a := firewallAccess(
+		map[string]string{"/etc/nftables.conf": "nftables.conf"},
+		map[string]cmdResult{nftListRuleset: {file: "nft.ruleset.ingress-drop"}},
+	)
+	b := buildBegun(t, "firewall", a)
+	if e := env(t, b, "firewall.normalization_confidence"); e.Value != "partial" {
+		t.Errorf("confidence %+v, want partial (an ingress filter chain carries rules, S2)", e)
+	}
+	if e := env(t, b, "firewall.restricts_inbound"); e.Status != facts.StatusAbsent {
+		t.Errorf("restricts_inbound %+v, want ABSENT — never a confident ok:false when an earlier inbound hook carries rules (S2)", e)
+	}
+	if got := b.Worst("firewall"); got != facts.StatusOK {
+		t.Errorf(`Worst("firewall") = %s, want ok (partial is not a collector failure)`, got)
+	}
+}
+
+// S2 for the iptables path: a *filter :INPUT ACCEPT with zero -A INPUT rules
+// alone is a confident ok:false, but a *raw PREROUTING drop is an earlier
+// inbound-path rule the *filter view does not see. It must degrade to partial
+// + restricts_inbound ABSENT, not a confident ok:false FAIL.
+func TestFirewallIptablesRawPreroutingBlocksConfidentOpen(t *testing.T) {
+	a := firewallAccess(
+		map[string]string{"/etc/iptables/rules.v4": "iptables-save.raw-drop"},
+		map[string]cmdResult{
+			nftListRuleset: {exitCode: 1, stderr: "sh: nft: command not found\n"},
+			iptablesSave:   {file: "iptables-save.raw-drop"},
+		},
+	)
+	b := buildBegun(t, "firewall", a)
+	if e := env(t, b, "firewall.normalization_confidence"); e.Value != "partial" {
+		t.Errorf("confidence %+v, want partial (a *raw PREROUTING rule is inbound-path, S2)", e)
+	}
+	if e := env(t, b, "firewall.restricts_inbound"); e.Status != facts.StatusAbsent {
+		t.Errorf("restricts_inbound %+v, want ABSENT (S2)", e)
+	}
+	if got := b.Worst("firewall"); got != facts.StatusOK {
+		t.Errorf(`Worst("firewall") = %s, want ok`, got)
+	}
+}
+
+// N1: a type nat INPUT base chain (policy accept, zero rules — created by any
+// iptables-nft save/restore) must NOT demote a hardened `filter INPUT drop`
+// host to MANUAL. Only filter chains are weighed, so the host stays full +
+// restricts_inbound ok:true.
+func TestFirewallNatInputChainIgnored(t *testing.T) {
+	a := firewallAccess(
+		map[string]string{"/etc/nftables.conf": "nftables.conf"},
+		map[string]cmdResult{nftListRuleset: {file: "nft.ruleset.nat-input-drop"}},
+	)
+	b := buildBegun(t, "firewall", a)
+	if e := env(t, b, "firewall.normalization_confidence"); e.Value != "full" {
+		t.Errorf("confidence %+v, want full (a type nat INPUT chain must not demote a filter INPUT drop, N1)", e)
+	}
+	if e := env(t, b, "firewall.restricts_inbound"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("restricts_inbound %+v, want ok true (N1)", e)
+	}
+	if got := b.Worst("firewall"); got != facts.StatusOK {
+		t.Errorf(`Worst("firewall") = %s, want ok`, got)
+	}
+}
+
 // H-16, multiple input base chains that AGREE: an nft ruleset with an ip and
 // an ip6 input base chain both "policy drop" stays full + restricts_inbound
 // ok:true (the old "exactly one input chain" rule would have made every
