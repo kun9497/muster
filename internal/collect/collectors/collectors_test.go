@@ -1118,6 +1118,99 @@ func TestAccountsRejectsAnImplausibleHashId(t *testing.T) {
 	}
 }
 
+// --- cron ---------------------------------------------------------------
+
+// cron.files lists every cron/at config file that exists, with a precomputed
+// owner_ok (root-owned, or the spool owner for a per-user spool file) and the
+// group/other-writable flags. A world-writable /etc/crontab is owner_ok true
+// but group/other-writable true, which U-37 will fail.
+func TestCronConfigFiles(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{
+			"/etc/crontab":                   "crontab",
+			"/etc/cron.d/muster":             "cron_d_entry",
+			"/etc/cron.allow":                "cron_allow",
+			"/var/spool/cron/crontabs/alice": "spool_user",
+			"/etc/group":                     "group",
+		},
+		stats: map[string]statResult{
+			"/etc/crontab":                   {mode: 0o644, uid: 0, gid: 0, kind: "regular"},
+			"/etc/cron.d/muster":             {mode: 0o644, uid: 0, gid: 0, kind: "regular"},
+			"/etc/cron.allow":                {mode: 0o644, uid: 0, gid: 0, kind: "regular"},
+			"/var/spool/cron/crontabs/alice": {mode: 0o600, uid: 1000, gid: 1000, kind: "regular"},
+		},
+	}
+	rows := okList(t, build(t, "cron", a), "cron.files")
+	byPath := map[string]map[string]any{}
+	for _, r := range rows {
+		m := r.(map[string]any)
+		byPath[m["path"].(string)] = m
+	}
+	if byPath["/etc/crontab"]["owner_ok"] != true || byPath["/etc/crontab"]["scope"] != "system" {
+		t.Errorf("crontab %v", byPath["/etc/crontab"])
+	}
+	if byPath["/var/spool/cron/crontabs/alice"]["owner_ok"] != true || byPath["/var/spool/cron/crontabs/alice"]["user"] != "alice" {
+		t.Errorf("a per-user spool file owned by that user is owner_ok: %v", byPath["/var/spool/cron/crontabs/alice"])
+	}
+	if byPath["/etc/cron.allow"]["scope"] != "access" {
+		t.Errorf("cron.allow is scope access: %v", byPath["/etc/cron.allow"])
+	}
+}
+
+// A spool directory caught by a spool glob (/var/spool/cron/crontabs matched by
+// /var/spool/cron/*) is not a cron.files row — directories are covered by
+// cron.dirs, and cronRow skips a non-regular Kind.
+func TestCronSpoolDirIsNotAFileRow(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{"/etc/crontab": "crontab", "/etc/group": "group"},
+		dirs:  map[string]bool{"/var/spool/cron/crontabs": true},
+		stats: map[string]statResult{
+			"/etc/crontab":             {mode: 0o644, uid: 0, kind: "regular"},
+			"/var/spool/cron/crontabs": {mode: 0o1730, uid: 0, gid: 0, kind: "dir"},
+		},
+	}
+	rows := okList(t, build(t, "cron", a), "cron.files")
+	for _, r := range rows {
+		if r.(map[string]any)["path"] == "/var/spool/cron/crontabs" {
+			t.Errorf("a spool directory must not be a cron.files row: %v", r)
+		}
+	}
+}
+
+// The systemd timer inventory parses the systemctl table; a systemctl failure
+// is the command's error, not an empty list.
+func TestCronTimersInventoryAndFailure(t *testing.T) {
+	ok := &fsAccess{
+		files: map[string]string{"/etc/crontab": "crontab", "/etc/group": "group"},
+		stats: map[string]statResult{"/etc/crontab": {mode: 0o644, kind: "regular"}},
+		cmds:  map[string]cmdResult{"/usr/bin/systemctl list-unit-files --type=timer --no-legend --no-pager": {file: "systemctl_list_timers.txt"}},
+	}
+	rows := okList(t, build(t, "cron", ok), "cron.timers")
+	if len(rows) == 0 || rows[0].(map[string]any)["name"] == "" {
+		t.Fatalf("timers %v", rows)
+	}
+	bad := &fsAccess{
+		files: map[string]string{"/etc/crontab": "crontab", "/etc/group": "group"},
+		stats: map[string]statResult{"/etc/crontab": {mode: 0o644, kind: "regular"}},
+		cmds:  map[string]cmdResult{"/usr/bin/systemctl list-unit-files --type=timer --no-legend --no-pager": {exitCode: 1, stderr: "fail\n"}},
+	}
+	if e := env(t, build(t, "cron", bad), "cron.timers"); e.Status == facts.StatusOK {
+		t.Errorf("a failed systemctl must not be an ok empty list: %+v", e)
+	}
+}
+
+// A world-writable /etc/crontab is recorded group/other-writable so U-37 fails.
+func TestCronWorldWritableCrontab(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{"/etc/crontab": "crontab", "/etc/group": "group"},
+		stats: map[string]statResult{"/etc/crontab": {mode: 0o646, uid: 0, kind: "regular"}},
+	}
+	rows := okList(t, build(t, "cron", a), "cron.files")
+	if rows[0].(map[string]any)["other_writable"] != true {
+		t.Errorf("0646 crontab is other-writable: %v", rows[0])
+	}
+}
+
 // --- sockets ------------------------------------------------------------
 
 func TestSocketsParsesListeningAndLoopback(t *testing.T) {

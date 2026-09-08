@@ -1670,6 +1670,36 @@
       "Collector": "walk",
       "DefaultOn": "",
       "SubjectKind": ""
+    },
+    {
+      "Key": "cron.files",
+      "Type": "list\u003crecord\u003e",
+      "Description": "Every cron/at configuration and spool file - path, scope, user, mode, owner and the group/other-writable flags.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "cron",
+      "DefaultOn": "",
+      "SubjectKind": "file"
+    },
+    {
+      "Key": "cron.dirs",
+      "Type": "list\u003crecord\u003e",
+      "Description": "The cron and at directories - path, mode, owner and the group/other-writable flags.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "cron",
+      "DefaultOn": "",
+      "SubjectKind": "file"
+    },
+    {
+      "Key": "cron.timers",
+      "Type": "list\u003crecord\u003e",
+      "Description": "The systemd timer unit-file inventory - name and enablement state.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "cron",
+      "DefaultOn": "",
+      "SubjectKind": "unit"
     }
   ]
 }

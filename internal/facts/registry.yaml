@@ -915,3 +915,24 @@ keys:
     since: 1
     sensitivity: public
     collector: walk
+  - key: cron.files
+    type: list<record>
+    description: Every cron/at configuration and spool file - path, scope, user, mode, owner and the group/other-writable flags.
+    since: 1
+    sensitivity: public
+    collector: cron
+    subject_kind: file
+  - key: cron.dirs
+    type: list<record>
+    description: The cron and at directories - path, mode, owner and the group/other-writable flags.
+    since: 1
+    sensitivity: public
+    collector: cron
+    subject_kind: file
+  - key: cron.timers
+    type: list<record>
+    description: The systemd timer unit-file inventory - name and enablement state.
+    since: 1
+    sensitivity: public
+    collector: cron
+    subject_kind: unit

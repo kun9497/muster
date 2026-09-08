@@ -1,0 +1,2 @@
+# muster synthetic cron.d drop-in
+*/10 * * * *   root   /usr/local/bin/muster-heartbeat
