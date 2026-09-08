@@ -239,7 +239,7 @@ git commit -m "Normalise the inbound default policy with an explicit confidence"
 func TestHostsDenyAllDetected(t *testing.T) {
 	a := filesAccess(map[string]string{
 		"/etc/hosts.deny":  "# comment\nALL: ALL\n",
-		"/etc/hosts.allow": "sshd: 10.0.0.0/8\n",
+		"/etc/hosts.allow": "sshd: 192.0.2.0/24\n",
 	})
 	b := build(t, "files", a)
 	if e := env(t, b, "files.etc_hosts_deny_all"); e.Status != facts.StatusOK || e.Value != true {
