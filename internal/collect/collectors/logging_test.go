@@ -641,3 +641,31 @@ func TestJournaldEtcDropinShadowsTheVendorDropin(t *testing.T) {
 		}
 	}
 }
+
+// C3 for the OTHER oracle: the configuration chain reads cleanly, but the
+// stat of /var/log/journal is refused. That stat is the whole runtime side
+// and, under Storage=auto, the whole judgement — so both carry the read's
+// status. "The directory could not be stat-ed, therefore the journal is
+// volatile" would be a fabricated FAIL.
+func TestJournaldDeniedJournalDirIsNotVolatile(t *testing.T) {
+	a := loggingAccess(map[string]string{"/etc/systemd/journald.conf": "journald.conf.main"}, nil)
+	a.fails["/var/log/journal"] = os.ErrPermission // no stats entry: fsAccess.Stat then fails
+	b := buildBegun(t, "logging", a)
+
+	s := setting(t, b, "logging.journald.storage")
+	if s.Runtime == nil || s.Runtime.Status != facts.StatusDenied ||
+		!strings.Contains(s.Runtime.Reason, "/var/log/journal") {
+		t.Errorf("storage runtime = %+v, want denied naming /var/log/journal", s.Runtime)
+	}
+	// The file that WAS readable still answers its own side.
+	if s.Persisted == nil || s.Persisted.Status != facts.StatusOK || s.Persisted.Value != "auto" {
+		t.Errorf("storage persisted = %+v, want ok:auto", s.Persisted)
+	}
+	e := env(t, b, "logging.journald.persistent")
+	if e.Status != facts.StatusDenied || !strings.Contains(e.Reason, "/var/log/journal") {
+		t.Errorf("persistent = %+v, want denied naming /var/log/journal (never ok:false, never error)", e)
+	}
+	if got := b.Worst("logging"); got != facts.StatusDenied {
+		t.Errorf("Worst(logging) = %s, want denied", got)
+	}
+}
