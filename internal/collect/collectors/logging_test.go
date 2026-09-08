@@ -438,3 +438,206 @@ func TestLoggingRulesAreRecordedInFileOrder(t *testing.T) {
 		t.Errorf("the discard must come first, as it does in the file: %+v", first)
 	}
 }
+
+// --- journald (Rulings I-8 / I-23) --------------------------------------
+
+// journalDirSeed makes /var/log/journal a DIRECTORY on the fake host. Ruling
+// I-20: fsAccess.Stat reports a Kind only from stats, so a dirs entry alone
+// would leave Kind empty and the directory would read as "not a directory".
+func journalDirSeed(a *fsAccess) {
+	a.stats["/var/log/journal"] = statResult{mode: 0o2755, uid: 0, gid: 4, kind: "dir"}
+	a.dirs["/var/log/journal"] = true
+}
+
+// Ruling I-8: the journal is persistent when Storage=persistent, or when
+// Storage is auto (journald's default) AND /var/log/journal is there — the
+// directory is what journald consults at boot. The two sides of
+// logging.journald.storage are ALWAYS both set (H-18): persisted is what the
+// chain configures, runtime is what the directory says the journal is doing
+// now, and the two disagreeing is the interesting case, not an error.
+func TestJournaldPersistentDerivation(t *testing.T) {
+	cases := []struct {
+		name       string
+		files      map[string]string
+		journalDir bool
+		want       bool
+		persisted  string
+		runtime    string
+	}{{
+		name:       "auto with the journal directory present",
+		files:      map[string]string{"/etc/systemd/journald.conf": "journald.conf.main"},
+		journalDir: true, want: true, persisted: "auto", runtime: "persistent",
+	}, {
+		name:  "auto without it",
+		files: map[string]string{"/etc/systemd/journald.conf": "journald.conf.main"},
+		want:  false, persisted: "auto", runtime: "volatile",
+	}, {
+		// journald creates the directory itself on the next boot, so its
+		// absence is not what decides an explicit Storage=persistent.
+		name: "Storage=persistent before the directory exists",
+		files: map[string]string{
+			"/etc/systemd/journald.conf":                  "journald.conf.main",
+			"/etc/systemd/journald.conf.d/10-vendor.conf": "journald.d.10-vendor-etc",
+		},
+		want: true, persisted: "persistent", runtime: "volatile",
+	}, {
+		// The configuration wins over a leftover directory: journald with
+		// Storage=volatile writes nothing into it.
+		name: "Storage=volatile with the directory still on disk",
+		files: map[string]string{
+			"/etc/systemd/journald.conf":                  "journald.conf.main",
+			"/etc/systemd/journald.conf.d/10-vendor.conf": "journald.d.10-vendor",
+		},
+		journalDir: true, want: false, persisted: "volatile", runtime: "persistent",
+	}}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			a := loggingAccess(tc.files, nil)
+			if tc.journalDir {
+				journalDirSeed(a)
+			}
+			b := buildBegun(t, "logging", a)
+
+			if e := env(t, b, "logging.journald.persistent"); e.Status != facts.StatusOK || e.Value != tc.want {
+				t.Errorf("persistent = %+v, want ok:%v", e, tc.want)
+			}
+			s := setting(t, b, "logging.journald.storage")
+			if s.Persisted == nil || s.Persisted.Status != facts.StatusOK || s.Persisted.Value != tc.persisted {
+				t.Errorf("storage persisted = %+v, want ok:%q", s.Persisted, tc.persisted)
+			}
+			if s.Runtime == nil || s.Runtime.Status != facts.StatusOK || s.Runtime.Value != tc.runtime {
+				t.Errorf("storage runtime = %+v, want ok:%q", s.Runtime, tc.runtime)
+			}
+			// No fixture here sets ForwardToSyslog, and journald's default is no.
+			if e := env(t, b, "logging.journald.forward_to_syslog"); e.Status != facts.StatusOK || e.Value != false {
+				t.Errorf("forward_to_syslog = %+v, want ok:false", e)
+			}
+			if got := b.Worst("logging"); got != facts.StatusOK {
+				t.Errorf("Worst(logging) = %s, want ok", got)
+			}
+		})
+	}
+}
+
+// C3/R148: a drop-in that EXISTS and cannot be read is the answer for every
+// value the chain could set — including the runtime side, which must not be
+// published as a confident "volatile" beside a persisted side nobody could
+// read. Never a default.
+func TestJournaldUnreadableDropinIsNotADefault(t *testing.T) {
+	a := loggingAccess(map[string]string{
+		"/etc/systemd/journald.conf":             "journald.conf.main",
+		"/etc/systemd/journald.conf.d/10-x.conf": "journald.d.10-vendor-etc",
+	}, nil)
+	a.fails["/etc/systemd/journald.conf.d/10-x.conf"] = os.ErrPermission
+	journalDirSeed(a) // the stat that would otherwise have said "persistent"
+	b := buildBegun(t, "logging", a)
+
+	s := setting(t, b, "logging.journald.storage")
+	for _, side := range []struct {
+		name string
+		e    *facts.Envelope
+	}{{"runtime", s.Runtime}, {"persisted", s.Persisted}} {
+		if side.e == nil || side.e.Status != facts.StatusDenied {
+			t.Errorf("storage %s = %+v, want denied", side.name, side.e)
+			continue
+		}
+		if !strings.Contains(side.e.Reason, "/etc/systemd/journald.conf.d/10-x.conf") {
+			t.Errorf("storage %s: the reason must name the file: %+v", side.name, side.e)
+		}
+	}
+	for _, k := range []string{"logging.journald.forward_to_syslog", "logging.journald.persistent"} {
+		e := env(t, b, k)
+		if e.Status != facts.StatusDenied {
+			t.Errorf("%s must carry the read failure, not a default: %+v", k, e)
+		}
+		if !strings.Contains(e.Reason, "/etc/systemd/journald.conf.d/10-x.conf") {
+			t.Errorf("%s: the reason must name the file: %+v", k, e)
+		}
+	}
+	if got := b.Worst("logging"); got != facts.StatusDenied {
+		t.Errorf("Worst(logging) = %s, want denied", got)
+	}
+}
+
+// Ruling I-11: with no systemd there is no journal to judge. ok:false would
+// claim to have judged one that does not exist; unsupported ranks as ok in
+// Worst (R71), so such a host's run stays complete.
+func TestJournaldOnANonSystemdHostIsUnsupported(t *testing.T) {
+	a := &fsAccess{files: map[string]string{}, cmds: map[string]cmdResult{}, fails: map[string]error{},
+		dirs: map[string]bool{}, stats: map[string]statResult{}}
+	journalDirSeed(a) // even a leftover directory does not make a journal
+	b := buildBegun(t, "logging", a)
+
+	s := setting(t, b, "logging.journald.storage")
+	for _, side := range []struct {
+		name string
+		e    *facts.Envelope
+	}{{"runtime", s.Runtime}, {"persisted", s.Persisted}} {
+		if side.e == nil || side.e.Status != facts.StatusUnsupported {
+			t.Errorf("storage %s = %+v, want unsupported", side.name, side.e)
+		}
+	}
+	for _, k := range []string{"logging.journald.forward_to_syslog", "logging.journald.persistent"} {
+		e := env(t, b, k)
+		if e.Status != facts.StatusUnsupported {
+			t.Errorf("%s = %+v, want unsupported", k, e)
+		}
+		if !strings.Contains(e.Reason, "journald") {
+			t.Errorf("%s: the reason must say what this host has not got: %+v", k, e)
+		}
+	}
+	if got := b.Worst("logging"); got != facts.StatusOK {
+		t.Errorf("Worst(logging) = %s, want ok (unsupported ranks ok)", got)
+	}
+}
+
+// Ruling I-23: systemd >= 254 may ship only /usr/lib/systemd/journald.conf.
+// With no /etc copy the vendor file IS this host's main file, and its values
+// are the answer — never journald's compiled-in defaults.
+func TestJournaldMainFileFallsBackToTheVendorCopy(t *testing.T) {
+	a := loggingAccess(map[string]string{"/usr/lib/systemd/journald.conf": "journald.conf.vendor"}, nil)
+	b := buildBegun(t, "logging", a)
+
+	s := setting(t, b, "logging.journald.storage")
+	if s.Persisted == nil || s.Persisted.Status != facts.StatusOK || s.Persisted.Value != "persistent" {
+		t.Errorf("storage persisted = %+v, want ok:persistent from the vendor copy", s.Persisted)
+	}
+	if e := env(t, b, "logging.journald.forward_to_syslog"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("forward_to_syslog = %+v, want ok:true from the vendor copy", e)
+	}
+	if e := env(t, b, "logging.journald.persistent"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("persistent = %+v, want ok:true", e)
+	}
+	if src := s.Persisted.Source; src == nil || len(src.Inputs) != 1 ||
+		src.Inputs[0].Path != "/usr/lib/systemd/journald.conf" {
+		t.Errorf("the persisted side must cite the file it was read from: %+v", src)
+	}
+}
+
+// Ruling I-5/I-23 for the journald LEAVES: the /etc drop-in shadows the
+// same-named vendor one — which is never opened — while a drop-in with
+// another basename still applies, whichever directory it came from.
+func TestJournaldEtcDropinShadowsTheVendorDropin(t *testing.T) {
+	a := loggingAccess(map[string]string{
+		"/etc/systemd/journald.conf":                      "journald.conf.main",       // Storage=auto
+		"/usr/lib/systemd/journald.conf.d/10-vendor.conf": "journald.d.10-vendor",     // Storage=volatile (shadowed)
+		"/etc/systemd/journald.conf.d/10-vendor.conf":     "journald.d.10-vendor-etc", // Storage=persistent
+		"/run/systemd/journald.conf.d/20-runtime.conf":    "journald.d.20-runtime",    // ForwardToSyslog=yes
+	}, nil)
+	b := buildBegun(t, "logging", a)
+
+	if s := setting(t, b, "logging.journald.storage"); s.Persisted == nil || s.Persisted.Value != "persistent" {
+		t.Errorf("storage persisted = %+v, want the /etc drop-in's persistent", s.Persisted)
+	}
+	if e := env(t, b, "logging.journald.persistent"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("persistent = %+v, want ok:true (no journal directory needed)", e)
+	}
+	if e := env(t, b, "logging.journald.forward_to_syslog"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("forward_to_syslog = %+v, want ok:true from the /run drop-in", e)
+	}
+	for _, p := range a.reads {
+		if strings.HasPrefix(p, "/usr/lib/systemd/journald.conf.d/") {
+			t.Errorf("a shadowed drop-in must not be read: %s", p)
+		}
+	}
+}

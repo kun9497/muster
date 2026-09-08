@@ -2772,6 +2772,36 @@
       "SubjectKind": "facility"
     },
     {
+      "Key": "logging.journald.storage",
+      "Type": "setting\u003cstring\u003e",
+      "Description": "journald's Storage= from /etc/systemd/journald.conf (or the /usr/lib copy) merged with its drop-in directories - persisted as configured (auto when unset, journald's default), runtime as persistent or volatile from whether /var/log/journal is a directory; the read's status on both sides when a file in the chain exists but cannot be read, and unsupported on a host with no systemd.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "logging",
+      "DefaultOn": "both",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "logging.journald.forward_to_syslog",
+      "Type": "bool",
+      "Description": "journald's merged ForwardToSyslog=, false when unset (journald's default); evidence only, since forwarding neither adds nor removes journal storage.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "logging",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "logging.journald.persistent",
+      "Type": "bool",
+      "Description": "Whether the journal survives a reboot - true when Storage is persistent, or when it is auto (the default, and what journald falls back to for a value it cannot parse) and /var/log/journal is a directory; the read's status when a configuration file in the chain exists but cannot be read, and unsupported on a host with no systemd.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "logging",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
       "Key": "logging.log_targets",
       "Type": "list\u003crecord\u003e",
       "Description": "The distinct local file targets the rules name, each with path, exists, persistent, mtime_age_s and stat_status; mtime_age_s is the whole seconds between the file's modification time and the run's collected_at and is omitted when either is unknown or the file was modified after the run started, and a path outside the collector's declaration is recorded with stat_status undeclared and never stat-ed. Evidence only.",

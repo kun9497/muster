@@ -26,15 +26,16 @@ const (
 
 	// Ruling I-10: the log directory is declared as two flat globs, never a
 	// "**"-ish pattern — guardedAccess matches with path.Match, which has no
-	// recursive wildcard. The second also covers /var/log/journal for the
-	// journald leaves Task 3 adds.
+	// recursive wildcard. The first is what declares /var/log/journal for the
+	// journald leaves; the second reaches a target inside a subdirectory.
 	varLogGlob    = "/var/log/*"
 	varLogSubGlob = "/var/log/*/*"
 )
 
-// The journald configuration chain (Ruling I-23). It is declared here, with
-// the rest of this collector's reads, because the journald leaves live in the
-// same collector; nothing in this file reads it yet.
+// journaldGlob is the drop-in file pattern systemd itself reads.
+const journaldGlob = "*.conf"
+
+// The journald configuration chain (Ruling I-23), read by journaldFacts.
 var (
 	journaldMains = []string{"/etc/systemd/journald.conf", "/usr/lib/systemd/journald.conf"}
 	// Descending precedence, the order mergeDropins wants.
@@ -50,7 +51,7 @@ func loggingReads() []string {
 	reads := []string{rsyslogConf, rsyslogDGlob, syslogNgConf, systemdMarker, varLogGlob, varLogSubGlob}
 	reads = append(reads, journaldMains...)
 	for _, d := range journaldDropinDirs {
-		reads = append(reads, path.Join(d, "*.conf"))
+		reads = append(reads, path.Join(d, journaldGlob))
 	}
 	return reads
 }
@@ -83,6 +84,10 @@ var rsyslogLeafKeys = []string{
 func runLogging(_ context.Context, a collect.Access, b *collect.Builder) error {
 	impl, data, truncated, readErr := syslogImplementation(a)
 	b.Set("logging.syslog.implementation", collect.OK(impl, implementationSource(impl)))
+	// The journal is answered on every branch: a host can run journald and a
+	// syslog daemon at once, and an unreadable rsyslog.conf says nothing
+	// about the journal.
+	journaldFacts(a, b)
 
 	if readErr != nil {
 		for _, k := range rsyslogLeafKeys {
@@ -172,6 +177,146 @@ func noRsyslogReason(impl string) string {
 		return "this host is configured with syslog-ng, whose dialect this version does not parse; check " + syslogNgConf + " by hand"
 	}
 	return "no rsyslog configuration on this host (" + rsyslogConf + " is not present)"
+}
+
+// --- journald (Rulings I-8 / I-23) --------------------------------------
+
+// journalDir is where journald keeps a PERSISTENT journal. Its being a
+// DIRECTORY is the runtime half of logging.journald.storage: under journald's
+// default Storage=auto, that directory existing is exactly what makes the
+// journal survive a reboot. varLogGlob is what declares it.
+const journalDir = "/var/log/journal"
+
+// journaldFacts writes the three logging.journald.* leaves. They are derived
+// independently of the rsyslog model: a host can run both, and a host that
+// runs neither still has a journal.
+func journaldFacts(a collect.Access, b *collect.Builder) {
+	if !pathPresent(a, systemdMarker) {
+		// Ruling I-11: no systemd, no journal to judge. ok:false here would
+		// claim to have judged a journal that does not exist; unsupported
+		// ranks as ok in Worst (R71), so such a host's run stays complete.
+		journaldDegraded(b, collect.Unsupported("no systemd journald on this host"))
+		return
+	}
+	values, inputs, err := mergeDropins(a, journaldMain(a), journaldDropinDirs, journaldGlob)
+	if err != nil {
+		// C3/R148: a file in the chain exists and could not be read, so that
+		// read's status is the answer for every value the chain could set.
+		// The runtime side degrades with it rather than publishing a
+		// confident "volatile" beside a persisted side nobody could read.
+		journaldDegraded(b, dropinEnvelope(err))
+		return
+	}
+	// R147: a fresh Source pointer per envelope, never one shared.
+	src := func() *facts.Source { return &facts.Source{Kind: "derived", Inputs: slices.Clone(inputs)} }
+
+	// journald's documented default. An EMPTY assignment RESETS the setting
+	// to it — mergeDropins keeps the "" so the reset survives
+	// last-write-wins, and it is read here as the default, not as a value.
+	storage := values["Storage"]
+	if storage == "" {
+		storage = "auto"
+	}
+	dir, dirErr := journalDirIsDir(a)
+	now := "volatile"
+	if dir {
+		now = "persistent"
+	}
+	runtimeSide := collect.OK(now, &facts.Source{Kind: "file", Path: journalDir})
+	if dirErr != nil {
+		runtimeSide = *dirErr
+	}
+	// H-18: both sides, always — persisted is what the chain configures,
+	// runtime is what the journal is doing right now, and the two disagreeing
+	// is the interesting case, not an error.
+	b.SetSetting("logging.journald.storage", facts.Setting{
+		Runtime:   envp(runtimeSide),
+		Persisted: envp(collect.OK(storage, src())),
+	})
+	// Evidence only: forwarding to syslog neither adds nor removes journal
+	// storage. journald's compiled-in default is no.
+	b.Set("logging.journald.forward_to_syslog", collect.OK(systemdBool(values["ForwardToSyslog"], false), src()))
+	b.Set("logging.journald.persistent", journaldPersistent(storage, dir, dirErr, inputs))
+}
+
+// journaldDegraded publishes one status for all three journald leaves: they
+// answer from one chain and degrade together.
+func journaldDegraded(b *collect.Builder, e facts.Envelope) {
+	b.SetSetting("logging.journald.storage", facts.Setting{Runtime: envp(e), Persisted: envp(e)})
+	b.Set("logging.journald.forward_to_syslog", e)
+	b.Set("logging.journald.persistent", e)
+}
+
+// journaldPersistent is Ruling I-8: the journal survives a reboot when
+// Storage is persistent, or when it is auto — journald's default — and
+// /var/log/journal is there to hold it.
+func journaldPersistent(storage string, dir bool, dirErr *facts.Envelope, inputs []facts.Source) facts.Envelope {
+	derived := func(extra ...facts.Source) *facts.Source {
+		return &facts.Source{Kind: "derived", Inputs: append(slices.Clone(inputs), extra...)}
+	}
+	switch storage {
+	case "persistent":
+		// journald creates /var/log/journal itself, so the directory not
+		// being there yet does not make this host's journal volatile.
+		return collect.OK(true, derived())
+	case "volatile", "none":
+		return collect.OK(false, derived())
+	}
+	// auto — and any value journald does not recognise, which it ignores in
+	// favour of that same default. The directory decides.
+	if dirErr != nil {
+		return *dirErr
+	}
+	return collect.OK(dir, derived(facts.Source{Kind: "file", Path: journalDir}))
+}
+
+// journaldMain is the main configuration file this host actually has:
+// /etc/systemd/journald.conf, or the vendor copy systemd >= 254 ships when
+// there is no /etc one (Ruling I-23). A path that is there but cannot be
+// stat-ed is still this host's main file — mergeDropins then reports the read
+// failure, which C3 makes the answer for every leaf.
+func journaldMain(a collect.Access) string {
+	for _, p := range journaldMains {
+		if pathPresent(a, p) {
+			return p
+		}
+	}
+	// Neither is there: journald's compiled-in defaults apply, and the
+	// drop-ins are still merged over them.
+	return journaldMains[0]
+}
+
+// journalDirIsDir reports whether /var/log/journal is a directory. A stat
+// that was refused answers nothing at all: it comes back as that read's own
+// status (C3), never as a fabricated "so the journal is volatile".
+func journalDirIsDir(a collect.Access) (bool, *facts.Envelope) {
+	meta, err := a.Stat(journalDir)
+	switch {
+	case err == nil:
+		return meta.Kind == "dir", nil
+	case errors.Is(err, fs.ErrNotExist):
+		return false, nil
+	default:
+		e := readErrorEnv(journalDir, err)
+		return false, &e
+	}
+}
+
+// systemdBool reads a systemd boolean: the spellings parse_boolean accepts,
+// case-insensitively. A value systemd cannot parse is ignored and the setting
+// keeps its default, so anything else answers def.
+func systemdBool(v string, def bool) bool {
+	for _, yes := range []string{"1", "yes", "y", "true", "t", "on"} {
+		if equalFoldASCII(v, yes) {
+			return true
+		}
+	}
+	for _, no := range []string{"0", "no", "n", "false", "f", "off"} {
+		if equalFoldASCII(v, no) {
+			return false
+		}
+	}
+	return def
 }
 
 // --- the rsyslog configuration ------------------------------------------
