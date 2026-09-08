@@ -28,6 +28,7 @@
              "issue":{"nonempty":{"status":"ok","value":true},"os_escapes":{"status":"ok","value":false}}},
   "files":{"etc_passwd":{"mode":{"status":"ok","value":420,"source":{"kind":"sys","path":"/etc/passwd"}},"uid":{"status":"ok","value":0},"gid":{"status":"ok","value":0},"acl_present":{"status":"ok","value":false},"acl_entries":{"status":"ok","value":[]}},
            "etc_hosts":{"mode":{"status":"ok","value":384,"source":{"kind":"file","path":"/etc/hosts"}},"uid":{"status":"ok","value":0}},
+           "etc_hosts_deny_all":{"status":"ok","value":false},
            "etc_services":{"mode":{"status":"ok","value":420,"source":{"kind":"file","path":"/etc/services"}},"uid":{"status":"ok","value":0}},
            "etc_hosts_lpd":{"mode":{"status":"absent"},"uid":{"status":"absent"}},
            "etc_shadow":{"uid":{"status":"ok","value":0},"mode":{"status":"ok","value":0,"source":{"kind":"sys","path":"/etc/shadow"}},"acl_entries":{"status":"ok","value":[]}},
@@ -69,6 +70,7 @@
            "log_files":{"status":"ok","value":[
              {"path":"/var/log/syslog","mode":416,"uid":0,"gid":103,"group":"adm","group_writable":false,"other_writable":false}
            ]}},
+  "firewall":{"backend":{"status":"ok","value":"nftables"},"restricts_inbound":{"status":"ok","value":true},"normalization_confidence":{"status":"ok","value":"full"}},
   "sudo":{"installed":{"status":"ok","value":true},"includedir":{"status":"ok","value":"/etc/sudoers.d"},"secure_path":{"status":"ok","value":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"}},
   "cron":{"files":{"status":"ok","value":[
             {"path":"/etc/crontab","scope":"system","user":"","mode":416,"uid":0,"gid":0,"group":"root","owner_ok":true,"group_writable":false,"other_writable":false},
