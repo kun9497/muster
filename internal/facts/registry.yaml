@@ -2157,7 +2157,11 @@ keys:
       host has no DNS configuration at all; a FRAGMENT that could not be read leaves the files
       that did answer listed and shows up in dns.parse_complete instead. A fragment included from
       two different scopes is read once per include chain, as named reads it, and still appears
-      here once; a fragment already open further up its own chain is a cycle and is refused.
+      here once; a fragment already open further up its own chain is a cycle and is refused. On a
+      stock RHEL-family host the crypto-policy fragment is a symlink the no-follow read primitive
+      refuses; the policy name is then read from /etc/crypto-policies/state/current and the file it
+      resolves to under /usr/share/crypto-policies appears here in its place, because the link's own
+      bytes were never read.
       On unbound the source cites a path this collector stat-ed rather than read.
     since: 1
     sensitivity: public
@@ -2167,9 +2171,10 @@ keys:
     description: >-
       Whether every configuration file the collector was told to read could be read in full; false
       when a read failed, when the read primitive cut a file at its limit, or when an include named
-      a path this collector's declaration does not cover - that last one is a file the configuration
-      told the collector to read and the collector did not, so what it sets is unknown either way,
-      and it counts in dns.unmodelled as well. A construct outside the model is not a read failure
+      a path this collector's declaration does not cover, or a declared path that is a symbolic link
+      or another non-regular file this collector does not follow - those last two are a file the
+      configuration told the collector to read and the collector did not, so what it sets is unknown
+      either way, and each counts in dns.unmodelled as well. A construct outside the model is not a read failure
       and counts only in dns.unmodelled. A host with no DNS configuration at all read everything
       there was, so the parse is complete and the judged leaves carry that story.
     since: 1
@@ -2182,7 +2187,11 @@ keys:
       whose per-client zones are a configuration of their own; an address match list nested inside
       another; an address match list element naming an acl nothing in the chain defines (acl names
       are matched the way named matches them, without regard to case); an include outside the
-      collector's declaration; an include already open further up its own chain, which is a cycle.
+      collector's declaration; an include whose declared target is a symbolic link or another
+      non-regular file this collector does not follow, the stock RHEL-family crypto-policy fragment
+      excepted - its policy name is read from the crypto-policies state file so the fragment it
+      resolves to can be read in its place; an include already open further up its own chain, which
+      is a cycle.
       Any of them makes dns.options.allow_transfer,
       dns.options.allow_update and dns.zones absent, so a server whose real zones live where the
       model does not read is reported as unjudgeable rather than judged by the part that was read.

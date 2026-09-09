@@ -4,6 +4,7 @@ package collectors
 
 import (
 	"context"
+	"errors"
 	"net/netip"
 	"path"
 	"slices"
@@ -26,6 +27,19 @@ const (
 	// otherwise read as "no DNS server" while it serves zones.
 	bindChrootConf = "/var/named/chroot/etc/named.conf"
 	unboundConf    = "/etc/unbound/unbound.conf"
+
+	// The RHEL-family crypto-policies route (Ruling LR-1). named.conf includes
+	// the back-end fragment, which update-crypto-policies installs as a
+	// SYMLINK into the share tree — a link the no-follow read primitive
+	// refuses. cryptoPolicyState holds the name of the policy in force and
+	// cryptoPolicyBindGlob covers the fragment that name resolves to, so the
+	// stock host is followed through paths the declaration approved rather
+	// than through the link.
+	cryptoPolicyFragment = "/etc/crypto-policies/back-ends/bind.config"
+	cryptoPolicyState    = "/etc/crypto-policies/state/current"
+	cryptoPolicyBindGlob = "/usr/share/crypto-policies/*/bind.txt"
+	cryptoPolicyBindDir  = "/usr/share/crypto-policies/"
+	cryptoPolicyBindFile = "/bind.txt"
 
 	namedBin   = "/usr/sbin/named"
 	unboundBin = "/usr/sbin/unbound"
@@ -79,7 +93,8 @@ var dnsCollector = collect.Collector{
 			bindDebianConf, "/etc/bind/named.conf.*", "/etc/bind/*.conf",
 			bindRhelConf, "/etc/named/*.conf", "/etc/named.rfc1912.zones",
 			"/etc/named.root.key", "/etc/named/*.zones",
-			"/etc/crypto-policies/back-ends/bind.config", bindChrootConf,
+			cryptoPolicyFragment, cryptoPolicyState, cryptoPolicyBindGlob,
+			bindChrootConf,
 			unboundConf,
 			etcOSRelease, usrLibOSRelease,
 			namedBin, unboundBin,
@@ -409,6 +424,18 @@ func (p *dnsParse) noteUnread(file, target string) {
 		" is outside this collector's declaration and was not read")
 }
 
+// noteUnreadLink records a DECLARED include whose target the no-follow read
+// primitive refused because it is not a regular file — a symlink above all,
+// which is the shape a config-managed fragment takes on a stock RHEL-family
+// host. Ruling LR-1: like noteUnread it is both unmodelled and an incomplete
+// parse, and unlike the read failures around it, it is not an `error`: nothing
+// is wrong with the host, this collector simply does not follow the link.
+func (p *dnsParse) noteUnreadLink(file, target string) {
+	p.notRead = append(p.notRead, target)
+	p.noteUnmodelled(file, "include "+target+" is a symbolic link or another "+
+		"non-regular file, which this collector does not follow; it was not read")
+}
+
 // --- the tokenizer ------------------------------------------------------
 
 // dnsToken is one token of a named.conf: a brace or a semicolon (punct), a
@@ -623,6 +650,24 @@ func (s *dnsStream) include() {
 	}
 	data, meta, err := s.p.a.ReadFile(clean, readLimit)
 	if err != nil {
+		// Ruling LR-1: the no-follow read primitive refuses a symlink, a
+		// directory and every special file, and a fragment an admin
+		// symlinked into a config-managed tree is EXACTLY that shape. Not
+		// reading it is a limitation of this collector, not an I/O failure of
+		// the host: filing it as `error` would flip run.complete and hand CI
+		// exit code 2 for a configuration nothing is wrong with. It degrades
+		// the way an undeclared include does instead — the parse is
+		// incomplete, the construct is counted, and every judged leaf carries
+		// the story. The stock RHEL-family crypto-policy fragment is the one
+		// link followed, through paths of its own that the declaration covers.
+		if nonRegular(err) {
+			if clean == cryptoPolicyFragment && errors.Is(err, collect.ErrSymlink) &&
+				s.followCryptoPolicy(from) {
+				return
+			}
+			s.p.noteUnreadLink(from, clean)
+			return
+		}
 		// An include names a file named itself refuses to start without, so a
 		// missing one is a failure, not a fragment to skip.
 		s.p.fail(readErrorEnv(clean, err))
@@ -631,6 +676,79 @@ func (s *dnsStream) include() {
 	s.p.record(clean, meta.Truncated)
 	s.p.expanded++
 	s.frames = append(s.frames, dnsFrame{toks: dnsTokenize(data), file: clean})
+}
+
+// followCryptoPolicy resolves the one symlink this collector follows, and
+// reports whether the fragment behind it reached the parse.
+//
+// Ruling LR-1: on every stock RHEL, Rocky and Alma 9 BIND host
+// update-crypto-policies replaces /etc/crypto-policies/back-ends/bind.config
+// with a symlink into /usr/share/crypto-policies/<POLICY>/bind.txt. The link
+// itself is never followed — that would defeat the no-follow primitive the
+// whole read discipline rests on. Instead the POLICY NAME is read out of the
+// state file the same package writes, checked to be a name rather than a path,
+// and the fragment it identifies is read through the declaration's own glob.
+// The bytes are tokenised in place, so the fragment's statements belong to the
+// block that included it exactly as they would have (Ruling L-18), and
+// config_files records the file that answered rather than the link that did
+// not. Every failure along the route falls back to the caller's tier (1): a
+// guess about what the fragment sets would be the confident-wrong answer H-16
+// forbids.
+func (s *dnsStream) followCryptoPolicy(from string) bool {
+	state, _, err := s.p.a.ReadFile(cryptoPolicyState, readLimit)
+	if err != nil {
+		return false
+	}
+	policy := cryptoPolicyName(state)
+	if policy == "" {
+		return false
+	}
+	resolved := cryptoPolicyBindDir + policy + cryptoPolicyBindFile
+	// The name check above forbids "/" and ".", so the glob still covers what
+	// was built; asking the guard anyway keeps the declaration the single
+	// authority on what may be opened.
+	if !declared(s.p.a, resolved) {
+		return false
+	}
+	data, meta, err := s.p.a.ReadFile(resolved, readLimit)
+	if err != nil {
+		return false
+	}
+	s.p.record(resolved, meta.Truncated)
+	s.p.expanded++
+	s.frames = append(s.frames, dnsFrame{toks: dnsTokenize(data), file: resolved})
+	return true
+}
+
+// cryptoPolicyName is the policy named by the first non-empty line of the
+// state file, or "" when that line is not a policy name. update-crypto-policies
+// writes one bare name there (DEFAULT, FIPS, a custom one, optionally with
+// ":subpolicy" modifiers), and only [A-Za-z0-9_.:-] may reach a path this
+// collector builds — a "/" or a ".." would build a path outside the share tree
+// that the declaration's glob no longer covers.
+func cryptoPolicyName(data []byte) string {
+	for _, raw := range splitLines(data) {
+		line := strings.TrimSpace(raw)
+		if line == "" {
+			continue
+		}
+		for _, r := range line {
+			switch {
+			case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9':
+			case r == '_' || r == ':' || r == '-':
+			case r == '.':
+				// A name may carry a dot; a name that IS dots is a directory
+				// reference, not a policy.
+				if line == "." || line == ".." {
+					return ""
+				}
+			default:
+				return ""
+			}
+		}
+		return line
+	}
+	return ""
 }
 
 // open reports whether a file is already being read further up this include

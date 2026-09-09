@@ -34,6 +34,12 @@ const (
 	undeclaredInclude    = "/srv/x.conf"
 	namedFanA            = "/etc/named/fan-a.conf"
 	namedFanB            = "/etc/named/fan-b.conf"
+	// The stock RHEL-family crypto-policies route (Ruling LR-1): the fragment
+	// the back-ends link points into under the default policy. It is spelled
+	// here rather than built from the collector's own constants, because a
+	// test that names the same literal the declaration's glob must cover is
+	// what proves the glob covers it.
+	cryptoPolicyBind = "/usr/share/crypto-policies/DEFAULT/bind.txt"
 )
 
 // dnsAccess builds the double for the dns collector. Ruling I-20: every map a
@@ -936,5 +942,178 @@ func TestDnsOneIncludePerZoneIsNotCapped(t *testing.T) {
 			t.Errorf("%s = %s (%s), want ok: a hundred single inclusions must still reach a verdict",
 				k, s, env(t, b, k).Reason)
 		}
+	}
+}
+
+// Ruling LR-1, tier (1): a declared include whose target the no-follow read
+// primitive refuses because it is not a regular file was NOT READ. That is an
+// environment limitation, not an I/O failure — filing it as `error` would flip
+// run.complete and hand CI exit code 2 for a config-managed fragment an admin
+// symlinked — so it degrades the way an undeclared include does: counted in
+// unmodelled, the parse incomplete, the judged leaves absent naming the link,
+// and the run still complete.
+func TestDnsSymlinkedIncludeIsNotAnError(t *testing.T) {
+	a := dnsAccess(map[string]string{
+		bindDebianConf:      "named.conf.debian",
+		bindOptionsFragment: "named.conf.options",
+		bindLocalFragment:   "named.conf.local",
+		bindDefaultZones:    "named.conf.default-zones",
+		etcOSRelease:        "os-release.ubuntu2204",
+	})
+	a.fails[bindLocalFragment] = collect.ErrSymlink
+	b := buildBegun(t, "dns", a)
+	dnsComplete(t, b)
+
+	// The whole point: one error envelope would make the collect run partial.
+	if w := b.Worst("dns"); w != facts.StatusOK {
+		t.Errorf(`Worst("dns") = %s, want ok — a symlinked fragment is a limitation, not an error`, w)
+	}
+	for _, k := range dnsJudgedLeaves {
+		absentBecause(t, b, k, bindLocalFragment, "symbolic link")
+	}
+	if dnsBool(t, b, "dns.parse_complete") {
+		t.Error("a fragment the configuration named and muster did not read leaves the parse incomplete")
+	}
+	if n := dnsInt(t, b, "dns.unmodelled"); n != 1 {
+		t.Errorf("unmodelled = %d, want 1", n)
+	}
+	// The files that DID answer stay listed as the evidence they are.
+	want := []string{bindDebianConf, bindDefaultZones, bindOptionsFragment}
+	if got := stringList(t, b, "dns.config_files"); !slices.Equal(got, want) {
+		t.Errorf("config_files %v, want %v", got, want)
+	}
+}
+
+// Ruling LR-1, tier (2): on every stock RHEL-family BIND host
+// update-crypto-policies installs the declared crypto-policy fragment as a
+// SYMLINK into /usr/share/crypto-policies/<POLICY>/bind.txt, which the
+// no-follow primitive refuses. The collector follows that one route through
+// its own declaration — the policy name out of /etc/crypto-policies/state/current,
+// then the fragment the glob covers — and tokenises it in place, so the stock
+// host judges exactly as it would if the fragment were a regular file.
+func TestDnsRhelCryptoPolicyThroughStateCurrent(t *testing.T) {
+	direct := buildBegun(t, "dns", dnsAccess(map[string]string{
+		bindRhelConf:     "named.conf.rhel",
+		rhelCryptoPolicy: "bind.config.rhel",
+		rhel1912Zones:    "named.rfc1912.zones",
+		rhelRootKey:      "named.root.key",
+		etcOSRelease:     "os-release.rhel9",
+	}))
+
+	a := dnsAccess(map[string]string{
+		bindRhelConf:      "named.conf.rhel",
+		cryptoPolicyState: "crypto-policies.state.current",
+		cryptoPolicyBind:  "bind.config.rhel",
+		rhel1912Zones:     "named.rfc1912.zones",
+		rhelRootKey:       "named.root.key",
+		etcOSRelease:      "os-release.rhel9",
+	})
+	a.fails[rhelCryptoPolicy] = collect.ErrSymlink
+	b := buildBegun(t, "dns", a)
+	dnsComplete(t, b)
+
+	if !dnsBool(t, b, "dns.parse_complete") {
+		t.Error("the resolved fragment was read, so the parse is complete")
+	}
+	if n := dnsInt(t, b, "dns.unmodelled"); n != 0 {
+		t.Errorf("unmodelled = %d, want 0", n)
+	}
+	// config_files names the file whose bytes reached the parse, not the link.
+	files := stringList(t, b, "dns.config_files")
+	if !slices.Contains(files, cryptoPolicyBind) {
+		t.Errorf("config_files %v must record the resolved fragment %s", files, cryptoPolicyBind)
+	}
+	if slices.Contains(files, rhelCryptoPolicy) {
+		t.Errorf("config_files %v names the link, whose bytes were never read", files)
+	}
+	if !slices.Contains(a.reads, cryptoPolicyState) {
+		t.Errorf("the policy name was never read out of %s: reads %v", cryptoPolicyState, a.reads)
+	}
+	// Tokenised IN PLACE: every leaf but the file list matches the host whose
+	// fragment is a regular file, which is what "as the fragment would have
+	// been" means.
+	for _, k := range append([]string{"dns.implementation", "dns.parse_complete", "dns.unmodelled"}, dnsJudgedLeaves...) {
+		got, want := env(t, b, k), env(t, direct, k)
+		if got.Status != want.Status || got.Reason != want.Reason {
+			t.Errorf("%s = {%s %q}, want the direct chain's {%s %q}", k, got.Status, got.Reason, want.Status, want.Reason)
+		}
+	}
+	if got := dnsZoneNames(t, b); !slices.Equal(got, dnsZoneNames(t, direct)) {
+		t.Errorf("zones %v, want the direct chain's %v", got, dnsZoneNames(t, direct))
+	}
+}
+
+// Ruling LR-1: every failure on the crypto-policies route falls back to tier
+// (1) — the honest "this fragment was not read" — and never to an error or to
+// a guess about what the fragment would have set.
+func TestDnsCryptoPolicyRouteFallsBackToTierOne(t *testing.T) {
+	cases := []struct {
+		name  string
+		files map[string]string
+	}{
+		// The state file a stock host has is missing (a chroot, a container).
+		{"no state file", map[string]string{}},
+		// A policy name that is not a policy name: it must never be pasted
+		// into a path, and the glob must never stop covering the result.
+		{"policy name refused", map[string]string{cryptoPolicyState: "crypto-policies.state.traversal"}},
+		// The name parses, but the fragment it points at is not on disk.
+		{"fragment missing", map[string]string{cryptoPolicyState: "crypto-policies.state.current"}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			files := map[string]string{
+				bindRhelConf:  "named.conf.rhel",
+				rhel1912Zones: "named.rfc1912.zones",
+				rhelRootKey:   "named.root.key",
+				etcOSRelease:  "os-release.rhel9",
+			}
+			for k, v := range c.files {
+				files[k] = v
+			}
+			a := dnsAccess(files)
+			a.fails[rhelCryptoPolicy] = collect.ErrSymlink
+			b := buildBegun(t, "dns", a)
+			dnsComplete(t, b)
+
+			if w := b.Worst("dns"); w != facts.StatusOK {
+				t.Errorf(`Worst("dns") = %s, want ok`, w)
+			}
+			for _, k := range dnsJudgedLeaves {
+				absentBecause(t, b, k, rhelCryptoPolicy, "symbolic link")
+			}
+			if dnsBool(t, b, "dns.parse_complete") {
+				t.Error("the fragment was not read, so the parse is incomplete")
+			}
+			if n := dnsInt(t, b, "dns.unmodelled"); n != 1 {
+				t.Errorf("unmodelled = %d, want 1", n)
+			}
+		})
+	}
+}
+
+// Ruling LR-12: the emission set is driven by the REGISTRY, not by a list this
+// file keeps in step by hand — a key added to registry.yaml and never
+// published would otherwise reach a control as `missing` → ERROR(missing_fact).
+func TestDnsPublishesEveryRegisteredKeyOnAHostWithNoServer(t *testing.T) {
+	b := buildBegun(t, "dns", dnsAccess(nil))
+	reg, err := facts.LoadRegistry()
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := 0
+	for _, k := range reg.Keys {
+		if k.Collector != "dns" {
+			continue
+		}
+		n++
+		if s := env(t, b, k.Key).Status; s != facts.StatusOK && s != facts.StatusAbsent {
+			t.Errorf("%s = %s, want ok or absent on a host with no DNS server", k.Key, s)
+		}
+	}
+	if n == 0 {
+		t.Fatal("the registry declares no dns keys, so this test would pass vacuously")
+	}
+	if w := b.Worst("dns"); w != facts.StatusOK {
+		t.Errorf(`Worst("dns") = %s, want ok`, w)
 	}
 }
