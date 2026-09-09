@@ -4,6 +4,7 @@ package collectors
 
 import (
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -30,6 +31,8 @@ const (
 	namedCustomInclude   = "/etc/named/custom.conf"
 	namedTransferInclude = "/etc/named/transfer.conf"
 	undeclaredInclude    = "/srv/x.conf"
+	namedFanA            = "/etc/named/fan-a.conf"
+	namedFanB            = "/etc/named/fan-b.conf"
 )
 
 // dnsAccess builds the double for the dns collector. Ruling I-20: every map a
@@ -438,6 +441,14 @@ func TestDnsZonesAbsentWhenAPrimaryTransferDefaultIsUnknown(t *testing.T) {
 	}
 	recField(t, dnsZoneRec(t, secondary, "example.org"), "type", "slave")
 	recField(t, dnsZoneRec(t, secondary, "example.org"), "update_restricted", true)
+	// The residual of Ruling L-53, pinned so it cannot drift into a guess: a
+	// SECONDARY zone on an unknown build has no honest transfer bool either -
+	// its build default is exactly as unknown - and the leaf-level absence
+	// covers only primary and master. The field is therefore left OFF this
+	// record. Nothing reads it: U-50's `where` filters to primary and master
+	// before its `require` looks at the field, and a require on a field a
+	// record lacks is an internal ERROR rather than a MANUAL.
+	recAbsent(t, dnsZoneRec(t, secondary, "example.org"), "transfer_restricted")
 }
 
 // Ruling L-54: the include guard is per CHAIN, not per run. The same declared
@@ -848,4 +859,46 @@ func TestDnsOversizedListIsRefused(t *testing.T) {
 	z := dnsZoneRec(t, b, "example.org")
 	recAbsent(t, z, "allow_transfer")
 	recField(t, z, "transfer_restricted", true)
+}
+
+// Ruling L-58: the per-CHAIN include guard bounds one path through the
+// configuration, not the work of a run. L-18/L-54 let the same fragment be
+// inlined once per path that reaches it, so a file that includes the next one
+// twice DOUBLES the token stream at every level and the seven levels the depth
+// cap allows are 2^7 re-reads of the deepest fragment. A run-wide cap on the
+// number of fragments inlined bounds that; a configuration that reaches it is
+// a construct outside the model — unmodelled, with the judged leaves absent
+// naming the cap — rather than a verdict drawn from the part that fit.
+func TestDnsIncludeExpansionIsCapped(t *testing.T) {
+	a := dnsAccess(map[string]string{
+		bindRhelConf: "named.conf.fanout",
+		namedFanA:    "named.conf.fan-a",
+		namedFanB:    "named.conf.fan-b",
+		etcOSRelease: "os-release.rhel9",
+	})
+	b := buildBegun(t, "dns", a)
+	dnsComplete(t, b)
+
+	if n := dnsInt(t, b, "dns.unmodelled"); n == 0 {
+		t.Error("unmodelled = 0: the expansions the cap refused must be counted")
+	}
+	for _, k := range dnsJudgedLeaves {
+		absentBecause(t, b, k, strconv.Itoa(maxIncludeExpansions), "include")
+	}
+	// The point of the cap is the work it does NOT do: every inlined fragment
+	// is a file this collector opened, and without the cap this chain opens
+	// the deepest one 64 times over.
+	if n := len(a.reads); n > maxIncludeExpansions+2 {
+		t.Errorf("reads = %d, want at most the cap plus named.conf and os-release", n)
+	}
+	// A cap is not a read that failed: every file that was opened was read in
+	// full, so parse_complete carries no claim about privileges or I/O.
+	if !dnsBool(t, b, "dns.parse_complete") {
+		t.Error("the cap is a construct outside the model, not a read failure")
+	}
+	// The main file and both fragments answered, so they are still the
+	// evidence for what WAS read.
+	if got := stringList(t, b, "dns.config_files"); !slices.Equal(got, []string{bindRhelConf, namedFanA, namedFanB}) {
+		t.Errorf("config_files %v, want each file that was read, once", got)
+	}
 }

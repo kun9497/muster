@@ -531,3 +531,70 @@ func TestMailOversizedValueIsNotStored(t *testing.T) {
 		t.Errorf("inet_interfaces = %q, want all", got)
 	}
 }
+
+// The M16 cap reaches the DERIVED verdict too. When disable_vrfy_command is
+// itself longer than a value this collector stores, the parameter leaf refuses
+// it — and the verdict must refuse it as well, because postfixYes() of a value
+// nobody looked at is not "the compiled default", it is a guess that reads
+// ok:false on a host whose main.cf may well say yes.
+func TestMailOversizedVrfyParameterRefusesTheVerdict(t *testing.T) {
+	b := build(t, "mail", mailAccess(map[string]string{postfixMainCf: "main.cf.oversized-vrfy"}))
+	mailComplete(t, b)
+
+	for _, k := range []string{"mail.postfix.disable_vrfy_command", "mail.expn_vrfy_restricted"} {
+		e := env(t, b, k)
+		if e.Status != facts.StatusAbsent {
+			t.Errorf("%s = %+v, want absent for an oversized value", k, e)
+		}
+		if !strings.Contains(e.Reason, "disable_vrfy_command") {
+			t.Errorf("%s reason %q must name the parameter it refused", k, e.Reason)
+		}
+		if strings.Contains(e.Reason, "yes yes") {
+			t.Errorf("%s reason %q must not carry the value it refused", k, e.Reason)
+		}
+	}
+	// The rest of the file is still evidence.
+	if got := mailString(t, b, "mail.postfix.inet_interfaces"); got != "all" {
+		t.Errorf("inet_interfaces = %q, want all", got)
+	}
+}
+
+// A leftover conffile is reported even when ANOTHER MTA answered the facts.
+// RHEL carries postfix and sendmail side by side, and a third package removed
+// with `rpm -e` leaves its configuration behind; the implementation's reason
+// has to carry BOTH notes, or the operator is shown the MTA to reconcile and
+// never the stale file to purge (IR-7).
+func TestMailLeftoverIsNamedBesideASecondMTA(t *testing.T) {
+	a := mailAccess(map[string]string{
+		postfixMainCf: "main.cf.debian",
+		sendmailCf:    "sendmail.cf.goaway",
+		exim4Conf:     "exim4.conf.conf",
+	})
+	// exim's package was removed; its configuration file stayed behind.
+	delete(a.stats, exim4Bin)
+	b := buildBegun(t, "mail", a)
+	mailComplete(t, b)
+
+	e := env(t, b, "mail.implementation")
+	if e.Status != facts.StatusOK || e.Value != "postfix" {
+		t.Fatalf("implementation %+v, want ok postfix (first in the fixed order)", e)
+	}
+	for _, want := range []string{"sendmail", sendmailCf, exim4Conf, exim4Bin, "removed package"} {
+		if !strings.Contains(e.Reason, want) {
+			t.Errorf("implementation reason %q must name %q: the second MTA AND the leftover", e.Reason, want)
+		}
+	}
+	// Neither of the other two files was opened, and the leftover is not
+	// evidence for anything: it is a file to delete.
+	if !slices.Equal(a.reads, []string{postfixMainCf}) {
+		t.Errorf("reads = %v, want only the chosen implementation's file", a.reads)
+	}
+	if got := stringList(t, b, "mail.config_files"); !slices.Equal(got, []string{postfixMainCf}) {
+		t.Errorf("config_files %v, want only the file that was read", got)
+	}
+	// A second MTA still refuses the derived verdict (Ruling L-48).
+	absentBecause(t, b, "mail.expn_vrfy_restricted", "postfix", "sendmail")
+	if w := b.Worst("mail"); w != facts.StatusOK {
+		t.Errorf(`Worst("mail") = %s, want ok`, w)
+	}
+}

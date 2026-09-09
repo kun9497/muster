@@ -119,11 +119,19 @@ var goawayExpansion = []string{
 // themselves — is handled beside it in sendmailPrivacyValue.
 var sendmailPrivacyRe = regexp.MustCompile(`^O(?:\s+|p)PrivacyOptions\s*=(.*)$`)
 
-// sendmailPrivacyFlags is every privacy flag sendmail's own PrivacyValues
-// table defines. A token outside it is a value this collector cannot make
-// sense of — a macro reference, a typo, or a flag a later release added —
+// sendmailPrivacyFlags is the vocabulary a PrivacyOptions line may use: the
+// sixteen names sendmail's own PrivacyValues table defines, plus the
+// seventeenth entry below. A token outside it is a value this collector cannot
+// make sense of — a macro reference, a typo, or a flag a later release added —
 // and Ruling L-50 answers it with an ABSENCE naming the line rather than a
 // verdict drawn from half a set (H-16: under-claim, never over-claim).
+//
+// The seventeenth is "norecipients", which sendmail does NOT define: its own
+// flag is "noreceipts", and "norecipients" is the misspelling that circulates
+// in third-party hardening guides. It is tolerated rather than treated as an
+// unknown token because it names nothing either half of the EXPN/VRFY verdict
+// reads — novrfy and noexpn are the only two judged — so refusing the whole
+// line over it would withhold an answer the file does give.
 var sendmailPrivacyFlags = map[string]bool{
 	"public": true, "needmailhelo": true, "needexpnhelo": true, "needvrfyhelo": true,
 	"noexpn": true, "novrfy": true, "noverb": true, "noetrn": true,

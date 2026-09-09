@@ -1,0 +1,16 @@
+// Synthetic named.conf whose include chain FANS OUT: this file includes the
+// same fragment eight times, and that fragment includes the next one eight
+// times, so a guard that only refuses a file already open in the CURRENT
+// chain inlines sixty-four copies of the deepest fragment. Nothing here is a
+// real configuration; it exists to reach the run-wide expansion cap.
+options {
+	allow-transfer { none; };
+};
+include "/etc/named/fan-a.conf";
+include "/etc/named/fan-a.conf";
+include "/etc/named/fan-a.conf";
+include "/etc/named/fan-a.conf";
+include "/etc/named/fan-a.conf";
+include "/etc/named/fan-a.conf";
+include "/etc/named/fan-a.conf";
+include "/etc/named/fan-a.conf";

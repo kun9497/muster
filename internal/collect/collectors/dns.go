@@ -34,6 +34,18 @@ const (
 	usrLibOSRelease = "/usr/lib/os-release"
 )
 
+// maxIncludeExpansions caps how many fragments ONE run inlines, however they
+// are reached. Ruling L-58: maxIncludeDepth bounds a single chain and does not
+// bound the work, because L-18/L-54 give an included fragment's statements to
+// the enclosing block and therefore let the same file be inlined once per PATH
+// that reaches it — a fragment that includes the next one twice doubles the
+// token stream at every level, so the seven levels the depth cap allows are
+// 2^7 re-reads of the deepest one. A configuration past this cap is a
+// construct outside the model: it counts in dns.unmodelled and the judged
+// leaves step back, rather than being answered from the part of the chain that
+// happened to fit.
+const maxIncludeExpansions = 64
+
 // dnsImpl is one modelled DNS server: the configuration files it is
 // recognised by, in probe order, and the binaries whose presence proves the
 // package is installed rather than merely left behind (Ruling L-3, the 2I
@@ -122,6 +134,13 @@ type dnsElem struct {
 // L-53 turns an undeterminable default into an absence of the whole list only
 // for these — U-50 judges exactly them, and a hint, forward, stub or redirect
 // zone carries nothing an operator would notice a transfer of.
+//
+// The residual is deliberate and narrow: on a build whose default this
+// collector does not know, a SECONDARY (slave) zone — or any other type
+// outside this table — is published with no transfer_restricted field at all,
+// because there is no honest bool for it there either and inventing one is the
+// guess Ruling L-16 exists to refuse. Nothing reads it: U-50 filters to these
+// types in its `where`, which runs before the `require` that names the field.
 var dnsAuthoritative = map[string]bool{"primary": true, "master": true}
 
 // dnsZone is one zone statement, with the two lists it may set of its own.
@@ -181,6 +200,9 @@ type dnsParse struct {
 	// be determined (Ruling L-53). It absents dns.zones alone, never the other
 	// judged leaves.
 	unknownTransfer []string
+	// expanded counts the fragments this run has inlined, across every chain
+	// (Ruling L-58): the depth cap bounds one path, this bounds the work.
+	expanded int
 
 	acls  map[string][]dnsElem
 	zones []dnsZone
@@ -584,6 +606,15 @@ func (s *dnsStream) include() {
 			" is already open in this include chain: a cycle, which was not followed")
 		return
 	}
+	// Ruling L-58: the run-wide expansion cap, checked here so the declaration
+	// guard and the cycle guard keep answering for their own cases first. It
+	// is what bounds the WORK — the per-chain guard admits one inlining per
+	// path, and paths multiply.
+	if s.p.expanded >= maxIncludeExpansions {
+		s.p.noteUnmodelled(from, "include "+clean+" was not expanded: this run has already inlined "+
+			strconv.Itoa(maxIncludeExpansions)+" fragments, the cap on one configuration's include expansion")
+		return
+	}
 	data, meta, err := s.p.a.ReadFile(clean, readLimit)
 	if err != nil {
 		// An include names a file named itself refuses to start without, so a
@@ -592,6 +623,7 @@ func (s *dnsStream) include() {
 		return
 	}
 	s.p.record(clean, meta.Truncated)
+	s.p.expanded++
 	s.frames = append(s.frames, dnsFrame{toks: dnsTokenize(data), file: clean})
 }
 
@@ -967,11 +999,14 @@ func (p *dnsParse) listOpen(elems []dnsElem, seen map[string]bool) bool {
 // zoneRecord is one zone as the fact carries it. The effective list is the
 // zone's own when it sets one and the options level's otherwise.
 //
-// name, type, transfer_restricted and update_restricted are set on every
-// record a published list carries; a record has no envelope inside it, and a
-// control that reads a field a record does not have is an internal ERROR
-// rather than an absence, so a question with no answer is refused at the LEAF
-// (Ruling L-53) rather than by omitting a field a clause judges. file,
+// name, type and update_restricted are on every record a published list
+// carries, and so is transfer_restricted — EXCEPT on a zone outside
+// dnsAuthoritative (a secondary, hint, stub, forward or redirect zone) whose
+// build default is unknown, which no control reads. A record has no envelope
+// inside it, and a control that reads a field a record does not have is an
+// internal ERROR rather than an absence, so for the primary and master zones a
+// transfer control does judge, a question with no answer is refused at the
+// LEAF (Ruling L-53) rather than by omitting the field the clause names. file,
 // allow_transfer and allow_update are evidence no control requires and are
 // left out when there is nothing to record: an empty allow-transfer list is
 // legal and renders as "", which must stay distinct from "nothing set one".
