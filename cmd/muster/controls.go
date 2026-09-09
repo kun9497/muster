@@ -89,7 +89,7 @@ func runControls(args []string, stdout, stderr io.Writer) int {
 		// R35: a missing fixture directory used to make lint skip the
 		// fixture-pair rule and still print "ok" -- a green light it had not
 		// earned. It is an error now.
-		if !controls.FixtureDirExists(fixtures) {
+		if !controls.DirExists(fixtures) {
 			fmt.Fprintf(stderr, "muster: fixture directory %s does not exist; run controls lint from the repository root or pass --fixtures <dir>\n", fixtures)
 			return exitError
 		}
@@ -106,14 +106,12 @@ func runControls(args []string, stdout, stderr io.Writer) int {
 				return exitError
 			}
 			refIndex = idx
-		} else {
-			fmt.Fprintln(stdout, shapeOnlyNote)
 		}
 		// M-2/M-26: the inventory cross-check is not optional, so a missing
 		// inventory directory is an error the way a missing fixture directory
 		// is (R35), never a silently skipped rule. The directory checks run
 		// in the order fixtures, references, kisa.
-		if !controls.FixtureDirExists(kisaDir) {
+		if !controls.DirExists(kisaDir) {
 			fmt.Fprintf(stderr, "muster: kisa inventory directory %s does not exist; run controls lint from the repository root or pass --kisa <dir>\n", kisaDir)
 			return exitError
 		}
@@ -126,6 +124,12 @@ func runControls(args []string, stdout, stderr io.Writer) int {
 		// the evaluator itself, so this never fails the lint.
 		if unused := controls.UnusedKeys(set, reg); len(unused) > 0 {
 			fmt.Fprintf(stdout, "note: %d registered fact keys are used by no control: %s\n", len(unused), strings.Join(unused, ", "))
+		}
+		// Printed here, after every directory check, so a run that fails on
+		// --fixtures or --kisa does not first hand out advice about a flag
+		// that had nothing to do with the failure.
+		if refIndex == nil {
+			fmt.Fprintln(stdout, shapeOnlyNote)
 		}
 		problems := controls.Lint(set, reg, controls.LintOptions{CustomFuncs: check.CustomFuncs(), FixtureDir: fixtures, References: refIndex, KISA: inventory})
 		for _, p := range problems {

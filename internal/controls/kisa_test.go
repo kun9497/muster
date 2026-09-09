@@ -113,3 +113,85 @@ func TestLoadKISAMissingFiles(t *testing.T) {
 		t.Errorf("the 2026 edition must still load: %d items", len(x.Items["2026"]))
 	}
 }
+
+// writeKISADir copies the committed inventory into a temp directory,
+// replacing the named files with the given bodies. An empty body leaves the
+// file out entirely.
+func writeKISADir(t *testing.T, replace map[string]string) string {
+	t.Helper()
+	dir := t.TempDir()
+	for _, name := range []string{"kisa_items_latest.json", "kisa_items_2021.json", "kisa_deferred.json"} {
+		body, replaced := replace[name]
+		if !replaced {
+			data, err := os.ReadFile(filepath.Join(repoKISA, name))
+			if err != nil {
+				t.Fatal(err)
+			}
+			body = string(data)
+		}
+		if body == "" {
+			continue
+		}
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return dir
+}
+
+// M-37: kisa_deferred.json is the only sanctioned way to make the coverage
+// gate pass while an item is unimplemented, so an entry that says nothing --
+// no id, no stage, no reason -- is a hole in the gate, not a row. That is a
+// property of the file, so it is caught at the file.
+func TestLoadKISARejectsAnIncompleteDeferral(t *testing.T) {
+	cases := map[string]string{
+		"no id":     `[{"id": "", "stage": "3", "reason": "r"}]`,
+		"no stage":  `[{"id": "U-15", "stage": "", "reason": "r"}]`,
+		"no reason": `[{"id": "U-15", "stage": "3", "reason": "   "}]`,
+	}
+	for name, body := range cases {
+		t.Run(name, func(t *testing.T) {
+			dir := writeKISADir(t, map[string]string{"kisa_deferred.json": body})
+			_, err := LoadKISA(dir)
+			if err == nil {
+				t.Fatal("an incomplete deferral must be an error")
+			}
+			for _, want := range []string{"kisa_deferred.json", "deferral 0"} {
+				if !strings.Contains(err.Error(), want) {
+					t.Errorf("error %q must name %q", err, want)
+				}
+			}
+		})
+	}
+	if _, err := LoadKISA(writeKISADir(t, nil)); err != nil {
+		t.Errorf("the committed deferral list must load: %v", err)
+	}
+}
+
+// LOW 5: a broken importance in the inventory used to surface as a
+// kisa_importance problem blaming the control for the file.
+func TestLoadKISARejectsAnItemWithAnUnknownImportance(t *testing.T) {
+	body := `[{"id": "U-01", "name_ko": "n", "category": "c", "importance": "high", "page": 1}]`
+	_, err := LoadKISA(writeKISADir(t, map[string]string{"kisa_items_latest.json": body}))
+	if err == nil {
+		t.Fatal("an importance outside 상/중/하 must be an error")
+	}
+	for _, want := range []string{"kisa_items_latest.json", "U-01", "high"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q must name %q", err, want)
+		}
+	}
+}
+
+// LOW 12: every message names the file the same way, including the read.
+func TestLoadKISANamesTheFileOnAReadFailure(t *testing.T) {
+	dir := writeKISADir(t, map[string]string{"kisa_items_2021.json": ""})
+	_, err := LoadKISA(dir)
+	if err == nil {
+		t.Fatal("a missing edition file must be an error")
+	}
+	want := filepath.Join(dir, "kisa_items_2021.json")
+	if !strings.HasPrefix(err.Error(), want+": ") {
+		t.Errorf("error %q must start with %q, the way the decode errors do", err, want+": ")
+	}
+}

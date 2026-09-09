@@ -2,9 +2,12 @@ package controls
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // KISAItem is one row of the KISA Unix item inventory under
@@ -33,6 +36,11 @@ type Deferral struct {
 // KISAInventory is what the lint cross-checks references.kisa against: the
 // item lists keyed by edition year and the deferrals. "2026" is the current
 // edition, held in kisa_items_latest.json.
+//
+// Built by LoadKISA; do not construct or mutate it directly. Items is
+// shadowed by an unexported per-edition index, so a hand-built value would
+// answer Item and HasEdition with nothing -- and an inventory that reports no
+// 2026 edition turns the set-level coverage gate off rather than failing it.
 type KISAInventory struct {
 	Items    map[string][]KISAItem
 	Deferred []Deferral
@@ -67,7 +75,7 @@ func LoadKISA(dir string) (*KISAInventory, error) {
 		path := filepath.Join(dir, ed.file)
 		data, err := os.ReadFile(path)
 		if err != nil {
-			return nil, fmt.Errorf("kisa inventory: %w", err)
+			return nil, fmt.Errorf("%s: %w", path, err)
 		}
 		var items []KISAItem
 		if err := json.Unmarshal(data, &items); err != nil {
@@ -84,20 +92,37 @@ func LoadKISA(dir string) (*KISAInventory, error) {
 			if _, dup := byID[it.ID]; dup {
 				return nil, fmt.Errorf("%s: duplicate item %s", path, it.ID)
 			}
+			// A broken importance here would otherwise surface as a
+			// kisa_importance problem blaming the control for the file.
+			if !validImportance[it.Importance] {
+				return nil, fmt.Errorf("%s: item %s has unknown importance %q", path, it.ID, it.Importance)
+			}
 			byID[it.ID] = it
 		}
 		x.Items[ed.year] = items
 		x.byEdition[ed.year] = byID
 	}
-	data, err := os.ReadFile(filepath.Join(dir, kisaDeferredFile))
+	path := filepath.Join(dir, kisaDeferredFile)
+	data, err := os.ReadFile(path)
 	switch {
-	case os.IsNotExist(err):
+	case errors.Is(err, fs.ErrNotExist):
 		x.Deferred = nil
 	case err != nil:
-		return nil, fmt.Errorf("kisa inventory: %w", err)
+		return nil, fmt.Errorf("%s: %w", path, err)
 	default:
 		if err := json.Unmarshal(data, &x.Deferred); err != nil {
-			return nil, fmt.Errorf("%s: %w", filepath.Join(dir, kisaDeferredFile), err)
+			return nil, fmt.Errorf("%s: %w", path, err)
+		}
+	}
+	// M-37: this file is the only sanctioned way to make the coverage gate
+	// pass while an item is unimplemented, and stage 3 reads it to find out
+	// what it owes. An entry that names nothing, or excuses itself with
+	// nothing, is a hole in the gate rather than a row. Whether the id is a
+	// real item is a question about the set, not about the file, so lint
+	// asks it (kisa_coverage) and this loader does not.
+	for i, d := range x.Deferred {
+		if d.ID == "" || d.Stage == "" || strings.TrimSpace(d.Reason) == "" {
+			return nil, fmt.Errorf("%s: deferral %d needs an id, a stage and a reason", path, i)
 		}
 	}
 	return x, nil

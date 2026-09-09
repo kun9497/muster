@@ -135,6 +135,11 @@ func TestControlsLintNotesAndKisaFlag(t *testing.T) {
 	if strings.Contains(out3.String(), "ok:") {
 		t.Errorf("lint must not report ok when it could not cross-check the inventory: %q", out3.String())
 	}
+	// LOW 10: a run that fails on --kisa must not first hand out advice
+	// about a different flag. The note belongs after every directory check.
+	if strings.Contains(out3.String(), shapeOnlyNote) {
+		t.Errorf("a failed run must not print the shape-only note: %q", out3.String())
+	}
 
 	var out4, errb4 bytes.Buffer
 	if code := runControls([]string{"lint", "--kisa"}, &out4, &errb4); code != exitError {

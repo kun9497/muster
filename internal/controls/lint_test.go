@@ -780,3 +780,148 @@ func TestLintUnindexedMessageNamesTheIndexDir(t *testing.T) {
 		t.Errorf("message must not name the default index directory: %v", messagesOf(ps, "references_stig"))
 	}
 }
+
+// M-37: a deferral naming something that is not a 2026 item excuses nothing
+// and would sit in the file forever. It is reported per id, beside the other
+// coverage offences, so the set-level rule stays one contract.
+func TestLintKISACoverageNamesADeferralThatIsNotAnItem(t *testing.T) {
+	dir := writeKISADir(t, map[string]string{"kisa_deferred.json": `[
+	  {"id": "U-15", "stage": "3", "reason": "r"},
+	  {"id": "U-98", "stage": "3", "reason": "r"},
+	  {"id": "U-97", "stage": "3", "reason": "r"}
+	]`})
+	inv, err := LoadKISA(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ps := lintSet(t, LintOptions{KISA: inv}, goodControl)
+	got := 0
+	for _, m := range messagesOf(ps, "kisa_coverage") {
+		if strings.Contains(m, "is not a 2026 item") {
+			got++
+		}
+	}
+	if got != 2 {
+		t.Errorf("want one problem per stray deferral, got %d: %v", got, messagesOf(ps, "kisa_coverage"))
+	}
+	for _, want := range []string{"deferred id U-97 is not a 2026 item", "deferred id U-98 is not a 2026 item"} {
+		if !hasMessage(ps, "kisa_coverage", want) {
+			t.Errorf("want %q among %v", want, messagesOf(ps, "kisa_coverage"))
+		}
+	}
+	// The committed list is clean, so the real inventory must not produce one.
+	clean := lintSet(t, LintOptions{KISA: mustLoadKISA(t)}, goodControl)
+	for _, m := range messagesOf(clean, "kisa_coverage") {
+		if strings.Contains(m, "is not a 2026 item") {
+			t.Errorf("the committed deferral list must be clean: %q", m)
+		}
+	}
+}
+
+// M-39: one control listing an id twice is a mistake in that control, not two
+// controls claiming one item -- the coverage message used to say "cited by 2
+// controls" and then name the same control twice.
+func TestLintKISARepeatedReferenceIsNamedPerControl(t *testing.T) {
+	inv := mustLoadKISA(t)
+	twice := strings.Replace(goodControl, `"2026": ["U-01"]`, `"2026": ["U-01", "U-01"]`, 1)
+	ps := lintSet(t, LintOptions{KISA: inv}, twice)
+	if !hasMessage(ps, "references_kisa", "U-01 is listed twice under 2026") {
+		t.Errorf("a repeated id must be a per-control problem: %v", messagesOf(ps, "references_kisa"))
+	}
+	for _, p := range ps {
+		if p.Rule == "references_kisa" && strings.Contains(p.Message, "listed twice") && (p.ControlID == "" || p.Path == "") {
+			t.Errorf("the repeat belongs to a control, not to the set: %+v", p)
+		}
+	}
+	for _, m := range messagesOf(ps, "kisa_coverage") {
+		if strings.Contains(m, "is cited by") {
+			t.Errorf("one control citing an id twice is not two controls: %q", m)
+		}
+	}
+	// Two controls really claiming one item is still reported.
+	second := strings.Replace(goodControl, "id: muster.account.good", "id: muster.account.good_twin", 1)
+	both := lintSet(t, LintOptions{KISA: inv}, goodControl, second)
+	if !hasMessage(both, "kisa_coverage", "U-01 is cited by 2 controls") {
+		t.Errorf("two controls claiming one item must still be reported: %v", messagesOf(both, "kisa_coverage"))
+	}
+}
+
+// M-38: the hazard is identical wherever a clause judges shell_valid -- in
+// applies_when an unreadable /etc/shells turns the whole control into a
+// silent NOT_APPLICABLE instead of the ERROR R126 wanted.
+func TestLintShellValidScreenCoversEveryClauseList(t *testing.T) {
+	const judge = "  - { fact: accounts.users, op: none, where: { field: shell_valid, op: eq, expected: true } }\n"
+	const screen = "  - { fact: accounts.shells, op: present }\n"
+	head := `id: muster.account.shell_screen_lists_test
+title_en: t
+title_ko: 제목
+description_en: d
+description_ko: d
+category: account
+importance: 하
+automation: auto
+requires_facts: ">=1"
+absent_means: fail
+`
+	body := `checks:
+  - { fact: accounts.shells, op: present }
+  - { fact: services.ssh.installed, op: eq, expected: true }
+remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true }
+`
+	// applies_when is its own list: a screen in checks does not cover it.
+	appliesWhen := head + "applies_when:\n" + judge + body
+	if !hasMessage(lintOne(t, appliesWhen, LintOptions{}), "shell_valid_screen", "applies_when") {
+		t.Error("an unscreened shell_valid clause in applies_when must be a problem")
+	}
+	if ps := lintOne(t, head+"applies_when:\n"+screen+judge+body, LintOptions{}); len(ps) != 0 {
+		t.Errorf("a screened applies_when must lint clean: %v", ps)
+	}
+
+	// A mechanism's when list is its own list too.
+	mechWhen := head + `mechanisms:
+  - when:
+      - { fact: accounts.users, op: none, where: { field: shell_valid, op: eq, expected: true } }
+    checks:
+      - { fact: services.ssh.installed, op: eq, expected: true }
+remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true }
+`
+	if !hasMessage(lintOne(t, mechWhen, LintOptions{}), "shell_valid_screen", "mechanisms[0].when") {
+		t.Error("an unscreened shell_valid clause in a mechanism's when must be a problem")
+	}
+}
+
+// LOW 4: the message is about the list, so a second unscreened clause in the
+// same list adds a byte-identical line and inflates the problem count.
+func TestLintShellValidScreenReportsAListOnce(t *testing.T) {
+	const judge = "  - { fact: accounts.users, op: none, where: { field: shell_valid, op: eq, expected: true } }\n"
+	y := `id: muster.account.shell_screen_once_test
+title_en: t
+title_ko: 제목
+description_en: d
+description_ko: d
+category: account
+importance: 하
+automation: auto
+requires_facts: ">=1"
+absent_means: fail
+checks:
+` + judge + judge + "remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true }\n"
+	if got := len(messagesOf(lintOne(t, y, LintOptions{}), "shell_valid_screen")); got != 1 {
+		t.Errorf("want one problem for the list, got %d", got)
+	}
+}
+
+// LOW 7: an empty Path alone does not make a problem set-level; M-2 says a
+// set-level problem carries neither a control id nor a path. A Set built in
+// code has controls with empty paths, and their problems must not sort in
+// among the set-level ones or claim to be them.
+func TestProblemStringMarksOnlySetLevelProblems(t *testing.T) {
+	setLevel := Problem{Rule: "kisa_coverage", Message: "m"}
+	if got, want := setLevel.String(), "controls: kisa_coverage: m"; got != want {
+		t.Errorf("String() = %q, want %q", got, want)
+	}
+	pathless := Problem{ControlID: "muster.account.x", Rule: "titles", Message: "m"}
+	if strings.HasPrefix(pathless.String(), "controls: ") {
+		t.Errorf("a control problem must not masquerade as set-level: %q", pathless.String())
+	}
+}

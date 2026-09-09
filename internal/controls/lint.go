@@ -20,9 +20,12 @@ type Problem struct {
 }
 
 // String renders a problem for the CLI. A set-level problem belongs to no
-// file, so it names the set instead of an empty path (M-2).
+// file, so it names the set instead of an empty path. M-2 marks such a
+// problem by both an empty control id and an empty path: a Set built in code
+// rather than loaded from disk has controls with no path, and their problems
+// must not masquerade as set-level.
 func (p Problem) String() string {
-	if p.Path == "" {
+	if p.ControlID == "" && p.Path == "" {
 		return fmt.Sprintf("controls: %s: %s", p.Rule, p.Message)
 	}
 	return fmt.Sprintf("%s: %s: %s", p.Path, p.Rule, p.Message)
@@ -150,7 +153,16 @@ func Lint(s *Set, reg *facts.Registry, opts LintOptions) []Problem {
 			if wellFormedYear && opts.KISA != nil && !known {
 				add("references_kisa", "no inventory for edition %s; kisa references must name an edition with an inventory file", year)
 			}
+			// M-39: an id repeated inside one list is a mistake in this
+			// control, and a different one from two controls claiming the
+			// same item -- which is what the set-level rule reports.
+			seen := map[string]bool{}
 			for _, it := range items {
+				if seen[it] {
+					add("references_kisa", "kisa reference %s is listed twice under %s", it, year)
+					continue
+				}
+				seen[it] = true
 				if !kisaItemRe.MatchString(it) {
 					add("references_kisa", "kisa reference %q must look like U-01", it)
 					continue
@@ -218,8 +230,10 @@ func Lint(s *Set, reg *facts.Registry, opts LintOptions) []Problem {
 				lintClause(c, cl, reg, add, fmt.Sprintf("mechanisms[%d].checks", mi))
 			}
 		}
+		lintShellValidScreen(c.AppliesWhen, add, "applies_when")
 		lintShellValidScreen(c.Checks, add, "checks")
 		for mi, m := range c.Mechanisms {
+			lintShellValidScreen(m.When, add, fmt.Sprintf("mechanisms[%d].when", mi))
 			lintShellValidScreen(m.Checks, add, fmt.Sprintf("mechanisms[%d].checks", mi))
 		}
 		if opts.FixtureDir != "" && hasJudgment {
@@ -302,7 +316,15 @@ func lintKISACoverage(s *Set, x *KISAInventory) []Problem {
 	citedBy := map[string][]string{}
 	for i := range s.Controls {
 		c := &s.Controls[i]
+		// M-39: count each control once however many times its own list
+		// repeats an id, so "cited by N controls" is true by construction.
+		// The repeat itself is a per-control references_kisa problem.
+		seen := map[string]bool{}
 		for _, id := range c.References.KISA[LatestKISAEdition] {
+			if seen[id] {
+				continue
+			}
+			seen[id] = true
 			citedBy[id] = append(citedBy[id], c.ID)
 		}
 	}
@@ -340,30 +362,47 @@ func lintKISACoverage(s *Set, x *KISAInventory) []Problem {
 		add("%d %s items are cited by no control and are not deferred: %s (enrol them or list them in %s)",
 			len(uncited), LatestKISAEdition, strings.Join(uncited, ", "), kisaDeferredFile)
 	}
+	// M-37: the loop above is over items, so it structurally cannot see a
+	// deferral for something that is not an item -- a typo, or an id from
+	// another edition. Such an entry excuses nothing and would sit in the
+	// file forever, so it gets its own pass. Deferred is file-ordered and
+	// file order is not a promise, hence the sort.
+	var strays []string
+	for _, d := range x.Deferred {
+		if _, ok := x.Item(LatestKISAEdition, d.ID); !ok {
+			strays = append(strays, d.ID)
+		}
+	}
+	sort.Strings(strays)
+	for _, id := range strays {
+		add("deferred id %s is not a %s item", id, LatestKISAEdition)
+	}
 	return out
 }
 
 // lintShellValidScreen is R126 as a rule (M-4). accounts.users[].shell_valid
 // is false for a shell /etc/shells does not list, so a host where /etc/shells
-// could not be read reports every account as invalid -- or, with the
-// judgment inverted, as fine. The clause that judges shell_valid must be
-// preceded, in the same list, by a { fact: accounts.shells, op: present }
-// screen, which turns an unreadable /etc/shells into ERROR before any row is
-// examined (system_account_shells.yaml is the shape).
+// could not be read reports every account as invalid -- or, with the judgment
+// inverted, as fine. The clause that judges shell_valid must be preceded, in
+// the same list, by a { fact: accounts.shells, op: present } screen, which
+// turns an unreadable /etc/shells into ERROR before any row is examined
+// (system_account_shells.yaml is the shape).
+//
+// It runs over every clause list a control has -- applies_when, checks, and
+// each mechanism's when and checks (M-38) -- because the hazard is the same
+// in all of them: in applies_when an unreadable /etc/shells would make the
+// control a silent NOT_APPLICABLE instead of the ERROR R126 wanted. The
+// finding is a property of the list, so a list is reported once however many
+// unscreened clauses it holds.
 func lintShellValidScreen(cls []Clause, add func(string, string, ...any), where string) {
-	screened := false
 	for _, cl := range cls {
 		if cl.Fact == "accounts.shells" && cl.Op == "present" {
-			screened = true
-			continue
-		}
-		if screened {
-			continue
+			return
 		}
 		for _, sub := range []*Clause{cl.Where, cl.Require} {
 			if sub != nil && sub.Field == "shell_valid" {
 				add("shell_valid_screen", "%s: a clause on shell_valid needs an earlier { fact: accounts.shells, op: present } clause in the same list, or an unreadable /etc/shells is judged instead of reported", where)
-				break
+				return
 			}
 		}
 	}
@@ -480,10 +519,10 @@ func lintExpected(cl Clause, add func(string, string, ...any), where string) {
 	}
 }
 
-// FixtureDirExists reports whether dir is a directory the CLI can lint
-// fixtures against. A missing directory is an error there (R35), never a
-// silently skipped rule.
-func FixtureDirExists(dir string) bool {
+// DirExists reports whether dir is a directory the CLI can lint against --
+// the fixtures, and the KISA inventory the cross-check needs. A missing
+// directory is an error there (R35), never a silently skipped rule.
+func DirExists(dir string) bool {
 	st, err := os.Stat(dir)
 	return err == nil && st.IsDir()
 }
