@@ -19,16 +19,26 @@ type Problem struct {
 	Message   string
 }
 
-func (p Problem) String() string { return fmt.Sprintf("%s: %s: %s", p.Path, p.Rule, p.Message) }
+// String renders a problem for the CLI. A set-level problem belongs to no
+// file, so it names the set instead of an empty path (M-2).
+func (p Problem) String() string {
+	if p.Path == "" {
+		return fmt.Sprintf("controls: %s: %s", p.Rule, p.Message)
+	}
+	return fmt.Sprintf("%s: %s: %s", p.Path, p.Rule, p.Message)
+}
 
 // LintOptions carries what lint cannot know on its own: the registered
-// custom functions (owned by check), where fixtures live, and the generated
+// custom functions (owned by check), where fixtures live, the generated
 // STIG/NIST reference index (nil means references are checked for shape
-// only, never for existence).
+// only, never for existence) and the KISA item inventory (nil means
+// references.kisa is checked for shape only, and the set-level coverage rule
+// does not run at all).
 type LintOptions struct {
 	CustomFuncs map[string]bool
 	FixtureDir  string
 	References  *ReferenceIndex
+	KISA        *KISAInventory
 }
 
 var (
@@ -128,13 +138,46 @@ func Lint(s *Set, reg *facts.Registry, opts LintOptions) []Problem {
 			}
 		}
 		for year, items := range c.References.KISA {
-			if !kisaYearRe.MatchString(year) {
+			wellFormedYear := kisaYearRe.MatchString(year)
+			if !wellFormedYear {
 				add("references_kisa", "kisa reference key %q must be a four-digit edition year", year)
+			}
+			// M-2: with an inventory, every cited id must be a real item of
+			// the edition it is filed under, and an edition muster holds no
+			// inventory for cannot be checked at all -- which is an error,
+			// not a licence to cite anything.
+			known := wellFormedYear && opts.KISA != nil && opts.KISA.HasEdition(year)
+			if wellFormedYear && opts.KISA != nil && !known {
+				add("references_kisa", "no inventory for edition %s; kisa references must name an edition with an inventory file", year)
 			}
 			for _, it := range items {
 				if !kisaItemRe.MatchString(it) {
 					add("references_kisa", "kisa reference %q must look like U-01", it)
+					continue
 				}
+				if !known {
+					continue
+				}
+				item, ok := opts.KISA.Item(year, it)
+				if !ok {
+					add("references_kisa", "%s is not in the %s inventory", it, year)
+					continue
+				}
+				// R117 automated: a control that claims an item must agree
+				// with the guide about how important that item is.
+				if year == LatestKISAEdition && item.Importance != c.Importance {
+					add("kisa_importance", "importance %q does not match the %s inventory, which lists %s as %q", c.Importance, year, it, item.Importance)
+				}
+			}
+		}
+		// M-8: evidence names the facts a reviewer needs in front of them.
+		// It is only meaningful where muster declines to judge.
+		if len(c.Evidence) > 0 && c.Automation != "manual" {
+			add("evidence", "evidence is only valid on manual controls; this one is %s", c.Automation)
+		}
+		for _, k := range c.Evidence {
+			if _, ok := reg.Lookup(k); !ok {
+				add("evidence", "evidence key %q is not registered", k)
 			}
 		}
 		for _, r := range c.References.CIS {
@@ -149,7 +192,7 @@ func Lint(s *Set, reg *facts.Registry, opts LintOptions) []Problem {
 			case !ValidSTIGID(r.ID):
 				add("references_stig", "stig reference id %q must look like RHEL-09-211010", r.ID)
 			case opts.References != nil && !opts.References.HasSTIG(r.Benchmark, r.Version, r.ID):
-				add("references_stig", "stig reference %s@%s %s is not in docs/reference/stig", r.Benchmark, r.Version, r.ID)
+				add("references_stig", "stig reference %s@%s %s is not in %s", r.Benchmark, r.Version, r.ID, filepath.Join(opts.References.Dir, "stig"))
 			}
 		}
 		for _, n := range c.References.NIST80053 {
@@ -175,6 +218,10 @@ func Lint(s *Set, reg *facts.Registry, opts LintOptions) []Problem {
 				lintClause(c, cl, reg, add, fmt.Sprintf("mechanisms[%d].checks", mi))
 			}
 		}
+		lintShellValidScreen(c.Checks, add, "checks")
+		for mi, m := range c.Mechanisms {
+			lintShellValidScreen(m.Checks, add, fmt.Sprintf("mechanisms[%d].checks", mi))
+		}
 		if opts.FixtureDir != "" && hasJudgment {
 			for _, prefix := range []string{"pass-", "fail-"} {
 				matches, _ := filepath.Glob(filepath.Join(opts.FixtureDir, c.ID, prefix+"*.json"))
@@ -184,6 +231,7 @@ func Lint(s *Set, reg *facts.Registry, opts LintOptions) []Problem {
 			}
 		}
 	}
+	out = append(out, lintKISACoverage(s, opts.KISA)...)
 	// M13: several rules range over a map (params, references.kisa), whose
 	// iteration order Go randomises, so the message has to be part of the
 	// sort key or two problems of the same rule swap places between runs.
@@ -237,6 +285,88 @@ func paramDefaultMatches(p Param) bool {
 		return true
 	}
 	return false
+}
+
+// lintKISACoverage is the set-level half of M-2: coverage is a property of
+// the whole set, not of any one file, so its problems carry no control id and
+// no path. Every item of the current edition is implemented by exactly one
+// control or listed in kisa_deferred.json -- an item cited twice, an item
+// cited by nobody and not deferred, and a deferral a control has since
+// implemented are each an error naming the ids. Only the current edition is
+// judged: a 2021 item may legitimately be cited by two controls, because the
+// 2021 list was split and renumbered into 2026 (M-26).
+func lintKISACoverage(s *Set, x *KISAInventory) []Problem {
+	if x == nil || !x.HasEdition(LatestKISAEdition) {
+		return nil
+	}
+	citedBy := map[string][]string{}
+	for i := range s.Controls {
+		c := &s.Controls[i]
+		for _, id := range c.References.KISA[LatestKISAEdition] {
+			citedBy[id] = append(citedBy[id], c.ID)
+		}
+	}
+	var out []Problem
+	add := func(format string, args ...any) {
+		out = append(out, Problem{Rule: "kisa_coverage", Message: fmt.Sprintf(format, args...)})
+	}
+	var duplicated, stale, uncited []string
+	for _, it := range x.Items[LatestKISAEdition] {
+		n, deferred := len(citedBy[it.ID]), x.IsDeferred(it.ID)
+		switch {
+		case n == 0 && !deferred:
+			uncited = append(uncited, it.ID)
+		case n > 1:
+			duplicated = append(duplicated, it.ID)
+		}
+		if n > 0 && deferred {
+			stale = append(stale, it.ID)
+		}
+	}
+	sort.Strings(duplicated)
+	sort.Strings(stale)
+	sort.Strings(uncited)
+	for _, id := range duplicated {
+		cs := append([]string(nil), citedBy[id]...)
+		sort.Strings(cs)
+		add("%s is cited by %d controls: %s", id, len(cs), strings.Join(cs, ", "))
+	}
+	for _, id := range stale {
+		cs := append([]string(nil), citedBy[id]...)
+		sort.Strings(cs)
+		add("deferred item %s is cited by %s; drop it from %s", id, strings.Join(cs, ", "), kisaDeferredFile)
+	}
+	if len(uncited) > 0 {
+		add("%d %s items are cited by no control and are not deferred: %s (enrol them or list them in %s)",
+			len(uncited), LatestKISAEdition, strings.Join(uncited, ", "), kisaDeferredFile)
+	}
+	return out
+}
+
+// lintShellValidScreen is R126 as a rule (M-4). accounts.users[].shell_valid
+// is false for a shell /etc/shells does not list, so a host where /etc/shells
+// could not be read reports every account as invalid -- or, with the
+// judgment inverted, as fine. The clause that judges shell_valid must be
+// preceded, in the same list, by a { fact: accounts.shells, op: present }
+// screen, which turns an unreadable /etc/shells into ERROR before any row is
+// examined (system_account_shells.yaml is the shape).
+func lintShellValidScreen(cls []Clause, add func(string, string, ...any), where string) {
+	screened := false
+	for _, cl := range cls {
+		if cl.Fact == "accounts.shells" && cl.Op == "present" {
+			screened = true
+			continue
+		}
+		if screened {
+			continue
+		}
+		for _, sub := range []*Clause{cl.Where, cl.Require} {
+			if sub != nil && sub.Field == "shell_valid" {
+				add("shell_valid_screen", "%s: a clause on shell_valid needs an earlier { fact: accounts.shells, op: present } clause in the same list, or an unreadable /etc/shells is judged instead of reported", where)
+				break
+			}
+		}
+	}
 }
 
 // lintClause checks one top-level clause and, for collections, its

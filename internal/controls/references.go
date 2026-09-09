@@ -13,10 +13,16 @@ import (
 // which STIG ids exist per product and release, and the NIST 800-53 ids
 // they map to. Lint accepts only identifiers found here (spec §3).
 type ReferenceIndex struct {
+	// Dir is the directory LoadReferenceIndex was given, so a message about
+	// an unindexed id can name the index the reader actually passed rather
+	// than the literal docs/reference/stig (M-4).
+	Dir string
+
 	products map[string]string          // product or alias -> product
 	versions map[string]string          // product -> indexed version
 	stig     map[string]map[string]bool // product -> id set
 	nist     map[string]bool
+	from     map[string]string // product or alias -> the file that claimed it
 }
 
 var (
@@ -36,7 +42,7 @@ func LoadReferenceIndex(dir string) (*ReferenceIndex, error) {
 		return nil, fmt.Errorf("reference index: no stig/*.json under %s (run: go run ./tools/refindex)", dir)
 	}
 	sort.Strings(files)
-	x := &ReferenceIndex{products: map[string]string{}, versions: map[string]string{}, stig: map[string]map[string]bool{}, nist: map[string]bool{}}
+	x := &ReferenceIndex{Dir: dir, products: map[string]string{}, versions: map[string]string{}, stig: map[string]map[string]bool{}, nist: map[string]bool{}, from: map[string]string{}}
 	for _, f := range files {
 		data, err := os.ReadFile(f)
 		if err != nil {
@@ -57,9 +63,17 @@ func LoadReferenceIndex(dir string) (*ReferenceIndex, error) {
 		if doc.Product == "" || doc.Version == "" {
 			return nil, fmt.Errorf("%s: product and version are required", f)
 		}
-		x.products[doc.Product] = doc.Product
-		for _, a := range doc.AppliesTo {
-			x.products[a] = doc.Product
+		// M-4: two files claiming one product (or an applies_to alias that
+		// collides with another file's product) would let the later file
+		// silently shadow the earlier, so lint would accept ids from one
+		// release and reject ids from the other with nothing to explain it.
+		// Files are walked in sorted order, so the message is stable.
+		for _, name := range append([]string{doc.Product}, doc.AppliesTo...) {
+			if prev, ok := x.from[name]; ok && prev != f {
+				return nil, fmt.Errorf("duplicate index for product %s: %s and %s", name, prev, f)
+			}
+			x.from[name] = f
+			x.products[name] = doc.Product
 		}
 		x.versions[doc.Product] = doc.Version
 		ids := map[string]bool{}

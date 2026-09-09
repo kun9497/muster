@@ -121,6 +121,7 @@ type Control struct {
 	Importance    string           `yaml:"importance"` // 상 | 중 | 하
 	Automation    string           `yaml:"automation"` // auto | partial | manual | not_applicable
 	ManualReason  string           `yaml:"manual_reason,omitempty"`
+	Evidence      []string         `yaml:"evidence,omitempty"` // manual controls only: fact keys the reviewer needs in hand
 	References    References       `yaml:"references"`
 	RequiresFacts string           `yaml:"requires_facts"`
 	AppliesWhen   ClauseList       `yaml:"applies_when,omitempty"`

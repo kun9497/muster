@@ -1,6 +1,7 @@
 package controls
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -480,5 +481,302 @@ func TestLintFixturePairRule(t *testing.T) {
 	os.WriteFile(filepath.Join(fx, "muster.account.good", "fail-one.json"), []byte("{}"), 0o644)
 	if ps := lintOne(t, goodControl, LintOptions{FixtureDir: fx}); len(ps) != 0 {
 		t.Fatalf("unexpected: %v", ps)
+	}
+}
+
+// lintSet lints a set built from several control files, which is what the
+// set-level rules (kisa_coverage) need.
+func lintSet(t *testing.T, opts LintOptions, yamlTexts ...string) []Problem {
+	t.Helper()
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "VERSION"), []byte("t+1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "account"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for i, y := range yamlTexts {
+		name := fmt.Sprintf("c%d.yaml", i)
+		if err := os.WriteFile(filepath.Join(dir, "account", name), []byte(y), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	set, err := LoadFS(os.DirFS(dir))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	reg, err := facts.LoadRegistry()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return Lint(set, reg, opts)
+}
+
+// messagesOf returns the messages of every problem carrying rule.
+func messagesOf(ps []Problem, rule string) []string {
+	var out []string
+	for _, p := range ps {
+		if p.Rule == rule {
+			out = append(out, p.Message)
+		}
+	}
+	return out
+}
+
+// hasMessage reports whether any message of rule contains every fragment.
+func hasMessage(ps []Problem, rule string, fragments ...string) bool {
+	for _, m := range messagesOf(ps, rule) {
+		all := true
+		for _, f := range fragments {
+			if !strings.Contains(m, f) {
+				all = false
+			}
+		}
+		if all {
+			return true
+		}
+	}
+	return false
+}
+
+// M-2: every id under references.kisa["<year>"] must exist in that edition's
+// inventory, and an edition muster has no inventory file for is an error
+// rather than an unchecked citation.
+func TestLintKISAReferenceMustExistInTheEdition(t *testing.T) {
+	inv := mustLoadKISA(t)
+
+	unknownID := strings.Replace(goodControl, `"2026": ["U-01"]`, `"2026": ["U-99"]`, 1)
+	ps := lintOne(t, unknownID, LintOptions{KISA: inv})
+	if !hasMessage(ps, "references_kisa", "U-99", "2026") {
+		t.Errorf("an id absent from the edition must be a references_kisa problem naming it and the edition: %v", messagesOf(ps, "references_kisa"))
+	}
+
+	unknownYear := strings.Replace(goodControl, `"2026": ["U-01"]`, `"1999": ["U-01"]`, 1)
+	ps = lintOne(t, unknownYear, LintOptions{KISA: inv})
+	if !hasMessage(ps, "references_kisa", "1999") {
+		t.Errorf("an edition with no inventory must be a references_kisa problem naming it: %v", messagesOf(ps, "references_kisa"))
+	}
+
+	if ps := lintOne(t, goodControl, LintOptions{KISA: inv}); len(messagesOf(ps, "references_kisa")) != 0 {
+		t.Errorf("a cited id that is in the edition must lint clean: %v", messagesOf(ps, "references_kisa"))
+	}
+}
+
+// M-2: the R117 class of bug -- a control whose importance disagrees with the
+// KISA item it claims to implement -- is caught by the lint, not by a reader.
+func TestLintKISAImportanceMustMatchTheInventory(t *testing.T) {
+	inv := mustLoadKISA(t)
+
+	if ps := lintOne(t, goodControl, LintOptions{KISA: inv}); len(messagesOf(ps, "kisa_importance")) != 0 {
+		t.Errorf("importance 상 on a control citing U-01 (상) must lint clean: %v", messagesOf(ps, "kisa_importance"))
+	}
+
+	mismatched := strings.Replace(goodControl, "importance: 상", "importance: 하", 1)
+	ps := lintOne(t, mismatched, LintOptions{KISA: inv})
+	if !hasMessage(ps, "kisa_importance", "하", "상", "U-01") {
+		t.Errorf("a mismatch must name the control's importance, the inventory's and the id: %v", messagesOf(ps, "kisa_importance"))
+	}
+}
+
+// M-2: coverage is a property of the whole set, so the problem carries no
+// control id and no path, and String() says so.
+func TestLintKISACoverageIsSetLevel(t *testing.T) {
+	inv := mustLoadKISA(t)
+	second := strings.Replace(goodControl, "id: muster.account.good", "id: muster.account.good_twin", 1)
+
+	ps := lintSet(t, LintOptions{KISA: inv}, goodControl, second)
+	if !hasMessage(ps, "kisa_coverage", "U-01 is cited by 2 controls") {
+		t.Errorf("an item cited twice must be reported: %v", messagesOf(ps, "kisa_coverage"))
+	}
+	found := false
+	for _, p := range ps {
+		if p.Rule != "kisa_coverage" {
+			continue
+		}
+		found = true
+		if p.ControlID != "" || p.Path != "" {
+			t.Errorf("a set-level problem must carry no control id and no path: %+v", p)
+		}
+		if got, want := p.String(), "controls: kisa_coverage: "+p.Message; got != want {
+			t.Errorf("String() = %q, want %q", got, want)
+		}
+	}
+	if !found {
+		t.Fatal("no kisa_coverage problem at all")
+	}
+
+	ps = lintSet(t, LintOptions{KISA: inv}, goodControl)
+	if !hasMessage(ps, "kisa_coverage", "U-02", "U-67") {
+		t.Errorf("items no control cites must be listed: %v", messagesOf(ps, "kisa_coverage"))
+	}
+	for _, m := range messagesOf(ps, "kisa_coverage") {
+		if strings.Contains(m, "U-15") {
+			t.Errorf("a deferred item must not be reported as uncited: %q", m)
+		}
+	}
+
+	deferredCited := strings.Replace(goodControl, `"2026": ["U-01"]`, `"2026": ["U-15"]`, 1)
+	ps = lintSet(t, LintOptions{KISA: inv}, deferredCited)
+	if !hasMessage(ps, "kisa_coverage", "U-15", "muster.account.good") {
+		t.Errorf("a stale deferral must name the item and the control citing it: %v", messagesOf(ps, "kisa_coverage"))
+	}
+}
+
+// The gate: the embedded set must satisfy the cross-check against the
+// committed inventory. Every 2026 item is enrolled exactly once or deferred.
+func TestLintEmbeddedSetPassesTheKISACrossCheck(t *testing.T) {
+	set, err := LoadDefault()
+	if err != nil {
+		t.Fatal(err)
+	}
+	reg, err := facts.LoadRegistry()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range Lint(set, reg, LintOptions{KISA: mustLoadKISA(t)}) {
+		t.Errorf("embedded set: %s", p)
+	}
+}
+
+// A nil inventory keeps today's behaviour: references.kisa is checked for
+// shape only, so the unit tests that build a one-control set stay clean.
+func TestLintWithoutInventoryIsShapeOnly(t *testing.T) {
+	unknownID := strings.Replace(goodControl, `"2026": ["U-01"]`, `"2026": ["U-99"]`, 1)
+	if ps := lintOne(t, unknownID, LintOptions{}); len(ps) != 0 {
+		t.Errorf("without an inventory a well-formed id must lint clean: %v", ps)
+	}
+	mismatched := strings.Replace(goodControl, "importance: 상", "importance: 하", 1)
+	if ps := lintOne(t, mismatched, LintOptions{}); len(ps) != 0 {
+		t.Errorf("without an inventory importance is not cross-checked: %v", ps)
+	}
+	if ps := lintSet(t, LintOptions{}, goodControl); len(ps) != 0 {
+		t.Errorf("without an inventory there is no set-level coverage rule: %v", ps)
+	}
+}
+
+const manualEvidenceControl = `id: muster.patch.evidence_test
+title_en: t
+title_ko: 제목
+description_en: d
+description_ko: d
+category: patch
+importance: 상
+automation: manual
+manual_reason: r
+requires_facts: ">=1"
+evidence: [patch.pending_security_count, patch.metadata_age_s]
+`
+
+// M-8: evidence: names the facts a reviewer needs in front of them for a
+// manual call. It is only meaningful where muster declines to judge, and
+// every key must be one the registry knows.
+func TestLintEvidenceOnlyOnManualControlsAndRegistered(t *testing.T) {
+	if ps := lintOne(t, manualEvidenceControl, LintOptions{}); len(ps) != 0 {
+		t.Fatalf("registered evidence keys on a manual control must lint clean: %v", ps)
+	}
+
+	onAuto := `id: muster.patch.evidence_auto_test
+title_en: t
+title_ko: 제목
+description_en: d
+description_ko: d
+category: patch
+importance: 상
+automation: auto
+requires_facts: ">=1"
+absent_means: fail
+evidence: [patch.pending_security_count]
+checks: [{ fact: patch.reboot_required, op: eq, expected: false }]
+remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true }
+`
+	ps := lintOne(t, onAuto, LintOptions{})
+	if !hasMessage(ps, "evidence", "manual") {
+		t.Errorf("evidence on an auto control must be a problem saying so: %v", messagesOf(ps, "evidence"))
+	}
+
+	unregistered := strings.Replace(manualEvidenceControl, "patch.metadata_age_s", "nope.key", 1)
+	ps = lintOne(t, unregistered, LintOptions{})
+	if !hasMessage(ps, "evidence", `"nope.key"`, "registered") {
+		t.Errorf("an unregistered evidence key must be named: %v", messagesOf(ps, "evidence"))
+	}
+}
+
+// M-4 (R126 as a rule): shell_valid is false for a shell /etc/shells does not
+// list, so a denied /etc/shells would quietly turn every row into a pass. The
+// screen clause must come first in the same list.
+func TestLintShellValidNeedsTheShellsScreen(t *testing.T) {
+	const screen = "  - { fact: accounts.shells, op: present }\n"
+	const judge = "  - { fact: accounts.users, op: each, subject: name, where: { field: system, op: eq, expected: true }, require: { field: shell_valid, op: eq, expected: false } }\n"
+	head := `id: muster.account.shell_screen_test
+title_en: t
+title_ko: 제목
+description_en: d
+description_ko: d
+category: account
+importance: 하
+automation: auto
+requires_facts: ">=1"
+absent_means: fail
+checks:
+`
+	tail := "remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true }\n"
+
+	if ps := lintOne(t, head+screen+judge+tail, LintOptions{}); len(ps) != 0 {
+		t.Fatalf("the screened shape (system_account_shells.yaml) must lint clean: %v", ps)
+	}
+	ps := lintOne(t, head+judge+tail, LintOptions{})
+	if !hasMessage(ps, "shell_valid_screen", "accounts.shells") {
+		t.Errorf("an unscreened shell_valid clause must be a problem naming the screen fact: %v", messagesOf(ps, "shell_valid_screen"))
+	}
+	// The screen has to precede the judgment, not merely appear in the list.
+	ps = lintOne(t, head+judge+screen+tail, LintOptions{})
+	if !hasMessage(ps, "shell_valid_screen", "accounts.shells") {
+		t.Errorf("a screen after the judgment must still be a problem: %v", messagesOf(ps, "shell_valid_screen"))
+	}
+	// where, not just require, names the field.
+	whereForm := head + "  - { fact: accounts.users, op: none, where: { field: shell_valid, op: eq, expected: true } }\n" + tail
+	if !hasMessage(lintOne(t, whereForm, LintOptions{}), "shell_valid_screen", "accounts.shells") {
+		t.Error("a where clause on shell_valid must be screened too")
+	}
+	// A mechanism's checks list is its own list.
+	indent := func(s string) string { return "    " + s }
+	mech := `id: muster.account.shell_screen_mech_test
+title_en: t
+title_ko: 제목
+description_en: d
+description_ko: d
+category: account
+importance: 하
+automation: auto
+requires_facts: ">=1"
+absent_means: fail
+mechanisms:
+  - when: [{ fact: services.ssh.installed, op: eq, expected: true }]
+    checks:
+` + indent(judge) + tail
+	if !hasMessage(lintOne(t, mech, LintOptions{}), "shell_valid_screen", "accounts.shells") {
+		t.Error("an unscreened shell_valid clause inside a mechanism must be a problem")
+	}
+	mechOK := strings.Replace(mech, "    checks:\n", "    checks:\n"+indent(screen), 1)
+	if ps := lintOne(t, mechOK, LintOptions{}); len(ps) != 0 {
+		t.Errorf("a screened mechanism must lint clean: %v", ps)
+	}
+}
+
+// M-4: the message must name the index directory lint was actually given, so
+// a run against a custom index does not send the reader to docs/reference.
+func TestLintUnindexedMessageNamesTheIndexDir(t *testing.T) {
+	x, err := LoadReferenceIndex(filepath.Join("testdata", "refs"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	bad := strings.Replace(goodControl, "requires_facts:", "  stig: [{ benchmark: mini, version: V1R1, id: MINI-00-777777 }]\nrequires_facts:", 1)
+	ps := lintOne(t, bad, LintOptions{References: x})
+	want := filepath.Join("testdata", "refs", "stig")
+	if !hasMessage(ps, "references_stig", want) {
+		t.Errorf("message must name %q: %v", want, messagesOf(ps, "references_stig"))
+	}
+	if hasMessage(ps, "references_stig", filepath.Join("docs", "reference", "stig")) {
+		t.Errorf("message must not name the default index directory: %v", messagesOf(ps, "references_stig"))
 	}
 }

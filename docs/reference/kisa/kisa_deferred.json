@@ -1,0 +1,17 @@
+[
+  {
+    "id": "U-15",
+    "stage": "3",
+    "reason": "file and directory ownership needs the deep filesystem walk"
+  },
+  {
+    "id": "U-23",
+    "stage": "3",
+    "reason": "SUID/SGID/sticky discovery needs the deep filesystem walk"
+  },
+  {
+    "id": "U-33",
+    "stage": "3",
+    "reason": "hidden file discovery needs the deep filesystem walk"
+  }
+]

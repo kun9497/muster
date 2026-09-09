@@ -18,11 +18,24 @@ flags (lint):
                         see docs/reference); without this flag, stig and nist_800_53 references are
                         checked for shape only, never for existence in the index; with it, every id
                         must exist in the index
+  --kisa <dir>         directory holding the KISA item inventory (default docs/reference/kisa); every
+                        references.kisa id must be an item of the edition it is filed under, the
+                        control's importance must match the item's, and every current-edition item
+                        must be claimed by exactly one control or listed in kisa_deferred.json
 `
 
 // defaultFixtureDir is where the fixtures live relative to the repository
 // root, which is where lint is meant to run.
 const defaultFixtureDir = "controls/testdata"
+
+// defaultKISADir is where the KISA item inventory lives relative to the
+// repository root, the same way defaultFixtureDir does.
+const defaultKISADir = "docs/reference/kisa"
+
+// shapeOnlyNote tells the reader that the stig and nist_800_53 ids in this
+// run were checked for shape only. Without it a clean lint reads as though
+// every id had been verified against the index (M-4).
+const shapeOnlyNote = "note: stig and nist_800_53 references checked for shape only; pass --references docs/reference to check them against the index"
 
 func runControls(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
@@ -43,6 +56,7 @@ func runControls(args []string, stdout, stderr io.Writer) int {
 	case "lint":
 		fixtures := defaultFixtureDir
 		references := ""
+		kisaDir := defaultKISADir
 		rest := args[1:]
 		for i := 0; i < len(rest); i++ {
 			switch rest[i] {
@@ -60,6 +74,13 @@ func runControls(args []string, stdout, stderr io.Writer) int {
 				}
 				i++
 				references = rest[i]
+			case "--kisa":
+				if i+1 >= len(rest) {
+					fmt.Fprintf(stderr, "muster: flag %s needs a value\n%s", rest[i], controlsUsage)
+					return exitError
+				}
+				i++
+				kisaDir = rest[i]
 			default:
 				fmt.Fprintf(stderr, "muster: unknown flag %s\n%s", rest[i], controlsUsage)
 				return exitError
@@ -85,13 +106,28 @@ func runControls(args []string, stdout, stderr io.Writer) int {
 				return exitError
 			}
 			refIndex = idx
+		} else {
+			fmt.Fprintln(stdout, shapeOnlyNote)
+		}
+		// M-2/M-26: the inventory cross-check is not optional, so a missing
+		// inventory directory is an error the way a missing fixture directory
+		// is (R35), never a silently skipped rule. The directory checks run
+		// in the order fixtures, references, kisa.
+		if !controls.FixtureDirExists(kisaDir) {
+			fmt.Fprintf(stderr, "muster: kisa inventory directory %s does not exist; run controls lint from the repository root or pass --kisa <dir>\n", kisaDir)
+			return exitError
+		}
+		inventory, err := controls.LoadKISA(kisaDir)
+		if err != nil {
+			fmt.Fprintf(stderr, "muster: %v\n", err)
+			return exitError
 		}
 		// Spec §5.5: report registered keys no control uses. Some are read by
 		// the evaluator itself, so this never fails the lint.
 		if unused := controls.UnusedKeys(set, reg); len(unused) > 0 {
 			fmt.Fprintf(stdout, "note: %d registered fact keys are used by no control: %s\n", len(unused), strings.Join(unused, ", "))
 		}
-		problems := controls.Lint(set, reg, controls.LintOptions{CustomFuncs: check.CustomFuncs(), FixtureDir: fixtures, References: refIndex})
+		problems := controls.Lint(set, reg, controls.LintOptions{CustomFuncs: check.CustomFuncs(), FixtureDir: fixtures, References: refIndex, KISA: inventory})
 		for _, p := range problems {
 			fmt.Fprintln(stderr, p)
 		}
