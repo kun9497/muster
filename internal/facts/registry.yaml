@@ -1621,6 +1621,7 @@ keys:
     since: 1
     sensitivity: public
     collector: nfs
+    subject_kind: dir
   - key: nfs.exports_source
     type: list<string>
     description: The export files actually read, in the order they were parsed.

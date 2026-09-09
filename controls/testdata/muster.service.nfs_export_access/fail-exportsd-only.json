@@ -1,0 +1,9 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "services":{"nfs_server":{"installed":{"status":"ok","value":true}}},
+  "nfs":{"exports":{"status":"ok","value":[
+    {"path":"/srv/share","client":"*","options":"rw,no_root_squash","wildcard":true,"root_squash":false}
+  ]}},
+  "files":{"etc_exports":{
+    "mode":{"status":"absent","reason":"/etc/exports does not exist"},
+    "uid":{"status":"absent","reason":"/etc/exports does not exist"}}}
+}}

@@ -2819,7 +2819,7 @@
       "Sensitivity": "public",
       "Collector": "nfs",
       "DefaultOn": "",
-      "SubjectKind": ""
+      "SubjectKind": "dir"
     },
     {
       "Key": "nfs.exports_source",

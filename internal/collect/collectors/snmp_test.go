@@ -102,6 +102,8 @@ var snmpFixtureSecrets = []string{
 	"aliasPrivPhraseFour",
 	"aliasAuthPhraseFive",
 	"aliasPrivPhraseSix",
+	"s3ssAttachedString",
+	"tr4pLateString",
 }
 
 // assertNoSecrets is the redaction proof every snmp test ends with.
@@ -571,8 +573,8 @@ func TestSnmpBareTrapSinksRecordTheCompiledDefault(t *testing.T) {
 	b := buildBegun(t, "snmp", snmpAccess(map[string]string{testSnmpdConf: "snmpd.conf.traps-default"}, nil))
 
 	recs := okList(t, b, "snmp.communities")
-	if len(recs) != 4 {
-		t.Fatalf("communities %v, want a record for each of the two bare sinks, the sink that names its own community and the trapsess -c", recs)
+	if len(recs) != 6 {
+		t.Fatalf("communities %v, want the two bare sinks above any trapcommunity, the sink that names its own community, both trapsess spellings and the trapcommunity line - and nothing for the bare sink BELOW it", recs)
 	}
 	// c1, c2 — the bare trapsink and trap2sink: no community token and no
 	// trapcommunity anywhere above them, so each falls back to the compiled-in
@@ -597,16 +599,66 @@ func TestSnmpBareTrapSinksRecordTheCompiledDefault(t *testing.T) {
 		sess["length"] != 14 || sess["source_restricted"] != false {
 		t.Errorf("communities[3] = %v, want the trapsess -c community as {c4, trap, is_default false, length 14}", sess)
 	}
+	// c5 — the getopt-attached spelling `-cCOMMUNITY`, which net-snmp's own
+	// argument parser accepts: 18 runes, so a reader that took the whole token
+	// (20 runes) or nothing at all is distinguishable from one that took the
+	// remainder after the flag (review round 1, LOW-3).
+	attached := snmpRecord(t, recs, 4)
+	if attached["ref"] != "c5" || attached["kind"] != "trap" || attached["is_default"] != false ||
+		attached["length"] != 18 || attached["source_restricted"] != false {
+		t.Errorf("communities[4] = %v, want the attached trapsess -cCOMMUNITY as {c5, trap, is_default false, length 18}", attached)
+	}
+	// c6 — the trapcommunity line itself, read AFTER all of the above.
+	late := snmpRecord(t, recs, 5)
+	if late["ref"] != "c6" || late["kind"] != "trap" || late["is_default"] != false ||
+		late["length"] != 14 || late["source_restricted"] != false {
+		t.Errorf("communities[5] = %v, want the trapcommunity line as {c6, trap, is_default false, length 14}", late)
+	}
 	for i := range recs {
 		if r := snmpRecord(t, recs, i); len(r) != 5 {
 			t.Errorf("community record %v carries %d fields, want exactly five", r, len(r))
 		}
 	}
 	// A trap destination is not a community and is not measured as one.
-	for _, host := range []string{"198.51.100.9", "198.51.100.11", "203.0.113.7", "198.51.100.13"} {
+	for _, host := range []string{"198.51.100.9", "198.51.100.11", "203.0.113.7", "198.51.100.13", "198.51.100.15", "198.51.100.19"} {
 		if bytes.Contains(snmpSubtreeJSON(t, b), []byte(host)) {
 			t.Errorf("trap destination %s must not reach the snmp subtree", host)
 		}
+	}
+	assertNoSecrets(t, b)
+}
+
+// Review round 1, LOW-1. The suppression rule is PARSE ORDER, not "a
+// trapcommunity exists somewhere in the stack": net-snmp resolves a sink's
+// community when it reads the sink line, so only the sinks BELOW a
+// trapcommunity inherit its string and the ones above it still send the
+// compiled-in default. Nothing distinguished the two readings before this
+// test - snmpd.conf.traps puts trapcommunity first and snmpd.conf.traps-default
+// used to have none - so a whole-chain pre-pass would have stayed green. The
+// fixture now carries a bare sink on BOTH sides of a trapcommunity line, and
+// the two assertions below fail in opposite directions under a whole-chain
+// reading (which would drop c1 and c2) and under no suppression at all (which
+// would add a seventh record for the sink after it).
+func TestSnmpTrapCommunitySuppressionFollowsParseOrder(t *testing.T) {
+	b := buildBegun(t, "snmp", snmpAccess(map[string]string{testSnmpdConf: "snmpd.conf.traps-default"}, nil))
+
+	recs := okList(t, b, "snmp.communities")
+	defaults := 0
+	for i := range recs {
+		if snmpRecord(t, recs, i)["is_default"] == true {
+			defaults++
+		}
+	}
+	// The two bare sinks ABOVE the trapcommunity line each record the
+	// compiled-in default; the bare sink BELOW it records nothing, so a third
+	// default would mean the flag was never consulted.
+	if defaults != 2 {
+		t.Errorf("communities %v carry %d compiled-default records, want exactly the two bare sinks above the trapcommunity line", recs, defaults)
+	}
+	// And the last record is the trapcommunity line itself, not a sink below
+	// it: a whole-chain reading would have suppressed c1 and c2 and left four.
+	if len(recs) != 6 || snmpRecord(t, recs, 5)["length"] != 14 {
+		t.Errorf("communities %v, want six records ending in the trapcommunity line", recs)
 	}
 	assertNoSecrets(t, b)
 }

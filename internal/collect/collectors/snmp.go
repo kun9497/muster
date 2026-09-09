@@ -414,10 +414,22 @@ func (p *snmpParse) trapSink(args []string) {
 // same discipline createUser's option handling follows (Ruling J-38). The
 // flag is matched case-sensitively because net-snmp's -c and -C are two
 // different options.
+//
+// Review round 1, LOW-3: trapsess is parsed by net-snmp's own snmp_parse_args,
+// which is getopt-based, so the argument may be attached to the flag
+// (`-cpublic`) as well as separated (`-c public`). Reading only the separated
+// form left the attached one recording nothing, which is the vacuous-`each`
+// hole Ruling J-43 exists to close, in a narrower spelling.
 func (p *snmpParse) trapSess(args []string) {
-	for i := 0; i+1 < len(args); i++ {
-		if args[i] == "-c" {
-			p.addCommunity("trap", args[i+1], "")
+	for i, a := range args {
+		switch {
+		case a == "-c":
+			if i+1 < len(args) {
+				p.addCommunity("trap", args[i+1], "")
+			}
+			return
+		case strings.HasPrefix(a, "-c") && len(a) > 2:
+			p.addCommunity("trap", a[2:], "")
 			return
 		}
 	}
