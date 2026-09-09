@@ -1,0 +1,8 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "services":{"dns":{"installed":{"status":"ok","value":true}}},
+  "dns":{"implementation":{"status":"ok","value":"bind"},
+         "zones":{"status":"ok","value":[
+           {"name":".","type":"hint","file":"/var/named/named.ca","update_restricted":true},
+           {"name":"example.org","type":"slave","file":"/var/named/slaves/example.org.zone","update_restricted":true}
+         ],"source":{"kind":"file","path":"/etc/named.conf"}}}
+}}

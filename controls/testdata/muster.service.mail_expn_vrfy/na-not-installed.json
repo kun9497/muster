@@ -1,0 +1,5 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "services":{"mail":{"installed":{"status":"ok","value":false}}},
+  "mail":{"implementation":{"status":"ok","value":"none"},
+          "expn_vrfy_restricted":{"status":"absent","reason":"no mail transfer agent is installed on this host"}}
+}}

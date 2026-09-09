@@ -1,0 +1,8 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "services":{"dns":{"installed":{"status":"ok","value":true}}},
+  "dns":{"implementation":{"status":"ok","value":"bind"},
+         "options":{"allow_transfer":{"status":"ok","value":"any","source":{"kind":"file","path":"/etc/named.conf"}}},
+         "zones":{"status":"ok","value":[
+           {"name":"example.org","type":"primary","file":"/var/named/example.org.zone","allow_transfer":"any","allow_update":"none","transfer_restricted":false,"update_restricted":true}
+         ],"source":{"kind":"file","path":"/etc/named.conf"}}}
+}}

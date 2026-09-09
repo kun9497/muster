@@ -19,7 +19,9 @@
               "snmp":{"installed":{"status":"ok","value":true},"active":{"status":"ok","value":false},"enabled":{"status":"ok","value":false},"reachable":{"status":"ok","value":true}},
               "ntp":{"installed":{"status":"ok","value":true},"active":{"status":"ok","value":true}},
               "syslog":{"active":{"status":"ok","value":true}},
-              "ftp":{"installed":{"status":"ok","value":true},"active":{"status":"ok","value":false}}},
+              "ftp":{"installed":{"status":"ok","value":true},"active":{"status":"ok","value":false}},
+              "mail":{"installed":{"status":"ok","value":true},"active":{"status":"ok","value":true},"reachable":{"status":"ok","value":false}},
+              "dns":{"installed":{"status":"ok","value":true},"active":{"status":"ok","value":true}}},
   "sshd":{"collect_method":{"status":"ok","value":"T"},"version":{"status":"ok","value":"8.9"},"personas_collected":{"status":"ok","value":true},
           "options":{"permit_root_login":{"effective":{"status":"ok","value":"yes","source":{"kind":"file","path":"/etc/ssh/sshd_config","line":40,"raw":"PermitRootLogin yes"}}},
                      "client_alive_interval":{"effective":{"status":"ok","value":300}},
@@ -136,5 +138,11 @@
            {"path":"/etc/ftpusers","role":"pam_deny","exists":true,"root_listed":true,"mode":416,"uid":0,"gid":0,"stat_status":"ok"}
          ]},
          "root_denied":{"status":"ok","value":true,"source":{"kind":"file","path":"/etc/ftpusers"}}},
+  "mail":{"implementation":{"status":"ok","value":"postfix"},
+          "expn_vrfy_restricted":{"status":"ok","value":true,"source":{"kind":"file","path":"/etc/postfix/main.cf"}}},
+  "dns":{"implementation":{"status":"ok","value":"bind"},
+         "zones":{"status":"ok","value":[
+           {"name":"example.org","type":"primary","file":"/var/lib/bind/db.example.org","allow_transfer":"none","allow_update":"none","transfer_restricted":true,"update_restricted":true}
+         ],"source":{"kind":"file","path":"/etc/bind/named.conf"}}},
   "walk":{"world_writable":{"status":"absent"}}
  }}

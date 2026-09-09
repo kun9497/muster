@@ -1,0 +1,9 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "services":{"dns":{"installed":{"status":"ok","value":true}}},
+  "dns":{"implementation":{"status":"ok","value":"bind"},
+         "options":{"allow_transfer":{"status":"ok","value":"none","source":{"kind":"file","path":"/etc/named.conf"}}},
+         "zones":{"status":"ok","value":[
+           {"name":"example.org","type":"primary","file":"/var/named/example.org.zone","allow_transfer":"key xfer-key","allow_update":"none","transfer_restricted":true,"update_restricted":true},
+           {"name":"example.net","type":"master","file":"/var/named/example.net.zone","allow_transfer":"none","allow_update":"none","transfer_restricted":true,"update_restricted":true}
+         ],"source":{"kind":"file","path":"/etc/named.conf"}}}
+}}

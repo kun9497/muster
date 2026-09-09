@@ -1,0 +1,26 @@
+id: muster.service.dns_zone_transfer
+title_en: Every authoritative zone restricts who may transfer it
+title_ko: 모든 권한 존이 존 전송 대상을 제한한다
+description_en: "A zone transfer hands the caller every record of a zone at once - every host name, every address, every service the zone documents - so a nameserver that transfers to anyone publishes an inventory of the network it serves. The check reads each zone this host is authoritative for (type primary or master) and requires an effective allow-transfer that names someone: an address, a prefix, an acl, a TSIG key, localhost, localnets or none all restrict, while a list containing any does not, and a negated element restricts nothing by itself. The defaults matter twice over. allow-transfer defaulted to any in every BIND before 9.20 and to none from 9.20 on, so a configuration that sets it nowhere means opposite things on two builds; muster reads ID and VERSION_ID from /etc/os-release, knows the 9.16 and 9.18 builds it ships with (Ubuntu 22.04 and 24.04, Debian 12, RHEL, Rocky and AlmaLinux 9.x), and reads MANUAL on any other build rather than guessing. allow-update, which U-51 judges, defaults to none in every version. One consequence is worth stating plainly: the localhost and RFC 1912 reverse zones that every BIND package ships are type master, so on a 9.16 or 9.18 build that sets no allow-transfer they inherit the open default and are reported here. That is a real finding, if a noisy one - those zones transfer on request - and the one-line fix in options {} settles them together with the zones this host was built to serve. A configuration using views is a manual review: muster does not model them, and the same zone name can carry different lists per view. So is a chain muster could not read in full or one whose transfer default cannot be determined. A host with no BIND installed, or one running unbound, is not applicable."
+description_ko: "존 전송은 존의 모든 레코드 - 호스트 이름, 주소, 그 존이 기록하는 모든 서비스 - 를 한 번에 내어 주므로, 누구에게나 전송하는 네임서버는 자신이 서비스하는 네트워크의 목록을 공개하는 것과 같습니다. 이 점검은 이 호스트가 권한을 가진 존(type 이 primary 또는 master)마다 유효한 allow-transfer 가 대상을 지정하는지 확인합니다 - 주소, 프리픽스, acl, TSIG 키, localhost, localnets, none 은 모두 제한이지만 any 를 포함한 목록은 제한이 아니며, 부정된 원소는 그 자체로는 아무것도 제한하지 않습니다. 기본값은 두 가지 이유로 중요합니다. allow-transfer 는 BIND 9.20 이전에는 any, 9.20 부터는 none 이 기본값이므로, 아무 데서도 설정하지 않은 구성이 빌드에 따라 정반대를 뜻합니다. muster 는 /etc/os-release 의 ID 와 VERSION_ID 를 읽어 9.16·9.18 을 싣는 빌드(Ubuntu 22.04·24.04, Debian 12, RHEL·Rocky·AlmaLinux 9.x)를 알고 있으며, 그 밖의 빌드에서는 추측하지 않고 수동 검토로 답합니다. U-51 이 판정하는 allow-update 는 모든 버전에서 기본값이 none 입니다. 한 가지 결과는 분명히 밝혀 둘 만합니다 - 모든 BIND 패키지가 함께 설치하는 localhost 및 RFC 1912 역방향 존은 type master 이므로, allow-transfer 를 설정하지 않은 9.16·9.18 빌드에서는 열린 기본값을 물려받아 여기에 보고됩니다. 이는 다소 시끄럽더라도 실제 결함입니다 - 그 존들은 요청하면 전송됩니다 - 그리고 options {} 한 줄이면 이 호스트가 본래 서비스하려던 존과 함께 정리됩니다. view 를 쓰는 구성은 수동 검토입니다. muster 는 view 를 모델링하지 않으며 같은 존 이름이 view 마다 다른 목록을 가질 수 있기 때문입니다. 끝까지 읽지 못한 설정 체인이나 전송 기본값을 확정할 수 없는 경우도 마찬가지입니다. BIND 가 설치되지 않았거나 unbound 를 쓰는 호스트는 해당 없음입니다."
+category: service
+importance: 상
+automation: auto
+references:
+  kisa: { "2026": ["U-50"], "2021": ["U-34"] }
+requires_facts: ">=1"
+absent_means: manual
+applies_when:
+  - { fact: services.dns.installed, op: eq, expected: true }
+  - { fact: dns.implementation, op: eq, expected: bind }
+checks:
+  # The `where` runs before the `require`: a record of any other type may
+  # carry no transfer_restricted field at all (Ruling L-53), and a require on
+  # a field a record lacks is an internal ERROR rather than a MANUAL.
+  - { fact: dns.zones, op: each, subject: name, where: { field: type, op: in, expected: ["primary", "master"] }, require: { field: transfer_restricted, op: eq, expected: true } }
+remediation:
+  text_en: Set allow-transfer { none; } in the options {} block, or a list naming the secondaries and their TSIG keys, and override it per zone only where a transfer is really served; then reload named.
+  text_ko: options {} 블록에 allow-transfer { none; } 를 설정하거나 보조 서버와 그 TSIG 키를 지정한 목록을 설정하고, 실제로 전송을 제공하는 존에서만 존 단위로 재정의한 뒤 named 를 다시 읽힙니다.
+  risk: restart_service
+  idempotent: true
+decision: D09

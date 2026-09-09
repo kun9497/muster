@@ -1,0 +1,25 @@
+id: muster.service.dns_dynamic_update
+title_en: Every authoritative zone restricts who may update it dynamically
+title_ko: 모든 권한 존이 동적 업데이트 대상을 제한한다
+description_en: "Dynamic update lets a client write records into a zone over the network. A zone that accepts updates from anyone lets a caller add, replace or delete any name it serves - pointing a host name at an address of the caller's choosing is enough to sit in the middle of traffic that was meant for somewhere else. The check reads each zone this host is authoritative for (type primary or master) and requires that updates be restricted: allow-update names someone rather than any, or the zone carries an update-policy, which grants named identities per-name permission instead of opening the zone to an address range. allow-update is unset by default in every BIND version and an unset list is none, so a zone that never mentions it is restricted - which is why this control, unlike U-50, needs no build evidence to reach a verdict. A configuration using views is a manual review: muster does not model them, and the same zone name can carry different lists per view. So is a chain muster could not read in full, or one whose zone list it had to withhold. A host with no BIND installed, or one running unbound, is not applicable."
+description_ko: "동적 업데이트는 클라이언트가 네트워크를 통해 존에 레코드를 기록하게 해 줍니다. 누구의 업데이트든 받아들이는 존은 자신이 서비스하는 이름을 임의로 추가·교체·삭제하도록 허용하는 셈이며, 호스트 이름을 공격자가 고른 주소로 돌려놓는 것만으로도 다른 곳으로 향하던 트래픽 한가운데에 자리 잡을 수 있습니다. 이 점검은 이 호스트가 권한을 가진 존(type 이 primary 또는 master)마다 업데이트가 제한되어 있는지 확인합니다 - allow-update 가 any 가 아니라 대상을 지정하고 있거나, 존이 update-policy 를 두어 주소 대역을 여는 대신 지정된 신원에 이름 단위 권한을 주는 경우입니다. allow-update 는 모든 BIND 버전에서 기본적으로 설정되지 않으며 설정되지 않은 목록은 none 이므로, 이를 전혀 언급하지 않은 존은 제한된 상태입니다 - 그래서 이 항목은 U-50 과 달리 판정에 빌드 정보를 필요로 하지 않습니다. view 를 쓰는 구성은 수동 검토입니다. muster 는 view 를 모델링하지 않으며 같은 존 이름이 view 마다 다른 목록을 가질 수 있기 때문입니다. 끝까지 읽지 못한 설정 체인이나 존 목록을 보류해야 했던 경우도 마찬가지입니다. BIND 가 설치되지 않았거나 unbound 를 쓰는 호스트는 해당 없음입니다."
+category: service
+importance: 중
+automation: auto
+references:
+  kisa: { "2026": ["U-51"], "2021": [] }
+requires_facts: ">=1"
+absent_means: manual
+applies_when:
+  - { fact: services.dns.installed, op: eq, expected: true }
+  - { fact: dns.implementation, op: eq, expected: bind }
+checks:
+  # The `where` runs before the `require`, for the same reason as U-50: a
+  # record of another type may carry fewer fields (Ruling L-53).
+  - { fact: dns.zones, op: each, subject: name, where: { field: type, op: in, expected: ["primary", "master"] }, require: { field: update_restricted, op: eq, expected: true } }
+remediation:
+  text_en: Remove allow-update { any; } from the zone, leaving it unset (which is none) or naming the updaters, or replace it with an update-policy that grants a TSIG identity permission over the names it really owns; then reload named.
+  text_ko: 존에서 allow-update { any; } 를 제거하여 설정하지 않은 상태(none)로 두거나 업데이트 주체를 지정하고, 또는 TSIG 신원에 실제로 소유한 이름에 대해서만 권한을 주는 update-policy 로 대체한 뒤 named 를 다시 읽힙니다.
+  risk: restart_service
+  idempotent: true
+decision: D09

@@ -1,0 +1,6 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "services":{"dns":{"installed":{"status":"ok","value":true}}},
+  "dns":{"implementation":{"status":"ok","value":"bind"},
+         "unmodelled":{"status":"ok","value":1},
+         "zones":{"status":"absent","reason":"this configuration uses constructs outside the collector's model: /etc/named.conf: a view statement"}}
+}}

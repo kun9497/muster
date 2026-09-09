@@ -1,0 +1,8 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "services":{"mail":{"installed":{"status":"ok","value":true},"reachable":{"status":"ok","value":true}}},
+  "mail":{"implementation":{"status":"ok","value":"postfix"},
+          "postfix":{"inet_interfaces":{"status":"ok","value":"all","source":{"kind":"file","path":"/etc/postfix/main.cf"}},
+                     "mynetworks":{"status":"absent","reason":"mynetworks is not set in /etc/postfix/main.cf; postfix's compiled default is the host's own connected networks"},
+                     "smtpd_relay_restrictions":{"status":"ok","value":"permit_mynetworks, permit_sasl_authenticated, defer_unauth_destination","source":{"kind":"file","path":"/etc/postfix/main.cf"}},
+                     "authorized_submit_users":{"status":"absent","reason":"authorized_submit_users is not set in /etc/postfix/main.cf; postfix's compiled default is static:anyone"}}}
+}}

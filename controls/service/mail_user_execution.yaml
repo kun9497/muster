@@ -1,0 +1,24 @@
+id: muster.service.mail_user_execution
+title_en: The mail transfer agent's queue and submission commands are restricted to administrators
+title_ko: 메일 서버의 큐·전송 명령 실행이 관리자로 제한된다
+description_en: "An MTA ships commands an ordinary user can run - postfix's sendmail and postdrop, sendmail's sendmail, mailq and runq - and a host that lets every local account submit mail or inspect the queue gives a compromised unprivileged account both a spam relay and the recipient addresses in the spool. muster collects the evidence and leaves the verdict to a person: postfix's authorized_submit_users (mail.postfix.authorized_submit_users), whose compiled default static:anyone allows every account, and sendmail's restrictqrun and restrictmailq privacy flags (mail.sendmail.privacy_options). Neither settles the question on its own. What actually decides it is the set-group-id bit and group of the submission binaries, the maildrop directory's mode, and the site's own answer to which accounts are meant to send mail at all - none of which muster reads, and a verdict drawn from the configuration file alone would be an over-claim on a host whose binaries were tightened by hand. A host with no MTA installed is not applicable."
+description_ko: "메일 서버는 일반 사용자가 실행할 수 있는 명령을 함께 설치합니다 - postfix 의 sendmail 과 postdrop, sendmail 의 sendmail·mailq·runq 입니다. 모든 로컬 계정이 메일을 제출하거나 큐를 들여다볼 수 있는 호스트는 탈취된 비특권 계정에 스팸 릴레이와 스풀 안의 수신자 주소를 함께 내어 줍니다. muster 는 근거만 수집하고 판정은 사람에게 남깁니다 - postfix 의 authorized_submit_users(mail.postfix.authorized_submit_users, 컴파일 기본값 static:anyone 은 모든 계정을 허용합니다)와 sendmail 의 restrictqrun·restrictmailq privacy 플래그(mail.sendmail.privacy_options)입니다. 어느 쪽도 혼자서는 답이 되지 않습니다. 실제로 답을 결정하는 것은 제출 바이너리의 setgid 비트와 그룹, maildrop 디렉터리의 권한, 그리고 어떤 계정이 메일을 보내야 하는지에 대한 조직 자신의 기준인데 muster 는 이 중 어느 것도 읽지 않으며, 설정 파일만으로 내린 판정은 바이너리를 손으로 강화해 둔 호스트에 대한 과잉 주장이 됩니다. MTA 가 설치되지 않은 호스트는 해당 없음입니다."
+category: service
+importance: 상
+automation: manual
+manual_reason: "Decide by hand whether an ordinary user on this host can submit mail or inspect the queue, reading postfix's authorized_submit_users (mail.postfix.authorized_submit_users) or sendmail's restrictqrun and restrictmailq privacy flags (mail.sendmail.privacy_options) together with the set-group-id bit, group and mode of the submission binaries and the maildrop directory, which muster does not collect."
+references:
+  kisa: { "2026": ["U-46"], "2021": ["U-32"] }
+requires_facts: ">=1"
+applies_when:
+  # Ruling L-11: both gates are facts the snapshot always carries, so a host
+  # with no MTA reads NOT_APPLICABLE rather than a permanent MANUAL row, and
+  # the two of them are the evidence the MANUAL result is shown with.
+  - { fact: services.mail.installed, op: eq, expected: true }
+  - { fact: mail.implementation, op: present }
+remediation:
+  text_en: Name the accounts that may submit mail in postfix's authorized_submit_users, or add restrictqrun and restrictmailq to sendmail's PrivacyOptions, and confirm the submission binaries are set-group-id to the MTA's own group rather than world-executable by every account; restart the mail transfer agent afterwards.
+  text_ko: postfix 는 authorized_submit_users 에 메일을 제출할 수 있는 계정을 명시하고, sendmail 은 PrivacyOptions 에 restrictqrun 과 restrictmailq 를 추가한 뒤, 제출 바이너리가 모든 계정이 실행할 수 있는 상태가 아니라 메일 서버 자신의 그룹에 setgid 되어 있는지 확인하고 메일 서버를 재시작합니다.
+  risk: restart_service
+  idempotent: true
+decision: D09

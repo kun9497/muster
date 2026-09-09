@@ -1,0 +1,6 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "services":{"mail":{"installed":{"status":"ok","value":true}}},
+  "mail":{"implementation":{"status":"ok","value":"sendmail"},
+          "sendmail":{"privacy_options":{"status":"ok","value":["authwarnings","novrfy"],"source":{"kind":"file","path":"/etc/mail/sendmail.cf"}}},
+          "expn_vrfy_restricted":{"status":"ok","value":false,"source":{"kind":"file","path":"/etc/mail/sendmail.cf"}}}
+}}

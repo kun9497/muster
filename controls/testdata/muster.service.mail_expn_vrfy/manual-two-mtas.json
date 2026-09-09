@@ -1,0 +1,5 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "services":{"mail":{"installed":{"status":"ok","value":true}}},
+  "mail":{"implementation":{"status":"ok","value":"postfix","reason":"postfix answers these facts; also installed on this host and not read here: sendmail (/etc/mail/sendmail.cf)"},
+          "expn_vrfy_restricted":{"status":"absent","reason":"more than one mail transfer agent is installed on this host (postfix, sendmail (/etc/mail/sendmail.cf)); which of them serves port 25 cannot be read out of their configuration files, so this verdict is left to the operator"}}
+}}

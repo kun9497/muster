@@ -1,0 +1,25 @@
+id: muster.service.mail_expn_vrfy
+title_en: The mail transfer agent refuses the SMTP EXPN and VRFY commands
+title_ko: 메일 서버가 SMTP EXPN, VRFY 명령을 거부한다
+description_en: "SMTP VRFY confirms whether an address exists on this host and EXPN expands a mailing list into its members, so an MTA that answers either one hands anyone who can open port 25 a way to enumerate accounts before authenticating. postfix implements no EXPN command at all - it answers 502 whatever the configuration says - so its disable_vrfy_command parameter settles both halves of the question; the compiled default is no, which leaves VRFY answered, so a main.cf that never names the parameter is a finding rather than a pass by default. sendmail is judged on its privacy options: novrfy AND noexpn must both be in force, counting the flags the goaway shorthand stands for, and every PrivacyOptions line of sendmail.cf is folded together because sendmail's own parser ORs them into one set rather than replacing. exim decides both commands in its ACLs, which muster does not model, so an exim host is a manual review; so is a host carrying more than one MTA at once, because the configuration files cannot say which of them serves port 25 and a hardened postfix beside a permissive sendmail must never read as a pass. A per-service \"-o disable_vrfy_command\" override in postfix's master.cf is not modelled either. A host with no MTA installed is not applicable."
+description_ko: "SMTP VRFY 는 주소가 이 호스트에 존재하는지 확인해 주고 EXPN 은 메일링 리스트를 구성원 목록으로 펼쳐 주므로, 둘 중 하나에라도 응답하는 메일 서버는 25 번 포트를 열 수 있는 누구에게나 인증 전에 계정을 열거할 수단을 내어 줍니다. postfix 는 EXPN 명령 자체를 구현하지 않아 설정과 무관하게 502 로 답하므로 disable_vrfy_command 하나가 두 물음을 모두 결정합니다. 컴파일 기본값이 no 여서 VRFY 는 응답하는 상태로 남으며, 따라서 이 매개변수를 적지 않은 main.cf 는 기본값에 의한 통과가 아니라 결함입니다. sendmail 은 privacy 옵션으로 판정합니다 - novrfy 와 noexpn 이 모두 적용되어야 하고, goaway 축약이 대신하는 플래그도 함께 셉니다. sendmail 의 파서가 여러 PrivacyOptions 줄을 대치하지 않고 하나의 집합으로 OR 하므로 sendmail.cf 의 모든 줄을 합쳐 읽습니다. exim 은 두 명령을 ACL 에서 결정하는데 muster 는 이를 모델링하지 않으므로 exim 호스트는 수동 검토이며, MTA 가 둘 이상 설치된 호스트도 마찬가지입니다 - 어느 쪽이 25 번 포트를 서비스하는지는 설정 파일이 말해 주지 않으므로, 허용적인 sendmail 옆의 강화된 postfix 가 통과로 읽혀서는 안 됩니다. postfix master.cf 의 서비스별 \"-o disable_vrfy_command\" 재정의도 모델 밖입니다. MTA 가 설치되지 않은 호스트는 해당 없음입니다."
+category: service
+importance: 중
+automation: auto
+references:
+  kisa: { "2026": ["U-48"], "2021": ["U-70"] }
+requires_facts: ">=1"
+absent_means: manual
+applies_when:
+  # Ruling J-22: the services collector writes ok:false - not absent - for a
+  # unit that is not installed, so `op: present` would run the check on every
+  # host and one with no MTA would read MANUAL.
+  - { fact: services.mail.installed, op: eq, expected: true }
+checks:
+  - { fact: mail.expn_vrfy_restricted, op: eq, expected: true }
+remediation:
+  text_en: Set disable_vrfy_command = yes in postfix's main.cf, or add novrfy and noexpn to the PrivacyOptions line of sendmail.cf, then restart the mail transfer agent.
+  text_ko: postfix 는 main.cf 에 disable_vrfy_command = yes 를 설정하고, sendmail 은 sendmail.cf 의 PrivacyOptions 줄에 novrfy 와 noexpn 을 추가한 뒤 메일 서버를 재시작합니다.
+  risk: restart_service
+  idempotent: true
+decision: D09
