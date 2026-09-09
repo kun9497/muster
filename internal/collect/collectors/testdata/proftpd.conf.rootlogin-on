@@ -1,0 +1,7 @@
+# synthetic proftpd configuration that permits a root login and identifies
+# itself with a custom string.
+ServerName "FTP service"
+ServerType standalone
+ServerIdent on "FTP service ready"
+UseFtpUsers on
+RootLogin on

@@ -68,6 +68,12 @@ var ftpJudgedLeaves = []string{
 	"ftp.userlist_enable",
 	"ftp.userlist_deny",
 	"ftp.userlist_file",
+	"ftp.access_files",
+	"ftp.access_file_present",
+	"ftp.root_denied",
+	"ftp.banner_source",
+	"ftp.banner_text",
+	"ftp.banner_discloses_version",
 }
 
 // ftpBool fetches an ok bool leaf, reporting the envelope rather than a bare
@@ -841,5 +847,476 @@ func TestFtpProftpdUnclosedSectionIsUnmodelled(t *testing.T) {
 	if !strings.Contains(e.Reason, "/etc/proftpd/conf.d/10-unclosed") ||
 		!strings.Contains(e.Reason, "<Directory>") {
 		t.Errorf("tls_enforced reason %q must name the fragment and the section", e.Reason)
+	}
+}
+
+// ftpAccessRow fetches one ftp.access_files record by path, failing the test
+// rather than panicking when the collector published something else.
+func ftpAccessRow(t *testing.T, b *collect.Builder, want string) map[string]any {
+	t.Helper()
+	for _, v := range okList(t, b, "ftp.access_files") {
+		rec, ok := v.(map[string]any)
+		if !ok {
+			t.Fatalf("ftp.access_files element %#v is not a record", v)
+		}
+		if rec["path"] == want {
+			return rec
+		}
+	}
+	t.Fatalf("ftp.access_files has no row for %s (rows %v)", want, ftpAccessPaths(t, b))
+	return nil
+}
+
+// ftpAccessPaths is every access-file row's path, in publication order, so a
+// test can pin both the membership and the sort.
+func ftpAccessPaths(t *testing.T, b *collect.Builder) []string {
+	t.Helper()
+	out := []string{}
+	for _, v := range okList(t, b, "ftp.access_files") {
+		rec, ok := v.(map[string]any)
+		if !ok {
+			t.Fatalf("ftp.access_files element %#v is not a record", v)
+		}
+		p, _ := rec["path"].(string)
+		out = append(out, p)
+	}
+	return out
+}
+
+// ftpRowField asserts one record field, reporting the whole row on a
+// mismatch so a wrong role or a stat that did not land is visible at once.
+func ftpRowField(t *testing.T, rec map[string]any, field string, want any) {
+	t.Helper()
+	if got := rec[field]; got != want {
+		t.Errorf("%v: %s = %#v, want %#v", rec["path"], field, got, want)
+	}
+}
+
+// Ruling L-21: the deny source is /etc/pam.d/ + pam_service_name, and the
+// list it names carries the permission fields U-56 judges. Ruling L-15: mode
+// is the INT of the raw 0o7777 bits, exactly as writePermFacts stores it, so
+// 0640 is 416.
+func TestFtpAccessFilesDebianPamDeny(t *testing.T) {
+	a := ftpAccess(map[string]string{
+		"/etc/vsftpd.conf":  "vsftpd.conf.debian",
+		"/etc/pam.d/vsftpd": "pam.d.vsftpd.debian",
+		"/etc/ftpusers":     "ftpusers.root",
+	})
+	a.stats["/etc/ftpusers"] = statResult{mode: 0o640, uid: 0, gid: 42, kind: "regular"}
+	b := buildBegun(t, "ftp", a)
+
+	if got := ftpAccessPaths(t, b); !slices.Equal(got, []string{"/etc/ftpusers"}) {
+		t.Fatalf("access_files paths %v, want the PAM list alone", got)
+	}
+	rec := ftpAccessRow(t, b, "/etc/ftpusers")
+	for _, c := range []struct {
+		field string
+		want  any
+	}{
+		{"role", "pam_deny"},
+		{"exists", true},
+		{"root_listed", true},
+		{"stat_status", "ok"},
+		{"mode", 416},
+		{"uid", 0},
+		{"gid", 42},
+	} {
+		ftpRowField(t, rec, c.field, c.want)
+	}
+	if !ftpBool(t, b, "ftp.access_file_present") {
+		t.Error("access_file_present must be true when a row exists")
+	}
+	e := env(t, b, "ftp.root_denied")
+	if e.Status != facts.StatusOK || e.Value != true {
+		t.Fatalf("root_denied %+v, want ok true", e)
+	}
+	if !strings.Contains(e.Reason, "/etc/ftpusers") {
+		t.Errorf("root_denied reason %q must name the file that denies root", e.Reason)
+	}
+	// The pam.d file is a SOURCE, not an access file: /etc/pam.d/vsftpd is
+	// 0644 on every Debian host, and recording it as a row would fail U-56
+	// for a permission that is correct.
+	if got := ftpAccessPaths(t, b); slices.Contains(got, "/etc/pam.d/vsftpd") {
+		t.Errorf("access_files %v must not carry the pam.d service file itself", got)
+	}
+}
+
+// The RHEL shape: PAM names /etc/vsftpd/ftpusers and userlist_enable=YES adds
+// the build's own user list, so there are two rows, sorted by path.
+func TestFtpAccessFilesRhelUserlistDeny(t *testing.T) {
+	a := ftpAccess(map[string]string{
+		"/etc/vsftpd/vsftpd.conf": "vsftpd.conf.rhel",
+		"/etc/pam.d/vsftpd":       "pam.d.vsftpd.rhel",
+		"/etc/vsftpd/ftpusers":    "ftpusers.root",
+		"/etc/vsftpd/user_list":   "user_list.noroot",
+	})
+	b := buildBegun(t, "ftp", a)
+	if got := ftpAccessPaths(t, b); !slices.Equal(got,
+		[]string{"/etc/vsftpd/ftpusers", "/etc/vsftpd/user_list"}) {
+		t.Fatalf("access_files paths %v, want both files sorted", got)
+	}
+	ftpRowField(t, ftpAccessRow(t, b, "/etc/vsftpd/ftpusers"), "role", "pam_deny")
+	ftpRowField(t, ftpAccessRow(t, b, "/etc/vsftpd/ftpusers"), "root_listed", true)
+	ftpRowField(t, ftpAccessRow(t, b, "/etc/vsftpd/user_list"), "role", "userlist_deny")
+	ftpRowField(t, ftpAccessRow(t, b, "/etc/vsftpd/user_list"), "root_listed", false)
+	if e := env(t, b, "ftp.root_denied"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("root_denied %+v, want ok true: the PAM list names root", e)
+	}
+}
+
+// userlist_deny=NO turns the same file into an ALLOW list, which refuses every
+// account it does not name: root absent from it DENIES root, and root present
+// in it permits root. The deny reading of the same file is the opposite
+// verdict, so this is the assertion that catches a flipped semantics.
+func TestFtpUserlistAllowSemantics(t *testing.T) {
+	withList := func(list string) *fsAccess {
+		return ftpAccess(map[string]string{
+			"/etc/vsftpd.conf":      "vsftpd.conf.userlist-allow-declared",
+			"/etc/pam.d/vsftpd":     "pam.d.vsftpd.nolistfile",
+			"/etc/vsftpd/user_list": list,
+		})
+	}
+	off := buildBegun(t, "ftp", withList("user_list.noroot"))
+	ftpRowField(t, ftpAccessRow(t, off, "/etc/vsftpd/user_list"), "role", "userlist_allow")
+	if e := env(t, off, "ftp.root_denied"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("root_denied %+v, want ok true: an allow list that omits root refuses it", e)
+	}
+	on := buildBegun(t, "ftp", withList("user_list.root"))
+	if e := env(t, on, "ftp.root_denied"); e.Status != facts.StatusOK || e.Value != false {
+		t.Errorf("root_denied %+v, want ok false: the allow list names root", e)
+	}
+
+	// The same file read as a DENY list, which is what userlist_deny leaves
+	// it: now naming root is what refuses root, and omitting it is not.
+	denyList := func(list string) *fsAccess {
+		return ftpAccess(map[string]string{
+			"/etc/vsftpd.conf":      "vsftpd.conf.userlist-deny",
+			"/etc/pam.d/vsftpd":     "pam.d.vsftpd.nolistfile",
+			"/etc/vsftpd/user_list": list,
+		})
+	}
+	named := buildBegun(t, "ftp", denyList("user_list.root"))
+	ftpRowField(t, ftpAccessRow(t, named, "/etc/vsftpd/user_list"), "role", "userlist_deny")
+	if e := env(t, named, "ftp.root_denied"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("root_denied %+v, want ok true: the deny list names root", e)
+	}
+	if e := env(t, buildBegun(t, "ftp", denyList("user_list.noroot")), "ftp.root_denied"); e.Status != facts.StatusOK || e.Value != false {
+		t.Errorf("root_denied %+v, want ok false: the deny list omits root", e)
+	}
+
+	// The same semantics reached through PAM: sense=allow over a declared file.
+	pam := buildBegun(t, "ftp", ftpAccess(map[string]string{
+		"/etc/vsftpd.conf":      "vsftpd.conf.debian",
+		"/etc/pam.d/vsftpd":     "pam.d.vsftpd.allow",
+		"/etc/vsftpd/user_list": "user_list.noroot",
+	}))
+	ftpRowField(t, ftpAccessRow(t, pam, "/etc/vsftpd/user_list"), "role", "pam_allow")
+	if e := env(t, pam, "ftp.root_denied"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("root_denied %+v, want ok true: pam_listfile sense=allow omits root", e)
+	}
+}
+
+// Nothing denies root and nothing allow-lists anyone: a definite finding, not
+// an absent leaf. A deny list that exists and simply does not name root is the
+// same answer, and its row still carries the permissions U-56 judges.
+func TestFtpRootNotDeniedIsFalse(t *testing.T) {
+	none := buildBegun(t, "ftp", ftpAccess(map[string]string{
+		"/etc/vsftpd.conf":  "vsftpd.conf.debian",
+		"/etc/pam.d/vsftpd": "pam.d.vsftpd.nolistfile",
+	}))
+	if e := env(t, none, "ftp.root_denied"); e.Status != facts.StatusOK || e.Value != false {
+		t.Fatalf("root_denied %+v, want ok false when no list denies root", e)
+	}
+	if got := ftpAccessPaths(t, none); len(got) != 0 {
+		t.Errorf("access_files %v, want an ok empty list", got)
+	}
+	if e := env(t, none, "ftp.access_file_present"); e.Status != facts.StatusOK || e.Value != false {
+		t.Errorf("access_file_present %+v, want ok false", e)
+	}
+
+	listed := buildBegun(t, "ftp", ftpAccess(map[string]string{
+		"/etc/vsftpd.conf":  "vsftpd.conf.debian",
+		"/etc/pam.d/vsftpd": "pam.d.vsftpd.debian",
+		"/etc/ftpusers":     "ftpusers.noroot",
+	}))
+	if e := env(t, listed, "ftp.root_denied"); e.Status != facts.StatusOK || e.Value != false {
+		t.Errorf("root_denied %+v, want ok false: the list exists and omits root", e)
+	}
+}
+
+// local_enable=NO refuses every local account, root included, whatever the
+// lists say.
+func TestFtpLocalDisabledDeniesRoot(t *testing.T) {
+	b := buildBegun(t, "ftp", ftpAccess(map[string]string{
+		"/etc/vsftpd.conf":  "vsftpd.conf.anon-only",
+		"/etc/pam.d/vsftpd": "pam.d.vsftpd.nolistfile",
+	}))
+	e := env(t, b, "ftp.root_denied")
+	if e.Status != facts.StatusOK || e.Value != true {
+		t.Fatalf("root_denied %+v, want ok true", e)
+	}
+	if !strings.Contains(e.Reason, "local") {
+		t.Errorf("root_denied reason %q must say local logins are disabled", e.Reason)
+	}
+}
+
+// Rulings L-21 and L-22: pam_service_name picks the pam.d file, and both a
+// service name and a listfile path outside the declaration are RECORDED and
+// never opened - a path muster's change control never approved is not a path
+// it reads.
+func TestFtpUndeclaredPamListfileIsRecorded(t *testing.T) {
+	ftpService := ftpAccess(map[string]string{
+		"/etc/vsftpd.conf": "vsftpd.conf.pam-ftp",
+		"/etc/pam.d/ftp":   "pam.d.ftp.debian",
+		"/etc/ftpusers":    "ftpusers.root",
+	})
+	b := buildBegun(t, "ftp", ftpService)
+	if e := env(t, b, "ftp.root_denied"); e.Status != facts.StatusOK || e.Value != true {
+		t.Fatalf("root_denied %+v, want ok true through /etc/pam.d/ftp", e)
+	}
+	if slices.Contains(ftpService.reads, "/etc/pam.d/vsftpd") {
+		t.Error("pam_service_name=ftp must not send the collector to /etc/pam.d/vsftpd")
+	}
+
+	site := ftpAccess(map[string]string{"/etc/vsftpd.conf": "vsftpd.conf.pam-other"})
+	other := buildBegun(t, "ftp", site)
+	e := env(t, other, "ftp.root_denied")
+	if e.Status != facts.StatusAbsent {
+		t.Errorf("root_denied %+v, want absent: the PAM service is outside the declaration", e)
+	}
+	if !strings.Contains(e.Reason, "/etc/pam.d/vsftpd-site") {
+		t.Errorf("root_denied reason %q must name the service file", e.Reason)
+	}
+	if slices.Contains(site.reads, "/etc/pam.d/vsftpd-site") {
+		t.Error("an undeclared PAM service file must be recorded, never read")
+	}
+
+	undeclared := ftpAccess(map[string]string{
+		"/etc/vsftpd.conf":  "vsftpd.conf.debian",
+		"/etc/pam.d/vsftpd": "pam.d.vsftpd.undeclared",
+	})
+	out := buildBegun(t, "ftp", undeclared)
+	rec := ftpAccessRow(t, out, "/etc/vsftpd/deny_users")
+	for _, c := range []struct {
+		field string
+		want  any
+	}{
+		{"role", "pam_deny"},
+		{"stat_status", "undeclared"},
+		{"exists", false},
+		{"root_listed", false},
+		// Ruling L-15: never 0, which reads as a root-owned file with no bits.
+		{"mode", -1},
+		{"uid", -1},
+		{"gid", -1},
+	} {
+		ftpRowField(t, rec, c.field, c.want)
+	}
+	if slices.Contains(undeclared.reads, "/etc/vsftpd/deny_users") {
+		t.Error("an undeclared listfile must be recorded, never read")
+	}
+	if e := env(t, out, "ftp.root_denied"); e.Status != facts.StatusAbsent ||
+		!strings.Contains(e.Reason, "/etc/vsftpd/deny_users") {
+		t.Errorf("root_denied %+v must be absent and name the list it could not read", e)
+	}
+}
+
+// A deny list that STATS but cannot be READ: the permission fields are known,
+// so U-56 can still judge them, the content is not, and root_denied is absent
+// rather than a confident false.
+func TestFtpAccessFileStatOkButReadDenied(t *testing.T) {
+	a := ftpAccess(map[string]string{
+		"/etc/vsftpd.conf":  "vsftpd.conf.debian",
+		"/etc/pam.d/vsftpd": "pam.d.vsftpd.debian",
+		"/etc/ftpusers":     "ftpusers.root",
+	})
+	a.stats["/etc/ftpusers"] = statResult{mode: 0o600, uid: 0, gid: 0, kind: "regular"}
+	a.fails["/etc/ftpusers"] = unix.EACCES
+	b := buildBegun(t, "ftp", a)
+	rec := ftpAccessRow(t, b, "/etc/ftpusers")
+	ftpRowField(t, rec, "stat_status", "ok")
+	ftpRowField(t, rec, "exists", true)
+	ftpRowField(t, rec, "mode", 384)
+	ftpRowField(t, rec, "root_listed", false)
+	if _, ok := rec["reason"]; !ok {
+		t.Errorf("%v carries no reason for the read it could not do", rec["path"])
+	}
+	e := env(t, b, "ftp.root_denied")
+	if e.Status != facts.StatusAbsent {
+		t.Fatalf("root_denied %+v, want absent: the only deny list could not be read", e)
+	}
+	if !strings.Contains(e.Reason, "/etc/ftpusers") {
+		t.Errorf("root_denied reason %q must name the file", e.Reason)
+	}
+	// The run stays complete: an unreadable ftpusers says nothing about
+	// anonymous logins, and C3 binds a file to the values it could set.
+	if e := env(t, b, "ftp.parse_complete"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("parse_complete %+v, want ok true", e)
+	}
+	if s := env(t, b, "ftp.anonymous_enabled").Status; s != facts.StatusOK {
+		t.Errorf("anonymous_enabled = %s, want ok: the access list cannot set it", s)
+	}
+}
+
+// The greeting: ftpd_banner wins over banner_file, a custom line that does not
+// name the product is not a disclosure, and an unset banner is the compiled
+// greeting, whose text is NOT invented.
+func TestFtpBannerDisclosure(t *testing.T) {
+	unset := buildBegun(t, "ftp", ftpAccess(map[string]string{
+		"/etc/vsftpd.conf":  "vsftpd.conf.debian",
+		"/etc/pam.d/vsftpd": "pam.d.vsftpd.nolistfile",
+	}))
+	if e := env(t, unset, "ftp.banner_source"); e.Status != facts.StatusOK || e.Value != "default" {
+		t.Fatalf("banner_source %+v, want ok default", e)
+	}
+	e := env(t, unset, "ftp.banner_text")
+	if e.Status != facts.StatusOK || e.Value != "" {
+		t.Errorf("banner_text %+v, want an ok empty string: the compiled text is not invented", e)
+	}
+	if !strings.Contains(strings.ToLower(e.Reason), "vsftpd") {
+		t.Errorf("banner_text reason %q must name the product whose greeting is served", e.Reason)
+	}
+	if !ftpBool(t, unset, "ftp.banner_discloses_version") {
+		t.Error("vsftpd's compiled greeting names the product")
+	}
+
+	plain := buildBegun(t, "ftp", ftpAccess(map[string]string{"/etc/vsftpd.conf": "vsftpd.conf.banner"}))
+	if e := env(t, plain, "ftp.banner_source"); e.Value != "ftpd_banner" {
+		t.Errorf("banner_source %+v, want ftpd_banner", e)
+	}
+	if e := env(t, plain, "ftp.banner_text"); e.Value != "Welcome. Authorized use only." {
+		t.Errorf("banner_text %+v", e)
+	}
+	if ftpBool(t, plain, "ftp.banner_discloses_version") {
+		t.Error("a custom greeting that names no product is not a disclosure")
+	}
+
+	named := buildBegun(t, "ftp", ftpAccess(map[string]string{"/etc/vsftpd.conf": "vsftpd.conf.banner-version"}))
+	if !ftpBool(t, named, "ftp.banner_discloses_version") {
+		t.Error("a greeting naming vsFTPd discloses the product")
+	}
+
+	file := buildBegun(t, "ftp", ftpAccess(map[string]string{
+		"/etc/vsftpd.conf": "vsftpd.conf.banner-file",
+		"/etc/issue.net":   "issue_net",
+	}))
+	if e := env(t, file, "ftp.banner_source"); e.Value != "banner_file" {
+		t.Errorf("banner_source %+v, want banner_file", e)
+	}
+	if e := env(t, file, "ftp.banner_text"); e.Status != facts.StatusOK ||
+		!strings.Contains(fmt.Sprint(e.Value), "Authorized use only") {
+		t.Errorf("banner_text %+v, want the file's text", e)
+	}
+	if ftpBool(t, file, "ftp.banner_discloses_version") {
+		t.Error("the banner file names no product")
+	}
+
+	fileNamed := buildBegun(t, "ftp", ftpAccess(map[string]string{
+		"/etc/vsftpd.conf": "vsftpd.conf.banner-file",
+		"/etc/issue.net":   "vsftpd.banner.version",
+	}))
+	if !ftpBool(t, fileNamed, "ftp.banner_discloses_version") {
+		t.Error("a banner FILE naming vsFTPd discloses the product too")
+	}
+
+	// Ruling L-5: a banner file outside the declaration is recorded and never
+	// opened, so its text and the verdict built on it are absent.
+	site := ftpAccess(map[string]string{"/etc/vsftpd.conf": "vsftpd.conf.banner-file-undeclared"})
+	outside := buildBegun(t, "ftp", site)
+	if e := env(t, outside, "ftp.banner_source"); e.Status != facts.StatusOK || e.Value != "banner_file" {
+		t.Errorf("banner_source %+v, want ok banner_file", e)
+	}
+	for _, k := range []string{"ftp.banner_text", "ftp.banner_discloses_version"} {
+		e := env(t, outside, k)
+		if e.Status != facts.StatusAbsent {
+			t.Errorf("%s = %s, want absent", k, e.Status)
+		}
+		if !strings.Contains(e.Reason, "/srv/ftp/welcome.txt") {
+			t.Errorf("%s reason %q must name the file it did not read", k, e.Reason)
+		}
+	}
+	if slices.Contains(site.reads, "/srv/ftp/welcome.txt") {
+		t.Error("an undeclared banner file must be recorded, never read")
+	}
+}
+
+// proftpd: ServerIdent decides the greeting and RootLogin decides the root
+// login, both at the top level only (Ruling L-35). /etc/ftpusers is an access
+// file whenever UseFtpUsers is not off.
+func TestFtpProftpdIdentAndRootLogin(t *testing.T) {
+	stock := buildBegun(t, "ftp", ftpAccess(map[string]string{"/etc/proftpd/proftpd.conf": "proftpd.conf.stock"}))
+	if e := env(t, stock, "ftp.banner_source"); e.Status != facts.StatusOK || e.Value != "default" {
+		t.Fatalf("banner_source %+v, want ok default when ServerIdent is unset", e)
+	}
+	if !ftpBool(t, stock, "ftp.banner_discloses_version") {
+		t.Error("proftpd's default identification names the product")
+	}
+	e := env(t, stock, "ftp.root_denied")
+	if e.Status != facts.StatusOK || e.Value != true {
+		t.Fatalf("root_denied %+v, want ok true: RootLogin defaults to off", e)
+	}
+	if !strings.Contains(e.Reason, "RootLogin") {
+		t.Errorf("root_denied reason %q must name the directive", e.Reason)
+	}
+	// UseFtpUsers is on, so /etc/ftpusers is an access file even when it is
+	// not there - and an absent row never claims mode 0 owned by root (L-15).
+	rec := ftpAccessRow(t, stock, "/etc/ftpusers")
+	ftpRowField(t, rec, "role", "ftpusers")
+	ftpRowField(t, rec, "stat_status", "absent")
+	ftpRowField(t, rec, "exists", false)
+	ftpRowField(t, rec, "mode", -1)
+	ftpRowField(t, rec, "uid", -1)
+	ftpRowField(t, rec, "gid", -1)
+	if e := env(t, stock, "ftp.access_file_present"); e.Status != facts.StatusOK || e.Value != false {
+		t.Errorf("access_file_present %+v, want ok false", e)
+	}
+
+	off := buildBegun(t, "ftp", ftpAccess(map[string]string{"/etc/proftpd/proftpd.conf": "proftpd.conf.ident-off"}))
+	if e := env(t, off, "ftp.banner_source"); e.Value != "serverident" {
+		t.Errorf("banner_source %+v, want serverident", e)
+	}
+	if ftpBool(t, off, "ftp.banner_discloses_version") {
+		t.Error("ServerIdent off suppresses the product name")
+	}
+
+	root := buildBegun(t, "ftp", ftpAccess(map[string]string{"/etc/proftpd/proftpd.conf": "proftpd.conf.rootlogin-on"}))
+	if e := env(t, root, "ftp.root_denied"); e.Status != facts.StatusOK || e.Value != false {
+		t.Errorf("root_denied %+v, want ok false: RootLogin on and no list names root", e)
+	}
+	if e := env(t, root, "ftp.banner_text"); e.Status != facts.StatusOK || e.Value != "FTP service ready" {
+		t.Errorf("banner_text %+v, want the quoted identification string", e)
+	}
+	if ftpBool(t, root, "ftp.banner_discloses_version") {
+		t.Error("a custom identification string that names no product is not a disclosure")
+	}
+
+	listed := buildBegun(t, "ftp", ftpAccess(map[string]string{
+		"/etc/proftpd/proftpd.conf": "proftpd.conf.rootlogin-on",
+		"/etc/ftpusers":             "ftpusers.root",
+	}))
+	if e := env(t, listed, "ftp.root_denied"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("root_denied %+v, want ok true: /etc/ftpusers names root", e)
+	}
+}
+
+// pure-ftpd refuses every account below MinUID, which is at least 1 in every
+// build, so root cannot log in at all; its greeting is not configurable in
+// this model, so the banner leaves are absent rather than guessed.
+func TestFtpPureFtpdRootAndBanner(t *testing.T) {
+	b := buildBegun(t, "ftp", ftpAccess(map[string]string{"/etc/pure-ftpd/pure-ftpd.conf": "pure-ftpd.conf.stock"}))
+	e := env(t, b, "ftp.root_denied")
+	if e.Status != facts.StatusOK || e.Value != true {
+		t.Fatalf("root_denied %+v, want ok true", e)
+	}
+	if !strings.Contains(e.Reason, "MinUID") {
+		t.Errorf("root_denied reason %q must name the evidence", e.Reason)
+	}
+	for _, k := range []string{"ftp.banner_source", "ftp.banner_text", "ftp.banner_discloses_version"} {
+		if s := env(t, b, k).Status; s != facts.StatusAbsent {
+			t.Errorf("%s = %s, want absent on pure-ftpd", k, s)
+		}
+	}
+	if got := ftpAccessPaths(t, b); len(got) != 0 {
+		t.Errorf("access_files %v, want an ok empty list", got)
 	}
 }

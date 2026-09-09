@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io/fs"
 	"path"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -49,6 +50,25 @@ const (
 const (
 	vsftpdDebianUserList = "/etc/vsftpd.user_list"
 	vsftpdRhelUserList   = "/etc/vsftpd/user_list"
+	etcFtpusers          = "/etc/ftpusers"
+
+	// vsftpd's own compiled pam_service_name. Ruling L-21: both packaged
+	// builds ship this value and upstream ships "ftp", so both pam.d files
+	// are declared; any other name is a path this collector never opened.
+	vsftpdDefaultPamService = "vsftpd"
+)
+
+// The roles an access-control file plays. The plan names four; pam_allow is
+// the fifth (see the ftp.access_files registry description): pam_listfile
+// takes sense=allow as readily as sense=deny, and filing such a file as a
+// userlist_allow would point a reader at ftp.userlist_file, which is not
+// where it came from.
+const (
+	rolePamDeny       = "pam_deny"
+	rolePamAllow      = "pam_allow"
+	roleUserlistDeny  = "userlist_deny"
+	roleUserlistAllow = "userlist_allow"
+	roleFtpusers      = "ftpusers"
 )
 
 var (
@@ -56,13 +76,15 @@ var (
 	vsftpdMains  = []string{vsftpdDebianConf, vsftpdRhelConf}
 	proftpdMains = []string{proftpdDebianConf, proftpdRhelConf}
 
-	// The access files the next task reads; declared here so the whole
-	// module's declaration is settled in one place.
+	// The access files this collector reads, and the greeting files a
+	// vsftpd banner_file may point at. Ruling L-5: a config-supplied path
+	// outside these lists is recorded, never opened.
 	ftpAccessFiles = []string{
 		"/etc/vsftpd/ftpusers", vsftpdRhelUserList, vsftpdDebianUserList,
-		"/etc/vsftpd.ftpusers", "/etc/ftpusers",
-		"/etc/pam.d/vsftpd", "/etc/pam.d/ftp",
+		"/etc/vsftpd.ftpusers", etcFtpusers,
+		pamDir + "/" + vsftpdDefaultPamService, pamDir + "/ftp",
 	}
+	ftpBannerFiles = []string{"/etc/issue.net", "/etc/vsftpd/banner*"}
 )
 
 // ftpConfCandidates is every main configuration file the collector looks
@@ -80,7 +102,8 @@ func ftpReads() []string {
 		pureFtpdConf, pureFtpdConfGlob,
 		vsftpdBin, proftpdBin, pureFtpdBin,
 	}
-	return append(reads, ftpAccessFiles...)
+	reads = append(reads, ftpAccessFiles...)
+	return append(reads, ftpBannerFiles...)
 }
 
 var ftpCollector = collect.Collector{
@@ -108,6 +131,15 @@ var ftpJudgedKeys = []string{
 	"ftp.userlist_enable",
 	"ftp.userlist_deny",
 	"ftp.userlist_file",
+	// The access and greeting leaves degrade with the rest: WHICH files hold
+	// the access lists is itself read out of the configuration, so a parse
+	// that could not be finished cannot promise the list is complete either.
+	"ftp.access_files",
+	"ftp.access_file_present",
+	"ftp.root_denied",
+	"ftp.banner_source",
+	"ftp.banner_text",
+	"ftp.banner_discloses_version",
 }
 
 // vsftpdDefaults are the values vsftpd's own tunables.c compiles in, which
@@ -649,6 +681,17 @@ func (p *ftpParse) publishVsftpd(b *collect.Builder, src *facts.Source) {
 	b.Set("ftp.userlist_enable", collect.OK(p.vsftpdBool("userlist_enable"), src))
 	b.Set("ftp.userlist_deny", collect.OK(p.vsftpdBool("userlist_deny"), src))
 	b.Set("ftp.userlist_file", p.userlistFile(src))
+
+	recs, blind := p.vsftpdAccess()
+	p.publishAccessFiles(b, src, recs, "this vsftpd configuration names no per-account access list")
+	if !p.vsftpdBool("local_enable") {
+		e := collect.OK(true, src)
+		e.Reason = "local_enable is NO: no local account, root included, may log in"
+		b.Set("ftp.root_denied", e)
+	} else {
+		b.Set("ftp.root_denied", rootDenied(recs, blind, src))
+	}
+	p.publishVsftpdBanner(b, src)
 }
 
 // userlistFile is the explicit userlist_file, or the build default that is
@@ -663,15 +706,34 @@ func (p *ftpParse) userlistFile(src *facts.Source) facts.Envelope {
 		}
 		return collect.OK(v, src)
 	}
-	for _, c := range p.userListCandidates() {
-		if pathPresent(p.a, c) {
-			e := collect.OK(c, &facts.Source{Kind: "file", Path: c})
-			e.Reason = "userlist_file is not set; this is the build default that exists on this host"
-			return e
-		}
+	if c, ok := p.userlistDefault(); ok {
+		e := collect.OK(c, &facts.Source{Kind: "file", Path: c})
+		e.Reason = "userlist_file is not set; this is the build default that exists on this host"
+		return e
 	}
 	return collect.Absent("userlist_file is not set and neither build default (" +
 		vsftpdDebianUserList + ", " + vsftpdRhelUserList + ") exists")
+}
+
+// userlistDefault is the build default user list that is on disk, if either
+// is; the leaf and the access record must agree on which file that is.
+func (p *ftpParse) userlistDefault() (string, bool) {
+	for _, c := range p.userListCandidates() {
+		if pathPresent(p.a, c) {
+			return c, true
+		}
+	}
+	return "", false
+}
+
+// userlistPath is the file vsftpd would actually read its user list from -
+// the explicit userlist_file, else the build default that exists - as a
+// plain path, for the access record that has to stat it.
+func (p *ftpParse) userlistPath() (string, bool) {
+	if v, ok := p.vsftpd["userlist_file"]; ok && v != "" && !oversized(v) {
+		return v, true
+	}
+	return p.userlistDefault()
 }
 
 // userListCandidates orders the two build defaults by the layout the main
@@ -693,6 +755,17 @@ func (p *ftpParse) publishProftpd(b *collect.Builder, src *facts.Source) {
 	b.Set("ftp.tcp_wrappers", collect.Absent(
 		"proftpd wraps connections through mod_wrap2's directives, which this model does not read"))
 	p.setNotAVsftpdConcept(b, "proftpd")
+
+	recs := p.proftpdAccess()
+	p.publishAccessFiles(b, src, recs, "UseFtpUsers is off, so proftpd consults no per-account access list")
+	if !proftpdOn(p.pro["rootlogin"]) {
+		e := collect.OK(true, src)
+		e.Reason = "RootLogin is not on, and proftpd's own default is off, so root cannot log in"
+		b.Set("ftp.root_denied", e)
+	} else {
+		b.Set("ftp.root_denied", rootDenied(recs, nil, src))
+	}
+	p.publishProftpdBanner(b, src)
 }
 
 func (p *ftpParse) publishPureFtpd(b *collect.Builder, src *facts.Source) {
@@ -706,6 +779,14 @@ func (p *ftpParse) publishPureFtpd(b *collect.Builder, src *facts.Source) {
 	b.Set("ftp.tcp_wrappers", collect.Absent(
 		"pure-ftpd has no tcp_wrappers setting of its own in this model"))
 	p.setNotAVsftpdConcept(b, "pure-ftpd")
+
+	p.publishAccessFiles(b, src, nil,
+		"pure-ftpd is not configured through a per-account list in this model")
+	root := collect.OK(true, src)
+	root.Reason = "pure-ftpd refuses every account whose uid is below MinUID, which is at least 1 in every build, so root cannot log in"
+	b.Set("ftp.root_denied", root)
+	notModelled := collect.Absent("the pure-ftpd greeting is not configurable in this version's model")
+	p.setBanner(b, notModelled, notModelled, notModelled)
 }
 
 // setNotAVsftpdConcept writes the three user-list leaves for an
@@ -850,4 +931,438 @@ func proftpdSectionName(line string) string {
 		name = name[:i]
 	}
 	return name
+}
+
+// ftpProductRe matches a product name in a greeting. A bare version number
+// is deliberately NOT a disclosure: "220 3.0.5 ready" tells a scanner
+// nothing about which daemon the number belongs to, while any of these
+// names hands it the software to look up advisories for.
+var ftpProductRe = regexp.MustCompile(`(?i)\b(vsftpd|proftpd|pure-?ftpd|wu-?ftpd)\b`)
+
+// ftpAccessRec is one access-control file as this run found it: the
+// permission fields U-56 judges, whether root is named in it, and what the
+// stat could say. Ruling L-15: mode, uid and gid are the INTS writePermFacts
+// stores, and a record whose stat did not succeed carries -1 in all three —
+// never 0, which reads as a root-owned file with no bits set.
+type ftpAccessRec struct {
+	path string
+	role string
+
+	exists     bool
+	rootListed bool
+	mode       int
+	uid        int
+	gid        int
+	statStatus string // Ruling L-22: ok|absent|denied|error|undeclared
+	reason     string
+
+	// blind is set when the file's CONTENT could not be read, so rootListed
+	// is not an answer about this file — only about what was seen of it.
+	blind bool
+}
+
+// record is the row a control reads. R176: every field a clause could filter
+// or compare on is present in every row, whatever the stat said; reason is
+// the one addition, and only when there is something to say.
+func (r *ftpAccessRec) record() map[string]any {
+	rec := map[string]any{
+		"path":        r.path,
+		"role":        r.role,
+		"exists":      r.exists,
+		"root_listed": r.rootListed,
+		"mode":        r.mode,
+		"uid":         r.uid,
+		"gid":         r.gid,
+		"stat_status": r.statStatus,
+	}
+	if r.reason != "" {
+		rec["reason"] = r.reason
+	}
+	return rec
+}
+
+// rootDenial is what one access file says about a root login.
+type rootDenial int
+
+const (
+	rootUndecided rootDenial = iota // this file refuses nobody named root
+	rootRefused                     // this file refuses root
+	rootUnknown                     // this file could not be read
+)
+
+// says reads one record with its ROLE's semantics. A deny list refuses the
+// accounts it names; an allow list refuses every account it does NOT name,
+// so the same file read the other way is the opposite verdict. A deny list
+// that is not there refuses nobody, which is a definite answer, while an
+// allow list that is not there cannot be read as "everyone is allowed".
+func (r *ftpAccessRec) says() rootDenial {
+	allow := r.role == roleUserlistAllow || r.role == rolePamAllow
+	switch {
+	case r.blind:
+		return rootUnknown
+	case !r.exists:
+		if allow {
+			return rootUnknown
+		}
+		return rootUndecided
+	case allow == r.rootListed:
+		return rootUndecided
+	}
+	return rootRefused
+}
+
+// accessRecord stats one access-control file and reads it for a literal root
+// line. Ruling L-5: a path the declaration does not cover is recorded and
+// never opened. The stat and the read are separate questions — a 0640
+// root-owned list is stat-able by anyone and readable by almost nobody — so
+// a file whose content is denied still carries the permission fields U-56
+// judges, with an honest reason for the content it could not see.
+func (p *ftpParse) accessRecord(file, role string) *ftpAccessRec {
+	r := &ftpAccessRec{path: path.Clean(file), role: role, mode: -1, uid: -1, gid: -1}
+	if !declared(p.a, r.path) {
+		r.statStatus, r.blind = "undeclared", true
+		r.reason = "outside this collector's declaration: recorded, never opened"
+		return r
+	}
+	meta, err := p.a.Stat(r.path)
+	if err != nil {
+		e := collect.FromReadError(err, collect.ReadMeta{})
+		r.statStatus = string(e.Status)
+		r.blind = e.Status != facts.StatusAbsent
+		if r.blind {
+			r.reason = readReason(r.path, err)
+		}
+		return r
+	}
+	r.statStatus, r.exists = "ok", true
+	r.mode, r.uid, r.gid = int(meta.Mode), int(meta.UID), int(meta.GID)
+	data, rmeta, rerr := p.a.ReadFile(r.path, readLimit)
+	switch {
+	case rerr != nil:
+		r.blind = true
+		r.reason = "the file exists but its content could not be read: " + readReason(r.path, rerr)
+	case rmeta.Truncated:
+		r.blind = true
+		r.reason = "the file was cut at the read limit; a name past the cap cannot be seen"
+	default:
+		r.rootListed = listsRoot(data)
+	}
+	return r
+}
+
+// listsRoot reports whether a user list names root. Each line is one account
+// name; a blank line and a '#' comment name nobody.
+func listsRoot(data []byte) bool {
+	for _, raw := range splitLines(data) {
+		line := strings.TrimSpace(raw)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		if line == "root" {
+			return true
+		}
+	}
+	return false
+}
+
+// pamListfile is one pam_listfile.so line: the file it names and whether
+// that file is an allow list rather than a deny list.
+type pamListfile struct {
+	file  string
+	allow bool
+}
+
+// parsePamListfiles reads every pam_listfile.so line that filters on the
+// USER name. The control field is not inspected — a list under auth, account
+// or session gates the same login either way — and onerr is a failure policy
+// rather than a membership rule, so it is ignored. An @include line pulls in
+// a common-* stack, which carries no per-service user list.
+func parsePamListfiles(data []byte) []pamListfile {
+	var out []pamListfile
+	for _, raw := range splitLines(data) {
+		line := strings.TrimSpace(raw)
+		if line == "" || strings.HasPrefix(line, "#") || strings.HasPrefix(line, "@") {
+			continue
+		}
+		fields := strings.Fields(line)
+		mod := -1
+		for i, f := range fields {
+			if path.Base(f) == "pam_listfile.so" {
+				mod = i
+				break
+			}
+		}
+		if mod < 0 {
+			continue
+		}
+		var lf pamListfile
+		item, sense := "", ""
+		for _, f := range fields[mod+1:] {
+			k, v, ok := strings.Cut(f, "=")
+			if !ok {
+				continue
+			}
+			switch strings.ToLower(k) {
+			case "item":
+				item = strings.ToLower(v)
+			case "sense":
+				sense = strings.ToLower(v)
+			case "file":
+				lf.file = v
+			}
+		}
+		// item=group, item=tty and the rest gate on something other than the
+		// account name, so they say nothing about whether root may log in.
+		if item != "user" || lf.file == "" {
+			continue
+		}
+		lf.allow = sense == "allow"
+		out = append(out, lf)
+	}
+	return out
+}
+
+// vsftpdAccess is every file vsftpd consults to decide WHO may log in, plus
+// the sources whose content could not be seen. Ruling L-21: the PAM service
+// file is /etc/pam.d/ + the pam_service_name value, whose compiled default is
+// vsftpd in both packaged builds; a name the declaration does not cover is
+// named in the reason rather than opened.
+func (p *ftpParse) vsftpdAccess() (recs []*ftpAccessRec, blind []string) {
+	pamFile := p.pamServiceFile()
+	if !declared(p.a, pamFile) {
+		blind = append(blind, pamFile+" is outside this collector's declaration and was not read, so the lists it names are unknown")
+	} else {
+		data, meta, err := p.a.ReadFile(pamFile, readLimit)
+		switch {
+		case err != nil && errors.Is(err, fs.ErrNotExist):
+			// Nothing names a list. That is an answer, not a blind spot.
+		case err != nil:
+			blind = append(blind, pamFile+" could not be read: "+readReason(pamFile, err))
+		case meta.Truncated:
+			blind = append(blind, pamFile+" was cut at the read limit, so a list named past the cap is unknown")
+		default:
+			for _, lf := range parsePamListfiles(data) {
+				role := rolePamDeny
+				if lf.allow {
+					role = rolePamAllow
+				}
+				recs = append(recs, p.accessRecord(lf.file, role))
+			}
+		}
+	}
+	if p.vsftpdBool("userlist_enable") {
+		role := roleUserlistAllow
+		if p.vsftpdBool("userlist_deny") {
+			role = roleUserlistDeny
+		}
+		switch file, ok := p.userlistPath(); {
+		case ok:
+			recs = append(recs, p.accessRecord(file, role))
+		case role == roleUserlistAllow:
+			// An allow list decides by ABSENCE, so not knowing which file it
+			// is leaves every account's verdict open.
+			blind = append(blind, "userlist_enable is on with userlist_deny=NO, but no user list file could be identified")
+		}
+	}
+	return dedupeAccess(recs), blind
+}
+
+// pamServiceFile is the pam.d file vsftpd's own pam_service_name names.
+func (p *ftpParse) pamServiceFile() string {
+	svc := strings.TrimSpace(p.vsftpd["pam_service_name"])
+	if svc == "" {
+		svc = vsftpdDefaultPamService
+	}
+	return path.Clean(pamDir + "/" + svc)
+}
+
+// proftpdAccess is /etc/ftpusers whenever UseFtpUsers is not explicitly off:
+// the directive's own default is on, and that file is the only per-account
+// list this model reads for proftpd.
+func (p *ftpParse) proftpdAccess() []*ftpAccessRec {
+	if proftpdOff(p.pro["useftpusers"]) {
+		return nil
+	}
+	return []*ftpAccessRec{p.accessRecord(etcFtpusers, roleFtpusers)}
+}
+
+// dedupeAccess keeps the first record of each path and sorts by path, so the
+// same host renders the same bytes however many directives named the file.
+func dedupeAccess(recs []*ftpAccessRec) []*ftpAccessRec {
+	seen := map[string]bool{}
+	out := make([]*ftpAccessRec, 0, len(recs))
+	for _, r := range recs {
+		if seen[r.path] {
+			continue
+		}
+		seen[r.path] = true
+		out = append(out, r)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].path < out[j].path })
+	return out
+}
+
+// publishAccessFiles writes the record list and the presence bool. emptyWhy
+// is the reason the presence leaf carries when this implementation named no
+// access list at all — false there means "nothing was found", which is a
+// different claim from "a list was found and it is empty".
+func (p *ftpParse) publishAccessFiles(b *collect.Builder, src *facts.Source, recs []*ftpAccessRec, emptyWhy string) {
+	list := []any{} // R50: never nil
+	present := false
+	for _, r := range recs {
+		list = append(list, r.record())
+		if r.exists {
+			present = true
+		}
+	}
+	b.Set("ftp.access_files", collect.OK(list, src))
+	e := collect.OK(present, src)
+	if len(recs) == 0 {
+		e.Reason = emptyWhy
+	}
+	b.Set("ftp.access_file_present", e)
+}
+
+// rootDenied answers whether a root login is refused. blind names the
+// sources whose content could not be seen: when nothing refuses root and one
+// of them is blind, the honest answer is none at all rather than a confident
+// false that would PASS U-57 on a host nobody could examine.
+func rootDenied(recs []*ftpAccessRec, blind []string, src *facts.Source) facts.Envelope {
+	var unknown []string
+	for _, r := range recs {
+		switch r.says() {
+		case rootRefused:
+			e := collect.OK(true, src)
+			e.Reason = r.path + " (" + r.role + ") refuses a root login"
+			return e
+		case rootUnknown:
+			unknown = append(unknown, r.path)
+		}
+	}
+	unknown = append(unknown, blind...)
+	if len(unknown) > 0 {
+		return collect.Absent("whether a root login is refused cannot be decided: " +
+			strings.Join(unknown, "; "))
+	}
+	e := collect.OK(false, src)
+	e.Reason = "no access list this collector read refuses a root login"
+	return e
+}
+
+// setBanner writes the three greeting leaves together: what configures the
+// greeting, what it says, and whether that names the product.
+func (p *ftpParse) setBanner(b *collect.Builder, source, text, discloses facts.Envelope) {
+	b.Set("ftp.banner_source", source)
+	b.Set("ftp.banner_text", text)
+	b.Set("ftp.banner_discloses_version", discloses)
+}
+
+// publishVsftpdBanner follows vsftpd's own precedence: ftpd_banner wins over
+// banner_file, and neither set means the compiled greeting. That greeting's
+// text is NOT invented here — the source says "default", the text is empty
+// with a reason naming the product, and the disclosure verdict is true
+// because every build's compiled greeting names vsftpd.
+func (p *ftpParse) publishVsftpdBanner(b *collect.Builder, src *facts.Source) {
+	if v := strings.TrimSpace(p.vsftpd["ftpd_banner"]); v != "" {
+		source := collect.OK("ftpd_banner", src)
+		if oversized(v) {
+			e := collect.Absent("ftpd_banner's value is longer than this collector stores")
+			p.setBanner(b, source, e, e)
+			return
+		}
+		p.setBanner(b, source, collect.OK(v, src), collect.OK(ftpProductRe.MatchString(v), src))
+		return
+	}
+	file := strings.TrimSpace(p.vsftpd["banner_file"])
+	if file == "" {
+		text := collect.OK("", src)
+		text.Reason = "neither ftpd_banner nor banner_file is set, so vsftpd serves its compiled greeting; this collector does not invent that text"
+		discloses := collect.OK(true, src)
+		discloses.Reason = "vsftpd's compiled greeting names the product"
+		p.setBanner(b, collect.OK("default", src), text, discloses)
+		return
+	}
+	source := collect.OK("banner_file", src)
+	clean := path.Clean(file)
+	if !declared(p.a, clean) {
+		e := collect.Absent("banner_file " + clean + " is outside this collector's declaration and was not read")
+		p.setBanner(b, source, e, e)
+		return
+	}
+	data, meta, err := p.a.ReadFile(clean, readLimit)
+	switch {
+	case err != nil:
+		e := readErrorEnv(clean, err)
+		p.setBanner(b, source, e, e)
+	case meta.Truncated:
+		e := collect.Absent(clean + " was cut at the read limit; what is past the cap cannot be judged")
+		p.setBanner(b, source, e, e)
+	default:
+		text := strings.TrimRight(string(data), "\n")
+		if oversized(text) {
+			e := collect.Absent(clean + " is longer than this collector stores")
+			p.setBanner(b, source, e, e)
+			return
+		}
+		fsrc := &facts.Source{Kind: "file", Path: clean}
+		p.setBanner(b, source, collect.OK(text, fsrc), collect.OK(ftpProductRe.MatchString(text), fsrc))
+	}
+}
+
+// publishProftpdBanner reads ServerIdent, whose argument is on or off and,
+// when on, an optional string of the server's own. Unset is proftpd's
+// compiled identification, which names the product.
+func (p *ftpParse) publishProftpdBanner(b *collect.Builder, src *facts.Source) {
+	args := strings.TrimSpace(p.pro["serverident"])
+	if args == "" {
+		p.setBanner(b, collect.OK("default", src),
+			p.compiledIdent(src, "ServerIdent is not set, so proftpd sends its compiled identification; this collector does not invent that text"),
+			p.namesTheProduct(src))
+		return
+	}
+	source := collect.OK("serverident", src)
+	mode, rest, _ := strings.Cut(args, " ")
+	rest = strings.Trim(strings.TrimSpace(rest), `"`)
+	switch {
+	case proftpdOff(mode):
+		text := collect.OK("", src)
+		text.Reason = "ServerIdent " + mode + " keeps the product name out of the identification string"
+		p.setBanner(b, source, text, collect.OK(false, src))
+	case !proftpdOn(mode):
+		e := collect.Absent("ServerIdent " + args + " is neither on nor off, and proftpd refuses to start on it")
+		p.setBanner(b, source, e, e)
+	case rest == "":
+		p.setBanner(b, source,
+			p.compiledIdent(src, "ServerIdent on carries no string of its own, so proftpd sends its compiled identification"),
+			p.namesTheProduct(src))
+	case oversized(rest):
+		e := collect.Absent("the ServerIdent string is longer than this collector stores")
+		p.setBanner(b, source, e, e)
+	default:
+		p.setBanner(b, source, collect.OK(rest, src), collect.OK(ftpProductRe.MatchString(rest), src))
+	}
+}
+
+// compiledIdent is the empty text a daemon's own greeting carries, with the
+// reason that says why it is empty rather than unknown.
+func (p *ftpParse) compiledIdent(src *facts.Source, why string) facts.Envelope {
+	e := collect.OK("", src)
+	e.Reason = why
+	return e
+}
+
+func (p *ftpParse) namesTheProduct(src *facts.Source) facts.Envelope {
+	e := collect.OK(true, src)
+	e.Reason = "proftpd's compiled identification names the product"
+	return e
+}
+
+// proftpdOff reads proftpd's boolean form for a directive whose OWN default
+// is on, so only an explicit off turns it off.
+func proftpdOff(v string) bool {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "off", "no", "false", "0":
+		return true
+	}
+	return false
 }

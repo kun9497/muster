@@ -1,0 +1,8 @@
+# synthetic vsftpd configuration whose user list is an ALLOW list: every
+# account the file does not name is refused.
+anonymous_enable=NO
+local_enable=YES
+pam_service_name=vsftpd
+userlist_enable=YES
+userlist_deny=NO
+userlist_file=/etc/vsftpd/user_list

@@ -1,0 +1,5 @@
+# synthetic vsftpd configuration whose greeting names the product.
+anonymous_enable=NO
+local_enable=YES
+pam_service_name=vsftpd
+ftpd_banner=vsFTPd 3.0.5 ready

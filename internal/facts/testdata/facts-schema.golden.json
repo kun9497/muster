@@ -3370,6 +3370,66 @@
       "Collector": "ftp",
       "DefaultOn": "",
       "SubjectKind": ""
+    },
+    {
+      "Key": "ftp.access_files",
+      "Type": "list\u003crecord\u003e",
+      "Description": "One row per access-control file this host's FTP configuration names, sorted by path, with fields path, role, exists, root_listed, mode, uid, gid and stat_status (plus reason when something could not be seen). role is pam_deny or pam_allow for a file named by a pam_listfile.so line in /etc/pam.d/\u003cpam_service_name\u003e, userlist_deny or userlist_allow for vsftpd's own user list with its sense taken from userlist_deny, and ftpusers for proftpd's /etc/ftpusers when UseFtpUsers is not off. The pam.d service file itself is a SOURCE, not a row - it is world-readable by design and is not an access list. mode is the raw 0o7777 bits as an int (416 for 0640) and uid/gid are ints; a row whose stat did not succeed carries -1 in all three, never 0. stat_status is ok, absent, denied, error or undeclared, the last meaning the configuration named a path outside this collector's declaration, which is recorded and never opened. root_listed is true when a non-comment line of the file is exactly root; it is false, with a reason, whenever the file could be stat-ed but not read.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "ftp",
+      "DefaultOn": "",
+      "SubjectKind": "file"
+    },
+    {
+      "Key": "ftp.access_file_present",
+      "Type": "bool",
+      "Description": "Whether at least one of the access-control files in ftp.access_files exists on this host. False with a reason when the configuration names none at all, which is a different finding from a list that exists and is empty.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "ftp",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "ftp.root_denied",
+      "Type": "bool",
+      "Description": "Whether a root login over FTP is refused. vsftpd - local_enable NO, or root named in a pam_deny or userlist_deny file, or an allow list (userlist_deny NO, or pam_listfile sense=allow) that does not name root. proftpd - RootLogin not on, whose own default is off, or root named in /etc/ftpusers while UseFtpUsers is on. pure-ftpd - always true, because it refuses every account below MinUID, which is at least 1 in every build. Absent when a list that would decide it could not be read: an undeclared path, a denied read or a file cut at the read limit, with the reason naming it.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "ftp",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "ftp.banner_source",
+      "Type": "string",
+      "Description": "What configures the greeting a client is shown before it authenticates - ftpd_banner or banner_file for vsftpd, serverident for proftpd's ServerIdent, default when nothing is configured and the daemon sends its compiled greeting, none when a daemon sends no greeting at all. Absent on pure-ftpd, whose greeting is not configurable in this version's model.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "ftp",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "ftp.banner_text",
+      "Type": "string",
+      "Description": "The configured greeting text - the ftpd_banner value, the content of banner_file, or the string of a proftpd ServerIdent on. A daemon's COMPILED greeting is not invented here - the source is then default and this text is empty, with the reason naming the product whose greeting is served. Absent when the configured banner file is outside this collector's declaration, could not be read, or was cut at the read limit.",
+      "Since": 1,
+      "Sensitivity": "internal",
+      "Collector": "ftp",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "ftp.banner_discloses_version",
+      "Type": "bool",
+      "Description": "Whether the greeting names the FTP software. True whenever the text matches vsftpd, proftpd, pure-ftpd or wu-ftpd, case-insensitively; a bare version number in an otherwise custom greeting is deliberately NOT a disclosure, since it identifies no product. An unset vsftpd banner and an unset or argument-less proftpd ServerIdent are true, because both compiled greetings name the product; ServerIdent off is false. Absent on pure-ftpd and wherever ftp.banner_text is absent.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "ftp",
+      "DefaultOn": "",
+      "SubjectKind": ""
     }
   ]
 }

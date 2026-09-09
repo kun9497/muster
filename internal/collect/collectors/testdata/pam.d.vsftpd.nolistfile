@@ -1,0 +1,6 @@
+# synthetic /etc/pam.d/vsftpd that names no user list at all: nothing here
+# denies an account by name.
+auth	required	pam_shells.so
+@include common-auth
+@include common-account
+@include common-session

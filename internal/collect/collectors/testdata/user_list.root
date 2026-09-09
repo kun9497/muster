@@ -1,0 +1,4 @@
+# synthetic vsftpd user list naming root.
+root
+bin
+daemon

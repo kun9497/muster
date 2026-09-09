@@ -1,0 +1,6 @@
+# synthetic vsftpd configuration that reads its greeting from a file the
+# collector declares.
+anonymous_enable=NO
+local_enable=YES
+pam_service_name=vsftpd
+banner_file=/etc/issue.net

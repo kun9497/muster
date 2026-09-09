@@ -1,0 +1,7 @@
+# synthetic /etc/pam.d/vsftpd in the Debian shape.
+# Deny users named in /etc/ftpusers.
+auth	required	pam_listfile.so item=user sense=deny file=/etc/ftpusers onerr=succeed
+auth	required	pam_shells.so
+@include common-auth
+@include common-account
+@include common-session

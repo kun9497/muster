@@ -1,0 +1,6 @@
+# synthetic vsftpd configuration whose greeting is a custom line that names
+# no product.
+anonymous_enable=NO
+local_enable=YES
+pam_service_name=vsftpd
+ftpd_banner=Welcome. Authorized use only.
