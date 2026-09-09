@@ -1695,13 +1695,13 @@ keys:
     collector: snmp
   - key: snmp.communities
     type: list<record>
-    description: Every configured SNMP community, REDACTED to {ref, kind, is_default, length, source_restricted} - the string itself is never stored, not even hashed, since a hash of a short well-known word is trivially reversible. ref is an opaque ordinal (c1, c2, ...) in file order, kind is ro or rw (a com2sec community is rw only when an access rule reachable from its security name grants a write view), is_default says the string is one of the collector's embedded well-known defaults, length is its rune count and source_restricted says it is bound to a source other than default or an any-address form.
+    description: Every configured SNMP community, REDACTED to {ref, kind, is_default, length, source_restricted} - the string itself is never stored, not even hashed, since a hash of a short well-known word is trivially reversible. ref is an opaque ordinal (c1, c2, ...) in file order; kind is ro, rw or trap (a com2sec community is rw only when an access rule reachable from its security name grants a write view; trap is a trapcommunity or a community named by a trapsink, trap2sink or informsink, which is outbound and carries no source); is_default says the string is one of the collector's embedded well-known defaults; length is its rune count; and source_restricted says it is bound to a source other than default or an any-address form.
     since: 1
     sensitivity: secret
     collector: snmp
   - key: snmp.v3_users
     type: list<record>
-    description: Every SNMPv3 user as {name, auth_proto, priv_proto, level}, sorted by name; the authentication and privacy passphrases are never stored. auth_proto and priv_proto are empty for a user known only from a rouser/rwuser line, and level is the level the user's key material supports, falling back to the minimum an access line demands. Absent when no snmpd configuration was found, or when part of it could not be read.
+    description: The SNMPv3 users named by a createUser, rouser or rwuser directive, as {name, auth_proto, priv_proto, level} sorted by name; a usmUser line in the persistent state file is not parsed, so a user with no createUser and no rouser/rwuser is not listed. No passphrase, master key or localized key is ever stored - auth_proto and priv_proto are filled only from an allow-list of protocol names and are empty for a user whose protocols were not named. level is the level the user's key material supports, falling back to the minimum an access line demands. Absent when no snmpd configuration was found, or when part of it could not be read.
     since: 1
     sensitivity: secret
     collector: snmp

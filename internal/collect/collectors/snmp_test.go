@@ -35,11 +35,12 @@ func snmpAccess(files map[string]string, cmds map[string]cmdResult) *fsAccess {
 		cmds = map[string]cmdResult{}
 	}
 	return &fsAccess{
-		files: files,
-		cmds:  cmds,
-		fails: map[string]error{},
-		dirs:  map[string]bool{},
-		stats: map[string]statResult{},
+		files:     files,
+		cmds:      cmds,
+		fails:     map[string]error{},
+		dirs:      map[string]bool{},
+		stats:     map[string]statResult{},
+		truncated: map[string]bool{},
 	}
 }
 
@@ -49,13 +50,66 @@ func snmpAccess(files map[string]string, cmds map[string]cmdResult) *fsAccess {
 // assert that a secret is absent from EVERY envelope, reason, source and
 // record field at once rather than from the handful a test remembered to
 // look at.
+//
+// Round-1 review finding 9: json.Marshal escapes '<', '>' and '&', so a
+// secret carrying one of those bytes would survive a bytes.Contains check
+// against its own spelling. An Encoder with SetEscapeHTML(false) removes the
+// blind spot rather than relying on fixture secrets staying alphanumeric.
 func treeJSON(t *testing.T, b *collect.Builder) []byte {
 	t.Helper()
-	data, err := json.Marshal(b.Tree())
-	if err != nil {
-		t.Fatalf("marshal tree: %v", err)
+	return encodeNoEscape(t, b.Tree())
+}
+
+func encodeNoEscape(t *testing.T, v any) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(v); err != nil {
+		t.Fatalf("marshal: %v", err)
 	}
-	return data
+	return buf.Bytes()
+}
+
+// snmpFixtureSecrets is every secret any snmp fixture carries: community
+// strings, v3 passphrases, master and localized keys, engine ids and the
+// words of an unquoted multi-word passphrase. Ruling J-42: every snmp test
+// asserts the WHOLE list absent, not just the strings its own fixture
+// happens to seed, so a leak introduced on one code path is caught by every
+// test that reaches it.
+var snmpFixtureSecrets = []string{
+	"s3cr3tLongOne",
+	"c0mmun1tyOnlyHere",
+	"fr4gmentOnlyString",
+	"authPhraseAlphaOne",
+	"privPhraseBetaTwo",
+	"0xdeadbeefcafebabe",
+	"0xfeedfacecafebeef",
+	"0x80001f8880",
+	"authKeyWordUnique",
+	"privKeyWordUnique",
+	"unquotedPhraseWordA",
+	"unquotedPhraseWordB",
+	"unquotedPhraseWordC",
+	"unquotedPhraseWordD",
+	"tr4pOnlyString",
+	"s1nkOnlyString",
+}
+
+// assertNoSecrets is the redaction proof every snmp test ends with.
+func assertNoSecrets(t *testing.T, b *collect.Builder) {
+	t.Helper()
+	data := treeJSON(t, b)
+	for _, s := range snmpFixtureSecrets {
+		if bytes.Contains(data, []byte(s)) {
+			t.Errorf("fixture secret %q leaked into the snapshot", s)
+		}
+	}
+	// "public" may legitimately appear elsewhere in a snapshot, so it is
+	// asserted only against the subtree this collector owns.
+	if bytes.Contains(snmpSubtreeJSON(t, b), []byte("public")) {
+		t.Error("the default community string leaked into the snmp subtree")
+	}
 }
 
 // snmpSubtreeJSON serialises only the snmp subtree. A word like "public" may
@@ -64,11 +118,7 @@ func treeJSON(t *testing.T, b *collect.Builder) []byte {
 // assertion is scoped to the subtree this collector owns.
 func snmpSubtreeJSON(t *testing.T, b *collect.Builder) []byte {
 	t.Helper()
-	data, err := json.Marshal(b.Tree()["snmp"])
-	if err != nil {
-		t.Fatalf("marshal snmp subtree: %v", err)
-	}
-	return data
+	return encodeNoEscape(t, b.Tree()["snmp"])
 }
 
 // stringList fetches an ok list<string> fact as a []string, reporting the
@@ -133,12 +183,7 @@ func TestSnmpCommunitiesAreRedacted(t *testing.T) {
 	}
 
 	// The strings themselves are nowhere in the serialised snapshot.
-	if bytes.Contains(treeJSON(t, b), []byte("s3cr3tLongOne")) {
-		t.Error("community string leaked into the snapshot")
-	}
-	if bytes.Contains(snmpSubtreeJSON(t, b), []byte("public")) {
-		t.Error("the default community string leaked into the snmp subtree")
-	}
+	assertNoSecrets(t, b)
 
 	// A community directive enables the two community-based versions.
 	if v := stringList(t, b, "snmp.versions_enabled"); !slices.Equal(v, []string{"v1", "v2c"}) {
@@ -189,9 +234,7 @@ func TestSnmpCom2secSourceAndCommunity(t *testing.T) {
 
 	// The community reaches no field of any record — not the access rule's
 	// source, not anywhere else in the snapshot.
-	if bytes.Contains(treeJSON(t, b), []byte("c0mmun1tyOnlyHere")) {
-		t.Error("the com2sec community string leaked into the snapshot")
-	}
+	assertNoSecrets(t, b)
 
 	// A com2sec is only a v2c enablement because a group names the v2c model
 	// for its security name.
@@ -239,11 +282,7 @@ func TestSnmpV3OnlyFromStateFile(t *testing.T) {
 	}
 
 	// The passphrases in the state file are key material and never leave it.
-	for _, secret := range []string{"authPhraseAlphaOne", "privPhraseBetaTwo"} {
-		if bytes.Contains(treeJSON(t, b), []byte(secret)) {
-			t.Errorf("v3 key material %q leaked into the snapshot", secret)
-		}
-	}
+	assertNoSecrets(t, b)
 	if files := stringList(t, b, "snmp.config_files"); !slices.Equal(files, []string{testSnmpdConf, testSnmpStateFile}) {
 		t.Errorf("config_files %v, want both files sorted", files)
 	}
@@ -280,6 +319,9 @@ func TestSnmpFollowsDeclaredIncludes(t *testing.T) {
 	if e := env(t, b, "snmp.parse_complete"); e.Value != true {
 		t.Errorf("parse_complete %+v, want ok true", e)
 	}
+	// Include expansion is the most fragile path in the collector and the one
+	// where a refactor would most plausibly carry a value through.
+	assertNoSecrets(t, b)
 }
 
 // An includeFile outside the collector's declaration is RECORDED, never
@@ -312,6 +354,7 @@ func TestSnmpUnreadableIncludeMakesJudgedListsAbsent(t *testing.T) {
 	if got := b.Worst("snmp"); got != facts.StatusOK {
 		t.Errorf(`Worst("snmp") = %s, want ok`, got)
 	}
+	assertNoSecrets(t, b)
 }
 
 // The persistent state file is root-only. Read as a non-root user it is
@@ -343,9 +386,7 @@ func TestSnmpNonRootStateFileIsDenied(t *testing.T) {
 	}
 	// Even a denied run may not leak: nothing that was readable carries a
 	// community string.
-	if bytes.Contains(treeJSON(t, b), []byte("s3cr3tLongOne")) {
-		t.Error("community string leaked into a denied snapshot")
-	}
+	assertNoSecrets(t, b)
 }
 
 // As root, a state file that is simply not there means nothing was ever
@@ -366,6 +407,7 @@ func TestSnmpMissingStateFileIsEmpty(t *testing.T) {
 	if got := b.Worst("snmp"); got != facts.StatusOK {
 		t.Errorf(`Worst("snmp") = %s, want ok`, got)
 	}
+	assertNoSecrets(t, b)
 }
 
 // No snmpd configuration at all: the judged lists are absent (naming the
@@ -398,5 +440,145 @@ func TestSnmpNoConfigIsAbsentNotMissing(t *testing.T) {
 	}
 	if got := b.Worst("snmp"); got != facts.StatusOK {
 		t.Errorf(`Worst("snmp") = %s, want ok (a host that does not run snmpd is not a failure)`, got)
+	}
+	assertNoSecrets(t, b)
+}
+
+// Round-1 review finding 1 (BLOCKING) / Ruling J-38. createUser's positional
+// grammar is interleaved with option PAIRS (-e engineID, -m masterkey,
+// -l localizedkey), so reading "the token at index 3" as the privacy protocol
+// publishes a master key — the one byte string on the host that is directly
+// usable to talk to the agent — into a sensitivity: secret record field. The
+// protocol slots are therefore taken only from an allow-list of protocol
+// names; anything else is key material and is never stored.
+func TestSnmpCreateUserMasterKeyIsNeverStored(t *testing.T) {
+	b := buildBegun(t, "snmp", snmpAccess(map[string]string{
+		testSnmpStateFile: "snmpd.conf.createuser-keys",
+	}, nil))
+
+	users := okList(t, b, "snmp.v3_users")
+	if len(users) != 3 {
+		t.Fatalf("v3_users %v, want the three createUser lines", users)
+	}
+	// bob: the master-key form — the protocols are named, both keys are not.
+	bob := snmpRecord(t, users, 0)
+	if bob["name"] != "bob" || bob["auth_proto"] != "SHA" || bob["priv_proto"] != "AES" || bob["level"] != "priv" {
+		t.Errorf("v3_users[0] = %v, want {bob, SHA, AES, priv} — never a -m key", bob)
+	}
+	// carol: an unquoted multi-word passphrase — no word of it is a protocol.
+	carol := snmpRecord(t, users, 1)
+	if carol["name"] != "carol" || carol["auth_proto"] != "SHA" || carol["priv_proto"] != "AES" || carol["level"] != "priv" {
+		t.Errorf("v3_users[1] = %v, want {carol, SHA, AES, priv} — never a passphrase word", carol)
+	}
+	// dave: -e engineID before the name, and the long protocol spellings.
+	dave := snmpRecord(t, users, 2)
+	if dave["name"] != "dave" || dave["auth_proto"] != "SHA-256" || dave["priv_proto"] != "AES-256" || dave["level"] != "priv" {
+		t.Errorf("v3_users[2] = %v, want {dave, SHA-256, AES-256, priv}", dave)
+	}
+	for _, u := range []map[string]any{bob, carol, dave} {
+		if len(u) != 4 {
+			t.Errorf("v3_users record %v carries %d fields, want exactly four", u, len(u))
+		}
+	}
+	if v := stringList(t, b, "snmp.versions_enabled"); !slices.Equal(v, []string{"v3"}) {
+		t.Errorf("versions_enabled %v, want [v3]", v)
+	}
+	assertNoSecrets(t, b)
+}
+
+// Round-1 review finding 2 / Ruling J-39. A configuration file cut at the read
+// limit is a partial file, so a confident "no rwcommunity here" built from it
+// is a false PASS. A truncated read makes the parse incomplete and the judged
+// lists absent, and the evidence leaves carry the truncation marker.
+func TestSnmpTruncatedConfigMakesJudgedListsAbsent(t *testing.T) {
+	a := snmpAccess(map[string]string{testSnmpdConf: "snmpd.conf.v2c-public"}, nil)
+	a.truncated[testSnmpdConf] = true
+	b := buildBegun(t, "snmp", a)
+
+	for _, k := range []string{"snmp.versions_enabled", "snmp.communities", "snmp.v3_users"} {
+		e := env(t, b, k)
+		if e.Status != facts.StatusAbsent {
+			t.Errorf("%s %+v, want absent", k, e)
+		}
+		if !strings.Contains(e.Reason, testSnmpdConf) {
+			t.Errorf("%s reason %q, want it to name the truncated file", k, e.Reason)
+		}
+	}
+	if e := env(t, b, "snmp.parse_complete"); e.Status != facts.StatusOK || e.Value != false {
+		t.Errorf("parse_complete %+v, want ok false", e)
+	}
+	// R70: an evidence value parsed out of a partial stream is marked as such.
+	for _, k := range []string{"snmp.access_rules", "snmp.agent_addresses", "snmp.config_files", "snmp.parse_complete"} {
+		if e := env(t, b, k); !e.Truncated {
+			t.Errorf("%s %+v, want Truncated true", k, e)
+		}
+	}
+	if got := b.Worst("snmp"); got != facts.StatusOK {
+		t.Errorf(`Worst("snmp") = %s, want ok (a file too large to read is not a privilege failure)`, got)
+	}
+	assertNoSecrets(t, b)
+}
+
+// Round-1 review finding 3 / Ruling J-40. A trap community is a community
+// string on the wire; leaving the trap directives unparsed made a trap-only
+// host read communities: [], which makes U-60's and U-61's `each` clauses
+// vacuously true — a PASS with a default community in use.
+func TestSnmpTrapCommunitiesAreRecorded(t *testing.T) {
+	b := buildBegun(t, "snmp", snmpAccess(map[string]string{testSnmpdConf: "snmpd.conf.traps"}, nil))
+
+	recs := okList(t, b, "snmp.communities")
+	if len(recs) != 2 {
+		t.Fatalf("communities %v, want the trapcommunity and the trap2sink community (a sink with no community of its own adds none)", recs)
+	}
+	tc := snmpRecord(t, recs, 0)
+	if tc["ref"] != "c1" || tc["kind"] != "trap" || tc["length"] != 14 ||
+		tc["is_default"] != false || tc["source_restricted"] != false {
+		t.Errorf("communities[0] = %v, want the trapcommunity as {c1, trap, 14, not default, not source-restricted}", tc)
+	}
+	sink := snmpRecord(t, recs, 1)
+	if sink["ref"] != "c2" || sink["kind"] != "trap" || sink["length"] != 14 || sink["source_restricted"] != false {
+		t.Errorf("communities[1] = %v, want the trap2sink community (the THIRD token, never the host)", sink)
+	}
+	for _, r := range []map[string]any{tc, sink} {
+		if len(r) != 5 {
+			t.Errorf("community record %v carries %d fields, want exactly five", r, len(r))
+		}
+	}
+	// A sink host is not a community and is not measured as one.
+	if bytes.Contains(snmpSubtreeJSON(t, b), []byte("198.51.100.5")) {
+		t.Error("a trap sink host must not reach the snmp subtree as a community")
+	}
+	assertNoSecrets(t, b)
+}
+
+// Round-1 review finding 4 / Ruling J-41. An envelope's Source is what a
+// reader and a report render, so it must name the files the value was actually
+// computed from — never a hardcoded path the collector may not even have read.
+func TestSnmpSourcesCiteTheFilesActuallyRead(t *testing.T) {
+	b := buildBegun(t, "snmp", snmpAccess(map[string]string{
+		testSnmpdConf:     "snmpd.conf.v2c-public",
+		testSnmpStateFile: "snmpd.conf.createuser-keys",
+	}, nil))
+
+	// communities is derived from the whole stack, in read order.
+	src := env(t, b, "snmp.communities").Source
+	if src == nil || src.Kind != "derived" || len(src.Inputs) != 2 ||
+		src.Inputs[0].Path != testSnmpdConf || src.Inputs[1].Path != testSnmpStateFile {
+		t.Errorf("communities source %+v, want derived over both files in read order", src)
+	}
+	// v3_users comes only from the state file here, so that is what it cites.
+	us := env(t, b, "snmp.v3_users").Source
+	if us == nil || us.Kind != "file" || us.Path != testSnmpStateFile {
+		t.Errorf("v3_users source %+v, want the state file it was read from", us)
+	}
+	assertNoSecrets(t, b)
+}
+
+// With nothing to read there is nothing to cite: an evidence leaf carries no
+// Source at all rather than pointing at a file that does not exist.
+func TestSnmpNoConfigCitesNoSource(t *testing.T) {
+	b := buildBegun(t, "snmp", snmpAccess(nil, nil))
+	if e := env(t, b, "snmp.config_files"); e.Source != nil {
+		t.Errorf("config_files source %+v, want none when no file was read", e.Source)
 	}
 }

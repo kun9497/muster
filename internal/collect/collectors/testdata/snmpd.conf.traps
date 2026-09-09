@@ -1,0 +1,4 @@
+trapcommunity tr4pOnlyString
+trap2sink 198.51.100.5 s1nkOnlyString 162
+informsink 203.0.113.7
+trapsink 198.51.100.9

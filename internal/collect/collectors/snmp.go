@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io/fs"
 	"path"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -54,9 +55,16 @@ func snmpCandidates() []string {
 	return []string{snmpdConfPath, snmpdLocalConfPath}
 }
 
-// snmpStateFiles are the persistent files net-snmp itself writes — the
-// createUser lines it moves out of snmpd.conf end up here. Both families'
-// locations are read; only one exists on a given host.
+// snmpStateFiles are the persistent files net-snmp itself writes. Both
+// families' locations are read; only one exists on a given host.
+//
+// Round-1 review finding 7: what a steady-state agent persists here is a
+// usmUser line — a positional line whose later fields are the localized keys
+// in hex — while net-snmp-create-v3-user appends the createUser form. Only
+// createUser is parsed: pulling a name out of usmUser by index is exactly the
+// class of bug Ruling J-38 exists to prevent, and the cost of not doing it is
+// a v3 user missing from the EVIDENCE list, which is the conservative
+// direction. The registry description says which directives are covered.
 func snmpStateFiles() []string {
 	return []string{snmpStatePath, snmpNetStatePath}
 }
@@ -143,6 +151,13 @@ type snmpParse struct {
 	rules       []any
 	agents      []any
 
+	// curFile is the file whose directives are being parsed right now, and
+	// userFiles the files that actually contributed a v3 user directive, so
+	// snmp.v3_users can cite what it was computed from rather than the whole
+	// stack (Ruling J-41).
+	curFile   string
+	userFiles []string
+
 	users     map[string]*snmpUser
 	userNames []string
 
@@ -155,9 +170,11 @@ type snmpParse struct {
 
 	// readFailure is the first read that failed for a reason other than
 	// "not there"; undeclared lists every include the declaration does not
-	// cover. Either one means the configuration was not seen in full.
+	// cover; truncated lists every file the read primitive cut at the read
+	// limit. Any of the three means the configuration was not seen in full.
 	readFailure *facts.Envelope
 	undeclared  []string
+	truncated   []string
 }
 
 // runSnmp reads the configuration stack and publishes the seven snmp keys.
@@ -184,7 +201,18 @@ func runSnmp(_ context.Context, a collect.Access, b *collect.Builder) error {
 	p.scan()
 	p.resolveCom2secKinds()
 
-	src := &facts.Source{Kind: "file", Path: snmpdConfPath}
+	// Ruling J-41: every envelope cites the files it was actually computed
+	// from. src covers the whole stack; the users source covers only the
+	// files that contributed a v3 user, so a user set that came from the
+	// persistent state file alone cites the state file and nothing else.
+	src := snmpSource(p.files)
+	usersSrc := src
+	if len(p.userFiles) > 0 {
+		usersSrc = snmpSource(p.userFiles)
+	}
+	// R70: a value parsed out of a file the read primitive cut at the limit
+	// is not the whole answer, and every evidence leaf says so.
+	cut := len(p.truncated) > 0
 	if judged := p.judged(); judged != nil {
 		b.Set("snmp.versions_enabled", *judged)
 		b.Set("snmp.communities", *judged)
@@ -192,13 +220,31 @@ func runSnmp(_ context.Context, a collect.Access, b *collect.Builder) error {
 	} else {
 		b.Set("snmp.versions_enabled", collect.OK(p.versions(), src))
 		b.Set("snmp.communities", collect.OK(p.communities, src))
-		b.Set("snmp.v3_users", collect.OK(p.v3Users(), src))
+		b.Set("snmp.v3_users", collect.OK(p.v3Users(), usersSrc))
 	}
-	b.Set("snmp.access_rules", collect.OK(p.rules, src))
-	b.Set("snmp.agent_addresses", collect.OK(p.agents, src))
-	b.Set("snmp.config_files", collect.OK(p.sortedFiles(), src))
-	b.Set("snmp.parse_complete", collect.OK(p.complete(), src))
+	b.Set("snmp.access_rules", withTruncation(collect.OK(p.rules, src), cut))
+	b.Set("snmp.agent_addresses", withTruncation(collect.OK(p.agents, src), cut))
+	b.Set("snmp.config_files", withTruncation(collect.OK(p.sortedFiles(), src), cut))
+	b.Set("snmp.parse_complete", withTruncation(collect.OK(p.complete(), src), cut))
 	return nil
+}
+
+// snmpSource renders the provenance of a value computed from files: a plain
+// file source when exactly one file contributed, the repository's derived
+// shape (accounts.go's precedent) when several did, and NOTHING when none
+// did — an envelope must never cite a path the collector did not read.
+func snmpSource(files []string) *facts.Source {
+	switch len(files) {
+	case 0:
+		return nil
+	case 1:
+		return &facts.Source{Kind: "file", Path: files[0]}
+	}
+	inputs := make([]facts.Source, 0, len(files))
+	for _, f := range files {
+		inputs = append(inputs, facts.Source{Kind: "file", Path: f})
+	}
+	return &facts.Source{Kind: "derived", Inputs: inputs}
 }
 
 // scan reads the candidate files in a fixed order: the main file and its
@@ -247,7 +293,16 @@ func (p *snmpParse) readFile(file string, depth int) {
 		return
 	}
 	p.files = append(p.files, file)
+	if meta.Truncated {
+		// Round-1 review finding 2: the parse stops at the cap, so a
+		// directive past it is invisible, and a confident "no rwcommunity
+		// here" built from a partial file is a false PASS.
+		p.truncated = append(p.truncated, file)
+	}
+	prev := p.curFile
+	p.curFile = file
 	p.parse(data, depth)
+	p.curFile = prev
 }
 
 // fail records the first read that could not answer. The first is kept
@@ -294,6 +349,20 @@ func (p *snmpParse) directive(keyword string, args []string, depth int) {
 		p.createUser(args)
 	case "rouser", "rwuser":
 		p.roleUser(args)
+	case "trapcommunity":
+		// trapcommunity STRING — the default community every sink below uses
+		// when it names none of its own. A trap is outbound, so it enables no
+		// inbound protocol version; only the string is measured.
+		if len(args) > 0 {
+			p.addCommunity("trap", args[0], "")
+		}
+	case "trapsink", "trap2sink", "informsink":
+		// HOST [COMMUNITY [PORT]] — the community is the SECOND argument and
+		// the host is never one; a sink that names no community of its own
+		// uses trapcommunity's, which is already recorded, so it adds none.
+		if len(args) > 1 {
+			p.addCommunity("trap", args[1], "")
+		}
 	case "agentaddress":
 		p.agentAddress(args)
 	case "includefile":
@@ -388,25 +457,109 @@ func (p *snmpParse) access(args []string) {
 }
 
 // createUser records `createUser [-e ENGINEID] NAME [AUTHPROTO AUTHPASS
-// [PRIVPROTO [PRIVPASS]]]`. The two passphrases are the most sensitive bytes
-// on the host and are read only to know that they are there: neither is
-// stored, and the level they imply is all that survives.
+// [PRIVPROTO [PRIVPASS]]]`, and the master-key form
+// `createUser NAME AUTHPROTO -m KEY [PRIVPROTO -m KEY]`.
+//
+// Round-1 review finding 1 (BLOCKING) / Ruling J-38: the positional grammar
+// is interleaved with option PAIRS, so reading "the token at index 3" as the
+// privacy protocol published a master key — the one string on the host that
+// is directly usable to talk to the agent — into a sensitivity: secret record
+// field. Two defences, both needed, which together remove the whole class
+// rather than the two shapes that were found:
+//
+//  1. every option flag consumes its argument, wherever on the line it sits
+//     and however many times it appears (snmpStripOptionPairs);
+//  2. a protocol slot is filled ONLY from an allow-list of protocol names,
+//     normalised to upper case, so the stored value is always one of a dozen
+//     public constants. A token that is not a protocol is by construction
+//     either an option or key material, and the field is left empty — which
+//     the record already documents as "not seen here".
+//
+// The passphrases and keys are therefore read only to know that they are
+// there: none is stored, and the level they imply is all that survives.
 func (p *snmpParse) createUser(args []string) {
-	if len(args) >= 2 && strings.EqualFold(args[0], "-e") {
-		args = args[2:]
-	}
+	args = snmpStripOptionPairs(args)
 	if len(args) == 0 {
 		return
 	}
 	u := p.user(args[0])
+	p.noteUserFile()
+	rest := args[1:]
+	u.authProto, u.privProto = snmpProtocols(rest)
 	switch {
-	case len(args) >= 4:
-		u.authProto, u.privProto, u.keyLevel = args[1], args[3], "priv"
-	case len(args) >= 2:
-		u.authProto, u.keyLevel = args[1], "auth"
+	case u.privProto != "":
+		u.keyLevel = "priv"
+	case len(rest) > 0:
+		// Something follows the name but no protocol was recognised: the user
+		// has credentials of some kind, so "auth" is the honest floor —
+		// "noauth" would understate the host's posture.
+		u.keyLevel = "auth"
 	default:
 		u.keyLevel = "noauth"
 	}
+}
+
+// snmpCreateUserOptions are createUser's option flags, each of which carries
+// one argument: an engine id, a master key or a localized key. The argument
+// is dropped with the flag — a localized key talks to the agent directly and
+// a master key is worse.
+var snmpCreateUserOptions = map[string]bool{"-e": true, "-m": true, "-l": true}
+
+// snmpStripOptionPairs removes every option flag and the argument it carries,
+// leaving only the positional tokens. One line may carry three of them.
+func snmpStripOptionPairs(args []string) []string {
+	out := make([]string, 0, len(args))
+	for i := 0; i < len(args); i++ {
+		if snmpCreateUserOptions[strings.ToLower(args[i])] {
+			i++ // skip the flag's argument along with the flag
+			continue
+		}
+		out = append(out, args[i])
+	}
+	return out
+}
+
+// snmpAuthProtocols and snmpPrivProtocols are the only values that may ever
+// reach v3_users' protocol fields. They are matched case-insensitively and
+// stored upper-cased, so two hosts that spell "sha" and "SHA" produce one
+// fact and the stored byte string never echoes its input.
+var snmpAuthProtocols = map[string]bool{
+	"md5": true, "sha": true, "sha-224": true, "sha-256": true, "sha-384": true, "sha-512": true,
+}
+
+var snmpPrivProtocols = map[string]bool{
+	"des": true, "aes": true, "aes-128": true, "aes-192": true, "aes-256": true,
+	"aes192": true, "aes256": true,
+}
+
+// snmpProtocols picks the authentication and privacy protocols out of
+// createUser's positional tokens. The privacy protocol can only follow the
+// authentication one, so the search for it starts there; everything in
+// between is a passphrase or a key and is passed over without being stored.
+func snmpProtocols(toks []string) (auth, priv string) {
+	for i, t := range toks {
+		if !snmpAuthProtocols[strings.ToLower(t)] {
+			continue
+		}
+		auth = strings.ToUpper(t)
+		for _, u := range toks[i+1:] {
+			if snmpPrivProtocols[strings.ToLower(u)] {
+				return auth, strings.ToUpper(u)
+			}
+		}
+		return auth, ""
+	}
+	return "", ""
+}
+
+// noteUserFile remembers that the file being parsed contributed a v3 user, in
+// read order and without duplicates, so snmp.v3_users cites only the files it
+// was actually computed from (Ruling J-41).
+func (p *snmpParse) noteUserFile() {
+	if p.curFile == "" || slices.Contains(p.userFiles, p.curFile) {
+		return
+	}
+	p.userFiles = append(p.userFiles, p.curFile)
 }
 
 // roleUser records `rouser|rwuser [-s SECMODEL] NAME [noauth|auth|priv …]`.
@@ -420,6 +573,7 @@ func (p *snmpParse) roleUser(args []string) {
 		return
 	}
 	u := p.user(args[0])
+	p.noteUserFile()
 	u.accessLevel = "auth"
 	if len(args) > 1 {
 		switch strings.ToLower(args[1]) {
@@ -446,7 +600,10 @@ func (p *snmpParse) user(name string) *snmpUser {
 func (p *snmpParse) agentAddress(args []string) {
 	for _, arg := range args {
 		for _, spec := range strings.Split(arg, ",") {
-			if spec = strings.TrimSpace(spec); spec != "" {
+			// M16 (round-1 review finding 6): a spec longer than the token cap
+			// is not a listen address that was misread, it is not one at all,
+			// so none of it is copied into the snapshot.
+			if spec = strings.TrimSpace(spec); spec != "" && !oversized(spec) {
 				p.agents = append(p.agents, spec)
 			}
 		}
@@ -575,7 +732,7 @@ func (p *snmpParse) v3Users() []any {
 			level = "noauth"
 		}
 		out = append(out, map[string]any{
-			"name":       u.name,
+			"name":       snmpField(u.name),
 			"auth_proto": u.authProto,
 			"priv_proto": u.privProto,
 			"level":      level,
@@ -598,7 +755,7 @@ func (p *snmpParse) sortedFiles() []any {
 // read. A host with no snmpd configuration at all read everything there was,
 // so the parse is complete and the judged lists carry the story instead.
 func (p *snmpParse) complete() bool {
-	return p.readFailure == nil && len(p.undeclared) == 0
+	return p.readFailure == nil && len(p.undeclared) == 0 && len(p.truncated) == 0
 }
 
 // judged is the envelope the three judged lists share when the configuration
@@ -608,6 +765,11 @@ func (p *snmpParse) complete() bool {
 func (p *snmpParse) judged() *facts.Envelope {
 	if p.readFailure != nil {
 		return p.readFailure
+	}
+	if len(p.truncated) > 0 {
+		e := collect.Absent("the configuration was cut at the read limit in " +
+			strings.Join(p.truncated, ", ") + "; what is past the cap cannot be judged")
+		return &e
 	}
 	if len(p.undeclared) > 0 {
 		targets := append([]string(nil), p.undeclared...)
@@ -638,13 +800,25 @@ func (p *snmpParse) judged() *facts.Envelope {
 func snmpRule(kind, name, secModel, secLevel, source, readView, writeView string) map[string]any {
 	return map[string]any{
 		"kind":       kind,
-		"name":       name,
-		"sec_model":  secModel,
-		"sec_level":  secLevel,
-		"source":     source,
-		"read_view":  readView,
-		"write_view": writeView,
+		"name":       snmpField(name),
+		"sec_model":  snmpField(secModel),
+		"sec_level":  snmpField(secLevel),
+		"source":     snmpField(source),
+		"read_view":  snmpField(readView),
+		"write_view": snmpField(writeView),
 	}
+}
+
+// snmpField is the value one record field stores. M16 (round-1 review
+// finding 6): a token longer than sshd's shared maxTokenValue is not a value
+// that was misread, it is not a value at all, so none of it is copied into
+// the snapshot — the field is left empty, which the records already document
+// as "not seen here".
+func snmpField(s string) string {
+	if oversized(s) {
+		return ""
+	}
+	return s
 }
 
 // snmpSourceRestricted reports whether a community is bound to a source at
@@ -652,7 +826,7 @@ func snmpRule(kind, name, secModel, secLevel, source, readView, writeView string
 // anywhere", so they are no restriction; so is an absent source.
 func snmpSourceRestricted(source string) bool {
 	switch strings.ToLower(strings.TrimSpace(source)) {
-	case "", "default", "0.0.0.0", "0.0.0.0/0", "::/0":
+	case "", "default", "0.0.0.0", "0.0.0.0/0", "0/0", "::", "::/0":
 		return false
 	}
 	return true
