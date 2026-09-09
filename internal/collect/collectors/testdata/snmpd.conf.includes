@@ -1,0 +1,2 @@
+includeDir /etc/snmp/snmpd.conf.d
+rocommunity public

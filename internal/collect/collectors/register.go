@@ -44,6 +44,7 @@ func init() {
 	collect.Register(loggingCollector)
 	collect.Register(timesyncCollector)
 	collect.Register(nfsCollector)
+	collect.Register(snmpCollector)
 	collect.Register(walkCollector)
 }
 

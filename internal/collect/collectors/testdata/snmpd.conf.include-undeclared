@@ -1,0 +1,2 @@
+rocommunity public
+includeFile /opt/vendor/snmpd-extra.conf

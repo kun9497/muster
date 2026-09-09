@@ -2930,6 +2930,76 @@
       "Collector": "files",
       "DefaultOn": "",
       "SubjectKind": ""
+    },
+    {
+      "Key": "snmp.versions_enabled",
+      "Type": "list\u003cstring\u003e",
+      "Description": "The SNMP protocol versions the configuration enables, a subset of v1, v2c and v3; a rocommunity/rwcommunity directive enables both v1 and v2c, a com2sec enables a version only once a group names that model for its security name, and v3 is enabled by the existence of any v3 user. Absent when no snmpd configuration was found, or when part of it could not be read.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "snmp",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "snmp.communities",
+      "Type": "list\u003crecord\u003e",
+      "Description": "Every configured SNMP community, REDACTED to {ref, kind, is_default, length, source_restricted} - the string itself is never stored, not even hashed, since a hash of a short well-known word is trivially reversible. ref is an opaque ordinal (c1, c2, ...) in file order, kind is ro or rw (a com2sec community is rw only when an access rule reachable from its security name grants a write view), is_default says the string is one of the collector's embedded well-known defaults, length is its rune count and source_restricted says it is bound to a source other than default or an any-address form.",
+      "Since": 1,
+      "Sensitivity": "secret",
+      "Collector": "snmp",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "snmp.v3_users",
+      "Type": "list\u003crecord\u003e",
+      "Description": "Every SNMPv3 user as {name, auth_proto, priv_proto, level}, sorted by name; the authentication and privacy passphrases are never stored. auth_proto and priv_proto are empty for a user known only from a rouser/rwuser line, and level is the level the user's key material supports, falling back to the minimum an access line demands. Absent when no snmpd configuration was found, or when part of it could not be read.",
+      "Since": 1,
+      "Sensitivity": "secret",
+      "Collector": "snmp",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "snmp.access_rules",
+      "Type": "list\u003crecord\u003e",
+      "Description": "The VACM and community-mapping lines in file order as {kind, name, sec_model, sec_level, source, read_view, write_view}; kind is com2sec, group, view or access. Each kind fills the fields that carry its meaning - com2sec puts the security name in name and the address or range in source; group puts the group name in name, the model in sec_model and the security name in source; view puts the view name in name, included/excluded in sec_level and the OID subtree in source; access puts the group name in name, the context in source and the two views in read_view/write_view. A com2sec community string is never one of the fields.",
+      "Since": 1,
+      "Sensitivity": "internal",
+      "Collector": "snmp",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "snmp.agent_addresses",
+      "Type": "list\u003cstring\u003e",
+      "Description": "The listen specifications of every agentaddress directive in file order, one entry per comma-separated spec.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "snmp",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "snmp.config_files",
+      "Type": "list\u003cstring\u003e",
+      "Description": "The snmpd configuration files actually read, sorted; includes followed through includeFile and includeDir appear alongside the declared candidates, and each file appears exactly once however it was reached.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "snmp",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "snmp.parse_complete",
+      "Type": "bool",
+      "Description": "Whether every configuration file the collector was told to read could be read; false when a read failed or when an includeFile/includeDir named a target outside the collector's declaration, which is recorded and never touched. A host with no snmpd configuration at all read everything there was, so the parse is complete and the judged lists carry that story instead.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "snmp",
+      "DefaultOn": "",
+      "SubjectKind": ""
     }
   ]
 }

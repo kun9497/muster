@@ -1687,3 +1687,45 @@ keys:
     since: 1
     sensitivity: public
     collector: files
+  - key: snmp.versions_enabled
+    type: list<string>
+    description: The SNMP protocol versions the configuration enables, a subset of v1, v2c and v3; a rocommunity/rwcommunity directive enables both v1 and v2c, a com2sec enables a version only once a group names that model for its security name, and v3 is enabled by the existence of any v3 user. Absent when no snmpd configuration was found, or when part of it could not be read.
+    since: 1
+    sensitivity: public
+    collector: snmp
+  - key: snmp.communities
+    type: list<record>
+    description: Every configured SNMP community, REDACTED to {ref, kind, is_default, length, source_restricted} - the string itself is never stored, not even hashed, since a hash of a short well-known word is trivially reversible. ref is an opaque ordinal (c1, c2, ...) in file order, kind is ro or rw (a com2sec community is rw only when an access rule reachable from its security name grants a write view), is_default says the string is one of the collector's embedded well-known defaults, length is its rune count and source_restricted says it is bound to a source other than default or an any-address form.
+    since: 1
+    sensitivity: secret
+    collector: snmp
+  - key: snmp.v3_users
+    type: list<record>
+    description: Every SNMPv3 user as {name, auth_proto, priv_proto, level}, sorted by name; the authentication and privacy passphrases are never stored. auth_proto and priv_proto are empty for a user known only from a rouser/rwuser line, and level is the level the user's key material supports, falling back to the minimum an access line demands. Absent when no snmpd configuration was found, or when part of it could not be read.
+    since: 1
+    sensitivity: secret
+    collector: snmp
+  - key: snmp.access_rules
+    type: list<record>
+    description: The VACM and community-mapping lines in file order as {kind, name, sec_model, sec_level, source, read_view, write_view}; kind is com2sec, group, view or access. Each kind fills the fields that carry its meaning - com2sec puts the security name in name and the address or range in source; group puts the group name in name, the model in sec_model and the security name in source; view puts the view name in name, included/excluded in sec_level and the OID subtree in source; access puts the group name in name, the context in source and the two views in read_view/write_view. A com2sec community string is never one of the fields.
+    since: 1
+    sensitivity: internal
+    collector: snmp
+  - key: snmp.agent_addresses
+    type: list<string>
+    description: The listen specifications of every agentaddress directive in file order, one entry per comma-separated spec.
+    since: 1
+    sensitivity: public
+    collector: snmp
+  - key: snmp.config_files
+    type: list<string>
+    description: The snmpd configuration files actually read, sorted; includes followed through includeFile and includeDir appear alongside the declared candidates, and each file appears exactly once however it was reached.
+    since: 1
+    sensitivity: public
+    collector: snmp
+  - key: snmp.parse_complete
+    type: bool
+    description: Whether every configuration file the collector was told to read could be read; false when a read failed or when an includeFile/includeDir named a target outside the collector's declaration, which is recorded and never touched. A host with no snmpd configuration at all read everything there was, so the parse is complete and the judged lists carry that story instead.
+    since: 1
+    sensitivity: public
+    collector: snmp

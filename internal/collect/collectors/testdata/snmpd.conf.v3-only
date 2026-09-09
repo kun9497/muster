@@ -1,0 +1,4 @@
+agentaddress udp:127.0.0.1:161
+rouser confOnlyUser priv
+view   systemview included .1.3.6.1.2.1.1
+access notConfigGroup "" usm priv exact systemview none none
