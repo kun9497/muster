@@ -1729,3 +1729,64 @@ keys:
     since: 1
     sensitivity: public
     collector: snmp
+  - key: patch.manager
+    type: string
+    description: The package manager this host is judged through - apt when the dpkg database exists, dnf when the dnf metadata cache directory does, otherwise unknown, in which case every other patch fact is unsupported.
+    since: 1
+    sensitivity: public
+    collector: patch
+  - key: patch.metadata_age_s
+    type: int
+    description: Whole seconds between the newest cached package metadata (the newest apt Packages list or update-success stamp; the newest dnf repomd.xml) and the run's collected_at, so the same snapshot always renders the same age. Absent when the host holds no metadata cache at all, and then pending_security_count is absent too; muster never refreshes the metadata itself.
+    since: 1
+    sensitivity: public
+    collector: patch
+  - key: patch.security_metadata_available
+    type: bool
+    description: Whether the metadata cache carries a security channel at all - an apt list file of a -security suite, or a cached repomd.xml declaring an updateinfo data section. It is decided from the cached files, never from a command's exit code, because a security query that exits cleanly with no output says the same thing whether the channel is missing or nothing is pending.
+    since: 1
+    sensitivity: public
+    collector: patch
+  - key: patch.pending_security_count
+    type: int
+    description: How many pending updates come from a security channel - counted from the origins of the cache-only apt simulation, and from the cached updateinfo on dnf. Unsupported when a cache exists but carries no security channel, never 0, which would read as nothing pending; absent when there is no metadata cache at all.
+    since: 1
+    sensitivity: public
+    collector: patch
+  - key: patch.pending_updates
+    type: list<record>
+    description: The upgrades the cache-only simulation reports as {name, current, candidate, origin}, sorted by name then candidate; current is empty for a package the upgrade would newly install, and origin is the suite or repository the candidate comes from. Evidence only, and never obtained by refreshing metadata.
+    since: 1
+    sensitivity: internal
+    collector: patch
+  - key: patch.reboot_required
+    type: bool
+    description: Whether the host is waiting for a reboot - the /run/reboot-required flag on apt hosts, needs-restarting -r on dnf hosts. Unsupported inside a container, where the kernel belongs to the host rather than to this namespace and nothing is run at all, and unsupported where the dnf tool is not installed.
+    since: 1
+    sensitivity: public
+    collector: patch
+  - key: patch.auto_update.enabled
+    type: setting<bool>
+    description: Whether unattended upgrades are configured to apply updates - persisted from APT::Periodic::Unattended-Upgrade or from dnf-automatic's apply_updates. The runtime side is not probed in this version, since a timer's state belongs to the services inventory. Evidence only - a fleet may patch centrally by policy.
+    since: 1
+    sensitivity: public
+    collector: patch
+    default_on: both
+  - key: patch.held_packages
+    type: list<string>
+    description: Packages pinned to their current version and therefore held back from an upgrade, sorted; from apt-mark showhold. Unsupported on dnf hosts, whose versionlock plugin is not probed in this version.
+    since: 1
+    sensitivity: public
+    collector: patch
+  - key: patch.days_since_last_install
+    type: int
+    description: Whole days between the newest package installation the dpkg log records and the run's collected_at. Absent when the log records no installation, and unsupported on dnf hosts, whose rpm installation times are not probed in this version.
+    since: 1
+    sensitivity: public
+    collector: patch
+  - key: packages.installed
+    type: list<record>
+    description: Installed packages as {name, version, arch} read from the package database (dpkg status on apt hosts, rpm -qa on dnf hosts); a version is evidence only and is never obtained by invoking a daemon.
+    since: 1
+    sensitivity: internal
+    collector: patch
