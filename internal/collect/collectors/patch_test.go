@@ -61,16 +61,6 @@ func testPatchNow(t *testing.T) time.Time {
 	return now.UTC()
 }
 
-// cmdKey renders a declared command the way fsAccess keys its canned
-// outcomes — the same join collect.commandString uses for --list-actions and
-// for the run header. Ruling J-23: every test key below is built by passing
-// the collector's OWN command value through here, so the declaration, the
-// run and the fixture key cannot drift apart (a hand-typed key would hide a
-// changed argument instead of failing).
-func cmdKey(c collect.Command) string {
-	return strings.TrimSpace(c.Path + " " + strings.Join(c.Args, " "))
-}
-
 // recordingAccess wraps the shared double with a log of every command that
 // actually reached Run. Ruling J-31 needs to assert a command was NOT run,
 // which no assertion on the resulting facts can prove on its own: a

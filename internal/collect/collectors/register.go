@@ -49,6 +49,26 @@ func init() {
 	collect.Register(walkCollector)
 }
 
+// filesSource renders the provenance of a value computed from files: a plain
+// file source when exactly one file contributed, the repository's derived
+// shape (accounts.go's precedent) when several did, and NOTHING when none
+// did — an envelope must never cite a path the collector did not read.
+// Shared by the snmp and nfs collectors, both of which parse one main file
+// plus a drop-in directory and must cite whichever of them existed.
+func filesSource(files []string) *facts.Source {
+	switch len(files) {
+	case 0:
+		return nil
+	case 1:
+		return &facts.Source{Kind: "file", Path: files[0]}
+	}
+	inputs := make([]facts.Source, 0, len(files))
+	for _, f := range files {
+		inputs = append(inputs, facts.Source{Kind: "file", Path: f})
+	}
+	return &facts.Source{Kind: "derived", Inputs: inputs}
+}
+
 // splitLines splits file or command output into lines and drops a trailing
 // carriage return, so a CRLF-terminated file parses exactly like an LF one.
 func splitLines(data []byte) []string {

@@ -202,6 +202,16 @@ func (a *fsAccess) Run(_ context.Context, c collect.Command) collect.Output {
 	}
 }
 
+// cmdKey renders a declared command the way fsAccess keys its canned
+// outcomes — the same join collect.commandString uses for --list-actions and
+// for the run header. Ruling J-23: every test key is built by passing the
+// collector's OWN command value through here, so the declaration, the run
+// and the fixture key cannot drift apart (a hand-typed key would hide a
+// changed argument instead of failing). Shared by the patch and nfs suites.
+func cmdKey(c collect.Command) string {
+	return strings.TrimSpace(c.Path + " " + strings.Join(c.Args, " "))
+}
+
 func collectorNamed(t *testing.T, name string) collect.Collector {
 	t.Helper()
 	for _, c := range collect.All() {

@@ -3,15 +3,25 @@
 package collectors
 
 import (
+	"errors"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/kun9497/muster/internal/facts"
 )
 
+// The host paths the nfs collector reads, spelled here as literals so a test
+// asserts against the real path rather than against whatever the collector
+// happens to have named its constant.
+const (
+	testExportsPath     = "/etc/exports"
+	testExportsFragment = "/etc/exports.d/10-x.exports"
+)
+
 // nfsAccess seeds every map fsAccess exposes (files, cmds, fails, dirs,
-// stats) so a test may assign into any of them after construction without
-// tripping a nil-map panic (the R226/I-20 lesson).
+// stats, truncated) so a test may assign into any of them after construction
+// without tripping a nil-map panic (the R226/I-20 lesson).
 func nfsAccess(files map[string]string, cmds map[string]cmdResult) *fsAccess {
 	if files == nil {
 		files = map[string]string{}
@@ -20,11 +30,12 @@ func nfsAccess(files map[string]string, cmds map[string]cmdResult) *fsAccess {
 		cmds = map[string]cmdResult{}
 	}
 	return &fsAccess{
-		files: files,
-		cmds:  cmds,
-		fails: map[string]error{},
-		dirs:  map[string]bool{},
-		stats: map[string]statResult{},
+		files:     files,
+		cmds:      cmds,
+		fails:     map[string]error{},
+		dirs:      map[string]bool{},
+		stats:     map[string]statResult{},
+		truncated: map[string]bool{},
 	}
 }
 
@@ -50,6 +61,10 @@ func TestNfsExportsWorldAndRootSquash(t *testing.T) {
 	}
 	if list := okList(t, b, "nfs.exports_source"); len(list) != 1 || list[0] != "/etc/exports" {
 		t.Errorf("exports_source %v, want [/etc/exports]", list)
+	}
+	// Ruling JR-10: one file read is cited as that file.
+	if src := env(t, b, "nfs.exports").Source; src == nil || src.Kind != "file" || src.Path != testExportsPath {
+		t.Errorf("nfs.exports source %+v, want the one file that was read", src)
 	}
 	if got := b.Worst("nfs"); got != facts.StatusOK {
 		t.Errorf(`Worst("nfs") = %s, want ok`, got)
@@ -88,6 +103,29 @@ func TestNfsExportsDFragments(t *testing.T) {
 	second := recs[1].(map[string]any)
 	if second["path"] != "/srv/first" {
 		t.Errorf("second record %v, want path /srv/first", second)
+	}
+
+	// Ruling JR-10: the Source names the files ACTUALLY read. This host has
+	// no /etc/exports at all, so citing it would send a reader — and a
+	// remediation — to a file the collector never opened; several files read
+	// take the repository's derived shape, in read order.
+	src := env(t, b, "nfs.exports").Source
+	if src == nil {
+		t.Fatalf("nfs.exports carries no source")
+	}
+	if src.Path == testExportsPath {
+		t.Errorf("nfs.exports cites %s, which is not present on this host", testExportsPath)
+	}
+	if src.Kind != "derived" || len(src.Inputs) != len(want) {
+		t.Fatalf("nfs.exports source %+v, want the derived shape over both fragments", src)
+	}
+	for i, w := range want {
+		if src.Inputs[i].Kind != "file" || src.Inputs[i].Path != w {
+			t.Errorf("nfs.exports source input[%d] = %+v, want the file %s", i, src.Inputs[i], w)
+		}
+	}
+	if ssrc := env(t, b, "nfs.exports_source").Source; ssrc == nil || ssrc.Kind != "derived" {
+		t.Errorf("nfs.exports_source source %+v, want the same derived shape", ssrc)
 	}
 }
 
@@ -134,6 +172,10 @@ func TestNfsNoExportsIsEmptyNotMissing(t *testing.T) {
 	}
 	if list := okList(t, b, "nfs.exports_source"); len(list) != 0 {
 		t.Errorf("exports_source %v, want empty", list)
+	}
+	// Ruling JR-10: with nothing read there is nothing to cite.
+	if src := env(t, b, "nfs.exports").Source; src != nil {
+		t.Errorf("nfs.exports source %+v, want none when no export file was read", src)
 	}
 }
 
@@ -205,5 +247,128 @@ func TestFilesEtcExportsAbsentWhenMissing(t *testing.T) {
 		if e := env(t, b, k); e.Status != facts.StatusAbsent {
 			t.Errorf("%s %+v, want absent", k, e)
 		}
+	}
+}
+
+// Ruling JR-2 (R70). The read primitive answers a file past the 1 MiB cap
+// with data[:limit], Truncated true and NO error, so a parse of that prefix
+// is a partial answer wearing a complete answer's clothes: a wildcard export
+// written past the cap is invisible and nfs.exports would PASS the control
+// on it. Both judged leaves go ABSENT naming the file that was cut — the
+// snmp judged-list shape, and the exact reason
+// controls/testdata/muster.service.nfs_export_access/manual-parse-incomplete.json
+// models — while the corroboration leaf is still recorded and the run stays
+// complete.
+func TestNfsTruncatedReadIsAbsent(t *testing.T) {
+	cases := []struct {
+		name  string
+		files map[string]string
+		cut   string
+	}{
+		{"main file", map[string]string{testExportsPath: "exports.world"}, testExportsPath},
+		{"fragment", map[string]string{
+			testExportsPath:     "exports.world",
+			testExportsFragment: "exports.d_10-extra.exports",
+		}, testExportsFragment},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			a := nfsAccess(tc.files, nil)
+			a.truncated[tc.cut] = true
+			b := buildBegun(t, "nfs", a)
+			for _, k := range []string{"nfs.exports", "nfs.exports_source"} {
+				e := env(t, b, k)
+				if e.Status != facts.StatusAbsent {
+					t.Errorf("%s %+v, want absent: a read cut at the cap is never published as the whole answer", k, e)
+				}
+				if !strings.Contains(e.Reason, tc.cut) {
+					t.Errorf("%s reason %q, want the cut file %s named", k, e.Reason, tc.cut)
+				}
+			}
+			if e := env(t, b, "nfs.exports_runtime_collected"); e.Status != facts.StatusOK {
+				t.Errorf("exports_runtime_collected %+v, want ok (the corroboration is still recorded)", e)
+			}
+			if got := b.Worst("nfs"); got != facts.StatusOK {
+				t.Errorf(`Worst("nfs") = %s, want ok (a cap is not an environment failure)`, got)
+			}
+		})
+	}
+}
+
+// Ruling JR-1. The sshd Include precedent: a fragment that EXISTS but cannot
+// be read is the answer for every value it could set (C3) — publishing the
+// other files' exports as complete would hide whatever this one adds. A
+// `continue` in that branch is silent and this is the test that catches it.
+func TestNfsUnreadableFragmentIsDenied(t *testing.T) {
+	a := nfsAccess(map[string]string{
+		testExportsPath:     "exports.world",
+		testExportsFragment: "exports.d_10-extra.exports",
+	}, nil)
+	a.fails[testExportsFragment] = os.ErrPermission
+	b := buildBegun(t, "nfs", a)
+	for _, k := range []string{"nfs.exports", "nfs.exports_source"} {
+		e := env(t, b, k)
+		if e.Status != facts.StatusDenied {
+			t.Errorf("%s %+v, want denied: an unreadable fragment is never silently skipped", k, e)
+		}
+		if !strings.Contains(e.Reason, testExportsFragment) {
+			t.Errorf("%s reason %q, want the fragment path named (C3: path-prefixed)", k, e.Reason)
+		}
+	}
+	if got := b.Worst("nfs"); got != facts.StatusDenied {
+		t.Errorf(`Worst("nfs") = %s, want denied`, got)
+	}
+}
+
+// Ruling JR-6. This collector declares Needs "none", so a Glob that fails is
+// an environment limitation, never an error — one error envelope ranks worst
+// in Builder.Worst, flips run.complete and breaks the collect-contract leg.
+// patch's identical branch already says unsupported; this mirrors it.
+func TestNfsGlobFailureIsUnsupportedNotError(t *testing.T) {
+	a := nfsAccess(map[string]string{testExportsPath: "exports.world"}, nil)
+	a.globErr = errors.New("glob boom")
+	b := buildBegun(t, "nfs", a)
+	for _, k := range []string{"nfs.exports", "nfs.exports_source"} {
+		if e := env(t, b, k); e.Status != facts.StatusUnsupported {
+			t.Errorf("%s %+v, want unsupported", k, e)
+		}
+	}
+	if e := env(t, b, "nfs.exports_runtime_collected"); e.Status != facts.StatusOK {
+		t.Errorf("exports_runtime_collected %+v, want ok (still recorded)", e)
+	}
+	if got := b.Worst("nfs"); got != facts.StatusOK {
+		t.Errorf(`Worst("nfs") = %s, want ok`, got)
+	}
+}
+
+// Ruling JR-8. exportfs is corroboration, never the judged source, so both
+// of its outcomes are a plain ok boolean citing the declared command — the
+// success branch had no test at all before this one, which left the true
+// value unobserved on every shape.
+func TestNfsExportfsCorroborationIsRecorded(t *testing.T) {
+	cases := []struct {
+		name     string
+		exitCode int
+		want     bool
+	}{
+		{"exportfs answers", 0, true},
+		{"exportfs refuses", 1, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			a := nfsAccess(map[string]string{testExportsPath: "exports.world"},
+				map[string]cmdResult{cmdKey(exportfsCmd): {exitCode: tc.exitCode}})
+			b := buildBegun(t, "nfs", a)
+			e := env(t, b, "nfs.exports_runtime_collected")
+			if e.Status != facts.StatusOK || e.Value != tc.want {
+				t.Errorf("exports_runtime_collected %+v, want ok %v", e, tc.want)
+			}
+			if e.Source == nil || e.Source.Cmd != cmdKey(exportfsCmd) {
+				t.Errorf("exports_runtime_collected source %+v, want the declared %q", e.Source, cmdKey(exportfsCmd))
+			}
+			if got := b.Worst("nfs"); got != facts.StatusOK {
+				t.Errorf(`Worst("nfs") = %s, want ok (exportfs never worsens the run)`, got)
+			}
+		})
 	}
 }

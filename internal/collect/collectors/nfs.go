@@ -56,30 +56,34 @@ var nfsCollector = collect.Collector{
 // else is there (a missing /etc/exports with fragments still parses).
 func runNfs(ctx context.Context, a collect.Access, b *collect.Builder) error {
 	var records []any
-	var sourceFiles []any
+	// readFiles is every export file whose content actually reached the
+	// parse, in read order: it is both the exports_source value and, per
+	// Ruling JR-10, the provenance every envelope here cites. truncated is
+	// the subset the read primitive cut at the cap (Ruling JR-2).
+	var readFiles, truncated []string
 
 	switch data, meta, err := a.ReadFile(exportsPath, readLimit); {
 	case err == nil:
 		records = append(records, parseExportsContent(data)...)
-		sourceFiles = append(sourceFiles, exportsPath)
+		readFiles = append(readFiles, exportsPath)
+		if meta.Truncated {
+			truncated = append(truncated, exportsPath)
+		}
 	case errors.Is(err, fs.ErrNotExist):
 		// Nothing exported from the main file is not a finding; the
 		// fragments below may still export something.
 	default:
-		e := collect.FromReadError(err, meta)
-		b.Set("nfs.exports", e)
-		b.Set("nfs.exports_source", e)
-		b.Set("nfs.exports_runtime_collected", nfsRuntimeCollected(ctx, a))
-		return nil
+		return nfsJudged(ctx, a, b, pathReason(exportsPath, collect.FromReadError(err, meta)))
 	}
 
 	matches, err := a.Glob(exportsDGlob)
 	if err != nil {
-		e := collect.ErrorEnv("glob " + exportsDGlob + ": " + err.Error())
-		b.Set("nfs.exports", e)
-		b.Set("nfs.exports_source", e)
-		b.Set("nfs.exports_runtime_collected", nfsRuntimeCollected(ctx, a))
-		return nil
+		// Ruling JR-6: this collector declares Needs "none", so a Glob that
+		// fails is an environment limitation and never an error — one error
+		// envelope ranks worst in Builder.Worst, flips run.complete and
+		// breaks the collect-contract leg over a condition the reason
+		// already describes. patch's identical branch says the same thing.
+		return nfsJudged(ctx, a, b, collect.Unsupported("glob "+exportsDGlob+": "+err.Error()))
 	}
 	sort.Strings(matches)
 	for _, m := range matches {
@@ -92,22 +96,55 @@ func runNfs(ctx context.Context, a collect.Access, b *collect.Builder) error {
 			// never be silently skipped — that would publish the other
 			// files' exports as the complete answer when this one might add
 			// or change entries.
-			e := collect.FromReadError(err, meta)
-			b.Set("nfs.exports", e)
-			b.Set("nfs.exports_source", e)
-			b.Set("nfs.exports_runtime_collected", nfsRuntimeCollected(ctx, a))
-			return nil
+			return nfsJudged(ctx, a, b, pathReason(m, collect.FromReadError(err, meta)))
 		}
 		records = append(records, parseExportsContent(data)...)
-		sourceFiles = append(sourceFiles, m)
+		readFiles = append(readFiles, m)
+		if meta.Truncated {
+			truncated = append(truncated, m)
+		}
+	}
+
+	// R70 / Ruling JR-2: the read primitive answers a file past the cap with
+	// the prefix, Truncated true and NO error, so a directive written past
+	// it is invisible. A parse of that prefix is not the answer — publishing
+	// it as one is a confident-wrong PASS on the wildcard nobody could see —
+	// so both judged leaves go absent naming what was cut, the shape
+	// snmp.communities already takes.
+	if len(truncated) > 0 {
+		return nfsJudged(ctx, a, b, collect.Absent(strings.Join(truncated, ", ")+
+			" was cut at the read limit; what is past the cap cannot be judged"))
 	}
 
 	sortExportRecords(records)
-	src := &facts.Source{Kind: "file", Path: exportsPath}
+	var sourceFiles []any
+	for _, f := range readFiles {
+		sourceFiles = append(sourceFiles, f)
+	}
+	src := filesSource(readFiles)
 	b.Set("nfs.exports", collect.OK(records, src))
 	b.Set("nfs.exports_source", collect.OK(sourceFiles, src))
 	b.Set("nfs.exports_runtime_collected", nfsRuntimeCollected(ctx, a))
 	return nil
+}
+
+// nfsJudged publishes one envelope on both judged leaves and still records
+// the corroboration — the shape every early return out of runNfs shares, so
+// a new one cannot forget the third key (a registered key the snapshot lacks
+// is ERROR(missing_fact), never absent_means).
+func nfsJudged(ctx context.Context, a collect.Access, b *collect.Builder, e facts.Envelope) error {
+	b.Set("nfs.exports", e)
+	b.Set("nfs.exports_source", e)
+	b.Set("nfs.exports_runtime_collected", nfsRuntimeCollected(ctx, a))
+	return nil
+}
+
+// pathReason prefixes a read's reason with the file it came from (C3), so a
+// denied fragment names itself rather than leaving the reader to guess which
+// of the export files could not be opened.
+func pathReason(p string, e facts.Envelope) facts.Envelope {
+	e.Reason = p + ": " + e.Reason
+	return e
 }
 
 // nfsRuntimeCollected asks the kernel export table to corroborate the parsed

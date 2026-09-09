@@ -212,10 +212,10 @@ func runSnmp(_ context.Context, a collect.Access, b *collect.Builder) error {
 	// from. src covers the whole stack; the users source covers only the
 	// files that contributed a v3 user, so a user set that came from the
 	// persistent state file alone cites the state file and nothing else.
-	src := snmpSource(p.files)
+	src := filesSource(p.files)
 	usersSrc := src
 	if len(p.userFiles) > 0 {
-		usersSrc = snmpSource(p.userFiles)
+		usersSrc = filesSource(p.userFiles)
 	}
 	// R70: a value parsed out of a file the read primitive cut at the limit
 	// is not the whole answer, and every evidence leaf says so.
@@ -234,24 +234,6 @@ func runSnmp(_ context.Context, a collect.Access, b *collect.Builder) error {
 	b.Set("snmp.config_files", withTruncation(collect.OK(p.sortedFiles(), src), cut))
 	b.Set("snmp.parse_complete", withTruncation(collect.OK(p.complete(), src), cut))
 	return nil
-}
-
-// snmpSource renders the provenance of a value computed from files: a plain
-// file source when exactly one file contributed, the repository's derived
-// shape (accounts.go's precedent) when several did, and NOTHING when none
-// did — an envelope must never cite a path the collector did not read.
-func snmpSource(files []string) *facts.Source {
-	switch len(files) {
-	case 0:
-		return nil
-	case 1:
-		return &facts.Source{Kind: "file", Path: files[0]}
-	}
-	inputs := make([]facts.Source, 0, len(files))
-	for _, f := range files {
-		inputs = append(inputs, facts.Source{Kind: "file", Path: f})
-	}
-	return &facts.Source{Kind: "derived", Inputs: inputs}
 }
 
 // scan reads the candidate files in a fixed order: the main file and its
