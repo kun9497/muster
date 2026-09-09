@@ -1,0 +1,5 @@
+# Synthetic sendmail.cf fragment: two option lines, whitespace separators and
+# a continuation. sendmail ORs every list into one set of flags.
+O PrivacyOptions=authwarnings needmailhelo
+O PrivacyOptions=novrfy,
+	noexpn

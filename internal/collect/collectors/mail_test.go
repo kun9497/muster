@@ -3,6 +3,8 @@
 package collectors
 
 import (
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -153,10 +155,11 @@ func TestMailPostfixDebianStock(t *testing.T) {
 	if got := mailString(t, b, "mail.postfix.mynetworks"); got != "127.0.0.0/8 [::ffff:127.0.0.0]/104 [::1]/128" {
 		t.Errorf("mynetworks = %q, want the stock loopback list", got)
 	}
+	if got := mailString(t, b, "mail.postfix.smtpd_relay_restrictions"); got != "permit_mynetworks permit_sasl_authenticated defer_unauth_destination" {
+		t.Errorf("smtpd_relay_restrictions = %q, want the stock list", got)
+	}
 	// Every parameter the file does not set is absent with postfix's own
 	// compiled default named, never that default published as a value.
-	absentBecause(t, b, "mail.postfix.smtpd_relay_restrictions",
-		"permit_mynetworks, permit_sasl_authenticated, defer_unauth_destination")
 	absentBecause(t, b, "mail.postfix.smtpd_recipient_restrictions", "default is empty")
 	absentBecause(t, b, "mail.postfix.disable_vrfy_command", "default is no")
 	absentBecause(t, b, "mail.postfix.authorized_submit_users", "static:anyone")
@@ -168,8 +171,9 @@ func TestMailPostfixDebianStock(t *testing.T) {
 	if w := b.Worst("mail"); w != facts.StatusOK {
 		t.Errorf(`Worst("mail") = %s, want ok`, w)
 	}
-	// The read guard covers nine paths; only the one that exists is opened,
-	// and main.cf's own parameters can name files that are never followed.
+	// The read guard covers nine paths; only the one that exists is opened.
+	// This file names /etc/aliases through alias_maps and alias_database, and
+	// neither is followed: a path main.cf mentions is not a path muster reads.
 	if !slices.Equal(a.reads, []string{postfixMainCf}) {
 		t.Errorf("reads = %v, want only %s", a.reads, postfixMainCf)
 	}
@@ -178,6 +182,14 @@ func TestMailPostfixDebianStock(t *testing.T) {
 // A line beginning with whitespace continues the previous value, joined with
 // a single space; a later assignment of the same parameter wins; a '#' that
 // is not at the start of a line belongs to the value.
+//
+// The fixture also carries the two cases postconf(5) settles and nothing else
+// in the suite reaches: an INDENTED comment between a parameter and its
+// continuation (a comment, never part of the value) and a line that is not an
+// assignment at all followed by an indented line (which has no parameter left
+// to extend). Reading the indented comment as a continuation shows up in
+// mynetworks; dropping the "last = \"\"" reset after a non-assignment line
+// shows up in inet_interfaces.
 func TestMailPostfixContinuationAndLastWins(t *testing.T) {
 	b := build(t, "mail", mailAccess(map[string]string{postfixMainCf: "main.cf.continuation"}))
 	mailComplete(t, b)
@@ -185,13 +197,33 @@ func TestMailPostfixContinuationAndLastWins(t *testing.T) {
 	for _, c := range []struct{ key, want string }{
 		{"mail.postfix.mynetworks", "127.0.0.0/8 198.51.100.0/24 203.0.113.0/24"},
 		{"mail.postfix.smtpd_relay_restrictions", "permit_mynetworks, reject_unauth_destination"},
-		// Two inet_interfaces lines: the LAST is what postfix uses.
+		// Two inet_interfaces lines: the LAST is what postfix uses, and the
+		// orphan continuation further down does not extend it.
 		{"mail.postfix.inet_interfaces", "loopback-only"},
 		{"mail.postfix.smtpd_recipient_restrictions", "check_policy_service unix:private/policy # inline, not a comment"},
 	} {
 		if got := mailString(t, b, c.key); got != c.want {
 			t.Errorf("%s = %q, want %q", c.key, got, c.want)
 		}
+	}
+}
+
+// The other half of the continuation guard: a line beginning with whitespace
+// BEFORE any parameter has nothing to extend and must not become a parameter
+// of its own. No published leaf can show that — a parameter with an empty
+// name is looked up by nobody — so the parse map itself is the assertion.
+func TestMailPostfixOrphanContinuationCreatesNoParameter(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("testdata", "main.cf.continuation"))
+	if err != nil {
+		t.Fatalf("read fixture: %v", err)
+	}
+	got := map[string]string{}
+	parsePostfixInto(got, data)
+	if v, ok := got[""]; ok {
+		t.Errorf("the parse invented a parameter with an empty name = %q", v)
+	}
+	if got["inet_interfaces"] != "loopback-only" {
+		t.Errorf("inet_interfaces = %q, want loopback-only", got["inet_interfaces"])
 	}
 }
 
@@ -215,6 +247,10 @@ func TestMailPostfixVrfyDisabled(t *testing.T) {
 	if !mailBool(t, on, "mail.expn_vrfy_restricted") {
 		t.Error(`postfix reads "on" as yes, so VRFY is refused`)
 	}
+	// This file sets nothing else, so it is where the unset-parameter branch
+	// of smtpd_relay_restrictions is pinned.
+	absentBecause(t, on, "mail.postfix.smtpd_relay_restrictions",
+		"permit_mynetworks, permit_sasl_authenticated, defer_unauth_destination")
 
 	off := build(t, "mail", mailAccess(map[string]string{postfixMainCf: "main.cf.relay-open"}))
 	if got := mailString(t, off, "mail.postfix.disable_vrfy_command"); got != "no" {
@@ -286,6 +322,38 @@ func TestMailSendmailPrivacyOptions(t *testing.T) {
 	}
 	if !mailBool(t, old, "mail.expn_vrfy_restricted") {
 		t.Error("noexpn and novrfy together restrict both commands")
+	}
+
+	// Ruling L-50: sendmail ORs every PrivacyOptions line into one set, so
+	// two lines are a UNION and not a last-one-wins; the separators may be
+	// commas or whitespace, and a following indented line continues the value.
+	union := build(t, "mail", mailAccess(map[string]string{sendmailCf: "sendmail.cf.two-lines"}))
+	if got := stringList(t, union, "mail.sendmail.privacy_options"); !slices.Equal(got,
+		[]string{"authwarnings", "needmailhelo", "noexpn", "novrfy"}) {
+		t.Errorf("privacy_options = %v, want the union of both lines", got)
+	}
+	if !mailBool(t, union, "mail.expn_vrfy_restricted") {
+		t.Error("novrfy on one line and noexpn on the next still restrict both")
+	}
+
+	// The bare legacy spelling, where the flags follow the option letter.
+	legacy := build(t, "mail", mailAccess(map[string]string{sendmailCf: "sendmail.cf.legacy"}))
+	if got := stringList(t, legacy, "mail.sendmail.privacy_options"); !slices.Contains(got, "goaway") {
+		t.Errorf("privacy_options = %v, want the Opgoaway flags", got)
+	}
+	if !mailBool(t, legacy, "mail.expn_vrfy_restricted") {
+		t.Error("Opgoaway is goaway, which covers novrfy and noexpn")
+	}
+
+	// A line this collector cannot read is not an empty set of flags: both
+	// leaves refuse rather than publish a FAIL with an untrue reason.
+	bad := buildBegun(t, "mail", mailAccess(map[string]string{sendmailCf: "sendmail.cf.garbled"}))
+	mailComplete(t, bad)
+	for _, k := range []string{"mail.sendmail.privacy_options", "mail.expn_vrfy_restricted"} {
+		absentBecause(t, bad, k, "confPRIVACY_FLAGS")
+	}
+	if w := bad.Worst("mail"); w != facts.StatusOK {
+		t.Errorf(`Worst("mail") = %s, want ok`, w)
 	}
 
 	// A .cf with no PrivacyOptions line at all is an EMPTY list, not an
@@ -379,6 +447,15 @@ func TestMailImplementationAndDegradation(t *testing.T) {
 			t.Errorf("%s reason %q must name the file that could not be read", k, e.Reason)
 		}
 	}
+	// Ruling L-49: the file is THERE and could not be opened, which is not the
+	// same finding as "this host has no mail configuration at all".
+	cf := env(t, db, "mail.config_files")
+	if cf.Status != facts.StatusDenied {
+		t.Errorf("config_files %+v, want denied rather than an empty list", cf)
+	}
+	if !strings.Contains(cf.Reason, postfixMainCf) {
+		t.Errorf("config_files reason %q must name the file", cf.Reason)
+	}
 	if w := db.Worst("mail"); w != facts.StatusDenied {
 		t.Errorf(`Worst("mail") = %s, want denied`, w)
 	}
@@ -395,10 +472,13 @@ func TestMailImplementationAndDegradation(t *testing.T) {
 	}
 }
 
-// Two MTAs installed at once: the first in the fixed order answers, and the
-// other is named in the implementation's reason. It is evidence, not a
-// reason to refuse a verdict — postfix is what /usr/sbin/sendmail points at
-// on such a host — and the second configuration is never opened.
+// Two MTAs installed at once (RHEL installs postfix and sendmail side by
+// side under alternatives): the first in the fixed order answers the evidence
+// leaves and the other is named in the implementation's reason, but the
+// DERIVED verdict is refused — which of the two serves port 25 is decided by
+// the enabled unit, not by this collector's probe order, so a hardened
+// postfix beside a permissive sendmail must never read PASS (Ruling L-48).
+// The second configuration is still never opened.
 func TestMailSecondImplementationIsNamedNotJudged(t *testing.T) {
 	a := mailAccess(map[string]string{
 		postfixMainCf: "main.cf.debian",
@@ -416,6 +496,15 @@ func TestMailSecondImplementationIsNamedNotJudged(t *testing.T) {
 	}
 	// The sendmail leaf is not answered from a file this host does not run.
 	absentBecause(t, b, "mail.sendmail.privacy_options", "postfix")
+	// The verdict names BOTH families rather than describing one of them.
+	absentBecause(t, b, "mail.expn_vrfy_restricted", "postfix", "sendmail", sendmailCf)
+	// The evidence leaves are still the parsed ones.
+	if got := mailString(t, b, "mail.postfix.inet_interfaces"); got != "all" {
+		t.Errorf("inet_interfaces = %q, want the parsed value", got)
+	}
+	if w := b.Worst("mail"); w != facts.StatusOK {
+		t.Errorf(`Worst("mail") = %s, want ok`, w)
+	}
 	if !slices.Equal(a.reads, []string{postfixMainCf}) {
 		t.Errorf("reads = %v, want only the chosen implementation's file", a.reads)
 	}

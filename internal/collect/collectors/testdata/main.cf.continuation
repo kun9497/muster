@@ -1,11 +1,15 @@
+    a continuation line with no parameter above it
 #a comment at column zero
 inet_interfaces = all
 biff=no
 mynetworks = 127.0.0.0/8
+    # an indented comment is a comment, not a continuation
     198.51.100.0/24
 	203.0.113.0/24
 smtpd_relay_restrictions =
     permit_mynetworks,
     reject_unauth_destination
 inet_interfaces = loopback-only
+this line is not a parameter assignment
+    an orphan continuation after it
 smtpd_recipient_restrictions = check_policy_service unix:private/policy # inline, not a comment

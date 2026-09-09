@@ -3434,7 +3434,7 @@
     {
       "Key": "mail.implementation",
       "Type": "string",
-      "Description": "Which mail transfer agent this host is configured with - postfix, sendmail, exim or none. An MTA is named only when its binary is installed as well as its configuration file, so a conffile left behind by a removed package does not decide, and the reason then names that leftover. When two of them are installed at once the fixed order postfix, sendmail, exim picks the one these facts describe and the reason names the other, which is evidence rather than a reason to refuse a verdict - only one binary can be behind /usr/sbin/sendmail. Evidence only (whether a mail service is running is services.mail.active).",
+      "Description": "Which mail transfer agent this host is configured with - postfix, sendmail, exim or none. An MTA is named only when its binary is installed as well as its configuration file, so a conffile left behind by a removed package does not decide, and the reason then names that leftover. When two of them are installed at once - which RHEL allows, postfix and sendmail side by side under alternatives - the fixed order postfix, sendmail, exim picks the one whose configuration the mail.postfix.* and mail.sendmail.* leaves describe, and the reason names the other; which of them actually serves port 25 is decided by the enabled unit (services.mail.*) and cannot be read out of the files, so mail.expn_vrfy_restricted is then ABSENT rather than drawn from the winner of this order. Evidence only (whether a mail service is running is services.mail.active).",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "mail",
@@ -3444,7 +3444,7 @@
     {
       "Key": "mail.config_files",
       "Type": "list\u003cstring\u003e",
-      "Description": "The mail transfer agent configuration files this collector found, sorted. For postfix and sendmail these are the files it read - /etc/postfix/main.cf and /etc/mail/sendmail.cf, the only files it opens; a path main.cf names (a lookup table, an alias database, a chroot) is never followed. For exim the file is listed as the evidence that named the implementation and is NOT parsed.",
+      "Description": "The mail transfer agent configuration files this collector found, sorted. For postfix and sendmail these are the files it read - /etc/postfix/main.cf and /etc/mail/sendmail.cf, the only files it opens; a path main.cf names (a lookup table, an alias database, a chroot) is never followed. For exim the file is listed as the evidence that named the implementation and is NOT parsed. A configuration file that exists but could not be read carries the read's own status here - denied, naming the path - rather than an empty list, which would say this host has no mail configuration at all.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "mail",
@@ -3514,7 +3514,7 @@
     {
       "Key": "mail.sendmail.privacy_options",
       "Type": "list\u003cstring\u003e",
-      "Description": "The flags of the first \"O PrivacyOptions=\" line of /etc/mail/sendmail.cf (the single-letter \"OpPrivacyOptions=\" spelling counts too), lower-cased, deduplicated and sorted. A goaway token is KEPT in the list and its expansion appended beside it, because which flags goaway covers depends on the sendmail release - 8.14 covers authwarnings, noexpn, novrfy, noverb, needmailhelo, needexpnhelo, needvrfyhelo and nobodyreturn - so only novrfy and noexpn, present in every version, are judged. An empty list means the file was read and carries no such line, which is sendmail's default \"public\"; that is a different finding from an absence. Absent on a postfix or exim host, and denied when sendmail.cf could not be read.",
+      "Description": "The union of the flags of EVERY PrivacyOptions line of /etc/mail/sendmail.cf, lower-cased, deduplicated and sorted. Every spelling sendmail accepts is read: the long \"O PrivacyOptions=\" form, the \"OpPrivacyOptions=\" form and the bare legacy \"Op\" form where the flags follow the option letter; flags may be separated by commas or by whitespace, and a following line that begins with whitespace continues the value. The lines are a UNION rather than a last-one-wins, because sendmail's own setoption ORs each list into its privacy flags and never clears them. A goaway token is KEPT in the list and its expansion appended beside it, because which flags goaway covers depends on the sendmail release - 8.14 covers authwarnings, noexpn, novrfy, noverb, needmailhelo, needexpnhelo, needvrfyhelo and nobodyreturn - so only novrfy and noexpn, present in every version, are judged. An empty list means the file was read and carries no such line, which is sendmail's default \"public\"; that is a different finding from an absence. ABSENT, naming the line, when a line carries a token outside sendmail's own flag vocabulary - a macro reference, a typo, or a flag a later release added - since a set this collector knows is incomplete must not become a verdict. Absent on a postfix or exim host, and denied when sendmail.cf could not be read.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "mail",
@@ -3524,7 +3524,7 @@
     {
       "Key": "mail.expn_vrfy_restricted",
       "Type": "bool",
-      "Description": "Whether the MTA refuses the SMTP VRFY and EXPN commands, which enumerate accounts and mailing lists to anyone who can open port 25. postfix - disable_vrfy_command is affirmative; postfix implements no EXPN command at all, so that one parameter settles both, and its compiled default no leaves VRFY answered. sendmail - both novrfy and noexpn are in mail.sendmail.privacy_options after a goaway is expanded. exim - ABSENT, because exim decides both in its ACLs, which this collector does not model. Absent on a host with no MTA, and denied when the configuration exists but could not be read.",
+      "Description": "Whether the MTA refuses the SMTP VRFY and EXPN commands, which enumerate accounts and mailing lists to anyone who can open port 25. postfix - disable_vrfy_command is affirmative; postfix implements no EXPN command at all, so that one parameter settles both, and its compiled default no leaves VRFY answered. A per-service \"-o disable_vrfy_command\" override in master.cf is NOT modelled, so this reads main.cf's answer for every service. sendmail - both novrfy and noexpn are in mail.sendmail.privacy_options after a goaway is expanded and every PrivacyOptions line is folded in. exim - ABSENT, because exim decides both in its ACLs, which this collector does not model. ABSENT when more than one MTA is installed at once, naming both, because the configuration files cannot say which of them serves port 25. Absent on a host with no MTA, and denied when the configuration exists but could not be read.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "mail",

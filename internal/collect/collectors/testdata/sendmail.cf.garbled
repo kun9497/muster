@@ -1,0 +1,3 @@
+# Synthetic sendmail.cf fragment: a privacy list built from a macro this
+# collector cannot resolve, so what it restricts is not known.
+O PrivacyOptions=${confPRIVACY_FLAGS}

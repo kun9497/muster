@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"unicode"
 
 	"github.com/kun9497/muster/internal/collect"
 	"github.com/kun9497/muster/internal/facts"
@@ -111,11 +112,25 @@ var goawayExpansion = []string{
 	"needmailhelo", "needexpnhelo", "needvrfyhelo", "nobodyreturn",
 }
 
-// sendmailPrivacyRe matches the sendmail.cf option line this collector
-// reads, in both spellings: the long "O PrivacyOptions=" form m4 emits and
-// the single-letter "OpPrivacyOptions=" form, with whitespace around the
-// separator tolerated either way.
+// sendmailPrivacyRe matches the named sendmail.cf option line, in both
+// spellings: the long "O PrivacyOptions=" form m4 emits and the
+// "OpPrivacyOptions=" spelling, with whitespace around the separator
+// tolerated either way. The bare legacy form — "Op" followed by the flags
+// themselves — is handled beside it in sendmailPrivacyValue.
 var sendmailPrivacyRe = regexp.MustCompile(`^O(?:\s+|p)PrivacyOptions\s*=(.*)$`)
+
+// sendmailPrivacyFlags is every privacy flag sendmail's own PrivacyValues
+// table defines. A token outside it is a value this collector cannot make
+// sense of — a macro reference, a typo, or a flag a later release added —
+// and Ruling L-50 answers it with an ABSENCE naming the line rather than a
+// verdict drawn from half a set (H-16: under-claim, never over-claim).
+var sendmailPrivacyFlags = map[string]bool{
+	"public": true, "needmailhelo": true, "needexpnhelo": true, "needvrfyhelo": true,
+	"noexpn": true, "novrfy": true, "noverb": true, "noetrn": true,
+	"norecipients": true, "noreceipts": true, "nobodyreturn": true, "noactualrecipient": true,
+	"authwarnings": true, "restrictmailq": true, "restrictqrun": true, "restrictexpand": true,
+	"goaway": true,
+}
 
 // mailConfCandidates is every configuration file the collector looks for, in
 // probe order — the list a reason names when it found none of them.
@@ -147,6 +162,7 @@ type mailParse struct {
 	postfix    map[string]string // lowercased parameter -> raw value, last wins
 	privacy    []string          // sendmail's PrivacyOptions flags, expanded and sorted
 	privacySet bool              // the .cf carried a PrivacyOptions line at all
+	privacyBad string            // the first privacy line this collector could not read
 }
 
 // runMail publishes the mail keys from configuration files alone: D14 forbids
@@ -235,7 +251,7 @@ func (p *mailParse) read() {
 	case "postfix":
 		parsePostfixInto(p.postfix, data)
 	case "sendmail":
-		p.privacy, p.privacySet = parseSendmailPrivacy(data)
+		p.privacy, p.privacySet, p.privacyBad = parseSendmailPrivacy(data)
 	}
 }
 
@@ -262,17 +278,33 @@ func (p *mailParse) publish(b *collect.Builder) {
 	cut := len(p.truncated) > 0
 
 	impl := collect.OK(p.impl, p.implSource())
+	// Name the file, so a reader can see a leftover to purge rather than a
+	// configuration anything was judged by (IR-7) — including when ANOTHER
+	// MTA answered and the leftover would otherwise go unreported.
+	var notes []string
+	if len(p.also) > 0 {
+		notes = append(notes, "also installed on this host and not read here: "+strings.Join(p.also, ", "))
+	}
+	if p.leftover != "" {
+		notes = append(notes, p.leftover)
+	}
 	switch {
 	case p.impl == "none" && p.leftover != "":
-		// Name the file, so a reader can see it is a leftover to purge rather
-		// than a configuration anything was judged by (IR-7).
 		impl.Reason = "no mail transfer agent on this host: " + p.leftover
-	case len(p.also) > 0:
-		impl.Reason = p.impl + " answers these facts; also installed on this host and not read here: " +
-			strings.Join(p.also, ", ")
+	case len(notes) > 0:
+		impl.Reason = p.impl + " answers these facts; " + strings.Join(notes, "; ")
 	}
 	b.Set("mail.implementation", impl)
-	b.Set("mail.config_files", withTruncation(collect.OK(mailList(p.sortedFiles()), src), cut))
+
+	// Ruling L-49 (C3): a configuration file that exists but could not be
+	// read is not an empty list of configuration files — it is a file this
+	// collector knows is there and could not open, and the leaf says so with
+	// the read's own status.
+	files := withTruncation(collect.OK(mailList(p.sortedFiles()), src), cut)
+	if p.readFailure != nil {
+		files = *p.readFailure
+	}
+	b.Set("mail.config_files", files)
 
 	if e := p.judged(); e != nil {
 		for _, k := range mailJudgedKeys {
@@ -325,8 +357,33 @@ func (p *mailParse) publishPostfix(b *collect.Builder, src *facts.Source) {
 	// postfix implements no EXPN command at all — it answers 502 whatever the
 	// configuration says — so the one parameter settles both halves of the
 	// question, and its own compiled default leaves VRFY answered.
-	e := collect.OK(postfixYes(p.postfix["disable_vrfy_command"]), src)
+	v := p.postfix["disable_vrfy_command"]
+	if oversized(v) {
+		// The string leaf refused this value; a verdict must not be drawn
+		// from a value the collector declined to store either.
+		p.setExpnVrfy(b, collect.Absent("disable_vrfy_command: "+oversizedReason))
+		return
+	}
+	e := collect.OK(postfixYes(v), src)
 	e.Reason = "postfix implements no EXPN command, so disable_vrfy_command decides both; its compiled default is no"
+	p.setExpnVrfy(b, e)
+}
+
+// setExpnVrfy publishes the derived verdict, refusing it outright when more
+// than one MTA is installed at once (Ruling L-48). The configuration files
+// cannot say which of the two actually serves port 25 — that is the running
+// side, services.mail.* — so reading the winner of this collector's fixed
+// probe order as the host's answer would be exactly the over-claim H-16
+// forbids: a hardened postfix beside a permissive sendmail would PASS U-48
+// on a host that answers VRFY. The evidence leaves stay as parsed.
+func (p *mailParse) setExpnVrfy(b *collect.Builder, e facts.Envelope) {
+	if len(p.also) > 0 {
+		b.Set("mail.expn_vrfy_restricted", collect.Absent(
+			"more than one mail transfer agent is installed on this host ("+p.impl+", "+
+				strings.Join(p.also, ", ")+"); which of them serves port 25 cannot be read out of "+
+				"their configuration files, so this verdict is left to the operator"))
+		return
+	}
 	b.Set("mail.expn_vrfy_restricted", e)
 }
 
@@ -353,6 +410,16 @@ func (p *mailParse) publishSendmail(b *collect.Builder, src *facts.Source) {
 		b.Set(pp.key, collect.Absent(pp.param+
 			" is not a sendmail setting; this host is configured with sendmail"))
 	}
+	if p.privacyBad != "" {
+		// Ruling L-50: a privacy line this collector cannot read is not an
+		// empty set of flags. Publishing one would be a FAIL carrying an
+		// untrue reason, so both leaves name the line instead.
+		e := collect.Absent(sendmailCf + ": this collector cannot read the privacy options in " +
+			p.privacyBad + ", so what they restrict is not known")
+		b.Set("mail.sendmail.privacy_options", e)
+		p.setExpnVrfy(b, e)
+		return
+	}
 	opts := collect.OK(mailList(p.privacy), src)
 	if !p.privacySet {
 		// An empty list is the honest answer: the file was READ and it sets
@@ -364,8 +431,8 @@ func (p *mailParse) publishSendmail(b *collect.Builder, src *facts.Source) {
 
 	e := collect.OK(slices.Contains(p.privacy, "novrfy") && slices.Contains(p.privacy, "noexpn"), src)
 	e.Reason = "novrfy and noexpn are the two privacy flags every sendmail version carries; " +
-		"a goaway is expanded before this test"
-	b.Set("mail.expn_vrfy_restricted", e)
+		"a goaway is expanded and every PrivacyOptions line is folded in before this test"
+	p.setExpnVrfy(b, e)
 }
 
 func (p *mailParse) publishExim(b *collect.Builder) {
@@ -374,7 +441,7 @@ func (p *mailParse) publishExim(b *collect.Builder) {
 		b.Set(pp.key, collect.Absent(reason))
 	}
 	b.Set("mail.sendmail.privacy_options", collect.Absent(reason))
-	b.Set("mail.expn_vrfy_restricted", collect.Absent(
+	p.setExpnVrfy(b, collect.Absent(
 		"exim decides VRFY and EXPN in its ACLs, which this collector does not model"))
 }
 
@@ -451,19 +518,75 @@ func postfixYes(v string) bool {
 	return false
 }
 
-// parseSendmailPrivacy is the PrivacyOptions list of a sendmail.cf, and
-// whether the file carried such a line at all. The FIRST matching line is
-// the answer, so the same file always yields the same list.
-func parseSendmailPrivacy(data []byte) ([]string, bool) {
+// sendmailLogicalLines joins a sendmail.cf's continuation lines: readcf
+// treats a line that begins with whitespace as a continuation of the line
+// above it, so an option value may be spread over several lines. A blank
+// line carries nothing and is dropped.
+func sendmailLogicalLines(data []byte) []string {
+	var out []string
 	for _, raw := range splitLines(data) {
-		m := sendmailPrivacyRe.FindStringSubmatch(raw)
-		if m == nil {
+		if strings.TrimSpace(raw) == "" {
 			continue
 		}
-		return expandPrivacyOptions(strings.Split(m[1], ",")), true
+		if (raw[0] == ' ' || raw[0] == '\t') && len(out) > 0 {
+			out[len(out)-1] += " " + strings.TrimSpace(raw)
+			continue
+		}
+		out = append(out, raw)
 	}
-	return nil, false
+	return out
 }
+
+// sendmailPrivacyValue is the flag list one option line carries, and whether
+// the line is a PrivacyOptions line at all. Both spellings are read: the
+// named "O PrivacyOptions=" form and the bare legacy "Op" form, where the
+// flags follow the option letter directly.
+func sendmailPrivacyValue(line string) (string, bool) {
+	if m := sendmailPrivacyRe.FindStringSubmatch(line); m != nil {
+		return m[1], true
+	}
+	if v, ok := strings.CutPrefix(line, "Op"); ok {
+		return v, true
+	}
+	return "", false
+}
+
+// parseSendmailPrivacy is the UNION of every PrivacyOptions line of a
+// sendmail.cf, whether the file carried one at all, and the first line whose
+// value could not be read.
+//
+// Ruling L-50: sendmail's own setoption ORs each list into PrivacyFlags and
+// never clears it, so two lines are one set rather than the last one winning
+// — reading only the first would report a host as answering VRFY when its
+// second line refuses it. Flags are separated by commas OR whitespace, both
+// of which sendmail's scanner skips. A token outside sendmail's own flag
+// vocabulary makes the whole line unreadable, and the caller then refuses a
+// verdict instead of publishing a set it knows is incomplete.
+func parseSendmailPrivacy(data []byte) (flags []string, found bool, bad string) {
+	var tokens []string
+	for _, line := range sendmailLogicalLines(data) {
+		v, ok := sendmailPrivacyValue(line)
+		if !ok {
+			continue
+		}
+		found = true
+		for _, t := range strings.FieldsFunc(v, sendmailPrivacySep) {
+			t = strings.ToLower(t)
+			if !sendmailPrivacyFlags[t] {
+				return nil, true, sourceRaw(strings.TrimSpace(line))
+			}
+			tokens = append(tokens, t)
+		}
+	}
+	if !found {
+		return nil, false, ""
+	}
+	return expandPrivacyOptions(tokens), true, ""
+}
+
+// sendmailPrivacySep reports the runes that separate two flags: a comma or
+// any whitespace, which is what sendmail's own scanner skips between them.
+func sendmailPrivacySep(r rune) bool { return r == ',' || unicode.IsSpace(r) }
 
 // expandPrivacyOptions folds one comma-separated PrivacyOptions list into the
 // sorted, deduplicated set of flags it means. Ruling L-26: goaway is KEPT as
