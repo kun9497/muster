@@ -35,6 +35,10 @@ regex = '''(?i)\b[a-z0-9][a-z0-9-]*\.(?:corp|internal|intra|lan|local|priv)\b'''
 # progress. They are never committed, so the CI scan over git history cannot
 # see them; only a local --no-git scan of the working tree reaches them.
 paths = ['''^\.superpowers[/\\]''']
+# net-snmp's optional /etc/snmp/snmpd.local.conf is a real, public file name whose
+# ".local" suffix matches the private-DNS shape above. Allow that one literal
+# match only (never a path allowlist, which would weaken the lab-host guard).
+regexes = ['''^snmpd\.local$''']
 
 [[rules]]
 id = "private-ipv4-address"
