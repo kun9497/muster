@@ -1,0 +1,5 @@
+# synthetic /etc/pam.d/vsftpd whose list carries a bracketed control spec.
+# What such a spec does on failure is written in the brackets, and this model
+# does not evaluate them.
+auth	[success=1 default=ignore]	pam_listfile.so item=user sense=deny file=/etc/ftpusers onerr=succeed
+@include common-auth

@@ -1,0 +1,4 @@
+zone "example.net" IN {
+	type master;
+	file "/var/named/example.net.zone";
+};

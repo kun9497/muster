@@ -1,0 +1,4 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "services":{"ftp":{"installed":{"status":"ok","value":true},"active":{"status":"ok","value":true}}},
+  "ftp":{"tls_enforced":{"status":"ok","value":false,"reason":"ssl_enable is NO, so every session is served in the clear","source":{"kind":"file","path":"/etc/vsftpd.conf"}}}
+}}

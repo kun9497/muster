@@ -1,0 +1,4 @@
+# synthetic /etc/ftpusers that forgets root.
+daemon
+bin
+sys

@@ -1,0 +1,4 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "services":{"ftp":{"installed":{"status":"ok","value":true}}},
+  "ftp":{"root_denied":{"status":"absent","reason":"the set of access-control files cannot be completed: /etc/vsftpd/deny_users: the configuration named a path outside this collector's declaration, which is recorded and never opened"}}
+}}

@@ -186,7 +186,7 @@ func TestCheckEndToEndJSONAndTable(t *testing.T) {
 	if _, declared := params["muster.service.telnet_disabled"]; declared {
 		t.Errorf("only controls that declare params belong in check.params: %v", params)
 	}
-	// R26: full-pass.json must produce exactly the fifty-two embedded
+	// R26: full-pass.json must produce exactly the sixty-four embedded
 	// controls' documented statuses, not merely "some PASS rows appear
 	// somewhere in the output".
 	assertStatuses(t, out1.Bytes(), map[string]string{
@@ -242,6 +242,18 @@ func TestCheckEndToEndJSONAndTable(t *testing.T) {
 		"muster.service.snmp_community_strength": "PASS",
 		"muster.service.snmp_access_control":     "PASS",
 		"muster.patch.security_updates":          "PASS",
+		"muster.service.ftp_anonymous":           "PASS",
+		"muster.service.ftp_banner":              "PASS",
+		"muster.service.ftp_unencrypted":         "PASS",
+		"muster.service.ftpusers_permissions":    "PASS",
+		"muster.service.ftpusers_root":           "PASS",
+		"muster.service.mail_expn_vrfy":          "PASS",
+		"muster.service.mail_user_execution":     "MANUAL",
+		"muster.service.mail_relay":              "MANUAL",
+		"muster.service.mail_version":            "MANUAL",
+		"muster.service.dns_zone_transfer":       "PASS",
+		"muster.service.dns_dynamic_update":      "PASS",
+		"muster.service.dns_version":             "MANUAL",
 	})
 
 	var table bytes.Buffer
@@ -253,7 +265,7 @@ func TestCheckEndToEndJSONAndTable(t *testing.T) {
 	}
 
 	// R26: full-fail.json flips only root_remote_login to FAIL; the other
-	// fifty-one controls are unchanged from full-pass.json.
+	// sixty-three controls are unchanged from full-pass.json.
 	var failJSON bytes.Buffer
 	if code := run([]string{"check", "--facts", "testdata/full-fail.json", "--format", "json"}, &failJSON, &errb); code != exitFindings {
 		t.Fatalf("exit %d, want 1 for a FAIL; stderr %q", code, errb.String())
@@ -311,6 +323,18 @@ func TestCheckEndToEndJSONAndTable(t *testing.T) {
 		"muster.service.snmp_community_strength": "PASS",
 		"muster.service.snmp_access_control":     "PASS",
 		"muster.patch.security_updates":          "PASS",
+		"muster.service.ftp_anonymous":           "PASS",
+		"muster.service.ftp_banner":              "PASS",
+		"muster.service.ftp_unencrypted":         "PASS",
+		"muster.service.ftpusers_permissions":    "PASS",
+		"muster.service.ftpusers_root":           "PASS",
+		"muster.service.mail_expn_vrfy":          "PASS",
+		"muster.service.mail_user_execution":     "MANUAL",
+		"muster.service.mail_relay":              "MANUAL",
+		"muster.service.mail_version":            "MANUAL",
+		"muster.service.dns_zone_transfer":       "PASS",
+		"muster.service.dns_dynamic_update":      "PASS",
+		"muster.service.dns_version":             "MANUAL",
 	})
 
 	// R26: every run() call's exit code is asserted, including --quiet's,

@@ -1,0 +1,19 @@
+options {
+	directory "/var/named";
+	allow-transfer { any; };
+	allow-update { none; };
+};
+
+zone "example.org" IN {
+	type master;
+	file "/var/named/example.org.zone";
+	// The zone level wins over the wide-open options level.
+	allow-transfer { 192.0.2.0/24; };
+	allow-update { any; };
+};
+
+zone "example.net" IN {
+	type master;
+	file "/var/named/example.net.zone";
+	update-policy local;
+};

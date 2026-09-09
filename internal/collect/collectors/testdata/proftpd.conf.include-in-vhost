@@ -1,0 +1,11 @@
+# synthetic proftpd configuration whose fragment directory is included from
+# inside a <VirtualHost>, so the fragments belong to that host and not to
+# the server the top-level directives configure.
+ServerName "FTP service"
+ServerType standalone
+UseFtpUsers on
+<VirtualHost ftp.example.org>
+  ServerName "second service"
+  Include /etc/proftpd/conf.d/
+</VirtualHost>
+TLSEngine on

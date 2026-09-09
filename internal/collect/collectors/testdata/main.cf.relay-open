@@ -1,0 +1,10 @@
+# Synthetic postfix main.cf: an MTA that relays for the whole internet and
+# names one parameter through another, which is stored unexpanded.
+myhostname = relay.example.org
+inet_interfaces = all
+mynetworks = 0.0.0.0/0
+mynetworks_style = class
+smtpd_relay_restrictions = permit_mynetworks, permit_sasl_authenticated
+smtpd_recipient_restrictions = $smtpd_relay_restrictions, permit
+authorized_submit_users = static:anyone
+disable_vrfy_command = no

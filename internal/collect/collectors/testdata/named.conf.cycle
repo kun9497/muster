@@ -1,0 +1,6 @@
+options {
+	directory "/var/named";
+	allow-transfer { none; };
+};
+
+include "/etc/named/loop-a.conf";

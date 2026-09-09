@@ -1,0 +1,16 @@
+options {
+	directory "/var/named";
+	allow-transfer { none; };
+};
+
+zone "example.org" IN {
+	type master;
+	file "/var/named/example.org.zone";
+	include "/etc/named/open.conf";
+};
+
+zone "example.net" IN {
+	type master;
+	file "/var/named/example.net.zone";
+	include "/etc/named/open.conf";
+};

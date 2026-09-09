@@ -1,0 +1,8 @@
+# synthetic proftpd configuration in the stock Debian shape: the fragment
+# directory is included by name, with no glob, and proftpd reads every file
+# in it.
+ServerName "FTP service"
+ServerType standalone
+UseFtpUsers on
+TLSEngine on
+Include /etc/proftpd/conf.d/

@@ -1,0 +1,4 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "services":{"ftp":{"installed":{"status":"ok","value":true}}},
+  "ftp":{"banner_discloses_version":{"status":"absent","reason":"pure-ftpd's greeting is not configurable in this version's model"}}
+}}

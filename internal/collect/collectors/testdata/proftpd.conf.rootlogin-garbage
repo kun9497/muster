@@ -1,0 +1,7 @@
+# synthetic proftpd configuration whose RootLogin argument is neither on nor
+# off. proftpd refuses to start on it, so nothing here is the running
+# server's answer.
+ServerName "FTP service"
+ServerType standalone
+UseFtpUsers on
+RootLogin maybe

@@ -1,0 +1,4 @@
+# synthetic /etc/pam.d/vsftpd whose list is an ALLOW list: only the accounts
+# the file names may log in.
+auth	required	pam_listfile.so item=user sense=allow file=/etc/vsftpd/user_list onerr=fail
+@include common-auth

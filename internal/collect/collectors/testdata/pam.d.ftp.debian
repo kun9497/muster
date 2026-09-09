@@ -1,0 +1,4 @@
+# synthetic /etc/pam.d/ftp - the upstream service name, reached through
+# pam_service_name=ftp.
+auth	required	pam_listfile.so item=user sense=deny file=/etc/ftpusers onerr=succeed
+@include common-auth

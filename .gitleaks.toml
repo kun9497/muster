@@ -40,7 +40,12 @@ paths = ['''^\.superpowers[/\\]''']
 # match only (never a path allowlist, which would weaken the lab-host guard).
 # A Go field access such as "w.priv" in the snmp tests (a struct field named priv)
 # also matches the shape. Allow that exact token only.
-regexes = ['''^snmpd\.local$''', '''^w\.priv$''']
+# Debian's BIND chain ships a fragment whose name ends in ".local" (named.conf plus
+# that suffix); the token the rule sees is "conf.local". Allow that exact token only.
+# The same chain's named.conf.default-zones points its localhost zone at Debian's
+# real, public zone file /etc/bind/db.local; the token the rule sees is "db.local".
+# Allow that exact token only.
+regexes = ['''^snmpd\.local$''', '''^w\.priv$''', '''^conf\.local$''', '''^db\.local$''']
 
 [[rules]]
 id = "private-ipv4-address"

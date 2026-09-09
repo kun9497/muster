@@ -1,0 +1,4 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "services":{"ftp":{"installed":{"status":"ok","value":false}}},
+  "ftp":{"root_denied":{"status":"absent","reason":"no modelled FTP daemon configuration is present"}}
+}}

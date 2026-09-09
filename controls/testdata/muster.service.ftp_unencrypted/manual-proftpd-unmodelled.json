@@ -1,0 +1,4 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "services":{"ftp":{"installed":{"status":"ok","value":true},"active":{"status":"ok","value":true}}},
+  "ftp":{"tls_enforced":{"status":"absent","reason":"this configuration uses constructs outside the collector's model: /etc/proftpd/proftpd.conf: an IfModule section encloses a modelled directive"}}
+}}

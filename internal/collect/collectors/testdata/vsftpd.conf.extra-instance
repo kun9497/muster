@@ -1,0 +1,5 @@
+# synthetic configuration of a SECOND vsftpd instance, alongside the main
+# /etc/vsftpd/vsftpd.conf of the RHEL layout.
+listen=YES
+listen_port=2121
+anonymous_enable=YES

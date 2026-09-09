@@ -1,0 +1,4 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "services":{"ftp":{"installed":{"status":"ok","value":true},"active":{"status":"unsupported","reason":"procfs is masked or not mounted: no /proc/self/net/tcp"}}},
+  "ftp":{"tls_enforced":{"status":"ok","value":false,"source":{"kind":"file","path":"/etc/vsftpd.conf"}}}
+}}

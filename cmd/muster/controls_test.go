@@ -33,7 +33,7 @@ func TestControlsLintFixturesFlagAndUnusedKeysNote(t *testing.T) {
 	if code := runControls([]string{"lint", "--fixtures", repoFixtures, "--references", repoReferences}, &out, &errb); code != exitOK {
 		t.Fatalf("exit %d, want %d; stderr %q", code, exitOK, errb.String())
 	}
-	if !strings.Contains(out.String(), "ok: 52 controls") {
+	if !strings.Contains(out.String(), "ok: 64 controls") {
 		t.Errorf("stdout %q lacks the ok line", out.String())
 	}
 	// Spec §5.5: registered keys no control uses are reported, without failing.
@@ -72,7 +72,7 @@ func TestControlsLintWithoutReferencesFlagChecksShapeOnly(t *testing.T) {
 	if code := runControls([]string{"lint", "--fixtures", repoFixtures}, &out, &errb); code != exitOK {
 		t.Fatalf("exit %d, want %d; stderr %q", code, exitOK, errb.String())
 	}
-	if !strings.Contains(out.String(), "ok: 52 controls") {
+	if !strings.Contains(out.String(), "ok: 64 controls") {
 		t.Errorf("stdout %q lacks the ok line", out.String())
 	}
 }

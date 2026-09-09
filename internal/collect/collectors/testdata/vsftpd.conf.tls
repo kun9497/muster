@@ -1,0 +1,6 @@
+# synthetic vsftpd configuration with TLS turned on and the force_local_*
+# defaults left alone.
+anonymous_enable=NO
+local_enable=YES
+ssl_enable=YES
+rsa_cert_file=/etc/ssl/certs/vsftpd.pem

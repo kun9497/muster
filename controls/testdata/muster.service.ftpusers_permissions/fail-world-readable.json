@@ -1,0 +1,7 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "services":{"ftp":{"installed":{"status":"ok","value":true}}},
+  "ftp":{"access_file_present":{"status":"ok","value":true},
+         "access_files":{"status":"ok","value":[
+           {"path":"/etc/ftpusers","role":"pam_deny","exists":true,"root_listed":true,"mode":420,"uid":0,"gid":0,"stat_status":"ok"}
+         ]}}
+}}

@@ -1,0 +1,8 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "services":{"ftp":{"installed":{"status":"ok","value":true}}},
+  "ftp":{"access_file_present":{"status":"ok","value":true},
+         "access_files":{"status":"ok","value":[
+           {"path":"/etc/vsftpd/ftpusers","role":"pam_deny","exists":true,"root_listed":true,"mode":384,"uid":0,"gid":0,"stat_status":"ok"},
+           {"path":"/etc/vsftpd/user_list","role":"userlist_deny","exists":true,"root_listed":true,"mode":416,"uid":0,"gid":0,"stat_status":"ok"}
+         ]}}
+}}

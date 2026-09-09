@@ -1,0 +1,5 @@
+# synthetic /etc/ftpusers: the accounts refused an FTP login.
+root
+daemon
+bin
+sys

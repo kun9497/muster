@@ -3100,6 +3100,506 @@
       "Collector": "patch",
       "DefaultOn": "",
       "SubjectKind": ""
+    },
+    {
+      "Key": "services.ftp.installed",
+      "Type": "bool",
+      "Description": "An FTP server unit or inetd entry exists on the host.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.ftp.active",
+      "Type": "bool",
+      "Description": "The FTP service is running, socket-activated or reachable on its port.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.ftp.unit_file_state",
+      "Type": "string",
+      "Description": "UnitFileState of the first present FTP unit (evidence only; \"not-found\" when none).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.ftp.enabled",
+      "Type": "bool",
+      "Description": "An FTP unit will start at boot or on socket activation.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.ftp.reachable",
+      "Type": "bool",
+      "Description": "The FTP service would accept a connection from off the host (non-loopback listener on port 21).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.mail.installed",
+      "Type": "bool",
+      "Description": "A mail transfer agent unit (postfix, sendmail or exim) exists on the host.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.mail.active",
+      "Type": "bool",
+      "Description": "The mail transfer agent is running or reachable on its port.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.mail.unit_file_state",
+      "Type": "string",
+      "Description": "UnitFileState of the first present mail unit (evidence only; \"not-found\" when none).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.mail.enabled",
+      "Type": "bool",
+      "Description": "A mail unit will start at boot.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.mail.reachable",
+      "Type": "bool",
+      "Description": "The mail transfer agent would accept a connection from off the host (non-loopback listener on port 25).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.dns.installed",
+      "Type": "bool",
+      "Description": "A DNS server unit (bind or unbound) exists on the host.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.dns.active",
+      "Type": "bool",
+      "Description": "The DNS server is running or reachable on its port.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.dns.unit_file_state",
+      "Type": "string",
+      "Description": "UnitFileState of the first present DNS unit (evidence only; \"not-found\" when none).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.dns.enabled",
+      "Type": "bool",
+      "Description": "A DNS unit will start at boot.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.dns.reachable",
+      "Type": "bool",
+      "Description": "The DNS server would accept a query from off the host (non-loopback listener on port 53).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.libwrap_present",
+      "Type": "bool",
+      "Description": "Whether the TCP wrappers library is installed, from a presence probe over the paths libwrap.so.0 lives at on the Debian and RHEL families; a symlink counts as present, so false means every candidate was absent. RHEL 8 and later ship no libwrap at all, so a daemon built against it - and a deny-all /etc/hosts.deny - restricts nothing there. Evidence for the operator and the gate stage 2M's U-28 needs before it can judge a hosts.deny; no control in this stage reads it.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "ftp.implementation",
+      "Type": "string",
+      "Description": "Which FTP daemon this host is configured with - vsftpd, proftpd, pure-ftpd or none. A daemon is named only when its binary is installed as well as its configuration file, so a conffile left behind by a removed package does not decide, and the reason then names that leftover. Evidence only (whether an FTP service is running is services.ftp.active).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "ftp",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "ftp.config_files",
+      "Type": "list\u003cstring\u003e",
+      "Description": "The FTP configuration files actually read, sorted; a proftpd Include the declaration covers appears alongside the main file, and each file appears once however it was reached. A main configuration file that exists but could not be read carries the read's own status here rather than an ok empty list, because an ok list asserts found and readable; a fragment that failed after another file answered leaves those files listed and shows up in ftp.parse_complete instead.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "ftp",
+      "DefaultOn": "",
+      "SubjectKind": "file"
+    },
+    {
+      "Key": "ftp.parse_complete",
+      "Type": "bool",
+      "Description": "Whether every configuration file the collector was told to read could be read in full; false when a read failed or when the read primitive cut a file at its limit. A construct outside the model is not a read failure - it counts in ftp.unmodelled instead. A host with no FTP configuration at all read everything there was, so the parse is complete and the judged leaves carry that story.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "ftp",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "ftp.unmodelled",
+      "Type": "int",
+      "Description": "How many constructs outside this collector's model the configuration uses - a second vsftpd instance under /etc/vsftpd; a vsftpd boolean whose value is none of the spellings vsftpd accepts (YES/TRUE/1, NO/FALSE/0), which vsftpd refuses to start on; a proftpd VirtualHost, Global or IfModule section enclosing a modelled directive; a proftpd conditional section - IfDefine, IfVersion, IfClass, IfUser, IfGroup or IfSession - enclosing one, because what switches the condition (/etc/sysconfig/proftpd for the defines EPEL's stock file uses) is outside this collector's declaration, so the stock EPEL proftpd host is reported as unjudgeable; a proftpd Include outside the collector's declaration; and a proftpd Include target or pure-ftpd conf entry that is a symbolic link, which both daemons follow and this collector does not. Any of them makes every judged leaf absent, so a server whose real settings live where the model does not read is reported as unjudgeable rather than judged by settings it never uses.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "ftp",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "ftp.local_enabled",
+      "Type": "bool",
+      "Description": "Whether local accounts may log in over FTP - vsftpd's local_enable, whose compiled default is NO; proftpd and pure-ftpd authenticate local accounts and have no directive that turns them off wholesale, so both read true with that reason.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "ftp",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "ftp.anonymous_enabled",
+      "Type": "bool",
+      "Description": "Whether an anonymous login is served - vsftpd's anonymous_enable, whose COMPILED default is YES in both the Debian and the RHEL build (the Debian man page's \"Default NO\" is a documentation-only patch), so a file that never names it does serve anonymous logins - the value is read in vsftpd's own spellings, YES/TRUE/1 against NO/FALSE/0, case blind, and a value outside them counts in ftp.unmodelled rather than falling to that default; a proftpd Anonymous block at an attributed depth; pure-ftpd's NoAnonymous not being yes.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "ftp",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "ftp.tls_enforced",
+      "Type": "bool",
+      "Description": "Whether every session this daemon serves must be encrypted - vsftpd's ssl_enable with force_local_logins_ssl and force_local_data_ssl (both default YES) left on and, when anonymous logins are served, force_anon_logins_ssl and force_anon_data_ssl (both default NO) turned on; proftpd's TLSEngine on with TLSRequired on at the top level - a directive inside a conditional section such as \u003cIfDefine TLS\u003e, which is how EPEL's stock file ships it, is not attributed and counts in ftp.unmodelled instead; pure-ftpd's TLS setting at 2 or higher, which refuses a cleartext session.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "ftp",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "ftp.tcp_wrappers",
+      "Type": "bool",
+      "Description": "Whether vsftpd consults /etc/hosts.allow and /etc/hosts.deny - the tcp_wrappers setting, whose compiled default is NO. Absent on proftpd, which wraps connections through mod_wrap2's directives, and on pure-ftpd, which has no setting of its own in this model. Whether the library is installed at all is files.libwrap_present.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "ftp",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "ftp.userlist_enable",
+      "Type": "bool",
+      "Description": "Whether vsftpd consults its user list at all - userlist_enable, whose compiled default is NO. Absent on proftpd and pure-ftpd, whose access list is /etc/ftpusers rather than a list of this shape.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "ftp",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "ftp.userlist_deny",
+      "Type": "bool",
+      "Description": "Whether vsftpd's user list is a DENY list (the compiled default YES) rather than the allow list userlist_deny=NO makes it, which refuses every account the file does not name. Absent on proftpd and pure-ftpd.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "ftp",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "ftp.userlist_file",
+      "Type": "string",
+      "Description": "The file vsftpd reads its user list from - the explicit userlist_file, or the build default that is actually on disk (/etc/vsftpd.user_list on the Debian build, /etc/vsftpd/user_list on the RHEL build), preferring the one that matches the layout the main configuration file proved. Absent when the setting is unset and neither default exists, and on proftpd and pure-ftpd.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "ftp",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "ftp.access_files",
+      "Type": "list\u003crecord\u003e",
+      "Description": "One row per access-control file this host's FTP configuration names, sorted by path, with fields path, role, exists, root_listed, mode, uid, gid and stat_status (plus reason when something could not be seen). role is pam_deny or pam_allow for a file named by a pam_listfile.so line in /etc/pam.d/\u003cpam_service_name\u003e, userlist_deny or userlist_allow for vsftpd's own user list with its sense taken from userlist_deny, and ftpusers for proftpd's /etc/ftpusers when UseFtpUsers is not off. The pam.d service file itself is a SOURCE, not a row - it is world-readable by design and is not an access list. mode is the raw 0o7777 bits as an int (416 for 0640) and uid/gid are ints; a row whose stat did not succeed carries -1 in all three, never 0. stat_status is ok, absent, denied, error or undeclared, the last meaning the configuration named a path outside this collector's declaration, which is recorded and never opened. root_listed is true when a non-comment line of the file is exactly root; it is false, with a reason, whenever the file could be stat-ed but not read. This list and ftp.access_file_present are ABSENT together whenever the SET could not be completed - a source outside the declaration, an unreadable or truncated pam.d service file, a pam_listfile line filtering on something other than the account name (item=group and the like: it can still refuse root, but its file is not a list of accounts whose permissions this set may offer for judgement), a userlist_file value longer than this collector stores, or a row whose own stat_status is undeclared, denied or error - because a partial list is not evidence a control may judge, however clean the rows the collector did reach. A row that stats but cannot be READ keeps the list ok: its permissions are known, and only ftp.root_denied loses its answer.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "ftp",
+      "DefaultOn": "",
+      "SubjectKind": "file"
+    },
+    {
+      "Key": "ftp.access_file_present",
+      "Type": "bool",
+      "Description": "Whether at least one of the access-control files in ftp.access_files exists on this host. False with a reason when the configuration names none at all, which is a different finding from a list that exists and is empty. Absent, alongside ftp.access_files, whenever the set of access files could not be completed, so a blind spot never reads as an affirmative \"this host has no access list\".",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "ftp",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "ftp.root_denied",
+      "Type": "bool",
+      "Description": "Whether a root login over FTP is refused. vsftpd - local_enable NO, or root named in a pam_deny or userlist_deny file, or an allow list (userlist_deny NO, or pam_listfile sense=allow) that does not name root. proftpd - RootLogin not on, whose own default is off, or root named in /etc/ftpusers while UseFtpUsers is on. pure-ftpd - always true, because it refuses every account below MinUID, which is at least 1 in every build. A pam_listfile.so line counts only when its control field is required or requisite (a bracketed spec writes its own failure handling, and optional or sufficient do not make a failure refuse the login), it filters on item=user, it names an explicit sense, and it carries no apply=; a line that fails any of those still becomes a row, because U-56 judges a list's permissions whatever PAM does with it, but it cannot decide this leaf - except a line filtering on something other than the account name, which becomes no row at all and absents the whole access set instead. Absent when a list that would decide it could not be read - an undeclared path, an unreadable or truncated file, or a directive that cannot refuse a login by itself - with the reason naming it; DENIED rather than absent when the pam.d service file itself could not be read, so a reader sees a privilege problem and not a host without FTP access control.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "ftp",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "ftp.banner_source",
+      "Type": "string",
+      "Description": "What configures the greeting a client is shown before it authenticates - ftpd_banner or banner_file for vsftpd, serverident for proftpd's ServerIdent, default when nothing is configured and the daemon sends its compiled greeting, none when a daemon sends no greeting at all. Absent on pure-ftpd, whose greeting is not configurable in this version's model.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "ftp",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "ftp.banner_text",
+      "Type": "string",
+      "Description": "The configured greeting text - the ftpd_banner value, the content of banner_file, or the string of a proftpd ServerIdent on. A daemon's COMPILED greeting is not invented here - the source is then default and this text is empty, with the reason naming the product whose greeting is served. Absent when the configured banner file is outside this collector's declaration, is a symbolic link or another non-regular file this collector does not follow, could not be read, or was cut at the read limit.",
+      "Since": 1,
+      "Sensitivity": "internal",
+      "Collector": "ftp",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "ftp.banner_discloses_version",
+      "Type": "bool",
+      "Description": "Whether the greeting names the FTP software. True whenever the text matches vsftpd, proftpd, pure-ftpd or wu-ftpd, case-insensitively; a bare version number in an otherwise custom greeting is deliberately NOT a disclosure, since it identifies no product. An unset vsftpd banner and an unset or argument-less proftpd ServerIdent are true, because both compiled greetings name the product; ServerIdent off is false. Absent on pure-ftpd and wherever ftp.banner_text is absent.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "ftp",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "mail.implementation",
+      "Type": "string",
+      "Description": "Which mail transfer agent this host is configured with - postfix, sendmail, exim or none. An MTA is named only when its binary is installed as well as its configuration file, so a conffile left behind by a removed package does not decide, and the reason then names that leftover. When two of them are installed at once - which RHEL allows, postfix and sendmail side by side under alternatives - the fixed order postfix, sendmail, exim picks the one whose configuration the mail.postfix.* and mail.sendmail.* leaves describe, and the reason names the other; which of them actually serves port 25 is decided by the enabled unit (services.mail.*) and cannot be read out of the files, so mail.expn_vrfy_restricted is then ABSENT rather than drawn from the winner of this order. Evidence only (whether a mail service is running is services.mail.active).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "mail",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "mail.config_files",
+      "Type": "list\u003cstring\u003e",
+      "Description": "The mail transfer agent configuration files this collector found, sorted. For postfix and sendmail these are the files it read - /etc/postfix/main.cf and /etc/mail/sendmail.cf, the only files it opens; a path main.cf names (a lookup table, an alias database, a chroot) is never followed. For exim the file is listed as the evidence that named the implementation and is NOT parsed. A configuration file that exists but could not be read carries the read's own status here - denied, naming the path - rather than an empty list, which would say this host has no mail configuration at all.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "mail",
+      "DefaultOn": "",
+      "SubjectKind": "file"
+    },
+    {
+      "Key": "mail.postfix.inet_interfaces",
+      "Type": "string",
+      "Description": "The inet_interfaces value of /etc/postfix/main.cf, exactly as written, with any $name reference left unexpanded because expanding it needs parameters this collector does not model. Absent, naming postfix's compiled default \"all\", when main.cf does not set it; absent on a sendmail or exim host, and denied when main.cf exists but could not be read.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "mail",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "mail.postfix.mynetworks",
+      "Type": "string",
+      "Description": "The mynetworks value of /etc/postfix/main.cf, exactly as written and unexpanded - the client networks postfix relays for without authentication. Absent when main.cf does not set it, because postfix then computes the list from the host's own interfaces and netmasks and no file states it; absent on a sendmail or exim host, and denied when main.cf could not be read.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "mail",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "mail.postfix.smtpd_relay_restrictions",
+      "Type": "string",
+      "Description": "The smtpd_relay_restrictions value of /etc/postfix/main.cf, exactly as written and unexpanded. Absent, naming postfix's compiled default \"permit_mynetworks, permit_sasl_authenticated, defer_unauth_destination\", when main.cf does not set it; absent on a sendmail or exim host, and denied when main.cf could not be read.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "mail",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "mail.postfix.smtpd_recipient_restrictions",
+      "Type": "string",
+      "Description": "The smtpd_recipient_restrictions value of /etc/postfix/main.cf, exactly as written and unexpanded. Absent, naming postfix's compiled default of an empty list, when main.cf does not set it; absent on a sendmail or exim host, and denied when main.cf could not be read.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "mail",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "mail.postfix.disable_vrfy_command",
+      "Type": "string",
+      "Description": "The disable_vrfy_command value of /etc/postfix/main.cf, as written, so a reader sees the spelling the file uses; postfix takes yes or no, case blind, and refuses to start on anything else, so a value outside that pair leaves mail.expn_vrfy_restricted absent rather than answered from the compiled default. Absent, naming the compiled default \"no\", when main.cf does not set it - the derived mail.expn_vrfy_restricted still reads that default. Absent on a sendmail or exim host, and denied when main.cf could not be read.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "mail",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "mail.postfix.authorized_submit_users",
+      "Type": "string",
+      "Description": "The authorized_submit_users value of /etc/postfix/main.cf, exactly as written and unexpanded - which accounts may hand a message to the sendmail-compatible submission command. Absent, naming postfix's compiled default \"static:anyone\", when main.cf does not set it; absent on a sendmail or exim host, and denied when main.cf could not be read. Evidence for the operator judging U-46; no automatic control reads it.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "mail",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "mail.sendmail.privacy_options",
+      "Type": "list\u003cstring\u003e",
+      "Description": "The union of the flags of EVERY PrivacyOptions line of /etc/mail/sendmail.cf, lower-cased, deduplicated and sorted. Every spelling sendmail accepts is read: the long \"O PrivacyOptions=\" form, the \"OpPrivacyOptions=\" form and the bare legacy \"Op\" form where the flags follow the option letter; flags may be separated by commas or by whitespace, and a following line that begins with whitespace continues the value. The lines are a UNION rather than a last-one-wins, because sendmail's own setoption ORs each list into its privacy flags and never clears them. A goaway token is KEPT in the list and its expansion appended beside it, because which flags goaway covers depends on the sendmail release - 8.14 covers authwarnings, noexpn, novrfy, noverb, needmailhelo, needexpnhelo, needvrfyhelo and nobodyreturn - so only novrfy and noexpn, present in every version, are judged. An empty list means the file was read and carries no such line, which is sendmail's default \"public\"; that is a different finding from an absence. ABSENT, naming the line, when a line carries a token outside sendmail's own flag vocabulary - a macro reference, a typo, or a flag a later release added - since a set this collector knows is incomplete must not become a verdict. Absent on a postfix or exim host, and denied when sendmail.cf could not be read.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "mail",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "mail.expn_vrfy_restricted",
+      "Type": "bool",
+      "Description": "Whether the MTA refuses the SMTP VRFY and EXPN commands, which enumerate accounts and mailing lists to anyone who can open port 25. postfix - disable_vrfy_command is yes; postfix implements no EXPN command at all, so that one parameter settles both, and its compiled default no leaves VRFY answered. postfix takes yes or no there, case blind, and refuses to start on anything else, so a value outside that pair leaves this ABSENT naming the parameter rather than answered from the compiled default. A per-service \"-o disable_vrfy_command\" override in master.cf is NOT modelled, so this reads main.cf's answer for every service. sendmail - both novrfy and noexpn are in mail.sendmail.privacy_options after a goaway is expanded and every PrivacyOptions line is folded in. exim - ABSENT, because exim decides both in its ACLs, which this collector does not model. ABSENT when more than one MTA is installed at once, naming both, because the configuration files cannot say which of them serves port 25. Absent on a host with no MTA, and denied when the configuration exists but could not be read.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "mail",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "dns.implementation",
+      "Type": "string",
+      "Description": "Which DNS server this host is configured with - bind, unbound or none. A server is named only when its binary is installed as well as its configuration file, so a conffile left behind by a removed package does not decide, and the reason then names that leftover. bind is recognised by /etc/bind/named.conf, /etc/named.conf or the bind-chroot copy under /var/named/chroot with /usr/sbin/named beside it; unbound by /etc/unbound/unbound.conf with /usr/sbin/unbound. unbound is a caching resolver that serves no authoritative zones, so its configuration is recorded as evidence and never parsed. Evidence only (whether a DNS service is running is services.dns.active).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "dns",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "dns.config_files",
+      "Type": "list\u003cstring\u003e",
+      "Description": "The DNS configuration files actually read, sorted, each appearing once however it was reached - named.conf plus every include the collector's declaration covers, which on a stock host is the Debian options and local fragments or the RHEL crypto-policy fragment, named.rfc1912.zones and named.root.key. A zone's own file is NEVER opened and never appears here. For unbound the file is listed as the evidence that named the implementation and is NOT parsed. A main configuration file that exists but could not be read carries the read's own status here - denied, naming the path - rather than an empty list, which would say this host has no DNS configuration at all; a FRAGMENT that could not be read leaves the files that did answer listed and shows up in dns.parse_complete instead. A fragment included from two different scopes is read once per include chain, as named reads it, and still appears here once; a fragment already open further up its own chain is a cycle and is refused. On a stock RHEL-family host the crypto-policy fragment is a symlink the no-follow read primitive refuses; the policy name is then read from /etc/crypto-policies/state/current and the file it resolves to under /usr/share/crypto-policies appears here in its place, because the link's own bytes were never read. update-crypto-policies writes ONE name in that state file; a file carrying more than one non-empty line is read for its first, which is the only place this route can name the wrong file - the fragment it reads sets no value any control judges, so a wrong pick shows up here and can never move a verdict. On unbound the source cites a path this collector stat-ed rather than read.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "dns",
+      "DefaultOn": "",
+      "SubjectKind": "file"
+    },
+    {
+      "Key": "dns.parse_complete",
+      "Type": "bool",
+      "Description": "Whether every configuration file the collector was told to read could be read in full; false when a read failed, when the read primitive cut a file at its limit, or when an include named a path this collector's declaration does not cover, or a declared path that is a symbolic link or another non-regular file this collector does not follow - those last two are a file the configuration told the collector to read and the collector did not, so what it sets is unknown either way, and each counts in dns.unmodelled as well. A construct outside the model is not a read failure and counts only in dns.unmodelled. A host with no DNS configuration at all read everything there was, so the parse is complete and the judged leaves carry that story.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "dns",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "dns.unmodelled",
+      "Type": "int",
+      "Description": "How many constructs outside this collector's model the configuration uses - a view statement, whose per-client zones are a configuration of their own; an address match list nested inside another; an address match list element naming an acl nothing in the chain defines (acl names are matched the way named matches them, without regard to case); an include outside the collector's declaration; an include whose declared target is a symbolic link or another non-regular file this collector does not follow, the stock RHEL-family crypto-policy fragment excepted - its policy name is read from the crypto-policies state file so the fragment it resolves to can be read in its place; an include already open further up its own chain, which is a cycle. Any of them makes dns.options.allow_transfer, dns.options.allow_update and dns.zones absent, so a server whose real zones live where the model does not read is reported as unjudgeable rather than judged by the part that was read.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "dns",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "dns.options.allow_transfer",
+      "Type": "string",
+      "Description": "The options-level allow-transfer address match list, rendered as its elements in file order separated by \"; \" - the list every zone that does not set its own inherits. A key reference is rendered \"key \u003cname\u003e\" and an acl name is left as written; resolving what an acl covers is dns.zones' business, not this leaf's. ABSENT when options does not set it, with the reason naming the default it was not set against: the collector reads ID and VERSION_ID from /etc/os-release (falling back to /usr/lib/os-release) and knows the BIND 9.16/9.18 builds - ubuntu 22.04 and 24.04, debian 12, and rhel, rocky or almalinux 9.x - whose default is any; on any other build, or when os-release could not be read, the reason says the default depends on the version (any before 9.20, none from 9.20). Absent on unbound and on a host with no DNS server, denied when named.conf could not be read, and absent naming the limit when the rendered list is longer than a value may be.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "dns",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "dns.options.allow_update",
+      "Type": "string",
+      "Description": "The options-level allow-update address match list, rendered as its elements in file order separated by \"; \" - the list every zone that does not set its own inherits. ABSENT when options does not set it, because an unset allow-update is none in EVERY BIND version and no file states it. Absent on unbound and on a host with no DNS server, and denied when named.conf could not be read.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "dns",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "dns.zones",
+      "Type": "list\u003crecord\u003e",
+      "Description": "Every zone statement of the named.conf chain, sorted by name, as records of name, type, file, allow_transfer, allow_update, transfer_restricted and update_restricted. type is the zone's own - primary, master, secondary, slave, forward, hint, stub, mirror or redirect. file is the path the zone names, recorded verbatim and NEVER opened: every real zone file lives outside this collector's declaration, and a record field is evidence for the operator rather than a path muster reads. allow_transfer and allow_update are the EFFECTIVE lists - the zone's own when it sets one, the options level's otherwise - and are left out of the record when neither level sets one. transfer_restricted is true when the effective list is set and contains no \"any\"; an acl name is resolved through the whole chain wherever it is defined, and a key reference, localhost, localnets, none and an address or prefix all restrict, while a negated element restricts nothing by itself. When NOTHING sets allow-transfer the build decides (see dns.options.allow_transfer): false on a BIND 9.16/9.18 build, while on any other build the WHOLE list is ABSENT naming the zones, because 9.20 turned outgoing transfers off by default, the file says neither, and a record has no way to carry an unknown bool that a control could read as anything but an internal error. That absence covers the primary and master zones, which are what a transfer control judges; a zone of any other type on an unknown build is published without the field, since nothing that judges transfers reads one. name, type and update_restricted are on every record. update_restricted is true when allow-update is unset - none in every version - or sets no \"any\", and true when the zone carries an update-policy, which grants named identities per-name updates rather than opening the zone. The WHOLE list is absent when dns.parse_complete is false, when dns.unmodelled is above zero, or when a primary or master zone's transfer default is undeterminable as above - the other leaves keep answering there, since an unset allow-update is none whatever the build. It is the empty list on unbound, which serves no authoritative zones.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "dns",
+      "DefaultOn": "",
+      "SubjectKind": "zone"
     }
   ]
 }

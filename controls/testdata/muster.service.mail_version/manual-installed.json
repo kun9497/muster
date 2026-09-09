@@ -1,0 +1,4 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "services":{"mail":{"installed":{"status":"ok","value":true}}},
+  "mail":{"implementation":{"status":"ok","value":"postfix"}}
+}}

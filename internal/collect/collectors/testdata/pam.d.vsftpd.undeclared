@@ -1,0 +1,4 @@
+# synthetic /etc/pam.d/vsftpd naming a list outside this collector's
+# declaration; the path is recorded, never opened.
+auth	required	pam_listfile.so item=user sense=deny file=/etc/vsftpd/deny_users onerr=succeed
+@include common-auth

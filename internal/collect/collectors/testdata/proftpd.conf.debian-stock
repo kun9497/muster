@@ -1,0 +1,39 @@
+# Synthetic proftpd configuration in the shape Debian's stock file has: several
+# <IfModule> sections, none of which holds a directive this model attributes.
+# The server's own settings are all at the top level, so this host is judgeable
+# and nothing here is a construct outside the model.
+ServerName "FTP service"
+ServerType standalone
+DefaultServer on
+Port 21
+UseFtpUsers on
+RootLogin off
+
+<IfModule mod_quotatab.c>
+  QuotaEngine off
+</IfModule>
+
+<IfModule mod_ratio.c>
+  Ratios off
+</IfModule>
+
+<IfModule mod_delay.c>
+  DelayEngine on
+</IfModule>
+
+<IfModule mod_ctrls.c>
+  ControlsEngine off
+  ControlsMaxClients 2
+  <IfModule mod_ctrls_admin.c>
+    AdminControlsEngine off
+  </IfModule>
+</IfModule>
+
+<IfModule mod_dynmasq.c>
+  DynMasqRefresh 28800
+</IfModule>
+
+# A commented-out anonymous area, exactly as the stock file ships it.
+# <Anonymous ~ftp>
+#   User ftp
+# </Anonymous>

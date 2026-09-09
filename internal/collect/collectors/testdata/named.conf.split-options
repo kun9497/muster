@@ -1,0 +1,11 @@
+options {
+	directory "/var/named";
+	// The fragment carries a directive that only means anything INSIDE
+	// options; it is inlined at the include point, not read on its own.
+	include "/etc/named/transfer.conf";
+};
+
+zone "example.org" IN {
+	type master;
+	file "/var/named/example.org.zone";
+};

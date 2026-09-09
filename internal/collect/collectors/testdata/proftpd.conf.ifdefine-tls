@@ -1,0 +1,26 @@
+# Synthetic proftpd configuration in the shape EPEL's stock file has: the TLS
+# directives and the anonymous area are each wrapped in an <IfDefine>, switched
+# on by /etc/sysconfig/proftpd, which this collector neither declares nor reads.
+ServerName "FTP service"
+ServerType standalone
+UseFtpUsers on
+
+<IfDefine TLS>
+  TLSEngine on
+  TLSRequired on
+</IfDefine>
+
+# A third conditional section, holding nothing this model attributes: it is
+# NOT counted, because a section costs something only when a modelled directive
+# inside it would otherwise have been read as the server's own.
+<IfModule mod_dynmasq.c>
+  DynMasqRefresh 28800
+</IfModule>
+
+<IfDefine ANONYMOUS_FTP>
+  <Anonymous ~ftp>
+    User ftp
+    Group ftp
+    UserAlias anonymous ftp
+  </Anonymous>
+</IfDefine>

@@ -1,0 +1,5 @@
+# synthetic vsftpd configuration that serves anonymous logins only: no local
+# account, root included, can log in at all.
+anonymous_enable=YES
+local_enable=NO
+pam_service_name=vsftpd

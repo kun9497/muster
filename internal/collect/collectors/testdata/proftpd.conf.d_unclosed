@@ -1,0 +1,4 @@
+# A fragment that opens a section and never closes it: the section is
+# unclosed relative to the fragment's own include site, not to the top level.
+<Directory /srv/ftp/incoming>
+  AllowOverwrite off

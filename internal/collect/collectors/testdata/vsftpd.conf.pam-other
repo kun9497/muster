@@ -1,0 +1,5 @@
+# synthetic vsftpd configuration whose PAM service is a site-local name this
+# collector does not declare.
+anonymous_enable=NO
+local_enable=YES
+pam_service_name=vsftpd-site

@@ -1,0 +1,4 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "services":{"ftp":{"installed":{"status":"ok","value":true}}},
+  "ftp":{"anonymous_enabled":{"status":"ok","value":false,"source":{"kind":"file","path":"/etc/vsftpd.conf"}}}
+}}

@@ -1,0 +1,24 @@
+id: muster.service.mail_relay
+title_en: The mail transfer agent relays only for the clients it is meant to serve
+title_ko: 메일 서버가 서비스 대상 클라이언트에 대해서만 릴레이한다
+description_en: "An MTA that accepts mail from anywhere and forwards it anywhere is an open relay: it is enrolled in block lists within hours and it carries other people's spam under this host's name. muster collects the evidence and leaves the verdict to a person, because the answer is a policy decision about which networks this host serves. postfix spreads it across three parameters - inet_interfaces decides whether the daemon listens beyond loopback at all, mynetworks names the clients it trusts by address, and smtpd_relay_restrictions decides the rest (mail.postfix.*); the compiled default of mynetworks is derived from the host's own interfaces, so what it covers cannot be read out of the file. sendmail decides it in the access map, a compiled database muster does not read. Whether the daemon is reachable off-host at all is services.mail.reachable, a listener on tcp/25 bound to something other than loopback. A relay that is deliberately open to a whole site is a legitimate configuration on a mail hub and a finding on a workstation, which is exactly the judgement muster leaves to the operator. A host with no MTA installed is not applicable."
+description_ko: "어디에서 온 메일이든 받아 어디로든 전달하는 메일 서버는 오픈 릴레이입니다 - 몇 시간 안에 차단 목록에 등재되고, 이 호스트의 이름으로 남의 스팸을 나르게 됩니다. muster 는 근거만 수집하고 판정은 사람에게 남깁니다. 어느 네트워크를 서비스할 것인지는 조직의 정책 판단이기 때문입니다. postfix 는 이를 세 매개변수에 나누어 둡니다 - inet_interfaces 는 데몬이 루프백 밖에서 듣는지를 정하고, mynetworks 는 주소로 신뢰할 클라이언트를 지정하며, smtpd_relay_restrictions 가 나머지를 결정합니다(mail.postfix.*). mynetworks 의 컴파일 기본값은 호스트 자신의 인터페이스에서 산출되므로 그것이 무엇을 포함하는지는 파일만 보고 알 수 없습니다. sendmail 은 access 맵에서 결정하는데, 이는 muster 가 읽지 않는 컴파일된 데이터베이스입니다. 데몬이 호스트 밖에서 닿을 수 있는지 자체는 services.mail.reachable - 루프백이 아닌 주소에 바인딩된 tcp/25 리스너 - 이 답합니다. 사이트 전체에 의도적으로 열어 둔 릴레이는 메일 허브에서는 정당한 설정이고 워크스테이션에서는 결함이며, 바로 그 판단을 muster 는 운영자에게 남깁니다. MTA 가 설치되지 않은 호스트는 해당 없음입니다."
+category: service
+importance: 상
+automation: manual
+manual_reason: "Decide by hand whether this MTA relays for off-host clients, reading whether it is reachable at all (services.mail.reachable, a tcp/25 listener on a non-loopback address) together with postfix's inet_interfaces, mynetworks and smtpd_relay_restrictions (mail.postfix.*) or sendmail's access map, which muster does not read, against the set of networks this host is meant to serve."
+references:
+  kisa: { "2026": ["U-47"], "2021": ["U-31"] }
+requires_facts: ">=1"
+applies_when:
+  # Ruling L-11: both gates are facts the snapshot always carries, so a host
+  # with no MTA reads NOT_APPLICABLE rather than a permanent MANUAL row, and
+  # the two of them are the evidence the MANUAL result is shown with.
+  - { fact: services.mail.installed, op: eq, expected: true }
+  - { fact: mail.implementation, op: present }
+remediation:
+  text_en: Restrict postfix with mynetworks and an smtpd_relay_restrictions that ends in defer_unauth_destination, and bind inet_interfaces to loopback where the host sends only its own mail; for sendmail, list the relayed domains in the access map and rebuild it. Restart the mail transfer agent afterwards.
+  text_ko: postfix 는 mynetworks 를 제한하고 smtpd_relay_restrictions 를 defer_unauth_destination 으로 끝맺으며, 자신의 메일만 보내는 호스트라면 inet_interfaces 를 루프백으로 묶습니다. sendmail 은 릴레이할 도메인을 access 맵에 등록하고 맵을 다시 만듭니다. 이후 메일 서버를 재시작합니다.
+  risk: restart_service
+  idempotent: true
+decision: D09

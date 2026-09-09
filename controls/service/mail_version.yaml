@@ -1,0 +1,26 @@
+id: muster.service.mail_version
+title_en: The mail transfer agent is kept at the vendor's patched level
+title_ko: 메일 서버가 벤더가 패치한 수준으로 유지된다
+description_en: "A mail transfer agent listens on port 25 for anything that can reach it, so a flaw in the installed package is reachable before any account is involved. This item asks whether the MTA on this host is at the level the distribution's security updates have reached, and muster deliberately does not answer it. Matching a version string against an advisory is a claim about which fixes were backported into which build (D24), and every distribution muster targets patches in place while leaving the upstream version number where it was, so the string alone proves nothing in either direction; asking the daemon its own version would mean running it, which muster never does (D14). What the host does carry is its patch state: patch.pending_security_count is how many security updates are waiting, and patch.metadata_age_s is how old the index those counts came from is - a count of zero read from a month-old index is not evidence of anything. Read the two beside the package manager's own record of the installed MTA and decide. A host with no MTA installed is not applicable."
+description_ko: "메일 서버는 port 25 에서 도달 가능한 모든 상대를 기다리므로, 설치된 패키지의 결함은 계정이 개입하기도 전에 도달 가능합니다. 이 항목은 이 호스트의 MTA 가 배포판 보안 업데이트가 도달한 수준에 있는지를 묻고, muster 는 의도적으로 답하지 않습니다. 버전 문자열을 권고문과 대조하는 것은 어떤 수정이 어떤 빌드에 백포트되었는지에 대한 주장이며(D24), muster 가 대상으로 삼는 배포판은 모두 상위 버전 번호를 그대로 둔 채 제자리에서 패치하므로 문자열만으로는 어느 쪽도 증명하지 못합니다. 데몬에게 직접 버전을 묻는 것은 데몬을 실행하는 일이므로 muster 는 하지 않습니다(D14). 호스트가 실제로 가진 근거는 패치 상태입니다 - patch.pending_security_count 는 대기 중인 보안 업데이트 수이고, patch.metadata_age_s 는 그 수를 읽어 온 인덱스가 얼마나 오래되었는지입니다. 한 달 묵은 인덱스에서 읽은 0 은 아무것도 증명하지 못합니다. 이 둘을 패키지 관리자가 기록한 설치된 MTA 정보와 함께 읽고 판단하십시오. MTA 가 설치되지 않은 호스트는 해당 없음입니다."
+category: service
+importance: 상
+automation: manual
+manual_reason: "Confirm by hand that the mail transfer agent package on this host is at the level the vendor's security updates have reached. muster never matches a version against an advisory (D24) and never asks the daemon, so read patch.pending_security_count and patch.metadata_age_s together with the package manager's own record of the installed MTA."
+references:
+  kisa: { "2026": ["U-45"], "2021": ["U-30"] }
+requires_facts: ">=1"
+applies_when:
+  # Ruling L-11: both gates are facts the snapshot always carries, so a host
+  # with no MTA reads NOT_APPLICABLE rather than a permanent MANUAL row, and
+  # the two of them are the evidence the MANUAL result is shown with. Ruling
+  # L-6: the patch.* leaves the operator reads are evidence, never a gate -
+  # a host whose patch collector could not answer must still raise this item.
+  - { fact: services.mail.installed, op: eq, expected: true }
+  - { fact: mail.implementation, op: present }
+remediation:
+  text_en: Refresh the package index and install the distribution's pending security updates for the mail transfer agent from its own repository, then restart the daemon and confirm the queue is being served again.
+  text_ko: 패키지 인덱스를 갱신하고 배포판 저장소에서 메일 서버의 대기 중인 보안 업데이트를 설치한 뒤, 데몬을 재시작하고 큐가 다시 처리되는지 확인합니다.
+  risk: restart_service
+  idempotent: true
+decision: D09

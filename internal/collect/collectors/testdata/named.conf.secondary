@@ -1,0 +1,9 @@
+options {
+	directory "/var/named";
+};
+
+zone "example.org" IN {
+	type slave;
+	file "/var/named/slaves/example.org.zone";
+	masters { 192.0.2.10; };
+};

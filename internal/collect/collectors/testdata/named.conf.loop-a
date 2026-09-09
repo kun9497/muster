@@ -1,0 +1,6 @@
+zone "example.org" IN {
+	type master;
+	file "/var/named/example.org.zone";
+};
+
+include "/etc/named/loop-b.conf";

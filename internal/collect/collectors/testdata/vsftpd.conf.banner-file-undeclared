@@ -1,0 +1,6 @@
+# synthetic vsftpd configuration whose greeting file is outside this
+# collector's declaration: the path is recorded, never opened.
+anonymous_enable=NO
+local_enable=YES
+pam_service_name=vsftpd
+banner_file=/srv/ftp/welcome.txt

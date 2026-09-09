@@ -1,0 +1,2 @@
+# Synthetic sendmail.cf fragment: the single-letter option spelling, spaced.
+OpPrivacyOptions = noexpn , novrfy

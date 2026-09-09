@@ -1,0 +1,19 @@
+// Synthetic fragment: it includes the next level sixteen times. Each
+// inclusion is legitimate on its own - the fragment is not open above this
+// point - so only a cap on the whole run bounds the work.
+include "/etc/named/fan-b.conf";
+include "/etc/named/fan-b.conf";
+include "/etc/named/fan-b.conf";
+include "/etc/named/fan-b.conf";
+include "/etc/named/fan-b.conf";
+include "/etc/named/fan-b.conf";
+include "/etc/named/fan-b.conf";
+include "/etc/named/fan-b.conf";
+include "/etc/named/fan-b.conf";
+include "/etc/named/fan-b.conf";
+include "/etc/named/fan-b.conf";
+include "/etc/named/fan-b.conf";
+include "/etc/named/fan-b.conf";
+include "/etc/named/fan-b.conf";
+include "/etc/named/fan-b.conf";
+include "/etc/named/fan-b.conf";

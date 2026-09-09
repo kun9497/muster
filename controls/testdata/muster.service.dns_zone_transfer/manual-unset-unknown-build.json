@@ -1,0 +1,5 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "services":{"dns":{"installed":{"status":"ok","value":true}}},
+  "dns":{"implementation":{"status":"ok","value":"bind"},
+         "zones":{"status":"absent","reason":"allow-transfer is not set for zone example.org and the BIND default depends on the version (any before 9.20, none from 9.20); set it explicitly"}}
+}}

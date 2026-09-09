@@ -1,0 +1,22 @@
+id: muster.service.ftp_banner
+title_en: The FTP greeting does not name the software serving it
+title_ko: FTP 접속 안내 문구가 서비스 소프트웨어를 알리지 않는다
+description_en: "The greeting an FTP daemon sends before a client authenticates is read by anyone who can open the port, so it must not tell them which product - and therefore which advisories - to try. muster judges the CONFIGURED greeting: vsftpd's ftpd_banner or the contents of its banner_file, and proftpd's ServerIdent. A greeting is a disclosure when it names vsftpd, proftpd, pure-ftpd or wu-ftpd, matched case-insensitively; a bare version number in an otherwise custom greeting is deliberately not a disclosure, because a number identifies no product. An unset vsftpd banner and an unset or argument-less proftpd ServerIdent are findings, since both daemons then send a compiled greeting that names themselves - muster does not invent that text, it reports the source. ServerIdent off is a pass. pure-ftpd's greeting is not configurable in this model, so a pure-ftpd host is a manual review rather than a guess, as is a banner file outside this collector's declaration, one that could not be read, or one cut at the read limit. A host with no FTP daemon installed is not applicable."
+description_ko: "FTP 데몬이 클라이언트 인증 전에 보내는 접속 안내 문구는 포트를 열 수 있는 누구나 읽을 수 있으므로, 어떤 제품인지 - 따라서 어떤 취약점 권고를 시도해 볼지 - 알려 주면 안 됩니다. muster 는 설정된 문구를 판정합니다 - vsftpd 의 ftpd_banner 또는 banner_file 의 내용, proftpd 의 ServerIdent 입니다. 문구가 vsftpd, proftpd, pure-ftpd, wu-ftpd 중 하나를 대소문자 구분 없이 포함하면 정보 노출로 봅니다. 그 외에는 사용자 정의 문구 안의 단순 버전 번호를 의도적으로 노출로 보지 않습니다 - 숫자만으로는 제품을 특정할 수 없기 때문입니다. vsftpd 의 문구를 설정하지 않은 경우와 proftpd 의 ServerIdent 를 설정하지 않았거나 인자 없이 켠 경우는 결함입니다. 두 데몬 모두 그때는 자기 이름을 담은 컴파일 기본 문구를 보내기 때문이며, muster 는 그 문구를 지어내지 않고 출처를 보고합니다. ServerIdent off 는 통과입니다. pure-ftpd 의 문구는 이 모델에서 설정 대상이 아니므로 pure-ftpd 호스트는 추측 대신 수동 검토이고, 선언 범위 밖의 banner 파일, 읽지 못한 파일, 읽기 한도에서 잘린 파일도 마찬가지입니다. FTP 데몬이 설치되어 있지 않은 호스트는 해당 없음입니다."
+category: service
+importance: 하
+automation: auto
+references:
+  kisa: { "2026": ["U-53"], "2021": [] }
+requires_facts: ">=1"
+absent_means: manual
+applies_when:
+  - { fact: services.ftp.installed, op: eq, expected: true }
+checks:
+  - { fact: ftp.banner_discloses_version, op: eq, expected: false }
+remediation:
+  text_en: Set ftpd_banner to a notice that names no product in vsftpd.conf (or point banner_file at such a file), or set ServerIdent on "<notice>" in proftpd.conf, then restart the daemon.
+  text_ko: vsftpd.conf 의 ftpd_banner 를 제품명이 없는 안내 문구로 설정하거나(또는 banner_file 이 그런 파일을 가리키게 하고), proftpd.conf 에 ServerIdent on "<안내 문구>" 를 설정한 뒤 데몬을 재시작합니다.
+  risk: restart_service
+  idempotent: true
+decision: D09

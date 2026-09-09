@@ -1,0 +1,6 @@
+# Synthetic proftpd configuration that pulls in one named fragment the
+# collector declares, rather than a whole fragment directory.
+ServerName "FTP service"
+ServerType standalone
+UseFtpUsers on
+Include /etc/proftpd/site.conf

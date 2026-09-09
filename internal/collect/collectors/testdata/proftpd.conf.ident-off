@@ -1,0 +1,9 @@
+# synthetic proftpd configuration with every modelled directive at the top
+# level: the identification string suppressed, root refused and TLS required.
+ServerName "FTP service"
+ServerIdent off
+ServerType standalone
+UseFtpUsers on
+RootLogin off
+TLSEngine on
+TLSRequired on

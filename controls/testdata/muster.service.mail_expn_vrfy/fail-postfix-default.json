@@ -1,0 +1,7 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "services":{"mail":{"installed":{"status":"ok","value":true}}},
+  "mail":{"implementation":{"status":"ok","value":"postfix"},
+          "postfix":{"disable_vrfy_command":{"status":"absent","reason":"disable_vrfy_command is not set in /etc/postfix/main.cf; postfix's compiled default is no"}},
+          "expn_vrfy_restricted":{"status":"ok","value":false,"source":{"kind":"file","path":"/etc/postfix/main.cf"},
+            "reason":"postfix implements no EXPN command, so disable_vrfy_command decides both; its compiled default is no"}}
+}}

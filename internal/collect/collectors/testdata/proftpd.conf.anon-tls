@@ -1,0 +1,18 @@
+# synthetic proftpd configuration whose TLS requirement covers the anonymous
+# area only, and whose RootLogin sits inside a <Directory>: neither is the
+# server-wide setting, so neither is attributed.
+ServerName "FTP service"
+ServerType standalone
+UseFtpUsers on
+TLSEngine on
+<Anonymous /srv/ftp>
+  User ftp
+  UserAlias anonymous ftp
+  TLSRequired on
+</Anonymous>
+<Directory /srv/ftp/incoming>
+  RootLogin on
+  <Limit WRITE>
+    DenyAll
+  </Limit>
+</Directory>
