@@ -1761,7 +1761,7 @@ keys:
     collector: patch
   - key: patch.reboot_required
     type: bool
-    description: Whether the host is waiting for a reboot - the /run/reboot-required flag on apt hosts, needs-restarting -r on dnf hosts. Unsupported inside a container, where the kernel belongs to the host rather than to this namespace and nothing is run at all, and unsupported where the dnf tool is not installed.
+    description: Whether the host is waiting for a reboot - the /run/reboot-required flag on apt hosts, needs-restarting -r on dnf hosts. Unsupported inside a container, where the kernel belongs to the host rather than to this namespace and nothing is run at all, and unsupported where needs-restarting, which the dnf-utils package ships, is not installed.
     since: 1
     sensitivity: public
     collector: patch
@@ -1780,7 +1780,7 @@ keys:
     collector: patch
   - key: patch.days_since_last_install
     type: int
-    description: Whole days between the newest package installation the dpkg log records and the run's collected_at. Absent when the log records no installation, and unsupported on dnf hosts, whose rpm installation times are not probed in this version.
+    description: Whole days between the newest package installation the dpkg log records and the run's collected_at. dpkg writes local time with no zone and collected_at is UTC, so this is a whole-day approximation that can be one day out on a host away from UTC - evidence that a host is being maintained, never a judged value. Absent when the log records no installation, and unsupported on dnf hosts, whose rpm installation times are not probed in this version.
     since: 1
     sensitivity: public
     collector: patch

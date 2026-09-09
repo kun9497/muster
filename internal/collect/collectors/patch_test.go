@@ -5,6 +5,7 @@ package collectors
 import (
 	"bytes"
 	"context"
+	"errors"
 	"os"
 	"slices"
 	"strings"
@@ -22,10 +23,18 @@ import (
 // the read primitive refuses a symlinked component outright (ErrSymlink →
 // error), and one error envelope flips run.complete.
 const (
-	testDpkgStatus      = "/var/lib/dpkg/status"
-	testDpkgLog         = "/var/log/dpkg.log"
-	testAptListsMain    = "/var/lib/apt/lists/archive.example.org_ubuntu_dists_jammy_main_binary-amd64_Packages"
-	testAptListsSec     = "/var/lib/apt/lists/archive.example.org_ubuntu_dists_jammy-security_main_binary-amd64_Packages"
+	testDpkgStatus   = "/var/lib/dpkg/status"
+	testDpkgLog      = "/var/log/dpkg.log"
+	testAptListsMain = "/var/lib/apt/lists/archive.example.org_ubuntu_dists_jammy_main_binary-amd64_Packages"
+	testAptListsSec  = "/var/lib/apt/lists/archive.example.org_ubuntu_dists_jammy-security_main_binary-amd64_Packages"
+	// The compressed spellings an Acquire::GzipIndexes host keeps INSTEAD of
+	// the bare ones — what the official debian and ubuntu images ship
+	// (Ruling J-45). Such a host has no periodic stamp either, since
+	// apt-daily never runs in a container.
+	testAptListsMainGz  = "/var/lib/apt/lists/archive.example.org_ubuntu_dists_jammy_main_binary-amd64_Packages.gz"
+	testAptListsSecGz   = "/var/lib/apt/lists/archive.example.org_ubuntu_dists_jammy-security_main_binary-amd64_Packages.gz"
+	testAptInRelease    = "/var/lib/apt/lists/archive.example.org_ubuntu_dists_jammy_InRelease"
+	testAptSecInRelease = "/var/lib/apt/lists/archive.example.org_ubuntu_dists_jammy-security_InRelease"
 	testAptAutoUpgrades = "/etc/apt/apt.conf.d/20auto-upgrades"
 	testRunReboot       = "/run/reboot-required"
 	testRunRebootPkgs   = "/run/reboot-required.pkgs"
@@ -110,15 +119,22 @@ func patchAccess(files map[string]string, cmds map[string]cmdResult) *recordingA
 // dirs (so Glob names it) and stats (so Stat answers with the modification
 // time the age is derived from); its content is never read.
 func patchAptAccess(cacheMtime time.Time, withSecurityList bool, cmds map[string]cmdResult) *recordingAccess {
+	lists := []string{testAptListsMain}
+	if withSecurityList {
+		lists = append(lists, testAptListsSec)
+	}
+	return patchAptAccessLists(cacheMtime, lists, cmds)
+}
+
+// patchAptAccessLists is patchAptAccess over an explicit set of list-file
+// names, so a test can describe a cache the way a real host holds it — bare
+// indexes, compressed ones, or an InRelease with no Packages file at all.
+func patchAptAccessLists(cacheMtime time.Time, lists []string, cmds map[string]cmdResult) *recordingAccess {
 	a := patchAccess(map[string]string{
 		testDpkgStatus:      "dpkg.status.sample",
 		testDpkgLog:         "dpkg.log.sample",
 		testAptAutoUpgrades: "apt.20auto-upgrades",
 	}, cmds)
-	lists := []string{testAptListsMain}
-	if withSecurityList {
-		lists = append(lists, testAptListsSec)
-	}
 	for _, p := range lists {
 		a.dirs[p] = true
 		a.stats[p] = statResult{mode: 0o644, kind: "regular", mtime: cacheMtime}
@@ -179,6 +195,20 @@ func findRecord(t *testing.T, list []any, field, want string) map[string]any {
 	}
 	t.Fatalf("no record with %s = %q in %#v", field, want, list)
 	return nil
+}
+
+// assertCacheLeavesAgree pins the one pair of answers that can never both be
+// true: a snapshot must not say "there is no package metadata cache at all"
+// and "this host has a security channel" at the same time. The two are
+// derived from the same listing, so a presence test narrower than the
+// channel test makes the snapshot contradict itself (review LOW 1).
+func assertCacheLeavesAgree(t *testing.T, b *collect.Builder) {
+	t.Helper()
+	age := env(t, b, "patch.metadata_age_s")
+	sec := env(t, b, "patch.security_metadata_available")
+	if age.Status == facts.StatusAbsent && sec.Status == facts.StatusOK && sec.Value == true {
+		t.Errorf("contradiction: metadata_age_s says there is no cache (%+v) while security_metadata_available found a channel in it (%+v)", age, sec)
+	}
 }
 
 // apt: the newest Packages list stamps metadata_age_s; `apt-get -s upgrade`
@@ -380,27 +410,161 @@ func TestPatchNoSecurityMetadataIsUnsupportedNotZero(t *testing.T) {
 // here: mergeSoft lets a single unsupported beat an absent, and the control
 // would silently read NOT_APPLICABLE instead.
 func TestPatchNoCacheIsAbsentOnBothLeaves(t *testing.T) {
-	a := patchAccess(map[string]string{testDpkgStatus: "dpkg.status.sample"}, map[string]cmdResult{
-		cmdKey(aptSimulateCmd): {file: "apt-get.s-upgrade.none"},
+	// The dnf half (review LOW 4): /var/cache/dnf exists, so the manager is
+	// dnf, but it holds no repomd.xml — the same "never updated" shape the
+	// apt half describes, reached through a different family.
+	dnfEmpty := patchAccess(nil, map[string]cmdResult{
+		cmdKey(dnfCheckUpdateCmd): {exitCode: 0},
+		cmdKey(rpmQaCmd):          {file: "rpm.qa.sample"},
+	})
+	dnfEmpty.dirs[testDnfCacheDir] = true
+	dnfEmpty.stats[testDnfCacheDir] = statResult{mode: 0o755, kind: "dir"}
+
+	shapes := []struct {
+		name    string
+		access  collect.Access
+		manager string
+	}{
+		{"apt", patchAccess(map[string]string{testDpkgStatus: "dpkg.status.sample"}, map[string]cmdResult{
+			cmdKey(aptSimulateCmd): {file: "apt-get.s-upgrade.none"},
+		}), "apt"},
+		{"dnf", dnfEmpty, "dnf"},
+	}
+	for _, s := range shapes {
+		t.Run(s.name, func(t *testing.T) {
+			b := buildPatch(t, s.access, testPatchCollectedAt, "none")
+
+			if e := env(t, b, "patch.manager"); e.Value != s.manager {
+				t.Fatalf("manager %+v, want %s", e, s.manager)
+			}
+			age := env(t, b, "patch.metadata_age_s")
+			if age.Status != facts.StatusAbsent {
+				t.Errorf("metadata_age_s %+v, want absent", age)
+			}
+			count := env(t, b, "patch.pending_security_count")
+			if count.Status != facts.StatusAbsent {
+				t.Fatalf("pending_security_count %+v, want absent — unsupported would read NOT_APPLICABLE, not MANUAL", count)
+			}
+			if age.Reason == "" || count.Reason == "" {
+				t.Errorf("both leaves must say why: %+v / %+v", age, count)
+			}
+			assertCacheLeavesAgree(t, b)
+			if w := b.Worst("patch"); w != facts.StatusOK {
+				t.Errorf("Worst = %s, want ok — a host that was never updated is not a collection failure", w)
+			}
+		})
+	}
+}
+
+// Ruling J-45: a host with Acquire::GzipIndexes "true" — what the official
+// debian and ubuntu images ship in /etc/apt/apt.conf.d/docker-gzip-indexes —
+// keeps only the COMPRESSED indexes and has no periodic stamp, because
+// apt-daily never runs there. Seconds after a successful `apt-get update`
+// that host must not be told it "may never have been updated": every index
+// spelling is cache evidence, and the newest of them is the age anchor.
+func TestPatchCompressedIndexesCountAsCache(t *testing.T) {
+	now := testPatchNow(t)
+	a := patchAptAccessLists(now.Add(-1800*time.Second), []string{
+		testAptInRelease, testAptListsMainGz, testAptSecInRelease, testAptListsSecGz,
+	}, map[string]cmdResult{
+		cmdKey(aptSimulateCmd): {file: "apt-get.s-upgrade.security"},
 	})
 	b := buildPatch(t, a, testPatchCollectedAt, "none")
 
-	if e := env(t, b, "patch.manager"); e.Value != "apt" {
-		t.Fatalf("manager %+v, want apt from the dpkg database", e)
-	}
 	age := env(t, b, "patch.metadata_age_s")
-	if age.Status != facts.StatusAbsent {
-		t.Errorf("metadata_age_s %+v, want absent", age)
+	if age.Status != facts.StatusOK || age.Value != 1800 {
+		t.Fatalf("metadata_age_s %+v, want ok 1800 — a compressed index is a cache", age)
 	}
-	count := env(t, b, "patch.pending_security_count")
-	if count.Status != facts.StatusAbsent {
-		t.Fatalf("pending_security_count %+v, want absent — unsupported would read NOT_APPLICABLE, not MANUAL", count)
+	sec := env(t, b, "patch.security_metadata_available")
+	if sec.Status != facts.StatusOK || sec.Value != true {
+		t.Errorf("security_metadata_available %+v, want ok true from the -security files", sec)
 	}
-	if age.Reason == "" || count.Reason == "" {
-		t.Errorf("both leaves must say why: %+v / %+v", age, count)
+	if e := env(t, b, "patch.pending_security_count"); e.Status != facts.StatusOK || e.Value != 1 {
+		t.Errorf("pending_security_count %+v, want ok 1 from the simulation", e)
 	}
+	assertCacheLeavesAgree(t, b)
 	if w := b.Worst("patch"); w != facts.StatusOK {
-		t.Errorf("Worst = %s, want ok — a host that was never updated is not a collection failure", w)
+		t.Errorf("Worst = %s, want ok", w)
+	}
+
+	// An InRelease with no index beside it is still evidence that this host
+	// talked to a repository, so it anchors the age rather than reading as
+	// "never updated".
+	only := patchAptAccessLists(now.Add(-600*time.Second), []string{testAptInRelease}, map[string]cmdResult{
+		cmdKey(aptSimulateCmd): {file: "apt-get.s-upgrade.none"},
+	})
+	b2 := buildPatch(t, only, testPatchCollectedAt, "none")
+	if e := env(t, b2, "patch.metadata_age_s"); e.Status != facts.StatusOK || e.Value != 600 {
+		t.Errorf("metadata_age_s %+v, want ok 600", e)
+	}
+	assertCacheLeavesAgree(t, b2)
+}
+
+// Ruling J-44: a capture that hit the 8 MiB output cap yields a count derived
+// from a PARTIAL stream, and pending_security_count is a judged leaf — an
+// undercount published as a complete `ok` reads as PASS. The truncation flag
+// R70 exists for must reach the count, exactly as it reaches its dnf twin and
+// the pending_updates list beside it.
+func TestPatchTruncatedSimulationMarksTheCount(t *testing.T) {
+	now := testPatchNow(t)
+	a := patchAptAccess(now.Add(-time.Hour), true, map[string]cmdResult{
+		cmdKey(aptSimulateCmd): {file: "apt-get.s-upgrade.security", truncated: true},
+	})
+	b := buildPatch(t, a, testPatchCollectedAt, "none")
+
+	count := env(t, b, "patch.pending_security_count")
+	if count.Status != facts.StatusOK {
+		t.Fatalf("pending_security_count %+v, want ok", count)
+	}
+	if !count.Truncated {
+		t.Errorf("pending_security_count %+v: a count taken from a capped capture must be marked truncated", count)
+	}
+	if ups := env(t, b, "patch.pending_updates"); !ups.Truncated {
+		t.Errorf("pending_updates %+v must be marked truncated too", ups)
+	}
+
+	// The dnf twin already carries the flag; assert it so the two families
+	// cannot drift apart again.
+	d := patchDnfAccess(now.Add(-time.Hour), "repomd.updateinfo.xml", map[string]cmdResult{
+		cmdKey(dnfCheckUpdateCmd): {file: "dnf.check-update.100", exitCode: 100},
+		cmdKey(dnfUpdateinfoCmd):  {file: "dnf.updateinfo.list", truncated: true},
+		cmdKey(rpmQaCmd):          {file: "rpm.qa.sample"},
+	})
+	if e := env(t, buildPatch(t, d, testPatchCollectedAt, "none"), "patch.pending_security_count"); !e.Truncated {
+		t.Errorf("dnf pending_security_count %+v must be marked truncated", e)
+	}
+}
+
+// R220 again: this collector needs no privilege and files every limitation as
+// `unsupported`. A listing that cannot be produced is one more limitation —
+// an error envelope there would rank worst and flip run.complete, breaking
+// the collect-contract leg over a condition the collector already knows how
+// to describe (review LOW 2).
+func TestPatchGlobFailureIsUnsupportedNotError(t *testing.T) {
+	for _, s := range []struct {
+		name   string
+		access *recordingAccess
+	}{
+		{"apt", patchAptAccess(testPatchNow(t).Add(-time.Hour), true, map[string]cmdResult{
+			cmdKey(aptSimulateCmd): {file: "apt-get.s-upgrade.none"},
+		})},
+		{"dnf", patchDnfAccess(testPatchNow(t).Add(-time.Hour), "repomd.updateinfo.xml", map[string]cmdResult{
+			cmdKey(dnfCheckUpdateCmd): {exitCode: 0},
+			cmdKey(rpmQaCmd):          {file: "rpm.qa.sample"},
+		})},
+	} {
+		t.Run(s.name, func(t *testing.T) {
+			s.access.globErr = errors.New("syntax error in pattern")
+			b := buildPatch(t, s.access, testPatchCollectedAt, "none")
+			for _, k := range []string{"patch.metadata_age_s", "patch.security_metadata_available", "patch.pending_security_count"} {
+				if e := env(t, b, k); e.Status != facts.StatusUnsupported {
+					t.Errorf("%s %+v, want unsupported", k, e)
+				}
+			}
+			if w := b.Worst("patch"); w != facts.StatusOK {
+				t.Fatalf("Worst = %s, want ok — an unlistable cache must not flip run.complete", w)
+			}
+		})
 	}
 }
 

@@ -194,6 +194,32 @@ type patchCache struct {
 	failed *facts.Envelope
 }
 
+// aptIndexSuffixes are the names apt leaves in /var/lib/apt/lists after a
+// successful update. Ruling J-45: a host with `Acquire::GzipIndexes "true"`
+// — what the official debian and ubuntu images ship in
+// /etc/apt/apt.conf.d/docker-gzip-indexes — keeps only the COMPRESSED index
+// and never runs apt-daily, so it has no periodic stamp either. A presence
+// test that looked only for a bare `_Packages` would tell such a host it
+// "may never have been updated" seconds after a successful `apt-get update`,
+// and would make the snapshot contradict itself by reporting a security
+// channel in a cache it had just called absent.
+var aptIndexSuffixes = []string{
+	"Packages", "Packages.gz", "Packages.xz", "Packages.lz4", "Packages.zst", "Packages.bz2",
+	"InRelease",
+}
+
+// isAptIndexName reports whether a /var/lib/apt/lists entry is an index apt
+// fetched, in any of the spellings it stores one under. The lock file, the
+// partial/ directory and the detached `Release`/`Release.gpg` pair are not.
+func isAptIndexName(base string) bool {
+	for _, suffix := range aptIndexSuffixes {
+		if strings.HasSuffix(base, suffix) {
+			return true
+		}
+	}
+	return false
+}
+
 // isSecuritySuite reports whether an apt list file name or a simulated
 // upgrade's origin names a security channel. Ubuntu's expanded maintenance
 // suites (esm-apps, esm-infra) publish security updates under their own
@@ -210,25 +236,25 @@ func aptCache(a collect.Access) patchCache {
 	var c patchCache
 	matches, err := a.Glob(aptListsGlob)
 	if err != nil {
-		e := collect.ErrorEnv("glob " + aptListsGlob + ": " + err.Error())
+		// R220: this collector needs no privilege and files every limitation
+		// as unsupported. An error envelope here would rank worst in
+		// Builder.Worst, flip run.complete and break the collect-contract
+		// leg over a condition the reason already describes.
+		e := collect.Unsupported("glob " + aptListsGlob + ": " + err.Error())
 		c.failed = &e
 		return c
 	}
 	sort.Strings(matches)
 	for _, m := range matches {
 		base := path.Base(m)
-		isIndex := strings.HasSuffix(base, "Packages") || strings.HasSuffix(base, "InRelease")
-		if !isIndex {
+		if !isAptIndexName(base) {
 			continue
 		}
 		if isSecuritySuite(base) && !c.security {
 			c.security, c.securityPath = true, m
 		}
-		// Only a Packages list proves the index itself was fetched; an
-		// InRelease alone names a suite without carrying its contents.
-		if !strings.HasSuffix(base, "Packages") {
-			continue
-		}
+		// Every index spelling is evidence that this host talked to a
+		// repository, and the newest of them anchors the age (Ruling J-45).
 		c.present = true
 		c.noteNewest(a, m)
 	}
@@ -256,7 +282,7 @@ func dnfCache(a collect.Access) patchCache {
 	var c patchCache
 	matches, err := a.Glob(dnfRepomdGlob)
 	if err != nil {
-		e := collect.ErrorEnv("glob " + dnfRepomdGlob + ": " + err.Error())
+		e := collect.Unsupported("glob " + dnfRepomdGlob + ": " + err.Error())
 		c.failed = &e
 		return c
 	}
@@ -358,7 +384,11 @@ func runPatchApt(ctx context.Context, a collect.Access, b *collect.Builder, now 
 	if cmdOK(out) {
 		updates := parseAptSimulation(out.Stdout)
 		b.Set("patch.pending_updates", withTruncation(collect.OK(updates, src), out.Truncated))
-		b.Set("patch.pending_security_count", cache.securityCount(countAptSecurity(out.Stdout), true, "", src))
+		// Ruling J-44: the count comes from the SAME capture pending_updates
+		// does, so it carries the same truncation flag. pending_security_count
+		// is judged (`eq 0`), and an undercount taken from a capped stream
+		// would otherwise be published as a complete ok and read as PASS.
+		b.Set("patch.pending_security_count", withTruncation(cache.securityCount(countAptSecurity(out.Stdout), true, "", src), out.Truncated))
 	} else {
 		reason := patchCmdReason(out, aptSimulateCmd)
 		b.Set("patch.pending_updates", collect.Unsupported(reason))
