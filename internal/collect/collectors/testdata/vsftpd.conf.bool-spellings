@@ -1,0 +1,7 @@
+# Synthetic vsftpd configuration written in the boolean spellings vsftpd's own
+# parseconf.c accepts beside yes/no: TRUE/FALSE and 1/0.
+anonymous_enable=FALSE
+local_enable=1
+ssl_enable=TRUE
+force_local_logins_ssl=YES
+force_local_data_ssl=true

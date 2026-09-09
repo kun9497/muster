@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"golang.org/x/sys/unix"
 
@@ -175,12 +176,29 @@ var proftpdModelled = map[string]bool{
 }
 
 // proftpdOpaqueSections are the sections whose contents belong to another
-// server, another build or another module, and are therefore not the
-// answer for this host.
+// server, another build, another module — or to a condition this collector
+// cannot evaluate — and are therefore not the answer for this host.
+//
+// Ruling LR-2: the <If…> family is opaque for the second reason. EPEL's stock
+// proftpd.conf wraps TLSEngine/TLSRequired in <IfDefine TLS> and the anonymous
+// area in <IfDefine ANONYMOUS_FTP>, and what switches those defines on is
+// /etc/sysconfig/proftpd — a file outside this collector's declaration. The
+// version, class, user, group and session conditions are the same shape: the
+// state they test is not in the files this collector reads, so a directive
+// inside one is neither in force nor out of it as far as the evidence goes.
+// Reading them as plain containers let a modelled directive inside be passed
+// over in silence, which answered U-54 and U-35 from the top-level defaults
+// the running server may never have used.
 var proftpdOpaqueSections = map[string]bool{
 	"virtualhost": true,
 	"global":      true,
 	"ifmodule":    true,
+	"ifdefine":    true,
+	"ifversion":   true,
+	"ifclass":     true,
+	"ifuser":      true,
+	"ifgroup":     true,
+	"ifsession":   true,
 }
 
 // ftpParse accumulates what this host's FTP configuration says. impl is the
@@ -259,6 +277,7 @@ func (p *ftpParse) detectVsftpd() bool {
 		} else {
 			p.record(c, meta.Truncated)
 			parseVsftpdInto(p.vsftpd, data)
+			p.noteBadVsftpdBooleans(c)
 		}
 		// Ruling L-24: the glob matches the main file itself, so every OTHER
 		// match is a second instance whose settings this model does not
@@ -360,6 +379,7 @@ func (p *ftpParse) detectPureFtpd() bool {
 		data, meta, err := p.a.ReadFile(m, readLimit)
 		if err != nil {
 			if errors.Is(err, fs.ErrNotExist) || nonRegular(err) {
+				p.noteSymlinkedFragment(path.Dir(m), m, err)
 				continue
 			}
 			p.fail(readErrorEnv(m, err))
@@ -514,6 +534,7 @@ func (p *ftpParse) proftpdInclude(file, target string, depth int, stack []*proft
 		data, meta, err := p.a.ReadFile(t, readLimit)
 		if err != nil {
 			if errors.Is(err, fs.ErrNotExist) || nonRegular(err) {
+				p.noteSymlinkedFragment(file, t, err)
 				continue
 			}
 			// The sshd Include precedent: a fragment that cannot be READ is
@@ -571,6 +592,26 @@ func nonRegular(err error) bool {
 		errors.Is(err, unix.ENOTDIR)
 }
 
+// noteSymlinkedFragment counts a configuration fragment that was skipped
+// because it is a SYMLINK, and does nothing for every other member of the
+// non-regular class.
+//
+// Ruling LR-4: L-41's silent skip exists for what a fragment glob may
+// legitimately match and no daemon would read — a stash subdirectory, a
+// socket, a device node. A symlink is not that: proftpd and pure-ftpd both
+// follow one, so a fragment a configuration manager symlinked into the
+// directory IS part of the running configuration, and passing over it in
+// silence answered from the settings that happened to be visible. Counting it
+// leaves the judged leaves absent — a manual review — while the run stays
+// complete, because nothing is wrong with the host: this collector simply does
+// not follow the link.
+func (p *ftpParse) noteSymlinkedFragment(file, target string, err error) {
+	if !errors.Is(err, collect.ErrSymlink) {
+		return
+	}
+	p.noteUnmodelled(file, target+" is a symbolic link, which this collector does not follow; it was not read")
+}
+
 // record notes a file whose content reached the parse, once however it was
 // reached, and whether the read primitive cut it at the cap.
 func (p *ftpParse) record(file string, truncated bool) {
@@ -614,7 +655,13 @@ func (p *ftpParse) publish(b *collect.Builder) {
 	if p.impl == "none" && p.leftover != "" {
 		// Name the file, so a reader can see it is a leftover to purge
 		// rather than a configuration anything was judged by (IR-7).
-		impl.Reason = "no FTP daemon on this host: " + p.leftover
+		//
+		// Ruling LR-13, L-59's wording: services.ftp.installed is TRUE for a
+		// host that only answers on port 21, and such a host reaches this
+		// branch too, so the reason reports what this collector looked for and
+		// did not find. It may not tell the reader no FTP daemon is on the
+		// host, which the gate it is read beside denies.
+		impl.Reason = "no modelled FTP daemon configuration is present: " + p.leftover
 	}
 	b.Set("ftp.implementation", impl)
 	// Ruling L-52 (C3, mail's L-49 shape): a configuration file that exists
@@ -832,22 +879,66 @@ func (p *ftpParse) setNotAVsftpdConcept(b *collect.Builder, impl string) {
 }
 
 // vsftpdBool reads one boolean tunable, falling back to the value vsftpd
-// itself compiles in. A value that is neither YES nor NO makes vsftpd
-// refuse to start at all, so the compiled default is the honest answer for
-// it too.
+// itself compiles in when the file does not set it.
+//
+// Ruling LR-3: the spellings are vsftpd's own. parseconf.c takes YES, TRUE and
+// 1 for true and NO, FALSE and 0 for false, case blind, and refuses to start
+// on anything else — so reading only yes/no turned an "anonymous_enable=FALSE"
+// into the compiled YES and reported a host as serving the anonymous logins it
+// refuses. A value outside those spellings never reaches here as an answer:
+// noteBadVsftpdBooleans counted it during the parse, so every judged leaf is
+// already absent (the L-46 shape).
 func (p *ftpParse) vsftpdBool(key string) bool {
-	def := vsftpdDefaults[key]
 	v, ok := p.vsftpd[key]
 	if !ok {
-		return def
+		return vsftpdDefaults[key]
 	}
+	if b, ok := vsftpdBoolValue(v); ok {
+		return b
+	}
+	return vsftpdDefaults[key]
+}
+
+// vsftpdBoolValue is one value read as vsftpd's parseconf.c reads it, and
+// whether it is a boolean at all.
+func vsftpdBoolValue(v string) (bool, bool) {
 	switch strings.ToLower(strings.TrimSpace(v)) {
-	case "yes":
-		return true
-	case "no":
-		return false
+	case "yes", "true", "1":
+		return true, true
+	case "no", "false", "0":
+		return false, true
 	}
-	return def
+	return false, false
+}
+
+// noteBadVsftpdBooleans counts every boolean tunable this model reads whose
+// value is not one vsftpd accepts. Ruling LR-3, the L-46 shape: vsftpd refuses
+// to start on such a value, so answering that tunable from the compiled
+// default would be a confident verdict about a configuration this host cannot
+// be running. The keys are walked in sorted order, so the same file always
+// yields the same reason.
+func (p *ftpParse) noteBadVsftpdBooleans(file string) {
+	keys := make([]string, 0, len(vsftpdDefaults))
+	for k := range vsftpdDefaults {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		v, ok := p.vsftpd[k]
+		if !ok {
+			continue
+		}
+		if _, isBool := vsftpdBoolValue(v); isBool {
+			continue
+		}
+		// M16: an oversized value is named by its key alone — the value is
+		// exactly what must not be copied into the snapshot.
+		what := k + "=" + v
+		if oversized(v) {
+			what = k + ": " + oversizedReason
+		}
+		p.noteUnmodelled(file, what+" is not a vsftpd boolean; vsftpd refuses to start on it")
+	}
 }
 
 func (p *ftpParse) implSource() *facts.Source {
@@ -874,6 +965,14 @@ func (p *ftpParse) sortedFiles() []any {
 // parser takes whole-line '#' comments only, splits at the FIRST '=' and
 // lets a later line override an earlier one, so last wins here too. The key
 // is folded to lower case; the value keeps its own case.
+//
+// Ruling LR-7: that folding and the surrounding trim are LENIENT — vsftpd
+// matches its key names exactly and refuses to start on "Anonymous_Enable" or
+// on a key with a leading space, where this parser reads the setting. The
+// leniency is deliberate and kept: a configuration vsftpd refuses to start on
+// is not a running exposure, and reading it the strict way would answer such a
+// host from the compiled defaults instead — the confidently wrong verdict in
+// the opposite direction.
 func parseVsftpdInto(dst map[string]string, data []byte) {
 	for _, raw := range splitLines(data) {
 		line := strings.TrimSpace(raw)
@@ -892,14 +991,26 @@ func parseVsftpdInto(dst map[string]string, data []byte) {
 // per line — into the settings map, last wins. The Debian layout's
 // one-setting-per-file directory is folded by the caller, which takes the
 // name from the file name.
+//
+// Ruling LR-5: the name ends at the first WHITESPACE, not at the first space.
+// pure-ftpd separates on any whitespace run, so a tab-separated
+// "NoAnonymous<TAB>yes" is a setting like any other; cutting on " " alone left
+// it unset and judged the compiled default — anonymous logins permitted — on a
+// host that refuses them.
 func parsePureFtpdInto(dst map[string]string, data []byte) {
 	for _, raw := range splitLines(data) {
 		line := strings.TrimSpace(raw)
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
-		name, value, _ := strings.Cut(line, " ")
-		dst[name] = strings.TrimSpace(value)
+		i := strings.IndexFunc(line, unicode.IsSpace)
+		if i < 0 {
+			// A name with no value at all: pure-ftpd reads it as an empty
+			// setting, and so does this model.
+			dst[line] = ""
+			continue
+		}
+		dst[line[:i]] = strings.TrimSpace(line[i:])
 	}
 }
 
@@ -1480,6 +1591,16 @@ func (p *ftpParse) publishVsftpdBanner(b *collect.Builder, src *facts.Source) {
 	}
 	data, meta, err := p.a.ReadFile(clean, readLimit)
 	switch {
+	case err != nil && nonRegular(err):
+		// Ruling LR-6: /etc/issue.net is a symlink to /etc/issue on a common
+		// admin layout, and the no-follow read primitive refuses it. That is
+		// this collector declining to follow a link, not a host with a broken
+		// greeting file: filing it as `error` would flip run.complete and hand
+		// CI exit code 2. The greeting is unknown, which is an absence naming
+		// the path; a genuine permission failure below still reads denied.
+		e := collect.Absent("banner_file " + clean + " is a symbolic link or another non-regular " +
+			"file, which this collector does not follow; it was not read")
+		p.setBanner(b, source, e, e)
 	case err != nil:
 		e := readErrorEnv(clean, err)
 		p.setBanner(b, source, e, e)

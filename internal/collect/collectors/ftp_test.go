@@ -228,6 +228,9 @@ func TestFtpLeftoverConffileIsNotAnImplementation(t *testing.T) {
 			t.Errorf("%s = %s, want absent: nothing serves FTP here", k, s)
 		}
 	}
+	// Ruling LR-13: a leftover conffile is the OTHER way to reach the branch,
+	// and a port-21 listener can carry one, so its reasons answer to L-60 too.
+	assertNoModelledFtpWording(t, b)
 }
 
 // Ruling L-23: pure-ftpd is decided by its binary plus a readable
@@ -670,15 +673,33 @@ func TestFtpNoDaemonIsAbsentNotMissing(t *testing.T) {
 	if w := b.Worst("ftp"); w != facts.StatusOK {
 		t.Errorf(`Worst("ftp") = %s, want ok`, w)
 	}
-	// Ruling L-60: services.ftp.installed is TRUE on a host that only answers
-	// on port 21, and that host reaches this same branch — no conffile of a
-	// modelled daemon with its binary. The reason may therefore report what
-	// this collector looked for and did not find; it may not tell the reader
-	// no FTP daemon is installed, which the gate it is read beside denies.
-	for _, k := range ftpJudgedLeaves {
+	assertNoModelledFtpWording(t, b)
+}
+
+// assertNoModelledFtpWording walks every leaf that carries a reason on a host
+// this collector found no modelled FTP configuration on.
+//
+// Ruling L-60: services.ftp.installed is TRUE on a host that only answers on
+// port 21, and that host reaches the same branch — no conffile of a modelled
+// daemon with its binary. A reason may therefore report what this collector
+// looked for and did not find; it may not tell the reader no FTP daemon is
+// there, which the gate it is read beside denies.
+//
+// Ruling LR-13: the walk covers ftp.implementation, not only the thirteen
+// judged leaves. That evidence leaf carries its own reason on a leftover
+// conffile, and walking the judged leaves alone let it keep the wording L-59
+// removed from everywhere else.
+func assertNoModelledFtpWording(t *testing.T, b *collect.Builder) {
+	t.Helper()
+	for _, k := range append([]string{"ftp.implementation"}, ftpJudgedLeaves...) {
 		r := env(t, b, k).Reason
-		if strings.Contains(r, "installed on this host") {
-			t.Errorf("%s reason %q contradicts a port-21 listener with no modelled configuration", k, r)
+		if r == "" {
+			continue
+		}
+		for _, forbidden := range []string{"installed on this host", "FTP daemon on this host"} {
+			if strings.Contains(r, forbidden) {
+				t.Errorf("%s reason %q contradicts a port-21 listener with no modelled configuration", k, r)
+			}
 		}
 		if !strings.Contains(r, "no modelled FTP daemon configuration is present") {
 			t.Errorf("%s reason %q must say what was looked for and not found", k, r)
@@ -1531,5 +1552,197 @@ func TestFtpOversizedUserlistFileNamesNoRow(t *testing.T) {
 	}
 	if e := p.userlistFile(nil); e.Status != facts.StatusAbsent {
 		t.Errorf("userlist_file %+v, want absent - the leaf and the row must agree", e)
+	}
+}
+
+// Ruling LR-2: a conditional section is opaque. EPEL's stock proftpd.conf
+// wraps TLSEngine/TLSRequired in <IfDefine TLS> and the anonymous area in
+// <IfDefine ANONYMOUS_FTP>, both switched by /etc/sysconfig/proftpd — a file
+// this collector neither declares nor reads. Whether the directives inside are
+// in force therefore cannot be read out of the configuration, so each section
+// is counted once and the judged leaves step back to a manual review instead
+// of reporting a TLS setting the running server may never have seen.
+func TestFtpProftpdConditionalSectionsAreOpaque(t *testing.T) {
+	b := buildBegun(t, "ftp", ftpAccess(map[string]string{
+		"/etc/proftpd.conf": "proftpd.conf.ifdefine-tls",
+	}))
+	if e := env(t, b, "ftp.implementation"); e.Status != facts.StatusOK || e.Value != "proftpd" {
+		t.Fatalf("implementation %+v, want ok proftpd", e)
+	}
+	if e := env(t, b, "ftp.unmodelled"); e.Status != facts.StatusOK || e.Value != 2 {
+		t.Fatalf("unmodelled %+v, want ok 2 — one per conditional section", e)
+	}
+	for _, k := range []string{"ftp.tls_enforced", "ftp.anonymous_enabled"} {
+		absentBecause(t, b, k, "IfDefine")
+	}
+	// The parse itself finished: an opaque section is a construct outside the
+	// model, not a file that could not be read.
+	if e := env(t, b, "ftp.parse_complete"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("parse_complete %+v, want ok true", e)
+	}
+	if w := b.Worst("ftp"); w != facts.StatusOK {
+		t.Errorf("Worst(ftp) = %s, want ok", w)
+	}
+}
+
+// Ruling LR-3: vsftpd's parseconf.c takes YES/TRUE/1 and NO/FALSE/0, case
+// blind, and refuses to start on anything else. Reading only yes/no made every
+// other spelling fall to the COMPILED default — silently inverting
+// anonymous_enable=FALSE into "anonymous logins are served".
+func TestFtpVsftpdBooleanSpellings(t *testing.T) {
+	b := buildBegun(t, "ftp", ftpAccess(map[string]string{
+		"/etc/vsftpd.conf": "vsftpd.conf.bool-spellings",
+	}))
+	for _, c := range []struct {
+		key  string
+		want bool
+	}{
+		{"ftp.anonymous_enabled", false}, // FALSE, not the compiled YES
+		{"ftp.local_enabled", true},      // 1
+		{"ftp.tls_enforced", true},       // TRUE with the force_local_* pair on
+	} {
+		if got := ftpBool(t, b, c.key); got != c.want {
+			t.Errorf("%s = %v, want %v", c.key, got, c.want)
+		}
+	}
+	if e := env(t, b, "ftp.unmodelled"); e.Status != facts.StatusOK || e.Value != 0 {
+		t.Errorf("unmodelled %+v, want ok 0: every spelling here is one vsftpd accepts", e)
+	}
+}
+
+// Ruling LR-3, the L-46 shape: a value that is NOT one of vsftpd's boolean
+// spellings makes vsftpd refuse to start, so the compiled default is a verdict
+// about a configuration this host cannot be running. It is counted and the
+// judged leaves step back.
+func TestFtpVsftpdNonBooleanIsNotTheCompiledDefault(t *testing.T) {
+	b := buildBegun(t, "ftp", ftpAccess(map[string]string{
+		"/etc/vsftpd.conf": "vsftpd.conf.bool-garbage",
+	}))
+	if e := env(t, b, "ftp.unmodelled"); e.Status != facts.StatusOK || e.Value != 1 {
+		t.Fatalf("unmodelled %+v, want ok 1", e)
+	}
+	for _, k := range ftpJudgedLeaves {
+		absentBecause(t, b, k, "userlist_enable=maybe")
+	}
+	if w := b.Worst("ftp"); w != facts.StatusOK {
+		t.Errorf("Worst(ftp) = %s, want ok", w)
+	}
+}
+
+// Ruling LR-4: proftpd and pure-ftpd both FOLLOW a symlink, so a fragment an
+// admin or a configuration manager symlinked into place is part of the running
+// configuration. The no-follow read primitive refuses it, and skipping it in
+// silence — the treatment a directory or a socket in a fragment glob earns —
+// would answer from the settings that happen to be visible. It is counted
+// instead, so the judged leaves say so.
+func TestFtpSymlinkedFragmentIsNeverDroppedSilently(t *testing.T) {
+	t.Run("proftpd Include", func(t *testing.T) {
+		a := ftpAccess(map[string]string{"/etc/proftpd.conf": "proftpd.conf.include-file"})
+		a.fails["/etc/proftpd/site.conf"] = collect.ErrSymlink
+		b := buildBegun(t, "ftp", a)
+		if e := env(t, b, "ftp.unmodelled"); e.Status != facts.StatusOK || e.Value != 1 {
+			t.Fatalf("unmodelled %+v, want ok 1", e)
+		}
+		for _, k := range ftpJudgedLeaves {
+			absentBecause(t, b, k, "/etc/proftpd/site.conf", "symbolic link")
+		}
+		if w := b.Worst("ftp"); w != facts.StatusOK {
+			t.Errorf("Worst(ftp) = %s, want ok", w)
+		}
+	})
+	t.Run("pure-ftpd conf entry", func(t *testing.T) {
+		a := ftpAccess(map[string]string{
+			"/etc/pure-ftpd/conf/NoAnonymous": "pure-ftpd.d_NoAnonymous",
+			"/etc/pure-ftpd/conf/TLS":         "pure-ftpd.d_TLS",
+		})
+		a.fails["/etc/pure-ftpd/conf/NoAnonymous"] = collect.ErrSymlink
+		b := buildBegun(t, "ftp", a)
+		if e := env(t, b, "ftp.implementation"); e.Status != facts.StatusOK || e.Value != "pure-ftpd" {
+			t.Fatalf("implementation %+v, want ok pure-ftpd", e)
+		}
+		if e := env(t, b, "ftp.unmodelled"); e.Status != facts.StatusOK || e.Value != 1 {
+			t.Fatalf("unmodelled %+v, want ok 1", e)
+		}
+		for _, k := range ftpJudgedLeaves {
+			absentBecause(t, b, k, "/etc/pure-ftpd/conf/NoAnonymous", "symbolic link")
+		}
+		if w := b.Worst("ftp"); w != facts.StatusOK {
+			t.Errorf("Worst(ftp) = %s, want ok", w)
+		}
+	})
+}
+
+// Ruling LR-5: pure-ftpd separates a Name from its value on ANY whitespace
+// run. Splitting on a single space left a tab-separated NoAnonymous unset, so
+// the compiled default — anonymous logins permitted — was judged instead of
+// the setting the file really carries.
+func TestFtpPureFtpdSplitsOnAnyWhitespace(t *testing.T) {
+	b := buildBegun(t, "ftp", ftpAccess(map[string]string{
+		"/etc/pure-ftpd/pure-ftpd.conf": "pure-ftpd.conf.tabs",
+	}))
+	if e := env(t, b, "ftp.implementation"); e.Status != facts.StatusOK || e.Value != "pure-ftpd" {
+		t.Fatalf("implementation %+v, want ok pure-ftpd", e)
+	}
+	if got := ftpBool(t, b, "ftp.anonymous_enabled"); got {
+		t.Error("anonymous_enabled = true: the tab-separated NoAnonymous yes was not read")
+	}
+	if got := ftpBool(t, b, "ftp.tls_enforced"); !got {
+		t.Error("tls_enforced = false: the tab-separated TLS 2 was not read")
+	}
+}
+
+// Ruling LR-6: /etc/issue.net is a symlink to /etc/issue on a common admin
+// layout, and banner_file pointing at it made all three greeting leaves
+// `error` — one error envelope flips run.complete and hands CI exit code 2.
+// The path was not read, which is an absence naming the link; a genuine
+// permission failure still reads denied.
+func TestFtpSymlinkedBannerFileIsNotAnError(t *testing.T) {
+	a := ftpAccess(map[string]string{"/etc/vsftpd.conf": "vsftpd.conf.banner-file"})
+	a.fails["/etc/issue.net"] = collect.ErrSymlink
+	b := buildBegun(t, "ftp", a)
+
+	if e := env(t, b, "ftp.banner_source"); e.Status != facts.StatusOK || e.Value != "banner_file" {
+		t.Errorf("banner_source %+v: what configures the greeting is still known", e)
+	}
+	for _, k := range []string{"ftp.banner_text", "ftp.banner_discloses_version"} {
+		absentBecause(t, b, k, "/etc/issue.net", "symbolic link")
+	}
+	if w := b.Worst("ftp"); w != facts.StatusOK {
+		t.Errorf("Worst(ftp) = %s, want ok — a link muster does not follow is a limitation", w)
+	}
+
+	// A real permission failure is a different finding and keeps its status.
+	denied := ftpAccess(map[string]string{"/etc/vsftpd.conf": "vsftpd.conf.banner-file"})
+	denied.fails["/etc/issue.net"] = unix.EACCES
+	db := buildBegun(t, "ftp", denied)
+	if e := env(t, db, "ftp.banner_text"); e.Status != facts.StatusDenied {
+		t.Errorf("banner_text %+v, want denied on EACCES", e)
+	}
+}
+
+// Ruling LR-12: the emission set is driven by the REGISTRY, not by a list this
+// file keeps in step by hand — a key added to registry.yaml and never
+// published would otherwise reach a control as `missing` → ERROR(missing_fact).
+func TestFtpPublishesEveryRegisteredKeyOnAHostWithNoDaemon(t *testing.T) {
+	b := buildBegun(t, "ftp", ftpAccess(nil))
+	reg, err := facts.LoadRegistry()
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := 0
+	for _, k := range reg.Keys {
+		if k.Collector != "ftp" {
+			continue
+		}
+		n++
+		if s := env(t, b, k.Key).Status; s != facts.StatusOK && s != facts.StatusAbsent {
+			t.Errorf("%s = %s, want ok or absent on a host with no FTP daemon", k.Key, s)
+		}
+	}
+	if n == 0 {
+		t.Fatal("the registry declares no ftp keys, so this test would pass vacuously")
+	}
+	if w := b.Worst("ftp"); w != facts.StatusOK {
+		t.Errorf("Worst(ftp) = %s, want ok", w)
 	}
 }

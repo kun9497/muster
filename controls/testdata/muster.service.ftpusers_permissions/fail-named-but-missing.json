@@ -2,6 +2,6 @@
   "services":{"ftp":{"installed":{"status":"ok","value":true}}},
   "ftp":{"access_file_present":{"status":"ok","value":false},
          "access_files":{"status":"ok","value":[
-           {"path":"/etc/vsftpd.user_list","role":"userlist_deny","exists":false,"root_listed":false,"mode":-1,"uid":-1,"gid":-1,"stat_status":"absent","reason":"/etc/vsftpd.user_list does not exist"}
+           {"path":"/etc/vsftpd.user_list","role":"userlist_deny","exists":false,"root_listed":false,"mode":-1,"uid":-1,"gid":-1,"stat_status":"absent"}
          ]}}
 }}

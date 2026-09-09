@@ -1,0 +1,6 @@
+# Synthetic pure-ftpd configuration whose Name and value are separated by a
+# TAB, which pure-ftpd separates on as readily as on a space.
+ChrootEveryone	yes
+NoAnonymous	yes
+TLS	2
+MaxClientsNumber	50

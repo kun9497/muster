@@ -1,0 +1,6 @@
+# Synthetic vsftpd configuration whose userlist_enable is none of vsftpd's
+# boolean spellings. vsftpd refuses to start on it, so the compiled default is
+# not what this host serves.
+anonymous_enable=NO
+local_enable=YES
+userlist_enable=maybe

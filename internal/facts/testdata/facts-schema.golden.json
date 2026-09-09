@@ -3294,7 +3294,7 @@
     {
       "Key": "ftp.unmodelled",
       "Type": "int",
-      "Description": "How many constructs outside this collector's model the configuration uses - a second vsftpd instance under /etc/vsftpd, a proftpd VirtualHost, Global or IfModule section enclosing a modelled directive, or a proftpd Include outside the collector's declaration. Any of them makes every judged leaf absent, so a server whose real settings live where the model does not read is reported as unjudgeable rather than judged by settings it never uses.",
+      "Description": "How many constructs outside this collector's model the configuration uses - a second vsftpd instance under /etc/vsftpd; a vsftpd boolean whose value is none of the spellings vsftpd accepts (YES/TRUE/1, NO/FALSE/0), which vsftpd refuses to start on; a proftpd VirtualHost, Global or IfModule section enclosing a modelled directive; a proftpd conditional section - IfDefine, IfVersion, IfClass, IfUser, IfGroup or IfSession - enclosing one, because what switches the condition (/etc/sysconfig/proftpd for the defines EPEL's stock file uses) is outside this collector's declaration, so the stock EPEL proftpd host is reported as unjudgeable; a proftpd Include outside the collector's declaration; and a proftpd Include target or pure-ftpd conf entry that is a symbolic link, which both daemons follow and this collector does not. Any of them makes every judged leaf absent, so a server whose real settings live where the model does not read is reported as unjudgeable rather than judged by settings it never uses.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "ftp",
@@ -3314,7 +3314,7 @@
     {
       "Key": "ftp.anonymous_enabled",
       "Type": "bool",
-      "Description": "Whether an anonymous login is served - vsftpd's anonymous_enable, whose COMPILED default is YES in both the Debian and the RHEL build (the Debian man page's \"Default NO\" is a documentation-only patch), so a file that never names it does serve anonymous logins; a proftpd Anonymous block at an attributed depth; pure-ftpd's NoAnonymous not being yes.",
+      "Description": "Whether an anonymous login is served - vsftpd's anonymous_enable, whose COMPILED default is YES in both the Debian and the RHEL build (the Debian man page's \"Default NO\" is a documentation-only patch), so a file that never names it does serve anonymous logins - the value is read in vsftpd's own spellings, YES/TRUE/1 against NO/FALSE/0, case blind, and a value outside them counts in ftp.unmodelled rather than falling to that default; a proftpd Anonymous block at an attributed depth; pure-ftpd's NoAnonymous not being yes.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "ftp",
@@ -3324,7 +3324,7 @@
     {
       "Key": "ftp.tls_enforced",
       "Type": "bool",
-      "Description": "Whether every session this daemon serves must be encrypted - vsftpd's ssl_enable with force_local_logins_ssl and force_local_data_ssl (both default YES) left on and, when anonymous logins are served, force_anon_logins_ssl and force_anon_data_ssl (both default NO) turned on; proftpd's TLSEngine on with TLSRequired on at the top level; pure-ftpd's TLS setting at 2 or higher, which refuses a cleartext session.",
+      "Description": "Whether every session this daemon serves must be encrypted - vsftpd's ssl_enable with force_local_logins_ssl and force_local_data_ssl (both default YES) left on and, when anonymous logins are served, force_anon_logins_ssl and force_anon_data_ssl (both default NO) turned on; proftpd's TLSEngine on with TLSRequired on at the top level - a directive inside a conditional section such as \u003cIfDefine TLS\u003e, which is how EPEL's stock file ships it, is not attributed and counts in ftp.unmodelled instead; pure-ftpd's TLS setting at 2 or higher, which refuses a cleartext session.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "ftp",
@@ -3414,7 +3414,7 @@
     {
       "Key": "ftp.banner_text",
       "Type": "string",
-      "Description": "The configured greeting text - the ftpd_banner value, the content of banner_file, or the string of a proftpd ServerIdent on. A daemon's COMPILED greeting is not invented here - the source is then default and this text is empty, with the reason naming the product whose greeting is served. Absent when the configured banner file is outside this collector's declaration, could not be read, or was cut at the read limit.",
+      "Description": "The configured greeting text - the ftpd_banner value, the content of banner_file, or the string of a proftpd ServerIdent on. A daemon's COMPILED greeting is not invented here - the source is then default and this text is empty, with the reason naming the product whose greeting is served. Absent when the configured banner file is outside this collector's declaration, is a symbolic link or another non-regular file this collector does not follow, could not be read, or was cut at the read limit.",
       "Since": 1,
       "Sensitivity": "internal",
       "Collector": "ftp",

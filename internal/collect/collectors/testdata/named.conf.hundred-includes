@@ -1,7 +1,8 @@
-// Synthetic named.conf in the shape a nameserver that serves many zones
-// really has: one include per zone file, a hundred of them. Nothing here
-// fans out - each fragment is inlined exactly once - so the run-wide
-// expansion cap must not refuse it.
+// Synthetic named.conf in the shape a nameserver that keeps one file per
+// zone really has: a hundred includes, each pulling in a per-zone fragment.
+// Nothing here fans out - each fragment is inlined exactly once - so the
+// run-wide expansion cap must not refuse it. The zone this host serves is
+// declared in the fragments, not here.
 options {
 	allow-transfer { none; };
 };

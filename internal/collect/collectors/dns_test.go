@@ -916,7 +916,7 @@ func TestDnsIncludeExpansionIsCapped(t *testing.T) {
 // hundred zones, and it must reach a verdict rather than a manual review.
 func TestDnsOneIncludePerZoneIsNotCapped(t *testing.T) {
 	files := map[string]string{
-		bindRhelConf: "named.conf.many-zones",
+		bindRhelConf: "named.conf.hundred-includes",
 		etcOSRelease: "os-release.rhel9",
 	}
 	for i := 1; i <= 100; i++ {
@@ -943,6 +943,14 @@ func TestDnsOneIncludePerZoneIsNotCapped(t *testing.T) {
 				k, s, env(t, b, k).Reason)
 		}
 	}
+	// Ruling LR-14: the fragments carry a real zone statement, so the ok above
+	// is a verdict about a zone that was PARSED rather than about an empty
+	// list. Every inclusion declares the same zone, which is how a hundred
+	// records reaching dns.zones proves a hundred fragments were inlined.
+	if got := dnsZoneNames(t, b); len(got) != 100 {
+		t.Errorf("dns.zones carries %d records, want one per inlined fragment (100)", len(got))
+	}
+	recField(t, dnsZoneRec(t, b, "example.org"), "transfer_restricted", true)
 }
 
 // Ruling LR-1, tier (1): a declared include whose target the no-follow read

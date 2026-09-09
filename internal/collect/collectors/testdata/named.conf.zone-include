@@ -1,3 +1,8 @@
-// Synthetic per-zone fragment. It stands in for the zone statement a real
-// nameserver keeps in its own file; what this fixture exercises is the
-// COUNT of inlined fragments, not their content.
+// Synthetic per-zone fragment: the zone statement a nameserver that keeps one
+// file per zone puts in each of them. What this fixture exercises is the COUNT
+// of inlined fragments, but it carries a real zone so the verdict the test
+// asserts is a verdict about a zone that was parsed.
+zone "example.org" IN {
+	type master;
+	file "/var/named/example.org.zone";
+};
