@@ -38,7 +38,9 @@ paths = ['''^\.superpowers[/\\]''']
 # net-snmp's optional /etc/snmp/snmpd.local.conf is a real, public file name whose
 # ".local" suffix matches the private-DNS shape above. Allow that one literal
 # match only (never a path allowlist, which would weaken the lab-host guard).
-regexes = ['''^snmpd\.local$''']
+# A Go field access such as "w.priv" in the snmp tests (a struct field named priv)
+# also matches the shape. Allow that exact token only.
+regexes = ['''^snmpd\.local$''', '''^w\.priv$''']
 
 [[rules]]
 id = "private-ipv4-address"
