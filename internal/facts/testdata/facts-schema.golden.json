@@ -3254,7 +3254,7 @@
     {
       "Key": "files.libwrap_present",
       "Type": "bool",
-      "Description": "Whether the TCP wrappers library is installed, from a presence probe over the paths libwrap.so.0 lives at on the Debian and RHEL families; a symlink counts as present, so false means every candidate was absent. RHEL 8 and later ship no libwrap at all, so a daemon built against it - and a deny-all /etc/hosts.deny - restricts nothing there. Evidence for the operator; no control in this stage consumes it.",
+      "Description": "Whether the TCP wrappers library is installed, from a presence probe over the paths libwrap.so.0 lives at on the Debian and RHEL families; a symlink counts as present, so false means every candidate was absent. RHEL 8 and later ship no libwrap at all, so a daemon built against it - and a deny-all /etc/hosts.deny - restricts nothing there. Evidence for the operator and the gate stage 2M's U-28 needs before it can judge a hosts.deny; no control in this stage reads it.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "files",

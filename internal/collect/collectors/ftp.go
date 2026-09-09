@@ -26,7 +26,11 @@ const (
 	proftpdDebianConf = "/etc/proftpd/proftpd.conf"
 	proftpdRhelConf   = "/etc/proftpd.conf"
 	proftpdConfGlob   = "/etc/proftpd/*.conf"
-	proftpdConfDGlob  = "/etc/proftpd/conf.d/*.conf"
+	// Wider than the brief's /etc/proftpd/conf.d/*.conf: a directory Include
+	// reads every file in the directory (Ruling L-37), and a fragment named
+	// without a .conf suffix would otherwise be invisible. The narrower
+	// pattern is a subset of this one, so the glob form still matches.
+	proftpdConfDGlob = "/etc/proftpd/conf.d/*"
 
 	pureFtpdConf     = "/etc/pure-ftpd/pure-ftpd.conf"
 	pureFtpdConfGlob = "/etc/pure-ftpd/conf/*"
@@ -243,7 +247,11 @@ func (p *ftpParse) noteExtraInstances() {
 	}
 	sort.Strings(matches)
 	for _, m := range matches {
-		if m != vsftpdRhelConf {
+		// The exclusion is the file this run actually PARSED, not a fixed
+		// path: on a host carrying both layouts the Debian file wins the
+		// probe order, and /etc/vsftpd/vsftpd.conf is then a second
+		// instance like any other.
+		if m != p.mainFile {
 			p.unmodelled = append(p.unmodelled, m+" configures a second vsftpd instance, which this model does not attribute")
 		}
 	}
@@ -342,7 +350,7 @@ func (p *ftpParse) parseProftpd(file string, data []byte, depth int) {
 		}
 		if strings.HasPrefix(line, "<") {
 			name := proftpdSectionName(line)
-			if strings.EqualFold(name, "anonymous") && !p.noteOpaque(file, stack, "<Anonymous>") {
+			if strings.EqualFold(name, "anonymous") && p.attributes(file, stack, "<Anonymous>") {
 				p.proAno = true
 			}
 			stack = append(stack, proftpdSection{name: name})
@@ -358,7 +366,7 @@ func (p *ftpParse) parseProftpd(file string, data []byte, depth int) {
 		if !proftpdModelled[key] {
 			continue
 		}
-		if p.noteOpaque(file, stack, fields[0]) {
+		if !p.attributes(file, stack, fields[0]) {
 			continue
 		}
 		p.pro[key] = args
@@ -373,10 +381,21 @@ type proftpdSection struct {
 	noted bool
 }
 
-// noteOpaque reports whether the current depth is inside a section this
-// model does not attribute, counting that section once the first time
-// something modelled turns up inside it.
-func (p *ftpParse) noteOpaque(file string, stack []proftpdSection, what string) bool {
+// attributes reports whether what was read at a depth whose settings are the
+// SERVER's own, which Ruling L-35 fixes at the top level and nowhere else:
+// TLSRequired inside <Anonymous> covers the anonymous area alone, RootLogin
+// inside <Directory> covers that tree alone, and reading either as the
+// server-wide answer is the over-claim H-16 forbids - a false PASS for U-54
+// on a server that still takes local logins in clear.
+//
+// The two kinds of section differ only in what they cost. <VirtualHost>,
+// <Global> and <IfModule> can REDEFINE server-wide behaviour, so each is
+// counted once in unmodelled the first time something modelled turns up
+// inside it and the judged leaves go absent. Every other section -
+// <Anonymous>, <Directory>, <Limit> and the rest - only narrows the scope
+// of what it holds, so it is a neutral container: nothing inside it is
+// attributed, and nothing about it makes the file unjudgeable.
+func (p *ftpParse) attributes(file string, stack []proftpdSection, what string) bool {
 	for i := len(stack) - 1; i >= 0; i-- {
 		if !proftpdOpaqueSections[strings.ToLower(stack[i].name)] {
 			continue
@@ -386,9 +405,9 @@ func (p *ftpParse) noteOpaque(file string, stack []proftpdSection, what string) 
 			p.noteUnmodelled(file, "<"+stack[i].name+"> encloses "+what+
 				", which this model does not attribute to the server")
 		}
-		return true
+		return false
 	}
-	return false
+	return len(stack) == 0
 }
 
 // proftpdInclude follows one Include. R55/Ruling L-5: the target is asked
@@ -404,15 +423,16 @@ func (p *ftpParse) proftpdInclude(file, target string, depth int) {
 		p.fail(collect.ErrorEnv("include nesting deeper than " + strconv.Itoa(maxIncludeDepth) + " levels at " + file))
 		return
 	}
-	if !declared(p.a, target) {
+	pattern, ok := p.includePattern(target)
+	if !ok {
 		p.noteUnmodelled(file, "Include "+target+" is outside this collector's declaration and was not read")
 		return
 	}
-	targets := []string{target}
-	if strings.ContainsAny(target, "*?[") {
-		matches, err := p.a.Glob(target)
+	targets := []string{pattern}
+	if strings.ContainsAny(pattern, "*?[") {
+		matches, err := p.a.Glob(pattern)
 		if err != nil {
-			p.fail(collect.Unsupported("glob " + target + ": " + err.Error()))
+			p.fail(collect.Unsupported("glob " + pattern + ": " + err.Error()))
 			return
 		}
 		sort.Strings(matches)
@@ -436,6 +456,28 @@ func (p *ftpParse) proftpdInclude(file, target string, depth int) {
 		p.record(t, meta.Truncated)
 		p.parseProftpd(t, data, depth+1)
 	}
+}
+
+// includePattern turns one Include target into the pattern the collector
+// will actually read, and reports whether the declaration covers it.
+//
+// Ruling L-37: the stock Debian proftpd.conf includes its fragment
+// DIRECTORY - "Include /etc/proftpd/conf.d/" - and proftpd reads every file
+// in it, whatever its name. Reading the directory as a literal file would
+// fail, and refusing it would make every stock Debian host unjudgeable, so
+// a target that is not itself declared is retried as that directory's glob,
+// which the declaration does cover. A target neither form covers stays
+// undeclared and is recorded rather than read.
+func (p *ftpParse) includePattern(target string) (string, bool) {
+	dirForm := strings.HasSuffix(target, "/")
+	clean := path.Clean(target)
+	if !dirForm && declared(p.a, clean) {
+		return clean, true
+	}
+	if glob := clean + "/*"; declared(p.a, glob) {
+		return glob, true
+	}
+	return "", false
 }
 
 // record notes a file whose content reached the parse, once however it was

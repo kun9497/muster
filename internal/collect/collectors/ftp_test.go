@@ -3,6 +3,7 @@
 package collectors
 
 import (
+	"os"
 	"slices"
 	"strings"
 	"testing"
@@ -13,9 +14,10 @@ import (
 	"github.com/kun9497/muster/internal/facts"
 )
 
-// ftpAccess builds the double for the ftp collector. Ruling I-20: EVERY map
-// fsAccess offers is initialised here — a later `a.fails[…] = …` or
-// `a.stats[…] = …` on a nil map panics — and Ruling L-31: `stats` carries
+// ftpAccess builds the double for the ftp collector. Ruling I-20: every map
+// a test of this collector reaches into is initialised here — a later
+// `a.fails[…] = …`, `a.stats[…] = …` or `a.truncated[…] = …` on a nil map
+// panics — and Ruling L-31: `stats` carries
 // `kind: "dir"` for /run/systemd/system and `kind: "regular"` for every
 // daemon binary, derived from the configuration files the fixture seeds,
 // exactly as loggingAccess does.
@@ -44,11 +46,12 @@ func ftpAccess(files map[string]string) *fsAccess {
 		stats[bin] = statResult{mode: 0o755, kind: "regular"}
 	}
 	return &fsAccess{
-		files: files,
-		cmds:  map[string]cmdResult{},
-		fails: map[string]error{},
-		dirs:  map[string]bool{"/run/systemd/system": true},
-		stats: stats,
+		files:     files,
+		cmds:      map[string]cmdResult{},
+		fails:     map[string]error{},
+		dirs:      map[string]bool{"/run/systemd/system": true},
+		stats:     stats,
+		truncated: map[string]bool{},
 	}
 }
 
@@ -86,7 +89,7 @@ func ftpBool(t *testing.T, b *collect.Builder, key string) bool {
 func TestFtpVsftpdDebianStock(t *testing.T) {
 	a := ftpAccess(map[string]string{"/etc/vsftpd.conf": "vsftpd.conf.debian"})
 	a.stats["/etc/vsftpd.user_list"] = statResult{mode: 0o600, kind: "regular"}
-	b := build(t, "ftp", a)
+	b := buildBegun(t, "ftp", a)
 
 	if e := env(t, b, "ftp.implementation"); e.Status != facts.StatusOK || e.Value != "vsftpd" {
 		t.Fatalf("implementation %+v, want ok vsftpd", e)
@@ -161,7 +164,7 @@ func TestFtpVsftpdTLSEnforced(t *testing.T) {
 // Ruling L-24: /etc/vsftpd/*.conf matches the main file itself, so only the
 // OTHER matches are extra instances this model does not attribute.
 func TestFtpVsftpdSecondInstanceIsUnmodelled(t *testing.T) {
-	b := build(t, "ftp", ftpAccess(map[string]string{
+	b := buildBegun(t, "ftp", ftpAccess(map[string]string{
 		"/etc/vsftpd/vsftpd.conf": "vsftpd.conf.rhel",
 		"/etc/vsftpd/extra.conf":  "vsftpd.conf.extra-instance",
 	}))
@@ -182,6 +185,21 @@ func TestFtpVsftpdSecondInstanceIsUnmodelled(t *testing.T) {
 	}
 	if w := b.Worst("ftp"); w != facts.StatusOK {
 		t.Errorf(`Worst("ftp") = %s, want ok (absent ranks ok)`, w)
+	}
+
+	// A host carrying BOTH layouts: the Debian file wins the probe order, so
+	// the RHEL one is a second instance like any other - the exclusion is
+	// the file actually parsed, not a fixed path.
+	both := buildBegun(t, "ftp", ftpAccess(map[string]string{
+		"/etc/vsftpd.conf":        "vsftpd.conf.debian",
+		"/etc/vsftpd/vsftpd.conf": "vsftpd.conf.rhel",
+	}))
+	if e := env(t, both, "ftp.unmodelled"); e.Status != facts.StatusOK || e.Value != 1 {
+		t.Fatalf("unmodelled %+v, want ok 1 for the unparsed second layout", e)
+	}
+	if e := env(t, both, "ftp.anonymous_enabled"); e.Status != facts.StatusAbsent ||
+		!strings.Contains(e.Reason, vsftpdRhelConf) {
+		t.Errorf("anonymous_enabled %+v must be absent and name the second instance", e)
 	}
 }
 
@@ -217,6 +235,11 @@ func TestFtpPureFtpdDetectedByGlob(t *testing.T) {
 	if e := env(t, b, "ftp.implementation"); e.Status != facts.StatusOK || e.Value != "pure-ftpd" {
 		t.Fatalf("implementation %+v, want ok pure-ftpd", e)
 	}
+	// What ENFORCES L-23 is the guard: build() fails the test on any access
+	// outside the declaration, and neither /etc/pure-ftpd nor
+	// /etc/pure-ftpd/conf is declared, so a directory stat could not have
+	// got this far. This scan of the read log is the second belt - it sees
+	// ReadFile only.
 	for _, r := range a.reads {
 		if r == "/etc/pure-ftpd/conf" || r == "/etc/pure-ftpd" {
 			t.Errorf("the model must not read %q — the declaration does not cover it", r)
@@ -332,6 +355,103 @@ func TestFtpProftpdTopLevelDirectives(t *testing.T) {
 	}
 }
 
+// Ruling L-35: a modelled directive is the SERVER's setting only at the top
+// level. TLSRequired inside <Anonymous> covers the anonymous area alone, so
+// a local login is still served in clear - attributing it would be a false
+// PASS for U-54, which is the over-claim H-16 forbids. <Anonymous> and
+// <Directory> are neutral containers: they hide what is inside them without
+// making the file unjudgeable.
+func TestFtpProftpdAttributesTopLevelOnly(t *testing.T) {
+	b := buildBegun(t, "ftp", ftpAccess(map[string]string{"/etc/proftpd/proftpd.conf": "proftpd.conf.anon-tls"}))
+	if e := env(t, b, "ftp.tls_enforced"); e.Status != facts.StatusOK || e.Value != false {
+		t.Errorf("tls_enforced %+v, want ok false: TLSRequired is scoped to <Anonymous>", e)
+	}
+	if !ftpBool(t, b, "ftp.anonymous_enabled") {
+		t.Error("the <Anonymous> opener is read at the top level and still names an anonymous login")
+	}
+	if e := env(t, b, "ftp.unmodelled"); e.Status != facts.StatusOK || e.Value != 0 {
+		t.Errorf("unmodelled %+v, want 0: <Anonymous>, <Directory> and <Limit> are neutral containers", e)
+	}
+	if e := env(t, b, "ftp.parse_complete"); e.Value != true {
+		t.Errorf("parse_complete %+v", e)
+	}
+
+	// The same rule at the level below the published leaves, for the
+	// directives Task 2 judges: only the top-level ones reach the model.
+	data, err := os.ReadFile("testdata/proftpd.conf.anon-tls")
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := &ftpParse{a: ftpAccess(nil), seen: map[string]bool{}, pro: map[string]string{}}
+	p.parseProftpd("/etc/proftpd/proftpd.conf", data, 0)
+	for _, k := range []string{"tlsengine", "useftpusers"} {
+		if _, ok := p.pro[k]; !ok {
+			t.Errorf("%s is at the top level and must be attributed", k)
+		}
+	}
+	for _, k := range []string{"tlsrequired", "rootlogin"} {
+		if v, ok := p.pro[k]; ok {
+			t.Errorf("%s = %q was attributed from inside a section", k, v)
+		}
+	}
+}
+
+// Ruling L-37: the stock Debian proftpd.conf includes its fragment
+// DIRECTORY by name, with no glob. The declaration covers that directory's
+// contents, so the fragments are read rather than making every stock host
+// unjudgeable.
+func TestFtpProftpdDirectoryIncludeIsRead(t *testing.T) {
+	empty := buildBegun(t, "ftp", ftpAccess(map[string]string{"/etc/proftpd/proftpd.conf": "proftpd.conf.include-dir"}))
+	if e := env(t, empty, "ftp.unmodelled"); e.Status != facts.StatusOK || e.Value != 0 {
+		t.Fatalf("unmodelled %+v, want 0: an empty fragment directory is not a construct outside the model", e)
+	}
+	if e := env(t, empty, "ftp.parse_complete"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("parse_complete %+v", e)
+	}
+	if e := env(t, empty, "ftp.tls_enforced"); e.Status != facts.StatusOK || e.Value != false {
+		t.Errorf("tls_enforced %+v, want ok false: nothing sets TLSRequired", e)
+	}
+
+	withFragment := buildBegun(t, "ftp", ftpAccess(map[string]string{
+		"/etc/proftpd/proftpd.conf":           "proftpd.conf.include-dir",
+		"/etc/proftpd/conf.d/10-tls-required": "proftpd.conf.d_tlsrequired",
+	}))
+	if !ftpBool(t, withFragment, "ftp.tls_enforced") {
+		t.Error("a fragment's top-level TLSRequired completes the server's TLS requirement")
+	}
+	if got := stringList(t, withFragment, "ftp.config_files"); !slices.Equal(got,
+		[]string{"/etc/proftpd/conf.d/10-tls-required", "/etc/proftpd/proftpd.conf"}) {
+		t.Errorf("config_files %v, want both files sorted", got)
+	}
+}
+
+// R70/Ruling L-38: the read primitive answers a file past the cap with the
+// prefix, Truncated true and NO error, so a directive written past it is
+// invisible and a confident answer built from the prefix is a false PASS.
+func TestFtpTruncatedConfIsAbsent(t *testing.T) {
+	a := ftpAccess(map[string]string{"/etc/vsftpd.conf": "vsftpd.conf.debian"})
+	a.truncated["/etc/vsftpd.conf"] = true
+	b := buildBegun(t, "ftp", a)
+	for _, k := range ftpJudgedLeaves {
+		e := env(t, b, k)
+		if e.Status != facts.StatusAbsent {
+			t.Errorf("%s = %s, want absent when the file was cut at the cap", k, e.Status)
+		}
+		if !strings.Contains(e.Reason, "/etc/vsftpd.conf") {
+			t.Errorf("%s reason %q must name the file that was cut", k, e.Reason)
+		}
+	}
+	if e := env(t, b, "ftp.parse_complete"); e.Status != facts.StatusOK || e.Value != false {
+		t.Errorf("parse_complete %+v, want ok false", e)
+	}
+	if e := env(t, b, "ftp.config_files"); !e.Truncated {
+		t.Errorf("config_files %+v must carry the truncation flag", e)
+	}
+	if w := b.Worst("ftp"); w != facts.StatusOK {
+		t.Errorf(`Worst("ftp") = %s, want ok (absent ranks ok, the run stays complete)`, w)
+	}
+}
+
 // The user list can be an ALLOW list, and an explicit userlist_file is the
 // value — the distro default is only the fallback.
 func TestFtpVsftpdUserlistAllowList(t *testing.T) {
@@ -370,7 +490,7 @@ func TestFtpUnreadableConfIsDenied(t *testing.T) {
 	a := ftpAccess(map[string]string{"/etc/vsftpd.conf": "vsftpd.conf.debian"})
 	a.fails["/etc/vsftpd.conf"] = unix.EACCES
 	a.stats["/etc/vsftpd.conf"] = statResult{mode: 0o600, kind: "regular"}
-	b := build(t, "ftp", a)
+	b := buildBegun(t, "ftp", a)
 	if e := env(t, b, "ftp.implementation"); e.Value != "vsftpd" {
 		t.Fatalf("implementation %+v: the binary and the file are both there", e)
 	}
@@ -386,12 +506,19 @@ func TestFtpUnreadableConfIsDenied(t *testing.T) {
 	if e := env(t, b, "ftp.parse_complete"); e.Status != facts.StatusOK || e.Value != false {
 		t.Errorf("parse_complete %+v, want ok false", e)
 	}
+	// Ruling L-36: the Worst assertions elsewhere in this file are only
+	// meaningful because this one shows the builder really does rank the
+	// collector's envelopes - build(), which never calls Begin, reports ok
+	// here whatever the collector wrote.
+	if w := b.Worst("ftp"); w != facts.StatusDenied {
+		t.Errorf(`Worst("ftp") = %s, want denied`, w)
+	}
 }
 
 // A host with no FTP daemon at all: absent judged leaves, ok evidence and a
 // complete run (Ruling L-7 — the collect contract must stay complete).
 func TestFtpNoDaemonIsAbsentNotMissing(t *testing.T) {
-	b := build(t, "ftp", ftpAccess(nil))
+	b := buildBegun(t, "ftp", ftpAccess(nil))
 	if e := env(t, b, "ftp.implementation"); e.Status != facts.StatusOK || e.Value != "none" {
 		t.Fatalf("implementation %+v, want ok none", e)
 	}
@@ -436,7 +563,7 @@ func TestServicesFtpMailDnsRowsDegradeWithTheTable(t *testing.T) {
 	for _, c := range declaredShowCommands() {
 		declared[c.Args[len(c.Args)-1]] = true
 	}
-	b := build(t, "services", &fsAccess{}) // no /run/systemd/system
+	b := buildBegun(t, "services", &fsAccess{}) // no /run/systemd/system
 	for _, w := range want {
 		row, ok := rows[w.name]
 		if !ok {

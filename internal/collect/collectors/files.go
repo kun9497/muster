@@ -64,8 +64,8 @@ func filesReads() []string {
 }
 
 // libwrapPaths is where libwrap.so.0 lives on the distributions muster
-// judges - the Debian/Ubuntu multiarch directories for the two supported
-// architectures, and the RHEL-family lib64 pair - plus the plain /usr/lib
+// judges — the Debian/Ubuntu multiarch directories for the two supported
+// architectures, and the RHEL-family lib64 pair — plus the plain /usr/lib
 // of a 32-bit build. RHEL 8 and later ship no libwrap at all, which is
 // exactly what the fact exists to say.
 var libwrapPaths = []string{
@@ -153,9 +153,9 @@ func runFiles(_ context.Context, a collect.Access, b *collect.Builder) error {
 
 	// Ruling L-9/L-20: whether this host has TCP wrappers at all. anyPresent
 	// counts a symlink or a denied stat as present, so ok:false means every
-	// candidate was ENOENT - the RHEL 8+ shape, where a tcp_wrappers=YES
+	// candidate was ENOENT — the RHEL 8+ shape, where a tcp_wrappers=YES
 	// setting and a deny-all /etc/hosts.deny restrict nothing. Evidence for
-	// the operator; no control in this stage consumes it.
+	// the operator and for 2M's U-28 gate; no control in this stage reads it.
 	b.Set("files.libwrap_present", collect.OK(anyPresent(a, libwrapPaths),
 		&facts.Source{Kind: "derived"}))
 
