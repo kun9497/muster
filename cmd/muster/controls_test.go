@@ -5,8 +5,12 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/kun9497/muster/internal/controls"
 )
 
 var repoFixtures = filepath.Join("..", "..", "controls", "testdata")
@@ -39,10 +43,74 @@ func TestControlsLintFixturesFlagAndUnusedKeysNote(t *testing.T) {
 	if !strings.Contains(out.String(), "ok: 64 controls") {
 		t.Errorf("stdout %q lacks the ok line", out.String())
 	}
-	// Spec §5.5: registered keys no control uses are reported, without failing.
-	if !strings.Contains(out.String(), "sockets.listening") || !strings.Contains(out.String(), "used by no control") {
-		t.Errorf("stdout %q lacks the unused-keys note", out.String())
+	// Spec §5.5 / M-27: registered keys no control uses are reported by the
+	// usage note, without failing.
+	if !strings.Contains(out.String(), "sockets.listening") ||
+		!strings.Contains(out.String(), "registered fact keys are used by a control") ||
+		!strings.Contains(out.String(), "unused:") {
+		t.Errorf("stdout %q lacks the fact-usage note", out.String())
 	}
+}
+
+// M-3 (spec §11): the note reports facts used, not merely facts collected --
+// how many registered keys a control reads, how many the engine reads on its
+// own, and which are read by nobody. The three account for every registered
+// key, so the note is checked as an arithmetic statement rather than as a
+// string.
+func TestControlsLintPrintsTheUsageNote(t *testing.T) {
+	var out, errb bytes.Buffer
+	if code := runControls([]string{"lint", "--fixtures", repoFixtures, "--references", repoReferences, "--kisa", repoKisa}, &out, &errb); code != exitOK {
+		t.Fatalf("exit %d, want %d; stderr %q", code, exitOK, errb.String())
+	}
+	re := regexp.MustCompile(`note: (\d+) of (\d+) registered fact keys are used by a control \((\d+) read by the engine\)(; unused: (.*))?\n`)
+	m := re.FindStringSubmatch(out.String())
+	if m == nil {
+		t.Fatalf("stdout %q does not carry the usage note", out.String())
+	}
+	used, registered, engine := atoi(t, m[1]), atoi(t, m[2]), atoi(t, m[3])
+	var unused []string
+	if m[5] != "" {
+		unused = strings.Split(m[5], ", ")
+	}
+	if used+engine+len(unused) != registered {
+		t.Errorf("%d used + %d engine + %d unused != %d registered: %q", used, engine, len(unused), registered, m[0])
+	}
+	if used == 0 || registered == 0 {
+		t.Errorf("the note reports nothing used: %q", m[0])
+	}
+	found := false
+	for _, k := range unused {
+		if k == "sockets.listening" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("sockets.listening is referenced by no control and must be named in the note: %q", m[0])
+	}
+}
+
+// The label belongs to the list: a set that reads every key it collects has
+// no "unused:" to print, and an empty label would read as a defect in the
+// note rather than as good news. The embedded set always has unused keys, so
+// this shape can only be reached directly.
+func TestUsageNoteOmitsTheListWhenNothingIsUnused(t *testing.T) {
+	got := usageNote([]controls.CollectorUsage{
+		{Collector: "a", Registered: 2, Used: 2},
+		{Collector: "b", Registered: 1, Engine: 1},
+	})
+	const want = "note: 2 of 3 registered fact keys are used by a control (1 read by the engine)"
+	if got != want {
+		t.Errorf("usageNote = %q, want %q", got, want)
+	}
+}
+
+func atoi(t *testing.T, s string) int {
+	t.Helper()
+	n, err := strconv.Atoi(s)
+	if err != nil {
+		t.Fatalf("%q: %v", s, err)
+	}
+	return n
 }
 
 // R98: without --references, a missing stig/*.json under the given

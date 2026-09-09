@@ -37,6 +37,28 @@ const defaultKISADir = "docs/reference/kisa"
 // every id had been verified against the index (M-4).
 const shapeOnlyNote = "note: stig and nist_800_53 references checked for shape only; pass --references docs/reference to check them against the index"
 
+// usageNote renders the fact-key report of spec §11 as the one line lint
+// prints: how many registered keys a control reads, how many the engine
+// reads on its own, and the keys nobody reads. The three numbers account for
+// every registered key. The list is omitted, along with the "unused:" label,
+// when there is nothing to list -- a set that reads everything it collects
+// should say so and stop.
+func usageNote(usage []controls.CollectorUsage) string {
+	registered, used, engine := 0, 0, 0
+	var unused []string
+	for _, u := range usage {
+		registered += u.Registered
+		used += u.Used
+		engine += u.Engine
+		unused = append(unused, u.Unused...)
+	}
+	note := fmt.Sprintf("note: %d of %d registered fact keys are used by a control (%d read by the engine)", used, registered, engine)
+	if len(unused) > 0 {
+		note += "; unused: " + strings.Join(unused, ", ")
+	}
+	return note
+}
+
 func runControls(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
 		fmt.Fprint(stderr, controlsUsage)
@@ -120,11 +142,11 @@ func runControls(args []string, stdout, stderr io.Writer) int {
 			fmt.Fprintf(stderr, "muster: %v\n", err)
 			return exitError
 		}
-		// Spec §5.5: report registered keys no control uses. Some are read by
-		// the evaluator itself, so this never fails the lint.
-		if unused := controls.UnusedKeys(set, reg); len(unused) > 0 {
-			fmt.Fprintf(stdout, "note: %d registered fact keys are used by no control: %s\n", len(unused), strings.Join(unused, ", "))
-		}
+		// Spec §11 / M-3: report facts used, not facts collected -- how much
+		// of the registry a control reads, how much the engine reads on its
+		// own, and which keys nobody reads. Some of the last are collected
+		// for controls that do not exist yet, so this never fails the lint.
+		fmt.Fprintln(stdout, usageNote(controls.FactUsage(set, reg)))
 		// Printed here, after every directory check, so a run that fails on
 		// --fixtures or --kisa does not first hand out advice about a flag
 		// that had nothing to do with the failure.

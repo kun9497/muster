@@ -134,7 +134,7 @@ titles, never their discussion, check and fix text. See
 1. **Skeleton.** `collect` and `check`, the facts schema, table and JSON
    output, exit codes, waivers, and eight controls flowing end to end.
 2. **Both distributions, every automatable KISA item.** Collectors for Ubuntu
-   and Rocky; 58 of the 67 items judged automatically or with automatic
+   and Rocky; 64 of the 67 items judged automatically or with automatic
    evidence, the remaining 9 (mail, DNS and FTP daemon configuration) listed as
    `MANUAL` with the reason recorded in the control. Every control gains DISA
    STIG and NIST SP 800-53 reference numbers where a mapping exists.
