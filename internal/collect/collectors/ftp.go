@@ -308,6 +308,13 @@ func (p *ftpParse) detectProftpd() bool {
 		}
 		p.record(c, meta.Truncated)
 		p.parseProftpd(c, data, 0, nil)
+		// Ruling L-46: proftpd refuses to start on a boolean it does not
+		// recognise, so reading such a RootLogin as the directive's default
+		// off would be a confident verdict on a configuration that cannot
+		// run — the same shape ServerIdent already answers with an absence.
+		if v, ok := p.pro["rootlogin"]; ok && !proftpdOn(v) && !proftpdOff(v) {
+			p.noteUnmodelled(c, "RootLogin "+v+" is neither on nor off, and proftpd refuses to start on it")
+		}
 		return true
 	}
 	return false
@@ -682,15 +689,14 @@ func (p *ftpParse) publishVsftpd(b *collect.Builder, src *facts.Source) {
 	b.Set("ftp.userlist_deny", collect.OK(p.vsftpdBool("userlist_deny"), src))
 	b.Set("ftp.userlist_file", p.userlistFile(src))
 
-	recs, blind := p.vsftpdAccess()
-	p.publishAccessFiles(b, src, recs, "this vsftpd configuration names no per-account access list")
+	var settled *facts.Envelope
 	if !p.vsftpdBool("local_enable") {
 		e := collect.OK(true, src)
 		e.Reason = "local_enable is NO: no local account, root included, may log in"
-		b.Set("ftp.root_denied", e)
-	} else {
-		b.Set("ftp.root_denied", rootDenied(recs, blind, src))
+		settled = &e
 	}
+	p.publishAccess(b, src, p.vsftpdAccess(),
+		"this vsftpd configuration names no per-account access list", settled)
 	p.publishVsftpdBanner(b, src)
 }
 
@@ -727,13 +733,23 @@ func (p *ftpParse) userlistDefault() (string, bool) {
 }
 
 // userlistPath is the file vsftpd would actually read its user list from -
-// the explicit userlist_file, else the build default that exists - as a
+// the explicit userlist_file, else the build default that exists — as a
 // plain path, for the access record that has to stat it.
 func (p *ftpParse) userlistPath() (string, bool) {
-	if v, ok := p.vsftpd["userlist_file"]; ok && v != "" && !oversized(v) {
-		return v, true
+	if v, ok := p.vsftpd["userlist_file"]; ok && v != "" {
+		// The leaf is Absent for an oversized value, and the row must agree:
+		// falling through to a build default would publish a row for a file
+		// this configuration never named.
+		return v, !oversized(v)
 	}
 	return p.userlistDefault()
+}
+
+// userlistNamed reports whether the configuration names a user list of its
+// own, whatever this collector could do with the value.
+func (p *ftpParse) userlistNamed() bool {
+	v, ok := p.vsftpd["userlist_file"]
+	return ok && v != ""
 }
 
 // userListCandidates orders the two build defaults by the layout the main
@@ -756,15 +772,16 @@ func (p *ftpParse) publishProftpd(b *collect.Builder, src *facts.Source) {
 		"proftpd wraps connections through mod_wrap2's directives, which this model does not read"))
 	p.setNotAVsftpdConcept(b, "proftpd")
 
-	recs := p.proftpdAccess()
-	p.publishAccessFiles(b, src, recs, "UseFtpUsers is off, so proftpd consults no per-account access list")
+	var settled *facts.Envelope
 	if !proftpdOn(p.pro["rootlogin"]) {
+		// An argument that is neither on nor off never reaches here: it is
+		// unmodelled, so every judged leaf is already absent (Ruling L-46).
 		e := collect.OK(true, src)
 		e.Reason = "RootLogin is not on, and proftpd's own default is off, so root cannot log in"
-		b.Set("ftp.root_denied", e)
-	} else {
-		b.Set("ftp.root_denied", rootDenied(recs, nil, src))
+		settled = &e
 	}
+	p.publishAccess(b, src, ftpAccessSet{recs: p.proftpdAccess()},
+		"UseFtpUsers is off, so proftpd consults no per-account access list", settled)
 	p.publishProftpdBanner(b, src)
 }
 
@@ -780,11 +797,10 @@ func (p *ftpParse) publishPureFtpd(b *collect.Builder, src *facts.Source) {
 		"pure-ftpd has no tcp_wrappers setting of its own in this model"))
 	p.setNotAVsftpdConcept(b, "pure-ftpd")
 
-	p.publishAccessFiles(b, src, nil,
-		"pure-ftpd is not configured through a per-account list in this model")
 	root := collect.OK(true, src)
 	root.Reason = "pure-ftpd refuses every account whose uid is below MinUID, which is at least 1 in every build, so root cannot log in"
-	b.Set("ftp.root_denied", root)
+	p.publishAccess(b, src, ftpAccessSet{},
+		"pure-ftpd is not configured through a per-account list in this model", &root)
 	notModelled := collect.Absent("the pure-ftpd greeting is not configurable in this version's model")
 	p.setBanner(b, notModelled, notModelled, notModelled)
 }
@@ -956,9 +972,72 @@ type ftpAccessRec struct {
 	statStatus string // Ruling L-22: ok|absent|denied|error|undeclared
 	reason     string
 
-	// blind is set when the file's CONTENT could not be read, so rootListed
+	// blind is set when the file's CONTENT could not be read, or when the
+	// directive that named it cannot decide a login by itself, so rootListed
 	// is not an answer about this file — only about what was seen of it.
 	blind bool
+}
+
+// statBlind reports whether the row's PERMISSION fields are unknown, which
+// is a different blindness from an unreadable content: mode, uid and gid are
+// what U-56 judges, and a row that never obtained them must not be left in
+// an ok list for a `where exists eq true` clause to drop silently (Ruling
+// L-44). A file that is simply not there IS examined — it has no permissions
+// to judge.
+func (r *ftpAccessRec) statBlind() bool {
+	return r.statStatus != "ok" && r.statStatus != "absent"
+}
+
+// blindWhy names this row in a reason, with the construct or the failure
+// that stopped it when there is one.
+func (r *ftpAccessRec) blindWhy() string {
+	if r.reason == "" {
+		return r.path
+	}
+	return r.path + ": " + r.reason
+}
+
+// note appends one more thing that went wrong with this row, keeping every
+// reason rather than the last.
+func (r *ftpAccessRec) note(why string) {
+	if r.reason == "" {
+		r.reason = why
+		return
+	}
+	r.reason += "; " + why
+}
+
+// ftpAccessSet is what the access-file scan found: the rows, the reasons no
+// complete answer is possible, and the read failure whose STATUS the leaves
+// must carry (C3) rather than a bare absence.
+type ftpAccessSet struct {
+	recs  []*ftpAccessRec
+	blind []string
+	fail  *facts.Envelope
+}
+
+// blocked is the envelope every access leaf carries when the SET could not be
+// completed, and nil when it could. Ruling L-43/L-44: a source the collector
+// never opened, or a row whose permissions it never obtained, makes the whole
+// set unusable — however clean the rows it did reach. Leaving the list ok
+// would let U-56 pass over a partial one, and leaving the presence bool ok
+// would let it fail on a blind spot.
+func (s ftpAccessSet) blocked() *facts.Envelope {
+	if s.fail != nil {
+		e := *s.fail
+		return &e
+	}
+	why := append([]string(nil), s.blind...)
+	for _, r := range s.recs {
+		if r.statBlind() {
+			why = append(why, r.blindWhy())
+		}
+	}
+	if len(why) == 0 {
+		return nil
+	}
+	e := collect.Absent("the set of access-control files cannot be completed: " + strings.Join(why, "; "))
+	return &e
 }
 
 // record is the row a control reads. R176: every field a clause could filter
@@ -1065,18 +1144,36 @@ func listsRoot(data []byte) bool {
 	return false
 }
 
-// pamListfile is one pam_listfile.so line: the file it names and whether
-// that file is an allow list rather than a deny list.
+// pamListfile is one pam_listfile.so line: the file it names, what it filters
+// on, whether it is an allow list rather than a deny list, and — Ruling L-45
+// — whether the line can refuse a login at all. why names the construct that
+// stops it when it cannot.
 type pamListfile struct {
 	file  string
+	item  string
 	allow bool
+	acts  bool
+	why   string
 }
 
-// parsePamListfiles reads every pam_listfile.so line that filters on the
-// USER name. The control field is not inspected — a list under auth, account
-// or session gates the same login either way — and onerr is a failure policy
-// rather than a membership rule, so it is ignored. An @include line pulls in
-// a common-* stack, which carries no per-service user list.
+// parsePamListfiles reads every pam_listfile.so line and says whether it can
+// refuse a login on its own. Ruling L-45: keying on item/sense/file alone
+// reads an INERT line as a deny and hands U-57 a false PASS, so a line counts
+// only when all four hold.
+//
+//   - the control field makes a failure refuse the login: required or
+//     requisite. optional and sufficient do not, and a bracketed spec writes
+//     its own handling in the brackets, which this model does not evaluate.
+//   - item=user. A list of groups, ttys or shells can still refuse root, but
+//     it is not a list of accounts, so the caller treats it as a blind source
+//     rather than a row whose permissions U-56 would judge as one.
+//   - an explicit sense=deny or sense=allow. pam_listfile errors without one.
+//   - no apply=, which scopes the check to one user or group, leaving every
+//     account outside it unchecked.
+//
+// onerr is a failure policy rather than a membership rule, so it is ignored.
+// An @include line pulls in a common-* stack, which carries no per-service
+// user list.
 func parsePamListfiles(data []byte) []pamListfile {
 	var out []pamListfile
 	for _, raw := range splitLines(data) {
@@ -1092,11 +1189,11 @@ func parsePamListfiles(data []byte) []pamListfile {
 				break
 			}
 		}
-		if mod < 0 {
+		if mod < 1 {
 			continue
 		}
-		var lf pamListfile
-		item, sense := "", ""
+		lf := pamListfile{item: "user"}
+		sense, apply, sawItem := "", "", false
 		for _, f := range fields[mod+1:] {
 			k, v, ok := strings.Cut(f, "=")
 			if !ok {
@@ -1104,19 +1201,35 @@ func parsePamListfiles(data []byte) []pamListfile {
 			}
 			switch strings.ToLower(k) {
 			case "item":
-				item = strings.ToLower(v)
+				lf.item, sawItem = strings.ToLower(v), true
 			case "sense":
 				sense = strings.ToLower(v)
 			case "file":
 				lf.file = v
+			case "apply":
+				apply = v
 			}
 		}
-		// item=group, item=tty and the rest gate on something other than the
-		// account name, so they say nothing about whether root may log in.
-		if item != "user" || lf.file == "" {
+		if lf.file == "" {
 			continue
 		}
 		lf.allow = sense == "allow"
+		// The control field is everything between the type and the module, so
+		// a bracketed spec is caught whole rather than by its first word.
+		control := strings.Join(fields[1:mod], " ")
+		switch {
+		case strings.HasPrefix(control, "["):
+			lf.why = "the bracketed control " + control + " writes its own failure handling, which this model does not evaluate"
+		case !strings.EqualFold(control, "required") && !strings.EqualFold(control, "requisite"):
+			lf.why = "the control field " + control + " does not make this module's failure refuse the login"
+		case !sawItem || sense == "":
+			lf.why = "the line names no sense=, which pam_listfile itself refuses to act on"
+		case sense != "deny" && sense != "allow":
+			lf.why = "sense=" + sense + " is neither deny nor allow"
+		case apply != "":
+			lf.why = "apply=" + apply + " scopes the check to part of the user base, so an account outside it is never checked"
+		}
+		lf.acts = lf.why == ""
 		out = append(out, lf)
 	}
 	return out
@@ -1127,26 +1240,46 @@ func parsePamListfiles(data []byte) []pamListfile {
 // file is /etc/pam.d/ + the pam_service_name value, whose compiled default is
 // vsftpd in both packaged builds; a name the declaration does not cover is
 // named in the reason rather than opened.
-func (p *ftpParse) vsftpdAccess() (recs []*ftpAccessRec, blind []string) {
+func (p *ftpParse) vsftpdAccess() ftpAccessSet {
+	var s ftpAccessSet
 	pamFile := p.pamServiceFile()
 	if !declared(p.a, pamFile) {
-		blind = append(blind, pamFile+" is outside this collector's declaration and was not read, so the lists it names are unknown")
+		s.blind = append(s.blind, pamFile+" is outside this collector's declaration and was not read, so the lists it names are unknown")
 	} else {
 		data, meta, err := p.a.ReadFile(pamFile, readLimit)
 		switch {
 		case err != nil && errors.Is(err, fs.ErrNotExist):
 			// Nothing names a list. That is an answer, not a blind spot.
 		case err != nil:
-			blind = append(blind, pamFile+" could not be read: "+readReason(pamFile, err))
+			// C3: the READ's status, not a bare absence — a denied PAM stack
+			// is a privilege problem an operator can act on.
+			e := readErrorEnv(pamFile, err)
+			s.fail = &e
 		case meta.Truncated:
-			blind = append(blind, pamFile+" was cut at the read limit, so a list named past the cap is unknown")
+			s.blind = append(s.blind, pamFile+" was cut at the read limit, so a list named past the cap is unknown")
 		default:
 			for _, lf := range parsePamListfiles(data) {
+				if lf.item != "user" {
+					// Not a list of accounts: it can still refuse root, so it
+					// is not ignored, but judging its permissions as a user
+					// list would be a finding about the wrong file.
+					s.blind = append(s.blind, pamFile+" filters on item="+lf.item+" over "+lf.file+
+						", which this model does not read as a list of accounts")
+					continue
+				}
 				role := rolePamDeny
 				if lf.allow {
 					role = rolePamAllow
 				}
-				recs = append(recs, p.accessRecord(lf.file, role))
+				rec := p.accessRecord(lf.file, role)
+				if !lf.acts {
+					// Ruling L-45: still a row, because U-56 judges the
+					// permissions of a list whatever the line does with it -
+					// but it cannot decide a login.
+					rec.blind = true
+					rec.note(lf.why)
+				}
+				s.recs = append(s.recs, rec)
 			}
 		}
 	}
@@ -1157,14 +1290,17 @@ func (p *ftpParse) vsftpdAccess() (recs []*ftpAccessRec, blind []string) {
 		}
 		switch file, ok := p.userlistPath(); {
 		case ok:
-			recs = append(recs, p.accessRecord(file, role))
+			s.recs = append(s.recs, p.accessRecord(file, role))
+		case p.userlistNamed():
+			s.blind = append(s.blind, "userlist_file names a value longer than this collector stores, so the list it points at could not be examined")
 		case role == roleUserlistAllow:
 			// An allow list decides by ABSENCE, so not knowing which file it
 			// is leaves every account's verdict open.
-			blind = append(blind, "userlist_enable is on with userlist_deny=NO, but no user list file could be identified")
+			s.blind = append(s.blind, "userlist_enable is on with userlist_deny=NO, but no user list file could be identified")
 		}
 	}
-	return dedupeAccess(recs), blind
+	s.recs = dedupeAccess(s.recs)
+	return s
 }
 
 // pamServiceFile is the pam.d file vsftpd's own pam_service_name names.
@@ -1186,48 +1322,81 @@ func (p *ftpParse) proftpdAccess() []*ftpAccessRec {
 	return []*ftpAccessRec{p.accessRecord(etcFtpusers, roleFtpusers)}
 }
 
-// dedupeAccess keeps the first record of each path and sorts by path, so the
-// same host renders the same bytes however many directives named the file.
+// dedupeAccess drops a repeat of the same path IN THE SAME ROLE and sorts by
+// path then role, so the same host renders the same bytes however many
+// directives named the file. The role is part of the key on purpose: one file
+// can be a PAM allow list and vsftpd's own deny list at once, and keeping
+// only the first would hide half of what decides the login — or, with a
+// last-wins, show an allow list as a deny list.
 func dedupeAccess(recs []*ftpAccessRec) []*ftpAccessRec {
 	seen := map[string]bool{}
 	out := make([]*ftpAccessRec, 0, len(recs))
 	for _, r := range recs {
-		if seen[r.path] {
+		key := r.path + "\x00" + r.role
+		if seen[key] {
 			continue
 		}
-		seen[r.path] = true
+		seen[key] = true
 		out = append(out, r)
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i].path < out[j].path })
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].path != out[j].path {
+			return out[i].path < out[j].path
+		}
+		return out[i].role < out[j].role
+	})
 	return out
 }
 
-// publishAccessFiles writes the record list and the presence bool. emptyWhy
-// is the reason the presence leaf carries when this implementation named no
-// access list at all — false there means "nothing was found", which is a
-// different claim from "a list was found and it is empty".
-func (p *ftpParse) publishAccessFiles(b *collect.Builder, src *facts.Source, recs []*ftpAccessRec, emptyWhy string) {
-	list := []any{} // R50: never nil
-	present := false
-	for _, r := range recs {
-		list = append(list, r.record())
-		if r.exists {
-			present = true
+// publishAccess writes the three access leaves together. emptyWhy is the
+// reason the presence leaf carries when this implementation named no access
+// list at all — false there means "nothing was found", which is a different
+// claim from "a list was found and it is empty". settled is the answer that
+// holds whatever the lists say: vsftpd's local_enable=NO and proftpd's
+// RootLogin off refuse root before any file is consulted.
+//
+// Ruling L-43: a set that could not be completed makes ALL THREE carry that
+// story. Leaving the list ok would let U-56's `each` judge a partial set, and
+// leaving the presence bool ok:false would let it FAIL on a file nobody
+// opened — both of them claims about evidence the collector never had.
+func (p *ftpParse) publishAccess(b *collect.Builder, src *facts.Source, s ftpAccessSet, emptyWhy string, settled *facts.Envelope) {
+	blocked := s.blocked()
+	if blocked != nil {
+		b.Set("ftp.access_files", *blocked)
+		b.Set("ftp.access_file_present", *blocked)
+	} else {
+		list := []any{} // R50: never nil
+		present := false
+		for _, r := range s.recs {
+			list = append(list, r.record())
+			if r.exists {
+				present = true
+			}
 		}
+		b.Set("ftp.access_files", collect.OK(list, src))
+		e := collect.OK(present, src)
+		if len(s.recs) == 0 {
+			e.Reason = emptyWhy
+		}
+		b.Set("ftp.access_file_present", e)
 	}
-	b.Set("ftp.access_files", collect.OK(list, src))
-	e := collect.OK(present, src)
-	if len(recs) == 0 {
-		e.Reason = emptyWhy
+	switch {
+	case settled != nil:
+		b.Set("ftp.root_denied", *settled)
+	case blocked != nil:
+		b.Set("ftp.root_denied", *blocked)
+	default:
+		b.Set("ftp.root_denied", rootDenied(s.recs, src))
 	}
-	b.Set("ftp.access_file_present", e)
 }
 
-// rootDenied answers whether a root login is refused. blind names the
-// sources whose content could not be seen: when nothing refuses root and one
-// of them is blind, the honest answer is none at all rather than a confident
-// false that would PASS U-57 on a host nobody could examine.
-func rootDenied(recs []*ftpAccessRec, blind []string, src *facts.Source) facts.Envelope {
+// rootDenied answers whether a root login is refused, from rows the caller
+// has already established are examinable. A row whose content could not be
+// seen, or whose directive cannot refuse a login by itself (Ruling L-45),
+// leaves the answer absent naming that row and the construct: an under-claim
+// reads MANUAL, while a confident false would PASS U-57 on a host nobody
+// could examine.
+func rootDenied(recs []*ftpAccessRec, src *facts.Source) facts.Envelope {
 	var unknown []string
 	for _, r := range recs {
 		switch r.says() {
@@ -1236,10 +1405,9 @@ func rootDenied(recs []*ftpAccessRec, blind []string, src *facts.Source) facts.E
 			e.Reason = r.path + " (" + r.role + ") refuses a root login"
 			return e
 		case rootUnknown:
-			unknown = append(unknown, r.path)
+			unknown = append(unknown, r.blindWhy())
 		}
 	}
-	unknown = append(unknown, blind...)
 	if len(unknown) > 0 {
 		return collect.Absent("whether a root login is refused cannot be decided: " +
 			strings.Join(unknown, "; "))

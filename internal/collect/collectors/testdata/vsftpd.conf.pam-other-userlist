@@ -1,0 +1,8 @@
+# synthetic vsftpd configuration whose PAM service is a site-local name this
+# collector does not declare, alongside a user list it can read: one source
+# examined, one not.
+anonymous_enable=NO
+local_enable=YES
+pam_service_name=vsftpd-site
+userlist_enable=YES
+userlist_file=/etc/vsftpd/user_list

@@ -1,0 +1,4 @@
+# synthetic /etc/pam.d/vsftpd that filters on the GROUP name rather than the
+# account name, so the file it names is not a list of accounts.
+auth	required	pam_listfile.so item=group sense=deny file=/etc/ftpusers onerr=succeed
+@include common-auth

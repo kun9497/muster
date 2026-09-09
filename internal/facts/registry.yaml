@@ -1969,13 +1969,19 @@ keys:
       all three, never 0. stat_status is ok, absent, denied, error or undeclared, the last meaning
       the configuration named a path outside this collector's declaration, which is recorded and
       never opened. root_listed is true when a non-comment line of the file is exactly root; it is
-      false, with a reason, whenever the file could be stat-ed but not read.
+      false, with a reason, whenever the file could be stat-ed but not read. This list and
+      ftp.access_file_present are ABSENT together whenever the SET could not be completed - a
+      source outside the declaration, an unreadable or truncated pam.d service file, or a row
+      whose own stat_status is undeclared, denied or error - because a partial list is not
+      evidence a control may judge, however clean the rows the collector did reach. A row that
+      stats but cannot be READ keeps the list ok: its permissions are known, and only
+      ftp.root_denied loses its answer.
     since: 1
     sensitivity: public
     collector: ftp
   - key: ftp.access_file_present
     type: bool
-    description: Whether at least one of the access-control files in ftp.access_files exists on this host. False with a reason when the configuration names none at all, which is a different finding from a list that exists and is empty.
+    description: Whether at least one of the access-control files in ftp.access_files exists on this host. False with a reason when the configuration names none at all, which is a different finding from a list that exists and is empty. Absent, alongside ftp.access_files, whenever the set of access files could not be completed, so a blind spot never reads as an affirmative "this host has no access list".
     since: 1
     sensitivity: public
     collector: ftp
@@ -1986,9 +1992,16 @@ keys:
       pam_deny or userlist_deny file, or an allow list (userlist_deny NO, or pam_listfile
       sense=allow) that does not name root. proftpd - RootLogin not on, whose own default is off,
       or root named in /etc/ftpusers while UseFtpUsers is on. pure-ftpd - always true, because it
-      refuses every account below MinUID, which is at least 1 in every build. Absent when a list
-      that would decide it could not be read: an undeclared path, a denied read or a file cut at
-      the read limit, with the reason naming it.
+      refuses every account below MinUID, which is at least 1 in every build. A pam_listfile.so
+      line counts only when its control field is required or requisite (a bracketed spec writes
+      its own failure handling, and optional or sufficient do not make a failure refuse the
+      login), it filters on item=user, it names an explicit sense, and it carries no apply=; a
+      line that fails any of those still becomes a row, because U-56 judges a list's permissions
+      whatever PAM does with it, but it cannot decide this leaf. Absent when a list that would
+      decide it could not be read - an undeclared path, an unreadable or truncated file, or a
+      directive that cannot refuse a login by itself - with the reason naming it; DENIED rather
+      than absent when the pam.d service file itself could not be read, so a reader sees a
+      privilege problem and not a host without FTP access control.
     since: 1
     sensitivity: public
     collector: ftp

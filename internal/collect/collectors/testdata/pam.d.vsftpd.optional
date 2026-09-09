@@ -1,0 +1,4 @@
+# synthetic /etc/pam.d/vsftpd whose list is optional: PAM ignores the
+# module's failure, so the line refuses nobody.
+auth	optional	pam_listfile.so item=user sense=deny file=/etc/ftpusers onerr=succeed
+@include common-auth
