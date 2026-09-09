@@ -58,7 +58,22 @@ func filesReads() []string {
 	for _, name := range dotfiles {
 		reads = append(reads, "/home/*/"+name, "/root/"+name)
 	}
-	return reads
+	// The TCP wrappers library, declared literally: files.libwrap_present is
+	// a presence probe over the paths its shared object lives at (L-9).
+	return append(reads, libwrapPaths...)
+}
+
+// libwrapPaths is where libwrap.so.0 lives on the distributions muster
+// judges - the Debian/Ubuntu multiarch directories for the two supported
+// architectures, and the RHEL-family lib64 pair - plus the plain /usr/lib
+// of a 32-bit build. RHEL 8 and later ship no libwrap at all, which is
+// exactly what the fact exists to say.
+var libwrapPaths = []string{
+	"/usr/lib/x86_64-linux-gnu/libwrap.so.0",
+	"/usr/lib/aarch64-linux-gnu/libwrap.so.0",
+	"/usr/lib64/libwrap.so.0",
+	"/lib64/libwrap.so.0",
+	"/usr/lib/libwrap.so.0",
 }
 
 func runFiles(_ context.Context, a collect.Access, b *collect.Builder) error {
@@ -135,6 +150,14 @@ func runFiles(_ context.Context, a collect.Access, b *collect.Builder) error {
 	ld, lf := logTree(a, groups, gmeta, gerr)
 	b.Set("files.log_dirs", ld)
 	b.Set("files.log_files", lf)
+
+	// Ruling L-9/L-20: whether this host has TCP wrappers at all. anyPresent
+	// counts a symlink or a denied stat as present, so ok:false means every
+	// candidate was ENOENT - the RHEL 8+ shape, where a tcp_wrappers=YES
+	// setting and a deny-all /etc/hosts.deny restrict nothing. Evidence for
+	// the operator; no control in this stage consumes it.
+	b.Set("files.libwrap_present", collect.OK(anyPresent(a, libwrapPaths),
+		&facts.Source{Kind: "derived"}))
 
 	// /etc/securetty is absent on RHEL 8+ and on the Debian family; the
 	// control that reads it treats that as "this mechanism is not in use".

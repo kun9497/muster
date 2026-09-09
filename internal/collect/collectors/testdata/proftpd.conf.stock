@@ -1,0 +1,13 @@
+# synthetic proftpd configuration: no anonymous block, no TLS, no RootLogin
+ServerName "FTP service"
+ServerType standalone
+DefaultServer on
+Port 21
+UseIPv6 on
+MaxInstances 30
+User proftpd
+Group nogroup
+Umask 022 022
+AllowOverwrite on
+TimeoutIdle 1200
+UseFtpUsers on

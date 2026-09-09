@@ -1,0 +1,4 @@
+# synthetic vsftpd configuration that never names anonymous_enable, so the
+# compiled default (YES) decides.
+listen=YES
+pam_service_name=vsftpd

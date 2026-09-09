@@ -1,0 +1,6 @@
+# synthetic vsftpd configuration that turns TLS on but exempts the data
+# channel, so a login is encrypted and the transfer is not.
+anonymous_enable=NO
+local_enable=YES
+ssl_enable=YES
+force_local_data_ssl=NO

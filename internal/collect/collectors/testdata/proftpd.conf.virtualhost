@@ -1,0 +1,10 @@
+# synthetic proftpd configuration whose TLS directives live inside a
+# <VirtualHost> block, which this model does not attribute.
+ServerName "FTP service"
+ServerType standalone
+UseFtpUsers on
+<VirtualHost ftp.example.org>
+  ServerName "second service"
+  TLSEngine on
+  TLSRequired on
+</VirtualHost>

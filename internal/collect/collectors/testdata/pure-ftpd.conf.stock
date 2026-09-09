@@ -1,0 +1,5 @@
+# synthetic pure-ftpd configuration in the single-file (RHEL) style.
+ChrootEveryone yes
+NoAnonymous yes
+TLS 2
+MaxClientsNumber 50

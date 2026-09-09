@@ -1,0 +1,6 @@
+# synthetic vsftpd configuration whose user list is an ALLOW list.
+anonymous_enable=NO
+local_enable=YES
+userlist_enable=YES
+userlist_deny=NO
+userlist_file=/etc/vsftpd/allowed_users

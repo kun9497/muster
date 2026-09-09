@@ -1791,3 +1791,166 @@ keys:
     since: 1
     sensitivity: internal
     collector: patch
+  - key: services.ftp.installed
+    type: bool
+    description: An FTP server unit or inetd entry exists on the host.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.ftp.active
+    type: bool
+    description: The FTP service is running, socket-activated or reachable on its port.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.ftp.unit_file_state
+    type: string
+    description: UnitFileState of the first present FTP unit (evidence only; "not-found" when none).
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.ftp.enabled
+    type: bool
+    description: An FTP unit will start at boot or on socket activation.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.ftp.reachable
+    type: bool
+    description: The FTP service would accept a connection from off the host (non-loopback listener on port 21).
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.mail.installed
+    type: bool
+    description: A mail transfer agent unit (postfix, sendmail or exim) exists on the host.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.mail.active
+    type: bool
+    description: The mail transfer agent is running or reachable on its port.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.mail.unit_file_state
+    type: string
+    description: UnitFileState of the first present mail unit (evidence only; "not-found" when none).
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.mail.enabled
+    type: bool
+    description: A mail unit will start at boot.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.mail.reachable
+    type: bool
+    description: The mail transfer agent would accept a connection from off the host (non-loopback listener on port 25).
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.dns.installed
+    type: bool
+    description: A DNS server unit (bind or unbound) exists on the host.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.dns.active
+    type: bool
+    description: The DNS server is running or reachable on its port.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.dns.unit_file_state
+    type: string
+    description: UnitFileState of the first present DNS unit (evidence only; "not-found" when none).
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.dns.enabled
+    type: bool
+    description: A DNS unit will start at boot.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.dns.reachable
+    type: bool
+    description: The DNS server would accept a query from off the host (non-loopback listener on port 53).
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: files.libwrap_present
+    type: bool
+    description: Whether the TCP wrappers library is installed, from a presence probe over the paths libwrap.so.0 lives at on the Debian and RHEL families; a symlink counts as present, so false means every candidate was absent. RHEL 8 and later ship no libwrap at all, so a daemon built against it - and a deny-all /etc/hosts.deny - restricts nothing there. Evidence for the operator; no control in this stage consumes it.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: ftp.implementation
+    type: string
+    description: Which FTP daemon this host is configured with - vsftpd, proftpd, pure-ftpd or none. A daemon is named only when its binary is installed as well as its configuration file, so a conffile left behind by a removed package does not decide, and the reason then names that leftover. Evidence only (whether an FTP service is running is services.ftp.active).
+    since: 1
+    sensitivity: public
+    collector: ftp
+  - key: ftp.config_files
+    type: list<string>
+    subject_kind: file
+    description: The FTP configuration files actually read, sorted; a proftpd Include the declaration covers appears alongside the main file, and each file appears once however it was reached.
+    since: 1
+    sensitivity: public
+    collector: ftp
+  - key: ftp.parse_complete
+    type: bool
+    description: Whether every configuration file the collector was told to read could be read in full; false when a read failed or when the read primitive cut a file at its limit. A construct outside the model is not a read failure - it counts in ftp.unmodelled instead. A host with no FTP configuration at all read everything there was, so the parse is complete and the judged leaves carry that story.
+    since: 1
+    sensitivity: public
+    collector: ftp
+  - key: ftp.unmodelled
+    type: int
+    description: How many constructs outside this collector's model the configuration uses - a second vsftpd instance under /etc/vsftpd, a proftpd VirtualHost, Global or IfModule section enclosing a modelled directive, or a proftpd Include outside the collector's declaration. Any of them makes every judged leaf absent, so a server whose real settings live where the model does not read is reported as unjudgeable rather than judged by settings it never uses.
+    since: 1
+    sensitivity: public
+    collector: ftp
+  - key: ftp.local_enabled
+    type: bool
+    description: Whether local accounts may log in over FTP - vsftpd's local_enable, whose compiled default is NO; proftpd and pure-ftpd authenticate local accounts and have no directive that turns them off wholesale, so both read true with that reason.
+    since: 1
+    sensitivity: public
+    collector: ftp
+  - key: ftp.anonymous_enabled
+    type: bool
+    description: Whether an anonymous login is served - vsftpd's anonymous_enable, whose COMPILED default is YES in both the Debian and the RHEL build (the Debian man page's "Default NO" is a documentation-only patch), so a file that never names it does serve anonymous logins; a proftpd Anonymous block at an attributed depth; pure-ftpd's NoAnonymous not being yes.
+    since: 1
+    sensitivity: public
+    collector: ftp
+  - key: ftp.tls_enforced
+    type: bool
+    description: Whether every session this daemon serves must be encrypted - vsftpd's ssl_enable with force_local_logins_ssl and force_local_data_ssl (both default YES) left on and, when anonymous logins are served, force_anon_logins_ssl and force_anon_data_ssl (both default NO) turned on; proftpd's TLSEngine on with TLSRequired on at the top level; pure-ftpd's TLS setting at 2 or higher, which refuses a cleartext session.
+    since: 1
+    sensitivity: public
+    collector: ftp
+  - key: ftp.tcp_wrappers
+    type: bool
+    description: Whether vsftpd consults /etc/hosts.allow and /etc/hosts.deny - the tcp_wrappers setting, whose compiled default is NO. Absent on proftpd, which wraps connections through mod_wrap2's directives, and on pure-ftpd, which has no setting of its own in this model. Whether the library is installed at all is files.libwrap_present.
+    since: 1
+    sensitivity: public
+    collector: ftp
+  - key: ftp.userlist_enable
+    type: bool
+    description: Whether vsftpd consults its user list at all - userlist_enable, whose compiled default is NO. Absent on proftpd and pure-ftpd, whose access list is /etc/ftpusers rather than a list of this shape.
+    since: 1
+    sensitivity: public
+    collector: ftp
+  - key: ftp.userlist_deny
+    type: bool
+    description: Whether vsftpd's user list is a DENY list (the compiled default YES) rather than the allow list userlist_deny=NO makes it, which refuses every account the file does not name. Absent on proftpd and pure-ftpd.
+    since: 1
+    sensitivity: public
+    collector: ftp
+  - key: ftp.userlist_file
+    type: string
+    description: The file vsftpd reads its user list from - the explicit userlist_file, or the build default that is actually on disk (/etc/vsftpd.user_list on the Debian build, /etc/vsftpd/user_list on the RHEL build), preferring the one that matches the layout the main configuration file proved. Absent when the setting is unset and neither default exists, and on proftpd and pure-ftpd.
+    since: 1
+    sensitivity: public
+    collector: ftp

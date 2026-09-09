@@ -1,0 +1,9 @@
+# synthetic proftpd configuration that serves an anonymous login.
+ServerName "FTP service"
+ServerType standalone
+UseFtpUsers on
+<Anonymous /srv/ftp>
+  User ftp
+  Group nogroup
+  UserAlias anonymous ftp
+</Anonymous>

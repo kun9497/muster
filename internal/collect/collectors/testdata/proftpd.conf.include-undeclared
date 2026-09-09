@@ -1,0 +1,5 @@
+# synthetic proftpd configuration that pulls in a fragment from outside the
+# collector's declaration.
+ServerName "FTP service"
+UseFtpUsers on
+Include /usr/local/etc/proftpd-site.conf

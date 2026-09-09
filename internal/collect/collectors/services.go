@@ -88,6 +88,15 @@ var services = []logicalService{
 	// source is active, so every implementation is one logical service.
 	{name: "ntp", units: []unitRef{{"chrony.service", true}, {"chronyd.service", true}, {"systemd-timesyncd.service", true}, {"ntpd.service", true}, {"ntp.service", true}, {"ntpsec.service", true}}},
 	{name: "syslog", units: []unitRef{{"rsyslog.service", true}, {"syslog-ng.service", true}}},
+	// 2L (Ruling L-8). Three daemons whose CONFIGURATION the ftp, mail and
+	// dns collectors read; these rows answer the other half - whether the
+	// host runs them at all. No template units: probeUnits takes concrete
+	// names, so postfix's per-instance template is named by its default
+	// instance postfix@-.service. ftp is the only one a super-server can
+	// host, and each row's fixed port gives it a reachable leaf.
+	{name: "ftp", units: []unitRef{{"vsftpd.service", true}, {"vsftpd.socket", true}, {"proftpd.service", true}, {"proftpd.socket", true}, {"pure-ftpd.service", true}}, inetdNames: []string{"ftp"}, servers: []string{"vsftpd", "proftpd", "in.ftpd", "pure-ftpd"}, ports: []portSpec{{"tcp", 21}}},
+	{name: "mail", units: []unitRef{{"postfix.service", true}, {"postfix@-.service", true}, {"sendmail.service", true}, {"exim4.service", true}, {"exim.service", true}}, ports: []portSpec{{"tcp", 25}}},
+	{name: "dns", units: []unitRef{{"named.service", true}, {"bind9.service", true}, {"named-chroot.service", true}, {"unbound.service", true}}, ports: []portSpec{{"udp", 53}, {"tcp", 53}}},
 }
 
 // declaredShowCommands lists every systemctl invocation the collector may
