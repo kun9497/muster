@@ -1,0 +1,5 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "services":{"ftp":{"installed":{"status":"ok","value":true}}},
+  "ftp":{"access_file_present":{"status":"absent","reason":"the set of access-control files cannot be completed: /etc/pam.d/vsftpd-site is outside this collector's declaration and was not read, so the lists it names are unknown"},
+         "access_files":{"status":"absent","reason":"the set of access-control files cannot be completed: /etc/pam.d/vsftpd-site is outside this collector's declaration and was not read, so the lists it names are unknown"}}
+}}

@@ -1,0 +1,4 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "services":{"ftp":{"installed":{"status":"ok","value":true}}},
+  "ftp":{"root_denied":{"status":"ok","value":true,"reason":"root is named in /etc/ftpusers, which a pam_listfile.so line denies on","source":{"kind":"file","path":"/etc/ftpusers"}}}
+}}

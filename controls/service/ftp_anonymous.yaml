@@ -1,0 +1,27 @@
+id: muster.service.ftp_anonymous
+title_en: The FTP service serves no anonymous login
+title_ko: FTP 서비스가 익명 로그인을 제공하지 않는다
+description_en: "An anonymous FTP login hands an unauthenticated caller a session on the host, so a daemon that serves one must be able to justify it. The verdict is read from the daemon's own configuration: vsftpd's anonymous_enable, a proftpd <Anonymous> block, and pure-ftpd's NoAnonymous. vsftpd's COMPILED default is YES in both the Debian and the RHEL build - the Debian man page's \"Default: NO\" is a documentation-only patch that never reached tunables.c - so a configuration file that never names anonymous_enable really does serve anonymous logins and is a finding, not a pass by default. A host with no FTP daemon installed is not applicable. A configuration this collector could not read in full, or one using a construct outside its model (a second vsftpd instance, a proftpd VirtualHost, Global or IfModule section enclosing a modelled directive), is a manual review rather than a pass: the settings that decide the answer may live where muster does not look. The pure-ftpd-mysql, pure-ftpd-ldap and pure-ftpd-postgresql packages install their own binary and unit, which the services table sees only through a listener on port 21; where that is all this host offers, the daemon's own settings are still read from /etc/pure-ftpd."
+description_ko: "익명 FTP 로그인은 인증되지 않은 접속자에게 호스트의 세션을 그대로 내어 주므로, 이를 제공하는 데몬은 그럴 만한 근거가 있어야 합니다. 판정은 데몬 자신의 설정에서 읽습니다 - vsftpd 의 anonymous_enable, proftpd 의 <Anonymous> 블록, pure-ftpd 의 NoAnonymous 입니다. vsftpd 의 컴파일 기본값은 Debian 빌드와 RHEL 빌드 모두 YES 입니다. Debian man page 의 \"Default: NO\" 는 tunables.c 에 반영되지 않은 문서만의 패치이므로, anonymous_enable 을 전혀 적지 않은 설정 파일은 실제로 익명 로그인을 제공하며 기본값에 의한 통과가 아니라 결함입니다. FTP 데몬이 설치되어 있지 않은 호스트는 해당 없음입니다. 설정을 끝까지 읽지 못했거나 모델 밖 구문(두 번째 vsftpd 인스턴스, 모델이 읽는 지시어를 감싼 proftpd VirtualHost·Global·IfModule 섹션)을 쓰는 설정은 통과가 아니라 수동 검토입니다 - 답을 결정하는 설정이 muster 가 보지 않는 곳에 있을 수 있기 때문입니다. pure-ftpd-mysql, pure-ftpd-ldap, pure-ftpd-postgresql 패키지는 각자의 바이너리와 유닛을 설치하며 services 표는 이를 21 번 포트 리스너로만 인식하지만, 그런 호스트에서도 데몬 설정은 /etc/pure-ftpd 에서 그대로 읽습니다."
+category: service
+importance: 상
+automation: auto
+references:
+  kisa: { "2026": ["U-35"], "2021": ["U-20"] }
+requires_facts: ">=1"
+absent_means: manual
+applies_when:
+  # Ruling J-22: the services collector writes ok:false - not absent - for a
+  # unit that is not installed, so `op: present` would run the checks on every
+  # host and one with no FTP daemon would read MANUAL. `eq true` gives
+  # NOT_APPLICABLE there, and an unsupported (no systemd) reading screens to
+  # NOT_APPLICABLE as well.
+  - { fact: services.ftp.installed, op: eq, expected: true }
+checks:
+  - { fact: ftp.anonymous_enabled, op: eq, expected: false }
+remediation:
+  text_en: Set anonymous_enable=NO in vsftpd.conf, remove the <Anonymous> block from proftpd.conf, or set NoAnonymous yes for pure-ftpd, then restart the daemon.
+  text_ko: vsftpd.conf 에 anonymous_enable=NO 를 설정하거나, proftpd.conf 의 <Anonymous> 블록을 제거하거나, pure-ftpd 에 NoAnonymous yes 를 설정한 뒤 데몬을 재시작합니다.
+  risk: restart_service
+  idempotent: true
+decision: D09

@@ -1,0 +1,4 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "services":{"ftp":{"installed":{"status":"ok","value":true}}},
+  "ftp":{"root_denied":{"status":"ok","value":true,"reason":"local_enable is NO: no local account, root included, may log in","source":{"kind":"file","path":"/etc/vsftpd.conf"}}}
+}}

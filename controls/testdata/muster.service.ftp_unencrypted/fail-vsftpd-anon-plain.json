@@ -1,0 +1,4 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "services":{"ftp":{"installed":{"status":"ok","value":true},"active":{"status":"ok","value":true}}},
+  "ftp":{"tls_enforced":{"status":"ok","value":false,"reason":"ssl_enable is YES, but anonymous logins are served without force_anon_logins_ssl or force_anon_data_ssl","source":{"kind":"file","path":"/etc/vsftpd.conf"}}}
+}}

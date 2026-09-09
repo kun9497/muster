@@ -1,0 +1,4 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "services":{"ftp":{"installed":{"status":"ok","value":true}}},
+  "ftp":{"banner_discloses_version":{"status":"ok","value":false,"reason":"ServerIdent is off, so proftpd sends no greeting of its own","source":{"kind":"file","path":"/etc/proftpd/proftpd.conf"}}}
+}}

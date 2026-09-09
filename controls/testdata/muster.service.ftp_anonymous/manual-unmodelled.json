@@ -1,0 +1,4 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "services":{"ftp":{"installed":{"status":"ok","value":true}}},
+  "ftp":{"anonymous_enabled":{"status":"absent","reason":"this configuration uses constructs outside the collector's model: /etc/proftpd/proftpd.conf: a VirtualHost section encloses a modelled directive"}}
+}}

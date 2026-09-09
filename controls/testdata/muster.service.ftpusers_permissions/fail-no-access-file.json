@@ -1,0 +1,5 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "services":{"ftp":{"installed":{"status":"ok","value":true}}},
+  "ftp":{"access_file_present":{"status":"ok","value":false,"reason":"this vsftpd configuration names no per-account access list"},
+         "access_files":{"status":"ok","value":[]}}
+}}

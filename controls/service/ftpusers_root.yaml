@@ -1,0 +1,22 @@
+id: muster.service.ftpusers_root
+title_en: A root login over FTP is refused
+title_ko: FTP 를 통한 root 로그인이 거부된다
+description_en: "FTP sends its password in the clear, so the account with the most to lose must not be reachable through it. What \"root is refused\" means depends on the daemon. vsftpd refuses root when local_enable is NO (no local account can log in at all), when root is named in a deny list - /etc/ftpusers through a pam_listfile.so line, or its own userlist_file while userlist_deny is YES - or when an allow list (userlist_deny=NO, or a pam_listfile line with sense=allow) does not name root. proftpd refuses root when RootLogin is not on, which is its own default, or when root is named in /etc/ftpusers while UseFtpUsers is on. pure-ftpd always refuses root, because it serves no account below MinUID and every build compiles that at 1 or above. A pam_listfile.so line only counts when it could actually refuse the login: its control field must be required or requisite, it must filter on the account name, it must name an explicit sense, and it must not be scoped by apply= to part of the user base. Where the list that would decide this could not be read - a path outside this collector's declaration, a file it could not open or one cut at the read limit - the result is a manual review rather than a pass, and a denied PAM stack is reported as the privilege problem it is. A host with no FTP daemon installed is not applicable."
+description_ko: "FTP 는 비밀번호를 평문으로 보내므로, 잃을 것이 가장 많은 계정이 그 경로로 닿을 수 있으면 안 됩니다. \"root 가 거부된다\" 의 의미는 데몬마다 다릅니다. vsftpd 는 local_enable 이 NO 이거나(로컬 계정이 아예 로그인할 수 없음), root 가 거부 목록에 있거나(pam_listfile.so 줄이 가리키는 /etc/ftpusers, 또는 userlist_deny 가 YES 인 상태의 자체 userlist_file), 허용 목록(userlist_deny=NO 또는 sense=allow 인 pam_listfile 줄)이 root 를 담고 있지 않을 때 root 를 거부합니다. proftpd 는 RootLogin 이 on 이 아닐 때(자체 기본값이 off 입니다) 또는 UseFtpUsers 가 켜진 상태에서 /etc/ftpusers 에 root 가 있을 때 거부합니다. pure-ftpd 는 MinUID 미만 계정을 아예 제공하지 않고 모든 빌드가 이를 1 이상으로 컴파일하므로 언제나 거부합니다. pam_listfile.so 줄은 실제로 로그인을 거부할 수 있을 때만 인정합니다 - 제어 필드가 required 또는 requisite 여야 하고, 계정 이름으로 걸러야 하며, sense 를 명시해야 하고, apply= 로 사용자 일부에만 적용되어서는 안 됩니다. 이를 결정할 목록을 읽지 못한 경우 - 이 수집기의 선언 밖 경로, 열지 못한 파일, 읽기 한도에서 잘린 파일 - 는 통과가 아니라 수동 검토이며, 접근이 거부된 PAM 스택은 권한 문제 그대로 보고합니다. FTP 데몬이 설치되어 있지 않은 호스트는 해당 없음입니다."
+category: service
+importance: 중
+automation: auto
+references:
+  kisa: { "2026": ["U-57"], "2021": ["U-64"] }
+requires_facts: ">=1"
+absent_means: manual
+applies_when:
+  - { fact: services.ftp.installed, op: eq, expected: true }
+checks:
+  - { fact: ftp.root_denied, op: eq, expected: true }
+remediation:
+  text_en: Add root to the access-control file the daemon reads (/etc/ftpusers, or vsftpd's userlist_file with userlist_deny=YES), or set local_enable=NO for vsftpd and RootLogin off for proftpd, then restart the daemon.
+  text_ko: 데몬이 읽는 접근 제어 파일(/etc/ftpusers, 또는 userlist_deny=YES 인 vsftpd 의 userlist_file)에 root 를 추가하거나, vsftpd 에는 local_enable=NO 를, proftpd 에는 RootLogin off 를 설정한 뒤 데몬을 재시작합니다.
+  risk: none
+  idempotent: true
+decision: D09

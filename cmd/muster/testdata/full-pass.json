@@ -18,7 +18,8 @@
               "talk":{"active":{"status":"ok","value":false},"enabled":{"status":"ok","value":false},"reachable":{"status":"ok","value":false}},
               "snmp":{"installed":{"status":"ok","value":true},"active":{"status":"ok","value":false},"enabled":{"status":"ok","value":false},"reachable":{"status":"ok","value":false}},
               "ntp":{"installed":{"status":"ok","value":true},"active":{"status":"ok","value":true}},
-              "syslog":{"active":{"status":"ok","value":true}}},
+              "syslog":{"active":{"status":"ok","value":true}},
+              "ftp":{"installed":{"status":"ok","value":true},"active":{"status":"ok","value":false}}},
   "sshd":{"collect_method":{"status":"ok","value":"T"},"version":{"status":"ok","value":"8.9"},"personas_collected":{"status":"ok","value":true},
           "options":{"permit_root_login":{"effective":{"status":"ok","value":"no","source":{"kind":"command","cmd":"/usr/sbin/sshd -T"}}},
                      "client_alive_interval":{"effective":{"status":"ok","value":300}},
@@ -128,5 +129,12 @@
          "faillock":{"enabled":{"status":"ok","value":true},"deny":{"status":"ok","value":5}},
          "su":{"wheel_required":{"status":"ok","value":true}},
          "umask_module":{"enabled":{"status":"ok","value":true}}},
+  "ftp":{"anonymous_enabled":{"status":"ok","value":false,"source":{"kind":"file","path":"/etc/vsftpd.conf"}},
+         "banner_discloses_version":{"status":"ok","value":false,"source":{"kind":"file","path":"/etc/vsftpd.conf"}},
+         "access_file_present":{"status":"ok","value":true},
+         "access_files":{"status":"ok","value":[
+           {"path":"/etc/ftpusers","role":"pam_deny","exists":true,"root_listed":true,"mode":416,"uid":0,"gid":0,"stat_status":"ok"}
+         ]},
+         "root_denied":{"status":"ok","value":true,"source":{"kind":"file","path":"/etc/ftpusers"}}},
   "walk":{"world_writable":{"status":"absent"}}
  }}

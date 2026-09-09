@@ -1,0 +1,4 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "services":{"ftp":{"installed":{"status":"ok","value":true}}},
+  "ftp":{"root_denied":{"status":"ok","value":true,"reason":"userlist_deny is NO and /etc/vsftpd/allowed_users does not name root, so root is not on the allow list","source":{"kind":"file","path":"/etc/vsftpd/allowed_users"}}}
+}}

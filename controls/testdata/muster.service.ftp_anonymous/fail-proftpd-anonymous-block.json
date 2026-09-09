@@ -1,0 +1,4 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "services":{"ftp":{"installed":{"status":"ok","value":true}}},
+  "ftp":{"anonymous_enabled":{"status":"ok","value":true,"reason":"an <Anonymous> block is declared at the top level","source":{"kind":"file","path":"/etc/proftpd/proftpd.conf"}}}
+}}

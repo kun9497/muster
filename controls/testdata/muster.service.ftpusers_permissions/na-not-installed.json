@@ -1,0 +1,5 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "services":{"ftp":{"installed":{"status":"ok","value":false}}},
+  "ftp":{"access_file_present":{"status":"absent","reason":"no FTP daemon is installed on this host"},
+         "access_files":{"status":"absent","reason":"no FTP daemon is installed on this host"}}
+}}

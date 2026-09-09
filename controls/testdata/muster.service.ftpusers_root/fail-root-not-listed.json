@@ -1,0 +1,4 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "services":{"ftp":{"installed":{"status":"ok","value":true}}},
+  "ftp":{"root_denied":{"status":"ok","value":false,"reason":"no access list this collector read refuses a root login","source":{"kind":"file","path":"/etc/ftpusers"}}}
+}}
