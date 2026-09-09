@@ -2814,7 +2814,7 @@
     {
       "Key": "nfs.exports",
       "Type": "list\u003crecord\u003e",
-      "Description": "Every NFS export as {path, client, options, wildcard, root_squash} parsed from /etc/exports and /etc/exports.d/*.exports; a path with no client spec, or a bare \"(options)\" spec with a space before the parenthesis (exportfs's own space-sensitive trap), exports to the world (client \"*\", wildcard true); root_squash is derived from the absence of no_root_squash in the client's options.",
+      "Description": "Every NFS export as {path, client, options, wildcard, root_squash} parsed from /etc/exports and /etc/exports.d/*.exports; a path with no client spec, or a bare \"(options)\" spec with a space before the parenthesis (exportfs's own space-sensitive trap), exports to the world (client \"*\", wildcard true); root_squash is derived from the absence of no_root_squash in the client's options. An export file that exists but cannot be read, and a file the read primitive cut at the size cap, both make this list carry that answer instead - the read's status or absent, naming the path in either case - because a parse of the files that happened to be readable, or of a prefix, would publish a partial export list as the whole one; nothing partial is ever published here.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "nfs",
@@ -3004,7 +3004,7 @@
     {
       "Key": "patch.manager",
       "Type": "string",
-      "Description": "The package manager this host is judged through - apt when the dpkg database exists, dnf when the dnf metadata cache directory does, otherwise unknown, in which case every other patch fact is unsupported.",
+      "Description": "The package manager this host is judged through - apt when the dpkg database /var/lib/dpkg/status exists, which is tested first; dnf when any of the dnf metadata cache /var/cache/dnf, /etc/dnf/dnf.conf or the rpm database directory /var/lib/rpm exists, so a host whose cache was wiped is still judged as a dnf host and reads a manual review until it has one again; otherwise unknown, in which case every other patch fact is unsupported. The Source names the artefact that actually proved the family, not a fixed path.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "patch",

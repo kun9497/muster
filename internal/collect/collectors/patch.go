@@ -393,9 +393,18 @@ func (c patchCache) age(now time.Time) facts.Envelope {
 }
 
 // securityAvailable is the security_metadata_available envelope.
+//
+// With no cache at all there is no file to cite: newestPath is the cache
+// DIRECTORY, which on the Ruling JR-9 shape - a dnf host named from
+// /etc/dnf/dnf.conf or the rpm database - does not exist. An envelope must
+// never name a path the collector did not read, so that answer carries no
+// Source, the shape filesSource already returns when nothing was read.
 func (c patchCache) securityAvailable() facts.Envelope {
 	if c.failed != nil {
 		return *c.failed
+	}
+	if !c.present {
+		return collect.OK(c.security, nil)
 	}
 	p := c.securityPath
 	if p == "" {

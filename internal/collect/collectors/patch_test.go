@@ -1029,6 +1029,11 @@ func TestPatchDnfWithoutCacheDirIsManualNotUnknown(t *testing.T) {
 					t.Errorf("%s %+v, want absent (no metadata cache at all)", k, ae)
 				}
 			}
+			// An envelope must never name a path the collector did not read:
+			// /var/cache/dnf is exactly what is missing on this shape.
+			if se := env(t, b, "patch.security_metadata_available"); se.Source != nil {
+				t.Errorf("security_metadata_available source %+v, want none - %s does not exist on this host", se.Source, testDnfCacheDir)
+			}
 			assertCacheLeavesAgree(t, b)
 		})
 	}
