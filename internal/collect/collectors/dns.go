@@ -117,6 +117,13 @@ type dnsElem struct {
 	negated bool
 }
 
+// dnsAuthoritative names the zone types this host serves its own copy of, and
+// therefore the ones an allow-transfer decides the transferability of. Ruling
+// L-53 turns an undeterminable default into an absence of the whole list only
+// for these — U-50 judges exactly them, and a hint, forward, stub or redirect
+// zone carries nothing an operator would notice a transfer of.
+var dnsAuthoritative = map[string]bool{"primary": true, "master": true}
+
 // dnsZone is one zone statement, with the two lists it may set of its own.
 type dnsZone struct {
 	name  string
@@ -170,6 +177,10 @@ type dnsParse struct {
 	unmodelled  []string
 	notRead     []string
 	undefACL    map[string]bool
+	// unknownTransfer names the primary zones whose transfer default could not
+	// be determined (Ruling L-53). It absents dns.zones alone, never the other
+	// judged leaves.
+	unknownTransfer []string
 
 	acls  map[string][]dnsElem
 	zones []dnsZone
@@ -206,7 +217,9 @@ func (p *dnsParse) detect() {
 		// unbound is a resolver: it serves no authoritative zones, so there is
 		// nothing in its configuration this collector would be entitled to
 		// judge. The file is recorded as the evidence that named the
-		// implementation and is never opened.
+		// implementation and is never opened — so the source these leaves cite
+		// is a path this collector STAT-ed rather than read, which the registry
+		// description states in as many words.
 		p.record(p.mainFile, false)
 	case "bind":
 		p.readBuild()
@@ -559,9 +572,16 @@ func (s *dnsStream) include() {
 		s.p.noteUnread(from, clean)
 		return
 	}
-	if s.p.seen[clean] {
-		// Already inlined once. named would read it again and reject the
-		// duplicate statements; reading it twice here would only double them.
+	// Ruling L-54: the guard is per include CHAIN, not per run. L-18 gives an
+	// included fragment's statements to the ENCLOSING block, so the same
+	// fragment included from two different scopes means two different things
+	// and named reads it both times; skipping the second would report a zone
+	// as restricted while the running server transfers it to anyone. What must
+	// still be refused is a file that is already OPEN above this point — a
+	// cycle, which would otherwise only stop at the depth cap.
+	if s.open(clean) {
+		s.p.noteUnmodelled(from, "include "+clean+
+			" is already open in this include chain: a cycle, which was not followed")
 		return
 	}
 	data, meta, err := s.p.a.ReadFile(clean, readLimit)
@@ -573,6 +593,18 @@ func (s *dnsStream) include() {
 	}
 	s.p.record(clean, meta.Truncated)
 	s.frames = append(s.frames, dnsFrame{toks: dnsTokenize(data), file: clean})
+}
+
+// open reports whether a file is already being read further up this include
+// chain. Only the frames currently on the stack count: a fragment that was
+// read and finished is not open, and including it again is legitimate.
+func (s *dnsStream) open(file string) bool {
+	for _, f := range s.frames {
+		if f.file == file {
+			return true
+		}
+	}
+	return false
 }
 
 // skipStatement consumes the rest of a statement this model does not read,
@@ -743,7 +775,10 @@ func (p *dnsParse) parseACL(s *dnsStream) {
 	}
 	elems := p.parseAML(s)
 	if name != "" {
-		p.acls[name] = elems
+		// named compares acl names case-insensitively, so the table is keyed
+		// on the folded name; the element keeps the spelling the file used,
+		// because that is what a reason and a rendered list show.
+		p.acls[strings.ToLower(name)] = elems
 	}
 }
 
@@ -912,15 +947,15 @@ func (p *dnsParse) listOpen(elems []dnsElem, seen map[string]bool) bool {
 		case dnsElemAny:
 			return true
 		case dnsElemACL:
-			ref, ok := p.acls[e.name]
+			ref, ok := p.acls[strings.ToLower(e.name)]
 			if !ok {
 				p.noteUndefinedACL(e.name)
 				continue
 			}
-			if seen[e.name] {
+			if seen[strings.ToLower(e.name)] {
 				continue // an acl that names itself, directly or in a cycle
 			}
-			seen[e.name] = true
+			seen[strings.ToLower(e.name)] = true
 			if p.listOpen(ref, seen) {
 				return true
 			}
@@ -930,9 +965,16 @@ func (p *dnsParse) listOpen(elems []dnsElem, seen map[string]bool) bool {
 }
 
 // zoneRecord is one zone as the fact carries it. The effective list is the
-// zone's own when it sets one and the options level's otherwise; a field with
-// no answer is left OUT of the record, which is how a record says "absent" —
-// there is no envelope inside a record to carry a status.
+// zone's own when it sets one and the options level's otherwise.
+//
+// name, type, transfer_restricted and update_restricted are set on every
+// record a published list carries; a record has no envelope inside it, and a
+// control that reads a field a record does not have is an internal ERROR
+// rather than an absence, so a question with no answer is refused at the LEAF
+// (Ruling L-53) rather than by omitting a field a clause judges. file,
+// allow_transfer and allow_update are evidence no control requires and are
+// left out when there is nothing to record: an empty allow-transfer list is
+// legal and renders as "", which must stay distinct from "nothing set one".
 func (p *dnsParse) zoneRecord(z dnsZone) map[string]any {
 	rec := map[string]any{"name": z.name, "type": z.ztype}
 	if z.file != "" {
@@ -952,6 +994,13 @@ func (p *dnsParse) zoneRecord(z dnsZone) map[string]any {
 	case p.defaultTransferAny():
 		// Ruling L-16: nothing sets the list and this build's default is any.
 		rec["transfer_restricted"] = false
+	case dnsAuthoritative[z.ztype]:
+		// Ruling L-53: nothing sets the list and the build is unknown, so
+		// there is no honest bool to put here — and a record cannot carry an
+		// "unknown", because a control that reads a field a record does not
+		// have is an internal ERROR rather than the MANUAL Ruling L-16 asks
+		// for. The zone is named instead, and publish absents the WHOLE leaf.
+		p.unknownTransfer = append(p.unknownTransfer, z.name)
 	}
 
 	update, updateSet := z.update, z.updateSet
@@ -1036,6 +1085,16 @@ func (p *dnsParse) publish(b *collect.Builder) {
 	}
 	b.Set("dns.options.allow_transfer", p.optionTransfer(src))
 	b.Set("dns.options.allow_update", p.optionUpdate(src))
+	// Ruling L-53: the absence is published HERE rather than through judged(),
+	// whose envelope reaches all three leaves. dns.options.allow_update is
+	// perfectly knowable on a host with an unknown BIND build — unset is none
+	// in every version — and must keep answering.
+	if len(p.unknownTransfer) > 0 {
+		b.Set("dns.zones", collect.Absent("allow-transfer is not set for zone "+
+			strings.Join(p.unknownTransfer, ", ")+" and the BIND default depends on the "+
+			"version (any before 9.20, none from 9.20); set it explicitly"))
+		return
+	}
 	b.Set("dns.zones", collect.OK(p.records, src))
 }
 

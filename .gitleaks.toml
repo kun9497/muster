@@ -42,7 +42,10 @@ paths = ['''^\.superpowers[/\\]''']
 # also matches the shape. Allow that exact token only.
 # Debian's BIND chain ships a fragment whose name ends in ".local" (named.conf plus
 # that suffix); the token the rule sees is "conf.local". Allow that exact token only.
-regexes = ['''^snmpd\.local$''', '''^w\.priv$''', '''^conf\.local$''']
+# The same chain's named.conf.default-zones points its localhost zone at Debian's
+# real, public zone file /etc/bind/db.local; the token the rule sees is "db.local".
+# Allow that exact token only.
+regexes = ['''^snmpd\.local$''', '''^w\.priv$''', '''^conf\.local$''', '''^db\.local$''']
 
 [[rules]]
 id = "private-ipv4-address"

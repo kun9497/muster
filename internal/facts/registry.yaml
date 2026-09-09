@@ -2150,7 +2150,10 @@ keys:
       NOT parsed. A main configuration file that exists but could not be read carries the read's
       own status here - denied, naming the path - rather than an empty list, which would say this
       host has no DNS configuration at all; a FRAGMENT that could not be read leaves the files
-      that did answer listed and shows up in dns.parse_complete instead.
+      that did answer listed and shows up in dns.parse_complete instead. A fragment included from
+      two different scopes is read once per include chain, as named reads it, and still appears
+      here once; a fragment already open further up its own chain is a cycle and is refused.
+      On unbound the source cites a path this collector stat-ed rather than read.
     since: 1
     sensitivity: public
     collector: dns
@@ -2172,8 +2175,10 @@ keys:
     description: >-
       How many constructs outside this collector's model the configuration uses - a view statement,
       whose per-client zones are a configuration of their own; an address match list nested inside
-      another; an address match list element naming an acl nothing in the chain defines; an include
-      outside the collector's declaration. Any of them makes dns.options.allow_transfer,
+      another; an address match list element naming an acl nothing in the chain defines (acl names
+      are matched the way named matches them, without regard to case); an include outside the
+      collector's declaration; an include already open further up its own chain, which is a cycle.
+      Any of them makes dns.options.allow_transfer,
       dns.options.allow_update and dns.zones absent, so a server whose real zones live where the
       model does not read is reported as unjudgeable rather than judged by the part that was read.
     since: 1
@@ -2217,12 +2222,18 @@ keys:
       "any"; an acl name is resolved through the whole chain wherever it is defined, and a key
       reference, localhost, localnets, none and an address or prefix all restrict, while a negated
       element restricts nothing by itself. When NOTHING sets allow-transfer the build decides
-      (see dns.options.allow_transfer): false on a BIND 9.16/9.18 build, and the field is LEFT OUT
-      on any other build, because 9.20 turned outgoing transfers off by default and the file says
-      neither. update_restricted is true when allow-update is unset - none in every version - or
+      (see dns.options.allow_transfer): false on a BIND 9.16/9.18 build, while on any other build
+      the WHOLE list is ABSENT naming the zones, because 9.20 turned outgoing transfers off by
+      default, the file says neither, and a record has no way to carry an unknown bool that a
+      control could read as anything but an internal error. That absence covers the primary and
+      master zones, which are what a transfer control judges; a zone of any other type on an
+      unknown build is published without the field, since nothing that judges transfers reads one.
+      name, type and update_restricted are on every record. update_restricted is true when allow-update is unset - none in every version - or
       sets no "any", and true when the zone carries an update-policy, which grants named identities
       per-name updates rather than opening the zone. The WHOLE list is absent when
-      dns.parse_complete is false or dns.unmodelled is above zero; it is the empty list on unbound,
+      dns.parse_complete is false, when dns.unmodelled is above zero, or when a primary or master
+      zone's transfer default is undeterminable as above - the other leaves keep answering there,
+      since an unset allow-update is none whatever the build. It is the empty list on unbound,
       which serves no authoritative zones.
     since: 1
     sensitivity: public

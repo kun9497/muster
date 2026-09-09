@@ -20,6 +20,10 @@ import (
 const (
 	bindOptionsFragment  = "/etc/bind/named.conf.options"
 	bindLocalFragment    = "/etc/bind/named.conf.local"
+	bindDefaultZones     = "/etc/bind/named.conf.default-zones"
+	namedOpenInclude     = "/etc/named/open.conf"
+	namedLoopA           = "/etc/named/loop-a.conf"
+	namedLoopB           = "/etc/named/loop-b.conf"
 	rhelCryptoPolicy     = "/etc/crypto-policies/back-ends/bind.config"
 	rhel1912Zones        = "/etc/named.rfc1912.zones"
 	rhelRootKey          = "/etc/named.root.key"
@@ -189,15 +193,19 @@ func recAbsent(t *testing.T, rec map[string]any, field string) {
 	}
 }
 
-// Debian's chain: named.conf includes named.conf.options, which refuses
-// transfers outright, and the local fragment, which defines one primary zone.
-// The zone sets neither list, so it INHERITS the options-level refusal, and an
-// unset allow-update is none in every BIND version.
+// Ruling L-56: the STOCK Debian/Ubuntu chain — named.conf includes
+// named.conf.options (which sets no allow-transfer), the empty local fragment,
+// and named.conf.default-zones with the root hint and the four RFC 1912
+// localhost zones. Nothing sets allow-transfer anywhere, so on an Ubuntu 22.04
+// build (BIND 9.18) every one of those four master zones inherits the compiled
+// default any and is NOT restricted — the package default, reported honestly.
 func TestDnsBindDebianChain(t *testing.T) {
 	a := dnsAccess(map[string]string{
 		bindDebianConf:      "named.conf.debian",
 		bindOptionsFragment: "named.conf.options",
 		bindLocalFragment:   "named.conf.local",
+		bindDefaultZones:    "named.conf.default-zones",
+		etcOSRelease:        "os-release.ubuntu2204",
 	})
 	b := buildBegun(t, "dns", a)
 	dnsComplete(t, b)
@@ -205,7 +213,7 @@ func TestDnsBindDebianChain(t *testing.T) {
 	if e := env(t, b, "dns.implementation"); e.Status != facts.StatusOK || e.Value != "bind" {
 		t.Fatalf("implementation %+v, want ok bind", e)
 	}
-	want := []string{bindDebianConf, bindLocalFragment, bindOptionsFragment}
+	want := []string{bindDebianConf, bindDefaultZones, bindLocalFragment, bindOptionsFragment}
 	if got := stringList(t, b, "dns.config_files"); !slices.Equal(got, want) {
 		t.Errorf("config_files %v, want %v", got, want)
 	}
@@ -215,27 +223,52 @@ func TestDnsBindDebianChain(t *testing.T) {
 	if n := dnsInt(t, b, "dns.unmodelled"); n != 0 {
 		t.Errorf("unmodelled = %d, want 0", n)
 	}
-	if got := dnsString(t, b, "dns.options.allow_transfer"); got != "none" {
-		t.Errorf("options.allow_transfer = %q, want none", got)
-	}
+	absentBecause(t, b, "dns.options.allow_transfer", "9.16/9.18", "ubuntu 22.04", "defaults to any")
 	absentBecause(t, b, "dns.options.allow_update", "none in every version")
 
-	if got := dnsZoneNames(t, b); !slices.Equal(got, []string{"example.org"}) {
-		t.Fatalf("zones %v, want just example.org", got)
+	wantZones := []string{".", "0.in-addr.arpa", "127.in-addr.arpa", "255.in-addr.arpa", "localhost"}
+	if got := dnsZoneNames(t, b); !slices.Equal(got, wantZones) {
+		t.Fatalf("zones %v, want %v", got, wantZones)
 	}
-	z := dnsZoneRec(t, b, "example.org")
-	recField(t, z, "type", "master")
-	recField(t, z, "file", "/var/lib/bind/db.example.org")
-	recField(t, z, "allow_transfer", "none")
-	recField(t, z, "transfer_restricted", true)
-	recField(t, z, "update_restricted", true)
-	// Nothing sets allow-update anywhere in the chain, so there is no
-	// effective list to publish — only the default the verdict came from.
-	recAbsent(t, z, "allow_update")
+	root := dnsZoneRec(t, b, ".")
+	recField(t, root, "type", "hint")
+	recField(t, root, "file", "/usr/share/dns/root.hints")
+
+	for _, name := range []string{"0.in-addr.arpa", "127.in-addr.arpa", "255.in-addr.arpa", "localhost"} {
+		z := dnsZoneRec(t, b, name)
+		recField(t, z, "type", "master")
+		// Nothing sets a list at either level, so the build default decides.
+		recField(t, z, "transfer_restricted", false)
+		recAbsent(t, z, "allow_transfer")
+		// An unset allow-update is none in every version.
+		recField(t, z, "update_restricted", true)
+		recAbsent(t, z, "allow_update")
+	}
+	recField(t, dnsZoneRec(t, b, "localhost"), "file", "/etc/bind/db.local")
 
 	if w := b.Worst("dns"); w != facts.StatusOK {
 		t.Errorf(`Worst("dns") = %s, want ok`, w)
 	}
+}
+
+// A zone that sets no list of its own inherits the options level's refusal —
+// the shape a hardened Debian host is in once an operator adds
+// "allow-transfer { none; };" to named.conf.options.
+func TestDnsZoneInheritsOptionsRefusal(t *testing.T) {
+	b := buildBegun(t, "dns", dnsAccess(map[string]string{
+		bindRhelConf: "named.conf.inherit-none",
+		etcOSRelease: "os-release.ubuntu2204",
+	}))
+	dnsComplete(t, b)
+
+	if got := dnsString(t, b, "dns.options.allow_transfer"); got != "none" {
+		t.Errorf("options.allow_transfer = %q, want none", got)
+	}
+	z := dnsZoneRec(t, b, "example.org")
+	recField(t, z, "allow_transfer", "none")
+	recField(t, z, "transfer_restricted", true)
+	recField(t, z, "update_restricted", true)
+	recAbsent(t, z, "allow_update")
 }
 
 // RHEL 9's stock chain: the crypto-policy fragment is included INSIDE
@@ -348,18 +381,119 @@ func TestDnsUnsetTransferDefaultFollowsTheBuild(t *testing.T) {
 		etcOSRelease: "os-release.unknown",
 	}))
 	dnsComplete(t, unknown)
-	recAbsent(t, dnsZoneRec(t, unknown, "example.org"), "transfer_restricted")
 	absentBecause(t, unknown, "dns.options.allow_transfer",
 		"any before 9.20, none from 9.20")
-	// The unset allow-update still answers: its default does not move.
-	recField(t, dnsZoneRec(t, unknown, "example.org"), "update_restricted", true)
 
 	// A host with no os-release readable at all is the same unknown build.
 	none := buildBegun(t, "dns", dnsAccess(map[string]string{
 		bindRhelConf: "named.conf.open-transfer",
 	}))
 	dnsComplete(t, none)
-	recAbsent(t, dnsZoneRec(t, none, "example.org"), "transfer_restricted")
+	absentBecause(t, none, "dns.options.allow_transfer",
+		"any before 9.20, none from 9.20")
+}
+
+// Ruling L-53: a primary zone whose transfer default cannot be determined —
+// nothing sets allow-transfer at either level AND the build is unknown — makes
+// the WHOLE dns.zones leaf absent, naming the zone. A record cannot carry an
+// "unknown" bool, and a control that reads a field a record does not have is
+// an internal ERROR rather than the MANUAL Ruling L-16 asks for. The absence
+// is published at the leaf, NOT through the shared degradation envelope, so
+// dns.options.allow_update — knowable here, none in every version — and the
+// evidence leaves keep answering.
+func TestDnsZonesAbsentWhenAPrimaryTransferDefaultIsUnknown(t *testing.T) {
+	b := buildBegun(t, "dns", dnsAccess(map[string]string{
+		bindRhelConf: "named.conf.open-transfer",
+		etcOSRelease: "os-release.unknown",
+	}))
+	dnsComplete(t, b)
+
+	absentBecause(t, b, "dns.zones", "example.org", "any before 9.20, none from 9.20")
+	absentBecause(t, b, "dns.options.allow_update", "none in every version")
+	// The evidence leaves are unaffected: nothing failed to be read or parsed.
+	if !dnsBool(t, b, "dns.parse_complete") {
+		t.Error("an undeterminable default is not a read failure")
+	}
+	if n := dnsInt(t, b, "dns.unmodelled"); n != 0 {
+		t.Errorf("unmodelled = %d, want 0: an undeterminable default is not an unmodelled construct", n)
+	}
+	if got := stringList(t, b, "dns.config_files"); !slices.Equal(got, []string{bindRhelConf}) {
+		t.Errorf("config_files %v, want the main file", got)
+	}
+	if e := env(t, b, "dns.implementation"); e.Status != facts.StatusOK || e.Value != "bind" {
+		t.Errorf("implementation %+v, want ok bind", e)
+	}
+	if w := b.Worst("dns"); w != facts.StatusOK {
+		t.Errorf(`Worst("dns") = %s, want ok`, w)
+	}
+
+	// No PRIMARY zone needs the default here, so the list still answers.
+	secondary := buildBegun(t, "dns", dnsAccess(map[string]string{
+		bindRhelConf: "named.conf.secondary",
+		etcOSRelease: "os-release.unknown",
+	}))
+	dnsComplete(t, secondary)
+	if got := dnsZoneNames(t, secondary); !slices.Equal(got, []string{"example.org"}) {
+		t.Fatalf("zones %v, want the secondary zone listed", got)
+	}
+	recField(t, dnsZoneRec(t, secondary, "example.org"), "type", "slave")
+	recField(t, dnsZoneRec(t, secondary, "example.org"), "update_restricted", true)
+}
+
+// Ruling L-54: the include guard is per CHAIN, not per run. The same declared
+// fragment included from two different zones is two different meanings — L-18
+// gives its statements to the enclosing block — and named reads it twice, so
+// dropping the second inclusion would report the second zone as restricted
+// while the running server transfers it to anyone.
+func TestDnsSameFragmentIncludedTwice(t *testing.T) {
+	a := dnsAccess(map[string]string{
+		bindRhelConf:     "named.conf.twice",
+		namedOpenInclude: "named.conf.open",
+		etcOSRelease:     "os-release.rhel9",
+	})
+	b := buildBegun(t, "dns", a)
+	dnsComplete(t, b)
+
+	if n := dnsInt(t, b, "dns.unmodelled"); n != 0 {
+		t.Errorf("unmodelled = %d, want 0", n)
+	}
+	if !dnsBool(t, b, "dns.parse_complete") {
+		t.Error("both inclusions were read in full")
+	}
+	// The options level refuses transfers; BOTH zones override it through the
+	// same fragment.
+	for _, name := range []string{"example.org", "example.net"} {
+		z := dnsZoneRec(t, b, name)
+		recField(t, z, "allow_transfer", "any")
+		recField(t, z, "transfer_restricted", false)
+	}
+	// The file list still names it once, however many times it was reached.
+	if got := stringList(t, b, "dns.config_files"); !slices.Equal(got, []string{bindRhelConf, namedOpenInclude}) {
+		t.Errorf("config_files %v, want each file once", got)
+	}
+}
+
+// The other half of Ruling L-54: a cycle still terminates. loop-a includes
+// loop-b, which includes loop-a again — the second one is already open in this
+// chain, so it is refused and counted rather than followed.
+func TestDnsIncludeCycleTerminates(t *testing.T) {
+	b := buildBegun(t, "dns", dnsAccess(map[string]string{
+		bindRhelConf: "named.conf.cycle",
+		namedLoopA:   "named.conf.loop-a",
+		namedLoopB:   "named.conf.loop-b",
+		etcOSRelease: "os-release.rhel9",
+	}))
+	dnsComplete(t, b)
+
+	if n := dnsInt(t, b, "dns.unmodelled"); n != 1 {
+		t.Errorf("unmodelled = %d, want 1 for the cycle", n)
+	}
+	for _, k := range dnsJudgedLeaves {
+		absentBecause(t, b, k, namedLoopA, "cycle")
+	}
+	if !dnsBool(t, b, "dns.parse_complete") {
+		t.Error("every file of the cycle was read; the loop is not a read failure")
+	}
 }
 
 // A zone-level allow-transfer overrides a wide-open options level; an explicit

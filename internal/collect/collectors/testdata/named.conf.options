@@ -1,9 +1,9 @@
 options {
 	directory "/var/cache/bind";
 
-	// Transfers are refused outright; every zone inherits this unless it
-	// says otherwise.
-	allow-transfer { none; };
+	// If there is a firewall between you and nameservers you want
+	// to talk to, you may need to fix the firewall to allow multiple
+	// ports to talk.  See http://www.kb.cert.org/vuls/id/800113
 
 	dnssec-validation auto;
 
