@@ -1,0 +1,11 @@
+options {
+	directory "/var/cache/bind";
+
+	// Transfers are refused outright; every zone inherits this unless it
+	// says otherwise.
+	allow-transfer { none; };
+
+	dnssec-validation auto;
+
+	listen-on-v6 { any; };
+};

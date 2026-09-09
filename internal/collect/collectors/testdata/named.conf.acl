@@ -1,0 +1,12 @@
+options {
+	directory "/var/named";
+	// The ACL is defined BELOW this reference: resolution is a second pass.
+	allow-transfer { xfer; };
+};
+
+zone "example.org" IN {
+	type master;
+	file "/var/named/example.org.zone";
+};
+
+acl "xfer" { 198.51.100.0/24; };

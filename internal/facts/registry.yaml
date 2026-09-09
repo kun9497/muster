@@ -2132,3 +2132,98 @@ keys:
     since: 1
     sensitivity: public
     collector: mail
+  - key: dns.implementation
+    type: string
+    description: Which DNS server this host is configured with - bind, unbound or none. A server is named only when its binary is installed as well as its configuration file, so a conffile left behind by a removed package does not decide, and the reason then names that leftover. bind is recognised by /etc/bind/named.conf, /etc/named.conf or the bind-chroot copy under /var/named/chroot with /usr/sbin/named beside it; unbound by /etc/unbound/unbound.conf with /usr/sbin/unbound. unbound is a caching resolver that serves no authoritative zones, so its configuration is recorded as evidence and never parsed. Evidence only (whether a DNS service is running is services.dns.active).
+    since: 1
+    sensitivity: public
+    collector: dns
+  - key: dns.config_files
+    type: list<string>
+    subject_kind: file
+    description: >-
+      The DNS configuration files actually read, sorted, each appearing once however it was
+      reached - named.conf plus every include the collector's declaration covers, which on a stock
+      host is the Debian options and local fragments or the RHEL crypto-policy fragment,
+      named.rfc1912.zones and named.root.key. A zone's own file is NEVER opened and never appears
+      here. For unbound the file is listed as the evidence that named the implementation and is
+      NOT parsed. A main configuration file that exists but could not be read carries the read's
+      own status here - denied, naming the path - rather than an empty list, which would say this
+      host has no DNS configuration at all; a FRAGMENT that could not be read leaves the files
+      that did answer listed and shows up in dns.parse_complete instead.
+    since: 1
+    sensitivity: public
+    collector: dns
+  - key: dns.parse_complete
+    type: bool
+    description: >-
+      Whether every configuration file the collector was told to read could be read in full; false
+      when a read failed, when the read primitive cut a file at its limit, or when an include named
+      a path this collector's declaration does not cover - that last one is a file the configuration
+      told the collector to read and the collector did not, so what it sets is unknown either way,
+      and it counts in dns.unmodelled as well. A construct outside the model is not a read failure
+      and counts only in dns.unmodelled. A host with no DNS configuration at all read everything
+      there was, so the parse is complete and the judged leaves carry that story.
+    since: 1
+    sensitivity: public
+    collector: dns
+  - key: dns.unmodelled
+    type: int
+    description: >-
+      How many constructs outside this collector's model the configuration uses - a view statement,
+      whose per-client zones are a configuration of their own; an address match list nested inside
+      another; an address match list element naming an acl nothing in the chain defines; an include
+      outside the collector's declaration. Any of them makes dns.options.allow_transfer,
+      dns.options.allow_update and dns.zones absent, so a server whose real zones live where the
+      model does not read is reported as unjudgeable rather than judged by the part that was read.
+    since: 1
+    sensitivity: public
+    collector: dns
+  - key: dns.options.allow_transfer
+    type: string
+    description: >-
+      The options-level allow-transfer address match list, rendered as its elements in file order
+      separated by "; " - the list every zone that does not set its own inherits. A key reference is
+      rendered "key <name>" and an acl name is left as written; resolving what an acl covers is
+      dns.zones' business, not this leaf's. ABSENT when options does not set it, with the reason
+      naming the default it was not set against: the collector reads ID and VERSION_ID from
+      /etc/os-release (falling back to /usr/lib/os-release) and knows the BIND 9.16/9.18 builds -
+      ubuntu 22.04 and 24.04, debian 12, and rhel, rocky or almalinux 9.x - whose default is any;
+      on any other build, or when os-release could not be read, the reason says the default depends
+      on the version (any before 9.20, none from 9.20). Absent on unbound and on a host with no DNS
+      server, denied when named.conf could not be read, and absent naming the limit when the
+      rendered list is longer than a value may be.
+    since: 1
+    sensitivity: public
+    collector: dns
+  - key: dns.options.allow_update
+    type: string
+    description: The options-level allow-update address match list, rendered as its elements in file order separated by "; " - the list every zone that does not set its own inherits. ABSENT when options does not set it, because an unset allow-update is none in EVERY BIND version and no file states it. Absent on unbound and on a host with no DNS server, and denied when named.conf could not be read.
+    since: 1
+    sensitivity: public
+    collector: dns
+  - key: dns.zones
+    type: list<record>
+    subject_kind: zone
+    description: >-
+      Every zone statement of the named.conf chain, sorted by name, as records of name, type, file,
+      allow_transfer, allow_update, transfer_restricted and update_restricted. type is the zone's
+      own - primary, master, secondary, slave, forward, hint, stub, mirror or redirect. file is the
+      path the zone names, recorded verbatim and NEVER opened: every real zone file lives outside
+      this collector's declaration, and a record field is evidence for the operator rather than a
+      path muster reads. allow_transfer and allow_update are the EFFECTIVE lists - the zone's own
+      when it sets one, the options level's otherwise - and are left out of the record when neither
+      level sets one. transfer_restricted is true when the effective list is set and contains no
+      "any"; an acl name is resolved through the whole chain wherever it is defined, and a key
+      reference, localhost, localnets, none and an address or prefix all restrict, while a negated
+      element restricts nothing by itself. When NOTHING sets allow-transfer the build decides
+      (see dns.options.allow_transfer): false on a BIND 9.16/9.18 build, and the field is LEFT OUT
+      on any other build, because 9.20 turned outgoing transfers off by default and the file says
+      neither. update_restricted is true when allow-update is unset - none in every version - or
+      sets no "any", and true when the zone carries an update-policy, which grants named identities
+      per-name updates rather than opening the zone. The WHOLE list is absent when
+      dns.parse_complete is false or dns.unmodelled is above zero; it is the empty list on unbound,
+      which serves no authoritative zones.
+    since: 1
+    sensitivity: public
+    collector: dns

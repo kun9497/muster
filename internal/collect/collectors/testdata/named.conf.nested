@@ -1,0 +1,9 @@
+options {
+	directory "/var/named";
+	allow-transfer { 192.0.2.0/24; { 198.51.100.1; }; };
+};
+
+zone "example.org" IN {
+	type master;
+	file "/var/named/example.org.zone";
+};

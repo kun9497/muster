@@ -1,0 +1,7 @@
+options {
+	directory "/var/named";
+	allow-transfer { none; };
+	include "/srv/x.conf";
+};
+
+include "/etc/named/custom.conf";
