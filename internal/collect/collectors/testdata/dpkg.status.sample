@@ -1,0 +1,32 @@
+Package: base-files
+Status: install ok installed
+Priority: required
+Section: admin
+Installed-Size: 393
+Maintainer: Example Maintainer <maintainer@example.org>
+Architecture: amd64
+Multi-Arch: foreign
+Version: 12ubuntu4.6
+Description: Debian base system miscellaneous files
+ This package contains the basic filesystem hierarchy of a Debian system.
+
+Package: libssl3
+Status: install ok installed
+Priority: optional
+Architecture: amd64
+Version: 3.0.2-0ubuntu1.18
+Description: Secure Sockets Layer toolkit - shared libraries
+
+Package: libssl3
+Status: install ok installed
+Priority: optional
+Architecture: i386
+Version: 3.0.2-0ubuntu1.18
+Description: Secure Sockets Layer toolkit - shared libraries
+
+Package: telnetd
+Status: deinstall ok config-files
+Priority: optional
+Architecture: amd64
+Version: 0.17-44
+Description: telnet server, removed but not purged

@@ -1,0 +1,5 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "services":{"nfs_server":{"installed":{"status":"unsupported","reason":"no systemd on this host, so unit state cannot be read"}}},
+  "nfs":{"exports":{"status":"ok","value":[]}},
+  "files":{"etc_exports":{"mode":{"status":"absent","reason":"/etc/exports does not exist"},"uid":{"status":"absent","reason":"/etc/exports does not exist"}}}
+}}

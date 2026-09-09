@@ -1,0 +1,3 @@
+createUser erin SHA512 aliasAuthPhraseOne AES256 aliasPrivPhraseTwo
+createUser frank sha256 aliasAuthPhraseThree aes128 aliasPrivPhraseFour
+createUser gina SHA224 aliasAuthPhraseFive AES192 aliasPrivPhraseSix

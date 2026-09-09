@@ -1,0 +1,3 @@
+createUser bob SHA -m 0xdeadbeefcafebabe AES -m 0xfeedfacecafebeef
+createUser carol SHA unquotedPhraseWordA unquotedPhraseWordB AES unquotedPhraseWordC unquotedPhraseWordD
+createUser -e 0x80001f8880 dave SHA-256 authKeyWordUnique AES-256 privKeyWordUnique

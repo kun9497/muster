@@ -1,0 +1,28 @@
+id: muster.service.snmp_access_control
+title_en: SNMP communities are bound to the managers allowed to use them
+title_ko: SNMP 커뮤니티가 사용을 허용한 관리 서버에 묶여 있다
+description_en: "Every configured SNMP community must name the host or network allowed to use it rather than accepting any source. A community with no source, or one bound to an any-address form such as default, 0.0.0.0/0 or ::, is usable by anyone who can reach the agent's port. The source is read from the directive that defines the community - the third token of a rocommunity or rwcommunity line, the middle field of a com2sec - and the VACM lines and agentaddress specifications the collector also records are evidence for a reviewer, not conditions of this check: an agent bound only to loopback is a real mitigation but it is a listen address, changeable without touching the community, so it does not by itself pass a community that names no source. A trap destination's community, and the community a proxy directive forwards with, are both outbound and have no inbound source to restrict, so neither is judged here; their strength is judged by muster.service.snmp_community_strength instead, because a weak outbound community is still a credential on the wire. A host with no SNMP agent installed is not applicable. An agent that is installed but defines no community at all - a v3-only agent, or one whose community lines are commented out - reads an EMPTY community list and passes: there is no unbound community where there is no community, and v3 access is governed by users and VACM rules rather than by a source-bound community. An agent installed with no configuration file anywhere is a different shape - the list is absent rather than empty - and reads a manual review, as does a configuration that could only be read in part."
+description_ko: "설정된 모든 SNMP 커뮤니티는 아무 출발지나 받아들이지 말고 사용을 허용할 호스트나 네트워크를 지정해야 합니다. 소스가 없는 커뮤니티, 또는 default·0.0.0.0/0·:: 같은 임의 주소 형태에 묶인 커뮤니티는 에이전트 포트에 닿을 수 있는 누구나 쓸 수 있습니다. 소스는 커뮤니티를 정의한 지시자에서 읽습니다 - rocommunity·rwcommunity 줄의 세 번째 토큰, com2sec 의 가운데 필드입니다. 수집기가 함께 기록하는 VACM 줄과 agentaddress 지정은 검토자를 위한 증거이지 이 점검의 조건이 아닙니다: 루프백에만 바인딩한 에이전트는 실제로 완화 수단이지만 커뮤니티를 건드리지 않고도 바꿀 수 있는 리슨 주소이므로, 소스를 지정하지 않은 커뮤니티를 그것만으로 통과시키지 않습니다. 트랩 대상의 커뮤니티와 proxy 지시자가 전달에 쓰는 커뮤니티는 모두 나가는 방향이라 제한할 인바운드 소스 자체가 없으므로 여기서는 판단하지 않습니다. 대신 그 강도는 muster.service.snmp_community_strength 에서 판단합니다 - 나가는 방향의 약한 커뮤니티도 통신 상의 자격 증명이기 때문입니다. SNMP 에이전트가 설치되어 있지 않은 호스트는 해당 없음입니다. 에이전트는 설치되어 있으나 커뮤니티를 하나도 정의하지 않는 경우 - v3 전용이거나 커뮤니티 줄이 모두 주석 처리된 경우 - 커뮤니티 목록이 비어 있는 상태로 통과합니다. 커뮤니티가 없으면 묶이지 않은 커뮤니티도 없고, v3 접근은 소스에 묶인 커뮤니티가 아니라 사용자와 VACM 규칙으로 통제되기 때문입니다. 설정 파일이 어디에도 없는 경우는 다릅니다 - 목록이 비어 있는 것이 아니라 부재이며 수동 검토로 처리합니다. 설정을 일부만 읽은 경우도 같습니다."
+category: service
+importance: 상
+automation: auto
+references:
+  kisa: { "2026": ["U-61"], "2021": [] }
+requires_facts: ">=1"
+absent_means: manual
+applies_when:
+  # Ruling J-22 - never `op: present`; see muster.service.nfs_export_access.
+  - { fact: services.snmp.installed, op: eq, expected: true }
+checks:
+  # Ruling J-46 / JR-7: a trap destination and a proxy target are both
+  # OUTBOUND and have no inbound source to restrict, so their communities are
+  # source_restricted false by construction and judging them here would fail
+  # every trapping or proxying host for something this control is not about.
+  # Both are still judged for strength by U-60.
+  - { fact: snmp.communities, op: each, subject: ref, where: { field: kind, op: not_in, expected: ["trap", "proxy"] }, require: { field: source_restricted, op: eq, expected: true } }
+remediation:
+  text_en: Give every rocommunity, rwcommunity and com2sec line in snmpd.conf the address or CIDR range of the manager allowed to use it instead of default or an any-address form, restart the agent, and restrict 161/udp at the host firewall as well.
+  text_ko: snmpd.conf 의 rocommunity·rwcommunity·com2sec 줄에 default 나 임의 주소 형태 대신 사용을 허용할 관리 서버의 주소나 CIDR 대역을 지정하고, 에이전트를 재시작한 뒤 호스트 방화벽에서도 161/udp 를 제한합니다.
+  risk: restart_service
+  idempotent: true
+decision: D09

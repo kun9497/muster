@@ -1,0 +1,7 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "patch":{
+    "manager":{"status":"ok","value":"apt"},
+    "metadata_age_s":{"status":"absent","reason":"no package metadata cache; the host may never have been updated (metadata is never refreshed by muster, D27)"},
+    "pending_security_count":{"status":"absent","reason":"no package metadata cache; the host may never have been updated (metadata is never refreshed by muster, D27)"}
+  }
+}}

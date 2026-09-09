@@ -2810,6 +2810,296 @@
       "Collector": "logging",
       "DefaultOn": "",
       "SubjectKind": ""
+    },
+    {
+      "Key": "nfs.exports",
+      "Type": "list\u003crecord\u003e",
+      "Description": "Every NFS export as {path, client, options, wildcard, root_squash} parsed from /etc/exports and /etc/exports.d/*.exports; a path with no client spec, or a bare \"(options)\" spec with a space before the parenthesis (exportfs's own space-sensitive trap), exports to the world (client \"*\", wildcard true); root_squash is derived from the absence of no_root_squash in the client's options. An export file that exists but cannot be read, and a file the read primitive cut at the size cap, both make this list carry that answer instead - the read's status or absent, naming the path in either case - because a parse of the files that happened to be readable, or of a prefix, would publish a partial export list as the whole one; nothing partial is ever published here.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "nfs",
+      "DefaultOn": "",
+      "SubjectKind": "dir"
+    },
+    {
+      "Key": "nfs.exports_source",
+      "Type": "list\u003cstring\u003e",
+      "Description": "The export files actually read, in the order they were parsed.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "nfs",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "nfs.exports_runtime_collected",
+      "Type": "bool",
+      "Description": "Whether exportfs -v ran successfully to corroborate the parsed exports; exportfs is never the judged source, so its absence or a non-root failure is recorded as false, never an error.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "nfs",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_exports.mode",
+      "Type": "int",
+      "Description": "Permission bits of /etc/exports as an integer (e.g. 384 for 0600).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_exports.uid",
+      "Type": "int",
+      "Description": "Owner uid of /etc/exports.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_exports.gid",
+      "Type": "int",
+      "Description": "Group gid of /etc/exports.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_exports.group",
+      "Type": "string",
+      "Description": "Group name for the gid of /etc/exports from /etc/group; empty when the gid has no name.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_exports.group_readable",
+      "Type": "bool",
+      "Description": "Whether the group permission bits of /etc/exports include read (derived from mode).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_exports.group_writable",
+      "Type": "bool",
+      "Description": "Whether the group permission bits of /etc/exports include write (derived from mode).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_exports.other_readable",
+      "Type": "bool",
+      "Description": "Whether the other permission bits of /etc/exports include read (derived from mode).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_exports.other_writable",
+      "Type": "bool",
+      "Description": "Whether the other permission bits of /etc/exports include write (derived from mode).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "files.etc_exports.acl_present",
+      "Type": "bool",
+      "Description": "Whether a POSIX ACL xattr is present on /etc/exports.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "snmp.versions_enabled",
+      "Type": "list\u003cstring\u003e",
+      "Description": "The SNMP protocol versions the configuration enables, a subset of v1, v2c and v3; a rocommunity/rwcommunity directive enables both v1 and v2c, a com2sec enables a version only once a group names that model for its security name, and v3 is enabled by the existence of any v3 user. Absent when no snmpd configuration was found, or when part of it could not be read.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "snmp",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "snmp.communities",
+      "Type": "list\u003crecord\u003e",
+      "Description": "Every configured SNMP community, REDACTED to {ref, kind, is_default, length, source_restricted} - the string itself is never stored, not even hashed, since a hash of a short well-known word is trivially reversible. ref is an opaque ordinal (c1, c2, ...) in file order; kind is ro, rw, trap or proxy (a com2sec community is rw only when an access rule reachable from its security name grants a write view; trap is a trapcommunity, a community named by a trapsink, trap2sink, informsink or by a trapsess -c option, or - for a trap destination that names none and has no trapcommunity directive above it - net-snmp's compiled-in fallback, which is recorded once per such destination because the agent really does send it; proxy is the community a proxy directive forwards with, read from its -c option, with the destination host and the OID subtree never stored; trap and proxy are both outbound and carry no source); is_default says the string is one of the collector's embedded well-known defaults; length is its rune count; and source_restricted says it is bound to a source other than default or an any-address form.",
+      "Since": 1,
+      "Sensitivity": "secret",
+      "Collector": "snmp",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "snmp.v3_users",
+      "Type": "list\u003crecord\u003e",
+      "Description": "The SNMPv3 users named by a createUser, rouser or rwuser directive, as {name, auth_proto, priv_proto, level} sorted by name; a usmUser line in the persistent state file is not parsed, so a user with no createUser and no rouser/rwuser is not listed. No passphrase, master key or localized key is ever stored - auth_proto and priv_proto are filled only from an allow-list of protocol names and are empty for a user whose protocols were not named. level is the level the user's key material supports, falling back to the minimum an access line demands. Absent when no snmpd configuration was found, or when part of it could not be read.",
+      "Since": 1,
+      "Sensitivity": "secret",
+      "Collector": "snmp",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "snmp.access_rules",
+      "Type": "list\u003crecord\u003e",
+      "Description": "The VACM and community-mapping lines in file order as {kind, name, sec_model, sec_level, source, read_view, write_view}; kind is com2sec, group, view or access. Each kind fills the fields that carry its meaning - com2sec puts the security name in name and the address or range in source; group puts the group name in name, the model in sec_model and the security name in source; view puts the view name in name, included/excluded in sec_level and the OID subtree in source; access puts the group name in name, the context in source and the two views in read_view/write_view. A com2sec community string is never one of the fields.",
+      "Since": 1,
+      "Sensitivity": "internal",
+      "Collector": "snmp",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "snmp.agent_addresses",
+      "Type": "list\u003cstring\u003e",
+      "Description": "The listen specifications of every agentaddress directive in file order, one entry per comma-separated spec.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "snmp",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "snmp.config_files",
+      "Type": "list\u003cstring\u003e",
+      "Description": "The snmpd configuration files actually read, sorted; includes followed through includeFile and includeDir appear alongside the declared candidates, and each file appears exactly once however it was reached.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "snmp",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "snmp.parse_complete",
+      "Type": "bool",
+      "Description": "Whether every configuration file the collector was told to read could be read; false when a read failed or when an includeFile/includeDir named a target outside the collector's declaration, which is recorded and never touched. A host with no snmpd configuration at all read everything there was, so the parse is complete and the judged lists carry that story instead.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "snmp",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "patch.manager",
+      "Type": "string",
+      "Description": "The package manager this host is judged through - apt when the dpkg database /var/lib/dpkg/status exists, which is tested first; dnf when any of the dnf metadata cache /var/cache/dnf, /etc/dnf/dnf.conf or the rpm database directory /var/lib/rpm exists, so a host whose cache was wiped is still judged as a dnf host and reads a manual review until it has one again; otherwise unknown, in which case every other patch fact is unsupported. The Source names the artefact that actually proved the family, not a fixed path.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "patch",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "patch.metadata_age_s",
+      "Type": "int",
+      "Description": "Whole seconds between the newest cached package metadata (the newest apt Packages list or update-success stamp; the newest dnf repomd.xml) and the run's collected_at, so the same snapshot always renders the same age. A cache NEWER than collected_at - an index rewritten between the run's single clock reading and this stat, or a little clock skew - is a cache refreshed during the run, so the age is floored at zero and the reason says why; it is never reported as underivable, which would hide the pending security count under a not-applicable result. Absent when the host holds no metadata cache at all, and then pending_security_count is absent too; muster never refreshes the metadata itself.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "patch",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "patch.security_metadata_available",
+      "Type": "bool",
+      "Description": "Whether the metadata cache carries a security channel at all - an apt list file of a -security suite, or a cached repomd.xml declaring an updateinfo data section. It is decided from the cached files, never from a command's exit code, because a security query that exits cleanly with no output says the same thing whether the channel is missing or nothing is pending. A cached repomd that exists but cannot be READ carries that read's status here - denied on an unprivileged run - rather than a false, so an unreadable cache is never reported as a host with no security channel.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "patch",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "patch.pending_security_count",
+      "Type": "int",
+      "Description": "How many pending updates come from a security channel - counted from the origins of the cache-only apt simulation, and from the cached updateinfo on dnf. Unsupported when a cache exists but carries no security channel, never 0, which would read as nothing pending; absent when there is no metadata cache at all.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "patch",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "patch.pending_updates",
+      "Type": "list\u003crecord\u003e",
+      "Description": "The upgrades the cache-only simulation reports as {name, current, candidate, origin}, sorted by name then candidate; current is empty for a package the upgrade would newly install, and origin is the suite or repository the candidate comes from. Evidence only, and never obtained by refreshing metadata.",
+      "Since": 1,
+      "Sensitivity": "internal",
+      "Collector": "patch",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "patch.reboot_required",
+      "Type": "bool",
+      "Description": "Whether the host is waiting for a reboot - the /run/reboot-required flag on apt hosts, needs-restarting -r on dnf hosts. Unsupported inside a container, where the kernel belongs to the host rather than to this namespace and nothing is run at all, and unsupported where needs-restarting, which the dnf-utils package ships, is not installed.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "patch",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "patch.auto_update.enabled",
+      "Type": "setting\u003cbool\u003e",
+      "Description": "Whether unattended upgrades are configured to apply updates - persisted from APT::Periodic::Unattended-Upgrade or from dnf-automatic's apply_updates. The runtime side is not probed in this version, since a timer's state belongs to the services inventory. Evidence only - a fleet may patch centrally by policy.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "patch",
+      "DefaultOn": "both",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "patch.held_packages",
+      "Type": "list\u003cstring\u003e",
+      "Description": "Packages pinned to their current version and therefore held back from an upgrade, sorted; from apt-mark showhold. Unsupported on dnf hosts, whose versionlock plugin is not probed in this version.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "patch",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "patch.days_since_last_install",
+      "Type": "int",
+      "Description": "Whole days between the newest package installation the dpkg log records and the run's collected_at. dpkg writes local time with no zone and collected_at is UTC, so this is a whole-day approximation that can be one day out on a host away from UTC - evidence that a host is being maintained, never a judged value. Absent when the log records no installation, and unsupported on dnf hosts, whose rpm installation times are not probed in this version.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "patch",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "packages.installed",
+      "Type": "list\u003crecord\u003e",
+      "Description": "Installed packages as {name, version, arch} read from the package database (dpkg status on apt hosts, rpm -qa on dnf hosts); a version is evidence only and is never obtained by invoking a daemon.",
+      "Since": 1,
+      "Sensitivity": "internal",
+      "Collector": "patch",
+      "DefaultOn": "",
+      "SubjectKind": ""
     }
   ]
 }

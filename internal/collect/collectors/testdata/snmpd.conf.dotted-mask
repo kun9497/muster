@@ -1,0 +1,5 @@
+# net-snmp's SOURCE grammar accepts NETWORK/NETMASK with a dotted mask, not
+# only a prefix length, and it ANDs the address with the mask.
+rocommunity d0ttedMaskAnyOne 0.0.0.0/0.0.0.0
+rwcommunity z3roMaskHostTwo 192.0.2.0/0.0.0.0
+rocommunity n3tmaskBoundThree 192.0.2.0/255.255.255.0

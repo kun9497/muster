@@ -1,0 +1,8 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "services":{"snmp":{"installed":{"status":"ok","value":true}}},
+  "snmp":{"communities":{"status":"ok","value":[
+    {"ref":"c1","kind":"ro","is_default":false,"length":14,"source_restricted":true},
+    {"ref":"c2","kind":"proxy","is_default":false,"length":17,"source_restricted":false},
+    {"ref":"c3","kind":"proxy","is_default":false,"length":18,"source_restricted":false}
+  ]}}
+}}

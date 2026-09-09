@@ -1,0 +1,27 @@
+id: muster.patch.security_updates
+title_en: No security updates are pending in the cached package metadata
+title_ko: 캐시된 패키지 메타데이터에 대기 중인 보안 업데이트가 없다
+description_en: Judged only from the package metadata collect already cached - muster never refreshes the metadata itself, nor holds a package-manager lock to read it fresh (D27). The cache's age is checked against the parameter, and a stale cache is flagged as WARN with its age reported, rather than being trusted silently. A host that carries no package metadata cache at all cannot be judged this way at all - it may simply never have been updated - so the result is MANUAL rather than a failure. A host whose cache exists but carries no security channel (no -security suite list on apt, no updateinfo data on dnf) cannot be judged either, and the result is not applicable. Reboot-required state and unattended-upgrade configuration are recorded as evidence for the operator, never judged. This control is partial because a pending security count read from a cache, however current that cache is, cannot prove the host itself is current - only that the cache was, at the time it was last refreshed.
+description_ko: collect 가 이미 캐시해 둔 패키지 메타데이터만으로 판정합니다 - muster 는 메타데이터를 직접 갱신하지도, 새로 읽기 위해 패키지 매니저 잠금을 쥐지도 않습니다(D27). 캐시의 나이는 파라미터와 비교해 판정하며, 오래된 캐시는 조용히 신뢰되지 않고 그 나이와 함께 WARN 으로 표시됩니다. 패키지 메타데이터 캐시가 전혀 없는 호스트는 이 방식으로는 판정할 수 없습니다 - 애초에 한 번도 갱신되지 않았을 수 있으므로 - 실패가 아니라 MANUAL 로 처리합니다. 캐시는 있지만 보안 채널이 없는 호스트(apt 의 -security 목록도, dnf 의 updateinfo 데이터도 없음) 역시 판정할 수 없어 해당 없음으로 처리합니다. 재부팅 필요 여부와 무인 업데이트 설정은 운영자를 위한 증거로만 기록하고 판정에는 쓰지 않습니다. 캐시에서 읽은 대기 중인 보안 업데이트 수는, 그 캐시가 아무리 최신이어도 호스트 자체가 최신임을 증명하지는 못합니다 - 증명하는 것은 마지막으로 갱신되었을 때 캐시가 최신이었다는 것뿐이므로, 이 항목은 partial 입니다.
+category: patch
+importance: 상
+automation: partial
+references:
+  kisa: { "2026": ["U-64"], "2021": ["U-42"] }
+  stig:
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-211015 }
+requires_facts: ">=1"
+absent_means: manual
+params:
+  max_metadata_age_s: { type: int, default: 604800, description: "Oldest acceptable age of the cached package metadata, in seconds" }
+applies_when:
+  - { fact: patch.manager, op: in, expected: [apt, dnf] }
+checks:
+  - { fact: patch.metadata_age_s, op: lte, expected: "${max_metadata_age_s}" }
+  - { fact: patch.pending_security_count, op: eq, expected: 0 }
+remediation:
+  text_en: Refresh the package metadata (apt update, or dnf makecache) and apply the pending security updates (apt upgrade with the -security sources, or dnf update --security), then reboot if a kernel or core library changed.
+  text_ko: 패키지 메타데이터를 갱신하고(apt update 또는 dnf makecache) 대기 중인 보안 업데이트를 적용합니다(-security 소스를 포함한 apt upgrade, 또는 dnf update --security). 커널이나 핵심 라이브러리가 바뀌었다면 재부팅합니다.
+  risk: reboot_required
+  idempotent: true
+decision: D09

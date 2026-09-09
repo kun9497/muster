@@ -1,0 +1,7 @@
+trapsink 198.51.100.9
+trap2sink udp:198.51.100.11:162
+informsink 203.0.113.7 s1nkTwoString
+trapsess -v 2c -c s3ssOnlyString udp:198.51.100.13:162
+trapsess -v2c -cs3ssAttachedString udp:198.51.100.15:162
+trapcommunity tr4pLateString
+trapsink 198.51.100.19

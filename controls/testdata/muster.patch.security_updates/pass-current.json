@@ -1,0 +1,7 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "patch":{
+    "manager":{"status":"ok","value":"apt"},
+    "metadata_age_s":{"status":"ok","value":3600},
+    "pending_security_count":{"status":"ok","value":0}
+  }
+}}

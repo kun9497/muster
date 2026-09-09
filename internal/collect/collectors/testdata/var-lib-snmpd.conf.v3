@@ -1,0 +1,2 @@
+engineBoots 7
+createUser aStateOnlyUser SHA-512 authPhraseAlphaOne AES-256 privPhraseBetaTwo

@@ -1,0 +1,7 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "patch":{
+    "manager":{"status":"ok","value":"dnf"},
+    "metadata_age_s":{"status":"ok","value":7200},
+    "pending_security_count":{"status":"unsupported","reason":"the package metadata cache carries no security channel, so a pending security count cannot be derived from it"}
+  }
+}}

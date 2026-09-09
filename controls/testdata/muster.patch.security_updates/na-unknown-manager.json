@@ -1,0 +1,7 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "patch":{
+    "manager":{"status":"ok","value":"unknown"},
+    "metadata_age_s":{"status":"unsupported","reason":"no supported package manager"},
+    "pending_security_count":{"status":"unsupported","reason":"no supported package manager"}
+  }
+}}

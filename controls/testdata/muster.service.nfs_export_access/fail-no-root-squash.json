@@ -1,0 +1,7 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "services":{"nfs_server":{"installed":{"status":"ok","value":true}}},
+  "nfs":{"exports":{"status":"ok","value":[
+    {"path":"/srv/share","client":"198.51.100.0/24","options":"rw,sync,no_root_squash","wildcard":false,"root_squash":false}
+  ]}},
+  "files":{"etc_exports":{"mode":{"status":"ok","value":420},"uid":{"status":"ok","value":0}}}
+}}

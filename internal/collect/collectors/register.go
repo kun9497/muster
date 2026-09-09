@@ -43,7 +43,40 @@ func init() {
 	collect.Register(firewallCollector)
 	collect.Register(loggingCollector)
 	collect.Register(timesyncCollector)
+	collect.Register(nfsCollector)
+	collect.Register(snmpCollector)
+	collect.Register(patchCollector)
 	collect.Register(walkCollector)
+}
+
+// filesSource renders the provenance of a value computed from files: a plain
+// file source when exactly one file contributed, the repository's derived
+// shape (accounts.go's precedent) when several did, and NOTHING when none
+// did — an envelope must never cite a path the collector did not read.
+// Shared by the snmp and nfs collectors, both of which parse one main file
+// plus a drop-in directory and must cite whichever of them existed.
+func filesSource(files []string) *facts.Source {
+	switch len(files) {
+	case 0:
+		return nil
+	case 1:
+		return &facts.Source{Kind: "file", Path: files[0]}
+	}
+	inputs := make([]facts.Source, 0, len(files))
+	for _, f := range files {
+		inputs = append(inputs, facts.Source{Kind: "file", Path: f})
+	}
+	return &facts.Source{Kind: "derived", Inputs: inputs}
+}
+
+// pathReason prefixes a read's reason with the file it came from (C3), so a
+// denied read names itself rather than leaving the reader to guess which of
+// the several files a collector opens could not be opened. Shared by the
+// nfs and patch collectors, both of which read a set of files discovered by
+// a glob.
+func pathReason(p string, e facts.Envelope) facts.Envelope {
+	e.Reason = p + ": " + e.Reason
+	return e
 }
 
 // splitLines splits file or command output into lines and drops a trailing

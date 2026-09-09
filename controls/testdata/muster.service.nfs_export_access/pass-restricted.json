@@ -1,0 +1,8 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "services":{"nfs_server":{"installed":{"status":"ok","value":true}}},
+  "nfs":{"exports":{"status":"ok","value":[
+    {"path":"/srv/share","client":"198.51.100.0/24","options":"ro,sync,root_squash","wildcard":false,"root_squash":true},
+    {"path":"/srv/home","client":"203.0.113.17","options":"rw,sync","wildcard":false,"root_squash":true}
+  ]}},
+  "files":{"etc_exports":{"mode":{"status":"ok","value":420},"uid":{"status":"ok","value":0}}}
+}}
