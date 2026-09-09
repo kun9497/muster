@@ -53,6 +53,13 @@ const (
 	dnfCacheDir      = "/var/cache/dnf"
 	dnfRepomdGlob    = "/var/cache/dnf/*/repodata/repomd.xml"
 	dnfAutomaticConf = "/etc/dnf/automatic.conf"
+
+	// Ruling JR-9: the two artefacts that OUTLIVE the metadata cache, so a
+	// host whose cache was wiped is still recognisably a dnf host. The rpm
+	// database is a DIRECTORY - the read primitive refuses a non-regular
+	// file outright, so it may only ever be stat-ed, never read.
+	dnfConfPath = "/etc/dnf/dnf.conf"
+	rpmDBDir    = "/var/lib/rpm"
 )
 
 // patchReadLimit caps the package database and the dpkg log, both of which
@@ -107,6 +114,7 @@ var patchCollector = collect.Collector{
 			dpkgStatusPath, dpkgLogPath,
 			rebootRequiredPath, rebootRequiredPkgsPath,
 			dnfCacheDir, dnfRepomdGlob, dnfAutomaticConf,
+			dnfConfPath, rpmDBDir,
 		},
 		Commands: patchCommands,
 		// Ruling J-5: nothing here needs privilege, so a failure is never a
@@ -125,12 +133,13 @@ const noCacheReason = "no package metadata cache; the host may never have been u
 
 func runPatch(ctx context.Context, a collect.Access, b *collect.Builder) error {
 	now := collectedAt(b)
-	switch mgr := detectPatchManager(a); mgr {
+	mgr, evidence := detectPatchManager(a)
+	switch mgr {
 	case "apt":
-		b.Set("patch.manager", collect.OK(mgr, &facts.Source{Kind: "file", Path: dpkgStatusPath}))
+		b.Set("patch.manager", collect.OK(mgr, &facts.Source{Kind: "file", Path: evidence}))
 		runPatchApt(ctx, a, b, now)
 	case "dnf":
-		b.Set("patch.manager", collect.OK(mgr, &facts.Source{Kind: "file", Path: dnfCacheDir}))
+		b.Set("patch.manager", collect.OK(mgr, &facts.Source{Kind: "file", Path: evidence}))
 		runPatchDnf(ctx, a, b, now)
 	default:
 		b.Set("patch.manager", collect.OK(mgr, &facts.Source{Kind: "derived"}))
@@ -139,18 +148,31 @@ func runPatch(ctx context.Context, a collect.Access, b *collect.Builder) error {
 	return nil
 }
 
-// detectPatchManager names the package manager from the artefact each one
-// always leaves behind: the dpkg database on the debian family, the dnf
-// metadata cache directory on the rhel family. A host with neither is
-// "unknown" and every judged leaf says so rather than guessing.
-func detectPatchManager(a collect.Access) string {
-	switch {
-	case exists(a, dpkgStatusPath):
-		return "apt"
-	case exists(a, dnfCacheDir):
-		return "dnf"
+// detectPatchManager names the package manager and returns the artefact that
+// proved it, so patch.manager cites what was actually found rather than a
+// fixed path the host may not have.
+//
+// Ruling JR-9: the metadata CACHE is not evidence of the family. A
+// `dnf clean all`, or an image that never created /var/cache/dnf, left a
+// perfectly ordinary Rocky or Alma host reading "unknown", and an unknown
+// manager makes every judged leaf unsupported - which sends U-64 to
+// NOT_APPLICABLE, "no security updates to worry about", where the honest
+// answer is the J-25 MANUAL an absent cache already produces. So the family
+// is named from artefacts that survive a cache wipe as well, and dnfCache's
+// present:false then makes the shape. The dpkg database still wins first.
+// pathPresent, not exists: /var/lib/rpm is a directory and on some layouts a
+// symlink, and a path that refuses to be stat-ed for any reason other than
+// "not found" is still occupied.
+func detectPatchManager(a collect.Access) (mgr, evidence string) {
+	if exists(a, dpkgStatusPath) {
+		return "apt", dpkgStatusPath
 	}
-	return "unknown"
+	for _, p := range []string{dnfCacheDir, dnfConfPath, rpmDBDir} {
+		if pathPresent(a, p) {
+			return "dnf", p
+		}
+	}
+	return "unknown", ""
 }
 
 // runPatchUnknown publishes the honest shape for a host muster cannot judge:
@@ -293,8 +315,28 @@ func dnfCache(a collect.Access) patchCache {
 		if c.security {
 			continue
 		}
-		if data, _, err := a.ReadFile(m, readLimit); err == nil && strings.Contains(string(data), `type="updateinfo"`) {
-			c.security, c.securityPath = true, m
+		data, meta, err := a.ReadFile(m, readLimit)
+		switch {
+		case err == nil:
+			if strings.Contains(string(data), `type="updateinfo"`) {
+				c.security, c.securityPath = true, m
+			}
+		case errors.Is(err, fs.ErrNotExist):
+			// The glob listed it and the read found it gone - a repository
+			// cache rewritten under this run contributes nothing, exactly as
+			// an absent file does.
+		default:
+			// Ruling JR-4 (C3): a repomd that EXISTS but cannot be read is
+			// the answer for every value it could set. Treating the failed
+			// read as "no updateinfo declared here" made
+			// security_metadata_available false and the count unsupported,
+			// which reads U-64 NOT_APPLICABLE - "nothing to worry about" -
+			// on a host that may have pending security updates and merely
+			// would not let this run look. A non-root denied is the honest
+			// H-17 answer, and it reaches all three cache-derived leaves.
+			e := pathReason(m, collect.FromReadError(err, meta))
+			c.failed = &e
+			return c
 		}
 	}
 	if c.newestPath == "" {
@@ -329,12 +371,24 @@ func (c patchCache) age(now time.Time) facts.Envelope {
 		return collect.Absent(noCacheReason)
 	case c.newest.IsZero():
 		return collect.Unsupported("the package metadata cache modification time is not known, so no age can be derived")
+	case now.IsZero():
+		return collect.Unsupported("no usable clock for the age of " + c.newestPath + "; the run header carries no collected_at")
 	default:
-		age, ok := mtimeAge(now, c.newest)
-		if !ok {
-			return collect.Unsupported("no usable clock for the age of " + c.newestPath + "; the run header carries no collected_at, or the cache is newer than it")
+		// Ruling JR-11: the age is computed HERE rather than through the
+		// shared mtimeAge helper, whose "a file newer than the clock has no
+		// derivable age" is 2I's semantics and stays. A metadata cache newer
+		// than collected_at is not an unknown age: apt-daily rewriting an
+		// index between the one clock reading R54 takes and this Stat, or a
+		// few seconds of skew, means the cache was refreshed DURING the run,
+		// so it is zero seconds old. Saying unsupported instead made U-64 -
+		// which screens its two checks as a union - read NOT_APPLICABLE and
+		// hid a pending security count underneath it.
+		if d := now.Sub(c.newest); d >= 0 {
+			return collect.OK(int(d/time.Second), src)
 		}
-		return collect.OK(age, src)
+		e := collect.OK(0, src)
+		e.Reason = c.newestPath + " is newer than the run's collected_at; the cache was refreshed during the run, so its age is floored at zero"
+		return e
 	}
 }
 

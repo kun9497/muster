@@ -139,14 +139,6 @@ func nfsJudged(ctx context.Context, a collect.Access, b *collect.Builder, e fact
 	return nil
 }
 
-// pathReason prefixes a read's reason with the file it came from (C3), so a
-// denied fragment names itself rather than leaving the reader to guess which
-// of the export files could not be opened.
-func pathReason(p string, e facts.Envelope) facts.Envelope {
-	e.Reason = p + ": " + e.Reason
-	return e
-}
-
 // nfsRuntimeCollected asks the kernel export table to corroborate the parsed
 // files. exportfs is corroboration only, never the judged source, so ANY
 // failure — the binary absent, a non-root privilege refusal, a timeout —

@@ -43,6 +43,11 @@ const (
 	testDnfCacheDir     = "/var/cache/dnf"
 	testDnfRepomd       = "/var/cache/dnf/baseos-9f2c1a4b7d3e/repodata/repomd.xml"
 	testDnfAutomatic    = "/etc/dnf/automatic.conf"
+	// The two artefacts that outlive a metadata cache and so still name the
+	// family after a `dnf clean all` (Ruling JR-9). The rpm database is a
+	// DIRECTORY, which is why its probe may only stat.
+	testDnfConf  = "/etc/dnf/dnf.conf"
+	testRpmDBDir = "/var/lib/rpm"
 )
 
 // testPatchCollectedAt is the run header's single clock reading (R54). Every
@@ -143,6 +148,21 @@ func patchDnfAccess(cacheMtime time.Time, repomd string, cmds map[string]cmdResu
 	a.dirs[testDnfCacheDir] = true
 	a.stats[testDnfCacheDir] = statResult{mode: 0o755, kind: "dir"}
 	a.stats[testDnfRepomd] = statResult{mode: 0o644, kind: "regular", mtime: cacheMtime}
+	return a
+}
+
+// patchDnfNoCacheAccess is a dnf host whose metadata cache is GONE - a
+// `dnf clean all`, or an image that never created one - leaving only the
+// artefact named here to say which family it is.
+func patchDnfNoCacheAccess(marker string, isDir bool) *recordingAccess {
+	a := patchAccess(nil, nil)
+	if isDir {
+		a.dirs[marker] = true
+		a.stats[marker] = statResult{mode: 0o755, kind: "dir"}
+	} else {
+		a.files[marker] = "dnf.automatic.conf"
+		a.stats[marker] = statResult{mode: 0o644, kind: "regular"}
+	}
 	return a
 }
 
@@ -814,6 +834,8 @@ func TestPatchSetsEveryKeyOnEveryShape(t *testing.T) {
 			cmdKey(aptMarkHoldCmd): {file: "apt-mark.showhold"},
 		}), "none"},
 		{"dnf-no-commands", patchDnfAccess(now.Add(-time.Hour), "repomd.updateinfo.xml", nil), "none"},
+		{"dnf-no-cache-dir", patchDnfNoCacheAccess(testDnfConf, false), "none"},
+		{"dnf-rpmdb-only", patchDnfNoCacheAccess(testRpmDBDir, true), "none"},
 		{"container", patchDnfAccess(now.Add(-time.Hour), "repomd.updateinfo.xml", nil), "lxc"},
 	}
 	registered := patchRegisteredKeys(t)
@@ -941,5 +963,114 @@ func TestPatchAutoUpdateShapes(t *testing.T) {
 	})
 	if s := setting(t, buildPatch(t, dnf, testPatchCollectedAt, "none"), "patch.auto_update.enabled"); s.Persisted.Value != true {
 		t.Errorf("persisted %+v, want true from dnf-automatic's apply_updates = yes", s.Persisted)
+	}
+}
+
+// Ruling JR-4 (C3). A repomd.xml that EXISTS but cannot be read is the answer
+// for every value it could set. Reading it as "no updateinfo declared here"
+// makes security_metadata_available false and the count unsupported, which
+// sends U-64 to NOT_APPLICABLE - "this host has no security channel to worry
+// about" - on a host that may have pending security updates and simply would
+// not let this run look. Denied is the honest H-17 answer.
+func TestPatchUnreadableRepomdIsTheAnswer(t *testing.T) {
+	now := testPatchNow(t)
+	a := patchDnfAccess(now.Add(-time.Hour), "repomd.updateinfo.xml", nil)
+	a.fails[testDnfRepomd] = os.ErrPermission
+	b := buildPatch(t, a, testPatchCollectedAt, "none")
+
+	if e := env(t, b, "patch.manager"); e.Status != facts.StatusOK || e.Value != "dnf" {
+		t.Fatalf("manager %+v, want ok dnf", e)
+	}
+	for _, k := range []string{"patch.metadata_age_s", "patch.security_metadata_available", "patch.pending_security_count"} {
+		e := env(t, b, k)
+		if e.Status != facts.StatusDenied {
+			t.Errorf("%s %+v, want denied: an unreadable repomd is never read as 'no security channel'", k, e)
+		}
+		if !strings.Contains(e.Reason, testDnfRepomd) {
+			t.Errorf("%s reason %q, want the repomd path named (C3: path-prefixed)", k, e.Reason)
+		}
+	}
+	assertCacheLeavesAgree(t, b)
+}
+
+// Ruling JR-9. The metadata CACHE is not evidence of the package family: a
+// `dnf clean all`, or an image that never created /var/cache/dnf, left the
+// manager "unknown" and every judged leaf unsupported, which reads U-64
+// NOT_APPLICABLE on a Rocky/Alma host. The honest answer there is the J-25
+// MANUAL that an absent cache already produces - so the family is named from
+// an artefact that survives a cache wipe, and dnfCache's present:false makes
+// the shape.
+func TestPatchDnfWithoutCacheDirIsManualNotUnknown(t *testing.T) {
+	cases := []struct {
+		name   string
+		marker string
+		isDir  bool
+	}{
+		{"dnf.conf", testDnfConf, false},
+		{"rpm database directory", testRpmDBDir, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			b := buildPatch(t, patchDnfNoCacheAccess(tc.marker, tc.isDir), testPatchCollectedAt, "none")
+
+			e := env(t, b, "patch.manager")
+			if e.Status != facts.StatusOK || e.Value != "dnf" {
+				t.Fatalf("manager %+v, want ok dnf (the family outlives its cache)", e)
+			}
+			if e.Source == nil || e.Source.Path != tc.marker {
+				t.Errorf("manager source %+v, want the artefact %s that actually proved the family", e.Source, tc.marker)
+			}
+			// Ruling J-25: no cache is ABSENT, never unsupported - an
+			// unsupported count would make U-64 read NOT_APPLICABLE, which
+			// says "nothing to worry about" where the truth is "nobody can
+			// tell".
+			for _, k := range []string{"patch.metadata_age_s", "patch.pending_security_count"} {
+				if ae := env(t, b, k); ae.Status != facts.StatusAbsent {
+					t.Errorf("%s %+v, want absent (no metadata cache at all)", k, ae)
+				}
+			}
+			assertCacheLeavesAgree(t, b)
+		})
+	}
+}
+
+// A host with neither family's artefact is still "unknown": JR-9 widened the
+// dnf probe, it did not make every host a dnf host.
+func TestPatchNoFamilyArtefactIsStillUnknown(t *testing.T) {
+	b := buildPatch(t, patchAccess(nil, nil), testPatchCollectedAt, "none")
+	if e := env(t, b, "patch.manager"); e.Status != facts.StatusOK || e.Value != "unknown" {
+		t.Errorf("manager %+v, want ok unknown", e)
+	}
+}
+
+// Ruling JR-11. apt-daily rewriting an index between the one clock reading
+// R54 takes and this collector's Stat - or a few seconds of clock skew -
+// makes the cache NEWER than collected_at. That is not an unknown age: the
+// cache was refreshed during the run, so it is zero seconds old. Reporting
+// unsupported there hid a pending security count under U-64's
+// NOT_APPLICABLE, because the control screens its two checks as a union.
+func TestPatchCacheNewerThanTheClockIsAgeZero(t *testing.T) {
+	now := testPatchNow(t)
+	a := patchAptAccess(now.Add(time.Minute), true, map[string]cmdResult{
+		cmdKey(aptSimulateCmd): {file: "apt-get.s-upgrade.security"},
+	})
+	b := buildPatch(t, a, testPatchCollectedAt, "none")
+
+	e := env(t, b, "patch.metadata_age_s")
+	if e.Status != facts.StatusOK || e.Value != 0 {
+		t.Fatalf("metadata_age_s %+v, want ok 0 (the cache was refreshed during the run)", e)
+	}
+	if e.Reason == "" {
+		t.Error("metadata_age_s must say WHY the age is zero rather than presenting a floor as a measurement")
+	}
+	// The count must survive: hiding it was the whole cost of the old answer.
+	if pc := env(t, b, "patch.pending_security_count"); pc.Status != facts.StatusOK {
+		t.Errorf("pending_security_count %+v, want ok - a clock skew must not hide the count", pc)
+	}
+	// The shared mtimeAge helper keeps 2I's semantics: it is the local
+	// computation that floors at zero, not the helper every other collector
+	// derives an age with.
+	if _, ok := mtimeAge(now, now.Add(time.Minute)); ok {
+		t.Error("mtimeAge must still refuse a modification time later than the clock (2I semantics stay)")
 	}
 }

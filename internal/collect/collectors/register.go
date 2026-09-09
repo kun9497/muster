@@ -69,6 +69,16 @@ func filesSource(files []string) *facts.Source {
 	return &facts.Source{Kind: "derived", Inputs: inputs}
 }
 
+// pathReason prefixes a read's reason with the file it came from (C3), so a
+// denied read names itself rather than leaving the reader to guess which of
+// the several files a collector opens could not be opened. Shared by the
+// nfs and patch collectors, both of which read a set of files discovered by
+// a glob.
+func pathReason(p string, e facts.Envelope) facts.Envelope {
+	e.Reason = p + ": " + e.Reason
+	return e
+}
+
 // splitLines splits file or command output into lines and drops a trailing
 // carriage return, so a CRLF-terminated file parses exactly like an LF one.
 func splitLines(data []byte) []string {

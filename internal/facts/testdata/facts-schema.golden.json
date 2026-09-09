@@ -3014,7 +3014,7 @@
     {
       "Key": "patch.metadata_age_s",
       "Type": "int",
-      "Description": "Whole seconds between the newest cached package metadata (the newest apt Packages list or update-success stamp; the newest dnf repomd.xml) and the run's collected_at, so the same snapshot always renders the same age. Absent when the host holds no metadata cache at all, and then pending_security_count is absent too; muster never refreshes the metadata itself.",
+      "Description": "Whole seconds between the newest cached package metadata (the newest apt Packages list or update-success stamp; the newest dnf repomd.xml) and the run's collected_at, so the same snapshot always renders the same age. A cache NEWER than collected_at - an index rewritten between the run's single clock reading and this stat, or a little clock skew - is a cache refreshed during the run, so the age is floored at zero and the reason says why; it is never reported as underivable, which would hide the pending security count under a not-applicable result. Absent when the host holds no metadata cache at all, and then pending_security_count is absent too; muster never refreshes the metadata itself.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "patch",
@@ -3024,7 +3024,7 @@
     {
       "Key": "patch.security_metadata_available",
       "Type": "bool",
-      "Description": "Whether the metadata cache carries a security channel at all - an apt list file of a -security suite, or a cached repomd.xml declaring an updateinfo data section. It is decided from the cached files, never from a command's exit code, because a security query that exits cleanly with no output says the same thing whether the channel is missing or nothing is pending.",
+      "Description": "Whether the metadata cache carries a security channel at all - an apt list file of a -security suite, or a cached repomd.xml declaring an updateinfo data section. It is decided from the cached files, never from a command's exit code, because a security query that exits cleanly with no output says the same thing whether the channel is missing or nothing is pending. A cached repomd that exists but cannot be READ carries that read's status here - denied on an unprivileged run - rather than a false, so an unreadable cache is never reported as a host with no security channel.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "patch",
