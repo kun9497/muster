@@ -3430,6 +3430,106 @@
       "Collector": "ftp",
       "DefaultOn": "",
       "SubjectKind": ""
+    },
+    {
+      "Key": "mail.implementation",
+      "Type": "string",
+      "Description": "Which mail transfer agent this host is configured with - postfix, sendmail, exim or none. An MTA is named only when its binary is installed as well as its configuration file, so a conffile left behind by a removed package does not decide, and the reason then names that leftover. When two of them are installed at once the fixed order postfix, sendmail, exim picks the one these facts describe and the reason names the other, which is evidence rather than a reason to refuse a verdict - only one binary can be behind /usr/sbin/sendmail. Evidence only (whether a mail service is running is services.mail.active).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "mail",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "mail.config_files",
+      "Type": "list\u003cstring\u003e",
+      "Description": "The mail transfer agent configuration files this collector found, sorted. For postfix and sendmail these are the files it read - /etc/postfix/main.cf and /etc/mail/sendmail.cf, the only files it opens; a path main.cf names (a lookup table, an alias database, a chroot) is never followed. For exim the file is listed as the evidence that named the implementation and is NOT parsed.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "mail",
+      "DefaultOn": "",
+      "SubjectKind": "file"
+    },
+    {
+      "Key": "mail.postfix.inet_interfaces",
+      "Type": "string",
+      "Description": "The inet_interfaces value of /etc/postfix/main.cf, exactly as written, with any $name reference left unexpanded because expanding it needs parameters this collector does not model. Absent, naming postfix's compiled default \"all\", when main.cf does not set it; absent on a sendmail or exim host, and denied when main.cf exists but could not be read.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "mail",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "mail.postfix.mynetworks",
+      "Type": "string",
+      "Description": "The mynetworks value of /etc/postfix/main.cf, exactly as written and unexpanded - the client networks postfix relays for without authentication. Absent when main.cf does not set it, because postfix then computes the list from the host's own interfaces and netmasks and no file states it; absent on a sendmail or exim host, and denied when main.cf could not be read.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "mail",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "mail.postfix.smtpd_relay_restrictions",
+      "Type": "string",
+      "Description": "The smtpd_relay_restrictions value of /etc/postfix/main.cf, exactly as written and unexpanded. Absent, naming postfix's compiled default \"permit_mynetworks, permit_sasl_authenticated, defer_unauth_destination\", when main.cf does not set it; absent on a sendmail or exim host, and denied when main.cf could not be read.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "mail",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "mail.postfix.smtpd_recipient_restrictions",
+      "Type": "string",
+      "Description": "The smtpd_recipient_restrictions value of /etc/postfix/main.cf, exactly as written and unexpanded. Absent, naming postfix's compiled default of an empty list, when main.cf does not set it; absent on a sendmail or exim host, and denied when main.cf could not be read.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "mail",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "mail.postfix.disable_vrfy_command",
+      "Type": "string",
+      "Description": "The disable_vrfy_command value of /etc/postfix/main.cf, as written, so a reader sees the spelling the file uses; postfix accepts yes, true, on and 1 for the affirmative, case-insensitively. Absent, naming the compiled default \"no\", when main.cf does not set it - the derived mail.expn_vrfy_restricted still reads that default. Absent on a sendmail or exim host, and denied when main.cf could not be read.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "mail",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "mail.postfix.authorized_submit_users",
+      "Type": "string",
+      "Description": "The authorized_submit_users value of /etc/postfix/main.cf, exactly as written and unexpanded - which accounts may hand a message to the sendmail-compatible submission command. Absent, naming postfix's compiled default \"static:anyone\", when main.cf does not set it; absent on a sendmail or exim host, and denied when main.cf could not be read. Evidence for the operator judging U-46; no automatic control reads it.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "mail",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "mail.sendmail.privacy_options",
+      "Type": "list\u003cstring\u003e",
+      "Description": "The flags of the first \"O PrivacyOptions=\" line of /etc/mail/sendmail.cf (the single-letter \"OpPrivacyOptions=\" spelling counts too), lower-cased, deduplicated and sorted. A goaway token is KEPT in the list and its expansion appended beside it, because which flags goaway covers depends on the sendmail release - 8.14 covers authwarnings, noexpn, novrfy, noverb, needmailhelo, needexpnhelo, needvrfyhelo and nobodyreturn - so only novrfy and noexpn, present in every version, are judged. An empty list means the file was read and carries no such line, which is sendmail's default \"public\"; that is a different finding from an absence. Absent on a postfix or exim host, and denied when sendmail.cf could not be read.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "mail",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "mail.expn_vrfy_restricted",
+      "Type": "bool",
+      "Description": "Whether the MTA refuses the SMTP VRFY and EXPN commands, which enumerate accounts and mailing lists to anyone who can open port 25. postfix - disable_vrfy_command is affirmative; postfix implements no EXPN command at all, so that one parameter settles both, and its compiled default no leaves VRFY answered. sendmail - both novrfy and noexpn are in mail.sendmail.privacy_options after a goaway is expanded. exim - ABSENT, because exim decides both in its ACLs, which this collector does not model. Absent on a host with no MTA, and denied when the configuration exists but could not be read.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "mail",
+      "DefaultOn": "",
+      "SubjectKind": ""
     }
   ]
 }

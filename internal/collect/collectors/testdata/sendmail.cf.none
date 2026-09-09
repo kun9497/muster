@@ -1,0 +1,3 @@
+# Synthetic sendmail.cf fragment: no PrivacyOptions line at all.
+O SmtpGreetingMessage=$j Sendmail $v/$Z; $b
+O Timeout.queuereturn=5d

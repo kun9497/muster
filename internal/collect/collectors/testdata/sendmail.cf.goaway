@@ -1,0 +1,4 @@
+# Synthetic sendmail.cf fragment: only the option lines this collector reads.
+O SmtpGreetingMessage=$j Sendmail $v/$Z; $b
+O PrivacyOptions=goaway
+O Timeout.queuereturn=5d

@@ -1,0 +1,2 @@
+# Synthetic sendmail.cf fragment: VRFY refused, EXPN still answered.
+O PrivacyOptions=authwarnings,novrfy

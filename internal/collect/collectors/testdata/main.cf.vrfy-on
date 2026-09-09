@@ -1,0 +1,3 @@
+# Synthetic postfix main.cf: the boolean spelled "on" rather than "yes".
+myhostname = mail.example.org
+disable_vrfy_command = on

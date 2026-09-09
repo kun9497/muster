@@ -46,6 +46,7 @@ func init() {
 	collect.Register(nfsCollector)
 	collect.Register(snmpCollector)
 	collect.Register(ftpCollector)
+	collect.Register(mailCollector)
 	collect.Register(patchCollector)
 	collect.Register(walkCollector)
 }

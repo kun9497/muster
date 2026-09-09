@@ -1,0 +1,7 @@
+# Synthetic postfix main.cf: VRFY refused, submission limited to one account.
+myhostname = mail.example.org
+inet_interfaces = loopback-only
+mynetworks = 127.0.0.0/8 [::1]/128
+smtpd_relay_restrictions = permit_mynetworks, reject
+disable_vrfy_command = YES
+authorized_submit_users = static:postfix
