@@ -129,9 +129,18 @@ func nfsRuntimeCollected(ctx context.Context, a collect.Access) facts.Envelope {
 // under the kernel's own defaults (ro, root_squash).
 func parseExportsContent(data []byte) []any {
 	recs := []any{}
-	for _, line := range joinBackslashContinuedLines(splitLines(data)) {
+	raw := splitLines(data)
+	// Round-1 review finding 1: exports(5) says '#' introduces a comment
+	// anywhere on a line, not only at its start. Strip per PHYSICAL line,
+	// before backslash-continuation joining, so a comment can never smuggle
+	// a stray "\" into the join.
+	deCommented := make([]string, len(raw))
+	for i, l := range raw {
+		deCommented[i] = stripComment(l)
+	}
+	for _, line := range joinBackslashContinuedLines(deCommented) {
 		trimmed := strings.TrimSpace(line)
-		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+		if trimmed == "" {
 			continue
 		}
 		toks := tokenizeExportLine(trimmed)
@@ -145,11 +154,47 @@ func parseExportsContent(data []byte) []any {
 			continue
 		}
 		for _, ct := range clients {
+			if strings.HasPrefix(ct, "-") {
+				// Round-1 review finding 3 (LOW): BSD exportfs's
+				// "-options,root=host" defaults-line syntax is not valid
+				// exports(5) on Linux; skip it rather than mint a bogus
+				// client named "-rw".
+				continue
+			}
 			client, options := splitClientSpec(ct)
+			if client == "" {
+				// Round-1 review finding 2: exportfs's classic space-before-'('
+				// trap. tokenizeExportLine already split "client (options)" on
+				// the space into TWO tokens, so a token that is bare
+				// "(options)" is a SECOND, separate client spec — the world —
+				// not the preceding host's options. Normalise it the same way
+				// the no-client-spec branch above already does.
+				client = "*"
+			}
 			recs = append(recs, exportRecord(path, client, options))
 		}
 	}
 	return recs
+}
+
+// stripComment removes everything from the first unquoted '#' onward:
+// exports(5) documents '#' as introducing a comment wherever it appears on a
+// line, not only at the start. Kept simple per the round-1 review: a '#'
+// inside a double-quoted path is honoured, but there is no escape-character
+// handling beyond that — exports(5) itself does not define any.
+func stripComment(line string) string {
+	inQuote := false
+	for i := 0; i < len(line); i++ {
+		switch line[i] {
+		case '"':
+			inQuote = !inQuote
+		case '#':
+			if !inQuote {
+				return line[:i]
+			}
+		}
+	}
+	return line
 }
 
 // exportRecord builds one nfs.exports record. wildcard and root_squash are

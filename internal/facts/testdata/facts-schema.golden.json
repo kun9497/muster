@@ -2814,7 +2814,7 @@
     {
       "Key": "nfs.exports",
       "Type": "list\u003crecord\u003e",
-      "Description": "Every NFS export as {path, client, options, wildcard, root_squash} parsed from /etc/exports and /etc/exports.d/*.exports; a path with no client spec exports to the world (client \"*\", wildcard true); root_squash is derived from the absence of no_root_squash in the client's options.",
+      "Description": "Every NFS export as {path, client, options, wildcard, root_squash} parsed from /etc/exports and /etc/exports.d/*.exports; a path with no client spec, or a bare \"(options)\" spec with a space before the parenthesis (exportfs's own space-sensitive trap), exports to the world (client \"*\", wildcard true); root_squash is derived from the absence of no_root_squash in the client's options.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "nfs",

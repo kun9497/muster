@@ -137,6 +137,46 @@ func TestNfsNoExportsIsEmptyNotMissing(t *testing.T) {
 	}
 }
 
+// exports(5): '#' introduces a comment anywhere on a line, not only at its
+// start, and a BSD-style "-options" defaults line (no client, options
+// prefixed with "-") is not valid Linux exports(5) syntax. Round-1 review
+// finding 1 (BLOCKING) + finding 3 (LOW).
+func TestNfsTrailingCommentIsNotAClient(t *testing.T) {
+	a := nfsAccess(map[string]string{"/etc/exports": "exports.trailing_comment"}, nil)
+	b := buildBegun(t, "nfs", a)
+	recs := okList(t, b, "nfs.exports")
+	if len(recs) != 1 {
+		t.Fatalf("exports %v, want exactly 1 record (a trailing comment must not mint phantom clients, and the BSD-style \"-rw\" line must not mint a bogus one)", recs)
+	}
+	rec := recs[0].(map[string]any)
+	if rec["path"] != "/srv5" || rec["client"] != "gss/krb5" || rec["options"] != "rw" ||
+		rec["wildcard"] != false || rec["root_squash"] != true {
+		t.Errorf("record %v", rec)
+	}
+}
+
+// exportfs's classic space-before-'(' trap: "client (options)" (a SPACE
+// before the parenthesis) is two separate client specs — the bare host with
+// default options, and a second, world-exporting "(options)" entry — never
+// one "client(options)" pair. Round-1 review finding 2 (BLOCKING).
+func TestNfsSpaceBeforeOptionsExportsToTheWorld(t *testing.T) {
+	a := nfsAccess(map[string]string{"/etc/exports": "exports.space_before_options"}, nil)
+	b := buildBegun(t, "nfs", a)
+	recs := okList(t, b, "nfs.exports")
+	if len(recs) != 2 {
+		t.Fatalf("exports %v, want 2 records (space before '(' is a second, world, client spec)", recs)
+	}
+	// Sorted by (path, client): "*" < "192.0.2.5" lexically.
+	world := recs[0].(map[string]any)
+	if world["client"] != "*" || world["wildcard"] != true || world["root_squash"] != true || world["options"] != "rw" {
+		t.Errorf("world export %v, want client \"*\", wildcard true, root_squash true, options \"rw\"", world)
+	}
+	host := recs[1].(map[string]any)
+	if host["client"] != "192.0.2.5" || host["wildcard"] != false || host["root_squash"] != true {
+		t.Errorf("host export %v, want the bare host with default options", host)
+	}
+}
+
 // files.etc_exports.* — the nine writePermFacts leaves for /etc/exports,
 // written by the FILES collector (C1: a fixed path's permission facts
 // belong there, even though this file's nfs collector owns the export

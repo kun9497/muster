@@ -1,0 +1,2 @@
+/srv5 gss/krb5(rw) # trailing comment
+/srv6 -rw
