@@ -388,6 +388,19 @@ func (p *ftpParse) parseProftpd(file string, data []byte, depth int, base []*pro
 		}
 		p.pro[key] = args
 	}
+	// Ruling L-42, mirroring L-40: a section still open at end of file is
+	// the other half of a tag that does not match. proftpd refuses to start
+	// on it, so what the file appears to say about the server is not what
+	// the server does. Sections are counted against this file's OWN base,
+	// so a fragment that closes everything it opened stays complete even
+	// when its includer left a section open around it.
+	for i := len(base); i < len(stack); i++ {
+		if stack[i].noted {
+			continue
+		}
+		stack[i].noted = true
+		p.noteUnmodelled(file, "<"+stack[i].name+"> is never closed, so this file cannot be modelled")
+	}
 }
 
 // proftpdSection is one open section and whether the collector has already
@@ -504,10 +517,19 @@ func (p *ftpParse) includePattern(target string) (string, bool) {
 // L-41). Such an entry is skipped, never filed as an error: one error
 // envelope flips run.complete and hands CI exit code 2 for something that
 // was never configuration.
+//
+// Ruling L-42: the test is the WHOLE class, not the sentinel the primitive
+// raises after a successful open. open(2) never gets far enough to report
+// ErrNotRegular for a socket (ENXIO) or for a path whose component stopped
+// being a directory between the glob and the read (ENOTDIR), and a device
+// node can answer EISDIR; every one of them says the same thing — this
+// entry is not a configuration file.
 func nonRegular(err error) bool {
 	return errors.Is(err, collect.ErrNotRegular) ||
 		errors.Is(err, collect.ErrSymlink) ||
-		errors.Is(err, unix.EISDIR)
+		errors.Is(err, unix.EISDIR) ||
+		errors.Is(err, unix.ENXIO) ||
+		errors.Is(err, unix.ENOTDIR)
 }
 
 // record notes a file whose content reached the parse, once however it was

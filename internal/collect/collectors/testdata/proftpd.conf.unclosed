@@ -1,0 +1,9 @@
+# synthetic proftpd configuration whose <Anonymous> section is never closed.
+# proftpd itself refuses to start on it, so nothing in the file can be read
+# as the running server's configuration.
+ServerName "FTP service"
+ServerType standalone
+UseFtpUsers on
+<Anonymous /srv/ftp>
+  User ftp
+  UserAlias anonymous ftp

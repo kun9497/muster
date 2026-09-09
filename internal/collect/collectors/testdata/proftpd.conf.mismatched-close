@@ -7,3 +7,4 @@ TLSEngine on
   User ftp
 </Limit>
 TLSRequired on
+</Anonymous>

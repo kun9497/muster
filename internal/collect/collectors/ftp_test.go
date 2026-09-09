@@ -737,3 +737,109 @@ func TestFilesLibwrapPresent(t *testing.T) {
 		t.Errorf("libwrap_present %+v, want ok false when every candidate is ENOENT", e)
 	}
 }
+
+// Ruling L-42: the skip must key on the read primitive's whole non-regular
+// class, not on ErrNotRegular alone. A socket answers open(2) with ENXIO and
+// a path whose component was replaced answers ENOTDIR, and either would
+// otherwise become an error envelope — run.complete false and CI exit code 2
+// — for something that was never configuration.
+func TestFtpProftpdSkipsEveryNonRegularFragment(t *testing.T) {
+	a := ftpAccess(map[string]string{
+		"/etc/proftpd/proftpd.conf":           "proftpd.conf.include-dir",
+		"/etc/proftpd/conf.d/10-tls-required": "proftpd.conf.d_tlsrequired",
+	})
+	// dirs is fsAccess's "occupies the path but is not a readable file" map,
+	// which is what makes Glob match these entries at all; the error each
+	// read answers with is what the collector has to classify.
+	for _, e := range []struct {
+		path string
+		err  error
+	}{
+		{"/etc/proftpd/conf.d/control.sock", unix.ENXIO},
+		{"/etc/proftpd/conf.d/queue.fifo", unix.EISDIR},
+		{"/etc/proftpd/conf.d/vanished", unix.ENOTDIR},
+	} {
+		a.dirs[e.path] = true
+		a.fails[e.path] = fmt.Errorf("%s: %w", e.path, e.err)
+	}
+	a.stats["/etc/proftpd/conf.d/control.sock"] = statResult{mode: 0o755, kind: "socket"}
+	b := buildBegun(t, "ftp", a)
+	if e := env(t, b, "ftp.unmodelled"); e.Status != facts.StatusOK || e.Value != 0 {
+		t.Fatalf("unmodelled %+v, want 0", e)
+	}
+	if e := env(t, b, "ftp.parse_complete"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("parse_complete %+v, want ok true", e)
+	}
+	if !ftpBool(t, b, "ftp.tls_enforced") {
+		t.Error("the regular fragment is still read")
+	}
+	if w := b.Worst("ftp"); w != facts.StatusOK {
+		t.Errorf(`Worst("ftp") = %s, want ok: a socket under conf.d is not an error`, w)
+	}
+}
+
+// Ruling L-42: the closing-tag guard is len(stack) > len(base), never
+// len(stack) > 0. A fragment included from INSIDE a section may not close
+// that section: popping it would attribute everything below the stray tag to
+// the server, which is the false PASS L-35 closed, reached through the
+// include path.
+func TestFtpProftpdFragmentCannotCloseTheIncludersSection(t *testing.T) {
+	a := ftpAccess(map[string]string{
+		"/etc/proftpd/proftpd.conf":    "proftpd.conf.include-in-anon",
+		"/etc/proftpd/conf.d/10-stray": "proftpd.conf.d_stray-close",
+	})
+	b := buildBegun(t, "ftp", a)
+	if e := env(t, b, "ftp.unmodelled"); e.Status != facts.StatusOK || e.Value != 1 {
+		t.Fatalf("unmodelled %+v, want ok 1 for the stray closing tag", e)
+	}
+	e := env(t, b, "ftp.tls_enforced")
+	if e.Status != facts.StatusAbsent {
+		t.Errorf("tls_enforced %+v, want absent while the fragment cannot be modelled", e)
+	}
+	if !strings.Contains(e.Reason, "</Anonymous>") {
+		t.Errorf("tls_enforced reason %q must name the stray tag", e.Reason)
+	}
+	// The load-bearing assertion: with the guard mutated to len(stack) > 0 the
+	// fragment's TLSRequired becomes the SERVER's answer.
+	if v, ok := proftpdModelOf(t, a, "proftpd.conf.include-in-anon")["tlsrequired"]; ok {
+		t.Errorf("tlsrequired = %q: the fragment popped its includer's section", v)
+	}
+}
+
+// Ruling L-42, mirroring L-40: a section still open at end of file is a file
+// proftpd refuses to start on. The reason names the section, and a fragment
+// is judged against its OWN base, so a fragment that closes everything it
+// opened is complete even when its includer left a section open around it.
+func TestFtpProftpdUnclosedSectionIsUnmodelled(t *testing.T) {
+	main := buildBegun(t, "ftp", ftpAccess(map[string]string{
+		"/etc/proftpd/proftpd.conf": "proftpd.conf.unclosed",
+	}))
+	if e := env(t, main, "ftp.unmodelled"); e.Status != facts.StatusOK || e.Value != 1 {
+		t.Fatalf("unmodelled %+v, want ok 1 for the unclosed section", e)
+	}
+	for _, k := range ftpJudgedLeaves {
+		e := env(t, main, k)
+		if e.Status != facts.StatusAbsent {
+			t.Errorf("%s = %s, want absent while a section is left open", k, e.Status)
+		}
+		if !strings.Contains(e.Reason, "<Anonymous>") {
+			t.Errorf("%s reason %q must name the unclosed section", k, e.Reason)
+		}
+	}
+	if w := main.Worst("ftp"); w != facts.StatusOK {
+		t.Errorf(`Worst("ftp") = %s, want ok`, w)
+	}
+
+	frag := buildBegun(t, "ftp", ftpAccess(map[string]string{
+		"/etc/proftpd/proftpd.conf":       "proftpd.conf.include-dir",
+		"/etc/proftpd/conf.d/10-unclosed": "proftpd.conf.d_unclosed",
+	}))
+	if e := env(t, frag, "ftp.unmodelled"); e.Status != facts.StatusOK || e.Value != 1 {
+		t.Fatalf("unmodelled %+v, want ok 1 for the fragment's unclosed section", e)
+	}
+	e := env(t, frag, "ftp.tls_enforced")
+	if !strings.Contains(e.Reason, "/etc/proftpd/conf.d/10-unclosed") ||
+		!strings.Contains(e.Reason, "<Directory>") {
+		t.Errorf("tls_enforced reason %q must name the fragment and the section", e.Reason)
+	}
+}

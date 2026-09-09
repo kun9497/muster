@@ -1,0 +1,5 @@
+# A fragment carrying a closing tag for a section the INCLUDER opened. It
+# must not pop that section: everything below would otherwise be attributed
+# to the server.
+</Anonymous>
+TLSRequired on
