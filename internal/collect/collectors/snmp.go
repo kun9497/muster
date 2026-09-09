@@ -350,6 +350,15 @@ func (p *snmpParse) directive(keyword string, args []string, depth int) {
 		p.trapSink(args)
 	case "trapsess":
 		p.trapSess(args)
+	case "proxy":
+		// Ruling JR-7: `proxy [-Cn CONTEXT] [SNMPCMD OPTIONS] HOST OID...`
+		// forwards a subtree to another agent and authenticates to it with
+		// the community its -c option names — a credential really on the
+		// wire. Leaving it unparsed made a proxy-only host record an EMPTY
+		// community list, and an empty list makes U-60's and U-61's `each`
+		// clauses vacuously true: a PASS on a credential nobody measured.
+		// The destination host and the OID subtree are never stored.
+		p.dashCCommunity("proxy", args)
 	case "agentaddress":
 		p.agentAddress(args)
 	case "includefile":
@@ -403,15 +412,27 @@ func (p *snmpParse) trapSink(args []string) {
 // form left the attached one recording nothing, which is the vacuous-`each`
 // hole Ruling J-43 exists to close, in a narrower spelling.
 func (p *snmpParse) trapSess(args []string) {
+	p.dashCCommunity("trap", args)
+}
+
+// dashCCommunity records the community a getopt-style `-c` option carries,
+// in both spellings net-snmp's own snmp_parse_args accepts: separated
+// (`-c COMMUNITY`) and attached (`-cCOMMUNITY`). It is shared by trapsess
+// and proxy, the two directives whose community is an option argument
+// rather than a position. Every other option, and the destination itself,
+// is passed over rather than guessed at (Ruling J-38). The flag is matched
+// case-sensitively because net-snmp's -c and -C are two different options —
+// proxy's `-Cn CONTEXT` must never be read as the community.
+func (p *snmpParse) dashCCommunity(kind string, args []string) {
 	for i, a := range args {
 		switch {
 		case a == "-c":
 			if i+1 < len(args) {
-				p.addCommunity("trap", args[i+1], "")
+				p.addCommunity(kind, args[i+1], "")
 			}
 			return
 		case strings.HasPrefix(a, "-c") && len(a) > 2:
-			p.addCommunity("trap", a[2:], "")
+			p.addCommunity(kind, a[2:], "")
 			return
 		}
 	}
@@ -882,12 +903,45 @@ func snmpField(s string) string {
 }
 
 // snmpSourceRestricted reports whether a community is bound to a source at
-// all. "default" and the two any-address forms are how net-snmp spells "from
+// all. "default" and the any-address forms are how net-snmp spells "from
 // anywhere", so they are no restriction; so is an absent source.
+//
+// Ruling JR-3: net-snmp's SOURCE grammar is not only ADDRESS and
+// ADDRESS/PREFIXLEN — it also accepts NETWORK/NETMASK with a DOTTED mask,
+// and the agent ANDs the address with the mask before comparing. A table of
+// literal spellings therefore read `0.0.0.0/0.0.0.0` as a restriction and
+// PASSed U-61 on a community usable from anywhere. Two independent readings
+// make a source unrestricted, and either one is enough: the ADDRESS is one
+// of the any forms, whatever mask follows it; or the MASK selects nothing,
+// whatever address precedes it.
 func snmpSourceRestricted(source string) bool {
-	switch strings.ToLower(strings.TrimSpace(source)) {
-	case "", "default", "0.0.0.0", "0.0.0.0/0", "0/0", "::", "::/0":
+	s := strings.ToLower(strings.TrimSpace(source))
+	addr, mask, hasMask := strings.Cut(s, "/")
+	switch addr {
+	case "", "default", "0", "0.0.0.0", "::":
 		return false
+	}
+	return !(hasMask && snmpZeroMask(mask))
+}
+
+// snmpZeroMask reports whether a SOURCE's mask half selects nothing at all,
+// in either spelling net-snmp accepts: a prefix length of zero ("/0"), or a
+// dotted netmask whose every octet is zero ("/0.0.0.0"). A mask this
+// function cannot read is never treated as zero — an unreadable mask must
+// make a community look MORE restricted than it is, which is a false FAIL a
+// human reviews, never a false PASS (H-16).
+func snmpZeroMask(mask string) bool {
+	if n, err := strconv.Atoi(mask); err == nil {
+		return n == 0
+	}
+	octets := strings.Split(mask, ".")
+	if len(octets) != 4 {
+		return false
+	}
+	for _, o := range octets {
+		if n, err := strconv.Atoi(o); err != nil || n != 0 {
+			return false
+		}
 	}
 	return true
 }

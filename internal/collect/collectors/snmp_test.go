@@ -104,6 +104,12 @@ var snmpFixtureSecrets = []string{
 	"aliasPrivPhraseSix",
 	"s3ssAttachedString",
 	"tr4pLateString",
+	"d0ttedMaskAnyOne",
+	"z3roMaskHostTwo",
+	"n3tmaskBoundThree",
+	"pr0xyHostRoOne",
+	"pr0xyC0mmunityTwo",
+	"pr0xyAttachedThree",
 }
 
 // assertNoSecrets is the redaction proof every snmp test ends with.
@@ -726,4 +732,114 @@ func TestSnmpNoConfigCitesNoSource(t *testing.T) {
 	if e := env(t, b, "snmp.config_files"); e.Source != nil {
 		t.Errorf("config_files source %+v, want none when no file was read", e.Source)
 	}
+}
+
+// Ruling JR-3. net-snmp's SOURCE grammar is not only "address" and
+// "address/prefixlen": it also accepts NETWORK/NETMASK with a DOTTED mask,
+// and it ANDs the address with the mask before comparing. A spelling table
+// that knew only the literal any-address forms read
+// `0.0.0.0/0.0.0.0` as a restriction, so U-61 PASSed a community usable from
+// anywhere — the false PASS this control exists to prevent.
+func TestSnmpDottedMaskAnySourceIsUnrestricted(t *testing.T) {
+	b := buildBegun(t, "snmp", snmpAccess(map[string]string{testSnmpdConf: "snmpd.conf.dotted-mask"}, nil))
+
+	recs := okList(t, b, "snmp.communities")
+	if len(recs) != 3 {
+		t.Fatalf("communities %v, want the three ro/rw lines", recs)
+	}
+	any := snmpRecord(t, recs, 0)
+	if any["kind"] != "ro" || any["length"] != 16 || any["source_restricted"] != false {
+		t.Errorf("communities[0] = %v, want the 0.0.0.0/0.0.0.0 community UNRESTRICTED", any)
+	}
+	zeroMask := snmpRecord(t, recs, 1)
+	if zeroMask["kind"] != "rw" || zeroMask["length"] != 15 || zeroMask["source_restricted"] != false {
+		t.Errorf("communities[1] = %v, want the 192.0.2.0/0.0.0.0 community UNRESTRICTED (a zero mask matches every address)", zeroMask)
+	}
+	bound := snmpRecord(t, recs, 2)
+	if bound["kind"] != "ro" || bound["length"] != 17 || bound["source_restricted"] != true {
+		t.Errorf("communities[2] = %v, want the 192.0.2.0/255.255.255.0 community restricted", bound)
+	}
+	assertNoSecrets(t, b)
+}
+
+// The whole SOURCE spelling table, so a reading that happens to be right for
+// the fixture above is not mistaken for a rule. A source is unrestricted
+// when the ADDRESS is one of net-snmp's any forms whatever the mask, and
+// when the MASK selects nothing whatever the address; everything else names
+// a bounded set and is a restriction.
+func TestSnmpSourceRestrictedSpellings(t *testing.T) {
+	cases := []struct {
+		source string
+		want   bool
+	}{
+		{"", false},
+		{"default", false},
+		{"DEFAULT", false},
+		{"0.0.0.0", false},
+		{"0.0.0.0/0", false},
+		{"0/0", false},
+		{"0.0.0.0/0.0.0.0", false},
+		{"0.0.0.0/255.0.0.0", false},
+		{"192.0.2.0/0.0.0.0", false},
+		{"192.0.2.0/0", false},
+		{"::", false},
+		{"::/0", false},
+		{"192.0.2.0/255.255.255.0", true},
+		{"192.0.2.0/24", true},
+		{"192.0.2.5", true},
+		{"2001:db8::/32", true},
+		{"manager.example.org", true},
+	}
+	for _, tc := range cases {
+		if got := snmpSourceRestricted(tc.source); got != tc.want {
+			t.Errorf("snmpSourceRestricted(%q) = %v, want %v", tc.source, got, tc.want)
+		}
+	}
+}
+
+// Ruling JR-7. `proxy [-Cn CONTEXT] [SNMPCMD OPTIONS] HOST OID...` forwards a
+// subtree to another agent and authenticates with the community its -c
+// option names — a credential really on the wire. It was not parsed at all,
+// so a proxy-only host recorded an EMPTY community list, which makes U-60's
+// and U-61's `each` clauses vacuously true: a PASS on an unmeasured
+// credential. The destination host and the OID subtree are never stored.
+func TestSnmpProxyCommunitiesAreRecorded(t *testing.T) {
+	b := buildBegun(t, "snmp", snmpAccess(map[string]string{testSnmpdConf: "snmpd.conf.proxy"}, nil))
+
+	recs := okList(t, b, "snmp.communities")
+	if len(recs) != 3 {
+		t.Fatalf("communities %v, want the rocommunity and BOTH proxy communities", recs)
+	}
+	ro := snmpRecord(t, recs, 0)
+	if ro["ref"] != "c1" || ro["kind"] != "ro" || ro["source_restricted"] != true {
+		t.Errorf("communities[0] = %v, want the restricted rocommunity", ro)
+	}
+	// The separated spelling, read past a -Cn CONTEXT option that must not be
+	// mistaken for it (net-snmp's -c and -C are two different options).
+	sep := snmpRecord(t, recs, 1)
+	if sep["ref"] != "c2" || sep["kind"] != "proxy" || sep["is_default"] != false ||
+		sep["length"] != 17 || sep["source_restricted"] != false {
+		t.Errorf("communities[1] = %v, want the proxy -c community as {c2, proxy, is_default false, length 17, source_restricted false}", sep)
+	}
+	// The getopt-attached spelling, which net-snmp's own argument parser
+	// accepts: 18 runes, so taking the whole token or nothing is
+	// distinguishable from taking the remainder after the flag.
+	att := snmpRecord(t, recs, 2)
+	if att["ref"] != "c3" || att["kind"] != "proxy" || att["is_default"] != false ||
+		att["length"] != 18 || att["source_restricted"] != false {
+		t.Errorf("communities[2] = %v, want the attached proxy -cCOMMUNITY as {c3, proxy, is_default false, length 18}", att)
+	}
+	for i := range recs {
+		if r := snmpRecord(t, recs, i); len(r) != 5 {
+			t.Errorf("community record %v carries %d fields, want exactly five", r, len(r))
+		}
+	}
+	// Neither the proxy destination nor the OID subtree it forwards is a
+	// community, and neither reaches the snapshot.
+	for _, tok := range []string{"203.0.113.21", "203.0.113.23", "1.3.6.1.2.1.25", "ctxA"} {
+		if bytes.Contains(snmpSubtreeJSON(t, b), []byte(tok)) {
+			t.Errorf("proxy token %s must not reach the snmp subtree", tok)
+		}
+	}
+	assertNoSecrets(t, b)
 }
