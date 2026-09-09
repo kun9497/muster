@@ -243,9 +243,18 @@ func TestMailPostfixVrfyDisabled(t *testing.T) {
 		t.Errorf("authorized_submit_users = %q", got)
 	}
 
+	// Ruling LR-8: postfix's mail_conf_bool takes yes or no, case blind, and
+	// refuses to start on anything else - "on" included. Reading it as a yes
+	// answered VRFY for a host that cannot be running this file at all, so the
+	// verdict steps back and names the parameter. The evidence leaf keeps the
+	// value as written, which is what tells the operator what to fix.
 	on := build(t, "mail", mailAccess(map[string]string{postfixMainCf: "main.cf.vrfy-on"}))
-	if !mailBool(t, on, "mail.expn_vrfy_restricted") {
-		t.Error(`postfix reads "on" as yes, so VRFY is refused`)
+	absentBecause(t, on, "mail.expn_vrfy_restricted", "disable_vrfy_command", "on")
+	if got := mailString(t, on, "mail.postfix.disable_vrfy_command"); got != "on" {
+		t.Errorf("disable_vrfy_command = %q, want the value as written", got)
+	}
+	if w := on.Worst("mail"); w != facts.StatusOK {
+		t.Errorf("Worst(mail) = %s, want ok: a file postfix refuses is not a collector error", w)
 	}
 	// This file sets nothing else, so it is where the unset-parameter branch
 	// of smtpd_relay_restrictions is pinned.
@@ -596,5 +605,32 @@ func TestMailLeftoverIsNamedBesideASecondMTA(t *testing.T) {
 	absentBecause(t, b, "mail.expn_vrfy_restricted", "postfix", "sendmail")
 	if w := b.Worst("mail"); w != facts.StatusOK {
 		t.Errorf(`Worst("mail") = %s, want ok`, w)
+	}
+}
+
+// Ruling LR-12: the emission set is driven by the REGISTRY, not by a list this
+// file keeps in step by hand — a key added to registry.yaml and never
+// published would otherwise reach a control as `missing` → ERROR(missing_fact).
+func TestMailPublishesEveryRegisteredKeyOnAHostWithNoMta(t *testing.T) {
+	b := buildBegun(t, "mail", mailAccess(nil))
+	reg, err := facts.LoadRegistry()
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := 0
+	for _, k := range reg.Keys {
+		if k.Collector != "mail" {
+			continue
+		}
+		n++
+		if s := env(t, b, k.Key).Status; s != facts.StatusOK && s != facts.StatusAbsent {
+			t.Errorf("%s = %s, want ok or absent on a host with no MTA", k.Key, s)
+		}
+	}
+	if n == 0 {
+		t.Fatal("the registry declares no mail keys, so this test would pass vacuously")
+	}
+	if w := b.Worst("mail"); w != facts.StatusOK {
+		t.Errorf("Worst(mail) = %s, want ok", w)
 	}
 }

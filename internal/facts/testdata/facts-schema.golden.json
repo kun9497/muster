@@ -3494,7 +3494,7 @@
     {
       "Key": "mail.postfix.disable_vrfy_command",
       "Type": "string",
-      "Description": "The disable_vrfy_command value of /etc/postfix/main.cf, as written, so a reader sees the spelling the file uses; postfix accepts yes, true, on and 1 for the affirmative, case-insensitively. Absent, naming the compiled default \"no\", when main.cf does not set it - the derived mail.expn_vrfy_restricted still reads that default. Absent on a sendmail or exim host, and denied when main.cf could not be read.",
+      "Description": "The disable_vrfy_command value of /etc/postfix/main.cf, as written, so a reader sees the spelling the file uses; postfix takes yes or no, case blind, and refuses to start on anything else, so a value outside that pair leaves mail.expn_vrfy_restricted absent rather than answered from the compiled default. Absent, naming the compiled default \"no\", when main.cf does not set it - the derived mail.expn_vrfy_restricted still reads that default. Absent on a sendmail or exim host, and denied when main.cf could not be read.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "mail",
@@ -3524,7 +3524,7 @@
     {
       "Key": "mail.expn_vrfy_restricted",
       "Type": "bool",
-      "Description": "Whether the MTA refuses the SMTP VRFY and EXPN commands, which enumerate accounts and mailing lists to anyone who can open port 25. postfix - disable_vrfy_command is affirmative; postfix implements no EXPN command at all, so that one parameter settles both, and its compiled default no leaves VRFY answered. A per-service \"-o disable_vrfy_command\" override in master.cf is NOT modelled, so this reads main.cf's answer for every service. sendmail - both novrfy and noexpn are in mail.sendmail.privacy_options after a goaway is expanded and every PrivacyOptions line is folded in. exim - ABSENT, because exim decides both in its ACLs, which this collector does not model. ABSENT when more than one MTA is installed at once, naming both, because the configuration files cannot say which of them serves port 25. Absent on a host with no MTA, and denied when the configuration exists but could not be read.",
+      "Description": "Whether the MTA refuses the SMTP VRFY and EXPN commands, which enumerate accounts and mailing lists to anyone who can open port 25. postfix - disable_vrfy_command is yes; postfix implements no EXPN command at all, so that one parameter settles both, and its compiled default no leaves VRFY answered. postfix takes yes or no there, case blind, and refuses to start on anything else, so a value outside that pair leaves this ABSENT naming the parameter rather than answered from the compiled default. A per-service \"-o disable_vrfy_command\" override in master.cf is NOT modelled, so this reads main.cf's answer for every service. sendmail - both novrfy and noexpn are in mail.sendmail.privacy_options after a goaway is expanded and every PrivacyOptions line is folded in. exim - ABSENT, because exim decides both in its ACLs, which this collector does not model. ABSENT when more than one MTA is installed at once, naming both, because the configuration files cannot say which of them serves port 25. Absent on a host with no MTA, and denied when the configuration exists but could not be read.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "mail",

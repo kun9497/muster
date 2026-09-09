@@ -365,14 +365,24 @@ func (p *mailParse) publishPostfix(b *collect.Builder, src *facts.Source) {
 	// postfix implements no EXPN command at all — it answers 502 whatever the
 	// configuration says — so the one parameter settles both halves of the
 	// question, and its own compiled default leaves VRFY answered.
-	v := p.postfix["disable_vrfy_command"]
+	v, set := p.postfix["disable_vrfy_command"]
 	if oversized(v) {
 		// The string leaf refused this value; a verdict must not be drawn
 		// from a value the collector declined to store either.
 		p.setExpnVrfy(b, collect.Absent("disable_vrfy_command: "+oversizedReason))
 		return
 	}
-	e := collect.OK(postfixYes(v), src)
+	yes, isBool := postfixYes(v)
+	if set && !isBool {
+		// Ruling LR-8, the L-46 shape: postfix refuses to start on a boolean
+		// it does not recognise, so reading this parameter as its compiled
+		// default would be a confident verdict about a configuration this
+		// host cannot be running.
+		p.setExpnVrfy(b, collect.Absent("disable_vrfy_command = "+v+" is not a postfix boolean; "+
+			"postfix takes yes or no, case blind, and refuses to start on anything else"))
+		return
+	}
+	e := collect.OK(yes, src)
 	e.Reason = "postfix implements no EXPN command, so disable_vrfy_command decides both; its compiled default is no"
 	p.setExpnVrfy(b, e)
 }
@@ -514,16 +524,23 @@ func parsePostfixInto(dst map[string]string, data []byte) {
 	}
 }
 
-// postfixYes reads postfix's boolean form. postfix accepts yes/no,
-// true/false, on/off and 1/0, case-insensitively; anything else makes it
-// refuse to start, so the compiled default — false for every boolean this
-// collector reads — is the honest answer for it too.
-func postfixYes(v string) bool {
+// postfixYes reads postfix's boolean form, and reports whether the value IS
+// one.
+//
+// Ruling LR-8: the spellings are postfix's own, and there are exactly two of
+// them. mail_conf_bool() compares the value against "yes" and "no", case
+// blind, and fatals on anything else — so "true", "on" and "1" are not
+// postfix booleans at all, and reading one as a yes answered a question about
+// a host postfix refuses to start on. A value outside the pair leaves the
+// verdict to the caller, which absents it rather than guessing.
+func postfixYes(v string) (bool, bool) {
 	switch strings.ToLower(strings.TrimSpace(v)) {
-	case "yes", "true", "on", "1":
-		return true
+	case "yes":
+		return true, true
+	case "no":
+		return false, true
 	}
-	return false
+	return false, false
 }
 
 // sendmailLogicalLines joins a sendmail.cf's continuation lines: readcf

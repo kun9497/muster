@@ -1,3 +1,5 @@
-# Synthetic postfix main.cf: the boolean spelled "on" rather than "yes".
+# Synthetic postfix main.cf: disable_vrfy_command spelled "on", which is NOT
+# a postfix boolean - mail_conf_bool takes yes or no, case blind, and postfix
+# refuses to start on anything else.
 myhostname = mail.example.org
 disable_vrfy_command = on
