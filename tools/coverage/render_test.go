@@ -58,23 +58,33 @@ func TestRenderMarksDeferredItems(t *testing.T) {
 	items := []controls.KISAItem{
 		{ID: "U-01", NameKo: "root 계정 원격 접속 제한", Importance: "상"},
 		{ID: "U-15", NameKo: "파일 및 디렉터리 소유자 설정", Importance: "상"},
+		{ID: "U-33", NameKo: "숨겨진 파일 및 디렉토리 검색 및 제거", Importance: "하"},
 		{ID: "U-45", NameKo: "메일 서비스 버전 점검", Importance: "중"},
 	}
-	deferred := []controls.Deferral{{ID: "U-15", Stage: "3", Reason: "needs the deep filesystem walk"}}
+	// Two stages, neither of them the one the committed table holds, so a
+	// row that hard-coded "stage 3" would fail both times.
+	deferred := []controls.Deferral{
+		{ID: "U-15", Stage: "4", Reason: "needs the deep filesystem walk"},
+		{ID: "U-33", Stage: "7", Reason: "needs the deep filesystem walk"},
+	}
 	set := []controls.Control{
 		{ID: "muster.account.root_remote_login", Automation: "auto", References: controls.References{KISA: map[string][]string{"2026": {"U-01"}}}},
 	}
 	got := render(items, deferred, nil, set)
-	const want = "| U-15 | 파일 및 디렉터리 소유자 설정 | 상 | — | — | deferred (stage 3) |"
-	if !strings.Contains(got, want) {
-		t.Errorf("missing deferred row %q in:\n%s", want, got)
+	for _, want := range []string{
+		"| U-15 | 파일 및 디렉터리 소유자 설정 | 상 | — | — | deferred (stage 4) |",
+		"| U-33 | 숨겨진 파일 및 디렉토리 검색 및 제거 | 하 | — | — | deferred (stage 7) |",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing deferred row %q in:\n%s", want, got)
+		}
 	}
 	// The row that is neither enrolled nor deferred keeps saying so, or
 	// "deferred" would just be a nicer word for the same gap.
 	if !strings.Contains(got, "| U-45 | 메일 서비스 버전 점검 | 중 | — | — | not enrolled |") {
 		t.Errorf("an item that is neither enrolled nor deferred must still read \"not enrolled\":\n%s", got)
 	}
-	if !strings.Contains(got, "1 of 3 items enrolled (auto 1, partial 0, manual 0)") {
+	if !strings.Contains(got, "1 of 4 items enrolled (auto 1, partial 0, manual 0)") {
 		t.Errorf("a deferred item must not be counted as enrolled:\n%s", got)
 	}
 	if strings.Contains(got, "needs the deep filesystem walk") {

@@ -43,15 +43,12 @@ const shapeOnlyNote = "note: stig and nist_800_53 references checked for shape o
 // every registered key. The list is omitted, along with the "unused:" label,
 // when there is nothing to list -- a set that reads everything it collects
 // should say so and stop.
-func usageNote(usage []controls.CollectorUsage) string {
-	registered, used, engine := 0, 0, 0
-	var unused []string
-	for _, u := range usage {
-		registered += u.Registered
-		used += u.Used
-		engine += u.Engine
-		unused = append(unused, u.Unused...)
-	}
+//
+// It takes the unused keys rather than deriving them from usage: they are
+// controls.UnusedKeys, in registry order (spec §5.5, M-40/M-42), and the
+// report groups them by collector instead.
+func usageNote(usage []controls.CollectorUsage, unused []string) string {
+	registered, used, engine := controls.Totals(usage)
 	note := fmt.Sprintf("note: %d of %d registered fact keys are used by a control (%d read by the engine)", used, registered, engine)
 	if len(unused) > 0 {
 		note += "; unused: " + strings.Join(unused, ", ")
@@ -146,7 +143,7 @@ func runControls(args []string, stdout, stderr io.Writer) int {
 		// of the registry a control reads, how much the engine reads on its
 		// own, and which keys nobody reads. Some of the last are collected
 		// for controls that do not exist yet, so this never fails the lint.
-		fmt.Fprintln(stdout, usageNote(controls.FactUsage(set, reg)))
+		fmt.Fprintln(stdout, usageNote(controls.FactUsage(set, reg), controls.UnusedKeys(set, reg)))
 		// Printed here, after every directory check, so a run that fails on
 		// --fixtures or --kisa does not first hand out advice about a flag
 		// that had nothing to do with the failure.

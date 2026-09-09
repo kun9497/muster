@@ -52,6 +52,34 @@ func TestFactUsagePerCollectorInRegistryOrder(t *testing.T) {
 			t.Errorf("%s: %d used + %d engine + %d unused != %d registered", u.Collector, u.Used, u.Engine, len(u.Unused), u.Registered)
 		}
 	}
+
+	// M-41: a key a control names is used by definition, whatever else
+	// reads it. Engine counts what no control cites, or the headline claim
+	// "facts used, not facts collected" would under-count the facts used.
+	cites := &Set{Controls: []Control{{
+		ID:     "muster.file.cites_an_engine_key",
+		Checks: []Clause{{Fact: "walk.complete", Op: "present"}},
+	}}}
+	engineReg := doubleRegistry(facts.Entry{Key: "walk.complete", Collector: "walk"})
+	wantCited := []CollectorUsage{{Collector: "walk", Registered: 1, Used: 1, Engine: 0}}
+	if got := FactUsage(cites, engineReg); !reflect.DeepEqual(got, wantCited) {
+		t.Errorf("a control citing an engine-read key: FactUsage =\n%#v\nwant\n%#v", got, wantCited)
+	}
+}
+
+// M-3/LOW-5: both renderers state the same three numbers, so they read them
+// from one place rather than each folding the slice again.
+func TestTotalsSumsEveryCollector(t *testing.T) {
+	registered, used, engine := Totals([]CollectorUsage{
+		{Collector: "a", Registered: 5, Used: 3, Engine: 1, Unused: []string{"a.k"}},
+		{Collector: "b", Registered: 2, Used: 0, Engine: 0, Unused: []string{"b.k", "b.j"}},
+	})
+	if registered != 7 || used != 3 || engine != 1 {
+		t.Errorf("Totals = (%d, %d, %d), want (7, 3, 1)", registered, used, engine)
+	}
+	if r, u, e := Totals(nil); r != 0 || u != 0 || e != 0 {
+		t.Errorf("Totals(nil) = (%d, %d, %d), want zeroes", r, u, e)
+	}
 }
 
 // A control names facts in four places besides checks, and a manual control
@@ -90,12 +118,14 @@ func TestFactUsageCountsEveryPlaceAControlNamesAFact(t *testing.T) {
 	}
 }
 
-// M-3: UnusedKeys stays as a wrapper, so the note the CLI prints and the
-// table tools/coverage renders can never disagree about what is unused.
+// M-3/M-40: UnusedKeys stays a wrapper over FactUsage, so the note the CLI
+// prints and the table tools/coverage renders can never disagree about what
+// is unused -- but it answers in registry order (spec §5.5), not in the
+// report's per-collector order.
 func TestUnusedKeysIsDerivedFromFactUsage(t *testing.T) {
-	// alpha.k sits between the two zeta keys, so a wrapper that walks the
-	// registry itself and one that concatenates the per-collector lists
-	// produce different orders -- this pins the second.
+	// alpha.k sits between the two zeta keys, so registry order and the
+	// concatenation of the per-collector lists differ: registry order is
+	// [alpha.k, zeta.other], the grouped order [zeta.other, alpha.k].
 	reg := doubleRegistry(
 		facts.Entry{Key: "zeta.cited", Collector: "zeta"},
 		facts.Entry{Key: "alpha.k", Collector: "alpha"},
@@ -105,8 +135,8 @@ func TestUnusedKeysIsDerivedFromFactUsage(t *testing.T) {
 		ID:     "muster.file.double",
 		Checks: []Clause{{Fact: "zeta.cited", Op: "present"}},
 	}}}
-	if got, want := UnusedKeys(set, reg), []string{"zeta.other", "alpha.k"}; !reflect.DeepEqual(got, want) {
-		t.Errorf("UnusedKeys = %v, want %v (the per-collector lists in order)", got, want)
+	if got, want := UnusedKeys(set, reg), []string{"alpha.k", "zeta.other"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("UnusedKeys = %v, want %v (registry order, spec §5.5)", got, want)
 	}
 
 	realSet, err := LoadDefault()
@@ -117,12 +147,36 @@ func TestUnusedKeysIsDerivedFromFactUsage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var want []string
+	// The same keys the report calls unused, no more and no fewer...
+	fromReport := map[string]bool{}
+	total := 0
 	for _, u := range FactUsage(realSet, realReg) {
-		want = append(want, u.Unused...)
+		for _, k := range u.Unused {
+			fromReport[k] = true
+			total++
+		}
 	}
-	if got := UnusedKeys(realSet, realReg); !reflect.DeepEqual(got, want) {
-		t.Errorf("UnusedKeys must be the concatenation of every CollectorUsage.Unused:\ngot  %v\nwant %v", got, want)
+	got := UnusedKeys(realSet, realReg)
+	if len(got) != total {
+		t.Errorf("UnusedKeys lists %d keys, the report %d", len(got), total)
+	}
+	for _, k := range got {
+		if !fromReport[k] {
+			t.Errorf("%s is not in any CollectorUsage.Unused", k)
+		}
+	}
+	// ...in the order the registry lists them. The real registry mentions
+	// files and services twice each, so this is not the grouped order.
+	at := map[string]int{}
+	for i, e := range realReg.Keys {
+		at[e.Key] = i
+	}
+	prev := -1
+	for _, k := range got {
+		if at[k] <= prev {
+			t.Fatalf("UnusedKeys is not in registry order: %s comes at %d, after %d", k, at[k], prev)
+		}
+		prev = at[k]
 	}
 }
 

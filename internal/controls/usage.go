@@ -21,8 +21,8 @@ var engineReadKeys = set("walk.complete", "sshd.collect_method", "sshd.personas_
 // used, not facts collected). Registered is how many keys the registry files
 // under the collector; Used is how many of them at least one control names,
 // whether to judge them or to hand them to a reviewer as evidence; Engine is
-// how many the check engine reads on its own; Unused names the rest, in the
-// order the registry lists them.
+// how many of the rest the check engine reads on its own; Unused names what
+// is left, in the order the registry lists it.
 //
 // Used, Engine and len(Unused) partition Registered, so the three numbers
 // always add up to it.
@@ -39,10 +39,12 @@ type CollectorUsage struct {
 // registry first mentions them and the unused keys in registry order, so the
 // report is a stable rendering of registry order rather than of map order.
 //
-// A key the engine reads is counted in Engine and nowhere else, even in the
-// impossible case of a control naming it: Engine is then a property of the
-// registry and the hand-maintained engineReadKeys list alone, which is what
-// makes it worth reading as a check on that list.
+// M-41: a key a control names is Used, whatever else reads it -- that is
+// what the headline number claims. Engine therefore counts the engine-read
+// keys no control cites, which is the number worth reading as a check on the
+// hand-maintained list: an entry there that a control has since taken over
+// stops being counted, and one for a key nothing reads any more shows up as
+// an engine key in a collector that should have none.
 func FactUsage(s *Set, reg *facts.Registry) []CollectorUsage {
 	used := map[string]bool{}
 	mark := func(cls []Clause) {
@@ -79,10 +81,10 @@ func FactUsage(s *Set, reg *facts.Registry) []CollectorUsage {
 		u := &out[i]
 		u.Registered++
 		switch {
-		case engineReadKeys[e.Key]:
-			u.Engine++
 		case used[e.Key]:
 			u.Used++
+		case engineReadKeys[e.Key]:
+			u.Engine++
 		default:
 			u.Unused = append(u.Unused, e.Key)
 		}
@@ -90,15 +92,40 @@ func FactUsage(s *Set, reg *facts.Registry) []CollectorUsage {
 	return out
 }
 
-// UnusedKeys returns the registered fact keys no control in s references
-// (spec §5.5), grouped by collector in the order FactUsage reports them. It
-// is a note rather than a lint failure: some keys are read by the evaluator
-// itself (see engineReadKeys) and others are collected for controls that do
-// not exist yet.
+// Totals folds a report into the three numbers both renderers state: how
+// many keys are registered, how many a control reads and how many only the
+// engine reads. The unused count is len of the key list, which every caller
+// has anyway (UnusedKeys), and registered - used - engine besides.
+func Totals(usage []CollectorUsage) (registered, used, engine int) {
+	for _, u := range usage {
+		registered += u.Registered
+		used += u.Used
+		engine += u.Engine
+	}
+	return registered, used, engine
+}
+
+// UnusedKeys returns the registered fact keys no control in s references, in
+// registry order (spec §5.5). It is a note rather than a lint failure: some
+// keys are read by the evaluator itself (see engineReadKeys) and others are
+// collected for controls that do not exist yet.
+//
+// It is derived from FactUsage so the note and the table can never disagree
+// about what is unused (M-3), but it answers in the registry's order rather
+// than the report's: a collector may hold several non-contiguous runs of
+// keys, so the two orders differ (M-40).
 func UnusedKeys(s *Set, reg *facts.Registry) []string {
-	var out []string
+	unused := map[string]bool{}
 	for _, u := range FactUsage(s, reg) {
-		out = append(out, u.Unused...)
+		for _, k := range u.Unused {
+			unused[k] = true
+		}
+	}
+	var out []string
+	for _, e := range reg.Keys {
+		if unused[e.Key] {
+			out = append(out, e.Key)
+		}
 	}
 	return out
 }

@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/kun9497/muster/internal/controls"
+	"github.com/kun9497/muster/internal/facts"
 )
 
 var repoFixtures = filepath.Join("..", "..", "controls", "testdata")
@@ -87,6 +89,21 @@ func TestControlsLintPrintsTheUsageNote(t *testing.T) {
 	if !found {
 		t.Errorf("sockets.listening is referenced by no control and must be named in the note: %q", m[0])
 	}
+	// M-40/M-42: the note does not build its own list. It prints
+	// controls.UnusedKeys, which answers in registry order -- a list the
+	// note derived itself from the per-collector report would carry the
+	// same keys in a different order.
+	set, err := controls.LoadDefault()
+	if err != nil {
+		t.Fatal(err)
+	}
+	reg, err := facts.LoadRegistry()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := controls.UnusedKeys(set, reg); !reflect.DeepEqual(unused, want) {
+		t.Errorf("the note's unused list is not controls.UnusedKeys:\ngot  %v\nwant %v", unused, want)
+	}
 }
 
 // The label belongs to the list: a set that reads every key it collects has
@@ -94,12 +111,16 @@ func TestControlsLintPrintsTheUsageNote(t *testing.T) {
 // note rather than as good news. The embedded set always has unused keys, so
 // this shape can only be reached directly.
 func TestUsageNoteOmitsTheListWhenNothingIsUnused(t *testing.T) {
-	got := usageNote([]controls.CollectorUsage{
+	usage := []controls.CollectorUsage{
 		{Collector: "a", Registered: 2, Used: 2},
 		{Collector: "b", Registered: 1, Engine: 1},
-	})
+	}
 	const want = "note: 2 of 3 registered fact keys are used by a control (1 read by the engine)"
-	if got != want {
+	if got := usageNote(usage, nil); got != want {
+		t.Errorf("usageNote = %q, want %q", got, want)
+	}
+	// The list it prints is the one it is given, in that order.
+	if got, want := usageNote(usage, []string{"b.k", "a.k"}), want+"; unused: b.k, a.k"; got != want {
 		t.Errorf("usageNote = %q, want %q", got, want)
 	}
 }

@@ -36,13 +36,11 @@ func join(items []controls.KISAItem, deferred []controls.Deferral, set []control
 	return byItem, stage, unknown
 }
 
-// enrolledCount is how many inventory items muster judges today. A deferred
-// item never counts, whatever the set says: the deferral file is the
-// statement of intent, and an item both deferred and claimed is a lint
-// failure (kisa_coverage), not a coverage gain. The README guard reads this
-// number, so it has exactly one definition.
-func enrolledCount(items []controls.KISAItem, deferred []controls.Deferral, set []controls.Control) int {
-	byItem, stage, _ := join(items, deferred, set)
+// countEnrolled is how many inventory items muster judges today, over an
+// already-joined set. A deferred item never counts, whatever the set says:
+// the deferral file is the statement of intent, and an item both deferred
+// and claimed is a lint failure (kisa_coverage), not a coverage gain.
+func countEnrolled(items []controls.KISAItem, byItem map[string][]controls.Control, stage map[string]string) int {
 	n := 0
 	for _, it := range items {
 		if _, isDeferred := stage[it.ID]; isDeferred {
@@ -53,6 +51,14 @@ func enrolledCount(items []controls.KISAItem, deferred []controls.Deferral, set 
 		}
 	}
 	return n
+}
+
+// enrolledCount answers the same question from the inputs, for callers that
+// have not joined anything -- the README guard in main.go. The table and the
+// guard therefore share one definition of "enrolled".
+func enrolledCount(items []controls.KISAItem, deferred []controls.Deferral, set []controls.Control) int {
+	byItem, stage, _ := join(items, deferred, set)
+	return countEnrolled(items, byItem, stage)
 }
 
 // render joins the KISA inventory with the embedded control set and appends
@@ -86,7 +92,7 @@ func render(items []controls.KISAItem, deferred []controls.Deferral, usage []con
 		}
 	}
 	fmt.Fprintf(&b, "%d of %d items enrolled (auto %d, partial %d, manual %d).\n\n",
-		enrolledCount(items, deferred, set), len(sorted), counts["auto"], counts["partial"], counts["manual"])
+		countEnrolled(items, byItem, stage), len(sorted), counts["auto"], counts["partial"], counts["manual"])
 	b.WriteString("| ID | Item (KISA) | Imp. | Control | Automation | Status |\n|---|---|---|---|---|---|\n")
 	b.WriteString(strings.Join(rows, "\n"))
 	b.WriteString("\n")
@@ -105,13 +111,9 @@ func render(items []controls.KISAItem, deferred []controls.Deferral, usage []con
 // whose three numbers account for every registered key. A collector that has
 // no unused key gets an em dash rather than an empty cell.
 func renderUsage(usage []controls.CollectorUsage) string {
-	registered, used, engine, unused := 0, 0, 0, 0
-	for _, u := range usage {
-		registered += u.Registered
-		used += u.Used
-		engine += u.Engine
-		unused += len(u.Unused)
-	}
+	// The same three numbers the lint note states, from the same fold.
+	registered, used, engine := controls.Totals(usage)
+	unused := registered - used - engine
 	var b strings.Builder
 	b.WriteString("\n## Fact keys used by controls\n\n")
 	fmt.Fprintf(&b, "%d of %d registered keys are read by a control (%d by the engine); %d unused.\n\n", used, registered, engine, unused)

@@ -6,6 +6,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -30,6 +31,11 @@ func run(args []string, stderr io.Writer) int {
 	readmeDir := fs.String("readme-dir", ".", "directory holding README.md and README.ko.md, whose roadmap sentence -check verifies")
 	check := fs.Bool("check", false, "exit 1 if the committed file differs instead of writing")
 	if err := fs.Parse(args); err != nil {
+		// -h and -help print the usage and are not a failure to determine
+		// anything; a bad flag is.
+		if errors.Is(err, flag.ErrHelp) {
+			return 0
+		}
 		return 2
 	}
 	inventory, err := controls.LoadKISA(*kisaDir)
@@ -47,17 +53,24 @@ func run(args []string, stderr io.Writer) int {
 	}
 	got := []byte(render(items, inventory.Deferred, controls.FactUsage(set, reg), set.Controls))
 	if *check {
+		// Both halves of the gate run every time and the worst code wins,
+		// so a contributor who is stale in the table and in the prose
+		// learns about both in one run instead of one per run.
+		code := 0
 		have, err := os.ReadFile(*out)
-		if err != nil {
+		switch {
+		case err != nil:
 			fmt.Fprintf(stderr, "coverage: %s does not exist; run: go run ./tools/coverage\n", *out)
-			return 1
-		}
-		if !bytes.Equal(have, got) {
+			code = 1
+		case !bytes.Equal(have, got):
 			fmt.Fprintf(stderr, "coverage: %s is out of date; run: go run ./tools/coverage\n", *out)
 			io.WriteString(stderr, unifiedDiff(*out, have, got))
-			return 1
+			code = 1
 		}
-		return checkREADMEs(stderr, *readmeDir, enrolledCount(items, inventory.Deferred, set.Controls), len(items))
+		if c := checkREADMEs(stderr, *readmeDir, enrolledCount(items, inventory.Deferred, set.Controls), len(items)); c > code {
+			code = c
+		}
+		return code
 	}
 	if err := os.WriteFile(*out, got, 0o644); err != nil {
 		return fatal(stderr, err)
