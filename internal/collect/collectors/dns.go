@@ -44,7 +44,13 @@ const (
 // construct outside the model: it counts in dns.unmodelled and the judged
 // leaves step back, rather than being answered from the part of the chain that
 // happened to fit.
-const maxIncludeExpansions = 64
+//
+// Ruling L-59: the number is 256, not 64. A nameserver that keeps one include
+// per zone reaches a hundred fragments while doing nothing pathological, and a
+// cap that turned that ordinary configuration into a manual review would be
+// refusing the hosts this control set exists to judge. 256 still bounds the
+// fan-out the depth guard alone admits.
+const maxIncludeExpansions = 256
 
 // dnsImpl is one modelled DNS server: the configuration files it is
 // recognised by, in probe order, and the binaries whose presence proves the

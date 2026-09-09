@@ -1,0 +1,3 @@
+// Synthetic per-zone fragment. It stands in for the zone statement a real
+// nameserver keeps in its own file; what this fixture exercises is the
+// COUNT of inlined fragments, not their content.

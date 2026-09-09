@@ -3,6 +3,7 @@
 package collectors
 
 import (
+	"fmt"
 	"slices"
 	"strconv"
 	"strings"
@@ -887,7 +888,7 @@ func TestDnsIncludeExpansionIsCapped(t *testing.T) {
 	}
 	// The point of the cap is the work it does NOT do: every inlined fragment
 	// is a file this collector opened, and without the cap this chain opens
-	// the deepest one 64 times over.
+	// the deepest one 256 times over.
 	if n := len(a.reads); n > maxIncludeExpansions+2 {
 		t.Errorf("reads = %d, want at most the cap plus named.conf and os-release", n)
 	}
@@ -900,5 +901,40 @@ func TestDnsIncludeExpansionIsCapped(t *testing.T) {
 	// evidence for what WAS read.
 	if got := stringList(t, b, "dns.config_files"); !slices.Equal(got, []string{bindRhelConf, namedFanA, namedFanB}) {
 		t.Errorf("config_files %v, want each file that was read, once", got)
+	}
+}
+
+// Ruling L-59: the cap bounds a pathological fan-out, and a nameserver that
+// keeps ONE include per zone is not one. A hundred zone fragments, each
+// inlined exactly once, is an ordinary configuration on a host that serves a
+// hundred zones, and it must reach a verdict rather than a manual review.
+func TestDnsOneIncludePerZoneIsNotCapped(t *testing.T) {
+	files := map[string]string{
+		bindRhelConf: "named.conf.many-zones",
+		etcOSRelease: "os-release.rhel9",
+	}
+	for i := 1; i <= 100; i++ {
+		files[fmt.Sprintf("/etc/named/zone-%03d.conf", i)] = "named.conf.zone-include"
+	}
+	b := buildBegun(t, "dns", dnsAccess(files))
+	dnsComplete(t, b)
+
+	if n := dnsInt(t, b, "dns.unmodelled"); n != 0 {
+		t.Errorf("unmodelled = %d, want 0: one include per zone is not a construct outside the model", n)
+	}
+	// The verdict leaves the configuration really does set must ANSWER. An
+	// unset allow-update is none in every version and is absent for its own
+	// reason, so what this test forbids is any leaf stepping back because of
+	// the cap.
+	for _, k := range dnsJudgedLeaves {
+		if r := env(t, b, k).Reason; strings.Contains(r, "expansion") || strings.Contains(r, "inlined") {
+			t.Errorf("%s stepped back for the cap: %s", k, r)
+		}
+	}
+	for _, k := range []string{"dns.options.allow_transfer", "dns.zones"} {
+		if s := env(t, b, k).Status; s != facts.StatusOK {
+			t.Errorf("%s = %s (%s), want ok: a hundred single inclusions must still reach a verdict",
+				k, s, env(t, b, k).Reason)
+		}
 	}
 }

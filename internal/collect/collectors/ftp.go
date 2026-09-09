@@ -676,10 +676,14 @@ func (p *ftpParse) judged() *facts.Envelope {
 		return &e
 	}
 	if p.impl == "none" {
-		reason := "no FTP daemon is installed on this host: none of " +
+		// Ruling L-60: services.ftp.installed is true for a host that only
+		// answers on port 21, and such a host reaches this branch too. The
+		// reason therefore reports what this collector looked for and did not
+		// find, and never claims the host has no FTP daemon.
+		reason := "no modelled FTP daemon configuration is present: none of " +
 			strings.Join(ftpConfCandidates(), ", ") + " is present with its daemon binary"
 		if p.leftover != "" {
-			reason = "no FTP daemon is installed on this host: " + p.leftover
+			reason = "no modelled FTP daemon configuration is present: " + p.leftover
 		}
 		e := collect.Absent(reason)
 		return &e

@@ -670,6 +670,20 @@ func TestFtpNoDaemonIsAbsentNotMissing(t *testing.T) {
 	if w := b.Worst("ftp"); w != facts.StatusOK {
 		t.Errorf(`Worst("ftp") = %s, want ok`, w)
 	}
+	// Ruling L-60: services.ftp.installed is TRUE on a host that only answers
+	// on port 21, and that host reaches this same branch — no conffile of a
+	// modelled daemon with its binary. The reason may therefore report what
+	// this collector looked for and did not find; it may not tell the reader
+	// no FTP daemon is installed, which the gate it is read beside denies.
+	for _, k := range ftpJudgedLeaves {
+		r := env(t, b, k).Reason
+		if strings.Contains(r, "installed on this host") {
+			t.Errorf("%s reason %q contradicts a port-21 listener with no modelled configuration", k, r)
+		}
+		if !strings.Contains(r, "no modelled FTP daemon configuration is present") {
+			t.Errorf("%s reason %q must say what was looked for and not found", k, r)
+		}
+	}
 }
 
 // Ruling L-8: the three new rows are rows of the services TABLE, so they

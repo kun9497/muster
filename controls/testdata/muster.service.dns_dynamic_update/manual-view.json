@@ -2,5 +2,5 @@
   "services":{"dns":{"installed":{"status":"ok","value":true}}},
   "dns":{"implementation":{"status":"ok","value":"bind"},
          "unmodelled":{"status":"ok","value":1},
-         "zones":{"status":"absent","reason":"this configuration uses constructs outside the collector's model: /etc/named.conf: a view statement"}}
+         "zones":{"status":"absent","reason":"this configuration uses constructs outside the collector's model: /etc/named.conf: a view statement, whose per-client zones this collector does not model"}}
 }}

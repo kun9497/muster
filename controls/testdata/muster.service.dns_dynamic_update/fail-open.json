@@ -1,7 +1,7 @@
 {"synthetic": true, "schema_version":1,"run":{},"facts":{
   "services":{"dns":{"installed":{"status":"ok","value":true}}},
   "dns":{"implementation":{"status":"ok","value":"bind"},
-         "options":{"allow_update":{"status":"absent","reason":"allow-update is not set in options; an unset allow-update is none in every BIND version"}},
+         "options":{"allow_update":{"status":"absent","reason":"options sets no allow-update; not set is none in every version"}},
          "zones":{"status":"ok","value":[
            {"name":"example.org","type":"primary","file":"/var/named/example.org.zone","allow_transfer":"none","allow_update":"any","transfer_restricted":true,"update_restricted":false}
          ],"source":{"kind":"file","path":"/etc/named.conf"}}}

@@ -1976,9 +1976,8 @@ keys:
       like: it can still refuse root, but its file is not a list of accounts whose permissions
       this set may offer for judgement), a userlist_file value longer than this collector
       stores, or a row whose own stat_status is undeclared, denied or error - because a partial
-      list is not
-      evidence a control may judge, however clean the rows the collector did reach. A row that
-      stats but cannot be READ keeps the list ok: its permissions are known, and only
+      list is not evidence a control may judge, however clean the rows the collector did reach. A
+      row that stats but cannot be READ keeps the list ok: its permissions are known, and only
       ftp.root_denied loses its answer.
     since: 1
     sensitivity: public
