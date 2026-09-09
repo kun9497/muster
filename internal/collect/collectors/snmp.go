@@ -168,6 +168,13 @@ type snmpParse struct {
 
 	communityDirective bool
 
+	// trapCommunitySeen says a trapcommunity directive has already been read
+	// in this stack. net-snmp applies trapcommunity at PARSE time, so it is
+	// the sinks BELOW it that inherit its string; a sink above one, or on a
+	// host that has none at all, falls back to the compiled-in default
+	// instead (Ruling J-43).
+	trapCommunitySeen bool
+
 	// readFailure is the first read that failed for a reason other than
 	// "not there"; undeclared lists every include the declaration does not
 	// cover; truncated lists every file the read primitive cut at the read
@@ -354,21 +361,65 @@ func (p *snmpParse) directive(keyword string, args []string, depth int) {
 		// when it names none of its own. A trap is outbound, so it enables no
 		// inbound protocol version; only the string is measured.
 		if len(args) > 0 {
+			p.trapCommunitySeen = true
 			p.addCommunity("trap", args[0], "")
 		}
 	case "trapsink", "trap2sink", "informsink":
-		// HOST [COMMUNITY [PORT]] — the community is the SECOND argument and
-		// the host is never one; a sink that names no community of its own
-		// uses trapcommunity's, which is already recorded, so it adds none.
-		if len(args) > 1 {
-			p.addCommunity("trap", args[1], "")
-		}
+		p.trapSink(args)
+	case "trapsess":
+		p.trapSess(args)
 	case "agentaddress":
 		p.agentAddress(args)
 	case "includefile":
 		p.includeFile(args, depth)
 	case "includedir":
 		p.includeDir(args, depth)
+	}
+}
+
+// snmpCompiledTrapCommunity is the community net-snmp itself falls back to
+// when a trap destination names none and no trapcommunity directive has set
+// one — the agent's compiled-in default, a public constant of the software
+// and not a secret read off this host. It is passed through addCommunity
+// like any other string, so the record it produces is the same five redacted
+// fields and the word itself still never reaches the snapshot.
+const snmpCompiledTrapCommunity = "public"
+
+// trapSink records `trapsink|trap2sink|informsink HOST [COMMUNITY [PORT]]`.
+// The community is the SECOND argument and the host is never one.
+//
+// Ruling J-43 (Task 2 re-review note 1): a sink that names no community of
+// its own uses the trapcommunity directive's string when one has been read
+// above it — that string is already recorded, so the sink adds none. With no
+// trapcommunity in the stack there is still a community on the wire: net-snmp
+// falls back to its compiled-in default. Recording nothing for that host left
+// snmp.communities empty, which makes U-60's and U-61's `each` clauses
+// vacuously true — a PASS on a host trapping with the best-known community
+// there is. So the fallback is recorded, once per bare sink, exactly as the
+// configuration would send it.
+func (p *snmpParse) trapSink(args []string) {
+	if len(args) > 1 {
+		p.addCommunity("trap", args[1], "")
+		return
+	}
+	if len(args) == 1 && !p.trapCommunitySeen {
+		p.addCommunity("trap", snmpCompiledTrapCommunity, "")
+	}
+}
+
+// trapSess records `trapsess [SNMPCMD OPTIONS] HOST` — net-snmp's modern
+// replacement for trapsink, whose community is not positional but the
+// argument of -c. Only that one flag is read: every other option, and the
+// destination itself, is passed over rather than guessed at, which is the
+// same discipline createUser's option handling follows (Ruling J-38). The
+// flag is matched case-sensitively because net-snmp's -c and -C are two
+// different options.
+func (p *snmpParse) trapSess(args []string) {
+	for i := 0; i+1 < len(args); i++ {
+		if args[i] == "-c" {
+			p.addCommunity("trap", args[i+1], "")
+			return
+		}
 	}
 }
 
@@ -520,16 +571,30 @@ func snmpStripOptionPairs(args []string) []string {
 }
 
 // snmpAuthProtocols and snmpPrivProtocols are the only values that may ever
-// reach v3_users' protocol fields. They are matched case-insensitively and
-// stored upper-cased, so two hosts that spell "sha" and "SHA" produce one
-// fact and the stored byte string never echoes its input.
-var snmpAuthProtocols = map[string]bool{
-	"md5": true, "sha": true, "sha-224": true, "sha-256": true, "sha-384": true, "sha-512": true,
+// reach v3_users' protocol fields: each maps a spelling net-snmp accepts,
+// folded to lower case, to the one CANONICAL form that is stored. The stored
+// value is therefore always one of a dozen public constants and never echoes
+// the input, so two hosts that write "aes256" and "AES-256" produce one fact.
+//
+// Ruling J-43 (Task 2 re-review note 4): net-snmp accepts the undashed
+// spellings of the SHA-2 and AES key lengths as well as the dashed ones, and
+// a spelling the list misses leaves the field empty — which the record
+// documents as "not seen here", so a user with strong protocols would read as
+// one whose protocols were never named. Understating is the safe direction,
+// but it is still wrong, so both spellings are listed.
+var snmpAuthProtocols = map[string]string{
+	"md5": "MD5", "sha": "SHA",
+	"sha-224": "SHA-224", "sha224": "SHA-224",
+	"sha-256": "SHA-256", "sha256": "SHA-256",
+	"sha-384": "SHA-384", "sha384": "SHA-384",
+	"sha-512": "SHA-512", "sha512": "SHA-512",
 }
 
-var snmpPrivProtocols = map[string]bool{
-	"des": true, "aes": true, "aes-128": true, "aes-192": true, "aes-256": true,
-	"aes192": true, "aes256": true,
+var snmpPrivProtocols = map[string]string{
+	"des": "DES", "aes": "AES",
+	"aes-128": "AES-128", "aes128": "AES-128",
+	"aes-192": "AES-192", "aes192": "AES-192",
+	"aes-256": "AES-256", "aes256": "AES-256",
 }
 
 // snmpProtocols picks the authentication and privacy protocols out of
@@ -538,13 +603,14 @@ var snmpPrivProtocols = map[string]bool{
 // between is a passphrase or a key and is passed over without being stored.
 func snmpProtocols(toks []string) (auth, priv string) {
 	for i, t := range toks {
-		if !snmpAuthProtocols[strings.ToLower(t)] {
+		a, ok := snmpAuthProtocols[strings.ToLower(t)]
+		if !ok {
 			continue
 		}
-		auth = strings.ToUpper(t)
+		auth = a
 		for _, u := range toks[i+1:] {
-			if snmpPrivProtocols[strings.ToLower(u)] {
-				return auth, strings.ToUpper(u)
+			if pv, ok := snmpPrivProtocols[strings.ToLower(u)]; ok {
+				return auth, pv
 			}
 		}
 		return auth, ""

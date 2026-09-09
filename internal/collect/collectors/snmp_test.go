@@ -94,6 +94,14 @@ var snmpFixtureSecrets = []string{
 	"unquotedPhraseWordD",
 	"tr4pOnlyString",
 	"s1nkOnlyString",
+	"s1nkTwoString",
+	"s3ssOnlyString",
+	"aliasAuthPhraseOne",
+	"aliasPrivPhraseTwo",
+	"aliasAuthPhraseThree",
+	"aliasPrivPhraseFour",
+	"aliasAuthPhraseFive",
+	"aliasPrivPhraseSix",
 }
 
 // assertNoSecrets is the redaction proof every snmp test ends with.
@@ -528,7 +536,7 @@ func TestSnmpTrapCommunitiesAreRecorded(t *testing.T) {
 
 	recs := okList(t, b, "snmp.communities")
 	if len(recs) != 2 {
-		t.Fatalf("communities %v, want the trapcommunity and the trap2sink community (a sink with no community of its own adds none)", recs)
+		t.Fatalf("communities %v, want the trapcommunity and the trap2sink community (a sink with no community of its own uses the trapcommunity already recorded above it and adds none)", recs)
 	}
 	tc := snmpRecord(t, recs, 0)
 	if tc["ref"] != "c1" || tc["kind"] != "trap" || tc["length"] != 14 ||
@@ -547,6 +555,91 @@ func TestSnmpTrapCommunitiesAreRecorded(t *testing.T) {
 	// A sink host is not a community and is not measured as one.
 	if bytes.Contains(snmpSubtreeJSON(t, b), []byte("198.51.100.5")) {
 		t.Error("a trap sink host must not reach the snmp subtree as a community")
+	}
+	assertNoSecrets(t, b)
+}
+
+// Ruling J-43 (Task 2 re-review note 1). net-snmp's trap sinks fall back to a
+// COMPILED-IN default community when neither the sink line nor a trapcommunity
+// directive above them names one, so a configuration of bare sinks really does
+// ship traps with the best-known community there is. Recording nothing for it
+// left snmp.communities empty on such a host, which makes U-60's and U-61's
+// `each` clauses vacuously true — a PASS on a weak credential. Note 2:
+// trapsess is net-snmp's modern replacement for trapsink and carries its
+// community in a -c flag rather than by position.
+func TestSnmpBareTrapSinksRecordTheCompiledDefault(t *testing.T) {
+	b := buildBegun(t, "snmp", snmpAccess(map[string]string{testSnmpdConf: "snmpd.conf.traps-default"}, nil))
+
+	recs := okList(t, b, "snmp.communities")
+	if len(recs) != 4 {
+		t.Fatalf("communities %v, want a record for each of the two bare sinks, the sink that names its own community and the trapsess -c", recs)
+	}
+	// c1, c2 — the bare trapsink and trap2sink: no community token and no
+	// trapcommunity anywhere above them, so each falls back to the compiled-in
+	// default, which is a well-known string six runes long.
+	for i, ref := range []string{"c1", "c2"} {
+		r := snmpRecord(t, recs, i)
+		if r["ref"] != ref || r["kind"] != "trap" || r["is_default"] != true ||
+			r["length"] != 6 || r["source_restricted"] != false {
+			t.Errorf("communities[%d] = %v, want {%s, trap, is_default true, length 6, source_restricted false}", i, r, ref)
+		}
+	}
+	// c3 — an informsink naming its own 13-rune community, which is no default.
+	named := snmpRecord(t, recs, 2)
+	if named["ref"] != "c3" || named["kind"] != "trap" || named["is_default"] != false ||
+		named["length"] != 13 || named["source_restricted"] != false {
+		t.Errorf("communities[2] = %v, want the informsink's own community as {c3, trap, is_default false, length 13}", named)
+	}
+	// c4 — trapsess: the community is the token after -c, never the host and
+	// never the version argument of the -v that precedes it.
+	sess := snmpRecord(t, recs, 3)
+	if sess["ref"] != "c4" || sess["kind"] != "trap" || sess["is_default"] != false ||
+		sess["length"] != 14 || sess["source_restricted"] != false {
+		t.Errorf("communities[3] = %v, want the trapsess -c community as {c4, trap, is_default false, length 14}", sess)
+	}
+	for i := range recs {
+		if r := snmpRecord(t, recs, i); len(r) != 5 {
+			t.Errorf("community record %v carries %d fields, want exactly five", r, len(r))
+		}
+	}
+	// A trap destination is not a community and is not measured as one.
+	for _, host := range []string{"198.51.100.9", "198.51.100.11", "203.0.113.7", "198.51.100.13"} {
+		if bytes.Contains(snmpSubtreeJSON(t, b), []byte(host)) {
+			t.Errorf("trap destination %s must not reach the snmp subtree", host)
+		}
+	}
+	assertNoSecrets(t, b)
+}
+
+// Ruling J-43. net-snmp accepts the undashed spellings of the SHA-2 and AES
+// key lengths (SHA512, AES128) as well as the dashed ones, and a spelling the
+// allow-list misses leaves the protocol field EMPTY — which the record
+// documents as "not seen here", so a v3 user with strong protocols would read
+// as one whose protocols were never named. Whichever spelling the file used,
+// the stored value is the canonical dashed upper-case form, so two hosts that
+// write AES256 and AES-256 produce one fact.
+func TestSnmpUndashedProtocolSpellingsAreCanonical(t *testing.T) {
+	b := buildBegun(t, "snmp", snmpAccess(map[string]string{
+		testSnmpStateFile: "snmpd.conf.createuser-aliases",
+	}, nil))
+
+	users := okList(t, b, "snmp.v3_users")
+	if len(users) != 3 {
+		t.Fatalf("v3_users %v, want the three createUser lines", users)
+	}
+	want := []struct{ name, auth, priv string }{
+		{"erin", "SHA-512", "AES-256"},
+		{"frank", "SHA-256", "AES-128"}, // spelled in lower case in the file
+		{"gina", "SHA-224", "AES-192"},
+	}
+	for i, w := range want {
+		u := snmpRecord(t, users, i)
+		if u["name"] != w.name || u["auth_proto"] != w.auth || u["priv_proto"] != w.priv || u["level"] != "priv" {
+			t.Errorf("v3_users[%d] = %v, want {%s, %s, %s, priv} — the undashed spelling canonicalised", i, u, w.name, w.auth, w.priv)
+		}
+		if len(u) != 4 {
+			t.Errorf("v3_users record %v carries %d fields, want exactly four", u, len(u))
+		}
 	}
 	assertNoSecrets(t, b)
 }
