@@ -1896,7 +1896,7 @@ keys:
   - key: ftp.config_files
     type: list<string>
     subject_kind: file
-    description: The FTP configuration files actually read, sorted; a proftpd Include the declaration covers appears alongside the main file, and each file appears once however it was reached.
+    description: The FTP configuration files actually read, sorted; a proftpd Include the declaration covers appears alongside the main file, and each file appears once however it was reached. A main configuration file that exists but could not be read carries the read's own status here rather than an ok empty list, because an ok list asserts found and readable; a fragment that failed after another file answered leaves those files listed and shows up in ftp.parse_complete instead.
     since: 1
     sensitivity: public
     collector: ftp
@@ -1971,8 +1971,12 @@ keys:
       never opened. root_listed is true when a non-comment line of the file is exactly root; it is
       false, with a reason, whenever the file could be stat-ed but not read. This list and
       ftp.access_file_present are ABSENT together whenever the SET could not be completed - a
-      source outside the declaration, an unreadable or truncated pam.d service file, or a row
-      whose own stat_status is undeclared, denied or error - because a partial list is not
+      source outside the declaration, an unreadable or truncated pam.d service file, a
+      pam_listfile line filtering on something other than the account name (item=group and the
+      like: it can still refuse root, but its file is not a list of accounts whose permissions
+      this set may offer for judgement), a userlist_file value longer than this collector
+      stores, or a row whose own stat_status is undeclared, denied or error - because a partial
+      list is not
       evidence a control may judge, however clean the rows the collector did reach. A row that
       stats but cannot be READ keeps the list ok: its permissions are known, and only
       ftp.root_denied loses its answer.
@@ -1997,7 +2001,9 @@ keys:
       its own failure handling, and optional or sufficient do not make a failure refuse the
       login), it filters on item=user, it names an explicit sense, and it carries no apply=; a
       line that fails any of those still becomes a row, because U-56 judges a list's permissions
-      whatever PAM does with it, but it cannot decide this leaf. Absent when a list that would
+      whatever PAM does with it, but it cannot decide this leaf - except a line filtering on
+      something other than the account name, which becomes no row at all and absents the whole
+      access set instead. Absent when a list that would
       decide it could not be read - an undeclared path, an unreadable or truncated file, or a
       directive that cannot refuse a login by itself - with the reason naming it; DENIED rather
       than absent when the pam.d service file itself could not be read, so a reader sees a

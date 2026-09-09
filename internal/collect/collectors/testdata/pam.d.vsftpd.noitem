@@ -1,0 +1,5 @@
+# synthetic /etc/pam.d/vsftpd whose list names no item=, which pam_listfile
+# itself refuses to act on - the sense is there, the field it filters on is
+# not.
+auth	required	pam_listfile.so sense=deny file=/etc/ftpusers onerr=succeed
+@include common-auth

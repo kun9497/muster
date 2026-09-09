@@ -627,6 +627,16 @@ func TestFtpUnreadableConfIsDenied(t *testing.T) {
 	if e := env(t, b, "ftp.parse_complete"); e.Status != facts.StatusOK || e.Value != false {
 		t.Errorf("parse_complete %+v, want ok false", e)
 	}
+	// Ruling L-52 (C3, mail's L-49 shape): the file this collector knows is
+	// there and could not open is not an ok empty list of configuration
+	// files - an ok list asserts found AND readable.
+	cf := env(t, b, "ftp.config_files")
+	if cf.Status != facts.StatusDenied {
+		t.Errorf("config_files %+v, want denied - never ok with the file silently omitted", cf)
+	}
+	if !strings.Contains(cf.Reason, "/etc/vsftpd.conf") {
+		t.Errorf("config_files reason %q must name the file it could not open", cf.Reason)
+	}
 	// Ruling L-36: the Worst assertions elsewhere in this file are only
 	// meaningful because this one shows the builder really does rank the
 	// collector's envelopes — build(), which never calls Begin, reports ok
@@ -1366,6 +1376,35 @@ func TestFtpBlindAccessSourceDegradesEveryLeaf(t *testing.T) {
 	})
 	pamDenied.fails["/etc/pam.d/vsftpd"] = unix.EACCES
 	ftpAccessLeavesBlocked(t, buildBegun(t, "ftp", pamDenied), facts.StatusDenied, "/etc/pam.d/vsftpd")
+
+	// Ruling L-46: the PAM service file was READ, but the read stopped at the
+	// cap, so a pam_listfile line past it names a list nobody has seen. The
+	// deny line before the cap is not licence to call the set complete.
+	pamCut := ftpAccess(map[string]string{
+		"/etc/vsftpd.conf":  "vsftpd.conf.debian",
+		"/etc/pam.d/vsftpd": "pam.d.vsftpd.debian",
+		"/etc/ftpusers":     "ftpusers.root",
+	})
+	pamCut.truncated["/etc/pam.d/vsftpd"] = true
+	cut := buildBegun(t, "ftp", pamCut)
+	ftpAccessLeavesBlocked(t, cut, facts.StatusAbsent, "/etc/pam.d/vsftpd was cut at the read limit")
+	// The configuration files themselves were read in full: only the PAM
+	// stack was cut, and that is an access-set blind spot, not a parse one.
+	if e := env(t, cut, "ftp.parse_complete"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("parse_complete %+v: vsftpd.conf itself was read in full", e)
+	}
+
+	// Ruling L-46: an oversized userlist_file names a list this collector
+	// cannot even identify, so the set is incomplete - never an ok list
+	// carrying only the rows some OTHER source happened to name.
+	over := buildBegun(t, "ftp", ftpAccess(map[string]string{
+		"/etc/vsftpd.conf": "vsftpd.conf.userlist-oversized",
+	}))
+	ftpAccessLeavesBlocked(t, over, facts.StatusAbsent, "longer than this collector stores")
+	// The leaf and the set agree about the same blind spot.
+	if e := env(t, over, "ftp.userlist_file"); e.Status != facts.StatusAbsent {
+		t.Errorf("userlist_file %+v, want absent alongside the set", e)
+	}
 }
 
 // Ruling L-45: a pam_listfile.so line refuses a login only when its control
@@ -1382,6 +1421,10 @@ func TestFtpPamListfileControlFlags(t *testing.T) {
 		{"pam.d.vsftpd.bracket", "default=ignore"},
 		{"pam.d.vsftpd.apply", "apply="},
 		{"pam.d.vsftpd.nosense", "sense="},
+		// Ruling L-46: a line that names a sense but no item= is refused for
+		// the MISSING item, and the reason must name that construct - not the
+		// sense= the line does carry.
+		{"pam.d.vsftpd.noitem", "item="},
 	} {
 		b := buildBegun(t, "ftp", ftpAccess(map[string]string{
 			"/etc/vsftpd.conf":  "vsftpd.conf.debian",

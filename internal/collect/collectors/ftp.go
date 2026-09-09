@@ -617,7 +617,18 @@ func (p *ftpParse) publish(b *collect.Builder) {
 		impl.Reason = "no FTP daemon on this host: " + p.leftover
 	}
 	b.Set("ftp.implementation", impl)
-	b.Set("ftp.config_files", withTruncation(collect.OK(p.sortedFiles(), src), cut))
+	// Ruling L-52 (C3, mail's L-49 shape): a configuration file that exists
+	// but could not be read is not an empty list of configuration files - it
+	// is a file this collector knows is there and could not open, and the
+	// leaf says so with the read's own status, because an ok list asserts
+	// found AND readable. A fragment that failed after another file DID
+	// answer leaves those files listed as evidence (dns's guard): the failure
+	// is still named in ftp.parse_complete and in every judged leaf.
+	files := withTruncation(collect.OK(p.sortedFiles(), src), cut)
+	if p.readFailure != nil && len(p.files) == 0 {
+		files = *p.readFailure
+	}
+	b.Set("ftp.config_files", files)
 	b.Set("ftp.parse_complete", collect.OK(p.complete(), src))
 	b.Set("ftp.unmodelled", collect.OK(len(p.unmodelled), src))
 
@@ -1222,7 +1233,13 @@ func parsePamListfiles(data []byte) []pamListfile {
 			lf.why = "the bracketed control " + control + " writes its own failure handling, which this model does not evaluate"
 		case !strings.EqualFold(control, "required") && !strings.EqualFold(control, "requisite"):
 			lf.why = "the control field " + control + " does not make this module's failure refuse the login"
-		case !sawItem || sense == "":
+		// Ruling L-46: the two missing fields are separate constructs, and the
+		// reason names the one that is actually missing - an operator told to
+		// add a sense= to a line that already has one has been sent to the
+		// wrong place.
+		case !sawItem:
+			lf.why = "the line names no item=, which pam_listfile itself refuses to act on"
+		case sense == "":
 			lf.why = "the line names no sense=, which pam_listfile itself refuses to act on"
 		case sense != "deny" && sense != "allow":
 			lf.why = "sense=" + sense + " is neither deny nor allow"
