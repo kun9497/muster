@@ -1,0 +1,12 @@
+# synthetic proftpd configuration whose fragment directory is included from
+# inside an <Anonymous> block, so the fragments cover the anonymous area
+# alone.
+ServerName "FTP service"
+ServerType standalone
+UseFtpUsers on
+TLSEngine on
+<Anonymous /srv/ftp>
+  User ftp
+  UserAlias anonymous ftp
+  Include /etc/proftpd/conf.d/
+</Anonymous>

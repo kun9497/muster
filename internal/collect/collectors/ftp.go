@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 
+	"golang.org/x/sys/unix"
+
 	"github.com/kun9497/muster/internal/collect"
 	"github.com/kun9497/muster/internal/facts"
 )
@@ -273,7 +275,7 @@ func (p *ftpParse) detectProftpd() bool {
 			return true
 		}
 		p.record(c, meta.Truncated)
-		p.parseProftpd(c, data, 0)
+		p.parseProftpd(c, data, 0, nil)
 		return true
 	}
 	return false
@@ -318,7 +320,7 @@ func (p *ftpParse) detectPureFtpd() bool {
 	for _, m := range matches {
 		data, meta, err := p.a.ReadFile(m, readLimit)
 		if err != nil {
-			if errors.Is(err, fs.ErrNotExist) {
+			if errors.Is(err, fs.ErrNotExist) || nonRegular(err) {
 				continue
 			}
 			p.fail(readErrorEnv(m, err))
@@ -333,8 +335,14 @@ func (p *ftpParse) detectPureFtpd() bool {
 // parseProftpd walks one proftpd file. Directives are attributed only at a
 // depth this model understands; an Include is followed when the declaration
 // covers it and recorded when it does not (Ruling L-5).
-func (p *ftpParse) parseProftpd(file string, data []byte, depth int) {
-	var stack []proftpdSection
+func (p *ftpParse) parseProftpd(file string, data []byte, depth int, base []*proftpdSection) {
+	// Ruling L-39: an included file is inlined AT THE INCLUDE POINT, so it
+	// begins at the include site's depth, not at the top level. The header
+	// is copied so an append here can never reach into the caller's backing
+	// array, while the sections themselves are shared pointers, so a
+	// fragment that lands inside a <VirtualHost> marks THAT section noted
+	// and the caller sees it.
+	stack := append([]*proftpdSection(nil), base...)
 	for _, raw := range splitLines(data) {
 		line := strings.TrimSpace(raw)
 		// proftpd treats a '#' as a comment only where a directive would
@@ -343,9 +351,18 @@ func (p *ftpParse) parseProftpd(file string, data []byte, depth int) {
 			continue
 		}
 		if strings.HasPrefix(line, "</") {
-			if len(stack) > 0 {
+			// Ruling L-40: a closing tag that does not match the section it
+			// appears to close is a file proftpd refuses to start on.
+			// Popping blindly would re-attribute everything after it to the
+			// server — a confident verdict on a configuration that cannot
+			// run — so the stack stays as it is and the file is unmodelled.
+			// A fragment can never pop a section its includer opened either:
+			// that is what base bounds.
+			if len(stack) > len(base) && strings.EqualFold(stack[len(stack)-1].name, proftpdClosingName(line)) {
 				stack = stack[:len(stack)-1]
+				continue
 			}
+			p.noteUnmodelled(file, line+" does not close the section it appears to, so this file cannot be modelled")
 			continue
 		}
 		if strings.HasPrefix(line, "<") {
@@ -353,14 +370,14 @@ func (p *ftpParse) parseProftpd(file string, data []byte, depth int) {
 			if strings.EqualFold(name, "anonymous") && p.attributes(file, stack, "<Anonymous>") {
 				p.proAno = true
 			}
-			stack = append(stack, proftpdSection{name: name})
+			stack = append(stack, &proftpdSection{name: name})
 			continue
 		}
 		fields := strings.Fields(line)
 		key := strings.ToLower(fields[0])
 		args := strings.TrimSpace(strings.TrimPrefix(line, fields[0]))
 		if key == "include" {
-			p.proftpdInclude(file, args, depth)
+			p.proftpdInclude(file, args, depth, stack)
 			continue
 		}
 		if !proftpdModelled[key] {
@@ -385,17 +402,17 @@ type proftpdSection struct {
 // SERVER's own, which Ruling L-35 fixes at the top level and nowhere else:
 // TLSRequired inside <Anonymous> covers the anonymous area alone, RootLogin
 // inside <Directory> covers that tree alone, and reading either as the
-// server-wide answer is the over-claim H-16 forbids - a false PASS for U-54
+// server-wide answer is the over-claim H-16 forbids — a false PASS for U-54
 // on a server that still takes local logins in clear.
 //
 // The two kinds of section differ only in what they cost. <VirtualHost>,
 // <Global> and <IfModule> can REDEFINE server-wide behaviour, so each is
 // counted once in unmodelled the first time something modelled turns up
-// inside it and the judged leaves go absent. Every other section -
-// <Anonymous>, <Directory>, <Limit> and the rest - only narrows the scope
+// inside it and the judged leaves go absent. Every other section —
+// <Anonymous>, <Directory>, <Limit> and the rest — only narrows the scope
 // of what it holds, so it is a neutral container: nothing inside it is
 // attributed, and nothing about it makes the file unjudgeable.
-func (p *ftpParse) attributes(file string, stack []proftpdSection, what string) bool {
+func (p *ftpParse) attributes(file string, stack []*proftpdSection, what string) bool {
 	for i := len(stack) - 1; i >= 0; i-- {
 		if !proftpdOpaqueSections[strings.ToLower(stack[i].name)] {
 			continue
@@ -414,7 +431,7 @@ func (p *ftpParse) attributes(file string, stack []proftpdSection, what string) 
 // of the declaration through the guard's own Allowed probe, so an include
 // outside it is RECORDED with its path and never touched — muster does not
 // read a path a change-control reviewer never approved.
-func (p *ftpParse) proftpdInclude(file, target string, depth int) {
+func (p *ftpParse) proftpdInclude(file, target string, depth int, stack []*proftpdSection) {
 	target = strings.Trim(strings.TrimSpace(target), `"`)
 	if target == "" {
 		return
@@ -444,7 +461,7 @@ func (p *ftpParse) proftpdInclude(file, target string, depth int) {
 		}
 		data, meta, err := p.a.ReadFile(t, readLimit)
 		if err != nil {
-			if errors.Is(err, fs.ErrNotExist) {
+			if errors.Is(err, fs.ErrNotExist) || nonRegular(err) {
 				continue
 			}
 			// The sshd Include precedent: a fragment that cannot be READ is
@@ -454,7 +471,7 @@ func (p *ftpParse) proftpdInclude(file, target string, depth int) {
 			continue
 		}
 		p.record(t, meta.Truncated)
-		p.parseProftpd(t, data, depth+1)
+		p.parseProftpd(t, data, depth+1, stack)
 	}
 }
 
@@ -462,7 +479,7 @@ func (p *ftpParse) proftpdInclude(file, target string, depth int) {
 // will actually read, and reports whether the declaration covers it.
 //
 // Ruling L-37: the stock Debian proftpd.conf includes its fragment
-// DIRECTORY - "Include /etc/proftpd/conf.d/" - and proftpd reads every file
+// DIRECTORY — "Include /etc/proftpd/conf.d/" — and proftpd reads every file
 // in it, whatever its name. Reading the directory as a literal file would
 // fail, and refusing it would make every stock Debian host unjudgeable, so
 // a target that is not itself declared is retried as that directory's glob,
@@ -478,6 +495,19 @@ func (p *ftpParse) includePattern(target string) (string, bool) {
 		return glob, true
 	}
 	return "", false
+}
+
+// nonRegular reports whether a read failed because the path is not a
+// regular file: the no-follow read primitive refuses a directory, a symlink
+// and every special file, and a glob over a fragment DIRECTORY matches
+// whatever is in it — an admin's stash subdirectory included (Ruling
+// L-41). Such an entry is skipped, never filed as an error: one error
+// envelope flips run.complete and hands CI exit code 2 for something that
+// was never configuration.
+func nonRegular(err error) bool {
+	return errors.Is(err, collect.ErrNotRegular) ||
+		errors.Is(err, collect.ErrSymlink) ||
+		errors.Is(err, unix.EISDIR)
 }
 
 // record notes a file whose content reached the parse, once however it was
@@ -781,6 +811,12 @@ func proftpdOn(v string) bool {
 		return true
 	}
 	return false
+}
+
+// proftpdClosingName is the tag of a section closer, so "</VirtualHost>" is
+// "VirtualHost" — the name a matching opener would have carried.
+func proftpdClosingName(line string) string {
+	return proftpdSectionName("<" + strings.TrimPrefix(line, "</"))
 }
 
 // proftpdSectionName is the tag of a section opener, so "<VirtualHost

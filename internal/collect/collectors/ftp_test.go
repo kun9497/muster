@@ -3,6 +3,7 @@
 package collectors
 
 import (
+	"fmt"
 	"os"
 	"slices"
 	"strings"
@@ -188,7 +189,7 @@ func TestFtpVsftpdSecondInstanceIsUnmodelled(t *testing.T) {
 	}
 
 	// A host carrying BOTH layouts: the Debian file wins the probe order, so
-	// the RHEL one is a second instance like any other - the exclusion is
+	// the RHEL one is a second instance like any other — the exclusion is
 	// the file actually parsed, not a fixed path.
 	both := buildBegun(t, "ftp", ftpAccess(map[string]string{
 		"/etc/vsftpd.conf":        "vsftpd.conf.debian",
@@ -238,7 +239,7 @@ func TestFtpPureFtpdDetectedByGlob(t *testing.T) {
 	// What ENFORCES L-23 is the guard: build() fails the test on any access
 	// outside the declaration, and neither /etc/pure-ftpd nor
 	// /etc/pure-ftpd/conf is declared, so a directory stat could not have
-	// got this far. This scan of the read log is the second belt - it sees
+	// got this far. This scan of the read log is the second belt — it sees
 	// ReadFile only.
 	for _, r := range a.reads {
 		if r == "/etc/pure-ftpd/conf" || r == "/etc/pure-ftpd" {
@@ -357,7 +358,7 @@ func TestFtpProftpdTopLevelDirectives(t *testing.T) {
 
 // Ruling L-35: a modelled directive is the SERVER's setting only at the top
 // level. TLSRequired inside <Anonymous> covers the anonymous area alone, so
-// a local login is still served in clear - attributing it would be a false
+// a local login is still served in clear — attributing it would be a false
 // PASS for U-54, which is the over-claim H-16 forbids. <Anonymous> and
 // <Directory> are neutral containers: they hide what is inside them without
 // making the file unjudgeable.
@@ -378,22 +379,32 @@ func TestFtpProftpdAttributesTopLevelOnly(t *testing.T) {
 
 	// The same rule at the level below the published leaves, for the
 	// directives Task 2 judges: only the top-level ones reach the model.
-	data, err := os.ReadFile("testdata/proftpd.conf.anon-tls")
-	if err != nil {
-		t.Fatal(err)
-	}
-	p := &ftpParse{a: ftpAccess(nil), seen: map[string]bool{}, pro: map[string]string{}}
-	p.parseProftpd("/etc/proftpd/proftpd.conf", data, 0)
+	pro := proftpdModelOf(t, ftpAccess(nil), "proftpd.conf.anon-tls")
 	for _, k := range []string{"tlsengine", "useftpusers"} {
-		if _, ok := p.pro[k]; !ok {
+		if _, ok := pro[k]; !ok {
 			t.Errorf("%s is at the top level and must be attributed", k)
 		}
 	}
 	for _, k := range []string{"tlsrequired", "rootlogin"} {
-		if v, ok := p.pro[k]; ok {
+		if v, ok := pro[k]; ok {
 			t.Errorf("%s = %q was attributed from inside a section", k, v)
 		}
 	}
+}
+
+// proftpdModelOf parses one proftpd fixture through the collector's own
+// parser and returns the directives it attributed to the SERVER. It reaches
+// below the published leaves on purpose: RootLogin and UseFtpUsers are
+// Task 2's, and the scope rule that decides them is this task's.
+func proftpdModelOf(t *testing.T, a *fsAccess, fixture string) map[string]string {
+	t.Helper()
+	data, err := os.ReadFile("testdata/" + fixture)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := &ftpParse{a: a, seen: map[string]bool{}, pro: map[string]string{}}
+	p.parseProftpd("/etc/proftpd/proftpd.conf", data, 0, nil)
+	return p.pro
 }
 
 // Ruling L-37: the stock Debian proftpd.conf includes its fragment
@@ -422,6 +433,110 @@ func TestFtpProftpdDirectoryIncludeIsRead(t *testing.T) {
 	if got := stringList(t, withFragment, "ftp.config_files"); !slices.Equal(got,
 		[]string{"/etc/proftpd/conf.d/10-tls-required", "/etc/proftpd/proftpd.conf"}) {
 		t.Errorf("config_files %v, want both files sorted", got)
+	}
+}
+
+// Ruling L-39: proftpd inlines an included file AT THE INCLUDE POINT, so a
+// fragment pulled in from inside a section inherits that section's context.
+// Parsing it at depth 0 would make a fragment's TLSRequired the server's
+// answer — the same false PASS for U-54 that the top-level rule closed,
+// reached through the include path.
+func TestFtpProftpdIncludeInheritsTheIncludeSite(t *testing.T) {
+	withFragment := func(main string) *fsAccess {
+		return ftpAccess(map[string]string{
+			"/etc/proftpd/proftpd.conf":  main,
+			"/etc/proftpd/conf.d/10-tls": "proftpd.conf.d_tls-and-root",
+		})
+	}
+
+	// Included from inside a <VirtualHost>: the fragment configures that
+	// host, and the section is the construct this model does not attribute,
+	// counted once.
+	vh := buildBegun(t, "ftp", withFragment("proftpd.conf.include-in-vhost"))
+	if e := env(t, vh, "ftp.unmodelled"); e.Status != facts.StatusOK || e.Value != 1 {
+		t.Fatalf("unmodelled %+v, want ok 1 for the <VirtualHost> the fragment landed in", e)
+	}
+	e := env(t, vh, "ftp.tls_enforced")
+	if e.Status != facts.StatusAbsent {
+		t.Errorf("tls_enforced %+v, want absent: the fragment is a virtual host's", e)
+	}
+	if !strings.Contains(e.Reason, "VirtualHost") {
+		t.Errorf("tls_enforced reason %q must name the section", e.Reason)
+	}
+
+	// Included from inside <Anonymous>: a neutral container, so nothing is
+	// attributed and nothing is unmodelled — TLSEngine on alone does not
+	// enforce TLS.
+	anon := buildBegun(t, "ftp", withFragment("proftpd.conf.include-in-anon"))
+	if e := env(t, anon, "ftp.unmodelled"); e.Status != facts.StatusOK || e.Value != 0 {
+		t.Fatalf("unmodelled %+v, want ok 0: <Anonymous> is a neutral container", e)
+	}
+	if e := env(t, anon, "ftp.tls_enforced"); e.Status != facts.StatusOK || e.Value != false {
+		t.Errorf("tls_enforced %+v, want ok false", e)
+	}
+	pro := proftpdModelOf(t, withFragment("proftpd.conf.include-in-anon"), "proftpd.conf.include-in-anon")
+	for _, k := range []string{"tlsrequired", "rootlogin"} {
+		if v, ok := pro[k]; ok {
+			t.Errorf("%s = %q was attributed from a fragment included inside <Anonymous>", k, v)
+		}
+	}
+
+	// A top-level Include is unchanged: that fragment IS the server's.
+	top := buildBegun(t, "ftp", ftpAccess(map[string]string{
+		"/etc/proftpd/proftpd.conf":           "proftpd.conf.include-dir",
+		"/etc/proftpd/conf.d/10-tls-required": "proftpd.conf.d_tlsrequired",
+	}))
+	if !ftpBool(t, top, "ftp.tls_enforced") {
+		t.Error("a fragment included at the top level completes the server's TLS requirement")
+	}
+}
+
+// Ruling L-40: a closing tag that does not match the innermost open section
+// is a file proftpd itself refuses to start on. Popping blindly would
+// re-attribute everything after it to the server; the honest answer is that
+// the file cannot be modelled.
+func TestFtpProftpdMismatchedCloseIsUnmodelled(t *testing.T) {
+	a := ftpAccess(map[string]string{"/etc/proftpd/proftpd.conf": "proftpd.conf.mismatched-close"})
+	b := buildBegun(t, "ftp", a)
+	if e := env(t, b, "ftp.unmodelled"); e.Status != facts.StatusOK || e.Value != 1 {
+		t.Fatalf("unmodelled %+v, want ok 1 for the mismatched closing tag", e)
+	}
+	if e := env(t, b, "ftp.tls_enforced"); e.Status != facts.StatusAbsent ||
+		!strings.Contains(e.Reason, "</Limit>") {
+		t.Errorf("tls_enforced %+v must be absent and name the line", e)
+	}
+	if v, ok := proftpdModelOf(t, a, "proftpd.conf.mismatched-close")["tlsrequired"]; ok {
+		t.Errorf("tlsrequired = %q: the stray tag must not have popped the open section", v)
+	}
+	if w := b.Worst("ftp"); w != facts.StatusOK {
+		t.Errorf(`Worst("ftp") = %s, want ok`, w)
+	}
+}
+
+// Ruling L-41: the widened conf.d glob matches whatever is in the directory,
+// including an admin's stash subdirectory. The read primitive refuses a
+// non-regular file, and that refusal must SKIP the entry — one error
+// envelope would flip run.complete and hand CI exit code 2 for a benign
+// directory.
+func TestFtpProftpdSkipsNonRegularFragments(t *testing.T) {
+	a := ftpAccess(map[string]string{
+		"/etc/proftpd/proftpd.conf":           "proftpd.conf.include-dir",
+		"/etc/proftpd/conf.d/10-tls-required": "proftpd.conf.d_tlsrequired",
+	})
+	a.dirs["/etc/proftpd/conf.d/disabled"] = true
+	a.fails["/etc/proftpd/conf.d/disabled"] = fmt.Errorf("%s: %w", "/etc/proftpd/conf.d/disabled", collect.ErrNotRegular)
+	b := buildBegun(t, "ftp", a)
+	if e := env(t, b, "ftp.unmodelled"); e.Status != facts.StatusOK || e.Value != 0 {
+		t.Fatalf("unmodelled %+v, want 0", e)
+	}
+	if e := env(t, b, "ftp.parse_complete"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("parse_complete %+v, want ok true", e)
+	}
+	if !ftpBool(t, b, "ftp.tls_enforced") {
+		t.Error("the regular fragment is still read")
+	}
+	if w := b.Worst("ftp"); w != facts.StatusOK {
+		t.Errorf(`Worst("ftp") = %s, want ok: a stash directory is not an error`, w)
 	}
 }
 
@@ -508,7 +623,7 @@ func TestFtpUnreadableConfIsDenied(t *testing.T) {
 	}
 	// Ruling L-36: the Worst assertions elsewhere in this file are only
 	// meaningful because this one shows the builder really does rank the
-	// collector's envelopes - build(), which never calls Begin, reports ok
+	// collector's envelopes — build(), which never calls Begin, reports ok
 	// here whatever the collector wrote.
 	if w := b.Worst("ftp"); w != facts.StatusDenied {
 		t.Errorf(`Worst("ftp") = %s, want denied`, w)

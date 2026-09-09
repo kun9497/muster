@@ -1,0 +1,9 @@
+# synthetic proftpd configuration whose closing tag does not match the
+# section it appears to close. proftpd itself refuses to start on this, so
+# nothing after it can be read as the running server's configuration.
+ServerName "FTP service"
+TLSEngine on
+<Anonymous /srv/ftp>
+  User ftp
+</Limit>
+TLSRequired on
