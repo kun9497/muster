@@ -10,13 +10,13 @@
               "finger":{"active":{"status":"ok","value":false},"enabled":{"status":"ok","value":false},"reachable":{"status":"ok","value":false}},
               "rservices":{"active":{"status":"ok","value":false},"enabled":{"status":"ok","value":false},"reachable":{"status":"ok","value":false}},
               "dos_services":{"active":{"status":"ok","value":false},"enabled":{"status":"ok","value":false},"reachable":{"status":"ok","value":false}},
-              "nfs_server":{"active":{"status":"ok","value":false},"enabled":{"status":"ok","value":false},"reachable":{"status":"ok","value":false}},
+              "nfs_server":{"installed":{"status":"ok","value":true},"active":{"status":"ok","value":false},"enabled":{"status":"ok","value":false},"reachable":{"status":"ok","value":false}},
               "automount":{"active":{"status":"ok","value":false},"enabled":{"status":"ok","value":false}},
               "rpcbind":{"active":{"status":"ok","value":false},"enabled":{"status":"ok","value":false},"reachable":{"status":"ok","value":false}},
               "nis":{"active":{"status":"ok","value":false},"enabled":{"status":"ok","value":false}},
               "tftp":{"active":{"status":"ok","value":false},"enabled":{"status":"ok","value":false},"reachable":{"status":"ok","value":false}},
               "talk":{"active":{"status":"ok","value":false},"enabled":{"status":"ok","value":false},"reachable":{"status":"ok","value":false}},
-              "snmp":{"active":{"status":"ok","value":false},"enabled":{"status":"ok","value":false},"reachable":{"status":"ok","value":false}},
+              "snmp":{"installed":{"status":"ok","value":true},"active":{"status":"ok","value":false},"enabled":{"status":"ok","value":false},"reachable":{"status":"ok","value":false}},
               "ntp":{"installed":{"status":"ok","value":true},"active":{"status":"ok","value":true}},
               "syslog":{"active":{"status":"ok","value":true}}},
   "sshd":{"collect_method":{"status":"ok","value":"T"},"version":{"status":"ok","value":"8.9"},"personas_collected":{"status":"ok","value":true},
@@ -33,6 +33,7 @@
            "etc_hosts_deny_all":{"status":"ok","value":false},
            "etc_services":{"mode":{"status":"ok","value":420,"source":{"kind":"file","path":"/etc/services"}},"uid":{"status":"ok","value":0}},
            "etc_hosts_lpd":{"mode":{"status":"absent"},"uid":{"status":"absent"}},
+           "etc_exports":{"mode":{"status":"ok","value":420},"uid":{"status":"ok","value":0}},
            "etc_shadow":{"uid":{"status":"ok","value":0},"mode":{"status":"ok","value":0,"source":{"kind":"sys","path":"/etc/shadow"}},"acl_entries":{"status":"ok","value":[]}},
            "root_home":{"uid":{"status":"ok","value":0},"group_writable":{"status":"ok","value":false},"other_writable":{"status":"ok","value":false}},
            "env_files":{"status":"ok","value":[
@@ -86,6 +87,12 @@
                {"facility":"cron","logged":true,"priority_floor":"info","target":"/var/log/syslog","persistent":true}
              ]}},
              "journald":{"persistent":{"status":"ok","value":true}}},
+  "nfs":{"exports":{"status":"ok","value":[]}},
+  "snmp":{"versions_enabled":{"status":"ok","value":["v3"]},
+          "communities":{"status":"ok","value":[
+            {"ref":"c1","kind":"ro","is_default":false,"length":24,"source_restricted":true}
+          ]}},
+  "patch":{"manager":{"status":"ok","value":"apt"},"metadata_age_s":{"status":"ok","value":3600},"pending_security_count":{"status":"ok","value":0}},
   "sudo":{"installed":{"status":"ok","value":true},"includedir":{"status":"ok","value":"/etc/sudoers.d"},"secure_path":{"status":"ok","value":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"}},
   "cron":{"files":{"status":"ok","value":[
             {"path":"/etc/crontab","scope":"system","user":"","mode":416,"uid":0,"gid":0,"group":"root","owner_ok":true,"group_writable":false,"other_writable":false},
