@@ -1,0 +1,4 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "services":{"snmp":{"installed":{"status":"ok","value":true}}},
+  "snmp":{"versions_enabled":{"status":"ok","value":[]}}
+}}

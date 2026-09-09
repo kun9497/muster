@@ -1,0 +1,4 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "services":{"snmp":{"installed":{"status":"ok","value":false}}},
+  "snmp":{"communities":{"status":"absent","reason":"no snmpd configuration was found on this host"}}
+}}

@@ -1,0 +1,5 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "services":{"nfs_server":{"installed":{"status":"ok","value":true}}},
+  "nfs":{"exports":{"status":"absent","reason":"/etc/exports was cut at the read limit; what is past the cap cannot be judged"}},
+  "files":{"etc_exports":{"mode":{"status":"ok","value":420},"uid":{"status":"ok","value":0}}}
+}}

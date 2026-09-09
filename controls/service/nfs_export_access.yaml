@@ -1,0 +1,31 @@
+id: muster.service.nfs_export_access
+title_en: NFS exports name their clients and squash remote root
+title_ko: NFS 공유가 클라이언트를 지정하고 원격 root 를 낮춘다
+description_en: "Every NFS export must name the hosts or networks allowed to mount it instead of exporting to the world, and must squash a remote root down to an unprivileged user; /etc/exports itself must be owned by root and no more permissive than 0644. The judgment is made from the export files - /etc/exports and /etc/exports.d/*.exports - because those are what survives a reboot. When the run is root, exportfs -v is collected as corroboration of the running export table and is recorded as evidence; it is never the judged source, so a difference between the files and the running table shows up as evidence rather than as a verdict, and a non-root run that cannot run it is not a failure. A path with no client specification at all, and the space-before-parenthesis form that exportfs itself reads as two specifications, both export to the world and are judged as such. A host that exports nothing passes: an empty export list is not a finding. A host with no NFS server installed is not applicable, since there is nothing to export from, and where the export files could not be read the result is a manual review rather than a pass."
+description_ko: "모든 NFS 공유는 전체 공개 대신 마운트를 허용할 호스트나 네트워크를 명시해야 하고, 원격 root 를 권한 없는 사용자로 낮춰야 하며, /etc/exports 자체는 root 소유에 0644 이하여야 합니다. 판단은 재부팅 후에도 남는 것, 즉 공유 파일(/etc/exports 와 /etc/exports.d/*.exports)을 기준으로 합니다. root 로 실행하면 exportfs -v 로 현재 공유 테이블을 수집해 증거로 남기지만 판단 근거로 쓰지는 않으므로, 파일과 현재 테이블이 다르면 판정이 아니라 증거로 드러나며, root 가 아니어서 실행하지 못한 경우도 실패가 아닙니다. 클라이언트 지정이 아예 없는 경로와, exportfs 자신이 두 개의 지정으로 읽는 괄호 앞 공백 형태는 모두 전체 공개로 판단합니다. 공유가 하나도 없는 호스트는 통과합니다 - 아무것도 내보내지 않는 것은 결함이 아닙니다. NFS 서버가 설치되어 있지 않은 호스트는 내보낼 것이 없으므로 해당 없음이고, 공유 파일을 읽지 못한 경우는 통과가 아니라 수동 검토로 처리합니다."
+category: service
+importance: 상
+automation: auto
+references:
+  kisa: { "2026": ["U-40"], "2021": ["U-25", "U-69"] }
+requires_facts: ">=1"
+absent_means: manual
+applies_when:
+  # Ruling J-22: `op: present` holds for any ok envelope, and the services
+  # collector writes ok:false - not absent - for a unit that is not installed,
+  # so `present` would run the checks on every host and one with no NFS server
+  # would read MANUAL, contradicting the description. `eq true` gives
+  # NOT_APPLICABLE there, and an unsupported (no systemd) reading screens to
+  # NOT_APPLICABLE as well.
+  - { fact: services.nfs_server.installed, op: eq, expected: true }
+checks:
+  - { fact: nfs.exports, op: each, subject: path, require: { field: wildcard, op: eq, expected: false } }
+  - { fact: nfs.exports, op: each, subject: path, require: { field: root_squash, op: eq, expected: true } }
+  - { fact: files.etc_exports.mode, op: in, expected: [0, 4, 32, 36, 128, 132, 160, 164, 256, 260, 288, 292, 384, 388, 416, 420] } # 0644 or any subset of its bits; the literal from muster.file.passwd_permissions (Ruling J-28)
+  - { fact: files.etc_exports.uid, op: eq, expected: 0 }
+remediation:
+  text_en: Replace every wildcard client in /etc/exports with the hosts or networks that need the share, remove no_root_squash from its options, then chown root:root /etc/exports and chmod 644 /etc/exports, and apply the result with exportfs -ra.
+  text_ko: /etc/exports 의 와일드카드 클라이언트를 공유가 필요한 호스트나 네트워크로 바꾸고, 옵션에서 no_root_squash 를 제거한 뒤, chown root:root /etc/exports 와 chmod 644 /etc/exports 를 적용하고 exportfs -ra 로 반영합니다.
+  risk: restart_service
+  idempotent: true
+decision: D09
