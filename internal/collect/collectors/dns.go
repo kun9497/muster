@@ -662,7 +662,7 @@ func (s *dnsStream) include() {
 		// link followed, through paths of its own that the declaration covers.
 		if nonRegular(err) {
 			if clean == cryptoPolicyFragment && errors.Is(err, collect.ErrSymlink) &&
-				s.followCryptoPolicy(from) {
+				s.followCryptoPolicy() {
 				return
 			}
 			s.p.noteUnreadLink(from, clean)
@@ -694,7 +694,7 @@ func (s *dnsStream) include() {
 // not. Every failure along the route falls back to the caller's tier (1): a
 // guess about what the fragment sets would be the confident-wrong answer H-16
 // forbids.
-func (s *dnsStream) followCryptoPolicy(from string) bool {
+func (s *dnsStream) followCryptoPolicy() bool {
 	state, _, err := s.p.a.ReadFile(cryptoPolicyState, readLimit)
 	if err != nil {
 		return false
@@ -726,6 +726,13 @@ func (s *dnsStream) followCryptoPolicy(from string) bool {
 // ":subpolicy" modifiers), and only [A-Za-z0-9_.:-] may reach a path this
 // collector builds — a "/" or a ".." would build a path outside the share tree
 // that the declaration's glob no longer covers.
+//
+// Ruling LR-15: a state file carrying MORE than one non-empty line is not a
+// shape update-crypto-policies writes, and the FIRST line wins here. What that
+// can cost is bounded and evidence-only: the fragment this route reads carries
+// disable-algorithms and disable-ds-digests statements, which no judged leaf
+// reads, so a wrong pick can only name the wrong policy's file in
+// dns.config_files — it can never move a verdict. dns.config_files says so.
 func cryptoPolicyName(data []byte) string {
 	for _, raw := range splitLines(data) {
 		line := strings.TrimSpace(raw)

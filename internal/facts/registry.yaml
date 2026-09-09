@@ -2175,7 +2175,10 @@ keys:
       stock RHEL-family host the crypto-policy fragment is a symlink the no-follow read primitive
       refuses; the policy name is then read from /etc/crypto-policies/state/current and the file it
       resolves to under /usr/share/crypto-policies appears here in its place, because the link's own
-      bytes were never read.
+      bytes were never read. update-crypto-policies writes ONE name in that state file; a file
+      carrying more than one non-empty line is read for its first, which is the only place this
+      route can name the wrong file - the fragment it reads sets no value any control judges, so a
+      wrong pick shows up here and can never move a verdict.
       On unbound the source cites a path this collector stat-ed rather than read.
     since: 1
     sensitivity: public

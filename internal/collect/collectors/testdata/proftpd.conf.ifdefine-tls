@@ -10,6 +10,13 @@ UseFtpUsers on
   TLSRequired on
 </IfDefine>
 
+# A third conditional section, holding nothing this model attributes: it is
+# NOT counted, because a section costs something only when a modelled directive
+# inside it would otherwise have been read as the server's own.
+<IfModule mod_dynmasq.c>
+  DynMasqRefresh 28800
+</IfModule>
+
 <IfDefine ANONYMOUS_FTP>
   <Anonymous ~ftp>
     User ftp

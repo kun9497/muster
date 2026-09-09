@@ -689,11 +689,18 @@ func TestFtpNoDaemonIsAbsentNotMissing(t *testing.T) {
 // judged leaves. That evidence leaf carries its own reason on a leftover
 // conffile, and walking the judged leaves alone let it keep the wording L-59
 // removed from everywhere else.
+//
+// Ruling LR-15 (M-1): the empty-reason skip is ftp.implementation's ALONE. It
+// exists because that leaf carries no reason on a host with no leftover
+// conffile; applying it to the judged leaves too would have let one published
+// absent with an EMPTY reason pass both checks in silence, which is weaker
+// than the pin this helper replaced. Every judged leaf must still SAY what was
+// looked for and not found.
 func assertNoModelledFtpWording(t *testing.T, b *collect.Builder) {
 	t.Helper()
 	for _, k := range append([]string{"ftp.implementation"}, ftpJudgedLeaves...) {
 		r := env(t, b, k).Reason
-		if r == "" {
+		if k == "ftp.implementation" && r == "" {
 			continue
 		}
 		for _, forbidden := range []string{"installed on this host", "FTP daemon on this host"} {
@@ -1579,6 +1586,41 @@ func TestFtpProftpdConditionalSectionsAreOpaque(t *testing.T) {
 	// model, not a file that could not be read.
 	if e := env(t, b, "ftp.parse_complete"); e.Status != facts.StatusOK || e.Value != true {
 		t.Errorf("parse_complete %+v, want ok true", e)
+	}
+	if w := b.Worst("ftp"); w != facts.StatusOK {
+		t.Errorf("Worst(ftp) = %s, want ok", w)
+	}
+}
+
+// Ruling LR-15: the other half of LR-2 — an opaque section costs the host a
+// verdict only when a MODELLED directive inside it would otherwise have been
+// read as the server's own, never on entry. Debian's stock proftpd.conf ships
+// half a dozen <IfModule> blocks and puts every setting this model reads at the
+// top level, so widening the opaque set must leave that host judgeable. Without
+// this, the fixture above (where every conditional section wraps something
+// modelled) would let a change that counted a section on entry pass.
+func TestFtpProftpdEmptyConditionalSectionsCostNothing(t *testing.T) {
+	b := buildBegun(t, "ftp", ftpAccess(map[string]string{
+		"/etc/proftpd.conf": "proftpd.conf.debian-stock",
+	}))
+	if e := env(t, b, "ftp.implementation"); e.Status != facts.StatusOK || e.Value != "proftpd" {
+		t.Fatalf("implementation %+v, want ok proftpd", e)
+	}
+	if e := env(t, b, "ftp.unmodelled"); e.Status != facts.StatusOK || e.Value != 0 {
+		t.Fatalf("unmodelled %+v, want ok 0 — no modelled directive is inside any of them", e)
+	}
+	// The judged leaves must ANSWER: this host is not a manual review.
+	for _, c := range []struct {
+		key  string
+		want bool
+	}{
+		{"ftp.tls_enforced", false},      // no TLSEngine anywhere
+		{"ftp.anonymous_enabled", false}, // the anonymous area is commented out
+		{"ftp.root_denied", true},        // RootLogin off, at the top level
+	} {
+		if got := ftpBool(t, b, c.key); got != c.want {
+			t.Errorf("%s = %v, want %v", c.key, got, c.want)
+		}
 	}
 	if w := b.Worst("ftp"); w != facts.StatusOK {
 		t.Errorf("Worst(ftp) = %s, want ok", w)

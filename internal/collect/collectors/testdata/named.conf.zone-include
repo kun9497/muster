@@ -2,6 +2,13 @@
 // file per zone puts in each of them. What this fixture exercises is the COUNT
 // of inlined fragments, but it carries a real zone so the verdict the test
 // asserts is a verdict about a zone that was parsed.
+//
+// Ruling LR-15: every one of the hundred includes pulls in THIS file, so the
+// hundred zone statements all carry the same name, and named refuses a
+// duplicate zone name at load. That is deliberate and is the price of a cap
+// fixture that needs a hundred fragments without a hundred files: this model
+// does not judge duplicate zone names, so the count is what is under test. A
+// duplicate-zone note belongs to a later plan, not to this fixture.
 zone "example.org" IN {
 	type master;
 	file "/var/named/example.org.zone";
