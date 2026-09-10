@@ -181,9 +181,11 @@ func TestSnapshotExtractKeepsOnlyWhatTheControlReads(t *testing.T) {
 	}
 
 	// Exactly the keys U-28 reads: applies_when (firewall.backend) and the
-	// three mechanisms' when/checks. firewall.normalization_confidence sits
-	// beside them in the snapshot and no clause names it.
-	want := []string{"files.etc_hosts_deny_all", "firewall.backend", "firewall.restricts_inbound"}
+	// three mechanisms' when/checks, files.libwrap_present among them since
+	// M-9 gated the tcp_wrappers mechanism on it.
+	// firewall.normalization_confidence sits beside them in the snapshot and
+	// no clause names it.
+	want := []string{"files.etc_hosts_deny_all", "files.libwrap_present", "firewall.backend", "firewall.restricts_inbound"}
 	if leaves := leafPaths(factsOf(t, got)); !reflect.DeepEqual(leaves, want) {
 		t.Errorf("extracted leaves %v, want %v", leaves, want)
 	}
@@ -296,17 +298,42 @@ func TestSnapshotExtractWalkAndEvidenceKeys(t *testing.T) {
 
 	// A manual control: its evidence keys are what the reviewer needs in
 	// hand, so they are cut out beside the applies_when facts. Without
-	// --out the file goes to stdout.
+	// --out the file goes to stdout. M-8/Task 7: full-pass.json now carries
+	// every evidence leaf the four manual controls name, so nothing is
+	// missing here and stderr stays empty.
 	var stdout3, stderr3 bytes.Buffer
 	if code := run([]string{"snapshot", "extract", "--facts", fullPassPath, "--control", "muster.service.mail_version"}, &stdout3, &stderr3); code != exitOK {
 		t.Fatalf("exit %d, want %d; stderr %q", code, exitOK, stderr3.String())
 	}
-	want := []string{"mail.implementation", "patch.metadata_age_s", "patch.pending_security_count", "services.mail.installed"}
+	want := []string{"mail.implementation", "patch.metadata_age_s", "patch.pending_security_count", "patch.security_metadata_available", "services.mail.installed"}
 	if leaves := leafPaths(factsOf(t, readJSON(t, stdout3.Bytes()))); !reflect.DeepEqual(leaves, want) {
 		t.Errorf("extracted leaves %v, want %v", leaves, want)
 	}
-	if !strings.Contains(stderr3.String(), "missing: patch.security_metadata_available") {
-		t.Errorf("stderr %q must name the evidence key the snapshot lacks", stderr3.String())
+	if stderr3.Len() != 0 {
+		t.Errorf("nothing was missing; stderr %q", stderr3.String())
+	}
+
+	// An evidence key the snapshot does not carry is still named on stderr,
+	// the same way a missing applies_when fact is: the reviewer has to know
+	// the worksheet came out short.
+	thinMail := filepath.Join(dir, "thin-mail.json")
+	writeSnapshot(t, thinMail, `{
+	  "schema_version": 1,
+	  "run": {"muster_version": "0.0.1", "collected_at": "2026-09-09T00:00:00Z"},
+	  "facts": {
+	    "services": {"mail": {"installed": {"status": "ok", "value": true}}},
+	    "mail": {"implementation": {"status": "ok", "value": "postfix"}},
+	    "patch": {"metadata_age_s": {"status": "ok", "value": 60}}
+	  }
+	}`)
+	var stdoutThin, stderrThin bytes.Buffer
+	if code := run([]string{"snapshot", "extract", "--facts", thinMail, "--control", "muster.service.mail_version"}, &stdoutThin, &stderrThin); code != exitOK {
+		t.Fatalf("exit %d, want %d; stderr %q", code, exitOK, stderrThin.String())
+	}
+	for _, k := range []string{"patch.pending_security_count", "patch.security_metadata_available"} {
+		if !strings.Contains(stderrThin.String(), k) {
+			t.Errorf("stderr %q must name the evidence key %s the snapshot lacks", stderrThin.String(), k)
+		}
 	}
 
 	// Content-faithful: an integer beyond float64's exact range keeps its

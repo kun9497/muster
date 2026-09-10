@@ -34,6 +34,7 @@
   "files":{"etc_passwd":{"mode":{"status":"ok","value":420,"source":{"kind":"sys","path":"/etc/passwd"}},"uid":{"status":"ok","value":0},"gid":{"status":"ok","value":0},"acl_present":{"status":"ok","value":false},"acl_entries":{"status":"ok","value":[]}},
            "etc_hosts":{"mode":{"status":"ok","value":384,"source":{"kind":"file","path":"/etc/hosts"}},"uid":{"status":"ok","value":0}},
            "etc_hosts_deny_all":{"status":"ok","value":false},
+           "libwrap_present":{"status":"ok","value":true},
            "etc_services":{"mode":{"status":"ok","value":420,"source":{"kind":"file","path":"/etc/services"}},"uid":{"status":"ok","value":0}},
            "etc_hosts_lpd":{"mode":{"status":"absent"},"uid":{"status":"absent"}},
            "etc_exports":{"mode":{"status":"ok","value":420},"uid":{"status":"ok","value":0}},
@@ -95,7 +96,8 @@
           "communities":{"status":"ok","value":[
             {"ref":"c1","kind":"ro","is_default":false,"length":24,"source_restricted":true}
           ]}},
-  "patch":{"manager":{"status":"ok","value":"apt"},"metadata_age_s":{"status":"ok","value":3600},"pending_security_count":{"status":"ok","value":0}},
+  "patch":{"manager":{"status":"ok","value":"apt"},"metadata_age_s":{"status":"ok","value":3600},"pending_security_count":{"status":"ok","value":0},
+           "security_metadata_available":{"status":"ok","value":true,"source":{"kind":"file","path":"/var/lib/apt/lists"}}},
   "sudo":{"installed":{"status":"ok","value":true},"includedir":{"status":"ok","value":"/etc/sudoers.d"},"secure_path":{"status":"ok","value":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"}},
   "cron":{"files":{"status":"ok","value":[
             {"path":"/etc/crontab","scope":"system","user":"","mode":416,"uid":0,"gid":0,"group":"root","owner_ok":true,"group_writable":false,"other_writable":false},
@@ -139,7 +141,12 @@
          ]},
          "root_denied":{"status":"ok","value":true,"source":{"kind":"file","path":"/etc/ftpusers"}}},
   "mail":{"implementation":{"status":"ok","value":"postfix"},
-          "expn_vrfy_restricted":{"status":"ok","value":true,"source":{"kind":"file","path":"/etc/postfix/main.cf"}}},
+          "expn_vrfy_restricted":{"status":"ok","value":true,"source":{"kind":"file","path":"/etc/postfix/main.cf"}},
+          "postfix":{"inet_interfaces":{"status":"ok","value":"loopback-only","source":{"kind":"file","path":"/etc/postfix/main.cf"}},
+                     "mynetworks":{"status":"absent","reason":"main.cf does not set mynetworks; postfix derives the list from the host's own interfaces and netmasks, and no file states it"},
+                     "smtpd_relay_restrictions":{"status":"ok","value":"permit_mynetworks reject_unauth_destination","source":{"kind":"file","path":"/etc/postfix/main.cf"}},
+                     "authorized_submit_users":{"status":"ok","value":"static:root","source":{"kind":"file","path":"/etc/postfix/main.cf"}}},
+          "sendmail":{"privacy_options":{"status":"absent","reason":"the mail transfer agent on this host is postfix; there is no /etc/mail/sendmail.cf to read"}}},
   "dns":{"implementation":{"status":"ok","value":"bind"},
          "zones":{"status":"ok","value":[
            {"name":"example.org","type":"primary","file":"/var/lib/bind/db.example.org","allow_transfer":"none","allow_update":"none","transfer_restricted":true,"update_restricted":true}
