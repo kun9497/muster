@@ -331,7 +331,9 @@ func TestSnapshotExtractWalkAndEvidenceKeys(t *testing.T) {
 		t.Fatalf("exit %d, want %d; stderr %q", code, exitOK, stderrThin.String())
 	}
 	for _, k := range []string{"patch.pending_security_count", "patch.security_metadata_available"} {
-		if !strings.Contains(stderrThin.String(), k) {
+		// The warning's shape, not merely a mention of the key somewhere on
+		// stderr (snapshot.go writes "missing: <key>").
+		if !strings.Contains(stderrThin.String(), "missing: "+k) {
 			t.Errorf("stderr %q must name the evidence key %s the snapshot lacks", stderrThin.String(), k)
 		}
 	}

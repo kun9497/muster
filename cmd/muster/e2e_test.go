@@ -224,8 +224,10 @@ func checkStatuses(jsonBytes []byte, want map[string]string) error {
 		return fmt.Errorf("parse results: %v", err)
 	}
 	got := map[string]string{}
+	seen := map[string]int{}
 	for _, r := range rep.Results {
 		got[r.ID] = r.Status
+		seen[r.ID]++
 	}
 	var problems []string
 	for _, id := range sortedIDs(want) {
@@ -237,6 +239,12 @@ func checkStatuses(jsonBytes []byte, want map[string]string) error {
 		}
 	}
 	for _, id := range sortedIDs(got) {
+		// A duplicate would otherwise collapse last-write-wins and the two
+		// loops below would never see it. The loader rejects a duplicate
+		// control id today, so this guards the helper, not the set.
+		if seen[id] > 1 {
+			problems = append(problems, fmt.Sprintf("%s: the report carries this control %d times", id, seen[id]))
+		}
 		if _, named := want[id]; !named {
 			problems = append(problems, fmt.Sprintf("%s: the report carries this control (status %q) and want does not name it", id, got[id]))
 		}
@@ -320,6 +328,68 @@ func TestAssertStatusesIsExhaustive(t *testing.T) {
 	if !strings.Contains(err.Error(), "muster.account.no_such_control") {
 		t.Errorf("the rejection must name the phantom control: %v", err)
 	}
+
+	// The two exhaustiveness loops, driven apart. The `dropped` case above
+	// is rejected by either one of them, so on its own it would stay green
+	// with either deleted; these two cases each leave exactly one loop with
+	// anything to say. A synthesised report is what makes that possible: a
+	// report that came out of run() always agrees with the embedded set.
+	//
+	// The set-loops's own case: the report carries the same sixty-three the
+	// map names, so nothing is unnamed and nothing mismatches - only the
+	// control the set loads and the map skips is left.
+	if err := checkStatuses(reportBytes(t, rowsOf(short)), short); err == nil {
+		t.Errorf("a control the set loads but neither the report nor want names must be rejected")
+	} else if !strings.Contains(err.Error(), dropped) {
+		t.Errorf("the rejection must name the control the set loads, %s: %v", dropped, err)
+	}
+
+	// The got-loop's own case: want names every loaded control, so the set
+	// loop has nothing to say; the report carries one id beyond them.
+	const phantom = "muster.account.not_in_the_set"
+	withPhantom := append(rowsOf(complete), reportRow{ID: phantom, Status: "PASS"})
+	if err := checkStatuses(reportBytes(t, withPhantom), complete); err == nil {
+		t.Errorf("a control the report carries that want does not name must be rejected")
+	} else if !strings.Contains(err.Error(), phantom) {
+		t.Errorf("the rejection must name the unasserted control %s: %v", phantom, err)
+	}
+
+	// A duplicated result id must not collapse into one reading.
+	doubled := append(rowsOf(complete), reportRow{ID: dropped, Status: complete[dropped]})
+	if err := checkStatuses(reportBytes(t, doubled), complete); err == nil {
+		t.Errorf("a report carrying %s twice must be rejected", dropped)
+	} else if !strings.Contains(err.Error(), dropped) {
+		t.Errorf("the rejection must name the duplicated control %s: %v", dropped, err)
+	}
+}
+
+// reportRow is one row of the minimum report checkStatuses reads.
+type reportRow struct {
+	ID     string `json:"id"`
+	Status string `json:"status"`
+}
+
+// reportBytes renders rows as a --format json report. Synthesising one is the
+// only way to hand checkStatuses a report that disagrees with the embedded
+// control set, which is what pinning its two loops apart needs.
+func reportBytes(t *testing.T, rows []reportRow) []byte {
+	t.Helper()
+	b, err := json.Marshal(struct {
+		Results []reportRow `json:"results"`
+	}{rows})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return b
+}
+
+// rowsOf renders a want map as report rows, in id order.
+func rowsOf(m map[string]string) []reportRow {
+	rows := make([]reportRow, 0, len(m))
+	for _, id := range sortedIDs(m) {
+		rows = append(rows, reportRow{ID: id, Status: m[id]})
+	}
+	return rows
 }
 
 // M-8: a MANUAL row is the worksheet the reviewer answers the item from, so
@@ -339,13 +409,26 @@ func assertManualEvidenceIsPresent(t *testing.T, jsonBytes []byte) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Keyed on the automation class alone: lint permits a manual control with
+	// no evidence list, and such a control must still be counted below, or the
+	// "every manual control produced a MANUAL row" guard would balance while
+	// covering less than it claims.
 	declared := map[string][]string{}
 	for _, c := range set.Controls {
-		if c.Automation == "manual" && len(c.Evidence) > 0 {
+		if c.Automation == "manual" {
 			declared[c.ID] = c.Evidence
 		}
 	}
 	if len(declared) == 0 {
+		t.Fatal("the set loads no manual control, so this assertion proves nothing")
+	}
+	lists := 0
+	for _, keys := range declared {
+		if len(keys) > 0 {
+			lists++
+		}
+	}
+	if lists == 0 {
 		t.Fatal("no manual control declares an evidence list, so this assertion proves nothing")
 	}
 	var rep struct {

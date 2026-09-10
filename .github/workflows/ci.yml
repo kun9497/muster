@@ -89,6 +89,8 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: "1.25.5"
+      - name: install cron and sudo
+        run: sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq cron sudo
       - run: CGO_ENABLED=0 go build -trimpath -o bin/muster ./cmd/muster
       - name: prepare output directory
         run: mkdir -m 700 "$RUNNER_TEMP/muster"
@@ -112,6 +114,14 @@ jobs:
           # (its reason starts "absent counts as pass") may carry absent evidence.
           jq -e '[.results[] | select(.status=="PASS") | . as $r | .evidence[]? | select(.status != "ok" and (.status != "absent" or (($r.reason // "") | startswith("absent counts as pass") | not)))] | length == 0' "$RUNNER_TEMP/muster/user-report.json"
           jq -e '[.results[] | select(.status=="ERROR")] | length > 0' "$RUNNER_TEMP/muster/user-report.json"
+      - name: the capability matrix's runner assumptions hold
+        run: |
+          test -d /var/spool/cron/crontabs && test -f /etc/sudoers || {
+            echo "the nonroot capability matrix assumes the cron spool (/var/spool/cron/crontabs, mode 1730)"
+            echo "and /etc/sudoers (mode 0440) exist on this runner; without them cron.files, cron.dirs,"
+            echo "sudo.includedir and sudo.secure_path read absent instead of denied"
+            exit 1
+          }
       - name: every fact the capability matrix calls root-only reads denied
         run: |
           jq -e --slurpfile m docs/reference/capability-matrix.json '
@@ -181,14 +191,13 @@ jobs:
           # Same rule as the non-root job: absent evidence is allowed only under absent_means: pass.
           jq -e '[.results[] | select(.status=="PASS") | . as $r | .evidence[]? | select(.status != "ok" and (.status != "absent" or (($r.reason // "") | startswith("absent counts as pass") | not)))] | length == 0' "$RUNNER_TEMP/muster/containers/report.json"
       - name: every fact the capability matrix calls systemd-only reads unsupported
+        if: matrix.init == 'false'
         run: |
-          if [ "${{ matrix.init }}" = "false" ]; then
-            jq -e --slurpfile m docs/reference/capability-matrix.json '
-              [ $m[0]["no-systemd"].unsupported[] as $k
-                | ($k | split(".")) as $p
-                | (.facts | getpath($p) | .status)
-                | select(. != "unsupported") ] | length == 0' "$RUNNER_TEMP/muster/containers/c.json"
-          fi
+          jq -e --slurpfile m docs/reference/capability-matrix.json '
+            [ $m[0]["no-systemd"].unsupported[] as $k
+              | ($k | split(".")) as $p
+              | (.facts | getpath($p) | .status)
+              | select(. != "unsupported") ] | length == 0' "$RUNNER_TEMP/muster/containers/c.json"
 
   collect-contract:
     runs-on: ubuntu-24.04
