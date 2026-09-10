@@ -119,10 +119,12 @@ CIS나 STIG 준수 여부를 인증하지 않습니다. 컨트롤이 인용할 �
 
 1. **뼈대.** `collect`와 `check`, facts 스키마, 표·JSON 출력, 종료 코드, waiver,
    그리고 끝까지 흐르는 컨트롤 여덟 개.
-2. **두 배포판, 자동 판정 가능한 KISA 항목 전체.** Ubuntu와 Rocky 수집기. 67개 중
-   58개를 자동 판정하거나 자동 근거를 붙이고, 나머지 9개(메일·DNS·FTP 데몬 설정)는
-   `MANUAL`로 등재하고 이유를 컨트롤에 기록. 매핑이 있는 모든 컨트롤에 DISA STIG와
-   NIST SP 800-53 참조 번호를 추가.
+2. **두 배포판, 자동 판정 가능한 KISA 항목 전체.** Ubuntu와 Rocky 수집기. 67개 중 64개를
+   자동 판정하거나 자동 근거를 붙임(auto 55, partial 5, manual 4 — manual은 근거를 함께
+   제시). 나머지 3개 — 파일·디렉터리 소유자(U-15), SUID/SGID/sticky 파일(U-23), 숨겨진
+   파일(U-33) — 는 stage 3의 심층 파일시스템 워크가 필요하며 `docs/reference/coverage.md`에
+   유예 항목으로 표시. 매핑이 있는 모든 컨트롤에 DISA STIG와 NIST SP 800-53 참조 번호를
+   추가하고, `controls lint`가 모든 KISA 참조를 67개 항목 인벤토리와 교차 검사.
 3. **목록 밖의 고가치 점검과 프로파일**, 같은 수집기에서: 패키지 무결성, SUID/SGID와
    world-writable 파일, `sudoers`, 파일 capability와 ACL, cron·타이머 인벤토리,
    `authorized_keys` 인벤토리, 삭제된 바이너리로 도는 프로세스, 커널 자기보호 sysctl,

@@ -15,10 +15,14 @@ import (
 )
 
 const (
-	pwqualityConf  = "/etc/security/pwquality.conf"
-	pwqualityConfD = "/etc/security/pwquality.conf.d/*.conf"
-	faillockConf   = "/etc/security/faillock.conf"
-	pwhistoryConf  = "/etc/security/pwhistory.conf"
+	pwqualityConf = "/etc/security/pwquality.conf"
+	// pwqualityConfDir is the drop-in directory mergeDropinsWith is given;
+	// pwqualityConfD is the same directory as the glob the declaration lists
+	// and the pattern a failed listing is reported against.
+	pwqualityConfDir = "/etc/security/pwquality.conf.d"
+	pwqualityConfD   = pwqualityConfDir + "/*.conf"
+	faillockConf     = "/etc/security/faillock.conf"
+	pwhistoryConf    = "/etc/security/pwhistory.conf"
 )
 
 // pamCollector reads the PAM configuration the login-facing services use.

@@ -34,7 +34,12 @@ var filesCollector = collect.Collector{
 // /home/* and /root, the deeper home root /home/*/* (R187, so a home one
 // level down such as /home/dept/alice is declared rather than reported
 // unexaminable), and the per-home dotfile globs for every env-file name plus
-// .rhosts/.shosts under both /home/*/ and /root/.
+// .rhosts/.shosts under /home/*/, /home/*/*/ and /root/. The dotfile globs
+// MIRROR the declared home roots (M-53): a root that is declared but whose
+// dotfiles are not would be stat'd and then have its .rhosts and shell files
+// silently skipped, which is the vacuous PASS C4 exists to prevent. A home
+// deeper than the declared roots stays undeclared on purpose - the enumerations
+// then name it and go absent (M-52).
 func filesReads() []string {
 	reads := []string{passwdPath, shadowPath, securettyPath, groupPath, hostsPath, servicesPath, hostsLpdPath, exportsPath}
 	reads = append(reads, hostsEquivPath, hostsAllowPath, hostsDenyPath, shellsPath, "/proc/self/mountinfo")
@@ -56,7 +61,7 @@ func filesReads() []string {
 	reads = append(reads, varLogDir, varLogGlob1, varLogGlob2)
 	dotfiles := append(append([]string{}, userEnvNames...), ".rhosts", ".shosts")
 	for _, name := range dotfiles {
-		reads = append(reads, "/home/*/"+name, "/root/"+name)
+		reads = append(reads, "/home/*/"+name, "/home/*/*/"+name, "/root/"+name)
 	}
 	// The TCP wrappers library, declared literally: files.libwrap_present is
 	// a presence probe over the paths its shared object lives at (L-9).
@@ -65,14 +70,22 @@ func filesReads() []string {
 
 // libwrapPaths is where libwrap.so.0 lives on the distributions muster
 // judges — the Debian/Ubuntu multiarch directories for the two supported
-// architectures, and the RHEL-family lib64 pair — plus the plain /usr/lib
-// of a 32-bit build. RHEL 8 and later ship no libwrap at all, which is
-// exactly what the fact exists to say.
+// architectures, the RHEL-family /usr/lib64, and the plain /usr/lib of a
+// 32-bit build. RHEL 8 and later ship no libwrap at all, which is exactly
+// what the fact exists to say.
+//
+// C-1: no candidate may sit under a merged-usr alias. /lib64 and /lib are
+// symlinks into /usr on every host muster targets, and the read primitive
+// refuses a symlinked component (spec §8), so a candidate there would answer
+// ErrSymlink — which pathPresent counts as occupied — and the probe would
+// read true on every such host whether or not the library is installed. The
+// alias targets are the candidates instead: /usr/lib64/libwrap.so.0 is what
+// /lib64/libwrap.so.0 resolves to, and the unmerged Debian layout puts the
+// library under /lib/<multiarch>, never /lib64.
 var libwrapPaths = []string{
 	"/usr/lib/x86_64-linux-gnu/libwrap.so.0",
 	"/usr/lib/aarch64-linux-gnu/libwrap.so.0",
 	"/usr/lib64/libwrap.so.0",
-	"/lib64/libwrap.so.0",
 	"/usr/lib/libwrap.so.0",
 }
 

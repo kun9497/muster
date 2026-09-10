@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -88,23 +89,42 @@ func parseCheckArgs(args []string) (checkFlags, error) {
 	return f, nil
 }
 
+// openFacts reads the snapshot at path -- or standard input, for "-" --
+// and returns both the validated snapshot and the bytes it was decoded
+// from. check needs only the snapshot; snapshot extract needs the bytes
+// too, to decode the fact tree a second time with json.Number, so the two
+// commands read their --facts flag through one function rather than two
+// copies of the same size, depth and schema handling (spec 7.2).
+func openFacts(path string) (*facts.Snapshot, []byte, error) {
+	var in io.Reader = os.Stdin
+	if path != "-" {
+		fh, err := os.Open(path)
+		if err != nil {
+			return nil, nil, err
+		}
+		defer fh.Close()
+		in = fh
+	}
+	// The same limit facts.Load applies, read here so the bytes can be
+	// handed back: Load sees one byte more than the maximum and rejects it.
+	data, err := io.ReadAll(io.LimitReader(in, facts.MaxSnapshotBytes+1))
+	if err != nil {
+		return nil, nil, fmt.Errorf("read snapshot: %w", err)
+	}
+	snap, err := facts.Load(bytes.NewReader(data))
+	if err != nil {
+		return nil, nil, err
+	}
+	return snap, data, nil
+}
+
 func runCheck(args []string, stdout, stderr io.Writer) int {
 	f, err := parseCheckArgs(args)
 	if err != nil {
 		fmt.Fprintf(stderr, "muster: %v\n%s", err, checkUsage)
 		return exitError
 	}
-	var in io.Reader = os.Stdin
-	if f.facts != "-" {
-		fh, err := os.Open(f.facts)
-		if err != nil {
-			fmt.Fprintf(stderr, "muster: %v\n", err)
-			return exitError
-		}
-		defer fh.Close()
-		in = fh
-	}
-	snap, err := facts.Load(in)
+	snap, _, err := openFacts(f.facts)
 	if err != nil {
 		fmt.Fprintf(stderr, "muster: %v\n", err)
 		return exitError

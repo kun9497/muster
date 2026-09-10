@@ -1,0 +1,238 @@
+package main
+
+import (
+	"bytes"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/kun9497/muster/internal/controls"
+)
+
+var (
+	repoRoot     = filepath.Join("..", "..")
+	repoCoverage = filepath.Join(repoRoot, "docs", "reference", "coverage.md")
+	repoKISA     = filepath.Join(repoRoot, "docs", "reference", "kisa")
+)
+
+// liveCounts is what the guard demands of the READMEs today: how many items
+// of the committed inventory the committed set enrols, how many items there
+// are, and how the enrolled controls divide by automation. The fixtures below
+// are built from it rather than from literals, so enrolling a control changes
+// what the test writes instead of failing it with a confusing message
+// (LOW 12). TestCheckPassesOnTheCommittedTree is what pins the live numbers
+// against the real READMEs.
+func liveCounts(t *testing.T) coverageNumbers {
+	t.Helper()
+	inventory, err := controls.LoadKISA(repoKISA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	set, err := controls.LoadDefault()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return counts(inventory.Items[controls.LatestKISAEdition], inventory.Deferred, set.Controls)
+}
+
+// M-20/M-24: the roadmap sentence in both READMEs is a claim about coverage,
+// and a stale claim is worse than none. -check verifies the fragment after
+// normalising whitespace on both sides, so the Korean sentence may keep its
+// line break.
+func TestCheckVerifiesTheReadmeCountFragments(t *testing.T) {
+	n := liveCounts(t)
+	enrolled, total := n.enrolled, n.total
+	var (
+		fragEN   = fmt.Sprintf("%d of the %d items", enrolled, total)
+		fragKO   = fmt.Sprintf("%d개 중 %d개", total, enrolled)
+		tripleEN = fmt.Sprintf("%d auto, %d partial, %d manual", n.auto, n.partial, n.manual)
+		tripleKO = fmt.Sprintf("auto %d, partial %d, manual %d", n.auto, n.partial, n.manual)
+		staleEN  = fmt.Sprintf("%d auto, %d partial, %d manual", n.auto-1, n.partial+1, n.manual)
+		staleKO  = fmt.Sprintf("auto %d, partial %d, manual %d", n.auto-1, n.partial+1, n.manual)
+		stale    = enrolled - 1
+		goodEN   = fmt.Sprintf("and Rocky; %s judged automatically or with automatic\nevidence (%s), the rest waiting for stage 3.\n", fragEN, tripleEN)
+		goodKO   = fmt.Sprintf("Ubuntu와 Rocky 수집기. %d개 중\n   %d개를 자동 판정하거나 자동 근거를 붙이고(%s), 나머지는 3단계.\n", total, enrolled, tripleKO)
+	)
+	cases := []struct {
+		name, en, ko string
+		wantCode     int
+		wantErr      string
+	}{
+		{"both current", goodEN, goodKO, 0, ""},
+		{
+			name:     "english stale",
+			en:       strings.Replace(goodEN, fmt.Sprintf("%d of the", enrolled), fmt.Sprintf("%d of the", stale), 1),
+			ko:       goodKO,
+			wantCode: 1,
+			wantErr:  fmt.Sprintf("coverage: README.md does not mention %q; update the roadmap sentence", fragEN),
+		},
+		{
+			name:     "korean stale",
+			en:       goodEN,
+			ko:       strings.Replace(goodKO, fmt.Sprintf("%d개를", enrolled), fmt.Sprintf("%d개를", stale), 1),
+			wantCode: 1,
+			wantErr:  fmt.Sprintf("coverage: README.ko.md does not mention %q; update the roadmap sentence", fragKO),
+		},
+		// G-2: the automation triple goes stale on its own -- a control that
+		// moves from partial to auto leaves every other number untouched.
+		{
+			name:     "english triple stale",
+			en:       strings.Replace(goodEN, tripleEN, staleEN, 1),
+			ko:       goodKO,
+			wantCode: 1,
+			wantErr:  fmt.Sprintf("coverage: README.md does not mention %q; update the roadmap sentence", tripleEN),
+		},
+		{
+			name:     "korean triple stale",
+			en:       goodEN,
+			ko:       strings.Replace(goodKO, tripleKO, staleKO, 1),
+			wantCode: 1,
+			wantErr:  fmt.Sprintf("coverage: README.ko.md does not mention %q; update the roadmap sentence", tripleKO),
+		},
+		{
+			// The fragment may be split anywhere, including inside the
+			// English one, because both sides are normalised.
+			name:     "english wrapped mid-fragment",
+			en:       strings.Replace(goodEN, fragEN, fmt.Sprintf("%d of\n   the %d items", enrolled, total), 1),
+			ko:       goodKO,
+			wantCode: 0,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			write(t, filepath.Join(dir, "README.md"), tc.en)
+			write(t, filepath.Join(dir, "README.ko.md"), tc.ko)
+			var errb bytes.Buffer
+			code := run([]string{"-check", "-out", repoCoverage, "-kisa-dir", repoKISA, "-readme-dir", dir}, &errb)
+			if code != tc.wantCode {
+				t.Fatalf("exit %d, want %d; stderr %q", code, tc.wantCode, errb.String())
+			}
+			if tc.wantErr != "" && !strings.Contains(errb.String(), tc.wantErr) {
+				t.Errorf("stderr %q lacks %q", errb.String(), tc.wantErr)
+			}
+			if tc.wantCode == 0 && errb.Len() > 0 {
+				t.Errorf("a passing check must say nothing: %q", errb.String())
+			}
+		})
+	}
+}
+
+// The committed tree is what CI checks: the table is current and both
+// READMEs carry the live number.
+func TestCheckPassesOnTheCommittedTree(t *testing.T) {
+	var errb bytes.Buffer
+	if code := run([]string{"-check", "-out", repoCoverage, "-kisa-dir", repoKISA, "-readme-dir", repoRoot}, &errb); code != 0 {
+		t.Fatalf("exit %d, want 0; stderr:\n%s", code, errb.String())
+	}
+}
+
+// A stale table is reported as a diff naming the file, not as a bare "differs".
+func TestCheckReportsAStaleTable(t *testing.T) {
+	stale := filepath.Join(t.TempDir(), "coverage.md")
+	write(t, stale, "<!-- Generated by go run ./tools/coverage; do not edit. -->\nnothing like the real thing\n")
+	var errb bytes.Buffer
+	if code := run([]string{"-check", "-out", stale, "-kisa-dir", repoKISA, "-readme-dir", repoRoot}, &errb); code != 1 {
+		t.Fatalf("exit %d, want 1; stderr %q", code, errb.String())
+	}
+	if !strings.Contains(errb.String(), "out of date") || !strings.Contains(errb.String(), "@@") {
+		t.Errorf("stderr %q must name the staleness and show the diff", errb.String())
+	}
+}
+
+// LOW 7: a contributor who is stale in both places learns about both in one
+// run, and the exit code is the worst of the two -- an unreadable README is
+// "could not be determined" (2), which outranks a stale file (1).
+func TestCheckReportsTheTableAndTheReadmeTogether(t *testing.T) {
+	n := liveCounts(t)
+	enrolled, total := n.enrolled, n.total
+	dir := t.TempDir()
+	stale := filepath.Join(dir, "coverage.md")
+	write(t, stale, "<!-- Generated by go run ./tools/coverage; do not edit. -->\nnothing like the real thing\n")
+	write(t, filepath.Join(dir, "README.md"), fmt.Sprintf("%d of the %d items\n", enrolled-1, total))
+	write(t, filepath.Join(dir, "README.ko.md"), fmt.Sprintf("%d개 중 %d개\n", total, enrolled))
+
+	var errb bytes.Buffer
+	if code := run([]string{"-check", "-out", stale, "-kisa-dir", repoKISA, "-readme-dir", dir}, &errb); code != 1 {
+		t.Fatalf("exit %d, want 1; stderr %q", code, errb.String())
+	}
+	if !strings.Contains(errb.String(), "is out of date") {
+		t.Errorf("stderr %q must report the stale table", errb.String())
+	}
+	if !strings.Contains(errb.String(), "README.md does not mention") {
+		t.Errorf("stderr %q must report the stale README in the same run", errb.String())
+	}
+
+	// The README cannot be read at all: worse than stale, and it wins.
+	if err := os.Remove(filepath.Join(dir, "README.md")); err != nil {
+		t.Fatal(err)
+	}
+	var errb2 bytes.Buffer
+	if code := run([]string{"-check", "-out", stale, "-kisa-dir", repoKISA, "-readme-dir", dir}, &errb2); code != 2 {
+		t.Fatalf("exit %d, want 2; stderr %q", code, errb2.String())
+	}
+	if !strings.Contains(errb2.String(), "is out of date") {
+		t.Errorf("stderr %q must still report the stale table", errb2.String())
+	}
+}
+
+// LOW 10: asking for the usage is not a failure to determine anything.
+func TestHelpExitsZero(t *testing.T) {
+	for _, flag := range []string{"-h", "-help"} {
+		var errb bytes.Buffer
+		if code := run([]string{flag}, &errb); code != 0 {
+			t.Errorf("%s: exit %d, want 0; stderr %q", flag, code, errb.String())
+		}
+		if !strings.Contains(errb.String(), "-kisa-dir") {
+			t.Errorf("%s: the usage must name the flags: %q", flag, errb.String())
+		}
+	}
+	var errb bytes.Buffer
+	if code := run([]string{"-nonsense"}, &errb); code != 2 {
+		t.Errorf("an unknown flag is still exit 2, got %d", code)
+	}
+}
+
+func TestUnifiedDiffTrimsCommonPrefixAndSuffix(t *testing.T) {
+	have := []byte("a\nb\nc\nd\n")
+	want := []byte("a\nb\nCHANGED\nd\n")
+	got := unifiedDiff("docs/reference/coverage.md", have, want)
+	if !strings.Contains(got, "--- docs/reference/coverage.md (committed)") ||
+		!strings.Contains(got, "+++ docs/reference/coverage.md (generated)") {
+		t.Errorf("the diff must name the file on both sides:\n%s", got)
+	}
+	// One line changed on line 3, so exactly one hunk of one removed and
+	// one added line -- the shared head and tail must not appear.
+	if n := strings.Count(got, "@@"); n != 2 {
+		t.Errorf("want exactly one hunk header, got %d @@ markers:\n%s", n, got)
+	}
+	if !strings.Contains(got, "@@ -3,1 +3,1 @@") {
+		t.Errorf("wrong hunk offsets:\n%s", got)
+	}
+	if !strings.Contains(got, "\n-c\n") || !strings.Contains(got, "\n+CHANGED\n") {
+		t.Errorf("the changed lines are missing:\n%s", got)
+	}
+	for _, unwanted := range []string{"\n-a\n", "\n+a\n", "\n-d\n", "\n+d\n"} {
+		if strings.Contains(got, unwanted) {
+			t.Errorf("the common prefix and suffix must be trimmed (%q):\n%s", unwanted, got)
+		}
+	}
+
+	// Identical inputs leave nothing between the trimmed prefix and suffix:
+	// an empty hunk and no body lines at all.
+	// Four lines and the empty string after the trailing newline are all
+	// common, so the hunk opens past the end of the file and is empty.
+	const empty = "--- x.md (committed)\n+++ x.md (generated)\n@@ -6,0 +6,0 @@\n"
+	if same := unifiedDiff("x.md", have, have); same != empty {
+		t.Errorf("identical inputs must yield an empty hunk:\n%q\nwant\n%q", same, empty)
+	}
+}
+
+func write(t *testing.T, path, content string) {
+	t.Helper()
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}

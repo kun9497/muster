@@ -35,9 +35,20 @@ func (t mountTable) mountPoint(p string) string {
 func devEntries(a collect.Access, mounts mountTable) (facts.Envelope, facts.Envelope) {
 	var paths []string
 	for _, g := range []string{"/dev/*", "/dev/*/*"} {
-		if m, err := a.Glob(g); err == nil {
-			paths = append(paths, m...)
+		m, err := a.Glob(g)
+		if err != nil {
+			// M-10: a /dev this process may not list is not a /dev with
+			// nothing in it. Publishing the walk it managed would give U-26 a
+			// clean empty dev_nondevice on evidence never seen — the same
+			// vacuous PASS the caller already refuses when
+			// /proc/self/mountinfo cannot be read, filed the same way.
+			// C-5/C3: path-prefixed, as the two sibling M-10 sites file
+			// theirs — DeniedReason alone is a constant, so the reason would
+			// not say which directory could not be listed.
+			e := readErrorEnv(g, err)
+			return e, e
 		}
+		paths = append(paths, m...)
 	}
 	sort.Strings(paths)
 	truncated := false

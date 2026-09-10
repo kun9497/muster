@@ -295,7 +295,8 @@ func (p *ftpParse) detectVsftpd() bool {
 func (p *ftpParse) noteExtraInstances() {
 	matches, err := p.a.Glob(vsftpdConfGlob)
 	if err != nil {
-		p.fail(collect.Unsupported("glob " + vsftpdConfGlob + ": " + err.Error()))
+		// M-49: a directory this run may not search is denied, not unsupported.
+		p.fail(globReadError(vsftpdConfGlob, err, collect.Unsupported("glob "+vsftpdConfGlob+": "+err.Error())))
 		return
 	}
 	sort.Strings(matches)
@@ -349,7 +350,8 @@ func (p *ftpParse) detectPureFtpd() bool {
 	confPresent := err == nil || !errors.Is(err, fs.ErrNotExist)
 	matches, gerr := p.a.Glob(pureFtpdConfGlob)
 	if gerr != nil {
-		p.fail(collect.Unsupported("glob " + pureFtpdConfGlob + ": " + gerr.Error()))
+		// M-49: a directory this run may not search is denied, not unsupported.
+		p.fail(globReadError(pureFtpdConfGlob, gerr, collect.Unsupported("glob "+pureFtpdConfGlob+": "+gerr.Error())))
 		matches = nil
 	}
 	if !confPresent && len(matches) == 0 {
@@ -521,7 +523,8 @@ func (p *ftpParse) proftpdInclude(file, target string, depth int, stack []*proft
 	if strings.ContainsAny(pattern, "*?[") {
 		matches, err := p.a.Glob(pattern)
 		if err != nil {
-			p.fail(collect.Unsupported("glob " + pattern + ": " + err.Error()))
+			// M-49: a directory this run may not search is denied, not unsupported.
+			p.fail(globReadError(pattern, err, collect.Unsupported("glob "+pattern+": "+err.Error())))
 			return
 		}
 		sort.Strings(matches)

@@ -129,7 +129,16 @@ func (s *superServers) readInetd(a collect.Access) {
 
 // readXinetd appends one entry per `service <name>` block across all fragments.
 func (s *superServers) readXinetd(a collect.Access) {
-	paths, _ := a.Glob(xinetdGlob)
+	paths, err := a.Glob(xinetdGlob)
+	if err != nil {
+		// M-10: the fragment directory could not be listed, so a fragment
+		// enabling telnet, ftp or rsh may be sitting there unseen and "no
+		// super-server entry" would be a guess. Note it like an unreadable
+		// fragment: R227 then makes it the envelope every leaf a fragment
+		// could have set carries, instead of a silent ok:false.
+		s.noteReadError(xinetdGlob, err)
+		return
+	}
 	slices.Sort(paths)
 	for _, p := range paths {
 		data, meta, err := a.ReadFile(p, readLimit)

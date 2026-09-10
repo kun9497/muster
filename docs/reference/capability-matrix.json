@@ -1,0 +1,23 @@
+{
+  "nonroot": {
+    "denied": [
+      "accounts.shadow_in_use",
+      "cron.dirs",
+      "cron.files",
+      "files.etc_shadow.acl_entries",
+      "files.etc_shadow.acl_present",
+      "files.etc_sudoers.acl_present",
+      "files.root_home.acl_present",
+      "sudo.includedir",
+      "sudo.secure_path"
+    ]
+  },
+  "no-systemd": {
+    "unsupported": [
+      "services.ssh.installed",
+      "services.ntp.installed",
+      "services.syslog.installed",
+      "services.ftp.installed"
+    ]
+  }
+}

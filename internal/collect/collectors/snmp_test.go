@@ -843,3 +843,68 @@ func TestSnmpProxyCommunitiesAreRecorded(t *testing.T) {
 	}
 	assertNoSecrets(t, b)
 }
+
+// M-49 (extending M-10): the drop-in directory listing can now fail with a
+// permission error, which is denied — not the ErrorEnv this branch used to
+// give every Glob failure. An error envelope ranks worst in Builder.Worst,
+// flips run.complete and sends check to exit 2 over a condition that is
+// simply "this run is not root", and R220/H-17 already say a root-only read
+// as a non-root user is denied. The judged lists carry it, path-prefixed, so
+// U-61 reads ERROR rather than "v1 is not enabled".
+func TestSnmpDeniedConfDIsDeniedNotError(t *testing.T) {
+	a := snmpAccess(map[string]string{testSnmpdConf: "snmpd.conf.v2c-public"}, nil)
+	a.deniedDirs = map[string]bool{snmpdConfDDir: true}
+	b := buildBegun(t, "snmp", a)
+
+	for _, k := range []string{"snmp.versions_enabled", "snmp.communities", "snmp.v3_users"} {
+		e := env(t, b, k)
+		if e.Status != facts.StatusDenied {
+			t.Errorf("%s %+v, want denied (never error)", k, e)
+		}
+		if !strings.Contains(e.Reason, snmpdConfDGlob) {
+			t.Errorf("%s reason %q must name %s", k, e.Reason, snmpdConfDGlob)
+		}
+	}
+	if e := env(t, b, "snmp.parse_complete"); e.Status != facts.StatusOK || e.Value != false {
+		t.Errorf("parse_complete %+v, want ok false", e)
+	}
+	if got := b.Worst("snmp"); got != facts.StatusDenied {
+		t.Errorf(`Worst("snmp") = %s, want denied`, got)
+	}
+	assertNoSecrets(t, b)
+}
+
+// M-49, the includeDir site. This is a SECOND Glob inside the snmp collector
+// and it fails first: scan() parses the candidate files — expanding
+// `includeDir /etc/snmp/snmpd.conf.d` in place — before it globs the drop-in
+// directory on its own initiative, and p.fail keeps the FIRST failure. So the
+// envelope every judged leaf carries here is includeDir's, and reverting only
+// includeDir to its old blanket ErrorEnv turns this test red while
+// TestSnmpDeniedConfDIsDeniedNotError (whose fixture has no includeDir
+// directive) stays green.
+//
+// The declaration covers exactly one glob, so includeDir can only ever build
+// the pattern scan() uses and the two reasons read identically — the STATUS
+// is what tells the two sites apart, which is precisely what is asserted.
+func TestSnmpDeniedIncludeDirIsDeniedNotError(t *testing.T) {
+	a := snmpAccess(map[string]string{testSnmpdConf: "snmpd.conf.includes"}, nil)
+	a.deniedDirs = map[string]bool{snmpdConfDDir: true}
+	b := buildBegun(t, "snmp", a)
+
+	for _, k := range []string{"snmp.versions_enabled", "snmp.communities", "snmp.v3_users"} {
+		e := env(t, b, k)
+		if e.Status != facts.StatusDenied {
+			t.Errorf("%s %+v, want denied (never error)", k, e)
+		}
+		if !strings.HasPrefix(e.Reason, snmpdConfDGlob+":") {
+			t.Errorf("%s reason %q must be prefixed with %s", k, e.Reason, snmpdConfDGlob)
+		}
+	}
+	if e := env(t, b, "snmp.parse_complete"); e.Status != facts.StatusOK || e.Value != false {
+		t.Errorf("parse_complete %+v, want ok false", e)
+	}
+	if got := b.Worst("snmp"); got != facts.StatusDenied {
+		t.Errorf(`Worst("snmp") = %s, want denied`, got)
+	}
+	assertNoSecrets(t, b)
+}

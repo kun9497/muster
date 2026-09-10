@@ -1,8 +1,10 @@
 package check
 
 import (
+	"errors"
 	"fmt"
 	"math"
+	"strings"
 
 	"github.com/kun9497/muster/internal/controls"
 	"github.com/kun9497/muster/internal/facts"
@@ -11,7 +13,7 @@ import (
 // evalCollection implements each and none (spec §6.3, §6.4). Every element
 // examined becomes an observation keyed <kind>:<subject value>.
 func (e *env) evalCollection(cl controls.Clause, entry facts.Entry, list []any, src *facts.Source) clauseOutcome {
-	out := clauseOutcome{Holds: true, Evidence: []Evidence{{Fact: cl.Fact, Status: facts.StatusOK, Value: fmt.Sprintf("%d elements", len(list)), Source: src}}}
+	out := clauseOutcome{Holds: true, Count: len(list)}
 	kind := entry.SubjectKind
 	if kind == "" {
 		kind = "item"
@@ -34,6 +36,27 @@ func (e *env) evalCollection(cl controls.Clause, entry facts.Entry, list []any, 
 			return clauseOutcome{Err: err}
 		}
 	}
+	// failed are the elements this clause JUDGED and found wanting; unjudged
+	// are the ones it could not judge at all (M-5). M-44 keeps the two apart
+	// everywhere they are reported: saying "matching: user:bob" on a nopass
+	// clause would assert that bob has an empty password, which is the
+	// confident-wrong claim M-5 exists to prevent.
+	var failed, unjudged []string
+	// M-5: an element whose judged field the snapshot does not carry fails
+	// the clause and says which field, and the loop goes on so the report
+	// still lists every element that was examined. M-46: the row carries its
+	// OWN sub-clause rendered, so two elements missing two different fields
+	// are told apart even when both fields expect the same value — the
+	// clause-level reason can only name the first.
+	missing := func(subject string, mf missingFieldError, sub *controls.Clause) {
+		out.Observations = append(out.Observations, Observation{Subject: subject, Expected: describeField(sub, e.params), Actual: nil, Verdict: "fail"})
+		out.Holds = false
+		unjudged = append(unjudged, subject)
+		if out.Reason == "" {
+			out.Reason = fmt.Sprintf("element %s has no field %q", subject, mf.Field)
+		}
+	}
+	selected := 0
 	for i, elem := range list {
 		subject := fmt.Sprintf("%s:%s", kind, subjectValue(cl.Subject, elem, i))
 		switch cl.Op {
@@ -41,35 +64,124 @@ func (e *env) evalCollection(cl controls.Clause, entry facts.Entry, list []any, 
 			if cl.Where != nil {
 				sel, err := fieldClause(cl.Where, elem, e.params)
 				if err != nil {
-					return clauseOutcome{Err: err}
+					var mf missingFieldError
+					if !errors.As(err, &mf) {
+						return clauseOutcome{Err: err}
+					}
+					// Never a silent deselection: an element that could not
+					// be tested for selection is the vacuous PASS §5.7 forbids.
+					missing(subject, mf, cl.Where)
+					continue
 				}
 				if !sel {
 					continue
 				}
 			}
+			selected++
 			ok, err := fieldClause(cl.Require, elem, e.params)
 			if err != nil {
-				return clauseOutcome{Err: err}
+				var mf missingFieldError
+				if !errors.As(err, &mf) {
+					return clauseOutcome{Err: err}
+				}
+				missing(subject, mf, cl.Require)
+				continue
 			}
 			obs := Observation{Subject: subject, Expected: requireExpected, Actual: fieldValue(cl.Require.Field, elem), Verdict: "pass"}
 			if !ok {
 				obs.Verdict = "fail"
 				out.Holds = false
+				failed = append(failed, subject)
 			}
 			out.Observations = append(out.Observations, obs)
 		case "none":
 			hit, err := fieldClause(cl.Where, elem, e.params)
 			if err != nil {
-				return clauseOutcome{Err: err}
+				var mf missingFieldError
+				if !errors.As(err, &mf) {
+					return clauseOutcome{Err: err}
+				}
+				missing(subject, mf, cl.Where)
+				continue
 			}
 			if hit {
 				out.Holds = false
+				failed = append(failed, subject)
 				out.Observations = append(out.Observations, Observation{Subject: subject, Expected: fmt.Sprintf("not %s %v", cl.Where.Op, whereExpected), Actual: fieldValue(cl.Where.Field, elem), Verdict: "fail"})
 			}
 		}
 	}
+	// M-6: an `each` whose `where` selected nothing out of a non-empty list
+	// judged none of the host's elements. The observation makes that visible
+	// in every report; when the filter was a ${param} rather than the
+	// control's own literal, the caller turns it into MANUAL as well.
+	//
+	// Both halves are skipped once the clause is already failing (M-33, and
+	// LOW-2 amending M-6's "always"): nothing was selected BECAUSE a field is
+	// missing, not because the filter excluded anything, so a pass-verdict
+	// row asserting the selection is fine has no business on a finding.
+	if cl.Op == "each" && cl.Where != nil && len(list) > 0 && selected == 0 && out.Holds {
+		out.Observations = append(out.Observations, Observation{
+			Subject:  kind + ":*",
+			Expected: describeField(cl.Where, e.params),
+			Actual:   fmt.Sprintf("0 of %d elements selected", len(list)),
+			Verdict:  "pass",
+		})
+		if name, ok := paramName(cl.Where.Expected); ok {
+			out.Vacuous = name
+		}
+	}
+	out.Evidence = []Evidence{{Fact: cl.Fact, Status: facts.StatusOK, Value: collectionValue(cl, out.Count, selected, failed, unjudged), Source: src}}
 	return out
 }
+
+// maxNamedSubjects caps how many subjects an evidence value spells out; the
+// observations stay the complete record (M-7).
+const maxNamedSubjects = 5
+
+// collectionValue is the evidence value of an each/none clause: what it
+// judged, not only how much of it (M-7). Subjects appear in the snapshot's
+// own list order, so the same input renders the same bytes. M-44: the
+// elements the clause could not judge are their own trailing segment, never
+// folded into the ones it did judge.
+func collectionValue(cl controls.Clause, n, selected int, failed, unjudged []string) string {
+	value := fmt.Sprintf("%d elements", n)
+	switch cl.Op {
+	case "each":
+		if cl.Where != nil {
+			value += fmt.Sprintf("; %d selected", selected)
+		}
+		if len(failed) > 0 {
+			value += "; failing: " + namedSubjects(failed)
+		}
+	case "none":
+		if len(failed) > 0 {
+			value += "; matching: " + namedSubjects(failed)
+		} else if len(unjudged) == 0 {
+			value += "; none matching"
+		}
+	}
+	if len(unjudged) > 0 {
+		value += "; unjudged: " + namedSubjects(unjudged)
+	}
+	return value
+}
+
+func namedSubjects(subjects []string) string {
+	if len(subjects) <= maxNamedSubjects {
+		return strings.Join(subjects, ", ")
+	}
+	return fmt.Sprintf("%s, +%d more", strings.Join(subjects[:maxNamedSubjects], ", "), len(subjects)-maxNamedSubjects)
+}
+
+// missingFieldError is fieldClause's answer for an element that has no value
+// under the field the sub-clause names. Spec §5.7 (line 206): a clause that
+// names a field an older snapshot lacks fails that clause with a reason
+// naming the field — so this is a typed error the collection loop turns into
+// a failing observation, never an ERROR(internal_error).
+type missingFieldError struct{ Field string }
+
+func (e missingFieldError) Error() string { return fmt.Sprintf("element has no field %q", e.Field) }
 
 // subjectValue picks the element field named by `subject` for a record
 // element, or the element itself for a scalar (string) element regardless of
@@ -111,7 +223,9 @@ func fieldClause(sub *controls.Clause, elem any, params map[string]any) (bool, e
 		if sub.Op == "present" {
 			return false, nil
 		}
-		return false, fmt.Errorf("element has no field %q", sub.Field)
+		// Every other op judges the field's VALUE, which this element does
+		// not have; M-5 fails the clause naming the field.
+		return false, missingFieldError{Field: sub.Field}
 	}
 	expected, err := substitute(sub.Expected, params)
 	if err != nil {

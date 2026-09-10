@@ -19,7 +19,7 @@
 | U-12 | 세션 종료 시간 설정 | 하 | muster.account.session_timeout | auto | enrolled |
 | U-13 | 안전한 비밀번호 암호화 알고리즘 사용 | 중 | muster.account.password_hash_algorithm | auto | enrolled |
 | U-14 | root 홈, 패스 디렉터리 권한 및 패스 설정 | 상 | muster.account.root_home_and_path | auto | enrolled |
-| U-15 | 파일 및 디렉터리 소유자 설정 | 상 | — | — | not enrolled |
+| U-15 | 파일 및 디렉터리 소유자 설정 | 상 | — | — | deferred (stage 3) |
 | U-16 | /etc/passwd 파일 소유자 및 권한 설정 | 상 | muster.file.passwd_permissions | auto | enrolled |
 | U-17 | 시스템 시작 스크립트 권한 설정 | 상 | muster.file.startup_script_permissions | auto | enrolled |
 | U-18 | /etc/shadow 파일 소유자 및 권한 설정 | 상 | muster.file.shadow_permissions | auto | enrolled |
@@ -27,7 +27,7 @@
 | U-20 | /etc/(x)inetd.conf 파일 소유자 및 권한 설정 | 상 | muster.file.inetd_conf_permissions | auto | enrolled |
 | U-21 | /etc/(r)syslog.conf 파일 소유자 및 권한 설정 | 상 | muster.file.syslog_conf_permissions | auto | enrolled |
 | U-22 | /etc/services 파일 소유자 및 권한 설정 | 상 | muster.file.services_permissions | auto | enrolled |
-| U-23 | SUID, SGID, Sticky bit 설정 파일 점검 | 상 | — | — | not enrolled |
+| U-23 | SUID, SGID, Sticky bit 설정 파일 점검 | 상 | — | — | deferred (stage 3) |
 | U-24 | 사용자, 시스템 환경변수 파일 소유자 및 권한 설정 | 상 | muster.file.env_file_permissions | auto | enrolled |
 | U-25 | world writable 파일 점검 | 상 | muster.file.world_writable | partial | enrolled |
 | U-26 | /dev에 존재하지 않는 device 파일 점검 | 상 | muster.file.dev_no_stale_files | auto | enrolled |
@@ -37,7 +37,7 @@
 | U-30 | UMASK 설정 관리 | 중 | muster.account.umask_policy | auto | enrolled |
 | U-31 | 홈 디렉토리 소유자 및 권한 설정 | 중 | muster.file.home_dir_permissions | auto | enrolled |
 | U-32 | 홈 디렉토리로 지정한 디렉토리의 존재 관리 | 중 | muster.file.home_dir_exists | auto | enrolled |
-| U-33 | 숨겨진 파일 및 디렉토리 검색 및 제거 | 하 | — | — | not enrolled |
+| U-33 | 숨겨진 파일 및 디렉토리 검색 및 제거 | 하 | — | — | deferred (stage 3) |
 | U-34 | Finger 서비스 비활성화 | 상 | muster.service.finger_disabled | auto | enrolled |
 | U-35 | 공유 서비스에 대한 익명 접근 제한 설정 | 상 | muster.service.ftp_anonymous | auto | enrolled |
 | U-36 | r 계열 서비스 비활성화 | 상 | muster.service.rservices_disabled | auto | enrolled |
@@ -72,3 +72,30 @@
 | U-65 | NTP 및 시각 동기화 설정 | 중 | muster.log.time_sync | auto | enrolled |
 | U-66 | 정책에 따른 시스템 로깅 설정 | 중 | muster.log.syslog_policy | auto | enrolled |
 | U-67 | 로그 디렉터리 소유자 및 권한 설정 | 중 | muster.file.log_dir_permissions | auto | enrolled |
+
+## Fact keys used by controls
+
+146 of 343 registered keys are read by a control (4 by the engine); 193 unused.
+
+| Collector | Registered | Used by a control | Read by the engine | Unused |
+|---|---|---|---|---|
+| services | 80 | 40 | 0 | services.ssh.active, services.ssh.unit_file_state, services.ssh.enabled, services.telnet.installed, services.telnet.active, services.telnet.unit_file_state, services.telnet.enabled, services.finger.installed, services.finger.unit_file_state, services.rservices.installed, services.rservices.unit_file_state, services.dos_services.installed, services.dos_services.unit_file_state, services.nfs_server.unit_file_state, services.automount.installed, services.automount.unit_file_state, services.rpcbind.installed, services.rpcbind.unit_file_state, services.nis.installed, services.nis.unit_file_state, services.tftp.installed, services.tftp.unit_file_state, services.talk.installed, services.talk.unit_file_state, services.snmp.unit_file_state, services.ntp.unit_file_state, services.ntp.enabled, services.syslog.installed, services.syslog.unit_file_state, services.syslog.enabled, services.ftp.unit_file_state, services.ftp.enabled, services.ftp.reachable, services.mail.active, services.mail.unit_file_state, services.mail.enabled, services.dns.active, services.dns.unit_file_state, services.dns.enabled, services.dns.reachable |
+| sockets | 1 | 0 | 0 | sockets.listening |
+| sshd | 11 | 4 | 2 | sshd.version, sshd.options.max_auth_tries, sshd.options.banner, sshd.include_sources, sshd.banner_file.exists |
+| banners | 10 | 2 | 0 | banners.issue.nonempty, banners.issue.os_escapes, banners.issue.mode, banners.issue_net.mode, banners.motd.nonempty, banners.motd.mode, banners.motd_d, banners.dynamic_motd |
+| files | 101 | 44 | 0 | files.etc_passwd.acl_present, files.etc_passwd.group, files.etc_passwd.group_readable, files.etc_passwd.group_writable, files.etc_passwd.other_readable, files.etc_passwd.other_writable, files.etc_shadow.gid, files.etc_shadow.group, files.etc_shadow.group_readable, files.etc_shadow.group_writable, files.etc_shadow.other_readable, files.etc_shadow.other_writable, files.etc_shadow.acl_present, files.etc_hosts.gid, files.etc_hosts.group, files.etc_hosts.group_readable, files.etc_hosts.group_writable, files.etc_hosts.other_readable, files.etc_hosts.other_writable, files.etc_hosts.acl_present, files.etc_services.gid, files.etc_services.group, files.etc_services.group_readable, files.etc_services.group_writable, files.etc_services.other_readable, files.etc_services.other_writable, files.etc_services.acl_present, files.etc_hosts_lpd.gid, files.etc_hosts_lpd.group, files.etc_hosts_lpd.group_readable, files.etc_hosts_lpd.group_writable, files.etc_hosts_lpd.other_readable, files.etc_hosts_lpd.other_writable, files.etc_hosts_lpd.acl_present, files.root_home.mode, files.root_home.gid, files.root_home.acl_present, files.etc_hosts_equiv.mode, files.etc_hosts_equiv.uid, files.dev_entries, files.etc_sudoers.gid, files.etc_sudoers.acl_present, files.etc_sudoers_d.mode, files.etc_sudoers_d.uid, files.etc_sudoers_d.gid, files.etc_sudoers_d.acl_present, files.etc_hosts_allow_lines, files.etc_hosts_deny_lines, sudo.includedir, sudo.secure_path, files.etc_exports.gid, files.etc_exports.group, files.etc_exports.group_readable, files.etc_exports.group_writable, files.etc_exports.other_readable, files.etc_exports.other_writable, files.etc_exports.acl_present |
+| accounts | 22 | 12 | 1 | accounts.login_defs.pass_warn_age, accounts.login_defs.uid_min, accounts.login_defs.sys_uid_max, accounts.login_defs.sha_crypt_min_rounds, accounts.login_defs.home_mode, accounts.login_defs.env_supath, accounts.login_defs.env_path, accounts.parse_failures, accounts.groups |
+| pam | 28 | 9 | 0 | pam.stacks, pam.managing_layer, pam.parse_complete, pam.pwquality.local_users_only, pam.pwquality.minclass, pam.pwquality.dcredit, pam.pwquality.ucredit, pam.pwquality.lcredit, pam.pwquality.ocredit, pam.pwquality.enforce_for_root, pam.password.remember, pam.faillock.unlock_time, pam.faillock.fail_interval, pam.faillock.even_deny_root, pam.faillock.root_unlock_time, pam.su.wheel_control, pam.su.wheel_group, pam.su.wheel_args, pam.umask_module.args |
+| os | 2 | 0 | 0 | env.container, env.has_systemd |
+| env | 7 | 4 | 0 | env.shell.tmout_readonly, env.shell.tmout_settings, env.shell.umask_settings |
+| walk | 2 | 1 | 1 | — |
+| cron | 3 | 2 | 0 | cron.timers |
+| firewall | 8 | 2 | 0 | firewall.enabled, firewall.default_policy.input, firewall.default_policy.forward, firewall.normalization_confidence, firewall.rules, firewall.raw_dumps |
+| timesync | 4 | 1 | 0 | time_sync.provider, time_sync.servers, time_sync.synchronized |
+| logging | 10 | 3 | 0 | logging.rsyslog.rules, logging.rsyslog.parse_complete, logging.rsyslog.unmodelled, logging.rsyslog.property_filters, logging.journald.storage, logging.journald.forward_to_syslog, logging.log_targets |
+| nfs | 3 | 1 | 0 | nfs.exports_source, nfs.exports_runtime_collected |
+| snmp | 7 | 2 | 0 | snmp.v3_users, snmp.access_rules, snmp.agent_addresses, snmp.config_files, snmp.parse_complete |
+| patch | 10 | 4 | 0 | patch.pending_updates, patch.reboot_required, patch.auto_update.enabled, patch.held_packages, patch.days_since_last_install, packages.installed |
+| ftp | 17 | 6 | 0 | ftp.implementation, ftp.config_files, ftp.parse_complete, ftp.unmodelled, ftp.local_enabled, ftp.tcp_wrappers, ftp.userlist_enable, ftp.userlist_deny, ftp.userlist_file, ftp.banner_source, ftp.banner_text |
+| mail | 10 | 7 | 0 | mail.config_files, mail.postfix.smtpd_recipient_restrictions, mail.postfix.disable_vrfy_command |
+| dns | 7 | 2 | 0 | dns.config_files, dns.parse_complete, dns.unmodelled, dns.options.allow_transfer, dns.options.allow_update |

@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -647,5 +648,162 @@ func TestHostAccessWritableRefusesSymlink(t *testing.T) {
 	}
 	if (hostAccess{}).Writable(link) {
 		t.Error("Writable on a symlink must be refused, not resolved")
+	}
+}
+
+// M-10: filepath.Glob swallows the EACCES it gets from a directory this
+// process may not search and answers with an empty list, so a non-root run
+// reads "nothing is there" where the honest answer is "we were not allowed
+// to look". hostAccess.Glob probes the pattern's literal directory first and
+// reports that denial, wrapped so every caller's FromReadError classifies it
+// (errors.Is(err, fs.ErrPermission)) and the message names the directory.
+//
+// Only a non-root process can be refused: root searches a 0000 directory
+// regardless of its mode, so this test skips under euid 0 and the lab run
+// repeats the package as an unprivileged user.
+func TestHostGlobReportsADeniedDirectory(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root may search any directory; the denial this test needs only exists for an unprivileged process")
+	}
+	parent := t.TempDir()
+	denied := filepath.Join(parent, "closed")
+	if err := os.Mkdir(denied, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	// Put the mode back before the temp tree is removed, so cleanup never
+	// depends on the very permission this test took away.
+	t.Cleanup(func() { os.Chmod(denied, 0o700) })
+
+	matches, err := (hostAccess{}).Glob(denied + "/*")
+	if err == nil {
+		t.Fatalf("Glob of an unsearchable directory returned %v and no error", matches)
+	}
+	if !errors.Is(err, fs.ErrPermission) {
+		t.Errorf("error %v does not satisfy errors.Is(err, fs.ErrPermission), so FromReadError would not read it as denied", err)
+	}
+	if _, ok := DeniedReason(err); !ok {
+		t.Errorf("DeniedReason(%v) did not classify the denial", err)
+	}
+	if !strings.Contains(err.Error(), denied) {
+		t.Errorf("error %q must name the directory %q", err, denied)
+	}
+	if matches != nil {
+		t.Errorf("a denied Glob must return no matches, got %v", matches)
+	}
+
+	// A directory that is simply not there is not a denial: the probe falls
+	// through and filepath.Glob's own answer stands.
+	missing := filepath.Join(parent, "gone")
+	if m, err := (hostAccess{}).Glob(missing + "/*"); err != nil || m != nil {
+		t.Errorf("Glob of a missing directory = (%v, %v), want (nil, nil)", m, err)
+	}
+
+	// A symlinked directory still gets filepath.Glob's answer: the probe
+	// refuses to follow the link (ErrSymlink), which is not a denial, and
+	// every match is read back through the no-follow primitive afterwards.
+	real := filepath.Join(parent, "real")
+	if err := os.Mkdir(real, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	mkfile(t, filepath.Join(real, "a.conf"), "x", 0o644)
+	link := filepath.Join(parent, "link")
+	if err := os.Symlink(real, link); err != nil {
+		t.Fatal(err)
+	}
+	want, wantErr := filepath.Glob(link + "/*")
+	got, gotErr := (hostAccess{}).Glob(link + "/*")
+	if gotErr != wantErr || !reflect.DeepEqual(got, want) {
+		t.Errorf("Glob through a symlinked directory = (%v, %v), want filepath.Glob's (%v, %v)", got, gotErr, want, wantErr)
+	}
+}
+
+// M-11: Getxattr sizes its buffer from the attribute itself
+// (Fgetxattr(fd, name, nil)) and allocates exactly that, rather than
+// allocating a flat 64 KiB for every ACL probe. The length was already right
+// — buf[:n] — so the capacity is what tells the two apart.
+func TestGetxattrSizesTheBuffer(t *testing.T) {
+	const name = "user.x"
+	value := bytes.Repeat([]byte("v"), 100)
+	p := xattrFile(t, name, value)
+
+	got, err := (hostAccess{}).Getxattr(p, name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, value) {
+		t.Fatalf("value %q, want %q", got, value)
+	}
+	if cap(got) != len(value) {
+		t.Errorf("buffer capacity %d for a %d-byte attribute: the read must be sized from the attribute, not a fixed cap", cap(got), len(value))
+	}
+}
+
+// xattrFile creates a regular file carrying one extended attribute and
+// returns its path, skipping the test when no filesystem available to it
+// accepts a user.* attribute (tmpfs before Linux 6.6 refuses them outright).
+//
+// The fallback deliberately stays OUT of the source tree: a killed or
+// panicking run would leave an untracked directory in internal/collect —
+// root-owned when the sudo test job took that branch — and the tree may be a
+// read-only checkout. /var/tmp is on the root filesystem on every
+// distribution muster targets, which is the point: it is a different
+// filesystem from a tmpfs /tmp.
+func xattrFile(t *testing.T, name string, value []byte) string {
+	t.Helper()
+	var last error
+	for _, base := range []string{"", "/var/tmp", os.Getenv("XDG_RUNTIME_DIR")} {
+		dir := base
+		if base == "" {
+			dir = t.TempDir()
+		} else {
+			if _, err := os.Stat(base); err != nil {
+				continue
+			}
+			d, err := os.MkdirTemp(base, "muster-xattr")
+			if err != nil {
+				continue
+			}
+			t.Cleanup(func() { os.RemoveAll(d) })
+			dir = d
+		}
+		p := filepath.Join(dir, "f")
+		mkfile(t, p, "content", 0o644)
+		err := unix.Setxattr(p, name, value, 0)
+		if err == nil {
+			return p
+		}
+		last = err
+	}
+	t.Skipf("no filesystem here accepts a %s attribute: %v", name, last)
+	return ""
+}
+
+// M-10 states GlobDir precisely: clean the pattern first, then take the
+// parent of the segment holding the first meta-character. This table is the
+// only place that rule is pinned — TestHostGlobReportsADeniedDirectory
+// exercises one shape and skips under euid 0, so on a root run nothing else
+// covers it — and the collectors' test double calls the same function, so a
+// change here is a change to every denied-directory test at once. It runs at
+// every privilege level: the rule is pure string arithmetic and touches no
+// host.
+func TestGlobDirIsTheLiteralDirectory(t *testing.T) {
+	for _, c := range []struct{ pattern, want string }{
+		{"/etc/profile.d/*.sh", "/etc/profile.d"}, // the ordinary shape
+		{"/dev/*", "/dev"},                        // one level
+		{"/dev/*/*", "/dev"},                      // only the FIRST literal directory
+		{"/etc/*/x.conf", "/etc"},                 // the meta-character in a middle segment
+		{"/*", "/"},                               // the root directory
+		{"/etc/snmp/snmpd.conf.d/", "/etc/snmp/snmpd.conf.d"}, // a trailing slash is cleaned away
+		{"/var/log//syslog", "/var/log/syslog"},               // meta-free: its own answer, cleaned
+		{"/etc/passwd", "/etc/passwd"},                        // meta-free literal file
+		{"etc/*.conf", "etc"},                                 // relative: openNoFollow then refuses it, so the probe falls through
+		{"/etc/ssh/sshd_config.d/*.conf", "/etc/ssh/sshd_config.d"},
+		{"/var/cache/dnf/*/repodata/repomd.xml", "/var/cache/dnf"},
+		{"/etc/rc?.d/S*", "/etc"}, // "?" counts as a meta-character too
+		{"/etc/[a-z]*.conf", "/etc"},
+	} {
+		if got := GlobDir(c.pattern); got != c.want {
+			t.Errorf("GlobDir(%q) = %q, want %q", c.pattern, got, c.want)
+		}
 	}
 }

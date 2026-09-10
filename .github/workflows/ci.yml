@@ -89,6 +89,8 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: "1.25.5"
+      - name: install cron and sudo
+        run: sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq cron sudo
       - run: CGO_ENABLED=0 go build -trimpath -o bin/muster ./cmd/muster
       - name: prepare output directory
         run: mkdir -m 700 "$RUNNER_TEMP/muster"
@@ -112,6 +114,31 @@ jobs:
           # (its reason starts "absent counts as pass") may carry absent evidence.
           jq -e '[.results[] | select(.status=="PASS") | . as $r | .evidence[]? | select(.status != "ok" and (.status != "absent" or (($r.reason // "") | startswith("absent counts as pass") | not)))] | length == 0' "$RUNNER_TEMP/muster/user-report.json"
           jq -e '[.results[] | select(.status=="ERROR")] | length > 0' "$RUNNER_TEMP/muster/user-report.json"
+      - name: the capability matrix's runner assumptions hold
+        run: |
+          test -d /var/spool/cron/crontabs && test -f /etc/sudoers || {
+            echo "the nonroot capability matrix assumes the cron spool (/var/spool/cron/crontabs, mode 1730)"
+            echo "and /etc/sudoers (mode 0440) exist on this runner; without them cron.files, cron.dirs,"
+            echo "sudo.includedir and sudo.secure_path read absent instead of denied"
+            exit 1
+          }
+          # G-4: the same argument for the four keys that rest on /etc/shadow
+          # (root:shadow 0640) and /root (0700) being unreadable by the runner
+          # user. This step runs as that user, so the tests answer for the run
+          # the snapshot above came from.
+          ! test -r /etc/shadow && ! test -r /root || {
+            echo "the nonroot capability matrix assumes this user cannot read /etc/shadow or /root;"
+            echo "on a runner where either is readable, accounts.shadow_in_use, files.etc_shadow.acl_present,"
+            echo "files.etc_shadow.acl_entries and files.root_home.acl_present read ok instead of denied"
+            exit 1
+          }
+      - name: every fact the capability matrix calls root-only reads denied
+        run: |
+          jq -e --slurpfile m docs/reference/capability-matrix.json '
+            [ $m[0].nonroot.denied[] as $k
+              | ($k | split(".")) as $p
+              | (.facts | getpath($p) | .status)
+              | select(. != "denied") ] | length == 0' "$RUNNER_TEMP/muster/user.json"
 
   collect-containers:
     runs-on: ubuntu-24.04
@@ -163,6 +190,13 @@ jobs:
           jq -e '.run.env.container != "none"' "$RUNNER_TEMP/muster/containers/c.json"
           if [ "${{ matrix.init }}" = "true" ]; then
             jq -e '.facts.services.ssh.installed.status == "ok"' "$RUNNER_TEMP/muster/containers/c.json"
+            # C-1: the Rocky/Alma 9 images ship no libwrap, so the presence
+            # probe must read false. It read true everywhere while the
+            # candidate list held /lib64/libwrap.so.0 (a symlink on every
+            # merged-usr host), which left U-28's tcp_wrappers gate inert.
+            # The Ubuntu/Debian images are not asserted: libwrap0 may or may
+            # not be pulled in there.
+            jq -e '.facts.files.libwrap_present.value == false' "$RUNNER_TEMP/muster/containers/c.json"
           else
             jq -e '.facts.services.ssh.installed.status == "unsupported"' "$RUNNER_TEMP/muster/containers/c.json"
           fi
@@ -173,6 +207,14 @@ jobs:
           set -e
           # Same rule as the non-root job: absent evidence is allowed only under absent_means: pass.
           jq -e '[.results[] | select(.status=="PASS") | . as $r | .evidence[]? | select(.status != "ok" and (.status != "absent" or (($r.reason // "") | startswith("absent counts as pass") | not)))] | length == 0' "$RUNNER_TEMP/muster/containers/report.json"
+      - name: every fact the capability matrix calls systemd-only reads unsupported
+        if: matrix.init == 'false'
+        run: |
+          jq -e --slurpfile m docs/reference/capability-matrix.json '
+            [ $m[0]["no-systemd"].unsupported[] as $k
+              | ($k | split(".")) as $p
+              | (.facts | getpath($p) | .status)
+              | select(. != "unsupported") ] | length == 0' "$RUNNER_TEMP/muster/containers/c.json"
 
   collect-contract:
     runs-on: ubuntu-24.04

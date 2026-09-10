@@ -7,6 +7,8 @@
 package collectors
 
 import (
+	"errors"
+	"io/fs"
 	"os"
 	"strconv"
 	"strings"
@@ -80,6 +82,27 @@ func filesSource(files []string) *facts.Source {
 func pathReason(p string, e facts.Envelope) facts.Envelope {
 	e.Reason = p + ": " + e.Reason
 	return e
+}
+
+// globReadError classifies a Glob failure (M-49, extending M-10). Until the
+// directory probe landed, filepath.Glob could only ever fail with
+// ErrBadPattern — an environment or programming limitation, never a
+// privilege one — so a site was right to give every Glob failure one blanket
+// class. The probe changes what these branches can RECEIVE: an EACCES from a
+// directory this run may not search is a privilege failure and nothing else,
+// and R220/H-17 already fix its class as denied, path-prefixed. Filing it as
+// unsupported would rank it as ok in Builder.Worst and label a denial "this
+// environment has no such mechanism"; filing it as error would rank it worst,
+// flip run.complete and send check to exit 2 over a run that is simply not
+// root.
+//
+// otherwise is the envelope the site already chose for every non-permission
+// failure, and it keeps that text unchanged.
+func globReadError(pattern string, err error, otherwise facts.Envelope) facts.Envelope {
+	if errors.Is(err, fs.ErrPermission) {
+		return readErrorEnv(pattern, err)
+	}
+	return otherwise
 }
 
 // splitLines splits file or command output into lines and drops a trailing

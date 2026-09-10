@@ -1079,3 +1079,60 @@ func TestPatchCacheNewerThanTheClockIsAgeZero(t *testing.T) {
 		t.Error("mtimeAge must still refuse a modification time later than the clock (2I semantics stay)")
 	}
 }
+
+// M-49 (extending M-10): R220 chose unsupported for a failed Glob because
+// filepath.Glob could then only fail with ErrBadPattern — never a privilege
+// error. It can now, and unsupported ranks as ok in Builder.Worst, so a
+// denied /var/lib/apt/lists would be filed as "this environment has no such
+// mechanism" and U-64 would judge an age nobody could read. A permission
+// failure is denied; every other Glob failure keeps R220's unsupported.
+func TestPatchDeniedAptListsIsDeniedNotUnsupported(t *testing.T) {
+	now := testPatchNow(t)
+	a := patchAptAccess(now.Add(-time.Hour), true, map[string]cmdResult{
+		cmdKey(aptSimulateCmd): {file: "apt-get.s-upgrade.security"},
+		cmdKey(aptMarkHoldCmd): {file: "apt-mark.showhold"},
+	})
+	a.deniedDirs = map[string]bool{"/var/lib/apt/lists": true}
+	b := buildPatch(t, a, testPatchCollectedAt, "none")
+
+	for _, k := range []string{"patch.metadata_age_s", "patch.security_metadata_available", "patch.pending_security_count"} {
+		e := env(t, b, k)
+		if e.Status != facts.StatusDenied {
+			t.Errorf("%s %+v, want denied (never unsupported, never error)", k, e)
+		}
+		if !strings.Contains(e.Reason, aptListsGlob) {
+			t.Errorf("%s reason %q must name %s", k, e.Reason, aptListsGlob)
+		}
+	}
+	if got := b.Worst("patch"); got != facts.StatusDenied {
+		t.Errorf(`Worst("patch") = %s, want denied`, got)
+	}
+}
+
+// M-49, the dnfCache site. TestPatchGlobFailureIsUnsupportedNotError pins the
+// non-permission half of this branch (both families); this pins the
+// permission half for dnf, the way TestPatchDeniedAptListsIsDeniedNotUnsupported
+// does for apt. A /var/cache/dnf the run may not list is a privilege failure,
+// and unsupported — which ranks as ok in Builder.Worst — would let U-64 judge
+// a metadata age nobody could read.
+func TestPatchDeniedDnfCacheIsDeniedNotUnsupported(t *testing.T) {
+	a := patchDnfAccess(testPatchNow(t).Add(-time.Hour), "repomd.updateinfo.xml", map[string]cmdResult{
+		cmdKey(dnfCheckUpdateCmd): {exitCode: 0},
+		cmdKey(rpmQaCmd):          {file: "rpm.qa.sample"},
+	})
+	a.deniedDirs = map[string]bool{testDnfCacheDir: true}
+	b := buildPatch(t, a, testPatchCollectedAt, "none")
+
+	for _, k := range []string{"patch.metadata_age_s", "patch.security_metadata_available", "patch.pending_security_count"} {
+		e := env(t, b, k)
+		if e.Status != facts.StatusDenied {
+			t.Errorf("%s %+v, want denied (never unsupported, never error)", k, e)
+		}
+		if !strings.HasPrefix(e.Reason, dnfRepomdGlob+":") {
+			t.Errorf("%s reason %q must be prefixed with %s", k, e.Reason, dnfRepomdGlob)
+		}
+	}
+	if w := b.Worst("patch"); w != facts.StatusDenied {
+		t.Errorf(`Worst("patch") = %s, want denied`, w)
+	}
+}

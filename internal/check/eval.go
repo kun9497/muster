@@ -85,6 +85,10 @@ func evalOne(e *env, c *controls.Control) (r Result) {
 	if c.Automation == "manual" || c.Automation == "not_applicable" {
 		if c.Automation == "manual" {
 			r.Status, r.Reason = MANUAL, c.ManualReason
+			// M-8: a manual control names the facts the reviewer needs in
+			// front of them; they are the evidence the MANUAL row carries,
+			// after whatever applies_when already read (Evaluate dedupes).
+			r.Evidence = append(r.Evidence, e.evidenceFor(c.Evidence)...)
 		} else {
 			r.Status, r.Reason = NotApplicable, c.ManualReason
 		}
@@ -198,10 +202,22 @@ func evalOne(e *env, c *controls.Control) (r Result) {
 	}
 	// Steps 11-14.
 	all := clauseOutcome{Holds: true}
+	var vacuous *vacuousClause
 	for _, cl := range checks {
 		out := e.evalClause(cl)
 		if out.Err != nil {
 			return fail(r, ERROR, InternalError, out.Err.Error())
+		}
+		// M-6: a `where` whose ${param} selected no element of a non-empty
+		// list judged nothing on this host, so there may be no verdict to
+		// give — the parameter, not the host, is what the reader has to look
+		// at. M-48: only the whole set of clauses can establish that, so the
+		// first such clause is recorded here and decided after the loop; the
+		// clause itself accumulates like any other holding clause, which is
+		// what keeps its evidence and its selection record on whatever
+		// verdict the control ends with.
+		if out.Vacuous != "" && vacuous == nil {
+			vacuous = &vacuousClause{param: out.Vacuous, fact: cl.Fact, count: out.Count}
 		}
 		all.Evidence = append(all.Evidence, out.Evidence...)
 		all.Observations = append(all.Observations, out.Observations...)
@@ -217,7 +233,14 @@ func evalOne(e *env, c *controls.Control) (r Result) {
 			}
 			all.Err = nil
 			if r.Reason == "" {
-				r.Reason = "clause does not hold: " + e.describe(cl)
+				// M-5: a clause that knows WHY it failed — an element whose
+				// judged field the snapshot lacks — says so; otherwise the
+				// clause itself is the explanation.
+				why := out.Reason
+				if why == "" {
+					why = e.describe(cl)
+				}
+				r.Reason = "clause does not hold: " + why
 			}
 		}
 		if out.Degraded != "" && all.Degraded == "" {
@@ -234,7 +257,28 @@ func evalOne(e *env, c *controls.Control) (r Result) {
 	if all.Degraded == "" && e.remoteNSS(checks) {
 		all.Degraded = degradedRemoteNSS
 	}
+	// M-45/M-48: MANUAL claims muster judged nothing, so it is the verdict
+	// only when nothing else was decided — after every clause has been
+	// evaluated and after the degradation checks above, either of which
+	// outranks it. The evidence and observations are the ones finish() would
+	// have attached, including this clause's own selection record.
+	if vacuous != nil && all.Holds && all.Degraded == "" {
+		res := fail(r, MANUAL, "", fmt.Sprintf("parameter %q selected no element of %s (%d elements)", vacuous.param, vacuous.fact, vacuous.count))
+		res.Evidence = append(res.Evidence, all.Evidence...)
+		res.Observations = all.Observations
+		return res
+	}
 	return finish(r, c, all)
+}
+
+// vacuousClause is the first `each` clause whose ${param} `where` selected no
+// element of a non-empty list (M-6), carried past the clause loop so the
+// verdict is decided once, on the whole control, rather than at whichever
+// position the clause happens to occupy (M-48).
+type vacuousClause struct {
+	param string
+	fact  string
+	count int
 }
 
 // parseFallback reports whether any clause reads a daemon-derived sshd fact
@@ -636,6 +680,13 @@ func describeSub(fact, op, keyword string, sub *controls.Clause, params map[stri
 	if sub == nil {
 		return fmt.Sprintf("%s %s", fact, op)
 	}
+	return fmt.Sprintf("%s %s %s %s", fact, op, keyword, describeField(sub, params))
+}
+
+// describeField renders a where/require sub-clause on its own — the form an
+// observation that names no single element carries as its Expected (M-6).
+// The parameter values in force are substituted here too (R27).
+func describeField(sub *controls.Clause, params map[string]any) string {
 	field := sub.Field
 	if field == "" {
 		field = "value"
@@ -644,5 +695,5 @@ func describeSub(fact, op, keyword string, sub *controls.Clause, params map[stri
 	if err != nil {
 		expected = sub.Expected
 	}
-	return fmt.Sprintf("%s %s %s %s %s %v", fact, op, keyword, field, sub.Op, expected)
+	return fmt.Sprintf("%s %s %v", field, sub.Op, expected)
 }

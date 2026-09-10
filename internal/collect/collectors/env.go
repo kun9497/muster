@@ -55,7 +55,20 @@ var envShellKeys = []string{
 
 func runEnv(_ context.Context, a collect.Access, b *collect.Builder) error {
 	var all []shellAssignment
-	for _, p := range profileReadOrder(a) {
+	order, err := profileReadOrder(a)
+	if err != nil {
+		// C3/M-10: the read ORDER itself is incomplete — /etc/profile.d could
+		// not be listed, and a drop-in there is where a TMOUT or umask is
+		// usually set. Every value those files could have set carries the
+		// listing error, path-prefixed, exactly as a present-but-unreadable
+		// profile file does below.
+		e := readErrorEnv(profileDGlob, err)
+		for _, k := range envShellKeys {
+			b.Set(k, e)
+		}
+		return nil
+	}
+	for _, p := range order {
 		data, _, err := a.ReadFile(p, readLimit)
 		if err != nil {
 			if errors.Is(err, fs.ErrNotExist) {
@@ -82,16 +95,20 @@ func runEnv(_ context.Context, a collect.Access, b *collect.Builder) error {
 
 // profileReadOrder returns the profile files that exist, in the fixed order,
 // with profile.d sorted. Both distro bashrc names are included; only the one
-// that exists contributes.
-func profileReadOrder(a collect.Access) []string {
-	out := []string{etcProfile}
-	if matches, err := a.Glob(profileDGlob); err == nil {
-		sort.Strings(matches)
-		out = append(out, matches...)
+// that exists contributes. A profile.d that cannot be LISTED is returned as
+// an error rather than skipped (M-10): the caller cannot judge a value from
+// the files it did manage to read when it does not know which files there
+// were.
+func profileReadOrder(a collect.Access) ([]string, error) {
+	matches, err := a.Glob(profileDGlob)
+	if err != nil {
+		return nil, err
 	}
+	sort.Strings(matches)
+	out := append([]string{etcProfile}, matches...)
 	out = append(out, bashBashrc, etcBashrc, cshCshrc)
 	out = append(out, rootDotfiles...)
-	return out
+	return out, nil
 }
 
 func writeTMOUT(b *collect.Builder, all []shellAssignment) {

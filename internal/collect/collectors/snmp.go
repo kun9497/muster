@@ -245,7 +245,8 @@ func (p *snmpParse) scan() {
 	}
 	matches, err := p.a.Glob(snmpdConfDGlob)
 	if err != nil {
-		p.fail(collect.ErrorEnv("glob " + snmpdConfDGlob + ": " + err.Error()))
+		// M-49: a directory this run may not search is denied, not error.
+		p.fail(globReadError(snmpdConfDGlob, err, collect.ErrorEnv("glob "+snmpdConfDGlob+": "+err.Error())))
 	} else {
 		sort.Strings(matches)
 		for _, m := range matches {
@@ -721,7 +722,8 @@ func (p *snmpParse) includeDir(args []string, depth int) {
 	}
 	matches, err := p.a.Glob(pattern)
 	if err != nil {
-		p.fail(collect.ErrorEnv("glob " + pattern + ": " + err.Error()))
+		// M-49: a directory this run may not search is denied, not error.
+		p.fail(globReadError(pattern, err, collect.ErrorEnv("glob "+pattern+": "+err.Error())))
 		return
 	}
 	sort.Strings(matches)

@@ -20,12 +20,21 @@ type env struct {
 // HardFail is set by the caller as it folds clause outcomes together: it
 // marks that at least one clause failed on every side it selected, which no
 // side-mismatch degradation may soften (C2, spec §6.5 step 12).
+//
+// Reason, Vacuous and Count are what a collection clause knows and its
+// caller cannot re-derive: the clause-level reason a missing field produces
+// (M-5), the parameter whose `where` selected nothing (M-6) and the length
+// of the list that was judged (M-33, so evalOne never parses the evidence
+// string back into a number).
 type clauseOutcome struct {
 	Holds        bool
 	HardFail     bool
 	Evidence     []Evidence
 	Observations []Observation
 	Degraded     string
+	Reason       string
+	Vacuous      string
+	Count        int
 	Err          error
 }
 

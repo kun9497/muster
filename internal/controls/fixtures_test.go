@@ -154,6 +154,69 @@ func checkInvariants(t *testing.T, name string, r check.Result) {
 	}
 }
 
+// M-8/M-25: a control muster declines to judge names the facts the reviewer
+// needs in front of them, so its manual-*.json fixture must carry every one
+// of those leaves. A leaf the fixture omits reads back "missing", which
+// shows the reviewer nothing exactly where the control promised evidence.
+// (The walk gate's own missing walk.complete on
+// muster.file.world_writable/manual-no-walk.json is by design — R16 — and is
+// not an evidence-list key, so it is out of this test's scope.)
+func TestManualFixturesCarryEveryEvidenceLeaf(t *testing.T) {
+	set, err := controls.LoadDefault()
+	if err != nil {
+		t.Fatal(err)
+	}
+	reg, err := facts.LoadRegistry()
+	if err != nil {
+		t.Fatal(err)
+	}
+	checked := 0
+	for _, c := range set.Controls {
+		if c.Automation != "manual" || len(c.Evidence) == 0 {
+			continue
+		}
+		files, _ := filepath.Glob(filepath.Join(fixtureRoot, c.ID, "manual-*.json"))
+		sort.Strings(files)
+		if len(files) == 0 {
+			t.Errorf("%s declares evidence but has no manual-*.json fixture to show it on", c.ID)
+		}
+		for _, f := range files {
+			snap, _ := loadFixture(t, f)
+			one := &controls.Set{Version: set.Version, Digest: set.Digest, Controls: []controls.Control{c}}
+			r := check.Evaluate(snap, one, reg, check.Options{})[0]
+			if r.Status != check.MANUAL {
+				t.Errorf("%s: status %s (%s), want MANUAL", f, r.Status, r.Reason)
+				continue
+			}
+			// LOW-5: a setting key emits one entry per side, so every side is
+			// kept rather than the last one overwriting the rest. No manual
+			// control names a setting today and the lint rule does not forbid
+			// one, which is exactly when a gate keyed by fact alone would
+			// quietly stop checking.
+			status := map[string][]facts.Status{}
+			for _, ev := range r.Evidence {
+				status[ev.Fact] = append(status[ev.Fact], ev.Status)
+			}
+			for _, k := range c.Evidence {
+				got := status[k]
+				if len(got) == 0 {
+					t.Errorf("%s: the result carries no evidence for %s", f, k)
+					continue
+				}
+				for _, st := range got {
+					if st == facts.StatusMissing {
+						t.Errorf("%s: evidence %s is missing from the fixture; a MANUAL result must show every leaf its control names", f, k)
+					}
+				}
+			}
+			checked++
+		}
+	}
+	if checked == 0 {
+		t.Error("no manual control with an evidence list was checked; M-8's evidence lists are gone")
+	}
+}
+
 func TestLintOfEmbeddedSetIsClean(t *testing.T) {
 	set, _ := controls.LoadDefault()
 	reg, _ := facts.LoadRegistry()

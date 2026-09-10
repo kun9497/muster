@@ -7,6 +7,15 @@ category: service
 importance: 상
 automation: manual
 manual_reason: "Decide by hand whether this MTA relays for off-host clients, reading whether it is reachable at all (services.mail.reachable, a tcp/25 listener on a non-loopback address) together with postfix's inet_interfaces, mynetworks and smtpd_relay_restrictions (mail.postfix.*) or sendmail's access map, which muster does not read, against the set of networks this host is meant to serve."
+# Ruling M-8: the facts a reviewer needs in front of them to answer this by
+# hand - whether the daemon is reachable off-host at all, and the three
+# postfix parameters that spread the relay decision between them. A sendmail
+# host decides it in the access map, which muster does not read.
+evidence:
+  - services.mail.reachable
+  - mail.postfix.inet_interfaces
+  - mail.postfix.mynetworks
+  - mail.postfix.smtpd_relay_restrictions
 references:
   kisa: { "2026": ["U-47"], "2021": ["U-31"] }
 requires_facts: ">=1"

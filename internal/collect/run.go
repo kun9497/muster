@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -228,6 +229,12 @@ func Run(ctx context.Context, o Options, stdout io.Writer) (Outcome, error) {
 			hdr.PartialFailures = append(hdr.PartialFailures, c.Name)
 		}
 	}
+	// M-15 (J-7): now that every collector has run, the header can name the
+	// secret keys this run actually stored — the values that are in the
+	// snapshot only in reduced form. Profile and IncludeSecrets are unchanged
+	// (R52: nothing stores an original secret, and --include-secrets is still
+	// not offered).
+	hdr.Redaction.RedactedFields = redactedFields(b, reg)
 	hdr.Complete = complete
 	if hdr.Host.Hostname == "" {
 		// The os collector normally fills this from /etc/hostname; fall
@@ -257,6 +264,31 @@ func Run(ctx context.Context, o Options, stdout io.Writer) (Outcome, error) {
 		return Outcome{}, err
 	}
 	return out, nil
+}
+
+// redactedFields lists, sorted, the registered `sensitivity: secret` keys a
+// collector filled with a value in this run (M-15): those, and only those,
+// are the values the snapshot carries in reduced form. A secret key whose
+// envelope is absent, denied or missing named no value, so listing it would
+// claim a reduction that never happened — the field is the set of values
+// that were reduced, not the set of keys that could carry one. The registry
+// is walked in its own order and the result sorted, so the header is
+// byte-identical for two runs that stored the same keys. The registry's two
+// secret keys happen to be in sorted order today, so no fixture of registered
+// keys can currently tell the sort apart from registry order; the sort is
+// here for the next secret key, wherever in registry.yaml it lands.
+func redactedFields(b *Builder, reg *facts.Registry) []string {
+	var out []string
+	for _, e := range reg.Keys {
+		if e.Sensitivity != "secret" {
+			continue
+		}
+		if env, ok := b.leaf(e.Key).(facts.Envelope); ok && env.Status == facts.StatusOK {
+			out = append(out, e.Key)
+		}
+	}
+	sort.Strings(out)
+	return out
 }
 
 // unameNodename is the kernel's node name, taken from uname(2) (M12).

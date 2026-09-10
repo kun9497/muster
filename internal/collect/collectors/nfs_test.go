@@ -372,3 +372,28 @@ func TestNfsExportfsCorroborationIsRecorded(t *testing.T) {
 		})
 	}
 }
+
+// M-49 (extending M-10): Ruling JR-6 chose unsupported for a failed Glob
+// because filepath.Glob could then only fail with ErrBadPattern — an
+// environment limitation, never a privilege one. A directory the run may not
+// search IS a privilege one, and unsupported ranks as ok in Builder.Worst,
+// so it would quietly mislabel a denial as "this environment has no such
+// mechanism" and let U-24 read the exports it could see as the whole set.
+func TestNfsDeniedExportsDIsDeniedNotUnsupported(t *testing.T) {
+	a := nfsAccess(nil, nil)
+	a.deniedDirs = map[string]bool{"/etc/exports.d": true}
+	b := buildBegun(t, "nfs", a)
+
+	for _, k := range []string{"nfs.exports", "nfs.exports_source"} {
+		e := env(t, b, k)
+		if e.Status != facts.StatusDenied {
+			t.Errorf("%s %+v, want denied (never unsupported, never error)", k, e)
+		}
+		if !strings.Contains(e.Reason, exportsDGlob) {
+			t.Errorf("%s reason %q must name %s", k, e.Reason, exportsDGlob)
+		}
+	}
+	if got := b.Worst("nfs"); got != facts.StatusDenied {
+		t.Errorf(`Worst("nfs") = %s, want denied`, got)
+	}
+}

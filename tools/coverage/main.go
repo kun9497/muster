@@ -1,58 +1,131 @@
 // Command coverage renders docs/reference/coverage.md from the embedded
-// control set and the KISA item inventory, or checks that the committed
-// file is current (-check). It never touches internal/collect.
+// control set, the KISA item inventory and the fact registry, or checks that
+// the committed file -- and the roadmap sentence of both READMEs -- is
+// current (-check). It never touches internal/collect.
 package main
 
 import (
 	"bytes"
-	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/kun9497/muster/internal/controls"
+	"github.com/kun9497/muster/internal/facts"
 )
 
-func main() {
-	out := flag.String("out", "docs/reference/coverage.md", "file to write")
-	inv := flag.String("kisa", "docs/reference/kisa/kisa_items_latest.json", "KISA item inventory")
-	check := flag.Bool("check", false, "exit 1 if the committed file differs instead of writing")
-	flag.Parse()
-	data, err := os.ReadFile(*inv)
+func main() { os.Exit(run(os.Args[1:], os.Stderr)) }
+
+// run is the whole command. It takes its arguments and its error stream so
+// that -check, which is what CI runs, is testable without a subprocess.
+// Exit codes: 0 current or written, 1 stale, 2 could not be determined.
+func run(args []string, stderr io.Writer) int {
+	fs := flag.NewFlagSet("coverage", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	out := fs.String("out", "docs/reference/coverage.md", "file to write")
+	kisaDir := fs.String("kisa-dir", "docs/reference/kisa", "directory holding the KISA item inventory")
+	readmeDir := fs.String("readme-dir", ".", "directory holding README.md and README.ko.md, whose roadmap sentence -check verifies")
+	check := fs.Bool("check", false, "exit 1 if the committed file differs instead of writing")
+	if err := fs.Parse(args); err != nil {
+		// -h and -help print the usage and are not a failure to determine
+		// anything; a bad flag is.
+		if errors.Is(err, flag.ErrHelp) {
+			return 0
+		}
+		return 2
+	}
+	inventory, err := controls.LoadKISA(*kisaDir)
 	if err != nil {
-		fatal(err)
+		return fatal(stderr, err)
 	}
-	var items []kisaItem
-	if err := json.Unmarshal(data, &items); err != nil {
-		fatal(fmt.Errorf("%s: %w", *inv, err))
-	}
+	items := inventory.Items[controls.LatestKISAEdition]
 	set, err := controls.LoadDefault()
 	if err != nil {
-		fatal(err)
+		return fatal(stderr, err)
 	}
-	got := []byte(render(items, set.Controls))
+	reg, err := facts.LoadRegistry()
+	if err != nil {
+		return fatal(stderr, err)
+	}
+	got := []byte(render(items, inventory.Deferred, controls.FactUsage(set, reg), set.Controls))
 	if *check {
+		// Both halves of the gate run every time and the worst code wins,
+		// so a contributor who is stale in the table and in the prose
+		// learns about both in one run instead of one per run.
+		code := 0
 		have, err := os.ReadFile(*out)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "coverage: %s does not exist; run: go run ./tools/coverage\n", *out)
-			os.Exit(1)
+		switch {
+		case err != nil:
+			fmt.Fprintf(stderr, "coverage: %s does not exist; run: go run ./tools/coverage\n", *out)
+			code = 1
+		case !bytes.Equal(have, got):
+			fmt.Fprintf(stderr, "coverage: %s is out of date; run: go run ./tools/coverage\n", *out)
+			io.WriteString(stderr, unifiedDiff(*out, have, got))
+			code = 1
 		}
-		if !bytes.Equal(have, got) {
-			fmt.Fprintf(os.Stderr, "coverage: %s is out of date; run: go run ./tools/coverage\n", *out)
-			os.Stderr.WriteString(unifiedDiff(*out, have, got))
-			os.Exit(1)
+		if c := checkREADMEs(stderr, *readmeDir, counts(items, inventory.Deferred, set.Controls)); c > code {
+			code = c
 		}
-		return
+		return code
 	}
 	if err := os.WriteFile(*out, got, 0o644); err != nil {
-		fatal(err)
+		return fatal(stderr, err)
 	}
+	return 0
 }
 
-func fatal(err error) {
-	fmt.Fprintf(os.Stderr, "coverage: %v\n", err)
-	os.Exit(2)
+// checkREADMEs verifies that the roadmap sentence of both READMEs still
+// carries the live coverage numbers (M-20). The sentence is a claim about
+// what muster judges, and a stale claim is worse than none; the generated
+// table alone cannot keep it honest, because nothing regenerates prose.
+//
+// Both sides are whitespace-normalised before matching (M-24), so a sentence
+// that wraps the fragment across a line break -- which the Korean one does --
+// still matches, and reflowing a paragraph never fails the gate.
+func checkREADMEs(stderr io.Writer, dir string, n coverageNumbers) int {
+	for _, f := range []struct {
+		name      string
+		fragments []string
+	}{
+		// G-2: the automation triple beside the enrolled number is the same
+		// kind of claim and goes stale the same way -- a control moving from
+		// partial to auto leaves the table regenerated, -check green and the
+		// sentence wrong. Each README spells the triple its own way.
+		{"README.md", []string{
+			fmt.Sprintf("%d of the %d items", n.enrolled, n.total),
+			fmt.Sprintf("%d auto, %d partial, %d manual", n.auto, n.partial, n.manual),
+		}},
+		{"README.ko.md", []string{
+			fmt.Sprintf("%d개 중 %d개", n.total, n.enrolled),
+			fmt.Sprintf("auto %d, partial %d, manual %d", n.auto, n.partial, n.manual),
+		}},
+	} {
+		data, err := os.ReadFile(filepath.Join(dir, f.name))
+		if err != nil {
+			return fatal(stderr, err)
+		}
+		text := normalizeSpace(string(data))
+		for _, frag := range f.fragments {
+			if !strings.Contains(text, normalizeSpace(frag)) {
+				fmt.Fprintf(stderr, "coverage: %s does not mention %q; update the roadmap sentence\n", f.name, frag)
+				return 1
+			}
+		}
+	}
+	return 0
+}
+
+// normalizeSpace collapses every run of whitespace, newlines included, to a
+// single space so that a fragment split across lines still matches.
+func normalizeSpace(s string) string { return strings.Join(strings.Fields(s), " ") }
+
+func fatal(stderr io.Writer, err error) int {
+	fmt.Fprintf(stderr, "coverage: %v\n", err)
+	return 2
 }
 
 // unifiedDiff renders a minimal unified-diff-style report naming path and

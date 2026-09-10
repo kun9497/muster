@@ -79,11 +79,13 @@ func runNfs(ctx context.Context, a collect.Access, b *collect.Builder) error {
 	matches, err := a.Glob(exportsDGlob)
 	if err != nil {
 		// Ruling JR-6: this collector declares Needs "none", so a Glob that
-		// fails is an environment limitation and never an error — one error
+		// fails for an environment reason is never an error — one error
 		// envelope ranks worst in Builder.Worst, flips run.complete and
 		// breaks the collect-contract leg over a condition the reason
 		// already describes. patch's identical branch says the same thing.
-		return nfsJudged(ctx, a, b, collect.Unsupported("glob "+exportsDGlob+": "+err.Error()))
+		// M-49: a directory this run may not SEARCH is not an environment
+		// limitation either — it is a privilege one, and denied is its class.
+		return nfsJudged(ctx, a, b, globReadError(exportsDGlob, err, collect.Unsupported("glob "+exportsDGlob+": "+err.Error())))
 	}
 	sort.Strings(matches)
 	for _, m := range matches {

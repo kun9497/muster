@@ -782,6 +782,16 @@ func statExists(a collect.Access, p string) bool {
 	return err == nil
 }
 
+// globNonEmpty reports whether a pattern names anything. M-10: a Glob that
+// FAILED is deliberately still treated as "nothing here" rather than routed
+// to a fact. This is backend DETECTION, and statExists — its sibling on every
+// one of these decisions — already answers "not present" for a stat that
+// failed for any reason, on purpose: the authoritative privilege story is the
+// kernel ruleset capture, not a config probe, and that capture is the path
+// that reports a non-root run (runFirewall files every leaf denied when it
+// fails, before detection is ever consulted). Making this one leg error
+// instead would flip run.complete over a condition the ruleset facts already
+// carry. TestFirewallDeniedGlobKeepsTheCaptureVerdict pins the decision.
 func globNonEmpty(a collect.Access, pattern string) bool {
 	m, err := a.Glob(pattern)
 	return err == nil && len(m) > 0

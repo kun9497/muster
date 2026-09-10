@@ -1,0 +1,4 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{"files":{
+  "user_rhosts":{"status":"absent","reason":"not examined - muster does not follow symlinks and a component of the path is one: /home/alice/.rhosts","source":{"kind":"file","path":"/etc/passwd"}},
+  "etc_hosts_equiv_lines":{"status":"ok","value":[]}
+}}}

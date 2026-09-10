@@ -15,7 +15,7 @@ params:
   facilities:
     type: list<string>
     default: ["auth", "authpriv", "kern", "daemon", "cron"]
-    description: The syslog facilities that must be logged to a persistent local target; the 20 standard facility names are accepted (auth, authpriv, cron, daemon, ftp, kern, lpr, mail, news, syslog, user, uucp and local0-local7), and any other name matches no record and is not judged
+    description: The syslog facilities that must be logged to a persistent local target; the 20 standard facility names are accepted (auth, authpriv, cron, daemon, ftp, kern, lpr, mail, news, syslog, user, uucp and local0-local7), and any other name matches no record and is not judged; a value where NO name matches any record is reported MANUAL naming the parameter rather than judged, since a host none of whose facilities were selected has had nothing checked
 requires_facts: ">=1"
 absent_means: manual
 applies_when:

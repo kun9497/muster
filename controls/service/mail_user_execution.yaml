@@ -7,6 +7,13 @@ category: service
 importance: 상
 automation: manual
 manual_reason: "Decide by hand whether an ordinary user on this host can submit mail or inspect the queue, reading postfix's authorized_submit_users (mail.postfix.authorized_submit_users) or sendmail's restrictqrun and restrictmailq privacy flags (mail.sendmail.privacy_options) together with the set-group-id bit, group and mode of the submission binaries and the maildrop directory, which muster does not collect."
+# Ruling M-8: the facts a reviewer needs in front of them to answer this by
+# hand - the one postfix parameter and the one sendmail flag list that bear
+# on it. Whichever MTA this host runs, the other reads absent, which is
+# itself part of what the reviewer is being shown.
+evidence:
+  - mail.postfix.authorized_submit_users
+  - mail.sendmail.privacy_options
 references:
   kisa: { "2026": ["U-46"], "2021": ["U-32"] }
 requires_facts: ">=1"

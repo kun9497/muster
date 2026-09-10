@@ -776,9 +776,21 @@ func TestServicesFtpMailDnsRowsDegradeWithTheTable(t *testing.T) {
 }
 
 // Ruling L-9/L-20: libwrap presence is anyPresent over the library's
-// candidate paths — a symlink counts — and ok:false only when every
-// candidate is ENOENT. There is no denied branch.
+// candidate paths — a symlink AT THE CANDIDATE ITSELF counts — and ok:false
+// only when every candidate is ENOENT. There is no denied branch.
+//
+// C-1: no candidate may sit under a merged-usr alias (/lib64, /lib). muster
+// stats without following symlinks, so on every stock x86_64 host — where
+// /lib64 is a symlink to usr/lib64 — such a candidate answers ErrSymlink from
+// the INTERMEDIATE component, which pathPresent counts as occupied. The probe
+// then read ok:true whether or not the library was installed, and U-28's gate
+// could never fire.
 func TestFilesLibwrapPresent(t *testing.T) {
+	for _, p := range libwrapPaths {
+		if strings.HasPrefix(p, "/lib64/") || strings.HasPrefix(p, "/lib/") {
+			t.Errorf("candidate %q is under a merged-usr alias: the symlinked component answers ErrSymlink, which the presence probe would count as present on every such host", p)
+		}
+	}
 	a := &fsAccess{
 		files: map[string]string{"/etc/group": "group"},
 		stats: map[string]statResult{
@@ -790,7 +802,21 @@ func TestFilesLibwrapPresent(t *testing.T) {
 	if e := env(t, build(t, "files", a), "files.libwrap_present"); e.Status != facts.StatusOK || e.Value != true {
 		t.Errorf("libwrap_present %+v, want ok true", e)
 	}
-	none := &fsAccess{files: map[string]string{"/etc/group": "group"}}
+	// L-20: a symlink at the FINAL component still counts — the RHEL-family
+	// candidate is the one a merged-usr /lib64 points at.
+	rhel := &fsAccess{
+		files: map[string]string{"/etc/group": "group"},
+		stats: map[string]statResult{"/usr/lib64/libwrap.so.0": {mode: 0o777, kind: "symlink"}},
+	}
+	if e := env(t, build(t, "files", rhel), "files.libwrap_present"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("libwrap_present %+v, want ok true for a final-component symlink at /usr/lib64/libwrap.so.0", e)
+	}
+	// Every candidate answers ENOENT explicitly, so the false is the probe's
+	// answer over the whole list rather than an empty double.
+	none := &fsAccess{files: map[string]string{"/etc/group": "group"}, fails: map[string]error{}}
+	for _, p := range libwrapPaths {
+		none.fails[p] = unix.ENOENT
+	}
 	if e := env(t, build(t, "files", none), "files.libwrap_present"); e.Status != facts.StatusOK || e.Value != false {
 		t.Errorf("libwrap_present %+v, want ok false when every candidate is ENOENT", e)
 	}
@@ -1786,5 +1812,91 @@ func TestFtpPublishesEveryRegisteredKeyOnAHostWithNoDaemon(t *testing.T) {
 	}
 	if w := b.Worst("ftp"); w != facts.StatusOK {
 		t.Errorf("Worst(ftp) = %s, want ok", w)
+	}
+}
+
+// M-49 (extending M-10): /etc/vsftpd holds the main file this run parsed AND
+// every other vsftpd instance. A listing the run may not do is not a listing
+// that found no second instance, and Ruling L-24's unsupported — chosen when
+// filepath.Glob could only fail with ErrBadPattern — ranks as ok in
+// Builder.Worst, so it would let U-55 judge one instance's answer as the
+// host's. A permission failure is denied and reaches every judged leaf.
+func TestFtpDeniedInstanceGlobIsDeniedNotUnsupported(t *testing.T) {
+	a := ftpAccess(map[string]string{vsftpdRhelConf: "vsftpd.conf.rhel"})
+	a.deniedDirs = map[string]bool{"/etc/vsftpd": true}
+	b := buildBegun(t, "ftp", a)
+
+	for _, k := range []string{"ftp.local_enabled", "ftp.anonymous_enabled", "ftp.access_files"} {
+		e := env(t, b, k)
+		if e.Status != facts.StatusDenied {
+			t.Errorf("%s %+v, want denied (never unsupported, never error)", k, e)
+		}
+		if !strings.Contains(e.Reason, vsftpdConfGlob) {
+			t.Errorf("%s reason %q must name %s", k, e.Reason, vsftpdConfGlob)
+		}
+	}
+	if e := env(t, b, "ftp.parse_complete"); e.Status != facts.StatusOK || e.Value != false {
+		t.Errorf("parse_complete %+v, want ok false", e)
+	}
+	if got := b.Worst("ftp"); got != facts.StatusDenied {
+		t.Errorf(`Worst("ftp") = %s, want denied`, got)
+	}
+}
+
+// M-49, the detectPureFtpd site. The Debian pure-ftpd layout keeps one
+// setting per file under /etc/pure-ftpd/conf, so a directory this run may not
+// list is a set of settings nobody read — not a host with none of them. The
+// main file was readable, so the implementation is still identified; the
+// judged leaves carry the denial.
+func TestFtpDeniedPureFtpdConfDirIsDeniedNotUnsupported(t *testing.T) {
+	a := ftpAccess(map[string]string{pureFtpdConf: "pure-ftpd.conf.stock"})
+	a.deniedDirs = map[string]bool{"/etc/pure-ftpd/conf": true} // the literal directory of pureFtpdConfGlob
+	b := buildBegun(t, "ftp", a)
+
+	if e := env(t, b, "ftp.implementation"); e.Status != facts.StatusOK || e.Value != "pure-ftpd" {
+		t.Fatalf("implementation %+v, want ok \"pure-ftpd\" — the main file WAS read", e)
+	}
+	for _, k := range []string{"ftp.local_enabled", "ftp.anonymous_enabled", "ftp.access_files"} {
+		e := env(t, b, k)
+		if e.Status != facts.StatusDenied {
+			t.Errorf("%s %+v, want denied (never unsupported, never error)", k, e)
+		}
+		if !strings.HasPrefix(e.Reason, pureFtpdConfGlob+":") {
+			t.Errorf("%s reason %q must be prefixed with %s", k, e.Reason, pureFtpdConfGlob)
+		}
+	}
+	if e := env(t, b, "ftp.parse_complete"); e.Status != facts.StatusOK || e.Value != false {
+		t.Errorf("parse_complete %+v, want ok false", e)
+	}
+	if got := b.Worst("ftp"); got != facts.StatusDenied {
+		t.Errorf(`Worst("ftp") = %s, want denied`, got)
+	}
+}
+
+// M-49, the proftpdInclude site. The stock Debian proftpd.conf includes its
+// fragment DIRECTORY, and a fragment there is where TLSEngine or a
+// RootLogin override lives — so a directory the run may not list is not a
+// configuration with no fragments. Ruling L-4 degrades every judged leaf
+// together; what M-49 fixes is the CLASS, from unsupported (which ranks as
+// ok and reads "this environment has no such mechanism") to denied.
+func TestFtpDeniedProftpdIncludeDirIsDeniedNotUnsupported(t *testing.T) {
+	a := ftpAccess(map[string]string{proftpdDebianConf: "proftpd.conf.include-dir"})
+	a.deniedDirs = map[string]bool{"/etc/proftpd/conf.d": true} // the literal directory of proftpdConfDGlob
+	b := buildBegun(t, "ftp", a)
+
+	if e := env(t, b, "ftp.implementation"); e.Status != facts.StatusOK || e.Value != "proftpd" {
+		t.Fatalf("implementation %+v, want ok \"proftpd\" — the main file WAS read", e)
+	}
+	for _, k := range []string{"ftp.tls_enforced", "ftp.local_enabled", "ftp.access_files"} {
+		e := env(t, b, k)
+		if e.Status != facts.StatusDenied {
+			t.Errorf("%s %+v, want denied (never unsupported, never error)", k, e)
+		}
+		if !strings.HasPrefix(e.Reason, proftpdConfDGlob+":") {
+			t.Errorf("%s reason %q must be prefixed with %s", k, e.Reason, proftpdConfDGlob)
+		}
+	}
+	if got := b.Worst("ftp"); got != facts.StatusDenied {
+		t.Errorf(`Worst("ftp") = %s, want denied`, got)
 	}
 }

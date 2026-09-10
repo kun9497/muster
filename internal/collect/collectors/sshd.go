@@ -376,7 +376,10 @@ func writeBannerFile(a collect.Access, b *collect.Builder, p string) {
 	// Include expansion sets); a stock Banner (/etc/issue.net, /etc/issue)
 	// is declared and read normally.
 	if !declared(a, p) {
-		e := collect.ErrorEnv("Banner " + p + " is outside the collector's declaration")
+		// M-12 (convention C4): a path muster CHOSE not to read is absent with
+		// the path in the reason, never an error — the run stays complete and
+		// U-62 reads MANUAL through its absent_means rather than ERROR.
+		e := collect.Absent("Banner " + p + " is outside the collector's declaration: recorded, never read")
 		e.Source = src
 		b.Set("sshd.banner_file.exists", e)
 		b.Set("sshd.banner_file.nonempty", e)
@@ -528,8 +531,9 @@ func parseSshdConfig(a collect.Access, file, keyword string, depth int) (facts.E
 					// carried a higher-priority value, so expanding to
 					// nothing and publishing the main file's value as ok
 					// would be a PASS on evidence never seen — the same rule
-					// an unreadable drop-in gets just below.
-					return collect.ErrorEnv("Include " + pattern + ": " + err.Error()), true
+					// an unreadable drop-in gets just below. M-49: a directory
+					// this run may not search is denied, not error.
+					return globReadError(pattern, err, collect.ErrorEnv("Include "+pattern+": "+err.Error())), true
 				}
 				slices.Sort(matches)
 				for _, m := range matches {

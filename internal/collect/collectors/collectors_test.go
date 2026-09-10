@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path"
@@ -47,6 +48,12 @@ type fsAccess struct {
 	xattrValues map[string]map[string][]byte // host path -> attribute name -> value, served by Getxattr
 	writable    map[string]bool              // host path -> Writable answer
 	globErr     error                        // when set, every Glob fails with it
+
+	// deniedDirs are the literal glob directories this process may not
+	// search: a pattern whose literal directory (globDirOf, the rule
+	// hostAccess.Glob probes) is listed fails the way the host primitive
+	// fails, rather than matching nothing (M-10).
+	deniedDirs map[string]bool
 
 	// reads records every path ReadFile was asked for, so a test can assert
 	// that a collector did NOT go looking for something it did not need.
@@ -120,6 +127,15 @@ func (a *fsAccess) Stat(p string) (collect.ReadMeta, error) {
 func (a *fsAccess) Glob(pattern string) ([]string, error) {
 	if a.globErr != nil {
 		return nil, a.globErr
+	}
+	// M-10: the host primitive probes the pattern's literal directory and
+	// reports a directory this process may not search instead of returning an
+	// empty list. The double mirrors that through the SAME rule
+	// (collect.GlobDir, not a copy of it) and wraps the errno with the
+	// directory exactly as hostAccess.Glob does, so every caller's
+	// FromReadError classifies it as denied and names the path.
+	if dir := collect.GlobDir(pattern); a.deniedDirs[dir] {
+		return nil, fmt.Errorf("%s: %w", dir, unix.EACCES)
 	}
 	var out []string
 	for p := range a.files {
@@ -485,9 +501,11 @@ func TestSshdIncludeSourcesRecordedInExpansionOrder(t *testing.T) {
 	}
 }
 
-// R168: a Banner path outside Declare.Reads must be refused by the guard's
-// Allowed and recorded as an error, never read. build() wraps the access in
-// collect.Guard, so Allowed is live here (mirrors
+// R168, and M-12's convention C4: a Banner path outside Declare.Reads must be
+// refused by the guard's Allowed and RECORDED, never read — and a path muster
+// chose not to read is ABSENT with the path in the reason, not an error, so
+// U-62 reads MANUAL through its absent_means and the run stays complete.
+// build() wraps the access in collect.Guard, so Allowed is live here (mirrors
 // TestSshdIncludeOutsideDeclarationIsRecordedNotViolated).
 func TestSshdBannerOutsideDeclarationIsRecordedNotRead(t *testing.T) {
 	a := &fsAccess{files: map[string]string{
@@ -496,15 +514,18 @@ func TestSshdBannerOutsideDeclarationIsRecordedNotRead(t *testing.T) {
 	b := build(t, "sshd", a) // build fails the test on any guard violation
 	for _, key := range []string{"sshd.banner_file.exists", "sshd.banner_file.nonempty"} {
 		e := env(t, b, key)
-		if e.Status != facts.StatusError {
-			t.Errorf("%s %+v, want error", key, e)
+		if e.Status != facts.StatusAbsent {
+			t.Errorf("%s %+v, want absent — a path muster declined to read is not an error", key, e)
 		}
-		if !strings.Contains(e.Reason, "/root/secret") || !strings.Contains(e.Reason, "outside the collector's declaration") {
+		if e.Reason != "Banner /root/secret is outside the collector's declaration: recorded, never read" {
 			t.Errorf("%s reason %q", key, e.Reason)
 		}
 	}
 	if slices.Contains(a.reads, "/root/secret") {
 		t.Errorf("an undeclared Banner path must never be read: reads = %v", a.reads)
+	}
+	if w := b.Worst("sshd"); w != facts.StatusOK {
+		t.Errorf(`Worst("sshd") = %s, want ok — declining to read a path must not make the run partial`, w)
 	}
 }
 
@@ -779,6 +800,30 @@ func TestSshdIncludeGlobFailureIsRecorded(t *testing.T) {
 	}
 	if want := "Include /etc/ssh/sshd_config.d/*.conf: glob boom"; s.Persisted.Reason != want {
 		t.Errorf("reason %q, want %q", s.Persisted.Reason, want)
+	}
+}
+
+// M-49 (extending M-10): before the directory probe, filepath.Glob could only
+// ever fail with ErrBadPattern, so this branch's blanket ErrorEnv was sound.
+// It can now receive an EACCES, and a permission failure is denied, not error
+// — error ranks worst in Builder.Worst, flips run.complete and sends check to
+// exit 2 over a condition that is simply "this run is not root". The reason
+// still names the Include pattern.
+func TestSshdIncludeGlobDeniedIsDeniedNotError(t *testing.T) {
+	a := &fsAccess{
+		files:      map[string]string{"/etc/ssh/sshd_config": "sshd_config"},
+		deniedDirs: map[string]bool{"/etc/ssh/sshd_config.d": true},
+	}
+	b := buildBegun(t, "sshd", a)
+	s := setting(t, b, "sshd.options.permit_root_login")
+	if s.Persisted == nil || s.Persisted.Status != facts.StatusDenied {
+		t.Fatalf("persisted %+v, want denied", s.Persisted)
+	}
+	if !strings.Contains(s.Persisted.Reason, sshdConfigDir) {
+		t.Errorf("reason %q must name %s", s.Persisted.Reason, sshdConfigDir)
+	}
+	if w := b.Worst("sshd"); w != facts.StatusDenied {
+		t.Errorf(`Worst("sshd") = %s, want denied (never error)`, w)
 	}
 }
 
@@ -1194,6 +1239,27 @@ func TestCronSpoolDirIsNotAFileRow(t *testing.T) {
 	for _, r := range rows {
 		if r.(map[string]any)["path"] == "/var/spool/cron/crontabs" {
 			t.Errorf("a spool directory must not be a cron.files row: %v", r)
+		}
+	}
+}
+
+// M-10: /var/spool/cron/crontabs is 1730 on the Debian family, so a non-root
+// run may not list it. The collector already routes a Glob error to both
+// keys; what it never used to see is the error itself — filepath.Glob
+// swallowed the EACCES and answered "no crontabs here", which is a clean
+// empty cron.files a control reads as a PASS. With the directory probed, the
+// listing failure reaches cron.files and cron.dirs as denied.
+func TestCronDeniedSpoolIsDenied(t *testing.T) {
+	a := &fsAccess{
+		files:      map[string]string{"/etc/crontab": "crontab", "/etc/group": "group"},
+		dirs:       map[string]bool{"/var/spool/cron/crontabs": true},
+		stats:      map[string]statResult{"/etc/crontab": {mode: 0o644, uid: 0, kind: "regular"}},
+		deniedDirs: map[string]bool{"/var/spool/cron/crontabs": true},
+	}
+	b := build(t, "cron", a)
+	for _, k := range []string{"cron.files", "cron.dirs"} {
+		if e := env(t, b, k); e.Status != facts.StatusDenied {
+			t.Errorf("%s: %+v, want denied — an unlistable spool is not an empty one", k, e)
 		}
 	}
 }
@@ -1800,6 +1866,22 @@ func TestServicesTelnetInstalledFromXinetdAndReachable(t *testing.T) {
 	}
 	if env(t, b, "services.telnet.reachable").Value != true {
 		t.Errorf("reachable %+v", env(t, b, "services.telnet.reachable"))
+	}
+}
+
+// M-10: /etc/xinetd.d that cannot be listed could hold the fragment that
+// enables telnet, so "no super-server entry" would be a guess. readXinetd
+// used to discard the Glob error entirely (`paths, _ :=`); it now notes it,
+// and the note is the envelope every leaf a fragment could have set carries
+// (R227) — the same treatment an unreadable fragment already got.
+func TestXinetdGlobDeniedIsTheAnswer(t *testing.T) {
+	a := servicesAccess(map[string]string{"/proc/self/net/tcp": "proc_net_tcp"}, allUnitsNotFound())
+	a.deniedDirs = map[string]bool{"/etc/xinetd.d": true}
+	b := build(t, "services", a)
+	for _, k := range []string{"services.telnet.installed", "services.telnet.enabled", "services.telnet.active"} {
+		if e := env(t, b, k); e.Status != facts.StatusDenied {
+			t.Errorf("%s: %+v, want denied — an unlistable /etc/xinetd.d is not an empty one", k, e)
+		}
 	}
 }
 
@@ -2514,6 +2596,29 @@ func TestEnvEffectiveTMOUT(t *testing.T) {
 	}
 }
 
+// C3/M-10: /etc/profile.d is where a TMOUT or a umask is usually set, so a
+// directory this process may not list is the answer for every value those
+// drop-ins could have set — not a value derived from /etc/profile alone.
+// profileReadOrder used to ignore the Glob error (`if ..., err == nil`),
+// leaving env.shell.tmout ok:600 from the main profile while the drop-in
+// that overrides it was never seen.
+func TestProfileDDeniedIsTheAnswer(t *testing.T) {
+	a := &fsAccess{
+		files:      map[string]string{"/etc/profile": "profile"}, // TMOUT=600; export TMOUT
+		deniedDirs: map[string]bool{"/etc/profile.d": true},
+	}
+	b := build(t, "env", a)
+	for _, k := range envShellKeys {
+		e := env(t, b, k)
+		if e.Status != facts.StatusDenied {
+			t.Errorf("%s: %+v, want denied", k, e)
+		}
+		if !strings.HasPrefix(e.Reason, profileDGlob+":") {
+			t.Errorf("%s: reason %q must name %s (C3, path-prefixed)", k, e.Reason, profileDGlob)
+		}
+	}
+}
+
 // A conditional umask does not win and is flagged; a system-scope and a
 // root-scope umask are both recorded with the right scope.
 func TestEnvUmaskSettings(t *testing.T) {
@@ -2907,6 +3012,74 @@ func TestFilesDevExcludesDeeperMounts(t *testing.T) {
 	}
 }
 
+// M-10/M3: the one Glob site that deliberately keeps ignoring its error.
+// `globNonEmpty` feeds backend DETECTION only, and every leaf it could reach
+// has already been filed by the ruleset capture — so with a capture that
+// SUCCEEDED, an unsearchable /etc/firewalld/zones and /etc/nftables must
+// leave firewall.backend ok and put no firewall leaf into error. This is the
+// counterpart of TestXinetdGlobDeniedIsTheAnswer: it pins the decision, so a
+// later change that routes globNonEmpty's error to a fact is caught here
+// rather than in a non-root run's exit code.
+func TestFirewallDeniedGlobKeepsTheCaptureVerdict(t *testing.T) {
+	a := firewallAccess(
+		map[string]string{"/etc/nftables.conf": "nftables.conf"},
+		map[string]cmdResult{nftListRuleset: {file: "nft.ruleset.drop"}},
+	)
+	// The literal directories of firewalldZone and nftablesDropinRHEL.
+	a.deniedDirs = map[string]bool{"/etc/firewalld/zones": true, "/etc/nftables": true}
+	b := buildBegun(t, "firewall", a)
+
+	if e := env(t, b, "firewall.backend"); e.Status != facts.StatusOK || e.Value != "nftables" {
+		t.Errorf("backend %+v, want ok \"nftables\" — the capture, not a config listing, names the backend", e)
+	}
+	for _, k := range collectorKeys(t, b, "firewall") {
+		if e, ok := leaf(t, b, k).(facts.Envelope); ok && e.Status == facts.StatusError {
+			t.Errorf("%s is error (%s); a detection glob that was denied must not make any firewall leaf error", k, e.Reason)
+		}
+	}
+	if w := b.Worst("firewall"); w == facts.StatusError {
+		t.Errorf(`Worst("firewall") = %s, want anything but error`, w)
+	}
+}
+
+// collectorKeys is every key one collector set, so a test can sweep the whole
+// leaf set rather than naming the handful it happens to remember.
+func collectorKeys(t *testing.T, b *collect.Builder, name string) []string {
+	t.Helper()
+	ks := b.Keys(name)
+	if len(ks) == 0 {
+		t.Fatalf("%s set no keys", name)
+	}
+	return ks
+}
+
+// M-10: a /dev this process may not list is not a /dev with nothing in it.
+// The walk used to drop the Glob error on the floor and publish an empty
+// dev_nondevice — the vacuous PASS for U-26 that files.go already refuses
+// when /proc/self/mountinfo cannot be read. The listing failure is now the
+// answer on both dev keys, exactly as the mountinfo failure is.
+func TestDevGlobDeniedIsTheAnswer(t *testing.T) {
+	a := &fsAccess{
+		files:      map[string]string{"/proc/self/mountinfo": "mountinfo_dev", "/dev/planted": ""},
+		dirs:       map[string]bool{"/dev": true},
+		stats:      map[string]statResult{"/dev/planted": {mode: 0o644, kind: "regular"}},
+		deniedDirs: map[string]bool{"/dev": true},
+	}
+	b := build(t, "files", a)
+	for _, k := range []string{"files.dev_entries", "files.dev_nondevice"} {
+		e := env(t, b, k)
+		if e.Status != facts.StatusDenied {
+			t.Errorf("%s: %+v, want denied — an unlistable /dev is not a clean one", k, e)
+		}
+		// C-5/C3: the read's status PATH-PREFIXED, as the two sibling M-10
+		// sites (env.go, services_super.go) file theirs. DeniedReason alone is
+		// a constant, so the operator would not learn which directory it was.
+		if !strings.HasPrefix(e.Reason, "/dev/*: ") {
+			t.Errorf("%s reason %q must name the directory that could not be listed", k, e.Reason)
+		}
+	}
+}
+
 // /root permission facts come from stat only; a stat failure reaches all six
 // leaves.
 func TestFilesRootHome(t *testing.T) {
@@ -3020,5 +3193,238 @@ func TestHostsDenyUnreadableIsNotSilentFalse(t *testing.T) {
 	// hosts.allow is read independently and is unaffected.
 	if e := env(t, b, "files.etc_hosts_allow_lines"); e.Status != facts.StatusOK {
 		t.Errorf("etc_hosts_allow_lines should be unaffected: %+v", e)
+	}
+}
+
+// M-12/M-32 (convention C4): a path muster CHOSE not to read is not an error.
+// An INTERACTIVE account whose home lies outside the collector's declaration
+// cannot be judged at all, so the whole files.home_dirs leaf is absent and
+// names each such account — U-31/U-32 then read MANUAL through their
+// absent_means, never the false FAIL a denied row would produce. A
+// NON-interactive account with an undeclared home (/nonexistent on every
+// stock host) keeps its denied row and the leaf stays ok.
+func TestHomeOutsideTheDeclarationMakesTheLeafAbsent(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{
+			"/etc/passwd": "passwd_home_undeclared", "/etc/shells": "shells_home",
+			"/proc/self/mountinfo": "mountinfo",
+		},
+		dirs:  map[string]bool{"/root": true},
+		stats: map[string]statResult{"/root": {mode: 0o700, uid: 0, gid: 0, kind: "dir"}},
+	}
+	e := env(t, build(t, "files", a), "files.home_dirs")
+	if e.Status != facts.StatusAbsent {
+		t.Fatalf("files.home_dirs %+v, want absent — an unexaminable interactive home is not a finding", e)
+	}
+	// Sorted by user, so two hosts with the same accounts produce the same
+	// bytes; svc is non-interactive and must not be named. bob's home field is
+	// EMPTY, which is not a path outside the declaration but no path at all,
+	// and the reason has to say which it is (the operator's only clue that a
+	// certain U-32 finding became MANUAL).
+	want := "home path outside the collector's declaration: app (/srv/app), bob (no home path in /etc/passwd), zed (/opt/zed)"
+	if e.Reason != want {
+		t.Errorf("reason %q, want %q", e.Reason, want)
+	}
+
+	// A non-interactive account with an undeclared home keeps today's denied
+	// row and leaves the leaf ok (M-32) — okList fails the test if it is not.
+	b := &fsAccess{
+		files: map[string]string{
+			"/etc/passwd": "passwd_home", "/etc/shells": "shells_home",
+			"/proc/self/mountinfo": "mountinfo",
+		},
+		dirs:  map[string]bool{"/root": true, "/home/alice": true},
+		stats: map[string]statResult{"/root": {mode: 0o700, kind: "dir"}, "/home/alice": {mode: 0o755, uid: 1000, gid: 1000, kind: "dir"}},
+	}
+	var svc map[string]any
+	for _, r := range okList(t, build(t, "files", b), "files.home_dirs") {
+		if m := r.(map[string]any); m["user"] == "svc" {
+			svc = m
+		}
+	}
+	if svc == nil || svc["stat_status"] != "denied" {
+		t.Fatalf("a non-interactive undeclared home keeps its denied row: %v", svc)
+	}
+	if svc["reason"] != "home path outside the collector's declaration" {
+		t.Errorf("svc row reason %v", svc["reason"])
+	}
+}
+
+// M-13/M-30 (convention C3): a .rhosts/.shosts that EXISTS but cannot be read
+// is the answer for the whole files.user_rhosts leaf — the read's status with
+// the path in front of the reason — never a dropped row that would let U-27
+// pass on a file nobody could see. ENOENT stays "no row".
+func TestUnreadableRhostsIsDenied(t *testing.T) {
+	base := func() *fsAccess {
+		return &fsAccess{
+			files: map[string]string{
+				"/etc/passwd": "passwd_home", "/etc/shells": "shells_home",
+				"/proc/self/mountinfo": "mountinfo",
+			},
+			fails: map[string]error{},
+		}
+	}
+	// EACCES on an existing .rhosts -> denied, path-prefixed.
+	a := base()
+	a.fails["/home/bob/.rhosts"] = os.ErrPermission
+	e := env(t, build(t, "files", a), "files.user_rhosts")
+	if e.Status != facts.StatusDenied {
+		t.Errorf("an unreadable .rhosts must make the leaf denied: %+v", e)
+	}
+	if !strings.HasPrefix(e.Reason, "/home/bob/.rhosts: ") {
+		t.Errorf("reason %q must name the file that could not be read", e.Reason)
+	}
+	// C-2: a home muster cannot reach WITHOUT following a symlink (/home ->
+	// /export/home, or one relocated home symlinked back) is a path muster
+	// declined to read, which convention C4 files as absent naming the path —
+	// never the error a Needs: "none" collector would turn into a partial run
+	// and an exit code 2 on a host that was never misconfigured.
+	a = base()
+	a.fails["/home/alice/.shosts"] = collect.ErrSymlink
+	bs := build(t, "files", a)
+	e = env(t, bs, "files.user_rhosts")
+	if e.Status != facts.StatusAbsent || !strings.Contains(e.Reason, "/home/alice/.shosts") {
+		t.Errorf("a .shosts behind a symlink must be absent naming the path: %+v", e)
+	}
+	if !strings.Contains(e.Reason, "symlink") {
+		t.Errorf("reason %q must say muster does not follow symlinks", e.Reason)
+	}
+	if w := bs.Worst("files"); w != facts.StatusOK {
+		t.Errorf(`Worst("files") = %s, want ok — a symlinked home must not make the run partial`, w)
+	}
+	// ENOTDIR: the home is a regular file, so no .rhosts can exist under it —
+	// no row, and the leaf stays a clean ok list (never "not present" absent).
+	a = base()
+	a.fails["/home/alice/.rhosts"] = unix.ENOTDIR
+	bn := build(t, "files", a)
+	if got := okList(t, bn, "files.user_rhosts"); len(got) != 0 {
+		t.Errorf("an ENOTDIR .rhosts is no row, not %v", got)
+	}
+	if w := bn.Worst("files"); w != facts.StatusOK {
+		t.Errorf(`Worst("files") = %s, want ok for an ENOTDIR home`, w)
+	}
+	// A file that EXISTS and cannot be read outranks a path muster declined to
+	// follow: the denied read is the answer even though bob's home is behind a
+	// symlink, and the state is held per call, never in a package variable.
+	a = base()
+	a.fails["/home/alice/.rhosts"] = os.ErrPermission
+	a.fails["/home/bob/.rhosts"] = collect.ErrSymlink
+	e = env(t, build(t, "files", a), "files.user_rhosts")
+	if e.Status != facts.StatusDenied || !strings.HasPrefix(e.Reason, "/home/alice/.rhosts: ") {
+		t.Errorf("an unreadable file must outrank a symlinked path: %+v", e)
+	}
+	// A later, clean run must not inherit it (the state is a local, never a
+	// package-level variable), and ENOENT is still "no row".
+	if got := okList(t, build(t, "files", base()), "files.user_rhosts"); len(got) != 0 {
+		t.Errorf("a host with no .rhosts anywhere is an empty ok list, not %v", got)
+	}
+}
+
+// M-52: files.user_rhosts and files.env_files answer an undeclared interactive
+// home the way files.home_dirs does. Skipping such a home silently published a
+// clean ok [] — a confident PASS for U-27 (importance 상) and U-24 over
+// dotfiles muster never looked at. A non-interactive account is not walked at
+// all and must not make either leaf absent.
+func TestSiblingHomeLeavesFollowTheUndeclaredHomeRule(t *testing.T) {
+	undeclared := &fsAccess{files: map[string]string{
+		"/etc/passwd": "passwd_home_undeclared", "/etc/shells": "shells_home",
+		"/proc/self/mountinfo": "mountinfo",
+	}}
+	b := build(t, "files", undeclared)
+	want := "home path outside the collector's declaration: app (/srv/app), bob (no home path in /etc/passwd), zed (/opt/zed)"
+	for _, k := range []string{"files.user_rhosts", "files.env_files"} {
+		e := env(t, b, k)
+		if e.Status != facts.StatusAbsent {
+			t.Errorf("%s %+v, want absent — a home muster declined to walk is not an empty one", k, e)
+		}
+		if e.Reason != want {
+			t.Errorf("%s reason %q, want %q", k, e.Reason, want)
+		}
+	}
+	// A stock host: only the non-interactive svc home (/nonexistent) is
+	// undeclared, so both leaves stay ok — okList fails the test if they do not.
+	stock := &fsAccess{files: map[string]string{
+		"/etc/passwd": "passwd_home", "/etc/shells": "shells_home",
+		"/proc/self/mountinfo": "mountinfo",
+	}}
+	bs := build(t, "files", stock)
+	okList(t, bs, "files.user_rhosts")
+	okList(t, bs, "files.env_files")
+	// M-30 still outranks the absence: a .rhosts that EXISTS and cannot be read
+	// is a harder answer than a home muster chose not to visit.
+	both := &fsAccess{
+		files: map[string]string{
+			"/etc/passwd": "passwd_home_undeclared", "/etc/shells": "shells_home",
+			"/proc/self/mountinfo": "mountinfo",
+		},
+		fails: map[string]error{"/root/.rhosts": os.ErrPermission},
+	}
+	e := env(t, build(t, "files", both), "files.user_rhosts")
+	if e.Status != facts.StatusDenied || !strings.HasPrefix(e.Reason, "/root/.rhosts: ") {
+		t.Errorf("a read error must outrank the undeclared-home absence: %+v", e)
+	}
+}
+
+// M-53: the per-home dotfile declarations mirror the declared home ROOTS. R187
+// declares /home/*/* as a home root, so a home one level down (/home/dept/alice)
+// is stat'd — but its .rhosts and its shell dotfiles were only declared under
+// /home/*/ and /root/, so U-27 and U-24 saw nothing there. With the dotfiles of
+// a nested root declared they are examined like any other home's; a home DEEPER
+// than the declared roots is still declined, which M-52 turns into the absence
+// that reads MANUAL rather than a clean pass.
+func TestNestedHomeRootDotfilesAreDeclared(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{
+			"/etc/passwd": "passwd_home_nested", "/etc/shells": "shells_home",
+			"/proc/self/mountinfo":     "mountinfo",
+			"/home/dept/alice/.rhosts": "home_alice_rhosts", // holds a bare "+"
+			"/home/dept/alice/.bashrc": "home_alice_bashrc",
+		},
+		stats: map[string]statResult{
+			"/root":                    {mode: 0o700, kind: "dir"},
+			"/home/dept/alice":         {mode: 0o700, uid: 1000, gid: 1000, kind: "dir"},
+			"/home/dept/alice/.rhosts": {mode: 0o600, uid: 1000, kind: "regular"},
+			"/home/dept/alice/.bashrc": {mode: 0o644, uid: 1000, kind: "regular"},
+		},
+	}
+	b := build(t, "files", a)
+	// okList fails the test if either leaf went absent, which is what an
+	// undeclared dotfile set produces (M-52).
+	rh := okList(t, b, "files.user_rhosts")
+	if len(rh) != 1 {
+		t.Fatalf("user_rhosts %v, want the nested home's .rhosts", rh)
+	}
+	row := rh[0].(map[string]any)
+	if row["path"] != "/home/dept/alice/.rhosts" || row["has_plus"] != true {
+		t.Errorf("the nested .rhosts must be read and its \"+\" recorded: %v", row)
+	}
+	found := false
+	for _, r := range okList(t, b, "files.env_files") {
+		if r.(map[string]any)["path"] == "/home/dept/alice/.bashrc" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("the nested home's .bashrc must be a row: %v", okList(t, b, "files.env_files"))
+	}
+	okList(t, b, "files.home_dirs") // the home root itself was already declared (R187)
+
+	// A home DEEPER than /home/*/* is outside every declared root: the three
+	// leaves name it and go absent rather than passing over files muster never
+	// looked at.
+	deep := &fsAccess{
+		files: map[string]string{
+			"/etc/passwd": "passwd_home_deep", "/etc/shells": "shells_home",
+			"/proc/self/mountinfo": "mountinfo",
+		},
+		stats: map[string]statResult{"/root": {mode: 0o700, kind: "dir"}},
+	}
+	bd := build(t, "files", deep)
+	want := "home path outside the collector's declaration: deep (/home/a/b/c)"
+	for _, k := range []string{"files.home_dirs", "files.user_rhosts", "files.env_files"} {
+		e := env(t, bd, k)
+		if e.Status != facts.StatusAbsent || e.Reason != want {
+			t.Errorf("%s = %+v, want absent with %q", k, e, want)
+		}
 	}
 }
