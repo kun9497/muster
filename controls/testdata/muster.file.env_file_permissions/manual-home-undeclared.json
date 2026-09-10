@@ -1,0 +1,1 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{"files":{"env_files":{"status":"absent","reason":"home path outside the collector's declaration: app (/srv/app)","source":{"kind":"file","path":"/etc/passwd"}}}}}

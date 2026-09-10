@@ -25,6 +25,31 @@ func interactive(shell string, shells map[string]bool) bool {
 	return shells[shell]
 }
 
+// undeclaredHome is how an account whose home muster declined to visit is named
+// in a leaf's reason. An EMPTY home field is not a path outside the
+// declaration - there is no path at all - and saying which it is stays the
+// operator's only clue why a certain U-32 finding turned into a MANUAL.
+func undeclaredHome(r passwdRow) string {
+	if r.home == "" {
+		return r.name + " (no home path in /etc/passwd)"
+	}
+	return r.name + " (" + r.home + ")"
+}
+
+// undeclaredHomes is the answer a home-keyed enumeration gives when it declined
+// to visit an interactive account's home (M-12/M-32, M-52, convention C4): the
+// whole leaf absent, naming each such account sorted by user so the same host
+// produces the same bytes. A username is followed by " (" and a space sorts
+// below every character a username may hold, so sorting the composed strings is
+// sorting by user. The controls then read MANUAL rather than the confident PASS
+// or FAIL a partial enumeration would produce.
+func undeclaredHomes(names []string, src *facts.Source) facts.Envelope {
+	slices.Sort(names)
+	e := collect.Absent("home path outside the collector's declaration: " + strings.Join(names, ", "))
+	e.Source = src
+	return e
+}
+
 func homeDirs(a collect.Access, rows []passwdRow, shells map[string]bool, mounts mountTable) facts.Envelope {
 	out := []any{}
 	// undeclared names the INTERACTIVE accounts whose home muster declined to
@@ -33,12 +58,13 @@ func homeDirs(a collect.Access, rows []passwdRow, shells map[string]bool, mounts
 	// would read as a finding.
 	var undeclared []string
 	for _, r := range rows {
+		inter := interactive(r.shell, shells)
 		// R176: initialise EVERY field the controls where/require on, defaulted,
 		// BEFORE the branch, so U-31/U-32's `each … require` never compares an
 		// absent field on a denied/absent row (which would ERROR, not FAIL).
 		rec := map[string]any{
 			"user": r.name, "uid": r.uid, "home": r.home,
-			"interactive":    interactive(r.shell, shells),
+			"interactive":    inter,
 			"is_dir":         false,
 			"owner_matches":  false,
 			"group_writable": false,
@@ -48,12 +74,13 @@ func homeDirs(a collect.Access, rows []passwdRow, shells map[string]bool, mounts
 			"owner_uid":      -1,
 		}
 		// Only stat a home inside the declaration; an interactive home is
-		// essentially always /home/* or /root. An undeclared home cannot be
-		// examined under our declaration: record it as denied with a reason,
-		// never as absent (which absent_means could excuse).
+		// essentially always /home/* or /root. A home muster declined to visit
+		// still gets its row, recorded denied with the reason, so a reader of
+		// the list sees the account; an INTERACTIVE one also joins undeclared,
+		// and any entry there replaces the whole leaf below (C4).
 		if r.home == "" || !declared(a, r.home) {
-			if interactive(r.shell, shells) {
-				undeclared = append(undeclared, r.name+" ("+r.home+")")
+			if inter {
+				undeclared = append(undeclared, undeclaredHome(r))
 			}
 			rec["stat_status"] = "denied"
 			rec["reason"] = "home path outside the collector's declaration"
@@ -86,18 +113,14 @@ func homeDirs(a collect.Access, rows []passwdRow, shells map[string]bool, mounts
 		out = append(out, rec)
 	}
 	src := &facts.Source{Kind: "file", Path: passwdPath}
-	// M-12/M-32 (convention C4): a path muster CHOSE not to read is absent with
-	// the path in the reason, never a denied row. An interactive home outside
-	// the declaration is unexaminable, so the leaf as a whole is absent and
-	// names each account (sorted by user, so the same host produces the same
-	// bytes); U-31/U-32 then read MANUAL rather than the false FAIL a denied
-	// row would produce. A NON-interactive account (/nonexistent on every stock
+	// M-12/M-32 (convention C4): a path muster CHOSE not to read is absent, not
+	// a denied row a control would read as a finding. One such home suppresses
+	// judgement of every other home in the same run - U-31/U-32 go MANUAL for
+	// the whole host - which is M-12's whole-leaf trade and the reason the text
+	// names each account. A NON-interactive account (/nonexistent on every stock
 	// host) keeps its denied row and leaves the leaf ok.
 	if len(undeclared) > 0 {
-		slices.Sort(undeclared)
-		e := collect.Absent("home path outside the collector's declaration: " + strings.Join(undeclared, ", "))
-		e.Source = src
-		return e
+		return undeclaredHomes(undeclared, src)
 	}
 	return collect.OK(out, src)
 }
@@ -125,19 +148,33 @@ func envFiles(a collect.Access, rows []passwdRow, shells map[string]bool) facts.
 	for _, p := range systemEnvFiles {
 		stat(p, "system", "", 0) // system files must be root-owned (uid 0)
 	}
+	// M-52: an interactive home whose dotfiles are ALL outside the declaration
+	// was silently skipped, which published a clean ok [] - a confident PASS for
+	// U-24 over files muster never looked at. It gets the files.home_dirs answer
+	// instead: the whole leaf absent, naming each such account.
+	var undeclared []string
 	for _, r := range rows {
 		if !interactive(r.shell, shells) {
 			continue
 		}
+		visited := false
 		for _, name := range userEnvNames {
 			p := path.Join(r.home, name)
 			if !declared(a, p) {
 				continue
 			}
+			visited = true
 			stat(p, "user", r.name, r.uid)
 		}
+		if !visited {
+			undeclared = append(undeclared, undeclaredHome(r))
+		}
 	}
-	return collect.OK(out, &facts.Source{Kind: "file", Path: passwdPath})
+	src := &facts.Source{Kind: "file", Path: passwdPath}
+	if len(undeclared) > 0 {
+		return undeclaredHomes(undeclared, src)
+	}
+	return collect.OK(out, src)
 }
 
 // envFileRow describes an environment file muster could stat. owner_ok means
@@ -179,9 +216,12 @@ func userRhosts(a collect.Access, rows []passwdRow, shells map[string]bool) fact
 	// to this call — never a package-level variable — so one host's denied read
 	// cannot leak into the next collection.
 	var readErr *facts.Envelope
-	scan := func(p, homeUser string, ownerUID int) {
+	// scan reports whether the path was inside the declaration, so a home whose
+	// .rhosts AND .shosts were both declined can be named below (M-52) instead
+	// of passing as a home with no such file.
+	scan := func(p, homeUser string, ownerUID int) bool {
 		if !declared(a, p) {
-			return
+			return false
 		}
 		data, meta, err := a.ReadFile(p, readLimit)
 		if err != nil {
@@ -189,7 +229,7 @@ func userRhosts(a collect.Access, rows []passwdRow, shells map[string]bool) fact
 				e := readErrorEnv(p, err)
 				readErr = &e
 			}
-			return // ENOENT: no row, the file need not exist
+			return true // ENOENT: no row, the file need not exist
 		}
 		plus, count := false, 0
 		for _, l := range splitLines(data) {
@@ -207,21 +247,37 @@ func userRhosts(a collect.Access, rows []passwdRow, shells map[string]bool) fact
 			"owner_ok": int(meta.UID) == ownerUID || int(meta.UID) == 0,
 			"has_plus": plus, "entry_count": count,
 		})
+		return true
 	}
+	// M-52: a home whose .rhosts and .shosts are both outside the declaration
+	// was silently skipped, which published a clean ok [] - a confident PASS for
+	// U-27 over a file that may hold a "+". It gets the files.home_dirs answer
+	// instead: the whole leaf absent, naming each such account.
+	var undeclared []string
 	for _, r := range rows {
 		if !interactive(r.shell, shells) {
 			continue
 		}
-		scan(path.Join(r.home, ".rhosts"), r.name, r.uid)
-		scan(path.Join(r.home, ".shosts"), r.name, r.uid)
+		rhosts := scan(path.Join(r.home, ".rhosts"), r.name, r.uid)
+		shosts := scan(path.Join(r.home, ".shosts"), r.name, r.uid)
+		if !rhosts && !shosts {
+			undeclared = append(undeclared, undeclaredHome(r))
+		}
 	}
 	if readErr != nil {
-		// The read's status is the answer for the leaf, path-prefixed and
-		// carrying no source list (the precedent passwdRows and untrustedShells
-		// set for an enumeration that could not be completed).
+		// A file that EXISTS and cannot be read is the harder answer and
+		// outranks a home muster chose not to visit: the read's status,
+		// path-prefixed, carrying no source list (the precedent passwdRows and
+		// untrustedShells set for an enumeration that could not be completed).
+		// Rows collected before it are dropped with it, which is the whole-leaf
+		// answer M-30 rules; U-27's description says so.
 		return *readErr
 	}
-	return collect.OK(out, &facts.Source{Kind: "file", Path: passwdPath})
+	src := &facts.Source{Kind: "file", Path: passwdPath}
+	if len(undeclared) > 0 {
+		return undeclaredHomes(undeclared, src)
+	}
+	return collect.OK(out, src)
 }
 
 type mountTable struct{ points map[string]string } // mount point -> fstype

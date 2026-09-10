@@ -1,8 +1,12 @@
 id: muster.file.home_dir_exists
 title_en: Every interactive account has a home directory that exists
 title_ko: 모든 대화형 계정이 실제 존재하는 홈 디렉터리를 가진다
-description_en: Each interactive account's home directory named in /etc/passwd must exist and be a directory. An account whose home is missing lands in / on login and may write into unexpected places; an account whose home muster could not stat is reported rather than assumed present. A home outside the declared home roots (not under /home, /home/*/ or /root) cannot be examined under the collector's declaration and is reported as denied — a finding — rather than assumed present. Service accounts with a nologin shell (whose home is often /nonexistent by design) are skipped.
-description_ko: /etc/passwd 에 적힌 각 대화형 계정의 홈 디렉터리가 실제로 존재하고 디렉터리여야 합니다. 홈이 없는 계정은 로그인 시 / 로 떨어져 예상치 못한 곳에 쓸 수 있으며, muster 가 stat 할 수 없었던 홈은 존재한다고 단정하지 않고 보고합니다. 선언된 홈 루트(/home, /home/*/, /root) 밖의 홈은 수집기 선언으로 점검할 수 없어 존재한다고 가정하지 않고 denied(발견 항목)로 보고합니다. nologin 셸의 서비스 계정(홈이 흔히 의도적으로 /nonexistent)은 건너뜁니다.
+description_en: Each interactive account's home directory named in /etc/passwd must exist and be a directory. An account whose home is missing lands in / on login and may write into unexpected places; an account whose home muster could not stat is reported rather than assumed present. A home outside the declared home roots (not under /home, /home/*/ or /root) cannot be examined under the collector's declaration - muster declines to read it and reports the whole home enumeration as absent, naming each such account, so this control is MANUAL for a reviewer to settle rather than a finding muster cannot substantiate. Because the answer is the whole list, one such account suppresses the judgement of every other home in the same run. Service accounts with a nologin shell (whose home is often /nonexistent by design) are skipped.
+
+
+description_ko: /etc/passwd 에 적힌 각 대화형 계정의 홈 디렉터리가 실제로 존재하고 디렉터리여야 합니다. 홈이 없는 계정은 로그인 시 / 로 떨어져 예상치 못한 곳에 쓸 수 있으며, muster 가 stat 할 수 없었던 홈은 존재한다고 단정하지 않고 보고합니다. 선언된 홈 루트(/home, /home/*/, /root) 밖의 홈은 수집기 선언으로 점검할 수 없어, muster 는 그 경로를 읽지 않고 홈 목록 전체를 absent 로 하여 해당 계정을 하나씩 이름과 함께 보고합니다. 따라서 이 컨트롤은 근거 없는 발견 항목 대신 검토자가 판단하는 MANUAL 이 되며, 답이 목록 전체이므로 그런 계정이 하나만 있어도 같은 실행의 다른 홈에 대한 판정까지 함께 보류됩니다. nologin 셸의 서비스 계정(홈이 흔히 의도적으로 /nonexistent)은 건너뜁니다.
+
+
 category: file
 importance: 중
 automation: auto

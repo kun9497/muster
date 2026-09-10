@@ -1,8 +1,12 @@
 id: muster.file.home_dir_permissions
 title_en: Interactive home directories are owned by their user and not writable by others
 title_ko: 대화형 홈 디렉터리가 사용자 소유이며 타인이 쓸 수 없다
-description_en: Each interactive account's home directory must be owned by that account and must not be group- or world-writable. A home muster could not stat (an unreadable parent) is reported here rather than passed silently, since an unexaminable home could hide anything. A home directory outside the declared home roots (not under /home, /home/*/ or /root) likewise cannot be examined under the collector's declaration and is reported as denied — a finding — rather than assumed compliant. Service accounts with a nologin shell are skipped so a host's thirty /nonexistent service homes do not each become a finding.
-description_ko: 각 대화형 계정의 홈 디렉터리는 해당 계정 소유여야 하고 그룹·전체 쓰기가 가능하면 안 됩니다. muster 가 stat 할 수 없었던 홈(상위 디렉터리를 읽을 수 없는 경우)은 조용히 통과시키지 않고 여기서 보고합니다. 점검 불가한 홈은 무엇이든 숨길 수 있기 때문입니다. 선언된 홈 루트(/home, /home/*/, /root) 밖의 홈 디렉터리도 수집기 선언으로는 점검할 수 없어 양호로 가정하지 않고 denied(발견 항목)로 보고합니다. nologin 셸의 서비스 계정은 건너뛰어, 호스트의 서른 개 /nonexistent 서비스 홈이 각각 findings 가 되지 않게 합니다.
+description_en: Each interactive account's home directory must be owned by that account and must not be group- or world-writable. A home muster could not stat (an unreadable parent) is reported here rather than passed silently, since an unexaminable home could hide anything. A home directory outside the declared home roots (not under /home, /home/*/ or /root) likewise cannot be examined under the collector's declaration - muster declines to read it and reports the whole home enumeration as absent, naming each such account, so this control is MANUAL for a reviewer to settle rather than a finding muster cannot substantiate. Because the answer is the whole list, one such account suppresses the judgement of every other home in the same run, including a genuinely world-writable one. Service accounts with a nologin shell are skipped so a host's thirty /nonexistent service homes do not each become a finding.
+
+
+description_ko: 각 대화형 계정의 홈 디렉터리는 해당 계정 소유여야 하고 그룹·전체 쓰기가 가능하면 안 됩니다. muster 가 stat 할 수 없었던 홈(상위 디렉터리를 읽을 수 없는 경우)은 조용히 통과시키지 않고 여기서 보고합니다. 점검 불가한 홈은 무엇이든 숨길 수 있기 때문입니다. 선언된 홈 루트(/home, /home/*/, /root) 밖의 홈 디렉터리도 수집기 선언으로는 점검할 수 없어, muster 는 그 경로를 읽지 않고 홈 목록 전체를 absent 로 하여 해당 계정을 하나씩 이름과 함께 보고합니다. 따라서 이 컨트롤은 근거 없는 발견 항목 대신 검토자가 판단하는 MANUAL 이 되며, 답이 목록 전체이므로 그런 계정이 하나만 있어도 같은 실행의 다른 홈(실제로 전체 쓰기가 가능한 홈을 포함해)에 대한 판정까지 함께 보류됩니다. nologin 셸의 서비스 계정은 건너뛰어, 호스트의 서른 개 /nonexistent 서비스 홈이 각각 findings 가 되지 않게 합니다.
+
+
 category: file
 importance: 중
 automation: auto

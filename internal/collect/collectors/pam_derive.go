@@ -153,8 +153,16 @@ func pwqualityFacts(s pamStacks, a collect.Access) map[string]facts.Envelope {
 	// cannot; it replaces every value below, since the defaults would be a
 	// guess about a file that exists (R148).
 	var readErr *facts.Envelope
+	// raw keeps the FINAL value seen for each integer key, parseable or not,
+	// because apply is called in precedence order (the merged conf chain, then
+	// the module arguments) - so raw[k] ends up holding exactly what the host
+	// last said (M-50).
+	raw := map[string]string{}
 	apply := func(kv map[string]string) {
 		for _, k := range pwqualityInts {
+			if v, ok := kv[k]; ok {
+				raw[k] = v
+			}
 			applyInt(vals, kv, k)
 		}
 		for _, f := range []string{"enforce_for_root", "local_users_only"} {
@@ -188,7 +196,29 @@ func pwqualityFacts(s pamStacks, a collect.Access) map[string]facts.Envelope {
 		return out
 	}
 	out["pam.pwquality.local_users_only"] = collect.OK(flags["local_users_only"], src())
+	// M-50: a value libpwquality would reject is not a value. applyInt drops it
+	// silently, which would publish the compiled-in default as ok over a file
+	// that plainly says something else. Such a key is absent instead, naming key
+	// and value; the merged map cannot tell "minlen =" from a bare "minlen"
+	// line and neither shape is an integer, so both land here. The offenders are
+	// found by walking the fixed pwqualityInts, never the map (determinism).
+	unparseable := func(k string) (facts.Envelope, bool) {
+		v, seen := raw[k]
+		if !seen {
+			return facts.Envelope{}, false
+		}
+		if _, err := strconv.Atoi(strings.TrimSpace(v)); err == nil {
+			return facts.Envelope{}, false
+		}
+		e := collect.Absent(k + " = " + strconv.Quote(v) + " is not an integer; libpwquality rejects the configuration")
+		e.Source = src()
+		return e, true
+	}
 	for _, k := range pwqualityInts {
+		if e, bad := unparseable(k); bad {
+			out["pam.pwquality."+k] = e
+			continue
+		}
 		out["pam.pwquality."+k] = collect.OK(vals[k], src())
 	}
 	required := vals["minclass"]
@@ -201,7 +231,16 @@ func pwqualityFacts(s pamStacks, a collect.Access) map[string]facts.Envelope {
 	if negative > required {
 		required = negative
 	}
+	// required_classes is derived from minclass and the four credits; an
+	// unparseable one of those five would make the derived number a guess, so it
+	// goes absent with the offender. minlen is not one of its inputs.
 	out["pam.pwquality.required_classes"] = collect.OK(required, src())
+	for _, k := range []string{"minclass", "dcredit", "ucredit", "lcredit", "ocredit"} {
+		if e, bad := unparseable(k); bad {
+			out["pam.pwquality.required_classes"] = e
+			break
+		}
+	}
 	out["pam.pwquality.enforce_for_root"] = collect.OK(flags["enforce_for_root"], src())
 	return out
 }

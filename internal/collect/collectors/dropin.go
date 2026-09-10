@@ -36,9 +36,25 @@ func dropinEnvelope(err error) facts.Envelope {
 	return collect.ErrorEnv(err.Error())
 }
 
-// mergeDropins merges a systemd-style main configuration file with its
-// drop-in directories, exactly the way systemd itself resolves one (spec's
-// sysctl shadowing rule, Ruling I-5/I-19):
+// mergeDropins resolves a systemd-style drop-in chain: mergeDropinsWith with
+// systemd's own line parser (spec's sysctl shadowing rule, Ruling I-5/I-19).
+//
+// values holds every Key=Value seen, keyed by the bare key; parseDropin is
+// section-agnostic (a caller looks a bare key up) but also records the
+// qualified "Section/Key" form, so a caller that cares which section set a
+// value can ask for that instead. An empty value RESETS the setting the way
+// systemd does — it is stored as "", never dropped, so the reset survives
+// last-write-wins.
+func mergeDropins(a collect.Access, main string, dirs []string, glob string) (map[string]string, []facts.Source, error) {
+	return mergeDropinsWith(a, main, dirs, glob, parseDropin)
+}
+
+// mergeDropinsWith merges a main configuration file with its drop-in
+// directories, exactly the way systemd itself resolves one, with the line
+// parser as a parameter so a chain whose file syntax is not systemd's resolves
+// through the same code (M-23: pwquality's conf files carry bare-word flags
+// such as enforce_for_root that parseDropin discards, so that caller passes
+// parseKVInto):
 //
 //   - the main file is applied first — a main file that is not there is not
 //     an error, since the daemon's compiled-in defaults then apply;
@@ -48,29 +64,14 @@ func dropinEnvelope(err error) facts.Envelope {
 //   - the survivors are applied in lexicographic BASENAME order (10-… before
 //     20-…, whichever directory each came from), last write wins.
 //
-// values holds every Key=Value seen, keyed by the bare key; the parser is
-// section-agnostic (a caller looks a bare key up) but also records the
-// qualified "Section/Key" form, so a caller that cares which section set a
-// value can ask for that instead. An empty value RESETS the setting the way
-// systemd does — it is stored as "", never dropped, so the reset survives
-// last-write-wins. inputs lists the files actually read, in the order they
-// were applied. readErr is the FIRST read error of a file that exists (R148:
-// it poisons every value derived from the chain); a file that is simply
-// absent is not one.
+// parse is handed each file's bytes and the shared values map, in the order the
+// files are applied, so the last file to set a key wins whatever the syntax.
+// inputs lists the files actually read, in the order they were applied. readErr
+// is the FIRST read error of a file that exists (R148: it poisons every value
+// derived from the chain); a file that is simply absent is not one.
 //
 // The caller declares the main file and each dir's glob in its own
 // Declaration.Reads — this helper never widens the declaration.
-func mergeDropins(a collect.Access, main string, dirs []string, glob string) (map[string]string, []facts.Source, error) {
-	return mergeDropinsWith(a, main, dirs, glob, parseDropin)
-}
-
-// mergeDropinsWith is mergeDropins with the line parser as a parameter, for a
-// chain whose file syntax is not systemd's (M-23): pwquality's conf files carry
-// bare-word flags (enforce_for_root) that parseDropin discards, so it passes
-// parseKVInto instead. parse is handed each file's bytes and the shared values
-// map, in the order the files are applied, so the last file to set a key wins
-// whatever the syntax. Everything else — shadowing, ordering, which files are
-// cited and R148's first read error — is one implementation for every caller.
 func mergeDropinsWith(a collect.Access, main string, dirs []string, glob string, parse func([]byte, map[string]string)) (map[string]string, []facts.Source, error) {
 	values := map[string]string{}
 	var inputs []facts.Source

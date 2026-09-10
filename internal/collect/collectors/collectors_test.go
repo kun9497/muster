@@ -3210,8 +3210,11 @@ func TestHomeOutsideTheDeclarationMakesTheLeafAbsent(t *testing.T) {
 		t.Fatalf("files.home_dirs %+v, want absent — an unexaminable interactive home is not a finding", e)
 	}
 	// Sorted by user, so two hosts with the same accounts produce the same
-	// bytes; svc is non-interactive and must not be named.
-	want := "home path outside the collector's declaration: app (/srv/app), zed (/opt/zed)"
+	// bytes; svc is non-interactive and must not be named. bob's home field is
+	// EMPTY, which is not a path outside the declaration but no path at all,
+	// and the reason has to say which it is (the operator's only clue that a
+	// certain U-32 finding became MANUAL).
+	want := "home path outside the collector's declaration: app (/srv/app), bob (no home path in /etc/passwd), zed (/opt/zed)"
 	if e.Reason != want {
 		t.Errorf("reason %q, want %q", e.Reason, want)
 	}
@@ -3286,5 +3289,50 @@ func TestUnreadableRhostsIsDenied(t *testing.T) {
 	// package-level variable), and ENOENT is still "no row".
 	if got := okList(t, build(t, "files", base()), "files.user_rhosts"); len(got) != 0 {
 		t.Errorf("a host with no .rhosts anywhere is an empty ok list, not %v", got)
+	}
+}
+
+// M-52: files.user_rhosts and files.env_files answer an undeclared interactive
+// home the way files.home_dirs does. Skipping such a home silently published a
+// clean ok [] — a confident PASS for U-27 (importance 상) and U-24 over
+// dotfiles muster never looked at. A non-interactive account is not walked at
+// all and must not make either leaf absent.
+func TestSiblingHomeLeavesFollowTheUndeclaredHomeRule(t *testing.T) {
+	undeclared := &fsAccess{files: map[string]string{
+		"/etc/passwd": "passwd_home_undeclared", "/etc/shells": "shells_home",
+		"/proc/self/mountinfo": "mountinfo",
+	}}
+	b := build(t, "files", undeclared)
+	want := "home path outside the collector's declaration: app (/srv/app), bob (no home path in /etc/passwd), zed (/opt/zed)"
+	for _, k := range []string{"files.user_rhosts", "files.env_files"} {
+		e := env(t, b, k)
+		if e.Status != facts.StatusAbsent {
+			t.Errorf("%s %+v, want absent — a home muster declined to walk is not an empty one", k, e)
+		}
+		if e.Reason != want {
+			t.Errorf("%s reason %q, want %q", k, e.Reason, want)
+		}
+	}
+	// A stock host: only the non-interactive svc home (/nonexistent) is
+	// undeclared, so both leaves stay ok — okList fails the test if they do not.
+	stock := &fsAccess{files: map[string]string{
+		"/etc/passwd": "passwd_home", "/etc/shells": "shells_home",
+		"/proc/self/mountinfo": "mountinfo",
+	}}
+	bs := build(t, "files", stock)
+	okList(t, bs, "files.user_rhosts")
+	okList(t, bs, "files.env_files")
+	// M-30 still outranks the absence: a .rhosts that EXISTS and cannot be read
+	// is a harder answer than a home muster chose not to visit.
+	both := &fsAccess{
+		files: map[string]string{
+			"/etc/passwd": "passwd_home_undeclared", "/etc/shells": "shells_home",
+			"/proc/self/mountinfo": "mountinfo",
+		},
+		fails: map[string]error{"/root/.rhosts": os.ErrPermission},
+	}
+	e := env(t, build(t, "files", both), "files.user_rhosts")
+	if e.Status != facts.StatusDenied || !strings.HasPrefix(e.Reason, "/root/.rhosts: ") {
+		t.Errorf("a read error must outrank the undeclared-home absence: %+v", e)
 	}
 }

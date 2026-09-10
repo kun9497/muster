@@ -956,4 +956,102 @@ func TestPwqualityDropinsMergeLikeSystemd(t *testing.T) {
 	if got := sourcePaths(t, e); !slices.Equal(got, []string{pwqualityConf, "/etc/authselect/system-auth"}) {
 		t.Errorf("inputs %v", got)
 	}
+	// Drop-ins with no main file at all - the shape of a host that ships
+	// nothing in /etc/security and drops one hardening file in. The helper's
+	// ENOENT on the main file is not an error and it is not cited.
+	a = rockyPAM()
+	a.files["/etc/authselect/system-auth"] = "pam/rocky/authselect-password-auth"
+	a.files["/etc/security/pwquality.conf.d/10-a.conf"] = "pam/rocky/dropin-10-a.conf"
+	a.files["/etc/security/pwquality.conf.d/20-b.conf"] = "pam/rocky/dropin-20-b.conf"
+	e = env(t, build(t, "pam", a), "pam.pwquality.minlen")
+	if e.Status != facts.StatusOK || e.Value != 16 {
+		t.Errorf("drop-ins with no main file: %+v, want 16", e)
+	}
+	if got := sourcePaths(t, e); !slices.Equal(got, []string{
+		"/etc/security/pwquality.conf.d/10-a.conf",
+		"/etc/security/pwquality.conf.d/20-b.conf",
+		"/etc/authselect/system-auth",
+	}) {
+		t.Errorf("inputs %v, want only the drop-ins and the stack line", got)
+	}
+	// A drop-in that is a symlink is pinned deliberately as error, not absent:
+	// it is a file IN the configuration chain that somebody put there, which is
+	// M-12's "an administrator's symlink at a declared file" case, not the
+	// "muster declined to read this" case. The run goes partial, as it should.
+	a = chain()
+	a.fails["/etc/security/pwquality.conf.d/10-a.conf"] = collect.ErrSymlink
+	b = build(t, "pam", a)
+	for _, k := range passwordKeys[1:10] {
+		g := env(t, b, k)
+		if g.Status != facts.StatusError || !strings.HasPrefix(g.Reason, "/etc/security/pwquality.conf.d/10-a.conf: ") {
+			t.Errorf("%s = %+v, want the symlinked drop-in's error", k, g)
+		}
+	}
+}
+
+// M-50: a value libpwquality would reject is not a value. applyInt used to drop
+// it silently, which published the compiled-in default as ok over a file that
+// plainly says something else - the most confident kind of wrong answer. The
+// key is absent instead, naming key and value, and any derived key that reads
+// it goes absent with it.
+func TestPwqualityUnparseableIntegerIsAbsent(t *testing.T) {
+	chain := func(bad string) *fsAccess {
+		a := rockyPAM()
+		a.files["/etc/authselect/system-auth"] = "pam/rocky/authselect-password-auth"
+		a.files[pwqualityConf] = "pam/rocky/pwquality.conf"                                // minlen 8, minclass 4, dcredit 0
+		a.files["/etc/security/pwquality.conf.d/10-a.conf"] = "pam/rocky/dropin-10-a.conf" // minlen 10, minclass 3, ucredit -1
+		a.files["/etc/security/pwquality.conf.d/30-bad.conf"] = bad
+		return a
+	}
+	// minlen = wat, last in the chain, over two files that set it to a number.
+	b := build(t, "pam", chain("pam/rocky/dropin-30-bad-minlen.conf"))
+	e := env(t, b, "pam.pwquality.minlen")
+	if e.Status != facts.StatusAbsent {
+		t.Errorf("minlen %+v, want absent - the compiled-in 8 would be a guess over a file that says otherwise", e)
+	}
+	if e.Reason != `minlen = "wat" is not an integer; libpwquality rejects the configuration` {
+		t.Errorf("minlen reason %q must name the key and the value it could not read", e.Reason)
+	}
+	if got := sourcePaths(t, e); len(got) != 4 {
+		t.Errorf("an absent value still cites every file that was read: %v", got)
+	}
+	for _, c := range []struct {
+		key  string
+		want int
+	}{{"minclass", 3}, {"ucredit", -1}} {
+		if g := env(t, b, "pam.pwquality."+c.key); g.Status != facts.StatusOK || g.Value != c.want {
+			t.Errorf("%s = %+v, want %d - one unreadable key must not poison the rest", c.key, g, c.want)
+		}
+	}
+	if g := env(t, b, "pam.pwquality.required_classes"); g.Status != facts.StatusOK || g.Value != 3 {
+		t.Errorf("required_classes %+v, want 3 - minlen is not one of its inputs", g)
+	}
+	if g := env(t, b, "pam.pwquality.enabled"); g.Status != facts.StatusOK || g.Value != true {
+		t.Errorf("enabled follows the stack, not the values: %+v", g)
+	}
+	// A credit IS one of required_classes' five inputs, so the derived key goes
+	// absent with the offender rather than publishing a number derived from a
+	// default nobody wrote.
+	b = build(t, "pam", chain("pam/rocky/dropin-30-bad-credit.conf"))
+	for _, k := range []string{"pam.pwquality.ucredit", "pam.pwquality.required_classes"} {
+		g := env(t, b, k)
+		if g.Status != facts.StatusAbsent || !strings.Contains(g.Reason, `ucredit = "plenty"`) {
+			t.Errorf("%s = %+v, want absent naming ucredit", k, g)
+		}
+	}
+	if g := env(t, b, "pam.pwquality.minlen"); g.Status != facts.StatusOK || g.Value != 10 {
+		t.Errorf("minlen %+v, want the 10 the readable drop-in set", g)
+	}
+	// "minlen =" (an empty reset) and a bare "minclass" line are one shape: the
+	// merged map cannot tell them apart, and neither is an integer.
+	b = build(t, "pam", chain("pam/rocky/dropin-30-reset.conf"))
+	for _, k := range []string{"minlen", "minclass"} {
+		g := env(t, b, "pam.pwquality."+k)
+		if g.Status != facts.StatusAbsent || !strings.Contains(g.Reason, k+` = ""`) {
+			t.Errorf("%s = %+v, want absent naming the empty value", k, g)
+		}
+	}
+	if g := env(t, b, "pam.pwquality.required_classes"); g.Status != facts.StatusAbsent {
+		t.Errorf("required_classes %+v, want absent - minclass is one of its inputs", g)
+	}
 }
