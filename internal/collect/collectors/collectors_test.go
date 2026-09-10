@@ -130,10 +130,11 @@ func (a *fsAccess) Glob(pattern string) ([]string, error) {
 	}
 	// M-10: the host primitive probes the pattern's literal directory and
 	// reports a directory this process may not search instead of returning an
-	// empty list. The double mirrors that, wrapping the errno with the
+	// empty list. The double mirrors that through the SAME rule
+	// (collect.GlobDir, not a copy of it) and wraps the errno with the
 	// directory exactly as hostAccess.Glob does, so every caller's
 	// FromReadError classifies it as denied and names the path.
-	if dir := globDirOf(pattern); a.deniedDirs[dir] {
+	if dir := collect.GlobDir(pattern); a.deniedDirs[dir] {
 		return nil, fmt.Errorf("%s: %w", dir, unix.EACCES)
 	}
 	var out []string
@@ -149,18 +150,6 @@ func (a *fsAccess) Glob(pattern string) ([]string, error) {
 	}
 	slices.Sort(out)
 	return out, nil
-}
-
-// globDirOf is the literal directory a glob pattern lists — the same rule
-// hostAccess.Glob probes (globDir in internal/collect/registry.go), repeated
-// here because the double cannot reach an unexported helper of that package.
-func globDirOf(pattern string) string {
-	p := path.Clean(pattern)
-	i := strings.IndexAny(p, "*?[")
-	if i < 0 {
-		return p
-	}
-	return path.Dir(p[:i+1])
 }
 
 // Llistxattr lists the union of a.xattrs[p] (names with no set value) and
@@ -806,6 +795,30 @@ func TestSshdIncludeGlobFailureIsRecorded(t *testing.T) {
 	}
 	if want := "Include /etc/ssh/sshd_config.d/*.conf: glob boom"; s.Persisted.Reason != want {
 		t.Errorf("reason %q, want %q", s.Persisted.Reason, want)
+	}
+}
+
+// M-49 (extending M-10): before the directory probe, filepath.Glob could only
+// ever fail with ErrBadPattern, so this branch's blanket ErrorEnv was sound.
+// It can now receive an EACCES, and a permission failure is denied, not error
+// — error ranks worst in Builder.Worst, flips run.complete and sends check to
+// exit 2 over a condition that is simply "this run is not root". The reason
+// still names the Include pattern.
+func TestSshdIncludeGlobDeniedIsDeniedNotError(t *testing.T) {
+	a := &fsAccess{
+		files:      map[string]string{"/etc/ssh/sshd_config": "sshd_config"},
+		deniedDirs: map[string]bool{"/etc/ssh/sshd_config.d": true},
+	}
+	b := buildBegun(t, "sshd", a)
+	s := setting(t, b, "sshd.options.permit_root_login")
+	if s.Persisted == nil || s.Persisted.Status != facts.StatusDenied {
+		t.Fatalf("persisted %+v, want denied", s.Persisted)
+	}
+	if !strings.Contains(s.Persisted.Reason, sshdConfigDir) {
+		t.Errorf("reason %q must name %s", s.Persisted.Reason, sshdConfigDir)
+	}
+	if w := b.Worst("sshd"); w != facts.StatusDenied {
+		t.Errorf(`Worst("sshd") = %s, want denied (never error)`, w)
 	}
 }
 
@@ -2992,6 +3005,47 @@ func TestFilesDevExcludesDeeperMounts(t *testing.T) {
 	if !sawShm {
 		t.Error("dev_entries must still list the /dev/shm file (it is excluded only from dev_nondevice)")
 	}
+}
+
+// M-10/M3: the one Glob site that deliberately keeps ignoring its error.
+// `globNonEmpty` feeds backend DETECTION only, and every leaf it could reach
+// has already been filed by the ruleset capture — so with a capture that
+// SUCCEEDED, an unsearchable /etc/firewalld/zones and /etc/nftables must
+// leave firewall.backend ok and put no firewall leaf into error. This is the
+// counterpart of TestXinetdGlobDeniedIsTheAnswer: it pins the decision, so a
+// later change that routes globNonEmpty's error to a fact is caught here
+// rather than in a non-root run's exit code.
+func TestFirewallDeniedGlobKeepsTheCaptureVerdict(t *testing.T) {
+	a := firewallAccess(
+		map[string]string{"/etc/nftables.conf": "nftables.conf"},
+		map[string]cmdResult{nftListRuleset: {file: "nft.ruleset.drop"}},
+	)
+	// The literal directories of firewalldZone and nftablesDropinRHEL.
+	a.deniedDirs = map[string]bool{"/etc/firewalld/zones": true, "/etc/nftables": true}
+	b := buildBegun(t, "firewall", a)
+
+	if e := env(t, b, "firewall.backend"); e.Status != facts.StatusOK || e.Value != "nftables" {
+		t.Errorf("backend %+v, want ok \"nftables\" — the capture, not a config listing, names the backend", e)
+	}
+	for _, k := range collectorKeys(t, b, "firewall") {
+		if e, ok := leaf(t, b, k).(facts.Envelope); ok && e.Status == facts.StatusError {
+			t.Errorf("%s is error (%s); a detection glob that was denied must not make any firewall leaf error", k, e.Reason)
+		}
+	}
+	if w := b.Worst("firewall"); w == facts.StatusError {
+		t.Errorf(`Worst("firewall") = %s, want anything but error`, w)
+	}
+}
+
+// collectorKeys is every key one collector set, so a test can sweep the whole
+// leaf set rather than naming the handful it happens to remember.
+func collectorKeys(t *testing.T, b *collect.Builder, name string) []string {
+	t.Helper()
+	ks := b.Keys(name)
+	if len(ks) == 0 {
+		t.Fatalf("%s set no keys", name)
+	}
+	return ks
 }
 
 // M-10: a /dev this process may not list is not a /dev with nothing in it.

@@ -1788,3 +1788,31 @@ func TestFtpPublishesEveryRegisteredKeyOnAHostWithNoDaemon(t *testing.T) {
 		t.Errorf("Worst(ftp) = %s, want ok", w)
 	}
 }
+
+// M-49 (extending M-10): /etc/vsftpd holds the main file this run parsed AND
+// every other vsftpd instance. A listing the run may not do is not a listing
+// that found no second instance, and Ruling L-24's unsupported — chosen when
+// filepath.Glob could only fail with ErrBadPattern — ranks as ok in
+// Builder.Worst, so it would let U-55 judge one instance's answer as the
+// host's. A permission failure is denied and reaches every judged leaf.
+func TestFtpDeniedInstanceGlobIsDeniedNotUnsupported(t *testing.T) {
+	a := ftpAccess(map[string]string{vsftpdRhelConf: "vsftpd.conf.rhel"})
+	a.deniedDirs = map[string]bool{"/etc/vsftpd": true}
+	b := buildBegun(t, "ftp", a)
+
+	for _, k := range []string{"ftp.local_enabled", "ftp.anonymous_enabled", "ftp.access_files"} {
+		e := env(t, b, k)
+		if e.Status != facts.StatusDenied {
+			t.Errorf("%s %+v, want denied (never unsupported, never error)", k, e)
+		}
+		if !strings.Contains(e.Reason, vsftpdConfGlob) {
+			t.Errorf("%s reason %q must name %s", k, e.Reason, vsftpdConfGlob)
+		}
+	}
+	if e := env(t, b, "ftp.parse_complete"); e.Status != facts.StatusOK || e.Value != false {
+		t.Errorf("parse_complete %+v, want ok false", e)
+	}
+	if got := b.Worst("ftp"); got != facts.StatusDenied {
+		t.Errorf(`Worst("ftp") = %s, want denied`, got)
+	}
+}

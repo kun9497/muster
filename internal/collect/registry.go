@@ -133,14 +133,28 @@ func (hostAccess) ReadFile(p string, limit int64) ([]byte, ReadMeta, error) {
 
 func (hostAccess) Stat(p string) (ReadMeta, error) { return Stat(rewriteProcSelf(p)) }
 
-// globDir is the literal directory a pattern lists: the longest leading part
+// GlobDir is the literal directory a pattern lists: the longest leading part
 // with no "*", "?" or "[", reduced to its parent when the segment that part
 // ends in is the one holding the meta-character. The pattern is cleaned
 // first, so a dynamic pattern carrying a trailing slash still names a
 // directory. A pattern with no meta-character at all is its own answer —
 // filepath.Glob then only stats that one path, and the probe below turns
 // ENOTDIR into a fall-through.
-func globDir(pattern string) string {
+//
+// Two consequences are accepted rather than worked around. A meta-free
+// pattern that names an unsearchable DIRECTORY now reads denied where
+// filepath.Glob returned the name unread; only sshd's Include expansion can
+// hand Glob such a pattern, and an Include naming a directory is unreadable
+// anyway. And only this FIRST literal directory is probed, so a multi-level
+// pattern (/dev/*/*, /var/log/*/*, /home/*/*, /etc/systemd/system/*/*) still
+// drops an EACCES raised on an intermediate directory the expansion walks
+// into — that is the rule M-10 fixes, and widening it would mean listing the
+// tree here rather than probing one path.
+//
+// It is exported so the collectors' test double can key its denied-directory
+// map on the same rule the primitive probes, instead of a hand copy that can
+// silently go stale.
+func GlobDir(pattern string) string {
 	p := path.Clean(pattern)
 	i := strings.IndexAny(p, "*?[")
 	if i < 0 {
@@ -167,7 +181,7 @@ func globDir(pattern string) string {
 // refuses it there (ErrSymlink): Glob does not re-implement the no-follow
 // walk itself, it only ever names candidates.
 func (hostAccess) Glob(pattern string) ([]string, error) {
-	dir := globDir(pattern)
+	dir := GlobDir(pattern)
 	fd, _, err := openNoFollow(dir, unix.O_RDONLY|unix.O_DIRECTORY|unix.O_NOFOLLOW|unix.O_CLOEXEC)
 	switch {
 	case err == nil:
@@ -262,6 +276,12 @@ func readXattr(fd int, name string, size int) ([]byte, error) {
 	n, err := unix.Fgetxattr(fd, name, buf)
 	if err != nil {
 		return nil, err
+	}
+	if n <= 0 {
+		// The attribute was emptied between the sizing call and this read:
+		// nil, like the size <= 0 branch above, so a zero-length value has
+		// one shape however it was reached.
+		return nil, nil
 	}
 	return buf[:n], nil
 }

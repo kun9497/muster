@@ -741,32 +741,69 @@ func TestGetxattrSizesTheBuffer(t *testing.T) {
 // xattrFile creates a regular file carrying one extended attribute and
 // returns its path, skipping the test when no filesystem available to it
 // accepts a user.* attribute (tmpfs before Linux 6.6 refuses them outright).
+//
+// The fallback deliberately stays OUT of the source tree: a killed or
+// panicking run would leave an untracked directory in internal/collect —
+// root-owned when the sudo test job took that branch — and the tree may be a
+// read-only checkout. /var/tmp is on the root filesystem on every
+// distribution muster targets, which is the point: it is a different
+// filesystem from a tmpfs /tmp.
 func xattrFile(t *testing.T, name string, value []byte) string {
 	t.Helper()
 	var last error
-	for _, dir := range []string{t.TempDir(), ""} {
-		if dir == "" {
-			// The module tree, as a second chance when TMPDIR is a
-			// filesystem without user xattrs.
-			d, err := os.MkdirTemp(".", "xattr")
+	for _, base := range []string{"", "/var/tmp", os.Getenv("XDG_RUNTIME_DIR")} {
+		dir := base
+		if base == "" {
+			dir = t.TempDir()
+		} else {
+			if _, err := os.Stat(base); err != nil {
+				continue
+			}
+			d, err := os.MkdirTemp(base, "muster-xattr")
 			if err != nil {
-				t.Fatal(err)
+				continue
 			}
 			t.Cleanup(func() { os.RemoveAll(d) })
-			abs, err := filepath.Abs(d)
-			if err != nil {
-				t.Fatal(err)
-			}
-			dir = abs
+			dir = d
 		}
 		p := filepath.Join(dir, "f")
 		mkfile(t, p, "content", 0o644)
-		if err := unix.Setxattr(p, name, value, 0); err == nil {
+		err := unix.Setxattr(p, name, value, 0)
+		if err == nil {
 			return p
-		} else {
-			last = err
 		}
+		last = err
 	}
 	t.Skipf("no filesystem here accepts a %s attribute: %v", name, last)
 	return ""
+}
+
+// M-10 states GlobDir precisely: clean the pattern first, then take the
+// parent of the segment holding the first meta-character. This table is the
+// only place that rule is pinned — TestHostGlobReportsADeniedDirectory
+// exercises one shape and skips under euid 0, so on a root run nothing else
+// covers it — and the collectors' test double calls the same function, so a
+// change here is a change to every denied-directory test at once. It runs at
+// every privilege level: the rule is pure string arithmetic and touches no
+// host.
+func TestGlobDirIsTheLiteralDirectory(t *testing.T) {
+	for _, c := range []struct{ pattern, want string }{
+		{"/etc/profile.d/*.sh", "/etc/profile.d"}, // the ordinary shape
+		{"/dev/*", "/dev"},                        // one level
+		{"/dev/*/*", "/dev"},                      // only the FIRST literal directory
+		{"/etc/*/x.conf", "/etc"},                 // the meta-character in a middle segment
+		{"/*", "/"},                               // the root directory
+		{"/etc/snmp/snmpd.conf.d/", "/etc/snmp/snmpd.conf.d"}, // a trailing slash is cleaned away
+		{"/var/log//syslog", "/var/log/syslog"},               // meta-free: its own answer, cleaned
+		{"/etc/passwd", "/etc/passwd"},                        // meta-free literal file
+		{"etc/*.conf", "etc"},                                 // relative: openNoFollow then refuses it, so the probe falls through
+		{"/etc/ssh/sshd_config.d/*.conf", "/etc/ssh/sshd_config.d"},
+		{"/var/cache/dnf/*/repodata/repomd.xml", "/var/cache/dnf"},
+		{"/etc/rc?.d/S*", "/etc"}, // "?" counts as a meta-character too
+		{"/etc/[a-z]*.conf", "/etc"},
+	} {
+		if got := GlobDir(c.pattern); got != c.want {
+			t.Errorf("GlobDir(%q) = %q, want %q", c.pattern, got, c.want)
+		}
+	}
 }

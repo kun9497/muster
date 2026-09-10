@@ -258,11 +258,14 @@ func aptCache(a collect.Access) patchCache {
 	var c patchCache
 	matches, err := a.Glob(aptListsGlob)
 	if err != nil {
-		// R220: this collector needs no privilege and files every limitation
-		// as unsupported. An error envelope here would rank worst in
-		// Builder.Worst, flip run.complete and break the collect-contract
-		// leg over a condition the reason already describes.
-		e := collect.Unsupported("glob " + aptListsGlob + ": " + err.Error())
+		// R220: this collector needs no privilege and files every ENVIRONMENT
+		// limitation as unsupported. An error envelope here would rank worst
+		// in Builder.Worst, flip run.complete and break the collect-contract
+		// leg over a condition the reason already describes. M-49: a
+		// directory this run may not search is a privilege failure, not an
+		// environment one, and unsupported — which ranks as ok — would label
+		// a denial "this environment has no such mechanism".
+		e := globReadError(aptListsGlob, err, collect.Unsupported("glob "+aptListsGlob+": "+err.Error()))
 		c.failed = &e
 		return c
 	}
@@ -304,7 +307,8 @@ func dnfCache(a collect.Access) patchCache {
 	var c patchCache
 	matches, err := a.Glob(dnfRepomdGlob)
 	if err != nil {
-		e := collect.Unsupported("glob " + dnfRepomdGlob + ": " + err.Error())
+		// M-49, as in aptCache above.
+		e := globReadError(dnfRepomdGlob, err, collect.Unsupported("glob "+dnfRepomdGlob+": "+err.Error()))
 		c.failed = &e
 		return c
 	}

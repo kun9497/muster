@@ -273,7 +273,10 @@ func Run(ctx context.Context, o Options, stdout io.Writer) (Outcome, error) {
 // claim a reduction that never happened — the field is the set of values
 // that were reduced, not the set of keys that could carry one. The registry
 // is walked in its own order and the result sorted, so the header is
-// byte-identical for two runs that stored the same keys.
+// byte-identical for two runs that stored the same keys. The registry's two
+// secret keys happen to be in sorted order today, so no fixture of registered
+// keys can currently tell the sort apart from registry order; the sort is
+// here for the next secret key, wherever in registry.yaml it lands.
 func redactedFields(b *Builder, reg *facts.Registry) []string {
 	var out []string
 	for _, e := range reg.Keys {

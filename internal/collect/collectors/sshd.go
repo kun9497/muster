@@ -528,8 +528,9 @@ func parseSshdConfig(a collect.Access, file, keyword string, depth int) (facts.E
 					// carried a higher-priority value, so expanding to
 					// nothing and publishing the main file's value as ok
 					// would be a PASS on evidence never seen — the same rule
-					// an unreadable drop-in gets just below.
-					return collect.ErrorEnv("Include " + pattern + ": " + err.Error()), true
+					// an unreadable drop-in gets just below. M-49: a directory
+					// this run may not search is denied, not error.
+					return globReadError(pattern, err, collect.ErrorEnv("Include "+pattern+": "+err.Error())), true
 				}
 				slices.Sort(matches)
 				for _, m := range matches {

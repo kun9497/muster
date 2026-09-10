@@ -843,3 +843,33 @@ func TestSnmpProxyCommunitiesAreRecorded(t *testing.T) {
 	}
 	assertNoSecrets(t, b)
 }
+
+// M-49 (extending M-10): the drop-in directory listing can now fail with a
+// permission error, which is denied — not the ErrorEnv this branch used to
+// give every Glob failure. An error envelope ranks worst in Builder.Worst,
+// flips run.complete and sends check to exit 2 over a condition that is
+// simply "this run is not root", and R220/H-17 already say a root-only read
+// as a non-root user is denied. The judged lists carry it, path-prefixed, so
+// U-61 reads ERROR rather than "v1 is not enabled".
+func TestSnmpDeniedConfDIsDeniedNotError(t *testing.T) {
+	a := snmpAccess(map[string]string{testSnmpdConf: "snmpd.conf.v2c-public"}, nil)
+	a.deniedDirs = map[string]bool{snmpdConfDDir: true}
+	b := buildBegun(t, "snmp", a)
+
+	for _, k := range []string{"snmp.versions_enabled", "snmp.communities", "snmp.v3_users"} {
+		e := env(t, b, k)
+		if e.Status != facts.StatusDenied {
+			t.Errorf("%s %+v, want denied (never error)", k, e)
+		}
+		if !strings.Contains(e.Reason, snmpdConfDGlob) {
+			t.Errorf("%s reason %q must name %s", k, e.Reason, snmpdConfDGlob)
+		}
+	}
+	if e := env(t, b, "snmp.parse_complete"); e.Status != facts.StatusOK || e.Value != false {
+		t.Errorf("parse_complete %+v, want ok false", e)
+	}
+	if got := b.Worst("snmp"); got != facts.StatusDenied {
+		t.Errorf(`Worst("snmp") = %s, want denied`, got)
+	}
+	assertNoSecrets(t, b)
+}
