@@ -521,6 +521,86 @@ func TestEvidenceDoesNotRepeatTheSameReading(t *testing.T) {
 	evidenceHasFact("services.ssh.installed", facts.StatusOK)(t, r)
 }
 
+// syslogPolicyControl mirrors U-66's rsyslog mechanism: an `each` whose
+// `where` filters the rule list by a parameter. It is the shape M-6 is
+// about — the parameter, not the host, decides what gets judged.
+func syslogPolicyControl(facilities []any) controls.Control {
+	return controls.Control{
+		ID: "muster.log.syslog_policy", Importance: "중", Category: "log", Automation: "auto", AbsentMeans: "manual",
+		RequiresFacts: ">=1",
+		Params:        map[string]controls.Param{"facilities": {Type: "list<string>", Default: facilities}},
+		Checks: []controls.Clause{{Fact: "logging.rsyslog.rules", Op: "each", Subject: "facility",
+			Where:   &controls.Clause{Field: "facility", Op: "in", Expected: "${facilities}"},
+			Require: &controls.Clause{Field: "target_kind", Op: "eq", Expected: "file"}}},
+		Remediation: &controls.Remediation{Risk: "none"},
+	}
+}
+
+// M-6: when the `where` that selected nothing is a ${param}, the control
+// judged none of the host's elements and the parameter is the reason. That
+// is not a PASS: it is MANUAL, naming the parameter, the fact and how many
+// elements went unjudged.
+func TestVacuousParamSelectionIsManual(t *testing.T) {
+	c := syslogPolicyControl([]any{"authpriv"})
+	r := Evaluate(snap(t, rsyslogRulesFacts), one(c), reg, Options{})[0]
+	if r.Status != MANUAL || r.ReasonCode != "" {
+		t.Fatalf("status=%s code=%q reason=%q, want MANUAL with no reason code", r.Status, r.ReasonCode, r.Reason)
+	}
+	if want := `parameter "facilities" selected no element of logging.rsyslog.rules (3 elements)`; r.Reason != want {
+		t.Errorf("reason = %q, want %q", r.Reason, want)
+	}
+	// The MANUAL row still shows the reader the fact and the selection.
+	evidenceHasFact("logging.rsyslog.rules", facts.StatusOK)(t, r)
+	if len(r.Observations) != 1 || r.Observations[0].Subject != "item:*" {
+		t.Errorf("observations %+v, want the one item:* selection record", r.Observations)
+	}
+	// A parameter that does select something judges the host as before.
+	if pr := Evaluate(snap(t, rsyslogRulesFacts), one(syslogPolicyControl([]any{"cron"})), reg, Options{})[0]; pr.Status != PASS {
+		t.Errorf("status=%s reason=%q, want PASS once the parameter selects a rule", pr.Status, pr.Reason)
+	}
+}
+
+// M-6 (2F/R204): an EMPTY list is a genuinely empty enumeration, not a
+// parameter that missed — it stays the vacuous PASS it has always been.
+func TestEmptyListStaysAVacuousPass(t *testing.T) {
+	r := Evaluate(snap(t, `{"logging":{"rsyslog":{"rules":{"status":"ok","value":[]}}}}`), one(syslogPolicyControl([]any{"authpriv"})), reg, Options{})[0]
+	if r.Status != PASS {
+		t.Fatalf("status=%s reason=%q, want PASS", r.Status, r.Reason)
+	}
+	if len(r.Observations) != 0 {
+		t.Errorf("an empty enumeration has no element to observe: %+v", r.Observations)
+	}
+}
+
+// M-8: a manual control names the facts a reviewer needs in hand, and the
+// MANUAL result carries them — after whatever applies_when already read, and
+// deduped against it.
+func TestManualControlAttachesItsEvidenceList(t *testing.T) {
+	c := controls.Control{
+		ID: "muster.service.mail_version", Importance: "상", Category: "service", Automation: "manual",
+		ManualReason:  "read the patch state beside the package manager's record of the installed MTA",
+		RequiresFacts: ">=1",
+		AppliesWhen:   controls.ClauseList{{Fact: "services.mail.installed", Op: "eq", Expected: true}},
+		Evidence:      []string{"patch.pending_security_count", "patch.metadata_age_s", "services.mail.installed"},
+	}
+	r := Evaluate(snap(t, `{"services":{"mail":{"installed":{"status":"ok","value":true}}},`+
+		`"patch":{"pending_security_count":{"status":"ok","value":3},"metadata_age_s":{"status":"ok","value":3600}}}`),
+		one(c), reg, Options{})[0]
+	if r.Status != MANUAL {
+		t.Fatalf("status=%s reason=%q, want MANUAL", r.Status, r.Reason)
+	}
+	var got []string
+	for _, ev := range r.Evidence {
+		got = append(got, ev.Fact)
+	}
+	// applies_when's reading first, then the declared list in order, and the
+	// repeated key only once (the dedupe Evaluate already runs).
+	want := "services.mail.installed,patch.pending_security_count,patch.metadata_age_s"
+	if strings.Join(got, ",") != want {
+		t.Errorf("evidence facts = %v, want %s", got, want)
+	}
+}
+
 func TestEvaluateIsolatesPanics(t *testing.T) {
 	customs["__panic"] = func(e *env, c *controls.Control) clauseOutcome { panic("boom") }
 	defer delete(customs, "__panic")

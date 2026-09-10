@@ -51,6 +51,22 @@ func substitute(expected any, params map[string]any) (any, error) {
 	return v, nil
 }
 
+// paramName reports the parameter a raw expected value references, if it is
+// a whole `${name}` reference. substitute() has already replaced the token by
+// the time a clause is judged, so M-6 reads the name off the clause's own
+// unsubstituted value.
+func paramName(expected any) (string, bool) {
+	s, ok := expected.(string)
+	if !ok {
+		return "", false
+	}
+	m := paramRef.FindStringSubmatch(s)
+	if m == nil {
+		return "", false
+	}
+	return m[1], true
+}
+
 // baseType strips setting<...> so comparisons see the inner type.
 func baseType(typ string) string {
 	if strings.HasPrefix(typ, "setting<") {
