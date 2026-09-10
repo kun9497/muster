@@ -24,7 +24,8 @@ muster는 Linux 호스트를 KISA 2026 Unix 서버 가이드에 대조해 점검
 
 1. **뼈대 만들기.** `go run ./cmd/muster controls new muster.<area>.<name> --kisa-id U-NN`
    이 `controls/<area>/<name>.yaml`을 항목의 중요도와 KISA 참조(2026, 그리고 매핑의 2021
-   번호)를 채워 쓰고, `controls/testdata/<id>/`에 픽스처 스텁 두 개를 만듭니다. area는
+   번호)를 채워 쓰고, `controls/testdata/<id>/`에 그 automation이 도달할 수 있는 픽스처
+   스텁(`auto`·`partial`은 `pass-`/`fail-` 한 쌍, `manual`은 `manual-` 하나)을 만듭니다. area는
    `account`, `file`, `service`, `patch`, `log`, `beyond`입니다. 다른 컨트롤이 이미 등재한
    항목과 `docs/reference/kisa/kisa_deferred.json`에 유예된 항목은 거부합니다. 유예 항목을
    등재하려면 먼저 유예 항목에서 지우세요. 현재 인벤토리의 항목은 모두 둘 중 하나이므로,
@@ -37,8 +38,10 @@ muster는 Linux 호스트를 KISA 2026 Unix 서버 가이드에 대조해 점검
    `absent_means`(`pass`, `fail`, `not_applicable`, `manual`)로, 게이트는 `applies_when`으로
    정합니다. `manual` 컨트롤은 `manual_reason`과, 검토자가 앞에 두어야 할 팩트의
    `evidence:` 목록을 가집니다.
-4. **픽스처.** `controls/testdata/<id>/pass-*.json`과 `fail-*.json`은 필수입니다(컨트롤에
-   따라 `manual-*`, `na-*`, `error-*`). 각각은 컨트롤이 읽는 키만 담은 부분 스냅샷이며
+4. **픽스처.** 판정(`checks`나 `mechanisms`)이 있는 컨트롤은 `controls/testdata/<id>/pass-*.json`과
+   `fail-*.json`이 필요하고, `manual` 컨트롤은 모든 `evidence:` 리프를 담은 `manual-*.json`이
+   필요하며 `applies_when` 게이트가 있으면 `na-*.json`도 둡니다(컨트롤에 따라 `error-*`;
+   파일 이름 접두사가 기대 상태입니다). 각각은 컨트롤이 읽는 키만 담은 부분 스냅샷이며
    `"synthetic": true`로 표시합니다. `go run ./cmd/muster snapshot extract --facts <스냅샷>
    --control <id> --out <파일>`이 실제 스냅샷에서 정확히 그 키들만 잘라 냅니다. 값을
    검토하고 호스트를 식별하는 것을 지운 뒤 synthetic으로 표시하세요. `_expect`로
@@ -99,9 +102,11 @@ muster는 Linux 호스트를 KISA 2026 Unix 서버 가이드에 대조해 점검
 
 ## 문서
 
-영문이 정본이며 모든 문서는 같은 커밋에서 갱신되는 `X.ko.md` 쌍을 가집니다. 식별자,
-플래그, 경로는 양쪽 모두 영문으로 둡니다. `CHANGELOG.md`는 영문 전용입니다. 기존
-스냅샷의 판정을 바꾸는 변경은 **Controls** 아래에 기록하고 `controls/VERSION`을 올립니다.
+영문이 정본입니다. 사용자를 향한 문서 — README, 이 문서, 설계 스펙, 그리고 모든 컨트롤의
+제목과 설명 — 는 같은 커밋에서 갱신되는 `X.ko.md`(또는 `_ko`) 쌍을 가지며, `CHANGELOG.md`,
+`CLAUDE.md`, 계획 문서, 보안·저작권 고지는 영문 전용입니다. 식별자, 플래그, 경로는 양쪽
+모두 영문으로 둡니다. 기존 스냅샷의 판정을 바꾸는 변경은 changelog의 **Controls** 아래에
+기록하고 `controls/VERSION`을 올립니다.
 
 ## 커밋과 리뷰
 

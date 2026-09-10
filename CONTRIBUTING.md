@@ -30,7 +30,9 @@ are changing before you change it. Korean: `CONTRIBUTING.ko.md`.
    `go run ./cmd/muster controls new muster.<area>.<name> --kisa-id U-NN`
    writes `controls/<area>/<name>.yaml` with the item's importance and its
    KISA references (2026, and the 2021 number from the mapping) filled in,
-   and two fixture stubs under `controls/testdata/<id>/`. Areas are
+   and the fixture stubs its automation can reach under
+   `controls/testdata/<id>/` (a `pass-`/`fail-` pair for `auto` and
+   `partial`, one `manual-` stub for `manual`). Areas are
    `account`, `file`, `service`, `patch`, `log` and `beyond`. The command
    refuses an item another control already claims and an item listed in
    `docs/reference/kisa/kisa_deferred.json`: to enrol a deferred item,
@@ -47,8 +49,11 @@ are changing before you change it. Korean: `CONTRIBUTING.ko.md`.
    means (`pass`, `fail`, `not_applicable`, `manual`) and `applies_when` for
    the gate. A `manual` control carries `manual_reason` and an `evidence:`
    list of the facts a reviewer needs in front of them.
-4. **Fixtures.** `controls/testdata/<id>/pass-*.json` and `fail-*.json` are
-   required (`manual-*`, `na-*`, `error-*` as the control needs). Each is a
+4. **Fixtures.** A control with a judgment (`checks` or `mechanisms`) needs
+   `controls/testdata/<id>/pass-*.json` and `fail-*.json`; a `manual`
+   control needs `manual-*.json` carrying every `evidence:` leaf, plus
+   `na-*.json` when it has an `applies_when` gate (`error-*` as the control
+   needs; the file-name prefix is the expected status). Each is a
    partial snapshot holding only the keys the control reads, marked
    `"synthetic": true`. `go run ./cmd/muster snapshot extract --facts
    <snapshot> --control <id> --out <file>` cuts exactly those keys out of a
@@ -124,10 +129,13 @@ are changing before you change it. Korean: `CONTRIBUTING.ko.md`.
 
 ## Documentation
 
-English is canonical; every document has a `X.ko.md` pair updated in the
-same commit. Identifiers, flags and paths stay English on both sides.
-`CHANGELOG.md` is English-only; a change that alters a verdict on an existing
-snapshot goes under **Controls** and bumps `controls/VERSION`.
+English is canonical. The user-facing documents — the README, this page,
+the design spec and every control's titles and descriptions — have a
+`X.ko.md` (or `_ko`) pair updated in the same commit; `CHANGELOG.md`,
+`CLAUDE.md`, the plans and the security/attribution notes are English-only.
+Identifiers, flags and paths stay English on both sides. A change that
+alters a verdict on an existing snapshot goes under **Controls** in the
+changelog and bumps `controls/VERSION`.
 
 ## Commits and reviews
 

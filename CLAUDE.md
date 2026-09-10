@@ -54,14 +54,17 @@ and lives behind build tags.
 
 ## Tests
 
-- Every control has `controls/testdata/<id>/pass-*.json` and `fail-*.json`; the prefix is the expected
-  status (`fail-` on a `partial` control expects `WARN`). `_expect` may add `reason_code` and `exit_code`.
+- Every control with a judgment has `controls/testdata/<id>/pass-*.json` and `fail-*.json`; a `manual`
+  control has `manual-*.json` carrying every `evidence:` leaf (plus `na-*.json` when gated). The prefix is
+  the expected status (`fail-` on a `partial` control expects `WARN`). `_expect` may add `reason_code` and
+  `exit_code` — nothing else in it is read.
 - Write the test that drives the caller before the test of the helper. After adding a call site, delete
   the call and confirm the suite goes red; if it stays green, the implementation is tested, not the feature.
 - Assert something that differs when the call is gone. Prefer structural assertions to substrings.
 - Golden files: `go test ./internal/report -run TestJSON -update`, `-run TestTableGolden -update`,
   `go test ./internal/facts -run TestFactsSchemaGolden -update`. Review the diff before committing a
-  regenerated golden; a facts golden change means a `since` entry or a schema version bump.
+  regenerated golden; a facts golden change means a `since` entry or a schema version bump, except a
+  description-only edit, which regenerates the golden with neither (say so in the commit).
 
 ## Documentation
 

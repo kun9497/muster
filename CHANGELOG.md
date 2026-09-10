@@ -55,7 +55,8 @@ Verdict-affecting changes in this version:
 - `muster.account.password_policy` (U-02): an integer pwquality setting whose
   final value does not parse (libpwquality rejects such a configuration)
   makes that leaf `absent` naming the key and value; the control reads FAIL
-  instead of silently using the compiled-in default.
+  instead of silently keeping whatever value was applied before it (the
+  compiled-in default when nothing had set the key).
 
 Stage-2 history of the set (all merged to `main` before this version was cut;
 every plan is under `docs/superpowers/plans/`):
@@ -73,15 +74,19 @@ every plan is under `docs/superpowers/plans/`):
 | 2I logging and time synchronisation | PR #9 | 47 |
 | 2J NFS, SNMP and patch hygiene | PR #10 | 52 |
 | 2L FTP, mail and DNS (the first `manual` controls) | PR #11 | 64 |
-| 2M the coverage and reference gate | this branch | 64 |
+| 2M the coverage and reference gate | this version | 64 |
 
 ### Collectors
 
 - `Glob` over a declared directory the process may not read now reports the
-  denial, and every collector classifies that denial as `denied` (it used to
-  be swallowed as an empty listing, or filed as `error`/`unsupported` at a
-  few sites): `cron.files`/`cron.dirs` read `denied` without root, among
-  others. A non-root run that meets such a directory is now partial.
+  denial, and every collector that lists a declared directory reports it as
+  `denied` (it used to be swallowed as an empty listing, or filed as
+  `error`/`unsupported` at a few sites): `cron.files`/`cron.dirs` read
+  `denied` without root, among others. The firewall presence probe keeps
+  ignoring it, because the ruleset capture reports the same directory, and
+  the rsyslog include listing follows the logging collector's parse-incomplete
+  rule (absent, MANUAL). A non-root run that meets such a directory is now
+  partial.
 - Convention C4: a path muster declined to read is `absent` with the path in
   the reason, never `error` (an sshd `Banner` outside the declaration; an
   interactive home outside the home roots); a declared file that exists but
@@ -99,7 +104,9 @@ every plan is under `docs/superpowers/plans/`):
   KISA inventory (`--kisa docs/reference/kisa`): an unknown id, an importance
   that disagrees with the inventory, an item cited by two controls, an item
   cited by none and not deferred, a deferred item that a control cites, a
-  malformed deferral, and an id repeated inside one control are lint errors.
+  deferral naming something that is not a 2026 item, and an id repeated
+  inside one control are lint errors; a deferral without an id, a stage or a
+  reason is rejected when the inventory loads.
   `shell_valid` may only be judged behind an `accounts.shells present`
   screen in every clause list. The unindexed-reference message names the
   index directory it was given; two index files for one product are
