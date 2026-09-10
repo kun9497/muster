@@ -34,7 +34,12 @@ var filesCollector = collect.Collector{
 // /home/* and /root, the deeper home root /home/*/* (R187, so a home one
 // level down such as /home/dept/alice is declared rather than reported
 // unexaminable), and the per-home dotfile globs for every env-file name plus
-// .rhosts/.shosts under both /home/*/ and /root/.
+// .rhosts/.shosts under /home/*/, /home/*/*/ and /root/. The dotfile globs
+// MIRROR the declared home roots (M-53): a root that is declared but whose
+// dotfiles are not would be stat'd and then have its .rhosts and shell files
+// silently skipped, which is the vacuous PASS C4 exists to prevent. A home
+// deeper than the declared roots stays undeclared on purpose - the enumerations
+// then name it and go absent (M-52).
 func filesReads() []string {
 	reads := []string{passwdPath, shadowPath, securettyPath, groupPath, hostsPath, servicesPath, hostsLpdPath, exportsPath}
 	reads = append(reads, hostsEquivPath, hostsAllowPath, hostsDenyPath, shellsPath, "/proc/self/mountinfo")
@@ -56,7 +61,7 @@ func filesReads() []string {
 	reads = append(reads, varLogDir, varLogGlob1, varLogGlob2)
 	dotfiles := append(append([]string{}, userEnvNames...), ".rhosts", ".shosts")
 	for _, name := range dotfiles {
-		reads = append(reads, "/home/*/"+name, "/root/"+name)
+		reads = append(reads, "/home/*/"+name, "/home/*/*/"+name, "/root/"+name)
 	}
 	// The TCP wrappers library, declared literally: files.libwrap_present is
 	// a presence probe over the paths its shared object lives at (L-9).

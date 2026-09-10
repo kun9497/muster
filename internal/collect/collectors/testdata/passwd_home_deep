@@ -1,0 +1,2 @@
+root:x:0:0:root:/root:/bin/bash
+deep:x:1001:1001:Deep:/home/a/b/c:/bin/bash

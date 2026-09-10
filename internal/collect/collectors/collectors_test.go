@@ -3336,3 +3336,67 @@ func TestSiblingHomeLeavesFollowTheUndeclaredHomeRule(t *testing.T) {
 		t.Errorf("a read error must outrank the undeclared-home absence: %+v", e)
 	}
 }
+
+// M-53: the per-home dotfile declarations mirror the declared home ROOTS. R187
+// declares /home/*/* as a home root, so a home one level down (/home/dept/alice)
+// is stat'd — but its .rhosts and its shell dotfiles were only declared under
+// /home/*/ and /root/, so U-27 and U-24 saw nothing there. With the dotfiles of
+// a nested root declared they are examined like any other home's; a home DEEPER
+// than the declared roots is still declined, which M-52 turns into the absence
+// that reads MANUAL rather than a clean pass.
+func TestNestedHomeRootDotfilesAreDeclared(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{
+			"/etc/passwd": "passwd_home_nested", "/etc/shells": "shells_home",
+			"/proc/self/mountinfo":     "mountinfo",
+			"/home/dept/alice/.rhosts": "home_alice_rhosts", // holds a bare "+"
+			"/home/dept/alice/.bashrc": "home_alice_bashrc",
+		},
+		stats: map[string]statResult{
+			"/root":                    {mode: 0o700, kind: "dir"},
+			"/home/dept/alice":         {mode: 0o700, uid: 1000, gid: 1000, kind: "dir"},
+			"/home/dept/alice/.rhosts": {mode: 0o600, uid: 1000, kind: "regular"},
+			"/home/dept/alice/.bashrc": {mode: 0o644, uid: 1000, kind: "regular"},
+		},
+	}
+	b := build(t, "files", a)
+	// okList fails the test if either leaf went absent, which is what an
+	// undeclared dotfile set produces (M-52).
+	rh := okList(t, b, "files.user_rhosts")
+	if len(rh) != 1 {
+		t.Fatalf("user_rhosts %v, want the nested home's .rhosts", rh)
+	}
+	row := rh[0].(map[string]any)
+	if row["path"] != "/home/dept/alice/.rhosts" || row["has_plus"] != true {
+		t.Errorf("the nested .rhosts must be read and its \"+\" recorded: %v", row)
+	}
+	found := false
+	for _, r := range okList(t, b, "files.env_files") {
+		if r.(map[string]any)["path"] == "/home/dept/alice/.bashrc" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("the nested home's .bashrc must be a row: %v", okList(t, b, "files.env_files"))
+	}
+	okList(t, b, "files.home_dirs") // the home root itself was already declared (R187)
+
+	// A home DEEPER than /home/*/* is outside every declared root: the three
+	// leaves name it and go absent rather than passing over files muster never
+	// looked at.
+	deep := &fsAccess{
+		files: map[string]string{
+			"/etc/passwd": "passwd_home_deep", "/etc/shells": "shells_home",
+			"/proc/self/mountinfo": "mountinfo",
+		},
+		stats: map[string]statResult{"/root": {mode: 0o700, kind: "dir"}},
+	}
+	bd := build(t, "files", deep)
+	want := "home path outside the collector's declaration: deep (/home/a/b/c)"
+	for _, k := range []string{"files.home_dirs", "files.user_rhosts", "files.env_files"} {
+		e := env(t, bd, k)
+		if e.Status != facts.StatusAbsent || e.Reason != want {
+			t.Errorf("%s = %+v, want absent with %q", k, e, want)
+		}
+	}
+}
