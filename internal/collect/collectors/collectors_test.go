@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path"
@@ -47,6 +48,12 @@ type fsAccess struct {
 	xattrValues map[string]map[string][]byte // host path -> attribute name -> value, served by Getxattr
 	writable    map[string]bool              // host path -> Writable answer
 	globErr     error                        // when set, every Glob fails with it
+
+	// deniedDirs are the literal glob directories this process may not
+	// search: a pattern whose literal directory (globDirOf, the rule
+	// hostAccess.Glob probes) is listed fails the way the host primitive
+	// fails, rather than matching nothing (M-10).
+	deniedDirs map[string]bool
 
 	// reads records every path ReadFile was asked for, so a test can assert
 	// that a collector did NOT go looking for something it did not need.
@@ -121,6 +128,14 @@ func (a *fsAccess) Glob(pattern string) ([]string, error) {
 	if a.globErr != nil {
 		return nil, a.globErr
 	}
+	// M-10: the host primitive probes the pattern's literal directory and
+	// reports a directory this process may not search instead of returning an
+	// empty list. The double mirrors that, wrapping the errno with the
+	// directory exactly as hostAccess.Glob does, so every caller's
+	// FromReadError classifies it as denied and names the path.
+	if dir := globDirOf(pattern); a.deniedDirs[dir] {
+		return nil, fmt.Errorf("%s: %w", dir, unix.EACCES)
+	}
 	var out []string
 	for p := range a.files {
 		if ok, _ := path.Match(pattern, p); ok {
@@ -134,6 +149,18 @@ func (a *fsAccess) Glob(pattern string) ([]string, error) {
 	}
 	slices.Sort(out)
 	return out, nil
+}
+
+// globDirOf is the literal directory a glob pattern lists — the same rule
+// hostAccess.Glob probes (globDir in internal/collect/registry.go), repeated
+// here because the double cannot reach an unexported helper of that package.
+func globDirOf(pattern string) string {
+	p := path.Clean(pattern)
+	i := strings.IndexAny(p, "*?[")
+	if i < 0 {
+		return p
+	}
+	return path.Dir(p[:i+1])
 }
 
 // Llistxattr lists the union of a.xattrs[p] (names with no set value) and
@@ -1198,6 +1225,27 @@ func TestCronSpoolDirIsNotAFileRow(t *testing.T) {
 	}
 }
 
+// M-10: /var/spool/cron/crontabs is 1730 on the Debian family, so a non-root
+// run may not list it. The collector already routes a Glob error to both
+// keys; what it never used to see is the error itself — filepath.Glob
+// swallowed the EACCES and answered "no crontabs here", which is a clean
+// empty cron.files a control reads as a PASS. With the directory probed, the
+// listing failure reaches cron.files and cron.dirs as denied.
+func TestCronDeniedSpoolIsDenied(t *testing.T) {
+	a := &fsAccess{
+		files:      map[string]string{"/etc/crontab": "crontab", "/etc/group": "group"},
+		dirs:       map[string]bool{"/var/spool/cron/crontabs": true},
+		stats:      map[string]statResult{"/etc/crontab": {mode: 0o644, uid: 0, kind: "regular"}},
+		deniedDirs: map[string]bool{"/var/spool/cron/crontabs": true},
+	}
+	b := build(t, "cron", a)
+	for _, k := range []string{"cron.files", "cron.dirs"} {
+		if e := env(t, b, k); e.Status != facts.StatusDenied {
+			t.Errorf("%s: %+v, want denied — an unlistable spool is not an empty one", k, e)
+		}
+	}
+}
+
 // The systemd timer inventory parses the systemctl table; a systemctl failure
 // is the command's error, not an empty list.
 func TestCronTimersInventoryAndFailure(t *testing.T) {
@@ -1800,6 +1848,22 @@ func TestServicesTelnetInstalledFromXinetdAndReachable(t *testing.T) {
 	}
 	if env(t, b, "services.telnet.reachable").Value != true {
 		t.Errorf("reachable %+v", env(t, b, "services.telnet.reachable"))
+	}
+}
+
+// M-10: /etc/xinetd.d that cannot be listed could hold the fragment that
+// enables telnet, so "no super-server entry" would be a guess. readXinetd
+// used to discard the Glob error entirely (`paths, _ :=`); it now notes it,
+// and the note is the envelope every leaf a fragment could have set carries
+// (R227) — the same treatment an unreadable fragment already got.
+func TestXinetdGlobDeniedIsTheAnswer(t *testing.T) {
+	a := servicesAccess(map[string]string{"/proc/self/net/tcp": "proc_net_tcp"}, allUnitsNotFound())
+	a.deniedDirs = map[string]bool{"/etc/xinetd.d": true}
+	b := build(t, "services", a)
+	for _, k := range []string{"services.telnet.installed", "services.telnet.enabled", "services.telnet.active"} {
+		if e := env(t, b, k); e.Status != facts.StatusDenied {
+			t.Errorf("%s: %+v, want denied — an unlistable /etc/xinetd.d is not an empty one", k, e)
+		}
 	}
 }
 
@@ -2514,6 +2578,29 @@ func TestEnvEffectiveTMOUT(t *testing.T) {
 	}
 }
 
+// C3/M-10: /etc/profile.d is where a TMOUT or a umask is usually set, so a
+// directory this process may not list is the answer for every value those
+// drop-ins could have set — not a value derived from /etc/profile alone.
+// profileReadOrder used to ignore the Glob error (`if ..., err == nil`),
+// leaving env.shell.tmout ok:600 from the main profile while the drop-in
+// that overrides it was never seen.
+func TestProfileDDeniedIsTheAnswer(t *testing.T) {
+	a := &fsAccess{
+		files:      map[string]string{"/etc/profile": "profile"}, // TMOUT=600; export TMOUT
+		deniedDirs: map[string]bool{"/etc/profile.d": true},
+	}
+	b := build(t, "env", a)
+	for _, k := range envShellKeys {
+		e := env(t, b, k)
+		if e.Status != facts.StatusDenied {
+			t.Errorf("%s: %+v, want denied", k, e)
+		}
+		if !strings.HasPrefix(e.Reason, profileDGlob+":") {
+			t.Errorf("%s: reason %q must name %s (C3, path-prefixed)", k, e.Reason, profileDGlob)
+		}
+	}
+}
+
 // A conditional umask does not win and is flagged; a system-scope and a
 // root-scope umask are both recorded with the right scope.
 func TestEnvUmaskSettings(t *testing.T) {
@@ -2904,6 +2991,26 @@ func TestFilesDevExcludesDeeperMounts(t *testing.T) {
 	}
 	if !sawShm {
 		t.Error("dev_entries must still list the /dev/shm file (it is excluded only from dev_nondevice)")
+	}
+}
+
+// M-10: a /dev this process may not list is not a /dev with nothing in it.
+// The walk used to drop the Glob error on the floor and publish an empty
+// dev_nondevice — the vacuous PASS for U-26 that files.go already refuses
+// when /proc/self/mountinfo cannot be read. The listing failure is now the
+// answer on both dev keys, exactly as the mountinfo failure is.
+func TestDevGlobDeniedIsTheAnswer(t *testing.T) {
+	a := &fsAccess{
+		files:      map[string]string{"/proc/self/mountinfo": "mountinfo_dev", "/dev/planted": ""},
+		dirs:       map[string]bool{"/dev": true},
+		stats:      map[string]statResult{"/dev/planted": {mode: 0o644, kind: "regular"}},
+		deniedDirs: map[string]bool{"/dev": true},
+	}
+	b := build(t, "files", a)
+	for _, k := range []string{"files.dev_entries", "files.dev_nondevice"} {
+		if e := env(t, b, k); e.Status != facts.StatusDenied {
+			t.Errorf("%s: %+v, want denied — an unlistable /dev is not a clean one", k, e)
+		}
 	}
 }
 

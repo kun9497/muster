@@ -133,11 +133,50 @@ func (hostAccess) ReadFile(p string, limit int64) ([]byte, ReadMeta, error) {
 
 func (hostAccess) Stat(p string) (ReadMeta, error) { return Stat(rewriteProcSelf(p)) }
 
-// Glob is filepath.Glob. A match reached through a symlinked directory is
+// globDir is the literal directory a pattern lists: the longest leading part
+// with no "*", "?" or "[", reduced to its parent when the segment that part
+// ends in is the one holding the meta-character. The pattern is cleaned
+// first, so a dynamic pattern carrying a trailing slash still names a
+// directory. A pattern with no meta-character at all is its own answer —
+// filepath.Glob then only stats that one path, and the probe below turns
+// ENOTDIR into a fall-through.
+func globDir(pattern string) string {
+	p := path.Clean(pattern)
+	i := strings.IndexAny(p, "*?[")
+	if i < 0 {
+		return p
+	}
+	return path.Dir(p[:i+1])
+}
+
+// Glob is filepath.Glob, with the directory it is about to list probed
+// first (M-10). filepath.Glob discards the EACCES it gets from a directory
+// this process may not search and answers with an empty list, so a non-root
+// run reads "there is nothing there" where the honest answer is "we were
+// not allowed to look" — a clean empty list is exactly what a control reads
+// as a PASS. The probe opens the pattern's literal directory through the
+// same no-follow primitive every other read goes through and returns the
+// denial named by that directory; the wrapped Errno satisfies
+// errors.Is(err, fs.ErrPermission), so each caller's FromReadError files it
+// as denied without any of them learning a new error shape.
+//
+// ANY other probe outcome falls through to filepath.Glob unchanged —
+// success, ENOENT, ENOTDIR, ErrSymlink, ELOOP, a relative or unclean
+// pattern. In particular a match reached through a symlinked directory is
 // still read through ReadFile/Stat afterward, and the read primitive
-// refuses it there (ErrSymlink) — Glob does not need to re-implement the
-// no-follow walk itself, it only ever names candidates.
-func (hostAccess) Glob(pattern string) ([]string, error) { return filepath.Glob(pattern) }
+// refuses it there (ErrSymlink): Glob does not re-implement the no-follow
+// walk itself, it only ever names candidates.
+func (hostAccess) Glob(pattern string) ([]string, error) {
+	dir := globDir(pattern)
+	fd, _, err := openNoFollow(dir, unix.O_RDONLY|unix.O_DIRECTORY|unix.O_NOFOLLOW|unix.O_CLOEXEC)
+	switch {
+	case err == nil:
+		unix.Close(fd)
+	case errors.Is(err, unix.EACCES), errors.Is(err, unix.EPERM):
+		return nil, fmt.Errorf("%s: %w", dir, err)
+	}
+	return filepath.Glob(pattern)
+}
 
 // Llistxattr lists a file's extended attributes without following a symlink
 // in any path component. It opens the path through the same no-follow
@@ -180,15 +219,46 @@ func splitXattrNames(buf []byte) []string {
 // Getxattr returns the value of one extended attribute of p, opened through
 // the same no-follow primitive Llistxattr uses. ENODATA/EOPNOTSUPP propagate
 // unchanged so the caller (aclEntries) can tell "not set" from a real
-// failure. A value larger than the 64 KiB buffer returns ERANGE, which the
-// caller reports as an error envelope, never a silently truncated value.
+// failure.
+//
+// M-11: the buffer is sized from the attribute itself — Fgetxattr with a nil
+// destination returns the value's length — and allocated exactly, the way
+// Llistxattr already sizes its name list, rather than reserving a flat
+// 64 KiB for every ACL probe. The value can still grow between the two
+// calls, which the kernel reports as ERANGE; that is re-sized once and read
+// again, and a second ERANGE is returned to the caller as the error it is,
+// never a silently truncated value.
 func (hostAccess) Getxattr(p, name string) ([]byte, error) {
 	fd, _, err := openNoFollow(rewriteProcSelf(p), openFlags)
 	if err != nil {
 		return nil, err
 	}
 	defer unix.Close(fd)
-	buf := make([]byte, 64<<10)
+	size, err := unix.Fgetxattr(fd, name, nil)
+	if err != nil {
+		return nil, err
+	}
+	v, err := readXattr(fd, name, size)
+	if errors.Is(err, unix.ERANGE) {
+		if size, err = unix.Fgetxattr(fd, name, nil); err != nil {
+			return nil, err
+		}
+		v, err = readXattr(fd, name, size)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return v, nil
+}
+
+// readXattr reads one attribute into a buffer of exactly size bytes. A zero
+// size is an empty attribute: there is nothing to read, and a zero-length
+// destination would make Fgetxattr a second sizing call rather than a read.
+func readXattr(fd int, name string, size int) ([]byte, error) {
+	if size <= 0 {
+		return nil, nil
+	}
+	buf := make([]byte, size)
 	n, err := unix.Fgetxattr(fd, name, buf)
 	if err != nil {
 		return nil, err
