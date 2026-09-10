@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io/fs"
 	"path"
+	"slices"
 	"strings"
 
 	"github.com/kun9497/muster/internal/collect"
@@ -26,6 +27,11 @@ func interactive(shell string, shells map[string]bool) bool {
 
 func homeDirs(a collect.Access, rows []passwdRow, shells map[string]bool, mounts mountTable) facts.Envelope {
 	out := []any{}
+	// undeclared names the INTERACTIVE accounts whose home muster declined to
+	// examine (M-12/M-32). Their homes cannot be judged at all, so the whole
+	// leaf becomes absent below rather than shipping denied rows U-31/U-32
+	// would read as a finding.
+	var undeclared []string
 	for _, r := range rows {
 		// R176: initialise EVERY field the controls where/require on, defaulted,
 		// BEFORE the branch, so U-31/U-32's `each … require` never compares an
@@ -46,6 +52,9 @@ func homeDirs(a collect.Access, rows []passwdRow, shells map[string]bool, mounts
 		// examined under our declaration: record it as denied with a reason,
 		// never as absent (which absent_means could excuse).
 		if r.home == "" || !declared(a, r.home) {
+			if interactive(r.shell, shells) {
+				undeclared = append(undeclared, r.name+" ("+r.home+")")
+			}
 			rec["stat_status"] = "denied"
 			rec["reason"] = "home path outside the collector's declaration"
 			out = append(out, rec)
@@ -76,7 +85,21 @@ func homeDirs(a collect.Access, rows []passwdRow, shells map[string]bool, mounts
 		}
 		out = append(out, rec)
 	}
-	return collect.OK(out, &facts.Source{Kind: "file", Path: passwdPath})
+	src := &facts.Source{Kind: "file", Path: passwdPath}
+	// M-12/M-32 (convention C4): a path muster CHOSE not to read is absent with
+	// the path in the reason, never a denied row. An interactive home outside
+	// the declaration is unexaminable, so the leaf as a whole is absent and
+	// names each account (sorted by user, so the same host produces the same
+	// bytes); U-31/U-32 then read MANUAL rather than the false FAIL a denied
+	// row would produce. A NON-interactive account (/nonexistent on every stock
+	// host) keeps its denied row and leaves the leaf ok.
+	if len(undeclared) > 0 {
+		slices.Sort(undeclared)
+		e := collect.Absent("home path outside the collector's declaration: " + strings.Join(undeclared, ", "))
+		e.Source = src
+		return e
+	}
+	return collect.OK(out, src)
 }
 
 // systemEnvFiles are the fixed system-scope shell environment files; userEnv
@@ -150,13 +173,23 @@ func envSymlinkRow(p, scope, homeUser string) map[string]any {
 // or begins "+ "), entry_count.
 func userRhosts(a collect.Access, rows []passwdRow, shells map[string]bool) facts.Envelope {
 	out := []any{}
+	// readErr is the FIRST .rhosts/.shosts that EXISTS but this process cannot
+	// read (M-13/M-30, convention C3): it becomes the whole leaf, because a
+	// dropped row would let U-27 pass on a file nobody could see. It is local
+	// to this call — never a package-level variable — so one host's denied read
+	// cannot leak into the next collection.
+	var readErr *facts.Envelope
 	scan := func(p, homeUser string, ownerUID int) {
 		if !declared(a, p) {
 			return
 		}
 		data, meta, err := a.ReadFile(p, readLimit)
 		if err != nil {
-			return // absent or denied: no row (a denied .rhosts is not itself a finding; the file may not exist)
+			if !errors.Is(err, fs.ErrNotExist) && readErr == nil {
+				e := readErrorEnv(p, err)
+				readErr = &e
+			}
+			return // ENOENT: no row, the file need not exist
 		}
 		plus, count := false, 0
 		for _, l := range splitLines(data) {
@@ -181,6 +214,12 @@ func userRhosts(a collect.Access, rows []passwdRow, shells map[string]bool) fact
 		}
 		scan(path.Join(r.home, ".rhosts"), r.name, r.uid)
 		scan(path.Join(r.home, ".shosts"), r.name, r.uid)
+	}
+	if readErr != nil {
+		// The read's status is the answer for the leaf, path-prefixed and
+		// carrying no source list (the precedent passwdRows and untrustedShells
+		// set for an enumeration that could not be completed).
+		return *readErr
 	}
 	return collect.OK(out, &facts.Source{Kind: "file", Path: passwdPath})
 }

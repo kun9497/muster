@@ -376,7 +376,10 @@ func writeBannerFile(a collect.Access, b *collect.Builder, p string) {
 	// Include expansion sets); a stock Banner (/etc/issue.net, /etc/issue)
 	// is declared and read normally.
 	if !declared(a, p) {
-		e := collect.ErrorEnv("Banner " + p + " is outside the collector's declaration")
+		// M-12 (convention C4): a path muster CHOSE not to read is absent with
+		// the path in the reason, never an error — the run stays complete and
+		// U-62 reads MANUAL through its absent_means rather than ERROR.
+		e := collect.Absent("Banner " + p + " is outside the collector's declaration: recorded, never read")
 		e.Source = src
 		b.Set("sshd.banner_file.exists", e)
 		b.Set("sshd.banner_file.nonempty", e)

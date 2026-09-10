@@ -501,9 +501,11 @@ func TestSshdIncludeSourcesRecordedInExpansionOrder(t *testing.T) {
 	}
 }
 
-// R168: a Banner path outside Declare.Reads must be refused by the guard's
-// Allowed and recorded as an error, never read. build() wraps the access in
-// collect.Guard, so Allowed is live here (mirrors
+// R168, and M-12's convention C4: a Banner path outside Declare.Reads must be
+// refused by the guard's Allowed and RECORDED, never read — and a path muster
+// chose not to read is ABSENT with the path in the reason, not an error, so
+// U-62 reads MANUAL through its absent_means and the run stays complete.
+// build() wraps the access in collect.Guard, so Allowed is live here (mirrors
 // TestSshdIncludeOutsideDeclarationIsRecordedNotViolated).
 func TestSshdBannerOutsideDeclarationIsRecordedNotRead(t *testing.T) {
 	a := &fsAccess{files: map[string]string{
@@ -512,15 +514,18 @@ func TestSshdBannerOutsideDeclarationIsRecordedNotRead(t *testing.T) {
 	b := build(t, "sshd", a) // build fails the test on any guard violation
 	for _, key := range []string{"sshd.banner_file.exists", "sshd.banner_file.nonempty"} {
 		e := env(t, b, key)
-		if e.Status != facts.StatusError {
-			t.Errorf("%s %+v, want error", key, e)
+		if e.Status != facts.StatusAbsent {
+			t.Errorf("%s %+v, want absent — a path muster declined to read is not an error", key, e)
 		}
-		if !strings.Contains(e.Reason, "/root/secret") || !strings.Contains(e.Reason, "outside the collector's declaration") {
+		if e.Reason != "Banner /root/secret is outside the collector's declaration: recorded, never read" {
 			t.Errorf("%s reason %q", key, e.Reason)
 		}
 	}
 	if slices.Contains(a.reads, "/root/secret") {
 		t.Errorf("an undeclared Banner path must never be read: reads = %v", a.reads)
+	}
+	if w := b.Worst("sshd"); w != facts.StatusOK {
+		t.Errorf(`Worst("sshd") = %s, want ok — declining to read a path must not make the run partial`, w)
 	}
 }
 
@@ -3181,5 +3186,105 @@ func TestHostsDenyUnreadableIsNotSilentFalse(t *testing.T) {
 	// hosts.allow is read independently and is unaffected.
 	if e := env(t, b, "files.etc_hosts_allow_lines"); e.Status != facts.StatusOK {
 		t.Errorf("etc_hosts_allow_lines should be unaffected: %+v", e)
+	}
+}
+
+// M-12/M-32 (convention C4): a path muster CHOSE not to read is not an error.
+// An INTERACTIVE account whose home lies outside the collector's declaration
+// cannot be judged at all, so the whole files.home_dirs leaf is absent and
+// names each such account — U-31/U-32 then read MANUAL through their
+// absent_means, never the false FAIL a denied row would produce. A
+// NON-interactive account with an undeclared home (/nonexistent on every
+// stock host) keeps its denied row and the leaf stays ok.
+func TestHomeOutsideTheDeclarationMakesTheLeafAbsent(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{
+			"/etc/passwd": "passwd_home_undeclared", "/etc/shells": "shells_home",
+			"/proc/self/mountinfo": "mountinfo",
+		},
+		dirs:  map[string]bool{"/root": true},
+		stats: map[string]statResult{"/root": {mode: 0o700, uid: 0, gid: 0, kind: "dir"}},
+	}
+	e := env(t, build(t, "files", a), "files.home_dirs")
+	if e.Status != facts.StatusAbsent {
+		t.Fatalf("files.home_dirs %+v, want absent — an unexaminable interactive home is not a finding", e)
+	}
+	// Sorted by user, so two hosts with the same accounts produce the same
+	// bytes; svc is non-interactive and must not be named.
+	want := "home path outside the collector's declaration: app (/srv/app), zed (/opt/zed)"
+	if e.Reason != want {
+		t.Errorf("reason %q, want %q", e.Reason, want)
+	}
+
+	// A non-interactive account with an undeclared home keeps today's denied
+	// row and leaves the leaf ok (M-32) — okList fails the test if it is not.
+	b := &fsAccess{
+		files: map[string]string{
+			"/etc/passwd": "passwd_home", "/etc/shells": "shells_home",
+			"/proc/self/mountinfo": "mountinfo",
+		},
+		dirs:  map[string]bool{"/root": true, "/home/alice": true},
+		stats: map[string]statResult{"/root": {mode: 0o700, kind: "dir"}, "/home/alice": {mode: 0o755, uid: 1000, gid: 1000, kind: "dir"}},
+	}
+	var svc map[string]any
+	for _, r := range okList(t, build(t, "files", b), "files.home_dirs") {
+		if m := r.(map[string]any); m["user"] == "svc" {
+			svc = m
+		}
+	}
+	if svc == nil || svc["stat_status"] != "denied" {
+		t.Fatalf("a non-interactive undeclared home keeps its denied row: %v", svc)
+	}
+	if svc["reason"] != "home path outside the collector's declaration" {
+		t.Errorf("svc row reason %v", svc["reason"])
+	}
+}
+
+// M-13/M-30 (convention C3): a .rhosts/.shosts that EXISTS but cannot be read
+// is the answer for the whole files.user_rhosts leaf — the read's status with
+// the path in front of the reason — never a dropped row that would let U-27
+// pass on a file nobody could see. ENOENT stays "no row".
+func TestUnreadableRhostsIsDenied(t *testing.T) {
+	base := func() *fsAccess {
+		return &fsAccess{
+			files: map[string]string{
+				"/etc/passwd": "passwd_home", "/etc/shells": "shells_home",
+				"/proc/self/mountinfo": "mountinfo",
+			},
+			fails: map[string]error{},
+		}
+	}
+	// EACCES on an existing .rhosts -> denied, path-prefixed.
+	a := base()
+	a.fails["/home/bob/.rhosts"] = os.ErrPermission
+	e := env(t, build(t, "files", a), "files.user_rhosts")
+	if e.Status != facts.StatusDenied {
+		t.Errorf("an unreadable .rhosts must make the leaf denied: %+v", e)
+	}
+	if !strings.HasPrefix(e.Reason, "/home/bob/.rhosts: ") {
+		t.Errorf("reason %q must name the file that could not be read", e.Reason)
+	}
+	// A symlinked (non-regular) .shosts is error, not denied — FromReadError
+	// classifies, this code only prefixes the path.
+	a = base()
+	a.fails["/home/alice/.shosts"] = collect.ErrSymlink
+	e = env(t, build(t, "files", a), "files.user_rhosts")
+	if e.Status != facts.StatusError || !strings.HasPrefix(e.Reason, "/home/alice/.shosts: ") {
+		t.Errorf("a symlinked .shosts must be error with the path: %+v", e)
+	}
+	// The FIRST read error wins, and it is held per call: alice is scanned
+	// before bob, so alice's denied read is the answer even though bob's is a
+	// different class.
+	a = base()
+	a.fails["/home/alice/.rhosts"] = os.ErrPermission
+	a.fails["/home/bob/.rhosts"] = collect.ErrSymlink
+	e = env(t, build(t, "files", a), "files.user_rhosts")
+	if e.Status != facts.StatusDenied || !strings.HasPrefix(e.Reason, "/home/alice/.rhosts: ") {
+		t.Errorf("the first read error must win: %+v", e)
+	}
+	// A later, clean run must not inherit it (the state is a local, never a
+	// package-level variable), and ENOENT is still "no row".
+	if got := okList(t, build(t, "files", base()), "files.user_rhosts"); len(got) != 0 {
+		t.Errorf("a host with no .rhosts anywhere is an empty ok list, not %v", got)
 	}
 }
