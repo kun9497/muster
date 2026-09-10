@@ -889,3 +889,71 @@ func TestPAMAccessFactsFollowTheStackStatus(t *testing.T) {
 		}
 	}
 }
+
+// M-14/M-23: pwquality's conf and its conf.d drop-ins merge through the SHARED
+// drop-in helper, so the chain resolves the way every other drop-in reader in
+// this collector resolves one — the main file first, then the directory in
+// lexicographic basename order, last write wins per key — with pwquality's own
+// parser, in which a bare word is a flag (parseDropin would drop the line).
+// R148 still holds: the first file that exists but cannot be read is the answer
+// for every value the chain could set.
+func TestPwqualityDropinsMergeLikeSystemd(t *testing.T) {
+	chain := func() *fsAccess {
+		a := rockyPAM()
+		// The stack without a minlen= argument, so the files decide (the module
+		// argument's precedence is TestPAMPwqualityPrecedence's subject).
+		a.files["/etc/authselect/system-auth"] = "pam/rocky/authselect-password-auth"
+		a.files[pwqualityConf] = "pam/rocky/pwquality.conf"                                // minlen 8, minclass 4, dcredit 0
+		a.files["/etc/security/pwquality.conf.d/10-a.conf"] = "pam/rocky/dropin-10-a.conf" // minlen 10, minclass 3, ucredit -1
+		a.files["/etc/security/pwquality.conf.d/20-b.conf"] = "pam/rocky/dropin-20-b.conf" // minlen 16, bare enforce_for_root
+		return a
+	}
+	b := build(t, "pam", chain())
+	for _, c := range []struct {
+		key  string
+		want int
+	}{{"minlen", 16}, {"minclass", 3}, {"ucredit", -1}, {"dcredit", 0}} {
+		if e := env(t, b, "pam.pwquality."+c.key); e.Status != facts.StatusOK || e.Value != c.want {
+			t.Errorf("%s = %+v, want %d (the last file to set a key wins)", c.key, e, c.want)
+		}
+	}
+	// M-23: a bare word is a flag in pwquality's syntax; a merge that used the
+	// systemd parser would drop the line and read the flag as unset.
+	if e := env(t, b, "pam.pwquality.enforce_for_root"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("a bare enforce_for_root line in a drop-in sets the flag: %+v", e)
+	}
+	// The inputs are the files actually read, in the order they were applied,
+	// then the stack line the module was loaded from.
+	wantInputs := []string{
+		pwqualityConf,
+		"/etc/security/pwquality.conf.d/10-a.conf",
+		"/etc/security/pwquality.conf.d/20-b.conf",
+		"/etc/authselect/system-auth",
+	}
+	if got := sourcePaths(t, env(t, b, "pam.pwquality.minlen")); !slices.Equal(got, wantInputs) {
+		t.Errorf("inputs %v, want %v", got, wantInputs)
+	}
+	// R148: a drop-in that exists but cannot be read is the answer for every
+	// derived value — never the surviving files' numbers dressed up as ok.
+	a := chain()
+	a.fails["/etc/security/pwquality.conf.d/10-a.conf"] = os.ErrPermission
+	b = build(t, "pam", a)
+	for _, k := range passwordKeys[1:10] {
+		e := env(t, b, k)
+		if e.Status != facts.StatusDenied || !strings.HasPrefix(e.Reason, "/etc/security/pwquality.conf.d/10-a.conf: ") {
+			t.Errorf("%s = %+v, want the unreadable drop-in's denied read", k, e)
+		}
+	}
+	// A conf.d directory that is not there is not an error: the main file alone
+	// answers, and it is the only input.
+	a = rockyPAM()
+	a.files["/etc/authselect/system-auth"] = "pam/rocky/authselect-password-auth"
+	a.files[pwqualityConf] = "pam/rocky/pwquality.conf"
+	e := env(t, build(t, "pam", a), "pam.pwquality.minlen")
+	if e.Status != facts.StatusOK || e.Value != 8 {
+		t.Errorf("with no drop-in directory the conf file answers: %+v, want 8", e)
+	}
+	if got := sourcePaths(t, e); !slices.Equal(got, []string{pwqualityConf, "/etc/authselect/system-auth"}) {
+		t.Errorf("inputs %v", got)
+	}
+}

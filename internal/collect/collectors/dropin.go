@@ -61,6 +61,17 @@ func dropinEnvelope(err error) facts.Envelope {
 // The caller declares the main file and each dir's glob in its own
 // Declaration.Reads — this helper never widens the declaration.
 func mergeDropins(a collect.Access, main string, dirs []string, glob string) (map[string]string, []facts.Source, error) {
+	return mergeDropinsWith(a, main, dirs, glob, parseDropin)
+}
+
+// mergeDropinsWith is mergeDropins with the line parser as a parameter, for a
+// chain whose file syntax is not systemd's (M-23): pwquality's conf files carry
+// bare-word flags (enforce_for_root) that parseDropin discards, so it passes
+// parseKVInto instead. parse is handed each file's bytes and the shared values
+// map, in the order the files are applied, so the last file to set a key wins
+// whatever the syntax. Everything else — shadowing, ordering, which files are
+// cited and R148's first read error — is one implementation for every caller.
+func mergeDropinsWith(a collect.Access, main string, dirs []string, glob string, parse func([]byte, map[string]string)) (map[string]string, []facts.Source, error) {
 	values := map[string]string{}
 	var inputs []facts.Source
 	var readErr error
@@ -77,7 +88,7 @@ func mergeDropins(a collect.Access, main string, dirs []string, glob string) (ma
 			}
 			return
 		}
-		parseDropin(data, values)
+		parse(data, values)
 		inputs = append(inputs, facts.Source{Kind: "file", Path: p})
 	}
 	read(main)

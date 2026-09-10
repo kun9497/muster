@@ -20,6 +20,16 @@ import (
 // with spaces but no "=" is not a key.
 func parseKV(data []byte) map[string]string {
 	kv := map[string]string{}
+	parseKVInto(data, kv)
+	return kv
+}
+
+// parseKVInto is parseKV into a map the caller owns, which is the shape
+// mergeDropinsWith wants (M-23): a whole drop-in chain accumulates into one map
+// and the last file to set a key wins. The systemd parser cannot stand in for
+// it — it discards a line with no "=", which is exactly how pwquality writes a
+// flag.
+func parseKVInto(data []byte, kv map[string]string) {
 	for _, raw := range splitLines(data) {
 		l := strings.TrimSpace(raw)
 		if l == "" || strings.HasPrefix(l, "#") {
@@ -36,7 +46,6 @@ func parseKV(data []byte) map[string]string {
 		}
 		kv[k] = strings.TrimSpace(v)
 	}
-	return kv
 }
 
 // readKV reads one conf file and tells the caller which of the three things
@@ -144,12 +153,6 @@ func pwqualityFacts(s pamStacks, a collect.Access) map[string]facts.Envelope {
 	// cannot; it replaces every value below, since the defaults would be a
 	// guess about a file that exists (R148).
 	var readErr *facts.Envelope
-	fail := func(p string, err error) {
-		if readErr == nil {
-			e := readErrorEnv(p, err)
-			readErr = &e
-		}
-	}
 	apply := func(kv map[string]string) {
 		for _, k := range pwqualityInts {
 			applyInt(vals, kv, k)
@@ -160,25 +163,19 @@ func pwqualityFacts(s pamStacks, a collect.Access) map[string]facts.Envelope {
 			}
 		}
 	}
-	if kv, src, err := readKV(a, pwqualityConf); err != nil {
-		fail(pwqualityConf, err)
-	} else if kv != nil {
-		apply(kv)
-		inputs = append(inputs, *src)
-	}
-	matches, err := a.Glob(pwqualityConfD)
+	// pwquality.conf and its conf.d drop-ins resolve through the shared drop-in
+	// helper (M-14), with pwquality's own parser rather than systemd's (M-23):
+	// the main file first, then the directory in lexicographic order, the last
+	// file to set a key winning. The first file that exists but cannot be read
+	// comes back as the error and poisons every value below (R148); a file that
+	// is simply not there is not one, and only the files actually read are cited.
+	kv, confInputs, err := mergeDropinsWith(a, pwqualityConf, []string{pwqualityConfDir}, "*.conf", parseKVInto)
 	if err != nil {
-		fail(pwqualityConfD, err)
+		e := dropinEnvelope(err)
+		readErr = &e
 	}
-	slices.Sort(matches)
-	for _, m := range matches {
-		if kv, src, err := readKV(a, m); err != nil {
-			fail(m, err)
-		} else if kv != nil {
-			apply(kv)
-			inputs = append(inputs, *src)
-		}
-	}
+	apply(kv)
+	inputs = append(inputs, confInputs...)
 	apply(argsKV(enabled.Args))
 	inputs = append(inputs, lineSource(*enabled))
 	// A fresh Source per key, so no two envelopes share one pointer (R147).
