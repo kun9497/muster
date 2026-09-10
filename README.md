@@ -135,9 +135,13 @@ titles, never their discussion, check and fix text. See
    output, exit codes, waivers, and eight controls flowing end to end.
 2. **Both distributions, every automatable KISA item.** Collectors for Ubuntu
    and Rocky; 64 of the 67 items judged automatically or with automatic
-   evidence, the remaining 9 (mail, DNS and FTP daemon configuration) listed as
-   `MANUAL` with the reason recorded in the control. Every control gains DISA
-   STIG and NIST SP 800-53 reference numbers where a mapping exists.
+   evidence (55 auto, 5 partial, 4 manual with the evidence attached). The
+   remaining three — file and directory ownership (U-15), SUID/SGID/sticky
+   files (U-23) and hidden files (U-33) — need the deep filesystem walk of
+   stage 3 and are listed as deferred in `docs/reference/coverage.md`. Every
+   control gains DISA STIG and NIST SP 800-53 reference numbers where a
+   mapping exists, and `controls lint` cross-checks every KISA reference
+   against the 67-item inventory.
 3. **High-value checks beyond the list, and profiles**, from the same collector: package
    integrity, SUID/SGID and world-writable files, `sudoers`, file capabilities
    and ACLs, cron and timer inventory, `authorized_keys` inventory, processes

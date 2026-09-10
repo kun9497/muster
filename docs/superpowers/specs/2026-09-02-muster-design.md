@@ -314,7 +314,10 @@ The rows below are evaluated in order and the first that applies decides. Fact s
 | 11 | a clause fails and `automation: partial` | `WARN`, listed under manual review |
 | 12 | a clause fails | `FAIL` |
 | 13 | all clauses hold but collection was degraded (parse fallback for a daemon-reported setting, personas requested but not collected, firewall confidence below full, a remote NSS source for account facts) | `WARN` naming the degradation |
+| 13a | all clauses hold and none was degraded, but an `each … where` whose `expected` is a `${param}` reference selected no element of a non-empty list | `MANUAL` naming the parameter and the fact — a mistyped override must not read as a clean pass; a literal `where` that selects nothing still passes and records a `<kind>:*` observation saying so |
 | 14 | all clauses hold | `PASS` |
+
+A record element that lacks the field a `where` or `require` sub-clause names fails that clause with a reason naming the element and the field (section 5.7) and is listed as `unjudged` in the clause's evidence, never as matching or failing; `present`/`absent` keep their meaning on a missing field. Row 13a is decided once, after every clause has been evaluated, so a failing or degraded clause anywhere in the control outranks it. (Amended 2026-09-10, plan 2M.)
 
 The evaluator runs the walk gate (steps 9–10) before the fact-status screening (steps 6–8) for walk-based controls, so a walk that was not run yields `MANUAL`, not `ERROR` for the absent walk facts.
 
