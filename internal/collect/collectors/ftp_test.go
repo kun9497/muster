@@ -1816,3 +1816,61 @@ func TestFtpDeniedInstanceGlobIsDeniedNotUnsupported(t *testing.T) {
 		t.Errorf(`Worst("ftp") = %s, want denied`, got)
 	}
 }
+
+// M-49, the detectPureFtpd site. The Debian pure-ftpd layout keeps one
+// setting per file under /etc/pure-ftpd/conf, so a directory this run may not
+// list is a set of settings nobody read — not a host with none of them. The
+// main file was readable, so the implementation is still identified; the
+// judged leaves carry the denial.
+func TestFtpDeniedPureFtpdConfDirIsDeniedNotUnsupported(t *testing.T) {
+	a := ftpAccess(map[string]string{pureFtpdConf: "pure-ftpd.conf.stock"})
+	a.deniedDirs = map[string]bool{"/etc/pure-ftpd/conf": true} // the literal directory of pureFtpdConfGlob
+	b := buildBegun(t, "ftp", a)
+
+	if e := env(t, b, "ftp.implementation"); e.Status != facts.StatusOK || e.Value != "pure-ftpd" {
+		t.Fatalf("implementation %+v, want ok \"pure-ftpd\" — the main file WAS read", e)
+	}
+	for _, k := range []string{"ftp.local_enabled", "ftp.anonymous_enabled", "ftp.access_files"} {
+		e := env(t, b, k)
+		if e.Status != facts.StatusDenied {
+			t.Errorf("%s %+v, want denied (never unsupported, never error)", k, e)
+		}
+		if !strings.HasPrefix(e.Reason, pureFtpdConfGlob+":") {
+			t.Errorf("%s reason %q must be prefixed with %s", k, e.Reason, pureFtpdConfGlob)
+		}
+	}
+	if e := env(t, b, "ftp.parse_complete"); e.Status != facts.StatusOK || e.Value != false {
+		t.Errorf("parse_complete %+v, want ok false", e)
+	}
+	if got := b.Worst("ftp"); got != facts.StatusDenied {
+		t.Errorf(`Worst("ftp") = %s, want denied`, got)
+	}
+}
+
+// M-49, the proftpdInclude site. The stock Debian proftpd.conf includes its
+// fragment DIRECTORY, and a fragment there is where TLSEngine or a
+// RootLogin override lives — so a directory the run may not list is not a
+// configuration with no fragments. Ruling L-4 degrades every judged leaf
+// together; what M-49 fixes is the CLASS, from unsupported (which ranks as
+// ok and reads "this environment has no such mechanism") to denied.
+func TestFtpDeniedProftpdIncludeDirIsDeniedNotUnsupported(t *testing.T) {
+	a := ftpAccess(map[string]string{proftpdDebianConf: "proftpd.conf.include-dir"})
+	a.deniedDirs = map[string]bool{"/etc/proftpd/conf.d": true} // the literal directory of proftpdConfDGlob
+	b := buildBegun(t, "ftp", a)
+
+	if e := env(t, b, "ftp.implementation"); e.Status != facts.StatusOK || e.Value != "proftpd" {
+		t.Fatalf("implementation %+v, want ok \"proftpd\" — the main file WAS read", e)
+	}
+	for _, k := range []string{"ftp.tls_enforced", "ftp.local_enabled", "ftp.access_files"} {
+		e := env(t, b, k)
+		if e.Status != facts.StatusDenied {
+			t.Errorf("%s %+v, want denied (never unsupported, never error)", k, e)
+		}
+		if !strings.HasPrefix(e.Reason, proftpdConfDGlob+":") {
+			t.Errorf("%s reason %q must be prefixed with %s", k, e.Reason, proftpdConfDGlob)
+		}
+	}
+	if got := b.Worst("ftp"); got != facts.StatusDenied {
+		t.Errorf(`Worst("ftp") = %s, want denied`, got)
+	}
+}
