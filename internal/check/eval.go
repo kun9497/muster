@@ -211,7 +211,13 @@ func evalOne(e *env, c *controls.Control) (r Result) {
 		// list judged nothing on this host, so there is no verdict to give —
 		// the parameter, not the host, is what the reader has to look at.
 		// Everything already read stays with the result.
-		if out.Vacuous != "" {
+		//
+		// M-45: only while nothing else has been decided. MANUAL claims
+		// muster judged nothing, which is false once an earlier clause has
+		// found something or been degraded; those fall through to the normal
+		// accumulation below, where finish() gives the FAIL or WARN and this
+		// clause's own evidence and selection record travel with it.
+		if out.Vacuous != "" && all.Holds && all.Degraded == "" {
 			res := fail(r, MANUAL, "", fmt.Sprintf("parameter %q selected no element of %s (%d elements)", out.Vacuous, cl.Fact, out.Count))
 			res.Evidence = append(append(res.Evidence, all.Evidence...), out.Evidence...)
 			res.Observations = append(append([]Observation(nil), all.Observations...), out.Observations...)

@@ -560,6 +560,56 @@ func TestVacuousParamSelectionIsManual(t *testing.T) {
 	}
 }
 
+// M-45 (amends M-6/M-33 for the cross-clause case): a control that has
+// already determined a finding does not lose it because a LATER clause's
+// parameter selected nothing. M-33 settled this inside one clause; the rule
+// is the same between clauses — MANUAL says "muster judged nothing", which
+// is false once any clause has judged something.
+func TestVacuousSelectionDoesNotOutrankAFinding(t *testing.T) {
+	// The vacuous clause is second, so the earlier verdict is already in
+	// `all` when it is reached.
+	withEarlier := func(earlier controls.Clause) controls.Control {
+		c := syslogPolicyControl([]any{"authpriv"})
+		c.Checks = append([]controls.Clause{earlier}, c.Checks...)
+		return c
+	}
+
+	t.Run("a failing clause wins", func(t *testing.T) {
+		c := withEarlier(controls.Clause{Fact: "services.syslog.active", Op: "eq", Expected: true})
+		r := Evaluate(snap(t, `{"services":{"syslog":{"active":{"status":"ok","value":false}}},`+
+			rsyslogRulesFacts[1:]), one(c), reg, Options{})[0]
+		if r.Status != FAIL {
+			t.Fatalf("status=%s reason=%q, want FAIL: a stopped daemon is a finding whatever the parameter selects", r.Status, r.Reason)
+		}
+		if !strings.Contains(r.Reason, "services.syslog.active") {
+			t.Errorf("reason must name the clause that failed: %q", r.Reason)
+		}
+		// The vacuous selection is still on the record, just not the verdict.
+		found := false
+		for _, ob := range r.Observations {
+			if ob.Subject == "item:*" && ob.Actual == "0 of 3 elements selected" {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("the selection record must survive the fall-through: %+v", r.Observations)
+		}
+		evidenceHasFact("logging.rsyslog.rules", facts.StatusOK)(t, r)
+	})
+
+	t.Run("a degradation survives", func(t *testing.T) {
+		c := withEarlier(controls.Clause{Fact: "accounts.login_defs.pass_max_days", Op: "lte", Expected: 90})
+		r := Evaluate(snap(t, `{"accounts":{"login_defs":{"pass_max_days":{"runtime":{"status":"ok","value":90}}}},`+
+			rsyslogRulesFacts[1:]), one(c), reg, Options{})[0]
+		if r.Status != WARN {
+			t.Fatalf("status=%s reason=%q, want WARN", r.Status, r.Reason)
+		}
+		if r.Degraded != degradedRevertsOnReboot {
+			t.Errorf("Degraded = %q, want %q; MANUAL used to swallow it", r.Degraded, degradedRevertsOnReboot)
+		}
+	})
+}
+
 // M-6 (2F/R204): an EMPTY list is a genuinely empty enumeration, not a
 // parameter that missed — it stays the vacuous PASS it has always been.
 func TestEmptyListStaysAVacuousPass(t *testing.T) {

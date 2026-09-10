@@ -193,6 +193,64 @@ func TestVacuousLiteralSelectionIsObservedNotFailed(t *testing.T) {
 	}
 }
 
+// M-46: spec §5.7 asks for a reason naming the field, and the clause-level
+// reason can name only the first one. Each observation therefore carries its
+// OWN sub-clause, so two elements missing two different fields are told
+// apart in the record even when the two fields expect the same value.
+func TestMissingFieldObservationNamesItsOwnField(t *testing.T) {
+	e := newEnv(t, `{"schema_version":1,"run":{},"facts":{"accounts":{"users":{"status":"ok","value":[
+	  {"name":"alice","shell_valid":true},
+	  {"name":"bob","system":true}]}}}}`)
+	out := e.evalClause(controls.Clause{Fact: "accounts.users", Op: "each", Subject: "name",
+		Where:   &controls.Clause{Field: "system", Op: "eq", Expected: true},
+		Require: &controls.Clause{Field: "shell_valid", Op: "eq", Expected: true}})
+	if out.Err != nil {
+		t.Fatal(out.Err)
+	}
+	if len(out.Observations) != 2 {
+		t.Fatalf("both elements are unjudgeable and both are observed: %+v", out.Observations)
+	}
+	alice, bob := out.Observations[0], out.Observations[1]
+	if fmt.Sprint(alice.Expected) == fmt.Sprint(bob.Expected) {
+		t.Fatalf("the two rows must be told apart; both read %v", alice.Expected)
+	}
+	if got := fmt.Sprint(alice.Expected); !strings.Contains(got, "system") {
+		t.Errorf("alice lacks system; Expected = %q", got)
+	}
+	if got := fmt.Sprint(bob.Expected); !strings.Contains(got, "shell_valid") {
+		t.Errorf("bob lacks shell_valid; Expected = %q", got)
+	}
+}
+
+// LOW-2 (amends M-6's "always"): nothing was selected BECAUSE the field is
+// missing, not because the filter excluded it, so the row asserting the
+// selection is fine has no business sitting on a failing clause.
+func TestVacuousRowIsSkippedWhenTheClauseAlreadyFailed(t *testing.T) {
+	e := newEnv(t, `{"schema_version":1,"run":{},"facts":{"accounts":{"users":{"status":"ok","value":[
+	  {"name":"alice","shell_valid":true},
+	  {"name":"bob","shell_valid":true}]}}}}`)
+	out := e.evalClause(controls.Clause{Fact: "accounts.users", Op: "each", Subject: "name",
+		Where:   &controls.Clause{Field: "system", Op: "eq", Expected: true},
+		Require: &controls.Clause{Field: "shell_valid", Op: "eq", Expected: true}})
+	if out.Err != nil || out.Holds {
+		t.Fatalf("holds=%v err=%v", out.Holds, out.Err)
+	}
+	for _, ob := range out.Observations {
+		if strings.HasSuffix(ob.Subject, ":*") {
+			t.Errorf("a failing clause selected nothing because it could not judge; no selection row: %+v", ob)
+		}
+	}
+	if len(out.Observations) != 2 {
+		t.Errorf("only the two unjudged elements are observed: %+v", out.Observations)
+	}
+	if out.Vacuous != "" {
+		t.Errorf("Vacuous=%q; a finding is never overridden by a vacuous selection", out.Vacuous)
+	}
+	if got := out.Evidence[0].Value; got != "2 elements; 0 selected; unjudged: user:alice, user:bob" {
+		t.Errorf("evidence value = %q", got)
+	}
+}
+
 // M-7: the evidence of a collection clause names what it judged, so a reader
 // of the JSON sees the subjects without walking every observation.
 func TestCollectionEvidenceNamesTheSubjects(t *testing.T) {
@@ -225,6 +283,28 @@ func TestCollectionEvidenceNamesTheSubjects(t *testing.T) {
 			controls.Clause{Fact: "accounts.users", Op: "each", Subject: "name",
 				Require: &controls.Clause{Field: "shell_valid", Op: "eq", Expected: false}},
 			"6 elements; failing: user:u1, user:u2, user:u3, user:u4, user:u5, +1 more"},
+		// M-44: an element that could not be judged is never listed as one
+		// that WAS. "matching: user:bob" on a nopass clause asserts that bob
+		// has an empty password, which is the confident-wrong claim M-5
+		// exists to prevent, moved from the status into the evidence string.
+		{"none keeps an unjudged element out of matching",
+			users(`{"name":"root","password_status":"hashed"},{"name":"bob"},{"name":"carol","password_status":"nopass"}`),
+			controls.Clause{Fact: "accounts.users", Op: "none", Subject: "name",
+				Where: &controls.Clause{Field: "password_status", Op: "eq", Expected: "nopass"}},
+			"3 elements; matching: user:carol; unjudged: user:bob"},
+		{"each keeps an unjudged element out of failing",
+			users(`{"name":"alice","shell_valid":true},{"name":"bob"},{"name":"carol","shell_valid":true}`),
+			controls.Clause{Fact: "accounts.users", Op: "each", Subject: "name",
+				Require: &controls.Clause{Field: "shell_valid", Op: "eq", Expected: false}},
+			"3 elements; failing: user:alice, user:carol; unjudged: user:bob"},
+		// An unqualified "none matching" would be the same over-claim in the
+		// other direction: nothing matched among the elements that could be
+		// tested, and one could not be.
+		{"none with an unjudged element does not claim none matching",
+			users(`{"name":"root","password_status":"hashed"},{"name":"bob"},{"name":"carol","password_status":"hashed"}`),
+			controls.Clause{Fact: "accounts.users", Op: "none", Subject: "name",
+				Where: &controls.Clause{Field: "password_status", Op: "eq", Expected: "nopass"}},
+			"3 elements; unjudged: user:bob"},
 		{"none names the matching subjects",
 			walk(`{"path":"/a","sticky":false},{"path":"/b","sticky":false},{"path":"/c","sticky":true}`),
 			controls.Clause{Fact: "walk.world_writable", Op: "none", Subject: "path",

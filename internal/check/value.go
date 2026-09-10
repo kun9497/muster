@@ -35,6 +35,8 @@ func ParamValues(c *controls.Control, overrides map[string]any) map[string]any {
 
 // substitute resolves `${name}` as a whole value with the parameter's own
 // type preserved (spec §6.3). Anything else passes through unchanged.
+// paramName below recognises the same reference and must stay in step with
+// what counts as one here.
 func substitute(expected any, params map[string]any) (any, error) {
 	s, ok := expected.(string)
 	if !ok {
@@ -54,7 +56,8 @@ func substitute(expected any, params map[string]any) (any, error) {
 // paramName reports the parameter a raw expected value references, if it is
 // a whole `${name}` reference. substitute() has already replaced the token by
 // the time a clause is judged, so M-6 reads the name off the clause's own
-// unsubstituted value.
+// unsubstituted value. It recognises exactly what substitute() resolves —
+// the two share paramRef and must stay in step.
 func paramName(expected any) (string, bool) {
 	s, ok := expected.(string)
 	if !ok {

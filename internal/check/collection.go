@@ -29,12 +29,6 @@ func (e *env) evalCollection(cl controls.Clause, entry facts.Entry, list []any, 
 		if err != nil {
 			return clauseOutcome{Err: err}
 		}
-		if cl.Where != nil {
-			whereExpected, err = substitute(cl.Where.Expected, e.params)
-			if err != nil {
-				return clauseOutcome{Err: err}
-			}
-		}
 	case "none":
 		var err error
 		whereExpected, err = substitute(cl.Where.Expected, e.params)
@@ -42,12 +36,22 @@ func (e *env) evalCollection(cl controls.Clause, entry facts.Entry, list []any, 
 			return clauseOutcome{Err: err}
 		}
 	}
+	// failed are the elements this clause JUDGED and found wanting; unjudged
+	// are the ones it could not judge at all (M-5). M-44 keeps the two apart
+	// everywhere they are reported: saying "matching: user:bob" on a nopass
+	// clause would assert that bob has an empty password, which is the
+	// confident-wrong claim M-5 exists to prevent.
+	var failed, unjudged []string
 	// M-5: an element whose judged field the snapshot does not carry fails
 	// the clause and says which field, and the loop goes on so the report
-	// still lists every element that was examined.
-	missing := func(subject string, mf missingFieldError, expected any) {
-		out.Observations = append(out.Observations, Observation{Subject: subject, Expected: expected, Actual: nil, Verdict: "fail"})
+	// still lists every element that was examined. M-46: the row carries its
+	// OWN sub-clause rendered, so two elements missing two different fields
+	// are told apart even when both fields expect the same value — the
+	// clause-level reason can only name the first.
+	missing := func(subject string, mf missingFieldError, sub *controls.Clause) {
+		out.Observations = append(out.Observations, Observation{Subject: subject, Expected: describeField(sub, e.params), Actual: nil, Verdict: "fail"})
 		out.Holds = false
+		unjudged = append(unjudged, subject)
 		if out.Reason == "" {
 			out.Reason = fmt.Sprintf("element %s has no field %q", subject, mf.Field)
 		}
@@ -66,7 +70,7 @@ func (e *env) evalCollection(cl controls.Clause, entry facts.Entry, list []any, 
 					}
 					// Never a silent deselection: an element that could not
 					// be tested for selection is the vacuous PASS §5.7 forbids.
-					missing(subject, mf, whereExpected)
+					missing(subject, mf, cl.Where)
 					continue
 				}
 				if !sel {
@@ -80,13 +84,14 @@ func (e *env) evalCollection(cl controls.Clause, entry facts.Entry, list []any, 
 				if !errors.As(err, &mf) {
 					return clauseOutcome{Err: err}
 				}
-				missing(subject, mf, requireExpected)
+				missing(subject, mf, cl.Require)
 				continue
 			}
 			obs := Observation{Subject: subject, Expected: requireExpected, Actual: fieldValue(cl.Require.Field, elem), Verdict: "pass"}
 			if !ok {
 				obs.Verdict = "fail"
 				out.Holds = false
+				failed = append(failed, subject)
 			}
 			out.Observations = append(out.Observations, obs)
 		case "none":
@@ -96,11 +101,12 @@ func (e *env) evalCollection(cl controls.Clause, entry facts.Entry, list []any, 
 				if !errors.As(err, &mf) {
 					return clauseOutcome{Err: err}
 				}
-				missing(subject, mf, whereExpected)
+				missing(subject, mf, cl.Where)
 				continue
 			}
 			if hit {
 				out.Holds = false
+				failed = append(failed, subject)
 				out.Observations = append(out.Observations, Observation{Subject: subject, Expected: fmt.Sprintf("not %s %v", cl.Where.Op, whereExpected), Actual: fieldValue(cl.Where.Field, elem), Verdict: "fail"})
 			}
 		}
@@ -108,23 +114,24 @@ func (e *env) evalCollection(cl controls.Clause, entry facts.Entry, list []any, 
 	// M-6: an `each` whose `where` selected nothing out of a non-empty list
 	// judged none of the host's elements. The observation makes that visible
 	// in every report; when the filter was a ${param} rather than the
-	// control's own literal, the caller turns it into MANUAL as well —
-	// but only while the clause is otherwise holding, since a missing field
-	// (M-5) is a failure no vacuous selection may override (M-33).
-	if cl.Op == "each" && cl.Where != nil && len(list) > 0 && selected == 0 {
+	// control's own literal, the caller turns it into MANUAL as well.
+	//
+	// Both halves are skipped once the clause is already failing (M-33, and
+	// LOW-2 amending M-6's "always"): nothing was selected BECAUSE a field is
+	// missing, not because the filter excluded anything, so a pass-verdict
+	// row asserting the selection is fine has no business on a finding.
+	if cl.Op == "each" && cl.Where != nil && len(list) > 0 && selected == 0 && out.Holds {
 		out.Observations = append(out.Observations, Observation{
 			Subject:  kind + ":*",
 			Expected: describeField(cl.Where, e.params),
 			Actual:   fmt.Sprintf("0 of %d elements selected", len(list)),
 			Verdict:  "pass",
 		})
-		if out.Holds {
-			if name, ok := paramName(cl.Where.Expected); ok {
-				out.Vacuous = name
-			}
+		if name, ok := paramName(cl.Where.Expected); ok {
+			out.Vacuous = name
 		}
 	}
-	out.Evidence = []Evidence{{Fact: cl.Fact, Status: facts.StatusOK, Value: collectionValue(cl, len(list), selected, out.Observations), Source: src}}
+	out.Evidence = []Evidence{{Fact: cl.Fact, Status: facts.StatusOK, Value: collectionValue(cl, out.Count, selected, failed, unjudged), Source: src}}
 	return out
 }
 
@@ -133,16 +140,11 @@ func (e *env) evalCollection(cl controls.Clause, entry facts.Entry, list []any, 
 const maxNamedSubjects = 5
 
 // collectionValue is the evidence value of an each/none clause: what it
-// judged, not only how much of it (M-7). Subjects appear in observation
-// order — the snapshot's own list order, so the same input renders the same
-// bytes.
-func collectionValue(cl controls.Clause, n, selected int, obs []Observation) string {
-	var failed []string
-	for _, ob := range obs {
-		if ob.Verdict == "fail" {
-			failed = append(failed, ob.Subject)
-		}
-	}
+// judged, not only how much of it (M-7). Subjects appear in the snapshot's
+// own list order, so the same input renders the same bytes. M-44: the
+// elements the clause could not judge are their own trailing segment, never
+// folded into the ones it did judge.
+func collectionValue(cl controls.Clause, n, selected int, failed, unjudged []string) string {
 	value := fmt.Sprintf("%d elements", n)
 	switch cl.Op {
 	case "each":
@@ -155,9 +157,12 @@ func collectionValue(cl controls.Clause, n, selected int, obs []Observation) str
 	case "none":
 		if len(failed) > 0 {
 			value += "; matching: " + namedSubjects(failed)
-		} else {
+		} else if len(unjudged) == 0 {
 			value += "; none matching"
 		}
+	}
+	if len(unjudged) > 0 {
+		value += "; unjudged: " + namedSubjects(unjudged)
 	}
 	return value
 }

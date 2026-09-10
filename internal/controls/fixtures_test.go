@@ -188,18 +188,25 @@ func TestManualFixturesCarryEveryEvidenceLeaf(t *testing.T) {
 				t.Errorf("%s: status %s (%s), want MANUAL", f, r.Status, r.Reason)
 				continue
 			}
-			status := map[string]facts.Status{}
+			// LOW-5: a setting key emits one entry per side, so every side is
+			// kept rather than the last one overwriting the rest. No manual
+			// control names a setting today and the lint rule does not forbid
+			// one, which is exactly when a gate keyed by fact alone would
+			// quietly stop checking.
+			status := map[string][]facts.Status{}
 			for _, ev := range r.Evidence {
-				status[ev.Fact] = ev.Status
+				status[ev.Fact] = append(status[ev.Fact], ev.Status)
 			}
 			for _, k := range c.Evidence {
-				st, ok := status[k]
-				if !ok {
+				got := status[k]
+				if len(got) == 0 {
 					t.Errorf("%s: the result carries no evidence for %s", f, k)
 					continue
 				}
-				if st == facts.StatusMissing {
-					t.Errorf("%s: evidence %s is missing from the fixture; a MANUAL result must show every leaf its control names", f, k)
+				for _, st := range got {
+					if st == facts.StatusMissing {
+						t.Errorf("%s: evidence %s is missing from the fixture; a MANUAL result must show every leaf its control names", f, k)
+					}
 				}
 			}
 			checked++
