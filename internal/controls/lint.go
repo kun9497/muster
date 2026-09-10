@@ -51,7 +51,8 @@ var (
 	kisaItemRe      = regexp.MustCompile(`^U-[0-9]{2}$`)
 	paramRefRe      = regexp.MustCompile(`^\$\{([a-z][a-z0-9_]*)\}$`)
 
-	validCategory    = set("account", "file", "service", "patch", "log", "beyond")
+	categories       = []string{"account", "file", "service", "patch", "log", "beyond"}
+	validCategory    = set(categories...)
 	validImportance  = set("상", "중", "하")
 	validAutomation  = set("auto", "partial", "manual", "not_applicable")
 	validAbsentMeans = set("pass", "fail", "not_applicable", "manual")
@@ -63,6 +64,18 @@ var (
 	orderedOps       = set("lt", "lte", "gt", "gte")
 	collectionOps    = set("each", "none")
 )
+
+// ValidControlID reports whether id is a well-formed control id --
+// muster.<area>.<name>, lowercase (spec §6.2). It is the same rule the
+// id_format lint applies, exported so controls new can refuse a bad id
+// before it writes a file the lint would then reject.
+func ValidControlID(id string) bool { return idRe.MatchString(id) }
+
+// Categories returns the categories a control may declare (spec §6.2) in a
+// fixed order. controls new derives the category from the id's area, so it
+// needs the list both to check that area and to name the choices when it
+// refuses.
+func Categories() []string { return append([]string(nil), categories...) }
 
 func set(xs ...string) map[string]bool {
 	m := map[string]bool{}

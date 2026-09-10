@@ -16,6 +16,15 @@ const (
 	exitError    = 2 // could not run, or the result cannot be trusted
 )
 
+// exitRefused is what the developer commands (controls new, snapshot
+// extract) return when they decline to act: an id that is not a control id,
+// an item the inventory does not list or has deferred, a path that already
+// holds something, a control the set does not carry. It is the "ran, and has
+// something to say" code, never the "could not run" one, which stays for bad
+// flags and I/O failures. Neither command writes a result JSON, so this
+// widens no contract of spec §7.
+const exitRefused = exitFindings
+
 // Set by -ldflags at build time (see Makefile).
 var (
 	version = "dev"
@@ -28,7 +37,8 @@ const usage = `usage: muster <command> [flags]
 commands:
   collect    gather host facts as root and write a snapshot (Linux)
   check      evaluate a facts snapshot against the embedded controls
-  controls   lint or list the embedded controls
+  controls   lint, list or scaffold the embedded controls
+  snapshot   extract the leaves a control reads from a snapshot into a fixture skeleton
   version    print version, commit and build date
   help       print this message
 `
@@ -64,6 +74,8 @@ func run(args []string, stdout, stderr io.Writer) (code int) {
 		return runCheck(args[1:], stdout, stderr)
 	case "controls":
 		return runControls(args[1:], stdout, stderr)
+	case "snapshot":
+		return runSnapshot(args[1:], stdout, stderr)
 	case "__panic_for_test":
 		panic("deliberate")
 	default:
