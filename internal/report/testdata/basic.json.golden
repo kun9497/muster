@@ -53,7 +53,7 @@
   "check": {
     "muster_version": "0.1.0",
     "commit": "abc1234",
-    "controls_version": "kisa-unix-2026+2026.09.02",
+    "controls_version": "kisa-unix-2026+2026.09.09",
     "controls_digest": "sha256:c",
     "snapshot_digest": "sha256:3ca89c25dccde2eb154173d105a799bd6a025f3521885e1514dfbd43cee113f7",
     "guide_edition": "kisa-unix-2026",

@@ -33,7 +33,7 @@ func sampleReport(t *testing.T) *Report {
 		{ID: "muster.account.password_policy", Importance: "상", Automation: "auto", Status: check.WAIVED, Waiver: &check.WaiverNote{Applied: true, Reason: "r", Expires: "2026-09-20"}},
 		{ID: "muster.log.review", Importance: "하", Automation: "manual", Status: check.MANUAL, Reason: "interview"},
 	}
-	cb := CheckBlock{MusterVersion: "0.1.0", Commit: "abc1234", ControlsVersion: "kisa-unix-2026+2026.09.02", ControlsDigest: "sha256:c", SnapshotDigest: snap.Digest(), GuideEdition: "kisa-unix-2026",
+	cb := CheckBlock{MusterVersion: "0.1.0", Commit: "abc1234", ControlsVersion: "kisa-unix-2026+2026.09.09", ControlsDigest: "sha256:c", SnapshotDigest: snap.Digest(), GuideEdition: "kisa-unix-2026",
 		Waivers: WaiversBlock{Path: "w.yaml", Digest: "sha256:w", Applied: 1, ExpiringSoon: 1}}
 	return Build(snap, results, cb)
 }

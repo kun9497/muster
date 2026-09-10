@@ -112,6 +112,13 @@ jobs:
           # (its reason starts "absent counts as pass") may carry absent evidence.
           jq -e '[.results[] | select(.status=="PASS") | . as $r | .evidence[]? | select(.status != "ok" and (.status != "absent" or (($r.reason // "") | startswith("absent counts as pass") | not)))] | length == 0' "$RUNNER_TEMP/muster/user-report.json"
           jq -e '[.results[] | select(.status=="ERROR")] | length > 0' "$RUNNER_TEMP/muster/user-report.json"
+      - name: every fact the capability matrix calls root-only reads denied
+        run: |
+          jq -e --slurpfile m docs/reference/capability-matrix.json '
+            [ $m[0].nonroot.denied[] as $k
+              | ($k | split(".")) as $p
+              | (.facts | getpath($p) | .status)
+              | select(. != "denied") ] | length == 0' "$RUNNER_TEMP/muster/user.json"
 
   collect-containers:
     runs-on: ubuntu-24.04
@@ -173,6 +180,15 @@ jobs:
           set -e
           # Same rule as the non-root job: absent evidence is allowed only under absent_means: pass.
           jq -e '[.results[] | select(.status=="PASS") | . as $r | .evidence[]? | select(.status != "ok" and (.status != "absent" or (($r.reason // "") | startswith("absent counts as pass") | not)))] | length == 0' "$RUNNER_TEMP/muster/containers/report.json"
+      - name: every fact the capability matrix calls systemd-only reads unsupported
+        run: |
+          if [ "${{ matrix.init }}" = "false" ]; then
+            jq -e --slurpfile m docs/reference/capability-matrix.json '
+              [ $m[0]["no-systemd"].unsupported[] as $k
+                | ($k | split(".")) as $p
+                | (.facts | getpath($p) | .status)
+                | select(. != "unsupported") ] | length == 0' "$RUNNER_TEMP/muster/containers/c.json"
+          fi
 
   collect-contract:
     runs-on: ubuntu-24.04

@@ -150,7 +150,7 @@ func TestTableEscapesObservationAndWaiverFields(t *testing.T) {
 		{ID: "test.waiver", Importance: "상", Automation: "auto", Status: check.WAIVED,
 			Waiver: &check.WaiverNote{Applied: true, Reason: "safe", Expires: "\x1b]0;evil\a"}},
 	}
-	cb := CheckBlock{MusterVersion: "0.1.0", Commit: "abc1234", ControlsVersion: "kisa-unix-2026+2026.09.02", ControlsDigest: "sha256:c", SnapshotDigest: snap.Digest(), GuideEdition: "kisa-unix-2026"}
+	cb := CheckBlock{MusterVersion: "0.1.0", Commit: "abc1234", ControlsVersion: "kisa-unix-2026+2026.09.09", ControlsDigest: "sha256:c", SnapshotDigest: snap.Digest(), GuideEdition: "kisa-unix-2026"}
 	r := Build(snap, results, cb)
 
 	var buf bytes.Buffer
