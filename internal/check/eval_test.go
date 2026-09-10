@@ -610,6 +610,58 @@ func TestVacuousSelectionDoesNotOutrankAFinding(t *testing.T) {
 	})
 }
 
+// M-48 (amends M-45): the same rule must not depend on the order the clauses
+// happen to be written in. Deciding the vacuous selection while the loop was
+// still running meant a control whose vacuous clause came FIRST returned
+// MANUAL and never evaluated the clauses after it — the mirror of the case
+// M-45 fixed.
+func TestVacuousSelectionIsDecidedAfterEveryClause(t *testing.T) {
+	// The vacuous clause is first this time, so nothing has been decided
+	// when it is reached.
+	withLater := func(later controls.Clause) controls.Control {
+		c := syslogPolicyControl([]any{"authpriv"})
+		c.Checks = append(c.Checks, later)
+		return c
+	}
+	syslogActive := func(v string) string {
+		return `{"services":{"syslog":{"active":{"status":"ok","value":` + v + `}}},` + rsyslogRulesFacts[1:]
+	}
+
+	t.Run("a later failing clause wins", func(t *testing.T) {
+		c := withLater(controls.Clause{Fact: "services.syslog.active", Op: "eq", Expected: true})
+		r := Evaluate(snap(t, syslogActive("false")), one(c), reg, Options{})[0]
+		if r.Status != FAIL {
+			t.Fatalf("status=%s reason=%q, want FAIL: the clause after the vacuous one must still be evaluated", r.Status, r.Reason)
+		}
+		if !strings.Contains(r.Reason, "services.syslog.active") {
+			t.Errorf("reason must name the clause that failed: %q", r.Reason)
+		}
+		found := false
+		for _, ob := range r.Observations {
+			if ob.Subject == "item:*" && ob.Actual == "0 of 3 elements selected" {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("the selection record must survive the fall-through: %+v", r.Observations)
+		}
+	})
+
+	t.Run("later holding clauses leave it MANUAL", func(t *testing.T) {
+		c := withLater(controls.Clause{Fact: "services.syslog.active", Op: "eq", Expected: true})
+		r := Evaluate(snap(t, syslogActive("true")), one(c), reg, Options{})[0]
+		if r.Status != MANUAL || r.ReasonCode != "" {
+			t.Fatalf("status=%s code=%q reason=%q, want MANUAL with no reason code", r.Status, r.ReasonCode, r.Reason)
+		}
+		if want := `parameter "facilities" selected no element of logging.rsyslog.rules (3 elements)`; r.Reason != want {
+			t.Errorf("reason = %q, want %q", r.Reason, want)
+		}
+		// Everything read on the way stays with the MANUAL result.
+		evidenceHasFact("logging.rsyslog.rules", facts.StatusOK)(t, r)
+		evidenceHasFact("services.syslog.active", facts.StatusOK)(t, r)
+	})
+}
+
 // M-6 (2F/R204): an EMPTY list is a genuinely empty enumeration, not a
 // parameter that missed — it stays the vacuous PASS it has always been.
 func TestEmptyListStaysAVacuousPass(t *testing.T) {

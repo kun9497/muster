@@ -202,26 +202,22 @@ func evalOne(e *env, c *controls.Control) (r Result) {
 	}
 	// Steps 11-14.
 	all := clauseOutcome{Holds: true}
+	var vacuous *vacuousClause
 	for _, cl := range checks {
 		out := e.evalClause(cl)
 		if out.Err != nil {
 			return fail(r, ERROR, InternalError, out.Err.Error())
 		}
 		// M-6: a `where` whose ${param} selected no element of a non-empty
-		// list judged nothing on this host, so there is no verdict to give —
-		// the parameter, not the host, is what the reader has to look at.
-		// Everything already read stays with the result.
-		//
-		// M-45: only while nothing else has been decided. MANUAL claims
-		// muster judged nothing, which is false once an earlier clause has
-		// found something or been degraded; those fall through to the normal
-		// accumulation below, where finish() gives the FAIL or WARN and this
-		// clause's own evidence and selection record travel with it.
-		if out.Vacuous != "" && all.Holds && all.Degraded == "" {
-			res := fail(r, MANUAL, "", fmt.Sprintf("parameter %q selected no element of %s (%d elements)", out.Vacuous, cl.Fact, out.Count))
-			res.Evidence = append(append(res.Evidence, all.Evidence...), out.Evidence...)
-			res.Observations = append(append([]Observation(nil), all.Observations...), out.Observations...)
-			return res
+		// list judged nothing on this host, so there may be no verdict to
+		// give — the parameter, not the host, is what the reader has to look
+		// at. M-48: only the whole set of clauses can establish that, so the
+		// first such clause is recorded here and decided after the loop; the
+		// clause itself accumulates like any other holding clause, which is
+		// what keeps its evidence and its selection record on whatever
+		// verdict the control ends with.
+		if out.Vacuous != "" && vacuous == nil {
+			vacuous = &vacuousClause{param: out.Vacuous, fact: cl.Fact, count: out.Count}
 		}
 		all.Evidence = append(all.Evidence, out.Evidence...)
 		all.Observations = append(all.Observations, out.Observations...)
@@ -261,7 +257,28 @@ func evalOne(e *env, c *controls.Control) (r Result) {
 	if all.Degraded == "" && e.remoteNSS(checks) {
 		all.Degraded = degradedRemoteNSS
 	}
+	// M-45/M-48: MANUAL claims muster judged nothing, so it is the verdict
+	// only when nothing else was decided — after every clause has been
+	// evaluated and after the degradation checks above, either of which
+	// outranks it. The evidence and observations are the ones finish() would
+	// have attached, including this clause's own selection record.
+	if vacuous != nil && all.Holds && all.Degraded == "" {
+		res := fail(r, MANUAL, "", fmt.Sprintf("parameter %q selected no element of %s (%d elements)", vacuous.param, vacuous.fact, vacuous.count))
+		res.Evidence = append(res.Evidence, all.Evidence...)
+		res.Observations = all.Observations
+		return res
+	}
 	return finish(r, c, all)
+}
+
+// vacuousClause is the first `each` clause whose ${param} `where` selected no
+// element of a non-empty list (M-6), carried past the clause loop so the
+// verdict is decided once, on the whole control, rather than at whichever
+// position the clause happens to occupy (M-48).
+type vacuousClause struct {
+	param string
+	fact  string
+	count int
 }
 
 // parseFallback reports whether any clause reads a daemon-derived sshd fact
