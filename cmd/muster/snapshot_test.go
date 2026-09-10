@@ -113,7 +113,7 @@ func controlStatus(t *testing.T, path, id string) check.Status {
 
 // M-16: extract cuts exactly the leaves the control reads out of a snapshot
 // -- applies_when and every mechanism's when/checks for U-28 -- copies them
-// byte for byte, and carries a provenance block that names the OS but never
+// content-faithfully, and carries a provenance block that names the OS but never
 // the host.
 func TestSnapshotExtractKeepsOnlyWhatTheControlReads(t *testing.T) {
 	out := filepath.Join(t.TempDir(), "f.json")
@@ -187,7 +187,8 @@ func TestSnapshotExtractKeepsOnlyWhatTheControlReads(t *testing.T) {
 	if leaves := leafPaths(factsOf(t, got)); !reflect.DeepEqual(leaves, want) {
 		t.Errorf("extracted leaves %v, want %v", leaves, want)
 	}
-	// Byte-faithful, not re-encoded: files.etc_hosts_deny_all is
+	// Content-faithful, not re-encoded (object keys are sorted by the
+	// encoder, nothing else changes): files.etc_hosts_deny_all is
 	// {"status":"ok","value":false}, and value is omitempty on the envelope
 	// type, so a copy that went through the registry would drop it.
 	srcFacts := factsOf(t, source)
@@ -206,6 +207,25 @@ func TestSnapshotExtractKeepsOnlyWhatTheControlReads(t *testing.T) {
 	}
 	if cut != full {
 		t.Errorf("the extract decides U-28 %s; the snapshot it came from decides %s", cut, full)
+	}
+
+	// M-54: the same promise, for a control the engine resolves keys of its
+	// own while it evaluates. root_remote_login is judged on sshd.options.*,
+	// and the engine reads sshd.personas_collected and sshd.collect_method
+	// beside it -- a fixture cut without them degrades where the host did
+	// not, which is the one thing this command may never do.
+	const withEngineKeys = "muster.account.root_remote_login"
+	engineOut := filepath.Join(t.TempDir(), "rrl.json")
+	var engineStdout, engineStderr bytes.Buffer
+	if code := run([]string{"snapshot", "extract", "--facts", fullPassPath, "--control", withEngineKeys, "--out", engineOut}, &engineStdout, &engineStderr); code != exitOK {
+		t.Fatalf("exit %d, want %d; stderr %q", code, exitOK, engineStderr.String())
+	}
+	fullEngine := controlStatus(t, fullPassPath, withEngineKeys)
+	if fullEngine != check.PASS {
+		t.Fatalf("the source snapshot decides %s %s, so this test proves nothing", withEngineKeys, fullEngine)
+	}
+	if cutEngine := controlStatus(t, engineOut, withEngineKeys); cutEngine != fullEngine {
+		t.Errorf("the extract decides %s %s; the snapshot it came from decides %s", withEngineKeys, cutEngine, fullEngine)
 	}
 }
 
@@ -289,7 +309,7 @@ func TestSnapshotExtractWalkAndEvidenceKeys(t *testing.T) {
 		t.Errorf("stderr %q must name the evidence key the snapshot lacks", stderr3.String())
 	}
 
-	// Byte-faithful: an integer beyond float64's exact range keeps its
+	// Content-faithful: an integer beyond float64's exact range keeps its
 	// digits, and a field the envelope type does not know survives -- both
 	// of which a copy through the registry would lose.
 	odd := filepath.Join(dir, "odd.json")
@@ -312,7 +332,7 @@ func TestSnapshotExtractWalkAndEvidenceKeys(t *testing.T) {
 	}
 	for _, want := range []string{"9007199254740993", `"collector_note": "kept"`, `"value": false`} {
 		if !strings.Contains(stdout4.String(), want) {
-			t.Errorf("the copy is not byte-faithful: %q is gone\n%s", want, stdout4.String())
+			t.Errorf("the copy is not content-faithful: %q is gone\n%s", want, stdout4.String())
 		}
 	}
 
@@ -365,5 +385,36 @@ func TestSnapshotExtractIsDeterministic(t *testing.T) {
 	}
 	if !bytes.Contains(first, []byte("\n  \"facts\": {")) {
 		t.Errorf("the file must be indented for review:\n%s", first)
+	}
+}
+
+// A snapshot from a real host is not cheap to reproduce, and the whole input
+// is in memory by the time the extract is written -- so pointing --out at
+// --facts would succeed, quietly, and leave a few hundred bytes where the
+// snapshot was.
+func TestSnapshotExtractRefusesToOverwriteItsOwnInput(t *testing.T) {
+	dir := t.TempDir()
+	snapshot := filepath.Join(dir, "snap.json")
+	source, err := os.ReadFile(fullPassPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(snapshot, source, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"snapshot", "extract", "--facts", snapshot, "--control", "muster.file.ip_port_restriction", "--out", snapshot}, &stdout, &stderr)
+	if code != exitRefused {
+		t.Fatalf("exit %d, want %d; stderr %q", code, exitRefused, stderr.String())
+	}
+	after, err := os.ReadFile(snapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(source, after) {
+		t.Errorf("the snapshot was overwritten by its own extract: %d bytes, was %d", len(after), len(source))
+	}
+	if !strings.Contains(stderr.String(), snapshot) {
+		t.Errorf("stderr %q must name the file it refused to write over", stderr.String())
 	}
 }

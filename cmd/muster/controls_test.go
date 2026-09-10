@@ -316,11 +316,83 @@ func kisaMappingRows(t *testing.T, dir string) []kisaMappingRow {
 	return doc.Mapping
 }
 
+// The two items syntheticKisaDir adds, and the 2021 id one of them descends
+// from. They are ids, not guide rows: the names and categories below are the
+// word "synthetic" (ATTRIBUTION.md).
+const (
+	scaffoldableItem       = "U-97" // has a 2021 ancestor
+	scaffoldableItemNo2021 = "U-96" // a current-edition addition
+	scaffoldableAncestor   = "U-06"
+)
+
+// syntheticKisaDir copies the repository's KISA inventory into a temp
+// directory and adds two items no control claims. It is what the happy path
+// needs: M-55 refuses an item an embedded control already implements, and
+// every item of the real inventory is either implemented or deferred --
+// which is exactly what the set-level coverage rule enforces. An inventory
+// that has moved ahead of the set is therefore the only state in which
+// controls new has anything to do, and the state it exists for.
+func syntheticKisaDir(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	var items []map[string]any
+	readKisaJSON(t, filepath.Join(repoKisa, "kisa_items_latest.json"), &items)
+	items = append(items,
+		map[string]any{"id": scaffoldableItem, "name_ko": "synthetic", "category": "synthetic", "importance": "하", "page": 1},
+		map[string]any{"id": scaffoldableItemNo2021, "name_ko": "synthetic", "category": "synthetic", "importance": "중", "page": 2},
+	)
+	writeKisaJSON(t, filepath.Join(dir, "kisa_items_latest.json"), items)
+	for _, name := range []string{"kisa_items_2021.json", "kisa_deferred.json"} {
+		data, err := os.ReadFile(filepath.Join(repoKisa, name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, name), data, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var mapping map[string]any
+	readKisaJSON(t, filepath.Join(repoKisa, "kisa_mapping.json"), &mapping)
+	rows, ok := mapping["mapping"].([]any)
+	if !ok {
+		t.Fatalf("kisa_mapping.json has no mapping list")
+	}
+	mapping["mapping"] = append(rows,
+		map[string]any{"latest_id": scaffoldableItem, "latest_name": "synthetic", "from_2021": []string{scaffoldableAncestor}, "relation": "same", "note": ""},
+		map[string]any{"latest_id": scaffoldableItemNo2021, "latest_name": "synthetic", "from_2021": []string{}, "relation": "new", "note": ""},
+	)
+	writeKisaJSON(t, filepath.Join(dir, "kisa_mapping.json"), mapping)
+	return dir
+}
+
+func readKisaJSON(t *testing.T, path string, into any) {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(data, into); err != nil {
+		t.Fatalf("%s: %v", path, err)
+	}
+}
+
+func writeKisaJSON(t *testing.T, path string, value any) {
+	t.Helper()
+	data, err := json.Marshal(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
 // M-16: controls new writes one control skeleton and its fixture stubs, the
 // skeleton loads strictly and lints clean on shape, and a second run touches
 // nothing.
 func TestControlsNewWritesASkeletonAndRefusesToOverwrite(t *testing.T) {
-	inv, err := controls.LoadKISA(repoKisa)
+	kisaDir := syntheticKisaDir(t)
+	inv, err := controls.LoadKISA(kisaDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -328,17 +400,16 @@ func TestControlsNewWritesASkeletonAndRefusesToOverwrite(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	const kisaID = "U-01"
-	item, ok := inv.Item(controls.LatestKISAEdition, kisaID)
-	if !ok || inv.IsDeferred(kisaID) {
-		t.Fatalf("%s is not an implementable item of the %s inventory", kisaID, controls.LatestKISAEdition)
+	item, ok := inv.Item(controls.LatestKISAEdition, scaffoldableItem)
+	if !ok || inv.IsDeferred(scaffoldableItem) {
+		t.Fatalf("%s is not an implementable item of the %s inventory", scaffoldableItem, controls.LatestKISAEdition)
 	}
 
 	tmp := t.TempDir()
 	out := filepath.Join(tmp, "controls")
 	fixtures := filepath.Join(tmp, "testdata")
 	var stdout, stderr bytes.Buffer
-	code := runControls([]string{"new", "muster.file.example", "--kisa-id", kisaID, "--kisa-dir", repoKisa, "--out", out, "--fixtures", fixtures}, &stdout, &stderr)
+	code := runControls([]string{"new", "muster.file.example", "--kisa-id", scaffoldableItem, "--kisa-dir", kisaDir, "--out", out, "--fixtures", fixtures}, &stdout, &stderr)
 	if code != exitOK {
 		t.Fatalf("exit %d, want %d; stdout %q stderr %q", code, exitOK, stdout.String(), stderr.String())
 	}
@@ -376,7 +447,7 @@ func TestControlsNewWritesASkeletonAndRefusesToOverwrite(t *testing.T) {
 	if !strings.Contains(c.TitleKo, item.NameKo) {
 		t.Errorf("title_ko %q must carry the inventory's item name as its placeholder", c.TitleKo)
 	}
-	if !strings.Contains(c.TitleEn, kisaID) {
+	if !strings.Contains(c.TitleEn, scaffoldableItem) {
 		t.Errorf("title_en %q must name the item it scaffolds", c.TitleEn)
 	}
 	if c.Automation != "auto" {
@@ -396,7 +467,7 @@ func TestControlsNewWritesASkeletonAndRefusesToOverwrite(t *testing.T) {
 			t.Errorf("the placeholder clause names %q, which is not a registered fact key", cl.Fact)
 		}
 	}
-	wantKISA := map[string][]string{"2026": {kisaID}, "2021": kisaFrom2021(t, repoKisa, kisaID)}
+	wantKISA := map[string][]string{"2026": {scaffoldableItem}, "2021": kisaFrom2021(t, kisaDir, scaffoldableItem)}
 	if !reflect.DeepEqual(c.References.KISA, wantKISA) {
 		t.Errorf("references.kisa %v, want %v", c.References.KISA, wantKISA)
 	}
@@ -410,21 +481,12 @@ func TestControlsNewWritesASkeletonAndRefusesToOverwrite(t *testing.T) {
 		checkFixtureStub(t, filepath.Join(fixtures, "muster.file.example", name))
 	}
 
-	// A 2026 item with no 2021 ancestor writes an empty list, not null: the
-	// schema is a map of edition to ids, and "no ancestor" is a statement.
-	var emptyID string
-	for _, row := range kisaMappingRows(t, repoKisa) {
-		if _, known := inv.Item(controls.LatestKISAEdition, row.LatestID); known && !inv.IsDeferred(row.LatestID) && len(row.From2021) == 0 {
-			emptyID = row.LatestID
-			break
-		}
-	}
-	if emptyID == "" {
-		t.Fatal("no 2026 item without a 2021 ancestor; this case cannot be exercised")
-	}
+	// A current-edition item with no 2021 ancestor writes an empty list, not
+	// null: the schema is a map of edition to ids, and "no ancestor" is a
+	// statement.
 	fresh := t.TempDir()
 	var out2, err2 bytes.Buffer
-	if code := runControls([]string{"new", "muster.account.example", "--kisa-id", emptyID, "--kisa-dir", repoKisa, "--out", filepath.Join(fresh, "controls"), "--fixtures", filepath.Join(fresh, "testdata")}, &out2, &err2); code != exitOK {
+	if code := runControls([]string{"new", "muster.account.example", "--kisa-id", scaffoldableItemNo2021, "--kisa-dir", kisaDir, "--out", filepath.Join(fresh, "controls"), "--fixtures", filepath.Join(fresh, "testdata")}, &out2, &err2); code != exitOK {
 		t.Fatalf("exit %d, want %d; stderr %q", code, exitOK, err2.String())
 	}
 	body, err := os.ReadFile(filepath.Join(fresh, "controls", "account", "example.yaml"))
@@ -432,12 +494,12 @@ func TestControlsNewWritesASkeletonAndRefusesToOverwrite(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !strings.Contains(string(body), `"2021": []`) {
-		t.Errorf("a 2026 item with no 2021 ancestor must write an empty list:\n%s", body)
+		t.Errorf("a current-edition item with no 2021 ancestor must write an empty list:\n%s", body)
 	}
 
 	// A second run refuses, names the file, and changes nothing.
 	var out3, err3 bytes.Buffer
-	if code := runControls([]string{"new", "muster.file.example", "--kisa-id", kisaID, "--kisa-dir", repoKisa, "--out", out, "--fixtures", fixtures}, &out3, &err3); code != exitRefused {
+	if code := runControls([]string{"new", "muster.file.example", "--kisa-id", scaffoldableItem, "--kisa-dir", kisaDir, "--out", out, "--fixtures", fixtures}, &out3, &err3); code != exitRefused {
 		t.Fatalf("second run exit %d, want %d; stderr %q", code, exitRefused, err3.String())
 	}
 	if !strings.Contains(err3.String(), yamlPath) {
@@ -454,7 +516,7 @@ func TestControlsNewWritesASkeletonAndRefusesToOverwrite(t *testing.T) {
 		t.Fatal(err)
 	}
 	var out4, err4 bytes.Buffer
-	if code := runControls([]string{"new", "muster.file.example", "--kisa-id", kisaID, "--kisa-dir", repoKisa, "--out", out, "--fixtures", fixtures}, &out4, &err4); code != exitRefused {
+	if code := runControls([]string{"new", "muster.file.example", "--kisa-id", scaffoldableItem, "--kisa-dir", kisaDir, "--out", out, "--fixtures", fixtures}, &out4, &err4); code != exitRefused {
 		t.Fatalf("exit %d, want %d; stderr %q", code, exitRefused, err4.String())
 	}
 	if !strings.Contains(err4.String(), filepath.Join(fixtures, "muster.file.example")) {
@@ -465,8 +527,43 @@ func TestControlsNewWritesASkeletonAndRefusesToOverwrite(t *testing.T) {
 	}
 }
 
+// Same input, same bytes (CLAUDE.md): the skeleton's determinism rests on
+// yaml.v3 sorting the one map it writes, which is a property of a dependency
+// and so worth pinning here rather than trusting.
+func TestControlsNewIsDeterministic(t *testing.T) {
+	kisaDir := syntheticKisaDir(t)
+	read := func() (yamlBody, stub []byte) {
+		t.Helper()
+		dir := t.TempDir()
+		out := filepath.Join(dir, "controls")
+		fixtures := filepath.Join(dir, "testdata")
+		var stdout, stderr bytes.Buffer
+		if code := runControls([]string{"new", "muster.file.example", "--kisa-id", scaffoldableItem, "--kisa-dir", kisaDir, "--out", out, "--fixtures", fixtures}, &stdout, &stderr); code != exitOK {
+			t.Fatalf("exit %d, want %d; stderr %q", code, exitOK, stderr.String())
+		}
+		y, err := os.ReadFile(filepath.Join(out, "file", "example.yaml"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		s, err := os.ReadFile(filepath.Join(fixtures, "muster.file.example", "pass-example.json"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return y, s
+	}
+	firstYAML, firstStub := read()
+	secondYAML, secondStub := read()
+	if !bytes.Equal(firstYAML, secondYAML) {
+		t.Errorf("two scaffolds of the same item differ:\n%s\n---\n%s", firstYAML, secondYAML)
+	}
+	if !bytes.Equal(firstStub, secondStub) {
+		t.Errorf("two fixture stubs differ:\n%s\n---\n%s", firstStub, secondStub)
+	}
+}
+
 // The refusals that keep a broken control out of the set in the first place.
 func TestControlsNewRefusesWhatTheSetCannotHold(t *testing.T) {
+	kisaDir := syntheticKisaDir(t)
 	dir := t.TempDir()
 	out := filepath.Join(dir, "controls")
 	fixtures := filepath.Join(dir, "testdata")
@@ -481,23 +578,23 @@ func TestControlsNewRefusesWhatTheSetCannotHold(t *testing.T) {
 	}
 
 	// A bad id, named with the rule it broke.
-	code, stderr := scaffold("muster.File.Example", "--kisa-id", "U-01", "--kisa-dir", repoKisa, "--out", out, "--fixtures", fixtures)
+	code, stderr := scaffold("muster.File.Example", "--kisa-id", scaffoldableItem, "--kisa-dir", kisaDir, "--out", out, "--fixtures", fixtures)
 	if code != exitRefused || !strings.Contains(stderr, "muster.<area>.<name>") {
 		t.Errorf("bad id: exit %d stderr %q", code, stderr)
 	}
 	// An area that is not a control category has no directory to live in.
-	code, stderr = scaffold("muster.nowhere.example", "--kisa-id", "U-01", "--kisa-dir", repoKisa, "--out", out, "--fixtures", fixtures)
+	code, stderr = scaffold("muster.nowhere.example", "--kisa-id", scaffoldableItem, "--kisa-dir", kisaDir, "--out", out, "--fixtures", fixtures)
 	if code != exitRefused || !strings.Contains(stderr, "nowhere") {
 		t.Errorf("bad area: exit %d stderr %q", code, stderr)
 	}
 	// An id the inventory does not list.
-	code, stderr = scaffold("muster.file.example", "--kisa-id", "U-99", "--kisa-dir", repoKisa, "--out", out, "--fixtures", fixtures)
+	code, stderr = scaffold("muster.file.example", "--kisa-id", "U-99", "--kisa-dir", kisaDir, "--out", out, "--fixtures", fixtures)
 	if code != exitRefused || !strings.Contains(stderr, "U-99") {
 		t.Errorf("unknown item: exit %d stderr %q", code, stderr)
 	}
 	// An id muster has deferred: a control for it would fail the set-level
 	// coverage rule the moment it is committed.
-	inv, err := controls.LoadKISA(repoKisa)
+	inv, err := controls.LoadKISA(kisaDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -505,12 +602,19 @@ func TestControlsNewRefusesWhatTheSetCannotHold(t *testing.T) {
 		t.Fatal("no deferred item; this case cannot be exercised")
 	}
 	deferred := inv.Deferred[0].ID
-	code, stderr = scaffold("muster.file.example", "--kisa-id", deferred, "--kisa-dir", repoKisa, "--out", out, "--fixtures", fixtures)
+	code, stderr = scaffold("muster.file.example", "--kisa-id", deferred, "--kisa-dir", kisaDir, "--out", out, "--fixtures", fixtures)
 	if code != exitRefused || !strings.Contains(stderr, deferred) || !strings.Contains(stderr, "kisa_deferred.json") {
 		t.Errorf("deferred item: exit %d stderr %q", code, stderr)
 	}
+	// M-55: an id an embedded control already implements. The same argument
+	// as the deferral: the second control makes kisa_coverage fail on the
+	// duplicate, one commit later.
+	code, stderr = scaffold("muster.account.example", "--kisa-id", "U-02", "--kisa-dir", kisaDir, "--out", out, "--fixtures", fixtures)
+	if code != exitRefused || !strings.Contains(stderr, "U-02") || !strings.Contains(stderr, "muster.account.password_policy") {
+		t.Errorf("claimed item: exit %d stderr %q must name the control that already claims it", code, stderr)
+	}
 	// No inventory to read at all.
-	code, stderr = scaffold("muster.file.example", "--kisa-id", "U-01", "--kisa-dir", filepath.Join(dir, "nothing"), "--out", out, "--fixtures", fixtures)
+	code, stderr = scaffold("muster.file.example", "--kisa-id", scaffoldableItem, "--kisa-dir", filepath.Join(dir, "nothing"), "--out", out, "--fixtures", fixtures)
 	if code != exitRefused || !strings.Contains(stderr, "nothing") {
 		t.Errorf("missing inventory: exit %d stderr %q", code, stderr)
 	}
@@ -521,7 +625,7 @@ func TestControlsNewRefusesWhatTheSetCannotHold(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, name := range []string{"kisa_items_latest.json", "kisa_items_2021.json", "kisa_deferred.json"} {
-		data, err := os.ReadFile(filepath.Join(repoKisa, name))
+		data, err := os.ReadFile(filepath.Join(kisaDir, name))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -529,7 +633,7 @@ func TestControlsNewRefusesWhatTheSetCannotHold(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	code, stderr = scaffold("muster.file.example", "--kisa-id", "U-01", "--kisa-dir", partial, "--out", out, "--fixtures", fixtures)
+	code, stderr = scaffold("muster.file.example", "--kisa-id", scaffoldableItem, "--kisa-dir", partial, "--out", out, "--fixtures", fixtures)
 	if code != exitRefused || !strings.Contains(stderr, "kisa_mapping.json") {
 		t.Errorf("missing mapping: exit %d stderr %q", code, stderr)
 	}
@@ -538,24 +642,41 @@ func TestControlsNewRefusesWhatTheSetCannotHold(t *testing.T) {
 		t.Errorf("a refused run wrote %v under %s", entries, out)
 	}
 
+	// A fixture root that is a file, not a directory: the run fails, and it
+	// must fail before the YAML is on disk. Half a control -- one that claims
+	// a KISA item with no fixtures beside it -- fails controls lint on two
+	// rules at once, and with the default flags it lands in the real set.
+	notADir := filepath.Join(dir, "a-file")
+	if err := os.WriteFile(notADir, []byte("not a directory\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	halfOut := filepath.Join(dir, "half", "controls")
+	code, stderr = scaffold("muster.file.example", "--kisa-id", scaffoldableItem, "--kisa-dir", kisaDir, "--out", halfOut, "--fixtures", notADir)
+	if code != exitError {
+		t.Errorf("fixture root that is a file: exit %d, want %d; stderr %q", code, exitError, stderr)
+	}
+	if _, err := os.Stat(filepath.Join(halfOut, "file", "example.yaml")); err == nil {
+		t.Errorf("the failed run left half a control at %s", filepath.Join(halfOut, "file", "example.yaml"))
+	}
+
 	// Flag errors are the other kind: could not run, rather than refused to.
 	var o, e bytes.Buffer
-	if code := runControls([]string{"new", "muster.file.example", "--kisa-dir", repoKisa}, &o, &e); code != exitError || !strings.Contains(e.String(), "--kisa-id") {
+	if code := runControls([]string{"new", "muster.file.example", "--kisa-dir", kisaDir}, &o, &e); code != exitError || !strings.Contains(e.String(), "--kisa-id") {
 		t.Errorf("missing --kisa-id: exit %d stderr %q", code, e.String())
 	}
 	o.Reset()
 	e.Reset()
-	if code := runControls([]string{"new", "muster.file.example", "--kisa-id", "U-01", "--bogus"}, &o, &e); code != exitError || !strings.Contains(e.String(), "--bogus") {
+	if code := runControls([]string{"new", "muster.file.example", "--kisa-id", scaffoldableItem, "--bogus"}, &o, &e); code != exitError || !strings.Contains(e.String(), "--bogus") {
 		t.Errorf("unknown flag: exit %d stderr %q", code, e.String())
 	}
 	o.Reset()
 	e.Reset()
-	if code := runControls([]string{"new", "--kisa-id", "U-01"}, &o, &e); code != exitError || !strings.Contains(e.String(), "control id") {
+	if code := runControls([]string{"new", "--kisa-id", scaffoldableItem}, &o, &e); code != exitError || !strings.Contains(e.String(), "control id") {
 		t.Errorf("no id: exit %d stderr %q", code, e.String())
 	}
 	o.Reset()
 	e.Reset()
-	if code := runControls([]string{"new", "muster.file.example", "--kisa-id", "U-01", "--automation", "sometimes"}, &o, &e); code != exitError || !strings.Contains(e.String(), "sometimes") {
+	if code := runControls([]string{"new", "muster.file.example", "--kisa-id", scaffoldableItem, "--automation", "sometimes"}, &o, &e); code != exitError || !strings.Contains(e.String(), "sometimes") {
 		t.Errorf("bad automation: exit %d stderr %q", code, e.String())
 	}
 }
@@ -563,6 +684,7 @@ func TestControlsNewRefusesWhatTheSetCannotHold(t *testing.T) {
 // M-8/M-16: a manual skeleton judges nothing. It states why muster declines
 // and names the facts the reviewer needs in hand instead.
 func TestControlsNewManualShape(t *testing.T) {
+	kisaDir := syntheticKisaDir(t)
 	reg, err := facts.LoadRegistry()
 	if err != nil {
 		t.Fatal(err)
@@ -571,7 +693,7 @@ func TestControlsNewManualShape(t *testing.T) {
 	out := filepath.Join(tmp, "controls")
 	fixtures := filepath.Join(tmp, "testdata")
 	var stdout, stderr bytes.Buffer
-	code := runControls([]string{"new", "muster.service.example", "--kisa-id", "U-45", "--automation", "manual", "--kisa-dir", repoKisa, "--out", out, "--fixtures", fixtures}, &stdout, &stderr)
+	code := runControls([]string{"new", "muster.service.example", "--kisa-id", scaffoldableItem, "--automation", "manual", "--kisa-dir", kisaDir, "--out", out, "--fixtures", fixtures}, &stdout, &stderr)
 	if code != exitOK {
 		t.Fatalf("exit %d, want %d; stderr %q", code, exitOK, stderr.String())
 	}
@@ -603,18 +725,24 @@ func TestControlsNewManualShape(t *testing.T) {
 	if c.Remediation != nil {
 		t.Errorf("a manual skeleton carries no remediation: %v", c.Remediation)
 	}
+	// absent_means is only read where there is a judgment to skip, so on a
+	// manual control it is a field the engine never looks at -- and a field
+	// no committed manual control carries.
+	if c.AbsentMeans != "" {
+		t.Errorf("absent_means %q on a manual skeleton is dead configuration", c.AbsentMeans)
+	}
 	if problems := controls.Lint(set, reg, controls.LintOptions{}); len(problems) != 0 {
 		for _, p := range problems {
 			t.Errorf("the manual skeleton is not lint-clean: %s", p)
 		}
 	}
-	// The fixture prefixes are the statuses a manual control can produce.
-	for _, name := range []string{"manual-example.json", "na-example.json"} {
-		checkFixtureStub(t, filepath.Join(fixtures, "muster.service.example", name))
-	}
-	for _, name := range []string{"pass-example.json", "fail-example.json"} {
+	// The one status a manual skeleton can actually produce. NOT_APPLICABLE
+	// needs an applies_when the scaffold does not have, so an na- stub would
+	// be a fixture the shape it was scaffolded with forbids.
+	checkFixtureStub(t, filepath.Join(fixtures, "muster.service.example", "manual-example.json"))
+	for _, name := range []string{"pass-example.json", "fail-example.json", "na-example.json"} {
 		if _, err := os.Stat(filepath.Join(fixtures, "muster.service.example", name)); err == nil {
-			t.Errorf("a manual control can never produce %s", name)
+			t.Errorf("a manual skeleton must not scaffold %s", name)
 		}
 	}
 }

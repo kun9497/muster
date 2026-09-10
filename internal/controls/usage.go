@@ -1,6 +1,9 @@
 package controls
 
 import (
+	"sort"
+	"strings"
+
 	"github.com/kun9497/muster/internal/facts"
 )
 
@@ -16,6 +19,76 @@ import (
 // visible: a key dropped from the engine but left here shows up as engine-
 // read in a collector that has no business having one (M-3).
 var engineReadKeys = set("walk.complete", "sshd.collect_method", "sshd.personas_collected", "accounts.nss.remote")
+
+// enginePrefixes maps the prefix of a key a control may name to the
+// engine-read keys the engine resolves while it evaluates such a control
+// (M-54). It is the per-control half of engineReadKeys, which stays the
+// single truth: a package test asserts that every key a row can return is a
+// member of that map, and that every member is reachable from some row, so
+// the two can never drift into two lists.
+//
+// A prefix is deliberately coarser than the engine's own predicates -- a
+// user-or-group subject_kind for accounts.nss.remote, the
+// sshd.options./sshd.banner_file. split for the two sshd keys. Restating
+// those here would need the registry and would drift from eval.go in
+// silence, while a prefix can only ask for a leaf that turns out to be
+// unnecessary, never omit one that matters.
+var enginePrefixes = []struct {
+	prefix string
+	keys   []string
+}{
+	{"walk.", []string{"walk.complete"}},
+	{"sshd.", []string{"sshd.collect_method", "sshd.personas_collected"}},
+	{"accounts.", []string{"accounts.nss.remote"}},
+}
+
+// EngineKeys returns, sorted and deduplicated, the engine-read keys the check
+// engine resolves on its own while it evaluates c: the walk gate, the sshd
+// parse-fallback and persona degradations, and the remote-NSS degradation
+// (internal/check: eval.go, clause.go). No clause of c names them, so a
+// snapshot cut down to c's clauses needs them added or it degrades
+// differently from the snapshot it was cut from -- which is how a fixture
+// comes to claim a verdict its host never gave.
+func EngineKeys(c *Control) []string {
+	named := map[string]bool{}
+	mark := func(clauses []Clause) {
+		for _, cl := range clauses {
+			if cl.Fact != "" {
+				named[cl.Fact] = true
+			}
+		}
+	}
+	mark(c.AppliesWhen)
+	mark(c.Checks)
+	for _, m := range c.Mechanisms {
+		mark(m.When)
+		mark(m.Checks)
+	}
+	// M-8: evidence is what a manual control hands the reviewer, and a
+	// fixture for it is cut the same way, so it implies the same keys.
+	for _, k := range c.Evidence {
+		named[k] = true
+	}
+	implied := map[string]bool{}
+	for k := range named {
+		for _, row := range enginePrefixes {
+			if strings.HasPrefix(k, row.prefix) {
+				for _, e := range row.keys {
+					implied[e] = true
+				}
+			}
+		}
+	}
+	if len(implied) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(implied))
+	for k := range implied {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
+}
 
 // CollectorUsage is the fact-key report for one collector (spec §11: facts
 // used, not facts collected). Registered is how many keys the registry files

@@ -235,7 +235,7 @@ func runControls(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stdout, "ok: %d controls, set %s\n", len(set.Controls), set.Version)
 		return exitOK
 	case "new":
-		return runControlsNew(args[1:], stdout, stderr)
+		return runControlsNew(args[1:], set, stdout, stderr)
 	case "list":
 		for _, c := range set.Controls {
 			fmt.Fprintf(stdout, "%s\t%s\t%s\t%s\n", c.ID, c.Importance, c.Automation, c.TitleEn)
@@ -302,7 +302,7 @@ func parseControlsNewArgs(args []string) (newFlags, error) {
 // spec §6.2). It checks everything it can before it writes anything: a
 // refusal must leave the tree exactly as it found it, or the developer is
 // left with half a control and no way to tell which half.
-func runControlsNew(args []string, stdout, stderr io.Writer) int {
+func runControlsNew(args []string, set *controls.Set, stdout, stderr io.Writer) int {
 	f, err := parseControlsNewArgs(args)
 	if err != nil {
 		fmt.Fprintf(stderr, "muster: %v\n%s", err, controlsNewUsage)
@@ -338,6 +338,14 @@ func runControlsNew(args []string, stdout, stderr io.Writer) int {
 			f.kisaID, filepath.Join(f.kisaDir, kisaDeferredFile))
 		return exitRefused
 	}
+	// M-55: the same argument one step later. An item an embedded control
+	// already implements makes the coverage rule fail on the duplicate the
+	// moment the second control is committed, and the inventory does not say
+	// which items are taken -- so the command that reads it says so instead.
+	if claimed := claimant(set, f.kisaID); claimed != "" {
+		fmt.Fprintf(stderr, "muster: %s is already implemented by %s; extend that control or pick another item\n", f.kisaID, claimed)
+		return exitRefused
+	}
 	from2021, err := kisaAncestors(f.kisaDir, f.kisaID)
 	if err != nil {
 		fmt.Fprintf(stderr, "muster: %v\n", err)
@@ -362,19 +370,22 @@ func runControlsNew(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "muster: %v\n", err)
 		return exitError
 	}
-	if err := os.MkdirAll(filepath.Dir(yamlPath), 0o755); err != nil {
-		fmt.Fprintf(stderr, "muster: %v\n", err)
-		return exitError
+	// Both directories first: after the first byte is written the only work
+	// left is two more writes into directories that already exist, so a
+	// mistyped --fixtures cannot leave a control YAML with no fixtures
+	// beside it -- half a control, which claims a KISA item and fails the
+	// lint on two rules at once.
+	for _, dir := range []string{filepath.Dir(yamlPath), fixtureDir} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			fmt.Fprintf(stderr, "muster: %v\n", err)
+			return exitError
+		}
 	}
 	if err := os.WriteFile(yamlPath, append([]byte(scaffoldHeader), body...), 0o644); err != nil {
 		fmt.Fprintf(stderr, "muster: %v\n", err)
 		return exitError
 	}
 	fmt.Fprintf(stdout, "wrote %s\n", yamlPath)
-	if err := os.MkdirAll(fixtureDir, 0o755); err != nil {
-		fmt.Fprintf(stderr, "muster: %v\n", err)
-		return exitError
-	}
 	for _, stub := range fixtureStubNames(f.automation) {
 		p := filepath.Join(fixtureDir, stub)
 		if err := os.WriteFile(p, []byte(fixtureStub), 0o644); err != nil {
@@ -391,7 +402,10 @@ func runControlsNew(args []string, stdout, stderr io.Writer) int {
 // pair its automation can reach (controls/testdata, CLAUDE.md).
 func fixtureStubNames(automation string) []string {
 	if automation == "manual" {
-		return []string{"manual-example.json", "na-example.json"}
+		// Only the one it can reach: the skeleton has no applies_when, so
+		// NOT_APPLICABLE is unreachable until the author adds one, and an
+		// na- stub would be a fixture the scaffolded shape forbids.
+		return []string{"manual-example.json"}
 	}
 	return []string{"pass-example.json", "fail-example.json"}
 }
@@ -431,15 +445,18 @@ func scaffoldControl(f newFlags, area string, item controls.KISAItem, from2021 [
 			kisaPriorEdition:           from2021,
 		}},
 		RequiresFacts: ">=1",
-		// The safe default: until the author decides what an absent fact
-		// means for this item, it means a human has to look (spec §6.5).
-		AbsentMeans: "manual",
 	}
 	if f.automation == "manual" {
 		c.ManualReason = "TODO: why muster declines to judge this item, and what the reviewer must read to decide it."
 		c.Evidence = []string{scaffoldFactKey}
+		// No absent_means: it decides what a judgment does with an absent
+		// fact, and a manual control has no judgment to decide for.
 		return c
 	}
+	// The safe default for a control that does judge: until the author
+	// decides what an absent fact means for this item, it means a human has
+	// to look (spec §6.5).
+	c.AbsentMeans = "manual"
 	c.Checks = []controls.Clause{{Fact: scaffoldFactKey, Op: "present"}}
 	c.Remediation = &controls.Remediation{
 		TextEn:     "TODO: the commands or edits that fix this, in the order an operator runs them.",
@@ -448,6 +465,21 @@ func scaffoldControl(f newFlags, area string, item controls.KISAItem, from2021 [
 		Idempotent: true,
 	}
 	return c
+}
+
+// claimant returns the id of the control that already cites the given
+// current-edition KISA item, or "" when the item is free. The set-level
+// coverage rule allows exactly one, so the first match is the answer.
+func claimant(set *controls.Set, kisaID string) string {
+	for i := range set.Controls {
+		c := &set.Controls[i]
+		for _, id := range c.References.KISA[controls.LatestKISAEdition] {
+			if id == kisaID {
+				return c.ID
+			}
+		}
+	}
+	return ""
 }
 
 // kisaAncestors returns the prior-edition items the given current-edition

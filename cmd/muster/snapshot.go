@@ -11,18 +11,19 @@ import (
 	"strings"
 
 	"github.com/kun9497/muster/internal/controls"
-	"github.com/kun9497/muster/internal/facts"
 )
 
 const snapshotUsage = `usage: muster snapshot <extract> [flags]
 
 extract cuts one control's fixture out of a snapshot: exactly the fact leaves
 that control reads -- its applies_when, its checks, every mechanism's when and
-checks, the evidence a manual control names, and walk.complete when it reads any
-walk.* key -- copied out of the snapshot unchanged, with an empty run block and a
-provenance note naming the muster version, the collection time and the OS. It
-never copies the hostname, and it never invents a leaf: a key the snapshot does
-not carry is reported on stderr and left out.
+checks, the evidence a manual control names, and the keys the engine resolves on
+its own while it evaluates that control. Each leaf is copied content-faithfully,
+with every field and every digit the host wrote and its object keys sorted, and
+the file carries an empty run block and a provenance note naming the muster
+version, the collection time and the OS. It never copies the hostname, it never
+invents a leaf -- a key the snapshot does not carry is reported on stderr and
+left out -- and it refuses to write over the snapshot it is cutting from.
 
 The file it writes says "synthetic": false, because it is not synthetic: it came
 off a real host. Read it, take out anything that identifies that host, and set
@@ -119,28 +120,25 @@ func runSnapshotExtract(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "muster: %v\n%s", err, snapshotUsage)
 		return exitError
 	}
-	var in io.Reader = os.Stdin
-	if f.facts != "-" {
-		fh, err := os.Open(f.facts)
-		if err != nil {
-			fmt.Fprintf(stderr, "muster: %v\n", err)
-			return exitError
+	// The whole snapshot is in memory by the time the extract is written,
+	// so pointing --out at --facts would succeed and quietly leave a few
+	// hundred bytes where a host snapshot was. A snapshot is not cheap to
+	// reproduce, so this is a refusal rather than a warning.
+	if f.out != "" && f.facts != "-" {
+		input, inErr := os.Stat(f.facts)
+		output, outErr := os.Stat(f.out)
+		if inErr == nil && outErr == nil && os.SameFile(input, output) {
+			fmt.Fprintf(stderr, "muster: refusing to write the extract over the snapshot it was cut from: %s\n", f.out)
+			return exitRefused
 		}
-		defer fh.Close()
-		in = fh
 	}
-	// The bytes are kept as well as the decoded snapshot: facts.Load applies
-	// the size, depth and schema rules (spec §7.2), and the raw tree decoded
+	// The bytes are kept as well as the decoded snapshot: openFacts applies
+	// the size, depth and schema rules (spec 7.2), and the raw tree decoded
 	// beside it is what the leaves are copied from. json.Number keeps every
 	// number exactly as the snapshot wrote it -- decoded into float64 and
 	// re-encoded, a large integer would come back in a different shape, and
 	// a fixture that differs from its host is not evidence of anything.
-	data, err := io.ReadAll(io.LimitReader(in, facts.MaxSnapshotBytes+1))
-	if err != nil {
-		fmt.Fprintf(stderr, "muster: read snapshot: %v\n", err)
-		return exitError
-	}
-	snap, err := facts.Load(bytes.NewReader(data))
+	snap, data, err := openFacts(f.facts)
 	if err != nil {
 		fmt.Fprintf(stderr, "muster: %v\n", err)
 		return exitError
@@ -211,11 +209,12 @@ func runSnapshotExtract(args []string, stdout, stderr io.Writer) int {
 }
 
 // controlFactKeys returns, deduplicated and sorted, every fact key the
-// control reads: the clauses it judges by, and the evidence a manual control
-// hands the reviewer (M-8). walk.complete joins them whenever a walk.* key
-// is read -- the engine resolves it directly to decide whether the deep walk
-// finished, so no clause names it and a fixture without it would report an
-// incomplete walk that never happened (internal/controls: engineReadKeys).
+// control reads: the clauses it judges by, the evidence a manual control
+// hands the reviewer (M-8), and the keys the engine resolves on its own while
+// it evaluates this control (M-54). The last are controls.EngineKeys, so this
+// command holds no opinion of its own about what the engine reads -- the
+// walk gate and the two sshd degradations and the remote-NSS degradation all
+// live beside engineReadKeys, where they can be held to it.
 func controlFactKeys(c *controls.Control) []string {
 	seen := map[string]bool{}
 	mark := func(clauses []controls.Clause) {
@@ -234,14 +233,8 @@ func controlFactKeys(c *controls.Control) []string {
 	for _, k := range c.Evidence {
 		seen[k] = true
 	}
-	walked := false
-	for k := range seen {
-		if strings.HasPrefix(k, "walk.") {
-			walked = true
-		}
-	}
-	if walked {
-		seen["walk.complete"] = true
+	for _, k := range controls.EngineKeys(c) {
+		seen[k] = true
 	}
 	keys := make([]string, 0, len(seen))
 	for k := range seen {
@@ -253,7 +246,8 @@ func controlFactKeys(c *controls.Control) []string {
 
 // leafAtPath descends a decoded facts tree by a key's dotted segments and
 // returns the leaf whole -- envelope or setting, with every field the
-// snapshot wrote. It is deliberately not facts.Registry.Resolve: that
+// snapshot wrote (the encoder later sorts the object keys, which is what the
+// determinism ruling asks for; nothing else about the leaf changes). It is deliberately not facts.Registry.Resolve: that
 // re-decodes a leaf into the envelope type, which drops a field the type
 // does not know and elides an empty value, and a fixture must be what the
 // host said, not what the reader understood of it.

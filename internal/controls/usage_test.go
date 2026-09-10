@@ -2,6 +2,7 @@ package controls
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/kun9497/muster/internal/facts"
@@ -206,5 +207,116 @@ func TestFactUsageCoversTheWholeRegistry(t *testing.T) {
 	}
 	if usage[0].Collector != reg.Keys[0].Collector {
 		t.Errorf("first row is %s, want the first collector of the registry (%s)", usage[0].Collector, reg.Keys[0].Collector)
+	}
+}
+
+// M-54: enginePrefixes and engineReadKeys must stay one truth, not two
+// copies. Every key a prefix row can return is a key the engine really reads,
+// and every key the engine reads is reachable from some row -- otherwise a
+// fixture cut for a control that reads it would silently lack it.
+func TestEnginePrefixesAndEngineReadKeysAgree(t *testing.T) {
+	reachable := map[string]bool{}
+	for _, row := range enginePrefixes {
+		if row.prefix == "" || !strings.HasSuffix(row.prefix, ".") {
+			t.Errorf("prefix %q must be a dotted fact-key prefix", row.prefix)
+		}
+		if len(row.keys) == 0 {
+			t.Errorf("prefix %q returns no key", row.prefix)
+		}
+		for _, k := range row.keys {
+			if !engineReadKeys[k] {
+				t.Errorf("prefix %q returns %q, which the engine does not read; engineReadKeys is the truth", row.prefix, k)
+			}
+			// A row's own keys must match its prefix, or the row could never
+			// ask for what a control reading them implies.
+			if !strings.HasPrefix(k, row.prefix) {
+				t.Errorf("prefix %q returns %q, which does not start with it", row.prefix, k)
+			}
+			reachable[k] = true
+		}
+	}
+	for k := range engineReadKeys {
+		if !reachable[k] {
+			t.Errorf("the engine reads %q and no prefix row returns it, so no fixture would ever carry it", k)
+		}
+	}
+}
+
+// EngineKeys answers per control: the keys the engine resolves while it
+// evaluates that control, whichever list the control names them in.
+func TestEngineKeysFollowEveryClauseListAndEvidence(t *testing.T) {
+	cases := []struct {
+		name string
+		c    Control
+		want []string
+	}{
+		{"nothing the engine reads",
+			Control{Checks: []Clause{{Fact: "firewall.backend", Op: "present"}}},
+			nil},
+		{"a walk key in checks",
+			Control{Checks: []Clause{{Fact: "walk.world_writable", Op: "each"}}},
+			[]string{"walk.complete"}},
+		{"an sshd key in a mechanism, deduplicated across when and checks",
+			Control{Mechanisms: []Mechanism{{
+				When:   ClauseList{{Fact: "sshd.options.permit_root_login", Op: "present"}},
+				Checks: []Clause{{Fact: "sshd.options.permit_root_login", Op: "in"}},
+			}}},
+			[]string{"sshd.collect_method", "sshd.personas_collected"}},
+		{"an accounts key in applies_when",
+			Control{AppliesWhen: ClauseList{{Fact: "accounts.users", Op: "present"}}},
+			[]string{"accounts.nss.remote"}},
+		{"a manual control's evidence counts too",
+			Control{Automation: "manual", Evidence: []string{"accounts.users"}},
+			[]string{"accounts.nss.remote"}},
+		{"two prefixes at once, sorted",
+			Control{Checks: []Clause{{Fact: "walk.world_writable", Op: "each"}, {Fact: "accounts.users", Op: "present"}}},
+			[]string{"accounts.nss.remote", "walk.complete"}},
+		{"the engine key itself is not doubled",
+			Control{Checks: []Clause{{Fact: "walk.complete", Op: "eq"}}},
+			[]string{"walk.complete"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := EngineKeys(&tc.c)
+			if len(got) == 0 && len(tc.want) == 0 {
+				return
+			}
+			if !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("EngineKeys = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+// The set muster ships is what the fixture workflow runs against: every
+// engine key a real control implies must be one the engine reads, and the
+// controls that imply none must get none.
+func TestEngineKeysOverTheEmbeddedSet(t *testing.T) {
+	set, err := LoadDefault()
+	if err != nil {
+		t.Fatal(err)
+	}
+	implied := 0
+	for i := range set.Controls {
+		c := &set.Controls[i]
+		keys := EngineKeys(c)
+		for _, k := range keys {
+			if !engineReadKeys[k] {
+				t.Errorf("%s implies %q, which the engine does not read", c.ID, k)
+			}
+		}
+		if len(keys) > 0 {
+			implied++
+		}
+	}
+	if implied == 0 {
+		t.Error("no control in the set implies an engine-read key; the report would be vacuous")
+	}
+	rrl, ok := set.ByID("muster.account.root_remote_login")
+	if !ok {
+		t.Fatal("the set has no muster.account.root_remote_login")
+	}
+	if want := []string{"sshd.collect_method", "sshd.personas_collected"}; !reflect.DeepEqual(EngineKeys(rrl), want) {
+		t.Errorf("EngineKeys(root_remote_login) = %v, want %v", EngineKeys(rrl), want)
 	}
 }
