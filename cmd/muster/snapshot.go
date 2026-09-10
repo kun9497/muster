@@ -37,7 +37,7 @@ flags:
   --out <file>      write here instead of stdout
 
 exit codes: 0 wrote the skeleton; 1 refused (no such control in the embedded
-set); 2 bad flags or an I/O error.
+set, or --out names the snapshot itself); 2 bad flags or an I/O error.
 `
 
 // fixtureSkeleton is what extract writes: a snapshot cut down to the leaves

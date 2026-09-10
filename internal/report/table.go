@@ -152,7 +152,7 @@ func WriteTable(w io.Writer, r *Report, o TableOptions) error {
 				}
 				failing++
 				if shown < o.MaxObservations {
-					fmt.Fprintf(w, "    %s: expected %v, actual %v (%s)\n", escape(ob.Subject), escape(fmt.Sprint(ob.Expected)), escape(fmt.Sprint(ob.Actual)), escape(ob.Verdict))
+					fmt.Fprintf(w, "    %s: expected %v, actual %v (%s)\n", escape(ob.Subject), escape(fmt.Sprint(ob.Expected)), escape(actualText(ob.Actual)), escape(ob.Verdict))
 					shown++
 				}
 			}
@@ -162,6 +162,19 @@ func WriteTable(w io.Writer, r *Report, o TableOptions) error {
 		}
 	}
 	return nil
+}
+
+// actualText renders an observation's actual value. M-5's missing-field
+// observation carries none at all -- collection.go builds it with Actual nil
+// and the JSON omits the field -- and fmt.Sprint would print a Go nil, which
+// reads like a value the record held rather than a field it does not have
+// (EV-2). The JSON is unchanged: this is the table's rendering of the
+// observation, not the observation itself.
+func actualText(v any) string {
+	if v == nil {
+		return "(no such field)"
+	}
+	return fmt.Sprint(v)
 }
 
 func reasonLine(row Row) string {

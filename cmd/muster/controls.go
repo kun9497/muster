@@ -319,10 +319,14 @@ func runControlsNew(args []string, set *controls.Set, stdout, stderr io.Writer) 
 			area, area, strings.Join(controls.Categories(), ", "))
 		return exitRefused
 	}
+	// G-1/M-35: an inventory this command cannot READ is an I/O failure -- the
+	// exit-code line above says 2 and controls lint has answered 2 for a
+	// missing --kisa directory since M-35. Exit 1 stays what it means here: a
+	// refusal the inventory answered, an item it defers or a path that exists.
 	inventory, err := controls.LoadKISA(f.kisaDir)
 	if err != nil {
 		fmt.Fprintf(stderr, "muster: %v\n", err)
-		return exitRefused
+		return exitError
 	}
 	item, known := inventory.Item(controls.LatestKISAEdition, f.kisaID)
 	if !known {
@@ -349,7 +353,7 @@ func runControlsNew(args []string, set *controls.Set, stdout, stderr io.Writer) 
 	from2021, err := kisaAncestors(f.kisaDir, f.kisaID)
 	if err != nil {
 		fmt.Fprintf(stderr, "muster: %v\n", err)
-		return exitRefused
+		return exitError
 	}
 
 	yamlPath := filepath.Join(f.out, area, name+".yaml")

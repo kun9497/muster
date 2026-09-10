@@ -622,6 +622,59 @@ func TestLintKISACoverageIsSetLevel(t *testing.T) {
 	}
 }
 
+// G-3: LoadKISA is what fills the index Item and HasEdition answer from, so a
+// hand-built KISAInventory answers "no 2026 edition" -- and the coverage rule
+// used to return silently, turning the whole set-level gate off with nothing
+// said. A caller that passes an inventory is asking for the cross-check; if it
+// cannot run, that is a problem, not a pass. A nil KISA still means shape-only.
+func TestLintReportsAnInventoryWithoutTheCurrentEdition(t *testing.T) {
+	handBuilt := &KISAInventory{Items: map[string][]KISAItem{LatestKISAEdition: {{ID: "U-01"}}}}
+	ps := lintSet(t, LintOptions{KISA: handBuilt}, goodControl)
+	if !hasMessage(ps, "kisa_coverage", "no "+LatestKISAEdition+" edition") {
+		t.Errorf("an inventory the coverage rule cannot run on must say so: %v", messagesOf(ps, "kisa_coverage"))
+	}
+	if got := len(messagesOf(ps, "kisa_coverage")); got != 1 {
+		t.Errorf("want exactly one kisa_coverage problem, got %d: %v", got, messagesOf(ps, "kisa_coverage"))
+	}
+	// Shape-only linting (no inventory at all) is unchanged.
+	for _, m := range messagesOf(lintSet(t, LintOptions{}, goodControl), "kisa_coverage") {
+		t.Errorf("a nil inventory must run no coverage rule: %q", m)
+	}
+}
+
+// G-9: the uncited-items message names ids, so it must agree in number with
+// them -- a set one item short read "1 2026 items are cited by no control".
+// A two-item inventory built through LoadKISA (the only thing that fills the
+// edition index) gives exactly one uncited item; the real inventory gives the
+// plural in TestLintKISACoverageIsSetLevel above.
+func TestLintUncitedMessageAgreesInNumber(t *testing.T) {
+	dir := t.TempDir()
+	write := func(name, body string) {
+		t.Helper()
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("kisa_items_latest.json", `[{"id":"U-01","name_ko":"a","category":"account","importance":"상","page":1},
+	  {"id":"U-02","name_ko":"b","category":"account","importance":"상","page":2}]`)
+	write("kisa_items_2021.json", `[{"id":"U-01","name_ko":"a","category":"account","importance":"상","page":1}]`)
+	write(kisaDeferredFile, `[]`)
+	inv, err := LoadKISA(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ms := messagesOf(lintSet(t, LintOptions{KISA: inv}, goodControl), "kisa_coverage")
+	if len(ms) != 1 {
+		t.Fatalf("want one kisa_coverage problem for the one uncited item, got %v", ms)
+	}
+	if !strings.Contains(ms[0], "1 2026 item is cited by no control") {
+		t.Errorf("message %q must agree in number with the one id it names", ms[0])
+	}
+	if strings.Contains(ms[0], "items are") {
+		t.Errorf("message %q still uses the plural", ms[0])
+	}
+}
+
 // The gate: the embedded set must satisfy the cross-check against the
 // committed inventory. Every 2026 item is enrolled exactly once or deferred.
 func TestLintEmbeddedSetPassesTheKISACrossCheck(t *testing.T) {
@@ -873,8 +926,12 @@ remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true }
 	if !hasMessage(lintOne(t, appliesWhen, LintOptions{}), "shell_valid_screen", "applies_when") {
 		t.Error("an unscreened shell_valid clause in applies_when must be a problem")
 	}
-	if ps := lintOne(t, head+"applies_when:\n"+screen+judge+body, LintOptions{}); len(ps) != 0 {
-		t.Errorf("a screened applies_when must lint clean: %v", ps)
+	// EV-4 refuses a collection op in a screen whatever it selects on, so this
+	// construct now also carries a clause_grammar problem; what is asserted
+	// here is the shell_valid rule alone, satisfied by a screen in its OWN list.
+	screened := head + "applies_when:\n" + screen + judge + body
+	if ps := messagesOf(lintOne(t, screened, LintOptions{}), "shell_valid_screen"); len(ps) != 0 {
+		t.Errorf("a screen in the same list must satisfy the shell_valid rule: %v", ps)
 	}
 
 	// A mechanism's when list is its own list too.
@@ -887,6 +944,61 @@ remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true }
 `
 	if !hasMessage(lintOne(t, mechWhen, LintOptions{}), "shell_valid_screen", "mechanisms[0].when") {
 		t.Error("an unscreened shell_valid clause in a mechanism's when must be a problem")
+	}
+}
+
+// EV-4: each/none may only be judged, never screened. evalOne reads a screen
+// clause's Holds alone (eval.go), so under applies_when or a mechanism's when
+// a selection that matched nothing would silently apply the control or choose
+// the mechanism, and an M-5 missing field would silently skip it -- with no
+// field-naming reason anywhere. No embedded control does this today; the rule
+// is what keeps it that way.
+func TestLintRefusesACollectionOpInAScreen(t *testing.T) {
+	head := `id: muster.account.screen_grammar_test
+title_en: t
+title_ko: 제목
+description_en: d
+description_ko: d
+category: account
+importance: 하
+automation: auto
+requires_facts: ">=1"
+absent_means: fail
+`
+	const judged = "  - { fact: files.home_dirs, op: none, where: { field: other_writable, op: eq, expected: true } }\n"
+	const screenOK = "  - { fact: accounts.shells, op: present }\n"
+	const remediation = "remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true }\n"
+
+	// applies_when
+	y := head + "applies_when:\n" + judged + "checks:\n" + screenOK + remediation
+	if !hasMessage(lintOne(t, y, LintOptions{}), "clause_grammar", "applies_when", "only valid under checks") {
+		t.Errorf("an each/none clause in applies_when must be a clause_grammar problem: %v", lintOne(t, y, LintOptions{}))
+	}
+	// a mechanism's when
+	mech := head + `mechanisms:
+  - when:
+      - { fact: files.home_dirs, op: none, where: { field: other_writable, op: eq, expected: true } }
+    checks:
+      - { fact: accounts.shells, op: present }
+` + remediation
+	if !hasMessage(lintOne(t, mech, LintOptions{}), "clause_grammar", "mechanisms[0].when", "only valid under checks") {
+		t.Errorf("an each/none clause in a mechanism's when must be a clause_grammar problem: %v", lintOne(t, mech, LintOptions{}))
+	}
+	// The same clause under checks is the ordinary case and must stay clean of
+	// this rule -- in both the plain and the mechanism list.
+	for _, ok := range []string{
+		head + "checks:\n" + screenOK + judged + remediation,
+		head + `mechanisms:
+  - checks:
+      - { fact: accounts.shells, op: present }
+      - { fact: files.home_dirs, op: none, where: { field: other_writable, op: eq, expected: true } }
+` + remediation,
+	} {
+		for _, m := range messagesOf(lintOne(t, ok, LintOptions{}), "clause_grammar") {
+			if strings.Contains(m, "only valid under checks") {
+				t.Errorf("a judged each/none must lint clean: %s", m)
+			}
+		}
 	}
 }
 

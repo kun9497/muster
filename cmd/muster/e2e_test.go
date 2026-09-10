@@ -451,16 +451,25 @@ func assertManualEvidenceIsPresent(t *testing.T, jsonBytes []byte) {
 			continue
 		}
 		checked++
-		read := map[string]string{}
+		// T-6/EV-5 (LOW-5, as internal/controls' fixture gate does it): a
+		// setting key emits one entry PER SIDE, so every side is kept rather
+		// than the last one overwriting the rest. No manual control names a
+		// setting today and the lint rule does not forbid one, which is
+		// exactly when a gate keyed by fact alone would quietly stop checking.
+		read := map[string][]string{}
 		for _, ev := range r.Evidence {
-			read[ev.Fact] = ev.Status
+			read[ev.Fact] = append(read[ev.Fact], ev.Status)
 		}
 		for _, k := range keys {
-			switch status, shown := read[k]; {
-			case !shown:
+			sides := read[k]
+			if len(sides) == 0 {
 				t.Errorf("%s: the MANUAL row does not carry its declared evidence %s", r.ID, k)
-			case status == "missing":
-				t.Errorf("%s: MANUAL evidence %s is missing from the snapshot; the row names a fact it cannot show", r.ID, k)
+				continue
+			}
+			for _, status := range sides {
+				if status == "missing" {
+					t.Errorf("%s: MANUAL evidence %s is missing from the snapshot; the row names a fact it cannot show", r.ID, k)
+				}
 			}
 		}
 	}

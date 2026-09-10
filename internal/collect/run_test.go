@@ -8,6 +8,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -542,5 +543,21 @@ func TestRunRecordsRedactedFields(t *testing.T) {
 	// R52: the profile and the flag are unchanged by any of this.
 	if r.Profile != "default" || r.IncludeSecrets {
 		t.Errorf("redaction %+v", r)
+	}
+	// T-4: the header D13 promises is the one in the FILE. The in-memory
+	// value above is set before the snapshot is marshalled, so it alone would
+	// stay green if the field were filled after the encode, or if its JSON
+	// name or omitempty ever changed.
+	f, err := os.Open(out.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	snap, err := facts.Load(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"snmp.communities"}; !reflect.DeepEqual(snap.Run.Redaction.RedactedFields, want) {
+		t.Errorf("the written snapshot says redacted_fields %v, wanted %v", snap.Run.Redaction.RedactedFields, want)
 	}
 }

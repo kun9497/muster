@@ -53,12 +53,42 @@ func countEnrolled(items []controls.KISAItem, byItem map[string][]controls.Contr
 	return n
 }
 
-// enrolledCount answers the same question from the inputs, for callers that
-// have not joined anything -- the README guard in main.go. The table and the
-// guard therefore share one definition of "enrolled".
-func enrolledCount(items []controls.KISAItem, deferred []controls.Deferral, set []controls.Control) int {
+// countAutomation counts the ENROLLED controls by automation kind, the same
+// way countEnrolled counts items: a deferred item contributes nothing, and a
+// control no inventory item names is not enrolled. The table's summary line
+// and the README guard both read it, so the parenthetical in the READMEs can
+// never drift from the one in coverage.md (M-3, G-2).
+func countAutomation(items []controls.KISAItem, byItem map[string][]controls.Control, stage map[string]string) (auto, partial, manual int) {
+	for _, it := range items {
+		if _, isDeferred := stage[it.ID]; isDeferred {
+			continue
+		}
+		for _, c := range byItem[it.ID] {
+			switch c.Automation {
+			case "auto":
+				auto++
+			case "partial":
+				partial++
+			case "manual":
+				manual++
+			}
+		}
+	}
+	return auto, partial, manual
+}
+
+// coverageNumbers are the numbers both READMEs and the table's summary line
+// state: how many of the inventory's items the set enrols, how many items
+// there are, and how the enrolled controls divide by automation.
+type coverageNumbers struct{ enrolled, total, auto, partial, manual int }
+
+// counts answers all of them from the inputs, for callers that have not
+// joined anything -- the README guard in main.go. The table and the guard
+// therefore share one definition of "enrolled" and one of the triple.
+func counts(items []controls.KISAItem, deferred []controls.Deferral, set []controls.Control) coverageNumbers {
 	byItem, stage, _ := join(items, deferred, set)
-	return countEnrolled(items, byItem, stage)
+	auto, partial, manual := countAutomation(items, byItem, stage)
+	return coverageNumbers{enrolled: countEnrolled(items, byItem, stage), total: len(items), auto: auto, partial: partial, manual: manual}
 }
 
 // render joins the KISA inventory with the embedded control set and appends
@@ -73,7 +103,6 @@ func render(items []controls.KISAItem, deferred []controls.Deferral, usage []con
 	var b strings.Builder
 	b.WriteString(header)
 	b.WriteString("# KISA 2026 Unix items — coverage\n\n")
-	counts := map[string]int{}
 	var rows []string
 	for _, it := range sorted {
 		if st, isDeferred := stage[it.ID]; isDeferred {
@@ -87,12 +116,12 @@ func render(items []controls.KISAItem, deferred []controls.Deferral, usage []con
 		}
 		sort.Slice(cs, func(i, j int) bool { return cs[i].ID < cs[j].ID })
 		for _, c := range cs {
-			counts[c.Automation]++
 			rows = append(rows, fmt.Sprintf("| %s | %s | %s | %s | %s | enrolled |", it.ID, it.NameKo, it.Importance, c.ID, c.Automation))
 		}
 	}
+	auto, partial, manual := countAutomation(items, byItem, stage)
 	fmt.Fprintf(&b, "%d of %d items enrolled (auto %d, partial %d, manual %d).\n\n",
-		countEnrolled(items, byItem, stage), len(sorted), counts["auto"], counts["partial"], counts["manual"])
+		countEnrolled(items, byItem, stage), len(sorted), auto, partial, manual)
 	b.WriteString("| ID | Item (KISA) | Imp. | Control | Automation | Status |\n|---|---|---|---|---|---|\n")
 	b.WriteString(strings.Join(rows, "\n"))
 	b.WriteString("\n")

@@ -38,9 +38,10 @@ type Deferral struct {
 // edition, held in kisa_items_latest.json.
 //
 // Built by LoadKISA; do not construct or mutate it directly. Items is
-// shadowed by an unexported per-edition index, so a hand-built value would
-// answer Item and HasEdition with nothing -- and an inventory that reports no
-// 2026 edition turns the set-level coverage gate off rather than failing it.
+// shadowed by an unexported per-edition index, so a hand-built value answers
+// Item and HasEdition with nothing. Lint says so rather than falling silent:
+// an inventory that reports no current edition is one kisa_coverage problem
+// (G-3), never a set-level gate quietly turned off.
 type KISAInventory struct {
 	Items    map[string][]KISAItem
 	Deferred []Deferral

@@ -122,6 +122,16 @@ jobs:
             echo "sudo.includedir and sudo.secure_path read absent instead of denied"
             exit 1
           }
+          # G-4: the same argument for the four keys that rest on /etc/shadow
+          # (root:shadow 0640) and /root (0700) being unreadable by the runner
+          # user. This step runs as that user, so the tests answer for the run
+          # the snapshot above came from.
+          ! test -r /etc/shadow && ! test -r /root || {
+            echo "the nonroot capability matrix assumes this user cannot read /etc/shadow or /root;"
+            echo "on a runner where either is readable, accounts.shadow_in_use, files.etc_shadow.acl_present,"
+            echo "files.etc_shadow.acl_entries and files.root_home.acl_present read ok instead of denied"
+            exit 1
+          }
       - name: every fact the capability matrix calls root-only reads denied
         run: |
           jq -e --slurpfile m docs/reference/capability-matrix.json '

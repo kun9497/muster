@@ -67,7 +67,7 @@ func run(args []string, stderr io.Writer) int {
 			io.WriteString(stderr, unifiedDiff(*out, have, got))
 			code = 1
 		}
-		if c := checkREADMEs(stderr, *readmeDir, enrolledCount(items, inventory.Deferred, set.Controls), len(items)); c > code {
+		if c := checkREADMEs(stderr, *readmeDir, counts(items, inventory.Deferred, set.Controls)); c > code {
 			code = c
 		}
 		return code
@@ -86,18 +86,34 @@ func run(args []string, stderr io.Writer) int {
 // Both sides are whitespace-normalised before matching (M-24), so a sentence
 // that wraps the fragment across a line break -- which the Korean one does --
 // still matches, and reflowing a paragraph never fails the gate.
-func checkREADMEs(stderr io.Writer, dir string, enrolled, total int) int {
-	for _, f := range []struct{ name, fragment string }{
-		{"README.md", fmt.Sprintf("%d of the %d items", enrolled, total)},
-		{"README.ko.md", fmt.Sprintf("%d개 중 %d개", total, enrolled)},
+func checkREADMEs(stderr io.Writer, dir string, n coverageNumbers) int {
+	for _, f := range []struct {
+		name      string
+		fragments []string
+	}{
+		// G-2: the automation triple beside the enrolled number is the same
+		// kind of claim and goes stale the same way -- a control moving from
+		// partial to auto leaves the table regenerated, -check green and the
+		// sentence wrong. Each README spells the triple its own way.
+		{"README.md", []string{
+			fmt.Sprintf("%d of the %d items", n.enrolled, n.total),
+			fmt.Sprintf("%d auto, %d partial, %d manual", n.auto, n.partial, n.manual),
+		}},
+		{"README.ko.md", []string{
+			fmt.Sprintf("%d개 중 %d개", n.total, n.enrolled),
+			fmt.Sprintf("auto %d, partial %d, manual %d", n.auto, n.partial, n.manual),
+		}},
 	} {
 		data, err := os.ReadFile(filepath.Join(dir, f.name))
 		if err != nil {
 			return fatal(stderr, err)
 		}
-		if !strings.Contains(normalizeSpace(string(data)), normalizeSpace(f.fragment)) {
-			fmt.Fprintf(stderr, "coverage: %s does not mention %q; update the roadmap sentence\n", f.name, f.fragment)
-			return 1
+		text := normalizeSpace(string(data))
+		for _, frag := range f.fragments {
+			if !strings.Contains(text, normalizeSpace(frag)) {
+				fmt.Fprintf(stderr, "coverage: %s does not mention %q; update the roadmap sentence\n", f.name, frag)
+				return 1
+			}
 		}
 	}
 	return 0

@@ -613,10 +613,14 @@ func TestControlsNewRefusesWhatTheSetCannotHold(t *testing.T) {
 	if code != exitRefused || !strings.Contains(stderr, "U-02") || !strings.Contains(stderr, "muster.account.password_policy") {
 		t.Errorf("claimed item: exit %d stderr %q must name the control that already claims it", code, stderr)
 	}
-	// No inventory to read at all.
+	// No inventory to read at all. G-1/M-35: an inventory this command cannot
+	// READ is an I/O failure, not a refusal -- the command's own exit-code
+	// line says 2, and controls lint has answered 2 for a missing --kisa
+	// directory since M-35. A refusal is reserved for an id the inventory
+	// answers about.
 	code, stderr = scaffold("muster.file.example", "--kisa-id", scaffoldableItem, "--kisa-dir", filepath.Join(dir, "nothing"), "--out", out, "--fixtures", fixtures)
-	if code != exitRefused || !strings.Contains(stderr, "nothing") {
-		t.Errorf("missing inventory: exit %d stderr %q", code, stderr)
+	if code != exitError || !strings.Contains(stderr, "nothing") {
+		t.Errorf("missing inventory: exit %d stderr %q, want exit %d", code, stderr, exitError)
 	}
 	// An inventory without the mapping file: the 2021 ids cannot be derived
 	// and controls new does not guess them.
@@ -634,8 +638,8 @@ func TestControlsNewRefusesWhatTheSetCannotHold(t *testing.T) {
 		}
 	}
 	code, stderr = scaffold("muster.file.example", "--kisa-id", scaffoldableItem, "--kisa-dir", partial, "--out", out, "--fixtures", fixtures)
-	if code != exitRefused || !strings.Contains(stderr, "kisa_mapping.json") {
-		t.Errorf("missing mapping: exit %d stderr %q", code, stderr)
+	if code != exitError || !strings.Contains(stderr, "kisa_mapping.json") {
+		t.Errorf("missing mapping: exit %d stderr %q, want exit %d", code, stderr, exitError)
 	}
 	// Nothing was written by any of them.
 	if entries, err := os.ReadDir(out); err == nil && len(entries) > 0 {

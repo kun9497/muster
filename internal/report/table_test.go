@@ -140,6 +140,32 @@ func TestTableQuietHidesPassAndManual(t *testing.T) {
 	}
 }
 
+// EV-2: M-5's missing-field observation carries no actual value at all --
+// collection.go builds it with Actual nil and the JSON omits the field
+// (omitempty). fmt.Sprint(nil) rendered "actual <nil>", which reads like a
+// value the record held rather than a field it does not have; the reason line
+// above the row already names the field.
+func TestTableRendersAnAbsentActualAsNoSuchField(t *testing.T) {
+	snap, _ := facts.Load(strings.NewReader(`{"schema_version":1,"run":{"muster_version":"0.1.0","collected_at":"2026-09-02T06:00:00Z",
+	  "host":{"hostname":"web-01"},"collectors":[{"name":"test","status":"ok","ms":1}],
+	  "complete":true,"partial_failures":[]},"facts":{}}`))
+	results := []check.Result{
+		{ID: "test.missing_field", Importance: "상", Automation: "auto", Status: check.FAIL,
+			Reason:       `element user:daemon has no field "shell_valid"`,
+			Observations: []check.Observation{{Subject: "user:daemon", Expected: "shell_valid eq false", Actual: nil, Verdict: "fail"}}},
+	}
+	cb := CheckBlock{MusterVersion: "0.1.0", Commit: "abc1234", ControlsVersion: "kisa-unix-2026+2026.09.09", ControlsDigest: "sha256:c", SnapshotDigest: snap.Digest(), GuideEdition: "kisa-unix-2026"}
+	var buf bytes.Buffer
+	WriteTable(&buf, Build(snap, results, cb), TableOptions{})
+	out := buf.String()
+	if !strings.Contains(out, "actual (no such field)") {
+		t.Errorf("an observation with no actual value must say so:\n%s", out)
+	}
+	if strings.Contains(out, "<nil>") {
+		t.Errorf("the table must never print a Go nil:\n%s", out)
+	}
+}
+
 func TestTableEscapesObservationAndWaiverFields(t *testing.T) {
 	snap, _ := facts.Load(strings.NewReader(`{"schema_version":1,"run":{"muster_version":"0.1.0","collected_at":"2026-09-02T06:00:00Z",
 	  "host":{"hostname":"web-01"},"collectors":[{"name":"test","status":"ok","ms":1}],

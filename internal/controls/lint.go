@@ -229,18 +229,21 @@ func Lint(s *Set, reg *facts.Registry, opts LintOptions) []Problem {
 				add("references_nist", "nist_800_53 reference %q appears in no indexed STIG rule", n)
 			}
 		}
+		// The last argument says whether the list is a SCREEN (applies_when,
+		// a mechanism's when) rather than a judgement: the evaluator reads
+		// only Holds there, so a collection op must not appear (EV-4).
 		for _, cl := range c.AppliesWhen {
-			lintClause(c, cl, reg, add, "applies_when")
+			lintClause(c, cl, reg, add, "applies_when", true)
 		}
 		for _, cl := range c.Checks {
-			lintClause(c, cl, reg, add, "checks")
+			lintClause(c, cl, reg, add, "checks", false)
 		}
 		for mi, m := range c.Mechanisms {
 			for _, cl := range m.When {
-				lintClause(c, cl, reg, add, fmt.Sprintf("mechanisms[%d].when", mi))
+				lintClause(c, cl, reg, add, fmt.Sprintf("mechanisms[%d].when", mi), true)
 			}
 			for _, cl := range m.Checks {
-				lintClause(c, cl, reg, add, fmt.Sprintf("mechanisms[%d].checks", mi))
+				lintClause(c, cl, reg, add, fmt.Sprintf("mechanisms[%d].checks", mi), false)
 			}
 		}
 		lintShellValidScreen(c.AppliesWhen, add, "applies_when")
@@ -323,8 +326,16 @@ func paramDefaultMatches(p Param) bool {
 // judged: a 2021 item may legitimately be cited by two controls, because the
 // 2021 list was split and renumbered into 2026 (M-26).
 func lintKISACoverage(s *Set, x *KISAInventory) []Problem {
-	if x == nil || !x.HasEdition(LatestKISAEdition) {
-		return nil
+	if x == nil {
+		return nil // shape-only linting: no inventory was offered
+	}
+	// G-3: the index Item and HasEdition answer from is filled by LoadKISA
+	// alone, so a hand-built value reports no edition. A caller that passed an
+	// inventory asked for the cross-check, and a cross-check that cannot run
+	// is a problem rather than a silent pass -- which is what turning the
+	// set-level gate off without a word would be.
+	if !x.HasEdition(LatestKISAEdition) {
+		return []Problem{{Rule: "kisa_coverage", Message: fmt.Sprintf("inventory holds no %s edition; the coverage rule cannot run", LatestKISAEdition)}}
 	}
 	citedBy := map[string][]string{}
 	for i := range s.Controls {
@@ -372,8 +383,14 @@ func lintKISACoverage(s *Set, x *KISAInventory) []Problem {
 		add("deferred item %s is cited by %s; drop it from %s", id, strings.Join(cs, ", "), kisaDeferredFile)
 	}
 	if len(uncited) > 0 {
-		add("%d %s items are cited by no control and are not deferred: %s (enrol them or list them in %s)",
-			len(uncited), LatestKISAEdition, strings.Join(uncited, ", "), kisaDeferredFile)
+		// G-9: a set one item short read "1 2026 items are cited by no
+		// control". The message names ids, so it agrees in number with them.
+		noun, verb, them := "items", "are", "them"
+		if len(uncited) == 1 {
+			noun, verb, them = "item", "is", "it"
+		}
+		add("%d %s %s %s cited by no control and %s not deferred: %s (enrol %s or list %s in %s)",
+			len(uncited), LatestKISAEdition, noun, verb, verb, strings.Join(uncited, ", "), them, them, kisaDeferredFile)
 	}
 	// M-37: the loop above is over items, so it structurally cannot see a
 	// deferral for something that is not an item -- a typo, or an id from
@@ -422,8 +439,10 @@ func lintShellValidScreen(cls []Clause, add func(string, string, ...any), where 
 }
 
 // lintClause checks one top-level clause and, for collections, its
-// sub-clauses, against the grammar of spec §6.3.
-func lintClause(c *Control, cl Clause, reg *facts.Registry, add func(string, string, ...any), where string) {
+// sub-clauses, against the grammar of spec §6.3. screen says the clause sits
+// in a list the evaluator reads for Holds alone -- applies_when or a
+// mechanism's when.
+func lintClause(c *Control, cl Clause, reg *facts.Registry, add func(string, string, ...any), where string, screen bool) {
 	if cl.Fact == "" {
 		add("clause_grammar", "%s: clause needs fact", where)
 		return
@@ -445,6 +464,13 @@ func lintClause(c *Control, cl Clause, reg *facts.Registry, add func(string, str
 			add("clause_grammar", "%s: where/require/subject are only valid with each or none", where)
 		}
 	case collectionOps[cl.Op]:
+		// EV-4: a screen's outcome is read for Holds alone (eval.go), so a
+		// selection that matched nothing would silently apply the control or
+		// choose the mechanism, and an M-5 missing field would silently skip
+		// it -- neither with the reason a judged clause would carry.
+		if screen {
+			add("clause_grammar", "%s: each/none are only valid under checks — a screen cannot carry a vacuous or missing-field outcome", where)
+		}
 		if !isList {
 			add("clause_grammar", "%s: %s needs a list-typed fact; %s is %s", where, cl.Op, cl.Fact, entry.Type)
 		}
