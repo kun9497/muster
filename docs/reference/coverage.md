@@ -75,11 +75,11 @@
 
 ## Fact keys used by controls
 
-138 of 343 registered keys are read by a control (4 by the engine); 201 unused.
+145 of 343 registered keys are read by a control (4 by the engine); 194 unused.
 
 | Collector | Registered | Used by a control | Read by the engine | Unused |
 |---|---|---|---|---|
-| services | 80 | 39 | 0 | services.ssh.active, services.ssh.unit_file_state, services.ssh.enabled, services.telnet.installed, services.telnet.active, services.telnet.unit_file_state, services.telnet.enabled, services.finger.installed, services.finger.unit_file_state, services.rservices.installed, services.rservices.unit_file_state, services.dos_services.installed, services.dos_services.unit_file_state, services.nfs_server.unit_file_state, services.automount.installed, services.automount.unit_file_state, services.rpcbind.installed, services.rpcbind.unit_file_state, services.nis.installed, services.nis.unit_file_state, services.tftp.installed, services.tftp.unit_file_state, services.talk.installed, services.talk.unit_file_state, services.snmp.unit_file_state, services.ntp.unit_file_state, services.ntp.enabled, services.syslog.installed, services.syslog.unit_file_state, services.syslog.enabled, services.ftp.unit_file_state, services.ftp.enabled, services.ftp.reachable, services.mail.active, services.mail.unit_file_state, services.mail.enabled, services.mail.reachable, services.dns.active, services.dns.unit_file_state, services.dns.enabled, services.dns.reachable |
+| services | 80 | 40 | 0 | services.ssh.active, services.ssh.unit_file_state, services.ssh.enabled, services.telnet.installed, services.telnet.active, services.telnet.unit_file_state, services.telnet.enabled, services.finger.installed, services.finger.unit_file_state, services.rservices.installed, services.rservices.unit_file_state, services.dos_services.installed, services.dos_services.unit_file_state, services.nfs_server.unit_file_state, services.automount.installed, services.automount.unit_file_state, services.rpcbind.installed, services.rpcbind.unit_file_state, services.nis.installed, services.nis.unit_file_state, services.tftp.installed, services.tftp.unit_file_state, services.talk.installed, services.talk.unit_file_state, services.snmp.unit_file_state, services.ntp.unit_file_state, services.ntp.enabled, services.syslog.installed, services.syslog.unit_file_state, services.syslog.enabled, services.ftp.unit_file_state, services.ftp.enabled, services.ftp.reachable, services.mail.active, services.mail.unit_file_state, services.mail.enabled, services.dns.active, services.dns.unit_file_state, services.dns.enabled, services.dns.reachable |
 | sockets | 1 | 0 | 0 | sockets.listening |
 | sshd | 11 | 4 | 2 | sshd.version, sshd.options.max_auth_tries, sshd.options.banner, sshd.include_sources, sshd.banner_file.exists |
 | banners | 10 | 2 | 0 | banners.issue.nonempty, banners.issue.os_escapes, banners.issue.mode, banners.issue_net.mode, banners.motd.nonempty, banners.motd.mode, banners.motd_d, banners.dynamic_motd |
@@ -95,7 +95,7 @@
 | logging | 10 | 3 | 0 | logging.rsyslog.rules, logging.rsyslog.parse_complete, logging.rsyslog.unmodelled, logging.rsyslog.property_filters, logging.journald.storage, logging.journald.forward_to_syslog, logging.log_targets |
 | nfs | 3 | 1 | 0 | nfs.exports_source, nfs.exports_runtime_collected |
 | snmp | 7 | 2 | 0 | snmp.v3_users, snmp.access_rules, snmp.agent_addresses, snmp.config_files, snmp.parse_complete |
-| patch | 10 | 3 | 0 | patch.security_metadata_available, patch.pending_updates, patch.reboot_required, patch.auto_update.enabled, patch.held_packages, patch.days_since_last_install, packages.installed |
+| patch | 10 | 4 | 0 | patch.pending_updates, patch.reboot_required, patch.auto_update.enabled, patch.held_packages, patch.days_since_last_install, packages.installed |
 | ftp | 17 | 6 | 0 | ftp.implementation, ftp.config_files, ftp.parse_complete, ftp.unmodelled, ftp.local_enabled, ftp.tcp_wrappers, ftp.userlist_enable, ftp.userlist_deny, ftp.userlist_file, ftp.banner_source, ftp.banner_text |
-| mail | 10 | 2 | 0 | mail.config_files, mail.postfix.inet_interfaces, mail.postfix.mynetworks, mail.postfix.smtpd_relay_restrictions, mail.postfix.smtpd_recipient_restrictions, mail.postfix.disable_vrfy_command, mail.postfix.authorized_submit_users, mail.sendmail.privacy_options |
+| mail | 10 | 7 | 0 | mail.config_files, mail.postfix.smtpd_recipient_restrictions, mail.postfix.disable_vrfy_command |
 | dns | 7 | 2 | 0 | dns.config_files, dns.parse_complete, dns.unmodelled, dns.options.allow_transfer, dns.options.allow_update |

@@ -1,4 +1,10 @@
 {"synthetic": true, "schema_version":1,"run":{},"facts":{
   "services":{"dns":{"installed":{"status":"ok","value":true}}},
-  "dns":{"implementation":{"status":"ok","value":"bind"}}
+  "dns":{"implementation":{"status":"ok","value":"bind"}},
+  "patch":{
+    "manager":{"status":"ok","value":"dnf"},
+    "metadata_age_s":{"status":"ok","value":2592000},
+    "security_metadata_available":{"status":"ok","value":true},
+    "pending_security_count":{"status":"ok","value":0}
+  }
 }}

@@ -7,6 +7,14 @@ category: service
 importance: 상
 automation: manual
 manual_reason: "Confirm by hand that the mail transfer agent package on this host is at the level the vendor's security updates have reached. muster never matches a version against an advisory (D24) and never asks the daemon, so read patch.pending_security_count and patch.metadata_age_s together with the package manager's own record of the installed MTA."
+# Ruling M-8: the facts a reviewer needs in front of them to answer this by
+# hand. muster declines to judge the version, so the patch state is what it
+# can honestly put on the row - the count, the age of the index that count
+# came from, and whether the cache carries a security channel at all.
+evidence:
+  - patch.pending_security_count
+  - patch.metadata_age_s
+  - patch.security_metadata_available
 references:
   kisa: { "2026": ["U-45"], "2021": ["U-30"] }
 requires_facts: ">=1"
