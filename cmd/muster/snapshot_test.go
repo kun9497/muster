@@ -229,6 +229,66 @@ func TestSnapshotExtractKeepsOnlyWhatTheControlReads(t *testing.T) {
 	if cutEngine := controlStatus(t, engineOut, withEngineKeys); cutEngine != fullEngine {
 		t.Errorf("the extract decides %s %s; the snapshot it came from decides %s", withEngineKeys, cutEngine, fullEngine)
 	}
+
+	// EV-1: the remote-NSS degradation is decided by the REGISTRY (a clause
+	// fact whose subject_kind is user or group), not by an accounts. prefix.
+	// files.home_dirs is subject_kind user, so a host with a remote NSS source
+	// reads U-32 WARN; a fixture cut without accounts.nss.remote would read
+	// PASS -- a fixture claiming a verdict its host never gave.
+	remoteSrc := filepath.Join(t.TempDir(), "remote-nss.json")
+	writeWithRemoteNSS(t, fullPassPath, remoteSrc)
+	const subjectKeyed = "muster.file.home_dir_exists"
+	remoteOut := filepath.Join(t.TempDir(), "home.json")
+	var remoteStdout, remoteStderr bytes.Buffer
+	if code := run([]string{"snapshot", "extract", "--facts", remoteSrc, "--control", subjectKeyed, "--out", remoteOut}, &remoteStdout, &remoteStderr); code != exitOK {
+		t.Fatalf("exit %d, want %d; stderr %q", code, exitOK, remoteStderr.String())
+	}
+	fullRemote := controlStatus(t, remoteSrc, subjectKeyed)
+	if fullRemote != check.WARN {
+		t.Fatalf("the source snapshot decides %s %s, want WARN, so this test proves nothing", subjectKeyed, fullRemote)
+	}
+	if cutRemote := controlStatus(t, remoteOut, subjectKeyed); cutRemote != fullRemote {
+		t.Errorf("the extract decides %s %s; the snapshot it came from decides %s", subjectKeyed, cutRemote, fullRemote)
+	}
+}
+
+// writeWithRemoteNSS copies a snapshot with facts.accounts.nss.remote set to
+// ok:true, which is how a host with an LDAP or SSSD account source reads. The
+// committed snapshot has no such leaf (its account source is files), so the
+// degradation is added here rather than in the shared fixture, where it would
+// move every account control's e2e row.
+func writeWithRemoteNSS(t *testing.T, src, dst string) {
+	t.Helper()
+	data, err := os.ReadFile(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var snap map[string]any
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.UseNumber()
+	if err := dec.Decode(&snap); err != nil {
+		t.Fatal(err)
+	}
+	tree, ok := snap["facts"].(map[string]any)
+	if !ok {
+		t.Fatalf("%s has no facts tree", src)
+	}
+	accounts, ok := tree["accounts"].(map[string]any)
+	if !ok {
+		t.Fatalf("%s has no accounts subtree", src)
+	}
+	nss, ok := accounts["nss"].(map[string]any)
+	if !ok {
+		t.Fatalf("%s has no accounts.nss subtree", src)
+	}
+	nss["remote"] = map[string]any{"status": "ok", "value": true}
+	out, err := json.Marshal(snap)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(dst, out, 0o644); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func leafAt(t *testing.T, tree map[string]any, key string) any {

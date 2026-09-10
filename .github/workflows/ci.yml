@@ -180,6 +180,13 @@ jobs:
           jq -e '.run.env.container != "none"' "$RUNNER_TEMP/muster/containers/c.json"
           if [ "${{ matrix.init }}" = "true" ]; then
             jq -e '.facts.services.ssh.installed.status == "ok"' "$RUNNER_TEMP/muster/containers/c.json"
+            # C-1: the Rocky/Alma 9 images ship no libwrap, so the presence
+            # probe must read false. It read true everywhere while the
+            # candidate list held /lib64/libwrap.so.0 (a symlink on every
+            # merged-usr host), which left U-28's tcp_wrappers gate inert.
+            # The Ubuntu/Debian images are not asserted: libwrap0 may or may
+            # not be pulled in there.
+            jq -e '.facts.files.libwrap_present.value == false' "$RUNNER_TEMP/muster/containers/c.json"
           else
             jq -e '.facts.services.ssh.installed.status == "unsupported"' "$RUNNER_TEMP/muster/containers/c.json"
           fi

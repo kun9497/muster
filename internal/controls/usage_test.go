@@ -2,6 +2,7 @@ package controls
 
 import (
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -274,10 +275,23 @@ func TestEngineKeysFollowEveryClauseListAndEvidence(t *testing.T) {
 		{"the engine key itself is not doubled",
 			Control{Checks: []Clause{{Fact: "walk.complete", Op: "eq"}}},
 			[]string{"walk.complete"}},
+		// EV-1: files.home_dirs is a list of user records, so the evaluator
+		// degrades a control judging it on a remote NSS host -- and nothing in
+		// the key's spelling says so.
+		{"a subject-keyed fact outside the accounts prefix",
+			Control{Checks: []Clause{{Fact: "files.home_dirs", Op: "each"}}},
+			[]string{"accounts.nss.remote"}},
+		{"a group-keyed fact",
+			Control{Checks: []Clause{{Fact: "accounts.groups", Op: "each"}}},
+			[]string{"accounts.nss.remote"}},
+	}
+	reg, err := facts.LoadRegistry()
+	if err != nil {
+		t.Fatal(err)
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := EngineKeys(&tc.c)
+			got := EngineKeys(&tc.c, reg)
 			if len(got) == 0 && len(tc.want) == 0 {
 				return
 			}
@@ -296,10 +310,14 @@ func TestEngineKeysOverTheEmbeddedSet(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	reg, err := facts.LoadRegistry()
+	if err != nil {
+		t.Fatal(err)
+	}
 	implied := 0
 	for i := range set.Controls {
 		c := &set.Controls[i]
-		keys := EngineKeys(c)
+		keys := EngineKeys(c, reg)
 		for _, k := range keys {
 			if !engineReadKeys[k] {
 				t.Errorf("%s implies %q, which the engine does not read", c.ID, k)
@@ -316,7 +334,55 @@ func TestEngineKeysOverTheEmbeddedSet(t *testing.T) {
 	if !ok {
 		t.Fatal("the set has no muster.account.root_remote_login")
 	}
-	if want := []string{"sshd.collect_method", "sshd.personas_collected"}; !reflect.DeepEqual(EngineKeys(rrl), want) {
-		t.Errorf("EngineKeys(root_remote_login) = %v, want %v", EngineKeys(rrl), want)
+	if want := []string{"sshd.collect_method", "sshd.personas_collected"}; !reflect.DeepEqual(EngineKeys(rrl, reg), want) {
+		t.Errorf("EngineKeys(root_remote_login) = %v, want %v", EngineKeys(rrl, reg), want)
+	}
+	// EV-1: the two home controls are judged on files.home_dirs, a list of
+	// user records, so a fixture cut for either needs the remote-NSS leaf.
+	for _, id := range []string{"muster.file.home_dir_exists", "muster.file.home_dir_permissions"} {
+		c, ok := set.ByID(id)
+		if !ok {
+			t.Fatalf("the set has no %s", id)
+		}
+		if keys := EngineKeys(c, reg); !slices.Contains(keys, "accounts.nss.remote") {
+			t.Errorf("EngineKeys(%s) = %v, want accounts.nss.remote among them", id, keys)
+		}
+	}
+}
+
+// EV-1: EngineKeys must answer for the SAME facts internal/check degrades on.
+// remoteNSS (eval.go) reads the registry's subject_kind, so this walks every
+// registered key of those two kinds and asserts a one-clause control naming it
+// implies accounts.nss.remote. A prefix table cannot pass this test: the
+// subject-keyed keys are spread over the files, accounts and walk collectors.
+func TestEngineKeysCoverEverySubjectKeyedRegistryKey(t *testing.T) {
+	reg, err := facts.LoadRegistry()
+	if err != nil {
+		t.Fatal(err)
+	}
+	walked := 0
+	for _, e := range reg.Keys {
+		if e.SubjectKind != "user" && e.SubjectKind != "group" {
+			continue
+		}
+		walked++
+		c := Control{Checks: []Clause{{Fact: e.Key, Op: "each"}}}
+		if keys := EngineKeys(&c, reg); !slices.Contains(keys, "accounts.nss.remote") {
+			t.Errorf("a control judging %s (subject_kind %s) implies %v; the evaluator degrades it on accounts.nss.remote", e.Key, e.SubjectKind, keys)
+		}
+	}
+	if walked == 0 {
+		t.Fatal("the registry has no user- or group-keyed list, so this test proves nothing")
+	}
+	// accounts.shadow_in_use is not a list and carries no subject_kind; the
+	// evaluator names it explicitly, so EngineKeys must too.
+	c := Control{Checks: []Clause{{Fact: "accounts.shadow_in_use", Op: "eq"}}}
+	if keys := EngineKeys(&c, reg); !slices.Contains(keys, "accounts.nss.remote") {
+		t.Errorf("EngineKeys(accounts.shadow_in_use) = %v, want accounts.nss.remote", keys)
+	}
+	// A nil registry is the documented fallback: the prefix rows still answer.
+	nilReg := Control{Checks: []Clause{{Fact: "walk.world_writable", Op: "each"}}}
+	if keys := EngineKeys(&nilReg, nil); !reflect.DeepEqual(keys, []string{"walk.complete"}) {
+		t.Errorf("EngineKeys with a nil registry = %v, want the prefix rows", keys)
 	}
 }

@@ -3067,8 +3067,15 @@ func TestDevGlobDeniedIsTheAnswer(t *testing.T) {
 	}
 	b := build(t, "files", a)
 	for _, k := range []string{"files.dev_entries", "files.dev_nondevice"} {
-		if e := env(t, b, k); e.Status != facts.StatusDenied {
+		e := env(t, b, k)
+		if e.Status != facts.StatusDenied {
 			t.Errorf("%s: %+v, want denied — an unlistable /dev is not a clean one", k, e)
+		}
+		// C-5/C3: the read's status PATH-PREFIXED, as the two sibling M-10
+		// sites (env.go, services_super.go) file theirs. DeniedReason alone is
+		// a constant, so the operator would not learn which directory it was.
+		if !strings.HasPrefix(e.Reason, "/dev/*: ") {
+			t.Errorf("%s reason %q must name the directory that could not be listed", k, e.Reason)
 		}
 	}
 }
@@ -3267,23 +3274,44 @@ func TestUnreadableRhostsIsDenied(t *testing.T) {
 	if !strings.HasPrefix(e.Reason, "/home/bob/.rhosts: ") {
 		t.Errorf("reason %q must name the file that could not be read", e.Reason)
 	}
-	// A symlinked (non-regular) .shosts is error, not denied — FromReadError
-	// classifies, this code only prefixes the path.
+	// C-2: a home muster cannot reach WITHOUT following a symlink (/home ->
+	// /export/home, or one relocated home symlinked back) is a path muster
+	// declined to read, which convention C4 files as absent naming the path —
+	// never the error a Needs: "none" collector would turn into a partial run
+	// and an exit code 2 on a host that was never misconfigured.
 	a = base()
 	a.fails["/home/alice/.shosts"] = collect.ErrSymlink
-	e = env(t, build(t, "files", a), "files.user_rhosts")
-	if e.Status != facts.StatusError || !strings.HasPrefix(e.Reason, "/home/alice/.shosts: ") {
-		t.Errorf("a symlinked .shosts must be error with the path: %+v", e)
+	bs := build(t, "files", a)
+	e = env(t, bs, "files.user_rhosts")
+	if e.Status != facts.StatusAbsent || !strings.Contains(e.Reason, "/home/alice/.shosts") {
+		t.Errorf("a .shosts behind a symlink must be absent naming the path: %+v", e)
 	}
-	// The FIRST read error wins, and it is held per call: alice is scanned
-	// before bob, so alice's denied read is the answer even though bob's is a
-	// different class.
+	if !strings.Contains(e.Reason, "symlink") {
+		t.Errorf("reason %q must say muster does not follow symlinks", e.Reason)
+	}
+	if w := bs.Worst("files"); w != facts.StatusOK {
+		t.Errorf(`Worst("files") = %s, want ok — a symlinked home must not make the run partial`, w)
+	}
+	// ENOTDIR: the home is a regular file, so no .rhosts can exist under it —
+	// no row, and the leaf stays a clean ok list (never "not present" absent).
+	a = base()
+	a.fails["/home/alice/.rhosts"] = unix.ENOTDIR
+	bn := build(t, "files", a)
+	if got := okList(t, bn, "files.user_rhosts"); len(got) != 0 {
+		t.Errorf("an ENOTDIR .rhosts is no row, not %v", got)
+	}
+	if w := bn.Worst("files"); w != facts.StatusOK {
+		t.Errorf(`Worst("files") = %s, want ok for an ENOTDIR home`, w)
+	}
+	// A file that EXISTS and cannot be read outranks a path muster declined to
+	// follow: the denied read is the answer even though bob's home is behind a
+	// symlink, and the state is held per call, never in a package variable.
 	a = base()
 	a.fails["/home/alice/.rhosts"] = os.ErrPermission
 	a.fails["/home/bob/.rhosts"] = collect.ErrSymlink
 	e = env(t, build(t, "files", a), "files.user_rhosts")
 	if e.Status != facts.StatusDenied || !strings.HasPrefix(e.Reason, "/home/alice/.rhosts: ") {
-		t.Errorf("the first read error must win: %+v", e)
+		t.Errorf("an unreadable file must outrank a symlinked path: %+v", e)
 	}
 	// A later, clean run must not inherit it (the state is a local, never a
 	// package-level variable), and ENOENT is still "no row".

@@ -42,7 +42,10 @@ func devEntries(a collect.Access, mounts mountTable) (facts.Envelope, facts.Enve
 			// clean empty dev_nondevice on evidence never seen — the same
 			// vacuous PASS the caller already refuses when
 			// /proc/self/mountinfo cannot be read, filed the same way.
-			e := collect.FromReadError(err, collect.ReadMeta{})
+			// C-5/C3: path-prefixed, as the two sibling M-10 sites file
+			// theirs — DeniedReason alone is a constant, so the reason would
+			// not say which directory could not be listed.
+			e := readErrorEnv(g, err)
 			return e, e
 		}
 		paths = append(paths, m...)

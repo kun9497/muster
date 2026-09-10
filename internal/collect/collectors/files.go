@@ -70,14 +70,22 @@ func filesReads() []string {
 
 // libwrapPaths is where libwrap.so.0 lives on the distributions muster
 // judges — the Debian/Ubuntu multiarch directories for the two supported
-// architectures, and the RHEL-family lib64 pair — plus the plain /usr/lib
-// of a 32-bit build. RHEL 8 and later ship no libwrap at all, which is
-// exactly what the fact exists to say.
+// architectures, the RHEL-family /usr/lib64, and the plain /usr/lib of a
+// 32-bit build. RHEL 8 and later ship no libwrap at all, which is exactly
+// what the fact exists to say.
+//
+// C-1: no candidate may sit under a merged-usr alias. /lib64 and /lib are
+// symlinks into /usr on every host muster targets, and the read primitive
+// refuses a symlinked component (spec §8), so a candidate there would answer
+// ErrSymlink — which pathPresent counts as occupied — and the probe would
+// read true on every such host whether or not the library is installed. The
+// alias targets are the candidates instead: /usr/lib64/libwrap.so.0 is what
+// /lib64/libwrap.so.0 resolves to, and the unmerged Debian layout puts the
+// library under /lib/<multiarch>, never /lib64.
 var libwrapPaths = []string{
 	"/usr/lib/x86_64-linux-gnu/libwrap.so.0",
 	"/usr/lib/aarch64-linux-gnu/libwrap.so.0",
 	"/usr/lib64/libwrap.so.0",
-	"/lib64/libwrap.so.0",
 	"/usr/lib/libwrap.so.0",
 }
 

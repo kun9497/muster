@@ -9,6 +9,8 @@ import (
 	"slices"
 	"strings"
 
+	"golang.org/x/sys/unix"
+
 	"github.com/kun9497/muster/internal/collect"
 	"github.com/kun9497/muster/internal/facts"
 )
@@ -46,6 +48,23 @@ func undeclaredHome(r passwdRow) string {
 func undeclaredHomes(names []string, src *facts.Source) facts.Envelope {
 	slices.Sort(names)
 	e := collect.Absent("home path outside the collector's declaration: " + strings.Join(names, ", "))
+	e.Source = src
+	return e
+}
+
+// unfollowedPaths is the answer a home-keyed enumeration gives when a read
+// failed because a COMPONENT of the path is a symlink (C-2): /home linked to
+// /export/home, or one home relocated and linked back. muster reads without
+// following symlinks (spec §8), so the file was never examined — that is a
+// path muster declined to read, which convention C4 files as absent naming
+// the path, not the `error` a Needs: "none" collector would turn into a
+// partial run and an exit code 2 on a host nobody had misconfigured. The
+// same condition already makes files.home_dirs a denied row (R182); this leaf
+// has no row to carry it, so the whole leaf answers. Paths are sorted, so the
+// same host produces the same bytes.
+func unfollowedPaths(paths []string, src *facts.Source) facts.Envelope {
+	slices.Sort(paths)
+	e := collect.Absent("not examined - muster does not follow symlinks and a component of the path is one: " + strings.Join(paths, ", "))
 	e.Source = src
 	return e
 }
@@ -216,6 +235,11 @@ func userRhosts(a collect.Access, rows []passwdRow, shells map[string]bool) fact
 	// to this call — never a package-level variable — so one host's denied read
 	// cannot leak into the next collection.
 	var readErr *facts.Envelope
+	// unfollowed names the .rhosts/.shosts muster could not reach without
+	// following a symlink (C-2). They are not read errors of a file that
+	// exists: nothing was examined, so they answer absent below rather than
+	// error, and they never reach readErr.
+	var unfollowed []string
 	// scan reports whether the path was inside the declaration, so a home whose
 	// .rhosts AND .shosts were both declined can be named below (M-52) instead
 	// of passing as a home with no such file.
@@ -225,11 +249,21 @@ func userRhosts(a collect.Access, rows []passwdRow, shells map[string]bool) fact
 		}
 		data, meta, err := a.ReadFile(p, readLimit)
 		if err != nil {
-			if !errors.Is(err, fs.ErrNotExist) && readErr == nil {
-				e := readErrorEnv(p, err)
-				readErr = &e
+			switch {
+			case errors.Is(err, fs.ErrNotExist), errors.Is(err, unix.ENOTDIR):
+				// No row: the file need not exist, and ENOTDIR says the home is
+				// not a directory, so no file can exist under it either.
+			case errors.Is(err, collect.ErrSymlink):
+				unfollowed = append(unfollowed, p)
+			default:
+				// EACCES/EPERM and anything else: a file that EXISTS and
+				// cannot be read is the whole leaf (M-13/M-30, C3).
+				if readErr == nil {
+					e := readErrorEnv(p, err)
+					readErr = &e
+				}
 			}
-			return true // ENOENT: no row, the file need not exist
+			return true
 		}
 		plus, count := false, 0
 		for _, l := range splitLines(data) {
@@ -266,7 +300,7 @@ func userRhosts(a collect.Access, rows []passwdRow, shells map[string]bool) fact
 	}
 	if readErr != nil {
 		// A file that EXISTS and cannot be read is the harder answer and
-		// outranks a home muster chose not to visit: the read's status,
+		// outranks a path muster declined to read at all: the read's status,
 		// path-prefixed, carrying no source list (the precedent passwdRows and
 		// untrustedShells set for an enumeration that could not be completed).
 		// Rows collected before it are dropped with it, which is the whole-leaf
@@ -274,6 +308,11 @@ func userRhosts(a collect.Access, rows []passwdRow, shells map[string]bool) fact
 		return *readErr
 	}
 	src := &facts.Source{Kind: "file", Path: passwdPath}
+	// Both remaining answers are absent (C4). A path behind a symlink names a
+	// file, so it is the more specific of the two and answers first.
+	if len(unfollowed) > 0 {
+		return unfollowedPaths(unfollowed, src)
+	}
 	if len(undeclared) > 0 {
 		return undeclaredHomes(undeclared, src)
 	}

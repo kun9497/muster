@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/kun9497/muster/internal/controls"
+	"github.com/kun9497/muster/internal/facts"
 )
 
 const snapshotUsage = `usage: muster snapshot <extract> [flags]
@@ -162,6 +163,14 @@ func runSnapshotExtract(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "muster: %s is not a control of the embedded set; muster controls list names them all\n", f.control)
 		return exitRefused
 	}
+	// The registry the evaluator would use: the engine reads the remote-NSS
+	// degradation off a clause fact's subject_kind, so the keys a fixture needs
+	// cannot be known from the control alone (EV-1).
+	reg, err := facts.LoadRegistry()
+	if err != nil {
+		fmt.Fprintf(stderr, "muster: %v\n", err)
+		return exitError
+	}
 
 	out := fixtureSkeleton{
 		SchemaVersion: snap.SchemaVersion,
@@ -174,7 +183,7 @@ func runSnapshotExtract(args []string, stdout, stderr io.Writer) int {
 		},
 		Facts: map[string]any{},
 	}
-	for _, key := range controlFactKeys(c) {
+	for _, key := range controlFactKeys(c, reg) {
 		leaf, found := leafAtPath(raw.Facts, key)
 		if !found {
 			// Never invented: a fixture built from this file would report
@@ -215,7 +224,7 @@ func runSnapshotExtract(args []string, stdout, stderr io.Writer) int {
 // command holds no opinion of its own about what the engine reads -- the
 // walk gate and the two sshd degradations and the remote-NSS degradation all
 // live beside engineReadKeys, where they can be held to it.
-func controlFactKeys(c *controls.Control) []string {
+func controlFactKeys(c *controls.Control, reg *facts.Registry) []string {
 	seen := map[string]bool{}
 	mark := func(clauses []controls.Clause) {
 		for _, cl := range clauses {
@@ -233,7 +242,7 @@ func controlFactKeys(c *controls.Control) []string {
 	for _, k := range c.Evidence {
 		seen[k] = true
 	}
-	for _, k := range controls.EngineKeys(c) {
+	for _, k := range controls.EngineKeys(c, reg) {
 		seen[k] = true
 	}
 	keys := make([]string, 0, len(seen))

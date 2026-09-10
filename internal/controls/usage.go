@@ -27,12 +27,14 @@ var engineReadKeys = set("walk.complete", "sshd.collect_method", "sshd.personas_
 // member of that map, and that every member is reachable from some row, so
 // the two can never drift into two lists.
 //
-// A prefix is deliberately coarser than the engine's own predicates -- a
-// user-or-group subject_kind for accounts.nss.remote, the
-// sshd.options./sshd.banner_file. split for the two sshd keys. Restating
-// those here would need the registry and would drift from eval.go in
-// silence, while a prefix can only ask for a leaf that turns out to be
-// unnecessary, never omit one that matters.
+// A prefix is deliberately coarser than the engine's own predicates -- the
+// sshd.options./sshd.banner_file. split for the two sshd keys. A prefix can
+// only ask for a leaf that turns out to be unnecessary, never omit one that
+// matters -- but it can only ask for a leaf a key's PREFIX implies, which is
+// why the remote-NSS row is not the whole story: the engine decides that
+// degradation from the registry, and remoteNSSSubject below reads the same
+// registry it does (EV-1). The accounts. row stays because every key under it
+// is an account fact whether or not it carries a subject_kind.
 var enginePrefixes = []struct {
 	prefix string
 	keys   []string
@@ -49,7 +51,12 @@ var enginePrefixes = []struct {
 // snapshot cut down to c's clauses needs them added or it degrades
 // differently from the snapshot it was cut from -- which is how a fixture
 // comes to claim a verdict its host never gave.
-func EngineKeys(c *Control) []string {
+//
+// reg is the registry the evaluator will use. It decides the remote-NSS row
+// the way the evaluator does, from each named fact's subject_kind; a nil
+// registry answers on the prefixes alone, which is the pre-EV-1 behaviour and
+// misses every subject-keyed key outside accounts. (files.home_dirs).
+func EngineKeys(c *Control, reg *facts.Registry) []string {
 	named := map[string]bool{}
 	mark := func(clauses []Clause) {
 		for _, cl := range clauses {
@@ -78,6 +85,9 @@ func EngineKeys(c *Control) []string {
 				}
 			}
 		}
+		if remoteNSSSubject(k, reg) {
+			implied["accounts.nss.remote"] = true
+		}
 	}
 	if len(implied) == 0 {
 		return nil
@@ -88,6 +98,28 @@ func EngineKeys(c *Control) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+// remoteNSSSubject mirrors internal/check's remoteNSS predicate (eval.go): a
+// clause is subject to a remote account source when the fact it names is a
+// list of user or group records -- the registry's subject_kind, not the key's
+// spelling -- or when it is accounts.shadow_in_use. files.home_dirs and
+// files.env_files are subject_kind user and live nowhere near the accounts.
+// prefix, which is exactly the miss EV-1 found: a fixture cut for U-31/U-32
+// without accounts.nss.remote reads PASS where its host read WARN.
+//
+// It is one predicate copied to one other place on purpose: the evaluator may
+// not import controls' fixture tooling, and a test walks every registry key of
+// those two subject kinds to hold the copy to the original.
+func remoteNSSSubject(key string, reg *facts.Registry) bool {
+	if key == "accounts.shadow_in_use" {
+		return true
+	}
+	if reg == nil {
+		return false
+	}
+	e, ok := reg.Lookup(key)
+	return ok && (e.SubjectKind == "user" || e.SubjectKind == "group")
 }
 
 // CollectorUsage is the fact-key report for one collector (spec §11: facts

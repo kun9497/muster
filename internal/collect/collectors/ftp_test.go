@@ -776,9 +776,21 @@ func TestServicesFtpMailDnsRowsDegradeWithTheTable(t *testing.T) {
 }
 
 // Ruling L-9/L-20: libwrap presence is anyPresent over the library's
-// candidate paths — a symlink counts — and ok:false only when every
-// candidate is ENOENT. There is no denied branch.
+// candidate paths — a symlink AT THE CANDIDATE ITSELF counts — and ok:false
+// only when every candidate is ENOENT. There is no denied branch.
+//
+// C-1: no candidate may sit under a merged-usr alias (/lib64, /lib). muster
+// stats without following symlinks, so on every stock x86_64 host — where
+// /lib64 is a symlink to usr/lib64 — such a candidate answers ErrSymlink from
+// the INTERMEDIATE component, which pathPresent counts as occupied. The probe
+// then read ok:true whether or not the library was installed, and U-28's gate
+// could never fire.
 func TestFilesLibwrapPresent(t *testing.T) {
+	for _, p := range libwrapPaths {
+		if strings.HasPrefix(p, "/lib64/") || strings.HasPrefix(p, "/lib/") {
+			t.Errorf("candidate %q is under a merged-usr alias: the symlinked component answers ErrSymlink, which the presence probe would count as present on every such host", p)
+		}
+	}
 	a := &fsAccess{
 		files: map[string]string{"/etc/group": "group"},
 		stats: map[string]statResult{
@@ -790,7 +802,21 @@ func TestFilesLibwrapPresent(t *testing.T) {
 	if e := env(t, build(t, "files", a), "files.libwrap_present"); e.Status != facts.StatusOK || e.Value != true {
 		t.Errorf("libwrap_present %+v, want ok true", e)
 	}
-	none := &fsAccess{files: map[string]string{"/etc/group": "group"}}
+	// L-20: a symlink at the FINAL component still counts — the RHEL-family
+	// candidate is the one a merged-usr /lib64 points at.
+	rhel := &fsAccess{
+		files: map[string]string{"/etc/group": "group"},
+		stats: map[string]statResult{"/usr/lib64/libwrap.so.0": {mode: 0o777, kind: "symlink"}},
+	}
+	if e := env(t, build(t, "files", rhel), "files.libwrap_present"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("libwrap_present %+v, want ok true for a final-component symlink at /usr/lib64/libwrap.so.0", e)
+	}
+	// Every candidate answers ENOENT explicitly, so the false is the probe's
+	// answer over the whole list rather than an empty double.
+	none := &fsAccess{files: map[string]string{"/etc/group": "group"}, fails: map[string]error{}}
+	for _, p := range libwrapPaths {
+		none.fails[p] = unix.ENOENT
+	}
 	if e := env(t, build(t, "files", none), "files.libwrap_present"); e.Status != facts.StatusOK || e.Value != false {
 		t.Errorf("libwrap_present %+v, want ok false when every candidate is ENOENT", e)
 	}
