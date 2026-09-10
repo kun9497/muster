@@ -511,3 +511,36 @@ func TestMusterCollectorFillsEUIDAndCapabilities(t *testing.T) {
 		t.Errorf("euid %d, want %d", b.Header().EUID, os.Geteuid())
 	}
 }
+
+// M-15 (J-7): run.redaction.redacted_fields names the registered secret keys
+// this run actually stored — in reduced form, since nothing stores an
+// original secret (R52). A secret key the run did not fill with a value
+// (here snmp.v3_users, absent because no snmpd configuration was found) is
+// not listed: the field is the set of values that were reduced, not the set
+// of keys that could carry one. The no-secret case is pinned in
+// TestRunWritesSnapshotWithHeaderAndCollectorLog, where the list is empty and
+// omitempty keeps the field out of the JSON entirely.
+func TestRunRecordsRedactedFields(t *testing.T) {
+	Reset()
+	defer Reset()
+	Register(Collector{Name: "snmp", Declare: Declaration{Needs: "none"}, Run: func(ctx context.Context, a Access, b *Builder) error {
+		b.Set("snmp.communities", OK([]any{map[string]any{"ref": "c1", "length": 6}}, nil))
+		b.Set("snmp.v3_users", Absent("no snmpd configuration was found"))
+		// A public key a collector set is never redaction evidence.
+		b.Set("snmp.parse_complete", OK(true, nil))
+		return nil
+	}})
+	dir := t.TempDir()
+	out, err := Run(context.Background(), Options{Out: filepath.Join(dir, "s.json"), Access: quietAccess{}}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := out.Header.Redaction
+	if len(r.RedactedFields) != 1 || r.RedactedFields[0] != "snmp.communities" {
+		t.Errorf("redacted_fields %v, want just the secret key that was stored", r.RedactedFields)
+	}
+	// R52: the profile and the flag are unchanged by any of this.
+	if r.Profile != "default" || r.IncludeSecrets {
+		t.Errorf("redaction %+v", r)
+	}
+}
