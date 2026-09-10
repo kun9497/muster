@@ -37,7 +37,8 @@ flags (new): run "muster controls new" with no arguments to see them
 const controlsNewUsage = `usage: muster controls new <id> --kisa-id U-NN [flags]
 
 Scaffolds one control: <out>/<area>/<name>.yaml from the id (muster.<area>.<name>)
-and a pair of synthetic fixture stubs under <fixtures>/<id>. Everything it writes
+and the synthetic fixture stubs its automation can reach under <fixtures>/<id>
+(a pass-/fail- pair for auto and partial, one manual- stub for manual). Everything it writes
 is a placeholder in muster's own words -- replace the titles, the descriptions,
 the placeholder fact key and the remediation with what this control really
 judges, and fill the stubs in: they carry no facts and no expectation, so the

@@ -11,10 +11,12 @@ automation: auto
 references:
   kisa: { "2026": ["U-27"], "2021": ["U-17"] }
 requires_facts: ">=1"
-# manual, not pass (M-52): files.user_rhosts is absent only when a home was
-# outside the declaration - never on a stock host, where it was always ok - and
-# files.etc_hosts_equiv_lines is never absent (R177). So this can only turn a
-# would-be vacuous PASS into a reviewer question.
+# manual, not pass (M-52, MR-2, MR-4): files.user_rhosts is absent only when an
+# interactive home was outside the declaration or reachable only through a
+# symlink - never on a stock host, where it was always ok - and
+# files.etc_hosts_equiv_lines is never absent (R177). The MANUAL row still
+# carries the hosts.equiv lines as evidence, so a "+" there is visible to the
+# reviewer even though this run could not judge every home.
 absent_means: manual
 checks:
   - { fact: files.user_rhosts, op: none, where: { field: has_plus, op: eq, expected: true } }
