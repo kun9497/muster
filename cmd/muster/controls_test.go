@@ -613,13 +613,6 @@ func TestControlsNewRefusesWhatTheSetCannotHold(t *testing.T) {
 	if code != exitRefused || !strings.Contains(stderr, deferred) || !strings.Contains(stderr, "kisa_deferred.json") {
 		t.Errorf("deferred item: exit %d stderr %q", code, stderr)
 	}
-	// M-55: an id an embedded control already implements. The same argument
-	// as the deferral: the second control makes kisa_coverage fail on the
-	// duplicate, one commit later.
-	code, stderr = scaffold("muster.account.example", "--kisa-id", "U-02", "--kisa-dir", kisaDir, "--out", out, "--fixtures", fixtures)
-	if code != exitRefused || !strings.Contains(stderr, "U-02") || !strings.Contains(stderr, "muster.account.password_policy") {
-		t.Errorf("claimed item: exit %d stderr %q must name the control that already claims it", code, stderr)
-	}
 	// No inventory to read at all. G-1/M-35: an inventory this command cannot
 	// READ is an I/O failure, not a refusal -- the command's own exit-code
 	// line says 2, and controls lint has answered 2 for a missing --kisa
@@ -785,5 +778,43 @@ func checkFixtureStub(t *testing.T, path string) {
 	}
 	if len(stub) != 5 {
 		t.Errorf("%s: %d top-level keys, want 5: %v", path, len(stub), stub)
+	}
+}
+
+// Fix round 1, amending M-55: W-10 allows several controls on one KISA item —
+// U-23 carries two — so an item an embedded control already claims is no
+// longer a refusal. The command scaffolds and says which control is already
+// there, because the inventory does not, and an author who did not mean to
+// add a second one has to be told.
+func TestControlsNewNotesAnItemAnotherControlClaims(t *testing.T) {
+	kisaDir := syntheticKisaDir(t)
+	dir := t.TempDir()
+	out := filepath.Join(dir, "controls")
+	fixtures := filepath.Join(dir, "testdata")
+
+	var stdout, stderr bytes.Buffer
+	code := runControls([]string{"new", "muster.account.example", "--kisa-id", "U-02", "--kisa-dir", kisaDir, "--out", out, "--fixtures", fixtures}, &stdout, &stderr)
+	if code != exitOK {
+		t.Fatalf("exit %d, want %d; stderr %q", code, exitOK, stderr.String())
+	}
+	yamlPath := filepath.Join(out, "account", "example.yaml")
+	if _, err := os.Stat(yamlPath); err != nil {
+		t.Fatalf("a claimed item must still be scaffolded: %v", err)
+	}
+	note := stderr.String()
+	if !strings.HasPrefix(note, "note: ") {
+		t.Errorf("the claim is a note, not an error: %q", note)
+	}
+	if !strings.Contains(note, "U-02") || !strings.Contains(note, "muster.account.password_policy") {
+		t.Errorf("note %q must name the item and the control that already claims it", note)
+	}
+	// An item nothing claims says nothing: a note on every scaffold would be
+	// noise, and this is the half that shows the note is conditional.
+	var quietOut, quietErr bytes.Buffer
+	if code := runControls([]string{"new", "muster.file.example", "--kisa-id", scaffoldableItem, "--kisa-dir", kisaDir, "--out", out, "--fixtures", fixtures}, &quietOut, &quietErr); code != exitOK {
+		t.Fatalf("exit %d, want %d; stderr %q", code, exitOK, quietErr.String())
+	}
+	if quietErr.Len() != 0 {
+		t.Errorf("an unclaimed item must scaffold silently: stderr %q", quietErr.String())
 	}
 }
