@@ -207,7 +207,7 @@ The registry's `sensitivity` label decides what is stored. By default: `/etc/sha
 
 ### 5.8 Limits
 
-One MiB per file read (smaller for `sudoers` and `authorized_keys`); beyond that `truncated: true`. Walk results carry a count cap and `truncated_count`. A control that depends on a truncated fact cannot `PASS`.
+One MiB per file read (smaller for `sudoers` and `authorized_keys`); beyond that `truncated: true`. Walk result lists carry a count cap, `truncated: true` on the list that reached it, and `walk.stats.truncated_counts` (stage 3A). A control that depends on a truncated fact cannot `PASS`.
 
 ### 5.9 Lifecycle
 
@@ -311,6 +311,7 @@ The rows below are evaluated in order and the first that applies decides. Fact s
 | 8 | a fact referenced by the chosen `checks` is `absent` | per `absent_means` |
 | 9 | the control is walk-based and the walk was not run | `MANUAL` ("run collect --deep") |
 | 10 | the control is walk-based and `walk.complete` is false | `ERROR(walk_incomplete)` |
+| 10a | the control is walk-based and `walk.complete` is `denied`, `timeout` or `error` | `ERROR` naming the reason (stage 3A: the walk was requested and could not run) |
 | 11 | a clause fails and `automation: partial` | `WARN`, listed under manual review |
 | 12 | a clause fails | `FAIL` |
 | 13 | all clauses hold but collection was degraded (parse fallback for a daemon-reported setting, personas requested but not collected, firewall confidence below full, a remote NSS source for account facts) | `WARN` naming the degradation |
@@ -393,7 +394,7 @@ muster runs as root on other people's production hosts, and its output is the mo
 
 - **Commands.** Only commands registered in the collector registry run: absolute path, fixed arguments, per-command timeout, output cap. No shell. The environment is discarded and rebuilt (`PATH=/usr/sbin:/usr/bin:/sbin:/bin`, `LC_ALL=C`, `LANG=C`, `TZ=UTC`; `LD_PRELOAD`, `LD_LIBRARY_PATH` and `IFS` never inherited). Processes run in their own group so a timeout kills descendants.
 - **Reads.** Every file read goes through one primitive with two tiers, and the tier used is recorded in the fact's `source`. Tier 1 is `openat2` with `RESOLVE_NO_SYMLINKS|RESOLVE_NO_MAGICLINKS` (Linux 5.6 and later — every first-release target), which refuses any symbolic link in any path component. Tier 2, for kernels or seccomp profiles that reject `openat2`, walks the path component by component with `openat(O_NOFOLLOW|O_DIRECTORY|O_CLOEXEC)` from `/`, which gives the same guarantee. No tier follows a symlink anywhere in the path; `os.Root` is not used, because it follows links inside its root. After opening, `fstat` confirms a regular file (FIFOs, devices and sockets are refused); a size cap applies; a NUL byte marks the file binary and its content is not stored; a world-writable or non-root-owned parent sets `path_untrusted`.
-- **Walk.** Off by default (`--deep`). Local filesystems only, decided from `/proc/self/mountinfo`: `nfs`, `cifs`, `smb3`, `fuse.*`, `sshfs`, `afs`, overlay and snap mounts are excluded; autofs mount points are not even `stat`ed; `/proc`, `/sys`, `/dev`, `/run` are skipped; no symlink is followed; a `(dev, ino)` set breaks cycles; a time and count budget ends the walk with `complete=false`; `nice`, and `ionice` where the I/O scheduler honours it, lower its priority.
+- **Walk.** Off by default (`--deep`). Local filesystems only, decided from `/proc/self/mountinfo`: `nfs`, `cifs`, `smb3`, `fuse.*`, `sshfs`, `afs`, overlay and snap mounts are excluded; autofs mount points are listed by their parent with `AT_NO_AUTOMOUNT` and never opened; `/proc`, `/sys`, `/dev`, `/run` are skipped; no symlink is followed; a `(dev, ino)` set breaks cycles; a time and count budget ends the walk with `complete=false`; `nice` and `ionice` lower its priority, best effort (stage 3A, W-3).
 - **Writes.** The snapshot is the only file `collect` ever writes. No service is restarted, no setting changed, no network connection made by any subcommand, no package metadata refreshed, no update check, no telemetry. CI runs `collect` in a network-less container on a read-only bind mount to prove it.
 - **Data files.** Root never parses a control, waiver or old snapshot. `check` refuses writable data files when root and treats snapshots as hostile input (decode limits, no execution of anything it contains, no reuse of its paths as output paths, escaped rendering).
 - **Snapshot confidentiality.** Redaction by default (section 5.6); 0600 in a 0700 directory; never `/tmp` by default; a lifecycle with a lock and retention (section 5.9). A `--anonymize` mode for sharing (stable hashing of hostnames, addresses and user names) arrives in stage 3 together with the invariant test that anonymised and original snapshots produce identical verdicts.
@@ -419,7 +420,7 @@ muster runs as root on other people's production hosts, and its output is the mo
 An item is classified by the kind of fact its judgment needs, not by its KISA category:
 
 - **auto** — the judgment follows from collected facts.
-- **partial** — the evidence is collected automatically but the final judgment is a human one (which accounts are unnecessary, which SUID files are legitimate). Violations are reported as `WARN` with the observation list, and the item is counted under manual review.
+- **partial** — the evidence is collected automatically but the final judgment is a human one (which accounts are unnecessary; which packaged setuid file is legitimate when no package declaration can vouch for it — an unpackaged setuid file, or one its package declares without the bit, is an automatic finding: stage 3A, W-10). Violations are reported as `WARN` with the observation list, and the item is counted under manual review.
 - **manual** — an interview or an external fact is required; evidence is attached.
 - **deferred (service)** — the judgment needs a parser for a specific daemon's own configuration that v1 does not ship: mail (postfix, sendmail), DNS (bind), and FTP daemon configuration (vsftpd, proftpd). Items that read a plain file or a service state — `ftpusers`, telnet, NFS exports, `snmpd.conf` communities — are not deferred. In v1 the deferred items are enrolled as `manual` with the evidence muster can collect (installed, running, version string) and their `manual_reason` names the deferral.
 - **not_applicable** — the mechanism does not exist on the supported platforms; the control says why.
@@ -553,7 +554,7 @@ Legend: auto — judged from facts; partial — evidence automatic, judgment hum
 | U-20 | /etc/(x)inetd.conf 파일 소유자 및 권한 설정 | 상 | auto |
 | U-21 | /etc/(r)syslog.conf 파일 소유자 및 권한 설정 | 상 | auto |
 | U-22 | /etc/services 파일 소유자 및 권한 설정 | 상 | auto |
-| U-23 | SUID, SGID, Sticky bit 설정 파일 점검 | 상 | partial (walk) |
+| U-23 | SUID, SGID, Sticky bit 설정 파일 점검 | 상 | auto (walk); a second `partial` control holds the setuid files no package declaration can verify (stage 3A, W-10) |
 | U-24 | 사용자, 시스템 환경변수 파일 소유자 및 권한 설정 | 상 | auto |
 | U-25 | world writable 파일 점검 | 상 | partial (walk) |
 | U-26 | /dev에 존재하지 않는 device 파일 점검 | 상 | auto |

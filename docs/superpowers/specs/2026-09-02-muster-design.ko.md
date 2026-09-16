@@ -207,7 +207,7 @@ source = {kind: file|command|proc|sys|derived, path, line, raw, cmd, exit_code}
 
 ### 5.8 한도
 
-파일 읽기 하나당 1 MiB입니다(`sudoers`와 `authorized_keys`는 더 작습니다). 그 이상은 `truncated: true`입니다. 워크 결과에는 개수 상한과 `truncated_count`가 붙습니다. 잘린 팩트에 의존하는 컨트롤은 `PASS`가 될 수 없습니다.
+파일 읽기 하나당 1 MiB입니다(`sudoers`와 `authorized_keys`는 더 작습니다). 그 이상은 `truncated: true`입니다. 워크 결과 리스트는 건수 상한을 가지며, 상한에 닿은 리스트에는 `truncated: true`가, `walk.stats.truncated_counts`에는 리스트별 건수가 실립니다(3A단계). 잘린 팩트에 의존하는 컨트롤은 `PASS`가 될 수 없습니다.
 
 ### 5.9 수명 주기
 
@@ -311,6 +311,7 @@ checks:
 | 8 | 선택된 `checks`가 참조한 팩트가 `absent` | `absent_means`에 따름 |
 | 9 | 워크 기반 컨트롤인데 워크를 실행하지 않음 | `MANUAL`("collect --deep을 실행하십시오") |
 | 10 | 워크 기반 컨트롤인데 `walk.complete`가 false | `ERROR(walk_incomplete)` |
+| 10a | 워크 기반 컨트롤인데 `walk.complete`가 `denied`, `timeout`, `error` | 사유를 명시한 `ERROR`(3A단계: 워크를 요청했으나 돌지 못함) |
 | 11 | 절이 실패하고 `automation: partial` | `WARN`, 수동 검토 항목으로 표시 |
 | 12 | 절이 실패 | `FAIL` |
 | 13 | 모든 절이 성립하지만 수집이 저하됨(데몬이 보고하는 설정에 대한 파싱 폴백, 페르소나를 요청했으나 수집되지 않음, 방화벽 신뢰도가 full 미만, 계정 팩트의 원격 NSS 소스) | 저하 내용을 명시한 `WARN` |
@@ -393,7 +394,7 @@ muster는 남의 프로덕션 호스트에서 root로 돌고, 그 출력은 공�
 
 - **명령.** 수집기 레지스트리에 등록된 명령만 실행합니다. 절대 경로, 고정된 인자, 명령별 타임아웃, 출력 상한이 붙습니다. 셸은 쓰지 않습니다. 환경은 버리고 다시 구성합니다(`PATH=/usr/sbin:/usr/bin:/sbin:/bin`, `LC_ALL=C`, `LANG=C`, `TZ=UTC`. `LD_PRELOAD`, `LD_LIBRARY_PATH`, `IFS`는 결코 상속하지 않습니다). 프로세스는 자기 그룹에서 돌기 때문에 타임아웃이 자손까지 종료합니다.
 - **읽기.** 모든 파일 읽기는 두 계층을 가진 하나의 프리미티브를 거치며, 어느 계층을 썼는지는 팩트의 `source`에 기록됩니다. 1계층은 `RESOLVE_NO_SYMLINKS|RESOLVE_NO_MAGICLINKS`를 준 `openat2`입니다(리눅스 5.6 이상. 첫 릴리스의 모든 대상이 여기 해당합니다). 경로의 어느 구성 요소에 있든 심볼릭 링크를 거부합니다. 2계층은 `openat2`를 거부하는 커널이나 seccomp 프로파일을 위한 것으로, `/`부터 `openat(O_NOFOLLOW|O_DIRECTORY|O_CLOEXEC)`으로 경로를 구성 요소 단위로 걸어가며 같은 보장을 줍니다. 어느 계층도 경로의 어디에서든 심볼릭 링크를 따라가지 않습니다. `os.Root`는 자기 루트 안의 링크를 따라가므로 쓰지 않습니다. 연 다음에는 `fstat`으로 일반 파일임을 확인합니다(FIFO, 디바이스, 소켓은 거부합니다). 크기 상한이 적용됩니다. NUL 바이트가 있으면 그 파일을 바이너리로 표시하고 내용을 저장하지 않습니다. 부모 디렉터리가 world-writable이거나 root 소유가 아니면 `path_untrusted`를 설정합니다.
-- **워크.** 기본적으로 꺼져 있습니다(`--deep`). 로컬 파일시스템만 대상으로 하며 `/proc/self/mountinfo`로 판단합니다. `nfs`, `cifs`, `smb3`, `fuse.*`, `sshfs`, `afs`, overlay와 snap 마운트는 제외합니다. autofs 마운트 지점은 `stat`조차 하지 않습니다. `/proc`, `/sys`, `/dev`, `/run`은 건너뜁니다. 심볼릭 링크는 따라가지 않습니다. `(dev, ino)` 집합으로 순환을 끊습니다. 시간과 개수 예산이 다하면 `complete=false`로 워크를 끝냅니다. `nice`와, I/O 스케줄러가 존중하는 경우의 `ionice`가 우선순위를 낮춥니다.
+- **워크.** 기본적으로 꺼져 있습니다(`--deep`). 로컬 파일시스템만 대상으로 하며 `/proc/self/mountinfo`로 판단합니다. `nfs`, `cifs`, `smb3`, `fuse.*`, `sshfs`, `afs`, overlay와 snap 마운트는 제외합니다. autofs 마운트 지점은 부모가 `AT_NO_AUTOMOUNT`로 나열만 하고 절대 열지 않습니다. `/proc`, `/sys`, `/dev`, `/run`은 건너뜁니다. 심볼릭 링크는 따라가지 않습니다. `(dev, ino)` 집합으로 순환을 끊습니다. 시간과 개수 예산이 다하면 `complete=false`로 워크를 끝냅니다. `nice`와 `ionice`가 최선 노력으로 우선순위를 낮춥니다(3A단계, W-3).
 - **쓰기.** 스냅샷은 `collect`가 쓰는 유일한 파일입니다. 어떤 서브커맨드도 서비스를 재시작하지 않고, 설정을 바꾸지 않고, 네트워크 연결을 만들지 않고, 패키지 메타데이터를 갱신하지 않고, 업데이트를 확인하지 않고, 텔레메트리를 보내지 않습니다. CI는 네트워크 없는 컨테이너에서 읽기 전용 바인드 마운트 위에 `collect`를 돌려 이를 증명합니다.
 - **데이터 파일.** root는 컨트롤, waiver, 옛 스냅샷을 결코 파싱하지 않습니다. `check`는 root일 때 쓰기 가능한 데이터 파일을 거부하고, 스냅샷을 적대적 입력으로 다룹니다(디코드 한도, 그 안의 무엇도 실행하지 않음, 그 안의 경로를 출력 경로로 재사용하지 않음, 이스케이프한 렌더링).
 - **스냅샷 기밀성.** 기본적으로 편집합니다(5.6절). 0700 디렉터리 안의 0600 파일입니다. 기본 위치는 결코 `/tmp`가 아닙니다. 잠금과 보존 정책을 갖춘 수명 주기가 있습니다(5.9절). 공유용 `--anonymize` 모드(호스트명, 주소, 사용자 이름의 안정적 해싱)는 익명화한 스냅샷과 원본 스냅샷이 동일한 판정을 낳는지 확인하는 불변식 테스트와 함께 3단계에 도착합니다.
@@ -419,7 +420,7 @@ muster는 남의 프로덕션 호스트에서 root로 돌고, 그 출력은 공�
 항목은 KISA 분류가 아니라 판정에 필요한 팩트의 종류로 분류합니다.
 
 - **auto** — 수집한 팩트에서 판정이 따라 나옵니다.
-- **partial** — 근거는 자동으로 수집하지만 최종 판단은 사람의 몫입니다(어떤 계정이 불필요한지, 어떤 SUID 파일이 정당한지). 위반은 관찰 목록과 함께 `WARN`으로 보고하고, 항목은 수동 검토로 집계합니다.
+- **partial** — 근거는 자동으로 수집하지만 최종 판단은 사람의 몫입니다(어떤 계정이 불필요한지; 패키지 선언이 보증하지 못하는 패키지 소속 setuid 파일이 정당한지 — 패키지 비소속 setuid 파일이나 패키지가 그 비트 없이 선언한 파일은 자동 판정 대상: 3A단계, W-10). 위반은 관찰 목록과 함께 `WARN`으로 보고하고, 항목은 수동 검토로 집계합니다.
 - **manual** — 인터뷰나 외부 사실이 필요합니다. 근거는 첨부합니다.
 - **deferred (service)** — 판정에 v1이 제공하지 않는, 특정 데몬 고유 설정의 파서가 필요합니다. 메일(postfix, sendmail), DNS(bind), FTP 데몬 설정(vsftpd, proftpd)이 그렇습니다. 평범한 파일이나 서비스 상태를 읽는 항목(`ftpusers`, telnet, NFS export, `snmpd.conf`의 커뮤니티)은 미루지 않습니다. v1에서 미룬 항목들은 muster가 수집할 수 있는 근거(설치 여부, 구동 여부, 버전 문자열)와 함께 `manual`로 등록하고, `manual_reason`에 미룬 사유를 적습니다.
 - **not_applicable** — 지원 플랫폼에 그 메커니즘이 없습니다. 컨트롤이 그 이유를 말합니다.
@@ -553,7 +554,7 @@ assay에서 얻은 두 교훈은 "헬퍼는 커버되는데 아무도 호출하�
 | U-20 | /etc/(x)inetd.conf 파일 소유자 및 권한 설정 | 상 | auto |
 | U-21 | /etc/(r)syslog.conf 파일 소유자 및 권한 설정 | 상 | auto |
 | U-22 | /etc/services 파일 소유자 및 권한 설정 | 상 | auto |
-| U-23 | SUID, SGID, Sticky bit 설정 파일 점검 | 상 | partial (walk) |
+| U-23 | SUID, SGID, Sticky bit 설정 파일 점검 | 상 | auto (walk); 패키지 선언으로 검증할 수 없는 setuid 파일은 두 번째 `partial` 컨트롤이 맡음(3A단계, W-10) |
 | U-24 | 사용자, 시스템 환경변수 파일 소유자 및 권한 설정 | 상 | auto |
 | U-25 | world writable 파일 점검 | 상 | partial (walk) |
 | U-26 | /dev에 존재하지 않는 device 파일 점검 | 상 | auto |
