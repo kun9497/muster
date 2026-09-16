@@ -301,3 +301,32 @@ func TestLoadFallsBackToTheMajorVersion(t *testing.T) {
 		t.Errorf("loadFrom over a broken fallback = %v, want an error naming rocky-9.json", err)
 	}
 }
+
+// A-6/A-7: every release sources.json pins has a committed list. The file is
+// named from the IMAGE's VERSION_ID, so a release pinned as "9" is matched
+// by a list whose release is "9" or any point release of it.
+func TestEveryPinnedReleaseHasAList(t *testing.T) {
+	s, err := LoadSources()
+	if err != nil {
+		t.Fatalf("LoadSources: %v", err)
+	}
+	lists, err := All()
+	if err != nil {
+		t.Fatalf("All(): %v", err)
+	}
+	for _, r := range s.Releases {
+		found := false
+		for _, l := range lists {
+			major, _, _ := strings.Cut(l.Release, ".")
+			if l.Distro == r.ID && (l.Release == r.VersionID || major == r.VersionID) {
+				found = true
+				if l.ImageDigest != r.Digest {
+					t.Errorf("%s-%s: the list was generated from %s, sources.json pins %s", l.Distro, l.Release, l.ImageDigest, r.Digest)
+				}
+			}
+		}
+		if !found {
+			t.Errorf("%s-%s is pinned in sources.json but no list is committed for it", r.ID, r.VersionID)
+		}
+	}
+}
