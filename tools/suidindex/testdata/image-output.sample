@@ -1,0 +1,38 @@
+== osrelease
+ubuntu
+22.04
+== usrmerge
+/bin usr/bin
+/sbin usr/sbin
+/lib usr/lib
+/libx32 /opt/compat/libx32
+== versions
+login 1:4.8.1-2ubuntu2.2
+passwd 1:4.8.1-2ubuntu2.2
+util-linux 2.37.2-4ubuntu3
+at 3.2.5-1ubuntu1
+sudo 1.9.9-1ubuntu2.6
+== files login
+4755 root root /bin/su
+644 root root /etc/login.defs
+755 root root /usr/bin/faillog
+== files passwd
+4755 root root /usr/bin/passwd
+2755 root shadow /usr/bin/chage
+755 root root /usr/sbin/useradd
+== files util-linux
+4755 root root /bin/mount
+4755 root root /bin/umount
+755 root root /usr/bin/dmesg
+644 root root /etc/login.defs
+== modes at
+	chmod 4755 $2/usr/bin/at
+== deb at 1111111111111111111111111111111111111111111111111111111111111111
+-rwxr-xr-x root/root      1024 2024-01-01 00:00 ./usr/bin/atq
+-rwsr-sr-x daemon/daemon  5678 2024-01-01 00:00 ./usr/bin/at
+drwxr-xr-x root/root         0 2024-01-01 00:00 ./usr/bin/
+== modes sudo
+	chmod 0644 /etc/sudoers
+== deb sudo 2222222222222222222222222222222222222222222222222222222222222222
+-rwsr-xr-x root/root    820202 2024-01-01 00:00 ./usr/bin/sudo
+-rw-r----- root/root      1234 2024-01-01 00:00 ./etc/sudoers

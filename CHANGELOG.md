@@ -156,6 +156,23 @@ every plan is under `docs/superpowers/plans/`):
   (spec §11), marks deferred items, and `go run ./tools/coverage -check`
   also verifies the README count sentence. `controls lint` prints the same
   usage totals.
+- `tools/suidindex` generates the setuid/setgid reference lists the walk's
+  dpkg join reads (`docs/reference/suid/*.json`) by running the public
+  container images pinned by digest in `docs/reference/suid/sources.json` and
+  asking the distribution's own package tool what it ships. Five releases are
+  committed: Ubuntu 22.04 and 24.04, Debian 12, Rocky 9 and AlmaLinux 9. A
+  package a base image does not install is downloaded on the host from a URL
+  and SHA-256 pinned in `sources.json` and bind-mounted read-only into the
+  container; the generating container gets no network and installs nothing.
+  `make suidindex-check` regenerates to memory and compares byte for byte;
+  CI runs neither target and reads the committed lists, exactly as it does
+  for `tools/refindex`. On a dpkg host of one of the five releases a packaged
+  setuid file is now decided by the list instead of reading `none` and only
+  warning; a file whose bit a maintainer script sets after unpacking (pkexec,
+  fusermount3, the polkit agent helper) is reported as `postinst` and warns
+  rather than being called a finding. `suid.Load` falls back from the host's
+  VERSION_ID to its major, so a list generated from a 9.8 image answers for
+  any Rocky or AlmaLinux 9 host.
 - `muster controls new` scaffolds a control and its fixture stubs;
   `muster snapshot extract` cuts the leaves a control reads (and the
   engine-read keys they imply) out of a snapshot into a fixture skeleton.

@@ -244,3 +244,60 @@ func listProblems(l List) []string {
 	}
 	return out
 }
+
+// Ruling A-36. The RHEL family's images report a POINT release (rocky 9.8)
+// where sources.json — and the maintainer — pin the major, so a list is
+// committed under the version the image reported and Load falls back from
+// the host's own version to `<id>-<major>.json`. Without the fallback a
+// rocky 9.5 host and a rocky 9.8 list could never meet, and every packaged
+// candidate on that host would read reference "none".
+func TestLoadFallsBackToTheMajorVersion(t *testing.T) {
+	major := goodList()
+	major.Distro, major.Release = "rocky", "9"
+	exact := goodList()
+	exact.Distro, exact.Release = "rocky", "9.8"
+	exact.Entries = append(exact.Entries, Entry{Path: "/usr/bin/zz", Mode: 0o755, Owner: "root", Group: "root", Package: "util-linux"})
+	majorJSON, err := json.Marshal(major)
+	if err != nil {
+		t.Fatal(err)
+	}
+	exactJSON, err := json.Marshal(exact)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	onlyMajor := fstest.MapFS{"rocky-9.json": {Data: majorJSON}}
+	l, ok, err := loadFrom(onlyMajor, "rocky", "9.8")
+	if err != nil || !ok {
+		t.Fatalf("loadFrom(rocky, 9.8) with only rocky-9.json = (%v, %v, %v)", l, ok, err)
+	}
+	if l.Release != "9" {
+		t.Errorf("the fallback loaded %q, want the major list", l.Release)
+	}
+
+	// The exact file wins whenever it exists: the fallback must never
+	// shadow the list generated for this very version.
+	both := fstest.MapFS{"rocky-9.json": {Data: majorJSON}, "rocky-9.8.json": {Data: exactJSON}}
+	l, ok, err = loadFrom(both, "rocky", "9.8")
+	if err != nil || !ok {
+		t.Fatalf("loadFrom(rocky, 9.8) with both = (%v, %v, %v)", l, ok, err)
+	}
+	if l.Release != "9.8" || len(l.Entries) != len(exact.Entries) {
+		t.Errorf("the fallback shadowed the exact list: loaded %q with %d entries", l.Release, len(l.Entries))
+	}
+
+	// A version with no dot has no major to fall back to, and a release
+	// neither name reaches is still the ordinary "no list" answer.
+	if l, ok, err := loadFrom(onlyMajor, "rocky", "10"); ok || err != nil || l != nil {
+		t.Errorf("loadFrom(rocky, 10) = (%v, %v, %v), want (nil, false, nil)", l, ok, err)
+	}
+	if l, ok, err := loadFrom(onlyMajor, "almalinux", "9.8"); ok || err != nil || l != nil {
+		t.Errorf("loadFrom(almalinux, 9.8) = (%v, %v, %v), want (nil, false, nil)", l, ok, err)
+	}
+	// A malformed fallback file is still an error naming it, not a silent
+	// "no list".
+	broken := fstest.MapFS{"rocky-9.json": {Data: []byte("{not json")}}
+	if _, _, err := loadFrom(broken, "rocky", "9.8"); err == nil || !strings.Contains(err.Error(), "rocky-9.json") {
+		t.Errorf("loadFrom over a broken fallback = %v, want an error naming rocky-9.json", err)
+	}
+}

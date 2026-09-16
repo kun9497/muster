@@ -76,10 +76,14 @@ type List struct {
 }
 
 // Load returns the list for one release, named from the host's
-// os-release ID and VERSION_ID ("ubuntu", "22.04" -> ubuntu-22.04.json). A
-// release with no committed list is (nil, false, nil) — an ordinary answer,
-// which the join reports as reference "none" — while a file that will not
-// decode is an error naming it.
+// os-release ID and VERSION_ID ("ubuntu", "22.04" -> ubuntu-22.04.json),
+// falling back to the MAJOR version when there is no list for the exact one
+// ("rocky", "9.5" -> rocky-9.5.json, then rocky-9.json). The RHEL family
+// reports a point release where a maintainer pins a major (ruling A-36), and
+// without the fallback a list generated from a 9.8 image could only ever
+// answer for a 9.8 host. A release no name reaches is (nil, false, nil) — an
+// ordinary answer, which the join reports as reference "none" — while a file
+// that will not decode is an error naming it.
 func Load(id, versionID string) (*List, bool, error) { return loadFrom(FS, id, versionID) }
 
 // All returns every committed list, in file-name order, for the shape test
@@ -119,6 +123,14 @@ func loadFrom(fsys fs.FS, id, versionID string) (*List, bool, error) {
 	// directory, is where the skip belongs.
 	name := id + "-" + versionID + ".json"
 	data, err := fs.ReadFile(fsys, name)
+	if errors.Is(err, fs.ErrNotExist) {
+		major, _, hasMajor := strings.Cut(versionID, ".")
+		if !hasMajor || major == "" {
+			return nil, false, nil
+		}
+		name = id + "-" + major + ".json"
+		data, err = fs.ReadFile(fsys, name)
+	}
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, false, nil
 	}
