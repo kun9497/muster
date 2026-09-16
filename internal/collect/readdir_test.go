@@ -7,6 +7,8 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"reflect"
+	"strings"
 	"syscall"
 	"testing"
 
@@ -245,27 +247,125 @@ func TestReadlinkReadsOnlyTheFinalLink(t *testing.T) {
 // other refused read rather than learning a new error shape. Both halves are
 // asserted; which one runs is decided by the uid the suite happens to have
 // (root on the lab host, an unprivileged user on the CI runner).
+//
+// The two halves are subtests so the one this uid cannot prove is SKIPped
+// by name rather than silently not run: a root-only CI that quietly lost
+// the denial assertion would look exactly like a passing suite.
 func TestReadDirOnAnUnreadableDirectory(t *testing.T) {
-	_, a := walkTree(t)
-	shut := filepath.Join(a, "d")
-	chmod(t, shut, 0o000)
-	l, err := hostAccess{}.ReadDir(shut, Identity{})
-	if os.Getuid() == 0 {
+	root := os.Getuid() == 0
+
+	t.Run("root lists it", func(t *testing.T) {
+		if !root {
+			t.Skipf("needs uid 0; this run is uid %d (the lab host covers this half)", os.Getuid())
+		}
+		_, a := walkTree(t)
+		shut := filepath.Join(a, "d")
+		chmod(t, shut, 0o000)
+		l, err := hostAccess{}.ReadDir(shut, Identity{})
 		if err != nil {
 			t.Fatalf("root must be able to list a 0o000 directory: %v", err)
 		}
 		if l.Self.Mode != 0 {
 			t.Errorf("Self.Mode = %#o, want 0", l.Self.Mode)
 		}
-		return
+	})
+
+	t.Run("anyone else is denied", func(t *testing.T) {
+		if root {
+			t.Skip("needs a non-root uid; root bypasses DAC, so only the CI runner covers this half")
+		}
+		_, a := walkTree(t)
+		shut := filepath.Join(a, "d")
+		chmod(t, shut, 0o000)
+		l, err := hostAccess{}.ReadDir(shut, Identity{})
+		if !errors.Is(err, fs.ErrPermission) {
+			t.Fatalf("err = %v, want a permission error", err)
+		}
+		if _, ok := DeniedReason(err); !ok {
+			t.Errorf("DeniedReason did not recognise %v", err)
+		}
+		if len(l.Entries) != 0 {
+			t.Errorf("a denied listing must be empty, got %+v", l.Entries)
+		}
+	})
+}
+
+// stubEntryStat replaces the per-entry stat for the duration of one test:
+// the named entries answer with the given errno, every other name is stat'ed
+// for real. It is the only way to reach ReadDir's two per-entry error
+// branches — a name that vanishes between getdents and statx, and a stat
+// that fails for any other reason — without racing a live filesystem.
+func stubEntryStat(t *testing.T, errs map[string]error) {
+	t.Helper()
+	real := statEntry
+	statEntry = func(dirfd int, name string, flags int) (DirEntry, error) {
+		if err, ok := errs[name]; ok {
+			return DirEntry{}, err
+		}
+		return real(dirfd, name, flags)
 	}
-	if !errors.Is(err, fs.ErrPermission) {
-		t.Fatalf("err = %v, want a permission error", err)
+	t.Cleanup(func() { statEntry = real })
+}
+
+// A name that is gone by the time it is stat'ed is dropped from the listing
+// and nothing else is: on a live host a temporary file disappearing mid-walk
+// is ordinary churn, and losing the whole directory over it would be a far
+// worse answer than losing the one entry.
+func TestReadDirDropsAVanishedEntry(t *testing.T) {
+	_, a := walkTree(t)
+	stubEntryStat(t, map[string]error{"f": unix.ENOENT})
+	l, err := hostAccess{}.ReadDir(a, Identity{})
+	if err != nil {
+		t.Fatalf("a vanished entry must not fail the listing: %v", err)
 	}
-	if _, ok := DeniedReason(err); !ok {
-		t.Errorf("DeniedReason did not recognise %v", err)
+	if _, ok := entryByName(l, "f"); ok {
+		t.Error("the vanished entry is still in the listing")
+	}
+	var names []string
+	for _, e := range l.Entries {
+		names = append(names, e.Name)
+	}
+	if !reflect.DeepEqual(names, []string{"d", "l", "p", "s"}) {
+		t.Errorf("entries = %v, want every other entry to survive", names)
+	}
+}
+
+// Any other per-entry stat failure fails the whole listing: a directory
+// muster could only partly stat is not a directory it may report facts
+// about, and the error names the entry it happened on so the reason is
+// actionable.
+func TestReadDirFailsOnAnUnstatableEntry(t *testing.T) {
+	_, a := walkTree(t)
+	stubEntryStat(t, map[string]error{"p": unix.EIO})
+	l, err := hostAccess{}.ReadDir(a, Identity{})
+	if !errors.Is(err, unix.EIO) {
+		t.Fatalf("err = %v, want it to wrap EIO", err)
+	}
+	if want := filepath.Join(a, "p"); !strings.Contains(err.Error(), want) {
+		t.Errorf("err = %q, want it to name %q", err, want)
 	}
 	if len(l.Entries) != 0 {
-		t.Errorf("a denied listing must be empty, got %+v", l.Entries)
+		t.Errorf("a failed listing must be empty, got %+v", l.Entries)
+	}
+}
+
+// NoWalkAccess is what every double that does not implement the walk
+// embeds, and it must say so rather than answer with a silently empty
+// listing: fakeAccess embeds it without overriding either method.
+func TestNoWalkAccessRefusesBothWalkMethods(t *testing.T) {
+	var a Access = &fakeAccess{}
+	l, err := a.ReadDir("/etc", Identity{})
+	if !errors.Is(err, ErrNoWalk) {
+		t.Errorf("ReadDir: err = %v, want ErrNoWalk", err)
+	}
+	if len(l.Entries) != 0 {
+		t.Errorf("ReadDir returned entries: %+v", l.Entries)
+	}
+	target, err := a.Readlink("/etc/localtime")
+	if !errors.Is(err, ErrNoWalk) {
+		t.Errorf("Readlink: err = %v, want ErrNoWalk", err)
+	}
+	if target != "" {
+		t.Errorf("Readlink returned %q", target)
 	}
 }

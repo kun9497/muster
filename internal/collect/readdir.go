@@ -103,19 +103,19 @@ func (hostAccess) ReadDir(p string, expect Identity) (Listing, error) {
 	defer unix.Close(fd)
 	self, err := statxAt(fd, "", unix.AT_EMPTY_PATH|unix.AT_SYMLINK_NOFOLLOW|unix.AT_NO_AUTOMOUNT)
 	if err != nil {
-		return Listing{}, err
+		return Listing{}, fmt.Errorf("%s: %w", p, err)
 	}
 	if expect != (Identity{}) && (self.Dev != expect.Dev || self.Ino != expect.Ino) {
 		return Listing{}, fmt.Errorf("%s: %w", p, ErrVanished)
 	}
 	names, err := readNames(fd)
 	if err != nil {
-		return Listing{}, err
+		return Listing{}, fmt.Errorf("%s: %w", p, err)
 	}
 	sort.Strings(names)
 	out := Listing{Self: self}
 	for _, n := range names {
-		e, err := statxAt(fd, n, unix.AT_SYMLINK_NOFOLLOW|unix.AT_NO_AUTOMOUNT)
+		e, err := statEntry(fd, n, unix.AT_SYMLINK_NOFOLLOW|unix.AT_NO_AUTOMOUNT)
 		if errors.Is(err, unix.ENOENT) {
 			continue
 		}
@@ -182,6 +182,16 @@ func readNames(fd int) ([]string, error) {
 	}
 }
 
+// statEntry is the per-ENTRY stat ReadDir makes, as a variable so a test can
+// stand in a failure the host will not produce on demand: the two branches
+// that follow it — a name that vanished between getdents and statx is
+// dropped, any other failure fails the whole listing — are otherwise only
+// reachable by racing a live filesystem, which is not a test. Production
+// never assigns it, and the directory's OWN stat deliberately still calls
+// statxAt directly, so a test that scripts entry failures cannot
+// accidentally break Self.
+var statEntry = statxAt
+
 // statxAt stats name relative to dirfd (or dirfd itself, with an empty name
 // and AT_EMPTY_PATH) and renders the result as a DirEntry. STATX_MNT_ID is
 // asked for alongside the basic stats; a kernel that does not know it
@@ -228,6 +238,13 @@ func (hostAccess) Readlink(p string) (string, error) {
 	n, err := unix.Readlinkat(dir, path.Base(p), buf)
 	if err != nil {
 		return "", fmt.Errorf("%s: %w", p, err)
+	}
+	// Readlinkat does not NUL-terminate and does not report truncation: it
+	// silently returns as much as fits. A target that exactly filled PATH_MAX
+	// may therefore be short of its real value, and a truncated target is
+	// worse than no target — it names a different file. Refuse it instead.
+	if n == len(buf) {
+		return "", fmt.Errorf("%s: symlink target too long (%d bytes or more)", p, n)
 	}
 	return string(buf[:n]), nil
 }
