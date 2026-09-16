@@ -1,0 +1,6 @@
+# synthetic: subordinate uid ranges, no host was read to write this file
+alice:100000:65536
+ghost:400000:65536
+1000:200000:65536
+malformed-line-without-fields
+bob:notanumber:65536
