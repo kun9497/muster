@@ -16,6 +16,7 @@ import (
 	"golang.org/x/sys/unix"
 
 	"github.com/kun9497/muster/internal/collect"
+	"github.com/kun9497/muster/internal/facts"
 )
 
 // mountinfoPath is the one file the plan cannot do without: it names every
@@ -230,12 +231,13 @@ func planMounts(a collect.Access, opts collect.WalkOptions, homes []homeRoot) (m
 	slices.SortStableFunc(rows, func(x, y mountRow) int { return x.id - y.id })
 
 	p := mountPlan{
-		enter:         map[int]mountRow{},
-		known:         map[int]bool{},
-		excludedRoots: map[string]bool{},
-		skipped:       []skipRow{},
-		homes:         homes,
-		usrMerged:     map[string]string{},
+		enter:            map[int]mountRow{},
+		known:            map[int]bool{},
+		excludedRoots:    map[string]bool{},
+		skipped:          []skipRow{},
+		homes:            homes,
+		configUnreadable: []configRead{},
+		usrMerged:        map[string]string{},
 	}
 	root, haveRoot := mountRow{}, false
 	for _, r := range rows {
@@ -304,7 +306,7 @@ func (p *mountPlan) resolveAliases(candidates []mountRow) {
 	for _, dev := range devs {
 		group := groups[dev]
 		slices.SortStableFunc(group, func(x, y mountRow) int {
-			if x.root == "/" != (y.root == "/") {
+			if (x.root == "/") != (y.root == "/") {
 				if x.root == "/" {
 					return -1
 				}
@@ -426,10 +428,14 @@ func (p *mountPlan) readConfig(a collect.Access, file string) ([]byte, bool) {
 	if errors.Is(err, fs.ErrNotExist) || errors.Is(err, unix.ENOTDIR) {
 		return nil, false
 	}
-	p.configUnreadable = append(p.configUnreadable, configRead{
-		path:   file,
-		status: string(collect.FromReadError(err, meta).Status),
-	})
+	status := string(collect.FromReadError(err, meta).Status)
+	if errors.Is(err, collect.ErrUndeclared) {
+		// C4: a path muster declined to read is absent, never error. The
+		// guard refuses a file this collector did not declare, and that is
+		// a fact about muster, not about the host.
+		status = string(facts.StatusAbsent)
+	}
+	p.configUnreadable = append(p.configUnreadable, configRead{path: file, status: status})
 	return nil, false
 }
 

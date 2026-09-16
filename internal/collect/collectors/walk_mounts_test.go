@@ -313,8 +313,10 @@ func TestPlanRecordsUsrMerged(t *testing.T) {
 	}
 }
 
-// A-16: /root and /home are the two user-home prefixes; every other pw_dir
-// that is not on the exclusion list is a service home, one row per account.
+// A-16/A-23: /root and /home are the two user-home prefixes, and every
+// account whose pw_dir survives the exclusion list is a row of its own —
+// user kind under /root or /home, service kind anywhere else — because an
+// account row is what names the rootless container stores under that home.
 func TestClassifyHomes(t *testing.T) {
 	data, err := os.ReadFile("testdata/passwd.homes")
 	if err != nil {
@@ -324,9 +326,11 @@ func TestClassifyHomes(t *testing.T) {
 	want := []homeRoot{
 		{path: "/root", user: "", kind: "user"},
 		{path: "/home", user: "", kind: "user"},
+		{path: "/home/alice", user: "alice", kind: "user"},
 		{path: "/nonexistent", user: "_apt", kind: "service"},
 		{path: "/nonexistent", user: "messagebus", kind: "service"},
 		{path: "/nonexistent", user: "tcpdump", kind: "service"},
+		{path: "/root", user: "root", kind: "user"},
 		{path: "/var/lib/postgresql", user: "postgres", kind: "service"},
 		{path: "/var/www", user: "www-data", kind: "service"},
 	}
@@ -383,5 +387,73 @@ func TestHomeRules(t *testing.T) {
 		if got := directChildOfServiceHome(tc.path, homes); got != tc.want {
 			t.Errorf("directChildOfServiceHome(%q) = %v, want %v", tc.path, got, tc.want)
 		}
+	}
+}
+
+// A-23, end to end: the home set a real /etc/passwd produces must reach the
+// excluded roots, so a rootless store under a USER home — /root and
+// /home/alice are where podman and rootless docker actually put one — is
+// excluded exactly as a service home's is. This is the composition
+// classifyHomes and planMounts are used in by the collector; testing the
+// two apart would let a home set that names no account pass both.
+func TestPlanRootlessRootsFromPasswd(t *testing.T) {
+	data, err := os.ReadFile("testdata/passwd.homes")
+	if err != nil {
+		t.Fatalf("read fixture: %v", err)
+	}
+	rows, _ := parsePasswd(data)
+	p := mustPlan(t, mountDouble("mountinfo.ubuntu"), collect.WalkOptions{}, classifyHomes(rows))
+	for _, home := range []string{"/root", "/home/alice", "/var/www", "/var/lib/postgresql", "/nonexistent"} {
+		for _, sub := range []string{"/.local/share/containers", "/.local/share/docker"} {
+			if !p.excludedRoots[home+sub] {
+				t.Errorf("%s must be an excluded root", home+sub)
+			}
+			if !hasSkip(p, skipRow{path: home + sub, reason: "container_storage"}) {
+				t.Errorf("%s must be skipped as container_storage", home+sub)
+			}
+		}
+	}
+	// nobody:/ and daemon:/usr/sbin are not homes, so neither contributes a
+	// store: excluding /.local/share/containers or /usr/sbin/.local/... would
+	// be an exclusion nobody asked for.
+	for _, notAHome := range []string{"/", "/usr/sbin"} {
+		if p.excludedRoots[notAHome+"/.local/share/containers"] {
+			t.Errorf("%s is not a home and must contribute no store", notAHome)
+		}
+	}
+}
+
+// C4: a configuration file this collector did not declare is absent — the
+// path muster declined to read — never an error about the host.
+func TestPlanUndeclaredConfigIsAbsent(t *testing.T) {
+	a := &fsAccess{files: map[string]string{
+		"/proc/self/mountinfo":    "mountinfo.ubuntu",
+		"/etc/docker/daemon.json": "daemon.json.data-root",
+	}}
+	g := collect.Guard(a, collect.Collector{
+		Name:    "walk",
+		Declare: collect.Declaration{Reads: []string{mountinfoPath, containersStoragePath, containerdConfigPath}, Walk: true},
+	})
+	p, err := planMounts(g, collect.WalkOptions{}, nil)
+	if err != nil {
+		t.Fatalf("planMounts: %v", err)
+	}
+	// The other two files are declared and simply are not there, so the one
+	// row is the one file the guard refused.
+	want := []configRead{{path: dockerDaemonPath, status: "absent"}}
+	if !reflect.DeepEqual(p.configUnreadable, want) {
+		t.Errorf("configUnreadable = %+v, want %+v", p.configUnreadable, want)
+	}
+	if hasSkip(p, skipRow{path: "/data/docker-root", reason: "container_storage", detail: dockerDaemonPath}) {
+		t.Error("a file the guard refused must not contribute a root")
+	}
+}
+
+// A-14: an empty configUnreadable is an empty list, not a nil that would
+// serialise as null in walk.stats.
+func TestPlanEmptyConfigUnreadableIsNotNil(t *testing.T) {
+	p := mustPlan(t, mountDouble("mountinfo.ubuntu"), collect.WalkOptions{}, nil)
+	if p.configUnreadable == nil {
+		t.Error("configUnreadable must be an empty list, not nil")
 	}
 }

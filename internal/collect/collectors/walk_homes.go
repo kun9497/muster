@@ -43,20 +43,24 @@ var notAHome = []string{
 }
 
 // classifyHomes turns /etc/passwd rows into the home set the walk uses. The
-// two prefix rows come first, then every service home sorted by path and
-// then by account, so the recorded set is byte-identical for the same file
-// (A-14). A pw_dir shared by several accounts — _apt, messagebus and
-// tcpdump all sit on /nonexistent — yields one row per account, and a
-// pw_dir that does not exist is still a row: the set says what the rule
-// used, not what the filesystem has.
+// two prefix rows come first, then one row per ACCOUNT — a user home with
+// its own account and kind "user", a service home with kind "service" —
+// sorted by path and then by account, so the recorded set is
+// byte-identical for the same file (A-14). A pw_dir shared by several
+// accounts — _apt, messagebus and tcpdump all sit on /nonexistent — yields
+// one row per account, and a pw_dir that does not exist is still a row: the
+// set says what the rule used, not what the filesystem has.
 //
-// A pw_dir that is itself a user home (/root, /home/alice) adds no row: the
-// two prefix rows already cover it at any depth. rows nil — an unreadable
-// /etc/passwd — therefore yields the two prefix rows alone, which degrades
-// toward RECORDING a service home's dotfiles rather than toward hiding
-// them: the walk would rather report a normal dotfile than miss one.
+// An account whose pw_dir is /root or under /home gets a row of its own
+// even though the two prefix rows already exempt its dotfiles at any depth
+// (A-23): the row is also what names the rootless container stores under
+// that home, and /root/.local/share/containers is as real a store as
+// /var/www/.local/share/docker. rows nil — an unreadable /etc/passwd —
+// yields the two prefix rows alone, which degrades toward RECORDING a
+// service home's dotfiles rather than toward hiding them: the walk would
+// rather report a normal dotfile than miss one.
 func classifyHomes(rows []passwdRow) []homeRoot {
-	service := make([]homeRoot, 0, len(rows))
+	accounts := make([]homeRoot, 0, len(rows))
 	for _, r := range rows {
 		if !strings.HasPrefix(r.home, "/") {
 			continue // an empty or relative pw_dir names no directory
@@ -65,20 +69,21 @@ func classifyHomes(rows []passwdRow) []homeRoot {
 		if h == "/" || underOrEqualAny(h, notAHome) {
 			continue
 		}
+		kind := "service"
 		if underOrEqual(h, "/root") || underOrEqual(h, "/home") {
-			continue // already covered by the prefix rows
+			kind = "user"
 		}
-		service = append(service, homeRoot{path: h, user: r.name, kind: "service"})
+		accounts = append(accounts, homeRoot{path: h, user: r.name, kind: kind})
 	}
-	slices.SortFunc(service, func(a, b homeRoot) int {
+	slices.SortFunc(accounts, func(a, b homeRoot) int {
 		if c := strings.Compare(a.path, b.path); c != 0 {
 			return c
 		}
 		return strings.Compare(a.user, b.user)
 	})
-	out := make([]homeRoot, 0, len(homePrefixRows)+len(service))
+	out := make([]homeRoot, 0, len(homePrefixRows)+len(accounts))
 	out = append(out, homePrefixRows...)
-	return append(out, service...)
+	return append(out, accounts...)
 }
 
 // underUserHome reports whether p lies inside a user home — under /root/ or
