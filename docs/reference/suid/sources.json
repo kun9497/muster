@@ -1,0 +1,107 @@
+{
+  "releases": [
+    {
+      "id": "ubuntu",
+      "version_id": "22.04",
+      "image": "docker.io/library/ubuntu:22.04",
+      "digest": "",
+      "packages": [
+        {"name": "util-linux", "reason": "the base image installs it; it ships su, mount and umount setuid root"},
+        {"name": "passwd", "reason": "the base image installs it; it ships passwd, chfn, chsh, gpasswd and newgrp setuid root"},
+        {"name": "login", "reason": "the base image installs it; it owns /bin/login and the utmp-group helpers"},
+        {"name": "at", "reason": "a scheduled-job host installs it and /usr/bin/at runs setuid daemon", "url": "", "sha256": ""},
+        {"name": "screen", "reason": "a terminal-multiplexer host installs it and its session socket helper is setgid utmp", "url": "", "sha256": ""},
+        {"name": "sudo", "reason": "almost every managed host installs it and /usr/bin/sudo is setuid root", "url": "", "sha256": ""},
+        {"name": "openssh-client", "reason": "ships ssh-keysign setuid root for host-based authentication", "url": "", "sha256": ""},
+        {"name": "postfix", "reason": "a mail host installs it and postdrop/postqueue are setgid postdrop", "url": "", "sha256": ""},
+        {"name": "exim4-base", "reason": "the other mail transport this family ships; its delivery binary is setuid root", "url": "", "sha256": ""},
+        {"name": "mtr-tiny", "reason": "a diagnostic tool whose raw-socket binary has carried setuid root historically", "url": "", "sha256": ""},
+        {"name": "fuse3", "reason": "ships fusermount3 setuid root so unprivileged mounts work", "url": "", "sha256": ""},
+        {"name": "policykit-1", "reason": "ships pkexec setuid root on this release", "url": "", "sha256": ""},
+        {"name": "dbus", "reason": "ships dbus-daemon-launch-helper setuid root on this release", "url": "", "sha256": ""}
+      ]
+    },
+    {
+      "id": "ubuntu",
+      "version_id": "24.04",
+      "image": "docker.io/library/ubuntu:24.04",
+      "digest": "",
+      "packages": [
+        {"name": "util-linux", "reason": "the base image installs it; it ships su, mount and umount setuid root"},
+        {"name": "passwd", "reason": "the base image installs it; it ships passwd, chfn, chsh, gpasswd and newgrp setuid root"},
+        {"name": "login", "reason": "the base image installs it; it owns /bin/login and the utmp-group helpers"},
+        {"name": "at", "reason": "a scheduled-job host installs it and /usr/bin/at runs setuid daemon", "url": "", "sha256": ""},
+        {"name": "screen", "reason": "a terminal-multiplexer host installs it and its session socket helper is setgid utmp", "url": "", "sha256": ""},
+        {"name": "sudo", "reason": "almost every managed host installs it and /usr/bin/sudo is setuid root", "url": "", "sha256": ""},
+        {"name": "openssh-client", "reason": "ships ssh-keysign setuid root for host-based authentication", "url": "", "sha256": ""},
+        {"name": "postfix", "reason": "a mail host installs it and postdrop/postqueue are setgid postdrop", "url": "", "sha256": ""},
+        {"name": "exim4-base", "reason": "the other mail transport this family ships; its delivery binary is setuid root", "url": "", "sha256": ""},
+        {"name": "mtr-tiny", "reason": "a diagnostic tool whose raw-socket binary has carried setuid root historically", "url": "", "sha256": ""},
+        {"name": "fuse3", "reason": "ships fusermount3 setuid root so unprivileged mounts work", "url": "", "sha256": ""},
+        {"name": "polkitd", "reason": "the polkit daemon package of this release, which pkexec belongs to", "url": "", "sha256": ""},
+        {"name": "dbus-daemon", "reason": "ships dbus-daemon-launch-helper setuid root on this release", "url": "", "sha256": ""}
+      ]
+    },
+    {
+      "id": "debian",
+      "version_id": "12",
+      "image": "docker.io/library/debian:12",
+      "digest": "",
+      "packages": [
+        {"name": "util-linux", "reason": "the base image installs it; it ships su, mount and umount setuid root"},
+        {"name": "passwd", "reason": "the base image installs it; it ships passwd, chfn, chsh, gpasswd and newgrp setuid root"},
+        {"name": "login", "reason": "the base image installs it; it owns /bin/login and the utmp-group helpers"},
+        {"name": "at", "reason": "a scheduled-job host installs it and /usr/bin/at runs setuid daemon", "url": "", "sha256": ""},
+        {"name": "screen", "reason": "a terminal-multiplexer host installs it and its session socket helper is setgid utmp", "url": "", "sha256": ""},
+        {"name": "sudo", "reason": "almost every managed host installs it and /usr/bin/sudo is setuid root", "url": "", "sha256": ""},
+        {"name": "openssh-client", "reason": "ships ssh-keysign setuid root for host-based authentication", "url": "", "sha256": ""},
+        {"name": "postfix", "reason": "a mail host installs it and postdrop/postqueue are setgid postdrop", "url": "", "sha256": ""},
+        {"name": "exim4-base", "reason": "the default mail transport of this family; its delivery binary is setuid root", "url": "", "sha256": ""},
+        {"name": "mtr-tiny", "reason": "a diagnostic tool whose raw-socket binary has carried setuid root historically", "url": "", "sha256": ""},
+        {"name": "fuse3", "reason": "ships fusermount3 setuid root so unprivileged mounts work", "url": "", "sha256": ""},
+        {"name": "polkitd", "reason": "the polkit daemon package of this release, which pkexec belongs to", "url": "", "sha256": ""},
+        {"name": "dbus-daemon", "reason": "ships dbus-daemon-launch-helper setuid root on this release", "url": "", "sha256": ""}
+      ]
+    },
+    {
+      "id": "rocky",
+      "version_id": "9",
+      "image": "quay.io/rockylinux/rockylinux:9",
+      "digest": "",
+      "packages": [
+        {"name": "util-linux-core", "reason": "the base image installs it; it ships mount, umount and su setuid root"},
+        {"name": "shadow-utils", "reason": "the base image installs it; it ships chage, gpasswd and newgrp setuid or setgid"},
+        {"name": "passwd", "reason": "the base image installs it; /usr/bin/passwd is setuid root"},
+        {"name": "sudo", "reason": "almost every managed host installs it and /usr/bin/sudo is setuid root"},
+        {"name": "openssh", "reason": "ships ssh-keysign setuid root for host-based authentication"},
+        {"name": "polkit", "reason": "ships pkexec setuid root"},
+        {"name": "dbus-daemon", "reason": "ships dbus-daemon-launch-helper setgid dbus"},
+        {"name": "at", "reason": "a scheduled-job host installs it and /usr/bin/at runs setuid daemon"},
+        {"name": "postfix", "reason": "the default mail transport of this family; postdrop/postqueue are setgid postdrop"},
+        {"name": "krb5-workstation", "reason": "ships ksu setuid root on a Kerberos-joined host"},
+        {"name": "fuse3", "reason": "ships fusermount3 setuid root so unprivileged mounts work"},
+        {"name": "mtr", "reason": "a diagnostic tool whose raw-socket binary has carried setuid root historically"}
+      ]
+    },
+    {
+      "id": "almalinux",
+      "version_id": "9",
+      "image": "docker.io/library/almalinux:9",
+      "digest": "",
+      "packages": [
+        {"name": "util-linux-core", "reason": "the base image installs it; it ships mount, umount and su setuid root"},
+        {"name": "shadow-utils", "reason": "the base image installs it; it ships chage, gpasswd and newgrp setuid or setgid"},
+        {"name": "passwd", "reason": "the base image installs it; /usr/bin/passwd is setuid root"},
+        {"name": "sudo", "reason": "almost every managed host installs it and /usr/bin/sudo is setuid root"},
+        {"name": "openssh", "reason": "ships ssh-keysign setuid root for host-based authentication"},
+        {"name": "polkit", "reason": "ships pkexec setuid root"},
+        {"name": "dbus-daemon", "reason": "ships dbus-daemon-launch-helper setgid dbus"},
+        {"name": "at", "reason": "a scheduled-job host installs it and /usr/bin/at runs setuid daemon"},
+        {"name": "postfix", "reason": "the default mail transport of this family; postdrop/postqueue are setgid postdrop"},
+        {"name": "krb5-workstation", "reason": "ships ksu setuid root on a Kerberos-joined host"},
+        {"name": "fuse3", "reason": "ships fusermount3 setuid root so unprivileged mounts work"},
+        {"name": "mtr", "reason": "a diagnostic tool whose raw-socket binary has carried setuid root historically"}
+      ]
+    }
+  ]
+}
