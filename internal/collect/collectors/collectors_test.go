@@ -43,6 +43,7 @@ type fsAccess struct {
 
 	files       map[string]string            // host path -> testdata file name
 	dirs        map[string]bool              // host path -> exists, but is not a readable file
+	links       map[string]string            // host path -> symlink target, stored form (Readlink; Stat is ErrSymlink)
 	cmds        map[string]cmdResult         // command line -> canned outcome
 	fails       map[string]error             // host path -> error returned instead of content
 	truncated   map[string]bool              // host path -> ReadFile reports the read hit the cap (R70)
@@ -112,6 +113,12 @@ func (a *fsAccess) Stat(p string) (collect.ReadMeta, error) {
 	// non-root run. A path present only in fails still fails its Stat.
 	if s, ok := a.stats[p]; ok {
 		return collect.ReadMeta{Tier: "openat2", Mode: s.mode, UID: s.uid, GID: s.gid, Kind: s.kind, ModTime: s.mtime}, nil
+	}
+	// A symlink is ErrSymlink with the path wrapped, exactly as the host
+	// primitive answers it: Stat never follows the final component, and the
+	// walk'''s plan learns a relocated container-storage root that way.
+	if _, ok := a.links[p]; ok {
+		return collect.ReadMeta{Tier: "openat2", Kind: "symlink", Mode: 0o777}, fmt.Errorf("%s: %w", p, collect.ErrSymlink)
 	}
 	if err, ok := a.fails[p]; ok {
 		return collect.ReadMeta{}, err
@@ -192,6 +199,22 @@ func (a *fsAccess) Getxattr(p, name string) ([]byte, error) {
 		return v, nil
 	}
 	return nil, unix.ENODATA
+}
+
+// Readlink serves the links map in stored form, unresolved. A path that is
+// not a link answers the way readlinkat does: EINVAL when it exists as
+// something else, ENOENT when it does not exist at all.
+func (a *fsAccess) Readlink(p string) (string, error) {
+	if t, ok := a.links[p]; ok {
+		return t, nil
+	}
+	if _, ok := a.files[p]; ok {
+		return "", unix.EINVAL
+	}
+	if a.dirs[p] {
+		return "", unix.EINVAL
+	}
+	return "", os.ErrNotExist
 }
 
 func (a *fsAccess) Writable(p string) bool { return a.writable[p] }

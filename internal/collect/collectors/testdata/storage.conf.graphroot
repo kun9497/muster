@@ -1,0 +1,8 @@
+[storage]
+driver = "overlay"
+runroot = "/run/containers/storage"
+graphroot = "/data/containers/storage"
+rootless_storage_path = "/data/rootless/storage"
+
+[storage.options]
+additionalimagestores = []
