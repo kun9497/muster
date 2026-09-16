@@ -254,9 +254,10 @@ func frozenClock() walkClock {
 	return walkClock{start: start, now: func() time.Time { return start }}
 }
 
-// runWalk traverses with no budget and no entry limit: both are only
-// enforced when positive, so a test says what it is about.
-func runWalk(a collect.Access, plan mountPlan) walkResult {
+// traverseTree traverses with no budget and no entry limit: both are only
+// enforced when positive, so a test says what it is about. It is the
+// traversal alone — the collector's own runWalk is exercised by walk_test.go.
+func traverseTree(a collect.Access, plan mountPlan) walkResult {
 	return traverse(context.Background(), a, plan, walkIDs(), collect.WalkOptions{}, frozenClock())
 }
 
@@ -352,7 +353,7 @@ func mainTree() (*fsAccess, mountPlan) {
 // (A-14) and each record carries exactly the fields the registry names.
 func TestTraverseSortsEveryCandidate(t *testing.T) {
 	a, plan := mainTree()
-	r := runWalk(a, plan)
+	r := traverseTree(a, plan)
 
 	if !r.complete || r.stopReason != "" || r.lastPath != "" {
 		t.Errorf("complete = %v, stopReason = %q, lastPath = %q; want a finished walk", r.complete, r.stopReason, r.lastPath)
@@ -492,7 +493,7 @@ func TestTraverseRecordsDeniedAndVanished(t *testing.T) {
 		{path: "/mnt", reason: "excluded_type", detail: "nfs4"},
 		{path: "/mnt", reason: "bind_duplicate"},
 	}}.build()
-	r := runWalk(a, plan)
+	r := traverseTree(a, plan)
 
 	want := []map[string]any{
 		{"path": "/acces", "reason": "denied", "detail": ""},
@@ -529,7 +530,7 @@ func TestTraverseIdentityMismatch(t *testing.T) {
 	setSelf(tree, "/a", devFor(1), 4242) // the entry in / still names the old inode
 	a := &fsAccess{tree: tree}
 
-	r := runWalk(a, planSpec{enter: map[int]string{1: "/"}}.build())
+	r := traverseTree(a, planSpec{enter: map[int]string{1: "/"}}.build())
 
 	want := []map[string]any{{"path": "/a", "reason": "vanished", "detail": ""}}
 	if !reflect.DeepEqual(r.lists.skipped, want) {
@@ -562,7 +563,7 @@ func TestTraverseHonoursMountBoundaries(t *testing.T) {
 	a := &fsAccess{tree: tree}
 
 	plan := planSpec{enter: map[int]string{1: "/", 2: "/entered"}, known: []int{7}}.build()
-	r := runWalk(a, plan)
+	r := traverseTree(a, plan)
 
 	if got := rowPaths(r.lists.suid); !slices.Equal(got, []string{"/entered/su"}) {
 		t.Errorf("suid = %v, want only the entered mount's file", got)
@@ -581,7 +582,7 @@ func TestTraverseHonoursMountBoundaries(t *testing.T) {
 	t.Run("kernel mount id wins", func(t *testing.T) {
 		spec := map[string][]collect.DirEntry{"/": {treeDir("a", 0o755)}, "/a": {treeFile("su", 0o4755)}}
 		a := &fsAccess{tree: buildTree(spec, map[string]uint64{"/": 4})}
-		r := runWalk(a, planSpec{enter: map[int]string{9: "/"}}.build())
+		r := traverseTree(a, planSpec{enter: map[int]string{9: "/"}}.build())
 		if got := rowPaths(r.lists.suid); !slices.Equal(got, []string{"/a/su"}) {
 			t.Errorf("suid = %v, want the root's own subtree walked", got)
 		}
@@ -600,7 +601,7 @@ func TestTraverseBreaksCycles(t *testing.T) {
 		"/b": {treeFile("su", 0o4755)},
 	}
 	a := &fsAccess{tree: buildTree(spec, nil)}
-	r := runWalk(a, planSpec{enter: map[int]string{1: "/"}}.build())
+	r := traverseTree(a, planSpec{enter: map[int]string{1: "/"}}.build())
 
 	if got := rowPaths(r.lists.suid); !slices.Equal(got, []string{"/a/su"}) {
 		t.Errorf("suid = %v, want the directory reported once", got)
@@ -621,7 +622,7 @@ func TestTraverseBreaksCycles(t *testing.T) {
 	}
 	tree := buildTree(rootSpec, map[string]uint64{"/one": 1, "/two": 2})
 	setSelf(tree, "/two", devFor(1), tree["/one"].Self.Ino)
-	rr := runWalk(&fsAccess{tree: tree}, planSpec{enter: map[int]string{1: "/one", 2: "/two"}}.build())
+	rr := traverseTree(&fsAccess{tree: tree}, planSpec{enter: map[int]string{1: "/one", 2: "/two"}}.build())
 	if got := rowPaths(rr.lists.suid); !slices.Equal(got, []string{"/one/su"}) {
 		t.Errorf("suid = %v, want one row from two roots on one directory", got)
 	}
@@ -640,7 +641,7 @@ func TestTraverseNeverFollowsSymlinks(t *testing.T) {
 		},
 	}
 	a := &fsAccess{tree: buildTree(spec, nil), links: map[string]string{"/link": "/real", "/real/inner": "/real"}}
-	r := runWalk(a, planSpec{enter: map[int]string{1: "/"}}.build())
+	r := traverseTree(a, planSpec{enter: map[int]string{1: "/"}}.build())
 
 	for _, p := range []string{"/link", "/real/inner"} {
 		if slices.Contains(a.readDirs, p) {
@@ -680,7 +681,7 @@ func TestTraverseSkipsExcludedRoots(t *testing.T) {
 		excluded: []string{"/store", "/marker", "/data"},
 	}.build()
 
-	r := runWalk(a, plan)
+	r := traverseTree(a, plan)
 
 	if slices.Contains(a.readDirs, "/store") || slices.Contains(a.readDirs, "/data") || slices.Contains(a.readDirs, "/data/sub") {
 		t.Errorf("listed %v, want no excluded root entered", a.readDirs)
@@ -771,7 +772,7 @@ func TestTraverseCapsWithoutStopping(t *testing.T) {
 			"/z-late": {treeFile("su", 0o4755)},
 		}
 		a := &fsAccess{tree: buildTree(spec, nil)}
-		r := runWalk(a, planSpec{enter: map[int]string{1: "/"}}.build())
+		r := traverseTree(a, planSpec{enter: map[int]string{1: "/"}}.build())
 
 		if len(r.lists.worldWritable) != listCaps[capWorldWritable] {
 			t.Errorf("worldWritable kept %d rows, want %d", len(r.lists.worldWritable), listCaps[capWorldWritable])
@@ -793,7 +794,7 @@ func TestTraverseCapsWithoutStopping(t *testing.T) {
 			many = append(many, treeFile(fmt.Sprintf(".h%05d", i), 0o644))
 		}
 		spec := map[string][]collect.DirEntry{"/": {treeDir("opt", 0o755)}, "/opt": many}
-		r := runWalk(&fsAccess{tree: buildTree(spec, nil)}, planSpec{enter: map[int]string{1: "/"}}.build())
+		r := traverseTree(&fsAccess{tree: buildTree(spec, nil)}, planSpec{enter: map[int]string{1: "/"}}.build())
 
 		if len(r.lists.hidden) != listCaps[capHidden] {
 			t.Errorf("hidden kept %d rows, want %d", len(r.lists.hidden), listCaps[capHidden])
@@ -815,7 +816,7 @@ func TestTraverseCapsWithoutStopping(t *testing.T) {
 			spec["/opt/"+name] = []collect.DirEntry{treeFile(".git", 0o644)}
 		}
 		spec["/opt"] = top
-		r := runWalk(&fsAccess{tree: buildTree(spec, nil)}, planSpec{enter: map[int]string{1: "/"}}.build())
+		r := traverseTree(&fsAccess{tree: buildTree(spec, nil)}, planSpec{enter: map[int]string{1: "/"}}.build())
 
 		if len(r.lists.hidden) != allowlistedHiddenCap {
 			t.Errorf("hidden kept %d rows, want %d allowlisted ones", len(r.lists.hidden), allowlistedHiddenCap)
@@ -836,7 +837,7 @@ func TestTraverseCapsWithoutStopping(t *testing.T) {
 		for i := 0; i < listCaps[capSkipped]+1; i++ {
 			plan.skipped = append(plan.skipped, skipRow{path: fmt.Sprintf("/s%05d", i), reason: "container_storage"})
 		}
-		r := runWalk(&fsAccess{tree: buildTree(map[string][]collect.DirEntry{"/": {}}, nil)}, plan)
+		r := traverseTree(&fsAccess{tree: buildTree(map[string][]collect.DirEntry{"/": {}}, nil)}, plan)
 		if len(r.lists.skipped) != listCaps[capSkipped] || !r.lists.truncated[capSkipped] {
 			t.Errorf("skipped kept %d rows, truncated %v; want %d and true — the plan's rows count toward the cap",
 				len(r.lists.skipped), r.lists.truncated[capSkipped], listCaps[capSkipped])
@@ -868,16 +869,16 @@ func TestTraverseIsDeterministic(t *testing.T) {
 	}
 
 	a1, plan := mainTree()
-	first := encode(t, runWalk(a1, plan))
+	first := encode(t, traverseTree(a1, plan))
 
 	a2, plan2 := mainTree()
-	if second := encode(t, runWalk(a2, plan2)); second != first {
+	if second := encode(t, traverseTree(a2, plan2)); second != first {
 		t.Errorf("a second traversal differs:\n%s\n%s", first, second)
 	}
 
 	a3, plan3 := mainTree()
 	a3.shuffle = true
-	if reversed := encode(t, runWalk(a3, plan3)); reversed != first {
+	if reversed := encode(t, traverseTree(a3, plan3)); reversed != first {
 		t.Errorf("a traversal of the same tree listed in reverse differs:\n%s\n%s", first, reversed)
 	}
 }
@@ -893,7 +894,7 @@ func TestHiddenDirectoryRecordsOnlyItself(t *testing.T) {
 		"/opt/.cache/a/b": {treeFile("tool", 0o4755), treeFile(".deep", 0o666)},
 	}
 	a := &fsAccess{tree: buildTree(spec, nil)}
-	r := runWalk(a, planSpec{enter: map[int]string{1: "/"}}.build())
+	r := traverseTree(a, planSpec{enter: map[int]string{1: "/"}}.build())
 
 	if got := rowPaths(r.lists.hidden); !slices.Equal(got, []string{"/opt/.cache"}) {
 		t.Errorf("hidden = %v, want only the hidden directory itself", got)
@@ -914,7 +915,7 @@ func TestHiddenDirectoryRecordsOnlyItself(t *testing.T) {
 		"/opt/.cache/m": {treeFile(".inner", 0o644)},
 	}
 	tree := buildTree(mspec, map[string]uint64{"/": 1, "/opt/.cache/m": 2})
-	rr := runWalk(&fsAccess{tree: tree}, planSpec{enter: map[int]string{1: "/", 2: "/opt/.cache/m"}}.build())
+	rr := traverseTree(&fsAccess{tree: tree}, planSpec{enter: map[int]string{1: "/", 2: "/opt/.cache/m"}}.build())
 	if got := rowPaths(rr.lists.hidden); !slices.Equal(got, []string{"/opt/.cache"}) {
 		t.Errorf("hidden = %v, want only the hidden directory itself across the mount boundary", got)
 	}
@@ -942,7 +943,7 @@ func TestTraverseFallsBackToDev(t *testing.T) {
 		skipped: []skipRow{{path: "/planned", reason: "excluded_type", detail: "nfs4"}},
 	}.build()
 
-	r := runWalk(a, plan)
+	r := traverseTree(a, plan)
 
 	if !r.mntIDFallback {
 		t.Error("mntIDFallback = false, want true when no listing reports a mount id")

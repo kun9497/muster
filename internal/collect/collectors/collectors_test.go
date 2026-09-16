@@ -2523,21 +2523,6 @@ func TestOSWritesEnvContainerAndSystemdAsFacts(t *testing.T) {
 	}
 }
 
-// --- walk ---------------------------------------------------------------
-
-// R47/R76: stage 1 registers walk with nothing declared and it writes no
-// keys, so U-25 stays MANUAL on a real stage-1 snapshot.
-func TestWalkDeclaresAndWritesNothing(t *testing.T) {
-	c := collectorNamed(t, "walk")
-	if len(c.Declare.Reads) != 0 || len(c.Declare.Commands) != 0 {
-		t.Errorf("walk must declare nothing in stage 1: %+v", c.Declare)
-	}
-	b := build(t, "walk", &fsAccess{})
-	if len(b.Tree()) != 0 {
-		t.Errorf("walk must write no keys: %v", b.Tree())
-	}
-}
-
 // --- the declaration contract ------------------------------------------
 
 func TestEveryCollectorStaysInsideItsDeclaration(t *testing.T) {

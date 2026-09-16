@@ -63,6 +63,15 @@ const (
 	containerdConfigPath  = "/etc/containerd/config.toml"
 )
 
+// The two ways a mountinfo that WAS read can still be unusable. They are
+// sentinels rather than inline errors so the collector can tell them from a
+// read failure (A-24): a file muster read and could not plan a walk from is
+// an error naming the file, never "could not be read", which would be false.
+var (
+	errNoMountRow  = errors.New("no mount is listed")
+	errNoRootMount = errors.New("no mount is the root filesystem")
+)
+
 var (
 	// storageRootRE matches podman's two store paths in storage.conf. The
 	// file is TOML, but muster has no TOML decoder and needs two scalars:
@@ -168,7 +177,7 @@ func parseMountinfo(data []byte) ([]mountRow, error) {
 		})
 	}
 	if len(rows) == 0 {
-		return nil, errors.New("no mount is listed")
+		return nil, errNoMountRow
 	}
 	return rows, nil
 }
@@ -247,7 +256,7 @@ func planMounts(a collect.Access, opts collect.WalkOptions, homes []homeRoot) (m
 		}
 	}
 	if !haveRoot {
-		return mountPlan{}, fmt.Errorf("%s: no mount is the root filesystem", mountinfoPath)
+		return mountPlan{}, fmt.Errorf("%s: %w", mountinfoPath, errNoRootMount)
 	}
 	p.rootType, p.rootWalkable = root.fstype, localTypes[root.fstype]
 	if !p.rootWalkable {

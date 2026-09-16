@@ -9,15 +9,20 @@ import (
 
 // engineReadKeys are registered fact keys the check engine (internal/check)
 // resolves directly against the registry rather than through a control's
-// declarative Checks/AppliesWhen clauses, so no control ever names them in a
-// Fact field: walk.complete gates the walk, sshd.collect_method decides the
-// sshd parse-fallback degradation, sshd.personas_collected decides persona
-// evaluation, and accounts.nss.remote decides the remote-NSS degradation
-// (eval.go, clause.go). The report must not call these unused; nothing in a
-// control file could ever make that report go away. The list is
-// hand-maintained, and the report is where a forgotten entry becomes
-// visible: a key dropped from the engine but left here shows up as engine-
-// read in a collector that has no business having one (M-3).
+// declarative Checks/AppliesWhen clauses: walk.complete gates the walk,
+// sshd.collect_method decides the sshd parse-fallback degradation,
+// sshd.personas_collected decides persona evaluation, and accounts.nss.remote
+// decides the remote-NSS degradation (eval.go, clause.go). Membership says
+// the ENGINE reads the key; it does not say that no control does. A control
+// is free to name one in a clause of its own, and FactUsage then counts it
+// as used rather than as engine-read — the truer answer, because a key a
+// control file names is accounted for by a file a reviewer can read. The
+// list exists for the keys nothing in controls/ names: the report would
+// otherwise call them unused, and nothing anybody wrote in a control file
+// could make that report go away. It is hand-maintained, and the report is
+// where a forgotten entry becomes visible: a key dropped from the engine
+// but left here shows up as engine-read in a collector that has no business
+// having one (M-3).
 var engineReadKeys = set("walk.complete", "sshd.collect_method", "sshd.personas_collected", "accounts.nss.remote")
 
 // enginePrefixes maps the prefix of a key a control may name to the

@@ -53,7 +53,7 @@ func joinWalk(t *testing.T, a *fsAccess) (*walkResult, mountPlan) {
 	plan := planSpec{enter: map[int]string{1: "/"}}.build()
 	plan.usrMerged = map[string]string{}
 	plan.readUsrMerged(a)
-	r := runWalk(a, plan)
+	r := traverseTree(a, plan)
 	return &r, plan
 }
 

@@ -44,6 +44,15 @@ const (
 type idTables struct {
 	uidKnown func(uint32) (bool, string)
 	gidKnown func(uint32) (bool, string)
+
+	// rows are the /etc/passwd lines this load parsed, which the collector
+	// turns into the home set (A-16). They are carried here rather than
+	// read again because /etc/passwd is read once per run for the uid
+	// table already, and a second read could see a different file — the
+	// home set and the uid table must describe one /etc/passwd, not two.
+	// Empty when the file could not be read; classifyHomes then answers
+	// with the two prefix rows alone.
+	rows []passwdRow
 }
 
 // idRange is one delegated range, half-open: [start, end). It is kept in
@@ -133,9 +142,10 @@ func loadIDTables(a collect.Access) (idTables, map[string]facts.Envelope) {
 	userNames := map[string]bool{}
 	groupSet := map[string]bool{}
 
+	var passwdRows []passwdRow
 	if data, ok := read(passwdPath); ok {
-		rows, _ := parsePasswd(data) // a mangled line is one lost account, not a lost file
-		for _, r := range rows {
+		passwdRows, _ = parsePasswd(data) // a mangled line is one lost account, not a lost file
+		for _, r := range passwdRows {
 			userNames[r.name] = true
 			if r.uid >= 0 {
 				uids.ids[uint32(r.uid)] = true
@@ -170,7 +180,7 @@ func loadIDTables(a collect.Access) (idTables, map[string]facts.Envelope) {
 		gids.ranges = mergeRanges(parseSubIDs(data, func(n string) bool { return groupSet[n] || userNames[n] }))
 	}
 
-	return idTables{uidKnown: uids.known, gidKnown: gids.known}, failures
+	return idTables{uidKnown: uids.known, gidKnown: gids.known, rows: passwdRows}, failures
 }
 
 // idSpace is one past the largest id a uid_t or gid_t can hold.

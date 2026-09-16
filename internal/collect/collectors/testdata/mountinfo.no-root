@@ -1,0 +1,2 @@
+36 35 8:2 / /home rw,relatime - ext4 /dev/sda2 rw
+37 35 8:3 / /srv rw,relatime - ext4 /dev/sda3 rw
