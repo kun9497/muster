@@ -574,3 +574,46 @@ checks:
 - [ ] **Step 3:** Execution notes: rulings A-N settled during execution, the lab numbers (walk.stats, list sizes, statuses on the stock host), what was parked (3C verification, lists pending if A-7 fell through, `not_contains` on `list<int>` not added).
 - [ ] **Step 4:** Gates (A-12) + `gitleaks git --no-banner` + the host-string grep over every commit → 0; `git log --format=%B main..HEAD | grep -c "Claude-Session"` equals the commit count.
 - [ ] **Step 5:** Commit `Record the execution notes for plan 3A and bring the documents up to the walk`, then the merge menu — push/PR only on the user's word.
+
+## Execution notes
+
+Executed 2026-09-16 in worktree `stage3a-walk` over main `ffccdcf`, one implementer at a time (Opus), an Opus task review per task, a Sonnet scoped re-review per fix round, two Fable whole-branch reviews (collect side; evaluator, controls, tools, documents), one fix wave and a Sonnet scoped re-review of it. Every task closed in at most one fix round; the whole-branch reviews found no BLOCKING finding, one Important on each side (the btrfs top-level alias; the spec's W-7 paragraph describing the tool as designed rather than as shipped), both fixed. The Linux-only suites ran on the lab host as root through the session's read-only scripts; nothing captured from that host is committed.
+
+### Rulings settled during execution (A-18 … A-41; A-1 … A-17 are in Global Constraints)
+
+- **A-18** The `none_subject` lint rule stands and ten shipped controls gained `subject: path` (`subject: position` on `env.shell.root_path_entries`, which has no stable field): observation subjects of those controls are now `file:<path>` instead of `file:<index>`; recorded in the CHANGELOG.
+- **A-19** With `O_DIRECTORY` a trailing symlink opens as ENOTDIR on Linux 5.15, so `ReadDir` re-probes an ENOTDIR with an `O_PATH|O_NOFOLLOW` open and reports `ErrSymlink` — one name for a symlink in the path.
+- **A-20** The guard refuses a relative or unclean `ReadDir` path as a plain error, not a recorded violation (a muster bug, not a declaration breach).
+- **A-21** The plan's `--deep --timeout 3m → 3m` example contradicted spec §6: with the default 10m budget that pair is refused naming both flags; "given wins" holds with `--walk-budget 1m --timeout 3m`. **A-22** `--walk-budget` equal to `--timeout` stays accepted; zero or negative budgets and `--walk-exclude /` are refused.
+- **A-23** `classifyHomes` emits, after the two prefix rows, one `kind: user` row per account whose `pw_dir` is `/root` or under `/home`, then the service rows — so the rootless container stores under `/root` and `/home/<user>` are excluded as W-2 requires. **A-24** A mountinfo without a `/` row is an error naming the file (a chroot whose root is not a mount point); an undeclared configuration read is `{path, absent}` (C4).
+- **A-25** `gid_known` is decided from `/etc/group` and `/etc/subgid` only; `subgid` names resolve through group or passwd names and a numeric first field is accepted; a missing id file is not forwarded, a truncated one is forwarded as ok + `truncated` (R70).
+- **A-26** The plan's "a boundary child in the enter set is pushed" was a defect — every entered mount is also a root, so it would be walked twice; a boundary into any mountinfo-known mount is passed over, only an id mountinfo never carried is `unlisted_mount`. **A-27** A mount point at or under an excluded root is not pushed as a root. **A-28** `detail` for an unusual open errno is the errno text.
+- **A-29** `truncated_counts.hidden` counts non-allowlisted candidates only; `allowlisted_hidden` counts every allowlisted one; disjoint. **A-30** `underHidden` latches on the dot prefix whether or not the directory was recorded.
+- **A-31** A reference list that will not decode is an `error` envelope naming the file. **A-32** Missing `diversions`/`statoverride` are silence; a missing or unreadable `.list` or `status` is the join's answer (C3). **A-33** dpkg decision order for a covered package: entry present with the bits → `list` true; else `postinst_sets_mode` → `postinst`; else version equal → `list` false; else `version_mismatch`.
+- **A-34** A panic in the walk goroutine errors all nine walk keys (completeness is unknown, not false); the join still runs after the deadline.
+- **A-35** `controls new` notes, instead of refusing, an item another control already judges (W-10); `describeField` omits the expected for `present`/`absent`.
+- **A-36** Lists are named by the image's `VERSION_ID` (`rocky-9.8.json`); `suid.Load` falls back to `<id>-<major>.json`, then the highest committed `<id>-<major>.<minor>.json` (regression test over the real embedded FS). **A-37** The SHA-256 is the pin; the URL is what `apt-get download --print-uris` reports; download host-side, verify before opening, bind-mount read-only into a `--network none` container. **A-38** `postinst_sets_mode` is detected from the maintainer scripts (computed `chmod $MODE`, `dpkg-statoverride --add`), with the matched line printed as evidence and a literal target required to be a shipped file; a literal-mode grep would have FAILed stock `pkexec`, `fusermount3` and `postdrop`. **A-39** The covered set is named ∪ image-discovered (recorded in `sources.json`'s note); `-check` masks `generated`; the platform is pinned to `linux/amd64` and recorded.
+- **A-40** The root filesystem is always the alias entered: `mountPoint == "/"` ranks first in the tie-break (a btrfs top-level subvolume mounted elsewhere is the duplicate); the root row is the highest-id `/` mount. **A-41** A list entry vouches for a bit only when its package is the host's owner of the path; a truncated dpkg `.list` drops its cut last line; `groupSet` is built from every group name.
+
+### Lab numbers (stock-ish Ubuntu 22.04 node, `collect --deep`, defaults)
+
+| Measure | Value |
+|---|---|
+| walk collector | ok, 5107 ms; run complete |
+| entries / dirs / files / symlinks | 905462 / 148154 / 748920 / 8388 |
+| stop_reason, mnt_id_fallback, nice+ioprio | "", false, applied |
+| suid_sgid / suid_sgid_unverified | 17 (list 15, statoverride 2) / 4 (postinst 4: pkexec, the polkit agent helper, fusermount3, the dbus launch helper) |
+| world_writable / sticky_missing / hidden / skipped | 1066 / 178 / 566 / 198 |
+| unowned | 2000, truncated (23869 offered — the node's copied build trees, uid 197609) |
+| U-25 | WARN (was MANUAL) |
+| non-root (`runuser -u nobody`) | exit 1; `walk.complete` denied; no other walk key |
+| `setpriv` with CAP_DAC_READ_SEARCH/CAP_DAC_OVERRIDE dropped | a `chmod 000` directory is a `denied` skip row; `walk.complete` true |
+
+Reference lists (public images, `linux/amd64`; packages / files / setuid rows / postinst-flagged): ubuntu-22.04 17/702/16/8, ubuntu-24.04 18/695/16/8, debian-12 18/1354/15/8, rocky-9.8 7/619/12/0, almalinux-9.8 5/333/10/0; two generations byte-identical; `-check` exit 0 with a cold cache.
+
+### Parked
+
+- Package verification (`rpm -V` / `dpkg --verify`) and `CommandTemplate` → 3C (W-8). `/var/lib/portables` and `/var/lib/extensions` as fixed-set candidates → 3C.
+- Rootless container stores of accounts that are not in `/etc/passwd` (remote NSS) are walked; name it in U-23's description → 3B. The four record-list facts without `subject_kind` (`files.user_rhosts`, `files.env_files`, `files.dev_nondevice`, `env.shell.root_path_entries`; observations read `item:`) need a `since` entry → 3B.
+- The `internal/report` tests pin the literal `+2026.09.09` version, so the goldens never move with `controls/VERSION`. rpm reference lists are thin (nothing is installed in-image; cross-check only). A non-LTS point release gets the highest committed minor of its major (lenient within W-7's floor). One huge directory is listed whole before the entry budget fires (bounded by one listing). A container-storage path that is also a non-local mount gets two `walk.skipped` rows.
+- CI: the runner's first `--deep` run is read for `walk.stats.truncated_counts`; a list at its cap is fixed by an exclusion or an allowlist row, never a raised cap (A-8).
