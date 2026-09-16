@@ -66,26 +66,28 @@ var walkTraverse = traverse
 
 // findingList is one of the six lists a control or a warning reads: the key
 // it is written under, the cap index whose truncation flag it carries, and
-// whether the package join decides it (W-6). A joined list cites the join's
-// evidence and, when the join failed, carries its envelope instead of rows;
-// the other two answer from what the traversal saw and nothing else.
+// which outside answer decides it. joined: the package join (W-6) — such a
+// list cites the join's evidence and, when the join failed, carries its
+// envelope instead of rows. ids: the id tables (W-5) — an id file that
+// could not be read answers for the whole list (C3). sticky_missing is
+// decided by neither: what it reports is true of the entry itself.
 type findingList struct {
 	key    string
 	cap    int
 	joined bool
+	ids    bool
 }
 
 var findingLists = []findingList{
-	{"walk.suid_sgid", capSUIDSGID, true},
-	{"walk.suid_sgid_unverified", capSUIDUnverified, true},
-	{"walk.world_writable", capWorldWritable, true},
-	{"walk.sticky_missing", capStickyMissing, false},
-	{"walk.unowned", capUnowned, false},
-	{"walk.hidden", capHidden, true},
+	{key: "walk.suid_sgid", cap: capSUIDSGID, joined: true},
+	{key: "walk.suid_sgid_unverified", cap: capSUIDUnverified, joined: true},
+	{key: "walk.world_writable", cap: capWorldWritable, joined: true},
+	{key: "walk.sticky_missing", cap: capStickyMissing},
+	{key: "walk.unowned", cap: capUnowned, ids: true},
+	{key: "walk.hidden", cap: capHidden, joined: true},
 }
 
-// idFileOrder is the order an id-file failure is looked for in, so a host
-// where two of them are unreadable always reports the same one.
+// idFileOrder is the order idFileOutcome consults the four id files in.
 var idFileOrder = []string{passwdPath, groupPath, subuidPath, subgidPath}
 
 // walkOutcome is what the walk goroutine hands back: the traversal's
@@ -136,6 +138,14 @@ func runWalk(ctx context.Context, a collect.Access, b *collect.Builder) error {
 		writeWalkPanic(b, out.panicked)
 		return nil
 	}
+	// The join runs even when the deadline stopped the walk, and on
+	// purpose: the rows the traversal did produce are real, and publishing
+	// them with the package fields the traversal initialised would read as
+	// "no package owns this" — a finding muster would have invented out of
+	// a clock. On a real host the command and the reads the join makes fail
+	// against that same expired context, so every joined list carries that
+	// failure's envelope, which is the honest answer; against a double that
+	// ignores the context they simply join, which is honest too.
 	jo := joinCandidates(ctx, a, b.Header(), plan, &out.r)
 	writeWalkFacts(b, plan, out, jo, idFail, derived)
 	if out.r.stopReason == "deadline" {
@@ -222,32 +232,12 @@ func writeWalkPanic(b *collect.Builder, panicked string) {
 	}
 }
 
-// writeWalkFacts writes the nine keys of a walk that ran (§7). The source
-// says what decided each one: the walk itself for the lists it judged
-// alone, the package database for the four the join decided.
+// writeWalkFacts writes the nine keys of a walk that ran (§7).
 func writeWalkFacts(b *collect.Builder, plan mountPlan, out walkOutcome, jo joinOutcome, idFail map[string]facts.Envelope, derived *facts.Source) {
 	r := &out.r
 	b.Set("walk.complete", collect.OK(r.complete, derived))
 	for _, l := range findingLists {
-		src := derived
-		if l.joined {
-			src = jo.source
-		}
-		e := collect.OK(rowsValue(*r.lists.at(l.cap)), src)
-		e.Truncated = r.lists.truncated[l.cap]
-		switch {
-		case l.joined && jo.failed != nil:
-			// The join is one operation: a table nobody could read leaves
-			// every list it decides as unanswerable as the others.
-			e = *jo.failed
-		case l.joined && jo.truncated:
-			// The rows that were joined are real; the absence of a row
-			// means nothing, which is exactly what truncated says.
-			e.Truncated = true
-		case l.key == "walk.unowned":
-			e = unownedEnvelope(e, idFail)
-		}
-		b.Set(l.key, e)
+		b.Set(l.key, listEnvelope(l, r, jo, idFail, derived))
 	}
 	skipped := collect.OK(rowsValue(r.lists.skipped), derived)
 	skipped.Truncated = r.lists.truncated[capSkipped]
@@ -255,15 +245,63 @@ func writeWalkFacts(b *collect.Builder, plan mountPlan, out walkOutcome, jo join
 	b.Set("walk.stats", collect.OK(walkStats(plan, out.r, out.nice, out.ioprio), derived))
 }
 
-// unownedEnvelope applies C3 to walk.unowned: if one of the four id files
-// could not be read, nothing on this host can say which ids are accounted
-// for, so the fact is that read's status with the path in the reason rather
-// than a list computed from the files that did answer. A file that is
-// simply not there says nothing — a host with no /etc/subuid has no
-// delegation to miss — and a file whose read hit the size cap is still an
-// answer as far as it goes, forwarded as ok with truncated (R70).
-func unownedEnvelope(ok facts.Envelope, failures map[string]facts.Envelope) facts.Envelope {
-	truncated := false
+// listEnvelope is the envelope one finding list carries. A list nothing
+// could decide carries the failure and no rows at all — the rows are built
+// only on the path that keeps them, so an unanswerable fact can never also
+// publish a value somebody might read past the status. The source says what
+// decided the list: the walk itself for the two it judged alone, the
+// package database for the four the join decided.
+func listEnvelope(l findingList, r *walkResult, jo joinOutcome, idFail map[string]facts.Envelope, derived *facts.Source) facts.Envelope {
+	if l.joined && jo.failed != nil {
+		// The join is one operation: a table nobody could read leaves every
+		// list it decides as unanswerable as the others.
+		return *jo.failed
+	}
+	var idTruncated bool
+	if l.ids {
+		failed, failing, truncated := idFileOutcome(idFail)
+		if failing {
+			return failed
+		}
+		idTruncated = truncated
+	}
+	src := derived
+	if l.joined {
+		src = jo.source
+	}
+	e := collect.OK(rowsValue(*r.lists.at(l.cap)), src)
+	// A list at its cap is a sample (§2): the rows it carries are real, and
+	// the absence of a row from it is not evidence that there is none.
+	e.Truncated = r.lists.truncated[l.cap]
+	if l.joined && jo.truncated {
+		// The same for a package table read only in part: what was joined
+		// is real, and a row the table never reached decides nothing.
+		e.Truncated = true
+	}
+	if idTruncated {
+		e.Truncated = true
+	}
+	return e
+}
+
+// idFileOutcome is what the four id files do to the list the tables decide
+// (C3/R70). A file that could not be read is the answer for the whole list:
+// nothing on this host can then say which ids are accounted for, so the
+// fact is that read's status with the path in the reason rather than a list
+// computed from the files that happened to answer. A file whose read hit
+// the size cap leaves the list an answer as far as it goes, with truncated
+// saying that the ids past the cap are unknown.
+//
+// An ABSENT id file is deliberately NOT forwarded. A host with no
+// /etc/subuid has no delegation to miss, and a host with no /etc/passwd at
+// all really does have an entry-by-entry answer — every uid on it is
+// unaccounted for — which is the honest reading and exactly what the list
+// then reports. Degrading that to "could not say" would hide a host that
+// has no accounts behind a word that means muster could not look.
+//
+// The four files are consulted in one fixed order, so a host where two of
+// them are unreadable always reports the same one.
+func idFileOutcome(failures map[string]facts.Envelope) (failed facts.Envelope, failing, truncated bool) {
 	for _, p := range idFileOrder {
 		e, found := failures[p]
 		if !found {
@@ -271,13 +309,12 @@ func unownedEnvelope(ok facts.Envelope, failures map[string]facts.Envelope) fact
 		}
 		switch e.Status {
 		case facts.StatusDenied, facts.StatusError, facts.StatusTimeout:
-			return e
+			return e, true, false
 		case facts.StatusOK:
 			truncated = true
 		}
 	}
-	ok.Truncated = ok.Truncated || truncated
-	return ok
+	return facts.Envelope{}, false, truncated
 }
 
 // walkStats is the walk's own account of itself: the thirteen fields the
@@ -320,11 +357,13 @@ func walkStats(plan mountPlan, r walkResult, nice, ioprio bool) map[string]any {
 }
 
 // planSkipRows renders the roots the plan refused before the walk began, for
-// the one branch that writes walk.skipped without a traversal.
+// the one branch that writes walk.skipped without a traversal. It goes
+// through skipRowValue like every row the traversal adds, so the two cannot
+// describe one vocabulary two ways.
 func planSkipRows(rows []skipRow) []any {
 	out := make([]any, 0, len(rows))
 	for _, s := range rows {
-		out = append(out, map[string]any{"path": s.path, "reason": s.reason, "detail": s.detail})
+		out = append(out, skipRowValue(s))
 	}
 	return out
 }

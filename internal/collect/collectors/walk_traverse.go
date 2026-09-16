@@ -415,7 +415,7 @@ func (w *walker) hidden(f frame, e collect.DirEntry, p string) {
 }
 
 func (w *walker) addSkip(p, reason, detail string) {
-	w.r.lists.addRow(capSkipped, map[string]any{"path": p, "reason": reason, "detail": detail})
+	w.r.lists.addRow(capSkipped, skipRowValue(skipRow{path: p, reason: reason, detail: detail}))
 }
 
 // skipReason maps a failed listing to the closed vocabulary of A-15. A

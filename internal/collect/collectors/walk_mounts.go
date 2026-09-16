@@ -108,6 +108,14 @@ type mountRow struct {
 // errno text for a vanished row the traversal adds later.
 type skipRow struct{ path, reason, detail string }
 
+// skipRowValue renders one skipped root as the record walk.skipped carries.
+// The plan writes its rows before the first directory is opened and the
+// traversal adds more as it goes; both go through here, so one vocabulary
+// can never be published in two shapes.
+func skipRowValue(s skipRow) map[string]any {
+	return map[string]any{"path": s.path, "reason": s.reason, "detail": s.detail}
+}
+
 // configRead is one row of walk.stats.config_unreadable: a container
 // configuration file that exists and could not be read, with the read's
 // status word. Such a file is not a root — the walk cannot know where it

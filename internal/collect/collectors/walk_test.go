@@ -5,6 +5,7 @@ package collectors
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -468,6 +469,127 @@ func TestWalkIDFilesFailureReachesUnowned(t *testing.T) {
 	if e2.Status != facts.StatusOK || !e2.Truncated {
 		t.Errorf("walk.unowned = %+v, want ok and truncated", e2)
 	}
+}
+
+// walkWideTree is one directory holding more world-writable files than the
+// list's own cap, and nothing else that any other list judges: the entries
+// are regular files (so no sticky_missing row), owned by root (so no
+// unowned row) and plainly named (so no hidden row). It is what makes a
+// dropped truncation flag on ONE list visible against six that stay false.
+func walkWideTree(n int) map[string][]collect.DirEntry {
+	entries := make([]collect.DirEntry, 0, n)
+	for i := 0; i < n; i++ {
+		entries = append(entries, treeFile(fmt.Sprintf("f%05d", i), 0o666))
+	}
+	return map[string][]collect.DirEntry{
+		"/":     {treeDir("home", 0o755), treeDir("srv", 0o755)},
+		"/home": {},
+		"/srv":  entries,
+	}
+}
+
+// untruncated asserts that every key but the named ones is ok and carries no
+// truncation, which is what makes a flag set on the right list mean anything.
+func untruncated(t *testing.T, b *collect.Builder, except ...string) {
+	t.Helper()
+	for _, key := range allWalkKeys {
+		if slices.Contains(except, key) {
+			continue
+		}
+		if e := env(t, b, key); e.Truncated {
+			t.Errorf("%s = %+v, want no truncation", key, e)
+		}
+	}
+}
+
+// §2/R70: a fact built from a sample must say so, or a control reads the
+// absence of a row as the absence of the thing. The walk has two independent
+// sources of truncation — a list that hit its own cap, and a package table
+// the join read only in part — and the collector has to forward each onto
+// the keys it belongs to and onto no others.
+func TestWalkForwardsBothTruncationFlags(t *testing.T) {
+	wwCap := listCaps[capWorldWritable]
+	wide := func(a *fsAccess) *fsAccess {
+		a.tree = buildTree(walkWideTree(wwCap+1), map[string]uint64{"/": 1, "/home": 2})
+		return a
+	}
+	cutTable := func(a *fsAccess) *fsAccess {
+		a.cmds[cmdKey(rpmCommand)] = cmdResult{file: "rpm.qa-files.cut", truncated: true}
+		return a
+	}
+
+	t.Run("a list at its cap", func(t *testing.T) {
+		b := walkRun(t, wide(walkAccess()))
+		e := env(t, b, "walk.world_writable")
+		if e.Status != facts.StatusOK || !e.Truncated {
+			t.Errorf("walk.world_writable = %+v, want ok and truncated", e)
+		}
+		if n := len(walkRows(t, b, "walk.world_writable")); n != wwCap {
+			t.Errorf("rows = %d, want the cap (%d)", n, wwCap)
+		}
+		// The count is what says how many there really were, and it is the
+		// reason the fact is a sample rather than the answer.
+		counts := walkStatsValue(t, b)["truncated_counts"].(map[string]any)
+		if counts["world_writable"] != wwCap+1 {
+			t.Errorf("truncated_counts.world_writable = %v, want %d", counts["world_writable"], wwCap+1)
+		}
+		untruncated(t, b, "walk.world_writable")
+	})
+
+	t.Run("a package table read in part", func(t *testing.T) {
+		b := walkRun(t, cutTable(walkAccess()))
+		for _, key := range walkJoinedKeys {
+			e := env(t, b, key)
+			if e.Status != facts.StatusOK || !e.Truncated {
+				t.Errorf("%s = %+v, want ok and truncated: the table was read only in part", key, e)
+			}
+		}
+		// Nothing the join did not decide is affected: these three answer
+		// from what the traversal saw, and it saw all of it.
+		untruncated(t, b, walkJoinedKeys...)
+	})
+
+	// walk.skipped has a cap and a flag of its own, and it is the list a
+	// reviewer reads to judge whether the walk saw what it should have: a
+	// sample of the roots it refused, presented as the whole set, would be
+	// the most misleading of the seven.
+	t.Run("the skipped list at its cap", func(t *testing.T) {
+		withEUID(t, 0)
+		skipCap := listCaps[capSkipped]
+		exclude := make([]string, 0, skipCap+1)
+		for i := 0; i <= skipCap; i++ {
+			exclude = append(exclude, fmt.Sprintf("/excluded%05d", i))
+		}
+		b, err := deepWalk(context.Background(), t, walkAccess(), collect.WalkOptions{Exclude: exclude})
+		if err != nil {
+			t.Fatalf("walk: %v", err)
+		}
+		e := env(t, b, "walk.skipped")
+		if e.Status != facts.StatusOK || !e.Truncated {
+			t.Errorf("walk.skipped = %+v, want ok and truncated", e)
+		}
+		if n := len(walkRows(t, b, "walk.skipped")); n != skipCap {
+			t.Errorf("rows = %d, want the cap (%d)", n, skipCap)
+		}
+		counts := walkStatsValue(t, b)["truncated_counts"].(map[string]any)
+		if n, _ := counts["skipped"].(int); n <= skipCap {
+			t.Errorf("truncated_counts.skipped = %v, want more than the cap (%d)", counts["skipped"], skipCap)
+		}
+		untruncated(t, b, "walk.skipped")
+	})
+
+	t.Run("both at once", func(t *testing.T) {
+		b := walkRun(t, cutTable(wide(walkAccess())))
+		// world_writable is both at its cap and joined from a partial
+		// table; either alone would set the flag, and both must keep it.
+		if e := env(t, b, "walk.world_writable"); e.Status != facts.StatusOK || !e.Truncated {
+			t.Errorf("walk.world_writable = %+v, want ok and truncated", e)
+		}
+		if e := env(t, b, "walk.suid_sgid"); !e.Truncated {
+			t.Errorf("walk.suid_sgid = %+v, want the join's truncation", e)
+		}
+		untruncated(t, b, walkJoinedKeys...)
+	})
 }
 
 // §2: a limit stops the walk without costing it what it had already seen.
