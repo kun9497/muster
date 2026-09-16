@@ -1,0 +1,6 @@
+/lib/libfoo.so.1
+/lib/libfoo.so.1.distrib
+pkg-c
+/usr/bin/x
+/usr/bin/x.distrib
+pkg-b
