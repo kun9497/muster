@@ -136,18 +136,18 @@ func TestHiddenAllowlisted(t *testing.T) {
 // lists, every cap positive, and the two informational lists (hidden and
 // skipped) allowed to grow past the finding lists.
 func TestHiddenAllowlistListCaps(t *testing.T) {
-	if len(listCaps) != 7 {
-		t.Fatalf("listCaps has %d entries, want one per walk list", len(listCaps))
+	if len(listCaps) != capCount {
+		t.Fatalf("listCaps has %d entries, want one per walk list (%d)", len(listCaps), capCount)
 	}
 	for i, c := range listCaps {
 		if c <= 0 {
 			t.Errorf("listCaps[%d] = %d, want a positive cap", i, c)
 		}
 	}
-	findings := listCaps[:5]
-	for i, c := range findings {
-		if listCaps[5] < c || listCaps[6] < c {
-			t.Errorf("listCaps[%d] = %d exceeds the hidden (%d) or skipped (%d) cap", i, c, listCaps[5], listCaps[6])
+	for _, i := range []int{capSUIDSGID, capSUIDUnverified, capWorldWritable, capStickyMissing, capUnowned} {
+		if listCaps[capHidden] < listCaps[i] || listCaps[capSkipped] < listCaps[i] {
+			t.Errorf("listCaps[%d] = %d exceeds the hidden (%d) or skipped (%d) cap",
+				i, listCaps[i], listCaps[capHidden], listCaps[capSkipped])
 		}
 	}
 	if allowlistedHiddenCap <= 0 {

@@ -102,17 +102,18 @@ func (s *idSet) inRange(id uint64) bool {
 // A file whose read hit the size cap gets an entry as well, with what was
 // read still folded into the tables: the accounts that were read are real,
 // and the entry is what tells the caller that the ones past the cap were
-// not. The map's promise is therefore "every path whose contribution is
-// incomplete, and why" — a caller that degrades on any entry degrades
-// correctly.
+// not. It is an ok envelope carrying Truncated (R70) — a short read is not a
+// failed one — so the caller forwards the flag rather than degrading the
+// fact. The map's promise is therefore "every path whose contribution is
+// incomplete, and how", and the envelope's status says which kind.
 func loadIDTables(a collect.Access) (idTables, map[string]facts.Envelope) {
 	failures := map[string]facts.Envelope{}
 	note := func(path string, meta collect.ReadMeta) {
 		if !meta.Truncated {
 			return
 		}
-		e := collect.ErrorEnv(path + ": read hit the size cap; the ids past it were not read")
-		e.Truncated = true
+		e := collect.OKRead(nil, &facts.Source{Kind: "file", Path: path}, meta)
+		e.Reason = path + ": read hit the size cap; ids beyond it are unknown"
 		failures[path] = e
 	}
 	read := func(path string) ([]byte, bool) {
@@ -204,7 +205,10 @@ func parseSubIDs(data []byte, nameKnown func(string) bool) []idRange {
 		if _, numErr := strconv.ParseUint(f[0], 10, 32); numErr != nil && !nameKnown(f[0]) {
 			continue
 		}
-		if start >= idSpace {
+		if start >= idSpace || count > idSpace {
+			// Neither end may leave the id space, and refusing a count that
+			// large before the addition is also what keeps start+count from
+			// wrapping around a uint64 into a range covering low ids.
 			continue
 		}
 		end := start + count

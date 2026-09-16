@@ -222,21 +222,22 @@ func (a *fsAccess) Getxattr(p, name string) ([]byte, error) {
 }
 
 // ReadDir serves the scripted tree, overriding the embedded NoWalkAccess.
-// It answers the way the host primitive answers: a directory the caller may
-// not search fails with the seeded error, an unscripted path is ENOENT, and
-// an expect that does not match the scripted (dev, ino) is ErrVanished with
-// the path named — never a listing of the directory that IS there. The
+// It answers the way the host primitive answers: every error names the path
+// it happened on — a directory the caller may not search fails with the
+// seeded errno wrapped, an unscripted path is a wrapped ENOENT, and an
+// expect that does not match the scripted (dev, ino) is ErrVanished, never
+// a listing of the directory that IS there. The
 // entries come back sorted, as collect.ReadDir sorts them, or reversed when
 // shuffle is set; either way they are a copy, so a tree listed twice is the
 // same tree twice.
 func (a *fsAccess) ReadDir(p string, expect collect.Identity) (collect.Listing, error) {
 	a.readDirs = append(a.readDirs, p)
 	if err := a.dirErrs[p]; err != nil {
-		return collect.Listing{}, err
+		return collect.Listing{}, fmt.Errorf("%s: %w", p, err)
 	}
 	l, ok := a.tree[p]
 	if !ok {
-		return collect.Listing{}, os.ErrNotExist
+		return collect.Listing{}, fmt.Errorf("%s: %w", p, os.ErrNotExist)
 	}
 	if expect != (collect.Identity{}) && expect != (collect.Identity{Dev: l.Self.Dev, Ino: l.Self.Ino}) {
 		return collect.Listing{}, fmt.Errorf("%s: %w", p, collect.ErrVanished)
@@ -3548,11 +3549,13 @@ func TestFSAccessTreeDouble(t *testing.T) {
 		t.Errorf("identity mismatch: err = %v, want the path named", err)
 	}
 
-	if _, err := a.ReadDir("/nope", collect.Identity{}); !errors.Is(err, os.ErrNotExist) {
-		t.Errorf("unscripted path: err = %v, want ErrNotExist", err)
+	_, err = a.ReadDir("/nope", collect.Identity{})
+	if !errors.Is(err, os.ErrNotExist) || !strings.Contains(err.Error(), "/nope") {
+		t.Errorf("unscripted path: err = %v, want ErrNotExist naming the path", err)
 	}
-	if _, err := a.ReadDir("/srv/denied", collect.Identity{}); !errors.Is(err, unix.EACCES) {
-		t.Errorf("dirErrs path: err = %v, want EACCES", err)
+	_, err = a.ReadDir("/srv/denied", collect.Identity{})
+	if !errors.Is(err, unix.EACCES) || !strings.Contains(err.Error(), "/srv/denied") {
+		t.Errorf("dirErrs path: err = %v, want EACCES naming the path", err)
 	}
 
 	a.shuffle = true

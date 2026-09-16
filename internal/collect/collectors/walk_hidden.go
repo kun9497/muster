@@ -85,15 +85,28 @@ func hiddenAllowlisted(path, name string) bool {
 	return hiddenBareSet[name] || hiddenExactSet[path]
 }
 
-// listCaps bounds how many rows one run records per list, in the order the
-// walk's lists are declared: suid_sgid, suid_sgid_unverified,
-// world_writable, sticky_missing, unowned, hidden (the entries that are NOT
-// allowlisted) and skipped. The findings are capped lower than the two
-// informational lists because a host with more than two thousand setuid
-// binaries has a problem the two thousandth row will not add to, while the
-// hidden and skipped lists are what a reader uses to judge whether the walk
-// saw what it should have and are worth carrying further.
-var listCaps = [7]int{2000, 2000, 2000, 2000, 2000, 10000, 10000}
+// The index of each of the walk's lists into listCaps. They are named so
+// that a cap is picked by the list it belongs to rather than by a number
+// nobody can check, and so that inserting a list means adding a name here
+// instead of renumbering call sites.
+const (
+	capSUIDSGID = iota
+	capSUIDUnverified
+	capWorldWritable
+	capStickyMissing
+	capUnowned
+	capHidden // the hidden entries that are NOT allowlisted
+	capSkipped
+	capCount
+)
+
+// listCaps bounds how many rows one run records per list, in the order
+// above. The findings are capped lower than the two informational lists
+// because a host with more than two thousand setuid binaries has a problem
+// the two thousandth row will not add to, while the hidden and skipped
+// lists are what a reader uses to judge whether the walk saw what it should
+// have, and are worth carrying further.
+var listCaps = [capCount]int{2000, 2000, 2000, 2000, 2000, 10000, 10000}
 
 // allowlistedHiddenCap bounds the separate count-and-sample the walk keeps
 // of hidden entries it DID pass over, so a reviewer can see what the

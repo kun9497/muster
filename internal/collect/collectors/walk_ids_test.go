@@ -61,6 +61,9 @@ func TestIDTables(t *testing.T) {
 		{200000, true, "subid", "a numeric first field is that uid's own range"},
 		{265535, true, "subid", "the last id of the numeric row's range"},
 		{265536, false, "unknown", "one past the numeric row's range"},
+		{4294966999, false, "unknown", "one below the range that runs off the end of the id space"},
+		{4294967295, true, "subid", "the clamped end of a range whose count runs past the id space"},
+		{5, false, "unknown", "a count larger than the whole id space delegates nothing at all"},
 		{61183, false, "unknown", "one below the DynamicUser range"},
 		{61184, true, "dynamic", "the first id of the DynamicUser range"},
 		{65519, true, "dynamic", "the last id of the DynamicUser range"},
@@ -138,8 +141,10 @@ func TestIDTablesTruncatedFileIsReported(t *testing.T) {
 	if !ok {
 		t.Fatalf("a truncated /etc/passwd went unreported: %v", failures)
 	}
-	if e.Status != facts.StatusError || !e.Truncated || !strings.HasPrefix(e.Reason, "/etc/passwd: ") {
-		t.Errorf("/etc/passwd: %+v, want a truncated error envelope whose reason names the path", e)
+	// R70: a short read is not a failed one. The entry is an ok envelope
+	// carrying Truncated, which the caller forwards rather than degrading on.
+	if e.Status != facts.StatusOK || !e.Truncated || !strings.HasPrefix(e.Reason, "/etc/passwd: ") {
+		t.Errorf("/etc/passwd: %+v, want an ok+truncated envelope whose reason names the path", e)
 	}
 }
 
