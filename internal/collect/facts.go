@@ -40,8 +40,15 @@ func (b *Builder) Header() *facts.Run { return b.header }
 // parsed (W-12). Run calls it for --deep and for nothing else, so the walk
 // collector asking Walk() is asking whether the operator wanted a walk at
 // all — the question a package-level flag could not answer honestly for two
-// runs in one process.
-func (b *Builder) SetWalk(o WalkOptions) { b.walk = &o }
+// runs in one process. The two lists are cloned: the caller's slices are
+// the command line's backing arrays, and a Builder that aliased them would
+// have the walk's boundaries change under it if anything ever appended to
+// or rewrote them.
+func (b *Builder) SetWalk(o WalkOptions) {
+	o.Exclude = slices.Clone(o.Exclude)
+	o.Include = slices.Clone(o.Include)
+	b.walk = &o
+}
 
 // Walk returns the walk options and whether they were set. False means
 // --deep was not given: the walk collector writes no key, walk.* stays

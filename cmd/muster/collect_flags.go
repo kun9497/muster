@@ -15,18 +15,18 @@ import (
 const collectUsage = `usage: muster collect [flags]
 
 flags:
-  --out <path|->        snapshot path (default /var/lib/muster/snapshots/<host>-<time>-<digest>.json)
-  --force               overwrite an existing --out path
-  --deep                run the filesystem walk (needs root; raises the default --timeout to --walk-budget + 5m)
-  --walk-budget <dur>   wall-time limit for the walk (default 10m; needs --deep)
+  --out <path|->          snapshot path (default /var/lib/muster/snapshots/<host>-<time>-<digest>.json)
+  --force                 overwrite an existing --out path
+  --deep                  run the filesystem walk (needs root; raises the default --timeout to --walk-budget + 5m)
+  --walk-budget <dur>     wall-time limit for the walk (default 10m; needs --deep)
   --walk-max-entries <n>  entries the walk may visit (default 2000000; needs --deep)
-  --walk-exclude <path> a root the walk must not enter, repeatable (needs --deep)
-  --walk-include <path> a container-storage root to walk after all, repeatable; the fixed set only (needs --deep)
-  --timeout <duration>  global deadline (default 5m)
-  --require-root        exit 2 without writing when not root
-  --require-complete    exit 2 (instead of 1) when the snapshot is partial
-  --list-actions        print every path read, command run and the file written, then exit
-  --format table|json   with --list-actions (default table)
+  --walk-exclude <path>   a root the walk must not enter, repeatable (needs --deep)
+  --walk-include <path>   a container-storage root to walk after all, repeatable; the fixed set only (needs --deep)
+  --timeout <duration>    global deadline (default 5m)
+  --require-root          exit 2 without writing when not root
+  --require-complete      exit 2 (instead of 1) when the snapshot is partial
+  --list-actions          print every path read, command run and the file written, then exit
+  --format table|json     with --list-actions (default table)
 `
 
 // defaultWalkBudget and defaultWalkMaxEntries are the walk's two limits
@@ -165,6 +165,14 @@ func parseCollectFlags(args []string) (collectOpts, error) {
 	if walkFlag != "" && !o.deep {
 		return o, fmt.Errorf("%s needs --deep", walkFlag)
 	}
+	// A budget of zero or less is not a short walk, it is a walk that is
+	// over before it starts — and a negative one would drag the derived
+	// deadline below zero, where collect.Run silently restores its own 5m
+	// default. Refused like a zero entry cap, and only under --deep, so a
+	// run without the walk is unaffected.
+	if o.deep && o.walkBudget <= 0 {
+		return o, fmt.Errorf("--walk-budget must be greater than 0, got %s", o.walkBudget)
+	}
 	if o.deep && !o.timeoutGiven {
 		o.timeout = o.walkBudget + walkTimeoutMargin
 	}
@@ -173,7 +181,9 @@ func parseCollectFlags(args []string) (collectOpts, error) {
 	// is ERROR(walk_incomplete). Better to refuse the pair now, naming
 	// both, than to spend the deadline finding that out. The default budget
 	// counts as a budget — an explicit --timeout below 10m is refused
-	// exactly as an explicit --walk-budget above the deadline is.
+	// exactly as an explicit --walk-budget above the deadline is. A budget
+	// equal to the deadline is accepted: the spec refuses a budget *above*
+	// it, and the two limits stopping together is the operator's call.
 	if o.deep && o.walkBudget > o.timeout {
 		return o, fmt.Errorf("--walk-budget %s exceeds --timeout %s", o.walkBudget, o.timeout)
 	}
@@ -210,6 +220,12 @@ func entryCap(v string) (int, error) {
 func checkWalkPath(flag, v string) error {
 	if !strings.HasPrefix(v, "/") || path.Clean(v) != v {
 		return fmt.Errorf("%s: %s must be an absolute, clean path", flag, v)
+	}
+	// The walk matches an exclusion by "equal or under", so "/" excludes
+	// every filesystem there is. An operator who wants no walk asks for no
+	// walk; a flag that turns --deep into an expensive no-op is a trap.
+	if v == "/" {
+		return fmt.Errorf("%s: / would exclude every filesystem", flag)
 	}
 	return nil
 }

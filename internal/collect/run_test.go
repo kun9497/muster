@@ -615,3 +615,26 @@ func TestDeepReachesTheWalkCollectorThroughTheBuilder(t *testing.T) {
 		})
 	}
 }
+
+// The Builder keeps its own copy of the exclusion lists. They arrive as the
+// command line's backing arrays, and a walk whose boundaries could change
+// after they were set is a walk whose walk.skipped rows do not describe the
+// traversal that ran.
+func TestSetWalkCopiesTheExclusionLists(t *testing.T) {
+	reg, err := facts.LoadRegistry()
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := NewBuilder(reg)
+	if got, ok := b.Walk(); ok || !reflect.DeepEqual(got, WalkOptions{}) {
+		t.Errorf("a Builder nobody armed reports (%+v, %v)", got, ok)
+	}
+	exclude, include := []string{"/data"}, []string{"/var/snap"}
+	b.SetWalk(WalkOptions{Budget: time.Minute, MaxEntries: 5, Exclude: exclude, Include: include})
+	exclude[0], include[0] = "/mutated", "/mutated"
+	want := WalkOptions{Budget: time.Minute, MaxEntries: 5,
+		Exclude: []string{"/data"}, Include: []string{"/var/snap"}}
+	if got, ok := b.Walk(); !ok || !reflect.DeepEqual(got, want) {
+		t.Errorf("after the caller rewrote its slices the Builder says (%+v, %v), want (%+v, true)", got, ok, want)
+	}
+}

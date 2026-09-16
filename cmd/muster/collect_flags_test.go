@@ -117,6 +117,39 @@ func TestWalkBudgetMustFitTheTimeout(t *testing.T) {
 	}
 }
 
+// A budget of zero is a walk that is over before it starts, and a negative
+// one drags the derived deadline below zero, where collect.Run would
+// silently put its own 5m default back — a walk running on a deadline the
+// operator never asked for. Both are refused naming the flag, exit 2.
+func TestWalkBudgetMustBePositive(t *testing.T) {
+	for _, v := range []string{"0s", "-10m"} {
+		t.Run(v, func(t *testing.T) {
+			_, err := parseCollectFlags([]string{"--deep", "--walk-budget", v})
+			if err == nil || !strings.Contains(err.Error(), "--walk-budget must be greater than 0") {
+				t.Fatalf("err=%v, want one naming --walk-budget", err)
+			}
+			var out, errb strings.Builder
+			if code := runCollect([]string{"--deep", "--walk-budget", v}, &out, &errb); code != exitError {
+				t.Errorf("code %d, want %d", code, exitError)
+			}
+			if !strings.Contains(errb.String(), "--walk-budget must be greater than 0") {
+				t.Errorf("stderr %q", errb.String())
+			}
+			if out.Len() != 0 {
+				t.Errorf("stdout must stay empty on error, got %q", out.String())
+			}
+		})
+	}
+	// The spec refuses a budget ABOVE the deadline, so an equal pair stands.
+	got, err := parseCollectFlags([]string{"--deep", "--walk-budget", "3m", "--timeout", "3m"})
+	if err != nil {
+		t.Fatalf("a budget equal to the deadline is accepted: %v", err)
+	}
+	if got.walkBudget != got.timeout {
+		t.Errorf("got %+v", got)
+	}
+}
+
 // W-12: a walk flag without --deep tunes a walk that will not run. Ignoring
 // it silently is how an operator ends up trusting an exclusion that never
 // applied, so it is an error naming the flag, and exit 2 through runCollect.
@@ -126,6 +159,9 @@ func TestWalkFlagsNeedDeep(t *testing.T) {
 		{"--walk-max-entries", "10"},
 		{"--walk-exclude", "/data"},
 		{"--walk-include", "/var/snap"},
+		// A value the walk would also refuse is still reported as the flag
+		// that needs --deep: without a walk there is no budget to judge.
+		{"--walk-budget", "0s"},
 	} {
 		t.Run(args[0], func(t *testing.T) {
 			_, err := parseCollectFlags(args)
@@ -178,6 +214,9 @@ func TestWalkIncludeOnlyRemovesAFixedRoot(t *testing.T) {
 		{[]string{"--deep", "--walk-include", "/proc"}, []string{"--walk-include: /proc is not a container-storage root"}},
 		{[]string{"--deep", "--walk-include", "/var/lib/docker/"}, []string{"--walk-include", "/var/lib/docker/"}},
 		{[]string{"--deep", "--walk-exclude", "data"}, []string{"--walk-exclude", "data"}},
+		// "/" is an absolute, clean path and would still exclude every
+		// filesystem under the walk's "equal or under" rule.
+		{[]string{"--deep", "--walk-exclude", "/"}, []string{"--walk-exclude: / would exclude every filesystem"}},
 		{[]string{"--deep", "--walk-exclude", "/data/../etc"}, []string{"--walk-exclude", "/data/../etc"}},
 	} {
 		_, err := parseCollectFlags(tc.args)
