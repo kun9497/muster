@@ -72,7 +72,10 @@ are changing before you change it. Korean: `CONTRIBUTING.ko.md`.
    and must exist in `docs/reference/stig/*.json`; `references.nist_800_53`
    ids must appear in some indexed rule. `make refindex` regenerates the
    index from the pinned DISA files (network); CI only reads the committed
-   index.
+   index. The walk's reference lists have the same shape of life:
+   `make suidindex` regenerates them from pinned public images (docker and
+   network), `make suidindex-check` verifies them, CI reads the committed
+   files.
 
 ## Adding a fact
 
@@ -110,6 +113,20 @@ are changing before you change it. Korean: `CONTRIBUTING.ko.md`.
   ages are computed from `collected_at`.
 - Same input, same bytes: sort every list, never let map order reach a
   value or a reason.
+- The walk (`collect --deep`) is the one collector licensed to read outside
+  a fixed declaration: `Declaration.Walk: true` allows `ReadDir` on any
+  path, but every file it opens by name (`/proc/self/mountinfo`, the id
+  files, the container-runtime configuration files, dpkg's database) is
+  still declared, and it never follows a symlink. Its finding lists are
+  capped, never stop the walk, and say so with `truncated: true`; a root it
+  did not enter is a `walk.skipped` row with a reason from a closed
+  vocabulary. The dpkg join decides a setuid bit against
+  `docs/reference/suid/<id>-<version_id>.json`, a reference list of every
+  file and mode of the covered packages of a public image; regenerate it
+  with `go run ./tools/suidindex` (docker and network; `-check` compares)
+  and never seed its package list from a guide's or benchmark's list of
+  binaries — packages come from what the image ships, each with a reason in
+  `sources.json`.
 
 ## Tests
 

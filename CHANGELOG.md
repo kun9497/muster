@@ -142,10 +142,10 @@ every plan is under `docs/superpowers/plans/`):
 
 - `muster controls lint` cross-checks every `references.kisa` id against the
   KISA inventory (`--kisa docs/reference/kisa`): an unknown id, an importance
-  that disagrees with the inventory, an item cited by two controls, an item
-  cited by none and not deferred, a deferred item that a control cites, a
-  deferral naming something that is not a 2026 item, and an id repeated
-  inside one control are lint errors; a deferral without an id, a stage or a
+  that disagrees with the inventory, an item cited by none and not deferred,
+  a deferred item that a control cites, a deferral naming something that is
+  not a 2026 item, and an id repeated inside one control are lint errors (an
+  item judged by several controls is allowed since 3A — U-23 has two); a deferral without an id, a stage or a
   reason is rejected when the inventory loads.
   `shell_valid` may only be judged behind an `accounts.shells present`
   screen in every clause list. The unindexed-reference message names the
@@ -156,6 +156,12 @@ every plan is under `docs/superpowers/plans/`):
   (spec §11), marks deferred items, and `go run ./tools/coverage -check`
   also verifies the README count sentence. `controls lint` prints the same
   usage totals.
+- The clause grammar gains `not_contains` (a string, or a `list<string>`
+  element, that must be absent), the counterpart of `contains`. Lint requires
+  `subject` on a `none` clause over a record list, so a finding and a waiver
+  name the element rather than its position. `muster controls new` notes,
+  instead of refusing, an item another control already judges. A reason for
+  a `present`/`absent` sub-clause no longer ends in `<nil>`.
 - `tools/suidindex` generates the setuid/setgid reference lists the walk's
   dpkg join reads (`docs/reference/suid/*.json`) by running the public
   container images pinned by digest in `docs/reference/suid/sources.json` and

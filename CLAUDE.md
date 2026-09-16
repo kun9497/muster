@@ -19,6 +19,9 @@ waiver keys, output format.
   regenerates `docs/reference/stig/*.json` from the pinned DISA files (network; caches downloads under
   `.cache/refindex/`, git-ignored). `make refindex-check` — `go run ./tools/refindex -check`; CI does not
   run either `refindex` target and instead lints against the committed index (see `make lint-controls`).
+  `make suidindex` / `make suidindex-check` — `go run ./tools/suidindex [-check]` regenerates or verifies
+  `docs/reference/suid/*.json` from the public images pinned in `sources.json` (docker and network;
+  maintainer-run; CI reads the committed lists through the embedded `suid` package).
 
 ## Layout
 
@@ -26,7 +29,24 @@ waiver keys, output format.
 schema, strict loader, lint. `internal/check` the pure evaluator — it must never import `os/exec`, `net`
 or touch the host (a test enforces it). `internal/waiver` waivers, applied after evaluation. `internal/report`
 renderers and the exit code. `controls/` the embedded control set and its fixtures. `collect` is Linux-only
-and lives behind build tags.
+and lives behind build tags (`internal/collect/walkroots.go` is the one untagged file, so the flag parser
+can name the container-storage roots on every platform). `internal/pkgfiles` holds the package-file
+parsers the walk's join and `tools/suidindex` share. `docs/reference/suid/` is a Go package that embeds
+the per-release reference lists of declared modes; `tools/suidindex` (maintainer-run, docker, network)
+regenerates them from public images and `-check` compares.
+
+## The walk (stage 3A)
+
+- `collect --deep` runs the `walk` collector (root only; without root it writes `walk.complete` denied
+  and nothing else). `--walk-budget`, `--walk-max-entries`, `--walk-exclude`, `--walk-include` bound it;
+  `--deep` raises the default `--timeout` to budget + 5m. On the lab host the walk is proven through the
+  session's read-only scripts, never from a checkout; the recipe lives in the session notes.
+- `Declaration.Walk: true` licenses `Access.ReadDir(path, expect)` on any absolute clean path for that
+  collector alone; `Readlink` is guarded by `Reads` like `Stat`. Both go through `openNoFollow`; a symlink
+  is listed, never followed; a directory whose identity changed between listing and opening is `vanished`.
+- Every walk list is capped (`listCaps`); a full list never stops the walk — `truncated: true` on that
+  key and `walk.stats.truncated_counts` record it. `walk.skipped` rows carry a closed `reason` vocabulary
+  and a `detail`. Records are maps; every list is sorted by `path`.
 
 ## Stage-2 conventions
 
