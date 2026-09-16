@@ -1,0 +1,23 @@
+id: muster.file.suid_sgid_unverified
+title_en: No setuid or setgid file is left with its declaration unverified
+title_ko: 선언을 확인하지 못한 setuid·setgid 파일이 남아 있지 않다
+description_en: "A packaged setuid or setgid file whose declared mode muster could not decide is listed here rather than judged with the rest. dpkg's file lists carry ownership but not modes, so the declaration comes from the release's reference list, and four outcomes leave the question open: the list covers no such package (unlisted), it covers another version of it (version_mismatch), the package sets the mode from its install script (postinst), or there is no reference list for this release (none). Each is a WARN, not a FAIL: the bit may be exactly what the package intends, and muster refuses to invent a finding out of its own missing data. Review each row -- it names the package and which of the four reasons applies -- and confirm the bit against the vendor's own package before you keep it."
+description_ko: "패키지가 소유하지만 선언된 모드를 muster 가 결정하지 못한 setuid·setgid 파일은 나머지와 함께 판단하지 않고 여기에 나열합니다. dpkg 의 파일 목록은 소유 관계만 담고 모드는 담지 않으므로 선언은 릴리스 참조 목록에서 오는데, 네 가지 결과가 질문을 열어 둔 채로 남깁니다. 목록에 그 패키지가 없거나(unlisted), 다른 버전을 담고 있거나(version_mismatch), 패키지가 설치 스크립트에서 모드를 설정하거나(postinst), 이 릴리스용 참조 목록이 아예 없는(none) 경우입니다. 각각은 FAIL 이 아니라 WARN 입니다. 그 비트가 패키지의 의도 그대로일 수 있고, muster 는 자신의 데이터가 없다는 이유로 판정을 지어내지 않습니다. 각 행은 패키지 이름과 네 가지 사유 중 무엇인지 알려 줍니다. 비트를 유지하려면 배포사의 패키지와 직접 대조해 확인하십시오."
+category: file
+importance: 상
+automation: partial
+references:
+  kisa:
+    "2021":
+      - U-13
+    "2026":
+      - U-23
+requires_facts: '>=1'
+absent_means: manual
+checks:
+  - { fact: walk.suid_sgid_unverified, op: none, subject: path, where: { field: path, op: present } }
+remediation:
+  text_en: For each row, compare the file against the vendor's own package (dpkg-deb -c or rpm -qlvp on the downloaded package, or debsums -c) and record the current mode first (stat -c '%a %n' <path>). If the package really ships the bit, leave it and waive the row with that reason; if it does not, remove the bit with chmod u-s <path> or chmod g-s <path>, restoring with chmod <recorded mode> <path>.
+  text_ko: 각 행마다 배포사의 패키지와 파일을 직접 대조하고(내려받은 패키지에 dpkg-deb -c 또는 rpm -qlvp, 혹은 debsums -c), 현재 모드를 먼저 기록합니다(stat -c '%a %n' <path>). 패키지가 실제로 그 비트를 배포한다면 그대로 두고 그 사유로 waive 합니다. 그렇지 않다면 chmod u-s <path> 또는 chmod g-s <path> 로 비트를 제거하고, chmod <기록한 모드> <path> 로 되돌립니다.
+  risk: none
+  idempotent: true

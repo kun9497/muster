@@ -1,0 +1,27 @@
+id: muster.file.suid_sgid
+title_en: Every setuid or setgid file is one its package ships that way, and no writable directory lacks the sticky bit
+title_ko: setuid·setgid 파일은 모두 패키지가 그렇게 배포한 것이고, 쓰기 가능한 디렉터리에 sticky bit 가 빠지지 않았다
+description_en: "The deep walk joins every setuid and setgid file it finds to the host's package database and, on dpkg, to the release's reference list of declared bits. A file no package owns, and a file whose package owns it without that bit, fail: those are the two shapes a privilege backdoor takes. The reference list is a floor, not a ceiling -- a bit the list saw and a later package update removed still passes until the list is regenerated, so a host far ahead of the shipped list is judged more leniently, never more harshly. Rows the join could not decide are not judged here at all; muster.file.suid_sgid_unverified carries them. The third clause is the sticky bit: a directory others may write into without it lets any user replace another's file, and every such directory fails."
+description_ko: "deep walk 는 찾아낸 모든 setuid·setgid 파일을 호스트의 패키지 데이터베이스에, dpkg 에서는 릴리스의 선언 비트 참조 목록에 대조합니다. 어떤 패키지도 소유하지 않은 파일과, 패키지가 소유하되 그 비트 없이 배포하는 파일은 FAIL 입니다. 권한 백도어는 이 두 가지 모습을 띱니다. 참조 목록은 하한선이지 상한선이 아닙니다. 목록이 본 비트를 이후 패키지 업데이트가 제거했더라도 목록을 다시 생성하기 전까지는 PASS 로 남으므로, 배포된 목록보다 앞선 호스트는 더 관대하게 판단될 뿐 더 엄하게 판단되지는 않습니다. 대조가 결정하지 못한 행은 여기서 판단하지 않으며 muster.file.suid_sgid_unverified 가 담습니다. 세 번째 절은 sticky bit 입니다. 다른 사용자가 쓸 수 있으면서 sticky bit 가 없는 디렉터리에서는 누구나 남의 파일을 바꿔치기할 수 있으므로 그런 디렉터리는 모두 FAIL 입니다."
+category: file
+importance: 상
+automation: auto
+references:
+  kisa:
+    "2021":
+      - U-13
+    "2026":
+      - U-23
+requires_facts: '>=1'
+absent_means: manual
+params:
+  forbidden_suid: { type: list<string>, default: [], description: Paths whose setuid or setgid bit your policy forbids even when a package declares it (no default list is shipped; see the KISA guide or CIS for a starting point) }
+checks:
+  - { fact: walk.suid_sgid, op: each, subject: path, require: { field: package_declared, op: eq, expected: true } }
+  - { fact: walk.suid_sgid, op: none, subject: path, where: { field: path, op: in, expected: "${forbidden_suid}" } }
+  - { fact: walk.sticky_missing, op: none, subject: path, where: { field: path, op: present } }
+remediation:
+  text_en: Record the current mode first (stat -c '%a %n' <path>) so the change can be undone. For a setuid or setgid file no package declares, remove the bit with chmod u-s <path> or chmod g-s <path>, or delete the file if nothing needs it; restore with chmod <recorded mode> <path>. For a directory in the sticky list, add the bit with chmod +t <path>; undo with chmod -t <path>.
+  text_ko: 되돌릴 수 있도록 현재 모드를 먼저 기록합니다(stat -c '%a %n' <path>). 어떤 패키지도 선언하지 않은 setuid·setgid 파일은 chmod u-s <path> 또는 chmod g-s <path> 로 비트를 제거하거나, 필요 없다면 파일을 삭제합니다. 되돌릴 때는 chmod <기록한 모드> <path> 입니다. sticky 목록의 디렉터리는 chmod +t <path> 로 비트를 추가하고, chmod -t <path> 로 되돌립니다.
+  risk: none
+  idempotent: true

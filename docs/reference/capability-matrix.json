@@ -9,7 +9,8 @@
       "files.etc_sudoers.acl_present",
       "files.root_home.acl_present",
       "sudo.includedir",
-      "sudo.secure_path"
+      "sudo.secure_path",
+      "walk.complete"
     ]
   },
   "no-systemd": {
@@ -18,6 +19,16 @@
       "services.ntp.installed",
       "services.syslog.installed",
       "services.ftp.installed"
+    ]
+  },
+  "container": {
+    "unsupported": [
+      "walk.suid_sgid",
+      "walk.suid_sgid_unverified",
+      "walk.world_writable",
+      "walk.sticky_missing",
+      "walk.unowned",
+      "walk.hidden"
     ]
   }
 }

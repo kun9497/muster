@@ -1,0 +1,1 @@
+{"synthetic": true, "schema_version":1,"run":{"deep":true},"facts":{"accounts":{"nss":{"remote":{"status":"ok","value":true},"passwd_sources":{"status":"ok","value":["files","sss"]}}},"walk":{"complete":{"status":"ok","value":true},"unowned":{"status":"ok","value":[]}}}}

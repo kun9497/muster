@@ -59,8 +59,26 @@ func TestLoadKISAReadsTheInventoryAndDeferrals(t *testing.T) {
 		t.Error("U-72 must not be in the 2026 edition; the editions must not be merged")
 	}
 
-	if len(x.Deferred) != 3 {
-		t.Fatalf("deferrals = %+v, want three", x.Deferred)
+	// Stage 3 enrolled U-15, U-23 and U-33, the last three deferrals: the
+	// committed list is empty and every 2026 item is now claimed by a
+	// control. A row that reappears here is a promise muster has not kept,
+	// so the assertion is on the file, not merely on the decode.
+	if len(x.Deferred) != 0 {
+		t.Fatalf("deferrals = %+v, want none: every 2026 item is enrolled", x.Deferred)
+	}
+}
+
+// The decode itself still has to survive a non-empty list, or the day an
+// edition adds an item nothing would catch a deferral whose stage or reason
+// went missing. The rows are this test's own, not the repository's.
+func TestLoadKISADecodesDeferralRows(t *testing.T) {
+	dir := writeKISADir(t, map[string]string{"kisa_deferred.json": `[
+	  {"id": "U-01", "stage": "9", "reason": "a synthetic row, so this test does not rest on the committed list"},
+	  {"id": "U-02", "stage": "9", "reason": "the second row proves the list is a list"}
+	]`})
+	x, err := LoadKISA(dir)
+	if err != nil {
+		t.Fatal(err)
 	}
 	var ids []string
 	for _, d := range x.Deferred {
@@ -73,8 +91,7 @@ func TestLoadKISAReadsTheInventoryAndDeferrals(t *testing.T) {
 		}
 	}
 	sort.Strings(ids)
-	want := []string{"U-15", "U-23", "U-33"}
-	if strings.Join(ids, ",") != strings.Join(want, ",") {
+	if want := []string{"U-01", "U-02"}; strings.Join(ids, ",") != strings.Join(want, ",") {
 		t.Errorf("deferred ids = %v, want %v", ids, want)
 	}
 }

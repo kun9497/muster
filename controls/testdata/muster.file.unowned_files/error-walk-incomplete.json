@@ -1,0 +1,1 @@
+{"synthetic": true, "_expect":{"reason_code":"walk_incomplete","exit_code":2},"schema_version":1,"run":{"deep":true},"facts":{"accounts":{"nss":{"remote":{"status":"ok","value":false},"passwd_sources":{"status":"ok","value":["files","systemd"]}}},"walk":{"complete":{"status":"ok","value":false},"unowned":{"status":"ok","value":[]}}}}

@@ -42,7 +42,7 @@ func TestControlsLintFixturesFlagAndUnusedKeysNote(t *testing.T) {
 	if code := runControls([]string{"lint", "--fixtures", repoFixtures, "--references", repoReferences, "--kisa", repoKisa}, &out, &errb); code != exitOK {
 		t.Fatalf("exit %d, want %d; stderr %q", code, exitOK, errb.String())
 	}
-	if !strings.Contains(out.String(), "ok: 64 controls") {
+	if !strings.Contains(out.String(), "ok: 68 controls") {
 		t.Errorf("stdout %q lacks the ok line", out.String())
 	}
 	// Spec §5.5 / M-27: registered keys no control uses are reported by the
@@ -164,7 +164,7 @@ func TestControlsLintWithoutReferencesFlagChecksShapeOnly(t *testing.T) {
 	if code := runControls([]string{"lint", "--fixtures", repoFixtures, "--kisa", repoKisa}, &out, &errb); code != exitOK {
 		t.Fatalf("exit %d, want %d; stderr %q", code, exitOK, errb.String())
 	}
-	if !strings.Contains(out.String(), "ok: 64 controls") {
+	if !strings.Contains(out.String(), "ok: 68 controls") {
 		t.Errorf("stdout %q lacks the ok line", out.String())
 	}
 }
@@ -201,7 +201,7 @@ func TestControlsLintNotesAndKisaFlag(t *testing.T) {
 	if !strings.Contains(out.String(), shapeOnlyNote) {
 		t.Errorf("stdout %q lacks the shape-only note", out.String())
 	}
-	if !strings.Contains(out.String(), "ok: 64 controls") {
+	if !strings.Contains(out.String(), "ok: 68 controls") {
 		t.Errorf("stdout %q lacks the ok line", out.String())
 	}
 
@@ -323,6 +323,7 @@ const (
 	scaffoldableItem       = "U-97" // has a 2021 ancestor
 	scaffoldableItemNo2021 = "U-96" // a current-edition addition
 	scaffoldableAncestor   = "U-06"
+	deferredItem           = "U-95" // an item the synthetic inventory defers
 )
 
 // syntheticKisaDir copies the repository's KISA inventory into a temp
@@ -340,17 +341,22 @@ func syntheticKisaDir(t *testing.T) string {
 	items = append(items,
 		map[string]any{"id": scaffoldableItem, "name_ko": "synthetic", "category": "synthetic", "importance": "하", "page": 1},
 		map[string]any{"id": scaffoldableItemNo2021, "name_ko": "synthetic", "category": "synthetic", "importance": "중", "page": 2},
+		map[string]any{"id": deferredItem, "name_ko": "synthetic", "category": "synthetic", "importance": "중", "page": 3},
 	)
 	writeKisaJSON(t, filepath.Join(dir, "kisa_items_latest.json"), items)
-	for _, name := range []string{"kisa_items_2021.json", "kisa_deferred.json"} {
-		data, err := os.ReadFile(filepath.Join(repoKisa, name))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(filepath.Join(dir, name), data, 0o644); err != nil {
-			t.Fatal(err)
-		}
+	data, err := os.ReadFile(filepath.Join(repoKisa, "kisa_items_2021.json"))
+	if err != nil {
+		t.Fatal(err)
 	}
+	if err := os.WriteFile(filepath.Join(dir, "kisa_items_2021.json"), data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// The deferral list is this directory's own. The repository's is empty
+	// now that every 2026 item is enrolled, and the refusal controls new owes
+	// a deferred item has to be exercised against something.
+	writeKisaJSON(t, filepath.Join(dir, "kisa_deferred.json"), []map[string]any{
+		{"id": deferredItem, "stage": "9", "reason": "synthetic: deferred so the refusal can be exercised"},
+	})
 	var mapping map[string]any
 	readKisaJSON(t, filepath.Join(repoKisa, "kisa_mapping.json"), &mapping)
 	rows, ok := mapping["mapping"].([]any)
@@ -360,6 +366,7 @@ func syntheticKisaDir(t *testing.T) string {
 	mapping["mapping"] = append(rows,
 		map[string]any{"latest_id": scaffoldableItem, "latest_name": "synthetic", "from_2021": []string{scaffoldableAncestor}, "relation": "same", "note": ""},
 		map[string]any{"latest_id": scaffoldableItemNo2021, "latest_name": "synthetic", "from_2021": []string{}, "relation": "new", "note": ""},
+		map[string]any{"latest_id": deferredItem, "latest_name": "synthetic", "from_2021": []string{}, "relation": "new", "note": ""},
 	)
 	writeKisaJSON(t, filepath.Join(dir, "kisa_mapping.json"), mapping)
 	return dir

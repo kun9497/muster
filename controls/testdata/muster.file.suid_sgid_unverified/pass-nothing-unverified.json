@@ -1,0 +1,1 @@
+{"synthetic": true, "_expect":{"exit_code":0},"schema_version":1,"run":{"deep":true},"facts":{"walk":{"complete":{"status":"ok","value":true},"suid_sgid_unverified":{"status":"ok","value":[]}}}}

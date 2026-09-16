@@ -1,0 +1,1 @@
+{"synthetic": true, "_expect":{"reason_code":"permission_denied","exit_code":2},"schema_version":1,"run":{"deep":true},"facts":{"accounts":{"nss":{"remote":{"status":"ok","value":false},"passwd_sources":{"status":"ok","value":["files","systemd"]}}},"walk":{"complete":{"status":"ok","value":true},"unowned":{"status":"denied","reason":"/etc/passwd: permission denied"}}}}

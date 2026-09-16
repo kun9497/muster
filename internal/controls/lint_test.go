@@ -614,14 +614,24 @@ func TestLintKISACoverageIsSetLevel(t *testing.T) {
 	if !hasMessage(ps, "kisa_coverage", "U-02", "U-67") {
 		t.Errorf("items no control cites must be listed: %v", messagesOf(ps, "kisa_coverage"))
 	}
-	for _, m := range messagesOf(ps, "kisa_coverage") {
+	// Stage 3 enrolled the last three deferrals, so the committed list is
+	// empty and the two deferral rules below need an inventory that defers
+	// something. It is this test's own file: the rules are what is under
+	// test, not which items the repository happens to owe.
+	defInv, err := LoadKISA(writeKISADir(t, map[string]string{
+		"kisa_deferred.json": `[{"id": "U-15", "stage": "9", "reason": "deferred by this test alone"}]`,
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, m := range messagesOf(lintSet(t, LintOptions{KISA: defInv}, goodControl), "kisa_coverage") {
 		if strings.Contains(m, "U-15") {
 			t.Errorf("a deferred item must not be reported as uncited: %q", m)
 		}
 	}
 
 	deferredCited := strings.Replace(goodControl, `"2026": ["U-01"]`, `"2026": ["U-15"]`, 1)
-	ps = lintSet(t, LintOptions{KISA: inv}, deferredCited)
+	ps = lintSet(t, LintOptions{KISA: defInv}, deferredCited)
 	if !hasMessage(ps, "kisa_coverage", "U-15", "muster.account.good") {
 		t.Errorf("a stale deferral must name the item and the control citing it: %v", messagesOf(ps, "kisa_coverage"))
 	}

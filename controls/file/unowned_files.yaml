@@ -1,0 +1,28 @@
+id: muster.file.unowned_files
+title_en: Every file and directory has an owner and a group this host knows
+title_ko: 모든 파일과 디렉터리의 소유자와 그룹을 이 호스트가 알고 있다
+description_en: "The deep walk lists every entry whose uid or gid resolves to no local account or group; a file left behind by a deleted account is the one an attacker can take over by recreating the id. Blind spots: a host whose passwd or group database names a remote source, and a host whose nsswitch line uses NIS compat, are read MANUAL with both nsswitch facts as evidence, because the ids muster could not resolve may resolve there. An sssd configured only through conf.d is not detected as remote, so such a host reads FAIL on its domain-owned files -- waive the control or fix the detection. A container-storage root named in a configuration file the walk could not read (walk.stats.config_unreadable) is walked as ordinary filesystem, so its image layers may surface here as findings."
+description_ko: "deep walk 는 uid 또는 gid 가 로컬 계정·그룹으로 해석되지 않는 모든 항목을 나열합니다. 삭제된 계정이 남긴 파일은 공격자가 같은 id 를 다시 만들어 차지할 수 있는 대상입니다. 판단하지 않는 범위: passwd 또는 group 데이터베이스가 원격 소스를 지정한 호스트와 nsswitch 행이 NIS compat 를 쓰는 호스트는 두 nsswitch 사실을 근거로 붙인 채 MANUAL 로 읽습니다. 해석하지 못한 id 가 그곳에서는 해석될 수 있기 때문입니다. conf.d 로만 구성된 sssd 는 원격으로 탐지되지 않으므로 그런 호스트는 도메인 소유 파일에서 FAIL 로 읽습니다. 통제를 waive 하거나 탐지를 고치십시오. 워크가 읽지 못한 설정 파일이 지정한 컨테이너 스토리지 루트(walk.stats.config_unreadable)는 일반 파일시스템으로 순회되므로 그 이미지 레이어가 결과에 나타날 수 있습니다."
+category: file
+importance: 상
+automation: auto
+references:
+  kisa:
+    "2021":
+      - U-06
+    "2026":
+      - U-15
+requires_facts: '>=1'
+absent_means: manual
+mechanisms:
+  - when:
+      - { fact: accounts.nss.remote, op: eq, expected: false }
+      - { fact: accounts.nss.passwd_sources, op: not_contains, expected: compat }
+    checks:
+      - { fact: walk.unowned, op: none, subject: path, where: { field: uid_known, op: eq, expected: false } }
+      - { fact: walk.unowned, op: none, subject: path, where: { field: gid_known, op: eq, expected: false } }
+remediation:
+  text_en: For each listed path decide whether the file is still needed. Record its current owner first (stat -c '%u %g %n' <path>) so the change can be undone, then either give it an existing account and group (chown <user>:<group> <path>) or remove it (rm -i <path>). Restore with chown <uid>:<gid> <path> using the recorded numbers.
+  text_ko: 나열된 경로마다 그 파일이 아직 필요한지 판단합니다. 되돌릴 수 있도록 현재 소유자를 먼저 기록하고(stat -c '%u %g %n' <path>), 존재하는 계정과 그룹을 지정하거나(chown <user>:<group> <path>) 파일을 제거합니다(rm -i <path>). 기록해 둔 숫자로 chown <uid>:<gid> <path> 하면 원래대로 돌아갑니다.
+  risk: none
+  idempotent: true

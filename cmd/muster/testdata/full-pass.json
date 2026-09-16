@@ -122,7 +122,7 @@
               "orphan_gids":{"status":"ok","value":[]},
               "shells":{"status":"ok","value":["/bin/sh","/bin/bash"]},
               "admin_group_members":{"status":"ok","value":[{"name":"alice","group":"sudo","via":"secondary"}]},
-              "nss":{"passwd_sources":{"status":"ok","value":["files"]},"group_sources":{"status":"ok","value":["files"]}},
+              "nss":{"passwd_sources":{"status":"ok","value":["files"]},"group_sources":{"status":"ok","value":["files"]},"remote":{"status":"ok","value":false}},
               "users":{"status":"ok","value":[
                 {"name":"root","uid":0,"system":false,"shell_valid":true,"uid_duplicate":false,"shadowed":true,"password_status":"hashed","hash_algo":"$6$"},
                 {"name":"daemon","uid":1,"system":true,"shell_valid":false,"uid_duplicate":false,"shadowed":true,"password_status":"locked","hash_algo":""},

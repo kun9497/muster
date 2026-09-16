@@ -22,7 +22,7 @@ references and, later, offered as selectable profiles.
 > environment, system-file, startup and cron permissions, services and
 > super-servers, the firewall, logging and time synchronisation, NFS, SNMP and
 > patch hygiene, FTP, mail and DNS, and the closing coverage-and-reference
-> gate. 64 of the 67 items are enrolled; the three that need the deep
+> gate. 67 of the 67 items are enrolled; the three that need the deep
 > filesystem walk (U-15, U-23, U-33) are deferred to stage 3, and U-25
 > (world-writable files) is enrolled but reads `MANUAL` until that same walk
 > lands. Which item is judged by which control, with its automation class, and
@@ -160,8 +160,8 @@ titles, never their discussion, check and fix text. See
 1. **Skeleton.** `collect` and `check`, the facts schema, table and JSON
    output, exit codes, waivers, and eight controls flowing end to end.
 2. **Both distributions, every automatable KISA item.** Collectors for Ubuntu
-   and Rocky; 64 of the 67 items judged automatically or with automatic
-   evidence (55 auto, 5 partial, 4 manual with the evidence attached). The
+   and Rocky; 67 of the 67 items judged automatically or with automatic
+   evidence (57 auto, 7 partial, 4 manual with the evidence attached). The
    remaining three — file and directory ownership (U-15), SUID/SGID/sticky
    files (U-23) and hidden files (U-33) — need the deep filesystem walk of
    stage 3 and are listed as deferred in `docs/reference/coverage.md`. Every
