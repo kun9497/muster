@@ -34,9 +34,13 @@ type cmdResult struct {
 }
 
 // fsAccess serves declared paths from testdata and commands from canned
-// outcomes. It implements all seven Access methods (R46/R60), so a collector
+// outcomes. It implements every Access method (R46/R60), so a collector
 // under test can never reach the real host.
 type fsAccess struct {
+	// NoWalkAccess answers ReadDir/Readlink with ErrNoWalk: no collector
+	// under test here walks a tree yet.
+	collect.NoWalkAccess
+
 	files       map[string]string            // host path -> testdata file name
 	dirs        map[string]bool              // host path -> exists, but is not a readable file
 	cmds        map[string]cmdResult         // command line -> canned outcome

@@ -19,8 +19,9 @@ import (
 )
 
 // quietAccess answers "nothing here" to every access, so a Run test
-// exercises the orchestration and never the host.
-type quietAccess struct{}
+// exercises the orchestration and never the host. capAccess embeds it, so
+// the NoWalkAccess it carries answers for both.
+type quietAccess struct{ NoWalkAccess }
 
 func (quietAccess) ReadFile(string, int64) ([]byte, ReadMeta, error) {
 	return nil, ReadMeta{}, os.ErrNotExist
