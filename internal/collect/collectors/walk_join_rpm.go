@@ -79,7 +79,7 @@ func joinRPM(ctx context.Context, a collect.Access, cands map[string]bool, r *wa
 		}
 		return fail(collect.ErrorEnv(reason))
 	}
-	table, err := rpmFileTable(res.Stdout, cands)
+	table, err := rpmFileTable(res.Stdout, cands, res.Truncated)
 	if err != nil {
 		return fail(collect.ErrorEnv(rpmLabel + ": " + err.Error()))
 	}
@@ -93,7 +93,21 @@ func joinRPM(ctx context.Context, a collect.Access, cands map[string]bool, r *wa
 // rpmFileTable streams the query's output and keeps the candidate lines
 // alone, so the memory the join costs is bounded by the number of findings
 // and not by the number of files on the host.
-func rpmFileTable(stdout []byte, cands map[string]bool) (map[string]rpmFile, error) {
+//
+// A capture that hit the output cap ends mid-line, and the last line of a
+// capped capture is dropped rather than parsed: the path is the last field,
+// so a cut one is a PREFIX of the real path and could spell some other
+// candidate exactly (a cut /var/lib/x/spool-archive reads as
+// /var/lib/x/spool). Deciding a candidate from another file's mode is worse
+// than not deciding it.
+func rpmFileTable(stdout []byte, cands map[string]bool, truncated bool) (map[string]rpmFile, error) {
+	if truncated {
+		if i := bytes.LastIndexByte(stdout, '\n'); i >= 0 {
+			stdout = stdout[:i+1]
+		} else {
+			stdout = nil
+		}
+	}
 	table := make(map[string]rpmFile, len(cands))
 	sc := bufio.NewScanner(bytes.NewReader(stdout))
 	sc.Buffer(make([]byte, 0, bufio.MaxScanTokenSize), rpmMaxLine)

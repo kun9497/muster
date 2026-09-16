@@ -4,3 +4,6 @@ pkg-c
 /usr/bin/x
 /usr/bin/x.distrib
 pkg-b
+/usr/sbin/z
+/usr/sbin/z.distrib
+aa-diverter

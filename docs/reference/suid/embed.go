@@ -114,10 +114,10 @@ func loadFrom(fsys fs.FS, id, versionID string) (*List, bool, error) {
 	if id == "" || versionID == "" {
 		return nil, false, nil
 	}
+	// No pair of a distro and a version spells sources.json, so there is no
+	// guard against it here; allFrom, which reads whatever is in the
+	// directory, is where the skip belongs.
 	name := id + "-" + versionID + ".json"
-	if name == sourcesName {
-		return nil, false, nil
-	}
 	data, err := fs.ReadFile(fsys, name)
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, false, nil

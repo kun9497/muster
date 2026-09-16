@@ -30,7 +30,12 @@ import (
 // containing a space — or a tab — survives whole; rpm records the owner and
 // group as NAMES, never as ids, and they are reported as it recorded them.
 // The mode field is the full st_mode in octal (0104755 for a setuid file),
-// masked here to 0o7777.
+// masked here to 0o7777: the file-TYPE bits are discarded deliberately, so a
+// symlink or a directory row reads as a mode-only row like any other. The
+// join never needs the type — the traversal decides what a candidate is from
+// its own stat, and it never makes a symlink a mode candidate — and a caller
+// that needed it would be asking this parser a question rpm's own format
+// string was not asked.
 func ParseRPMFileLine(line string) (pkg string, mode int, owner, group string, p string, ok bool) {
 	f := strings.SplitN(line, "\t", 5)
 	if len(f) < 5 || f[0] == "" || !strings.HasPrefix(f[4], "/") {

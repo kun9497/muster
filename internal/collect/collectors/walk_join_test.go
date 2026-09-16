@@ -29,10 +29,11 @@ var joinTreeSpec = map[string][]collect.DirEntry{
 	"/":    {treeDir("usr", 0o755), treeDir("opt", 0o755), treeDir("srv", 0o755), treeDir("var", 0o755)},
 	"/usr": {treeDir("bin", 0o755), treeDir("sbin", 0o755)},
 	"/usr/bin": {
-		treeFile("at", 0o4755), treeFile("foo", 0o4755), treeFile("passwd", 0o4755),
-		treeFile("python3", 0o4755), treeFile("su", 0o4755), treeFile("x.distrib", 0o4755),
+		treeFile("at", 0o4755), treeFile("atq", 0o2755), treeFile("foo", 0o4755),
+		treeFile("passwd", 0o4755), treeFile("python3", 0o4755), treeFile("sar", 0o4755),
+		treeFile("su", 0o4755), treeFile("x", 0o4755), treeFile("x.distrib", 0o4755),
 	},
-	"/usr/sbin":        {treeFile(".h", 0o600)},
+	"/usr/sbin":        {treeFile(".h", 0o600), treeFile("z", 0o4755), treeFile("z.distrib", 0o4755)},
 	"/opt":             {treeDir("x", 0o755)},
 	"/opt/x":           {treeFile("tool", 0o4755), treeFile(".hidden", 0o600)},
 	"/var":             {treeDir("lib", 0o755)},
@@ -79,8 +80,15 @@ func dpkgFiles() map[string]string {
 		"/var/lib/dpkg/info/at.list":               "dpkg.info/at.list",
 		"/var/lib/dpkg/info/foo-tools.list":        "dpkg.info/foo-tools.list",
 		"/var/lib/dpkg/info/pkg-a.list":            "dpkg.info/pkg-a.list",
-		"/var/lib/dpkg/info/sysstat.list":          "dpkg.info/sysstat.list",
-		"/var/lib/dpkg/diversions":                 "dpkg.diversions.sample",
+		"/var/lib/dpkg/info/pkg-b.list":            "dpkg.info/pkg-b.list",
+		"/var/lib/dpkg/info/aa-diverter.list":      "dpkg.info/aa-diverter.list",
+		"/var/lib/dpkg/info/zz-orig.list":          "dpkg.info/zz-orig.list",
+		// zz-dup names /usr/bin/foo as well, with no diversion between
+		// them: a broken database, where the first list in Glob's sorted
+		// order keeps the path so the answer is not the directory's order.
+		"/var/lib/dpkg/info/zz-dup.list":  "dpkg.info/zz-dup.list",
+		"/var/lib/dpkg/info/sysstat.list": "dpkg.info/sysstat.list",
+		"/var/lib/dpkg/diversions":        "dpkg.diversions.sample",
 	}
 }
 
@@ -281,6 +289,30 @@ func TestJoinRPMFailureShapes(t *testing.T) {
 	}
 }
 
+// A capped capture ends mid-line, and the path is the last field: the cut
+// line must be dropped, or a prefix of some longer path decides the
+// candidate it happens to spell.
+func TestJoinRPMCappedCaptureDropsTheCutLine(t *testing.T) {
+	a := &fsAccess{
+		dirs: map[string]bool{"/var/lib/rpm": true},
+		cmds: map[string]cmdResult{cmdKey(rpmCommand): {file: "rpm.qa-files.cut", truncated: true}},
+	}
+	r, plan := joinWalk(t, a)
+	out := joinCandidates(context.Background(), a, ubuntuHeader(), plan, r)
+	if out.failed != nil || !out.truncated {
+		t.Fatalf("outcome = %+v, want ok and truncated", out)
+	}
+	// The complete lines are still the answer for the paths they name.
+	checkRow(t, r.lists.suid, "/usr/bin/su", map[string]any{
+		"package": "util-linux", "package_declared": true, "reference": "rpmdb",
+	})
+	// The last line of the capture is `…/var/lib/x/spool`, cut out of a
+	// longer path; nothing may be decided from it.
+	checkRow(t, r.lists.worldWritable, "/var/lib/x/spool", map[string]any{
+		"package": "", "package_declared": false, "reference": "unpackaged",
+	})
+}
+
 // The join's memory is bounded by the candidates, never by the host's file
 // count: a table with a thousand lines leaves exactly the candidate rows.
 func TestJoinIsBoundedByCandidates(t *testing.T) {
@@ -293,7 +325,7 @@ func TestJoinIsBoundedByCandidates(t *testing.T) {
 	b.WriteString("sysstat\t0100600\troot\troot\t/usr/sbin/.h\n")
 	cands := map[string]bool{"/usr/bin/su": true, "/usr/bin/python3": true, "/usr/sbin/.h": true}
 
-	table, err := rpmFileTable([]byte(b.String()), cands)
+	table, err := rpmFileTable([]byte(b.String()), cands, false)
 	if err != nil {
 		t.Fatalf("rpmFileTable: %v", err)
 	}
@@ -306,7 +338,7 @@ func TestJoinIsBoundedByCandidates(t *testing.T) {
 // rather than reporting the rest of the table as unpackaged.
 func TestJoinRPMOverlongLineIsAnError(t *testing.T) {
 	line := "pkg\t0100644\troot\troot\t/usr/share/" + strings.Repeat("x", 70<<10) + "\n"
-	if _, err := rpmFileTable([]byte(line), map[string]bool{"/usr/bin/su": true}); err == nil {
+	if _, err := rpmFileTable([]byte(line), map[string]bool{"/usr/bin/su": true}, false); err == nil {
 		t.Fatal("rpmFileTable accepted a line over the buffer")
 	}
 }
@@ -349,11 +381,29 @@ func TestJoinDpkgDecisionTable(t *testing.T) {
 			"package": "python3.11", "package_declared": false, "reference": "list", "declared_mode": 0o755,
 		})
 		checkList(t, r, "/usr/bin/python3", "suid_sgid")
-		// the package sets the mode from its maintainer script
-		checkRow(t, r.lists.suidUnverified, "/usr/bin/at", map[string]any{
-			"package": "at", "package_declared": false, "reference": "postinst", "declared_mode": nil,
+		// in packages, version equal, NO entry at all -> the same finding
+		// (the list covers every file of a covered package, so a path it
+		// does not hold is a path the distribution does not ship).
+		checkRow(t, r.lists.suid, "/usr/bin/sar", map[string]any{
+			"package": "sysstat", "package_declared": false, "reference": "list", "declared_mode": nil,
 		})
-		// packaged, but the list covers no such package
+		checkList(t, r, "/usr/bin/sar", "suid_sgid")
+		// the package sets the mode from its maintainer script, and the
+		// list does not show this file carrying the bit
+		checkRow(t, r.lists.suidUnverified, "/usr/bin/at", map[string]any{
+			"package": "at", "package_declared": false, "reference": "postinst", "declared_mode": 0o755,
+		})
+		// A-33: the same package's OTHER file is listed WITH the bit, and a
+		// bit the list saw is a declaration whatever set it — a postinst
+		// package is not a blanket "nothing here can be judged".
+		checkRow(t, r.lists.suid, "/usr/bin/atq", map[string]any{
+			"package": "at", "package_declared": true, "reference": "list",
+			"declared_mode": 0o2755, "declared_owner": "root", "declared_group": "daemon",
+		})
+		checkList(t, r, "/usr/bin/atq", "suid_sgid")
+		// packaged, but the list covers no such package. Two .list files
+		// name this path (foo-tools and zz-dup), so the row also pins that
+		// the first in Glob's sorted order keeps it.
 		checkRow(t, r.lists.suidUnverified, "/usr/bin/foo", map[string]any{
 			"package": "foo-tools", "package_declared": false, "reference": "unlisted",
 		})
@@ -452,6 +502,22 @@ func TestJoinDpkgDiversions(t *testing.T) {
 	})
 	checkList(t, r, "/usr/bin/x.distrib", "suid_sgid")
 
+	// Both packages name /usr/bin/x — the one that shipped it and the one
+	// that displaced it — so the diversion's THIRD line is what tells the
+	// two candidates apart. The pairs are spelt so that the diverting
+	// package sorts after its victim in one case (pkg-a, pkg-b) and before
+	// it in the other (aa-diverter, zz-orig): the answer cannot come from
+	// whichever .list Glob handed over last.
+	for _, c := range []struct{ path, pkg string }{
+		{"/usr/bin/x", "pkg-b"},         // the diverting package's own file
+		{"/usr/bin/x.distrib", "pkg-a"}, // the file it displaced
+		{"/usr/sbin/z", "aa-diverter"},  // diverting package sorts first
+		{"/usr/sbin/z.distrib", "zz-orig"},
+	} {
+		checkRow(t, append(slices.Clone(r.lists.suid), r.lists.suidUnverified...), c.path,
+			map[string]any{"package": c.pkg})
+	}
+
 	// Without the diversions file the same candidate is nobody's.
 	a2 := dpkgAccess()
 	delete(a2.files, "/var/lib/dpkg/diversions")
@@ -529,6 +595,38 @@ func TestJoinDpkgFailureShapes(t *testing.T) {
 			t.Errorf("reason %q does not name the directory", out.failed.Reason)
 		}
 	})
+
+	// The status file named the family; if it then cannot be read, the
+	// versions the list's rule compares against are unknown and the join
+	// says so rather than reading every covered package as a mismatch.
+	for _, c := range []struct {
+		name string
+		err  error
+		want facts.Status
+	}{
+		{"status denied", fmt.Errorf("open: %w", unix.EACCES), facts.StatusDenied},
+		{"status vanished", os.ErrNotExist, facts.StatusAbsent},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			useReferenceList(t, "ubuntu", "22.04")
+			a := dpkgAccess()
+			// Stat still answers — that is how the family was chosen — while
+			// the content read fails.
+			a.stats = map[string]statResult{"/var/lib/dpkg/status": {mode: 0o644, kind: "regular"}}
+			a.fails = map[string]error{"/var/lib/dpkg/status": c.err}
+			r, plan := joinWalk(t, a)
+			if detectFamily(a) != "dpkg" {
+				t.Fatalf("family = %q, want dpkg", detectFamily(a))
+			}
+			out := joinCandidates(context.Background(), a, ubuntuHeader(), plan, r)
+			if out.failed == nil || out.failed.Status != c.want {
+				t.Fatalf("failed = %+v, want %s", out.failed, c.want)
+			}
+			if !strings.Contains(out.failed.Reason, dpkgStatusPath) {
+				t.Errorf("reason %q does not name the file", out.failed.Reason)
+			}
+		})
+	}
 
 	t.Run("a reference list that will not decode", func(t *testing.T) {
 		orig := loadReferenceList

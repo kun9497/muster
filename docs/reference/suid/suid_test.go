@@ -80,11 +80,6 @@ func TestLoadAndAllOverAFixtureTree(t *testing.T) {
 	if l2, ok, err := loadFrom(fsys, "ubuntu", "24.04"); ok || err != nil || l2 != nil {
 		t.Errorf("a release with no list = (%v, %v, %v), want (nil, false, nil)", l2, ok, err)
 	}
-	// "sources" is not a distro, but nothing must be able to reach the
-	// generator's input through Load either.
-	if l3, ok, err := loadFrom(fsys, "sources", ""); ok || err != nil || l3 != nil {
-		t.Errorf("loadFrom(sources) = (%v, %v, %v), want (nil, false, nil)", l3, ok, err)
-	}
 	all, err := allFrom(fsys)
 	if err != nil {
 		t.Fatalf("allFrom: %v", err)
