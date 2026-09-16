@@ -15,6 +15,22 @@
 //	suidindex -check          regenerate to memory and diff, exit 1 on drift
 //	suidindex -resolve        pin an image's digest and an archive's URL
 //
+// -platform (default linux/amd64) is what the image is pulled and run for and
+// what the list records as its `arch`; the image's own `uname -m` has to
+// agree, so a runtime that quietly served an emulated image of another
+// architecture cannot produce a list labelled with this one.
+//
+// The packages a list covers are a SEED UNIONED WITH A DISCOVERY: sources.json
+// names the ones a maintainer cares about, and the script inside the image
+// adds the owning package of every setuid and setgid file the image carries
+// (`find / -xdev -perm /6000 -type f`, then `dpkg -S` or `rpm -qf`). That is
+// why a generated list covers mount, libpam-modules-bin and usermode, which
+// nobody wrote down: a base image installs things nobody thought to list, and
+// a package the join meets but the list does not cover reads `unlisted` and
+// can only warn. A seed the image does not install and that pins no archive
+// is dropped with a warning — the generator installs nothing, because a list
+// has to be reproducible from the pinned image digest alone.
+//
 // -resolve is the only mode that asks the archive what the current version
 // is; it prints the image digest and, per extended package, the `.deb` URL
 // `apt-get download --print-uris` reports inside the image together with the
@@ -76,11 +92,21 @@ type options struct {
 	outDir      string
 	cacheDir    string
 	runtime     string
+	platform    string
+	arch        string
 	generated   string
 	only        string
 	check       bool
 	resolve     bool
 }
+
+// defaultPlatform is the one the committed lists were generated for. A
+// distribution can ship a binary setuid on one architecture and not on
+// another, and a runtime on an arm64 machine will happily serve an emulated
+// amd64 image (or the reverse) without saying so — so the platform is asked
+// for explicitly, recorded in the list, and cross-checked against the
+// image's own `uname -m`.
+const defaultPlatform = "linux/amd64"
 
 func main() {
 	var o options
@@ -88,6 +114,7 @@ func main() {
 	flag.StringVar(&o.outDir, "out", "docs/reference/suid", "output directory")
 	flag.StringVar(&o.cacheDir, "cache", ".cache/suidindex", "download cache directory (git-ignored)")
 	flag.StringVar(&o.runtime, "runtime", "docker", "container runtime: docker or podman")
+	flag.StringVar(&o.platform, "platform", defaultPlatform, "the image platform to pull and record")
 	flag.StringVar(&o.generated, "generated", "", "the date to stamp into `generated` (default: today, UTC)")
 	flag.StringVar(&o.only, "release", "", "generate only this release, as id-version_id")
 	flag.BoolVar(&o.check, "check", false, "regenerate to memory and exit 1 if the committed files differ")
@@ -111,6 +138,16 @@ func run(o options, stderr io.Writer) error {
 	sources, err := loadSources(o.sourcesPath)
 	if err != nil {
 		return err
+	}
+	if o.platform == "" {
+		o.platform = defaultPlatform
+	}
+	if o.arch == "" {
+		_, arch, ok := strings.Cut(o.platform, "/")
+		if !ok || arch == "" {
+			return fmt.Errorf("-platform %q is not <os>/<arch>", o.platform)
+		}
+		o.arch = arch
 	}
 	generated := o.generated
 	if generated == "" {
@@ -152,9 +189,14 @@ func run(o options, stderr io.Writer) error {
 				stale = true
 				continue
 			}
-			if msg, differs := describeDifference(have, blob); differs {
+			switch msg, kind := describeDifference(have, blob); kind {
+			case diffReal:
 				fmt.Fprintf(stderr, "suidindex: %s is out of date: %s\n", path, msg)
 				stale = true
+			case diffDateOnly:
+				// Not drift: the clock. -check has to be usable on a day
+				// that is not the day the lists were generated.
+				fmt.Fprintf(stderr, "suidindex: %s matches; %s\n", path, msg)
 			}
 			continue
 		}
@@ -233,7 +275,7 @@ func generateRelease(o options, rel suid.Release, generated string) (suid.List, 
 	if err != nil {
 		return suid.List{}, nil, err
 	}
-	return assembleList(rel, generated, out)
+	return assembleList(rel, generated, o.arch, out)
 }
 
 // fetchArchive returns one pinned .deb, from the cache when the cached copy
@@ -409,6 +451,7 @@ func scriptFor(rel suid.Release) (string, error) {
 	var b strings.Builder
 	b.WriteString("set -u\n")
 	b.WriteString("echo '== osrelease'\n. /etc/os-release\nprintf '%s\\n%s\\n' \"$ID\" \"$VERSION_ID\"\n")
+	b.WriteString("echo '== arch'\nuname -m\n")
 	b.WriteString("echo '== usrmerge'\n")
 	b.WriteString("for d in " + strings.Join(usrAliases, " ") + "; do\n")
 	b.WriteString("  if [ -L \"$d\" ]; then printf '%s %s\\n' \"$d\" \"$(readlink \"$d\")\"; fi\n")
@@ -478,7 +521,7 @@ done
 // tests drive the whole check path from a recorded document, on a host with
 // no container runtime.
 var runScript = func(o options, image, debsDir, script string, network bool) ([]byte, error) {
-	args := []string{"run", "--rm", "--entrypoint", "sh"}
+	args := []string{"run", "--rm", "--platform", o.platform, "--entrypoint", "sh"}
 	if !network {
 		args = append(args, "--network", "none")
 	}
@@ -489,21 +532,62 @@ var runScript = func(o options, image, debsDir, script string, network bool) ([]
 	return runRuntime(o, args...)
 }
 
-// imageDigest pulls an image by tag and reports the digest to pin it by.
+// imageDigest pulls an image for the pinned platform and reports the digest
+// to pin it by.
 func imageDigest(o options, image string) (string, error) {
-	if _, err := runRuntime(o, "pull", "--quiet", image); err != nil {
+	if _, err := runRuntime(o, "pull", "--quiet", "--platform", o.platform, image); err != nil {
 		return "", err
 	}
-	out, err := runRuntime(o, "image", "inspect", "--format", "{{index .RepoDigests 0}}", image)
+	out, err := runRuntime(o, "image", "inspect", "--format", "{{json .RepoDigests}}", image)
 	if err != nil {
 		return "", err
 	}
-	ref := strings.TrimSpace(string(out))
-	_, digest, ok := strings.Cut(ref, "@")
-	if !ok {
-		return "", fmt.Errorf("%s: %q carries no digest", image, ref)
+	var repoDigests []string
+	if err := json.Unmarshal(bytes.TrimSpace(out), &repoDigests); err != nil {
+		return "", fmt.Errorf("%s: cannot read RepoDigests: %w", image, err)
 	}
-	return digest, nil
+	return matchingDigest(image, repoDigests)
+}
+
+// matchingDigest picks the RepoDigests entry for the repository that was
+// ASKED for. A local image is known by every repository it was ever tagged
+// or pulled under, in no order the caller controls, so taking the first
+// would pin a list to whatever else happened to share the image id — a
+// mirror, or another distribution's tag. No entry for the requested
+// repository is a refusal: a digest guessed from a different name would be
+// recorded in the list and in sources.json as if it had been verified.
+func matchingDigest(image string, repoDigests []string) (string, error) {
+	want := normalizeRepo(repoOf(image))
+	for _, rd := range repoDigests {
+		repo, digest, ok := strings.Cut(rd, "@")
+		if !ok {
+			continue
+		}
+		if normalizeRepo(repo) == want {
+			return digest, nil
+		}
+	}
+	return "", fmt.Errorf("%s: no RepoDigests entry for %s (have %v) — pull it and try again", image, want, repoDigests)
+}
+
+// repoOf drops an image reference's tag. The colon that introduces a tag is
+// the one AFTER the last slash; a registry may carry a port ("host:5000/x"),
+// whose colon comes before it.
+func repoOf(image string) string {
+	i := strings.LastIndexByte(image, ':')
+	if i < 0 || i < strings.LastIndexByte(image, '/') {
+		return image
+	}
+	return image[:i]
+}
+
+// normalizeRepo spells a Docker Hub repository the one way, so the
+// docker.io/library/ubuntu a maintainer writes in sources.json and the
+// ubuntu the runtime reports are the same repository.
+func normalizeRepo(repo string) string {
+	repo = strings.TrimPrefix(repo, "docker.io/")
+	repo = strings.TrimPrefix(repo, "index.docker.io/")
+	return strings.TrimPrefix(repo, "library/")
 }
 
 // runRuntime runs the container runtime and returns its stdout. A non-zero

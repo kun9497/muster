@@ -164,15 +164,22 @@ every plan is under `docs/superpowers/plans/`):
   package a base image does not install is downloaded on the host from a URL
   and SHA-256 pinned in `sources.json` and bind-mounted read-only into the
   container; the generating container gets no network and installs nothing.
-  `make suidindex-check` regenerates to memory and compares byte for byte;
-  CI runs neither target and reads the committed lists, exactly as it does
-  for `tools/refindex`. On a dpkg host of one of the five releases a packaged
-  setuid file is now decided by the list instead of reading `none` and only
-  warning; a file whose bit a maintainer script sets after unpacking (pkexec,
-  fusermount3, the polkit agent helper) is reported as `postinst` and warns
-  rather than being called a finding. `suid.Load` falls back from the host's
-  VERSION_ID to its major, so a list generated from a 9.8 image answers for
-  any Rocky or AlmaLinux 9 host.
+  Every list records the architecture it was read from (`arch`), and the
+  image is pulled and run for that platform; an image whose own `uname -m`
+  disagrees is refused. `make suidindex-check` regenerates to memory and
+  compares byte for byte, except for `generated`: a run on another day
+  reports the date it would have stamped and passes, so the committed lists
+  can be verified at any time. CI runs neither target and reads the committed
+  lists, exactly as it does for `tools/refindex`. On a dpkg host of one of
+  the five releases a packaged setuid file is now decided by the list instead
+  of reading `none` and only warning; a file whose bit a maintainer script
+  sets after unpacking (pkexec, fusermount3, the polkit agent helper) is
+  reported as `postinst` and warns rather than being called a finding.
+  `suid.Load` resolves a host's release in three steps — the exact
+  `<id>-<version_id>.json`, then `<id>-<major>.json`, then the highest
+  `<id>-<major>.<minor>.json` present, with the minors compared as numbers —
+  so the lists generated from the 9.8 RHEL-family images answer for a host on
+  any Rocky or AlmaLinux 9.x.
 - `muster controls new` scaffolds a control and its fixture stubs;
   `muster snapshot extract` cuts the leaves a control reads (and the
   engine-read keys they imply) out of a snapshot into a fixture skeleton.

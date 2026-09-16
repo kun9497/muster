@@ -1,6 +1,7 @@
 {
   "distro": "ubuntu",
   "release": "22.04",
+  "arch": "amd64",
   "image_digest": "sha256:829f6df217bcbae2b371026e81711d1a787c61b2967ad09d015063663ebafbf7",
   "generated": "2026-09-16",
   "packages": [
@@ -26,6 +27,10 @@
     {
       "name": "libpam-modules-bin",
       "version": "1.4.0-11ubuntu2.8"
+    },
+    {
+      "name": "libutempter0",
+      "version": "1.2.1-2build2"
     },
     {
       "name": "login",
@@ -1484,6 +1489,20 @@
       "owner": "root",
       "group": "root",
       "package": "util-linux"
+    },
+    {
+      "path": "/usr/lib/x86_64-linux-gnu/libutempter.so.1.2.1",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "libutempter0"
+    },
+    {
+      "path": "/usr/lib/x86_64-linux-gnu/utempter/utempter",
+      "mode": 1517,
+      "owner": "root",
+      "group": "utmp",
+      "package": "libutempter0"
     },
     {
       "path": "/usr/libexec/polkit-agent-helper-1",
@@ -3208,6 +3227,20 @@
       "package": "libpam-modules-bin"
     },
     {
+      "path": "/usr/share/doc/libutempter0/changelog.Debian.gz",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "libutempter0"
+    },
+    {
+      "path": "/usr/share/doc/libutempter0/copyright",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "libutempter0"
+    },
+    {
       "path": "/usr/share/doc/login/changelog.Debian.gz",
       "mode": 420,
       "owner": "root",
@@ -3787,6 +3820,13 @@
       "owner": "root",
       "group": "root",
       "package": "libpam-modules-bin"
+    },
+    {
+      "path": "/usr/share/lintian/overrides/libutempter0",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "libutempter0"
     },
     {
       "path": "/usr/share/lintian/overrides/login",

@@ -37,7 +37,7 @@ func TestReferenceListsAreWellFormed(t *testing.T) {
 	// The checker is not vacuous: a list that breaks each rule reports each
 	// rule, by name.
 	bad := List{
-		Distro: "", Release: "22.04", ImageDigest: "", Generated: "",
+		Distro: "", Release: "22.04", Arch: "", ImageDigest: "", Generated: "",
 		Packages: []Package{{Name: "util-linux", Version: "1"}},
 		Entries: []Entry{
 			{Path: "/usr/bin/su", Mode: 0o4755, Owner: "root", Group: "root", Package: "util-linux"},
@@ -46,7 +46,7 @@ func TestReferenceListsAreWellFormed(t *testing.T) {
 			{Path: "/usr/bin/su", Mode: 0o4755, Owner: "root", Group: "root", Package: "nowhere"},
 		},
 	}
-	want := []string{"distro", "image_digest", "generated", "sorted", "/bin/mount", "relative", "duplicate", "nowhere"}
+	want := []string{"distro", "arch", "image_digest", "generated", "sorted", "/bin/mount", "relative", "duplicate", "nowhere"}
 	got := strings.Join(listProblems(bad), "; ")
 	for _, w := range want {
 		if !strings.Contains(got, w) {
@@ -176,7 +176,7 @@ func TestSourcesJSONShape(t *testing.T) {
 // invented versions, no host anywhere.
 func goodList() List {
 	return List{
-		Distro: "ubuntu", Release: "22.04",
+		Distro: "ubuntu", Release: "22.04", Arch: "amd64",
 		ImageDigest: "sha256:1111111111111111111111111111111111111111111111111111111111111111",
 		Generated:   "2026-01-01",
 		Packages: []Package{
@@ -204,6 +204,9 @@ func listProblems(l List) []string {
 	}
 	if l.Release == "" {
 		out = append(out, "release is empty")
+	}
+	if l.Arch == "" {
+		out = append(out, "arch is empty")
 	}
 	if l.ImageDigest == "" {
 		out = append(out, "image_digest is empty")
@@ -328,5 +331,71 @@ func TestEveryPinnedReleaseHasAList(t *testing.T) {
 		if !found {
 			t.Errorf("%s-%s is pinned in sources.json but no list is committed for it", r.ID, r.VersionID)
 		}
+	}
+}
+
+// Ruling A-36 as amended. A host reports a point release the maintainer never
+// generated from — rocky 9.5 when the image that produced the list was 9.8 —
+// and the fallback has to reach the list anyway, over the REAL embedded
+// files, or every packaged candidate on that host reads reference "none".
+// This is the regression test for the committed tree, not for the mechanism;
+// TestLoadFallsBackToTheMajorVersion drives the mechanism over a fixture.
+func TestLoadReachesTheCommittedListFromAnyPointRelease(t *testing.T) {
+	for _, c := range []struct{ id, versionID string }{
+		{"rocky", "9.5"},
+		{"rocky", "9.8"},
+		{"rocky", "9"},
+		{"almalinux", "9.4"},
+		{"almalinux", "9"},
+		{"ubuntu", "22.04"},
+		{"ubuntu", "24.04"},
+		{"debian", "12"},
+	} {
+		l, ok, err := Load(c.id, c.versionID)
+		if err != nil || !ok {
+			t.Errorf("Load(%q, %q) = (%v, %v, %v), want the committed list", c.id, c.versionID, l, ok, err)
+			continue
+		}
+		if l.Distro != c.id || len(l.Entries) == 0 || len(l.Packages) == 0 {
+			t.Errorf("Load(%q, %q) returned %s-%s with %d packages and %d entries",
+				c.id, c.versionID, l.Distro, l.Release, len(l.Packages), len(l.Entries))
+		}
+	}
+	// A major nothing was generated for is still the ordinary "no list".
+	if l, ok, err := Load("rocky", "10.1"); ok || err != nil || l != nil {
+		t.Errorf("Load(rocky, 10.1) = (%v, %v, %v), want (nil, false, nil)", l, ok, err)
+	}
+}
+
+// The point-release fallback picks the HIGHEST minor present and compares the
+// components as numbers, so 9.10 outranks 9.9 — which a string sort gets
+// backwards — and the answer never depends on directory order.
+func TestPointReleaseFallbackPicksTheHighestMinorNumerically(t *testing.T) {
+	blob := func(release string) []byte {
+		l := goodList()
+		l.Distro, l.Release = "rocky", release
+		b, err := json.Marshal(l)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return b
+	}
+	fsys := fstest.MapFS{
+		"rocky-9.9.json":  {Data: blob("9.9")},
+		"rocky-9.10.json": {Data: blob("9.10")},
+		"rocky-9.2.json":  {Data: blob("9.2")},
+	}
+	l, ok, err := loadFrom(fsys, "rocky", "9.5")
+	if err != nil || !ok {
+		t.Fatalf("loadFrom(rocky, 9.5) = (%v, %v, %v)", l, ok, err)
+	}
+	if l.Release != "9.10" {
+		t.Errorf("the fallback chose %q, want 9.10 (the highest minor, compared numerically)", l.Release)
+	}
+	// A plain major file, when one exists, is preferred to every point
+	// release: it is the list the maintainer generated for the major.
+	fsys["rocky-9.json"] = &fstest.MapFile{Data: blob("9")}
+	if l, _, _ := loadFrom(fsys, "rocky", "9.5"); l == nil || l.Release != "9" {
+		t.Errorf("with rocky-9.json present the fallback chose %v, want the major list", l)
 	}
 }

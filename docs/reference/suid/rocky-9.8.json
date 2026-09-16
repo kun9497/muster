@@ -1,6 +1,7 @@
 {
   "distro": "rocky",
   "release": "9.8",
+  "arch": "amd64",
   "image_digest": "sha256:8101994123cf3d0a8fee517bee7f39e555c7d92bd2d9eb3303cc988a0eeed00f",
   "generated": "2026-09-16",
   "packages": [

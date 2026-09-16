@@ -50,15 +50,15 @@ func sampleOutput(t *testing.T) []byte {
 // dpkg-query and of an extended one from the .deb's control, and the whole
 // thing sorted.
 func TestAssembleListFromImageOutput(t *testing.T) {
-	got, warnings, err := assembleList(sampleRelease(), "2026-09-16", sampleOutput(t))
+	got, warnings, err := assembleList(sampleRelease(), "2026-09-16", "amd64", sampleOutput(t))
 	if err != nil {
 		t.Fatalf("assembleList: %v", err)
 	}
 	if got.Distro != "ubuntu" || got.Release != "22.04" {
 		t.Errorf("header = %q/%q, want the image's own os-release", got.Distro, got.Release)
 	}
-	if got.ImageDigest != sampleRelease().Digest || got.Generated != "2026-09-16" {
-		t.Errorf("digest %q generated %q", got.ImageDigest, got.Generated)
+	if got.ImageDigest != sampleRelease().Digest || got.Generated != "2026-09-16" || got.Arch != "amd64" {
+		t.Errorf("digest %q generated %q arch %q", got.ImageDigest, got.Generated, got.Arch)
 	}
 	wantPkgs := []suid.Package{
 		{Name: "at", Version: "3.2.5-1ubuntu1", PostinstSetsMode: true},
@@ -90,8 +90,14 @@ func TestAssembleListFromImageOutput(t *testing.T) {
 	}
 	// The one path two packages list keeps the first in (path, package)
 	// order and is named on stderr rather than silently dropped.
-	if len(warnings) != 1 || !strings.Contains(warnings[0], "/etc/login.defs") || !strings.Contains(warnings[0], "util-linux") {
-		t.Errorf("warnings = %v, want one naming /etc/login.defs and util-linux", warnings)
+	var dup int
+	for _, w := range warnings {
+		if strings.Contains(w, "/etc/login.defs") && strings.Contains(w, "util-linux") && strings.Contains(w, "keeps login") {
+			dup++
+		}
+	}
+	if dup != 1 {
+		t.Errorf("warnings = %v, want exactly one naming /etc/login.defs, util-linux and the row kept", warnings)
 	}
 }
 
@@ -99,7 +105,7 @@ func TestAssembleListFromImageOutput(t *testing.T) {
 // not a declaration about a file, and a list that held /usr/bin would be
 // joined against the walk's own directory rows.
 func TestAssembleListDropsNonRegularArchiveRows(t *testing.T) {
-	got, _, err := assembleList(sampleRelease(), "2026-09-16", sampleOutput(t))
+	got, _, err := assembleList(sampleRelease(), "2026-09-16", "amd64", sampleOutput(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,7 +117,7 @@ func TestAssembleListDropsNonRegularArchiveRows(t *testing.T) {
 	out := strings.Replace(string(sampleOutput(t)),
 		"-rwxr-xr-x root/root      1024 2024-01-01 00:00 ./usr/bin/atq",
 		"lrwxrwxrwx root/root         0 2024-01-01 00:00 ./usr/bin/atq -> at", 1)
-	got, _, err = assembleList(sampleRelease(), "2026-09-16", []byte(out))
+	got, _, err = assembleList(sampleRelease(), "2026-09-16", "amd64", []byte(out))
 	if err != nil {
 		t.Fatalf("a symlink row must be skipped, not an error: %v", err)
 	}
@@ -128,7 +134,7 @@ func TestAssembleListCanonicalisesOnlyUsrAliases(t *testing.T) {
 	out := strings.Replace(string(sampleOutput(t)),
 		"755 root root /usr/bin/dmesg",
 		"755 root root /usr/bin/dmesg\n644 root root /libx32/ld.so.conf", 1)
-	got, _, err := assembleList(sampleRelease(), "2026-09-16", []byte(out))
+	got, _, err := assembleList(sampleRelease(), "2026-09-16", "amd64", []byte(out))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -166,11 +172,12 @@ func TestAssembleListRefusesBrokenOutput(t *testing.T) {
 		{"archive digest is not the pin", strings.Replace(base, strings.Repeat("1", 64), strings.Repeat("9", 64), 1), "sha256"},
 		{"unreadable stat line", strings.Replace(base, "755 root root /usr/bin/dmesg", "whoops", 1), "whoops"},
 		{"unreadable archive line", strings.Replace(base, "-rw-r----- root/root      1234 2024-01-01 00:00 ./etc/sudoers", "-rw-r-----", 1), "-rw-r-----"},
-		{"no entries at all", "== osrelease\nubuntu\n22.04\n== usrmerge\n== versions\n", "no entries"},
+		{"no entries at all", "== osrelease\nubuntu\n22.04\n== arch\nx86_64\n== usrmerge\n== versions\n", "no entries"},
+		{"no arch section", strings.Replace(base, "== arch\nx86_64\n", "", 1), "== arch"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			_, _, err := assembleList(sampleRelease(), "2026-09-16", []byte(c.out))
+			_, _, err := assembleList(sampleRelease(), "2026-09-16", "amd64", []byte(c.out))
 			if err == nil {
 				t.Fatalf("assembleList accepted %s", c.name)
 			}
@@ -186,7 +193,23 @@ func TestAssembleListRefusesBrokenOutput(t *testing.T) {
 // unpacking" (unverifiable). It is read off the maintainer scripts, so the
 // decision is a text one and testable without an image — and every line
 // below is one this tool actually read out of a public archive.
+//
+// A LITERAL target has to be a file the package ships. The walk only ever
+// makes a regular file a setuid candidate (walk_traverse.go), so a chmod on
+// a directory or on a path the archive does not contain can never decide
+// anything the join will ask about, and flagging the package for it would
+// cost a WARN on every one of its real files for nothing. A computed target
+// keeps the generous answer, because the archive gives no way to know.
 func TestPostinstSetsMode(t *testing.T) {
+	// What the package ships, in the canonical form the list holds. fuse3's
+	// script says /bin/fusermount3 and the list says /usr/bin/fusermount3,
+	// so the lookup has to canonicalise before it decides.
+	shipped := map[string]bool{
+		"/usr/bin/wall": true, "/usr/lib/x": true, "/usr/bin/foo": true,
+		"/usr/sbin/bar": true, "/usr/bin/y": true, "/etc/sudoers": true,
+		"/etc/x": true, "/usr/bin/fusermount3": true, "/usr/bin/pkexec": true,
+	}
+	merged := map[string]string{"/bin": "/usr/bin", "/sbin": "/usr/sbin"}
 	cases := []struct {
 		line string
 		want bool
@@ -195,38 +218,73 @@ func TestPostinstSetsMode(t *testing.T) {
 		{"chmod 2755 /usr/bin/wall", true},
 		{"  chmod 6755 /usr/lib/x", true},
 		{"chmod u+s /usr/bin/foo", true},
-		{"chmod -R g+s /var/spool/mail", true},
 		{"chmod a+rwxs /usr/bin/foo", true},
 		{"chmod 0755 /usr/bin/foo", false},
 		{"chmod 644 /etc/sudoers", false},
 		{"chmod 1777 /run/screen", false},
 		{"chmod u+x /usr/sbin/bar", false},
-		{"chmod 4755", false},           // no operand: not a claim about a shipped file
-		{"# chmod 4755 /usr/bin", true}, // a commented line still names the intent; the scan is conservative
+		{"chmod 4755", false}, // no operand: not a claim about a shipped file
 		{"echo chmodding", false},
 		{"", false},
-		// policykit-1 and postfix compute the mode, so the archive's text
-		// never spells it. A scan that only understood a literal mode would
-		// call every ordinary /usr/bin/pkexec a finding.
+		// fuse3's own line: pre-merge on the left, canonical in the list.
+		{"    chmod 4755 /bin/fusermount3", true},
+		// A literal target the archive does not ship decides nothing.
+		{"chmod -R g+s /var/spool/mail", false},
+		{"# chmod 4755 /usr/bin", false},
+		{"chmod 4755 /usr/bin/not-in-this-package", false},
+		// policykit-1 and postfix compute the mode AND the target, so the
+		// archive's text never spells either. A scan that insisted on a
+		// literal would call every ordinary /usr/bin/pkexec a finding.
 		{"	chmod $MODE $FILE", true},
 		{`chmod "$mode" "$file"`, true},
 		{"chmod ${MODE} /usr/bin/pkexec", true},
 		{"chmod $3 \"$1\"", true},
-		// dbus and postfix set the mode through dpkg's own override table,
-		// which has exactly the effect a chmod would.
+		// dbus sets the mode through dpkg's own override table, which has
+		// exactly the effect a chmod would; its target is computed too.
 		{`dpkg-statoverride --update --add root "$MESSAGEUSER" 4754 "$LAUNCHER"`, true},
-		{"dpkg-statoverride --update --add postfix postdrop 02710 /var/spool/postfix/public", true},
+		// postfix's override names a literal DIRECTORY, which is not a
+		// candidate the walk could ever raise.
+		{"dpkg-statoverride --update --add postfix postdrop 02710 /var/spool/postfix/public", false},
 		{"dpkg-statoverride --add root root 0755 /usr/bin/x", false},
 		{"dpkg-statoverride --remove /usr/sbin/postdrop >/dev/null 2>&1 || true", false},
 		{"if ! dpkg-statoverride --list $FILE > /dev/null 2>&1; then", false},
 	}
 	for _, c := range cases {
-		if got := postinstSetsMode([]string{c.line}); got != c.want {
+		line, got := postinstSetsMode([]string{c.line}, shipped, merged)
+		if got != c.want {
 			t.Errorf("postinstSetsMode(%q) = %v, want %v", c.line, got, c.want)
 		}
+		if got && line != strings.TrimSpace(c.line) {
+			t.Errorf("postinstSetsMode(%q) reported the line as %q", c.line, line)
+		}
 	}
-	if !postinstSetsMode([]string{"chmod 644 /etc/x", "chmod u+s /usr/bin/y"}) {
-		t.Error("one qualifying line among several must set the flag")
+	if line, ok := postinstSetsMode([]string{"chmod 644 /etc/x", "chmod u+s /usr/bin/y"}, shipped, merged); !ok || line != "chmod u+s /usr/bin/y" {
+		t.Errorf("one qualifying line among several = (%q, %v)", line, ok)
+	}
+}
+
+// The flag is not a bare boolean in a generated file: the run says which
+// maintainer-script line it read it off, so a maintainer can check the
+// judgement without unpacking the archive again.
+func TestPostinstFlagCarriesItsEvidence(t *testing.T) {
+	_, warnings, err := assembleList(sampleRelease(), "2026-09-16", "amd64", sampleOutput(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var found string
+	for _, w := range warnings {
+		if strings.Contains(w, "postinst sets a mode") {
+			found = w
+		}
+	}
+	if !strings.Contains(found, "at:") || !strings.Contains(found, "chmod 4755 $2/usr/bin/at") {
+		t.Errorf("warnings = %v, want one naming at and the line it was read off", warnings)
+	}
+	// sudo's only mode line is an ordinary 0644, so it reports nothing.
+	for _, w := range warnings {
+		if strings.Contains(w, "sudo") && strings.Contains(w, "postinst") {
+			t.Errorf("sudo was flagged: %s", w)
+		}
 	}
 }
 
@@ -249,17 +307,36 @@ func TestDescribeDifferenceNamesTheFirstDifferingThing(t *testing.T) {
 		}
 		return b
 	}
-	if msg, differs := describeDifference(enc(base), enc(base)); differs {
+	if msg, kind := describeDifference(enc(base), enc(base)); kind != diffNone {
 		t.Errorf("identical lists differ: %s", msg)
+	}
+	// A run on another day moves `generated` and nothing else. That is not
+	// drift — it is the clock — so -check reports it and passes; the
+	// maintainer can verify the committed lists on any day.
+	later := base
+	later.Generated = "2026-11-30"
+	msg, kind := describeDifference(enc(base), enc(later))
+	if kind != diffDateOnly {
+		t.Errorf("a date-only difference = %v (%s), want diffDateOnly", kind, msg)
+	}
+	if !strings.Contains(msg, "2026-11-30") || !strings.Contains(msg, "2026-09-16") {
+		t.Errorf("the date-only message %q names neither date", msg)
+	}
+	// A date that moves ALONGSIDE real drift is still drift.
+	both := later
+	both.Entries = append([]suid.Entry(nil), base.Entries...)
+	both.Entries[1].Mode = 0o755
+	if msg, kind := describeDifference(enc(base), enc(both)); kind != diffReal || !strings.Contains(msg, "/usr/bin/sudo") {
+		t.Errorf("drift under a new date = (%q, %v), want the path and diffReal", msg, kind)
 	}
 	mutate := func(f func(*suid.List)) string {
 		l := base
 		l.Packages = append([]suid.Package(nil), base.Packages...)
 		l.Entries = append([]suid.Entry(nil), base.Entries...)
 		f(&l)
-		msg, differs := describeDifference(enc(base), enc(l))
-		if !differs {
-			t.Fatalf("no difference reported")
+		msg, kind := describeDifference(enc(base), enc(l))
+		if kind != diffReal {
+			t.Fatalf("difference reported as %v: %s", kind, msg)
 		}
 		return msg
 	}
@@ -306,7 +383,7 @@ func TestScriptRefusesAnUnsafePackageName(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"dpkg -L", "dpkg-query -W", "dpkg-deb --fsys-tarfile \"/debs/$d.deb\"", "archives='at sudo'", "dpkg-deb -e", "-perm /6000"} {
+	for _, want := range []string{"dpkg -L", "dpkg-query -W", `dpkg-deb --fsys-tarfile "/debs/$d.deb"`, "archives='at sudo'", "dpkg-deb -e", "-perm /6000", "uname -m"} {
 		if !strings.Contains(deb, want) {
 			t.Errorf("the dpkg script does not run %q", want)
 		}
@@ -322,7 +399,7 @@ func TestCheckReportsTheDifferingPathAndFails(t *testing.T) {
 	// A clean check first, so the failure below is about the drift and not
 	// about the harness.
 	o := options{sourcesPath: sources, outDir: dir, cacheDir: dir, check: true, generated: "2026-09-16"}
-	want, _, err := assembleList(rel, "2026-09-16", out)
+	want, _, err := assembleList(rel, "2026-09-16", "amd64", out)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -476,5 +553,81 @@ func TestCacheNameSeparatesTwoArchivesWithOneFileName(t *testing.T) {
 		if !strings.ContainsRune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-", r) {
 			t.Errorf("cacheName(%q) = %q contains %q", esc.URL, cacheName(esc), r)
 		}
+	}
+}
+
+// -check on another day must still be usable: the date moves on every run by
+// construction, so a run that differs in `generated` alone says so and
+// passes, while anything else fails as before.
+func TestCheckPassesWhenOnlyTheDateMoved(t *testing.T) {
+	dir := t.TempDir()
+	rel, out, sources := stubbedRelease(t, dir)
+	want, _, err := assembleList(rel, "2026-09-16", "amd64", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	blob, err := renderList(want)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(dir+"/ubuntu-22.04.json", blob, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var log strings.Builder
+	o := options{sourcesPath: sources, outDir: dir, cacheDir: dir, arch: "amd64", check: true, generated: "2026-11-30"}
+	if err := run(o, &log); err != nil {
+		t.Fatalf("-check a day later: %v (%s)", err, log.String())
+	}
+	if !strings.Contains(log.String(), "2026-11-30") {
+		t.Errorf("the run said nothing about the date it would have stamped: %s", log.String())
+	}
+}
+
+// The image the tool ran is pinned to one architecture, because a
+// distribution can ship a binary setuid on one and not on another. An image
+// whose own uname disagrees with the pin is refused rather than written out
+// under the wrong name.
+func TestArchMismatchIsRefused(t *testing.T) {
+	out := strings.Replace(string(sampleOutput(t)), "== arch\nx86_64", "== arch\naarch64", 1)
+	if out == string(sampleOutput(t)) {
+		t.Fatal("the sample carries no == arch section")
+	}
+	_, _, err := assembleList(sampleRelease(), "2026-09-16", "amd64", []byte(out))
+	if err == nil || !strings.Contains(err.Error(), "aarch64") {
+		t.Errorf("err = %v, want one naming the machine the image reported", err)
+	}
+	// And the pin is what lands in the list, under its Go name.
+	l, _, err := assembleList(sampleRelease(), "2026-09-16", "amd64", sampleOutput(t))
+	if err != nil || l.Arch != "amd64" {
+		t.Errorf("arch = %q (%v), want amd64", l.Arch, err)
+	}
+}
+
+// `docker image inspect` reports every repository the local image is known
+// by. Taking the first would pin a list to whatever tag happened to be
+// pulled alongside it, so the entry has to be the one for the image asked
+// for — and no entry at all is a refusal, not a guess.
+func TestImageDigestPicksTheMatchingRepository(t *testing.T) {
+	repos := []string{
+		"rockylinux/rockylinux@sha256:" + strings.Repeat("a", 64),
+		"ubuntu@sha256:" + strings.Repeat("b", 64),
+		"mymirror.invalid/ubuntu@sha256:" + strings.Repeat("c", 64),
+	}
+	for _, c := range []struct{ image, want string }{
+		{"docker.io/library/ubuntu:22.04", "sha256:" + strings.Repeat("b", 64)},
+		{"ubuntu:22.04", "sha256:" + strings.Repeat("b", 64)},
+		{"docker.io/rockylinux/rockylinux:9", "sha256:" + strings.Repeat("a", 64)},
+		{"mymirror.invalid/ubuntu:22.04", "sha256:" + strings.Repeat("c", 64)},
+	} {
+		got, err := matchingDigest(c.image, repos)
+		if err != nil || got != c.want {
+			t.Errorf("matchingDigest(%q) = (%q, %v), want %q", c.image, got, err, c.want)
+		}
+	}
+	if got, err := matchingDigest("docker.io/library/debian:12", repos); err == nil {
+		t.Errorf("matchingDigest(debian) = %q, want a refusal", got)
+	}
+	if _, err := matchingDigest("docker.io/library/ubuntu:22.04", nil); err == nil {
+		t.Error("an image with no RepoDigests was accepted")
 	}
 }

@@ -19,12 +19,14 @@ package suid
 
 import (
 	"bytes"
+	"cmp"
 	"embed"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
 	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -66,24 +68,30 @@ type Entry struct {
 // List is one release's reference list. Entries are sorted by path and the
 // paths are canonicalised into /usr (pkgfiles.CanonicalUsr) with the image's
 // own merged-usr table, so they are already in the form the walk reports.
+//
+// Arch is the Go architecture name of the image the list was read from
+// ("amd64"). A distribution can ship a binary setuid on one architecture and
+// not on another, and an image pulled on a different machine is a different
+// image, so the list says which one it describes rather than leaving a reader
+// to assume.
 type List struct {
 	Distro      string    `json:"distro"`
 	Release     string    `json:"release"`
+	Arch        string    `json:"arch"`
 	ImageDigest string    `json:"image_digest"`
 	Generated   string    `json:"generated"`
 	Packages    []Package `json:"packages"`
 	Entries     []Entry   `json:"entries"`
 }
 
-// Load returns the list for one release, named from the host's
-// os-release ID and VERSION_ID ("ubuntu", "22.04" -> ubuntu-22.04.json),
-// falling back to the MAJOR version when there is no list for the exact one
-// ("rocky", "9.5" -> rocky-9.5.json, then rocky-9.json). The RHEL family
-// reports a point release where a maintainer pins a major (ruling A-36), and
-// without the fallback a list generated from a 9.8 image could only ever
-// answer for a 9.8 host. A release no name reaches is (nil, false, nil) — an
-// ordinary answer, which the join reports as reference "none" — while a file
-// that will not decode is an error naming it.
+// Load returns the list for one release, named from the host's os-release ID
+// and VERSION_ID ("ubuntu", "22.04" -> ubuntu-22.04.json). When there is no
+// list for the exact version it falls back, in order, to <id>-<major>.json
+// and then to the highest <id>-<major>.<minor>.json present — see listName
+// for why the third step is the one the RHEL family depends on. A release no
+// name reaches is (nil, false, nil) — an ordinary answer, which the join
+// reports as reference "none" — while a file that will not decode is an
+// error naming it.
 func Load(id, versionID string) (*List, bool, error) { return loadFrom(FS, id, versionID) }
 
 // All returns every committed list, in file-name order, for the shape test
@@ -121,16 +129,11 @@ func loadFrom(fsys fs.FS, id, versionID string) (*List, bool, error) {
 	// No pair of a distro and a version spells sources.json, so there is no
 	// guard against it here; allFrom, which reads whatever is in the
 	// directory, is where the skip belongs.
-	name := id + "-" + versionID + ".json"
-	data, err := fs.ReadFile(fsys, name)
-	if errors.Is(err, fs.ErrNotExist) {
-		major, _, hasMajor := strings.Cut(versionID, ".")
-		if !hasMajor || major == "" {
-			return nil, false, nil
-		}
-		name = id + "-" + major + ".json"
-		data, err = fs.ReadFile(fsys, name)
+	name, ok := listName(fsys, id, versionID)
+	if !ok {
+		return nil, false, nil
 	}
+	data, err := fs.ReadFile(fsys, name)
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, false, nil
 	}
@@ -142,6 +145,89 @@ func loadFrom(fsys fs.FS, id, versionID string) (*List, bool, error) {
 		return nil, false, fmt.Errorf("%s: %w", name, err)
 	}
 	return &l, true, nil
+}
+
+// listName resolves a host's ID and VERSION_ID to a committed file, in three
+// steps (ruling A-36, as amended):
+//
+//  1. <id>-<versionID>.json   the list generated for exactly this version
+//  2. <id>-<major>.json       a list the maintainer pinned to the major
+//  3. <id>-<major>.<minor>.json, the highest minor present
+//
+// Step 3 is what makes the RHEL family work at all. Those images report a
+// point release, so the committed files are rocky-9.8.json and
+// almalinux-9.8.json; a host running 9.5 matches neither step 1 nor step 2,
+// and without step 3 every packaged candidate on it would read reference
+// "none". The list is a floor and not a ceiling (see the package comment):
+// what it shows carrying a bit is a declaration whatever the version, and
+// what it does not is decided by the join's own version rule, which reports
+// version_mismatch rather than a finding.
+//
+// The minors are compared as NUMBERS, component by component, so 9.10 beats
+// 9.9 — a string sort gets that backwards — and the answer cannot depend on
+// the order the directory is read in.
+func listName(fsys fs.FS, id, versionID string) (string, bool) {
+	exact := id + "-" + versionID + ".json"
+	if fileExists(fsys, exact) {
+		return exact, true
+	}
+	major := versionID
+	if i := strings.IndexByte(versionID, '.'); i >= 0 {
+		major = versionID[:i]
+	}
+	if major == "" {
+		return "", false
+	}
+	if name := id + "-" + major + ".json"; name != exact && fileExists(fsys, name) {
+		return name, true
+	}
+	prefix := id + "-" + major + "."
+	entries, err := fs.ReadDir(fsys, ".")
+	if err != nil {
+		return "", false
+	}
+	best, bestVer := "", []string(nil)
+	for _, e := range entries {
+		n := e.Name()
+		if n == sourcesName || e.IsDir() || !strings.HasPrefix(n, prefix) || !strings.HasSuffix(n, ".json") {
+			continue
+		}
+		ver := strings.Split(strings.TrimSuffix(strings.TrimPrefix(n, id+"-"), ".json"), ".")
+		if best == "" || compareVersion(ver, bestVer) > 0 {
+			best, bestVer = n, ver
+		}
+	}
+	return best, best != ""
+}
+
+// compareVersion orders two dotted versions component by component. A pair
+// that are both numbers is compared as numbers; anything else falls back to
+// a string comparison, so a component nobody anticipated still orders
+// deterministically instead of panicking or being dropped.
+func compareVersion(a, b []string) int {
+	for i := 0; i < len(a) && i < len(b); i++ {
+		na, erra := strconv.Atoi(a[i])
+		nb, errb := strconv.Atoi(b[i])
+		if erra == nil && errb == nil {
+			if na != nb {
+				return cmp.Compare(na, nb)
+			}
+			continue
+		}
+		if c := strings.Compare(a[i], b[i]); c != 0 {
+			return c
+		}
+	}
+	return cmp.Compare(len(a), len(b))
+}
+
+func fileExists(fsys fs.FS, name string) bool {
+	f, err := fsys.Open(name)
+	if err != nil {
+		return false
+	}
+	_ = f.Close()
+	return true
 }
 
 func allFrom(fsys fs.FS) ([]List, error) {
@@ -173,7 +259,13 @@ func allFrom(fsys fs.FS) ([]List, error) {
 // Sources is sources.json: per release, the public image the list is
 // generated inside and the packages it covers. tools/suidindex reads it;
 // nothing at run time does.
+//
+// Note carries what a comment would carry if JSON had comments — above all
+// that the packages listed here are a SEED and not the whole covered set:
+// the generator unions them with the owners of every setuid and setgid file
+// the image carries, so a list covers packages this file never names.
 type Sources struct {
+	Note     string    `json:"note,omitempty"`
 	Releases []Release `json:"releases"`
 }
 

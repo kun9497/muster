@@ -20,6 +20,7 @@ import (
 // a sequence of sections, each introduced by a `== ` header:
 //
 //	== osrelease           the image's own ID and VERSION_ID, one per line
+//	== arch                the image's own `uname -m`
 //	== usrmerge            `<alias> <readlink target>` for each merged-usr link
 //	== versions            `<package> <version>` for every package covered
 //	== files <package>     `stat -c '%a %U %G %n'` for every file it installs
@@ -31,6 +32,13 @@ import (
 // fixture (testdata/image-output.sample) and every rule the reference list
 // depends on is tested on a host with no docker at all.
 //
+// The covered packages are a SEED unioned with a discovery: sources.json
+// names the ones a maintainer cares about, and the script adds the owner of
+// every setuid and setgid file the image carries, so a list covers packages
+// sources.json never mentions (mount, libpam-modules-bin, usermode). A seed
+// the image does not install is dropped with a warning — the script installs
+// nothing, because a list has to be reproducible from the pinned digest.
+//
 // The lines are parsed by internal/pkgfiles — the same parsers the collector
 // reads a host's package database with (Task 6). That is the point of the
 // shared package: a line the tool and the join read differently would
@@ -38,6 +46,7 @@ import (
 
 const (
 	sectionOSRelease = "osrelease"
+	sectionArch      = "arch"
 	sectionUsrMerge  = "usrmerge"
 	sectionVersions  = "versions"
 	sectionFiles     = "files"
@@ -78,7 +87,7 @@ func parseScriptOutput(out []byte) (*document, error) {
 				return nil, fmt.Errorf("a section header with no name: %q", line)
 			}
 			switch f[0] {
-			case sectionOSRelease, sectionUsrMerge, sectionVersions, sectionFiles, sectionModes, sectionDeb:
+			case sectionOSRelease, sectionArch, sectionUsrMerge, sectionVersions, sectionFiles, sectionModes, sectionDeb:
 			default:
 				return nil, fmt.Errorf("unknown section %q", f[0])
 			}
@@ -103,15 +112,16 @@ func parseScriptOutput(out []byte) (*document, error) {
 }
 
 // assembleList turns one run's document into the release's committed list.
-// generated is stamped into the list and is the run's UTC date, so a
-// regeneration on another day differs in that one field and -check says so
-// rather than pretending the data moved.
+// generated is stamped into the list and is the run's UTC date; arch is the
+// Go architecture name the image was pulled for, which the image's own
+// `uname -m` has to agree with.
 //
-// The second result is the warnings the run produced — a path two packages
-// both install, or a package sources.json names that the image does not
-// have. They are not failures: the list is still correct, but a maintainer
-// wants to know the image no longer carries something it was asked about.
-func assembleList(rel suid.Release, generated string, out []byte) (suid.List, []string, error) {
+// The second result is the warnings the run produced — the maintainer-script
+// line behind every postinst_sets_mode flag, a path two packages both
+// install, and a package sources.json names that the image does not have.
+// They are not failures: the list is still correct, but each is a judgement
+// a person should be able to check without unpacking an archive again.
+func assembleList(rel suid.Release, generated, arch string, out []byte) (suid.List, []string, error) {
 	doc, err := parseScriptOutput(out)
 	if err != nil {
 		return suid.List{}, nil, err
@@ -128,6 +138,9 @@ func assembleList(rel suid.Release, generated string, out []byte) (suid.List, []
 	if versionID != rel.VersionID && majorOf(versionID) != rel.VersionID {
 		return suid.List{}, nil, fmt.Errorf("the image reports VERSION_ID=%q, which is not %q nor a point release of it", versionID, rel.VersionID)
 	}
+	if err := doc.checkArch(arch); err != nil {
+		return suid.List{}, nil, err
+	}
 
 	merged, err := doc.usrMerged()
 	if err != nil {
@@ -142,6 +155,17 @@ func assembleList(rel suid.Release, generated string, out []byte) (suid.List, []
 		return suid.List{}, nil, fmt.Errorf("the run produced no entries at all")
 	}
 
+	// What each package ships, in the canonical form the list holds it in.
+	// postinstSetsMode needs it: a chmod naming a literal path decides
+	// nothing unless that path is a file this package actually installs.
+	shipped := make(map[string]map[string]bool, len(covered))
+	for _, e := range entries {
+		if shipped[e.Package] == nil {
+			shipped[e.Package] = map[string]bool{}
+		}
+		shipped[e.Package][e.Path] = true
+	}
+
 	versions := doc.versions()
 	packages := make([]suid.Package, 0, len(covered))
 	for _, name := range covered {
@@ -150,8 +174,9 @@ func assembleList(rel suid.Release, generated string, out []byte) (suid.List, []
 			return suid.List{}, nil, fmt.Errorf("package %s ships files but the run reported no version for it", name)
 		}
 		p := suid.Package{Name: name, Version: v}
-		if postinstSetsMode(doc.linesOf(sectionModes, name)) {
+		if line, ok := postinstSetsMode(doc.linesOf(sectionModes, name), shipped[name], merged); ok {
 			p.PostinstSetsMode = true
+			warnings = append(warnings, fmt.Sprintf("%s: postinst sets a mode: %s", name, line))
 		}
 		packages = append(packages, p)
 	}
@@ -175,8 +200,8 @@ func assembleList(rel suid.Release, generated string, out []byte) (suid.List, []
 			}
 			// sources.json may force the flag for a package whose script
 			// this tool's textual scan cannot read.
-			if rel.Packages[i].PostinstSetsMode {
-				setPostinst(packages, sp.Name)
+			if rel.Packages[i].PostinstSetsMode && setPostinst(packages, sp.Name) {
+				warnings = append(warnings, fmt.Sprintf("%s: postinst sets a mode: sources.json says so", sp.Name))
 			}
 		case !coveredSet[sp.Name]:
 			warnings = append(warnings, fmt.Sprintf("%s: sources.json names %s, but the image does not install it; the list does not cover it", rel.ID+"-"+versionID, sp.Name))
@@ -186,6 +211,7 @@ func assembleList(rel suid.Release, generated string, out []byte) (suid.List, []
 	return suid.List{
 		Distro:      id,
 		Release:     versionID,
+		Arch:        arch,
 		ImageDigest: rel.Digest,
 		Generated:   generated,
 		Packages:    packages,
@@ -193,12 +219,48 @@ func assembleList(rel suid.Release, generated string, out []byte) (suid.List, []
 	}, warnings, nil
 }
 
-func setPostinst(pkgs []suid.Package, name string) {
+// setPostinst raises the flag and reports whether it was not already up, so
+// a forced flag that only repeats what the scan found says nothing.
+func setPostinst(pkgs []suid.Package, name string) bool {
 	for i := range pkgs {
-		if pkgs[i].Name == name {
+		if pkgs[i].Name == name && !pkgs[i].PostinstSetsMode {
 			pkgs[i].PostinstSetsMode = true
+			return true
 		}
 	}
+	return false
+}
+
+// machineArch maps the kernel's name for a machine to Go's. An image's
+// `uname -m` is the only thing that can contradict the platform the tool
+// asked the runtime for, which is why it is read at all: a runtime that
+// quietly served an emulated image of another architecture would otherwise
+// produce a list labelled amd64 out of arm64 binaries.
+var machineArch = map[string]string{
+	"x86_64": "amd64", "amd64": "amd64",
+	"aarch64": "arm64", "arm64": "arm64",
+	"ppc64le": "ppc64le", "s390x": "s390x", "riscv64": "riscv64",
+}
+
+func (d *document) checkArch(want string) error {
+	s, ok := d.section(sectionArch, "")
+	if !ok {
+		return fmt.Errorf("the run reported no == arch section")
+	}
+	machine := ""
+	for _, line := range s.lines {
+		if t := strings.TrimSpace(line); t != "" {
+			machine = t
+			break
+		}
+	}
+	if machine == "" {
+		return fmt.Errorf("== arch reported nothing")
+	}
+	if got := machineArch[machine]; got != want {
+		return fmt.Errorf("the image reports uname -m %q, but the run pinned %s", machine, want)
+	}
+	return nil
 }
 
 // majorOf is the part of a VERSION_ID before the first dot: the RHEL family
@@ -390,10 +452,11 @@ func (d *document) entries(merged map[string]string) (entries []suid.Entry, cove
 
 // setModeCall matches a chmod: its mode operand and the operand after it,
 // with any option flags skipped. The scan is textual and deliberately
-// generous — a line this tool misreads as setting a special bit costs a WARN
-// on that package's files, while one it MISSES lets the join read an
-// ordinary /usr/bin/pkexec as "the distribution does not ship this setuid",
-// which is a finding against a perfectly stock host.
+// generous about a mode or a target the script COMPUTES — a line this tool
+// misreads as setting a special bit costs a WARN on that package's files,
+// while one it MISSES lets the join read an ordinary /usr/bin/pkexec as "the
+// distribution does not ship this setuid", which is a finding against a
+// perfectly stock host.
 var setModeCall = regexp.MustCompile(`(?:^|[;&|(]|\s)chmod\s+(?:-[A-Za-z-]+\s+)*(\S+)\s+(\S+)`)
 
 // statOverrideAdd matches a maintainer script that hands the mode to dpkg
@@ -404,27 +467,53 @@ var setModeCall = regexp.MustCompile(`(?:^|[;&|(]|\s)chmod\s+(?:-[A-Za-z-]+\s+)*
 var statOverrideAdd = regexp.MustCompile(`dpkg-statoverride\s.*--add(\s|$)`)
 
 // postinstSetsMode reports whether an archive's maintainer scripts give a
-// shipped path a setuid or setgid bit. Such a package's ARCHIVE is not the
-// truth about an installed host — the file is unpacked without the bit and
-// the script adds it — so the join routes its files to
-// walk.suid_sgid_unverified instead of reading the archive's mode as a
-// declaration (W-7).
+// shipped FILE a setuid or setgid bit, and returns the line it read that
+// off. Such a package's archive is not the truth about an installed host —
+// the file is unpacked without the bit and the script adds it — so the join
+// routes its files to walk.suid_sgid_unverified instead of reading the
+// archive's mode as a declaration (W-7).
 //
-// A mode the script COMPUTES (chmod $MODE $FILE, as policykit-1 and postfix
-// do) counts: the archive cannot say what it will be, and "unverifiable" is
-// the honest answer.
-func postinstSetsMode(lines []string) bool {
-	for _, line := range lines {
-		if statOverrideAdd.MatchString(line) && hasSpecialModeWord(line) {
+// Two things are required of a line, and the second is what keeps the flag
+// from being raised by everything:
+//
+//   - the MODE has to carry setuid or setgid, or be one the script computes
+//     (chmod $MODE $FILE, as policykit-1 and postfix do), which the archive
+//     gives no way to resolve;
+//   - the TARGET, when it is a literal absolute path, has to be a file this
+//     package ships. The walk only ever makes a REGULAR FILE a setuid
+//     candidate, so a chmod on a directory (`chmod -R g+s /var/spool/mail`)
+//     or on a path the archive does not contain can never decide anything
+//     the join will ask about — and raising the flag for it would soften
+//     every one of that package's real files to a WARN for nothing. A
+//     computed target keeps the generous answer.
+//
+// shipped holds the package's own paths in the canonical form the list uses,
+// and merged is the image's usr table: fuse3's script says /bin/fusermount3
+// while the list says /usr/bin/fusermount3, and a lookup that did not
+// canonicalise would drop the one package whose flag is least in doubt.
+func postinstSetsMode(lines []string, shipped map[string]bool, merged map[string]string) (string, bool) {
+	ships := func(target string) bool {
+		if strings.ContainsAny(target, "$`*?") || !strings.HasPrefix(target, "/") {
+			// Computed, or relative to a directory the script chose: the
+			// archive cannot say what it names.
 			return true
 		}
+		return shipped[pkgfiles.CanonicalUsr(strings.TrimRight(target, "/"), merged)]
+	}
+	for _, line := range lines {
+		if statOverrideAdd.MatchString(line) {
+			if mode, target, ok := statOverrideTarget(line); ok && mode&0o6000 != 0 && ships(target) {
+				return strings.TrimSpace(line), true
+			}
+			continue
+		}
 		for _, m := range setModeCall.FindAllStringSubmatch(line, -1) {
-			if setsSpecialBit(m[1]) {
-				return true
+			if setsSpecialBit(m[1]) && ships(unquote(m[2])) {
+				return strings.TrimSpace(line), true
 			}
 		}
 	}
-	return false
+	return "", false
 }
 
 // setsSpecialBit classifies one chmod mode operand.
@@ -445,21 +534,31 @@ func setsSpecialBit(mode string) bool {
 	return false
 }
 
-// hasSpecialModeWord reports whether any word of a statoverride call is an
-// octal mode carrying setuid or setgid — 4754 for dbus's launch helper,
-// 02710 for postfix's maildrop. The mode is one word of several and its
-// position differs between `--add` and `--update --add`, so it is found by
-// what it looks like rather than by counting.
-func hasSpecialModeWord(line string) bool {
-	for _, w := range strings.FieldsFunc(line, func(r rune) bool { return strings.ContainsRune(" \t\"'", r) }) {
-		if len(w) < 3 || len(w) > 5 {
+// statOverrideTarget reads the mode and the path out of a statoverride call.
+// The arguments are `<user> <group> <mode> <path>` after the options, but the
+// options differ between `--add` and `--update --add`, so the mode is found
+// by what it looks like — an octal word — and the path is the word after it.
+func statOverrideTarget(line string) (mode int, target string, ok bool) {
+	words := strings.FieldsFunc(line, func(r rune) bool { return strings.ContainsRune(" \t", r) })
+	for i, w := range words {
+		u := unquote(w)
+		if len(u) < 3 || len(u) > 5 {
 			continue
 		}
-		if v, err := strconv.ParseUint(w, 8, 32); err == nil && v&0o6000 != 0 {
-			return true
+		v, err := strconv.ParseUint(u, 8, 32)
+		if err != nil || i+1 >= len(words) {
+			continue
 		}
+		return int(v), unquote(words[i+1]), true
 	}
-	return false
+	return 0, "", false
+}
+
+// unquote strips the shell quoting a maintainer script puts round a word.
+// "$LAUNCHER" has to keep its dollar sign — that is what makes it computed —
+// so only the surrounding quotes go.
+func unquote(w string) string {
+	return strings.Trim(w, `"'`)
 }
 
 // renderList encodes a list the one way the committed files are encoded:
@@ -480,38 +579,57 @@ func renderList(l suid.List) ([]byte, error) {
 	return append(data, '\n'), nil
 }
 
+// diffKind is what -check found. A date-only difference is separated from
+// real drift because `generated` moves on every run by construction: a
+// -check that failed on it would only be usable on the day the lists were
+// made, and a maintainer verifying a months-old tree would learn nothing.
+type diffKind int
+
+const (
+	diffNone diffKind = iota
+	diffDateOnly
+	diffReal
+)
+
 // describeDifference reports the FIRST thing that moved between the
 // committed list and the one this run produced. A byte comparison alone
 // would send the maintainer to a diff of tens of thousands of lines; the
 // answer they need is "which file, and what about it".
-func describeDifference(committed, generated []byte) (string, bool) {
+//
+// `generated` is compared LAST and on its own: everything else is compared
+// with the two dates masked to the same value, so a date that moved
+// alongside real drift is still reported as the drift.
+func describeDifference(committed, generated []byte) (string, diffKind) {
 	if bytes.Equal(committed, generated) {
-		return "", false
+		return "", diffNone
 	}
 	var have, got suid.List
 	if err := json.Unmarshal(committed, &have); err != nil {
-		return fmt.Sprintf("the committed file does not decode: %v", err), true
+		return fmt.Sprintf("the committed file does not decode: %v", err), diffReal
 	}
 	if err := json.Unmarshal(generated, &got); err != nil {
-		return fmt.Sprintf("the generated list does not decode: %v", err), true
+		return fmt.Sprintf("the generated list does not decode: %v", err), diffReal
 	}
 	for _, f := range []struct{ name, a, b string }{
 		{"distro", have.Distro, got.Distro},
 		{"release", have.Release, got.Release},
+		{"arch", have.Arch, got.Arch},
 		{"image_digest", have.ImageDigest, got.ImageDigest},
-		{"generated", have.Generated, got.Generated},
 	} {
 		if f.a != f.b {
-			return fmt.Sprintf("%s is %q, the run produced %q", f.name, f.a, f.b), true
+			return fmt.Sprintf("%s is %q, the run produced %q", f.name, f.a, f.b), diffReal
 		}
 	}
 	if msg, differs := firstPackageDifference(have.Packages, got.Packages); differs {
-		return msg, true
+		return msg, diffReal
 	}
 	if msg, differs := firstEntryDifference(have.Entries, got.Entries); differs {
-		return msg, true
+		return msg, diffReal
 	}
-	return "the two encode the same list but not the same bytes; regenerate to normalise the file", true
+	if have.Generated != got.Generated {
+		return fmt.Sprintf("generated is %q and this run would stamp %q; nothing else moved", have.Generated, got.Generated), diffDateOnly
+	}
+	return "the two encode the same list but not the same bytes; regenerate to normalise the file", diffReal
 }
 
 func firstPackageDifference(have, got []suid.Package) (string, bool) {
