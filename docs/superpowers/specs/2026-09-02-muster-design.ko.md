@@ -266,7 +266,7 @@ decision: D09
 
 **절 문법.** 모든 절은 — `checks`, `when`, `applies_when`, `where`, `require` 아래에서 똑같이 — 키 `{fact, op, expected}`와 선택적 수식어 `on`, `persona`만 씁니다. `where`와 `require` 안에서는 `fact` 대신 `field`가 오며, 검사 대상 원소의 필드 이름을 가리킵니다. 원소가 스칼라이면 생략합니다. 엄격한 디코딩은 그 밖의 키를 모두 거부합니다. `applies_when`과 `when`은 모두 성립해야 하는 절의 리스트입니다. 인라인 절 하나는 원소가 하나인 리스트의 약식 표기입니다. `or`는 없습니다. 대안은 `mechanisms`로 표현합니다.
 
-**연산자.** 스칼라 연산자 열세 개(`eq ne in not_in lt lte gt gte matches not_matches contains present absent`)와 컬렉션 연산자 두 개(`each`, `none`)가 있습니다. `present`와 `absent`는 `expected`를 받지 않습니다. `not_matches`는 스칼라에 대해서만 쓰이며 `matches`가 성립하지 않을 때 정확히 성립합니다. `matches`는 Go `regexp`(RE2) 패턴을 받습니다. 앵커 없이 대소문자를 구분해, 스칼라의 값 전체 또는 리스트의 각 원소에 대해 매칭하며, `.`은 개행에 매칭하지 않습니다. lint는 로드 시점에 모든 패턴을 컴파일합니다. 비교는 레지스트리가 타입을 정하므로 `"0"`과 `0`을 혼동할 수 없습니다. `lt`…`gte`는 숫자 타입을 요구합니다.
+**연산자.** 스칼라 연산자 열네 개(`eq ne in not_in lt lte gt gte matches not_matches contains not_contains present absent`)와 컬렉션 연산자 두 개(`each`, `none`)가 있습니다. `present`와 `absent`는 `expected`를 받지 않습니다. `not_matches`는 스칼라에 대해서만 쓰이며 `matches`가 성립하지 않을 때 정확히 성립합니다. `matches`는 Go `regexp`(RE2) 패턴을 받습니다. 앵커 없이 대소문자를 구분해, 스칼라의 값 전체 또는 리스트의 각 원소에 대해 매칭하며, `.`은 개행에 매칭하지 않습니다. lint는 로드 시점에 모든 패턴을 컴파일합니다. 비교는 레지스트리가 타입을 정하므로 `"0"`과 `0`을 혼동할 수 없습니다. `lt`…`gte`는 숫자 타입을 요구합니다.
 
 **파라미터.** `expected`는 리터럴이거나 `${name}`입니다. 치환은 값 전체 단위로만 이루어집니다. `expected` 전체가 정확히 `${name}`이어야 합니다. 파라미터의 값은 선언된 타입을 유지한 채 삽입되므로 리스트 파라미터는 리스트를 내놓습니다. `params` 아래의 각 항목은 `{type, default, description}`을 선언합니다. lint는 선언되지 않은 파라미터에 대한 참조와 타입이 맞지 않는 기본값을 거부합니다.
 

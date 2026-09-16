@@ -477,9 +477,16 @@ func lintClause(c *Control, cl Clause, reg *facts.Registry, add func(string, str
 			add("clause_grammar", "%s: none needs where", where)
 		}
 		// W-10: a record element has no name of its own, so without subject
-		// every observation and every waiver would name it by its position in
-		// a list whose order is the collector's, not the host's. A scalar
+		// every observation and every waiver falls back to the element's index
+		// in a list whose order is the collector's, not the host's. A scalar
 		// element IS its name, so the rule is record-lists only.
+		//
+		// What the rule requires is a DELIBERATE choice of naming field, not a
+		// non-positional one: where a record carries no stable identifier, a
+		// positional field is the right subject. env.shell.root_path_entries
+		// is the case -- a PATH element's value is empty for the "." entry the
+		// control exists to catch and may repeat, so `subject: position` names
+		// it, and the order is root's PATH rather than the collector's.
 		if cl.Op == "none" && entry.Type == "list<record>" && cl.Subject == "" {
 			add("none_subject", "%s: none on %s (list<record>) needs subject so observations and waivers can name the element", where, cl.Fact)
 		}
