@@ -148,7 +148,7 @@ func compare(op string, actual, expected any, typ string) (bool, error) {
 			return false, fmt.Errorf("actual %v is not a string", actual)
 		}
 		switch op {
-		case "eq", "ne", "contains", "matches", "not_matches":
+		case "eq", "ne", "contains", "not_contains", "matches", "not_matches":
 			e, ok := expected.(string)
 			if !ok {
 				return false, fmt.Errorf("expected %v is not a string", expected)
@@ -160,6 +160,8 @@ func compare(op string, actual, expected any, typ string) (bool, error) {
 				return a != e, nil
 			case "contains":
 				return strings.Contains(a, e), nil
+			case "not_contains":
+				return !strings.Contains(a, e), nil
 			case "matches", "not_matches":
 				re, err := regexp.Compile(e)
 				if err != nil {
@@ -209,17 +211,22 @@ func compareList(op string, actual, expected any) (bool, error) {
 			return eq, nil
 		}
 		return !eq, nil
-	case "contains":
+	case "contains", "not_contains":
 		e, ok := expected.(string)
 		if !ok {
 			return false, fmt.Errorf("expected %v is not a string", expected)
 		}
+		found := false
 		for _, x := range xs {
 			if x == e {
-				return true, nil
+				found = true
+				break
 			}
 		}
-		return false, nil
+		if op == "contains" {
+			return found, nil
+		}
+		return !found, nil
 	case "matches":
 		pat, ok := expected.(string)
 		if !ok {

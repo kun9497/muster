@@ -585,8 +585,13 @@ func TestLintKISACoverageIsSetLevel(t *testing.T) {
 	second := strings.Replace(goodControl, "id: muster.account.good", "id: muster.account.good_twin", 1)
 
 	ps := lintSet(t, LintOptions{KISA: inv}, goodControl, second)
-	if !hasMessage(ps, "kisa_coverage", "U-01 is cited by 2 controls") {
-		t.Errorf("an item cited twice must be reported: %v", messagesOf(ps, "kisa_coverage"))
+	// W-10: two controls implementing one item is allowed, so the set-level
+	// problems here are the uncited ones -- which is what makes this test's
+	// point about where a set-level problem carries no id and no path.
+	for _, m := range messagesOf(ps, "kisa_coverage") {
+		if strings.Contains(m, "U-01 is cited by") {
+			t.Errorf("an item cited by two controls must not be reported: %q", m)
+		}
 	}
 	found := false
 	for _, p := range ps {
@@ -891,11 +896,18 @@ func TestLintKISARepeatedReferenceIsNamedPerControl(t *testing.T) {
 			t.Errorf("one control citing an id twice is not two controls: %q", m)
 		}
 	}
-	// Two controls really claiming one item is still reported.
+	// W-10: two controls really claiming one item is allowed now, so neither
+	// shape reaches kisa_coverage -- the repeat is the per-control problem
+	// above and nothing else.
 	second := strings.Replace(goodControl, "id: muster.account.good", "id: muster.account.good_twin", 1)
 	both := lintSet(t, LintOptions{KISA: inv}, goodControl, second)
-	if !hasMessage(both, "kisa_coverage", "U-01 is cited by 2 controls") {
-		t.Errorf("two controls claiming one item must still be reported: %v", messagesOf(both, "kisa_coverage"))
+	for _, m := range messagesOf(both, "kisa_coverage") {
+		if strings.Contains(m, "U-01 is cited by") {
+			t.Errorf("two controls claiming one item is no longer a coverage problem: %q", m)
+		}
+	}
+	if len(messagesOf(both, "references_kisa")) != 0 {
+		t.Errorf("neither control repeats an id, so nothing is a per-control problem: %v", messagesOf(both, "references_kisa"))
 	}
 }
 
@@ -1035,5 +1047,118 @@ func TestProblemStringMarksOnlySetLevelProblems(t *testing.T) {
 	pathless := Problem{ControlID: "muster.account.x", Rule: "titles", Message: "m"}
 	if strings.HasPrefix(pathless.String(), "controls: ") {
 		t.Errorf("a control problem must not masquerade as set-level: %q", pathless.String())
+	}
+}
+
+// W-10: `none` over a list<record> names its elements by index unless the
+// clause says which field identifies one, so a finding reads "file:3" and a
+// waiver has nothing stable to name. The rule is record-lists only.
+func TestLintNoneOnRecordListNeedsSubject(t *testing.T) {
+	const head = `id: muster.account.x
+title_en: t
+title_ko: 제목
+description_en: d
+description_ko: 설명
+category: account
+importance: 상
+automation: auto
+requires_facts: ">=1"
+absent_means: fail
+checks:
+`
+	const tail = "remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true }\n"
+
+	without := head + "  - { fact: cron.files, op: none, where: { field: other_writable, op: eq, expected: true } }\n" + tail
+	if !hasMessage(lintOne(t, without, LintOptions{}), "none_subject", "cron.files") {
+		t.Errorf("a none clause on a list<record> without subject must be a none_subject problem naming the fact: %v", lintOne(t, without, LintOptions{}))
+	}
+
+	with := head + "  - { fact: cron.files, op: none, subject: path, where: { field: other_writable, op: eq, expected: true } }\n" + tail
+	if ps := lintOne(t, with, LintOptions{}); len(ps) != 0 {
+		t.Errorf("a none clause carrying subject must lint clean: %v", ps)
+	}
+}
+
+// W-10: a list<string> element IS its own name, so `none` over one needs no
+// subject -- U-01's securetty clause is exactly that shape and must stay clean.
+func TestLintNoneOnStringListNeedsNoSubject(t *testing.T) {
+	const y = `id: muster.account.x
+title_en: t
+title_ko: 제목
+description_en: d
+description_ko: 설명
+category: account
+importance: 상
+automation: auto
+requires_facts: ">=1"
+absent_means: fail
+checks:
+  - { fact: files.etc_securetty_lines, op: none, where: { op: matches, expected: "^pts/" } }
+remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true }
+`
+	if ps := lintOne(t, y, LintOptions{}); len(ps) != 0 {
+		t.Errorf("none over a list<string> must lint clean without subject: %v", ps)
+	}
+}
+
+// W-10: not_contains is an operator of the grammar, so the lint must accept
+// it wherever it accepts contains -- including a mechanism's when, which is
+// where the walk's controls screen the NSS source list.
+func TestLintNotContainsIsAScalarOp(t *testing.T) {
+	if !scalarOps["not_contains"] {
+		t.Error("not_contains must be a scalar operator")
+	}
+	const y = `id: muster.account.x
+title_en: t
+title_ko: 제목
+description_en: d
+description_ko: 설명
+category: account
+importance: 상
+automation: auto
+requires_facts: ">=1"
+absent_means: fail
+mechanisms:
+  - when: [{ fact: accounts.nss.passwd_sources, op: not_contains, expected: compat }]
+    checks:
+      - { fact: services.ssh.installed, op: eq, expected: true }
+remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true }
+`
+	if ps := lintOne(t, y, LintOptions{}); len(ps) != 0 {
+		t.Errorf("not_contains in a mechanism's when must lint clean: %v", ps)
+	}
+}
+
+// W-10: stage 3 splits one KISA item across more than one control (U-23's
+// setuid, setgid and sticky halves), so "cited by N controls" is no longer an
+// offence. The other two coverage offences -- an item nobody cites and is not
+// deferred, and a deferral a control has since implemented -- are untouched.
+func TestLintKISACoverageAllowsTwoControlsPerItem(t *testing.T) {
+	// U-23 stays an item but stops being deferred; U-15 stays deferred.
+	dir := writeKISADir(t, map[string]string{"kisa_deferred.json": `[
+	  {"id": "U-15", "stage": "3", "reason": "r"}
+	]`})
+	inv, err := LoadKISA(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cite := func(id, ctrl string) string {
+		y := strings.Replace(goodControl, `"2026": ["U-01"]`, `"2026": ["`+id+`"]`, 1)
+		return strings.Replace(y, "id: muster.account.good", "id: "+ctrl, 1)
+	}
+
+	ps := lintSet(t, LintOptions{KISA: inv}, cite("U-23", "muster.file.suid"), cite("U-23", "muster.file.sticky"))
+	for _, m := range messagesOf(ps, "kisa_coverage") {
+		if strings.Contains(m, "U-23 is cited by") {
+			t.Errorf("two controls implementing one item is no longer an offence: %q", m)
+		}
+	}
+	if !hasMessage(ps, "kisa_coverage", "U-01") {
+		t.Errorf("an item no control cites and that is not deferred must still be reported: %v", messagesOf(ps, "kisa_coverage"))
+	}
+
+	stale := lintSet(t, LintOptions{KISA: inv}, cite("U-15", "muster.file.owner"), cite("U-15", "muster.file.group"))
+	if !hasMessage(stale, "kisa_coverage", "deferred item U-15", "muster.file.group", "muster.file.owner") {
+		t.Errorf("a stale deferral must still name the item and every control citing it: %v", messagesOf(stale, "kisa_coverage"))
 	}
 }

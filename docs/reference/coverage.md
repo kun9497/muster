@@ -75,7 +75,7 @@
 
 ## Fact keys used by controls
 
-146 of 343 registered keys are read by a control (4 by the engine); 193 unused.
+146 of 350 registered keys are read by a control (4 by the engine); 200 unused.
 
 | Collector | Registered | Used by a control | Read by the engine | Unused |
 |---|---|---|---|---|
@@ -88,7 +88,7 @@
 | pam | 28 | 9 | 0 | pam.stacks, pam.managing_layer, pam.parse_complete, pam.pwquality.local_users_only, pam.pwquality.minclass, pam.pwquality.dcredit, pam.pwquality.ucredit, pam.pwquality.lcredit, pam.pwquality.ocredit, pam.pwquality.enforce_for_root, pam.password.remember, pam.faillock.unlock_time, pam.faillock.fail_interval, pam.faillock.even_deny_root, pam.faillock.root_unlock_time, pam.su.wheel_control, pam.su.wheel_group, pam.su.wheel_args, pam.umask_module.args |
 | os | 2 | 0 | 0 | env.container, env.has_systemd |
 | env | 7 | 4 | 0 | env.shell.tmout_readonly, env.shell.tmout_settings, env.shell.umask_settings |
-| walk | 2 | 1 | 1 | — |
+| walk | 9 | 1 | 1 | walk.suid_sgid, walk.suid_sgid_unverified, walk.sticky_missing, walk.unowned, walk.hidden, walk.skipped, walk.stats |
 | cron | 3 | 2 | 0 | cron.timers |
 | firewall | 8 | 2 | 0 | firewall.enabled, firewall.default_policy.input, firewall.default_policy.forward, firewall.normalization_confidence, firewall.rules, firewall.raw_dumps |
 | timesync | 4 | 1 | 0 | time_sync.provider, time_sync.servers, time_sync.synchronized |

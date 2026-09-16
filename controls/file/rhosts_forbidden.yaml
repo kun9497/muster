@@ -19,7 +19,7 @@ requires_facts: ">=1"
 # reviewer even though this run could not judge every home.
 absent_means: manual
 checks:
-  - { fact: files.user_rhosts, op: none, where: { field: has_plus, op: eq, expected: true } }
+  - { fact: files.user_rhosts, op: none, subject: path, where: { field: has_plus, op: eq, expected: true } }
   - { fact: files.etc_hosts_equiv_lines, op: none, where: { op: matches, expected: "^\\+" } }
 remediation:
   text_en: Remove the "+" entries from the offending ~/.rhosts, ~/.shosts and /etc/hosts.equiv, or remove the files entirely if r-command trust is not in use.

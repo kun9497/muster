@@ -60,7 +60,7 @@ var (
 	validOn          = set("runtime", "persisted", "effective", "both")
 	validPersona     = set("root", "user", "invalid")
 	validParamType   = set("string", "int", "bool", "list<string>", "list<int>")
-	scalarOps        = set("eq", "ne", "in", "not_in", "lt", "lte", "gt", "gte", "matches", "not_matches", "contains", "present", "absent")
+	scalarOps        = set("eq", "ne", "in", "not_in", "lt", "lte", "gt", "gte", "matches", "not_matches", "contains", "not_contains", "present", "absent")
 	orderedOps       = set("lt", "lte", "gt", "gte")
 	collectionOps    = set("each", "none")
 )
@@ -319,12 +319,14 @@ func paramDefaultMatches(p Param) bool {
 
 // lintKISACoverage is the set-level half of M-2: coverage is a property of
 // the whole set, not of any one file, so its problems carry no control id and
-// no path. Every item of the current edition is implemented by exactly one
-// control or listed in kisa_deferred.json -- an item cited twice, an item
-// cited by nobody and not deferred, and a deferral a control has since
-// implemented are each an error naming the ids. Only the current edition is
-// judged: a 2021 item may legitimately be cited by two controls, because the
-// 2021 list was split and renumbered into 2026 (M-26).
+// no path. Every item of the current edition is implemented by at least one
+// control or listed in kisa_deferred.json -- an item cited by nobody and not
+// deferred, and a deferral a control has since implemented, are each an error
+// naming the ids. W-10: more than one control per item is allowed, because an
+// item such as U-23 covers setuid, setgid and sticky, whose remediations and
+// waivers have nothing to do with each other. One control listing an id twice
+// is still a per-control references_kisa problem (M-39). Only the current
+// edition is judged (M-26).
 func lintKISACoverage(s *Set, x *KISAInventory) []Problem {
 	if x == nil {
 		return nil // shape-only linting: no inventory was offered
@@ -356,27 +358,18 @@ func lintKISACoverage(s *Set, x *KISAInventory) []Problem {
 	add := func(format string, args ...any) {
 		out = append(out, Problem{Rule: "kisa_coverage", Message: fmt.Sprintf(format, args...)})
 	}
-	var duplicated, stale, uncited []string
+	var stale, uncited []string
 	for _, it := range x.Items[LatestKISAEdition] {
 		n, deferred := len(citedBy[it.ID]), x.IsDeferred(it.ID)
-		switch {
-		case n == 0 && !deferred:
+		if n == 0 && !deferred {
 			uncited = append(uncited, it.ID)
-		case n > 1:
-			duplicated = append(duplicated, it.ID)
 		}
 		if n > 0 && deferred {
 			stale = append(stale, it.ID)
 		}
 	}
-	sort.Strings(duplicated)
 	sort.Strings(stale)
 	sort.Strings(uncited)
-	for _, id := range duplicated {
-		cs := append([]string(nil), citedBy[id]...)
-		sort.Strings(cs)
-		add("%s is cited by %d controls: %s", id, len(cs), strings.Join(cs, ", "))
-	}
 	for _, id := range stale {
 		cs := append([]string(nil), citedBy[id]...)
 		sort.Strings(cs)
@@ -482,6 +475,13 @@ func lintClause(c *Control, cl Clause, reg *facts.Registry, add func(string, str
 		}
 		if cl.Op == "none" && cl.Where == nil {
 			add("clause_grammar", "%s: none needs where", where)
+		}
+		// W-10: a record element has no name of its own, so without subject
+		// every observation and every waiver would name it by its position in
+		// a list whose order is the collector's, not the host's. A scalar
+		// element IS its name, so the rule is record-lists only.
+		if cl.Op == "none" && entry.Type == "list<record>" && cl.Subject == "" {
+			add("none_subject", "%s: none on %s (list<record>) needs subject so observations and waivers can name the element", where, cl.Fact)
 		}
 		for _, sub := range []*Clause{cl.Where, cl.Require} {
 			if sub == nil {

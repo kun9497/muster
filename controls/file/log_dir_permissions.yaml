@@ -18,12 +18,12 @@ absent_means: manual
 params:
   allowed_groups: { type: list<string>, default: ["root", "syslog", "adm", "utmp"], description: groups permitted to have group-write on a /var/log entry }
 checks:
-  - { fact: files.log_dirs, op: none, where: { field: other_writable, op: eq, expected: true } }
+  - { fact: files.log_dirs, op: none, subject: path, where: { field: other_writable, op: eq, expected: true } }
   - { fact: files.log_dirs, op: each, subject: path, where: { field: group_writable, op: eq, expected: true }, require: { field: group, op: in, expected: "${allowed_groups}" } }
-  - { fact: files.log_dirs, op: none, where: { field: reason, op: present } }
-  - { fact: files.log_files, op: none, where: { field: other_writable, op: eq, expected: true } }
+  - { fact: files.log_dirs, op: none, subject: path, where: { field: reason, op: present } }
+  - { fact: files.log_files, op: none, subject: path, where: { field: other_writable, op: eq, expected: true } }
   - { fact: files.log_files, op: each, subject: path, where: { field: group_writable, op: eq, expected: true }, require: { field: group, op: in, expected: "${allowed_groups}" } }
-  - { fact: files.log_files, op: none, where: { field: reason, op: present } }
+  - { fact: files.log_files, op: none, subject: path, where: { field: reason, op: present } }
 remediation:
   text_en: chmod o-w each world-writable log path; for a group-writable path owned by an unexpected group, chown it to root or a logging group, or add that group to the parameter if it is legitimate.
   text_ko: 전체 쓰기 가능한 로그 경로에 chmod o-w 를 적용하고, 예상치 못한 그룹이 소유한 그룹-쓰기 경로는 root 나 로깅 그룹으로 chown 하거나, 정당하면 그 그룹을 파라미터에 추가합니다.

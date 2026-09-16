@@ -17,13 +17,13 @@ absent_means: fail
 params:
   allowed_modes: { type: list<int>, default: [0, 32, 128, 160, 256, 288, 384, 416], description: cron file modes at 0640 or stricter (bit-subsets of 0640) }
 checks:
-  - { fact: cron.files, op: none, where: { field: reason, op: present } }
+  - { fact: cron.files, op: none, subject: path, where: { field: reason, op: present } }
   - { fact: cron.files, op: each, subject: path, where: { field: scope, op: in, expected: ["system", "access", "user"] }, require: { field: mode, op: in, expected: "${allowed_modes}" } }
-  - { fact: cron.files, op: none, where: { field: other_writable, op: eq, expected: true } }
+  - { fact: cron.files, op: none, subject: path, where: { field: other_writable, op: eq, expected: true } }
   - { fact: cron.files, op: each, subject: path, where: { field: scope, op: in, expected: ["system", "access"] }, require: { field: owner_ok, op: eq, expected: true } }
   - { fact: cron.files, op: each, subject: path, where: { field: scope, op: eq, expected: "user" }, require: { field: owner_ok, op: eq, expected: true } }
   - { fact: cron.files, op: each, subject: path, where: { field: scope, op: eq, expected: "periodic" }, require: { field: owner_ok, op: eq, expected: true } }
-  - { fact: cron.dirs, op: none, where: { field: other_writable, op: eq, expected: true } }
+  - { fact: cron.dirs, op: none, subject: path, where: { field: other_writable, op: eq, expected: true } }
 remediation:
   text_en: chmod 0640 the crontab-FORMAT files (/etc/crontab, /etc/cron.d/* and the per-user spools), chown the system files to root, and chmod go-w (not 0640, which would break run-parts) the /etc/cron.{hourly,daily,weekly,monthly} periodic-script directories and their scripts; chmod o-w the cron directories.
   text_ko: crontab 형식 파일(/etc/crontab, /etc/cron.d/*, 사용자별 스풀)에 chmod 0640 을 적용하고 시스템 파일을 root 로 chown 하며, /etc/cron.{hourly,daily,weekly,monthly} 주기 스크립트 디렉터리와 그 스크립트에는 (run-parts 를 깨뜨리는 0640 이 아니라) chmod go-w 를 적용하고, cron 디렉터리에 chmod o-w 를 적용합니다.

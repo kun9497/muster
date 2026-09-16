@@ -20,7 +20,7 @@ checks:
   - { fact: files.etc_sudoers.uid, op: eq, expected: 0 }
   - { fact: files.sudoers_d_entries, op: each, subject: path, where: { field: ignored, op: eq, expected: false }, require: { field: other_writable, op: eq, expected: false } }
   - { fact: files.sudoers_d_entries, op: each, subject: path, where: { field: ignored, op: eq, expected: false }, require: { field: group_writable, op: eq, expected: false } }
-  - { fact: files.sudoers_d_entries, op: none, where: { field: reason, op: present } }
+  - { fact: files.sudoers_d_entries, op: none, subject: path, where: { field: reason, op: present } }
 remediation:
   text_en: chmod 0440 /etc/sudoers and chown it to root; chmod go-w each active file under /etc/sudoers.d.
   text_ko: /etc/sudoers 에 chmod 0440 을 적용하고 root 로 chown 하며, /etc/sudoers.d 아래 활성 파일에 chmod go-w 를 적용합니다.
