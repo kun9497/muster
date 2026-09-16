@@ -56,11 +56,32 @@ func walkAccess() *fsAccess {
 	}
 }
 
+// walkDpkgAccess is the same synthetic tree on a Debian-family host: dpkg's
+// database instead of the rpm command, and the merged-/usr symlinks the
+// join canonicalises the .list spellings through.
+func walkDpkgAccess() *fsAccess {
+	a := &fsAccess{
+		files: map[string]string{
+			mountinfoPath: "mountinfo",
+			passwdPath:    "passwd",
+			groupPath:     "group",
+			subuidPath:    "subuid.sample",
+			subgidPath:    "subgid.sample",
+		},
+		links: mergedUsrLinks(),
+		tree:  buildTree(walkTreeSpec, map[string]uint64{"/": 1, "/home": 2}),
+	}
+	for p, f := range dpkgFiles() {
+		a.files[p] = f
+	}
+	return a
+}
+
 // deepWalk runs the walk collector the way collect.Run does — Begin first,
 // so Keys and Worst can be asked about what it wrote, and under the guard,
 // so a read outside the declaration fails the test rather than being served.
 // --deep is armed with opts; the caller that wants it disarmed uses build().
-func deepWalk(ctx context.Context, t *testing.T, a collect.Access, opts collect.WalkOptions) (*collect.Builder, error) {
+func deepWalk(ctx context.Context, t *testing.T, a collect.Access, opts collect.WalkOptions, setup ...func(*collect.Builder)) (*collect.Builder, error) {
 	t.Helper()
 	reg, err := facts.LoadRegistry()
 	if err != nil {
@@ -68,6 +89,9 @@ func deepWalk(ctx context.Context, t *testing.T, a collect.Access, opts collect.
 	}
 	b := collect.NewBuilder(reg)
 	b.SetWalk(opts)
+	for _, f := range setup {
+		f(b)
+	}
 	b.Begin("walk")
 	c := collectorNamed(t, "walk")
 	g := collect.Guard(a, c)
@@ -388,6 +412,42 @@ func TestWalkHappyPath(t *testing.T) {
 // §7: the join is one operation, so a table nobody could read leaves every
 // list it decides unanswerable — and leaves every other key exactly as the
 // traversal found it.
+// The rpm family is what every other test here runs; this is the dpkg
+// family end to end, through collect.Guard with the collector's real
+// declaration. It is the only place the four dpkg database paths, the info
+// glob and the merged-/usr symlinks are all served to the collector itself
+// rather than to the join in isolation, so a path the join reads that
+// walkReads does not declare fails HERE and nowhere else.
+func TestWalkDpkgFamilyUnderTheGuard(t *testing.T) {
+	useReferenceList(t, "ubuntu", "22.04")
+	withEUID(t, 0)
+	b, err := deepWalk(context.Background(), t, walkDpkgAccess(), collect.WalkOptions{},
+		func(b *collect.Builder) {
+			b.Header().Host.OSRelease = facts.OSRelease{ID: "ubuntu", VersionID: "22.04"}
+		})
+	if err != nil {
+		t.Fatalf("walk: %v", err)
+	}
+	if e := env(t, b, "walk.complete"); e.Status != facts.StatusOK || e.Value != true {
+		t.Fatalf("walk.complete = %+v, want ok true", e)
+	}
+	// The reference list decided the setuid candidate...
+	checkRow(t, walkRows(t, b, "walk.suid_sgid"), "/usr/bin/su", map[string]any{
+		"package": "util-linux", "package_declared": true, "reference": refList,
+		"declared_path": "/bin/su",
+	})
+	// ...and a dpkg .list alone decided the hidden one, which carries no bit.
+	checkRow(t, walkRows(t, b, "walk.hidden"), "/usr/sbin/.h", map[string]any{
+		"package": "sysstat", "package_declared": true, "reference": refDpkgDB,
+	})
+	// The joined lists cite the dpkg info directory, not the rpm command.
+	for _, key := range walkJoinedKeys {
+		if src := env(t, b, key).Source; src == nil || src.Kind != "file" || src.Path != dpkgInfoDir {
+			t.Errorf("%s source = %+v, want the dpkg info directory", key, src)
+		}
+	}
+}
+
 func TestWalkJoinFailurePoisonsOnlyJoinedLists(t *testing.T) {
 	a := walkAccess()
 	a.cmds[cmdKey(rpmCommand)] = cmdResult{exitCode: 1, stderr: "rpm: database is locked\n"}

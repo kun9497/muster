@@ -152,22 +152,27 @@ func loadIDTables(a collect.Access) (idTables, map[string]facts.Envelope) {
 			}
 		}
 	}
-	// groupNames is the same gid -> name map the permission facts are built
-	// from, so the walk and those facts cannot disagree about /etc/group. A
-	// gid that only appears as an account's primary group is NOT taken as
-	// known: no group claims it, which is exactly the dangling ownership the
-	// unowned rule is looking for.
-	if names, meta, err := groupNames(a); err != nil {
+	// groupIdents is the same /etc/group the permission facts are built from,
+	// so the walk and those facts cannot disagree about it. A gid that only
+	// appears as an account's primary group is NOT taken as known: no group
+	// claims it, which is exactly the dangling ownership the unowned rule is
+	// looking for.
+	//
+	// The names come from the ROWS and not from a gid -> name map: two
+	// groups may share one gid, and folding them first would lose the second
+	// name — a /etc/subgid line naming it would then be dropped as unknown
+	// and its delegated range would read as unaccounted for.
+	if rows, meta, err := groupIdents(a); err != nil {
 		e := collect.FromReadError(err, meta)
 		e.Reason = groupPath + ": " + e.Reason
 		failures[groupPath] = e
 	} else {
 		note(groupPath, meta)
-		for gid, name := range names {
-			if gid >= 0 {
-				gids.ids[uint32(gid)] = true
+		for _, r := range rows {
+			if r.gid >= 0 {
+				gids.ids[uint32(r.gid)] = true
 			}
-			groupSet[name] = true
+			groupSet[r.name] = true
 		}
 	}
 

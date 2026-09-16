@@ -256,10 +256,14 @@ func planMounts(a collect.Access, opts collect.WalkOptions, homes []homeRoot) (m
 		configUnreadable: []configRead{},
 		usrMerged:        map[string]string{},
 	}
+	// The root is the TOP of the stack at "/", not the first row: a host
+	// booted without an initramfs keeps the kernel's own `rootfs / rootfs`
+	// row underneath the real filesystem, and taking the first would answer
+	// "unsupported" for every file on an ordinary ext4 host.
 	root, haveRoot := mountRow{}, false
 	for _, r := range rows {
 		p.known[r.id] = true
-		if r.mountPoint == "/" && !haveRoot {
+		if r.mountPoint == "/" && (!haveRoot || r.id > root.id) {
 			root, haveRoot = r, true
 		}
 	}
@@ -303,9 +307,17 @@ func planMounts(a collect.Access, opts collect.WalkOptions, homes []homeRoot) (m
 // resolveAliases fills the enter set, dropping bind aliases. Two mounts are
 // aliases when they share a device and one's subtree root equals or lies
 // under the other's: the same files reached by two paths, and walking both
-// would report every finding twice. The one kept is the mount whose root is
-// "/", then the shortest mount point, then the lexicographically first — a
-// total order, so the same mountinfo always keeps the same mount.
+// would report every finding twice. The one kept is the mount AT "/", then
+// the mount whose subtree root is "/", then the shortest mount point, then
+// the lexicographically first — a total order, so the same mountinfo always
+// keeps the same mount.
+//
+// The root filesystem is ranked first because it is the one mount the walk
+// cannot do without. On a btrfs host whose "/" is the subvolume /@ while the
+// top level is mounted as well (/mnt/btrfs, subtree root "/"), ranking root
+// "/" first would keep /mnt/btrfs and push both / and /home out as bind
+// duplicates: the walk would answer for /mnt/btrfs/@/etc/…, no package
+// join would match and the home exemption would never fire.
 //
 // A row is compared against every mount kept so far, not only the first:
 // btrfs subvolumes share a device with unrelated roots (/@ and /@home), and
@@ -323,6 +335,12 @@ func (p *mountPlan) resolveAliases(candidates []mountRow) {
 	for _, dev := range devs {
 		group := groups[dev]
 		slices.SortStableFunc(group, func(x, y mountRow) int {
+			if (x.mountPoint == "/") != (y.mountPoint == "/") {
+				if x.mountPoint == "/" {
+					return -1
+				}
+				return 1
+			}
 			if (x.root == "/") != (y.root == "/") {
 				if x.root == "/" {
 					return -1

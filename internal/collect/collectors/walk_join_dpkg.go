@@ -3,6 +3,7 @@
 package collectors
 
 import (
+	"bytes"
 	"errors"
 	"io/fs"
 	"path"
@@ -155,6 +156,16 @@ func (j *dpkgJoin) read(p string, optional bool) ([]byte, bool) {
 	}
 	if meta.Truncated {
 		j.out.truncated = true
+		// A capped read ends mid-line, and the cut tail is not a path: it
+		// is the PREFIX of one, so "/usr/bin/sudoedit" cut short spells
+		// "/usr/bin/su" and would hand a candidate to the wrong package.
+		// Everything after the last newline is dropped, exactly as the rpm
+		// reader drops the last line of a capped capture.
+		if i := bytes.LastIndexByte(data, '\n'); i >= 0 {
+			data = data[:i+1]
+		} else {
+			data = nil
+		}
 	}
 	return data, true
 }
@@ -401,7 +412,7 @@ func decideBit(cand map[string]any, bit int, idx dpkgIndex, list *suid.List) (de
 	if !covered {
 		return false, refUnlisted, nil, declaredPath
 	}
-	e, found := list.Entry(dpkgListKey(p, idx))
+	e, found := listEntryFor(p, pkg, idx, list)
 	if found {
 		declaredMode = e.Mode
 	}
@@ -415,6 +426,25 @@ func decideBit(cand map[string]any, bit int, idx dpkgIndex, list *suid.List) (de
 	default:
 		return false, refVersionMismatch, declaredMode, declaredPath
 	}
+}
+
+// listEntryFor is the reference list's entry for one candidate, and only
+// when it belongs to the package that owns the candidate ON THIS HOST.
+//
+// The list is keyed by path, but a path can be named by two packages: one
+// that Replaces another, or a diversion, whose `from` is listed by the
+// package that shipped it AND owned at run time by the package that
+// displaced it. Honouring the other package's bit would let package B vouch
+// for a file package A installed — the entry would declare a setuid bit the
+// host's owner never ships. A path the list holds under a different package
+// is therefore absent from the list as far as this candidate is concerned,
+// which sends it down the version rule like any other unlisted path.
+func listEntryFor(p, pkg string, idx dpkgIndex, list *suid.List) (suid.Entry, bool) {
+	e, ok := list.Entry(dpkgListKey(p, idx))
+	if !ok || e.Package != pkg {
+		return suid.Entry{}, false
+	}
+	return e, true
 }
 
 // dpkgListKey is the path the reference list holds a candidate under: the
@@ -439,7 +469,7 @@ func declaredIdentity(p, reference string, idx dpkgIndex, list *suid.List) (owne
 		if list == nil {
 			return "", ""
 		}
-		if e, ok := list.Entry(dpkgListKey(p, idx)); ok {
+		if e, ok := listEntryFor(p, idx.owner[p], idx, list); ok {
 			return e.Owner, e.Group
 		}
 	}

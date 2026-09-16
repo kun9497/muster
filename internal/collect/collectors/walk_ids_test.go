@@ -78,6 +78,7 @@ func TestIDTables(t *testing.T) {
 		{100005, true, "subid", "inside alice's subordinate gid range, named through /etc/passwd"},
 		{300050, true, "subid", "inside adm's subordinate gid range, named through /etc/group"},
 		{400000, false, "unknown", "a subgid line naming neither a user nor a group is ignored"},
+		{600025, true, "subid", "dupshadow shares gid 42 with shadow; the SECOND name of a gid still names its range"},
 		{500000, false, "unknown", "a zero count is an empty range"},
 		{61184, true, "dynamic", "the DynamicUser range covers gids too"},
 		{65519, true, "dynamic", "the last id of the DynamicUser range"},

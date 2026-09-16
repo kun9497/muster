@@ -476,7 +476,7 @@ func lintClause(c *Control, cl Clause, reg *facts.Registry, add func(string, str
 		if cl.Op == "none" && cl.Where == nil {
 			add("clause_grammar", "%s: none needs where", where)
 		}
-		// W-10: a record element has no name of its own, so without subject
+		// Spec §5: a record element has no name of its own, so without subject
 		// every observation and every waiver falls back to the element's index
 		// in a list whose order is the collector's, not the host's. A scalar
 		// element IS its name, so the rule is record-lists only.

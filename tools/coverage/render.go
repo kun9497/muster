@@ -120,8 +120,12 @@ func render(items []controls.KISAItem, deferred []controls.Deferral, usage []con
 		}
 	}
 	auto, partial, manual := countAutomation(items, byItem, stage)
-	fmt.Fprintf(&b, "%d of %d items enrolled (auto %d, partial %d, manual %d).\n\n",
-		countEnrolled(items, byItem, stage), len(sorted), auto, partial, manual)
+	// The two numbers count different things: an item may be judged by more
+	// than one control, so the triple is a count of CONTROLS, and reading
+	// it as a breakdown of the item count got the wrong answer. The
+	// controls total is stated beside it.
+	fmt.Fprintf(&b, "%d of %d items enrolled; %d controls (auto %d, partial %d, manual %d).\n\n",
+		countEnrolled(items, byItem, stage), len(sorted), auto+partial+manual, auto, partial, manual)
 	b.WriteString("| ID | Item (KISA) | Imp. | Control | Automation | Status |\n|---|---|---|---|---|---|\n")
 	b.WriteString(strings.Join(rows, "\n"))
 	b.WriteString("\n")

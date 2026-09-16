@@ -112,6 +112,22 @@ func useReferenceList(t *testing.T, id, versionID string) {
 	}
 }
 
+// useReferenceListAs is useReferenceList with the fixture edited first, for
+// the cases that need a list shaped differently from the committed one.
+func useReferenceListAs(t *testing.T, id, versionID string, edit func(*suid.List)) {
+	t.Helper()
+	fixture := readFixtureList(t)
+	edit(fixture)
+	orig := loadReferenceList
+	t.Cleanup(func() { loadReferenceList = orig })
+	loadReferenceList = func(gotID, gotVersion string) (*suid.List, bool, error) {
+		if gotID != id || gotVersion != versionID {
+			return nil, false, nil
+		}
+		return fixture, true, nil
+	}
+}
+
 func readFixtureList(t *testing.T) *suid.List {
 	t.Helper()
 	data, err := os.ReadFile(filepath.Join("testdata", "suid.reference.ubuntu-22.04.json"))
@@ -465,6 +481,34 @@ func TestJoinDpkgDecisionTable(t *testing.T) {
 	})
 }
 
+// D: the reference list is keyed by PATH, and a path can be named by two
+// packages -- a Replaces, or a diversion whose `from` the diverting package
+// owns at run time. A bit the list records under package B says nothing
+// about the file package A installed, so the entry is only honoured for the
+// package that owns the candidate on this host.
+func TestJoinDpkgListEntryAnswersOnlyForItsOwnPackage(t *testing.T) {
+	useReferenceListAs(t, "ubuntu", "22.04", func(l *suid.List) {
+		for i := range l.Entries {
+			if l.Entries[i].Path == "/usr/bin/x" {
+				l.Entries[i].Package = "pkg-b"
+			}
+		}
+	})
+	a := dpkgAccess()
+	r, plan := joinWalk(t, a)
+	joinCandidates(context.Background(), a, ubuntuHeader(), plan, r)
+
+	// /usr/bin/x.distrib is pkg-a's file, looked up in the list under the
+	// pre-diversion name /usr/bin/x. pkg-a is covered at the version the
+	// host has, so an entry that is not pkg-a's leaves the bit a finding.
+	checkRow(t, r.lists.suid, "/usr/bin/x.distrib", map[string]any{
+		"package": "pkg-a", "package_declared": false, "reference": "list",
+		"declared_mode": nil, "declared_owner": "", "declared_group": "",
+		"declared_path": "/usr/bin/x",
+	})
+	checkList(t, r, "/usr/bin/x.distrib", "suid_sgid")
+}
+
 // dpkg-statoverride is what the administrator told dpkg to enforce on every
 // upgrade, so it outranks the reference list — and it declares a path no
 // package owns.
@@ -580,6 +624,26 @@ func TestJoinDpkgFailureShapes(t *testing.T) {
 		}
 		// what the partial read did carry was still joined
 		checkRow(t, r.lists.suid, "/usr/bin/su", map[string]any{"package": "util-linux"})
+	})
+
+	// C: the cut tail of a capped read is the PREFIX of a path, not a path.
+	// The fixture is what the cap delivers: util-linux's list ending in
+	// "/bin/su", which the whole file spells "/bin/sudoedit". Parsing it
+	// would hand /usr/bin/su to util-linux on the strength of a byte count.
+	t.Run("a list capped in the middle of a path", func(t *testing.T) {
+		useReferenceList(t, "ubuntu", "22.04")
+		a := dpkgAccess()
+		a.files["/var/lib/dpkg/info/util-linux:amd64.list"] = "dpkg.info/util-linux.list.capped"
+		a.truncated = map[string]bool{"/var/lib/dpkg/info/util-linux:amd64.list": true}
+		r, plan := joinWalk(t, a)
+		out := joinCandidates(context.Background(), a, ubuntuHeader(), plan, r)
+		if out.failed != nil || !out.truncated {
+			t.Fatalf("outcome = %+v, want no failure and truncated", out)
+		}
+		checkRow(t, r.lists.suid, "/usr/bin/su", map[string]any{
+			"package": "", "package_declared": false, "reference": "unpackaged",
+			"declared_mode": nil, "declared_path": "",
+		})
 	})
 
 	t.Run("the info directory cannot be listed", func(t *testing.T) {

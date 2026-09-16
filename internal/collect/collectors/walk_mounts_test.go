@@ -157,6 +157,40 @@ func TestPlanKeepsBtrfsSubvolumesApart(t *testing.T) {
 	}
 }
 
+// W-2: on a btrfs host the top level is often mounted as well, with subtree
+// root "/" while the root filesystem is the subvolume /@. The root
+// filesystem is the alias kept whatever its subtree root is: keeping
+// /mnt/btrfs instead would push / and /home out as duplicates and the walk
+// would answer for /mnt/btrfs/@/…, which no package join can match.
+func TestPlanKeepsTheRootFilesystemOverTheBtrfsTopLevel(t *testing.T) {
+	p := mustPlan(t, mountDouble("mountinfo.btrfs-toplevel"), collect.WalkOptions{}, nil)
+	if got, want := enterPoints(p), []string{"/", "/home"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("enter = %v, want %v", got, want)
+	}
+	if _, ok := p.enter[50]; ok {
+		t.Error("the btrfs top level is an alias of the root filesystem and must not be entered")
+	}
+	if !hasSkip(p, skipRow{path: "/mnt/btrfs", reason: "bind_duplicate"}) {
+		t.Errorf("/mnt/btrfs must be skipped as bind_duplicate; skipped = %+v", skipsOtherThan(p, "container_storage"))
+	}
+}
+
+// §7: a host booted without an initramfs keeps the kernel's own rootfs row
+// under the real root. The row that decides the walk is the TOP of the stack
+// at "/", so such a host reads ext4 and is walked.
+func TestPlanTakesTheTopOfTheRootStack(t *testing.T) {
+	p := mustPlan(t, mountDouble("mountinfo.rootfs-stack"), collect.WalkOptions{}, nil)
+	if !p.rootWalkable || p.rootType != "ext4" {
+		t.Errorf("root: type %q walkable %v, want ext4 true", p.rootType, p.rootWalkable)
+	}
+	if got, want := enterPoints(p), []string{"/", "/boot"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("enter = %v, want %v", got, want)
+	}
+	if !hasSkip(p, skipRow{path: "/", reason: "excluded_type", detail: "rootfs"}) {
+		t.Errorf("the rootfs row must still be recorded as excluded_type; skipped = %+v", skipsOtherThan(p, "container_storage"))
+	}
+}
+
 // §7: a root filesystem that is not on the positive list (an overlay in a
 // container) is recorded and nothing is entered — the walk answers for a
 // host, not for an image layer.
