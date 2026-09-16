@@ -331,6 +331,25 @@ maintainer wants to, and a unit test loads every committed list for shape, sort 
 canonical paths and that each release in `sources.json` has one. The first `sources.json`
 covers ubuntu 22.04, ubuntu 24.04, debian 12, rocky 9, almalinux 9 — the CI images.
 
+*As shipped (plan 3A execution rulings A-36 to A-39, recorded here because the plan is deleted
+at merge).* The covered set is the named packages **unioned** with the owners of the image's
+setuid/setgid files; `sources.json` says so in a top-level `note` and the discovered packages
+were folded back with reasons. `postinst_sets_mode` is not curated by hand: the tool reads
+each extended package's maintainer scripts and flags a package whose `postinst` sets a mode
+(`chmod` with a literal or computed mode, `dpkg-statoverride --add`) on a file the package
+ships, printing the matched line as evidence; a literal target that is a directory or an
+unshipped path does not flag. The archive pin is the SHA-256: the URL is the one
+`apt-get download --print-uris` reports in the image (a snapshot-service URL may replace it
+later), the tool downloads on the host with `net/http`, verifies the digest before opening
+and bind-mounts the file read-only into a container run with `--network none`; only the
+`-resolve` mode has a network. The list carries `arch` (`amd64`, the pinned `--platform`)
+and `packages[].postinst_sets_mode`, and is named by the image's own `VERSION_ID`
+(`rocky-9.8.json`): `suid.Load(id, version_id)` tries the exact file, then `<id>-<major>.json`,
+then the highest committed `<id>-<major>.<minor>.json`, so a Rocky 9.5 host finds the 9.8
+list — which is only ever more lenient within W-7's floor (a listed bit passes, anything
+else is `version_mismatch` → WARN), never a false FAIL. `-check` compares every byte except
+the `generated` date, which it reports.
+
 **W-8 — package verification is plan 3C's.** `rpm -V <pkg…>` and `dpkg --verify <pkg…>` take a
 package list computed at run time; the guard's whitelist is an exact argument match (main §8
 "fixed arguments"), and both commands exit 1 when any file differs, which today's command

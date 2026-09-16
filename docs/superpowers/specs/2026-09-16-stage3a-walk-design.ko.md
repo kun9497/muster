@@ -292,6 +292,22 @@ URL과 다이제스트를 고정하는 방식 — `-check`가 살아 있는 아�
 첫 `sources.json`은 ubuntu 22.04, ubuntu 24.04, debian 12, rocky 9, almalinux 9 — CI 이미지 — 를
 담습니다.
 
+*출하된 형태(플랜 3A 실행 판정 A-36~A-39. 플랜은 병합 시 삭제되므로 여기에 기록).* 다루는
+집합은 이름으로 적은 패키지와 이미지의 setuid/setgid 파일 소유자의 **합집합**이며, `sources.json`의
+최상위 `note`가 이를 말하고 발견된 패키지는 사유와 함께 다시 적었습니다. `postinst_sets_mode`는 손으로
+큐레이션하지 않습니다. 도구가 확장 패키지의 maintainer 스크립트를 읽어 `postinst`가 그 패키지가
+배포하는 파일에 모드를 세우는(`chmod`의 리터럴·계산 모드, `dpkg-statoverride --add`) 패키지를 표시하고
+일치한 줄을 근거로 출력합니다. 디렉터리나 배포하지 않는 경로를 가리키는 리터럴 대상은 표시하지
+않습니다. 아카이브의 고정은 SHA-256입니다. URL은 이미지 안에서 `apt-get download --print-uris`가
+보고한 것이고(뒤에 스냅샷 서비스 URL로 바꿀 수 있음), 도구는 호스트에서 `net/http`로 받아 열기 전에
+다이제스트를 검증하고 `--network none`으로 돌리는 컨테이너에 읽기 전용으로 바인드 마운트합니다.
+네트워크는 `-resolve` 모드에만 있습니다. 목록은 `arch`(`amd64`, 고정한 `--platform`)와
+`packages[].postinst_sets_mode`를 담고 이미지 자체의 `VERSION_ID`로 이름 짓습니다(`rocky-9.8.json`).
+`suid.Load(id, version_id)`는 정확한 파일, 다음 `<id>-<major>.json`, 다음 커밋된 가장 높은
+`<id>-<major>.<minor>.json` 순으로 찾으므로 Rocky 9.5 호스트는 9.8 목록을 얻습니다. 이는 W-7의 바닥
+안에서 더 관대할 뿐(목록에 있는 비트는 통과, 그 밖은 `version_mismatch` → WARN) 거짓 FAIL은 결코
+아닙니다. `-check`는 `generated` 날짜만 빼고 모든 바이트를 대조하며 날짜는 보고합니다.
+
 **W-8 — 패키지 검증은 계획 3C의 몫.** `rpm -V <pkg…>`와 `dpkg --verify <pkg…>`는 실행 시점에
 계산된 패키지 목록을 받습니다. 가드의 화이트리스트는 인수 정확 일치(본 설계 §8 "고정 인수")이고,
 두 명령은 어느 파일이든 다르면 exit 1이라 오늘의 명령 컨벤션은 실패한 명령으로 기록합니다. 3C가
