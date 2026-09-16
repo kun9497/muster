@@ -126,3 +126,40 @@ func TestCollectListActionsOnLinux(t *testing.T) {
 		t.Errorf("stderr must stay empty, got %q", errb.String())
 	}
 }
+
+// W-12: --deep travels from the command line to the header of the snapshot
+// on disk. run.deep false is what a later check reads as "the walk never
+// ran" (main §6.5 row 9), so this flag reaching collect.Options is the
+// difference between a MANUAL row and a verdict.
+func TestCollectDeepReachesTheHeader(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("linux only")
+	}
+	for _, tc := range []struct {
+		name string
+		args []string
+		want bool
+	}{
+		{"deep", []string{"collect", "--deep", "--walk-budget", "5s", "--out", "-"}, true},
+		{"shallow", []string{"collect", "--out", "-"}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var out, errb bytes.Buffer
+			if code := run(tc.args, &out, &errb); code != exitOK && code != exitFindings {
+				t.Fatalf("code %d stderr %q", code, errb.String())
+			}
+			hdr, ok := readJSON(t, out.Bytes())["run"].(map[string]any)
+			if !ok {
+				t.Fatalf("no run header in the snapshot: %s", out.String())
+			}
+			if hdr["deep"] != tc.want {
+				t.Errorf("run.deep %v, want %v", hdr["deep"], tc.want)
+			}
+			// The stage-1 warning that the walk arrives later is gone: a
+			// warning that contradicts the header is worse than none.
+			if strings.Contains(errb.String(), "stage 3") {
+				t.Errorf("stderr still parks the walk: %q", errb.String())
+			}
+		})
+	}
+}

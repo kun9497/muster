@@ -562,3 +562,56 @@ func TestRunRecordsRedactedFields(t *testing.T) {
 		t.Errorf("the written snapshot says redacted_fields %v, wanted %v", snap.Run.Redaction.RedactedFields, want)
 	}
 }
+
+// W-12: --deep is the only thing that turns the walk on, and the walk
+// collector learns its budget and its exclusions from the Builder rather
+// than from a package-level variable. Without --deep the collector must see
+// nothing at all — a WalkOptions carrying defaults would let a walk run on a
+// snapshot whose header says run.deep false.
+func TestDeepReachesTheWalkCollectorThroughTheBuilder(t *testing.T) {
+	want := WalkOptions{Budget: time.Minute, MaxEntries: 5,
+		Exclude: []string{"/data"}, Include: []string{"/var/snap"}}
+	for _, tc := range []struct {
+		name string
+		deep bool
+		want WalkOptions
+		ok   bool
+	}{
+		{name: "deep", deep: true, want: want, ok: true},
+		{name: "shallow"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			Reset()
+			defer Reset()
+			var got WalkOptions
+			var ok bool
+			Register(Collector{Name: "walkspy", Declare: Declaration{Needs: "none"},
+				Run: func(_ context.Context, _ Access, b *Builder) error {
+					got, ok = b.Walk()
+					return nil
+				}})
+			dir := t.TempDir()
+			out, err := Run(context.Background(), Options{Out: filepath.Join(dir, "s.json"),
+				Access: quietAccess{}, Deep: tc.deep, Walk: want}, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if ok != tc.ok || !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("the collector saw (%+v, %v), want (%+v, %v)", got, ok, tc.want, tc.ok)
+			}
+			// The header in the FILE is the contract a later check reads.
+			f, err := os.Open(out.Path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer f.Close()
+			snap, err := facts.Load(f)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if snap.Run.Deep != tc.deep {
+				t.Errorf("run.deep %v, want %v", snap.Run.Deep, tc.deep)
+			}
+		})
+	}
+}

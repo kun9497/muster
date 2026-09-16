@@ -32,11 +32,6 @@ func runCollect(args []string, stdout, stderr io.Writer) int {
 		}
 		return exitOK
 	}
-	// R47/R76: --deep is accepted so a stage-3 command line runs today, but
-	// the walk itself is stage 3 and run.deep stays false.
-	if co.deep {
-		fmt.Fprintln(stderr, "muster: warning: deep walk arrives in stage 3; walk facts not collected")
-	}
 	if os.Geteuid() != 0 && !co.requireRoot {
 		fmt.Fprintln(stderr, "muster: warning: not running as root; expect denied facts")
 	}
@@ -50,6 +45,10 @@ func runCollect(args []string, stdout, stderr io.Writer) int {
 	}
 	out, err := collect.Run(context.Background(), collect.Options{
 		Out: co.out, Force: co.force, Timeout: co.timeout, RequireRoot: co.requireRoot,
+		Deep: co.deep, Walk: collect.WalkOptions{
+			Budget: co.walkBudget, MaxEntries: co.walkMaxEntries,
+			Exclude: co.walkExclude, Include: co.walkInclude,
+		},
 		Version: version, Commit: commit,
 		ControlsVersion: set.Version, ControlsDigest: set.Digest,
 	}, stdout)
