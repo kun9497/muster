@@ -4,9 +4,16 @@
 # tools/refindex downloads the pinned DISA STIG and CCI zips here, and
 # tools/suidindex the pinned .deb archives
 /.cache/
-# `go build ./cmd/muster` and `go test -c` drop these at the repository root
+# `go build ./cmd/muster`, `go build ./tools/...` and `go test -c` drop these
+# at the repository root
 /muster
 /muster.exe
+/coverage
+/coverage.exe
+/refindex
+/refindex.exe
+/suidindex
+/suidindex.exe
 *.test
 *.test.exe
 
