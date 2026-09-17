@@ -1,0 +1,93 @@
+# Surviving mutants no fixture can distinguish, one row each; the mutation test
+# fails when a row's mutant is killed or is not generated (spec 3F, F-3).
+#
+# A mutant that survives because a fixture is MISSING is fixed by adding the
+# fixture, never by a row here. Every reason below names the collector
+# invariant or the closed value vocabulary that makes the mutant equivalent.
+
+- control: muster.account.cron_permissions
+  mutant: "checks[0] remove"
+  reason: >-
+    cronRow (internal/collect/collectors/cron.go) writes `reason` only on the stat-error
+    branch, which also sets mode -1 and owner_ok false. Every value of the closed scope
+    vocabulary (system, access, user, periodic) is then already judged by checks[1],
+    checks[3], checks[4] or checks[5], so no cron.files row can be the sole failure of the
+    reason clause.
+
+- control: muster.account.password_policy
+  mutant: "checks[3] remove"
+  reason: >-
+    pam.pwquality.enabled is ok:false only in pam_derive.go's "not stacked" branch, which
+    sets pam.pwquality.minlen and pam.pwquality.required_classes to absent. Those are
+    checks[4]'s and checks[5]'s facts, so such a host resolves through absent_means: fail
+    in the screening pass before any clause runs, with or without this clause.
+
+- control: muster.account.root_home_and_path
+  mutant: "mechanisms[1].when[0] remove"
+  reason: >-
+    The `when` fact is files.root_home.uid under `op: present`, which holds for every ok
+    envelope, and writeRootHome (internal/collect/collectors/files.go) gives all six /root
+    leaves the SAME envelope when the stat fails. So the `when` is only ever absent — the
+    mechanism is skipped and absent_means gives FAIL, exactly what the unconditional
+    mechanism's own absent checks give — or hard, which is ERROR with the same reason code
+    from either screening pass.
+
+- control: muster.account.root_remote_login
+  mutant: "mechanisms[1].when[1] remove"
+  reason: >-
+    files.etc_securetty and files.etc_securetty_lines are written from one ReadFile in
+    internal/collect/collectors/files.go, so the screened `present` fact is ok exactly when
+    the judged line list is ok. With the screen gone the line list's own absent or denied
+    status produces the same MANUAL or the same ERROR code.
+
+- control: muster.file.home_dir_exists
+  mutant: "checks[0] remove"
+  reason: >-
+    files_home.go sets is_dir true only inside the branch that sets stat_status "ok", so a
+    files.home_dirs row that fails checks[0] (stat_status eq "ok") always also fails
+    checks[1] (is_dir eq true). No row can make the stat-status clause the sole failure.
+
+- control: muster.file.ip_port_restriction
+  mutant: "mechanisms[1].when[0] remove"
+  reason: >-
+    firewall.backend's vocabulary is firewalld, ufw, nftables, iptables and none. For the
+    first four this `when` already holds. For none, Ruling H-16's normaliser always writes
+    restricts_inbound ok:false (the readable-empty case), so the unconditional mechanism
+    FAILs — and mechanisms[2] is reachable only when NOT (deny_all AND libwrap), which is
+    when its own two checks FAIL. Both sides give FAIL with no reason code.
+
+- control: muster.file.ip_port_restriction
+  mutant: "mechanisms[2].when[0] remove"
+  reason: >-
+    mechanisms[1] already claims the four named firewall.backend values, so mechanisms[2]
+    is only ever reached with backend == none, which is exactly what its own `when`
+    selects. No snapshot can reach this mechanism with a backend the `when` would reject.
+
+- control: muster.file.startup_script_permissions
+  mutant: "checks[3] remove"
+  reason: >-
+    permRow (internal/collect/collectors/files_startup.go) sets `reason` only on the
+    stat-error branch, which leaves uid -1 and is_symlink false, so every
+    files.startup_scripts row carrying a reason also fails checks[2] (uid eq 0). The reason
+    clause is never the sole failure.
+
+- control: muster.file.suid_sgid
+  mutant: "params.forbidden_suid.default expected []"
+  reason: >-
+    The shipped default of forbidden_suid IS the empty list, so substituting [] re-encodes
+    the original control byte for byte. There is no judgment change for a fixture to see.
+
+- control: muster.file.suid_sgid
+  mutant: "checks[1] remove"
+  reason: >-
+    This clause's `where` is `path in ${forbidden_suid}` and the shipped default is the
+    empty list, so it selects no element of walk.suid_sgid on any host. Only an operator's
+    own forbidden_suid override makes it judge anything, and a fixture carries no parameter
+    overrides.
+
+- control: muster.log.syslog_policy
+  mutant: "mechanisms[0].checks[1] remove"
+  reason: >-
+    rsyslogCoverage (internal/collect/collectors/logging.go) assigns `persistent` only
+    inside the branch that has already set `logged` true, so a facility that fails
+    checks[1] (logged eq true) always also fails checks[2] (persistent eq true).

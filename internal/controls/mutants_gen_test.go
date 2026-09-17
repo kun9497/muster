@@ -197,6 +197,86 @@ func TestMutantsOfSignaturesAndOrder(t *testing.T) {
 	}
 }
 
+// A two-mechanism control: the second half of F-2's generation order, which
+// sigFixtureYAML (no mechanisms) cannot exercise -- per mechanism the `when`
+// clauses then their removals, the checks then their removals, and the whole
+// mechanism last, because the control has more than one.
+const sigMechFixtureYAML = `
+id: muster.test.mechanisms
+title_en: Mechanism signature fixture
+title_ko: mechanism signature fixture
+description_en: Exercises the mechanism half of F-2's generation order.
+description_ko: F-2 mechanisms.
+category: file
+importance: 중
+automation: auto
+references: {}
+requires_facts: ">=1"
+absent_means: manual
+mechanisms:
+  - when:
+      - { fact: a.one, op: present }
+    checks:
+      - { fact: a.two, op: eq, expected: true }
+      - { fact: a.three, op: gte, expected: 2 }
+  - when:
+      - { fact: b.one, op: eq, expected: true }
+      - { fact: b.two, op: present }
+    checks:
+      - { fact: b.three, op: eq, expected: false }
+remediation:
+  text_en: Fix it.
+  text_ko: Fix it.
+  risk: none
+  idempotent: true
+`
+
+func TestMutantsOfMechanismSignaturesAndOrder(t *testing.T) {
+	c := mustControl(t, sigMechFixtureYAML)
+	want := []string{
+		"absent_means ->pass",
+		"absent_means ->fail",
+		"absent_means ->not_applicable",
+		"mechanisms[0].when[0] op present->absent",
+		"mechanisms[0].when[0] remove",
+		"mechanisms[0].checks[0] op eq->ne",
+		"mechanisms[0].checks[0] expected not",
+		"mechanisms[0].checks[0] remove",
+		"mechanisms[0].checks[1] op gte->lt",
+		"mechanisms[0].checks[1] expected +1",
+		"mechanisms[0].checks[1] expected -1",
+		"mechanisms[0].checks[1] remove",
+		"mechanisms[0] remove",
+		"mechanisms[1].when[0] op eq->ne",
+		"mechanisms[1].when[0] expected not",
+		"mechanisms[1].when[0] remove",
+		"mechanisms[1].when[1] op present->absent",
+		"mechanisms[1].when[1] remove",
+		"mechanisms[1].checks[0] op eq->ne",
+		"mechanisms[1].checks[0] expected not",
+		"mechanisms[1] remove",
+	}
+	ms := mutantsOf(c)
+	if got := signatures(ms); !reflect.DeepEqual(got, want) {
+		t.Errorf("signatures mismatch\n got: %s\nwant: %s", strings.Join(got, "\n      "), strings.Join(want, "\n      "))
+	}
+	// A mechanism's mutant must change that mechanism and leave the other one
+	// exactly as it was: the closures in mutantsOf capture j and k, and one
+	// that captured the wrong index would still produce the right signature.
+	for _, m := range ms {
+		if !strings.HasPrefix(m.Signature, "mechanisms[1]") || strings.HasSuffix(m.Signature, " remove") {
+			continue
+		}
+		if !reflect.DeepEqual(m.Control.Mechanisms[0], c.Mechanisms[0]) {
+			t.Errorf("%s: also changed mechanisms[0]: %+v", m.Signature, m.Control.Mechanisms[0])
+		}
+	}
+	rm := findMutant(t, ms, "mechanisms[0] remove")
+	if len(rm.Control.Mechanisms) != 1 || !reflect.DeepEqual(rm.Control.Mechanisms[0], c.Mechanisms[1]) {
+		t.Errorf("mechanisms[0] remove left %+v, want only the original mechanisms[1]", rm.Control.Mechanisms)
+	}
+}
+
 const opsHead = "id: muster.test.ops\ntitle_en: T\ntitle_ko: T\ncategory: file\nimportance: 중\nautomation: auto\nreferences: {}\nrequires_facts: \">=1\"\nabsent_means: fail\n"
 
 // F-2's operator table, row by row.

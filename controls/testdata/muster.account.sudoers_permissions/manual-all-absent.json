@@ -1,0 +1,1 @@
+{"synthetic":true,"schema_version":1,"run":{},"facts":{"sudo":{"installed":{"status":"ok","value":true}},"files":{"etc_sudoers":{"mode":{"status":"absent","reason":"/etc/sudoers is not on this host"},"uid":{"status":"absent","reason":"/etc/sudoers is not on this host"}},"sudoers_d_entries":{"status":"absent","reason":"/etc/sudoers.d is not on this host"}}}}

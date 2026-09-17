@@ -1,0 +1,1 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{"services":{"snmp":{"active":{"status":"ok","value":true,"source":{"kind":"command","cmd":"/usr/bin/systemctl show snmpd.service"}},"enabled":{"status":"ok","value":false},"reachable":{"status":"ok","value":false}}}}}

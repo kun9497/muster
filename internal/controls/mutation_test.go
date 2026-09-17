@@ -55,13 +55,15 @@ func decodeExclusions(raw []byte) ([]exclusion, error) {
 	return out, nil
 }
 
-// loadExclusions reads controls/testdata/_mutants.yaml. An absent file is an
-// empty list: a repository whose fixtures kill every mutant needs no file.
+// loadExclusions reads controls/testdata/_mutants.yaml. The file is REQUIRED:
+// it is the reviewed record of which mutants no fixture can distinguish
+// (F-3), and a repository that lost it would silently accept every survivor
+// the list used to explain.
 func loadExclusions(t *testing.T, path string) []exclusion {
 	t.Helper()
 	raw, err := os.ReadFile(path)
 	if errors.Is(err, fs.ErrNotExist) {
-		return nil
+		t.Fatalf("%s is missing; the exclusion list is part of the contract (spec 3F, F-3)", path)
 	}
 	if err != nil {
 		t.Fatal(err)
@@ -151,12 +153,11 @@ func evaluateFixtures(t *testing.T, c controls.Control, set *controls.Set, reg *
 
 // TestEveryMutantIsKilled is F-1: for every control of the embedded set,
 // every mutant F-2 generates is evaluated against the control's own fixtures
-// and must change at least one fixture's (status, reason_code). It runs in
-// REPORT MODE -- every survivor is logged and the test passes -- until
-// MUSTER_MUTANTS_STRICT=1 turns the survivors into a failure. The exclusion
-// list (F-3) is honoured either way, and an exclusion that no longer holds --
-// killed, or naming a mutant nobody generates -- fails the test whatever the
-// mode, because a rotten exclusion is a bug in the list, not a survivor.
+// and must change at least one fixture's (status, reason_code). A mutant that
+// survives fails the test unless controls/testdata/_mutants.yaml explains why
+// no fixture can tell it apart (F-3), and an exclusion that no longer holds --
+// killed, or naming a mutant nobody generates -- fails the test too, because
+// a rotten exclusion is a bug in the list, not a survivor.
 func TestEveryMutantIsKilled(t *testing.T) {
 	set, err := controls.LoadDefault()
 	if err != nil {
@@ -166,7 +167,6 @@ func TestEveryMutantIsKilled(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	strict := os.Getenv("MUSTER_MUTANTS_STRICT") == "1"
 	excl := loadExclusions(t, filepath.Join(fixtureRoot, "_mutants.yaml"))
 	generatedBy := make([]bool, len(excl))
 
@@ -223,13 +223,19 @@ func TestEveryMutantIsKilled(t *testing.T) {
 		}
 	}
 	t.Logf("mutants: generated %d, invalid %d, killed %d, surviving %d, excluded %d", generated, invalid, killed, surviving, excluded)
+	// The loop's own bookkeeping: every generated mutant lands in exactly one
+	// of the four buckets. A refactor that stopped counting one of them -- or
+	// a generator that produced nothing at all -- would otherwise leave the
+	// test green with nothing behind it.
+	if generated == 0 {
+		t.Error("the generator produced no mutants at all")
+	}
+	if got := invalid + killed + surviving + excluded; got != generated {
+		t.Errorf("bookkeeping: invalid %d + killed %d + surviving %d + excluded %d = %d, want generated %d",
+			invalid, killed, surviving, excluded, got, generated)
+	}
 	if surviving > 0 {
-		msg := strings.Join(report, "\n")
-		if strict {
-			t.Errorf("surviving mutants:\n%s", msg)
-		} else {
-			t.Logf("surviving mutants (report mode; set MUSTER_MUTANTS_STRICT=1 to fail):\n%s", msg)
-		}
+		t.Errorf("surviving mutants:\n%s", strings.Join(report, "\n"))
 	}
 }
 
@@ -283,11 +289,6 @@ func TestFindExclusionMatchesControlAndSignature(t *testing.T) {
 func TestLoadExclusions(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "_mutants.yaml")
-	// G-2: Task 2 writes the file; until it exists the list is empty and the
-	// loop still runs.
-	if got := loadExclusions(t, path); got != nil {
-		t.Errorf("an absent file is not an empty list: %+v", got)
-	}
 	body := "- {control: muster.a.one, mutant: \"checks[0] op lte->gt\", reason: equivalent to lt 4}\n"
 	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
 		t.Fatal(err)
@@ -295,6 +296,18 @@ func TestLoadExclusions(t *testing.T) {
 	want := []exclusion{{Control: "muster.a.one", Mutant: "checks[0] op lte->gt", Reason: "equivalent to lt 4"}}
 	if got := loadExclusions(t, path); !reflect.DeepEqual(got, want) {
 		t.Errorf("= %+v, want %+v", got, want)
+	}
+	// F-3: the repository's own list is required, not optional. An absent file
+	// makes loadExclusions fail the test outright; this asserts the file that
+	// keeps TestEveryMutantIsKilled honest is really there and really decodes.
+	rows := loadExclusions(t, filepath.Join(fixtureRoot, "_mutants.yaml"))
+	if len(rows) == 0 {
+		t.Errorf("%s/_mutants.yaml decoded to no rows", fixtureRoot)
+	}
+	for _, e := range rows {
+		if !strings.HasPrefix(e.Control, "muster.") {
+			t.Errorf("exclusion names %q, which is not a control id", e.Control)
+		}
 	}
 }
 

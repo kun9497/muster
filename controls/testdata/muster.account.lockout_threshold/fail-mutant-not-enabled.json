@@ -1,0 +1,1 @@
+{"synthetic":true,"schema_version":1,"run":{},"facts":{"pam":{"faillock":{"enabled":{"status":"ok","value":false,"reason":"pam_faillock.so is not stacked in the auth stack"},"deny":{"status":"ok","value":3}}}}}

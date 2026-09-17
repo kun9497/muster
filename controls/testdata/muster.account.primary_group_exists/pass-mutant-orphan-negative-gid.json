@@ -1,0 +1,1 @@
+{"synthetic":true,"schema_version":1,"run":{},"facts":{"accounts":{"orphan_gids":{"status":"ok","value":[{"name":"broken","gid":-1}],"source":{"kind":"derived","inputs":[{"kind":"file","path":"/etc/passwd"},{"kind":"file","path":"/etc/group"}]}}}}}

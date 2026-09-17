@@ -55,9 +55,13 @@ var flips = map[string]string{
 	"present": "absent", "absent": "present",
 }
 
-// paramRefRe mirrors the loader's own ${name} reference syntax. A clause
-// whose expected is such a reference is not mutated in place: F-2 mutates it
-// once through the parameter's default instead, however many clauses cite it.
+// paramRefRe mirrors the loader's own ${name} reference syntax. There are two
+// production copies of this pattern -- `paramRefRe` in internal/controls/lint.go
+// and `paramRef` in internal/check/value.go -- and this one must accept exactly
+// what they do, or a clause they resolve through a parameter would be mutated
+// in place here (or vice versa). A clause whose expected is such a reference is
+// not mutated in place: F-2 mutates it once through the parameter's default
+// instead, however many clauses cite it.
 var paramRefRe = regexp.MustCompile(`^\$\{[a-z][a-z0-9_]*\}$`)
 
 func isParamRef(v any) bool {
@@ -174,7 +178,10 @@ func clauseMutants(out *[]mutant, c controls.Control, path string, ref func(*con
 // a YAML integer into int, so the arithmetic keeps the type a param
 // declaration demands), `"__mutant__"` for a string, and one `drop[i]` per
 // element plus `[]` for a list. A nil expected -- present, absent, each,
-// none -- yields nothing.
+// none -- yields nothing. Any other non-nil type panics rather than being
+// skipped: a new `expected` shape in the schema (a float, a map) must add its
+// own rows here, and silently generating nothing for it would shrink the
+// mutant set without anyone noticing.
 func expectedMutants(out *[]mutant, c controls.Control, path string, v any, set func(*controls.Control, any)) {
 	switch x := v.(type) {
 	case bool:
@@ -191,6 +198,10 @@ func expectedMutants(out *[]mutant, c controls.Control, path string, v any, set 
 			})
 		}
 		addMutant(out, c, path+" expected []", func(m *controls.Control) { set(m, []any{}) })
+	case nil:
+		// present, absent, each, none: no literal to substitute.
+	default:
+		panic(fmt.Sprintf("expectedMutants: %s has an expected of unhandled type %T (%v); add its substitution rows", path, v, v))
 	}
 }
 
