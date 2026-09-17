@@ -101,17 +101,35 @@ func oracleLines(b []byte) []string {
 
 // --- sshd ---------------------------------------------------------------
 
-// sshdOracleAliases maps a value sshd_config may spell one way onto the word
-// `sshd -T` prints for it. The map belongs to the test: it is what the oracle
-// knows about the daemon's own vocabulary, not a rule the parser has to
-// follow. "without-password" is OpenSSH's deprecated spelling of
-// "prohibit-password"; the daemon accepts it in the file and prints the
-// modern word, and muster stores what the file says.
-var sshdOracleAliases = map[string]string{"without-password": "prohibit-password"}
+// sshdOracleAliases folds the spellings OpenSSH itself treats as one value
+// onto a single token, so the comparison is about the VALUE and not about
+// which synonym each side happens to print. The map belongs to the test: it
+// is what the oracle knows about the daemon's vocabulary, never a rule the
+// parser has to follow.
+//
+// PermitRootLogin has two spellings of one setting, and the fold has to run
+// on BOTH sides rather than one way from the file's word to the daemon's.
+// `sshd -T` does not print the modern word: it prints whichever spelling its
+// multistate table lists first, which on OpenSSH 9.6p1 (Ubuntu 24.04) is the
+// deprecated "without-password" — measured, for every value:
+//
+//	file: without-password     -> sshd -T: without-password
+//	file: prohibit-password    -> sshd -T: without-password
+//	file: yes / no / forced-commands-only -> the same word back
+//
+// So a one-way map onto "prohibit-password" would report a mismatch on a host
+// configured with either spelling, including the modern one the guides
+// recommend. muster stores what the FILE says, which is right; the synonym is
+// the daemon's presentation, and knowing that is the oracle's job. Every
+// other value still has to match exactly.
+var sshdOracleAliases = map[string]string{
+	"without-password":  "prohibit-password",
+	"prohibit-password": "prohibit-password",
+}
 
-// sshdOracleValue is the parsed value in the daemon's vocabulary. An unset
-// Banner is the daemon's "none" — sshd prints the default, the file says
-// nothing — so an empty parsed value is compared as "none" rather than as a
+// sshdOracleValue is one value in the vocabulary both sides are compared in.
+// An unset Banner is the daemon's "none" — sshd prints the default, the file
+// says nothing — so an empty value is compared as "none" rather than as a
 // difference the administrator never made.
 func sshdOracleValue(keyword, v string) string {
 	if a, ok := sshdOracleAliases[strings.ToLower(v)]; ok {
@@ -169,8 +187,11 @@ func TestOracleSshdConfig(t *testing.T) {
 			continue
 		}
 		compared++
-		if got := sshdOracleValue(o.keyword, v); !strings.EqualFold(got, want) {
-			t.Errorf("sshd: %s: parser %q, sshd -T %q", o.keyword, got, want)
+		// Both sides go through the fold, and the message reports the RAW
+		// words each side used — the folded token is the test's arithmetic,
+		// not evidence anyone can act on.
+		if !strings.EqualFold(sshdOracleValue(o.keyword, v), sshdOracleValue(o.keyword, want)) {
+			t.Errorf("sshd: %s: parser %q, sshd -T %q", o.keyword, v, want)
 		}
 	}
 	if v := g.Violations(); len(v) != 0 {
@@ -394,41 +415,77 @@ func oracleFindmnt(t *testing.T, stdout []byte) map[oracleMount]bool {
 	return out
 }
 
+// mountDiff is one attempt at the mountinfo comparison: how many rows the
+// parser produced, and the two one-sided differences against findmnt.
+type mountDiff struct {
+	rows        int
+	parserOnly  map[oracleMount]bool
+	findmntOnly map[oracleMount]bool
+}
+
 // TestOracleMountinfo: the mount table muster parsed is the mount table
 // util-linux reads out of the same file — the same ids, the same types, the
 // same mount points, including the octal escapes both have to undo.
+//
+// The two sides cannot read the file at the same instant, and a mount table
+// moves under both of them: sudo's PAM session mounts /run/user/0, snapd
+// remounts its loopbacks, unattended-upgrades comes and goes. Softening the
+// rule to "mostly equal" would let a real parser bug through, so the equality
+// stays exact and the RACE is removed instead: the whole comparison runs
+// twice, and only a difference that survived both attempts is reported. A
+// transient row cannot be in two independent samples on the same side; a
+// parser that drops or mangles a row is in every sample.
 func TestOracleMountinfo(t *testing.T) {
 	oracleEnabled(t)
 	bin := oracleBinary(t, findmntPath)
 	c := collectorNamed(t, "walk")
 	g := collect.Guard(collect.Host(), c)
-	data, _, err := g.ReadFile(mountinfoPath, mountinfoReadLimit)
-	if err != nil {
-		t.Fatalf("read %s: %v", mountinfoPath, err)
+
+	attempt := func() mountDiff {
+		data, _, err := g.ReadFile(mountinfoPath, mountinfoReadLimit)
+		if err != nil {
+			t.Fatalf("read %s: %v", mountinfoPath, err)
+		}
+		rows, err := parseMountinfo(data)
+		if err != nil {
+			t.Fatalf("parseMountinfo(%s): %v", mountinfoPath, err)
+		}
+		got := map[oracleMount]bool{}
+		for _, r := range rows {
+			got[oracleMount{id: r.id, fstype: r.fstype, target: r.mountPoint}] = true
+		}
+		want := oracleFindmnt(t, oracleOutput(t, bin, "-A", "-J", "-o", "ID,FSTYPE,TARGET"))
+		d := mountDiff{rows: len(rows), parserOnly: map[oracleMount]bool{}, findmntOnly: map[oracleMount]bool{}}
+		for m := range got {
+			if !want[m] {
+				d.parserOnly[m] = true
+			}
+		}
+		for m := range want {
+			if !got[m] {
+				d.findmntOnly[m] = true
+			}
+		}
+		return d
 	}
+
+	first, second := attempt(), attempt()
 	if v := g.Violations(); len(v) != 0 {
 		t.Fatalf("mountinfo oracle reached outside the collector's declaration: %v", v)
 	}
-	rows, err := parseMountinfo(data)
-	if err != nil {
-		t.Fatalf("parseMountinfo(%s): %v", mountinfoPath, err)
-	}
-	got := map[oracleMount]bool{}
-	for _, r := range rows {
-		got[oracleMount{id: r.id, fstype: r.fstype, target: r.mountPoint}] = true
-	}
-	want := oracleFindmnt(t, oracleOutput(t, bin, "-A", "-J", "-o", "ID,FSTYPE,TARGET"))
-	for _, m := range oracleSortedMounts(got) {
-		if !want[m] {
+	for _, m := range oracleSortedMounts(first.parserOnly) {
+		if second.parserOnly[m] {
 			t.Errorf("mountinfo: parser has %+v, findmnt does not", m)
 		}
 	}
-	for _, m := range oracleSortedMounts(want) {
-		if !got[m] {
+	for _, m := range oracleSortedMounts(first.findmntOnly) {
+		if second.findmntOnly[m] {
 			t.Errorf("mountinfo: findmnt has %+v, the parser does not", m)
 		}
 	}
-	t.Logf("oracle mountinfo: compared %d", len(got))
+	// The row count, not the set size: two identical rows are two rows the
+	// parser produced, and counting the set would report one.
+	t.Logf("oracle mountinfo: compared %d", first.rows)
 }
 
 // oracleSortedMounts orders a mount set by id so a difference is reported the
@@ -472,6 +529,14 @@ func oracleShow(t *testing.T, bin, unit string) (load, active, unitFile string) 
 	return load, active, unitFile
 }
 
+// oracleSuperHosted reports whether the collector consults the super-server
+// reader for this row. It is setService's own condition (services.go): an
+// inetd.conf name OR a server basename is enough, and a row that has either
+// can have an enabled or active verdict systemd cannot account for.
+func oracleSuperHosted(svc logicalService) bool {
+	return len(svc.inetdNames) > 0 || len(svc.servers) > 0
+}
+
 // TestOracleServices: the per-service verdicts the collector published are
 // what systemd itself says about the units behind them.
 //
@@ -480,10 +545,12 @@ func oracleShow(t *testing.T, bin, unit string) (load, active, unitFile string) 
 // sweep (which units were asked, and that every answer reached the verdict),
 // not the rule's truth table, which the unit tests own.
 //
-// active is compared only for rows with no fixed ports and no super-server
-// names. For the others the collector also counts a reachable port or an
-// inetd/xinetd entry, neither of which systemd knows about, so a difference
-// there would be the design and not a disagreement.
+// For a row a super-server can host (oracleSuperHosted) enabled is compared
+// in one direction only, and active is not compared at all; for a row with
+// fixed ports active is not compared either. In those cases the collector
+// also counts a reachable port or an inetd/xinetd entry, neither of which
+// systemd knows about, so a verdict above systemd's is the design and not a
+// disagreement. A verdict BELOW systemd's never is, on any row.
 func TestOracleServices(t *testing.T) {
 	oracleEnabled(t)
 	bin := oracleBinary(t, systemctlPath)
@@ -509,10 +576,18 @@ func TestOracleServices(t *testing.T) {
 			continue
 		}
 		compared++
-		if e.Value != wantEnabled {
+		// G-17: for a row a super-server can host, setService may raise
+		// enabled on an inetd.conf or xinetd.d entry systemd knows nothing
+		// about, so that direction is the design and not a disagreement. The
+		// other direction never is: systemd saying a unit will start and the
+		// collector publishing false is a mismatch on every row.
+		switch {
+		case wantEnabled && e.Value != true:
+			t.Errorf("services: %s.enabled: collector %v, systemctl %v", svc.name, e.Value, wantEnabled)
+		case !wantEnabled && e.Value == true && !oracleSuperHosted(svc):
 			t.Errorf("services: %s.enabled: collector %v, systemctl %v", svc.name, e.Value, wantEnabled)
 		}
-		if len(svc.ports) != 0 || len(svc.inetdNames) != 0 {
+		if len(svc.ports) != 0 || oracleSuperHosted(svc) {
 			continue // the collector counts a port or a super-server entry too
 		}
 		a := env(t, b, "services."+svc.name+".active")
