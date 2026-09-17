@@ -36,10 +36,6 @@ func owner(uid, gid uint32) entOpt { return func(e *collect.DirEntry) { e.UID, e
 // the directory that is opened.
 func inode(n uint64) entOpt { return func(e *collect.DirEntry) { e.Ino = n } }
 
-// device pins an entry's device, for the st_dev fallback where a mount
-// boundary is a change of device rather than of mount id.
-func device(n uint64) entOpt { return func(e *collect.DirEntry) { e.Dev = n } }
-
 func treeDir(name string, mode uint32, opts ...entOpt) collect.DirEntry {
 	return treeEnt(name, "dir", mode, opts)
 }
