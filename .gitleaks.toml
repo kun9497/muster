@@ -58,7 +58,9 @@ paths = ['''^\.superpowers[/\\]''']
 # firewall or TCP-wrapper fixture may spell them. The allowlist names the exact
 # literal, not a path: a real host address such as 10.1.2.3 still trips the rule
 # everywhere. New fixtures should prefer the RFC 5737 documentation ranges.
-regexes = ['''^(?:10\.0\.0\.0|172\.16\.0\.0|192\.168\.0\.0)$''']
+# Docker's default bridge network is spelled where the examples rewrite is
+# explained; it is a network identifier too, never a host.
+regexes = ['''^(?:10\.0\.0\.0|172\.16\.0\.0|172\.17\.0\.0|192\.168\.0\.0)$''']
 # One commit spelled a 10/8 network as a prose example of the examples
 # workflow's address rewrite; the next commit reworded it, but the range scan
 # still sees the history. The commit, not the literal, is allowlisted.
