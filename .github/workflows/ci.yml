@@ -142,6 +142,10 @@ jobs:
             'ClientAliveCountMax 0' \
             'Banner /etc/issue.net' \
             | sudo tee /etc/ssh/sshd_config.d/99-muster-oracle.conf >/dev/null
+          # The runner installs openssh-server but never starts sshd, so its
+          # privilege-separation directory does not exist and both -t and the
+          # oracle's -T would exit 255 on that alone.
+          sudo mkdir -p /run/sshd
           sudo /usr/sbin/sshd -t
       - name: the parsers agree with the daemons (oracle)
         run: |
