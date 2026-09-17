@@ -311,3 +311,50 @@ func TestExamplesLoadAndCheck(t *testing.T) {}
 - [ ] **Step 2:** Write the documents; gates (G-9), staticcheck on the lab, gitleaks, the host-string grep.
 - [ ] **Step 3:** On the user's word: push, PR; trigger `fuzz.yml` and `examples.yml` on the branch (`gh workflow run … --ref stage3f-hardening`); read the fuzz shards (a crash → fix commit + seed per G-1), fetch both examples (`make examples-fetch`), review the VM file for RFC 1918 firewall literals (extend the rewrite or the gitleaks allowlist with exact literals), add the run id to `examples/README.md`, commit; CI green; merge on the user's word.
 - [ ] **Step 4:** Execution notes: rulings G-11…, the mutant totals (generated/invalid/killed/excluded) and the exclusion list's size, the first nightly fuzz result, the oracle results per image, the example sizes; parked items.
+
+## Execution notes
+
+Executed 2026-09-17 in the worktree `stage3f-hardening` over main `0fe31c8`: spec `ec9d6e8`, plan `9283b8c`, five implementation tasks with a review and one fix round each, a two-reviewer whole-branch review, one fix wave, a scoped re-review, and the documents. Every gate in G-9 ran green on Windows and on the lab host (suite, race build over `internal/controls` and `internal/collect/...`, the four oracle pairs, staticcheck) and gitleaks over the whole range found nothing.
+
+### Rulings settled during execution (G-15 … G-28; G-1 … G-14 are in Global Constraints)
+
+- **G-15 (no-op mutants):** the generator never emits `expected []` for a list whose shipped default is already empty — the mutant re-encodes the original byte for byte, so nothing could kill it.
+- **G-16 (the first crash):** ten seconds of fuzzing found a real defect. `aptPeriodicUnattended` indexed `strings.ToLower(l)` and sliced `l`; ToLower widens an invalid byte to the three-byte U+FFFD, so a fragment with a stray byte before the key panicked the patch collector. Fixed in its own commit with a length-preserving ASCII fold; the crasher is committed as the target's corpus file. CHANGELOG Collectors carries it.
+- **G-17 (services oracle vs super-servers):** the collector's `enabled` also folds a super-server hit, which `systemctl` cannot see, so the oracle compares one-directionally for rows with an inetd name or a super-server entry: collector `false` against systemd `true` is always a mismatch; collector `true` against systemd `false` only for a row nothing else could have enabled. Test shaped, collector untouched.
+- **G-18 (transient mounts):** the mountinfo pair reads `/proc/self/mountinfo` and runs `findmnt` twice and reports only a difference present in both attempts; set equality is kept.
+- **G-19 (sshd oracle on a stock runner):** the CI root job writes a drop-in with all five `sshdOptions` keywords (`PermitRootLogin without-password`, so the alias map is exercised), validates it with `sshd -t`, and takes it out before the seed step; the oracle step asserts `oracle sshd: compared [1-9]`. The test itself stays tolerant — a stock configuration compares nothing and passes — because the CI step is the right owner of the vacuity assertion.
+- **G-20 (PermitRootLogin fold):** measured on OpenSSH 9.6p1 (public `ubuntu:24.04`): `sshd -T` prints `without-password` whether the file says `without-password` or `prohibit-password`. The spec's one-way alias would have flagged either spelling, so the fold is symmetric and applied to both sides; every other value is compared exactly. Spec §4 corrected.
+- **G-21 (manual controls' gates):** the mutation test skips a manual control only when it has no `applies_when`, no checks and no mechanisms; the four manual service controls' gates are mutated like everyone else's.
+- **G-22 (a missing fact is not a kill):** a transition to `ERROR(missing_fact)` from a non-ERROR base shows no difference for that fixture. Fourteen mutants had been "killed" only because a fixture omitted the other mechanism's keys — a shape collect never writes. Those fixtures were completed with the other mechanism's keys present as `absent` envelopes, and the mutants now die on a verdict.
+- **G-23 (the examples rewrite):** the jq rewrite substitutes every RFC 1918 IPv4 literal (with its CIDR suffix) in the firewall dumps and rules, the TCP-wrapper and `hosts.equiv` lines, the time-sync servers and the NFS export clients with an RFC 5737 form, sends IPv6 socket addresses to `2001:db8::1`, and ends with a whole-file assertion using the same shapes as `.gitleaks.toml`, so the workflow refuses rather than the pull request.
+- **G-24 (example staleness):** the byte comparison of the committed reports runs only when the snapshot's `controls_digest` equals the embedded set's; load, evaluate and the no-`internal_error` assertion always run. This is the spec's "staleness is not gated" made precise: a control change does not turn the example test red, a broken renderer does.
+- **G-25 (inventory grammar):** the fuzz inventory lists every function or method with a `[]byte` parameter in any position and follows selector calls, so a parser written as a method is seen. Five parsers the first grammar missed got targets (proftpd, xinetd, inetd, snmpd, ntp); two rsyslog helpers whose output is not proportional to their input are declared in `notParsers` with the reason.
+- **G-26 (one walk-exclusion list):** `.github/walk-excludes` is read by `ci.yml` and `examples.yml`; there is no second copy to drift.
+- **G-27 (fuzz.yml on its own pull requests):** a `pull_request` trigger on the workflow's path runs the shards with a five-second fuzz time, so an edit to the workflow is exercised before merge; the nightly keeps sixty seconds.
+- **G-28 (an equivalent gate):** `mail.go` and `dns.go` publish `<svc>.implementation` with `collect.OK` unconditionally, so the `present` gate can never be the sole reason a manual service control is NOT_APPLICABLE; `applies_when[1] remove` on those four controls is an exclusion, not a fixture gap. A fixture the collector cannot produce is never the answer (the same principle as G-22).
+
+### What the reviews found
+
+Per-task reviews: Task 1 clean; Task 2 two unreachable fixture shapes (a gid of -1, an absent PATH list) → one exclusion and one reshaped fixture; Task 3 one Important (a swallowed `go test -list` failure in the shard script) and the G-16 crash; Task 4 one Blocking (the sshd pair compared nothing on a stock runner) plus the super-server and transient-mount shapes; Task 5 two Important (the example binary built without its version; the runner collect without `--require-root`).
+
+Whole-branch (two Fable reviewers, by area): no Blocking on the mutation side (G-21 and G-22 came from it, and an exclusion row naming an invalid mutant now errors); one Blocking on the CI side — the examples rewrite covered only the sockets, and the runner's Docker rules carry `172.17.0.0/16`, so the first VM example would have failed the secrets scan on the pull request (G-23) — plus G-24 … G-27. One fix wave of four commits plus the G-28 follow-up. The scoped re-review (Fable) confirmed every item against the rulings, reproduced the totals and the inventory, and approved with three LOW notes — a banner fixture left in an invented shape, a case-sensitive hostname pattern in the examples assertion, a corrupt committed report skipped rather than failed — which one residual commit closed.
+
+### Deviations from the spec, as shipped
+
+- F-6/F-7: the `pkgfiles` targets join the computed modulo split rather than a fixed shard; with fifty-five targets a nightly shard runs about fourteen minutes, not nine. `notParsers` is nearly empty — `splitLines`, `firstLine`, `sourceRaw` and `showValues` were fuzzed or routed through a parent instead of declared away (stronger than G-11 planned).
+- F-8: `findmnt` runs with `-A` (without it findmnt de-duplicates rows); the oracle runs commands through `collect.RunCommand`, not raw `os/exec`; the PermitRootLogin fold is symmetric (G-20); the services rule is one-directional for super-hosted rows (G-17). Spec §4 corrected in both languages.
+- F-11: the jq path guard is `(… .value | type) == "array"` — the spec's `// []` form is an invalid jq path expression when the fact carries no value.
+- F-12: the staleness gate of G-24.
+
+### Numbers
+
+- Mutants over the 68 controls: generated 1132, invalid 4 (all the `shell_valid_screen` lint rule), killed 1112, surviving 0, excluded 16 (`controls/testdata/_mutants.yaml`); the first run had 255 survivors, all fixture gaps or equivalents. Fixtures added: 168 (all synthetic; 9 all-absent under the G-12 cap of 64; 2 base-only ACL). The package runs in about 2.4 s without the race detector.
+- Fuzz: 51 targets in `internal/collect/collectors` and 4 in `internal/pkgfiles` (floor 30); inventory 79 parsers — 54 reached directly, 23 through a parent, 2 declared. Seeds-only run 0.09 s test time on the lab. Ten seconds per target on the lab found one crash (G-16), none after.
+- Oracles on the lab host (root): sshd compared 1 keyword (one of five set in that file), accounts 98 rows, mountinfo 175 mounts, services 17 rows, no mismatch. In a public Rocky 9 init container: sshd skipped (no binary), accounts 50, mountinfo 16, services 17, no mismatch. A deliberate mutation of each parser turned its pair red.
+- Examples: the rehearsed `ubuntu:24.04` container snapshot is 143,411 bytes after the rewrite against the 4 MiB cap; the runner-VM file arrives with the first `examples.yml` run on the pull request and is recorded in `examples/README.md` with the run id.
+
+### Parked
+
+- The first nightly `fuzz.yml` result and the two example files are produced on the pull request (Task 6, Step 3); hand-off H-1 — review the VM file for literal addresses in any fact the rewrite does not cover — stays open until then.
+- Fuzzing one-line helpers (`firstLine`, `snmpStripComment`) for sixty seconds nightly is wasted budget; harmless, revisit if the nightly grows.
+- The inventory grammar still cannot see a parser that takes its bytes as a `string`; such a parser must be declared in `coveredThrough` by hand (the test's comment says so).
