@@ -116,9 +116,9 @@ muster는 Linux 호스트를 KISA 2026 Unix 서버 가이드에 대조해 점검
   `controls/testdata/_mutants.yaml`에 넣습니다. 한 줄에 하나, 그 불변식을 이름으로 부르는
   이유와 함께. 변이체가 죽었거나 더 이상 생성되지 않는 행이 있으면 테스트가 실패합니다.
 - `internal/collect/collectors`와 `internal/pkgfiles`의 모든 파서 진입점에는 그 파서의
-  testdata에서 시드를 얻는 `Fuzz<Name>` 타깃이 있고, 새 `parse*` 함수에 타깃이 없으면
-  `TestEveryParserHasAFuzzTarget`이 실패합니다(부모를 통해서만 닿는 헬퍼는
-  `coveredThrough`에 선언). 풀 리퀘스트는 시드만 돌리고, 밤마다 도는 `fuzz.yml`이 타깃마다
+  testdata에서 시드를 얻는 `Fuzz<Name>` 타깃이 있고, `[]byte`를 받는 새 함수나 메서드에
+  타깃이 없으면 `TestEveryParserHasAFuzzTarget`이 실패합니다(부모를 통해서만 닿는 헬퍼는
+  `coveredThrough`에, 호스트 입력이 아닌 바이트는 이유와 함께 `notParsers`에 선언). 풀 리퀘스트는 시드만 돌리고, 밤마다 도는 `fuzz.yml`이 타깃마다
   1분씩 샤드 4개로 퍼징합니다. `make fuzz TARGET=<name> TIME=<duration>`은 하나를 로컬에서
   돌립니다. 크래시는 Go가 `testdata/fuzz/` 아래에 쓰는 코퍼스 파일로 들어가고, 수정은
   별도 커밋입니다.

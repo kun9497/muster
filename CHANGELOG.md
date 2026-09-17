@@ -147,12 +147,12 @@ every plan is under `docs/superpowers/plans/`):
 - A mutation test over the control set. `TestEveryMutantIsKilled`
   (`internal/controls`) mutates every control — operators flipped, expected
   values shifted, clauses and mechanisms removed, `absent_means` changed — and
-  requires the fixtures to kill each mutant; a mutant that only breaks the
-  loader or the evaluator is invalid, not killed. The suite ships the
+  requires the fixtures to kill each mutant; a mutant the lint rejects, or
+  that only makes the evaluator recover a panic, is invalid, not killed. The suite ships the
   fixtures that made the score exact (168 added), and
-  `controls/testdata/_mutants.yaml` lists the 11 mutants no fixture can
+  `controls/testdata/_mutants.yaml` lists the 16 mutants no fixture can
   distinguish, each with the collector invariant that makes it equivalent.
-- A fuzz target with seeds for every parser entry point (50 across
+- A fuzz target with seeds for every parser entry point (55 across
   `internal/collect/collectors` and `internal/pkgfiles`), an inventory test
   that fails when a new parser has none, and the nightly `fuzz.yml` workflow
   (four shards, a minute per target); pull requests run the seeds only.

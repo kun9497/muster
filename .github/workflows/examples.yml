@@ -98,7 +98,7 @@ jobs:
             # lists, the configured time sources and the NFS export clients.
             # The last octet is kept, so two different addresses stay two
             # different addresses, and an optional /prefix is outside the
-            # match, so 10.1.2.0/24 becomes 198.51.100.0/24 rather than
+            # match, so a 10/8 network like 10.<x>.<y>.0/24 becomes 198.51.100.0/24 rather than
             # losing its mask.
             #
             # Every list is guarded by the same `type == "array"` test: a fact

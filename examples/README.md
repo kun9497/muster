@@ -54,7 +54,7 @@ host-shaped is committed:
   `2001:db8::1` (RFC 3849);
 - every RFC 1918 address (`10/8`, `172.16/12`, `192.168/16`) a host's own configuration put
   into a fact is renumbered into `198.51.100.0/24`, keeping its last octet and any `/prefix`,
-  so `10.1.2.0/24` becomes `198.51.100.0/24`. The facts scanned are the firewall's
+  so a 10/8 network like `10.<x>.<y>.0/24` becomes `198.51.100.0/24`. The facts scanned are the firewall's
   `raw_dumps[].content` and `rules[].saddr`, the `files.etc_hosts_allow_lines`,
   `files.etc_hosts_deny_lines` and `files.etc_hosts_equiv_lines` line lists,
   `time_sync.servers`, and each `nfs.exports[].client`;

@@ -87,8 +87,8 @@ regenerates them from public images and `-check` compares.
   description-only edit, which regenerates the golden with neither (say so in the commit).
 - The mutation test (`internal/controls`, `TestEveryMutantIsKilled`) runs with the suite: a control
   change or a new fixture must leave zero survivors; a mutant no fixture can distinguish goes into
-  `controls/testdata/_mutants.yaml` with a reason naming the collector invariant. Every `parse*`
-  function needs a `Fuzz<Name>` target with seeds (`make fuzz TARGET=<name>`); the nightly `fuzz.yml`
+  `controls/testdata/_mutants.yaml` with a reason naming the collector invariant. Every function or
+  method that takes `[]byte` needs a `Fuzz<Name>` target with seeds (`make fuzz TARGET=<name>`); the nightly `fuzz.yml`
   does the real fuzzing, PRs run the seeds only.
 - `MUSTER_ORACLE=1 go test ./internal/collect/collectors -run Oracle` on the lab (root) compares the
   parsers with their daemons; CI runs it in the root job and the init containers. `examples/` comes

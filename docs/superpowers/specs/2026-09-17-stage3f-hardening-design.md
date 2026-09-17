@@ -54,7 +54,7 @@ surviving, excluded — in its log line.
 **signature** that names it, stable across runs and readable by a person; the signature
 grammar is `<path> <operator>` where `<path>` is a JSON-pointer-like locator into the control
 (`checks[1]`, `checks[0].where`, `mechanisms[2].when[0]`, `mechanisms[1].checks[0].require`,
-`applies_when[0]`, `params.allowed`, `absent_means`) and `<operator>` one of the rows below.
+`applies_when[0]`, `params.<name>.default`, `absent_means`) and `<operator>` one of the rows below.
 
 | Family (design §11) | Operator | Applies to |
 |---|---|---|
@@ -177,7 +177,7 @@ inside the test, and compares:
 | `parseSshdConfig` on `/etc/ssh/sshd_config`, once per keyword of `sshdOptions` (the parse path, called directly so `-G`/`-T` are not consulted) | `sshd -T` as root | for every keyword the parser resolved to a value, `-T` carries the same keyword with the same value after an alias map the test owns (`without-password` and `prohibit-password` fold to one token on both sides, because `sshd -T` prints `without-password` for either spelling; an unset `banner` → `none`; case folded); keywords the file did not set are not compared (defaults are the daemon's) |
 | `parsePasswd`, `parseGroup` on `/etc/passwd`, `/etc/group` | `getent passwd`, `getent group` | every parser row `(name, uid, gid, home, shell)` / `(name, gid, members)` appears in `getent`'s output with the same values (members compared after the parser's trim and de-duplication); a `getent`-only row must carry an id in the systemd dynamic range 61184–65519 (Ubuntu 24.04 and EL9 ship `passwd: files systemd`) — anything else is a mismatch |
 | `parseMountinfo` on `/proc/self/mountinfo` | `findmnt -A -J -o ID,FSTYPE,TARGET` (`-A` keeps every mountinfo row; without it findmnt de-duplicates) | the sets of `(id, fstype, target)` are equal after flattening `findmnt`'s nested `children` and the same octal unescaping |
-| `services.<name>.enabled` and `.active` for every row of the services table (the collector's facts are per logical service, an OR over the row's units) | `systemctl show -p LoadState,ActiveState,UnitFileState,SubState <unit>` for each of the row's units | `enabled` equals the OR of `enabledFromUnitFile(state, active)` over the row's units (the collector's own function, reused); `active` is compared only for rows with no `ports` and no super-server names (for the others the collector also counts a reachable port or an inetd entry, which the oracle does not see) |
+| `services.<name>.enabled` and `.active` for every row of the services table (the collector's facts are per logical service, an OR over the row's units) | `systemctl show -p LoadState,ActiveState,UnitFileState,SubState <unit>` for each of the row's units | `enabled` is compared with the OR of `enabledFromUnitFile(state, active)` over the row's units (the collector's own function, reused): a collector `false` against a systemd `true` is always a mismatch, a collector `true` against a systemd `false` only for a row with no inetd name and no super-server entry (the collector also counts a super-server hit, which the oracle does not see); `active` is compared only for rows with no `ports` and no super-server names (for the others the collector also counts a reachable port or an inetd entry, which the oracle does not see) |
 
 A mismatch fails naming the pair, the key and both values. A pair whose oracle binary is
 absent (`sshd` in a container without openssh) skips with the binary's name; the test's

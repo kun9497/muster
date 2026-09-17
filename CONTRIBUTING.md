@@ -149,9 +149,10 @@ are changing before you change it. Korean: `CONTRIBUTING.ko.md`.
   whose mutant is killed or is no longer generated.
 - Every parser entry point in `internal/collect/collectors` and
   `internal/pkgfiles` has a `Fuzz<Name>` target seeded from the parser's own
-  testdata, and `TestEveryParserHasAFuzzTarget` fails when a new `parse*`
-  function has none (a helper reached only through a parent is declared in
-  `coveredThrough`). Pull requests run the seeds only; the nightly `fuzz.yml`
+  testdata, and `TestEveryParserHasAFuzzTarget` fails when a new function or
+  method that takes `[]byte` has none (a helper reached only through a parent
+  is declared in `coveredThrough`; bytes that are not host input, in
+  `notParsers` with a reason). Pull requests run the seeds only; the nightly `fuzz.yml`
   runs each target for a minute over four shards. `make fuzz TARGET=<name>
   TIME=<duration>` runs one locally. A crash lands as the corpus file Go
   writes under `testdata/fuzz/`, with the fix in its own commit.

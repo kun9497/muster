@@ -45,7 +45,7 @@ invalid입니다 — 평가기는 모든 패닉을 그 상태로 회수하므로
 **F-2 — 뮤테이션 연산자.** 뮤턴트는 정확히 하나만 바꾸고, 실행마다 안정적이고 사람이 읽을 수 있는
 **서명**을 가집니다. 서명 문법은 `<path> <operator>`이며 `<path>`는 컨트롤 안의 JSON-pointer 비슷한
 위치(`checks[1]`, `checks[0].where`, `mechanisms[2].when[0]`, `mechanisms[1].checks[0].require`,
-`applies_when[0]`, `params.allowed`, `absent_means`), `<operator>`는 아래 행 중 하나입니다.
+`applies_when[0]`, `params.<name>.default`, `absent_means`), `<operator>`는 아래 행 중 하나입니다.
 
 | 부류(설계 §11) | 연산자 | 적용 대상 |
 |---|---|---|
@@ -153,7 +153,7 @@ TIME=<duration>`은 같은 플래그로 타깃 하나를 로컬에서 돌립니�
 | `/etc/ssh/sshd_config`에 대한 `parseSshdConfig`, `sshdOptions`의 키워드마다 한 번(파싱 경로, 직접 호출하므로 `-G`/`-T`는 참조하지 않음) | root로 `sshd -T` | 파서가 값으로 해석한 모든 키워드에 대해, 테스트가 소유한 별칭 표(`without-password`와 `prohibit-password`는 양쪽 모두 한 토큰으로 접음 — `sshd -T`는 어느 철자든 `without-password`로 출력하므로; 설정되지 않은 `banner` → `none`; 대소문자 접음)를 거친 뒤 `-T`가 같은 키워드에 같은 값을 가짐; 파일이 설정하지 않은 키워드는 비교하지 않음(기본값은 데몬의 것) |
 | `/etc/passwd`, `/etc/group`에 대한 `parsePasswd`, `parseGroup` | `getent passwd`, `getent group` | 파서의 모든 행 `(name, uid, gid, home, shell)` / `(name, gid, members)`가 `getent` 출력에 같은 값으로 나타남(members는 파서의 trim·중복 제거 후 비교); `getent`에만 있는 행은 systemd 동적 범위 61184–65519의 id를 가져야 함(Ubuntu 24.04와 EL9는 `passwd: files systemd`) — 그 밖은 불일치 |
 | `/proc/self/mountinfo`에 대한 `parseMountinfo` | `findmnt -A -J -o ID,FSTYPE,TARGET`(`-A`는 mountinfo의 모든 행을 유지; 없으면 findmnt가 중복을 제거) | `findmnt`의 중첩 `children`을 펴고 같은 8진 이스케이프 해제 후 `(id, fstype, target)` 집합이 같음 |
-| services 표의 모든 행에 대한 `services.<name>.enabled`와 `.active`(수집기의 팩트는 논리 서비스 단위이며 행의 유닛들에 대한 OR) | 행의 유닛마다 `systemctl show -p LoadState,ActiveState,UnitFileState,SubState <unit>` | `enabled`는 행의 유닛들에 대한 `enabledFromUnitFile(state, active)`의 OR와 같음(수집기 자신의 함수를 재사용); `active`는 `ports`와 슈퍼서버 이름이 없는 행에서만 비교(나머지는 수집기가 도달 가능한 포트나 inetd 항목도 세는데 오라클은 그것을 보지 못함) |
+| services 표의 모든 행에 대한 `services.<name>.enabled`와 `.active`(수집기의 팩트는 논리 서비스 단위이며 행의 유닛들에 대한 OR) | 행의 유닛마다 `systemctl show -p LoadState,ActiveState,UnitFileState,SubState <unit>` | `enabled`는 행의 유닛들에 대한 `enabledFromUnitFile(state, active)`의 OR와 비교(수집기 자신의 함수를 재사용): 수집기 `false` 대 systemd `true`는 항상 불일치, 수집기 `true` 대 systemd `false`는 inetd 이름도 슈퍼서버 항목도 없는 행에서만 불일치(수집기는 슈퍼서버 적중도 세는데 오라클은 그것을 보지 못함); `active`는 `ports`와 슈퍼서버 이름이 없는 행에서만 비교(나머지는 수집기가 도달 가능한 포트나 inetd 항목도 세는데 오라클은 그것을 보지 못함) |
 
 불일치는 쌍·키·양쪽 값을 이름 지어 실패합니다. 오라클 바이너리가 없는 쌍(openssh 없는 컨테이너의
 `sshd`)은 바이너리 이름과 함께 skip하며, 테스트의 요약 줄이 몇 쌍이 돌았는지 말합니다.
