@@ -80,5 +80,14 @@ before they are committed — update the run id above, and commit.
 `cmd/muster/examples_test.go` reloads every snapshot here, re-runs `check` in process and
 compares both reports byte for byte, ignoring only the four provenance fields that differ
 between a release binary and `go test` (`muster_version`, `commit`, `controls_version`,
-`controls_digest`) and the table's first line. A stale example does not fail the suite for
-being stale, only for no longer being reproducible.
+`controls_digest`) and the table's first line.
+
+A stale example never fails the suite. The test reads the committed report's own
+`check.controls_digest` and compares it with the digest of the control set this build
+embeds: when they differ, the example was collected against a set whose verdicts this
+binary cannot reproduce, so the test logs `collected against control set <digest>, this
+build is <digest>; byte comparison skipped` and skips **only** that comparison. Loading the
+snapshot, evaluating it and the assertion that no control ends in `ERROR(internal_error)`
+are properties of the snapshot, not of the control set, and they run either way. When the
+two digests match, both reports are compared as above and any difference is a failure —
+refresh the examples.

@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -54,27 +55,90 @@ func reportsFor(t *testing.T, snap *facts.Snapshot, set *controls.Set) (jsonRepo
 	return j.Bytes(), tb.Bytes()
 }
 
-// maskReport drops maskedCheckKeys from a JSON report and re-marshals it.
-// encoding/json sorts map keys, so two masked reports of the same content are
-// the same bytes whatever order the originals were written in.
-func maskReport(t *testing.T, data []byte) []byte {
-	t.Helper()
+// maskReportBytes drops maskedCheckKeys from a JSON report and re-marshals
+// it. encoding/json sorts map keys, so two masked reports of the same content
+// are the same bytes whatever order the originals were written in.
+func maskReportBytes(data []byte) ([]byte, error) {
 	var doc map[string]any
 	if err := json.Unmarshal(data, &doc); err != nil {
-		t.Fatalf("report is not JSON: %v", err)
+		return nil, fmt.Errorf("report is not JSON: %w", err)
 	}
 	cb, ok := doc["check"].(map[string]any)
 	if !ok {
-		t.Fatalf("report has no check block: %v", doc["check"])
+		return nil, fmt.Errorf("report has no check block: %v", doc["check"])
 	}
 	for _, k := range maskedCheckKeys {
 		delete(cb, k)
 	}
-	out, err := json.Marshal(doc)
+	return json.Marshal(doc)
+}
+
+// maskReport is maskReportBytes for a caller that has a *testing.T and for
+// which a malformed report is simply the end of the test.
+func maskReport(t *testing.T, data []byte) []byte {
+	t.Helper()
+	out, err := maskReportBytes(data)
 	if err != nil {
-		t.Fatalf("re-marshal: %v", err)
+		t.Fatal(err)
 	}
 	return out
+}
+
+// reportControlsDigest returns a report's check.controls_digest, or "" when
+// the bytes are not a report or carry no digest. "" never equals a real
+// digest, so an unreadable committed report is treated as one this build
+// cannot reproduce rather than compared against it.
+func reportControlsDigest(data []byte) string {
+	var doc struct {
+		Check struct {
+			ControlsDigest string `json:"controls_digest"`
+		} `json:"check"`
+	}
+	if err := json.Unmarshal(data, &doc); err != nil {
+		return ""
+	}
+	return doc.Check.ControlsDigest
+}
+
+// checkExampleReports is the comparison half of the F-12 gate on one example:
+// the committed reports against what this build just produced. It returns the
+// problems to report and, instead of them, the note to log when the example
+// was collected against a DIFFERENT control set.
+//
+// Ruling G-24: a snapshot collected before a control was added, retitled or
+// re-parameterised carries that older set's verdicts in its committed report,
+// and this build cannot reproduce them -- the byte comparison would fail on
+// every example from the moment controls/ changed until somebody re-ran the
+// workflow, which is a staleness alarm wired to the wrong bell. The report's
+// own check.controls_digest says which set wrote it, so the comparison runs
+// only when that is this build's set. Everything else about the example --
+// that it loads, that it evaluates, that no control ends in
+// ERROR(internal_error) -- is checked either way by the caller: those are
+// properties of the SNAPSHOT, and no control-set change excuses them.
+func checkExampleReports(name string, gotJSON, wantJSON, gotTable, wantTable []byte, buildDigest string) (problems []string, note string) {
+	if committed := reportControlsDigest(wantJSON); committed != buildDigest {
+		return nil, fmt.Sprintf("examples/%s: collected against control set %s, this build is %s; byte comparison skipped",
+			name, committed, buildDigest)
+	}
+	maskedGot, err := maskReportBytes(gotJSON)
+	if err != nil {
+		return []string{fmt.Sprintf("%s: the report this build produced %v", name, err)}, ""
+	}
+	maskedWant, err := maskReportBytes(wantJSON)
+	if err != nil {
+		return []string{fmt.Sprintf("%s: the committed report %v", name, err)}, ""
+	}
+	if !bytes.Equal(maskedGot, maskedWant) {
+		problems = append(problems, fmt.Sprintf(
+			"%s-report.json is not what this binary produces from %s; refresh the examples (see examples/README.md)",
+			strings.TrimSuffix(name, ".json"), name))
+	}
+	if !bytes.Equal(tableBody(gotTable), tableBody(wantTable)) {
+		problems = append(problems, fmt.Sprintf(
+			"%s-report.txt is not what this binary produces from %s; refresh the examples (see examples/README.md)",
+			strings.TrimSuffix(name, ".json"), name))
+	}
+	return problems, ""
 }
 
 // tableBody drops the table's first line, which carries the binary version,
@@ -185,6 +249,92 @@ func TestExampleReportHelpers(t *testing.T) {
 	}
 }
 
+// TestExampleStalenessGate is ruling G-24, driven the way the example gate
+// drives it: real reports of a real snapshot, compared through
+// checkExampleReports. The committed report is then damaged in two different
+// ways -- the verdicts changed while the control-set digest still says this
+// build's set, and the same damage with a digest that says another set -- and
+// only the first may be reported.
+func TestExampleStalenessGate(t *testing.T) {
+	set, err := controls.LoadDefault()
+	if err != nil {
+		t.Fatalf("load controls: %v", err)
+	}
+	pass, _, err := openFacts(filepath.Join("testdata", "full-pass.json"))
+	if err != nil {
+		t.Fatalf("load full-pass: %v", err)
+	}
+	gotJSON, gotTable := reportsFor(t, pass, set)
+
+	// The report this build just produced carries this build's digest, which
+	// is what makes the gate open at all.
+	if got := reportControlsDigest(gotJSON); got != set.Digest {
+		t.Fatalf("this build's own report carries controls_digest %q, want %q", got, set.Digest)
+	}
+
+	// 1. A current, matching pair: compared, and nothing to report.
+	problems, note := checkExampleReports("x.json", gotJSON, gotJSON, gotTable, gotTable, set.Digest)
+	if len(problems) != 0 || note != "" {
+		t.Errorf("a current example reported %v / %q", problems, note)
+	}
+
+	// 2. A current pair whose committed reports do NOT match: both
+	//    comparisons fire. This is the branch the gate must not swallow.
+	fail, _, err := openFacts(filepath.Join("testdata", "full-fail.json"))
+	if err != nil {
+		t.Fatalf("load full-fail: %v", err)
+	}
+	otherJSON, otherTable := reportsFor(t, fail, set)
+	problems, note = checkExampleReports("x.json", gotJSON, otherJSON, gotTable, otherTable, set.Digest)
+	if note != "" {
+		t.Errorf("a committed report of this build's own control set was called stale: %q", note)
+	}
+	if len(problems) != 2 {
+		t.Errorf("a mismatching example reported %d problems, want one per report: %v", len(problems), problems)
+	}
+
+	// 3. The same mismatch, but the committed report names another control
+	//    set: nothing is reported and the note names both digests.
+	stale := retagControlsDigest(t, otherJSON, "sha256:0000000000000000")
+	problems, note = checkExampleReports("x.json", gotJSON, stale, gotTable, otherTable, set.Digest)
+	if len(problems) != 0 {
+		t.Errorf("an example of another control set was compared anyway: %v", problems)
+	}
+	for _, want := range []string{"x.json", "sha256:0000000000000000", set.Digest, "skipped"} {
+		if !strings.Contains(note, want) {
+			t.Errorf("the note %q does not name %q", note, want)
+		}
+	}
+
+	// 4. A committed report that is not a report at all reads as no digest,
+	//    which is nobody's control set, so it is skipped rather than compared
+	//    against bytes it cannot be compared with.
+	if got := reportControlsDigest([]byte("not json")); got != "" {
+		t.Errorf("reportControlsDigest of a non-report = %q", got)
+	}
+}
+
+// retagControlsDigest returns report with a different check.controls_digest,
+// which is how a report collected against an older control set differs from
+// one this build could reproduce.
+func retagControlsDigest(t *testing.T, report []byte, digest string) []byte {
+	t.Helper()
+	var doc map[string]any
+	if err := json.Unmarshal(report, &doc); err != nil {
+		t.Fatalf("report is not JSON: %v", err)
+	}
+	cb, ok := doc["check"].(map[string]any)
+	if !ok {
+		t.Fatalf("report has no check block")
+	}
+	cb["controls_digest"] = digest
+	out, err := json.Marshal(doc)
+	if err != nil {
+		t.Fatalf("re-marshal: %v", err)
+	}
+	return out
+}
+
 // TestExamplesLoadAndCheck is the F-12 gate on the committed examples: each
 // snapshot still loads, still evaluates without the evaluator recovering a
 // panic, and still produces the reports beside it -- the same-input-same-bytes
@@ -243,15 +393,16 @@ func TestExamplesLoadAndCheck(t *testing.T) {
 			if err != nil {
 				t.Fatalf("every example snapshot needs its JSON report beside it: %v", err)
 			}
-			if !bytes.Equal(maskReport(t, gotJSON), maskReport(t, wantJSON)) {
-				t.Errorf("%s-report.json is not what this binary produces from %s; refresh the examples (see examples/README.md)", filepath.Base(base), filepath.Base(f))
-			}
 			wantTable, err := os.ReadFile(base + "-report.txt")
 			if err != nil {
 				t.Fatalf("every example snapshot needs its table report beside it: %v", err)
 			}
-			if !bytes.Equal(tableBody(gotTable), tableBody(wantTable)) {
-				t.Errorf("%s-report.txt is not what this binary produces from %s; refresh the examples (see examples/README.md)", filepath.Base(base), filepath.Base(f))
+			problems, note := checkExampleReports(filepath.Base(f), gotJSON, wantJSON, gotTable, wantTable, set.Digest)
+			if note != "" {
+				t.Log(note)
+			}
+			for _, p := range problems {
+				t.Error(p)
 			}
 		})
 	}
