@@ -46,6 +46,15 @@ jobs:
   collect-root:
     runs-on: ubuntu-24.04
     needs: test
+    env:
+      # The runner image's own trees, excluded from the walk: its toolchain
+      # caches and the system directories the image itself makes
+      # world-writable (the first --deep run measured 210,280 world-writable
+      # entries, 345k of them under /usr/local/lib alone). No host of anyone's
+      # owns these permissions, and a path absent from a later image is
+      # harmless. The same list prunes the diagnostic find below, so a list at
+      # its cap names a cause the list does not already cover.
+      WALK_EXCLUDES: /opt/hostedtoolcache /opt/pipx /opt/runner-cache /opt/microsoft /opt/az /imagegeneration /usr/share /usr/local/lib /usr/local/share /usr/local/.ghcup /usr/lib/jvm
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -61,21 +70,11 @@ jobs:
       - name: collect as root
         run: |
           set +e
-          # The exclusions are the runner image's toolchain caches: millions of
-          # entries muster would walk and no host of anyone's owns. A path that
-          # does not exist on this image is harmless, so the list can stay the
-          # same as the image changes.
+          excludes=()
+          for p in $WALK_EXCLUDES; do excludes+=(--walk-exclude "$p"); done
           sudo ./bin/muster collect --out "$RUNNER_TEMP/muster/root.json" \
             --deep --walk-budget 15m --walk-max-entries 6000000 \
-            --walk-exclude /opt/hostedtoolcache \
-            --walk-exclude /usr/share/dotnet \
-            --walk-exclude /usr/local/lib/android \
-            --walk-exclude /usr/lib/jvm \
-            --walk-exclude /usr/local/.ghcup \
-            --walk-exclude /usr/share/swift \
-            --walk-exclude /opt/microsoft \
-            --walk-exclude /opt/az \
-            --walk-exclude /imagegeneration \
+            "${excludes[@]}" \
             --require-root --require-complete
           code=$?
           set -e
@@ -93,10 +92,12 @@ jobs:
           # exclusion or an allowlist row rather than a raised cap: the
           # runner image's own world-writable entries by top directory, and
           # every root the walk did not enter.
-          echo "== world-writable entries on the runner, by top directory (find, independent of muster)"
-          sudo find / -xdev \( -path /proc -o -path /sys -o -path /dev -o -path /run \) -prune -o -perm -0002 -not -type l -print 2>/dev/null | cut -d/ -f1-4 | sort | uniq -c | sort -rn | head -30
-          echo "== other-writable directories without the sticky bit, by top directory"
-          sudo find / -xdev \( -path /proc -o -path /sys -o -path /dev -o -path /run \) -prune -o -type d -perm -0002 -not -perm -1000 -print 2>/dev/null | cut -d/ -f1-4 | sort | uniq -c | sort -rn | head -20
+          prune=(-path /proc -o -path /sys -o -path /dev -o -path /run)
+          for p in $WALK_EXCLUDES; do prune+=(-o -path "$p"); done
+          echo "== world-writable entries the walk could see on the runner, by top directory (find, independent of muster)"
+          sudo find / -xdev \( "${prune[@]}" \) -prune -o -perm -0002 -not -type l -print 2>/dev/null | cut -d/ -f1-4 | sort | uniq -c | sort -rn | head -30
+          echo "== other-writable directories without the sticky bit the walk could see, by top directory"
+          sudo find / -xdev \( "${prune[@]}" \) -prune -o -type d -perm -0002 -not -perm -1000 -print 2>/dev/null | cut -d/ -f1-4 | sort | uniq -c | sort -rn | head -20
           echo "== walk.skipped"
           jq -r '.facts.walk.skipped.value[] | "\(.reason) \(.path)"' "$RUNNER_TEMP/muster/root.json" | sort | uniq -c | sort -rn | head -40
       - name: the walk finished and every list it produced is ok
