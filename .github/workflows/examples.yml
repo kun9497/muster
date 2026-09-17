@@ -25,15 +25,27 @@ jobs:
       MAX_BYTES: "4194304"
     steps:
       - uses: actions/checkout@v4
+        # Tags, so `make build` stamps a version rather than falling back to
+        # the abbreviated commit.
+        with: {fetch-depth: 0}
       - uses: actions/setup-go@v5
         with: {go-version: "1.25.5", check-latest: false}
-      - run: CGO_ENABLED=0 go build -trimpath -o bin/muster ./cmd/muster
+      - name: build muster the way a release is built
+        # `make build` is CGO_ENABLED=0 go build -trimpath with the Makefile's
+        # LDFLAGS, which stamp main.version, main.commit and main.date from
+        # git. A plain `go build` leaves the defaults of cmd/muster/main.go in
+        # place, and every example would then claim to have been collected by
+        # muster "dev" at commit "none" -- the opposite of the provenance F-11
+        # says the snapshot headers carry.
+        run: make build
+      - name: what built these examples
+        run: ./bin/muster version
       - name: prepare the output directory
         run: mkdir -m 700 "$RUNNER_TEMP/ex"
 
       - name: collect inside ubuntu:24.04
         run: |
-          docker run --rm -v "$PWD/bin:/m:ro" -v "$RUNNER_TEMP/ex:/out" \
+          docker run --rm --platform linux/amd64 -v "$PWD/bin:/m:ro" -v "$RUNNER_TEMP/ex:/out" \
             ubuntu:24.04 /m/muster collect --deep --out /out/ubuntu-24.04-container.json
           sudo chown "$(id -u)" "$RUNNER_TEMP/ex/ubuntu-24.04-container.json"
 
@@ -43,17 +55,23 @@ jobs:
           for p in $WALK_EXCLUDES; do excludes+=(--walk-exclude "$p"); done
           set +e
           sudo ./bin/muster collect --deep --walk-budget 15m --walk-max-entries 6000000 \
-            "${excludes[@]}" --out "$RUNNER_TEMP/ex/ubuntu-24.04-vm.json"
+            "${excludes[@]}" --require-root --out "$RUNNER_TEMP/ex/ubuntu-24.04-vm.json"
           code=$?
           set -e
-          sudo chown "$(id -u)" "$RUNNER_TEMP/ex/ubuntu-24.04-vm.json"
           echo "collect exit $code"
           # 0 complete, 1 partial, 2 nothing collected. A partial snapshot is
           # still a usable example -- and its degraded envelopes are part of
           # what an example should show -- so it is reported here and judged
-          # by the person who commits it, while 2 stops the run.
-          jq -r '.run.partial_failures, (.run.collectors[] | select(.status != "ok") | "\(.name): \(.status) \(.reason)")' \
-            "$RUNNER_TEMP/ex/ubuntu-24.04-vm.json"
+          # by the person who commits it, while 2 stops the run. An exit 2 may
+          # have written no file at all, so the diagnostics are guarded: a run
+          # that collected nothing should say so, not die in chown.
+          if [ -f "$RUNNER_TEMP/ex/ubuntu-24.04-vm.json" ]; then
+            sudo chown "$(id -u)" "$RUNNER_TEMP/ex/ubuntu-24.04-vm.json"
+            jq -r '.run.partial_failures, (.run.collectors[] | select(.status != "ok") | "\(.name): \(.status) \(.reason)")' \
+              "$RUNNER_TEMP/ex/ubuntu-24.04-vm.json"
+          else
+            echo "collect wrote no snapshot"
+          fi
           test "$code" -le 1
 
       - name: rewrite what identifies a host, and refuse an oversized example
@@ -122,7 +140,8 @@ jobs:
             tcode=$?
             set -e
             echo "$f: check json exit $jcode, table exit $tcode"
-            test -s "$b-report.json" && test -s "$b-report.txt"
+            test -s "$b-report.json"
+            test -s "$b-report.txt"
             jq -e '.check.guide_edition == "kisa-unix-2026"' "$b-report.json" > /dev/null
             jq -e '[.results[] | select(.status == "ERROR" and .reason_code == "internal_error")] | length == 0' "$b-report.json" > /dev/null
           done

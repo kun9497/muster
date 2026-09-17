@@ -14,20 +14,26 @@ builds this repository, and both are rewritten (below) before they are kept.
 | `ubuntu-24.04-vm.json` | `muster collect --deep` on the GitHub Actions `ubuntu-24.04` runner VM, with the walk exclusions `ci.yml` uses, so the walk lists carry real rows. |
 | `ubuntu-24.04-vm-report.json` / `-report.txt` | `muster check` on that snapshot, as JSON and as the table. |
 
+**Those six files and the run id below arrive with the first run of the workflow**; until then
+this README is the only file here, and the test that checks the examples skips saying so.
+
 Produced by run `<run id>` of [`.github/workflows/examples.yml`](../.github/workflows/examples.yml).
 The snapshot headers carry the rest of the provenance: `muster_version`, `commit`,
-`collected_at` and `host.os_release`.
+`collected_at` and `host.os_release` — the workflow builds the binary with `make build`, so those
+are the real version and commit and not the unstamped defaults.
 
 ## The commands
 
 ```sh
+make build                                  # stamps the version and commit
+
 # in the container
-docker run --rm -v "$PWD/bin:/m:ro" -v "$RUNNER_TEMP/ex:/out" \
+docker run --rm --platform linux/amd64 -v "$PWD/bin:/m:ro" -v "$RUNNER_TEMP/ex:/out" \
   ubuntu:24.04 /m/muster collect --deep --out /out/ubuntu-24.04-container.json
 
 # on the runner VM (the same --walk-exclude list as ci.yml's collect-root job)
 sudo ./bin/muster collect --deep --walk-budget 15m --walk-max-entries 6000000 \
-  --walk-exclude ... --out "$RUNNER_TEMP/ex/ubuntu-24.04-vm.json"
+  --walk-exclude ... --require-root --out "$RUNNER_TEMP/ex/ubuntu-24.04-vm.json"
 
 # the reports, after the rewrite below
 NO_COLOR=1 ./bin/muster check --facts <snapshot> --format json > <snapshot>-report.json
