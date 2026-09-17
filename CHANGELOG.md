@@ -141,6 +141,10 @@ every plan is under `docs/superpowers/plans/`):
   without changing the line's byte length; an `apt.conf` fragment carrying a
   byte that is not UTF-8 before the key used to make the patch collector
   panic. Found by the new fuzz target; the input is committed as its seed.
+- The nftables ruleset parser skips a line that is only whitespace inside a
+  chain instead of indexing its first word; a form feed there used to panic
+  the firewall collector. Found by the first sixty-second run of the nightly
+  fuzz workflow; the input is committed as its seed.
 
 ### Tooling
 
