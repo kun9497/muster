@@ -19,7 +19,9 @@ it sits beside (a fixture that passes for the wrong reason is invisible); does a
 panic, loop or grow without bound on input the fixtures never showed it; do the parsers
 agree with the daemons whose files they read. And one thing the README cannot show: what a
 real snapshot and report look like. 3F answers each with the cheapest mechanism that cannot
-go stale: a mutation test that runs with `go test` (F-1…F-4), one fuzz target per parser entry point (30 targets: 26 in the collectors, 4 in `pkgfiles`)
+go stale: a mutation test that runs with `go test` (F-1…F-4), one fuzz target per parser entry point (at least 30 targets — the F-5 table is the floor, the
+F-6 inventory rule the ceiling: 26 in the collectors, 4 in `pkgfiles`, plus one for every
+parser the inventory finds under another name)
 with a committed corpus run nightly (F-5…F-7), an oracle test that runs in the CI jobs that already
 have the daemons (F-8…F-10), and two committed example snapshots with their reports
 (F-11…F-12).
@@ -211,8 +213,9 @@ host. The snapshot headers already carry the provenance (`muster_version`, `comm
 `collected_at`, `host.os_release`). Before `check` runs, the workflow rewrites two things in
 each snapshot with `jq` so no host-shaped literal is committed: `run.host.hostname` becomes
 `github-runner` / `ubuntu-container`, and every non-loopback, non-wildcard `addr` in the
-`sockets.*` records becomes `192.0.2.1` (an RFC 5737 address); `machine_id_hash` and
-`boot_id` are hashes and stay. The reports are generated from the rewritten files. An example
+`sockets.*` records becomes `192.0.2.1` (an RFC 5737 address); `run.host.boot_id` (the raw boot UUID), `run.host.kernel`
+and `run.host.uptime_s` are blanked (they identify the runner's kernel, not the image);
+`machine_id_hash` is a hash and stays. The reports are generated from the rewritten files. An example
 over 4 MiB is refused by the workflow (the VM's walk lists sit under their caps after the root
 job's exclusions).
 
