@@ -118,6 +118,52 @@ func openFacts(path string) (*facts.Snapshot, []byte, error) {
 	return snap, data, nil
 }
 
+// newCheckBlock is everything check does between a loaded snapshot and
+// report.Build: it evaluates the snapshot, records the parameter values in
+// force, applies the waiver file and returns the provenance block the report
+// carries. warn receives the body of each warning line -- the caller decides
+// where warnings go, so the command can prefix them and a test can collect
+// them (spec §7.4: warnings are stderr, never stdout).
+//
+// G-14: the example test (examples_test.go) regenerates a committed report
+// through this function. A committed report is only evidence that this
+// binary produces it if the bytes the test compares came through the same
+// code, so there is one implementation and not two that can drift.
+func newCheckBlock(set *controls.Set, snap *facts.Snapshot, reg *facts.Registry, wf *waiver.File, warn func(string)) ([]check.Result, report.CheckBlock) {
+	opts := check.Options{}
+	results := check.Evaluate(snap, set, reg, opts)
+	cb := report.CheckBlock{
+		MusterVersion: version, Commit: commit,
+		ControlsVersion: set.Version, ControlsDigest: set.Digest,
+		SnapshotDigest: snap.Digest(), GuideEdition: "kisa-unix-2026",
+	}
+	// I5/R30: record the parameter values that were actually in force, for
+	// every control that declares any (spec §6.6, §9). encoding/json sorts
+	// map keys, so this stays byte-identical for identical input.
+	for i := range set.Controls {
+		c := &set.Controls[i]
+		if len(c.Params) == 0 {
+			continue
+		}
+		if cb.Params == nil {
+			cb.Params = make(map[string]map[string]any, len(set.Controls))
+		}
+		cb.Params[c.ID] = check.ParamValues(c, opts.Params[c.ID])
+	}
+	if snap.Run.ControlsDigest != "" && snap.Run.ControlsDigest != set.Digest {
+		warn(fmt.Sprintf("snapshot was collected with control set %s; evaluating with %s", snap.Run.ControlsVersion, set.Version))
+	}
+	if wf != nil {
+		known := map[string]bool{}
+		for _, c := range set.Controls {
+			known[c.ID] = true
+		}
+		tally := wf.Apply(results, known, time.Now().UTC(), warn)
+		cb.Waivers = report.WaiversBlock{Path: wf.Path, Digest: wf.Digest, Applied: tally.Applied, NotApplied: tally.NotApplied, Expired: tally.Expired, Unknown: tally.Unknown, ExpiringSoon: tally.ExpiringSoon}
+	}
+	return results, cb
+}
+
 func runCheck(args []string, stdout, stderr io.Writer) int {
 	f, err := parseCheckArgs(args)
 	if err != nil {
@@ -161,37 +207,7 @@ func runCheck(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "muster: warning: check does not need root")
 	}
 
-	opts := check.Options{}
-	results := check.Evaluate(snap, set, reg, opts)
-	cb := report.CheckBlock{
-		MusterVersion: version, Commit: commit,
-		ControlsVersion: set.Version, ControlsDigest: set.Digest,
-		SnapshotDigest: snap.Digest(), GuideEdition: "kisa-unix-2026",
-	}
-	// I5/R30: record the parameter values that were actually in force, for
-	// every control that declares any (spec §6.6, §9). encoding/json sorts
-	// map keys, so this stays byte-identical for identical input.
-	for i := range set.Controls {
-		c := &set.Controls[i]
-		if len(c.Params) == 0 {
-			continue
-		}
-		if cb.Params == nil {
-			cb.Params = make(map[string]map[string]any, len(set.Controls))
-		}
-		cb.Params[c.ID] = check.ParamValues(c, opts.Params[c.ID])
-	}
-	if snap.Run.ControlsDigest != "" && snap.Run.ControlsDigest != set.Digest {
-		fmt.Fprintf(stderr, "muster: warning: snapshot was collected with control set %s; evaluating with %s\n", snap.Run.ControlsVersion, set.Version)
-	}
-	if wf != nil {
-		known := map[string]bool{}
-		for _, c := range set.Controls {
-			known[c.ID] = true
-		}
-		tally := wf.Apply(results, known, time.Now().UTC(), func(msg string) { fmt.Fprintf(stderr, "muster: warning: %s\n", msg) })
-		cb.Waivers = report.WaiversBlock{Path: wf.Path, Digest: wf.Digest, Applied: tally.Applied, NotApplied: tally.NotApplied, Expired: tally.Expired, Unknown: tally.Unknown, ExpiringSoon: tally.ExpiringSoon}
-	}
+	results, cb := newCheckBlock(set, snap, reg, wf, func(msg string) { fmt.Fprintf(stderr, "muster: warning: %s\n", msg) })
 	rep := report.Build(snap, results, cb)
 
 	switch f.format {
