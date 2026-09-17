@@ -14,6 +14,14 @@
     checks[3], checks[4] or checks[5], so no cron.files row can be the sole failure of the
     reason clause.
 
+- control: muster.account.primary_group_exists
+  mutant: "checks[0].where expected -1"
+  reason: >-
+    The clause reads "the orphan list is non-empty" as `gid gte 0`, and orphanGIDs
+    (internal/collect/collectors/accounts_groups.go, `if u.gid >= 0 && !exists[u.gid]`) never
+    emits a row with a negative gid -- an unparsable gid is a parse failure, not an orphan.
+    So no snapshot carries the gid -1 element that alone separates `gte -1` from `gte 0`.
+
 - control: muster.account.password_policy
   mutant: "checks[3] remove"
   reason: >-
@@ -70,12 +78,6 @@
     stat-error branch, which leaves uid -1 and is_symlink false, so every
     files.startup_scripts row carrying a reason also fails checks[2] (uid eq 0). The reason
     clause is never the sole failure.
-
-- control: muster.file.suid_sgid
-  mutant: "params.forbidden_suid.default expected []"
-  reason: >-
-    The shipped default of forbidden_suid IS the empty list, so substituting [] re-encodes
-    the original control byte for byte. There is no judgment change for a fixture to see.
 
 - control: muster.file.suid_sgid
   mutant: "checks[1] remove"

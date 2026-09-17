@@ -177,7 +177,9 @@ func clauseMutants(out *[]mutant, c controls.Control, path string, ref func(*con
 // value: `expected not` for a bool, `+1` and `-1` for an int (yaml.v3 decodes
 // a YAML integer into int, so the arithmetic keeps the type a param
 // declaration demands), `"__mutant__"` for a string, and one `drop[i]` per
-// element plus `[]` for a list. A nil expected -- present, absent, each,
+// element plus `[]` for a list -- except an ALREADY EMPTY list, whose `[]`
+// substitution would re-encode the original control and be a no-op mutant no
+// fixture could ever kill (G-15). A nil expected -- present, absent, each,
 // none -- yields nothing. Any other non-nil type panics rather than being
 // skipped: a new `expected` shape in the schema (a float, a map) must add its
 // own rows here, and silently generating nothing for it would shrink the
@@ -197,7 +199,11 @@ func expectedMutants(out *[]mutant, c controls.Control, path string, v any, set 
 				set(m, slices.Delete(slices.Clone(x), i, i+1))
 			})
 		}
-		addMutant(out, c, path+" expected []", func(m *controls.Control) { set(m, []any{}) })
+		// G-15: no no-op mutants. Emptying a list that is already empty is the
+		// original control, and the kill loop would count it a survivor forever.
+		if len(x) > 0 {
+			addMutant(out, c, path+" expected []", func(m *controls.Control) { set(m, []any{}) })
+		}
 	case nil:
 		// present, absent, each, none: no literal to substitute.
 	default:

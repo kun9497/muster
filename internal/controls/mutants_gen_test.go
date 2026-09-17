@@ -263,8 +263,13 @@ func TestMutantsOfMechanismSignaturesAndOrder(t *testing.T) {
 	// A mechanism's mutant must change that mechanism and leave the other one
 	// exactly as it was: the closures in mutantsOf capture j and k, and one
 	// that captured the wrong index would still produce the right signature.
+	// Only "mechanisms[1] remove" is exempt, because deleting the mechanism is
+	// the one edit that renumbers the list; a `when[k] remove` or a
+	// `checks[i] remove` INSIDE mechanisms[1] must still leave mechanisms[0]
+	// byte-identical, and those are exactly the closures most likely to
+	// capture the wrong index.
 	for _, m := range ms {
-		if !strings.HasPrefix(m.Signature, "mechanisms[1]") || strings.HasSuffix(m.Signature, " remove") {
+		if !strings.HasPrefix(m.Signature, "mechanisms[1]") || m.Signature == "mechanisms[1] remove" {
 			continue
 		}
 		if !reflect.DeepEqual(m.Control.Mechanisms[0], c.Mechanisms[0]) {
@@ -324,6 +329,9 @@ func TestMutantsOfOperatorTable(t *testing.T) {
 			}, []any{
 				[]any{"y", "z"}, []any{"x", "z"}, []any{"x", "y"}, []any{},
 			}},
+			// G-15: an already-empty list has no drop[i] and no `expected []`
+			// -- that substitution would re-encode the original control.
+			{"empty list", "[]", nil, nil},
 		}
 		for _, tc := range cases {
 			t.Run(tc.name, func(t *testing.T) {
@@ -344,6 +352,25 @@ func TestMutantsOfOperatorTable(t *testing.T) {
 					}
 				}
 			})
+		}
+	})
+
+	// G-15: a parameter whose shipped default is the empty list -- the shape
+	// muster.file.suid_sgid's forbidden_suid ships, a policy hook with no
+	// default entries -- must produce NO mutant at all. `expected []` on it
+	// would be the original control byte for byte: a survivor forever, and an
+	// exclusion row that documents nothing.
+	t.Run("empty_list_param_yields_no_mutant", func(t *testing.T) {
+		c := mustControl(t, opsHead+"params:\n  forbidden: { type: list<string>, default: [], description: d }\nchecks:\n  - { fact: a.rows, op: none, subject: name, where: { field: name, op: in, expected: \"${forbidden}\" } }\n")
+		for _, s := range signatures(mutantsOf(c)) {
+			if strings.HasPrefix(s, "params.") {
+				t.Errorf("generated %q for an already-empty default; it would re-encode the original control", s)
+			}
+		}
+		// The control's own clauses are still mutated, so the guard is about the
+		// no-op substitution alone and not about skipping the parameter's site.
+		if got := signatures(mutantsOf(c)); len(got) == 0 {
+			t.Error("the control produced no mutants at all")
 		}
 	})
 
