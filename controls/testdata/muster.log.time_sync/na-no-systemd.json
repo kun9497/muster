@@ -1,3 +1,4 @@
 {"synthetic": true, "schema_version":1,"run":{},"facts":{
-  "services":{"ntp":{"installed":{"status":"unsupported","reason":"no systemd on this host; service state cannot be read"}}}
-}}
+  "services":{"ntp":{"installed":{"status":"unsupported","reason":"no systemd on this host; service state cannot be read"},
+                     "active":{"status":"unsupported","reason":"no systemd on this host; service state cannot be read"}}},
+  "time_sync":{"server_count":{"status":"unsupported","reason":"no systemd on this host; no time synchronisation provider could be named"}}}}

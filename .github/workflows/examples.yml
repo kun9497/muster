@@ -1,0 +1,216 @@
+name: examples
+
+# The committed examples/ snapshots and their reports (spec 3F, F-11/F-12).
+# Run by hand; a person then downloads the artifact with
+# `make examples-fetch RUN=<run id>`, reviews the diff and commits. Nothing
+# here runs on a push or a pull request, and nothing here is collected from
+# anybody's host: one snapshot comes from a public image, the other from the
+# throwaway GitHub runner VM, and both are rewritten below.
+on:
+  workflow_dispatch:
+  # A workflow that has never run is not registered, so it cannot be
+  # dispatched from a branch; a pull request that edits this file runs it
+  # once, which registers it and produces the examples for that branch.
+  pull_request:
+    paths: ['.github/workflows/examples.yml']
+
+permissions: {contents: read}
+
+jobs:
+  examples:
+    runs-on: ubuntu-24.04
+    env:
+      # F-11: an example over 4 MiB is refused rather than committed.
+      MAX_BYTES: "4194304"
+    steps:
+      - uses: actions/checkout@v4
+        # Tags, so `make build` stamps a version rather than falling back to
+        # the abbreviated commit.
+        with: {fetch-depth: 0}
+      - uses: actions/setup-go@v5
+        with: {go-version: "1.25.5", check-latest: false}
+      - name: build muster the way a release is built
+        # `make build` is CGO_ENABLED=0 go build -trimpath with the Makefile's
+        # LDFLAGS, which stamp main.version, main.commit and main.date from
+        # git. A plain `go build` leaves the defaults of cmd/muster/main.go in
+        # place, and every example would then claim to have been collected by
+        # muster "dev" at commit "none" -- the opposite of the provenance F-11
+        # says the snapshot headers carry.
+        run: make build
+      - name: what built these examples
+        run: ./bin/muster version
+      - name: prepare the output directory
+        run: mkdir -m 700 "$RUNNER_TEMP/ex"
+
+      - name: collect inside ubuntu:24.04
+        run: |
+          docker run --rm --platform linux/amd64 -v "$PWD/bin:/m:ro" -v "$RUNNER_TEMP/ex:/out" \
+            ubuntu:24.04 /m/muster collect --deep --out /out/ubuntu-24.04-container.json
+          sudo chown "$(id -u)" "$RUNNER_TEMP/ex/ubuntu-24.04-container.json"
+
+      - name: collect on the runner VM
+        run: |
+          # Ruling G-26: the one list, .github/walk-excludes, which ci.yml's
+          # collect-root job reads too -- the VM example is "the walk CI
+          # already proves" only while the two runs exclude the same trees.
+          mapfile -t walk_excludes < <(grep -vE '^[[:space:]]*(#|$)' .github/walk-excludes)
+          excludes=()
+          for p in "${walk_excludes[@]}"; do excludes+=(--walk-exclude "$p"); done
+          set +e
+          sudo ./bin/muster collect --deep --walk-budget 15m --walk-max-entries 6000000 \
+            "${excludes[@]}" --require-root --out "$RUNNER_TEMP/ex/ubuntu-24.04-vm.json"
+          code=$?
+          set -e
+          echo "collect exit $code"
+          # 0 complete, 1 partial, 2 nothing collected. A partial snapshot is
+          # still a usable example -- and its degraded envelopes are part of
+          # what an example should show -- so it is reported here and judged
+          # by the person who commits it, while 2 stops the run. An exit 2 may
+          # have written no file at all, so the diagnostics are guarded: a run
+          # that collected nothing should say so, not die in chown.
+          if [ -f "$RUNNER_TEMP/ex/ubuntu-24.04-vm.json" ]; then
+            sudo chown "$(id -u)" "$RUNNER_TEMP/ex/ubuntu-24.04-vm.json"
+            jq -r '.run.partial_failures, (.run.collectors[] | select(.status != "ok") | "\(.name): \(.status) \(.reason)")' \
+              "$RUNNER_TEMP/ex/ubuntu-24.04-vm.json"
+            # W-4: the same per-list line ci.yml's collect-root job prints.
+            # The size cap in the next step refuses the whole file without
+            # saying WHICH walk list grew, so the lengths are on the log
+            # before anything can fire.
+            jq -r '.facts.walk | to_entries[] | "\(.key): status=\(.value.status) truncated=\(.value.truncated // false) length=\(if (.value.value | type) == "array" then (.value.value | length) else "-" end)"' \
+              "$RUNNER_TEMP/ex/ubuntu-24.04-vm.json"
+          else
+            echo "collect wrote no snapshot"
+          fi
+          test "$code" -le 1
+
+      - name: rewrite what identifies a host, and refuse an oversized example
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/ex"
+          rewrite() {
+            # F-11: the hostname becomes a fixed name, the boot UUID, the
+            # kernel string and the uptime are blanked (they identify the
+            # runner's kernel, not the image), every listening socket address
+            # that is neither loopback nor a wildcard becomes an RFC 5737 /
+            # RFC 3849 documentation address, and every RFC 1918 address a
+            # host's own configuration put into a fact is renumbered into
+            # 198.51.100.0/24. machine_id_hash is already a hash and stays.
+            #
+            # Ruling G-23: the sockets list used to be the only place the
+            # rewrite looked, and a runner's addresses reach a snapshot
+            # through half a dozen other facts - the firewall's raw dumps and
+            # its normalised rules, the TCP-wrapper and hosts.equiv line
+            # lists, the configured time sources and the NFS export clients.
+            # The last octet is kept, so two different addresses stay two
+            # different addresses, and an optional /prefix is outside the
+            # match, so a 10/8 network like 10.<x>.<y>.0/24 becomes 198.51.100.0/24 rather than
+            # losing its mask.
+            #
+            # Every list is guarded by the same `type == "array"` test: a fact
+            # whose status is not ok carries no value, and `.value |= ...` on
+            # a null is an invalid path expression that stops jq -- proven on
+            # a snapshot whose sockets fact reads unsupported.
+            jq --arg host "$2" '
+              def rfc1918:
+                gsub("\\b10\\.\\d{1,3}\\.\\d{1,3}\\.(?<d>\\d{1,3})\\b"; "198.51.100." + .d)
+                | gsub("\\b172\\.(?:1[6-9]|2[0-9]|3[01])\\.\\d{1,3}\\.(?<d>\\d{1,3})\\b"; "198.51.100." + .d)
+                | gsub("\\b192\\.168\\.\\d{1,3}\\.(?<d>\\d{1,3})\\b"; "198.51.100." + .d);
+              def scrubstr: if type == "string" then rfc1918 else . end;
+              def scrubfield(name): if (.[name] | type) == "string" then .[name] |= rfc1918 else . end;
+              .run.host.hostname = $host
+              | .run.host.boot_id = ""
+              | .run.host.kernel = ""
+              | .run.host.uptime_s = 0
+              | if (.facts.sockets.listening.value | type) == "array"
+                then .facts.sockets.listening.value |= map(
+                  if (.addr | test("^(127\\.|::1$|0\\.0\\.0\\.0$|::$)") | not)
+                  then .addr = (if (.addr | test(":")) then "2001:db8::1" else "192.0.2.1" end)
+                  else . end)
+                else . end
+              | if (.facts.firewall.raw_dumps.value | type) == "array"
+                then .facts.firewall.raw_dumps.value |= map(scrubfield("content")) else . end
+              | if (.facts.firewall.rules.value | type) == "array"
+                then .facts.firewall.rules.value |= map(scrubfield("saddr")) else . end
+              | if (.facts.files.etc_hosts_allow_lines.value | type) == "array"
+                then .facts.files.etc_hosts_allow_lines.value |= map(scrubstr) else . end
+              | if (.facts.files.etc_hosts_deny_lines.value | type) == "array"
+                then .facts.files.etc_hosts_deny_lines.value |= map(scrubstr) else . end
+              | if (.facts.files.etc_hosts_equiv_lines.value | type) == "array"
+                then .facts.files.etc_hosts_equiv_lines.value |= map(scrubstr) else . end
+              | if (.facts.time_sync.servers.value | type) == "array"
+                then .facts.time_sync.servers.value |= map(scrubstr) else . end
+              | if (.facts.nfs.exports.value | type) == "array"
+                then .facts.nfs.exports.value |= map(scrubfield("client")) else . end
+            ' "$1" > "$1.tmp"
+            mv "$1.tmp" "$1"
+            size=$(stat -c%s "$1")
+            echo "$1: $size bytes, hostname $2"
+            test "$size" -le "$MAX_BYTES" || {
+              echo "$1 is $size bytes, over the $MAX_BYTES byte cap (F-11): narrow the walk or leave it out"
+              exit 1
+            }
+            # The rewrite is the only thing standing between a runner's
+            # addresses and a committed file, so it is asserted, not assumed.
+            jq -e --arg host "$2" '
+              .run.host.hostname == $host
+              and .run.host.boot_id == ""
+              and .run.host.kernel == ""
+              and .run.host.uptime_s == 0
+              and ([.facts.sockets.listening.value // [] | .[]
+                    | select(.addr | test("^(127\\.|::1$|0\\.0\\.0\\.0$|::$|192\\.0\\.2\\.1$|2001:db8::1$)") | not)]
+                   | length == 0)
+            ' "$1" > /dev/null
+            # Ruling G-23: and then the whole file, because the fact nobody
+            # thought of is exactly what a per-fact list cannot cover. These
+            # are .gitleaks.toml's three shapes for tracked files - an RFC
+            # 1918 address, a private DNS suffix and a non-personal e-mail -
+            # with that file's own literal allowlists applied, so this step
+            # refuses what the secrets job would refuse, one commit earlier.
+            ipv4='\b(10\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}|172\.(1[6-9]|2[0-9]|3[01])\.[0-9]{1,3}\.[0-9]{1,3}|192\.168\.[0-9]{1,3}\.[0-9]{1,3})\b'
+            host_shape='\b[a-zA-Z0-9][a-zA-Z0-9-]*\.(corp|internal|intra|lan|local|priv)\b'
+            email='[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.(com|net|org|io|co|kr)'
+            allowed='^(10\.0\.0\.0|172\.16\.0\.0|192\.168\.0\.0|snmpd\.local|conf\.local|db\.local|w\.priv)$|@(openssh\.com|libssh\.org|example\.(com|org|net))$'
+            # The hostname rule in .gitleaks.toml is written (?i), so its
+            # shape is matched here with -i as well; a suffix spelled .CORP
+            # would otherwise pass this step and be refused by the secrets
+            # job. The address and e-mail patterns keep their own casing.
+            hits=$( { grep -oE -e "$ipv4" -e "$email" "$1" || true
+                      grep -oiE -e "$host_shape" "$1" || true
+                    } | grep -vE "$allowed" | sort | uniq -c | sort -rn | head -20 || true)
+            if [ -n "$hits" ]; then
+              echo "$1 still carries what .gitleaks.toml refuses in a tracked file:"
+              echo "$hits"
+              exit 1
+            fi
+          }
+          rewrite ubuntu-24.04-container.json ubuntu-container
+          rewrite ubuntu-24.04-vm.json github-runner
+
+      - name: check both snapshots
+        run: |
+          cd "$RUNNER_TEMP/ex"
+          for f in ubuntu-24.04-container.json ubuntu-24.04-vm.json; do
+            b=${f%.json}
+            # check exits 1 on a FAIL and 2 on an ERROR; both are ordinary
+            # results for a real host, and the report is what is wanted here.
+            # The table width is fixed at 100 by the renderer, so only colour
+            # has to be turned off for a file that people read in a diff.
+            set +e
+            NO_COLOR=1 "$GITHUB_WORKSPACE/bin/muster" check --facts "$f" --format json > "$b-report.json"
+            jcode=$?
+            NO_COLOR=1 "$GITHUB_WORKSPACE/bin/muster" check --facts "$f" --format table > "$b-report.txt"
+            tcode=$?
+            set -e
+            echo "$f: check json exit $jcode, table exit $tcode"
+            test -s "$b-report.json"
+            test -s "$b-report.txt"
+            jq -e '.check.guide_edition == "kisa-unix-2026"' "$b-report.json" > /dev/null
+            jq -e '[.results[] | select(.status == "ERROR" and .reason_code == "internal_error")] | length == 0' "$b-report.json" > /dev/null
+          done
+          ls -l
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: examples-${{ github.run_id }}
+          path: "${{ runner.temp }}/ex"
+          if-no-files-found: error

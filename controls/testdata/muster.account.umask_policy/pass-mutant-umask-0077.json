@@ -1,0 +1,1 @@
+{"synthetic":true,"schema_version":1,"run":{},"facts":{"accounts":{"login_defs":{"umask":{"status":"ok","value":"0077","source":{"kind":"file","path":"/etc/login.defs","line":180}}}},"pam":{"umask_module":{"enabled":{"status":"ok","value":true}}}}}

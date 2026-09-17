@@ -165,6 +165,14 @@ CIS나 STIG 준수 여부를 인증하지 않습니다. 컨트롤이 인용할 �
 이후 릴리스로 미룬 것: 다중 호스트 집계, 에이전트리스 SSH 모드, ISMS-P 매핑, 파일
 무결성 베이스라인, 인증서 만료, OS EOL 감지, 클라우드 VM 항목.
 
+## 출력 예시
+
+[`examples/`](examples/)에는 실제 스냅샷 두 개와 `muster check`가 그것으로 만든 리포트가
+있습니다 — 하나는 공개 `ubuntu:24.04` 컨테이너 안에서, 하나는 GitHub Actions 러너 VM에서
+`--deep`으로 수집한 것 — 아무것도 돌리지 않고 출력의 모양을 읽을 수 있도록. 둘 다 누구의
+호스트에서도 오지 않았습니다. `examples.yml` 워크플로가 수집하고 보관 전에 호스트 정체를
+지우며, 테스트가 변경 때마다 끝까지 검사합니다.
+
 ## 문서와 기여
 
 - [CONTRIBUTING.ko.md](CONTRIBUTING.ko.md) — 컨트롤 추가(`muster controls new`가

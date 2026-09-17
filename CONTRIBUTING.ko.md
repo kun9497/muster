@@ -108,10 +108,32 @@ muster는 Linux 호스트를 KISA 2026 Unix 서버 가이드에 대조해 점검
 - 기능이 사라졌을 때 달라지는 것을 단언하세요. 부분 문자열보다 구조적 단언을 우선합니다.
 - 골든: `go test ./internal/report -run TestJSON -update`, `-run TestTableGolden -update`,
   위의 팩트 골든. 재생성된 골든은 커밋 전에 모두 검토합니다.
+- 픽스처는 제 몫을 해야 합니다. `go test ./internal/controls -run
+  TestEveryMutantIsKilled`는 모든 컨트롤을 변이시키고(연산자 뒤집기, 기대값 이동, 절과
+  메커니즘 제거, `absent_means` 변경) 변이체마다 다르게 답하는 픽스처를 요구합니다.
+  살아남은 변이체는 빠진 픽스처입니다 — 보여 주는 것을 이름으로 삼아 하나 추가하세요.
+  수집기 불변식이나 닫힌 값 어휘 때문에 어떤 픽스처도 구별할 수 없는 변이체만
+  `controls/testdata/_mutants.yaml`에 넣습니다. 한 줄에 하나, 그 불변식을 이름으로 부르는
+  이유와 함께. 변이체가 죽었거나 더 이상 생성되지 않는 행이 있으면 테스트가 실패합니다.
+- `internal/collect/collectors`와 `internal/pkgfiles`의 모든 파서 진입점에는 그 파서의
+  testdata에서 시드를 얻는 `Fuzz<Name>` 타깃이 있고, `[]byte`를 받는 새 함수나 메서드에
+  타깃이 없으면 `TestEveryParserHasAFuzzTarget`이 실패합니다(부모를 통해서만 닿는 헬퍼는
+  `coveredThrough`에, 호스트 입력이 아닌 바이트는 이유와 함께 `notParsers`에 선언). 풀 리퀘스트는 시드만 돌리고, 밤마다 도는 `fuzz.yml`이 타깃마다
+  1분씩 샤드 4개로 퍼징합니다. `make fuzz TARGET=<name> TIME=<duration>`은 하나를 로컬에서
+  돌립니다. 크래시는 Go가 `testdata/fuzz/` 아래에 쓰는 코퍼스 파일로 들어가고, 수정은
+  별도 커밋입니다.
+- `MUSTER_ORACLE=1 go test ./internal/collect/collectors -run Oracle`(Linux, root)은
+  sshd·passwd/group·mountinfo·services 파서를 그 호스트의 `sshd -T`, `getent`, `findmnt`,
+  `systemctl`과 비교합니다. CI는 root 잡과 init 컨테이너 안에서 돌립니다. 불일치는 파서
+  결함이거나 테스트에 기록할 데몬 동작이지, 느슨하게 할 규칙이 아닙니다.
+- `examples/`에는 `examples.yml` 워크플로가 수집한 스냅샷 두 개 — `ubuntu:24.04` 컨테이너와
+  러너 VM — 가 호스트 정체를 지운 형태로 있고, `cmd/muster`의 예시 테스트가 끝까지
+  검사합니다. `make examples-fetch RUN=<id>`가 워크플로 실행에서 갱신합니다. 사설 호스트의
+  스냅샷으로 바꿔 넣지 마세요.
 - CI는 race 빌드, lint, coverage 검사, 러너 VM에서의 root 수집, 비root 수집, 컨테이너
   매트릭스(Ubuntu 22.04/24.04, Rocky 9, AlmaLinux 9, Debian 12는 카나리), 읽기 전용 계약
-  실행, 그리고 capability matrix(`docs/reference/capability-matrix.json`: root 없이
-  `denied`여야 하는 팩트와 systemd 없이 `unsupported`여야 하는 팩트)를 돌립니다.
+  실행, 데몬 오라클, 그리고 capability matrix(`docs/reference/capability-matrix.json`:
+  root 없이 `denied`여야 하는 팩트와 systemd 없이 `unsupported`여야 하는 팩트)를 돌립니다.
 
 ## 문서
 

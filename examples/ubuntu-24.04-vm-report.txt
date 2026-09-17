@@ -1,0 +1,213 @@
+muster 94ca596 · controls kisa-unix-2026+2026.09.16 · guide kisa-unix-2026 · host github-runner · collected 2026-09-17T08:30:07Z
+automatic  high 16/10/0  medium 9/2/0  low 3/1/0  (pass/fail/warn)
+manual review 11  ·  undecidable error 0 / n-a 16 / waived 0  ·  facts failed 0  ·  waivers expiring within 30d 0
+
+FAIL           high   muster.account.cron_permissions         cron 설정 파일이 0640 이하로 엄격하며 소…
+    reason: clause does not hold: cron.files each require mode in [0 32 128 160 256 288 384 416]
+    cron.files = 19 elements; none matching  (/etc/crontab)
+    cron.files = 19 elements; 6 selected; failing: file:/etc/crontab, file:/etc/cron.d/.placeholder, file:/etc/cron.d/e2scrub_all, file:/etc/cron.d/php, file:/etc/cron.d/sphinxsearch, +1 more  (/etc/crontab)
+    cron.files = 19 elements; 6 selected  (/etc/crontab)
+    cron.files = 19 elements; 0 selected  (/etc/crontab)
+    cron.files = 19 elements; 13 selected  (/etc/crontab)
+    cron.dirs = 7 elements; none matching  (/etc/cron.d)
+    file:/etc/crontab: expected [0 32 128 160 256 288 384 416], actual 420 (fail)
+    file:/etc/cron.d/.placeholder: expected [0 32 128 160 256 288 384 416], actual 420 (fail)
+    file:/etc/cron.d/e2scrub_all: expected [0 32 128 160 256 288 384 416], actual 420 (fail)
+    file:/etc/cron.d/php: expected [0 32 128 160 256 288 384 416], actual 420 (fail)
+    file:/etc/cron.d/sphinxsearch: expected [0 32 128 160 256 288 384 416], actual 420 (fail)
+    (+1 more, use --all)
+FAIL           high   muster.account.lockout_threshold        로그인 실패가 정해진 횟수를 넘으면 계정이…
+    reason: absent counts as fail: pam.faillock.deny is absent on this host
+    pam.faillock.enabled = false
+    pam.faillock.deny: absent
+FAIL           high   muster.account.password_policy          비밀번호 사용 기간·길이·복잡성 정책이 설…
+    reason: absent counts as fail: accounts.login_defs.pass_min_len is absent on this host
+    accounts.login_defs.pass_max_days@runtime = 99999
+    accounts.login_defs.pass_max_days@persisted = 99999  (/etc/login.defs:165)
+    accounts.login_defs.pass_min_days@runtime = 0
+    accounts.login_defs.pass_min_days@persisted = 0  (/etc/login.defs:166)
+    accounts.login_defs.pass_min_len: absent
+    pam.pwquality.enabled = false
+    pam.pwquality.minlen: absent
+    pam.pwquality.required_classes: absent
+FAIL           high   muster.account.root_home_and_path       root 홈 디렉터리와 PATH 가 안전하다
+    reason: clause does not hold: env.shell.root_path_entries none where is_dot eq true
+    env.shell.root_path_raw = $PATH:/opt/pipx_bin  (/root/.profile:13)
+    files.root_home.uid = 0  (/root)
+    files.root_home.group_writable = false  (/root)
+    files.root_home.other_writable = false  (/root)
+    env.shell.root_path_entries = 3 elements; matching: item:0  (/root/.profile:13)
+    env.shell.root_path_entries = 3 elements; none matching  (/root/.profile:13)
+    item:0: expected not eq true, actual true (fail)
+PASS           high   muster.account.root_only_uid_zero       uid 0 인 계정은 root 뿐이다
+FAIL           high   muster.account.root_remote_login        root 계정이 SSH로 직접 로그인할 수 없다
+    reason: clause does not hold: sshd.options.permit_root_login in [no prohibit-password]; collection was degraded: personas not collected
+    services.ssh.installed = true  (/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState ssh.service)
+    sshd.options.permit_root_login@effective = without-password  (/usr/sbin/sshd -G)
+PASS           high   muster.account.shadow_passwords         비밀번호가 /etc/shadow 에만 해시로 저장된…
+FAIL           high   muster.account.su_restricted            PAM 이 su 를 wheel 그룹으로 제한한다
+    reason: clause does not hold: pam.su.wheel_required eq true
+    pam.su.wheel_required = false
+PASS           high   muster.file.dev_no_stale_files          /dev 에 일반 파일이 없다
+MANUAL         high   muster.file.env_file_permissions        셸 환경변수 파일이 올바른 소유자를 갖고 …
+    reason: absent needs review: files.env_files is absent on this host
+FAIL           high   muster.file.hosts_permissions           /etc/hosts 가 root 소유이고 root 만 읽을 …
+    reason: clause does not hold: files.etc_hosts.mode in [0 128 256 384]
+    files.etc_hosts.uid = 0  (/etc/hosts)
+    files.etc_hosts.mode = 420  (/etc/hosts)
+PASS           high   muster.file.inetd_conf_permissions      inetd/xinetd 설정이 root 소유이며 노출되…
+    reason: absent counts as pass: no mechanism applies to this host
+MANUAL         high   muster.file.ip_port_restriction         접속 IP 및 포트가 제한되어 있다
+    reason: absent needs review: firewall.restricts_inbound is absent on this host
+PASS           high   muster.file.passwd_permissions          /etc/passwd 가 root 소유이고 다른 사용자…
+MANUAL         high   muster.file.rhosts_forbidden            .rhosts 나 hosts.equiv 가 무조건 신뢰를 …
+    reason: absent needs review: files.user_rhosts is absent on this host
+PASS           high   muster.file.services_permissions        /etc/services 가 root 소유이고 그룹과 다…
+FAIL           high   muster.file.shadow_permissions          /etc/shadow 가 root 소유이고 root 만 읽을…
+    reason: clause does not hold: files.etc_shadow.mode in [0 256]
+    files.etc_shadow.uid = 0  (/etc/shadow)
+    files.etc_shadow.mode = 416  (/etc/shadow)
+    files.etc_shadow.acl_entries = 0 elements; none matching  (/etc/shadow)
+PASS           high   muster.file.startup_script_permissions  시스템 시작 스크립트가 그룹·기타 사용자에…
+FAIL           high   muster.file.suid_sgid                   setuid·setgid 파일은 모두 패키지가 그렇게…
+    reason: clause does not hold: walk.sticky_missing none where path present
+    walk.suid_sgid = 17 elements  (/var/lib/dpkg/info)
+    walk.suid_sgid = 17 elements; none matching  (/var/lib/dpkg/info)
+    walk.sticky_missing = 34 elements; matching: file:/opt, file:/opt/actionarchivecache, file:/opt/actionarchivecache/actions_cache, file:/opt/actionarchivecache/actions_checkout, file:/opt/actionarchivecache/actions_setup-no…
+    file:/opt: expected not present, actual /opt (fail)
+    file:/opt/actionarchivecache: expected not present, actual /opt/actionarchivecache (fail)
+    file:/opt/actionarchivecache/actions_cache: expected not present, actual /opt/actionarchivecache/actions_cache (fail)
+    file:/opt/actionarchivecache/actions_checkout: expected not present, actual /opt/actionarchivecache/actions_checkout (fail)
+    file:/opt/actionarchivecache/actions_setup-node: expected not present, actual /opt/actionarchivecache/actions_setup-node (fail)
+    (+29 more, use --all)
+WARN           high   muster.file.suid_sgid_unverified        선언을 확인하지 못한 setuid·setgid 파일이…
+    reason: clause does not hold: walk.suid_sgid_unverified none where path present
+    walk.suid_sgid_unverified = 7 elements; matching: file:/usr/bin/fusermount3, file:/usr/bin/mlock, file:/usr/bin/newgidmap, file:/usr/bin/newuidmap, file:/usr/bin/ssh-agent, +2 more  (/var/lib/dpkg/info)
+    file:/usr/bin/fusermount3: expected not present, actual /usr/bin/fusermount3 (fail)
+    file:/usr/bin/mlock: expected not present, actual /usr/bin/mlock (fail)
+    file:/usr/bin/newgidmap: expected not present, actual /usr/bin/newgidmap (fail)
+    file:/usr/bin/newuidmap: expected not present, actual /usr/bin/newuidmap (fail)
+    file:/usr/bin/ssh-agent: expected not present, actual /usr/bin/ssh-agent (fail)
+    (+2 more, use --all)
+FAIL           high   muster.file.syslog_conf_permissions     syslog 설정이 0640 이하로 엄격하며 root …
+    reason: clause does not hold: files.syslog_configs each require mode in [0 32 128 160 256 288 384 416]
+    files.syslog_configs = 4 elements; 4 selected; failing: file:/etc/rsyslog.conf, file:/etc/rsyslog.d/20-ufw.conf, file:/etc/rsyslog.d/21-cloudinit.conf, file:/etc/rsyslog.d/50-default.conf  (/etc/rsyslog.conf)
+    files.syslog_configs = 4 elements; 4 selected  (/etc/rsyslog.conf)
+    files.syslog_configs = 4 elements; none matching  (/etc/rsyslog.conf)
+    files.journald_configs = 1 elements; 1 selected; failing: file:/etc/systemd/journald.conf  (/etc/systemd/journald.conf)
+    files.journald_configs = 1 elements; 1 selected  (/etc/systemd/journald.conf)
+    files.journald_configs = 1 elements; none matching  (/etc/systemd/journald.conf)
+    file:/etc/rsyslog.conf: expected [0 32 128 160 256 288 384 416], actual 420 (fail)
+    file:/etc/rsyslog.d/20-ufw.conf: expected [0 32 128 160 256 288 384 416], actual 420 (fail)
+    file:/etc/rsyslog.d/21-cloudinit.conf: expected [0 32 128 160 256 288 384 416], actual 420 (fail)
+    file:/etc/rsyslog.d/50-default.conf: expected [0 32 128 160 256 288 384 416], actual 420 (fail)
+    file:/etc/systemd/journald.conf: expected [0 32 128 160 256 288 384 416], actual 420 (fail)
+PASS           high   muster.file.unowned_files               모든 파일과 디렉터리의 소유자와 그룹을 이…
+WARN           high   muster.file.world_writable              예상치 못한 world-writable 파일이 없다
+    reason: clause does not hold: walk.world_writable each require package_declared eq true
+    walk.world_writable = 543 elements; 521 selected; failing: file:/opt, file:/opt/actionarchivecache, file:/opt/actionarchivecache/actions_cache, file:/opt/actionarchivecache/actions_cache/0057852bfaa89a56745cba8c7296529d2fc…  (/var/lib/dpkg/info)
+    file:/opt: expected true, actual false (fail)
+    file:/opt/actionarchivecache: expected true, actual false (fail)
+    file:/opt/actionarchivecache/actions_cache: expected true, actual false (fail)
+    file:/opt/actionarchivecache/actions_cache/0057852bfaa89a56745cba8c7296529d2fc39830.tar.gz: expected true, actual false (fail)
+    file:/opt/actionarchivecache/actions_cache/0400d5f644dc74513175e3cd8d07132dd4860809.tar.gz: expected true, actual false (fail)
+    (+516 more, use --all)
+WARN           high   muster.patch.security_updates           캐시된 패키지 메타데이터에 대기 중인 보안…
+    reason: clause does not hold: patch.metadata_age_s lte 604800
+    patch.manager = apt  (/var/lib/dpkg/status)
+    patch.metadata_age_s = 816847  (/var/lib/apt/periodic/update-success-stamp)
+    patch.pending_security_count = 0  (/usr/bin/apt-get -s upgrade -o Debug::NoLocking=1)
+PASS           high   muster.service.automount_disabled       automount 서비스가 활성화되어 있지 않다
+NOT_APPLICABLE high   muster.service.dns_version              네임서버가 벤더가 패치한 수준으로 유지된다
+    reason: applies_when does not hold: services.dns.installed eq true
+NOT_APPLICABLE high   muster.service.dns_zone_transfer        모든 권한 존이 존 전송 대상을 제한한다
+    reason: applies_when does not hold: services.dns.installed eq true
+PASS           high   muster.service.dos_services_disabled    DoS 취약 서비스가 활성화되어 있지 않다
+PASS           high   muster.service.finger_disabled          finger 서비스가 활성화되어 있지 않다
+NOT_APPLICABLE high   muster.service.ftp_anonymous            FTP 서비스가 익명 로그인을 제공하지 않는다
+    reason: applies_when does not hold: services.ftp.installed eq true
+NOT_APPLICABLE high   muster.service.mail_relay               메일 서버가 서비스 대상 클라이언트에 대해…
+    reason: applies_when does not hold: services.mail.installed eq true
+NOT_APPLICABLE high   muster.service.mail_user_execution      메일 서버의 큐·전송 명령 실행이 관리자로 …
+    reason: applies_when does not hold: services.mail.installed eq true
+NOT_APPLICABLE high   muster.service.mail_version             메일 서버가 벤더가 패치한 수준으로 유지된…
+    reason: applies_when does not hold: services.mail.installed eq true
+NOT_APPLICABLE high   muster.service.nfs_export_access        NFS 공유가 클라이언트를 지정하고 원격 roo…
+    reason: applies_when does not hold: services.nfs_server.installed eq true
+PASS           high   muster.service.nfs_server_disabled      NFS 서버가 활성화되어 있지 않다
+PASS           high   muster.service.nis_disabled             NIS 가 활성화되어 있지 않고 계정 조회에도…
+PASS           high   muster.service.rpcbind_disabled         RPC 포트매퍼(rpcbind)가 활성화되어 있지 …
+PASS           high   muster.service.rservices_disabled       r-services(rsh/rlogin/rexec)가 활성화되어…
+NOT_APPLICABLE high   muster.service.snmp_access_control      SNMP 커뮤니티가 사용을 허용한 관리 서버에…
+    reason: applies_when does not hold: services.snmp.installed eq true
+NOT_APPLICABLE high   muster.service.snmp_version             SNMP 에이전트가 버전 3 만 사용한다
+    reason: applies_when does not hold: services.snmp.installed eq true
+PASS           high   muster.service.tftp_talk_disabled       tftp 와 talk 가 활성화되어 있지 않고 접속…
+PASS           medium muster.account.admin_group_minimal      root 그룹에 root 외의 계정이 없다
+FAIL           medium muster.account.password_hash_algorithm  비밀번호가 안전한 알고리즘으로 해시된다
+    reason: clause does not hold: accounts.users each require hash_algo in [$5$ $6$ $y$ $gy$ $7$ $2b$ $2y$ $2a$]
+    accounts.login_defs.encrypt_method = SHA512  (/etc/login.defs:295)
+    pam.password.unix_hash = yescrypt
+    accounts.shadow_in_use = true
+    accounts.users = 39 elements; 2 selected; failing: user:root  (/etc/passwd)
+    user:root: expected [$5$ $6$ $y$ $gy$ $7$ $2b$ $2y$ $2a$], actual legacy (fail)
+PASS           medium muster.account.sudoers_permissions      sudoers 와 드롭인이 0440 이며 root 소유이…
+PASS           medium muster.account.umask_policy             기본 파일 생성 마스크가 그룹·기타 쓰기를 …
+PASS           medium muster.account.unique_uids              두 계정이 같은 uid 를 갖지 않는다
+MANUAL         medium muster.file.home_dir_exists             모든 대화형 계정이 실제 존재하는 홈 디렉…
+    reason: absent needs review: files.home_dirs is absent on this host
+MANUAL         medium muster.file.home_dir_permissions        대화형 홈 디렉터리가 사용자 소유이며 타인…
+    reason: absent needs review: files.home_dirs is absent on this host
+FAIL           medium muster.file.log_dir_permissions         로그 디렉터리·파일이 소유 그룹 밖에서 쓰…
+    reason: clause does not hold: files.log_dirs each require group in [root syslog adm utmp]
+    files.log_dirs = 16 elements; none matching  (/var/log)
+    files.log_dirs = 16 elements; 2 selected; failing: file:/var/log/postgresql  (/var/log)
+    files.log_files = 30 elements; none matching  (/var/log)
+    files.log_files = 30 elements; 3 selected  (/var/log)
+    file:/var/log/postgresql: expected [root syslog adm utmp], actual postgres (fail)
+PASS           medium muster.log.syslog_policy                시스템 로깅이 보안 관련 facility 를 영구 …
+PASS           medium muster.log.time_sync                    시스템 시각이 설정된 소스와 동기화된다
+NOT_APPLICABLE medium muster.service.dns_dynamic_update       모든 권한 존이 동적 업데이트 대상을 제한…
+    reason: applies_when does not hold: services.dns.installed eq true
+PASS           medium muster.service.ftp_account_shell        ftp 계정으로 대화형 로그인을 할 수 없다
+NOT_APPLICABLE medium muster.service.ftp_unencrypted          암호화되지 않은 FTP 서비스가 동작하지 않…
+    reason: applies_when does not hold: services.ftp.installed eq true
+NOT_APPLICABLE medium muster.service.ftpusers_root            FTP 를 통한 root 로그인이 거부된다
+    reason: applies_when does not hold: services.ftp.installed eq true
+NOT_APPLICABLE medium muster.service.mail_expn_vrfy           메일 서버가 SMTP EXPN, VRFY 명령을 거부한…
+    reason: applies_when does not hold: services.mail.installed eq true
+NOT_APPLICABLE medium muster.service.snmp_community_strength  SNMP 커뮤니티 문자열이 잘 알려진 값도 짧…
+    reason: applies_when does not hold: services.snmp.installed eq true
+PASS           medium muster.service.snmp_disabled            SNMP 가 활성화되어 있지 않고 접속할 수도 …
+PASS           medium muster.service.telnet_disabled          Telnet 서비스에 접속할 수 없다
+PASS           low    muster.account.primary_group_exists     모든 계정의 기본 그룹이 존재한다
+PASS           low    muster.account.session_timeout          유휴 SSH 세션이 정해진 시간이 지나면 끊긴…
+FAIL           low    muster.account.system_account_shells    시스템 계정에 로그인 셸이 없다
+    reason: clause does not hold: accounts.users each require shell_valid eq false
+    accounts.shells = [/bin/sh /usr/bin/sh /bin/bash /usr/bin/bash /bin/rbash /usr/bin/rbash /usr/bin/dash /usr/bin/screen /usr/bin/tmux /usr/bin/pwsh /opt/microsoft/powershell/7/pwsh]  (/etc/shells)
+    accounts.users = 39 elements; 35 selected; failing: user:postgres  (/etc/passwd)
+    user:postgres: expected false, actual true (fail)
+WARN           low    muster.account.unnecessary_accounts     불필요한 계정이 제거되어 있다
+    reason: clause does not hold: accounts.users none where name in [lp uucp nuucp]
+    accounts.users = 39 elements; matching: user:lp, user:uucp  (/etc/passwd)
+    user:lp: expected not in [lp uucp nuucp], actual lp (fail)
+    user:uucp: expected not in [lp uucp nuucp], actual uucp (fail)
+WARN           low    muster.file.hidden_entries              홈 디렉터리 밖의 숨김 파일과 디렉터리는 …
+    reason: clause does not hold: walk.hidden each require package_declared eq true
+    walk.hidden = 367 elements; 165 selected; failing: file:/etc/.java, file:/etc/skel/.bash_profile, file:/etc/skel/.cargo, file:/etc/skel/.composer, file:/etc/skel/.config, +100 more  (/var/lib/dpkg/info)
+    file:/etc/.java: expected true, actual false (fail)
+    file:/etc/skel/.bash_profile: expected true, actual false (fail)
+    file:/etc/skel/.cargo: expected true, actual false (fail)
+    file:/etc/skel/.composer: expected true, actual false (fail)
+    file:/etc/skel/.config: expected true, actual false (fail)
+    (+100 more, use --all)
+PASS           low    muster.file.hosts_lpd_permissions       /etc/hosts.lpd 가 존재하면 root 소유이고 …
+    reason: absent counts as pass: files.etc_hosts_lpd.uid is absent on this host
+NOT_APPLICABLE low    muster.service.ftp_banner               FTP 접속 안내 문구가 서비스 소프트웨어를 …
+    reason: applies_when does not hold: services.ftp.installed eq true
+NOT_APPLICABLE low    muster.service.ftpusers_permissions     FTP 접근 제어 파일이 root 소유이고 0640 …
+    reason: applies_when does not hold: services.ftp.installed eq true
+WARN           low    muster.service.login_banner             로그인 시 경고 메시지가 표시된다
+    reason: clause does not hold: sshd.banner_file.nonempty eq true
+    services.ssh.installed = true  (/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState ssh.service)
+    sshd.banner_file.nonempty = false

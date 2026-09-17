@@ -193,6 +193,15 @@ Deferred to a later release: multi-host aggregation, an agentless SSH mode, an
 ISMS-P mapping, file-integrity baselines, certificate expiry, OS end-of-life
 detection, cloud VM items.
 
+## Example output
+
+[`examples/`](examples/) holds two real snapshots and the reports `muster check`
+makes from them — one collected inside a public `ubuntu:24.04` container, one on
+the GitHub Actions runner VM with `--deep` — so the shape of the output can be
+read without running anything. Neither comes from anyone's host: the
+`examples.yml` workflow collects them and rewrites the host identity before they
+are kept, and a test checks them end to end on every change.
+
 ## Documents and contributing
 
 - [CONTRIBUTING.md](CONTRIBUTING.md) — adding a control (`muster controls new`

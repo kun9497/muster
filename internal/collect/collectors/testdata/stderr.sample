@@ -1,0 +1,3 @@
+
+warning: locale not supported by C library, using the fallback 'C' locale
+error: cannot open Packages database in /var/lib/rpm

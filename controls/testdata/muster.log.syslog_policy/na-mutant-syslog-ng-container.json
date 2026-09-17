@@ -1,0 +1,1 @@
+{"synthetic":true,"schema_version":1,"run":{},"facts":{"services":{"syslog":{"active":{"status":"unsupported","reason":"no init system to query in this container"}}},"logging":{"syslog":{"implementation":{"status":"ok","value":"syslog-ng"}},"rsyslog":{"coverage":{"status":"absent","reason":"syslog-ng configuration is not parsed in this version"}}}}}

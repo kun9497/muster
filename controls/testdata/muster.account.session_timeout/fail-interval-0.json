@@ -3,4 +3,6 @@
   "sshd":{"options":{
     "client_alive_interval":{"effective":{"status":"ok","value":0,"source":{"kind":"command","cmd":"/usr/sbin/sshd -T"}}},
     "client_alive_count_max":{"effective":{"status":"ok","value":3,"source":{"kind":"command","cmd":"/usr/sbin/sshd -T"}}}}},
-  "env":{"shell":{"tmout":{"status":"ok","value":0}}}}}
+  "env":{"shell":{
+    "tmout":{"status":"ok","value":0,"source":{"kind":"file","path":"/etc/profile.d/tmout.sh","line":1}},
+    "tmout_exported":{"status":"ok","value":true,"source":{"kind":"file","path":"/etc/profile.d/tmout.sh","line":1}}}}}}

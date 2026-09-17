@@ -1,0 +1,24 @@
+# The GitHub runner image's own trees, excluded from the walk: its toolchain
+# caches and the system directories the image itself makes world-writable (the
+# first --deep run measured 210,280 world-writable entries, 345k of them under
+# /usr/local/lib alone). No host of anyone's owns these permissions, and a path
+# absent from a later image is harmless.
+#
+# Ruling G-26: ONE copy, read by ci.yml's collect-root job (the walk flags and
+# the diagnostic find that explains a capped list) and by examples.yml's VM
+# collect. The VM example is only "the walk CI already proves" while the two
+# runs exclude exactly the same trees, and a second inline copy is how that
+# stops being true.
+#
+# One absolute path per line; a line starting with # is a comment.
+/opt/hostedtoolcache
+/opt/pipx
+/opt/runner-cache
+/opt/microsoft
+/opt/az
+/imagegeneration
+/usr/share
+/usr/local/lib
+/usr/local/share
+/usr/local/.ghcup
+/usr/lib/jvm

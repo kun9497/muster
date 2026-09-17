@@ -1,0 +1,1 @@
+{"synthetic":true,"schema_version":1,"run":{},"facts":{"accounts":{"login_defs":{"umask":{"status":"absent","reason":"login.defs sets no UMASK"}}},"pam":{"umask_module":{"enabled":{"status":"absent","reason":"no login, sshd or other PAM service file"}}}}}

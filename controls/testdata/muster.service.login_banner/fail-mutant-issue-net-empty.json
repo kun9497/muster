@@ -1,0 +1,4 @@
+{"synthetic":true,"schema_version":1,"run":{},"facts":{
+  "services":{"ssh":{"installed":{"status":"ok","value":false}}},
+  "sshd":{"banner_file":{"nonempty":{"status":"ok","value":false,"source":{"kind":"derived"}}}},
+  "banners":{"issue_net":{"nonempty":{"status":"ok","value":false,"source":{"kind":"file","path":"/etc/issue.net"}},"os_escapes":{"status":"ok","value":false,"source":{"kind":"file","path":"/etc/issue.net"}}}}}}

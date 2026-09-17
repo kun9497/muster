@@ -1,0 +1,2714 @@
+{
+  "schema_version": 1,
+  "run": {
+    "muster_version": "94ca596",
+    "commit": "94ca596",
+    "controls_version": "kisa-unix-2026+2026.09.16",
+    "controls_digest": "sha256:b63d828be048ac893f0346f485385fd9eae141a1914e261691d593028202e641",
+    "guide_edition": "kisa-unix-2026",
+    "collected_at": "2026-09-17T08:30:07Z",
+    "host": {
+      "hostname": "ubuntu-container",
+      "machine_id_hash": "",
+      "kernel": "",
+      "os_release": {
+        "id": "ubuntu",
+        "version_id": "24.04",
+        "family": "debian"
+      },
+      "boot_id": "",
+      "uptime_s": 0
+    },
+    "euid": 0,
+    "capabilities": [
+      "raw:00000000a80425fb"
+    ],
+    "env": {
+      "container": "docker",
+      "virt": "hyperv",
+      "wsl": false,
+      "chroot": false,
+      "has_systemd": false,
+      "sysctl_writable": false,
+      "cloud_init": false
+    },
+    "collectors": [
+      {
+        "name": "accounts",
+        "status": "ok",
+        "ms": 0
+      },
+      {
+        "name": "banners",
+        "status": "ok",
+        "ms": 0
+      },
+      {
+        "name": "cron",
+        "status": "ok",
+        "ms": 0,
+        "cmd": "/usr/bin/systemctl list-unit-files --type=timer --no-legend --no-pager"
+      },
+      {
+        "name": "dns",
+        "status": "ok",
+        "ms": 0
+      },
+      {
+        "name": "env",
+        "status": "ok",
+        "ms": 0
+      },
+      {
+        "name": "files",
+        "status": "ok",
+        "ms": 1
+      },
+      {
+        "name": "firewall",
+        "status": "ok",
+        "ms": 0,
+        "cmd": "/usr/sbin/nft list ruleset"
+      },
+      {
+        "name": "ftp",
+        "status": "ok",
+        "ms": 0
+      },
+      {
+        "name": "logging",
+        "status": "ok",
+        "ms": 0
+      },
+      {
+        "name": "mail",
+        "status": "ok",
+        "ms": 0
+      },
+      {
+        "name": "muster",
+        "status": "ok",
+        "ms": 0
+      },
+      {
+        "name": "nfs",
+        "status": "ok",
+        "ms": 0,
+        "cmd": "/usr/sbin/exportfs -v"
+      },
+      {
+        "name": "os",
+        "status": "ok",
+        "ms": 0
+      },
+      {
+        "name": "pam",
+        "status": "ok",
+        "ms": 0
+      },
+      {
+        "name": "patch",
+        "status": "ok",
+        "ms": 22,
+        "cmd": "/usr/bin/apt-get -s upgrade -o Debug::NoLocking=1"
+      },
+      {
+        "name": "services",
+        "status": "ok",
+        "ms": 0,
+        "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState atftpd.service"
+      },
+      {
+        "name": "snmp",
+        "status": "ok",
+        "ms": 0
+      },
+      {
+        "name": "sockets",
+        "status": "ok",
+        "ms": 1
+      },
+      {
+        "name": "sshd",
+        "status": "ok",
+        "ms": 0,
+        "cmd": "/usr/sbin/sshd -G"
+      },
+      {
+        "name": "timesync",
+        "status": "ok",
+        "ms": 0,
+        "cmd": "/usr/bin/timedatectl show-timesync --all"
+      },
+      {
+        "name": "walk",
+        "status": "ok",
+        "ms": 0,
+        "cmd": "/usr/bin/rpm -qa --qf [%{=NAME}\t%{FILEMODES:octal}\t%{FILEUSERNAME}\t%{FILEGROUPNAME}\t%{FILENAMES}\n]"
+      }
+    ],
+    "redaction": {
+      "profile": "default",
+      "include_secrets": false
+    },
+    "deep": true,
+    "complete": true,
+    "partial_failures": []
+  },
+  "check": {
+    "muster_version": "94ca596",
+    "commit": "94ca596",
+    "controls_version": "kisa-unix-2026+2026.09.16",
+    "controls_digest": "sha256:b63d828be048ac893f0346f485385fd9eae141a1914e261691d593028202e641",
+    "snapshot_digest": "sha256:bb68204f9345ac453a2a98fed0c3c10ba192d01e250f6668169cc589e7e19c39",
+    "guide_edition": "kisa-unix-2026",
+    "waivers": {
+      "applied": 0,
+      "not_applied": 0,
+      "expired": 0,
+      "unknown": 0,
+      "expiring_soon": 0
+    },
+    "params": {
+      "muster.account.cron_permissions": {
+        "allowed_modes": [
+          0,
+          32,
+          128,
+          160,
+          256,
+          288,
+          384,
+          416
+        ]
+      },
+      "muster.account.lockout_threshold": {
+        "max_attempts": 5
+      },
+      "muster.account.password_hash_algorithm": {
+        "allowed_hashes": [
+          "$5$",
+          "$6$",
+          "$y$",
+          "$gy$",
+          "$7$",
+          "$2b$",
+          "$2y$",
+          "$2a$"
+        ],
+        "allowed_methods": [
+          "SHA256",
+          "SHA512",
+          "YESCRYPT",
+          "BCRYPT"
+        ],
+        "allowed_pam_hashes": [
+          "",
+          "sha256",
+          "sha512",
+          "yescrypt",
+          "gost_yescrypt",
+          "blowfish"
+        ]
+      },
+      "muster.account.password_policy": {
+        "max_days": 90,
+        "min_classes": 3,
+        "min_days": 1,
+        "min_len": 8
+      },
+      "muster.account.root_remote_login": {
+        "allowed": [
+          "no",
+          "prohibit-password"
+        ]
+      },
+      "muster.account.session_timeout": {
+        "max_count": 3,
+        "max_idle": 600,
+        "max_interval": 300
+      },
+      "muster.account.sudoers_permissions": {
+        "allowed_modes": [
+          0,
+          32,
+          256,
+          288
+        ]
+      },
+      "muster.account.umask_policy": {
+        "acceptable": [
+          "022",
+          "027",
+          "077",
+          "0022",
+          "0027",
+          "0077"
+        ]
+      },
+      "muster.account.unnecessary_accounts": {
+        "unnecessary": [
+          "lp",
+          "uucp",
+          "nuucp"
+        ]
+      },
+      "muster.file.hosts_lpd_permissions": {
+        "allowed_modes": [
+          0,
+          128,
+          256,
+          384
+        ]
+      },
+      "muster.file.hosts_permissions": {
+        "allowed_modes": [
+          0,
+          128,
+          256,
+          384
+        ]
+      },
+      "muster.file.inetd_conf_permissions": {
+        "allowed_modes": [
+          0,
+          128,
+          256,
+          384
+        ]
+      },
+      "muster.file.log_dir_permissions": {
+        "allowed_groups": [
+          "root",
+          "syslog",
+          "adm",
+          "utmp"
+        ]
+      },
+      "muster.file.services_permissions": {
+        "allowed_modes": [
+          0,
+          4,
+          32,
+          36,
+          128,
+          132,
+          160,
+          164,
+          256,
+          260,
+          288,
+          292,
+          384,
+          388,
+          416,
+          420
+        ]
+      },
+      "muster.file.shadow_permissions": {
+        "allowed_modes": [
+          0,
+          256
+        ]
+      },
+      "muster.file.suid_sgid": {
+        "forbidden_suid": []
+      },
+      "muster.file.syslog_conf_permissions": {
+        "allowed_modes": [
+          0,
+          32,
+          128,
+          160,
+          256,
+          288,
+          384,
+          416
+        ]
+      },
+      "muster.log.syslog_policy": {
+        "facilities": [
+          "auth",
+          "authpriv",
+          "kern",
+          "daemon",
+          "cron"
+        ]
+      },
+      "muster.patch.security_updates": {
+        "max_metadata_age_s": 604800
+      },
+      "muster.service.ftpusers_permissions": {
+        "allowed_modes": [
+          0,
+          32,
+          128,
+          160,
+          256,
+          288,
+          384,
+          416
+        ]
+      },
+      "muster.service.nfs_export_access": {
+        "allowed_modes": [
+          0,
+          4,
+          32,
+          36,
+          128,
+          132,
+          160,
+          164,
+          256,
+          260,
+          288,
+          292,
+          384,
+          388,
+          416,
+          420
+        ]
+      },
+      "muster.service.snmp_community_strength": {
+        "min_length": 8
+      }
+    }
+  },
+  "summary": {
+    "automatic": {
+      "high": {
+        "pass": 10,
+        "fail": 7,
+        "warn": 0
+      },
+      "medium": {
+        "pass": 8,
+        "fail": 0,
+        "warn": 0
+      },
+      "low": {
+        "pass": 3,
+        "fail": 1,
+        "warn": 0
+      }
+    },
+    "manual_review": 4,
+    "undecidable": {
+      "error": 0,
+      "not_applicable": 35,
+      "waived": 0
+    },
+    "facts_failed": 0,
+    "waivers_expiring_soon": 0
+  },
+  "results": [
+    {
+      "id": "muster.account.cron_permissions",
+      "title_en": "Cron configuration files are 0640 or stricter and owned appropriately",
+      "title_ko": "cron 설정 파일이 0640 이하로 엄격하며 소유가 적절하다",
+      "category": "account",
+      "importance": "상",
+      "automation": "auto",
+      "status": "FAIL",
+      "reason": "clause does not hold: cron.files each require mode in [0 32 128 160 256 288 384 416]",
+      "evidence": [
+        {
+          "fact": "cron.files",
+          "status": "ok",
+          "value": "3 elements; none matching",
+          "source": {
+            "kind": "file",
+            "path": "/etc/crontab"
+          }
+        },
+        {
+          "fact": "cron.files",
+          "status": "ok",
+          "value": "3 elements; 1 selected; failing: file:/etc/cron.d/e2scrub_all",
+          "source": {
+            "kind": "file",
+            "path": "/etc/crontab"
+          }
+        },
+        {
+          "fact": "cron.files",
+          "status": "ok",
+          "value": "3 elements; 1 selected",
+          "source": {
+            "kind": "file",
+            "path": "/etc/crontab"
+          }
+        },
+        {
+          "fact": "cron.files",
+          "status": "ok",
+          "value": "3 elements; 0 selected",
+          "source": {
+            "kind": "file",
+            "path": "/etc/crontab"
+          }
+        },
+        {
+          "fact": "cron.files",
+          "status": "ok",
+          "value": "3 elements; 2 selected",
+          "source": {
+            "kind": "file",
+            "path": "/etc/crontab"
+          }
+        },
+        {
+          "fact": "cron.dirs",
+          "status": "ok",
+          "value": "2 elements; none matching",
+          "source": {
+            "kind": "file",
+            "path": "/etc/cron.d"
+          }
+        }
+      ],
+      "observations": [
+        {
+          "subject": "file:/etc/cron.d/e2scrub_all",
+          "expected": [
+            0,
+            32,
+            128,
+            160,
+            256,
+            288,
+            384,
+            416
+          ],
+          "actual": 420,
+          "verdict": "fail"
+        },
+        {
+          "subject": "file:/etc/cron.d/e2scrub_all",
+          "expected": true,
+          "actual": true,
+          "verdict": "pass"
+        },
+        {
+          "subject": "file:*",
+          "expected": "scope eq user",
+          "actual": "0 of 3 elements selected",
+          "verdict": "pass"
+        },
+        {
+          "subject": "file:/etc/cron.daily/apt-compat",
+          "expected": true,
+          "actual": true,
+          "verdict": "pass"
+        },
+        {
+          "subject": "file:/etc/cron.daily/dpkg",
+          "expected": true,
+          "actual": true,
+          "verdict": "pass"
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "muster.account.lockout_threshold",
+      "title_en": "Accounts lock after a bounded number of failed logins",
+      "title_ko": "로그인 실패가 정해진 횟수를 넘으면 계정이 잠긴다",
+      "category": "account",
+      "importance": "상",
+      "automation": "auto",
+      "status": "FAIL",
+      "reason": "absent counts as fail: pam.faillock.deny is absent on this host",
+      "evidence": [
+        {
+          "fact": "pam.faillock.enabled",
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "file",
+                "path": "/etc/pam.d/common-account"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/pam.d/common-auth"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/pam.d/common-password"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/pam.d/common-session"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/pam.d/login"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/pam.d/other"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/pam.d/passwd"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/pam.d/su"
+              }
+            ]
+          }
+        },
+        {
+          "fact": "pam.faillock.deny",
+          "status": "absent"
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "muster.account.password_policy",
+      "title_en": "Password ageing, length and complexity policy is set and enforced",
+      "title_ko": "비밀번호 사용 기간·길이·복잡성 정책이 설정되고 강제된다",
+      "category": "account",
+      "importance": "상",
+      "automation": "auto",
+      "status": "FAIL",
+      "reason": "absent counts as fail: accounts.login_defs.pass_min_len is absent on this host",
+      "evidence": [
+        {
+          "fact": "accounts.login_defs.pass_max_days",
+          "status": "absent",
+          "side": "runtime"
+        },
+        {
+          "fact": "accounts.login_defs.pass_max_days",
+          "status": "ok",
+          "value": 99999,
+          "source": {
+            "kind": "file",
+            "path": "/etc/login.defs",
+            "line": 165,
+            "raw": "PASS_MAX_DAYS\t99999"
+          },
+          "side": "persisted"
+        },
+        {
+          "fact": "accounts.login_defs.pass_min_days",
+          "status": "absent",
+          "side": "runtime"
+        },
+        {
+          "fact": "accounts.login_defs.pass_min_days",
+          "status": "ok",
+          "value": 0,
+          "source": {
+            "kind": "file",
+            "path": "/etc/login.defs",
+            "line": 166,
+            "raw": "PASS_MIN_DAYS\t0"
+          },
+          "side": "persisted"
+        },
+        {
+          "fact": "accounts.login_defs.pass_min_len",
+          "status": "absent"
+        },
+        {
+          "fact": "pam.pwquality.enabled",
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "file",
+                "path": "/etc/pam.d/common-account"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/pam.d/common-auth"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/pam.d/common-password"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/pam.d/common-session"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/pam.d/login"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/pam.d/other"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/pam.d/passwd"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/pam.d/su"
+              }
+            ]
+          }
+        },
+        {
+          "fact": "pam.pwquality.minlen",
+          "status": "absent"
+        },
+        {
+          "fact": "pam.pwquality.required_classes",
+          "status": "absent"
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "muster.account.root_home_and_path",
+      "title_en": "root's home directory and PATH are safe",
+      "title_ko": "root 홈 디렉터리와 PATH 가 안전하다",
+      "category": "account",
+      "importance": "상",
+      "automation": "auto",
+      "status": "PASS",
+      "evidence": [
+        {
+          "fact": "files.root_home.uid",
+          "status": "ok",
+          "value": 0,
+          "source": {
+            "kind": "file",
+            "path": "/root"
+          }
+        },
+        {
+          "fact": "files.root_home.group_writable",
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "file",
+            "path": "/root"
+          }
+        },
+        {
+          "fact": "files.root_home.other_writable",
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "file",
+            "path": "/root"
+          }
+        }
+      ],
+      "mechanism": 2,
+      "severity": "high"
+    },
+    {
+      "id": "muster.account.root_only_uid_zero",
+      "title_en": "root is the only account with uid 0",
+      "title_ko": "uid 0 인 계정은 root 뿐이다",
+      "category": "account",
+      "importance": "상",
+      "automation": "auto",
+      "status": "PASS",
+      "evidence": [
+        {
+          "fact": "accounts.users",
+          "status": "ok",
+          "value": "19 elements; 1 selected",
+          "source": {
+            "kind": "file",
+            "path": "/etc/passwd"
+          }
+        }
+      ],
+      "observations": [
+        {
+          "subject": "user:root",
+          "expected": "root",
+          "actual": "root",
+          "verdict": "pass"
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "muster.account.root_remote_login",
+      "title_en": "Root cannot log in directly over SSH",
+      "title_ko": "root 계정이 SSH로 직접 로그인할 수 없다",
+      "category": "account",
+      "importance": "상",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when: services.ssh.installed: no systemd on this host or inside this container",
+      "evidence": [
+        {
+          "fact": "services.ssh.installed",
+          "status": "unsupported"
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "muster.account.shadow_passwords",
+      "title_en": "Passwords are stored only as hashes in /etc/shadow",
+      "title_ko": "비밀번호가 /etc/shadow 에만 해시로 저장된다",
+      "category": "account",
+      "importance": "상",
+      "automation": "auto",
+      "status": "PASS",
+      "evidence": [
+        {
+          "fact": "accounts.shadow_in_use",
+          "status": "ok",
+          "value": true,
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "file",
+                "path": "/etc/passwd"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/shadow"
+              }
+            ]
+          }
+        },
+        {
+          "fact": "accounts.users",
+          "status": "ok",
+          "value": "19 elements; none matching",
+          "source": {
+            "kind": "file",
+            "path": "/etc/passwd"
+          }
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "muster.account.su_restricted",
+      "title_en": "su is restricted to the wheel group by PAM",
+      "title_ko": "PAM 이 su 를 wheel 그룹으로 제한한다",
+      "category": "account",
+      "importance": "상",
+      "automation": "auto",
+      "status": "FAIL",
+      "reason": "clause does not hold: pam.su.wheel_required eq true",
+      "evidence": [
+        {
+          "fact": "pam.su.wheel_required",
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "file",
+                "path": "/etc/pam.d/common-account"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/pam.d/common-auth"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/pam.d/common-password"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/pam.d/common-session"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/pam.d/login"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/pam.d/other"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/pam.d/passwd"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/pam.d/su"
+              }
+            ]
+          }
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "muster.file.dev_no_stale_files",
+      "title_en": "/dev holds no regular files",
+      "title_ko": "/dev 에 일반 파일이 없다",
+      "category": "file",
+      "importance": "상",
+      "automation": "auto",
+      "status": "PASS",
+      "evidence": [
+        {
+          "fact": "files.dev_nondevice",
+          "status": "ok",
+          "value": "0 elements; none matching",
+          "source": {
+            "kind": "file",
+            "path": "/dev"
+          }
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "muster.file.env_file_permissions",
+      "title_en": "Shell environment files are owned correctly and not writable by others",
+      "title_ko": "셸 환경변수 파일이 올바른 소유자를 갖고 타인이 쓸 수 없다",
+      "category": "file",
+      "importance": "상",
+      "automation": "auto",
+      "status": "PASS",
+      "evidence": [
+        {
+          "fact": "files.env_files",
+          "status": "ok",
+          "value": "6 elements; none matching",
+          "source": {
+            "kind": "file",
+            "path": "/etc/passwd"
+          }
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "muster.file.hosts_permissions",
+      "title_en": "/etc/hosts is owned by root and readable by root only",
+      "title_ko": "/etc/hosts 가 root 소유이고 root 만 읽을 수 있다",
+      "category": "file",
+      "importance": "상",
+      "automation": "auto",
+      "status": "FAIL",
+      "reason": "clause does not hold: files.etc_hosts.mode in [0 128 256 384]",
+      "evidence": [
+        {
+          "fact": "files.etc_hosts.uid",
+          "status": "ok",
+          "value": 0,
+          "source": {
+            "kind": "file",
+            "path": "/etc/hosts"
+          }
+        },
+        {
+          "fact": "files.etc_hosts.mode",
+          "status": "ok",
+          "value": 420,
+          "source": {
+            "kind": "file",
+            "path": "/etc/hosts"
+          }
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "muster.file.inetd_conf_permissions",
+      "title_en": "The inetd/xinetd configuration is owned by root and not exposed",
+      "title_ko": "inetd/xinetd 설정이 root 소유이며 노출되지 않는다",
+      "category": "file",
+      "importance": "상",
+      "automation": "auto",
+      "status": "PASS",
+      "reason": "absent counts as pass: no mechanism applies to this host",
+      "evidence": [
+        {
+          "fact": "files.etc_inetd_conf.mode",
+          "status": "absent"
+        },
+        {
+          "fact": "files.etc_xinetd_conf.mode",
+          "status": "absent"
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "muster.file.ip_port_restriction",
+      "title_en": "Inbound access is restricted by IP and port",
+      "title_ko": "접속 IP 및 포트가 제한되어 있다",
+      "category": "file",
+      "importance": "상",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when: firewall.backend: no readable kernel firewall ruleset: nft list ruleset: fork/exec /usr/sbin/nft: no such file or directory",
+      "evidence": [
+        {
+          "fact": "firewall.backend",
+          "status": "unsupported"
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "muster.file.passwd_permissions",
+      "title_en": "/etc/passwd is owned by root and not writable by others",
+      "title_ko": "/etc/passwd 가 root 소유이고 다른 사용자가 쓸 수 없다",
+      "category": "file",
+      "importance": "상",
+      "automation": "auto",
+      "status": "PASS",
+      "evidence": [
+        {
+          "fact": "files.etc_passwd.uid",
+          "status": "ok",
+          "value": 0,
+          "source": {
+            "kind": "file",
+            "path": "/etc/passwd"
+          }
+        },
+        {
+          "fact": "files.etc_passwd.gid",
+          "status": "ok",
+          "value": 0,
+          "source": {
+            "kind": "file",
+            "path": "/etc/passwd"
+          }
+        },
+        {
+          "fact": "files.etc_passwd.mode",
+          "status": "ok",
+          "value": 420,
+          "source": {
+            "kind": "file",
+            "path": "/etc/passwd"
+          }
+        },
+        {
+          "fact": "files.etc_passwd.acl_entries",
+          "status": "ok",
+          "value": "0 elements; none matching",
+          "source": {
+            "kind": "file",
+            "path": "/etc/passwd"
+          }
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "muster.file.rhosts_forbidden",
+      "title_en": "No .rhosts or hosts.equiv grants blanket trust",
+      "title_ko": ".rhosts 나 hosts.equiv 가 무조건 신뢰를 허용하지 않는다",
+      "category": "file",
+      "importance": "상",
+      "automation": "auto",
+      "status": "PASS",
+      "evidence": [
+        {
+          "fact": "files.user_rhosts",
+          "status": "ok",
+          "value": "0 elements; none matching",
+          "source": {
+            "kind": "file",
+            "path": "/etc/passwd"
+          }
+        },
+        {
+          "fact": "files.etc_hosts_equiv_lines",
+          "status": "ok",
+          "value": "0 elements; none matching",
+          "source": {
+            "kind": "derived"
+          }
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "muster.file.services_permissions",
+      "title_en": "/etc/services is owned by root and not writable by group or others",
+      "title_ko": "/etc/services 가 root 소유이고 그룹과 다른 사용자가 쓸 수 없다",
+      "category": "file",
+      "importance": "상",
+      "automation": "auto",
+      "status": "FAIL",
+      "reason": "absent counts as fail: files.etc_services.uid is absent on this host",
+      "evidence": [
+        {
+          "fact": "files.etc_services.uid",
+          "status": "absent"
+        },
+        {
+          "fact": "files.etc_services.mode",
+          "status": "absent"
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "muster.file.shadow_permissions",
+      "title_en": "/etc/shadow is owned by root and readable by root only",
+      "title_ko": "/etc/shadow 가 root 소유이고 root 만 읽을 수 있다",
+      "category": "file",
+      "importance": "상",
+      "automation": "auto",
+      "status": "FAIL",
+      "reason": "clause does not hold: files.etc_shadow.mode in [0 256]",
+      "evidence": [
+        {
+          "fact": "files.etc_shadow.uid",
+          "status": "ok",
+          "value": 0,
+          "source": {
+            "kind": "file",
+            "path": "/etc/shadow"
+          }
+        },
+        {
+          "fact": "files.etc_shadow.mode",
+          "status": "ok",
+          "value": 416,
+          "source": {
+            "kind": "file",
+            "path": "/etc/shadow"
+          }
+        },
+        {
+          "fact": "files.etc_shadow.acl_entries",
+          "status": "ok",
+          "value": "0 elements; none matching",
+          "source": {
+            "kind": "file",
+            "path": "/etc/shadow"
+          }
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "muster.file.startup_script_permissions",
+      "title_en": "System startup scripts are not writable by group or others",
+      "title_ko": "시스템 시작 스크립트가 그룹·기타 사용자에게 쓰기 불가능하다",
+      "category": "file",
+      "importance": "상",
+      "automation": "auto",
+      "status": "PASS",
+      "evidence": [
+        {
+          "fact": "files.startup_scripts",
+          "status": "ok",
+          "value": "8 elements; 1 selected",
+          "source": {
+            "kind": "file",
+            "path": "/etc/systemd/system"
+          }
+        },
+        {
+          "fact": "files.startup_scripts",
+          "status": "ok",
+          "value": "8 elements; none matching",
+          "source": {
+            "kind": "file",
+            "path": "/etc/systemd/system"
+          }
+        },
+        {
+          "fact": "files.startup_dirs",
+          "status": "ok",
+          "value": "9 elements; none matching",
+          "source": {
+            "kind": "file",
+            "path": "/etc/init.d"
+          }
+        }
+      ],
+      "observations": [
+        {
+          "subject": "file:/etc/init.d/procps",
+          "expected": false,
+          "actual": false,
+          "verdict": "pass"
+        },
+        {
+          "subject": "file:/etc/init.d/procps",
+          "expected": false,
+          "actual": false,
+          "verdict": "pass"
+        },
+        {
+          "subject": "file:/etc/init.d/procps",
+          "expected": 0,
+          "actual": 0,
+          "verdict": "pass"
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "muster.file.suid_sgid",
+      "title_en": "Every setuid or setgid file is one its package ships that way, and no writable directory lacks the sticky bit",
+      "title_ko": "setuid·setgid 파일은 모두 패키지가 그렇게 배포한 것이고, 쓰기 가능한 디렉터리에 sticky bit 가 빠지지 않았다",
+      "category": "file",
+      "importance": "상",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason_code": "unsupported_env",
+      "reason": "walk.suid_sgid: root filesystem is overlay; the walk answers for a host, not for a container layer",
+      "evidence": [
+        {
+          "fact": "walk.suid_sgid",
+          "status": "unsupported"
+        },
+        {
+          "fact": "walk.sticky_missing",
+          "status": "unsupported"
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "muster.file.suid_sgid_unverified",
+      "title_en": "No setuid or setgid file is left with its declaration unverified",
+      "title_ko": "선언을 확인하지 못한 setuid·setgid 파일이 남아 있지 않다",
+      "category": "file",
+      "importance": "상",
+      "automation": "partial",
+      "status": "NOT_APPLICABLE",
+      "reason_code": "unsupported_env",
+      "reason": "walk.suid_sgid_unverified: root filesystem is overlay; the walk answers for a host, not for a container layer",
+      "evidence": [
+        {
+          "fact": "walk.suid_sgid_unverified",
+          "status": "unsupported"
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "muster.file.syslog_conf_permissions",
+      "title_en": "The syslog configuration is 0640 or stricter and owned by root",
+      "title_ko": "syslog 설정이 0640 이하로 엄격하며 root 소유이다",
+      "category": "file",
+      "importance": "상",
+      "automation": "auto",
+      "status": "PASS",
+      "evidence": [
+        {
+          "fact": "files.syslog_configs",
+          "status": "ok",
+          "value": "0 elements; 0 selected",
+          "source": {
+            "kind": "file",
+            "path": "/etc/rsyslog.conf"
+          }
+        },
+        {
+          "fact": "files.syslog_configs",
+          "status": "ok",
+          "value": "0 elements; none matching",
+          "source": {
+            "kind": "file",
+            "path": "/etc/rsyslog.conf"
+          }
+        },
+        {
+          "fact": "files.journald_configs",
+          "status": "ok",
+          "value": "0 elements; 0 selected",
+          "source": {
+            "kind": "file",
+            "path": "/etc/systemd/journald.conf"
+          }
+        },
+        {
+          "fact": "files.journald_configs",
+          "status": "ok",
+          "value": "0 elements; none matching",
+          "source": {
+            "kind": "file",
+            "path": "/etc/systemd/journald.conf"
+          }
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "muster.file.unowned_files",
+      "title_en": "Every file and directory has an owner and a group this host knows",
+      "title_ko": "모든 파일과 디렉터리의 소유자와 그룹을 이 호스트가 알고 있다",
+      "category": "file",
+      "importance": "상",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason_code": "unsupported_env",
+      "reason": "walk.unowned: root filesystem is overlay; the walk answers for a host, not for a container layer",
+      "evidence": [
+        {
+          "fact": "accounts.nss.remote",
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "file",
+                "path": "/etc/nsswitch.conf"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/sssd/sssd.conf"
+              }
+            ]
+          }
+        },
+        {
+          "fact": "accounts.nss.passwd_sources",
+          "status": "ok",
+          "value": [
+            "files"
+          ],
+          "source": {
+            "kind": "file",
+            "path": "/etc/nsswitch.conf",
+            "line": 7
+          }
+        },
+        {
+          "fact": "walk.unowned",
+          "status": "unsupported"
+        }
+      ],
+      "mechanism": 1,
+      "severity": "high"
+    },
+    {
+      "id": "muster.file.world_writable",
+      "title_en": "No unexpected world-writable files",
+      "title_ko": "예상치 못한 world-writable 파일이 없다",
+      "category": "file",
+      "importance": "상",
+      "automation": "partial",
+      "status": "NOT_APPLICABLE",
+      "reason_code": "unsupported_env",
+      "reason": "walk.world_writable: root filesystem is overlay; the walk answers for a host, not for a container layer",
+      "evidence": [
+        {
+          "fact": "walk.world_writable",
+          "status": "unsupported"
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "muster.patch.security_updates",
+      "title_en": "No security updates are pending in the cached package metadata",
+      "title_ko": "캐시된 패키지 메타데이터에 대기 중인 보안 업데이트가 없다",
+      "category": "patch",
+      "importance": "상",
+      "automation": "partial",
+      "status": "MANUAL",
+      "reason": "absent needs review: patch.metadata_age_s is absent on this host",
+      "evidence": [
+        {
+          "fact": "patch.manager",
+          "status": "ok",
+          "value": "apt",
+          "source": {
+            "kind": "file",
+            "path": "/var/lib/dpkg/status"
+          }
+        },
+        {
+          "fact": "patch.metadata_age_s",
+          "status": "absent"
+        },
+        {
+          "fact": "patch.pending_security_count",
+          "status": "absent"
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "muster.service.automount_disabled",
+      "title_en": "The automount service is not enabled",
+      "title_ko": "automount 서비스가 활성화되어 있지 않다",
+      "category": "service",
+      "importance": "상",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason_code": "unsupported_env",
+      "reason": "services.automount.active: no systemd on this host or inside this container",
+      "evidence": [
+        {
+          "fact": "services.automount.active",
+          "status": "unsupported"
+        },
+        {
+          "fact": "services.automount.enabled",
+          "status": "unsupported"
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "muster.service.dns_version",
+      "title_en": "The nameserver is kept at the vendor's patched level",
+      "title_ko": "네임서버가 벤더가 패치한 수준으로 유지된다",
+      "category": "service",
+      "importance": "상",
+      "automation": "manual",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when: services.dns.installed: no systemd on this host or inside this container",
+      "evidence": [
+        {
+          "fact": "services.dns.installed",
+          "status": "unsupported"
+        },
+        {
+          "fact": "dns.implementation",
+          "status": "ok",
+          "value": "none",
+          "source": {
+            "kind": "derived"
+          }
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "muster.service.dns_zone_transfer",
+      "title_en": "Every authoritative zone restricts who may transfer it",
+      "title_ko": "모든 권한 존이 존 전송 대상을 제한한다",
+      "category": "service",
+      "importance": "상",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when: services.dns.installed: no systemd on this host or inside this container",
+      "evidence": [
+        {
+          "fact": "services.dns.installed",
+          "status": "unsupported"
+        },
+        {
+          "fact": "dns.implementation",
+          "status": "ok",
+          "value": "none",
+          "source": {
+            "kind": "derived"
+          }
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "muster.service.dos_services_disabled",
+      "title_en": "The DoS-prone small services are not enabled or reachable",
+      "title_ko": "DoS 취약 서비스가 활성화되어 있지 않다",
+      "category": "service",
+      "importance": "상",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason_code": "unsupported_env",
+      "reason": "services.dos_services.active: no systemd on this host or inside this container",
+      "evidence": [
+        {
+          "fact": "services.dos_services.active",
+          "status": "unsupported"
+        },
+        {
+          "fact": "services.dos_services.enabled",
+          "status": "unsupported"
+        },
+        {
+          "fact": "services.dos_services.reachable",
+          "status": "unsupported"
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "muster.service.finger_disabled",
+      "title_en": "The finger service is not enabled or reachable",
+      "title_ko": "finger 서비스가 활성화되어 있지 않다",
+      "category": "service",
+      "importance": "상",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason_code": "unsupported_env",
+      "reason": "services.finger.active: no systemd on this host or inside this container",
+      "evidence": [
+        {
+          "fact": "services.finger.active",
+          "status": "unsupported"
+        },
+        {
+          "fact": "services.finger.enabled",
+          "status": "unsupported"
+        },
+        {
+          "fact": "services.finger.reachable",
+          "status": "unsupported"
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "muster.service.ftp_anonymous",
+      "title_en": "The FTP service serves no anonymous login",
+      "title_ko": "FTP 서비스가 익명 로그인을 제공하지 않는다",
+      "category": "service",
+      "importance": "상",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when: services.ftp.installed: no systemd on this host or inside this container",
+      "evidence": [
+        {
+          "fact": "services.ftp.installed",
+          "status": "unsupported"
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "muster.service.mail_relay",
+      "title_en": "The mail transfer agent relays only for the clients it is meant to serve",
+      "title_ko": "메일 서버가 서비스 대상 클라이언트에 대해서만 릴레이한다",
+      "category": "service",
+      "importance": "상",
+      "automation": "manual",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when: services.mail.installed: no systemd on this host or inside this container",
+      "evidence": [
+        {
+          "fact": "services.mail.installed",
+          "status": "unsupported"
+        },
+        {
+          "fact": "mail.implementation",
+          "status": "ok",
+          "value": "none",
+          "source": {
+            "kind": "derived"
+          }
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "muster.service.mail_user_execution",
+      "title_en": "The mail transfer agent's queue and submission commands are restricted to administrators",
+      "title_ko": "메일 서버의 큐·전송 명령 실행이 관리자로 제한된다",
+      "category": "service",
+      "importance": "상",
+      "automation": "manual",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when: services.mail.installed: no systemd on this host or inside this container",
+      "evidence": [
+        {
+          "fact": "services.mail.installed",
+          "status": "unsupported"
+        },
+        {
+          "fact": "mail.implementation",
+          "status": "ok",
+          "value": "none",
+          "source": {
+            "kind": "derived"
+          }
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "muster.service.mail_version",
+      "title_en": "The mail transfer agent is kept at the vendor's patched level",
+      "title_ko": "메일 서버가 벤더가 패치한 수준으로 유지된다",
+      "category": "service",
+      "importance": "상",
+      "automation": "manual",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when: services.mail.installed: no systemd on this host or inside this container",
+      "evidence": [
+        {
+          "fact": "services.mail.installed",
+          "status": "unsupported"
+        },
+        {
+          "fact": "mail.implementation",
+          "status": "ok",
+          "value": "none",
+          "source": {
+            "kind": "derived"
+          }
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "muster.service.nfs_export_access",
+      "title_en": "NFS exports name their clients and squash remote root",
+      "title_ko": "NFS 공유가 클라이언트를 지정하고 원격 root 를 낮춘다",
+      "category": "service",
+      "importance": "상",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when: services.nfs_server.installed: no systemd on this host or inside this container",
+      "evidence": [
+        {
+          "fact": "services.nfs_server.installed",
+          "status": "unsupported"
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "muster.service.nfs_server_disabled",
+      "title_en": "The NFS server is not enabled or reachable",
+      "title_ko": "NFS 서버가 활성화되어 있지 않다",
+      "category": "service",
+      "importance": "상",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason_code": "unsupported_env",
+      "reason": "services.nfs_server.active: no systemd on this host or inside this container",
+      "evidence": [
+        {
+          "fact": "services.nfs_server.active",
+          "status": "unsupported"
+        },
+        {
+          "fact": "services.nfs_server.enabled",
+          "status": "unsupported"
+        },
+        {
+          "fact": "services.nfs_server.reachable",
+          "status": "unsupported"
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "muster.service.nis_disabled",
+      "title_en": "NIS is not enabled and not used to resolve accounts",
+      "title_ko": "NIS 가 활성화되어 있지 않고 계정 조회에도 쓰이지 않는다",
+      "category": "service",
+      "importance": "상",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason_code": "unsupported_env",
+      "reason": "services.nis.active: no systemd on this host or inside this container",
+      "evidence": [
+        {
+          "fact": "services.nis.active",
+          "status": "unsupported"
+        },
+        {
+          "fact": "services.nis.enabled",
+          "status": "unsupported"
+        },
+        {
+          "fact": "accounts.nss.passwd_sources",
+          "status": "ok",
+          "value": [
+            "files"
+          ],
+          "source": {
+            "kind": "file",
+            "path": "/etc/nsswitch.conf",
+            "line": 7
+          }
+        },
+        {
+          "fact": "accounts.nss.group_sources",
+          "status": "ok",
+          "value": [
+            "files"
+          ],
+          "source": {
+            "kind": "file",
+            "path": "/etc/nsswitch.conf",
+            "line": 8
+          }
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "muster.service.rpcbind_disabled",
+      "title_en": "The RPC portmapper is not enabled or reachable",
+      "title_ko": "RPC 포트매퍼(rpcbind)가 활성화되어 있지 않다",
+      "category": "service",
+      "importance": "상",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason_code": "unsupported_env",
+      "reason": "services.rpcbind.active: no systemd on this host or inside this container",
+      "evidence": [
+        {
+          "fact": "services.rpcbind.active",
+          "status": "unsupported"
+        },
+        {
+          "fact": "services.rpcbind.enabled",
+          "status": "unsupported"
+        },
+        {
+          "fact": "services.rpcbind.reachable",
+          "status": "unsupported"
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "muster.service.rservices_disabled",
+      "title_en": "The r-services are not enabled or reachable",
+      "title_ko": "r-services(rsh/rlogin/rexec)가 활성화되어 있지 않다",
+      "category": "service",
+      "importance": "상",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason_code": "unsupported_env",
+      "reason": "services.rservices.active: no systemd on this host or inside this container",
+      "evidence": [
+        {
+          "fact": "services.rservices.active",
+          "status": "unsupported"
+        },
+        {
+          "fact": "services.rservices.enabled",
+          "status": "unsupported"
+        },
+        {
+          "fact": "services.rservices.reachable",
+          "status": "unsupported"
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "muster.service.snmp_access_control",
+      "title_en": "SNMP communities are bound to the managers allowed to use them",
+      "title_ko": "SNMP 커뮤니티가 사용을 허용한 관리 서버에 묶여 있다",
+      "category": "service",
+      "importance": "상",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when: services.snmp.installed: no systemd on this host or inside this container",
+      "evidence": [
+        {
+          "fact": "services.snmp.installed",
+          "status": "unsupported"
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "muster.service.snmp_version",
+      "title_en": "The SNMP agent enables only version 3",
+      "title_ko": "SNMP 에이전트가 버전 3 만 사용한다",
+      "category": "service",
+      "importance": "상",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when: services.snmp.installed: no systemd on this host or inside this container",
+      "evidence": [
+        {
+          "fact": "services.snmp.installed",
+          "status": "unsupported"
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "muster.service.tftp_talk_disabled",
+      "title_en": "tftp and talk are not enabled or reachable",
+      "title_ko": "tftp 와 talk 가 활성화되어 있지 않고 접속할 수도 없다",
+      "category": "service",
+      "importance": "상",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason_code": "unsupported_env",
+      "reason": "services.tftp.active: no systemd on this host or inside this container",
+      "evidence": [
+        {
+          "fact": "services.tftp.active",
+          "status": "unsupported"
+        },
+        {
+          "fact": "services.tftp.enabled",
+          "status": "unsupported"
+        },
+        {
+          "fact": "services.tftp.reachable",
+          "status": "unsupported"
+        },
+        {
+          "fact": "services.talk.active",
+          "status": "unsupported"
+        },
+        {
+          "fact": "services.talk.enabled",
+          "status": "unsupported"
+        },
+        {
+          "fact": "services.talk.reachable",
+          "status": "unsupported"
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "muster.account.admin_group_minimal",
+      "title_en": "The root group holds no account other than root",
+      "title_ko": "root 그룹에 root 외의 계정이 없다",
+      "category": "account",
+      "importance": "중",
+      "automation": "partial",
+      "status": "PASS",
+      "evidence": [
+        {
+          "fact": "accounts.admin_group_members",
+          "status": "ok",
+          "value": "1 elements; none matching",
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "file",
+                "path": "/etc/passwd"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/group"
+              }
+            ]
+          }
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.account.password_hash_algorithm",
+      "title_en": "Passwords are hashed with a strong algorithm",
+      "title_ko": "비밀번호가 안전한 알고리즘으로 해시된다",
+      "category": "account",
+      "importance": "중",
+      "automation": "auto",
+      "status": "PASS",
+      "evidence": [
+        {
+          "fact": "accounts.login_defs.encrypt_method",
+          "status": "ok",
+          "value": "SHA512",
+          "source": {
+            "kind": "file",
+            "path": "/etc/login.defs",
+            "line": 295,
+            "raw": "ENCRYPT_METHOD SHA512"
+          }
+        },
+        {
+          "fact": "pam.password.unix_hash",
+          "status": "ok",
+          "value": "yescrypt",
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "file",
+                "path": "/etc/pam.d/common-password",
+                "line": 25
+              }
+            ]
+          }
+        },
+        {
+          "fact": "accounts.shadow_in_use",
+          "status": "ok",
+          "value": true,
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "file",
+                "path": "/etc/passwd"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/shadow"
+              }
+            ]
+          }
+        },
+        {
+          "fact": "accounts.users",
+          "status": "ok",
+          "value": "19 elements; 0 selected",
+          "source": {
+            "kind": "file",
+            "path": "/etc/passwd"
+          }
+        }
+      ],
+      "observations": [
+        {
+          "subject": "user:*",
+          "expected": "hash_algo ne ",
+          "actual": "0 of 19 elements selected",
+          "verdict": "pass"
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.account.sudoers_permissions",
+      "title_en": "sudoers and its drop-ins are 0440 and owned by root",
+      "title_ko": "sudoers 와 드롭인이 0440 이며 root 소유이다",
+      "category": "account",
+      "importance": "중",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when does not hold: sudo.installed eq true",
+      "evidence": [
+        {
+          "fact": "sudo.installed",
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "derived"
+          }
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.account.umask_policy",
+      "title_en": "The default file-creation mask denies group and other write",
+      "title_ko": "기본 파일 생성 마스크가 그룹·기타 쓰기를 막는다",
+      "category": "account",
+      "importance": "중",
+      "automation": "auto",
+      "status": "PASS",
+      "evidence": [
+        {
+          "fact": "accounts.login_defs.umask",
+          "status": "ok",
+          "value": "022",
+          "source": {
+            "kind": "file",
+            "path": "/etc/login.defs",
+            "line": 151,
+            "raw": "UMASK\t\t022"
+          }
+        },
+        {
+          "fact": "pam.umask_module.enabled",
+          "status": "ok",
+          "value": true,
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "file",
+                "path": "/etc/pam.d/common-session",
+                "line": 26
+              }
+            ]
+          }
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.account.unique_uids",
+      "title_en": "No two accounts share a uid",
+      "title_ko": "두 계정이 같은 uid 를 갖지 않는다",
+      "category": "account",
+      "importance": "중",
+      "automation": "auto",
+      "status": "PASS",
+      "evidence": [
+        {
+          "fact": "accounts.users",
+          "status": "ok",
+          "value": "19 elements; none matching",
+          "source": {
+            "kind": "file",
+            "path": "/etc/passwd"
+          }
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.file.home_dir_exists",
+      "title_en": "Every interactive account has a home directory that exists",
+      "title_ko": "모든 대화형 계정이 실제 존재하는 홈 디렉터리를 가진다",
+      "category": "file",
+      "importance": "중",
+      "automation": "auto",
+      "status": "PASS",
+      "evidence": [
+        {
+          "fact": "files.home_dirs",
+          "status": "ok",
+          "value": "19 elements; 2 selected",
+          "source": {
+            "kind": "file",
+            "path": "/etc/passwd"
+          }
+        }
+      ],
+      "observations": [
+        {
+          "subject": "user:root",
+          "expected": "ok",
+          "actual": "ok",
+          "verdict": "pass"
+        },
+        {
+          "subject": "user:ubuntu",
+          "expected": "ok",
+          "actual": "ok",
+          "verdict": "pass"
+        },
+        {
+          "subject": "user:root",
+          "expected": true,
+          "actual": true,
+          "verdict": "pass"
+        },
+        {
+          "subject": "user:ubuntu",
+          "expected": true,
+          "actual": true,
+          "verdict": "pass"
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.file.home_dir_permissions",
+      "title_en": "Interactive home directories are owned by their user and not writable by others",
+      "title_ko": "대화형 홈 디렉터리가 사용자 소유이며 타인이 쓸 수 없다",
+      "category": "file",
+      "importance": "중",
+      "automation": "auto",
+      "status": "PASS",
+      "evidence": [
+        {
+          "fact": "files.home_dirs",
+          "status": "ok",
+          "value": "19 elements; 2 selected",
+          "source": {
+            "kind": "file",
+            "path": "/etc/passwd"
+          }
+        }
+      ],
+      "observations": [
+        {
+          "subject": "user:root",
+          "expected": true,
+          "actual": true,
+          "verdict": "pass"
+        },
+        {
+          "subject": "user:ubuntu",
+          "expected": true,
+          "actual": true,
+          "verdict": "pass"
+        },
+        {
+          "subject": "user:root",
+          "expected": false,
+          "actual": false,
+          "verdict": "pass"
+        },
+        {
+          "subject": "user:ubuntu",
+          "expected": false,
+          "actual": false,
+          "verdict": "pass"
+        },
+        {
+          "subject": "user:root",
+          "expected": false,
+          "actual": false,
+          "verdict": "pass"
+        },
+        {
+          "subject": "user:ubuntu",
+          "expected": false,
+          "actual": false,
+          "verdict": "pass"
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.file.log_dir_permissions",
+      "title_en": "Log directories and files are not writable beyond their owning group",
+      "title_ko": "로그 디렉터리·파일이 소유 그룹 밖에서 쓰기 불가능하다",
+      "category": "file",
+      "importance": "중",
+      "automation": "auto",
+      "status": "PASS",
+      "evidence": [
+        {
+          "fact": "files.log_dirs",
+          "status": "ok",
+          "value": "2 elements; none matching",
+          "source": {
+            "kind": "file",
+            "path": "/var/log"
+          }
+        },
+        {
+          "fact": "files.log_dirs",
+          "status": "ok",
+          "value": "2 elements; 0 selected",
+          "source": {
+            "kind": "file",
+            "path": "/var/log"
+          }
+        },
+        {
+          "fact": "files.log_files",
+          "status": "ok",
+          "value": "9 elements; none matching",
+          "source": {
+            "kind": "file",
+            "path": "/var/log"
+          }
+        },
+        {
+          "fact": "files.log_files",
+          "status": "ok",
+          "value": "9 elements; 3 selected",
+          "source": {
+            "kind": "file",
+            "path": "/var/log"
+          }
+        }
+      ],
+      "observations": [
+        {
+          "subject": "file:*",
+          "expected": "group_writable eq true",
+          "actual": "0 of 2 elements selected",
+          "verdict": "pass"
+        },
+        {
+          "subject": "file:/var/log/btmp",
+          "expected": [
+            "root",
+            "syslog",
+            "adm",
+            "utmp"
+          ],
+          "actual": "utmp",
+          "verdict": "pass"
+        },
+        {
+          "subject": "file:/var/log/lastlog",
+          "expected": [
+            "root",
+            "syslog",
+            "adm",
+            "utmp"
+          ],
+          "actual": "utmp",
+          "verdict": "pass"
+        },
+        {
+          "subject": "file:/var/log/wtmp",
+          "expected": [
+            "root",
+            "syslog",
+            "adm",
+            "utmp"
+          ],
+          "actual": "utmp",
+          "verdict": "pass"
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.log.syslog_policy",
+      "title_en": "System logging covers the security-relevant facilities persistently",
+      "title_ko": "시스템 로깅이 보안 관련 facility 를 영구 저장한다",
+      "category": "log",
+      "importance": "중",
+      "automation": "auto",
+      "status": "MANUAL",
+      "reason": "absent needs review: no mechanism applies to this host",
+      "evidence": [
+        {
+          "fact": "logging.syslog.implementation",
+          "status": "ok",
+          "value": "none",
+          "source": {
+            "kind": "derived"
+          }
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.log.time_sync",
+      "title_en": "System time is synchronised from a configured source",
+      "title_ko": "시스템 시각이 설정된 소스와 동기화된다",
+      "category": "log",
+      "importance": "중",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when: services.ntp.installed: no systemd on this host or inside this container",
+      "evidence": [
+        {
+          "fact": "services.ntp.installed",
+          "status": "unsupported"
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.service.dns_dynamic_update",
+      "title_en": "Every authoritative zone restricts who may update it dynamically",
+      "title_ko": "모든 권한 존이 동적 업데이트 대상을 제한한다",
+      "category": "service",
+      "importance": "중",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when: services.dns.installed: no systemd on this host or inside this container",
+      "evidence": [
+        {
+          "fact": "services.dns.installed",
+          "status": "unsupported"
+        },
+        {
+          "fact": "dns.implementation",
+          "status": "ok",
+          "value": "none",
+          "source": {
+            "kind": "derived"
+          }
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.service.ftp_account_shell",
+      "title_en": "The ftp account cannot log in interactively",
+      "title_ko": "ftp 계정으로 대화형 로그인을 할 수 없다",
+      "category": "service",
+      "importance": "중",
+      "automation": "auto",
+      "status": "PASS",
+      "evidence": [
+        {
+          "fact": "accounts.shells",
+          "status": "ok",
+          "value": [
+            "/bin/sh",
+            "/usr/bin/sh",
+            "/bin/bash",
+            "/usr/bin/bash",
+            "/bin/rbash",
+            "/usr/bin/rbash",
+            "/usr/bin/dash"
+          ],
+          "source": {
+            "kind": "file",
+            "path": "/etc/shells"
+          }
+        },
+        {
+          "fact": "accounts.users",
+          "status": "ok",
+          "value": "19 elements; 0 selected",
+          "source": {
+            "kind": "file",
+            "path": "/etc/passwd"
+          }
+        }
+      ],
+      "observations": [
+        {
+          "subject": "user:*",
+          "expected": "name eq ftp",
+          "actual": "0 of 19 elements selected",
+          "verdict": "pass"
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.service.ftp_unencrypted",
+      "title_en": "No FTP service accepts a cleartext session",
+      "title_ko": "암호화되지 않은 FTP 서비스가 동작하지 않는다",
+      "category": "service",
+      "importance": "중",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when: services.ftp.installed: no systemd on this host or inside this container",
+      "evidence": [
+        {
+          "fact": "services.ftp.installed",
+          "status": "unsupported"
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.service.ftpusers_root",
+      "title_en": "A root login over FTP is refused",
+      "title_ko": "FTP 를 통한 root 로그인이 거부된다",
+      "category": "service",
+      "importance": "중",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when: services.ftp.installed: no systemd on this host or inside this container",
+      "evidence": [
+        {
+          "fact": "services.ftp.installed",
+          "status": "unsupported"
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.service.mail_expn_vrfy",
+      "title_en": "The mail transfer agent refuses the SMTP EXPN and VRFY commands",
+      "title_ko": "메일 서버가 SMTP EXPN, VRFY 명령을 거부한다",
+      "category": "service",
+      "importance": "중",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when: services.mail.installed: no systemd on this host or inside this container",
+      "evidence": [
+        {
+          "fact": "services.mail.installed",
+          "status": "unsupported"
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.service.snmp_community_strength",
+      "title_en": "SNMP community strings are neither well known nor short",
+      "title_ko": "SNMP 커뮤니티 문자열이 잘 알려진 값도 짧은 값도 아니다",
+      "category": "service",
+      "importance": "중",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when: services.snmp.installed: no systemd on this host or inside this container",
+      "evidence": [
+        {
+          "fact": "services.snmp.installed",
+          "status": "unsupported"
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.service.snmp_disabled",
+      "title_en": "SNMP is not enabled or reachable",
+      "title_ko": "SNMP 가 활성화되어 있지 않고 접속할 수도 없다",
+      "category": "service",
+      "importance": "중",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason_code": "unsupported_env",
+      "reason": "services.snmp.active: no systemd on this host or inside this container",
+      "evidence": [
+        {
+          "fact": "services.snmp.active",
+          "status": "unsupported"
+        },
+        {
+          "fact": "services.snmp.enabled",
+          "status": "unsupported"
+        },
+        {
+          "fact": "services.snmp.reachable",
+          "status": "unsupported"
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.service.telnet_disabled",
+      "title_en": "Telnet is not reachable",
+      "title_ko": "Telnet 서비스에 접속할 수 없다",
+      "category": "service",
+      "importance": "중",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason_code": "unsupported_env",
+      "reason": "services.telnet.reachable: no systemd on this host or inside this container",
+      "evidence": [
+        {
+          "fact": "services.telnet.reachable",
+          "status": "unsupported"
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.account.primary_group_exists",
+      "title_en": "Every account's primary group exists",
+      "title_ko": "모든 계정의 기본 그룹이 존재한다",
+      "category": "account",
+      "importance": "하",
+      "automation": "auto",
+      "status": "PASS",
+      "evidence": [
+        {
+          "fact": "accounts.orphan_gids",
+          "status": "ok",
+          "value": "0 elements; none matching",
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "file",
+                "path": "/etc/passwd"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/group"
+              }
+            ]
+          }
+        }
+      ],
+      "severity": "low"
+    },
+    {
+      "id": "muster.account.session_timeout",
+      "title_en": "An idle SSH session is disconnected after a bounded time",
+      "title_ko": "유휴 SSH 세션이 정해진 시간이 지나면 끊긴다",
+      "category": "account",
+      "importance": "하",
+      "automation": "auto",
+      "status": "FAIL",
+      "reason": "absent counts as fail: no mechanism applies to this host",
+      "evidence": [
+        {
+          "fact": "env.shell.tmout",
+          "status": "ok",
+          "value": 0,
+          "source": {
+            "kind": "derived"
+          }
+        },
+        {
+          "fact": "sshd.options.client_alive_interval",
+          "status": "absent",
+          "side": "persisted"
+        },
+        {
+          "fact": "sshd.options.client_alive_interval",
+          "status": "absent",
+          "side": "effective"
+        }
+      ],
+      "severity": "low"
+    },
+    {
+      "id": "muster.account.system_account_shells",
+      "title_en": "System accounts have no login shell",
+      "title_ko": "시스템 계정에 로그인 셸이 없다",
+      "category": "account",
+      "importance": "하",
+      "automation": "auto",
+      "status": "PASS",
+      "evidence": [
+        {
+          "fact": "accounts.shells",
+          "status": "ok",
+          "value": [
+            "/bin/sh",
+            "/usr/bin/sh",
+            "/bin/bash",
+            "/usr/bin/bash",
+            "/bin/rbash",
+            "/usr/bin/rbash",
+            "/usr/bin/dash"
+          ],
+          "source": {
+            "kind": "file",
+            "path": "/etc/shells"
+          }
+        },
+        {
+          "fact": "accounts.users",
+          "status": "ok",
+          "value": "19 elements; 16 selected",
+          "source": {
+            "kind": "file",
+            "path": "/etc/passwd"
+          }
+        }
+      ],
+      "observations": [
+        {
+          "subject": "user:daemon",
+          "expected": false,
+          "actual": false,
+          "verdict": "pass"
+        },
+        {
+          "subject": "user:bin",
+          "expected": false,
+          "actual": false,
+          "verdict": "pass"
+        },
+        {
+          "subject": "user:sys",
+          "expected": false,
+          "actual": false,
+          "verdict": "pass"
+        },
+        {
+          "subject": "user:sync",
+          "expected": false,
+          "actual": false,
+          "verdict": "pass"
+        },
+        {
+          "subject": "user:games",
+          "expected": false,
+          "actual": false,
+          "verdict": "pass"
+        },
+        {
+          "subject": "user:man",
+          "expected": false,
+          "actual": false,
+          "verdict": "pass"
+        },
+        {
+          "subject": "user:lp",
+          "expected": false,
+          "actual": false,
+          "verdict": "pass"
+        },
+        {
+          "subject": "user:mail",
+          "expected": false,
+          "actual": false,
+          "verdict": "pass"
+        },
+        {
+          "subject": "user:news",
+          "expected": false,
+          "actual": false,
+          "verdict": "pass"
+        },
+        {
+          "subject": "user:uucp",
+          "expected": false,
+          "actual": false,
+          "verdict": "pass"
+        },
+        {
+          "subject": "user:proxy",
+          "expected": false,
+          "actual": false,
+          "verdict": "pass"
+        },
+        {
+          "subject": "user:www-data",
+          "expected": false,
+          "actual": false,
+          "verdict": "pass"
+        },
+        {
+          "subject": "user:backup",
+          "expected": false,
+          "actual": false,
+          "verdict": "pass"
+        },
+        {
+          "subject": "user:list",
+          "expected": false,
+          "actual": false,
+          "verdict": "pass"
+        },
+        {
+          "subject": "user:irc",
+          "expected": false,
+          "actual": false,
+          "verdict": "pass"
+        },
+        {
+          "subject": "user:_apt",
+          "expected": false,
+          "actual": false,
+          "verdict": "pass"
+        }
+      ],
+      "severity": "low"
+    },
+    {
+      "id": "muster.account.unnecessary_accounts",
+      "title_en": "Accounts that are not needed have been removed",
+      "title_ko": "불필요한 계정이 제거되어 있다",
+      "category": "account",
+      "importance": "하",
+      "automation": "partial",
+      "status": "WARN",
+      "reason": "clause does not hold: accounts.users none where name in [lp uucp nuucp]",
+      "evidence": [
+        {
+          "fact": "accounts.users",
+          "status": "ok",
+          "value": "19 elements; matching: user:lp, user:uucp",
+          "source": {
+            "kind": "file",
+            "path": "/etc/passwd"
+          }
+        }
+      ],
+      "observations": [
+        {
+          "subject": "user:lp",
+          "expected": "not in [lp uucp nuucp]",
+          "actual": "lp",
+          "verdict": "fail"
+        },
+        {
+          "subject": "user:uucp",
+          "expected": "not in [lp uucp nuucp]",
+          "actual": "uucp",
+          "verdict": "fail"
+        }
+      ],
+      "severity": "low"
+    },
+    {
+      "id": "muster.file.hidden_entries",
+      "title_en": "Every hidden file and directory outside the home directories belongs to a package",
+      "title_ko": "홈 디렉터리 밖의 숨김 파일과 디렉터리는 모두 패키지의 것이다",
+      "category": "file",
+      "importance": "하",
+      "automation": "partial",
+      "status": "NOT_APPLICABLE",
+      "reason_code": "unsupported_env",
+      "reason": "walk.hidden: root filesystem is overlay; the walk answers for a host, not for a container layer",
+      "evidence": [
+        {
+          "fact": "walk.hidden",
+          "status": "unsupported"
+        }
+      ],
+      "severity": "low"
+    },
+    {
+      "id": "muster.file.hosts_lpd_permissions",
+      "title_en": "/etc/hosts.lpd, when present, is owned by root and readable by root only",
+      "title_ko": "/etc/hosts.lpd 가 존재하면 root 소유이고 root 만 읽을 수 있다",
+      "category": "file",
+      "importance": "하",
+      "automation": "auto",
+      "status": "PASS",
+      "reason": "absent counts as pass: files.etc_hosts_lpd.uid is absent on this host",
+      "evidence": [
+        {
+          "fact": "files.etc_hosts_lpd.uid",
+          "status": "absent"
+        },
+        {
+          "fact": "files.etc_hosts_lpd.mode",
+          "status": "absent"
+        }
+      ],
+      "severity": "low"
+    },
+    {
+      "id": "muster.service.ftp_banner",
+      "title_en": "The FTP greeting does not name the software serving it",
+      "title_ko": "FTP 접속 안내 문구가 서비스 소프트웨어를 알리지 않는다",
+      "category": "service",
+      "importance": "하",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when: services.ftp.installed: no systemd on this host or inside this container",
+      "evidence": [
+        {
+          "fact": "services.ftp.installed",
+          "status": "unsupported"
+        }
+      ],
+      "severity": "low"
+    },
+    {
+      "id": "muster.service.ftpusers_permissions",
+      "title_en": "The FTP access-control files are root-owned and 0640 or stricter",
+      "title_ko": "FTP 접근 제어 파일이 root 소유이고 0640 이하로 엄격하다",
+      "category": "service",
+      "importance": "하",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when: services.ftp.installed: no systemd on this host or inside this container",
+      "evidence": [
+        {
+          "fact": "services.ftp.installed",
+          "status": "unsupported"
+        }
+      ],
+      "severity": "low"
+    },
+    {
+      "id": "muster.service.login_banner",
+      "title_en": "A login warning banner is presented",
+      "title_ko": "로그인 시 경고 메시지가 표시된다",
+      "category": "service",
+      "importance": "하",
+      "automation": "partial",
+      "status": "WARN",
+      "reason": "clause does not hold: banners.issue_net.os_escapes eq false",
+      "evidence": [
+        {
+          "fact": "banners.issue_net.nonempty",
+          "status": "ok",
+          "value": true,
+          "source": {
+            "kind": "file",
+            "path": "/etc/issue.net"
+          }
+        },
+        {
+          "fact": "banners.issue_net.os_escapes",
+          "status": "ok",
+          "value": true,
+          "source": {
+            "kind": "file",
+            "path": "/etc/issue.net"
+          }
+        }
+      ],
+      "mechanism": 2,
+      "severity": "low"
+    }
+  ]
+}

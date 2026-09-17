@@ -6,7 +6,12 @@ DATE    := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 
 LDFLAGS := -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(DATE)
 
-.PHONY: build test lint fmt tidy lint-controls coverage refindex refindex-check suidindex suidindex-check clean
+# Defaults for `make fuzz`: 60 seconds in the collectors package, the same
+# budget the nightly workflow gives each target.
+TIME    ?= 60s
+FUZZPKG ?= ./internal/collect/collectors/
+
+.PHONY: build test lint fmt tidy lint-controls coverage refindex refindex-check suidindex suidindex-check fuzz examples-fetch clean
 
 build:
 	CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)" -o bin/$(BINARY) $(PKG)
@@ -39,6 +44,20 @@ suidindex:
 
 suidindex-check:
 	go run ./tools/suidindex -check
+
+# One fuzz target for a short time; the seed corpus already runs in `make
+# test`, so this is for the target you are working on. The nightly fuzz
+# workflow runs all of them.
+fuzz:
+	@test -n "$(TARGET)" || { echo "usage: make fuzz TARGET=FuzzParsePasswd [TIME=60s] [FUZZPKG=./internal/pkgfiles/]"; exit 1; }
+	go test -run '^$$' -fuzz "^$(TARGET)$$" -fuzztime $(TIME) $(FUZZPKG)
+
+# Downloads the snapshots and reports of an examples.yml run into examples/,
+# where a person reviews the diff and commits them (F-12). Needs the gh CLI
+# and read access to the repository's Actions artifacts.
+examples-fetch:
+	@test -n "$(RUN)" || { echo "usage: make examples-fetch RUN=<workflow run id>  (gh run list --workflow examples.yml)"; exit 1; }
+	gh run download $(RUN) -n examples-$(RUN) -D examples/
 
 fmt:
 	gofmt -l -w .

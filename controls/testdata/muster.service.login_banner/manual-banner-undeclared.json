@@ -2,4 +2,5 @@
   "services":{"ssh":{"installed":{"status":"ok","value":true}}},
   "sshd":{"banner_file":{
     "exists":{"status":"absent","reason":"Banner /srv/warning.txt is outside the collector's declaration: recorded, never read","source":{"kind":"file","path":"/srv/warning.txt"}},
-    "nonempty":{"status":"absent","reason":"Banner /srv/warning.txt is outside the collector's declaration: recorded, never read","source":{"kind":"file","path":"/srv/warning.txt"}}}}}}
+    "nonempty":{"status":"absent","reason":"Banner /srv/warning.txt is outside the collector's declaration: recorded, never read","source":{"kind":"file","path":"/srv/warning.txt"}}}},
+  "banners":{"issue_net":{"nonempty":{"status":"ok","value":false,"source":{"kind":"file","path":"/etc/issue.net"}},"os_escapes":{"status":"ok","value":false,"source":{"kind":"file","path":"/etc/issue.net"}}}}}}

@@ -1,0 +1,1 @@
+{"synthetic":true,"schema_version":1,"run":{},"facts":{"files":{"etc_services":{"uid":{"status":"absent","reason":"/etc/services is not on this host"},"mode":{"status":"absent","reason":"/etc/services is not on this host"}}}}}

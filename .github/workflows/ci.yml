@@ -46,15 +46,6 @@ jobs:
   collect-root:
     runs-on: ubuntu-24.04
     needs: test
-    env:
-      # The runner image's own trees, excluded from the walk: its toolchain
-      # caches and the system directories the image itself makes
-      # world-writable (the first --deep run measured 210,280 world-writable
-      # entries, 345k of them under /usr/local/lib alone). No host of anyone's
-      # owns these permissions, and a path absent from a later image is
-      # harmless. The same list prunes the diagnostic find below, so a list at
-      # its cap names a cause the list does not already cover.
-      WALK_EXCLUDES: /opt/hostedtoolcache /opt/pipx /opt/runner-cache /opt/microsoft /opt/az /imagegeneration /usr/share /usr/local/lib /usr/local/share /usr/local/.ghcup /usr/lib/jvm
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -70,8 +61,11 @@ jobs:
       - name: collect as root
         run: |
           set +e
+          # Ruling G-26: the one list, .github/walk-excludes, which
+          # examples.yml's VM collect reads too.
+          mapfile -t walk_excludes < <(grep -vE '^[[:space:]]*(#|$)' .github/walk-excludes)
           excludes=()
-          for p in $WALK_EXCLUDES; do excludes+=(--walk-exclude "$p"); done
+          for p in "${walk_excludes[@]}"; do excludes+=(--walk-exclude "$p"); done
           sudo ./bin/muster collect --out "$RUNNER_TEMP/muster/root.json" \
             --deep --walk-budget 15m --walk-max-entries 6000000 \
             "${excludes[@]}" \
@@ -92,8 +86,9 @@ jobs:
           # exclusion or an allowlist row rather than a raised cap: the
           # runner image's own world-writable entries by top directory, and
           # every root the walk did not enter.
+          mapfile -t walk_excludes < <(grep -vE '^[[:space:]]*(#|$)' .github/walk-excludes)
           prune=(-path /proc -o -path /sys -o -path /dev -o -path /run)
-          for p in $WALK_EXCLUDES; do prune+=(-o -path "$p"); done
+          for p in "${walk_excludes[@]}"; do prune+=(-o -path "$p"); done
           echo "== world-writable entries the walk could see on the runner, by top directory (find, independent of muster)"
           sudo find / -xdev \( "${prune[@]}" \) -prune -o -perm -0002 -not -type l -print 2>/dev/null | cut -d/ -f1-4 | sort | uniq -c | sort -rn | head -30
           echo "== other-writable directories without the sticky bit the walk could see, by top directory"
@@ -117,6 +112,54 @@ jobs:
           jq -e '.check.guide_edition == "kisa-unix-2026"' "$RUNNER_TEMP/muster/root-report.json"
       - name: sudo-run linux tests
         run: sudo env PATH="$PATH" GOFLAGS="$GOFLAGS" go test ./internal/collect/... ./cmd/muster/ -count=1
+      # P-1: the corpus is taken BEFORE the oracle drop-in is written, so it
+      # is the image's real files by construction rather than by the removal
+      # step below having run -- exactly how the init-container job already
+      # does it. An oracle failure used to skip the seed step with it.
+      - name: seed files from the runner (artifact)
+        run: |
+          mkdir -p "$RUNNER_TEMP/seeds/sshd" && sudo cp /etc/ssh/sshd_config "$RUNNER_TEMP/seeds/sshd/" && sudo cp -r /etc/ssh/sshd_config.d "$RUNNER_TEMP/seeds/sshd/" 2>/dev/null || true
+          cp /etc/passwd /etc/group "$RUNNER_TEMP/seeds/" && cp /proc/self/mountinfo "$RUNNER_TEMP/seeds/mountinfo"
+          sudo chown -R "$(id -u)" "$RUNNER_TEMP/seeds"
+      - uses: actions/upload-artifact@v4
+        with: {name: seeds-runner, path: "${{ runner.temp }}/seeds"}
+      - name: give the sshd oracle something to compare
+        run: |
+          # The stock sshd_config leaves every keyword the sshd pair compares
+          # commented out, so on an untouched runner that pair would run,
+          # compare nothing, and still report PASS. This drop-in sets all
+          # five; the stock file's first line is
+          # "Include /etc/ssh/sshd_config.d/*.conf", so the daemon and
+          # parseSshdConfig both see it. The values are deliberately
+          # non-default, and "without-password" is the deprecated spelling of
+          # "prohibit-password", which exercises the oracle's alias map. The
+          # seed corpus was taken above, before this file existed, so it keeps
+          # the image's real files whatever happens here.
+          printf '%s\n' \
+            'PermitRootLogin without-password' \
+            'MaxAuthTries 3' \
+            'ClientAliveInterval 300' \
+            'ClientAliveCountMax 0' \
+            'Banner /etc/issue.net' \
+            | sudo tee /etc/ssh/sshd_config.d/99-muster-oracle.conf >/dev/null
+          # The runner installs openssh-server but never starts sshd, so its
+          # privilege-separation directory does not exist and both -t and the
+          # oracle's -T would exit 255 on that alone.
+          sudo mkdir -p /run/sshd
+          sudo /usr/sbin/sshd -t
+      - name: the parsers agree with the daemons (oracle)
+        run: |
+          set -o pipefail
+          sudo env PATH="$PATH" GOFLAGS="$GOFLAGS" MUSTER_ORACLE=1 go test ./internal/collect/collectors/ -run Oracle -count=1 -v 2>&1 | tee "$RUNNER_TEMP/oracle.log"
+          ! grep -q -- '--- SKIP' "$RUNNER_TEMP/oracle.log"
+          # A pair that compared nothing is not a pair that agreed: the sshd
+          # keywords are set above, so the count has to be non-zero here.
+          grep -q 'oracle sshd: compared [1-9]' "$RUNNER_TEMP/oracle.log"
+      - name: take the oracle drop-in back out
+        # P-1: the runner is thrown away, but a step that exists to undo a
+        # change must run whether or not the thing it guarded passed.
+        if: always()
+        run: sudo rm -f /etc/ssh/sshd_config.d/99-muster-oracle.conf
 
   collect-nonroot:
     runs-on: ubuntu-24.04
@@ -205,7 +248,10 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: "1.25.5"
-      - run: CGO_ENABLED=0 go build -trimpath -o bin/muster ./cmd/muster
+      - name: build muster and the collectors test binary
+        run: |
+          CGO_ENABLED=0 go build -trimpath -o bin/muster ./cmd/muster
+          CGO_ENABLED=0 go test -c ./internal/collect/collectors/ -o bin/collectors.test
       - name: collect inside ${{ matrix.image }}
         run: |
           mkdir -m 700 "$RUNNER_TEMP/muster"
@@ -218,6 +264,28 @@ jobs:
               sleep 1
             done
             docker exec "$cid" /m/muster collect --deep --out /out/c.json || true
+            # $cid is a shell variable of this block, so everything that needs
+            # the container belongs here. The trap removes it however this
+            # block ends: a failing oracle below must not leak a container.
+            trap 'docker rm -f "$cid" >/dev/null 2>&1 || true' EXIT
+            # F-10: the four files this image really ships, for the fuzz
+            # corpus. Copied BEFORE the oracle runs, so a mismatch that stops
+            # this step still leaves the artifact the triage needs.
+            mkdir -m 700 "$RUNNER_TEMP/muster/containers/seeds"
+            for f in /etc/ssh/sshd_config /etc/passwd /etc/group /proc/self/mountinfo; do
+              docker exec "$cid" sh -c "cat $f" > "$RUNNER_TEMP/muster/containers/seeds/$(basename "$f")" 2>/dev/null || true
+            done
+            # A file the image does not ship leaves the redirection's empty
+            # file behind; an empty seed claiming to be an image's config
+            # would be a lie in the corpus, so it goes.
+            find "$RUNNER_TEMP/muster/containers/seeds" -type f -empty -delete
+            echo "SEED_NAME=seeds-$(echo '${{ matrix.image }}' | tr '/:' '--')" >> "$GITHUB_ENV"
+            # The parsers against the image's own daemons (F-9). A pair whose
+            # oracle binary the image does not ship skips — the log counts
+            # them — but a mismatch fails the job.
+            set -o pipefail
+            docker exec "$cid" env MUSTER_ORACLE=1 /m/collectors.test -test.run Oracle -test.v 2>&1 | tee "$RUNNER_TEMP/muster/containers/oracle.log"
+            echo "pairs skipped: $(grep -c -- '--- SKIP' "$RUNNER_TEMP/muster/containers/oracle.log" || true)"
             docker rm -f "$cid"
           else
             docker run --rm -v "$PWD/bin:/m:ro" -v "$RUNNER_TEMP/muster/containers:/out" ${{ matrix.image }} /m/muster collect --deep --out /out/c.json || true
@@ -237,6 +305,11 @@ jobs:
           else
             jq -e '.facts.services.ssh.installed.status == "unsupported"' "$RUNNER_TEMP/muster/containers/c.json"
           fi
+      # always(): the seeds are copied before the oracle runs precisely so a
+      # mismatch can be triaged against the files it read.
+      - uses: actions/upload-artifact@v4
+        if: always() && matrix.init == 'true' && env.SEED_NAME != ''
+        with: {name: "${{ env.SEED_NAME }}", path: "${{ runner.temp }}/muster/containers/seeds"}
       - name: unseen facts are ERROR or NOT_APPLICABLE, never PASS
         run: |
           set +e
