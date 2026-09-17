@@ -190,7 +190,7 @@ TIME=<duration>`은 같은 플래그로 타깃 하나를 로컬에서 돌립니�
 생성합니다. 4 MiB를 넘는 예시는 워크플로가 거부합니다(VM의 워크 리스트는 root 잡의 제외 뒤 상한
 아래에 있음).
 
-**F-12 — 생성과 테스트.** 새 워크플로 `.github/workflows/examples.yml`(`workflow_dispatch`만)이 바이너리를
+**F-12 — 생성과 테스트.** 새 워크플로 `.github/workflows/examples.yml`(`workflow_dispatch`, 그리고 이 워크플로 파일을 고치는 풀 리퀘스트)이 바이너리를
 빌드하고 스냅샷 둘과 리포트 둘을 수집해 아티팩트 `examples-<run id>`로 올립니다. `make examples-fetch
 RUN=<id>`가 `gh run download`로 `examples/`에 내려받고 사람이 커밋합니다. `cmd/muster/examples_test.go`는
 커밋된 스냅샷을 각각 로드해 내장 셋으로 `check`를 돌리고 어떤 결과도 `ERROR(internal_error)`가 아님을

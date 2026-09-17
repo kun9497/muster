@@ -8,6 +8,11 @@ name: examples
 # throwaway GitHub runner VM, and both are rewritten below.
 on:
   workflow_dispatch:
+  # A workflow that has never run is not registered, so it cannot be
+  # dispatched from a branch; a pull request that edits this file runs it
+  # once, which registers it and produces the examples for that branch.
+  pull_request:
+    paths: ['.github/workflows/examples.yml']
 
 permissions: {contents: read}
 

@@ -221,7 +221,7 @@ over 4 MiB is refused by the workflow (the VM's walk lists sit under their caps 
 job's exclusions).
 
 **F-12 — Generation and the test.** A new workflow `.github/workflows/examples.yml`
-(`workflow_dispatch` only) builds the binary, collects both snapshots and both reports, and
+(`workflow_dispatch`, and a pull request that edits the workflow itself) builds the binary, collects both snapshots and both reports, and
 uploads them as the artifact `examples-<run id>`; `make examples-fetch RUN=<id>` downloads
 it with `gh run download` into `examples/`, and a person commits. `cmd/muster/examples_test.go`
 loads each committed snapshot, runs `check` against the embedded set, asserts no result is
