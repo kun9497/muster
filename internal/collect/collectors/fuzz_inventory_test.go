@@ -258,6 +258,14 @@ func fuzzTargetCalls(t *testing.T) map[string]map[string]bool {
 }
 
 // readsHostBytes is the inventory grammar of F-6.
+//
+// It reads the FIRST parameter only, which is where every parser this package
+// has takes its bytes. A parser shaped otherwise is not caught — a
+// `(name string, f []string)` that parses pre-split fields, or a plain
+// `(s string)` like firstQuoted — so a new parser of that shape has to be
+// declared in coveredThrough (or given a target) by hand; this test will not
+// notice it is missing. Widening the grammar to any string parameter would
+// sweep in every path, key and service name the package passes around.
 func readsHostBytes(fn *ast.FuncDecl) bool {
 	params := fn.Type.Params.List
 	if len(params) == 0 {

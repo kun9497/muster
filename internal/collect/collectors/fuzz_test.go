@@ -62,12 +62,22 @@ func memMeta(data []byte) collect.ReadMeta {
 	return collect.ReadMeta{Tier: "componentwise", Size: int64(len(data)), Kind: "regular", Mode: 0o644}
 }
 
-func (m *memAccess) ReadFile(p string, _ int64) ([]byte, collect.ReadMeta, error) {
+// ReadFile honours limit the way the host primitive does: the read stops
+// there and the meta says it was cut, while Size stays the file's real size.
+// Without that, the truncated branch every caller has — parseSshdConfig
+// stores meta on the envelope it returns — would be unreachable through this
+// double whatever the fuzzer produced.
+func (m *memAccess) ReadFile(p string, limit int64) ([]byte, collect.ReadMeta, error) {
 	data, ok := m.files[p]
 	if !ok {
 		return nil, collect.ReadMeta{}, &fs.PathError{Op: "open", Path: p, Err: fs.ErrNotExist}
 	}
-	return data, memMeta(data), nil
+	meta := memMeta(data)
+	if limit > 0 && int64(len(data)) > limit {
+		data = data[:limit]
+		meta.Truncated = true
+	}
+	return data, meta, nil
 }
 
 func (m *memAccess) Stat(p string) (collect.ReadMeta, error) {
@@ -128,6 +138,22 @@ func TestMemAccess(t *testing.T) {
 
 	if _, err := a.Stat("/etc/ssh/sshd_config.d/00-fuzz.conf"); err != nil {
 		t.Errorf("Stat of a served path: %v", err)
+	}
+
+	// A limit below the file's size cuts the read and says so, while Size
+	// stays the size the file really has.
+	short, meta, err := a.ReadFile("/etc/ssh/sshd_config", 4)
+	if err != nil {
+		t.Fatalf("ReadFile with a limit: %v", err)
+	}
+	if string(short) != "Perm" {
+		t.Errorf("ReadFile with limit 4 returned %q, want the first four bytes", short)
+	}
+	if !meta.Truncated {
+		t.Error("ReadFile with a limit below the size did not report Truncated")
+	}
+	if meta.Size != int64(len(data)) {
+		t.Errorf("a truncated read reported Size %d, want the file's %d", meta.Size, len(data))
 	}
 	if _, _, err := a.ReadFile("/etc/shadow", readLimit); !errors.Is(err, fs.ErrNotExist) {
 		t.Errorf("ReadFile of an unserved path = %v, want fs.ErrNotExist", err)
@@ -259,10 +285,19 @@ func TestSeedsRefuseAnEmptyGlob(t *testing.T) {
 // covers the fixed-size wrapper a target returns its results in.
 const listSlack = 64
 
-// rawBound is the longest an evidence string may be. sourceRaw cuts at
-// rawCap bytes and appends a one-rune ellipsis to say that it cut, so the
-// stored string is rawCap plus that marker and never more.
-const rawBound = rawCap + len("…")
+// rawEllipsis is the marker sourceRaw appends when it cut a line at rawCap.
+const rawEllipsis = "…"
+
+// rawWithinCap is the contract exactly: at most rawCap bytes of the file's
+// own line, plus the marker when — and only when — the line was cut. Bounding
+// the whole string at rawCap+len(rawEllipsis) would let an uncut line run
+// three bytes over the cap unnoticed.
+func rawWithinCap(s string) bool {
+	if strings.HasSuffix(s, rawEllipsis) {
+		return len(s)-len(rawEllipsis) <= rawCap
+	}
+	return len(s) <= rawCap
+}
 
 // modulePath is muster's import path. The bound walk descends into muster's
 // own types only: a time.Time or an *fs.PathError a parser hands back is
@@ -340,10 +375,15 @@ func (w *boundWalk) walk(v reflect.Value, at string, depth int) {
 		for i := 0; i < tp.NumField(); i++ {
 			f := tp.Field(i)
 			fv := v.Field(i)
+			// Today the only field that reaches this branch is
+			// facts.Source.Raw, through FuzzParseSshdConfig — it is the one
+			// target whose parser returns an Envelope. The check is written
+			// for the field name rather than for that type so a parser that
+			// starts storing evidence is bounded the day it does.
 			if fv.Kind() == reflect.String && rawFields[strings.ToLower(f.Name)] {
-				if n := fv.Len(); n > rawBound {
-					w.t.Fatalf("%s stored a %d-byte %s at %s.%s (cap %d)",
-						w.parser, n, f.Name, at, f.Name, rawBound)
+				if s := fv.String(); !rawWithinCap(s) {
+					w.t.Fatalf("%s stored a %d-byte %s at %s.%s (cap %d, plus %q only when it cut)",
+						w.parser, len(s), f.Name, at, f.Name, rawCap, rawEllipsis)
 				}
 			}
 			w.walk(fv, at+"."+f.Name, depth+1)
