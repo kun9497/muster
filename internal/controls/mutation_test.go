@@ -87,6 +87,20 @@ func indexExclusion(excl []exclusion, id, signature string) int {
 	return -1
 }
 
+// invalidExclusion returns the message an exclusion deserves when it names a
+// mutant the lint REJECTS, or "" when the pair is fine (LOW-1). An exclusion
+// exists to explain a mutant that survived every fixture; a mutant the lint
+// rejects is never evaluated against a fixture at all, so the row explains
+// nothing and is evidence of a typo or of a control change the list did not
+// follow. Marking it generated and moving on -- what the loop used to do --
+// let such a row sit in the list forever.
+func invalidExclusion(id, signature string, excluded, valid bool) string {
+	if !excluded || valid {
+		return ""
+	}
+	return fmt.Sprintf("excluded mutant %s %s is rejected by the control lint, so no fixture ever judged it; an exclusion explains a SURVIVOR, drop the row", id, signature)
+}
+
 // findExclusion returns the entry covering one mutant of one control, or nil.
 func findExclusion(excl []exclusion, id, signature string) *exclusion {
 	if i := indexExclusion(excl, id, signature); i >= 0 {
@@ -95,11 +109,28 @@ func findExclusion(excl []exclusion, id, signature string) *exclusion {
 	return nil
 }
 
+// missingFactOnly reports whether a fixture's answer moved to
+// ERROR(missing_fact) from something that was not an ERROR at all. Ruling
+// G-22: that transition is NOT a kill. The evaluator raises missing_fact when
+// a control reads a REGISTERED key the snapshot does not carry, and a
+// snapshot without a registered key is a shape `collect` never writes -- it
+// is a gap in the fixture, not a state of a host. A mutant that "dies" only
+// because a fixture is incomplete has been examined by nothing: the operator
+// would never see that answer. So the pair is treated as no difference, and
+// the mutant has to die on a VERDICT somewhere else or be reported as a
+// survivor. It is deliberately not counted invalid either -- the mutant is a
+// control the lint accepts, and hiding it would lose the finding.
+func missingFactOnly(base, got outcome) bool {
+	return got.Status == check.ERROR && got.Reason == check.MissingFact && base.Status != check.ERROR
+}
+
 // compareOutcomes is the kill oracle of F-1. diff says at least one fixture
 // answered differently; onlyInternal says every fixture that did so moved to
 // ERROR(internal_error), which the evaluator produces by recovering a panic
 // and which therefore proves nothing about the judgment; firstDiff is the
-// index of the first fixture that differs, or -1.
+// index of the first fixture that differs, or -1. A move to
+// ERROR(missing_fact) off a non-ERROR base is not a difference at all
+// (missingFactOnly).
 func compareOutcomes(base, got []outcome) (diff, onlyInternal bool, firstDiff int) {
 	firstDiff = -1
 	if len(base) != len(got) {
@@ -107,7 +138,7 @@ func compareOutcomes(base, got []outcome) (diff, onlyInternal bool, firstDiff in
 	}
 	onlyInternal = true
 	for i := range base {
-		if base[i] == got[i] {
+		if base[i] == got[i] || missingFactOnly(base[i], got[i]) {
 			continue
 		}
 		diff = true
@@ -173,8 +204,11 @@ func TestEveryMutantIsKilled(t *testing.T) {
 	var generated, invalid, killed, surviving, excluded int
 	var report []string
 	for _, c := range set.Controls {
-		// A control muster declines to judge has nothing to mutate.
-		if c.Automation == "manual" && len(c.Checks)+len(c.Mechanisms) == 0 {
+		// A control muster declines to judge has nothing to mutate --
+		// but a manual control's applies_when is still a judgment, the one
+		// that decides NOT_APPLICABLE against MANUAL (ruling G-21), so a
+		// manual control is only skipped when it carries no gate either.
+		if c.Automation == "manual" && len(c.AppliesWhen)+len(c.Checks)+len(c.Mechanisms) == 0 {
 			continue
 		}
 		files, _ := filepath.Glob(filepath.Join(fixtureRoot, c.ID, "*.json"))
@@ -191,10 +225,15 @@ func TestEveryMutantIsKilled(t *testing.T) {
 			// The mark is set before the validity check, because a mutant
 			// the lint rejects was still generated -- reporting it as
 			// "not generated" would send a reviewer looking for a typo.
-			if i := indexExclusion(excl, c.ID, m.Signature); i >= 0 {
-				generatedBy[i] = true
+			ei := indexExclusion(excl, c.ID, m.Signature)
+			if ei >= 0 {
+				generatedBy[ei] = true
 			}
-			if !lintValid(m.Control, reg) {
+			valid := lintValid(m.Control, reg)
+			if msg := invalidExclusion(c.ID, m.Signature, ei >= 0, valid); msg != "" {
+				t.Error(msg)
+			}
+			if !valid {
 				invalid++
 				continue
 			}
@@ -256,12 +295,51 @@ func TestCompareOutcomes(t *testing.T) {
 		{"only a recovered panic", []outcome{ok, bad}, []outcome{ok, boom}, true, true, 1},
 		{"a panic and a real change", []outcome{ok, bad, ok}, []outcome{boom, bad, bad}, true, false, 0},
 		{"empty", nil, nil, false, false, -1},
+		// Ruling G-22: a fixture that answers ERROR(missing_fact) where it
+		// used to answer a verdict shows the mutant nothing -- the snapshot
+		// simply lacks a registered key, a shape `collect` never writes.
+		{"only a missing fact", []outcome{ok, bad}, []outcome{ok, missing}, false, false, -1},
+		{"a missing fact and a real change", []outcome{ok, bad, ok}, []outcome{missing, bad, bad}, true, false, 2},
+		// The exemption is one-directional: a base that was already ERROR
+		// moving to ERROR(missing_fact) is a reason-code change like any
+		// other, and a move AWAY from missing_fact is always a kill.
+		{"missing fact off an error base", []outcome{boom}, []outcome{missing}, true, false, 0},
+		{"away from a missing fact", []outcome{missing}, []outcome{ok}, true, false, 0},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			diff, onlyIntern, first := compareOutcomes(tc.base, tc.got)
 			if diff != tc.diff || onlyIntern != tc.onlyIntern || first != tc.first {
 				t.Errorf("= (%v, %v, %d), want (%v, %v, %d)", diff, onlyIntern, first, tc.diff, tc.onlyIntern, tc.first)
+			}
+		})
+	}
+}
+
+// TestInvalidExclusion is LOW-1: the kill loop marks an exclusion generated
+// before it knows whether the mutant is one the lint accepts, so only this
+// rule stops a row naming a lint-rejected mutant from passing unnoticed.
+func TestInvalidExclusion(t *testing.T) {
+	cases := []struct {
+		name            string
+		excluded, valid bool
+		wantMessage     bool
+	}{
+		{"excluded and invalid", true, false, true},
+		{"excluded and valid", true, true, false},
+		{"not excluded and invalid", false, false, false},
+		{"not excluded and valid", false, true, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := invalidExclusion("muster.a.one", "checks[0] op eq->ne", tc.excluded, tc.valid)
+			if (got != "") != tc.wantMessage {
+				t.Fatalf("= %q, want a message: %v", got, tc.wantMessage)
+			}
+			if tc.wantMessage {
+				if !strings.Contains(got, "muster.a.one") || !strings.Contains(got, "checks[0] op eq->ne") {
+					t.Errorf("the message names neither the control nor the mutant: %q", got)
+				}
 			}
 		})
 	}

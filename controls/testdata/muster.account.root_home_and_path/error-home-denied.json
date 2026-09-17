@@ -1,5 +1,5 @@
 {"synthetic": true, "_expect":{"status":"ERROR","reason_code":"permission_denied"}, "schema_version":1,"run":{},"facts":{
-  "env":{"shell":{"root_path_raw":{"status":"absent","reason":"no PATH assignment"}}},
+  "env":{"shell":{"root_path_raw":{"status":"absent","reason":"no PATH assignment"},"root_path_entries":{"status":"absent","reason":"no PATH assignment"}}},
   "files":{"root_home":{
     "uid":{"status":"denied","reason":"/root: permission denied"},
     "group_writable":{"status":"denied","reason":"/root: permission denied"},

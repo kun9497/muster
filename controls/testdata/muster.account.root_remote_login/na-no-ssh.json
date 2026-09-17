@@ -1,1 +1,6 @@
-{"synthetic": true, "schema_version":1,"run":{},"facts":{"services":{"ssh":{"installed":{"status":"ok","value":false}}}}}
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "services":{"ssh":{"installed":{"status":"ok","value":false}}},
+  "sshd":{"personas_collected":{"status":"ok","value":false},
+    "options":{"permit_root_login":{"effective":{"status":"absent","reason":"sshd_config sets no PermitRootLogin"}}}},
+  "files":{"etc_securetty":{"status":"absent","reason":"/etc/securetty is not on this host"}},
+  "pam":{"securetty_enabled":{"status":"ok","value":false,"reason":"no login PAM stack names pam_securetty.so"}}}}

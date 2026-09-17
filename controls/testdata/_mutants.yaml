@@ -93,3 +93,15 @@
     rsyslogCoverage (internal/collect/collectors/logging.go) assigns `persistent` only
     inside the branch that has already set `logged` true, so a facility that fails
     checks[1] (logged eq true) always also fails checks[2] (persistent eq true).
+
+- control: muster.service.login_banner
+  mutant: "mechanisms[1].when[0] remove"
+  reason: >-
+    The `when` fact is banners.issue_net.nonempty, which is also this mechanism's
+    checks[0], and bannerContent (internal/collect/collectors/banners.go) writes nonempty
+    and os_escapes from ONE ReadFile with the SAME envelope. The screen and the judgment
+    can therefore never disagree: an ok envelope makes the `when` hold, so the mechanism
+    is chosen with or without it; an absent one skips the mechanism into absent_means:
+    manual, which is exactly the MANUAL that screening the same absent leaf in the checks
+    gives; and a hard status gives the same ERROR code from the mechanism loop or from the
+    check screening.

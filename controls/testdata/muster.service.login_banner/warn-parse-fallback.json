@@ -1,4 +1,5 @@
 {"synthetic": true, "_expect":{"status":"WARN"}, "schema_version":1,"run":{},"facts":{
   "services":{"ssh":{"installed":{"status":"ok","value":true}}},
   "sshd":{"collect_method":{"status":"ok","value":"parse"},
-    "banner_file":{"nonempty":{"status":"ok","value":true,"source":{"kind":"file","path":"/etc/issue.net"}}}}}}
+    "banner_file":{"nonempty":{"status":"ok","value":true,"source":{"kind":"file","path":"/etc/issue.net"}}}},
+  "banners":{"issue_net":{"nonempty":{"status":"ok","value":true,"source":{"kind":"file","path":"/etc/issue.net"}},"os_escapes":{"status":"ok","value":false,"source":{"kind":"file","path":"/etc/issue.net"}}}}}}

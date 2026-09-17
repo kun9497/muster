@@ -1,0 +1,6 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "services":{"mail":{"installed":{"status":"ok","value":true},"reachable":{"status":"ok","value":true}}},
+  "mail":{"implementation":{"status":"absent","reason":"an MTA answers on port 25 but neither postfix, sendmail nor exim is configured on this host; which implementation it runs cannot be named"},
+          "postfix":{"authorized_submit_users":{"status":"absent","reason":"no postfix configuration on this host"}},
+          "sendmail":{"privacy_options":{"status":"absent","reason":"no sendmail configuration on this host"}}}
+}}
