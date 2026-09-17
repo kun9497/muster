@@ -117,6 +117,18 @@ jobs:
           jq -e '.check.guide_edition == "kisa-unix-2026"' "$RUNNER_TEMP/muster/root-report.json"
       - name: sudo-run linux tests
         run: sudo env PATH="$PATH" GOFLAGS="$GOFLAGS" go test ./internal/collect/... ./cmd/muster/ -count=1
+      - name: the parsers agree with the daemons (oracle)
+        run: |
+          set -o pipefail
+          sudo env PATH="$PATH" GOFLAGS="$GOFLAGS" MUSTER_ORACLE=1 go test ./internal/collect/collectors/ -run Oracle -count=1 -v 2>&1 | tee "$RUNNER_TEMP/oracle.log"
+          ! grep -q -- '--- SKIP' "$RUNNER_TEMP/oracle.log"
+      - name: seed files from the runner (artifact)
+        run: |
+          mkdir -p "$RUNNER_TEMP/seeds/sshd" && sudo cp /etc/ssh/sshd_config "$RUNNER_TEMP/seeds/sshd/" && sudo cp -r /etc/ssh/sshd_config.d "$RUNNER_TEMP/seeds/sshd/" 2>/dev/null || true
+          cp /etc/passwd /etc/group "$RUNNER_TEMP/seeds/" && cp /proc/self/mountinfo "$RUNNER_TEMP/seeds/mountinfo"
+          sudo chown -R "$(id -u)" "$RUNNER_TEMP/seeds"
+      - uses: actions/upload-artifact@v4
+        with: {name: seeds-runner, path: "${{ runner.temp }}/seeds"}
 
   collect-nonroot:
     runs-on: ubuntu-24.04
@@ -205,7 +217,10 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: "1.25.5"
-      - run: CGO_ENABLED=0 go build -trimpath -o bin/muster ./cmd/muster
+      - name: build muster and the collectors test binary
+        run: |
+          CGO_ENABLED=0 go build -trimpath -o bin/muster ./cmd/muster
+          CGO_ENABLED=0 go test -c ./internal/collect/collectors/ -o bin/collectors.test
       - name: collect inside ${{ matrix.image }}
         run: |
           mkdir -m 700 "$RUNNER_TEMP/muster"
@@ -218,6 +233,24 @@ jobs:
               sleep 1
             done
             docker exec "$cid" /m/muster collect --deep --out /out/c.json || true
+            # The parsers against the image's own daemons (F-9). $cid is a
+            # shell variable of this block, so the run belongs here, before
+            # the container is removed. A pair whose oracle binary the image
+            # does not ship skips — the log counts them — but a mismatch
+            # fails the job.
+            set -o pipefail
+            docker exec "$cid" env MUSTER_ORACLE=1 /m/collectors.test -test.run Oracle -test.v 2>&1 | tee "$RUNNER_TEMP/muster/containers/oracle.log"
+            echo "pairs skipped: $(grep -c -- '--- SKIP' "$RUNNER_TEMP/muster/containers/oracle.log" || true)"
+            # F-10: the four files this image really ships, for the fuzz corpus.
+            mkdir -m 700 "$RUNNER_TEMP/muster/containers/seeds"
+            for f in /etc/ssh/sshd_config /etc/passwd /etc/group /proc/self/mountinfo; do
+              docker exec "$cid" sh -c "cat $f" > "$RUNNER_TEMP/muster/containers/seeds/$(basename "$f")" 2>/dev/null || true
+            done
+            # A file the image does not ship leaves the redirection's empty
+            # file behind; an empty seed claiming to be an image's config
+            # would be a lie in the corpus, so it goes.
+            find "$RUNNER_TEMP/muster/containers/seeds" -type f -empty -delete
+            echo "SEED_NAME=seeds-$(echo '${{ matrix.image }}' | tr '/:' '--')" >> "$GITHUB_ENV"
             docker rm -f "$cid"
           else
             docker run --rm -v "$PWD/bin:/m:ro" -v "$RUNNER_TEMP/muster/containers:/out" ${{ matrix.image }} /m/muster collect --deep --out /out/c.json || true
@@ -237,6 +270,9 @@ jobs:
           else
             jq -e '.facts.services.ssh.installed.status == "unsupported"' "$RUNNER_TEMP/muster/containers/c.json"
           fi
+      - uses: actions/upload-artifact@v4
+        if: matrix.init == 'true'
+        with: {name: "${{ env.SEED_NAME }}", path: "${{ runner.temp }}/muster/containers/seeds"}
       - name: unseen facts are ERROR or NOT_APPLICABLE, never PASS
         run: |
           set +e
