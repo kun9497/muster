@@ -1,0 +1,37 @@
+name: fuzz
+
+# The seed corpus runs inside `go test ./...` on every pull request; the
+# fuzzing itself runs here, once a night and on demand (spec 3F, F-7). The
+# shard assignment is computed from `go test -list`, never committed, so a new
+# target joins the rotation by existing.
+on:
+  schedule: [{cron: "17 3 * * *"}]
+  workflow_dispatch:
+
+permissions: {contents: read}
+
+jobs:
+  fuzz:
+    runs-on: ubuntu-24.04
+    strategy: {fail-fast: false, matrix: {shard: [0, 1, 2, 3]}}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: {go-version: "1.25.5", check-latest: false}
+      - name: fuzz my share of the targets for 60 s each
+        run: |
+          set -o pipefail
+          targets=$( { go test -list '^Fuzz' ./internal/collect/collectors/ | sed 's#^Fuzz#./internal/collect/collectors/ Fuzz#'; go test -list '^Fuzz' ./internal/pkgfiles/ | sed 's#^Fuzz#./internal/pkgfiles/ Fuzz#'; } | grep ' Fuzz' | sort )
+          i=0; failed=0
+          while read -r pkg name; do
+            if [ $((i % 4)) -eq ${{ matrix.shard }} ]; then
+              echo "== $name"
+              go test -run '^$' -fuzz "^${name}\$" -fuzztime 60s "$pkg" || failed=1
+            fi
+            i=$((i+1))
+          done <<< "$targets"
+          exit $failed
+      - name: upload new corpus entries
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with: {name: "fuzz-corpus-shard-${{ matrix.shard }}", path: "internal/**/testdata/fuzz/**", if-no-files-found: ignore}

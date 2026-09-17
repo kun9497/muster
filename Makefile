@@ -6,7 +6,12 @@ DATE    := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 
 LDFLAGS := -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(DATE)
 
-.PHONY: build test lint fmt tidy lint-controls coverage refindex refindex-check suidindex suidindex-check clean
+# Defaults for `make fuzz`: 60 seconds in the collectors package, the same
+# budget the nightly workflow gives each target.
+TIME    ?= 60s
+FUZZPKG ?= ./internal/collect/collectors/
+
+.PHONY: build test lint fmt tidy lint-controls coverage refindex refindex-check suidindex suidindex-check fuzz clean
 
 build:
 	CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)" -o bin/$(BINARY) $(PKG)
@@ -39,6 +44,13 @@ suidindex:
 
 suidindex-check:
 	go run ./tools/suidindex -check
+
+# One fuzz target for a short time; the seed corpus already runs in `make
+# test`, so this is for the target you are working on. The nightly fuzz
+# workflow runs all of them.
+fuzz:
+	@test -n "$(TARGET)" || { echo "usage: make fuzz TARGET=FuzzParsePasswd [TIME=60s] [FUZZPKG=./internal/pkgfiles/]"; exit 1; }
+	go test -run '^$$' -fuzz "^$(TARGET)$$" -fuzztime $(TIME) $(FUZZPKG)
 
 fmt:
 	gofmt -l -w .
