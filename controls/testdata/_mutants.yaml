@@ -105,3 +105,45 @@
     manual, which is exactly the MANUAL that screening the same absent leaf in the checks
     gives; and a hard status gives the same ERROR code from the mechanism loop or from the
     check screening.
+
+# Ruling G-28: the four manual service controls gate on `<svc>.implementation
+# present`, and that gate can only fail on a shape the collector never writes.
+# Both publish sites build the leaf unconditionally with collect.OK — mail.go's
+# `impl := collect.OK(p.impl, p.implSource())` and the identical line in
+# dns.go — and a host with nothing installed gets the value "none", not an
+# absent envelope. So dropping the gate is an EQUIVALENT mutant: on every
+# snapshot `collect` can produce, the first gate alone decides the row. The
+# other mutants of these controls' gates are still generated and still killed
+# by na-not-installed.json and the manual fixtures.
+
+- control: muster.service.dns_version
+  mutant: "applies_when[1] remove"
+  reason: >-
+    dnsParse.publish (internal/collect/collectors/dns.go) sets dns.implementation with
+    `impl := collect.OK(p.impl, p.implSource())` on every path — a host with no nameserver
+    gets the value "none", never an absent envelope — so this `present` gate holds on every
+    snapshot collect writes and removing it cannot change any fixture's answer.
+
+- control: muster.service.mail_version
+  mutant: "applies_when[1] remove"
+  reason: >-
+    mailParse.publish (internal/collect/collectors/mail.go) sets mail.implementation with
+    `impl := collect.OK(p.impl, p.implSource())` on every path — a host with no MTA gets the
+    value "none", never an absent envelope — so this `present` gate holds on every snapshot
+    collect writes and removing it cannot change any fixture's answer.
+
+- control: muster.service.mail_relay
+  mutant: "applies_when[1] remove"
+  reason: >-
+    mailParse.publish (internal/collect/collectors/mail.go) sets mail.implementation with
+    `impl := collect.OK(p.impl, p.implSource())` on every path — a host with no MTA gets the
+    value "none", never an absent envelope — so this `present` gate holds on every snapshot
+    collect writes and removing it cannot change any fixture's answer.
+
+- control: muster.service.mail_user_execution
+  mutant: "applies_when[1] remove"
+  reason: >-
+    mailParse.publish (internal/collect/collectors/mail.go) sets mail.implementation with
+    `impl := collect.OK(p.impl, p.implSource())` on every path — a host with no MTA gets the
+    value "none", never an absent envelope — so this `present` gate holds on every snapshot
+    collect writes and removing it cannot change any fixture's answer.
