@@ -11,7 +11,7 @@ builds this repository, and both are rewritten (below) before they are kept.
 | --- | --- |
 | `ubuntu-24.04-container.json` | `muster collect --deep` inside the public `ubuntu:24.04` image: an overlay root, no systemd, the walk lists `unsupported`. |
 | `ubuntu-24.04-container-report.json` / `-report.txt` | `muster check` on that snapshot, as JSON and as the table. |
-| `ubuntu-24.04-vm.json` | `muster collect --deep` on the GitHub Actions `ubuntu-24.04` runner VM, with the walk exclusions `ci.yml` uses, so the walk lists carry real rows. |
+| `ubuntu-24.04-vm.json` | `muster collect --deep` on the GitHub Actions `ubuntu-24.04` runner VM, with the walk exclusions of `.github/walk-excludes` — the same file `ci.yml` reads — so the walk lists carry real rows. |
 | `ubuntu-24.04-vm-report.json` / `-report.txt` | `muster check` on that snapshot, as JSON and as the table. |
 
 **Those six files and the run id below arrive with the first run of the workflow**; until then
@@ -31,7 +31,8 @@ make build                                  # stamps the version and commit
 docker run --rm --platform linux/amd64 -v "$PWD/bin:/m:ro" -v "$RUNNER_TEMP/ex:/out" \
   ubuntu:24.04 /m/muster collect --deep --out /out/ubuntu-24.04-container.json
 
-# on the runner VM (the same --walk-exclude list as ci.yml's collect-root job)
+# on the runner VM (the --walk-exclude list of .github/walk-excludes, which
+# ci.yml's collect-root job reads from the same file)
 sudo ./bin/muster collect --deep --walk-budget 15m --walk-max-entries 6000000 \
   --walk-exclude ... --require-root --out "$RUNNER_TEMP/ex/ubuntu-24.04-vm.json"
 
@@ -49,11 +50,22 @@ host-shaped is committed:
 - `run.host.boot_id` (a boot UUID), `run.host.kernel` and `run.host.uptime_s` are blanked —
   they describe the runner's kernel, not the image;
 - every `addr` in `facts.sockets.listening.value` that is neither loopback (`127.`, `::1`) nor
-  a wildcard (`0.0.0.0`, `::`) becomes `192.0.2.1`, the RFC 5737 documentation address;
+  a wildcard (`0.0.0.0`, `::`) becomes `192.0.2.1` (RFC 5737) or, for an IPv6 address,
+  `2001:db8::1` (RFC 3849);
+- every RFC 1918 address (`10/8`, `172.16/12`, `192.168/16`) a host's own configuration put
+  into a fact is renumbered into `198.51.100.0/24`, keeping its last octet and any `/prefix`,
+  so `10.1.2.0/24` becomes `198.51.100.0/24`. The facts scanned are the firewall's
+  `raw_dumps[].content` and `rules[].saddr`, the `files.etc_hosts_allow_lines`,
+  `files.etc_hosts_deny_lines` and `files.etc_hosts_equiv_lines` line lists,
+  `time_sync.servers`, and each `nfs.exports[].client`;
 - `run.host.machine_id_hash` is already a hash and stays.
 
 The workflow refuses an example over 4 MiB, and asserts the rewrite afterwards rather than
-assuming it.
+assuming it — first per fact, and then over the whole file, which is grepped for the three
+shapes [`.gitleaks.toml`](../.gitleaks.toml) refuses in a tracked file (an RFC 1918 address, a
+private DNS suffix, a non-personal e-mail address), with that file's own literal allowlists
+applied. A fact nobody thought of is caught there rather than by the secrets job after the
+commit.
 
 ## Refreshing them
 

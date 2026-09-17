@@ -46,15 +46,6 @@ jobs:
   collect-root:
     runs-on: ubuntu-24.04
     needs: test
-    env:
-      # The runner image's own trees, excluded from the walk: its toolchain
-      # caches and the system directories the image itself makes
-      # world-writable (the first --deep run measured 210,280 world-writable
-      # entries, 345k of them under /usr/local/lib alone). No host of anyone's
-      # owns these permissions, and a path absent from a later image is
-      # harmless. The same list prunes the diagnostic find below, so a list at
-      # its cap names a cause the list does not already cover.
-      WALK_EXCLUDES: /opt/hostedtoolcache /opt/pipx /opt/runner-cache /opt/microsoft /opt/az /imagegeneration /usr/share /usr/local/lib /usr/local/share /usr/local/.ghcup /usr/lib/jvm
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -70,8 +61,11 @@ jobs:
       - name: collect as root
         run: |
           set +e
+          # Ruling G-26: the one list, .github/walk-excludes, which
+          # examples.yml's VM collect reads too.
+          mapfile -t walk_excludes < <(grep -vE '^[[:space:]]*(#|$)' .github/walk-excludes)
           excludes=()
-          for p in $WALK_EXCLUDES; do excludes+=(--walk-exclude "$p"); done
+          for p in "${walk_excludes[@]}"; do excludes+=(--walk-exclude "$p"); done
           sudo ./bin/muster collect --out "$RUNNER_TEMP/muster/root.json" \
             --deep --walk-budget 15m --walk-max-entries 6000000 \
             "${excludes[@]}" \
@@ -92,8 +86,9 @@ jobs:
           # exclusion or an allowlist row rather than a raised cap: the
           # runner image's own world-writable entries by top directory, and
           # every root the walk did not enter.
+          mapfile -t walk_excludes < <(grep -vE '^[[:space:]]*(#|$)' .github/walk-excludes)
           prune=(-path /proc -o -path /sys -o -path /dev -o -path /run)
-          for p in $WALK_EXCLUDES; do prune+=(-o -path "$p"); done
+          for p in "${walk_excludes[@]}"; do prune+=(-o -path "$p"); done
           echo "== world-writable entries the walk could see on the runner, by top directory (find, independent of muster)"
           sudo find / -xdev \( "${prune[@]}" \) -prune -o -perm -0002 -not -type l -print 2>/dev/null | cut -d/ -f1-4 | sort | uniq -c | sort -rn | head -30
           echo "== other-writable directories without the sticky bit the walk could see, by top directory"
@@ -117,6 +112,17 @@ jobs:
           jq -e '.check.guide_edition == "kisa-unix-2026"' "$RUNNER_TEMP/muster/root-report.json"
       - name: sudo-run linux tests
         run: sudo env PATH="$PATH" GOFLAGS="$GOFLAGS" go test ./internal/collect/... ./cmd/muster/ -count=1
+      # P-1: the corpus is taken BEFORE the oracle drop-in is written, so it
+      # is the image's real files by construction rather than by the removal
+      # step below having run -- exactly how the init-container job already
+      # does it. An oracle failure used to skip the seed step with it.
+      - name: seed files from the runner (artifact)
+        run: |
+          mkdir -p "$RUNNER_TEMP/seeds/sshd" && sudo cp /etc/ssh/sshd_config "$RUNNER_TEMP/seeds/sshd/" && sudo cp -r /etc/ssh/sshd_config.d "$RUNNER_TEMP/seeds/sshd/" 2>/dev/null || true
+          cp /etc/passwd /etc/group "$RUNNER_TEMP/seeds/" && cp /proc/self/mountinfo "$RUNNER_TEMP/seeds/mountinfo"
+          sudo chown -R "$(id -u)" "$RUNNER_TEMP/seeds"
+      - uses: actions/upload-artifact@v4
+        with: {name: seeds-runner, path: "${{ runner.temp }}/seeds"}
       - name: give the sshd oracle something to compare
         run: |
           # The stock sshd_config leaves every keyword the sshd pair compares
@@ -126,9 +132,9 @@ jobs:
           # "Include /etc/ssh/sshd_config.d/*.conf", so the daemon and
           # parseSshdConfig both see it. The values are deliberately
           # non-default, and "without-password" is the deprecated spelling of
-          # "prohibit-password", which exercises the oracle's alias map. It is
-          # removed again before the seed step, so the corpus keeps the
-          # image's real files.
+          # "prohibit-password", which exercises the oracle's alias map. The
+          # seed corpus was taken above, before this file existed, so it keeps
+          # the image's real files whatever happens here.
           printf '%s\n' \
             'PermitRootLogin without-password' \
             'MaxAuthTries 3' \
@@ -146,14 +152,10 @@ jobs:
           # keywords are set above, so the count has to be non-zero here.
           grep -q 'oracle sshd: compared [1-9]' "$RUNNER_TEMP/oracle.log"
       - name: take the oracle drop-in back out
+        # P-1: the runner is thrown away, but a step that exists to undo a
+        # change must run whether or not the thing it guarded passed.
+        if: always()
         run: sudo rm -f /etc/ssh/sshd_config.d/99-muster-oracle.conf
-      - name: seed files from the runner (artifact)
-        run: |
-          mkdir -p "$RUNNER_TEMP/seeds/sshd" && sudo cp /etc/ssh/sshd_config "$RUNNER_TEMP/seeds/sshd/" && sudo cp -r /etc/ssh/sshd_config.d "$RUNNER_TEMP/seeds/sshd/" 2>/dev/null || true
-          cp /etc/passwd /etc/group "$RUNNER_TEMP/seeds/" && cp /proc/self/mountinfo "$RUNNER_TEMP/seeds/mountinfo"
-          sudo chown -R "$(id -u)" "$RUNNER_TEMP/seeds"
-      - uses: actions/upload-artifact@v4
-        with: {name: seeds-runner, path: "${{ runner.temp }}/seeds"}
 
   collect-nonroot:
     runs-on: ubuntu-24.04

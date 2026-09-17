@@ -1,12 +1,21 @@
 name: fuzz
 
 # The seed corpus runs inside `go test ./...` on every pull request; the
-# fuzzing itself runs here, once a night and on demand (spec 3F, F-7). The
+# fuzzing itself runs here, once a night, on demand, and -- briefly -- on a
+# pull request that edits this file (spec 3F, F-7; ruling G-27). The
 # shard assignment is computed from `go test -list`, never committed, so a new
 # target joins the rotation by existing.
 on:
   schedule: [{cron: "17 3 * * *"}]
   workflow_dispatch:
+  # Ruling G-27: a workflow that only ever runs at night is a workflow whose
+  # own edits are never exercised before they are merged. A pull request that
+  # TOUCHES this file runs it, at 5 s a target instead of 60 -- long enough to
+  # prove the shard arithmetic, the listing and the seed corpus, short enough
+  # not to hold up a review. Nothing else triggers it, so an ordinary pull
+  # request is unaffected.
+  pull_request:
+    paths: ['.github/workflows/fuzz.yml']
 
 permissions: {contents: read}
 
@@ -14,11 +23,15 @@ jobs:
   fuzz:
     runs-on: ubuntu-24.04
     strategy: {fail-fast: false, matrix: {shard: [0, 1, 2, 3]}}
+    env:
+      # 60 s a target nightly and on demand; 5 s when this file is under
+      # review (ruling G-27).
+      FUZZTIME: ${{ github.event_name == 'pull_request' && '5s' || '60s' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with: {go-version: "1.25.5", check-latest: false}
-      - name: fuzz my share of the targets for 60 s each
+      - name: fuzz my share of the targets (60 s each nightly, 5 s on a pull request)
         run: |
           # One assignment per package, so a package that fails to build or
           # lists no target fails the shard here rather than silently
@@ -33,7 +46,7 @@ jobs:
             if [ $((i % 4)) -eq ${{ matrix.shard }} ]; then
               echo "== $name"
               ran=$((ran+1))
-              go test -run '^$' -fuzz "^${name}\$" -fuzztime 60s "$pkg" || failed=1
+              go test -run '^$' -fuzz "^${name}\$" -fuzztime "$FUZZTIME" "$pkg" || failed=1
             fi
             i=$((i+1))
           done <<< "$targets"

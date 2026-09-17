@@ -37,6 +37,19 @@ import (
 //     job on the runner VM — which has all four — asserts there are none.
 //     A binary that IS there and refuses to answer fails the pair: a daemon
 //     that will not print its own configuration is a finding, not a gap.
+//
+// LOW-12 — one assumption these pairs make about the host they run on. The
+// accounts and group pairs ask getent for what /etc/passwd, /etc/group,
+// /etc/shadow and the subid files say, so they hold only where NSS resolves
+// those databases from the files alone: `passwd: files systemd` and
+// `group: files systemd` on a stock Ubuntu or RHEL, which is what the CI
+// runner and the init containers have. On a host whose /etc/nsswitch.conf
+// also names sss, ldap or nis, getent answers from the directory as well and
+// every account it adds looks like a row the parser missed. The pairs are
+// opt-in (MUSTER_ORACLE=1) and the jobs that set it run on images we control,
+// so nothing checks the NSS stack here; a self-hosted runner joined to a
+// directory would see those false getent-only rows and should not enable the
+// oracles.
 
 // oracleEnabled gates every pair. The oracles talk to the host's real
 // daemons, so they are opt-in: `go test ./...` on a developer's machine or

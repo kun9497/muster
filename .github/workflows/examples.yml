@@ -15,12 +15,6 @@ jobs:
   examples:
     runs-on: ubuntu-24.04
     env:
-      # The same list ci.yml's collect-root job uses: the runner image's own
-      # toolchain caches and the system trees the image itself makes
-      # world-writable. They belong to no host anyone runs, and without them
-      # the walk's lists reach their caps on noise. Keeping the two lists
-      # identical is what makes the VM example the walk CI already proves.
-      WALK_EXCLUDES: /opt/hostedtoolcache /opt/pipx /opt/runner-cache /opt/microsoft /opt/az /imagegeneration /usr/share /usr/local/lib /usr/local/share /usr/local/.ghcup /usr/lib/jvm
       # F-11: an example over 4 MiB is refused rather than committed.
       MAX_BYTES: "4194304"
     steps:
@@ -51,8 +45,12 @@ jobs:
 
       - name: collect on the runner VM
         run: |
+          # Ruling G-26: the one list, .github/walk-excludes, which ci.yml's
+          # collect-root job reads too -- the VM example is "the walk CI
+          # already proves" only while the two runs exclude the same trees.
+          mapfile -t walk_excludes < <(grep -vE '^[[:space:]]*(#|$)' .github/walk-excludes)
           excludes=()
-          for p in $WALK_EXCLUDES; do excludes+=(--walk-exclude "$p"); done
+          for p in "${walk_excludes[@]}"; do excludes+=(--walk-exclude "$p"); done
           set +e
           sudo ./bin/muster collect --deep --walk-budget 15m --walk-max-entries 6000000 \
             "${excludes[@]}" --require-root --out "$RUNNER_TEMP/ex/ubuntu-24.04-vm.json"
@@ -69,6 +67,12 @@ jobs:
             sudo chown "$(id -u)" "$RUNNER_TEMP/ex/ubuntu-24.04-vm.json"
             jq -r '.run.partial_failures, (.run.collectors[] | select(.status != "ok") | "\(.name): \(.status) \(.reason)")' \
               "$RUNNER_TEMP/ex/ubuntu-24.04-vm.json"
+            # W-4: the same per-list line ci.yml's collect-root job prints.
+            # The size cap in the next step refuses the whole file without
+            # saying WHICH walk list grew, so the lengths are on the log
+            # before anything can fire.
+            jq -r '.facts.walk | to_entries[] | "\(.key): status=\(.value.status) truncated=\(.value.truncated // false) length=\(if (.value.value | type) == "array" then (.value.value | length) else "-" end)"' \
+              "$RUNNER_TEMP/ex/ubuntu-24.04-vm.json"
           else
             echo "collect wrote no snapshot"
           fi
@@ -81,17 +85,33 @@ jobs:
           rewrite() {
             # F-11: the hostname becomes a fixed name, the boot UUID, the
             # kernel string and the uptime are blanked (they identify the
-            # runner's kernel, not the image), and every listening socket
-            # address that is neither loopback nor a wildcard becomes the
-            # RFC 5737 documentation address 192.0.2.1. machine_id_hash is
-            # already a hash and stays. The socket records are
-            # .facts.sockets.listening.value[] with proto, addr, port, inode
-            # and loopback (internal/collect/collectors/sockets.go). The type
-            # guard is load-bearing: a fact whose status is not ok carries no
-            # value, and `(.facts.sockets.listening.value // []) |= ...` is
-            # then an invalid path expression that stops jq -- proven on a
-            # snapshot whose sockets fact reads unsupported.
+            # runner's kernel, not the image), every listening socket address
+            # that is neither loopback nor a wildcard becomes an RFC 5737 /
+            # RFC 3849 documentation address, and every RFC 1918 address a
+            # host's own configuration put into a fact is renumbered into
+            # 198.51.100.0/24. machine_id_hash is already a hash and stays.
+            #
+            # Ruling G-23: the sockets list used to be the only place the
+            # rewrite looked, and a runner's addresses reach a snapshot
+            # through half a dozen other facts - the firewall's raw dumps and
+            # its normalised rules, the TCP-wrapper and hosts.equiv line
+            # lists, the configured time sources and the NFS export clients.
+            # The last octet is kept, so two different addresses stay two
+            # different addresses, and an optional /prefix is outside the
+            # match, so 10.1.2.0/24 becomes 198.51.100.0/24 rather than
+            # losing its mask.
+            #
+            # Every list is guarded by the same `type == "array"` test: a fact
+            # whose status is not ok carries no value, and `.value |= ...` on
+            # a null is an invalid path expression that stops jq -- proven on
+            # a snapshot whose sockets fact reads unsupported.
             jq --arg host "$2" '
+              def rfc1918:
+                gsub("\\b10\\.\\d{1,3}\\.\\d{1,3}\\.(?<d>\\d{1,3})\\b"; "198.51.100." + .d)
+                | gsub("\\b172\\.(?:1[6-9]|2[0-9]|3[01])\\.\\d{1,3}\\.(?<d>\\d{1,3})\\b"; "198.51.100." + .d)
+                | gsub("\\b192\\.168\\.\\d{1,3}\\.(?<d>\\d{1,3})\\b"; "198.51.100." + .d);
+              def scrubstr: if type == "string" then rfc1918 else . end;
+              def scrubfield(name): if (.[name] | type) == "string" then .[name] |= rfc1918 else . end;
               .run.host.hostname = $host
               | .run.host.boot_id = ""
               | .run.host.kernel = ""
@@ -99,8 +119,23 @@ jobs:
               | if (.facts.sockets.listening.value | type) == "array"
                 then .facts.sockets.listening.value |= map(
                   if (.addr | test("^(127\\.|::1$|0\\.0\\.0\\.0$|::$)") | not)
-                  then .addr = "192.0.2.1" else . end)
+                  then .addr = (if (.addr | test(":")) then "2001:db8::1" else "192.0.2.1" end)
+                  else . end)
                 else . end
+              | if (.facts.firewall.raw_dumps.value | type) == "array"
+                then .facts.firewall.raw_dumps.value |= map(scrubfield("content")) else . end
+              | if (.facts.firewall.rules.value | type) == "array"
+                then .facts.firewall.rules.value |= map(scrubfield("saddr")) else . end
+              | if (.facts.files.etc_hosts_allow_lines.value | type) == "array"
+                then .facts.files.etc_hosts_allow_lines.value |= map(scrubstr) else . end
+              | if (.facts.files.etc_hosts_deny_lines.value | type) == "array"
+                then .facts.files.etc_hosts_deny_lines.value |= map(scrubstr) else . end
+              | if (.facts.files.etc_hosts_equiv_lines.value | type) == "array"
+                then .facts.files.etc_hosts_equiv_lines.value |= map(scrubstr) else . end
+              | if (.facts.time_sync.servers.value | type) == "array"
+                then .facts.time_sync.servers.value |= map(scrubstr) else . end
+              | if (.facts.nfs.exports.value | type) == "array"
+                then .facts.nfs.exports.value |= map(scrubfield("client")) else . end
             ' "$1" > "$1.tmp"
             mv "$1.tmp" "$1"
             size=$(stat -c%s "$1")
@@ -117,9 +152,25 @@ jobs:
               and .run.host.kernel == ""
               and .run.host.uptime_s == 0
               and ([.facts.sockets.listening.value // [] | .[]
-                    | select(.addr | test("^(127\\.|::1$|0\\.0\\.0\\.0$|::$|192\\.0\\.2\\.1$)") | not)]
+                    | select(.addr | test("^(127\\.|::1$|0\\.0\\.0\\.0$|::$|192\\.0\\.2\\.1$|2001:db8::1$)") | not)]
                    | length == 0)
             ' "$1" > /dev/null
+            # Ruling G-23: and then the whole file, because the fact nobody
+            # thought of is exactly what a per-fact list cannot cover. These
+            # are .gitleaks.toml's three shapes for tracked files - an RFC
+            # 1918 address, a private DNS suffix and a non-personal e-mail -
+            # with that file's own literal allowlists applied, so this step
+            # refuses what the secrets job would refuse, one commit earlier.
+            ipv4='\b(10\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}|172\.(1[6-9]|2[0-9]|3[01])\.[0-9]{1,3}\.[0-9]{1,3}|192\.168\.[0-9]{1,3}\.[0-9]{1,3})\b'
+            host_shape='\b[a-zA-Z0-9][a-zA-Z0-9-]*\.(corp|internal|intra|lan|local|priv)\b'
+            email='[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.(com|net|org|io|co|kr)'
+            allowed='^(10\.0\.0\.0|172\.16\.0\.0|192\.168\.0\.0|snmpd\.local|conf\.local|db\.local|w\.priv)$|@(openssh\.com|libssh\.org|example\.(com|org|net))$'
+            hits=$(grep -oE -e "$ipv4" -e "$host_shape" -e "$email" "$1" | grep -vE "$allowed" | sort | uniq -c | sort -rn | head -20 || true)
+            if [ -n "$hits" ]; then
+              echo "$1 still carries what .gitleaks.toml refuses in a tracked file:"
+              echo "$hits"
+              exit 1
+            fi
           }
           rewrite ubuntu-24.04-container.json ubuntu-container
           rewrite ubuntu-24.04-vm.json github-runner
