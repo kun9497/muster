@@ -165,7 +165,13 @@ jobs:
             host_shape='\b[a-zA-Z0-9][a-zA-Z0-9-]*\.(corp|internal|intra|lan|local|priv)\b'
             email='[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.(com|net|org|io|co|kr)'
             allowed='^(10\.0\.0\.0|172\.16\.0\.0|192\.168\.0\.0|snmpd\.local|conf\.local|db\.local|w\.priv)$|@(openssh\.com|libssh\.org|example\.(com|org|net))$'
-            hits=$(grep -oE -e "$ipv4" -e "$host_shape" -e "$email" "$1" | grep -vE "$allowed" | sort | uniq -c | sort -rn | head -20 || true)
+            # The hostname rule in .gitleaks.toml is written (?i), so its
+            # shape is matched here with -i as well; a suffix spelled .CORP
+            # would otherwise pass this step and be refused by the secrets
+            # job. The address and e-mail patterns keep their own casing.
+            hits=$( { grep -oE -e "$ipv4" -e "$email" "$1" || true
+                      grep -oiE -e "$host_shape" "$1" || true
+                    } | grep -vE "$allowed" | sort | uniq -c | sort -rn | head -20 || true)
             if [ -n "$hits" ]; then
               echo "$1 still carries what .gitleaks.toml refuses in a tracked file:"
               echo "$hits"

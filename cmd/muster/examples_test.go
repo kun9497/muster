@@ -84,20 +84,21 @@ func maskReport(t *testing.T, data []byte) []byte {
 	return out
 }
 
-// reportControlsDigest returns a report's check.controls_digest, or "" when
-// the bytes are not a report or carry no digest. "" never equals a real
-// digest, so an unreadable committed report is treated as one this build
-// cannot reproduce rather than compared against it.
-func reportControlsDigest(data []byte) string {
+// reportControlsDigest returns a report's check.controls_digest, or the error
+// that says the bytes are not JSON at all. A report that parses but carries no
+// digest reads as "", which never equals a real digest, so it is treated as a
+// set this build cannot reproduce; bytes that do not parse are a damaged file,
+// not another control set, and the caller must say so rather than skip them.
+func reportControlsDigest(data []byte) (string, error) {
 	var doc struct {
 		Check struct {
 			ControlsDigest string `json:"controls_digest"`
 		} `json:"check"`
 	}
 	if err := json.Unmarshal(data, &doc); err != nil {
-		return ""
+		return "", err
 	}
-	return doc.Check.ControlsDigest
+	return doc.Check.ControlsDigest, nil
 }
 
 // checkExampleReports is the comparison half of the F-12 gate on one example:
@@ -116,7 +117,15 @@ func reportControlsDigest(data []byte) string {
 // ERROR(internal_error) -- is checked either way by the caller: those are
 // properties of the SNAPSHOT, and no control-set change excuses them.
 func checkExampleReports(name string, gotJSON, wantJSON, gotTable, wantTable []byte, buildDigest string) (problems []string, note string) {
-	if committed := reportControlsDigest(wantJSON); committed != buildDigest {
+	// A committed report that does not parse has no digest to compare, but it
+	// is a damaged file rather than another control set: skipping it would
+	// hide a truncated or half-written report behind the staleness note.
+	committed, err := reportControlsDigest(wantJSON)
+	if err != nil {
+		return []string{fmt.Sprintf("%s-report.json does not parse as JSON: %v; refresh the examples (see examples/README.md)",
+			strings.TrimSuffix(name, ".json"), err)}, ""
+	}
+	if committed != buildDigest {
 		return nil, fmt.Sprintf("examples/%s: collected against control set %s, this build is %s; byte comparison skipped",
 			name, committed, buildDigest)
 	}
@@ -268,8 +277,8 @@ func TestExampleStalenessGate(t *testing.T) {
 
 	// The report this build just produced carries this build's digest, which
 	// is what makes the gate open at all.
-	if got := reportControlsDigest(gotJSON); got != set.Digest {
-		t.Fatalf("this build's own report carries controls_digest %q, want %q", got, set.Digest)
+	if got, err := reportControlsDigest(gotJSON); err != nil || got != set.Digest {
+		t.Fatalf("this build's own report carries controls_digest %q (err %v), want %q", got, err, set.Digest)
 	}
 
 	// 1. A current, matching pair: compared, and nothing to report.
@@ -306,11 +315,24 @@ func TestExampleStalenessGate(t *testing.T) {
 		}
 	}
 
-	// 4. A committed report that is not a report at all reads as no digest,
-	//    which is nobody's control set, so it is skipped rather than compared
-	//    against bytes it cannot be compared with.
-	if got := reportControlsDigest([]byte("not json")); got != "" {
-		t.Errorf("reportControlsDigest of a non-report = %q", got)
+	// 4. A committed report that is not JSON at all is a damaged file, not
+	//    another control set: it is reported, naming the file, and never
+	//    swallowed by the staleness note.
+	problems, note = checkExampleReports("x.json", gotJSON, []byte("not json"), gotTable, otherTable, set.Digest)
+	if note != "" {
+		t.Errorf("a corrupt committed report was called stale: %q", note)
+	}
+	if len(problems) != 1 {
+		t.Fatalf("a corrupt committed report reported %d problems, want 1: %v", len(problems), problems)
+	}
+	if !strings.Contains(problems[0], "x-report.json") {
+		t.Errorf("the problem %q does not name the committed report file", problems[0])
+	}
+
+	// A report that parses but names another control set still takes the
+	// skip, so the new branch reports damage only.
+	if _, err := reportControlsDigest(stale); err != nil {
+		t.Errorf("a well-formed report of another control set does not parse: %v", err)
 	}
 }
 

@@ -1,3 +1,8 @@
 {"synthetic": true, "_expect":{"status":"MANUAL"}, "schema_version":1,"run":{},"facts":{
   "services":{"ssh":{"installed":{"status":"ok","value":false}}},
-  "banners":{"issue_net":{"nonempty":{"status":"absent","reason":"/etc/issue.net is absent"}}}}}
+  "sshd":{"banner_file":{
+    "exists":{"status":"ok","value":false,"source":{"kind":"derived"}},
+    "nonempty":{"status":"ok","value":false,"source":{"kind":"derived"}}}},
+  "banners":{"issue_net":{
+    "nonempty":{"status":"absent","reason":"not present"},
+    "os_escapes":{"status":"absent","reason":"not present"}}}}}
