@@ -1,0 +1,66 @@
+# Example snapshots and reports
+
+What a real `muster collect` snapshot and the reports `muster check` makes from it look like,
+so nobody has to run anything to see the shape of the output.
+
+**No file in this directory comes from anyone's host.** One snapshot is collected inside a
+public `ubuntu:24.04` container, the other on the throwaway GitHub Actions runner VM that
+builds this repository, and both are rewritten (below) before they are kept.
+
+| File | Where it comes from |
+| --- | --- |
+| `ubuntu-24.04-container.json` | `muster collect --deep` inside the public `ubuntu:24.04` image: an overlay root, no systemd, the walk lists `unsupported`. |
+| `ubuntu-24.04-container-report.json` / `-report.txt` | `muster check` on that snapshot, as JSON and as the table. |
+| `ubuntu-24.04-vm.json` | `muster collect --deep` on the GitHub Actions `ubuntu-24.04` runner VM, with the walk exclusions `ci.yml` uses, so the walk lists carry real rows. |
+| `ubuntu-24.04-vm-report.json` / `-report.txt` | `muster check` on that snapshot, as JSON and as the table. |
+
+Produced by run `<run id>` of [`.github/workflows/examples.yml`](../.github/workflows/examples.yml).
+The snapshot headers carry the rest of the provenance: `muster_version`, `commit`,
+`collected_at` and `host.os_release`.
+
+## The commands
+
+```sh
+# in the container
+docker run --rm -v "$PWD/bin:/m:ro" -v "$RUNNER_TEMP/ex:/out" \
+  ubuntu:24.04 /m/muster collect --deep --out /out/ubuntu-24.04-container.json
+
+# on the runner VM (the same --walk-exclude list as ci.yml's collect-root job)
+sudo ./bin/muster collect --deep --walk-budget 15m --walk-max-entries 6000000 \
+  --walk-exclude ... --out "$RUNNER_TEMP/ex/ubuntu-24.04-vm.json"
+
+# the reports, after the rewrite below
+NO_COLOR=1 ./bin/muster check --facts <snapshot> --format json > <snapshot>-report.json
+NO_COLOR=1 ./bin/muster check --facts <snapshot> --format table > <snapshot>-report.txt
+```
+
+## The rewrite
+
+Before `check` runs, the workflow rewrites each snapshot with `jq` so that nothing
+host-shaped is committed:
+
+- `run.host.hostname` becomes `ubuntu-container` or `github-runner`;
+- `run.host.boot_id` (a boot UUID), `run.host.kernel` and `run.host.uptime_s` are blanked —
+  they describe the runner's kernel, not the image;
+- every `addr` in `facts.sockets.listening.value` that is neither loopback (`127.`, `::1`) nor
+  a wildcard (`0.0.0.0`, `::`) becomes `192.0.2.1`, the RFC 5737 documentation address;
+- `run.host.machine_id_hash` is already a hash and stays.
+
+The workflow refuses an example over 4 MiB, and asserts the rewrite afterwards rather than
+assuming it.
+
+## Refreshing them
+
+```sh
+gh workflow run examples.yml --ref main
+make examples-fetch RUN=<run id>          # gh run download into examples/
+```
+
+Then review the diff — the whole point of this directory is that a person looks at the files
+before they are committed — update the run id above, and commit.
+
+`cmd/muster/examples_test.go` reloads every snapshot here, re-runs `check` in process and
+compares both reports byte for byte, ignoring only the four provenance fields that differ
+between a release binary and `go test` (`muster_version`, `commit`, `controls_version`,
+`controls_digest`) and the table's first line. A stale example does not fail the suite for
+being stale, only for no longer being reproducible.

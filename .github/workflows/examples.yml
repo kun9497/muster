@@ -1,0 +1,135 @@
+name: examples
+
+# The committed examples/ snapshots and their reports (spec 3F, F-11/F-12).
+# Run by hand; a person then downloads the artifact with
+# `make examples-fetch RUN=<run id>`, reviews the diff and commits. Nothing
+# here runs on a push or a pull request, and nothing here is collected from
+# anybody's host: one snapshot comes from a public image, the other from the
+# throwaway GitHub runner VM, and both are rewritten below.
+on:
+  workflow_dispatch:
+
+permissions: {contents: read}
+
+jobs:
+  examples:
+    runs-on: ubuntu-24.04
+    env:
+      # The same list ci.yml's collect-root job uses: the runner image's own
+      # toolchain caches and the system trees the image itself makes
+      # world-writable. They belong to no host anyone runs, and without them
+      # the walk's lists reach their caps on noise. Keeping the two lists
+      # identical is what makes the VM example the walk CI already proves.
+      WALK_EXCLUDES: /opt/hostedtoolcache /opt/pipx /opt/runner-cache /opt/microsoft /opt/az /imagegeneration /usr/share /usr/local/lib /usr/local/share /usr/local/.ghcup /usr/lib/jvm
+      # F-11: an example over 4 MiB is refused rather than committed.
+      MAX_BYTES: "4194304"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: {go-version: "1.25.5", check-latest: false}
+      - run: CGO_ENABLED=0 go build -trimpath -o bin/muster ./cmd/muster
+      - name: prepare the output directory
+        run: mkdir -m 700 "$RUNNER_TEMP/ex"
+
+      - name: collect inside ubuntu:24.04
+        run: |
+          docker run --rm -v "$PWD/bin:/m:ro" -v "$RUNNER_TEMP/ex:/out" \
+            ubuntu:24.04 /m/muster collect --deep --out /out/ubuntu-24.04-container.json
+          sudo chown "$(id -u)" "$RUNNER_TEMP/ex/ubuntu-24.04-container.json"
+
+      - name: collect on the runner VM
+        run: |
+          excludes=()
+          for p in $WALK_EXCLUDES; do excludes+=(--walk-exclude "$p"); done
+          set +e
+          sudo ./bin/muster collect --deep --walk-budget 15m --walk-max-entries 6000000 \
+            "${excludes[@]}" --out "$RUNNER_TEMP/ex/ubuntu-24.04-vm.json"
+          code=$?
+          set -e
+          sudo chown "$(id -u)" "$RUNNER_TEMP/ex/ubuntu-24.04-vm.json"
+          echo "collect exit $code"
+          # 0 complete, 1 partial, 2 nothing collected. A partial snapshot is
+          # still a usable example -- and its degraded envelopes are part of
+          # what an example should show -- so it is reported here and judged
+          # by the person who commits it, while 2 stops the run.
+          jq -r '.run.partial_failures, (.run.collectors[] | select(.status != "ok") | "\(.name): \(.status) \(.reason)")' \
+            "$RUNNER_TEMP/ex/ubuntu-24.04-vm.json"
+          test "$code" -le 1
+
+      - name: rewrite what identifies a host, and refuse an oversized example
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/ex"
+          rewrite() {
+            # F-11: the hostname becomes a fixed name, the boot UUID, the
+            # kernel string and the uptime are blanked (they identify the
+            # runner's kernel, not the image), and every listening socket
+            # address that is neither loopback nor a wildcard becomes the
+            # RFC 5737 documentation address 192.0.2.1. machine_id_hash is
+            # already a hash and stays. The socket records are
+            # .facts.sockets.listening.value[] with proto, addr, port, inode
+            # and loopback (internal/collect/collectors/sockets.go). The type
+            # guard is load-bearing: a fact whose status is not ok carries no
+            # value, and `(.facts.sockets.listening.value // []) |= ...` is
+            # then an invalid path expression that stops jq -- proven on a
+            # snapshot whose sockets fact reads unsupported.
+            jq --arg host "$2" '
+              .run.host.hostname = $host
+              | .run.host.boot_id = ""
+              | .run.host.kernel = ""
+              | .run.host.uptime_s = 0
+              | if (.facts.sockets.listening.value | type) == "array"
+                then .facts.sockets.listening.value |= map(
+                  if (.addr | test("^(127\\.|::1$|0\\.0\\.0\\.0$|::$)") | not)
+                  then .addr = "192.0.2.1" else . end)
+                else . end
+            ' "$1" > "$1.tmp"
+            mv "$1.tmp" "$1"
+            size=$(stat -c%s "$1")
+            echo "$1: $size bytes, hostname $2"
+            test "$size" -le "$MAX_BYTES" || {
+              echo "$1 is $size bytes, over the $MAX_BYTES byte cap (F-11): narrow the walk or leave it out"
+              exit 1
+            }
+            # The rewrite is the only thing standing between a runner's
+            # addresses and a committed file, so it is asserted, not assumed.
+            jq -e --arg host "$2" '
+              .run.host.hostname == $host
+              and .run.host.boot_id == ""
+              and .run.host.kernel == ""
+              and .run.host.uptime_s == 0
+              and ([.facts.sockets.listening.value // [] | .[]
+                    | select(.addr | test("^(127\\.|::1$|0\\.0\\.0\\.0$|::$|192\\.0\\.2\\.1$)") | not)]
+                   | length == 0)
+            ' "$1" > /dev/null
+          }
+          rewrite ubuntu-24.04-container.json ubuntu-container
+          rewrite ubuntu-24.04-vm.json github-runner
+
+      - name: check both snapshots
+        run: |
+          cd "$RUNNER_TEMP/ex"
+          for f in ubuntu-24.04-container.json ubuntu-24.04-vm.json; do
+            b=${f%.json}
+            # check exits 1 on a FAIL and 2 on an ERROR; both are ordinary
+            # results for a real host, and the report is what is wanted here.
+            # The table width is fixed at 100 by the renderer, so only colour
+            # has to be turned off for a file that people read in a diff.
+            set +e
+            NO_COLOR=1 "$GITHUB_WORKSPACE/bin/muster" check --facts "$f" --format json > "$b-report.json"
+            jcode=$?
+            NO_COLOR=1 "$GITHUB_WORKSPACE/bin/muster" check --facts "$f" --format table > "$b-report.txt"
+            tcode=$?
+            set -e
+            echo "$f: check json exit $jcode, table exit $tcode"
+            test -s "$b-report.json" && test -s "$b-report.txt"
+            jq -e '.check.guide_edition == "kisa-unix-2026"' "$b-report.json" > /dev/null
+            jq -e '[.results[] | select(.status == "ERROR" and .reason_code == "internal_error")] | length == 0' "$b-report.json" > /dev/null
+          done
+          ls -l
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: examples-${{ github.run_id }}
+          path: "${{ runner.temp }}/ex"
+          if-no-files-found: error
