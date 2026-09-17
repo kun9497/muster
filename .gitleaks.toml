@@ -59,6 +59,10 @@ paths = ['''^\.superpowers[/\\]''']
 # literal, not a path: a real host address such as 10.1.2.3 still trips the rule
 # everywhere. New fixtures should prefer the RFC 5737 documentation ranges.
 regexes = ['''^(?:10\.0\.0\.0|172\.16\.0\.0|192\.168\.0\.0)$''']
+# One commit spelled a 10/8 network as a prose example of the examples
+# workflow's address rewrite; the next commit reworded it, but the range scan
+# still sees the history. The commit, not the literal, is allowlisted.
+commits = ['''e916e0a54b53d99a7ddd95b7cbd25fd5a0d5fe13''']
 
 [[rules]]
 id = "non-personal-email"
