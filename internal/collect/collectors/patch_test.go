@@ -1136,3 +1136,56 @@ func TestPatchDeniedDnfCacheIsDeniedNotUnsupported(t *testing.T) {
 		t.Errorf(`Worst("patch") = %s, want denied`, w)
 	}
 }
+
+// G-16. aptPeriodicUnattended locates the key in a case-folded copy of the
+// line and then slices the ORIGINAL line at that index, so the fold must not
+// move a single byte. strings.ToLower decodes, and a byte that is not valid
+// UTF-8 comes back as the three-byte U+FFFD, which made the index point past
+// the end of the original — the fuzzer found the panic on the first line
+// below. asciiLower folds A-Z only and is length-preserving.
+func TestAptPeriodicUnattendedFoldsWithoutMovingTheLine(t *testing.T) {
+	// A Latin-1 byte before the key, which is what apt.conf written by a
+	// non-UTF-8 editor looks like.
+	const bad = "\xff"
+
+	for _, c := range []struct {
+		name            string
+		line            string
+		enabled, wanted bool
+	}{
+		{"the crashing line, no value", bad + "APT::PeriodiC::UnAttended-UpgrAde", false, false},
+		{"a non-UTF-8 byte before the key", bad + `APT::PeriodiC::UnAttended-UpgrAde "1";`, true, true},
+		{"a non-UTF-8 byte inside the value", `APT::Periodic::Unattended-Upgrade "` + bad + `1";`, true, true},
+		{"mixed case, all ASCII", `APT::PeriodiC::UnAttended-UpgrAde "1";`, true, true},
+		{"the zero apt reads as off", `APT::Periodic::Unattended-Upgrade "0";`, false, true},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			enabled, found := aptPeriodicUnattended([]byte(c.line + "\n"))
+			if enabled != c.enabled || found != c.wanted {
+				t.Errorf("aptPeriodicUnattended(%q) = %v, %v; want %v, %v",
+					c.line, enabled, found, c.enabled, c.wanted)
+			}
+		})
+	}
+}
+
+// asciiLower is only safe for the index above because it never changes the
+// length: a fold that decodes would put the key at an offset the original
+// line does not have.
+func TestASCIILowerKeepsEveryByteInPlace(t *testing.T) {
+	for _, s := range []string{"", "ABC", "abc", "\xffAPT", "A\xc3\x28Z", "\xff\xfe\xfd", "APT::Periodic"} {
+		got := asciiLower(s)
+		if len(got) != len(s) {
+			t.Errorf("asciiLower(%q) is %d bytes, the input is %d", s, len(got), len(s))
+		}
+		for i := 0; i < len(s); i++ {
+			want := s[i]
+			if want >= 'A' && want <= 'Z' {
+				want += 'a' - 'A'
+			}
+			if got[i] != want {
+				t.Errorf("asciiLower(%q)[%d] = %q, want %q", s, i, got[i], want)
+			}
+		}
+	}
+}

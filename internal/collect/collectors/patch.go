@@ -531,7 +531,7 @@ func aptPeriodicUnattended(data []byte) (bool, bool) {
 	enabled, found := false, false
 	for _, line := range splitLines(data) {
 		l := stripAptComment(line)
-		i := strings.Index(strings.ToLower(l), key)
+		i := strings.Index(asciiLower(l), key)
 		if i < 0 {
 			continue
 		}
@@ -542,6 +542,31 @@ func aptPeriodicUnattended(data []byte) (bool, bool) {
 		enabled, found = v != "" && v != "0", true
 	}
 	return enabled, found
+}
+
+// asciiLower folds A-Z to a-z and leaves every other byte exactly as it is,
+// so the result is byte-for-byte as long as its input and an index into it is
+// an index into the original line. strings.ToLower is NOT length-preserving —
+// it decodes, and a byte that is not valid UTF-8 comes back as the three-byte
+// U+FFFD — so indexing a ToLower copy and slicing the original panicked on an
+// apt.conf line that held one such byte before the key (G-16). apt's own key
+// matching is ASCII-case-insensitive, so nothing is lost by folding only A-Z.
+func asciiLower(s string) string {
+	var b []byte
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c < 'A' || c > 'Z' {
+			continue
+		}
+		if b == nil {
+			b = []byte(s)
+		}
+		b[i] = c + ('a' - 'A')
+	}
+	if b == nil {
+		return s
+	}
+	return string(b)
 }
 
 // stripAptComment cuts an apt.conf line at its first comment introducer.
