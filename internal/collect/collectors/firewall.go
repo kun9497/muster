@@ -328,6 +328,13 @@ func parseNftRuleset(content string) ([]baseChain, []any) {
 			continue
 		}
 		f := strings.Fields(line)
+		// A line that is not blank to trimSpaceASCII (which trims only space
+		// and tab) can still hold no fields — a lone form feed, say, which
+		// strings.Fields does treat as space. Nothing above reads such a line,
+		// and every read below indexes f, so skip it here.
+		if len(f) == 0 {
+			continue
+		}
 		if len(f) > 0 && line[len(line)-1] == '{' {
 			switch {
 			case len(stack) == 0 && f[0] == "table":

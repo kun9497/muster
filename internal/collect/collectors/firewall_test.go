@@ -4,6 +4,7 @@ package collectors
 
 import (
 	"context"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -372,5 +373,52 @@ func TestFirewallDualStackDropIsRestricted(t *testing.T) {
 	}
 	if e := env(t, b, "firewall.restricts_inbound"); e.Status != facts.StatusOK || e.Value != true {
 		t.Errorf("restricts_inbound %+v, want ok true", e)
+	}
+}
+
+// A line inside a chain body that is not blank yet carries no fields must be
+// skipped, not indexed: trimSpaceASCII trims only space and tab, while
+// strings.Fields also treats a form feed as space, so such a line reached the
+// chain body's f[0] read. The nightly fuzz run of FuzzParseNftRuleset found
+// it; the input is the committed crasher.
+func TestParseNftRulesetFieldlessLineInChain(t *testing.T) {
+	bases, rules := parseNftRuleset("{\nchain {\n\f")
+	if len(bases) != 0 {
+		t.Errorf("base chains = %+v, want none (nothing declares a hook and no chain closes)", bases)
+	}
+	if len(rules) != 0 {
+		t.Errorf("rules = %v, want none", rules)
+	}
+}
+
+// A blank line inside a chain body is an administrator's spacing, never a
+// rule: the parse must be identical to the same ruleset written without it.
+func TestParseNftRulesetBlankLineInChainIsIgnored(t *testing.T) {
+	const packed = "table inet filter {\n" +
+		"\tchain input {\n" +
+		"\t\ttype filter hook input priority filter; policy drop;\n" +
+		"\t\tct state established,related accept\n" +
+		"\t\ttcp dport 22 accept\n" +
+		"\t}\n" +
+		"}\n"
+	const spaced = "table inet filter {\n" +
+		"\tchain input {\n" +
+		"\t\ttype filter hook input priority filter; policy drop;\n" +
+		"\t\tct state established,related accept\n" +
+		"\n" +
+		"\t  \t\n" +
+		"\t\ttcp dport 22 accept\n" +
+		"\t}\n" +
+		"}\n"
+	wantBases, wantRules := parseNftRuleset(packed)
+	if len(wantBases) != 1 || len(wantRules) != 2 {
+		t.Fatalf("the packed ruleset itself parsed as %+v / %v, want one base chain and two rules", wantBases, wantRules)
+	}
+	gotBases, gotRules := parseNftRuleset(spaced)
+	if !reflect.DeepEqual(gotBases, wantBases) {
+		t.Errorf("base chains with blank lines = %+v, want %+v", gotBases, wantBases)
+	}
+	if !reflect.DeepEqual(gotRules, wantRules) {
+		t.Errorf("rules with blank lines = %v, want %v", gotRules, wantRules)
 	}
 }
