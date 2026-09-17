@@ -14,10 +14,10 @@ builds this repository, and both are rewritten (below) before they are kept.
 | `ubuntu-24.04-vm.json` | `muster collect --deep` on the GitHub Actions `ubuntu-24.04` runner VM, with the walk exclusions of `.github/walk-excludes` — the same file `ci.yml` reads — so the walk lists carry real rows. |
 | `ubuntu-24.04-vm-report.json` / `-report.txt` | `muster check` on that snapshot, as JSON and as the table. |
 
-**Those six files and the run id below arrive with the first run of the workflow**; until then
-this README is the only file here, and the test that checks the examples skips saying so.
+When a refresh is pending, the six files may be missing; the test that checks the examples
+then skips, saying so.
 
-Produced by run `<run id>` of [`.github/workflows/examples.yml`](../.github/workflows/examples.yml).
+Produced by run [`35199955815`](https://github.com/kun9497/muster/actions/runs/35199955815) of [`.github/workflows/examples.yml`](../.github/workflows/examples.yml).
 The snapshot headers carry the rest of the provenance: `muster_version`, `commit`,
 `collected_at` and `host.os_release` — the workflow builds the binary with `make build`, so those
 are the real version and commit and not the unstamped defaults.
