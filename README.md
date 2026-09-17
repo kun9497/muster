@@ -14,29 +14,33 @@ the Linux server asset class: KISA is the primary standard, and global
 benchmarks (CIS Benchmarks, DISA STIG, NIST SP 800-53) are attached as
 references and, later, offered as selectable profiles.
 
-> **Status: stage 2 complete (September 2026).** Stage 1 — the skeleton:
-> `collect`, `check`, waivers, exit codes, eight controls end to end — and
-> stage 2 — every automatable KISA item — are merged: the foundations with
-> DISA STIG and NIST SP 800-53 references, accounts, the PAM stacks, the
-> completed sshd collector with login banners, home directories and the shell
-> environment, system-file, startup and cron permissions, services and
-> super-servers, the firewall, logging and time synchronisation, NFS, SNMP and
-> patch hygiene, FTP, mail and DNS, and the closing coverage-and-reference
-> gate. 64 of the 67 items are enrolled; the three that need the deep
-> filesystem walk (U-15, U-23, U-33) are deferred to stage 3, and U-25
-> (world-writable files) is enrolled but reads `MANUAL` until that same walk
-> lands. Which item is judged by which control, with its automation class, and
-> which fact keys the controls read is generated into
+> **Status: stage 3A merged (September 2026).** Stage 1 — the skeleton:
+> `collect`, `check`, waivers, exit codes, eight controls end to end — stage 2
+> — every automatable KISA item, from the foundations with DISA STIG and NIST
+> SP 800-53 references through accounts, PAM, sshd, home directories, system
+> files, services, the firewall, logging, NFS, SNMP, patch hygiene, FTP, mail
+> and DNS to the closing coverage-and-reference gate — and stage 3A — the deep
+> filesystem walk — are merged. 67 of the 67 items are enrolled (68 controls:
+> 57 auto, 7 partial, 4 manual with the evidence attached). `collect --deep`
+> walks the local filesystems once, under a time and entry budget, without
+> following a symlink or entering a remote mount or a container layer, and
+> joins every setuid, world-writable, unowned or hidden entry to the package
+> that owns it — rpm's file table on the RHEL family, dpkg's file lists plus a
+> reference list of declared modes on the Debian family — so U-15, U-23, U-25
+> and U-33 are judged from evidence rather than reported for review. Which
+> item is judged by which control, with its automation class, and which fact
+> keys the controls read is generated into
 > [the coverage table](docs/reference/coverage.md) and checked by CI, which
-> also runs the collector as root on a VM, as a normal user, inside Ubuntu
-> 22.04/24.04 and Rocky/Alma 9 containers (with Debian 12 as a non-blocking
-> canary), in a read-only container without a network, and against
-> [a capability matrix](docs/reference/capability-matrix.json) of facts that
-> must read `denied` without root and `unsupported` without systemd. The
+> also runs the collector, walk included, as root on a VM, as a normal user,
+> inside Ubuntu 22.04/24.04 and Rocky/Alma 9 containers (with Debian 12 as a
+> non-blocking canary), in a read-only container without a network, and
+> against [a capability matrix](docs/reference/capability-matrix.json) of
+> facts that must read `denied` without root, `unsupported` without systemd
+> and `unsupported` for the walk inside a container. The
 > architecture, contracts and release scope are written up in
 > [the design specification](docs/superpowers/specs/2026-09-02-muster-design.md);
 > changes that alter a verdict are recorded in [CHANGELOG.md](CHANGELOG.md).
-> The stage-3 and stage-4 items below are the plan, not a promise.
+> The remaining stage-3 and stage-4 items below are the plan, not a promise.
 
 > **Not affiliated.** muster is an unofficial personal project. It is not
 > endorsed by KISA or by the Center for Internet Security, it contains no CIS
@@ -139,14 +143,15 @@ guide is included, and the guide itself is not included. CIS Benchmark
 references are benchmark name, version and recommendation number only, and
 muster judges no CIS compliance. See [ATTRIBUTION.md](ATTRIBUTION.md).
 
-Global benchmarks are cross-references, not a second rulebook. Of the 64
+Global benchmarks are cross-references, not a second rulebook. Of the 68
 controls, 25 carry DISA STIG rule ids, 20 carry NIST SP 800-53 control ids and
 13 carry CIS Benchmark recommendation numbers; the mappings are still being
 filled in, and a control gets one only where the benchmark judges the same
 criterion. `muster controls lint` refuses a STIG or
 NIST id that is not in the committed index and cross-checks every KISA item
 number against the 67-item inventory, so an item can be neither forgotten nor
-claimed twice. From stage 3 a `cis-<distro>-l1`
+mis-claimed (an item may be judged by more than one control, as U-23 is, but
+every citation must name a real item). From stage 3 a `cis-<distro>-l1`
 profile can select controls and parameters from the same collector. muster records the
 numbers, never the benchmark text, and certifies no level of CIS or STIG
 compliance. The STIG and NIST identifiers a control may cite are generated
@@ -161,17 +166,18 @@ titles, never their discussion, check and fix text. See
    output, exit codes, waivers, and eight controls flowing end to end.
 2. **Both distributions, every automatable KISA item.** Collectors for Ubuntu
    and Rocky; 64 of the 67 items judged automatically or with automatic
-   evidence (55 auto, 5 partial, 4 manual with the evidence attached). The
-   remaining three — file and directory ownership (U-15), SUID/SGID/sticky
-   files (U-23) and hidden files (U-33) — need the deep filesystem walk of
-   stage 3 and are listed as deferred in `docs/reference/coverage.md`. Every
-   control gains DISA STIG and NIST SP 800-53 reference numbers where a
-   mapping exists, and `controls lint` cross-checks every KISA reference
-   against the 67-item inventory.
-3. **The deep filesystem walk, high-value checks beyond the list, and
-   profiles**, from the same collector: the walk that enrols the three deferred
-   items (file ownership, SUID/SGID/sticky files, hidden files), package
-   integrity, world-writable files, file capabilities
+   evidence, the three that need a filesystem traversal — file and directory
+   ownership (U-15), SUID/SGID/sticky files (U-23) and hidden files (U-33) —
+   deferred to the walk. Every control gains DISA STIG and NIST SP 800-53
+   reference numbers where a mapping exists, and `controls lint` cross-checks
+   every KISA reference against the 67-item inventory.
+3. **The deep filesystem walk (3A, merged), then high-value checks beyond the
+   list and profiles**, from the same collector. 3A: `collect --deep` enrols
+   the three deferred items and makes U-25 judge a real host — 67 of the 67
+   items, 68 controls (57 auto, 7 partial, 4 manual with the evidence
+   attached); a maintainer tool, `tools/suidindex`, generates the per-release
+   reference lists of declared modes from public container images. Next:
+   package verification (`rpm -V` / `dpkg --verify`), file capabilities
    and ACLs, cron and timer inventory, `authorized_keys` inventory, processes
    running deleted binaries, kernel self-protection sysctls, mount options,
    audit pipeline health, patch hygiene, exposure of listening sockets versus

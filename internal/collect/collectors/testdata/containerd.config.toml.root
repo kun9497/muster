@@ -1,0 +1,6 @@
+version = 2
+root = "/data/containerd"
+state = "/run/containerd"
+
+[plugins]
+  root = "/not/the/containerd/root"

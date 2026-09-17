@@ -1,0 +1,23 @@
+{
+  "distro": "ubuntu",
+  "release": "22.04",
+  "image_digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+  "generated": "2026-01-01",
+  "packages": [
+    {"name": "at", "version": "3.2.5-1ubuntu1", "postinst_sets_mode": true},
+    {"name": "passwd", "version": "1:4.8.1-2ubuntu2.2"},
+    {"name": "pkg-a", "version": "2.0-1"},
+    {"name": "python3.11", "version": "3.11.0-1"},
+    {"name": "sysstat", "version": "12.5.2-2"},
+    {"name": "util-linux", "version": "2.37.2-4ubuntu3"}
+  ],
+  "entries": [
+    {"path": "/usr/bin/at", "mode": 493, "owner": "root", "group": "root", "package": "at"},
+    {"path": "/usr/bin/atq", "mode": 1517, "owner": "root", "group": "daemon", "package": "at"},
+    {"path": "/usr/bin/passwd", "mode": 2541, "owner": "root", "group": "shadow", "package": "passwd"},
+    {"path": "/usr/bin/python3", "mode": 493, "owner": "root", "group": "root", "package": "python3.11"},
+    {"path": "/usr/bin/su", "mode": 2541, "owner": "root", "group": "root", "package": "util-linux"},
+    {"path": "/usr/bin/x", "mode": 2541, "owner": "root", "group": "root", "package": "pkg-a"},
+    {"path": "/usr/sbin/.h", "mode": 384, "owner": "root", "group": "root", "package": "sysstat"}
+  ]
+}

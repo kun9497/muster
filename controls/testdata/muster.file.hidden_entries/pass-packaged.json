@@ -1,0 +1,1 @@
+{"synthetic": true, "schema_version":1,"run":{"deep":true},"facts":{"walk":{"complete":{"status":"ok","value":true},"hidden":{"status":"ok","value":[{"path":"/etc/skel/.bashrc","kind":"regular","uid":0,"package":"bash","package_declared":true,"reference":"dpkgdb","allowlisted":false}]}}}}

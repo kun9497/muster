@@ -15,10 +15,10 @@ params:
 checks:
   - { fact: files.syslog_configs, op: each, subject: path, where: { field: mode, op: ne, expected: -1 }, require: { field: mode, op: in, expected: "${allowed_modes}" } }
   - { fact: files.syslog_configs, op: each, subject: path, where: { field: mode, op: ne, expected: -1 }, require: { field: uid, op: eq, expected: 0 } }
-  - { fact: files.syslog_configs, op: none, where: { field: reason, op: present } }
+  - { fact: files.syslog_configs, op: none, subject: path, where: { field: reason, op: present } }
   - { fact: files.journald_configs, op: each, subject: path, where: { field: mode, op: ne, expected: -1 }, require: { field: mode, op: in, expected: "${allowed_modes}" } }
   - { fact: files.journald_configs, op: each, subject: path, where: { field: mode, op: ne, expected: -1 }, require: { field: uid, op: eq, expected: 0 } }
-  - { fact: files.journald_configs, op: none, where: { field: reason, op: present } }
+  - { fact: files.journald_configs, op: none, subject: path, where: { field: reason, op: present } }
 remediation:
   text_en: chmod 0640 /etc/rsyslog.conf and the files under /etc/rsyslog.d, and chown them to root; investigate any config that could not be read.
   text_ko: /etc/rsyslog.conf 와 /etc/rsyslog.d 아래 파일에 chmod 0640 을 적용하고 root 로 chown 하며, 읽을 수 없었던 설정은 조사합니다.

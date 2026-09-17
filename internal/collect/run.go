@@ -29,23 +29,50 @@ var ErrNotRoot = errors.New("collect requires root (--require-root)")
 // (spec §7.1).
 const defaultTimeout = 5 * time.Minute
 
+// WalkOptions are the limits and the exclusions of the deep filesystem
+// walk (W-12), as the collect command parsed them. They reach the walk
+// collector through the Builder, not a package-level variable, so two Run
+// calls in one process — a test suite is one — can never share or leak
+// them, and a collector that reads them without Deep having been given
+// finds nothing (Builder.Walk reports false).
+//
+// Budget is wall time for the traversal, MaxEntries caps the entries it
+// visits; exceeding either stops the walk with walk.complete false rather
+// than failing the run. Exclude adds a root the walk must not enter;
+// Include takes an entry off the fixed container-storage set and nothing
+// else (the command rejects any other value).
+type WalkOptions struct {
+	Budget     time.Duration
+	MaxEntries int
+	Exclude    []string
+	Include    []string
+}
+
 // Options for one collect run.
 //
 // Two flags of the collect command deliberately have no field here. R52:
 // --include-secrets is not offered in stage 1 — nothing stores an original
 // secret, so the header always says profile "default", include_secrets
 // false, and an option that could only ever lie is not worth having.
-// R47/R76: --deep is accepted by the command, which warns that the walk
-// arrives in stage 3; the walk collector writes nothing and run.deep stays
-// false, so an Options.Deep that changed nothing would be a trap. Both
-// arrive with the behaviour they name. --require-complete is likewise not
-// here: it selects an exit code and never changes what is collected or
-// written, so it is a parameter of ExitCodeFor instead.
+// --require-complete is likewise not here: it selects an exit code and
+// never changes what is collected or written, so it is a parameter of
+// ExitCodeFor instead.
+//
+// Deep is not among them any more. R47/R76 kept --deep out of this struct
+// while the walk collector wrote nothing: an option that changed nothing
+// would have been a trap. Stage 3 gives it the behaviour it names — Deep
+// runs the traversal, fills the walk.* keys and is published as run.deep,
+// which is what tells a later check the difference between "the walk found
+// nothing" and "the walk never ran".
 type Options struct {
 	Out         string // "" = the default snapshot directory; "-" = stdout
 	Force       bool
 	Timeout     time.Duration // 0 = defaultTimeout
 	RequireRoot bool
+
+	// Deep runs the filesystem walk; Walk is read only when it is true.
+	Deep bool
+	Walk WalkOptions
 
 	Version         string
 	Commit          string
@@ -202,8 +229,16 @@ func Run(ctx context.Context, o Options, stdout io.Writer) (Outcome, error) {
 	// evaluates Env, and the facts that decide a verdict carry their own
 	// status. run.collectors[os] is where a reader sees the block was never
 	// filled (spec §5.1).
-	// Parked: run.deep stays false in stage 1 (R47/R76) — the walk.* keys
-	// are absent, which is not "the walk ran and found nothing".
+	// run.deep is the header's record of whether the walk was asked for:
+	// without it the walk.* keys are absent, which is not "the walk ran and
+	// found nothing" — main §6.5 row 9 turns that into MANUAL rather than a
+	// verdict. The walk collector gets its budget and its exclusions from
+	// the Builder, and only when Deep was given, so a snapshot whose header
+	// says false cannot carry walk facts.
+	hdr.Deep = o.Deep
+	if o.Deep {
+		b.SetWalk(o.Walk)
+	}
 	// R52: stage 1 stores no original secret value.
 	hdr.Redaction = facts.Redaction{Profile: "default", IncludeSecrets: false}
 	hdr.Collectors = []facts.CollectorRun{}

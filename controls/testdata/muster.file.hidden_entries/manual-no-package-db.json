@@ -1,0 +1,1 @@
+{"synthetic": true, "schema_version":1,"run":{"deep":true},"facts":{"walk":{"complete":{"status":"ok","value":true},"hidden":{"status":"absent","reason":"no package database"}}}}

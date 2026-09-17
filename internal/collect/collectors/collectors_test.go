@@ -34,11 +34,16 @@ type cmdResult struct {
 }
 
 // fsAccess serves declared paths from testdata and commands from canned
-// outcomes. It implements all seven Access methods (R46/R60), so a collector
+// outcomes. It implements every Access method (R46/R60), so a collector
 // under test can never reach the real host.
 type fsAccess struct {
+	// NoWalkAccess answers ReadDir/Readlink with ErrNoWalk: no collector
+	// under test here walks a tree yet.
+	collect.NoWalkAccess
+
 	files       map[string]string            // host path -> testdata file name
 	dirs        map[string]bool              // host path -> exists, but is not a readable file
+	links       map[string]string            // host path -> symlink target, stored form (Readlink; Stat is ErrSymlink)
 	cmds        map[string]cmdResult         // command line -> canned outcome
 	fails       map[string]error             // host path -> error returned instead of content
 	truncated   map[string]bool              // host path -> ReadFile reports the read hit the cap (R70)
@@ -58,6 +63,26 @@ type fsAccess struct {
 	// reads records every path ReadFile was asked for, so a test can assert
 	// that a collector did NOT go looking for something it did not need.
 	reads []string
+
+	// tree is the scripted directory tree the walk is tested against: host
+	// path -> that directory's listing. A path with no entry here does not
+	// exist as a directory. Entries may be written in any order; ReadDir
+	// hands out a sorted copy.
+	tree map[string]collect.Listing
+
+	// dirErrs are the directories ReadDir fails on, whatever tree says —
+	// the denied and vanished directories a real walk has to survive.
+	dirErrs map[string]error
+
+	// shuffle reverses the order ReadDir returns entries in. The traversal
+	// must produce the same facts either way (A-14), so a test that seeds
+	// the same tree twice, once shuffled, proves it does not depend on the
+	// order the kernel happened to hand the names over in.
+	shuffle bool
+
+	// readDirs records every path ReadDir was asked for, in order, so a
+	// test can assert what the traversal descended into and what it did not.
+	readDirs []string
 }
 
 // statResult is the one shape fsAccess.Stat renders into a collect.ReadMeta
@@ -108,6 +133,12 @@ func (a *fsAccess) Stat(p string) (collect.ReadMeta, error) {
 	// non-root run. A path present only in fails still fails its Stat.
 	if s, ok := a.stats[p]; ok {
 		return collect.ReadMeta{Tier: "openat2", Mode: s.mode, UID: s.uid, GID: s.gid, Kind: s.kind, ModTime: s.mtime}, nil
+	}
+	// A symlink is ErrSymlink with the path wrapped, exactly as the host
+	// primitive answers it: Stat never follows the final component, and the
+	// walk'''s plan learns a relocated container-storage root that way.
+	if _, ok := a.links[p]; ok {
+		return collect.ReadMeta{Tier: "openat2", Kind: "symlink", Mode: 0o777}, fmt.Errorf("%s: %w", p, collect.ErrSymlink)
 	}
 	if err, ok := a.fails[p]; ok {
 		return collect.ReadMeta{}, err
@@ -188,6 +219,52 @@ func (a *fsAccess) Getxattr(p, name string) ([]byte, error) {
 		return v, nil
 	}
 	return nil, unix.ENODATA
+}
+
+// ReadDir serves the scripted tree, overriding the embedded NoWalkAccess.
+// It answers the way the host primitive answers: every error names the path
+// it happened on — a directory the caller may not search fails with the
+// seeded errno wrapped, an unscripted path is a wrapped ENOENT, and an
+// expect that does not match the scripted (dev, ino) is ErrVanished, never
+// a listing of the directory that IS there. The
+// entries come back sorted, as collect.ReadDir sorts them, or reversed when
+// shuffle is set; either way they are a copy, so a tree listed twice is the
+// same tree twice.
+func (a *fsAccess) ReadDir(p string, expect collect.Identity) (collect.Listing, error) {
+	a.readDirs = append(a.readDirs, p)
+	if err := a.dirErrs[p]; err != nil {
+		return collect.Listing{}, fmt.Errorf("%s: %w", p, err)
+	}
+	l, ok := a.tree[p]
+	if !ok {
+		return collect.Listing{}, fmt.Errorf("%s: %w", p, os.ErrNotExist)
+	}
+	if expect != (collect.Identity{}) && expect != (collect.Identity{Dev: l.Self.Dev, Ino: l.Self.Ino}) {
+		return collect.Listing{}, fmt.Errorf("%s: %w", p, collect.ErrVanished)
+	}
+	entries := slices.Clone(l.Entries)
+	slices.SortFunc(entries, func(x, y collect.DirEntry) int { return strings.Compare(x.Name, y.Name) })
+	if a.shuffle {
+		slices.Reverse(entries)
+	}
+	l.Entries = entries
+	return l, nil
+}
+
+// Readlink serves the links map in stored form, unresolved. A path that is
+// not a link answers the way readlinkat does: EINVAL when it exists as
+// something else, ENOENT when it does not exist at all.
+func (a *fsAccess) Readlink(p string) (string, error) {
+	if t, ok := a.links[p]; ok {
+		return t, nil
+	}
+	if _, ok := a.files[p]; ok {
+		return "", unix.EINVAL
+	}
+	if a.dirs[p] {
+		return "", unix.EINVAL
+	}
+	return "", os.ErrNotExist
 }
 
 func (a *fsAccess) Writable(p string) bool { return a.writable[p] }
@@ -2446,21 +2523,6 @@ func TestOSWritesEnvContainerAndSystemdAsFacts(t *testing.T) {
 	}
 }
 
-// --- walk ---------------------------------------------------------------
-
-// R47/R76: stage 1 registers walk with nothing declared and it writes no
-// keys, so U-25 stays MANUAL on a real stage-1 snapshot.
-func TestWalkDeclaresAndWritesNothing(t *testing.T) {
-	c := collectorNamed(t, "walk")
-	if len(c.Declare.Reads) != 0 || len(c.Declare.Commands) != 0 {
-		t.Errorf("walk must declare nothing in stage 1: %+v", c.Declare)
-	}
-	b := build(t, "walk", &fsAccess{})
-	if len(b.Tree()) != 0 {
-		t.Errorf("walk must write no keys: %v", b.Tree())
-	}
-}
-
 // --- the declaration contract ------------------------------------------
 
 func TestEveryCollectorStaysInsideItsDeclaration(t *testing.T) {
@@ -3427,4 +3489,84 @@ func TestNestedHomeRootDotfilesAreDeclared(t *testing.T) {
 			t.Errorf("%s = %+v, want absent with %q", k, e, want)
 		}
 	}
+}
+
+// TestFSAccessTreeDouble pins the scripted-tree behaviour the walk's tests
+// are written against: a listing comes back sorted, the shuffle switch
+// reverses it without disturbing the script, a directory named in dirErrs
+// fails the way the host primitive fails, an unscripted path is ENOENT, an
+// identity that does not match the scripted (dev, ino) is ErrVanished, and
+// every call is recorded in order.
+func TestFSAccessTreeDouble(t *testing.T) {
+	srv := collect.Listing{
+		Self: collect.DirEntry{Kind: "dir", Mode: 0o755, Dev: 64, Ino: 2},
+		Entries: []collect.DirEntry{
+			{Name: "b", Kind: "dir", Mode: 0o755, Dev: 64, Ino: 11},
+			{Name: "a", Kind: "regular", Mode: 0o644, Dev: 64, Ino: 10},
+			{Name: "c", Kind: "symlink", Mode: 0o777, Dev: 64, Ino: 12},
+		},
+	}
+	a := &fsAccess{
+		tree:    map[string]collect.Listing{"/srv": srv},
+		dirErrs: map[string]error{"/srv/denied": unix.EACCES},
+	}
+
+	l, err := a.ReadDir("/srv", collect.Identity{})
+	if err != nil {
+		t.Fatalf("ReadDir(/srv): %v", err)
+	}
+	if want := []string{"a", "b", "c"}; !slices.Equal(entryNames(l), want) {
+		t.Errorf("entries %v, want %v sorted", entryNames(l), want)
+	}
+	if l.Self.Ino != 2 || l.Self.Name != "" {
+		t.Errorf("Self = %+v, want the scripted directory with an empty Name", l.Self)
+	}
+
+	// A matching identity lists; a mismatched one vanishes, named by its path.
+	if _, err := a.ReadDir("/srv", collect.Identity{Dev: 64, Ino: 2}); err != nil {
+		t.Errorf("ReadDir with the scripted identity: %v", err)
+	}
+	_, err = a.ReadDir("/srv", collect.Identity{Dev: 64, Ino: 3})
+	if !errors.Is(err, collect.ErrVanished) {
+		t.Errorf("identity mismatch: err = %v, want ErrVanished", err)
+	}
+	if err != nil && !strings.Contains(err.Error(), "/srv") {
+		t.Errorf("identity mismatch: err = %v, want the path named", err)
+	}
+
+	_, err = a.ReadDir("/nope", collect.Identity{})
+	if !errors.Is(err, os.ErrNotExist) || !strings.Contains(err.Error(), "/nope") {
+		t.Errorf("unscripted path: err = %v, want ErrNotExist naming the path", err)
+	}
+	_, err = a.ReadDir("/srv/denied", collect.Identity{})
+	if !errors.Is(err, unix.EACCES) || !strings.Contains(err.Error(), "/srv/denied") {
+		t.Errorf("dirErrs path: err = %v, want EACCES naming the path", err)
+	}
+
+	a.shuffle = true
+	l, err = a.ReadDir("/srv", collect.Identity{})
+	if err != nil {
+		t.Fatalf("ReadDir(/srv) shuffled: %v", err)
+	}
+	if want := []string{"c", "b", "a"}; !slices.Equal(entryNames(l), want) {
+		t.Errorf("shuffled entries %v, want %v", entryNames(l), want)
+	}
+	// The script itself is never touched: the double hands out copies, so a
+	// test that walks the same tree twice sees the same directory twice.
+	if want := []string{"b", "a", "c"}; !slices.Equal(entryNames(a.tree["/srv"]), want) {
+		t.Errorf("the scripted tree was mutated: %v, want %v", entryNames(a.tree["/srv"]), want)
+	}
+
+	want := []string{"/srv", "/srv", "/srv", "/nope", "/srv/denied", "/srv"}
+	if !slices.Equal(a.readDirs, want) {
+		t.Errorf("readDirs = %v, want %v", a.readDirs, want)
+	}
+}
+
+func entryNames(l collect.Listing) []string {
+	out := make([]string, 0, len(l.Entries))
+	for _, e := range l.Entries {
+		out = append(out, e.Name)
+	}
+	return out
 }

@@ -1,0 +1,1 @@
+{"synthetic": true, "schema_version":1,"run":{"deep":true},"facts":{"walk":{"complete":{"status":"ok","value":true},"suid_sgid":{"status":"absent","reason":"no package database"},"sticky_missing":{"status":"ok","value":[]}}}}

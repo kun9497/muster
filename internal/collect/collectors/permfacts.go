@@ -19,11 +19,37 @@ const groupPath = "/etc/group"
 // a /etc/group that hit the read cap may be missing the very entry a name
 // was looked up in.
 func groupNames(a collect.Access) (map[int]string, collect.ReadMeta, error) {
-	data, meta, err := a.ReadFile(groupPath, readLimit)
+	rows, meta, err := groupIdents(a)
 	if err != nil {
 		return nil, meta, err
 	}
 	out := map[int]string{}
+	for _, r := range rows {
+		if _, dup := out[r.gid]; !dup {
+			out[r.gid] = r.name
+		}
+	}
+	return out, meta, nil
+}
+
+// groupIdent is one usable line of /etc/group: the name and the gid.
+type groupIdent struct {
+	name string
+	gid  int
+}
+
+// groupIdents reads /etc/group and returns EVERY usable line in file order.
+// A gid may be spelt by more than one group — an administrator adding a
+// second name for an existing gid is an old and legal habit — so a caller
+// that needs the names (the walk's sub-id tables) must see all of them,
+// while a caller that needs one name per gid (the permission facts) folds
+// the rows itself.
+func groupIdents(a collect.Access) ([]groupIdent, collect.ReadMeta, error) {
+	data, meta, err := a.ReadFile(groupPath, readLimit)
+	if err != nil {
+		return nil, meta, err
+	}
+	var out []groupIdent
 	for _, l := range splitLines(data) {
 		f := strings.Split(l, ":")
 		if len(f) < 3 || f[0] == "" {
@@ -33,9 +59,7 @@ func groupNames(a collect.Access) (map[int]string, collect.ReadMeta, error) {
 		if err != nil {
 			continue
 		}
-		if _, dup := out[gid]; !dup {
-			out[gid] = f[0]
-		}
+		out = append(out, groupIdent{name: f[0], gid: gid})
 	}
 	return out, meta, nil
 }

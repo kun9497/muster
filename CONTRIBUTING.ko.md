@@ -55,7 +55,9 @@ muster는 Linux 호스트를 KISA 2026 Unix 서버 가이드에 대조해 점검
 6. **참조.** `references.stig` 항목은 `{benchmark, version, id}`이며
    `docs/reference/stig/*.json`에 있어야 합니다. `references.nist_800_53` id는 인덱스된 어떤
    규칙에든 나타나야 합니다. `make refindex`가 고정된 DISA 파일에서 인덱스를 재생성하고
-   (네트워크 필요), CI는 커밋된 인덱스만 읽습니다.
+   (네트워크 필요), CI는 커밋된 인덱스만 읽습니다. 워크의 기준 목록도 같은 방식으로
+   삽니다. `make suidindex`가 고정된 공개 이미지에서 재생성하고(docker와 네트워크 필요),
+   `make suidindex-check`가 검증하며, CI는 커밋된 파일을 읽습니다.
 
 ## 팩트 추가
 
@@ -86,6 +88,17 @@ muster는 Linux 호스트를 KISA 2026 Unix 서버 가이드에 대조해 점검
   쓰지 않습니다. 나이는 `collected_at`으로 계산합니다.
 - 같은 입력, 같은 바이트. 모든 리스트를 정렬하고, map 순서가 값이나 사유에 닿지 않게
   합니다.
+- 워크(`collect --deep`)는 고정 선언 밖을 읽도록 허가된 유일한 수집기입니다.
+  `Declaration.Walk: true`는 어떤 경로든 `ReadDir`를 허용하지만, 이름으로 여는 모든
+  파일(`/proc/self/mountinfo`, id 파일들, 컨테이너 런타임 설정 파일, dpkg 데이터베이스)은
+  여전히 선언하며, 심링크는 결코 따라가지 않습니다. 발견 리스트는 상한이 있고 워크를
+  멈추지 않으며 `truncated: true`로 말합니다. 들어가지 않은 루트는 닫힌 어휘의 사유를 가진
+  `walk.skipped` 행입니다. dpkg 결합은 setuid 비트를
+  `docs/reference/suid/<id>-<version_id>.json` — 공개 이미지의 대상 패키지가 가진 모든
+  파일과 모드의 기준 목록 — 에 대조해 결정합니다. `go run ./tools/suidindex`(docker와
+  네트워크. `-check`는 비교)로 재생성하고, 그 패키지 목록을 가이드나 벤치마크의 바이너리
+  목록에서 가져오지 않습니다. 패키지는 이미지가 배포하는 것에서 오며 `sources.json`에
+  사유를 하나씩 적습니다.
 
 ## 테스트
 

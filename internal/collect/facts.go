@@ -25,6 +25,7 @@ type Builder struct {
 	header  *facts.Run
 	current string
 	keys    map[string][]string // collector name -> keys set under it (R71)
+	walk    *WalkOptions        // nil until SetWalk: --deep was not given
 }
 
 func NewBuilder(reg *facts.Registry) *Builder {
@@ -34,6 +35,32 @@ func NewBuilder(reg *facts.Registry) *Builder {
 // Header returns the run header being assembled for this snapshot; it
 // starts empty and later tasks fill it in as collection proceeds.
 func (b *Builder) Header() *facts.Run { return b.header }
+
+// SetWalk arms the deep filesystem walk with the options the command
+// parsed (W-12). Run calls it for --deep and for nothing else, so the walk
+// collector asking Walk() is asking whether the operator wanted a walk at
+// all — the question a package-level flag could not answer honestly for two
+// runs in one process. The two lists are cloned: the caller's slices are
+// the command line's backing arrays, and a Builder that aliased them would
+// have the walk's boundaries change under it if anything ever appended to
+// or rewrote them.
+func (b *Builder) SetWalk(o WalkOptions) {
+	o.Exclude = slices.Clone(o.Exclude)
+	o.Include = slices.Clone(o.Include)
+	b.walk = &o
+}
+
+// Walk returns the walk options and whether they were set. False means
+// --deep was not given: the walk collector writes no key, walk.* stays
+// absent and the header says run.deep false. A caller must not treat the
+// zero WalkOptions as "walk with the defaults" — a zero budget is not the
+// default budget, it is no walk.
+func (b *Builder) Walk() (WalkOptions, bool) {
+	if b.walk == nil {
+		return WalkOptions{}, false
+	}
+	return *b.walk, true
+}
 
 // Begin marks name as the collector whose keys are being set from here on,
 // so Keys and Worst can later be asked about it (R71).

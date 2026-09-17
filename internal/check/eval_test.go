@@ -1,6 +1,7 @@
 package check
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -486,6 +487,28 @@ func TestReasonForEachAndNoneNamesTheSubClauseNotNil(t *testing.T) {
 	}
 	if !strings.Contains(r2.Reason, "where") || !strings.Contains(r2.Reason, "^pts/") {
 		t.Errorf("none reason must name the where sub-clause: %q", r2.Reason)
+	}
+
+	// Fix round 1: `present` and `absent` take no expected, so rendering one
+	// printed the nil back out — "path present <nil>" — which reads as a
+	// value the clause wanted and is the same defect this test is named for.
+	presentCtl := controls.Control{
+		ID: "muster.file.suid_sgid", Importance: "상", Category: "file", Automation: "auto", AbsentMeans: "manual",
+		Remediation: &controls.Remediation{Risk: "none"},
+		Checks:      []controls.Clause{{Fact: "walk.sticky_missing", Op: "none", Subject: "path", Where: &controls.Clause{Field: "path", Op: "present"}}},
+	}
+	presentFacts := `{"walk":{"complete":{"status":"ok","value":true},"sticky_missing":{"status":"ok","value":[{"path":"/var/tmp/open","mode":511,"uid":0,"gid":0}]}}}`
+	r3 := Evaluate(snap(t, presentFacts), one(presentCtl), reg, Options{})[0]
+	if r3.Reason == "" || strings.Contains(r3.Reason, "<nil>") {
+		t.Fatalf("a present sub-clause must render without an expected: %q (%+v)", r3.Reason, r3)
+	}
+	if !strings.HasSuffix(r3.Reason, "walk.sticky_missing none where path present") {
+		t.Errorf("reason = %q, want it to end in the sub-clause with no expected", r3.Reason)
+	}
+	for _, o := range r3.Observations {
+		if strings.Contains(fmt.Sprint(o.Expected), "<nil>") {
+			t.Errorf("observation %+v renders the absent expected", o)
+		}
 	}
 }
 

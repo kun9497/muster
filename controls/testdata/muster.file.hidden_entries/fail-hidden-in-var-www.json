@@ -1,0 +1,1 @@
+{"synthetic": true, "schema_version":1,"run":{"deep":true},"facts":{"walk":{"complete":{"status":"ok","value":true},"hidden":{"status":"ok","value":[{"path":"/var/www/html/.cache","kind":"dir","uid":33,"package":"","package_declared":false,"reference":"unpackaged","allowlisted":false}]}}}}

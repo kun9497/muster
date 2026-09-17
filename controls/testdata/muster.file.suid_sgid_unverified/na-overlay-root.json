@@ -1,0 +1,1 @@
+{"synthetic": true, "schema_version":1,"run":{"deep":true},"facts":{"walk":{"complete":{"status":"ok","value":true},"suid_sgid_unverified":{"status":"unsupported","reason":"root filesystem is overlay; the walk answers for a host, not for a container layer"}}}}

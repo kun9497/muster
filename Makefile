@@ -6,7 +6,7 @@ DATE    := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 
 LDFLAGS := -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(DATE)
 
-.PHONY: build test lint fmt tidy lint-controls coverage refindex refindex-check clean
+.PHONY: build test lint fmt tidy lint-controls coverage refindex refindex-check suidindex suidindex-check clean
 
 build:
 	CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)" -o bin/$(BINARY) $(PKG)
@@ -31,6 +31,14 @@ refindex:
 
 refindex-check:
 	go run ./tools/refindex -check
+
+# Needs a container runtime and the network; CI runs neither and reads the
+# committed docs/reference/suid/*.json instead.
+suidindex:
+	go run ./tools/suidindex
+
+suidindex-check:
+	go run ./tools/suidindex -check
 
 fmt:
 	gofmt -l -w .

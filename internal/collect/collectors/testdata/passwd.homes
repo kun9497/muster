@@ -1,0 +1,9 @@
+root:x:0:0:root:/root:/bin/bash
+daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin
+nobody:x:65534:65534:Nobody:/:/usr/sbin/nologin
+_apt:x:42:65534::/nonexistent:/usr/sbin/nologin
+messagebus:x:101:101::/nonexistent:/usr/sbin/nologin
+tcpdump:x:102:103::/nonexistent:/usr/sbin/nologin
+postgres:x:113:118:PostgreSQL administrator:/var/lib/postgresql:/bin/bash
+www-data:x:33:33:www-data:/var/www:/usr/sbin/nologin
+alice:x:1000:1000:Alice:/home/alice:/bin/bash

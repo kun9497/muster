@@ -89,6 +89,15 @@ func TestCompareTypedScalars(t *testing.T) {
 		{"matches", "x", "(", "string", false, true},
 		{"present", "anything", nil, "string", true, false},
 		{"bogus", "x", "x", "string", false, true},
+		// W-10: not_contains is the negation of contains on both the types
+		// contains accepts -- substring on a string, element equality on a
+		// list<string> -- and is an error anywhere else, as contains is.
+		{"not_contains", []any{"files", "systemd"}, "compat", "list<string>", true, false},
+		{"not_contains", []any{"compat"}, "compat", "list<string>", false, false},
+		{"not_contains", []any{}, "compat", "list<string>", true, false},
+		{"not_contains", "files systemd", "compat", "string", true, false},
+		{"not_contains", "compat files", "compat", "string", false, false},
+		{"not_contains", float64(3), 3, "int", false, true},
 	}
 	for _, c := range cases {
 		got, err := compare(c.op, c.act, c.exp, c.typ)

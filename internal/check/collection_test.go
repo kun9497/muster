@@ -1,11 +1,14 @@
 package check
 
 import (
+	"bytes"
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 
 	"github.com/kun9497/muster/internal/controls"
+	"github.com/kun9497/muster/internal/facts"
 )
 
 // The snapshots below drive the M-5/M-6/M-7 cases. accounts.users carries
@@ -328,6 +331,77 @@ func TestCollectionEvidenceNamesTheSubjects(t *testing.T) {
 			}
 			if got := out.Evidence[0].Value; got != tc.value {
 				t.Errorf("evidence value = %q, want %q", got, tc.value)
+			}
+		})
+	}
+}
+
+// W-10 fix round 1: the none_subject lint rule exists so a finding names the
+// element an operator must act on, and the rule is only worth having if the
+// evaluator really reads a `none` clause's `subject` on a record list. This
+// pins the shape end to end -- two embedded controls over their own committed
+// fixtures -- so deleting `subject: path` from either control, or dropping the
+// Subject lookup from evalCollection, goes red here rather than quietly
+// reverting every finding to the element's index in the collector's list.
+//
+// The two prefixes are the registry's, not the clause's: cron.files declares
+// subject_kind "file" and files.user_rhosts declares none, which is why the
+// second subject reads "item:". The part this test is about -- everything
+// after the colon -- is the control's `subject` field either way.
+func TestRecordListObservationsAreNamedByTheControlsSubject(t *testing.T) {
+	set, err := controls.LoadDefault()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct {
+		id      string
+		fixture string
+		want    string
+	}{
+		{"muster.account.cron_permissions", "fail-world-writable.json", "file:/etc/crontab"},
+		{"muster.file.rhosts_forbidden", "fail-plus.json", "item:/home/alice/.rhosts"},
+	} {
+		t.Run(c.id, func(t *testing.T) {
+			var ctrl *controls.Control
+			for i := range set.Controls {
+				if set.Controls[i].ID == c.id {
+					ctrl = &set.Controls[i]
+				}
+			}
+			if ctrl == nil {
+				t.Fatalf("the embedded set has no %s", c.id)
+			}
+			raw, err := os.ReadFile("../../controls/testdata/" + c.id + "/" + c.fixture)
+			if err != nil {
+				t.Fatal(err)
+			}
+			snapshot, err := facts.Load(bytes.NewReader(raw))
+			if err != nil {
+				t.Fatal(err)
+			}
+			res := Evaluate(snapshot, one(*ctrl), reg, Options{})
+			if len(res) != 1 {
+				t.Fatalf("want one result, got %d", len(res))
+			}
+			if res[0].Status != FAIL {
+				t.Fatalf("status=%s, want FAIL -- the fixture must reach the none clause", res[0].Status)
+			}
+			var got []string
+			for _, o := range res[0].Observations {
+				got = append(got, o.Subject)
+			}
+			found := false
+			kind := strings.SplitN(c.want, ":", 2)[0]
+			for _, s := range got {
+				if s == c.want {
+					found = true
+				}
+				if s == kind+":0" {
+					t.Errorf("a record element must not be named by its index in the collector's list: %v", got)
+				}
+			}
+			if !found {
+				t.Errorf("want an observation subject %q, got %v", c.want, got)
 			}
 		})
 	}

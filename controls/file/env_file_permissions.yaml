@@ -14,9 +14,9 @@ references:
 requires_facts: ">=1"
 absent_means: manual
 checks:
-  - { fact: files.env_files, op: none, where: { field: owner_ok, op: eq, expected: false } }
-  - { fact: files.env_files, op: none, where: { field: group_writable, op: eq, expected: true } }
-  - { fact: files.env_files, op: none, where: { field: other_writable, op: eq, expected: true } }
+  - { fact: files.env_files, op: none, subject: path, where: { field: owner_ok, op: eq, expected: false } }
+  - { fact: files.env_files, op: none, subject: path, where: { field: group_writable, op: eq, expected: true } }
+  - { fact: files.env_files, op: none, subject: path, where: { field: other_writable, op: eq, expected: true } }
 remediation:
   text_en: chown the file to root or the home owner and chmod go-w; replace a symlinked environment file with a regular file.
   text_ko: 해당 파일을 root 또는 홈 소유자로 chown 하고 chmod go-w 를 적용하며, 심볼릭 링크인 환경 파일은 일반 파일로 교체합니다.

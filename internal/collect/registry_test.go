@@ -25,10 +25,15 @@ import (
 // registration/declaration behaviour and never actually run the collector.
 func noopRun(context.Context, Access, *Builder) error { return nil }
 
-// fakeAccess implements all seven Access methods (R46/R60); ReadFile, Stat,
+// fakeAccess implements every Access method (R46/R60); ReadFile, Stat,
 // Llistxattr, Getxattr and Writable each record the path they were asked
-// about so tests can assert on what actually reached the host.
-type fakeAccess struct{ reads []string }
+// about so tests can assert on what actually reached the host. The two walk
+// methods come from NoWalkAccess: this double answers questions about
+// single paths, never about a directory tree.
+type fakeAccess struct {
+	NoWalkAccess
+	reads []string
+}
 
 func (f *fakeAccess) ReadFile(p string, _ int64) ([]byte, ReadMeta, error) {
 	f.reads = append(f.reads, p)
@@ -805,5 +810,168 @@ func TestGlobDirIsTheLiteralDirectory(t *testing.T) {
 		if got := GlobDir(c.pattern); got != c.want {
 			t.Errorf("GlobDir(%q) = %q, want %q", c.pattern, got, c.want)
 		}
+	}
+}
+
+// --- the walk licence (W-3, §9) ------------------------------------------
+
+// recordingWalkAccess is a double whose ReadDir/Readlink record what
+// actually reached inner, so the guard tests can prove a refusal never got
+// that far. It embeds fakeAccess for the other five methods.
+type recordingWalkAccess struct {
+	fakeAccess
+	dirs  []string
+	links []string
+}
+
+func (r *recordingWalkAccess) ReadDir(p string, _ Identity) (Listing, error) {
+	r.dirs = append(r.dirs, p)
+	return Listing{}, nil
+}
+
+func (r *recordingWalkAccess) Readlink(p string) (string, error) {
+	r.links = append(r.links, p)
+	return "target", nil
+}
+
+// ReadDir is not licensed by Reads: a collector may only list directories
+// when its Declaration says Walk, which is what --list-actions prints as
+// the single "walk" row. Without it the call is ErrUndeclared, is recorded
+// as a "readdir <path>" violation and never reaches inner.
+func TestGuardReadDirNeedsTheWalkLicence(t *testing.T) {
+	inner := &recordingWalkAccess{}
+	noWalk := Guard(inner, Collector{Name: "t", Declare: Declaration{Reads: []string{"/etc", "/etc/*"}, Needs: "root"}})
+	if _, err := noWalk.ReadDir("/etc", Identity{}); !errors.Is(err, ErrUndeclared) {
+		t.Errorf("readdir without the walk licence: err = %v, want ErrUndeclared", err)
+	}
+	if len(inner.dirs) != 0 {
+		t.Errorf("a refused readdir reached inner: %v", inner.dirs)
+	}
+	v := noWalk.Violations()
+	if len(v) != 1 || !strings.Contains(v[0], "readdir /etc") {
+		t.Errorf("violations = %v, want one naming %q", v, "readdir /etc")
+	}
+
+	// Walk: true licenses any absolute clean path, declared or not — the
+	// walk's boundaries are its own, not the Reads globs.
+	walker := Guard(inner, Collector{Name: "w", Declare: Declaration{Walk: true, Needs: "root"}})
+	for _, p := range []string{"/", "/etc", "/home/alice/.ssh"} {
+		if _, err := walker.ReadDir(p, Identity{}); err != nil {
+			t.Errorf("readdir %s under the walk licence: %v", p, err)
+		}
+	}
+	if len(inner.dirs) != 3 {
+		t.Errorf("inner saw %v, want all three paths", inner.dirs)
+	}
+	if v := walker.Violations(); len(v) != 0 {
+		t.Errorf("violations = %v, want none", v)
+	}
+
+	// A relative or unclean path is refused before inner is reached, the
+	// way allowedPath cleans one for every other method.
+	before := len(inner.dirs)
+	for _, p := range []string{"etc", "/etc/../etc", "/etc/"} {
+		if _, err := walker.ReadDir(p, Identity{}); err == nil {
+			t.Errorf("readdir %q must be refused", p)
+		}
+	}
+	if len(inner.dirs) != before {
+		t.Errorf("an unclean path reached inner: %v", inner.dirs[before:])
+	}
+}
+
+// Readlink is a read: it is matched against Declaration.Reads exactly as
+// Stat is, and a refusal is recorded as a "readlink <path>" violation.
+func TestGuardReadlinkIsARead(t *testing.T) {
+	inner := &recordingWalkAccess{}
+	g := Guard(inner, Collector{Name: "t", Declare: Declaration{Reads: []string{"/etc/localtime"}, Needs: "none"}})
+	if got, err := g.Readlink("/etc/localtime"); err != nil || got != "target" {
+		t.Errorf("declared readlink: %q %v", got, err)
+	}
+	if _, err := g.Readlink("/etc/shadow"); !errors.Is(err, ErrUndeclared) {
+		t.Errorf("undeclared readlink: err = %v, want ErrUndeclared", err)
+	}
+	if len(inner.links) != 1 || inner.links[0] != "/etc/localtime" {
+		t.Errorf("inner saw %v, want only the declared path", inner.links)
+	}
+	v := g.Violations()
+	if len(v) != 1 || !strings.Contains(v[0], "readlink /etc/shadow") {
+		t.Errorf("violations = %v, want one naming %q", v, "readlink /etc/shadow")
+	}
+	// R72: the CLEANED path reaches inner, as it does for Stat.
+	if _, err := g.Readlink("/etc/ssh/../localtime"); err != nil {
+		t.Errorf("unclean but declared readlink: %v", err)
+	}
+	if len(inner.links) != 2 || inner.links[1] != "/etc/localtime" {
+		t.Errorf("inner saw %v, want the cleaned path", inner.links)
+	}
+	// The walk licence alone does not license a readlink.
+	w := Guard(inner, Collector{Name: "w", Declare: Declaration{Walk: true, Needs: "root"}})
+	if _, err := w.Readlink("/etc/localtime"); !errors.Is(err, ErrUndeclared) {
+		t.Errorf("readlink under Walk but undeclared: err = %v, want ErrUndeclared", err)
+	}
+}
+
+// §9: a collector that declares the walk contributes exactly one "walk" row
+// to --list-actions, with the fixed target sentence, sorted among its reads
+// by the existing (collector, kind, target) order.
+func TestListActionsRendersTheWalkRow(t *testing.T) {
+	Reset()
+	defer Reset()
+	Register(Collector{Name: "w", Declare: Declaration{Walk: true, Reads: []string{"/etc/subuid"}, Needs: "root"}, Run: noopRun})
+	Register(Collector{Name: "plain", Declare: Declaration{Reads: []string{"/etc/passwd"}, Needs: "none"}, Run: noopRun})
+
+	acts := ListActions()
+	var walkRows []Action
+	for _, a := range acts {
+		if a.Kind == "walk" {
+			walkRows = append(walkRows, a)
+		}
+	}
+	if len(walkRows) != 1 {
+		t.Fatalf("walk rows = %+v, want exactly one", walkRows)
+	}
+	want := Action{
+		Collector: "w",
+		Kind:      "walk",
+		Target:    "every local filesystem, no symlink followed, boundaries and exclusions as declared",
+		Needs:     "root",
+	}
+	if walkRows[0] != want {
+		t.Errorf("walk row = %+v, want %+v", walkRows[0], want)
+	}
+
+	// It sits with its own collector's rows, after the read ("read" < "walk").
+	var seq []string
+	for _, a := range acts {
+		if a.Collector == "w" {
+			seq = append(seq, a.Kind)
+		}
+	}
+	if !reflect.DeepEqual(seq, []string{"read", "walk"}) {
+		t.Errorf("collector w rows = %v, want [read walk]", seq)
+	}
+	for i := 1; i < len(acts); i++ {
+		prev, cur := acts[i-1], acts[i]
+		if prev.Collector > cur.Collector ||
+			(prev.Collector == cur.Collector && prev.Kind > cur.Kind) ||
+			(prev.Collector == cur.Collector && prev.Kind == cur.Kind && prev.Target > cur.Target) {
+			t.Fatalf("not sorted at %d: %+v then %+v", i, prev, cur)
+		}
+	}
+
+	// A collector without the licence contributes no walk row.
+	for _, a := range acts {
+		if a.Collector == "plain" && a.Kind == "walk" {
+			t.Errorf("unexpected walk row for a collector that did not declare it: %+v", a)
+		}
+	}
+
+	var buf bytes.Buffer
+	if err := WriteActions(&buf, acts, "table"); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(buf.String(), "walk") || !strings.Contains(buf.String(), want.Target) {
+		t.Errorf("table is missing the walk row:\n%s", buf.String())
 	}
 }

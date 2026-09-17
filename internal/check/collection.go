@@ -107,7 +107,9 @@ func (e *env) evalCollection(cl controls.Clause, entry facts.Entry, list []any, 
 			if hit {
 				out.Holds = false
 				failed = append(failed, subject)
-				out.Observations = append(out.Observations, Observation{Subject: subject, Expected: fmt.Sprintf("not %s %v", cl.Where.Op, whereExpected), Actual: fieldValue(cl.Where.Field, elem), Verdict: "fail"})
+				// "not " + the operator: present/absent carry no expected, so
+				// they render as "not present" rather than "not present <nil>".
+				out.Observations = append(out.Observations, Observation{Subject: subject, Expected: "not " + describeOpExpected(cl.Where.Op, whereExpected), Actual: fieldValue(cl.Where.Field, elem), Verdict: "fail"})
 			}
 		}
 	}

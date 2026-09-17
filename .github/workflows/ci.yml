@@ -46,6 +46,15 @@ jobs:
   collect-root:
     runs-on: ubuntu-24.04
     needs: test
+    env:
+      # The runner image's own trees, excluded from the walk: its toolchain
+      # caches and the system directories the image itself makes
+      # world-writable (the first --deep run measured 210,280 world-writable
+      # entries, 345k of them under /usr/local/lib alone). No host of anyone's
+      # owns these permissions, and a path absent from a later image is
+      # harmless. The same list prunes the diagnostic find below, so a list at
+      # its cap names a cause the list does not already cover.
+      WALK_EXCLUDES: /opt/hostedtoolcache /opt/pipx /opt/runner-cache /opt/microsoft /opt/az /imagegeneration /usr/share /usr/local/lib /usr/local/share /usr/local/.ghcup /usr/lib/jvm
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -61,12 +70,40 @@ jobs:
       - name: collect as root
         run: |
           set +e
-          sudo ./bin/muster collect --out "$RUNNER_TEMP/muster/root.json" --require-root --require-complete
+          excludes=()
+          for p in $WALK_EXCLUDES; do excludes+=(--walk-exclude "$p"); done
+          sudo ./bin/muster collect --out "$RUNNER_TEMP/muster/root.json" \
+            --deep --walk-budget 15m --walk-max-entries 6000000 \
+            "${excludes[@]}" \
+            --require-root --require-complete
           code=$?
           set -e
           sudo chown "$(id -u)" "$RUNNER_TEMP/muster/root.json"
           jq -r '.run.partial_failures, (.run.collectors[] | select(.status != "ok") | "\(.name): \(.status) \(.reason)"), .facts.sshd.collect_method.value, .facts.sshd.options.permit_root_login.runtime.status' "$RUNNER_TEMP/muster/root.json"
           test "$code" -eq 0
+      - name: what the walk did
+        run: |
+          # Printed before anything is asserted, so a red assertion below is
+          # read next to the stop reason, the counts and the truncation flags
+          # rather than guessed at from a bare exit code.
+          jq '.facts.walk.stats.value' "$RUNNER_TEMP/muster/root.json"
+          jq -r '.facts.walk | to_entries[] | "\(.key): status=\(.value.status) truncated=\(.value.truncated // false) length=\(if (.value.value | type) == "array" then (.value.value | length) else "-" end)"' "$RUNNER_TEMP/muster/root.json"
+          # A list at its cap names its cause here, so the remedy can be an
+          # exclusion or an allowlist row rather than a raised cap: the
+          # runner image's own world-writable entries by top directory, and
+          # every root the walk did not enter.
+          prune=(-path /proc -o -path /sys -o -path /dev -o -path /run)
+          for p in $WALK_EXCLUDES; do prune+=(-o -path "$p"); done
+          echo "== world-writable entries the walk could see on the runner, by top directory (find, independent of muster)"
+          sudo find / -xdev \( "${prune[@]}" \) -prune -o -perm -0002 -not -type l -print 2>/dev/null | cut -d/ -f1-4 | sort | uniq -c | sort -rn | head -30
+          echo "== other-writable directories without the sticky bit the walk could see, by top directory"
+          sudo find / -xdev \( "${prune[@]}" \) -prune -o -type d -perm -0002 -not -perm -1000 -print 2>/dev/null | cut -d/ -f1-4 | sort | uniq -c | sort -rn | head -20
+          echo "== walk.skipped"
+          jq -r '.facts.walk.skipped.value[] | "\(.reason) \(.path)"' "$RUNNER_TEMP/muster/root.json" | sort | uniq -c | sort -rn | head -40
+      - name: the walk finished and every list it produced is ok
+        run: |
+          jq -e '.facts.walk.complete.value == true' "$RUNNER_TEMP/muster/root.json"
+          jq -e '[.facts.walk | to_entries[] | select(.key != "complete" and .key != "stats") | select(.value.status != "ok" or .value.truncated == true)] | length == 0' "$RUNNER_TEMP/muster/root.json"
       - name: check the root snapshot
         run: |
           sudo chown "$(id -u)" "$RUNNER_TEMP/muster/root.json"
@@ -97,7 +134,7 @@ jobs:
       - name: collect without root is partial (exit 1)
         run: |
           set +e
-          ./bin/muster collect --out "$RUNNER_TEMP/muster/user.json"
+          ./bin/muster collect --deep --out "$RUNNER_TEMP/muster/user.json"
           code=$?
           set -e
           test "$code" -eq 1
@@ -180,10 +217,10 @@ jobs:
               case "$state" in running|degraded) break ;; esac
               sleep 1
             done
-            docker exec "$cid" /m/muster collect --out /out/c.json || true
+            docker exec "$cid" /m/muster collect --deep --out /out/c.json || true
             docker rm -f "$cid"
           else
-            docker run --rm -v "$PWD/bin:/m:ro" -v "$RUNNER_TEMP/muster/containers:/out" ${{ matrix.image }} /m/muster collect --out /out/c.json || true
+            docker run --rm -v "$PWD/bin:/m:ro" -v "$RUNNER_TEMP/muster/containers:/out" ${{ matrix.image }} /m/muster collect --deep --out /out/c.json || true
           fi
           sudo chown "$(id -u)" "$RUNNER_TEMP/muster/containers/c.json"
           test -s "$RUNNER_TEMP/muster/containers/c.json"
@@ -215,6 +252,13 @@ jobs:
               | ($k | split(".")) as $p
               | (.facts | getpath($p) | .status)
               | select(. != "unsupported") ] | length == 0' "$RUNNER_TEMP/muster/containers/c.json"
+      - name: every fact the capability matrix calls container-unsupported reads unsupported
+        run: |
+          jq -e --slurpfile m docs/reference/capability-matrix.json '
+            [ $m[0].container.unsupported[] as $k
+              | ($k | split(".")) as $p
+              | (.facts | getpath($p) | .status)
+              | select(. != "unsupported") ] | length == 0' "$RUNNER_TEMP/muster/containers/c.json"
 
   collect-contract:
     runs-on: ubuntu-24.04
@@ -232,9 +276,16 @@ jobs:
           docker run --rm --network none --read-only \
             -v "$PWD":/src:ro \
             -v "$RUNNER_TEMP/muster/out":/out \
-            ubuntu:24.04 /src/bin/muster collect --out /out/s.json
+            ubuntu:24.04 /src/bin/muster collect --deep --out /out/s.json
           sudo chown "$(id -u)" "$RUNNER_TEMP/muster/out/s.json"
           files=$(find "$RUNNER_TEMP/muster/out" -type f)
           test "$files" = "$RUNNER_TEMP/muster/out/s.json"
           test "$(stat -c '%a' "$RUNNER_TEMP/muster/out/s.json")" = "600"
           jq -e '.run.complete == true and .run.env.container != "none"' "$RUNNER_TEMP/muster/out/s.json"
+      - name: every fact the capability matrix calls container-unsupported reads unsupported
+        run: |
+          jq -e --slurpfile m docs/reference/capability-matrix.json '
+            [ $m[0].container.unsupported[] as $k
+              | ($k | split(".")) as $p
+              | (.facts | getpath($p) | .status)
+              | select(. != "unsupported") ] | length == 0' "$RUNNER_TEMP/muster/out/s.json"

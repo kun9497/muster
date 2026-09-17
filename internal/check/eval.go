@@ -695,5 +695,16 @@ func describeField(sub *controls.Clause, params map[string]any) string {
 	if err != nil {
 		expected = sub.Expected
 	}
-	return fmt.Sprintf("%s %s %v", field, sub.Op, expected)
+	return field + " " + describeOpExpected(sub.Op, expected)
+}
+
+// describeOpExpected renders one operator with the value it compares against.
+// present and absent take no expected (spec §6.3, and the lint rule says so),
+// so printing one rendered the nil back out — "path present <nil>" — which
+// reads as a value the clause wanted rather than as the absence of one.
+func describeOpExpected(op string, expected any) string {
+	if op == "present" || op == "absent" {
+		return op
+	}
+	return fmt.Sprintf("%s %v", op, expected)
 }

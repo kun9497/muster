@@ -11,12 +11,41 @@ verdict on an existing snapshot is at least a minor release and appears under
 
 ### Controls
 
-Control set `kisa-unix-2026+2026.09.09` (was `+2026.09.02`). 64 of the 67
-KISA 2026 Unix items are enrolled: auto 55, partial 5, manual 4 with evidence
-attached. U-15, U-23 and U-33 wait for the deep filesystem walk (stage 3) and
-are listed in `docs/reference/kisa/kisa_deferred.json`.
+Control set `kisa-unix-2026+2026.09.16` (was `+2026.09.09`). All 67 KISA 2026
+Unix items are enrolled: auto 57, partial 7, manual 4 with evidence attached.
+`docs/reference/kisa/kisa_deferred.json` is now empty — the three items that
+waited for the deep filesystem walk are in. Every control below reads
+`walk.*`, so it is MANUAL ("run collect --deep") on a snapshot collected
+without `--deep`, and NOT_APPLICABLE on a container whose root layer the walk
+does not enter.
 
 Verdict-affecting changes in this version:
+
+- `muster.file.unowned_files` (U-15, auto) fails on any entry whose uid or
+  gid resolves to no local account or group. A host whose passwd database
+  names a remote source, or whose nsswitch line uses NIS compat, is MANUAL
+  with both nsswitch facts as evidence rather than judged on ids it cannot
+  see.
+- `muster.file.suid_sgid` (U-23, auto) fails on a setuid or setgid file no
+  package owns, on one whose package owns it without that bit, on any path
+  named in the new `forbidden_suid` parameter (empty by default — muster
+  ships no list), and on a directory others may write into that has no
+  sticky bit.
+- `muster.file.suid_sgid_unverified` (U-23, partial) is WARN for every
+  packaged setuid or setgid file whose declared mode could not be decided
+  (`unlisted`, `version_mismatch`, `postinst` or `none`); the row names the
+  package and the reason. These used to be invisible.
+- `muster.file.hidden_entries` (U-33, partial) is WARN for every hidden file
+  or directory outside the home exemption that no package declares.
+  Allowlisted entries are recorded and not judged.
+- The `none` clauses of ten existing controls name their observations by the
+  element's `path` instead of its index in the collector's list
+  (`file:/etc/crontab`, not `file:0`; `position` on the root PATH entries), so
+  a waiver naming a subject must now use the path.
+
+Control set `kisa-unix-2026+2026.09.09` (was `+2026.09.02`) enrolled 64 of the
+67 items: auto 55, partial 5, manual 4. Its verdict-affecting changes, still
+unreleased, were:
 
 - A record element that lacks the field a `where`/`require` sub-clause names
   now fails that clause with a reason naming the element and the field (spec
@@ -78,6 +107,17 @@ every plan is under `docs/superpowers/plans/`):
 
 ### Collectors
 
+- New `walk` collector: `collect --deep` (root only) walks the host's local
+  filesystems once — `--walk-budget`, `--walk-max-entries`, `--walk-exclude`
+  and `--walk-include` bound it — and writes nine keys: `walk.suid_sgid`,
+  `walk.suid_sgid_unverified`, `walk.world_writable`, `walk.sticky_missing`,
+  `walk.unowned`, `walk.hidden`, `walk.skipped`, `walk.stats` and
+  `walk.complete`. Every candidate is joined to rpm's file table or to dpkg's
+  file lists plus the release's reference list of declared modes, so a finding
+  says which package owns the path and whether the package declares the bit.
+  Without `--deep` no `walk.*` key is written at all; without root
+  `walk.complete` is `denied`; a container layer the walk does not enter
+  leaves every list `unsupported`.
 - `Glob` over a declared directory the process may not read now reports the
   denial, and every collector that lists a declared directory reports it as
   `denied` (it used to be swallowed as an empty listing, or filed as
@@ -102,10 +142,10 @@ every plan is under `docs/superpowers/plans/`):
 
 - `muster controls lint` cross-checks every `references.kisa` id against the
   KISA inventory (`--kisa docs/reference/kisa`): an unknown id, an importance
-  that disagrees with the inventory, an item cited by two controls, an item
-  cited by none and not deferred, a deferred item that a control cites, a
-  deferral naming something that is not a 2026 item, and an id repeated
-  inside one control are lint errors; a deferral without an id, a stage or a
+  that disagrees with the inventory, an item cited by none and not deferred,
+  a deferred item that a control cites, a deferral naming something that is
+  not a 2026 item, and an id repeated inside one control are lint errors (an
+  item judged by several controls is allowed since 3A — U-23 has two); a deferral without an id, a stage or a
   reason is rejected when the inventory loads.
   `shell_valid` may only be judged behind an `accounts.shells present`
   screen in every clause list. The unindexed-reference message names the
@@ -116,6 +156,36 @@ every plan is under `docs/superpowers/plans/`):
   (spec §11), marks deferred items, and `go run ./tools/coverage -check`
   also verifies the README count sentence. `controls lint` prints the same
   usage totals.
+- The clause grammar gains `not_contains` (a string, or a `list<string>`
+  element, that must be absent), the counterpart of `contains`. Lint requires
+  `subject` on a `none` clause over a record list, so a finding and a waiver
+  name the element rather than its position. `muster controls new` notes,
+  instead of refusing, an item another control already judges. A reason for
+  a `present`/`absent` sub-clause no longer ends in `<nil>`.
+- `tools/suidindex` generates the setuid/setgid reference lists the walk's
+  dpkg join reads (`docs/reference/suid/*.json`) by running the public
+  container images pinned by digest in `docs/reference/suid/sources.json` and
+  asking the distribution's own package tool what it ships. Five releases are
+  committed: Ubuntu 22.04 and 24.04, Debian 12, Rocky 9 and AlmaLinux 9. A
+  package a base image does not install is downloaded on the host from a URL
+  and SHA-256 pinned in `sources.json` and bind-mounted read-only into the
+  container; the generating container gets no network and installs nothing.
+  Every list records the architecture it was read from (`arch`), and the
+  image is pulled and run for that platform; an image whose own `uname -m`
+  disagrees is refused. `make suidindex-check` regenerates to memory and
+  compares byte for byte, except for `generated`: a run on another day
+  reports the date it would have stamped and passes, so the committed lists
+  can be verified at any time. CI runs neither target and reads the committed
+  lists, exactly as it does for `tools/refindex`. On a dpkg host of one of
+  the five releases a packaged setuid file is now decided by the list instead
+  of reading `none` and only warning; a file whose bit a maintainer script
+  sets after unpacking (pkexec, fusermount3, the polkit agent helper) is
+  reported as `postinst` and warns rather than being called a finding.
+  `suid.Load` resolves a host's release in three steps — the exact
+  `<id>-<version_id>.json`, then `<id>-<major>.json`, then the highest
+  `<id>-<major>.<minor>.json` present, with the minors compared as numbers —
+  so the lists generated from the 9.8 RHEL-family images answer for a host on
+  any Rocky or AlmaLinux 9.x.
 - `muster controls new` scaffolds a control and its fixture stubs;
   `muster snapshot extract` cuts the leaves a control reads (and the
   engine-read keys they imply) out of a snapshot into a fixture skeleton.

@@ -1,0 +1,12 @@
+util-linux	0104755	root	root	/usr/bin/su
+util-linux	0100755	root	root	/usr/bin/mount
+util-linux	0102755	root	tty	/usr/bin/wall
+python3	0100755	root	root	/usr/bin/python3
+coreutils	0100755	root	root	/usr/bin/ls
+setup	0100644	root	root	/etc/profile
+spooler	0041777	root	mail	/var/lib/x/spool
+web-assets	0040755	root	root	/srv/share
+sysstat	0100600	root	root	/usr/sbin/.h
+vendor-data	0100644	root	root	/opt/vendor/data files/readme.txt
+filesystem	0040555	root	root	/usr/sbin
+kernel-tools	0104750	root	root	/usr/sbin/tool-priv

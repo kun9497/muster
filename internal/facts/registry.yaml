@@ -1446,7 +1446,7 @@ keys:
     collector: env
   - key: walk.world_writable
     type: list<record>
-    description: World-writable files found by the deep walk, with path, sticky, uid, gid, package_declared.
+    description: World-writable entries of every kind found by the deep walk - path, kind, sticky, uid, gid, package, package_declared, reference; sorted by path.
     since: 1
     sensitivity: internal
     collector: walk
@@ -1456,6 +1456,54 @@ keys:
     description: Whether the deep walk finished within its budget.
     since: 1
     sensitivity: public
+    collector: walk
+  - key: walk.suid_sgid
+    type: list<record>
+    description: Regular files with setuid or setgid whose declaration the package join decided - path, mode, uid, gid, setuid, setgid, package, package_declared, declared_mode, declared_owner, declared_group, declared_path, reference; sorted by path; truncated at 2000 rows.
+    since: 1
+    sensitivity: internal
+    collector: walk
+    subject_kind: file
+  - key: walk.suid_sgid_unverified
+    type: list<record>
+    description: Regular files with setuid or setgid that a package owns but whose mode the join could not decide (reference unlisted, version_mismatch, postinst or none) - same fields as walk.suid_sgid; sorted by path.
+    since: 1
+    sensitivity: internal
+    collector: walk
+    subject_kind: file
+  - key: walk.sticky_missing
+    type: list<record>
+    description: Directories writable by others without the sticky bit - path, mode, uid, gid; sorted by path.
+    since: 1
+    sensitivity: internal
+    collector: walk
+    subject_kind: file
+  - key: walk.unowned
+    type: list<record>
+    description: Entries of every kind whose uid or gid is not known locally - path, kind, uid, gid, uid_known, gid_known, uid_class, gid_class (passwd, subid, dynamic, unknown); sorted by path.
+    since: 1
+    sensitivity: internal
+    collector: walk
+    subject_kind: file
+  - key: walk.hidden
+    type: list<record>
+    description: Entries whose name begins with a dot outside the home exemption - path, kind, uid, package, package_declared, reference, allowlisted; sorted by path; 10000 non-allowlisted and 2000 allowlisted rows at most.
+    since: 1
+    sensitivity: internal
+    collector: walk
+    subject_kind: file
+  - key: walk.skipped
+    type: list<record>
+    description: Every root the walk did not enter - path, reason (excluded_type, pseudo_path, container_storage, excluded_by_flag, bind_duplicate, denied, vanished, unlisted_mount) and detail (the fstype, link, configuration file or errno behind the reason, else empty); sorted by path; provenance, read by no control.
+    since: 1
+    sensitivity: internal
+    collector: walk
+    subject_kind: file
+  - key: walk.stats
+    type: record
+    description: The walk's own account of itself - entries, dirs, files, symlinks, stop_reason, last_path, truncated_counts, allowlisted_hidden, config_unreadable, home_roots, mnt_id_fallback, nice_applied, ioprio_applied; provenance, read by no control.
+    since: 1
+    sensitivity: internal
     collector: walk
   - key: cron.files
     type: list<record>

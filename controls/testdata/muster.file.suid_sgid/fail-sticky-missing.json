@@ -1,0 +1,1 @@
+{"synthetic": true, "schema_version":1,"run":{"deep":true},"facts":{"walk":{"complete":{"status":"ok","value":true},"suid_sgid":{"status":"ok","value":[]},"sticky_missing":{"status":"ok","value":[{"path":"/var/tmp/open","mode":511,"uid":0,"gid":0}]}}}}

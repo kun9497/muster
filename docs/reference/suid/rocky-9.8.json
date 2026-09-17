@@ -1,0 +1,4372 @@
+{
+  "distro": "rocky",
+  "release": "9.8",
+  "arch": "amd64",
+  "image_digest": "sha256:8101994123cf3d0a8fee517bee7f39e555c7d92bd2d9eb3303cc988a0eeed00f",
+  "generated": "2026-09-16",
+  "packages": [
+    {
+      "name": "libutempter",
+      "version": "1.2.1-6.el9"
+    },
+    {
+      "name": "pam",
+      "version": "1.5.1-28.el9"
+    },
+    {
+      "name": "passwd",
+      "version": "0.80-12.el9"
+    },
+    {
+      "name": "shadow-utils",
+      "version": "4.9-16.el9"
+    },
+    {
+      "name": "usermode",
+      "version": "1.114-7.el9"
+    },
+    {
+      "name": "util-linux",
+      "version": "2.37.4-25.el9"
+    },
+    {
+      "name": "util-linux-core",
+      "version": "2.37.4-25.el9"
+    }
+  ],
+  "entries": [
+    {
+      "path": "/etc/adjtime",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/etc/default/useradd",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/etc/login.defs",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/etc/pam.d/config-util",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/etc/pam.d/fingerprint-auth",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/etc/pam.d/login",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/etc/pam.d/other",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/etc/pam.d/passwd",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/etc/pam.d/password-auth",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/etc/pam.d/postlogin",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/etc/pam.d/remote",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/etc/pam.d/runuser",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/etc/pam.d/runuser-l",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/etc/pam.d/smartcard-auth",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/etc/pam.d/su",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/etc/pam.d/su-l",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/etc/pam.d/system-auth",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/etc/security/access.conf",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/etc/security/chroot.conf",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/etc/security/console.apps/config-util",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/etc/security/console.handlers",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/etc/security/console.perms",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/etc/security/faillock.conf",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/etc/security/group.conf",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/etc/security/limits.conf",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/etc/security/namespace.conf",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/etc/security/namespace.init",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/etc/security/opasswd",
+      "mode": 384,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/etc/security/pam_env.conf",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/etc/security/pwhistory.conf",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/etc/security/sepermit.conf",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/etc/security/time.conf",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/bin/cal",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/bin/chage",
+      "mode": 2541,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/bin/chmem",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/bin/choom",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/bin/chrt",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux-core"
+    },
+    {
+      "path": "/usr/bin/col",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/bin/colcrt",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/bin/colrm",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/bin/column",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/bin/consolehelper",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/bin/dmesg",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux-core"
+    },
+    {
+      "path": "/usr/bin/eject",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/bin/fallocate",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/bin/fincore",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/bin/findmnt",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux-core"
+    },
+    {
+      "path": "/usr/bin/flock",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux-core"
+    },
+    {
+      "path": "/usr/bin/getopt",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/bin/gpasswd",
+      "mode": 2541,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/bin/hardlink",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux-core"
+    },
+    {
+      "path": "/usr/bin/hexdump",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/bin/ionice",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux-core"
+    },
+    {
+      "path": "/usr/bin/ipcmk",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux-core"
+    },
+    {
+      "path": "/usr/bin/ipcrm",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux-core"
+    },
+    {
+      "path": "/usr/bin/ipcs",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux-core"
+    },
+    {
+      "path": "/usr/bin/irqtop",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/bin/isosize",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/bin/kill",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux-core"
+    },
+    {
+      "path": "/usr/bin/last",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/bin/lastlog",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/bin/logger",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux-core"
+    },
+    {
+      "path": "/usr/bin/login",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/bin/look",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/bin/lsblk",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/bin/lscpu",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/bin/lsipc",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/bin/lsirq",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/bin/lslocks",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/bin/lslogins",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/bin/lsmem",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/bin/lsns",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/bin/mcookie",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/bin/mesg",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/bin/more",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux-core"
+    },
+    {
+      "path": "/usr/bin/mount",
+      "mode": 2541,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux-core"
+    },
+    {
+      "path": "/usr/bin/mountpoint",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux-core"
+    },
+    {
+      "path": "/usr/bin/namei",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/bin/newgidmap",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/bin/newgrp",
+      "mode": 2541,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/bin/newuidmap",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/bin/nsenter",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux-core"
+    },
+    {
+      "path": "/usr/bin/passwd",
+      "mode": 2541,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/bin/prlimit",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/bin/rename",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/bin/renice",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux-core"
+    },
+    {
+      "path": "/usr/bin/rev",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/bin/script",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/bin/scriptlive",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/bin/scriptreplay",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/bin/setarch",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/bin/setpriv",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/bin/setsid",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux-core"
+    },
+    {
+      "path": "/usr/bin/setterm",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/bin/su",
+      "mode": 2541,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/bin/taskset",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux-core"
+    },
+    {
+      "path": "/usr/bin/ul",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/bin/umount",
+      "mode": 2541,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux-core"
+    },
+    {
+      "path": "/usr/bin/unshare",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux-core"
+    },
+    {
+      "path": "/usr/bin/utmpdump",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/bin/uuidgen",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/bin/uuidparse",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/bin/wall",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/bin/wdctl",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/bin/whereis",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/bin/write",
+      "mode": 1517,
+      "owner": "root",
+      "group": "tty",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/lib/systemd/system/fstrim.service",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/lib/systemd/system/fstrim.timer",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/lib/systemd/system/pam_namespace.service",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/lib/tmpfiles.d/pam.conf",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/lib64/libpam.so.0.85.1",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/lib64/libpam_misc.so.0.82.1",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/lib64/libpamc.so.0.82.1",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/lib64/libutempter.so.1.2.1",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "libutempter"
+    },
+    {
+      "path": "/usr/lib64/security/pam_access.so",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/lib64/security/pam_chroot.so",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/lib64/security/pam_console.so",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/lib64/security/pam_debug.so",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/lib64/security/pam_deny.so",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/lib64/security/pam_echo.so",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/lib64/security/pam_env.so",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/lib64/security/pam_exec.so",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/lib64/security/pam_faildelay.so",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/lib64/security/pam_faillock.so",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/lib64/security/pam_filter.so",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/lib64/security/pam_filter/upperLOWER",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/lib64/security/pam_ftp.so",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/lib64/security/pam_group.so",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/lib64/security/pam_issue.so",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/lib64/security/pam_keyinit.so",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/lib64/security/pam_lastlog.so",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/lib64/security/pam_limits.so",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/lib64/security/pam_listfile.so",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/lib64/security/pam_localuser.so",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/lib64/security/pam_loginuid.so",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/lib64/security/pam_mail.so",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/lib64/security/pam_mkhomedir.so",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/lib64/security/pam_motd.so",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/lib64/security/pam_namespace.so",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/lib64/security/pam_nologin.so",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/lib64/security/pam_permit.so",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/lib64/security/pam_postgresok.so",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/lib64/security/pam_pwhistory.so",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/lib64/security/pam_rhosts.so",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/lib64/security/pam_rootok.so",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/lib64/security/pam_securetty.so",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/lib64/security/pam_selinux.so",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/lib64/security/pam_sepermit.so",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/lib64/security/pam_setquota.so",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/lib64/security/pam_shells.so",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/lib64/security/pam_stress.so",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/lib64/security/pam_succeed_if.so",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/lib64/security/pam_time.so",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/lib64/security/pam_timestamp.so",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/lib64/security/pam_tty_audit.so",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/lib64/security/pam_umask.so",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/lib64/security/pam_unix.so",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/lib64/security/pam_userdb.so",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/lib64/security/pam_usertype.so",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/lib64/security/pam_warn.so",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/lib64/security/pam_wheel.so",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/lib64/security/pam_xauth.so",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/libexec/utempter/utempter",
+      "mode": 1481,
+      "owner": "root",
+      "group": "utmp",
+      "package": "libutempter"
+    },
+    {
+      "path": "/usr/sbin/addpart",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/sbin/agetty",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux-core"
+    },
+    {
+      "path": "/usr/sbin/blkdiscard",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/sbin/blkid",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux-core"
+    },
+    {
+      "path": "/usr/sbin/blkzone",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/sbin/blockdev",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux-core"
+    },
+    {
+      "path": "/usr/sbin/cfdisk",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/sbin/chcpu",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/sbin/chgpasswd",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/sbin/chpasswd",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/sbin/ctrlaltdel",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/sbin/delpart",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/sbin/faillock",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/sbin/fdformat",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/sbin/fdisk",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/sbin/findfs",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/sbin/fsck",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux-core"
+    },
+    {
+      "path": "/usr/sbin/fsck.cramfs",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/sbin/fsck.minix",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/sbin/fsfreeze",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/sbin/fstrim",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/sbin/groupadd",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/sbin/groupdel",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/sbin/groupmems",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/sbin/groupmod",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/sbin/grpck",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/sbin/grpconv",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/sbin/grpunconv",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/sbin/hwclock",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/sbin/ldattach",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/sbin/losetup",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux-core"
+    },
+    {
+      "path": "/usr/sbin/mkfs",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/sbin/mkfs.cramfs",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/sbin/mkfs.minix",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/sbin/mkhomedir_helper",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/sbin/mkswap",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux-core"
+    },
+    {
+      "path": "/usr/sbin/newusers",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/sbin/nologin",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/sbin/pam_console_apply",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/sbin/pam_namespace_helper",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/sbin/pam_timestamp_check",
+      "mode": 2541,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/sbin/partx",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux-core"
+    },
+    {
+      "path": "/usr/sbin/pivot_root",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/sbin/pwck",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/sbin/pwconv",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/sbin/pwhistory_helper",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/sbin/pwunconv",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/sbin/readprofile",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/sbin/resizepart",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/sbin/rfkill",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/sbin/rtcwake",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/sbin/runuser",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/sbin/sfdisk",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/sbin/sulogin",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/sbin/swaplabel",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/sbin/swapoff",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux-core"
+    },
+    {
+      "path": "/usr/sbin/swapon",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux-core"
+    },
+    {
+      "path": "/usr/sbin/switch_root",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux-core"
+    },
+    {
+      "path": "/usr/sbin/unix_chkpwd",
+      "mode": 2541,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/sbin/unix_update",
+      "mode": 448,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/sbin/useradd",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/sbin/userdel",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/sbin/userhelper",
+      "mode": 2505,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/sbin/usermod",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/sbin/vipw",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/sbin/wipefs",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/sbin/zramctl",
+      "mode": 493,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/addpart",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/blkdiscard",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/blkid",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux-core"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/blkzone",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/blockdev",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux-core"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/cal",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/cfdisk",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/chcpu",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/chmem",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/chrt",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux-core"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/col",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/colcrt",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/colrm",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/column",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/ctrlaltdel",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/delpart",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/dmesg",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux-core"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/eject",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/fallocate",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/fdformat",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/fdisk",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/fincore",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/findfs",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/findmnt",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux-core"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/flock",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux-core"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/fsck",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux-core"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/fsck.cramfs",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/fsck.minix",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/fsfreeze",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/fstrim",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/getopt",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/hardlink",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux-core"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/hexdump",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/hwclock",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/ionice",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux-core"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/ipcmk",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux-core"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/ipcrm",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux-core"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/ipcs",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux-core"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/irqtop",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/isosize",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/last",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/ldattach",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/logger",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux-core"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/look",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/losetup",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux-core"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/lsblk",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/lscpu",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/lsipc",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/lsirq",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/lslocks",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/lslogins",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/lsmem",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/lsns",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/mcookie",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/mesg",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/mkfs",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/mkfs.cramfs",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/mkfs.minix",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/mkswap",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux-core"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/more",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux-core"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/mountpoint",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux-core"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/namei",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/nsenter",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux-core"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/partx",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux-core"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/pivot_root",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/prlimit",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/readprofile",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/rename",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/renice",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux-core"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/resizepart",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/rev",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/rfkill",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/rtcwake",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/script",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/scriptlive",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/scriptreplay",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/setarch",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/setpriv",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/setsid",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux-core"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/setterm",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/sfdisk",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/su",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/swaplabel",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/swapoff",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux-core"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/swapon",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux-core"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/taskset",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux-core"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/ul",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/unshare",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux-core"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/utmpdump",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/uuidgen",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/uuidparse",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/wall",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/wdctl",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/whereis",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/wipefs",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/write",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/bash-completion/completions/zramctl",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/licenses/libutempter/COPYING",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "libutempter"
+    },
+    {
+      "path": "/usr/share/licenses/pam/Copyright",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/licenses/pam/gpl-2.0.txt",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/licenses/passwd/COPYING",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/licenses/shadow-utils/gpl-2.0.txt",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/share/licenses/shadow-utils/shadow-bsd.txt",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/share/licenses/usermode/COPYING",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/licenses/util-linux/COPYING.BSD-3-Clause",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/licenses/util-linux/COPYING.BSD-4-Clause-UC",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/licenses/util-linux/COPYING.GPL-2.0-or-later",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/licenses/util-linux/COPYING.GPL-3.0-or-later",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/licenses/util-linux/COPYING.ISC",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/licenses/util-linux/COPYING.LGPL-2.1-or-later",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/locale/af/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/am/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/ar/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/ar/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/ar/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/as/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/as/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/as/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/ast/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/ast/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/az/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/be/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/be/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/bg/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/bg/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/bg/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/bn/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/bn/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/bn/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/bn_IN/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/bn_IN/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/bn_IN/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/bs/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/bs/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/bs/LC_MESSAGES/shadow.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/share/locale/bs/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/ca/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/ca/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/ca/LC_MESSAGES/shadow.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/share/locale/ca/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/ca/LC_MESSAGES/util-linux.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/locale/cs/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/cs/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/cs/LC_MESSAGES/shadow.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/share/locale/cs/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/cs/LC_MESSAGES/util-linux.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/locale/cy/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/cy/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/cy/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/da/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/da/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/da/LC_MESSAGES/shadow.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/share/locale/da/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/da/LC_MESSAGES/util-linux.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/locale/de/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/de/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/de/LC_MESSAGES/shadow.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/share/locale/de/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/de/LC_MESSAGES/util-linux.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/locale/de_CH/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/de_CH/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/dz/LC_MESSAGES/shadow.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/share/locale/el/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/el/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/el/LC_MESSAGES/shadow.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/share/locale/el/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/en_GB/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/en_GB/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/eo/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/es/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/es/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/es/LC_MESSAGES/shadow.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/share/locale/es/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/es/LC_MESSAGES/util-linux.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/locale/et/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/et/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/et/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/et/LC_MESSAGES/util-linux.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/locale/eu/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/eu/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/eu/LC_MESSAGES/shadow.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/share/locale/eu/LC_MESSAGES/util-linux.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/locale/fa/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/fa/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/fa/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/fi/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/fi/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/fi/LC_MESSAGES/shadow.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/share/locale/fi/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/fi/LC_MESSAGES/util-linux.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/locale/fr/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/fr/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/fr/LC_MESSAGES/shadow.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/share/locale/fr/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/fr/LC_MESSAGES/util-linux.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/locale/ga/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/gl/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/gl/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/gl/LC_MESSAGES/shadow.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/share/locale/gl/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/gl/LC_MESSAGES/util-linux.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/locale/gu/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/gu/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/gu/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/he/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/he/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/he/LC_MESSAGES/shadow.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/share/locale/he/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/hi/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/hi/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/hi/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/hr/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/hr/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/hr/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/hr/LC_MESSAGES/util-linux.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/locale/hu/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/hu/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/hu/LC_MESSAGES/shadow.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/share/locale/hu/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/hu/LC_MESSAGES/util-linux.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/locale/hy/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/ia/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/id/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/id/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/id/LC_MESSAGES/shadow.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/share/locale/id/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/id/LC_MESSAGES/util-linux.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/locale/is/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/is/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/is/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/it/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/it/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/it/LC_MESSAGES/shadow.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/share/locale/it/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/it/LC_MESSAGES/util-linux.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/locale/ja/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/ja/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/ja/LC_MESSAGES/shadow.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/share/locale/ja/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/ja/LC_MESSAGES/util-linux.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/locale/ka/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/ka/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/ka/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/kk/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/kk/LC_MESSAGES/shadow.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/share/locale/km/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/km/LC_MESSAGES/shadow.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/share/locale/kn/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/kn/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/kn/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/ko/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/ko/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/ko/LC_MESSAGES/shadow.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/share/locale/ko/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/ku/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/kw_GB/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/ky/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/lo/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/lt/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/lv/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/lv/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/mai/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/mk/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/mk/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/mk/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/ml/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/ml/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/ml/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/mn/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/mr/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/mr/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/mr/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/ms/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/ms/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/ms/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/my/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/my/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/nb/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/nb/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/nb/LC_MESSAGES/shadow.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/share/locale/nb/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/nds/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/nds/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/ne/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/ne/LC_MESSAGES/shadow.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/share/locale/nl/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/nl/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/nl/LC_MESSAGES/shadow.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/share/locale/nl/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/nl/LC_MESSAGES/util-linux.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/locale/nn/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/nn/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/nn/LC_MESSAGES/shadow.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/share/locale/or/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/or/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/or/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/pa/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/pa/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/pa/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/pl/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/pl/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/pl/LC_MESSAGES/shadow.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/share/locale/pl/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/pl/LC_MESSAGES/util-linux.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/locale/pt/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/pt/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/pt/LC_MESSAGES/shadow.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/share/locale/pt/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/pt/LC_MESSAGES/util-linux.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/locale/pt_BR/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/pt_BR/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/pt_BR/LC_MESSAGES/shadow.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/share/locale/pt_BR/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/pt_BR/LC_MESSAGES/util-linux.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/locale/ro/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/ro/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/ro/LC_MESSAGES/shadow.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/share/locale/ro/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/ru/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/ru/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/ru/LC_MESSAGES/shadow.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/share/locale/ru/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/ru/LC_MESSAGES/util-linux.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/locale/si/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/si/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/si/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/sk/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/sk/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/sk/LC_MESSAGES/shadow.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/share/locale/sk/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/sl/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/sl/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/sl/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/sl/LC_MESSAGES/util-linux.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/locale/sq/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/sq/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/sq/LC_MESSAGES/shadow.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/share/locale/sr/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/sr/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/sr/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/sr@latin/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/sr@latin/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/sr@latin/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/sv/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/sv/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/sv/LC_MESSAGES/shadow.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/share/locale/sv/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/sv/LC_MESSAGES/util-linux.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/locale/ta/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/ta/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/ta/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/te/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/te/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/te/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/tg/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/tg/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/th/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/tl/LC_MESSAGES/shadow.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/share/locale/tr/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/tr/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/tr/LC_MESSAGES/shadow.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/share/locale/tr/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/tr/LC_MESSAGES/util-linux.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/locale/uk/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/uk/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/uk/LC_MESSAGES/shadow.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/share/locale/uk/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/uk/LC_MESSAGES/util-linux.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/locale/ur/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/ur/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/vi/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/vi/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/vi/LC_MESSAGES/shadow.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/share/locale/vi/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/vi/LC_MESSAGES/util-linux.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/locale/wa/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/yo/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/zh_CN/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/zh_CN/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/zh_CN/LC_MESSAGES/shadow.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/share/locale/zh_CN/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/zh_CN/LC_MESSAGES/util-linux.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/locale/zh_HK/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/zh_TW/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    },
+    {
+      "path": "/usr/share/locale/zh_TW/LC_MESSAGES/passwd.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "passwd"
+    },
+    {
+      "path": "/usr/share/locale/zh_TW/LC_MESSAGES/shadow.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "shadow-utils"
+    },
+    {
+      "path": "/usr/share/locale/zh_TW/LC_MESSAGES/usermode.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "usermode"
+    },
+    {
+      "path": "/usr/share/locale/zh_TW/LC_MESSAGES/util-linux.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "util-linux"
+    },
+    {
+      "path": "/usr/share/locale/zu/LC_MESSAGES/Linux-PAM.mo",
+      "mode": 420,
+      "owner": "root",
+      "group": "root",
+      "package": "pam"
+    }
+  ]
+}

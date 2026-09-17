@@ -1,0 +1,23 @@
+id: muster.file.hidden_entries
+title_en: Every hidden file and directory outside the home directories belongs to a package
+title_ko: 홈 디렉터리 밖의 숨김 파일과 디렉터리는 모두 패키지의 것이다
+description_en: "A name beginning with a dot in a system directory is the oldest place to park a tool where ls does not show it. The deep walk records every such entry outside the home exemption -- a user home at any depth and the direct children of a service home are not findings, because dot files are what a home is made of -- and joins it to the package database. An entry a package owns passes; an entry no package owns is a WARN, not a FAIL, because a legitimate application, a deployment or an administrator's own note looks exactly the same from the filesystem. Entries the shipped allowlist covers are recorded with allowlisted true and are not judged; they are capped and counted separately (walk.stats.allowlisted_hidden), so a deployed source tree cannot crowd the list. Each row's reference names the database that answered: dpkgdb or rpmdb where a package owns the entry - a hidden entry carries no special bit, so ownership is the whole answer - and unpackaged where none does. Review each row and remove, move or waive it."
+description_ko: "시스템 디렉터리에서 점으로 시작하는 이름은 ls 에 보이지 않는 곳에 도구를 숨겨 두는 가장 오래된 수법입니다. deep walk 는 홈 예외를 뺀 모든 그런 항목을 기록하고 패키지 데이터베이스에 대조합니다. 홈 디렉터리는 점 파일로 이루어져 있으므로 사용자 홈의 모든 깊이와 서비스 홈의 직속 자식은 결과에 넣지 않습니다. 패키지가 소유한 항목은 PASS 이고, 어떤 패키지도 소유하지 않은 항목은 FAIL 이 아니라 WARN 입니다. 정상적인 애플리케이션, 배포 산출물, 관리자가 남긴 메모가 파일시스템에서는 똑같아 보이기 때문입니다. 함께 배포되는 allowlist 에 해당하는 항목은 allowlisted true 로 기록만 하고 판단하지 않으며, 별도 상한과 계수를 둡니다(walk.stats.allowlisted_hidden). 배포된 소스 트리가 목록을 밀어내지 못하게 하기 위함입니다. 각 행의 reference 는 답한 데이터베이스를 알려 줍니다. 숨김 항목은 특수 비트를 가지지 않아 소유 관계가 답의 전부이므로, 패키지가 소유하면 dpkgdb 또는 rpmdb 이고 어느 패키지도 소유하지 않으면 unpackaged 입니다. 각 행을 검토해 제거하거나 옮기거나 waive 하십시오."
+category: file
+importance: 하
+automation: partial
+references:
+  kisa:
+    "2021":
+      - U-59
+    "2026":
+      - U-33
+requires_facts: '>=1'
+absent_means: manual
+checks:
+  - { fact: walk.hidden, op: each, subject: path, where: { field: allowlisted, op: eq, expected: false }, require: { field: package_declared, op: eq, expected: true } }
+remediation:
+  text_en: Inspect each listed entry (ls -ld <path>; file <path>) and find out what wrote it. Move a file that belongs to an application into its own directory under a visible name, or delete it with rm -i <path> once you have a copy (cp -a <path> <backup>) to restore from. An entry you have confirmed as legitimate is waived with the reason rather than renamed.
+  text_ko: 나열된 항목을 각각 확인하고(ls -ld <path>; file <path>) 무엇이 만들었는지 파악합니다. 애플리케이션의 파일이라면 보이는 이름의 전용 디렉터리로 옮기고, 복원할 사본을 만든 뒤(cp -a <path> <backup>) rm -i <path> 로 삭제합니다. 정당한 항목으로 확인했다면 이름을 바꾸는 대신 사유를 적어 waive 합니다.
+  risk: none
+  idempotent: true

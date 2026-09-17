@@ -33,6 +33,18 @@ type Access interface {
 	// EOPNOTSUPP propagate unchanged so the caller can classify them.
 	Getxattr(path, name string) ([]byte, error)
 
+	// ReadDir lists one directory without following a symlink in any
+	// component of path and without following any entry. expect, when
+	// non-zero, is the (dev, ino) the caller believes path has; a mismatch
+	// is ErrVanished. It is licensed by Declaration.Walk, not by
+	// Declaration.Reads — the walk's boundaries are its own.
+	ReadDir(path string, expect Identity) (Listing, error)
+
+	// Readlink returns the target of the symlink at path, stored form,
+	// unresolved. It is a read like Stat and is licensed by
+	// Declaration.Reads.
+	Readlink(path string) (string, error)
+
 	Run(ctx context.Context, c Command) Output
 
 	// Writable is an environment probe — answers whether this process may
@@ -47,6 +59,13 @@ type Declaration struct {
 	Reads    []string
 	Commands []Command
 	Needs    string // root | none
+
+	// Walk licenses the deep filesystem traversal: ReadDir on any absolute
+	// clean path. It is deliberately not a list of Reads globs — the walk
+	// visits every local filesystem, and enumerating that as paths would be
+	// both unreadable and a lie. --list-actions prints it as one "walk" row
+	// naming the boundaries instead.
+	Walk bool
 }
 
 // Collector is one registered fact source.
@@ -416,6 +435,41 @@ func (g *guardedAccess) Stat(p string) (ReadMeta, error) {
 	return g.inner.Stat(clean)
 }
 
+// ReadDir is the one access NOT authorised against Declaration.Reads: the
+// walk visits every local filesystem, so there is no glob that could
+// honestly describe it. It is licensed by Declaration.Walk alone, which
+// --list-actions prints as a single "walk" row; a collector without that
+// licence is refused with ErrUndeclared and the attempt is recorded as a
+// "readdir <path>" violation.
+//
+// A relative or unclean path is refused here, before inner is reached, the
+// way allowedPath cleans one for every other method: the guard must never
+// hand inner a path whose meaning the kernel would decide by re-resolving
+// it. Unlike the other methods this one does not silently substitute the
+// cleaned form — the walk builds its paths from listings it made itself, so
+// an unclean one means the caller has a bug, not a spelling.
+func (g *guardedAccess) ReadDir(p string, expect Identity) (Listing, error) {
+	if !g.decl.Walk {
+		return Listing{}, g.violate("readdir " + p)
+	}
+	if !path.IsAbs(p) || path.Clean(p) != p {
+		return Listing{}, fmt.Errorf("%s: readdir path %q must be absolute and clean", g.name, p)
+	}
+	return g.inner.ReadDir(p, expect)
+}
+
+// Readlink is a read: authorised against Declaration.Reads exactly as Stat
+// is, with the CLEANED path passed to inner (R72). The walk licence does
+// not license it — a collector that wants to read a link's target declares
+// that path.
+func (g *guardedAccess) Readlink(p string) (string, error) {
+	clean, ok := g.allowedPath(p)
+	if !ok {
+		return "", g.violate("readlink " + p)
+	}
+	return g.inner.Readlink(clean)
+}
+
 func (g *guardedAccess) Glob(pattern string) ([]string, error) {
 	if _, ok := g.allowedPath(pattern); !ok {
 		return nil, g.violate("glob " + pattern)
@@ -465,17 +519,23 @@ func (g *guardedAccess) Run(ctx context.Context, c Command) Output {
 // Action is one row of --list-actions (spec §9).
 type Action struct {
 	Collector string `json:"collector"`
-	Kind      string `json:"kind"` // read | command | write
+	Kind      string `json:"kind"` // read | command | walk | write
 	Target    string `json:"target"`
 	Needs     string `json:"needs"`
 }
 
+// walkTarget is what a declared walk is printed as. The traversal has no
+// finite path list to enumerate, so the row names the boundaries instead —
+// which is the thing a change-control reviewer is actually approving.
+const walkTarget = "every local filesystem, no symlink followed, boundaries and exclusions as declared"
+
 // ListActions renders the registry as the document a change-control
-// reviewer reads: every path read, every command run, the single write. A
-// /proc/self target is printed in its declared form, never the pid muster
-// substitutes at run time (R40). The result is sorted by (collector, kind,
-// target) so the document is deterministic regardless of the order a
-// collector declared its reads and commands in.
+// reviewer reads: every path read, every command run, the walk a collector
+// declares, the single write. A /proc/self target is printed in its declared
+// form, never the pid muster substitutes at run time (R40). The result is
+// sorted by (collector, kind, target) so the document is deterministic
+// regardless of the order a collector declared its reads and commands in —
+// "read" sorts before "walk", so a walking collector's row comes last.
 func ListActions() []Action {
 	var out []Action
 	for _, c := range All() {
@@ -484,6 +544,9 @@ func ListActions() []Action {
 		}
 		for _, cmd := range c.Declare.Commands {
 			out = append(out, Action{Collector: c.Name, Kind: "command", Target: commandString(cmd), Needs: c.Declare.Needs})
+		}
+		if c.Declare.Walk {
+			out = append(out, Action{Collector: c.Name, Kind: "walk", Target: walkTarget, Needs: c.Declare.Needs})
 		}
 	}
 	out = append(out, Action{Collector: "muster", Kind: "write", Target: DefaultSnapshotDir + "/<hostname>-<time>-<digest>.json", Needs: "root"})

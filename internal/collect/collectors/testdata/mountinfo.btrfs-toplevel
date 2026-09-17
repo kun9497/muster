@@ -1,0 +1,3 @@
+30 1 8:16 /@ / rw,relatime shared:1 - btrfs /dev/vda2 rw,subvol=/@
+45 30 8:16 /@home /home rw,relatime shared:2 - btrfs /dev/vda2 rw,subvol=/@home
+50 30 8:16 / /mnt/btrfs rw,relatime shared:3 - btrfs /dev/vda2 rw,subvolid=5,subvol=/

@@ -1,0 +1,34 @@
+Package: util-linux
+Status: install ok installed
+Architecture: amd64
+Version: 2.37.2-4ubuntu3
+
+Package: passwd
+Status: install ok installed
+Architecture: amd64
+Version: 1:4.8.1-2ubuntu2.2
+
+Package: python3.11
+Status: install ok installed
+Architecture: amd64
+Version: 3.11.0-1
+
+Package: at
+Status: install ok installed
+Architecture: amd64
+Version: 3.2.5-1ubuntu1
+
+Package: foo-tools
+Status: install ok installed
+Architecture: amd64
+Version: 1.0-1
+
+Package: pkg-a
+Status: install ok installed
+Architecture: amd64
+Version: 2.0-1
+
+Package: sysstat
+Status: install ok installed
+Architecture: amd64
+Version: 12.5.2-2

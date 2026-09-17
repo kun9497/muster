@@ -1,8 +1,8 @@
 id: muster.file.world_writable
 title_en: No unexpected world-writable files
 title_ko: 예상치 못한 world-writable 파일이 없다
-description_en: World-writable files without the sticky bit that no package declares that way need a human decision. Requires the deep walk.
-description_ko: sticky bit 가 없고 어떤 패키지도 그렇게 배포하지 않은 world-writable 파일은 사람의 판단이 필요합니다. deep walk 가 필요합니다.
+description_en: "World-writable files without the sticky bit that no package declares that way need a human decision. Requires the deep walk. A world-writable directory that lacks the sticky bit is judged as a finding by muster.file.suid_sgid (U-23), which reads walk.sticky_missing; this control is about the entries of every kind that are writable by others at all. Each row's reference names the source that decided the declaration - rpmdb, statoverride or list - or why none could: unlisted, version_mismatch, postinst, none, or unpackaged when no package owns the path. The vocabulary's remaining value, dpkgdb, says only that a dpkg .list names the path: a .list carries no modes, so it can never declare a permission bit and never decides this list. It decides muster.file.hidden_entries, whose entries carry no bit to compare."
+description_ko: "sticky bit 가 없고 어떤 패키지도 그렇게 배포하지 않은 world-writable 파일은 사람의 판단이 필요합니다. deep walk 가 필요합니다. sticky bit 가 없는 world-writable 디렉터리는 walk.sticky_missing 을 읽는 muster.file.suid_sgid (U-23) 가 결함으로 판정합니다. 이 통제는 다른 사용자가 쓸 수 있는 모든 종류의 항목을 다룹니다. 각 행의 reference 는 선언을 결정한 출처(rpmdb, statoverride, list)를, 결정하지 못했다면 그 이유(unlisted, version_mismatch, postinst, none, 어떤 패키지도 경로를 소유하지 않으면 unpackaged)를 알려 줍니다. 어휘의 나머지 값인 dpkgdb 는 dpkg 의 .list 가 그 경로를 적어 둔다는 사실만 알려 줍니다. .list 에는 모드가 없어 권한 비트를 선언할 수 없으므로 이 목록을 결정하지 않으며, 비트를 비교할 것이 없는 muster.file.hidden_entries 를 결정합니다."
 category: file
 importance: 상
 automation: partial

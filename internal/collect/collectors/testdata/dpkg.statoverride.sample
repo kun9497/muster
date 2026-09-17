@@ -1,0 +1,3 @@
+root root 4755 /bin/su
+root shadow 2755 /usr/bin/expiry
+root root 4755 /opt/x/tool

@@ -229,3 +229,32 @@ func TestLintOfEmbeddedSetIsClean(t *testing.T) {
 		t.Error(p)
 	}
 }
+
+// An operator reading a walk finding sees a `reference` word and nothing
+// else; the control's description is where that word is explained. dpkgdb is
+// the one value the two list controls over walk.hidden and walk.world_writable
+// left unexplained: the first produces it, the second cannot and says so.
+// Both languages, because a Korean reader gets the Korean description.
+func TestWalkControlsExplainTheDpkgdbReference(t *testing.T) {
+	set, err := controls.LoadDefault()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]bool{"muster.file.hidden_entries": false, "muster.file.world_writable": false}
+	for _, c := range set.Controls {
+		if _, ok := want[c.ID]; !ok {
+			continue
+		}
+		want[c.ID] = true
+		for lang, text := range map[string]string{"description_en": c.DescriptionEn, "description_ko": c.DescriptionKo} {
+			if !strings.Contains(text, "dpkgdb") {
+				t.Errorf("%s: %s does not explain the dpkgdb reference value", c.ID, lang)
+			}
+		}
+	}
+	for id, found := range want {
+		if !found {
+			t.Errorf("%s is not in the shipped set", id)
+		}
+	}
+}

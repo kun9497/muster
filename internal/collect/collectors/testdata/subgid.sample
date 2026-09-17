@@ -1,0 +1,6 @@
+# synthetic: subordinate gid ranges, no host was read to write this file
+alice:100000:65536
+adm:300000:100
+nogroup9:400000:65536
+root:500000:0
+dupshadow:600000:50

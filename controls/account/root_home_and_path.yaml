@@ -20,8 +20,8 @@ mechanisms:
       - { fact: files.root_home.uid, op: eq, expected: 0 }
       - { fact: files.root_home.group_writable, op: eq, expected: false }
       - { fact: files.root_home.other_writable, op: eq, expected: false }
-      - { fact: env.shell.root_path_entries, op: none, where: { field: is_dot, op: eq, expected: true } }
-      - { fact: env.shell.root_path_entries, op: none, where: { field: world_writable, op: eq, expected: true } }
+      - { fact: env.shell.root_path_entries, op: none, subject: position, where: { field: is_dot, op: eq, expected: true } }
+      - { fact: env.shell.root_path_entries, op: none, subject: position, where: { field: world_writable, op: eq, expected: true } }
   - when:
       - { fact: files.root_home.uid, op: present }
     checks:

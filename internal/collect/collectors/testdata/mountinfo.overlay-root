@@ -1,0 +1,2 @@
+1 0 0:50 / / rw,relatime - overlay overlay rw,lowerdir=/lower,upperdir=/upper,workdir=/work
+20 1 0:51 / /tmp rw,nosuid,nodev shared:2 - tmpfs tmpfs rw,size=65536k

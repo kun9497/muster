@@ -29,7 +29,7 @@ flags (lint):
   --kisa <dir>         directory holding the KISA item inventory (default docs/reference/kisa); every
                         references.kisa id must be an item of the edition it is filed under, the
                         control's importance must match the item's, and every current-edition item
-                        must be claimed by exactly one control or listed in kisa_deferred.json
+                        must be claimed by at least one control or listed in kisa_deferred.json
 
 flags (new): run "muster controls new" with no arguments to see them
 `
@@ -343,13 +343,18 @@ func runControlsNew(args []string, set *controls.Set, stdout, stderr io.Writer) 
 			f.kisaID, filepath.Join(f.kisaDir, kisaDeferredFile))
 		return exitRefused
 	}
-	// M-55: the same argument one step later. An item an embedded control
-	// already implements makes the coverage rule fail on the duplicate the
-	// moment the second control is committed, and the inventory does not say
-	// which items are taken -- so the command that reads it says so instead.
-	if claimed := claimant(set, f.kisaID); claimed != "" {
-		fmt.Fprintf(stderr, "muster: %s is already implemented by %s; extend that control or pick another item\n", f.kisaID, claimed)
-		return exitRefused
+	// M-55, amended by W-10: an item another control already implements is NOT
+	// a refusal. The set-level coverage rule allows several controls on one
+	// item -- U-23 is judged by muster.file.suid_sgid and
+	// muster.file.suid_sgid_unverified -- so the second one is a legitimate
+	// thing to scaffold. It is still worth saying out loud: the inventory does
+	// not record which items are taken, so an author who meant a fresh item
+	// and mistyped the number would otherwise find out at review. The note
+	// goes to stderr, leaving the "wrote <path>" lines on stdout as the
+	// command's machine-readable product.
+	if claimed := claimants(set, f.kisaID); len(claimed) > 0 {
+		fmt.Fprintf(stderr, "note: %s is already implemented by %s; more than one control per item is allowed, so make sure the two judge different things\n",
+			f.kisaID, strings.Join(claimed, ", "))
 	}
 	from2021, err := kisaAncestors(f.kisaDir, f.kisaID)
 	if err != nil {
@@ -472,19 +477,24 @@ func scaffoldControl(f newFlags, area string, item controls.KISAItem, from2021 [
 	return c
 }
 
-// claimant returns the id of the control that already cites the given
-// current-edition KISA item, or "" when the item is free. The set-level
-// coverage rule allows exactly one, so the first match is the answer.
-func claimant(set *controls.Set, kisaID string) string {
+// claimants returns the ids of every control that already cites the given
+// current-edition KISA item, empty when the item is free. W-10 allows more
+// than one control per item -- U-23 is judged by two -- so this collects them
+// all rather than stopping at the first.
+func claimants(set *controls.Set, kisaID string) []string {
+	var out []string
 	for i := range set.Controls {
 		c := &set.Controls[i]
 		for _, id := range c.References.KISA[controls.LatestKISAEdition] {
 			if id == kisaID {
-				return c.ID
+				out = append(out, c.ID)
 			}
 		}
 	}
-	return ""
+	// The set loads in path order, which is deterministic already; sorting by
+	// id keeps the note byte-identical whatever a future loader does with it.
+	slices.Sort(out)
+	return out
 }
 
 // kisaAncestors returns the prior-edition items the given current-edition

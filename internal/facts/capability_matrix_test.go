@@ -14,11 +14,13 @@ import (
 // host's configuration (spec line 466, ruling M-18).
 const capabilityMatrixPath = "../../docs/reference/capability-matrix.json"
 
-// capabilityFamilies are the two runner capabilities the matrix describes, and
-// capabilityStatuses the two words the CI steps test for. A third of either
-// would name something no step asserts.
+// capabilityFamilies are the runner capabilities the matrix describes, and
+// capabilityStatuses the two words the CI steps test for. One more of either
+// would name something no step asserts, so the list grows only when a step
+// does: "container" arrived with the deep walk, whose finding lists are
+// unsupported on a root layer the walk does not enter.
 var (
-	capabilityFamilies = []string{"nonroot", "no-systemd"}
+	capabilityFamilies = []string{"nonroot", "no-systemd", "container"}
 	capabilityStatuses = []string{"denied", "unsupported"}
 )
 

@@ -1,0 +1,4 @@
+30 1 8:16 / / rw,relatime shared:1 - ext4 /dev/vda2 rw
+45 30 8:16 /var/data /srv/data rw,relatime shared:1 - ext4 /dev/vda2 rw
+50 30 8:32 / /a rw,relatime shared:40 - xfs /dev/vdb1 rw
+51 30 8:32 / /b rw,relatime shared:41 - xfs /dev/vdb1 rw
