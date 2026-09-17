@@ -846,6 +846,34 @@ func FuzzFirstSettingLine(f *testing.F) {
 	})
 }
 
+// FuzzParseProftpd drives the proftpd file walk itself (ruling G-25): the
+// section stack, the Include handling and the depth attribution, not just the
+// line helpers under it. A fresh ftpParse per call keeps the two runs
+// fuzzBody compares independent, and memAccess serves the input at BOTH
+// proftpd main paths, so an Include the input carries expands to a file
+// carrying the same Include and the recursion guard is exercised.
+func FuzzParseProftpd(f *testing.F) {
+	seeds(f, "testdata/proftpd.conf.*")
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "parseProftpd", func() any {
+			p := &ftpParse{
+				a: &memAccess{files: map[string][]byte{
+					proftpdDebianConf: data,
+					proftpdRhelConf:   data,
+				}},
+				impl:     "proftpd",
+				mainFile: proftpdDebianConf,
+				seen:     map[string]bool{},
+				vsftpd:   map[string]string{},
+				pro:      map[string]string{},
+				pure:     map[string]string{},
+			}
+			p.parseProftpd(proftpdDebianConf, data, 0, nil)
+			return []any{p.pro, p.proAno, p.files, p.truncated, p.unmodelled, p.readFailure}
+		}, len(data))
+	})
+}
+
 func FuzzProftpdClosingName(f *testing.F) {
 	seeds(f, "testdata/proftpd.conf.*")
 	f.Fuzz(func(t *testing.T, data []byte) {
@@ -942,6 +970,31 @@ func FuzzSNMPTokens(f *testing.F) {
 	})
 }
 
+// FuzzSNMPParse drives the directive walk, which the two line helpers below
+// it do not reach: the com2sec/group/access bookkeeping, the v3 user table
+// and the include handling all live there. memAccess serves the input at the
+// main path so an include naming it exercises the depth guard.
+func FuzzSNMPParse(f *testing.F) {
+	seeds(f, "testdata/snmpd.conf.*", "testdata/var-lib-snmpd.conf.*")
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "parse", func() any {
+			p := &snmpParse{
+				a:            &memAccess{files: map[string][]byte{snmpdConfPath: data}},
+				seen:         map[string]bool{},
+				users:        map[string]*snmpUser{},
+				accessWrites: map[string][]string{},
+				com2secNames: map[string]bool{},
+				communities:  []any{},
+				rules:        []any{},
+				agents:       []any{},
+				curFile:      snmpdConfPath,
+			}
+			p.parse(data, 0)
+			return []any{p.communities, p.rules, p.agents, p.userNames, p.groups, p.undeclared, p.truncated}
+		}, len(data))
+	})
+}
+
 func FuzzDNSTokenize(f *testing.F) {
 	seeds(f, "testdata/named.conf.*")
 	f.Fuzz(func(t *testing.T, data []byte) {
@@ -953,6 +1006,20 @@ func FuzzCryptoPolicyName(f *testing.F) {
 	seeds(f, "testdata/crypto-policies.state.*")
 	f.Fuzz(func(t *testing.T, data []byte) {
 		fuzzBody(t, "cryptoPolicyName", func() any { return cryptoPolicyName(data) }, len(data))
+	})
+}
+
+// FuzzNTPFile drives the ntpd/ntpsec configuration walk: the server and pool
+// directives and the includefile chain it returns, which parseChronySources
+// (a different file grammar) never sees.
+func FuzzNTPFile(f *testing.F) {
+	seeds(f, "testdata/ntp.conf.*")
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "ntpFile", func() any {
+			s := &timesyncScan{a: &memAccess{files: map[string][]byte{}}}
+			includes := s.ntpFile(data, 0)
+			return []any{includes, s.servers}
+		}, len(data))
 	})
 }
 
@@ -986,6 +1053,37 @@ func FuzzAttrValue(f *testing.F) {
 		fuzzBody(t, "attrValue", func() any {
 			v, ok := attrValue(string(data))
 			return []any{v, ok}
+		}, len(data))
+	})
+}
+
+// FuzzParseXinetd drives the fragment walk (ruling G-25): the block flushing
+// at `service`, at a closing brace and at end of file, which attrValue alone
+// never reaches.
+func FuzzParseXinetd(f *testing.F) {
+	seeds(f, "testdata/xinetd*")
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "parseXinetd", func() any {
+			s := &superServers{}
+			s.parseXinetd("/etc/xinetd.d/fuzz", data, false)
+			return []any{s.entries, s.readErr}
+		}, len(data))
+	})
+}
+
+// FuzzReadInetd is the one target named for a function the inventory grammar
+// does not catch: readInetd takes a collect.Access and does its own read, so
+// the bytes reach it through memAccess rather than through a parameter
+// (ruling G-25). Widening the grammar to every Access-taking function would
+// inventory each of this package's collectors, so the target is listed by
+// hand instead.
+func FuzzReadInetd(f *testing.F) {
+	seeds(f, "testdata/inetd.conf.*")
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "readInetd", func() any {
+			s := &superServers{}
+			s.readInetd(&memAccess{files: map[string][]byte{inetdConf: data}})
+			return []any{s.entries, s.readErr}
 		}, len(data))
 	})
 }

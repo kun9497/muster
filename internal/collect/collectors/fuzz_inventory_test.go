@@ -19,10 +19,13 @@ import (
 // The inventory is computed from the package's own sources rather than from a
 // name prefix, because "parse" is not the rule — nssSources, decodeACL,
 // dnsTokenize, rsyslogLogicalLines, rpmFileTable, showValues and a dozen
-// others parse host bytes under other names. A function is in the inventory
-// when its first parameter is a []byte, or a string called content, line, sel
-// or act: that is what "this function is handed the bytes of a file or a
-// command's output" looks like in this package.
+// others parse host bytes under other names. A function OR METHOD is in the
+// inventory when ANY of its parameters is a []byte, or its first parameter is
+// a string called content, line, sel or act: that is what "this function is
+// handed the bytes of a file or a command's output" looks like in this
+// package. Ruling G-25 widened both halves of that rule — methods were
+// skipped entirely, and a `(path string, data []byte)` parser was invisible
+// because the bytes were not first.
 //
 // Every inventory function must then be either the direct callee of one of
 // fuzz_test.go's targets, or a row of coveredThrough naming a target that
@@ -48,6 +51,7 @@ var fuzzTargets = []string{
 	"FuzzFirstSettingLine",
 	"FuzzListsRoot",
 	"FuzzNSSSources",
+	"FuzzNTPFile",
 	"FuzzNewestDpkgInstall",
 	"FuzzOSEscapes",
 	"FuzzParseAptSimulation",
@@ -67,6 +71,7 @@ var fuzzTargets = []string{
 	"FuzzParsePasswd",
 	"FuzzParsePostfixInto",
 	"FuzzParseProcNet",
+	"FuzzParseProftpd",
 	"FuzzParsePureFtpdInto",
 	"FuzzParseRpmQa",
 	"FuzzParseRsyslogSelector",
@@ -76,8 +81,11 @@ var fuzzTargets = []string{
 	"FuzzParseSshdConfig",
 	"FuzzParseSubIDs",
 	"FuzzParseVsftpdInto",
+	"FuzzParseXinetd",
 	"FuzzProftpdClosingName",
 	"FuzzRPMFileTable",
+	"FuzzReadInetd",
+	"FuzzSNMPParse",
 	"FuzzSNMPStripComment",
 	"FuzzSNMPTokens",
 	"FuzzShowValues",
@@ -115,10 +123,22 @@ var coveredThrough = map[string]string{
 }
 
 // notParsers is the escape hatch: a function the inventory grammar catches
-// that is not in fact handed host bytes, with the reason it is not. It is
-// empty today — every function the grammar finds parses something a host
-// wrote — and a row added here has to say why fuzzing it would prove nothing.
-var notParsers = map[string]string{}
+// that no target may be written for, with the reason. A row says either that
+// the bytes are not host input, or which target covers the grammar in
+// substance — and it has to explain why a target of its own would prove
+// nothing (or could not be written honestly).
+var notParsers = map[string]string{
+	"file": "rsyslogScan.file emits one rule PER FACILITY of a selector, so `*.*` " +
+		"turns five bytes into two dozen rows; fuzzBody's bound is proportional to " +
+		"the input and a target for it would fail on valid rsyslog rather than on a bug. " +
+		"Every grammar it reads is fuzzed one level down by FuzzParseRsyslogSelector, " +
+		"which runs rsyslogLogicalLines and then each selector, action, action call, " +
+		"brace delta and numeric selector over the same input.",
+	"continuation": "rsyslogScan.continuation is reached only from rsyslogScan.file and " +
+		"takes an action string that file has already split off a logical line; it " +
+		"re-emits the PREVIOUS line's selector, so it inherits file's per-facility " +
+		"amplification. FuzzParseRsyslogSelector fuzzes the action strings it is handed.",
+}
 
 // stringParamNames are the parameter names that make a string parameter host
 // input in this package (F-6).
@@ -156,14 +176,17 @@ func TestEveryParserHasAFuzzTarget(t *testing.T) {
 
 	// 3. Every parser is covered, and every row of the two tables is true.
 	var orphans []string
+	var nDirect, nThrough, nDeclared int
 	for _, fn := range inventory {
 		switch {
 		case direct[fn] != "":
+			nDirect++
 			if through, ok := coveredThrough[fn]; ok {
 				t.Errorf("coveredThrough says %s is reached through %s, but %s calls it directly; drop the row",
 					fn, through, direct[fn])
 			}
 		case coveredThrough[fn] != "":
+			nThrough++
 			through := coveredThrough[fn]
 			if !slices.Contains(fuzzTargets, through) {
 				t.Errorf("coveredThrough[%s] names %s, which is not a fuzz target", fn, through)
@@ -171,7 +194,9 @@ func TestEveryParserHasAFuzzTarget(t *testing.T) {
 				t.Errorf("coveredThrough[%s] names %s, but nothing %s calls reaches %s", fn, through, through, fn)
 			}
 		case notParsers[fn] != "":
-			// Declared not to be host input, with its reason.
+			// Declared not to be host input, or covered in substance by
+			// another target, with its reason.
+			nDeclared++
 		default:
 			orphans = append(orphans, fn)
 		}
@@ -192,9 +217,10 @@ func TestEveryParserHasAFuzzTarget(t *testing.T) {
 		}
 	}
 
-	t.Logf("%d parsers, %d fuzz targets: %d reached directly, %d through a parent, %d declared not host input",
-		len(inventory), len(fuzzTargets), len(inventory)-len(coveredThrough)-len(notParsers),
-		len(coveredThrough), len(notParsers))
+	// The counts are tallied from the loop above rather than from the table
+	// lengths, so the line reports what the call graph actually showed.
+	t.Logf("%d parsers, %d fuzz targets: %d reached directly, %d through a parent, %d declared, %d uncovered",
+		len(inventory), len(fuzzTargets), nDirect, nThrough, nDeclared, len(orphans))
 }
 
 // packageParsers returns the inventory of parser names, sorted, and the call
@@ -218,13 +244,30 @@ func packageParsers(t *testing.T) (inventory []string, calls map[string]map[stri
 		}
 		for _, decl := range file.Decls {
 			fn, ok := decl.(*ast.FuncDecl)
-			if !ok || fn.Recv != nil || fn.Body == nil {
+			if !ok || fn.Body == nil {
 				continue
 			}
-			if readsHostBytes(fn) {
+			// Ruling G-25: a METHOD that is handed host bytes is a parser
+			// like any other -- (*ftpParse).parseProftpd and
+			// (*superServers).parseXinetd were invisible while this loop
+			// skipped every fn.Recv != nil.
+			if readsHostBytes(fn) && !slices.Contains(inventory, fn.Name.Name) {
 				inventory = append(inventory, fn.Name.Name)
 			}
-			calls[fn.Name.Name] = calledNames(fn.Body)
+			// A method is keyed by its own name, which is how a
+			// *ast.SelectorExpr callee is recorded too, so `p.parseProftpd()`
+			// in a target's body resolves to this declaration. Two
+			// declarations that share a name (a function and a method, or two
+			// methods on different types) merge into one node of the graph:
+			// the graph is used to prove a parser is REACHED, and a merge can
+			// only make it claim more, which the coveredThrough rows are
+			// reviewed against.
+			if calls[fn.Name.Name] == nil {
+				calls[fn.Name.Name] = map[string]bool{}
+			}
+			for callee := range calledNames(fn.Body) {
+				calls[fn.Name.Name][callee] = true
+			}
 		}
 	}
 	if len(inventory) == 0 {
@@ -257,44 +300,61 @@ func fuzzTargetCalls(t *testing.T) map[string]map[string]bool {
 	return out
 }
 
-// readsHostBytes is the inventory grammar of F-6.
+// readsHostBytes is the inventory grammar of F-6, as widened by ruling G-25.
 //
-// It reads the FIRST parameter only, which is where every parser this package
-// has takes its bytes. A parser shaped otherwise is not caught — a
-// `(name string, f []string)` that parses pre-split fields, or a plain
-// `(s string)` like firstQuoted — so a new parser of that shape has to be
-// declared in coveredThrough (or given a target) by hand; this test will not
-// notice it is missing. Widening the grammar to any string parameter would
-// sweep in every path, key and service name the package passes around.
+// A []byte parameter ANYWHERE in the signature makes the function a parser:
+// `parseProftpd(file string, data []byte, …)` and
+// `parseXinetd(p string, data []byte, truncated bool)` put the path first and
+// the bytes second, and the old first-parameter-only rule could not see
+// either. A string parameter still counts only under one of the names
+// stringParamNames pins, because widening to any string would sweep in every
+// path, key and service name the package passes around.
+//
+// A parser shaped otherwise is still not caught — a `(name string, f
+// []string)` that parses pre-split fields, or a plain `(s string)` like
+// firstQuoted — so one of those has to be declared in coveredThrough (or
+// given a target) by hand. Nor is a function that takes a collect.Access and
+// reads the file itself: readInetd is such a function and has a target named
+// in fuzzTargets, but widening the grammar to every Access-taking function
+// would inventory each of this package's collectors.
 func readsHostBytes(fn *ast.FuncDecl) bool {
-	params := fn.Type.Params.List
-	if len(params) == 0 {
-		return false
-	}
-	first := params[0]
-	if array, ok := first.Type.(*ast.ArrayType); ok && array.Len == nil {
-		if elem, ok := array.Elt.(*ast.Ident); ok && elem.Name == "byte" {
-			return true
-		}
-	}
-	if id, ok := first.Type.(*ast.Ident); ok && id.Name == "string" {
-		for _, name := range first.Names {
-			if stringParamNames[name.Name] {
+	for i, param := range fn.Type.Params.List {
+		if array, ok := param.Type.(*ast.ArrayType); ok && array.Len == nil {
+			if elem, ok := array.Elt.(*ast.Ident); ok && elem.Name == "byte" {
 				return true
+			}
+		}
+		if i > 0 {
+			continue
+		}
+		if id, ok := param.Type.(*ast.Ident); ok && id.Name == "string" {
+			for _, name := range param.Names {
+				if stringParamNames[name.Name] {
+					return true
+				}
 			}
 		}
 	}
 	return false
 }
 
-// calledNames is every plain function name called anywhere inside body,
-// nested function literals included.
+// calledNames is every function name called anywhere inside body, nested
+// function literals included. A selector call (`p.parseProftpd(…)`,
+// `s.parseXinetd(…)`) contributes its FINAL name, so a method reads the same
+// way a plain function does — without that, ruling G-25's newly inventoried
+// methods could never be shown to be reached. A package-qualified call
+// (`strings.TrimSpace`) contributes that name too; it is a name this
+// package's own declarations never have, so it can match nothing in the
+// graph.
 func calledNames(body *ast.BlockStmt) map[string]bool {
 	out := map[string]bool{}
 	ast.Inspect(body, func(n ast.Node) bool {
 		if call, ok := n.(*ast.CallExpr); ok {
-			if id, ok := call.Fun.(*ast.Ident); ok {
-				out[id.Name] = true
+			switch fn := call.Fun.(type) {
+			case *ast.Ident:
+				out[fn.Name] = true
+			case *ast.SelectorExpr:
+				out[fn.Sel.Name] = true
 			}
 		}
 		return true
