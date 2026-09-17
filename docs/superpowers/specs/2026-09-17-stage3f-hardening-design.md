@@ -155,9 +155,9 @@ new parser without either fails the test.
 **F-7 — Where it runs.** A new workflow `.github/workflows/fuzz.yml` — `schedule` once a day
 and `workflow_dispatch` — on `ubuntu-24.04`, a four-shard matrix; each shard runs, for its
 share of the target list, `go test -run '^$' -fuzz '^Fuzz<Name>$' -fuzztime 60s
-./internal/collect/collectors/` (and the `pkgfiles` targets on shard 1), about nine minutes
-per shard; a failing target uploads `testdata/fuzz/` and fails the job. The shard assignment
-is computed, not committed: each shard runs `go test -list '^Fuzz' ./...` and takes the
+./internal/collect/collectors/` (the `pkgfiles` targets take part in the same split), about
+twelve minutes per shard with fifty targets; a failing target uploads `testdata/fuzz/` and fails
+the job. The shard assignment is computed, not committed: each shard runs `go test -list '^Fuzz' ./...` and takes the
 targets whose index modulo four is its own, so a new target joins the rotation by existing.
 `make fuzz TARGET=<name> TIME=<duration>` runs one target locally with the same flags. The
 pull-request workflow gains nothing: the seed corpus already runs inside `go test ./...`. This
@@ -169,13 +169,14 @@ pull-request budget is the seed corpus, the nightly run is the fuzzing (recorded
 **F-8 — Four pairs, compared on the machine that runs them.** `internal/collect/collectors/
 oracle_test.go` (Linux) skips unless `MUSTER_ORACLE=1`. It reads the host through
 `collect.Host()` under `collect.Guard` with the collector's own declaration, runs the oracle
-command through `os/exec` inside the test, and compares:
+command through `collect.RunCommand` (absolute path, no shell, a timeout and an output cap)
+inside the test, and compares:
 
 | Parser | Oracle | Rule |
 |---|---|---|
-| `parseSshdConfig` on `/etc/ssh/sshd_config`, once per keyword of `sshdOptions` (the parse path, called directly so `-G`/`-T` are not consulted) | `sshd -T` as root | for every keyword the parser resolved to a value, `-T` carries the same keyword with the same value after an alias map the test owns (`without-password` → `prohibit-password`, an unset `banner` → `none`, case folded); keywords the file did not set are not compared (defaults are the daemon's) |
+| `parseSshdConfig` on `/etc/ssh/sshd_config`, once per keyword of `sshdOptions` (the parse path, called directly so `-G`/`-T` are not consulted) | `sshd -T` as root | for every keyword the parser resolved to a value, `-T` carries the same keyword with the same value after an alias map the test owns (`without-password` and `prohibit-password` fold to one token on both sides, because `sshd -T` prints `without-password` for either spelling; an unset `banner` → `none`; case folded); keywords the file did not set are not compared (defaults are the daemon's) |
 | `parsePasswd`, `parseGroup` on `/etc/passwd`, `/etc/group` | `getent passwd`, `getent group` | every parser row `(name, uid, gid, home, shell)` / `(name, gid, members)` appears in `getent`'s output with the same values (members compared after the parser's trim and de-duplication); a `getent`-only row must carry an id in the systemd dynamic range 61184–65519 (Ubuntu 24.04 and EL9 ship `passwd: files systemd`) — anything else is a mismatch |
-| `parseMountinfo` on `/proc/self/mountinfo` | `findmnt -J -o ID,FSTYPE,TARGET` | the sets of `(id, fstype, target)` are equal after flattening `findmnt`'s nested `children` and the same octal unescaping |
+| `parseMountinfo` on `/proc/self/mountinfo` | `findmnt -A -J -o ID,FSTYPE,TARGET` (`-A` keeps every mountinfo row; without it findmnt de-duplicates) | the sets of `(id, fstype, target)` are equal after flattening `findmnt`'s nested `children` and the same octal unescaping |
 | `services.<name>.enabled` and `.active` for every row of the services table (the collector's facts are per logical service, an OR over the row's units) | `systemctl show -p LoadState,ActiveState,UnitFileState,SubState <unit>` for each of the row's units | `enabled` equals the OR of `enabledFromUnitFile(state, active)` over the row's units (the collector's own function, reused); `active` is compared only for rows with no `ports` and no super-server names (for the others the collector also counts a reachable port or an inetd entry, which the oracle does not see) |
 
 A mismatch fails naming the pair, the key and both values. A pair whose oracle binary is

@@ -138,11 +138,40 @@ are changing before you change it. Korean: `CONTRIBUTING.ko.md`.
 - Goldens: `go test ./internal/report -run TestJSON -update`,
   `-run TestTableGolden -update`, and the facts golden above. Review every
   regenerated golden before committing it.
+- A fixture must earn its place. `go test ./internal/controls -run
+  TestEveryMutantIsKilled` mutates every control (operators flipped, expected
+  values shifted, clauses and mechanisms removed, `absent_means` changed) and
+  requires a fixture that answers differently for each mutant. A survivor is
+  a missing fixture — add one, named for what it shows. Only a mutant no
+  fixture can tell apart, because a collector invariant or a closed value
+  vocabulary makes it equivalent, goes into `controls/testdata/_mutants.yaml`:
+  one row, and a reason that names that invariant. The test fails on a row
+  whose mutant is killed or is no longer generated.
+- Every parser entry point in `internal/collect/collectors` and
+  `internal/pkgfiles` has a `Fuzz<Name>` target seeded from the parser's own
+  testdata, and `TestEveryParserHasAFuzzTarget` fails when a new `parse*`
+  function has none (a helper reached only through a parent is declared in
+  `coveredThrough`). Pull requests run the seeds only; the nightly `fuzz.yml`
+  runs each target for a minute over four shards. `make fuzz TARGET=<name>
+  TIME=<duration>` runs one locally. A crash lands as the corpus file Go
+  writes under `testdata/fuzz/`, with the fix in its own commit.
+- `MUSTER_ORACLE=1 go test ./internal/collect/collectors -run Oracle` (Linux,
+  as root) compares the sshd, passwd/group, mountinfo and services parsers
+  with `sshd -T`, `getent`, `findmnt` and `systemctl` on the host it runs on;
+  CI runs it in the root job and inside the init containers. A mismatch is a
+  parser defect or a daemon behaviour to record in the test, never a rule to
+  loosen.
+- `examples/` holds two snapshots the `examples.yml` workflow collects — an
+  `ubuntu:24.04` container and the runner VM — rewritten so they carry no
+  host identity, and `cmd/muster`'s example test checks them end to end.
+  `make examples-fetch RUN=<id>` refreshes them from a workflow run; never
+  replace them with a snapshot from a private host.
 - CI runs the race build, the lint, the coverage check, a root collect on the
   runner VM, a non-root collect, the container matrix (Ubuntu 22.04/24.04,
   Rocky 9, AlmaLinux 9, Debian 12 as a canary), the read-only contract run,
-  and the capability matrix (`docs/reference/capability-matrix.json`): facts
-  that must be `denied` without root and `unsupported` without systemd.
+  the daemon oracles, and the capability matrix
+  (`docs/reference/capability-matrix.json`): facts that must be `denied`
+  without root and `unsupported` without systemd.
 
 ## Documentation
 

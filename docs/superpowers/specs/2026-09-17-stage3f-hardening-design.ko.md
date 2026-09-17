@@ -133,8 +133,8 @@ absent이고(`manual-no-package-db` 픽스처들이 이미 그 모양), absent �
 
 **F-7 — 어디서 도는가.** 새 워크플로 `.github/workflows/fuzz.yml` — 하루 한 번 `schedule`과
 `workflow_dispatch` — `ubuntu-24.04`, 샤드 4개 매트릭스. 각 샤드는 자기 몫의 타깃 목록에 대해
-`go test -run '^$' -fuzz '^Fuzz<Name>$' -fuzztime 60s ./internal/collect/collectors/`(그리고 샤드 1은
-`pkgfiles` 타깃도)를 돌리며 샤드당 약 9분입니다. 실패한 타깃은 `testdata/fuzz/`를 올리고 잡을
+`go test -run '^$' -fuzz '^Fuzz<Name>$' -fuzztime 60s ./internal/collect/collectors/`를 돌리며
+(`pkgfiles` 타깃도 같은 분할에 참여) 타깃 50개 기준 샤드당 약 12분입니다. 실패한 타깃은 `testdata/fuzz/`를 올리고 잡을
 실패시킵니다. 샤드 배정은 커밋하지 않고 계산합니다. 각 샤드가 `go test -list '^Fuzz' ./...`를 돌려 인덱스 mod 4가
 자기 것인 타깃을 맡으므로 새 타깃은 존재하는 것만으로 순환에 합류합니다. `make fuzz TARGET=<name>
 TIME=<duration>`은 같은 플래그로 타깃 하나를 로컬에서 돌립니다. PR 워크플로는 아무것도 얻지
@@ -145,13 +145,14 @@ TIME=<duration>`은 같은 플래그로 타깃 하나를 로컬에서 돌립니�
 
 **F-8 — 네 쌍, 그것을 돌리는 머신 위에서 비교.** `internal/collect/collectors/oracle_test.go`(Linux)는
 `MUSTER_ORACLE=1`이 아니면 skip합니다. 수집기 자신의 선언으로 `collect.Guard`를 씌운 `collect.Host()`로
-호스트를 읽고, 오라클 명령을 테스트 안에서 `os/exec`로 돌려 비교합니다.
+호스트를 읽고, 오라클 명령을 테스트 안에서 `collect.RunCommand`(절대 경로, 셸 없음, 타임아웃과
+출력 상한)로 돌려 비교합니다.
 
 | 파서 | 오라클 | 규칙 |
 |---|---|---|
-| `/etc/ssh/sshd_config`에 대한 `parseSshdConfig`, `sshdOptions`의 키워드마다 한 번(파싱 경로, 직접 호출하므로 `-G`/`-T`는 참조하지 않음) | root로 `sshd -T` | 파서가 값으로 해석한 모든 키워드에 대해, 테스트가 소유한 별칭 표(`without-password` → `prohibit-password`, 설정되지 않은 `banner` → `none`, 대소문자 접음)를 거친 뒤 `-T`가 같은 키워드에 같은 값을 가짐; 파일이 설정하지 않은 키워드는 비교하지 않음(기본값은 데몬의 것) |
+| `/etc/ssh/sshd_config`에 대한 `parseSshdConfig`, `sshdOptions`의 키워드마다 한 번(파싱 경로, 직접 호출하므로 `-G`/`-T`는 참조하지 않음) | root로 `sshd -T` | 파서가 값으로 해석한 모든 키워드에 대해, 테스트가 소유한 별칭 표(`without-password`와 `prohibit-password`는 양쪽 모두 한 토큰으로 접음 — `sshd -T`는 어느 철자든 `without-password`로 출력하므로; 설정되지 않은 `banner` → `none`; 대소문자 접음)를 거친 뒤 `-T`가 같은 키워드에 같은 값을 가짐; 파일이 설정하지 않은 키워드는 비교하지 않음(기본값은 데몬의 것) |
 | `/etc/passwd`, `/etc/group`에 대한 `parsePasswd`, `parseGroup` | `getent passwd`, `getent group` | 파서의 모든 행 `(name, uid, gid, home, shell)` / `(name, gid, members)`가 `getent` 출력에 같은 값으로 나타남(members는 파서의 trim·중복 제거 후 비교); `getent`에만 있는 행은 systemd 동적 범위 61184–65519의 id를 가져야 함(Ubuntu 24.04와 EL9는 `passwd: files systemd`) — 그 밖은 불일치 |
-| `/proc/self/mountinfo`에 대한 `parseMountinfo` | `findmnt -J -o ID,FSTYPE,TARGET` | `findmnt`의 중첩 `children`을 펴고 같은 8진 이스케이프 해제 후 `(id, fstype, target)` 집합이 같음 |
+| `/proc/self/mountinfo`에 대한 `parseMountinfo` | `findmnt -A -J -o ID,FSTYPE,TARGET`(`-A`는 mountinfo의 모든 행을 유지; 없으면 findmnt가 중복을 제거) | `findmnt`의 중첩 `children`을 펴고 같은 8진 이스케이프 해제 후 `(id, fstype, target)` 집합이 같음 |
 | services 표의 모든 행에 대한 `services.<name>.enabled`와 `.active`(수집기의 팩트는 논리 서비스 단위이며 행의 유닛들에 대한 OR) | 행의 유닛마다 `systemctl show -p LoadState,ActiveState,UnitFileState,SubState <unit>` | `enabled`는 행의 유닛들에 대한 `enabledFromUnitFile(state, active)`의 OR와 같음(수집기 자신의 함수를 재사용); `active`는 `ports`와 슈퍼서버 이름이 없는 행에서만 비교(나머지는 수집기가 도달 가능한 포트나 inetd 항목도 세는데 오라클은 그것을 보지 못함) |
 
 불일치는 쌍·키·양쪽 값을 이름 지어 실패합니다. 오라클 바이너리가 없는 쌍(openssh 없는 컨테이너의

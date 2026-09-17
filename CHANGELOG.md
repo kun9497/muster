@@ -137,9 +137,34 @@ every plan is under `docs/superpowers/plans/`):
 - pwquality drop-ins merge through the shared drop-in helper
   (`mergeDropinsWith`), keeping the bare-word flags libpwquality accepts.
 - Extended-attribute reads allocate exactly the value's size.
+- The apt periodic parser folds the case of `APT::Periodic::Unattended-Upgrade`
+  without changing the line's byte length; an `apt.conf` fragment carrying a
+  byte that is not UTF-8 before the key used to make the patch collector
+  panic. Found by the new fuzz target; the input is committed as its seed.
 
 ### Tooling
 
+- A mutation test over the control set. `TestEveryMutantIsKilled`
+  (`internal/controls`) mutates every control — operators flipped, expected
+  values shifted, clauses and mechanisms removed, `absent_means` changed — and
+  requires the fixtures to kill each mutant; a mutant that only breaks the
+  loader or the evaluator is invalid, not killed. The suite ships the
+  fixtures that made the score exact (168 added), and
+  `controls/testdata/_mutants.yaml` lists the 11 mutants no fixture can
+  distinguish, each with the collector invariant that makes it equivalent.
+- A fuzz target with seeds for every parser entry point (50 across
+  `internal/collect/collectors` and `internal/pkgfiles`), an inventory test
+  that fails when a new parser has none, and the nightly `fuzz.yml` workflow
+  (four shards, a minute per target); pull requests run the seeds only.
+  `make fuzz TARGET=<name> TIME=<duration>` runs one target locally.
+- Daemon oracles in CI: with `MUSTER_ORACLE=1` the sshd, passwd/group,
+  mountinfo and services parsers are compared with `sshd -T`, `getent`,
+  `findmnt` and `systemctl` on the runner VM and inside the init containers;
+  the runner's real configuration files are uploaded as a seed corpus.
+- Example snapshots under `examples/`, collected by the `examples.yml`
+  workflow from an `ubuntu:24.04` container and the runner VM and rewritten
+  so they carry no host identity; a test checks them end to end and
+  `make examples-fetch RUN=<id>` refreshes them.
 - `muster controls lint` cross-checks every `references.kisa` id against the
   KISA inventory (`--kisa docs/reference/kisa`): an unknown id, an importance
   that disagrees with the inventory, an item cited by none and not deferred,
