@@ -351,6 +351,29 @@ func TestModulesTreeMissingIsUnsupported(t *testing.T) {
 		}
 	}
 
+	// K-26: a merged-/usr host with no /usr/lib/modules at all — every
+	// minimal container, which is where spec §5 promises unsupported and
+	// where the capability matrix's container row asserts it. The fallback to
+	// /lib is taken, /lib is the symlink that merged-/usr makes it, and the
+	// no-follow read stops in the path. That is the same absence reported one
+	// directory later, not an error about the host: reporting it as an error
+	// would put kernel.modules outside the four statuses B-10 allows there.
+	merged := &fsAccess{files: map[string]string{
+		kernelReleasePath: "kernel-osrelease",
+		procModulesPath:   "proc_modules.sample",
+	}}
+	merged.fails = map[string]error{path.Join(libTree, modulesDepName): collect.ErrSymlink}
+	e = env(t, build(t, "modules", merged), modulesKey)
+	if e.Status != facts.StatusUnsupported {
+		t.Errorf("kernel.modules on a merged-/usr host with no module tree = %+v, want unsupported", e)
+	}
+	if !strings.Contains(e.Reason, usrTree) || !strings.Contains(e.Reason, libModulesDir) {
+		t.Errorf("reason %q must name both %s and %s", e.Reason, usrTree, libModulesDir)
+	}
+	if e.Value != nil {
+		t.Errorf("kernel.modules on a merged-/usr host carries %#v, want no rows", e.Value)
+	}
+
 	// A host that is not merged-/usr: no /usr/lib/modules directory at all,
 	// and the tree is where it always was.
 	lib := &fsAccess{files: moduleTreeFiles(libTree)}

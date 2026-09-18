@@ -294,16 +294,26 @@ jobs:
             find "$RUNNER_TEMP/muster/containers/seeds" -type f -empty -delete
             echo "SEED_NAME=seeds-$(echo '${{ matrix.image }}' | tr '/:' '--')" >> "$GITHUB_ENV"
             # K-18: the EL family's non-root path (spec §5). /boot/grub2 is
-            # 0700 there, so an unprivileged run cannot even stat grub.cfg:
-            # every boot.grub_cfg.* leaf and boot.grub_password_set read
-            # denied, and controls 8 and 9 are ERROR rather than the
+            # 0700 on a real EL host, so an unprivileged run cannot even stat
+            # grub.cfg: every boot.grub_cfg.* leaf and boot.grub_password_set
+            # read denied, and controls 8 and 9 are ERROR rather than the
             # NOT_APPLICABLE that falling through to the next candidate would
             # have produced. The capability matrix cannot express a
             # per-distribution denied, so this is the step that proves it.
+            #
+            # The init images ship no /boot/grub2 at all (a container has no
+            # bootloader), so the step lays out the two files with the modes
+            # an EL host gives them — the same arrangement the sshd oracle
+            # step makes on the runner. What is proved is muster's rule, not
+            # the image's contents: a refused stat is denied, and a candidate
+            # that exists is never skipped for the next one.
+            #
             # 65534 is nobody on both init images; the output directory is
             # 0700 and owned by it, because muster refuses to write a snapshot
             # into a world-writable one. A non-root collect is partial (exit
-            # 1), so only the jq below may fail this job.
+            # 1), so only the jq below may fail this job, and the container is
+            # thrown away afterwards either way.
+            docker exec "$cid" sh -c 'mkdir -p /boot/grub2 && printf "set default=0\n" > /boot/grub2/grub.cfg && chmod 700 /boot/grub2 && chmod 600 /boot/grub2/grub.cfg'
             docker exec "$cid" sh -c 'mkdir -p /tmp/muster-nonroot && chmod 700 /tmp/muster-nonroot && chown 65534 /tmp/muster-nonroot'
             docker exec -u 65534 "$cid" /m/muster collect --out /tmp/muster-nonroot/nonroot.json || true
             docker exec "$cid" cat /tmp/muster-nonroot/nonroot.json > "$RUNNER_TEMP/muster/containers/nonroot.json"
