@@ -100,6 +100,35 @@ func TestCapabilityMatrixRejectsASettingJudgedOffTheEffectiveSide(t *testing.T) 
 	}
 }
 
+// M-18's first rule, which the committed matrix can never exercise because it
+// passes: a key CI cannot address at all. A typo in the matrix would make
+// `getpath` read null, the step would fail with nothing to say, and the
+// contributor would go looking at the runner instead of at the file.
+func TestCapabilityMatrixRejectsAnUnregisteredKey(t *testing.T) {
+	reg, err := LoadRegistry()
+	if err != nil {
+		t.Fatal(err)
+	}
+	const typo = "kernel.sysctl.protected_fifo" // the registered key is plural
+	if _, ok := reg.Lookup(typo); ok {
+		t.Fatalf("%s is registered, so it cannot stand for a typo here", typo)
+	}
+	problems := capabilityMatrixProblems(reg, map[string]map[string][]string{
+		"nonroot":    {"denied": {typo}},
+		"no-systemd": {"unsupported": {"services.ssh.installed"}},
+		"container":  {"unsupported": {"kernel.modules"}},
+	})
+	found := false
+	for _, p := range problems {
+		if strings.Contains(p, typo) && strings.Contains(p, "not a registered fact key") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("a matrix naming %s must be reported as unregistered; problems were %v", typo, problems)
+	}
+}
+
 // capabilityMatrixProblems is the checker itself, over a decoded matrix, so
 // both the committed file and a constructed one can be put through it.
 func capabilityMatrixProblems(reg *Registry, matrix map[string]map[string][]string) []string {

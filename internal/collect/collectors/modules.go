@@ -27,9 +27,11 @@ const (
 	// usrModulesDir is where the module tree lives (K-14). Every supported
 	// distribution is merged-/usr, so /lib is a symlink there and a no-follow
 	// read under it would be an error rather than an answer; libModulesDir is
-	// consulted only on a host that has no /usr/lib/modules at all.
+	// consulted only on a host that has no /usr/lib/modules at all, and only
+	// after libDir itself says this host is not merged-/usr (K-27).
 	usrModulesDir = "/usr/lib/modules"
 	libModulesDir = "/lib/modules"
+	libDir        = "/lib"
 
 	modulesDepName     = "modules.dep"
 	modulesBuiltinName = "modules.builtin"
@@ -82,7 +84,7 @@ var modulesCollector = collect.Collector{
 }
 
 func modulesReads() []string {
-	reads := []string{kernelReleasePath, procModulesPath, usrModulesDir}
+	reads := []string{kernelReleasePath, procModulesPath, usrModulesDir, libDir}
 	for _, root := range []string{usrModulesDir, libModulesDir} {
 		reads = append(reads,
 			path.Join(root, "*", modulesDepName),
@@ -131,6 +133,28 @@ func moduleList(a collect.Access) facts.Envelope {
 		if !errors.Is(err, fs.ErrNotExist) {
 			return readErrorEnv(usrModulesDir, err)
 		}
+		// K-27: ask /lib itself what shape this host is, before reading three
+		// components deeper. A merged-/usr host — which is every minimal
+		// container, where B-10 promises unsupported — has /lib as a symlink,
+		// so /lib/modules is the /usr/lib/modules just found missing and the
+		// answer is that same absence. Inferring this from the error the
+		// modules.dep read returns instead would call a symlinked
+		// modules.dep under a REAL /lib the merged-/usr alias and turn a
+		// finding about the host into unsupported; here that read keeps its
+		// own status (C4).
+		if _, lerr := a.Stat(libDir); lerr != nil {
+			switch {
+			case errors.Is(lerr, collect.ErrSymlink):
+				return collect.Unsupported(path.Join(usrModulesDir, release) + " does not exist and " +
+					libDir + " is a symbolic link, so " + libModulesDir + " is the same directory: " +
+					"this host carries no module tree for its running kernel")
+			case errors.Is(lerr, fs.ErrNotExist):
+				return collect.Unsupported(path.Join(usrModulesDir, release) + " does not exist and there is no " +
+					libDir + ": this host carries no module tree for its running kernel")
+			default:
+				return readErrorEnv(libDir, lerr)
+			}
+		}
 		root = libModulesDir
 	}
 	tree := path.Join(root, release)
@@ -150,15 +174,6 @@ func moduleList(a collect.Access) facts.Envelope {
 	switch {
 	case errors.Is(err, fs.ErrNotExist):
 		return collect.Unsupported(tree + " has no " + modulesDepName + ": this host carries no module tree for its running kernel")
-	case root == libModulesDir && errors.Is(err, collect.ErrSymlink):
-		// K-14 from the other side. The fallback is for a host that is not
-		// merged-/usr; on one that is, /lib is a symlink and the no-follow
-		// read stops there. That is not a tree muster could not read — it is
-		// the alias of the /usr/lib/modules this run has just found missing,
-		// so the answer is the same absence, not an error about the host.
-		// Every minimal container is exactly this shape (B-10).
-		return collect.Unsupported(path.Join(usrModulesDir, release) + " does not exist and " +
-			libModulesDir + " is the merged-/usr alias of it: this host carries no module tree for its running kernel")
 	case err != nil:
 		return readErrorEnv(depPath, err)
 	}

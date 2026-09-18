@@ -351,32 +351,57 @@ func TestModulesTreeMissingIsUnsupported(t *testing.T) {
 		}
 	}
 
-	// K-26: a merged-/usr host with no /usr/lib/modules at all — every
+	// K-27: a merged-/usr host with no /usr/lib/modules at all — every
 	// minimal container, which is where spec §5 promises unsupported and
-	// where the capability matrix's container row asserts it. The fallback to
-	// /lib is taken, /lib is the symlink that merged-/usr makes it, and the
-	// no-follow read stops in the path. That is the same absence reported one
-	// directory later, not an error about the host: reporting it as an error
-	// would put kernel.modules outside the four statuses B-10 allows there.
+	// where the capability matrix's container row asserts it. What decides it
+	// is /lib itself: it is the symlink merged-/usr makes it, so /lib/modules
+	// IS the /usr/lib/modules just found missing and the answer is that same
+	// absence. Reporting an error here would put kernel.modules outside the
+	// statuses B-10 allows in a container.
 	merged := &fsAccess{files: map[string]string{
 		kernelReleasePath: "kernel-osrelease",
 		procModulesPath:   "proc_modules.sample",
 	}}
-	merged.fails = map[string]error{path.Join(libTree, modulesDepName): collect.ErrSymlink}
+	merged.links = map[string]string{libDir: "usr/lib"}
 	e = env(t, build(t, "modules", merged), modulesKey)
 	if e.Status != facts.StatusUnsupported {
 		t.Errorf("kernel.modules on a merged-/usr host with no module tree = %+v, want unsupported", e)
 	}
-	if !strings.Contains(e.Reason, usrTree) || !strings.Contains(e.Reason, libModulesDir) {
-		t.Errorf("reason %q must name both %s and %s", e.Reason, usrTree, libModulesDir)
+	if !strings.Contains(e.Reason, usrTree) || !strings.Contains(e.Reason, libDir) {
+		t.Errorf("reason %q must name both %s and %s", e.Reason, usrTree, libDir)
 	}
 	if e.Value != nil {
 		t.Errorf("kernel.modules on a merged-/usr host carries %#v, want no rows", e.Value)
 	}
+	if slices.Contains(merged.reads, path.Join(libTree, modulesDepName)) {
+		t.Errorf("%s is a symlink, so %s must not be read at all: %v", libDir, libTree, merged.reads)
+	}
+
+	// K-27, the other shape, and the reason the rule is asked of /lib rather
+	// than inferred from the error the modules.dep read returns: on a host
+	// whose /lib is a REAL directory, a symlink at or above modules.dep is an
+	// administrator's doing and a finding about that host (C4). It must keep
+	// the read's own status; calling it "merged-/usr" would be a false
+	// statement AND would hide the finding behind unsupported.
+	linked := &fsAccess{files: map[string]string{
+		kernelReleasePath: "kernel-osrelease",
+		procModulesPath:   "proc_modules.sample",
+	}}
+	linked.dirs = map[string]bool{libDir: true}
+	linked.fails = map[string]error{path.Join(libTree, modulesDepName): collect.ErrSymlink}
+	e = env(t, build(t, "modules", linked), modulesKey)
+	if e.Status != facts.StatusError {
+		t.Errorf("kernel.modules with a symlinked %s under a real %s = %+v, want error",
+			path.Join(libTree, modulesDepName), libDir, e)
+	}
+	if !strings.Contains(e.Reason, path.Join(libTree, modulesDepName)) {
+		t.Errorf("reason %q does not name the file that could not be read", e.Reason)
+	}
 
 	// A host that is not merged-/usr: no /usr/lib/modules directory at all,
-	// and the tree is where it always was.
-	lib := &fsAccess{files: moduleTreeFiles(libTree)}
+	// /lib a real directory (K-27: that is what licenses the fallback), and
+	// the tree where it always was.
+	lib := &fsAccess{files: moduleTreeFiles(libTree), dirs: map[string]bool{libDir: true}}
 	rows := okList(t, build(t, "modules", lib), modulesKey)
 	if len(rows) != len(moduleCandidates) {
 		t.Errorf("rows from %s = %d, want %d", libTree, len(rows), len(moduleCandidates))
@@ -493,6 +518,9 @@ func TestModulesDeclarationCoversItsReads(t *testing.T) {
 
 	want := []string{
 		"/etc/modprobe.d/*.conf",
+		// K-27: /lib itself, because whether the /lib/modules fallback is a
+		// real directory or the merged-/usr alias is a question about /lib.
+		"/lib",
 		"/lib/modprobe.d/*.conf",
 		"/lib/modules/*/modules.builtin",
 		"/lib/modules/*/modules.dep",
