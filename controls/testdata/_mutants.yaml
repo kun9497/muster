@@ -157,42 +157,5 @@
     ok values. So mechanism [3] is only ever reached on a host whose pattern its own `when`
     already accepts; and where the leaf is not ok, every mechanism is skipped alike -- the
     original resolves through absent_means with "no mechanism applies", the mutant through the
-    same absent_means on the mechanism's own checks, and both are FAIL with no reason code. No
+    same absent_means on the mechanism's own checks, and both are MANUAL with no reason code. No
     snapshot collect can write separates the two.
-
-# The three rows below are NOT equivalent mutants: a fixture that reaches
-# absentMeans on this control kills all three (verified -- with such a fixture
-# in the directory the mutation test reports surviving 1, this file's first
-# core_dump_policy row). They survive because the fixture harness cannot
-# express the expectation. absentMeans returns FAIL even under `partial`
-# (spec 3B B-5 row 6), and TestEveryControlHasFixturesThatBehave maps EVERY
-# fail-*.json of a `partial` control to WARN (internal/controls/fixtures_test.go),
-# while no other prefix expects FAIL. So the only fixture that could kill them
-# is one the harness rejects. When the harness gains a way to expect FAIL on a
-# partial control, add controls/testdata/muster.beyond.core_dump_policy/
-# fail-all-absent.json (core_pattern ok, every judged leaf absent) and delete
-# these three rows -- the kill loop reports an exclusion that is killed again,
-# so the list cannot rot silently.
-
-- control: muster.beyond.core_dump_policy
-  mutant: "absent_means ->pass"
-  reason: >-
-    Reaching absentMeans on this control needs a fixture whose judged coredump leaf is absent
-    while coredump.core_pattern is ok -- the shape coredumpCollector writes on a host with no
-    coredump.conf and no limits.conf core line. That fixture answers FAIL, and the fixture
-    harness expects WARN from every fail-*.json of a `partial` control, so it cannot be
-    committed. See the comment above this row.
-
-- control: muster.beyond.core_dump_policy
-  mutant: "absent_means ->not_applicable"
-  reason: >-
-    Same as the ->pass row above: the only fixture that distinguishes this mutant reaches
-    absentMeans and therefore answers FAIL, which no fixture prefix can express on a `partial`
-    control. See the comment above these rows.
-
-- control: muster.beyond.core_dump_policy
-  mutant: "absent_means ->manual"
-  reason: >-
-    Same as the ->pass row above: the only fixture that distinguishes this mutant reaches
-    absentMeans and therefore answers FAIL, which no fixture prefix can express on a `partial`
-    control. See the comment above these rows.

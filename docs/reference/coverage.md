@@ -81,7 +81,7 @@
 | Control | Imp. | Automation | Fact keys read | STIG ids |
 |---|---|---|---|---|
 | muster.beyond.aslr_and_link_protection | 상 | auto | env.container, kernel.sysctl.protected_fifos, kernel.sysctl.protected_hardlinks, kernel.sysctl.protected_regular, kernel.sysctl.protected_symlinks, kernel.sysctl.randomize_va_space | RHEL-09-213030, RHEL-09-213035, RHEL-09-213070, UBTU-22-213020, UBTU-24-700310 |
-| muster.beyond.core_dump_policy | 중 | partial | coredump.core_pattern, coredump.limits.hard_core, coredump.systemd.process_size_max, coredump.systemd.storage, env.container | RHEL-09-213040, RHEL-09-213085, RHEL-09-213090, RHEL-09-213095, UBTU-22-213015, UBTU-24-600070 |
+| muster.beyond.core_dump_policy | 중 | partial | coredump.core_pattern, coredump.limits.hard_core, coredump.systemd.process_size_max, coredump.systemd.storage, env.container | RHEL-09-213040, RHEL-09-213085, RHEL-09-213090, RHEL-09-213095 |
 | muster.beyond.kernel_pointer_exposure | 중 | auto | env.container, kernel.sysctl.dmesg_restrict, kernel.sysctl.kptr_restrict | RHEL-09-213010, RHEL-09-213025, UBTU-22-213010, UBTU-24-600140 |
 | muster.beyond.ptrace_restriction | 중 | auto | env.container, kernel.sysctl.perf_event_paranoid, kernel.sysctl.yama_ptrace_scope | RHEL-09-213015, RHEL-09-213080 |
 | muster.beyond.suid_dumpable_disabled | 중 | auto | coredump.suid_dumpable, env.container | — |
