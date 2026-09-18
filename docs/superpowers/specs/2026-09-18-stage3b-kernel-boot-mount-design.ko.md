@@ -59,10 +59,10 @@ sysctl과 세 출처의 코어덤프 정책, 부트 체인, 마운트 옵션과 
 | | `boot.grub_password_set` | `bool` | grub.cfg, `/boot/grub2/user.cfg`(EL에서 0600), `/etc/grub.d/*`의 `set superusers` 또는 `password_pbkdf2`; 그중 읽을 수 없는 파일은 읽기의 상태(C3) |
 | `mounts` | `mounts.points`(`subject_kind: mount`) | `list<record>` | `/proc/self/mountinfo`(3A의 `parseMountinfo`를 필드 6의 마운트별 옵션과 source를 남기도록 확장)로 후보 `/`, `/boot`, `/home`, `/tmp`, `/var`, `/var/tmp`, `/var/log`, `/var/log/audit`, `/dev/shm`마다 한 행: `target`, `separate`(정확히 그 target에 마운트가 있음), `mounted_by`(그것을 담는 마운트 — `separate`면 target 자신), `source`, `fstype`, `options`(`list<string>`); 별도가 아닌 행의 `source`·`fstype`·`options`는 `mounted_by`의 것이라 행이 오늘 그 경로를 지배하는 것을 말함. 영속 마운트(`/etc/fstab`, `.mount` 유닛)는 3B에서 읽지 않음: 판정하는 컨트롤이 없음 |
 | | `mounts.tmp.separate`, `mounts.var_tmp.separate`, `mounts.dev_shm.separate`, `mounts.home.separate` | `bool` | 행의 `separate`와 같은 사실을 leaf로, 메커니즘이 문지기로 쓸 수 있게(B-1) |
-| `modules` | `kernel.modules`(`subject_kind: module`) | `list<record>` | 후보 `cramfs`, `freevxfs`, `jffs2`, `hfs`, `hfsplus`, `udf`, `usb-storage`, `dccp`, `sctp`, `rds`, `tipc`마다 한 행: `name`, `loaded`(`/proc/modules`), `builtin`(`/lib/modules/<release>/modules.builtin`), `available`(`modules.dep`), `blacklisted`(`blacklist <name>` 줄), `install_disabled`(`install <name> /bin/false` 또는 `/bin/true`), `disabled`(파생: `!loaded && !builtin && (install_disabled || !available)`), `sources`(`list<string>`: 그 모듈을 언급하는 modprobe.d 파일들, `builtin`이면 감시자 값 `built into the kernel` 하나 추가); `modules.dep`의 이름은 `.ko`, `.ko.zst`, `.ko.xz` 접미를 떼고 비교; modprobe.d는 `/etc/modprobe.d`, `/run/modprobe.d`, `/usr/lib/modprobe.d`, `/usr/local/lib/modprobe.d`, `.conf` 파일만, modprobe.d(5)대로 이름으로 가림; 모듈 이름은 `-`와 `_`를 접어서 비교 |
+| `modules` | `kernel.modules`(`subject_kind: module`) | `list<record>` | 후보 `cramfs`, `freevxfs`, `jffs2`, `hfs`, `hfsplus`, `udf`, `usb-storage`, `dccp`, `sctp`, `rds`, `tipc`마다 한 행: `name`, `loaded`(`/proc/modules`), `builtin`(`/usr/lib/modules/<release>/modules.builtin`; `/lib/modules`는 merged-`/usr`가 아닌 호스트에서만 — 지원 호스트에서 `/lib`는 심링크라 따라가지 않는 읽기는 오류가 됨), `available`(`modules.dep`), `blacklisted`(`blacklist <name>` 줄), `install_disabled`(`install <name> /bin/false` 또는 `/bin/true`), `disabled`(파생: `!loaded && !builtin && (install_disabled || !available)`), `sources`(`list<string>`: 그 모듈을 언급하는 modprobe.d 파일들, `builtin`이면 감시자 값 `built into the kernel` 하나 추가); `modules.dep`의 이름은 `.ko`, `.ko.zst`, `.ko.xz` 접미를 떼고 비교; modprobe.d는 `/etc/modprobe.d`, `/run/modprobe.d`, `/usr/lib/modprobe.d`, `/usr/local/lib/modprobe.d`, `.conf` 파일만, modprobe.d(5)대로 이름으로 가림; 모듈 이름은 `-`와 `_`를 접어서 비교 |
 | `swap` | `swap.present` | `bool` | `/proc/swaps`에 행이 있음 |
 | | `swap.devices` | `list<record>` | `path`, `type`(`file` \| `partition`), `encrypted`, `backing`(판정의 근거가 된 블록 장치) |
-| | `swap.encrypted` | `bool` | 모든 장치가 dm-crypt 위일 때 true: 장치(스왑 파일이면 그것을 담는 마운트의 소스 장치)에서 `/sys/block/<dev>/slaves/`를 따라 내려가 `dm/uuid`가 `CRYPT-`로 시작하는 장치(암호화)나 slave가 없는 장치(비암호화)에 닿을 때까지 — 스톡 "암호화 LVM" 배치는 스왑이 `LVM-` 볼륨 위에 있고 그 slave가 `CRYPT-` 장치; `backing`은 판정이 내려진 장치; `/sys/block/zramN/backing_dev`가 `none`인 zram은 메모리라 `backing: zram`으로 암호화로 침; 스왑이 없으면 `absent` |
+| | `swap.encrypted` | `bool` | 모든 장치가 dm-crypt 위일 때 true: 장치(스왑 파일이면 그것을 담는 마운트의 소스 장치)의 `/sys/block/<dev>` 링크를 읽고 — 거기의 항목은 전부 심링크 — 대상이 `devices/virtual/block` 아래이면 `slaves/`를 따라 내려가 `dm/uuid`가 `CRYPT-`로 시작하는 장치(암호화)나 링크가 물리 장치를 가리키는 장치(비암호화)에 닿을 때까지; 담는 마운트의 소스가 블록 장치 노드가 아닌 스왑 파일(컨테이너의 `overlay`, 클라우드 이미지의 `/dev/root`)은 소스를 이름 짓는 `unsupported`이지 결코 오류가 아님 — 스톡 "암호화 LVM" 배치는 스왑이 `LVM-` 볼륨 위에 있고 그 slave가 `CRYPT-` 장치; `backing`은 판정이 내려진 장치; `/sys/block/zramN/backing_dev`가 `none`인 zram은 메모리라 `backing: zram`으로 암호화로 침; 스왑이 없으면 `absent` |
 
 **B-3 — `/proc/sys`를 직접 읽고, 판정은 runtime 쪽을 읽는다.** `sysctl` 바이너리도,
 선언의 명령도 없습니다. `default_on: effective`(= runtime)는 sysctl에 `both`를 이름 짓는
@@ -85,7 +85,7 @@ modprobe.d는 관리자가 무엇을 했는지를 말합니다. 트리가 모르
 `disabled` false입니다 — 공식의 `!builtin` 항이 그것인데, 내장은 `/proc/modules`에 결코
 없어서 `install … /bin/false` 줄만 있으면 통과해 버릴 것이기 때문입니다 — 그리고
 `sources` 항목이 `built into the kernel`을 말합니다; 컨트롤은 그 행을 실패시키고 조치
-문구는 재빌드나 면제만이 길이라고 말합니다. `/lib/modules/<release>`가 없으면(컨테이너,
+문구는 재빌드나 면제만이 길이라고 말합니다. 모듈 트리(`/usr/lib/modules/<release>`)가 없으면(컨테이너,
 모듈을 지운 커널) `kernel.modules` 봉투 전체가 경로와 함께 `unsupported`입니다 — 절반만
 아는 행의 목록은 결코 아닙니다.
 
@@ -113,19 +113,19 @@ grub-mkconfig 자신의 umask 077에 근거하며 설명에 인용합니다.
 | 2 | `ptrace_restriction` | 중 | `yama_ptrace_scope in [1, 2, 3]`; `perf_event_paranoid gte 2`; `absent_means: fail`(Yama 없는 커널에는 ptrace 범위 자체가 없음; §6.5의 선별이 첫 absent 팩트에서 컨트롤 전체를 해소하므로 그때 나머지 절은 증거일 뿐) |
 | 3 | `unprivileged_bpf_restricted` | 하 | `unprivileged_bpf_disabled in [1, 2]`; `bpf_jit_harden in [1, 2]`; `absent_means: not_applicable`(BPF 시스템콜이나 JIT 없이 빌드된 커널에는 제한할 것이 없음). `bpf_jit_harden`은 기본 0이고 스톡 Ubuntu·EL9의 어떤 sysctl.d도 정하지 않아 모든 스톡 호스트가 이것에 실패합니다 — 실제 KSPP 약점이며, 컨트롤 2를 물들이지 않도록 따로, 낮게 둠 |
 | 4 | `aslr_and_link_protection` | 상 | `randomize_va_space eq 2`; `protected_symlinks eq 1`; `protected_hardlinks eq 1`; `protected_fifos in [1, 2]`; `protected_regular in [1, 2]`; `absent_means: fail` |
-| 5 | `sysrq_restricted` | 중 | `sysrq in ${allowed_sysrq}`, 기본 `[0]`; 설명이 배포판 기본(Ubuntu 176, Debian 438, EL 16)과 그중 하나를 허용하는 파라미터를 이름 지음 |
+| 5 | `sysrq_restricted` | 중 | `sysrq in ${allowed_sysrq}`, 기본 `[0]`; `absent_means: fail`; 설명이 배포판 기본(Ubuntu 176, Debian 438, EL 16)과 그중 하나를 허용하는 파라미터를 이름 지음 |
 | 6 | `core_dump_policy` | 중, `partial` | `coredump.core_pattern`에 대한 메커니즘 넷, 첫 일치가 이김: (a) `matches ^\|.*systemd-coredump` → `coredump.systemd.storage eq none` 그리고 `coredump.systemd.process_size_max eq 0`; (b) `matches ^\|/bin/(false\|true)( \|$)` — 비활성 패턴에 대한 STIG 자신의 조치 — → 구성상 성립하는 검사(`core_pattern matches ^\|/bin/`), PASS; (c) `not_matches ^\|` → `coredump.limits.hard_core eq 0`; (d) 그 밖의 파이프(apport 등) → 구성상 실패하는 검사 하나 `core_pattern not_matches ^\|`, 그래서 `partial` 컨트롤이 패턴을 증거로 WARN을 읽음 — 검사 없는 메커니즘은 PASS가 될 것. `absent_means: fail`: systemd도 limits 줄도 없는 호스트에서 `absentMeans`는 `partial` 아래서도 FAIL을 돌려주며, 이 컨트롤이 낼 수 있는 유일한 FAIL |
-| 7 | `suid_dumpable_disabled` | 중 | `coredump.suid_dumpable eq 0` |
+| 7 | `suid_dumpable_disabled` | 중 | `coredump.suid_dumpable eq 0`; `absent_means: fail` |
 | 8 | `bootloader_config_permissions` | 상 | `boot.grub_cfg.mode in` 0600의 부분집합(`params.allowed_modes`), `uid eq 0`, `gid eq 0`; `absent_means: not_applicable`(grub.cfg 없음: 다른 부트로더거나 없음); `denied` stat(root 없는 EL)은 ERROR, 결코 NOT_APPLICABLE이 아님 |
 | 9 | `bootloader_password` | 중 | `boot.grub_password_set eq true`; `absent_means: not_applicable`; `denied` 읽기(root 없이 EL의 0600 grub.cfg)는 모든 denied 팩트처럼 ERROR |
 | 10 | `secure_boot_enabled` | 중 | `applies_when`에 `boot.firmware eq uefi`도; `boot.secure_boot eq true`; `absent_means: manual`(efivarfs나 변수가 없는 UEFI는 여기서 읽을 수 없음) |
-| 11 | `separate_partitions` | 중, `partial` | `mounts.points` `each`, `subject: target`, `where target in ${required_separate}`(기본 `[/tmp, /var, /var/tmp, /var/log, /var/log/audit, /home]`), `require separate eq true`; 파티션은 설치 시점의 결정이라 WARN |
+| 11 | `separate_partitions` | 중, `partial` | `mounts.points` `each`, `subject: target`, `where target in ${required_separate}`(기본 `[/tmp, /var, /var/tmp, /var/log, /var/log/audit, /home]`), `require separate eq true`; `absent_means: not_applicable`; 파티션은 설치 시점의 결정이라 WARN |
 | 12 | `tmp_mount_options` | 중 | 메커니즘 하나 `when mounts.tmp.separate eq true`: `mounts.points each where target eq /tmp require options contains nodev`, `nosuid`, `noexec`도 같게; 메커니즘 없음 → 평가기의 사유("no mechanism applies to this host")로 NOT_APPLICABLE; 설명이 그런 호스트의 결함은 컨트롤 11이라고 말함 |
 | 13 | `var_tmp_mount_options` | 중 | `/var/tmp`에 대해 12와 같음 |
 | 14 | `dev_shm_mount_options` | 중 | `/dev/shm`에 대해 12와 같음; 모든 systemd 호스트가 이를 `nosuid,nodev`만 있고 `noexec` 없는 별도 tmpfs로 마운트하므로 스톡 호스트는 이것에 실패 |
 | 15 | `home_mount_options` | 하 | `/home`에 대해 12와 같되 `nodev`, `nosuid`만; EL9 기본 배치는 `/home`에 둘 다 없는 자체 볼륨을 주므로 스톡 EL은 실패 |
 | 16 | `swap_encrypted` | 중 | `swap.encrypted eq true`; `absent_means: not_applicable`(스왑 없음) |
-| 17 | `uncommon_filesystems_disabled` | 하 | `kernel.modules each`, `subject: name`, `where name in [cramfs, freevxfs, jffs2, hfs, hfsplus, udf]`, `require disabled eq true` |
+| 17 | `uncommon_filesystems_disabled` | 하 | `kernel.modules each`, `subject: name`, `where name in [cramfs, freevxfs, jffs2, hfs, hfsplus, udf]`, `require disabled eq true`; `absent_means: fail`(17–19) |
 | 18 | `usb_storage_disabled` | 중 | `usb-storage`에 대해 17과 같음 |
 | 19 | `uncommon_network_protocols_disabled` | 중 | `dccp`, `sctp`, `rds`, `tipc`에 대해 17과 같음 |
 
@@ -175,8 +175,9 @@ grub-mkconfig 자신의 umask 077에 근거하며 설명에 인용합니다.
 `env.container`에 대한 `applies_when`으로 NOT_APPLICABLE입니다: 커널 sysctl은 호스트의
 것이고, `/boot`는 컨테이너의 것이 아니며, 마운트와 스왑은 호스트의 배치이고,
 `/lib/modules` 없는 모듈 목록은 목록이 아닙니다. 수집기는 그래도 거기서 돌며 증거를
-씁니다: `kernel.modules`는 빠진 모듈 트리를 이름 짓는 `unsupported`(capability matrix의
-`container` 행에 추가되고 CI 컨테이너 매트릭스가 검사), `boot.firmware`는
+씁니다: `kernel.modules`는 빠진 모듈 트리를 이름 짓는 `unsupported`, `swap.encrypted`는
+overlay 소스를 이름 짓는 `unsupported`(capability matrix의 `container` 행에 둘 다 추가되고
+CI 컨테이너 매트릭스가 검사), `boot.firmware`는
 `/sys/firmware/efi`가 말하는 대로(UEFI 호스트의 컨테이너는 그것을 봄), `boot.grub_cfg.*`는
 `absent`, `mounts.points`는 컨테이너 자신의 mountinfo로.
 
@@ -188,8 +189,9 @@ grub.cfg의 stat조차 거부됩니다: 모든 `boot.grub_cfg.*` leaf와 `boot.g
 (0600인 `user.cfg`도 읽음)이 `denied`이고 컨트롤 8과 9는 ERROR입니다 — 다음 후보로
 넘어갔더라면 나왔을 NOT_APPLICABLE은 결코 아닙니다. Ubuntu는 `/boot/grub`와 grub.cfg를
 읽을 수 있게 배포하므로 러너의 비root 잡이 읽습니다; capability matrix는 배포판별
-`denied`를 표현할 수 없으므로 두 컨트롤의 설명이 그 문장을 담습니다. CI의 Rocky init
-컨테이너가 EL 경로를 증명합니다.
+`denied`를 표현할 수 없으므로 두 컨트롤의 설명이 그 문장을 담습니다. CI 컨테이너 스텝이
+Rocky·Alma init 이미지 안에서 비root `collect`를 한 번 돌려 그 `denied` 상태를 단언하며,
+그것이 EL 경로를 증명합니다.
 
 systemd 없이는 아무것도 바뀌지 않습니다: `coredump.systemd.*`가 `absent`이고 그런
 호스트의 `core_pattern`은 systemd 파이프가 아니므로 컨트롤 6은 메커니즘 (c)나 (d)로 갑니다.

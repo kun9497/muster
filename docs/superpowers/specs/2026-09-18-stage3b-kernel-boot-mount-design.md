@@ -65,10 +65,10 @@ paths; nothing here runs a program. Forty keys, all `since: 1`, `sensitivity: pu
 | | `boot.grub_password_set` | `bool` | `set superusers` or `password_pbkdf2` in grub.cfg, `/boot/grub2/user.cfg` (0600 on EL), `/etc/grub.d/*`; an unreadable file among them is the read's status (C3) |
 | `mounts` | `mounts.points` (`subject_kind: mount`) | `list<record>` | one row per candidate `/`, `/boot`, `/home`, `/tmp`, `/var`, `/var/tmp`, `/var/log`, `/var/log/audit`, `/dev/shm` from `/proc/self/mountinfo` (3A's `parseMountinfo`, extended to keep the per-mount options of field 6 and the source): `target`, `separate` (a mount exactly at the target), `mounted_by` (the mount that contains it — the target itself when `separate`), `source`, `fstype`, `options` (`list<string>`); on a row that is not separate, `source`, `fstype` and `options` are those of `mounted_by`, so the row says what governs the path today. Persisted mounts (`/etc/fstab`, `.mount` units) are not read in 3B: no control judges them |
 | | `mounts.tmp.separate`, `mounts.var_tmp.separate`, `mounts.dev_shm.separate`, `mounts.home.separate` | `bool` | the same fact as the row's `separate`, as a leaf so a mechanism can gate on it (B-1) |
-| `modules` | `kernel.modules` (`subject_kind: module`) | `list<record>` | one row per candidate `cramfs`, `freevxfs`, `jffs2`, `hfs`, `hfsplus`, `udf`, `usb-storage`, `dccp`, `sctp`, `rds`, `tipc`: `name`, `loaded` (`/proc/modules`), `builtin` (`/lib/modules/<release>/modules.builtin`), `available` (`modules.dep`), `blacklisted` (a `blacklist <name>` line), `install_disabled` (`install <name> /bin/false` or `/bin/true`), `disabled` (derived: `!loaded && !builtin && (install_disabled || !available)`), `sources` (`list<string>`: the modprobe.d files that mention the module, plus the one sentinel `built into the kernel` when `builtin`); `modules.dep` names are matched with their `.ko`, `.ko.zst` and `.ko.xz` suffixes stripped; modprobe.d is `/etc/modprobe.d`, `/run/modprobe.d`, `/usr/lib/modprobe.d`, `/usr/local/lib/modprobe.d`, `.conf` files only, masking by name as modprobe.d(5) says; a module name matches with `-` and `_` folded |
+| `modules` | `kernel.modules` (`subject_kind: module`) | `list<record>` | one row per candidate `cramfs`, `freevxfs`, `jffs2`, `hfs`, `hfsplus`, `udf`, `usb-storage`, `dccp`, `sctp`, `rds`, `tipc`: `name`, `loaded` (`/proc/modules`), `builtin` (`/usr/lib/modules/<release>/modules.builtin`; `/lib/modules` only on a host that is not merged-`/usr` — on the supported ones `/lib` is a symlink and a no-follow read would be an error), `available` (`modules.dep`), `blacklisted` (a `blacklist <name>` line), `install_disabled` (`install <name> /bin/false` or `/bin/true`), `disabled` (derived: `!loaded && !builtin && (install_disabled || !available)`), `sources` (`list<string>`: the modprobe.d files that mention the module, plus the one sentinel `built into the kernel` when `builtin`); `modules.dep` names are matched with their `.ko`, `.ko.zst` and `.ko.xz` suffixes stripped; modprobe.d is `/etc/modprobe.d`, `/run/modprobe.d`, `/usr/lib/modprobe.d`, `/usr/local/lib/modprobe.d`, `.conf` files only, masking by name as modprobe.d(5) says; a module name matches with `-` and `_` folded |
 | `swap` | `swap.present` | `bool` | `/proc/swaps` has a row |
 | | `swap.devices` | `list<record>` | `path`, `type` (`file` \| `partition`), `encrypted`, `backing` (the block device the judgment was made on) |
-| | `swap.encrypted` | `bool` | true when every device is on dm-crypt: from the device (for a swap file, the source device of the mount that contains it) follow `/sys/block/<dev>/slaves/` down until a device whose `dm/uuid` begins `CRYPT-` (encrypted) or one with no slaves (not) — the stock "encrypted LVM" layout has swap on an `LVM-` volume whose slave is the `CRYPT-` device; `backing` names the device the decision was made on; zram with `/sys/block/zramN/backing_dev` = `none` is memory and counts as encrypted with `backing: zram`; no swap → `absent` |
+| | `swap.encrypted` | `bool` | true when every device is on dm-crypt: from the device (for a swap file, the source device of the mount that contains it) read the `/sys/block/<dev>` link — every entry there is a symlink — and, for a target under `devices/virtual/block`, follow `slaves/` down until a device whose `dm/uuid` begins `CRYPT-` (encrypted) or one whose link points at a physical device (not); a swap file whose containing mount's source is not a block-device node (`overlay` in a container, `/dev/root` on a cloud image) is `unsupported` naming the source, never an error — the stock "encrypted LVM" layout has swap on an `LVM-` volume whose slave is the `CRYPT-` device; `backing` names the device the decision was made on; zram with `/sys/block/zramN/backing_dev` = `none` is memory and counts as encrypted with `backing: zram`; no swap → `absent` |
 
 **B-3 — `/proc/sys` is read directly, and the verdict reads the runtime side.** No `sysctl` binary, no command in the declaration. `default_on: effective` (= runtime) departs from the main design's §5.3, which names `both` for sysctl: a value the kernel compiles in — `dmesg_restrict` on Ubuntu, `protected_symlinks` everywhere — has no persisted line at all, and `both` would WARN "reverts on reboot" on every host for a setting that does not revert. The persisted side is evidence in the envelope; D29 records the departure.
 `/proc/sys/kernel/yama/ptrace_scope` that does not exist (Yama not built) is `absent`
@@ -87,9 +87,9 @@ does not know (`available` false, `builtin` false) is disabled by absence and pa
 built-in module has `disabled` false whatever modprobe.d says — the formula's `!builtin`
 term, because a built-in is never in `/proc/modules` and an `install … /bin/false` line
 would otherwise pass it — and its `sources` entry says `built into the kernel`; the control fails the row and the remediation says a rebuild or a
-waiver is the only way out. When `/lib/modules/<release>` is missing (a container, a
-kernel whose modules were removed) the whole `kernel.modules` envelope is `unsupported`
-with the path — never a list of half-known rows.
+waiver is the only way out. When the module tree (`/usr/lib/modules/<release>`) is missing (a container, a kernel
+whose modules were removed) the whole `kernel.modules` envelope is `unsupported` with the
+path — never a list of half-known rows.
 
 ## 3. Controls (B-5 … B-8)
 
@@ -116,19 +116,19 @@ change nor answer for (§5).
 | 2 | `ptrace_restriction` | 중 | `yama_ptrace_scope in [1, 2, 3]`; `perf_event_paranoid gte 2`; `absent_means: fail` (a kernel without Yama has no ptrace scope at all; the screening of §6.5 resolves the whole control on the first absent fact, so the other clause is then evidence only) |
 | 3 | `unprivileged_bpf_restricted` | 하 | `unprivileged_bpf_disabled in [1, 2]`; `bpf_jit_harden in [1, 2]`; `absent_means: not_applicable` (a kernel built without the BPF syscall or the JIT has nothing to restrict). `bpf_jit_harden` defaults to 0 and no stock Ubuntu or EL9 sysctl.d sets it, so every stock host fails this one — a real KSPP weakness, kept separate and low so it does not colour control 2 |
 | 4 | `aslr_and_link_protection` | 상 | `randomize_va_space eq 2`; `protected_symlinks eq 1`; `protected_hardlinks eq 1`; `protected_fifos in [1, 2]`; `protected_regular in [1, 2]`; `absent_means: fail` |
-| 5 | `sysrq_restricted` | 중 | `sysrq in ${allowed_sysrq}`, default `[0]`; the description names the distribution defaults (Ubuntu 176, Debian 438, EL 16) and the parameter that admits one of them |
+| 5 | `sysrq_restricted` | 중 | `sysrq in ${allowed_sysrq}`, default `[0]`; `absent_means: fail`; the description names the distribution defaults (Ubuntu 176, Debian 438, EL 16) and the parameter that admits one of them |
 | 6 | `core_dump_policy` | 중, `partial` | four mechanisms on `coredump.core_pattern`, first match wins: (a) `matches ^\|.*systemd-coredump` → `coredump.systemd.storage eq none` and `coredump.systemd.process_size_max eq 0`; (b) `matches ^\|/bin/(false\|true)( \|$)` — the STIG's own remediation for a disabled pattern — → a check that holds by construction (`core_pattern matches ^\|/bin/`), PASS; (c) `not_matches ^\|` → `coredump.limits.hard_core eq 0`; (d) any other pipe (apport and the like) → one check that fails by construction, `core_pattern not_matches ^\|`, so a `partial` control reads WARN with the pattern as evidence — a mechanism with no checks would PASS. `absent_means: fail`: on a host without systemd and without a limits line, `absentMeans` returns FAIL even under `partial`, the one FAIL this control can give |
-| 7 | `suid_dumpable_disabled` | 중 | `coredump.suid_dumpable eq 0` |
+| 7 | `suid_dumpable_disabled` | 중 | `coredump.suid_dumpable eq 0`; `absent_means: fail` |
 | 8 | `bootloader_config_permissions` | 상 | `boot.grub_cfg.mode in` the subsets of 0600 (`params.allowed_modes`), `uid eq 0`, `gid eq 0`; `absent_means: not_applicable` (no grub.cfg: another bootloader, or none); a `denied` stat (EL without root) is ERROR, never NOT_APPLICABLE |
 | 9 | `bootloader_password` | 중 | `boot.grub_password_set eq true`; `absent_means: not_applicable`; a `denied` read (EL's 0600 grub.cfg without root) is ERROR, as every denied fact is |
 | 10 | `secure_boot_enabled` | 중 | `applies_when` also `boot.firmware eq uefi`; `boot.secure_boot eq true`; `absent_means: manual` (UEFI without efivarfs or the variable cannot be read from here) |
-| 11 | `separate_partitions` | 중, `partial` | `mounts.points` `each`, `subject: target`, `where target in ${required_separate}` (default `[/tmp, /var, /var/tmp, /var/log, /var/log/audit, /home]`), `require separate eq true`; a partition is an installation-time decision, so WARN |
+| 11 | `separate_partitions` | 중, `partial` | `mounts.points` `each`, `subject: target`, `where target in ${required_separate}` (default `[/tmp, /var, /var/tmp, /var/log, /var/log/audit, /home]`), `require separate eq true`; `absent_means: not_applicable`; a partition is an installation-time decision, so WARN |
 | 12 | `tmp_mount_options` | 중 | one mechanism `when mounts.tmp.separate eq true`: `mounts.points each where target eq /tmp require options contains nodev`, and the same for `nosuid`, `noexec`; no mechanism → NOT_APPLICABLE with the evaluator's reason ("no mechanism applies to this host"); the description says that such a host's finding is control 11 |
 | 13 | `var_tmp_mount_options` | 중 | as 12 for `/var/tmp` |
 | 14 | `dev_shm_mount_options` | 중 | as 12 for `/dev/shm`; every systemd host has it as a separate tmpfs mounted `nosuid,nodev` without `noexec`, so stock hosts fail this one |
 | 15 | `home_mount_options` | 하 | as 12 for `/home`, `nodev` and `nosuid` only; EL9's default layout gives `/home` its own volume without either, so stock EL fails it |
 | 16 | `swap_encrypted` | 중 | `swap.encrypted eq true`; `absent_means: not_applicable` (no swap) |
-| 17 | `uncommon_filesystems_disabled` | 하 | `kernel.modules each`, `subject: name`, `where name in [cramfs, freevxfs, jffs2, hfs, hfsplus, udf]`, `require disabled eq true` |
+| 17 | `uncommon_filesystems_disabled` | 하 | `kernel.modules each`, `subject: name`, `where name in [cramfs, freevxfs, jffs2, hfs, hfsplus, udf]`, `require disabled eq true`; `absent_means: fail` (17–19) |
 | 18 | `usb_storage_disabled` | 중 | as 17 for `usb-storage` |
 | 19 | `uncommon_network_protocols_disabled` | 중 | as 17 for `dccp`, `sctp`, `rds`, `tipc` |
 
@@ -180,8 +180,9 @@ change.** Decision D29 in the main design.
 NOT_APPLICABLE through `applies_when` on `env.container`: the kernel's sysctls are the
 host's, `/boot` is not the container's, mounts and swap are the host's arrangement, and a
 module list without `/lib/modules` is not a list. The collectors still run there and write
-evidence: `kernel.modules` `unsupported` naming the missing module tree (the capability
-matrix's `container` row gains it and the CI container matrix checks it), `boot.firmware`
+evidence: `kernel.modules` `unsupported` naming the missing module tree and `swap.encrypted`
+`unsupported` naming the overlay source (the capability matrix's `container` row gains both
+and the CI container matrix checks them), `boot.firmware`
 whatever `/sys/firmware/efi` says (a container on a UEFI host sees it), `boot.grub_cfg.*`
 `absent`, `mounts.points` from the container's own mountinfo.
 
@@ -194,8 +195,9 @@ and `boot.grub_password_set` (which also reads the 0600 `user.cfg`) are `denied`
 controls 8 and 9 are ERROR — never NOT_APPLICABLE, which is what falling through to the
 next candidate would have produced. Ubuntu ships `/boot/grub` and grub.cfg readable, so the
 runner's non-root job reads them; the capability matrix cannot express a per-distribution
-`denied`, and the two controls' descriptions carry the sentence instead. The Rocky init
-container in CI proves the EL path.
+`denied`, and the two controls' descriptions carry the sentence instead. The CI container
+step runs one non-root `collect` inside the Rocky and Alma init images and asserts those
+`denied` statuses, which is what proves the EL path.
 
 Without systemd nothing changes: `coredump.systemd.*` is `absent` and such a host's
 `core_pattern` is not the systemd pipe, so control 6 takes mechanism (c) or (d).
