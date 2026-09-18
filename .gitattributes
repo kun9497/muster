@@ -1,2 +1,7 @@
 * text=auto eol=lf
 *.png binary
+
+# One fixture is deliberately CRLF-terminated: it proves the sysctl.d parser
+# strips the carriage return a Windows-edited configuration file leaves
+# behind. `text=auto eol=lf` above would normalise that away on commit.
+internal/collect/collectors/testdata/sysctl.d-60-hardening.conf -text

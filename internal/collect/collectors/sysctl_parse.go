@@ -117,16 +117,13 @@ func (s *sysctlScan) fail(p string, err error) {
 }
 
 // read applies one file of the chain. A path that is not there is simply not
-// part of this host's chain. A path that is there and is NOT a regular file
-// is skipped — a directory or a device named *.conf sets nothing — except a
-// SYMLINK, which is the shape an administrator's out-of-tree fragment has:
-// muster does not follow it, so the honest answer is that file's error, and
-// C3 carries it to every value the chain could have set (the one link a
-// distribution itself ships is handled by the caller).
+// part of this host's chain; what every other shape means is chainReadFailed's
+// judgment (the one link a distribution itself ships at 99-sysctl.conf is
+// handled by the caller, before the read).
 func (s *sysctlScan) read(a collect.Access, p string) {
 	data, meta, err := a.ReadFile(p, readLimit)
 	if err != nil {
-		if chainReadFailed(err) {
+		if chainReadFailed(a, p, err) {
 			s.fail(p, err)
 		}
 		return

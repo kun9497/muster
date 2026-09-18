@@ -55,7 +55,7 @@ func parseCoredumpConf(data []byte) coredumpConf {
 			section = strings.TrimSpace(line[1 : len(line)-1])
 			continue
 		}
-		if !strings.EqualFold(section, "Coredump") {
+		if section != "Coredump" {
 			continue
 		}
 		k, v, ok := strings.Cut(line, "=")
@@ -91,42 +91,105 @@ func mergeCoredumpConf(files []confFile) (storage, sizeMax coredumpWinner, seen 
 }
 
 // sizeSuffixes are systemd's binary size suffixes, in the order their
-// exponent grows. systemd takes K to mean 1024, not 1000, and accepts no
-// "B" suffix.
+// exponent grows: K is 1024, not 1000. "B" is a suffix too, with a factor of
+// one, and so is the empty string — which is why a bare number parses and
+// "2GB" does not (systemd consumes the "G" and then fails on the leftover
+// "B", where a number was due).
 const sizeSuffixes = "KMGTPE"
 
-// parseSizeValue parses a systemd size: a decimal number with an optional
-// binary suffix. It refuses anything else — a negative number, a "2GB", a
-// word — rather than guessing, so the caller can report the bytes it saw.
-// An overflow is refused for the same reason: a silently wrapped size would
-// be a confident wrong answer.
+// sizeInfinity is what systemd spells "infinity": no limit at all.
+const sizeInfinity = "infinity"
+
+// parseSizeValue parses a size the way systemd's parse_size does, which is
+// what ProcessSizeMax= is read with:
+//
+//   - a decimal number with an optional binary suffix, and "B"/"b" as a
+//     suffix of factor one;
+//   - a decimal FRACTION of a suffix ("1.5G");
+//   - CONCATENATION of several such terms ("1G512M"), summed;
+//   - "infinity", the one word that is a size.
+//
+// Everything else is refused rather than guessed, so the caller can report
+// the bytes it saw as an `error` instead of publishing a number the daemon
+// would never have computed: a negative number, a trailing "2GB", a word, a
+// term with no digits, and an overflow — a silently wrapped size would be a
+// confident wrong answer.
 func parseSizeValue(s string) (int64, bool) {
 	s = strings.TrimSpace(s)
 	if s == "" {
 		return 0, false
 	}
-	mult := int64(1)
-	// The last BYTE, upper-cased by hand: strings.ToUpper may change the
-	// length of a non-ASCII string, and indexing the result by this one's
-	// length would then be out of range.
-	last := s[len(s)-1]
-	if last >= 'a' && last <= 'z' {
-		last -= 'a' - 'A'
+	if s == sizeInfinity {
+		return math.MaxInt64, true
 	}
-	if i := strings.IndexByte(sizeSuffixes, last); i >= 0 {
-		for range i + 1 {
-			mult *= 1024
+	var total int64
+	for len(s) > 0 {
+		s = strings.TrimLeft(s, " \t")
+		whole, rest, ok := leadingDigits(s)
+		if !ok {
+			return 0, false
 		}
-		s = s[:len(s)-1]
+		s = rest
+		n, err := strconv.ParseInt(whole, 10, 64)
+		if err != nil {
+			return 0, false
+		}
+		// The fraction is carried as a float only between here and the
+		// multiplication: systemd does the same, and the factor it is
+		// multiplied by is at most 2^60, so the product stays exact enough
+		// that no size an operator writes can round to a different byte.
+		frac := 0.0
+		if strings.HasPrefix(s, ".") {
+			digits, rest, ok := leadingDigits(s[1:])
+			if !ok {
+				return 0, false
+			}
+			f, err := strconv.ParseFloat("0."+digits, 64)
+			if err != nil {
+				return 0, false
+			}
+			frac, s = f, rest
+		}
+		s = strings.TrimLeft(s, " \t")
+		mult := int64(1)
+		if len(s) > 0 {
+			c := s[0]
+			if c >= 'a' && c <= 'z' {
+				c -= 'a' - 'A'
+			}
+			if i := strings.IndexByte(sizeSuffixes, c); i >= 0 {
+				for range i + 1 {
+					mult *= 1024
+				}
+				s = s[1:]
+			} else if c == 'B' {
+				s = s[1:]
+			}
+		}
+		if n > math.MaxInt64/mult {
+			return 0, false
+		}
+		term := n * mult
+		if frac > 0 {
+			term += int64(frac * float64(mult))
+		}
+		if term > math.MaxInt64-total {
+			return 0, false
+		}
+		total += term
 	}
-	n, err := strconv.ParseInt(s, 10, 64)
-	if err != nil || n < 0 {
-		return 0, false
+	return total, true
+}
+
+// leadingDigits splits the run of ASCII digits at the front of s from the
+// rest, and reports whether there was one at all. A term with no digits —
+// "-1", "high", the "B" left over from "2GB" — is not a size.
+func leadingDigits(s string) (digits, rest string, ok bool) {
+	i := 0
+	for i < len(s) && s[i] >= '0' && s[i] <= '9' {
+		i++
 	}
-	if n > math.MaxInt64/mult {
-		return 0, false
-	}
-	return n * mult, true
+	return s[:i], s[i:], i > 0
 }
 
 // limitLine is one `* hard core <value>` or `* - core <value>` line of

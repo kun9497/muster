@@ -3,6 +3,7 @@
 package collectors
 
 import (
+	"math"
 	"reflect"
 	"slices"
 	"strings"
@@ -89,7 +90,7 @@ func TestCoredumpSystemdConfMerge(t *testing.T) {
 		t.Errorf("storage cites %+v, want the 90- drop-in that set it last", st.Source)
 	}
 	sz := env(t, b, "coredump.systemd.process_size_max")
-	if sz.Status != facts.StatusOK || sz.Value != 0 {
+	if sz.Status != facts.StatusOK || sz.Value != int64(0) {
 		t.Errorf("process_size_max %+v, want ok 0", sz)
 	}
 	if slices.Contains(a.reads, "/usr/lib/systemd/coredump.conf.d/10-size.conf") {
@@ -133,6 +134,28 @@ func TestCoredumpSystemdConfMerge(t *testing.T) {
 		if e.Status != facts.StatusDenied || !strings.Contains(e.Reason, "50-local.conf") {
 			t.Errorf("%s %+v, want denied naming the unreadable drop-in", key, e)
 		}
+	}
+}
+
+// K-21 in the coredump.conf chain: a drop-in linked to /dev/null masks the
+// vendor file of that base name and is not an error.
+func TestCoredumpDevNullMasksADropin(t *testing.T) {
+	a := &fsAccess{files: coredumpSeeds()}
+	a.files["/etc/systemd/coredump.conf.d/10-size.conf"] = "coredump.conf.d-10-size.conf"
+	a.files["/usr/lib/systemd/coredump.conf.d/90-disable.conf"] = "coredump.conf.d-90-disable.conf"
+	seedLink(a, "/etc/systemd/coredump.conf.d/90-disable.conf", "/dev/null")
+	b := build(t, "coredump", a)
+
+	// The 90- drop-in is masked away, so the 10- one is the last word.
+	st := env(t, b, "coredump.systemd.storage")
+	if st.Status != facts.StatusOK || st.Value != "journal" {
+		t.Fatalf("storage %+v, want ok journal: the 90- drop-in is masked to /dev/null", st)
+	}
+	if sz := env(t, b, "coredump.systemd.process_size_max"); sz.Status != facts.StatusOK || sz.Value != int64(2<<30) {
+		t.Errorf("process_size_max %+v, want ok 2G from the 10- drop-in", sz)
+	}
+	if slices.Contains(a.reads, "/usr/lib/systemd/coredump.conf.d/90-disable.conf") {
+		t.Error("the masked vendor drop-in was read; /dev/null still owns that base name")
 	}
 }
 
@@ -255,16 +278,18 @@ func TestParseCoredumpConf(t *testing.T) {
 		"Storage=outside-a-section\n" +
 		"[Journal]\n" +
 		"Storage=persistent\n" +
+		"[coredump]\n" +
+		"Storage=lower-case-section\n" +
 		"[Coredump]\n" +
 		"Storage=journal\n" +
 		"ProcessSizeMax=2G\n" +
 		"Storage=none\n" +
 		"Compress=yes\n"))
-	if !got.storage.set || got.storage.value != "none" || got.storage.line != 8 {
-		t.Errorf("storage %+v, want the last [Coredump] assignment, none, at line 8", got.storage)
+	if !got.storage.set || got.storage.value != "none" || got.storage.line != 10 {
+		t.Errorf("storage %+v, want the last [Coredump] assignment, none, at line 10", got.storage)
 	}
-	if !got.sizeMax.set || got.sizeMax.value != "2G" || got.sizeMax.line != 7 {
-		t.Errorf("sizeMax %+v, want 2G at line 7", got.sizeMax)
+	if !got.sizeMax.set || got.sizeMax.value != "2G" || got.sizeMax.line != 9 {
+		t.Errorf("sizeMax %+v, want 2G at line 9", got.sizeMax)
 	}
 
 	empty := parseCoredumpConf([]byte("[Coredump]\n#Storage=external\n"))
@@ -283,11 +308,26 @@ func TestParseSizeValue(t *testing.T) {
 		{"2G", 2 << 30, true},
 		{"10m", 10 << 20, true},
 		{"1K", 1024, true},
+		{"4096", 4096, true},
+		// systemd's parse_size, in full: a "B" of factor one, a fraction of a
+		// suffix, and concatenated terms that are summed.
+		{"512B", 512, true},
+		{"512b", 512, true},
+		{"1.5G", 1<<30 + 1<<29, true},
+		{"1G512M", 1<<30 + 512<<20, true},
+		{"1G512M256K", 1<<30 + 512<<20 + 256<<10, true},
+		{"1 G", 1 << 30, true},
+		{"infinity", math.MaxInt64, true},
 		{"", 0, false},
 		{"-1", 0, false},
-		{"2GB", 0, false},
+		{"2GB", 0, false}, // the "G" is consumed; the leftover "B" is not a term
+		{"1.G", 0, false}, // a fraction point with no digits
+		{"G", 0, false},   // a suffix with no number
+		{"1G-5M", 0, false},
+		{"unlimited", 0, false}, // limits.conf's word, not systemd's
 		{"high", 0, false},
-		{"9223372036854775807E", 0, false}, // overflow, not a silent wrap
+		{"9223372036854775807E", 0, false},                     // overflow, not a silent wrap
+		{"9223372036854775807B9223372036854775807B", 0, false}, // overflow of the sum
 	} {
 		got, ok := parseSizeValue(tc.in)
 		if ok != tc.ok || (ok && got != tc.want) {

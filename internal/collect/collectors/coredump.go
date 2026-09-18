@@ -20,6 +20,9 @@ const (
 	suidDumpablePath = "/proc/sys/fs/suid_dumpable"
 	limitsConfPath   = "/etc/security/limits.conf"
 	limitsDGlob      = "/etc/security/limits.d/*.conf"
+
+	// devNull is the mask target of ruling K-21.
+	devNull = "/dev/null"
 )
 
 // suidDumpableKey is the thirteenth sysctl of B-2: it lives with the
@@ -111,7 +114,7 @@ func (s *coredumpScan) fail(p string, err error) {
 func (s *coredumpScan) read(a collect.Access, p string) bool {
 	data, meta, err := a.ReadFile(p, readLimit)
 	if err != nil {
-		if chainReadFailed(err) {
+		if chainReadFailed(a, p, err) {
 			s.fail(p, err)
 		}
 		return !errors.Is(err, fs.ErrNotExist)
@@ -194,7 +197,7 @@ func writeCoredumpConf(a collect.Access, b *collect.Builder) {
 			return
 		}
 		b.Set("coredump.systemd.process_size_max",
-			withTruncation(collect.OK(int(n), coredumpSource(sizeMax)), scan.truncated))
+			withTruncation(collect.OK(n, coredumpSource(sizeMax)), scan.truncated))
 	}
 }
 
@@ -265,18 +268,30 @@ func pathsOf(files []confFile) []string {
 // contributes nothing.
 //
 // A path that is not there is not part of this host's chain. A SYMLINK is
-// the chain's answer: muster reads without following links, so a fragment an
-// administrator symlinked in cannot be read, and C4 makes that the honest
-// `error` rather than a silent omission that would look like "sets nothing".
+// normally the chain's answer: muster reads without following links, so a
+// fragment an administrator symlinked in cannot be read, and C4 makes that
+// the honest `error` rather than a silent omission that would look like
+// "sets nothing".
+//
+// Ruling K-21 carves out the ONE link that is not a fragment at all: a link
+// to /dev/null is sysctl.d(5)'s and systemd's documented MASK idiom. It says
+// "this base name is disabled" — the entry sets nothing on purpose, and the
+// masking rule that already gave the earlier directory the base name is what
+// makes the vendor file below it disappear. Reporting the operator's own
+// documented act as an error would be muster's bug. The target is resolved
+// TEXTUALLY, through the same no-follow stat-and-readlink linkTarget uses
+// everywhere else; a link anywhere else still errors.
+//
 // Every other non-regular entry — a directory, a device, a socket named
 // *.conf — sets nothing and is skipped, which is the crypto-policies lesson:
 // a shape that cannot carry settings must degrade, never error.
-func chainReadFailed(err error) bool {
+func chainReadFailed(a collect.Access, p string, err error) bool {
 	switch {
 	case errors.Is(err, fs.ErrNotExist):
 		return false
 	case errors.Is(err, collect.ErrSymlink):
-		return true
+		target, ok := linkTarget(a, p)
+		return !ok || target != devNull
 	default:
 		return !nonRegular(err)
 	}

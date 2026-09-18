@@ -180,6 +180,23 @@ func TestSysctlPersistedMerge(t *testing.T) {
 		t.Errorf("-kernel.unprivileged_bpf_disabled persisted %+v, want 2", got)
 	}
 
+	// The last assignment wins WITHIN one file too, not only across files:
+	// 60-hardening.conf sets perf_event_paranoid to 3 on line 7 and to 1 on
+	// line 11, and the source must cite the line that won.
+	if got := persistedOK(t, b, "kernel.sysctl.perf_event_paranoid"); got.Value != 1 {
+		t.Errorf("perf_event_paranoid persisted %+v, want 1: the file assigns it twice", got)
+	} else if got.Source.Line != 11 {
+		t.Errorf("perf_event_paranoid cites line %d, want 11, the second assignment", got.Source.Line)
+	}
+
+	// A CRLF-terminated line parses as its value, not as the value plus a
+	// carriage return, and the evidence line carries none either.
+	if got := persistedOK(t, b, "kernel.sysctl.randomize_va_space"); got.Value != 2 {
+		t.Errorf("randomize_va_space persisted %+v, want 2 from the CRLF line", got)
+	} else if strings.ContainsRune(got.Source.Raw, '\r') {
+		t.Errorf("the evidence line %q kept its carriage return", got.Source.Raw)
+	}
+
 	// /etc/sysctl.conf is applied last of all.
 	if got := persistedOK(t, b, "kernel.sysctl.kptr_restrict"); got.Value != 2 {
 		t.Errorf("kptr_restrict persisted %+v, want 2 from /etc/sysctl.conf", got)
@@ -253,6 +270,35 @@ func TestSysctlOtherSymlinkIsAnError(t *testing.T) {
 	// have set, and the runtime side is untouched by it.
 	if s := setting(t, b, "kernel.sysctl.sysrq"); s.Runtime.Status != facts.StatusOK || s.Effective.Value != 176 {
 		t.Errorf("runtime %+v / effective %+v, want the /proc/sys answer", s.Runtime, s.Effective)
+	}
+}
+
+// K-21: a link to /dev/null is sysctl.d(5)'s mask idiom, not a fragment
+// muster failed to read. The base name is disabled — the vendor file below it
+// is never opened — and nothing about it is an error.
+func TestSysctlDevNullMasksABaseName(t *testing.T) {
+	a := &fsAccess{files: map[string]string{
+		"/usr/lib/sysctl.d/99-protect-links.conf": "sysctl.d-99-protect-links.conf",
+		"/etc/sysctl.d/10-magic-sysrq.conf":       "sysctl.d-10-magic-sysrq.conf",
+	}}
+	for k, v := range procSysSeeds() {
+		a.files[k] = v
+	}
+	seedLink(a, "/etc/sysctl.d/99-protect-links.conf", "/dev/null")
+	b := build(t, "sysctl", a)
+
+	// Not an error anywhere: the masked key simply has no persisted value.
+	for _, key := range []string{"kernel.sysctl.protected_regular", "kernel.sysctl.protected_fifos"} {
+		if got := persisted(t, b, key); got.Status != facts.StatusAbsent {
+			t.Errorf("%s persisted %+v, want absent: the base name is masked to /dev/null", key, got)
+		}
+	}
+	if slices.Contains(a.reads, "/usr/lib/sysctl.d/99-protect-links.conf") {
+		t.Error("the masked vendor file was read; /dev/null still owns that base name")
+	}
+	// Every other key is untouched by the mask.
+	if got := persistedOK(t, b, "kernel.sysctl.sysrq"); got.Value != 176 {
+		t.Errorf("sysrq persisted %+v, want 176 from the file the mask says nothing about", got)
 	}
 }
 
