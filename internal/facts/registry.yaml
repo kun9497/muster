@@ -2512,7 +2512,7 @@ keys:
     collector: boot
   - key: boot.grub_password_set
     type: bool
-    description: Whether a bootloader superuser or password hash is configured in the chosen grub.cfg, /boot/grub2/user.cfg or an /etc/grub.d fragment.
+    description: Whether a literal grub.pbkdf2 password hash is configured in the chosen grub.cfg, /boot/grub2/user.cfg or an /etc/grub.d fragment; the ${GRUB2_PASSWORD} reference and the set superusers line every EL grub.cfg carries are not one.
     since: 1
     sensitivity: public
     collector: boot

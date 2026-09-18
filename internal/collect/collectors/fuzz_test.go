@@ -1117,14 +1117,14 @@ func FuzzParseLimitsCore(f *testing.F) {
 }
 
 func FuzzGrubPasswordSet(f *testing.F) {
-	seeds(f, "testdata/grub.cfg.sample", "testdata/user.cfg.sample", "testdata/grub.d-*.sample")
+	seeds(f, "testdata/grub.cfg.*", "testdata/user.cfg.sample", "testdata/grub.d-*.sample")
 	f.Fuzz(func(t *testing.T, data []byte) {
 		fuzzBody(t, "grubPasswordSet", func() any { return grubPasswordSet(data) }, len(data))
 	})
 }
 
 func FuzzSecureBootFromEfivar(f *testing.F) {
-	seeds(f, "testdata/SecureBoot.sample")
+	seeds(f, "testdata/SecureBoot.*")
 	f.Fuzz(func(t *testing.T, data []byte) {
 		fuzzBody(t, "secureBootFromEfivar", func() any {
 			enabled, ok := secureBootFromEfivar(data)

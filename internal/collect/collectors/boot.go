@@ -34,6 +34,10 @@ const (
 	// grubUserCfg is what grub-setpassword writes on EL, 0600 and root-owned.
 	grubUserCfg = "/boot/grub2/user.cfg"
 	grubDGlob   = "/etc/grub.d/*"
+
+	// grubHashPrefix is what grub-mkpasswd-pbkdf2 puts in front of every hash
+	// it prints, whichever digest was asked for.
+	grubHashPrefix = "grub.pbkdf2."
 )
 
 // grubCfgFixed are the two candidates that need no enumeration, in the order
@@ -232,7 +236,7 @@ func grubPassword(a collect.Access, cfg string, cfgErr *facts.Envelope) facts.En
 		return *scan.readErr
 	}
 	if len(scan.files) == 0 {
-		return collect.Absent("no grub.cfg, " + grubUserCfg + " or " + grubDGlob + " to read a superuser from")
+		return collect.Absent("no grub.cfg, " + grubUserCfg + " or " + grubDGlob + " to read a password hash from")
 	}
 
 	set := false
@@ -245,26 +249,50 @@ func grubPassword(a collect.Access, cfg string, cfgErr *facts.Envelope) facts.En
 }
 
 // grubPasswordSet reports whether the bytes of one file of the boot chain
-// configure a bootloader password. GRUB asks for one once a superuser is
-// named (`set superusers`), and can check it once a hash is given
-// (`password_pbkdf2`); either is enough to judge the file by.
+// carry a bootloader password (ruling K-22). The test is a literal
+// `grub.pbkdf2.` hash and nothing else, in either of the two shapes a
+// distribution writes one in:
 //
-// The token has to be the line's FIRST field, so a message or an echo that
-// merely mentions it is not a password, and a commented-out example — which
-// every distribution ships — is skipped like the comment it is.
+//	password_pbkdf2 <user> grub.pbkdf2.sha512.…   (Debian and Ubuntu, in grub.cfg)
+//	GRUB2_PASSWORD=grub.pbkdf2.sha512.…           (EL, in user.cfg, value possibly quoted)
+//
+// `set superusers` counts for nothing, and a `${GRUB2_PASSWORD}` reference is
+// not a hash. EL's 01_users fragment emits BOTH tokens into every generated
+// grub.cfg, inside an `if [ -n "${GRUB2_PASSWORD}" ]` GRUB evaluates at boot:
+// naming a superuser is the template's text, present on every EL host whether
+// or not anyone ever ran grub-setpassword, so judging by it would fail a
+// whole distribution for a password it does not have. A hash is only ever
+// there because someone put it there.
+//
+// A commented-out example — which every distribution ships — is skipped like
+// the comment it is, and the token must be the line's FIRST field, so a
+// message or an echo that merely mentions it is not a password.
 func grubPasswordSet(data []byte) bool {
 	for _, line := range splitLines(data) {
 		fields := strings.Fields(line)
 		if len(fields) == 0 || strings.HasPrefix(fields[0], "#") {
 			continue
 		}
-		if fields[0] == "password_pbkdf2" {
+		if fields[0] == "password_pbkdf2" && len(fields) >= 3 &&
+			strings.HasPrefix(fields[2], grubHashPrefix) {
 			return true
 		}
-		if fields[0] == "set" && len(fields) > 1 &&
-			(fields[1] == "superusers" || strings.HasPrefix(fields[1], "superusers=")) {
+		if v, ok := strings.CutPrefix(fields[0], "GRUB2_PASSWORD="); ok &&
+			strings.HasPrefix(unquoteShellValue(v), grubHashPrefix) {
 			return true
 		}
 	}
 	return false
+}
+
+// unquoteShellValue strips the one pair of matching quotes a shell assignment
+// may carry. user.cfg is sourced by GRUB's own shell, which accepts the hash
+// quoted or bare, and grub-setpassword has written it both ways.
+func unquoteShellValue(v string) string {
+	if len(v) >= 2 {
+		if q := v[0]; (q == '"' || q == '\'') && v[len(v)-1] == q {
+			return v[1 : len(v)-1]
+		}
+	}
+	return v
 }

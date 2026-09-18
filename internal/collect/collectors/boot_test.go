@@ -171,10 +171,87 @@ func TestBootGrubCfgCandidatesAndDenied(t *testing.T) {
 	}
 }
 
+// A UEFI host keeps grub.cfg under a vendor directory of the EFI system
+// partition, which has to be enumerated before it can be stat'd (K-4). The
+// vendor name varies by distribution and more than one may be installed, so
+// the candidates are taken in the sorted order Glob returns them in.
+func TestBootGrubCfgOnTheEFIPartition(t *testing.T) {
+	const rocky = "/boot/efi/EFI/rocky/grub.cfg"
+	const centos = "/boot/efi/EFI/centos/grub.cfg"
+
+	// Neither fixed candidate exists, so the EFI one is the answer, and the
+	// permission leaves are that file's.
+	files := map[string]string{groupPath: "group", rocky: "grub.cfg.sample"}
+	b := build(t, "boot", &fsAccess{files: files, stats: bootStats(rocky)})
+	if e := env(t, b, "boot.grub_cfg.path"); e.Status != facts.StatusOK || e.Value != rocky {
+		t.Fatalf("boot.grub_cfg.path = %+v, want ok %s", e, rocky)
+	}
+	if e := env(t, b, "boot.grub_cfg.mode"); e.Status != facts.StatusOK || e.Value != 0o600 {
+		t.Errorf("boot.grub_cfg.mode = %+v, want the 0600 of %s", e, rocky)
+	}
+	if e := env(t, b, "boot.grub_password_set"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("boot.grub_password_set = %+v, want the true of %s's hash", e, rocky)
+	}
+
+	// Two vendor directories: the sorted order decides, so the answer is the
+	// same on every run whatever order the kernel listed them in.
+	files = map[string]string{groupPath: "group", rocky: "grub.cfg.sample", centos: "grub.cfg.comments"}
+	stats := bootStats(rocky)
+	stats[centos] = statResult{mode: 0o644, uid: 0, gid: 0, kind: "regular"}
+	b = build(t, "boot", &fsAccess{files: files, stats: stats})
+	if e := env(t, b, "boot.grub_cfg.path"); e.Status != facts.StatusOK || e.Value != centos {
+		t.Errorf("boot.grub_cfg.path = %+v, want %s: the EFI candidates are taken in sorted order", e, centos)
+	}
+	if e := env(t, b, "boot.grub_cfg.mode"); e.Value != 0o644 {
+		t.Errorf("boot.grub_cfg.mode = %+v, want the 0644 of %s", e, centos)
+	}
+}
+
+// A /boot/efi/EFI this run may not search is the answer at the position the
+// EFI candidates occupy — after the two fixed paths have said "not there".
+// Glob discards that refusal and would otherwise look like "no vendor
+// directory", which is the NOT_APPLICABLE B-10 refuses.
+func TestBootGrubCfgGlobRefused(t *testing.T) {
+	a := &fsAccess{
+		files:      map[string]string{groupPath: "group"},
+		deniedDirs: map[string]bool{"/boot/efi/EFI": true},
+	}
+	b := build(t, "boot", a)
+	for _, key := range append([]string{"path"}, permLeaves...) {
+		e := env(t, b, "boot.grub_cfg."+key)
+		if e.Status != facts.StatusDenied {
+			t.Errorf("boot.grub_cfg.%s = %+v, want denied", key, e)
+		}
+		if !strings.Contains(e.Reason, grubEFIGlob) {
+			t.Errorf("boot.grub_cfg.%s reason %q does not name %s", key, e.Reason, grubEFIGlob)
+		}
+	}
+	if e := env(t, b, "boot.grub_password_set"); e.Status != facts.StatusDenied {
+		t.Errorf("boot.grub_password_set = %+v, want denied with the rest", e)
+	}
+}
+
+// A /sys/firmware/efi that exists and cannot be stat'd is neither uefi nor
+// bios: the answer is the read's status, never a guess in either direction.
+func TestBootFirmwareRefused(t *testing.T) {
+	a := &fsAccess{files: bootSeeds(), fails: map[string]error{efiDir: unix.EACCES}}
+	e := env(t, build(t, "boot", a), "boot.firmware")
+	if e.Status != facts.StatusDenied {
+		t.Errorf("boot.firmware = %+v, want denied", e)
+	}
+	if !strings.Contains(e.Reason, efiDir) {
+		t.Errorf("the reason %q does not name %s", e.Reason, efiDir)
+	}
+	if e.Value != nil {
+		t.Errorf("a denied firmware leaf carries the value %#v", e.Value)
+	}
+}
+
 // The password is judged from the whole chain: the chosen grub.cfg, the
-// user.cfg grub-setpassword writes and every /etc/grub.d fragment. One file
-// of that chain that exists and cannot be read is the answer for the leaf
-// (C3), even when another file already said true — a run that could not read
+// user.cfg grub-setpassword writes and every /etc/grub.d fragment. What is
+// judged is a literal grub.pbkdf2 hash (K-22) and nothing else. One file of
+// that chain that exists and cannot be read is the answer for the leaf (C3),
+// even when another file already said true — a run that could not read
 // everything must not report a value as if it had.
 func TestBootGrubPasswordSet(t *testing.T) {
 	set := func(a *fsAccess) facts.Envelope {
@@ -183,24 +260,43 @@ func TestBootGrubPasswordSet(t *testing.T) {
 	}
 
 	files := bootSeeds()
-	files[grubCfgEL] = "grub.cfg.sample" // set superusers="root"
+	files[grubCfgEL] = "grub.cfg.sample" // password_pbkdf2 root grub.pbkdf2.…
 	if e := set(&fsAccess{files: files, stats: bootStats(grubCfgEL)}); e.Status != facts.StatusOK || e.Value != true {
-		t.Errorf(`grub.cfg with set superusers -> %+v, want ok true`, e)
+		t.Errorf(`grub.cfg with a password_pbkdf2 hash -> %+v, want ok true`, e)
 	}
 
-	// The superuser is declared in a hand-written fragment instead; the
-	// generated grub.cfg says nothing.
+	// The hash is in a hand-written fragment instead; the generated grub.cfg
+	// says nothing.
 	files = bootSeeds()
 	files["/etc/grub.d/40_custom"] = "grub.d-40_custom.sample"
 	if e := set(&fsAccess{files: files, stats: bootStats(grubCfgEL)}); e.Status != facts.StatusOK || e.Value != true {
 		t.Errorf("password_pbkdf2 in /etc/grub.d/40_custom -> %+v, want ok true", e)
 	}
 
-	// Both tokens appear, in comments only, and nothing else sets one.
+	// EL's grub.cfg as 01_users generates it on EVERY host: `set superusers`
+	// and `password_pbkdf2 root "${GRUB2_PASSWORD}"` are the template's own
+	// text, and no hash is anywhere. Judging those tokens would have failed a
+	// whole distribution for a password it does not have (K-22).
+	files = bootSeeds()
+	files[grubCfgEL] = "grub.cfg.el-stock"
+	if e := set(&fsAccess{files: files, stats: bootStats(grubCfgEL)}); e.Status != facts.StatusOK || e.Value != false {
+		t.Errorf("EL's stock 01_users block -> %+v, want ok false: it references a hash it does not have", e)
+	}
+
+	// The hash EL really keeps, in the user.cfg grub-setpassword writes.
+	files = bootSeeds()
+	files[grubCfgEL] = "grub.cfg.el-stock"
+	files[grubUserCfg] = "user.cfg.sample"
+	if e := set(&fsAccess{files: files, stats: bootStats(grubCfgEL)}); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("GRUB2_PASSWORD=grub.pbkdf2.… in user.cfg -> %+v, want ok true", e)
+	}
+
+	// An uncommented `set superusers` and two commented-out hashes, and
+	// nothing else.
 	plain := &fsAccess{files: bootSeeds(), stats: bootStats(grubCfgEL)}
 	e := set(plain)
 	if e.Status != facts.StatusOK || e.Value != false {
-		t.Errorf("a chain whose only mentions are comments -> %+v, want ok false", e)
+		t.Errorf("a chain with a superuser but no hash -> %+v, want ok false", e)
 	}
 	if e.Source == nil || e.Source.Kind != "derived" || len(e.Source.Inputs) != 2 {
 		t.Errorf("source %+v, want the two files that were read", e.Source)
@@ -349,13 +445,19 @@ func TestGrubPasswordSet(t *testing.T) {
 		in   string
 		want bool
 	}{
-		{"superusers", `set superusers="root"`, true},
-		{"superusers indented", "\tset superusers=\"root\"\n", true},
-		{"superusers bare", "set superusers\n", true},
-		{"pbkdf2", "password_pbkdf2 root grub.pbkdf2.sha512.10000.SALT.HASH\n", true},
-		{"commented out", "# set superusers=\"root\"\n#password_pbkdf2 root x\n", false},
-		{"merely mentioned", `echo "set superusers is how you name one"`, false},
-		{"a variable that starts the same", "set superusers_note=1\n", false},
+		{"pbkdf2 hash", "password_pbkdf2 root grub.pbkdf2.sha512.10000.SALT.HASH\n", true},
+		{"pbkdf2 hash indented", "\t  password_pbkdf2 root grub.pbkdf2.sha512.10000.SALT.HASH\n", true},
+		{"user.cfg bare", "GRUB2_PASSWORD=grub.pbkdf2.sha512.10000.SALT.HASH\n", true},
+		{"user.cfg double-quoted", `GRUB2_PASSWORD="grub.pbkdf2.sha512.10000.SALT.HASH"`, true},
+		{"user.cfg single-quoted", `GRUB2_PASSWORD='grub.pbkdf2.sha512.10000.SALT.HASH'`, true},
+		{"superusers alone", `set superusers="root"`, false},
+		{"superusers bare", "set superusers\n", false},
+		{"a reference, not a hash", `password_pbkdf2 root "${GRUB2_PASSWORD}"`, false},
+		{"an empty user.cfg variable", "GRUB2_PASSWORD=\n", false},
+		{"a user.cfg reference", "GRUB2_PASSWORD=${SOMETHING}\n", false},
+		{"pbkdf2 with no hash argument", "password_pbkdf2 root\n", false},
+		{"commented out", "# password_pbkdf2 root grub.pbkdf2.sha512.10000.SALT.HASH\n", false},
+		{"merely mentioned", `echo "password_pbkdf2 root grub.pbkdf2.sha512.x is the shape"`, false},
 		{"empty", "", false},
 	} {
 		if got := grubPasswordSet([]byte(tc.in)); got != tc.want {
