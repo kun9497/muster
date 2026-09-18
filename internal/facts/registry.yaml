@@ -835,12 +835,14 @@ keys:
     since: 1
     sensitivity: public
     collector: files
+    subject_kind: file
   - key: files.user_rhosts
     type: list<record>
     description: .rhosts and .shosts files under interactive homes, as derived flags only - owning account match, whether a wildcard "+" entry is present and the non-comment entry count, never the file body.
     since: 1
     sensitivity: internal
     collector: files
+    subject_kind: file
   - key: files.root_home.mode
     type: int
     description: Permission bits of /root as an integer (e.g. 448 for 0700).
@@ -907,6 +909,7 @@ keys:
     since: 1
     sensitivity: public
     collector: files
+    subject_kind: file
   - key: files.startup_scripts
     type: list<record>
     description: SysV init scripts and systemd unit files under the startup roots, each with path, mode, owner, group, the group/other-writable flags and is_symlink - the enabled-unit symlinks U-17 filters out.

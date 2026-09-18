@@ -1549,7 +1549,7 @@
       "Sensitivity": "public",
       "Collector": "files",
       "DefaultOn": "",
-      "SubjectKind": ""
+      "SubjectKind": "file"
     },
     {
       "Key": "files.user_rhosts",
@@ -1559,7 +1559,7 @@
       "Sensitivity": "internal",
       "Collector": "files",
       "DefaultOn": "",
-      "SubjectKind": ""
+      "SubjectKind": "file"
     },
     {
       "Key": "files.root_home.mode",
@@ -1669,7 +1669,7 @@
       "Sensitivity": "public",
       "Collector": "files",
       "DefaultOn": "",
-      "SubjectKind": ""
+      "SubjectKind": "file"
     },
     {
       "Key": "files.startup_scripts",
