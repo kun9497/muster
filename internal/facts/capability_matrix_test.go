@@ -25,13 +25,16 @@ var (
 )
 
 // M-18/M-34: the matrix is only worth a CI step if every key in it is a
-// registered key CI can actually address by its dotted path. A setting's
-// envelope has no single .status - its runtime and persisted sides carry one
-// each - so a setting key would make the jq expression read null and the step
-// would pass on nothing. A files.*.{mode,uid,gid} leaf is the other trap:
-// those look root-only but are answered by a stat, which muster opens with
-// O_PATH and which needs no read permission, so they are not denied to an
-// unprivileged run at all.
+// registered key CI can actually address by its dotted path. A setting is
+// addressable too, since K-17: its envelope has no .status of its own - the
+// runtime, persisted and effective sides carry one each - so the CI steps
+// read `(.status // .effective.status)`, and the effective side is the right
+// one to read only for a setting the registry judges there. A setting with
+// any other default_on would be checked on a side no control reads, so it is
+// rejected here rather than silently asserted against the wrong status.
+// A files.*.{mode,uid,gid} leaf is the other trap: those look root-only but
+// are answered by a stat, which muster opens with O_PATH and which needs no
+// read permission, so they are not denied to an unprivileged run at all.
 func TestCapabilityMatrixNamesRegisteredKeys(t *testing.T) {
 	raw, err := os.ReadFile(capabilityMatrixPath)
 	if err != nil {
@@ -45,7 +48,61 @@ func TestCapabilityMatrixNamesRegisteredKeys(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	for _, p := range capabilityMatrixProblems(reg, matrix) {
+		t.Errorf("%s: %s", capabilityMatrixPath, p)
+	}
+}
 
+// K-17: the setting rule above is a live rule, not a comment. Eight registered
+// settings are judged on `both` sides rather than on the effective one, and a
+// matrix that named one of them would have the CI step read a status the
+// control does not use. This feeds the checker such a matrix and demands the
+// complaint, so deleting the rule goes red here rather than in six months on
+// somebody's runner.
+func TestCapabilityMatrixRejectsASettingJudgedOffTheEffectiveSide(t *testing.T) {
+	reg, err := LoadRegistry()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var key string
+	for _, e := range reg.Keys {
+		if reg.IsSetting(e) && e.DefaultOn != "effective" {
+			key = e.Key
+			break
+		}
+	}
+	if key == "" {
+		t.Skip("no registered setting is judged off the effective side, so the rule has nothing to reject here")
+	}
+	problems := capabilityMatrixProblems(reg, map[string]map[string][]string{
+		"nonroot":    {"denied": {key}},
+		"no-systemd": {"unsupported": {"services.ssh.installed"}},
+		"container":  {"unsupported": {"kernel.modules"}},
+	})
+	found := false
+	for _, p := range problems {
+		if strings.Contains(p, key) && strings.Contains(p, "effective.status") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("a matrix naming %s (default_on is not effective) must be reported; problems were %v", key, problems)
+	}
+	// The same matrix with a setting judged on the effective side is fine:
+	// the five 0600 sysctls of B-3 are exactly that, and a rule that rejected
+	// every setting would put them back out of reach of the CI step.
+	if p := capabilityMatrixProblems(reg, map[string]map[string][]string{
+		"nonroot":    {"denied": {"kernel.sysctl.protected_fifos"}},
+		"no-systemd": {"unsupported": {"services.ssh.installed"}},
+		"container":  {"unsupported": {"kernel.modules"}},
+	}); len(p) != 0 {
+		t.Errorf("a setting judged on the effective side is addressable through .effective.status: %v", p)
+	}
+}
+
+// capabilityMatrixProblems is the checker itself, over a decoded matrix, so
+// both the committed file and a constructed one can be put through it.
+func capabilityMatrixProblems(reg *Registry, matrix map[string]map[string][]string) []string {
 	var problems []string
 	report := func(format string, args ...any) {
 		problems = append(problems, fmt.Sprintf(format, args...))
@@ -70,10 +127,12 @@ func TestCapabilityMatrixNamesRegisteredKeys(t *testing.T) {
 					report("%s.%s names %q, which is not a registered fact key", family, status, key)
 					continue
 				}
-				// Every family: only a plain envelope answers `.status`; a
-				// setting splits into sides and the jq step reads null.
-				if reg.IsSetting(e) {
-					report("%s names the setting %q (type %s); a setting's sides carry the status, not the key", family, key, e.Type)
+				// Every family: a plain envelope answers `.status` and a
+				// setting answers `.effective.status`, which is the fallback
+				// the CI jq takes - but only a setting judged on the
+				// effective side has its answer there.
+				if reg.IsSetting(e) && e.DefaultOn != "effective" {
+					report("%s names the setting %q (type %s, default_on %q); the CI step falls back to .effective.status, which is not the side this key is judged on", family, key, e.Type, e.DefaultOn)
 				}
 				// M-34, the nonroot half: a stat-only leaf is not denied to an
 				// unprivileged run, because the stat opens with O_PATH.
@@ -88,11 +147,8 @@ func TestCapabilityMatrixNamesRegisteredKeys(t *testing.T) {
 			report("family %q is missing", family)
 		}
 	}
-
 	sort.Strings(problems)
-	for _, p := range problems {
-		t.Errorf("%s: %s", capabilityMatrixPath, p)
-	}
+	return problems
 }
 
 func isStatLeaf(key string) bool {

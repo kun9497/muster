@@ -212,12 +212,25 @@ jobs:
             echo "files.etc_shadow.acl_entries and files.root_home.acl_present read ok instead of denied"
             exit 1
           }
+          # K-17: the same argument for the five 0600 /proc/sys files of spec
+          # B-3. They are the only reason the five kernel.sysctl.* keys are in
+          # the nonroot row, and a kernel that published them 0644 would let
+          # the matrix step pass on nothing.
+          for f in /proc/sys/net/core/bpf_jit_harden \
+                   /proc/sys/fs/protected_symlinks /proc/sys/fs/protected_hardlinks \
+                   /proc/sys/fs/protected_fifos /proc/sys/fs/protected_regular; do
+            ! test -r "$f" || {
+              echo "the nonroot capability matrix assumes this user cannot read $f (0600 on a stock kernel);"
+              echo "where it is readable, that kernel.sysctl.* key reads ok instead of denied"
+              exit 1
+            }
+          done
       - name: every fact the capability matrix calls root-only reads denied
         run: |
           jq -e --slurpfile m docs/reference/capability-matrix.json '
             [ $m[0].nonroot.denied[] as $k
               | ($k | split(".")) as $p
-              | (.facts | getpath($p) | .status)
+              | (.facts | getpath($p) | (.status // .effective.status))
               | select(. != "denied") ] | length == 0' "$RUNNER_TEMP/muster/user.json"
 
   collect-containers:
@@ -280,6 +293,21 @@ jobs:
             # would be a lie in the corpus, so it goes.
             find "$RUNNER_TEMP/muster/containers/seeds" -type f -empty -delete
             echo "SEED_NAME=seeds-$(echo '${{ matrix.image }}' | tr '/:' '--')" >> "$GITHUB_ENV"
+            # K-18: the EL family's non-root path (spec §5). /boot/grub2 is
+            # 0700 there, so an unprivileged run cannot even stat grub.cfg:
+            # every boot.grub_cfg.* leaf and boot.grub_password_set read
+            # denied, and controls 8 and 9 are ERROR rather than the
+            # NOT_APPLICABLE that falling through to the next candidate would
+            # have produced. The capability matrix cannot express a
+            # per-distribution denied, so this is the step that proves it.
+            # 65534 is nobody on both init images; the output directory is
+            # 0700 and owned by it, because muster refuses to write a snapshot
+            # into a world-writable one. A non-root collect is partial (exit
+            # 1), so only the jq below may fail this job.
+            docker exec "$cid" sh -c 'mkdir -p /tmp/muster-nonroot && chmod 700 /tmp/muster-nonroot && chown 65534 /tmp/muster-nonroot'
+            docker exec -u 65534 "$cid" /m/muster collect --out /tmp/muster-nonroot/nonroot.json || true
+            docker exec "$cid" cat /tmp/muster-nonroot/nonroot.json > "$RUNNER_TEMP/muster/containers/nonroot.json"
+            jq -e '.facts.boot.grub_cfg.mode.status == "denied" and .facts.boot.grub_password_set.status == "denied"' "$RUNNER_TEMP/muster/containers/nonroot.json"
             # The parsers against the image's own daemons (F-9). A pair whose
             # oracle binary the image does not ship skips — the log counts
             # them — but a mismatch fails the job.
@@ -323,14 +351,14 @@ jobs:
           jq -e --slurpfile m docs/reference/capability-matrix.json '
             [ $m[0]["no-systemd"].unsupported[] as $k
               | ($k | split(".")) as $p
-              | (.facts | getpath($p) | .status)
+              | (.facts | getpath($p) | (.status // .effective.status))
               | select(. != "unsupported") ] | length == 0' "$RUNNER_TEMP/muster/containers/c.json"
       - name: every fact the capability matrix calls container-unsupported reads unsupported
         run: |
           jq -e --slurpfile m docs/reference/capability-matrix.json '
             [ $m[0].container.unsupported[] as $k
               | ($k | split(".")) as $p
-              | (.facts | getpath($p) | .status)
+              | (.facts | getpath($p) | (.status // .effective.status))
               | select(. != "unsupported") ] | length == 0' "$RUNNER_TEMP/muster/containers/c.json"
 
   collect-contract:
@@ -360,5 +388,5 @@ jobs:
           jq -e --slurpfile m docs/reference/capability-matrix.json '
             [ $m[0].container.unsupported[] as $k
               | ($k | split(".")) as $p
-              | (.facts | getpath($p) | .status)
+              | (.facts | getpath($p) | (.status // .effective.status))
               | select(. != "unsupported") ] | length == 0' "$RUNNER_TEMP/muster/out/s.json"

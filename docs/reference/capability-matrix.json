@@ -8,6 +8,11 @@
       "files.etc_shadow.acl_present",
       "files.etc_sudoers.acl_present",
       "files.root_home.acl_present",
+      "kernel.sysctl.bpf_jit_harden",
+      "kernel.sysctl.protected_fifos",
+      "kernel.sysctl.protected_hardlinks",
+      "kernel.sysctl.protected_regular",
+      "kernel.sysctl.protected_symlinks",
       "sudo.includedir",
       "sudo.secure_path",
       "walk.complete"
@@ -28,7 +33,9 @@
       "walk.world_writable",
       "walk.sticky_missing",
       "walk.unowned",
-      "walk.hidden"
+      "walk.hidden",
+      "kernel.modules",
+      "swap.encrypted"
     ]
   }
 }
