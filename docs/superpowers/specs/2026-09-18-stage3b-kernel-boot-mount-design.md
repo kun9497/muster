@@ -49,7 +49,8 @@ names) the collector emits **every candidate as a row**, present or not, so that
 never selects nothing and a waiver can name the row (`mount:/tmp`, `module:usb-storage`).
 
 **B-2 — six collectors, all `Needs: none`, reads only, no commands.** Each declares its
-paths; nothing here runs a program. Forty keys, all `since: 1`, `sensitivity: public`
+paths; nothing here runs a program. Forty keys, all `since: 1`, `sensitivity: public` except `mounts.points`, whose `source`
+can name a network export and is `internal` like `sockets.listening`
 (12 sysctl + 6 coredump + 13 boot + 5 mounts + 1 modules + 3 swap):
 
 | Collector | Keys | Type | Source |
@@ -166,7 +167,7 @@ change.** Decision D29 in the main design.
   have no beyond rows, so their bytes do not move and no golden is regenerated for the order.
   Result rows gain no field — `category` already says `beyond`.
 - The table's summary block gains two lines, `KISA 2026 (68 controls): pass … fail … warn
-  … manual … n/a … error …` and `beyond the guide (19 controls): …` (the counts are over the
+  … manual … n/a … error … waived …` and `beyond the guide (19 controls): …` (the counts are over the
   report's results), and one separator line `— beyond the guide —` before the first beyond
   row that is shown. The table golden changes by exactly
   those lines; the commit that regenerates it says so.

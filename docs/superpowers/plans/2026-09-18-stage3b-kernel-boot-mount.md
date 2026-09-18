@@ -232,3 +232,47 @@ func TestModulesTreeMissingIsUnsupported(t *testing.T) {}
 - [ ] **Step 2:** Write the documents; gates (K-8), staticcheck on the lab, gitleaks over the range, the host-string grep.
 - [ ] **Step 3:** On the user's word: push, PR; run `examples.yml` on the branch (`gh workflow run examples.yml --ref stage3b-kernel-boot-mount` — it is registered now), fetch both examples (`make examples-fetch RUN=<id>`), review the VM file (the runner's nineteen verdicts are part of the example now), update `examples/README.md`'s run id, commit; CI green; merge on the user's word.
 - [ ] **Step 4:** Execution notes: rulings K-n settled during execution, the lab table as read, the runner's verdicts, the first nightly fuzz result for the new targets, what was parked.
+
+## Execution notes
+
+Executed 2026-09-18 in the worktree `stage3b-kernel-boot-mount` over main `f1199d1`: spec `365810c` (corrected in `2f0c136` and `b0534a2`), plan `9e05afe` + pre-flight fold `2f0c136`, eight implementation tasks each with an opus review and one or two fix rounds, two Fable whole-branch reviews by area, one fix wave, a scoped re-review, the documents and decision D29. Every gate in K-8 ran green on Windows and on the lab host (suite, race build over `internal/controls`, `internal/collect/...` and `internal/report`, five oracle pairs, staticcheck) and gitleaks over the whole range found nothing.
+
+### Rulings settled during execution (K-19 … K-29; K-1 … K-18 are in Global Constraints)
+
+- **K-19 (example reports after a report-format change):** `summary.scopes` changed the committed example reports' bytes while the controls digest had not moved, so Task 1 regenerated the two reports locally from the committed snapshots (a report is a pure function of the snapshot and the embedded set; provenance kept). The workflow run on the pull request replaces all six files (K-12).
+- **K-20 (sysctl merge):** on the lab `procps.service` is an alias of `systemd-sysctl.service`, so the persisted merge follows systemd-sysctl: `*.conf` of `/etc`, `/run`, `/usr/local/lib`, `/usr/lib` sorted by base name across the directories, an earlier directory masking the same name, the later name winning, `/etc/sysctl.conf` last. The plan's example inverted this; the implementer pinned the man page.
+- **K-21 (the `/dev/null` mask):** a symlink to `/dev/null` in any `.d` directory muster reads is the documented way to disable a vendor file; it contributes nothing, masks the same base name in later directories, and is never an error. Any other symlink stays that file's error (C4).
+- **K-22 (what proves a bootloader password):** EL's `01_users` template emits `set superusers` and `password_pbkdf2 root ${GRUB2_PASSWORD}` into every generated grub.cfg, so the spec's two-token rule read true on every stock EL host. `boot.grub_password_set` is true iff an uncommented line of grub.cfg, `user.cfg` or a regular `/etc/grub.d/*` carries a literal `grub.pbkdf2.` hash.
+- **K-23 (a partition vs. a name that is not a device):** `/sys/block/<name>` exists neither for a partition nor for `/dev/root`; a name is a real, terminal device only when its parent disk's directory lists it — probed with a names-only `Glob("/sys/block/<disk>/*")`, because a `Stat` under a `/sys/block` symlink is refused by the no-follow primitive.
+- **K-24 (swap edge shapes):** every swap device must be encrypted; md and loop devices are terminal; zram with a real backing device is terminal on it; a declared sysfs file that exists and cannot be read takes precedence over `unsupported`.
+- **K-25 (control 6's absence):** the fixture harness maps a `fail-` fixture of a `partial` control to WARN while `absentMeans` returns FAIL, so `absent_means: fail` on the core-dump control could not be pinned. It is `absent_means: manual`: a host whose systemd coredump file sets nothing and that has no limits line has decided nothing, and muster does not substitute the daemon's default.
+- **K-26 (proving the EL non-root path in CI):** the Rocky and Alma init images ship no `/boot/grub2`; the container step lays out that shape (0700 with a 0600 grub.cfg) as root before the non-root collect, the way the root job writes the sshd drop-in.
+- **K-27 (the `/lib/modules` fallback):** on a merged-`/usr` container image `/usr/lib/modules` is absent and `/lib` is a symlink, so the fallback read `ErrSymlink` and flipped `run.complete` in every container. The fallback is taken only when `/lib` is a real directory; a link makes the tree `unsupported`. Found by the CI container rehearsal on the lab.
+- **K-28 (the upgraded-EL bootloader link):** an EL host upgraded to 9 on UEFI keeps `/boot/grub2/grub.cfg` as a link into `/boot/efi/EFI/<vendor>/`, and `grub2-mkconfig` preserves it; the candidate resolves textually, a target under the declared EFI glob becomes the path with the target's permission facts, and `user.cfg` beside the target is read for the hash.
+- **K-29 (sensitivity of `mounts.points`):** `source` can name a network export, so the key is `internal` like `sockets.listening`.
+
+### What the reviews found
+
+Per-task reviews: Task 1 clean (four minors parked, folded in the wave); Task 2 two Important (the `/dev/null` mask link spread an error to every persisted side; the size parser refused values systemd accepts); Task 3 the K-22 rule and an untested candidate loop; Task 4 a Blocking (the partition probe under a symlink), the walk's cycle guard and an untested depth limit; Task 5 minors; Task 6 the harness gap behind K-25 and two references dropped; Task 7 two reference omissions and a fixture shape the collector never writes; Task 8 K-27 not implemented literally.
+
+Whole-branch (two Fable reviewers): no Blocking on either side. The collectors side found the upgraded-EL link (K-28), a read limit that would have turned a large module tree into ERROR, and an unfuzzed arithmetic parser; the controls side found the committed examples stale (refreshed on the pull request, K-12) and wording on the partition control. One fix wave of three commits; the scoped re-review is recorded below.
+
+### Deviations from the spec, as shipped
+
+- The bootloader password rule (K-22), control 6's `absent_means` (K-25), the sysctl `default_on` departure from §5.3 (D29), modprobe.d's precedence (`/usr/local/lib` before `/usr/lib`, then `/lib`), `.ko.gz` among the stripped suffixes, the `/lib` fallback (K-27), the CI layout for the EL proof (K-26), `mounts.points` `internal` (K-29) — all folded into the spec text in `b0534a2` and the notes commit.
+- B-9's table line prints `waived` too, so the numbers sum to the scope's count.
+- The plan's `--category beyond` for `controls new` became "an id in the `beyond` area" plus `--importance`; a beyond control has no inventory item to take a rating from.
+- `_mutants.yaml` gained exactly one row (control 6's mechanism (d) guard, implied by (c) under first-match); the three rows K-25 made unnecessary were removed.
+
+### Numbers
+
+- Controls 87 (68 for the 67 items, unchanged; 19 beyond), set `kisa-unix-2026+2026.09.18`; fixtures added 129 (44 + 85) plus the stock-host snapshot; registry +40 keys (`schema_version` 1, all `since: 1`) plus `subject_kind: file` on three existing keys; fuzz targets 64 + 4 (was 51 + 4); mutation test 1472 generated, 4 invalid, 1451 killed, 0 surviving, 17 excluded.
+- Lab host (stock Ubuntu 22.04, VMware, BIOS): the nineteen verdicts read exactly spec §5's table — 1 PASS, 2 PASS, 3 FAIL, 4 PASS, 5 FAIL, 6 WARN, 7 FAIL, 8 FAIL, 9 FAIL, 10 NOT_APPLICABLE, 11 WARN, 12–13 NOT_APPLICABLE, 14 FAIL, 15 NOT_APPLICABLE, 16 FAIL, 17–19 FAIL — and the synthetic snapshot under `controls/testdata/_hosts/` pins them. Oracles: sshd 1 keyword, accounts 98, mountinfo 175, services 17, sysctl 12, no mismatch. Non-root on the lab: the five 0600 sysctl files `denied`. Public containers: `kernel.modules` and `swap.encrypted` `unsupported` in `ubuntu:22.04`, `ubuntu:24.04`, `debian:12` and the Rocky init image; the EL non-root bootloader path `denied`/`denied` in Rocky and Alma.
+- The runner's verdicts and the refreshed examples are recorded with the pull request's first runs (Step 3).
+
+### Parked
+
+- Persisted mounts, `kexec_load_disabled`, `systemd-coredump.socket` masking, network sysctls, `/var*` mount options, squashfs, the kernel command line: spec §1 and §7.
+- The three copies of the drop-in chain (`mergeDropinsWith`, `dropinPaths`, `sysctlFiles`) could be one; systemd ≥ 254's extra main-file locations for `coredump.conf`.
+- `installDisables` accepts `/bin/`, `/usr/bin/` and bare `false`/`true`; a wrapper script that exits non-zero is still "not disabled".
+- `swap.encrypted` `unsupported` in a container holds for a swap file behind an overlay root (the runner); a host with a swap partition answers a value from inside a container.

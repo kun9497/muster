@@ -43,7 +43,8 @@ sysctl과 세 출처의 코어덤프 정책, 부트 체인, 마운트 옵션과 
 않고 면제가 행을 부를 수 있게 합니다(`mount:/tmp`, `module:usb-storage`).
 
 **B-2 — 수집기 여섯, 모두 `Needs: none`, 읽기만, 명령 없음.** 각각 경로를 선언하며
-아무것도 프로그램을 실행하지 않습니다. 키 40개, 전부 `since: 1`, `sensitivity: public`
+아무것도 프로그램을 실행하지 않습니다. 키 40개, 전부 `since: 1`, `sensitivity: public` — 단 `mounts.points`는 `source`가 네트워크
+내보내기를 이름 지을 수 있어 `sockets.listening`처럼 `internal`
 (sysctl 12 + coredump 6 + boot 13 + mounts 5 + modules 1 + swap 3):
 
 | 수집기 | 키 | 타입 | 출처 |
@@ -162,7 +163,7 @@ grub-mkconfig 자신의 umask 077에 근거하며 설명에 인용합니다.
   없으므로 바이트가 움직이지 않고 순서 때문에 재생성되는 골든은 없습니다. 결과 행에 새
   필드는 없습니다 — `category`가 이미 `beyond`를 말합니다.
 - 테이블 요약 블록에 두 줄이 더해집니다: `KISA 2026 (68 controls): pass … fail … warn …
-  manual … n/a … error …`와 `beyond the guide (19 controls): …`(개수는 리포트 결과 기준),
+  manual … n/a … error … waived …`와 `beyond the guide (19 controls): …`(개수는 리포트 결과 기준),
   그리고 표시되는 첫 beyond 행 앞에 구분선 한 줄 `— beyond the guide —`. 테이블 골든은
   정확히 그 줄들만큼 바뀌고, 재생성하는 커밋이 그렇게 말합니다.
 - 종료 코드는 원래의 계약입니다: ERROR 하나라도 → 2, FAIL 하나라도 → 1. 가이드 밖의

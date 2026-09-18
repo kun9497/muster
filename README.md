@@ -81,7 +81,9 @@ muster controls lint --references docs/reference   # the control set's own gate
   never covers an `ERROR`.
 - **Exit codes** are a contract: `2` (could not run or cannot be trusted)
   outranks `1` (findings) outranks `0` (clean). `MANUAL` items do not fail the
-  run unless you ask them to.
+  run unless you ask them to. A FAIL beyond the guide counts like any other:
+  a host that is clean against the 67 items but ships stock kernel, boot or
+  mount settings reads `1` — the summary's two scopes say which side it is.
 
 ## Principles
 
