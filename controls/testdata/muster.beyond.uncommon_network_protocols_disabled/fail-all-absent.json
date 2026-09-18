@@ -12,7 +12,7 @@
     "kernel": {
       "modules": {
         "status": "absent",
-        "reason": "/usr/lib/modules/6.8.0-31-generic/modules.dep lists no module"
+        "reason": "/proc/modules: not present"
       }
     }
   }

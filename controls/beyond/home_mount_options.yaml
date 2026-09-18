@@ -6,7 +6,11 @@ description_ko: 홈 디렉터리는 그 주인이 쓸 수 있으므로, 압축�
 category: beyond
 importance: 하
 automation: auto
-references: {}
+references:
+  stig:
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-231045 }
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-231050 }
+  nist_800_53: ["CM-7(2)"]
 requires_facts: ">=1"
 applies_when:
   - { fact: env.container, op: eq, expected: none }

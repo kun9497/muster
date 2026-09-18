@@ -12,30 +12,30 @@
     "mounts": {
       "points": {
         "status": "absent",
-        "reason": "/proc/self/mountinfo does not exist"
+        "reason": "/proc/self/mountinfo: not present"
       },
       "home": {
         "separate": {
           "status": "absent",
-          "reason": "/proc/self/mountinfo does not exist"
+          "reason": "/proc/self/mountinfo: not present"
         }
       },
       "tmp": {
         "separate": {
           "status": "absent",
-          "reason": "/proc/self/mountinfo does not exist"
+          "reason": "/proc/self/mountinfo: not present"
         }
       },
       "var_tmp": {
         "separate": {
           "status": "absent",
-          "reason": "/proc/self/mountinfo does not exist"
+          "reason": "/proc/self/mountinfo: not present"
         }
       },
       "dev_shm": {
         "separate": {
           "status": "absent",
-          "reason": "/proc/self/mountinfo does not exist"
+          "reason": "/proc/self/mountinfo: not present"
         }
       }
     }

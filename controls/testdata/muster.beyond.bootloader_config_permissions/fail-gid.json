@@ -45,7 +45,7 @@
         },
         "group": {
           "status": "ok",
-          "value": "root",
+          "value": "users",
           "source": {
             "kind": "sys",
             "path": "/boot/grub2/grub.cfg"

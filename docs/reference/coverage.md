@@ -82,10 +82,10 @@
 |---|---|---|---|---|
 | muster.beyond.aslr_and_link_protection | 상 | auto | env.container, kernel.sysctl.protected_fifos, kernel.sysctl.protected_hardlinks, kernel.sysctl.protected_regular, kernel.sysctl.protected_symlinks, kernel.sysctl.randomize_va_space | RHEL-09-213030, RHEL-09-213035, RHEL-09-213070, UBTU-22-213020, UBTU-24-700310 |
 | muster.beyond.bootloader_config_permissions | 상 | auto | boot.grub_cfg.gid, boot.grub_cfg.mode, boot.grub_cfg.uid, env.container | RHEL-09-212025, RHEL-09-212030 |
-| muster.beyond.bootloader_password | 중 | auto | boot.grub_password_set, env.container | RHEL-09-212010 |
+| muster.beyond.bootloader_password | 중 | auto | boot.grub_password_set, env.container | RHEL-09-212010, UBTU-22-212010, UBTU-24-102000 |
 | muster.beyond.core_dump_policy | 중 | partial | coredump.core_pattern, coredump.limits.hard_core, coredump.systemd.process_size_max, coredump.systemd.storage, env.container | RHEL-09-213040, RHEL-09-213085, RHEL-09-213090, RHEL-09-213095 |
 | muster.beyond.dev_shm_mount_options | 중 | auto | env.container, mounts.dev_shm.separate, mounts.points | RHEL-09-231110, RHEL-09-231115, RHEL-09-231120 |
-| muster.beyond.home_mount_options | 하 | auto | env.container, mounts.home.separate, mounts.points | — |
+| muster.beyond.home_mount_options | 하 | auto | env.container, mounts.home.separate, mounts.points | RHEL-09-231045, RHEL-09-231050 |
 | muster.beyond.kernel_pointer_exposure | 중 | auto | env.container, kernel.sysctl.dmesg_restrict, kernel.sysctl.kptr_restrict | RHEL-09-213010, RHEL-09-213025, UBTU-22-213010, UBTU-24-600140 |
 | muster.beyond.ptrace_restriction | 중 | auto | env.container, kernel.sysctl.perf_event_paranoid, kernel.sysctl.yama_ptrace_scope | RHEL-09-213015, RHEL-09-213080 |
 | muster.beyond.secure_boot_enabled | 중 | auto | boot.firmware, boot.secure_boot, env.container | — |
