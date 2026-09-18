@@ -1,0 +1,43 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none"
+      }
+    },
+    "mounts": {
+      "points": {
+        "status": "absent",
+        "reason": "/proc/self/mountinfo does not exist"
+      },
+      "home": {
+        "separate": {
+          "status": "absent",
+          "reason": "/proc/self/mountinfo does not exist"
+        }
+      },
+      "tmp": {
+        "separate": {
+          "status": "absent",
+          "reason": "/proc/self/mountinfo does not exist"
+        }
+      },
+      "var_tmp": {
+        "separate": {
+          "status": "absent",
+          "reason": "/proc/self/mountinfo does not exist"
+        }
+      },
+      "dev_shm": {
+        "separate": {
+          "status": "absent",
+          "reason": "/proc/self/mountinfo does not exist"
+        }
+      }
+    }
+  }
+}

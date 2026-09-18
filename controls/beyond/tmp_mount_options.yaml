@@ -1,0 +1,30 @@
+id: muster.beyond.tmp_mount_options
+title_en: /tmp is mounted nodev, nosuid and noexec
+title_ko: /tmp 이 nodev, nosuid, noexec 로 마운트된다
+description_en: /tmp is the one directory every account and every daemon on the host may write to, so it is where an attacker who has any code execution at all puts the next stage — a setuid-root copy of a shell, a device node that reaches raw disk, a dropped binary to run. The three mount options take those away at the file-system level, whatever the file's own permissions say — nosuid makes the kernel ignore the setuid and setgid bits, nodev makes it ignore device nodes, and noexec refuses to execute a file from the mount at all. It is rated 중 because each of the three blocks a real escalation step but none of them blocks the initial foothold, and noexec is routinely worked around by an interpreter the attacker already has. The options are properties of a mount, so this control judges only a host where /tmp is a mount of its own — where it is not, the mechanism does not apply, muster answers NOT_APPLICABLE, and the finding for that host belongs to separate_partitions, which is where the missing mount is reported. Both distribution families mount a separate /tmp — where they mount one at all — as a tmpfs with nosuid and nodev and without noexec, so a host that has taken the trouble to split /tmp still commonly fails on the third option.
+description_ko: /tmp 은 호스트의 모든 계정과 모든 데몬이 쓸 수 있는 유일한 디렉터리이므로, 어떤 형태로든 코드 실행을 얻은 공격자가 다음 단계를 놓아두는 곳입니다. setuid root 로 복사한 셸, 원시 디스크에 닿는 장치 노드, 실행할 목적으로 떨어뜨린 바이너리가 그런 것들입니다. 세 마운트 옵션은 파일 자신의 권한이 무엇이든 파일 시스템 수준에서 그것들을 무력화합니다. nosuid 는 커널이 setuid·setgid 비트를 무시하게 하고, nodev 는 장치 노드를 무시하게 하며, noexec 는 그 마운트에서의 실행 자체를 거부합니다. 셋 각각이 실제 권한 상승 단계를 막지만 최초 침입 자체를 막지는 못하고 noexec 는 공격자가 이미 가진 인터프리터로 흔히 우회되므로 중요도는 중 입니다. 이 옵션들은 마운트의 속성이므로 이 항목은 /tmp 이 자체 마운트인 호스트만 판정합니다. 그렇지 않은 호스트에서는 메커니즘이 적용되지 않아 muster 가 NOT_APPLICABLE 로 답하며, 그 호스트의 지적 사항은 마운트가 없다는 사실을 보고하는 separate_partitions 에 속합니다. 두 배포판 계열 모두 /tmp 을 분리하는 경우 tmpfs 로 nosuid 와 nodev 는 주되 noexec 는 주지 않으므로, /tmp 을 분리하는 수고를 들인 호스트도 세 번째 옵션에서 실패하는 일이 흔합니다.
+category: beyond
+importance: 중
+automation: auto
+references:
+  stig:
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-231125 }
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-231130 }
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-231135 }
+  nist_800_53: ["CM-7(2)"]
+requires_facts: ">=1"
+applies_when:
+  - { fact: env.container, op: eq, expected: none }
+absent_means: not_applicable
+mechanisms:
+  - when:
+      - { fact: mounts.tmp.separate, op: eq, expected: true }
+    checks:
+      - { fact: mounts.points, op: each, subject: target, where: { field: target, op: eq, expected: "/tmp" }, require: { field: options, op: contains, expected: nodev } }
+      - { fact: mounts.points, op: each, subject: target, where: { field: target, op: eq, expected: "/tmp" }, require: { field: options, op: contains, expected: nosuid } }
+      - { fact: mounts.points, op: each, subject: target, where: { field: target, op: eq, expected: "/tmp" }, require: { field: options, op: contains, expected: noexec } }
+remediation:
+  text_en: Add nodev,nosuid,noexec to the /tmp line of /etc/fstab, or to a /etc/systemd/system/tmp.mount drop-in where systemd owns the mount, and remount. Check first that nothing on the host runs an installer, a package build or a self-extracting archive out of /tmp, because noexec breaks exactly those; where one does, point it at a directory of its own with TMPDIR rather than dropping the option.
+  text_ko: /etc/fstab 의 /tmp 줄에, 또는 systemd 가 마운트를 소유한다면 /etc/systemd/system/tmp.mount 드롭인에 nodev,nosuid,noexec 를 추가하고 다시 마운트합니다. noexec 는 설치 프로그램, 패키지 빌드, 자동 압축 해제 아카이브를 /tmp 에서 실행하는 동작을 그대로 깨뜨리므로 그런 것이 없는지 먼저 확인하고, 있다면 옵션을 빼는 대신 TMPDIR 로 전용 디렉터리를 지정하십시오.
+  risk: restart_service
+  idempotent: true

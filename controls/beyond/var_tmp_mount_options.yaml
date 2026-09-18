@@ -1,0 +1,30 @@
+id: muster.beyond.var_tmp_mount_options
+title_en: /var/tmp is mounted nodev, nosuid and noexec
+title_ko: /var/tmp 이 nodev, nosuid, noexec 로 마운트된다
+description_en: /var/tmp is the world-writable directory whose contents survive a reboot, which makes it the better hiding place of the two — a payload dropped in /tmp is usually on a tmpfs that empties itself at the next boot, while the same file in /var/tmp is still there weeks later, and on a systemd host it is the directory systemd-tmpfiles cleans on a thirty-day schedule rather than at every restart. nosuid makes the kernel ignore the setuid and setgid bits on files under the mount, nodev makes it ignore device nodes, and noexec refuses execution from the mount, so the three together deny persistence the privileges it would need. It is rated 중 for the same reason /tmp is — each option removes an escalation step rather than the foothold, and noexec is bypassed by any interpreter the attacker can already run. The options are properties of a mount, so this control judges only a host where /var/tmp is a mount of its own; where it is not, the mechanism does not apply, the answer is NOT_APPLICABLE, and that host's finding belongs to separate_partitions. Neither distribution family splits /var/tmp by default, so on most hosts the missing mount is the finding and this control stays NOT_APPLICABLE until it exists.
+description_ko: /var/tmp 은 전체 쓰기가 가능하면서 내용이 재부팅을 넘어 살아남는 디렉터리이므로 둘 중 더 나은 은닉처입니다. /tmp 에 떨어진 페이로드는 보통 다음 부팅에 스스로 비워지는 tmpfs 위에 있지만 같은 파일이 /var/tmp 에 있으면 몇 주 뒤에도 그대로 남아 있고, systemd 호스트에서 이 디렉터리는 재시작마다가 아니라 삼십 일 주기로 systemd-tmpfiles 가 청소합니다. nosuid 는 커널이 그 마운트 아래 파일의 setuid·setgid 비트를 무시하게 하고, nodev 는 장치 노드를 무시하게 하며, noexec 는 그 마운트에서의 실행을 거부하므로, 세 옵션이 함께 지속성 확보에 필요한 권한을 없앱니다. /tmp 과 같은 이유로 중요도는 중 입니다. 각 옵션은 최초 침입이 아니라 권한 상승 단계를 없애며 noexec 는 공격자가 이미 실행할 수 있는 인터프리터로 우회됩니다. 이 옵션들은 마운트의 속성이므로 이 항목은 /var/tmp 이 자체 마운트인 호스트만 판정합니다. 그렇지 않으면 메커니즘이 적용되지 않아 NOT_APPLICABLE 이며 그 호스트의 지적 사항은 separate_partitions 에 속합니다. 두 배포판 계열 모두 기본으로는 /var/tmp 을 분리하지 않으므로 대부분의 호스트에서는 마운트가 없다는 사실이 지적 사항이고 이 항목은 마운트가 생길 때까지 NOT_APPLICABLE 로 남습니다.
+category: beyond
+importance: 중
+automation: auto
+references:
+  stig:
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-231175 }
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-231180 }
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-231185 }
+  nist_800_53: ["CM-7(2)"]
+requires_facts: ">=1"
+applies_when:
+  - { fact: env.container, op: eq, expected: none }
+absent_means: not_applicable
+mechanisms:
+  - when:
+      - { fact: mounts.var_tmp.separate, op: eq, expected: true }
+    checks:
+      - { fact: mounts.points, op: each, subject: target, where: { field: target, op: eq, expected: "/var/tmp" }, require: { field: options, op: contains, expected: nodev } }
+      - { fact: mounts.points, op: each, subject: target, where: { field: target, op: eq, expected: "/var/tmp" }, require: { field: options, op: contains, expected: nosuid } }
+      - { fact: mounts.points, op: each, subject: target, where: { field: target, op: eq, expected: "/var/tmp" }, require: { field: options, op: contains, expected: noexec } }
+remediation:
+  text_en: Add nodev,nosuid,noexec to the /var/tmp line of /etc/fstab and remount. Where /var/tmp is bound to /tmp — the systemd var-tmp.mount arrangement some images ship — set the options on that bind mount itself, because a bind mount carries its own options and they have to be given again with remount,bind. Confirm that no package build or upgrade tooling executes from /var/tmp before adding noexec.
+  text_ko: /etc/fstab 의 /var/tmp 줄에 nodev,nosuid,noexec 를 추가하고 다시 마운트합니다. 일부 이미지가 배포하는 systemd var-tmp.mount 구성처럼 /var/tmp 이 /tmp 에 bind 되어 있다면 그 bind 마운트 자체에 옵션을 주어야 합니다. bind 마운트는 자기 옵션을 따로 가지므로 remount,bind 로 다시 지정해야 하기 때문입니다. noexec 를 추가하기 전에 패키지 빌드나 업그레이드 도구가 /var/tmp 에서 실행되지 않는지 확인하십시오.
+  risk: restart_service
+  idempotent: true

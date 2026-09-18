@@ -1,0 +1,25 @@
+id: muster.beyond.usb_storage_disabled
+title_en: The USB mass-storage driver cannot be loaded
+title_ko: USB 대용량 저장 장치 드라이버를 적재할 수 없다
+description_en: usb-storage is the driver that turns a USB port into a mounted file system, and with it loaded a server has a data path nobody authorised in either direction — anything plugged in can carry data out, and an image crafted for one of the file system parsers can carry code in, without a login, a network connection or a log entry that says what was copied. muster requires the module to be disabled. It is rated 중 rather than 하 because the port is usually the one part of a hardened server that is physically reachable — a data centre visitor, a contractor, a cleaner or a recovered stolen machine all meet it first — and because the same driver is the delivery route for the crafted images that uncommon_filesystems_disabled exists to keep away from the kernel. Disabling means install usb-storage /bin/false (or /bin/true) in a modprobe.d file, which is what actually stops modprobe loading the module; a blacklist usb-storage line only suppresses autoloading by alias and is recorded as evidence rather than credited, because an explicit modprobe still loads a blacklisted module. A kernel with the driver built in cannot be configured out of it and fails this control with the built-in state named as the reason; a kernel tree that does not ship the module at all passes.
+description_ko: usb-storage 는 USB 포트를 마운트 가능한 파일 시스템으로 바꾸는 드라이버이며, 이것이 적재되어 있으면 서버에 양방향 모두 아무도 승인하지 않은 데이터 경로가 생깁니다. 꽂히는 것은 무엇이든 데이터를 밖으로 나를 수 있고, 파일 시스템 해석기를 노리고 만든 이미지는 코드를 안으로 들일 수 있으며, 로그인도 네트워크 연결도 무엇이 복사되었는지 말해 주는 로그도 없습니다. muster 는 이 모듈이 비활성화되어 있기를 요구합니다. 포트는 대개 잘 굳혀진 서버에서 물리적으로 닿을 수 있는 유일한 부분이고(데이터센터 방문자, 외주 인력, 청소 인력, 도난당했다 회수된 장비가 모두 그것을 먼저 만납니다), uncommon_filesystems_disabled 가 커널에서 멀리하려는 조작된 이미지의 전달 경로가 바로 이 드라이버이므로 중요도는 하 가 아니라 중 입니다. 비활성화란 modprobe.d 파일의 install usb-storage /bin/false(또는 /bin/true)를 뜻하며 실제로 modprobe 의 적재를 막는 것이 그것입니다. blacklist usb-storage 줄은 별칭에 의한 자동 적재만 억제하므로 인정하지 않고 증거로만 기록합니다. 명시적인 modprobe 는 blacklist 된 모듈도 적재하기 때문입니다. 드라이버가 내장된 커널은 설정으로 뺄 수 없어 이 항목에서 실패하며 내장 상태가 그 이유로 표시되고, 모듈을 아예 배포하지 않는 커널 트리는 통과합니다.
+category: beyond
+importance: 중
+automation: auto
+references:
+  stig:
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-291010 }
+    - { benchmark: ubuntu2204, version: V2R9, id: UBTU-22-291010 }
+    - { benchmark: ubuntu2404, version: V1R6, id: UBTU-24-300039 }
+  nist_800_53: ["CM-7(9)", "IA-3"]
+requires_facts: ">=1"
+applies_when:
+  - { fact: env.container, op: eq, expected: none }
+absent_means: fail
+checks:
+  - { fact: kernel.modules, op: each, subject: name, where: { field: name, op: in, expected: ["usb-storage"] }, require: { field: disabled, op: eq, expected: true } }
+remediation:
+  text_en: Write install usb-storage /bin/false into a file under /etc/modprobe.d, for example /etc/modprobe.d/50-usb-storage.conf, and rebuild the initramfs so the setting applies during early boot as well. Check first that the host does not boot or install from USB media and that no operational procedure depends on a USB device for backups or recovery, because those stop working immediately. A USB keyboard, mouse or serial adapter is unaffected — this is the mass-storage driver alone, not USB support.
+  text_ko: /etc/modprobe.d 아래 파일(예를 들어 /etc/modprobe.d/50-usb-storage.conf)에 install usb-storage /bin/false 를 적고, 초기 부팅 단계에도 적용되도록 initramfs 를 다시 만듭니다. USB 매체로 부팅하거나 설치하지 않는지, 백업이나 복구 절차가 USB 장치에 의존하지 않는지 먼저 확인하십시오. 그런 것들은 즉시 동작을 멈춥니다. USB 키보드·마우스·시리얼 어댑터에는 영향이 없습니다. 이것은 USB 지원 전체가 아니라 대용량 저장 장치 드라이버 하나입니다.
+  risk: none
+  idempotent: true

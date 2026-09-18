@@ -76,21 +76,33 @@
 
 ## Beyond the guide
 
-7 controls muster checks that the guide does not ask for.
+19 controls muster checks that the guide does not ask for.
 
 | Control | Imp. | Automation | Fact keys read | STIG ids |
 |---|---|---|---|---|
 | muster.beyond.aslr_and_link_protection | 상 | auto | env.container, kernel.sysctl.protected_fifos, kernel.sysctl.protected_hardlinks, kernel.sysctl.protected_regular, kernel.sysctl.protected_symlinks, kernel.sysctl.randomize_va_space | RHEL-09-213030, RHEL-09-213035, RHEL-09-213070, UBTU-22-213020, UBTU-24-700310 |
+| muster.beyond.bootloader_config_permissions | 상 | auto | boot.grub_cfg.gid, boot.grub_cfg.mode, boot.grub_cfg.uid, env.container | RHEL-09-212025, RHEL-09-212030 |
+| muster.beyond.bootloader_password | 중 | auto | boot.grub_password_set, env.container | RHEL-09-212010 |
 | muster.beyond.core_dump_policy | 중 | partial | coredump.core_pattern, coredump.limits.hard_core, coredump.systemd.process_size_max, coredump.systemd.storage, env.container | RHEL-09-213040, RHEL-09-213085, RHEL-09-213090, RHEL-09-213095 |
+| muster.beyond.dev_shm_mount_options | 중 | auto | env.container, mounts.dev_shm.separate, mounts.points | RHEL-09-231110, RHEL-09-231115, RHEL-09-231120 |
+| muster.beyond.home_mount_options | 하 | auto | env.container, mounts.home.separate, mounts.points | — |
 | muster.beyond.kernel_pointer_exposure | 중 | auto | env.container, kernel.sysctl.dmesg_restrict, kernel.sysctl.kptr_restrict | RHEL-09-213010, RHEL-09-213025, UBTU-22-213010, UBTU-24-600140 |
 | muster.beyond.ptrace_restriction | 중 | auto | env.container, kernel.sysctl.perf_event_paranoid, kernel.sysctl.yama_ptrace_scope | RHEL-09-213015, RHEL-09-213080 |
+| muster.beyond.secure_boot_enabled | 중 | auto | boot.firmware, boot.secure_boot, env.container | — |
+| muster.beyond.separate_partitions | 중 | partial | env.container, mounts.points | RHEL-09-231010, RHEL-09-231015, RHEL-09-231020, RHEL-09-231025, RHEL-09-231030, RHEL-09-231035 |
 | muster.beyond.suid_dumpable_disabled | 중 | auto | coredump.suid_dumpable, env.container | — |
+| muster.beyond.swap_encrypted | 중 | auto | env.container, swap.encrypted | — |
 | muster.beyond.sysrq_restricted | 중 | auto | env.container, kernel.sysctl.sysrq | — |
+| muster.beyond.tmp_mount_options | 중 | auto | env.container, mounts.points, mounts.tmp.separate | RHEL-09-231125, RHEL-09-231130, RHEL-09-231135 |
+| muster.beyond.uncommon_filesystems_disabled | 하 | auto | env.container, kernel.modules | RHEL-09-231195 |
+| muster.beyond.uncommon_network_protocols_disabled | 중 | auto | env.container, kernel.modules | RHEL-09-213060, RHEL-09-213065 |
 | muster.beyond.unprivileged_bpf_restricted | 하 | auto | env.container, kernel.sysctl.bpf_jit_harden, kernel.sysctl.unprivileged_bpf_disabled | RHEL-09-213075 |
+| muster.beyond.usb_storage_disabled | 중 | auto | env.container, kernel.modules | RHEL-09-291010, UBTU-22-291010, UBTU-24-300039 |
+| muster.beyond.var_tmp_mount_options | 중 | auto | env.container, mounts.points, mounts.var_tmp.separate | RHEL-09-231175, RHEL-09-231180, RHEL-09-231185 |
 
 ## Fact keys used by controls
 
-170 of 390 registered keys are read by a control (3 by the engine); 217 unused.
+183 of 390 registered keys are read by a control (3 by the engine); 204 unused.
 
 | Collector | Registered | Used by a control | Read by the engine | Unused |
 |---|---|---|---|---|
@@ -116,7 +128,7 @@
 | dns | 7 | 2 | 0 | dns.config_files, dns.parse_complete, dns.unmodelled, dns.options.allow_transfer, dns.options.allow_update |
 | sysctl | 12 | 12 | 0 | — |
 | coredump | 6 | 5 | 0 | coredump.limits.sources |
-| boot | 13 | 0 | 0 | boot.firmware, boot.secure_boot, boot.grub_cfg.path, boot.grub_cfg.mode, boot.grub_cfg.uid, boot.grub_cfg.gid, boot.grub_cfg.group, boot.grub_cfg.group_readable, boot.grub_cfg.group_writable, boot.grub_cfg.other_readable, boot.grub_cfg.other_writable, boot.grub_cfg.acl_present, boot.grub_password_set |
-| mounts | 5 | 0 | 0 | mounts.points, mounts.tmp.separate, mounts.var_tmp.separate, mounts.dev_shm.separate, mounts.home.separate |
-| modules | 1 | 0 | 0 | kernel.modules |
-| swap | 3 | 0 | 0 | swap.present, swap.devices, swap.encrypted |
+| boot | 13 | 6 | 0 | boot.grub_cfg.path, boot.grub_cfg.group, boot.grub_cfg.group_readable, boot.grub_cfg.group_writable, boot.grub_cfg.other_readable, boot.grub_cfg.other_writable, boot.grub_cfg.acl_present |
+| mounts | 5 | 5 | 0 | — |
+| modules | 1 | 1 | 0 | — |
+| swap | 3 | 1 | 0 | swap.present, swap.devices |

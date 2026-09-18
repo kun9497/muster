@@ -1,0 +1,30 @@
+id: muster.beyond.dev_shm_mount_options
+title_en: /dev/shm is mounted nodev, nosuid and noexec
+title_ko: /dev/shm 이 nodev, nosuid, noexec 로 마운트된다
+description_en: /dev/shm is the POSIX shared-memory tmpfs, world-writable by design and backed by RAM, and it is a favoured place to stage code precisely because writing there looks like ordinary inter-process communication rather than a file drop — a payload that never touches a disk still needs somewhere executable, and this is usually the nearest one. nosuid makes the kernel ignore the setuid and setgid bits under the mount, nodev makes it ignore device nodes, and noexec refuses execution from the mount. It is rated 중 because the options close a staging ground rather than an entry point, and an attacker who can write there can generally write to /tmp as well. Every systemd host mounts /dev/shm as a separate tmpfs, so unlike the other three mount controls this one applies almost everywhere — and both distribution families mount it nosuid,nodev and without noexec, so a stock host fails this control on the third option alone. Where /dev/shm is somehow not a mount of its own the mechanism does not apply, the answer is NOT_APPLICABLE and the finding belongs to separate_partitions.
+description_ko: /dev/shm 은 POSIX 공유 메모리용 tmpfs 로 설계상 전체 쓰기가 가능하고 RAM 을 저장소로 씁니다. 여기에 쓰는 행위가 파일을 떨어뜨리는 것이 아니라 평범한 프로세스 간 통신처럼 보이기 때문에 코드를 올려두는 장소로 선호됩니다. 디스크에 전혀 닿지 않는 페이로드도 실행 가능한 장소는 필요하고 보통 가장 가까운 것이 여기입니다. nosuid 는 커널이 그 마운트 아래의 setuid·setgid 비트를 무시하게 하고, nodev 는 장치 노드를 무시하게 하며, noexec 는 그 마운트에서의 실행을 거부합니다. 이 옵션들은 진입 지점이 아니라 준비 장소를 닫는 것이고 거기에 쓸 수 있는 공격자는 대개 /tmp 에도 쓸 수 있으므로 중요도는 중 입니다. 모든 systemd 호스트가 /dev/shm 을 별도 tmpfs 로 마운트하므로 다른 세 마운트 항목과 달리 이 항목은 거의 모든 곳에 적용되며, 두 배포판 계열 모두 nosuid,nodev 는 주되 noexec 는 주지 않으므로 기본 설치 호스트는 세 번째 옵션 하나 때문에 이 항목에서 실패합니다. 어떤 이유로든 /dev/shm 이 자체 마운트가 아니면 메커니즘이 적용되지 않아 NOT_APPLICABLE 이며 지적 사항은 separate_partitions 에 속합니다.
+category: beyond
+importance: 중
+automation: auto
+references:
+  stig:
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-231110 }
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-231115 }
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-231120 }
+  nist_800_53: ["CM-7(2)"]
+requires_facts: ">=1"
+applies_when:
+  - { fact: env.container, op: eq, expected: none }
+absent_means: not_applicable
+mechanisms:
+  - when:
+      - { fact: mounts.dev_shm.separate, op: eq, expected: true }
+    checks:
+      - { fact: mounts.points, op: each, subject: target, where: { field: target, op: eq, expected: "/dev/shm" }, require: { field: options, op: contains, expected: nodev } }
+      - { fact: mounts.points, op: each, subject: target, where: { field: target, op: eq, expected: "/dev/shm" }, require: { field: options, op: contains, expected: nosuid } }
+      - { fact: mounts.points, op: each, subject: target, where: { field: target, op: eq, expected: "/dev/shm" }, require: { field: options, op: contains, expected: noexec } }
+remediation:
+  text_en: Add a /dev/shm line to /etc/fstab with tmpfs and defaults,nodev,nosuid,noexec, or drop a /etc/systemd/system/dev-shm.mount override carrying the same options, then remount. A handful of databases and Java runtimes map executable pages out of /dev/shm, so restart the application stack once and watch for an allocation failure before treating the change as done.
+  text_ko: /etc/fstab 에 tmpfs 와 defaults,nodev,nosuid,noexec 로 /dev/shm 줄을 추가하거나 같은 옵션을 담은 /etc/systemd/system/dev-shm.mount 재정의를 놓고 다시 마운트합니다. 일부 데이터베이스와 Java 런타임은 /dev/shm 에서 실행 가능한 페이지를 매핑하므로, 변경을 끝난 것으로 보기 전에 응용 스택을 한 번 재시작해 할당 실패가 없는지 확인하십시오.
+  risk: restart_service
+  idempotent: true

@@ -1,0 +1,19 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none"
+      }
+    },
+    "kernel": {
+      "modules": {
+        "status": "absent",
+        "reason": "/usr/lib/modules/6.8.0-31-generic/modules.dep lists no module"
+      }
+    }
+  }
+}

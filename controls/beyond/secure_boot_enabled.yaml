@@ -1,0 +1,21 @@
+id: muster.beyond.secure_boot_enabled
+title_en: UEFI Secure Boot is enforcing
+title_ko: UEFI 보안 부팅이 적용되고 있다
+description_en: Secure Boot makes the firmware refuse to hand control to a bootloader, shim or kernel that is not signed by a key the platform trusts, which is the only thing standing between a persistent bootkit and a host an attacker has had disk or firmware access to; without it, a replaced bootloader runs before any part of the operating system, so nothing the operating system does afterwards can detect it. muster reads the SecureBoot UEFI variable through efivarfs and requires it to be on. It is rated 중 because turning it on protects only against an attacker who already reached the disk or the boot media, and because a signed-but-vulnerable shim chain has repeatedly been bypassed, so it is a layer rather than a boundary. A BIOS or CSM host has no such variable and is NOT_APPLICABLE through applies_when — Secure Boot is a UEFI feature and there is nothing to enable. A UEFI host whose efivarfs is not mounted, or whose firmware exposes no SecureBoot variable, is reported for review rather than judged, because muster cannot tell an off setting from a variable it could not see. muster judges the SecureBoot variable alone and not SetupMode, so a host in setup mode — enrolling keys, with signature checking not yet enforcing — is not distinguished here and has to be confirmed by hand.
+description_ko: 보안 부팅은 플랫폼이 신뢰하는 키로 서명되지 않은 부트로더·shim·커널에 펌웨어가 제어권을 넘기지 않게 합니다. 디스크나 펌웨어에 접근한 공격자와 지속형 부트킷 사이를 막는 것은 이것뿐이며, 보안 부팅이 없으면 교체된 부트로더가 운영체제의 어떤 부분보다 먼저 실행되므로 이후 운영체제가 무엇을 하더라도 그것을 탐지할 수 없습니다. muster 는 efivarfs 를 통해 SecureBoot UEFI 변수를 읽고 그 값이 켜져 있기를 요구합니다. 이 보호는 이미 디스크나 부팅 매체에 도달한 공격자에게만 효과가 있고 서명되었지만 취약한 shim 체인이 여러 차례 우회된 전례가 있어 경계라기보다 한 겹의 층이므로 중요도는 중 입니다. BIOS 또는 CSM 호스트에는 그런 변수가 없으므로 applies_when 으로 NOT_APPLICABLE 이 됩니다. 보안 부팅은 UEFI 기능이고 켤 대상 자체가 없습니다. efivarfs 가 마운트되지 않았거나 펌웨어가 SecureBoot 변수를 노출하지 않는 UEFI 호스트는 판정하지 않고 검토 대상으로 보고합니다. 꺼져 있는 것과 볼 수 없었던 것을 muster 가 구분할 수 없기 때문입니다. muster 는 SecureBoot 변수만 보고 SetupMode 는 보지 않으므로, 키를 등록하는 중이라 아직 서명 검사가 강제되지 않는 setup mode 호스트는 여기서 구분되지 않으며 사람이 직접 확인해야 합니다.
+category: beyond
+importance: 중
+automation: auto
+references: {}
+requires_facts: ">=1"
+applies_when:
+  - { fact: env.container, op: eq, expected: none }
+  - { fact: boot.firmware, op: eq, expected: uefi }
+absent_means: manual
+checks:
+  - { fact: boot.secure_boot, op: eq, expected: true }
+remediation:
+  text_en: Enable Secure Boot in the firmware setup of the machine and leave the platform in user mode rather than setup mode. Confirm first that every kernel, initramfs and out-of-tree module the host loads is signed by a key the platform trusts, because an unsigned third-party driver — a hypervisor guest agent, a vendor storage module, a DKMS build — will stop loading the moment Secure Boot is enforcing. A host that cannot report the variable needs efivarfs mounted at /sys/firmware/efi/efivars before muster can judge it.
+  text_ko: 장비의 펌웨어 설정에서 보안 부팅을 켜고 플랫폼을 setup mode 가 아닌 user mode 로 둡니다. 보안 부팅이 적용되는 순간 서명되지 않은 제3자 드라이버(하이퍼바이저 게스트 에이전트, 벤더 스토리지 모듈, DKMS 로 빌드한 모듈 등)는 더 이상 적재되지 않으므로, 호스트가 적재하는 모든 커널·initramfs·외부 모듈이 플랫폼이 신뢰하는 키로 서명되어 있는지 먼저 확인하십시오. 변수를 보고하지 못하는 호스트는 muster 가 판정하려면 efivarfs 가 /sys/firmware/efi/efivars 에 마운트되어 있어야 합니다.
+  risk: reboot_required
+  idempotent: true

@@ -1,0 +1,28 @@
+id: muster.beyond.bootloader_config_permissions
+title_en: The bootloader configuration is readable by root alone
+title_ko: 부트로더 설정 파일을 root 만 읽을 수 있다
+description_en: grub.cfg names every kernel, initramfs and kernel command line the host boots, records the disk and volume layout it boots from, and on a host that guards the boot menu it also carries the superuser password hash; whoever can read it learns how the machine is put together, and whoever can write it owns the next boot. muster requires the file the boot collector found — /boot/grub/grub.cfg, /boot/grub2/grub.cfg or the copy on the EFI system partition — to be mode 0600 or stricter (a bit-subset of 0600, relaxed by params.allowed_modes, spec §6.6) and owned by uid 0 and gid 0. It is rated 상 because a group- or world-writable bootloader configuration is a root shell on the next reboot with nothing in the way, and no login, password or audit record between the attacker and the kernel command line. The STIG carries owner and group rules for grub.cfg but no mode rule, so the 0600 is taken from grub-mkconfig(8) itself, which generates the file under umask 077 — 0600 is the mode the tool that writes the file intends. The EL family keeps that mode and Ubuntu ships grub.cfg at 0644, so a stock Ubuntu host fails this control until an operator tightens it. A grub.cfg muster could not stat — an unprivileged run against the EL layout, where the file is 0600 — is ERROR, as every denied fact is, and never NOT_APPLICABLE; only a host with no grub.cfg at all is NOT_APPLICABLE, because it boots through something this control does not describe.
+description_ko: grub.cfg 는 호스트가 부팅하는 모든 커널과 initramfs, 커널 명령줄을 담고 있으며 어떤 디스크와 볼륨 구성에서 부팅하는지도 기록하고, 부팅 메뉴를 보호하는 호스트라면 superuser 비밀번호 해시까지 담습니다. 이 파일을 읽을 수 있는 사람은 장비 구성을 알게 되고, 쓸 수 있는 사람은 다음 부팅을 장악합니다. muster 는 boot 수집기가 찾은 파일(/boot/grub/grub.cfg, /boot/grub2/grub.cfg 또는 EFI 시스템 파티션의 사본)이 mode 0600 이하로 엄격하고(0600 의 비트 부분집합, params.allowed_modes 로 완화, 스펙 §6.6) uid 0·gid 0 소유일 것을 요구합니다. 그룹이나 전체가 쓸 수 있는 부트로더 설정은 다음 재부팅에 아무 방해 없이 얻는 root 셸이며 공격자와 커널 명령줄 사이에 로그인도 비밀번호도 감사 기록도 없으므로 중요도는 상 입니다. STIG 에는 grub.cfg 의 소유자·그룹 규칙만 있고 mode 규칙이 없으므로 0600 은 파일을 생성하는 grub-mkconfig(8) 자신이 umask 077 로 만든다는 사실에서 가져왔습니다. 즉 0600 은 그 파일을 쓰는 도구가 의도한 mode 입니다. EL 계열은 그 mode 를 유지하지만 Ubuntu 는 grub.cfg 를 0644 로 배포하므로 운영자가 조일 때까지 Ubuntu 기본 설치는 이 항목에서 실패합니다. stat 할 수 없었던 grub.cfg(파일이 0600 인 EL 구성을 권한 없이 수집한 경우)는 다른 모든 거부된 사실과 마찬가지로 ERROR 이며 NOT_APPLICABLE 이 아닙니다. grub.cfg 가 아예 없는 호스트만 NOT_APPLICABLE 이며, 그런 호스트는 이 항목이 설명하지 않는 다른 방식으로 부팅합니다.
+category: beyond
+importance: 상
+automation: auto
+references:
+  stig:
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-212025 }
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-212030 }
+  nist_800_53: ["CM-6"]
+requires_facts: ">=1"
+applies_when:
+  - { fact: env.container, op: eq, expected: none }
+absent_means: not_applicable
+params:
+  allowed_modes: { type: list<int>, default: [0, 128, 256, 384], description: "bootloader configuration modes at 0600 or stricter (the bit-subsets of 0600, in decimal)" }
+checks:
+  - { fact: boot.grub_cfg.mode, op: in, expected: "${allowed_modes}" }
+  - { fact: boot.grub_cfg.uid, op: eq, expected: 0 }
+  - { fact: boot.grub_cfg.gid, op: eq, expected: 0 }
+remediation:
+  text_en: chmod 0600 and chown root:root the grub.cfg your distribution uses (/boot/grub/grub.cfg on Debian and Ubuntu, /boot/grub2/grub.cfg on the EL family, plus the EFI copy where one exists). Regenerating the file with grub-mkconfig keeps the mode, so the change survives a kernel update; a grub.cfg on a FAT EFI system partition cannot carry a Unix mode at all and is governed by the mount options of /boot/efi instead.
+  text_ko: 배포판이 쓰는 grub.cfg(Debian·Ubuntu 는 /boot/grub/grub.cfg, EL 계열은 /boot/grub2/grub.cfg, EFI 사본이 있으면 그것도)에 chmod 0600 과 chown root:root 을 적용합니다. grub-mkconfig 로 파일을 다시 생성해도 mode 가 유지되므로 커널 업데이트 후에도 설정이 남습니다. FAT 인 EFI 시스템 파티션의 grub.cfg 는 Unix mode 를 가질 수 없으므로 대신 /boot/efi 의 마운트 옵션이 그 역할을 합니다.
+  risk: none
+  idempotent: true

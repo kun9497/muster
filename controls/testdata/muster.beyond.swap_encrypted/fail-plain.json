@@ -1,0 +1,59 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none"
+      }
+    },
+    "swap": {
+      "present": {
+        "status": "ok",
+        "value": true,
+        "source": {
+          "kind": "proc",
+          "path": "/proc/swaps"
+        }
+      },
+      "devices": {
+        "status": "ok",
+        "value": [
+          {
+            "path": "/swap.img",
+            "type": "file",
+            "encrypted": false,
+            "backing": "vda2"
+          }
+        ],
+        "source": {
+          "kind": "proc",
+          "path": "/proc/swaps"
+        }
+      },
+      "encrypted": {
+        "status": "ok",
+        "value": false,
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "proc",
+              "path": "/proc/swaps"
+            },
+            {
+              "kind": "proc",
+              "path": "/proc/self/mountinfo"
+            },
+            {
+              "kind": "sys",
+              "path": "/sys/block"
+            }
+          ]
+        }
+      }
+    }
+  }
+}
