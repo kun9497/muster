@@ -35,9 +35,14 @@ func linkMap(pairs ...linkPair) map[string]string {
 }
 
 // swapDouble builds the Access one swap layout is read through. Every sysfs
-// entry is spelled the way the kernel spells it: /sys/block is links only,
-// the device's own attributes are files under /sys/devices/virtual/block, and
-// a slaves/ entry is listed by name and never followed.
+// entry is spelled the way the kernel spells it: /sys/block is links only, a
+// partition is a directory under its disk (K-23), the device's own attributes
+// are files under /sys/devices/virtual/block, and a slaves/ entry is listed by
+// name and never followed.
+//
+// Every layout below and every fixture it names is SYNTHETIC: invented volume
+// group names, all-zero device-mapper uuids, invented partition numbers, and
+// no host anywhere. Nothing here was taken from a running machine.
 type swapLayout struct {
 	swaps  string            // the /proc/swaps fixture
 	mounts string            // the mountinfo fixture, "" when no swap FILE needs one
@@ -118,6 +123,7 @@ func TestParseProcSwaps(t *testing.T) {
 		swaps: "proc_swaps.partitions",
 		links: linkMap(sysLink("dm-1"), diskLink("sda")),
 		files: map[string]string{"/sys/devices/virtual/block/dm-1/dm/uuid": "dm.uuid.crypt"},
+		dirs:  []string{"/sys/block/sda/sda2"},
 	}))
 	plist := okList(t, part, "swap.devices")
 	if len(plist) != 2 {
@@ -142,7 +148,7 @@ func TestSwapEncryptedThroughSlaves(t *testing.T) {
 				"/sys/devices/virtual/block/dm-1/dm/uuid": "dm.uuid.lvm",
 				"/sys/devices/virtual/block/dm-0/dm/uuid": "dm.uuid.crypt",
 			},
-			dirs: []string{"/sys/devices/virtual/block/dm-1/slaves/dm-0"},
+			dirs: []string{"/sys/devices/virtual/block/dm-1/slaves/dm-0", "/sys/block/sda/sda2"},
 		}))
 		r := swapRow(t, okList(t, b, "swap.devices"), "/dev/dm-1")
 		if r["encrypted"] != true || r["backing"] != "dm-0" {
@@ -155,18 +161,50 @@ func TestSwapEncryptedThroughSlaves(t *testing.T) {
 		}
 	})
 
-	// A partition has no /sys/block entry of its own — sysfs lists it under
-	// its disk — so the disk is what says the name is a real device, and the
-	// partition is terminal: nothing below it can encrypt it.
+	// K-23: a partition has no /sys/block entry of its own — sysfs lists it as
+	// a DIRECTORY under its disk — so /sys/block/sda/sda2 is what says the
+	// name is a real device, and the partition is then terminal: nothing below
+	// it can encrypt it.
 	t.Run("bare partition", func(t *testing.T) {
 		b := build(t, "swap", swapDouble(swapLayout{
 			swaps: "proc_swaps.partitions",
 			links: linkMap(sysLink("dm-1"), diskLink("sda")),
 			files: map[string]string{"/sys/devices/virtual/block/dm-1/dm/uuid": "dm.uuid.crypt"},
+			dirs:  []string{"/sys/block/sda/sda2"},
 		}))
 		r := swapRow(t, okList(t, b, "swap.devices"), "/dev/sda2")
 		if r["encrypted"] != false || r["backing"] != "sda2" {
 			t.Errorf("/dev/sda2 row = %v, want encrypted false backing sda2", r)
+		}
+	})
+
+	// One dm-crypt node reached through two branches of one stack — a dm-thin
+	// pool whose data and metadata halves sit on the same LUKS device — is
+	// decided ONCE and read twice. A guard that answered "seen already, not
+	// encrypted" on the second branch would fail control 16 on a layout that
+	// is encrypted end to end.
+	t.Run("two branches share one crypt node", func(t *testing.T) {
+		b := build(t, "swap", swapDouble(swapLayout{
+			swaps: "proc_swaps.partitions",
+			links: linkMap(sysLink("dm-1"), sysLink("dm-2"), sysLink("dm-3"), sysLink("dm-0"),
+				diskLink("sda")),
+			files: map[string]string{
+				"/sys/devices/virtual/block/dm-1/dm/uuid": "dm.uuid.lvm",
+				"/sys/devices/virtual/block/dm-2/dm/uuid": "dm.uuid.lvm",
+				"/sys/devices/virtual/block/dm-3/dm/uuid": "dm.uuid.lvm",
+				"/sys/devices/virtual/block/dm-0/dm/uuid": "dm.uuid.crypt",
+			},
+			dirs: []string{
+				"/sys/devices/virtual/block/dm-1/slaves/dm-2",
+				"/sys/devices/virtual/block/dm-1/slaves/dm-3",
+				"/sys/devices/virtual/block/dm-2/slaves/dm-0",
+				"/sys/devices/virtual/block/dm-3/slaves/dm-0",
+				"/sys/block/sda/sda2",
+			},
+		}))
+		r := swapRow(t, okList(t, b, "swap.devices"), "/dev/dm-1")
+		if r["encrypted"] != true || r["backing"] != "dm-0" {
+			t.Errorf("/dev/dm-1 row = %v, want encrypted true backing dm-0: both halves are on the same crypt node", r)
 		}
 	})
 
@@ -179,7 +217,7 @@ func TestSwapEncryptedThroughSlaves(t *testing.T) {
 			mounts: "mountinfo.ubuntu-stock",
 			links:  linkMap(linkPair{"/dev/mapper/vg-root", "../dm-0"}, sysLink("dm-0"), diskLink("vda")),
 			files:  map[string]string{"/sys/devices/virtual/block/dm-0/dm/uuid": "dm.uuid.lvm"},
-			dirs:   []string{"/sys/devices/virtual/block/dm-0/slaves/vda2"},
+			dirs:   []string{"/sys/devices/virtual/block/dm-0/slaves/vda2", "/sys/block/vda/vda2"},
 		}))
 		r := swapRow(t, okList(t, b, "swap.devices"), "/swap.img")
 		if r["encrypted"] != false || r["backing"] != "vda2" {
@@ -226,6 +264,59 @@ func TestSwapEncryptedThroughSlaves(t *testing.T) {
 	})
 }
 
+// The mount that contains a swap file is found by whole COMPONENTS, not by a
+// string prefix: a /var2/swap.img on a host with a /var mount is on the root
+// filesystem, and resolving it through /var would answer about the wrong
+// device entirely. The double gives only the root's volume group a
+// /dev/mapper entry, so a resolver that picked /var cannot reach an answer at
+// all — the assertion is a value, not an absence.
+func TestSwapFileMountIsMatchedByComponent(t *testing.T) {
+	b := build(t, "swap", swapDouble(swapLayout{
+		swaps:  "proc_swaps.var2",
+		mounts: "mountinfo.varlog", // mounts /, /var and /var/log — but no /var2
+		links: linkMap(linkPair{"/dev/mapper/vg-root", "../dm-0"}, sysLink("dm-0"),
+			diskLink("vda")),
+		files: map[string]string{"/sys/devices/virtual/block/dm-0/dm/uuid": "dm.uuid.lvm"},
+		dirs:  []string{"/sys/devices/virtual/block/dm-0/slaves/vda2", "/sys/block/vda/vda2"},
+	}))
+	r := swapRow(t, okList(t, b, "swap.devices"), "/var2/swap.img")
+	if r["encrypted"] != false || r["backing"] != "vda2" {
+		t.Errorf("/var2/swap.img row = %v, want encrypted false backing vda2: /var does not govern /var2", r)
+	}
+
+	// C3: the answer was read out of the mount table, so the envelope cites
+	// it alongside /proc/swaps and the block tree.
+	e := env(t, b, "swap.encrypted")
+	if e.Status != facts.StatusOK || e.Source == nil || e.Source.Kind != "derived" {
+		t.Fatalf("swap.encrypted = %+v, want ok with a derived source", e)
+	}
+	var cited []string
+	for _, in := range e.Source.Inputs {
+		cited = append(cited, in.Path)
+	}
+	want := []string{procSwapsPath, mountinfoPath, sysBlockDir}
+	if !slices.Equal(cited, want) {
+		t.Errorf("swap.encrypted cites %v, want %v", cited, want)
+	}
+
+	// A host whose swap is a PARTITION never opened the mount table, so it
+	// must not cite one.
+	part := build(t, "swap", swapDouble(swapLayout{
+		swaps: "proc_swaps.zram",
+		links: linkMap(sysLink("zram0")),
+		files: map[string]string{"/sys/devices/virtual/block/zram0/backing_dev": "zram.backing_dev.none"},
+	}))
+	pe := env(t, part, "swap.encrypted")
+	if pe.Source == nil {
+		t.Fatal("swap.encrypted has no source")
+	}
+	for _, in := range pe.Source.Inputs {
+		if in.Path == mountinfoPath {
+			t.Errorf("swap.encrypted cites %s on a host with no swap file", mountinfoPath)
+		}
+	}
+}
+
 // K-16: a swap file whose containing mount is not on a block device this
 // kernel lists is UNSUPPORTED naming the source, never an error — the run
 // stays complete and control 16 reads NOT_APPLICABLE rather than ERROR.
@@ -265,6 +356,51 @@ func TestSwapUnresolvableSourceIsUnsupported(t *testing.T) {
 	}
 }
 
+// K-23: the disk being there is not enough. A /dev/sda9 on a host whose sda
+// lists sda1 and sda2 is a name this kernel does not have, and the probe that
+// catches it asks the disk's own directory for the partition's entry — by
+// name, the way K-15 reads slaves/, because /sys/block/sda is a symlink and
+// nothing under it can be opened no-follow.
+func TestSwapPartitionMustBeListedUnderItsDisk(t *testing.T) {
+	a := swapDouble(swapLayout{
+		swaps: "proc_swaps.missing-partition",
+		links: linkMap(diskLink("sda")),
+		dirs:  []string{"/sys/block/sda/sda1", "/sys/block/sda/sda2"},
+	})
+	b := buildBegun(t, "swap", a)
+
+	e := env(t, b, "swap.encrypted")
+	if e.Status != facts.StatusUnsupported {
+		t.Fatalf("swap.encrypted = %+v, want unsupported: sda lists no sda9", e)
+	}
+	if !strings.Contains(e.Reason, "/dev/sda9") {
+		t.Errorf("reason %q does not name the source /dev/sda9", e.Reason)
+	}
+	if w := b.Worst("swap"); w != facts.StatusOK {
+		t.Errorf("Worst(swap) = %v, want ok", w)
+	}
+	// A disk this run may not search is the read's status, never "no such
+	// partition": a denial must not read as a finding about the host.
+	deniedDisk := swapDouble(swapLayout{
+		swaps: "proc_swaps.missing-partition",
+		links: linkMap(diskLink("sda")),
+	})
+	deniedDisk.deniedDirs = map[string]bool{"/sys/block/sda": true}
+	if e := env(t, build(t, "swap", deniedDisk), "swap.encrypted"); e.Status != facts.StatusDenied {
+		t.Errorf("with /sys/block/sda unsearchable, swap.encrypted = %+v, want denied", e)
+	}
+
+	// The same name with its directory present is an ordinary bare partition.
+	a2 := swapDouble(swapLayout{
+		swaps: "proc_swaps.missing-partition",
+		links: linkMap(diskLink("sda")),
+		dirs:  []string{"/sys/block/sda/sda9"},
+	})
+	if e := env(t, build(t, "swap", a2), "swap.encrypted"); e.Status != facts.StatusOK || e.Value != false {
+		t.Errorf("with /sys/block/sda/sda9 present, swap.encrypted = %+v, want ok false", e)
+	}
+}
+
 // parentDisk is what tells /dev/sda2 (a partition of a disk sysfs lists) from
 // /dev/root (a name no kernel ever published), without muster stat'ing a path
 // in /dev it did not declare.
@@ -275,7 +411,8 @@ func TestParentDisk(t *testing.T) {
 		{"nvme0n1p2", "nvme0n1"},
 		{"mmcblk0p1", "mmcblk0"},
 		{"root", "root"},
-		{"dm-1", "dm-"},
+		{"dm-1", "dm-1"}, // a "-" is a family name, never a partition separator
+		{"loop1p", "loop1p"},
 		{"1", "1"},
 	} {
 		if got := parentDisk(tc.name); got != tc.want {
@@ -324,6 +461,7 @@ func TestSwapDeclarationCoversItsReads(t *testing.T) {
 		"/proc/self/mountinfo",
 		"/proc/swaps",
 		"/sys/block/*",
+		"/sys/block/*/*",
 		"/sys/devices/virtual/block/*/backing_dev",
 		"/sys/devices/virtual/block/*/dm/uuid",
 		"/sys/devices/virtual/block/*/slaves/*",

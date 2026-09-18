@@ -13,6 +13,11 @@ import (
 
 // mountsDouble serves one mountinfo fixture as the only file this collector
 // reads.
+//
+// Every mountinfo fixture named below is SYNTHETIC: invented mount ids and
+// device numbers, invented volume group names, the distributions' real
+// spellings for the mount points and the types, and no host anywhere. None of
+// it was taken from a running machine.
 func mountsDouble(fixture string) *fsAccess {
 	return &fsAccess{files: map[string]string{mountinfoPath: fixture}}
 }

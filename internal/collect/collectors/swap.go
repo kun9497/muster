@@ -31,6 +31,13 @@ const (
 	sysBlockDir  = "/sys/block"
 	sysBlockGlob = "/sys/block/*"
 
+	// sysBlockPartGlob is ruling K-23: a partition is a real DIRECTORY under
+	// its disk (/sys/block/sda/sda2), so the probe that says a partition name
+	// is a device on this host is a Stat of that directory, not the presence
+	// of the disk alone. A disk that has no such entry does not have that
+	// partition, whatever the name looks like.
+	sysBlockPartGlob = "/sys/block/*/*"
+
 	sysVirtualBlockDir = "/sys/devices/virtual/block"
 	dmUUIDGlob         = "/sys/devices/virtual/block/*/dm/uuid"
 	slavesGlob         = "/sys/devices/virtual/block/*/slaves/*"
@@ -67,7 +74,7 @@ var swapCollector = collect.Collector{
 		// thing that says which device that filesystem is.
 		mountinfoPath,
 		devMapperGlob,
-		sysBlockGlob, dmUUIDGlob, slavesGlob, backingDevGlob,
+		sysBlockGlob, sysBlockPartGlob, dmUUIDGlob, slavesGlob, backingDevGlob,
 	}, Needs: "none"},
 	Run: runSwap,
 }
@@ -114,7 +121,7 @@ func runSwap(_ context.Context, a collect.Access, b *collect.Builder) error {
 	src := &facts.Source{Kind: "proc", Path: procSwapsPath}
 	b.Set("swap.present", collect.OKRead(len(entries) > 0, src, meta))
 
-	r := &swapResolver{a: a}
+	r := newSwapResolver(a)
 	rows := make([]map[string]any, 0, len(entries))
 	decisions := make([]swapDecision, 0, len(entries))
 	for _, e := range entries {
@@ -128,7 +135,7 @@ func runSwap(_ context.Context, a collect.Access, b *collect.Builder) error {
 		})
 	}
 	b.Set("swap.devices", collect.OKRead(rowsValue(rows), src, meta))
-	b.Set("swap.encrypted", swapEncrypted(decisions, meta))
+	b.Set("swap.encrypted", swapEncrypted(decisions, r, meta))
 	return nil
 }
 
@@ -152,7 +159,7 @@ type swapDecision struct {
 // source comes next — "every device is encrypted" cannot be asserted about a
 // set with a member nobody could look at — and only then is the answer the
 // AND over the devices, which is what "every device is on dm-crypt" means.
-func swapEncrypted(decisions []swapDecision, meta collect.ReadMeta) facts.Envelope {
+func swapEncrypted(decisions []swapDecision, r *swapResolver, meta collect.ReadMeta) facts.Envelope {
 	if len(decisions) == 0 {
 		return collect.Absent(procSwapsPath + " lists no swap device")
 	}
@@ -180,9 +187,20 @@ func swapEncrypted(decisions []swapDecision, meta collect.ReadMeta) facts.Envelo
 	case unsupported != nil:
 		return *unsupported
 	}
-	return collect.OKRead(all, &facts.Source{Kind: "derived", Inputs: []facts.Source{
-		{Kind: "proc", Path: procSwapsPath}, {Kind: "sys", Path: sysBlockDir},
-	}}, meta)
+	return collect.OKRead(all, &facts.Source{Kind: "derived", Inputs: r.inputs()}, meta)
+}
+
+// inputs is the provenance of the host leaf: /proc/swaps always, the mount
+// table only when a swap FILE sent the resolver through it, and the sysfs
+// block tree the verdict was read out of. C3 — an envelope cites what was
+// read, and a snapshot whose swap is a file must let a reader see that the
+// mount table is part of the answer.
+func (r *swapResolver) inputs() []facts.Source {
+	in := []facts.Source{{Kind: "proc", Path: procSwapsPath}}
+	if r.mountRead {
+		in = append(in, facts.Source{Kind: "proc", Path: mountinfoPath})
+	}
+	return append(in, facts.Source{Kind: "sys", Path: sysBlockDir})
 }
 
 // swapResolver holds the reads one collect shares across devices: the mount
@@ -193,6 +211,19 @@ type swapResolver struct {
 	rows      []mountRow
 	mountErr  *facts.Envelope
 	mountRead bool
+
+	// decided memoizes one device's verdict by name. A device reached twice
+	// is the same device: a dm-thin pool whose data and metadata halves both
+	// sit on one dm-crypt node reaches that node through two paths, and a
+	// guard that answered "seen already, not encrypted" the second time would
+	// fail control 16 on a layout that is entirely encrypted. resolving is
+	// the in-flight set, which only a sysfs that contradicts itself can hit.
+	decided   map[string]swapDecision
+	resolving map[string]bool
+}
+
+func newSwapResolver(a collect.Access) *swapResolver {
+	return &swapResolver{a: a, decided: map[string]swapDecision{}, resolving: map[string]bool{}}
 }
 
 // decide resolves one swap device to a verdict. A swap file is traced to the
@@ -207,7 +238,7 @@ func (r *swapResolver) decide(e swapEntry) swapDecision {
 		}
 		source = s
 	}
-	return r.resolveSource(source, map[string]bool{}, 0)
+	return r.resolveSource(source, 0)
 }
 
 // fileSource is the device the filesystem holding a swap file is mounted
@@ -231,7 +262,7 @@ func (r *swapResolver) fileSource(p string) (string, *facts.Envelope) {
 // the legacy "/dev/root" of a cloud image, a device path this kernel lists
 // nowhere — is UNSUPPORTED naming the source, never an error, so run.complete
 // stays true and control 16 reads NOT_APPLICABLE rather than ERROR.
-func (r *swapResolver) resolveSource(source string, seen map[string]bool, depth int) swapDecision {
+func (r *swapResolver) resolveSource(source string, depth int) swapDecision {
 	if !strings.HasPrefix(source, devDir) {
 		return swapDecision{backing: source, fail: unresolvableSwapSource(source)}
 	}
@@ -256,7 +287,7 @@ func (r *swapResolver) resolveSource(source string, seen map[string]bool, depth 
 		// does not declare, so it is not one muster may follow (C4).
 		return swapDecision{backing: source, fail: unresolvableSwapSource(source)}
 	}
-	return r.resolveDevice(name, seen, depth)
+	return r.resolveDevice(name, depth)
 }
 
 // resolveDevice is the sysfs half of ruling K-15. /sys/block/<dev> is read as
@@ -265,18 +296,47 @@ func (r *swapResolver) resolveSource(source string, seen map[string]bool, depth 
 // disk on a bus — terminal, and not encrypted, because only device-mapper
 // encrypts.
 //
-// A name with no /sys/block entry at all is a PARTITION, which sysfs lists
-// under its disk and never at the top: the disk it belongs to is what says
-// the name is a real device, and the partition is then terminal too. A name
-// whose disk sysfs does not know either is not a block device on this host,
-// which is the other half of K-16 — it is how "/dev/root" is told from
-// "/dev/sda2" without muster ever stat'ing a path in /dev it did not declare.
-func (r *swapResolver) resolveDevice(name string, seen map[string]bool, depth int) swapDecision {
-	if depth > swapWalkDepth || seen[name] {
-		return swapDecision{backing: name}
+// A name with no /sys/block entry at all is a PARTITION, which sysfs lists as
+// a directory UNDER its disk and never at the top. Ruling K-23: the probe is
+// therefore /sys/block/<disk>/<name> — the partition's own directory — and not
+// the mere presence of the disk, which would accept "/dev/sda9" on a host
+// whose sda has two partitions. A name whose disk does not list it is not a
+// block device on this host, which is the other half of K-16: it is how
+// "/dev/root" is told from "/dev/sda2" without muster ever stat'ing a path in
+// /dev it did not declare.
+//
+// The probe is a GLOB of the disk's directory, read for names only, exactly as
+// K-15 reads slaves/ — not a Stat of the partition path. Every entry of
+// /sys/block is a symlink (K-15's own premise), so no path underneath one can
+// be opened no-follow: a Stat of /sys/block/sda/sda3 is refused with "symbolic
+// link in path" on every real host, which would turn a bare LVM partition into
+// an ERROR. Glob names candidates without resolving them, and a name is all
+// this probe wants.
+//
+// The verdict is memoized under the device's name, so a node two branches of
+// one dm stack share is decided once and read twice.
+func (r *swapResolver) resolveDevice(name string, depth int) swapDecision {
+	if d, ok := r.decided[name]; ok {
+		return d
 	}
-	seen[name] = true
+	if depth > swapWalkDepth {
+		return swapDecision{backing: name, fail: ptr(collect.Unsupported(
+			"the device stack under " + name + " is deeper than muster follows"))}
+	}
+	if r.resolving[name] {
+		// A device that is its own ancestor: sysfs contradicting itself. The
+		// verdict is being decided further up the stack and will be applied
+		// there, so this one is NEUTRAL in the AND rather than a false.
+		return swapDecision{encrypted: true, backing: name}
+	}
+	r.resolving[name] = true
+	d := r.resolveUncached(name, depth)
+	delete(r.resolving, name)
+	r.decided[name] = d
+	return d
+}
 
+func (r *swapResolver) resolveUncached(name string, depth int) swapDecision {
 	target, err := r.sysBlockLink(name)
 	switch {
 	case err != nil:
@@ -284,22 +344,23 @@ func (r *swapResolver) resolveDevice(name string, seen map[string]bool, depth in
 			return swapDecision{backing: name, fail: e}
 		}
 		// Not listed at the top of the block tree: a partition, if its disk
-		// is there, and nothing this kernel knows if it is not.
+		// lists it, and nothing this kernel knows if it does not.
 		disk := parentDisk(name)
 		if disk == name {
 			return swapDecision{backing: name, fail: unresolvableSwapSource(devDir + name)}
 		}
-		if _, derr := r.sysBlockLink(disk); derr != nil {
-			if e, isRead := swapReadFail(path.Join(sysBlockDir, disk), derr); isRead {
-				return swapDecision{backing: name, fail: e}
-			}
+		listed, lerr := r.diskLists(disk, name)
+		if lerr != nil {
+			return swapDecision{backing: name, fail: lerr}
+		}
+		if !listed {
 			return swapDecision{backing: name, fail: unresolvableSwapSource(devDir + name)}
 		}
 		return swapDecision{backing: name}
 	case path.Dir(target) != sysVirtualBlockDir:
 		return swapDecision{backing: name} // a disk on a bus: terminal
 	}
-	return r.resolveVirtual(path.Base(target), seen, depth)
+	return r.resolveVirtual(path.Base(target), depth)
 }
 
 // sysBlockLink reads one /sys/block entry as the symlink it is and resolves a
@@ -319,13 +380,25 @@ func (r *swapResolver) sysBlockLink(name string) (string, error) {
 	return path.Clean(target), nil
 }
 
+// diskLists reports whether a disk's own sysfs directory lists a partition of
+// that name. A disk that is not there lists nothing, which is the same answer
+// and the same finding: this kernel does not have the device the source named.
+func (r *swapResolver) diskLists(disk, name string) (bool, *facts.Envelope) {
+	pattern := path.Join(sysBlockDir, disk, "*")
+	matches, err := r.a.Glob(pattern)
+	if err != nil {
+		return false, ptr(globReadError(pattern, err, collect.ErrorEnv(pattern+": "+err.Error())))
+	}
+	return slices.ContainsFunc(matches, func(m string) bool { return path.Base(m) == name }), nil
+}
+
 // resolveVirtual walks a device the kernel composed. dm first: a uuid that
 // begins CRYPT- is the answer, and any other dm device — the LVM volume the
 // stock "encrypted LVM" installation puts swap on — is followed down its
 // slaves. A device with no dm/uuid is not device-mapper at all: zram with no
 // backing store is memory and counts as encrypted, and anything else is
 // terminal.
-func (r *swapResolver) resolveVirtual(name string, seen map[string]bool, depth int) swapDecision {
+func (r *swapResolver) resolveVirtual(name string, depth int) swapDecision {
 	uuidPath := path.Join(sysVirtualBlockDir, name, "dm", "uuid")
 	data, _, err := r.a.ReadFile(uuidPath, readLimit)
 	switch {
@@ -333,7 +406,7 @@ func (r *swapResolver) resolveVirtual(name string, seen map[string]bool, depth i
 		if strings.HasPrefix(strings.TrimSpace(string(data)), cryptUUIDPrefix) {
 			return swapDecision{encrypted: true, backing: name}
 		}
-		return r.resolveSlaves(name, seen, depth)
+		return r.resolveSlaves(name, depth)
 	case errors.Is(err, fs.ErrNotExist), errors.Is(err, unix.ENOTDIR):
 		// K-15: no dm/uuid means "not a dm device", not a read failure.
 		return r.resolveZram(name)
@@ -365,7 +438,7 @@ func (r *swapResolver) resolveZram(name string) swapDecision {
 // pages to the bare one, so "any" would be a false pass. The FIRST slave that
 // is not encrypted, in name order, is the one backing names, which is what
 // puts the operator in front of the disk they have to deal with.
-func (r *swapResolver) resolveSlaves(name string, seen map[string]bool, depth int) swapDecision {
+func (r *swapResolver) resolveSlaves(name string, depth int) swapDecision {
 	pattern := path.Join(sysVirtualBlockDir, name, "slaves", "*")
 	matches, err := r.a.Glob(pattern)
 	if err != nil {
@@ -380,7 +453,7 @@ func (r *swapResolver) resolveSlaves(name string, seen map[string]bool, depth in
 	out := swapDecision{encrypted: true, backing: name}
 	first := true
 	for _, m := range matches {
-		d := r.resolveDevice(path.Base(m), seen, depth+1)
+		d := r.resolveDevice(path.Base(m), depth+1)
 		if d.fail != nil {
 			return d
 		}
@@ -394,21 +467,28 @@ func (r *swapResolver) resolveSlaves(name string, seen map[string]bool, depth in
 }
 
 // parentDisk is the disk a partition name belongs to: sda2 -> sda, vda1 ->
-// vda, nvme0n1p2 -> nvme0n1, mmcblk0p1 -> mmcblk0. A name with no trailing
-// digits is not a partition name and is returned unchanged, which is what
-// makes "root" — the /dev/root of a cloud image, a name no kernel ever
-// published — resolve to nothing.
+// vda, nvme0n1p2 -> nvme0n1, mmcblk0p1 -> mmcblk0. A name that is not a
+// partition name is returned UNCHANGED, and the caller reads "disk == name" as
+// "this is not a partition of anything" — which is what makes "root", the
+// /dev/root of a cloud image that no kernel ever published, resolve to
+// nothing.
+//
+// Two shapes are not partition names. A name with no trailing digits at all is
+// one. So is a name whose digits follow a "-": dm-1, and every other kernel
+// family that numbers itself that way, is a whole device with a /sys/block
+// entry of its own, so a dm-1 that reached here is a name this host does not
+// have — "dm-" is not a disk and must never be probed as one.
 func parentDisk(name string) string {
 	i := len(name)
 	for i > 0 && name[i-1] >= '0' && name[i-1] <= '9' {
 		i--
 	}
-	if i == len(name) || i == 0 {
+	if i == len(name) || i == 0 || name[i-1] == '-' {
 		return name
 	}
 	// nvme and mmcblk separate the partition number with a "p" that only
-	// counts as a separator when a digit precedes it: dm-1 must not become
-	// "dm-" by the same rule, and it does not, because "-" is not "p".
+	// counts as a separator when a digit precedes it, so "loop1p" would not
+	// be mistaken for one.
 	if i > 1 && name[i-1] == 'p' && name[i-2] >= '0' && name[i-2] <= '9' {
 		i--
 	}
