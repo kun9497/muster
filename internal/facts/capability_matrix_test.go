@@ -24,6 +24,14 @@ var (
 	capabilityStatuses = []string{"denied", "unsupported"}
 )
 
+// capabilityNotesSection is the one section of the file that is prose rather
+// than an assertion: JSON carries no comments, and a list that says a key is
+// unsupported in a container without saying WHY is read as "muster cannot do
+// this in a container" when the truth is narrower. The CI steps never index
+// it. It is keyed by fact key so a note cannot outlive the key it explains -
+// the checker below holds it to the registry exactly as it holds the lists.
+const capabilityNotesSection = "_notes"
+
 // M-18/M-34: the matrix is only worth a CI step if every key in it is a
 // registered key CI can actually address by its dotted path. A setting is
 // addressable too, since K-17: its envelope has no .status of its own - the
@@ -137,6 +145,17 @@ func capabilityMatrixProblems(reg *Registry, matrix map[string]map[string][]stri
 		problems = append(problems, fmt.Sprintf(format, args...))
 	}
 	for _, family := range sortedMapKeys(matrix) {
+		if family == capabilityNotesSection {
+			for _, key := range sortedStatusKeys(matrix[family]) {
+				if _, ok := reg.Lookup(key); !ok {
+					report("%s names %q, which is not a registered fact key", capabilityNotesSection, key)
+				}
+				if len(matrix[family][key]) == 0 {
+					report("%s[%q] is empty, so it explains nothing", capabilityNotesSection, key)
+				}
+			}
+			continue
+		}
 		if !contains(capabilityFamilies, family) {
 			report("unknown capability family %q; the families are %s", family, strings.Join(capabilityFamilies, " and "))
 			continue
@@ -210,4 +229,45 @@ func sortedStatusKeys(m map[string][]string) []string {
 	}
 	sort.Strings(keys)
 	return keys
+}
+
+// The notes section is prose, but a note about a key the registry no longer
+// has is worse than no note: it tells a reader the key exists. The checker
+// holds it to the registry exactly as it holds the assertion lists.
+func TestCapabilityMatrixRejectsANoteAboutAnUnregisteredKey(t *testing.T) {
+	reg, err := LoadRegistry()
+	if err != nil {
+		t.Fatal(err)
+	}
+	const gone = "swap.encrypted_everywhere"
+	if _, ok := reg.Lookup(gone); ok {
+		t.Fatalf("%s is registered, so it cannot stand for a deleted key here", gone)
+	}
+	base := map[string]map[string][]string{
+		"nonroot":    {"denied": {"kernel.sysctl.protected_fifos"}},
+		"no-systemd": {"unsupported": {"services.ssh.installed"}},
+		"container":  {"unsupported": {"kernel.modules"}},
+	}
+	base[capabilityNotesSection] = map[string][]string{gone: {"a sentence about a key that is gone"}}
+	found := false
+	for _, p := range capabilityMatrixProblems(reg, base) {
+		if strings.Contains(p, gone) && strings.Contains(p, "not a registered fact key") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("a note about %s must be reported", gone)
+	}
+
+	// A note about a key that IS registered, with a sentence in it, passes -
+	// which is what the committed file relies on.
+	base[capabilityNotesSection] = map[string][]string{"swap.encrypted": {"why it is unsupported in a container"}}
+	if p := capabilityMatrixProblems(reg, base); len(p) != 0 {
+		t.Errorf("a note about a registered key must pass: %v", p)
+	}
+	// An empty note is a heading with nothing under it.
+	base[capabilityNotesSection] = map[string][]string{"swap.encrypted": {}}
+	if p := capabilityMatrixProblems(reg, base); len(p) == 0 {
+		t.Error("an empty note must be reported")
+	}
 }

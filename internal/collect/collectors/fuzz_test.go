@@ -1186,3 +1186,39 @@ func FuzzModuleStates(f *testing.F) {
 		}, len(data))
 	})
 }
+
+// FuzzParseSizeValue and FuzzParentDisk are the two scalar parsers of stage
+// 3B. Both take a string rather than a file's bytes, so the seeds are written
+// out here rather than globbed from testdata: what an operator writes in
+// ProcessSizeMax=, and what /proc/swaps and mountinfo spell a device with.
+//
+// fuzzBody's output bound is trivial for both — one returns an int64 and a
+// bool, the other a string cut out of its own input — so what these targets
+// really assert is no panic and determinism. parseSizeValue multiplies and
+// sums concatenated terms and has to refuse an overflow rather than wrap;
+// parentDisk indexes backwards through the name and has to stop at the
+// shapes that are not partition names at all.
+
+func FuzzParseSizeValue(f *testing.F) {
+	for _, s := range []string{
+		"2G", "1.5G", "1G512M", "100B", "infinity", "2GB", "-1",
+		"999999999999999999999999999999",
+	} {
+		f.Add([]byte(s))
+	}
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "parseSizeValue", func() any {
+			n, ok := parseSizeValue(string(data))
+			return []any{n, ok}
+		}, len(data))
+	})
+}
+
+func FuzzParentDisk(f *testing.F) {
+	for _, s := range []string{"sda3", "nvme0n1p2", "mmcblk0p1", "dm-1", "loop1p", "root"} {
+		f.Add([]byte(s))
+	}
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "parentDisk", func() any { return parentDisk(string(data)) }, len(data))
+	})
+}

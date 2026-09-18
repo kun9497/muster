@@ -37,5 +37,10 @@
       "kernel.modules",
       "swap.encrypted"
     ]
+  },
+  "_notes": {
+    "swap.encrypted": [
+      "Unsupported in a container only because the host's swap is a FILE reached through an overlay root (the CI runner's /mnt/swapfile), whose source is not a block device the container's kernel lists (K-16); a host whose swap is a partition resolves it through sysfs and answers a value, in a container as anywhere else."
+    ]
   }
 }
