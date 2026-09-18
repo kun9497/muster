@@ -21,7 +21,8 @@ references and, later, offered as selectable profiles.
 > files, services, the firewall, logging, NFS, SNMP, patch hygiene, FTP, mail
 > and DNS to the closing coverage-and-reference gate — and stage 3A — the deep
 > filesystem walk — are merged. 67 of the 67 items are enrolled (68 controls:
-> 57 auto, 7 partial, 4 manual with the evidence attached). `collect --deep`
+> 57 auto, 7 partial, 4 manual with the evidence attached),
+> and 19 beyond the guide. `collect --deep`
 > walks the local filesystems once, under a time and entry budget, without
 > following a symlink or entering a remote mount or a container layer, and
 > joins every setuid, world-writable, unowned or hidden entry to the package

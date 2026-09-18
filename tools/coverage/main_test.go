@@ -51,9 +51,16 @@ func TestCheckVerifiesTheReadmeCountFragments(t *testing.T) {
 		tripleKO = fmt.Sprintf("auto %d, partial %d, manual %d", n.auto, n.partial, n.manual)
 		staleEN  = fmt.Sprintf("%d auto, %d partial, %d manual", n.auto-1, n.partial+1, n.manual)
 		staleKO  = fmt.Sprintf("auto %d, partial %d, manual %d", n.auto-1, n.partial+1, n.manual)
-		stale    = enrolled - 1
-		goodEN   = fmt.Sprintf("and Rocky; %s judged automatically or with automatic\nevidence (%s), the rest waiting for stage 3.\n", fragEN, tripleEN)
-		goodKO   = fmt.Sprintf("Ubuntu와 Rocky 수집기. %d개 중\n   %d개를 자동 판정하거나 자동 근거를 붙이고(%s), 나머지는 3단계.\n", total, enrolled, tripleKO)
+		// B-12: the beyond count is the third claim, and the one neither of
+		// the others moves with — a control beyond the guide enrols no KISA
+		// item, so it changes neither the enrolled number nor the triple.
+		beyondEN      = fmt.Sprintf("and %d beyond the guide", n.beyond)
+		beyondKO      = fmt.Sprintf("그리고 가이드 밖 %d개", n.beyond)
+		staleBeyondEN = fmt.Sprintf("and %d beyond the guide", n.beyond-1)
+		staleBeyondKO = fmt.Sprintf("그리고 가이드 밖 %d개", n.beyond-1)
+		stale         = enrolled - 1
+		goodEN        = fmt.Sprintf("and Rocky; %s judged automatically or with automatic\nevidence (%s), %s, the rest waiting for stage 3.\n", fragEN, tripleEN, beyondEN)
+		goodKO        = fmt.Sprintf("Ubuntu와 Rocky 수집기. %d개 중\n   %d개를 자동 판정하거나 자동 근거를 붙이고(%s), %s, 나머지는 3단계.\n", total, enrolled, tripleKO, beyondKO)
 	)
 	cases := []struct {
 		name, en, ko string
@@ -90,6 +97,20 @@ func TestCheckVerifiesTheReadmeCountFragments(t *testing.T) {
 			ko:       strings.Replace(goodKO, tripleKO, staleKO, 1),
 			wantCode: 1,
 			wantErr:  fmt.Sprintf("coverage: README.ko.md does not mention %q; update the roadmap sentence", tripleKO),
+		},
+		{
+			name:     "english beyond count stale",
+			en:       strings.Replace(goodEN, beyondEN, staleBeyondEN, 1),
+			ko:       goodKO,
+			wantCode: 1,
+			wantErr:  fmt.Sprintf("coverage: README.md does not mention %q; update the roadmap sentence", beyondEN),
+		},
+		{
+			name:     "korean beyond count stale",
+			en:       goodEN,
+			ko:       strings.Replace(goodKO, beyondKO, staleBeyondKO, 1),
+			wantCode: 1,
+			wantErr:  fmt.Sprintf("coverage: README.ko.md does not mention %q; update the roadmap sentence", beyondKO),
 		},
 		{
 			// The fragment may be split anywhere, including inside the

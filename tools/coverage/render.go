@@ -79,8 +79,10 @@ func countAutomation(items []controls.KISAItem, byItem map[string][]controls.Con
 
 // coverageNumbers are the numbers both READMEs and the table's summary line
 // state: how many of the inventory's items the set enrols, how many items
-// there are, and how the enrolled controls divide by automation.
-type coverageNumbers struct{ enrolled, total, auto, partial, manual int }
+// there are, how the enrolled controls divide by automation, and how many
+// controls stand beyond the guide (B-9, B-12) -- a number the item table
+// cannot state, because a beyond control implements no item.
+type coverageNumbers struct{ enrolled, total, auto, partial, manual, beyond int }
 
 // counts answers all of them from the inputs, for callers that have not
 // joined anything -- the README guard in main.go. The table and the guard
@@ -88,7 +90,21 @@ type coverageNumbers struct{ enrolled, total, auto, partial, manual int }
 func counts(items []controls.KISAItem, deferred []controls.Deferral, set []controls.Control) coverageNumbers {
 	byItem, stage, _ := join(items, deferred, set)
 	auto, partial, manual := countAutomation(items, byItem, stage)
-	return coverageNumbers{enrolled: countEnrolled(items, byItem, stage), total: len(items), auto: auto, partial: partial, manual: manual}
+	return coverageNumbers{enrolled: countEnrolled(items, byItem, stage), total: len(items),
+		auto: auto, partial: partial, manual: manual, beyond: countBeyond(set)}
+}
+
+// countBeyond counts the controls of category "beyond": one predicate, the
+// same one renderBeyond and the report's scope split use (B-9), so the
+// README sentence and the generated table can never disagree.
+func countBeyond(set []controls.Control) int {
+	n := 0
+	for _, c := range set {
+		if c.Category == "beyond" {
+			n++
+		}
+	}
+	return n
 }
 
 // render joins the KISA inventory with the embedded control set and appends
