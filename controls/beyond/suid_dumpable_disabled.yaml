@@ -1,0 +1,20 @@
+id: muster.beyond.suid_dumpable_disabled
+title_en: A program that changed privilege never dumps core
+title_ko: 권한이 바뀐 프로그램은 코어를 남기지 않는다
+description_en: fs.suid_dumpable must be 0, so that a setuid or setgid program — and any program whose credentials changed during exec — is never dumped at all. The value 1 makes every such program dumpable like any other, and 2 keeps the dump but writes it readable by root only, which still puts the privileged process's memory on disk and hands it to whatever handler kernel.core_pattern names. Documentation/admin-guide/sysctl/fs.rst describes all three. It is rated 중 because the dump of a privileged program holds exactly what that program was trusted to read and its caller was not — a shadow hash, a host key, a token from a keyring — so the setting is what keeps an ordinary user from turning a crash into a copy of it. This is deliberately separate from core_dump_policy — that control asks what happens to a dump once it is taken, and this one is the kernel gate that decides whether the privileged dump is taken at all, which holds whatever handler is configured. Ubuntu ships 2 and the EL family 0, so a stock Ubuntu host fails this control until an operator sets it.
+description_ko: fs.suid_dumpable 은 0 이어야 하며, 그래야 setuid·setgid 프로그램과 exec 과정에서 자격 증명이 바뀐 모든 프로그램이 아예 덤프되지 않습니다. 값 1 은 그런 프로그램도 다른 프로그램과 똑같이 덤프되게 하고, 2 는 덤프를 남기되 root 만 읽을 수 있게 기록하는데 이 역시 권한 있는 프로세스의 메모리를 디스크에 올리고 kernel.core_pattern 이 지목한 처리기에 그대로 넘깁니다. 세 값 모두 Documentation/admin-guide/sysctl/fs.rst 에 설명되어 있습니다. 권한 있는 프로그램의 덤프에는 그 프로그램은 읽도록 신뢰받았지만 호출자는 그렇지 않았던 것, 즉 shadow 해시·호스트 키·키링에서 꺼낸 토큰이 그대로 들어 있고, 이 설정이 일반 사용자가 크래시를 그 사본으로 바꾸지 못하게 막는 지점이므로 중요도는 중 입니다. 이 항목을 core_dump_policy 와 일부러 분리한 이유는, 그 항목이 덤프가 떠진 뒤의 처리를 묻는 반면 이 항목은 애초에 권한 있는 덤프를 뜰지 결정하는 커널 차원의 차단이고 어떤 처리기를 쓰든 유효하기 때문입니다. Ubuntu 는 2 를, EL 계열은 0 을 배포하므로 Ubuntu 기본 설치는 운영자가 설정하기 전까지 이 항목에서 실패합니다.
+category: beyond
+importance: 중
+automation: auto
+references: {}
+requires_facts: ">=1"
+applies_when:
+  - { fact: env.container, op: eq, expected: none }
+absent_means: fail
+checks:
+  - { fact: coredump.suid_dumpable, op: eq, expected: 0 }
+remediation:
+  text_en: Write fs.suid_dumpable = 0 into a file under /etc/sysctl.d, for example /etc/sysctl.d/60-kernel-hardening.conf, and apply it with sysctl --system; it takes effect at once and needs no reboot. A crash-reporting tool that collects dumps from setuid programs stops receiving them, which is the intent.
+  text_ko: /etc/sysctl.d 아래 파일(예 /etc/sysctl.d/60-kernel-hardening.conf)에 fs.suid_dumpable = 0 을 적고 sysctl --system 으로 적용합니다. 즉시 반영되며 재부팅이 필요 없습니다. setuid 프로그램의 덤프를 수집하던 크래시 리포트 도구는 더 이상 그것을 받지 못하는데, 그것이 이 설정의 의도입니다.
+  risk: none
+  idempotent: true

@@ -1,0 +1,6 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "env":{"container":{"status":"ok","value":"none"}},
+  "kernel":{"sysctl":{
+    "sysrq":{"runtime":{"status":"absent","reason":"/proc/sys/kernel/sysrq does not exist"},"persisted":{"status":"absent","reason":"no sysctl.d line sets kernel.sysrq"},"effective":{"status":"absent","reason":"/proc/sys/kernel/sysrq does not exist"}}
+  }}
+}}

@@ -1,0 +1,6 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "env":{"container":{"status":"ok","value":"none"}},
+  "coredump":{
+    "suid_dumpable":{"runtime":{"status":"ok","value":0,"source":{"kind":"proc","path":"/proc/sys/fs/suid_dumpable"}},"persisted":{"status":"ok","value":0,"source":{"kind":"file","path":"/etc/sysctl.d/60-kernel-hardening.conf","line":11,"raw":"fs.suid_dumpable = 0"}},"effective":{"status":"ok","value":0,"source":{"kind":"proc","path":"/proc/sys/fs/suid_dumpable"}},"winner":{"kind":"proc","path":"/proc/sys/fs/suid_dumpable"}}
+  }
+}}

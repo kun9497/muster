@@ -1,0 +1,22 @@
+id: muster.beyond.sysrq_restricted
+title_en: The magic SysRq key is disabled, or limited to the value the operator declared
+title_ko: 매직 SysRq 키가 비활성화되어 있거나 운영자가 선언한 값으로 제한된다
+description_en: kernel.sysrq is the bitmask of magic SysRq functions the kernel accepts from the console and from a write to /proc/sysrq-trigger; muster requires 0 unless the operator lists the value their host runs with in params.allowed_sysrq (list<int>, default [0]). Documentation/admin-guide/sysrq.rst lists what the bits do. It is rated 중 because the functions are unauthenticated by design — whoever reaches the console — or any process able to write /proc/sysrq-trigger — can dump every task's memory and registers to the kernel log, send SIGKILL to everything, remount the filesystems read-only or reboot the host, without logging in and without leaving an audit record of who did it. The distributions disagree about the default, so a host is expected to fail this control until somebody decides — Ubuntu ships 176 (sync, remount read-only and the crash and reboot combinations), Debian 438 and the EL family 16 (the secure-attention key alone). An operator who wants their distribution's value keeps it and declares it, which is what the parameter is for; the point of the control is that the value is a decision rather than a default nobody looked at.
+description_ko: kernel.sysrq 는 커널이 콘솔과 /proc/sysrq-trigger 쓰기로부터 받아들이는 매직 SysRq 기능의 비트마스크이며, muster 는 운영자가 params.allowed_sysrq(list<int>, 기본값 [0])에 자기 호스트의 값을 선언하지 않는 한 0 을 요구합니다. 각 비트의 동작은 Documentation/admin-guide/sysrq.rst 에 정리되어 있습니다. 이 기능들은 설계상 인증을 거치지 않으므로 중요도는 중 입니다. 콘솔에 접근한 사람 또는 /proc/sysrq-trigger 에 쓸 수 있는 프로세스는 로그인 없이, 누가 했는지 남기지도 않고 모든 태스크의 메모리와 레지스터를 커널 로그로 덤프하거나 전부에 SIGKILL 을 보내거나 파일 시스템을 읽기 전용으로 다시 마운트하거나 호스트를 재부팅할 수 있습니다. 기본값은 배포판마다 다르므로 누군가 결정하기 전까지 호스트는 이 항목에서 실패하는 것이 정상입니다. Ubuntu 는 176(sync, 읽기 전용 재마운트, crash 및 reboot 조합), Debian 은 438, EL 계열은 16(보안 주의 키만)을 배포합니다. 배포판 값을 유지하려는 운영자는 그 값을 그대로 두고 선언하면 되며 파라미터가 그 용도입니다. 이 항목의 요지는 그 값이 아무도 보지 않은 기본값이 아니라 결정된 값이어야 한다는 것입니다.
+category: beyond
+importance: 중
+automation: auto
+references: {}
+requires_facts: ">=1"
+applies_when:
+  - { fact: env.container, op: eq, expected: none }
+absent_means: fail
+params:
+  allowed_sysrq: { type: list<int>, default: [0], description: "the kernel.sysrq bitmasks this host is allowed to run with; add the distribution default (Ubuntu 176, Debian 438, EL 16) to accept it" }
+checks:
+  - { fact: kernel.sysctl.sysrq, op: in, expected: "${allowed_sysrq}" }
+remediation:
+  text_en: Write kernel.sysrq = 0 into a file under /etc/sysctl.d and apply it with sysctl --system, or, if your operations team relies on the distribution's value, keep it and add that number to params.allowed_sysrq so the decision is recorded. A host whose console is physically controlled and whose recovery procedure uses SysRq is the case the parameter exists for.
+  text_ko: /etc/sysctl.d 아래 파일에 kernel.sysrq = 0 을 적고 sysctl --system 으로 적용합니다. 운영 절차가 배포판 값에 의존한다면 값을 유지하되 그 숫자를 params.allowed_sysrq 에 추가해 결정을 기록하십시오. 콘솔이 물리적으로 통제되고 복구 절차가 SysRq 를 쓰는 호스트가 바로 이 파라미터가 존재하는 이유입니다.
+  risk: none
+  idempotent: true

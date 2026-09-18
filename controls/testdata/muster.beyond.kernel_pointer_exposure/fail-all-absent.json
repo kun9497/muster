@@ -1,0 +1,6 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "env":{"container":{"status":"ok","value":"none"}},
+  "kernel":{"sysctl":{
+    "kptr_restrict":{"runtime":{"status":"absent","reason":"/proc/sys/kernel/kptr_restrict does not exist"},"persisted":{"status":"absent","reason":"no sysctl.d line sets kernel.kptr_restrict"},"effective":{"status":"absent","reason":"/proc/sys/kernel/kptr_restrict does not exist"}},"dmesg_restrict":{"runtime":{"status":"absent","reason":"/proc/sys/kernel/dmesg_restrict does not exist"},"persisted":{"status":"absent","reason":"no sysctl.d line sets kernel.dmesg_restrict"},"effective":{"status":"absent","reason":"/proc/sys/kernel/dmesg_restrict does not exist"}}
+  }}
+}}

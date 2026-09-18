@@ -1,0 +1,6 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "env":{"container":{"status":"ok","value":"none"}},
+  "coredump":{
+    "core_pattern":{"status":"ok","value":"/var/crash/core.%e.%p","source":{"kind":"proc","path":"/proc/sys/kernel/core_pattern"}},"systemd":{"storage":{"status":"absent","reason":"no coredump.conf on this host, so nothing sets Storage"},"process_size_max":{"status":"absent","reason":"no coredump.conf on this host, so nothing sets ProcessSizeMax"}},"limits":{"hard_core":{"status":"ok","value":-1,"source":{"kind":"file","path":"/etc/security/limits.d/90-core.conf","line":2,"raw":"*               hard    core            unlimited"}},"sources":{"status":"ok","value":["/etc/security/limits.d/90-core.conf"],"source":{"kind":"file","path":"/etc/security/limits.d/90-core.conf"}}}
+  }
+}}

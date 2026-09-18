@@ -1,0 +1,6 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "env":{"container":{"status":"ok","value":"none"}},
+  "coredump":{
+    "suid_dumpable":{"runtime":{"status":"ok","value":2,"source":{"kind":"proc","path":"/proc/sys/fs/suid_dumpable"}},"persisted":{"status":"absent","reason":"no sysctl.d line sets fs.suid_dumpable"},"effective":{"status":"ok","value":2,"source":{"kind":"proc","path":"/proc/sys/fs/suid_dumpable"}},"winner":{"kind":"proc","path":"/proc/sys/fs/suid_dumpable"}}
+  }
+}}

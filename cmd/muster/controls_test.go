@@ -42,7 +42,7 @@ func TestControlsLintFixturesFlagAndUnusedKeysNote(t *testing.T) {
 	if code := runControls([]string{"lint", "--fixtures", repoFixtures, "--references", repoReferences, "--kisa", repoKisa}, &out, &errb); code != exitOK {
 		t.Fatalf("exit %d, want %d; stderr %q", code, exitOK, errb.String())
 	}
-	if !strings.Contains(out.String(), "ok: 68 controls") {
+	if !strings.Contains(out.String(), "ok: 75 controls") {
 		t.Errorf("stdout %q lacks the ok line", out.String())
 	}
 	// Spec §5.5 / M-27: registered keys no control uses are reported by the
@@ -164,7 +164,7 @@ func TestControlsLintWithoutReferencesFlagChecksShapeOnly(t *testing.T) {
 	if code := runControls([]string{"lint", "--fixtures", repoFixtures, "--kisa", repoKisa}, &out, &errb); code != exitOK {
 		t.Fatalf("exit %d, want %d; stderr %q", code, exitOK, errb.String())
 	}
-	if !strings.Contains(out.String(), "ok: 68 controls") {
+	if !strings.Contains(out.String(), "ok: 75 controls") {
 		t.Errorf("stdout %q lacks the ok line", out.String())
 	}
 }
@@ -201,7 +201,7 @@ func TestControlsLintNotesAndKisaFlag(t *testing.T) {
 	if !strings.Contains(out.String(), shapeOnlyNote) {
 		t.Errorf("stdout %q lacks the shape-only note", out.String())
 	}
-	if !strings.Contains(out.String(), "ok: 68 controls") {
+	if !strings.Contains(out.String(), "ok: 75 controls") {
 		t.Errorf("stdout %q lacks the ok line", out.String())
 	}
 

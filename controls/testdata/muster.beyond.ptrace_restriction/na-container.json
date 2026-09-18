@@ -1,0 +1,6 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "env":{"container":{"status":"ok","value":"docker"}},
+  "kernel":{"sysctl":{
+    "yama_ptrace_scope":{"runtime":{"status":"ok","value":0,"source":{"kind":"proc","path":"/proc/sys/kernel/yama/ptrace_scope"}},"persisted":{"status":"absent","reason":"no sysctl.d line sets kernel.yama.ptrace_scope"},"effective":{"status":"ok","value":0,"source":{"kind":"proc","path":"/proc/sys/kernel/yama/ptrace_scope"}},"winner":{"kind":"proc","path":"/proc/sys/kernel/yama/ptrace_scope"}},"perf_event_paranoid":{"runtime":{"status":"ok","value":0,"source":{"kind":"proc","path":"/proc/sys/kernel/perf_event_paranoid"}},"persisted":{"status":"absent","reason":"no sysctl.d line sets kernel.perf_event_paranoid"},"effective":{"status":"ok","value":0,"source":{"kind":"proc","path":"/proc/sys/kernel/perf_event_paranoid"}},"winner":{"kind":"proc","path":"/proc/sys/kernel/perf_event_paranoid"}}
+  }}
+}}

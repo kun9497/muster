@@ -1,0 +1,6 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "env":{"container":{"status":"ok","value":"none"}},
+  "coredump":{
+    "core_pattern":{"status":"ok","value":"|/bin/false","source":{"kind":"proc","path":"/proc/sys/kernel/core_pattern"}},"systemd":{"storage":{"status":"absent","reason":"no coredump.conf on this host, so nothing sets Storage"},"process_size_max":{"status":"absent","reason":"no coredump.conf on this host, so nothing sets ProcessSizeMax"}},"limits":{"hard_core":{"status":"absent","reason":"no limits.conf line sets a hard core limit for *"},"sources":{"status":"ok","value":[]}}
+  }
+}}

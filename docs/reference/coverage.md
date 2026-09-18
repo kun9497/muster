@@ -76,11 +76,21 @@
 
 ## Beyond the guide
 
-None yet — every control in the set implements a KISA item.
+7 controls muster checks that the guide does not ask for.
+
+| Control | Imp. | Automation | Fact keys read | STIG ids |
+|---|---|---|---|---|
+| muster.beyond.aslr_and_link_protection | 상 | auto | env.container, kernel.sysctl.protected_fifos, kernel.sysctl.protected_hardlinks, kernel.sysctl.protected_regular, kernel.sysctl.protected_symlinks, kernel.sysctl.randomize_va_space | RHEL-09-213030, RHEL-09-213035, RHEL-09-213070, UBTU-22-213020, UBTU-24-700310 |
+| muster.beyond.core_dump_policy | 중 | partial | coredump.core_pattern, coredump.limits.hard_core, coredump.systemd.process_size_max, coredump.systemd.storage, env.container | RHEL-09-213040, RHEL-09-213085, RHEL-09-213090, RHEL-09-213095, UBTU-22-213015, UBTU-24-600070 |
+| muster.beyond.kernel_pointer_exposure | 중 | auto | env.container, kernel.sysctl.dmesg_restrict, kernel.sysctl.kptr_restrict | RHEL-09-213010, RHEL-09-213025, UBTU-22-213010, UBTU-24-600140 |
+| muster.beyond.ptrace_restriction | 중 | auto | env.container, kernel.sysctl.perf_event_paranoid, kernel.sysctl.yama_ptrace_scope | RHEL-09-213015, RHEL-09-213080 |
+| muster.beyond.suid_dumpable_disabled | 중 | auto | coredump.suid_dumpable, env.container | — |
+| muster.beyond.sysrq_restricted | 중 | auto | env.container, kernel.sysctl.sysrq | — |
+| muster.beyond.unprivileged_bpf_restricted | 하 | auto | env.container, kernel.sysctl.bpf_jit_harden, kernel.sysctl.unprivileged_bpf_disabled | RHEL-09-213075 |
 
 ## Fact keys used by controls
 
-152 of 390 registered keys are read by a control (3 by the engine); 235 unused.
+170 of 390 registered keys are read by a control (3 by the engine); 217 unused.
 
 | Collector | Registered | Used by a control | Read by the engine | Unused |
 |---|---|---|---|---|
@@ -91,7 +101,7 @@ None yet — every control in the set implements a KISA item.
 | files | 101 | 44 | 0 | files.etc_passwd.acl_present, files.etc_passwd.group, files.etc_passwd.group_readable, files.etc_passwd.group_writable, files.etc_passwd.other_readable, files.etc_passwd.other_writable, files.etc_shadow.gid, files.etc_shadow.group, files.etc_shadow.group_readable, files.etc_shadow.group_writable, files.etc_shadow.other_readable, files.etc_shadow.other_writable, files.etc_shadow.acl_present, files.etc_hosts.gid, files.etc_hosts.group, files.etc_hosts.group_readable, files.etc_hosts.group_writable, files.etc_hosts.other_readable, files.etc_hosts.other_writable, files.etc_hosts.acl_present, files.etc_services.gid, files.etc_services.group, files.etc_services.group_readable, files.etc_services.group_writable, files.etc_services.other_readable, files.etc_services.other_writable, files.etc_services.acl_present, files.etc_hosts_lpd.gid, files.etc_hosts_lpd.group, files.etc_hosts_lpd.group_readable, files.etc_hosts_lpd.group_writable, files.etc_hosts_lpd.other_readable, files.etc_hosts_lpd.other_writable, files.etc_hosts_lpd.acl_present, files.root_home.mode, files.root_home.gid, files.root_home.acl_present, files.etc_hosts_equiv.mode, files.etc_hosts_equiv.uid, files.dev_entries, files.etc_sudoers.gid, files.etc_sudoers.acl_present, files.etc_sudoers_d.mode, files.etc_sudoers_d.uid, files.etc_sudoers_d.gid, files.etc_sudoers_d.acl_present, files.etc_hosts_allow_lines, files.etc_hosts_deny_lines, sudo.includedir, sudo.secure_path, files.etc_exports.gid, files.etc_exports.group, files.etc_exports.group_readable, files.etc_exports.group_writable, files.etc_exports.other_readable, files.etc_exports.other_writable, files.etc_exports.acl_present |
 | accounts | 22 | 13 | 0 | accounts.login_defs.pass_warn_age, accounts.login_defs.uid_min, accounts.login_defs.sys_uid_max, accounts.login_defs.sha_crypt_min_rounds, accounts.login_defs.home_mode, accounts.login_defs.env_supath, accounts.login_defs.env_path, accounts.parse_failures, accounts.groups |
 | pam | 28 | 9 | 0 | pam.stacks, pam.managing_layer, pam.parse_complete, pam.pwquality.local_users_only, pam.pwquality.minclass, pam.pwquality.dcredit, pam.pwquality.ucredit, pam.pwquality.lcredit, pam.pwquality.ocredit, pam.pwquality.enforce_for_root, pam.password.remember, pam.faillock.unlock_time, pam.faillock.fail_interval, pam.faillock.even_deny_root, pam.faillock.root_unlock_time, pam.su.wheel_control, pam.su.wheel_group, pam.su.wheel_args, pam.umask_module.args |
-| os | 2 | 0 | 0 | env.container, env.has_systemd |
+| os | 2 | 1 | 0 | env.has_systemd |
 | env | 7 | 4 | 0 | env.shell.tmout_readonly, env.shell.tmout_settings, env.shell.umask_settings |
 | walk | 9 | 6 | 1 | walk.skipped, walk.stats |
 | cron | 3 | 2 | 0 | cron.timers |
@@ -104,8 +114,8 @@ None yet — every control in the set implements a KISA item.
 | ftp | 17 | 6 | 0 | ftp.implementation, ftp.config_files, ftp.parse_complete, ftp.unmodelled, ftp.local_enabled, ftp.tcp_wrappers, ftp.userlist_enable, ftp.userlist_deny, ftp.userlist_file, ftp.banner_source, ftp.banner_text |
 | mail | 10 | 7 | 0 | mail.config_files, mail.postfix.smtpd_recipient_restrictions, mail.postfix.disable_vrfy_command |
 | dns | 7 | 2 | 0 | dns.config_files, dns.parse_complete, dns.unmodelled, dns.options.allow_transfer, dns.options.allow_update |
-| sysctl | 12 | 0 | 0 | kernel.sysctl.kptr_restrict, kernel.sysctl.dmesg_restrict, kernel.sysctl.yama_ptrace_scope, kernel.sysctl.randomize_va_space, kernel.sysctl.unprivileged_bpf_disabled, kernel.sysctl.bpf_jit_harden, kernel.sysctl.perf_event_paranoid, kernel.sysctl.sysrq, kernel.sysctl.protected_symlinks, kernel.sysctl.protected_hardlinks, kernel.sysctl.protected_fifos, kernel.sysctl.protected_regular |
-| coredump | 6 | 0 | 0 | coredump.core_pattern, coredump.suid_dumpable, coredump.systemd.storage, coredump.systemd.process_size_max, coredump.limits.hard_core, coredump.limits.sources |
+| sysctl | 12 | 12 | 0 | — |
+| coredump | 6 | 5 | 0 | coredump.limits.sources |
 | boot | 13 | 0 | 0 | boot.firmware, boot.secure_boot, boot.grub_cfg.path, boot.grub_cfg.mode, boot.grub_cfg.uid, boot.grub_cfg.gid, boot.grub_cfg.group, boot.grub_cfg.group_readable, boot.grub_cfg.group_writable, boot.grub_cfg.other_readable, boot.grub_cfg.other_writable, boot.grub_cfg.acl_present, boot.grub_password_set |
 | mounts | 5 | 0 | 0 | mounts.points, mounts.tmp.separate, mounts.var_tmp.separate, mounts.dev_shm.separate, mounts.home.separate |
 | modules | 1 | 0 | 0 | kernel.modules |
