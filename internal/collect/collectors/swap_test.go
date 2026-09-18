@@ -3,6 +3,7 @@
 package collectors
 
 import (
+	"fmt"
 	"os"
 	"slices"
 	"strings"
@@ -398,6 +399,75 @@ func TestSwapPartitionMustBeListedUnderItsDisk(t *testing.T) {
 	})
 	if e := env(t, build(t, "swap", a2), "swap.encrypted"); e.Status != facts.StatusOK || e.Value != false {
 		t.Errorf("with /sys/block/sda/sda9 present, swap.encrypted = %+v, want ok false", e)
+	}
+}
+
+// A device stack deeper than muster follows is UNSUPPORTED naming the device
+// the walk gave up at, not a silent "not encrypted". The bound exists because
+// a sysfs that contradicts itself must not cost the run; it must not cost the
+// truth either, so the one thing it may never produce is a verdict.
+//
+// The chain below is longer than swapWalkDepth and ends in a terminal device,
+// so WITHOUT the depth guard the walk reaches the end and answers ok false —
+// which is what makes this test bite.
+func TestSwapWalkStopsAtItsDepthLimit(t *testing.T) {
+	const chain = swapWalkDepth + 8
+
+	var links []linkPair
+	files := map[string]string{}
+	var dirs []string
+	for i := 0; i <= chain; i++ {
+		dev := fmt.Sprintf("dm-%d", i)
+		links = append(links, sysLink(dev))
+		files["/sys/devices/virtual/block/"+dev+"/dm/uuid"] = "dm.uuid.lvm"
+		if i < chain {
+			dirs = append(dirs, fmt.Sprintf("/sys/devices/virtual/block/dm-%d/slaves/dm-%d", i, i+1))
+		}
+	}
+	b := buildBegun(t, "swap", swapDouble(swapLayout{
+		swaps: "proc_swaps.dm0",
+		links: linkMap(links...),
+		files: files,
+		dirs:  dirs,
+	}))
+
+	e := env(t, b, "swap.encrypted")
+	if e.Status != facts.StatusUnsupported {
+		t.Fatalf("swap.encrypted over a %d-deep stack = %+v, want unsupported", chain, e)
+	}
+	if !strings.Contains(e.Reason, "deeper than muster follows") {
+		t.Errorf("reason %q does not say the walk stopped at its own limit", e.Reason)
+	}
+	// The device the walk gave up at is named, so the reason points somewhere.
+	if !strings.Contains(e.Reason, fmt.Sprintf("dm-%d", swapWalkDepth+1)) {
+		t.Errorf("reason %q does not name the device the walk stopped at", e.Reason)
+	}
+	// Unsupported ranks as ok: a bound muster chose must not flip run.complete.
+	if w := b.Worst("swap"); w != facts.StatusOK {
+		t.Errorf("Worst(swap) = %v, want ok", w)
+	}
+
+	// A chain that fits answers normally, so the limit is what decided the
+	// case above and not the shape of the fixture.
+	var shortLinks []linkPair
+	shortFiles := map[string]string{}
+	var shortDirs []string
+	for i := 0; i <= 2; i++ {
+		dev := fmt.Sprintf("dm-%d", i)
+		shortLinks = append(shortLinks, sysLink(dev))
+		shortFiles["/sys/devices/virtual/block/"+dev+"/dm/uuid"] = "dm.uuid.lvm"
+		if i < 2 {
+			shortDirs = append(shortDirs, fmt.Sprintf("/sys/devices/virtual/block/dm-%d/slaves/dm-%d", i, i+1))
+		}
+	}
+	short := build(t, "swap", swapDouble(swapLayout{
+		swaps: "proc_swaps.dm0",
+		links: linkMap(shortLinks...),
+		files: shortFiles,
+		dirs:  shortDirs,
+	}))
+	if e := env(t, short, "swap.encrypted"); e.Status != facts.StatusOK || e.Value != false {
+		t.Errorf("a three-deep stack = %+v, want ok false", e)
 	}
 }
 
