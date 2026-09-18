@@ -1,0 +1,227 @@
+# Stage 3B — Kernel, Boot and Mount Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Ship spec 3B — six read-only collectors (sysctl, coredump, boot, mounts, modules, swap), nineteen controls of category `beyond` under `controls/beyond/`, and the report's two-scope summary — so a default `check` judges the kernel, the boot chain, mounts, swap and module blacklists of a host, says which of its verdicts come from the KISA guide and which from beyond it, and keeps every existing verdict, byte and exit code exactly as they are.
+
+**Architecture:** Each collector is one `register.go`-style file plus its parsers, declared `Needs: none` with `Reads` only, writing the spec's forty registry keys: twelve `setting<int>` sysctl leaves whose effective side is the runtime value, six coredump leaves, thirteen boot leaves (nine through `writePermFacts`), a `mounts.points` list that always carries the nine candidate rows plus four `separate` leaves, one `kernel.modules` list that always carries the eleven candidate rows, three swap leaves. The controls are plain YAML over those keys; every one is gated on `env.container eq none`; absence is a leaf's own `absent` so `absent_means` decides it. The report gains a `Scopes` struct in `Summary` and a (scope, severity, id) sort; a lint rule keeps `category: beyond` and the absence of `references.kisa` in step; the coverage tool gains a "Beyond the guide" table.
+
+**Tech Stack:** Go 1.25, `gopkg.in/yaml.v3`, the existing `collect.Access` / `Builder` / `writePermFacts` / `parseMountinfo` / `memAccess` seams, the 3F test gates (fixture harness, mutation test, fuzz inventory, oracles), GitHub Actions. No new dependency (D28).
+
+**Spec:** `docs/superpowers/specs/2026-09-18-stage3b-kernel-boot-mount-design.md` (B-1…B-12; §2 facts, §3 controls, §4 report, §5 environments, §6 tests and documents, §7 parked), committed at `365810c`.
+
+## Global Constraints
+
+- **Branch base:** `stage3b-kernel-boot-mount` at `365810c` over main `f1199d1`. Task 9 confirms `git merge-base HEAD main` is main's tip before the final gates.
+- **Ruling K-1 (nothing existing changes its verdict):** no existing control's clauses, no existing registry key's type or meaning, no exit code. The only edits to existing controls are B-12's: U-23's description sentence and the three `subject_kind: file` registry additions (Task 8). Existing report bytes are unchanged for a snapshot with no beyond results (B-9); the JSON and table goldens change only by the summary lines and the `scopes` object, in Task 1's commit, which says so.
+- **Ruling K-2 (the forty keys are the spec's, verbatim):** the registry gains exactly the keys of spec B-2 with the types and `subject_kind`s given there, all `since: 1`, `sensitivity: public`, `collector` naming the new collector; the facts golden is regenerated in the task that adds each collector's keys (a `since` entry is not needed while `schema_version` stays 1 — every existing key is `since: 1`; say so in the commit).
+- **Ruling K-3 (a sysctl setting's envelope):** `facts.Setting{Runtime: &r, Persisted: &p, Effective: &r2, Winner: runtimeSource}` where `r` is the `/proc/sys` read (`collect.OK(int, &facts.Source{Kind: "file", Path: "/proc/sys/<path>"})`, or the read's status through `collect.FromReadError`, or `collect.Absent("<path> does not exist")` on ENOENT, or `collect.ErrorEnv` naming the path and the bytes when the value is not an integer), `r2` a copy of `r`, `p` the merged persisted value with `Source{Kind: "file", Path: <winning file>}` or `collect.Absent("no sysctl.d line sets <key>")`. `default_on: effective` (B-3). Nothing computes "drift".
+- **Ruling K-4 (declarations):** every 3B collector declares its exact `Reads` (files and directory globs) and no `Commands`; `Needs: "none"`. `boot` declares `/etc/group` for `writePermFacts`. A path a collector needs that is outside its declaration is a bug, not a C4 `absent`.
+- **Ruling K-5 (candidate rows are always present):** `mounts.points` carries the nine candidates and `kernel.modules` the eleven, in the spec's order, on every host where the envelope is `ok` (B-1). A row's fields have the spec's names exactly; records are `map[string]any` like the walk's rows; lists are in candidate order (the order is the spec's, not sorted).
+- **Ruling K-6 (fixtures):** `controls/testdata/<id>/pass-*.json`, `fail-*.json`, `na-*.json` (`fail-` on a `partial` control expects WARN), `synthetic: true`, every screen fact `ok` in a fixture that judges (3F's G-12: an all-absent fixture keeps `env.container` `ok` `none` and the mechanism `when` facts `ok`), realistic record shapes per B-2, RFC 5737 addresses only, no host identity. The mutation test must read `surviving 0` after every control task; an exclusion goes into `controls/testdata/_mutants.yaml` only with a reason naming the collector invariant.
+- **Ruling K-7 (references):** `references.stig` entries are looked up by title in `docs/reference/stig/*.json` (the index holds `stig_id`, `severity`, `title`, `nist`); the implementer lists the candidate ids it found per control in its report and cites only those whose title is the same requirement; `references.nist_800_53` is the union of the cited rules' `nist`; `references.cis` is never set (B-5); `references.kisa` is never set on a beyond control; `importance` follows the spec's table and the description's one sentence says why.
+- **Ruling K-8 (lab and gates):** the LAB TOKEN is 3B's from Task 2. Linux-only tests run on the lab through the session's read-only `lab-sync.sh <worktree>` / `lab-run.sh '<cmd>'`; subagents build and run only under `/root/muster-dev`, `/tmp` and, for docker, the public images only; never install a package, change a service or write outside those paths; a snapshot produced on the lab is read, summarised in the report and deleted, never synced back or committed. Windows gates before every commit: `gofmt -l .`, `go vet ./...`, `GOOS=linux GOARCH=amd64 go vet ./...`, `go test ./... -count=1`, `go run ./cmd/muster controls lint --references docs/reference` (prints `ok: <n> controls`), `go run ./tools/coverage -check`; staticcheck (`go run honnef.co/go/tools/cmd/staticcheck@2025.1.1 ./...`) on the lab before every push. Never push, never `git stash`, never amend.
+- **Ruling K-9 (work split):** implementers write code, tests, fixtures, controls, registry entries, the capability matrix, the coverage tool and the two README count sentences; the controller writes CONTRIBUTING/CLAUDE/README prose, CHANGELOG, the main design's D29 and section edits, and the Execution notes (Task 9). Commit trailers `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>` and `Claude-Session: https://claude.ai/code/session_01LjfwtnJHSH7afTYL99Pmom` on every commit; no hostname, address, alias or organisation name in any file, commit or report.
+- **Ruling K-10 (the scope predicate):** `beyond` ⇔ `Category == "beyond"`; everything else is `guide`. The lint rule `beyond_scope` rejects a `beyond` control with any `references.kisa` entry and a non-`beyond` control without one. `Scopes` is a struct `{Guide, Beyond ScopeCounts}` with `ScopeCounts{Controls int; Automatic SeverityCounts; ManualReview int; Undecidable UndecidableCounts}` — fixed field order, no map (D20).
+- **Ruling K-11 (mechanisms with a check that holds or fails by construction):** control 6's mechanisms (b) and (d) carry the spec's constructed checks; a mechanism with no checks is a PASS and is not written anywhere in this plan.
+- **Ruling K-12 (examples):** the committed examples are refreshed from a manual `examples.yml` run on the pull request (Task 9, controller); until then `TestExamplesLoadAndCheck` skips the byte comparison on the digest gate and that is expected.
+- **Ruling K-13 (the stock-host snapshot):** Task 8's `controls/testdata/_hosts/ubuntu-22.04-stock.json` is synthetic (`synthetic: true`), shaped after the lab's stock reading of spec §5, and pins the nineteen verdicts in one table test; it is not a fixture of any single control and the fixture harness ignores `_hosts/`.
+
+## File Structure
+
+- Task 1: modify `internal/report/report.go` (`Scopes`, `ScopeCounts`, scope sort, per-scope counting), `internal/report/table.go` (two summary lines, the separator), `internal/report/report_test.go`, `internal/report/testdata/*.golden` (regenerated), `internal/controls/lint.go` (`beyond_scope`), `internal/controls/lint_test.go`, `tools/coverage/main.go` + `tools/coverage/*_test.go` ("Beyond the guide" table), `docs/reference/coverage.md` (regenerated).
+- Task 2: create `internal/collect/collectors/sysctl.go`, `sysctl_parse.go`, `sysctl_test.go`, `coredump.go`, `coredump_parse.go`, `coredump_test.go`, seeds under `testdata/` (`sysctl.d-*.conf`, `sysctl.conf.sample`, `coredump.conf.sample`, `limits.conf.sample`, `limits.d-*.conf`); modify `internal/facts/registry.yaml` (+18 keys), `internal/facts/testdata/*.golden`, `internal/collect/collectors/fuzz_test.go` (targets + globs).
+- Task 3: create `boot.go`, `boot_test.go`, seeds (`grub.cfg.sample`, `user.cfg.sample`, `grub.d-*.sample`, `SecureBoot.sample` binary); modify `registry.yaml` (+13), goldens, `fuzz_test.go`.
+- Task 4: create `mounts.go`, `mounts_test.go`, `swap.go`, `swap_test.go`, seeds (`proc_swaps.sample`, `mountinfo-*` reuse); modify `walk_mounts.go` (`mountRow` gains `options []string`, `source string`; `parseMountinfo` fills them), `walk_mounts_test.go`, `registry.yaml` (+8), goldens, `fuzz_test.go`.
+- Task 5: create `modules.go`, `modules_parse.go`, `modules_test.go`, seeds (`modules.builtin.sample`, `modules.dep.sample`, `modprobe.d-*.conf`, `proc_modules.sample`); modify `registry.yaml` (+1), goldens, `fuzz_test.go`.
+- Task 6: create `controls/beyond/kernel_pointer_exposure.yaml` … `suid_dumpable_disabled.yaml` (controls 1–7) and their fixtures; `controls/testdata/_mutants.yaml` rows if any.
+- Task 7: create `controls/beyond/bootloader_config_permissions.yaml` … `uncommon_network_protocols_disabled.yaml` (controls 8–19) and their fixtures; `controls/VERSION` → `kisa-unix-2026+2026.09.18`.
+- Task 8: create `controls/testdata/_hosts/ubuntu-22.04-stock.json`, `internal/controls/hosts_test.go`; modify `docs/reference/capability-matrix.json`, `internal/collect/collectors/oracle_test.go` (sysctl pair), `internal/facts/registry.yaml` (`subject_kind: file` ×3), `controls/file/suid_sgid.yaml` (description sentence), `tools/coverage` README fragment + `README.md`/`README.ko.md` count sentences, `docs/reference/coverage.md` (regenerated), goldens.
+- Task 9 (controller): `CONTRIBUTING.md`/`.ko.md`, `CLAUDE.md`, `README.md`/`.ko.md` prose, `CHANGELOG.md`, `docs/superpowers/specs/2026-09-02-muster-design.md`/`.ko.md` (D29, §9, §10.2), this plan's Execution notes; the whole-branch review, the fix wave, the gates, the examples refresh on the pull request.
+
+## Interfaces (produced by this plan)
+
+```go
+// internal/report/report.go
+type ScopeCounts struct {
+	Controls     int               `json:"controls"`
+	Automatic    SeverityCounts    `json:"automatic"`
+	ManualReview int               `json:"manual_review"`
+	Undecidable  UndecidableCounts `json:"undecidable"`
+}
+type Scopes struct {
+	Guide  ScopeCounts `json:"guide"`
+	Beyond ScopeCounts `json:"beyond"`
+}
+// Summary gains `Scopes Scopes `json:"scopes"`` as its last field.
+func scopeOf(r check.Result) string // "beyond" when r.Category == "beyond", else "guide"
+
+// internal/collect/collectors/sysctl_parse.go
+type sysctlKey struct{ key, path string }             // "kernel.kptr_restrict" ↔ "/proc/sys/kernel/kptr_restrict"; the twelve of B-2 + fs.suid_dumpable
+func sysctlFiles(a collect.Access) []sysctlFile        // the merged, masked, ordered persisted files (B-2), /etc/sysctl.d/99-sysctl.conf modelled
+func parseSysctlD(data []byte) []sysctlAssign          // {key (dots), value string, ignoreMissing bool}; slash keys normalised to dots
+func mergeSysctl(files []sysctlFile) map[string]sysctlWinner // last assignment wins; {value, file}
+func readProcSys(a collect.Access, path string) facts.Envelope // K-3's runtime envelope
+
+// internal/collect/collectors/coredump_parse.go
+func parseCoredumpConf(data []byte) coredumpConf       // [Coredump] Storage=, ProcessSizeMax=; last wins within a file
+func mergeCoredumpConf(files []confFile) (storage string, sizeMax int, seen []string)
+func parseLimitsCore(data []byte) []limitLine          // domain "*", type hard|"-", item core, value int (-1 for unlimited)
+
+// internal/collect/collectors/boot.go
+func grubCfgPath(a collect.Access) (path string, env *facts.Envelope) // first candidate; EACCES → Denied envelope for every leaf, ENOENT on all → Absent
+func secureBootFromEfivar(data []byte) (enabled bool, ok bool)      // len ≥ 5, byte 4
+func grubPasswordSet(data []byte) bool                              // "set superusers" or "password_pbkdf2" outside comments
+
+// internal/collect/collectors/walk_mounts.go (extended)
+type mountRow struct { /* existing fields */; options []string; source string }
+// internal/collect/collectors/mounts.go
+var mountCandidates = []string{"/", "/boot", "/home", "/tmp", "/var", "/var/tmp", "/var/log", "/var/log/audit", "/dev/shm"}
+func mountRows(rows []mountRow) []map[string]any       // K-5; governing mount = the longest mountPoint that is a prefix of the target
+// internal/collect/collectors/swap.go
+func parseProcSwaps(data []byte) []swapDevice          // path, type
+func swapBacking(a collect.Access, dev string) (backing string, encrypted bool) // the dm slaves walk of B-2
+// internal/collect/collectors/modules_parse.go
+var moduleCandidates = []string{"cramfs", "freevxfs", "jffs2", "hfs", "hfsplus", "udf", "usb-storage", "dccp", "sctp", "rds", "tipc"}
+func parseModulesBuiltin(data []byte) map[string]bool  // basename without .ko*, '-'/'_' folded
+func parseModulesDep(data []byte) map[string]bool
+func parseProcModules(data []byte) map[string]bool
+func parseModprobeD(name string, data []byte) []modprobeDirective // {kind: blacklist|install, module, target, file}
+func moduleRows(...) []map[string]any                  // K-5, disabled per B-4's formula
+```
+
+---
+
+### Task 1: the two-scope report, the scope lint rule and the coverage table (B-9, K-10)
+
+**Files:** modify `internal/report/report.go`, `table.go`, `report_test.go`, `testdata/*.golden`; `internal/controls/lint.go`, `lint_test.go`; `tools/coverage/main.go` and its test; regenerate `docs/reference/coverage.md`.
+
+**Interfaces:** produces `Scopes`, `ScopeCounts`, `scopeOf`, the lint rule `beyond_scope`, the coverage table `## Beyond the guide` (columns: control, importance, automation, fact keys read, STIG ids) — empty with a one-line "none yet" body until Task 6.
+
+- [ ] **Step 1: Failing tests** (`internal/report/report_test.go`)
+```go
+// Two results, one category beyond: Summary.Scopes.Guide.Controls == 1, .Beyond.Controls == 1; per-scope Automatic/ManualReview/Undecidable equal the top-level split; Guide+Beyond == top level for every field (a helper adds the two ScopeCounts and DeepEquals the sum with the top-level Summary's three parts).
+func TestSummaryScopesSumToTheTotal(t *testing.T) {}
+// A high beyond row sorts after a low guide row; among guide rows the old (severity, id) order holds; a report with no beyond rows sorts exactly as before (compare with a copy of the old comparator).
+func TestRowsSortGuideBeforeBeyond(t *testing.T) {}
+// Table: with no beyond rows the output is byte-identical to the golden except the two new summary lines; with beyond rows one "— beyond the guide —" line precedes the first shown beyond row and none is printed when no beyond row is shown.
+func TestTableScopeLinesAndSeparator(t *testing.T) {}
+```
+(`internal/controls/lint_test.go`) `TestLintBeyondScope`: a `beyond` control with `references.kisa` → problem rule `beyond_scope`; a `file` control without `references.kisa` → problem; a `beyond` control without kisa and a `file` control with kisa → clean. (`tools/coverage`) `TestCoverageBeyondTable`: with an embedded set that has no beyond control the section renders its "none yet" line; with one synthetic beyond control the row carries id, importance, automation, the sorted fact keys, the STIG ids.
+- [ ] **Step 2: Run red.** `go test ./internal/report/ ./internal/controls/ ./tools/coverage/ -count=1`.
+- [ ] **Step 3: Implement.** `report.go`: `scopeOf`; `Build` sorts by `(scopeRank, severityRank, ID)` with guide 0, beyond 1; the counting loop fills the top-level buckets as today and additionally the scope's `ScopeCounts` (a helper `count(into *ScopeCounts, row Row)` shared by both to keep them in step; `Controls++` per row). `table.go`: after the existing summary lines print `KISA 2026 (%d controls): pass %d fail %d warn %d manual %d n/a %d error %d` — sums over the three severities — and `beyond the guide (%d controls): …` with the same shape (the guide edition string comes from `r.Check.GuideEdition` as the header line does); in the row loop, before the first beyond row that is actually printed, `— beyond the guide —`. `lint.go`: rule `beyond_scope` per K-10. `tools/coverage`: the new section after the KISA table; the beyond rows' fact keys come from the same clause walker the "Fact keys used by controls" section uses.
+- [ ] **Step 4: Regenerate goldens** — `go test ./internal/report -run TestJSON -update`, `-run TestTableGolden -update`, `go run ./tools/coverage`; inspect the diff: JSON gains only `summary.scopes`, the table only the two lines. **Step 5: Gates, commit.** `Split the report's summary into the guide and beyond it` — the body names the golden change and its cause.
+
+### Task 2: the sysctl and coredump collectors (B-2 sysctl/coredump rows, B-3, K-3)
+
+**Files:** create `sysctl.go`, `sysctl_parse.go`, `sysctl_test.go`, `coredump.go`, `coredump_parse.go`, `coredump_test.go`, the seeds; modify `registry.yaml` (+18 keys: 12 `kernel.sysctl.*` `setting<int>` `default_on: effective`, `coredump.core_pattern` string, `coredump.suid_dumpable` setting<int>, `coredump.systemd.storage` string, `coredump.systemd.process_size_max` int, `coredump.limits.hard_core` int, `coredump.limits.sources` list<string>), the facts golden, `fuzz_test.go` (+`FuzzParseSysctlD`, `FuzzParseCoredumpConf`, `FuzzParseLimitsCore` with explicit seed globs).
+
+**Interfaces:** consumes `collect.Access` (`ReadFile`, `Stat`, `Glob`), `collect.Builder.SetSetting`, `collect.FromReadError`, `memAccess` (fuzz_test.go) for tests; produces the functions of the interface block.
+
+- [ ] **Step 1: Failing tests** (`sysctl_test.go`, through the `memAccess`-style test double the package already uses — read `collectors_test.go` for `fsAccess`)
+```go
+// /proc/sys values: "1\n" → OK int 1 with source file path; a missing kernel/yama/ptrace_scope → Absent("… does not exist"); a denied fs/protected_symlinks → Denied; "abc\n" → ErrorEnv naming path and bytes; Effective equals Runtime; Winner is the runtime source.
+func TestSysctlRuntimeEnvelopes(t *testing.T) {}
+// sysctl.d merge: /usr/lib/sysctl.d/50-default.conf sets kernel.sysrq=16, /etc/sysctl.d/10-magic-sysrq.conf sets 176 → persisted 176 citing the /etc file; a file name present in /etc and /usr/lib is read from /etc only (masking); /etc/sysctl.d/99-sysctl.conf as a symlink → /etc/sysctl.conf's content read at that position and the winner cites /etc/sysctl.conf; "-kernel.foo = 1" parses with ignoreMissing; "kernel/yama/ptrace_scope = 1" normalises to dots; a key no file sets → Persisted Absent("no sysctl.d line sets …").
+func TestSysctlPersistedMerge(t *testing.T) {}
+// The twelve keys are registered, each written once, and the declaration's Reads cover /proc/sys/<path> for every key, the five directories' *.conf globs and /etc/sysctl.conf.
+func TestSysctlDeclarationCoversItsReads(t *testing.T) {}
+```
+(`coredump_test.go`) `TestCoredumpCorePatternAndSuidDumpable` (string leaf; suid_dumpable a setting like the sysctl ones); `TestCoredumpSystemdConfMerge` (main file in /etc, else /usr/lib; drop-ins across the four directories sorted by name with /etc masking; `Storage=none`, `ProcessSizeMax=0`; no file → both Absent); `TestCoredumpLimitsCore` (`* hard core 0` → 0; `* - core unlimited` → -1; last wins across limits.conf then limits.d; a `@group hard core` line is not `*` and is ignored; no line → Absent; `sources` lists the files read).
+- [ ] **Step 2: Run red** (`GOOS=linux GOARCH=amd64 go test -c ./internal/collect/collectors/ -o NUL` on Windows; run on the lab).
+- [ ] **Step 3: Implement** per B-2/B-3/K-3. The persisted merge: collect `*.conf` from `/etc/sysctl.d`, `/run/sysctl.d`, `/usr/local/lib/sysctl.d`, `/usr/lib/sysctl.d` (Glob), keep the first directory's file per base name, sort by base name, append `/etc/sysctl.conf` last unless a `99-sysctl.conf` link stood in for it; a directory that cannot be listed is that directory's `denied` on every persisted side (C3) — the runtime side is unaffected. Registry: the 18 entries with descriptions in muster's words. Fuzz targets with `fuzzBody`, seeds from the new `testdata/sysctl.d-*.conf`, `sysctl.conf.sample`, `coredump.conf.sample`, `limits.conf.sample`.
+- [ ] **Step 4: Lab proof.** `lab-run.sh 'go test ./internal/collect/collectors/ -run "Sysctl|Coredump" -count=1 -v'`; then `go run ./cmd/muster collect --out /tmp/3b.json && python3 -c 'import json;d=json.load(open("/tmp/3b.json"));f=d["facts"];print(f["kernel"]["sysctl"]["sysrq"]["effective"]["value"], f["coredump"]["core_pattern"]["value"][:40], f["coredump"]["limits"]["hard_core"]["status"])' ; rm /tmp/3b.json` — expect 176, apport's pipe, `absent`. Report the twelve effective values and the persisted winners (paths only).
+- [ ] **Step 5: Gates, commit.** `Collect the kernel's self-protection sysctls and the core-dump policy` (facts golden regenerated; the commit says the keys are `since: 1` per K-2).
+
+### Task 3: the boot collector (B-2 boot rows, B-10)
+
+**Files:** create `boot.go`, `boot_test.go`, seeds; modify `registry.yaml` (+13: `boot.firmware`, `boot.secure_boot`, `boot.grub_cfg.path`, the nine `boot.grub_cfg.*` perm leaves, `boot.grub_password_set`), golden, `fuzz_test.go` (+`FuzzGrubPasswordSet`, `FuzzSecureBootFromEfivar`).
+
+- [ ] **Step 1: Failing tests**
+```go
+// /sys/firmware/efi present → "uefi"; absent → "bios".
+func TestBootFirmware(t *testing.T) {}
+// efivar bytes 06 00 00 00 01 → secure_boot true; …00 → false; 3 bytes → ErrorEnv; BIOS → Absent; UEFI with no efivars dir or variable → Absent naming the path.
+func TestBootSecureBoot(t *testing.T) {}
+// candidates: only /boot/grub2/grub.cfg exists → path is it and the nine perm leaves come from writePermFacts (mode 0600 uid 0 gid 0 group "root"); EACCES on the stat of /boot/grub2/grub.cfg → every leaf Denied and path Denied, and /boot/efi is NOT consulted; none exists → path Absent and every leaf Absent.
+func TestBootGrubCfgCandidatesAndDenied(t *testing.T) {}
+// grub.cfg with "set superusers=\"root\"" → true; "password_pbkdf2 root grub.pbkdf2…" in /etc/grub.d/40_custom → true; only comments → false; an unreadable /boot/grub2/user.cfg → the read's status (Denied) even when grub.cfg is readable (C3).
+func TestBootGrubPasswordSet(t *testing.T) {}
+```
+- [ ] **Step 2: Run red. Step 3: Implement.** `Reads`: `/sys/firmware/efi`, `/sys/firmware/efi/efivars/SecureBoot-*`, the three grub.cfg candidates, `/boot/grub2/user.cfg`, `/etc/grub.d/*`, `/etc/group`. `grubCfgPath`: stat each candidate without following symlinks; ENOENT → next; EACCES (or any other error) → that candidate's error is the answer for every leaf (`collect.FromReadError`); a symlink at the candidate is `error` by design (C4). `writePermFacts(b, a, "boot.grub_cfg", path, groups, gmeta, gerr, false)`.
+- [ ] **Step 4: Lab proof** (`-run Boot`, then the collect one-liner reading `boot.firmware`, `boot.grub_cfg.mode`, `boot.grub_password_set`: expect `bios`, 420 (0644), false). A public `rockylinux/rockylinux:9-ubi-init` container as a non-root user (`docker exec -u 65534`) running the static test binary's `TestBootGrubCfgCandidatesAndDenied` is the unit test; the EL non-root behaviour on a real `/boot` is proven in Task 8's CI container step, not here.
+- [ ] **Step 5: Gates, commit.** `Collect the boot chain: firmware, Secure Boot, the bootloader's file and its password`.
+
+### Task 4: the mounts and swap collectors (B-2 mounts/swap rows, B-6, K-5)
+
+**Files:** modify `walk_mounts.go` (`mountRow` + `parseMountinfo`), `walk_mounts_test.go`; create `mounts.go`, `mounts_test.go`, `swap.go`, `swap_test.go`, seeds; `registry.yaml` (+8: `mounts.points` list<record> `subject_kind: mount`, the four `mounts.<point>.separate` bools, `swap.present`, `swap.devices` list<record>, `swap.encrypted`), golden, `fuzz_test.go` (+`FuzzParseProcSwaps`; `FuzzParseMountinfo` already exists and now covers the two new fields).
+
+- [ ] **Step 1: Failing tests**
+```go
+// parseMountinfo keeps field 6 as options (split on ","), the source (the field after fstype); existing tests unchanged.
+func TestParseMountinfoOptionsAndSource(t *testing.T) {}
+// mountinfo.ubuntu-stock (/, /boot, /dev/shm, /run/user/1000): nine rows in candidate order; /tmp row separate false, mounted_by "/", options those of "/", fstype ext4; /dev/shm separate true, options contain nosuid and nodev; /var/log/audit mounted_by "/"; the four leaves match the rows' separate.
+func TestMountRowsAlwaysNineInOrder(t *testing.T) {}
+// The deepest mount governs: /var/log mounted and /var/log/audit not → audit row mounted_by "/var/log".
+func TestMountGoverningMountIsTheDeepest(t *testing.T) {}
+// mountinfo unreadable → mounts.points and the four leaves carry the read's status.
+func TestMountsReadErrorReachesEveryKey(t *testing.T) {}
+// /proc/swaps: header only → present false, devices [], encrypted Absent("no swap"); "/swap.img file …" → type file; "/dev/dm-1 partition …" → partition.
+func TestParseProcSwaps(t *testing.T) {}
+// dm slaves walk: /dev/dm-1 with dm/uuid "LVM-…" and slaves/dm-0 whose uuid is "CRYPT-LUKS2-…" → encrypted true, backing "dm-0"; /dev/sda2 with no slaves → false, backing "sda2"; a swap file on "/" whose source is /dev/mapper/vg-root → resolved through the mountinfo source to its dm name then the walk; zram0 with backing_dev "none" → true, backing "zram".
+func TestSwapEncryptedThroughSlaves(t *testing.T) {}
+```
+- [ ] **Step 2: Run red. Step 3: Implement.** `mounts` `Reads`: `/proc/self/mountinfo`. `swap` `Reads`: `/proc/swaps`, `/proc/self/mountinfo`, `/sys/block/*/dm/uuid`, `/sys/block/*/slaves/*`, `/sys/block/zram*/backing_dev`, `/dev/mapper/*` (Readlink is guarded by `Reads` like `Stat`). A `/dev/mapper/<name>` swap path resolves to `dm-N` through `Readlink`; `/dev/sdXN` → `sdXN`. `swap.encrypted` is `absent` when `swap.present` is false, `ok` bool otherwise; a device whose sysfs cannot be read makes `encrypted` the read's status.
+- [ ] **Step 4: Lab proof** (`-run "Mount|Swap"`; the collect one-liner: nine rows, `/dev/shm` separate with `nosuid`,`nodev`, `swap.present` true, `swap.encrypted` false with backing the root LV's slave). **Step 5: Gates, commit.** `Collect the candidate mount points and the swap devices` (with the `parseMountinfo` extension named in the body).
+
+### Task 5: the modules collector (B-2 modules row, B-4, B-7)
+
+**Files:** create `modules.go`, `modules_parse.go`, `modules_test.go`, seeds; `registry.yaml` (+1: `kernel.modules` list<record> `subject_kind: module`), golden, `fuzz_test.go` (+`FuzzParseModulesBuiltin`, `FuzzParseModulesDep`, `FuzzParseProcModules`, `FuzzParseModprobeD`).
+
+- [ ] **Step 1: Failing tests**
+```go
+// modules.builtin: "kernel/fs/squashfs/squashfs.ko" → squashfs; ".ko.zst"/".ko.xz" stripped; "usb-storage" and "usb_storage" fold to one name.
+func TestParseModulesBuiltinAndDep(t *testing.T) {}
+// modprobe.d: "blacklist cramfs" → {blacklist, cramfs}; "install usb-storage /bin/false" and "/bin/true" → {install, usb-storage, target}; "install foo /sbin/modprobe --ignore-install foo" is NOT disabled; comments and continuation lines ("\") handled; /etc masks /usr/lib by file name; non-.conf files ignored.
+func TestParseModprobeD(t *testing.T) {}
+// Eleven rows in candidate order on a tree where cramfs is in modules.dep with no directive → disabled false; udf with install /bin/false and not loaded → true; sctp loaded (in /proc/modules) with install /bin/false → false; hfs absent from dep and builtin → true (absent); a candidate listed in modules.builtin → builtin true, disabled false, sources ends with "built into the kernel"; blacklisted alone → blacklisted true, disabled false.
+func TestModuleRowsAndDisabled(t *testing.T) {}
+// /lib/modules/<release> missing → kernel.modules Unsupported naming the path (no rows); a denied modprobe.d directory → the envelope is that read's status.
+func TestModulesTreeMissingIsUnsupported(t *testing.T) {}
+```
+- [ ] **Step 2: Run red. Step 3: Implement.** The release is `/proc/sys/kernel/osrelease` read the way `os.go` reads it for `run.host.kernel` (never `exec`); the collector declares that path. `Reads`: `/proc/modules`, `/lib/modules/*/modules.builtin`, `/lib/modules/*/modules.dep`, the four modprobe.d directories' `*.conf`. Rows per K-5 with fields `name, loaded, builtin, available, blacklisted, install_disabled, disabled, sources`.
+- [ ] **Step 4: Lab proof** (`-run Modules`; collect one-liner: eleven rows, all `disabled false` except none, `squashfs` not a candidate, sources naming `/etc/modprobe.d/blacklist*.conf` where applicable). **Step 5: Gates, commit.** `Collect the state of the modules a hardened host disables`.
+
+### Task 6: controls 1–7 — kernel and core dump (B-5 rows 1–7, B-8, K-6, K-7, K-11)
+
+**Files:** create the seven control files under `controls/beyond/` and their fixtures under `controls/testdata/muster.beyond.<name>/`; `controls/testdata/_mutants.yaml` rows only with a reason.
+
+- [ ] **Step 1: The controls**, exactly the spec's table: ids `muster.beyond.kernel_pointer_exposure`, `ptrace_restriction`, `unprivileged_bpf_restricted`, `aslr_and_link_protection`, `sysrq_restricted`, `core_dump_policy`, `suid_dumpable_disabled`; `category: beyond`; `importance` per the table; `automation: auto` (6 is `partial`); no `references.kisa`; `references.stig` per K-7 (candidates found by title: RHEL-09-213080 ptrace, RHEL-09-213070 and UBTU-22-213020 / UBTU-24-700310 ASLR, RHEL-09-213030/213035 link protection, RHEL-09-213040/213085/213090/213095/213100 and UBTU-22-213015 / UBTU-24-600070 core dumps — cite only those whose title is the same requirement, and say in the report which were not); `applies_when: [{fact: env.container, op: eq, expected: none}]` on all; `absent_means` per the table; control 5's `params: {allowed_sysrq: {type: list<int>, default: [0]}}` and `checks: [{fact: kernel.sysctl.sysrq, op: in, expected: "${allowed_sysrq}"}]`; control 6's four mechanisms per K-11 in the spec's order with `when` on `coredump.core_pattern` (`matches` / `not_matches`, the regexes of the spec, escaped for YAML) and the constructed checks; descriptions in both languages, the one-sentence importance rationale, the distribution defaults for sysrq, the "see separate_partitions"-style pointers where the spec asks; remediation text with `risk` and `idempotent`.
+- [ ] **Step 2: Fixtures** per K-6: for each control `pass-*.json`, `fail-*.json` (one per clause, so every mutant dies), `na-container.json` (`env.container` `docker`), the all-absent fixture named for `absent_means` (`fail-all-absent.json` / `na-all-absent.json`), and for control 6 one fixture per mechanism: `pass-systemd-none.json`, `fail-systemd-external.json`, `pass-bin-false.json`, `pass-file-hard-core-0.json`, `fail-file-no-limit.json` (WARN — `fail-` on partial), `fail-apport-pipe.json` (WARN), `fail-all-absent.json` (FAIL through absentMeans, `_expect.reason_code` as the evaluator names it). Sysctl fixtures carry the `setting` shape (`runtime`/`persisted`/`effective`/`winner`).
+- [ ] **Step 3: Gates.** `go test ./internal/controls/ -count=1 -v -run 'EveryControlHasFixtures|EveryMutant|Lint'` → fixtures behave, `surviving 0`, `ok: 75 controls`; `go run ./tools/coverage` regenerates the beyond table (commit it). **Step 4: Commit.** `Judge the kernel's self-protection and its core-dump policy`.
+
+### Task 7: controls 8–19 — boot, mounts, swap, modules (B-5 rows 8–19, B-6, B-7)
+
+**Files:** the twelve control files and their fixtures; `controls/VERSION` → `kisa-unix-2026+2026.09.18`.
+
+- [ ] **Step 1: The controls**: `bootloader_config_permissions` (`params.allowed_modes: { type: list<int>, default: [0, 128, 256, 384], description: … }` — the bit-subsets of 0600 in decimal, the shape `controls/account/cron_permissions.yaml` uses, and `checks: [{fact: boot.grub_cfg.mode, op: in, expected: "${allowed_modes}"}]`; `uid eq 0`, `gid eq 0`; `absent_means: not_applicable`), `bootloader_password`, `secure_boot_enabled` (two `applies_when` clauses; `absent_means: manual`), `separate_partitions` (`partial`; `params.required_separate` list<string>; `each` with `subject: target`, `where: {field: target, op: in, expected: "${required_separate}"}`, `require: {field: separate, op: eq, expected: true}`), `tmp_mount_options` / `var_tmp_mount_options` / `dev_shm_mount_options` / `home_mount_options` (one mechanism each, `when: [{fact: mounts.<point>.separate, op: eq, expected: true}]`, three (two) `each` checks `where target eq /<point>` `require {field: options, op: contains, expected: nodev}` …; `absent_means: not_applicable` for the leaf's absence), `swap_encrypted`, `uncommon_filesystems_disabled` / `usb_storage_disabled` / `uncommon_network_protocols_disabled` (`each` over `kernel.modules`, `subject: name`, `where name in [...]`, `require disabled eq true`). STIG candidates by title: RHEL-09-212025/212030 (grub owner/group), RHEL-09-231015/231020/231025/231030/231035/231010 (separate file systems), RHEL-09-231125/231130/231135 (/tmp), 231175/231180/231185 (/var/tmp), 231110/231115/231120 (/dev/shm), RHEL-09-291010 and UBTU-22-291010 / UBTU-24-300039 (USB storage), RHEL-09-231195 (cramfs), RHEL-09-213060/213065 (sctp, tipc).
+- [ ] **Step 2: Fixtures** per K-6, including `na-bios.json` (control 10), `na-not-separate.json` (12–15, the leaf false → no mechanism), `na-no-swap.json`, the module fixtures with rows for every candidate (a `fail-builtin.json` where the judged module is built in; a `pass-absent-from-tree.json`), and for 11 a `fail-` (WARN) fixture with `/var` not separate.
+- [ ] **Step 3: Gates** (`surviving 0`, `ok: 87 controls`, coverage regenerated). **Step 4: Commit.** `Judge the boot chain, the mounts, the swap and the module blacklists` (with the VERSION bump named in the body).
+
+### Task 8: the stock-host snapshot, the oracle pair, the matrix, CI and the 3A hand-offs (B-10, B-11, B-12, K-13)
+
+**Files:** create `controls/testdata/_hosts/ubuntu-22.04-stock.json`, `internal/controls/hosts_test.go`; modify `docs/reference/capability-matrix.json` (`nonroot.denied` += the five 0600 sysctl keys; `container.unsupported` += `kernel.modules`), `internal/collect/collectors/oracle_test.go` (+`TestOracleSysctl`: `sysctl -n <key>` for the twelve, absolute path `/usr/sbin/sysctl` or `/sbin/sysctl`, compared with the runtime leaves; skips naming the binary when absent; `compared` logged like the others), `.github/workflows/ci.yml` only if the container matrix's static test binary needs `-test.run` widened (it runs `Oracle`, so no change is expected — confirm), `internal/facts/registry.yaml` (`subject_kind: file` on `files.user_rhosts`, `files.env_files`, `files.dev_nondevice`), the facts golden, `controls/file/suid_sgid.yaml` (U-23: one description sentence in both languages naming that rootless container stores of accounts absent from `/etc/passwd` are walked), `tools/coverage/main.go` (README fragments gain `and %d beyond the guide` / `그리고 가이드 밖 %d개`), `README.md` / `README.ko.md` count sentences only, `docs/reference/coverage.md`.
+
+- [ ] **Step 1: The stock snapshot and its test.** Build `_hosts/ubuntu-22.04-stock.json` from the collectors' own output shapes (Tasks 2–5's tests know them) with the values of spec §5's lab reading; `hosts_test.go` evaluates the whole embedded set against it and asserts the nineteen `muster.beyond.*` statuses of the spec's table (1 PASS … 19 FAIL) by id, plus that no beyond result is ERROR. A verdict that differs is a defect in the control or the snapshot, decided by the spec's table.
+- [ ] **Step 2: The matrix and the hand-offs.** The matrix test in CI (`collect-nonroot`, `collect-containers`) must go green with the added keys — run the matrix checker locally the way `ci.yml` does (read the workflow) against a lab non-root collect (`lab-run.sh` with `su -s /bin/sh nobody -c '…'` under a private `HOME`/`GOCACHE` as the 1B recipe does) and against the public `ubuntu:24.04` container. The three `subject_kind` additions change observation subjects: regenerate the facts golden and, for every fixture of the three controls that read those keys, confirm `_expect` needs no change (subjects are not in `_expect`).
+- [ ] **Step 3: Lab proof of the whole.** `lab-run.sh 'go run ./cmd/muster collect --out /tmp/3b.json && go run ./cmd/muster check --snapshot /tmp/3b.json --format table | grep -E "beyond|muster.beyond" ; rm /tmp/3b.json'` — the nineteen rows read as spec §5's table (report every deviation with the fact values; a deviation is a control or collector defect unless the lab host moved). `MUSTER_ORACLE=1 go test ./internal/collect/collectors/ -run Oracle -count=1 -v` → the sysctl pair compares 12, no mismatch.
+- [ ] **Step 4: Gates, commit.** `Pin the stock host's verdicts, add the sysctl oracle and the matrix rows, and land the 3A hand-offs` (or two commits: hand-offs first).
+
+### Task 9: documents, the whole-branch review, Execution notes and the gates (controller)
+
+**Files:** `CONTRIBUTING.md`/`.ko.md` (a short "Controls beyond the guide" rule: primary sources, no CIS number, the importance sentence, the container gate, the scope lint), `CLAUDE.md` (one line under Stage-2 conventions or a new "Beyond the guide" bullet: category `beyond` ⇔ no `references.kisa`; every beyond control gates on `env.container`), `README.md`/`.ko.md` (the "What it does" and roadmap paragraphs: 3B merged; the exit-code sentence), `CHANGELOG.md` (Controls: the nineteen with the VERSION bump, the exit-code sentence, the waiver-key change for the three `subject_kind`s; Collectors: the six; Tooling: `scopes`, the coverage table, the lint rule), the main design (`D29`: two scopes in the summary, exit code unchanged, `default_on: effective` for sysctl departing from §5.3, the `subject_kind` waiver-key change; §9 sentence; §10.2 "3B (merged)"; both languages), this plan's Execution notes.
+
+- [ ] **Step 1:** `git merge-base HEAD main` is main's tip; whole-branch review (two reviewers: collectors + registry side; controls + report + docs side), ONE fix wave, a scoped re-review.
+- [ ] **Step 2:** Write the documents; gates (K-8), staticcheck on the lab, gitleaks over the range, the host-string grep.
+- [ ] **Step 3:** On the user's word: push, PR; run `examples.yml` on the branch (`gh workflow run examples.yml --ref stage3b-kernel-boot-mount` — it is registered now), fetch both examples (`make examples-fetch RUN=<id>`), review the VM file (the runner's nineteen verdicts are part of the example now), update `examples/README.md`'s run id, commit; CI green; merge on the user's word.
+- [ ] **Step 4:** Execution notes: rulings K-n settled during execution, the lab table as read, the runner's verdicts, the first nightly fuzz result for the new targets, what was parked.
