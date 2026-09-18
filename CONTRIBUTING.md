@@ -77,6 +77,19 @@ are changing before you change it. Korean: `CONTRIBUTING.ko.md`.
    network), `make suidindex-check` verifies them, CI reads the committed
    files.
 
+### Controls beyond the guide
+
+A control that is not a KISA item has `category: beyond`, an id
+`muster.beyond.<name>`, no `references.kisa` (the lint rule `beyond_scope`
+keeps the two in step) and no CIS recommendation number: it is written from a
+primary source — kernel documentation, a man page, the distribution's own
+documentation — in muster's own words, and its description says in one
+sentence why it has the importance it has. Every such control gates on
+`env.container eq none`: inside a container these facts describe the host.
+`go run ./cmd/muster controls new muster.beyond.<name> --importance 중`
+scaffolds one (no `--kisa-id`). A fixture that reads a `setting` key carries
+the key present with its `effective` side `absent` when it means to be absent.
+
 ## Adding a fact
 
 - Register the key first: `{key, type, description, since, sensitivity,

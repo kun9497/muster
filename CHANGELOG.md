@@ -11,6 +11,37 @@ verdict on an existing snapshot is at least a minor release and appears under
 
 ### Controls
 
+Control set `kisa-unix-2026+2026.09.18` (was `+2026.09.16`). Nineteen controls
+beyond the KISA guide, category `beyond` (`muster.beyond.*`), written from
+primary sources — kernel documentation, man pages, the distributions' own
+documentation — with no CIS recommendation number: kernel pointer exposure,
+ptrace restriction, unprivileged BPF, ASLR and link protection, SysRq, the
+core-dump policy from its three sources, `suid_dumpable`; the bootloader
+file's permissions and password and Secure Boot; separate partitions and the
+`nodev`/`nosuid`/`noexec` options of `/tmp`, `/var/tmp`, `/dev/shm` and
+`/home`; swap encryption; and the uncommon filesystem, USB-storage and
+network-protocol modules. Every one is NOT_APPLICABLE inside a container.
+The 68 controls for the 67 items are unchanged. The exit code is the contract
+it was: a FAIL beyond the guide is a FAIL, until a profile lets a KISA-only
+user choose (D29). The report's summary gains `scopes` — the same three parts
+for the guide and for beyond it — and the table two lines and a separator;
+every existing summary field keeps its meaning.
+
+- `muster.beyond.core_dump_policy` reports a host whose systemd coredump file
+  sets nothing for review rather than judging it: systemd's own default stores
+  dumps, and muster does not substitute the daemon's default.
+- `muster.beyond.bootloader_password` counts a bootloader password only where a
+  literal `grub.pbkdf2.` hash is present (grub.cfg, `/boot/grub2/user.cfg` or
+  `/etc/grub.d/*`); EL's generated grub.cfg carries the template's
+  `set superusers` line on every host, so that token alone proves nothing.
+- Waiver keys: the observations of `files.user_rhosts`, `files.env_files` and
+  `files.dev_nondevice` now carry the subject kind `file:` instead of `item:`
+  (the registry names it), so a waiver written as `#item:/path` must become
+  `#file:/path` (D29). `env.shell.root_path_entries` keeps `item:`; its
+  subject is a position.
+- U-23's description says that rootless container stores of accounts absent
+  from `/etc/passwd` are walked too (description only).
+
 Control set `kisa-unix-2026+2026.09.16` (was `+2026.09.09`). All 67 KISA 2026
 Unix items are enrolled: auto 57, partial 7, manual 4 with evidence attached.
 `docs/reference/kisa/kisa_deferred.json` is now empty — the three items that
@@ -107,6 +138,28 @@ every plan is under `docs/superpowers/plans/`):
 
 ### Collectors
 
+- Six read-only collectors for the checks beyond the guide, none of which
+  runs a command: `sysctl` (twelve kernel self-protection settings as two-home
+  facts — the running value from `/proc/sys`, the persisted one merged from
+  the sysctl.d directories the way systemd-sysctl merges them; the verdict
+  reads the running value), `coredump` (`core_pattern`, `suid_dumpable`,
+  systemd's `Storage=`/`ProcessSizeMax=` across its drop-ins, the `* hard
+  core` limit), `boot` (firmware kind, Secure Boot from efivars, the
+  bootloader file's nine permission leaves, the password hash), `mounts`
+  (the nine candidate mount points, each row saying which mount governs it),
+  `swap` (devices from `/proc/swaps`; encryption decided through the sysfs
+  block links and the dm `slaves/` chain), `modules` (the eleven candidate
+  modules with what the module tree under `/usr/lib/modules`, `/proc/modules`
+  and modprobe.d say about each). Forty registry keys, `schema_version`
+  unchanged.
+- A symlink to `/dev/null` in a `.d` directory muster reads (sysctl.d,
+  coredump.conf.d, modprobe.d, grub.d) is the documented way to disable a
+  vendor file: it contributes nothing and is never an error; any other symlink
+  there is that file's error.
+- A swap file whose containing mount has no block-device node (an overlay
+  root, `/dev/root`) makes `swap.encrypted` `unsupported`, never an error; a
+  module tree that is missing makes `kernel.modules` `unsupported`.
+
 - New `walk` collector: `collect --deep` (root only) walks the host's local
   filesystems once — `--walk-budget`, `--walk-max-entries`, `--walk-exclude`
   and `--walk-include` bound it — and writes nine keys: `walk.suid_sgid`,
@@ -147,6 +200,19 @@ every plan is under `docs/superpowers/plans/`):
   fuzz workflow; the input is committed as its seed.
 
 ### Tooling
+
+- `summary.scopes` in the JSON report and two summary lines plus a separator
+  in the table split every verdict into the guide and beyond it; rows sort by
+  scope first. `controls lint` keeps `category: beyond` and the absence of a
+  KISA reference in step (`beyond_scope`), `controls new muster.beyond.<name>
+  --importance <상|중|하>` scaffolds such a control, and `coverage.md` gains a
+  "Beyond the guide" table.
+- A synthetic stock-host snapshot (`controls/testdata/_hosts/`) pins the
+  nineteen verdicts a stock Ubuntu 22.04 server reads; a fifth daemon oracle
+  compares the twelve sysctls with `sysctl -n`; the capability matrix names
+  the five `/proc/sys` files that are root-only and the two keys a container
+  cannot answer, and CI proves the EL non-root bootloader path inside the init
+  images.
 
 - A mutation test over the control set. `TestEveryMutantIsKilled`
   (`internal/controls`) mutates every control — operators flipped, expected
