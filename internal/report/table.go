@@ -30,6 +30,23 @@ func ColorEnabled(flag, noColorEnv, term string, isTTY bool) bool {
 
 const maxCell = 200
 
+// beyondSeparator marks, in the row block, where the KISA guide's verdict
+// ends and muster's own checks begin (B-9).
+const beyondSeparator = "— beyond the guide —"
+
+// scopeLine renders one scope's share of the summary block. The three pass/
+// fail/warn numbers are the sum over the severities; manual, n/a and error
+// are the parts of the summary that carry no severity at all.
+func scopeLine(c ScopeCounts) string {
+	a := c.Automatic
+	return fmt.Sprintf("(%d controls): pass %d fail %d warn %d manual %d n/a %d error %d",
+		c.Controls,
+		a.High.Pass+a.Medium.Pass+a.Low.Pass,
+		a.High.Fail+a.Medium.Fail+a.Low.Fail,
+		a.High.Warn+a.Medium.Warn+a.Low.Warn,
+		c.ManualReview, c.Undecidable.NotApplicable, c.Undecidable.Error)
+}
+
 // escape neutralises anything a hostile snapshot could use to repaint the
 // terminal (spec §7.4): C0/C1 controls, ESC, CR; tabs survive.
 func escape(s string) string {
@@ -101,8 +118,14 @@ func WriteTable(w io.Writer, r *Report, o TableOptions) error {
 		s.Automatic.High.Pass, s.Automatic.High.Fail, s.Automatic.High.Warn,
 		s.Automatic.Medium.Pass, s.Automatic.Medium.Fail, s.Automatic.Medium.Warn,
 		s.Automatic.Low.Pass, s.Automatic.Low.Fail, s.Automatic.Low.Warn)
-	fmt.Fprintf(w, "manual review %d  ·  undecidable error %d / n-a %d / waived %d  ·  facts failed %d  ·  waivers expiring within 30d %d\n\n",
+	fmt.Fprintf(w, "manual review %d  ·  undecidable error %d / n-a %d / waived %d  ·  facts failed %d  ·  waivers expiring within 30d %d\n",
 		s.ManualReview, s.Undecidable.Error, s.Undecidable.NotApplicable, s.Undecidable.Waived, s.FactsFailed, s.WaiversExpiringSoon)
+	// B-9: the exit code does not change, so the only way to see how much of
+	// the verdict is the guide's and how much is muster's own is to say it.
+	// The names are literals: "KISA 2026" is the guide these controls
+	// implement, not the control set's own edition string.
+	fmt.Fprintf(w, "KISA 2026 %s\n", scopeLine(s.Scopes.Guide))
+	fmt.Fprintf(w, "beyond the guide %s\n\n", scopeLine(s.Scopes.Beyond))
 
 	idWidth := 12
 	for _, row := range r.Results {
@@ -114,9 +137,18 @@ func WriteTable(w io.Writer, r *Report, o TableOptions) error {
 	if titleWidth < 10 {
 		titleWidth = 10
 	}
+	// B-9: the rows are sorted guide first, so one line marks where the
+	// guide's verdict ends. It announces rows the reader is about to see, so
+	// a run that shows no beyond row at all (--quiet, or a set without any)
+	// prints no separator.
+	separated := false
 	for _, row := range r.Results {
 		if hidden(o, row.Status) {
 			continue
+		}
+		if !separated && scopeOf(row.Category) == "beyond" {
+			fmt.Fprintf(w, "%s\n", beyondSeparator)
+			separated = true
 		}
 		title := row.TitleKo
 		if title == "" {

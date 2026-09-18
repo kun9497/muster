@@ -400,7 +400,61 @@
       "waived": 0
     },
     "facts_failed": 0,
-    "waivers_expiring_soon": 0
+    "waivers_expiring_soon": 0,
+    "scopes": {
+      "guide": {
+        "controls": 68,
+        "automatic": {
+          "high": {
+            "pass": 10,
+            "fail": 7,
+            "warn": 0
+          },
+          "medium": {
+            "pass": 8,
+            "fail": 0,
+            "warn": 0
+          },
+          "low": {
+            "pass": 3,
+            "fail": 1,
+            "warn": 0
+          }
+        },
+        "manual_review": 4,
+        "undecidable": {
+          "error": 0,
+          "not_applicable": 35,
+          "waived": 0
+        }
+      },
+      "beyond": {
+        "controls": 0,
+        "automatic": {
+          "high": {
+            "pass": 0,
+            "fail": 0,
+            "warn": 0
+          },
+          "medium": {
+            "pass": 0,
+            "fail": 0,
+            "warn": 0
+          },
+          "low": {
+            "pass": 0,
+            "fail": 0,
+            "warn": 0
+          }
+        },
+        "manual_review": 0,
+        "undecidable": {
+          "error": 0,
+          "not_applicable": 0,
+          "waived": 0
+        }
+      }
+    }
   },
   "results": [
     {
