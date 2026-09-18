@@ -4032,6 +4032,16 @@
       "SubjectKind": ""
     },
     {
+      "Key": "kernel.modules",
+      "Type": "list\u003crecord\u003e",
+      "Description": "One row per candidate kernel module (cramfs, freevxfs, jffs2, hfs, hfsplus, udf, usb-storage, dccp, sctp, rds, tipc) with name, loaded, builtin, available, blacklisted, install_disabled, disabled and sources; read from /proc/modules, /usr/lib/modules/\u003crelease\u003e/modules.dep and modules.builtin, and the modprobe.d chain; unsupported when this host carries no module tree for its running kernel.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "modules",
+      "DefaultOn": "",
+      "SubjectKind": "module"
+    },
+    {
       "Key": "swap.present",
       "Type": "bool",
       "Description": "Whether /proc/swaps lists any swap device.",

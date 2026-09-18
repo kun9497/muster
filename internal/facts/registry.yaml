@@ -2547,6 +2547,13 @@ keys:
     since: 1
     sensitivity: public
     collector: mounts
+  - key: kernel.modules
+    type: list<record>
+    description: One row per candidate kernel module (cramfs, freevxfs, jffs2, hfs, hfsplus, udf, usb-storage, dccp, sctp, rds, tipc) with name, loaded, builtin, available, blacklisted, install_disabled, disabled and sources; read from /proc/modules, /usr/lib/modules/<release>/modules.dep and modules.builtin, and the modprobe.d chain; unsupported when this host carries no module tree for its running kernel.
+    since: 1
+    sensitivity: public
+    collector: modules
+    subject_kind: module
   - key: swap.present
     type: bool
     description: Whether /proc/swaps lists any swap device.

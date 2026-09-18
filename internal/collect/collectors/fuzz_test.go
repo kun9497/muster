@@ -1142,3 +1142,47 @@ func FuzzSecureBootFromEfivar(f *testing.F) {
 		}, len(data))
 	})
 }
+
+func FuzzParseModulesBuiltin(f *testing.F) {
+	seeds(f, "testdata/modules.builtin.*")
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "parseModulesBuiltin", func() any { return parseModulesBuiltin(data) }, len(data))
+	})
+}
+
+func FuzzParseModulesDep(f *testing.F) {
+	seeds(f, "testdata/modules.dep.*")
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "parseModulesDep", func() any { return parseModulesDep(data) }, len(data))
+	})
+}
+
+func FuzzParseProcModules(f *testing.F) {
+	seeds(f, "testdata/proc_modules.*")
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "parseProcModules", func() any { return parseProcModules(data) }, len(data))
+	})
+}
+
+func FuzzParseModprobeD(f *testing.F) {
+	seeds(f, "testdata/modprobe.d-*.conf")
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "parseModprobeD", func() any { return parseModprobeD(data) }, len(data))
+	})
+}
+
+// FuzzModuleStates drives the fold the eleven rows are built from. It is the
+// one target here that takes three indexes and a file chain at once, so the
+// same bytes are handed to all four: what it proves is that no input makes
+// the fold disagree with itself or grow a row list out of proportion to what
+// it read, which the four per-source targets cannot show on their own.
+func FuzzModuleStates(f *testing.F) {
+	seeds(f, "testdata/modules.dep.*", "testdata/modules.builtin.*",
+		"testdata/proc_modules.*", "testdata/modprobe.d-*.conf")
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "moduleStates", func() any {
+			return moduleStates(data, data, data,
+				[]confFile{{path: "/etc/modprobe.d/fuzz.conf", data: data}})
+		}, len(data))
+	})
+}

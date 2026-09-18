@@ -80,7 +80,7 @@ None yet — every control in the set implements a KISA item.
 
 ## Fact keys used by controls
 
-152 of 389 registered keys are read by a control (3 by the engine); 234 unused.
+152 of 390 registered keys are read by a control (3 by the engine); 235 unused.
 
 | Collector | Registered | Used by a control | Read by the engine | Unused |
 |---|---|---|---|---|
@@ -108,4 +108,5 @@ None yet — every control in the set implements a KISA item.
 | coredump | 6 | 0 | 0 | coredump.core_pattern, coredump.suid_dumpable, coredump.systemd.storage, coredump.systemd.process_size_max, coredump.limits.hard_core, coredump.limits.sources |
 | boot | 13 | 0 | 0 | boot.firmware, boot.secure_boot, boot.grub_cfg.path, boot.grub_cfg.mode, boot.grub_cfg.uid, boot.grub_cfg.gid, boot.grub_cfg.group, boot.grub_cfg.group_readable, boot.grub_cfg.group_writable, boot.grub_cfg.other_readable, boot.grub_cfg.other_writable, boot.grub_cfg.acl_present, boot.grub_password_set |
 | mounts | 5 | 0 | 0 | mounts.points, mounts.tmp.separate, mounts.var_tmp.separate, mounts.dev_shm.separate, mounts.home.separate |
+| modules | 1 | 0 | 0 | kernel.modules |
 | swap | 3 | 0 | 0 | swap.present, swap.devices, swap.encrypted |

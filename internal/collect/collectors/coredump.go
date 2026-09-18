@@ -138,9 +138,25 @@ func coredumpConfFiles(a collect.Access) chainScan {
 			break
 		}
 	}
+	for _, p := range dropinPaths(a, coredumpDropinDirs, &s) {
+		s.read(a, p)
+	}
+	return s
+}
+
+// dropinPaths resolves a set of .d directories to the files a merged chain
+// applies, in the order it applies them: every *.conf of the directories, the
+// FIRST directory to offer a base name owning it — which is what masking a
+// vendor file means — and the survivors sorted by base name whichever
+// directory each came from. systemd and kmod both merge their drop-ins this
+// way, so the coredump and modules collectors share one implementation of it.
+//
+// A Glob this run may not perform is recorded on s and is the chain's answer
+// (C3), never an empty directory.
+func dropinPaths(a collect.Access, dirs []string, s *chainScan) []string {
 	chosen := map[string]string{}
 	var bases []string
-	for _, d := range coredumpDropinDirs {
+	for _, d := range dirs {
 		pattern := path.Join(d, "*.conf")
 		matches, err := a.Glob(pattern)
 		if err != nil {
@@ -158,10 +174,11 @@ func coredumpConfFiles(a collect.Access) chainScan {
 		}
 	}
 	slices.Sort(bases)
+	out := make([]string, 0, len(bases))
 	for _, base := range bases {
-		s.read(a, chosen[base])
+		out = append(out, chosen[base])
 	}
-	return s
+	return out
 }
 
 // writeCoredumpConf publishes systemd-coredump's two judged settings.

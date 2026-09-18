@@ -1,0 +1,10 @@
+kernel/fs/cramfs/cramfs.ko:
+kernel/fs/freevxfs/freevxfs.ko:
+kernel/fs/hfsplus/hfsplus.ko:
+kernel/fs/udf/udf.ko.zst: kernel/lib/crc-itu-t.ko.zst
+kernel/drivers/usb/storage/usb-storage.ko.xz: kernel/drivers/usb/common/usb-common.ko.xz
+kernel/net/dccp/dccp.ko: kernel/lib/libcrc32c.ko
+kernel/net/sctp/sctp.ko: kernel/lib/libcrc32c.ko
+kernel/net/rds/rds.ko:
+kernel/net/tipc/tipc.ko: kernel/net/ipv4/udp_tunnel.ko
+kernel/fs/squashfs/squashfs.ko.gz:
