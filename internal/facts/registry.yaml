@@ -2516,3 +2516,52 @@ keys:
     since: 1
     sensitivity: public
     collector: boot
+  - key: mounts.points
+    type: list<record>
+    description: One row per candidate mount point (/, /boot, /home, /tmp, /var, /var/tmp, /var/log, /var/log/audit, /dev/shm) with target, separate, mounted_by, source, fstype and options; on a row that is not separate the source, fstype and options are those of the mount that governs the path.
+    since: 1
+    sensitivity: public
+    collector: mounts
+    subject_kind: mount
+  - key: mounts.tmp.separate
+    type: bool
+    description: Whether a filesystem is mounted exactly at /tmp - the same fact as the row's separate, as a leaf a mechanism can gate on.
+    since: 1
+    sensitivity: public
+    collector: mounts
+  - key: mounts.var_tmp.separate
+    type: bool
+    description: Whether a filesystem is mounted exactly at /var/tmp - the same fact as the row's separate, as a leaf a mechanism can gate on.
+    since: 1
+    sensitivity: public
+    collector: mounts
+  - key: mounts.dev_shm.separate
+    type: bool
+    description: Whether a filesystem is mounted exactly at /dev/shm - the same fact as the row's separate, as a leaf a mechanism can gate on.
+    since: 1
+    sensitivity: public
+    collector: mounts
+  - key: mounts.home.separate
+    type: bool
+    description: Whether a filesystem is mounted exactly at /home - the same fact as the row's separate, as a leaf a mechanism can gate on.
+    since: 1
+    sensitivity: public
+    collector: mounts
+  - key: swap.present
+    type: bool
+    description: Whether /proc/swaps lists any swap device.
+    since: 1
+    sensitivity: public
+    collector: swap
+  - key: swap.devices
+    type: list<record>
+    description: One row per swap device with path, type (file or partition), encrypted and backing - the block device the judgment was made on.
+    since: 1
+    sensitivity: public
+    collector: swap
+  - key: swap.encrypted
+    type: bool
+    description: Whether every swap device is on dm-crypt or on memory-backed zram, decided from the sysfs block links and the dm slaves below them; absent when there is no swap, unsupported when a source is not a block device this kernel lists.
+    since: 1
+    sensitivity: public
+    collector: swap

@@ -593,6 +593,16 @@ func FuzzParseMountinfo(f *testing.F) {
 	})
 }
 
+// /proc/swaps is a header line and then one row per swap device; a row with
+// fewer than the two judged fields is dropped, so the list is bounded by the
+// input whatever the fuzzer produces.
+func FuzzParseProcSwaps(f *testing.F) {
+	seeds(f, "testdata/proc_swaps.*")
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "parseProcSwaps", func() any { return parseProcSwaps(data) }, len(data))
+	})
+}
+
 func FuzzParseProcNet(f *testing.F) {
 	seeds(f, "testdata/proc_net_*")
 	f.Fuzz(func(t *testing.T, data []byte) {

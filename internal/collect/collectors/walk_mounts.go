@@ -92,6 +92,13 @@ var (
 // subtree of the device that is mounted — "/" for an ordinary mount, a
 // subdirectory for a bind mount, a subvolume for btrfs — and it is what
 // tells a bind alias from a second subvolume.
+//
+// options and source are the mounts collector's (B-2): the per-mount option
+// list of field 6 — the kernel's own view of nodev/nosuid/noexec, not
+// fstab's — and the device or tag the filesystem was mounted from, which is
+// what the swap collector resolves a swap file's containing mount through.
+// The walk itself judges neither; they are parsed here because the file is
+// parsed here, and one parser for one file is the rule.
 type mountRow struct {
 	id, parent int
 	dev        string
@@ -99,6 +106,8 @@ type mountRow struct {
 	root       string
 	mountPoint string
 	fstype     string
+	source     string
+	options    []string
 }
 
 // skipRow is one row of walk.skipped (A-15): a root the walk did not enter
@@ -160,6 +169,14 @@ func (p *mountPlan) exclude(root, reason, detail string) {
 // mangled row must not cost the walk every boundary it knows. A file with
 // no parseable row at all is an error — every mount namespace has at least
 // its own root, so that is not a host muster can plan a walk for.
+//
+// Field 6 is the per-mount option list, kept split on "," so a caller asks
+// for a word rather than for a substring — "nodev" must not match
+// "nodevsomething" and "noexec" must not be found inside "rootcontext=…".
+// The source is the field after the fstype and carries the same octal
+// escapes fields 4 and 5 do. A line whose source field is missing is kept
+// with an empty source rather than dropped: the walk's boundaries do not
+// depend on it, and a row is worth more than the field it lacks.
 func parseMountinfo(data []byte) ([]mountRow, error) {
 	var rows []mountRow
 	for _, line := range splitLines(data) {
@@ -174,6 +191,10 @@ func parseMountinfo(data []byte) ([]mountRow, error) {
 		if err != nil || perr != nil || !ok {
 			continue
 		}
+		source := ""
+		if len(f) > sep+2 {
+			source = unescapeMountField(f[sep+2])
+		}
 		rows = append(rows, mountRow{
 			id:         id,
 			parent:     parent,
@@ -182,6 +203,8 @@ func parseMountinfo(data []byte) ([]mountRow, error) {
 			root:       unescapeMountField(f[3]),
 			mountPoint: unescapeMountField(f[4]),
 			fstype:     f[sep+1],
+			source:     source,
+			options:    strings.Split(f[5], ","),
 		})
 	}
 	if len(rows) == 0 {

@@ -74,6 +74,7 @@ var fuzzTargets = []string{
 	"FuzzParsePasswd",
 	"FuzzParsePostfixInto",
 	"FuzzParseProcNet",
+	"FuzzParseProcSwaps",
 	"FuzzParseProftpd",
 	"FuzzParsePureFtpdInto",
 	"FuzzParseRpmQa",

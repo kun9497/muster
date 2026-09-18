@@ -54,6 +54,8 @@ func init() {
 	collect.Register(sysctlCollector)
 	collect.Register(coredumpCollector)
 	collect.Register(bootCollector)
+	collect.Register(mountsCollector)
+	collect.Register(swapCollector)
 	collect.Register(walkCollector)
 }
 

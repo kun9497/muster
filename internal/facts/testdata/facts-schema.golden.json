@@ -3980,6 +3980,86 @@
       "Collector": "boot",
       "DefaultOn": "",
       "SubjectKind": ""
+    },
+    {
+      "Key": "mounts.points",
+      "Type": "list\u003crecord\u003e",
+      "Description": "One row per candidate mount point (/, /boot, /home, /tmp, /var, /var/tmp, /var/log, /var/log/audit, /dev/shm) with target, separate, mounted_by, source, fstype and options; on a row that is not separate the source, fstype and options are those of the mount that governs the path.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "mounts",
+      "DefaultOn": "",
+      "SubjectKind": "mount"
+    },
+    {
+      "Key": "mounts.tmp.separate",
+      "Type": "bool",
+      "Description": "Whether a filesystem is mounted exactly at /tmp - the same fact as the row's separate, as a leaf a mechanism can gate on.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "mounts",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "mounts.var_tmp.separate",
+      "Type": "bool",
+      "Description": "Whether a filesystem is mounted exactly at /var/tmp - the same fact as the row's separate, as a leaf a mechanism can gate on.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "mounts",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "mounts.dev_shm.separate",
+      "Type": "bool",
+      "Description": "Whether a filesystem is mounted exactly at /dev/shm - the same fact as the row's separate, as a leaf a mechanism can gate on.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "mounts",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "mounts.home.separate",
+      "Type": "bool",
+      "Description": "Whether a filesystem is mounted exactly at /home - the same fact as the row's separate, as a leaf a mechanism can gate on.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "mounts",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "swap.present",
+      "Type": "bool",
+      "Description": "Whether /proc/swaps lists any swap device.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "swap",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "swap.devices",
+      "Type": "list\u003crecord\u003e",
+      "Description": "One row per swap device with path, type (file or partition), encrypted and backing - the block device the judgment was made on.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "swap",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "swap.encrypted",
+      "Type": "bool",
+      "Description": "Whether every swap device is on dm-crypt or on memory-backed zram, decided from the sysfs block links and the dm slaves below them; absent when there is no swap, unsupported when a source is not a block device this kernel lists.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "swap",
+      "DefaultOn": "",
+      "SubjectKind": ""
     }
   ]
 }
