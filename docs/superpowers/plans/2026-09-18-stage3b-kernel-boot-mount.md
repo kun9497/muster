@@ -255,7 +255,7 @@ Executed 2026-09-18 in the worktree `stage3b-kernel-boot-mount` over main `f1199
 
 Per-task reviews: Task 1 clean (four minors parked, folded in the wave); Task 2 two Important (the `/dev/null` mask link spread an error to every persisted side; the size parser refused values systemd accepts); Task 3 the K-22 rule and an untested candidate loop; Task 4 a Blocking (the partition probe under a symlink), the walk's cycle guard and an untested depth limit; Task 5 minors; Task 6 the harness gap behind K-25 and two references dropped; Task 7 two reference omissions and a fixture shape the collector never writes; Task 8 K-27 not implemented literally.
 
-Whole-branch (two Fable reviewers): no Blocking on either side. The collectors side found the upgraded-EL link (K-28), a read limit that would have turned a large module tree into ERROR, and an unfuzzed arithmetic parser; the controls side found the committed examples stale (refreshed on the pull request, K-12) and wording on the partition control. One fix wave of three commits; the scoped re-review is recorded below.
+Whole-branch (two Fable reviewers): no Blocking on either side. The collectors side found the upgraded-EL link (K-28), a read limit that would have turned a large module tree into ERROR, and an unfuzzed arithmetic parser; the controls side found the committed examples stale (refreshed on the pull request, K-12) and wording on the partition control. One fix wave of three commits. The scoped re-review (Fable) confirmed every item against the rulings, reproduced the totals and the counts, judged the capability matrix's `_notes` placement reasonable, and approved with two corrections to these notes (this fixture count; this paragraph).
 
 ### Deviations from the spec, as shipped
 
@@ -266,7 +266,7 @@ Whole-branch (two Fable reviewers): no Blocking on either side. The collectors s
 
 ### Numbers
 
-- Controls 87 (68 for the 67 items, unchanged; 19 beyond), set `kisa-unix-2026+2026.09.18`; fixtures added 129 (44 + 85) plus the stock-host snapshot; registry +40 keys (`schema_version` 1, all `since: 1`) plus `subject_kind: file` on three existing keys; fuzz targets 64 + 4 (was 51 + 4); mutation test 1472 generated, 4 invalid, 1451 killed, 0 surviving, 17 excluded.
+- Controls 87 (68 for the 67 items, unchanged; 19 beyond), set `kisa-unix-2026+2026.09.18`; fixtures added 130 (44 + 85, plus one from a fix round) plus the stock-host snapshot; registry +40 keys (`schema_version` 1, all `since: 1`) plus `subject_kind: file` on three existing keys; fuzz targets 64 + 4 (was 51 + 4); mutation test 1472 generated, 4 invalid, 1451 killed, 0 surviving, 17 excluded.
 - Lab host (stock Ubuntu 22.04, VMware, BIOS): the nineteen verdicts read exactly spec §5's table — 1 PASS, 2 PASS, 3 FAIL, 4 PASS, 5 FAIL, 6 WARN, 7 FAIL, 8 FAIL, 9 FAIL, 10 NOT_APPLICABLE, 11 WARN, 12–13 NOT_APPLICABLE, 14 FAIL, 15 NOT_APPLICABLE, 16 FAIL, 17–19 FAIL — and the synthetic snapshot under `controls/testdata/_hosts/` pins them. Oracles: sshd 1 keyword, accounts 98, mountinfo 175, services 17, sysctl 12, no mismatch. Non-root on the lab: the five 0600 sysctl files `denied`. Public containers: `kernel.modules` and `swap.encrypted` `unsupported` in `ubuntu:22.04`, `ubuntu:24.04`, `debian:12` and the Rocky init image; the EL non-root bootloader path `denied`/`denied` in Rocky and Alma.
 - The runner's verdicts and the refreshed examples are recorded with the pull request's first runs (Step 3).
 
