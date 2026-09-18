@@ -35,16 +35,22 @@ const maxCell = 200
 const beyondSeparator = "— beyond the guide —"
 
 // scopeLine renders one scope's share of the summary block. The three pass/
-// fail/warn numbers are the sum over the severities; manual, n/a and error
-// are the parts of the summary that carry no severity at all.
+// fail/warn numbers are the sum over the severities; manual, n/a, error and
+// waived are the parts of the summary that carry no severity at all.
+//
+// Waived is printed because every control of a scope lands in exactly one of
+// these seven buckets: without it the numbers do not sum to the count in
+// front of them, and a reader who added them up would go looking for the
+// control that went missing.
 func scopeLine(c ScopeCounts) string {
 	a := c.Automatic
-	return fmt.Sprintf("(%d controls): pass %d fail %d warn %d manual %d n/a %d error %d",
+	return fmt.Sprintf("(%d controls): pass %d fail %d warn %d manual %d n/a %d error %d waived %d",
 		c.Controls,
 		a.High.Pass+a.Medium.Pass+a.Low.Pass,
 		a.High.Fail+a.Medium.Fail+a.Low.Fail,
 		a.High.Warn+a.Medium.Warn+a.Low.Warn,
-		c.ManualReview, c.Undecidable.NotApplicable, c.Undecidable.Error)
+		c.ManualReview, c.Undecidable.NotApplicable, c.Undecidable.Error,
+		c.Undecidable.Waived)
 }
 
 // escape neutralises anything a hostile snapshot could use to repaint the

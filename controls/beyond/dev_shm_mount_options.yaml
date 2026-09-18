@@ -24,7 +24,7 @@ mechanisms:
       - { fact: mounts.points, op: each, subject: target, where: { field: target, op: eq, expected: "/dev/shm" }, require: { field: options, op: contains, expected: nosuid } }
       - { fact: mounts.points, op: each, subject: target, where: { field: target, op: eq, expected: "/dev/shm" }, require: { field: options, op: contains, expected: noexec } }
 remediation:
-  text_en: Add a /dev/shm line to /etc/fstab with tmpfs and defaults,nodev,nosuid,noexec, or drop a /etc/systemd/system/dev-shm.mount override carrying the same options, then remount. A handful of databases and Java runtimes map executable pages out of /dev/shm, so restart the application stack once and watch for an allocation failure before treating the change as done.
-  text_ko: /etc/fstab 에 tmpfs 와 defaults,nodev,nosuid,noexec 로 /dev/shm 줄을 추가하거나 같은 옵션을 담은 /etc/systemd/system/dev-shm.mount 재정의를 놓고 다시 마운트합니다. 일부 데이터베이스와 Java 런타임은 /dev/shm 에서 실행 가능한 페이지를 매핑하므로, 변경을 끝난 것으로 보기 전에 응용 스택을 한 번 재시작해 할당 실패가 없는지 확인하십시오.
+  text_en: Add a /dev/shm line to /etc/fstab with tmpfs and defaults,nodev,nosuid,noexec, or drop a /etc/systemd/system/dev-shm.mount override carrying the same options, then remount. Software that maps executable pages from /dev/shm will stop working under noexec, so restart the stack and watch for an allocation failure before treating the change as done.
+  text_ko: /etc/fstab 에 tmpfs 와 defaults,nodev,nosuid,noexec 로 /dev/shm 줄을 추가하거나 같은 옵션을 담은 /etc/systemd/system/dev-shm.mount 재정의를 놓고 다시 마운트합니다. /dev/shm 에서 실행 가능한 페이지를 매핑하는 소프트웨어는 noexec 아래에서 동작하지 않으므로, 변경을 끝난 것으로 보기 전에 스택을 재시작해 할당 실패가 없는지 확인하십시오.
   risk: restart_service
   idempotent: true

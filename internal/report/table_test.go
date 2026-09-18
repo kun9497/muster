@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -310,8 +311,8 @@ func TestTableScopeLinesAndSeparator(t *testing.T) {
 		"muster 0.1.0 · controls kisa-unix-2026+2026.09.09 · guide kisa-unix-2026 · host web-01 · collected 2026-09-02T06:00:00Z",
 		"automatic  high 0/1/0  medium 1/0/0  low 0/0/0  (pass/fail/warn)",
 		"manual review 2  ·  undecidable error 1 / n-a 0 / waived 1  ·  facts failed 1  ·  waivers expiring within 30d 1",
-		"KISA 2026 (6 controls): pass 1 fail 1 warn 0 manual 2 n/a 0 error 1",
-		"beyond the guide (0 controls): pass 0 fail 0 warn 0 manual 0 n/a 0 error 0",
+		"KISA 2026 (6 controls): pass 1 fail 1 warn 0 manual 2 n/a 0 error 1 waived 1",
+		"beyond the guide (0 controls): pass 0 fail 0 warn 0 manual 0 n/a 0 error 0 waived 0",
 		"",
 	}
 	for i, w := range want {
@@ -359,10 +360,24 @@ func TestTableScopeLinesAndSeparator(t *testing.T) {
 			t.Errorf("a guide row printed below the separator: %q", l)
 		}
 	}
+	// The point of printing waived is that the buckets PARTITION the scope:
+	// every control lands in exactly one of the seven, so they sum to the
+	// count in front of them. A reader who adds them up and comes up short
+	// goes looking for a control that is not missing.
+	for _, l := range append(strings.Split(mixed.String(), "\n"), strings.Split(buf.String(), "\n")...) {
+		n, sum, ok := scopeLineNumbers(l)
+		if !ok {
+			continue
+		}
+		if n != sum {
+			t.Errorf("scope line %q: the buckets sum to %d, not to the %d controls it announces", l, sum, n)
+		}
+	}
+
 	// The per-scope line counts this report's own rows, not the total.
 	for _, w := range []string{
-		"KISA 2026 (4 controls): pass 1 fail 1 warn 0 manual 1 n/a 0 error 1",
-		"beyond the guide (6 controls): pass 1 fail 1 warn 1 manual 1 n/a 1 error 0",
+		"KISA 2026 (4 controls): pass 1 fail 1 warn 0 manual 1 n/a 0 error 1 waived 0",
+		"beyond the guide (6 controls): pass 1 fail 1 warn 1 manual 1 n/a 1 error 0 waived 1",
 	} {
 		if !strings.Contains(mixed.String(), w+"\n") {
 			t.Errorf("missing scope line %q:\n%s", w, mixed.String())
@@ -381,4 +396,27 @@ func TestTableScopeLinesAndSeparator(t *testing.T) {
 	if strings.Contains(quiet.String(), beyondSeparator) {
 		t.Errorf("every beyond row is hidden, so the separator must not print:\n%s", quiet.String())
 	}
+}
+
+// scopeLineNumbers reads a rendered scope line back: the control count it
+// announces and the sum of its buckets. ok is false for any other line.
+func scopeLineNumbers(line string) (controls, sum int, ok bool) {
+	open := strings.Index(line, "(")
+	close := strings.Index(line, " controls): ")
+	if open < 0 || close < open {
+		return 0, 0, false
+	}
+	n, err := strconv.Atoi(line[open+1 : close])
+	if err != nil {
+		return 0, 0, false
+	}
+	fields := strings.Fields(line[close+len(" controls): "):])
+	for i := 1; i < len(fields); i += 2 {
+		v, err := strconv.Atoi(fields[i])
+		if err != nil {
+			return 0, 0, false
+		}
+		sum += v
+	}
+	return n, sum, true
 }
