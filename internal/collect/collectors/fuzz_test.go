@@ -1094,3 +1094,24 @@ func FuzzFirstLine(f *testing.F) {
 		fuzzBody(t, "firstLine", func() any { return firstLine(data) }, len(data))
 	})
 }
+
+func FuzzParseSysctlD(f *testing.F) {
+	seeds(f, "testdata/sysctl.d-*.conf", "testdata/sysctl.conf.sample")
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "parseSysctlD", func() any { return parseSysctlD(data) }, len(data))
+	})
+}
+
+func FuzzParseCoredumpConf(f *testing.F) {
+	seeds(f, "testdata/coredump.conf.sample", "testdata/coredump.conf.d-*.conf")
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "parseCoredumpConf", func() any { return parseCoredumpConf(data) }, len(data))
+	})
+}
+
+func FuzzParseLimitsCore(f *testing.F) {
+	seeds(f, "testdata/limits.conf.sample", "testdata/limits.d-*.conf")
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "parseLimitsCore", func() any { return parseLimitsCore(data) }, len(data))
+	})
+}

@@ -80,7 +80,7 @@ None yet — every control in the set implements a KISA item.
 
 ## Fact keys used by controls
 
-152 of 350 registered keys are read by a control (3 by the engine); 195 unused.
+152 of 368 registered keys are read by a control (3 by the engine); 213 unused.
 
 | Collector | Registered | Used by a control | Read by the engine | Unused |
 |---|---|---|---|---|
@@ -104,3 +104,5 @@ None yet — every control in the set implements a KISA item.
 | ftp | 17 | 6 | 0 | ftp.implementation, ftp.config_files, ftp.parse_complete, ftp.unmodelled, ftp.local_enabled, ftp.tcp_wrappers, ftp.userlist_enable, ftp.userlist_deny, ftp.userlist_file, ftp.banner_source, ftp.banner_text |
 | mail | 10 | 7 | 0 | mail.config_files, mail.postfix.smtpd_recipient_restrictions, mail.postfix.disable_vrfy_command |
 | dns | 7 | 2 | 0 | dns.config_files, dns.parse_complete, dns.unmodelled, dns.options.allow_transfer, dns.options.allow_update |
+| sysctl | 12 | 0 | 0 | kernel.sysctl.kptr_restrict, kernel.sysctl.dmesg_restrict, kernel.sysctl.yama_ptrace_scope, kernel.sysctl.randomize_va_space, kernel.sysctl.unprivileged_bpf_disabled, kernel.sysctl.bpf_jit_harden, kernel.sysctl.perf_event_paranoid, kernel.sysctl.sysrq, kernel.sysctl.protected_symlinks, kernel.sysctl.protected_hardlinks, kernel.sysctl.protected_fifos, kernel.sysctl.protected_regular |
+| coredump | 6 | 0 | 0 | coredump.core_pattern, coredump.suid_dumpable, coredump.systemd.storage, coredump.systemd.process_size_max, coredump.limits.hard_core, coredump.limits.sources |

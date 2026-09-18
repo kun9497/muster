@@ -2317,3 +2317,124 @@ keys:
     since: 1
     sensitivity: public
     collector: dns
+  - key: kernel.sysctl.kptr_restrict
+    type: setting<int>
+    description: kernel.kptr_restrict - how much of a kernel pointer printed to an unprivileged reader is hidden; runtime from /proc/sys, persisted from the sysctl.d chain.
+    since: 1
+    sensitivity: public
+    collector: sysctl
+    default_on: effective
+  - key: kernel.sysctl.dmesg_restrict
+    type: setting<int>
+    description: kernel.dmesg_restrict - whether reading the kernel log needs a privilege; runtime from /proc/sys, persisted from the sysctl.d chain.
+    since: 1
+    sensitivity: public
+    collector: sysctl
+    default_on: effective
+  - key: kernel.sysctl.yama_ptrace_scope
+    type: setting<int>
+    description: kernel.yama.ptrace_scope - how far one process may attach a debugger to another; absent on a kernel built without Yama.
+    since: 1
+    sensitivity: public
+    collector: sysctl
+    default_on: effective
+  - key: kernel.sysctl.randomize_va_space
+    type: setting<int>
+    description: kernel.randomize_va_space - how much of a process address space is randomised at exec.
+    since: 1
+    sensitivity: public
+    collector: sysctl
+    default_on: effective
+  - key: kernel.sysctl.unprivileged_bpf_disabled
+    type: setting<int>
+    description: kernel.unprivileged_bpf_disabled - whether an unprivileged process may call bpf(2); absent on a kernel built without the BPF syscall.
+    since: 1
+    sensitivity: public
+    collector: sysctl
+    default_on: effective
+  - key: kernel.sysctl.bpf_jit_harden
+    type: setting<int>
+    description: net.core.bpf_jit_harden - how far the BPF just-in-time compiler blinds the constants it emits; absent on a kernel built without the JIT.
+    since: 1
+    sensitivity: public
+    collector: sysctl
+    default_on: effective
+  - key: kernel.sysctl.perf_event_paranoid
+    type: setting<int>
+    description: kernel.perf_event_paranoid - how much of the performance-event interface an unprivileged process may use.
+    since: 1
+    sensitivity: public
+    collector: sysctl
+    default_on: effective
+  - key: kernel.sysctl.sysrq
+    type: setting<int>
+    description: kernel.sysrq - the bitmask of magic SysRq functions the console may invoke; 0 disables them all.
+    since: 1
+    sensitivity: public
+    collector: sysctl
+    default_on: effective
+  - key: kernel.sysctl.protected_symlinks
+    type: setting<int>
+    description: fs.protected_symlinks - whether a symlink in a sticky world-writable directory may be followed across an ownership boundary.
+    since: 1
+    sensitivity: public
+    collector: sysctl
+    default_on: effective
+  - key: kernel.sysctl.protected_hardlinks
+    type: setting<int>
+    description: fs.protected_hardlinks - whether a hard link may be made to a file the linking account does not own and cannot write.
+    since: 1
+    sensitivity: public
+    collector: sysctl
+    default_on: effective
+  - key: kernel.sysctl.protected_fifos
+    type: setting<int>
+    description: fs.protected_fifos - whether a FIFO in a sticky world-writable directory may be opened for writing by another account; absent before Linux 4.19.
+    since: 1
+    sensitivity: public
+    collector: sysctl
+    default_on: effective
+  - key: kernel.sysctl.protected_regular
+    type: setting<int>
+    description: fs.protected_regular - the same restriction as protected_fifos for a regular file; absent before Linux 4.19.
+    since: 1
+    sensitivity: public
+    collector: sysctl
+    default_on: effective
+  - key: coredump.core_pattern
+    type: string
+    description: kernel.core_pattern verbatim - the file name pattern a core dump is written to, or the "|" pipe of the handler that takes it.
+    since: 1
+    sensitivity: public
+    collector: coredump
+  - key: coredump.suid_dumpable
+    type: setting<int>
+    description: fs.suid_dumpable - whether a setuid or otherwise privileged program may dump core; runtime from /proc/sys, persisted from the sysctl.d chain.
+    since: 1
+    sensitivity: public
+    collector: coredump
+    default_on: effective
+  - key: coredump.systemd.storage
+    type: string
+    description: Storage from the systemd-coredump configuration chain (none keeps no dump); absent when no coredump.conf sets it, since the daemon owns its own default.
+    since: 1
+    sensitivity: public
+    collector: coredump
+  - key: coredump.systemd.process_size_max
+    type: int
+    description: ProcessSizeMax from the systemd-coredump configuration chain, in bytes with the size suffix expanded; 0 means systemd-coredump processes no dump.
+    since: 1
+    sensitivity: public
+    collector: coredump
+  - key: coredump.limits.hard_core
+    type: int
+    description: The hard RLIMIT_CORE that limits.conf and limits.d set for every account ("*"), in 1024-byte blocks; -1 for unlimited, absent when no line sets one.
+    since: 1
+    sensitivity: public
+    collector: coredump
+  - key: coredump.limits.sources
+    type: list<string>
+    description: The limits.conf and limits.d files that were read for the hard core limit, in the order they are applied.
+    since: 1
+    sensitivity: public
+    collector: coredump

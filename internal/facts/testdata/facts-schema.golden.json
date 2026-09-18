@@ -3670,6 +3670,186 @@
       "Collector": "dns",
       "DefaultOn": "",
       "SubjectKind": "zone"
+    },
+    {
+      "Key": "kernel.sysctl.kptr_restrict",
+      "Type": "setting\u003cint\u003e",
+      "Description": "kernel.kptr_restrict - how much of a kernel pointer printed to an unprivileged reader is hidden; runtime from /proc/sys, persisted from the sysctl.d chain.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "kernel.sysctl.dmesg_restrict",
+      "Type": "setting\u003cint\u003e",
+      "Description": "kernel.dmesg_restrict - whether reading the kernel log needs a privilege; runtime from /proc/sys, persisted from the sysctl.d chain.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "kernel.sysctl.yama_ptrace_scope",
+      "Type": "setting\u003cint\u003e",
+      "Description": "kernel.yama.ptrace_scope - how far one process may attach a debugger to another; absent on a kernel built without Yama.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "kernel.sysctl.randomize_va_space",
+      "Type": "setting\u003cint\u003e",
+      "Description": "kernel.randomize_va_space - how much of a process address space is randomised at exec.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "kernel.sysctl.unprivileged_bpf_disabled",
+      "Type": "setting\u003cint\u003e",
+      "Description": "kernel.unprivileged_bpf_disabled - whether an unprivileged process may call bpf(2); absent on a kernel built without the BPF syscall.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "kernel.sysctl.bpf_jit_harden",
+      "Type": "setting\u003cint\u003e",
+      "Description": "net.core.bpf_jit_harden - how far the BPF just-in-time compiler blinds the constants it emits; absent on a kernel built without the JIT.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "kernel.sysctl.perf_event_paranoid",
+      "Type": "setting\u003cint\u003e",
+      "Description": "kernel.perf_event_paranoid - how much of the performance-event interface an unprivileged process may use.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "kernel.sysctl.sysrq",
+      "Type": "setting\u003cint\u003e",
+      "Description": "kernel.sysrq - the bitmask of magic SysRq functions the console may invoke; 0 disables them all.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "kernel.sysctl.protected_symlinks",
+      "Type": "setting\u003cint\u003e",
+      "Description": "fs.protected_symlinks - whether a symlink in a sticky world-writable directory may be followed across an ownership boundary.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "kernel.sysctl.protected_hardlinks",
+      "Type": "setting\u003cint\u003e",
+      "Description": "fs.protected_hardlinks - whether a hard link may be made to a file the linking account does not own and cannot write.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "kernel.sysctl.protected_fifos",
+      "Type": "setting\u003cint\u003e",
+      "Description": "fs.protected_fifos - whether a FIFO in a sticky world-writable directory may be opened for writing by another account; absent before Linux 4.19.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "kernel.sysctl.protected_regular",
+      "Type": "setting\u003cint\u003e",
+      "Description": "fs.protected_regular - the same restriction as protected_fifos for a regular file; absent before Linux 4.19.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "coredump.core_pattern",
+      "Type": "string",
+      "Description": "kernel.core_pattern verbatim - the file name pattern a core dump is written to, or the \"|\" pipe of the handler that takes it.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "coredump",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "coredump.suid_dumpable",
+      "Type": "setting\u003cint\u003e",
+      "Description": "fs.suid_dumpable - whether a setuid or otherwise privileged program may dump core; runtime from /proc/sys, persisted from the sysctl.d chain.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "coredump",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "coredump.systemd.storage",
+      "Type": "string",
+      "Description": "Storage from the systemd-coredump configuration chain (none keeps no dump); absent when no coredump.conf sets it, since the daemon owns its own default.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "coredump",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "coredump.systemd.process_size_max",
+      "Type": "int",
+      "Description": "ProcessSizeMax from the systemd-coredump configuration chain, in bytes with the size suffix expanded; 0 means systemd-coredump processes no dump.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "coredump",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "coredump.limits.hard_core",
+      "Type": "int",
+      "Description": "The hard RLIMIT_CORE that limits.conf and limits.d set for every account (\"*\"), in 1024-byte blocks; -1 for unlimited, absent when no line sets one.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "coredump",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "coredump.limits.sources",
+      "Type": "list\u003cstring\u003e",
+      "Description": "The limits.conf and limits.d files that were read for the hard core limit, in the order they are applied.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "coredump",
+      "DefaultOn": "",
+      "SubjectKind": ""
     }
   ]
 }

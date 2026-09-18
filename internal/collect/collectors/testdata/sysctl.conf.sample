@@ -1,0 +1,5 @@
+# Synthetic /etc/sysctl.conf: read last, or at the position of the
+# 99-sysctl.conf symlink that a distribution puts in /etc/sysctl.d.
+kernel.kptr_restrict = 2
+kernel.dmesg_restrict = 1
+fs.suid_dumpable = 0
