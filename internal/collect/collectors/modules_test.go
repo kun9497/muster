@@ -3,6 +3,7 @@
 package collectors
 
 import (
+	"maps"
 	"os"
 	"path"
 	"path/filepath"
@@ -176,13 +177,17 @@ func TestParseModprobeD(t *testing.T) {
 		}
 	}
 
-	// A "#" starts a comment anywhere on a line, and a trailing backslash
-	// continues the directive on the next one - both spellings a hardening
-	// file is written in.
+	// kmod's two rules: a trailing backslash joins the next physical line,
+	// and a "#" comments a line out only when it is the FIRST character.
+	// A "#" further along is an ordinary argument and stays inside an install
+	// command - cutting there could turn a command muster does not recognise
+	// into /bin/false, which is the one direction that turns a live module
+	// into a PASS.
 	cont := parseModprobeD(moduleFixture(t, "modprobe.d-continuation.conf"))
 	wantCont := []modprobeDirective{
 		{kind: "install", module: "dccp", command: "/bin/true"},
 		{kind: "blacklist", module: "hfsplus"},
+		{kind: "install", module: "squashfs", command: "/bin/false # kmod keeps this inside the command"},
 	}
 	if !slices.Equal(cont, wantCont) {
 		t.Errorf("parseModprobeD(continuation) =\n%+v\nwant\n%+v", cont, wantCont)
@@ -229,6 +234,17 @@ func TestModuleRowsAndDisabled(t *testing.T) {
 	}
 	if !slices.Equal(names, moduleCandidates) {
 		t.Fatalf("rows = %v\nwant the eleven candidates in order %v", names, moduleCandidates)
+	}
+
+	// K-5: a row carries the spec's eight fields and nothing else, on every
+	// row - a field a control could read must not depend on which module it
+	// landed on.
+	wantFields := []string{"available", "blacklisted", "builtin", "disabled", "install_disabled", "loaded", "name", "sources"}
+	for _, v := range rows {
+		got := slices.Sorted(maps.Keys(v.(map[string]any)))
+		if !slices.Equal(got, wantFields) {
+			t.Errorf("row %v has fields %v, want %v", v.(map[string]any)["name"], got, wantFields)
+		}
 	}
 
 	const etcBlacklist = "/etc/modprobe.d/blacklist.conf"
@@ -355,12 +371,48 @@ func TestModulesTreeMissingIsUnsupported(t *testing.T) {
 		t.Errorf("reason %q does not name the directory", e.Reason)
 	}
 
-	// C3 again, on the tree itself: modules.dep exists and cannot be read.
-	unreadable := moduleDouble(moduleTreeFiles(usrTree))
-	unreadable.fails = map[string]error{path.Join(usrTree, modulesDepName): unix.EACCES}
-	e = env(t, build(t, "modules", unreadable), modulesKey)
-	if e.Status != facts.StatusDenied {
-		t.Errorf("kernel.modules with an unreadable modules.dep = %+v, want denied", e)
+	// C3 again, on each of the three files the fact cannot be had without:
+	// the tree's index, the loaded-module table, and the module directory
+	// itself. A stat of /usr/lib/modules refused is NOT evidence that this
+	// host keeps its modules under /lib - it is evidence of nothing, and
+	// forking on it would publish an answer nobody could see.
+	for _, c := range []struct {
+		what string
+		path string
+	}{
+		{"modules.dep", path.Join(usrTree, modulesDepName)},
+		{"/proc/modules", procModulesPath},
+		{"the module directory", usrModulesDir},
+	} {
+		a := moduleDouble(moduleTreeFiles(usrTree))
+		a.fails = map[string]error{c.path: unix.EACCES}
+		e = env(t, build(t, "modules", a), modulesKey)
+		if e.Status != facts.StatusDenied {
+			t.Errorf("kernel.modules with %s denied = %+v, want denied", c.what, e)
+		}
+		if !strings.Contains(e.Reason, c.path) {
+			t.Errorf("reason %q does not name %s", e.Reason, c.path)
+		}
+		if strings.HasPrefix(c.path, usrModulesDir) && slices.Contains(a.reads, path.Join(libTree, modulesDepName)) {
+			t.Errorf("%s denied and the collector read %s anyway", c.what, libTree)
+		}
+	}
+
+	// The kernel release names the tree, so its read carries its own status
+	// too: gone is the read's status, and a file that is there but says
+	// nothing is a host this collector cannot answer for.
+	files := moduleTreeFiles(usrTree)
+	delete(files, kernelReleasePath)
+	e = env(t, build(t, "modules", moduleDouble(files)), modulesKey)
+	if e.Status != facts.StatusAbsent || !strings.Contains(e.Reason, kernelReleasePath) {
+		t.Errorf("kernel.modules with no %s = %+v, want absent naming it", kernelReleasePath, e)
+	}
+
+	empty := moduleTreeFiles(usrTree)
+	empty[kernelReleasePath] = "kernel-osrelease.empty"
+	e = env(t, build(t, "modules", moduleDouble(empty)), modulesKey)
+	if e.Status != facts.StatusUnsupported || !strings.Contains(e.Reason, kernelReleasePath) {
+		t.Errorf("kernel.modules with an empty %s = %+v, want unsupported naming it", kernelReleasePath, e)
 	}
 }
 
@@ -418,6 +470,7 @@ func TestModulesDeclarationCoversItsReads(t *testing.T) {
 
 	want := []string{
 		"/etc/modprobe.d/*.conf",
+		"/lib/modprobe.d/*.conf",
 		"/lib/modules/*/modules.builtin",
 		"/lib/modules/*/modules.dep",
 		"/proc/modules",

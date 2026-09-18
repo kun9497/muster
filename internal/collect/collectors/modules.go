@@ -54,13 +54,20 @@ var moduleCandidates = []string{
 
 // modprobeDirs are modprobe.d(5)'s directories in DESCENDING precedence: a
 // base name in an earlier one masks the same name in every later one, and
-// kmod applies the survivors in base-name order whichever directory each came
-// from. /usr/lib is the merged-/usr spelling of the /lib the man page names.
+// kmod applies the survivors in BASE-NAME order whichever directory each came
+// from — /usr/lib/aa.conf is applied before /etc/zz.conf.
+//
+// /usr/lib and /lib are both listed because they are one directory on a
+// merged-/usr host and two on anything else: /usr/lib comes first, so on a
+// merged host every base name /lib offers is already owned and is never read
+// through the symlink, and on a host where /lib/modprobe.d is real its files
+// are the last word, which is where kmod puts them.
 var modprobeDirs = []string{
 	"/etc/modprobe.d",
 	"/run/modprobe.d",
 	"/usr/local/lib/modprobe.d",
 	"/usr/lib/modprobe.d",
+	"/lib/modprobe.d",
 }
 
 // modulesCollector answers one question per candidate module — could this
@@ -97,10 +104,17 @@ func runModules(_ context.Context, a collect.Access, b *collect.Builder) error {
 // that could not read the tree or the modprobe.d chain must not publish a
 // list that reads as "nothing is configured" (C3).
 func moduleList(a collect.Access) facts.Envelope {
-	release := readTrim(a, kernelReleasePath)
+	// os.go reads the same file for the run header, where a failure can only
+	// be dropped; here it decides which directory the tree is in, so the
+	// read's own status is the answer for the whole fact (C3).
+	data, _, err := a.ReadFile(kernelReleasePath, osReadLimit)
+	if err != nil {
+		return readErrorEnv(kernelReleasePath, err)
+	}
+	release := strings.TrimSpace(string(data))
 	switch {
 	case release == "":
-		return collect.ErrorEnv(kernelReleasePath + " gave no kernel release, so the module tree cannot be named")
+		return collect.Unsupported(kernelReleasePath + " is empty, so the module tree cannot be named")
 	case strings.Contains(release, "/"):
 		return collect.ErrorEnv(kernelReleasePath + ": " + strconv.Quote(sourceRaw(release)) + " is not a kernel release")
 	}
@@ -110,6 +124,13 @@ func moduleList(a collect.Access) facts.Envelope {
 	// would be an error on every such host.
 	root := usrModulesDir
 	if _, err := a.Stat(usrModulesDir); err != nil {
+		// Only "it is not there" is evidence that this host keeps its modules
+		// somewhere else. A stat refused for any other reason says nothing
+		// about the layout, and falling through to /lib would answer a
+		// question nobody could see the answer to (C3).
+		if !errors.Is(err, fs.ErrNotExist) {
+			return readErrorEnv(usrModulesDir, err)
+		}
 		root = libModulesDir
 	}
 	tree := path.Join(root, release)
@@ -184,10 +205,11 @@ type moduleState struct {
 	loaded, builtin, available, blacklisted, installDisabled bool
 
 	// installSeen records that an install directive for this module has
-	// already been applied. kmod keeps the FIRST command it reads for a
-	// module and ignores every later one, and the chain is read in
-	// precedence order, so /etc's line beats the vendor's rather than the
-	// other way round.
+	// already been applied: kmod keeps the FIRST command it reads for a
+	// module and ignores every later one. "First" is in the chain's read
+	// order, which is base-name order across the directories — NOT directory
+	// order — so /usr/lib/aa.conf's install line beats /etc/zz.conf's, and
+	// masking is what gives /etc the last word on a base name it shares.
 	installSeen bool
 
 	sources []string

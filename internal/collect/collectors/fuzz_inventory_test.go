@@ -129,9 +129,9 @@ var coveredThrough = map[string]string{
 	"splitStatements":      "FuzzParseShellFile",
 	"stripAptComment":      "FuzzAptPeriodicUnattended",
 	"stripComment":         "FuzzParseExportsContent",
-	"stripModprobeComment": "FuzzParseModprobeD",
 	"stripRsyslogComment":  "FuzzParseRsyslogSelector",
 	"tokenizeExportLine":   "FuzzParseExportsContent",
+	"unescapeModprobeLine": "FuzzParseModprobeD",
 }
 
 // notParsers is the escape hatch: a function the inventory grammar catches

@@ -1,1 +1,3 @@
+# Synthetic: not a *.conf, so it is not part of the chain at all. If it were
+# read, cramfs would come back disabled.
 install cramfs /bin/false

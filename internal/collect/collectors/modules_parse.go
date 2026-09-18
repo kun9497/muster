@@ -105,20 +105,35 @@ var modprobeModuleFirst = map[string]bool{
 	"softdep":   true,
 }
 
-// parseModprobeD reads one modprobe.d file. A "#" starts a comment that runs
-// to the end of the line, and a line ending in a backslash continues on the
-// next one — both are how a hardening file is actually written, and a parser
-// that missed either would read a disabled module as configured.
+// parseModprobeD reads one modprobe.d file, the way kmod reads one.
+//
+// Two rules, and only two. A backslash escapes the character after it: at the
+// end of a physical line that character is the newline, so the next line is
+// part of the same logical line and the two are joined with NOTHING between
+// them (kmod's freadline_wrapped drops the backslash and the newline and
+// keeps every other byte, including the whitespace either side). And a
+// logical line is a comment only when its FIRST character is "#" — kmod does
+// not scan for a "#" anywhere else, so a "#" further along the line is an
+// ordinary argument, and an install command that carries one keeps it.
+//
+// Reading a trailing "#" as a comment would be the dangerous half of that: it
+// would cut an install command short and could turn a command muster does not
+// recognise into "/bin/false", which is the one direction that turns a live
+// module into a PASS.
 func parseModprobeD(data []byte) []modprobeDirective {
 	out := []modprobeDirective{}
 	pending := ""
 	for _, raw := range splitLines(data) {
-		line := strings.TrimRight(stripModprobeComment(raw), " \t")
-		if continued, ok := strings.CutSuffix(line, `\`); ok {
-			pending += continued + " "
+		text, continued := unescapeModprobeLine(raw)
+		pending += text
+		if continued {
 			continue
 		}
-		line, pending = pending+line, ""
+		line := pending
+		pending = ""
+		if strings.HasPrefix(line, "#") {
+			continue
+		}
 		fields := strings.Fields(line)
 		if len(fields) < 2 || !modprobeModuleFirst[fields[0]] {
 			continue
@@ -132,13 +147,31 @@ func parseModprobeD(data []byte) []modprobeDirective {
 	return out
 }
 
-// stripModprobeComment cuts a line at its first "#", which is where kmod's
-// own reader cuts it — a comment may follow a directive on the same line.
-func stripModprobeComment(line string) string {
-	if i := strings.IndexByte(line, '#'); i >= 0 {
-		return line[:i]
+// modprobeEscape is the character kmod reads as an escape.
+const modprobeEscape = '\\'
+
+// unescapeModprobeLine applies kmod's character rule to one physical line: a
+// backslash at the end of the line says the logical line continues on the
+// next one, and a backslash anywhere else is dropped and the character after
+// it kept verbatim. It returns the line's contribution and whether the
+// logical line continues.
+func unescapeModprobeLine(line string) (string, bool) {
+	if !strings.Contains(line, `\`) {
+		return line, false
 	}
-	return line
+	var b strings.Builder
+	for i := 0; i < len(line); i++ {
+		if line[i] != modprobeEscape {
+			b.WriteByte(line[i])
+			continue
+		}
+		if i == len(line)-1 {
+			return b.String(), true
+		}
+		i++
+		b.WriteByte(line[i])
+	}
+	return b.String(), false
 }
 
 // installDisables reports whether an install command is the "never load
