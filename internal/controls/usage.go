@@ -127,6 +127,42 @@ func remoteNSSSubject(key string, reg *facts.Registry) bool {
 	return ok && (e.SubjectKind == "user" || e.SubjectKind == "group")
 }
 
+// FactKeys returns, sorted and deduplicated, every registered fact key c
+// names: the clauses of applies_when, of checks, and of each mechanism's when
+// and checks, plus the evidence a manual control hands the reviewer (M-8).
+// It is the walker FactUsage folds over the whole set, exported so that a
+// report ABOUT one control -- the coverage tool's "Beyond the guide" table,
+// where nothing else says what a control reads -- answers from the same walk
+// rather than from a second one that could come to disagree with it.
+func FactKeys(c *Control) []string {
+	named := map[string]bool{}
+	mark := func(cls []Clause) {
+		for _, cl := range cls {
+			if cl.Fact != "" {
+				named[cl.Fact] = true
+			}
+		}
+	}
+	mark(c.AppliesWhen)
+	mark(c.Checks)
+	for _, m := range c.Mechanisms {
+		mark(m.When)
+		mark(m.Checks)
+	}
+	for _, k := range c.Evidence {
+		named[k] = true
+	}
+	if len(named) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(named))
+	for k := range named {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
+}
+
 // CollectorUsage is the fact-key report for one collector (spec §11: facts
 // used, not facts collected). Registered is how many keys the registry files
 // under the collector; Used is how many of them at least one control names,
@@ -157,25 +193,12 @@ type CollectorUsage struct {
 // an engine key in a collector that should have none.
 func FactUsage(s *Set, reg *facts.Registry) []CollectorUsage {
 	used := map[string]bool{}
-	mark := func(cls []Clause) {
-		for _, cl := range cls {
-			if cl.Fact != "" {
-				used[cl.Fact] = true
-			}
-		}
-	}
 	for i := range s.Controls {
-		c := &s.Controls[i]
-		mark(c.AppliesWhen)
-		mark(c.Checks)
-		for _, m := range c.Mechanisms {
-			mark(m.When)
-			mark(m.Checks)
-		}
 		// M-8: a manual control judges nothing but names the facts the
-		// reviewer needs in hand. Those facts are collected for a reason,
-		// which is precisely what "used" means here.
-		for _, k := range c.Evidence {
+		// reviewer needs in hand -- FactKeys counts those too, because they
+		// are collected for a reason, which is precisely what "used" means
+		// here.
+		for _, k := range FactKeys(&s.Controls[i]) {
 			used[k] = true
 		}
 	}

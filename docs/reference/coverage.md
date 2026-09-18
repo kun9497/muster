@@ -74,6 +74,10 @@
 | U-66 | 정책에 따른 시스템 로깅 설정 | 중 | muster.log.syslog_policy | auto | enrolled |
 | U-67 | 로그 디렉터리 소유자 및 권한 설정 | 중 | muster.file.log_dir_permissions | auto | enrolled |
 
+## Beyond the guide
+
+None yet — every control in the set implements a KISA item.
+
 ## Fact keys used by controls
 
 152 of 350 registered keys are read by a control (3 by the engine); 195 unused.

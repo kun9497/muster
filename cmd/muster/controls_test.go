@@ -818,3 +818,87 @@ func TestControlsNewNotesAnItemAnotherControlClaims(t *testing.T) {
 		t.Errorf("an unclaimed item must scaffold silently: stderr %q", quietErr.String())
 	}
 }
+
+// B-9/K-10: a control beyond the guide implements no KISA item, so the one
+// thing controls new reads the inventory for -- the item, its importance, its
+// name and its 2021 ancestors -- is not there to be read. The command asks
+// for none of it and scaffolds no references.kisa, which is exactly what the
+// beyond_scope lint requires of such a control.
+func TestControlsNewScaffoldsAControlBeyondTheGuide(t *testing.T) {
+	kisaDir := syntheticKisaDir(t)
+	root := t.TempDir()
+	out, fixtures := filepath.Join(root, "controls"), filepath.Join(root, "testdata")
+	reg, err := facts.LoadRegistry()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	if code := runControls([]string{"new", "muster.beyond.example", "--importance", "상",
+		"--kisa-dir", kisaDir, "--out", out, "--fixtures", fixtures}, &stdout, &stderr); code != exitOK {
+		t.Fatalf("exit %d, want %d; stderr %q", code, exitOK, stderr.String())
+	}
+	if err := os.WriteFile(filepath.Join(out, "VERSION"), []byte("scaffold-test\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	set, err := controls.LoadFS(os.DirFS(out))
+	if err != nil {
+		t.Fatalf("the skeleton does not decode strictly: %v", err)
+	}
+	if len(set.Controls) != 1 {
+		t.Fatalf("loaded %d controls, want 1", len(set.Controls))
+	}
+	c := set.Controls[0]
+	if c.Category != "beyond" {
+		t.Errorf("category %q, want beyond", c.Category)
+	}
+	if len(c.References.KISA) != 0 {
+		t.Errorf("a beyond control must carry no references.kisa, got %v", c.References.KISA)
+	}
+	if c.Importance != "상" {
+		t.Errorf("importance %q, want the one asked for", c.Importance)
+	}
+	if problems := controls.Lint(set, reg, controls.LintOptions{}); len(problems) != 0 {
+		for _, p := range problems {
+			t.Errorf("the skeleton is not lint-clean: %s", p)
+		}
+	}
+	for _, name := range []string{"pass-example.json", "fail-example.json"} {
+		checkFixtureStub(t, filepath.Join(fixtures, "muster.beyond.example", name))
+	}
+
+	// No --importance: muster rates its own checks, and the middle rating is
+	// the placeholder the author replaces.
+	fresh := t.TempDir()
+	var o2, e2 bytes.Buffer
+	if code := runControls([]string{"new", "muster.beyond.other", "--kisa-dir", kisaDir,
+		"--out", filepath.Join(fresh, "controls"), "--fixtures", filepath.Join(fresh, "testdata")}, &o2, &e2); code != exitOK {
+		t.Fatalf("exit %d, want %d; stderr %q", code, exitOK, e2.String())
+	}
+	body, err := os.ReadFile(filepath.Join(fresh, "controls", "beyond", "other.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(body), "importance: 중") {
+		t.Errorf("a beyond skeleton with no --importance must carry the middle rating:\n%s", body)
+	}
+	if strings.Contains(string(body), "kisa:") {
+		t.Errorf("a beyond skeleton must not scaffold references.kisa:\n%s", body)
+	}
+
+	// The two flags contradict each other, and a control that carried both
+	// would fail the beyond_scope lint the moment it was written.
+	var o3, e3 bytes.Buffer
+	if code := runControls([]string{"new", "muster.beyond.third", "--kisa-id", scaffoldableItem,
+		"--kisa-dir", kisaDir, "--out", filepath.Join(t.TempDir(), "controls"), "--fixtures", filepath.Join(t.TempDir(), "testdata")}, &o3, &e3); code != exitError {
+		t.Errorf("exit %d, want %d; stderr %q", code, exitError, e3.String())
+	}
+
+	// A control inside the guide still needs its item: nothing here relaxes
+	// that.
+	var o4, e4 bytes.Buffer
+	if code := runControls([]string{"new", "muster.file.nokisa", "--kisa-dir", kisaDir,
+		"--out", filepath.Join(t.TempDir(), "controls"), "--fixtures", filepath.Join(t.TempDir(), "testdata")}, &o4, &e4); code != exitError {
+		t.Errorf("exit %d, want %d; stderr %q", code, exitError, e4.String())
+	}
+}

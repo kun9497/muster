@@ -35,6 +35,7 @@ flags (new): run "muster controls new" with no arguments to see them
 `
 
 const controlsNewUsage = `usage: muster controls new <id> --kisa-id U-NN [flags]
+       muster controls new muster.beyond.<name> [--importance 상|중|하] [flags]
 
 Scaffolds one control: <out>/<area>/<name>.yaml from the id (muster.<area>.<name>)
 and the synthetic fixture stubs its automation can reach under <fixtures>/<id>
@@ -47,9 +48,18 @@ fixture test cannot pass until you do.
 It refuses rather than overwrite: an existing YAML or an existing fixture
 directory stops the run before anything is written.
 
+An id in the area "beyond" is a control beyond the KISA guide (B-9): it implements
+no item, so it takes no --kisa-id, scaffolds no references.kisa, and takes its
+importance from --importance rather than from the inventory. The two scopes are
+exclusive, and the beyond_scope lint says so.
+
 flags:
-  --kisa-id U-NN       the current-edition KISA item this control implements (required);
-                        its importance and its 2021 ancestors are read from the inventory
+  --kisa-id U-NN       the current-edition KISA item this control implements (required
+                        outside the area "beyond", refused inside it); its importance
+                        and its 2021 ancestors are read from the inventory
+  --importance <상|중|하>
+                        the rating of a control in the area "beyond" (default 중), which
+                        has no inventory item to read one from; refused elsewhere
   --automation <kind>  auto, partial or manual (default auto); a manual skeleton carries
                         manual_reason and evidence instead of checks and remediation
   --kisa-dir <dir>     directory holding the KISA item inventory and kisa_mapping.json
@@ -251,8 +261,20 @@ func runControls(args []string, stdout, stderr io.Writer) int {
 // newFlags is what controls new was asked for: the control id and where to
 // read the inventory and write the files.
 type newFlags struct {
-	id, kisaID, automation, kisaDir, out, fixtures string
+	id, kisaID, importance, automation, kisaDir, out, fixtures string
 }
+
+// beyondCategory is the area of an id that names a control beyond the KISA
+// guide (B-9). The command derives a control's category from its id's area,
+// so the area is what says which scope the control is in.
+const beyondCategory = "beyond"
+
+// defaultBeyondImportance is the placeholder rating of a scaffolded beyond
+// control: there is no inventory item to read one from, and the middle rating
+// is the one least likely to be left in place by accident in either
+// direction. The author replaces it with the one the primary source and the
+// STIG severity support (B-5).
+const defaultBeyondImportance = "중"
 
 func parseControlsNewArgs(args []string) (newFlags, error) {
 	f := newFlags{automation: "auto", kisaDir: defaultKISADir, out: defaultControlSetDir, fixtures: defaultFixtureDir}
@@ -273,6 +295,8 @@ func parseControlsNewArgs(args []string) (newFlags, error) {
 		switch a {
 		case "--kisa-id":
 			f.kisaID, err = next()
+		case "--importance":
+			f.importance, err = next()
 		case "--automation":
 			f.automation, err = next()
 		case "--kisa-dir":
@@ -288,8 +312,30 @@ func parseControlsNewArgs(args []string) (newFlags, error) {
 			return f, err
 		}
 	}
-	if f.kisaID == "" {
-		return f, errors.New("--kisa-id is required")
+	// B-9: which scope the control is in is a property of its id, so the two
+	// flags that differ between the scopes are checked against the id's area
+	// rather than against each other. A flag that belongs to the other scope
+	// is refused rather than ignored: silently dropping --kisa-id would write
+	// a control whose author believes it claims an item.
+	if beyond := strings.HasPrefix(f.id, "muster."+beyondCategory+"."); beyond {
+		if f.kisaID != "" {
+			return f, fmt.Errorf("a control in the area %q implements no KISA item, so --kisa-id %s cannot apply to %s", beyondCategory, f.kisaID, f.id)
+		}
+		if f.importance == "" {
+			f.importance = defaultBeyondImportance
+		}
+		switch f.importance {
+		case "상", "중", "하":
+		default:
+			return f, fmt.Errorf("--importance must be 상, 중 or 하, got %q", f.importance)
+		}
+	} else {
+		if f.kisaID == "" {
+			return f, errors.New("--kisa-id is required")
+		}
+		if f.importance != "" {
+			return f, fmt.Errorf("--importance applies only to the area %q; elsewhere the %s inventory decides it, and the kisa_importance lint holds the control to it", beyondCategory, controls.LatestKISAEdition)
+		}
 	}
 	switch f.automation {
 	case "auto", "partial", "manual":
@@ -320,48 +366,38 @@ func runControlsNew(args []string, set *controls.Set, stdout, stderr io.Writer) 
 			area, area, strings.Join(controls.Categories(), ", "))
 		return exitRefused
 	}
-	// G-1/M-35: an inventory this command cannot READ is an I/O failure -- the
-	// exit-code line above says 2 and controls lint has answered 2 for a
-	// missing --kisa directory since M-35. Exit 1 stays what it means here: a
-	// refusal the inventory answered, an item it defers or a path that exists.
-	inventory, err := controls.LoadKISA(f.kisaDir)
-	if err != nil {
-		fmt.Fprintf(stderr, "muster: %v\n", err)
-		return exitError
+	// B-9: every inventory question below -- is the item real, is it deferred,
+	// who else claims it, what did it descend from -- is a question about an
+	// item this control does not have. A beyond control skips all of them and
+	// the inventory is not read at all, so scaffolding one needs no --kisa-dir
+	// to exist.
+	var item controls.KISAItem
+	var from2021 []string
+	if area != beyondCategory {
+		// G-1/M-35: an inventory this command cannot READ is an I/O failure -- the
+		// exit-code line above says 2 and controls lint has answered 2 for a
+		// missing --kisa directory since M-35. Exit 1 stays what it means here: a
+		// refusal the inventory answered, an item it defers or a path that exists.
+		inventory, err := controls.LoadKISA(f.kisaDir)
+		if err != nil {
+			fmt.Fprintf(stderr, "muster: %v\n", err)
+			return exitError
+		}
+		var known bool
+		item, known = inventory.Item(controls.LatestKISAEdition, f.kisaID)
+		if !known {
+			fmt.Fprintf(stderr, "muster: %s is not an item of the %s inventory in %s\n", f.kisaID, controls.LatestKISAEdition, f.kisaDir)
+			return exitRefused
+		}
+		if code := checkKISAClaim(f, inventory, set, stderr); code != exitOK {
+			return code
+		}
+		from2021, err = kisaAncestors(f.kisaDir, f.kisaID)
+		if err != nil {
+			fmt.Fprintf(stderr, "muster: %v\n", err)
+			return exitError
+		}
 	}
-	item, known := inventory.Item(controls.LatestKISAEdition, f.kisaID)
-	if !known {
-		fmt.Fprintf(stderr, "muster: %s is not an item of the %s inventory in %s\n", f.kisaID, controls.LatestKISAEdition, f.kisaDir)
-		return exitRefused
-	}
-	// M-37: a deferred item is one muster has said in writing it does not
-	// implement yet. A control that cites it makes the set-level coverage
-	// rule fail on the deferral it has just contradicted, so the row goes
-	// first and the control second.
-	if inventory.IsDeferred(f.kisaID) {
-		fmt.Fprintf(stderr, "muster: %s is deferred in %s; drop its row there first, or the set-level coverage rule fails on the deferral this control contradicts\n",
-			f.kisaID, filepath.Join(f.kisaDir, kisaDeferredFile))
-		return exitRefused
-	}
-	// M-55, amended by W-10: an item another control already implements is NOT
-	// a refusal. The set-level coverage rule allows several controls on one
-	// item -- U-23 is judged by muster.file.suid_sgid and
-	// muster.file.suid_sgid_unverified -- so the second one is a legitimate
-	// thing to scaffold. It is still worth saying out loud: the inventory does
-	// not record which items are taken, so an author who meant a fresh item
-	// and mistyped the number would otherwise find out at review. The note
-	// goes to stderr, leaving the "wrote <path>" lines on stdout as the
-	// command's machine-readable product.
-	if claimed := claimants(set, f.kisaID); len(claimed) > 0 {
-		fmt.Fprintf(stderr, "note: %s is already implemented by %s; more than one control per item is allowed, so make sure the two judge different things\n",
-			f.kisaID, strings.Join(claimed, ", "))
-	}
-	from2021, err := kisaAncestors(f.kisaDir, f.kisaID)
-	if err != nil {
-		fmt.Fprintf(stderr, "muster: %v\n", err)
-		return exitError
-	}
-
 	yamlPath := filepath.Join(f.out, area, name+".yaml")
 	fixtureDir := filepath.Join(f.fixtures, f.id)
 	for _, p := range []string{yamlPath, fixtureDir} {
@@ -403,6 +439,36 @@ func runControlsNew(args []string, set *controls.Set, stdout, stderr io.Writer) 
 			return exitError
 		}
 		fmt.Fprintf(stdout, "wrote %s\n", p)
+	}
+	return exitOK
+}
+
+// checkKISAClaim asks the inventory whether this control may claim the item
+// it names, and returns exitOK when it may. It is the half of controls new
+// that only a control inside the guide has to pass; B-9 moved it here so the
+// beyond path does not have to step around it.
+func checkKISAClaim(f newFlags, inventory *controls.KISAInventory, set *controls.Set, stderr io.Writer) int {
+	// M-37: a deferred item is one muster has said in writing it does not
+	// implement yet. A control that cites it makes the set-level coverage
+	// rule fail on the deferral it has just contradicted, so the row goes
+	// first and the control second.
+	if inventory.IsDeferred(f.kisaID) {
+		fmt.Fprintf(stderr, "muster: %s is deferred in %s; drop its row there first, or the set-level coverage rule fails on the deferral this control contradicts\n",
+			f.kisaID, filepath.Join(f.kisaDir, kisaDeferredFile))
+		return exitRefused
+	}
+	// M-55, amended by W-10: an item another control already implements is NOT
+	// a refusal. The set-level coverage rule allows several controls on one
+	// item -- U-23 is judged by muster.file.suid_sgid and
+	// muster.file.suid_sgid_unverified -- so the second one is a legitimate
+	// thing to scaffold. It is still worth saying out loud: the inventory does
+	// not record which items are taken, so an author who meant a fresh item
+	// and mistyped the number would otherwise find out at review. The note
+	// goes to stderr, leaving the "wrote <path>" lines on stdout as the
+	// command's machine-readable product.
+	if claimed := claimants(set, f.kisaID); len(claimed) > 0 {
+		fmt.Fprintf(stderr, "note: %s is already implemented by %s; more than one control per item is allowed, so make sure the two judge different things\n",
+			f.kisaID, strings.Join(claimed, ", "))
 	}
 	return exitOK
 }
@@ -455,6 +521,16 @@ func scaffoldControl(f newFlags, area string, item controls.KISAItem, from2021 [
 			kisaPriorEdition:           from2021,
 		}},
 		RequiresFacts: ">=1",
+	}
+	// B-9: beyond the guide there is no item to name in the placeholders, no
+	// item name to borrow for title_ko, no inventory rating and no ancestor,
+	// so references stays empty -- which is what beyond_scope requires and
+	// what the two scopes being exclusive means in the file.
+	if area == beyondCategory {
+		c.TitleEn = "TODO: what this host must do, in one line"
+		c.TitleKo = "TODO: 이 호스트가 지켜야 하는 것을 한 줄로 적는다"
+		c.Importance = f.importance
+		c.References = controls.References{}
 	}
 	if f.automation == "manual" {
 		c.ManualReason = "TODO: why muster declines to judge this item, and what the reviewer must read to decide it."

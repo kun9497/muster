@@ -512,6 +512,18 @@ func lintSet(t *testing.T, opts LintOptions, yamlTexts ...string) []Problem {
 	return Lint(set, reg, opts)
 }
 
+// problemsOf returns every problem carrying rule, for a test that asserts on
+// a problem's control id or path rather than on its message.
+func problemsOf(ps []Problem, rule string) []Problem {
+	var out []Problem
+	for _, p := range ps {
+		if p.Rule == rule {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
 // messagesOf returns the messages of every problem carrying rule.
 func messagesOf(ps []Problem, rule string) []string {
 	var out []string
@@ -1170,5 +1182,60 @@ func TestLintKISACoverageAllowsTwoControlsPerItem(t *testing.T) {
 	stale := lintSet(t, LintOptions{KISA: inv}, cite("U-15", "muster.file.owner"), cite("U-15", "muster.file.group"))
 	if !hasMessage(stale, "kisa_coverage", "deferred item U-15", "muster.file.group", "muster.file.owner") {
 		t.Errorf("a stale deferral must still name the item and every control citing it: %v", messagesOf(stale, "kisa_coverage"))
+	}
+}
+
+// B-9/K-10: the two scopes are exclusive -- a control is category beyond if
+// and only if it cites no KISA item -- so nothing falls in both scopes or in
+// neither, which is what the report's split assumes.
+//
+// The rule has two halves and they are not offered together. A beyond control
+// that cites an item is wrong on its own evidence, so that half is a
+// per-control rule and needs no inventory. The converse, a guide control that
+// cites nothing, is a statement about coverage and lives with the coverage
+// rule: it runs only where a caller offered an inventory, which is why a unit
+// test that lints one control with no references at all stays clean.
+func TestLintBeyondScope(t *testing.T) {
+	beyond := func(y string) string {
+		return strings.Replace(strings.Replace(y, "category: account", "category: beyond", 1),
+			"id: muster.account.good", "id: muster.beyond.aslr", 1)
+	}
+	noKISA := func(y string) string {
+		return strings.Replace(y, "  kisa: { \"2026\": [\"U-01\"] }\n", "", 1)
+	}
+
+	// Half one, no inventory needed: beyond plus a KISA reference. It must
+	// fire without one, or the mutation test's inventory-free lint would
+	// never see it.
+	ps := problemsOf(lintOne(t, beyond(goodControl), LintOptions{}), "beyond_scope")
+	if len(ps) != 1 {
+		t.Fatalf("exactly one beyond_scope problem, got %v", ps)
+	}
+	if ps[0].ControlID != "muster.beyond.aslr" || ps[0].Path == "" || !strings.Contains(ps[0].Message, "U-01") {
+		t.Errorf("the problem must name the control, its file and the item it cites: %+v", ps[0])
+	}
+
+	// Half two, the converse, only with an inventory: a guide control that
+	// cites nothing.
+	inv := mustLoadKISA(t)
+	ps = problemsOf(lintSet(t, LintOptions{KISA: inv}, noKISA(goodControl)), "beyond_scope")
+	if len(ps) != 1 || ps[0].ControlID != "muster.account.good" || ps[0].Path == "" {
+		t.Errorf("a non-beyond control with no KISA reference must be reported against its own file: %+v", ps)
+	}
+	// K-10: the converse must stay inside the coverage rule. Without an
+	// inventory the same control is clean, which is what keeps every
+	// reference-free unit test and the mutation test's lintValid valid.
+	if ms := messagesOf(lintOne(t, noKISA(goodControl), LintOptions{}), "beyond_scope"); len(ms) != 0 {
+		t.Errorf("without an inventory the converse must not run: %v", ms)
+	}
+
+	// Both scopes as they are meant to be: clean on this rule either way.
+	for _, c := range []struct{ name, yaml string }{
+		{"beyond without kisa", beyond(noKISA(goodControl))},
+		{"guide with kisa", goodControl},
+	} {
+		if ms := messagesOf(lintSet(t, LintOptions{KISA: inv}, c.yaml), "beyond_scope"); len(ms) != 0 {
+			t.Errorf("%s must be clean: %v", c.name, ms)
+		}
 	}
 }
