@@ -2438,3 +2438,81 @@ keys:
     since: 1
     sensitivity: public
     collector: coredump
+  - key: boot.firmware
+    type: string
+    description: uefi when /sys/firmware/efi exists, bios when it does not - the firmware interface this host booted through.
+    since: 1
+    sensitivity: public
+    collector: boot
+  - key: boot.secure_boot
+    type: bool
+    description: Whether the firmware reports Secure Boot as enforcing, from the SecureBoot EFI variable; absent on BIOS and on UEFI without efivarfs or the variable.
+    since: 1
+    sensitivity: public
+    collector: boot
+  - key: boot.grub_cfg.path
+    type: string
+    description: The bootloader configuration file this host uses - the first of /boot/grub/grub.cfg, /boot/grub2/grub.cfg and /boot/efi/EFI/*/grub.cfg that exists.
+    since: 1
+    sensitivity: public
+    collector: boot
+  - key: boot.grub_cfg.mode
+    type: int
+    description: Permission bits of the bootloader configuration file as an integer (e.g. 384 for 0600).
+    since: 1
+    sensitivity: public
+    collector: boot
+  - key: boot.grub_cfg.uid
+    type: int
+    description: Owner uid of the bootloader configuration file.
+    since: 1
+    sensitivity: public
+    collector: boot
+  - key: boot.grub_cfg.gid
+    type: int
+    description: Group gid of the bootloader configuration file.
+    since: 1
+    sensitivity: public
+    collector: boot
+  - key: boot.grub_cfg.group
+    type: string
+    description: Group name for the gid of the bootloader configuration file from /etc/group; empty when the gid has no name.
+    since: 1
+    sensitivity: public
+    collector: boot
+  - key: boot.grub_cfg.group_readable
+    type: bool
+    description: Whether the group permission bits of the bootloader configuration file include read (derived from mode).
+    since: 1
+    sensitivity: public
+    collector: boot
+  - key: boot.grub_cfg.group_writable
+    type: bool
+    description: Whether the group permission bits of the bootloader configuration file include write (derived from mode).
+    since: 1
+    sensitivity: public
+    collector: boot
+  - key: boot.grub_cfg.other_readable
+    type: bool
+    description: Whether the other permission bits of the bootloader configuration file include read (derived from mode).
+    since: 1
+    sensitivity: public
+    collector: boot
+  - key: boot.grub_cfg.other_writable
+    type: bool
+    description: Whether the other permission bits of the bootloader configuration file include write (derived from mode).
+    since: 1
+    sensitivity: public
+    collector: boot
+  - key: boot.grub_cfg.acl_present
+    type: bool
+    description: Whether a POSIX ACL xattr is present on the bootloader configuration file.
+    since: 1
+    sensitivity: public
+    collector: boot
+  - key: boot.grub_password_set
+    type: bool
+    description: Whether a bootloader superuser or password hash is configured in the chosen grub.cfg, /boot/grub2/user.cfg or an /etc/grub.d fragment.
+    since: 1
+    sensitivity: public
+    collector: boot

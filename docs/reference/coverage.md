@@ -80,7 +80,7 @@ None yet — every control in the set implements a KISA item.
 
 ## Fact keys used by controls
 
-152 of 368 registered keys are read by a control (3 by the engine); 213 unused.
+152 of 381 registered keys are read by a control (3 by the engine); 226 unused.
 
 | Collector | Registered | Used by a control | Read by the engine | Unused |
 |---|---|---|---|---|
@@ -106,3 +106,4 @@ None yet — every control in the set implements a KISA item.
 | dns | 7 | 2 | 0 | dns.config_files, dns.parse_complete, dns.unmodelled, dns.options.allow_transfer, dns.options.allow_update |
 | sysctl | 12 | 0 | 0 | kernel.sysctl.kptr_restrict, kernel.sysctl.dmesg_restrict, kernel.sysctl.yama_ptrace_scope, kernel.sysctl.randomize_va_space, kernel.sysctl.unprivileged_bpf_disabled, kernel.sysctl.bpf_jit_harden, kernel.sysctl.perf_event_paranoid, kernel.sysctl.sysrq, kernel.sysctl.protected_symlinks, kernel.sysctl.protected_hardlinks, kernel.sysctl.protected_fifos, kernel.sysctl.protected_regular |
 | coredump | 6 | 0 | 0 | coredump.core_pattern, coredump.suid_dumpable, coredump.systemd.storage, coredump.systemd.process_size_max, coredump.limits.hard_core, coredump.limits.sources |
+| boot | 13 | 0 | 0 | boot.firmware, boot.secure_boot, boot.grub_cfg.path, boot.grub_cfg.mode, boot.grub_cfg.uid, boot.grub_cfg.gid, boot.grub_cfg.group, boot.grub_cfg.group_readable, boot.grub_cfg.group_writable, boot.grub_cfg.other_readable, boot.grub_cfg.other_writable, boot.grub_cfg.acl_present, boot.grub_password_set |

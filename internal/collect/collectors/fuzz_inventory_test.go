@@ -49,6 +49,7 @@ var fuzzTargets = []string{
 	"FuzzDnfAutomaticApply",
 	"FuzzFirstLine",
 	"FuzzFirstSettingLine",
+	"FuzzGrubPasswordSet",
 	"FuzzListsRoot",
 	"FuzzNSSSources",
 	"FuzzNTPFile",
@@ -91,6 +92,7 @@ var fuzzTargets = []string{
 	"FuzzSNMPParse",
 	"FuzzSNMPStripComment",
 	"FuzzSNMPTokens",
+	"FuzzSecureBootFromEfivar",
 	"FuzzShowValues",
 	"FuzzUFWEnabledLine",
 }

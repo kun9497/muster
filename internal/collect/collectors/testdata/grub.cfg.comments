@@ -1,0 +1,10 @@
+# synthetic grub.cfg with no superuser: both tokens appear in comments only
+### BEGIN /etc/grub.d/01_users ###
+# set superusers="root"
+#	password_pbkdf2 root grub.pbkdf2.sha512.10000.SALT.HASH
+### END /etc/grub.d/01_users ###
+
+set default="0"
+menuentry 'Linux' {
+	linux /vmlinuz root=/dev/sda1 ro quiet
+}

@@ -93,14 +93,17 @@ func readCorePattern(a collect.Access) facts.Envelope {
 	return collect.OKRead(strings.TrimSpace(string(data)), src, meta)
 }
 
-// coredumpScan is one pass over a merged configuration chain.
-type coredumpScan struct {
+// chainScan is one pass over a merged configuration chain: the files that
+// were read, the first read failure that is the chain's answer, and whether
+// any of those reads was cut short. The coredump and boot collectors both
+// walk a chain this way.
+type chainScan struct {
 	files     []confFile
 	readErr   *facts.Envelope
 	truncated bool
 }
 
-func (s *coredumpScan) fail(p string, err error) {
+func (s *chainScan) fail(p string, err error) {
 	if s.readErr == nil {
 		e := readErrorEnv(p, err)
 		s.readErr = &e
@@ -111,7 +114,7 @@ func (s *coredumpScan) fail(p string, err error) {
 // all, which is what decides the main-file candidate. chainReadFailed gives
 // the classification: absent is not part of this host's chain, a symlink is
 // this file's error, and any other non-regular entry sets nothing.
-func (s *coredumpScan) read(a collect.Access, p string) bool {
+func (s *chainScan) read(a collect.Access, p string) bool {
 	data, meta, err := a.ReadFile(p, readLimit)
 	if err != nil {
 		if chainReadFailed(a, p, err) {
@@ -128,8 +131,8 @@ func (s *coredumpScan) read(a collect.Access, p string) bool {
 // resolves a drop-in chain: the main file first, then every *.conf of the
 // four directories with the first directory to offer a base name owning it,
 // applied in lexicographic base-name order.
-func coredumpConfFiles(a collect.Access) coredumpScan {
-	var s coredumpScan
+func coredumpConfFiles(a collect.Access) chainScan {
+	var s chainScan
 	for _, main := range coredumpMains {
 		if s.read(a, main) {
 			break
@@ -219,7 +222,7 @@ func coredumpUnsetReason(key string, seen []string) string {
 // login: the last `* hard core` or `* - core` line of limits.conf and then
 // of limits.d in base-name order, with `unlimited` carried as -1.
 func writeCoredumpLimits(a collect.Access, b *collect.Builder) {
-	var scan coredumpScan
+	var scan chainScan
 	scan.read(a, limitsConfPath)
 	matches, err := a.Glob(limitsDGlob)
 	if err != nil {

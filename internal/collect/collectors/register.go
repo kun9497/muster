@@ -53,6 +53,7 @@ func init() {
 	collect.Register(patchCollector)
 	collect.Register(sysctlCollector)
 	collect.Register(coredumpCollector)
+	collect.Register(bootCollector)
 	collect.Register(walkCollector)
 }
 

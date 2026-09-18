@@ -3850,6 +3850,136 @@
       "Collector": "coredump",
       "DefaultOn": "",
       "SubjectKind": ""
+    },
+    {
+      "Key": "boot.firmware",
+      "Type": "string",
+      "Description": "uefi when /sys/firmware/efi exists, bios when it does not - the firmware interface this host booted through.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "boot",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "boot.secure_boot",
+      "Type": "bool",
+      "Description": "Whether the firmware reports Secure Boot as enforcing, from the SecureBoot EFI variable; absent on BIOS and on UEFI without efivarfs or the variable.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "boot",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "boot.grub_cfg.path",
+      "Type": "string",
+      "Description": "The bootloader configuration file this host uses - the first of /boot/grub/grub.cfg, /boot/grub2/grub.cfg and /boot/efi/EFI/*/grub.cfg that exists.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "boot",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "boot.grub_cfg.mode",
+      "Type": "int",
+      "Description": "Permission bits of the bootloader configuration file as an integer (e.g. 384 for 0600).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "boot",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "boot.grub_cfg.uid",
+      "Type": "int",
+      "Description": "Owner uid of the bootloader configuration file.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "boot",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "boot.grub_cfg.gid",
+      "Type": "int",
+      "Description": "Group gid of the bootloader configuration file.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "boot",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "boot.grub_cfg.group",
+      "Type": "string",
+      "Description": "Group name for the gid of the bootloader configuration file from /etc/group; empty when the gid has no name.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "boot",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "boot.grub_cfg.group_readable",
+      "Type": "bool",
+      "Description": "Whether the group permission bits of the bootloader configuration file include read (derived from mode).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "boot",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "boot.grub_cfg.group_writable",
+      "Type": "bool",
+      "Description": "Whether the group permission bits of the bootloader configuration file include write (derived from mode).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "boot",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "boot.grub_cfg.other_readable",
+      "Type": "bool",
+      "Description": "Whether the other permission bits of the bootloader configuration file include read (derived from mode).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "boot",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "boot.grub_cfg.other_writable",
+      "Type": "bool",
+      "Description": "Whether the other permission bits of the bootloader configuration file include write (derived from mode).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "boot",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "boot.grub_cfg.acl_present",
+      "Type": "bool",
+      "Description": "Whether a POSIX ACL xattr is present on the bootloader configuration file.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "boot",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "boot.grub_password_set",
+      "Type": "bool",
+      "Description": "Whether a bootloader superuser or password hash is configured in the chosen grub.cfg, /boot/grub2/user.cfg or an /etc/grub.d fragment.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "boot",
+      "DefaultOn": "",
+      "SubjectKind": ""
     }
   ]
 }

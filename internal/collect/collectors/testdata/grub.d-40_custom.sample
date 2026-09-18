@@ -1,0 +1,8 @@
+#!/bin/sh
+# synthetic /etc/grub.d/40_custom: the hand-written fragment an administrator
+# adds a bootloader password in
+exec tail -n +3 $0
+cat << EOF
+set superusers="admin"
+password_pbkdf2 admin grub.pbkdf2.sha512.10000.SALT.HASH
+EOF
