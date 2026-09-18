@@ -132,6 +132,7 @@ func runSwap(_ context.Context, a collect.Access, b *collect.Builder) error {
 			"type":      e.kind,
 			"encrypted": d.encrypted,
 			"backing":   d.backing,
+			"reason":    d.reason(),
 		})
 	}
 	b.Set("swap.devices", collect.OKRead(rowsValue(rows), src, meta))
@@ -151,6 +152,20 @@ type swapDecision struct {
 	// is not a block device this kernel lists (K-16), or the read's own
 	// status for a declared sysfs file that exists and could not be read.
 	fail *facts.Envelope
+}
+
+// reason is why this row has no judgment, and "" when it has one. A decision
+// that failed leaves encrypted at its zero value, and a row that said
+// `encrypted: false` with nothing beside it would read as a finding about the
+// host — "this swap is not encrypted" — where the truth is that muster could
+// not decide (K-16 unsupported, or a declared sysfs read that failed). The
+// host-level swap.encrypted leaf carries that status; the row carries the
+// sentence, so the evidence a reader sees never asserts more than was known.
+func (d swapDecision) reason() string {
+	if d.fail == nil {
+		return ""
+	}
+	return d.fail.Reason
 }
 
 // swapEncrypted is the host-level leaf. A read failure wins over every

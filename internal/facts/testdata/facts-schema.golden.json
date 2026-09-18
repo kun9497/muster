@@ -3874,7 +3874,7 @@
     {
       "Key": "boot.grub_cfg.path",
       "Type": "string",
-      "Description": "The bootloader configuration file this host uses - the first of /boot/grub/grub.cfg, /boot/grub2/grub.cfg and /boot/efi/EFI/*/grub.cfg that exists.",
+      "Description": "The bootloader configuration file this host uses - the first of /boot/grub/grub.cfg, /boot/grub2/grub.cfg and /boot/efi/EFI/*/grub.cfg that exists. Where one of the first two is the symlink an upgraded EL host keeps to a /boot/efi/EFI/*/grub.cfg, the target is the path and the permission leaves are the target's.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "boot",
@@ -3986,7 +3986,7 @@
       "Type": "list\u003crecord\u003e",
       "Description": "One row per candidate mount point (/, /boot, /home, /tmp, /var, /var/tmp, /var/log, /var/log/audit, /dev/shm) with target, separate, mounted_by, source, fstype and options; on a row that is not separate the source, fstype and options are those of the mount that governs the path.",
       "Since": 1,
-      "Sensitivity": "public",
+      "Sensitivity": "internal",
       "Collector": "mounts",
       "DefaultOn": "",
       "SubjectKind": "mount"
@@ -4054,7 +4054,7 @@
     {
       "Key": "swap.devices",
       "Type": "list\u003crecord\u003e",
-      "Description": "One row per swap device with path, type (file or partition), encrypted and backing - the block device the judgment was made on.",
+      "Description": "One row per swap device with path, type (file or partition), encrypted, backing - the block device the judgment was made on - and reason, which says why a row has no judgment and is empty on a row that has one.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "swap",

@@ -379,6 +379,7 @@ func TestBootDeclarationCoversItsReads(t *testing.T) {
 
 	want := []string{
 		"/boot/efi/EFI/*/grub.cfg",
+		"/boot/efi/EFI/*/user.cfg",
 		"/boot/grub/grub.cfg",
 		"/boot/grub2/grub.cfg",
 		"/boot/grub2/user.cfg",
@@ -462,6 +463,95 @@ func TestGrubPasswordSet(t *testing.T) {
 	} {
 		if got := grubPasswordSet([]byte(tc.in)); got != tc.want {
 			t.Errorf("%s: grubPasswordSet(%q) = %v, want %v", tc.name, tc.in, got, tc.want)
+		}
+	}
+}
+
+// Ruling K-28: an EL host installed before 9 and upgraded on UEFI keeps
+// /boot/grub2/grub.cfg as a LINK to the grub.cfg on the EFI system
+// partition, and grub2-mkconfig preserves it. The distribution ships that
+// link, so C4 says muster models it: the facts are the TARGET's — its path,
+// its permission bits — and grub-setpassword's user.cfg is read beside the
+// target, which is where it actually is.
+func TestBootGrubCfgOnAnUpgradedELHost(t *testing.T) {
+	const target = "/boot/efi/EFI/redhat/grub.cfg"
+	const beside = "/boot/efi/EFI/redhat/user.cfg"
+
+	files := bootSeeds()
+	delete(files, grubCfgEL)
+	files[target] = "grub.cfg.el-stock" // the ${GRUB2_PASSWORD} reference, no hash
+	files[beside] = "user.cfg.sample"   // the hash grub-setpassword wrote
+	a := &fsAccess{files: files, stats: map[string]statResult{
+		target: {mode: 0o644, uid: 0, gid: 0, kind: "regular"},
+	}}
+	seedLink(a, grubCfgEL, "../efi/EFI/redhat/grub.cfg")
+	b := build(t, "boot", a)
+
+	if e := env(t, b, "boot.grub_cfg.path"); e.Status != facts.StatusOK || e.Value != target {
+		t.Fatalf("boot.grub_cfg.path = %+v, want ok %s: the link's target is where the file is", e, target)
+	}
+	// The permission leaves describe the target, not the link: a symlink is
+	// 0777 and reporting that would say every host is world-writable.
+	if e := env(t, b, "boot.grub_cfg.mode"); e.Status != facts.StatusOK || e.Value != 0o644 {
+		t.Errorf("boot.grub_cfg.mode = %+v, want the 0644 of %s", e, target)
+	}
+	if e := env(t, b, "boot.grub_cfg.other_readable"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("boot.grub_cfg.other_readable = %+v, want the target's bits", e)
+	}
+	// The password is in the user.cfg BESIDE the target. /boot/grub2/user.cfg
+	// does not exist on this host, so a collector that only ever looked there
+	// would report false for a host that has a password.
+	if e := env(t, b, "boot.grub_password_set"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("boot.grub_password_set = %+v, want ok true from %s", e, beside)
+	}
+	if !slices.Contains(a.reads, beside) {
+		t.Errorf("%s was never read; the chain read %v", beside, a.reads)
+	}
+}
+
+// Any other link at a candidate stays that candidate's error (C4): its bytes
+// were never read and this declaration does not cover wherever it points.
+func TestBootGrubCfgForeignSymlinkIsAnError(t *testing.T) {
+	files := bootSeeds()
+	delete(files, grubCfgEL)
+	a := &fsAccess{files: files}
+	seedLink(a, grubCfgEL, "/opt/boot/grub.cfg")
+	b := build(t, "boot", a)
+
+	for _, key := range append([]string{"path"}, permLeaves...) {
+		e := env(t, b, "boot.grub_cfg."+key)
+		if e.Status != facts.StatusError {
+			t.Errorf("boot.grub_cfg.%s = %+v, want error", key, e)
+		}
+		if !strings.Contains(e.Reason, grubCfgEL) {
+			t.Errorf("boot.grub_cfg.%s reason %q does not name the link %s", key, e.Reason, grubCfgEL)
+		}
+	}
+	if e := env(t, b, "boot.grub_password_set"); e.Status != facts.StatusError {
+		t.Errorf("boot.grub_password_set = %+v, want error with the rest", e)
+	}
+	if slices.Contains(a.reads, "/opt/boot/grub.cfg") {
+		t.Error("muster followed a link out of its declaration")
+	}
+}
+
+// The user.cfg beside a grub.cfg is read only where the declaration covers
+// it: /boot/efi/EFI/*/user.cfg, never /boot/grub/user.cfg, which no
+// declaration names (C4).
+func TestGrubEFIUserCfg(t *testing.T) {
+	for _, tc := range []struct {
+		cfg, want string
+		ok        bool
+	}{
+		{"/boot/efi/EFI/redhat/grub.cfg", "/boot/efi/EFI/redhat/user.cfg", true},
+		{"/boot/efi/EFI/ubuntu/grub.cfg", "/boot/efi/EFI/ubuntu/user.cfg", true},
+		{grubCfgDebian, "", false},
+		{grubCfgEL, "", false},
+		{"", "", false},
+	} {
+		got, ok := grubEFIUserCfg(tc.cfg)
+		if got != tc.want || ok != tc.ok {
+			t.Errorf("grubEFIUserCfg(%q) = %q, %v; want %q, %v", tc.cfg, got, ok, tc.want, tc.ok)
 		}
 	}
 }

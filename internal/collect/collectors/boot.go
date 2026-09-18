@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"io/fs"
+	"path"
 	"slices"
 	"strconv"
 	"strings"
@@ -35,6 +36,16 @@ const (
 	grubUserCfg = "/boot/grub2/user.cfg"
 	grubDGlob   = "/etc/grub.d/*"
 
+	// grubEFIUserCfgGlob is the same file on the EFI system partition. An EL
+	// host upgraded on UEFI keeps its grub.cfg there and only a LINK at
+	// /boot/grub2/grub.cfg (K-28), and grub-setpassword writes user.cfg
+	// beside the real file — so the chain that answers the password question
+	// has to be able to read it.
+	grubEFIUserCfgGlob = "/boot/efi/EFI/*/user.cfg"
+
+	// grubUserCfgName is the base name both of those paths end in.
+	grubUserCfgName = "user.cfg"
+
 	// grubHashPrefix is what grub-mkpasswd-pbkdf2 puts in front of every hash
 	// it prints, whichever digest was asked for.
 	grubHashPrefix = "grub.pbkdf2."
@@ -58,7 +69,7 @@ var bootCollector = collect.Collector{
 	Declare: collect.Declaration{Reads: []string{
 		efiDir, secureBootGlob,
 		grubCfgDebian, grubCfgEL, grubEFIGlob,
-		grubUserCfg, grubDGlob,
+		grubUserCfg, grubEFIUserCfgGlob, grubDGlob,
 		// K-4: writePermFacts turns the gid of grub.cfg into a group name,
 		// and the file it reads to do that is declared here like any other.
 		groupPath,
@@ -150,10 +161,10 @@ func secureBootFromEfivar(data []byte) (enabled, ok bool) {
 // and hand controls 8 and 9 a NOT_APPLICABLE for a host that has one (B-10).
 // A refusal is the answer.
 //
-// A symlink at a candidate is an error by design (C4): muster reads without
-// following links, no distribution ships grub.cfg as one, and an
-// administrator who did put a link there has moved the file somewhere this
-// declaration does not cover.
+// A symlink at a candidate is an error by design (C4) with ONE exception the
+// distributions themselves ship: ruling K-28, the upgraded EL host below.
+// muster reads without following links, so an administrator who put a link
+// anywhere else has moved the file somewhere this declaration does not cover.
 func grubCfgPath(a collect.Access) (string, *facts.Envelope) {
 	// K-4: the EFI vendor directories are enumerated BEFORE any stat, so the
 	// candidate list is settled before the first question is put to the host.
@@ -161,9 +172,9 @@ func grubCfgPath(a collect.Access) (string, *facts.Envelope) {
 	slices.Sort(matches)
 
 	for _, p := range grubCfgFixed {
-		switch found, e := grubCandidate(a, p); {
+		switch resolved, found, e := grubCandidate(a, p); {
 		case found:
-			return p, nil
+			return resolved, nil
 		case e != nil:
 			return "", e
 		}
@@ -176,9 +187,9 @@ func grubCfgPath(a collect.Access) (string, *facts.Envelope) {
 		return "", &e
 	}
 	for _, p := range matches {
-		switch found, e := grubCandidate(a, p); {
+		switch resolved, found, e := grubCandidate(a, p); {
 		case found:
-			return p, nil
+			return resolved, nil
 		case e != nil:
 			return "", e
 		}
@@ -188,17 +199,52 @@ func grubCfgPath(a collect.Access) (string, *facts.Envelope) {
 	return "", &e
 }
 
-// grubCandidate stats one candidate: found, not there, or an answer.
-func grubCandidate(a collect.Access, p string) (bool, *facts.Envelope) {
+// grubCandidate stats one candidate: the path the facts are about, whether it
+// was found, or the answer every leaf has to carry.
+//
+// Ruling K-28: an EL host installed before 9 and upgraded on UEFI keeps
+// /boot/grub2/grub.cfg as a LINK to ../efi/EFI/<vendor>/grub.cfg, and
+// grub2-mkconfig preserves it — the distribution ships that link, so C4 says
+// muster models it rather than reporting the stock layout as an error. The
+// link is resolved TEXTUALLY, through the same no-follow linkTarget every
+// other modelled link goes through, and it is accepted only when the target
+// is a path this collector already declared: /boot/efi/EFI/*/grub.cfg, the
+// one place the upgrade moves the file to. The facts then describe the
+// TARGET, which is where the bytes and the permission bits actually are.
+//
+// A link to anywhere else is still that candidate's error: its bytes were
+// never read, and muster has no licence to read them.
+func grubCandidate(a collect.Access, p string) (string, bool, *facts.Envelope) {
 	switch _, err := a.Stat(p); {
 	case err == nil:
-		return true, nil
+		return p, true, nil
 	case errors.Is(err, fs.ErrNotExist):
-		return false, nil
+		return "", false, nil
+	case errors.Is(err, collect.ErrSymlink):
+		if target, ok := linkTarget(a, p); ok {
+			if matched, merr := path.Match(grubEFIGlob, target); merr == nil && matched {
+				return target, true, nil
+			}
+		}
+		e := readErrorEnv(p, err)
+		return "", false, &e
 	default:
 		e := readErrorEnv(p, err)
-		return false, &e
+		return "", false, &e
 	}
+}
+
+// grubEFIUserCfg is the user.cfg that sits beside a grub.cfg on the EFI
+// system partition, and the second half of K-28: grub-setpassword writes the
+// hash next to the file it generated, so a host whose grub.cfg is over there
+// keeps its password over there too. ok is false for every other chosen path
+// — /boot/grub/user.cfg is NOT declared and muster does not go looking for
+// it.
+func grubEFIUserCfg(cfg string) (string, bool) {
+	if matched, err := path.Match(grubEFIGlob, cfg); err != nil || !matched {
+		return "", false
+	}
+	return path.Join(path.Dir(cfg), grubUserCfgName), true
 }
 
 // grubPassword judges the whole chain GRUB reads a superuser out of: the
@@ -223,6 +269,9 @@ func grubPassword(a collect.Access, cfg string, cfgErr *facts.Envelope) facts.En
 		scan.read(a, cfg)
 	}
 	scan.read(a, grubUserCfg)
+	if beside, ok := grubEFIUserCfg(cfg); ok {
+		scan.read(a, beside)
+	}
 	matches, err := a.Glob(grubDGlob)
 	if err != nil {
 		scan.fail(grubDGlob, err)

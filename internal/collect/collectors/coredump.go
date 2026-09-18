@@ -200,7 +200,12 @@ func writeCoredumpConf(a collect.Access, b *collect.Builder) {
 	storage, sizeMax, seen := mergeCoredumpConf(scan.files)
 
 	if !storage.set {
-		b.Set("coredump.systemd.storage", collect.Absent(coredumpUnsetReason("Storage", seen)))
+		// "Nothing set it" is a conclusion about bytes that were all read.
+		// A chain cut at the read cap may have left the line that did set it
+		// beyond the cut, so the absent branch carries the truncation flag
+		// exactly as the OK branch does.
+		b.Set("coredump.systemd.storage",
+			withTruncation(collect.Absent(coredumpUnsetReason("Storage", seen)), scan.truncated))
 	} else {
 		b.Set("coredump.systemd.storage",
 			withTruncation(collect.OK(storage.value, coredumpSource(storage)), scan.truncated))
@@ -208,7 +213,8 @@ func writeCoredumpConf(a collect.Access, b *collect.Builder) {
 
 	switch {
 	case !sizeMax.set:
-		b.Set("coredump.systemd.process_size_max", collect.Absent(coredumpUnsetReason("ProcessSizeMax", seen)))
+		b.Set("coredump.systemd.process_size_max",
+			withTruncation(collect.Absent(coredumpUnsetReason("ProcessSizeMax", seen)), scan.truncated))
 	default:
 		n, ok := parseSizeValue(sizeMax.value)
 		if !ok {
@@ -268,7 +274,8 @@ func writeCoredumpLimits(a collect.Access, b *collect.Builder) {
 	}
 	b.Set("coredump.limits.sources", withTruncation(collect.OK(sources, filesSource(pathsOf(scan.files))), scan.truncated))
 	if winner == nil {
-		b.Set("coredump.limits.hard_core", collect.Absent("no limits.conf line sets a hard core limit for *"))
+		b.Set("coredump.limits.hard_core",
+			withTruncation(collect.Absent("no limits.conf line sets a hard core limit for *"), scan.truncated))
 		return
 	}
 	src := &facts.Source{Kind: "file", Path: winnerFile, Line: winner.line, Raw: winner.raw}

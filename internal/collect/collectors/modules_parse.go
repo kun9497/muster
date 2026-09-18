@@ -4,6 +4,7 @@ package collectors
 
 import (
 	"path"
+	"slices"
 	"strings"
 )
 
@@ -175,12 +176,17 @@ func unescapeModprobeLine(line string) (string, bool) {
 }
 
 // installDisables reports whether an install command is the "never load
-// this" idiom (B-7). `install <name> /bin/false` (or /bin/true) replaces
-// loading with a command that does nothing; `install <name> /sbin/modprobe
-// --ignore-install <name>` is the OPPOSITE — it is how an administrator
-// hangs something off a load that still happens — and reading it as disabled
-// would pass a host on which the module loads exactly as before.
+// this" idiom (B-7). `install <name> /bin/false` — or any other spelling of a
+// command that does nothing, installNoops — replaces loading with a no-op;
+// `install <name> /sbin/modprobe --ignore-install <name>` is the OPPOSITE —
+// it is how an administrator hangs something off a load that still happens —
+// and reading it as disabled would pass a host on which the module loads
+// exactly as before.
+//
+// Only the command's FIRST word is judged: that is the program modprobe's
+// shell runs, and a `false` that appears as an argument to something else
+// does not stop anything.
 func installDisables(command string) bool {
 	fields := strings.Fields(command)
-	return len(fields) > 0 && (fields[0] == installFalse || fields[0] == installTrue)
+	return len(fields) > 0 && slices.Contains(installNoops, fields[0])
 }

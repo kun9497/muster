@@ -551,3 +551,44 @@ func TestSwapDeclarationCoversItsReads(t *testing.T) {
 		t.Errorf("wrote %v, want the three keys of B-2", keys)
 	}
 }
+
+// A row whose decision failed says WHY. encrypted keeps its zero value when
+// nothing could be decided, and `encrypted: false` on its own reads as a
+// finding about the host — "this swap is not encrypted" — where the truth is
+// that muster could not look. reason carries that sentence, and is empty on a
+// row that really was judged.
+func TestSwapDeviceRowSaysWhyItHasNoJudgment(t *testing.T) {
+	// The container case of K-16: a swap FILE on an overlay root, whose
+	// source is not a block device this kernel lists.
+	a := swapDouble(swapLayout{swaps: "proc_swaps.sample", mounts: "mountinfo.overlay-root"})
+	rows := okList(t, buildBegun(t, "swap", a), "swap.devices")
+	r := swapRow(t, rows, "/swap.img")
+	if r["encrypted"] != false {
+		t.Fatalf("/swap.img row = %v, want encrypted false", r)
+	}
+	reason, ok := r["reason"].(string)
+	if !ok {
+		t.Fatalf("/swap.img row = %v, want a string reason field", r)
+	}
+	if !strings.Contains(reason, "overlay") {
+		t.Errorf("reason %q does not say what could not be resolved", reason)
+	}
+
+	// A row that WAS judged says nothing: an empty reason is how a reader
+	// tells "not encrypted, and we know" from "not encrypted, as far as we
+	// could see".
+	decided := swapDouble(swapLayout{
+		swaps: "proc_swaps.partitions",
+		links: linkMap(sysLink("dm-1"), diskLink("sda")),
+		files: map[string]string{"/sys/devices/virtual/block/dm-1/dm/uuid": "dm.uuid.crypt"},
+		dirs:  []string{"/sys/block/sda/sda2"},
+	})
+	drows := okList(t, buildBegun(t, "swap", decided), "swap.devices")
+	dr := swapRow(t, drows, "/dev/sda2")
+	if dr["reason"] != "" {
+		t.Errorf("/dev/sda2 row = %v, want an empty reason: this row was decided", dr)
+	}
+	if dr["encrypted"] != false || dr["backing"] != "sda2" {
+		t.Errorf("/dev/sda2 row = %v, want encrypted false backing sda2", dr)
+	}
+}

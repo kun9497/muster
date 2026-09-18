@@ -479,3 +479,53 @@ func persistedOK(t *testing.T, b *collect.Builder, key string) facts.Envelope {
 	}
 	return e
 }
+
+// The kernel's own proc_get_long takes the base from the text, so an
+// administrator's `0x10` is the sixteen the host would apply. Reading it as
+// "not an integer" would turn a working configuration into an ERROR, and
+// reading it as ten would be worse.
+func TestSysctlPersistedAcceptsTheBasesTheKernelDoes(t *testing.T) {
+	for _, tc := range []struct {
+		name, text string
+		want       any
+	}{
+		{"hex", "kernel.sysrq = 0x10\n", 16},
+		{"octal", "kernel.sysrq = 0177\n", 127},
+		{"decimal", "kernel.sysrq = 16\n", 16},
+	} {
+		a := &fsAccess{files: map[string]string{}, contents: map[string][]byte{
+			"/etc/sysctl.d/10-base.conf": []byte(tc.text),
+		}}
+		for k, v := range procSysSeeds() {
+			a.files[k] = v
+		}
+		b := build(t, "sysctl", a)
+		if got := persistedOK(t, b, "kernel.sysctl.sysrq"); got.Value != tc.want {
+			t.Errorf("%s: persisted %#v, want %#v", tc.name, got.Value, tc.want)
+		}
+	}
+}
+
+// Truncation has to reach the ABSENT branch too. "No sysctl.d line sets this"
+// is a conclusion about bytes that were all read; when a file of the chain was
+// cut at the read cap, the line that did set it may be past the cut, and an
+// unmarked absent would let a control read that guess as the host's answer.
+func TestSysctlAbsentPersistedCarriesTheChainsTruncation(t *testing.T) {
+	const cut = "/etc/sysctl.d/10-magic-sysrq.conf"
+	a := &fsAccess{
+		files:     map[string]string{cut: "sysctl.d-10-magic-sysrq.conf"},
+		truncated: map[string]bool{cut: true},
+	}
+	for k, v := range procSysSeeds() {
+		a.files[k] = v
+	}
+	b := build(t, "sysctl", a)
+
+	got := persisted(t, b, "kernel.sysctl.bpf_jit_harden")
+	if got.Status != facts.StatusAbsent {
+		t.Fatalf("persisted %+v, want absent: no file of the chain sets it", got)
+	}
+	if !got.Truncated {
+		t.Errorf("persisted %+v, want truncated: %s was cut at the read cap", got, cut)
+	}
+}

@@ -43,7 +43,7 @@ var sysctlLeaves = []struct {
 
 // The persisted half of a sysctl: sysctl.d(5)'s four directories in
 // DESCENDING precedence — a base name in an earlier one masks the same name
-// in every later one — plus /etc/sysctl.conf, which systemd-sysctl applies
+// in every later one — plus /etc/sysctl.conf, which `sysctl --system` applies
 // last of all.
 var sysctlDirs = []string{
 	"/etc/sysctl.d",
@@ -132,17 +132,24 @@ func (s *sysctlScan) read(a collect.Access, p string) {
 	s.files = append(s.files, sysctlFile{path: p, assigns: parseSysctlD(data)})
 }
 
-// sysctlFiles resolves the chain the way systemd-sysctl resolves it: every
+// sysctlFiles resolves the chain the way `sysctl --system` resolves it: every
 // *.conf of the four directories, the FIRST directory to offer a base name
 // owning it, the survivors applied in lexicographic BASE-NAME order
 // whichever directory each came from (sysctl.d(5): "the entry in the file
 // with the lexicographically latest name will take precedence"), and
 // /etc/sysctl.conf last.
 //
-// The stock /etc/sysctl.d/99-sysctl.conf symlink is modelled: when it points
-// at /etc/sysctl.conf, the main file is read AT THAT POSITION and is not
-// read again at the end, so a winner cites the real file and the byte-for-
-// byte same assignments are not applied twice.
+// systemd-sysctl itself NEVER reads /etc/sysctl.conf — that file is not one
+// of the directories sysctl.d(5) lists, which is the whole reason Debian and
+// Ubuntu ship the /etc/sysctl.d/99-sysctl.conf symlink pointing at it. The
+// last position is therefore procps' `sysctl --system` order, which is what a
+// host actually applies at boot (K-20: on the lab procps.service is an alias
+// of systemd-sysctl.service, so the two agree on everything else).
+//
+// That stock symlink is modelled: when it points at /etc/sysctl.conf, the
+// main file is read AT THAT POSITION and is not read again at the end, so a
+// winner cites the real file and the byte-for-byte same assignments are not
+// applied twice.
 func sysctlFiles(a collect.Access) sysctlScan {
 	var s sysctlScan
 	chosen := map[string]string{}

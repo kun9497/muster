@@ -3,6 +3,7 @@
 package collectors
 
 import (
+	"fmt"
 	"maps"
 	"os"
 	"path"
@@ -542,5 +543,105 @@ func TestModulesDeclarationCoversItsReads(t *testing.T) {
 	b := buildBegun(t, "modules", moduleDouble(moduleTreeFiles(usrTree)))
 	if keys := b.Keys("modules"); !slices.Equal(keys, []string{modulesKey}) {
 		t.Errorf("wrote %v, want just %s", keys, modulesKey)
+	}
+}
+
+// bigModulesDep renders a modules.dep of at least size bytes whose LAST line
+// is the candidate the assertion is about, so a read that stopped early loses
+// exactly that line. The filler names are invented and no host was read for
+// them (the fixture note at the top of this file applies).
+func bigModulesDep(size int, last string) []byte {
+	var b strings.Builder
+	for i := 0; b.Len() < size; i++ {
+		fmt.Fprintf(&b, "kernel/drivers/filler/filler%06d.ko:\n", i)
+	}
+	fmt.Fprintf(&b, "kernel/fs/%s/%s.ko:\n", last, last)
+	return []byte(b.String())
+}
+
+// The two module INDEXES are read under a cap of their own, the way the mount
+// table is: modules.dep lists every module of the tree and passes the general
+// 1 MiB readLimit on an ordinary distribution kernel. A cut index is silently
+// a SHORTER module list — "this host does not have hfs" — which is a wrong
+// finding rather than an honest truncation, so the cap has to clear a real
+// tree.
+func TestModulesIndexesAreReadUnderTheirOwnCap(t *testing.T) {
+	const candidate = "hfs"
+	files := moduleTreeFiles(usrTree)
+	delete(files, path.Join(usrTree, modulesDepName))
+	a := moduleDouble(files)
+	a.contents = map[string][]byte{
+		path.Join(usrTree, modulesDepName): bigModulesDep(2<<20, candidate),
+	}
+
+	b := build(t, "modules", a)
+	e := env(t, b, modulesKey)
+	if e.Status != facts.StatusOK {
+		t.Fatalf("%s = %+v, want ok", modulesKey, e)
+	}
+	if e.Truncated {
+		t.Errorf("%s is truncated at 2 MiB; the index cap is %d bytes", modulesKey, modulesDepReadLimit)
+	}
+	row := moduleRow(t, okList(t, b, modulesKey), candidate)
+	if !rowFlag(t, row, "available") {
+		t.Errorf("%s = %v, want available: its line is past 1 MiB and the whole index must be read", candidate, row)
+	}
+
+	// Past the index cap the read is cut and SAYS so — the envelope carries
+	// truncated, which is what stops a control reading the short list as the
+	// whole answer.
+	over := moduleDouble(files)
+	over.contents = map[string][]byte{
+		path.Join(usrTree, modulesDepName): bigModulesDep(modulesDepReadLimit+(1<<16), candidate),
+	}
+	if e := env(t, build(t, "modules", over), modulesKey); !e.Truncated {
+		t.Errorf("%s = %+v, want truncated: the index is larger than the cap", modulesKey, e)
+	}
+}
+
+// B-7: `install <name> <a command that does nothing>` is the "never load
+// this" idiom whichever way an administrator spelled the command. /bin and
+// /usr/bin are one directory on a merged-/usr host and two elsewhere, and
+// modprobe runs the command through /bin/sh, which finds a bare word on PATH.
+func TestInstallDisablesEverySpellingOfANoop(t *testing.T) {
+	for _, tc := range []struct {
+		command string
+		want    bool
+	}{
+		{"/bin/false", true},
+		{"/bin/true", true},
+		{"/usr/bin/false", true},
+		{"/usr/bin/true", true},
+		{"false", true},
+		{"true", true},
+		{"/bin/false # never", true},
+		{"  /usr/bin/true  ", true},
+		{"/sbin/modprobe --ignore-install cramfs", false},
+		{"/bin/falsely", false},
+		{"/opt/false", false},
+		{"logger false", false},
+		{"", false},
+	} {
+		if got := installDisables(tc.command); got != tc.want {
+			t.Errorf("installDisables(%q) = %v, want %v", tc.command, got, tc.want)
+		}
+	}
+}
+
+// The spellings have to survive the whole collector, not just the predicate:
+// a module whose install line says `/usr/bin/false` is disabled in the row a
+// control reads.
+func TestModulesInstallNoopThroughTheCollector(t *testing.T) {
+	files := withConf(moduleTreeFiles(usrTree), nil)
+	a := moduleDouble(files)
+	a.contents = map[string][]byte{
+		"/etc/modprobe.d/99-noops.conf": []byte("install cramfs /usr/bin/false\ninstall freevxfs true\n"),
+	}
+	rows := okList(t, build(t, "modules", a), modulesKey)
+	for _, name := range []string{"cramfs", "freevxfs"} {
+		row := moduleRow(t, rows, name)
+		if !rowFlag(t, row, "install_disabled") || !rowFlag(t, row, "disabled") {
+			t.Errorf("%s = %v, want install_disabled and disabled", name, row)
+		}
 	}
 }

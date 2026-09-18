@@ -42,6 +42,7 @@ type fsAccess struct {
 	collect.NoWalkAccess
 
 	files       map[string]string            // host path -> testdata file name
+	contents    map[string][]byte            // host path -> literal bytes, for content no fixture file should hold (a multi-megabyte index)
 	dirs        map[string]bool              // host path -> exists, but is not a readable file
 	links       map[string]string            // host path -> symlink target, stored form (Readlink; Stat is ErrSymlink)
 	cmds        map[string]cmdResult         // command line -> canned outcome
@@ -113,17 +114,34 @@ func (a *fsAccess) mode(p string, def uint32) uint32 {
 	return def
 }
 
-func (a *fsAccess) ReadFile(p string, _ int64) ([]byte, collect.ReadMeta, error) {
+// ReadFile honours limit the way the host primitive does: the read stops
+// there and the meta says it was cut, while Size stays the file's real size.
+// Without that, a caller that asks for a LARGER cap than the general one --
+// the module indexes, the mount table -- would read the same bytes through
+// this double whichever limit it passed, and a test of that cap would prove
+// nothing.
+func (a *fsAccess) ReadFile(p string, limit int64) ([]byte, collect.ReadMeta, error) {
 	a.reads = append(a.reads, p)
 	if err, ok := a.fails[p]; ok {
 		return nil, collect.ReadMeta{}, err
 	}
-	name, ok := a.files[p]
+	b, ok := a.contents[p]
 	if !ok {
-		return nil, collect.ReadMeta{}, os.ErrNotExist
+		name, named := a.files[p]
+		if !named {
+			return nil, collect.ReadMeta{}, os.ErrNotExist
+		}
+		var err error
+		if b, err = a.read(name); err != nil {
+			return b, collect.ReadMeta{Tier: "openat2", Size: int64(len(b)), Mode: a.mode(p, 0o644), Truncated: a.truncated[p]}, err
+		}
 	}
-	b, err := a.read(name)
-	return b, collect.ReadMeta{Tier: "openat2", Size: int64(len(b)), Mode: a.mode(p, 0o644), Truncated: a.truncated[p]}, err
+	meta := collect.ReadMeta{Tier: "openat2", Size: int64(len(b)), Mode: a.mode(p, 0o644), Truncated: a.truncated[p]}
+	if limit > 0 && int64(len(b)) > limit {
+		b = b[:limit]
+		meta.Truncated = true
+	}
+	return b, meta, nil
 }
 
 func (a *fsAccess) Stat(p string) (collect.ReadMeta, error) {
@@ -144,6 +162,9 @@ func (a *fsAccess) Stat(p string) (collect.ReadMeta, error) {
 		return collect.ReadMeta{}, err
 	}
 	if _, ok := a.files[p]; ok {
+		return collect.ReadMeta{Tier: "openat2", Mode: a.mode(p, 0o644)}, nil
+	}
+	if _, ok := a.contents[p]; ok {
 		return collect.ReadMeta{Tier: "openat2", Mode: a.mode(p, 0o644)}, nil
 	}
 	if a.dirs[p] {
@@ -170,6 +191,11 @@ func (a *fsAccess) Glob(pattern string) ([]string, error) {
 	}
 	var out []string
 	for p := range a.files {
+		if ok, _ := path.Match(pattern, p); ok {
+			out = append(out, p)
+		}
+	}
+	for p := range a.contents {
 		if ok, _ := path.Match(pattern, p); ok {
 			out = append(out, p)
 		}

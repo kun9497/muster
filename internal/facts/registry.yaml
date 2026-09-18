@@ -2455,7 +2455,7 @@ keys:
     collector: boot
   - key: boot.grub_cfg.path
     type: string
-    description: The bootloader configuration file this host uses - the first of /boot/grub/grub.cfg, /boot/grub2/grub.cfg and /boot/efi/EFI/*/grub.cfg that exists.
+    description: The bootloader configuration file this host uses - the first of /boot/grub/grub.cfg, /boot/grub2/grub.cfg and /boot/efi/EFI/*/grub.cfg that exists. Where one of the first two is the symlink an upgraded EL host keeps to a /boot/efi/EFI/*/grub.cfg, the target is the path and the permission leaves are the target's.
     since: 1
     sensitivity: public
     collector: boot
@@ -2523,7 +2523,7 @@ keys:
     type: list<record>
     description: One row per candidate mount point (/, /boot, /home, /tmp, /var, /var/tmp, /var/log, /var/log/audit, /dev/shm) with target, separate, mounted_by, source, fstype and options; on a row that is not separate the source, fstype and options are those of the mount that governs the path.
     since: 1
-    sensitivity: public
+    sensitivity: internal
     collector: mounts
     subject_kind: mount
   - key: mounts.tmp.separate
@@ -2565,7 +2565,7 @@ keys:
     collector: swap
   - key: swap.devices
     type: list<record>
-    description: One row per swap device with path, type (file or partition), encrypted and backing - the block device the judgment was made on.
+    description: One row per swap device with path, type (file or partition), encrypted, backing - the block device the judgment was made on - and reason, which says why a row has no judgment and is empty on a row that has one.
     since: 1
     sensitivity: public
     collector: swap

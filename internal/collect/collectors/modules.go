@@ -45,6 +45,29 @@ const (
 	installTrue  = "/bin/true"
 )
 
+// installNoops are every spelling of "run something that does nothing" an
+// administrator writes an `install` line with. /bin and /usr/bin are one
+// directory on a merged-/usr host and two on anything else, and modprobe
+// hands the command to `/bin/sh -c`, which resolves a bare word through PATH
+// — so `install cramfs false` disables the module exactly as
+// `install cramfs /bin/false` does, and reading only the /bin spelling as
+// disabled would fail a host that is configured correctly.
+var installNoops = []string{
+	installFalse, installTrue,
+	"/usr/bin/false", "/usr/bin/true",
+	"false", "true",
+}
+
+// modulesDepReadLimit is the cap the two module INDEXES are read under, the
+// way mountinfoReadLimit exists for the mount table. They are not
+// configuration: modules.dep lists every module of the tree with its
+// dependencies and passes 1 MiB on an ordinary desktop kernel, so the general
+// readLimit would cut it — and a cut index is silently a SHORTER module list,
+// which is a wrong "this host does not have cramfs" rather than an honest
+// truncation. 8 MiB clears the largest distribution kernel with room to
+// spare; a tree past it still reports truncated on the envelope.
+const modulesDepReadLimit = 8 << 20
+
 // moduleCandidates are the eleven modules of spec B-2, in the spec's order.
 // K-5: every one of them is a row on every host whose tree could be read,
 // present or not, so an `each` clause never selects nothing and a waiver can
@@ -170,7 +193,7 @@ func moduleList(a collect.Access) facts.Envelope {
 	// absence is the absence of the tree: a container, or a kernel whose
 	// modules were removed, has nothing here to judge (B-2, B-10).
 	depPath := path.Join(tree, modulesDepName)
-	depData, meta, err := a.ReadFile(depPath, readLimit)
+	depData, meta, err := a.ReadFile(depPath, modulesDepReadLimit)
 	switch {
 	case errors.Is(err, fs.ErrNotExist):
 		return collect.Unsupported(tree + " has no " + modulesDepName + ": this host carries no module tree for its running kernel")
@@ -184,7 +207,7 @@ func moduleList(a collect.Access) facts.Envelope {
 	// generated per build and an old one may not have it — and then nothing
 	// is built in as far as this host can say.
 	builtinPath := path.Join(tree, modulesBuiltinName)
-	builtinData, meta, err := a.ReadFile(builtinPath, readLimit)
+	builtinData, meta, err := a.ReadFile(builtinPath, modulesDepReadLimit)
 	switch {
 	case errors.Is(err, fs.ErrNotExist):
 		builtinData = nil

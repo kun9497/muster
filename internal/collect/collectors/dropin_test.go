@@ -90,3 +90,45 @@ func TestMergeDropinsUnreadableFileIsTheFirstReadError(t *testing.T) {
 		t.Errorf("the reason must name the file: %+v", e)
 	}
 }
+
+// Ruling K-21 is about ANY .d directory muster reads, not only sysctl.d: a
+// symlink to /dev/null is systemd's documented MASK, so the base name is
+// switched off on purpose and contributes nothing. Every caller of
+// mergeDropinsWith — journald, logind, the sshd and pwquality drop-ins —
+// answers it the same way, because they all classify a failed read through
+// chainReadFailed.
+func TestMergeDropinsDevNullIsAMaskAndAnyOtherLinkIsAnError(t *testing.T) {
+	const dirs0 = "/etc/systemd/journald.conf.d"
+	const dirs1 = "/usr/lib/systemd/journald.conf.d"
+	dirs := []string{dirs0, dirs1}
+
+	masked := timesyncAccess(map[string]string{
+		"/etc/systemd/journald.conf":                      "journald.conf.main",   // Storage=auto
+		"/usr/lib/systemd/journald.conf.d/10-vendor.conf": "journald.d.10-vendor", // Storage=volatile
+	}, nil)
+	seedLink(masked.fsAccess, dirs0+"/10-vendor.conf", devNull)
+	vals, inputs, err := mergeDropins(masked, "/etc/systemd/journald.conf", dirs, "*.conf")
+	if err != nil {
+		t.Fatalf("a /dev/null mask must not be an error: %v", err)
+	}
+	if vals["Storage"] != "auto" {
+		t.Errorf("Storage = %q, want the main file's auto: the mask owns the base name and sets nothing", vals["Storage"])
+	}
+	for _, in := range inputs {
+		if strings.HasSuffix(in.Path, "10-vendor.conf") {
+			t.Errorf("the masked base name is listed as an input: %v", inputs)
+		}
+	}
+
+	// Any other link is that file's error (C4): its bytes were never read,
+	// and a default guessed over it would be fabricated evidence.
+	foreign := timesyncAccess(map[string]string{
+		"/etc/systemd/journald.conf": "journald.conf.main",
+	}, nil)
+	seedLink(foreign.fsAccess, dirs0+"/20-managed.conf", "/opt/config/journald.conf")
+	if _, _, err := mergeDropins(foreign, "/etc/systemd/journald.conf", dirs, "*.conf"); err == nil {
+		t.Fatal("a drop-in symlinked out of the declaration must be reported")
+	} else if e := dropinEnvelope(err); e.Status != "error" || !strings.Contains(e.Reason, "20-managed.conf") {
+		t.Errorf("envelope %+v, want error naming the link", e)
+	}
+}

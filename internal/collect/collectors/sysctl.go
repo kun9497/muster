@@ -78,11 +78,15 @@ func readProcSys(a collect.Access, p string) facts.Envelope {
 		return readErrorEnv(p, err)
 	}
 	v := strings.TrimSpace(string(data))
-	n, cerr := strconv.Atoi(v)
+	// Base 0, the same reading the persisted side uses: one rule for the two
+	// halves of a setting, so the runtime and persisted values of the same
+	// knob can never be read off the same text differently. The kernel prints
+	// these knobs in decimal, which base 0 reads unchanged.
+	n, cerr := strconv.ParseInt(v, 0, 64)
 	if cerr != nil {
 		return collect.ErrorEnv(p + ": " + strconv.Quote(sourceRaw(v)) + " is not an integer")
 	}
-	return collect.OKRead(n, &facts.Source{Kind: "proc", Path: p}, meta)
+	return collect.OKRead(int(n), &facts.Source{Kind: "proc", Path: p}, meta)
 }
 
 // sysctlPersisted is the sysctl.d side of one variable.
@@ -94,14 +98,21 @@ func sysctlPersisted(k sysctlKey, scan sysctlScan, winners map[string]sysctlWinn
 	}
 	w, ok := winners[k.key]
 	if !ok {
-		return collect.Absent("no sysctl.d line sets " + k.key)
+		// "No line sets it" is a conclusion about bytes that were all read.
+		// A file of the chain cut at the read cap may have carried that line
+		// past the cut, so the absent branch marks the truncation the way the
+		// OK branch below does.
+		return withTruncation(collect.Absent("no sysctl.d line sets "+k.key), scan.truncated)
 	}
-	n, err := strconv.Atoi(w.value)
+	// The kernel's own proc_get_long takes the base from the text, so
+	// "0x1f" and "0177" are the values it would apply; base 0 reads them the
+	// same way and a decimal value is unaffected.
+	n, err := strconv.ParseInt(w.value, 0, 64)
 	if err != nil {
 		return collect.ErrorEnv(w.file + ": " + strconv.Quote(sourceRaw(w.value)) + " is not an integer for " + k.key)
 	}
 	src := &facts.Source{Kind: "file", Path: w.file, Line: w.line, Raw: w.raw}
-	return withTruncation(collect.OK(n, src), scan.truncated)
+	return withTruncation(collect.OK(int(n), src), scan.truncated)
 }
 
 // copyEnvelope duplicates an envelope and the source it points at, so two
