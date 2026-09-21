@@ -74,10 +74,12 @@ can name a network export and is `internal` like `sockets.listening`
 **B-3 — `/proc/sys` is read directly, and the verdict reads the runtime side.** No `sysctl` binary, no command in the declaration. `default_on: effective` (= runtime) departs from the main design's §5.3, which names `both` for sysctl: a value the kernel compiles in — `dmesg_restrict` on Ubuntu, `protected_symlinks` everywhere — has no persisted line at all, and `both` would WARN "reverts on reboot" on every host for a setting that does not revert. The persisted side is evidence in the envelope; D29 records the departure.
 `/proc/sys/kernel/yama/ptrace_scope` that does not exist (Yama not built) is `absent`
 with the path, and so is `fs/protected_fifos` on a kernel before 4.19. A value that does
-not parse as an integer is `error` naming the path and the bytes. Five of the files are
-0600 on the lab's kernel (`net/core/bpf_jit_harden` and the four `fs/protected_*`), so
-without root their runtime side is `denied`; the capability matrix's `nonroot` row lists
-them and controls 3 and 4 are ERROR in a non-root run. The persisted half never
+not parse as an integer is `error` naming the path and the bytes. `net/core/bpf_jit_harden`
+is 0600 on every supported kernel and the four `fs/protected_*` files are 0600 on some
+(the lab's 5.15) and world-readable on others (the runner's 6.x), so without root the
+runtime side of the first is always `denied` and of the four sometimes; the capability
+matrix's `nonroot` row names only `bpf_jit_harden`, control 3 is ERROR in every non-root
+run and control 4 on the kernels that publish the four files 0600. The persisted half never
 decides the leaf's effective value — a host whose runtime value drifted from its
 `sysctl.d` is exactly what the two homes make visible.
 
@@ -189,8 +191,9 @@ whatever `/sys/firmware/efi` says (a container on a UEFI host sees it), `boot.gr
 
 Without root most reads here still work — efivars, `/proc/swaps`, `modprobe.d`, the
 module tree and seven of the twelve `/proc/sys` files are world-readable — with two
-exceptions. The five 0600 sysctl files of B-3 are `denied`, so controls 3 and 4 are ERROR
-without root and the capability matrix's `nonroot` row names the five keys. On EL,
+exceptions. The 0600 sysctl files of B-3 are `denied`, so control 3 is ERROR without root
+everywhere and control 4 on some kernels; the capability matrix's `nonroot` row names
+`bpf_jit_harden` alone. On EL,
 `/boot/grub2` is 0700, so even the stat of grub.cfg is refused: every `boot.grub_cfg.*` leaf
 and `boot.grub_password_set` (which also reads the 0600 `user.cfg`) are `denied`, and
 controls 8 and 9 are ERROR — never NOT_APPLICABLE, which is what falling through to the
@@ -206,7 +209,9 @@ Without systemd nothing changes: `coredump.systemd.*` is `absent` and such a hos
 `core_pattern` is not the systemd pipe, so control 6 takes mechanism (c) or (d).
 
 On a BIOS machine `boot.firmware` is `bios`, `boot.secure_boot` is `absent`, and control 10
-is NOT_APPLICABLE; on UEFI with Secure Boot off it fails, which is the truth. `--deep` is
+is NOT_APPLICABLE; on UEFI with Secure Boot off it fails, which is the truth; on a UEFI host
+whose firmware exposes the variable but returns no data for it (the GitHub runner) the leaf
+is `unsupported` and the control NOT_APPLICABLE with `unsupported_env`. `--deep` is
 not needed by anything here: `mounts` reads mountinfo only.
 
 The stock lab host (Ubuntu 22.04 on VMware, BIOS, a plain swap file, no separate `/tmp` or

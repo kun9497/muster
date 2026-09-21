@@ -210,9 +210,9 @@ every plan is under `docs/superpowers/plans/`):
 - A synthetic stock-host snapshot (`controls/testdata/_hosts/`) pins the
   nineteen verdicts a stock Ubuntu 22.04 server reads; a fifth daemon oracle
   compares the twelve sysctls with `sysctl -n`; the capability matrix names
-  the five `/proc/sys` files that are root-only and the two keys a container
-  cannot answer, and CI proves the EL non-root bootloader path inside the init
-  images.
+  the `/proc/sys` file that is root-only on every supported kernel
+  (`bpf_jit_harden`) and the two keys a container cannot answer, and CI
+  proves the EL non-root bootloader path inside the init images.
 
 - A mutation test over the control set. `TestEveryMutantIsKilled`
   (`internal/controls`) mutates every control — operators flipped, expected

@@ -73,9 +73,11 @@ sysctl과 세 출처의 코어덤프 정책, 부트 체인, 마운트 옵션과 
 쪽은 봉투 안의 증거이며, D29가 이 이탈을 기록합니다. 존재하지 않는
 `/proc/sys/kernel/yama/ptrace_scope`(Yama 미빌드)는 경로와 함께 `absent`이고, 4.19 이전
 커널의 `fs/protected_fifos`도 그렇습니다. 정수로 파싱되지 않는 값은 경로와 바이트를 이름
-짓는 `error`입니다. 파일 열둘 중 다섯(`net/core/bpf_jit_harden`과 `fs/protected_*` 넷)은
-lab의 커널에서 0600이라 root 없이는 runtime 쪽이 `denied`입니다; capability matrix의
-`nonroot` 행이 그 다섯을 적고 컨트롤 3과 4는 비root 실행에서 ERROR입니다. persisted
+짓는 `error`입니다. `net/core/bpf_jit_harden`은 지원 커널 모두에서 0600이고 `fs/protected_*`
+넷은 어떤 커널(lab의 5.15)에서는 0600, 다른 커널(러너의 6.x)에서는 누구나 읽을 수 있어서,
+root 없이는 앞의 것의 runtime 쪽은 언제나 `denied`이고 넷은 때에 따라 그렇습니다;
+capability matrix의 `nonroot` 행은 `bpf_jit_harden`만 적고, 컨트롤 3은 모든 비root 실행에서,
+컨트롤 4는 넷을 0600으로 내놓는 커널에서 ERROR입니다. persisted
 쪽은 leaf의 effective 값을 결코 정하지 않습니다 — runtime 값이 `sysctl.d`에서 어긋난
 호스트가 바로 두 집이 보이게 하는 것입니다.
 
@@ -184,8 +186,9 @@ CI 컨테이너 매트릭스가 검사), `boot.firmware`는
 
 root 없이도 여기의 읽기는 대부분 됩니다 — efivars, `/proc/swaps`, `modprobe.d`, 모듈
 트리, 그리고 `/proc/sys` 파일 열둘 중 일곱은 누구나 읽습니다 — 예외가 둘입니다. B-3의
-0600 sysctl 파일 다섯은 `denied`이므로 컨트롤 3과 4는 root 없이 ERROR이고 capability
-matrix의 `nonroot` 행이 그 다섯 키를 적습니다. EL에서는 `/boot/grub2`가 0700이라
+0600 sysctl 파일은 `denied`이므로 컨트롤 3은 root 없이 어디서나, 컨트롤 4는 일부
+커널에서 ERROR이고 capability matrix의 `nonroot` 행은 `bpf_jit_harden` 하나만 적습니다.
+EL에서는 `/boot/grub2`가 0700이라
 grub.cfg의 stat조차 거부됩니다: 모든 `boot.grub_cfg.*` leaf와 `boot.grub_password_set`
 (0600인 `user.cfg`도 읽음)이 `denied`이고 컨트롤 8과 9는 ERROR입니다 — 다음 후보로
 넘어갔더라면 나왔을 NOT_APPLICABLE은 결코 아닙니다. Ubuntu는 `/boot/grub`와 grub.cfg를
@@ -199,7 +202,9 @@ systemd 없이는 아무것도 바뀌지 않습니다: `coredump.systemd.*`가 `
 호스트의 `core_pattern`은 systemd 파이프가 아니므로 컨트롤 6은 메커니즘 (c)나 (d)로 갑니다.
 
 BIOS 기계에서는 `boot.firmware`가 `bios`, `boot.secure_boot`가 `absent`, 컨트롤 10이
-NOT_APPLICABLE입니다; UEFI인데 Secure Boot가 꺼져 있으면 실패하며 그것이 사실입니다.
+NOT_APPLICABLE입니다; UEFI인데 Secure Boot가 꺼져 있으면 실패하며 그것이 사실입니다; 펌웨어가
+변수는 내놓되 데이터를 돌려주지 않는 UEFI 호스트(GitHub 러너)에서는 leaf가 `unsupported`이고
+컨트롤은 `unsupported_env`로 NOT_APPLICABLE입니다.
 `--deep`은 여기 어디에도 필요 없습니다: `mounts`는 mountinfo만 읽습니다.
 
 스톡 lab 호스트(VMware 위 Ubuntu 22.04, BIOS, 평문 스왑 파일, 별도 `/tmp`·`/var` 없음,
