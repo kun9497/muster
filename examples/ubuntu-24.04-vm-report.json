@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
   "run": {
-    "muster_version": "94ca596",
-    "commit": "94ca596",
-    "controls_version": "kisa-unix-2026+2026.09.16",
-    "controls_digest": "sha256:b63d828be048ac893f0346f485385fd9eae141a1914e261691d593028202e641",
+    "muster_version": "e5eda50",
+    "commit": "e5eda50",
+    "controls_version": "kisa-unix-2026+2026.09.18",
+    "controls_digest": "sha256:1236ece32ab31e36ec68736e546abc54ce3ab653a221c2a27e080a573cf39db6",
     "guide_edition": "kisa-unix-2026",
-    "collected_at": "2026-09-17T08:30:07Z",
+    "collected_at": "2026-09-21T00:36:06Z",
     "host": {
       "hostname": "github-runner",
       "machine_id_hash": "1d6f6908d56a5b37951f001d55c54773e0757799ded7f46439ef6dad42950555",
@@ -39,17 +39,27 @@
       {
         "name": "accounts",
         "status": "ok",
-        "ms": 8
+        "ms": 9
       },
       {
         "name": "banners",
         "status": "ok",
-        "ms": 57
+        "ms": 0
+      },
+      {
+        "name": "boot",
+        "status": "ok",
+        "ms": 6
+      },
+      {
+        "name": "coredump",
+        "status": "ok",
+        "ms": 0
       },
       {
         "name": "cron",
         "status": "ok",
-        "ms": 959,
+        "ms": 840,
         "cmd": "/usr/bin/systemctl list-unit-files --type=timer --no-legend --no-pager"
       },
       {
@@ -60,17 +70,17 @@
       {
         "name": "env",
         "status": "ok",
-        "ms": 126
+        "ms": 4
       },
       {
         "name": "files",
         "status": "ok",
-        "ms": 10
+        "ms": 19
       },
       {
         "name": "firewall",
         "status": "ok",
-        "ms": 25,
+        "ms": 20,
         "cmd": "/usr/sbin/nft list ruleset"
       },
       {
@@ -85,6 +95,16 @@
       },
       {
         "name": "mail",
+        "status": "ok",
+        "ms": 0
+      },
+      {
+        "name": "modules",
+        "status": "ok",
+        "ms": 23
+      },
+      {
+        "name": "mounts",
         "status": "ok",
         "ms": 0
       },
@@ -112,13 +132,13 @@
       {
         "name": "patch",
         "status": "ok",
-        "ms": 6097,
+        "ms": 1987,
         "cmd": "/usr/bin/apt-get -s upgrade -o Debug::NoLocking=1"
       },
       {
         "name": "services",
         "status": "ok",
-        "ms": 194,
+        "ms": 315,
         "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState atftpd.service"
       },
       {
@@ -129,24 +149,34 @@
       {
         "name": "sockets",
         "status": "ok",
-        "ms": 1
+        "ms": 9
       },
       {
         "name": "sshd",
         "status": "ok",
-        "ms": 318,
+        "ms": 107,
         "cmd": "/usr/sbin/sshd -G"
+      },
+      {
+        "name": "swap",
+        "status": "ok",
+        "ms": 0
+      },
+      {
+        "name": "sysctl",
+        "status": "ok",
+        "ms": 0
       },
       {
         "name": "timesync",
         "status": "ok",
-        "ms": 69,
+        "ms": 60,
         "cmd": "/usr/bin/timedatectl show-timesync --all"
       },
       {
         "name": "walk",
         "status": "ok",
-        "ms": 71023,
+        "ms": 13466,
         "cmd": "/usr/bin/rpm -qa --qf [%{=NAME}\t%{FILEMODES:octal}\t%{FILEUSERNAME}\t%{FILEGROUPNAME}\t%{FILENAMES}\n]"
       }
     ],
@@ -159,11 +189,11 @@
     "partial_failures": []
   },
   "check": {
-    "muster_version": "94ca596",
-    "commit": "94ca596",
-    "controls_version": "kisa-unix-2026+2026.09.16",
-    "controls_digest": "sha256:b63d828be048ac893f0346f485385fd9eae141a1914e261691d593028202e641",
-    "snapshot_digest": "sha256:1c3dee3d1854bae178c553671a14d304f3c309389cc9537b70f890f513cbe635",
+    "muster_version": "e5eda50",
+    "commit": "e5eda50",
+    "controls_version": "kisa-unix-2026+2026.09.18",
+    "controls_digest": "sha256:1236ece32ab31e36ec68736e546abc54ce3ab653a221c2a27e080a573cf39db6",
+    "snapshot_digest": "sha256:1b294d35ae8cf4a8cf176bdbc7e89ec54ce142d4e53185248b99b292ab1779f8",
     "guide_edition": "kisa-unix-2026",
     "waivers": {
       "applied": 0,
@@ -254,6 +284,29 @@
           "lp",
           "uucp",
           "nuucp"
+        ]
+      },
+      "muster.beyond.bootloader_config_permissions": {
+        "allowed_modes": [
+          0,
+          128,
+          256,
+          384
+        ]
+      },
+      "muster.beyond.separate_partitions": {
+        "required_separate": [
+          "/tmp",
+          "/var",
+          "/var/tmp",
+          "/var/log",
+          "/var/log/audit",
+          "/home"
+        ]
+      },
+      "muster.beyond.sysrq_restricted": {
+        "allowed_sysrq": [
+          0
         ]
       },
       "muster.file.hosts_lpd_permissions": {
@@ -381,25 +434,25 @@
   "summary": {
     "automatic": {
       "high": {
-        "pass": 16,
+        "pass": 18,
         "fail": 10,
         "warn": 0
       },
       "medium": {
-        "pass": 9,
-        "fail": 2,
+        "pass": 12,
+        "fail": 8,
         "warn": 0
       },
       "low": {
         "pass": 3,
-        "fail": 1,
+        "fail": 3,
         "warn": 0
       }
     },
-    "manual_review": 11,
+    "manual_review": 13,
     "undecidable": {
       "error": 0,
-      "not_applicable": 16,
+      "not_applicable": 20,
       "waived": 0
     },
     "facts_failed": 0,
@@ -432,28 +485,28 @@
         }
       },
       "beyond": {
-        "controls": 0,
+        "controls": 19,
         "automatic": {
           "high": {
-            "pass": 0,
+            "pass": 2,
             "fail": 0,
             "warn": 0
           },
           "medium": {
-            "pass": 0,
-            "fail": 0,
+            "pass": 3,
+            "fail": 6,
             "warn": 0
           },
           "low": {
             "pass": 0,
-            "fail": 0,
+            "fail": 2,
             "warn": 0
           }
         },
-        "manual_review": 0,
+        "manual_review": 2,
         "undecidable": {
           "error": 0,
-          "not_applicable": 0,
+          "not_applicable": 4,
           "waived": 0
         }
       }
@@ -2796,7 +2849,7 @@
         {
           "fact": "walk.world_writable",
           "status": "ok",
-          "value": "543 elements; 521 selected; failing: file:/opt, file:/opt/actionarchivecache, file:/opt/actionarchivecache/actions_cache, file:/opt/actionarchivecache/actions_cache/0057852bfaa89a56745cba8c7296529d2fc39830.tar.gz, file:/opt/actionarchivecache/actions_cache/0400d5f644dc74513175e3cd8d07132dd4860809.tar.gz, +516 more",
+          "value": "544 elements; 521 selected; failing: file:/opt, file:/opt/actionarchivecache, file:/opt/actionarchivecache/actions_cache, file:/opt/actionarchivecache/actions_cache/0057852bfaa89a56745cba8c7296529d2fc39830.tar.gz, file:/opt/actionarchivecache/actions_cache/0400d5f644dc74513175e3cd8d07132dd4860809.tar.gz, +516 more",
           "source": {
             "kind": "file",
             "path": "/var/lib/dpkg/info"
@@ -5955,7 +6008,7 @@
         {
           "fact": "patch.metadata_age_s",
           "status": "ok",
-          "value": 816847,
+          "value": 1134006,
           "source": {
             "kind": "file",
             "path": "/var/lib/apt/periodic/update-success-stamp"
@@ -8983,6 +9036,1123 @@
         }
       ],
       "mechanism": 1,
+      "severity": "low"
+    },
+    {
+      "id": "muster.beyond.aslr_and_link_protection",
+      "title_en": "Address space randomisation is full and the link protections are on",
+      "title_ko": "주소 공간 무작위화가 완전하고 링크 보호가 켜져 있다",
+      "category": "beyond",
+      "importance": "상",
+      "automation": "auto",
+      "status": "PASS",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "none",
+          "source": {
+            "kind": "file",
+            "path": "/proc/1/comm"
+          }
+        },
+        {
+          "fact": "kernel.sysctl.randomize_va_space",
+          "status": "ok",
+          "value": 2,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/sys/kernel/randomize_va_space"
+          },
+          "side": "effective"
+        },
+        {
+          "fact": "kernel.sysctl.protected_symlinks",
+          "status": "ok",
+          "value": 1,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/sys/fs/protected_symlinks"
+          },
+          "side": "effective"
+        },
+        {
+          "fact": "kernel.sysctl.protected_hardlinks",
+          "status": "ok",
+          "value": 1,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/sys/fs/protected_hardlinks"
+          },
+          "side": "effective"
+        },
+        {
+          "fact": "kernel.sysctl.protected_fifos",
+          "status": "ok",
+          "value": 1,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/sys/fs/protected_fifos"
+          },
+          "side": "effective"
+        },
+        {
+          "fact": "kernel.sysctl.protected_regular",
+          "status": "ok",
+          "value": 2,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/sys/fs/protected_regular"
+          },
+          "side": "effective"
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "muster.beyond.bootloader_config_permissions",
+      "title_en": "The bootloader configuration is readable by root alone",
+      "title_ko": "부트로더 설정 파일을 root 만 읽을 수 있다",
+      "category": "beyond",
+      "importance": "상",
+      "automation": "auto",
+      "status": "PASS",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "none",
+          "source": {
+            "kind": "file",
+            "path": "/proc/1/comm"
+          }
+        },
+        {
+          "fact": "boot.grub_cfg.mode",
+          "status": "ok",
+          "value": 384,
+          "source": {
+            "kind": "file",
+            "path": "/boot/grub/grub.cfg"
+          }
+        },
+        {
+          "fact": "boot.grub_cfg.uid",
+          "status": "ok",
+          "value": 0,
+          "source": {
+            "kind": "file",
+            "path": "/boot/grub/grub.cfg"
+          }
+        },
+        {
+          "fact": "boot.grub_cfg.gid",
+          "status": "ok",
+          "value": 0,
+          "source": {
+            "kind": "file",
+            "path": "/boot/grub/grub.cfg"
+          }
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "muster.beyond.bootloader_password",
+      "title_en": "The boot menu is guarded by a bootloader superuser password",
+      "title_ko": "부팅 메뉴가 부트로더 superuser 비밀번호로 보호된다",
+      "category": "beyond",
+      "importance": "중",
+      "automation": "auto",
+      "status": "FAIL",
+      "reason": "clause does not hold: boot.grub_password_set eq true",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "none",
+          "source": {
+            "kind": "file",
+            "path": "/proc/1/comm"
+          }
+        },
+        {
+          "fact": "boot.grub_password_set",
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "file",
+                "path": "/boot/grub/grub.cfg"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/grub.d/00_header"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/grub.d/01_track_initrdless_boot_fallback"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/grub.d/05_debian_theme"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/grub.d/10_linux"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/grub.d/10_linux_zfs"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/grub.d/20_linux_xen"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/grub.d/25_bli"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/grub.d/30_os-prober"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/grub.d/30_uefi-firmware"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/grub.d/35_fwupd"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/grub.d/40_custom"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/grub.d/41_custom"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/grub.d/README"
+              }
+            ]
+          }
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.beyond.core_dump_policy",
+      "title_en": "A core dump is thrown away rather than written to disk",
+      "title_ko": "코어 덤프가 디스크에 기록되지 않고 버려진다",
+      "category": "beyond",
+      "importance": "중",
+      "automation": "partial",
+      "status": "MANUAL",
+      "reason": "absent needs review: coredump.systemd.storage is absent on this host",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "none",
+          "source": {
+            "kind": "file",
+            "path": "/proc/1/comm"
+          }
+        },
+        {
+          "fact": "coredump.core_pattern",
+          "status": "ok",
+          "value": "|/usr/lib/systemd/systemd-coredump %P %u %g %s %t 9223372036854775808 %h %d",
+          "source": {
+            "kind": "proc",
+            "path": "/proc/sys/kernel/core_pattern"
+          }
+        },
+        {
+          "fact": "coredump.systemd.storage",
+          "status": "absent"
+        },
+        {
+          "fact": "coredump.systemd.process_size_max",
+          "status": "absent"
+        }
+      ],
+      "mechanism": 1,
+      "severity": "medium"
+    },
+    {
+      "id": "muster.beyond.dev_shm_mount_options",
+      "title_en": "/dev/shm is mounted nodev, nosuid and noexec",
+      "title_ko": "/dev/shm 이 nodev, nosuid, noexec 로 마운트된다",
+      "category": "beyond",
+      "importance": "중",
+      "automation": "auto",
+      "status": "FAIL",
+      "reason": "clause does not hold: mounts.points each require options contains noexec",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "none",
+          "source": {
+            "kind": "file",
+            "path": "/proc/1/comm"
+          }
+        },
+        {
+          "fact": "mounts.dev_shm.separate",
+          "status": "ok",
+          "value": true,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/self/mountinfo"
+          }
+        },
+        {
+          "fact": "mounts.points",
+          "status": "ok",
+          "value": "9 elements; 1 selected",
+          "source": {
+            "kind": "proc",
+            "path": "/proc/self/mountinfo"
+          }
+        },
+        {
+          "fact": "mounts.points",
+          "status": "ok",
+          "value": "9 elements; 1 selected; failing: mount:/dev/shm",
+          "source": {
+            "kind": "proc",
+            "path": "/proc/self/mountinfo"
+          }
+        }
+      ],
+      "observations": [
+        {
+          "subject": "mount:/dev/shm",
+          "expected": "nodev",
+          "actual": [
+            "rw",
+            "nosuid",
+            "nodev"
+          ],
+          "verdict": "pass"
+        },
+        {
+          "subject": "mount:/dev/shm",
+          "expected": "nosuid",
+          "actual": [
+            "rw",
+            "nosuid",
+            "nodev"
+          ],
+          "verdict": "pass"
+        },
+        {
+          "subject": "mount:/dev/shm",
+          "expected": "noexec",
+          "actual": [
+            "rw",
+            "nosuid",
+            "nodev"
+          ],
+          "verdict": "fail"
+        }
+      ],
+      "mechanism": 1,
+      "severity": "medium"
+    },
+    {
+      "id": "muster.beyond.kernel_pointer_exposure",
+      "title_en": "The kernel hides its pointers and its message buffer from unprivileged readers",
+      "title_ko": "커널이 포인터와 메시지 버퍼를 비권한 사용자에게 숨긴다",
+      "category": "beyond",
+      "importance": "중",
+      "automation": "auto",
+      "status": "PASS",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "none",
+          "source": {
+            "kind": "file",
+            "path": "/proc/1/comm"
+          }
+        },
+        {
+          "fact": "kernel.sysctl.kptr_restrict",
+          "status": "ok",
+          "value": 1,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/sys/kernel/kptr_restrict"
+          },
+          "side": "effective"
+        },
+        {
+          "fact": "kernel.sysctl.dmesg_restrict",
+          "status": "ok",
+          "value": 1,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/sys/kernel/dmesg_restrict"
+          },
+          "side": "effective"
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.beyond.ptrace_restriction",
+      "title_en": "One process cannot attach a debugger to another it did not start",
+      "title_ko": "한 프로세스가 자신이 띄우지 않은 프로세스에 디버거를 붙일 수 없다",
+      "category": "beyond",
+      "importance": "중",
+      "automation": "auto",
+      "status": "PASS",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "none",
+          "source": {
+            "kind": "file",
+            "path": "/proc/1/comm"
+          }
+        },
+        {
+          "fact": "kernel.sysctl.yama_ptrace_scope",
+          "status": "ok",
+          "value": 1,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/sys/kernel/yama/ptrace_scope"
+          },
+          "side": "effective"
+        },
+        {
+          "fact": "kernel.sysctl.perf_event_paranoid",
+          "status": "ok",
+          "value": 4,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/sys/kernel/perf_event_paranoid"
+          },
+          "side": "effective"
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.beyond.secure_boot_enabled",
+      "title_en": "UEFI Secure Boot is enforcing",
+      "title_ko": "UEFI 보안 부팅이 적용되고 있다",
+      "category": "beyond",
+      "importance": "중",
+      "automation": "auto",
+      "status": "FAIL",
+      "reason": "clause does not hold: boot.secure_boot eq true",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "none",
+          "source": {
+            "kind": "file",
+            "path": "/proc/1/comm"
+          }
+        },
+        {
+          "fact": "boot.firmware",
+          "status": "ok",
+          "value": "uefi",
+          "source": {
+            "kind": "sys",
+            "path": "/sys/firmware/efi"
+          }
+        },
+        {
+          "fact": "boot.secure_boot",
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "sys",
+            "path": "/sys/firmware/efi/efivars/SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c"
+          }
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.beyond.separate_partitions",
+      "title_en": "The directories users and daemons fill have file systems of their own",
+      "title_ko": "사용자와 데몬이 채우는 디렉터리가 별도 파일 시스템에 있다",
+      "category": "beyond",
+      "importance": "중",
+      "automation": "partial",
+      "status": "WARN",
+      "reason": "clause does not hold: mounts.points each require separate eq true",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "none",
+          "source": {
+            "kind": "file",
+            "path": "/proc/1/comm"
+          }
+        },
+        {
+          "fact": "mounts.points",
+          "status": "ok",
+          "value": "9 elements; 6 selected; failing: mount:/home, mount:/tmp, mount:/var, mount:/var/tmp, mount:/var/log, +1 more",
+          "source": {
+            "kind": "proc",
+            "path": "/proc/self/mountinfo"
+          }
+        }
+      ],
+      "observations": [
+        {
+          "subject": "mount:/home",
+          "expected": true,
+          "actual": false,
+          "verdict": "fail"
+        },
+        {
+          "subject": "mount:/tmp",
+          "expected": true,
+          "actual": false,
+          "verdict": "fail"
+        },
+        {
+          "subject": "mount:/var",
+          "expected": true,
+          "actual": false,
+          "verdict": "fail"
+        },
+        {
+          "subject": "mount:/var/tmp",
+          "expected": true,
+          "actual": false,
+          "verdict": "fail"
+        },
+        {
+          "subject": "mount:/var/log",
+          "expected": true,
+          "actual": false,
+          "verdict": "fail"
+        },
+        {
+          "subject": "mount:/var/log/audit",
+          "expected": true,
+          "actual": false,
+          "verdict": "fail"
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.beyond.suid_dumpable_disabled",
+      "title_en": "A program that changed privilege never dumps core",
+      "title_ko": "권한이 바뀐 프로그램은 코어를 남기지 않는다",
+      "category": "beyond",
+      "importance": "중",
+      "automation": "auto",
+      "status": "FAIL",
+      "reason": "clause does not hold: coredump.suid_dumpable eq 0",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "none",
+          "source": {
+            "kind": "file",
+            "path": "/proc/1/comm"
+          }
+        },
+        {
+          "fact": "coredump.suid_dumpable",
+          "status": "ok",
+          "value": 2,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/sys/fs/suid_dumpable"
+          },
+          "side": "effective"
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.beyond.swap_encrypted",
+      "title_en": "Every swap device is encrypted",
+      "title_ko": "모든 스왑 장치가 암호화되어 있다",
+      "category": "beyond",
+      "importance": "중",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason_code": "unsupported_env",
+      "reason": "swap.encrypted: /dev/root is not a block device this kernel lists under /sys/block, so there is nothing to decide encryption from",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "none",
+          "source": {
+            "kind": "file",
+            "path": "/proc/1/comm"
+          }
+        },
+        {
+          "fact": "swap.encrypted",
+          "status": "unsupported"
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.beyond.sysrq_restricted",
+      "title_en": "The magic SysRq key is disabled, or limited to the value the operator declared",
+      "title_ko": "매직 SysRq 키가 비활성화되어 있거나 운영자가 선언한 값으로 제한된다",
+      "category": "beyond",
+      "importance": "중",
+      "automation": "auto",
+      "status": "FAIL",
+      "reason": "clause does not hold: kernel.sysctl.sysrq in [0]",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "none",
+          "source": {
+            "kind": "file",
+            "path": "/proc/1/comm"
+          }
+        },
+        {
+          "fact": "kernel.sysctl.sysrq",
+          "status": "ok",
+          "value": 176,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/sys/kernel/sysrq"
+          },
+          "side": "effective"
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.beyond.tmp_mount_options",
+      "title_en": "/tmp is mounted nodev, nosuid and noexec",
+      "title_ko": "/tmp 이 nodev, nosuid, noexec 로 마운트된다",
+      "category": "beyond",
+      "importance": "중",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason": "no mechanism applies to this host",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "none",
+          "source": {
+            "kind": "file",
+            "path": "/proc/1/comm"
+          }
+        },
+        {
+          "fact": "mounts.tmp.separate",
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/self/mountinfo"
+          }
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.beyond.uncommon_network_protocols_disabled",
+      "title_en": "The network protocol modules no server needs cannot be loaded",
+      "title_ko": "서버에 필요 없는 네트워크 프로토콜 모듈을 적재할 수 없다",
+      "category": "beyond",
+      "importance": "중",
+      "automation": "auto",
+      "status": "FAIL",
+      "reason": "clause does not hold: kernel.modules each require disabled eq true",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "none",
+          "source": {
+            "kind": "file",
+            "path": "/proc/1/comm"
+          }
+        },
+        {
+          "fact": "kernel.modules",
+          "status": "ok",
+          "value": "11 elements; 4 selected; failing: module:sctp, module:tipc",
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "proc",
+                "path": "/proc/modules"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/modules/6.17.0-1022-azure/modules.dep"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/modules/6.17.0-1022-azure/modules.builtin"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/modprobe.d/aliases.conf"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/modprobe.d/blacklist-ath_pci.conf"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/modprobe.d/blacklist-firewire.conf"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/modprobe.d/blacklist-framebuffer.conf"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/modprobe.d/blacklist-nouveau.conf"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/modprobe.d/blacklist-radeon-instinct.conf"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/modprobe.d/blacklist-rare-network.conf"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/modprobe.d/blacklist.conf"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/modprobe.d/blacklist_linux-azure-6.17_6.17.0-1022-azure.conf"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/modprobe.d/disable-algif_aead.conf"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/modprobe.d/fbdev-blacklist.conf"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/modprobe.d/iwlwifi.conf"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/modprobe.d/mdadm.conf"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/modprobe.d/systemd.conf"
+              }
+            ]
+          }
+        }
+      ],
+      "observations": [
+        {
+          "subject": "module:dccp",
+          "expected": true,
+          "actual": true,
+          "verdict": "pass"
+        },
+        {
+          "subject": "module:sctp",
+          "expected": true,
+          "actual": false,
+          "verdict": "fail"
+        },
+        {
+          "subject": "module:rds",
+          "expected": true,
+          "actual": true,
+          "verdict": "pass"
+        },
+        {
+          "subject": "module:tipc",
+          "expected": true,
+          "actual": false,
+          "verdict": "fail"
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.beyond.usb_storage_disabled",
+      "title_en": "The USB mass-storage driver cannot be loaded",
+      "title_ko": "USB 대용량 저장 장치 드라이버를 적재할 수 없다",
+      "category": "beyond",
+      "importance": "중",
+      "automation": "auto",
+      "status": "PASS",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "none",
+          "source": {
+            "kind": "file",
+            "path": "/proc/1/comm"
+          }
+        },
+        {
+          "fact": "kernel.modules",
+          "status": "ok",
+          "value": "11 elements; 1 selected",
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "proc",
+                "path": "/proc/modules"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/modules/6.17.0-1022-azure/modules.dep"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/modules/6.17.0-1022-azure/modules.builtin"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/modprobe.d/aliases.conf"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/modprobe.d/blacklist-ath_pci.conf"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/modprobe.d/blacklist-firewire.conf"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/modprobe.d/blacklist-framebuffer.conf"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/modprobe.d/blacklist-nouveau.conf"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/modprobe.d/blacklist-radeon-instinct.conf"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/modprobe.d/blacklist-rare-network.conf"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/modprobe.d/blacklist.conf"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/modprobe.d/blacklist_linux-azure-6.17_6.17.0-1022-azure.conf"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/modprobe.d/disable-algif_aead.conf"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/modprobe.d/fbdev-blacklist.conf"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/modprobe.d/iwlwifi.conf"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/modprobe.d/mdadm.conf"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/modprobe.d/systemd.conf"
+              }
+            ]
+          }
+        }
+      ],
+      "observations": [
+        {
+          "subject": "module:usb-storage",
+          "expected": true,
+          "actual": true,
+          "verdict": "pass"
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.beyond.var_tmp_mount_options",
+      "title_en": "/var/tmp is mounted nodev, nosuid and noexec",
+      "title_ko": "/var/tmp 이 nodev, nosuid, noexec 로 마운트된다",
+      "category": "beyond",
+      "importance": "중",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason": "no mechanism applies to this host",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "none",
+          "source": {
+            "kind": "file",
+            "path": "/proc/1/comm"
+          }
+        },
+        {
+          "fact": "mounts.var_tmp.separate",
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/self/mountinfo"
+          }
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.beyond.home_mount_options",
+      "title_en": "/home is mounted nodev and nosuid",
+      "title_ko": "/home 이 nodev 와 nosuid 로 마운트된다",
+      "category": "beyond",
+      "importance": "하",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason": "no mechanism applies to this host",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "none",
+          "source": {
+            "kind": "file",
+            "path": "/proc/1/comm"
+          }
+        },
+        {
+          "fact": "mounts.home.separate",
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/self/mountinfo"
+          }
+        }
+      ],
+      "severity": "low"
+    },
+    {
+      "id": "muster.beyond.uncommon_filesystems_disabled",
+      "title_en": "The file system drivers no server needs cannot be loaded",
+      "title_ko": "서버에 필요 없는 파일 시스템 드라이버를 적재할 수 없다",
+      "category": "beyond",
+      "importance": "하",
+      "automation": "auto",
+      "status": "FAIL",
+      "reason": "clause does not hold: kernel.modules each require disabled eq true",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "none",
+          "source": {
+            "kind": "file",
+            "path": "/proc/1/comm"
+          }
+        },
+        {
+          "fact": "kernel.modules",
+          "status": "ok",
+          "value": "11 elements; 6 selected; failing: module:udf",
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "proc",
+                "path": "/proc/modules"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/modules/6.17.0-1022-azure/modules.dep"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/modules/6.17.0-1022-azure/modules.builtin"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/modprobe.d/aliases.conf"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/modprobe.d/blacklist-ath_pci.conf"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/modprobe.d/blacklist-firewire.conf"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/modprobe.d/blacklist-framebuffer.conf"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/modprobe.d/blacklist-nouveau.conf"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/modprobe.d/blacklist-radeon-instinct.conf"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/modprobe.d/blacklist-rare-network.conf"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/modprobe.d/blacklist.conf"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/modprobe.d/blacklist_linux-azure-6.17_6.17.0-1022-azure.conf"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/modprobe.d/disable-algif_aead.conf"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/modprobe.d/fbdev-blacklist.conf"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/modprobe.d/iwlwifi.conf"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/modprobe.d/mdadm.conf"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/modprobe.d/systemd.conf"
+              }
+            ]
+          }
+        }
+      ],
+      "observations": [
+        {
+          "subject": "module:cramfs",
+          "expected": true,
+          "actual": true,
+          "verdict": "pass"
+        },
+        {
+          "subject": "module:freevxfs",
+          "expected": true,
+          "actual": true,
+          "verdict": "pass"
+        },
+        {
+          "subject": "module:jffs2",
+          "expected": true,
+          "actual": true,
+          "verdict": "pass"
+        },
+        {
+          "subject": "module:hfs",
+          "expected": true,
+          "actual": true,
+          "verdict": "pass"
+        },
+        {
+          "subject": "module:hfsplus",
+          "expected": true,
+          "actual": true,
+          "verdict": "pass"
+        },
+        {
+          "subject": "module:udf",
+          "expected": true,
+          "actual": false,
+          "verdict": "fail"
+        }
+      ],
+      "severity": "low"
+    },
+    {
+      "id": "muster.beyond.unprivileged_bpf_restricted",
+      "title_en": "An unprivileged account cannot load a BPF program, and the JIT blinds its constants",
+      "title_ko": "비권한 계정이 BPF 프로그램을 적재할 수 없고 JIT 가 상수를 가린다",
+      "category": "beyond",
+      "importance": "하",
+      "automation": "auto",
+      "status": "FAIL",
+      "reason": "clause does not hold: kernel.sysctl.bpf_jit_harden in [1 2]",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "none",
+          "source": {
+            "kind": "file",
+            "path": "/proc/1/comm"
+          }
+        },
+        {
+          "fact": "kernel.sysctl.unprivileged_bpf_disabled",
+          "status": "ok",
+          "value": 2,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/sys/kernel/unprivileged_bpf_disabled"
+          },
+          "side": "effective"
+        },
+        {
+          "fact": "kernel.sysctl.bpf_jit_harden",
+          "status": "ok",
+          "value": 0,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/sys/net/core/bpf_jit_harden"
+          },
+          "side": "effective"
+        }
+      ],
       "severity": "low"
     }
   ]
