@@ -59,6 +59,17 @@ muster는 Linux 호스트를 KISA 2026 Unix 서버 가이드에 대조해 점검
    삽니다. `make suidindex`가 고정된 공개 이미지에서 재생성하고(docker와 네트워크 필요),
    `make suidindex-check`가 검증하며, CI는 커밋된 파일을 읽습니다.
 
+### 가이드 밖의 컨트롤
+
+KISA 항목이 아닌 컨트롤은 `category: beyond`, id `muster.beyond.<name>`이고
+`references.kisa`가 없으며(lint 규칙 `beyond_scope`가 둘을 나란히 유지) CIS 권고 번호도
+달지 않습니다. 1차 출처 — 커널 문서, man 페이지, 배포판 자체 문서 — 에서 muster의
+표현으로 쓰고, 설명이 그 중요도를 매긴 이유를 한 문장으로 말합니다. 이런 컨트롤은 모두
+`env.container eq none`을 문지기로 둡니다: 컨테이너 안에서 이 팩트들은 호스트를
+묘사합니다. `go run ./cmd/muster controls new muster.beyond.<name> --importance 중`이
+뼈대를 만듭니다(`--kisa-id` 없음). `setting` 키를 읽는 픽스처는 부재를 뜻할 때 키를 두되
+`effective` 쪽을 `absent`로 둡니다.
+
 ## 팩트 추가
 
 - 키를 먼저 등록합니다. `{key, type, description, since, sensitivity, collector}`(설정은

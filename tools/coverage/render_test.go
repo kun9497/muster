@@ -119,3 +119,57 @@ func TestRenderFactUsageSection(t *testing.T) {
 		t.Error("collector rows must keep the order FactUsage gave them")
 	}
 }
+
+// B-9: the KISA table says nothing about a control that implements no KISA
+// item, so the controls beyond the guide get a table of their own. It states
+// what a reviewer needs to judge a check nobody else wrote down: what it
+// reads and which STIG rule, if any, it agrees with.
+func TestCoverageBeyondTable(t *testing.T) {
+	items := []controls.KISAItem{{ID: "U-01", NameKo: "x", Importance: "상"}}
+	guideOnly := []controls.Control{
+		{ID: "muster.account.root_remote_login", Category: "account", Importance: "상", Automation: "auto",
+			References: controls.References{KISA: map[string][]string{"2026": {"U-01"}}}},
+	}
+	got := render(items, nil, nil, guideOnly)
+	if !strings.Contains(got, "\n## Beyond the guide\n") {
+		t.Errorf("the section heading is missing:\n%s", got)
+	}
+	if !strings.Contains(got, "None yet") {
+		t.Errorf("a set with no beyond control must say so in one line:\n%s", got)
+	}
+	if strings.Contains(got, "| Control | Imp. | Automation | Fact keys read | STIG ids |") {
+		t.Errorf("an empty section must not render an empty table:\n%s", got)
+	}
+
+	withBeyond := append(append([]controls.Control(nil), guideOnly...), controls.Control{
+		ID: "muster.beyond.aslr_and_link_protection", Category: "beyond", Importance: "중", Automation: "partial",
+		AppliesWhen: []controls.Clause{{Fact: "env.container", Op: "eq", Expected: "none"}},
+		Checks: []controls.Clause{
+			{Fact: "kernel.sysctl.randomize_va_space", Op: "eq", Expected: 2},
+			{Fact: "kernel.sysctl.protected_symlinks", Op: "eq", Expected: 1},
+		},
+		References: controls.References{STIG: []controls.STIGRef{
+			{Benchmark: "rhel9", Version: "V2R4", ID: "RHEL-09-213010"},
+			{Benchmark: "ubuntu2204", Version: "V2R3", ID: "UBTU-22-213015"},
+		}},
+	})
+	got = render(items, nil, nil, withBeyond)
+	want := "| muster.beyond.aslr_and_link_protection | 중 | partial | env.container, kernel.sysctl.protected_symlinks, kernel.sysctl.randomize_va_space | RHEL-09-213010, UBTU-22-213015 |"
+	if !strings.Contains(got, want) {
+		t.Errorf("missing beyond row\n want %s\n  in:\n%s", want, got)
+	}
+	if !strings.Contains(got, "| Control | Imp. | Automation | Fact keys read | STIG ids |") {
+		t.Errorf("the beyond table needs its header row:\n%s", got)
+	}
+	if strings.Contains(got, "None yet") {
+		t.Errorf("a set with a beyond control must not still say there is none:\n%s", got)
+	}
+	// A control that implements a KISA item belongs in the table above, not
+	// in this one.
+	if i := strings.Index(got, "## Beyond the guide"); i >= 0 && strings.Contains(got[i:], "muster.account.root_remote_login") {
+		t.Errorf("a guide control must not appear in the beyond table:\n%s", got[i:])
+	}
+	if render(items, nil, nil, withBeyond) != got {
+		t.Error("render must be deterministic")
+	}
+}

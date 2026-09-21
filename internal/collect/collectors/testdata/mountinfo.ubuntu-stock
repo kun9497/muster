@@ -1,0 +1,8 @@
+23 28 0:22 / /proc rw,nosuid,nodev,noexec,relatime shared:12 - proc proc rw
+24 28 0:23 / /sys rw,nosuid,nodev,noexec,relatime shared:2 - sysfs sysfs rw
+25 28 0:5 / /dev rw,nosuid,relatime shared:8 - devtmpfs udev rw,size=4096k,nr_inodes=1000
+26 28 0:24 / /run rw,nosuid,nodev,noexec,relatime shared:5 - tmpfs tmpfs rw,size=401124k,mode=755
+28 1 8:16 / / rw,relatime shared:1 - ext4 /dev/mapper/vg-root rw
+30 25 0:26 / /dev/shm rw,nosuid,nodev shared:7 - tmpfs tmpfs rw
+40 28 8:17 / /boot rw,relatime shared:20 - ext4 /dev/vda1 rw
+50 26 0:45 / /run/user/1000 rw,nosuid,nodev,relatime shared:30 - tmpfs tmpfs rw,size=200560k,mode=700,uid=1000

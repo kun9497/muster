@@ -1,0 +1,30 @@
+id: muster.beyond.separate_partitions
+title_en: The directories users and daemons fill have file systems of their own
+title_ko: 사용자와 데몬이 채우는 디렉터리가 별도 파일 시스템에 있다
+description_en: /tmp, /var, /var/tmp, /var/log, /var/log/audit and /home are the directories anything on the host can grow without asking — a temporary file, a log, a mail spool, a user's download — and when they share the root file system a single runaway writer fills the root, at which point the host cannot write a log, rotate one, record an audit event or in many cases finish a login. A separate file system turns that outage into a bounded failure of one directory, and it is also what makes the mount options of the next four controls possible at all, because nodev, nosuid and noexec are properties of a mount, not of a directory. muster reads the mount table and requires each of params.required_separate to be a mount point in its own right. It is rated 중 because the consequence is availability and the loss of audit, not a direct compromise. It is automation partial and reports WARN rather than FAIL because partitioning is an installation-time decision — on a host already in service the fix is a maintenance window and a data migration, not a setting — so muster raises it for a decision instead of failing a host that cannot act on it today. A host that runs no auditd has no /var/log/audit to separate at all, so it narrows params.required_separate or waives the mount:/var/log/audit subject, and either way records the decision rather than repeating it. A mount table muster could not read is an ERROR, not a pass and not an exemption — the read carries its own status, denied or error — and only a host with no mount table at all, where mounts.points is absent, is NOT_APPLICABLE.
+description_ko: /tmp, /var, /var/tmp, /var/log, /var/log/audit, /home 은 호스트의 무엇이든 허락 없이 키울 수 있는 디렉터리(임시 파일, 로그, 메일 스풀, 사용자의 내려받기)이며, 이들이 루트 파일 시스템을 공유하면 폭주하는 쓰기 하나가 루트를 가득 채웁니다. 그 시점부터 호스트는 로그를 쓰지도 회전시키지도 못하고 감사 이벤트를 기록하지도 못하며 많은 경우 로그인조차 끝내지 못합니다. 별도 파일 시스템은 그 장애를 한 디렉터리에 국한된 한정된 실패로 바꾸며, nodev·nosuid·noexec 가 디렉터리가 아니라 마운트의 속성이므로 이어지는 네 항목의 마운트 옵션을 가능하게 하는 전제이기도 합니다. muster 는 마운트 테이블을 읽어 params.required_separate 의 각 경로가 그 자체로 마운트 지점인지를 요구합니다. 결과가 직접적인 침해가 아니라 가용성과 감사 기록의 상실이므로 중요도는 중 입니다. 파티션 구성은 설치 시점의 결정이고 이미 서비스 중인 호스트에서는 설정 변경이 아니라 작업 시간과 데이터 이전이 필요하므로, 오늘 조치할 수 없는 호스트를 실패시키는 대신 결정 대상으로 올리기 위해 automation 은 partial 이며 WARN 으로 보고합니다. auditd 를 운영하지 않는 호스트에는 분리할 /var/log/audit 자체가 없으므로 params.required_separate 를 좁히거나 mount:/var/log/audit 대상을 waive 하여 그 결정을 기록해 두면 됩니다. muster 가 마운트 테이블을 읽지 못한 경우는 읽기의 상태(denied 또는 error)를 그대로 지니는 ERROR 이며, 마운트 테이블이 아예 없어 mounts.points 가 absent 인 호스트만 NOT_APPLICABLE 입니다.
+category: beyond
+importance: 중
+automation: partial
+references:
+  stig:
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-231010 }
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-231015 }
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-231020 }
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-231025 }
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-231030 }
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-231035 }
+  nist_800_53: ["AU-4", "CM-6"]
+requires_facts: ">=1"
+applies_when:
+  - { fact: env.container, op: eq, expected: none }
+absent_means: not_applicable
+params:
+  required_separate: { type: list<string>, default: ["/tmp", "/var", "/var/tmp", "/var/log", "/var/log/audit", "/home"], description: "the directories this host is required to mount as file systems of their own" }
+checks:
+  - { fact: mounts.points, op: each, subject: target, where: { field: target, op: in, expected: "${required_separate}" }, require: { field: separate, op: eq, expected: true } }
+remediation:
+  text_en: Give each directory a volume or partition of its own at installation time, or on a host already in service create the volume, copy the contents across in single-user mode, and add the mount to /etc/fstab. Where a full split is not worth the effort, /var and /var/log/audit are the two that repay it most — they are the ones whose exhaustion costs the host its logs and its audit trail. A host that genuinely wants fewer of them narrows params.required_separate so the decision is recorded rather than repeated at every run.
+  text_ko: 설치 시점에 각 디렉터리에 별도 볼륨이나 파티션을 배정하거나, 이미 서비스 중인 호스트에서는 볼륨을 만들고 단일 사용자 모드에서 내용을 옮긴 뒤 /etc/fstab 에 마운트를 추가합니다. 전부 분리할 만한 상황이 아니라면 /var 와 /var/log/audit 두 개가 가장 값어치를 합니다. 이 둘이 가득 차면 호스트가 로그와 감사 기록을 잃기 때문입니다. 정말로 더 적게 요구하려는 호스트는 params.required_separate 를 좁혀 그 결정을 매 실행마다 반복하지 않고 기록해 두면 됩니다.
+  risk: reboot_required
+  idempotent: true

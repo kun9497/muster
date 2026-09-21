@@ -1,0 +1,19 @@
+# synthetic grub.cfg as EL's 01_users fragment generates it on EVERY host: the
+# superuser and the password command are the template's own text, guarded by a
+# condition GRUB evaluates at boot, and no hash is present unless
+# grub-setpassword wrote one into user.cfg
+### BEGIN /etc/grub.d/01_users ###
+if [ -f ${prefix}/user.cfg ]; then
+  source ${prefix}/user.cfg
+  if [ -n "${GRUB2_PASSWORD}" ]; then
+    set superusers="root"
+    export superusers
+    password_pbkdf2 root "${GRUB2_PASSWORD}"
+  fi
+fi
+### END /etc/grub.d/01_users ###
+
+menuentry 'Linux' {
+	linux /vmlinuz root=/dev/mapper/rl-root ro
+	initrd /initramfs.img
+}

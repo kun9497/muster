@@ -4,7 +4,6 @@ package collectors
 
 import (
 	"errors"
-	"io/fs"
 	"path"
 	"slices"
 	"strings"
@@ -84,7 +83,14 @@ func mergeDropinsWith(a collect.Access, main string, dirs []string, glob string,
 	read := func(p string) {
 		data, _, err := a.ReadFile(p, readLimit)
 		if err != nil {
-			if !errors.Is(err, fs.ErrNotExist) {
+			// chainReadFailed is the one classification every merged chain
+			// uses: absent is not part of this host's chain, a /dev/null link
+			// is ruling K-21's documented MASK and contributes nothing, any
+			// other link is that file's error, and a shape that cannot carry
+			// settings at all is skipped. K-21 says "any .d directory muster
+			// reads", so journald.conf.d, logind.conf.d, sshd_config.d and
+			// pwquality.conf.d answer a mask the same way sysctl.d does.
+			if chainReadFailed(a, p, err) {
 				fail(p, err)
 			}
 			return

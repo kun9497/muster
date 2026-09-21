@@ -344,10 +344,13 @@ func TestCollectionEvidenceNamesTheSubjects(t *testing.T) {
 // Subject lookup from evalCollection, goes red here rather than quietly
 // reverting every finding to the element's index in the collector's list.
 //
-// The two prefixes are the registry's, not the clause's: cron.files declares
-// subject_kind "file" and files.user_rhosts declares none, which is why the
-// second subject reads "item:". The part this test is about -- everything
-// after the colon -- is the control's `subject` field either way.
+// The prefix is the registry's, not the clause's: both cron.files and
+// files.user_rhosts declare subject_kind "file" (the latter since plan 3B's
+// hand-off from 3A, which is why a waiver naming one of those subjects moved
+// from "item:" to "file:"), so both subjects read "file:"; a list with no
+// subject_kind reads "item:", which TestEvalCollectionScalarSubjectUsesElementValue pins. The
+// part this test is about -- everything after the colon -- is the control's
+// `subject` field either way.
 func TestRecordListObservationsAreNamedByTheControlsSubject(t *testing.T) {
 	set, err := controls.LoadDefault()
 	if err != nil {
@@ -359,7 +362,7 @@ func TestRecordListObservationsAreNamedByTheControlsSubject(t *testing.T) {
 		want    string
 	}{
 		{"muster.account.cron_permissions", "fail-world-writable.json", "file:/etc/crontab"},
-		{"muster.file.rhosts_forbidden", "fail-plus.json", "item:/home/alice/.rhosts"},
+		{"muster.file.rhosts_forbidden", "fail-plus.json", "file:/home/alice/.rhosts"},
 	} {
 		t.Run(c.id, func(t *testing.T) {
 			var ctrl *controls.Control

@@ -1,0 +1,171 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none"
+      }
+    },
+    "kernel": {
+      "modules": {
+        "status": "ok",
+        "value": [
+          {
+            "available": true,
+            "blacklisted": false,
+            "builtin": false,
+            "disabled": true,
+            "install_disabled": true,
+            "loaded": false,
+            "name": "cramfs",
+            "sources": [
+              "/etc/modprobe.d/50-hardening.conf"
+            ]
+          },
+          {
+            "available": true,
+            "blacklisted": false,
+            "builtin": false,
+            "disabled": true,
+            "install_disabled": true,
+            "loaded": false,
+            "name": "freevxfs",
+            "sources": [
+              "/etc/modprobe.d/50-hardening.conf"
+            ]
+          },
+          {
+            "available": true,
+            "blacklisted": false,
+            "builtin": false,
+            "disabled": true,
+            "install_disabled": true,
+            "loaded": false,
+            "name": "jffs2",
+            "sources": [
+              "/etc/modprobe.d/50-hardening.conf"
+            ]
+          },
+          {
+            "available": true,
+            "blacklisted": false,
+            "builtin": false,
+            "disabled": true,
+            "install_disabled": true,
+            "loaded": false,
+            "name": "hfs",
+            "sources": [
+              "/etc/modprobe.d/50-hardening.conf"
+            ]
+          },
+          {
+            "available": true,
+            "blacklisted": false,
+            "builtin": false,
+            "disabled": true,
+            "install_disabled": true,
+            "loaded": false,
+            "name": "hfsplus",
+            "sources": [
+              "/etc/modprobe.d/50-hardening.conf"
+            ]
+          },
+          {
+            "available": true,
+            "blacklisted": false,
+            "builtin": false,
+            "disabled": true,
+            "install_disabled": true,
+            "loaded": false,
+            "name": "udf",
+            "sources": [
+              "/etc/modprobe.d/50-hardening.conf"
+            ]
+          },
+          {
+            "available": true,
+            "blacklisted": false,
+            "builtin": false,
+            "disabled": true,
+            "install_disabled": true,
+            "loaded": false,
+            "name": "usb-storage",
+            "sources": [
+              "/etc/modprobe.d/50-hardening.conf"
+            ]
+          },
+          {
+            "available": true,
+            "blacklisted": false,
+            "builtin": false,
+            "disabled": true,
+            "install_disabled": true,
+            "loaded": false,
+            "name": "dccp",
+            "sources": [
+              "/etc/modprobe.d/50-hardening.conf"
+            ]
+          },
+          {
+            "available": true,
+            "blacklisted": false,
+            "builtin": false,
+            "disabled": true,
+            "install_disabled": true,
+            "loaded": false,
+            "name": "sctp",
+            "sources": [
+              "/etc/modprobe.d/50-hardening.conf"
+            ]
+          },
+          {
+            "available": false,
+            "blacklisted": false,
+            "builtin": false,
+            "disabled": true,
+            "install_disabled": false,
+            "loaded": false,
+            "name": "rds",
+            "sources": []
+          },
+          {
+            "available": true,
+            "blacklisted": false,
+            "builtin": false,
+            "disabled": true,
+            "install_disabled": true,
+            "loaded": false,
+            "name": "tipc",
+            "sources": [
+              "/etc/modprobe.d/50-hardening.conf"
+            ]
+          }
+        ],
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "proc",
+              "path": "/proc/modules"
+            },
+            {
+              "kind": "file",
+              "path": "/usr/lib/modules/6.8.0-31-generic/modules.dep"
+            },
+            {
+              "kind": "file",
+              "path": "/usr/lib/modules/6.8.0-31-generic/modules.builtin"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/modprobe.d/50-hardening.conf"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

@@ -83,9 +83,12 @@ nonsense
 		t.Fatalf("parseMountinfo: %v", err)
 	}
 	want := []mountRow{
-		{id: 36, parent: 35, dev: "98:0", devNum: unix.Mkdev(98, 0), root: "/mnt1", mountPoint: "/mnt2", fstype: "ext3"},
-		{id: 40, parent: 36, dev: "0:35", devNum: unix.Mkdev(0, 35), root: "/", mountPoint: "/mnt/my disk", fstype: "vfat"},
-		{id: 41, parent: 36, dev: "0:36", devNum: unix.Mkdev(0, 36), root: "/a b\tc", mountPoint: `/srv/x\y`, fstype: "tmpfs"},
+		{id: 36, parent: 35, dev: "98:0", devNum: unix.Mkdev(98, 0), root: "/mnt1", mountPoint: "/mnt2", fstype: "ext3",
+			source: "/dev/root", options: []string{"rw", "noatime"}},
+		{id: 40, parent: 36, dev: "0:35", devNum: unix.Mkdev(0, 35), root: "/", mountPoint: "/mnt/my disk", fstype: "vfat",
+			source: "/dev/sdb1", options: []string{"rw"}},
+		{id: 41, parent: 36, dev: "0:36", devNum: unix.Mkdev(0, 36), root: "/a b\tc", mountPoint: `/srv/x\y`, fstype: "tmpfs",
+			source: "tmpfs", options: []string{"rw"}},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("parseMountinfo =\n%+v\nwant\n%+v", got, want)
@@ -93,6 +96,59 @@ nonsense
 	if _, err := parseMountinfo([]byte("\n# nothing here\n")); err == nil {
 		t.Error("a mountinfo with no parseable row must be an error, not an empty plan")
 	}
+}
+
+// The mounts and swap collectors need two fields the walk never judged: the
+// per-mount option list of field 6, SPLIT on "," so a caller asks for a word
+// and not for a substring, and the source — the field after the fstype, with
+// the same octal escapes the mount point carries. A row whose source field is
+// missing keeps its other fields rather than being dropped.
+func TestParseMountinfoOptionsAndSource(t *testing.T) {
+	data := []byte(`28 1 8:16 / / rw,relatime shared:1 - ext4 /dev/mapper/vg-root rw
+41 28 0:40 / /tmp rw,nosuid,nodev,noexec shared:21 - tmpfs tmpfs rw,size=1024000k
+44 28 0:42 / /mnt/x rw - ext4 /dev/disk/by-label/my\040disk rw
+45 28 0:43 / /mnt/y rw - ext4
+`)
+	got, err := parseMountinfo(data)
+	if err != nil {
+		t.Fatalf("parseMountinfo: %v", err)
+	}
+	if len(got) != 4 {
+		t.Fatalf("parsed %d rows, want 4: a row with no source field is still a row", len(got))
+	}
+	type field struct {
+		source  string
+		options []string
+	}
+	want := []field{
+		{source: "/dev/mapper/vg-root", options: []string{"rw", "relatime"}},
+		{source: "tmpfs", options: []string{"rw", "nosuid", "nodev", "noexec"}},
+		{source: "/dev/disk/by-label/my disk", options: []string{"rw"}},
+		{source: "", options: []string{"rw"}},
+	}
+	for i, w := range want {
+		if got[i].source != w.source {
+			t.Errorf("row %d source = %q, want %q", i, got[i].source, w.source)
+		}
+		if !slices.Equal(got[i].options, w.options) {
+			t.Errorf("row %d options = %v, want %v", i, got[i].options, w.options)
+		}
+	}
+	// The split is what makes "nodev" a word: a substring test would find it
+	// inside an option no administrator wrote as one.
+	sub := mustRows(t, []byte("28 1 8:16 / / rw,rootcontext=nodevsomething - ext4 /dev/vda2 rw\n"))
+	if slices.Contains(sub[0].options, "nodev") {
+		t.Errorf("options %v contain nodev: the option is rootcontext=nodevsomething", sub[0].options)
+	}
+}
+
+func mustRows(t *testing.T, data []byte) []mountRow {
+	t.Helper()
+	rows, err := parseMountinfo(data)
+	if err != nil {
+		t.Fatalf("parseMountinfo: %v", err)
+	}
+	return rows
 }
 
 // W-2: the enter set is the positive list of local types, and the four

@@ -1,0 +1,6 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "env":{"container":{"status":"ok","value":"none"}},
+  "kernel":{"sysctl":{
+    "yama_ptrace_scope":{"runtime":{"status":"absent","reason":"/proc/sys/kernel/yama/ptrace_scope does not exist"},"persisted":{"status":"absent","reason":"no sysctl.d line sets kernel.yama.ptrace_scope"},"effective":{"status":"absent","reason":"/proc/sys/kernel/yama/ptrace_scope does not exist"}},"perf_event_paranoid":{"runtime":{"status":"absent","reason":"/proc/sys/kernel/perf_event_paranoid does not exist"},"persisted":{"status":"absent","reason":"no sysctl.d line sets kernel.perf_event_paranoid"},"effective":{"status":"absent","reason":"/proc/sys/kernel/perf_event_paranoid does not exist"}}
+  }}
+}}

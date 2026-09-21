@@ -1,0 +1,31 @@
+id: muster.beyond.aslr_and_link_protection
+title_en: Address space randomisation is full and the link protections are on
+title_ko: 주소 공간 무작위화가 완전하고 링크 보호가 켜져 있다
+description_en: kernel.randomize_va_space must be 2, the value that randomises the stack, the mmap region, the VDSO and the heap (brk) rather than only the first three, and the four filesystem link protections must be on — fs.protected_symlinks 1 and fs.protected_hardlinks 1, and fs.protected_fifos and fs.protected_regular 1 (a world-writable sticky directory) or 2 (any sticky directory the writer does not own). Documentation/admin-guide/sysctl/kernel.rst and fs.rst describe them. This is the only 상 of the kernel group because the two halves are what stand between a bug and a root shell — full randomisation is what makes a memory-corruption bug hard to turn into reliable code execution, and the link protections close the oldest local privilege-escalation pattern there is — a symlink, hard link or FIFO planted in /tmp so that a program running as root writes, reads or truncates a file its user was never allowed to name. Every supported distribution ships all five at a passing value, so a host that fails this one has had them turned off deliberately or has inherited a hardening file that predates them; muster judges the effective value, so a runtime change counts even where sysctl.d says otherwise, and a kernel too old to carry protected_fifos or protected_regular is reported rather than passed.
+description_ko: kernel.randomize_va_space 는 스택·mmap 영역·VDSO 뿐 아니라 힙(brk)까지 무작위화하는 값 2 여야 하고, 파일 시스템 링크 보호 네 가지가 켜져 있어야 합니다. fs.protected_symlinks 는 1, fs.protected_hardlinks 는 1, fs.protected_fifos 와 fs.protected_regular 는 1(전체 쓰기 가능한 sticky 디렉터리) 또는 2(쓰는 쪽이 소유하지 않은 모든 sticky 디렉터리)여야 합니다. 관련 설명은 Documentation/admin-guide/sysctl/kernel.rst 와 fs.rst 에 있습니다. 이 항목만 커널 묶음에서 상 인 이유는 두 축이 취약점과 root 셸 사이를 가로막는 것이기 때문입니다. 완전한 무작위화는 메모리 손상 버그를 신뢰할 수 있는 코드 실행으로 바꾸기 어렵게 만들고, 링크 보호는 가장 오래된 지역 권한 상승 패턴, 즉 root 로 도는 프로그램이 사용자가 지명할 수 없었던 파일을 쓰거나 읽거나 잘라내도록 /tmp 에 심어 두는 심볼릭 링크·하드 링크·FIFO 를 막습니다. 지원 대상 배포판은 다섯 값 모두 통과 기준으로 배포하므로 여기서 실패하는 호스트는 의도적으로 껐거나 이 값들보다 오래된 하드닝 파일을 물려받은 것입니다. muster 는 실효값을 판정하므로 sysctl.d 와 다르더라도 런타임 변경이 인정되며, protected_fifos 나 protected_regular 가 없는 오래된 커널은 통과가 아니라 그대로 보고합니다.
+category: beyond
+importance: 상
+automation: auto
+references:
+  stig:
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-213030 }
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-213035 }
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-213070 }
+    - { benchmark: ubuntu2204, version: V2R9, id: UBTU-22-213020 }
+    - { benchmark: ubuntu2404, version: V1R6, id: UBTU-24-700310 }
+  nist_800_53: ["AC-3(4)", "AC-6(10)", "SI-16"]
+requires_facts: ">=1"
+applies_when:
+  - { fact: env.container, op: eq, expected: none }
+absent_means: fail
+checks:
+  - { fact: kernel.sysctl.randomize_va_space, op: eq, expected: 2 }
+  - { fact: kernel.sysctl.protected_symlinks, op: eq, expected: 1 }
+  - { fact: kernel.sysctl.protected_hardlinks, op: eq, expected: 1 }
+  - { fact: kernel.sysctl.protected_fifos, op: in, expected: [1, 2] }
+  - { fact: kernel.sysctl.protected_regular, op: in, expected: [1, 2] }
+remediation:
+  text_en: Write kernel.randomize_va_space = 2, fs.protected_symlinks = 1, fs.protected_hardlinks = 1, fs.protected_fifos = 1 and fs.protected_regular = 2 into a file under /etc/sysctl.d and apply it with sysctl --system; if an existing hardening file lowers one of them, correct that file rather than adding a later one. All five take effect at once and need no reboot.
+  text_ko: /etc/sysctl.d 아래 파일에 kernel.randomize_va_space = 2, fs.protected_symlinks = 1, fs.protected_hardlinks = 1, fs.protected_fifos = 1, fs.protected_regular = 2 를 적고 sysctl --system 으로 적용합니다. 기존 하드닝 파일이 그중 하나를 낮추고 있다면 뒤에 파일을 더 얹지 말고 그 파일을 고치십시오. 다섯 값 모두 즉시 반영되며 재부팅이 필요 없습니다.
+  risk: none
+  idempotent: true

@@ -1,0 +1,32 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "docker"
+      }
+    },
+    "boot": {
+      "grub_password_set": {
+        "status": "ok",
+        "value": false,
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "file",
+              "path": "/boot/grub2/grub.cfg"
+            },
+            {
+              "kind": "file",
+              "path": "/boot/grub2/user.cfg"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

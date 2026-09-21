@@ -21,7 +21,8 @@ references and, later, offered as selectable profiles.
 > files, services, the firewall, logging, NFS, SNMP, patch hygiene, FTP, mail
 > and DNS to the closing coverage-and-reference gate — and stage 3A — the deep
 > filesystem walk — are merged. 67 of the 67 items are enrolled (68 controls:
-> 57 auto, 7 partial, 4 manual with the evidence attached). `collect --deep`
+> 57 auto, 7 partial, 4 manual with the evidence attached),
+> and 19 beyond the guide. `collect --deep`
 > walks the local filesystems once, under a time and entry budget, without
 > following a symlink or entering a remote mount or a container layer, and
 > joins every setuid, world-writable, unowned or hidden entry to the package
@@ -80,7 +81,9 @@ muster controls lint --references docs/reference   # the control set's own gate
   never covers an `ERROR`.
 - **Exit codes** are a contract: `2` (could not run or cannot be trusted)
   outranks `1` (findings) outranks `0` (clean). `MANUAL` items do not fail the
-  run unless you ask them to.
+  run unless you ask them to. A FAIL beyond the guide counts like any other:
+  a host that is clean against the 67 items but ships stock kernel, boot or
+  mount settings reads `1` — the summary's two scopes say which side it is.
 
 ## Principles
 
@@ -176,12 +179,16 @@ titles, never their discussion, check and fix text. See
    the three deferred items and makes U-25 judge a real host — 67 of the 67
    items, 68 controls (57 auto, 7 partial, 4 manual with the evidence
    attached); a maintainer tool, `tools/suidindex`, generates the per-release
-   reference lists of declared modes from public container images. Next:
-   package verification (`rpm -V` / `dpkg --verify`), file capabilities
+   reference lists of declared modes from public container images. 3B
+   (merged): the first nineteen controls beyond the guide — kernel
+   self-protection sysctls and the core-dump policy, the boot chain, separate
+   partitions and mount options, swap encryption, module blacklists — from six
+   read-only collectors, with the summary split into the guide and beyond it;
+   a FAIL beyond the guide counts for the exit code until profiles arrive.
+   Next: package verification (`rpm -V` / `dpkg --verify`), file capabilities
    and ACLs, cron and timer inventory, `authorized_keys` inventory, processes
-   running deleted binaries, kernel self-protection sysctls, mount options,
-   audit pipeline health, patch hygiene, exposure of listening sockets versus
-   firewall rules. Profiles select controls and parameters: `kisa-unix-2026`
+   running deleted binaries, audit pipeline health, patch hygiene, exposure of
+   listening sockets versus firewall rules. Profiles select controls and parameters: `kisa-unix-2026`
    stays the default, and a `cis-<distro>-l1` profile covers the CIS Level 1
    server recommendations for the target distributions, with `references.cis`
    as those controls' primary reference.

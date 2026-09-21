@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
   "run": {
-    "muster_version": "94ca596",
-    "commit": "94ca596",
-    "controls_version": "kisa-unix-2026+2026.09.16",
-    "controls_digest": "sha256:b63d828be048ac893f0346f485385fd9eae141a1914e261691d593028202e641",
+    "muster_version": "e5eda50",
+    "commit": "e5eda50",
+    "controls_version": "kisa-unix-2026+2026.09.18",
+    "controls_digest": "sha256:1236ece32ab31e36ec68736e546abc54ce3ab653a221c2a27e080a573cf39db6",
     "guide_edition": "kisa-unix-2026",
-    "collected_at": "2026-09-17T08:30:07Z",
+    "collected_at": "2026-09-21T00:36:06Z",
     "host": {
       "hostname": "ubuntu-container",
       "machine_id_hash": "",
@@ -44,6 +44,16 @@
         "ms": 0
       },
       {
+        "name": "boot",
+        "status": "ok",
+        "ms": 0
+      },
+      {
+        "name": "coredump",
+        "status": "ok",
+        "ms": 0
+      },
+      {
         "name": "cron",
         "status": "ok",
         "ms": 0,
@@ -62,7 +72,7 @@
       {
         "name": "files",
         "status": "ok",
-        "ms": 1
+        "ms": 3
       },
       {
         "name": "firewall",
@@ -82,6 +92,16 @@
       },
       {
         "name": "mail",
+        "status": "ok",
+        "ms": 0
+      },
+      {
+        "name": "modules",
+        "status": "ok",
+        "ms": 0
+      },
+      {
+        "name": "mounts",
         "status": "ok",
         "ms": 0
       },
@@ -109,7 +129,7 @@
       {
         "name": "patch",
         "status": "ok",
-        "ms": 22,
+        "ms": 31,
         "cmd": "/usr/bin/apt-get -s upgrade -o Debug::NoLocking=1"
       },
       {
@@ -126,13 +146,23 @@
       {
         "name": "sockets",
         "status": "ok",
-        "ms": 1
+        "ms": 9
       },
       {
         "name": "sshd",
         "status": "ok",
         "ms": 0,
         "cmd": "/usr/sbin/sshd -G"
+      },
+      {
+        "name": "swap",
+        "status": "ok",
+        "ms": 0
+      },
+      {
+        "name": "sysctl",
+        "status": "ok",
+        "ms": 0
       },
       {
         "name": "timesync",
@@ -1221,6 +1251,128 @@
         "source": {
           "kind": "file",
           "path": "/etc/update-motd.d"
+        }
+      }
+    },
+    "boot": {
+      "firmware": {
+        "status": "ok",
+        "value": "bios",
+        "source": {
+          "kind": "sys",
+          "path": "/sys/firmware/efi"
+        }
+      },
+      "grub_cfg": {
+        "acl_present": {
+          "status": "absent",
+          "reason": "no bootloader configuration at /boot/grub/grub.cfg, /boot/grub2/grub.cfg or /boot/efi/EFI/*/grub.cfg"
+        },
+        "gid": {
+          "status": "absent",
+          "reason": "no bootloader configuration at /boot/grub/grub.cfg, /boot/grub2/grub.cfg or /boot/efi/EFI/*/grub.cfg"
+        },
+        "group": {
+          "status": "absent",
+          "reason": "no bootloader configuration at /boot/grub/grub.cfg, /boot/grub2/grub.cfg or /boot/efi/EFI/*/grub.cfg"
+        },
+        "group_readable": {
+          "status": "absent",
+          "reason": "no bootloader configuration at /boot/grub/grub.cfg, /boot/grub2/grub.cfg or /boot/efi/EFI/*/grub.cfg"
+        },
+        "group_writable": {
+          "status": "absent",
+          "reason": "no bootloader configuration at /boot/grub/grub.cfg, /boot/grub2/grub.cfg or /boot/efi/EFI/*/grub.cfg"
+        },
+        "mode": {
+          "status": "absent",
+          "reason": "no bootloader configuration at /boot/grub/grub.cfg, /boot/grub2/grub.cfg or /boot/efi/EFI/*/grub.cfg"
+        },
+        "other_readable": {
+          "status": "absent",
+          "reason": "no bootloader configuration at /boot/grub/grub.cfg, /boot/grub2/grub.cfg or /boot/efi/EFI/*/grub.cfg"
+        },
+        "other_writable": {
+          "status": "absent",
+          "reason": "no bootloader configuration at /boot/grub/grub.cfg, /boot/grub2/grub.cfg or /boot/efi/EFI/*/grub.cfg"
+        },
+        "path": {
+          "status": "absent",
+          "reason": "no bootloader configuration at /boot/grub/grub.cfg, /boot/grub2/grub.cfg or /boot/efi/EFI/*/grub.cfg"
+        },
+        "uid": {
+          "status": "absent",
+          "reason": "no bootloader configuration at /boot/grub/grub.cfg, /boot/grub2/grub.cfg or /boot/efi/EFI/*/grub.cfg"
+        }
+      },
+      "grub_password_set": {
+        "status": "absent",
+        "reason": "no grub.cfg, /boot/grub2/user.cfg or /etc/grub.d/* to read a password hash from"
+      },
+      "secure_boot": {
+        "status": "absent",
+        "reason": "/sys/firmware/efi/efivars/SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c does not exist"
+      }
+    },
+    "coredump": {
+      "core_pattern": {
+        "status": "ok",
+        "value": "|/usr/lib/systemd/systemd-coredump %P %u %g %s %t 9223372036854775808 %h %d",
+        "source": {
+          "kind": "proc",
+          "path": "/proc/sys/kernel/core_pattern"
+        }
+      },
+      "limits": {
+        "hard_core": {
+          "status": "absent",
+          "reason": "no limits.conf line sets a hard core limit for *"
+        },
+        "sources": {
+          "status": "ok",
+          "value": [
+            "/etc/security/limits.conf"
+          ],
+          "source": {
+            "kind": "file",
+            "path": "/etc/security/limits.conf"
+          }
+        }
+      },
+      "suid_dumpable": {
+        "runtime": {
+          "status": "ok",
+          "value": 2,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/sys/fs/suid_dumpable"
+          }
+        },
+        "persisted": {
+          "status": "absent",
+          "reason": "no sysctl.d line sets fs.suid_dumpable"
+        },
+        "effective": {
+          "status": "ok",
+          "value": 2,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/sys/fs/suid_dumpable"
+          }
+        },
+        "winner": {
+          "kind": "proc",
+          "path": "/proc/sys/fs/suid_dumpable"
+        }
+      },
+      "systemd": {
+        "process_size_max": {
+          "status": "absent",
+          "reason": "no coredump.conf on this host, so nothing sets ProcessSizeMax"
+        },
+        "storage": {
+          "status": "absent",
+          "reason": "no coredump.conf on this host, so nothing sets Storage"
         }
       }
     },
@@ -2861,6 +3013,356 @@
         "reason": "no modelled FTP daemon configuration is present: none of /etc/vsftpd.conf, /etc/vsftpd/vsftpd.conf, /etc/proftpd/proftpd.conf, /etc/proftpd.conf, /etc/pure-ftpd/pure-ftpd.conf, /etc/pure-ftpd/conf/* is present with its daemon binary"
       }
     },
+    "kernel": {
+      "modules": {
+        "status": "unsupported",
+        "reason": "/usr/lib/modules/6.17.0-1022-azure does not exist and /lib is a symbolic link, so /lib/modules is the same directory: this host carries no module tree for its running kernel"
+      },
+      "sysctl": {
+        "bpf_jit_harden": {
+          "runtime": {
+            "status": "absent",
+            "reason": "/proc/sys/net/core/bpf_jit_harden does not exist"
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.core.bpf_jit_harden"
+          },
+          "effective": {
+            "status": "absent",
+            "reason": "/proc/sys/net/core/bpf_jit_harden does not exist"
+          }
+        },
+        "dmesg_restrict": {
+          "runtime": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/kernel/dmesg_restrict"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets kernel.dmesg_restrict"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/kernel/dmesg_restrict"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/kernel/dmesg_restrict"
+          }
+        },
+        "kptr_restrict": {
+          "runtime": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/kernel/kptr_restrict"
+            }
+          },
+          "persisted": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "file",
+              "path": "/etc/sysctl.d/10-kernel-hardening.conf",
+              "line": 15,
+              "raw": "kernel.kptr_restrict = 1"
+            }
+          },
+          "effective": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/kernel/kptr_restrict"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/kernel/kptr_restrict"
+          }
+        },
+        "perf_event_paranoid": {
+          "runtime": {
+            "status": "ok",
+            "value": 4,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/kernel/perf_event_paranoid"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets kernel.perf_event_paranoid"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 4,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/kernel/perf_event_paranoid"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/kernel/perf_event_paranoid"
+          }
+        },
+        "protected_fifos": {
+          "runtime": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/fs/protected_fifos"
+            }
+          },
+          "persisted": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "file",
+              "path": "/usr/lib/sysctl.d/99-protect-links.conf",
+              "line": 7,
+              "raw": "fs.protected_fifos = 1"
+            }
+          },
+          "effective": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/fs/protected_fifos"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/fs/protected_fifos"
+          }
+        },
+        "protected_hardlinks": {
+          "runtime": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/fs/protected_hardlinks"
+            }
+          },
+          "persisted": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "file",
+              "path": "/usr/lib/sysctl.d/99-protect-links.conf",
+              "line": 8,
+              "raw": "fs.protected_hardlinks = 1"
+            }
+          },
+          "effective": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/fs/protected_hardlinks"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/fs/protected_hardlinks"
+          }
+        },
+        "protected_regular": {
+          "runtime": {
+            "status": "ok",
+            "value": 2,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/fs/protected_regular"
+            }
+          },
+          "persisted": {
+            "status": "ok",
+            "value": 2,
+            "source": {
+              "kind": "file",
+              "path": "/usr/lib/sysctl.d/99-protect-links.conf",
+              "line": 9,
+              "raw": "fs.protected_regular = 2"
+            }
+          },
+          "effective": {
+            "status": "ok",
+            "value": 2,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/fs/protected_regular"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/fs/protected_regular"
+          }
+        },
+        "protected_symlinks": {
+          "runtime": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/fs/protected_symlinks"
+            }
+          },
+          "persisted": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "file",
+              "path": "/usr/lib/sysctl.d/99-protect-links.conf",
+              "line": 10,
+              "raw": "fs.protected_symlinks = 1"
+            }
+          },
+          "effective": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/fs/protected_symlinks"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/fs/protected_symlinks"
+          }
+        },
+        "randomize_va_space": {
+          "runtime": {
+            "status": "ok",
+            "value": 2,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/kernel/randomize_va_space"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets kernel.randomize_va_space"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 2,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/kernel/randomize_va_space"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/kernel/randomize_va_space"
+          }
+        },
+        "sysrq": {
+          "runtime": {
+            "status": "ok",
+            "value": 176,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/kernel/sysrq"
+            }
+          },
+          "persisted": {
+            "status": "ok",
+            "value": 176,
+            "source": {
+              "kind": "file",
+              "path": "/etc/sysctl.d/10-magic-sysrq.conf",
+              "line": 26,
+              "raw": "kernel.sysrq = 176"
+            }
+          },
+          "effective": {
+            "status": "ok",
+            "value": 176,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/kernel/sysrq"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/kernel/sysrq"
+          }
+        },
+        "unprivileged_bpf_disabled": {
+          "runtime": {
+            "status": "ok",
+            "value": 2,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/kernel/unprivileged_bpf_disabled"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets kernel.unprivileged_bpf_disabled"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 2,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/kernel/unprivileged_bpf_disabled"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/kernel/unprivileged_bpf_disabled"
+          }
+        },
+        "yama_ptrace_scope": {
+          "runtime": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/kernel/yama/ptrace_scope"
+            }
+          },
+          "persisted": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "file",
+              "path": "/etc/sysctl.d/10-ptrace.conf",
+              "line": 22,
+              "raw": "kernel.yama.ptrace_scope = 1"
+            }
+          },
+          "effective": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/kernel/yama/ptrace_scope"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/kernel/yama/ptrace_scope"
+          }
+        }
+      }
+    },
     "logging": {
       "journald": {
         "forward_to_syslog": {
@@ -2964,6 +3466,159 @@
         "privacy_options": {
           "status": "absent",
           "reason": "no mail transfer agent is installed on this host: none of /etc/postfix/main.cf, /etc/mail/sendmail.cf, /etc/exim4/update-exim4.conf.conf, /etc/exim/exim.conf is present with its daemon binary"
+        }
+      }
+    },
+    "mounts": {
+      "dev_shm": {
+        "separate": {
+          "status": "ok",
+          "value": true,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/self/mountinfo"
+          }
+        }
+      },
+      "home": {
+        "separate": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/self/mountinfo"
+          }
+        }
+      },
+      "points": {
+        "status": "ok",
+        "value": [
+          {
+            "fstype": "overlay",
+            "mounted_by": "/",
+            "options": [
+              "rw",
+              "relatime"
+            ],
+            "separate": true,
+            "source": "overlay",
+            "target": "/"
+          },
+          {
+            "fstype": "overlay",
+            "mounted_by": "/",
+            "options": [
+              "rw",
+              "relatime"
+            ],
+            "separate": false,
+            "source": "overlay",
+            "target": "/boot"
+          },
+          {
+            "fstype": "overlay",
+            "mounted_by": "/",
+            "options": [
+              "rw",
+              "relatime"
+            ],
+            "separate": false,
+            "source": "overlay",
+            "target": "/home"
+          },
+          {
+            "fstype": "overlay",
+            "mounted_by": "/",
+            "options": [
+              "rw",
+              "relatime"
+            ],
+            "separate": false,
+            "source": "overlay",
+            "target": "/tmp"
+          },
+          {
+            "fstype": "overlay",
+            "mounted_by": "/",
+            "options": [
+              "rw",
+              "relatime"
+            ],
+            "separate": false,
+            "source": "overlay",
+            "target": "/var"
+          },
+          {
+            "fstype": "overlay",
+            "mounted_by": "/",
+            "options": [
+              "rw",
+              "relatime"
+            ],
+            "separate": false,
+            "source": "overlay",
+            "target": "/var/tmp"
+          },
+          {
+            "fstype": "overlay",
+            "mounted_by": "/",
+            "options": [
+              "rw",
+              "relatime"
+            ],
+            "separate": false,
+            "source": "overlay",
+            "target": "/var/log"
+          },
+          {
+            "fstype": "overlay",
+            "mounted_by": "/",
+            "options": [
+              "rw",
+              "relatime"
+            ],
+            "separate": false,
+            "source": "overlay",
+            "target": "/var/log/audit"
+          },
+          {
+            "fstype": "tmpfs",
+            "mounted_by": "/dev/shm",
+            "options": [
+              "rw",
+              "nosuid",
+              "nodev",
+              "noexec",
+              "relatime"
+            ],
+            "separate": true,
+            "source": "shm",
+            "target": "/dev/shm"
+          }
+        ],
+        "source": {
+          "kind": "proc",
+          "path": "/proc/self/mountinfo"
+        }
+      },
+      "tmp": {
+        "separate": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/self/mountinfo"
+          }
+        }
+      },
+      "var_tmp": {
+        "separate": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/self/mountinfo"
+          }
         }
       }
     },
@@ -4484,7 +5139,7 @@
       },
       "days_since_last_install": {
         "status": "ok",
-        "value": 6,
+        "value": 9,
         "source": {
           "kind": "file",
           "path": "/var/log/dpkg.log"
@@ -5061,6 +5716,36 @@
         "value": "",
         "source": {
           "kind": "derived"
+        }
+      }
+    },
+    "swap": {
+      "devices": {
+        "status": "ok",
+        "value": [
+          {
+            "backing": "overlay",
+            "encrypted": false,
+            "path": "/swapfile",
+            "reason": "overlay is not a block device this kernel lists under /sys/block, so there is nothing to decide encryption from",
+            "type": "file"
+          }
+        ],
+        "source": {
+          "kind": "proc",
+          "path": "/proc/swaps"
+        }
+      },
+      "encrypted": {
+        "status": "unsupported",
+        "reason": "overlay is not a block device this kernel lists under /sys/block, so there is nothing to decide encryption from"
+      },
+      "present": {
+        "status": "ok",
+        "value": true,
+        "source": {
+          "kind": "proc",
+          "path": "/proc/swaps"
         }
       }
     },

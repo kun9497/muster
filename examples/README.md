@@ -17,7 +17,7 @@ builds this repository, and both are rewritten (below) before they are kept.
 When a refresh is pending, the six files may be missing; the test that checks the examples
 then skips, saying so.
 
-Produced by run [`35199955815`](https://github.com/kun9497/muster/actions/runs/35199955815) of [`.github/workflows/examples.yml`](../.github/workflows/examples.yml).
+Produced by run [`35548200943`](https://github.com/kun9497/muster/actions/runs/35548200943) of [`.github/workflows/examples.yml`](../.github/workflows/examples.yml).
 The snapshot headers carry the rest of the provenance: `muster_version`, `commit`,
 `collected_at` and `host.os_release` — the workflow builds the binary with `make build`, so those
 are the real version and commit and not the unstamped defaults.

@@ -1,0 +1,6 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "env":{"container":{"status":"ok","value":"docker"}},
+  "coredump":{
+    "core_pattern":{"status":"ok","value":"|/usr/share/apport/apport -p%p -s%s -c%c -d%d -P%P -u%u -g%g -F%F -- %E","source":{"kind":"proc","path":"/proc/sys/kernel/core_pattern"}},"systemd":{"storage":{"status":"absent","reason":"no coredump.conf on this host, so nothing sets Storage"},"process_size_max":{"status":"absent","reason":"no coredump.conf on this host, so nothing sets ProcessSizeMax"}},"limits":{"hard_core":{"status":"absent","reason":"no limits.conf line sets a hard core limit for *"},"sources":{"status":"ok","value":["/etc/security/limits.conf"],"source":{"kind":"file","path":"/etc/security/limits.conf"}}}
+  }
+}}

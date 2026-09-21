@@ -1,0 +1,28 @@
+id: muster.beyond.home_mount_options
+title_en: /home is mounted nodev and nosuid
+title_ko: /home 이 nodev 와 nosuid 로 마운트된다
+description_en: Home directories are writable by the people who own them, so a user who can create a setuid-root file there — through an unpacked archive, a restored backup, a shared directory or a careless package — has a way to keep root once they have had it, and a device node placed in a home directory is a path to raw disk that bypasses every file permission the file system above it enforces. nosuid makes the kernel ignore the setuid and setgid bits under the mount and nodev makes it ignore device nodes, which closes both. noexec is deliberately not required here — a home directory is where legitimate build output, scripts and language runtimes live, and demanding noexec on /home would fail every interactive host for something nobody could act on. It is rated 하 because both remaining routes need the attacker to already hold root or to be handed a crafted archive, so this is a hardening of last resort rather than a barrier on the way in. The EL9 default installation gives /home a logical volume of its own and mounts it with neither option, so a stock EL host with the standard layout fails this control. Where /home is not a mount of its own the mechanism does not apply, the answer is NOT_APPLICABLE and the finding belongs to separate_partitions.
+description_ko: 홈 디렉터리는 그 주인이 쓸 수 있으므로, 압축을 푼 아카이브·복원한 백업·공유 디렉터리·부주의한 패키지를 통해 setuid root 파일을 그곳에 만들 수 있는 사용자는 한 번 얻은 root 를 유지할 방법을 갖게 되고, 홈 디렉터리에 놓인 장치 노드는 그 위 파일 시스템이 강제하는 모든 파일 권한을 우회해 원시 디스크에 닿는 통로가 됩니다. nosuid 는 커널이 그 마운트 아래의 setuid·setgid 비트를 무시하게 하고 nodev 는 장치 노드를 무시하게 하므로 두 경로가 모두 닫힙니다. 여기서 noexec 는 일부러 요구하지 않습니다. 홈 디렉터리는 정당한 빌드 산출물과 스크립트와 언어 런타임이 사는 곳이며, /home 에 noexec 를 요구하면 아무도 조치할 수 없는 것 때문에 모든 대화형 호스트가 실패하기 때문입니다. 남은 두 경로 모두 공격자가 이미 root 를 쥐고 있거나 조작된 아카이브를 건네받아야 성립하므로 중요도는 하 이며, 침입 경로의 장벽이라기보다 마지막 단계의 강화입니다. EL9 기본 설치는 /home 에 별도 논리 볼륨을 주면서 두 옵션 중 어느 것도 주지 않으므로 표준 구성의 EL 기본 설치 호스트는 이 항목에서 실패합니다. /home 이 자체 마운트가 아니면 메커니즘이 적용되지 않아 NOT_APPLICABLE 이며 지적 사항은 separate_partitions 에 속합니다.
+category: beyond
+importance: 하
+automation: auto
+references:
+  stig:
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-231045 }
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-231050 }
+  nist_800_53: ["CM-7(2)"]
+requires_facts: ">=1"
+applies_when:
+  - { fact: env.container, op: eq, expected: none }
+absent_means: not_applicable
+mechanisms:
+  - when:
+      - { fact: mounts.home.separate, op: eq, expected: true }
+    checks:
+      - { fact: mounts.points, op: each, subject: target, where: { field: target, op: eq, expected: "/home" }, require: { field: options, op: contains, expected: nodev } }
+      - { fact: mounts.points, op: each, subject: target, where: { field: target, op: eq, expected: "/home" }, require: { field: options, op: contains, expected: nosuid } }
+remediation:
+  text_en: Add nodev,nosuid to the /home line of /etc/fstab and remount. Neither option touches ordinary use of a home directory — files still execute, because noexec is not asked for — so the change is safe on an interactive host; the one thing to check first is whether a container runtime or a chroot is rooted under /home, because those do create device nodes.
+  text_ko: /etc/fstab 의 /home 줄에 nodev,nosuid 를 추가하고 다시 마운트합니다. noexec 를 요구하지 않으므로 파일은 그대로 실행되고 두 옵션 모두 홈 디렉터리의 평범한 사용에는 영향을 주지 않아 대화형 호스트에서도 안전합니다. 먼저 확인할 것은 /home 아래에 뿌리를 둔 컨테이너 런타임이나 chroot 가 있는지 하나뿐입니다. 그런 것들은 장치 노드를 만들기 때문입니다.
+  risk: restart_service
+  idempotent: true

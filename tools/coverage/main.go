@@ -95,13 +95,20 @@ func checkREADMEs(stderr io.Writer, dir string, n coverageNumbers) int {
 		// kind of claim and goes stale the same way -- a control moving from
 		// partial to auto leaves the table regenerated, -check green and the
 		// sentence wrong. Each README spells the triple its own way.
+		//
+		// B-12: the count of controls beyond the guide is a third such claim,
+		// and the one the item table cannot keep honest at all -- a beyond
+		// control implements no KISA item, so enrolling one moves neither of
+		// the first two numbers.
 		{"README.md", []string{
 			fmt.Sprintf("%d of the %d items", n.enrolled, n.total),
 			fmt.Sprintf("%d auto, %d partial, %d manual", n.auto, n.partial, n.manual),
+			fmt.Sprintf("and %d beyond the guide", n.beyond),
 		}},
 		{"README.ko.md", []string{
 			fmt.Sprintf("%d개 중 %d개", n.total, n.enrolled),
 			fmt.Sprintf("auto %d, partial %d, manual %d", n.auto, n.partial, n.manual),
+			fmt.Sprintf("그리고 가이드 밖 %d개", n.beyond),
 		}},
 	} {
 		data, err := os.ReadFile(filepath.Join(dir, f.name))

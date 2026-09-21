@@ -1,0 +1,23 @@
+id: muster.beyond.uncommon_filesystems_disabled
+title_en: The file system drivers no server needs cannot be loaded
+title_ko: 서버에 필요 없는 파일 시스템 드라이버를 적재할 수 없다
+description_en: cramfs, freevxfs, jffs2, hfs, hfsplus and udf are file system drivers for media a server never mounts — a compressed ROM image, a Veritas volume, a flash translation layer, two generations of Macintosh disk and an optical disc — and every one of them is kernel code that parses a hostile on-disk structure with no privilege boundary in the way. They are autoloaded by the kernel the moment anything asks to mount that type, which on a host with automounting or an accessible USB port means an unprivileged user can reach thousands of lines of rarely audited parsing code with a crafted image. muster requires each of them to be disabled. It is rated 하 because reaching the code needs local access or physical media and none of these drivers is a remote attack surface. Disabling means install <name> /bin/false (or /bin/true) in a modprobe.d file, which is what actually stops modprobe loading the module — a blacklist <name> line only suppresses autoloading by alias and is recorded as evidence rather than credited, because an explicit modprobe still loads a blacklisted module. A module the running kernel has built in cannot be disabled by any configuration and fails this control, with the built-in state named as the reason; a module the kernel tree does not ship at all cannot be loaded and passes.
+description_ko: cramfs, freevxfs, jffs2, hfs, hfsplus, udf 는 서버가 마운트할 일이 없는 매체(압축 ROM 이미지, Veritas 볼륨, 플래시 변환 계층, 두 세대의 매킨토시 디스크, 광 디스크)를 위한 파일 시스템 드라이버이며, 하나같이 적대적일 수 있는 디스크 구조를 아무 권한 경계 없이 해석하는 커널 코드입니다. 무엇이든 그 유형의 마운트를 요청하는 순간 커널이 자동으로 적재하므로, 자동 마운트가 켜져 있거나 USB 포트에 접근할 수 있는 호스트에서는 권한 없는 사용자가 조작된 이미지 하나로 거의 감사되지 않은 수천 줄의 해석 코드에 닿을 수 있습니다. muster 는 이들 각각이 비활성화되어 있기를 요구합니다. 그 코드에 닿으려면 로컬 접근이나 물리 매체가 필요하고 이 드라이버들 중 원격 공격면인 것이 없으므로 중요도는 하 입니다. 비활성화란 modprobe.d 파일의 install <name> /bin/false(또는 /bin/true)를 뜻합니다. 실제로 modprobe 의 적재를 막는 것이 그것이기 때문입니다. blacklist <name> 줄은 별칭에 의한 자동 적재만 억제하므로 인정하지 않고 증거로만 기록합니다. 명시적인 modprobe 는 blacklist 된 모듈도 적재하기 때문입니다. 실행 중인 커널에 내장된 모듈은 어떤 설정으로도 비활성화할 수 없어 이 항목에서 실패하며 내장 상태가 그 이유로 표시됩니다. 커널 트리가 아예 배포하지 않는 모듈은 적재될 수 없으므로 통과합니다.
+category: beyond
+importance: 하
+automation: auto
+references:
+  stig:
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-231195 }
+  nist_800_53: ["CM-7"]
+requires_facts: ">=1"
+applies_when:
+  - { fact: env.container, op: eq, expected: none }
+absent_means: fail
+checks:
+  - { fact: kernel.modules, op: each, subject: name, where: { field: name, op: in, expected: ["cramfs", "freevxfs", "jffs2", "hfs", "hfsplus", "udf"] }, require: { field: disabled, op: eq, expected: true } }
+remediation:
+  text_en: Write one install <name> /bin/false line per module into a file under /etc/modprobe.d, for example /etc/modprobe.d/50-uncommon-filesystems.conf, and rebuild the initramfs so the setting also applies during early boot. A blacklist line alongside it does no harm but is not what muster credits. A module already built into the running kernel needs a kernel without it — the distribution kernels ship all six as modules, so this is rare — and a host that genuinely mounts one of these types, an optical drive reading UDF for instance, should carry a waiver naming the module rather than leaving the whole control undecided.
+  text_ko: 모듈마다 install <name> /bin/false 한 줄씩을 /etc/modprobe.d 아래 파일(예를 들어 /etc/modprobe.d/50-uncommon-filesystems.conf)에 적고, 초기 부팅 단계에도 적용되도록 initramfs 를 다시 만듭니다. blacklist 줄을 함께 두어도 해롭지는 않지만 muster 가 인정하는 것은 아닙니다. 이미 실행 중인 커널에 내장된 모듈은 그것이 빠진 커널이 필요합니다. 배포판 커널은 여섯 개를 모두 모듈로 배포하므로 드문 경우입니다. UDF 를 읽는 광학 드라이브처럼 이 유형 중 하나를 실제로 마운트하는 호스트는 항목 전체를 미결로 두지 말고 해당 모듈을 지목하는 waiver 를 두십시오.
+  risk: none
+  idempotent: true

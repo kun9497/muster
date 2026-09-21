@@ -80,6 +80,12 @@ func (m *memAccess) ReadFile(p string, limit int64) ([]byte, collect.ReadMeta, e
 	return data, meta, nil
 }
 
+// ReadFileBinary serves the same bytes: a fuzz corpus is arbitrary bytes
+// already, so there is no NUL rule to get past here.
+func (m *memAccess) ReadFileBinary(p string, limit int64) ([]byte, collect.ReadMeta, error) {
+	return m.ReadFile(p, limit)
+}
+
 func (m *memAccess) Stat(p string) (collect.ReadMeta, error) {
 	data, ok := m.files[p]
 	if !ok {
@@ -593,6 +599,16 @@ func FuzzParseMountinfo(f *testing.F) {
 	})
 }
 
+// /proc/swaps is a header line and then one row per swap device; a row with
+// fewer than the two judged fields is dropped, so the list is bounded by the
+// input whatever the fuzzer produces.
+func FuzzParseProcSwaps(f *testing.F) {
+	seeds(f, "testdata/proc_swaps.*")
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "parseProcSwaps", func() any { return parseProcSwaps(data) }, len(data))
+	})
+}
+
 func FuzzParseProcNet(f *testing.F) {
 	seeds(f, "testdata/proc_net_*")
 	f.Fuzz(func(t *testing.T, data []byte) {
@@ -1092,5 +1108,123 @@ func FuzzFirstLine(f *testing.F) {
 	seeds(f, "testdata/stderr.*")
 	f.Fuzz(func(t *testing.T, data []byte) {
 		fuzzBody(t, "firstLine", func() any { return firstLine(data) }, len(data))
+	})
+}
+
+func FuzzParseSysctlD(f *testing.F) {
+	seeds(f, "testdata/sysctl.d-*.conf", "testdata/sysctl.conf.sample")
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "parseSysctlD", func() any { return parseSysctlD(data) }, len(data))
+	})
+}
+
+func FuzzParseCoredumpConf(f *testing.F) {
+	seeds(f, "testdata/coredump.conf.sample", "testdata/coredump.conf.d-*.conf")
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "parseCoredumpConf", func() any { return parseCoredumpConf(data) }, len(data))
+	})
+}
+
+func FuzzParseLimitsCore(f *testing.F) {
+	seeds(f, "testdata/limits.conf.sample", "testdata/limits.d-*.conf")
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "parseLimitsCore", func() any { return parseLimitsCore(data) }, len(data))
+	})
+}
+
+func FuzzGrubPasswordSet(f *testing.F) {
+	seeds(f, "testdata/grub.cfg.*", "testdata/user.cfg.sample", "testdata/grub.d-*.sample")
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "grubPasswordSet", func() any { return grubPasswordSet(data) }, len(data))
+	})
+}
+
+func FuzzSecureBootFromEfivar(f *testing.F) {
+	seeds(f, "testdata/SecureBoot.*")
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "secureBootFromEfivar", func() any {
+			enabled, ok := secureBootFromEfivar(data)
+			return [2]bool{enabled, ok}
+		}, len(data))
+	})
+}
+
+func FuzzParseModulesBuiltin(f *testing.F) {
+	seeds(f, "testdata/modules.builtin.*")
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "parseModulesBuiltin", func() any { return parseModulesBuiltin(data) }, len(data))
+	})
+}
+
+func FuzzParseModulesDep(f *testing.F) {
+	seeds(f, "testdata/modules.dep.*")
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "parseModulesDep", func() any { return parseModulesDep(data) }, len(data))
+	})
+}
+
+func FuzzParseProcModules(f *testing.F) {
+	seeds(f, "testdata/proc_modules.*")
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "parseProcModules", func() any { return parseProcModules(data) }, len(data))
+	})
+}
+
+func FuzzParseModprobeD(f *testing.F) {
+	seeds(f, "testdata/modprobe.d-*.conf")
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "parseModprobeD", func() any { return parseModprobeD(data) }, len(data))
+	})
+}
+
+// FuzzModuleStates drives the fold the eleven rows are built from. It is the
+// one target here that takes three indexes and a file chain at once, so the
+// same bytes are handed to all four: what it proves is that no input makes
+// the fold disagree with itself or grow a row list out of proportion to what
+// it read, which the four per-source targets cannot show on their own.
+func FuzzModuleStates(f *testing.F) {
+	seeds(f, "testdata/modules.dep.*", "testdata/modules.builtin.*",
+		"testdata/proc_modules.*", "testdata/modprobe.d-*.conf")
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "moduleStates", func() any {
+			return moduleStates(data, data, data,
+				[]confFile{{path: "/etc/modprobe.d/fuzz.conf", data: data}})
+		}, len(data))
+	})
+}
+
+// FuzzParseSizeValue and FuzzParentDisk are the two scalar parsers of stage
+// 3B. Both take a string rather than a file's bytes, so the seeds are written
+// out here rather than globbed from testdata: what an operator writes in
+// ProcessSizeMax=, and what /proc/swaps and mountinfo spell a device with.
+//
+// fuzzBody's output bound is trivial for both — one returns an int64 and a
+// bool, the other a string cut out of its own input — so what these targets
+// really assert is no panic and determinism. parseSizeValue multiplies and
+// sums concatenated terms and has to refuse an overflow rather than wrap;
+// parentDisk indexes backwards through the name and has to stop at the
+// shapes that are not partition names at all.
+
+func FuzzParseSizeValue(f *testing.F) {
+	for _, s := range []string{
+		"2G", "1.5G", "1G512M", "100B", "infinity", "2GB", "-1",
+		"999999999999999999999999999999",
+	} {
+		f.Add([]byte(s))
+	}
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "parseSizeValue", func() any {
+			n, ok := parseSizeValue(string(data))
+			return []any{n, ok}
+		}, len(data))
+	})
+}
+
+func FuzzParentDisk(f *testing.F) {
+	for _, s := range []string{"sda3", "nvme0n1p2", "mmcblk0p1", "dm-1", "loop1p", "root"} {
+		f.Add([]byte(s))
+	}
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "parentDisk", func() any { return parentDisk(string(data)) }, len(data))
 	})
 }

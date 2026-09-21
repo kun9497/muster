@@ -1,0 +1,19 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none"
+      }
+    },
+    "boot": {
+      "grub_password_set": {
+        "status": "absent",
+        "reason": "no grub.cfg, /boot/grub2/user.cfg or /etc/grub.d/* to read a superuser from"
+      }
+    }
+  }
+}

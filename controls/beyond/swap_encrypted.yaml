@@ -1,0 +1,20 @@
+id: muster.beyond.swap_encrypted
+title_en: Every swap device is encrypted
+title_ko: 모든 스왑 장치가 암호화되어 있다
+description_en: Swap is a copy of process memory on disk, written by the kernel without asking the process and without any of the access control the process kept its memory behind, so a private key, a decrypted document, a session token or a password still in a buffer can be paged out to a plain block device and stay legible there long after the process exited. Encrypting the swap — as a dm-crypt volume, as part of an encrypted volume group, or as a compressed zram device that never reaches a disk at all — makes the pages unreadable to anyone who takes the disk, images it, or reads it from a rescue system. muster follows every device in /proc/swaps down through /sys/block to the device it is really backed by and requires all of them to end at dm-crypt or at zram. It is rated 중 because the attacker has to reach the storage rather than the running host, which most estates already bound by physical or hypervisor controls, and because full-disk encryption solves it as a side effect. A host with no swap at all is NOT_APPLICABLE — there is nothing to encrypt. A host whose swap muster cannot trace to a block device — an overlay root, a /dev/root the kernel never names in sysfs — is NOT_APPLICABLE as an environment this check cannot be made in, rather than a failure of the host.
+description_ko: 스왑은 프로세스 메모리를 디스크에 옮겨 적은 사본이며, 커널이 프로세스에 묻지 않고 프로세스가 메모리를 지키던 접근 통제도 없이 기록합니다. 그래서 개인 키, 복호화된 문서, 세션 토큰, 버퍼에 남아 있던 비밀번호가 평문 블록 장치로 내려가 프로세스가 끝난 뒤에도 한참 동안 읽을 수 있는 채로 남을 수 있습니다. 스왑을 dm-crypt 볼륨으로, 암호화된 볼륨 그룹의 일부로, 또는 디스크에 아예 닿지 않는 압축 zram 장치로 암호화하면 디스크를 떼어 가거나 이미지를 뜨거나 복구 시스템에서 읽는 사람에게 그 페이지들이 읽히지 않습니다. muster 는 /proc/swaps 의 모든 장치를 /sys/block 을 따라 실제 뒷받침하는 장치까지 추적하고 그 전부가 dm-crypt 또는 zram 에서 끝나기를 요구합니다. 공격자가 동작 중인 호스트가 아니라 저장 장치에 도달해야 하고 대부분의 환경이 이미 물리적 또는 하이퍼바이저 통제로 그것을 제한하며 전체 디스크 암호화로 부수적으로 해결되므로 중요도는 중 입니다. 스왑이 전혀 없는 호스트는 암호화할 대상이 없으므로 NOT_APPLICABLE 입니다. 스왑을 블록 장치까지 추적할 수 없는 호스트(오버레이 루트, 커널이 sysfs 에 이름을 두지 않는 /dev/root 등)는 호스트의 실패가 아니라 이 검사를 수행할 수 없는 환경으로서 NOT_APPLICABLE 입니다.
+category: beyond
+importance: 중
+automation: auto
+references: {}
+requires_facts: ">=1"
+applies_when:
+  - { fact: env.container, op: eq, expected: none }
+absent_means: not_applicable
+checks:
+  - { fact: swap.encrypted, op: eq, expected: true }
+remediation:
+  text_en: Put the swap device on dm-crypt — at installation time by encrypting the volume group the swap volume lives in, or afterwards with a /etc/crypttab entry using a random key and an /etc/fstab line naming the mapped device — or replace a disk-backed swap with zram, which is compressed RAM and never reaches storage. A swap file on an encrypted root is already covered, because the file is inside the encrypted volume. Changing the swap device needs a reboot to take effect, and a hibernating host cannot use a randomly keyed swap, because the resume image has to be readable at the next boot.
+  text_ko: 스왑 장치를 dm-crypt 위에 둡니다. 설치 시점에는 스왑 볼륨이 속한 볼륨 그룹을 암호화하고, 이후에는 임의 키를 쓰는 /etc/crypttab 항목과 매핑된 장치를 가리키는 /etc/fstab 줄로 구성합니다. 또는 디스크를 쓰는 스왑을 zram 으로 바꿉니다. zram 은 압축된 RAM 이며 저장 장치에 닿지 않습니다. 암호화된 루트 위의 스왑 파일은 암호화된 볼륨 안에 있으므로 이미 해당됩니다. 스왑 장치 변경은 재부팅해야 적용되며, 최대 절전을 쓰는 호스트는 다음 부팅에 재개 이미지를 읽을 수 있어야 하므로 임의 키 스왑을 쓸 수 없습니다.
+  risk: reboot_required
+  idempotent: true

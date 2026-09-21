@@ -1,0 +1,31 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none"
+      }
+    },
+    "boot": {
+      "firmware": {
+        "status": "ok",
+        "value": "uefi",
+        "source": {
+          "kind": "sys",
+          "path": "/sys/firmware/efi"
+        }
+      },
+      "secure_boot": {
+        "status": "ok",
+        "value": false,
+        "source": {
+          "kind": "sys",
+          "path": "/sys/firmware/efi/efivars/SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c"
+        }
+      }
+    }
+  }
+}

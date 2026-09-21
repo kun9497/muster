@@ -1,6 +1,8 @@
 muster 0.1.0 · controls kisa-unix-2026+2026.09.09 · guide kisa-unix-2026 · host web-01 · collected 2026-09-02T06:00:00Z
 automatic  high 0/1/0  medium 1/0/0  low 0/0/0  (pass/fail/warn)
 manual review 2  ·  undecidable error 1 / n-a 0 / waived 1  ·  facts failed 1  ·  waivers expiring within 30d 1
+KISA 2026 (6 controls): pass 1 fail 1 warn 0 manual 2 n/a 0 error 1 waived 1
+beyond the guide (0 controls): pass 0 fail 0 warn 0 manual 0 n/a 0 error 0 waived 0
 
 WAIVED         high   muster.account.password_policy    
     waived: r (expires 2026-09-20)

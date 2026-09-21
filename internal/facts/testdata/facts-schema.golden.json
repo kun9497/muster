@@ -1549,7 +1549,7 @@
       "Sensitivity": "public",
       "Collector": "files",
       "DefaultOn": "",
-      "SubjectKind": ""
+      "SubjectKind": "file"
     },
     {
       "Key": "files.user_rhosts",
@@ -1559,7 +1559,7 @@
       "Sensitivity": "internal",
       "Collector": "files",
       "DefaultOn": "",
-      "SubjectKind": ""
+      "SubjectKind": "file"
     },
     {
       "Key": "files.root_home.mode",
@@ -1669,7 +1669,7 @@
       "Sensitivity": "public",
       "Collector": "files",
       "DefaultOn": "",
-      "SubjectKind": ""
+      "SubjectKind": "file"
     },
     {
       "Key": "files.startup_scripts",
@@ -3670,6 +3670,406 @@
       "Collector": "dns",
       "DefaultOn": "",
       "SubjectKind": "zone"
+    },
+    {
+      "Key": "kernel.sysctl.kptr_restrict",
+      "Type": "setting\u003cint\u003e",
+      "Description": "kernel.kptr_restrict - how much of a kernel pointer printed to an unprivileged reader is hidden; runtime from /proc/sys, persisted from the sysctl.d chain.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "kernel.sysctl.dmesg_restrict",
+      "Type": "setting\u003cint\u003e",
+      "Description": "kernel.dmesg_restrict - whether reading the kernel log needs a privilege; runtime from /proc/sys, persisted from the sysctl.d chain.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "kernel.sysctl.yama_ptrace_scope",
+      "Type": "setting\u003cint\u003e",
+      "Description": "kernel.yama.ptrace_scope - how far one process may attach a debugger to another; absent on a kernel built without Yama.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "kernel.sysctl.randomize_va_space",
+      "Type": "setting\u003cint\u003e",
+      "Description": "kernel.randomize_va_space - how much of a process address space is randomised at exec.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "kernel.sysctl.unprivileged_bpf_disabled",
+      "Type": "setting\u003cint\u003e",
+      "Description": "kernel.unprivileged_bpf_disabled - whether an unprivileged process may call bpf(2); absent on a kernel built without the BPF syscall.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "kernel.sysctl.bpf_jit_harden",
+      "Type": "setting\u003cint\u003e",
+      "Description": "net.core.bpf_jit_harden - how far the BPF just-in-time compiler blinds the constants it emits; absent on a kernel built without the JIT.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "kernel.sysctl.perf_event_paranoid",
+      "Type": "setting\u003cint\u003e",
+      "Description": "kernel.perf_event_paranoid - how much of the performance-event interface an unprivileged process may use.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "kernel.sysctl.sysrq",
+      "Type": "setting\u003cint\u003e",
+      "Description": "kernel.sysrq - the bitmask of magic SysRq functions the console may invoke; 0 disables them all.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "kernel.sysctl.protected_symlinks",
+      "Type": "setting\u003cint\u003e",
+      "Description": "fs.protected_symlinks - whether a symlink in a sticky world-writable directory may be followed across an ownership boundary.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "kernel.sysctl.protected_hardlinks",
+      "Type": "setting\u003cint\u003e",
+      "Description": "fs.protected_hardlinks - whether a hard link may be made to a file the linking account does not own and cannot write.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "kernel.sysctl.protected_fifos",
+      "Type": "setting\u003cint\u003e",
+      "Description": "fs.protected_fifos - whether a FIFO in a sticky world-writable directory may be opened for writing by another account; absent before Linux 4.19.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "kernel.sysctl.protected_regular",
+      "Type": "setting\u003cint\u003e",
+      "Description": "fs.protected_regular - the same restriction as protected_fifos for a regular file; absent before Linux 4.19.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "coredump.core_pattern",
+      "Type": "string",
+      "Description": "kernel.core_pattern verbatim - the file name pattern a core dump is written to, or the \"|\" pipe of the handler that takes it.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "coredump",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "coredump.suid_dumpable",
+      "Type": "setting\u003cint\u003e",
+      "Description": "fs.suid_dumpable - whether a setuid or otherwise privileged program may dump core; runtime from /proc/sys, persisted from the sysctl.d chain.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "coredump",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "coredump.systemd.storage",
+      "Type": "string",
+      "Description": "Storage from the systemd-coredump configuration chain (none keeps no dump); absent when no coredump.conf sets it, since the daemon owns its own default.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "coredump",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "coredump.systemd.process_size_max",
+      "Type": "int",
+      "Description": "ProcessSizeMax from the systemd-coredump configuration chain, in bytes with the size suffix expanded; 0 means systemd-coredump processes no dump.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "coredump",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "coredump.limits.hard_core",
+      "Type": "int",
+      "Description": "The hard RLIMIT_CORE that limits.conf and limits.d set for every account (\"*\"), in 1024-byte blocks; -1 for unlimited, absent when no line sets one.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "coredump",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "coredump.limits.sources",
+      "Type": "list\u003cstring\u003e",
+      "Description": "The limits.conf and limits.d files that were read for the hard core limit, in the order they are applied.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "coredump",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "boot.firmware",
+      "Type": "string",
+      "Description": "uefi when /sys/firmware/efi exists, bios when it does not - the firmware interface this host booted through.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "boot",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "boot.secure_boot",
+      "Type": "bool",
+      "Description": "Whether the firmware reports Secure Boot as enforcing, from the SecureBoot EFI variable; absent on BIOS and on UEFI without efivarfs or the variable. A firmware that exposes the variable but returns too few bytes to hold an efivar's four-byte attribute word and its value is unsupported, because Secure Boot cannot be read from that host.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "boot",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "boot.grub_cfg.path",
+      "Type": "string",
+      "Description": "The bootloader configuration file this host uses - the first of /boot/grub/grub.cfg, /boot/grub2/grub.cfg and /boot/efi/EFI/*/grub.cfg that exists. Where one of the first two is the symlink an upgraded EL host keeps to a /boot/efi/EFI/*/grub.cfg, the target is the path and the permission leaves are the target's.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "boot",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "boot.grub_cfg.mode",
+      "Type": "int",
+      "Description": "Permission bits of the bootloader configuration file as an integer (e.g. 384 for 0600).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "boot",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "boot.grub_cfg.uid",
+      "Type": "int",
+      "Description": "Owner uid of the bootloader configuration file.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "boot",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "boot.grub_cfg.gid",
+      "Type": "int",
+      "Description": "Group gid of the bootloader configuration file.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "boot",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "boot.grub_cfg.group",
+      "Type": "string",
+      "Description": "Group name for the gid of the bootloader configuration file from /etc/group; empty when the gid has no name.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "boot",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "boot.grub_cfg.group_readable",
+      "Type": "bool",
+      "Description": "Whether the group permission bits of the bootloader configuration file include read (derived from mode).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "boot",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "boot.grub_cfg.group_writable",
+      "Type": "bool",
+      "Description": "Whether the group permission bits of the bootloader configuration file include write (derived from mode).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "boot",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "boot.grub_cfg.other_readable",
+      "Type": "bool",
+      "Description": "Whether the other permission bits of the bootloader configuration file include read (derived from mode).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "boot",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "boot.grub_cfg.other_writable",
+      "Type": "bool",
+      "Description": "Whether the other permission bits of the bootloader configuration file include write (derived from mode).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "boot",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "boot.grub_cfg.acl_present",
+      "Type": "bool",
+      "Description": "Whether a POSIX ACL xattr is present on the bootloader configuration file.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "boot",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "boot.grub_password_set",
+      "Type": "bool",
+      "Description": "Whether a literal grub.pbkdf2 password hash is configured in the chosen grub.cfg, /boot/grub2/user.cfg or an /etc/grub.d fragment; the ${GRUB2_PASSWORD} reference and the set superusers line every EL grub.cfg carries are not one.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "boot",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "mounts.points",
+      "Type": "list\u003crecord\u003e",
+      "Description": "One row per candidate mount point (/, /boot, /home, /tmp, /var, /var/tmp, /var/log, /var/log/audit, /dev/shm) with target, separate, mounted_by, source, fstype and options; on a row that is not separate the source, fstype and options are those of the mount that governs the path.",
+      "Since": 1,
+      "Sensitivity": "internal",
+      "Collector": "mounts",
+      "DefaultOn": "",
+      "SubjectKind": "mount"
+    },
+    {
+      "Key": "mounts.tmp.separate",
+      "Type": "bool",
+      "Description": "Whether a filesystem is mounted exactly at /tmp - the same fact as the row's separate, as a leaf a mechanism can gate on.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "mounts",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "mounts.var_tmp.separate",
+      "Type": "bool",
+      "Description": "Whether a filesystem is mounted exactly at /var/tmp - the same fact as the row's separate, as a leaf a mechanism can gate on.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "mounts",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "mounts.dev_shm.separate",
+      "Type": "bool",
+      "Description": "Whether a filesystem is mounted exactly at /dev/shm - the same fact as the row's separate, as a leaf a mechanism can gate on.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "mounts",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "mounts.home.separate",
+      "Type": "bool",
+      "Description": "Whether a filesystem is mounted exactly at /home - the same fact as the row's separate, as a leaf a mechanism can gate on.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "mounts",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "kernel.modules",
+      "Type": "list\u003crecord\u003e",
+      "Description": "One row per candidate kernel module (cramfs, freevxfs, jffs2, hfs, hfsplus, udf, usb-storage, dccp, sctp, rds, tipc) with name, loaded, builtin, available, blacklisted, install_disabled, disabled and sources; read from /proc/modules, /usr/lib/modules/\u003crelease\u003e/modules.dep and modules.builtin, and the modprobe.d chain; unsupported when this host carries no module tree for its running kernel.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "modules",
+      "DefaultOn": "",
+      "SubjectKind": "module"
+    },
+    {
+      "Key": "swap.present",
+      "Type": "bool",
+      "Description": "Whether /proc/swaps lists any swap device.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "swap",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "swap.devices",
+      "Type": "list\u003crecord\u003e",
+      "Description": "One row per swap device with path, type (file or partition), encrypted, backing - the block device the judgment was made on - and reason, which says why a row has no judgment and is empty on a row that has one.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "swap",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "swap.encrypted",
+      "Type": "bool",
+      "Description": "Whether every swap device is on dm-crypt or on memory-backed zram, decided from the sysfs block links and the dm slaves below them; absent when there is no swap, unsupported when a source is not a block device this kernel lists.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "swap",
+      "DefaultOn": "",
+      "SubjectKind": ""
     }
   ]
 }

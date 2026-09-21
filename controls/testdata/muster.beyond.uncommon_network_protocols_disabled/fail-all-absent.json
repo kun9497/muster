@@ -1,0 +1,19 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none"
+      }
+    },
+    "kernel": {
+      "modules": {
+        "status": "absent",
+        "reason": "/proc/modules: not present"
+      }
+    }
+  }
+}

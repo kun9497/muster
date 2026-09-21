@@ -1,0 +1,35 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none"
+      }
+    },
+    "swap": {
+      "present": {
+        "status": "ok",
+        "value": false,
+        "source": {
+          "kind": "proc",
+          "path": "/proc/swaps"
+        }
+      },
+      "devices": {
+        "status": "ok",
+        "value": [],
+        "source": {
+          "kind": "proc",
+          "path": "/proc/swaps"
+        }
+      },
+      "encrypted": {
+        "status": "absent",
+        "reason": "/proc/swaps lists no swap device"
+      }
+    }
+  }
+}

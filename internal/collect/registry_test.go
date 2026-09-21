@@ -39,6 +39,9 @@ func (f *fakeAccess) ReadFile(p string, _ int64) ([]byte, ReadMeta, error) {
 	f.reads = append(f.reads, p)
 	return []byte("x"), ReadMeta{}, nil
 }
+func (f *fakeAccess) ReadFileBinary(p string, limit int64) ([]byte, ReadMeta, error) {
+	return f.ReadFile(p, limit)
+}
 func (f *fakeAccess) Stat(p string) (ReadMeta, error) {
 	f.reads = append(f.reads, p)
 	return ReadMeta{}, nil
@@ -78,6 +81,24 @@ func TestGuardRejectsUndeclaredAccess(t *testing.T) {
 	}
 	if len(g.violations) != 2 {
 		t.Errorf("violations %v", g.violations)
+	}
+}
+
+// K-30: ReadFileBinary is a read like any other, so the guard holds it to
+// the same declaration. A collector that reached for an efivar it had not
+// declared would otherwise have found a way around the licence.
+func TestGuardTreatsReadFileBinaryAsARead(t *testing.T) {
+	c := Collector{Name: "t", Declare: Declaration{Reads: []string{"/sys/firmware/efi/efivars/SecureBoot-*"}}}
+	g := Guard(&fakeAccess{}, c)
+
+	if _, _, err := g.ReadFileBinary("/sys/firmware/efi/efivars/SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c", 10); err != nil {
+		t.Errorf("declared binary read must pass: %v", err)
+	}
+	if _, _, err := g.ReadFileBinary("/sys/firmware/efi/efivars/PK-8be4df61-93ca-11d2-aa0d-00e098032b8c", 10); !errors.Is(err, ErrUndeclared) {
+		t.Errorf("undeclared binary read: err=%v", err)
+	}
+	if v := g.Violations(); len(v) != 1 || !strings.Contains(v[0], "read /sys/firmware/efi/efivars/PK-") {
+		t.Errorf("violations = %v, want one naming the undeclared read", v)
 	}
 }
 

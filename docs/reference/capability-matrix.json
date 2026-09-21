@@ -8,6 +8,7 @@
       "files.etc_shadow.acl_present",
       "files.etc_sudoers.acl_present",
       "files.root_home.acl_present",
+      "kernel.sysctl.bpf_jit_harden",
       "sudo.includedir",
       "sudo.secure_path",
       "walk.complete"
@@ -28,7 +29,17 @@
       "walk.world_writable",
       "walk.sticky_missing",
       "walk.unowned",
-      "walk.hidden"
+      "walk.hidden",
+      "kernel.modules",
+      "swap.encrypted"
+    ]
+  },
+  "_notes": {
+    "kernel.sysctl.protected_symlinks": [
+      "NOT in the nonroot row, and neither are protected_hardlinks, protected_fifos or protected_regular (K-31): /proc/sys/fs/protected_* is 0600 on some kernels (the 5.15 lab host) and 0644 on others (the 6.x GitHub runner), so what an unprivileged run reads for these four keys is the kernel's choice and not a capability the matrix can assert. bpf_jit_harden is 0600 on both and stays."
+    ],
+    "swap.encrypted": [
+      "Unsupported in a container only because the host's swap is a FILE reached through an overlay root (the CI runner's /mnt/swapfile), whose source is not a block device the container's kernel lists (K-16); a host whose swap is a partition resolves it through sysfs and answers a value, in a container as anywhere else."
     ]
   }
 }

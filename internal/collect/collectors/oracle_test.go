@@ -617,3 +617,140 @@ func TestOracleServices(t *testing.T) {
 	}
 	t.Logf("oracle services: compared %d", compared)
 }
+
+// --- sysctl -------------------------------------------------------------
+
+// The sysctl oracle binary, by absolute path. procps installs it in /usr/sbin
+// on the Debian family and on a merged-/usr EL host; /sbin is the pre-merge
+// spelling, and a host that has only that one is still a host whose sysctl
+// can answer.
+var sysctlOraclePaths = []string{"/usr/sbin/sysctl", "/sbin/sysctl"}
+
+// sysctlOracleOutcome is what `sysctl -n <key>` said about one variable:
+// either a value it printed, or a failure with the message it printed. The
+// distinction the comparison needs is whether the failure was "there is no
+// such knob on this kernel" — which is muster's absent — or anything else,
+// which is a read that was refused and is muster's denied.
+type sysctlOracleOutcome struct {
+	value   int
+	ok      bool
+	missing bool
+	message string
+}
+
+func (o sysctlOracleOutcome) String() string {
+	if o.ok {
+		return strconv.Itoa(o.value)
+	}
+	if o.missing {
+		return "no such variable (" + o.message + ")"
+	}
+	return "could not be read (" + o.message + ")"
+}
+
+// oracleSysctlPath finds the oracle, or skips the pair naming both spellings.
+func oracleSysctlPath(t *testing.T) string {
+	t.Helper()
+	for _, p := range sysctlOraclePaths {
+		if _, err := os.Stat(p); err == nil {
+			return p
+		}
+	}
+	t.Skipf("oracle binary %s is not on this machine", strings.Join(sysctlOraclePaths, " or "))
+	return ""
+}
+
+// oracleSysctlValue asks procps for one variable. Unlike oracleOutput a
+// non-zero exit is an ANSWER here, not a failure of the pair: "cannot stat
+// /proc/sys/…: No such file or directory" is procps saying the kernel has no
+// such knob, which is exactly what muster reports as absent. Everything else
+// — a refused read above all — is kept apart, so an unreadable file can never
+// be mistaken for a knob that does not exist.
+func oracleSysctlValue(t *testing.T, bin, key string) sysctlOracleOutcome {
+	t.Helper()
+	out := collect.RunCommand(context.Background(), collect.Command{
+		Path: bin, Args: []string{"-n", key}, Timeout: 30 * time.Second, MaxOutput: 1 << 16,
+	})
+	line := bin + " -n " + key
+	switch {
+	case out.Err != nil:
+		t.Fatalf("%s could not be run: %v", line, out.Err)
+	case out.TimedOut:
+		t.Fatalf("%s timed out", line)
+	case out.Truncated:
+		t.Fatalf("%s produced more output than the oracle reads", line)
+	}
+	msg := strings.TrimSpace(string(out.Stderr))
+	if out.ExitCode != 0 {
+		return sysctlOracleOutcome{
+			missing: strings.Contains(msg, "No such file or directory"),
+			message: msg,
+		}
+	}
+	text := strings.TrimSpace(string(out.Stdout))
+	n, err := strconv.Atoi(text)
+	if err != nil {
+		t.Fatalf("%s printed %q, which is not an integer", line, text)
+	}
+	return sysctlOracleOutcome{value: n, ok: true}
+}
+
+// F-8: the twelve kernel self-protection sysctls against procps.
+//
+// muster never runs sysctl — /proc/sys is the kernel's own answer and reading
+// it needs no program (B-3) — so procps is a genuinely independent reader of
+// the same bytes: it resolves the dotted name to a path by its own rules and
+// prints what it finds. The pair therefore proves both halves of the runtime
+// side at once, the name-to-path table of sysctlLeaves and readProcSys.
+//
+// Only the RUNTIME side is compared. The persisted side is the sysctl.d
+// chain, and `sysctl -p` would apply files rather than report them — the one
+// thing an oracle may not do (nothing is written, started or installed here).
+//
+// Three agreements are counted, and they are not the same statement:
+// a value both sides read, a variable neither can find (a kernel without Yama,
+// or fs.protected_fifos before 4.19), and a file neither may read (the five
+// 0600 knobs of B-3, when this pair is run without root). Anything else is a
+// mismatch naming the key and what each side said.
+func TestOracleSysctl(t *testing.T) {
+	oracleEnabled(t)
+	bin := oracleSysctlPath(t)
+	c := collectorNamed(t, "sysctl")
+	g := collect.Guard(collect.Host(), c)
+
+	compared := 0
+	for _, l := range sysctlLeaves {
+		have := readProcSys(g, l.path)
+		want := oracleSysctlValue(t, bin, l.key)
+		switch {
+		case have.Status == facts.StatusOK && want.ok:
+			if have.Value != want.value {
+				t.Errorf("sysctl: %s (%s): muster %v, %s says %d", l.key, l.path, have.Value, bin, want.value)
+			}
+			compared++
+		case have.Status == facts.StatusAbsent && want.missing:
+			compared++
+		case have.Status == facts.StatusDenied && !want.ok && !want.missing:
+			compared++
+		default:
+			t.Errorf("sysctl: %s (%s): muster %s (%v%s), %s says %s",
+				l.key, l.path, have.Status, have.Value, reasonSuffix(have.Reason), bin, want)
+		}
+	}
+	if v := g.Violations(); len(v) != 0 {
+		t.Fatalf("sysctl oracle reached outside the collector's declaration: %v", v)
+	}
+	if compared == 0 {
+		t.Error("sysctl: no variable could be compared, so this pair proved nothing")
+	}
+	t.Logf("oracle sysctl: compared %d", compared)
+}
+
+// reasonSuffix renders a degraded envelope's reason inside a mismatch line
+// without printing an empty parenthesis for an ok one.
+func reasonSuffix(reason string) string {
+	if reason == "" {
+		return ""
+	}
+	return ": " + reason
+}

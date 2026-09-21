@@ -1,0 +1,6 @@
+# Synthetic /etc/systemd/coredump.conf: the shipped file sets nothing, every
+# line is commented out.
+[Coredump]
+#Storage=external
+#ProcessSizeMax=2G
+#ExternalSizeMax=2G

@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
   "run": {
-    "muster_version": "94ca596",
-    "commit": "94ca596",
-    "controls_version": "kisa-unix-2026+2026.09.16",
-    "controls_digest": "sha256:b63d828be048ac893f0346f485385fd9eae141a1914e261691d593028202e641",
+    "muster_version": "e5eda50",
+    "commit": "e5eda50",
+    "controls_version": "kisa-unix-2026+2026.09.18",
+    "controls_digest": "sha256:1236ece32ab31e36ec68736e546abc54ce3ab653a221c2a27e080a573cf39db6",
     "guide_edition": "kisa-unix-2026",
-    "collected_at": "2026-09-17T08:30:07Z",
+    "collected_at": "2026-09-21T00:36:06Z",
     "host": {
       "hostname": "ubuntu-container",
       "machine_id_hash": "",
@@ -44,6 +44,16 @@
         "ms": 0
       },
       {
+        "name": "boot",
+        "status": "ok",
+        "ms": 0
+      },
+      {
+        "name": "coredump",
+        "status": "ok",
+        "ms": 0
+      },
+      {
         "name": "cron",
         "status": "ok",
         "ms": 0,
@@ -62,7 +72,7 @@
       {
         "name": "files",
         "status": "ok",
-        "ms": 1
+        "ms": 3
       },
       {
         "name": "firewall",
@@ -82,6 +92,16 @@
       },
       {
         "name": "mail",
+        "status": "ok",
+        "ms": 0
+      },
+      {
+        "name": "modules",
+        "status": "ok",
+        "ms": 0
+      },
+      {
+        "name": "mounts",
         "status": "ok",
         "ms": 0
       },
@@ -109,7 +129,7 @@
       {
         "name": "patch",
         "status": "ok",
-        "ms": 22,
+        "ms": 31,
         "cmd": "/usr/bin/apt-get -s upgrade -o Debug::NoLocking=1"
       },
       {
@@ -126,13 +146,23 @@
       {
         "name": "sockets",
         "status": "ok",
-        "ms": 1
+        "ms": 9
       },
       {
         "name": "sshd",
         "status": "ok",
         "ms": 0,
         "cmd": "/usr/sbin/sshd -G"
+      },
+      {
+        "name": "swap",
+        "status": "ok",
+        "ms": 0
+      },
+      {
+        "name": "sysctl",
+        "status": "ok",
+        "ms": 0
       },
       {
         "name": "timesync",
@@ -156,11 +186,11 @@
     "partial_failures": []
   },
   "check": {
-    "muster_version": "94ca596",
-    "commit": "94ca596",
-    "controls_version": "kisa-unix-2026+2026.09.16",
-    "controls_digest": "sha256:b63d828be048ac893f0346f485385fd9eae141a1914e261691d593028202e641",
-    "snapshot_digest": "sha256:bb68204f9345ac453a2a98fed0c3c10ba192d01e250f6668169cc589e7e19c39",
+    "muster_version": "e5eda50",
+    "commit": "e5eda50",
+    "controls_version": "kisa-unix-2026+2026.09.18",
+    "controls_digest": "sha256:1236ece32ab31e36ec68736e546abc54ce3ab653a221c2a27e080a573cf39db6",
+    "snapshot_digest": "sha256:489e316528731845a43ed9aa0e23a2ad15ce9ec9c5aa5206ece3d69ddffedb3c",
     "guide_edition": "kisa-unix-2026",
     "waivers": {
       "applied": 0,
@@ -251,6 +281,29 @@
           "lp",
           "uucp",
           "nuucp"
+        ]
+      },
+      "muster.beyond.bootloader_config_permissions": {
+        "allowed_modes": [
+          0,
+          128,
+          256,
+          384
+        ]
+      },
+      "muster.beyond.separate_partitions": {
+        "required_separate": [
+          "/tmp",
+          "/var",
+          "/var/tmp",
+          "/var/log",
+          "/var/log/audit",
+          "/home"
+        ]
+      },
+      "muster.beyond.sysrq_restricted": {
+        "allowed_sysrq": [
+          0
         ]
       },
       "muster.file.hosts_lpd_permissions": {
@@ -396,11 +449,65 @@
     "manual_review": 4,
     "undecidable": {
       "error": 0,
-      "not_applicable": 35,
+      "not_applicable": 54,
       "waived": 0
     },
     "facts_failed": 0,
-    "waivers_expiring_soon": 0
+    "waivers_expiring_soon": 0,
+    "scopes": {
+      "guide": {
+        "controls": 68,
+        "automatic": {
+          "high": {
+            "pass": 10,
+            "fail": 7,
+            "warn": 0
+          },
+          "medium": {
+            "pass": 8,
+            "fail": 0,
+            "warn": 0
+          },
+          "low": {
+            "pass": 3,
+            "fail": 1,
+            "warn": 0
+          }
+        },
+        "manual_review": 4,
+        "undecidable": {
+          "error": 0,
+          "not_applicable": 35,
+          "waived": 0
+        }
+      },
+      "beyond": {
+        "controls": 19,
+        "automatic": {
+          "high": {
+            "pass": 0,
+            "fail": 0,
+            "warn": 0
+          },
+          "medium": {
+            "pass": 0,
+            "fail": 0,
+            "warn": 0
+          },
+          "low": {
+            "pass": 0,
+            "fail": 0,
+            "warn": 0
+          }
+        },
+        "manual_review": 0,
+        "undecidable": {
+          "error": 0,
+          "not_applicable": 19,
+          "waived": 0
+        }
+      }
+    }
   },
   "results": [
     {
@@ -2708,6 +2815,424 @@
         }
       ],
       "mechanism": 2,
+      "severity": "low"
+    },
+    {
+      "id": "muster.beyond.aslr_and_link_protection",
+      "title_en": "Address space randomisation is full and the link protections are on",
+      "title_ko": "주소 공간 무작위화가 완전하고 링크 보호가 켜져 있다",
+      "category": "beyond",
+      "importance": "상",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when does not hold: env.container eq none",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "docker",
+          "source": {
+            "kind": "file",
+            "path": "/.dockerenv"
+          }
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "muster.beyond.bootloader_config_permissions",
+      "title_en": "The bootloader configuration is readable by root alone",
+      "title_ko": "부트로더 설정 파일을 root 만 읽을 수 있다",
+      "category": "beyond",
+      "importance": "상",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when does not hold: env.container eq none",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "docker",
+          "source": {
+            "kind": "file",
+            "path": "/.dockerenv"
+          }
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "muster.beyond.bootloader_password",
+      "title_en": "The boot menu is guarded by a bootloader superuser password",
+      "title_ko": "부팅 메뉴가 부트로더 superuser 비밀번호로 보호된다",
+      "category": "beyond",
+      "importance": "중",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when does not hold: env.container eq none",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "docker",
+          "source": {
+            "kind": "file",
+            "path": "/.dockerenv"
+          }
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.beyond.core_dump_policy",
+      "title_en": "A core dump is thrown away rather than written to disk",
+      "title_ko": "코어 덤프가 디스크에 기록되지 않고 버려진다",
+      "category": "beyond",
+      "importance": "중",
+      "automation": "partial",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when does not hold: env.container eq none",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "docker",
+          "source": {
+            "kind": "file",
+            "path": "/.dockerenv"
+          }
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.beyond.dev_shm_mount_options",
+      "title_en": "/dev/shm is mounted nodev, nosuid and noexec",
+      "title_ko": "/dev/shm 이 nodev, nosuid, noexec 로 마운트된다",
+      "category": "beyond",
+      "importance": "중",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when does not hold: env.container eq none",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "docker",
+          "source": {
+            "kind": "file",
+            "path": "/.dockerenv"
+          }
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.beyond.kernel_pointer_exposure",
+      "title_en": "The kernel hides its pointers and its message buffer from unprivileged readers",
+      "title_ko": "커널이 포인터와 메시지 버퍼를 비권한 사용자에게 숨긴다",
+      "category": "beyond",
+      "importance": "중",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when does not hold: env.container eq none",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "docker",
+          "source": {
+            "kind": "file",
+            "path": "/.dockerenv"
+          }
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.beyond.ptrace_restriction",
+      "title_en": "One process cannot attach a debugger to another it did not start",
+      "title_ko": "한 프로세스가 자신이 띄우지 않은 프로세스에 디버거를 붙일 수 없다",
+      "category": "beyond",
+      "importance": "중",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when does not hold: env.container eq none",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "docker",
+          "source": {
+            "kind": "file",
+            "path": "/.dockerenv"
+          }
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.beyond.secure_boot_enabled",
+      "title_en": "UEFI Secure Boot is enforcing",
+      "title_ko": "UEFI 보안 부팅이 적용되고 있다",
+      "category": "beyond",
+      "importance": "중",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when does not hold: env.container eq none",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "docker",
+          "source": {
+            "kind": "file",
+            "path": "/.dockerenv"
+          }
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.beyond.separate_partitions",
+      "title_en": "The directories users and daemons fill have file systems of their own",
+      "title_ko": "사용자와 데몬이 채우는 디렉터리가 별도 파일 시스템에 있다",
+      "category": "beyond",
+      "importance": "중",
+      "automation": "partial",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when does not hold: env.container eq none",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "docker",
+          "source": {
+            "kind": "file",
+            "path": "/.dockerenv"
+          }
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.beyond.suid_dumpable_disabled",
+      "title_en": "A program that changed privilege never dumps core",
+      "title_ko": "권한이 바뀐 프로그램은 코어를 남기지 않는다",
+      "category": "beyond",
+      "importance": "중",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when does not hold: env.container eq none",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "docker",
+          "source": {
+            "kind": "file",
+            "path": "/.dockerenv"
+          }
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.beyond.swap_encrypted",
+      "title_en": "Every swap device is encrypted",
+      "title_ko": "모든 스왑 장치가 암호화되어 있다",
+      "category": "beyond",
+      "importance": "중",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when does not hold: env.container eq none",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "docker",
+          "source": {
+            "kind": "file",
+            "path": "/.dockerenv"
+          }
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.beyond.sysrq_restricted",
+      "title_en": "The magic SysRq key is disabled, or limited to the value the operator declared",
+      "title_ko": "매직 SysRq 키가 비활성화되어 있거나 운영자가 선언한 값으로 제한된다",
+      "category": "beyond",
+      "importance": "중",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when does not hold: env.container eq none",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "docker",
+          "source": {
+            "kind": "file",
+            "path": "/.dockerenv"
+          }
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.beyond.tmp_mount_options",
+      "title_en": "/tmp is mounted nodev, nosuid and noexec",
+      "title_ko": "/tmp 이 nodev, nosuid, noexec 로 마운트된다",
+      "category": "beyond",
+      "importance": "중",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when does not hold: env.container eq none",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "docker",
+          "source": {
+            "kind": "file",
+            "path": "/.dockerenv"
+          }
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.beyond.uncommon_network_protocols_disabled",
+      "title_en": "The network protocol modules no server needs cannot be loaded",
+      "title_ko": "서버에 필요 없는 네트워크 프로토콜 모듈을 적재할 수 없다",
+      "category": "beyond",
+      "importance": "중",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when does not hold: env.container eq none",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "docker",
+          "source": {
+            "kind": "file",
+            "path": "/.dockerenv"
+          }
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.beyond.usb_storage_disabled",
+      "title_en": "The USB mass-storage driver cannot be loaded",
+      "title_ko": "USB 대용량 저장 장치 드라이버를 적재할 수 없다",
+      "category": "beyond",
+      "importance": "중",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when does not hold: env.container eq none",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "docker",
+          "source": {
+            "kind": "file",
+            "path": "/.dockerenv"
+          }
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.beyond.var_tmp_mount_options",
+      "title_en": "/var/tmp is mounted nodev, nosuid and noexec",
+      "title_ko": "/var/tmp 이 nodev, nosuid, noexec 로 마운트된다",
+      "category": "beyond",
+      "importance": "중",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when does not hold: env.container eq none",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "docker",
+          "source": {
+            "kind": "file",
+            "path": "/.dockerenv"
+          }
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.beyond.home_mount_options",
+      "title_en": "/home is mounted nodev and nosuid",
+      "title_ko": "/home 이 nodev 와 nosuid 로 마운트된다",
+      "category": "beyond",
+      "importance": "하",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when does not hold: env.container eq none",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "docker",
+          "source": {
+            "kind": "file",
+            "path": "/.dockerenv"
+          }
+        }
+      ],
+      "severity": "low"
+    },
+    {
+      "id": "muster.beyond.uncommon_filesystems_disabled",
+      "title_en": "The file system drivers no server needs cannot be loaded",
+      "title_ko": "서버에 필요 없는 파일 시스템 드라이버를 적재할 수 없다",
+      "category": "beyond",
+      "importance": "하",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when does not hold: env.container eq none",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "docker",
+          "source": {
+            "kind": "file",
+            "path": "/.dockerenv"
+          }
+        }
+      ],
+      "severity": "low"
+    },
+    {
+      "id": "muster.beyond.unprivileged_bpf_restricted",
+      "title_en": "An unprivileged account cannot load a BPF program, and the JIT blinds its constants",
+      "title_ko": "비권한 계정이 BPF 프로그램을 적재할 수 없고 JIT 가 상수를 가린다",
+      "category": "beyond",
+      "importance": "하",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when does not hold: env.container eq none",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "docker",
+          "source": {
+            "kind": "file",
+            "path": "/.dockerenv"
+          }
+        }
+      ],
       "severity": "low"
     }
   ]

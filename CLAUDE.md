@@ -1,7 +1,7 @@
 # muster — working notes for Claude
 
 Design: `docs/superpowers/specs/2026-09-02-muster-design.md` (English canonical, Korean pair). It is also the
-decision log (D01–D28). Read it before changing any contract: facts schema, control ids, exit codes,
+decision log (D01–D29). Read it before changing any contract: facts schema, control ids, exit codes,
 waiver keys, output format.
 
 ## Build and test
@@ -47,6 +47,17 @@ regenerates them from public images and `-check` compares.
 - Every walk list is capped (`listCaps`); a full list never stops the walk — `truncated: true` on that
   key and `walk.stats.truncated_counts` record it. `walk.skipped` rows carry a closed `reason` vocabulary
   and a `detail`. Records are maps; every list is sorted by `path`.
+
+## Beyond the guide (stage 3B)
+
+- `category: beyond` ⇔ no `references.kisa` (lint `beyond_scope`); ids `muster.beyond.<name>` under
+  `controls/beyond/`; every beyond control gates on `env.container eq none`; importance is muster's own
+  rating from a primary source, said in the description. The summary's `scopes` splits the guide from
+  beyond it; the exit code counts both.
+- A `/dev/null` symlink in a `.d` directory muster reads is a mask, never an error; every `/sys/block`
+  entry is a symlink, so sysfs is walked through `Readlink` into `devices/virtual/block`; the module tree
+  is `/usr/lib/modules` on merged-`/usr` hosts. `controls/testdata/_hosts/` holds whole-host synthetic
+  snapshots (the stock Ubuntu 22.04 reading) that the fixture harness ignores and `hosts_test.go` pins.
 
 ## Stage-2 conventions
 

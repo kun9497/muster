@@ -195,6 +195,15 @@ func Lint(s *Set, reg *facts.Registry, opts LintOptions) []Problem {
 				}
 			}
 		}
+		// B-9/K-10, the half that needs no inventory: a control filed beyond
+		// the guide that also claims a KISA item contradicts itself on its
+		// own evidence, and the report's two scopes would then overlap. The
+		// converse -- a guide control that claims nothing -- is a statement
+		// about coverage and lives in lintKISACoverage, which runs only where
+		// a caller offered an inventory.
+		if c.Category == "beyond" && citesKISA(c) {
+			add("beyond_scope", "category beyond means this control implements no KISA item, but it cites %s; drop references.kisa or give it the category of the item", strings.Join(citedKISA(c), ", "))
+		}
 		// M-8: evidence names the facts a reviewer needs in front of them.
 		// It is only meaningful where muster declines to judge.
 		if len(c.Evidence) > 0 && c.Automation != "manual" {
@@ -280,6 +289,30 @@ func Lint(s *Set, reg *facts.Registry, opts LintOptions) []Problem {
 	return out
 }
 
+// citedKISA returns every KISA item c cites, across every edition, sorted and
+// deduplicated so the beyond_scope message is the same bytes on every run
+// (references.kisa is a map, whose iteration order Go randomises).
+func citedKISA(c *Control) []string {
+	seen := map[string]bool{}
+	for _, items := range c.References.KISA {
+		for _, it := range items {
+			seen[it] = true
+		}
+	}
+	out := make([]string, 0, len(seen))
+	for it := range seen {
+		out = append(out, it)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// citesKISA reports whether c claims any KISA item at all. An empty list
+// under an edition key claims nothing, so it counts as no reference: the
+// scope predicate must agree with the report's, which asks what the control
+// implements, not which keys its YAML happens to carry.
+func citesKISA(c *Control) bool { return len(citedKISA(c)) > 0 }
+
 func paramDefaultMatches(p Param) bool {
 	switch p.Type {
 	case "string":
@@ -327,6 +360,10 @@ func paramDefaultMatches(p Param) bool {
 // waivers have nothing to do with each other. One control listing an id twice
 // is still a per-control references_kisa problem (M-39). Only the current
 // edition is judged (M-26).
+//
+// It also carries the converse half of beyond_scope (B-9, K-10), for the
+// reason stated at that loop: it is an offence only where an inventory was
+// offered.
 func lintKISACoverage(s *Set, x *KISAInventory) []Problem {
 	if x == nil {
 		return nil // shape-only linting: no inventory was offered
@@ -338,6 +375,21 @@ func lintKISACoverage(s *Set, x *KISAInventory) []Problem {
 	// set-level gate off without a word would be.
 	if !x.HasEdition(LatestKISAEdition) {
 		return []Problem{{Rule: "kisa_coverage", Message: fmt.Sprintf("inventory holds no %s edition; the coverage rule cannot run", LatestKISAEdition)}}
+	}
+	var out []Problem
+	// B-9/K-10, the converse half: a control that is not beyond the guide
+	// must implement an item of it. It lives here rather than with the
+	// per-control rules because "claims nothing" is only an offence where
+	// somebody offered the guide to compare against -- a set linted for shape
+	// alone, which is what the mutation test and most unit tests do, carries
+	// no references at all and is not wrong for it. The problem still names
+	// the control and its file: it is that file that has to change.
+	for i := range s.Controls {
+		c := &s.Controls[i]
+		if c.Category != "beyond" && !citesKISA(c) {
+			out = append(out, Problem{ControlID: c.ID, Path: c.Path, Rule: "beyond_scope",
+				Message: fmt.Sprintf("category %q means this control implements a KISA item, but it cites none; add references.kisa or give it category beyond", c.Category)})
+		}
 	}
 	citedBy := map[string][]string{}
 	for i := range s.Controls {
@@ -354,7 +406,6 @@ func lintKISACoverage(s *Set, x *KISAInventory) []Problem {
 			citedBy[id] = append(citedBy[id], c.ID)
 		}
 	}
-	var out []Problem
 	add := func(format string, args ...any) {
 		out = append(out, Problem{Rule: "kisa_coverage", Message: fmt.Sprintf(format, args...)})
 	}

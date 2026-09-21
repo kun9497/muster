@@ -79,8 +79,10 @@ func countAutomation(items []controls.KISAItem, byItem map[string][]controls.Con
 
 // coverageNumbers are the numbers both READMEs and the table's summary line
 // state: how many of the inventory's items the set enrols, how many items
-// there are, and how the enrolled controls divide by automation.
-type coverageNumbers struct{ enrolled, total, auto, partial, manual int }
+// there are, how the enrolled controls divide by automation, and how many
+// controls stand beyond the guide (B-9, B-12) -- a number the item table
+// cannot state, because a beyond control implements no item.
+type coverageNumbers struct{ enrolled, total, auto, partial, manual, beyond int }
 
 // counts answers all of them from the inputs, for callers that have not
 // joined anything -- the README guard in main.go. The table and the guard
@@ -88,7 +90,21 @@ type coverageNumbers struct{ enrolled, total, auto, partial, manual int }
 func counts(items []controls.KISAItem, deferred []controls.Deferral, set []controls.Control) coverageNumbers {
 	byItem, stage, _ := join(items, deferred, set)
 	auto, partial, manual := countAutomation(items, byItem, stage)
-	return coverageNumbers{enrolled: countEnrolled(items, byItem, stage), total: len(items), auto: auto, partial: partial, manual: manual}
+	return coverageNumbers{enrolled: countEnrolled(items, byItem, stage), total: len(items),
+		auto: auto, partial: partial, manual: manual, beyond: countBeyond(set)}
+}
+
+// countBeyond counts the controls of category "beyond": one predicate, the
+// same one renderBeyond and the report's scope split use (B-9), so the
+// README sentence and the generated table can never disagree.
+func countBeyond(set []controls.Control) int {
+	n := 0
+	for _, c := range set {
+		if c.Category == "beyond" {
+			n++
+		}
+	}
+	return n
 }
 
 // render joins the KISA inventory with the embedded control set and appends
@@ -135,8 +151,69 @@ func render(items []controls.KISAItem, deferred []controls.Deferral, usage []con
 		b.WriteString(strings.Join(unknown, "\n"))
 		b.WriteString("\n")
 	}
+	b.WriteString(renderBeyond(set))
 	b.WriteString(renderUsage(usage))
 	return b.String()
+}
+
+// renderBeyond is the other half of the coverage question (B-9). The table
+// above joins the guide's items with the controls that implement them and so
+// cannot mention a control that implements none; without a table of their own
+// the checks beyond the guide would be the only part of the set no generated
+// document lists. The columns are what a reviewer needs in order to judge a
+// check nobody else wrote down: what it reads, and which STIG rule -- if any
+// -- it agrees with.
+//
+// The fact keys come from controls.FactKeys, the same walk the fact-usage
+// section folds over the whole set, so the two can never disagree about what
+// a control reads.
+func renderBeyond(set []controls.Control) string {
+	var rows []string
+	for _, c := range set {
+		if c.Category != "beyond" {
+			continue
+		}
+		rows = append(rows, fmt.Sprintf("| %s | %s | %s | %s | %s |",
+			c.ID, c.Importance, c.Automation, orDash(controls.FactKeys(&c)), orDash(stigIDs(c))))
+	}
+	var b strings.Builder
+	b.WriteString("\n## Beyond the guide\n\n")
+	if len(rows) == 0 {
+		b.WriteString("None yet — every control in the set implements a KISA item.\n")
+		return b.String()
+	}
+	sort.Strings(rows)
+	fmt.Fprintf(&b, "%d controls muster checks that the guide does not ask for.\n\n", len(rows))
+	b.WriteString("| Control | Imp. | Automation | Fact keys read | STIG ids |\n|---|---|---|---|---|\n")
+	b.WriteString(strings.Join(rows, "\n"))
+	b.WriteString("\n")
+	return b.String()
+}
+
+// stigIDs are the STIG rule ids a control cites, sorted and deduplicated: the
+// same rule may be indexed under more than one benchmark, and references.stig
+// is a list whose file order is not a promise.
+func stigIDs(c controls.Control) []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, r := range c.References.STIG {
+		if seen[r.ID] {
+			continue
+		}
+		seen[r.ID] = true
+		out = append(out, r.ID)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// orDash renders a list as a markdown cell, an em dash standing for "none" so
+// that an empty cell never reads as an oversight.
+func orDash(xs []string) string {
+	if len(xs) == 0 {
+		return "—"
+	}
+	return strings.Join(xs, ", ")
 }
 
 // renderUsage is spec §11 as a table: facts used, not facts collected. One

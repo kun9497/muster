@@ -51,6 +51,12 @@ func init() {
 	collect.Register(mailCollector)
 	collect.Register(dnsCollector)
 	collect.Register(patchCollector)
+	collect.Register(sysctlCollector)
+	collect.Register(coredumpCollector)
+	collect.Register(bootCollector)
+	collect.Register(mountsCollector)
+	collect.Register(modulesCollector)
+	collect.Register(swapCollector)
 	collect.Register(walkCollector)
 }
 

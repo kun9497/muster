@@ -1,0 +1,57 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none"
+      }
+    },
+    "boot": {
+      "grub_cfg": {
+        "path": {
+          "status": "absent",
+          "reason": "no bootloader configuration at /boot/grub/grub.cfg, /boot/grub2/grub.cfg or /boot/efi/EFI/*/grub.cfg"
+        },
+        "mode": {
+          "status": "absent",
+          "reason": "no bootloader configuration at /boot/grub/grub.cfg, /boot/grub2/grub.cfg or /boot/efi/EFI/*/grub.cfg"
+        },
+        "uid": {
+          "status": "absent",
+          "reason": "no bootloader configuration at /boot/grub/grub.cfg, /boot/grub2/grub.cfg or /boot/efi/EFI/*/grub.cfg"
+        },
+        "gid": {
+          "status": "absent",
+          "reason": "no bootloader configuration at /boot/grub/grub.cfg, /boot/grub2/grub.cfg or /boot/efi/EFI/*/grub.cfg"
+        },
+        "group": {
+          "status": "absent",
+          "reason": "no bootloader configuration at /boot/grub/grub.cfg, /boot/grub2/grub.cfg or /boot/efi/EFI/*/grub.cfg"
+        },
+        "group_readable": {
+          "status": "absent",
+          "reason": "no bootloader configuration at /boot/grub/grub.cfg, /boot/grub2/grub.cfg or /boot/efi/EFI/*/grub.cfg"
+        },
+        "group_writable": {
+          "status": "absent",
+          "reason": "no bootloader configuration at /boot/grub/grub.cfg, /boot/grub2/grub.cfg or /boot/efi/EFI/*/grub.cfg"
+        },
+        "other_readable": {
+          "status": "absent",
+          "reason": "no bootloader configuration at /boot/grub/grub.cfg, /boot/grub2/grub.cfg or /boot/efi/EFI/*/grub.cfg"
+        },
+        "other_writable": {
+          "status": "absent",
+          "reason": "no bootloader configuration at /boot/grub/grub.cfg, /boot/grub2/grub.cfg or /boot/efi/EFI/*/grub.cfg"
+        },
+        "acl_present": {
+          "status": "absent",
+          "reason": "no bootloader configuration at /boot/grub/grub.cfg, /boot/grub2/grub.cfg or /boot/efi/EFI/*/grub.cfg"
+        }
+      }
+    }
+  }
+}

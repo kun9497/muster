@@ -1,0 +1,175 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none"
+      }
+    },
+    "mounts": {
+      "points": {
+        "status": "ok",
+        "source": {
+          "kind": "proc",
+          "path": "/proc/self/mountinfo"
+        },
+        "value": [
+          {
+            "target": "/",
+            "separate": true,
+            "mounted_by": "/",
+            "source": "/dev/mapper/vg-root",
+            "fstype": "ext4",
+            "options": [
+              "rw",
+              "relatime"
+            ]
+          },
+          {
+            "target": "/boot",
+            "separate": true,
+            "mounted_by": "/boot",
+            "source": "/dev/vda2",
+            "fstype": "ext4",
+            "options": [
+              "rw",
+              "relatime",
+              "nodev",
+              "nosuid"
+            ]
+          },
+          {
+            "target": "/home",
+            "separate": true,
+            "mounted_by": "/home",
+            "source": "/dev/mapper/vg-home",
+            "fstype": "ext4",
+            "options": [
+              "rw",
+              "relatime",
+              "nodev",
+              "nosuid"
+            ]
+          },
+          {
+            "target": "/tmp",
+            "separate": true,
+            "mounted_by": "/tmp",
+            "source": "tmpfs",
+            "fstype": "tmpfs",
+            "options": [
+              "rw",
+              "nosuid",
+              "nodev",
+              "noexec",
+              "relatime"
+            ]
+          },
+          {
+            "target": "/var",
+            "separate": false,
+            "mounted_by": "/",
+            "source": "/dev/mapper/vg-root",
+            "fstype": "ext4",
+            "options": [
+              "rw",
+              "relatime"
+            ]
+          },
+          {
+            "target": "/var/tmp",
+            "separate": true,
+            "mounted_by": "/var/tmp",
+            "source": "/dev/mapper/vg-vartmp",
+            "fstype": "xfs",
+            "options": [
+              "rw",
+              "nosuid",
+              "nodev",
+              "noexec",
+              "relatime"
+            ]
+          },
+          {
+            "target": "/var/log",
+            "separate": true,
+            "mounted_by": "/var/log",
+            "source": "/dev/mapper/vg-varlog",
+            "fstype": "xfs",
+            "options": [
+              "rw",
+              "relatime"
+            ]
+          },
+          {
+            "target": "/var/log/audit",
+            "separate": true,
+            "mounted_by": "/var/log/audit",
+            "source": "/dev/mapper/vg-varlogaudit",
+            "fstype": "xfs",
+            "options": [
+              "rw",
+              "relatime"
+            ]
+          },
+          {
+            "target": "/dev/shm",
+            "separate": true,
+            "mounted_by": "/dev/shm",
+            "source": "tmpfs",
+            "fstype": "tmpfs",
+            "options": [
+              "rw",
+              "nosuid",
+              "nodev",
+              "noexec"
+            ]
+          }
+        ]
+      },
+      "home": {
+        "separate": {
+          "status": "ok",
+          "value": true,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/self/mountinfo"
+          }
+        }
+      },
+      "tmp": {
+        "separate": {
+          "status": "ok",
+          "value": true,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/self/mountinfo"
+          }
+        }
+      },
+      "var_tmp": {
+        "separate": {
+          "status": "ok",
+          "value": true,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/self/mountinfo"
+          }
+        }
+      },
+      "dev_shm": {
+        "separate": {
+          "status": "ok",
+          "value": true,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/self/mountinfo"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "env":{"container":{"status":"ok","value":"none"}},
+  "kernel":{"sysctl":{
+    "sysrq":{"runtime":{"status":"ok","value":176,"source":{"kind":"proc","path":"/proc/sys/kernel/sysrq"}},"persisted":{"status":"absent","reason":"no sysctl.d line sets kernel.sysrq"},"effective":{"status":"ok","value":176,"source":{"kind":"proc","path":"/proc/sys/kernel/sysrq"}},"winner":{"kind":"proc","path":"/proc/sys/kernel/sysrq"}}
+  }}
+}}

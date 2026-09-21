@@ -1,0 +1,24 @@
+id: muster.beyond.uncommon_network_protocols_disabled
+title_en: The network protocol modules no server needs cannot be loaded
+title_ko: 서버에 필요 없는 네트워크 프로토콜 모듈을 적재할 수 없다
+description_en: dccp, sctp, rds and tipc are transport and cluster protocols almost no server speaks — a congestion-controlled datagram transport, a telephony signalling transport, a remote direct memory access protocol and an inter-node cluster bus — and each is autoloaded by the kernel the moment any process creates a socket of that family, which an unprivileged process can do in one line. That makes them the worst kind of attack surface, kernel code that parses packets, reachable without privilege, and rarely exercised enough for its bugs to be found by ordinary use; all four have produced remote or local kernel exploits. muster requires each of them to be disabled. It is rated 중 because a single unprivileged socket call is enough to load the module and turn a local foothold into a kernel one, while an unreachable protocol offers an attacker nothing. Disabling means install <name> /bin/false (or /bin/true) in a modprobe.d file, which is what actually stops modprobe loading the module — a blacklist <name> line only suppresses autoloading by alias and is recorded as evidence rather than credited, because an explicit modprobe still loads a blacklisted module, and a module already loaded is never disabled whatever the configuration says. A module the running kernel has built in cannot be disabled at all and fails, with the built-in state named as the reason; a module the kernel tree does not ship cannot be loaded and passes.
+description_ko: dccp, sctp, rds, tipc 는 거의 어떤 서버도 쓰지 않는 전송·클러스터 프로토콜(혼잡 제어 데이터그램 전송, 전화망 신호 전송, 원격 직접 메모리 접근 프로토콜, 노드 간 클러스터 버스)이며, 어떤 프로세스든 그 계열의 소켓을 만드는 순간 커널이 자동으로 적재합니다. 권한 없는 프로세스도 한 줄이면 할 수 있는 일입니다. 그래서 이들은 최악의 공격면입니다. 패킷을 해석하는 커널 코드이고, 권한 없이 닿을 수 있으며, 평범한 사용으로 결함이 드러날 만큼 자주 쓰이지 않습니다. 네 가지 모두 원격 또는 로컬 커널 취약점을 낸 전력이 있습니다. muster 는 이들 각각이 비활성화되어 있기를 요구합니다. 권한 없는 소켓 호출 한 번이면 모듈이 적재되어 로컬 발판이 커널 수준 장악으로 바뀌는 반면, 닿을 수 없는 프로토콜은 공격자에게 아무것도 내주지 않으므로 중요도는 중 입니다. 비활성화란 modprobe.d 파일의 install <name> /bin/false(또는 /bin/true)를 뜻하며 실제로 modprobe 의 적재를 막는 것이 그것입니다. blacklist <name> 줄은 별칭에 의한 자동 적재만 억제하므로 인정하지 않고 증거로만 기록합니다. 명시적인 modprobe 는 blacklist 된 모듈도 적재하며, 이미 적재된 모듈은 설정이 무엇이라 하든 비활성화된 것이 아닙니다. 실행 중인 커널에 내장된 모듈은 아예 비활성화할 수 없어 실패하며 내장 상태가 그 이유로 표시되고, 커널 트리가 배포하지 않는 모듈은 적재될 수 없으므로 통과합니다.
+category: beyond
+importance: 중
+automation: auto
+references:
+  stig:
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-213060 }
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-213065 }
+  nist_800_53: ["CM-7"]
+requires_facts: ">=1"
+applies_when:
+  - { fact: env.container, op: eq, expected: none }
+absent_means: fail
+checks:
+  - { fact: kernel.modules, op: each, subject: name, where: { field: name, op: in, expected: ["dccp", "sctp", "rds", "tipc"] }, require: { field: disabled, op: eq, expected: true } }
+remediation:
+  text_en: Write one install <name> /bin/false line per protocol into a file under /etc/modprobe.d, for example /etc/modprobe.d/50-uncommon-protocols.conf, and rebuild the initramfs. A module that is already loaded stays loaded until the next boot, so check lsmod after rebooting rather than trusting the file alone. Hosts that genuinely speak one of these — an SCTP signalling gateway, a TIPC cluster member, an RDS fabric — should carry a waiver naming the module instead of leaving the control undecided for all four.
+  text_ko: 프로토콜마다 install <name> /bin/false 한 줄씩을 /etc/modprobe.d 아래 파일(예를 들어 /etc/modprobe.d/50-uncommon-protocols.conf)에 적고 initramfs 를 다시 만듭니다. 이미 적재된 모듈은 다음 부팅까지 적재된 채로 남으므로 파일만 믿지 말고 재부팅 후 lsmod 로 확인하십시오. 이들 중 하나를 실제로 쓰는 호스트(SCTP 신호 게이트웨이, TIPC 클러스터 구성원, RDS 패브릭 등)는 네 개 전부를 미결로 두지 말고 해당 모듈을 지목하는 waiver 를 두십시오.
+  risk: none
+  idempotent: true

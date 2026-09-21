@@ -1,0 +1,2 @@
+# synthetic /boot/grub2/user.cfg, the 0600 file grub-setpassword writes
+GRUB2_PASSWORD=grub.pbkdf2.sha512.10000.SALT.HASH

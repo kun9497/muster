@@ -147,3 +147,15 @@
     `impl := collect.OK(p.impl, p.implSource())` on every path — a host with no MTA gets the
     value "none", never an absent envelope — so this `present` gate holds on every snapshot
     collect writes and removing it cannot change any fixture's answer.
+
+- control: muster.beyond.core_dump_policy
+  mutant: "mechanisms[3].when[0] remove"
+  reason: >-
+    readCorePattern (internal/collect/collectors/coredump.go) writes coredump.core_pattern as
+    ONE string leaf from one read of /proc/sys/kernel/core_pattern, and mechanism [2]'s `when`
+    (not_matches ^\|) is the exact complement of mechanism [3]'s (matches ^\|) over that leaf's
+    ok values. So mechanism [3] is only ever reached on a host whose pattern its own `when`
+    already accepts; and where the leaf is not ok, every mechanism is skipped alike -- the
+    original resolves through absent_means with "no mechanism applies", the mutant through the
+    same absent_means on the mechanism's own checks, and both are MANUAL with no reason code. No
+    snapshot collect can write separates the two.

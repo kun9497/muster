@@ -1,0 +1,6 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "env":{"container":{"status":"ok","value":"none"}},
+  "kernel":{"sysctl":{
+    "kptr_restrict":{"runtime":{"status":"ok","value":1,"source":{"kind":"proc","path":"/proc/sys/kernel/kptr_restrict"}},"persisted":{"status":"ok","value":1,"source":{"kind":"file","path":"/etc/sysctl.d/60-kernel-hardening.conf","line":4,"raw":"kernel.kptr_restrict = 1"}},"effective":{"status":"ok","value":1,"source":{"kind":"proc","path":"/proc/sys/kernel/kptr_restrict"}},"winner":{"kind":"proc","path":"/proc/sys/kernel/kptr_restrict"}},"dmesg_restrict":{"runtime":{"status":"ok","value":0,"source":{"kind":"proc","path":"/proc/sys/kernel/dmesg_restrict"}},"persisted":{"status":"absent","reason":"no sysctl.d line sets kernel.dmesg_restrict"},"effective":{"status":"ok","value":0,"source":{"kind":"proc","path":"/proc/sys/kernel/dmesg_restrict"}},"winner":{"kind":"proc","path":"/proc/sys/kernel/dmesg_restrict"}}
+  }}
+}}

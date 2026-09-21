@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
   "run": {
-    "muster_version": "94ca596",
-    "commit": "94ca596",
-    "controls_version": "kisa-unix-2026+2026.09.16",
-    "controls_digest": "sha256:b63d828be048ac893f0346f485385fd9eae141a1914e261691d593028202e641",
+    "muster_version": "e5eda50",
+    "commit": "e5eda50",
+    "controls_version": "kisa-unix-2026+2026.09.18",
+    "controls_digest": "sha256:1236ece32ab31e36ec68736e546abc54ce3ab653a221c2a27e080a573cf39db6",
     "guide_edition": "kisa-unix-2026",
-    "collected_at": "2026-09-17T08:30:07Z",
+    "collected_at": "2026-09-21T00:36:06Z",
     "host": {
       "hostname": "github-runner",
       "machine_id_hash": "1d6f6908d56a5b37951f001d55c54773e0757799ded7f46439ef6dad42950555",
@@ -39,17 +39,27 @@
       {
         "name": "accounts",
         "status": "ok",
-        "ms": 8
+        "ms": 9
       },
       {
         "name": "banners",
         "status": "ok",
-        "ms": 57
+        "ms": 0
+      },
+      {
+        "name": "boot",
+        "status": "ok",
+        "ms": 6
+      },
+      {
+        "name": "coredump",
+        "status": "ok",
+        "ms": 0
       },
       {
         "name": "cron",
         "status": "ok",
-        "ms": 959,
+        "ms": 840,
         "cmd": "/usr/bin/systemctl list-unit-files --type=timer --no-legend --no-pager"
       },
       {
@@ -60,17 +70,17 @@
       {
         "name": "env",
         "status": "ok",
-        "ms": 126
+        "ms": 4
       },
       {
         "name": "files",
         "status": "ok",
-        "ms": 10
+        "ms": 19
       },
       {
         "name": "firewall",
         "status": "ok",
-        "ms": 25,
+        "ms": 20,
         "cmd": "/usr/sbin/nft list ruleset"
       },
       {
@@ -85,6 +95,16 @@
       },
       {
         "name": "mail",
+        "status": "ok",
+        "ms": 0
+      },
+      {
+        "name": "modules",
+        "status": "ok",
+        "ms": 23
+      },
+      {
+        "name": "mounts",
         "status": "ok",
         "ms": 0
       },
@@ -112,13 +132,13 @@
       {
         "name": "patch",
         "status": "ok",
-        "ms": 6097,
+        "ms": 1987,
         "cmd": "/usr/bin/apt-get -s upgrade -o Debug::NoLocking=1"
       },
       {
         "name": "services",
         "status": "ok",
-        "ms": 194,
+        "ms": 315,
         "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState atftpd.service"
       },
       {
@@ -129,24 +149,34 @@
       {
         "name": "sockets",
         "status": "ok",
-        "ms": 1
+        "ms": 9
       },
       {
         "name": "sshd",
         "status": "ok",
-        "ms": 318,
+        "ms": 107,
         "cmd": "/usr/sbin/sshd -G"
+      },
+      {
+        "name": "swap",
+        "status": "ok",
+        "ms": 0
+      },
+      {
+        "name": "sysctl",
+        "status": "ok",
+        "ms": 0
       },
       {
         "name": "timesync",
         "status": "ok",
-        "ms": 69,
+        "ms": 60,
         "cmd": "/usr/bin/timedatectl show-timesync --all"
       },
       {
         "name": "walk",
         "status": "ok",
-        "ms": 71023,
+        "ms": 13466,
         "cmd": "/usr/bin/rpm -qa --qf [%{=NAME}\t%{FILEMODES:octal}\t%{FILEUSERNAME}\t%{FILEGROUPNAME}\t%{FILENAMES}\n]"
       }
     ],
@@ -1931,6 +1961,239 @@
         }
       }
     },
+    "boot": {
+      "firmware": {
+        "status": "ok",
+        "value": "uefi",
+        "source": {
+          "kind": "sys",
+          "path": "/sys/firmware/efi"
+        }
+      },
+      "grub_cfg": {
+        "acl_present": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "file",
+            "path": "/boot/grub/grub.cfg"
+          }
+        },
+        "gid": {
+          "status": "ok",
+          "value": 0,
+          "source": {
+            "kind": "file",
+            "path": "/boot/grub/grub.cfg"
+          }
+        },
+        "group": {
+          "status": "ok",
+          "value": "root",
+          "source": {
+            "kind": "file",
+            "path": "/etc/group"
+          }
+        },
+        "group_readable": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "file",
+            "path": "/boot/grub/grub.cfg"
+          }
+        },
+        "group_writable": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "file",
+            "path": "/boot/grub/grub.cfg"
+          }
+        },
+        "mode": {
+          "status": "ok",
+          "value": 384,
+          "source": {
+            "kind": "file",
+            "path": "/boot/grub/grub.cfg"
+          }
+        },
+        "other_readable": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "file",
+            "path": "/boot/grub/grub.cfg"
+          }
+        },
+        "other_writable": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "file",
+            "path": "/boot/grub/grub.cfg"
+          }
+        },
+        "path": {
+          "status": "ok",
+          "value": "/boot/grub/grub.cfg",
+          "source": {
+            "kind": "file",
+            "path": "/boot/grub/grub.cfg"
+          }
+        },
+        "uid": {
+          "status": "ok",
+          "value": 0,
+          "source": {
+            "kind": "file",
+            "path": "/boot/grub/grub.cfg"
+          }
+        }
+      },
+      "grub_password_set": {
+        "status": "ok",
+        "value": false,
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "file",
+              "path": "/boot/grub/grub.cfg"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/grub.d/00_header"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/grub.d/01_track_initrdless_boot_fallback"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/grub.d/05_debian_theme"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/grub.d/10_linux"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/grub.d/10_linux_zfs"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/grub.d/20_linux_xen"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/grub.d/25_bli"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/grub.d/30_os-prober"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/grub.d/30_uefi-firmware"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/grub.d/35_fwupd"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/grub.d/40_custom"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/grub.d/41_custom"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/grub.d/README"
+            }
+          ]
+        }
+      },
+      "secure_boot": {
+        "status": "ok",
+        "value": false,
+        "source": {
+          "kind": "sys",
+          "path": "/sys/firmware/efi/efivars/SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c"
+        }
+      }
+    },
+    "coredump": {
+      "core_pattern": {
+        "status": "ok",
+        "value": "|/usr/lib/systemd/systemd-coredump %P %u %g %s %t 9223372036854775808 %h %d",
+        "source": {
+          "kind": "proc",
+          "path": "/proc/sys/kernel/core_pattern"
+        }
+      },
+      "limits": {
+        "hard_core": {
+          "status": "absent",
+          "reason": "no limits.conf line sets a hard core limit for *"
+        },
+        "sources": {
+          "status": "ok",
+          "value": [
+            "/etc/security/limits.conf"
+          ],
+          "source": {
+            "kind": "file",
+            "path": "/etc/security/limits.conf"
+          }
+        }
+      },
+      "suid_dumpable": {
+        "runtime": {
+          "status": "ok",
+          "value": 2,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/sys/fs/suid_dumpable"
+          }
+        },
+        "persisted": {
+          "status": "ok",
+          "value": 2,
+          "source": {
+            "kind": "file",
+            "path": "/usr/lib/sysctl.d/50-coredump.conf",
+            "line": 37,
+            "raw": "fs.suid_dumpable=2"
+          }
+        },
+        "effective": {
+          "status": "ok",
+          "value": 2,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/sys/fs/suid_dumpable"
+          }
+        },
+        "winner": {
+          "kind": "proc",
+          "path": "/proc/sys/fs/suid_dumpable"
+        }
+      },
+      "systemd": {
+        "process_size_max": {
+          "status": "absent",
+          "reason": "no coredump.conf line sets ProcessSizeMax"
+        },
+        "storage": {
+          "status": "absent",
+          "reason": "no coredump.conf line sets Storage"
+        }
+      }
+    },
     "cron": {
       "dirs": {
         "status": "ok",
@@ -2548,6 +2811,22 @@
           },
           {
             "fstype": "devtmpfs",
+            "kind": "dir",
+            "mode": 493,
+            "name": "bsg",
+            "path": "/dev/bsg",
+            "uid": 0
+          },
+          {
+            "fstype": "devtmpfs",
+            "kind": "chardev",
+            "mode": 384,
+            "name": "0:0:0:0",
+            "path": "/dev/bsg/0:0:0:0",
+            "uid": 0
+          },
+          {
+            "fstype": "devtmpfs",
             "kind": "chardev",
             "mode": 384,
             "name": "btrfs-control",
@@ -2694,6 +2973,14 @@
             "fstype": "devtmpfs",
             "kind": "dir",
             "mode": 493,
+            "name": "cloud",
+            "path": "/dev/disk/cloud",
+            "uid": 0
+          },
+          {
+            "fstype": "devtmpfs",
+            "kind": "dir",
+            "mode": 493,
             "name": "dma_heap",
             "path": "/dev/dma_heap",
             "uid": 0
@@ -2808,14 +3095,6 @@
             "mode": 438,
             "name": "uverbs0",
             "path": "/dev/infiniband/uverbs0",
-            "uid": 0
-          },
-          {
-            "fstype": "devtmpfs",
-            "kind": "chardev",
-            "mode": 438,
-            "name": "uverbs1",
-            "path": "/dev/infiniband/uverbs1",
             "uid": 0
           },
           {
@@ -3021,14 +3300,6 @@
           {
             "fstype": "devtmpfs",
             "kind": "chardev",
-            "mode": 384,
-            "name": "ng0n1",
-            "path": "/dev/ng0n1",
-            "uid": 0
-          },
-          {
-            "fstype": "devtmpfs",
-            "kind": "chardev",
             "mode": 438,
             "name": "null",
             "path": "/dev/null",
@@ -3040,62 +3311,6 @@
             "mode": 384,
             "name": "nvme-fabrics",
             "path": "/dev/nvme-fabrics",
-            "uid": 0
-          },
-          {
-            "fstype": "devtmpfs",
-            "kind": "chardev",
-            "mode": 384,
-            "name": "nvme0",
-            "path": "/dev/nvme0",
-            "uid": 0
-          },
-          {
-            "fstype": "devtmpfs",
-            "kind": "blockdev",
-            "mode": 432,
-            "name": "nvme0n1",
-            "path": "/dev/nvme0n1",
-            "uid": 0
-          },
-          {
-            "fstype": "devtmpfs",
-            "kind": "blockdev",
-            "mode": 432,
-            "name": "nvme0n1p1",
-            "path": "/dev/nvme0n1p1",
-            "uid": 0
-          },
-          {
-            "fstype": "devtmpfs",
-            "kind": "blockdev",
-            "mode": 432,
-            "name": "nvme0n1p14",
-            "path": "/dev/nvme0n1p14",
-            "uid": 0
-          },
-          {
-            "fstype": "devtmpfs",
-            "kind": "blockdev",
-            "mode": 432,
-            "name": "nvme0n1p15",
-            "path": "/dev/nvme0n1p15",
-            "uid": 0
-          },
-          {
-            "fstype": "devtmpfs",
-            "kind": "blockdev",
-            "mode": 432,
-            "name": "nvme0n1p16",
-            "path": "/dev/nvme0n1p16",
-            "uid": 0
-          },
-          {
-            "fstype": "devtmpfs",
-            "kind": "chardev",
-            "mode": 384,
-            "name": "nvme1",
-            "path": "/dev/nvme1",
             "uid": 0
           },
           {
@@ -3147,6 +3362,14 @@
             "uid": 0
           },
           {
+            "fstype": "devtmpfs",
+            "kind": "chardev",
+            "mode": 384,
+            "name": "ptp1",
+            "path": "/dev/ptp1",
+            "uid": 0
+          },
+          {
             "fstype": "devpts",
             "kind": "dir",
             "mode": 493,
@@ -3192,6 +3415,54 @@
             "mode": 384,
             "name": "rtc0",
             "path": "/dev/rtc0",
+            "uid": 0
+          },
+          {
+            "fstype": "devtmpfs",
+            "kind": "blockdev",
+            "mode": 432,
+            "name": "sda",
+            "path": "/dev/sda",
+            "uid": 0
+          },
+          {
+            "fstype": "devtmpfs",
+            "kind": "blockdev",
+            "mode": 432,
+            "name": "sda1",
+            "path": "/dev/sda1",
+            "uid": 0
+          },
+          {
+            "fstype": "devtmpfs",
+            "kind": "blockdev",
+            "mode": 432,
+            "name": "sda14",
+            "path": "/dev/sda14",
+            "uid": 0
+          },
+          {
+            "fstype": "devtmpfs",
+            "kind": "blockdev",
+            "mode": 432,
+            "name": "sda15",
+            "path": "/dev/sda15",
+            "uid": 0
+          },
+          {
+            "fstype": "devtmpfs",
+            "kind": "blockdev",
+            "mode": 432,
+            "name": "sda16",
+            "path": "/dev/sda16",
+            "uid": 0
+          },
+          {
+            "fstype": "devtmpfs",
+            "kind": "chardev",
+            "mode": 432,
+            "name": "sg0",
+            "path": "/dev/sg0",
             "uid": 0
           },
           {
@@ -5261,7 +5532,7 @@
             "group_writable": false,
             "mode": 420,
             "other_writable": false,
-            "path": "/var/log/sysstat/sa17",
+            "path": "/var/log/sysstat/sa21",
             "uid": 0
           },
           {
@@ -8446,7 +8717,7 @@
         "status": "ok",
         "value": [
           {
-            "content": "table ip security {\n\tchain OUTPUT {\n\t\ttype filter hook output priority 150; policy accept;\n\t\tip daddr 168.63.129.16 tcp dport 53 counter packets 0 bytes 0 accept\n\t\tip daddr 168.63.129.16 ip protocol tcp skuid 0 counter packets 562 bytes 241872 accept\n\t\tip daddr 168.63.129.16 ip protocol tcp ct state invalid,new counter packets 0 bytes 0 drop\n\t}\n}\ntable ip nat {\n\tchain DOCKER {\n\t\tiifname \"docker0\" counter packets 0 bytes 0 return\n\t}\n\n\tchain PREROUTING {\n\t\ttype nat hook prerouting priority dstnat; policy accept;\n\t\tfib daddr type local counter packets 2 bytes 367 jump DOCKER\n\t}\n\n\tchain OUTPUT {\n\t\ttype nat hook output priority dstnat; policy accept;\n\t\tip daddr != 127.0.0.0/8 fib daddr type local counter packets 0 bytes 0 jump DOCKER\n\t}\n\n\tchain POSTROUTING {\n\t\ttype nat hook postrouting priority srcnat; policy accept;\n\t\tip saddr 198.51.100.0/16 oifname != \"docker0\" counter packets 0 bytes 0 masquerade\n\t}\n}\ntable ip filter {\n\tchain DOCKER {\n\t\tiifname != \"docker0\" oifname \"docker0\" counter packets 0 bytes 0 drop\n\t}\n\n\tchain DOCKER-FORWARD {\n\t\tcounter packets 0 bytes 0 jump DOCKER-CT\n\t\tcounter packets 0 bytes 0 jump DOCKER-ISOLATION-STAGE-1\n\t\tcounter packets 0 bytes 0 jump DOCKER-BRIDGE\n\t\tiifname \"docker0\" counter packets 0 bytes 0 accept\n\t}\n\n\tchain DOCKER-BRIDGE {\n\t\toifname \"docker0\" counter packets 0 bytes 0 jump DOCKER\n\t}\n\n\tchain DOCKER-CT {\n\t\toifname \"docker0\" ct state related,established counter packets 0 bytes 0 accept\n\t}\n\n\tchain DOCKER-ISOLATION-STAGE-1 {\n\t\tiifname \"docker0\" oifname != \"docker0\" counter packets 0 bytes 0 jump DOCKER-ISOLATION-STAGE-2\n\t}\n\n\tchain DOCKER-ISOLATION-STAGE-2 {\n\t\toifname \"docker0\" counter packets 0 bytes 0 drop\n\t}\n\n\tchain FORWARD {\n\t\ttype filter hook forward priority filter; policy drop;\n\t\tcounter packets 0 bytes 0 jump DOCKER-USER\n\t\tcounter packets 0 bytes 0 jump DOCKER-FORWARD\n\t}\n\n\tchain DOCKER-USER {\n\t\tcounter packets 0 bytes 0 return\n\t}\n}\ntable ip6 nat {\n\tchain DOCKER {\n\t}\n\n\tchain PREROUTING {\n\t\ttype nat hook prerouting priority dstnat; policy accept;\n\t\tfib daddr type local counter packets 0 bytes 0 jump DOCKER\n\t}\n\n\tchain OUTPUT {\n\t\ttype nat hook output priority dstnat; policy accept;\n\t\tip6 daddr != ::1 fib daddr type local counter packets 0 bytes 0 jump DOCKER\n\t}\n}\ntable ip6 filter {\n\tchain DOCKER {\n\t}\n\n\tchain DOCKER-FORWARD {\n\t\tcounter packets 0 bytes 0 jump DOCKER-CT\n\t\tcounter packets 0 bytes 0 jump DOCKER-ISOLATION-STAGE-1\n\t\tcounter packets 0 bytes 0 jump DOCKER-BRIDGE\n\t}\n\n\tchain DOCKER-BRIDGE {\n\t}\n\n\tchain DOCKER-CT {\n\t}\n\n\tchain DOCKER-ISOLATION-STAGE-1 {\n\t}\n\n\tchain DOCKER-ISOLATION-STAGE-2 {\n\t}\n\n\tchain FORWARD {\n\t\ttype filter hook forward priority filter; policy accept;\n\t\tcounter packets 0 bytes 0 jump DOCKER-USER\n\t\tcounter packets 0 bytes 0 jump DOCKER-FORWARD\n\t}\n\n\tchain DOCKER-USER {\n\t\tcounter packets 0 bytes 0 return\n\t}\n}\n",
+            "content": "table ip security {\n\tchain OUTPUT {\n\t\ttype filter hook output priority 150; policy accept;\n\t\tip daddr 168.63.129.16 tcp dport 53 counter packets 0 bytes 0 accept\n\t\tip daddr 168.63.129.16 ip protocol tcp skuid 0 counter packets 501 bytes 226678 accept\n\t\tip daddr 168.63.129.16 ip protocol tcp ct state invalid,new counter packets 0 bytes 0 drop\n\t}\n}\ntable ip nat {\n\tchain DOCKER {\n\t\tiifname \"docker0\" counter packets 0 bytes 0 return\n\t}\n\n\tchain PREROUTING {\n\t\ttype nat hook prerouting priority dstnat; policy accept;\n\t\tfib daddr type local counter packets 0 bytes 0 jump DOCKER\n\t}\n\n\tchain OUTPUT {\n\t\ttype nat hook output priority dstnat; policy accept;\n\t\tip daddr != 127.0.0.0/8 fib daddr type local counter packets 0 bytes 0 jump DOCKER\n\t}\n\n\tchain POSTROUTING {\n\t\ttype nat hook postrouting priority srcnat; policy accept;\n\t\tip saddr 198.51.100.0/16 oifname != \"docker0\" counter packets 0 bytes 0 masquerade\n\t}\n}\ntable ip filter {\n\tchain DOCKER {\n\t\tiifname != \"docker0\" oifname \"docker0\" counter packets 0 bytes 0 drop\n\t}\n\n\tchain DOCKER-FORWARD {\n\t\tcounter packets 0 bytes 0 jump DOCKER-CT\n\t\tcounter packets 0 bytes 0 jump DOCKER-ISOLATION-STAGE-1\n\t\tcounter packets 0 bytes 0 jump DOCKER-BRIDGE\n\t\tiifname \"docker0\" counter packets 0 bytes 0 accept\n\t}\n\n\tchain DOCKER-BRIDGE {\n\t\toifname \"docker0\" counter packets 0 bytes 0 jump DOCKER\n\t}\n\n\tchain DOCKER-CT {\n\t\toifname \"docker0\" ct state related,established counter packets 0 bytes 0 accept\n\t}\n\n\tchain DOCKER-ISOLATION-STAGE-1 {\n\t\tiifname \"docker0\" oifname != \"docker0\" counter packets 0 bytes 0 jump DOCKER-ISOLATION-STAGE-2\n\t}\n\n\tchain DOCKER-ISOLATION-STAGE-2 {\n\t\toifname \"docker0\" counter packets 0 bytes 0 drop\n\t}\n\n\tchain FORWARD {\n\t\ttype filter hook forward priority filter; policy drop;\n\t\tcounter packets 0 bytes 0 jump DOCKER-USER\n\t\tcounter packets 0 bytes 0 jump DOCKER-FORWARD\n\t}\n\n\tchain DOCKER-USER {\n\t\tcounter packets 0 bytes 0 return\n\t}\n}\ntable ip6 nat {\n\tchain DOCKER {\n\t}\n\n\tchain PREROUTING {\n\t\ttype nat hook prerouting priority dstnat; policy accept;\n\t\tfib daddr type local counter packets 0 bytes 0 jump DOCKER\n\t}\n\n\tchain OUTPUT {\n\t\ttype nat hook output priority dstnat; policy accept;\n\t\tip6 daddr != ::1 fib daddr type local counter packets 0 bytes 0 jump DOCKER\n\t}\n}\ntable ip6 filter {\n\tchain DOCKER {\n\t}\n\n\tchain DOCKER-FORWARD {\n\t\tcounter packets 0 bytes 0 jump DOCKER-CT\n\t\tcounter packets 0 bytes 0 jump DOCKER-ISOLATION-STAGE-1\n\t\tcounter packets 0 bytes 0 jump DOCKER-BRIDGE\n\t}\n\n\tchain DOCKER-BRIDGE {\n\t}\n\n\tchain DOCKER-CT {\n\t}\n\n\tchain DOCKER-ISOLATION-STAGE-1 {\n\t}\n\n\tchain DOCKER-ISOLATION-STAGE-2 {\n\t}\n\n\tchain FORWARD {\n\t\ttype filter hook forward priority filter; policy accept;\n\t\tcounter packets 0 bytes 0 jump DOCKER-USER\n\t\tcounter packets 0 bytes 0 jump DOCKER-FORWARD\n\t}\n\n\tchain DOCKER-USER {\n\t\tcounter packets 0 bytes 0 return\n\t}\n}\n",
             "source": "/usr/sbin/nft list ruleset",
             "truncated": false
           }
@@ -8542,6 +8813,552 @@
       "userlist_file": {
         "status": "absent",
         "reason": "no modelled FTP daemon configuration is present: none of /etc/vsftpd.conf, /etc/vsftpd/vsftpd.conf, /etc/proftpd/proftpd.conf, /etc/proftpd.conf, /etc/pure-ftpd/pure-ftpd.conf, /etc/pure-ftpd/conf/* is present with its daemon binary"
+      }
+    },
+    "kernel": {
+      "modules": {
+        "status": "ok",
+        "value": [
+          {
+            "available": false,
+            "blacklisted": false,
+            "builtin": false,
+            "disabled": true,
+            "install_disabled": false,
+            "loaded": false,
+            "name": "cramfs",
+            "sources": []
+          },
+          {
+            "available": false,
+            "blacklisted": false,
+            "builtin": false,
+            "disabled": true,
+            "install_disabled": false,
+            "loaded": false,
+            "name": "freevxfs",
+            "sources": []
+          },
+          {
+            "available": false,
+            "blacklisted": false,
+            "builtin": false,
+            "disabled": true,
+            "install_disabled": false,
+            "loaded": false,
+            "name": "jffs2",
+            "sources": []
+          },
+          {
+            "available": false,
+            "blacklisted": false,
+            "builtin": false,
+            "disabled": true,
+            "install_disabled": false,
+            "loaded": false,
+            "name": "hfs",
+            "sources": []
+          },
+          {
+            "available": false,
+            "blacklisted": false,
+            "builtin": false,
+            "disabled": true,
+            "install_disabled": false,
+            "loaded": false,
+            "name": "hfsplus",
+            "sources": []
+          },
+          {
+            "available": true,
+            "blacklisted": false,
+            "builtin": false,
+            "disabled": false,
+            "install_disabled": false,
+            "loaded": false,
+            "name": "udf",
+            "sources": []
+          },
+          {
+            "available": false,
+            "blacklisted": false,
+            "builtin": false,
+            "disabled": true,
+            "install_disabled": false,
+            "loaded": false,
+            "name": "usb-storage",
+            "sources": []
+          },
+          {
+            "available": false,
+            "blacklisted": false,
+            "builtin": false,
+            "disabled": true,
+            "install_disabled": false,
+            "loaded": false,
+            "name": "dccp",
+            "sources": []
+          },
+          {
+            "available": true,
+            "blacklisted": false,
+            "builtin": false,
+            "disabled": false,
+            "install_disabled": false,
+            "loaded": false,
+            "name": "sctp",
+            "sources": []
+          },
+          {
+            "available": false,
+            "blacklisted": false,
+            "builtin": false,
+            "disabled": true,
+            "install_disabled": false,
+            "loaded": false,
+            "name": "rds",
+            "sources": []
+          },
+          {
+            "available": true,
+            "blacklisted": false,
+            "builtin": false,
+            "disabled": false,
+            "install_disabled": false,
+            "loaded": false,
+            "name": "tipc",
+            "sources": []
+          }
+        ],
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "proc",
+              "path": "/proc/modules"
+            },
+            {
+              "kind": "file",
+              "path": "/usr/lib/modules/6.17.0-1022-azure/modules.dep"
+            },
+            {
+              "kind": "file",
+              "path": "/usr/lib/modules/6.17.0-1022-azure/modules.builtin"
+            },
+            {
+              "kind": "file",
+              "path": "/usr/lib/modprobe.d/aliases.conf"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/modprobe.d/blacklist-ath_pci.conf"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/modprobe.d/blacklist-firewire.conf"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/modprobe.d/blacklist-framebuffer.conf"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/modprobe.d/blacklist-nouveau.conf"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/modprobe.d/blacklist-radeon-instinct.conf"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/modprobe.d/blacklist-rare-network.conf"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/modprobe.d/blacklist.conf"
+            },
+            {
+              "kind": "file",
+              "path": "/usr/lib/modprobe.d/blacklist_linux-azure-6.17_6.17.0-1022-azure.conf"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/modprobe.d/disable-algif_aead.conf"
+            },
+            {
+              "kind": "file",
+              "path": "/usr/lib/modprobe.d/fbdev-blacklist.conf"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/modprobe.d/iwlwifi.conf"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/modprobe.d/mdadm.conf"
+            },
+            {
+              "kind": "file",
+              "path": "/usr/lib/modprobe.d/systemd.conf"
+            }
+          ]
+        }
+      },
+      "sysctl": {
+        "bpf_jit_harden": {
+          "runtime": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/core/bpf_jit_harden"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.core.bpf_jit_harden"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/core/bpf_jit_harden"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/core/bpf_jit_harden"
+          }
+        },
+        "dmesg_restrict": {
+          "runtime": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/kernel/dmesg_restrict"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets kernel.dmesg_restrict"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/kernel/dmesg_restrict"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/kernel/dmesg_restrict"
+          }
+        },
+        "kptr_restrict": {
+          "runtime": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/kernel/kptr_restrict"
+            }
+          },
+          "persisted": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "file",
+              "path": "/etc/sysctl.d/10-kernel-hardening.conf",
+              "line": 15,
+              "raw": "kernel.kptr_restrict = 1"
+            }
+          },
+          "effective": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/kernel/kptr_restrict"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/kernel/kptr_restrict"
+          }
+        },
+        "perf_event_paranoid": {
+          "runtime": {
+            "status": "ok",
+            "value": 4,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/kernel/perf_event_paranoid"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets kernel.perf_event_paranoid"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 4,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/kernel/perf_event_paranoid"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/kernel/perf_event_paranoid"
+          }
+        },
+        "protected_fifos": {
+          "runtime": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/fs/protected_fifos"
+            }
+          },
+          "persisted": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "file",
+              "path": "/usr/lib/sysctl.d/99-protect-links.conf",
+              "line": 7,
+              "raw": "fs.protected_fifos = 1"
+            }
+          },
+          "effective": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/fs/protected_fifos"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/fs/protected_fifos"
+          }
+        },
+        "protected_hardlinks": {
+          "runtime": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/fs/protected_hardlinks"
+            }
+          },
+          "persisted": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "file",
+              "path": "/usr/lib/sysctl.d/99-protect-links.conf",
+              "line": 8,
+              "raw": "fs.protected_hardlinks = 1"
+            }
+          },
+          "effective": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/fs/protected_hardlinks"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/fs/protected_hardlinks"
+          }
+        },
+        "protected_regular": {
+          "runtime": {
+            "status": "ok",
+            "value": 2,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/fs/protected_regular"
+            }
+          },
+          "persisted": {
+            "status": "ok",
+            "value": 2,
+            "source": {
+              "kind": "file",
+              "path": "/usr/lib/sysctl.d/99-protect-links.conf",
+              "line": 9,
+              "raw": "fs.protected_regular = 2"
+            }
+          },
+          "effective": {
+            "status": "ok",
+            "value": 2,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/fs/protected_regular"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/fs/protected_regular"
+          }
+        },
+        "protected_symlinks": {
+          "runtime": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/fs/protected_symlinks"
+            }
+          },
+          "persisted": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "file",
+              "path": "/usr/lib/sysctl.d/99-protect-links.conf",
+              "line": 10,
+              "raw": "fs.protected_symlinks = 1"
+            }
+          },
+          "effective": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/fs/protected_symlinks"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/fs/protected_symlinks"
+          }
+        },
+        "randomize_va_space": {
+          "runtime": {
+            "status": "ok",
+            "value": 2,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/kernel/randomize_va_space"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets kernel.randomize_va_space"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 2,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/kernel/randomize_va_space"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/kernel/randomize_va_space"
+          }
+        },
+        "sysrq": {
+          "runtime": {
+            "status": "ok",
+            "value": 176,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/kernel/sysrq"
+            }
+          },
+          "persisted": {
+            "status": "ok",
+            "value": 176,
+            "source": {
+              "kind": "file",
+              "path": "/etc/sysctl.d/10-magic-sysrq.conf",
+              "line": 26,
+              "raw": "kernel.sysrq = 176"
+            }
+          },
+          "effective": {
+            "status": "ok",
+            "value": 176,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/kernel/sysrq"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/kernel/sysrq"
+          }
+        },
+        "unprivileged_bpf_disabled": {
+          "runtime": {
+            "status": "ok",
+            "value": 2,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/kernel/unprivileged_bpf_disabled"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets kernel.unprivileged_bpf_disabled"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 2,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/kernel/unprivileged_bpf_disabled"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/kernel/unprivileged_bpf_disabled"
+          }
+        },
+        "yama_ptrace_scope": {
+          "runtime": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/kernel/yama/ptrace_scope"
+            }
+          },
+          "persisted": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "file",
+              "path": "/etc/sysctl.d/10-ptrace.conf",
+              "line": 22,
+              "raw": "kernel.yama.ptrace_scope = 1"
+            }
+          },
+          "effective": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/kernel/yama/ptrace_scope"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/kernel/yama/ptrace_scope"
+          }
+        }
       }
     },
     "logging": {
@@ -9272,6 +10089,157 @@
         "privacy_options": {
           "status": "absent",
           "reason": "no mail transfer agent is installed on this host: none of /etc/postfix/main.cf, /etc/mail/sendmail.cf, /etc/exim4/update-exim4.conf.conf, /etc/exim/exim.conf is present with its daemon binary"
+        }
+      }
+    },
+    "mounts": {
+      "dev_shm": {
+        "separate": {
+          "status": "ok",
+          "value": true,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/self/mountinfo"
+          }
+        }
+      },
+      "home": {
+        "separate": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/self/mountinfo"
+          }
+        }
+      },
+      "points": {
+        "status": "ok",
+        "value": [
+          {
+            "fstype": "ext4",
+            "mounted_by": "/",
+            "options": [
+              "rw",
+              "relatime"
+            ],
+            "separate": true,
+            "source": "/dev/root",
+            "target": "/"
+          },
+          {
+            "fstype": "ext4",
+            "mounted_by": "/boot",
+            "options": [
+              "rw",
+              "relatime"
+            ],
+            "separate": true,
+            "source": "/dev/sda16",
+            "target": "/boot"
+          },
+          {
+            "fstype": "ext4",
+            "mounted_by": "/",
+            "options": [
+              "rw",
+              "relatime"
+            ],
+            "separate": false,
+            "source": "/dev/root",
+            "target": "/home"
+          },
+          {
+            "fstype": "ext4",
+            "mounted_by": "/",
+            "options": [
+              "rw",
+              "relatime"
+            ],
+            "separate": false,
+            "source": "/dev/root",
+            "target": "/tmp"
+          },
+          {
+            "fstype": "ext4",
+            "mounted_by": "/",
+            "options": [
+              "rw",
+              "relatime"
+            ],
+            "separate": false,
+            "source": "/dev/root",
+            "target": "/var"
+          },
+          {
+            "fstype": "ext4",
+            "mounted_by": "/",
+            "options": [
+              "rw",
+              "relatime"
+            ],
+            "separate": false,
+            "source": "/dev/root",
+            "target": "/var/tmp"
+          },
+          {
+            "fstype": "ext4",
+            "mounted_by": "/",
+            "options": [
+              "rw",
+              "relatime"
+            ],
+            "separate": false,
+            "source": "/dev/root",
+            "target": "/var/log"
+          },
+          {
+            "fstype": "ext4",
+            "mounted_by": "/",
+            "options": [
+              "rw",
+              "relatime"
+            ],
+            "separate": false,
+            "source": "/dev/root",
+            "target": "/var/log/audit"
+          },
+          {
+            "fstype": "tmpfs",
+            "mounted_by": "/dev/shm",
+            "options": [
+              "rw",
+              "nosuid",
+              "nodev"
+            ],
+            "separate": true,
+            "source": "tmpfs",
+            "target": "/dev/shm"
+          }
+        ],
+        "source": {
+          "kind": "proc",
+          "path": "/proc/self/mountinfo"
+        }
+      },
+      "tmp": {
+        "separate": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/self/mountinfo"
+          }
+        }
+      },
+      "var_tmp": {
+        "separate": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/self/mountinfo"
+          }
         }
       }
     },
@@ -16995,7 +17963,7 @@
       },
       "metadata_age_s": {
         "status": "ok",
-        "value": 816847,
+        "value": 1134006,
         "source": {
           "kind": "file",
           "path": "/var/lib/apt/periodic/update-success-stamp"
@@ -18027,63 +18995,63 @@
         "value": [
           {
             "addr": "0.0.0.0",
-            "inode": 5042,
+            "inode": 8053,
             "loopback": false,
             "port": 22,
             "proto": "tcp"
           },
           {
-            "addr": "127.0.0.54",
-            "inode": 4693,
+            "addr": "127.0.0.53",
+            "inode": 5402,
             "loopback": true,
             "port": 53,
             "proto": "tcp"
           },
           {
-            "addr": "127.0.0.53",
-            "inode": 4691,
+            "addr": "127.0.0.54",
+            "inode": 5404,
             "loopback": true,
             "port": 53,
             "proto": "tcp"
           },
           {
             "addr": "::",
-            "inode": 5044,
+            "inode": 5700,
             "loopback": false,
             "port": 22,
             "proto": "tcp6"
           },
           {
             "addr": "127.0.0.54",
-            "inode": 4692,
+            "inode": 5403,
             "loopback": true,
             "port": 53,
             "proto": "udp"
           },
           {
             "addr": "127.0.0.53",
-            "inode": 4690,
+            "inode": 5401,
             "loopback": true,
             "port": 53,
             "proto": "udp"
           },
           {
             "addr": "192.0.2.1",
-            "inode": 4922,
+            "inode": 7903,
             "loopback": false,
             "port": 68,
             "proto": "udp"
           },
           {
             "addr": "127.0.0.1",
-            "inode": 7658,
+            "inode": 8493,
             "loopback": true,
             "port": 323,
             "proto": "udp"
           },
           {
             "addr": "::1",
-            "inode": 7659,
+            "inode": 8494,
             "loopback": true,
             "port": 323,
             "proto": "udp6"
@@ -18316,6 +19284,36 @@
         "source": {
           "kind": "file",
           "path": "/etc/sudoers"
+        }
+      }
+    },
+    "swap": {
+      "devices": {
+        "status": "ok",
+        "value": [
+          {
+            "backing": "root",
+            "encrypted": false,
+            "path": "/swapfile",
+            "reason": "/dev/root is not a block device this kernel lists under /sys/block, so there is nothing to decide encryption from",
+            "type": "file"
+          }
+        ],
+        "source": {
+          "kind": "proc",
+          "path": "/proc/swaps"
+        }
+      },
+      "encrypted": {
+        "status": "unsupported",
+        "reason": "/dev/root is not a block device this kernel lists under /sys/block, so there is nothing to decide encryption from"
+      },
+      "present": {
+        "status": "ok",
+        "value": true,
+        "source": {
+          "kind": "proc",
+          "path": "/proc/swaps"
         }
       }
     },
@@ -22129,9 +23127,9 @@
         "value": {
           "allowlisted_hidden": 202,
           "config_unreadable": [],
-          "dirs": 34537,
-          "entries": 244987,
-          "files": 205064,
+          "dirs": 34558,
+          "entries": 245237,
+          "files": 205293,
           "home_roots": [
             {
               "kind": "user",
@@ -22277,7 +23275,7 @@
             "suid_sgid": 24,
             "suid_sgid_unverified": 0,
             "unowned": 0,
-            "world_writable": 543
+            "world_writable": 544
           }
         },
         "source": {
@@ -27879,7 +28877,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/tmp/systemd-private-43ab924a875c4e6bab84801f80b4fa18-ModemManager.service-oMSX8O/tmp",
+            "path": "/tmp/systemd-private-2ab76c673b4043caabed904ca094af5d-ModemManager.service-lHMn5s/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -27889,7 +28887,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/tmp/systemd-private-43ab924a875c4e6bab84801f80b4fa18-chrony.service-CR0l6R/tmp",
+            "path": "/tmp/systemd-private-2ab76c673b4043caabed904ca094af5d-chrony.service-RrlwPM/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -27899,7 +28897,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/tmp/systemd-private-43ab924a875c4e6bab84801f80b4fa18-haveged.service-PH46PJ/tmp",
+            "path": "/tmp/systemd-private-2ab76c673b4043caabed904ca094af5d-haveged.service-LTucrN/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -27909,7 +28907,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/tmp/systemd-private-43ab924a875c4e6bab84801f80b4fa18-polkit.service-9jKfD2/tmp",
+            "path": "/tmp/systemd-private-2ab76c673b4043caabed904ca094af5d-polkit.service-2yPQed/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -27919,7 +28917,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/tmp/systemd-private-43ab924a875c4e6bab84801f80b4fa18-systemd-logind.service-pQrh8g/tmp",
+            "path": "/tmp/systemd-private-2ab76c673b4043caabed904ca094af5d-systemd-logind.service-hGlRCW/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -27929,7 +28927,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/tmp/systemd-private-43ab924a875c4e6bab84801f80b4fa18-systemd-resolved.service-f2knbG/tmp",
+            "path": "/tmp/systemd-private-2ab76c673b4043caabed904ca094af5d-systemd-resolved.service-rq0DJK/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -27939,7 +28937,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/tmp/systemd-private-43ab924a875c4e6bab84801f80b4fa18-systemd-timedated.service-yHqTc1/tmp",
+            "path": "/tmp/systemd-private-2ab76c673b4043caabed904ca094af5d-systemd-timedated.service-3mJGCK/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -28259,7 +29257,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/var/tmp/systemd-private-43ab924a875c4e6bab84801f80b4fa18-ModemManager.service-WHoGbv/tmp",
+            "path": "/var/tmp/systemd-private-2ab76c673b4043caabed904ca094af5d-ModemManager.service-idTzQQ/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -28269,7 +29267,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/var/tmp/systemd-private-43ab924a875c4e6bab84801f80b4fa18-chrony.service-46jKvf/tmp",
+            "path": "/var/tmp/systemd-private-2ab76c673b4043caabed904ca094af5d-chrony.service-fYQjUO/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -28279,7 +29277,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/var/tmp/systemd-private-43ab924a875c4e6bab84801f80b4fa18-haveged.service-jee8u6/tmp",
+            "path": "/var/tmp/systemd-private-2ab76c673b4043caabed904ca094af5d-haveged.service-VpFTlN/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -28289,7 +29287,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/var/tmp/systemd-private-43ab924a875c4e6bab84801f80b4fa18-polkit.service-thdnH7/tmp",
+            "path": "/var/tmp/systemd-private-2ab76c673b4043caabed904ca094af5d-polkit.service-gegt2F/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -28299,7 +29297,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/var/tmp/systemd-private-43ab924a875c4e6bab84801f80b4fa18-systemd-logind.service-poNnMR/tmp",
+            "path": "/var/tmp/systemd-private-2ab76c673b4043caabed904ca094af5d-systemd-logind.service-T4a0CQ/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -28309,7 +29307,17 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/var/tmp/systemd-private-43ab924a875c4e6bab84801f80b4fa18-systemd-resolved.service-UtmpGa/tmp",
+            "path": "/var/tmp/systemd-private-2ab76c673b4043caabed904ca094af5d-systemd-resolved.service-s4Kxy3/tmp",
+            "reference": "unpackaged",
+            "sticky": true,
+            "uid": 0
+          },
+          {
+            "gid": 0,
+            "kind": "dir",
+            "package": "",
+            "package_declared": false,
+            "path": "/var/tmp/systemd-private-2ab76c673b4043caabed904ca094af5d-systemd-timedated.service-sQoQ2p/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0

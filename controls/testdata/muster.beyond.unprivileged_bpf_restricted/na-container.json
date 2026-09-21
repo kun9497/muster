@@ -1,0 +1,6 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "env":{"container":{"status":"ok","value":"docker"}},
+  "kernel":{"sysctl":{
+    "unprivileged_bpf_disabled":{"runtime":{"status":"ok","value":0,"source":{"kind":"proc","path":"/proc/sys/kernel/unprivileged_bpf_disabled"}},"persisted":{"status":"absent","reason":"no sysctl.d line sets kernel.unprivileged_bpf_disabled"},"effective":{"status":"ok","value":0,"source":{"kind":"proc","path":"/proc/sys/kernel/unprivileged_bpf_disabled"}},"winner":{"kind":"proc","path":"/proc/sys/kernel/unprivileged_bpf_disabled"}},"bpf_jit_harden":{"runtime":{"status":"ok","value":0,"source":{"kind":"proc","path":"/proc/sys/net/core/bpf_jit_harden"}},"persisted":{"status":"absent","reason":"no sysctl.d line sets net.core.bpf_jit_harden"},"effective":{"status":"ok","value":0,"source":{"kind":"proc","path":"/proc/sys/net/core/bpf_jit_harden"}},"winner":{"kind":"proc","path":"/proc/sys/net/core/bpf_jit_harden"}}
+  }}
+}}

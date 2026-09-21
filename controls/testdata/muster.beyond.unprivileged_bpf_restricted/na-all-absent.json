@@ -1,0 +1,6 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "env":{"container":{"status":"ok","value":"none"}},
+  "kernel":{"sysctl":{
+    "unprivileged_bpf_disabled":{"runtime":{"status":"absent","reason":"/proc/sys/kernel/unprivileged_bpf_disabled does not exist"},"persisted":{"status":"absent","reason":"no sysctl.d line sets kernel.unprivileged_bpf_disabled"},"effective":{"status":"absent","reason":"/proc/sys/kernel/unprivileged_bpf_disabled does not exist"}},"bpf_jit_harden":{"runtime":{"status":"absent","reason":"/proc/sys/net/core/bpf_jit_harden does not exist"},"persisted":{"status":"absent","reason":"no sysctl.d line sets net.core.bpf_jit_harden"},"effective":{"status":"absent","reason":"/proc/sys/net/core/bpf_jit_harden does not exist"}}
+  }}
+}}

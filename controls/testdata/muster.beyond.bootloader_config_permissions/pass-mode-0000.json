@@ -1,0 +1,97 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none"
+      }
+    },
+    "boot": {
+      "grub_cfg": {
+        "path": {
+          "status": "ok",
+          "value": "/boot/grub2/grub.cfg",
+          "source": {
+            "kind": "file",
+            "path": "/boot/grub2/grub.cfg"
+          }
+        },
+        "mode": {
+          "status": "ok",
+          "value": 0,
+          "source": {
+            "kind": "sys",
+            "path": "/boot/grub2/grub.cfg"
+          }
+        },
+        "uid": {
+          "status": "ok",
+          "value": 0,
+          "source": {
+            "kind": "sys",
+            "path": "/boot/grub2/grub.cfg"
+          }
+        },
+        "gid": {
+          "status": "ok",
+          "value": 0,
+          "source": {
+            "kind": "sys",
+            "path": "/boot/grub2/grub.cfg"
+          }
+        },
+        "group": {
+          "status": "ok",
+          "value": "root",
+          "source": {
+            "kind": "sys",
+            "path": "/boot/grub2/grub.cfg"
+          }
+        },
+        "group_readable": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "sys",
+            "path": "/boot/grub2/grub.cfg"
+          }
+        },
+        "group_writable": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "sys",
+            "path": "/boot/grub2/grub.cfg"
+          }
+        },
+        "other_readable": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "sys",
+            "path": "/boot/grub2/grub.cfg"
+          }
+        },
+        "other_writable": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "sys",
+            "path": "/boot/grub2/grub.cfg"
+          }
+        },
+        "acl_present": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "sys",
+            "path": "/boot/grub2/grub.cfg"
+          }
+        }
+      }
+    }
+  }
+}

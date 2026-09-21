@@ -1,0 +1,30 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none"
+      }
+    },
+    "boot": {
+      "firmware": {
+        "status": "ok",
+        "value": "uefi",
+        "source": {
+          "kind": "sys",
+          "path": "/sys/firmware/efi"
+        }
+      },
+      "secure_boot": {
+        "status": "unsupported",
+        "reason": "/sys/firmware/efi/efivars/SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c: the firmware exposes the variable but returns 0 bytes; Secure Boot cannot be read from here"
+      }
+    }
+  },
+  "_expect": {
+    "reason_code": "unsupported_env"
+  }
+}

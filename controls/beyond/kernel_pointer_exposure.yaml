@@ -1,0 +1,27 @@
+id: muster.beyond.kernel_pointer_exposure
+title_en: The kernel hides its pointers and its message buffer from unprivileged readers
+title_ko: 커널이 포인터와 메시지 버퍼를 비권한 사용자에게 숨긴다
+description_en: The kernel must not hand an unprivileged reader the addresses an exploit needs to aim itself. kernel.kptr_restrict must be 1, which zeroes a pointer printed through the %pK format for a reader without CAP_SYSLOG, or 2, which zeroes it for every reader; kernel.dmesg_restrict must be 1, which makes reading the kernel ring buffer need CAP_SYSLOG rather than being open to anyone with a shell. Both are described in the kernel's own Documentation/admin-guide/sysctl/kernel.rst. This is rated 중 because one leaked kernel address defeats the address-space randomisation every other memory protection on the host is built on, and the ring buffer prints such addresses freely during boot and after an oops — but it leaks information rather than granting privilege by itself. muster judges the effective value, so a value an operator set by hand at runtime counts and a host that persisted nothing in sysctl.d is still judged on what the running kernel is doing; a kernel that carries neither knob at all is reported rather than passed.
+description_ko: 커널은 공격 코드가 조준에 필요로 하는 주소를 비권한 사용자에게 넘겨주면 안 됩니다. kernel.kptr_restrict 는 1(CAP_SYSLOG 없는 사용자에게 %pK 형식으로 출력되는 포인터를 0 으로 대체) 또는 2(모든 사용자에게 0 으로 대체)여야 하고, kernel.dmesg_restrict 는 1 이어서 커널 링 버퍼를 읽는 데 CAP_SYSLOG 가 필요해야 하며 셸만 있으면 누구나 읽을 수 있어서는 안 됩니다. 두 값 모두 커널 문서 Documentation/admin-guide/sysctl/kernel.rst 에 설명되어 있습니다. 유출된 커널 주소 하나가 호스트의 다른 모든 메모리 보호가 전제로 삼는 주소 공간 무작위화를 무력화하고 링 버퍼는 부팅 중과 oops 이후에 그런 주소를 그대로 출력하지만, 그 자체로 권한을 주지는 않고 정보를 흘리는 것이므로 중요도를 중으로 둡니다. muster 는 실효값을 판정하므로 운영자가 런타임에 직접 설정한 값도 인정되고 sysctl.d 에 아무것도 남기지 않은 호스트도 현재 커널의 동작으로 판정되며, 두 항목이 아예 없는 커널은 통과가 아니라 그대로 보고합니다.
+category: beyond
+importance: 중
+automation: auto
+references:
+  stig:
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-213010 }
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-213025 }
+    - { benchmark: ubuntu2204, version: V2R9, id: UBTU-22-213010 }
+    - { benchmark: ubuntu2404, version: V1R6, id: UBTU-24-600140 }
+  nist_800_53: ["SC-2", "SC-4", "SI-16"]
+requires_facts: ">=1"
+applies_when:
+  - { fact: env.container, op: eq, expected: none }
+absent_means: fail
+checks:
+  - { fact: kernel.sysctl.kptr_restrict, op: in, expected: [1, 2] }
+  - { fact: kernel.sysctl.dmesg_restrict, op: eq, expected: 1 }
+remediation:
+  text_en: Write kernel.kptr_restrict = 1 (or 2) and kernel.dmesg_restrict = 1 into a file under /etc/sysctl.d, for example /etc/sysctl.d/60-kernel-hardening.conf, and apply it with sysctl --system; both take effect at once and need no reboot. Check first that no monitoring or crash-reporting agent on the host reads dmesg as an unprivileged user.
+  text_ko: /etc/sysctl.d 아래 파일(예 /etc/sysctl.d/60-kernel-hardening.conf)에 kernel.kptr_restrict = 1(또는 2) 과 kernel.dmesg_restrict = 1 을 적고 sysctl --system 으로 적용합니다. 두 값 모두 즉시 반영되며 재부팅이 필요 없습니다. 적용 전에 호스트의 모니터링·크래시 리포트 에이전트가 비권한 사용자로 dmesg 를 읽고 있지 않은지 확인하십시오.
+  risk: none
+  idempotent: true

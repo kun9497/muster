@@ -1,0 +1,6 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "env":{"container":{"status":"ok","value":"none"}},
+  "coredump":{
+    "suid_dumpable":{"runtime":{"status":"absent","reason":"/proc/sys/fs/suid_dumpable does not exist"},"persisted":{"status":"absent","reason":"no sysctl.d line sets fs.suid_dumpable"},"effective":{"status":"absent","reason":"/proc/sys/fs/suid_dumpable does not exist"}}
+  }
+}}
