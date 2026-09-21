@@ -119,6 +119,29 @@ func openComponentwise(p string, flags int) (int, string, error) {
 // over the limit is returned truncated and flagged; a NUL byte marks the
 // file binary and its content is not returned.
 func ReadFile(p string, limit int64) ([]byte, ReadMeta, error) {
+	return readFile(p, limit, false)
+}
+
+// ReadFileBinary is ReadFile for a file that is binary BY DESIGN and whose
+// bytes a collector decodes into a value instead of storing them. It differs
+// in one thing only: the NUL rule still sets meta.Binary, but the bytes come
+// back.
+//
+// Ruling K-30: efivarfs is that file. Every variable it exports begins with
+// the four-byte attribute word the firmware stored it with — 06 00 00 00 for
+// a variable with the boot-service and runtime bits — so EVERY efivar read
+// through ReadFile comes back empty, and boot.secure_boot reported "0 bytes"
+// on a UEFI host whose firmware had answered perfectly well. The reader, not
+// the firmware, was the empty one.
+//
+// It is not a way around the NUL rule for a text parser: nothing this
+// returns has been shown to be text, and a collector that hands the bytes to
+// a line splitter would be parsing whatever the file happens to contain.
+func ReadFileBinary(p string, limit int64) ([]byte, ReadMeta, error) {
+	return readFile(p, limit, true)
+}
+
+func readFile(p string, limit int64, keepBinary bool) ([]byte, ReadMeta, error) {
 	if limit < 0 {
 		return nil, ReadMeta{}, fmt.Errorf("%s: limit must be >= 0, got %d", p, limit)
 	}
@@ -150,7 +173,9 @@ func ReadFile(p string, limit int64) ([]byte, ReadMeta, error) {
 	}
 	if bytes.IndexByte(data, 0) >= 0 {
 		meta.Binary = true
-		return nil, meta, nil
+		if !keepBinary {
+			return nil, meta, nil
+		}
 	}
 	return data, meta, nil
 }

@@ -2449,7 +2449,7 @@ keys:
     collector: boot
   - key: boot.secure_boot
     type: bool
-    description: Whether the firmware reports Secure Boot as enforcing, from the SecureBoot EFI variable; absent on BIOS and on UEFI without efivarfs or the variable.
+    description: Whether the firmware reports Secure Boot as enforcing, from the SecureBoot EFI variable; absent on BIOS and on UEFI without efivarfs or the variable. A firmware that exposes the variable but returns too few bytes to hold an efivar's four-byte attribute word and its value is unsupported, because Secure Boot cannot be read from that host.
     since: 1
     sensitivity: public
     collector: boot

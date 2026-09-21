@@ -60,18 +60,25 @@ func TestBootFirmware(t *testing.T) {
 }
 
 // Secure Boot is one byte of one efivarfs file, behind the four-byte
-// attribute word every efivar carries. A file too short to hold both is not
-// an efivar and is an error, never a guessed "off"; a host with no efivarfs
-// and no variable — every BIOS host, and a UEFI host booted without it — is
-// absent with the path named, which is what lets control 10 say "manual"
-// rather than "Secure Boot is off".
+// attribute word every efivar carries. That word is NUL bytes, so the read
+// goes through ReadFileBinary (K-30) — the double applies the host's NUL
+// rule, so a collector that reached for ReadFile would read nothing here
+// too. A file too short to hold the word and a value is a firmware that
+// exposes the variable and returns nothing from it: unsupported, never a
+// guessed "off" and never an error, so the run stays complete. A host with
+// no efivarfs and no variable — every BIOS host, and a UEFI host booted
+// without it — is absent with the path named, which is what lets control 10
+// say "manual" rather than "Secure Boot is off".
 func TestBootSecureBoot(t *testing.T) {
-	seed := func(fixture string) facts.Envelope {
+	seedBuilder := func(fixture string) *collect.Builder {
 		t.Helper()
 		files := bootSeeds()
 		files[secureBootPath] = fixture
-		a := &fsAccess{files: files, dirs: map[string]bool{efiDir: true}}
-		return env(t, build(t, "boot", a), "boot.secure_boot")
+		return build(t, "boot", &fsAccess{files: files, dirs: map[string]bool{efiDir: true}})
+	}
+	seed := func(fixture string) facts.Envelope {
+		t.Helper()
+		return env(t, seedBuilder(fixture), "boot.secure_boot")
 	}
 
 	if e := seed("SecureBoot.sample"); e.Status != facts.StatusOK || e.Value != true {
@@ -85,10 +92,30 @@ func TestBootSecureBoot(t *testing.T) {
 	if e := seed("SecureBoot.off"); e.Status != facts.StatusOK || e.Value != false {
 		t.Errorf("06 00 00 00 00 -> %+v, want ok false", e)
 	}
-	if e := seed("SecureBoot.short"); e.Status != facts.StatusError {
-		t.Errorf("three bytes -> %+v, want error: that file cannot hold an attribute word and a value", e)
-	} else if !strings.Contains(e.Reason, secureBootPath) {
-		t.Errorf("the short-file reason %q does not name %s", e.Reason, secureBootPath)
+	if e := seed("SecureBoot.short"); e.Status != facts.StatusUnsupported {
+		t.Errorf("three bytes -> %+v, want unsupported: the firmware returned too little to be a value", e)
+	} else if !strings.Contains(e.Reason, secureBootPath) || !strings.Contains(e.Reason, "3 bytes") {
+		t.Errorf("the short-file reason %q must name %s and the byte count", e.Reason, secureBootPath)
+	}
+
+	// K-30, the shape the GitHub runner actually produced: the variable is
+	// there and the read succeeds with nothing in it.
+	empty := &fsAccess{
+		files:    bootSeeds(),
+		dirs:     map[string]bool{efiDir: true},
+		contents: map[string][]byte{secureBootPath: {}},
+	}
+	b := build(t, "boot", empty)
+	if e := env(t, b, "boot.secure_boot"); e.Status != facts.StatusUnsupported {
+		t.Errorf("an empty efivar -> %+v, want unsupported", e)
+	} else if !strings.Contains(e.Reason, secureBootPath) || !strings.Contains(e.Reason, "0 bytes") {
+		t.Errorf("the empty-file reason %q must name %s and the byte count", e.Reason, secureBootPath)
+	}
+	// And the run stays COMPLETE: a variable muster cannot read is not a
+	// collector that failed, so `collect --require-complete` on such a host
+	// still succeeds.
+	if w := b.Worst("boot"); w != facts.StatusOK {
+		t.Errorf(`Worst("boot") = %s, want ok — an unreadable Secure Boot variable must not make the run partial`, w)
 	}
 
 	// A BIOS host: no /sys/firmware/efi at all.

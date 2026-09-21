@@ -24,6 +24,14 @@ import (
 // (R46/R60).
 type Access interface {
 	ReadFile(path string, limit int64) ([]byte, ReadMeta, error)
+
+	// ReadFileBinary reads a file whose content is binary by design — an
+	// efivarfs variable, whose attribute word is NUL bytes — and hands the
+	// caller those bytes to decode a value from (K-30). It is licensed by
+	// Declaration.Reads exactly like ReadFile, and is never the right call
+	// for a file a collector is going to parse as text.
+	ReadFileBinary(path string, limit int64) ([]byte, ReadMeta, error)
+
 	Stat(path string) (ReadMeta, error)
 	Glob(pattern string) ([]string, error)
 	Llistxattr(path string) ([]string, error)
@@ -148,6 +156,10 @@ func Host() Access { return hostAccess{} }
 
 func (hostAccess) ReadFile(p string, limit int64) ([]byte, ReadMeta, error) {
 	return ReadFile(rewriteProcSelf(p), limit)
+}
+
+func (hostAccess) ReadFileBinary(p string, limit int64) ([]byte, ReadMeta, error) {
+	return ReadFileBinary(rewriteProcSelf(p), limit)
 }
 
 func (hostAccess) Stat(p string) (ReadMeta, error) { return Stat(rewriteProcSelf(p)) }
@@ -421,6 +433,17 @@ func (g *guardedAccess) ReadFile(p string, limit int64) ([]byte, ReadMeta, error
 		return nil, ReadMeta{}, g.violate("read " + p)
 	}
 	return g.inner.ReadFile(clean, limit)
+}
+
+// ReadFileBinary is guarded exactly as ReadFile is — the same declaration,
+// the same violation — because it is the same read; only the NUL rule of the
+// primitive differs (K-30).
+func (g *guardedAccess) ReadFileBinary(p string, limit int64) ([]byte, ReadMeta, error) {
+	clean, ok := g.allowedPath(p)
+	if !ok {
+		return nil, ReadMeta{}, g.violate("read " + p)
+	}
+	return g.inner.ReadFileBinary(clean, limit)
 }
 
 // Stat, Llistxattr, Getxattr and Writable are guarded the same way ReadFile

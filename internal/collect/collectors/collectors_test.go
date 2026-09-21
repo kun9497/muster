@@ -3,6 +3,7 @@
 package collectors
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -121,6 +122,19 @@ func (a *fsAccess) mode(p string, def uint32) uint32 {
 // this double whichever limit it passed, and a test of that cap would prove
 // nothing.
 func (a *fsAccess) ReadFile(p string, limit int64) ([]byte, collect.ReadMeta, error) {
+	return a.readFile(p, limit, false)
+}
+
+// ReadFileBinary is the double's half of K-30: the NUL rule below is the
+// host primitive's, and ReadFileBinary is the only way past it — so a
+// collector that decodes a binary-by-design file (the SecureBoot efivar,
+// whose attribute word is NUL bytes) reads nothing here unless it calls
+// this, exactly as on a host.
+func (a *fsAccess) ReadFileBinary(p string, limit int64) ([]byte, collect.ReadMeta, error) {
+	return a.readFile(p, limit, true)
+}
+
+func (a *fsAccess) readFile(p string, limit int64, keepBinary bool) ([]byte, collect.ReadMeta, error) {
 	a.reads = append(a.reads, p)
 	if err, ok := a.fails[p]; ok {
 		return nil, collect.ReadMeta{}, err
@@ -140,6 +154,12 @@ func (a *fsAccess) ReadFile(p string, limit int64) ([]byte, collect.ReadMeta, er
 	if limit > 0 && int64(len(b)) > limit {
 		b = b[:limit]
 		meta.Truncated = true
+	}
+	if bytes.IndexByte(b, 0) >= 0 {
+		meta.Binary = true
+		if !keepBinary {
+			return nil, meta, nil
+		}
 	}
 	return b, meta, nil
 }

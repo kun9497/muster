@@ -120,8 +120,18 @@ func bootFirmware(a collect.Access) facts.Envelope {
 // firmware that is not exporting the variable is not a firmware that has
 // Secure Boot off, and control 10's absent_means is what decides between
 // "not applicable" and "look at this by hand".
+//
+// The read is ReadFileBinary because an efivar's attribute word is NUL bytes
+// (K-30): through ReadFile it came back empty on every UEFI host, which is
+// the reader's answer and not the firmware's.
+//
+// A read that SUCCEEDS and still brings back too few bytes to hold that
+// attribute word and a value is unsupported, not an error: the firmware
+// exposes the variable and returns nothing from it, which is an environment
+// muster cannot read Secure Boot from rather than a defect on the host or in
+// muster. A read that FAILS — EIO, EACCES — keeps the read's own status.
 func bootSecureBoot(a collect.Access) facts.Envelope {
-	data, meta, err := a.ReadFile(secureBootPath, readLimit)
+	data, meta, err := a.ReadFileBinary(secureBootPath, readLimit)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			return collect.Absent(secureBootPath + " does not exist")
@@ -130,8 +140,8 @@ func bootSecureBoot(a collect.Access) facts.Envelope {
 	}
 	enabled, ok := secureBootFromEfivar(data)
 	if !ok {
-		return collect.ErrorEnv(secureBootPath + ": " + strconv.Itoa(len(data)) +
-			" bytes, too few for an efivar's four-byte attribute word and its value")
+		return collect.Unsupported(secureBootPath + ": the firmware exposes the variable but returns " +
+			strconv.Itoa(len(data)) + " bytes; Secure Boot cannot be read from here")
 	}
 	return collect.OKRead(enabled, &facts.Source{Kind: "sys", Path: secureBootPath}, meta)
 }
@@ -141,8 +151,9 @@ func bootSecureBoot(a collect.Access) facts.Envelope {
 // with, so the value starts at offset 4 and SecureBoot's value is one byte.
 //
 // ok is false when the file is shorter than that, which is not a value at
-// all: reading "off" out of four bytes would be an invention, and a host
-// whose efivarfs answers something that short has a problem worth an error.
+// all: reading "off" out of four bytes — or out of none — would be an
+// invention, so the caller reports a host that answers that short as one
+// Secure Boot cannot be read from.
 func secureBootFromEfivar(data []byte) (enabled, ok bool) {
 	if len(data) < 5 {
 		return false, false

@@ -80,6 +80,12 @@ func (m *memAccess) ReadFile(p string, limit int64) ([]byte, collect.ReadMeta, e
 	return data, meta, nil
 }
 
+// ReadFileBinary serves the same bytes: a fuzz corpus is arbitrary bytes
+// already, so there is no NUL rule to get past here.
+func (m *memAccess) ReadFileBinary(p string, limit int64) ([]byte, collect.ReadMeta, error) {
+	return m.ReadFile(p, limit)
+}
+
 func (m *memAccess) Stat(p string) (collect.ReadMeta, error) {
 	data, ok := m.files[p]
 	if !ok {

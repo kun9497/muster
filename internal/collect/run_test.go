@@ -26,6 +26,9 @@ type quietAccess struct{ NoWalkAccess }
 func (quietAccess) ReadFile(string, int64) ([]byte, ReadMeta, error) {
 	return nil, ReadMeta{}, os.ErrNotExist
 }
+func (quietAccess) ReadFileBinary(string, int64) ([]byte, ReadMeta, error) {
+	return nil, ReadMeta{}, os.ErrNotExist
+}
 func (quietAccess) Stat(string) (ReadMeta, error)       { return ReadMeta{}, os.ErrNotExist }
 func (quietAccess) Glob(string) ([]string, error)       { return nil, nil }
 func (quietAccess) Llistxattr(string) ([]string, error) { return nil, nil }

@@ -100,6 +100,42 @@ func TestReadFileTruncatesAndFlagsBinary(t *testing.T) {
 	}
 }
 
+// K-30: an efivarfs variable is binary by design — its four-byte attribute
+// word is 06 00 00 00 — so the NUL rule above emptied EVERY efivar read, and
+// boot.secure_boot reported "0 bytes" for a firmware that had answered.
+// ReadFileBinary is the one way past that rule: the flag still says binary
+// and the bytes come back. Nothing else about the read changes, so the cap
+// and the no-follow open still apply.
+func TestReadFileBinaryReturnsTheBytesReadFileWithholds(t *testing.T) {
+	dir := t.TempDir()
+	efivar := filepath.Join(dir, "SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c")
+	mkfile(t, efivar, "\x06\x00\x00\x00\x01", 0o644)
+
+	if data, meta, err := ReadFile(efivar, 100); err != nil || len(data) != 0 || !meta.Binary {
+		t.Errorf("ReadFile: len=%d meta=%+v err=%v; want no bytes and Binary", len(data), meta, err)
+	}
+	data, meta, err := ReadFileBinary(efivar, 100)
+	if err != nil {
+		t.Fatalf("ReadFileBinary: %v", err)
+	}
+	if string(data) != "\x06\x00\x00\x00\x01" {
+		t.Errorf("ReadFileBinary returned % x, want 06 00 00 00 01", data)
+	}
+	if !meta.Binary || meta.Size != 5 {
+		t.Errorf("ReadFileBinary meta = %+v, want Binary with Size 5", meta)
+	}
+	if data, meta, err := ReadFileBinary(efivar, 2); err != nil || len(data) != 2 || !meta.Truncated {
+		t.Errorf("ReadFileBinary under a cap: len=%d meta=%+v err=%v; want two bytes, truncated", len(data), meta, err)
+	}
+	link := filepath.Join(dir, "link")
+	if err := os.Symlink(efivar, link); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := ReadFileBinary(link, 100); !errors.Is(err, ErrSymlink) {
+		t.Errorf("ReadFileBinary on a symlink: %v, want ErrSymlink", err)
+	}
+}
+
 func TestReadFileNamesWithNewlines(t *testing.T) {
 	dir := t.TempDir()
 	odd := filepath.Join(dir, "weird\nname")

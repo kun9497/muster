@@ -212,13 +212,13 @@ jobs:
             echo "files.etc_shadow.acl_entries and files.root_home.acl_present read ok instead of denied"
             exit 1
           }
-          # K-17: the same argument for the five 0600 /proc/sys files of spec
-          # B-3. They are the only reason the five kernel.sysctl.* keys are in
-          # the nonroot row, and a kernel that published them 0644 would let
-          # the matrix step pass on nothing.
-          for f in /proc/sys/net/core/bpf_jit_harden \
-                   /proc/sys/fs/protected_symlinks /proc/sys/fs/protected_hardlinks \
-                   /proc/sys/fs/protected_fifos /proc/sys/fs/protected_regular; do
+          # K-17, narrowed by K-31: bpf_jit_harden is the one /proc/sys file of
+          # spec B-3 that every kernel muster runs on publishes 0600, and it is
+          # the only reason a kernel.sysctl.* key is in the nonroot row. The
+          # four /proc/sys/fs/protected_* files are 0600 on some kernels (5.15)
+          # and 0644 on others (this 6.x runner), so the matrix cannot assume
+          # them and no longer names them.
+          for f in /proc/sys/net/core/bpf_jit_harden; do
             ! test -r "$f" || {
               echo "the nonroot capability matrix assumes this user cannot read $f (0600 on a stock kernel);"
               echo "where it is readable, that kernel.sysctl.* key reads ok instead of denied"
