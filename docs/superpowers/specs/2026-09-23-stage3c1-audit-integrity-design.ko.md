@@ -11,7 +11,9 @@
 capability·ACL)입니다. 이 문서는 3C-1만 다루며 3C-2는 3C-1이 병합된 뒤 별도 설계를 갖습니다.
 결정은 I-1 … I-12로 번호를 붙이고 계획을 구속합니다. 2026-09-23의 새 리뷰(blocking 4, medium
 10, low 16)와 lab 호스트의 실측(`dpkg --verify`: 벽시계 10분 20초, `missing` 행 1199, exit 0)을
-반영했습니다. 이 판이 초안과 다른 곳은 그 둘의 몫입니다. 여기의 모든 점검은 1차 출처 —
+반영했고, 계획의 pre-flight 정정(계획의 J-1 … J-6: `auditctl` 종료 코드, 컨테이너가 답할 수 있는 것,
+dpkg의 종료 코드와 줄 형식, 세 릴리스의 AIDE 사실, 디렉터리 모드)도 반영했습니다. 이 판이 초안과
+다른 곳은 그것들의 몫입니다. 여기의 모든 점검은 1차 출처 —
 `auditd.conf(5)`, `auditctl(8)`, `augenrules(8)`, `aide(1)`과 `aide.conf(5)`, `sudoers(5)`,
 `rpm(8)`, `dpkg(1)`, `journal-upload.conf(5)` — 에서 muster의 말로 썼고, CIS 권고 번호를 달지
 않으며, 벤치마크 문장을 옮기지 않습니다(메인 설계 §11, D04).
@@ -50,10 +52,11 @@ sudo 세션 기록(`log_input`, `log_output`) — 여기서 읽는 것이 없으
    effective는 3B의 sysctl처럼 runtime의 복사본입니다(K-3).
 2. **명령은 인자가 고정이고 종료 코드는 데이터입니다.** `rpm -Va`는 "무언가 다르다"를 1로
    말합니다 — `patch` 수집기가 `dnf check-update`의 100과 `needs-restarting`의 1을 이미 그렇게
-   읽습니다; `dpkg --verify`는 digest 불일치에 1이지만 `missing` 행이 있어도 0으로 끝나므로
-   (lab 실측) 판정은 출력에서 읽고 종료 코드는 "답했다"(0 또는 1)와 "실패했다"만 가릅니다.
-   `auditctl`은 커널에 닿기 전에 비root 호출자를 거부하고(exit 4, "You must be root"), root일 때
-   답하지 않는 커널은 stderr로 압니다(I-3). 그 밖의 코드는 명령과 코드를 적은 `error`.
+   읽습니다; 인자 없는 `dpkg --verify`는 언제나 0으로 끝나므로(그 `verify()`는 설치되지 않은
+   이름의 패키지에만 실패를 돌려주며, lab의 `missing` 행 1199개도 0이었음) 판정은 행에서 읽고 종료
+   코드는 "답했다"(0, 또는 행이 있는 1)와 "실패했다"만 가릅니다. `auditctl`은 uid가 아니라 유효
+   `CAP_AUDIT_CONTROL`로 문을 지키며 커널에 닿기 전에 exit 4로 거부하고, root일 때 답하지 않는
+   커널은 stderr와 exit 255로 압니다(I-3). 그 밖의 코드는 명령과 코드를 적은 `error`.
 3. **데몬 설정이 가리키는 경로는 그 데몬의 수집기 몫입니다**(C1): `auditd.conf`의 `log_file`,
    `aide.conf`의 `database_in`. 권한 사실은 `writePermFacts`가 쓰는 아홉 leaf뿐입니다.
 4. **노이즈는 걸러내고 필터는 사실입니다.** verify 출력에서 무엇이 어떤 규칙으로 몇 행 빠졌는지가
@@ -124,15 +127,23 @@ sudo 세션 기록(`log_input`, `log_output`) — 여기서 읽는 것이 없으
   leaf 아홉 개씩(`mode, uid, gid, group, group_readable, group_writable, other_readable,
   other_writable, acl_present`). 선언된 stat 패턴 밖의 `log_file`은 C4입니다: 이유에 경로를 적은
   `absent`, 결코 `error`가 아님.
-- 상태 규칙. 호스트에 `auditctl`이 없음: runtime 쪽은 `absent`("auditctl is not installed"),
-  결코 `unsupported`가 아님 — 커널이 아무도 나열할 수 없는 규칙을 갖고 있을 수 있고, runtime 쪽이
-  필요한 컨트롤은 어차피 데몬 설치에 게이트됩니다. `auditctl`은 소켓을 열기 전에 비root 호출자를
-  거부합니다(`You must be root to run this program.`, exit 4): `denied`. root일 때 `Operation
-  not permitted`로 exit 1(`CAP_AUDIT_CONTROL` 없음: 비특권 컨테이너), `Connection refused`
-  (init이 아닌 사용자 네임스페이스: rootless podman, userns-remap), `audit support not in
-  kernel`(`audit=0`, `CONFIG_AUDIT` 없는 커널)은 메시지를 적은 `unsupported`; 특권 컨테이너와
-  호스트는 정상으로 답합니다. `/etc/audit`는 두 계열 다 0750 root이고 `/var/log/audit`는 0700이라
-  auditd가 있는 호스트의 비root 실행은 모든 영속·권한 leaf를 `denied`로 읽고, auditd가 없는
+- 상태 규칙(J-1). 호스트에 `auditctl`이 없음: runtime 쪽은 `absent`("auditctl is not
+  installed"), 결코 `unsupported`가 아님 — 커널이 아무도 나열할 수 없는 규칙을 갖고 있을 수 있고,
+  runtime 쪽이 필요한 컨트롤은 어차피 데몬 설치에 게이트됩니다. `auditctl`은 유효
+  `CAP_AUDIT_CONTROL`로 문을 지키므로(`audit_can_control()`) `You must be root to run this
+  program.`과 exit 4는 비root 실행에서 `denied`, root 실행에서 `unsupported`("no
+  CAP_AUDIT_CONTROL: an unprivileged container")입니다. 커널은 capability를 보기 전에 초기가 아닌
+  모든 pid 네임스페이스의 `AUDIT_GET`·`AUDIT_LIST_RULES`를 거부하고, `auditctl`은 그것을 `Error
+  sending status request (Operation not permitted)`(또는 `… rule list data request …`)와 exit
+  255로 보고합니다: `unsupported`("kernel audit is not reachable from this pid namespace") —
+  특권이든 아니든 모든 컨테이너가 그렇게 읽힙니다. init이 아닌 사용자 네임스페이스는
+  ECONNREFUSED를 받고 `auditctl -s`는 그것을 삼킵니다(`The audit system is disabled`, exit 0,
+  `enabled` 줄 없음): `enabled` 줄 없는 exit 0은 `unsupported`("the kernel gave no audit
+  status")이지 결코 값이 아닙니다. `audit support not in kernel` / `Cannot open netlink audit
+  socket`(`audit=0`, `CONFIG_AUDIT` 없는 커널)은 `unsupported`. 그 밖의 0 아닌 종료는 `error`.
+  `/etc/audit`와 `rules.d`는 두 계열 다 0750 root; `/var/log/audit`는 EL에서 0700 root, Ubuntu에서
+  0750 root:adm(Ubuntu 패치의 `log_group = adm`, 로그 파일은 0640 root:adm)이라 adm 그룹 밖의
+  비root 실행은 auditd가 있는 호스트에서 모든 영속·권한 leaf를 `denied`로 읽고, auditd가 없는
   호스트에서는 `absent`입니다. capability matrix의 비root 행(§6)을 auditd가 설치된 곳에서만
   assert하는 이유입니다.
 
@@ -155,20 +166,26 @@ sudo 세션 기록(`log_input`, `log_output`) — 여기서 읽는 것이 없으
 - `fim.aide.installed` — `bool`. `fim.aide.config_path` — `string`, `/etc/aide/aide.conf`
   (Debian 계열)와 `/etc/aide.conf`(EL) 중 먼저 존재하는 것; 둘 다 없으면 `absent`.
 - `fim.aide.database_path` — `string`: 설정 파일의 `database_in=`(aide ≥ 0.17), 없으면
-  `database=`(옛 형식)의 `file:` 값에 `@@define NAME value` 매크로를 `@@{NAME}` 참조에 치환한 것;
-  파일이 정의한 적 없는 매크로 참조는 적힌 대로 두고 이유에 그렇게 말합니다.
+  `database=`(옛 형식)의 `file:` 값에 `@@define NAME value` 매크로를 `@@{NAME}` 참조에 치환한 것
+  (EL9의 `aide.conf`가 쓰고 Ubuntu의 것은 리터럴 경로); 그 밖의 `@@` 지시자(`@@include`,
+  `@@x_include`, `@@x_include_setenv`)는 무시; 파일이 정의한 적 없는 매크로 참조는 적힌 대로 두고
+  이유에 그렇게 말합니다.
   `fim.aide.database_present` — `bool`, 그 경로의 일반 파일. `fim.aide.database_modified` —
   `string`, 그 mtime을 RFC 3339 UTC로, 근거.
 - `fim.aide.schedules` — `list<record>` `{kind, path, armed, detail}`, `kind` ∈ cron_daily |
-  cron_d | crontab | timer; `armed`는 그 행이 실제로 돌 것인지, `detail`은 아니라면 왜인지:
+  cron_d | crontab | timer; `armed`는 그 행이 실제로 돌 것인지, `detail`은 아니라면 왜인지(J-5).
   이름에 `aide`가 들어간 `/etc/cron.daily/` 아래 파일은 실행 비트가 있고(`run-parts`는 나머지를
-  건너뜀) **그리고** Debian 계열에서는 `/etc/default/aide`가 `CRON_DAILY_RUN=yes`를 둘 때
-  armed — 배포되는 스크립트는 그 파일을 읽고 아니면 곧바로 끝냅니다(22.04·24.04의 스크립트와
-  배포 기본값은 읽기를 고정하기 전에 계획의 pre-flight가 확인); 명령에 `aide`가 있는
-  `/etc/cron.d/*` 또는 `/etc/crontab`의 주석 아닌 줄(armed; 주석 처리된 줄은 점검을 끄는 흔한
-  방식이라 행이 아님); 이름에 `aide`가 들어간 타이머(Ubuntu 24.04의 `dailyaidecheck.timer`,
-  관리자의 `aidecheck.timer`)는 `list-timers`가 다음 실행 시각을 보일 때 armed.
-  `fim.aide.scheduled` — `bool`, armed 행이 하나 이상. systemd 없는 호스트는 cron 행만 싣습니다.
+  건너뜀), `/etc/default/aide`가 `CRON_DAILY_RUN`을 `yes` 아닌 값으로 두지 않았고(파일은 그 줄을
+  주석으로 싣고 두 스크립트 모두 기본을 `yes`로 두므로 stock 호스트는 armed), `/run/systemd/system`이
+  있으면 곧바로 끝나는 Ubuntu 24.04 shim이 아닐 때(파일 속 그 리터럴로 식별; systemd 호스트에서 그
+  행은 `armed: false`, `detail: "runs only without systemd"`) armed입니다. 명령에 `aide`가 있는
+  `/etc/cron.d/*` 또는 `/etc/crontab`의 주석 아닌 줄은 armed(주석 처리된 줄은 점검을 끄는 흔한
+  방식이라 행이 아님). 이름에 `aide`가 들어간 타이머 — Ubuntu 24.04의 `dailyaidecheck.timer`(패키지가
+  enable), EL9의 `aide-check.timer`(배포되나 preset으로 비활성), 관리자 자신의 것 — 는 `systemctl
+  list-timers --all`이 다음 실행 시각을 보이고 `CRON_DAILY_RUN` 게이트가 성립할 때 armed(24.04의
+  서비스도 같은 파일을 읽음). `fim.aide.scheduled` — `bool`, armed 행이 하나 이상. systemd 없는
+  호스트는 cron 행만 싣고, 타이머 목록을 읽을 수 없는 호스트는 두 leaf가 이유를 적은
+  `unsupported`입니다.
 - `fim.other_tools` — `list<record>` `{name, path}`, 발견된 다른 실행파일 전부.
 
 ### I-5 — `pkgverify` 수집기
@@ -185,17 +202,20 @@ MiB; 어느 것을 돌릴지는 `patch.go`가 정하듯 계열이 정함); 아�
   끝났고, 출력이 잘리지 않았으면 true. 파싱된 행이 **없는** exit 1은 stderr의 첫 줄들을 담은
   `error` — 잠기거나 깨진 데이터베이스의 `rpm -Va`는 불평을 stderr에 찍고 1로 끝나며 그 밖엔
   아무것도 찍지 않는데, 자기 패키지 데이터베이스를 읽지 못하는 호스트가 무수정으로 PASS해서는
-  결코 안 됩니다. 죽은 명령은 `timeout`, 상한에 닿은 출력은 `truncated`, 그 밖의 종료 코드는 코드를
-  적은 `error`; 이들은 `ok: false`가 아니라 봉투 자체의 상태. `packages.verify.tool` —
-  `string`, `rpm` 또는 `dpkg`.
+  결코 안 됩니다. 죽은 명령은 `timeout`; 그 밖의 종료 코드는 코드를 적은 `error`; 상한에 닿은 출력은
+  상한을 적은 이유와 `truncated: true`를 단 `ok` false이며 deep 게이트가 행 10으로 읽습니다(I-9).
+  `packages.verify.tool` — `string`, `rpm` 또는 `dpkg`.
 - `packages.verify.modified` — `list<record>` `{path, attributes, file_type}`(`internal`,
   5000행 상한, `subject_kind: file`): 필터 뒤에 남은 행. `attributes`는 달랐던 열의 목록으로,
   도구의 순서대로 이름으로: `rpm(8)`의 아홉 열 `S M 5 D L U G T P`에 대해 `size, mode, digest,
   device, link, user, group, mtime, caps`, `missing` 줄에는 `missing`; `dpkg --verify`는 같은
-  아홉 열 형식을 출력하고(`--verify-format rpm`이 유일한 형식) `digest`만 채울 수 있어 그 행은
-  `digest` 또는 `missing`을 갖습니다. `file_type`은 유형 문자를 단어로(`config, doc, ghost,
-  license, readme, artifact` — rpm ≥ 4.14는 `%artifact`에 `a`를 찍음) 또는 빈 문자열; 파서가
-  모르는 문자는 그 문자 그대로 두고 그것 때문에 행을 버리지 않습니다.
+  아홉 열 형식을 출력하고(`--verify-format rpm`이 유일한 형식) `digest`와, 더는 일반 파일이 아닌
+  경로에 `mode`만 채웁니다. 두 도구는 공백 하나가 다릅니다: rpm은 열과 유형 문자 사이에 공백 둘,
+  dpkg는 하나(J-4), 그리고 둘 다 괄호 메모를 붙일 수 있습니다 — 호출자가 stat하지 못한 파일의
+  ` (Permission denied)`, 정상 아닌 rpm 상태의 ` (not installed)` / ` (replaced)` — 행은 그것을
+  `note`에 둡니다. `file_type`은 유형 문자를 단어로(`config, doc, ghost, license, readme,
+  artifact` — rpm ≥ 4.14는 `%artifact`에 `a`를 찍음) 또는 빈 문자열; 파서가 모르는 문자(`s`, `m`,
+  `n`)는 그 문자 그대로 두고 그것 때문에 행을 버리지 않습니다.
 - `packages.verify.modified_config` — 같은 레코드 모양과 민감도, 설정 파일 행(유형 `c`, dpkg의
   conffile도 `c`로 표시됨) — 판정하지 않는 독자용 근거: 바뀐 설정 파일이 곧 운영의 모습입니다.
 - `packages.verify.filter` — `list<string>`, 적용한 규칙을 순서대로, 항상 여섯: `config`(유형
@@ -228,9 +248,9 @@ MiB; 어느 것을 돌릴지는 `patch.go`가 정하듯 계열이 정함); 아�
   `Defaults` 줄은 따옴표 값을 가진 쉼표 구분 옵션 목록입니다(`Defaults env_reset, !syslog,
   logfile="/var/log/sudo.log"`). 줄은 `/etc/sudoers`와 `@includedir` / `#includedir` 디렉터리의
   모든 파일을 `sudoers(5)`의 순서(사전순, `.`가 들거나 `~`로 끝나는 이름은 건너뜀)로 읽고, 백슬래시
-  이어짐을 합치며, 뒤의 줄이 이깁니다. `/etc/sudoers`는 두 계열 다 0440 root이므로(`sudoers.d`는
-  Debian 계열 0755, EL 0750, 그 안의 파일은 0440) 비root 실행은 세 leaf를 그 읽기의 상태로 읽고
-  (C3) matrix의 비root 행이 그것을 싣습니다.
+  이어짐을 합치며, 뒤의 줄이 이깁니다. `/etc/sudoers`는 두 계열 다 0440 root이므로(`sudoers.d`는 EL에서
+  0750, Debian 계열에서는 릴리스와 이미지에 따라 0755 또는 0750, 그 안의 파일은 0440) 비root 실행은
+  세 leaf를 그 읽기의 상태로 읽고(C3) matrix의 비root 행이 그것을 싣습니다.
 - **`logging`**에 `logging.rsyslog.forwards_remote`(`bool`: 파싱한 rsyslog 액션 중 원격 대상 —
   `@host`, `@@host`, `:omfwd:`, `action(type="omfwd")`, 파서가 이미 `remote`로 분류하는 것 —
   **의 호스트가 루프백이 아닌 것**(`127.0.0.0/8`, `::1`, `localhost`: 로컬 shipper로의 중계는 그
@@ -322,33 +342,40 @@ AU-2, AU-3, AU-4, AU-5, AU-9, AU-12, 전송에 AU-4(1)/AU-9(2), sudo에 AU-3, �
   `/etc/sudoers` 읽기의 상태. capability matrix의 `nonroot.denied` 행에 `audit.*` 키 34개,
   `packages.verify.complete`, `sudo.log.*` / `sudo.defaults.*` 셋이 추가되고, 그 행이 빠진
   패키지가 아니라 거부에 관한 것이 되도록 CI의 비root 잡이 `auditd`를 설치합니다(I-11). AIDE
-  경로는 계열에 따릅니다: Debian 계열에선 읽히지만 EL은 `/etc/aide.conf`를 0600으로,
-  `/var/lib/aide`를 0700으로 설치하므로 비root EL 실행은 `fim.aide.database_*`를 `denied`로,
-  `file_integrity_tool`을 ERROR로 읽습니다 — K-31이 `protected_*`를 뺐듯 matrix는 그 키들을 어느
-  쪽으로도 assert하지 않습니다. `journal-upload.conf`와 `cron.daily`는 root 없이 읽힙니다.
-- **컨테이너.** 세 경우이고 어느 것도 capability 행이 아닙니다. 비특권 컨테이너
-  (`CAP_AUDIT_CONTROL` 없음)는 root로도 `Operation not permitted`를 받고 runtime 쪽은
-  `unsupported`; init이 아닌 사용자 네임스페이스는 `Connection refused`, 같음; 특권 컨테이너 —
-  CI의 EL init 이미지는 `--privileged`로 돎 — 는 호스트의 audit 소켓을 공유해 정상으로 답하거나,
-  이미지에 `audit` 패키지가 없으면 `absent`. 어쨌든 아홉 컨트롤 모두 컨테이너 게이트로
-  NOT_APPLICABLE이므로 `container.unsupported`에는 아무것도 더하지 않습니다. `pkgverify`는
+  경로는 릴리스에 따릅니다: Ubuntu 22.04에선 읽히지만 EL은 `/etc/aide.conf`를 0600으로,
+  `/var/lib/aide`를 0700으로 설치하고 Ubuntu 24.04는 `/var/lib/aide`를 0700 `_aide:root`로 만드므로
+  거기서 비root 실행은 `fim.aide.database_*`를 `denied`로, `file_integrity_tool`을 ERROR로
+  읽습니다 — K-31이 `protected_*`를 뺐듯 matrix는 그 키들을 어느 쪽으로도 assert하지 않습니다. `journal-upload.conf`와 `cron.daily`는 root 없이 읽힙니다.
+- **컨테이너.** 어떤 컨테이너도 `auditctl`에 답하거나 `auditd`를 돌릴 수 없습니다. 커널이 초기가
+  아닌 모든 pid 네임스페이스의 audit netlink 요청을 거부하므로(J-1) 특권 init 컨테이너 — CI의 EL
+  이미지 — 도 runtime 쪽을 `unsupported`로 읽고 그 `auditd.service`는 등록에 실패합니다
+  (`services.auditd.installed` true, `.active` false); 비특권 컨테이너는 capability 게이트를 통해
+  `unsupported`; init이 아닌 사용자 네임스페이스는 조용한 ECONNREFUSED를 통해. 어느 것도 capability
+  행이 아닙니다: 아홉 컨트롤 모두 컨테이너 게이트로 NOT_APPLICABLE이므로 `container.unsupported`에는
+  아무것도 더하지 않고, audit 수집기의 runtime 경로는 러너 VM에서 증명합니다(아래). `pkgverify`는
   컨테이너에서 돌고(패키지 데이터베이스가 거기 있음) CI가 그것으로 파서를 실제 도구와
   비교합니다(I-11).
 - **systemd 없음.** `services.auditd.*`와 `services.journal_upload.*`는 표의 규칙대로
   `unsupported`; `fim.aide.schedules`는 cron 행만.
-- **계열 차이.** 둘 다 `/usr/sbin/auditctl`. AIDE: Debian 계열은 `/usr/bin/aide`와
-  `/etc/aide/aide.conf`, EL은 `/usr/sbin/aide`와 `/etc/aide.conf`; 데이터베이스 이름은 설정이
-  답함(거기선 `aide.db`, EL은 `aide.db.gz`); Ubuntu 22.04는 `/etc/cron.daily/aide`, 24.04는 같은
-  이름의 cron.daily 스크립트 옆에 `dailyaidecheck.timer`, EL은 스케줄을 싣지 않음. `rpm -Va`는
-  아홉 열을 채우고 유형 문자를 찍음; `dpkg --verify`는 digest 열만 채우고 conffile을 `c`로 표시.
-  sudo는 두 계열 다 기본으로 syslog에 기록.
+- **계열 차이.** 둘 다 `/usr/sbin/auditctl`이고, 배포되는 `rules.d/audit.rules`는 두 계열 다 같은
+  `10-base-config` 텍스트(제어 줄만, `-e` 없음)라 auditd만 설치한 호스트는 어느 계열에서든
+  `audit_rules_loaded`와 `audit_immutable`을 FAIL로 읽습니다. AIDE: Debian 계열은 `/usr/bin/aide`와
+  `/etc/aide/aide.conf`, EL은 `/usr/sbin/aide`와 `/etc/aide.conf`(0600); 데이터베이스 이름은 설정이
+  답함(거기선 `aide.db`, EL은 `@@define`을 거쳐 `aide.db.gz`); Ubuntu 22.04는
+  `/etc/cron.daily/aide`, 24.04는 같은 이름의 cron.daily shim 옆에 `dailyaidecheck.timer`, EL9는
+  preset으로 비활성인 `aide-check.timer`(J-5). `rpm -Va`는 아홉 열을 채우고 유형 문자를 찍음; `dpkg
+  --verify`는 digest 열(과 일반 파일이 아닌 것에 `mode`)을 채우고 conffile을 `c`로 표시. sudo는 두
+  계열 다 기본으로 syslog에 기록.
 - **lab과 러너.** lab 호스트(Ubuntu 22.04, 커널 5.15, root)에는 auditd도 AIDE도 없어 §4의 stock
   Ubuntu 열, verify 경로(`dpkg --verify`, 10분 20초, 문서 행 1199개 필터), `pkgverify`의 비root
   거부를 증명합니다; 거기에 아무것도 설치하지 않습니다. 감사 컨트롤의 통과 경로는 fixture와 CI가
-  증명하며, 이미지가 싣지 않는 것은 계획이 마련합니다: EL init 컨테이너 둘에서 `dnf install
-  audit`(특권이라 auditd가 커널에 등록되고 `auditctl`이 답함), 러너 VM의 root·비root 잡에서
-  `apt-get install auditd`. 러너 VM의 `--deep` 실행은 수정된 패키지 파일을 나열할 것이고 예시
-  스냅샷의 `package_files_unmodified` FAIL은 예상된 것입니다.
+  증명하며, 이미지가 싣지 않는 것은 계획이 마련합니다(J-2): 러너 VM의 root 잡에서 `apt-get
+  install auditd aide aide-common` — auditd가 돌고 `auditctl`이 답하는 유일한 환경 — 과 비root
+  잡에서 `auditd`; EL init 컨테이너 둘에서 `dnf install audit aide`로 저하 형태를 증명
+  (`services.auditd.installed` true와 `.active` false, runtime 쪽 `unsupported`, 데이터베이스 없는
+  `fim.tool` `aide`). examples 워크플로는 아무것도 설치하지 않으므로 커밋되는 VM 예시는 stock 읽기를
+  유지하며, 그 `--deep` 실행은 수정된 패키지 파일을 나열할 것이고 거기서
+  `package_files_unmodified`의 FAIL은 예상된 것입니다.
 
 ## 7. 테스트, CI, 문서 (I-11, I-12)
 
@@ -360,21 +387,25 @@ AU-2, AU-3, AU-4, AU-5, AU-9, AU-12, 전송에 AU-4(1)/AU-9(2), sudo에 AU-3, �
 stock Ubuntu 22.04 읽기와, 새로, stock EL9 읽기 — 가 `hosts_test.go`로 §4의 두 열을 한 번에
 고정합니다. 인벤토리 테스트가 강제하는 seed 달린 `Fuzz<Name>` 대상 일곱: 감사 규칙 파서,
 `auditd.conf` 파서, `auditctl -s` 리더, verify 출력 파서, sudoers `Defaults` 리더, `aide.conf`
-매크로 리더, `journal-upload.conf` 리더. `MUSTER_ORACLE=1` 아래 오라클 쌍 셋, 모두 lab이 아닌
-CI 컨테이너에서: Rocky·Alma init 이미지에서 verify 파서 대 `rpm -Va`, Ubuntu 이미지에서 `dpkg
---verify`(줄 수와 경로 집합이 일치하고 모든 줄이 분류에 닿아야 함; dpkg 쌍은 lab이 보인 종료
-코드도 확인), 그리고 `audit`를 설치한 특권 EL init 컨테이너에서 runtime 리더 대 `auditctl -s` /
-`auditctl -l`(`enabled` 필드와 규칙 수가 파싱 값과 일치). 수집기는 `memAccess`로 present /
+매크로 리더, `journal-upload.conf` 리더. `MUSTER_ORACLE=1` 아래 오라클 쌍 둘: `TestOracleVerify`는 계열의 도구 자체를 돌려(러너 VM과
+lab에서 `dpkg --verify`, Rocky·Alma init 이미지에서 `rpm -Va`) 테스트 소유 코드로 파싱하고, 경로
+집합이 수집기의 행과 필터 계수를 합한 것과 일치하고 모든 줄이 분류에 닿아야 하며, 패키지
+데이터베이스가 있는 호스트에서는 결코 건너뛰지 않습니다. `TestOracleAudit`는 `auditctl -s`의
+`enabled`와 `auditctl -l`의 규칙 수를 runtime 리더와 비교하며, `auditctl`이 커널에 닿지 못하는
+곳(J-1)에서만 건너뜁니다 — 컨테이너는 그렇고, `auditd`를 설치한 러너 VM은 그래선 안 됩니다. 수집기는 `memAccess`로 present /
 absent / denied / truncated 경로를 단위 테스트하고, lab(root와 비root)에서 stock Ubuntu 열에
 대해 증명하며, `--deep` 실행의 행 수·필터 계수·소요 시간은 계획의 Execution notes에 기록합니다.
 
-CI: EL init 잡 둘이 `audit`를 설치하고 `jq`로 `services.auditd.active`가 true로,
-`audit_rules_loaded`가 NOT_APPLICABLE로 읽힘을 assert(`unsupported_env`가 코드가 아님 — 게이트가
-코드); 러너 root 잡은 `auditd`를 설치하고, 이미 워크를 위해 `--deep`을 넘기며 이제
-`packages.verify.*`도 만들어 `complete` true와 `tool` `dpkg`를 assert; 비root 잡은 `auditd`를
-설치하고 `packages.verify.complete` `denied`와 `audit.conf.log_file` `denied`를 assert;
-capability matrix 테스트가 새 행을 덮음; `examples.yml`을 pull request에서 한 번 돌려 예시 파일
-여섯을 갱신(제어집합이 바뀌므로 digest 게이트가 아니면 바이트 비교를 건너뜀).
+CI(J-2): EL init 잡 둘이 `audit aide`를 설치하고 `jq`로 `services.auditd.installed`가 true로,
+`audit.rules.present`의 runtime 쪽이 `unsupported`로, `fim.tool`이 `aide`이고 `database_present`가
+false로, `audit_rules_loaded`가 NOT_APPLICABLE로 읽힘을 assert(컨테이너 게이트이지
+`unsupported_env`가 아님); 러너 root 잡은 `auditd aide aide-common`을 설치하고 `--deep
+--verify-timeout 20m`을 넘겨 `services.auditd.active` true, `audit.rules.present`의 runtime 쪽
+`ok`이고 false, `packages.verify.complete` true와 `tool` `dpkg`, `fim.tool` `aide`를 assert하며 그
+오라클 단계는 audit·verify 쌍이 비교했음을 요구; 비root 잡은 `auditd`를 설치하고
+`packages.verify.complete` `denied`와 `audit.conf.log_file` `denied`를 assert; capability matrix
+테스트가 새 행을 덮음; `examples.yml`을 pull request에서 한 번 돌려 예시 파일 여섯을
+갱신(제어집합이 바뀌므로 digest 게이트가 아니면 바이트 비교를 건너뜀).
 
 **I-12 — 문서.** 메인 설계에 D30, §6.5의 넓힌 행 9–10a와 고쳐 쓴 행 5, §7.2의
 `verify_incomplete`, §8의 플래그 둘, §10.2에 "3C-1 (merged)"와 남은 3C-2 목록 및 W-8을 닫는
@@ -389,8 +420,8 @@ CLAUDE.md: "Beyond the guide" 아래 두 줄(deep 기반 규칙; `fim.tool`의 `
 
 - 감사 규칙 내용 판정(신원 파일, 시각, 로그인 기록, 모듈, 특권 명령): 3D, CIS 프로파일과
   `references.cis`와 함께.
-- 실제 VM에서의 `auditctl` 오라클(CI 쌍은 특권 컨테이너에서 돌며 거기서 커널의 규칙 집합은 러너의
-  것이고 보통 비어 있음).
+- 비어 있지 않은 규칙 집합에 대한 `auditctl` 오라클: 러너 VM의 규칙 집합은 배포되는 기본 설정이라
+  쌍은 `enabled`와 0인 개수를 비교합니다.
 - `sudo.log.input` / `sudo.log.output`의 사실과 판정; 범위 지정 `Defaults`의 해석.
 - Tripwire, Samhain, osquery, Wazuh의 자동 판정(I-4의 `fim.other_tools`가 씨앗); AIDE
   데이터베이스의 나이를 `fim.aide.database_modified`로.
