@@ -12,8 +12,11 @@ and root-equivalent paths, with the items 3A and 3B parked for 3C (network sysct
 capabilities and ACLs in the walk). This document is 3C-1 alone; 3C-2 gets its own
 design once 3C-1 has merged. Decisions are numbered I-1 … I-12 and bind the plan. A fresh
 review on 2026-09-23 (4 blocking, 10 medium, 16 low findings) and a measurement on the lab
-host (`dpkg --verify`: 10 min 20 s wall, 1199 `missing` rows, exit 0) are folded in; where
-this version differs from the first draft, the difference is theirs. Every
+host (`dpkg --verify`: 10 min 20 s wall, 1199 `missing` rows, exit 0) are folded in, and so
+are the plan's pre-flight corrections of 2026-09-23 (J-1 … J-6 in the plan: the `auditctl`
+exit codes, what a container can answer, dpkg's exit code and line form, the AIDE facts of the
+three releases, the directory modes); where this version differs from the first draft, the
+difference is theirs. Every
 check here is written from primary sources — `auditd.conf(5)`, `auditctl(8)`,
 `augenrules(8)`, `aide(1)` and `aide.conf(5)`, `sudoers(5)`, `rpm(8)`, `dpkg(1)`,
 `journal-upload.conf(5)` — in muster's own wording, carries no CIS recommendation number,
@@ -60,12 +63,13 @@ second control would be the same verdict under a second id.
    a copy of runtime as in 3B's sysctl (K-3).
 2. **Commands have fixed arguments and an exit code is data.** `rpm -Va` exits 1 to say
    "something differs" — the `patch` collector already reads `dnf check-update`'s 100 and
-   `needs-restarting`'s 1 the same way; `dpkg --verify` exits 1 on a digest mismatch but 0
-   with `missing` rows (measured on the lab), so the verdict is read from the output and
-   the exit code only decides between "answered" (0 or 1) and "failed". `auditctl` refuses
-   a non-root caller before it touches the kernel (exit 4, "You must be root"), and as root
-   a kernel that does not answer is told from its stderr (I-3). Any other code is `error`
-   naming the command and the code.
+   `needs-restarting`'s 1 the same way; `dpkg --verify` with no arguments always exits 0
+   (its `verify()` returns a failure only for a named package that is not installed; the
+   lab's 1199 `missing` rows exited 0), so the verdict is read from the rows and the exit
+   code only decides between "answered" (0, or 1 with rows) and "failed". `auditctl` gates
+   on the effective `CAP_AUDIT_CONTROL`, not the uid, and refuses with exit 4 before it
+   touches the kernel; as root, a kernel that will not answer is told from its stderr and
+   exit 255 (I-3). Any other code is `error` naming the command and the code.
 3. **A path a daemon's configuration names belongs to that daemon's collector** (C1):
    `auditd.conf`'s `log_file`, `aide.conf`'s `database_in`. Permission facts are the nine
    leaves `writePermFacts` writes, no more.
@@ -150,18 +154,27 @@ path serves both families).
   acl_present`), of the file `log_file` names and of its parent directory. A `log_file`
   outside the declared stat patterns is C4: `absent` with the path in the reason, never
   `error`.
-- Status rules. `auditctl` not on the host: the runtime side is `absent` ("auditctl is
-  not installed"), never `unsupported` — the kernel may hold rules nobody can list, and
+- Status rules (J-1). `auditctl` not on the host: the runtime side is `absent` ("auditctl
+  is not installed"), never `unsupported` — the kernel may hold rules nobody can list, and
   the controls that need the runtime side are gated on the daemon being installed anyway.
-  `auditctl` refuses a non-root caller before opening the socket (`You must be root to run
-  this program.`, exit 4): `denied`. As root, exit 1 with `Operation not permitted` (no
-  `CAP_AUDIT_CONTROL`: an unprivileged container), `Connection refused` (a non-init user
-  namespace: rootless podman, userns-remap) or `audit support not in kernel` (`audit=0`,
-  a kernel without `CONFIG_AUDIT`) is `unsupported` naming the message; a privileged
-  container and a host answer normally. `/etc/audit` is 0750 root on both families and
-  `/var/log/audit` is 0700, so a non-root run on a host with auditd reads every persisted
-  and permission leaf `denied`; on a host without auditd they are `absent`, which is why
-  the capability matrix's non-root row (§6) is asserted only where auditd is installed.
+  `auditctl` gates on the effective `CAP_AUDIT_CONTROL` (`audit_can_control()`), so `You
+  must be root to run this program.` with exit 4 is `denied` when the run is not root and
+  `unsupported` ("no CAP_AUDIT_CONTROL: an unprivileged container") when it is. The kernel
+  refuses `AUDIT_GET` and `AUDIT_LIST_RULES` from any pid namespace but the initial one
+  before it looks at capabilities, which `auditctl` reports as `Error sending status
+  request (Operation not permitted)` (or `… rule list data request …`) with exit 255:
+  `unsupported` ("kernel audit is not reachable from this pid namespace") — every
+  container, privileged or not, reads that. A non-init user namespace gets ECONNREFUSED,
+  which `auditctl -s` swallows (`The audit system is disabled`, exit 0, no `enabled` line):
+  an exit 0 with no `enabled` line is `unsupported` ("the kernel gave no audit status"),
+  never a value. `audit support not in kernel` / `Cannot open netlink audit socket`
+  (`audit=0`, a kernel without `CONFIG_AUDIT`) is `unsupported`. Any other non-zero exit is
+  `error`. `/etc/audit` and `rules.d` are 0750 root on both families; `/var/log/audit` is
+  0700 root on EL and 0750 root:adm on Ubuntu (`log_group = adm` by Ubuntu's patch, the log
+  file 0640 root:adm), so a non-root run outside group adm reads every persisted and
+  permission leaf `denied` on a host with auditd; on a host without auditd they are
+  `absent`, which is why the capability matrix's non-root row (§6) is asserted only where
+  auditd is installed.
 
 ### I-4 — the `fim` collector
 
@@ -187,22 +200,29 @@ armed, and a `static` timer pulled in by a target is armed without being enabled
   when neither does.
 - `fim.aide.database_path` — `string`: the `file:` value of `database_in=` (aide ≥ 0.17),
   else of `database=` (older), from the configuration file, with `@@define NAME value`
-  macros substituted into `@@{NAME}` references; a reference to a macro the file never
-  defined is left as written and the reason says so. `fim.aide.database_present` — `bool`,
+  macros substituted into `@@{NAME}` references (EL9's `aide.conf` uses them; Ubuntu's has
+  literal paths); every other `@@` directive (`@@include`, `@@x_include`,
+  `@@x_include_setenv`) is ignored; a reference to a macro the file never defined is left
+  as written and the reason says so. `fim.aide.database_present` — `bool`,
   a regular file at that path. `fim.aide.database_modified` — `string`, its mtime as
   RFC 3339 UTC, evidence.
 - `fim.aide.schedules` — `list<record>` `{kind, path, armed, detail}`, `kind` ∈
   cron_daily | cron_d | crontab | timer; `armed` says the row will actually run and
-  `detail` why not: a file under `/etc/cron.daily/` whose name contains `aide`, armed when
-  it has the execute bit (`run-parts` skips the rest) **and**, on the Debian family, when
-  `/etc/default/aide` sets `CRON_DAILY_RUN=yes` — the shipped script sources that file and
-  exits at once otherwise (the plan's pre-flight confirms the 22.04 and 24.04 scripts and
-  the shipped default before the reading is pinned); a non-comment line of `/etc/cron.d/*`
-  or `/etc/crontab` whose command names `aide` (armed; a commented-out line is the usual
-  way a check is switched off and is not a row); a timer whose name contains `aide`
-  (`dailyaidecheck.timer` on Ubuntu 24.04, an administrator's `aidecheck.timer`), armed
-  when `list-timers` shows a next elapse time for it. `fim.aide.scheduled` — `bool`, at
-  least one armed row. A host without systemd lists cron rows only.
+  `detail` why not (J-5). A file under `/etc/cron.daily/` whose name contains `aide` is
+  armed when it has the execute bit (`run-parts` skips the rest), when `/etc/default/aide`
+  does not set `CRON_DAILY_RUN` to a value other than `yes` (the file ships the line
+  commented and both scripts default it to `yes`, so a stock host is armed), and when it is
+  not the Ubuntu 24.04 shim, which exits whenever `/run/systemd/system` exists (detected by
+  that literal in the file; on a systemd host the row is `armed: false`, `detail: "runs
+  only without systemd"`). A non-comment line of `/etc/cron.d/*` or `/etc/crontab` whose
+  command names `aide` is armed (a commented-out line is the usual way a check is switched
+  off and is not a row). A timer whose name contains `aide` — `dailyaidecheck.timer` on
+  Ubuntu 24.04 (enabled by the package), `aide-check.timer` on EL9 (shipped, preset-disabled),
+  an administrator's own — is armed when `systemctl list-timers --all` shows a next elapse
+  time for it and the `CRON_DAILY_RUN` gate holds (the 24.04 service reads the same file).
+  `fim.aide.scheduled` — `bool`, at least one armed row. A host without systemd lists cron
+  rows only; a host whose timer inventory cannot be read has both leaves `unsupported`
+  naming the reason.
 - `fim.other_tools` — `list<record>` `{name, path}`, every other binary found.
 
 ### I-5 — the `pkgverify` collector
@@ -221,19 +241,23 @@ needs root: an unprivileged rpm -Va marks every file it cannot read as untestabl
   `error` carrying the first lines of stderr — `rpm -Va` on a locked or corrupt database
   prints its complaint to stderr, exits 1 and prints nothing else, and a host that cannot
   read its own package database must never PASS as unmodified. A killed command is
-  `timeout`, an output at the cap `truncated`, any other exit code `error` naming it; those
-  are the envelope's own status, not `ok: false`. `packages.verify.tool` — `string`, `rpm`
-  or `dpkg`.
+  `timeout`; any other exit code is `error` naming it; an output at the cap is `ok` false
+  with `truncated: true` and a reason naming the cap, which the deep gate reads as row 10
+  (I-9). `packages.verify.tool` — `string`, `rpm` or `dpkg`.
 - `packages.verify.modified` — `list<record>` `{path, attributes, file_type}`
   (`internal`, capped at 5000, `subject_kind: file`): the rows left after the filter.
   `attributes` is the list of the columns that differed, in the tool's order and by name:
   `size, mode, digest, device, link, user, group, mtime, caps` for the nine columns
   `S M 5 D L U G T P` of `rpm(8)`, and `missing` for a `missing` line; `dpkg --verify`
-  prints the same nine-column form (`--verify-format rpm` is its only format) and can
-  fill only `digest`, so its rows carry `digest` or `missing`. `file_type` is the type
-  letter as a word (`config, doc, ghost, license, readme, artifact` — rpm ≥ 4.14 prints
-  `a` for `%artifact`) or empty; a letter the parser does not know is kept as the letter
-  and the row is never dropped for it.
+  prints the same nine-column form (`--verify-format rpm` is its only format) and fills
+  only `digest` and, for a path that is no longer a regular file, `mode`. The two tools
+  differ by a space: rpm puts two spaces between the columns and the type letter, dpkg one
+  (J-4), and both may append a note in parentheses — ` (Permission denied)` on a file the
+  caller could not stat, ` (not installed)` / ` (replaced)` on a file in a non-normal rpm
+  state — which the row keeps in `note`. `file_type` is the type letter as a word
+  (`config, doc, ghost, license, readme, artifact` — rpm ≥ 4.14 prints `a` for
+  `%artifact`) or empty; a letter the parser does not know (`s`, `m`, `n`) is kept as the
+  letter and the row is never dropped for it.
 - `packages.verify.modified_config` — the same record shape and sensitivity, the
   configuration-file rows (type `c`, and dpkg's conffiles, which it marks `c` too) —
   evidence for the reader, not judged: a changed configuration file is what
@@ -274,9 +298,10 @@ needs root: an unprivileged rpm -Va marks every file it cannot read as untestabl
   logfile="/var/log/sudo.log"`) with quoted values. Lines are read from `/etc/sudoers` and
   every file of the `@includedir` / `#includedir` directory in `sudoers(5)`'s order
   (lexical, names with `.` or ending in `~` skipped), backslash continuations joined,
-  later lines winning. `/etc/sudoers` is 0440 root on both families (`sudoers.d` is 0755
-  on the Debian family and 0750 on EL, its files 0440), so a non-root run reads the three
-  leaves as that read's status (C3) and the matrix's non-root row carries them.
+  later lines winning. `/etc/sudoers` is 0440 root on both families (`sudoers.d` is 0750 on
+  EL and 0755 or 0750 on the Debian family depending on the release and the image; its
+  files are 0440), so a non-root run reads the three leaves as that read's status (C3) and
+  the matrix's non-root row carries them.
 - **`logging`** gains `logging.rsyslog.forwards_remote` (`bool`: at least one parsed
   rsyslog action is a remote target — `@host`, `@@host`, `:omfwd:`, `action(type="omfwd")`,
   which the parser already classifies as `remote` — **whose host is not loopback**
@@ -380,39 +405,47 @@ to the implemented rule (§4). This is the only evaluator change of 3C-1.
   status of `/etc/sudoers`. The capability matrix's `nonroot.denied` row gains the 34
   `audit.*` keys, `packages.verify.complete` and the three `sudo.log.*` /
   `sudo.defaults.*` keys, and CI's non-root job installs `auditd` so that the row is
-  about a denial and not about a missing package (I-11). AIDE paths are family-dependent:
-  readable on the Debian family, but EL installs `/etc/aide.conf` 0600 and
-  `/var/lib/aide` 0700, so a non-root EL run reads `fim.aide.database_*` `denied` and
-  `file_integrity_tool` ERROR — the matrix does not assert those keys either way, as K-31
-  left `protected_*` out. `journal-upload.conf` and `cron.daily` are readable without root.
-- **Container.** Three cases, none of them a capability row: an unprivileged container
-  (no `CAP_AUDIT_CONTROL`) gets `Operation not permitted` as root and the runtime sides
-  are `unsupported`; a non-init user namespace gets `Connection refused`, the same; a
-  privileged container — CI's EL init images run `--privileged` — shares the host's
-  audit socket and answers normally, or `absent` when the `audit` package is not in the
-  image. Every one of the nine controls is NOT_APPLICABLE on the container gate
-  regardless, so nothing is added to `container.unsupported`. `pkgverify` runs in a
-  container (the package database is there) and CI uses that to compare the parser with
-  the real tools (I-11).
+  about a denial and not about a missing package (I-11). AIDE paths are release-dependent:
+  readable on Ubuntu 22.04, but EL installs `/etc/aide.conf` 0600 and `/var/lib/aide` 0700
+  and Ubuntu 24.04 creates `/var/lib/aide` 0700 `_aide:root`, so a non-root run there reads
+  `fim.aide.database_*` `denied` and `file_integrity_tool` ERROR — the matrix does not
+  assert those keys either way, as K-31 left `protected_*` out. `journal-upload.conf` and `cron.daily` are readable without root.
+- **Container.** No container can answer `auditctl` or run `auditd`: the kernel refuses
+  the audit netlink requests from every pid namespace but the initial one (J-1), so a
+  privileged init container — CI's EL images — reads the runtime sides `unsupported` and
+  its `auditd.service` fails to register (`services.auditd.installed` true, `.active`
+  false); an unprivileged container reads `unsupported` through the capability gate; a
+  non-init user namespace through the silent ECONNREFUSED. None of it is a capability row:
+  every one of the nine controls is NOT_APPLICABLE on the container gate regardless, so
+  nothing is added to `container.unsupported`, and the runtime paths of the audit
+  collector are proven on the runner VM (below). `pkgverify` runs in a container (the
+  package database is there) and CI uses that to compare the parser with the real tools
+  (I-11).
 - **No systemd.** `services.auditd.*` and `services.journal_upload.*` are `unsupported`
   by the table's rule; `fim.aide.schedules` holds cron rows only.
-- **Family differences.** `/usr/sbin/auditctl` on both. AIDE: `/usr/bin/aide` and
-  `/etc/aide/aide.conf` on the Debian family, `/usr/sbin/aide` and `/etc/aide.conf` on EL;
-  the database name comes from the configuration (`aide.db` there, `aide.db.gz` on EL);
-  Ubuntu 22.04 ships `/etc/cron.daily/aide`, 24.04 `dailyaidecheck.timer` beside a
-  cron.daily script of the same name, EL ships no schedule. `rpm -Va` fills nine columns
-  and prints type letters; `dpkg --verify` fills the digest column only and marks
-  conffiles `c`. sudo logs through syslog on both by default.
+- **Family differences.** `/usr/sbin/auditctl` on both, and the shipped
+  `rules.d/audit.rules` is the same `10-base-config` text on both (control lines only, no
+  `-e`), so a host that installs auditd and nothing else reads `audit_rules_loaded` and
+  `audit_immutable` FAIL on either family. AIDE: `/usr/bin/aide` and `/etc/aide/aide.conf`
+  on the Debian family, `/usr/sbin/aide` and `/etc/aide.conf` (0600) on EL; the database
+  name comes from the configuration (`aide.db` there, `aide.db.gz` on EL through
+  `@@define`); Ubuntu 22.04 ships `/etc/cron.daily/aide`, 24.04 `dailyaidecheck.timer`
+  beside a cron.daily shim of the same name, EL9 `aide-check.timer` preset-disabled (J-5).
+  `rpm -Va` fills nine columns and prints type letters; `dpkg --verify` fills the digest
+  column (and `mode` for a non-regular file) and marks conffiles `c`. sudo logs through
+  syslog on both by default.
 - **The lab and the runner.** The lab host (Ubuntu 22.04, kernel 5.15, root) carries
   neither auditd nor AIDE, so it proves the stock-Ubuntu column of §4, the verify path
   (`dpkg --verify`, 10 min 20 s, 1199 documentation rows filtered) and the non-root
   denial of `pkgverify`; nothing is installed on it. The passing paths of the audit
   controls are proven by fixtures and by CI, where the plan arranges what the images do
-  not ship: `dnf install audit` in the two EL init containers (privileged, so auditd
-  registers with the kernel and `auditctl` answers) and `apt-get install auditd` in the
-  runner VM's root and non-root jobs. The runner VM's `--deep` run will list modified
-  package files, and the example snapshot's FAIL on `package_files_unmodified` is
-  expected.
+  not ship (J-2): `apt-get install auditd aide aide-common` in the runner VM's root job —
+  the one environment where auditd runs and `auditctl` answers — and `auditd` in the
+  non-root job; `dnf install audit aide` in the two EL init containers, which prove the
+  degraded shapes (`services.auditd.installed` true and `.active` false, the runtime sides
+  `unsupported`, `fim.tool` `aide` with no database). The examples workflow installs
+  nothing, so the committed VM example keeps the stock reading; its `--deep` run will list
+  modified package files, and the FAIL on `package_files_unmodified` there is expected.
 
 ## 7. Tests, CI, documents (I-11, I-12)
 
@@ -426,27 +459,31 @@ AIDE). The mutation test stays at zero survivors, an equivalent mutant goes into
 reading — pin the two columns of §4 at once through `hosts_test.go`. Seven `Fuzz<Name>`
 targets with seeds, enforced by the inventory test: the audit rules parser, the
 `auditd.conf` parser, the `auditctl -s` reader, the verify-output parser, the sudoers
-`Defaults` reader, the `aide.conf` macro reader, the `journal-upload.conf` reader. Three
-oracle pairs under `MUSTER_ORACLE=1`, all in CI's containers rather than on the lab:
-`rpm -Va` against the verify parser in the Rocky and Alma init images, `dpkg --verify`
-against it in the Ubuntu images (the line count and the set of paths must agree, and a
-classification of every line must be reached; the dpkg pair also confirms the exit code
-the lab showed), and `auditctl -s` / `auditctl -l` against the runtime reader in the
-privileged EL init containers once `audit` is installed there (the `enabled` field and the
-rule count must agree with the parsed values). Collectors are unit-tested through `memAccess` on the
+`Defaults` reader, the `aide.conf` macro reader, the `journal-upload.conf` reader. Two
+oracle pairs under `MUSTER_ORACLE=1`: `TestOracleVerify` runs the family's tool itself
+(`dpkg --verify` on the runner VM and the lab, `rpm -Va` in the Rocky and Alma init
+images), parses it with test-owned code and requires the set of paths to agree with the
+collector's rows plus its filtered counts and every line to reach a classification; it
+never skips on a host with a package database. `TestOracleAudit` compares `auditctl -s`'s
+`enabled` and `auditctl -l`'s rule count with the runtime reader; it skips only where
+`auditctl` cannot reach the kernel (J-1), which the containers do and the runner VM, once
+`auditd` is installed there, must not. Collectors are unit-tested through `memAccess` on the
 present / absent / denied / truncated paths, proven on the lab (root and non-root) against
 the stock-Ubuntu column, and the `--deep` run's row counts, filtered counts and duration
 are recorded in the plan's Execution notes.
 
-CI: the two EL init jobs install `audit` and assert with `jq` that
-`services.auditd.active` reads true and `audit_rules_loaded` reads NOT_APPLICABLE
-(`unsupported_env` is not the code — the gate is); the runner's root job installs
-`auditd`, already passes `--deep` for the walk and now also produces `packages.verify.*`,
-asserting `complete` true and `tool` `dpkg`; the non-root job installs `auditd` and
-asserts `packages.verify.complete` `denied` and `audit.conf.log_file` `denied`; the
-capability matrix test covers the new rows; `examples.yml` is run once on the pull
-request and the six example files refreshed (the control set changes, so the digest gate
-would otherwise skip their byte comparison).
+CI (J-2): the two EL init jobs install `audit aide` and assert with `jq` that
+`services.auditd.installed` reads true, `audit.rules.present`'s runtime side reads
+`unsupported`, `fim.tool` reads `aide` with `database_present` false, and
+`audit_rules_loaded` reads NOT_APPLICABLE (the container gate, not `unsupported_env`);
+the runner's root job installs `auditd aide aide-common`, passes `--deep --verify-timeout
+20m` and asserts `services.auditd.active` true, the runtime side of `audit.rules.present`
+`ok` and false, `packages.verify.complete` true with `tool` `dpkg`, and `fim.tool` `aide`;
+its oracle step requires the audit and verify pairs to have compared; the non-root job
+installs `auditd` and asserts `packages.verify.complete` `denied` and
+`audit.conf.log_file` `denied`; the capability matrix test covers the new rows;
+`examples.yml` is run once on the pull request and the six example files refreshed (the
+control set changes, so the digest gate would otherwise skip their byte comparison).
 
 **I-12 — documents.** The main design gains D30, the widened rows 9–10a and the rewritten
 row 5 in §6.5, `verify_incomplete` in §7.2, the two flags in §8, and in §10.2 "3C-1
@@ -464,8 +501,8 @@ keeps its Execution notes as the earlier plans do.
 
 - Judging the content of the audit rules (identity files, time, login records, modules,
   privileged commands): 3D, with the CIS profile and `references.cis`.
-- The `auditctl` oracle on a real VM (the CI pair runs in privileged containers, where
-  the kernel's rule set is the runner's and normally empty).
+- An `auditctl` oracle against a rule set that is not empty: the runner VM's rule set is
+  the shipped base configuration, so the pair compares `enabled` and a count of zero.
 - `sudo.log.input` / `sudo.log.output` as facts and as a verdict; interpreting scoped
   `Defaults`.
 - Automatic verdicts for Tripwire, Samhain, osquery, Wazuh (I-4's `fim.other_tools` is
