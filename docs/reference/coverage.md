@@ -102,7 +102,7 @@
 
 ## Fact keys used by controls
 
-183 of 397 registered keys are read by a control (4 by the engine); 210 unused.
+183 of 431 registered keys are read by a control (4 by the engine); 244 unused.
 
 | Collector | Registered | Used by a control | Read by the engine | Unused |
 |---|---|---|---|---|
@@ -133,3 +133,4 @@
 | mounts | 5 | 5 | 0 | — |
 | modules | 1 | 1 | 0 | — |
 | swap | 3 | 1 | 0 | swap.present, swap.devices |
+| audit | 34 | 0 | 0 | audit.rules.present, audit.rules.loaded_count, audit.rules.persisted_count, audit.rules.persisted, audit.immutable, audit.status.enabled, audit.status.failure, audit.status.lost, audit.status.backlog_limit, audit.conf.log_file, audit.conf.log_group, audit.conf.max_log_file_action, audit.conf.space_left_action, audit.conf.admin_space_left_action, audit.conf.disk_full_action, audit.conf.disk_error_action, audit.log_file.mode, audit.log_file.uid, audit.log_file.gid, audit.log_file.group, audit.log_file.group_readable, audit.log_file.group_writable, audit.log_file.other_readable, audit.log_file.other_writable, audit.log_file.acl_present, audit.log_dir.mode, audit.log_dir.uid, audit.log_dir.gid, audit.log_dir.group, audit.log_dir.group_readable, audit.log_dir.group_writable, audit.log_dir.other_readable, audit.log_dir.other_writable, audit.log_dir.acl_present |

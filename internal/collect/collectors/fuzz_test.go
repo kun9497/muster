@@ -1259,3 +1259,35 @@ func FuzzParentDisk(f *testing.F) {
 		fuzzBody(t, "parentDisk", func() any { return parentDisk(string(data)) }, len(data))
 	})
 }
+
+// FuzzParseAuditRules reads a rules file and decides the lock from it, so the
+// -e argument reader is fuzzed with the grammar that feeds it.
+func FuzzParseAuditRules(f *testing.F) {
+	seeds(f, "testdata/audit.rules.*")
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "parseAuditRules", func() any {
+			rules := parseAuditRules(data, "/etc/audit/rules.d/fuzz.rules")
+			v, file, found := lastEnableValue(rules)
+			return []any{rules, v, file, found}
+		}, len(data))
+	})
+}
+
+func FuzzParseAuditdConf(f *testing.F) {
+	seeds(f, "testdata/auditd.conf.sample")
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "parseAuditdConf", func() any { return parseAuditdConf(data) }, len(data))
+	})
+}
+
+// FuzzParseAuditctlStatus reads auditctl output both ways the collector
+// does: -s as status fields and -l as rule lines.
+func FuzzParseAuditctlStatus(f *testing.F) {
+	seeds(f, "testdata/auditctl_*")
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "parseAuditctlStatus", func() any {
+			fields, ok := parseAuditctlStatus(data)
+			return []any{fields, ok, auditctlRuleLines(data)}
+		}, len(data))
+	})
+}

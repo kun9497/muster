@@ -4140,6 +4140,346 @@
       "Collector": "swap",
       "DefaultOn": "",
       "SubjectKind": ""
+    },
+    {
+      "Key": "audit.rules.present",
+      "Type": "setting\u003cbool\u003e",
+      "Description": "Whether the audit daemon carries at least one watch or syscall rule - runtime from auditctl -l (its \"No rules\" is false), persisted from the *.rules files of /etc/audit/rules.d that augenrules loads on a systemd host (/etc/audit/audit.rules on a host without systemd); absent on the persisted side when rules.d is missing, since augenrules then loads nothing at boot.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "audit",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "audit.rules.loaded_count",
+      "Type": "int",
+      "Description": "How many rule lines auditctl -l printed; evidence.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "audit",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "audit.rules.persisted_count",
+      "Type": "int",
+      "Description": "How many watch (-w) and syscall (-a, -A) rule lines the persisted source carries; control lines are not counted; evidence.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "audit",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "audit.rules.persisted",
+      "Type": "list\u003crecord\u003e",
+      "Description": "The persisted audit rules as read, one row per non-comment line in load order (the files in order, each file top to bottom) with file, line (the line number), kind (watch, syscall, control or other), key (the -k or key= value, empty when none) and text; capped at 2000 rows. augenrules regroups the control lines before loading, so this is the files, not the merged audit.rules.",
+      "Since": 1,
+      "Sensitivity": "internal",
+      "Collector": "audit",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "audit.immutable",
+      "Type": "setting\u003cbool\u003e",
+      "Description": "Whether the audit configuration is locked until reboot - runtime from auditctl -s reporting enabled 2, persisted from the last -e line of the persisted source being -e 2.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "audit",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "audit.status.enabled",
+      "Type": "int",
+      "Description": "The enabled field of auditctl -s (0 off, 1 on, 2 on and locked); evidence.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "audit",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "audit.status.failure",
+      "Type": "int",
+      "Description": "The failure field of auditctl -s - what the kernel does when it cannot record an event (0 silent, 1 printk, 2 panic); evidence.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "audit",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "audit.status.lost",
+      "Type": "int",
+      "Description": "The lost field of auditctl -s - events the kernel dropped since boot; evidence.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "audit",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "audit.status.backlog_limit",
+      "Type": "int",
+      "Description": "The backlog_limit field of auditctl -s - the kernel's queue of events awaiting the daemon; evidence.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "audit",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "audit.conf.log_file",
+      "Type": "string",
+      "Description": "The log_file of /etc/audit/auditd.conf as written; when the line is missing, the documented default /var/log/audit/audit.log with the source derived from auditd.conf.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "audit",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "audit.conf.log_group",
+      "Type": "string",
+      "Description": "The log_group of /etc/audit/auditd.conf as written; absent when no line sets it.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "audit",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "audit.conf.max_log_file_action",
+      "Type": "string",
+      "Description": "The max_log_file_action of /etc/audit/auditd.conf, lower-cased; absent when no line sets it, never the daemon's compiled default.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "audit",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "audit.conf.space_left_action",
+      "Type": "string",
+      "Description": "The space_left_action of /etc/audit/auditd.conf, lower-cased; absent when no line sets it, never the daemon's compiled default.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "audit",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "audit.conf.admin_space_left_action",
+      "Type": "string",
+      "Description": "The admin_space_left_action of /etc/audit/auditd.conf, lower-cased; absent when no line sets it, never the daemon's compiled default.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "audit",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "audit.conf.disk_full_action",
+      "Type": "string",
+      "Description": "The disk_full_action of /etc/audit/auditd.conf, lower-cased; absent when no line sets it, never the daemon's compiled default.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "audit",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "audit.conf.disk_error_action",
+      "Type": "string",
+      "Description": "The disk_error_action of /etc/audit/auditd.conf, lower-cased; absent when no line sets it, never the daemon's compiled default.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "audit",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "audit.log_file.mode",
+      "Type": "int",
+      "Description": "Permission bits of the audit log file auditd.conf's log_file names as an integer (e.g. 384 for 0600).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "audit",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "audit.log_file.uid",
+      "Type": "int",
+      "Description": "Owner uid of the audit log file auditd.conf's log_file names.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "audit",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "audit.log_file.gid",
+      "Type": "int",
+      "Description": "Group gid of the audit log file auditd.conf's log_file names.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "audit",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "audit.log_file.group",
+      "Type": "string",
+      "Description": "Group name for the gid of the audit log file auditd.conf's log_file names from /etc/group; empty when the gid has no name.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "audit",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "audit.log_file.group_readable",
+      "Type": "bool",
+      "Description": "Whether the group permission bits of the audit log file auditd.conf's log_file names include read (derived from mode).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "audit",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "audit.log_file.group_writable",
+      "Type": "bool",
+      "Description": "Whether the group permission bits of the audit log file auditd.conf's log_file names include write (derived from mode).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "audit",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "audit.log_file.other_readable",
+      "Type": "bool",
+      "Description": "Whether the other permission bits of the audit log file auditd.conf's log_file names include read (derived from mode).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "audit",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "audit.log_file.other_writable",
+      "Type": "bool",
+      "Description": "Whether the other permission bits of the audit log file auditd.conf's log_file names include write (derived from mode).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "audit",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "audit.log_file.acl_present",
+      "Type": "bool",
+      "Description": "Whether a POSIX ACL xattr is present on the audit log file auditd.conf's log_file names.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "audit",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "audit.log_dir.mode",
+      "Type": "int",
+      "Description": "Permission bits of the directory holding the audit log file as an integer (e.g. 384 for 0600).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "audit",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "audit.log_dir.uid",
+      "Type": "int",
+      "Description": "Owner uid of the directory holding the audit log file.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "audit",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "audit.log_dir.gid",
+      "Type": "int",
+      "Description": "Group gid of the directory holding the audit log file.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "audit",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "audit.log_dir.group",
+      "Type": "string",
+      "Description": "Group name for the gid of the directory holding the audit log file from /etc/group; empty when the gid has no name.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "audit",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "audit.log_dir.group_readable",
+      "Type": "bool",
+      "Description": "Whether the group permission bits of the directory holding the audit log file include read (derived from mode).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "audit",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "audit.log_dir.group_writable",
+      "Type": "bool",
+      "Description": "Whether the group permission bits of the directory holding the audit log file include write (derived from mode).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "audit",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "audit.log_dir.other_readable",
+      "Type": "bool",
+      "Description": "Whether the other permission bits of the directory holding the audit log file include read (derived from mode).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "audit",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "audit.log_dir.other_writable",
+      "Type": "bool",
+      "Description": "Whether the other permission bits of the directory holding the audit log file include write (derived from mode).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "audit",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "audit.log_dir.acl_present",
+      "Type": "bool",
+      "Description": "Whether a POSIX ACL xattr is present on the directory holding the audit log file.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "audit",
+      "DefaultOn": "",
+      "SubjectKind": ""
     }
   ]
 }

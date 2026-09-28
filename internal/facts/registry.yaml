@@ -2619,3 +2619,209 @@ keys:
     since: 1
     sensitivity: public
     collector: swap
+  - key: audit.rules.present
+    type: setting<bool>
+    description: Whether the audit daemon carries at least one watch or syscall rule - runtime from auditctl -l (its "No rules" is false), persisted from the *.rules files of /etc/audit/rules.d that augenrules loads on a systemd host (/etc/audit/audit.rules on a host without systemd); absent on the persisted side when rules.d is missing, since augenrules then loads nothing at boot.
+    since: 1
+    sensitivity: public
+    collector: audit
+    default_on: effective
+  - key: audit.rules.loaded_count
+    type: int
+    description: How many rule lines auditctl -l printed; evidence.
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.rules.persisted_count
+    type: int
+    description: How many watch (-w) and syscall (-a, -A) rule lines the persisted source carries; control lines are not counted; evidence.
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.rules.persisted
+    type: list<record>
+    description: The persisted audit rules as read, one row per non-comment line in load order (the files in order, each file top to bottom) with file, line (the line number), kind (watch, syscall, control or other), key (the -k or key= value, empty when none) and text; capped at 2000 rows. augenrules regroups the control lines before loading, so this is the files, not the merged audit.rules.
+    since: 1
+    sensitivity: internal
+    collector: audit
+  - key: audit.immutable
+    type: setting<bool>
+    description: Whether the audit configuration is locked until reboot - runtime from auditctl -s reporting enabled 2, persisted from the last -e line of the persisted source being -e 2.
+    since: 1
+    sensitivity: public
+    collector: audit
+    default_on: effective
+  - key: audit.status.enabled
+    type: int
+    description: The enabled field of auditctl -s (0 off, 1 on, 2 on and locked); evidence.
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.status.failure
+    type: int
+    description: The failure field of auditctl -s - what the kernel does when it cannot record an event (0 silent, 1 printk, 2 panic); evidence.
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.status.lost
+    type: int
+    description: The lost field of auditctl -s - events the kernel dropped since boot; evidence.
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.status.backlog_limit
+    type: int
+    description: The backlog_limit field of auditctl -s - the kernel's queue of events awaiting the daemon; evidence.
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.conf.log_file
+    type: string
+    description: The log_file of /etc/audit/auditd.conf as written; when the line is missing, the documented default /var/log/audit/audit.log with the source derived from auditd.conf.
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.conf.log_group
+    type: string
+    description: The log_group of /etc/audit/auditd.conf as written; absent when no line sets it.
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.conf.max_log_file_action
+    type: string
+    description: The max_log_file_action of /etc/audit/auditd.conf, lower-cased; absent when no line sets it, never the daemon's compiled default.
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.conf.space_left_action
+    type: string
+    description: The space_left_action of /etc/audit/auditd.conf, lower-cased; absent when no line sets it, never the daemon's compiled default.
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.conf.admin_space_left_action
+    type: string
+    description: The admin_space_left_action of /etc/audit/auditd.conf, lower-cased; absent when no line sets it, never the daemon's compiled default.
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.conf.disk_full_action
+    type: string
+    description: The disk_full_action of /etc/audit/auditd.conf, lower-cased; absent when no line sets it, never the daemon's compiled default.
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.conf.disk_error_action
+    type: string
+    description: The disk_error_action of /etc/audit/auditd.conf, lower-cased; absent when no line sets it, never the daemon's compiled default.
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.log_file.mode
+    type: int
+    description: Permission bits of the audit log file auditd.conf's log_file names as an integer (e.g. 384 for 0600).
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.log_file.uid
+    type: int
+    description: Owner uid of the audit log file auditd.conf's log_file names.
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.log_file.gid
+    type: int
+    description: Group gid of the audit log file auditd.conf's log_file names.
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.log_file.group
+    type: string
+    description: Group name for the gid of the audit log file auditd.conf's log_file names from /etc/group; empty when the gid has no name.
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.log_file.group_readable
+    type: bool
+    description: Whether the group permission bits of the audit log file auditd.conf's log_file names include read (derived from mode).
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.log_file.group_writable
+    type: bool
+    description: Whether the group permission bits of the audit log file auditd.conf's log_file names include write (derived from mode).
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.log_file.other_readable
+    type: bool
+    description: Whether the other permission bits of the audit log file auditd.conf's log_file names include read (derived from mode).
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.log_file.other_writable
+    type: bool
+    description: Whether the other permission bits of the audit log file auditd.conf's log_file names include write (derived from mode).
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.log_file.acl_present
+    type: bool
+    description: Whether a POSIX ACL xattr is present on the audit log file auditd.conf's log_file names.
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.log_dir.mode
+    type: int
+    description: Permission bits of the directory holding the audit log file as an integer (e.g. 384 for 0600).
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.log_dir.uid
+    type: int
+    description: Owner uid of the directory holding the audit log file.
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.log_dir.gid
+    type: int
+    description: Group gid of the directory holding the audit log file.
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.log_dir.group
+    type: string
+    description: Group name for the gid of the directory holding the audit log file from /etc/group; empty when the gid has no name.
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.log_dir.group_readable
+    type: bool
+    description: Whether the group permission bits of the directory holding the audit log file include read (derived from mode).
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.log_dir.group_writable
+    type: bool
+    description: Whether the group permission bits of the directory holding the audit log file include write (derived from mode).
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.log_dir.other_readable
+    type: bool
+    description: Whether the other permission bits of the directory holding the audit log file include read (derived from mode).
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.log_dir.other_writable
+    type: bool
+    description: Whether the other permission bits of the directory holding the audit log file include write (derived from mode).
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.log_dir.acl_present
+    type: bool
+    description: Whether a POSIX ACL xattr is present on the directory holding the audit log file.
+    since: 1
+    sensitivity: public
+    collector: audit
