@@ -3354,7 +3354,7 @@
     {
       "Key": "packages.verify.filter",
       "Type": "list\u003cstring\u003e",
-      "Description": "The noise-filter rules applied to the verification output, in order - config, doc, dpkg_excluded, ghost, mtime_only, unverifiable, unchanged.",
+      "Description": "The noise-filter rules applied to the verification output, in order - config, doc, dpkg_excluded, ghost, mtime_only, unverifiable, unchanged. doc drops a row by its type letter or a documentation-tree prefix, a modified row under the prefix included; dpkg_excluded drops only a missing row whose path a dpkg path-exclude glob covers.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "pkgverify",
@@ -3374,7 +3374,7 @@
     {
       "Key": "packages.verify.stats",
       "Type": "record",
-      "Description": "The verification's own account of itself - lines, exit_code, duration_ms, truncated, stderr_head, unparsed_head, packages_without_digests, packages_without_digests_error, dpkg_path_excludes; provenance, read by no control.",
+      "Description": "The verification's own account of itself - lines, exit_code, duration_ms, truncated, stderr_head, unparsed_head, packages_without_digests, packages_without_digests_error, dpkg_path_excludes (the path-exclude and path-include directives read), dpkg_path_excludes_error (each dpkg.cfg file that exists and could not be read, as path - reason; the dpkg_excluded rule is then not applied); provenance, read by no control.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "pkgverify",
@@ -4534,7 +4534,7 @@
     {
       "Key": "audit.log_dir.mode",
       "Type": "int",
-      "Description": "Permission bits of the directory holding the audit log file as an integer (e.g. 384 for 0600).",
+      "Description": "Permission bits of the directory holding the audit log file as an integer (e.g. 448 for 0700).",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "audit",
@@ -4664,7 +4664,7 @@
     {
       "Key": "fim.aide.database_present",
       "Type": "bool",
-      "Description": "Whether a regular file exists at fim.aide.database_path; absent, naming the path, when that path is outside /var/lib/aide.",
+      "Description": "Whether a regular file exists at fim.aide.database_path; false, with the reason, when AIDE is installed and neither configuration file exists or the configuration has no database_in= or database= line; absent, naming the path, when that path is outside /var/lib/aide.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "fim",

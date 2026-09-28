@@ -306,15 +306,16 @@ jobs:
               case "$state" in running|degraded) break ;; esac
               sleep 1
             done
+            # $cid is a shell variable of this block, so everything that needs
+            # the container belongs here. The trap removes it however this
+            # block ends: a failing install or oracle below must not leak a
+            # container.
+            trap 'docker rm -f "$cid" >/dev/null 2>&1 || true' EXIT
             # J-2: the audit userspace and AIDE, so the container reads an
             # installed auditd that cannot reach kernel audit from its pid
             # namespace (J-1) and an AIDE nobody has initialised.
             docker exec "$cid" dnf install -y -q audit aide
             docker exec "$cid" /m/muster collect --deep --out /out/c.json || true
-            # $cid is a shell variable of this block, so everything that needs
-            # the container belongs here. The trap removes it however this
-            # block ends: a failing oracle below must not leak a container.
-            trap 'docker rm -f "$cid" >/dev/null 2>&1 || true' EXIT
             # F-10: the four files this image really ships, for the fuzz
             # corpus. Copied BEFORE the oracle runs, so a mismatch that stops
             # this step still leaves the artifact the triage needs.

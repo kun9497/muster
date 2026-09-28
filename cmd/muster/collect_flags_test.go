@@ -193,7 +193,7 @@ func TestVerifyFlagsShapeTheDeadline(t *testing.T) {
 		{"no verify without deep", []string{"--no-verify"}, []string{"--no-verify needs --deep"}},
 		{"both flags", []string{"--deep", "--no-verify", "--verify-timeout", "1m"}, []string{"--verify-timeout", "--no-verify"}},
 		{"verify timeout above the deadline", []string{"--deep", "--verify-timeout", "40m", "--timeout", "30m"},
-			[]string{"--verify-timeout", "--timeout", "30m"}},
+			[]string{"--verify-timeout", "--timeout", "30m", "pass --no-verify or a smaller --verify-timeout"}},
 		{"zero verify timeout", []string{"--deep", "--verify-timeout", "0s"}, []string{"--verify-timeout must be greater than 0"}},
 		{"bad verify timeout", []string{"--deep", "--verify-timeout", "soon"}, []string{"--verify-timeout"}},
 	} {

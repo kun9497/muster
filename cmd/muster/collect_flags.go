@@ -228,7 +228,7 @@ func parseCollectFlags(args []string) (collectOpts, error) {
 	// deadline cannot hold ends as packages.verify.complete false and
 	// ERROR(verify_incomplete), so the pair is refused now.
 	if o.deep && !o.noVerify && o.verifyTimeout > o.timeout {
-		return o, fmt.Errorf("--verify-timeout %s exceeds --timeout %s", o.verifyTimeout, o.timeout)
+		return o, fmt.Errorf("--verify-timeout %s exceeds --timeout %s; pass --no-verify or a smaller --verify-timeout", o.verifyTimeout, o.timeout)
 	}
 	return o, nil
 }
