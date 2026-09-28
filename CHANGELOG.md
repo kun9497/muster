@@ -11,6 +11,28 @@ verdict on an existing snapshot is at least a minor release and appears under
 
 ### Controls
 
+Control set `kisa-unix-2026+2026.09.23` (was `+2026.09.18`). Nine more controls
+beyond the KISA guide (28 in all), written from `auditd.conf(5)`, `auditctl(8)`,
+`augenrules(8)`, `aide(1)`, `sudoers(5)`, `rpm(8)` and `dpkg(1)` in muster's own
+words: the audit daemon active, its rules loaded and persisted, its
+configuration immutable, its disk-full and space-left actions, the permissions
+of its log file and directory; system logs leaving the host (rsyslog to a
+non-loopback target, or `systemd-journal-upload`); sudo's own log kept; a
+file-integrity tool (AIDE) installed with a database and a schedule — a host
+running only another tool reads MANUAL naming it; and packaged files
+unmodified (`rpm -Va` / `dpkg --verify` under `--deep`, category `beyond`,
+importance 상). Every one is NOT_APPLICABLE inside a container. A stock host
+that installs auditd and nothing else reads three FAILs — rules, immutability
+and the shipped `suspend` actions — which is the truth of the shipped files.
+The 68 controls for the 67 items are unchanged.
+
+- `muster.beyond.audit_log_permissions` allows a 0640 log file because
+  Ubuntu's `log_group = adm` ships one; the RHEL rule it cites asks 0600.
+- `muster.beyond.package_files_unmodified` reads MANUAL on a run without
+  `--deep` ("run collect --deep without --no-verify"), ERROR(`verify_incomplete`)
+  when verification did not finish, and NOT_APPLICABLE on a host with no
+  package database.
+
 Control set `kisa-unix-2026+2026.09.18` (was `+2026.09.16`). Nineteen controls
 beyond the KISA guide, category `beyond` (`muster.beyond.*`), written from
 primary sources — kernel documentation, man pages, the distributions' own
@@ -138,6 +160,32 @@ every plan is under `docs/superpowers/plans/`):
 
 ### Collectors
 
+- `audit` reads the audit daemon's rules from `/etc/audit/rules.d/*.rules` in
+  the `ls -v` order augenrules loads them (falling back to `/etc/audit/audit.rules`
+  when the directory is missing, as augenrules does), the last `-e` line, the
+  seven disk-action keys of `auditd.conf`, and the nine permission leaves of the
+  log file and its directory; the running side comes from `auditctl -l` and
+  `auditctl -s`, classified by their exit codes and messages — exit 4 ("You must
+  be root") is `denied` without root and `unsupported` for a root without
+  CAP_AUDIT_CONTROL, exit 255 ("Operation not permitted") is `unsupported`
+  because no pid namespace but the initial one reaches the kernel. 34 keys.
+- `fim` models AIDE (`fim.tool` `aide`/`none`, or `absent` naming any other tool
+  found), its configuration and database path (`@@define` macros resolved),
+  and whether a check is armed: a `cron.daily` script with the execute bit,
+  `CRON_DAILY_RUN` not set to another value and not the 24.04 systemd shim, a
+  cron.d/crontab line, or a timer with a next elapse in `systemctl list-timers`.
+- `pkgverify` runs `rpm -Va` or `dpkg --verify` under `--deep` as root, within
+  `--verify-timeout`, and records the seven noise rules it applied with their
+  counts (`config`, `doc`, `dpkg_excluded`, `ghost`, `mtime_only`, `unverifiable`,
+  `unchanged`); a database that cannot be read is `error`, never an unmodified
+  PASS. 7 keys.
+- `logging` gains `logging.journal_upload.url` (the four systemd directories)
+  and `logging.rsyslog.forwards_remote` / `remote_targets` (a loopback target is
+  a relay, not forwarding; an incomplete rsyslog parse reads `absent`); the
+  sudo reader gains `sudo.log.syslog`, `sudo.log.logfile` and
+  `sudo.defaults.scoped_count`; the `services` table gains `auditd` and
+  `journal_upload`.
+
 - Six read-only collectors for the checks beyond the guide, none of which
   runs a command: `sysctl` (twelve kernel self-protection settings as two-home
   facts — the running value from `/proc/sys`, the persisted one merged from
@@ -200,6 +248,21 @@ every plan is under `docs/superpowers/plans/`):
   fuzz workflow; the input is committed as its seed.
 
 ### Tooling
+
+- `collect --verify-timeout <dur>` (default 30m) and `--no-verify` (both need
+  `--deep`); a `--deep` run's default `--timeout` is now walk budget +
+  verify timeout + 5m. A pre-existing `collect --deep --timeout <30m` is
+  refused naming `--verify-timeout` — pass `--no-verify` or a smaller
+  `--verify-timeout`.
+- The evaluator's walk gate is a table of deep families (D30): `walk.*` and
+  `packages.verify.*` controls read MANUAL / ERROR(`walk_incomplete` |
+  `verify_incomplete`) / NOT_APPLICABLE from their completeness fact.
+  `verify_incomplete` joins the reason-code vocabulary.
+- Two oracle pairs (`rpm -Va`/`dpkg --verify` against the verify parser;
+  `auditctl -s`/`-l` against the runtime reader), the capability matrix's
+  non-root rows for the 28 audit keys, `packages.verify.complete` and the sudo
+  log keys, a second stock-host snapshot (EL9), and CI proofs that install
+  auditd and AIDE on the runner VM and in the EL init containers.
 
 - `summary.scopes` in the JSON report and two summary lines plus a separator
   in the table split every verdict into the guide and beyond it; rows sort by

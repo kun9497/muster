@@ -14,13 +14,14 @@ the Linux server asset class: KISA is the primary standard, and global
 benchmarks (CIS Benchmarks, DISA STIG, NIST SP 800-53) are attached as
 references and, later, offered as selectable profiles.
 
-> **Status: stage 3A merged (September 2026).** Stage 1 — the skeleton:
+> **Status: stage 3C-1 merged (September 2026).** Stage 1 — the skeleton:
 > `collect`, `check`, waivers, exit codes, eight controls end to end — stage 2
 > — every automatable KISA item, from the foundations with DISA STIG and NIST
 > SP 800-53 references through accounts, PAM, sshd, home directories, system
 > files, services, the firewall, logging, NFS, SNMP, patch hygiene, FTP, mail
-> and DNS to the closing coverage-and-reference gate — and stage 3A — the deep
-> filesystem walk — are merged. 67 of the 67 items are enrolled (68 controls:
+> and DNS to the closing coverage-and-reference gate — and stages 3A, 3B and
+> 3C-1 — the deep filesystem walk, the first checks beyond the guide, audit
+> pipeline health and package integrity — are merged. 67 of the 67 items are enrolled (68 controls:
 > 57 auto, 7 partial, 4 manual with the evidence attached),
 > and 28 beyond the guide. `collect --deep`
 > walks the local filesystems once, under a time and entry budget, without
@@ -185,9 +186,13 @@ titles, never their discussion, check and fix text. See
    partitions and mount options, swap encryption, module blacklists — from six
    read-only collectors, with the summary split into the guide and beyond it;
    a FAIL beyond the guide counts for the exit code until profiles arrive.
-   Next: package verification (`rpm -V` / `dpkg --verify`), file capabilities
-   and ACLs, cron and timer inventory, `authorized_keys` inventory, processes
-   running deleted binaries, audit pipeline health, patch hygiene, exposure of
+   3C-1 (merged): audit pipeline health and package integrity — the audit
+   daemon's rules, immutability, disk actions and log permissions, log
+   forwarding, sudo's own log, the file-integrity tool, and whole-database
+   package verification (`rpm -Va` / `dpkg --verify` under `--deep`, the noise
+   filter recorded) — nine controls from three collectors and two extensions.
+   Next (3C-2): file capabilities and ACLs, `authorized_keys` inventory,
+   processes running deleted binaries, root-equivalent paths, exposure of
    listening sockets versus firewall rules. Profiles select controls and parameters: `kisa-unix-2026`
    stays the default, and a `cis-<distro>-l1` profile covers the CIS Level 1
    server recommendations for the target distributions, with `references.cis`

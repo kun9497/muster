@@ -103,11 +103,14 @@ sudo 세션 기록(`log_input`, `log_output`) — 여기서 읽는 것이 없으
   그 자체입니다.
 - **영속 소스는 systemd 호스트의 유일한 적재기인 `augenrules(8)`를 모델링합니다**(두 계열 다
   `ExecStartPost=-/sbin/augenrules --load`; 데몬 자신은 `/etc/audit/audit.rules`를 읽지 않음):
-  영속 답은 `/etc/audit/rules.d/`의 `*.rules` 파일을 C 로케일 사전순으로 읽은 것입니다. 빈
-  디렉터리는 "규칙 없음"이라는 영속 답이고(augenrules가 빈 `audit.rules`를 다시 만듦), 디렉터리가
-  **없으면** `absent`("rules.d is missing: augenrules loads nothing at boot") — 그 옆에 손으로 쓴
-  `audit.rules`는 다음 부팅에 죽은 파일이며, 그것을 영속으로 읽으면 두 집 절이 잡으려는 바로 그
-  경우를 PASS시킵니다. `/etc/audit/audit.rules`는 systemd가 없는 호스트에서만 영속 소스입니다.
+  영속 답은 `/etc/audit/rules.d/`의 `*.rules` 파일을 augenrules가 읽는 `ls -1v` 버전 정렬
+  순서(`9-x.rules`가 `10-y.rules` 앞, `99-`가 `100-` 앞)로 읽은 것입니다. 빈 디렉터리는 "규칙
+  없음"이라는 영속 답이고(augenrules가 빈 `audit.rules`를 다시 만듦), 디렉터리가 **없으면**
+  `/etc/audit/audit.rules`가 소스입니다 — augenrules는 "No rules directory"를 찍고 그 파일을
+  적재합니다 — ok 봉투는 그 대체를 이유에 적습니다; 둘 다 없으면 영속 쪽은 `absent`("neither
+  /etc/audit/rules.d nor /etc/audit/audit.rules exists")입니다. systemd 없는 호스트에서도
+  `/etc/audit/audit.rules`가 소스입니다. (실행 중 augenrules 스크립트 v2.8.5–v4.0에 대조해 정정;
+  계획의 J-23은 사전순과 "아무것도 적재하지 않음"이라 했음.)
   각 persisted 봉투의 source는 읽은 파일(들)을 적고, `audit.immutable`의 `winner`는 결정적인
   줄을 담은 파일을 적습니다.
 - `audit.immutable` — `setting<bool>`. runtime: `auditctl -s`가 `enabled 2`를 보고. persisted:
@@ -220,17 +223,19 @@ MiB; 어느 것을 돌릴지는 `patch.go`가 정하듯 계열이 정함); 아�
   `n`)는 그 문자 그대로 두고 그것 때문에 행을 버리지 않습니다.
 - `packages.verify.modified_config` — 같은 레코드 모양과 민감도, 설정 파일 행(유형 `c`, dpkg의
   conffile도 `c`로 표시됨) — 판정하지 않는 독자용 근거: 바뀐 설정 파일이 곧 운영의 모습입니다.
-- `packages.verify.filter` — `list<string>`, 적용한 규칙을 순서대로, 항상 여섯: `config`(유형
+- `packages.verify.filter` — `list<string>`, 적용한 규칙을 순서대로, 항상 일곱: `config`(유형
   `c` → `modified_config`), `doc`(유형 `d`, `l`, `r`, **또는 `/usr/share/doc/`,
   `/usr/share/man/`, `/usr/share/info/`, `/usr/share/locale/` 아래 경로** → 버림: dpkg에는 문서
   유형 문자가 없고, lab의 `missing` 행 1199개는 전부 최소 설치가 쓴 적 없는 문서였음),
   `dpkg_excluded`(`dpkg.cfg` / `dpkg.cfg.d`의 `path-exclude` glob에 맞는 경로 → 버림: 관리자가
   dpkg에 설치하지 말라고 한 것), `ghost`(유형 `g` → 버림: 배포되지 않는 파일), `mtime_only`(다른
   열이 `T`뿐 → 버림: 내용·모드·소유자가 그대로인 채 touch된 파일), `unverifiable`(다른 열이 없고
-  `?`가 하나 이상 → 버림: 도구가 검사할 수 없었음). 상수인데도 목록을 기록하는 것은 나중의 필터
+  `?`가 하나 이상 → 버림: 도구가 검사할 수 없었음), `unchanged`(다른 열도 `?`도 없음 — rpm은
+  `(not installed)`나 `(replaced)` 같은 상태 메모가 있을 때만 그런 행을 찍음 → 버림: 다른 것이
+  없음). 상수인데도 목록을 기록하는 것은 나중의 필터
   변경을 스냅샷의 날짜에서 볼 수 있게 하기 위함입니다.
 - `packages.verify.filtered_counts` — `record` `{config, doc, dpkg_excluded, ghost, mtime_only,
-  unverifiable}`(각 `int`). `packages.verify.stats` — `record` `{lines, exit_code, duration_ms,
+  unverifiable, unchanged}`(각 `int`). `packages.verify.stats` — `record` `{lines, exit_code, duration_ms,
   truncated, stderr_head, packages_without_digests, dpkg_path_excludes}`; `stderr_head`는
   stderr의 첫 세 줄, `unparsed_head`는 파서가 분류하지 못한 첫 세 줄(없으면 빈 값); `packages_without_digests`는 dpkg 호스트에서 옆에
   `*.md5sums`가 없는 `/var/lib/dpkg/info/*.list` 파일 수 — `dpkg --verify`가 말없이 검사하지
@@ -418,7 +423,8 @@ false로, `audit_rules_loaded`가 NOT_APPLICABLE로 읽힘을 assert(컨테이�
 "67개 항목에 68개 컨트롤, 그리고 가이드 밖 28개" — 와 로드맵 줄. CHANGELOG Controls(아홉,
 `controls/VERSION` → `kisa-unix-2026+2026.09.23`), Collectors(셋, 확장 둘, 표 행 둘),
 Tooling(deep 기반 규칙). CONTRIBUTING(양어): 종료 코드가 데이터인 명령에 대한 한 문단.
-CLAUDE.md: "Beyond the guide" 아래 두 줄(deep 기반 규칙; `fim.tool`의 `absent`가 뜻하는 것).
+CLAUDE.md: "Integrity (stage 3C-1)" 절(deep 기반 규칙과 플래그; auditctl 코드; augenrules의 순서와
+대체; `fim.tool`의 `absent`가 뜻하는 것).
 `coverage.md` 재생성. 계획은 앞선 계획들처럼 Execution notes를 유지합니다.
 
 ## 8. Parked

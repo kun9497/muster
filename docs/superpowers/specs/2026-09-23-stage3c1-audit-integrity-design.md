@@ -124,12 +124,15 @@ path serves both families).
 - **The persisted source models `augenrules(8)`, which is the only loader on a systemd
   host** (`ExecStartPost=-/sbin/augenrules --load` on both families; the daemon never reads
   `/etc/audit/audit.rules` itself): the persisted answer is the `*.rules` files of
-  `/etc/audit/rules.d/` in C-locale lexical order. An empty directory is a persisted answer
-  of "no rules" (augenrules regenerates an empty `audit.rules`); a **missing** directory is
-  `absent` ("rules.d is missing: augenrules loads nothing at boot") — a hand-written
-  `audit.rules` beside it is dead at the next boot, and reading it as persisted would PASS
-  the exact case the both-homes clause exists to catch. `/etc/audit/audit.rules` is the
-  persisted source only on a host without systemd. The source of each persisted envelope
+  `/etc/audit/rules.d/` in the `ls -1v` version-sort order augenrules reads them in
+  (`9-x.rules` before `10-y.rules`, `99-` before `100-`). An empty directory is a persisted
+  answer of "no rules" (augenrules regenerates an empty `audit.rules`); a **missing**
+  directory makes `/etc/audit/audit.rules` the source — augenrules prints "No rules
+  directory" and loads that file — with the ok envelopes noting the fallback; when neither
+  exists the persisted side is `absent` ("neither /etc/audit/rules.d nor
+  /etc/audit/audit.rules exists"). `/etc/audit/audit.rules` is also the source on a host
+  without systemd. (Corrected during execution against the augenrules script, v2.8.5–v4.0;
+  the plan's J-23 said lexical order and "loads nothing".) The source of each persisted envelope
   names the file(s) read; `audit.immutable`'s `winner` names the file that carried the
   deciding line.
 - `audit.immutable` — `setting<bool>`. Runtime: `auditctl -s` reports `enabled 2`.
@@ -263,7 +266,7 @@ needs root: an unprivileged rpm -Va marks every file it cannot read as untestabl
   configuration-file rows (type `c`, and dpkg's conffiles, which it marks `c` too) —
   evidence for the reader, not judged: a changed configuration file is what
   administration looks like.
-- `packages.verify.filter` — `list<string>`, the rules applied, in order, always the six:
+- `packages.verify.filter` — `list<string>`, the rules applied, in order, always the seven:
   `config` (type `c` → `modified_config`), `doc` (type `d`, `l` or `r`, **or a path under
   `/usr/share/doc/`, `/usr/share/man/`, `/usr/share/info/` or `/usr/share/locale/`** →
   dropped: dpkg has no documentation type letter, and the lab's 1199 `missing` rows were
@@ -272,10 +275,12 @@ needs root: an unprivileged rpm -Va marks every file it cannot read as untestabl
   not to install it), `ghost` (type `g` → dropped: the file is not shipped), `mtime_only`
   (the only differing column is `T` → dropped: a touched file with its content, mode and
   owner intact), `unverifiable` (no column differs and at least one is `?` → dropped: the
-  tool could not test it). Recording the list even though it is constant is what lets a
+  tool could not test it), `unchanged` (no column differs and none is `?` — rpm prints such a row
+  only for a state note such as `(not installed)` or `(replaced)` → dropped: nothing differs).
+  Recording the list even though it is constant is what lets a
   later filter change be seen in a snapshot's date.
 - `packages.verify.filtered_counts` — `record` `{config, doc, dpkg_excluded, ghost,
-  mtime_only, unverifiable}` (`int` each). `packages.verify.stats` — `record` `{lines,
+  mtime_only, unverifiable, unchanged}` (`int` each). `packages.verify.stats` — `record` `{lines,
   exit_code, duration_ms, truncated, stderr_head, packages_without_digests,
   dpkg_path_excludes}`; `stderr_head` the first three stderr lines and `unparsed_head` the first three lines the
   parser could not classify (empty when none);
@@ -498,8 +503,9 @@ languages): the count sentence — "68 controls for the 67 items, and 28 beyond 
 and the roadmap line. CHANGELOG under Controls (the nine, `controls/VERSION` →
 `kisa-unix-2026+2026.09.23`), Collectors (the three, the two extensions, the two table
 rows) and Tooling (the deep-based rule). CONTRIBUTING (both languages): one paragraph on
-commands whose exit code is data. CLAUDE.md: two lines under "Beyond the guide" (the
-deep-based rule; what `fim.tool`'s `absent` means). `coverage.md` regenerated. The plan
+commands whose exit code is data. CLAUDE.md: a section "Integrity (stage 3C-1)" (the
+deep-based rule and the flags; the auditctl codes; augenrules' order and fallback; what
+`fim.tool`'s `absent` means). `coverage.md` regenerated. The plan
 keeps its Execution notes as the earlier plans do.
 
 ## 8. Parked
