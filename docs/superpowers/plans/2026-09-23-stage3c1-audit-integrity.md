@@ -304,7 +304,7 @@ Seeds: `testdata/aide.conf.debian` (the jammy head, J-5), `testdata/aide.conf.el
 
 ## Execution notes
 
-Executed 2026-09-28 in the worktree `stage3c1-audit-integrity` over main `26e47e1` (spec approved 2026-09-23, plan committed with the two pre-flight reviews folded as J-19…J-24 at `75f4b11`; work paused between the pre-flight and Task 1 and resumed on 2026-09-28): seven implementation tasks, each with a task review and at most one fix round, the controller's documents, a two-reviewer whole-branch review, one fix wave, one scoped re-review. 21 commits, HEAD `(the document commit that follows the fix wave)`. Every Task 8 gate ran green on Windows and on the lab host; gitleaks over the whole range found nothing; no commit carries the lab's name or address.
+Executed 2026-09-28 in the worktree `stage3c1-audit-integrity` over main `26e47e1` (spec approved 2026-09-23, plan committed with the two pre-flight reviews folded as J-19…J-24 at `75f4b11`; work paused between the pre-flight and Task 1 and resumed on 2026-09-28): seven implementation tasks, each with a task review and at most one fix round, the controller's documents, a two-reviewer whole-branch review, one fix wave, one scoped re-review. 24 commits over main, the last being this notes commit on top of `56a0907`. Every Task 8 gate ran green on Windows and on the lab host; gitleaks over the whole range found nothing; no commit carries the lab's name or address.
 
 ### Rulings settled during execution (J-25 …; J-1 … J-24 are in Global Constraints)
 
@@ -332,11 +332,13 @@ Executed 2026-09-28 in the worktree `stage3c1-audit-integrity` over main `26e47e
 - **J-46 (an impossible fixture is deleted, the path pinned in the evaluator).** `error-verify-truncated.json` paired a truncated `modified` with `complete` ok true, a shape `verifyListEnv` cannot write; an `eval_test.go` derivation row pins the truncated path instead.
 - **J-47 (loopback aliases).** `localhost.localdomain`, `localhost6`, `ip6-localhost`, `ip6-loopback` are loopback for `forwards_remote`.
 - **J-48 (provenance of failed reads).** `stats.dpkg_path_excludes` holds directives only; fragments that could not be read go to `stats.dpkg_path_excludes_error`.
+- **J-49 (a `/dev/null` drop-in link is a mask in `sudoers.d` too).** The scoped re-review found that J-40's symlink rule turned a `/dev/null` link — the K-21 mask idiom — into an `absent` and a MANUAL; the mask holds no line, so it is neither read nor counted, and the three `sudo.log.*` leaves stay `ok`. Any other link stays `absent` naming it.
+- **J-50 (gitleaks and the sudoers example).** The MANUAL fixture's `@include /etc/sudoers.local` trips the hostname-shape rule; the exact token is allowlisted (as `snmpd.local` and `db.local` are), never a path.
 
 ### What the reviews found
 
 - Seven task reviews (opus): Tasks 1, 2, 5, 7 approved outright; Task 3 two Important (both plan-mandated facts wrong against upstream augenrules → J-30, J-31); Task 4 one Important (J-36); Task 6 one Important (J-39). Each fixed in one round; every re-review clean.
-- Whole-branch review (two fresh Fable reviewers over `26e47e1..ea892ef`): controls side 1 BLOCKING (J-40), 5 MEDIUM (J-46, J-42, J-43, J-41, the empty Execution notes), 11 LOW; collectors side 0 BLOCKING, 2 MEDIUM (J-44; the CI measurements only the first pull-request run can give), 12 LOW. One fix wave (opus, `4c06403`, `37748ff`, `614e19b`), one scoped re-review (opus, over `ea892ef..HEAD`; result recorded in the pull request).
+- Whole-branch review (two fresh Fable reviewers over `26e47e1..ea892ef`): controls side 1 BLOCKING (J-40), 5 MEDIUM (J-46, J-42, J-43, J-41, the empty Execution notes), 11 LOW; collectors side 0 BLOCKING, 2 MEDIUM (J-44; the CI measurements only the first pull-request run can give), 12 LOW. One fix wave (opus, `4c06403`, `37748ff`, `614e19b`), one scoped re-review (opus, over `ea892ef..b88422f`): 22 of 23 addressed, no BLOCKING, five residuals — `disk_error_action = ignore` takes no action (the description said it logs), the design row kept the removed wording, the forwarding control's no-systemd sentence was too broad, the `/dev/null` drop-in (J-49) and four fixtures with a superseded `database_present` reason — fixed in one residual dispatch (`56a0907`).
 - Left as reviewed, with the reason: the deadline check compares `--walk-budget` and `--verify-timeout` with `--timeout` separately, not their sum (J-10 as planned; the default deadline is the sum); the `auditd_active` / `audit_rules_loaded` / `audit_immutable` / `audit_disk_actions` non-root reading is ERROR naming the denial (§6, by design); `versionCompare` sets aside only the literal `.rules` suffix (the only suffix augenrules loads).
 
 ### Deviations from the spec, as shipped
