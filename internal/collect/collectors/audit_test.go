@@ -5,6 +5,7 @@ package collectors
 import (
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -110,6 +111,7 @@ func TestAuditStockEL9(t *testing.T) {
 		}
 	}
 
+	var confSources []*facts.Source
 	for k, want := range map[string]string{
 		"log_file":                "/var/log/audit/audit.log",
 		"log_group":               "root",
@@ -126,6 +128,12 @@ func TestAuditStockEL9(t *testing.T) {
 		if e.Source == nil || e.Source.Kind != "file" || e.Source.Path != auditdConfPath {
 			t.Errorf("audit.conf.%s source = %+v, want the file", k, e.Source)
 		}
+		for _, seen := range confSources {
+			if seen == e.Source {
+				t.Errorf("audit.conf.%s shares its source with another leaf (R147)", k)
+			}
+		}
+		confSources = append(confSources, e.Source)
 	}
 
 	for prefix, want := range map[string]int{"audit.log_file": 0o600, "audit.log_dir": 0o700} {
@@ -206,31 +214,50 @@ func TestAuditRulesDAndLastEnable(t *testing.T) {
 	}
 }
 
-// J-23: rules.d missing is absent, and a hand-written audit.rules beside it
-// is dead at the next boot, so it is not even read.
-func TestAuditRulesDMissingIsAbsent(t *testing.T) {
+// augenrules without rules.d prints "No rules directory" and loads
+// /etc/audit/audit.rules as it stands, so that file is the persisted source;
+// with neither there is nothing to load.
+func TestAuditRulesDMissingFallsBackToAuditRules(t *testing.T) {
 	a := auditAccess()
 	delete(a.dirs, auditRulesDDir)
 	delete(a.files, "/etc/audit/rules.d/audit.rules")
 	a.files[auditRulesPath] = "audit.rules.d-50-watch.rules"
 	b := build(t, "audit", a)
 
-	statusIs(t, "rules.present persisted", setting(t, b, "audit.rules.present").Persisted, facts.StatusAbsent, auditRulesDMissing)
-	statusIs(t, "immutable persisted", setting(t, b, "audit.immutable").Persisted, facts.StatusAbsent, auditRulesDMissing)
-	for _, k := range []string{"audit.rules.persisted", "audit.rules.persisted_count"} {
-		if e := env(t, b, k); e.Status != facts.StatusAbsent || e.Reason != auditRulesDMissing {
-			t.Errorf("%s = %+v, want absent %q", k, e, auditRulesDMissing)
-		}
+	present := setting(t, b, "audit.rules.present")
+	sideIs(t, "rules.present persisted", present.Persisted, true)
+	if src := present.Persisted.Source; src == nil || src.Kind != "file" || src.Path != auditRulesPath {
+		t.Errorf("persisted source = %+v, want the plain file %s", src, auditRulesPath)
 	}
-	if slices.Contains(a.reads, auditRulesPath) {
-		t.Errorf("reads %v: audit.rules must not be read on a systemd host", a.reads)
+	if present.Persisted.Reason != auditRulesDFallback {
+		t.Errorf("persisted reason = %q, want the fallback named", present.Persisted.Reason)
+	}
+	if n := auditInt(t, b, "audit.rules.persisted_count"); n != 2 {
+		t.Errorf("persisted_count = %d, want 2 from audit.rules", n)
+	}
+	if !slices.Contains(a.reads, auditRulesPath) {
+		t.Errorf("reads %v: audit.rules is what augenrules loads without rules.d", a.reads)
 	}
 
-	// An EMPTY rules.d is an answer: augenrules regenerates an empty
-	// audit.rules, so there are no rules and nothing is locked.
-	a.dirs[auditRulesDDir] = true
+	// Neither rules.d nor audit.rules: nothing to load at boot.
+	delete(a.files, auditRulesPath)
 	b = build(t, "audit", a)
-	present := setting(t, b, "audit.rules.present")
+	statusIs(t, "rules.present persisted", setting(t, b, "audit.rules.present").Persisted, facts.StatusAbsent, auditNothingToLoad)
+	statusIs(t, "immutable persisted", setting(t, b, "audit.immutable").Persisted, facts.StatusAbsent, auditNothingToLoad)
+	for _, k := range []string{"audit.rules.persisted", "audit.rules.persisted_count"} {
+		if e := env(t, b, k); e.Status != facts.StatusAbsent || e.Reason != auditNothingToLoad {
+			t.Errorf("%s = %+v, want absent %q", k, e, auditNothingToLoad)
+		}
+	}
+
+	// A present rules.d wins even beside audit.rules, and an EMPTY one is an
+	// answer: augenrules regenerates an empty audit.rules from it, so there
+	// are no rules and nothing is locked.
+	a.files[auditRulesPath] = "audit.rules.d-50-watch.rules"
+	a.dirs[auditRulesDDir] = true
+	a.reads = nil
+	b = build(t, "audit", a)
+	present = setting(t, b, "audit.rules.present")
 	sideIs(t, "rules.present persisted (empty rules.d)", present.Persisted, false)
 	if src := present.Persisted.Source; src == nil || src.Path != auditRulesDDir {
 		t.Errorf("empty rules.d source = %+v, want the directory", src)
@@ -238,6 +265,63 @@ func TestAuditRulesDMissingIsAbsent(t *testing.T) {
 	sideIs(t, "immutable persisted (empty rules.d)", setting(t, b, "audit.immutable").Persisted, false)
 	if rows := okList(t, b, "audit.rules.persisted"); len(rows) != 0 {
 		t.Errorf("rows = %v, want none", rows)
+	}
+	if slices.Contains(a.reads, auditRulesPath) {
+		t.Errorf("reads %v: with rules.d present augenrules regenerates audit.rules, so it is not read", a.reads)
+	}
+}
+
+// augenrules lists rules.d with `ls -1v`: version order, so 9- loads before
+// 10- and 99- before 100-, and the last -e in that order decides.
+func TestAuditRulesDVersionOrder(t *testing.T) {
+	a := auditAccess()
+	delete(a.cmds, cmdKey(auditctlStatusCmd))
+	delete(a.files, "/etc/audit/rules.d/audit.rules")
+	a.contents = map[string][]byte{
+		"/etc/audit/rules.d/10-site.rules":     []byte("-e 1\n"),
+		"/etc/audit/rules.d/9-lock.rules":      []byte("-e 2\n"),
+		"/etc/audit/rules.d/100-local.rules":   []byte("-w /etc/shadow -p wa -k shadow\n"),
+		"/etc/audit/rules.d/99-finalize.rules": []byte("-w /etc/group -p wa -k group\n"),
+	}
+	b := build(t, "audit", a)
+	var files []string
+	for _, r := range okList(t, b, "audit.rules.persisted") {
+		files = append(files, r.(map[string]any)["file"].(string))
+	}
+	want := []string{
+		"/etc/audit/rules.d/9-lock.rules",
+		"/etc/audit/rules.d/10-site.rules",
+		"/etc/audit/rules.d/99-finalize.rules",
+		"/etc/audit/rules.d/100-local.rules",
+	}
+	if !slices.Equal(files, want) {
+		t.Errorf("load order %v, want %v", files, want)
+	}
+	imm := setting(t, b, "audit.immutable")
+	sideIs(t, "immutable persisted", imm.Persisted, false)
+	if imm.Winner == nil || imm.Winner.Path != "/etc/audit/rules.d/10-site.rules" {
+		t.Errorf("immutable winner = %+v, want 10-site.rules, whose -e 1 is loaded last", imm.Winner)
+	}
+}
+
+func TestVersionCompare(t *testing.T) {
+	for _, tc := range []struct {
+		x, y string
+		want int
+	}{
+		{"9-lock.rules", "10-site.rules", -1},
+		{"99-finalize.rules", "100-local.rules", -1},
+		{"10-a.rules", "10-b.rules", -1},
+		{"a.rules", "a1.rules", -1},
+		{"007-x.rules", "7-x.rules", -1}, // equal value: strcmp breaks the tie
+		{"x", "x", 0},
+	} {
+		if got := sign(versionCompare(tc.x, tc.y)); got != tc.want {
+			t.Errorf("versionCompare(%q, %q) = %d, want %d", tc.x, tc.y, got, tc.want)
+		}
+		if got := sign(versionCompare(tc.y, tc.x)); got != -tc.want {
+			t.Errorf("versionCompare(%q, %q) = %d, want %d", tc.y, tc.x, got, -tc.want)
+		}
 	}
 }
 
@@ -272,7 +356,9 @@ func TestAuditctlClassification(t *testing.T) {
 		list, stat cmdResult
 		absentCmd  bool
 		want       facts.Status
-		reason     string
+		reason     string // both commands, unless one of the two below is set
+		listReason string
+		statReason string
 	}{
 		{name: "exit 4 not root", uid: 1000,
 			list: cmdResult{exitCode: 4, stderr: "You must be root to run this program.\n"},
@@ -283,17 +369,21 @@ func TestAuditctlClassification(t *testing.T) {
 			stat: cmdResult{exitCode: 4, stderr: "You must be root to run this program.\n"},
 			want: facts.StatusUnsupported, reason: "no CAP_AUDIT_CONTROL: an unprivileged container"},
 		{name: "container as root: -l 255, -s 4", uid: 0,
-			list: cmdResult{exitCode: 255, stderr: "Error sending rule list data request (Operation not permitted)\n"},
-			stat: cmdResult{exitCode: 4, stderr: "You must be root to run this program.\n"},
-			want: facts.StatusUnsupported, reason: ""},
+			list:       cmdResult{exitCode: 255, stderr: "Error sending rule list data request (Operation not permitted)\n"},
+			stat:       cmdResult{exitCode: 4, stderr: "You must be root to run this program.\n"},
+			want:       facts.StatusUnsupported,
+			listReason: "-l: kernel audit is not reachable from this pid namespace",
+			statReason: "-s: no CAP_AUDIT_CONTROL: an unprivileged container"},
 		{name: "exit 255 EPERM", uid: 0,
 			list: cmdResult{exitCode: 255, stderr: "Error sending rule list data request (Operation not permitted)\n"},
 			stat: cmdResult{exitCode: 255, stderr: "Error sending status request (Operation not permitted)\n"},
 			want: facts.StatusUnsupported, reason: "kernel audit is not reachable from this pid namespace"},
 		{name: "kernel without audit", uid: 0,
-			list: cmdResult{exitCode: 255, stderr: "Error - audit support not in kernel\nCannot open netlink audit socket\n"},
-			stat: cmdResult{exitCode: 1, stderr: "Cannot open netlink audit socket\n"},
-			want: facts.StatusUnsupported, reason: ""},
+			list:       cmdResult{exitCode: 255, stderr: "Error - audit support not in kernel\nCannot open netlink audit socket\n"},
+			stat:       cmdResult{exitCode: 1, stderr: "Cannot open netlink audit socket\n"},
+			want:       facts.StatusUnsupported,
+			listReason: "-l: Error - audit support not in kernel",
+			statReason: "-s: Cannot open netlink audit socket"},
 		{name: "exit 0 empty stdout", uid: 0,
 			list: cmdResult{}, stat: cmdResult{},
 			want: facts.StatusUnsupported, reason: "gave no audit status"},
@@ -319,20 +409,25 @@ func TestAuditctlClassification(t *testing.T) {
 			} else {
 				a.cmds = map[string]cmdResult{cmdKey(auditctlListCmd): tc.list, cmdKey(auditctlStatusCmd): tc.stat}
 			}
+			listReason, statReason := tc.reason, tc.reason
+			if tc.listReason != "" {
+				listReason = tc.listReason
+			}
+			if tc.statReason != "" {
+				statReason = tc.statReason
+			}
 			b := build(t, "audit", a)
 			present := setting(t, b, "audit.rules.present")
 			imm := setting(t, b, "audit.immutable")
-			for what, e := range map[string]*facts.Envelope{
-				"rules.present runtime":   present.Runtime,
-				"rules.present effective": present.Effective,
-				"immutable runtime":       imm.Runtime,
-				"immutable effective":     imm.Effective,
-			} {
-				statusIs(t, what, e, tc.want, tc.reason)
-			}
-			for _, k := range append([]string{"audit.rules.loaded_count"}, prefixed("audit.status.", auditStatusFields)...) {
+			statusIs(t, "rules.present runtime", present.Runtime, tc.want, listReason)
+			statusIs(t, "rules.present effective", present.Effective, tc.want, listReason)
+			loaded := env(t, b, "audit.rules.loaded_count")
+			statusIs(t, "loaded_count", &loaded, tc.want, listReason)
+			statusIs(t, "immutable runtime", imm.Runtime, tc.want, statReason)
+			statusIs(t, "immutable effective", imm.Effective, tc.want, statReason)
+			for _, k := range prefixed("audit.status.", auditStatusFields) {
 				e := env(t, b, k)
-				statusIs(t, k, &e, tc.want, tc.reason)
+				statusIs(t, k, &e, tc.want, statReason)
 			}
 			if present.Winner != nil {
 				t.Errorf("rules.present winner = %+v, want none while runtime did not answer", present.Winner)
@@ -367,6 +462,9 @@ func TestAuditRuntimeRulesAndLock(t *testing.T) {
 	b = build(t, "audit", a)
 	if e := env(t, b, "audit.status.lost"); e.Status != facts.StatusAbsent || !strings.Contains(e.Reason, "printed no lost") {
 		t.Errorf("lost = %+v, want absent naming the field", e)
+	}
+	if e := env(t, b, "audit.status.lost"); e.Source == nil || e.Source.Cmd != cmdKey(auditctlStatusCmd) {
+		t.Errorf("lost source = %+v, want the auditctl -s it was derived from (C4)", e.Source)
 	}
 }
 
@@ -559,7 +657,7 @@ func TestAuditPublishesEveryRegisteredKey(t *testing.T) {
 	// The lab's shape: systemd, no auditd anywhere.
 	b := build(t, "audit", shapes["no auditd"]())
 	statusIs(t, "rules.present runtime", setting(t, b, "audit.rules.present").Runtime, facts.StatusAbsent, "auditctl is not installed")
-	statusIs(t, "rules.present persisted", setting(t, b, "audit.rules.present").Persisted, facts.StatusAbsent, auditRulesDMissing)
+	statusIs(t, "rules.present persisted", setting(t, b, "audit.rules.present").Persisted, facts.StatusAbsent, auditNothingToLoad)
 	e := env(t, b, "audit.conf.log_file")
 	statusIs(t, "conf.log_file", &e, facts.StatusAbsent, "not present")
 	e = env(t, b, "audit.log_file.mode")
@@ -585,4 +683,56 @@ func sortedCopy(s []string) []string {
 	out := slices.Clone(s)
 	slices.Sort(out)
 	return out
+}
+
+func sign(n int) int {
+	switch {
+	case n < 0:
+		return -1
+	case n > 0:
+		return 1
+	}
+	return 0
+}
+
+// An empty or relative log_file names no file muster could stat: every
+// permission leaf says so, and nothing is stat'ed at "." or a relative path.
+func TestAuditLogFileNotAbsolute(t *testing.T) {
+	for _, v := range []string{"", "audit.log"} {
+		a := auditAccess()
+		delete(a.files, auditdConfPath)
+		a.contents = map[string][]byte{auditdConfPath: []byte("log_file = " + v + "\n")}
+		b := build(t, "audit", a)
+		want := "auditd.conf sets log_file to " + strconv.Quote(v) + ", which is not an absolute path"
+		for _, k := range append(prefixed("audit.log_file.", permLeaves), prefixed("audit.log_dir.", permLeaves)...) {
+			if e := env(t, b, k); e.Status != facts.StatusAbsent || e.Reason != want {
+				t.Errorf("log_file %q: %s = %+v, want absent %q", v, k, e, want)
+			}
+		}
+		if e := env(t, b, "audit.conf.log_file"); e.Status != facts.StatusOK || e.Value != v {
+			t.Errorf("conf.log_file = %+v, want %q as written", e, v)
+		}
+	}
+}
+
+// The order GNU ls -1v printed on the lab for these names — augenrules' own
+// listing — including the upstream sample rules' names.
+func TestAugenrulesOrderMatchesLsV(t *testing.T) {
+	lsV := []string{
+		"007-x.rules", "7-x.rules", "9-lock.rules", "10-a.rules", "10-b.rules", "10-site.rules",
+		"30-ospp-v42.rules", "30-pci-dss-v31.rules", "30-stig.rules", "43-module-load.rules",
+		"99-finalize.rules", "100-local.rules", "a.rules", "a1.rules",
+	}
+	in := make([]string, 0, len(lsV)+1)
+	for i := len(lsV) - 1; i >= 0; i-- {
+		in = append(in, auditRulesDDir+"/"+lsV[i])
+	}
+	in = append(in, auditRulesDDir+"/.hidden.rules")
+	var got []string
+	for _, p := range augenrulesOrder(in) {
+		got = append(got, strings.TrimPrefix(p, auditRulesDDir+"/"))
+	}
+	if !slices.Equal(got, lsV) {
+		t.Errorf("augenrulesOrder\n got %v\nwant %v (ls -1v, dot-files unlisted)", got, lsV)
+	}
 }

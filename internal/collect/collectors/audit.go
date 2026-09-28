@@ -27,7 +27,8 @@ const (
 	auditDefaultLog  = "/var/log/audit/audit.log"
 	auditRulesRowCap = 2000 // J-16
 
-	auditRulesDMissing = "rules.d is missing: augenrules loads nothing at boot"
+	auditRulesDFallback = "rules.d is missing; augenrules loads /etc/audit/audit.rules"
+	auditNothingToLoad  = "neither /etc/audit/rules.d nor /etc/audit/audit.rules exists"
 )
 
 // The two commands, fixed arguments, the primitive's 5 s and 1 MiB. On EL9
@@ -91,7 +92,9 @@ func runAudit(ctx context.Context, a collect.Access, b *collect.Builder) error {
 		}
 		n, ok := fields[name]
 		if !ok {
-			return withTruncation(collect.Absent(commandLine(auditctlStatusCmd)+" printed no "+name), statusEnv.Truncated)
+			missing := withTruncation(collect.Absent(commandLine(auditctlStatusCmd)+" printed no "+name), statusEnv.Truncated)
+			missing.Source = e.Source // C4: the degraded leaf keeps its source
+			return missing
 		}
 		e.Value = n
 		return e
@@ -199,42 +202,40 @@ func auditctlReason(out collect.Output) string {
 
 // auditPersist is the persisted side: the rules read, in load order, with the
 // source of the answer — or the one envelope every persisted leaf carries
-// instead (a missing rules.d, a read that failed — C3).
+// instead (nothing to load, a read that failed — C3). note rides on every ok
+// persisted envelope as its reason when the source was a fallback.
 type auditPersist struct {
 	fail      *facts.Envelope
 	rules     []auditRule
 	src       *facts.Source
+	note      string
 	truncated bool
 }
 
 // auditPersisted models augenrules(8), the only loader on a systemd host
 // (ExecStartPost on both families; the daemon never reads audit.rules
-// itself): the *.rules files of rules.d. rules.d is probed first (J-23),
-// because Glob cannot tell a missing directory from an empty one: missing is
-// absent — a hand-written audit.rules beside it is dead at the next boot —
-// and empty is "no rules". /etc/audit/audit.rules is the source only on a
-// host without systemd.
+// itself). rules.d is probed first (J-23), because Glob cannot tell a missing
+// directory from an empty one. rules.d present, even empty, is the source:
+// augenrules regenerates audit.rules from its *.rules files, so empty is "no
+// rules". rules.d missing makes augenrules print "No rules directory" and
+// load /etc/audit/audit.rules as it stands, so that file is the source; with
+// neither there is nothing to load. Without systemd /etc/audit/audit.rules
+// is the source.
 func auditPersisted(a collect.Access) auditPersist {
 	if !pathPresent(a, systemdMarker) {
-		data, meta, err := a.ReadFile(auditRulesPath, readLimit)
-		if err != nil {
-			e := readErrorEnv(auditRulesPath, err)
-			return auditPersist{fail: &e}
-		}
-		return auditPersist{
-			rules:     parseAuditRules(data, auditRulesPath),
-			src:       &facts.Source{Kind: "file", Path: auditRulesPath},
-			truncated: meta.Truncated,
-		}
+		return auditRulesFile(a, "")
 	}
 	if _, err := a.Stat(auditRulesDDir); err != nil {
-		var e facts.Envelope
-		if errors.Is(err, fs.ErrNotExist) {
-			e = collect.Absent(auditRulesDMissing)
-		} else {
-			e = readErrorEnv(auditRulesDDir, err)
+		if !errors.Is(err, fs.ErrNotExist) {
+			e := readErrorEnv(auditRulesDDir, err)
+			return auditPersist{fail: &e}
 		}
-		return auditPersist{fail: &e}
+		p := auditRulesFile(a, auditRulesDFallback)
+		if p.fail != nil && p.fail.Status == facts.StatusAbsent {
+			e := collect.Absent(auditNothingToLoad)
+			return auditPersist{fail: &e}
+		}
+		return p
 	}
 	matches, err := a.Glob(auditRulesDGlob)
 	if err != nil {
@@ -261,10 +262,28 @@ func auditPersisted(a collect.Access) auditPersist {
 	return p
 }
 
+// auditRulesFile reads /etc/audit/audit.rules as the persisted source, with
+// note as the ok envelopes' reason.
+func auditRulesFile(a collect.Access, note string) auditPersist {
+	data, meta, err := a.ReadFile(auditRulesPath, readLimit)
+	if err != nil {
+		e := readErrorEnv(auditRulesPath, err)
+		return auditPersist{fail: &e}
+	}
+	return auditPersist{
+		rules:     parseAuditRules(data, auditRulesPath),
+		src:       &facts.Source{Kind: "file", Path: auditRulesPath},
+		note:      note,
+		truncated: meta.Truncated,
+	}
+}
+
 // ok builds a persisted envelope with a source of its own, so no two leaves
 // share storage (R147).
 func (p auditPersist) ok(v any) facts.Envelope {
-	return withTruncation(copyEnvelope(collect.OK(v, p.src)), p.truncated)
+	e := withTruncation(copyEnvelope(collect.OK(v, p.src)), p.truncated)
+	e.Reason = p.note
+	return e
 }
 
 // ruleCount is the watch and syscall lines: control lines configure the
@@ -354,11 +373,11 @@ func writeAuditConf(a collect.Access, b *collect.Builder) {
 		return
 	}
 	conf := parseAuditdConf(data)
-	src := &facts.Source{Kind: "file", Path: auditdConfPath}
 	for _, k := range auditConfKeys {
 		v, ok := conf[k]
 		switch {
 		case ok:
+			src := &facts.Source{Kind: "file", Path: auditdConfPath} // one per leaf (R147)
 			b.Set("audit.conf."+k, collect.OKRead(v, src, meta))
 		case k == "log_file":
 			// The one documented default muster looks at: there is no
@@ -374,6 +393,17 @@ func writeAuditConf(a collect.Access, b *collect.Builder) {
 
 	logFile := auditDefaultLog
 	if v, ok := conf["log_file"]; ok {
+		if !path.IsAbs(v) {
+			// Empty or relative: the daemon cannot open it as written, and
+			// path.Clean would turn "" into "." — never a path to stat.
+			e := collect.Absent("auditd.conf sets log_file to " + strconv.Quote(v) + ", which is not an absolute path")
+			for _, prefix := range []string{"audit.log_file", "audit.log_dir"} {
+				for _, l := range permLeaves {
+					b.Set(prefix+"."+l, e)
+				}
+			}
+			return
+		}
 		logFile = path.Clean(v)
 	}
 	var groups map[int]string
@@ -384,7 +414,7 @@ func writeAuditConf(a collect.Access, b *collect.Builder) {
 		// C4: a path outside the declaration is one muster declined to
 		// read — absent with the path, never an error, and never a stat
 		// the guard would refuse.
-		if !path.IsAbs(p) || !declared(a, p) {
+		if !declared(a, p) {
 			e := collect.Absent(p + ": outside the paths muster reads")
 			for _, l := range permLeaves {
 				b.Set(prefix+"."+l, e)

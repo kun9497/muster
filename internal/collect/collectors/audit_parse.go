@@ -138,9 +138,10 @@ func lastEnableRule(rules []auditRule) (auditRule, bool) {
 	return last, found
 }
 
-// augenrulesOrder is the order the rules.d files are loaded in: the *.rules
-// names in C-locale lexical order (spec I-3), with the dot-files dropped —
-// augenrules lists the directory with ls, which never names them.
+// augenrulesOrder is the order augenrules loads the rules.d files in: it
+// lists the directory with `/bin/ls -1v`, so the *.rules names are in GNU
+// version order — 9-lock.rules before 10-site.rules — and the dot-files ls
+// never names are dropped.
 func augenrulesOrder(paths []string) []string {
 	out := make([]string, 0, len(paths))
 	for _, p := range paths {
@@ -148,9 +149,88 @@ func augenrulesOrder(paths []string) []string {
 			out = append(out, p)
 		}
 	}
-	slices.Sort(out)
+	slices.SortFunc(out, func(x, y string) int { return versionCompare(path.Base(x), path.Base(y)) })
 	return out
 }
+
+// versionCompare is ls -v's comparison (gnulib filevercmp) for the names a
+// *.rules glob can return: the ".rules" suffix is set aside and the prefixes
+// compared first, then the whole names, and a final tie falls back to
+// strings.Compare, as ls breaks a version tie with strcmp. filevercmp's
+// fuller suffix rule (any trailing run of ".alpha" parts) only matters for
+// names with more than one such part, which augenrules' own files do not use.
+func versionCompare(x, y string) int {
+	px, py := strings.TrimSuffix(x, ".rules"), strings.TrimSuffix(y, ".rules")
+	if c := verrevcmp(px, py); c != 0 {
+		return c
+	}
+	if c := verrevcmp(x, y); c != 0 {
+		return c
+	}
+	return strings.Compare(x, y)
+}
+
+// verrevcmp is filevercmp's core, the Debian version comparison: a run of
+// non-digits compares character by character with letters before other
+// bytes and the end of a run before either, then a run of digits compares by
+// numeric value, leading zeros ignored.
+func verrevcmp(s1, s2 string) int {
+	i, j := 0, 0
+	for i < len(s1) || j < len(s2) {
+		for (i < len(s1) && !isDigit(s1[i])) || (j < len(s2) && !isDigit(s2[j])) {
+			c1, c2 := verOrder(s1, i), verOrder(s2, j)
+			if c1 != c2 {
+				return c1 - c2
+			}
+			i++
+			j++
+		}
+		for i < len(s1) && s1[i] == '0' {
+			i++
+		}
+		for j < len(s2) && s2[j] == '0' {
+			j++
+		}
+		firstDiff := 0
+		for i < len(s1) && j < len(s2) && isDigit(s1[i]) && isDigit(s2[j]) {
+			if firstDiff == 0 {
+				firstDiff = int(s1[i]) - int(s2[j])
+			}
+			i++
+			j++
+		}
+		if i < len(s1) && isDigit(s1[i]) {
+			return 1
+		}
+		if j < len(s2) && isDigit(s2[j]) {
+			return -1
+		}
+		if firstDiff != 0 {
+			return firstDiff
+		}
+	}
+	return 0
+}
+
+// verOrder is filevercmp's character weight: the end of the string lowest,
+// then a digit, then letters by value, then every other byte above them.
+func verOrder(s string, i int) int {
+	if i >= len(s) {
+		return -1
+	}
+	c := s[i]
+	switch {
+	case isDigit(c):
+		return 0
+	case c >= 'a' && c <= 'z', c >= 'A' && c <= 'Z':
+		return int(c)
+	case c == '~':
+		return -1
+	}
+	return int(c) + 256
+}
+
+func isDigit(c byte) bool { return c >= '0' && c <= '9' }
 
 // parseAuditdConf reads auditd.conf's "keyword = value" lines. A line whose
 // first non-blank character is "#" is a comment (the shipped file's

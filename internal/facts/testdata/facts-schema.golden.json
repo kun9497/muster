@@ -4144,7 +4144,7 @@
     {
       "Key": "audit.rules.present",
       "Type": "setting\u003cbool\u003e",
-      "Description": "Whether the audit daemon carries at least one watch or syscall rule - runtime from auditctl -l (its \"No rules\" is false), persisted from the *.rules files of /etc/audit/rules.d that augenrules loads on a systemd host (/etc/audit/audit.rules on a host without systemd); absent on the persisted side when rules.d is missing, since augenrules then loads nothing at boot.",
+      "Description": "Whether the audit daemon carries at least one watch or syscall rule - runtime from auditctl -l (its \"No rules\" is false), persisted from what augenrules loads on a systemd host - the *.rules files of /etc/audit/rules.d in ls -v version order when the directory exists (an empty one is no rules), /etc/audit/audit.rules as it stands when rules.d is missing, absent when neither exists - and from /etc/audit/audit.rules on a host without systemd.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "audit",
@@ -4174,7 +4174,7 @@
     {
       "Key": "audit.rules.persisted",
       "Type": "list\u003crecord\u003e",
-      "Description": "The persisted audit rules as read, one row per non-comment line in load order (the files in order, each file top to bottom) with file, line (the line number), kind (watch, syscall, control or other), key (the -k or key= value, empty when none) and text; capped at 2000 rows. augenrules regroups the control lines before loading, so this is the files, not the merged audit.rules.",
+      "Description": "The persisted audit rules as read, one row per non-comment line in load order (the rules.d files in ls -v version order, each file top to bottom, or /etc/audit/audit.rules when that is the source) with file, line (the line number), kind (watch, syscall, control or other), key (the -k or key= value, empty when none) and text; capped at 2000 rows. augenrules regroups the control lines before loading, so this is the files, not the merged audit.rules.",
       "Since": 1,
       "Sensitivity": "internal",
       "Collector": "audit",
@@ -4184,7 +4184,7 @@
     {
       "Key": "audit.immutable",
       "Type": "setting\u003cbool\u003e",
-      "Description": "Whether the audit configuration is locked until reboot - runtime from auditctl -s reporting enabled 2, persisted from the last -e line of the persisted source being -e 2.",
+      "Description": "Whether the audit configuration is locked until reboot - runtime from auditctl -s reporting enabled 2, persisted from the last -e line of the persisted source (the same source as audit.rules.present, in the same load order) being -e 2; the winner names the line that decided when auditctl did not answer.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "audit",
