@@ -1,0 +1,103 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none"
+      }
+    },
+    "fim": {
+      "tool": {
+        "status": "ok",
+        "value": "aide",
+        "source": {
+          "kind": "file",
+          "path": "/usr/sbin/aide"
+        }
+      },
+      "aide": {
+        "installed": {
+          "status": "ok",
+          "value": true,
+          "source": {
+            "kind": "file",
+            "path": "/usr/sbin/aide"
+          }
+        },
+        "config_path": {
+          "status": "ok",
+          "value": "/etc/aide.conf",
+          "source": {
+            "kind": "file",
+            "path": "/etc/aide.conf"
+          }
+        },
+        "database_path": {
+          "status": "ok",
+          "value": "/var/lib/aide/aide.db.gz",
+          "source": {
+            "kind": "file",
+            "path": "/etc/aide.conf"
+          }
+        },
+        "database_present": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "file",
+            "path": "/var/lib/aide/aide.db.gz"
+          }
+        },
+        "database_modified": {
+          "status": "absent",
+          "reason": "no database at /var/lib/aide/aide.db.gz"
+        },
+        "schedules": {
+          "status": "ok",
+          "value": [
+            {
+              "kind": "timer",
+              "path": "aide-check.timer",
+              "armed": true,
+              "detail": ""
+            }
+          ],
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "command",
+                "cmd": "/usr/bin/systemctl list-timers --all --no-legend --no-pager",
+                "exit_code": 0
+              }
+            ]
+          }
+        },
+        "scheduled": {
+          "status": "ok",
+          "value": true,
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "command",
+                "cmd": "/usr/bin/systemctl list-timers --all --no-legend --no-pager",
+                "exit_code": 0
+              }
+            ]
+          }
+        }
+      },
+      "other_tools": {
+        "status": "ok",
+        "value": [],
+        "source": {
+          "kind": "derived"
+        }
+      }
+    }
+  }
+}

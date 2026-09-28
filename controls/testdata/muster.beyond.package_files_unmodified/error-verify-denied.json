@@ -1,0 +1,27 @@
+{
+  "synthetic": true,
+  "_expect": {
+    "reason_code": "permission_denied",
+    "exit_code": 2
+  },
+  "schema_version": 1,
+  "run": {
+    "deep": true
+  },
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none"
+      }
+    },
+    "packages": {
+      "verify": {
+        "complete": {
+          "status": "denied",
+          "reason": "package verification needs root: an unprivileged rpm -Va marks every file it cannot read as untestable"
+        }
+      }
+    }
+  }
+}

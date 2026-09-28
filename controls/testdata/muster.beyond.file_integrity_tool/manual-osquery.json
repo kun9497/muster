@@ -1,0 +1,92 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none"
+      }
+    },
+    "fim": {
+      "tool": {
+        "status": "absent",
+        "reason": "aide is not installed; other tools present: osqueryd (/opt/osquery/bin/osqueryd)"
+      },
+      "aide": {
+        "installed": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "derived"
+          }
+        },
+        "config_path": {
+          "status": "absent",
+          "reason": "neither /etc/aide/aide.conf nor /etc/aide.conf exists"
+        },
+        "database_path": {
+          "status": "absent",
+          "reason": "no AIDE configuration file names a database"
+        },
+        "database_present": {
+          "status": "absent",
+          "reason": "no AIDE configuration file names a database"
+        },
+        "database_modified": {
+          "status": "absent",
+          "reason": "no AIDE configuration file names a database"
+        },
+        "schedules": {
+          "status": "ok",
+          "value": [],
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "file",
+                "path": "/etc/crontab"
+              },
+              {
+                "kind": "command",
+                "cmd": "/usr/bin/systemctl list-timers --all --no-legend --no-pager",
+                "exit_code": 0
+              }
+            ]
+          }
+        },
+        "scheduled": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "file",
+                "path": "/etc/crontab"
+              },
+              {
+                "kind": "command",
+                "cmd": "/usr/bin/systemctl list-timers --all --no-legend --no-pager",
+                "exit_code": 0
+              }
+            ]
+          }
+        }
+      },
+      "other_tools": {
+        "status": "ok",
+        "value": [
+          {
+            "name": "osqueryd",
+            "path": "/opt/osquery/bin/osqueryd"
+          }
+        ],
+        "source": {
+          "kind": "derived"
+        }
+      }
+    }
+  }
+}

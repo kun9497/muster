@@ -1,0 +1,15 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {
+    "deep": false
+  },
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none"
+      }
+    }
+  }
+}

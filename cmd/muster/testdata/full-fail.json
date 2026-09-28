@@ -20,6 +20,7 @@
               "snmp":{"installed":{"status":"ok","value":true},"active":{"status":"ok","value":false},"enabled":{"status":"ok","value":false},"reachable":{"status":"ok","value":true}},
               "ntp":{"installed":{"status":"ok","value":true},"active":{"status":"ok","value":true}},
               "syslog":{"active":{"status":"ok","value":true}},
+              "journal_upload":{"installed":{"status":"ok","value":false},"active":{"status":"ok","value":false},"enabled":{"status":"ok","value":false}},
               "ftp":{"installed":{"status":"ok","value":true},"active":{"status":"ok","value":false}},
               "mail":{"installed":{"status":"ok","value":true},"active":{"status":"ok","value":true},"reachable":{"status":"ok","value":false}},
               "dns":{"installed":{"status":"ok","value":true},"active":{"status":"ok","value":true}}},
@@ -84,7 +85,8 @@
                "server_count":{"status":"ok","value":2},
                "synchronized":{"status":"ok","value":true}},
   "logging":{"syslog":{"implementation":{"status":"ok","value":"rsyslog"}},
-             "rsyslog":{"coverage":{"status":"ok","value":[
+             "journal_upload":{"url":{"status":"ok","value":""}},
+             "rsyslog":{"forwards_remote":{"status":"ok","value":true},"remote_targets":{"status":"ok","value":[{"rule":"*.* @@203.0.113.10:514","target":"@@203.0.113.10:514","loopback":false}]},"coverage":{"status":"ok","value":[
                {"facility":"auth","logged":true,"priority_floor":"info","target":"/var/log/auth.log","persistent":true},
                {"facility":"authpriv","logged":true,"priority_floor":"info","target":"/var/log/auth.log","persistent":true},
                {"facility":"kern","logged":true,"priority_floor":"info","target":"/var/log/kern.log","persistent":true},
@@ -99,7 +101,7 @@
           ]}},
   "patch":{"manager":{"status":"ok","value":"apt"},"metadata_age_s":{"status":"ok","value":3600},"pending_security_count":{"status":"ok","value":0},
            "security_metadata_available":{"status":"ok","value":true,"source":{"kind":"file","path":"/var/lib/apt/lists"}}},
-  "sudo":{"installed":{"status":"ok","value":true},"includedir":{"status":"ok","value":"/etc/sudoers.d"},"secure_path":{"status":"ok","value":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"}},
+  "sudo":{"installed":{"status":"ok","value":true},"log":{"syslog":{"status":"ok","value":true},"logfile":{"status":"ok","value":""}},"defaults":{"scoped_count":{"status":"ok","value":0}},"includedir":{"status":"ok","value":"/etc/sudoers.d"},"secure_path":{"status":"ok","value":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"}},
   "cron":{"files":{"status":"ok","value":[
             {"path":"/etc/crontab","scope":"system","user":"","mode":416,"uid":0,"gid":0,"group":"root","owner_ok":true,"group_writable":false,"other_writable":false},
             {"path":"/etc/cron.daily/logrotate","scope":"periodic","user":"","mode":493,"uid":0,"gid":0,"group":"root","owner_ok":true,"group_writable":false,"other_writable":false}
@@ -162,5 +164,6 @@
            "conf":{"space_left_action":{"status":"ok","value":"email","source":{"kind":"file","path":"/etc/audit/auditd.conf"}},"admin_space_left_action":{"status":"ok","value":"single","source":{"kind":"file","path":"/etc/audit/auditd.conf"}},"disk_full_action":{"status":"ok","value":"halt","source":{"kind":"file","path":"/etc/audit/auditd.conf"}},"disk_error_action":{"status":"ok","value":"halt","source":{"kind":"file","path":"/etc/audit/auditd.conf"}},"max_log_file_action":{"status":"ok","value":"rotate","source":{"kind":"file","path":"/etc/audit/auditd.conf"}}},
            "log_file":{"mode":{"status":"ok","value":384,"source":{"kind":"file","path":"/var/log/audit/audit.log"}},"uid":{"status":"ok","value":0,"source":{"kind":"file","path":"/var/log/audit/audit.log"}}},
            "log_dir":{"uid":{"status":"ok","value":0,"source":{"kind":"file","path":"/var/log/audit"}},"other_readable":{"status":"ok","value":false,"source":{"kind":"file","path":"/var/log/audit"}},"other_writable":{"status":"ok","value":false,"source":{"kind":"file","path":"/var/log/audit"}},"group_writable":{"status":"ok","value":false,"source":{"kind":"file","path":"/var/log/audit"}}}},
+  "fim":{"tool":{"status":"ok","value":"aide"},"aide":{"installed":{"status":"ok","value":true},"database_present":{"status":"ok","value":true},"scheduled":{"status":"ok","value":true}},"other_tools":{"status":"ok","value":[]}},
   "walk":{"world_writable":{"status":"absent"}}
  }}

@@ -1,0 +1,128 @@
+{
+  "synthetic": true,
+  "_expect": {
+    "reason_code": "verify_incomplete",
+    "exit_code": 2
+  },
+  "schema_version": 1,
+  "run": {
+    "deep": true
+  },
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none"
+      }
+    },
+    "packages": {
+      "verify": {
+        "complete": {
+          "status": "ok",
+          "value": false,
+          "truncated": true,
+          "reason": "/usr/bin/rpm -Va output reached its 64 MiB cap; the rows past it were not read",
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/rpm -Va",
+            "exit_code": 1
+          }
+        },
+        "tool": {
+          "status": "ok",
+          "value": "rpm",
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/rpm -Va",
+            "exit_code": 1
+          }
+        },
+        "modified": {
+          "status": "ok",
+          "value": [
+            {
+              "path": "/usr/bin/passwd",
+              "attributes": [
+                "size",
+                "digest",
+                "mtime"
+              ],
+              "untested": 0,
+              "file_type": "",
+              "note": ""
+            }
+          ],
+          "truncated": true,
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/rpm -Va",
+            "exit_code": 1
+          }
+        },
+        "modified_config": {
+          "status": "ok",
+          "value": [],
+          "truncated": true,
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/rpm -Va",
+            "exit_code": 1
+          }
+        },
+        "filter": {
+          "status": "ok",
+          "value": [
+            "config",
+            "doc",
+            "dpkg_excluded",
+            "ghost",
+            "mtime_only",
+            "unverifiable",
+            "unchanged"
+          ],
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/rpm -Va",
+            "exit_code": 1
+          }
+        },
+        "filtered_counts": {
+          "status": "ok",
+          "value": {
+            "config": 0,
+            "doc": 0,
+            "dpkg_excluded": 0,
+            "ghost": 0,
+            "mtime_only": 0,
+            "unverifiable": 0,
+            "unchanged": 0
+          },
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/rpm -Va",
+            "exit_code": 1
+          }
+        },
+        "stats": {
+          "status": "ok",
+          "value": {
+            "lines": 1,
+            "exit_code": 1,
+            "duration_ms": 71204,
+            "truncated": true,
+            "stderr_head": [],
+            "unparsed_head": [],
+            "packages_without_digests": 0,
+            "packages_without_digests_error": "",
+            "dpkg_path_excludes": []
+          },
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/rpm -Va",
+            "exit_code": 1
+          }
+        }
+      }
+    }
+  }
+}

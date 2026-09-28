@@ -49,6 +49,10 @@ var stockUbuntu2204 = map[string]check.Status{
 	"muster.beyond.audit_immutable":                     check.NotApplicable, // 3C-1: gate
 	"muster.beyond.audit_disk_actions":                  check.NotApplicable, // 3C-1: gate
 	"muster.beyond.audit_log_permissions":               check.NotApplicable, // 3C-1: gate
+	"muster.beyond.remote_log_forwarding":               check.FAIL,          // 3C-1: nothing leaves the host
+	"muster.beyond.sudo_logging":                        check.PASS,          // 3C-1: sudo's default syslog
+	"muster.beyond.file_integrity_tool":                 check.FAIL,          // 3C-1: no tool
+	"muster.beyond.package_files_unmodified":            check.PASS,          // 3C-1: --deep, only conffiles differ
 }
 
 // B-11: one synthetic snapshot of the stock host pins all nineteen verdicts at
