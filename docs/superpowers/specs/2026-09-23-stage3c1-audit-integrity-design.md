@@ -158,9 +158,11 @@ path serves both families).
   acl_present`), of the file `log_file` names and of its parent directory. A `log_file`
   outside the declared stat patterns is C4: `absent` with the path in the reason, never
   `error`.
-- Status rules (J-1). `auditctl` not on the host: the runtime side is `absent` ("auditctl
-  is not installed"), never `unsupported` — the kernel may hold rules nobody can list, and
-  the controls that need the runtime side are gated on the daemon being installed anyway.
+- Status rules (J-1). `auditctl` not on the host (the command cannot start because the
+  binary does not exist): the runtime side is `absent` ("auditctl is not installed"), never
+  `unsupported` — the kernel may hold rules nobody can list, and the controls that need the
+  runtime side are gated on the daemon being installed anyway; any other start failure (the
+  binary exists but cannot be executed) is `error` naming the command and the failure.
   `auditctl` gates on the effective `CAP_AUDIT_CONTROL` (`audit_can_control()`), so `You
   must be root to run this program.` with exit 4 is `denied` when the run is not root and
   `unsupported` ("no CAP_AUDIT_CONTROL: an unprivileged container") when it is. The kernel
@@ -208,7 +210,10 @@ armed, and a `static` timer pulled in by a target is armed without being enabled
   literal paths); every other `@@` directive (`@@include`, `@@x_include`,
   `@@x_include_setenv`) is ignored; a reference to a macro the file never defined is left
   as written and the reason says so. `fim.aide.database_present` — `bool`,
-  a regular file at that path. `fim.aide.database_modified` — `string`, its mtime as
+  a regular file at that path; `false`, not `absent`, when AIDE is installed but no
+  configuration file exists or the configuration names no database (the answer is
+  knowable: nothing points at a database), and `absent` only when the path it names is
+  outside `/var/lib/aide/` (C4, the path in the reason). `fim.aide.database_modified` — `string`, its mtime as
   RFC 3339 UTC, evidence.
 - `fim.aide.schedules` — `list<record>` `{kind, path, armed, detail}`, `kind` ∈
   cron_daily | cron_d | crontab | timer; `armed` says the row will actually run and
@@ -218,15 +223,21 @@ armed, and a `static` timer pulled in by a target is armed without being enabled
   commented and both scripts default it to `yes`, so a stock host is armed), and when it is
   not the Ubuntu 24.04 shim, which exits whenever `/run/systemd/system` exists (detected by
   that literal in the file; on a systemd host the row is `armed: false`, `detail: "runs
-  only without systemd"`). A non-comment line of `/etc/cron.d/*` or `/etc/crontab` whose
-  command names `aide` is armed (a commented-out line is the usual way a check is switched
-  off and is not a row). A timer whose name contains `aide` — `dailyaidecheck.timer` on
+  only without systemd"`). A non-comment line of `/etc/cron.d/*` or `/etc/crontab` is armed when a token
+  of its command has basename `aide`, `aide.wrapper`, `aideinit`, `aide-check` or
+  `dailyaidecheck` and is either bare or a path under a `bin`/`sbin` directory (`nice -n 19
+  /usr/bin/aide --check` arms; `find /var/log/aide -mtime +30 -delete` does not: the word
+  is an argument, not the program). A commented-out line is the usual way a check is
+  switched off and is not a row. A timer whose name contains `aide` — `dailyaidecheck.timer` on
   Ubuntu 24.04 (enabled by the package), `aide-check.timer` on EL9 (shipped, preset-disabled),
   an administrator's own — is armed when `systemctl list-timers --all` shows a next elapse
   time for it and the `CRON_DAILY_RUN` gate holds (the 24.04 service reads the same file).
   `fim.aide.scheduled` — `bool`, at least one armed row. A host without systemd lists cron
-  rows only; a host whose timer inventory cannot be read has both leaves `unsupported`
-  naming the reason.
+  rows only (`systemctl` cannot start, or answers "System has not been booted with
+  systemd": both schedule leaves `unsupported` naming the reason); a `list-timers` that
+  runs out of time is `timeout`, and any other non-zero exit is `error` naming the command
+  and its code — a systemd host whose timers cannot be listed is a fault, not a host
+  muster does not model.
 - `fim.other_tools` — `list<record>` `{name, path}`, every other binary found.
 
 ### I-5 — the `pkgverify` collector
@@ -270,9 +281,10 @@ needs root: an unprivileged rpm -Va marks every file it cannot read as untestabl
   `config` (type `c` → `modified_config`), `doc` (type `d`, `l` or `r`, **or a path under
   `/usr/share/doc/`, `/usr/share/man/`, `/usr/share/info/` or `/usr/share/locale/`** →
   dropped: dpkg has no documentation type letter, and the lab's 1199 `missing` rows were
-  all documentation a minimised install never wrote), `dpkg_excluded` (a path matching a
-  `path-exclude` glob of `dpkg.cfg` / `dpkg.cfg.d` → dropped: the administrator told dpkg
-  not to install it), `ghost` (type `g` → dropped: the file is not shipped), `mtime_only`
+  all documentation a minimised install never wrote), `dpkg_excluded` (a `missing` row whose path
+  matches a `path-exclude` glob of `dpkg.cfg` / `dpkg.cfg.d` → dropped: the administrator
+  told dpkg not to install it; a file that exists under such a glob with a differing digest
+  stays a modification — dpkg did write it, and something changed it), `ghost` (type `g` → dropped: the file is not shipped), `mtime_only`
   (the only differing column is `T` → dropped: a touched file with its content, mode and
   owner intact), `unverifiable` (no column differs and at least one is `?` → dropped: the
   tool could not test it), `unchanged` (no column differs and none is `?` — rpm prints such a row
@@ -281,13 +293,17 @@ needs root: an unprivileged rpm -Va marks every file it cannot read as untestabl
   later filter change be seen in a snapshot's date.
 - `packages.verify.filtered_counts` — `record` `{config, doc, dpkg_excluded, ghost,
   mtime_only, unverifiable, unchanged}` (`int` each). `packages.verify.stats` — `record` `{lines,
-  exit_code, duration_ms, truncated, stderr_head, packages_without_digests,
-  dpkg_path_excludes}`; `stderr_head` the first three stderr lines and `unparsed_head` the first three lines the
-  parser could not classify (empty when none);
+  exit_code, duration_ms, truncated, stderr_head, unparsed_head, packages_without_digests,
+  packages_without_digests_error, dpkg_path_excludes, dpkg_path_excludes_error}`; `stderr_head` the first three
+  stderr lines and `unparsed_head` the first three lines the parser could not classify (empty when none);
+  `packages_without_digests_error` the reason the digest probe could not run (`""` when it ran);
   `packages_without_digests` is, on a dpkg host, the number of
   `/var/lib/dpkg/info/*.list` files with no `*.md5sums` beside them — the packages
   `dpkg --verify` silently cannot check — and 0 on an rpm host; `dpkg_path_excludes` the
-  globs applied by the `dpkg_excluded` rule.
+  directives the `dpkg_excluded` rule applied, as written (`path-exclude=<glob>` and
+  `path-include=<glob>`, in file order — a later `path-include` puts a path back, as dpkg
+  itself reads them), and `dpkg_path_excludes_error` the `dpkg.cfg` / `dpkg.cfg.d` fragments
+  that could not be read (`<path>: <reason>`; an empty list when every one was).
 - A verify line that matches neither the nine-column form nor `missing` is counted in
   `stats.lines` and the first three such lines are kept in `stats.unparsed_head` without
   failing the key (rpm prints warnings to stdout on some hosts).
@@ -312,8 +328,9 @@ needs root: an unprivileged rpm -Va marks every file it cannot read as untestabl
 - **`logging`** gains `logging.rsyslog.forwards_remote` (`bool`: at least one parsed
   rsyslog action is a remote target — `@host`, `@@host`, `:omfwd:`, `action(type="omfwd")`,
   which the parser already classifies as `remote` — **whose host is not loopback**
-  (`127.0.0.0/8`, `::1`, `localhost`: a relay into a local shipper leaves nothing by
-  itself and stays in the evidence list only); false when rsyslog is not installed,
+  (`127.0.0.0/8`, `::1`, `localhost` and the `/etc/hosts` aliases Debian and EL ship —
+  `localhost.localdomain`, `localhost6`, `ip6-localhost`, `ip6-loopback`: a relay into a
+  local shipper leaves nothing by itself and stays in the evidence list only); false when rsyslog is not installed,
   because then nothing forwards; `absent` when the implementation is syslog-ng ("not
   modelled") or `none` (sysklogd, BusyBox: U-65 reads those MANUAL for the same reason)),
   `logging.rsyslog.remote_targets` (`list<record>` `{rule, target, loopback}`, `internal`,
@@ -344,9 +361,9 @@ is muster's own rating from the primary source and the description says why.
 | `audit_rules_loaded` | 상 | auto | `services.auditd.installed eq true` | `audit.rules.present eq true` on `runtime` and on `persisted` — rules loaded by hand are lost at reboot, so both homes | fail |
 | `audit_immutable` | 중 | auto | same | `audit.immutable eq true` on `runtime` and on `persisted` | fail |
 | `audit_disk_actions` | 중 | auto | same | `space_left_action` and `admin_space_left_action` `in ${allowed_space_actions}` (default `[syslog, email, exec, rotate, single, halt]`), `disk_full_action in ${allowed_disk_full_actions}` (default `[syslog, rotate, exec, single, halt]`), `disk_error_action in ${allowed_disk_error_actions}` (default `[syslog, exec, single, halt]`) — each default is `auditd.conf(5)`'s value list for that key minus `ignore` (records are lost and nothing is said) and `suspend` (one syslog line, then records are lost while the host runs on); `max_log_file_action in ${allowed_rotate_actions}` (default `[rotate, keep_logs, syslog]`) | manual — a missing line lets the daemon's compiled default decide, which nobody chose |
-| `audit_log_permissions` | 중 | auto | same | `audit.log_file.uid eq 0`, `audit.log_file.mode in ${allowed_modes}` (the eight bit-subsets of 0640 — 0640 rather than 0600 because Ubuntu's `log_group = adm` makes it the shipped state), `audit.log_dir.uid eq 0`, `audit.log_dir.other_readable eq false`, `audit.log_dir.other_writable eq false`, `audit.log_dir.group_writable eq false` (bits, not a 32-element list; no `other_executable` leaf exists, so 0751 passes) | manual — the file is where muster does not read (C4 names the path) or was never written; either needs a look, and `auditd_active` already says whether the daemon runs |
+| `audit_log_permissions` | 중 | auto | same | `audit.log_file.uid eq 0`, `audit.log_file.mode in ${allowed_modes}` (the eight bit-subsets of 0640 — 0640 rather than 0600 because Ubuntu's `log_group = adm` makes it the shipped state), `audit.log_file.group in ${allowed_groups}` (default `[root, adm]`: a 0640 file is only as restricted as its group, so the group is judged with the mode — root, or the logging group Ubuntu's patch names), `audit.log_dir.uid eq 0`, `audit.log_dir.other_readable eq false`, `audit.log_dir.other_writable eq false`, `audit.log_dir.group_writable eq false` (bits, not a 32-element list; no `other_executable` leaf exists, so 0751 passes) | manual — the file is where muster does not read (C4 names the path) or was never written; either needs a look, and `auditd_active` already says whether the daemon runs |
 | `remote_log_forwarding` | 하 | auto | — | mechanisms: `logging.rsyslog.forwards_remote eq true` → `services.syslog.active eq true`; `logging.journal_upload.url ne ""` → `services.journal_upload.active eq true` and `.enabled eq true` (an enabled unit that failed at boot ships nothing); `logging.rsyslog.forwards_remote eq false` → `logging.rsyslog.forwards_remote eq true` (fails by construction: nothing leaves the host; the URL leaf cannot serve here because it is `unsupported` without systemd) | manual — a syslog-ng or sysklogd host has `forwards_remote` absent and an empty URL, so no mechanism holds |
-| `sudo_logging` | 중 | auto | `sudo.installed eq true` | mechanisms: `sudo.log.syslog eq true` → passes on that; `sudo.log.syslog eq false` → `sudo.log.logfile matches ^/` | fail |
+| `sudo_logging` | 중 | auto | `sudo.installed eq true` | mechanisms: `sudo.log.syslog eq true` → passes on that; `sudo.log.syslog eq false` → `sudo.log.logfile matches ^/` | manual — the three `sudo.log.*` leaves are `absent` only when muster did not see every line sudo reads: an `@include` / `@includedir` outside the declared paths (C4) or a symlinked drop-in in `sudoers.d`, which sudo follows and muster does not; either could hold the `Defaults` line, so the answer is a look, with the path in the reason |
 | `file_integrity_tool` | 중 | auto | — | mechanisms: `fim.tool eq aide` → `fim.aide.database_present eq true`, `fim.aide.scheduled eq true`; `fim.tool eq none` → `fim.tool ne none` (fails by construction: no tool) | manual — a host with only an unmodelled tool has `fim.tool` absent, selects no mechanism, and reads MANUAL; the evidence the row carries is `fim.tool` itself, whose reason names the tools found (the evaluator attaches the `when` facts, not `fim.other_tools`) |
 | `package_files_unmodified` | 상 | auto | `--deep` (I-9) | `packages.verify.modified` `op: none, subject: path, where: {field: path, op: present}` — the deep gate reads `packages.verify.complete` before any check, so the control names no clause on it | fail |
 
@@ -412,9 +429,12 @@ to the implemented rule (§4). This is the only evaluator change of 3C-1.
   denial (rules files, `auditd.conf`, `auditctl`, the log directory — every one is
   root-only on both families); `services.auditd.*` still answers (`systemctl show`);
   `pkgverify` writes the `denied` completeness key alone; `sudo.log.*` is the read's
-  status of `/etc/sudoers`. The capability matrix's `nonroot.denied` row gains the 34
-  `audit.*` keys, `packages.verify.complete` and the three `sudo.log.*` /
-  `sudo.defaults.*` keys, and CI's non-root job installs `auditd` so that the row is
+  status of `/etc/sudoers`. The capability matrix's `nonroot.denied` row gains 28
+  `audit.*` keys (the eighteen `audit.log_file.*` / `audit.log_dir.*` leaves read `denied`
+  there too, because unreadable `auditd.conf` leaves the path unknown (C3), but the row's
+  rule keeps every `mode`, `uid` and `gid` leaf out since a stat needs no read permission
+  (M-34) — the matrix's `_notes` say so), `packages.verify.complete` and the three
+  `sudo.log.*` / `sudo.defaults.*` keys, and CI's non-root job installs `auditd` so that the row is
   about a denial and not about a missing package (I-11). AIDE paths are release-dependent:
   readable on Ubuntu 22.04, but EL installs `/etc/aide.conf` 0600 and `/var/lib/aide` 0700
   and Ubuntu 24.04 creates `/var/lib/aide` 0700 `_aide:root`, so a non-root run there reads

@@ -132,9 +132,10 @@ sudo 세션 기록(`log_input`, `log_output`) — 여기서 읽는 것이 없으
   leaf 아홉 개씩(`mode, uid, gid, group, group_readable, group_writable, other_readable,
   other_writable, acl_present`). 선언된 stat 패턴 밖의 `log_file`은 C4입니다: 이유에 경로를 적은
   `absent`, 결코 `error`가 아님.
-- 상태 규칙(J-1). 호스트에 `auditctl`이 없음: runtime 쪽은 `absent`("auditctl is not
-  installed"), 결코 `unsupported`가 아님 — 커널이 아무도 나열할 수 없는 규칙을 갖고 있을 수 있고,
-  runtime 쪽이 필요한 컨트롤은 어차피 데몬 설치에 게이트됩니다. `auditctl`은 유효
+- 상태 규칙(J-1). 호스트에 `auditctl`이 없음(실행파일이 없어 명령이 시작되지 못함): runtime 쪽은
+  `absent`("auditctl is not installed"), 결코 `unsupported`가 아님 — 커널이 아무도 나열할 수 없는
+  규칙을 갖고 있을 수 있고, runtime 쪽이 필요한 컨트롤은 어차피 데몬 설치에 게이트됩니다; 그 밖의
+  시작 실패(실행파일은 있으나 실행할 수 없음)는 명령과 실패를 적은 `error`입니다. `auditctl`은 유효
   `CAP_AUDIT_CONTROL`로 문을 지키므로(`audit_can_control()`) `You must be root to run this
   program.`과 exit 4는 비root 실행에서 `denied`, root 실행에서 `unsupported`("no
   CAP_AUDIT_CONTROL: an unprivileged container")입니다. 커널은 capability를 보기 전에 초기가 아닌
@@ -175,7 +176,10 @@ sudo 세션 기록(`log_input`, `log_output`) — 여기서 읽는 것이 없으
   (EL9의 `aide.conf`가 쓰고 Ubuntu의 것은 리터럴 경로); 그 밖의 `@@` 지시자(`@@include`,
   `@@x_include`, `@@x_include_setenv`)는 무시; 파일이 정의한 적 없는 매크로 참조는 적힌 대로 두고
   이유에 그렇게 말합니다.
-  `fim.aide.database_present` — `bool`, 그 경로의 일반 파일. `fim.aide.database_modified` —
+  `fim.aide.database_present` — `bool`, 그 경로의 일반 파일; AIDE는 설치됐으나 설정 파일이 없거나
+  설정이 데이터베이스를 지정하지 않으면 `absent`가 아닌 `false`(답은 알 수 있음: 아무것도
+  데이터베이스를 가리키지 않음), 지정한 경로가 `/var/lib/aide/` 밖일 때만 `absent`(C4, 이유에
+  경로). `fim.aide.database_modified` —
   `string`, 그 mtime을 RFC 3339 UTC로, 근거.
 - `fim.aide.schedules` — `list<record>` `{kind, path, armed, detail}`, `kind` ∈ cron_daily |
   cron_d | crontab | timer; `armed`는 그 행이 실제로 돌 것인지, `detail`은 아니라면 왜인지(J-5).
@@ -183,14 +187,19 @@ sudo 세션 기록(`log_input`, `log_output`) — 여기서 읽는 것이 없으
   건너뜀), `/etc/default/aide`가 `CRON_DAILY_RUN`을 `yes` 아닌 값으로 두지 않았고(파일은 그 줄을
   주석으로 싣고 두 스크립트 모두 기본을 `yes`로 두므로 stock 호스트는 armed), `/run/systemd/system`이
   있으면 곧바로 끝나는 Ubuntu 24.04 shim이 아닐 때(파일 속 그 리터럴로 식별; systemd 호스트에서 그
-  행은 `armed: false`, `detail: "runs only without systemd"`) armed입니다. 명령에 `aide`가 있는
-  `/etc/cron.d/*` 또는 `/etc/crontab`의 주석 아닌 줄은 armed(주석 처리된 줄은 점검을 끄는 흔한
-  방식이라 행이 아님). 이름에 `aide`가 들어간 타이머 — Ubuntu 24.04의 `dailyaidecheck.timer`(패키지가
+  행은 `armed: false`, `detail: "runs only without systemd"`) armed입니다. `/etc/cron.d/*` 또는
+  `/etc/crontab`의 주석 아닌 줄은 명령의 토큰 하나가 basename `aide`, `aide.wrapper`, `aideinit`,
+  `aide-check`, `dailyaidecheck` 중 하나이고 그 토큰이 맨 이름이거나 `bin`/`sbin` 디렉터리 아래
+  경로일 때 armed(`nice -n 19 /usr/bin/aide --check`는 armed; `find /var/log/aide -mtime +30
+  -delete`는 아님: 그 단어는 인자이지 프로그램이 아님). 주석 처리된 줄은 점검을 끄는 흔한 방식이라
+  행이 아닙니다. 이름에 `aide`가 들어간 타이머 — Ubuntu 24.04의 `dailyaidecheck.timer`(패키지가
   enable), EL9의 `aide-check.timer`(배포되나 preset으로 비활성), 관리자 자신의 것 — 는 `systemctl
   list-timers --all`이 다음 실행 시각을 보이고 `CRON_DAILY_RUN` 게이트가 성립할 때 armed(24.04의
   서비스도 같은 파일을 읽음). `fim.aide.scheduled` — `bool`, armed 행이 하나 이상. systemd 없는
-  호스트는 cron 행만 싣고, 타이머 목록을 읽을 수 없는 호스트는 두 leaf가 이유를 적은
-  `unsupported`입니다.
+  호스트는 cron 행만 싣습니다(`systemctl`이 시작되지 못하거나 "System has not been booted with
+  systemd"라 답함: 두 스케줄 leaf가 이유를 적은 `unsupported`); 시간을 넘긴 `list-timers`는
+  `timeout`, 그 밖의 0 아닌 종료는 명령과 코드를 적은 `error`입니다 — 타이머를 나열하지 못하는
+  systemd 호스트는 결함이지 muster가 모델링하지 않는 호스트가 아닙니다.
 - `fim.other_tools` — `list<record>` `{name, path}`, 발견된 다른 실행파일 전부.
 
 ### I-5 — `pkgverify` 수집기
@@ -227,8 +236,9 @@ MiB; 어느 것을 돌릴지는 `patch.go`가 정하듯 계열이 정함); 아�
   `c` → `modified_config`), `doc`(유형 `d`, `l`, `r`, **또는 `/usr/share/doc/`,
   `/usr/share/man/`, `/usr/share/info/`, `/usr/share/locale/` 아래 경로** → 버림: dpkg에는 문서
   유형 문자가 없고, lab의 `missing` 행 1199개는 전부 최소 설치가 쓴 적 없는 문서였음),
-  `dpkg_excluded`(`dpkg.cfg` / `dpkg.cfg.d`의 `path-exclude` glob에 맞는 경로 → 버림: 관리자가
-  dpkg에 설치하지 말라고 한 것), `ghost`(유형 `g` → 버림: 배포되지 않는 파일), `mtime_only`(다른
+  `dpkg_excluded`(경로가 `dpkg.cfg` / `dpkg.cfg.d`의 `path-exclude` glob에 맞는 `missing` 행 →
+  버림: 관리자가 dpkg에 설치하지 말라고 한 것; 그런 glob 아래 존재하면서 digest가 다른 파일은
+  여전히 변조 — dpkg가 쓴 파일을 무언가가 바꾼 것), `ghost`(유형 `g` → 버림: 배포되지 않는 파일), `mtime_only`(다른
   열이 `T`뿐 → 버림: 내용·모드·소유자가 그대로인 채 touch된 파일), `unverifiable`(다른 열이 없고
   `?`가 하나 이상 → 버림: 도구가 검사할 수 없었음), `unchanged`(다른 열도 `?`도 없음 — rpm은
   `(not installed)`나 `(replaced)` 같은 상태 메모가 있을 때만 그런 행을 찍음 → 버림: 다른 것이
@@ -236,11 +246,15 @@ MiB; 어느 것을 돌릴지는 `patch.go`가 정하듯 계열이 정함); 아�
   변경을 스냅샷의 날짜에서 볼 수 있게 하기 위함입니다.
 - `packages.verify.filtered_counts` — `record` `{config, doc, dpkg_excluded, ghost, mtime_only,
   unverifiable, unchanged}`(각 `int`). `packages.verify.stats` — `record` `{lines, exit_code, duration_ms,
-  truncated, stderr_head, packages_without_digests, dpkg_path_excludes}`; `stderr_head`는
-  stderr의 첫 세 줄, `unparsed_head`는 파서가 분류하지 못한 첫 세 줄(없으면 빈 값); `packages_without_digests`는 dpkg 호스트에서 옆에
+  truncated, stderr_head, unparsed_head, packages_without_digests, packages_without_digests_error,
+  dpkg_path_excludes, dpkg_path_excludes_error}`; `stderr_head`는 stderr의 첫 세 줄, `unparsed_head`는
+  파서가 분류하지 못한 첫 세 줄(없으면 빈 값); `packages_without_digests_error`는 digest 탐색이 돌지
+  못한 이유(돌았으면 `""`); `packages_without_digests`는 dpkg 호스트에서 옆에
   `*.md5sums`가 없는 `/var/lib/dpkg/info/*.list` 파일 수 — `dpkg --verify`가 말없이 검사하지
   못하는 패키지 — 이고 rpm 호스트에선 0; `dpkg_path_excludes`는 `dpkg_excluded` 규칙이 적용한
-  glob.
+  지시자를 적힌 대로(`path-exclude=<glob>`과 `path-include=<glob>`, 파일 순서 — 뒤의 `path-include`가
+  경로를 되살리는 것은 dpkg 자신이 읽는 방식), `dpkg_path_excludes_error`는 읽을 수 없었던
+  `dpkg.cfg` / `dpkg.cfg.d` 조각(`<path>: <reason>`; 전부 읽혔으면 빈 목록).
 - 아홉 열 형식에도 `missing`에도 맞지 않는 verify 줄은 `stats.lines`에 세고 처음 세 줄을
   `stats.unparsed_head`에 남기되 키를 실패시키지 않습니다(어떤 호스트에서 rpm은 경고를 stdout에 찍음).
 
@@ -260,8 +274,9 @@ MiB; 어느 것을 돌릴지는 `patch.go`가 정하듯 계열이 정함); 아�
   세 leaf를 그 읽기의 상태로 읽고(C3) matrix의 비root 행이 그것을 싣습니다.
 - **`logging`**에 `logging.rsyslog.forwards_remote`(`bool`: 파싱한 rsyslog 액션 중 원격 대상 —
   `@host`, `@@host`, `:omfwd:`, `action(type="omfwd")`, 파서가 이미 `remote`로 분류하는 것 —
-  **의 호스트가 루프백이 아닌 것**(`127.0.0.0/8`, `::1`, `localhost`: 로컬 shipper로의 중계는 그
-  자체로는 아무것도 내보내지 않으므로 근거 목록에만 남음)이 하나 이상; rsyslog가 설치되지 않았으면
+  **의 호스트가 루프백이 아닌 것**(`127.0.0.0/8`, `::1`, `localhost`, 그리고 Debian과 EL이 `/etc/hosts`에 싣는 별칭
+  `localhost.localdomain`, `localhost6`, `ip6-localhost`, `ip6-loopback`: 로컬 shipper로의 중계는
+  그 자체로는 아무것도 내보내지 않으므로 근거 목록에만 남음)이 하나 이상; rsyslog가 설치되지 않았으면
   false, 그러면 아무것도 전송하지 않으므로; 구현이 syslog-ng("not modelled")나 `none`(sysklogd,
   BusyBox: U-65가 같은 이유로 MANUAL로 읽음)이면 `absent`), `logging.rsyslog.remote_targets`
   (`list<record>` `{rule, target, loopback}`, `internal`, 근거; `rule`은 파서가 남긴 액션 텍스트),
@@ -291,9 +306,9 @@ leaf는 없으며, 패키지 이름을 적는 `packages.verify.*` leaf는 없습
 | `audit_rules_loaded` | 상 | auto | `services.auditd.installed eq true` | `audit.rules.present eq true`를 `runtime`과 `persisted`에서 — 손으로 넣은 규칙은 재부팅에 사라지므로 두 집 다 | fail |
 | `audit_immutable` | 중 | auto | 같음 | `audit.immutable eq true`를 `runtime`과 `persisted`에서 | fail |
 | `audit_disk_actions` | 중 | auto | 같음 | `space_left_action`과 `admin_space_left_action` `in ${allowed_space_actions}`(기본 `[syslog, email, exec, rotate, single, halt]`), `disk_full_action in ${allowed_disk_full_actions}`(기본 `[syslog, rotate, exec, single, halt]`), `disk_error_action in ${allowed_disk_error_actions}`(기본 `[syslog, exec, single, halt]`) — 각 기본값은 `auditd.conf(5)`의 그 키 값 목록에서 `ignore`(기록을 잃고 아무 말도 없음)와 `suspend`(syslog 한 줄 뒤 호스트는 계속 돌면서 기록을 잃음)를 뺀 것; `max_log_file_action in ${allowed_rotate_actions}`(기본 `[rotate, keep_logs, syslog]`) | manual — 줄이 없으면 데몬의 컴파일된 기본값이 정하며 그것은 아무도 고르지 않은 것 |
-| `audit_log_permissions` | 중 | auto | 같음 | `audit.log_file.uid eq 0`, `audit.log_file.mode in ${allowed_modes}`(0640의 비트 부분집합 여덟 — Ubuntu의 `log_group = adm`이 0640을 배포 상태로 만들므로 0600이 아닌 0640), `audit.log_dir.uid eq 0`, `audit.log_dir.other_readable eq false`, `audit.log_dir.other_writable eq false`, `audit.log_dir.group_writable eq false`(32개 목록이 아닌 비트; `other_executable` leaf가 없어 0751은 통과) | manual — 파일이 muster가 읽지 않는 곳에 있거나(C4가 경로를 적음) 쓰인 적이 없음; 둘 다 살펴봐야 하고, 데몬이 도는지는 `auditd_active`가 이미 말함 |
+| `audit_log_permissions` | 중 | auto | 같음 | `audit.log_file.uid eq 0`, `audit.log_file.mode in ${allowed_modes}`(0640의 비트 부분집합 여덟 — Ubuntu의 `log_group = adm`이 0640을 배포 상태로 만들므로 0600이 아닌 0640), `audit.log_file.group in ${allowed_groups}`(기본 `[root, adm]`: 0640 파일은 그 그룹만큼만 제한되므로 그룹을 모드와 함께 판정 — root 또는 Ubuntu 패치가 이름 붙인 로깅 그룹), `audit.log_dir.uid eq 0`, `audit.log_dir.other_readable eq false`, `audit.log_dir.other_writable eq false`, `audit.log_dir.group_writable eq false`(32개 목록이 아닌 비트; `other_executable` leaf가 없어 0751은 통과) | manual — 파일이 muster가 읽지 않는 곳에 있거나(C4가 경로를 적음) 쓰인 적이 없음; 둘 다 살펴봐야 하고, 데몬이 도는지는 `auditd_active`가 이미 말함 |
 | `remote_log_forwarding` | 하 | auto | — | mechanisms: `logging.rsyslog.forwards_remote eq true` → `services.syslog.active eq true`; `logging.journal_upload.url ne ""` → `services.journal_upload.active eq true`와 `.enabled eq true`(부팅에 실패한 enabled 유닛은 아무것도 보내지 않음); `logging.rsyslog.forwards_remote eq false` → `logging.rsyslog.forwards_remote eq true`(구성상 실패: 호스트를 떠나는 것이 없음; URL leaf는 systemd 없는 호스트에서 `unsupported`라 여기 쓸 수 없음) | manual — syslog-ng나 sysklogd 호스트는 `forwards_remote`가 absent이고 URL이 비어 있어 어느 mechanism도 성립하지 않음 |
-| `sudo_logging` | 중 | auto | `sudo.installed eq true` | mechanisms: `sudo.log.syslog eq true` → 그것으로 통과; `sudo.log.syslog eq false` → `sudo.log.logfile matches ^/` | fail |
+| `sudo_logging` | 중 | auto | `sudo.installed eq true` | mechanisms: `sudo.log.syslog eq true` → 그것으로 통과; `sudo.log.syslog eq false` → `sudo.log.logfile matches ^/` | manual — `sudo.log.*` leaf 셋은 muster가 sudo가 읽는 모든 줄을 보지 못했을 때만 `absent`: 선언된 경로 밖의 `@include` / `@includedir`(C4)이나 `sudoers.d`의 심볼릭 링크 drop-in(sudo는 따라가고 muster는 아님); 어느 쪽이든 `Defaults` 줄을 품을 수 있으므로 답은 살펴보기이며 이유에 경로를 적음 |
 | `file_integrity_tool` | 중 | auto | — | mechanisms: `fim.tool eq aide` → `fim.aide.database_present eq true`, `fim.aide.scheduled eq true`; `fim.tool eq none` → `fim.tool ne none`(구성상 실패: 도구 없음) | manual — 모델링 안 된 도구만 있는 호스트는 `fim.tool`이 absent라 어느 mechanism도 고르지 않고 MANUAL; 행이 싣는 근거는 `fim.tool` 자체이며 그 이유가 발견된 도구를 적음(평가기는 `when` 사실을 붙이지 `fim.other_tools`를 붙이지 않음) |
 | `package_files_unmodified` | 상 | auto | `--deep`(I-9) | `packages.verify.modified` `op: none, subject: path, where: {field: path, op: present}` — deep 게이트가 어느 check보다 먼저 `packages.verify.complete`를 읽으므로 컨트롤은 그것에 절을 두지 않음 | fail |
 
@@ -349,8 +364,11 @@ AU-5(1), AU-9, AU-12, SI-11, 전송에 AU-4(1), 무결성 도구에 SI-6과 CM-3
 - **비root.** auditd가 있는 호스트에서 감사 세부 컨트롤 넷은 거부를 적은 ERROR(규칙 파일,
   `auditd.conf`, `auditctl`, 로그 디렉터리 — 두 계열 다 전부 root 전용); `services.auditd.*`는
   여전히 답함(`systemctl show`); `pkgverify`는 `denied` 완료 키만 씀; `sudo.log.*`는
-  `/etc/sudoers` 읽기의 상태. capability matrix의 `nonroot.denied` 행에 `audit.*` 키 34개,
-  `packages.verify.complete`, `sudo.log.*` / `sudo.defaults.*` 셋이 추가되고, 그 행이 빠진
+  `/etc/sudoers` 읽기의 상태. capability matrix의 `nonroot.denied` 행에 `audit.*` 키 28개(`audit.log_file.*` /
+  `audit.log_dir.*` leaf 열여덟도 거기서 `denied`로 읽힘 — 읽을 수 없는 `auditd.conf`가 경로를 모르게
+  하므로(C3) — 하지만 stat은 읽기 권한이 필요 없으므로 행의 규칙이 `mode`, `uid`, `gid` leaf는 전부
+  빼둠(M-34); matrix의 `_notes`가 그렇게 적음), `packages.verify.complete`, `sudo.log.*` /
+  `sudo.defaults.*` 셋이 추가되고, 그 행이 빠진
   패키지가 아니라 거부에 관한 것이 되도록 CI의 비root 잡이 `auditd`를 설치합니다(I-11). AIDE
   경로는 릴리스에 따릅니다: Ubuntu 22.04에선 읽히지만 EL은 `/etc/aide.conf`를 0600으로,
   `/var/lib/aide`를 0700으로 설치하고 Ubuntu 24.04는 `/var/lib/aide`를 0700 `_aide:root`로 만드므로
