@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
   "run": {
-    "muster_version": "e5eda50",
-    "commit": "e5eda50",
-    "controls_version": "kisa-unix-2026+2026.09.18",
-    "controls_digest": "sha256:1236ece32ab31e36ec68736e546abc54ce3ab653a221c2a27e080a573cf39db6",
+    "muster_version": "81855c8",
+    "commit": "81855c8",
+    "controls_version": "kisa-unix-2026+2026.09.23",
+    "controls_digest": "sha256:f3337dac3ea8281886a8618f4cc136ddf62b3258dbfb113c560b5aeca854f41d",
     "guide_edition": "kisa-unix-2026",
-    "collected_at": "2026-09-21T00:36:06Z",
+    "collected_at": "2026-09-28T08:17:22Z",
     "host": {
       "hostname": "ubuntu-container",
       "machine_id_hash": "",
@@ -36,12 +36,18 @@
       {
         "name": "accounts",
         "status": "ok",
-        "ms": 0
+        "ms": 10
+      },
+      {
+        "name": "audit",
+        "status": "ok",
+        "ms": 2,
+        "cmd": "/usr/sbin/auditctl -l"
       },
       {
         "name": "banners",
         "status": "ok",
-        "ms": 0
+        "ms": 1
       },
       {
         "name": "boot",
@@ -51,12 +57,12 @@
       {
         "name": "coredump",
         "status": "ok",
-        "ms": 0
+        "ms": 45
       },
       {
         "name": "cron",
         "status": "ok",
-        "ms": 0,
+        "ms": 2,
         "cmd": "/usr/bin/systemctl list-unit-files --type=timer --no-legend --no-pager"
       },
       {
@@ -67,12 +73,18 @@
       {
         "name": "env",
         "status": "ok",
-        "ms": 0
+        "ms": 6
       },
       {
         "name": "files",
         "status": "ok",
-        "ms": 3
+        "ms": 7
+      },
+      {
+        "name": "fim",
+        "status": "ok",
+        "ms": 5,
+        "cmd": "/usr/bin/systemctl list-timers --all --no-legend --no-pager"
       },
       {
         "name": "firewall",
@@ -119,18 +131,24 @@
       {
         "name": "os",
         "status": "ok",
-        "ms": 0
+        "ms": 5
       },
       {
         "name": "pam",
         "status": "ok",
-        "ms": 0
+        "ms": 11
       },
       {
         "name": "patch",
         "status": "ok",
-        "ms": 31,
+        "ms": 572,
         "cmd": "/usr/bin/apt-get -s upgrade -o Debug::NoLocking=1"
+      },
+      {
+        "name": "pkgverify",
+        "status": "ok",
+        "ms": 7941,
+        "cmd": "/usr/bin/rpm -Va"
       },
       {
         "name": "services",
@@ -186,11 +204,11 @@
     "partial_failures": []
   },
   "check": {
-    "muster_version": "e5eda50",
-    "commit": "e5eda50",
-    "controls_version": "kisa-unix-2026+2026.09.18",
-    "controls_digest": "sha256:1236ece32ab31e36ec68736e546abc54ce3ab653a221c2a27e080a573cf39db6",
-    "snapshot_digest": "sha256:489e316528731845a43ed9aa0e23a2ad15ce9ec9c5aa5206ece3d69ddffedb3c",
+    "muster_version": "81855c8",
+    "commit": "81855c8",
+    "controls_version": "kisa-unix-2026+2026.09.23",
+    "controls_digest": "sha256:f3337dac3ea8281886a8618f4cc136ddf62b3258dbfb113c560b5aeca854f41d",
+    "snapshot_digest": "sha256:c9c109d846191c998440f69904f7872c79e961e9a48b02becf1efa677f1adae5",
     "guide_edition": "kisa-unix-2026",
     "waivers": {
       "applied": 0,
@@ -281,6 +299,50 @@
           "lp",
           "uucp",
           "nuucp"
+        ]
+      },
+      "muster.beyond.audit_disk_actions": {
+        "allowed_disk_error_actions": [
+          "syslog",
+          "exec",
+          "single",
+          "halt"
+        ],
+        "allowed_disk_full_actions": [
+          "syslog",
+          "rotate",
+          "exec",
+          "single",
+          "halt"
+        ],
+        "allowed_rotate_actions": [
+          "rotate",
+          "keep_logs",
+          "syslog"
+        ],
+        "allowed_space_actions": [
+          "syslog",
+          "email",
+          "exec",
+          "rotate",
+          "single",
+          "halt"
+        ]
+      },
+      "muster.beyond.audit_log_permissions": {
+        "allowed_groups": [
+          "root",
+          "adm"
+        ],
+        "allowed_modes": [
+          0,
+          128,
+          256,
+          384,
+          32,
+          160,
+          288,
+          416
         ]
       },
       "muster.beyond.bootloader_config_permissions": {
@@ -449,7 +511,7 @@
     "manual_review": 4,
     "undecidable": {
       "error": 0,
-      "not_applicable": 54,
+      "not_applicable": 63,
       "waived": 0
     },
     "facts_failed": 0,
@@ -482,7 +544,7 @@
         }
       },
       "beyond": {
-        "controls": 19,
+        "controls": 28,
         "automatic": {
           "high": {
             "pass": 0,
@@ -503,7 +565,7 @@
         "manual_review": 0,
         "undecidable": {
           "error": 0,
-          "not_applicable": 19,
+          "not_applicable": 28,
           "waived": 0
         }
       }
@@ -2840,6 +2902,54 @@
       "severity": "high"
     },
     {
+      "id": "muster.beyond.audit_rules_loaded",
+      "title_en": "The kernel has audit rules loaded, and the host keeps rules for the next boot",
+      "title_ko": "커널에 감사 규칙이 적재되어 있고 다음 부팅을 위한 규칙도 저장되어 있다",
+      "category": "beyond",
+      "importance": "상",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when: services.auditd.installed: no systemd on this host or inside this container",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "docker",
+          "source": {
+            "kind": "file",
+            "path": "/.dockerenv"
+          }
+        },
+        {
+          "fact": "services.auditd.installed",
+          "status": "unsupported"
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "muster.beyond.auditd_active",
+      "title_en": "The audit daemon is installed, running and started at boot",
+      "title_ko": "감사 데몬이 설치되어 실행 중이며 부팅 시 시작된다",
+      "category": "beyond",
+      "importance": "상",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when does not hold: env.container eq none",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "docker",
+          "source": {
+            "kind": "file",
+            "path": "/.dockerenv"
+          }
+        }
+      ],
+      "severity": "high"
+    },
+    {
       "id": "muster.beyond.bootloader_config_permissions",
       "title_en": "The bootloader configuration is readable by root alone",
       "title_ko": "부트로더 설정 파일을 root 만 읽을 수 있다",
@@ -2860,6 +2970,106 @@
         }
       ],
       "severity": "high"
+    },
+    {
+      "id": "muster.beyond.package_files_unmodified",
+      "title_en": "Every packaged file still matches the package database",
+      "title_ko": "패키지로 설치된 모든 파일이 패키지 데이터베이스와 여전히 일치한다",
+      "category": "beyond",
+      "importance": "상",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when does not hold: env.container eq none",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "docker",
+          "source": {
+            "kind": "file",
+            "path": "/.dockerenv"
+          }
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "muster.beyond.audit_disk_actions",
+      "title_en": "The audit daemon does something visible when its log storage runs short, fills or fails",
+      "title_ko": "감사 로그 저장 공간이 부족해지거나 가득 차거나 오류가 나면 감사 데몬이 드러나는 조치를 한다",
+      "category": "beyond",
+      "importance": "중",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when: services.auditd.installed: no systemd on this host or inside this container",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "docker",
+          "source": {
+            "kind": "file",
+            "path": "/.dockerenv"
+          }
+        },
+        {
+          "fact": "services.auditd.installed",
+          "status": "unsupported"
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.beyond.audit_immutable",
+      "title_en": "The audit configuration is locked until reboot, now and in the rules the next boot loads",
+      "title_ko": "감사 설정이 지금도, 다음 부팅이 적재할 규칙에서도 재부팅 전까지 잠겨 있다",
+      "category": "beyond",
+      "importance": "중",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when: services.auditd.installed: no systemd on this host or inside this container",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "docker",
+          "source": {
+            "kind": "file",
+            "path": "/.dockerenv"
+          }
+        },
+        {
+          "fact": "services.auditd.installed",
+          "status": "unsupported"
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.beyond.audit_log_permissions",
+      "title_en": "The audit log and its directory belong to root, the log's group is root or the logging group, and both are closed to other users",
+      "title_ko": "감사 로그와 그 디렉터리가 root 소유이고 로그의 그룹이 root 나 로깅 그룹이며 둘 다 다른 사용자에게 닫혀 있다",
+      "category": "beyond",
+      "importance": "중",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when: services.auditd.installed: no systemd on this host or inside this container",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "docker",
+          "source": {
+            "kind": "file",
+            "path": "/.dockerenv"
+          }
+        },
+        {
+          "fact": "services.auditd.installed",
+          "status": "unsupported"
+        }
+      ],
+      "severity": "medium"
     },
     {
       "id": "muster.beyond.bootloader_password",
@@ -2909,6 +3119,28 @@
       "id": "muster.beyond.dev_shm_mount_options",
       "title_en": "/dev/shm is mounted nodev, nosuid and noexec",
       "title_ko": "/dev/shm 이 nodev, nosuid, noexec 로 마운트된다",
+      "category": "beyond",
+      "importance": "중",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when does not hold: env.container eq none",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "docker",
+          "source": {
+            "kind": "file",
+            "path": "/.dockerenv"
+          }
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.beyond.file_integrity_tool",
+      "title_en": "A file-integrity tool has a baseline database and a scheduled check",
+      "title_ko": "파일 무결성 도구에 기준 데이터베이스와 예약된 검사가 있다",
       "category": "beyond",
       "importance": "중",
       "automation": "auto",
@@ -3000,6 +3232,28 @@
       "category": "beyond",
       "importance": "중",
       "automation": "partial",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when does not hold: env.container eq none",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "docker",
+          "source": {
+            "kind": "file",
+            "path": "/.dockerenv"
+          }
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.beyond.sudo_logging",
+      "title_en": "sudo records every command it runs to syslog or to a log file",
+      "title_ko": "sudo 가 실행하는 모든 명령을 syslog 나 로그 파일에 기록한다",
+      "category": "beyond",
+      "importance": "중",
+      "automation": "auto",
       "status": "NOT_APPLICABLE",
       "reason": "applies_when does not hold: env.container eq none",
       "evidence": [
@@ -3173,6 +3427,28 @@
       "id": "muster.beyond.home_mount_options",
       "title_en": "/home is mounted nodev and nosuid",
       "title_ko": "/home 이 nodev 와 nosuid 로 마운트된다",
+      "category": "beyond",
+      "importance": "하",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when does not hold: env.container eq none",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "docker",
+          "source": {
+            "kind": "file",
+            "path": "/.dockerenv"
+          }
+        }
+      ],
+      "severity": "low"
+    },
+    {
+      "id": "muster.beyond.remote_log_forwarding",
+      "title_en": "Log messages are forwarded to another host as they are written",
+      "title_ko": "로그 메시지가 기록되는 즉시 다른 호스트로 전달된다",
       "category": "beyond",
       "importance": "하",
       "automation": "auto",
