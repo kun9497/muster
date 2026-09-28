@@ -317,15 +317,15 @@
         },
         "database_path": {
           "status": "absent",
-          "reason": "no AIDE configuration file names a database"
+          "reason": "no AIDE configuration file names a database: neither /etc/aide/aide.conf nor /etc/aide.conf exists"
         },
         "database_present": {
           "status": "absent",
-          "reason": "no AIDE configuration file names a database"
+          "reason": "no AIDE configuration file names a database: neither /etc/aide/aide.conf nor /etc/aide.conf exists"
         },
         "database_modified": {
           "status": "absent",
-          "reason": "no AIDE configuration file names a database"
+          "reason": "no AIDE configuration file names a database: neither /etc/aide/aide.conf nor /etc/aide.conf exists"
         },
         "schedules": {
           "status": "ok",

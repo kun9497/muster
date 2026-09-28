@@ -368,8 +368,12 @@ func (s *sudoLogScan) includeDir(dir string, depth int) {
 		}
 		meta, err := s.a.Stat(m)
 		if errors.Is(err, collect.ErrSymlink) {
-			// muster never follows a link: skipped, and the leaves are absent.
-			s.skipped = append(s.skipped, m)
+			// A link to /dev/null is a mask (K-21): it holds no line, so it
+			// is neither read nor skipped. muster never follows any other
+			// link: skipped, and the leaves are absent naming it (W-7).
+			if target, ok := linkTarget(s.a, m); !ok || target != devNull {
+				s.skipped = append(s.skipped, m)
+			}
 			continue
 		}
 		if err == nil && meta.Kind == "dir" {

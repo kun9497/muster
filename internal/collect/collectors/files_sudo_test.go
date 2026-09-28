@@ -184,6 +184,35 @@ func TestSudoLogSkipsASymlinkedDropIn(t *testing.T) {
 	}
 }
 
+// R-4 / K-21: a drop-in linked to /dev/null is a mask. It holds no line, so
+// the real drop-in beside it still answers and the three leaves stay ok; a
+// link anywhere else is still skipped and named (W-7).
+func TestSudoLogDevNullDropInIsAMask(t *testing.T) {
+	// The links carry content only so the double's Glob lists them; a read
+	// of either would set a logfile and fail the ok assertions.
+	dropins := map[string]string{
+		"/etc/sudoers.d/10-masked":    "Defaults logfile=/var/log/sudo.log\n",
+		"/etc/sudoers.d/20-log":       "Defaults !syslog\n",
+		"/etc/sudoers.d/30-elsewhere": "Defaults logfile=/var/log/sudo.log\n",
+	}
+	a := sudoAccess("@includedir /etc/sudoers.d\n", dropins)
+	delete(a.contents, "/etc/sudoers.d/30-elsewhere")
+	a.links = map[string]string{"/etc/sudoers.d/10-masked": "/dev/null"}
+	sl, lf, sc := sudoLog(t, a)
+	okValue(t, sl, false, "syslog beside a mask")
+	okValue(t, lf, "", "logfile beside a mask")
+	okValue(t, sc, 0, "scoped_count beside a mask")
+
+	a = sudoAccess("@includedir /etc/sudoers.d\n", dropins)
+	a.links = map[string]string{"/etc/sudoers.d/10-masked": "/dev/null", "/etc/sudoers.d/30-elsewhere": "/srv/sudo-log"}
+	sl, lf, sc = sudoLog(t, a)
+	for name, e := range map[string]facts.Envelope{"syslog": sl, "logfile": lf, "scoped_count": sc} {
+		if e.Status != facts.StatusAbsent || e.Reason != "a symlinked drop-in was not read: /etc/sudoers.d/30-elsewhere" {
+			t.Errorf("%s = %+v, want absent naming only the non-mask link", name, e)
+		}
+	}
+}
+
 // X-1 / C4: an @include or @includedir outside the paths the collector
 // declares is a file muster did not look at, so the three leaves are absent
 // naming it — never sudo's default.
