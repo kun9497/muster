@@ -106,8 +106,9 @@ sorted and capped, with `truncated: true` on the key when the cap was hit.
 ### I-3 — the `audit` collector
 
 Declaration: reads `/etc/audit/auditd.conf`, `/etc/audit/audit.rules`,
-`/etc/audit/rules.d/*.rules` (Glob), and, for stat only, `/var/log`, `/var/log/audit`,
-`/var/log/audit/*` and `/var/log/*`; commands `/usr/sbin/auditctl -l` and
+`/etc/audit/rules.d` (stat: the primitive's `Glob` cannot tell a missing directory from an
+empty one, so the directory is probed first), `/etc/audit/rules.d/*.rules` (Glob), and, for
+stat only, `/var/log`, `/var/log/audit`, `/var/log/audit/*` and `/var/log/*`; commands `/usr/sbin/auditctl -l` and
 `/usr/sbin/auditctl -s` (5 s, 1 MiB each; on EL9 `/sbin` is a link to `usr/sbin`, so one
 path serves both families).
 
@@ -276,13 +277,14 @@ needs root: an unprivileged rpm -Va marks every file it cannot read as untestabl
 - `packages.verify.filtered_counts` — `record` `{config, doc, dpkg_excluded, ghost,
   mtime_only, unverifiable}` (`int` each). `packages.verify.stats` — `record` `{lines,
   exit_code, duration_ms, truncated, stderr_head, packages_without_digests,
-  dpkg_path_excludes}`; `stderr_head` the first three stderr lines (empty when none);
+  dpkg_path_excludes}`; `stderr_head` the first three stderr lines and `unparsed_head` the first three lines the
+  parser could not classify (empty when none);
   `packages_without_digests` is, on a dpkg host, the number of
   `/var/lib/dpkg/info/*.list` files with no `*.md5sums` beside them — the packages
   `dpkg --verify` silently cannot check — and 0 on an rpm host; `dpkg_path_excludes` the
   globs applied by the `dpkg_excluded` rule.
 - A verify line that matches neither the nine-column form nor `missing` is counted in
-  `stats.lines` and the first three such lines are kept in `complete`'s reason without
+  `stats.lines` and the first three such lines are kept in `stats.unparsed_head` without
   failing the key (rpm prints warnings to stdout on some hosts).
 
 ### I-6 — two extensions
@@ -337,11 +339,11 @@ is muster's own rating from the primary source and the description says why.
 | `audit_rules_loaded` | 상 | auto | `services.auditd.installed eq true` | `audit.rules.present eq true` on `runtime` and on `persisted` — rules loaded by hand are lost at reboot, so both homes | fail |
 | `audit_immutable` | 중 | auto | same | `audit.immutable eq true` on `runtime` and on `persisted` | fail |
 | `audit_disk_actions` | 중 | auto | same | `space_left_action` and `admin_space_left_action` `in ${allowed_space_actions}` (default `[syslog, email, exec, rotate, single, halt]`), `disk_full_action in ${allowed_disk_full_actions}` (default `[syslog, rotate, exec, single, halt]`), `disk_error_action in ${allowed_disk_error_actions}` (default `[syslog, exec, single, halt]`) — each default is `auditd.conf(5)`'s value list for that key minus `ignore` (records are lost and nothing is said) and `suspend` (one syslog line, then records are lost while the host runs on); `max_log_file_action in ${allowed_rotate_actions}` (default `[rotate, keep_logs, syslog]`) | manual — a missing line lets the daemon's compiled default decide, which nobody chose |
-| `audit_log_permissions` | 중 | auto | same | `audit.log_file.uid eq 0`, `audit.log_file.mode in ${allowed_modes}` (subsets of 0640), `audit.log_dir.uid eq 0`, `audit.log_dir.mode in ${allowed_dir_modes}` (subsets of 0750) | manual — the file is where muster does not read (C4 names the path) or was never written; either needs a look, and `auditd_active` already says whether the daemon runs |
-| `remote_log_forwarding` | 하 | auto | — | mechanisms: `logging.rsyslog.forwards_remote eq true` → `services.syslog.active eq true`; `logging.journal_upload.url ne ""` → `services.journal_upload.active eq true` and `.enabled eq true` (an enabled unit that failed at boot ships nothing); `logging.rsyslog.forwards_remote eq false` → `logging.journal_upload.url ne ""` (fails: nothing leaves the host) | manual — a syslog-ng or sysklogd host has `forwards_remote` absent and an empty URL, so no mechanism holds |
+| `audit_log_permissions` | 중 | auto | same | `audit.log_file.uid eq 0`, `audit.log_file.mode in ${allowed_modes}` (the eight bit-subsets of 0640 — 0640 rather than 0600 because Ubuntu's `log_group = adm` makes it the shipped state), `audit.log_dir.uid eq 0`, `audit.log_dir.other_readable eq false`, `audit.log_dir.other_writable eq false`, `audit.log_dir.group_writable eq false` (bits, not a 32-element list; no `other_executable` leaf exists, so 0751 passes) | manual — the file is where muster does not read (C4 names the path) or was never written; either needs a look, and `auditd_active` already says whether the daemon runs |
+| `remote_log_forwarding` | 하 | auto | — | mechanisms: `logging.rsyslog.forwards_remote eq true` → `services.syslog.active eq true`; `logging.journal_upload.url ne ""` → `services.journal_upload.active eq true` and `.enabled eq true` (an enabled unit that failed at boot ships nothing); `logging.rsyslog.forwards_remote eq false` → `logging.rsyslog.forwards_remote eq true` (fails by construction: nothing leaves the host; the URL leaf cannot serve here because it is `unsupported` without systemd) | manual — a syslog-ng or sysklogd host has `forwards_remote` absent and an empty URL, so no mechanism holds |
 | `sudo_logging` | 중 | auto | `sudo.installed eq true` | mechanisms: `sudo.log.syslog eq true` → passes on that; `sudo.log.syslog eq false` → `sudo.log.logfile matches ^/` | fail |
-| `file_integrity_tool` | 중 | auto | — | mechanisms: `fim.tool eq aide` → `fim.aide.database_present eq true`, `fim.aide.scheduled eq true`; `fim.tool eq none` → `fim.tool eq aide` (fails: no tool) | manual — a host with only an unmodelled tool has `fim.tool` absent, selects no mechanism, and reads MANUAL; the evidence the row carries is `fim.tool` itself, whose reason names the tools found (the evaluator attaches the `when` facts, not `fim.other_tools`) |
-| `package_files_unmodified` | 상 | auto | `--deep` (I-9) | `packages.verify.complete eq true`; `packages.verify.modified` `op: none, subject: path, where: {field: path, op: present}` | fail |
+| `file_integrity_tool` | 중 | auto | — | mechanisms: `fim.tool eq aide` → `fim.aide.database_present eq true`, `fim.aide.scheduled eq true`; `fim.tool eq none` → `fim.tool ne none` (fails by construction: no tool) | manual — a host with only an unmodelled tool has `fim.tool` absent, selects no mechanism, and reads MANUAL; the evidence the row carries is `fim.tool` itself, whose reason names the tools found (the evaluator attaches the `when` facts, not `fim.other_tools`) |
+| `package_files_unmodified` | 상 | auto | `--deep` (I-9) | `packages.verify.modified` `op: none, subject: path, where: {field: path, op: present}` — the deep gate reads `packages.verify.complete` before any check, so the control names no clause on it | fail |
 
 The mechanism shape follows 3B's core-dump control: the last mechanism's `when` holds on
 every judged host and its check fails, so "nothing configured" is FAIL. What reaches
@@ -376,9 +378,10 @@ nothing.
 the disk actions, the log file and directory ownership and mode, AIDE installed and
 scheduled, immutable rules and remote log offloading — not every rule on every benchmark
 (the 24.04 index has no disk-full rule, the 22.04 index no immutable-rules rule); the
-plan's pre-flight resolves the ids against the index as 3B's did. `references.nist_800_53`: AU-2, AU-3,
-AU-4, AU-5, AU-9, AU-12 for the audit controls, AU-4(1)/AU-9(2) for forwarding, AU-3 for
-sudo, SI-7 for the two integrity controls.
+plan's pre-flight resolves the ids against the index as 3B's did. `references.nist_800_53` is the union of the cited rules' ids — AU-3, AU-4, AU-5, AU-5(1),
+AU-9, AU-12, SI-11 across the audit controls, AU-4(1) for forwarding, SI-6 and CM-3(5) for
+the integrity tool — and, where no rule is cited, an id the index carries: AU-3 for sudo,
+CM-6 for package files (`SI-7`, `AU-2` and `AU-9(2)` appear in no indexed rule).
 
 ## 5. The deep-based rule (I-9, D30)
 
@@ -388,7 +391,9 @@ states for the same reason (it runs only under `--deep`, only as root, and can t
 so the rows are widened from "walk-based" to **deep-based**: a control that references any
 `walk.*` key or any `packages.verify.*` key. The completeness fact is `walk.complete` for
 the first set and `packages.verify.complete` for the second; the reason codes are
-`walk_incomplete` and `verify_incomplete`. The evaluator's test that pins rows 9–10a gains
+`walk_incomplete` and `verify_incomplete`. A completeness fact that is `unsupported` (a host
+with no package database) reads NOT_APPLICABLE with `unsupported_env`, a fourth branch the
+walk never needed. The evaluator's test that pins rows 9–10a gains
 the second family; `verify_incomplete` joins the fixed reason-code vocabulary of main
 §7.2, and the JSON and table goldens are regenerated once for it. D30 also rewrites row 5
 to the implemented rule (§4). This is the only evaluator change of 3C-1.

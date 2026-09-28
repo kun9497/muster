@@ -86,8 +86,10 @@ sudo 세션 기록(`log_input`, `log_output`) — 여기서 읽는 것이 없으
 
 ### I-3 — `audit` 수집기
 
-선언: 읽기 `/etc/audit/auditd.conf`, `/etc/audit/audit.rules`, `/etc/audit/rules.d/*.rules`
-(Glob), stat 전용 `/var/log`, `/var/log/audit`, `/var/log/audit/*`, `/var/log/*`; 명령
+선언: 읽기 `/etc/audit/auditd.conf`, `/etc/audit/audit.rules`, `/etc/audit/rules.d`(stat:
+프리미티브의 `Glob`은 없는 디렉터리와 빈 디렉터리를 구분하지 못하므로 디렉터리를 먼저 살핌),
+`/etc/audit/rules.d/*.rules`(Glob), stat 전용 `/var/log`, `/var/log/audit`, `/var/log/audit/*`,
+`/var/log/*`; 명령
 `/usr/sbin/auditctl -l`과 `/usr/sbin/auditctl -s`(각 5초, 1 MiB. EL9의 `/sbin`은 `usr/sbin`
 링크라 한 경로가 두 계열을 다 섬김).
 
@@ -230,12 +232,12 @@ MiB; 어느 것을 돌릴지는 `patch.go`가 정하듯 계열이 정함); 아�
 - `packages.verify.filtered_counts` — `record` `{config, doc, dpkg_excluded, ghost, mtime_only,
   unverifiable}`(각 `int`). `packages.verify.stats` — `record` `{lines, exit_code, duration_ms,
   truncated, stderr_head, packages_without_digests, dpkg_path_excludes}`; `stderr_head`는
-  stderr의 첫 세 줄(없으면 빈 값); `packages_without_digests`는 dpkg 호스트에서 옆에
+  stderr의 첫 세 줄, `unparsed_head`는 파서가 분류하지 못한 첫 세 줄(없으면 빈 값); `packages_without_digests`는 dpkg 호스트에서 옆에
   `*.md5sums`가 없는 `/var/lib/dpkg/info/*.list` 파일 수 — `dpkg --verify`가 말없이 검사하지
   못하는 패키지 — 이고 rpm 호스트에선 0; `dpkg_path_excludes`는 `dpkg_excluded` 규칙이 적용한
   glob.
 - 아홉 열 형식에도 `missing`에도 맞지 않는 verify 줄은 `stats.lines`에 세고 처음 세 줄을
-  `complete`의 이유에 남기되 키를 실패시키지 않습니다(어떤 호스트에서 rpm은 경고를 stdout에 찍음).
+  `stats.unparsed_head`에 남기되 키를 실패시키지 않습니다(어떤 호스트에서 rpm은 경고를 stdout에 찍음).
 
 ### I-6 — 확장 둘
 
@@ -284,11 +286,11 @@ leaf는 없으며, 패키지 이름을 적는 `packages.verify.*` leaf는 없습
 | `audit_rules_loaded` | 상 | auto | `services.auditd.installed eq true` | `audit.rules.present eq true`를 `runtime`과 `persisted`에서 — 손으로 넣은 규칙은 재부팅에 사라지므로 두 집 다 | fail |
 | `audit_immutable` | 중 | auto | 같음 | `audit.immutable eq true`를 `runtime`과 `persisted`에서 | fail |
 | `audit_disk_actions` | 중 | auto | 같음 | `space_left_action`과 `admin_space_left_action` `in ${allowed_space_actions}`(기본 `[syslog, email, exec, rotate, single, halt]`), `disk_full_action in ${allowed_disk_full_actions}`(기본 `[syslog, rotate, exec, single, halt]`), `disk_error_action in ${allowed_disk_error_actions}`(기본 `[syslog, exec, single, halt]`) — 각 기본값은 `auditd.conf(5)`의 그 키 값 목록에서 `ignore`(기록을 잃고 아무 말도 없음)와 `suspend`(syslog 한 줄 뒤 호스트는 계속 돌면서 기록을 잃음)를 뺀 것; `max_log_file_action in ${allowed_rotate_actions}`(기본 `[rotate, keep_logs, syslog]`) | manual — 줄이 없으면 데몬의 컴파일된 기본값이 정하며 그것은 아무도 고르지 않은 것 |
-| `audit_log_permissions` | 중 | auto | 같음 | `audit.log_file.uid eq 0`, `audit.log_file.mode in ${allowed_modes}`(0640의 부분집합), `audit.log_dir.uid eq 0`, `audit.log_dir.mode in ${allowed_dir_modes}`(0750의 부분집합) | manual — 파일이 muster가 읽지 않는 곳에 있거나(C4가 경로를 적음) 쓰인 적이 없음; 둘 다 살펴봐야 하고, 데몬이 도는지는 `auditd_active`가 이미 말함 |
-| `remote_log_forwarding` | 하 | auto | — | mechanisms: `logging.rsyslog.forwards_remote eq true` → `services.syslog.active eq true`; `logging.journal_upload.url ne ""` → `services.journal_upload.active eq true`와 `.enabled eq true`(부팅에 실패한 enabled 유닛은 아무것도 보내지 않음); `logging.rsyslog.forwards_remote eq false` → `logging.journal_upload.url ne ""`(실패: 호스트를 떠나는 것이 없음) | manual — syslog-ng나 sysklogd 호스트는 `forwards_remote`가 absent이고 URL이 비어 있어 어느 mechanism도 성립하지 않음 |
+| `audit_log_permissions` | 중 | auto | 같음 | `audit.log_file.uid eq 0`, `audit.log_file.mode in ${allowed_modes}`(0640의 비트 부분집합 여덟 — Ubuntu의 `log_group = adm`이 0640을 배포 상태로 만들므로 0600이 아닌 0640), `audit.log_dir.uid eq 0`, `audit.log_dir.other_readable eq false`, `audit.log_dir.other_writable eq false`, `audit.log_dir.group_writable eq false`(32개 목록이 아닌 비트; `other_executable` leaf가 없어 0751은 통과) | manual — 파일이 muster가 읽지 않는 곳에 있거나(C4가 경로를 적음) 쓰인 적이 없음; 둘 다 살펴봐야 하고, 데몬이 도는지는 `auditd_active`가 이미 말함 |
+| `remote_log_forwarding` | 하 | auto | — | mechanisms: `logging.rsyslog.forwards_remote eq true` → `services.syslog.active eq true`; `logging.journal_upload.url ne ""` → `services.journal_upload.active eq true`와 `.enabled eq true`(부팅에 실패한 enabled 유닛은 아무것도 보내지 않음); `logging.rsyslog.forwards_remote eq false` → `logging.rsyslog.forwards_remote eq true`(구성상 실패: 호스트를 떠나는 것이 없음; URL leaf는 systemd 없는 호스트에서 `unsupported`라 여기 쓸 수 없음) | manual — syslog-ng나 sysklogd 호스트는 `forwards_remote`가 absent이고 URL이 비어 있어 어느 mechanism도 성립하지 않음 |
 | `sudo_logging` | 중 | auto | `sudo.installed eq true` | mechanisms: `sudo.log.syslog eq true` → 그것으로 통과; `sudo.log.syslog eq false` → `sudo.log.logfile matches ^/` | fail |
-| `file_integrity_tool` | 중 | auto | — | mechanisms: `fim.tool eq aide` → `fim.aide.database_present eq true`, `fim.aide.scheduled eq true`; `fim.tool eq none` → `fim.tool eq aide`(실패: 도구 없음) | manual — 모델링 안 된 도구만 있는 호스트는 `fim.tool`이 absent라 어느 mechanism도 고르지 않고 MANUAL; 행이 싣는 근거는 `fim.tool` 자체이며 그 이유가 발견된 도구를 적음(평가기는 `when` 사실을 붙이지 `fim.other_tools`를 붙이지 않음) |
-| `package_files_unmodified` | 상 | auto | `--deep`(I-9) | `packages.verify.complete eq true`; `packages.verify.modified` `op: none, subject: path, where: {field: path, op: present}` | fail |
+| `file_integrity_tool` | 중 | auto | — | mechanisms: `fim.tool eq aide` → `fim.aide.database_present eq true`, `fim.aide.scheduled eq true`; `fim.tool eq none` → `fim.tool ne none`(구성상 실패: 도구 없음) | manual — 모델링 안 된 도구만 있는 호스트는 `fim.tool`이 absent라 어느 mechanism도 고르지 않고 MANUAL; 행이 싣는 근거는 `fim.tool` 자체이며 그 이유가 발견된 도구를 적음(평가기는 `when` 사실을 붙이지 `fim.other_tools`를 붙이지 않음) |
+| `package_files_unmodified` | 상 | auto | `--deep`(I-9) | `packages.verify.modified` `op: none, subject: path, where: {field: path, op: present}` — deep 게이트가 어느 check보다 먼저 `packages.verify.complete`를 읽으므로 컨트롤은 그것에 절을 두지 않음 | fail |
 
 mechanism의 모양은 3B의 코어덤프 컨트롤을 따릅니다. 마지막 mechanism의 `when`은 판정되는 모든
 호스트에서 성립하고 그 check는 실패하므로 "아무것도 설정 안 됨"은 FAIL입니다. `absent_means`에
@@ -316,8 +318,10 @@ EL9의 FAIL 셋은 사실을 말합니다: 데몬은 돌지만 아무것도 감�
 커밋된 색인에 auditd 패키지와 서비스, 디스크 처리, 로그 파일·디렉터리의 소유·모드, AIDE
 설치·예약, 불변 규칙, 원격 로그 전송의 `references.stig` 항목이 있습니다 — 모든 벤치마크에 모든
 규칙이 있는 것은 아닙니다(24.04 색인엔 disk-full 규칙이, 22.04 색인엔 불변 규칙이 없음). 계획의
-pre-flight가 3B처럼 색인과 대조해 id를 확정합니다. `references.nist_800_53`: 감사 컨트롤에
-AU-2, AU-3, AU-4, AU-5, AU-9, AU-12, 전송에 AU-4(1)/AU-9(2), sudo에 AU-3, 무결성 둘에 SI-7.
+pre-flight가 3B처럼 색인과 대조해 id를 확정합니다. `references.nist_800_53`은 인용한 규칙들의 id의 합집합 — 감사 컨트롤들에 AU-3, AU-4, AU-5,
+AU-5(1), AU-9, AU-12, SI-11, 전송에 AU-4(1), 무결성 도구에 SI-6과 CM-3(5) — 이고, 인용할 규칙이
+없는 곳은 색인이 가진 id: sudo에 AU-3, 패키지 파일에 CM-6(`SI-7`, `AU-2`, `AU-9(2)`는 어느
+색인 규칙에도 없음).
 
 ## 5. deep 기반 규칙 (I-9, D30)
 
@@ -326,7 +330,8 @@ AU-2, AU-3, AU-4, AU-5, AU-9, AU-12, 전송에 AU-4(1)/AU-9(2), sudo에 AU-3, �
 가지므로(`--deep`에서만, root로만 돌고, 타임아웃될 수 있음) 그 행들을 "워크 기반"에서 **deep
 기반**으로 넓힙니다: `walk.*` 키나 `packages.verify.*` 키를 참조하는 컨트롤. 완료 사실은 앞쪽에
 `walk.complete`, 뒤쪽에 `packages.verify.complete`; 이유 코드는 `walk_incomplete`와
-`verify_incomplete`. 행 9–10a를 고정하는 평가기 테스트가 두 번째 계열을 얻고,
+`verify_incomplete`. `unsupported`인 완료 사실(패키지 데이터베이스가 없는 호스트)은
+`unsupported_env`로 NOT_APPLICABLE로 읽히며, 워크에는 없던 넷째 분기입니다. 행 9–10a를 고정하는 평가기 테스트가 두 번째 계열을 얻고,
 `verify_incomplete`는 메인 §7.2의 고정 이유 코드 어휘에 들어가며 JSON·table golden을 그것 때문에
 한 번 재생성합니다. D30은 행 5도 구현된 규칙으로 고쳐 씁니다(§4). 이것이 3C-1의 유일한 평가기
 변경입니다.
