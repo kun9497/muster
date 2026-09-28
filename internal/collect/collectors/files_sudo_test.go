@@ -170,16 +170,33 @@ func TestFilesPublishesEverySudoKey(t *testing.T) {
 	}
 }
 
-// Review fix 5: muster never follows a link, so a symlinked drop-in is
-// skipped — never read, never an error — and the leaves say so.
+// Review fix 5 / W-7: muster never follows a link, so a symlinked drop-in is
+// skipped — never read, never an error. sudo does follow it, so what it sets
+// is unknown: the three leaves are absent naming the link.
 func TestSudoLogSkipsASymlinkedDropIn(t *testing.T) {
 	a := sudoAccess("@includedir /etc/sudoers.d\n", map[string]string{"/etc/sudoers.d/10-log": "Defaults !syslog\n"})
 	a.links = map[string]string{"/etc/sudoers.d/10-log": "/srv/sudo-log"}
 	sl, lf, sc := sudoLog(t, a)
 	for name, e := range map[string]facts.Envelope{"syslog": sl, "logfile": lf, "scoped_count": sc} {
-		if e.Status != facts.StatusOK || e.Reason != "symlink skipped: /etc/sudoers.d/10-log" {
-			t.Errorf("%s = %+v, want ok naming the skipped link", name, e)
+		if e.Status != facts.StatusAbsent || e.Reason != "a symlinked drop-in was not read: /etc/sudoers.d/10-log" {
+			t.Errorf("%s = %+v, want absent naming the skipped link", name, e)
 		}
 	}
-	okValue(t, sl, true, "syslog (the link was not read)")
+}
+
+// X-1 / C4: an @include or @includedir outside the paths the collector
+// declares is a file muster did not look at, so the three leaves are absent
+// naming it — never sudo's default.
+func TestSudoLogIncludeOutsideTheDeclaration(t *testing.T) {
+	for _, c := range []struct{ main, reason string }{
+		{"Defaults env_reset\n@include /etc/sudoers.local\n", "include /etc/sudoers.local is outside the collector's declaration"},
+		{"@includedir /etc/sudoers.extra\n", "includedir /etc/sudoers.extra is outside the collector's declaration"},
+	} {
+		sl, lf, sc := sudoLog(t, sudoAccess(c.main, nil))
+		for name, e := range map[string]facts.Envelope{"syslog": sl, "logfile": lf, "scoped_count": sc} {
+			if e.Status != facts.StatusAbsent || e.Reason != c.reason {
+				t.Errorf("%q: %s = %+v, want absent %q", c.main, name, e, c.reason)
+			}
+		}
+	}
 }

@@ -104,7 +104,7 @@ func runFim(ctx context.Context, a collect.Access, b *collect.Builder) error {
 	rows, cut := capRows(append([]any{}, others...), fimRowCap)
 	b.Set("fim.other_tools", withTruncation(collect.OK(rows, &facts.Source{Kind: "derived"}), cut))
 
-	aideDatabase(a, b)
+	aideDatabase(a, b, aide != "")
 	list, scheduled := aideSchedules(ctx, a)
 	b.Set("fim.aide.schedules", list)
 	b.Set("fim.aide.scheduled", scheduled)
@@ -112,7 +112,10 @@ func runFim(ctx context.Context, a collect.Access, b *collect.Builder) error {
 }
 
 // aideDatabase writes the configuration path and the three database leaves.
-func aideDatabase(a collect.Access, b *collect.Builder) {
+// With AIDE installed, a configuration that names no database — no file at
+// either candidate path, or no database line — is a known answer: there is
+// no database AIDE would check against, so database_present is ok false.
+func aideDatabase(a collect.Access, b *collect.Builder, installed bool) {
 	conf := ""
 	for _, p := range aideConfs {
 		if pathPresent(a, p) {
@@ -125,9 +128,21 @@ func aideDatabase(a collect.Access, b *collect.Builder) {
 		b.Set("fim.aide.database_present", e)
 		b.Set("fim.aide.database_modified", e)
 	}
+	noDatabase := func(reason string, inputs ...string) {
+		setDB(collect.Absent(reason))
+		if installed {
+			src := &facts.Source{Kind: "derived"}
+			for _, p := range inputs {
+				src.Inputs = append(src.Inputs, facts.Source{Kind: "file", Path: p})
+			}
+			e := collect.OK(false, src)
+			e.Reason = reason
+			b.Set("fim.aide.database_present", e)
+		}
+	}
 	if conf == "" {
 		b.Set("fim.aide.config_path", collect.Absent("neither "+aideConfDebian+" nor "+aideConfEL+" exists"))
-		setDB(collect.Absent("no AIDE configuration file names a database"))
+		noDatabase("no AIDE configuration file names a database: neither "+aideConfDebian+" nor "+aideConfEL+" exists", aideConfDebian, aideConfEL)
 		return
 	}
 	b.Set("fim.aide.config_path", collect.OK(conf, permSrc(conf)))
@@ -140,7 +155,7 @@ func aideDatabase(a collect.Access, b *collect.Builder) {
 	}
 	c := parseAideConf(data)
 	if !c.found {
-		setDB(collect.Absent("no database_in= or database= line in " + conf))
+		noDatabase("no database_in= or database= line in "+conf, conf)
 		return
 	}
 	dp := collect.OKRead(c.database, permSrc(conf), meta)
@@ -227,9 +242,9 @@ func aideSchedules(ctx context.Context, a collect.Access) (facts.Envelope, facts
 	s.cronDaily(systemd, gate)
 	s.crontabs()
 
-	var unsupported *facts.Envelope
+	var timerFailure *facts.Envelope
 	if systemd {
-		unsupported = s.timers(ctx, gate)
+		timerFailure = s.timers(ctx, gate)
 	}
 
 	slices.SortStableFunc(s.rows, func(x, y any) int {
@@ -238,7 +253,7 @@ func aideSchedules(ctx context.Context, a collect.Access) (facts.Envelope, facts
 	armed := slices.ContainsFunc(s.rows, func(r any) bool { return r.(map[string]any)["armed"] == true })
 	blocked := s.failure
 	if blocked == nil {
-		blocked = unsupported
+		blocked = timerFailure
 	}
 	if blocked != nil {
 		// An incomplete inventory is that failure's answer for the list;
@@ -344,23 +359,14 @@ func (s *fimSchedules) crontabs() {
 	}
 }
 
-// timers reads the timer inventory; a failure is the environment's
-// limitation (R220), returned as the unsupported answer for both leaves.
+// timers reads the timer inventory and returns the answer for both leaves
+// when it cannot be read: a kill is a timeout; a systemctl that could not
+// start, or a host not booted with systemd, is the environment's limitation
+// (R220, unsupported); any other non-zero exit is an error naming it.
 func (s *fimSchedules) timers(ctx context.Context, gate string) *facts.Envelope {
 	out := s.a.Run(ctx, listTimersCmd)
-	if out.Err != nil || out.TimedOut || out.ExitCode != 0 {
-		reason := firstLine(out.Stderr)
-		switch {
-		case reason != "":
-		case out.Err != nil:
-			reason = out.Err.Error()
-		case out.TimedOut:
-			reason = "systemctl list-timers timed out"
-		default:
-			reason = "systemctl list-timers exited " + strconv.Itoa(out.ExitCode)
-		}
-		e := collect.Unsupported("systemd timer inventory unavailable: " + reason)
-		return &e
+	if e := listTimersFailure(out); e != nil {
+		return e
 	}
 	s.inputs = append(s.inputs, *out.Source(listTimersCmd))
 	s.cut = s.cut || out.Truncated
@@ -390,4 +396,29 @@ func runPartsName(name string) bool {
 		}
 	}
 	return name != ""
+}
+
+// listTimersFailure classifies a systemctl list-timers run that gave no
+// inventory, or returns nil when it gave one.
+func listTimersFailure(out collect.Output) *facts.Envelope {
+	line := commandLine(listTimersCmd)
+	stderr := firstLine(out.Stderr)
+	var e facts.Envelope
+	switch {
+	case out.TimedOut:
+		e = collect.TimeoutEnv(line + " timed out")
+	case out.Err != nil:
+		e = collect.Unsupported("systemd timer inventory unavailable: " + line + ": " + out.Err.Error())
+	case out.ExitCode == 0:
+		return nil
+	case strings.Contains(string(out.Stderr), "System has not been booted with systemd"):
+		e = collect.Unsupported("systemd timer inventory unavailable: " + stderr)
+	default:
+		reason := line + " exited " + strconv.Itoa(out.ExitCode)
+		if stderr != "" {
+			reason += ": " + stderr
+		}
+		e = collect.ErrorEnv(reason)
+	}
+	return &e
 }

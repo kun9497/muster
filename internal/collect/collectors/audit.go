@@ -152,10 +152,13 @@ func auditctlEnvelope(out collect.Output, cmd collect.Command) (facts.Envelope, 
 	switch {
 	case out.TimedOut:
 		e = collect.TimeoutEnv(line + " timed out after " + patchTimeout(cmd).String())
-	case out.Err != nil:
+	case out.Err != nil && errors.Is(out.Err, fs.ErrNotExist):
 		// The kernel may hold rules nobody can list; the controls that need
 		// the runtime side gate on the daemon being installed anyway.
 		return collect.Absent("auditctl is not installed"), false
+	case out.Err != nil:
+		// It is there and could not be started: not an absence.
+		e = collect.ErrorEnv(line + ": " + out.Err.Error())
 	case out.ExitCode == 4:
 		if euid() != 0 {
 			e = collect.Denied(line + " needs CAP_AUDIT_CONTROL, which a non-root run does not have: " + auditctlReason(out))

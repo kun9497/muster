@@ -327,7 +327,9 @@ func verifyRule(r verifyRow, f verifyFilter) string {
 		return "config"
 	case r.letter == 'd' || r.letter == 'l' || r.letter == 'r' || hasDocPrefix(r.path):
 		return "doc"
-	case f.excluded(r.path):
+	case len(r.attrs) == 1 && r.attrs[0] == "missing" && f.excluded(r.path):
+		// A path-exclude glob explains only a file dpkg never installed; an
+		// installed file whose content differs under one is still changed.
 		return "dpkg_excluded"
 	case r.letter == 'g':
 		return "ghost"

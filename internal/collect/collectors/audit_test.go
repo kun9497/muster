@@ -4,6 +4,7 @@ package collectors
 
 import (
 	"fmt"
+	"io/fs"
 	"slices"
 	"strconv"
 	"strings"
@@ -393,6 +394,11 @@ func TestAuditctlClassification(t *testing.T) {
 			want: facts.StatusUnsupported, reason: "gave no audit status"},
 		{name: "not installed", uid: 0, absentCmd: true,
 			want: facts.StatusAbsent, reason: "auditctl is not installed"},
+		// W-9: a binary that is there and could not be started is an error
+		// naming the command, never "not installed".
+		{name: "could not start", uid: 0,
+			list: cmdResult{exitCode: -1, err: fs.ErrPermission}, stat: cmdResult{exitCode: -1, err: fs.ErrPermission},
+			want: facts.StatusError, listReason: "/usr/sbin/auditctl -l: permission denied", statReason: "/usr/sbin/auditctl -s: permission denied"},
 		{name: "other code", uid: 0,
 			list: cmdResult{exitCode: 3, stderr: "boom\n"}, stat: cmdResult{exitCode: 3, stderr: "boom\n"},
 			want: facts.StatusError, reason: "exited 3: boom"},

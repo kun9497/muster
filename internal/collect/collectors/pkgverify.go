@@ -106,10 +106,10 @@ func runPkgverify(ctx context.Context, a collect.Access, b *collect.Builder) err
 	parsed := parseVerifyOutput(out.Stdout, cut)
 
 	var filter verifyFilter
-	excludes := []any{} // R50: never nil, on rpm too
+	excludes, excludeErrors := []any{}, []any{} // R50: never nil, on rpm too
 	withoutDigests, digestProbe := 0, ""
 	if tool == "dpkg" {
-		filter, excludes = dpkgPathFilters(a)
+		filter, excludes, excludeErrors = dpkgPathFilters(a)
 		withoutDigests, digestProbe = dpkgPackagesWithoutDigests(a)
 	}
 	modified, config, counts := filterVerifyRows(parsed.rows, filter)
@@ -130,6 +130,7 @@ func runPkgverify(ctx context.Context, a collect.Access, b *collect.Builder) err
 		"packages_without_digests":       withoutDigests,
 		"packages_without_digests_error": digestProbe,
 		"dpkg_path_excludes":             excludes,
+		"dpkg_path_excludes_error":       excludeErrors,
 	}, src))
 	return nil
 }
@@ -211,6 +212,7 @@ func writeVerifyUnknown(b *collect.Builder) {
 		"packages_without_digests":       0,
 		"packages_without_digests_error": "",
 		"dpkg_path_excludes":             []any{},
+		"dpkg_path_excludes_error":       []any{},
 	}, derived))
 }
 
@@ -227,12 +229,13 @@ func verifyCountsValue(counts map[string]int) map[string]any {
 // dpkgPathFilters reads dpkg's path filters in the order dpkg itself loads
 // them (lib/dpkg/options.c dpkg_options_load): the dpkg.cfg.d entries whose
 // names pass loadcfgdir's rule, in sorted order, then dpkg.cfg. It returns
-// the compiled filter and what stats.dpkg_path_excludes records — each
-// directive as read, or, when any file that exists could not be read, the
-// failures alone: a partial set of globs is not dpkg's set, so the
+// the compiled filter, the directives stats.dpkg_path_excludes records, and
+// the read failures stats.dpkg_path_excludes_error records. When any file
+// that exists could not be read the directives are empty and the filter
+// holds none: a partial set of globs is not dpkg's set, so the
 // dpkg_excluded rule is then not applied at all. A missing file is not a
 // failure, and a link to /dev/null is a mask (K-21).
-func dpkgPathFilters(a collect.Access) (verifyFilter, []any) {
+func dpkgPathFilters(a collect.Access) (verifyFilter, []any, []any) {
 	var files []string
 	var failures []string
 	matches, err := a.Glob(dpkgCfgDGlob)
@@ -270,7 +273,7 @@ func dpkgPathFilters(a collect.Access) (verifyFilter, []any) {
 		filters = append(filters, parseDpkgPathExcludes(data)...)
 	}
 	if len(failures) > 0 {
-		return verifyFilter{}, stringsValue(failures)
+		return verifyFilter{}, []any{}, stringsValue(failures)
 	}
 
 	var f verifyFilter
@@ -285,7 +288,7 @@ func dpkgPathFilters(a collect.Access) (verifyFilter, []any) {
 		}
 		f.pathFilters = append(f.pathFilters, compiledPathFilter{include: pf.include, re: re})
 	}
-	return f, recorded
+	return f, recorded, []any{}
 }
 
 // dpkgPackagesWithoutDigests counts the installed packages dpkg --verify

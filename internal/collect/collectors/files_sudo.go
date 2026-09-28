@@ -272,13 +272,18 @@ func sudoLogFacts(b *collect.Builder, a collect.Access, main sudoersRead) {
 		}
 		return
 	}
+	if len(s.skipped) > 0 {
+		// sudo follows the link and muster does not, so what the drop-in
+		// sets is unknown: absent, naming it (C4), never a guessed value.
+		e := collect.Absent("a symlinked drop-in was not read: " + strings.Join(s.skipped, ", "))
+		for _, k := range sudoLogKeys {
+			b.Set(k, e)
+		}
+		return
+	}
 	src := func() *facts.Source { return &facts.Source{Kind: "derived", Inputs: slices.Clone(s.inputs)} }
 	ok := func(v any) facts.Envelope {
-		e := withTruncation(collect.OK(v, src()), s.truncated)
-		if len(s.skipped) > 0 {
-			e.Reason = "symlink skipped: " + strings.Join(s.skipped, ", ")
-		}
-		return e
+		return withTruncation(collect.OK(v, src()), s.truncated)
 	}
 	b.Set("sudo.log.syslog", ok(s.syslog))
 	b.Set("sudo.log.logfile", ok(s.logfile))
@@ -363,7 +368,7 @@ func (s *sudoLogScan) includeDir(dir string, depth int) {
 		}
 		meta, err := s.a.Stat(m)
 		if errors.Is(err, collect.ErrSymlink) {
-			// muster never follows a link: skipped, and said so on the leaves.
+			// muster never follows a link: skipped, and the leaves are absent.
 			s.skipped = append(s.skipped, m)
 			continue
 		}

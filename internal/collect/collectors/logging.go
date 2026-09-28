@@ -219,8 +219,12 @@ func rsyslogRemoteTargets(rules []rsyslogRule) ([]any, bool) {
 	return rows, forwards
 }
 
+// loopbackNames are the loopback host names Debian's and EL's /etc/hosts
+// define: localhost and its IPv6 and domain spellings.
+var loopbackNames = []string{"localhost", "localhost.localdomain", "localhost6", "ip6-localhost", "ip6-loopback"}
+
 // loopbackTarget reports whether a remote action's host is this host
-// (127.0.0.0/8, ::1, localhost): a relay into a local shipper leaves nothing
+// (127.0.0.0/8, ::1, one of loopbackNames): a relay into a local shipper leaves nothing
 // by itself. The target is as the parser kept it — a legacy @ or @@ prefix,
 // an (o,z9) option group, a [v6] literal, a :port, or omfwd's target with
 // ":"+port appended, which for a bare IPv6 literal makes the last group
@@ -249,7 +253,7 @@ func loopbackTarget(target string) bool {
 		hosts = append(hosts, h)
 	}
 	for _, h := range hosts {
-		if strings.EqualFold(h, "localhost") {
+		if slices.ContainsFunc(loopbackNames, func(n string) bool { return strings.EqualFold(h, n) }) {
 			return true
 		}
 		if addr, err := netip.ParseAddr(h); err == nil && addr.Unmap().IsLoopback() {

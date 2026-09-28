@@ -296,8 +296,8 @@ func TestPkgverifyDpkgExcludeGlobCrossesSlash(t *testing.T) {
 			"missing     /opt/vendor/a/b/c.bak\n" +
 				"missing     /opt/vendor/keep/x.bak\n" +
 				"missing     /opt/vendor/c.bak.1\n" +
-				"??5??????   /srv/cache/q/tmp7\n" +
-				"??5??????   /srv/cache/qq/tmp7\n")}},
+				"missing     /srv/cache/q/tmp7\n" +
+				"missing     /srv/cache/qq/tmp7\n")}},
 	}
 	b := pkgverifyRun(t, a, true)
 	mod := verifyRows(t, b, "packages.verify.modified")
@@ -319,6 +319,31 @@ func TestPkgverifyDpkgExcludeGlobCrossesSlash(t *testing.T) {
 	if got := strList(st["dpkg_path_excludes"]); !slices.Equal(got, want) {
 		t.Errorf("dpkg_path_excludes %v, want %v", got, want)
 	}
+}
+
+// W-1: a path-exclude glob explains a file dpkg never installed, so only a
+// missing row under it is dropped; an installed file under the same glob
+// whose content differs is still a modification.
+func TestPkgverifyDpkgExcludeDropsOnlyMissingRows(t *testing.T) {
+	withEUID(t, 0)
+	a := &fsAccess{
+		files: map[string]string{
+			dpkgStatusPath:       "dpkg.status.sample",
+			"/etc/dpkg/dpkg.cfg": "dpkg.cfg.d-globs",
+		},
+		cmds: map[string]cmdResult{cmdKey(dpkgVerifyCmd): {stdout: []byte(
+			"missing     /opt/vendor/gone.bak\n" +
+				"??5??????   /opt/vendor/changed.bak\n")}},
+	}
+	b := pkgverifyRun(t, a, true)
+	mod := verifyRows(t, b, "packages.verify.modified")
+	if r := mod["/opt/vendor/changed.bak"]; r == nil || !slices.Equal(attrsOf(r), []string{"digest"}) {
+		t.Errorf("an excluded path whose content differs must stay modified: %v", mod)
+	}
+	if mod["/opt/vendor/gone.bak"] != nil {
+		t.Errorf("an excluded missing row survived: %v", mod)
+	}
+	wantCounts(t, b, map[string]int{"dpkg_excluded": 1})
 }
 
 // A dpkg.cfg fragment that exists and cannot be read drops the dpkg_excluded
@@ -344,9 +369,14 @@ func TestPkgverifyUnreadableExcludesDropTheRule(t *testing.T) {
 		t.Errorf("the rule was applied from a partial set of globs: %v", mod)
 	}
 	wantCounts(t, b, map[string]int{})
-	got := strList(verifyRecord(t, b, "packages.verify.stats")["dpkg_path_excludes"])
+	st := verifyRecord(t, b, "packages.verify.stats")
+	got := strList(st["dpkg_path_excludes_error"])
 	if len(got) != 1 || !strings.HasPrefix(got[0], "/etc/dpkg/dpkg.cfg.d/locked: ") {
-		t.Errorf("dpkg_path_excludes %v, want the one failure path-prefixed", got)
+		t.Errorf("dpkg_path_excludes_error %v, want the one failure path-prefixed", got)
+	}
+	// W-10: the directives list holds directives only, never a failure.
+	if d := strList(st["dpkg_path_excludes"]); len(d) != 0 {
+		t.Errorf("dpkg_path_excludes %v, want empty beside a read failure", d)
 	}
 }
 
@@ -635,9 +665,13 @@ func TestPkgverifyPartialExcludesDropTheRule(t *testing.T) {
 				t.Errorf("the rule was applied from a partial set of globs: %v", mod)
 			}
 			wantCounts(t, b, map[string]int{})
-			got := strList(verifyRecord(t, b, "packages.verify.stats")["dpkg_path_excludes"])
+			st := verifyRecord(t, b, "packages.verify.stats")
+			got := strList(st["dpkg_path_excludes_error"])
 			if want := []string{"/etc/dpkg/dpkg.cfg.d/cut: " + tc.reason}; !slices.Equal(got, want) {
-				t.Errorf("dpkg_path_excludes %v, want %v", got, want)
+				t.Errorf("dpkg_path_excludes_error %v, want %v", got, want)
+			}
+			if d := strList(st["dpkg_path_excludes"]); len(d) != 0 {
+				t.Errorf("dpkg_path_excludes %v, want empty beside a read failure", d)
 			}
 		})
 	}

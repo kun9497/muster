@@ -3,7 +3,7 @@
 package collectors
 
 import (
-	"regexp"
+	"path"
 	"slices"
 	"strings"
 )
@@ -180,15 +180,31 @@ func cronDailyRun(data []byte) (string, bool) {
 	return value, set
 }
 
-// aideWord is "aide" as a word, so /usr/bin/aide and `aide --check` count
-// and raider does not.
-var aideWord = regexp.MustCompile(`\baide\b`)
+// aideCommands are the basenames that run an AIDE check: the binary, the
+// Debian wrapper and init script, EL's check unit's script name and Ubuntu
+// 24.04's daily check.
+var aideCommands = []string{"aide", "aide.wrapper", "aideinit", "aide-check", "dailyaidecheck"}
+
+// aideBinDirs are the directories a path token may run an AIDE command from.
+var aideBinDirs = []string{"/usr/bin", "/usr/sbin", "/bin", "/sbin", "/usr/local/bin", "/usr/local/sbin"}
+
+// runsAide reports whether one command-field token runs AIDE: its basename is
+// one of aideCommands and it is either bare (found on PATH) or a path in one
+// of aideBinDirs. So `nice -n 19 /usr/bin/aide --check` counts, while
+// `find /var/log/aide …` or `cp /etc/aide/aide.conf …` does not.
+func runsAide(tok string) bool {
+	tok = strings.Trim(tok, `;&|()'"`+"`")
+	if !slices.Contains(aideCommands, path.Base(tok)) {
+		return false
+	}
+	return !strings.Contains(tok, "/") || slices.Contains(aideBinDirs, path.Dir(tok))
+}
 
 // namesAide reports whether a system crontab (/etc/crontab, /etc/cron.d/*)
-// has a line whose COMMAND names aide. The user field is not the command, so
-// a user called adelaide does not count; a commented line, the usual way a
-// check is switched off, is no line at all; an environment assignment is not
-// a job.
+// has a line whose COMMAND runs aide (runsAide on any of its tokens). The
+// user field is not the command, so a user called adelaide does not count; a
+// commented line, the usual way a check is switched off, is no line at all;
+// an environment assignment is not a job.
 func namesAide(data []byte) bool {
 	for _, raw := range splitLines(data) {
 		l := strings.TrimSpace(raw)
@@ -207,7 +223,7 @@ func namesAide(data []byte) bool {
 		case len(f) >= 7:
 			cmd = f[6:]
 		}
-		if len(cmd) > 0 && aideWord.MatchString(strings.Join(cmd, " ")) {
+		if slices.ContainsFunc(cmd, runsAide) {
 			return true
 		}
 	}

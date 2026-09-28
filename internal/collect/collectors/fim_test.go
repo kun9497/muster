@@ -4,6 +4,7 @@ package collectors
 
 import (
 	"fmt"
+	"io/fs"
 	"slices"
 	"strings"
 	"testing"
@@ -336,18 +337,93 @@ func TestFimCrontabLine(t *testing.T) {
 	}
 }
 
-func TestFimTimerInventoryFailureIsUnsupported(t *testing.T) {
-	a := fimNoble()
-	a.cmds[cmdKey(listTimersCmd)] = cmdResult{exitCode: 1, stderr: "Failed to connect to bus: No such file or directory\n"}
-	b := buildBegun(t, "fim", a)
-	for _, k := range []string{"fim.aide.schedules", "fim.aide.scheduled"} {
-		e := env(t, b, k)
-		if e.Status != facts.StatusUnsupported || e.Reason != "systemd timer inventory unavailable: Failed to connect to bus: No such file or directory" {
-			t.Errorf("%s = %+v", k, e)
-		}
+// W-4: a list-timers run that gave no inventory is classified — a kill is a
+// timeout, a systemctl that could not start or a host not booted with systemd
+// is unsupported, any other non-zero exit is an error naming the command and
+// its code — on both leaves.
+func TestFimTimerInventoryFailure(t *testing.T) {
+	for _, c := range []struct {
+		name   string
+		res    cmdResult
+		status facts.Status
+		reason string
+	}{
+		{"timed out", cmdResult{timedOut: true, exitCode: -1}, facts.StatusTimeout,
+			"/usr/bin/systemctl list-timers --all --no-legend --no-pager timed out"},
+		{"could not start", cmdResult{exitCode: -1, err: fs.ErrNotExist}, facts.StatusUnsupported,
+			"systemd timer inventory unavailable: /usr/bin/systemctl list-timers --all --no-legend --no-pager: file does not exist"},
+		{"not booted with systemd", cmdResult{exitCode: 1, stderr: "System has not been booted with systemd as init system (PID 1). Can't operate.\nFailed to connect to bus: Host is down\n"}, facts.StatusUnsupported,
+			"systemd timer inventory unavailable: System has not been booted with systemd as init system (PID 1). Can't operate."},
+		{"other exit", cmdResult{exitCode: 1, stderr: "Failed to connect to bus: No such file or directory\n"}, facts.StatusError,
+			"/usr/bin/systemctl list-timers --all --no-legend --no-pager exited 1: Failed to connect to bus: No such file or directory"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			a := fimNoble()
+			// No cron.daily row, so scheduled carries the failure too.
+			delete(a.files, "/etc/cron.daily/dailyaidecheck")
+			delete(a.stats, "/etc/cron.daily/dailyaidecheck")
+			a.cmds[cmdKey(listTimersCmd)] = c.res
+			b := buildBegun(t, "fim", a)
+			for _, k := range []string{"fim.aide.schedules", "fim.aide.scheduled"} {
+				if e := env(t, b, k); e.Status != c.status || e.Reason != c.reason {
+					t.Errorf("%s = %+v, want %s %q", k, e, c.status, c.reason)
+				}
+			}
+		})
 	}
-	if w := b.Worst("fim"); w != facts.StatusOK {
-		t.Errorf(`Worst("fim") = %s, want ok`, w)
+}
+
+// X-3: with AIDE installed, a configuration that names no database is a
+// known answer — there is no database — so database_present is ok false with
+// the reason; database_path stays absent.
+func TestFimInstalledWithoutADatabaseLine(t *testing.T) {
+	a := fimJammy()
+	delete(a.files, "/etc/aide/aide.conf")
+	b := build(t, "fim", a)
+	e := env(t, b, "fim.aide.database_present")
+	okValue(t, e, false, "database_present without a configuration")
+	if !strings.Contains(e.Reason, "neither /etc/aide/aide.conf nor /etc/aide.conf exists") {
+		t.Errorf("reason %q must say neither configuration exists", e.Reason)
+	}
+	if e.Source == nil || e.Source.Kind != "derived" || len(e.Source.Inputs) != 2 ||
+		e.Source.Inputs[0].Path != "/etc/aide/aide.conf" || e.Source.Inputs[1].Path != "/etc/aide.conf" {
+		t.Errorf("source %+v, want derived from the two candidate paths", e.Source)
+	}
+	absentBecause(t, b, "fim.aide.database_path", "names a database")
+
+	a = fimJammy()
+	delete(a.files, "/etc/aide/aide.conf")
+	a.contents["/etc/aide/aide.conf"] = []byte("gzip_dbout=yes\n")
+	b = build(t, "fim", a)
+	e = env(t, b, "fim.aide.database_present")
+	okValue(t, e, false, "database_present without a database line")
+	if e.Reason != "no database_in= or database= line in /etc/aide/aide.conf" {
+		t.Errorf("reason %q", e.Reason)
+	}
+	if e.Source == nil || e.Source.Kind != "derived" || len(e.Source.Inputs) != 1 || e.Source.Inputs[0].Path != "/etc/aide/aide.conf" {
+		t.Errorf("source %+v, want derived from the configuration", e.Source)
+	}
+	absentBecause(t, b, "fim.aide.database_path", "no database_in= or database= line")
+}
+
+// X-5 / W-6: a cron line arms only when a command token runs an AIDE command
+// — bare, or from a bin/sbin directory — never when aide is a path argument.
+func TestNamesAideCommandToken(t *testing.T) {
+	for _, c := range []struct {
+		line string
+		want bool
+	}{
+		{"0 5 * * * root find /var/log/aide -mtime +30 -delete\n", false},
+		{"0 5 * * * root cp /etc/aide/aide.conf /root/aide.conf.bak\n", false},
+		{"0 5 * * * root nice -n 19 /usr/bin/aide --check\n", true},
+		{"0 5 * * * root aide --check\n", true},
+		{"@daily root /usr/sbin/aide.wrapper --check\n", true},
+		{"0 5 * * * root /opt/tools/aide --check\n", false},
+		{"0 5 * * * root cd / && dailyaidecheck;\n", true},
+	} {
+		if got := namesAide([]byte(c.line)); got != c.want {
+			t.Errorf("namesAide(%q) = %v, want %v", c.line, got, c.want)
+		}
 	}
 }
 
