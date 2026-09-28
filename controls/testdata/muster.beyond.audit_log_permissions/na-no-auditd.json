@@ -1,0 +1,104 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none"
+      }
+    },
+    "services": {
+      "auditd": {
+        "installed": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState auditd.service",
+            "exit_code": 0
+          }
+        }
+      }
+    },
+    "audit": {
+      "log_file": {
+        "mode": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "uid": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "gid": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "group": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "group_readable": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "group_writable": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "other_readable": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "other_writable": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "acl_present": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        }
+      },
+      "log_dir": {
+        "mode": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "uid": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "gid": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "group": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "group_readable": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "group_writable": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "other_readable": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "other_writable": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "acl_present": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        }
+      }
+    }
+  }
+}

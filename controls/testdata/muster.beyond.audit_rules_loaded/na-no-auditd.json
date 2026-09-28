@@ -1,0 +1,44 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none"
+      }
+    },
+    "services": {
+      "auditd": {
+        "installed": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState auditd.service",
+            "exit_code": 0
+          }
+        }
+      }
+    },
+    "audit": {
+      "rules": {
+        "present": {
+          "runtime": {
+            "status": "absent",
+            "reason": "auditctl is not installed"
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "neither /etc/audit/rules.d nor /etc/audit/audit.rules exists"
+          },
+          "effective": {
+            "status": "absent",
+            "reason": "auditctl is not installed"
+          }
+        }
+      }
+    }
+  }
+}

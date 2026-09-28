@@ -1,0 +1,57 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none"
+      }
+    },
+    "services": {
+      "auditd": {
+        "installed": {
+          "status": "ok",
+          "value": true,
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState auditd.service",
+            "exit_code": 0
+          }
+        }
+      }
+    },
+    "audit": {
+      "immutable": {
+        "runtime": {
+          "status": "ok",
+          "value": true,
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/sbin/auditctl -s",
+            "exit_code": 0
+          }
+        },
+        "persisted": {
+          "status": "absent",
+          "reason": "neither /etc/audit/rules.d nor /etc/audit/audit.rules exists"
+        },
+        "effective": {
+          "status": "ok",
+          "value": true,
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/sbin/auditctl -s",
+            "exit_code": 0
+          }
+        },
+        "winner": {
+          "kind": "command",
+          "cmd": "/usr/sbin/auditctl -s",
+          "exit_code": 0
+        }
+      }
+    }
+  }
+}

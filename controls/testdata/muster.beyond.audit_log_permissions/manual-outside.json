@@ -1,0 +1,104 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none"
+      }
+    },
+    "services": {
+      "auditd": {
+        "installed": {
+          "status": "ok",
+          "value": true,
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState auditd.service",
+            "exit_code": 0
+          }
+        }
+      }
+    },
+    "audit": {
+      "log_file": {
+        "mode": {
+          "status": "absent",
+          "reason": "/srv/audit/audit.log: outside the paths muster reads"
+        },
+        "uid": {
+          "status": "absent",
+          "reason": "/srv/audit/audit.log: outside the paths muster reads"
+        },
+        "gid": {
+          "status": "absent",
+          "reason": "/srv/audit/audit.log: outside the paths muster reads"
+        },
+        "group": {
+          "status": "absent",
+          "reason": "/srv/audit/audit.log: outside the paths muster reads"
+        },
+        "group_readable": {
+          "status": "absent",
+          "reason": "/srv/audit/audit.log: outside the paths muster reads"
+        },
+        "group_writable": {
+          "status": "absent",
+          "reason": "/srv/audit/audit.log: outside the paths muster reads"
+        },
+        "other_readable": {
+          "status": "absent",
+          "reason": "/srv/audit/audit.log: outside the paths muster reads"
+        },
+        "other_writable": {
+          "status": "absent",
+          "reason": "/srv/audit/audit.log: outside the paths muster reads"
+        },
+        "acl_present": {
+          "status": "absent",
+          "reason": "/srv/audit/audit.log: outside the paths muster reads"
+        }
+      },
+      "log_dir": {
+        "mode": {
+          "status": "absent",
+          "reason": "/srv/audit: outside the paths muster reads"
+        },
+        "uid": {
+          "status": "absent",
+          "reason": "/srv/audit: outside the paths muster reads"
+        },
+        "gid": {
+          "status": "absent",
+          "reason": "/srv/audit: outside the paths muster reads"
+        },
+        "group": {
+          "status": "absent",
+          "reason": "/srv/audit: outside the paths muster reads"
+        },
+        "group_readable": {
+          "status": "absent",
+          "reason": "/srv/audit: outside the paths muster reads"
+        },
+        "group_writable": {
+          "status": "absent",
+          "reason": "/srv/audit: outside the paths muster reads"
+        },
+        "other_readable": {
+          "status": "absent",
+          "reason": "/srv/audit: outside the paths muster reads"
+        },
+        "other_writable": {
+          "status": "absent",
+          "reason": "/srv/audit: outside the paths muster reads"
+        },
+        "acl_present": {
+          "status": "absent",
+          "reason": "/srv/audit: outside the paths muster reads"
+        }
+      }
+    }
+  }
+}

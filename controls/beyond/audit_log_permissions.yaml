@@ -1,0 +1,38 @@
+id: muster.beyond.audit_log_permissions
+title_en: The audit log and its directory belong to root and are closed to other users
+title_ko: 감사 로그와 그 디렉터리가 root 소유이며 다른 사용자에게 닫혀 있다
+description_en: The audit log holds the command lines, file names and account names of everything the rules record, so a reader learns what the host's users do, and a writer can erase the one record that would show what the writer did. muster judges the file auditd.conf's log_file names — /var/log/audit/audit.log when the line is missing, the default auditd.conf(5) documents — and the directory that holds it. The file must be owned by uid 0 and have mode 0640 or stricter (a bit-subset of 0640, params.allowed_modes, spec §6.6); the directory must be owned by uid 0 and be neither readable nor writable by others, nor writable by its group. muster allows 0640 where the RHEL rule asks 0600 because Ubuntu's auditd sets log_group = adm, which makes a 0640 root:adm file in a 0750 root:adm directory the shipped state there; the group is then the administrators' own. The directory is judged by its permission bits rather than a list of modes, and muster has no leaf for the others' execute bit, so a 0751 directory passes — search without read lists nothing and opens only a file whose name the caller already knows, and the file's own mode still guards that. It is rated 중 because a readable log leaks what the host is doing and a writable one undoes the audit trail, but only to someone already logged in to the host. A stock EL9 host ships a 0600 file in a 0700 directory and passes, as does Ubuntu's 0640 file in a 0750 directory once auditd is installed; a stock Ubuntu host without auditd reads NOT_APPLICABLE, where auditd_active fires instead. A log_file outside the paths muster reads, or a log the daemon never wrote, reads MANUAL — the reason names the path — and auditd_active already says whether the daemon runs.
+description_ko: 감사 로그에는 규칙이 기록하는 모든 것의 명령줄과 파일 이름, 계정 이름이 담기므로, 읽을 수 있는 사람은 호스트 사용자들이 무엇을 하는지 알게 되고 쓸 수 있는 사람은 자신이 한 일을 보여 줄 단 하나의 기록을 지울 수 있습니다. muster 는 auditd.conf 의 log_file 이 가리키는 파일(줄이 없으면 auditd.conf(5) 가 문서화한 기본값 /var/log/audit/audit.log)과 그 파일을 담은 디렉터리를 판정합니다. 파일은 uid 0 소유이고 mode 0640 이하로 엄격해야 하며(0640 의 비트 부분집합, params.allowed_modes, 스펙 §6.6), 디렉터리는 uid 0 소유이고 다른 사용자가 읽거나 쓸 수 없으며 그룹이 쓸 수 없어야 합니다. RHEL 규칙은 0600 을 요구하지만 muster 는 0640 을 허용합니다. Ubuntu 의 auditd 는 log_group = adm 을 설정하므로 그곳에서는 0750 root:adm 디렉터리 안의 0640 root:adm 파일이 배포 상태이고, 이때 그룹은 관리자 자신의 그룹입니다. 디렉터리는 mode 목록이 아니라 권한 비트로 판정하며 muster 에는 다른 사용자의 실행 비트에 대한 항목이 없으므로 0751 디렉터리는 통과합니다. 읽기 없는 검색 권한으로는 아무것도 나열할 수 없고 이름을 이미 아는 파일만 열 수 있으며, 그 파일은 여전히 자신의 mode 가 지킵니다. 읽을 수 있는 로그는 호스트가 하는 일을 흘리고 쓸 수 있는 로그는 감사 기록을 무효로 만들지만, 이미 호스트에 로그인한 사람에게만 해당하므로 중요도는 중 입니다. EL9 기본 설치는 0700 디렉터리 안에 0600 파일을 배포하므로 통과하고, auditd 를 설치한 Ubuntu 의 0750 디렉터리 안 0640 파일도 통과합니다. auditd 가 없는 Ubuntu 기본 설치는 NOT_APPLICABLE 이며 대신 auditd_active 가 경고합니다. muster 가 읽는 경로 밖에 있는 log_file 이나 데몬이 한 번도 쓰지 않은 로그는 MANUAL 이며 사유에 그 경로가 나옵니다. 데몬이 실행 중인지는 auditd_active 가 이미 알려 줍니다.
+category: beyond
+importance: 중
+automation: auto
+references:
+  stig:
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-653085 }
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-653090 }
+    - { benchmark: ubuntu2204, version: V2R9, id: UBTU-22-653045 }
+    - { benchmark: ubuntu2204, version: V2R9, id: UBTU-22-653050 }
+    - { benchmark: ubuntu2204, version: V2R9, id: UBTU-22-653060 }
+    - { benchmark: ubuntu2404, version: V1R6, id: UBTU-24-901300 }
+    - { benchmark: ubuntu2404, version: V1R6, id: UBTU-24-901310 }
+    - { benchmark: ubuntu2404, version: V1R6, id: UBTU-24-901380 }
+  nist_800_53: ["AU-9", "SI-11"]
+requires_facts: ">=1"
+applies_when:
+  - { fact: env.container, op: eq, expected: none }
+  - { fact: services.auditd.installed, op: eq, expected: true }
+absent_means: manual
+params:
+  allowed_modes: { type: list<int>, default: [0, 128, 256, 384, 32, 160, 288, 416], description: "audit log file modes at 0640 or stricter (the bit-subsets of 0640, in decimal)" }
+checks:
+  - { fact: audit.log_file.uid, op: eq, expected: 0 }
+  - { fact: audit.log_file.mode, op: in, expected: "${allowed_modes}" }
+  - { fact: audit.log_dir.uid, op: eq, expected: 0 }
+  - { fact: audit.log_dir.other_readable, op: eq, expected: false }
+  - { fact: audit.log_dir.other_writable, op: eq, expected: false }
+  - { fact: audit.log_dir.group_writable, op: eq, expected: false }
+remediation:
+  text_en: chown root the audit log and its directory, chmod 0600 the log (0640 where log_group in auditd.conf names an administrators' group such as adm) and chmod 0700 the directory (0750 with such a group). auditd creates each rotated file with the mode and log_group its configuration gives, so set log_group to root or to a group only administrators belong to, rather than fixing the files alone.
+  text_ko: 감사 로그와 그 디렉터리를 chown root 하고, 로그는 chmod 0600(auditd.conf 의 log_group 이 adm 같은 관리자 그룹을 지정하면 0640), 디렉터리는 chmod 0700(그런 그룹이면 0750)으로 둡니다. auditd 는 순환할 때마다 설정이 주는 mode 와 log_group 으로 새 파일을 만들므로 파일만 고치지 말고 log_group 을 root 나 관리자만 속한 그룹으로 설정하십시오.
+  risk: none
+  idempotent: true

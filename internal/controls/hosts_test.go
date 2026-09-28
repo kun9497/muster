@@ -20,7 +20,7 @@ const hostRoot = fixtureRoot + "/_hosts"
 // stockUbuntu2204 is the verdict table of spec §5 (B-10): what a stock Ubuntu
 // 22.04 host — BIOS, a plain swap file, no separate /tmp or /var, sysrq 176,
 // suid_dumpable 2, apport's core pattern, the distribution's blacklists only —
-// reads for the nineteen controls beyond the guide. The snapshot beside it
+// reads for the controls beyond the guide. The snapshot beside it
 // carries that host's facts; a verdict that moves is a defect in the control
 // or in the collector shape the snapshot copies, and this table is what
 // decides which.
@@ -44,6 +44,11 @@ var stockUbuntu2204 = map[string]check.Status{
 	"muster.beyond.uncommon_filesystems_disabled":       check.FAIL,          // 17: six modules loadable
 	"muster.beyond.usb_storage_disabled":                check.FAIL,          // 18: loadable
 	"muster.beyond.uncommon_network_protocols_disabled": check.FAIL,          // 19: four modules loadable
+	"muster.beyond.auditd_active":                       check.FAIL,          // 3C-1: no auditd
+	"muster.beyond.audit_rules_loaded":                  check.NotApplicable, // 3C-1: gate, auditd not installed
+	"muster.beyond.audit_immutable":                     check.NotApplicable, // 3C-1: gate
+	"muster.beyond.audit_disk_actions":                  check.NotApplicable, // 3C-1: gate
+	"muster.beyond.audit_log_permissions":               check.NotApplicable, // 3C-1: gate
 }
 
 // B-11: one synthetic snapshot of the stock host pins all nineteen verdicts at

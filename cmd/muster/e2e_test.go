@@ -103,6 +103,11 @@ func TestCheckEndToEndWaiversTurnFailIntoWaived(t *testing.T) {
 		"muster.beyond.uncommon_filesystems_disabled":       "PASS",
 		"muster.beyond.usb_storage_disabled":                "PASS",
 		"muster.beyond.uncommon_network_protocols_disabled": "PASS",
+		"muster.beyond.auditd_active":                       "PASS",
+		"muster.beyond.audit_rules_loaded":                  "PASS",
+		"muster.beyond.audit_immutable":                     "PASS",
+		"muster.beyond.audit_disk_actions":                  "PASS",
+		"muster.beyond.audit_log_permissions":               "PASS",
 		"muster.account.root_remote_login":                  "WAIVED",
 		"muster.account.password_policy":                    "PASS",
 		"muster.file.passwd_permissions":                    "PASS",
@@ -536,7 +541,7 @@ func TestCheckEndToEndJSONAndTable(t *testing.T) {
 	if _, declared := params["muster.service.telnet_disabled"]; declared {
 		t.Errorf("only controls that declare params belong in check.params: %v", params)
 	}
-	// R26: full-pass.json must produce exactly the eighty-seven embedded
+	// R26: full-pass.json must produce exactly the ninety-two embedded
 	// controls' documented statuses, not merely "some PASS rows appear
 	// somewhere in the output".
 	assertStatuses(t, out1.Bytes(), map[string]string{
@@ -559,6 +564,11 @@ func TestCheckEndToEndJSONAndTable(t *testing.T) {
 		"muster.beyond.uncommon_filesystems_disabled":       "PASS",
 		"muster.beyond.usb_storage_disabled":                "PASS",
 		"muster.beyond.uncommon_network_protocols_disabled": "PASS",
+		"muster.beyond.auditd_active":                       "PASS",
+		"muster.beyond.audit_rules_loaded":                  "PASS",
+		"muster.beyond.audit_immutable":                     "PASS",
+		"muster.beyond.audit_disk_actions":                  "PASS",
+		"muster.beyond.audit_log_permissions":               "PASS",
 		"muster.account.root_remote_login":                  "PASS",
 		"muster.account.password_policy":                    "PASS",
 		"muster.file.passwd_permissions":                    "PASS",
@@ -664,6 +674,11 @@ func TestCheckEndToEndJSONAndTable(t *testing.T) {
 		"muster.beyond.uncommon_filesystems_disabled":       "PASS",
 		"muster.beyond.usb_storage_disabled":                "PASS",
 		"muster.beyond.uncommon_network_protocols_disabled": "PASS",
+		"muster.beyond.auditd_active":                       "PASS",
+		"muster.beyond.audit_rules_loaded":                  "PASS",
+		"muster.beyond.audit_immutable":                     "PASS",
+		"muster.beyond.audit_disk_actions":                  "PASS",
+		"muster.beyond.audit_log_permissions":               "PASS",
 		"muster.account.root_remote_login":                  "FAIL",
 		"muster.account.password_policy":                    "PASS",
 		"muster.file.passwd_permissions":                    "PASS",

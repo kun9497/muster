@@ -1,0 +1,176 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none"
+      }
+    },
+    "services": {
+      "auditd": {
+        "installed": {
+          "status": "ok",
+          "value": true,
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState auditd.service",
+            "exit_code": 0
+          }
+        }
+      }
+    },
+    "audit": {
+      "log_file": {
+        "mode": {
+          "status": "ok",
+          "value": 288,
+          "source": {
+            "kind": "file",
+            "path": "/var/log/audit/audit.log"
+          }
+        },
+        "uid": {
+          "status": "ok",
+          "value": 0,
+          "source": {
+            "kind": "file",
+            "path": "/var/log/audit/audit.log"
+          }
+        },
+        "gid": {
+          "status": "ok",
+          "value": 0,
+          "source": {
+            "kind": "file",
+            "path": "/var/log/audit/audit.log"
+          }
+        },
+        "group": {
+          "status": "ok",
+          "value": "root",
+          "source": {
+            "kind": "file",
+            "path": "/etc/group"
+          }
+        },
+        "group_readable": {
+          "status": "ok",
+          "value": true,
+          "source": {
+            "kind": "file",
+            "path": "/var/log/audit/audit.log"
+          }
+        },
+        "group_writable": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "file",
+            "path": "/var/log/audit/audit.log"
+          }
+        },
+        "other_readable": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "file",
+            "path": "/var/log/audit/audit.log"
+          }
+        },
+        "other_writable": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "file",
+            "path": "/var/log/audit/audit.log"
+          }
+        },
+        "acl_present": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "file",
+            "path": "/var/log/audit/audit.log"
+          }
+        }
+      },
+      "log_dir": {
+        "mode": {
+          "status": "ok",
+          "value": 448,
+          "source": {
+            "kind": "file",
+            "path": "/var/log/audit"
+          }
+        },
+        "uid": {
+          "status": "ok",
+          "value": 0,
+          "source": {
+            "kind": "file",
+            "path": "/var/log/audit"
+          }
+        },
+        "gid": {
+          "status": "ok",
+          "value": 0,
+          "source": {
+            "kind": "file",
+            "path": "/var/log/audit"
+          }
+        },
+        "group": {
+          "status": "ok",
+          "value": "root",
+          "source": {
+            "kind": "file",
+            "path": "/etc/group"
+          }
+        },
+        "group_readable": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "file",
+            "path": "/var/log/audit"
+          }
+        },
+        "group_writable": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "file",
+            "path": "/var/log/audit"
+          }
+        },
+        "other_readable": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "file",
+            "path": "/var/log/audit"
+          }
+        },
+        "other_writable": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "file",
+            "path": "/var/log/audit"
+          }
+        },
+        "acl_present": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "file",
+            "path": "/var/log/audit"
+          }
+        }
+      }
+    }
+  }
+}

@@ -159,3 +159,36 @@
     original resolves through absent_means with "no mechanism applies", the mutant through the
     same absent_means on the mechanism's own checks, and both are MANUAL with no reason code. No
     snapshot collect can write separates the two.
+
+- control: muster.beyond.auditd_active
+  mutant: "checks[0] remove"
+  reason: >-
+    probeUnits (internal/collect/collectors/services.go:256-274) sets installed only for a unit
+    whose LoadState is not "not-found", and a not-found auditd.service reports ActiveState
+    inactive and an empty UnitFileState, so services.auditd.installed ok false always comes with
+    .active and .enabled ok false -- auditd has no port and no super-server entry that could
+    prove either another way. A host that fails checks[0] fails checks[1] and checks[2] too.
+
+- control: muster.beyond.auditd_active
+  mutant: "absent_means ->pass"
+  reason: >-
+    services.auditd.* (internal/collect/collectors/services.go) is ok from systemctl show, error
+    or denied from a failed show (verdict's firstFailure, commandFailure), or unsupported without
+    systemd (runServices) -- never absent. So no snapshot collect writes reaches absent_means,
+    and the value it names cannot change any fixture's answer.
+
+- control: muster.beyond.auditd_active
+  mutant: "absent_means ->not_applicable"
+  reason: >-
+    services.auditd.* (internal/collect/collectors/services.go) is ok from systemctl show, error
+    or denied from a failed show (verdict's firstFailure, commandFailure), or unsupported without
+    systemd (runServices) -- never absent. So no snapshot collect writes reaches absent_means,
+    and the value it names cannot change any fixture's answer.
+
+- control: muster.beyond.auditd_active
+  mutant: "absent_means ->manual"
+  reason: >-
+    services.auditd.* (internal/collect/collectors/services.go) is ok from systemctl show, error
+    or denied from a failed show (verdict's firstFailure, commandFailure), or unsupported without
+    systemd (runServices) -- never absent. So no snapshot collect writes reaches absent_means,
+    and the value it names cannot change any fixture's answer.

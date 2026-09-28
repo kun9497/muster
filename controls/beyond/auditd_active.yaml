@@ -1,0 +1,28 @@
+id: muster.beyond.auditd_active
+title_en: The audit daemon is installed, running and started at boot
+title_ko: 감사 데몬이 설치되어 실행 중이며 부팅 시 시작된다
+description_en: The Linux audit framework is the kernel's record of who did what — every system call and file access a rule selects, every login and privilege change a PAM or sudo module reports — and auditd is the daemon that takes those records from the kernel and writes them to disk. Without it the records go no further than the rate-limited kernel log, so there is no audit trail to speak of, and every other audit control describes a daemon that is not there. muster requires the auditd service to be installed, active now and enabled for the next boot, read from systemd's own view of auditd.service; a unit that is enabled but stopped, or running but not enabled, fails, because the first leaves a gap in the trail today and the second leaves one after the next reboot. It is rated 상 because a host that records nothing gives an intruder a free hand and gives the operator nothing to reconstruct an incident from afterwards. A stock EL9 host ships and starts auditd and passes; a stock Ubuntu host does not install it and fails here, and the four audit detail controls (audit_rules_loaded, audit_immutable, audit_disk_actions, audit_log_permissions) read NOT_APPLICABLE there, because they gate on the daemon being installed — this control is the one that fires. A kernel booted with audit=0 keeps auditd.service inactive (the unit carries ConditionKernelCommandLine=!audit=0), so such a host fails here while the two runtime controls read NOT_APPLICABLE. A host without systemd reads NOT_APPLICABLE, because muster reads the service state from systemd.
+description_ko: 리눅스 감사 프레임워크는 누가 무엇을 했는지에 대한 커널의 기록입니다. 규칙이 선택한 모든 시스템 호출과 파일 접근, PAM 이나 sudo 모듈이 보고하는 모든 로그인과 권한 변경이 여기에 담기며, auditd 는 그 기록을 커널에서 받아 디스크에 쓰는 데몬입니다. 데몬이 없으면 기록은 속도 제한이 걸린 커널 로그 이상으로 가지 못하므로 감사 기록이라 할 만한 것이 남지 않고, 다른 모든 감사 항목은 있지도 않은 데몬을 설명하는 셈이 됩니다. muster 는 systemd 가 보는 auditd.service 의 상태를 읽어 auditd 서비스가 설치되어 있고, 지금 실행 중이며, 다음 부팅에도 시작되도록 활성화되어 있을 것을 요구합니다. 활성화되었지만 멈춘 유닛은 오늘의 기록에 공백을 남기고, 실행 중이지만 활성화되지 않은 유닛은 다음 재부팅 이후에 공백을 남기므로 둘 다 실패입니다. 아무것도 기록하지 않는 호스트는 침입자에게 자유를 주고 운영자에게는 사고를 재구성할 근거를 남기지 않으므로 중요도는 상 입니다. EL9 기본 설치는 auditd 를 포함해 시작하므로 통과하고, Ubuntu 기본 설치는 auditd 를 설치하지 않으므로 여기서 실패합니다. 이때 네 가지 감사 세부 항목(audit_rules_loaded, audit_immutable, audit_disk_actions, audit_log_permissions)은 데몬 설치 여부로 게이트되므로 NOT_APPLICABLE 이며, 실제로 경고하는 것은 이 항목입니다. audit=0 으로 부팅한 커널에서는 auditd.service 가 비활성으로 남으므로(유닛에 ConditionKernelCommandLine=!audit=0 이 있음) 이 항목이 실패하고, 두 런타임 항목은 NOT_APPLICABLE 이 됩니다. systemd 가 없는 호스트는 muster 가 서비스 상태를 systemd 에서 읽으므로 NOT_APPLICABLE 입니다.
+category: beyond
+importance: 상
+automation: auto
+references:
+  stig:
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-653010 }
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-653015 }
+    - { benchmark: ubuntu2204, version: V2R9, id: UBTU-22-653010 }
+    - { benchmark: ubuntu2404, version: V1R6, id: UBTU-24-100400 }
+  nist_800_53: ["AU-12", "AU-12(3)", "AU-14(1)", "AU-3", "AU-3(1)", "AU-6(4)", "AU-7", "AU-7(1)", "AU-8", "CM-5(1)", "MA-3(5)", "MA-4(1)"]
+requires_facts: ">=1"
+applies_when:
+  - { fact: env.container, op: eq, expected: none }
+absent_means: fail
+checks:
+  - { fact: services.auditd.installed, op: eq, expected: true }
+  - { fact: services.auditd.active, op: eq, expected: true }
+  - { fact: services.auditd.enabled, op: eq, expected: true }
+remediation:
+  text_en: Install the audit daemon (the audit package on the EL family, auditd on Debian and Ubuntu) and run systemctl enable --now auditd, which starts it now and at every boot. Check that the kernel command line does not carry audit=0, which keeps the unit from starting; on the EL family the unit refuses a manual stop, so a restart after a configuration change is service auditd restart rather than systemctl restart.
+  text_ko: 감사 데몬(EL 계열은 audit 패키지, Debian·Ubuntu 는 auditd)을 설치하고 systemctl enable --now auditd 를 실행하면 지금 시작되고 매 부팅 시에도 시작됩니다. 커널 명령줄에 유닛의 시작을 막는 audit=0 이 없는지 확인하십시오. EL 계열의 유닛은 수동 중지를 거부하므로 설정 변경 후 재시작은 systemctl restart 대신 service auditd restart 로 합니다.
+  risk: none
+  idempotent: true

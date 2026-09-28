@@ -1,0 +1,71 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "docker"
+      }
+    },
+    "services": {
+      "auditd": {
+        "installed": {
+          "status": "ok",
+          "value": true,
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState auditd.service",
+            "exit_code": 0
+          }
+        }
+      }
+    },
+    "audit": {
+      "rules": {
+        "present": {
+          "runtime": {
+            "status": "unsupported",
+            "reason": "/usr/sbin/auditctl -l: kernel audit is not reachable from this pid namespace",
+            "source": {
+              "kind": "command",
+              "cmd": "/usr/sbin/auditctl -l",
+              "exit_code": 255
+            }
+          },
+          "persisted": {
+            "status": "ok",
+            "value": true,
+            "source": {
+              "kind": "derived",
+              "inputs": [
+                {
+                  "kind": "file",
+                  "path": "/etc/audit/rules.d/10-base-config.rules"
+                },
+                {
+                  "kind": "file",
+                  "path": "/etc/audit/rules.d/30-identity.rules"
+                },
+                {
+                  "kind": "file",
+                  "path": "/etc/audit/rules.d/99-finalize.rules"
+                }
+              ]
+            }
+          },
+          "effective": {
+            "status": "unsupported",
+            "reason": "/usr/sbin/auditctl -l: kernel audit is not reachable from this pid namespace",
+            "source": {
+              "kind": "command",
+              "cmd": "/usr/sbin/auditctl -l",
+              "exit_code": 255
+            }
+          }
+        }
+      }
+    }
+  }
+}

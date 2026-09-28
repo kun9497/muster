@@ -76,11 +76,16 @@
 
 ## Beyond the guide
 
-19 controls muster checks that the guide does not ask for.
+24 controls muster checks that the guide does not ask for.
 
 | Control | Imp. | Automation | Fact keys read | STIG ids |
 |---|---|---|---|---|
 | muster.beyond.aslr_and_link_protection | 상 | auto | env.container, kernel.sysctl.protected_fifos, kernel.sysctl.protected_hardlinks, kernel.sysctl.protected_regular, kernel.sysctl.protected_symlinks, kernel.sysctl.randomize_va_space | RHEL-09-213030, RHEL-09-213035, RHEL-09-213070, UBTU-22-213020, UBTU-24-700310 |
+| muster.beyond.audit_disk_actions | 중 | auto | audit.conf.admin_space_left_action, audit.conf.disk_error_action, audit.conf.disk_full_action, audit.conf.max_log_file_action, audit.conf.space_left_action, env.container, services.auditd.installed | RHEL-09-653020, RHEL-09-653025, RHEL-09-653040, RHEL-09-653050, RHEL-09-653055, UBTU-22-653030, UBTU-22-653040, UBTU-24-900960 |
+| muster.beyond.audit_immutable | 중 | auto | audit.immutable, env.container, services.auditd.installed | RHEL-09-654275, UBTU-24-909000 |
+| muster.beyond.audit_log_permissions | 중 | auto | audit.log_dir.group_writable, audit.log_dir.other_readable, audit.log_dir.other_writable, audit.log_dir.uid, audit.log_file.mode, audit.log_file.uid, env.container, services.auditd.installed | RHEL-09-653085, RHEL-09-653090, UBTU-22-653045, UBTU-22-653050, UBTU-22-653060, UBTU-24-901300, UBTU-24-901310, UBTU-24-901380 |
+| muster.beyond.audit_rules_loaded | 상 | auto | audit.rules.present, env.container, services.auditd.installed | — |
+| muster.beyond.auditd_active | 상 | auto | env.container, services.auditd.active, services.auditd.enabled, services.auditd.installed | RHEL-09-653010, RHEL-09-653015, UBTU-22-653010, UBTU-24-100400 |
 | muster.beyond.bootloader_config_permissions | 상 | auto | boot.grub_cfg.gid, boot.grub_cfg.mode, boot.grub_cfg.uid, env.container | RHEL-09-212025, RHEL-09-212030 |
 | muster.beyond.bootloader_password | 중 | auto | boot.grub_password_set, env.container | RHEL-09-212010, UBTU-22-212010, UBTU-24-102000 |
 | muster.beyond.core_dump_policy | 중 | partial | coredump.core_pattern, coredump.limits.hard_core, coredump.systemd.process_size_max, coredump.systemd.storage, env.container | RHEL-09-213040, RHEL-09-213085, RHEL-09-213090, RHEL-09-213095 |
@@ -102,11 +107,11 @@
 
 ## Fact keys used by controls
 
-183 of 454 registered keys are read by a control (4 by the engine); 267 unused.
+199 of 454 registered keys are read by a control (4 by the engine); 251 unused.
 
 | Collector | Registered | Used by a control | Read by the engine | Unused |
 |---|---|---|---|---|
-| services | 88 | 40 | 0 | services.ssh.active, services.ssh.unit_file_state, services.ssh.enabled, services.telnet.installed, services.telnet.active, services.telnet.unit_file_state, services.telnet.enabled, services.finger.installed, services.finger.unit_file_state, services.rservices.installed, services.rservices.unit_file_state, services.dos_services.installed, services.dos_services.unit_file_state, services.nfs_server.unit_file_state, services.automount.installed, services.automount.unit_file_state, services.rpcbind.installed, services.rpcbind.unit_file_state, services.nis.installed, services.nis.unit_file_state, services.tftp.installed, services.tftp.unit_file_state, services.talk.installed, services.talk.unit_file_state, services.snmp.unit_file_state, services.ntp.unit_file_state, services.ntp.enabled, services.syslog.installed, services.syslog.unit_file_state, services.syslog.enabled, services.auditd.installed, services.auditd.active, services.auditd.unit_file_state, services.auditd.enabled, services.journal_upload.installed, services.journal_upload.active, services.journal_upload.unit_file_state, services.journal_upload.enabled, services.ftp.unit_file_state, services.ftp.enabled, services.ftp.reachable, services.mail.active, services.mail.unit_file_state, services.mail.enabled, services.dns.active, services.dns.unit_file_state, services.dns.enabled, services.dns.reachable |
+| services | 88 | 43 | 0 | services.ssh.active, services.ssh.unit_file_state, services.ssh.enabled, services.telnet.installed, services.telnet.active, services.telnet.unit_file_state, services.telnet.enabled, services.finger.installed, services.finger.unit_file_state, services.rservices.installed, services.rservices.unit_file_state, services.dos_services.installed, services.dos_services.unit_file_state, services.nfs_server.unit_file_state, services.automount.installed, services.automount.unit_file_state, services.rpcbind.installed, services.rpcbind.unit_file_state, services.nis.installed, services.nis.unit_file_state, services.tftp.installed, services.tftp.unit_file_state, services.talk.installed, services.talk.unit_file_state, services.snmp.unit_file_state, services.ntp.unit_file_state, services.ntp.enabled, services.syslog.installed, services.syslog.unit_file_state, services.syslog.enabled, services.auditd.unit_file_state, services.journal_upload.installed, services.journal_upload.active, services.journal_upload.unit_file_state, services.journal_upload.enabled, services.ftp.unit_file_state, services.ftp.enabled, services.ftp.reachable, services.mail.active, services.mail.unit_file_state, services.mail.enabled, services.dns.active, services.dns.unit_file_state, services.dns.enabled, services.dns.reachable |
 | sockets | 1 | 0 | 0 | sockets.listening |
 | sshd | 11 | 4 | 2 | sshd.version, sshd.options.max_auth_tries, sshd.options.banner, sshd.include_sources, sshd.banner_file.exists |
 | banners | 10 | 2 | 0 | banners.issue.nonempty, banners.issue.os_escapes, banners.issue.mode, banners.issue_net.mode, banners.motd.nonempty, banners.motd.mode, banners.motd_d, banners.dynamic_motd |
@@ -133,5 +138,5 @@
 | mounts | 5 | 5 | 0 | — |
 | modules | 1 | 1 | 0 | — |
 | swap | 3 | 1 | 0 | swap.present, swap.devices |
-| audit | 34 | 0 | 0 | audit.rules.present, audit.rules.loaded_count, audit.rules.persisted_count, audit.rules.persisted, audit.immutable, audit.status.enabled, audit.status.failure, audit.status.lost, audit.status.backlog_limit, audit.conf.log_file, audit.conf.log_group, audit.conf.max_log_file_action, audit.conf.space_left_action, audit.conf.admin_space_left_action, audit.conf.disk_full_action, audit.conf.disk_error_action, audit.log_file.mode, audit.log_file.uid, audit.log_file.gid, audit.log_file.group, audit.log_file.group_readable, audit.log_file.group_writable, audit.log_file.other_readable, audit.log_file.other_writable, audit.log_file.acl_present, audit.log_dir.mode, audit.log_dir.uid, audit.log_dir.gid, audit.log_dir.group, audit.log_dir.group_readable, audit.log_dir.group_writable, audit.log_dir.other_readable, audit.log_dir.other_writable, audit.log_dir.acl_present |
+| audit | 34 | 13 | 0 | audit.rules.loaded_count, audit.rules.persisted_count, audit.rules.persisted, audit.status.enabled, audit.status.failure, audit.status.lost, audit.status.backlog_limit, audit.conf.log_file, audit.conf.log_group, audit.log_file.gid, audit.log_file.group, audit.log_file.group_readable, audit.log_file.group_writable, audit.log_file.other_readable, audit.log_file.other_writable, audit.log_file.acl_present, audit.log_dir.mode, audit.log_dir.gid, audit.log_dir.group, audit.log_dir.group_readable, audit.log_dir.acl_present |
 | fim | 9 | 0 | 0 | fim.tool, fim.aide.installed, fim.aide.config_path, fim.aide.database_path, fim.aide.database_present, fim.aide.database_modified, fim.aide.scheduled, fim.aide.schedules, fim.other_tools |
