@@ -207,15 +207,21 @@ func aideSchedules(ctx context.Context, a collect.Access) (facts.Envelope, facts
 
 	// The CRON_DAILY_RUN gate: both scripts default it to yes, and the
 	// 24.04 service reads the same file.
+	// An empty value is unset: the scripts read ${CRON_DAILY_RUN:-yes}. A file
+	// that is there and cannot be read leaves the gate unknown (C3): every row
+	// it controls is disarmed with that read as the detail, and scheduled is
+	// that read's status unless a row the gate does not control is armed.
 	gate := ""
+	var gateErr *facts.Envelope
 	switch data, _, err := a.ReadFile(aideDefaults, readLimit); {
 	case err == nil:
 		s.inputs = append(s.inputs, facts.Source{Kind: "file", Path: aideDefaults})
-		if v, set := cronDailyRun(data); set && v != "yes" {
+		if v, set := cronDailyRun(data); set && v != "yes" && v != "" {
 			gate = aideDefaults + " sets CRON_DAILY_RUN=" + v
 		}
 	case !errors.Is(err, fs.ErrNotExist):
-		s.fail(readErrorEnv(aideDefaults, err))
+		e := readErrorEnv(aideDefaults, err)
+		gate, gateErr = e.Reason, &e
 	}
 
 	s.cronDaily(systemd, gate)
@@ -242,8 +248,12 @@ func aideSchedules(ctx context.Context, a collect.Access) (facts.Envelope, facts
 		}
 		return *blocked, *blocked
 	}
+	scheduled := collect.OK(armed, s.src())
+	if !armed && gateErr != nil {
+		scheduled = *gateErr
+	}
 	rows, cut := capRows(append([]any{}, s.rows...), fimRowCap)
-	return withTruncation(collect.OK(rows, s.src()), cut || s.cut), collect.OK(armed, s.src())
+	return withTruncation(collect.OK(rows, s.src()), cut || s.cut), scheduled
 }
 
 func (s *fimSchedules) src() *facts.Source {
@@ -259,17 +269,27 @@ func (s *fimSchedules) cronDaily(systemd bool, gate string) {
 	}
 	slices.Sort(matches)
 	for _, m := range matches {
-		if !strings.Contains(path.Base(m), "aide") {
+		base := path.Base(m)
+		if !strings.Contains(base, "aide") {
+			continue
+		}
+		if !runPartsName(base) {
+			s.row("cron_daily", m, false, "run-parts skips this name")
 			continue
 		}
 		meta, err := s.a.Stat(m)
 		switch {
 		case errors.Is(err, fs.ErrNotExist):
 			continue
-		case err != nil:
-			s.row("cron_daily", m, false, readReason(m, err))
+		case errors.Is(err, collect.ErrSymlink):
+			// muster never follows a link; a row, never an error.
+			s.row("cron_daily", m, false, "not a regular file")
 			continue
-		case meta.Kind == "dir":
+		case err != nil:
+			s.fail(readErrorEnv(m, err))
+			continue
+		case meta.Kind != "regular":
+			s.row("cron_daily", m, false, "not a regular file")
 			continue
 		case meta.Mode&0o111 == 0:
 			s.row("cron_daily", m, false, "not executable (mode "+fmt.Sprintf("%04o", meta.Mode)+"); run-parts skips it")
@@ -358,4 +378,16 @@ func (s *fimSchedules) timers(ctx context.Context, gate string) *facts.Envelope 
 		}
 	}
 	return nil
+}
+
+// runPartsName is the name rule Debian's run-parts applies (and the
+// narrowest of the families'): letters, digits, underscore and hyphen only,
+// so aide.dpkg-old or aide~ never runs.
+func runPartsName(name string) bool {
+	for _, r := range name {
+		if !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '_' || r == '-') {
+			return false
+		}
+	}
+	return name != ""
 }

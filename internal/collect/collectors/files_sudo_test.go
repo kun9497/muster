@@ -169,3 +169,17 @@ func TestFilesPublishesEverySudoKey(t *testing.T) {
 		})
 	}
 }
+
+// Review fix 5: muster never follows a link, so a symlinked drop-in is
+// skipped — never read, never an error — and the leaves say so.
+func TestSudoLogSkipsASymlinkedDropIn(t *testing.T) {
+	a := sudoAccess("@includedir /etc/sudoers.d\n", map[string]string{"/etc/sudoers.d/10-log": "Defaults !syslog\n"})
+	a.links = map[string]string{"/etc/sudoers.d/10-log": "/srv/sudo-log"}
+	sl, lf, sc := sudoLog(t, a)
+	for name, e := range map[string]facts.Envelope{"syslog": sl, "logfile": lf, "scoped_count": sc} {
+		if e.Status != facts.StatusOK || e.Reason != "symlink skipped: /etc/sudoers.d/10-log" {
+			t.Errorf("%s = %+v, want ok naming the skipped link", name, e)
+		}
+	}
+	okValue(t, sl, true, "syslog (the link was not read)")
+}

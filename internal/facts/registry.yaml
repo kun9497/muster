@@ -1734,7 +1734,7 @@ keys:
     collector: logging
   - key: logging.rsyslog.forwards_remote
     type: bool
-    description: Whether at least one parsed rsyslog action is a remote target (@host, @@host, :omfwd:, action(type="omfwd")) whose host is not loopback (127.0.0.0/8, ::1, localhost - a relay into a local shipper stays in the evidence list only); false when rsyslog is not installed and journald is the logger, absent for syslog-ng (not modelled) and when no modelled syslog daemon is present.
+    description: Whether at least one parsed rsyslog action is a remote target (@host, @@host, :omfwd:, action(type="omfwd")) whose host is not loopback (127.0.0.0/8, ::1, localhost - a relay into a local shipper stays in the evidence list only); false when rsyslog is not installed and journald is the logger, absent for syslog-ng (not modelled), when no modelled syslog daemon is present, and when the configuration was not fully parsed (logging.rsyslog.parse_complete false) and no remote action was found.
     since: 1
     sensitivity: public
     collector: logging
@@ -2947,13 +2947,13 @@ keys:
     collector: fim
   - key: fim.aide.scheduled
     type: bool
-    description: Whether at least one fim.aide.schedules row is armed; unsupported when a systemd host's timer inventory cannot be read.
+    description: Whether at least one fim.aide.schedules row is armed; the read's status when /etc/default/aide cannot be read and no row it does not control is armed; unsupported when a systemd host's timer inventory cannot be read.
     since: 1
     sensitivity: public
     collector: fim
   - key: fim.aide.schedules
     type: list<record>
-    description: Every way this host schedules AIDE, sorted by path, with kind (cron_daily, cron_d, crontab or timer), path (the file, or the timer unit), armed and detail (why it will not run) - a cron.daily script whose name contains aide is armed when executable, not the Ubuntu 24.04 shim on a systemd host, and CRON_DAILY_RUN in /etc/default/aide is yes or unset; a cron.d or crontab line whose command names aide is armed; a timer whose name contains aide is armed when systemctl list-timers shows a next elapse and the same CRON_DAILY_RUN gate holds; capped at 64 rows.
+    description: Every way this host schedules AIDE, sorted by path, with kind (cron_daily, cron_d, crontab or timer), path (the file, or the timer unit), armed and detail (why it will not run) - a cron.daily script whose name contains aide is armed when it is a regular executable file with a name run-parts runs (letters, digits, _ and -), not the Ubuntu 24.04 shim on a systemd host, and CRON_DAILY_RUN in /etc/default/aide is yes, empty or unset (an /etc/default/aide that cannot be read disarms every row it controls); a cron.d or crontab line whose command names aide is armed; a timer whose name contains aide is armed when systemctl list-timers shows a next elapse and the same CRON_DAILY_RUN gate holds; capped at 64 rows.
     since: 1
     sensitivity: public
     collector: fim

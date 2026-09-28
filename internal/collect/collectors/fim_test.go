@@ -458,3 +458,85 @@ func TestFimPublishesEveryRegisteredKey(t *testing.T) {
 		})
 	}
 }
+
+// C3 on the gate (review fix 1): an /etc/default/aide this run may not read
+// may hold CRON_DAILY_RUN=no, so every row it controls is disarmed with that
+// read as the detail, and scheduled is the read's status unless a row the
+// gate does not control is armed.
+func TestFimUnreadableDefaultsDisarmsTheGatedRows(t *testing.T) {
+	a := fimJammy()
+	a.fails["/etc/default/aide"] = unix.EACCES
+	b := build(t, "fim", a)
+	r := schedule(t, okList(t, b, "fim.aide.schedules"), "/etc/cron.daily/aide")
+	if r["armed"] != false || !strings.HasPrefix(r["detail"].(string), "/etc/default/aide: ") {
+		t.Errorf("gated cron.daily row %v, want disarmed naming the unread file", r)
+	}
+	if e := env(t, b, "fim.aide.scheduled"); e.Status != facts.StatusDenied || !strings.HasPrefix(e.Reason, "/etc/default/aide: ") {
+		t.Errorf("scheduled = %+v, want denied naming /etc/default/aide", e)
+	}
+
+	a = fimJammy()
+	a.fails["/etc/default/aide"] = unix.EACCES
+	a.contents["/etc/cron.d/aide-check"] = []byte("0 5 * * * root /usr/bin/aide --check\n")
+	okValue(t, env(t, build(t, "fim", a), "fim.aide.scheduled"), true, "scheduled with an ungated cron.d row")
+
+	a = fimNoble()
+	a.fails["/etc/default/aide"] = unix.EACCES
+	b = build(t, "fim", a)
+	if r := schedule(t, okList(t, b, "fim.aide.schedules"), "dailyaidecheck.timer"); r["armed"] != false ||
+		!strings.HasPrefix(r["detail"].(string), "/etc/default/aide: ") {
+		t.Errorf("gated timer row %v", r)
+	}
+	if e := env(t, b, "fim.aide.scheduled"); e.Status != facts.StatusDenied {
+		t.Errorf("noble scheduled = %+v, want denied", e)
+	}
+}
+
+// Review fix 4: an empty CRON_DAILY_RUN= is unset (${CRON_DAILY_RUN:-yes}).
+func TestFimEmptyCronDailyRunIsYes(t *testing.T) {
+	a := fimJammy()
+	delete(a.files, "/etc/default/aide")
+	a.contents["/etc/default/aide"] = []byte("CRON_DAILY_RUN=\n")
+	okValue(t, env(t, build(t, "fim", a), "fim.aide.scheduled"), true, "scheduled with an empty CRON_DAILY_RUN")
+}
+
+// Review fix 3: run-parts runs only names of letters, digits, _ and -.
+func TestFimRunPartsSkipsTheName(t *testing.T) {
+	a := fimJammy()
+	a.files["/etc/cron.daily/aide.dpkg-old"] = "cron.daily-aide.sample"
+	a.stats["/etc/cron.daily/aide.dpkg-old"] = statResult{mode: 0o755, kind: "regular"}
+	b := build(t, "fim", a)
+	rows := okList(t, b, "fim.aide.schedules")
+	if r := schedule(t, rows, "/etc/cron.daily/aide.dpkg-old"); r["armed"] != false || r["detail"] != "run-parts skips this name" {
+		t.Errorf("dotted row %v", r)
+	}
+	if r := schedule(t, rows, "/etc/cron.daily/aide"); r["armed"] != true {
+		t.Errorf("the real script %v", r)
+	}
+}
+
+// Review fix 5: a link among the cron.daily candidates is a row, never an
+// error; a stat that fails is the list's answer (C3).
+func TestFimCronDailyNonRegularAndStatFailure(t *testing.T) {
+	a := fimAccess()
+	a.files["/etc/cron.daily/aide"] = "cron.daily-aide.sample"
+	a.links = map[string]string{"/etc/cron.daily/aide": "/usr/share/aide/bin/aide"}
+	b := buildBegun(t, "fim", a)
+	if r := schedule(t, okList(t, b, "fim.aide.schedules"), "/etc/cron.daily/aide"); r["armed"] != false || r["detail"] != "not a regular file" {
+		t.Errorf("symlink row %v", r)
+	}
+	okValue(t, env(t, b, "fim.aide.scheduled"), false, "scheduled")
+	if w := b.Worst("fim"); w != facts.StatusOK {
+		t.Errorf(`Worst("fim") = %s, want ok`, w)
+	}
+
+	a = fimAccess()
+	a.files["/etc/cron.daily/aide"] = "cron.daily-aide.sample"
+	a.fails["/etc/cron.daily/aide"] = unix.EACCES
+	b = build(t, "fim", a)
+	for _, k := range []string{"fim.aide.schedules", "fim.aide.scheduled"} {
+		if e := env(t, b, k); e.Status != facts.StatusDenied || !strings.HasPrefix(e.Reason, "/etc/cron.daily/aide: ") {
+			t.Errorf("%s = %+v, want denied naming the script", k, e)
+		}
+	}
+}

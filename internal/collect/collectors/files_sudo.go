@@ -273,9 +273,16 @@ func sudoLogFacts(b *collect.Builder, a collect.Access, main sudoersRead) {
 		return
 	}
 	src := func() *facts.Source { return &facts.Source{Kind: "derived", Inputs: slices.Clone(s.inputs)} }
-	b.Set("sudo.log.syslog", withTruncation(collect.OK(s.syslog, src()), s.truncated))
-	b.Set("sudo.log.logfile", withTruncation(collect.OK(s.logfile, src()), s.truncated))
-	b.Set("sudo.defaults.scoped_count", withTruncation(collect.OK(s.scoped, src()), s.truncated))
+	ok := func(v any) facts.Envelope {
+		e := withTruncation(collect.OK(v, src()), s.truncated)
+		if len(s.skipped) > 0 {
+			e.Reason = "symlink skipped: " + strings.Join(s.skipped, ", ")
+		}
+		return e
+	}
+	b.Set("sudo.log.syslog", ok(s.syslog))
+	b.Set("sudo.log.logfile", ok(s.logfile))
+	b.Set("sudo.defaults.scoped_count", ok(s.scoped))
 }
 
 // sudoLogScan applies the sudoers files in the order sudo reads them.
@@ -288,6 +295,7 @@ type sudoLogScan struct {
 	truncated bool
 	seen      map[string]bool
 	failure   *facts.Envelope
+	skipped   []string // symlinked drop-ins, never read
 }
 
 func (s *sudoLogScan) fail(e facts.Envelope) {
@@ -353,7 +361,13 @@ func (s *sudoLogScan) includeDir(dir string, depth int) {
 		if strings.Contains(base, ".") || strings.HasSuffix(base, "~") {
 			continue
 		}
-		if meta, err := s.a.Stat(m); err == nil && meta.Kind == "dir" {
+		meta, err := s.a.Stat(m)
+		if errors.Is(err, collect.ErrSymlink) {
+			// muster never follows a link: skipped, and said so on the leaves.
+			s.skipped = append(s.skipped, m)
+			continue
+		}
+		if err == nil && meta.Kind == "dir" {
 			continue
 		}
 		s.read(m, depth)

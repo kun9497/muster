@@ -165,7 +165,13 @@ func runLogging(_ context.Context, a collect.Access, b *collect.Builder) error {
 	targets, forwards := rsyslogRemoteTargets(s.rules)
 	capped, cut := capRows(targets, rsyslogRemoteCap)
 	b.Set("logging.rsyslog.remote_targets", withTruncation(collect.OK(capped, src()), s.truncated || cut))
-	set("logging.rsyslog.forwards_remote", forwards)
+	if !forwards && len(s.incomplete) > 0 {
+		// An include this run could not follow may hold the forward: with
+		// none parsed, there is no answer (a parsed one is still true).
+		b.Set("logging.rsyslog.forwards_remote", collect.Absent("rsyslog configuration not fully parsed; a forward may be hidden"))
+	} else {
+		set("logging.rsyslog.forwards_remote", forwards)
+	}
 	return nil
 }
 

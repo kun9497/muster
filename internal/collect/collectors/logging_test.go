@@ -1176,3 +1176,22 @@ func TestLoggingPublishesEveryRegisteredKey(t *testing.T) {
 		})
 	}
 }
+
+// Review ruling (c): an include this run could not read may hold the
+// forward, so with none parsed forwards_remote has no answer; a parsed one
+// is still true.
+func TestRsyslogForwardsUnderAnIncompleteParse(t *testing.T) {
+	a := rsyslogLiteral("$IncludeConfig /etc/rsyslog.d/10-custom.conf\n*.* /var/log/syslog\n")
+	a.fails["/etc/rsyslog.d/10-custom.conf"] = os.ErrPermission
+	b := buildBegun(t, "logging", a)
+	if e := env(t, b, "logging.rsyslog.parse_complete"); e.Value != false {
+		t.Fatalf("parse_complete %+v, want false", e)
+	}
+	absentBecause(t, b, "logging.rsyslog.forwards_remote", "rsyslog configuration not fully parsed; a forward may be hidden")
+
+	a = rsyslogLiteral("$IncludeConfig /etc/rsyslog.d/10-custom.conf\n*.* @@logs.example.com:514\n")
+	a.fails["/etc/rsyslog.d/10-custom.conf"] = os.ErrPermission
+	if e := env(t, buildBegun(t, "logging", a), "logging.rsyslog.forwards_remote"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("a parsed forward under an incomplete parse = %+v, want ok true", e)
+	}
+}

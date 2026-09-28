@@ -1327,7 +1327,7 @@ func FuzzNamesAide(f *testing.F) {
 
 func FuzzParseSudoersDefaults(f *testing.F) {
 	seeds(f, "testdata/sudoers*")
-	f.Add([]byte("Defaults env_keep += \"LANG LC_ALL\", !syslog, logfile=\"/var/log/sudo.log\" \\n  syslog=authpriv\nDefaults:root !syslog\n"))
+	f.Add([]byte("Defaults env_keep += \"LANG LC_ALL\", !syslog, logfile=\"/var/log/sudo.log\", \\\n  syslog=authpriv\nDefaults:root !syslog\n"))
 	f.Fuzz(func(t *testing.T, data []byte) {
 		fuzzBody(t, "parseSudoersDefaults", func() any { return parseSudoersDefaults(data) }, len(data))
 	})
