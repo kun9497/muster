@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"path"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 
@@ -72,8 +73,12 @@ func sudoersFacts(b *collect.Builder, a collect.Access, groups map[int]string) {
 	}
 	b.Set("files.sudoers_d_entries", sudoersDropIns(a, groups))
 	// sudo.* derived from reading /etc/sudoers (root-only). A non-root run
-	// gets a denied read → the three sudo.* keys carry that status.
-	writeSudoDerived(b, a)
+	// gets a denied read → every sudo.* key it could set carries that status.
+	// One read serves both writers.
+	var main sudoersRead
+	main.data, main.meta, main.err = a.ReadFile(sudoersPath, sudoersReadLimit)
+	writeSudoDerived(b, main)
+	sudoLogFacts(b, a, main)
 }
 
 // sudoersDropIns lists /etc/sudoers.d entries. sudo ignores a name ending in
@@ -98,10 +103,17 @@ func sudoersDropIns(a collect.Access, groups map[int]string) facts.Envelope {
 	return collect.OK(rows, &facts.Source{Kind: "file", Path: sudoersDDir})
 }
 
+// sudoersRead is the one read of /etc/sudoers both sudo.* writers share.
+type sudoersRead struct {
+	data []byte
+	meta collect.ReadMeta
+	err  error
+}
+
 // writeSudoDerived parses /etc/sudoers for the @includedir directory and the
 // Defaults secure_path. installed is whether /etc/sudoers exists at all.
-func writeSudoDerived(b *collect.Builder, a collect.Access) {
-	data, meta, err := a.ReadFile(sudoersPath, sudoersReadLimit)
+func writeSudoDerived(b *collect.Builder, main sudoersRead) {
+	data, err := main.data, main.err
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			src := &facts.Source{Kind: "derived"}
@@ -134,7 +146,6 @@ func writeSudoDerived(b *collect.Builder, a collect.Access) {
 			}
 		}
 	}
-	_ = meta
 	b.Set("sudo.installed", collect.OK(true, src))
 	b.Set("sudo.includedir", collect.OK(includedir, src))
 	b.Set("sudo.secure_path", collect.OK(securePath, src))
@@ -222,4 +233,324 @@ func logTree(a collect.Access, groups map[int]string, gmeta collect.ReadMeta, ge
 	de := withTruncation(collect.OK(dirs, src), truncated || gmeta.Truncated)
 	fe := withTruncation(collect.OK(files, src), truncated || gmeta.Truncated)
 	return de, fe
+}
+
+// --- sudo's logging defaults (spec I-6) ---------------------------------
+
+// sudoLogKeys degrade together: C3 makes a sudoers file that cannot be read
+// the answer for every value it could set.
+var sudoLogKeys = []string{"sudo.log.syslog", "sudo.log.logfile", "sudo.defaults.scoped_count"}
+
+// sudoMaxDepth bounds the include recursion, so two files including each
+// other through different spellings cannot loop.
+const sudoMaxDepth = 8
+
+// sudoLogFacts writes sudo.log.syslog, sudo.log.logfile and
+// sudo.defaults.scoped_count from /etc/sudoers (the read writeSudoDerived
+// made) and the files it includes, in sudoers(5)'s order, later lines
+// winning. Only unscoped Defaults are interpreted; scoped ones are counted.
+func sudoLogFacts(b *collect.Builder, a collect.Access, main sudoersRead) {
+	if main.err != nil {
+		if errors.Is(main.err, fs.ErrNotExist) {
+			// No sudoers file: sudo's compiled-in defaults, a fact.
+			b.Set("sudo.log.syslog", collect.OK(true, &facts.Source{Kind: "derived"}))
+			b.Set("sudo.log.logfile", collect.OK("", &facts.Source{Kind: "derived"}))
+			b.Set("sudo.defaults.scoped_count", collect.OK(0, &facts.Source{Kind: "derived"}))
+			return
+		}
+		e := readErrorEnv(sudoersPath, main.err)
+		for _, k := range sudoLogKeys {
+			b.Set(k, e)
+		}
+		return
+	}
+	s := &sudoLogScan{a: a, syslog: true, seen: map[string]bool{sudoersPath: true}}
+	s.file(sudoersPath, main.data, main.meta, 0)
+	if s.failure != nil {
+		for _, k := range sudoLogKeys {
+			b.Set(k, *s.failure)
+		}
+		return
+	}
+	if len(s.skipped) > 0 {
+		// sudo follows the link and muster does not, so what the drop-in
+		// sets is unknown: absent, naming it (C4), never a guessed value.
+		e := collect.Absent("a symlinked drop-in was not read: " + strings.Join(s.skipped, ", "))
+		for _, k := range sudoLogKeys {
+			b.Set(k, e)
+		}
+		return
+	}
+	src := func() *facts.Source { return &facts.Source{Kind: "derived", Inputs: slices.Clone(s.inputs)} }
+	ok := func(v any) facts.Envelope {
+		return withTruncation(collect.OK(v, src()), s.truncated)
+	}
+	b.Set("sudo.log.syslog", ok(s.syslog))
+	b.Set("sudo.log.logfile", ok(s.logfile))
+	b.Set("sudo.defaults.scoped_count", ok(s.scoped))
+}
+
+// sudoLogScan applies the sudoers files in the order sudo reads them.
+type sudoLogScan struct {
+	a         collect.Access
+	syslog    bool
+	logfile   string
+	scoped    int
+	inputs    []facts.Source
+	truncated bool
+	seen      map[string]bool
+	failure   *facts.Envelope
+	skipped   []string // symlinked drop-ins, never read
+}
+
+func (s *sudoLogScan) fail(e facts.Envelope) {
+	if s.failure == nil {
+		s.failure = &e
+	}
+}
+
+func (s *sudoLogScan) file(p string, data []byte, meta collect.ReadMeta, depth int) {
+	s.inputs = append(s.inputs, facts.Source{Kind: "file", Path: p})
+	s.truncated = s.truncated || meta.Truncated
+	for _, e := range parseSudoersDefaults(data) {
+		if s.failure != nil {
+			return
+		}
+		switch e.kind {
+		case sudoScoped:
+			s.scoped++
+		case sudoDefaults:
+			for _, o := range e.options {
+				switch o.name {
+				case "syslog":
+					// syslog=facility keeps logging on; only !syslog stops it.
+					s.syslog = !o.negated
+				case "logfile":
+					if o.negated {
+						s.logfile = ""
+					} else {
+						s.logfile = o.value
+					}
+				}
+			}
+		case sudoIncludeDir:
+			s.includeDir(e.arg, depth)
+		case sudoInclude:
+			s.include(e.arg, depth)
+		}
+	}
+}
+
+// includeDir reads every file of an includedir in lexical order, skipping a
+// name that contains a "." or ends in "~" as sudo does. The directory is
+// declared as /etc/sudoers.d alone; any other is a path the model declines
+// to read (C4).
+func (s *sudoLogScan) includeDir(dir string, depth int) {
+	dir = strings.TrimSuffix(dir, "/")
+	if dir != sudoersDDir {
+		s.fail(collect.Absent("includedir " + dir + " is outside the collector's declaration"))
+		return
+	}
+	if s.seen[dir] || depth >= sudoMaxDepth {
+		return
+	}
+	s.seen[dir] = true
+	matches, err := s.a.Glob(sudoersDGlob)
+	if err != nil {
+		s.fail(globReadError(sudoersDGlob, err, collect.ErrorEnv(sudoersDGlob+": "+err.Error())))
+		return
+	}
+	sort.Strings(matches)
+	for _, m := range matches {
+		base := path.Base(m)
+		if strings.Contains(base, ".") || strings.HasSuffix(base, "~") {
+			continue
+		}
+		meta, err := s.a.Stat(m)
+		if errors.Is(err, collect.ErrSymlink) {
+			// A link to /dev/null is a mask (K-21): it holds no line, so it
+			// is neither read nor skipped. muster never follows any other
+			// link: skipped, and the leaves are absent naming it (W-7).
+			if target, ok := linkTarget(s.a, m); !ok || target != devNull {
+				s.skipped = append(s.skipped, m)
+			}
+			continue
+		}
+		if err == nil && meta.Kind == "dir" {
+			continue
+		}
+		s.read(m, depth)
+		if s.failure != nil {
+			return
+		}
+	}
+}
+
+// include reads one file an @include/#include names.
+func (s *sudoLogScan) include(p string, depth int) {
+	if s.seen[p] || depth >= sudoMaxDepth {
+		return
+	}
+	s.seen[p] = true
+	if !path.IsAbs(p) || !declared(s.a, p) {
+		s.fail(collect.Absent("include " + p + " is outside the collector's declaration"))
+		return
+	}
+	s.read(p, depth)
+}
+
+func (s *sudoLogScan) read(p string, depth int) {
+	data, meta, err := s.a.ReadFile(p, sudoersReadLimit)
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
+		return
+	case err != nil:
+		s.fail(readErrorEnv(p, err))
+		return
+	}
+	s.file(p, data, meta, depth+1)
+}
+
+// The kinds of sudoers line the logging leaves care about.
+const (
+	sudoDefaults   = "defaults"
+	sudoScoped     = "scoped"
+	sudoIncludeDir = "includedir"
+	sudoInclude    = "include"
+)
+
+// sudoersEntry is one sudoers line that matters to sudo.log.*: an unscoped
+// Defaults line and its options, a scoped Defaults line (counted only), or
+// an include directive and its argument.
+type sudoersEntry struct {
+	kind    string
+	options []sudoOption
+	arg     string
+}
+
+// sudoOption is one Defaults option: its name, whether it was negated with
+// "!", and its value with quotes removed ("" when it has none).
+type sudoOption struct {
+	name    string
+	negated bool
+	value   string
+}
+
+// parseSudoersDefaults reads a sudoers file for its Defaults lines and
+// include directives, in file order. Backslash continuations are joined
+// first (a comment ends at its newline). sudo's lexer reads Defaults[:@>!]?
+// as ONE word, so a line is scoped exactly when the character right after
+// "Defaults" is one of those four — Defaults:root, Defaults!/usr/bin/x —
+// while "Defaults !syslog" and "Defaults<TAB>env_reset" are unscoped. The
+// option list is comma-separated with quoted values, whitespace around an
+// operator allowed and += / -= part of the option. #include and #includedir
+// are directives, not comments.
+func parseSudoersDefaults(data []byte) []sudoersEntry {
+	var logical []string
+	cur, joining := "", false
+	for _, raw := range splitLines(data) {
+		t := strings.TrimRight(raw, " \t")
+		if !joining && strings.HasPrefix(strings.TrimSpace(t), "#") {
+			logical = append(logical, strings.TrimSpace(t))
+			continue
+		}
+		if strings.HasSuffix(t, `\`) {
+			cur += strings.TrimSuffix(t, `\`) + " "
+			joining = true
+			continue
+		}
+		logical = append(logical, strings.TrimSpace(cur+t))
+		cur, joining = "", false
+	}
+	if joining {
+		logical = append(logical, strings.TrimSpace(cur))
+	}
+	var out []sudoersEntry
+	for _, l := range logical {
+		if kind, arg, ok := sudoDirective(l); ok {
+			out = append(out, sudoersEntry{kind: kind, arg: arg})
+			continue
+		}
+		rest, ok := strings.CutPrefix(l, "Defaults")
+		if !ok || rest == "" {
+			continue
+		}
+		switch c := rest[0]; {
+		case strings.IndexByte(":@>!", c) >= 0:
+			out = append(out, sudoersEntry{kind: sudoScoped})
+		case c == ' ' || c == '\t':
+			out = append(out, sudoersEntry{kind: sudoDefaults, options: sudoOptions(rest)})
+		}
+	}
+	return out
+}
+
+// sudoDirective recognises @include, @includedir and their # spellings.
+func sudoDirective(s string) (kind, arg string, ok bool) {
+	f := strings.Fields(s)
+	if len(f) < 2 {
+		return "", "", false
+	}
+	switch f[0] {
+	case "@includedir", "#includedir":
+		return sudoIncludeDir, strings.Trim(f[1], `"`), true
+	case "@include", "#include":
+		return sudoInclude, strings.Trim(f[1], `"`), true
+	}
+	return "", "", false
+}
+
+// sudoOptions splits a Defaults option list on the commas outside double
+// quotes, stops at an unquoted comment, and reads each option.
+func sudoOptions(s string) []sudoOption {
+	var parts []string
+	var b strings.Builder
+	quoted, escaped := false, false
+scan:
+	for _, r := range s {
+		switch {
+		case escaped:
+			escaped = false
+		case r == '\\':
+			escaped = true
+		case r == '"':
+			quoted = !quoted
+		case r == ',' && !quoted:
+			parts = append(parts, b.String())
+			b.Reset()
+			continue
+		case r == '#' && !quoted:
+			break scan
+		}
+		b.WriteRune(r)
+	}
+	parts = append(parts, b.String())
+	var out []sudoOption
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		neg := false
+		for strings.HasPrefix(p, "!") {
+			neg = !neg
+			p = strings.TrimSpace(p[1:])
+		}
+		name, rest := p, ""
+		if end := strings.IndexAny(p, "=+- \t"); end >= 0 {
+			name, rest = p[:end], strings.TrimSpace(p[end:])
+		}
+		if name == "" {
+			continue
+		}
+		value := ""
+		for _, op := range []string{"+=", "-=", "="} {
+			if v, ok := strings.CutPrefix(rest, op); ok {
+				value = strings.TrimSpace(v)
+				break
+			}
+		}
+		if len(value) >= 2 && value[0] == '"' && value[len(value)-1] == '"' {
+			value = value[1 : len(value)-1]
+		}
+		out = append(out, sudoOption{name: name, negated: neg, value: value})
+	}
+	return out
 }

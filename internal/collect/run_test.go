@@ -619,6 +619,45 @@ func TestDeepReachesTheWalkCollectorThroughTheBuilder(t *testing.T) {
 	}
 }
 
+// J-10: the verify options reach the pkgverify collector only through the
+// Builder, and only when --deep was given without --no-verify — the
+// collector asking Verify() is asking whether the operator wanted package
+// verification at all.
+func TestDeepReachesTheVerifyOptionsThroughTheBuilder(t *testing.T) {
+	want := VerifyOptions{Timeout: 7 * time.Minute}
+	for _, tc := range []struct {
+		name string
+		opts Options
+		want VerifyOptions
+		ok   bool
+	}{
+		{name: "deep", opts: Options{Deep: true, Verify: want}, want: want, ok: true},
+		{name: "deep without verification", opts: Options{Deep: true, Verify: want, NoVerify: true}},
+		{name: "shallow", opts: Options{Verify: want}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			Reset()
+			defer Reset()
+			var got VerifyOptions
+			var ok bool
+			Register(Collector{Name: "verifyspy", Declare: Declaration{Needs: "none"},
+				Run: func(_ context.Context, _ Access, b *Builder) error {
+					got, ok = b.Verify()
+					return nil
+				}})
+			o := tc.opts
+			o.Out = filepath.Join(t.TempDir(), "s.json")
+			o.Access = quietAccess{}
+			if _, err := Run(context.Background(), o, nil); err != nil {
+				t.Fatal(err)
+			}
+			if ok != tc.ok || got != tc.want {
+				t.Errorf("the collector saw (%+v, %v), want (%+v, %v)", got, ok, tc.want, tc.ok)
+			}
+		})
+	}
+}
+
 // The Builder keeps its own copy of the exclusion lists. They arrive as the
 // command line's backing arrays, and a walk whose boundaries could change
 // after they were set is a walk whose walk.skipped rows do not describe the

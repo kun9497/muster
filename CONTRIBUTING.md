@@ -141,6 +141,19 @@ the key present with its `effective` side `absent` when it means to be absent.
   binaries — packages come from what the image ships, each with a reason in
   `sources.json`.
 
+### Commands whose exit code is data
+
+A collector never reads a command's exit code as success or failure alone. `rpm
+-Va` exits 1 to say "something differs" and `dnf check-update` exits 100 to say
+"updates are pending"; `needs-restarting -r` exits 1 for "reboot required";
+`dpkg --verify` with no arguments exits 0 whatever it printed; `auditctl` exits
+4 when the caller lacks CAP_AUDIT_CONTROL and 255 when the kernel refuses the
+request. Classify in this order — timed out, could not start, then the codes and
+messages the tool documents, then anything else as `error` naming the command
+and the code — and write the verdict from the output, never from the code
+alone. Record the timeout on the `Command` and the exit code in the envelope's
+source (`Output.Source`).
+
 ## Tests
 
 - Write the test that drives the caller before the test of the helper. After

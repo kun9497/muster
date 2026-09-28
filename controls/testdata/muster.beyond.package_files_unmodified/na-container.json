@@ -1,0 +1,128 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {
+    "deep": true
+  },
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "docker"
+      }
+    },
+    "packages": {
+      "verify": {
+        "complete": {
+          "status": "ok",
+          "value": true,
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/dpkg --verify",
+            "exit_code": 0
+          }
+        },
+        "tool": {
+          "status": "ok",
+          "value": "dpkg",
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/dpkg --verify",
+            "exit_code": 0
+          }
+        },
+        "modified": {
+          "status": "ok",
+          "value": [],
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/dpkg --verify",
+            "exit_code": 0
+          }
+        },
+        "modified_config": {
+          "status": "ok",
+          "value": [
+            {
+              "path": "/etc/issue",
+              "attributes": [
+                "digest"
+              ],
+              "untested": 8,
+              "file_type": "config",
+              "note": ""
+            },
+            {
+              "path": "/etc/issue.net",
+              "attributes": [
+                "digest"
+              ],
+              "untested": 8,
+              "file_type": "config",
+              "note": ""
+            }
+          ],
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/dpkg --verify",
+            "exit_code": 0
+          }
+        },
+        "filter": {
+          "status": "ok",
+          "value": [
+            "config",
+            "doc",
+            "dpkg_excluded",
+            "ghost",
+            "mtime_only",
+            "unverifiable",
+            "unchanged"
+          ],
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/dpkg --verify",
+            "exit_code": 0
+          }
+        },
+        "filtered_counts": {
+          "status": "ok",
+          "value": {
+            "config": 2,
+            "doc": 1199,
+            "dpkg_excluded": 0,
+            "ghost": 0,
+            "mtime_only": 0,
+            "unverifiable": 0,
+            "unchanged": 0
+          },
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/dpkg --verify",
+            "exit_code": 0
+          }
+        },
+        "stats": {
+          "status": "ok",
+          "value": {
+            "lines": 1201,
+            "exit_code": 0,
+            "duration_ms": 48213,
+            "truncated": false,
+            "stderr_head": [],
+            "unparsed_head": [],
+            "packages_without_digests": 3,
+            "packages_without_digests_error": "",
+            "dpkg_path_excludes": [],
+            "dpkg_path_excludes_error": []
+          },
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/dpkg --verify",
+            "exit_code": 0
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,13 @@
+# AIDE conf
+
+# set environment for executable config files included by x_include
+@@x_include_setenv UPAC_settingsd /etc/aide/aide.settings.d
+
+# The daily cron job depends on these paths
+database_in=file:/var/lib/aide/aide.db
+database_out=file:/var/lib/aide/aide.db.new
+database_new=file:/var/lib/aide/aide.db.new
+gzip_dbout=yes
+
+@@x_include_setenv PATH /bin:/usr/bin
+@@x_include /etc/aide/aide.conf.d ^[a-zA-Z0-9_-]+$

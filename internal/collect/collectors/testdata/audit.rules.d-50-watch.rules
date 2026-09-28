@@ -1,0 +1,4 @@
+## Synthetic rules.d fragment: one watch and one syscall rule, each with a key.
+-w /etc/passwd -p wa -k identity
+
+-a always,exit -F arch=b64 -S execve -k exec

@@ -159,3 +159,102 @@
     original resolves through absent_means with "no mechanism applies", the mutant through the
     same absent_means on the mechanism's own checks, and both are MANUAL with no reason code. No
     snapshot collect can write separates the two.
+
+- control: muster.beyond.auditd_active
+  mutant: "checks[0] remove"
+  reason: >-
+    probeUnits (internal/collect/collectors/services.go:256-274) sets installed only for a unit
+    whose LoadState is not "not-found", and a not-found auditd.service reports ActiveState
+    inactive and an empty UnitFileState, so services.auditd.installed ok false always comes with
+    .active and .enabled ok false -- auditd has no port and no super-server entry that could
+    prove either another way. A host that fails checks[0] fails checks[1] and checks[2] too.
+
+- control: muster.beyond.auditd_active
+  mutant: "absent_means ->pass"
+  reason: >-
+    services.auditd.* (internal/collect/collectors/services.go) is ok from systemctl show, error
+    or denied from a failed show (verdict's firstFailure, commandFailure), or unsupported without
+    systemd (runServices) -- never absent. So no snapshot collect writes reaches absent_means,
+    and the value it names cannot change any fixture's answer.
+
+- control: muster.beyond.auditd_active
+  mutant: "absent_means ->not_applicable"
+  reason: >-
+    services.auditd.* (internal/collect/collectors/services.go) is ok from systemctl show, error
+    or denied from a failed show (verdict's firstFailure, commandFailure), or unsupported without
+    systemd (runServices) -- never absent. So no snapshot collect writes reaches absent_means,
+    and the value it names cannot change any fixture's answer.
+
+- control: muster.beyond.auditd_active
+  mutant: "absent_means ->manual"
+  reason: >-
+    services.auditd.* (internal/collect/collectors/services.go) is ok from systemctl show, error
+    or denied from a failed show (verdict's firstFailure, commandFailure), or unsupported without
+    systemd (runServices) -- never absent. So no snapshot collect writes reaches absent_means,
+    and the value it names cannot change any fixture's answer.
+
+- control: muster.beyond.remote_log_forwarding
+  mutant: "mechanisms[2].when[0] remove"
+  reason: >-
+    runLogging and noRsyslogForwarding (internal/collect/collectors/logging.go) write
+    logging.rsyslog.forwards_remote as an ok bool, as absent (syslog-ng, an unmodelled daemon,
+    an incomplete parse with no remote found) or as the rsyslog.conf read's hard status --
+    never unsupported. Mechanism [0] claims true and a hard status is ERROR at its `when`, so
+    mechanism [2] is reached only with false, which its own `when` accepts, or with absent,
+    where the original resolves through absent_means with "no mechanism applies" and the
+    mutant through the same absent_means on its own check: both MANUAL with no reason code.
+
+- control: muster.beyond.sudo_logging
+  mutant: "mechanisms[1].when[0] remove"
+  reason: >-
+    sudoLogFacts (internal/collect/collectors/files_sudo.go) writes sudo.log.syslog as an ok
+    bool -- true for sudo's compiled-in default, false only for an unscoped !syslog -- as the
+    sudoers read's hard status (C3), or as absent with sudo.log.logfile (an include outside the
+    declaration, a symlinked drop-in), never unsupported. Mechanism [0] claims true and a hard
+    status is ERROR at its `when`, so mechanism [1] is reached only with false, which its own
+    `when` selects, or with absent, where the original resolves through absent_means with "no
+    mechanism applies" and the mutant through the same absent_means on its absent logfile
+    check: both MANUAL.
+
+- control: muster.beyond.file_integrity_tool
+  mutant: "mechanisms[1].when[0] remove"
+  reason: >-
+    runFim (internal/collect/collectors/fim.go) writes fim.tool as ok "aide", ok "none" or
+    absent (another tool found, named in the reason) -- a closed vocabulary with no other
+    value and no hard status. Mechanism [0] claims "aide", so mechanism [1] is reached only
+    with "none", which its own `when` accepts, or with absent, where the original resolves
+    through absent_means with "no mechanism applies" and the mutant through the same
+    absent_means on its own check: both MANUAL with no reason code.
+
+- control: muster.beyond.package_files_unmodified
+  mutant: "absent_means ->pass"
+  reason: >-
+    runPkgverify (internal/collect/collectors/pkgverify.go) writes nothing without --deep or under
+    --no-verify,
+    which the deep gate reads as MANUAL before any check, and otherwise writes
+    packages.verify.complete as ok, denied, timeout, error or unsupported and
+    packages.verify.modified as an ok list (writeVerifyUnknown included) -- never absent. So no
+    snapshot collect writes reaches absent_means, and the value it names cannot change any
+    fixture's answer.
+
+- control: muster.beyond.package_files_unmodified
+  mutant: "absent_means ->not_applicable"
+  reason: >-
+    runPkgverify (internal/collect/collectors/pkgverify.go) writes nothing without --deep or under
+    --no-verify,
+    which the deep gate reads as MANUAL before any check, and otherwise writes
+    packages.verify.complete as ok, denied, timeout, error or unsupported and
+    packages.verify.modified as an ok list (writeVerifyUnknown included) -- never absent. So no
+    snapshot collect writes reaches absent_means, and the value it names cannot change any
+    fixture's answer.
+
+- control: muster.beyond.package_files_unmodified
+  mutant: "absent_means ->manual"
+  reason: >-
+    runPkgverify (internal/collect/collectors/pkgverify.go) writes nothing without --deep or under
+    --no-verify,
+    which the deep gate reads as MANUAL before any check, and otherwise writes
+    packages.verify.complete as ok, denied, timeout, error or unsupported and
+    packages.verify.modified as an ok list (writeVerifyUnknown included) -- never absent. So no
+    snapshot collect writes reaches absent_means, and the value it names cannot change any
+    fixture's answer.

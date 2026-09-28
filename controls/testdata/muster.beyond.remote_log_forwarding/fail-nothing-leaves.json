@@ -1,0 +1,111 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none"
+      }
+    },
+    "logging": {
+      "rsyslog": {
+        "forwards_remote": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "file",
+                "path": "/etc/rsyslog.conf"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/rsyslog.d/50-default.conf"
+              }
+            ]
+          }
+        },
+        "remote_targets": {
+          "status": "ok",
+          "value": [],
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "file",
+                "path": "/etc/rsyslog.conf"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/rsyslog.d/50-default.conf"
+              }
+            ]
+          }
+        }
+      },
+      "journal_upload": {
+        "url": {
+          "status": "ok",
+          "value": "",
+          "source": {
+            "kind": "derived"
+          }
+        }
+      }
+    },
+    "services": {
+      "syslog": {
+        "installed": {
+          "status": "ok",
+          "value": true,
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState rsyslog.service",
+            "exit_code": 0
+          }
+        },
+        "active": {
+          "status": "ok",
+          "value": true,
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState rsyslog.service",
+            "exit_code": 0
+          }
+        }
+      },
+      "journal_upload": {
+        "installed": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState systemd-journal-upload.service",
+            "exit_code": 0
+          }
+        },
+        "active": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState systemd-journal-upload.service",
+            "exit_code": 0
+          }
+        },
+        "enabled": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState systemd-journal-upload.service",
+            "exit_code": 0
+          }
+        }
+      }
+    }
+  }
+}

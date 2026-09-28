@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
   "run": {
-    "muster_version": "e5eda50",
-    "commit": "e5eda50",
-    "controls_version": "kisa-unix-2026+2026.09.18",
-    "controls_digest": "sha256:1236ece32ab31e36ec68736e546abc54ce3ab653a221c2a27e080a573cf39db6",
+    "muster_version": "81855c8",
+    "commit": "81855c8",
+    "controls_version": "kisa-unix-2026+2026.09.23",
+    "controls_digest": "sha256:f3337dac3ea8281886a8618f4cc136ddf62b3258dbfb113c560b5aeca854f41d",
     "guide_edition": "kisa-unix-2026",
-    "collected_at": "2026-09-21T00:36:06Z",
+    "collected_at": "2026-09-28T08:17:22Z",
     "host": {
       "hostname": "ubuntu-container",
       "machine_id_hash": "",
@@ -36,12 +36,18 @@
       {
         "name": "accounts",
         "status": "ok",
-        "ms": 0
+        "ms": 10
+      },
+      {
+        "name": "audit",
+        "status": "ok",
+        "ms": 2,
+        "cmd": "/usr/sbin/auditctl -l"
       },
       {
         "name": "banners",
         "status": "ok",
-        "ms": 0
+        "ms": 1
       },
       {
         "name": "boot",
@@ -51,12 +57,12 @@
       {
         "name": "coredump",
         "status": "ok",
-        "ms": 0
+        "ms": 45
       },
       {
         "name": "cron",
         "status": "ok",
-        "ms": 0,
+        "ms": 2,
         "cmd": "/usr/bin/systemctl list-unit-files --type=timer --no-legend --no-pager"
       },
       {
@@ -67,12 +73,18 @@
       {
         "name": "env",
         "status": "ok",
-        "ms": 0
+        "ms": 6
       },
       {
         "name": "files",
         "status": "ok",
-        "ms": 3
+        "ms": 7
+      },
+      {
+        "name": "fim",
+        "status": "ok",
+        "ms": 5,
+        "cmd": "/usr/bin/systemctl list-timers --all --no-legend --no-pager"
       },
       {
         "name": "firewall",
@@ -119,18 +131,24 @@
       {
         "name": "os",
         "status": "ok",
-        "ms": 0
+        "ms": 5
       },
       {
         "name": "pam",
         "status": "ok",
-        "ms": 0
+        "ms": 11
       },
       {
         "name": "patch",
         "status": "ok",
-        "ms": 31,
+        "ms": 572,
         "cmd": "/usr/bin/apt-get -s upgrade -o Debug::NoLocking=1"
+      },
+      {
+        "name": "pkgverify",
+        "status": "ok",
+        "ms": 7941,
+        "cmd": "/usr/bin/rpm -Va"
       },
       {
         "name": "services",
@@ -1146,6 +1164,174 @@
         "source": {
           "kind": "file",
           "path": "/etc/passwd"
+        }
+      }
+    },
+    "audit": {
+      "conf": {
+        "admin_space_left_action": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "disk_error_action": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "disk_full_action": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "log_file": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "log_group": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "max_log_file_action": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "space_left_action": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        }
+      },
+      "immutable": {
+        "runtime": {
+          "status": "absent",
+          "reason": "auditctl is not installed"
+        },
+        "persisted": {
+          "status": "absent",
+          "reason": "/etc/audit/audit.rules: not present"
+        },
+        "effective": {
+          "status": "absent",
+          "reason": "auditctl is not installed"
+        }
+      },
+      "log_dir": {
+        "acl_present": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "gid": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "group": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "group_readable": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "group_writable": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "mode": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "other_readable": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "other_writable": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "uid": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        }
+      },
+      "log_file": {
+        "acl_present": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "gid": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "group": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "group_readable": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "group_writable": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "mode": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "other_readable": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "other_writable": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "uid": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        }
+      },
+      "rules": {
+        "loaded_count": {
+          "status": "absent",
+          "reason": "auditctl is not installed"
+        },
+        "persisted": {
+          "status": "absent",
+          "reason": "/etc/audit/audit.rules: not present"
+        },
+        "persisted_count": {
+          "status": "absent",
+          "reason": "/etc/audit/audit.rules: not present"
+        },
+        "present": {
+          "runtime": {
+            "status": "absent",
+            "reason": "auditctl is not installed"
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "/etc/audit/audit.rules: not present"
+          },
+          "effective": {
+            "status": "absent",
+            "reason": "auditctl is not installed"
+          }
+        }
+      },
+      "status": {
+        "backlog_limit": {
+          "status": "absent",
+          "reason": "auditctl is not installed"
+        },
+        "enabled": {
+          "status": "absent",
+          "reason": "auditctl is not installed"
+        },
+        "failure": {
+          "status": "absent",
+          "reason": "auditctl is not installed"
+        },
+        "lost": {
+          "status": "absent",
+          "reason": "auditctl is not installed"
         }
       }
     },
@@ -2886,6 +3072,73 @@
         }
       }
     },
+    "fim": {
+      "aide": {
+        "config_path": {
+          "status": "absent",
+          "reason": "neither /etc/aide/aide.conf nor /etc/aide.conf exists"
+        },
+        "database_modified": {
+          "status": "absent",
+          "reason": "no AIDE configuration file names a database: neither /etc/aide/aide.conf nor /etc/aide.conf exists"
+        },
+        "database_path": {
+          "status": "absent",
+          "reason": "no AIDE configuration file names a database: neither /etc/aide/aide.conf nor /etc/aide.conf exists"
+        },
+        "database_present": {
+          "status": "absent",
+          "reason": "no AIDE configuration file names a database: neither /etc/aide/aide.conf nor /etc/aide.conf exists"
+        },
+        "installed": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "derived"
+          }
+        },
+        "scheduled": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "file",
+                "path": "/etc/cron.d/e2scrub_all"
+              }
+            ]
+          }
+        },
+        "schedules": {
+          "status": "ok",
+          "value": [],
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "file",
+                "path": "/etc/cron.d/e2scrub_all"
+              }
+            ]
+          }
+        }
+      },
+      "other_tools": {
+        "status": "ok",
+        "value": [],
+        "source": {
+          "kind": "derived"
+        }
+      },
+      "tool": {
+        "status": "ok",
+        "value": "none",
+        "source": {
+          "kind": "derived"
+        }
+      }
+    },
     "firewall": {
       "backend": {
         "status": "unsupported",
@@ -3364,6 +3617,12 @@
       }
     },
     "logging": {
+      "journal_upload": {
+        "url": {
+          "status": "unsupported",
+          "reason": "no systemd journald on this host"
+        }
+      },
       "journald": {
         "forward_to_syslog": {
           "status": "unsupported",
@@ -3393,6 +3652,10 @@
           "status": "absent",
           "reason": "no rsyslog configuration on this host (/etc/rsyslog.conf is not present)"
         },
+        "forwards_remote": {
+          "status": "absent",
+          "reason": "no modelled syslog daemon"
+        },
         "parse_complete": {
           "status": "absent",
           "reason": "no rsyslog configuration on this host (/etc/rsyslog.conf is not present)"
@@ -3400,6 +3663,10 @@
         "property_filters": {
           "status": "absent",
           "reason": "no rsyslog configuration on this host (/etc/rsyslog.conf is not present)"
+        },
+        "remote_targets": {
+          "status": "absent",
+          "reason": "no modelled syslog daemon"
         },
         "rules": {
           "status": "absent",
@@ -4109,6 +4376,114 @@
         "source": {
           "kind": "file",
           "path": "/var/lib/dpkg/status"
+        }
+      },
+      "verify": {
+        "complete": {
+          "status": "ok",
+          "value": true,
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/dpkg --verify",
+            "exit_code": 0
+          }
+        },
+        "filter": {
+          "status": "ok",
+          "value": [
+            "config",
+            "doc",
+            "dpkg_excluded",
+            "ghost",
+            "mtime_only",
+            "unverifiable",
+            "unchanged"
+          ],
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/dpkg --verify",
+            "exit_code": 0
+          }
+        },
+        "filtered_counts": {
+          "status": "ok",
+          "value": {
+            "config": 0,
+            "doc": 1505,
+            "dpkg_excluded": 0,
+            "ghost": 0,
+            "mtime_only": 0,
+            "unchanged": 0,
+            "unverifiable": 0
+          },
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/dpkg --verify",
+            "exit_code": 0
+          }
+        },
+        "modified": {
+          "status": "ok",
+          "value": [
+            {
+              "attributes": [
+                "missing"
+              ],
+              "file_type": "",
+              "note": "",
+              "path": "/var/lib/apt/lists/partial",
+              "untested": 0
+            }
+          ],
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/dpkg --verify",
+            "exit_code": 0
+          }
+        },
+        "modified_config": {
+          "status": "ok",
+          "value": [],
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/dpkg --verify",
+            "exit_code": 0
+          }
+        },
+        "stats": {
+          "status": "ok",
+          "value": {
+            "dpkg_path_excludes": [
+              "path-exclude=/usr/share/man/*",
+              "path-exclude=/usr/share/locale/*/LC_MESSAGES/*.mo",
+              "path-exclude=/usr/share/doc/*",
+              "path-include=/usr/share/doc/*/copyright",
+              "path-include=/usr/share/doc/*/changelog.*"
+            ],
+            "dpkg_path_excludes_error": [],
+            "duration_ms": 7935,
+            "exit_code": 0,
+            "lines": 1506,
+            "packages_without_digests": 0,
+            "packages_without_digests_error": "",
+            "stderr_head": [],
+            "truncated": false,
+            "unparsed_head": []
+          },
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/dpkg --verify",
+            "exit_code": 0
+          }
+        },
+        "tool": {
+          "status": "ok",
+          "value": "dpkg",
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/dpkg --verify",
+            "exit_code": 0
+          }
         }
       }
     },
@@ -5139,7 +5514,7 @@
       },
       "days_since_last_install": {
         "status": "ok",
-        "value": 9,
+        "value": 17,
         "source": {
           "kind": "file",
           "path": "/var/log/dpkg.log"
@@ -5189,6 +5564,24 @@
       }
     },
     "services": {
+      "auditd": {
+        "active": {
+          "status": "unsupported",
+          "reason": "no systemd on this host or inside this container"
+        },
+        "enabled": {
+          "status": "unsupported",
+          "reason": "no systemd on this host or inside this container"
+        },
+        "installed": {
+          "status": "unsupported",
+          "reason": "no systemd on this host or inside this container"
+        },
+        "unit_file_state": {
+          "status": "unsupported",
+          "reason": "no systemd on this host or inside this container"
+        }
+      },
       "automount": {
         "active": {
           "status": "unsupported",
@@ -5287,6 +5680,24 @@
           "reason": "no systemd on this host or inside this container"
         },
         "reachable": {
+          "status": "unsupported",
+          "reason": "no systemd on this host or inside this container"
+        },
+        "unit_file_state": {
+          "status": "unsupported",
+          "reason": "no systemd on this host or inside this container"
+        }
+      },
+      "journal_upload": {
+        "active": {
+          "status": "unsupported",
+          "reason": "no systemd on this host or inside this container"
+        },
+        "enabled": {
+          "status": "unsupported",
+          "reason": "no systemd on this host or inside this container"
+        },
+        "installed": {
           "status": "unsupported",
           "reason": "no systemd on this host or inside this container"
         },
@@ -5697,6 +6108,15 @@
       }
     },
     "sudo": {
+      "defaults": {
+        "scoped_count": {
+          "status": "ok",
+          "value": 0,
+          "source": {
+            "kind": "derived"
+          }
+        }
+      },
       "includedir": {
         "status": "ok",
         "value": "",
@@ -5709,6 +6129,22 @@
         "value": false,
         "source": {
           "kind": "derived"
+        }
+      },
+      "log": {
+        "logfile": {
+          "status": "ok",
+          "value": "",
+          "source": {
+            "kind": "derived"
+          }
+        },
+        "syslog": {
+          "status": "ok",
+          "value": true,
+          "source": {
+            "kind": "derived"
+          }
         }
       },
       "secure_path": {

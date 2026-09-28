@@ -390,6 +390,54 @@ keys:
     since: 1
     sensitivity: public
     collector: services
+  - key: services.auditd.installed
+    type: bool
+    description: The audit daemon's unit auditd.service exists on the host.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.auditd.active
+    type: bool
+    description: The audit daemon is running.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.auditd.unit_file_state
+    type: string
+    description: UnitFileState of auditd.service (evidence only; "not-found" when the unit is not there).
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.auditd.enabled
+    type: bool
+    description: auditd.service will start at boot.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.journal_upload.installed
+    type: bool
+    description: The journal upload unit systemd-journal-upload.service exists on the host.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.journal_upload.active
+    type: bool
+    description: systemd-journal-upload is running.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.journal_upload.unit_file_state
+    type: string
+    description: UnitFileState of systemd-journal-upload.service (evidence only; "not-found" when the unit is not there).
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.journal_upload.enabled
+    type: bool
+    description: systemd-journal-upload.service will start at boot.
+    since: 1
+    sensitivity: public
+    collector: services
   - key: sockets.listening
     type: list<record>
     description: Listening TCP/UDP sockets with proto, address, port, inode, pid and executable.
@@ -1086,6 +1134,24 @@ keys:
     since: 1
     sensitivity: public
     collector: files
+  - key: sudo.log.syslog
+    type: bool
+    description: Whether sudo logs to syslog by default - false only when an unscoped Defaults line negates it (!syslog), later lines winning across /etc/sudoers and its includedir files in sudo's order; on by default in sudoers(5), and a syslog=facility value keeps it on. The read's status, path-prefixed, when any of those files cannot be read.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: sudo.log.logfile
+    type: string
+    description: The unscoped Defaults logfile= value with quotes stripped, an empty string when none (or when !logfile resets it); the read's status, path-prefixed, when a sudoers file cannot be read.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: sudo.defaults.scoped_count
+    type: int
+    description: How many scoped Defaults lines (Defaults:user, Defaults@host, Defaults>runas, Defaults!command) the sudoers files carry - counted, not interpreted, since each changes one persona and sudo.log.* say what the host does by default; evidence.
+    since: 1
+    sensitivity: public
+    collector: files
   - key: accounts.login_defs.pass_max_days
     type: setting<int>
     description: PASS_MAX_DAYS - persisted in login.defs, effective as the maximum over existing accounts' shadow fields.
@@ -1666,6 +1732,24 @@ keys:
     since: 1
     sensitivity: public
     collector: logging
+  - key: logging.rsyslog.forwards_remote
+    type: bool
+    description: Whether at least one parsed rsyslog action is a remote target (@host, @@host, :omfwd:, action(type="omfwd")) whose host is not loopback (127.0.0.0/8, ::1, localhost - a relay into a local shipper stays in the evidence list only); false when rsyslog is not installed and journald is the logger, absent for syslog-ng (not modelled), when no modelled syslog daemon is present, and when the configuration was not fully parsed (logging.rsyslog.parse_complete false) and no remote action was found.
+    since: 1
+    sensitivity: public
+    collector: logging
+  - key: logging.rsyslog.remote_targets
+    type: list<record>
+    description: The remote rsyslog actions in rule order, one row per action line with rule (the action text as parsed), target and loopback; capped at 256 rows; evidence.
+    since: 1
+    sensitivity: internal
+    collector: logging
+  - key: logging.journal_upload.url
+    type: string
+    description: The URL= of [Upload] in journal-upload.conf (/etc/systemd, or the /usr/lib/systemd copy when there is none) merged with its journal-upload.conf.d drop-ins, last wins, kept as written; an empty string when no file sets it; the read's status when a file in the chain cannot be read, and unsupported on a host with no systemd.
+    since: 1
+    sensitivity: internal
+    collector: logging
   - key: nfs.exports
     type: list<record>
     description: Every NFS export as {path, client, options, wildcard, root_squash} parsed from /etc/exports and /etc/exports.d/*.exports; a path with no client spec, or a bare "(options)" spec with a space before the parenthesis (exportfs's own space-sensitive trap), exports to the world (client "*", wildcard true); root_squash is derived from the absence of no_root_squash in the client's options. An export file that exists but cannot be read, and a file the read primitive cut at the size cap, both make this list carry that answer instead - the read's status or absent, naming the path in either case - because a parse of the files that happened to be readable, or of a prefix, would publish a partial export list as the whole one; nothing partial is ever published here.
@@ -1842,6 +1926,50 @@ keys:
     since: 1
     sensitivity: internal
     collector: patch
+  - key: packages.verify.complete
+    type: bool
+    description: Whether package verification (rpm -Va or dpkg --verify) finished with its whole output parsed; only under --deep as root.
+    since: 1
+    sensitivity: public
+    collector: pkgverify
+  - key: packages.verify.tool
+    type: string
+    description: The package verification tool that ran - rpm or dpkg.
+    since: 1
+    sensitivity: public
+    collector: pkgverify
+  - key: packages.verify.modified
+    type: list<record>
+    description: Packaged files whose content, mode, owner, device, link, capabilities or presence differ from the package database after the noise filter - path, attributes, untested, file_type, note; sorted by path; only under --deep as root.
+    since: 1
+    sensitivity: internal
+    collector: pkgverify
+    subject_kind: file
+  - key: packages.verify.modified_config
+    type: list<record>
+    description: Packaged configuration files that differ from the package database - the same record shape as packages.verify.modified; evidence, not judged; sorted by path.
+    since: 1
+    sensitivity: internal
+    collector: pkgverify
+    subject_kind: file
+  - key: packages.verify.filter
+    type: list<string>
+    description: The noise-filter rules applied to the verification output, in order - config, doc, dpkg_excluded, ghost, mtime_only, unverifiable, unchanged. doc drops a row by its type letter or a documentation-tree prefix, a modified row under the prefix included; dpkg_excluded drops only a missing row whose path a dpkg path-exclude glob covers.
+    since: 1
+    sensitivity: public
+    collector: pkgverify
+  - key: packages.verify.filtered_counts
+    type: record
+    description: How many verification rows each filter rule removed - config, doc, dpkg_excluded, ghost, mtime_only, unverifiable, unchanged.
+    since: 1
+    sensitivity: public
+    collector: pkgverify
+  - key: packages.verify.stats
+    type: record
+    description: The verification's own account of itself - lines, exit_code, duration_ms, truncated, stderr_head, unparsed_head, packages_without_digests, packages_without_digests_error, dpkg_path_excludes (the path-exclude and path-include directives read), dpkg_path_excludes_error (each dpkg.cfg file that exists and could not be read, as path - reason; the dpkg_excluded rule is then not applied); provenance, read by no control.
+    since: 1
+    sensitivity: public
+    collector: pkgverify
   - key: services.ftp.installed
     type: bool
     description: An FTP server unit or inetd entry exists on the host.
@@ -2575,3 +2703,263 @@ keys:
     since: 1
     sensitivity: public
     collector: swap
+  - key: audit.rules.present
+    type: setting<bool>
+    description: Whether the audit daemon carries at least one watch or syscall rule - runtime from auditctl -l (its "No rules" is false), persisted from what augenrules loads on a systemd host - the *.rules files of /etc/audit/rules.d in ls -v version order when the directory exists (an empty one is no rules), /etc/audit/audit.rules as it stands when rules.d is missing, absent when neither exists - and from /etc/audit/audit.rules on a host without systemd.
+    since: 1
+    sensitivity: public
+    collector: audit
+    default_on: effective
+  - key: audit.rules.loaded_count
+    type: int
+    description: How many rule lines auditctl -l printed; evidence.
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.rules.persisted_count
+    type: int
+    description: How many watch (-w) and syscall (-a, -A) rule lines the persisted source carries; control lines are not counted; evidence.
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.rules.persisted
+    type: list<record>
+    description: The persisted audit rules as read, one row per non-comment line in load order (the rules.d files in ls -v version order, each file top to bottom, or /etc/audit/audit.rules when that is the source) with file, line (the line number), kind (watch, syscall, control or other), key (the -k or key= value, empty when none) and text; capped at 2000 rows. augenrules regroups the control lines before loading, so this is the files, not the merged audit.rules.
+    since: 1
+    sensitivity: internal
+    collector: audit
+  - key: audit.immutable
+    type: setting<bool>
+    description: Whether the audit configuration is locked until reboot - runtime from auditctl -s reporting enabled 2, persisted from the last -e line of the persisted source (the same source as audit.rules.present, in the same load order) being -e 2; the winner names the line that decided when auditctl did not answer.
+    since: 1
+    sensitivity: public
+    collector: audit
+    default_on: effective
+  - key: audit.status.enabled
+    type: int
+    description: The enabled field of auditctl -s (0 off, 1 on, 2 on and locked); evidence.
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.status.failure
+    type: int
+    description: The failure field of auditctl -s - what the kernel does when it cannot record an event (0 silent, 1 printk, 2 panic); evidence.
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.status.lost
+    type: int
+    description: The lost field of auditctl -s - events the kernel dropped since boot; evidence.
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.status.backlog_limit
+    type: int
+    description: The backlog_limit field of auditctl -s - the kernel's queue of events awaiting the daemon; evidence.
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.conf.log_file
+    type: string
+    description: The log_file of /etc/audit/auditd.conf as written; when the line is missing, the documented default /var/log/audit/audit.log with the source derived from auditd.conf.
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.conf.log_group
+    type: string
+    description: The log_group of /etc/audit/auditd.conf as written; absent when no line sets it.
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.conf.max_log_file_action
+    type: string
+    description: The max_log_file_action of /etc/audit/auditd.conf, lower-cased; absent when no line sets it, never the daemon's compiled default.
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.conf.space_left_action
+    type: string
+    description: The space_left_action of /etc/audit/auditd.conf, lower-cased; absent when no line sets it, never the daemon's compiled default.
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.conf.admin_space_left_action
+    type: string
+    description: The admin_space_left_action of /etc/audit/auditd.conf, lower-cased; absent when no line sets it, never the daemon's compiled default.
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.conf.disk_full_action
+    type: string
+    description: The disk_full_action of /etc/audit/auditd.conf, lower-cased; absent when no line sets it, never the daemon's compiled default.
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.conf.disk_error_action
+    type: string
+    description: The disk_error_action of /etc/audit/auditd.conf, lower-cased; absent when no line sets it, never the daemon's compiled default.
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.log_file.mode
+    type: int
+    description: Permission bits of the audit log file auditd.conf's log_file names as an integer (e.g. 384 for 0600).
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.log_file.uid
+    type: int
+    description: Owner uid of the audit log file auditd.conf's log_file names.
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.log_file.gid
+    type: int
+    description: Group gid of the audit log file auditd.conf's log_file names.
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.log_file.group
+    type: string
+    description: Group name for the gid of the audit log file auditd.conf's log_file names from /etc/group; empty when the gid has no name.
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.log_file.group_readable
+    type: bool
+    description: Whether the group permission bits of the audit log file auditd.conf's log_file names include read (derived from mode).
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.log_file.group_writable
+    type: bool
+    description: Whether the group permission bits of the audit log file auditd.conf's log_file names include write (derived from mode).
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.log_file.other_readable
+    type: bool
+    description: Whether the other permission bits of the audit log file auditd.conf's log_file names include read (derived from mode).
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.log_file.other_writable
+    type: bool
+    description: Whether the other permission bits of the audit log file auditd.conf's log_file names include write (derived from mode).
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.log_file.acl_present
+    type: bool
+    description: Whether a POSIX ACL xattr is present on the audit log file auditd.conf's log_file names.
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.log_dir.mode
+    type: int
+    description: Permission bits of the directory holding the audit log file as an integer (e.g. 448 for 0700).
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.log_dir.uid
+    type: int
+    description: Owner uid of the directory holding the audit log file.
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.log_dir.gid
+    type: int
+    description: Group gid of the directory holding the audit log file.
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.log_dir.group
+    type: string
+    description: Group name for the gid of the directory holding the audit log file from /etc/group; empty when the gid has no name.
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.log_dir.group_readable
+    type: bool
+    description: Whether the group permission bits of the directory holding the audit log file include read (derived from mode).
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.log_dir.group_writable
+    type: bool
+    description: Whether the group permission bits of the directory holding the audit log file include write (derived from mode).
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.log_dir.other_readable
+    type: bool
+    description: Whether the other permission bits of the directory holding the audit log file include read (derived from mode).
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.log_dir.other_writable
+    type: bool
+    description: Whether the other permission bits of the directory holding the audit log file include write (derived from mode).
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: audit.log_dir.acl_present
+    type: bool
+    description: Whether a POSIX ACL xattr is present on the directory holding the audit log file.
+    since: 1
+    sensitivity: public
+    collector: audit
+  - key: fim.tool
+    type: string
+    description: The file-integrity tool muster models on this host - aide when the AIDE binary exists, none when no known tool's binary does; absent when AIDE is missing and another tool's binary exists (Tripwire, Samhain, osquery, integrit, Wazuh/OSSEC), the reason naming them.
+    since: 1
+    sensitivity: public
+    collector: fim
+  - key: fim.aide.installed
+    type: bool
+    description: Whether the AIDE binary exists (/usr/bin/aide or /usr/sbin/aide).
+    since: 1
+    sensitivity: public
+    collector: fim
+  - key: fim.aide.config_path
+    type: string
+    description: The first AIDE configuration file that exists, /etc/aide/aide.conf (Debian family) then /etc/aide.conf (EL); absent when neither does.
+    since: 1
+    sensitivity: public
+    collector: fim
+  - key: fim.aide.database_path
+    type: string
+    description: The file the configuration reads its database from - database_in= (aide 0.17 and later), else database=, with the file prefix removed and @@define macros substituted; a macro the file never defines is left as written and the reason names it; the read's status when the configuration cannot be read.
+    since: 1
+    sensitivity: public
+    collector: fim
+  - key: fim.aide.database_present
+    type: bool
+    description: Whether a regular file exists at fim.aide.database_path; false, with the reason, when AIDE is installed and neither configuration file exists or the configuration has no database_in= or database= line; absent, naming the path, when that path is outside /var/lib/aide.
+    since: 1
+    sensitivity: public
+    collector: fim
+  - key: fim.aide.database_modified
+    type: string
+    description: The database file's modification time as RFC 3339 UTC; absent when there is no database; evidence (no key says whether the database is fresh).
+    since: 1
+    sensitivity: public
+    collector: fim
+  - key: fim.aide.scheduled
+    type: bool
+    description: Whether at least one fim.aide.schedules row is armed; the read's status when /etc/default/aide cannot be read and no row it does not control is armed; unsupported when a systemd host's timer inventory cannot be read.
+    since: 1
+    sensitivity: public
+    collector: fim
+  - key: fim.aide.schedules
+    type: list<record>
+    description: Every way this host schedules AIDE, sorted by path, with kind (cron_daily, cron_d, crontab or timer), path (the file, or the timer unit), armed and detail (why it will not run) - a cron.daily script whose name contains aide is armed when it is a regular executable file with a name run-parts runs (letters, digits, _ and -), not the Ubuntu 24.04 shim on a systemd host, and CRON_DAILY_RUN in /etc/default/aide is yes, empty or unset (an /etc/default/aide that cannot be read disarms every row it controls); a cron.d or crontab line whose command names aide is armed; a timer whose name contains aide is armed when systemctl list-timers shows a next elapse and the same CRON_DAILY_RUN gate holds; capped at 64 rows.
+    since: 1
+    sensitivity: public
+    collector: fim
+  - key: fim.other_tools
+    type: list<record>
+    description: The binaries of file-integrity tools other than AIDE that exist, each with name and path, sorted by path; capped at 64 rows; evidence.
+    since: 1
+    sensitivity: public
+    collector: fim

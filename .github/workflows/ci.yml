@@ -56,8 +56,10 @@ jobs:
         run: ./bin/muster collect --list-actions
       - name: prepare output directory
         run: mkdir -m 700 "$RUNNER_TEMP/muster"
-      - name: install openssh-server
-        run: sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq openssh-server
+      # J-2: auditd so the audit collector and its oracle read a running
+      # daemon, aide so fim.tool reads aide on a real host.
+      - name: install openssh-server, auditd and aide
+        run: sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq openssh-server auditd aide aide-common
       - name: collect as root
         run: |
           set +e
@@ -66,14 +68,21 @@ jobs:
           mapfile -t walk_excludes < <(grep -vE '^[[:space:]]*(#|$)' .github/walk-excludes)
           excludes=()
           for p in "${walk_excludes[@]}"; do excludes+=(--walk-exclude "$p"); done
+          # The deadline --deep derives is 15m + 25m + 5m: the walk's budget,
+          # the verify's timeout and the rest of the collectors.
           sudo ./bin/muster collect --out "$RUNNER_TEMP/muster/root.json" \
-            --deep --walk-budget 15m --walk-max-entries 6000000 \
+            --deep --walk-budget 15m --walk-max-entries 6000000 --verify-timeout 25m \
             "${excludes[@]}" \
             --require-root --require-complete
           code=$?
           set -e
           sudo chown "$(id -u)" "$RUNNER_TEMP/muster/root.json"
           jq -r '.run.partial_failures, (.run.collectors[] | select(.status != "ok") | "\(.name): \(.status) \(.reason)"), .facts.sshd.collect_method.value, .facts.sshd.options.permit_root_login.runtime.status' "$RUNNER_TEMP/muster/root.json"
+          # J-18: printed before the exit code is trusted. --require-complete
+          # turns a verify timeout into exit 2, so the duration and the row
+          # counts of the runner's dpkg --verify are read here first; the
+          # first pull-request run is their measurement.
+          jq '.facts.packages.verify.complete, .facts.packages.verify.stats.value, .facts.packages.verify.filtered_counts.value' "$RUNNER_TEMP/muster/root.json"
           test "$code" -eq 0
       - name: what the walk did
         run: |
@@ -99,6 +108,9 @@ jobs:
         run: |
           jq -e '.facts.walk.complete.value == true' "$RUNNER_TEMP/muster/root.json"
           jq -e '[.facts.walk | to_entries[] | select(.key != "complete" and .key != "stats") | select(.value.status != "ok" or .value.truncated == true)] | length == 0' "$RUNNER_TEMP/muster/root.json"
+      - name: auditd, the verify and aide read what the runner has
+        run: |
+          jq -e '.facts.services.auditd.active.value == true and .facts.audit.rules.present.runtime.status == "ok" and .facts.audit.rules.present.runtime.value == false and .facts.packages.verify.complete.value == true and .facts.packages.verify.tool.value == "dpkg" and .facts.fim.tool.value == "aide"' "$RUNNER_TEMP/muster/root.json"
       - name: check the root snapshot
         run: |
           sudo chown "$(id -u)" "$RUNNER_TEMP/muster/root.json"
@@ -150,11 +162,17 @@ jobs:
       - name: the parsers agree with the daemons (oracle)
         run: |
           set -o pipefail
-          sudo env PATH="$PATH" GOFLAGS="$GOFLAGS" MUSTER_ORACLE=1 go test ./internal/collect/collectors/ -run Oracle -count=1 -v 2>&1 | tee "$RUNNER_TEMP/oracle.log"
+          # J-24: the verify pair runs dpkg --verify twice, up to 30m each.
+          sudo env PATH="$PATH" GOFLAGS="$GOFLAGS" MUSTER_ORACLE=1 go test ./internal/collect/collectors/ -run Oracle -count=1 -v -timeout 90m 2>&1 | tee "$RUNNER_TEMP/oracle.log"
           ! grep -q -- '--- SKIP' "$RUNNER_TEMP/oracle.log"
           # A pair that compared nothing is not a pair that agreed: the sshd
-          # keywords are set above, so the count has to be non-zero here.
+          # keywords are set above, so the count has to be non-zero here, and
+          # so does the audit pair's, with auditd installed and running. The
+          # verify pair may compare zero rows on a clean image, but it must
+          # have run.
           grep -q 'oracle sshd: compared [1-9]' "$RUNNER_TEMP/oracle.log"
+          grep -q 'oracle audit: compared [1-9]' "$RUNNER_TEMP/oracle.log"
+          grep -q 'oracle verify: compared' "$RUNNER_TEMP/oracle.log"
       - name: take the oracle drop-in back out
         # P-1: the runner is thrown away, but a step that exists to undo a
         # change must run whether or not the thing it guarded passed.
@@ -169,8 +187,8 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: "1.25.5"
-      - name: install cron and sudo
-        run: sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq cron sudo
+      - name: install cron, sudo and auditd
+        run: sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq cron sudo auditd
       - run: CGO_ENABLED=0 go build -trimpath -o bin/muster ./cmd/muster
       - name: prepare output directory
         run: mkdir -m 700 "$RUNNER_TEMP/muster"
@@ -182,6 +200,9 @@ jobs:
           set -e
           test "$code" -eq 1
           jq -e '.run.complete == false and .run.euid != 0' "$RUNNER_TEMP/muster/user.json"
+          # --deep without root: pkgverify writes its one denied key, and the
+          # unreadable auditd.conf is the answer for every audit.conf leaf.
+          jq -e '.facts.packages.verify.complete.status == "denied" and .facts.audit.conf.log_file.status == "denied"' "$RUNNER_TEMP/muster/user.json"
       - name: every PASS is clean and something is ERROR without root
         run: |
           set +e
@@ -210,6 +231,15 @@ jobs:
             echo "the nonroot capability matrix assumes this user cannot read /etc/shadow or /root;"
             echo "on a runner where either is readable, accounts.shadow_in_use, files.etc_shadow.acl_present,"
             echo "files.etc_shadow.acl_entries and files.root_home.acl_present read ok instead of denied"
+            exit 1
+          }
+          # 3C-1: every audit.conf.* leaf, the twelve non-stat permission
+          # leaves of the audit log and its directory, and the persisted
+          # rules rest on /etc/audit (0750) and auditd.conf (0640) being
+          # unreadable by this user.
+          ! test -r /etc/audit/auditd.conf || {
+            echo "the nonroot capability matrix assumes this user cannot read /etc/audit/auditd.conf;"
+            echo "where it is readable, audit.conf.* and the audit.log_file/log_dir leaves read ok instead of denied"
             exit 1
           }
           # K-17, narrowed by K-31: bpf_jit_harden is the one /proc/sys file of
@@ -276,11 +306,16 @@ jobs:
               case "$state" in running|degraded) break ;; esac
               sleep 1
             done
-            docker exec "$cid" /m/muster collect --deep --out /out/c.json || true
             # $cid is a shell variable of this block, so everything that needs
             # the container belongs here. The trap removes it however this
-            # block ends: a failing oracle below must not leak a container.
+            # block ends: a failing install or oracle below must not leak a
+            # container.
             trap 'docker rm -f "$cid" >/dev/null 2>&1 || true' EXIT
+            # J-2: the audit userspace and AIDE, so the container reads an
+            # installed auditd that cannot reach kernel audit from its pid
+            # namespace (J-1) and an AIDE nobody has initialised.
+            docker exec "$cid" dnf install -y -q audit aide
+            docker exec "$cid" /m/muster collect --deep --out /out/c.json || true
             # F-10: the four files this image really ships, for the fuzz
             # corpus. Copied BEFORE the oracle runs, so a mismatch that stops
             # this step still leaves the artifact the triage needs.
@@ -340,6 +375,9 @@ jobs:
             # The Ubuntu/Debian images are not asserted: libwrap0 may or may
             # not be pulled in there.
             jq -e '.facts.files.libwrap_present.value == false' "$RUNNER_TEMP/muster/containers/c.json"
+            # J-1/J-2: auditd installed but unreachable from the container,
+            # and AIDE installed with no database.
+            jq -e '.facts.services.auditd.installed.value == true and .facts.audit.rules.present.runtime.status == "unsupported" and .facts.fim.tool.value == "aide" and .facts.fim.aide.database_present.value == false' "$RUNNER_TEMP/muster/containers/c.json"
           else
             jq -e '.facts.services.ssh.installed.status == "unsupported"' "$RUNNER_TEMP/muster/containers/c.json"
           fi
@@ -355,6 +393,8 @@ jobs:
           set -e
           # Same rule as the non-root job: absent evidence is allowed only under absent_means: pass.
           jq -e '[.results[] | select(.status=="PASS") | . as $r | .evidence[]? | select(.status != "ok" and (.status != "absent" or (($r.reason // "") | startswith("absent counts as pass") | not)))] | length == 0' "$RUNNER_TEMP/muster/containers/report.json"
+          # Every control beyond the guide gates on env.container eq none.
+          jq -e '[.results[] | select(.id == "muster.beyond.audit_rules_loaded") | .status] == ["NOT_APPLICABLE"]' "$RUNNER_TEMP/muster/containers/report.json"
       - name: every fact the capability matrix calls systemd-only reads unsupported
         if: matrix.init == 'false'
         run: |

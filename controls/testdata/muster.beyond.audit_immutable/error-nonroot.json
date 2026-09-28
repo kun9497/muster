@@ -1,0 +1,56 @@
+{
+  "synthetic": true,
+  "_expect": {
+    "reason_code": "permission_denied",
+    "exit_code": 2
+  },
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none"
+      }
+    },
+    "services": {
+      "auditd": {
+        "installed": {
+          "status": "ok",
+          "value": true,
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState auditd.service",
+            "exit_code": 0
+          }
+        }
+      }
+    },
+    "audit": {
+      "immutable": {
+        "runtime": {
+          "status": "denied",
+          "reason": "/usr/sbin/auditctl -s needs CAP_AUDIT_CONTROL, which a non-root run does not have: You must be root to run this program.",
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/sbin/auditctl -s",
+            "exit_code": 4
+          }
+        },
+        "persisted": {
+          "status": "denied",
+          "reason": "/etc/audit/rules.d: permission denied"
+        },
+        "effective": {
+          "status": "denied",
+          "reason": "/usr/sbin/auditctl -s needs CAP_AUDIT_CONTROL, which a non-root run does not have: You must be root to run this program.",
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/sbin/auditctl -s",
+            "exit_code": 4
+          }
+        }
+      }
+    }
+  }
+}

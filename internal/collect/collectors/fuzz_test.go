@@ -640,6 +640,37 @@ func FuzzParseDpkgStatus(f *testing.F) {
 	})
 }
 
+// FuzzParseVerifyOutput reads the verify output whole and as a cut capture, and
+// the stderr head the stats keep from the same bytes.
+func FuzzParseVerifyOutput(f *testing.F) {
+	seeds(f, "testdata/rpm_Va*", "testdata/dpkg_verify*")
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "parseVerifyOutput", func() any {
+			return []any{parseVerifyOutput(data, false), parseVerifyOutput(data, true), headLines(data)}
+		}, len(data))
+	})
+}
+
+// FuzzParseDpkgPathExcludes parses the filters and translates every glob, so
+// the fnmatch-to-regexp translation is fuzzed with the grammar that feeds it.
+func FuzzParseDpkgPathExcludes(f *testing.F) {
+	seeds(f, "testdata/dpkg.cfg.d-*")
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "parseDpkgPathExcludes", func() any {
+			filters := parseDpkgPathExcludes(data)
+			patterns := make([]string, 0, len(filters))
+			for _, pf := range filters {
+				if re, err := dpkgGlobRegexp(pf.glob); err == nil {
+					patterns = append(patterns, re.String())
+				} else {
+					patterns = append(patterns, "error")
+				}
+			}
+			return []any{filters, patterns}
+		}, len(data))
+	})
+}
+
 func FuzzParseAptSimulation(f *testing.F) {
 	seeds(f, "testdata/apt-get*")
 	f.Fuzz(func(t *testing.T, data []byte) {
@@ -1226,5 +1257,78 @@ func FuzzParentDisk(f *testing.F) {
 	}
 	f.Fuzz(func(t *testing.T, data []byte) {
 		fuzzBody(t, "parentDisk", func() any { return parentDisk(string(data)) }, len(data))
+	})
+}
+
+// FuzzParseAuditRules reads a rules file and decides the lock from it, so the
+// -e argument reader is fuzzed with the grammar that feeds it.
+func FuzzParseAuditRules(f *testing.F) {
+	seeds(f, "testdata/audit.rules.*")
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "parseAuditRules", func() any {
+			rules := parseAuditRules(data, "/etc/audit/rules.d/fuzz.rules")
+			v, file, found := lastEnableValue(rules)
+			return []any{rules, v, file, found}
+		}, len(data))
+	})
+}
+
+func FuzzParseAuditdConf(f *testing.F) {
+	seeds(f, "testdata/auditd.conf.sample")
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "parseAuditdConf", func() any { return parseAuditdConf(data) }, len(data))
+	})
+}
+
+// FuzzParseAuditctlStatus reads auditctl output both ways the collector
+// does: -s as status fields and -l as rule lines.
+func FuzzParseAuditctlStatus(f *testing.F) {
+	seeds(f, "testdata/auditctl_*")
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "parseAuditctlStatus", func() any {
+			fields, ok := parseAuditctlStatus(data)
+			return []any{fields, ok, auditctlRuleLines(data)}
+		}, len(data))
+	})
+}
+
+func FuzzParseAideConf(f *testing.F) {
+	seeds(f, "testdata/aide.conf.*")
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "parseAideConf", func() any { return parseAideConf(data) }, len(data))
+	})
+}
+
+func FuzzParseListTimers(f *testing.F) {
+	seeds(f, "testdata/list_timers.sample")
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "parseListTimers", func() any { return parseListTimers(data) }, len(data))
+	})
+}
+
+func FuzzCronDailyRun(f *testing.F) {
+	seeds(f, "testdata/default_aide.sample")
+	f.Add([]byte("CRON_DAILY_RUN=\"no\"\n"))
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "cronDailyRun", func() any {
+			v, set := cronDailyRun(data)
+			return []any{v, set}
+		}, len(data))
+	})
+}
+
+func FuzzNamesAide(f *testing.F) {
+	seeds(f, "testdata/crontab", "testdata/cron_d_entry")
+	f.Add([]byte("30 3 * * * root /usr/bin/aide --check\n@daily root aide\n"))
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "namesAide", func() any { return namesAide(data) }, len(data))
+	})
+}
+
+func FuzzParseSudoersDefaults(f *testing.F) {
+	seeds(f, "testdata/sudoers*")
+	f.Add([]byte("Defaults env_keep += \"LANG LC_ALL\", !syslog, logfile=\"/var/log/sudo.log\", \\\n  syslog=authpriv\nDefaults:root !syslog\n"))
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "parseSudoersDefaults", func() any { return parseSudoersDefaults(data) }, len(data))
 	})
 }

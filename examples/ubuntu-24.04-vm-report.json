@@ -1,15 +1,15 @@
 {
   "schema_version": 1,
   "run": {
-    "muster_version": "e5eda50",
-    "commit": "e5eda50",
-    "controls_version": "kisa-unix-2026+2026.09.18",
-    "controls_digest": "sha256:1236ece32ab31e36ec68736e546abc54ce3ab653a221c2a27e080a573cf39db6",
+    "muster_version": "81855c8",
+    "commit": "81855c8",
+    "controls_version": "kisa-unix-2026+2026.09.23",
+    "controls_digest": "sha256:f3337dac3ea8281886a8618f4cc136ddf62b3258dbfb113c560b5aeca854f41d",
     "guide_edition": "kisa-unix-2026",
-    "collected_at": "2026-09-21T00:36:06Z",
+    "collected_at": "2026-09-28T08:17:31Z",
     "host": {
       "hostname": "github-runner",
-      "machine_id_hash": "1d6f6908d56a5b37951f001d55c54773e0757799ded7f46439ef6dad42950555",
+      "machine_id_hash": "4d7193c17275652cce0569a44b2c249f54db99d23e0fd447ae531341cacc9ee5",
       "kernel": "",
       "os_release": {
         "id": "ubuntu",
@@ -39,7 +39,13 @@
       {
         "name": "accounts",
         "status": "ok",
-        "ms": 9
+        "ms": 0
+      },
+      {
+        "name": "audit",
+        "status": "ok",
+        "ms": 0,
+        "cmd": "/usr/sbin/auditctl -l"
       },
       {
         "name": "banners",
@@ -49,7 +55,7 @@
       {
         "name": "boot",
         "status": "ok",
-        "ms": 6
+        "ms": 20
       },
       {
         "name": "coredump",
@@ -59,7 +65,7 @@
       {
         "name": "cron",
         "status": "ok",
-        "ms": 840,
+        "ms": 827,
         "cmd": "/usr/bin/systemctl list-unit-files --type=timer --no-legend --no-pager"
       },
       {
@@ -70,17 +76,23 @@
       {
         "name": "env",
         "status": "ok",
-        "ms": 4
+        "ms": 8
       },
       {
         "name": "files",
         "status": "ok",
-        "ms": 19
+        "ms": 16
+      },
+      {
+        "name": "fim",
+        "status": "ok",
+        "ms": 11,
+        "cmd": "/usr/bin/systemctl list-timers --all --no-legend --no-pager"
       },
       {
         "name": "firewall",
         "status": "ok",
-        "ms": 20,
+        "ms": 11,
         "cmd": "/usr/sbin/nft list ruleset"
       },
       {
@@ -101,7 +113,7 @@
       {
         "name": "modules",
         "status": "ok",
-        "ms": 23
+        "ms": 24
       },
       {
         "name": "mounts",
@@ -127,18 +139,24 @@
       {
         "name": "pam",
         "status": "ok",
-        "ms": 1
+        "ms": 2
       },
       {
         "name": "patch",
         "status": "ok",
-        "ms": 1987,
+        "ms": 1837,
         "cmd": "/usr/bin/apt-get -s upgrade -o Debug::NoLocking=1"
+      },
+      {
+        "name": "pkgverify",
+        "status": "ok",
+        "ms": 582154,
+        "cmd": "/usr/bin/rpm -Va"
       },
       {
         "name": "services",
         "status": "ok",
-        "ms": 315,
+        "ms": 319,
         "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState atftpd.service"
       },
       {
@@ -154,7 +172,7 @@
       {
         "name": "sshd",
         "status": "ok",
-        "ms": 107,
+        "ms": 13,
         "cmd": "/usr/sbin/sshd -G"
       },
       {
@@ -165,18 +183,18 @@
       {
         "name": "sysctl",
         "status": "ok",
-        "ms": 0
+        "ms": 1
       },
       {
         "name": "timesync",
         "status": "ok",
-        "ms": 60,
+        "ms": 56,
         "cmd": "/usr/bin/timedatectl show-timesync --all"
       },
       {
         "name": "walk",
         "status": "ok",
-        "ms": 13466,
+        "ms": 11900,
         "cmd": "/usr/bin/rpm -qa --qf [%{=NAME}\t%{FILEMODES:octal}\t%{FILEUSERNAME}\t%{FILEGROUPNAME}\t%{FILENAMES}\n]"
       }
     ],
@@ -189,11 +207,11 @@
     "partial_failures": []
   },
   "check": {
-    "muster_version": "e5eda50",
-    "commit": "e5eda50",
-    "controls_version": "kisa-unix-2026+2026.09.18",
-    "controls_digest": "sha256:1236ece32ab31e36ec68736e546abc54ce3ab653a221c2a27e080a573cf39db6",
-    "snapshot_digest": "sha256:1b294d35ae8cf4a8cf176bdbc7e89ec54ce142d4e53185248b99b292ab1779f8",
+    "muster_version": "81855c8",
+    "commit": "81855c8",
+    "controls_version": "kisa-unix-2026+2026.09.23",
+    "controls_digest": "sha256:f3337dac3ea8281886a8618f4cc136ddf62b3258dbfb113c560b5aeca854f41d",
+    "snapshot_digest": "sha256:33eea7f61aaaa7e1b7c3a0639f99c542cd33d542f2d6ad9266b6ccf50dc6a8e1",
     "guide_edition": "kisa-unix-2026",
     "waivers": {
       "applied": 0,
@@ -284,6 +302,50 @@
           "lp",
           "uucp",
           "nuucp"
+        ]
+      },
+      "muster.beyond.audit_disk_actions": {
+        "allowed_disk_error_actions": [
+          "syslog",
+          "exec",
+          "single",
+          "halt"
+        ],
+        "allowed_disk_full_actions": [
+          "syslog",
+          "rotate",
+          "exec",
+          "single",
+          "halt"
+        ],
+        "allowed_rotate_actions": [
+          "rotate",
+          "keep_logs",
+          "syslog"
+        ],
+        "allowed_space_actions": [
+          "syslog",
+          "email",
+          "exec",
+          "rotate",
+          "single",
+          "halt"
+        ]
+      },
+      "muster.beyond.audit_log_permissions": {
+        "allowed_groups": [
+          "root",
+          "adm"
+        ],
+        "allowed_modes": [
+          0,
+          128,
+          256,
+          384,
+          32,
+          160,
+          288,
+          416
         ]
       },
       "muster.beyond.bootloader_config_permissions": {
@@ -435,24 +497,24 @@
     "automatic": {
       "high": {
         "pass": 18,
-        "fail": 10,
+        "fail": 12,
         "warn": 0
       },
       "medium": {
-        "pass": 12,
-        "fail": 8,
+        "pass": 13,
+        "fail": 9,
         "warn": 0
       },
       "low": {
         "pass": 3,
-        "fail": 3,
+        "fail": 4,
         "warn": 0
       }
     },
     "manual_review": 13,
     "undecidable": {
       "error": 0,
-      "not_applicable": 20,
+      "not_applicable": 24,
       "waived": 0
     },
     "facts_failed": 0,
@@ -485,28 +547,28 @@
         }
       },
       "beyond": {
-        "controls": 19,
+        "controls": 28,
         "automatic": {
           "high": {
             "pass": 2,
-            "fail": 0,
+            "fail": 2,
             "warn": 0
           },
           "medium": {
-            "pass": 3,
-            "fail": 6,
+            "pass": 4,
+            "fail": 7,
             "warn": 0
           },
           "low": {
             "pass": 0,
-            "fail": 2,
+            "fail": 3,
             "warn": 0
           }
         },
         "manual_review": 2,
         "undecidable": {
           "error": 0,
-          "not_applicable": 4,
+          "not_applicable": 8,
           "waived": 0
         }
       }
@@ -2849,7 +2911,7 @@
         {
           "fact": "walk.world_writable",
           "status": "ok",
-          "value": "544 elements; 521 selected; failing: file:/opt, file:/opt/actionarchivecache, file:/opt/actionarchivecache/actions_cache, file:/opt/actionarchivecache/actions_cache/0057852bfaa89a56745cba8c7296529d2fc39830.tar.gz, file:/opt/actionarchivecache/actions_cache/0400d5f644dc74513175e3cd8d07132dd4860809.tar.gz, +516 more",
+          "value": "545 elements; 522 selected; failing: file:/opt, file:/opt/actionarchivecache, file:/opt/actionarchivecache/actions_cache, file:/opt/actionarchivecache/actions_cache/0057852bfaa89a56745cba8c7296529d2fc39830.tar.gz, file:/opt/actionarchivecache/actions_cache/0400d5f644dc74513175e3cd8d07132dd4860809.tar.gz, +517 more",
           "source": {
             "kind": "file",
             "path": "/var/lib/dpkg/info"
@@ -4076,7 +4138,7 @@
           "verdict": "fail"
         },
         {
-          "subject": "file:/opt/actionarchivecache/github_codeql-action/6f530319d8c989665d0835536ec9571735fd2008.tar.gz",
+          "subject": "file:/opt/actionarchivecache/github_codeql-action/313a0b99225f41fe3a5666e8fa7b2d8048c194ec.tar.gz",
           "expected": true,
           "actual": false,
           "verdict": "fail"
@@ -4100,19 +4162,19 @@
           "verdict": "fail"
         },
         {
-          "subject": "file:/opt/actionarchivecache/github_gh-aw-actions/1aa033c7bf25ac9428fe521065b90c30a7070c4e.tar.gz",
+          "subject": "file:/opt/actionarchivecache/github_gh-aw-actions/49459c75b37a0b82b4ecb15e1079972cc3353bc9.tar.gz",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/opt/actionarchivecache/github_gh-aw-actions/49dc896ccb7d6d975514cfe232bcbd68cc12e2c1.tar.gz",
+          "subject": "file:/opt/actionarchivecache/github_gh-aw-actions/be41add0f204de343293628bb99a72a3894cfd7a.tar.gz",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/opt/actionarchivecache/github_gh-aw-actions/bc8c008a419c5b7a29df6f5641edd35fd1c6ea85.tar.gz",
+          "subject": "file:/opt/actionarchivecache/github_gh-aw-actions/d462c12b8f1f616b55fed699787b0280c594e592.tar.gz",
           "expected": true,
           "actual": false,
           "verdict": "fail"
@@ -4329,6 +4391,12 @@
         },
         {
           "subject": "file:/opt/google/chrome/libqt6_shim.so",
+          "expected": true,
+          "actual": false,
+          "verdict": "fail"
+        },
+        {
+          "subject": "file:/opt/google/chrome/libsapisid.so",
           "expected": true,
           "actual": false,
           "verdict": "fail"
@@ -6008,7 +6076,7 @@
         {
           "fact": "patch.metadata_age_s",
           "status": "ok",
-          "value": 1134006,
+          "value": 643390,
           "source": {
             "kind": "file",
             "path": "/var/lib/apt/periodic/update-success-stamp"
@@ -7938,7 +8006,7 @@
         {
           "fact": "walk.hidden",
           "status": "ok",
-          "value": "367 elements; 165 selected; failing: file:/etc/.java, file:/etc/skel/.bash_profile, file:/etc/skel/.cargo, file:/etc/skel/.composer, file:/etc/skel/.config, +100 more",
+          "value": "371 elements; 167 selected; failing: file:/etc/.java, file:/etc/skel/.bash_profile, file:/etc/skel/.cargo, file:/etc/skel/.composer, file:/etc/skel/.config, +102 more",
           "source": {
             "kind": "file",
             "path": "/var/lib/dpkg/info"
@@ -8343,121 +8411,133 @@
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/aws-cli/v2/2.36.40/dist/awscli/botocore/.changes",
+          "subject": "file:/usr/local/aws-cli/v2/2.36.49/dist/awscli/botocore/.changes",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.12.7/share/doc/julia/html/en/.documenter-siteinfo.json",
+          "subject": "file:/usr/local/julia1.13.0/share/doc/julia/html/en/.documenter-siteinfo.json",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.12.7/share/julia/base/JuliaSyntax/.mailmap",
+          "subject": "file:/usr/local/julia1.13.0/share/julia/base/JuliaSyntax/.mailmap",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.12.7/share/julia/stdlib/v1.12/ArgTools/.ci",
+          "subject": "file:/usr/local/julia1.13.0/share/julia/stdlib/v1.13/ArgTools/.ci",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.12.7/share/julia/stdlib/v1.12/DelimitedFiles/.ci",
+          "subject": "file:/usr/local/julia1.13.0/share/julia/stdlib/v1.13/DelimitedFiles/.ci",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.12.7/share/julia/stdlib/v1.12/Downloads/.ci",
+          "subject": "file:/usr/local/julia1.13.0/share/julia/stdlib/v1.13/DelimitedFiles/.codecov.yml",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.12.7/share/julia/stdlib/v1.12/LibCURL/.ci",
+          "subject": "file:/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Downloads/.ci",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.12.7/share/julia/stdlib/v1.12/LinearAlgebra/.buildkite",
+          "subject": "file:/usr/local/julia1.13.0/share/julia/stdlib/v1.13/LibCURL/.ci",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.12.7/share/julia/stdlib/v1.12/LinearAlgebra/.ci",
+          "subject": "file:/usr/local/julia1.13.0/share/julia/stdlib/v1.13/LinearAlgebra/.buildkite",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.12.7/share/julia/stdlib/v1.12/LinearAlgebra/.codecov.yml",
+          "subject": "file:/usr/local/julia1.13.0/share/julia/stdlib/v1.13/LinearAlgebra/.codecov.yml",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.12.7/share/julia/stdlib/v1.12/NetworkOptions/.codecov.yml",
+          "subject": "file:/usr/local/julia1.13.0/share/julia/stdlib/v1.13/NetworkOptions/.codecov.yml",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.12.7/share/julia/stdlib/v1.12/Pkg/.codecov.yml",
+          "subject": "file:/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Pkg/.codecov.yml",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.12.7/share/julia/stdlib/v1.12/Pkg/.pre-commit-config.yaml",
+          "subject": "file:/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Pkg/.git-blame-ignore-revs",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.12.7/share/julia/stdlib/v1.12/Pkg/test/test_packages/AugmentedPlatform/.pkg",
+          "subject": "file:/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Pkg/.pre-commit-config.yaml",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.12.7/share/julia/stdlib/v1.12/SHA/.ci",
+          "subject": "file:/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Pkg/test/test_packages/AugmentedPlatform/.pkg",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.12.7/share/julia/stdlib/v1.12/SparseArrays/.codecov.yml",
+          "subject": "file:/usr/local/julia1.13.0/share/julia/stdlib/v1.13/SHA/.ci",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.12.7/share/julia/stdlib/v1.12/Statistics/.ci",
+          "subject": "file:/usr/local/julia1.13.0/share/julia/stdlib/v1.13/SparseArrays/.ci",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.12.7/share/julia/stdlib/v1.12/SuiteSparse/.ci",
+          "subject": "file:/usr/local/julia1.13.0/share/julia/stdlib/v1.13/SparseArrays/.codecov.yml",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.12.7/share/julia/stdlib/v1.12/SuiteSparse/.devcontainer",
+          "subject": "file:/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Statistics/.ci",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.12.7/share/julia/stdlib/v1.12/Tar/.ci",
+          "subject": "file:/usr/local/julia1.13.0/share/julia/stdlib/v1.13/SuiteSparse/.ci",
+          "expected": true,
+          "actual": false,
+          "verdict": "fail"
+        },
+        {
+          "subject": "file:/usr/local/julia1.13.0/share/julia/stdlib/v1.13/SuiteSparse/.devcontainer",
+          "expected": true,
+          "actual": false,
+          "verdict": "fail"
+        },
+        {
+          "subject": "file:/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Tar/.ci",
           "expected": true,
           "actual": false,
           "verdict": "fail"
@@ -8607,25 +8687,25 @@
           "verdict": "fail"
         },
         {
-          "subject": "file:/var/lib/gems/3.2.0/gems/domain_name-0.6.20260902/.document",
+          "subject": "file:/var/lib/gems/3.2.0/gems/domain_name-0.6.20260907/.document",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/var/lib/gems/3.2.0/gems/fastlane-2.239.0/.yardopts",
+          "subject": "file:/var/lib/gems/3.2.0/gems/fastlane-2.240.1/.yardopts",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/var/lib/gems/3.2.0/gems/fastlane-2.239.0/fastlane/lib/fastlane/plugins/template/.rspec",
+          "subject": "file:/var/lib/gems/3.2.0/gems/fastlane-2.240.1/fastlane/lib/fastlane/plugins/template/.rspec",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/var/lib/gems/3.2.0/gems/fastlane-2.239.0/fastlane/lib/fastlane/plugins/template/.rubocop.yml",
+          "subject": "file:/var/lib/gems/3.2.0/gems/fastlane-2.240.1/fastlane/lib/fastlane/plugins/template/.rubocop.yml",
           "expected": true,
           "actual": false,
           "verdict": "fail"
@@ -8667,7 +8747,7 @@
           "verdict": "fail"
         },
         {
-          "subject": "file:/var/lib/gems/3.2.0/gems/google-apis-androidpublisher_v3-0.99.0/.yardopts",
+          "subject": "file:/var/lib/gems/3.2.0/gems/google-apis-androidpublisher_v3-0.108.0/.yardopts",
           "expected": true,
           "actual": false,
           "verdict": "fail"
@@ -8877,7 +8957,7 @@
           "verdict": "fail"
         },
         {
-          "subject": "file:/var/lib/gems/3.2.0/gems/unicode-emoji-4.2.0/.rake_tasks",
+          "subject": "file:/var/lib/gems/3.2.0/gems/unicode-emoji-4.3.0/.rake_tasks",
           "expected": true,
           "actual": false,
           "verdict": "fail"
@@ -9110,6 +9190,90 @@
       "severity": "high"
     },
     {
+      "id": "muster.beyond.audit_rules_loaded",
+      "title_en": "The kernel has audit rules loaded, and the host keeps rules for the next boot",
+      "title_ko": "커널에 감사 규칙이 적재되어 있고 다음 부팅을 위한 규칙도 저장되어 있다",
+      "category": "beyond",
+      "importance": "상",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when does not hold: services.auditd.installed eq true",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "none",
+          "source": {
+            "kind": "file",
+            "path": "/proc/1/comm"
+          }
+        },
+        {
+          "fact": "services.auditd.installed",
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState auditd.service",
+            "exit_code": 0
+          }
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "muster.beyond.auditd_active",
+      "title_en": "The audit daemon is installed, running and started at boot",
+      "title_ko": "감사 데몬이 설치되어 실행 중이며 부팅 시 시작된다",
+      "category": "beyond",
+      "importance": "상",
+      "automation": "auto",
+      "status": "FAIL",
+      "reason": "clause does not hold: services.auditd.installed eq true",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "none",
+          "source": {
+            "kind": "file",
+            "path": "/proc/1/comm"
+          }
+        },
+        {
+          "fact": "services.auditd.installed",
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState auditd.service",
+            "exit_code": 0
+          }
+        },
+        {
+          "fact": "services.auditd.active",
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState auditd.service",
+            "exit_code": 0
+          }
+        },
+        {
+          "fact": "services.auditd.enabled",
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState auditd.service",
+            "exit_code": 0
+          }
+        }
+      ],
+      "severity": "high"
+    },
+    {
       "id": "muster.beyond.bootloader_config_permissions",
       "title_en": "The bootloader configuration is readable by root alone",
       "title_ko": "부트로더 설정 파일을 root 만 읽을 수 있다",
@@ -9156,6 +9320,142 @@
         }
       ],
       "severity": "high"
+    },
+    {
+      "id": "muster.beyond.package_files_unmodified",
+      "title_en": "Every packaged file still matches the package database",
+      "title_ko": "패키지로 설치된 모든 파일이 패키지 데이터베이스와 여전히 일치한다",
+      "category": "beyond",
+      "importance": "상",
+      "automation": "auto",
+      "status": "FAIL",
+      "reason": "clause does not hold: packages.verify.modified none where path present",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "none",
+          "source": {
+            "kind": "file",
+            "path": "/proc/1/comm"
+          }
+        },
+        {
+          "fact": "packages.verify.modified",
+          "status": "ok",
+          "value": "1 elements; matching: file:/etc/cron.daily/google-chrome",
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/dpkg --verify",
+            "exit_code": 0
+          }
+        }
+      ],
+      "observations": [
+        {
+          "subject": "file:/etc/cron.daily/google-chrome",
+          "expected": "not present",
+          "actual": "/etc/cron.daily/google-chrome",
+          "verdict": "fail"
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "muster.beyond.audit_disk_actions",
+      "title_en": "The audit daemon does something visible when its log storage runs short, fills or fails",
+      "title_ko": "감사 로그 저장 공간이 부족해지거나 가득 차거나 오류가 나면 감사 데몬이 드러나는 조치를 한다",
+      "category": "beyond",
+      "importance": "중",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when does not hold: services.auditd.installed eq true",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "none",
+          "source": {
+            "kind": "file",
+            "path": "/proc/1/comm"
+          }
+        },
+        {
+          "fact": "services.auditd.installed",
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState auditd.service",
+            "exit_code": 0
+          }
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.beyond.audit_immutable",
+      "title_en": "The audit configuration is locked until reboot, now and in the rules the next boot loads",
+      "title_ko": "감사 설정이 지금도, 다음 부팅이 적재할 규칙에서도 재부팅 전까지 잠겨 있다",
+      "category": "beyond",
+      "importance": "중",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when does not hold: services.auditd.installed eq true",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "none",
+          "source": {
+            "kind": "file",
+            "path": "/proc/1/comm"
+          }
+        },
+        {
+          "fact": "services.auditd.installed",
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState auditd.service",
+            "exit_code": 0
+          }
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.beyond.audit_log_permissions",
+      "title_en": "The audit log and its directory belong to root, the log's group is root or the logging group, and both are closed to other users",
+      "title_ko": "감사 로그와 그 디렉터리가 root 소유이고 로그의 그룹이 root 나 로깅 그룹이며 둘 다 다른 사용자에게 닫혀 있다",
+      "category": "beyond",
+      "importance": "중",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when does not hold: services.auditd.installed eq true",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "none",
+          "source": {
+            "kind": "file",
+            "path": "/proc/1/comm"
+          }
+        },
+        {
+          "fact": "services.auditd.installed",
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState auditd.service",
+            "exit_code": 0
+          }
+        }
+      ],
+      "severity": "medium"
     },
     {
       "id": "muster.beyond.bootloader_password",
@@ -9368,6 +9668,37 @@
       "severity": "medium"
     },
     {
+      "id": "muster.beyond.file_integrity_tool",
+      "title_en": "A file-integrity tool has a baseline database and a scheduled check",
+      "title_ko": "파일 무결성 도구에 기준 데이터베이스와 예약된 검사가 있다",
+      "category": "beyond",
+      "importance": "중",
+      "automation": "auto",
+      "status": "FAIL",
+      "reason": "clause does not hold: fim.tool ne none",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "none",
+          "source": {
+            "kind": "file",
+            "path": "/proc/1/comm"
+          }
+        },
+        {
+          "fact": "fim.tool",
+          "status": "ok",
+          "value": "none",
+          "source": {
+            "kind": "derived"
+          }
+        }
+      ],
+      "mechanism": 2,
+      "severity": "medium"
+    },
+    {
       "id": "muster.beyond.kernel_pointer_exposure",
       "title_en": "The kernel hides its pointers and its message buffer from unprivileged readers",
       "title_ko": "커널이 포인터와 메시지 버퍼를 비권한 사용자에게 숨긴다",
@@ -9556,6 +9887,63 @@
           "verdict": "fail"
         }
       ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.beyond.sudo_logging",
+      "title_en": "sudo records every command it runs to syslog or to a log file",
+      "title_ko": "sudo 가 실행하는 모든 명령을 syslog 나 로그 파일에 기록한다",
+      "category": "beyond",
+      "importance": "중",
+      "automation": "auto",
+      "status": "PASS",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "none",
+          "source": {
+            "kind": "file",
+            "path": "/proc/1/comm"
+          }
+        },
+        {
+          "fact": "sudo.installed",
+          "status": "ok",
+          "value": true,
+          "source": {
+            "kind": "file",
+            "path": "/etc/sudoers"
+          }
+        },
+        {
+          "fact": "sudo.log.syslog",
+          "status": "ok",
+          "value": true,
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "file",
+                "path": "/etc/sudoers"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/sudoers.d/90-cloud-init-users"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/sudoers.d/README"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/sudoers.d/runner"
+              }
+            ]
+          }
+        }
+      ],
+      "mechanism": 1,
       "severity": "medium"
     },
     {
@@ -9973,6 +10361,63 @@
           }
         }
       ],
+      "severity": "low"
+    },
+    {
+      "id": "muster.beyond.remote_log_forwarding",
+      "title_en": "Log messages are forwarded to another host as they are written",
+      "title_ko": "로그 메시지가 기록되는 즉시 다른 호스트로 전달된다",
+      "category": "beyond",
+      "importance": "하",
+      "automation": "auto",
+      "status": "FAIL",
+      "reason": "clause does not hold: logging.rsyslog.forwards_remote eq true",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "none",
+          "source": {
+            "kind": "file",
+            "path": "/proc/1/comm"
+          }
+        },
+        {
+          "fact": "logging.rsyslog.forwards_remote",
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "file",
+                "path": "/etc/rsyslog.conf"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/rsyslog.d/20-ufw.conf"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/rsyslog.d/21-cloudinit.conf"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/rsyslog.d/50-default.conf"
+              }
+            ]
+          }
+        },
+        {
+          "fact": "logging.journal_upload.url",
+          "status": "ok",
+          "value": "",
+          "source": {
+            "kind": "derived"
+          }
+        }
+      ],
+      "mechanism": 3,
       "severity": "low"
     },
     {

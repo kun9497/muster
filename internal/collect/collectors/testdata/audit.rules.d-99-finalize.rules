@@ -1,0 +1,2 @@
+## Synthetic rules.d fragment: lock the configuration until reboot.
+-e 2

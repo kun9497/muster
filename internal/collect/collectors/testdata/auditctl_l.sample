@@ -1,0 +1,3 @@
+-w /etc/passwd -p wa -k identity
+-a always,exit -F arch=b64 -S execve -F key=exec
+-a always,exit -F arch=b32 -S execve -F key=exec

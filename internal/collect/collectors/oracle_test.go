@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -18,9 +19,9 @@ import (
 
 // The parser oracles (F-8 … F-10).
 //
-// Each of the four tests below reads the host the way the collector does —
-// through collect.Host() under the collector's own guard — and asks the
-// daemon that owns those bytes what IT thinks they say. A fixture can only
+// Each test below reads the host the way the collector does — through
+// collect.Host() under the collector's own guard — and asks the daemon or
+// tool that owns those bytes what IT thinks they say. A fixture can only
 // prove that a parser still answers what it answered yesterday; only the
 // daemon can prove the answer is right.
 //
@@ -30,11 +31,14 @@ import (
 //     by the function under test. An oracle that shares a parser with the
 //     parser it judges cannot disagree with it.
 //   - Nothing is written, started, stopped or installed. Every command is a
-//     query (`sshd -T`, `getent`, `findmnt`, `systemctl show`), run through
-//     the same exec discipline the collectors use.
+//     query (`sshd -T`, `getent`, `findmnt`, `systemctl show`, `sysctl -n`,
+//     `dpkg --verify` or `rpm -Va`, `auditctl -s` and `-l`), run through the
+//     same exec discipline the collectors use.
 //   - A pair whose oracle binary is not on this machine skips, naming the
-//     binary; that is the only skip an enabled run may produce, and the CI
-//     job on the runner VM — which has all four — asserts there are none.
+//     binary; that is the only skip an enabled run may produce — besides,
+//     for the audit pair, J-1's "auditctl cannot reach the kernel" (exit 4
+//     or 255, a container) — and the CI job on the runner VM, which has
+//     every binary and a running auditd, asserts there are none.
 //     A binary that IS there and refuses to answer fails the pair: a daemon
 //     that will not print its own configuration is a finding, not a gap.
 //
@@ -753,4 +757,239 @@ func reasonSuffix(reason string) string {
 		return ""
 	}
 	return ": " + reason
+}
+
+// --- package verification -----------------------------------------------
+
+// oracleVerifyLineRE is the oracle's own reading of a verify row, for both
+// tools: nine attribute columns (or "missing"), the optional file-type
+// letter, and the path to the end of the line, from which a parenthesised
+// trailer such as rpm's "(Permission denied)" is dropped. It is deliberately
+// looser than the collector's grammar: a row the collector rejects still
+// counts here, and the collector then fails the pair through
+// stats.unparsed_head or through the count.
+var oracleVerifyLineRE = regexp.MustCompile(`^(?:[SM5DLUGTP.?]{9}|missing)\s+(?:[a-z]\s+)?(/.*)$`)
+
+var oracleVerifyTrailerRE = regexp.MustCompile(` \([^)]*\)$`)
+
+// oracleVerifyTool is the package manager this host verifies with, chosen
+// the way a reader of the host would: the dpkg database first, then rpm's.
+func oracleVerifyTool(t *testing.T) (bin string, args []string) {
+	t.Helper()
+	switch {
+	case oracleExists("/var/lib/dpkg/status"):
+		return oracleBinary(t, "/usr/bin/dpkg"), []string{"--verify"}
+	case oracleExists("/var/lib/rpm"):
+		return oracleBinary(t, "/usr/bin/rpm"), []string{"-Va"}
+	}
+	t.Skip("no package database: neither /var/lib/dpkg/status nor /var/lib/rpm exists")
+	return "", nil
+}
+
+func oracleExists(p string) bool {
+	_, err := os.Stat(p)
+	return err == nil
+}
+
+// oracleVerifyRows is the path of every row the tool printed, and the lines
+// that were not rows.
+func oracleVerifyRows(stdout []byte) (paths []string, other []string) {
+	for _, l := range oracleLines(stdout) {
+		l = strings.TrimRight(l, "\r")
+		if strings.TrimSpace(l) == "" {
+			continue
+		}
+		m := oracleVerifyLineRE.FindStringSubmatch(l)
+		if m == nil {
+			other = append(other, l)
+			continue
+		}
+		paths = append(paths, oracleVerifyTrailerRE.ReplaceAllString(m[1], ""))
+	}
+	return paths, other
+}
+
+// TestOracleVerify runs the package manager's verification itself and
+// compares what it printed with what the pkgverify collector published: every
+// path the collector lists is a row the tool printed, and the listed rows
+// plus the filtered counts are exactly the rows the tool printed. The two
+// runs are minutes apart on a live host; a file that changes between them
+// shows as a mismatch with both counts in the log.
+func TestOracleVerify(t *testing.T) {
+	oracleEnabled(t)
+	bin, args := oracleVerifyTool(t)
+	line := bin + " " + strings.Join(args, " ")
+	out := collect.RunCommand(context.Background(), collect.Command{
+		Path: bin, Args: args, Timeout: 30 * time.Minute, MaxOutput: 64 << 20,
+	})
+	switch {
+	case out.Err != nil:
+		t.Fatalf("%s could not be run: %v", line, out.Err)
+	case out.TimedOut:
+		t.Fatalf("%s timed out", line)
+	case out.Truncated:
+		t.Fatalf("%s produced more output than the oracle reads", line)
+	case out.ExitCode != 0 && out.ExitCode != 1:
+		t.Fatalf("%s exited %d: %s", line, out.ExitCode, strings.TrimSpace(string(out.Stderr)))
+	}
+	oraclePaths, other := oracleVerifyRows(out.Stdout)
+	if len(other) != 0 {
+		t.Logf("%s printed %d lines that are not rows, first %q", line, len(other), other[0])
+	}
+
+	reg, err := facts.LoadRegistry()
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := collect.NewBuilder(reg)
+	b.SetVerify(collect.VerifyOptions{Timeout: 30 * time.Minute})
+	b.Begin("pkgverify")
+	c := collectorNamed(t, "pkgverify")
+	g := collect.Guard(collect.Host(), c)
+	if err := c.Run(context.Background(), g, b); err != nil {
+		t.Fatalf("pkgverify: %v", err)
+	}
+	if v := g.Violations(); len(v) != 0 {
+		t.Fatalf("pkgverify reached outside its declaration: %v", v)
+	}
+	if e := env(t, b, "packages.verify.complete"); e.Status != facts.StatusOK || e.Value != true {
+		t.Fatalf("packages.verify.complete: %s %v%s", e.Status, e.Value, reasonSuffix(e.Reason))
+	}
+	stats := verifyRecord(t, b, "packages.verify.stats")
+	if u, _ := stats["unparsed_head"].([]any); len(u) != 0 {
+		t.Errorf("the collector could not parse rows the tool printed: %v", u)
+	}
+
+	oracleSet := map[string]bool{}
+	for _, p := range oraclePaths {
+		oracleSet[p] = true
+	}
+	listed := 0
+	for _, key := range []string{"packages.verify.modified", "packages.verify.modified_config"} {
+		if env(t, b, key).Truncated {
+			t.Fatalf("%s is truncated; the path sets cannot be compared", key)
+		}
+		for _, r := range okList(t, b, key) {
+			p, _ := r.(map[string]any)["path"].(string)
+			if !oracleSet[p] {
+				t.Errorf("%s lists %s, which %s did not print", key, p, line)
+			}
+			listed++
+		}
+	}
+	filtered := 0
+	counts := verifyRecord(t, b, "packages.verify.filtered_counts")
+	for name, v := range counts {
+		n, ok := v.(int)
+		if !ok {
+			t.Fatalf("filtered_counts.%s is %T, not an int", name, v)
+		}
+		if name != "config" { // a config row is listed in modified_config AND counted
+			filtered += n
+		}
+	}
+	if listed+filtered != len(oraclePaths) {
+		t.Errorf("%s printed %d rows; muster listed %d and filtered %d (%v)", line, len(oraclePaths), listed, filtered, counts)
+	}
+	t.Logf("oracle verify: compared %d (listed %d, filtered %d)", len(oraclePaths), listed, filtered)
+}
+
+// --- audit --------------------------------------------------------------
+
+// oracleAuditctl runs one auditctl query. Exit 4 (no CAP_AUDIT_CONTROL) and
+// 255 (a pid namespace the kernel will not answer) are J-1's "cannot reach
+// the kernel" — the container case, where there is nothing to compare — and
+// the one skip this pair allows besides a missing binary.
+func oracleAuditctl(t *testing.T, bin string, arg string) []byte {
+	t.Helper()
+	out := collect.RunCommand(context.Background(), collect.Command{
+		Path: bin, Args: []string{arg}, Timeout: 30 * time.Second, MaxOutput: 8 << 20,
+	})
+	switch {
+	case out.Err != nil:
+		t.Fatalf("%s %s could not be run: %v", bin, arg, out.Err)
+	case out.TimedOut:
+		t.Fatalf("%s %s timed out", bin, arg)
+	case out.ExitCode == 4 || out.ExitCode == 255:
+		t.Skipf("auditctl cannot reach the kernel here (%s %s exited %d: %s)", bin, arg, out.ExitCode, strings.TrimSpace(string(out.Stderr)))
+	case out.ExitCode != 0:
+		t.Fatalf("%s %s exited %d: %s", bin, arg, out.ExitCode, strings.TrimSpace(string(out.Stderr)))
+	case out.Truncated:
+		t.Fatalf("%s %s produced more output than the oracle reads", bin, arg)
+	}
+	return out.Stdout
+}
+
+// oracleAuditEnabled is the enabled field of auditctl -s, read here.
+func oracleAuditEnabled(t *testing.T, stdout []byte) int {
+	t.Helper()
+	for _, l := range oracleLines(stdout) {
+		f := strings.Fields(l)
+		if len(f) >= 2 && f[0] == "enabled" {
+			n, err := strconv.Atoi(f[1])
+			if err != nil {
+				t.Fatalf("auditctl -s: enabled %q is not an integer", f[1])
+			}
+			return n
+		}
+	}
+	t.Fatalf("auditctl -s printed no enabled line:\n%s", stdout)
+	return 0
+}
+
+// oracleAuditRuleCount is how many rules auditctl -l printed: every
+// non-blank line but its "No rules".
+func oracleAuditRuleCount(stdout []byte) int {
+	n := 0
+	for _, l := range oracleLines(stdout) {
+		if s := strings.TrimSpace(l); s != "" && s != "No rules" {
+			n++
+		}
+	}
+	return n
+}
+
+// TestOracleAudit asks auditctl for the kernel's audit status and rule list
+// and compares them with the audit collector's audit.status.enabled and
+// audit.rules.loaded_count, read through the collector's own guard.
+func TestOracleAudit(t *testing.T) {
+	oracleEnabled(t)
+	bin := oracleBinary(t, "/usr/sbin/auditctl")
+	enabled := oracleAuditEnabled(t, oracleAuditctl(t, bin, "-s"))
+	rules := oracleAuditRuleCount(oracleAuditctl(t, bin, "-l"))
+
+	reg, err := facts.LoadRegistry()
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := collect.NewBuilder(reg)
+	b.Begin("audit")
+	c := collectorNamed(t, "audit")
+	g := collect.Guard(collect.Host(), c)
+	if err := c.Run(context.Background(), g, b); err != nil {
+		t.Fatalf("audit: %v", err)
+	}
+	if v := g.Violations(); len(v) != 0 {
+		t.Fatalf("audit reached outside its declaration: %v", v)
+	}
+
+	compared := 0
+	for _, pair := range []struct {
+		key  string
+		want int
+	}{
+		{"audit.status.enabled", enabled},
+		{"audit.rules.loaded_count", rules},
+	} {
+		e := env(t, b, pair.key)
+		switch {
+		case e.Status != facts.StatusOK:
+			t.Errorf("%s: muster %s%s, auditctl says %d", pair.key, e.Status, reasonSuffix(e.Reason), pair.want)
+		case e.Value != pair.want:
+			t.Errorf("%s: muster %v, auditctl says %d", pair.key, e.Value, pair.want)
+		default:
+			compared++
+		}
+	}
+	t.Logf("oracle audit: compared %d", compared)
 }

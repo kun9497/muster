@@ -1,0 +1,2 @@
+# synthetic: a name dpkg's loadcfgdir skips (not [A-Za-z0-9_-]+), so it must never apply.
+path-exclude=/usr/lib/*

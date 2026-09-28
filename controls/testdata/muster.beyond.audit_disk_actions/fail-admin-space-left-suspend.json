@@ -1,0 +1,70 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none"
+      }
+    },
+    "services": {
+      "auditd": {
+        "installed": {
+          "status": "ok",
+          "value": true,
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState auditd.service",
+            "exit_code": 0
+          }
+        }
+      }
+    },
+    "audit": {
+      "conf": {
+        "space_left_action": {
+          "status": "ok",
+          "value": "syslog",
+          "source": {
+            "kind": "file",
+            "path": "/etc/audit/auditd.conf"
+          }
+        },
+        "admin_space_left_action": {
+          "status": "ok",
+          "value": "suspend",
+          "source": {
+            "kind": "file",
+            "path": "/etc/audit/auditd.conf"
+          }
+        },
+        "disk_full_action": {
+          "status": "ok",
+          "value": "halt",
+          "source": {
+            "kind": "file",
+            "path": "/etc/audit/auditd.conf"
+          }
+        },
+        "disk_error_action": {
+          "status": "ok",
+          "value": "halt",
+          "source": {
+            "kind": "file",
+            "path": "/etc/audit/auditd.conf"
+          }
+        },
+        "max_log_file_action": {
+          "status": "ok",
+          "value": "rotate",
+          "source": {
+            "kind": "file",
+            "path": "/etc/audit/auditd.conf"
+          }
+        }
+      }
+    }
+  }
+}

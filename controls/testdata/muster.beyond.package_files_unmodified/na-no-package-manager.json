@@ -1,0 +1,95 @@
+{
+  "synthetic": true,
+  "_expect": {
+    "reason_code": "unsupported_env"
+  },
+  "schema_version": 1,
+  "run": {
+    "deep": true
+  },
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none"
+      }
+    },
+    "packages": {
+      "verify": {
+        "complete": {
+          "status": "unsupported",
+          "reason": "no supported package manager"
+        },
+        "tool": {
+          "status": "ok",
+          "value": "",
+          "source": {
+            "kind": "derived"
+          }
+        },
+        "modified": {
+          "status": "ok",
+          "value": [],
+          "source": {
+            "kind": "derived"
+          }
+        },
+        "modified_config": {
+          "status": "ok",
+          "value": [],
+          "source": {
+            "kind": "derived"
+          }
+        },
+        "filter": {
+          "status": "ok",
+          "value": [
+            "config",
+            "doc",
+            "dpkg_excluded",
+            "ghost",
+            "mtime_only",
+            "unverifiable",
+            "unchanged"
+          ],
+          "source": {
+            "kind": "derived"
+          }
+        },
+        "filtered_counts": {
+          "status": "ok",
+          "value": {
+            "config": 0,
+            "doc": 0,
+            "dpkg_excluded": 0,
+            "ghost": 0,
+            "mtime_only": 0,
+            "unverifiable": 0,
+            "unchanged": 0
+          },
+          "source": {
+            "kind": "derived"
+          }
+        },
+        "stats": {
+          "status": "ok",
+          "value": {
+            "lines": 0,
+            "exit_code": -1,
+            "duration_ms": 0,
+            "truncated": false,
+            "stderr_head": [],
+            "unparsed_head": [],
+            "packages_without_digests": 0,
+            "packages_without_digests_error": "",
+            "dpkg_path_excludes": [],
+            "dpkg_path_excludes_error": []
+          },
+          "source": {
+            "kind": "derived"
+          }
+        }
+      }
+    }
+  }
+}

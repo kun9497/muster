@@ -1,0 +1,24 @@
+# Example configuration file for AIDE.
+
+@@define DBDIR /var/lib/aide
+@@define LOGDIR /var/log/aide
+
+# The location of the database to be read.
+database_in=file:@@{DBDIR}/aide.db.gz
+
+# The location of the database to be written.
+#database_out=sql:host:port:database:login_name:passwd:table
+#database_out=file:aide.db.new
+database_out=file:@@{DBDIR}/aide.db.new.gz
+
+# Whether to gzip the output to database
+gzip_dbout=yes
+
+# Database attributes to include in report (H = all compiled hashsums, default)
+database_attrs=H
+
+# Add metadata to database (version info, timestamps)
+database_add_metadata=yes
+
+# Read /etc/aide.d/*.conf files
+@@include /etc/aide.d ^[a-zA-Z0-9_-]+\.conf$

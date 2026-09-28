@@ -1,7 +1,7 @@
 # muster — working notes for Claude
 
 Design: `docs/superpowers/specs/2026-09-02-muster-design.md` (English canonical, Korean pair). It is also the
-decision log (D01–D29). Read it before changing any contract: facts schema, control ids, exit codes,
+decision log (D01–D30). Read it before changing any contract: facts schema, control ids, exit codes,
 waiver keys, output format.
 
 ## Build and test
@@ -39,7 +39,8 @@ regenerates them from public images and `-check` compares.
 
 - `collect --deep` runs the `walk` collector (root only; without root it writes `walk.complete` denied
   and nothing else). `--walk-budget`, `--walk-max-entries`, `--walk-exclude`, `--walk-include` bound it;
-  `--deep` raises the default `--timeout` to budget + 5m. On the lab host the walk is proven through the
+  `--deep` raises the default `--timeout` to walk budget + `--verify-timeout` (30m) + 5m, or budget + 5m with
+  `--no-verify`. On the lab host the walk is proven through the
   session's read-only scripts, never from a checkout; the recipe lives in the session notes.
 - `Declaration.Walk: true` licenses `Access.ReadDir(path, expect)` on any absolute clean path for that
   collector alone; `Readlink` is guarded by `Reads` like `Stat`. Both go through `openNoFollow`; a symlink
@@ -58,6 +59,21 @@ regenerates them from public images and `-check` compares.
   entry is a symlink, so sysfs is walked through `Readlink` into `devices/virtual/block`; the module tree
   is `/usr/lib/modules` on merged-`/usr` hosts. `controls/testdata/_hosts/` holds whole-host synthetic
   snapshots (the stock Ubuntu 22.04 reading) that the fixture harness ignores and `hosts_test.go` pins.
+
+## Integrity (stage 3C-1)
+
+- `pkgverify` runs only under `--deep` as root (`Builder.Verify()` is set iff `--deep` without `--no-verify`);
+  without root it writes `packages.verify.complete` denied and nothing else. The evaluator's deep gate is
+  the `deepFamilies` table (`walk.` / `packages.verify.`): not run → MANUAL, complete false → ERROR
+  (`walk_incomplete` / `verify_incomplete`), `unsupported` → NOT_APPLICABLE, denied/timeout/error → ERROR.
+  The verify filter has seven named rules recorded in `packages.verify.filter`; dpkg's exit code carries no
+  verdict, dpkg's `path-exclude` globs are fnmatch (`*` crosses `/`), and an all-dots rpm row is `unchanged`.
+- `auditctl` gates on CAP_AUDIT_CONTROL (exit 4 "You must be root" → denied non-root / unsupported root) and
+  no pid namespace but the initial one reaches the kernel (exit 255 → unsupported): no container runs auditd
+  or answers `auditctl`, so the runtime paths are proven on the GitHub runner VM, which installs auditd.
+  augenrules loads `rules.d/*.rules` in `ls -v` version order and, without rules.d, `/etc/audit/audit.rules`.
+  `fim.tool` is `aide` / `none`, or `absent` naming the other tools found (that host reads MANUAL).
+  `controls/testdata/_hosts/` holds the stock Ubuntu 22.04 and EL9 readings.
 
 ## Stage-2 conventions
 

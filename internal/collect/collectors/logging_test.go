@@ -5,6 +5,7 @@ package collectors
 import (
 	"context"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -984,5 +985,218 @@ func TestLoggingNumericSelectorIsUnmodelled(t *testing.T) {
 	}
 	if e := env(t, b, "logging.rsyslog.coverage"); e.Status != facts.StatusAbsent {
 		t.Errorf("coverage = %+v, want absent", e)
+	}
+}
+
+// --- forwarding and journal-upload (spec I-6) ----------------------------
+
+// rsyslogLiteral is a host running rsyslog whose only configuration is conf.
+func rsyslogLiteral(conf string) *fsAccess {
+	a := loggingAccess(nil, nil)
+	a.contents = map[string][]byte{"/etc/rsyslog.conf": []byte(conf)}
+	a.stats["/usr/sbin/rsyslogd"] = statResult{mode: 0o755, kind: "regular"}
+	return a
+}
+
+func TestRsyslogRemoteTargets(t *testing.T) {
+	for _, c := range []struct {
+		name, conf string
+		forwards   bool
+		rows       []map[string]any
+	}{
+		{"tcp remote", "*.* @@logs.example.com:514\n", true,
+			[]map[string]any{{"rule": "*.* @@logs.example.com:514", "target": "@@logs.example.com:514", "loopback": false}}},
+		{"udp loopback", "*.* @127.0.0.1:514\n", false,
+			[]map[string]any{{"rule": "*.* @127.0.0.1:514", "target": "@127.0.0.1:514", "loopback": true}}},
+		{"omfwd to ::1", `*.* action(type="omfwd" target="[::1]" port="514" protocol="tcp")` + "\n", false,
+			[]map[string]any{{"rule": `*.* action(type="omfwd" target="[::1]" port="514" protocol="tcp")`, "target": "[::1]:514", "loopback": true}}},
+		{"relay and remote", "*.* @@(z9)localhost:10514\nauth.* :omfwd:logs.example.com\n", true,
+			[]map[string]any{
+				{"rule": "*.* @@(z9)localhost:10514", "target": "@@(z9)localhost:10514", "loopback": true},
+				{"rule": "auth.* :omfwd:logs.example.com", "target": "logs.example.com", "loopback": false},
+			}},
+		{"file only", "*.* /var/log/syslog\n", false, nil},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			b := buildBegun(t, "logging", rsyslogLiteral(c.conf))
+			if e := env(t, b, "logging.rsyslog.forwards_remote"); e.Status != facts.StatusOK || e.Value != c.forwards {
+				t.Errorf("forwards_remote = %+v, want %v", e, c.forwards)
+			}
+			rows := okList(t, b, "logging.rsyslog.remote_targets")
+			if len(rows) != len(c.rows) {
+				t.Fatalf("remote_targets = %v, want %v (one row per action, not per facility)", rows, c.rows)
+			}
+			for i, want := range c.rows {
+				got := rows[i].(map[string]any)
+				for k, v := range want {
+					if got[k] != v {
+						t.Errorf("row %d %s = %v, want %v", i, k, got[k], v)
+					}
+				}
+			}
+		})
+	}
+
+	// journald-only: nothing forwards, and the answer is derived.
+	b := buildBegun(t, "logging", loggingAccess(nil, nil))
+	e := env(t, b, "logging.rsyslog.forwards_remote")
+	if e.Status != facts.StatusOK || e.Value != false || e.Source == nil || e.Source.Kind != "derived" {
+		t.Errorf("journald-only forwards_remote = %+v", e)
+	}
+	if rows := okList(t, b, "logging.rsyslog.remote_targets"); len(rows) != 0 {
+		t.Errorf("journald-only remote_targets = %v", rows)
+	}
+
+	// syslog-ng and no modelled daemon at all: absent, never false.
+	ng := buildBegun(t, "logging", loggingAccess(map[string]string{"/etc/syslog-ng/syslog-ng.conf": "syslog-ng.conf"}, nil))
+	none := buildBegun(t, "logging", &fsAccess{})
+	for _, k := range []string{"logging.rsyslog.forwards_remote", "logging.rsyslog.remote_targets"} {
+		absentBecause(t, ng, k, "syslog-ng is not modelled")
+		absentBecause(t, none, k, "no modelled syslog daemon")
+	}
+
+	// An rsyslog.conf this run may not read is the answer for both (C3).
+	a := loggingAccess(nil, nil)
+	a.fails["/etc/rsyslog.conf"] = os.ErrPermission
+	a.stats["/usr/sbin/rsyslogd"] = statResult{mode: 0o755, kind: "regular"}
+	d := buildBegun(t, "logging", a)
+	for _, k := range []string{"logging.rsyslog.forwards_remote", "logging.rsyslog.remote_targets"} {
+		if e := env(t, d, k); e.Status != facts.StatusDenied || !strings.Contains(e.Reason, "/etc/rsyslog.conf") {
+			t.Errorf("%s = %+v, want denied naming the file", k, e)
+		}
+	}
+}
+
+func TestLoopbackTarget(t *testing.T) {
+	for in, want := range map[string]bool{
+		"@127.0.0.1":              true,
+		"@@127.0.1.1:514":         true,
+		"@@(o,z9)127.0.0.1:10514": true,
+		"@[::1]:514":              true,
+		"[::1]":                   true,
+		"::1":                     true,
+		"@localhost":              true,
+		"@@LOCALHOST:514":         true,
+		"@ip6-localhost":          true,
+		"@@ip6-loopback:514":      true,
+		"@localhost.localdomain":  true,
+		"@@localhost6:514":        true,
+		"@localhost6.example.com": false,
+		"@logs.example.com":       false,
+		"@@192.0.2.10:514":        false,
+		"@[2001:db8::1]:514":      false,
+		"2001:db8::1":             false,
+		"@127.example.com":        false,
+		"localhost.example.com":   false,
+		"":                        false,
+	} {
+		if got := loopbackTarget(in); got != want {
+			t.Errorf("loopbackTarget(%q) = %v, want %v", in, got, want)
+		}
+	}
+}
+
+func TestJournalUploadURL(t *testing.T) {
+	const main = "/etc/systemd/journal-upload.conf"
+	url := func(a *fsAccess) facts.Envelope {
+		t.Helper()
+		return env(t, buildBegun(t, "logging", a), "logging.journal_upload.url")
+	}
+	// The shipped file has only "# URL=".
+	e := url(loggingAccess(map[string]string{main: "journal-upload.conf.sample"}, nil))
+	if e.Status != facts.StatusOK || e.Value != "" || e.Source == nil || e.Source.Kind != "derived" || len(e.Source.Inputs) != 1 {
+		t.Errorf("stock url = %+v", e)
+	}
+
+	a := loggingAccess(nil, nil)
+	a.contents = map[string][]byte{main: []byte("[Upload]\nURL=https://logs.example.com:19532\n")}
+	if e := url(a); e.Status != facts.StatusOK || e.Value != "https://logs.example.com:19532" {
+		t.Errorf("url = %+v", e)
+	}
+
+	// A URL= outside [Upload] is not this setting.
+	a = loggingAccess(nil, nil)
+	a.contents = map[string][]byte{main: []byte("[Other]\nURL=https://wrong.example.com\n")}
+	if e := url(a); e.Status != facts.StatusOK || e.Value != "" {
+		t.Errorf("url from another section = %+v", e)
+	}
+
+	// A drop-in wins over the main file; the vendor main file answers when
+	// there is no /etc one.
+	a = loggingAccess(nil, nil)
+	a.contents = map[string][]byte{
+		"/usr/lib/systemd/journal-upload.conf":           []byte("[Upload]\nURL=https://main.example.com\n"),
+		"/run/systemd/journal-upload.conf.d/10-url.conf": []byte("[Upload]\nURL=https://dropin.example.com\n"),
+	}
+	if e := url(a); e.Status != facts.StatusOK || e.Value != "https://dropin.example.com" || len(e.Source.Inputs) != 2 {
+		t.Errorf("drop-in url = %+v", e)
+	}
+
+	// No file is no URL: a fact, not a default.
+	if e := url(loggingAccess(nil, nil)); e.Status != facts.StatusOK || e.Value != "" {
+		t.Errorf("no-file url = %+v", e)
+	}
+
+	if e := url(&fsAccess{}); e.Status != facts.StatusUnsupported || e.Reason != "no systemd journald on this host" {
+		t.Errorf("no-systemd url = %+v", e)
+	}
+
+	a = loggingAccess(map[string]string{main: "journal-upload.conf.sample"}, nil)
+	a.fails[main] = os.ErrPermission
+	if e := url(a); e.Status != facts.StatusDenied || !strings.HasPrefix(e.Reason, main+": ") {
+		t.Errorf("denied url = %+v", e)
+	}
+}
+
+// Every registered logging key is written on every shape the collector meets.
+func TestLoggingPublishesEveryRegisteredKey(t *testing.T) {
+	reg, err := facts.LoadRegistry()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var keys []string
+	for _, k := range reg.Keys {
+		if k.Collector == "logging" {
+			keys = append(keys, k.Key)
+		}
+	}
+	denied := func() *fsAccess {
+		a := loggingAccess(nil, nil)
+		a.fails["/etc/rsyslog.conf"] = os.ErrPermission
+		a.stats["/usr/sbin/rsyslogd"] = statResult{mode: 0o755, kind: "regular"}
+		return a
+	}
+	for name, a := range map[string]*fsAccess{
+		"none":          {},
+		"journald-only": loggingAccess(nil, nil),
+		"rsyslog":       loggingAccess(map[string]string{"/etc/rsyslog.conf": "rsyslog.conf.rhel"}, nil),
+		"syslog-ng":     loggingAccess(map[string]string{"/etc/syslog-ng/syslog-ng.conf": "syslog-ng.conf"}, nil),
+		"denied":        denied(),
+	} {
+		t.Run(name, func(t *testing.T) {
+			b := buildBegun(t, "logging", a)
+			if got := b.Keys("logging"); !slices.Equal(got, sortedCopy(keys)) {
+				t.Errorf("Keys(logging) = %v, want every registered key %v", got, keys)
+			}
+		})
+	}
+}
+
+// Review ruling (c): an include this run could not read may hold the
+// forward, so with none parsed forwards_remote has no answer; a parsed one
+// is still true.
+func TestRsyslogForwardsUnderAnIncompleteParse(t *testing.T) {
+	a := rsyslogLiteral("$IncludeConfig /etc/rsyslog.d/10-custom.conf\n*.* /var/log/syslog\n")
+	a.fails["/etc/rsyslog.d/10-custom.conf"] = os.ErrPermission
+	b := buildBegun(t, "logging", a)
+	if e := env(t, b, "logging.rsyslog.parse_complete"); e.Value != false {
+		t.Fatalf("parse_complete %+v, want false", e)
+	}
+	absentBecause(t, b, "logging.rsyslog.forwards_remote", "rsyslog configuration not fully parsed; a forward may be hidden")
+
+	a = rsyslogLiteral("$IncludeConfig /etc/rsyslog.d/10-custom.conf\n*.* @@logs.example.com:514\n")
+	a.fails["/etc/rsyslog.d/10-custom.conf"] = os.ErrPermission
+	if e := env(t, buildBegun(t, "logging", a), "logging.rsyslog.forwards_remote"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("a parsed forward under an incomplete parse = %+v, want ok true", e)
 	}
 }

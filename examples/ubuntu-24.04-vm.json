@@ -1,15 +1,15 @@
 {
   "schema_version": 1,
   "run": {
-    "muster_version": "e5eda50",
-    "commit": "e5eda50",
-    "controls_version": "kisa-unix-2026+2026.09.18",
-    "controls_digest": "sha256:1236ece32ab31e36ec68736e546abc54ce3ab653a221c2a27e080a573cf39db6",
+    "muster_version": "81855c8",
+    "commit": "81855c8",
+    "controls_version": "kisa-unix-2026+2026.09.23",
+    "controls_digest": "sha256:f3337dac3ea8281886a8618f4cc136ddf62b3258dbfb113c560b5aeca854f41d",
     "guide_edition": "kisa-unix-2026",
-    "collected_at": "2026-09-21T00:36:06Z",
+    "collected_at": "2026-09-28T08:17:31Z",
     "host": {
       "hostname": "github-runner",
-      "machine_id_hash": "1d6f6908d56a5b37951f001d55c54773e0757799ded7f46439ef6dad42950555",
+      "machine_id_hash": "4d7193c17275652cce0569a44b2c249f54db99d23e0fd447ae531341cacc9ee5",
       "kernel": "",
       "os_release": {
         "id": "ubuntu",
@@ -39,7 +39,13 @@
       {
         "name": "accounts",
         "status": "ok",
-        "ms": 9
+        "ms": 0
+      },
+      {
+        "name": "audit",
+        "status": "ok",
+        "ms": 0,
+        "cmd": "/usr/sbin/auditctl -l"
       },
       {
         "name": "banners",
@@ -49,7 +55,7 @@
       {
         "name": "boot",
         "status": "ok",
-        "ms": 6
+        "ms": 20
       },
       {
         "name": "coredump",
@@ -59,7 +65,7 @@
       {
         "name": "cron",
         "status": "ok",
-        "ms": 840,
+        "ms": 827,
         "cmd": "/usr/bin/systemctl list-unit-files --type=timer --no-legend --no-pager"
       },
       {
@@ -70,17 +76,23 @@
       {
         "name": "env",
         "status": "ok",
-        "ms": 4
+        "ms": 8
       },
       {
         "name": "files",
         "status": "ok",
-        "ms": 19
+        "ms": 16
+      },
+      {
+        "name": "fim",
+        "status": "ok",
+        "ms": 11,
+        "cmd": "/usr/bin/systemctl list-timers --all --no-legend --no-pager"
       },
       {
         "name": "firewall",
         "status": "ok",
-        "ms": 20,
+        "ms": 11,
         "cmd": "/usr/sbin/nft list ruleset"
       },
       {
@@ -101,7 +113,7 @@
       {
         "name": "modules",
         "status": "ok",
-        "ms": 23
+        "ms": 24
       },
       {
         "name": "mounts",
@@ -127,18 +139,24 @@
       {
         "name": "pam",
         "status": "ok",
-        "ms": 1
+        "ms": 2
       },
       {
         "name": "patch",
         "status": "ok",
-        "ms": 1987,
+        "ms": 1837,
         "cmd": "/usr/bin/apt-get -s upgrade -o Debug::NoLocking=1"
+      },
+      {
+        "name": "pkgverify",
+        "status": "ok",
+        "ms": 582154,
+        "cmd": "/usr/bin/rpm -Va"
       },
       {
         "name": "services",
         "status": "ok",
-        "ms": 315,
+        "ms": 319,
         "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState atftpd.service"
       },
       {
@@ -154,7 +172,7 @@
       {
         "name": "sshd",
         "status": "ok",
-        "ms": 107,
+        "ms": 13,
         "cmd": "/usr/sbin/sshd -G"
       },
       {
@@ -165,18 +183,18 @@
       {
         "name": "sysctl",
         "status": "ok",
-        "ms": 0
+        "ms": 1
       },
       {
         "name": "timesync",
         "status": "ok",
-        "ms": 60,
+        "ms": 56,
         "cmd": "/usr/bin/timedatectl show-timesync --all"
       },
       {
         "name": "walk",
         "status": "ok",
-        "ms": 13466,
+        "ms": 11900,
         "cmd": "/usr/bin/rpm -qa --qf [%{=NAME}\t%{FILEMODES:octal}\t%{FILEUSERNAME}\t%{FILEGROUPNAME}\t%{FILENAMES}\n]"
       }
     ],
@@ -1025,7 +1043,7 @@
             "hash_algo": "",
             "home": "/usr/sbin",
             "inactive": -1,
-            "last_change": 20692,
+            "last_change": 20700,
             "locked": true,
             "max": 99999,
             "min": 0,
@@ -1046,7 +1064,7 @@
             "hash_algo": "",
             "home": "/bin",
             "inactive": -1,
-            "last_change": 20692,
+            "last_change": 20700,
             "locked": true,
             "max": 99999,
             "min": 0,
@@ -1067,7 +1085,7 @@
             "hash_algo": "",
             "home": "/dev",
             "inactive": -1,
-            "last_change": 20692,
+            "last_change": 20700,
             "locked": true,
             "max": 99999,
             "min": 0,
@@ -1088,7 +1106,7 @@
             "hash_algo": "",
             "home": "/bin",
             "inactive": -1,
-            "last_change": 20692,
+            "last_change": 20700,
             "locked": true,
             "max": 99999,
             "min": 0,
@@ -1109,7 +1127,7 @@
             "hash_algo": "",
             "home": "/usr/games",
             "inactive": -1,
-            "last_change": 20692,
+            "last_change": 20700,
             "locked": true,
             "max": 99999,
             "min": 0,
@@ -1130,7 +1148,7 @@
             "hash_algo": "",
             "home": "/var/cache/man",
             "inactive": -1,
-            "last_change": 20692,
+            "last_change": 20700,
             "locked": true,
             "max": 99999,
             "min": 0,
@@ -1151,7 +1169,7 @@
             "hash_algo": "",
             "home": "/var/spool/lpd",
             "inactive": -1,
-            "last_change": 20692,
+            "last_change": 20700,
             "locked": true,
             "max": 99999,
             "min": 0,
@@ -1172,7 +1190,7 @@
             "hash_algo": "",
             "home": "/var/mail",
             "inactive": -1,
-            "last_change": 20692,
+            "last_change": 20700,
             "locked": true,
             "max": 99999,
             "min": 0,
@@ -1193,7 +1211,7 @@
             "hash_algo": "",
             "home": "/var/spool/news",
             "inactive": -1,
-            "last_change": 20692,
+            "last_change": 20700,
             "locked": true,
             "max": 99999,
             "min": 0,
@@ -1214,7 +1232,7 @@
             "hash_algo": "",
             "home": "/var/spool/uucp",
             "inactive": -1,
-            "last_change": 20692,
+            "last_change": 20700,
             "locked": true,
             "max": 99999,
             "min": 0,
@@ -1235,7 +1253,7 @@
             "hash_algo": "",
             "home": "/bin",
             "inactive": -1,
-            "last_change": 20692,
+            "last_change": 20700,
             "locked": true,
             "max": 99999,
             "min": 0,
@@ -1256,7 +1274,7 @@
             "hash_algo": "",
             "home": "/var/www",
             "inactive": -1,
-            "last_change": 20692,
+            "last_change": 20700,
             "locked": true,
             "max": 99999,
             "min": 0,
@@ -1277,7 +1295,7 @@
             "hash_algo": "",
             "home": "/var/backups",
             "inactive": -1,
-            "last_change": 20692,
+            "last_change": 20700,
             "locked": true,
             "max": 99999,
             "min": 0,
@@ -1298,7 +1316,7 @@
             "hash_algo": "",
             "home": "/var/list",
             "inactive": -1,
-            "last_change": 20692,
+            "last_change": 20700,
             "locked": true,
             "max": 99999,
             "min": 0,
@@ -1319,7 +1337,7 @@
             "hash_algo": "",
             "home": "/run/ircd",
             "inactive": -1,
-            "last_change": 20692,
+            "last_change": 20700,
             "locked": true,
             "max": 99999,
             "min": 0,
@@ -1340,7 +1358,7 @@
             "hash_algo": "",
             "home": "/nonexistent",
             "inactive": -1,
-            "last_change": 20692,
+            "last_change": 20700,
             "locked": true,
             "max": 99999,
             "min": 0,
@@ -1361,7 +1379,7 @@
             "hash_algo": "",
             "home": "/nonexistent",
             "inactive": -1,
-            "last_change": 20692,
+            "last_change": 20700,
             "locked": true,
             "max": 99999,
             "min": 0,
@@ -1382,7 +1400,7 @@
             "hash_algo": "",
             "home": "/",
             "inactive": -1,
-            "last_change": 20692,
+            "last_change": 20700,
             "locked": true,
             "max": -1,
             "min": -1,
@@ -1403,7 +1421,7 @@
             "hash_algo": "",
             "home": "/",
             "inactive": -1,
-            "last_change": 20692,
+            "last_change": 20700,
             "locked": true,
             "max": -1,
             "min": -1,
@@ -1424,7 +1442,7 @@
             "hash_algo": "",
             "home": "/usr/lib/dhcpcd",
             "inactive": -1,
-            "last_change": 20692,
+            "last_change": 20700,
             "locked": true,
             "max": -1,
             "min": -1,
@@ -1445,7 +1463,7 @@
             "hash_algo": "",
             "home": "/nonexistent",
             "inactive": -1,
-            "last_change": 20692,
+            "last_change": 20700,
             "locked": true,
             "max": -1,
             "min": -1,
@@ -1466,7 +1484,7 @@
             "hash_algo": "",
             "home": "/nonexistent",
             "inactive": -1,
-            "last_change": 20692,
+            "last_change": 20700,
             "locked": true,
             "max": -1,
             "min": -1,
@@ -1487,7 +1505,7 @@
             "hash_algo": "",
             "home": "/",
             "inactive": -1,
-            "last_change": 20692,
+            "last_change": 20700,
             "locked": true,
             "max": -1,
             "min": -1,
@@ -1508,7 +1526,7 @@
             "hash_algo": "",
             "home": "/run/uuidd",
             "inactive": -1,
-            "last_change": 20692,
+            "last_change": 20700,
             "locked": true,
             "max": -1,
             "min": -1,
@@ -1529,7 +1547,7 @@
             "hash_algo": "",
             "home": "/var/lib/tpm",
             "inactive": -1,
-            "last_change": 20692,
+            "last_change": 20700,
             "locked": true,
             "max": -1,
             "min": -1,
@@ -1550,7 +1568,7 @@
             "hash_algo": "",
             "home": "/run/sshd",
             "inactive": -1,
-            "last_change": 20692,
+            "last_change": 20700,
             "locked": true,
             "max": -1,
             "min": -1,
@@ -1571,7 +1589,7 @@
             "hash_algo": "",
             "home": "/var/cache/pollinate",
             "inactive": -1,
-            "last_change": 20692,
+            "last_change": 20700,
             "locked": true,
             "max": -1,
             "min": -1,
@@ -1592,7 +1610,7 @@
             "hash_algo": "",
             "home": "/nonexistent",
             "inactive": -1,
-            "last_change": 20692,
+            "last_change": 20700,
             "locked": true,
             "max": -1,
             "min": -1,
@@ -1613,7 +1631,7 @@
             "hash_algo": "",
             "home": "/var/lib/landscape",
             "inactive": -1,
-            "last_change": 20692,
+            "last_change": 20700,
             "locked": true,
             "max": -1,
             "min": -1,
@@ -1634,7 +1652,7 @@
             "hash_algo": "",
             "home": "/var/lib/fwupd",
             "inactive": -1,
-            "last_change": 20692,
+            "last_change": 20700,
             "locked": true,
             "max": -1,
             "min": -1,
@@ -1655,7 +1673,7 @@
             "hash_algo": "",
             "home": "/",
             "inactive": -1,
-            "last_change": 20692,
+            "last_change": 20700,
             "locked": true,
             "max": -1,
             "min": -1,
@@ -1676,7 +1694,7 @@
             "hash_algo": "",
             "home": "/var/lib/chrony",
             "inactive": -1,
-            "last_change": 20692,
+            "last_change": 20700,
             "locked": true,
             "max": -1,
             "min": -1,
@@ -1697,7 +1715,7 @@
             "hash_algo": "",
             "home": "/var/run/sphinxsearch",
             "inactive": -1,
-            "last_change": 20703,
+            "last_change": 20716,
             "locked": true,
             "max": -1,
             "min": -1,
@@ -1718,7 +1736,7 @@
             "hash_algo": "",
             "home": "/",
             "inactive": -1,
-            "last_change": 20703,
+            "last_change": 20716,
             "locked": true,
             "max": -1,
             "min": -1,
@@ -1739,7 +1757,7 @@
             "hash_algo": "",
             "home": "/nonexistent",
             "inactive": -1,
-            "last_change": 20703,
+            "last_change": 20716,
             "locked": true,
             "max": -1,
             "min": -1,
@@ -1760,7 +1778,7 @@
             "hash_algo": "",
             "home": "/var/lib/postgresql",
             "inactive": -1,
-            "last_change": 20703,
+            "last_change": 20716,
             "locked": true,
             "max": -1,
             "min": -1,
@@ -1781,7 +1799,7 @@
             "hash_algo": "$6$",
             "home": "/home/packer",
             "inactive": -1,
-            "last_change": 20703,
+            "last_change": 20716,
             "locked": false,
             "max": 99999,
             "min": 0,
@@ -1802,7 +1820,7 @@
             "hash_algo": "",
             "home": "/home/runner",
             "inactive": -1,
-            "last_change": 20703,
+            "last_change": 20716,
             "locked": true,
             "max": 99999,
             "min": 0,
@@ -1821,6 +1839,174 @@
         "source": {
           "kind": "file",
           "path": "/etc/passwd"
+        }
+      }
+    },
+    "audit": {
+      "conf": {
+        "admin_space_left_action": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "disk_error_action": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "disk_full_action": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "log_file": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "log_group": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "max_log_file_action": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "space_left_action": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        }
+      },
+      "immutable": {
+        "runtime": {
+          "status": "absent",
+          "reason": "auditctl is not installed"
+        },
+        "persisted": {
+          "status": "absent",
+          "reason": "neither /etc/audit/rules.d nor /etc/audit/audit.rules exists"
+        },
+        "effective": {
+          "status": "absent",
+          "reason": "auditctl is not installed"
+        }
+      },
+      "log_dir": {
+        "acl_present": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "gid": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "group": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "group_readable": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "group_writable": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "mode": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "other_readable": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "other_writable": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "uid": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        }
+      },
+      "log_file": {
+        "acl_present": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "gid": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "group": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "group_readable": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "group_writable": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "mode": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "other_readable": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "other_writable": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "uid": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        }
+      },
+      "rules": {
+        "loaded_count": {
+          "status": "absent",
+          "reason": "auditctl is not installed"
+        },
+        "persisted": {
+          "status": "absent",
+          "reason": "neither /etc/audit/rules.d nor /etc/audit/audit.rules exists"
+        },
+        "persisted_count": {
+          "status": "absent",
+          "reason": "neither /etc/audit/rules.d nor /etc/audit/audit.rules exists"
+        },
+        "present": {
+          "runtime": {
+            "status": "absent",
+            "reason": "auditctl is not installed"
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "neither /etc/audit/rules.d nor /etc/audit/audit.rules exists"
+          },
+          "effective": {
+            "status": "absent",
+            "reason": "auditctl is not installed"
+          }
+        }
+      },
+      "status": {
+        "backlog_limit": {
+          "status": "absent",
+          "reason": "auditctl is not installed"
+        },
+        "enabled": {
+          "status": "absent",
+          "reason": "auditctl is not installed"
+        },
+        "failure": {
+          "status": "absent",
+          "reason": "auditctl is not installed"
+        },
+        "lost": {
+          "status": "absent",
+          "reason": "auditctl is not installed"
         }
       }
     },
@@ -5207,7 +5393,7 @@
             "group_writable": false,
             "mode": 1517,
             "other_writable": false,
-            "path": "/var/log/journal/58b34b8c91a94400a52c175421986a53",
+            "path": "/var/log/journal/fa19dc2cce724d98816ef2caca855cd7",
             "uid": 0
           },
           {
@@ -5523,7 +5709,7 @@
             "group_writable": false,
             "mode": 420,
             "other_writable": false,
-            "path": "/var/log/sysstat/sa07",
+            "path": "/var/log/sysstat/sa20",
             "uid": 0
           },
           {
@@ -5532,7 +5718,7 @@
             "group_writable": false,
             "mode": 420,
             "other_writable": false,
-            "path": "/var/log/sysstat/sa21",
+            "path": "/var/log/sysstat/sa28",
             "uid": 0
           },
           {
@@ -8654,6 +8840,123 @@
         }
       }
     },
+    "fim": {
+      "aide": {
+        "config_path": {
+          "status": "absent",
+          "reason": "neither /etc/aide/aide.conf nor /etc/aide.conf exists"
+        },
+        "database_modified": {
+          "status": "absent",
+          "reason": "no AIDE configuration file names a database: neither /etc/aide/aide.conf nor /etc/aide.conf exists"
+        },
+        "database_path": {
+          "status": "absent",
+          "reason": "no AIDE configuration file names a database: neither /etc/aide/aide.conf nor /etc/aide.conf exists"
+        },
+        "database_present": {
+          "status": "absent",
+          "reason": "no AIDE configuration file names a database: neither /etc/aide/aide.conf nor /etc/aide.conf exists"
+        },
+        "installed": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "derived"
+          }
+        },
+        "scheduled": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "file",
+                "path": "/etc/cron.d/.placeholder"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/cron.d/e2scrub_all"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/cron.d/php"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/cron.d/sphinxsearch"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/cron.d/sysstat"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/crontab"
+              },
+              {
+                "kind": "command",
+                "cmd": "/usr/bin/systemctl list-timers --all --no-legend --no-pager",
+                "exit_code": 0
+              }
+            ]
+          }
+        },
+        "schedules": {
+          "status": "ok",
+          "value": [],
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "file",
+                "path": "/etc/cron.d/.placeholder"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/cron.d/e2scrub_all"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/cron.d/php"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/cron.d/sphinxsearch"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/cron.d/sysstat"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/crontab"
+              },
+              {
+                "kind": "command",
+                "cmd": "/usr/bin/systemctl list-timers --all --no-legend --no-pager",
+                "exit_code": 0
+              }
+            ]
+          }
+        }
+      },
+      "other_tools": {
+        "status": "ok",
+        "value": [],
+        "source": {
+          "kind": "derived"
+        }
+      },
+      "tool": {
+        "status": "ok",
+        "value": "none",
+        "source": {
+          "kind": "derived"
+        }
+      }
+    },
     "firewall": {
       "backend": {
         "status": "ok",
@@ -8717,7 +9020,7 @@
         "status": "ok",
         "value": [
           {
-            "content": "table ip security {\n\tchain OUTPUT {\n\t\ttype filter hook output priority 150; policy accept;\n\t\tip daddr 168.63.129.16 tcp dport 53 counter packets 0 bytes 0 accept\n\t\tip daddr 168.63.129.16 ip protocol tcp skuid 0 counter packets 501 bytes 226678 accept\n\t\tip daddr 168.63.129.16 ip protocol tcp ct state invalid,new counter packets 0 bytes 0 drop\n\t}\n}\ntable ip nat {\n\tchain DOCKER {\n\t\tiifname \"docker0\" counter packets 0 bytes 0 return\n\t}\n\n\tchain PREROUTING {\n\t\ttype nat hook prerouting priority dstnat; policy accept;\n\t\tfib daddr type local counter packets 0 bytes 0 jump DOCKER\n\t}\n\n\tchain OUTPUT {\n\t\ttype nat hook output priority dstnat; policy accept;\n\t\tip daddr != 127.0.0.0/8 fib daddr type local counter packets 0 bytes 0 jump DOCKER\n\t}\n\n\tchain POSTROUTING {\n\t\ttype nat hook postrouting priority srcnat; policy accept;\n\t\tip saddr 198.51.100.0/16 oifname != \"docker0\" counter packets 0 bytes 0 masquerade\n\t}\n}\ntable ip filter {\n\tchain DOCKER {\n\t\tiifname != \"docker0\" oifname \"docker0\" counter packets 0 bytes 0 drop\n\t}\n\n\tchain DOCKER-FORWARD {\n\t\tcounter packets 0 bytes 0 jump DOCKER-CT\n\t\tcounter packets 0 bytes 0 jump DOCKER-ISOLATION-STAGE-1\n\t\tcounter packets 0 bytes 0 jump DOCKER-BRIDGE\n\t\tiifname \"docker0\" counter packets 0 bytes 0 accept\n\t}\n\n\tchain DOCKER-BRIDGE {\n\t\toifname \"docker0\" counter packets 0 bytes 0 jump DOCKER\n\t}\n\n\tchain DOCKER-CT {\n\t\toifname \"docker0\" ct state related,established counter packets 0 bytes 0 accept\n\t}\n\n\tchain DOCKER-ISOLATION-STAGE-1 {\n\t\tiifname \"docker0\" oifname != \"docker0\" counter packets 0 bytes 0 jump DOCKER-ISOLATION-STAGE-2\n\t}\n\n\tchain DOCKER-ISOLATION-STAGE-2 {\n\t\toifname \"docker0\" counter packets 0 bytes 0 drop\n\t}\n\n\tchain FORWARD {\n\t\ttype filter hook forward priority filter; policy drop;\n\t\tcounter packets 0 bytes 0 jump DOCKER-USER\n\t\tcounter packets 0 bytes 0 jump DOCKER-FORWARD\n\t}\n\n\tchain DOCKER-USER {\n\t\tcounter packets 0 bytes 0 return\n\t}\n}\ntable ip6 nat {\n\tchain DOCKER {\n\t}\n\n\tchain PREROUTING {\n\t\ttype nat hook prerouting priority dstnat; policy accept;\n\t\tfib daddr type local counter packets 0 bytes 0 jump DOCKER\n\t}\n\n\tchain OUTPUT {\n\t\ttype nat hook output priority dstnat; policy accept;\n\t\tip6 daddr != ::1 fib daddr type local counter packets 0 bytes 0 jump DOCKER\n\t}\n}\ntable ip6 filter {\n\tchain DOCKER {\n\t}\n\n\tchain DOCKER-FORWARD {\n\t\tcounter packets 0 bytes 0 jump DOCKER-CT\n\t\tcounter packets 0 bytes 0 jump DOCKER-ISOLATION-STAGE-1\n\t\tcounter packets 0 bytes 0 jump DOCKER-BRIDGE\n\t}\n\n\tchain DOCKER-BRIDGE {\n\t}\n\n\tchain DOCKER-CT {\n\t}\n\n\tchain DOCKER-ISOLATION-STAGE-1 {\n\t}\n\n\tchain DOCKER-ISOLATION-STAGE-2 {\n\t}\n\n\tchain FORWARD {\n\t\ttype filter hook forward priority filter; policy accept;\n\t\tcounter packets 0 bytes 0 jump DOCKER-USER\n\t\tcounter packets 0 bytes 0 jump DOCKER-FORWARD\n\t}\n\n\tchain DOCKER-USER {\n\t\tcounter packets 0 bytes 0 return\n\t}\n}\n",
+            "content": "table ip security {\n\tchain OUTPUT {\n\t\ttype filter hook output priority 150; policy accept;\n\t\tip daddr 168.63.129.16 tcp dport 53 counter packets 0 bytes 0 accept\n\t\tip daddr 168.63.129.16 ip protocol tcp skuid 0 counter packets 300 bytes 169342 accept\n\t\tip daddr 168.63.129.16 ip protocol tcp ct state invalid,new counter packets 0 bytes 0 drop\n\t}\n}\ntable ip nat {\n\tchain DOCKER {\n\t\tiifname \"docker0\" counter packets 0 bytes 0 return\n\t}\n\n\tchain PREROUTING {\n\t\ttype nat hook prerouting priority dstnat; policy accept;\n\t\tfib daddr type local counter packets 0 bytes 0 jump DOCKER\n\t}\n\n\tchain OUTPUT {\n\t\ttype nat hook output priority dstnat; policy accept;\n\t\tip daddr != 127.0.0.0/8 fib daddr type local counter packets 0 bytes 0 jump DOCKER\n\t}\n\n\tchain POSTROUTING {\n\t\ttype nat hook postrouting priority srcnat; policy accept;\n\t\tip saddr 198.51.100.0/16 oifname != \"docker0\" counter packets 0 bytes 0 masquerade\n\t}\n}\ntable ip filter {\n\tchain DOCKER {\n\t\tiifname != \"docker0\" oifname \"docker0\" counter packets 0 bytes 0 drop\n\t}\n\n\tchain DOCKER-FORWARD {\n\t\tcounter packets 0 bytes 0 jump DOCKER-CT\n\t\tcounter packets 0 bytes 0 jump DOCKER-ISOLATION-STAGE-1\n\t\tcounter packets 0 bytes 0 jump DOCKER-BRIDGE\n\t\tiifname \"docker0\" counter packets 0 bytes 0 accept\n\t}\n\n\tchain DOCKER-BRIDGE {\n\t\toifname \"docker0\" counter packets 0 bytes 0 jump DOCKER\n\t}\n\n\tchain DOCKER-CT {\n\t\toifname \"docker0\" ct state related,established counter packets 0 bytes 0 accept\n\t}\n\n\tchain DOCKER-ISOLATION-STAGE-1 {\n\t\tiifname \"docker0\" oifname != \"docker0\" counter packets 0 bytes 0 jump DOCKER-ISOLATION-STAGE-2\n\t}\n\n\tchain DOCKER-ISOLATION-STAGE-2 {\n\t\toifname \"docker0\" counter packets 0 bytes 0 drop\n\t}\n\n\tchain FORWARD {\n\t\ttype filter hook forward priority filter; policy drop;\n\t\tcounter packets 0 bytes 0 jump DOCKER-USER\n\t\tcounter packets 0 bytes 0 jump DOCKER-FORWARD\n\t}\n\n\tchain DOCKER-USER {\n\t\tcounter packets 0 bytes 0 return\n\t}\n}\ntable ip6 nat {\n\tchain DOCKER {\n\t}\n\n\tchain PREROUTING {\n\t\ttype nat hook prerouting priority dstnat; policy accept;\n\t\tfib daddr type local counter packets 0 bytes 0 jump DOCKER\n\t}\n\n\tchain OUTPUT {\n\t\ttype nat hook output priority dstnat; policy accept;\n\t\tip6 daddr != ::1 fib daddr type local counter packets 0 bytes 0 jump DOCKER\n\t}\n}\ntable ip6 filter {\n\tchain DOCKER {\n\t}\n\n\tchain DOCKER-FORWARD {\n\t\tcounter packets 0 bytes 0 jump DOCKER-CT\n\t\tcounter packets 0 bytes 0 jump DOCKER-ISOLATION-STAGE-1\n\t\tcounter packets 0 bytes 0 jump DOCKER-BRIDGE\n\t}\n\n\tchain DOCKER-BRIDGE {\n\t}\n\n\tchain DOCKER-CT {\n\t}\n\n\tchain DOCKER-ISOLATION-STAGE-1 {\n\t}\n\n\tchain DOCKER-ISOLATION-STAGE-2 {\n\t}\n\n\tchain FORWARD {\n\t\ttype filter hook forward priority filter; policy accept;\n\t\tcounter packets 0 bytes 0 jump DOCKER-USER\n\t\tcounter packets 0 bytes 0 jump DOCKER-FORWARD\n\t}\n\n\tchain DOCKER-USER {\n\t\tcounter packets 0 bytes 0 return\n\t}\n}\n",
             "source": "/usr/sbin/nft list ruleset",
             "truncated": false
           }
@@ -9362,6 +9665,15 @@
       }
     },
     "logging": {
+      "journal_upload": {
+        "url": {
+          "status": "ok",
+          "value": "",
+          "source": {
+            "kind": "derived"
+          }
+        }
+      },
       "journald": {
         "forward_to_syslog": {
           "status": "ok",
@@ -9672,6 +9984,31 @@
             ]
           }
         },
+        "forwards_remote": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "file",
+                "path": "/etc/rsyslog.conf"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/rsyslog.d/20-ufw.conf"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/rsyslog.d/21-cloudinit.conf"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/rsyslog.d/50-default.conf"
+              }
+            ]
+          }
+        },
         "parse_complete": {
           "status": "ok",
           "value": true,
@@ -9700,6 +10037,31 @@
         "property_filters": {
           "status": "ok",
           "value": 2,
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "file",
+                "path": "/etc/rsyslog.conf"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/rsyslog.d/20-ufw.conf"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/rsyslog.d/21-cloudinit.conf"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/rsyslog.d/50-default.conf"
+              }
+            ]
+          }
+        },
+        "remote_targets": {
+          "status": "ok",
+          "value": [],
           "source": {
             "kind": "derived",
             "inputs": [
@@ -10464,7 +10826,7 @@
           {
             "arch": "amd64",
             "name": "bison",
-            "version": "2:3.8.2+dfsg-1build2"
+            "version": "2:3.8.2+dfsg-1ubuntu0.24.04.1"
           },
           {
             "arch": "amd64",
@@ -10649,7 +11011,7 @@
           {
             "arch": "amd64",
             "name": "containerd.io",
-            "version": "2.3.4-2~ubuntu.24.04~noble"
+            "version": "2.3.5-1~ubuntu.24.04~noble"
           },
           {
             "arch": "amd64",
@@ -10954,7 +11316,7 @@
           {
             "arch": "amd64",
             "name": "firefox",
-            "version": "155.0+build1-0ubuntu0.24.04.1~mt1"
+            "version": "156.0+build1-0ubuntu0.24.04.1~mt1"
           },
           {
             "arch": "amd64",
@@ -11184,7 +11546,7 @@
           {
             "arch": "amd64",
             "name": "gh",
-            "version": "2.100.0"
+            "version": "2.101.0"
           },
           {
             "arch": "amd64",
@@ -11254,12 +11616,12 @@
           {
             "arch": "amd64",
             "name": "google-chrome-stable",
-            "version": "152.0.7977.82-1"
+            "version": "153.0.8010.52-1"
           },
           {
             "arch": "amd64",
             "name": "google-cloud-cli",
-            "version": "583.0.0-0"
+            "version": "585.0.0-0"
           },
           {
             "arch": "amd64",
@@ -11524,7 +11886,7 @@
           {
             "arch": "all",
             "name": "krb5-locales",
-            "version": "1.20.1-6ubuntu2.8"
+            "version": "1.20.1-6ubuntu2.10"
           },
           {
             "arch": "amd64",
@@ -11564,7 +11926,7 @@
           {
             "arch": "amd64",
             "name": "libaom3",
-            "version": "3.8.2-2ubuntu0.1"
+            "version": "3.8.2-2ubuntu0.2"
           },
           {
             "arch": "amd64",
@@ -11794,7 +12156,7 @@
           {
             "arch": "amd64",
             "name": "libc-bin",
-            "version": "2.39-0ubuntu8.8"
+            "version": "2.39-0ubuntu8.9"
           },
           {
             "arch": "amd64",
@@ -11804,22 +12166,22 @@
           {
             "arch": "amd64",
             "name": "libc-dev-bin",
-            "version": "2.39-0ubuntu8.8"
+            "version": "2.39-0ubuntu8.9"
           },
           {
             "arch": "amd64",
             "name": "libc6",
-            "version": "2.39-0ubuntu8.8"
+            "version": "2.39-0ubuntu8.9"
           },
           {
             "arch": "amd64",
             "name": "libc6-dev",
-            "version": "2.39-0ubuntu8.8"
+            "version": "2.39-0ubuntu8.9"
           },
           {
             "arch": "amd64",
             "name": "libc6-i386",
-            "version": "2.39-0ubuntu8.8"
+            "version": "2.39-0ubuntu8.9"
           },
           {
             "arch": "amd64",
@@ -12444,7 +12806,7 @@
           {
             "arch": "amd64",
             "name": "libgssapi-krb5-2",
-            "version": "1.20.1-6ubuntu2.8"
+            "version": "1.20.1-6ubuntu2.10"
           },
           {
             "arch": "amd64",
@@ -12679,7 +13041,7 @@
           {
             "arch": "amd64",
             "name": "libk5crypto3",
-            "version": "1.20.1-6ubuntu2.8"
+            "version": "1.20.1-6ubuntu2.10"
           },
           {
             "arch": "amd64",
@@ -12699,12 +13061,12 @@
           {
             "arch": "amd64",
             "name": "libkrb5-3",
-            "version": "1.20.1-6ubuntu2.8"
+            "version": "1.20.1-6ubuntu2.10"
           },
           {
             "arch": "amd64",
             "name": "libkrb5support0",
-            "version": "1.20.1-6ubuntu2.8"
+            "version": "1.20.1-6ubuntu2.10"
           },
           {
             "arch": "amd64",
@@ -12989,7 +13351,7 @@
           {
             "arch": "amd64",
             "name": "libnetplan1",
-            "version": "1.1.2-8ubuntu1~24.04.2"
+            "version": "1.1.2-8ubuntu1~24.04.3"
           },
           {
             "arch": "amd64",
@@ -13219,7 +13581,7 @@
           {
             "arch": "amd64",
             "name": "libperl5.38t64",
-            "version": "5.38.2-3.2ubuntu0.4"
+            "version": "5.38.2-3.2ubuntu0.6"
           },
           {
             "arch": "amd64",
@@ -13259,12 +13621,12 @@
           {
             "arch": "amd64",
             "name": "libpolkit-agent-1-0",
-            "version": "124-2ubuntu1.24.04.3"
+            "version": "124-2ubuntu1.24.04.4"
           },
           {
             "arch": "amd64",
             "name": "libpolkit-gobject-1-0",
-            "version": "124-2ubuntu1.24.04.3"
+            "version": "124-2ubuntu1.24.04.4"
           },
           {
             "arch": "amd64",
@@ -13319,22 +13681,22 @@
           {
             "arch": "amd64",
             "name": "libpython3.12-dev",
-            "version": "3.12.3-1ubuntu0.16"
+            "version": "3.12.3-1ubuntu0.17"
           },
           {
             "arch": "amd64",
             "name": "libpython3.12-minimal",
-            "version": "3.12.3-1ubuntu0.16"
+            "version": "3.12.3-1ubuntu0.17"
           },
           {
             "arch": "amd64",
             "name": "libpython3.12-stdlib",
-            "version": "3.12.3-1ubuntu0.16"
+            "version": "3.12.3-1ubuntu0.17"
           },
           {
             "arch": "amd64",
             "name": "libpython3.12t64",
-            "version": "3.12.3-1ubuntu0.16"
+            "version": "3.12.3-1ubuntu0.17"
           },
           {
             "arch": "amd64",
@@ -13544,12 +13906,12 @@
           {
             "arch": "amd64",
             "name": "libsqlite3-0",
-            "version": "3.45.1-1ubuntu2.7"
+            "version": "3.45.1-1ubuntu2.8"
           },
           {
             "arch": "amd64",
             "name": "libsqlite3-dev",
-            "version": "3.45.1-1ubuntu2.7"
+            "version": "3.45.1-1ubuntu2.8"
           },
           {
             "arch": "amd64",
@@ -14389,7 +14751,7 @@
           {
             "arch": "all",
             "name": "locales",
-            "version": "2.39-0ubuntu8.8"
+            "version": "2.39-0ubuntu8.9"
           },
           {
             "arch": "amd64",
@@ -14524,7 +14886,7 @@
           {
             "arch": "amd64",
             "name": "microsoft-edge-stable",
-            "version": "152.0.4191.66-1"
+            "version": "153.0.4234.48-1"
           },
           {
             "arch": "amd64",
@@ -14644,12 +15006,12 @@
           {
             "arch": "amd64",
             "name": "netplan-generator",
-            "version": "1.1.2-8ubuntu1~24.04.2"
+            "version": "1.1.2-8ubuntu1~24.04.3"
           },
           {
             "arch": "amd64",
             "name": "netplan.io",
-            "version": "1.1.2-8ubuntu1~24.04.2"
+            "version": "1.1.2-8ubuntu1~24.04.3"
           },
           {
             "arch": "all",
@@ -14664,12 +15026,12 @@
           {
             "arch": "amd64",
             "name": "nginx",
-            "version": "1.24.0-2ubuntu7.17"
+            "version": "1.24.0-2ubuntu7.18"
           },
           {
             "arch": "all",
             "name": "nginx-common",
-            "version": "1.24.0-2ubuntu7.17"
+            "version": "1.24.0-2ubuntu7.18"
           },
           {
             "arch": "amd64",
@@ -14809,17 +15171,17 @@
           {
             "arch": "amd64",
             "name": "perl",
-            "version": "5.38.2-3.2ubuntu0.4"
+            "version": "5.38.2-3.2ubuntu0.6"
           },
           {
             "arch": "amd64",
             "name": "perl-base",
-            "version": "5.38.2-3.2ubuntu0.4"
+            "version": "5.38.2-3.2ubuntu0.6"
           },
           {
             "arch": "all",
             "name": "perl-modules-5.38",
-            "version": "5.38.2-3.2ubuntu0.4"
+            "version": "5.38.2-3.2ubuntu0.6"
           },
           {
             "arch": "all",
@@ -14834,7 +15196,7 @@
           {
             "arch": "all",
             "name": "php8.3",
-            "version": "8.3.6-0ubuntu0.24.04.10"
+            "version": "8.3.6-0ubuntu0.24.04.11"
           },
           {
             "arch": "amd64",
@@ -14849,62 +15211,62 @@
           {
             "arch": "amd64",
             "name": "php8.3-bcmath",
-            "version": "8.3.6-0ubuntu0.24.04.10"
+            "version": "8.3.6-0ubuntu0.24.04.11"
           },
           {
             "arch": "amd64",
             "name": "php8.3-bz2",
-            "version": "8.3.6-0ubuntu0.24.04.10"
+            "version": "8.3.6-0ubuntu0.24.04.11"
           },
           {
             "arch": "amd64",
             "name": "php8.3-cgi",
-            "version": "8.3.6-0ubuntu0.24.04.10"
+            "version": "8.3.6-0ubuntu0.24.04.11"
           },
           {
             "arch": "amd64",
             "name": "php8.3-cli",
-            "version": "8.3.6-0ubuntu0.24.04.10"
+            "version": "8.3.6-0ubuntu0.24.04.11"
           },
           {
             "arch": "amd64",
             "name": "php8.3-common",
-            "version": "8.3.6-0ubuntu0.24.04.10"
+            "version": "8.3.6-0ubuntu0.24.04.11"
           },
           {
             "arch": "amd64",
             "name": "php8.3-curl",
-            "version": "8.3.6-0ubuntu0.24.04.10"
+            "version": "8.3.6-0ubuntu0.24.04.11"
           },
           {
             "arch": "amd64",
             "name": "php8.3-dba",
-            "version": "8.3.6-0ubuntu0.24.04.10"
+            "version": "8.3.6-0ubuntu0.24.04.11"
           },
           {
             "arch": "amd64",
             "name": "php8.3-dev",
-            "version": "8.3.6-0ubuntu0.24.04.10"
+            "version": "8.3.6-0ubuntu0.24.04.11"
           },
           {
             "arch": "amd64",
             "name": "php8.3-enchant",
-            "version": "8.3.6-0ubuntu0.24.04.10"
+            "version": "8.3.6-0ubuntu0.24.04.11"
           },
           {
             "arch": "amd64",
             "name": "php8.3-fpm",
-            "version": "8.3.6-0ubuntu0.24.04.10"
+            "version": "8.3.6-0ubuntu0.24.04.11"
           },
           {
             "arch": "amd64",
             "name": "php8.3-gd",
-            "version": "8.3.6-0ubuntu0.24.04.10"
+            "version": "8.3.6-0ubuntu0.24.04.11"
           },
           {
             "arch": "amd64",
             "name": "php8.3-gmp",
-            "version": "8.3.6-0ubuntu0.24.04.10"
+            "version": "8.3.6-0ubuntu0.24.04.11"
           },
           {
             "arch": "amd64",
@@ -14919,27 +15281,27 @@
           {
             "arch": "amd64",
             "name": "php8.3-imap",
-            "version": "8.3.6-0ubuntu0.24.04.10"
+            "version": "8.3.6-0ubuntu0.24.04.11"
           },
           {
             "arch": "amd64",
             "name": "php8.3-interbase",
-            "version": "8.3.6-0ubuntu0.24.04.10"
+            "version": "8.3.6-0ubuntu0.24.04.11"
           },
           {
             "arch": "amd64",
             "name": "php8.3-intl",
-            "version": "8.3.6-0ubuntu0.24.04.10"
+            "version": "8.3.6-0ubuntu0.24.04.11"
           },
           {
             "arch": "amd64",
             "name": "php8.3-ldap",
-            "version": "8.3.6-0ubuntu0.24.04.10"
+            "version": "8.3.6-0ubuntu0.24.04.11"
           },
           {
             "arch": "amd64",
             "name": "php8.3-mbstring",
-            "version": "8.3.6-0ubuntu0.24.04.10"
+            "version": "8.3.6-0ubuntu0.24.04.11"
           },
           {
             "arch": "amd64",
@@ -14964,17 +15326,17 @@
           {
             "arch": "amd64",
             "name": "php8.3-mysql",
-            "version": "8.3.6-0ubuntu0.24.04.10"
+            "version": "8.3.6-0ubuntu0.24.04.11"
           },
           {
             "arch": "amd64",
             "name": "php8.3-odbc",
-            "version": "8.3.6-0ubuntu0.24.04.10"
+            "version": "8.3.6-0ubuntu0.24.04.11"
           },
           {
             "arch": "amd64",
             "name": "php8.3-opcache",
-            "version": "8.3.6-0ubuntu0.24.04.10"
+            "version": "8.3.6-0ubuntu0.24.04.11"
           },
           {
             "arch": "amd64",
@@ -14984,22 +15346,22 @@
           {
             "arch": "amd64",
             "name": "php8.3-pgsql",
-            "version": "8.3.6-0ubuntu0.24.04.10"
+            "version": "8.3.6-0ubuntu0.24.04.11"
           },
           {
             "arch": "amd64",
             "name": "php8.3-phpdbg",
-            "version": "8.3.6-0ubuntu0.24.04.10"
+            "version": "8.3.6-0ubuntu0.24.04.11"
           },
           {
             "arch": "amd64",
             "name": "php8.3-pspell",
-            "version": "8.3.6-0ubuntu0.24.04.10"
+            "version": "8.3.6-0ubuntu0.24.04.11"
           },
           {
             "arch": "amd64",
             "name": "php8.3-readline",
-            "version": "8.3.6-0ubuntu0.24.04.10"
+            "version": "8.3.6-0ubuntu0.24.04.11"
           },
           {
             "arch": "amd64",
@@ -15009,27 +15371,27 @@
           {
             "arch": "amd64",
             "name": "php8.3-snmp",
-            "version": "8.3.6-0ubuntu0.24.04.10"
+            "version": "8.3.6-0ubuntu0.24.04.11"
           },
           {
             "arch": "amd64",
             "name": "php8.3-soap",
-            "version": "8.3.6-0ubuntu0.24.04.10"
+            "version": "8.3.6-0ubuntu0.24.04.11"
           },
           {
             "arch": "amd64",
             "name": "php8.3-sqlite3",
-            "version": "8.3.6-0ubuntu0.24.04.10"
+            "version": "8.3.6-0ubuntu0.24.04.11"
           },
           {
             "arch": "amd64",
             "name": "php8.3-sybase",
-            "version": "8.3.6-0ubuntu0.24.04.10"
+            "version": "8.3.6-0ubuntu0.24.04.11"
           },
           {
             "arch": "amd64",
             "name": "php8.3-tidy",
-            "version": "8.3.6-0ubuntu0.24.04.10"
+            "version": "8.3.6-0ubuntu0.24.04.11"
           },
           {
             "arch": "amd64",
@@ -15039,12 +15401,12 @@
           {
             "arch": "amd64",
             "name": "php8.3-xml",
-            "version": "8.3.6-0ubuntu0.24.04.10"
+            "version": "8.3.6-0ubuntu0.24.04.11"
           },
           {
             "arch": "all",
             "name": "php8.3-xsl",
-            "version": "8.3.6-0ubuntu0.24.04.10"
+            "version": "8.3.6-0ubuntu0.24.04.11"
           },
           {
             "arch": "amd64",
@@ -15054,7 +15416,7 @@
           {
             "arch": "amd64",
             "name": "php8.3-zip",
-            "version": "8.3.6-0ubuntu0.24.04.10"
+            "version": "8.3.6-0ubuntu0.24.04.11"
           },
           {
             "arch": "amd64",
@@ -15104,7 +15466,7 @@
           {
             "arch": "amd64",
             "name": "polkitd",
-            "version": "124-2ubuntu1.24.04.3"
+            "version": "124-2ubuntu1.24.04.4"
           },
           {
             "arch": "all",
@@ -15139,7 +15501,7 @@
           {
             "arch": "amd64",
             "name": "powershell",
-            "version": "7.6.5-1.deb"
+            "version": "7.6.6-1.deb"
           },
           {
             "arch": "amd64",
@@ -15434,7 +15796,7 @@
           {
             "arch": "amd64",
             "name": "python3-netplan",
-            "version": "1.1.2-8ubuntu1~24.04.2"
+            "version": "1.1.2-8ubuntu1~24.04.3"
           },
           {
             "arch": "amd64",
@@ -15629,22 +15991,22 @@
           {
             "arch": "amd64",
             "name": "python3.12",
-            "version": "3.12.3-1ubuntu0.16"
+            "version": "3.12.3-1ubuntu0.17"
           },
           {
             "arch": "amd64",
             "name": "python3.12-dev",
-            "version": "3.12.3-1ubuntu0.16"
+            "version": "3.12.3-1ubuntu0.17"
           },
           {
             "arch": "amd64",
             "name": "python3.12-minimal",
-            "version": "3.12.3-1ubuntu0.16"
+            "version": "3.12.3-1ubuntu0.17"
           },
           {
             "arch": "amd64",
             "name": "python3.12-venv",
-            "version": "3.12.3-1ubuntu0.16"
+            "version": "3.12.3-1ubuntu0.17"
           },
           {
             "arch": "all",
@@ -15864,7 +16226,7 @@
           {
             "arch": "amd64",
             "name": "sqlite3",
-            "version": "3.45.1-1ubuntu2.7"
+            "version": "3.45.1-1ubuntu2.8"
           },
           {
             "arch": "amd64",
@@ -15974,7 +16336,7 @@
           {
             "arch": "amd64",
             "name": "temurin-11-jdk",
-            "version": "11.0.32.0.0+9-0"
+            "version": "11.0.32.1.0+1-0"
           },
           {
             "arch": "amd64",
@@ -16320,6 +16682,190 @@
         "source": {
           "kind": "file",
           "path": "/var/lib/dpkg/status"
+        }
+      },
+      "verify": {
+        "complete": {
+          "status": "ok",
+          "value": true,
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/dpkg --verify",
+            "exit_code": 0
+          }
+        },
+        "filter": {
+          "status": "ok",
+          "value": [
+            "config",
+            "doc",
+            "dpkg_excluded",
+            "ghost",
+            "mtime_only",
+            "unverifiable",
+            "unchanged"
+          ],
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/dpkg --verify",
+            "exit_code": 0
+          }
+        },
+        "filtered_counts": {
+          "status": "ok",
+          "value": {
+            "config": 9,
+            "doc": 0,
+            "dpkg_excluded": 0,
+            "ghost": 0,
+            "mtime_only": 0,
+            "unchanged": 0,
+            "unverifiable": 0
+          },
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/dpkg --verify",
+            "exit_code": 0
+          }
+        },
+        "modified": {
+          "status": "ok",
+          "value": [
+            {
+              "attributes": [
+                "missing"
+              ],
+              "file_type": "",
+              "note": "",
+              "path": "/etc/cron.daily/google-chrome",
+              "untested": 0
+            }
+          ],
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/dpkg --verify",
+            "exit_code": 0
+          }
+        },
+        "modified_config": {
+          "status": "ok",
+          "value": [
+            {
+              "attributes": [
+                "digest"
+              ],
+              "file_type": "config",
+              "note": "",
+              "path": "/etc/cloud/templates/sources.list.ubuntu.deb822.tmpl",
+              "untested": 8
+            },
+            {
+              "attributes": [
+                "digest"
+              ],
+              "file_type": "config",
+              "note": "",
+              "path": "/etc/containers/registries.conf",
+              "untested": 8
+            },
+            {
+              "attributes": [
+                "digest"
+              ],
+              "file_type": "config",
+              "note": "",
+              "path": "/etc/default/motd-news",
+              "untested": 8
+            },
+            {
+              "attributes": [
+                "digest"
+              ],
+              "file_type": "config",
+              "note": "",
+              "path": "/etc/firefox/syspref.js",
+              "untested": 8
+            },
+            {
+              "attributes": [
+                "digest"
+              ],
+              "file_type": "config",
+              "note": "",
+              "path": "/etc/needrestart/needrestart.conf",
+              "untested": 8
+            },
+            {
+              "attributes": [
+                "digest"
+              ],
+              "file_type": "config",
+              "note": "",
+              "path": "/etc/security/limits.conf",
+              "untested": 8
+            },
+            {
+              "attributes": [
+                "digest"
+              ],
+              "file_type": "config",
+              "note": "",
+              "path": "/etc/sysctl.conf",
+              "untested": 8
+            },
+            {
+              "attributes": [
+                "digest"
+              ],
+              "file_type": "config",
+              "note": "",
+              "path": "/etc/systemd/system.conf",
+              "untested": 8
+            },
+            {
+              "attributes": [
+                "digest"
+              ],
+              "file_type": "config",
+              "note": "",
+              "path": "/etc/waagent.conf",
+              "untested": 8
+            }
+          ],
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/dpkg --verify",
+            "exit_code": 0
+          }
+        },
+        "stats": {
+          "status": "ok",
+          "value": {
+            "dpkg_path_excludes": [],
+            "dpkg_path_excludes_error": [],
+            "duration_ms": 582142,
+            "exit_code": 0,
+            "lines": 10,
+            "packages_without_digests": 1,
+            "packages_without_digests_error": "",
+            "stderr_head": [],
+            "truncated": false,
+            "unparsed_head": []
+          },
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/dpkg --verify",
+            "exit_code": 0
+          }
+        },
+        "tool": {
+          "status": "ok",
+          "value": "dpkg",
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/dpkg --verify",
+            "exit_code": 0
+          }
         }
       }
     },
@@ -17963,7 +18509,7 @@
       },
       "metadata_age_s": {
         "status": "ok",
-        "value": 1134006,
+        "value": 643390,
         "source": {
           "kind": "file",
           "path": "/var/lib/apt/periodic/update-success-stamp"
@@ -17983,7 +18529,7 @@
         "value": [
           {
             "candidate": "1:1snap1-0ubuntu5",
-            "current": "155.0+build1-0ubuntu0.24.04.1~mt1",
+            "current": "156.0+build1-0ubuntu0.24.04.1~mt1",
             "name": "firefox",
             "origin": "Ubuntu:24.04/noble"
           }
@@ -18012,6 +18558,44 @@
       }
     },
     "services": {
+      "auditd": {
+        "active": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState auditd.service",
+            "exit_code": 0
+          }
+        },
+        "enabled": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState auditd.service",
+            "exit_code": 0
+          }
+        },
+        "installed": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState auditd.service",
+            "exit_code": 0
+          }
+        },
+        "unit_file_state": {
+          "status": "ok",
+          "value": "not-found",
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState auditd.service",
+            "exit_code": 0
+          }
+        }
+      },
       "automount": {
         "active": {
           "status": "ok",
@@ -18298,6 +18882,44 @@
           "source": {
             "kind": "command",
             "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState vsftpd.service",
+            "exit_code": 0
+          }
+        }
+      },
+      "journal_upload": {
+        "active": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState systemd-journal-upload.service",
+            "exit_code": 0
+          }
+        },
+        "enabled": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState systemd-journal-upload.service",
+            "exit_code": 0
+          }
+        },
+        "installed": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState systemd-journal-upload.service",
+            "exit_code": 0
+          }
+        },
+        "unit_file_state": {
+          "status": "ok",
+          "value": "not-found",
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState systemd-journal-upload.service",
             "exit_code": 0
           }
         }
@@ -18994,64 +19616,64 @@
         "status": "ok",
         "value": [
           {
-            "addr": "0.0.0.0",
-            "inode": 8053,
-            "loopback": false,
-            "port": 22,
-            "proto": "tcp"
-          },
-          {
             "addr": "127.0.0.53",
-            "inode": 5402,
+            "inode": 5383,
             "loopback": true,
             "port": 53,
             "proto": "tcp"
           },
           {
+            "addr": "0.0.0.0",
+            "inode": 7550,
+            "loopback": false,
+            "port": 22,
+            "proto": "tcp"
+          },
+          {
             "addr": "127.0.0.54",
-            "inode": 5404,
+            "inode": 5385,
             "loopback": true,
             "port": 53,
             "proto": "tcp"
           },
           {
             "addr": "::",
-            "inode": 5700,
+            "inode": 7552,
             "loopback": false,
             "port": 22,
             "proto": "tcp6"
           },
           {
             "addr": "127.0.0.54",
-            "inode": 5403,
+            "inode": 5384,
             "loopback": true,
             "port": 53,
             "proto": "udp"
           },
           {
             "addr": "127.0.0.53",
-            "inode": 5401,
+            "inode": 5382,
             "loopback": true,
             "port": 53,
             "proto": "udp"
           },
           {
             "addr": "192.0.2.1",
-            "inode": 7903,
+            "inode": 5570,
             "loopback": false,
             "port": 68,
             "proto": "udp"
           },
           {
             "addr": "127.0.0.1",
-            "inode": 8493,
+            "inode": 6082,
             "loopback": true,
             "port": 323,
             "proto": "udp"
           },
           {
             "addr": "::1",
-            "inode": 8494,
+            "inode": 6083,
             "loopback": true,
             "port": 323,
             "proto": "udp6"
@@ -19262,6 +19884,33 @@
       }
     },
     "sudo": {
+      "defaults": {
+        "scoped_count": {
+          "status": "ok",
+          "value": 0,
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "file",
+                "path": "/etc/sudoers"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/sudoers.d/90-cloud-init-users"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/sudoers.d/README"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/sudoers.d/runner"
+              }
+            ]
+          }
+        }
+      },
       "includedir": {
         "status": "ok",
         "value": "/etc/sudoers.d",
@@ -19276,6 +19925,58 @@
         "source": {
           "kind": "file",
           "path": "/etc/sudoers"
+        }
+      },
+      "log": {
+        "logfile": {
+          "status": "ok",
+          "value": "",
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "file",
+                "path": "/etc/sudoers"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/sudoers.d/90-cloud-init-users"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/sudoers.d/README"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/sudoers.d/runner"
+              }
+            ]
+          }
+        },
+        "syslog": {
+          "status": "ok",
+          "value": true,
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "file",
+                "path": "/etc/sudoers"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/sudoers.d/90-cloud-init-users"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/sudoers.d/README"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/sudoers.d/runner"
+              }
+            ]
+          }
         }
       },
       "secure_path": {
@@ -20699,7 +21400,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/aws-cli/v2/2.36.40/dist/awscli/botocore/.changes",
+            "path": "/usr/local/aws-cli/v2/2.36.49/dist/awscli/botocore/.changes",
             "reference": "unpackaged",
             "uid": 0
           },
@@ -20708,7 +21409,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/aws-sam-cli/1.166.1/dist/_internal/samcli/lib/init/templates/cookiecutter-aws-sam-hello-dotnet/.gitignore",
+            "path": "/usr/local/aws-sam-cli/1.166.2/dist/_internal/samcli/lib/init/templates/cookiecutter-aws-sam-hello-dotnet/.gitignore",
             "reference": "unpackaged",
             "uid": 0
           },
@@ -20717,7 +21418,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/aws-sam-cli/1.166.1/dist/_internal/samcli/lib/init/templates/cookiecutter-aws-sam-hello-dotnet/{{cookiecutter.project_name}}/.gitignore",
+            "path": "/usr/local/aws-sam-cli/1.166.2/dist/_internal/samcli/lib/init/templates/cookiecutter-aws-sam-hello-dotnet/{{cookiecutter.project_name}}/.gitignore",
             "reference": "unpackaged",
             "uid": 0
           },
@@ -20726,7 +21427,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/aws-sam-cli/1.166.1/dist/_internal/samcli/lib/init/templates/cookiecutter-aws-sam-hello-nodejs/.gitignore",
+            "path": "/usr/local/aws-sam-cli/1.166.2/dist/_internal/samcli/lib/init/templates/cookiecutter-aws-sam-hello-nodejs/.gitignore",
             "reference": "unpackaged",
             "uid": 0
           },
@@ -20735,7 +21436,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/aws-sam-cli/1.166.1/dist/_internal/samcli/lib/init/templates/cookiecutter-aws-sam-hello-nodejs/{{cookiecutter.project_name}}/.gitignore",
+            "path": "/usr/local/aws-sam-cli/1.166.2/dist/_internal/samcli/lib/init/templates/cookiecutter-aws-sam-hello-nodejs/{{cookiecutter.project_name}}/.gitignore",
             "reference": "unpackaged",
             "uid": 0
           },
@@ -20744,7 +21445,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/aws-sam-cli/1.166.1/dist/_internal/samcli/lib/init/templates/cookiecutter-aws-sam-hello-nodejs/{{cookiecutter.project_name}}/hello-world/.npmignore",
+            "path": "/usr/local/aws-sam-cli/1.166.2/dist/_internal/samcli/lib/init/templates/cookiecutter-aws-sam-hello-nodejs/{{cookiecutter.project_name}}/hello-world/.npmignore",
             "reference": "unpackaged",
             "uid": 0
           },
@@ -20753,7 +21454,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/aws-sam-cli/1.166.1/dist/_internal/samcli/lib/init/templates/cookiecutter-aws-sam-hello-python/.gitignore",
+            "path": "/usr/local/aws-sam-cli/1.166.2/dist/_internal/samcli/lib/init/templates/cookiecutter-aws-sam-hello-python/.gitignore",
             "reference": "unpackaged",
             "uid": 0
           },
@@ -20762,7 +21463,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/aws-sam-cli/1.166.1/dist/_internal/samcli/lib/init/templates/cookiecutter-aws-sam-hello-python/{{cookiecutter.project_name}}/.gitignore",
+            "path": "/usr/local/aws-sam-cli/1.166.2/dist/_internal/samcli/lib/init/templates/cookiecutter-aws-sam-hello-python/{{cookiecutter.project_name}}/.gitignore",
             "reference": "unpackaged",
             "uid": 0
           },
@@ -20771,7 +21472,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/aws-sam-cli/1.166.1/dist/_internal/samcli/lib/init/templates/cookiecutter-aws-sam-hello-ruby/.gitignore",
+            "path": "/usr/local/aws-sam-cli/1.166.2/dist/_internal/samcli/lib/init/templates/cookiecutter-aws-sam-hello-ruby/.gitignore",
             "reference": "unpackaged",
             "uid": 0
           },
@@ -20780,7 +21481,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/aws-sam-cli/1.166.1/dist/_internal/samcli/lib/init/templates/cookiecutter-aws-sam-hello-ruby/{{cookiecutter.project_name}}/.gitignore",
+            "path": "/usr/local/aws-sam-cli/1.166.2/dist/_internal/samcli/lib/init/templates/cookiecutter-aws-sam-hello-ruby/{{cookiecutter.project_name}}/.gitignore",
             "reference": "unpackaged",
             "uid": 0
           },
@@ -20789,7 +21490,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/doc/julia/html/en/.documenter-siteinfo.json",
+            "path": "/usr/local/julia1.13.0/share/doc/julia/html/en/.documenter-siteinfo.json",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -20798,7 +21499,16 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/base/.gitignore",
+            "path": "/usr/local/julia1.13.0/share/julia/Compiler/.gitignore",
+            "reference": "unpackaged",
+            "uid": 1000
+          },
+          {
+            "allowlisted": true,
+            "kind": "regular",
+            "package": "",
+            "package_declared": false,
+            "path": "/usr/local/julia1.13.0/share/julia/base/.gitignore",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -20807,7 +21517,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/base/JuliaSyntax/.github",
+            "path": "/usr/local/julia1.13.0/share/julia/base/JuliaSyntax/.github",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -20816,7 +21526,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/base/JuliaSyntax/.gitignore",
+            "path": "/usr/local/julia1.13.0/share/julia/base/JuliaSyntax/.gitignore",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -20825,7 +21535,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/base/JuliaSyntax/.mailmap",
+            "path": "/usr/local/julia1.13.0/share/julia/base/JuliaSyntax/.mailmap",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -20834,7 +21544,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/base/JuliaSyntax/sysimage/.gitignore",
+            "path": "/usr/local/julia1.13.0/share/julia/base/JuliaSyntax/sysimage/.gitignore",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -20843,7 +21553,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/ArgTools/.ci",
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/ArgTools/.ci",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -20852,7 +21562,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/ArgTools/.github",
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/ArgTools/.github",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -20861,7 +21571,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/ArgTools/.gitignore",
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/ArgTools/.gitignore",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -20870,142 +21580,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/DelimitedFiles/.ci",
-            "reference": "unpackaged",
-            "uid": 1000
-          },
-          {
-            "allowlisted": true,
-            "kind": "dir",
-            "package": "",
-            "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/DelimitedFiles/.github",
-            "reference": "unpackaged",
-            "uid": 1000
-          },
-          {
-            "allowlisted": true,
-            "kind": "dir",
-            "package": "",
-            "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/Distributed/.github",
-            "reference": "unpackaged",
-            "uid": 1000
-          },
-          {
-            "allowlisted": true,
-            "kind": "regular",
-            "package": "",
-            "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/Distributed/.gitignore",
-            "reference": "unpackaged",
-            "uid": 1000
-          },
-          {
-            "allowlisted": true,
-            "kind": "regular",
-            "package": "",
-            "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/Distributed/docs/.gitignore",
-            "reference": "unpackaged",
-            "uid": 1000
-          },
-          {
-            "allowlisted": false,
-            "kind": "dir",
-            "package": "",
-            "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/Downloads/.ci",
-            "reference": "unpackaged",
-            "uid": 1000
-          },
-          {
-            "allowlisted": true,
-            "kind": "dir",
-            "package": "",
-            "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/Downloads/.github",
-            "reference": "unpackaged",
-            "uid": 1000
-          },
-          {
-            "allowlisted": true,
-            "kind": "regular",
-            "package": "",
-            "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/Downloads/.gitignore",
-            "reference": "unpackaged",
-            "uid": 1000
-          },
-          {
-            "allowlisted": true,
-            "kind": "dir",
-            "package": "",
-            "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/JuliaSyntaxHighlighting/.github",
-            "reference": "unpackaged",
-            "uid": 1000
-          },
-          {
-            "allowlisted": true,
-            "kind": "regular",
-            "package": "",
-            "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/JuliaSyntaxHighlighting/.gitignore",
-            "reference": "unpackaged",
-            "uid": 1000
-          },
-          {
-            "allowlisted": true,
-            "kind": "dir",
-            "package": "",
-            "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/LazyArtifacts/.github",
-            "reference": "unpackaged",
-            "uid": 1000
-          },
-          {
-            "allowlisted": false,
-            "kind": "dir",
-            "package": "",
-            "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/LibCURL/.ci",
-            "reference": "unpackaged",
-            "uid": 1000
-          },
-          {
-            "allowlisted": true,
-            "kind": "dir",
-            "package": "",
-            "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/LibCURL/.github",
-            "reference": "unpackaged",
-            "uid": 1000
-          },
-          {
-            "allowlisted": true,
-            "kind": "regular",
-            "package": "",
-            "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/LibCURL/.gitignore",
-            "reference": "unpackaged",
-            "uid": 1000
-          },
-          {
-            "allowlisted": false,
-            "kind": "dir",
-            "package": "",
-            "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/LinearAlgebra/.buildkite",
-            "reference": "unpackaged",
-            "uid": 1000
-          },
-          {
-            "allowlisted": false,
-            "kind": "dir",
-            "package": "",
-            "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/LinearAlgebra/.ci",
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/DelimitedFiles/.ci",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -21014,7 +21589,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/LinearAlgebra/.codecov.yml",
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/DelimitedFiles/.codecov.yml",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -21023,7 +21598,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/LinearAlgebra/.github",
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/DelimitedFiles/.github",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -21032,16 +21607,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/LinearAlgebra/.gitignore",
-            "reference": "unpackaged",
-            "uid": 1000
-          },
-          {
-            "allowlisted": false,
-            "kind": "regular",
-            "package": "",
-            "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/NetworkOptions/.codecov.yml",
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/DelimitedFiles/.gitignore",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -21050,7 +21616,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/NetworkOptions/.github",
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Distributed/.github",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -21059,25 +21625,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/NetworkOptions/.gitignore",
-            "reference": "unpackaged",
-            "uid": 1000
-          },
-          {
-            "allowlisted": false,
-            "kind": "regular",
-            "package": "",
-            "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/Pkg/.codecov.yml",
-            "reference": "unpackaged",
-            "uid": 1000
-          },
-          {
-            "allowlisted": true,
-            "kind": "dir",
-            "package": "",
-            "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/Pkg/.github",
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Distributed/.gitignore",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -21086,25 +21634,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/Pkg/.gitignore",
-            "reference": "unpackaged",
-            "uid": 1000
-          },
-          {
-            "allowlisted": false,
-            "kind": "regular",
-            "package": "",
-            "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/Pkg/.pre-commit-config.yaml",
-            "reference": "unpackaged",
-            "uid": 1000
-          },
-          {
-            "allowlisted": true,
-            "kind": "regular",
-            "package": "",
-            "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/Pkg/test/test_packages/.gitignore",
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Distributed/docs/.gitignore",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -21113,7 +21643,16 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/Pkg/test/test_packages/AugmentedPlatform/.pkg",
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Downloads/.ci",
+            "reference": "unpackaged",
+            "uid": 1000
+          },
+          {
+            "allowlisted": true,
+            "kind": "dir",
+            "package": "",
+            "package_declared": false,
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Downloads/.github",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -21122,7 +21661,16 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/Pkg/test/test_packages/BigProject/.gitignore",
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Downloads/.gitignore",
+            "reference": "unpackaged",
+            "uid": 1000
+          },
+          {
+            "allowlisted": true,
+            "kind": "dir",
+            "package": "",
+            "package_declared": false,
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/JuliaSyntaxHighlighting/.github",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -21131,70 +21679,16 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/Pkg/test/test_packages/BigProject/SubModule/.gitignore",
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/JuliaSyntaxHighlighting/.gitignore",
             "reference": "unpackaged",
             "uid": 1000
           },
           {
             "allowlisted": true,
-            "kind": "regular",
+            "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/Pkg/test/test_packages/BigProject/SubModule2/.gitignore",
-            "reference": "unpackaged",
-            "uid": 1000
-          },
-          {
-            "allowlisted": true,
-            "kind": "regular",
-            "package": "",
-            "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/Pkg/test/test_packages/BuildProjectFixedDeps/.gitignore",
-            "reference": "unpackaged",
-            "uid": 1000
-          },
-          {
-            "allowlisted": true,
-            "kind": "regular",
-            "package": "",
-            "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/Pkg/test/test_packages/force_latest_compatible_version/BothOldAndNew/.gitignore",
-            "reference": "unpackaged",
-            "uid": 1000
-          },
-          {
-            "allowlisted": true,
-            "kind": "regular",
-            "package": "",
-            "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/Pkg/test/test_packages/force_latest_compatible_version/DirectDepWithoutCompatEntry/.gitignore",
-            "reference": "unpackaged",
-            "uid": 1000
-          },
-          {
-            "allowlisted": true,
-            "kind": "regular",
-            "package": "",
-            "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/Pkg/test/test_packages/force_latest_compatible_version/NewOnly/.gitignore",
-            "reference": "unpackaged",
-            "uid": 1000
-          },
-          {
-            "allowlisted": true,
-            "kind": "regular",
-            "package": "",
-            "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/Pkg/test/test_packages/force_latest_compatible_version/OldOnly1/.gitignore",
-            "reference": "unpackaged",
-            "uid": 1000
-          },
-          {
-            "allowlisted": true,
-            "kind": "regular",
-            "package": "",
-            "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/Pkg/test/test_packages/force_latest_compatible_version/OldOnly2/.gitignore",
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/LazyArtifacts/.github",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -21203,7 +21697,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/SHA/.ci",
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/LibCURL/.ci",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -21212,7 +21706,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/SHA/.github",
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/LibCURL/.github",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -21221,52 +21715,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/SHA/.gitignore",
-            "reference": "unpackaged",
-            "uid": 1000
-          },
-          {
-            "allowlisted": true,
-            "kind": "regular",
-            "package": "",
-            "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/SHA/docs/.gitignore",
-            "reference": "unpackaged",
-            "uid": 1000
-          },
-          {
-            "allowlisted": false,
-            "kind": "regular",
-            "package": "",
-            "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/SparseArrays/.codecov.yml",
-            "reference": "unpackaged",
-            "uid": 1000
-          },
-          {
-            "allowlisted": true,
-            "kind": "dir",
-            "package": "",
-            "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/SparseArrays/.github",
-            "reference": "unpackaged",
-            "uid": 1000
-          },
-          {
-            "allowlisted": true,
-            "kind": "regular",
-            "package": "",
-            "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/SparseArrays/.gitignore",
-            "reference": "unpackaged",
-            "uid": 1000
-          },
-          {
-            "allowlisted": true,
-            "kind": "regular",
-            "package": "",
-            "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/SparseArrays/gen/.gitignore",
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/LibCURL/.gitignore",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -21275,7 +21724,16 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/Statistics/.ci",
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/LinearAlgebra/.buildkite",
+            "reference": "unpackaged",
+            "uid": 1000
+          },
+          {
+            "allowlisted": false,
+            "kind": "regular",
+            "package": "",
+            "package_declared": false,
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/LinearAlgebra/.codecov.yml",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -21284,16 +21742,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/Statistics/.github",
-            "reference": "unpackaged",
-            "uid": 1000
-          },
-          {
-            "allowlisted": true,
-            "kind": "dir",
-            "package": "",
-            "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/StyledStrings/.github",
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/LinearAlgebra/.github",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -21302,7 +21751,88 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/StyledStrings/.gitignore",
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/LinearAlgebra/.gitignore",
+            "reference": "unpackaged",
+            "uid": 1000
+          },
+          {
+            "allowlisted": false,
+            "kind": "regular",
+            "package": "",
+            "package_declared": false,
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/NetworkOptions/.codecov.yml",
+            "reference": "unpackaged",
+            "uid": 1000
+          },
+          {
+            "allowlisted": true,
+            "kind": "dir",
+            "package": "",
+            "package_declared": false,
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/NetworkOptions/.github",
+            "reference": "unpackaged",
+            "uid": 1000
+          },
+          {
+            "allowlisted": true,
+            "kind": "regular",
+            "package": "",
+            "package_declared": false,
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/NetworkOptions/.gitignore",
+            "reference": "unpackaged",
+            "uid": 1000
+          },
+          {
+            "allowlisted": false,
+            "kind": "regular",
+            "package": "",
+            "package_declared": false,
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Pkg/.codecov.yml",
+            "reference": "unpackaged",
+            "uid": 1000
+          },
+          {
+            "allowlisted": false,
+            "kind": "regular",
+            "package": "",
+            "package_declared": false,
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Pkg/.git-blame-ignore-revs",
+            "reference": "unpackaged",
+            "uid": 1000
+          },
+          {
+            "allowlisted": true,
+            "kind": "dir",
+            "package": "",
+            "package_declared": false,
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Pkg/.github",
+            "reference": "unpackaged",
+            "uid": 1000
+          },
+          {
+            "allowlisted": true,
+            "kind": "regular",
+            "package": "",
+            "package_declared": false,
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Pkg/.gitignore",
+            "reference": "unpackaged",
+            "uid": 1000
+          },
+          {
+            "allowlisted": false,
+            "kind": "regular",
+            "package": "",
+            "package_declared": false,
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Pkg/.pre-commit-config.yaml",
+            "reference": "unpackaged",
+            "uid": 1000
+          },
+          {
+            "allowlisted": true,
+            "kind": "regular",
+            "package": "",
+            "package_declared": false,
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Pkg/test/test_packages/.gitignore",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -21311,7 +21841,88 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/SuiteSparse/.ci",
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Pkg/test/test_packages/AugmentedPlatform/.pkg",
+            "reference": "unpackaged",
+            "uid": 1000
+          },
+          {
+            "allowlisted": true,
+            "kind": "regular",
+            "package": "",
+            "package_declared": false,
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Pkg/test/test_packages/BigProject/.gitignore",
+            "reference": "unpackaged",
+            "uid": 1000
+          },
+          {
+            "allowlisted": true,
+            "kind": "regular",
+            "package": "",
+            "package_declared": false,
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Pkg/test/test_packages/BigProject/SubModule/.gitignore",
+            "reference": "unpackaged",
+            "uid": 1000
+          },
+          {
+            "allowlisted": true,
+            "kind": "regular",
+            "package": "",
+            "package_declared": false,
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Pkg/test/test_packages/BigProject/SubModule2/.gitignore",
+            "reference": "unpackaged",
+            "uid": 1000
+          },
+          {
+            "allowlisted": true,
+            "kind": "regular",
+            "package": "",
+            "package_declared": false,
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Pkg/test/test_packages/BuildProjectFixedDeps/.gitignore",
+            "reference": "unpackaged",
+            "uid": 1000
+          },
+          {
+            "allowlisted": true,
+            "kind": "regular",
+            "package": "",
+            "package_declared": false,
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Pkg/test/test_packages/force_latest_compatible_version/BothOldAndNew/.gitignore",
+            "reference": "unpackaged",
+            "uid": 1000
+          },
+          {
+            "allowlisted": true,
+            "kind": "regular",
+            "package": "",
+            "package_declared": false,
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Pkg/test/test_packages/force_latest_compatible_version/DirectDepWithoutCompatEntry/.gitignore",
+            "reference": "unpackaged",
+            "uid": 1000
+          },
+          {
+            "allowlisted": true,
+            "kind": "regular",
+            "package": "",
+            "package_declared": false,
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Pkg/test/test_packages/force_latest_compatible_version/NewOnly/.gitignore",
+            "reference": "unpackaged",
+            "uid": 1000
+          },
+          {
+            "allowlisted": true,
+            "kind": "regular",
+            "package": "",
+            "package_declared": false,
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Pkg/test/test_packages/force_latest_compatible_version/OldOnly1/.gitignore",
+            "reference": "unpackaged",
+            "uid": 1000
+          },
+          {
+            "allowlisted": true,
+            "kind": "regular",
+            "package": "",
+            "package_declared": false,
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Pkg/test/test_packages/force_latest_compatible_version/OldOnly2/.gitignore",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -21320,7 +21931,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/SuiteSparse/.devcontainer",
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/SHA/.ci",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -21329,7 +21940,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/SuiteSparse/.github",
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/SHA/.github",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -21338,7 +21949,16 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/TOML/.gitignore",
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/SHA/.gitignore",
+            "reference": "unpackaged",
+            "uid": 1000
+          },
+          {
+            "allowlisted": true,
+            "kind": "regular",
+            "package": "",
+            "package_declared": false,
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/SHA/docs/.gitignore",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -21347,7 +21967,16 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/Tar/.ci",
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/SparseArrays/.ci",
+            "reference": "unpackaged",
+            "uid": 1000
+          },
+          {
+            "allowlisted": false,
+            "kind": "regular",
+            "package": "",
+            "package_declared": false,
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/SparseArrays/.codecov.yml",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -21356,7 +21985,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/Tar/.github",
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/SparseArrays/.github",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -21365,7 +21994,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/stdlib/v1.12/Tar/.gitignore",
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/SparseArrays/.gitignore",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -21374,7 +22003,34 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/test/.gitignore",
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/SparseArrays/gen/.gitignore",
+            "reference": "unpackaged",
+            "uid": 1000
+          },
+          {
+            "allowlisted": false,
+            "kind": "dir",
+            "package": "",
+            "package_declared": false,
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Statistics/.ci",
+            "reference": "unpackaged",
+            "uid": 1000
+          },
+          {
+            "allowlisted": true,
+            "kind": "dir",
+            "package": "",
+            "package_declared": false,
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Statistics/.github",
+            "reference": "unpackaged",
+            "uid": 1000
+          },
+          {
+            "allowlisted": true,
+            "kind": "dir",
+            "package": "",
+            "package_declared": false,
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/StyledStrings/.github",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -21383,7 +22039,34 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/test/clangsa/.gitignore",
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/StyledStrings/.gitignore",
+            "reference": "unpackaged",
+            "uid": 1000
+          },
+          {
+            "allowlisted": false,
+            "kind": "dir",
+            "package": "",
+            "package_declared": false,
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/SuiteSparse/.ci",
+            "reference": "unpackaged",
+            "uid": 1000
+          },
+          {
+            "allowlisted": false,
+            "kind": "dir",
+            "package": "",
+            "package_declared": false,
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/SuiteSparse/.devcontainer",
+            "reference": "unpackaged",
+            "uid": 1000
+          },
+          {
+            "allowlisted": true,
+            "kind": "dir",
+            "package": "",
+            "package_declared": false,
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/SuiteSparse/.github",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -21392,7 +22075,25 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/test/embedding/.gitignore",
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/TOML/.gitignore",
+            "reference": "unpackaged",
+            "uid": 1000
+          },
+          {
+            "allowlisted": false,
+            "kind": "dir",
+            "package": "",
+            "package_declared": false,
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Tar/.ci",
+            "reference": "unpackaged",
+            "uid": 1000
+          },
+          {
+            "allowlisted": true,
+            "kind": "dir",
+            "package": "",
+            "package_declared": false,
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Tar/.github",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -21401,7 +22102,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/test/gcext/.gitignore",
+            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Tar/.gitignore",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -21410,7 +22111,43 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.12.7/share/julia/test/llvmpasses/.gitignore",
+            "path": "/usr/local/julia1.13.0/share/julia/test/.gitignore",
+            "reference": "unpackaged",
+            "uid": 1000
+          },
+          {
+            "allowlisted": true,
+            "kind": "regular",
+            "package": "",
+            "package_declared": false,
+            "path": "/usr/local/julia1.13.0/share/julia/test/clangsa/.gitignore",
+            "reference": "unpackaged",
+            "uid": 1000
+          },
+          {
+            "allowlisted": true,
+            "kind": "regular",
+            "package": "",
+            "package_declared": false,
+            "path": "/usr/local/julia1.13.0/share/julia/test/embedding/.gitignore",
+            "reference": "unpackaged",
+            "uid": 1000
+          },
+          {
+            "allowlisted": true,
+            "kind": "regular",
+            "package": "",
+            "package_declared": false,
+            "path": "/usr/local/julia1.13.0/share/julia/test/gcext/.gitignore",
+            "reference": "unpackaged",
+            "uid": 1000
+          },
+          {
+            "allowlisted": true,
+            "kind": "regular",
+            "package": "",
+            "package_declared": false,
+            "path": "/usr/local/julia1.13.0/share/julia/test/llvmpasses/.gitignore",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -21851,7 +22588,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/var/lib/gems/3.2.0/gems/domain_name-0.6.20260902/.document",
+            "path": "/var/lib/gems/3.2.0/gems/domain_name-0.6.20260907/.document",
             "reference": "unpackaged",
             "uid": 0
           },
@@ -21860,7 +22597,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/var/lib/gems/3.2.0/gems/domain_name-0.6.20260902/.github",
+            "path": "/var/lib/gems/3.2.0/gems/domain_name-0.6.20260907/.github",
             "reference": "unpackaged",
             "uid": 0
           },
@@ -21869,7 +22606,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/var/lib/gems/3.2.0/gems/domain_name-0.6.20260902/.gitignore",
+            "path": "/var/lib/gems/3.2.0/gems/domain_name-0.6.20260907/.gitignore",
             "reference": "unpackaged",
             "uid": 0
           },
@@ -21887,7 +22624,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/var/lib/gems/3.2.0/gems/fastlane-2.239.0/.yardopts",
+            "path": "/var/lib/gems/3.2.0/gems/fastlane-2.240.1/.yardopts",
             "reference": "unpackaged",
             "uid": 0
           },
@@ -21896,7 +22633,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/var/lib/gems/3.2.0/gems/fastlane-2.239.0/fastlane/lib/fastlane/plugins/template/.github",
+            "path": "/var/lib/gems/3.2.0/gems/fastlane-2.240.1/fastlane/lib/fastlane/plugins/template/.github",
             "reference": "unpackaged",
             "uid": 0
           },
@@ -21905,7 +22642,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/var/lib/gems/3.2.0/gems/fastlane-2.239.0/fastlane/lib/fastlane/plugins/template/.gitignore",
+            "path": "/var/lib/gems/3.2.0/gems/fastlane-2.240.1/fastlane/lib/fastlane/plugins/template/.gitignore",
             "reference": "unpackaged",
             "uid": 0
           },
@@ -21914,7 +22651,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/var/lib/gems/3.2.0/gems/fastlane-2.239.0/fastlane/lib/fastlane/plugins/template/.rspec",
+            "path": "/var/lib/gems/3.2.0/gems/fastlane-2.240.1/fastlane/lib/fastlane/plugins/template/.rspec",
             "reference": "unpackaged",
             "uid": 0
           },
@@ -21923,7 +22660,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/var/lib/gems/3.2.0/gems/fastlane-2.239.0/fastlane/lib/fastlane/plugins/template/.rubocop.yml",
+            "path": "/var/lib/gems/3.2.0/gems/fastlane-2.240.1/fastlane/lib/fastlane/plugins/template/.rubocop.yml",
             "reference": "unpackaged",
             "uid": 0
           },
@@ -22022,7 +22759,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/var/lib/gems/3.2.0/gems/google-apis-androidpublisher_v3-0.99.0/.yardopts",
+            "path": "/var/lib/gems/3.2.0/gems/google-apis-androidpublisher_v3-0.108.0/.yardopts",
             "reference": "unpackaged",
             "uid": 0
           },
@@ -22553,7 +23290,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/var/lib/gems/3.2.0/gems/unicode-emoji-4.2.0/.gitignore",
+            "path": "/var/lib/gems/3.2.0/gems/unicode-emoji-4.3.0/.gitignore",
             "reference": "unpackaged",
             "uid": 0
           },
@@ -22562,7 +23299,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/var/lib/gems/3.2.0/gems/unicode-emoji-4.2.0/.rake_tasks",
+            "path": "/var/lib/gems/3.2.0/gems/unicode-emoji-4.3.0/.rake_tasks",
             "reference": "unpackaged",
             "uid": 0
           },
@@ -22571,7 +23308,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/var/lib/gems/3.2.0/gems/unicode-emoji-4.2.0/spec/data/.keep",
+            "path": "/var/lib/gems/3.2.0/gems/unicode-emoji-4.3.0/spec/data/.keep",
             "reference": "unpackaged",
             "uid": 0
           },
@@ -23125,11 +23862,11 @@
       "stats": {
         "status": "ok",
         "value": {
-          "allowlisted_hidden": 202,
+          "allowlisted_hidden": 204,
           "config_unreadable": [],
-          "dirs": 34558,
-          "entries": 245237,
-          "files": 205293,
+          "dirs": 34690,
+          "entries": 246159,
+          "files": 206079,
           "home_roots": [
             {
               "kind": "user",
@@ -23267,15 +24004,15 @@
           "mnt_id_fallback": false,
           "nice_applied": true,
           "stop_reason": "",
-          "symlinks": 5380,
+          "symlinks": 5384,
           "truncated_counts": {
-            "hidden": 165,
+            "hidden": 167,
             "skipped": 85,
             "sticky_missing": 34,
             "suid_sgid": 24,
             "suid_sgid_unverified": 0,
             "unowned": 0,
-            "world_writable": 544
+            "world_writable": 545
           }
         },
         "source": {
@@ -25917,7 +26654,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/opt/actionarchivecache/github_codeql-action/6f530319d8c989665d0835536ec9571735fd2008.tar.gz",
+            "path": "/opt/actionarchivecache/github_codeql-action/313a0b99225f41fe3a5666e8fa7b2d8048c194ec.tar.gz",
             "reference": "unpackaged",
             "sticky": false,
             "uid": 1001
@@ -25957,7 +26694,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/opt/actionarchivecache/github_gh-aw-actions/1aa033c7bf25ac9428fe521065b90c30a7070c4e.tar.gz",
+            "path": "/opt/actionarchivecache/github_gh-aw-actions/49459c75b37a0b82b4ecb15e1079972cc3353bc9.tar.gz",
             "reference": "unpackaged",
             "sticky": false,
             "uid": 1001
@@ -25967,7 +26704,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/opt/actionarchivecache/github_gh-aw-actions/49dc896ccb7d6d975514cfe232bcbd68cc12e2c1.tar.gz",
+            "path": "/opt/actionarchivecache/github_gh-aw-actions/be41add0f204de343293628bb99a72a3894cfd7a.tar.gz",
             "reference": "unpackaged",
             "sticky": false,
             "uid": 1001
@@ -25977,7 +26714,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/opt/actionarchivecache/github_gh-aw-actions/bc8c008a419c5b7a29df6f5641edd35fd1c6ea85.tar.gz",
+            "path": "/opt/actionarchivecache/github_gh-aw-actions/d462c12b8f1f616b55fed699787b0280c594e592.tar.gz",
             "reference": "unpackaged",
             "sticky": false,
             "uid": 1001
@@ -26338,6 +27075,16 @@
             "package": "google-chrome-stable",
             "package_declared": false,
             "path": "/opt/google/chrome/libqt6_shim.so",
+            "reference": "unlisted",
+            "sticky": false,
+            "uid": 0
+          },
+          {
+            "gid": 0,
+            "kind": "regular",
+            "package": "google-chrome-stable",
+            "package_declared": false,
+            "path": "/opt/google/chrome/libsapisid.so",
             "reference": "unlisted",
             "sticky": false,
             "uid": 0
@@ -28877,7 +29624,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/tmp/systemd-private-2ab76c673b4043caabed904ca094af5d-ModemManager.service-lHMn5s/tmp",
+            "path": "/tmp/systemd-private-ebc05e67603f41c7adb73907fbe6e488-ModemManager.service-n38bRc/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -28887,7 +29634,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/tmp/systemd-private-2ab76c673b4043caabed904ca094af5d-chrony.service-RrlwPM/tmp",
+            "path": "/tmp/systemd-private-ebc05e67603f41c7adb73907fbe6e488-chrony.service-SfPToX/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -28897,7 +29644,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/tmp/systemd-private-2ab76c673b4043caabed904ca094af5d-haveged.service-LTucrN/tmp",
+            "path": "/tmp/systemd-private-ebc05e67603f41c7adb73907fbe6e488-haveged.service-svGrci/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -28907,7 +29654,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/tmp/systemd-private-2ab76c673b4043caabed904ca094af5d-polkit.service-2yPQed/tmp",
+            "path": "/tmp/systemd-private-ebc05e67603f41c7adb73907fbe6e488-polkit.service-dWG6Ry/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -28917,7 +29664,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/tmp/systemd-private-2ab76c673b4043caabed904ca094af5d-systemd-logind.service-hGlRCW/tmp",
+            "path": "/tmp/systemd-private-ebc05e67603f41c7adb73907fbe6e488-systemd-logind.service-ibarpO/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -28927,7 +29674,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/tmp/systemd-private-2ab76c673b4043caabed904ca094af5d-systemd-resolved.service-rq0DJK/tmp",
+            "path": "/tmp/systemd-private-ebc05e67603f41c7adb73907fbe6e488-systemd-resolved.service-1fC1Dx/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -28937,7 +29684,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/tmp/systemd-private-2ab76c673b4043caabed904ca094af5d-systemd-timedated.service-3mJGCK/tmp",
+            "path": "/tmp/systemd-private-ebc05e67603f41c7adb73907fbe6e488-systemd-timedated.service-Xugvuo/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -29257,7 +30004,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/var/tmp/systemd-private-2ab76c673b4043caabed904ca094af5d-ModemManager.service-idTzQQ/tmp",
+            "path": "/var/tmp/systemd-private-ebc05e67603f41c7adb73907fbe6e488-ModemManager.service-V4yUdZ/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -29267,7 +30014,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/var/tmp/systemd-private-2ab76c673b4043caabed904ca094af5d-chrony.service-fYQjUO/tmp",
+            "path": "/var/tmp/systemd-private-ebc05e67603f41c7adb73907fbe6e488-chrony.service-w5QZbF/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -29277,7 +30024,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/var/tmp/systemd-private-2ab76c673b4043caabed904ca094af5d-haveged.service-VpFTlN/tmp",
+            "path": "/var/tmp/systemd-private-ebc05e67603f41c7adb73907fbe6e488-haveged.service-KNjX07/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -29287,7 +30034,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/var/tmp/systemd-private-2ab76c673b4043caabed904ca094af5d-polkit.service-gegt2F/tmp",
+            "path": "/var/tmp/systemd-private-ebc05e67603f41c7adb73907fbe6e488-polkit.service-AuH77D/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -29297,7 +30044,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/var/tmp/systemd-private-2ab76c673b4043caabed904ca094af5d-systemd-logind.service-T4a0CQ/tmp",
+            "path": "/var/tmp/systemd-private-ebc05e67603f41c7adb73907fbe6e488-systemd-logind.service-yoWhNO/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -29307,7 +30054,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/var/tmp/systemd-private-2ab76c673b4043caabed904ca094af5d-systemd-resolved.service-s4Kxy3/tmp",
+            "path": "/var/tmp/systemd-private-ebc05e67603f41c7adb73907fbe6e488-systemd-resolved.service-3ARW45/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -29317,7 +30064,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/var/tmp/systemd-private-2ab76c673b4043caabed904ca094af5d-systemd-timedated.service-sQoQ2p/tmp",
+            "path": "/var/tmp/systemd-private-ebc05e67603f41c7adb73907fbe6e488-systemd-timedated.service-zfc0tg/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0

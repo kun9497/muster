@@ -1,0 +1,67 @@
+{
+  "synthetic": true,
+  "_expect": {
+    "reason_code": "unsupported_env"
+  },
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none"
+      }
+    },
+    "services": {
+      "auditd": {
+        "installed": {
+          "status": "ok",
+          "value": true,
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState auditd.service",
+            "exit_code": 0
+          }
+        }
+      }
+    },
+    "audit": {
+      "immutable": {
+        "runtime": {
+          "status": "unsupported",
+          "reason": "/usr/sbin/auditctl -s: Error - audit support not in kernel",
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/sbin/auditctl -s",
+            "exit_code": 1
+          }
+        },
+        "persisted": {
+          "status": "ok",
+          "value": true,
+          "source": {
+            "kind": "file",
+            "path": "/etc/audit/rules.d/99-finalize.rules",
+            "line": 4,
+            "raw": "-e 2"
+          }
+        },
+        "effective": {
+          "status": "unsupported",
+          "reason": "/usr/sbin/auditctl -s: Error - audit support not in kernel",
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/sbin/auditctl -s",
+            "exit_code": 1
+          }
+        },
+        "winner": {
+          "kind": "file",
+          "path": "/etc/audit/rules.d/99-finalize.rules",
+          "line": 4,
+          "raw": "-e 2"
+        }
+      }
+    }
+  }
+}

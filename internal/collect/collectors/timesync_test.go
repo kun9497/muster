@@ -60,13 +60,35 @@ func timesyncAccess(files map[string]string, cmds map[string]cmdResult) *timesyn
 // services.ntp.*/services.syslog.* key is unsupported and Worst stays ok.
 func TestServicesNtpAndSyslogRowsDegradeWithTheTable(t *testing.T) {
 	b := buildBegun(t, "services", &fsAccess{}) // no /run/systemd/system
-	for _, k := range []string{"services.ntp.installed", "services.ntp.active", "services.syslog.installed", "services.syslog.enabled"} {
+	for _, k := range []string{"services.ntp.installed", "services.ntp.active", "services.syslog.installed", "services.syslog.enabled",
+		"services.auditd.installed", "services.auditd.active", "services.auditd.enabled", "services.auditd.unit_file_state",
+		"services.journal_upload.installed", "services.journal_upload.active", "services.journal_upload.enabled", "services.journal_upload.unit_file_state"} {
 		if e := env(t, b, k); e.Status != facts.StatusUnsupported {
 			t.Errorf("%s = %s, want unsupported", k, e.Status)
 		}
 	}
 	if got := b.Worst("services"); got != facts.StatusOK {
 		t.Errorf(`Worst("services") = %s, want ok`, got)
+	}
+}
+
+// Spec I-6: the auditd and journal_upload rows answer by the table's rules — a
+// loaded, running auditd.service is installed and active; a host with no
+// systemd-journal-upload.service has it installed false, never absent.
+func TestServicesAuditdAndJournalUploadRows(t *testing.T) {
+	cmds := allUnitsNotFound()
+	cmds[showLine("auditd.service")] = cmdResult{file: "systemctl.loaded.active"}
+	b := build(t, "services", servicesAccess(map[string]string{"/proc/self/net/tcp": "proc_net_tcp"}, cmds))
+	for k, want := range map[string]any{
+		"services.auditd.installed":         true,
+		"services.auditd.active":            true,
+		"services.journal_upload.installed": false,
+		"services.journal_upload.active":    false,
+		"services.journal_upload.enabled":   false,
+	} {
+		if e := env(t, b, k); e.Status != facts.StatusOK || e.Value != want {
+			t.Errorf("%s = %+v, want ok %v", k, e, want)
+		}
 	}
 }
 

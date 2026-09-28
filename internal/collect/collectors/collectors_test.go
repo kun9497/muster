@@ -27,6 +27,7 @@ import (
 // cmdResult is one canned command outcome for fsAccess.
 type cmdResult struct {
 	file      string // testdata file served as stdout
+	stdout    []byte // literal stdout, for output no fixture file should hold (thousands of rows)
 	stderr    string
 	exitCode  int
 	timedOut  bool
@@ -323,7 +324,7 @@ func (a *fsAccess) Run(_ context.Context, c collect.Command) collect.Output {
 		// with Err set; the double has to say the same thing.
 		return collect.Output{ExitCode: -1, Err: os.ErrNotExist}
 	}
-	var stdout []byte
+	stdout := r.stdout
 	if r.file != "" {
 		b, err := a.read(r.file)
 		if err != nil {

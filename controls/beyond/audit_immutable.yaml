@@ -1,0 +1,26 @@
+id: muster.beyond.audit_immutable
+title_en: The audit configuration is locked until reboot, now and in the rules the next boot loads
+title_ko: 감사 설정이 지금도, 다음 부팅이 적재할 규칙에서도 재부팅 전까지 잠겨 있다
+description_en: auditctl(8) documents -e 2 as the lock on the audit configuration — once it is set, no rule can be added or deleted and auditing cannot be switched off until the host reboots. Without the lock, anyone who reaches root can run auditctl -D or auditctl -e 0 and blind the trail, leaving no record of what came after; with it, the only way to change the rules is a reboot, which is itself visible. Like the rules, the lock has two homes. The runtime home is the enabled field auditctl -s prints, which reads 2 when the kernel is locked; the persisted home is the last -e line of what augenrules(8) will load at the next boot — the *.rules files of /etc/audit/rules.d in version order, or /etc/audit/audit.rules when rules.d is missing — and it must be -e 2. The last -e decides because augenrules(8) moves the last -e line it finds to the end of the file it generates, so that one is what the kernel is left with. muster judges each home as its own clause. A lock set by hand that the next boot forgets, or an -e 2 in a file the daemon never loaded, are each a FAIL; the reason names the home — an absent persisted side reads "absent counts as fail", and the evidence rows carry the side, the file and line of the deciding -e, and the rules.d reason. It is rated 중 because the lock defends the trail against an attacker who already holds root, which is the case the trail most needs to survive, but it adds nothing until something else has gone wrong. A stock EL9 host ships no -e line and fails; a stock Ubuntu host has no auditd and reads NOT_APPLICABLE, where auditd_active fires instead. A kernel booted with audit=0 reads NOT_APPLICABLE here and auditd_active is the control that fires. A run without root cannot read the kernel's audit status and reads ERROR.
+description_ko: auditctl(8) 은 -e 2 를 감사 설정의 잠금으로 설명합니다. 한 번 설정되면 호스트가 재부팅할 때까지 규칙을 추가하거나 지울 수 없고 감사를 끌 수도 없습니다. 잠금이 없으면 root 권한에 도달한 누구든 auditctl -D 나 auditctl -e 0 을 실행해 감사를 무력화할 수 있고 그 뒤의 일은 기록에 남지 않습니다. 잠금이 있으면 규칙을 바꾸는 유일한 방법은 그 자체로 눈에 띄는 재부팅입니다. 규칙과 마찬가지로 잠금도 두 곳에 있습니다. 런타임 쪽은 auditctl -s 가 출력하는 enabled 값으로 커널이 잠겨 있으면 2 이고, 저장 쪽은 다음 부팅에 augenrules(8) 가 적재할 규칙(/etc/audit/rules.d 의 *.rules 파일을 버전 순서로, rules.d 가 없으면 /etc/audit/audit.rules)의 마지막 -e 줄입니다. 그 줄이 -e 2 여야 합니다. 마지막 -e 가 결정하는 까닭은 augenrules(8) 가 찾은 마지막 -e 줄을 자신이 만드는 파일의 끝으로 옮기므로 커널에 남는 것이 그 줄이기 때문입니다. muster 는 두 곳을 각각 독립된 조건으로 판정합니다. 손으로 걸었지만 다음 부팅이 잊어버리는 잠금도, 데몬이 한 번도 적재하지 않은 파일 속 -e 2 도 각각 FAIL 이며, 사유가 어느 쪽인지 알려 줍니다. 저장 쪽이 absent 이면 사유는 "absent counts as fail" 로 시작하고, 증거 행에 해당 쪽과 결정한 -e 줄의 파일·줄 번호, rules.d 관련 사유가 담깁니다. 잠금은 이미 root 를 가진 공격자, 즉 감사 기록이 가장 살아남아야 하는 상황에서 기록을 지키지만 다른 무언가가 먼저 잘못되기 전에는 아무것도 더하지 않으므로 중요도는 중 입니다. EL9 기본 설치에는 -e 줄이 없어 실패하고, Ubuntu 기본 설치는 auditd 가 없어 NOT_APPLICABLE 이며 대신 auditd_active 가 경고합니다. audit=0 으로 부팅한 커널은 여기서 NOT_APPLICABLE 이며 경고하는 것은 auditd_active 입니다. root 가 아닌 실행은 커널의 감사 상태를 읽을 수 없으므로 ERROR 입니다.
+category: beyond
+importance: 중
+automation: auto
+references:
+  stig:
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-654275 }
+    - { benchmark: ubuntu2404, version: V1R6, id: UBTU-24-909000 }
+  nist_800_53: ["AU-9"]
+requires_facts: ">=1"
+applies_when:
+  - { fact: env.container, op: eq, expected: none }
+  - { fact: services.auditd.installed, op: eq, expected: true }
+absent_means: fail
+checks:
+  - { fact: audit.immutable, op: eq, expected: true, on: runtime }
+  - { fact: audit.immutable, op: eq, expected: true, on: persisted }
+remediation:
+  text_en: Put -e 2 on the last line of the last file augenrules loads — a name such as /etc/audit/rules.d/99-finalize.rules sorts after the others — and run augenrules --load, or reboot, so the kernel is locked with the rules in place. From then on every rule change needs a reboot to take effect, so settle the rule set first; a host that must change rules at runtime has to accept the unlocked state and record that in a waiver.
+  text_ko: augenrules 가 마지막으로 적재하는 파일의 마지막 줄에 -e 2 를 둡니다. /etc/audit/rules.d/99-finalize.rules 같은 이름이면 다른 파일보다 뒤에 정렬됩니다. 그런 다음 augenrules --load 를 실행하거나 재부팅하면 규칙이 적재된 상태로 커널이 잠깁니다. 그 뒤로는 규칙을 바꿀 때마다 재부팅해야 적용되므로 규칙 구성을 먼저 확정하십시오. 런타임에 규칙을 바꿔야 하는 호스트는 잠기지 않은 상태를 받아들이고 waiver 로 그 사실을 남겨야 합니다.
+  risk: restart_service
+  idempotent: true

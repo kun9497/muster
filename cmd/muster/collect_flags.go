@@ -17,11 +17,13 @@ const collectUsage = `usage: muster collect [flags]
 flags:
   --out <path|->          snapshot path (default /var/lib/muster/snapshots/<host>-<time>-<digest>.json)
   --force                 overwrite an existing --out path
-  --deep                  run the filesystem walk (needs root; raises the default --timeout to --walk-budget + 5m)
+  --deep                  run the filesystem walk (needs root; raises the default --timeout to --walk-budget + --verify-timeout + 5m)
   --walk-budget <dur>     wall-time limit for the walk (default 10m; needs --deep)
   --walk-max-entries <n>  entries the walk may visit (default 2000000; needs --deep)
   --walk-exclude <path>   a root the walk must not enter, repeatable (needs --deep)
   --walk-include <path>   a container-storage root to walk after all, repeatable; the fixed set only (needs --deep)
+  --verify-timeout <dur>  wall-time limit for package verification (default 30m; needs --deep; --deep adds it to the default --timeout)
+  --no-verify             skip package verification in a --deep run
   --timeout <duration>    global deadline (default 5m)
   --require-root          exit 2 without writing when not root
   --require-complete      exit 2 (instead of 1) when the snapshot is partial
@@ -40,6 +42,10 @@ const (
 	// the walk's budget when --deep raises the default deadline. Under the
 	// plain 5m default a 10m walk could only ever end as a deadline.
 	walkTimeoutMargin = 5 * time.Minute
+	// defaultVerifyTimeout is package verification's wall-time limit
+	// (J-10). Like the walk's limits it is carried whether or not --deep
+	// was given and read only when it was and --no-verify was not.
+	defaultVerifyTimeout = 30 * time.Minute
 )
 
 // collectOpts is the parsed command line. It is deliberately not
@@ -57,6 +63,8 @@ type collectOpts struct {
 	walkMaxEntries  int
 	walkExclude     []string
 	walkInclude     []string
+	verifyTimeout   time.Duration
+	noVerify        bool
 	timeout         time.Duration
 	timeoutGiven    bool
 	requireRoot     bool
@@ -66,10 +74,13 @@ type collectOpts struct {
 }
 
 func parseCollectFlags(args []string) (collectOpts, error) {
-	o := collectOpts{format: "table", walkBudget: defaultWalkBudget, walkMaxEntries: defaultWalkMaxEntries}
+	o := collectOpts{format: "table", walkBudget: defaultWalkBudget, walkMaxEntries: defaultWalkMaxEntries,
+		verifyTimeout: defaultVerifyTimeout}
 	formatGiven := false
-	// walkFlag is the first walk flag seen, so a walk flag without --deep
-	// is refused naming the flag the operator actually typed.
+	verifyTimeoutGiven := false
+	// walkFlag is the first flag seen that tunes a --deep stage (the walk
+	// or package verification), so one given without --deep is refused
+	// naming the flag the operator actually typed.
 	walkFlag := ""
 	for i := 0; i < len(args); i++ {
 		a := args[i]
@@ -136,6 +147,18 @@ func parseCollectFlags(args []string) (collectOpts, error) {
 					o.walkInclude = append(o.walkInclude, v)
 				}
 			}
+		case "--verify-timeout":
+			markWalkFlag(&walkFlag, a)
+			verifyTimeoutGiven = true
+			var v string
+			if v, err = next(); err == nil {
+				if o.verifyTimeout, err = time.ParseDuration(v); err != nil {
+					err = fmt.Errorf("--verify-timeout: %w", err)
+				}
+			}
+		case "--no-verify":
+			markWalkFlag(&walkFlag, a)
+			o.noVerify = true
 		case "--require-root":
 			o.requireRoot = true
 		case "--require-complete":
@@ -173,8 +196,22 @@ func parseCollectFlags(args []string) (collectOpts, error) {
 	if o.deep && o.walkBudget <= 0 {
 		return o, fmt.Errorf("--walk-budget must be greater than 0, got %s", o.walkBudget)
 	}
+	// J-10: the verify timeout is refused at zero or below for the reason
+	// the budget is, and a timeout for a verification --no-verify skips
+	// tunes nothing — the same trap as a walk flag without --deep.
+	if o.deep && o.verifyTimeout <= 0 {
+		return o, fmt.Errorf("--verify-timeout must be greater than 0, got %s", o.verifyTimeout)
+	}
+	if verifyTimeoutGiven && o.noVerify {
+		return o, errors.New("--verify-timeout is meaningless with --no-verify")
+	}
+	// The walk and the verification run one after the other, so the
+	// derived deadline holds both, plus the margin for the rest of the run.
 	if o.deep && !o.timeoutGiven {
 		o.timeout = o.walkBudget + walkTimeoutMargin
+		if !o.noVerify {
+			o.timeout += o.verifyTimeout
+		}
 	}
 	// A budget the deadline cannot hold buys a half-seen filesystem: the
 	// walk is killed, walk.complete is false and every walk-based control
@@ -186,6 +223,12 @@ func parseCollectFlags(args []string) (collectOpts, error) {
 	// it, and the two limits stopping together is the operator's call.
 	if o.deep && o.walkBudget > o.timeout {
 		return o, fmt.Errorf("--walk-budget %s exceeds --timeout %s", o.walkBudget, o.timeout)
+	}
+	// The same reasoning for the verification: a verify timeout the
+	// deadline cannot hold ends as packages.verify.complete false and
+	// ERROR(verify_incomplete), so the pair is refused now.
+	if o.deep && !o.noVerify && o.verifyTimeout > o.timeout {
+		return o, fmt.Errorf("--verify-timeout %s exceeds --timeout %s; pass --no-verify or a smaller --verify-timeout", o.verifyTimeout, o.timeout)
 	}
 	return o, nil
 }

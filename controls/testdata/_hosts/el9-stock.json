@@ -1,0 +1,858 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {
+    "muster_version": "synthetic",
+    "commit": "synthetic",
+    "controls_version": "kisa-unix-2026+2026.09.23",
+    "controls_digest": "",
+    "guide_edition": "kisa-unix-2026",
+    "collected_at": "2026-09-23T00:00:00Z",
+    "host": {
+      "hostname": "el9-stock",
+      "machine_id_hash": "",
+      "kernel": "",
+      "os_release": {
+        "id": "rocky",
+        "version_id": "9.4",
+        "family": "rhel"
+      },
+      "boot_id": "",
+      "uptime_s": 0
+    },
+    "euid": 0,
+    "capabilities": [],
+    "env": {
+      "container": "none",
+      "virt": "vmware",
+      "wsl": false,
+      "chroot": false,
+      "has_systemd": true,
+      "sysctl_writable": true,
+      "cloud_init": false
+    },
+    "collectors": [
+      {
+        "name": "audit",
+        "status": "ok",
+        "ms": 0
+      },
+      {
+        "name": "files",
+        "status": "ok",
+        "ms": 0
+      },
+      {
+        "name": "fim",
+        "status": "ok",
+        "ms": 0
+      },
+      {
+        "name": "logging",
+        "status": "ok",
+        "ms": 0
+      },
+      {
+        "name": "os",
+        "status": "ok",
+        "ms": 0
+      },
+      {
+        "name": "pkgverify",
+        "status": "ok",
+        "ms": 0
+      },
+      {
+        "name": "services",
+        "status": "ok",
+        "ms": 0
+      }
+    ],
+    "redaction": {
+      "profile": "default",
+      "include_secrets": false
+    },
+    "deep": true,
+    "complete": true,
+    "partial_failures": []
+  },
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none",
+        "source": {
+          "kind": "file",
+          "path": "/proc/1/cgroup"
+        }
+      }
+    },
+    "services": {
+      "auditd": {
+        "installed": {
+          "status": "ok",
+          "value": true,
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState auditd.service",
+            "exit_code": 0
+          }
+        },
+        "active": {
+          "status": "ok",
+          "value": true,
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState auditd.service",
+            "exit_code": 0
+          }
+        },
+        "unit_file_state": {
+          "status": "ok",
+          "value": "enabled",
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState auditd.service",
+            "exit_code": 0
+          }
+        },
+        "enabled": {
+          "status": "ok",
+          "value": true,
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState auditd.service",
+            "exit_code": 0
+          }
+        }
+      },
+      "syslog": {
+        "installed": {
+          "status": "ok",
+          "value": true,
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState rsyslog.service",
+            "exit_code": 0
+          }
+        },
+        "active": {
+          "status": "ok",
+          "value": true,
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState rsyslog.service",
+            "exit_code": 0
+          }
+        },
+        "unit_file_state": {
+          "status": "ok",
+          "value": "enabled",
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState rsyslog.service",
+            "exit_code": 0
+          }
+        },
+        "enabled": {
+          "status": "ok",
+          "value": true,
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState rsyslog.service",
+            "exit_code": 0
+          }
+        }
+      },
+      "journal_upload": {
+        "installed": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState systemd-journal-upload.service",
+            "exit_code": 0
+          }
+        },
+        "active": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState systemd-journal-upload.service",
+            "exit_code": 0
+          }
+        },
+        "unit_file_state": {
+          "status": "ok",
+          "value": "not-found",
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState systemd-journal-upload.service",
+            "exit_code": 0
+          }
+        },
+        "enabled": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState systemd-journal-upload.service",
+            "exit_code": 0
+          }
+        }
+      }
+    },
+    "logging": {
+      "rsyslog": {
+        "forwards_remote": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "file",
+                "path": "/etc/rsyslog.conf"
+              }
+            ]
+          }
+        },
+        "remote_targets": {
+          "status": "ok",
+          "value": [],
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "file",
+                "path": "/etc/rsyslog.conf"
+              }
+            ]
+          }
+        }
+      },
+      "journal_upload": {
+        "url": {
+          "status": "ok",
+          "value": "",
+          "source": {
+            "kind": "derived"
+          }
+        }
+      }
+    },
+    "sudo": {
+      "installed": {
+        "status": "ok",
+        "value": true,
+        "source": {
+          "kind": "file",
+          "path": "/etc/sudoers"
+        }
+      },
+      "log": {
+        "syslog": {
+          "status": "ok",
+          "value": true,
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "file",
+                "path": "/etc/sudoers"
+              }
+            ]
+          }
+        },
+        "logfile": {
+          "status": "ok",
+          "value": "",
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "file",
+                "path": "/etc/sudoers"
+              }
+            ]
+          }
+        }
+      },
+      "defaults": {
+        "scoped_count": {
+          "status": "ok",
+          "value": 0,
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "file",
+                "path": "/etc/sudoers"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "fim": {
+      "tool": {
+        "status": "ok",
+        "value": "none",
+        "source": {
+          "kind": "derived"
+        }
+      },
+      "aide": {
+        "installed": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "derived"
+          }
+        },
+        "config_path": {
+          "status": "absent",
+          "reason": "neither /etc/aide/aide.conf nor /etc/aide.conf exists"
+        },
+        "database_path": {
+          "status": "absent",
+          "reason": "no AIDE configuration file names a database: neither /etc/aide/aide.conf nor /etc/aide.conf exists"
+        },
+        "database_present": {
+          "status": "absent",
+          "reason": "no AIDE configuration file names a database: neither /etc/aide/aide.conf nor /etc/aide.conf exists"
+        },
+        "database_modified": {
+          "status": "absent",
+          "reason": "no AIDE configuration file names a database: neither /etc/aide/aide.conf nor /etc/aide.conf exists"
+        },
+        "schedules": {
+          "status": "ok",
+          "value": [],
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "file",
+                "path": "/etc/cron.d/0hourly"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/crontab"
+              },
+              {
+                "kind": "command",
+                "cmd": "/usr/bin/systemctl list-timers --all --no-legend --no-pager",
+                "exit_code": 0
+              }
+            ]
+          }
+        },
+        "scheduled": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "file",
+                "path": "/etc/cron.d/0hourly"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/crontab"
+              },
+              {
+                "kind": "command",
+                "cmd": "/usr/bin/systemctl list-timers --all --no-legend --no-pager",
+                "exit_code": 0
+              }
+            ]
+          }
+        }
+      },
+      "other_tools": {
+        "status": "ok",
+        "value": [],
+        "source": {
+          "kind": "derived"
+        }
+      }
+    },
+    "packages": {
+      "verify": {
+        "complete": {
+          "status": "ok",
+          "value": true,
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/rpm -Va",
+            "exit_code": 1
+          }
+        },
+        "tool": {
+          "status": "ok",
+          "value": "rpm",
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/rpm -Va",
+            "exit_code": 1
+          }
+        },
+        "modified": {
+          "status": "ok",
+          "value": [],
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/rpm -Va",
+            "exit_code": 1
+          }
+        },
+        "modified_config": {
+          "status": "ok",
+          "value": [
+            {
+              "path": "/etc/chrony.conf",
+              "attributes": [
+                "size",
+                "digest",
+                "mtime"
+              ],
+              "untested": 0,
+              "file_type": "config",
+              "note": ""
+            }
+          ],
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/rpm -Va",
+            "exit_code": 1
+          }
+        },
+        "filter": {
+          "status": "ok",
+          "value": [
+            "config",
+            "doc",
+            "dpkg_excluded",
+            "ghost",
+            "mtime_only",
+            "unverifiable",
+            "unchanged"
+          ],
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/rpm -Va",
+            "exit_code": 1
+          }
+        },
+        "filtered_counts": {
+          "status": "ok",
+          "value": {
+            "config": 1,
+            "doc": 0,
+            "dpkg_excluded": 0,
+            "ghost": 3,
+            "mtime_only": 2,
+            "unverifiable": 0,
+            "unchanged": 0
+          },
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/rpm -Va",
+            "exit_code": 1
+          }
+        },
+        "stats": {
+          "status": "ok",
+          "value": {
+            "lines": 6,
+            "exit_code": 1,
+            "duration_ms": 61840,
+            "truncated": false,
+            "stderr_head": [],
+            "unparsed_head": [],
+            "packages_without_digests": 0,
+            "packages_without_digests_error": "",
+            "dpkg_path_excludes": [],
+            "dpkg_path_excludes_error": []
+          },
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/rpm -Va",
+            "exit_code": 1
+          }
+        }
+      }
+    },
+    "audit": {
+      "rules": {
+        "present": {
+          "runtime": {
+            "status": "ok",
+            "value": false,
+            "source": {
+              "kind": "command",
+              "cmd": "/usr/sbin/auditctl -l",
+              "exit_code": 0
+            }
+          },
+          "persisted": {
+            "status": "ok",
+            "value": false,
+            "source": {
+              "kind": "file",
+              "path": "/etc/audit/rules.d/audit.rules"
+            }
+          },
+          "effective": {
+            "status": "ok",
+            "value": false,
+            "source": {
+              "kind": "command",
+              "cmd": "/usr/sbin/auditctl -l",
+              "exit_code": 0
+            }
+          },
+          "winner": {
+            "kind": "command",
+            "cmd": "/usr/sbin/auditctl -l",
+            "exit_code": 0
+          }
+        },
+        "loaded_count": {
+          "status": "ok",
+          "value": 0,
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/sbin/auditctl -l",
+            "exit_code": 0
+          }
+        },
+        "persisted_count": {
+          "status": "ok",
+          "value": 0,
+          "source": {
+            "kind": "file",
+            "path": "/etc/audit/rules.d/audit.rules"
+          }
+        },
+        "persisted": {
+          "status": "ok",
+          "value": [
+            {
+              "file": "/etc/audit/rules.d/audit.rules",
+              "line": 2,
+              "kind": "control",
+              "key": "",
+              "text": "-D"
+            },
+            {
+              "file": "/etc/audit/rules.d/audit.rules",
+              "line": 6,
+              "kind": "control",
+              "key": "",
+              "text": "-b 8192"
+            },
+            {
+              "file": "/etc/audit/rules.d/audit.rules",
+              "line": 9,
+              "kind": "control",
+              "key": "",
+              "text": "--backlog_wait_time 60000"
+            },
+            {
+              "file": "/etc/audit/rules.d/audit.rules",
+              "line": 12,
+              "kind": "control",
+              "key": "",
+              "text": "-f 1"
+            }
+          ],
+          "source": {
+            "kind": "file",
+            "path": "/etc/audit/rules.d/audit.rules"
+          }
+        }
+      },
+      "immutable": {
+        "runtime": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/sbin/auditctl -s",
+            "exit_code": 0
+          }
+        },
+        "persisted": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "file",
+            "path": "/etc/audit/rules.d/audit.rules"
+          }
+        },
+        "effective": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/sbin/auditctl -s",
+            "exit_code": 0
+          }
+        },
+        "winner": {
+          "kind": "command",
+          "cmd": "/usr/sbin/auditctl -s",
+          "exit_code": 0
+        }
+      },
+      "status": {
+        "enabled": {
+          "status": "ok",
+          "value": 1,
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/sbin/auditctl -s",
+            "exit_code": 0
+          }
+        },
+        "failure": {
+          "status": "ok",
+          "value": 1,
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/sbin/auditctl -s",
+            "exit_code": 0
+          }
+        },
+        "lost": {
+          "status": "ok",
+          "value": 0,
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/sbin/auditctl -s",
+            "exit_code": 0
+          }
+        },
+        "backlog_limit": {
+          "status": "ok",
+          "value": 8192,
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/sbin/auditctl -s",
+            "exit_code": 0
+          }
+        }
+      },
+      "conf": {
+        "log_file": {
+          "status": "ok",
+          "value": "/var/log/audit/audit.log",
+          "source": {
+            "kind": "file",
+            "path": "/etc/audit/auditd.conf"
+          }
+        },
+        "log_group": {
+          "status": "ok",
+          "value": "root",
+          "source": {
+            "kind": "file",
+            "path": "/etc/audit/auditd.conf"
+          }
+        },
+        "max_log_file_action": {
+          "status": "ok",
+          "value": "rotate",
+          "source": {
+            "kind": "file",
+            "path": "/etc/audit/auditd.conf"
+          }
+        },
+        "space_left_action": {
+          "status": "ok",
+          "value": "syslog",
+          "source": {
+            "kind": "file",
+            "path": "/etc/audit/auditd.conf"
+          }
+        },
+        "admin_space_left_action": {
+          "status": "ok",
+          "value": "suspend",
+          "source": {
+            "kind": "file",
+            "path": "/etc/audit/auditd.conf"
+          }
+        },
+        "disk_full_action": {
+          "status": "ok",
+          "value": "suspend",
+          "source": {
+            "kind": "file",
+            "path": "/etc/audit/auditd.conf"
+          }
+        },
+        "disk_error_action": {
+          "status": "ok",
+          "value": "suspend",
+          "source": {
+            "kind": "file",
+            "path": "/etc/audit/auditd.conf"
+          }
+        }
+      },
+      "log_file": {
+        "mode": {
+          "status": "ok",
+          "value": 384,
+          "source": {
+            "kind": "file",
+            "path": "/var/log/audit/audit.log"
+          }
+        },
+        "uid": {
+          "status": "ok",
+          "value": 0,
+          "source": {
+            "kind": "file",
+            "path": "/var/log/audit/audit.log"
+          }
+        },
+        "gid": {
+          "status": "ok",
+          "value": 0,
+          "source": {
+            "kind": "file",
+            "path": "/var/log/audit/audit.log"
+          }
+        },
+        "group": {
+          "status": "ok",
+          "value": "root",
+          "source": {
+            "kind": "file",
+            "path": "/etc/group"
+          }
+        },
+        "group_readable": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "file",
+            "path": "/var/log/audit/audit.log"
+          }
+        },
+        "group_writable": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "file",
+            "path": "/var/log/audit/audit.log"
+          }
+        },
+        "other_readable": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "file",
+            "path": "/var/log/audit/audit.log"
+          }
+        },
+        "other_writable": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "file",
+            "path": "/var/log/audit/audit.log"
+          }
+        },
+        "acl_present": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "file",
+            "path": "/var/log/audit/audit.log"
+          }
+        }
+      },
+      "log_dir": {
+        "mode": {
+          "status": "ok",
+          "value": 448,
+          "source": {
+            "kind": "file",
+            "path": "/var/log/audit"
+          }
+        },
+        "uid": {
+          "status": "ok",
+          "value": 0,
+          "source": {
+            "kind": "file",
+            "path": "/var/log/audit"
+          }
+        },
+        "gid": {
+          "status": "ok",
+          "value": 0,
+          "source": {
+            "kind": "file",
+            "path": "/var/log/audit"
+          }
+        },
+        "group": {
+          "status": "ok",
+          "value": "root",
+          "source": {
+            "kind": "file",
+            "path": "/etc/group"
+          }
+        },
+        "group_readable": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "file",
+            "path": "/var/log/audit"
+          }
+        },
+        "group_writable": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "file",
+            "path": "/var/log/audit"
+          }
+        },
+        "other_readable": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "file",
+            "path": "/var/log/audit"
+          }
+        },
+        "other_writable": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "file",
+            "path": "/var/log/audit"
+          }
+        },
+        "acl_present": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "file",
+            "path": "/var/log/audit"
+          }
+        }
+      }
+    }
+  }
+}

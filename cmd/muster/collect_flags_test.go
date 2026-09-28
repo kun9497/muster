@@ -19,7 +19,7 @@ func TestParseCollectFlagsAcceptsEveryFlag(t *testing.T) {
 	got, err := parseCollectFlags([]string{"--out", p, "--force", "--deep",
 		"--walk-budget", "4m", "--walk-max-entries", "1000",
 		"--walk-exclude", "/data", "--walk-include", "/var/snap",
-		"--timeout", "30m", "--require-root", "--require-complete"})
+		"--verify-timeout", "20m", "--timeout", "30m", "--require-root", "--require-complete"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -28,7 +28,7 @@ func TestParseCollectFlagsAcceptsEveryFlag(t *testing.T) {
 	want := collectOpts{out: p, force: true, deep: true,
 		walkBudget: 4 * time.Minute, walkMaxEntries: 1000,
 		walkExclude: []string{"/data"}, walkInclude: []string{"/var/snap"},
-		timeout: 30 * time.Minute, timeoutGiven: true,
+		verifyTimeout: 20 * time.Minute, timeout: 30 * time.Minute, timeoutGiven: true,
 		requireRoot: true, requireComplete: true, format: "table"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got %+v want %+v", got, want)
@@ -40,9 +40,11 @@ func TestParseCollectFlagsDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// The budget and the entry cap carry their defaults whether or not
-	// --deep was given; --timeout stays zero, which is the collect default.
-	want := collectOpts{format: "table", walkBudget: 10 * time.Minute, walkMaxEntries: 2_000_000}
+	// The budget, the entry cap and the verify timeout carry their defaults
+	// whether or not --deep was given; --timeout stays zero, which is the
+	// collect default.
+	want := collectOpts{format: "table", walkBudget: 10 * time.Minute, walkMaxEntries: 2_000_000,
+		verifyTimeout: 30 * time.Minute}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("defaults %+v want %+v", got, want)
 	}
@@ -60,14 +62,15 @@ func TestParseCollectFlagsListActions(t *testing.T) {
 
 // W-12: a walk with a 10m budget under the 5m global default could only
 // ever end as a deadline, so --deep raises the default --timeout to the
-// budget plus the five minutes the rest of the run has today.
+// budget plus the five minutes the rest of the run has today — and, since
+// J-10, plus the package verification's own timeout.
 func TestDeepRaisesTheDefaultTimeout(t *testing.T) {
 	got, err := parseCollectFlags([]string{"--deep"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := collectOpts{deep: true, walkBudget: 10 * time.Minute, walkMaxEntries: 2_000_000,
-		timeout: 15 * time.Minute, format: "table"}
+		timeout: 45 * time.Minute, verifyTimeout: 30 * time.Minute, format: "table"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got %+v want %+v", got, want)
 	}
@@ -87,7 +90,8 @@ func TestDeepRaisesTheDefaultTimeout(t *testing.T) {
 // that is guaranteed to be killed leaves a half-seen filesystem, which is
 // ERROR(walk_incomplete) for every walk-based control.
 func TestWalkBudgetMustFitTheTimeout(t *testing.T) {
-	got, err := parseCollectFlags([]string{"--deep", "--walk-budget", "1m", "--timeout", "3m"})
+	// --no-verify keeps the 30m verify timeout out of the 3m deadline (J-24).
+	got, err := parseCollectFlags([]string{"--deep", "--no-verify", "--walk-budget", "1m", "--timeout", "3m"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -141,12 +145,69 @@ func TestWalkBudgetMustBePositive(t *testing.T) {
 		})
 	}
 	// The spec refuses a budget ABOVE the deadline, so an equal pair stands.
-	got, err := parseCollectFlags([]string{"--deep", "--walk-budget", "3m", "--timeout", "3m"})
+	got, err := parseCollectFlags([]string{"--deep", "--no-verify", "--walk-budget", "3m", "--timeout", "3m"})
 	if err != nil {
 		t.Fatalf("a budget equal to the deadline is accepted: %v", err)
 	}
 	if got.walkBudget != got.timeout {
 		t.Errorf("got %+v", got)
+	}
+}
+
+// J-10: package verification runs only under --deep, so its two flags follow
+// the walk flags' rules: each needs --deep, the pair is contradictory, the
+// verify timeout joins the derived deadline unless --no-verify drops the
+// verification, and an explicit --timeout it cannot fit inside is refused.
+func TestVerifyFlagsShapeTheDeadline(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		args []string
+		want collectOpts
+	}{
+		{"explicit verify timeout", []string{"--deep", "--verify-timeout", "20m"},
+			collectOpts{deep: true, walkBudget: 10 * time.Minute, walkMaxEntries: 2_000_000,
+				verifyTimeout: 20 * time.Minute, timeout: 35 * time.Minute, format: "table"}},
+		{"default verify timeout", []string{"--deep"},
+			collectOpts{deep: true, walkBudget: 10 * time.Minute, walkMaxEntries: 2_000_000,
+				verifyTimeout: 30 * time.Minute, timeout: 45 * time.Minute, format: "table"}},
+		{"no verify", []string{"--deep", "--no-verify"},
+			collectOpts{deep: true, noVerify: true, walkBudget: 10 * time.Minute, walkMaxEntries: 2_000_000,
+				verifyTimeout: 30 * time.Minute, timeout: 15 * time.Minute, format: "table"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := parseCollectFlags(tc.args)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("got %+v want %+v", got, tc.want)
+			}
+		})
+	}
+	for _, tc := range []struct {
+		name string
+		args []string
+		want []string
+	}{
+		{"verify timeout without deep", []string{"--verify-timeout", "20m"}, []string{"--verify-timeout needs --deep"}},
+		{"no verify without deep", []string{"--no-verify"}, []string{"--no-verify needs --deep"}},
+		{"both flags", []string{"--deep", "--no-verify", "--verify-timeout", "1m"}, []string{"--verify-timeout", "--no-verify"}},
+		{"verify timeout above the deadline", []string{"--deep", "--verify-timeout", "40m", "--timeout", "30m"},
+			[]string{"--verify-timeout", "--timeout", "30m", "pass --no-verify or a smaller --verify-timeout"}},
+		{"zero verify timeout", []string{"--deep", "--verify-timeout", "0s"}, []string{"--verify-timeout must be greater than 0"}},
+		{"bad verify timeout", []string{"--deep", "--verify-timeout", "soon"}, []string{"--verify-timeout"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := parseCollectFlags(tc.args)
+			if err == nil {
+				t.Fatalf("%v was accepted", tc.args)
+			}
+			for _, want := range tc.want {
+				if !strings.Contains(err.Error(), want) {
+					t.Errorf("err %q does not name %q", err, want)
+				}
+			}
+		})
 	}
 }
 

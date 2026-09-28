@@ -88,6 +88,11 @@ var services = []logicalService{
 	// source is active, so every implementation is one logical service.
 	{name: "ntp", units: []unitRef{{"chrony.service", true}, {"chronyd.service", true}, {"systemd-timesyncd.service", true}, {"ntpd.service", true}, {"ntp.service", true}, {"ntpsec.service", true}}},
 	{name: "syslog", units: []unitRef{{"rsyslog.service", true}, {"syslog-ng.service", true}}},
+	// 3C-1 (spec I-6). The audit daemon and the journal uploader: no
+	// super-server, no port (auditd listens only when configured as a
+	// remote-logging server, and journal-upload is a client).
+	{name: "auditd", units: []unitRef{{"auditd.service", true}}},
+	{name: "journal_upload", units: []unitRef{{"systemd-journal-upload.service", true}}},
 	// 2L (Ruling L-8). Three daemons whose CONFIGURATION the ftp, mail and
 	// dns collectors read; these rows answer the other half - whether the
 	// host runs them at all. No template units: probeUnits takes concrete

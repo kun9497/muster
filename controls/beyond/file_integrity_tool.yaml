@@ -1,0 +1,38 @@
+id: muster.beyond.file_integrity_tool
+title_en: A file-integrity tool has a baseline database and a scheduled check
+title_ko: 파일 무결성 도구에 기준 데이터베이스와 예약된 검사가 있다
+description_en: A file-integrity tool records the content, permissions and owners of the system's files in a database and compares the host with it on a schedule, so a replaced binary, an edited configuration file or a new setuid program is reported even when nothing else noticed it. muster models AIDE, the tool both distribution families package (aide(1)). A host with AIDE passes when the database its configuration names (database_in=, or database= on older releases) exists and when at least one schedule will actually run a check — an executable aide script in /etc/cron.daily that CRON_DAILY_RUN in /etc/default/aide does not switch off, a system crontab line that runs aide, or an aide timer that systemctl list-timers shows with a next elapse time. Every schedule muster found, armed or not, is in fim.aide.schedules with the reason a disarmed one will not run. Installing the package does not create the database — aide --init (aideinit on the Debian family) does — so a host where AIDE was just installed still FAILs until the database is initialised. A host with no file-integrity tool FAILs. A host whose only tool is one muster does not model (Tripwire, Samhain, osquery, integrit, a Wazuh or OSSEC agent) reads MANUAL; the evidence the row carries is fim.tool itself, whose reason names each tool found and its path, and fim.other_tools lists them. It is rated 중 because the tool finds a change after the fact rather than preventing it, but without one a quiet replacement of a system file goes unseen. A stock Ubuntu or EL9 install has no tool and no database and reads FAIL. muster does not judge whether the database is recent or what its rules cover; fim.aide.database_modified gives the database's age.
+description_ko: 파일 무결성 도구는 시스템 파일의 내용·권한·소유자를 데이터베이스에 기록해 두고 정해진 일정마다 호스트를 그것과 비교하므로, 교체된 실행 파일, 수정된 설정 파일, 새로 생긴 setuid 프로그램을 다른 무엇도 알아채지 못했을 때에도 보고합니다. muster 는 두 배포판 계열이 모두 패키지로 제공하는 AIDE(aide(1))를 모델링합니다. AIDE 가 있는 호스트는 설정이 가리키는 데이터베이스(database_in=, 이전 릴리스에서는 database=)가 존재하고, 실제로 검사를 실행할 일정이 하나 이상 있을 때 통과합니다. 그 일정은 /etc/default/aide 의 CRON_DAILY_RUN 이 끄지 않은 /etc/cron.daily 의 실행 가능한 aide 스크립트, aide 를 실행하는 시스템 crontab 줄, systemctl list-timers 에 다음 실행 시각이 나오는 aide 타이머입니다. muster 가 찾은 일정은 활성 여부와 관계없이 모두 fim.aide.schedules 에 있으며, 비활성인 일정에는 실행되지 않는 이유가 함께 기록됩니다. 패키지를 설치해도 데이터베이스는 생기지 않으며 aide --init(Debian 계열에서는 aideinit)이 만듭니다. 따라서 AIDE 를 막 설치한 호스트도 데이터베이스를 초기화할 때까지는 FAIL 입니다. 파일 무결성 도구가 없는 호스트는 FAIL 입니다. muster 가 모델링하지 않는 도구(Tripwire, Samhain, osquery, integrit, Wazuh 나 OSSEC 에이전트)만 있는 호스트는 MANUAL 입니다. 이 결과가 담는 증거는 fim.tool 자체이며, 그 사유에 찾은 도구와 경로가 모두 나오고 fim.other_tools 에도 나열됩니다. 도구는 변경을 막는 것이 아니라 사후에 찾아내지만, 도구가 없으면 시스템 파일이 조용히 교체되어도 아무도 모르므로 중요도는 중 입니다. Ubuntu·EL9 기본 설치에는 도구도 데이터베이스도 없으므로 FAIL 입니다. muster 는 데이터베이스가 최신인지나 규칙이 무엇을 다루는지는 판정하지 않으며, 데이터베이스의 수정 시각은 fim.aide.database_modified 에 있습니다.
+category: beyond
+importance: 중
+automation: auto
+references:
+  stig:
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-651010 }
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-651015 }
+    - { benchmark: ubuntu2204, version: V2R9, id: UBTU-22-651010 }
+    - { benchmark: ubuntu2204, version: V2R9, id: UBTU-22-651015 }
+    - { benchmark: ubuntu2204, version: V2R9, id: UBTU-22-651025 }
+    - { benchmark: ubuntu2404, version: V1R6, id: UBTU-24-100100 }
+    - { benchmark: ubuntu2404, version: V1R6, id: UBTU-24-100110 }
+    - { benchmark: ubuntu2404, version: V1R6, id: UBTU-24-100120 }
+  nist_800_53: ["CM-3(5)", "SI-6"]
+requires_facts: ">=1"
+applies_when:
+  - { fact: env.container, op: eq, expected: none }
+absent_means: manual
+mechanisms:
+  - when:
+      - { fact: fim.tool, op: eq, expected: aide }
+    checks:
+      - { fact: fim.aide.database_present, op: eq, expected: true }
+      - { fact: fim.aide.scheduled, op: eq, expected: true }
+  - when:
+      - { fact: fim.tool, op: eq, expected: none }
+    checks:
+      - { fact: fim.tool, op: ne, expected: none }
+remediation:
+  text_en: Install AIDE (apt install aide, or dnf install aide) and initialise its database on a host known to be clean — aideinit on the Debian family, which puts the new database in place; aide --init on EL, then move /var/lib/aide/aide.db.new.gz to /var/lib/aide/aide.db.gz. Then make sure a check runs daily. On Ubuntu 22.04 and Debian /etc/cron.daily/aide runs unless /etc/default/aide sets CRON_DAILY_RUN to something other than yes; Ubuntu 24.04 enables dailyaidecheck.timer; on EL9 run systemctl enable --now aide-check.timer. A database initialised after a compromise records the compromise as the baseline.
+  text_ko: AIDE 를 설치하고(apt install aide 또는 dnf install aide), 깨끗하다고 알려진 상태에서 데이터베이스를 초기화합니다. Debian 계열에서는 새 데이터베이스를 제자리에 두는 aideinit 을, EL 에서는 aide --init 을 실행한 뒤 /var/lib/aide/aide.db.new.gz 를 /var/lib/aide/aide.db.gz 로 옮깁니다. 그다음 매일 검사가 실행되는지 확인합니다. Ubuntu 22.04 와 Debian 에서는 /etc/default/aide 가 CRON_DAILY_RUN 을 yes 가 아닌 값으로 설정하지 않는 한 /etc/cron.daily/aide 가 실행되고, Ubuntu 24.04 는 dailyaidecheck.timer 를 활성화하며, EL9 에서는 systemctl enable --now aide-check.timer 를 실행합니다. 침해 이후에 초기화한 데이터베이스는 침해된 상태를 기준으로 기록합니다.
+  risk: none
+  idempotent: true

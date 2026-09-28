@@ -1,0 +1,47 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none"
+      }
+    },
+    "sudo": {
+      "installed": {
+        "status": "ok",
+        "value": false,
+        "source": {
+          "kind": "derived"
+        }
+      },
+      "log": {
+        "syslog": {
+          "status": "ok",
+          "value": true,
+          "source": {
+            "kind": "derived"
+          }
+        },
+        "logfile": {
+          "status": "ok",
+          "value": "",
+          "source": {
+            "kind": "derived"
+          }
+        }
+      },
+      "defaults": {
+        "scoped_count": {
+          "status": "ok",
+          "value": 0,
+          "source": {
+            "kind": "derived"
+          }
+        }
+      }
+    }
+  }
+}

@@ -257,6 +257,9 @@ func TestEngineKeysFollowEveryClauseListAndEvidence(t *testing.T) {
 		{"a walk key in checks",
 			Control{Checks: []Clause{{Fact: "walk.world_writable", Op: "each"}}},
 			[]string{"walk.complete"}},
+		{"a package verification key in checks",
+			Control{Checks: []Clause{{Fact: "packages.verify.modified", Op: "none"}}},
+			[]string{"packages.verify.complete"}},
 		{"an sshd key in a mechanism, deduplicated across when and checks",
 			Control{Mechanisms: []Mechanism{{
 				When:   ClauseList{{Fact: "sshd.options.permit_root_login", Op: "present"}},

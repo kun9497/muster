@@ -45,7 +45,11 @@ paths = ['''^\.superpowers[/\\]''']
 # The same chain's named.conf.default-zones points its localhost zone at Debian's
 # real, public zone file /etc/bind/db.local; the token the rule sees is "db.local".
 # Allow that exact token only.
-regexes = ['''^snmpd\.local$''', '''^w\.priv$''', '''^conf\.local$''', '''^db\.local$''']
+# The sudo_logging fixture and the sudo reader's test spell an administrator's
+# @include of /etc/sudoers.local — the customary name for a site-local sudoers
+# file, and the C4 case the control reads MANUAL on; the token the rule sees is
+# "sudoers.local". Allow that exact token only.
+regexes = ['''^snmpd\.local$''', '''^w\.priv$''', '''^conf\.local$''', '''^db\.local$''', '''^sudoers\.local$''']
 
 [[rules]]
 id = "private-ipv4-address"

@@ -1,8 +1,8 @@
-muster e5eda50 · controls kisa-unix-2026+2026.09.18 · guide kisa-unix-2026 · host github-runner · collected 2026-09-21T00:36:06Z
-automatic  high 18/10/0  medium 12/8/0  low 3/3/0  (pass/fail/warn)
-manual review 13  ·  undecidable error 0 / n-a 20 / waived 0  ·  facts failed 0  ·  waivers expiring within 30d 0
+muster 81855c8 · controls kisa-unix-2026+2026.09.23 · guide kisa-unix-2026 · host github-runner · collected 2026-09-28T08:17:31Z
+automatic  high 18/12/0  medium 13/9/0  low 3/4/0  (pass/fail/warn)
+manual review 13  ·  undecidable error 0 / n-a 24 / waived 0  ·  facts failed 0  ·  waivers expiring within 30d 0
 KISA 2026 (68 controls): pass 28 fail 13 warn 0 manual 11 n/a 16 error 0 waived 0
-beyond the guide (19 controls): pass 5 fail 8 warn 0 manual 2 n/a 4 error 0 waived 0
+beyond the guide (28 controls): pass 6 fail 12 warn 0 manual 2 n/a 8 error 0 waived 0
 
 FAIL           high   muster.account.cron_permissions                    cron 설정 파일이 0640 이하로 …
     reason: clause does not hold: cron.files each require mode in [0 32 128 160 256 288 384 416]
@@ -107,17 +107,17 @@ FAIL           high   muster.file.syslog_conf_permissions                syslog 
 PASS           high   muster.file.unowned_files                          모든 파일과 디렉터리의 소유자…
 WARN           high   muster.file.world_writable                         예상치 못한 world-writable 파…
     reason: clause does not hold: walk.world_writable each require package_declared eq true
-    walk.world_writable = 544 elements; 521 selected; failing: file:/opt, file:/opt/actionarchivecache, file:/opt/actionarchivecache/actions_cache, file:/opt/actionarchivecache/actions_cache/0057852bfaa89a56745cba8c7296529d2fc…  (/var/lib/dpkg/info)
+    walk.world_writable = 545 elements; 522 selected; failing: file:/opt, file:/opt/actionarchivecache, file:/opt/actionarchivecache/actions_cache, file:/opt/actionarchivecache/actions_cache/0057852bfaa89a56745cba8c7296529d2fc…  (/var/lib/dpkg/info)
     file:/opt: expected true, actual false (fail)
     file:/opt/actionarchivecache: expected true, actual false (fail)
     file:/opt/actionarchivecache/actions_cache: expected true, actual false (fail)
     file:/opt/actionarchivecache/actions_cache/0057852bfaa89a56745cba8c7296529d2fc39830.tar.gz: expected true, actual false (fail)
     file:/opt/actionarchivecache/actions_cache/0400d5f644dc74513175e3cd8d07132dd4860809.tar.gz: expected true, actual false (fail)
-    (+516 more, use --all)
+    (+517 more, use --all)
 WARN           high   muster.patch.security_updates                      캐시된 패키지 메타데이터에 대…
     reason: clause does not hold: patch.metadata_age_s lte 604800
     patch.manager = apt  (/var/lib/dpkg/status)
-    patch.metadata_age_s = 1.134006e+06  (/var/lib/apt/periodic/update-success-stamp)
+    patch.metadata_age_s = 643390  (/var/lib/apt/periodic/update-success-stamp)
     patch.pending_security_count = 0  (/usr/bin/apt-get -s upgrade -o Debug::NoLocking=1)
 PASS           high   muster.service.automount_disabled                  automount 서비스가 활성화되어 …
 NOT_APPLICABLE high   muster.service.dns_version                         네임서버가 벤더가 패치한 수준…
@@ -196,13 +196,13 @@ WARN           low    muster.account.unnecessary_accounts                불필�
     user:uucp: expected not in [lp uucp nuucp], actual uucp (fail)
 WARN           low    muster.file.hidden_entries                         홈 디렉터리 밖의 숨김 파일과 …
     reason: clause does not hold: walk.hidden each require package_declared eq true
-    walk.hidden = 367 elements; 165 selected; failing: file:/etc/.java, file:/etc/skel/.bash_profile, file:/etc/skel/.cargo, file:/etc/skel/.composer, file:/etc/skel/.config, +100 more  (/var/lib/dpkg/info)
+    walk.hidden = 371 elements; 167 selected; failing: file:/etc/.java, file:/etc/skel/.bash_profile, file:/etc/skel/.cargo, file:/etc/skel/.composer, file:/etc/skel/.config, +102 more  (/var/lib/dpkg/info)
     file:/etc/.java: expected true, actual false (fail)
     file:/etc/skel/.bash_profile: expected true, actual false (fail)
     file:/etc/skel/.cargo: expected true, actual false (fail)
     file:/etc/skel/.composer: expected true, actual false (fail)
     file:/etc/skel/.config: expected true, actual false (fail)
-    (+100 more, use --all)
+    (+102 more, use --all)
 PASS           low    muster.file.hosts_lpd_permissions                  /etc/hosts.lpd 가 존재하면 roo…
     reason: absent counts as pass: files.etc_hosts_lpd.uid is absent on this host
 NOT_APPLICABLE low    muster.service.ftp_banner                          FTP 접속 안내 문구가 서비스 소…
@@ -215,7 +215,26 @@ WARN           low    muster.service.login_banner                        로그�
     sshd.banner_file.nonempty = false
 — beyond the guide —
 PASS           high   muster.beyond.aslr_and_link_protection             주소 공간 무작위화가 완전하고 …
+NOT_APPLICABLE high   muster.beyond.audit_rules_loaded                   커널에 감사 규칙이 적재되어 있…
+    reason: applies_when does not hold: services.auditd.installed eq true
+FAIL           high   muster.beyond.auditd_active                        감사 데몬이 설치되어 실행 중이…
+    reason: clause does not hold: services.auditd.installed eq true
+    env.container = none  (/proc/1/comm)
+    services.auditd.installed = false  (/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState auditd.service)
+    services.auditd.active = false  (/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState auditd.service)
+    services.auditd.enabled = false  (/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState auditd.service)
 PASS           high   muster.beyond.bootloader_config_permissions        부트로더 설정 파일을 root 만 …
+FAIL           high   muster.beyond.package_files_unmodified             패키지로 설치된 모든 파일이 패…
+    reason: clause does not hold: packages.verify.modified none where path present
+    env.container = none  (/proc/1/comm)
+    packages.verify.modified = 1 elements; matching: file:/etc/cron.daily/google-chrome  (/usr/bin/dpkg --verify)
+    file:/etc/cron.daily/google-chrome: expected not present, actual /etc/cron.daily/google-chrome (fail)
+NOT_APPLICABLE medium muster.beyond.audit_disk_actions                   감사 로그 저장 공간이 부족해지…
+    reason: applies_when does not hold: services.auditd.installed eq true
+NOT_APPLICABLE medium muster.beyond.audit_immutable                      감사 설정이 지금도, 다음 부팅…
+    reason: applies_when does not hold: services.auditd.installed eq true
+NOT_APPLICABLE medium muster.beyond.audit_log_permissions                감사 로그와 그 디렉터리가 root…
+    reason: applies_when does not hold: services.auditd.installed eq true
 FAIL           medium muster.beyond.bootloader_password                  부팅 메뉴가 부트로더 superuser…
     reason: clause does not hold: boot.grub_password_set eq true
     env.container = none  (/proc/1/comm)
@@ -229,6 +248,10 @@ FAIL           medium muster.beyond.dev_shm_mount_options                /dev/sh
     mounts.points = 9 elements; 1 selected  (/proc/self/mountinfo)
     mounts.points = 9 elements; 1 selected; failing: mount:/dev/shm  (/proc/self/mountinfo)
     mount:/dev/shm: expected noexec, actual [rw nosuid nodev] (fail)
+FAIL           medium muster.beyond.file_integrity_tool                  파일 무결성 도구에 기준 데이터…
+    reason: clause does not hold: fim.tool ne none
+    env.container = none  (/proc/1/comm)
+    fim.tool = none
 PASS           medium muster.beyond.kernel_pointer_exposure              커널이 포인터와 메시지 버퍼를 …
 PASS           medium muster.beyond.ptrace_restriction                   한 프로세스가 자신이 띄우지 않…
 FAIL           medium muster.beyond.secure_boot_enabled                  UEFI 보안 부팅이 적용되고 있다
@@ -246,6 +269,7 @@ WARN           medium muster.beyond.separate_partitions                  사용�
     mount:/var/tmp: expected true, actual false (fail)
     mount:/var/log: expected true, actual false (fail)
     (+1 more, use --all)
+PASS           medium muster.beyond.sudo_logging                         sudo 가 실행하는 모든 명령을 s…
 FAIL           medium muster.beyond.suid_dumpable_disabled               권한이 바뀐 프로그램은 코어를 …
     reason: clause does not hold: coredump.suid_dumpable eq 0
     env.container = none  (/proc/1/comm)
@@ -269,6 +293,11 @@ NOT_APPLICABLE medium muster.beyond.var_tmp_mount_options                /var/tm
     reason: no mechanism applies to this host
 NOT_APPLICABLE low    muster.beyond.home_mount_options                   /home 이 nodev 와 nosuid 로 마…
     reason: no mechanism applies to this host
+FAIL           low    muster.beyond.remote_log_forwarding                로그 메시지가 기록되는 즉시 다…
+    reason: clause does not hold: logging.rsyslog.forwards_remote eq true
+    env.container = none  (/proc/1/comm)
+    logging.rsyslog.forwards_remote = false
+    logging.journal_upload.url = 
 FAIL           low    muster.beyond.uncommon_filesystems_disabled        서버에 필요 없는 파일 시스템 …
     reason: clause does not hold: kernel.modules each require disabled eq true
     env.container = none  (/proc/1/comm)

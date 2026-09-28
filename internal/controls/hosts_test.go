@@ -17,13 +17,15 @@ import (
 // mutation test and `controls lint` never see them.
 const hostRoot = fixtureRoot + "/_hosts"
 
-// stockUbuntu2204 is the verdict table of spec §5 (B-10): what a stock Ubuntu
-// 22.04 host — BIOS, a plain swap file, no separate /tmp or /var, sysrq 176,
-// suid_dumpable 2, apport's core pattern, the distribution's blacklists only —
-// reads for the nineteen controls beyond the guide. The snapshot beside it
-// carries that host's facts; a verdict that moves is a defect in the control
-// or in the collector shape the snapshot copies, and this table is what
-// decides which.
+// stockUbuntu2204 is the verdict table of spec §5 (B-10) and of the 3C-1
+// spec §4: what a stock Ubuntu 22.04 host — BIOS, a plain swap file, no
+// separate /tmp or /var, sysrq 176, suid_dumpable 2, apport's core pattern,
+// the distribution's blacklists only, no auditd, no AIDE, rsyslog writing
+// locally, sudo's compiled-in syslog, and `--deep` finding only the two
+// conffiles the installer rewrites — reads for the controls beyond the
+// guide. The snapshot beside it carries that host's facts; a verdict that
+// moves is a defect in the control or in the collector shape the snapshot
+// copies, and this table is what decides which.
 var stockUbuntu2204 = map[string]check.Status{
 	"muster.beyond.kernel_pointer_exposure":             check.PASS,          // 1: kptr 1, dmesg 1
 	"muster.beyond.ptrace_restriction":                  check.PASS,          // 2: yama 1, perf 4
@@ -44,21 +46,54 @@ var stockUbuntu2204 = map[string]check.Status{
 	"muster.beyond.uncommon_filesystems_disabled":       check.FAIL,          // 17: six modules loadable
 	"muster.beyond.usb_storage_disabled":                check.FAIL,          // 18: loadable
 	"muster.beyond.uncommon_network_protocols_disabled": check.FAIL,          // 19: four modules loadable
+	"muster.beyond.auditd_active":                       check.FAIL,          // 3C-1: no auditd
+	"muster.beyond.audit_rules_loaded":                  check.NotApplicable, // 3C-1: gate, auditd not installed
+	"muster.beyond.audit_immutable":                     check.NotApplicable, // 3C-1: gate
+	"muster.beyond.audit_disk_actions":                  check.NotApplicable, // 3C-1: gate
+	"muster.beyond.audit_log_permissions":               check.NotApplicable, // 3C-1: gate
+	"muster.beyond.remote_log_forwarding":               check.FAIL,          // 3C-1: nothing leaves the host
+	"muster.beyond.sudo_logging":                        check.PASS,          // 3C-1: sudo's default syslog
+	"muster.beyond.file_integrity_tool":                 check.FAIL,          // 3C-1: no tool
+	"muster.beyond.package_files_unmodified":            check.PASS,          // 3C-1: --deep, only conffiles differ
 }
 
-// B-11: one synthetic snapshot of the stock host pins all nineteen verdicts at
-// once. A per-control fixture proves a clause; only a whole-host snapshot
-// proves that the nineteen together say what the spec predicts a real stock
+// stockEL9 is the 3C-1 spec's EL9 reading (§4): a stock Rocky 9 install —
+// auditd installed, enabled and running with the shipped rules.d/audit.rules,
+// which carries control lines only (auditctl -l says "No rules"), no -e 2,
+// upstream auditd.conf (syslog at space_left, suspend at admin_space_left,
+// disk_full and disk_error), the 0700 log directory and 0600 log, no AIDE,
+// rsyslog writing locally, sudo's default syslog, and rpm -Va finding only
+// the installer's chrony.conf among the files rpm tracks. The snapshot
+// carries env, the header and the 3C-1 facts only, so the table names the
+// nine 3C-1 controls and nothing else.
+var stockEL9 = map[string]check.Status{
+	"muster.beyond.auditd_active":            check.PASS, // installed, active, enabled
+	"muster.beyond.audit_rules_loaded":       check.FAIL, // No rules; rules.d has control lines only
+	"muster.beyond.audit_immutable":          check.FAIL, // enabled 1, no -e 2
+	"muster.beyond.audit_disk_actions":       check.FAIL, // upstream suspend ×3
+	"muster.beyond.audit_log_permissions":    check.PASS, // 0600 root in 0700 root
+	"muster.beyond.remote_log_forwarding":    check.FAIL, // nothing leaves the host
+	"muster.beyond.sudo_logging":             check.PASS, // sudo's default syslog
+	"muster.beyond.file_integrity_tool":      check.FAIL, // no AIDE on a stock install
+	"muster.beyond.package_files_unmodified": check.PASS, // --deep, only a conffile differs
+}
+
+// B-11 and I-10: one synthetic snapshot per stock host pins its verdicts
+// at once. A per-control fixture proves a clause; only a whole-host snapshot
+// proves that the controls together say what the spec predicts a real stock
 // host says, which is what the lab run is compared against.
 //
-// SCOPE: the snapshot carries the facts of the six collectors of plan 3B and
-// env.container, and nothing else. The other 68 controls are evaluated with it
-// — Evaluate takes the whole embedded set, and running only nineteen of them
-// would not prove that the beyond scope is reached at all — but their results
-// are ERROR(missing_fact) for the keys the snapshot omits and are deliberately
-// not asserted. The one thing asserted about them is that they are not in the
-// beyond scope, by the count check below.
-func TestStockUbuntu2204PinsTheNineteenBeyondVerdicts(t *testing.T) {
+// SCOPE: the Ubuntu snapshot carries the facts of the collectors the beyond
+// controls read and env.container, and nothing else; the EL9 snapshot
+// carries only the 3C-1 facts. The whole embedded set is evaluated against
+// each — Evaluate takes the whole set, and running only the tabled controls
+// would not prove that the beyond scope is reached at all — but the other
+// controls' results are ERROR(missing_fact) for the keys a snapshot omits
+// and are deliberately not asserted: the guide controls on both snapshots,
+// and on the EL9 one the 3B controls as well. What is asserted is that the
+// Ubuntu table names every control beyond the guide, and that no tabled
+// control reads ERROR.
+func TestStockHostsPinTheBeyondVerdicts(t *testing.T) {
 	set, err := controls.LoadDefault()
 	if err != nil {
 		t.Fatal(err)
@@ -67,17 +102,10 @@ func TestStockUbuntu2204PinsTheNineteenBeyondVerdicts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	snap, _ := loadFixture(t, filepath.Join(hostRoot, "ubuntu-22.04-stock.json"))
 
-	results := check.Evaluate(snap, set, reg, check.Options{})
-	got := make(map[string]check.Result, len(results))
-	for _, r := range results {
-		got[r.ID] = r
-	}
-
-	// Every beyond control of the set is in the table and every table row is a
-	// control of the set: a twentieth control beyond the guide has to state
-	// what this host reads for it rather than slip past unasserted.
+	// Every beyond control of the set is in the Ubuntu table and every table
+	// row is a control of the set: a new control beyond the guide has to
+	// state what this host reads for it rather than slip past unasserted.
 	var beyond []string
 	for _, c := range set.Controls {
 		if c.Category == "beyond" {
@@ -86,32 +114,51 @@ func TestStockUbuntu2204PinsTheNineteenBeyondVerdicts(t *testing.T) {
 	}
 	sort.Strings(beyond)
 	if len(beyond) != len(stockUbuntu2204) {
-		t.Errorf("the set has %d controls beyond the guide, the stock table names %d: %s",
+		t.Errorf("the set has %d controls beyond the guide, the stock Ubuntu table names %d: %s",
 			len(beyond), len(stockUbuntu2204), strings.Join(beyond, " "))
 	}
 	for _, id := range beyond {
 		if _, ok := stockUbuntu2204[id]; !ok {
-			t.Errorf("%s is beyond the guide and the stock table does not say what this host reads for it", id)
+			t.Errorf("%s is beyond the guide and the stock Ubuntu table does not say what this host reads for it", id)
 		}
 	}
+	if len(stockEL9) != 9 {
+		t.Errorf("the stock EL9 table names %d controls, want the nine of 3C-1", len(stockEL9))
+	}
 
-	for _, id := range sortedKeys(stockUbuntu2204) {
-		want := stockUbuntu2204[id]
-		r, ok := got[id]
-		if !ok {
-			t.Errorf("%s: the set has no such control", id)
-			continue
-		}
-		if r.Status != want {
-			t.Errorf("%s: %s (%s: %s), want %s", id, r.Status, r.ReasonCode, r.Reason, want)
-		}
-		// B-10 again, as its own assertion: a beyond control that cannot be
-		// decided on a host whose facts are all ok is a collector or control
-		// defect, and reading the table alone would hide it behind the status
-		// it happened to expect.
-		if r.Status == check.ERROR {
-			t.Errorf("%s: ERROR (%s: %s) on a stock host every fact of which was collected", id, r.ReasonCode, r.Reason)
-		}
+	for _, host := range []struct {
+		file  string
+		table map[string]check.Status
+	}{
+		{"ubuntu-22.04-stock.json", stockUbuntu2204},
+		{"el9-stock.json", stockEL9},
+	} {
+		t.Run(host.file, func(t *testing.T) {
+			snap, _ := loadFixture(t, filepath.Join(hostRoot, host.file))
+			results := check.Evaluate(snap, set, reg, check.Options{})
+			got := make(map[string]check.Result, len(results))
+			for _, r := range results {
+				got[r.ID] = r
+			}
+			for _, id := range sortedKeys(host.table) {
+				want := host.table[id]
+				r, ok := got[id]
+				if !ok {
+					t.Errorf("%s: the set has no such control", id)
+					continue
+				}
+				if r.Status != want {
+					t.Errorf("%s: %s (%s: %s), want %s", id, r.Status, r.ReasonCode, r.Reason, want)
+				}
+				// B-10 again, as its own assertion: a tabled control that
+				// cannot be decided on a host whose facts are all ok is a
+				// collector or control defect, and reading the table alone
+				// would hide it behind the status it happened to expect.
+				if r.Status == check.ERROR {
+					t.Errorf("%s: ERROR (%s: %s) on a stock host every fact of which was collected", id, r.ReasonCode, r.Reason)
+				}
+			}
+		})
 	}
 }
 

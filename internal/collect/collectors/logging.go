@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"io/fs"
+	"net/netip"
 	"path"
 	"slices"
 	"sort"
@@ -58,12 +59,31 @@ var (
 	}
 )
 
+// The journal-upload chain (spec I-6): the same two main-file locations and
+// four drop-in directories journald uses, in the same precedence.
+var (
+	journalUploadMains      = []string{"/etc/systemd/journal-upload.conf", "/usr/lib/systemd/journal-upload.conf"}
+	journalUploadDropinDirs = []string{
+		"/etc/systemd/journal-upload.conf.d",
+		"/run/systemd/journal-upload.conf.d",
+		"/usr/local/lib/systemd/journal-upload.conf.d",
+		"/usr/lib/systemd/journal-upload.conf.d",
+	}
+)
+
+// rsyslogRemoteCap bounds logging.rsyslog.remote_targets (J-16).
+const rsyslogRemoteCap = 256
+
 func loggingReads() []string {
 	reads := []string{rsyslogConf, rsyslogDGlob, syslogNgConf, systemdMarker, varLogGlob, varLogSubGlob}
 	reads = append(reads, rsyslogBins...)
 	reads = append(reads, syslogNgBins...)
 	reads = append(reads, journaldMains...)
 	for _, d := range journaldDropinDirs {
+		reads = append(reads, path.Join(d, journaldGlob))
+	}
+	reads = append(reads, journalUploadMains...)
+	for _, d := range journalUploadDropinDirs {
 		reads = append(reads, path.Join(d, journaldGlob))
 	}
 	return reads
@@ -101,11 +121,14 @@ func runLogging(_ context.Context, a collect.Access, b *collect.Builder) error {
 	// syslog daemon at once, and an unreadable rsyslog.conf says nothing
 	// about the journal.
 	journaldFacts(a, b)
+	journalUploadFacts(a, b)
 
 	if sys.readErr != nil {
 		for _, k := range rsyslogLeafKeys {
 			b.Set(k, *sys.readErr)
 		}
+		b.Set("logging.rsyslog.forwards_remote", *sys.readErr)
+		b.Set("logging.rsyslog.remote_targets", *sys.readErr)
 		return nil
 	}
 	if sys.impl != "rsyslog" {
@@ -113,6 +136,7 @@ func runLogging(_ context.Context, a collect.Access, b *collect.Builder) error {
 		for _, k := range rsyslogLeafKeys {
 			b.Set(k, deg)
 		}
+		noRsyslogForwarding(b, sys.impl)
 		return nil
 	}
 
@@ -138,7 +162,132 @@ func runLogging(_ context.Context, a collect.Access, b *collect.Builder) error {
 		set("logging.rsyslog.coverage", rsyslogCoverage(s.rules))
 	}
 	set("logging.log_targets", s.logTargets(a, collectedAt(b)))
+	targets, forwards := rsyslogRemoteTargets(s.rules)
+	capped, cut := capRows(targets, rsyslogRemoteCap)
+	b.Set("logging.rsyslog.remote_targets", withTruncation(collect.OK(capped, src()), s.truncated || cut))
+	if !forwards && len(s.incomplete) > 0 {
+		// An include this run could not follow may hold the forward: with
+		// none parsed, there is no answer (a parsed one is still true).
+		b.Set("logging.rsyslog.forwards_remote", collect.Absent("rsyslog configuration not fully parsed; a forward may be hidden"))
+	} else {
+		set("logging.rsyslog.forwards_remote", forwards)
+	}
 	return nil
+}
+
+// noRsyslogForwarding answers the two forwarding leaves on a host whose
+// logger is not rsyslog (spec I-6): with journald alone nothing forwards, so
+// that is a fact; syslog-ng's dialect and the unmodelled daemons (sysklogd,
+// BusyBox) cannot be read, so there is no answer.
+func noRsyslogForwarding(b *collect.Builder, impl string) {
+	var e facts.Envelope
+	switch impl {
+	case "journald-only":
+		src := func() *facts.Source {
+			return &facts.Source{Kind: "derived", Inputs: []facts.Source{{Kind: "file", Path: systemdMarker}}}
+		}
+		b.Set("logging.rsyslog.forwards_remote", collect.OK(false, src()))
+		b.Set("logging.rsyslog.remote_targets", collect.OK([]any{}, src()))
+		return
+	case "syslog-ng":
+		e = collect.Absent("syslog-ng is not modelled")
+	default:
+		e = collect.Absent("no modelled syslog daemon")
+	}
+	b.Set("logging.rsyslog.forwards_remote", e)
+	b.Set("logging.rsyslog.remote_targets", e)
+}
+
+// rsyslogRemoteTargets lists the remote actions once per action line — the
+// parser expands a selector into one rule per facility, so `*.* @@host` is a
+// dozen rules and one row — in rule order, and says whether any of them
+// leaves the host.
+func rsyslogRemoteTargets(rules []rsyslogRule) ([]any, bool) {
+	rows := []any{}
+	seen := map[[2]string]bool{}
+	forwards := false
+	for _, r := range rules {
+		k := [2]string{r.line, r.target}
+		if r.kind != "remote" || seen[k] {
+			continue
+		}
+		seen[k] = true
+		lb := loopbackTarget(r.target)
+		forwards = forwards || !lb
+		rows = append(rows, map[string]any{"rule": r.line, "target": r.target, "loopback": lb})
+	}
+	return rows, forwards
+}
+
+// loopbackNames are the loopback host names Debian's and EL's /etc/hosts
+// define: localhost and its IPv6 and domain spellings.
+var loopbackNames = []string{"localhost", "localhost.localdomain", "localhost6", "ip6-localhost", "ip6-loopback"}
+
+// loopbackTarget reports whether a remote action's host is this host
+// (127.0.0.0/8, ::1, one of loopbackNames): a relay into a local shipper leaves nothing
+// by itself. The target is as the parser kept it — a legacy @ or @@ prefix,
+// an (o,z9) option group, a [v6] literal, a :port, or omfwd's target with
+// ":"+port appended, which for a bare IPv6 literal makes the last group
+// ambiguous, so both readings are tried.
+func loopbackTarget(target string) bool {
+	t := strings.TrimSpace(target)
+	t = strings.TrimPrefix(strings.TrimPrefix(t, "@"), "@")
+	if strings.HasPrefix(t, "(") {
+		if i := strings.IndexByte(t, ')'); i >= 0 {
+			t = t[i+1:]
+		}
+	}
+	var hosts []string
+	switch {
+	case strings.HasPrefix(t, "["):
+		if i := strings.IndexByte(t, ']'); i >= 0 {
+			hosts = append(hosts, t[1:i])
+		}
+	case strings.Count(t, ":") > 1:
+		hosts = append(hosts, t)
+		if i := strings.LastIndexByte(t, ':'); i >= 0 {
+			hosts = append(hosts, t[:i])
+		}
+	default:
+		h, _, _ := strings.Cut(t, ":")
+		hosts = append(hosts, h)
+	}
+	for _, h := range hosts {
+		if slices.ContainsFunc(loopbackNames, func(n string) bool { return strings.EqualFold(h, n) }) {
+			return true
+		}
+		if addr, err := netip.ParseAddr(h); err == nil && addr.Unmap().IsLoopback() {
+			return true
+		}
+	}
+	return false
+}
+
+// journalUploadFacts writes logging.journal_upload.url: the [Upload] URL= of
+// the merged journal-upload chain, last wins, kept as written — no file is
+// no URL, a fact and not a default.
+func journalUploadFacts(a collect.Access, b *collect.Builder) {
+	if !pathPresent(a, systemdMarker) {
+		b.Set("logging.journal_upload.url", collect.Unsupported("no systemd journald on this host"))
+		return
+	}
+	values, inputs, err := mergeDropins(a, journalUploadMain(a), journalUploadDropinDirs, journaldGlob)
+	if err != nil {
+		b.Set("logging.journal_upload.url", dropinEnvelope(err))
+		return
+	}
+	b.Set("logging.journal_upload.url", collect.OK(values["Upload/URL"], &facts.Source{Kind: "derived", Inputs: inputs}))
+}
+
+// journalUploadMain is the main journal-upload.conf this host has, the /etc
+// copy before the vendor one, as journaldMain chooses.
+func journalUploadMain(a collect.Access) string {
+	for _, p := range journalUploadMains {
+		if pathPresent(a, p) {
+			return p
+		}
+	}
+	return journalUploadMains[0]
 }
 
 // syslogSetup is what this host's files say about which logger it runs: the

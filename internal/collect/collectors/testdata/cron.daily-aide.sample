@@ -1,0 +1,81 @@
+#!/bin/bash
+#
+# ...
+if ! [ -f "/usr/bin/aide" ] && ! [ -f "/usr/sbin/aide" ]; then
+    exit 0
+fi
+
+# default variables
+
+PATH="/sbin:/usr/sbin:/bin:/usr/bin"
+LOGDIR="/var/log/aide"
+# LOGFILE: /var/log/aide/aide.log - all logs untruncated (not temp)
+LOGFILE="$LOGDIR/aide.log"
+PREFIX="aide"
+LOCKBASE="/run/aide"
+LOCKFILE="$LOCKBASE/cron.daily.lock"
+
+TMPBASE="/var/tmp"
+if ! [ -d "${TMPBASE}" ]; then
+    TMPBASE="/run/aide"
+fi
+TMPDIRIN="$TMPBASE/aide.cron.daily"
+
+USE_SAVELOG=""
+if command -v savelog > /dev/null; then
+    USE_SAVELOG="1"
+fi
+
+AIDEARGS="-V4"
+MAILSUBJ="Daily AIDE report for $FQDN"
+
+BEGINSTAMP="$(date +"%Y-%m-%d %H:%M:%S")"
+
+# make sure $LOCKBASE exists
+
+if ! [ -d "$LOCKBASE" ]; then
+    mkdir -p $LOCKBASE
+    chown root:root $LOCKBASE
+    chmod 600 $LOCKBASE
+fi
+
+# have /etc/default/aide override variables
+
+if [ -f "/etc/default/aide" ]; then
+    #shellcheck disable=1091
+    . "/etc/default/aide"
+fi
+
+# from here on, we're going to bail on unbound variables
+
+set -u
+
+# umask
+
+umask 077
+
+# grep aide configuration data from aide config
+
+DATABASE="$(< "${CONFIG}" grep "^database_in[[:space:]]*=[[:space:]]*file:/" | head -n 1 | cut --delimiter=: --fields=2)"
+DATABASE_OUT="$(< "${CONFIG}" grep "^database_out[[:space:]]*=[[:space:]]*file:/" | head -n 1 | cut --delimiter=: --fields=2)"
+
+< "${CONFIG}" grep -qE "^(report_)?grouped[[:space:]]*=[[:space:]]*(no|false)[[:space:]]*$" && GROUPED="false" || GROUPED="true"
+
+# default values
+
+CRON_DAILY_RUN="${CRON_DAILY_RUN:-yes}"
+MAILTO="${MAILTO:-root}"
+eval MAILTO="$MAILTO"
+MAILWIDTH="${MAILWIDTH:-990}"
+DATABASE="${DATABASE:-/var/lib/aide/aide.db}"
+LINES="${LINES:-1000}"
+COMMAND="${COMMAND:-check}"
+COPYNEWDB="${COPYNEWDB:-no}"
+QUIETREPORTS="${QUIETREPORTS:-no}"
+SILENTREPORTS="${SILENTREPORTS:-no}"
+TRUNCATEDETAILS="${TRUNCATEDETAILS:-no}"
+FILTERUPDATES="${FILTERUPDATES:-no}"
+# ...
+if [ "$CRON_DAILY_RUN" != "yes" ] && ! tty -s; then
+    exit 0
+fi

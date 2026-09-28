@@ -51,6 +51,9 @@ func init() {
 	collect.Register(mailCollector)
 	collect.Register(dnsCollector)
 	collect.Register(patchCollector)
+	collect.Register(pkgverifyCollector)
+	collect.Register(auditCollector)
+	collect.Register(fimCollector)
 	collect.Register(sysctlCollector)
 	collect.Register(coredumpCollector)
 	collect.Register(bootCollector)
@@ -201,4 +204,15 @@ func intField(s string) int {
 		return -1
 	}
 	return n
+}
+
+// capRows bounds a published list at limit rows (J-16) and says whether it
+// cut any. The caller marks the envelope through withTruncation and carries
+// on: a full list never stops a collector, and truncated tells the reader
+// the silence past the cap means nothing.
+func capRows(rows []any, limit int) ([]any, bool) {
+	if len(rows) <= limit {
+		return rows, false
+	}
+	return rows[:limit], true
 }

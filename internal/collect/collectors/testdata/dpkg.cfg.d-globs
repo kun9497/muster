@@ -1,0 +1,4 @@
+# synthetic: exercises dpkg's own glob semantics (fnmatch without FNM_PATHNAME).
+path-exclude /opt/vendor/*.bak
+path-exclude = "/srv/cache/?/tmp[0-9]"
+path-include=/opt/vendor/keep/*

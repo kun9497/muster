@@ -1,0 +1,35 @@
+id: muster.beyond.remote_log_forwarding
+title_en: Log messages are forwarded to another host as they are written
+title_ko: 로그 메시지가 기록되는 즉시 다른 호스트로 전달된다
+description_en: A log kept only on the host it describes can be edited by whoever takes that host — root there can delete the lines that show how it was taken — and a failed disk takes the record down with the host. Forwarding each message as it is written puts a copy out of that reach. muster accepts either of two senders. An rsyslog action whose target is another host — @host (UDP), @@host (TCP), :omfwd:, and action(type="omfwd"), the forms rsyslog.conf(5) documents — counts when the syslog service is running. A target on 127.0.0.0/8, ::1, localhost or one of the loopback names Debian's and EL's /etc/hosts give (localhost.localdomain, localhost6, ip6-localhost, ip6-loopback) is a relay into a local shipper and leaves nothing by itself, so it does not count; it stays in logging.rsyslog.remote_targets as evidence. A URL= in the [Upload] section of journal-upload.conf(5) counts when systemd-journal-upload.service is both active and enabled — an enabled unit that failed at boot ships nothing, and a unit started by hand is gone after the next boot. A host where neither holds FAILs, because nothing leaves it. An rsyslog forward is judged first, so a host that configures one while rsyslog is stopped reads FAIL even when journal-upload is running. On a host without systemd the syslog unit's state is unsupported, so an rsyslog forward configured there reads NOT_APPLICABLE, because muster cannot see whether the sender runs; such a host whose configuration forwards nothing reads FAIL like any other. It is rated 하 because forwarding keeps the record of an attack rather than stopping one, and a host that forwards nothing is no easier to break into. A stock Ubuntu or EL9 host forwards nothing and reads FAIL. A host whose logger is syslog-ng, sysklogd or BusyBox syslogd reads MANUAL, because muster does not parse those dialects and cannot say whether they forward; so does an rsyslog host whose configuration muster could not fully parse and that forwards nowhere in what it did parse, because an include it could not follow may hold the forward. muster judges that a sender is configured and running, not that the receiving host accepts and keeps the messages or that the transport is encrypted.
+description_ko: 해당 호스트에만 보관되는 로그는 그 호스트를 장악한 사람이 고칠 수 있고(그곳의 root 는 어떻게 장악했는지 보여 주는 줄을 지울 수 있습니다), 디스크가 고장 나면 기록도 호스트와 함께 사라집니다. 메시지가 기록되는 즉시 전달하면 그 손이 닿지 않는 곳에 사본이 남습니다. muster 는 두 가지 전송 방식 중 하나를 인정합니다. 대상이 다른 호스트인 rsyslog 액션(rsyslog.conf(5) 가 문서화한 @host(UDP), @@host(TCP), :omfwd:, action(type="omfwd"))은 syslog 서비스가 실행 중일 때 인정합니다. 127.0.0.0/8, ::1, localhost, 또는 Debian·EL 의 /etc/hosts 가 주는 루프백 이름(localhost.localdomain, localhost6, ip6-localhost, ip6-loopback)을 대상으로 하는 액션은 로컬 전송기로 넘기는 중계일 뿐 그 자체로는 아무것도 내보내지 않으므로 인정하지 않으며, 증거로 logging.rsyslog.remote_targets 에 남습니다. journal-upload.conf(5) 의 [Upload] 절에 있는 URL= 은 systemd-journal-upload.service 가 실행 중이면서 활성화(enabled)되어 있을 때 인정합니다. 활성화되었지만 부팅 때 실패한 유닛은 아무것도 보내지 않고, 수동으로 시작한 유닛은 다음 부팅 뒤에 사라지기 때문입니다. 둘 다 해당하지 않는 호스트는 아무것도 밖으로 나가지 않으므로 FAIL 입니다. rsyslog 전달을 먼저 판정하므로, 전달을 설정했지만 rsyslog 가 멈춘 호스트는 journal-upload 가 실행 중이어도 FAIL 입니다. systemd 가 없는 호스트에서는 syslog 유닛의 상태가 unsupported 이므로, 그곳에 설정된 rsyslog 전달은 전송기가 실행 중인지 muster 가 볼 수 없어 NOT_APPLICABLE 이고, 아무것도 전달하지 않도록 설정된 그런 호스트는 다른 호스트와 마찬가지로 FAIL 입니다. 전달은 공격을 막는 것이 아니라 공격의 기록을 지키는 것이고, 아무것도 전달하지 않는 호스트라서 더 쉽게 침입당하는 것은 아니므로 중요도는 하 입니다. Ubuntu·EL9 기본 설치는 아무것도 전달하지 않으므로 FAIL 입니다. 로거가 syslog-ng, sysklogd, BusyBox syslogd 인 호스트는 muster 가 그 문법을 해석하지 않아 전달 여부를 말할 수 없으므로 MANUAL 입니다. rsyslog 설정을 끝까지 해석하지 못했고 해석한 부분에는 원격 전달이 없는 호스트도 MANUAL 입니다. 따라가지 못한 include 에 전달 설정이 있을 수 있기 때문입니다. muster 는 전송기가 설정되어 실행 중인지를 판정할 뿐, 받는 호스트가 메시지를 받아 보관하는지나 전송이 암호화되는지는 판정하지 않습니다.
+category: beyond
+importance: 하
+automation: auto
+references:
+  stig:
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-652055 }
+  nist_800_53: ["AU-4(1)"]
+requires_facts: ">=1"
+applies_when:
+  - { fact: env.container, op: eq, expected: none }
+absent_means: manual
+mechanisms:
+  - when:
+      - { fact: logging.rsyslog.forwards_remote, op: eq, expected: true }
+    checks:
+      - { fact: services.syslog.active, op: eq, expected: true }
+  - when:
+      - { fact: logging.journal_upload.url, op: ne, expected: "" }
+    checks:
+      - { fact: services.journal_upload.active, op: eq, expected: true }
+      - { fact: services.journal_upload.enabled, op: eq, expected: true }
+  - when:
+      - { fact: logging.rsyslog.forwards_remote, op: eq, expected: false }
+    checks:
+      - { fact: logging.rsyslog.forwards_remote, op: eq, expected: true }
+remediation:
+  text_en: Add a forwarding action to a file under /etc/rsyslog.d/ — for example *.* @@logs.example.com:514, or action(type="omfwd" target="logs.example.com" port="514" protocol="tcp") — and restart rsyslog; or install systemd-journal-upload, set URL= under [Upload] in /etc/systemd/journal-upload.conf and run systemctl enable --now systemd-journal-upload.service. Make sure the receiving host accepts and stores the messages first. Restarting the logger can drop the messages sent while it restarts.
+  text_ko: /etc/rsyslog.d/ 아래 파일에 전달 액션(예 *.* @@logs.example.com:514, 또는 action(type="omfwd" target="logs.example.com" port="514" protocol="tcp"))을 추가하고 rsyslog 를 재시작하거나, systemd-journal-upload 를 설치하고 /etc/systemd/journal-upload.conf 의 [Upload] 에 URL= 을 설정한 뒤 systemctl enable --now systemd-journal-upload.service 를 실행합니다. 받는 호스트가 메시지를 받아 저장하는지 먼저 확인하십시오. 로거를 재시작하는 동안 보낸 메시지는 유실될 수 있습니다.
+  risk: restart_service
+  idempotent: true

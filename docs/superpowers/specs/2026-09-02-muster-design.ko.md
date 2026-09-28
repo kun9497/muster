@@ -305,13 +305,13 @@ checks:
 | 2 | `applies_when`이 참조한 팩트가 `missing`, `denied`, `timeout`, `error`, `truncated` | 해당 팩트를 명시한 `ERROR` |
 | 3 | `applies_when`이 참조한 팩트가 `absent`나 `unsupported`이거나, `applies_when`이 거짓으로 평가됨 | 근거를 붙인 `NOT_APPLICABLE` |
 | 4 | `automation: manual` | 수집한 근거와 함께 `MANUAL`. 따라서 `applies_when`이 성립하지 않는 manual 컨트롤은 영구적인 `MANUAL` 줄이 아니라 `NOT_APPLICABLE`입니다 |
-| 5 | `mechanisms`를 쓰는데 후보 팩트가 모두 `absent`나 `unsupported`여서 성립하는 `when`이 없음 | `absent_means`에 따름(`pass`, `fail`, `not_applicable`, `manual`) |
+| 5 | `mechanisms`를 쓰는데 모든 후보 팩트가 `absent`나 `unsupported`이거나 모든 `when`이 false로 평가되어 성립하는 `when`이 없음 | `absent_means`에 따름(`pass`, `fail`, `not_applicable`, `manual`) |
 | 6 | 선택된 `checks`가 참조한 팩트가 `missing`, `denied`, `timeout`, `error`, `truncated` | 권한, 한도, 키를 명시한 `ERROR` |
 | 7 | 선택된 `checks`가 참조한 팩트가 `unsupported` | 환경을 명시한 `NOT_APPLICABLE` |
 | 8 | 선택된 `checks`가 참조한 팩트가 `absent` | `absent_means`에 따름 |
-| 9 | 워크 기반 컨트롤인데 워크를 실행하지 않음 | `MANUAL`("collect --deep을 실행하십시오") |
-| 10 | 워크 기반 컨트롤인데 `walk.complete`가 false | `ERROR(walk_incomplete)` |
-| 10a | 워크 기반 컨트롤인데 `walk.complete`가 `denied`, `timeout`, `error` | 사유를 명시한 `ERROR`(3A단계: 워크를 요청했으나 돌지 못함) |
+| 9 | deep 기반 컨트롤(`walk.*` 또는 `packages.verify.*` 키를 읽음)인데 그 수집기를 실행하지 않음 | `MANUAL`("collect --deep을 실행하십시오". 패키지 검증은 "--no-verify 없이") |
+| 10 | deep 기반 컨트롤인데 그 계열의 완료 팩트가 false | 계열에 따라 `walk.complete`는 `ERROR(walk_incomplete)`, `packages.verify.complete`는 `ERROR(verify_incomplete)` |
+| 10a | deep 기반 컨트롤인데 그 계열의 완료 팩트가 `denied`, `timeout`, `error` | 사유를 명시한 `ERROR`(3A단계: 워크를 요청했으나 돌지 못함). 완료 팩트가 `unsupported`이면(패키지 데이터베이스가 없는 호스트) `NOT_APPLICABLE(unsupported_env)` |
 | 11 | 절이 실패하고 `automation: partial` | `WARN`, 수동 검토 항목으로 표시 |
 | 12 | 절이 실패 | `FAIL` |
 | 13 | 모든 절이 성립하지만 수집이 저하됨(데몬이 보고하는 설정에 대한 파싱 폴백, 페르소나를 요청했으나 수집되지 않음, 방화벽 신뢰도가 full 미만, 계정 팩트의 원격 NSS 소스) | 저하 내용을 명시한 `WARN` |
@@ -320,7 +320,7 @@ checks:
 
 `where`나 `require` 하위 절이 이름 붙인 필드가 없는 레코드 요소는 요소와 필드를 명시한 사유로 그 절을 실패시키며(5.7절), 절의 근거에는 일치·실패가 아니라 `unjudged`로 나열됩니다. 필드가 없을 때 `present`/`absent`의 의미는 그대로입니다. 13a행은 모든 절을 평가한 뒤 한 번만 결정하므로, 컨트롤 안 어디서든 실패하거나 저하된 절이 있으면 그쪽이 우선합니다. (2026-09-10 개정, 계획 2M.)
 
-평가기는 워크 기반 컨트롤에 대해 사실 상태 스크리닝(6~8단계)보다 워크 게이트(9~10단계)를 먼저 실행하므로, 워크를 실행하지 않았다면 부재한 워크 팩트에 대해 `ERROR`가 아니라 `MANUAL`이 됩니다.
+평가기는 deep 기반 컨트롤에 대해 사실 상태 스크리닝(6~8단계)보다 deep 게이트(9~10a단계)를 먼저 실행하므로, 워크나 패키지 검증을 실행하지 않았다면 부재한 팩트에 대해 `ERROR`가 아니라 `MANUAL`이 됩니다.
 
 waiver는 표를 거친 뒤에, `FAIL`과 `WARN`에만 적용합니다. 일치하는 유효한 waiver는 결과를 `WAIVED`로 바꾸며, 집계하고 표시합니다. waiver는 `ERROR`, `NOT_APPLICABLE`, `MANUAL`에는 결코 적용되지 않습니다. 그런 컨트롤에 waiver가 일치하면 적용되지 않았다고 사유와 함께 기록하고, 종료 코드는 그대로입니다.
 
@@ -376,7 +376,7 @@ waivers:
 
 컨트롤들도 서로 격리됩니다. 어떤 컨트롤의 평가 중 패닉(대개 custom 함수)이 나면 그 컨트롤은 `ERROR(internal_error)`가 되고 나머지는 평가됩니다. 최상위 recover는 마지막 방어선이며 2로 종료합니다.
 
-`ERROR` 사유는 고정된 어휘입니다. `permission_denied`, `timeout`, `truncated`, `unsupported_env`, `parse_error`, `missing_fact`, `schema_mismatch`, `walk_incomplete`, `internal_error`이며, 사람이 읽을 문구와 함께 JSON에 실려 CI가 이 값으로 매칭할 수 있습니다. 요약은 언제나 몇 개의 팩트가 수집에 실패했는지를 밝힙니다.
+`ERROR` 사유는 고정된 어휘입니다. `permission_denied`, `timeout`, `truncated`, `unsupported_env`, `parse_error`, `missing_fact`, `schema_mismatch`, `walk_incomplete`, `verify_incomplete`, `internal_error`이며, 사람이 읽을 문구와 함께 JSON에 실려 CI가 이 값으로 매칭할 수 있습니다. 요약은 언제나 몇 개의 팩트가 수집에 실패했는지를 밝힙니다.
 
 `check`의 종료 코드는 이렇습니다. `ERROR`가 하나라도 있으면 `2`, 아니면 `FAIL`이 하나라도 있으면 `1`, 그 밖에는 `0`입니다. `--allow-error`는 오류를 보고하되 종료 코드는 실패만으로 계산합니다(비 root 실행처럼 부분적임이 알려진 스냅샷용입니다). `--fail-on`의 기본값은 `fail`입니다. `fail`은 `FAIL`이 하나라도 있으면 1로 종료합니다. `warn`과 `manual`은 여기에 더해 `WARN`이나 `MANUAL`에서도 1로 종료합니다. `none`은 모든 발견 상태에 대해 0으로 종료하며 `ERROR` → 2 규칙만 남깁니다. `2 > 1 > 0` 우선순위는 모든 조합에서 성립하며 골든 테스트로 고정됩니다 (D11).
 
@@ -395,6 +395,7 @@ muster는 남의 프로덕션 호스트에서 root로 돌고, 그 출력은 공�
 - **명령.** 수집기 레지스트리에 등록된 명령만 실행합니다. 절대 경로, 고정된 인자, 명령별 타임아웃, 출력 상한이 붙습니다. 셸은 쓰지 않습니다. 환경은 버리고 다시 구성합니다(`PATH=/usr/sbin:/usr/bin:/sbin:/bin`, `LC_ALL=C`, `LANG=C`, `TZ=UTC`. `LD_PRELOAD`, `LD_LIBRARY_PATH`, `IFS`는 결코 상속하지 않습니다). 프로세스는 자기 그룹에서 돌기 때문에 타임아웃이 자손까지 종료합니다.
 - **읽기.** 모든 파일 읽기는 두 계층을 가진 하나의 프리미티브를 거치며, 어느 계층을 썼는지는 팩트의 `source`에 기록됩니다. 1계층은 `RESOLVE_NO_SYMLINKS|RESOLVE_NO_MAGICLINKS`를 준 `openat2`입니다(리눅스 5.6 이상. 첫 릴리스의 모든 대상이 여기 해당합니다). 경로의 어느 구성 요소에 있든 심볼릭 링크를 거부합니다. 2계층은 `openat2`를 거부하는 커널이나 seccomp 프로파일을 위한 것으로, `/`부터 `openat(O_NOFOLLOW|O_DIRECTORY|O_CLOEXEC)`으로 경로를 구성 요소 단위로 걸어가며 같은 보장을 줍니다. 어느 계층도 경로의 어디에서든 심볼릭 링크를 따라가지 않습니다. `os.Root`는 자기 루트 안의 링크를 따라가므로 쓰지 않습니다. 연 다음에는 `fstat`으로 일반 파일임을 확인합니다(FIFO, 디바이스, 소켓은 거부합니다). 크기 상한이 적용됩니다. NUL 바이트가 있으면 그 파일을 바이너리로 표시하고 내용을 저장하지 않습니다. 단, 설계상 바이너리인 소수의 파일(4바이트 속성 워드로 시작하는 EFI 변수. 3B단계)은 그 규칙만 뺀 같은 프리미티브 `ReadFileBinary`로 읽습니다. 부모 디렉터리가 world-writable이거나 root 소유가 아니면 `path_untrusted`를 설정합니다.
 - **워크.** 기본적으로 꺼져 있습니다(`--deep`). 로컬 파일시스템만 대상으로 하며 `/proc/self/mountinfo`로 판단합니다. `nfs`, `cifs`, `smb3`, `fuse.*`, `sshfs`, `afs`, overlay와 snap 마운트는 제외합니다. autofs 마운트 지점은 부모가 `AT_NO_AUTOMOUNT`로 나열만 하고 절대 열지 않습니다. `/proc`, `/sys`, `/dev`, `/run`은 건너뜁니다. 심볼릭 링크는 따라가지 않습니다. `(dev, ino)` 집합으로 순환을 끊습니다. 시간과 개수 예산이 다하면 `complete=false`로 워크를 끝냅니다. `nice`와 `ionice`가 최선 노력으로 우선순위를 낮춥니다(3A단계, W-3).
+- **검증.** 기본적으로 꺼져 있고 워크와 함께 돕니다(`--deep`, root; `--no-verify`면 제외). 인자가 고정된 `rpm -Va` 또는 `dpkg --verify`로 패키지 데이터베이스 전체를, 자체 `--verify-timeout`(기본 30분)과 64 MiB 출력 상한 아래 검증합니다. 종료 코드는 데이터입니다(rpm의 1은 "차이 있음", dpkg는 언제나 0). 판정이 무시하는 잡음 — 설정 파일, 문서, dpkg의 `path-exclude` 경로, ghost, mtime만 다른 행, 검사 불가 행, 상태 메모만 있는 행 — 은 이름 붙은 규칙으로 걸러지고 스냅샷이 그 규칙과 개수를 기록합니다(3C-1단계).
 - **쓰기.** 스냅샷은 `collect`가 쓰는 유일한 파일입니다. 어떤 서브커맨드도 서비스를 재시작하지 않고, 설정을 바꾸지 않고, 네트워크 연결을 만들지 않고, 패키지 메타데이터를 갱신하지 않고, 업데이트를 확인하지 않고, 텔레메트리를 보내지 않습니다. CI는 네트워크 없는 컨테이너에서 읽기 전용 바인드 마운트 위에 `collect`를 돌려 이를 증명합니다.
 - **데이터 파일.** root는 컨트롤, waiver, 옛 스냅샷을 결코 파싱하지 않습니다. `check`는 root일 때 쓰기 가능한 데이터 파일을 거부하고, 스냅샷을 적대적 입력으로 다룹니다(디코드 한도, 그 안의 무엇도 실행하지 않음, 그 안의 경로를 출력 경로로 재사용하지 않음, 이스케이프한 렌더링).
 - **스냅샷 기밀성.** 기본적으로 편집합니다(5.6절). 0700 디렉터리 안의 0600 파일입니다. 기본 위치는 결코 `/tmp`가 아닙니다. 잠금과 보존 정책을 갖춘 수명 주기가 있습니다(5.9절). 공유용 `--anonymize` 모드(호스트명, 주소, 사용자 이름의 안정적 해싱)는 익명화한 스냅샷과 원본 스냅샷이 동일한 판정을 낳는지 확인하는 불변식 테스트와 함께 3단계에 도착합니다.
@@ -439,7 +440,7 @@ muster는 남의 프로덕션 호스트에서 root로 돌고, 그 출력은 공�
 
 **2단계 — 두 배포판, 자동화 가능한 모든 항목.** 수집기를 완성합니다. sshd(`-G` → `-T` → 파싱 폴백. 사용한 방법을 기록. Match 페르소나. include 소스), 서비스(소켓 활성화, masked/static/indirect, 논리 이름), PAM(authselect / pam-auth-update / 수동 설정 탐지, 스택 확장, 소스를 갖춘 파생 pwquality와 faillock), 방화벽(백엔드 탐지, 원본 덤프, 신뢰도를 갖춘 최소한의 정규화 모델), 함수로서의 로깅(journald만 있는 호스트), 네트워크 sysctl(커널이 파라미터마다 `all`과 인터페이스별 값을 합성하는 방식을 반영합니다. `rp_filter`는 최댓값, `send_redirects`는 논리 OR, `accept_redirects`는 해당 인터페이스의 forwarding에 따라 달라집니다. `default`는 앞으로 생길 인터페이스를 위한 템플릿으로 수집하며 유효 값으로 접어 넣지 않고, IPv6 쌍도 함께 다룹니다), `/proc/sys` 트리 전체, MAC 상태(SELinux/AppArmor, 런타임 대 설정), NSS 원격 소스 탐지, inetd/xinetd, 배너, 시각 동기화, `snmpd.conf`(활성화된 버전, 기본값 여부·길이·출처 제한으로 편집한 커뮤니티), 캐시된 메타데이터로 보는 패치 위생, 계정 상태(해시 알고리즘, 빈 비밀번호), `env` 블록, ACL 항목. auto와 partial 58개 항목 전부를 픽스처와 함께 등록하고, deferred 9개 항목을 근거를 갖춘 manual로 등록합니다. 매핑이 있는 모든 컨트롤에 `references.stig`와 `references.nist_800_53`을 더합니다(3절). 2단계는 열두 개의 플랜으로 실행합니다. 2A 기반(파일 권한 팩트 템플릿, 드롭인 병합 헬퍼, 커버리지 표 생성기, CI 매트릭스 뼈대, 참조 인덱스 생성기, 어휘 추가), 2B 계정, 2C PAM, 2D sshd와 배너, 2E 홈 디렉터리와 셸 환경, 2G 서비스와 슈퍼서버, 2F 시스템 파일·시작 스크립트·cron, 2H 방화벽, 2I 로깅과 시각 동기화, 2J NFS·SNMP·패치 위생, 2L FTP/메일/DNS 근거와 deferred 항목 등재, 2M 커버리지·참조 게이트입니다. 워크에 의존하는 U-15, U-23, U-25, U-33은 3A단계를 기다렸습니다. Rocky와 AlmaLinux는 2단계 동안 CI의 init 컨테이너로 검증하고, 실제 VM 실행은 공개 릴리스 전에 합니다. CI 매트릭스(`ubuntu:22.04`, `ubuntu:24.04`, `rockylinux/rockylinux:9-ubi-init`, `almalinux/9-init`, 카나리아로 `debian:12`), GitHub 러너 VM에서의 `sudo muster collect`, 능력 매트릭스 테스트, 비 root 잡. 커버리지 표를 생성해 커밋합니다. 파서 오라클 테스트. 공개 이미지에서 뜬 예시 스냅샷. `snapshot extract`, `controls new`, `CONTRIBUTING.md`.
 
-**3단계 — 같은 수집기로 얻는, 목록 너머의 고가치 점검.** 3A(병합됨): 워크 자체와, 패키지 소유·선언 모드와의 결합(rpm의 파일 표. dpkg의 목록, `statoverride`, 릴리스별 기준 목록) — `2026-09-16-stage3a-walk-design.ko.md`. 3B(병합됨): 가이드 밖의 첫 컨트롤 19개 — 커널 자기 보호 sysctl과 세 소스를 보는 코어 덤프 정책, 부트 체인(grub.cfg 권한과 비밀번호, 시큐어 부트 상태), 분리된 파티션과 마운트 옵션, 스왑 암호화, 빌트인 탐지를 포함한 모듈 블랙리스트 — 를 읽기 전용 수집기 여섯으로, 그리고 리포트의 두 범위 — `2026-09-18-stage3b-kernel-boot-mount-design.ko.md`. 그 다음: 패키지 검증(`rpm -V` / `dpkg --verify`. 잡음은 걸러 내고 필터를 기록. 3C). 워크에서의 파일 capability와 ACL. 감사 파이프라인 건전성(auditd 규칙 존재와 불변 설정, journald 영속화, 원격 전달, sudo 로깅, 파일 무결성 도구의 설치와 스케줄). 노출 교차 점검(소켓 → 프로세스 → 패키지 대 방화벽. 방화벽 신뢰도가 full일 때만). root와 동등한 경로(컨테이너 런타임 소켓과 그 그룹, `ld.so.preload`, root 유닛의 쓰기 가능한 `ExecStart`, root의 `PATH`). 휴면 계정. U-63의 권한 점검을 넘어서는 `sudoers`의 `NOPASSWD`/`ALL`. 삭제된 실행 파일로 도는 프로세스. `authorized_keys` 인벤토리. 위험도 순서, 백업, 검증 명령, 롤백을 갖춘 `fix --dry-run`. 프로파일의 실현(6.6절). `kisa-unix-2026`이 기본으로 남고, `cis-<배포판>-l1` 프로파일이 같은 수집기 위에서 대상 배포판의 CIS Level 1 서버 권고에 해당하는 컨트롤과 파라미터를 고르며, 그 컨트롤들의 1차 참조는 `references.cis`입니다. 튜닝. 불변식 테스트를 갖춘 `--anonymize`. `--max-age`. 컨트롤 YAML 뮤테이션 테스트. 파서 퍼징.
+**3단계 — 같은 수집기로 얻는, 목록 너머의 고가치 점검.** 3A(병합됨): 워크 자체와, 패키지 소유·선언 모드와의 결합(rpm의 파일 표. dpkg의 목록, `statoverride`, 릴리스별 기준 목록) — `2026-09-16-stage3a-walk-design.ko.md`. 3B(병합됨): 가이드 밖의 첫 컨트롤 19개 — 커널 자기 보호 sysctl과 세 소스를 보는 코어 덤프 정책, 부트 체인(grub.cfg 권한과 비밀번호, 시큐어 부트 상태), 분리된 파티션과 마운트 옵션, 스왑 암호화, 빌트인 탐지를 포함한 모듈 블랙리스트 — 를 읽기 전용 수집기 여섯으로, 그리고 리포트의 두 범위 — `2026-09-18-stage3b-kernel-boot-mount-design.ko.md`. 3C-1(병합됨): 감사 파이프라인 상태와 패키지 무결성 — 감사 데몬의 규칙·불변·디스크 처리·로그 권한, 로그 전달, sudo 자체 로그, 파일 무결성 도구, 인자 고정의 전체 데이터베이스 패키지 검증(W-8 종결: `CommandTemplate` 없음) — 을 수집기 셋과 확장 둘로, deep 게이트는 계열의 표로 넓혀(D30) — `2026-09-23-stage3c1-audit-integrity-design.ko.md`. 그 다음 3C-2: 워크에서의 파일 capability와 ACL. 노출 교차 점검(소켓 → 프로세스 → 패키지 대 방화벽. 방화벽 신뢰도가 full일 때만). root와 동등한 경로(컨테이너 런타임 소켓과 그 그룹, `ld.so.preload`, root 유닛의 쓰기 가능한 `ExecStart`, root의 `PATH`). 휴면 계정. U-63의 권한 점검을 넘어서는 `sudoers`의 `NOPASSWD`/`ALL`. 삭제된 실행 파일로 도는 프로세스. `authorized_keys` 인벤토리. 위험도 순서, 백업, 검증 명령, 롤백을 갖춘 `fix --dry-run`. 프로파일의 실현(6.6절). `kisa-unix-2026`이 기본으로 남고, `cis-<배포판>-l1` 프로파일이 같은 수집기 위에서 대상 배포판의 CIS Level 1 서버 권고에 해당하는 컨트롤과 파라미터를 고르며, 그 컨트롤들의 1차 참조는 `references.cis`입니다. 튜닝. 불변식 테스트를 갖춘 `--anonymize`. `--max-age`. 컨트롤 YAML 뮤테이션 테스트. 파서 퍼징.
 
 **4단계 — 공개 릴리스.** 서버 변화와 규칙 변화를 구분하는 스냅샷 diff. 스키마 검증을 갖춘 SARIF. 드리프트 확인을 갖춘 완전한 이중 언어 문서 한 쌍. 릴리스 무결성(8절). `--controls-dir`. `snapshot ls|rm|prune`과 타이머 유닛. 패키지의 설치/업그레이드/제거 계약(remove는 스냅샷을 남기고 경고하며, purge는 삭제합니다). DCO와, 벤치마크 본문을 복사했는지 묻는 PR 템플릿. README 포지셔닝 표와 데모. 커버리지 공백 탐지기 역할을 하는 Lynis 차분 비교(버전 고정, `lynis-report.dat` 파싱, 매핑 표, 이미지별 기준선).
 
@@ -519,6 +520,7 @@ assay에서 얻은 두 교훈은 "헬퍼는 커버되는데 아무도 호출하�
 - **D26 — 권한 팩트는 ACL, capability, 속성을 포함한다.** `st_mode`만으로는 조용히 틀린 답이 나옵니다.
 - **D27 — 패치 위생은 캐시된 패키지 메타데이터만 쓴다.** `collect`는 패키지 메타데이터를 갱신하지 않고 패키지 매니저 잠금을 쥐지도 않습니다. 오래된 캐시는 그 나이와 함께 `WARN`입니다.
 - **D29 — 가이드 밖의 점검은 기본으로 돌고, 요약이 판정의 범위를 말하며, 종료 코드는 바뀌지 않는다.** 3B는 KISA 항목이 아닌 컨트롤(`category: beyond`)을 더합니다. 모든 `check`에서 돌고 요약은 `scopes` — 가이드와 가이드 밖, 각각 9절의 세 부분 — 를 얻되 기존 요약 필드는 의미를 유지하고 행은 범위로 먼저 정렬됩니다. 가이드 밖 FAIL도 종료 코드의 FAIL이며, KISA만 쓰는 사용자에게 선택을 주는 것은 플래그가 아니라 3D의 프로파일입니다. 이 결정에 세 가지 이탈이 얹힙니다: sysctl의 판정은 실행 중인 값을 읽고(5.3절의 `both`가 아닌 `default_on: effective` — 커널이 컴파일해 넣은 기본값에는 persisted 줄이 없어 있지도 않은 드리프트를 보고할 것이므로); `files.user_rhosts`, `files.env_files`, `files.dev_nondevice`의 관찰은 subject 종류 `item:` 대신 `file:`을 실어 이를 부르는 waiver 키가 바뀌며; 지원 호스트에서 수집기가 만들 수 없는 판정 팩트를 가진 컨트롤은 호스트가 결코 쓸 수 없는 픽스처를 싣는 대신 그 변이체를 동치로 기록합니다.
+- **D30 — deep 게이트는 계열의 표이고, 아무것도 고르지 않은 mechanism 컨트롤은 `absent_means`로 풀린다.** 3C-1은 패키지 검증을 둘째 `--deep` 전용 계열로 더합니다. 6.5절의 행 9–10a는 `walk.*`나 `packages.verify.*` 키를 읽는 모든 컨트롤에 적용되며, 완료 사실은 `walk.complete` / `packages.verify.complete`, 이유 코드는 `walk_incomplete` / `verify_incomplete`이고, `unsupported`인 완료 사실(패키지 데이터베이스가 없는 호스트)은 NOT_APPLICABLE로 읽힙니다. 행 5는 평가기가 적용하는 대로 다시 씁니다 — 사실이 absent였든 unsupported였든 false로 평가됐든 성립한 `when`이 없음 — 전달 컨트롤의 MANUAL 경로가 그것에 기대기 때문입니다. 이 결정에 플래그 둘이 얹힙니다: `--verify-timeout`(30분)과 `--no-verify`, 워크 예산과의 합이 기본 `--deep` 마감이며, `--deep` 실행에서 30분 아래의 명시적 `--timeout`은 이제 `--no-verify`나 더 작은 `--verify-timeout`이 필요합니다. 되돌리기: 셋째 deep 계열은 표의 행 하나입니다.
 - **D28 — Go, 최소 의존성, CLI 프레임워크 없음, 정적 바이너리 하나.** assay와 같은 선택이고 이유도 같습니다. 망 분리된 호스트에 복사할 파일 하나, 런타임 없음, 그리고 감사할 수 있을 만큼 짧은 의존성 목록입니다. 되돌리기: 의도한 바 없습니다.
 
 ## 14. 열린 쟁점
