@@ -250,7 +250,8 @@
 - control: muster.beyond.package_files_unmodified
   mutant: "absent_means ->pass"
   reason: >-
-    runPkgverify (internal/collect/collectors/pkgverify.go) writes nothing without --deep,
+    runPkgverify (internal/collect/collectors/pkgverify.go) writes nothing without --deep or under
+    --no-verify,
     which the deep gate reads as MANUAL before any check, and otherwise writes
     packages.verify.complete as ok, denied, timeout, error or unsupported and
     packages.verify.modified as an ok list (writeVerifyUnknown included) -- never absent. So no
@@ -260,7 +261,8 @@
 - control: muster.beyond.package_files_unmodified
   mutant: "absent_means ->not_applicable"
   reason: >-
-    runPkgverify (internal/collect/collectors/pkgverify.go) writes nothing without --deep,
+    runPkgverify (internal/collect/collectors/pkgverify.go) writes nothing without --deep or under
+    --no-verify,
     which the deep gate reads as MANUAL before any check, and otherwise writes
     packages.verify.complete as ok, denied, timeout, error or unsupported and
     packages.verify.modified as an ok list (writeVerifyUnknown included) -- never absent. So no
@@ -270,7 +272,8 @@
 - control: muster.beyond.package_files_unmodified
   mutant: "absent_means ->manual"
   reason: >-
-    runPkgverify (internal/collect/collectors/pkgverify.go) writes nothing without --deep,
+    runPkgverify (internal/collect/collectors/pkgverify.go) writes nothing without --deep or under
+    --no-verify,
     which the deep gate reads as MANUAL before any check, and otherwise writes
     packages.verify.complete as ok, denied, timeout, error or unsupported and
     packages.verify.modified as an ok list (writeVerifyUnknown included) -- never absent. So no

@@ -48,7 +48,7 @@
               "attributes": [
                 "digest"
               ],
-              "untested": 0,
+              "untested": 8,
               "file_type": "config",
               "note": ""
             },
@@ -57,7 +57,7 @@
               "attributes": [
                 "digest"
               ],
-              "untested": 0,
+              "untested": 8,
               "file_type": "config",
               "note": ""
             }

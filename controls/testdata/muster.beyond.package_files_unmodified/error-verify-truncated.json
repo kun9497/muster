@@ -43,7 +43,7 @@
               "attributes": [
                 "digest"
               ],
-              "untested": 0,
+              "untested": 8,
               "file_type": "",
               "note": ""
             },
@@ -52,7 +52,7 @@
               "attributes": [
                 "digest"
               ],
-              "untested": 0,
+              "untested": 8,
               "file_type": "",
               "note": ""
             }
@@ -72,7 +72,7 @@
               "attributes": [
                 "digest"
               ],
-              "untested": 0,
+              "untested": 8,
               "file_type": "config",
               "note": ""
             },
@@ -81,7 +81,7 @@
               "attributes": [
                 "digest"
               ],
-              "untested": 0,
+              "untested": 8,
               "file_type": "config",
               "note": ""
             }
@@ -129,9 +129,9 @@
         "stats": {
           "status": "ok",
           "value": {
-            "lines": 1201,
+            "lines": 1203,
             "exit_code": 0,
-            "duration_ms": 48213,
+            "duration_ms": 48877,
             "truncated": false,
             "stderr_head": [],
             "unparsed_head": [],

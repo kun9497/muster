@@ -106,7 +106,7 @@
         "stats": {
           "status": "ok",
           "value": {
-            "lines": 1,
+            "lines": 312847,
             "exit_code": 1,
             "duration_ms": 71204,
             "truncated": true,

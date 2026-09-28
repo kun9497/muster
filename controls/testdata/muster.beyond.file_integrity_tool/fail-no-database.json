@@ -69,6 +69,14 @@
             "kind": "derived",
             "inputs": [
               {
+                "kind": "file",
+                "path": "/etc/cron.d/0hourly"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/crontab"
+              },
+              {
                 "kind": "command",
                 "cmd": "/usr/bin/systemctl list-timers --all --no-legend --no-pager",
                 "exit_code": 0
@@ -82,6 +90,14 @@
           "source": {
             "kind": "derived",
             "inputs": [
+              {
+                "kind": "file",
+                "path": "/etc/cron.d/0hourly"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/crontab"
+              },
               {
                 "kind": "command",
                 "cmd": "/usr/bin/systemctl list-timers --all --no-legend --no-pager",
