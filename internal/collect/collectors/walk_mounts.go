@@ -176,7 +176,10 @@ func (p *mountPlan) exclude(root, reason, detail string) {
 // The source is the field after the fstype and carries the same octal
 // escapes fields 4 and 5 do. A line whose source field is missing is kept
 // with an empty source rather than dropped: the walk's boundaries do not
-// depend on it, and a row is worth more than the field it lacks.
+// depend on it, and a row is worth more than the field it lacks. The source
+// is bounded like every source a fact carries (rawCap, R64): a FUSE or
+// network source can be as long as its author likes, and the nightly fuzz
+// found one byte over the cap reaching the snapshot.
 func parseMountinfo(data []byte) ([]mountRow, error) {
 	var rows []mountRow
 	for _, line := range splitLines(data) {
@@ -193,7 +196,7 @@ func parseMountinfo(data []byte) ([]mountRow, error) {
 		}
 		source := ""
 		if len(f) > sep+2 {
-			source = unescapeMountField(f[sep+2])
+			source = sourceRaw(unescapeMountField(f[sep+2]))
 		}
 		rows = append(rows, mountRow{
 			id:         id,

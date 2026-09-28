@@ -246,6 +246,10 @@ every plan is under `docs/superpowers/plans/`):
   chain instead of indexing its first word; a form feed there used to panic
   the firewall collector. Found by the first sixty-second run of the nightly
   fuzz workflow; the input is committed as its seed.
+- The mountinfo parser bounds a mount's source field like every source a fact
+  carries (256 bytes, cut on a rune boundary, the marker only when cut); a
+  FUSE or network source longer than that used to reach the snapshot whole.
+  Found by the nightly fuzz workflow; the input is committed as its seed.
 
 ### Tooling
 

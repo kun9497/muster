@@ -6,7 +6,9 @@ import (
 	"os"
 	"reflect"
 	"slices"
+	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"golang.org/x/sys/unix"
 
@@ -154,6 +156,30 @@ func mustRows(t *testing.T, data []byte) []mountRow {
 // W-2: the enter set is the positive list of local types, and the four
 // pseudo paths are excluded by path whatever their type — a mount UNDER one
 // of them is decided by the path rule first.
+// A mount source is bounded like every source a fact carries: at most
+// rawCap bytes, cut on a rune boundary, with the marker only when it was cut.
+// The nightly fuzz found a 257-byte source reaching the row (the crash input
+// is the FuzzParseMountinfo corpus seed).
+func TestParseMountinfoBoundsTheSource(t *testing.T) {
+	long := "/srv/" + strings.Repeat("é", 200) // 405 bytes, multi-byte throughout
+	data := []byte("36 35 98:0 / /mnt rw - fuse.sshfs " + long + " rw\n" +
+		"37 35 98:0 / /data rw - ext4 /dev/sda1 rw\n")
+	rows, err := parseMountinfo(data)
+	if err != nil || len(rows) != 2 {
+		t.Fatalf("parseMountinfo = %d rows, %v", len(rows), err)
+	}
+	got := rows[0].source
+	if !strings.HasSuffix(got, "…") || len(got)-len("…") > rawCap || !utf8.ValidString(got) {
+		t.Errorf("long source = %d bytes %q, want at most %d valid bytes plus the marker", len(got), got[:24], rawCap)
+	}
+	if !strings.HasPrefix(long, strings.TrimSuffix(got, "…")) {
+		t.Errorf("cut source is not a prefix of the field")
+	}
+	if rows[1].source != "/dev/sda1" {
+		t.Errorf("short source = %q, want it untouched", rows[1].source)
+	}
+}
+
 func TestPlanEntersOnlyLocalTypes(t *testing.T) {
 	p := mustPlan(t, mountDouble("mountinfo.ubuntu"), collect.WalkOptions{}, nil)
 	if !p.rootWalkable || p.rootType != "ext4" {
