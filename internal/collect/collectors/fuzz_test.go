@@ -640,6 +640,37 @@ func FuzzParseDpkgStatus(f *testing.F) {
 	})
 }
 
+// FuzzParseVerifyOutput reads the verify output whole and as a cut capture, and
+// the stderr head the stats keep from the same bytes.
+func FuzzParseVerifyOutput(f *testing.F) {
+	seeds(f, "testdata/rpm_Va*", "testdata/dpkg_verify*")
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "parseVerifyOutput", func() any {
+			return []any{parseVerifyOutput(data, false), parseVerifyOutput(data, true), headLines(data)}
+		}, len(data))
+	})
+}
+
+// FuzzParseDpkgPathExcludes parses the filters and translates every glob, so
+// the fnmatch-to-regexp translation is fuzzed with the grammar that feeds it.
+func FuzzParseDpkgPathExcludes(f *testing.F) {
+	seeds(f, "testdata/dpkg.cfg.d-*")
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "parseDpkgPathExcludes", func() any {
+			filters := parseDpkgPathExcludes(data)
+			patterns := make([]string, 0, len(filters))
+			for _, pf := range filters {
+				if re, err := dpkgGlobRegexp(pf.glob); err == nil {
+					patterns = append(patterns, re.String())
+				} else {
+					patterns = append(patterns, "error")
+				}
+			}
+			return []any{filters, patterns}
+		}, len(data))
+	})
+}
+
 func FuzzParseAptSimulation(f *testing.F) {
 	seeds(f, "testdata/apt-get*")
 	f.Fuzz(func(t *testing.T, data []byte) {

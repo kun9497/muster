@@ -1,0 +1,10 @@
+S.5....T.  c /etc/ssh/sshd_config
+.......T.    /usr/lib/systemd/system/foo.service
+missing   d /usr/share/doc/foo/README
+..?......    /usr/sbin/unreadable
+SM5DLUGTP    /usr/bin/x
+missing   g /var/lib/g
+.M.......  a /usr/lib/.build-id/ab/cdef
+S.5......  s /usr/lib/odd
+missing     /usr/lib/gone (not installed)
+warning: %post(foo-1.0-1.x86_64) scriptlet failed, exit status 1
