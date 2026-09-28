@@ -4,7 +4,7 @@
   "run": {
     "muster_version": "synthetic",
     "commit": "synthetic",
-    "controls_version": "kisa-unix-2026+2026.09.18",
+    "controls_version": "kisa-unix-2026+2026.09.23",
     "controls_digest": "",
     "guide_edition": "kisa-unix-2026",
     "collected_at": "2026-09-18T00:00:00Z",
@@ -33,12 +33,32 @@
     },
     "collectors": [
       {
+        "name": "audit",
+        "status": "ok",
+        "ms": 0
+      },
+      {
         "name": "boot",
         "status": "ok",
         "ms": 0
       },
       {
         "name": "coredump",
+        "status": "ok",
+        "ms": 0
+      },
+      {
+        "name": "files",
+        "status": "ok",
+        "ms": 0
+      },
+      {
+        "name": "fim",
+        "status": "ok",
+        "ms": 0
+      },
+      {
+        "name": "logging",
         "status": "ok",
         "ms": 0
       },
@@ -54,6 +74,16 @@
       },
       {
         "name": "os",
+        "status": "ok",
+        "ms": 0
+      },
+      {
+        "name": "pkgverify",
+        "status": "ok",
+        "ms": 0
+      },
+      {
+        "name": "services",
         "status": "ok",
         "ms": 0
       },
@@ -432,13 +462,7 @@
           "status": "ok",
           "value": "",
           "source": {
-            "kind": "derived",
-            "inputs": [
-              {
-                "kind": "file",
-                "path": "/etc/systemd/journal-upload.conf"
-              }
-            ]
+            "kind": "derived"
           }
         }
       }
@@ -694,6 +718,174 @@
             "cmd": "/usr/bin/dpkg --verify",
             "exit_code": 0
           }
+        }
+      }
+    },
+    "audit": {
+      "rules": {
+        "present": {
+          "runtime": {
+            "status": "absent",
+            "reason": "auditctl is not installed"
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "neither /etc/audit/rules.d nor /etc/audit/audit.rules exists"
+          },
+          "effective": {
+            "status": "absent",
+            "reason": "auditctl is not installed"
+          }
+        },
+        "loaded_count": {
+          "status": "absent",
+          "reason": "auditctl is not installed"
+        },
+        "persisted_count": {
+          "status": "absent",
+          "reason": "neither /etc/audit/rules.d nor /etc/audit/audit.rules exists"
+        },
+        "persisted": {
+          "status": "absent",
+          "reason": "neither /etc/audit/rules.d nor /etc/audit/audit.rules exists"
+        }
+      },
+      "immutable": {
+        "runtime": {
+          "status": "absent",
+          "reason": "auditctl is not installed"
+        },
+        "persisted": {
+          "status": "absent",
+          "reason": "neither /etc/audit/rules.d nor /etc/audit/audit.rules exists"
+        },
+        "effective": {
+          "status": "absent",
+          "reason": "auditctl is not installed"
+        }
+      },
+      "status": {
+        "enabled": {
+          "status": "absent",
+          "reason": "auditctl is not installed"
+        },
+        "failure": {
+          "status": "absent",
+          "reason": "auditctl is not installed"
+        },
+        "lost": {
+          "status": "absent",
+          "reason": "auditctl is not installed"
+        },
+        "backlog_limit": {
+          "status": "absent",
+          "reason": "auditctl is not installed"
+        }
+      },
+      "conf": {
+        "log_file": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "log_group": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "max_log_file_action": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "space_left_action": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "admin_space_left_action": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "disk_full_action": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "disk_error_action": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        }
+      },
+      "log_file": {
+        "mode": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "uid": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "gid": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "group": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "group_readable": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "group_writable": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "other_readable": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "other_writable": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "acl_present": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        }
+      },
+      "log_dir": {
+        "mode": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "uid": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "gid": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "group": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "group_readable": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "group_writable": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "other_readable": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "other_writable": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
+        },
+        "acl_present": {
+          "status": "absent",
+          "reason": "/etc/audit/auditd.conf: not present"
         }
       }
     },

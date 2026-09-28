@@ -2,6 +2,34 @@
   "nonroot": {
     "denied": [
       "accounts.shadow_in_use",
+      "audit.conf.admin_space_left_action",
+      "audit.conf.disk_error_action",
+      "audit.conf.disk_full_action",
+      "audit.conf.log_file",
+      "audit.conf.log_group",
+      "audit.conf.max_log_file_action",
+      "audit.conf.space_left_action",
+      "audit.immutable",
+      "audit.log_dir.acl_present",
+      "audit.log_dir.group",
+      "audit.log_dir.group_readable",
+      "audit.log_dir.group_writable",
+      "audit.log_dir.other_readable",
+      "audit.log_dir.other_writable",
+      "audit.log_file.acl_present",
+      "audit.log_file.group",
+      "audit.log_file.group_readable",
+      "audit.log_file.group_writable",
+      "audit.log_file.other_readable",
+      "audit.log_file.other_writable",
+      "audit.rules.loaded_count",
+      "audit.rules.persisted",
+      "audit.rules.persisted_count",
+      "audit.rules.present",
+      "audit.status.backlog_limit",
+      "audit.status.enabled",
+      "audit.status.failure",
+      "audit.status.lost",
       "cron.dirs",
       "cron.files",
       "files.etc_shadow.acl_entries",
@@ -9,7 +37,11 @@
       "files.etc_sudoers.acl_present",
       "files.root_home.acl_present",
       "kernel.sysctl.bpf_jit_harden",
+      "packages.verify.complete",
+      "sudo.defaults.scoped_count",
       "sudo.includedir",
+      "sudo.log.logfile",
+      "sudo.log.syslog",
       "sudo.secure_path",
       "walk.complete"
     ]
@@ -35,6 +67,12 @@
     ]
   },
   "_notes": {
+    "audit.log_file.mode": [
+      "NOT in the nonroot row, and neither are audit.log_file.uid, audit.log_file.gid or the same three of audit.log_dir: on a non-root host with auditd installed every one of the eighteen audit.log_file.* and audit.log_dir.* leaves reads denied, because auditd.conf (0640 in the 0750 /etc/audit) cannot be read, so the path the leaves are about is unknown and the read's status is the answer for all of them (C3). The row's rule keeps every mode, uid and gid leaf out, since a stat of a fixed path needs no read permission (M-34); the row lists the other twelve."
+    ],
+    "fim.aide.database_present": [
+      "NOT in any row: whether an unprivileged run can see the AIDE database depends on the release, not on the capability - /var/lib/aide is readable on Ubuntu 22.04 and 0700 on EL9 and Ubuntu 24.04 - so the matrix does not assert it."
+    ],
     "kernel.sysctl.protected_symlinks": [
       "NOT in the nonroot row, and neither are protected_hardlinks, protected_fifos or protected_regular (K-31): /proc/sys/fs/protected_* is 0600 on some kernels (the 5.15 lab host) and 0644 on others (the 6.x GitHub runner), so what an unprivileged run reads for these four keys is the kernel's choice and not a capability the matrix can assert. bpf_jit_harden is 0600 on both and stays."
     ],

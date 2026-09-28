@@ -106,7 +106,7 @@ func runPkgverify(ctx context.Context, a collect.Access, b *collect.Builder) err
 	parsed := parseVerifyOutput(out.Stdout, cut)
 
 	var filter verifyFilter
-	var excludes []any
+	excludes := []any{} // R50: never nil, on rpm too
 	withoutDigests, digestProbe := 0, ""
 	if tool == "dpkg" {
 		filter, excludes = dpkgPathFilters(a)
