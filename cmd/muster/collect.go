@@ -49,6 +49,7 @@ func runCollect(args []string, stdout, stderr io.Writer) int {
 			Budget: co.walkBudget, MaxEntries: co.walkMaxEntries,
 			Exclude: co.walkExclude, Include: co.walkInclude,
 		},
+		Verify: collect.VerifyOptions{Timeout: co.verifyTimeout}, NoVerify: co.noVerify,
 		Version: version, Commit: commit,
 		ControlsVersion: set.Version, ControlsDigest: set.Digest,
 	}, stdout)

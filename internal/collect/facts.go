@@ -8,6 +8,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"time"
 
 	"golang.org/x/sys/unix"
 
@@ -26,6 +27,7 @@ type Builder struct {
 	current string
 	keys    map[string][]string // collector name -> keys set under it (R71)
 	walk    *WalkOptions        // nil until SetWalk: --deep was not given
+	verify  *VerifyOptions      // nil until SetVerify: --deep was not given, or --no-verify was
 }
 
 func NewBuilder(reg *facts.Registry) *Builder {
@@ -60,6 +62,33 @@ func (b *Builder) Walk() (WalkOptions, bool) {
 		return WalkOptions{}, false
 	}
 	return *b.walk, true
+}
+
+// VerifyOptions is what the command parsed for package verification (J-10).
+type VerifyOptions struct {
+	// Timeout bounds the verification command's wall time
+	// (--verify-timeout).
+	Timeout time.Duration
+}
+
+// SetVerify arms package verification with the options the command parsed
+// (J-10). Run calls it for --deep without --no-verify and for nothing else,
+// so the pkgverify collector asking Verify() is asking whether the operator
+// wanted package verification at all.
+func (b *Builder) SetVerify(o VerifyOptions) {
+	b.verify = &o
+}
+
+// Verify returns the verify options and whether they were set. False means
+// --deep was not given or --no-verify was: the pkgverify collector writes
+// no key and packages.verify.* stays absent. A caller must not treat the
+// zero VerifyOptions as "verify with the defaults" — a zero timeout is not
+// the default timeout.
+func (b *Builder) Verify() (VerifyOptions, bool) {
+	if b.verify == nil {
+		return VerifyOptions{}, false
+	}
+	return *b.verify, true
 }
 
 // Begin marks name as the collector whose keys are being set from here on,

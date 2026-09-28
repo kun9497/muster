@@ -79,6 +79,16 @@ func nopassControl() controls.Control {
 	}
 }
 
+// packageFilesControl reads a packages.verify.* list fact, which makes it
+// deep-based (spec §6.5 rows 9-10a): its gate is packages.verify.complete.
+func packageFilesControl() controls.Control {
+	return controls.Control{
+		ID: "muster.beyond.package_files_unmodified", Importance: "상", Category: "beyond", Automation: "auto", AbsentMeans: "fail",
+		Checks:      []controls.Clause{{Fact: "packages.verify.modified", Op: "none", Subject: "path", Where: &controls.Clause{Field: "path", Op: "present"}}},
+		Remediation: &controls.Remediation{Risk: "none"},
+	}
+}
+
 // passwordPolicyControl checks two `both` settings at once, which is what
 // makes cross-clause degradation shadowing (C2) visible: one clause can fail
 // on both sides while another carries a side mismatch.
@@ -192,6 +202,24 @@ func TestDerivationTable(t *testing.T) {
 			controls.Control{ID: "muster.file.world_writable", Importance: "상", Category: "file", Automation: "partial", AbsentMeans: "pass", Remediation: &controls.Remediation{Risk: "none"},
 				Checks: []controls.Clause{{Fact: "walk.world_writable", Op: "each", Subject: "path", Require: &controls.Clause{Field: "package_declared", Op: "eq", Expected: true}}}},
 			ERROR, WalkIncomplete, nil},
+		{"9 verify not run", `{"packages":{"verify":{"modified":{"status":"ok","value":[]}}}}`, packageFilesControl(), MANUAL, "",
+			func(t *testing.T, r Result) {
+				evidenceHasFact("packages.verify.complete", facts.StatusMissing)(t, r)
+				if !strings.Contains(r.Reason, "--no-verify") {
+					t.Errorf("row 9 names the flag: %q", r.Reason)
+				}
+			}},
+		{"10 verify incomplete", `{"packages":{"verify":{"modified":{"status":"ok","value":[]},"complete":{"status":"ok","value":false}}}}`,
+			packageFilesControl(), ERROR, VerifyIncomplete, evidenceHasFact("packages.verify.complete", facts.StatusOK)},
+		{"10a verify denied names the privilege", `{"packages":{"verify":{"modified":{"status":"ok","value":[]},"complete":{"status":"denied","reason":"package verification needs root"}}}}`,
+			packageFilesControl(), ERROR, PermissionDenied, evidenceHasFact("packages.verify.complete", facts.StatusDenied)},
+		{"10b verify unsupported is not applicable", `{"packages":{"verify":{"modified":{"status":"ok","value":[]},"complete":{"status":"unsupported","reason":"no supported package manager"}}}}`,
+			packageFilesControl(), NotApplicable, UnsupportedEnv, evidenceHasFact("packages.verify.complete", facts.StatusUnsupported)},
+		{"a walk control is not gated by packages.verify.complete",
+			`{"walk":{"world_writable":{"status":"ok","value":[]},"complete":{"status":"ok","value":true}},"packages":{"verify":{"complete":{"status":"ok","value":false}}}}`,
+			controls.Control{ID: "muster.file.world_writable", Importance: "상", Category: "file", Automation: "partial", AbsentMeans: "pass", Remediation: &controls.Remediation{Risk: "none"},
+				Checks: []controls.Clause{{Fact: "walk.world_writable", Op: "each", Subject: "path", Require: &controls.Clause{Field: "package_declared", Op: "eq", Expected: true}}}},
+			PASS, "", nil},
 		{"13 degraded warn", `{"sshd":{"personas_collected":{"status":"ok","value":false},"options":{"permit_root_login":{"effective":{"status":"ok","value":"no"}}}}}`,
 			controls.Control{ID: "muster.account.root_remote_login", Importance: "상", Category: "account", Automation: "auto", AbsentMeans: "not_applicable", Remediation: &controls.Remediation{Risk: "lockout_risk"},
 				Checks: []controls.Clause{{Fact: "sshd.options.permit_root_login", On: "effective", Persona: "root", Op: "eq", Expected: "no"}}},

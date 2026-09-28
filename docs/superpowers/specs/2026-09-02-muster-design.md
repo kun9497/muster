@@ -305,13 +305,13 @@ The rows below are evaluated in order and the first that applies decides. Fact s
 | 2 | a fact referenced by `applies_when` is `missing`, `denied`, `timeout`, `error` or `truncated` | `ERROR` naming the fact |
 | 3 | a fact referenced by `applies_when` is `absent` or `unsupported`, or `applies_when` evaluates false | `NOT_APPLICABLE` with the evidence attached |
 | 4 | `automation: manual` | `MANUAL` with the collected evidence — so a manual control whose `applies_when` does not hold is `NOT_APPLICABLE`, never a permanent `MANUAL` row |
-| 5 | `mechanisms` is used and no `when` holds because every candidate fact is `absent` or `unsupported` | per `absent_means` (`pass`, `fail`, `not_applicable`, `manual`) |
+| 5 | `mechanisms` is used and no `when` holds — because every candidate fact is `absent` or `unsupported`, or because every `when` evaluated false | per `absent_means` (`pass`, `fail`, `not_applicable`, `manual`) |
 | 6 | a fact referenced by the chosen `checks` is `missing`, `denied`, `timeout`, `error` or `truncated` | `ERROR` naming the privilege, limit or key |
 | 7 | a fact referenced by the chosen `checks` is `unsupported` | `NOT_APPLICABLE` naming the environment |
 | 8 | a fact referenced by the chosen `checks` is `absent` | per `absent_means` |
-| 9 | the control is walk-based and the walk was not run | `MANUAL` ("run collect --deep") |
-| 10 | the control is walk-based and `walk.complete` is false | `ERROR(walk_incomplete)` |
-| 10a | the control is walk-based and `walk.complete` is `denied`, `timeout` or `error` | `ERROR` naming the reason (stage 3A: the walk was requested and could not run) |
+| 9 | the control is deep-based (reads a `walk.*` or `packages.verify.*` key) and that collector was not run | `MANUAL` ("run collect --deep"; for package verification, "without --no-verify") |
+| 10 | the control is deep-based and its family's completeness fact is false | `ERROR(walk_incomplete)` / `ERROR(verify_incomplete)` per family with `walk.complete` / `packages.verify.complete` |
+| 10a | the control is deep-based and its family's completeness fact is `denied`, `timeout` or `error` | `ERROR` naming the reason (stage 3A: the walk was requested and could not run); a completeness fact that is `unsupported` (a host with no package database) is `NOT_APPLICABLE(unsupported_env)` |
 | 11 | a clause fails and `automation: partial` | `WARN`, listed under manual review |
 | 12 | a clause fails | `FAIL` |
 | 13 | all clauses hold but collection was degraded (parse fallback for a daemon-reported setting, personas requested but not collected, firewall confidence below full, a remote NSS source for account facts) | `WARN` naming the degradation |
@@ -320,7 +320,7 @@ The rows below are evaluated in order and the first that applies decides. Fact s
 
 A record element that lacks the field a `where` or `require` sub-clause names fails that clause with a reason naming the element and the field (section 5.7) and is listed as `unjudged` in the clause's evidence, never as matching or failing; `present`/`absent` keep their meaning on a missing field. Row 13a is decided once, after every clause has been evaluated, so a failing or degraded clause anywhere in the control outranks it. (Amended 2026-09-10, plan 2M.)
 
-The evaluator runs the walk gate (steps 9–10) before the fact-status screening (steps 6–8) for walk-based controls, so a walk that was not run yields `MANUAL`, not `ERROR` for the absent walk facts.
+The evaluator runs the deep gate (steps 9–10a) before the fact-status screening (steps 6–8) for deep-based controls, so a walk or a package verification that was not run yields `MANUAL`, not `ERROR` for its absent facts.
 
 Waivers are applied after the table, to `FAIL` and `WARN` only: a matching, valid waiver turns the result into `WAIVED`, counted and shown. A waiver never applies to `ERROR`, `NOT_APPLICABLE` or `MANUAL`; when one matches such a control it is recorded as not applied, with the reason, and the exit code is unchanged.
 
@@ -376,7 +376,7 @@ Input is untrusted. A snapshot that fails to parse, exceeds decode size or nesti
 
 Controls are isolated: a panic inside one control's evaluation (typically a custom function) makes that control `ERROR(internal_error)`; the rest are evaluated. The top-level recover is the last line and exits 2.
 
-`ERROR` reasons are a fixed vocabulary — `permission_denied`, `timeout`, `truncated`, `unsupported_env`, `parse_error`, `missing_fact`, `schema_mismatch`, `walk_incomplete`, `internal_error` — carried in the JSON alongside the human text so CI can match on them. The summary always states how many facts failed to collect.
+`ERROR` reasons are a fixed vocabulary — `permission_denied`, `timeout`, `truncated`, `unsupported_env`, `parse_error`, `missing_fact`, `schema_mismatch`, `walk_incomplete`, `verify_incomplete`, `internal_error` — carried in the JSON alongside the human text so CI can match on them. The summary always states how many facts failed to collect.
 
 Exit codes for `check`: any `ERROR` → `2`; otherwise any `FAIL` → `1`; otherwise `0`. `--allow-error` reports errors but computes the exit code from failures alone (for snapshots known to be partial, such as non-root runs). `--fail-on` defaults to `fail`: `fail` exits 1 on any `FAIL`; `warn` and `manual` additionally exit 1 on `WARN` or `MANUAL`; `none` exits 0 for every finding status and leaves only the `ERROR` → 2 rule in force. The precedence `2 > 1 > 0` holds under every combination and is fixed by golden tests (D11).
 

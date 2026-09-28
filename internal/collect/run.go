@@ -73,6 +73,10 @@ type Options struct {
 	// Deep runs the filesystem walk; Walk is read only when it is true.
 	Deep bool
 	Walk WalkOptions
+	// Verify is read only when Deep is true and NoVerify is false: package
+	// verification runs under --deep unless --no-verify drops it (J-10).
+	Verify   VerifyOptions
+	NoVerify bool
 
 	Version         string
 	Commit          string
@@ -238,6 +242,12 @@ func Run(ctx context.Context, o Options, stdout io.Writer) (Outcome, error) {
 	hdr.Deep = o.Deep
 	if o.Deep {
 		b.SetWalk(o.Walk)
+	}
+	// J-10: the header gains nothing for verification. A verification not
+	// asked for is visible as the absence of packages.verify.*, which
+	// main §6.5 row 9 reads as MANUAL, the way a walk not asked for is.
+	if o.Deep && !o.NoVerify {
+		b.SetVerify(o.Verify)
 	}
 	// R52: stage 1 stores no original secret value.
 	hdr.Redaction = facts.Redaction{Profile: "default", IncludeSecrets: false}

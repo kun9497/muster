@@ -3172,6 +3172,76 @@
       "SubjectKind": ""
     },
     {
+      "Key": "packages.verify.complete",
+      "Type": "bool",
+      "Description": "Whether package verification (rpm -Va or dpkg --verify) finished with its whole output parsed; only under --deep as root.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pkgverify",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "packages.verify.tool",
+      "Type": "string",
+      "Description": "The package verification tool that ran - rpm or dpkg.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pkgverify",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "packages.verify.modified",
+      "Type": "list\u003crecord\u003e",
+      "Description": "Packaged files whose content, mode, owner, device, link, capabilities or presence differ from the package database after the noise filter - path, attributes, untested, file_type, note; sorted by path; only under --deep as root.",
+      "Since": 1,
+      "Sensitivity": "internal",
+      "Collector": "pkgverify",
+      "DefaultOn": "",
+      "SubjectKind": "file"
+    },
+    {
+      "Key": "packages.verify.modified_config",
+      "Type": "list\u003crecord\u003e",
+      "Description": "Packaged configuration files that differ from the package database - the same record shape as packages.verify.modified; evidence, not judged; sorted by path.",
+      "Since": 1,
+      "Sensitivity": "internal",
+      "Collector": "pkgverify",
+      "DefaultOn": "",
+      "SubjectKind": "file"
+    },
+    {
+      "Key": "packages.verify.filter",
+      "Type": "list\u003cstring\u003e",
+      "Description": "The noise-filter rules applied to the verification output, in order - config, doc, dpkg_excluded, ghost, mtime_only, unverifiable.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pkgverify",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "packages.verify.filtered_counts",
+      "Type": "record",
+      "Description": "How many verification rows each filter rule removed - config, doc, dpkg_excluded, ghost, mtime_only, unverifiable.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pkgverify",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "packages.verify.stats",
+      "Type": "record",
+      "Description": "The verification's own account of itself - lines, exit_code, duration_ms, truncated, stderr_head, unparsed_head, packages_without_digests, dpkg_path_excludes; provenance, read by no control.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pkgverify",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
       "Key": "services.ftp.installed",
       "Type": "bool",
       "Description": "An FTP server unit or inetd entry exists on the host.",

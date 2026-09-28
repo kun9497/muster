@@ -305,13 +305,13 @@ checks:
 | 2 | `applies_when`이 참조한 팩트가 `missing`, `denied`, `timeout`, `error`, `truncated` | 해당 팩트를 명시한 `ERROR` |
 | 3 | `applies_when`이 참조한 팩트가 `absent`나 `unsupported`이거나, `applies_when`이 거짓으로 평가됨 | 근거를 붙인 `NOT_APPLICABLE` |
 | 4 | `automation: manual` | 수집한 근거와 함께 `MANUAL`. 따라서 `applies_when`이 성립하지 않는 manual 컨트롤은 영구적인 `MANUAL` 줄이 아니라 `NOT_APPLICABLE`입니다 |
-| 5 | `mechanisms`를 쓰는데 후보 팩트가 모두 `absent`나 `unsupported`여서 성립하는 `when`이 없음 | `absent_means`에 따름(`pass`, `fail`, `not_applicable`, `manual`) |
+| 5 | `mechanisms`를 쓰는데 모든 후보 팩트가 `absent`나 `unsupported`이거나 모든 `when`이 false로 평가되어 성립하는 `when`이 없음 | `absent_means`에 따름(`pass`, `fail`, `not_applicable`, `manual`) |
 | 6 | 선택된 `checks`가 참조한 팩트가 `missing`, `denied`, `timeout`, `error`, `truncated` | 권한, 한도, 키를 명시한 `ERROR` |
 | 7 | 선택된 `checks`가 참조한 팩트가 `unsupported` | 환경을 명시한 `NOT_APPLICABLE` |
 | 8 | 선택된 `checks`가 참조한 팩트가 `absent` | `absent_means`에 따름 |
-| 9 | 워크 기반 컨트롤인데 워크를 실행하지 않음 | `MANUAL`("collect --deep을 실행하십시오") |
-| 10 | 워크 기반 컨트롤인데 `walk.complete`가 false | `ERROR(walk_incomplete)` |
-| 10a | 워크 기반 컨트롤인데 `walk.complete`가 `denied`, `timeout`, `error` | 사유를 명시한 `ERROR`(3A단계: 워크를 요청했으나 돌지 못함) |
+| 9 | deep 기반 컨트롤(`walk.*` 또는 `packages.verify.*` 키를 읽음)인데 그 수집기를 실행하지 않음 | `MANUAL`("collect --deep을 실행하십시오". 패키지 검증은 "--no-verify 없이") |
+| 10 | deep 기반 컨트롤인데 그 계열의 완료 팩트가 false | 계열에 따라 `walk.complete`는 `ERROR(walk_incomplete)`, `packages.verify.complete`는 `ERROR(verify_incomplete)` |
+| 10a | deep 기반 컨트롤인데 그 계열의 완료 팩트가 `denied`, `timeout`, `error` | 사유를 명시한 `ERROR`(3A단계: 워크를 요청했으나 돌지 못함). 완료 팩트가 `unsupported`이면(패키지 데이터베이스가 없는 호스트) `NOT_APPLICABLE(unsupported_env)` |
 | 11 | 절이 실패하고 `automation: partial` | `WARN`, 수동 검토 항목으로 표시 |
 | 12 | 절이 실패 | `FAIL` |
 | 13 | 모든 절이 성립하지만 수집이 저하됨(데몬이 보고하는 설정에 대한 파싱 폴백, 페르소나를 요청했으나 수집되지 않음, 방화벽 신뢰도가 full 미만, 계정 팩트의 원격 NSS 소스) | 저하 내용을 명시한 `WARN` |
@@ -320,7 +320,7 @@ checks:
 
 `where`나 `require` 하위 절이 이름 붙인 필드가 없는 레코드 요소는 요소와 필드를 명시한 사유로 그 절을 실패시키며(5.7절), 절의 근거에는 일치·실패가 아니라 `unjudged`로 나열됩니다. 필드가 없을 때 `present`/`absent`의 의미는 그대로입니다. 13a행은 모든 절을 평가한 뒤 한 번만 결정하므로, 컨트롤 안 어디서든 실패하거나 저하된 절이 있으면 그쪽이 우선합니다. (2026-09-10 개정, 계획 2M.)
 
-평가기는 워크 기반 컨트롤에 대해 사실 상태 스크리닝(6~8단계)보다 워크 게이트(9~10단계)를 먼저 실행하므로, 워크를 실행하지 않았다면 부재한 워크 팩트에 대해 `ERROR`가 아니라 `MANUAL`이 됩니다.
+평가기는 deep 기반 컨트롤에 대해 사실 상태 스크리닝(6~8단계)보다 deep 게이트(9~10a단계)를 먼저 실행하므로, 워크나 패키지 검증을 실행하지 않았다면 부재한 팩트에 대해 `ERROR`가 아니라 `MANUAL`이 됩니다.
 
 waiver는 표를 거친 뒤에, `FAIL`과 `WARN`에만 적용합니다. 일치하는 유효한 waiver는 결과를 `WAIVED`로 바꾸며, 집계하고 표시합니다. waiver는 `ERROR`, `NOT_APPLICABLE`, `MANUAL`에는 결코 적용되지 않습니다. 그런 컨트롤에 waiver가 일치하면 적용되지 않았다고 사유와 함께 기록하고, 종료 코드는 그대로입니다.
 
@@ -376,7 +376,7 @@ waivers:
 
 컨트롤들도 서로 격리됩니다. 어떤 컨트롤의 평가 중 패닉(대개 custom 함수)이 나면 그 컨트롤은 `ERROR(internal_error)`가 되고 나머지는 평가됩니다. 최상위 recover는 마지막 방어선이며 2로 종료합니다.
 
-`ERROR` 사유는 고정된 어휘입니다. `permission_denied`, `timeout`, `truncated`, `unsupported_env`, `parse_error`, `missing_fact`, `schema_mismatch`, `walk_incomplete`, `internal_error`이며, 사람이 읽을 문구와 함께 JSON에 실려 CI가 이 값으로 매칭할 수 있습니다. 요약은 언제나 몇 개의 팩트가 수집에 실패했는지를 밝힙니다.
+`ERROR` 사유는 고정된 어휘입니다. `permission_denied`, `timeout`, `truncated`, `unsupported_env`, `parse_error`, `missing_fact`, `schema_mismatch`, `walk_incomplete`, `verify_incomplete`, `internal_error`이며, 사람이 읽을 문구와 함께 JSON에 실려 CI가 이 값으로 매칭할 수 있습니다. 요약은 언제나 몇 개의 팩트가 수집에 실패했는지를 밝힙니다.
 
 `check`의 종료 코드는 이렇습니다. `ERROR`가 하나라도 있으면 `2`, 아니면 `FAIL`이 하나라도 있으면 `1`, 그 밖에는 `0`입니다. `--allow-error`는 오류를 보고하되 종료 코드는 실패만으로 계산합니다(비 root 실행처럼 부분적임이 알려진 스냅샷용입니다). `--fail-on`의 기본값은 `fail`입니다. `fail`은 `FAIL`이 하나라도 있으면 1로 종료합니다. `warn`과 `manual`은 여기에 더해 `WARN`이나 `MANUAL`에서도 1로 종료합니다. `none`은 모든 발견 상태에 대해 0으로 종료하며 `ERROR` → 2 규칙만 남깁니다. `2 > 1 > 0` 우선순위는 모든 조합에서 성립하며 골든 테스트로 고정됩니다 (D11).
 

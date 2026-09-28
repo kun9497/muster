@@ -102,7 +102,7 @@
 
 ## Fact keys used by controls
 
-183 of 390 registered keys are read by a control (3 by the engine); 204 unused.
+183 of 397 registered keys are read by a control (4 by the engine); 210 unused.
 
 | Collector | Registered | Used by a control | Read by the engine | Unused |
 |---|---|---|---|---|
@@ -123,6 +123,7 @@
 | nfs | 3 | 1 | 0 | nfs.exports_source, nfs.exports_runtime_collected |
 | snmp | 7 | 2 | 0 | snmp.v3_users, snmp.access_rules, snmp.agent_addresses, snmp.config_files, snmp.parse_complete |
 | patch | 10 | 4 | 0 | patch.pending_updates, patch.reboot_required, patch.auto_update.enabled, patch.held_packages, patch.days_since_last_install, packages.installed |
+| pkgverify | 7 | 0 | 1 | packages.verify.tool, packages.verify.modified, packages.verify.modified_config, packages.verify.filter, packages.verify.filtered_counts, packages.verify.stats |
 | ftp | 17 | 6 | 0 | ftp.implementation, ftp.config_files, ftp.parse_complete, ftp.unmodelled, ftp.local_enabled, ftp.tcp_wrappers, ftp.userlist_enable, ftp.userlist_deny, ftp.userlist_file, ftp.banner_source, ftp.banner_text |
 | mail | 10 | 7 | 0 | mail.config_files, mail.postfix.smtpd_recipient_restrictions, mail.postfix.disable_vrfy_command |
 | dns | 7 | 2 | 0 | dns.config_files, dns.parse_complete, dns.unmodelled, dns.options.allow_transfer, dns.options.allow_update |

@@ -1842,6 +1842,50 @@ keys:
     since: 1
     sensitivity: internal
     collector: patch
+  - key: packages.verify.complete
+    type: bool
+    description: Whether package verification (rpm -Va or dpkg --verify) finished with its whole output parsed; only under --deep as root.
+    since: 1
+    sensitivity: public
+    collector: pkgverify
+  - key: packages.verify.tool
+    type: string
+    description: The package verification tool that ran - rpm or dpkg.
+    since: 1
+    sensitivity: public
+    collector: pkgverify
+  - key: packages.verify.modified
+    type: list<record>
+    description: Packaged files whose content, mode, owner, device, link, capabilities or presence differ from the package database after the noise filter - path, attributes, untested, file_type, note; sorted by path; only under --deep as root.
+    since: 1
+    sensitivity: internal
+    collector: pkgverify
+    subject_kind: file
+  - key: packages.verify.modified_config
+    type: list<record>
+    description: Packaged configuration files that differ from the package database - the same record shape as packages.verify.modified; evidence, not judged; sorted by path.
+    since: 1
+    sensitivity: internal
+    collector: pkgverify
+    subject_kind: file
+  - key: packages.verify.filter
+    type: list<string>
+    description: The noise-filter rules applied to the verification output, in order - config, doc, dpkg_excluded, ghost, mtime_only, unverifiable.
+    since: 1
+    sensitivity: public
+    collector: pkgverify
+  - key: packages.verify.filtered_counts
+    type: record
+    description: How many verification rows each filter rule removed - config, doc, dpkg_excluded, ghost, mtime_only, unverifiable.
+    since: 1
+    sensitivity: public
+    collector: pkgverify
+  - key: packages.verify.stats
+    type: record
+    description: The verification's own account of itself - lines, exit_code, duration_ms, truncated, stderr_head, unparsed_head, packages_without_digests, dpkg_path_excludes; provenance, read by no control.
+    since: 1
+    sensitivity: public
+    collector: pkgverify
   - key: services.ftp.installed
     type: bool
     description: An FTP server unit or inetd entry exists on the host.

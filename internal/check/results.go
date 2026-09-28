@@ -27,6 +27,7 @@ const (
 	MissingFact      ReasonCode = "missing_fact"
 	SchemaMismatch   ReasonCode = "schema_mismatch"
 	WalkIncomplete   ReasonCode = "walk_incomplete"
+	VerifyIncomplete ReasonCode = "verify_incomplete"
 	InternalError    ReasonCode = "internal_error"
 )
 

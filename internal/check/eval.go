@@ -151,38 +151,13 @@ func evalOne(e *env, c *controls.Control) (r Result) {
 		return finish(r, c, fn(e, c))
 	}
 	keys := clauseFacts(checks)
-	// Steps 9-10 (R2): the walk gate runs before the fact-status screening
-	// below. When the deep walk was never run, a walk-based list fact reads
-	// back "absent" or "missing" — screening it first would let step 8's
-	// absent_means resolve to PASS/FAIL and hide that the walk didn't run,
-	// contradicting step 9's MANUAL "run collect --deep".
-	if walkBased(keys) {
-		wc, _ := e.reg.Resolve(e.snap, "walk.complete")
-		// R16: every branch below carries evidence for walk.complete itself.
-		ev := walkCompleteEvidence(wc)
-		switch {
-		case wc.Envelope == nil || wc.Envelope.Status == facts.StatusMissing || wc.Envelope.Status == facts.StatusAbsent:
-			res := fail(r, MANUAL, "", "the deep walk was not run; run collect --deep")
-			res.Evidence = append(res.Evidence, ev)
-			return res
-		case wc.Envelope.Status == facts.StatusOK:
-			done, isBool := wc.Envelope.Value.(bool)
-			if !isBool {
-				// M12: a walk.complete that is not a bool is a malformed fact,
-				// not a walk that ran out of budget (spec §6.3: a type
-				// mismatch is an error, never a guess).
-				res := fail(r, ERROR, InternalError, fmt.Sprintf("walk.complete: expected a bool, got %v", wc.Envelope.Value))
-				res.Evidence = append(res.Evidence, ev)
-				return res
-			}
-			if !done {
-				res := fail(r, ERROR, WalkIncomplete, "the deep walk did not finish within its budget")
-				res.Evidence = append(res.Evidence, ev)
-				return res
-			}
-		default:
-			res := fail(r, ERROR, codeFor(wc.Envelope), "walk.complete: "+wc.Envelope.Reason)
-			res.Evidence = append(res.Evidence, ev)
+	// Steps 9-10a (R2, D30): the deep gate runs before the fact-status
+	// screening below. When a --deep stage was never run, a deep-based list
+	// fact reads back "absent" or "missing" — screening it first would let
+	// step 8's absent_means resolve to PASS/FAIL and hide that the stage
+	// didn't run, contradicting step 9's MANUAL.
+	for _, f := range deepBased(keys) {
+		if res, gated := e.deepGate(r, f); gated {
 			return res
 		}
 	}
@@ -612,13 +587,83 @@ func (e *env) evidenceFor(keys []string) []Evidence {
 	return out
 }
 
-// walkCompleteEvidence builds the Evidence entry the walk gate attaches for
-// walk.complete (R16); a key the snapshot doesn't carry reads as "missing".
-func walkCompleteEvidence(wc facts.Resolved) Evidence {
+// completeEvidence builds the Evidence entry the deep gate attaches for a
+// family's completeness fact (R16); a key the snapshot doesn't carry reads
+// as "missing".
+func completeEvidence(key string, wc facts.Resolved) Evidence {
 	if wc.Envelope == nil {
-		return Evidence{Fact: "walk.complete", Status: facts.StatusMissing}
+		return Evidence{Fact: key, Status: facts.StatusMissing}
 	}
-	return Evidence{Fact: "walk.complete", Status: wc.Envelope.Status, Value: wc.Envelope.Value, Source: wc.Envelope.Source}
+	return Evidence{Fact: key, Status: wc.Envelope.Status, Value: wc.Envelope.Value, Source: wc.Envelope.Source}
+}
+
+// deepFamily is one --deep stage whose facts main §6.5 rows 9-10a gate: a
+// control reading any key under prefix is judged only once the stage's
+// completeness fact says it ran to the end.
+type deepFamily struct {
+	prefix     string     // the keys that make a control deep-based
+	complete   string     // the family's completeness fact
+	incomplete ReasonCode // row 10's reason code
+	notRun     string     // row 9's reason
+	unfinished string     // row 10's reason
+}
+
+// deepFamilies is the table of --deep stages (D30), in the order the gate
+// consults them.
+var deepFamilies = []deepFamily{
+	{prefix: "walk.", complete: "walk.complete", incomplete: WalkIncomplete,
+		notRun:     "the deep walk was not run; run collect --deep",
+		unfinished: "the deep walk did not finish within its budget"},
+	{prefix: "packages.verify.", complete: "packages.verify.complete", incomplete: VerifyIncomplete,
+		notRun:     "package verification was not run; run collect --deep without --no-verify",
+		unfinished: "package verification did not finish: its timeout or output cap was reached"},
+}
+
+// deepBased returns the families, in table order, that keys touch.
+func deepBased(keys []string) []deepFamily {
+	var out []deepFamily
+	for _, f := range deepFamilies {
+		for _, k := range keys {
+			if strings.HasPrefix(k, f.prefix) {
+				out = append(out, f)
+				break
+			}
+		}
+	}
+	return out
+}
+
+// deepGate applies rows 9-10a for one family. It reports false when the
+// family's stage completed and the control goes on to the screening. Every
+// verdict carries evidence for the completeness fact itself (R16).
+func (e *env) deepGate(r Result, f deepFamily) (Result, bool) {
+	wc, _ := e.reg.Resolve(e.snap, f.complete)
+	ev := completeEvidence(f.complete, wc)
+	var res Result
+	switch {
+	case wc.Envelope == nil || wc.Envelope.Status == facts.StatusMissing || wc.Envelope.Status == facts.StatusAbsent:
+		res = fail(r, MANUAL, "", f.notRun)
+	case wc.Envelope.Status == facts.StatusOK:
+		done, isBool := wc.Envelope.Value.(bool)
+		if !isBool {
+			// M12: a completeness fact that is not a bool is a malformed
+			// fact, not a stage that ran out of time (spec §6.3: a type
+			// mismatch is an error, never a guess).
+			res = fail(r, ERROR, InternalError, fmt.Sprintf("%s: expected a bool, got %v", f.complete, wc.Envelope.Value))
+		} else if !done {
+			res = fail(r, ERROR, f.incomplete, f.unfinished)
+		} else {
+			return r, false
+		}
+	case wc.Envelope.Status == facts.StatusUnsupported:
+		// J-21: a host with nothing to verify (no package database) is not
+		// a stage that failed; codeFor would file it internal_error.
+		res = fail(r, NotApplicable, UnsupportedEnv, f.complete+": "+wc.Envelope.Reason)
+	default:
+		res = fail(r, ERROR, codeFor(wc.Envelope), f.complete+": "+wc.Envelope.Reason)
+	}
+	res.Evidence = append(res.Evidence, ev)
+	return res, true
 }
 
 func clauseFacts(cls []controls.Clause) []string {
@@ -631,15 +676,6 @@ func clauseFacts(cls []controls.Clause) []string {
 		}
 	}
 	return out
-}
-
-func walkBased(keys []string) bool {
-	for _, k := range keys {
-		if strings.HasPrefix(k, "walk.") {
-			return true
-		}
-	}
-	return false
 }
 
 func requiredVersion(s string) (int, bool) {

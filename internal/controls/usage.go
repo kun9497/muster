@@ -9,7 +9,8 @@ import (
 
 // engineReadKeys are registered fact keys the check engine (internal/check)
 // resolves directly against the registry rather than through a control's
-// declarative Checks/AppliesWhen clauses: walk.complete gates the walk,
+// declarative Checks/AppliesWhen clauses: walk.complete and
+// packages.verify.complete gate the two --deep families (D30),
 // sshd.collect_method decides the sshd parse-fallback degradation,
 // sshd.personas_collected decides persona evaluation, and accounts.nss.remote
 // decides the remote-NSS degradation (eval.go, clause.go). Membership says
@@ -23,7 +24,7 @@ import (
 // where a forgotten entry becomes visible: a key dropped from the engine
 // but left here shows up as engine-read in a collector that has no business
 // having one (M-3).
-var engineReadKeys = set("walk.complete", "sshd.collect_method", "sshd.personas_collected", "accounts.nss.remote")
+var engineReadKeys = set("walk.complete", "packages.verify.complete", "sshd.collect_method", "sshd.personas_collected", "accounts.nss.remote")
 
 // enginePrefixes maps the prefix of a key a control may name to the
 // engine-read keys the engine resolves while it evaluates such a control
@@ -45,12 +46,13 @@ var enginePrefixes = []struct {
 	keys   []string
 }{
 	{"walk.", []string{"walk.complete"}},
+	{"packages.verify.", []string{"packages.verify.complete"}},
 	{"sshd.", []string{"sshd.collect_method", "sshd.personas_collected"}},
 	{"accounts.", []string{"accounts.nss.remote"}},
 }
 
 // EngineKeys returns, sorted and deduplicated, the engine-read keys the check
-// engine resolves on its own while it evaluates c: the walk gate, the sshd
+// engine resolves on its own while it evaluates c: the deep gate, the sshd
 // parse-fallback and persona degradations, and the remote-NSS degradation
 // (internal/check: eval.go, clause.go). No clause of c names them, so a
 // snapshot cut down to c's clauses needs them added or it degrades
