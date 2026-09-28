@@ -390,6 +390,54 @@ keys:
     since: 1
     sensitivity: public
     collector: services
+  - key: services.auditd.installed
+    type: bool
+    description: The audit daemon's unit auditd.service exists on the host.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.auditd.active
+    type: bool
+    description: The audit daemon is running.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.auditd.unit_file_state
+    type: string
+    description: UnitFileState of auditd.service (evidence only; "not-found" when the unit is not there).
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.auditd.enabled
+    type: bool
+    description: auditd.service will start at boot.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.journal_upload.installed
+    type: bool
+    description: The journal upload unit systemd-journal-upload.service exists on the host.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.journal_upload.active
+    type: bool
+    description: systemd-journal-upload is running.
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.journal_upload.unit_file_state
+    type: string
+    description: UnitFileState of systemd-journal-upload.service (evidence only; "not-found" when the unit is not there).
+    since: 1
+    sensitivity: public
+    collector: services
+  - key: services.journal_upload.enabled
+    type: bool
+    description: systemd-journal-upload.service will start at boot.
+    since: 1
+    sensitivity: public
+    collector: services
   - key: sockets.listening
     type: list<record>
     description: Listening TCP/UDP sockets with proto, address, port, inode, pid and executable.
@@ -1086,6 +1134,24 @@ keys:
     since: 1
     sensitivity: public
     collector: files
+  - key: sudo.log.syslog
+    type: bool
+    description: Whether sudo logs to syslog by default - false only when an unscoped Defaults line negates it (!syslog), later lines winning across /etc/sudoers and its includedir files in sudo's order; on by default in sudoers(5), and a syslog=facility value keeps it on. The read's status, path-prefixed, when any of those files cannot be read.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: sudo.log.logfile
+    type: string
+    description: The unscoped Defaults logfile= value with quotes stripped, an empty string when none (or when !logfile resets it); the read's status, path-prefixed, when a sudoers file cannot be read.
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: sudo.defaults.scoped_count
+    type: int
+    description: How many scoped Defaults lines (Defaults:user, Defaults@host, Defaults>runas, Defaults!command) the sudoers files carry - counted, not interpreted, since each changes one persona and sudo.log.* say what the host does by default; evidence.
+    since: 1
+    sensitivity: public
+    collector: files
   - key: accounts.login_defs.pass_max_days
     type: setting<int>
     description: PASS_MAX_DAYS - persisted in login.defs, effective as the maximum over existing accounts' shadow fields.
@@ -1665,6 +1731,24 @@ keys:
     description: The distinct local file targets the rules name, each with path, exists, persistent, mtime_age_s and stat_status (ok, absent, denied, error or undeclared); mtime_age_s is the whole seconds between the file's modification time and the run's collected_at and is omitted when either is unknown or the file was modified after the run started, and a path outside the collector's declaration is recorded with stat_status undeclared and never stat-ed. Evidence only.
     since: 1
     sensitivity: public
+    collector: logging
+  - key: logging.rsyslog.forwards_remote
+    type: bool
+    description: Whether at least one parsed rsyslog action is a remote target (@host, @@host, :omfwd:, action(type="omfwd")) whose host is not loopback (127.0.0.0/8, ::1, localhost - a relay into a local shipper stays in the evidence list only); false when rsyslog is not installed and journald is the logger, absent for syslog-ng (not modelled) and when no modelled syslog daemon is present.
+    since: 1
+    sensitivity: public
+    collector: logging
+  - key: logging.rsyslog.remote_targets
+    type: list<record>
+    description: The remote rsyslog actions in rule order, one row per action line with rule (the action text as parsed), target and loopback; capped at 256 rows; evidence.
+    since: 1
+    sensitivity: internal
+    collector: logging
+  - key: logging.journal_upload.url
+    type: string
+    description: The URL= of [Upload] in journal-upload.conf (/etc/systemd, or the /usr/lib/systemd copy when there is none) merged with its journal-upload.conf.d drop-ins, last wins, kept as written; an empty string when no file sets it; the read's status when a file in the chain cannot be read, and unsupported on a host with no systemd.
+    since: 1
+    sensitivity: internal
     collector: logging
   - key: nfs.exports
     type: list<record>
@@ -2825,3 +2909,57 @@ keys:
     since: 1
     sensitivity: public
     collector: audit
+  - key: fim.tool
+    type: string
+    description: The file-integrity tool muster models on this host - aide when the AIDE binary exists, none when no known tool's binary does; absent when AIDE is missing and another tool's binary exists (Tripwire, Samhain, osquery, integrit, Wazuh/OSSEC), the reason naming them.
+    since: 1
+    sensitivity: public
+    collector: fim
+  - key: fim.aide.installed
+    type: bool
+    description: Whether the AIDE binary exists (/usr/bin/aide or /usr/sbin/aide).
+    since: 1
+    sensitivity: public
+    collector: fim
+  - key: fim.aide.config_path
+    type: string
+    description: The first AIDE configuration file that exists, /etc/aide/aide.conf (Debian family) then /etc/aide.conf (EL); absent when neither does.
+    since: 1
+    sensitivity: public
+    collector: fim
+  - key: fim.aide.database_path
+    type: string
+    description: The file the configuration reads its database from - database_in= (aide 0.17 and later), else database=, with the file prefix removed and @@define macros substituted; a macro the file never defines is left as written and the reason names it; the read's status when the configuration cannot be read.
+    since: 1
+    sensitivity: public
+    collector: fim
+  - key: fim.aide.database_present
+    type: bool
+    description: Whether a regular file exists at fim.aide.database_path; absent, naming the path, when that path is outside /var/lib/aide.
+    since: 1
+    sensitivity: public
+    collector: fim
+  - key: fim.aide.database_modified
+    type: string
+    description: The database file's modification time as RFC 3339 UTC; absent when there is no database; evidence (no key says whether the database is fresh).
+    since: 1
+    sensitivity: public
+    collector: fim
+  - key: fim.aide.scheduled
+    type: bool
+    description: Whether at least one fim.aide.schedules row is armed; unsupported when a systemd host's timer inventory cannot be read.
+    since: 1
+    sensitivity: public
+    collector: fim
+  - key: fim.aide.schedules
+    type: list<record>
+    description: Every way this host schedules AIDE, sorted by path, with kind (cron_daily, cron_d, crontab or timer), path (the file, or the timer unit), armed and detail (why it will not run) - a cron.daily script whose name contains aide is armed when executable, not the Ubuntu 24.04 shim on a systemd host, and CRON_DAILY_RUN in /etc/default/aide is yes or unset; a cron.d or crontab line whose command names aide is armed; a timer whose name contains aide is armed when systemctl list-timers shows a next elapse and the same CRON_DAILY_RUN gate holds; capped at 64 rows.
+    since: 1
+    sensitivity: public
+    collector: fim
+  - key: fim.other_tools
+    type: list<record>
+    description: The binaries of file-integrity tools other than AIDE that exist, each with name and path, sorted by path; capped at 64 rows; evidence.
+    since: 1
+    sensitivity: public
+    collector: fim

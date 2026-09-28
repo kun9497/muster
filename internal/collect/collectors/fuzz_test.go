@@ -1291,3 +1291,44 @@ func FuzzParseAuditctlStatus(f *testing.F) {
 		}, len(data))
 	})
 }
+
+func FuzzParseAideConf(f *testing.F) {
+	seeds(f, "testdata/aide.conf.*")
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "parseAideConf", func() any { return parseAideConf(data) }, len(data))
+	})
+}
+
+func FuzzParseListTimers(f *testing.F) {
+	seeds(f, "testdata/list_timers.sample")
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "parseListTimers", func() any { return parseListTimers(data) }, len(data))
+	})
+}
+
+func FuzzCronDailyRun(f *testing.F) {
+	seeds(f, "testdata/default_aide.sample")
+	f.Add([]byte("CRON_DAILY_RUN=\"no\"\n"))
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "cronDailyRun", func() any {
+			v, set := cronDailyRun(data)
+			return []any{v, set}
+		}, len(data))
+	})
+}
+
+func FuzzNamesAide(f *testing.F) {
+	seeds(f, "testdata/crontab", "testdata/cron_d_entry")
+	f.Add([]byte("30 3 * * * root /usr/bin/aide --check\n@daily root aide\n"))
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "namesAide", func() any { return namesAide(data) }, len(data))
+	})
+}
+
+func FuzzParseSudoersDefaults(f *testing.F) {
+	seeds(f, "testdata/sudoers*")
+	f.Add([]byte("Defaults env_keep += \"LANG LC_ALL\", !syslog, logfile=\"/var/log/sudo.log\" \\n  syslog=authpriv\nDefaults:root !syslog\n"))
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "parseSudoersDefaults", func() any { return parseSudoersDefaults(data) }, len(data))
+	})
+}

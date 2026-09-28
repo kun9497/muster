@@ -53,6 +53,7 @@ func init() {
 	collect.Register(patchCollector)
 	collect.Register(pkgverifyCollector)
 	collect.Register(auditCollector)
+	collect.Register(fimCollector)
 	collect.Register(sysctlCollector)
 	collect.Register(coredumpCollector)
 	collect.Register(bootCollector)

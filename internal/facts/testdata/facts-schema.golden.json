@@ -822,6 +822,86 @@
       "SubjectKind": ""
     },
     {
+      "Key": "services.auditd.installed",
+      "Type": "bool",
+      "Description": "The audit daemon's unit auditd.service exists on the host.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.auditd.active",
+      "Type": "bool",
+      "Description": "The audit daemon is running.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.auditd.unit_file_state",
+      "Type": "string",
+      "Description": "UnitFileState of auditd.service (evidence only; \"not-found\" when the unit is not there).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.auditd.enabled",
+      "Type": "bool",
+      "Description": "auditd.service will start at boot.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.journal_upload.installed",
+      "Type": "bool",
+      "Description": "The journal upload unit systemd-journal-upload.service exists on the host.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.journal_upload.active",
+      "Type": "bool",
+      "Description": "systemd-journal-upload is running.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.journal_upload.unit_file_state",
+      "Type": "string",
+      "Description": "UnitFileState of systemd-journal-upload.service (evidence only; \"not-found\" when the unit is not there).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "services.journal_upload.enabled",
+      "Type": "bool",
+      "Description": "systemd-journal-upload.service will start at boot.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "services",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
       "Key": "sockets.listening",
       "Type": "list\u003crecord\u003e",
       "Description": "Listening TCP/UDP sockets with proto, address, port, inode, pid and executable.",
@@ -1952,6 +2032,36 @@
       "SubjectKind": ""
     },
     {
+      "Key": "sudo.log.syslog",
+      "Type": "bool",
+      "Description": "Whether sudo logs to syslog by default - false only when an unscoped Defaults line negates it (!syslog), later lines winning across /etc/sudoers and its includedir files in sudo's order; on by default in sudoers(5), and a syslog=facility value keeps it on. The read's status, path-prefixed, when any of those files cannot be read.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "sudo.log.logfile",
+      "Type": "string",
+      "Description": "The unscoped Defaults logfile= value with quotes stripped, an empty string when none (or when !logfile resets it); the read's status, path-prefixed, when a sudoers file cannot be read.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "sudo.defaults.scoped_count",
+      "Type": "int",
+      "Description": "How many scoped Defaults lines (Defaults:user, Defaults@host, Defaults\u003erunas, Defaults!command) the sudoers files carry - counted, not interpreted, since each changes one persona and sudo.log.* say what the host does by default; evidence.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "files",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
       "Key": "accounts.login_defs.pass_max_days",
       "Type": "setting\u003cint\u003e",
       "Description": "PASS_MAX_DAYS - persisted in login.defs, effective as the maximum over existing accounts' shadow fields.",
@@ -2877,6 +2987,36 @@
       "Description": "The distinct local file targets the rules name, each with path, exists, persistent, mtime_age_s and stat_status (ok, absent, denied, error or undeclared); mtime_age_s is the whole seconds between the file's modification time and the run's collected_at and is omitted when either is unknown or the file was modified after the run started, and a path outside the collector's declaration is recorded with stat_status undeclared and never stat-ed. Evidence only.",
       "Since": 1,
       "Sensitivity": "public",
+      "Collector": "logging",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "logging.rsyslog.forwards_remote",
+      "Type": "bool",
+      "Description": "Whether at least one parsed rsyslog action is a remote target (@host, @@host, :omfwd:, action(type=\"omfwd\")) whose host is not loopback (127.0.0.0/8, ::1, localhost - a relay into a local shipper stays in the evidence list only); false when rsyslog is not installed and journald is the logger, absent for syslog-ng (not modelled) and when no modelled syslog daemon is present.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "logging",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "logging.rsyslog.remote_targets",
+      "Type": "list\u003crecord\u003e",
+      "Description": "The remote rsyslog actions in rule order, one row per action line with rule (the action text as parsed), target and loopback; capped at 256 rows; evidence.",
+      "Since": 1,
+      "Sensitivity": "internal",
+      "Collector": "logging",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "logging.journal_upload.url",
+      "Type": "string",
+      "Description": "The URL= of [Upload] in journal-upload.conf (/etc/systemd, or the /usr/lib/systemd copy when there is none) merged with its journal-upload.conf.d drop-ins, last wins, kept as written; an empty string when no file sets it; the read's status when a file in the chain cannot be read, and unsupported on a host with no systemd.",
+      "Since": 1,
+      "Sensitivity": "internal",
       "Collector": "logging",
       "DefaultOn": "",
       "SubjectKind": ""
@@ -4478,6 +4618,96 @@
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "audit",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "fim.tool",
+      "Type": "string",
+      "Description": "The file-integrity tool muster models on this host - aide when the AIDE binary exists, none when no known tool's binary does; absent when AIDE is missing and another tool's binary exists (Tripwire, Samhain, osquery, integrit, Wazuh/OSSEC), the reason naming them.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "fim",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "fim.aide.installed",
+      "Type": "bool",
+      "Description": "Whether the AIDE binary exists (/usr/bin/aide or /usr/sbin/aide).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "fim",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "fim.aide.config_path",
+      "Type": "string",
+      "Description": "The first AIDE configuration file that exists, /etc/aide/aide.conf (Debian family) then /etc/aide.conf (EL); absent when neither does.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "fim",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "fim.aide.database_path",
+      "Type": "string",
+      "Description": "The file the configuration reads its database from - database_in= (aide 0.17 and later), else database=, with the file prefix removed and @@define macros substituted; a macro the file never defines is left as written and the reason names it; the read's status when the configuration cannot be read.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "fim",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "fim.aide.database_present",
+      "Type": "bool",
+      "Description": "Whether a regular file exists at fim.aide.database_path; absent, naming the path, when that path is outside /var/lib/aide.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "fim",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "fim.aide.database_modified",
+      "Type": "string",
+      "Description": "The database file's modification time as RFC 3339 UTC; absent when there is no database; evidence (no key says whether the database is fresh).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "fim",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "fim.aide.scheduled",
+      "Type": "bool",
+      "Description": "Whether at least one fim.aide.schedules row is armed; unsupported when a systemd host's timer inventory cannot be read.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "fim",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "fim.aide.schedules",
+      "Type": "list\u003crecord\u003e",
+      "Description": "Every way this host schedules AIDE, sorted by path, with kind (cron_daily, cron_d, crontab or timer), path (the file, or the timer unit), armed and detail (why it will not run) - a cron.daily script whose name contains aide is armed when executable, not the Ubuntu 24.04 shim on a systemd host, and CRON_DAILY_RUN in /etc/default/aide is yes or unset; a cron.d or crontab line whose command names aide is armed; a timer whose name contains aide is armed when systemctl list-timers shows a next elapse and the same CRON_DAILY_RUN gate holds; capped at 64 rows.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "fim",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "fim.other_tools",
+      "Type": "list\u003crecord\u003e",
+      "Description": "The binaries of file-integrity tools other than AIDE that exist, each with name and path, sorted by path; capped at 64 rows; evidence.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "fim",
       "DefaultOn": "",
       "SubjectKind": ""
     }
