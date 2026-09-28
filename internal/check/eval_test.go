@@ -215,6 +215,15 @@ func TestDerivationTable(t *testing.T) {
 			packageFilesControl(), ERROR, PermissionDenied, evidenceHasFact("packages.verify.complete", facts.StatusDenied)},
 		{"10b verify unsupported is not applicable", `{"packages":{"verify":{"modified":{"status":"ok","value":[]},"complete":{"status":"unsupported","reason":"no supported package manager"}}}}`,
 			packageFilesControl(), NotApplicable, UnsupportedEnv, evidenceHasFact("packages.verify.complete", facts.StatusUnsupported)},
+		// X-2: the evaluator's own truncation screen, reached past the deep
+		// gate (complete ok true) on an ok modified list marked truncated.
+		{"6 verify complete but modified truncated", `{"packages":{"verify":{"complete":{"status":"ok","value":true},"modified":{"status":"ok","value":[],"truncated":true}}}}`,
+			packageFilesControl(), ERROR, Truncated, evidenceHasFact("packages.verify.modified", facts.StatusOK)},
+		// X-8: the walk family reads unsupported as NOT_APPLICABLE like verify.
+		{"10b walk unsupported is not applicable", `{"walk":{"world_writable":{"status":"ok","value":[]},"complete":{"status":"unsupported","reason":"no walk on this platform"}}}`,
+			controls.Control{ID: "muster.file.world_writable", Importance: "상", Category: "file", Automation: "partial", AbsentMeans: "pass", Remediation: &controls.Remediation{Risk: "none"},
+				Checks: []controls.Clause{{Fact: "walk.world_writable", Op: "each", Subject: "path", Require: &controls.Clause{Field: "package_declared", Op: "eq", Expected: true}}}},
+			NotApplicable, UnsupportedEnv, evidenceHasFact("walk.complete", facts.StatusUnsupported)},
 		{"a walk control is not gated by packages.verify.complete",
 			`{"walk":{"world_writable":{"status":"ok","value":[]},"complete":{"status":"ok","value":true}},"packages":{"verify":{"complete":{"status":"ok","value":false}}}}`,
 			controls.Control{ID: "muster.file.world_writable", Importance: "상", Category: "file", Automation: "partial", AbsentMeans: "pass", Remediation: &controls.Remediation{Risk: "none"},

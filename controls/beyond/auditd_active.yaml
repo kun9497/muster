@@ -22,7 +22,7 @@ checks:
   - { fact: services.auditd.active, op: eq, expected: true }
   - { fact: services.auditd.enabled, op: eq, expected: true }
 remediation:
-  text_en: Install the audit daemon (the audit package on the EL family, auditd on Debian and Ubuntu) and run systemctl enable --now auditd, which starts it now and at every boot. Check that the kernel command line does not carry audit=0, which keeps the unit from starting; on the EL family the unit refuses a manual stop, so a restart after a configuration change is service auditd restart rather than systemctl restart.
-  text_ko: 감사 데몬(EL 계열은 audit 패키지, Debian·Ubuntu 는 auditd)을 설치하고 systemctl enable --now auditd 를 실행하면 지금 시작되고 매 부팅 시에도 시작됩니다. 커널 명령줄에 유닛의 시작을 막는 audit=0 이 없는지 확인하십시오. EL 계열의 유닛은 수동 중지를 거부하므로 설정 변경 후 재시작은 systemctl restart 대신 service auditd restart 로 합니다.
+  text_en: Install the audit daemon (the audit package on the EL family, auditd on Debian and Ubuntu) and run systemctl enable --now auditd, which starts it now and at every boot. Check that the kernel command line does not carry audit=0, which keeps the unit from starting; the unit auditd ships refuses a manual stop (RefuseManualStop), so a restart after a configuration change is service auditd restart rather than systemctl restart.
+  text_ko: 감사 데몬(EL 계열은 audit 패키지, Debian·Ubuntu 는 auditd)을 설치하고 systemctl enable --now auditd 를 실행하면 지금 시작되고 매 부팅 시에도 시작됩니다. 커널 명령줄에 유닛의 시작을 막는 audit=0 이 없는지 확인하십시오. auditd 가 배포하는 유닛은 수동 중지를 거부하므로(RefuseManualStop) 설정 변경 후 재시작은 systemctl restart 대신 service auditd restart 로 합니다.
   risk: none
   idempotent: true

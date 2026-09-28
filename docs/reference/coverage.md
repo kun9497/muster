@@ -83,7 +83,7 @@
 | muster.beyond.aslr_and_link_protection | 상 | auto | env.container, kernel.sysctl.protected_fifos, kernel.sysctl.protected_hardlinks, kernel.sysctl.protected_regular, kernel.sysctl.protected_symlinks, kernel.sysctl.randomize_va_space | RHEL-09-213030, RHEL-09-213035, RHEL-09-213070, UBTU-22-213020, UBTU-24-700310 |
 | muster.beyond.audit_disk_actions | 중 | auto | audit.conf.admin_space_left_action, audit.conf.disk_error_action, audit.conf.disk_full_action, audit.conf.max_log_file_action, audit.conf.space_left_action, env.container, services.auditd.installed | RHEL-09-653020, RHEL-09-653025, RHEL-09-653040, RHEL-09-653050, RHEL-09-653055, UBTU-22-653030, UBTU-22-653040, UBTU-24-900960 |
 | muster.beyond.audit_immutable | 중 | auto | audit.immutable, env.container, services.auditd.installed | RHEL-09-654275, UBTU-24-909000 |
-| muster.beyond.audit_log_permissions | 중 | auto | audit.log_dir.group_writable, audit.log_dir.other_readable, audit.log_dir.other_writable, audit.log_dir.uid, audit.log_file.mode, audit.log_file.uid, env.container, services.auditd.installed | RHEL-09-653085, RHEL-09-653090, UBTU-22-653045, UBTU-22-653050, UBTU-22-653060, UBTU-24-901300, UBTU-24-901310, UBTU-24-901380 |
+| muster.beyond.audit_log_permissions | 중 | auto | audit.log_dir.group_writable, audit.log_dir.other_readable, audit.log_dir.other_writable, audit.log_dir.uid, audit.log_file.group, audit.log_file.mode, audit.log_file.uid, env.container, services.auditd.installed | RHEL-09-653080, RHEL-09-653085, RHEL-09-653090, UBTU-22-653045, UBTU-22-653050, UBTU-22-653055, UBTU-22-653060, UBTU-24-901300, UBTU-24-901310, UBTU-24-901350, UBTU-24-901380 |
 | muster.beyond.audit_rules_loaded | 상 | auto | audit.rules.present, env.container, services.auditd.installed | — |
 | muster.beyond.auditd_active | 상 | auto | env.container, services.auditd.active, services.auditd.enabled, services.auditd.installed | RHEL-09-653010, RHEL-09-653015, UBTU-22-653010, UBTU-24-100400 |
 | muster.beyond.bootloader_config_permissions | 상 | auto | boot.grub_cfg.gid, boot.grub_cfg.mode, boot.grub_cfg.uid, env.container | RHEL-09-212025, RHEL-09-212030 |
@@ -111,7 +111,7 @@
 
 ## Fact keys used by controls
 
-209 of 454 registered keys are read by a control (4 by the engine); 241 unused.
+210 of 454 registered keys are read by a control (4 by the engine); 240 unused.
 
 | Collector | Registered | Used by a control | Read by the engine | Unused |
 |---|---|---|---|---|
@@ -142,5 +142,5 @@
 | mounts | 5 | 5 | 0 | — |
 | modules | 1 | 1 | 0 | — |
 | swap | 3 | 1 | 0 | swap.present, swap.devices |
-| audit | 34 | 13 | 0 | audit.rules.loaded_count, audit.rules.persisted_count, audit.rules.persisted, audit.status.enabled, audit.status.failure, audit.status.lost, audit.status.backlog_limit, audit.conf.log_file, audit.conf.log_group, audit.log_file.gid, audit.log_file.group, audit.log_file.group_readable, audit.log_file.group_writable, audit.log_file.other_readable, audit.log_file.other_writable, audit.log_file.acl_present, audit.log_dir.mode, audit.log_dir.gid, audit.log_dir.group, audit.log_dir.group_readable, audit.log_dir.acl_present |
+| audit | 34 | 14 | 0 | audit.rules.loaded_count, audit.rules.persisted_count, audit.rules.persisted, audit.status.enabled, audit.status.failure, audit.status.lost, audit.status.backlog_limit, audit.conf.log_file, audit.conf.log_group, audit.log_file.gid, audit.log_file.group_readable, audit.log_file.group_writable, audit.log_file.other_readable, audit.log_file.other_writable, audit.log_file.acl_present, audit.log_dir.mode, audit.log_dir.gid, audit.log_dir.group, audit.log_dir.group_readable, audit.log_dir.acl_present |
 | fim | 9 | 3 | 0 | fim.aide.installed, fim.aide.config_path, fim.aide.database_path, fim.aide.database_modified, fim.aide.schedules, fim.other_tools |

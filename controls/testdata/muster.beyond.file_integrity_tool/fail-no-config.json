@@ -1,0 +1,121 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none"
+      }
+    },
+    "fim": {
+      "tool": {
+        "status": "ok",
+        "value": "aide",
+        "source": {
+          "kind": "file",
+          "path": "/usr/sbin/aide"
+        }
+      },
+      "aide": {
+        "installed": {
+          "status": "ok",
+          "value": true,
+          "source": {
+            "kind": "file",
+            "path": "/usr/sbin/aide"
+          }
+        },
+        "config_path": {
+          "status": "absent",
+          "reason": "neither /etc/aide/aide.conf nor /etc/aide.conf exists"
+        },
+        "database_path": {
+          "status": "absent",
+          "reason": "no AIDE configuration file names a database: neither /etc/aide/aide.conf nor /etc/aide.conf exists"
+        },
+        "database_present": {
+          "status": "ok",
+          "value": false,
+          "reason": "no AIDE configuration file names a database: neither /etc/aide/aide.conf nor /etc/aide.conf exists",
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "file",
+                "path": "/etc/aide/aide.conf"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/aide.conf"
+              }
+            ]
+          }
+        },
+        "database_modified": {
+          "status": "absent",
+          "reason": "no AIDE configuration file names a database: neither /etc/aide/aide.conf nor /etc/aide.conf exists"
+        },
+        "schedules": {
+          "status": "ok",
+          "value": [
+            {
+              "kind": "timer",
+              "path": "aide-check.timer",
+              "armed": true,
+              "detail": ""
+            }
+          ],
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "file",
+                "path": "/etc/cron.d/0hourly"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/crontab"
+              },
+              {
+                "kind": "command",
+                "cmd": "/usr/bin/systemctl list-timers --all --no-legend --no-pager",
+                "exit_code": 0
+              }
+            ]
+          }
+        },
+        "scheduled": {
+          "status": "ok",
+          "value": true,
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "file",
+                "path": "/etc/cron.d/0hourly"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/crontab"
+              },
+              {
+                "kind": "command",
+                "cmd": "/usr/bin/systemctl list-timers --all --no-legend --no-pager",
+                "exit_code": 0
+              }
+            ]
+          }
+        }
+      },
+      "other_tools": {
+        "status": "ok",
+        "value": [],
+        "source": {
+          "kind": "derived"
+        }
+      }
+    }
+  }
+}

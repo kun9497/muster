@@ -711,7 +711,8 @@
             "unparsed_head": [],
             "packages_without_digests": 3,
             "packages_without_digests_error": "",
-            "dpkg_path_excludes": []
+            "dpkg_path_excludes": [],
+            "dpkg_path_excludes_error": []
           },
           "source": {
             "kind": "command",

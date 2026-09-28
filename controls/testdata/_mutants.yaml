@@ -208,34 +208,13 @@
   mutant: "mechanisms[1].when[0] remove"
   reason: >-
     sudoLogFacts (internal/collect/collectors/files_sudo.go) writes sudo.log.syslog as an ok
-    bool -- true for sudo's compiled-in default, false only for an unscoped !syslog -- or as the
-    sudoers read's hard status (C3), never absent or unsupported. Mechanism [0] claims true and
-    a hard status is ERROR at its `when`, so mechanism [1] is only ever reached with false,
-    which is exactly what its own `when` selects.
-
-- control: muster.beyond.sudo_logging
-  mutant: "absent_means ->pass"
-  reason: >-
-    sudo.log.syslog and sudo.log.logfile (internal/collect/collectors/files_sudo.go) are ok --
-    the parsed value, or sudo's compiled-in defaults when /etc/sudoers does not exist -- or the
-    read's status (C3), never absent. So no snapshot collect writes reaches absent_means, and
-    the value it names cannot change any fixture's answer.
-
-- control: muster.beyond.sudo_logging
-  mutant: "absent_means ->not_applicable"
-  reason: >-
-    sudo.log.syslog and sudo.log.logfile (internal/collect/collectors/files_sudo.go) are ok --
-    the parsed value, or sudo's compiled-in defaults when /etc/sudoers does not exist -- or the
-    read's status (C3), never absent. So no snapshot collect writes reaches absent_means, and
-    the value it names cannot change any fixture's answer.
-
-- control: muster.beyond.sudo_logging
-  mutant: "absent_means ->manual"
-  reason: >-
-    sudo.log.syslog and sudo.log.logfile (internal/collect/collectors/files_sudo.go) are ok --
-    the parsed value, or sudo's compiled-in defaults when /etc/sudoers does not exist -- or the
-    read's status (C3), never absent. So no snapshot collect writes reaches absent_means, and
-    the value it names cannot change any fixture's answer.
+    bool -- true for sudo's compiled-in default, false only for an unscoped !syslog -- as the
+    sudoers read's hard status (C3), or as absent with sudo.log.logfile (an include outside the
+    declaration, a symlinked drop-in), never unsupported. Mechanism [0] claims true and a hard
+    status is ERROR at its `when`, so mechanism [1] is reached only with false, which its own
+    `when` selects, or with absent, where the original resolves through absent_means with "no
+    mechanism applies" and the mutant through the same absent_means on its absent logfile
+    check: both MANUAL.
 
 - control: muster.beyond.file_integrity_tool
   mutant: "mechanisms[1].when[0] remove"

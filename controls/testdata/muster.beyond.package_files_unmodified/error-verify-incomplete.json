@@ -90,10 +90,10 @@
           "status": "ok",
           "value": {
             "config": 0,
-            "doc": 0,
+            "doc": 201133,
             "dpkg_excluded": 0,
-            "ghost": 0,
-            "mtime_only": 0,
+            "ghost": 12953,
+            "mtime_only": 98760,
             "unverifiable": 0,
             "unchanged": 0
           },
@@ -114,7 +114,8 @@
             "unparsed_head": [],
             "packages_without_digests": 0,
             "packages_without_digests_error": "",
-            "dpkg_path_excludes": []
+            "dpkg_path_excludes": [],
+            "dpkg_path_excludes_error": []
           },
           "source": {
             "kind": "command",
