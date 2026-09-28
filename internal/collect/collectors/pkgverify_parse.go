@@ -290,7 +290,7 @@ func (f verifyFilter) excluded(p string) bool {
 
 // verifyFilterNames are the noise filter's rules in the order they are
 // tried; packages.verify.filter records them and filtered_counts counts each.
-var verifyFilterNames = []string{"config", "doc", "dpkg_excluded", "ghost", "mtime_only", "unverifiable"}
+var verifyFilterNames = []string{"config", "doc", "dpkg_excluded", "ghost", "mtime_only", "unverifiable", "unchanged"}
 
 // verifyDocPrefixes are the documentation trees the doc rule drops whatever
 // the type letter: dpkg has no documentation letter, and a minimised install
@@ -335,6 +335,10 @@ func verifyRule(r verifyRow, f verifyFilter) string {
 		return "mtime_only"
 	case len(r.attrs) == 0 && r.untested > 0:
 		return "unverifiable"
+	case len(r.attrs) == 0:
+		// All nine columns `.`: rpm printed the row only to carry a file
+		// state such as `(not installed)` or `(replaced)`. Nothing differs.
+		return "unchanged"
 	}
 	return ""
 }

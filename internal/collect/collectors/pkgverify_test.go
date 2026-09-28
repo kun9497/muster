@@ -165,7 +165,7 @@ func wantCounts(t *testing.T, b *collect.Builder, want map[string]int) {
 func wantFilter(t *testing.T, b *collect.Builder) {
 	t.Helper()
 	got := strList(env(t, b, "packages.verify.filter").Value)
-	want := []string{"config", "doc", "dpkg_excluded", "ghost", "mtime_only", "unverifiable"}
+	want := []string{"config", "doc", "dpkg_excluded", "ghost", "mtime_only", "unverifiable", "unchanged"}
 	if !slices.Equal(got, want) {
 		t.Errorf("filter %v, want %v", got, want)
 	}
@@ -584,5 +584,61 @@ func TestCapRowsCuts(t *testing.T) {
 	}
 	if got := len(pkgverifyRun(t, rpmVerifyHost(cmdResult{stdout: []byte(out.String()), exitCode: 1}), true).Keys("pkgverify")); got != 7 {
 		t.Errorf("a capped run wrote %d keys, want 7", got)
+	}
+}
+
+// rpm prints a row whose nine columns are all `.` only to carry a file state
+// (`(not installed)`, `(replaced)`): nothing differs, so it is not a
+// modification and the unchanged rule drops it. A `?`-only row is still
+// unverifiable — the order of the two rules is what tells them apart.
+func TestPkgverifyUnchangedRowIsDropped(t *testing.T) {
+	withEUID(t, 0)
+	b := pkgverifyRun(t, rpmVerifyHost(cmdResult{exitCode: 1, stdout: []byte(
+		// rpm prints `%s  %c %s`: with no type letter that is four blanks.
+		".........    /usr/bin/x (not installed)\n" +
+			"..?......    /usr/sbin/unreadable\n" +
+			"S.5......    /usr/bin/changed\n")}), true)
+	mod := verifyRows(t, b, "packages.verify.modified")
+	if len(mod) != 1 || mod["/usr/bin/changed"] == nil {
+		t.Errorf("modified %v, want /usr/bin/changed alone", mod)
+	}
+	wantCounts(t, b, map[string]int{"unchanged": 1, "unverifiable": 1})
+	wantFilter(t, b)
+}
+
+// A dpkg.cfg fragment read only in part (the read cap) or refused as binary
+// (a NUL byte: the primitive returns no data and no error) is as unreadable
+// as a denied one: its filters are not known, so the rule is dropped and the
+// reason recorded.
+func TestPkgverifyPartialExcludesDropTheRule(t *testing.T) {
+	withEUID(t, 0)
+	for _, tc := range []struct {
+		name, reason string
+		host         func(a *fsAccess)
+	}{
+		{"truncated", "truncated", func(a *fsAccess) {
+			a.files["/etc/dpkg/dpkg.cfg.d/cut"] = "dpkg.cfg.d-globs"
+			a.truncated = map[string]bool{"/etc/dpkg/dpkg.cfg.d/cut": true}
+		}},
+		{"binary", "binary", func(a *fsAccess) {
+			a.contents = map[string][]byte{"/etc/dpkg/dpkg.cfg.d/cut": []byte("path-exclude=/opt/vendor/*\x00\n")}
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			a := &fsAccess{
+				files: map[string]string{dpkgStatusPath: "dpkg.status.sample", "/etc/dpkg/dpkg.cfg": "dpkg.cfg.d-globs"},
+				cmds:  map[string]cmdResult{cmdKey(dpkgVerifyCmd): {stdout: []byte("missing     /opt/vendor/a/b/c.bak\n")}},
+			}
+			tc.host(a)
+			b := pkgverifyRun(t, a, true)
+			if mod := verifyRows(t, b, "packages.verify.modified"); mod["/opt/vendor/a/b/c.bak"] == nil {
+				t.Errorf("the rule was applied from a partial set of globs: %v", mod)
+			}
+			wantCounts(t, b, map[string]int{})
+			got := strList(verifyRecord(t, b, "packages.verify.stats")["dpkg_path_excludes"])
+			if want := []string{"/etc/dpkg/dpkg.cfg.d/cut: " + tc.reason}; !slices.Equal(got, want) {
+				t.Errorf("dpkg_path_excludes %v, want %v", got, want)
+			}
+		})
 	}
 }

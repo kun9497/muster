@@ -3214,7 +3214,7 @@
     {
       "Key": "packages.verify.filter",
       "Type": "list\u003cstring\u003e",
-      "Description": "The noise-filter rules applied to the verification output, in order - config, doc, dpkg_excluded, ghost, mtime_only, unverifiable.",
+      "Description": "The noise-filter rules applied to the verification output, in order - config, doc, dpkg_excluded, ghost, mtime_only, unverifiable, unchanged.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "pkgverify",
@@ -3224,7 +3224,7 @@
     {
       "Key": "packages.verify.filtered_counts",
       "Type": "record",
-      "Description": "How many verification rows each filter rule removed - config, doc, dpkg_excluded, ghost, mtime_only, unverifiable.",
+      "Description": "How many verification rows each filter rule removed - config, doc, dpkg_excluded, ghost, mtime_only, unverifiable, unchanged.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "pkgverify",
@@ -3234,7 +3234,7 @@
     {
       "Key": "packages.verify.stats",
       "Type": "record",
-      "Description": "The verification's own account of itself - lines, exit_code, duration_ms, truncated, stderr_head, unparsed_head, packages_without_digests, dpkg_path_excludes; provenance, read by no control.",
+      "Description": "The verification's own account of itself - lines, exit_code, duration_ms, truncated, stderr_head, unparsed_head, packages_without_digests, packages_without_digests_error, dpkg_path_excludes; provenance, read by no control.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "pkgverify",

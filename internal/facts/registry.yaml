@@ -1870,19 +1870,19 @@ keys:
     subject_kind: file
   - key: packages.verify.filter
     type: list<string>
-    description: The noise-filter rules applied to the verification output, in order - config, doc, dpkg_excluded, ghost, mtime_only, unverifiable.
+    description: The noise-filter rules applied to the verification output, in order - config, doc, dpkg_excluded, ghost, mtime_only, unverifiable, unchanged.
     since: 1
     sensitivity: public
     collector: pkgverify
   - key: packages.verify.filtered_counts
     type: record
-    description: How many verification rows each filter rule removed - config, doc, dpkg_excluded, ghost, mtime_only, unverifiable.
+    description: How many verification rows each filter rule removed - config, doc, dpkg_excluded, ghost, mtime_only, unverifiable, unchanged.
     since: 1
     sensitivity: public
     collector: pkgverify
   - key: packages.verify.stats
     type: record
-    description: The verification's own account of itself - lines, exit_code, duration_ms, truncated, stderr_head, unparsed_head, packages_without_digests, dpkg_path_excludes; provenance, read by no control.
+    description: The verification's own account of itself - lines, exit_code, duration_ms, truncated, stderr_head, unparsed_head, packages_without_digests, packages_without_digests_error, dpkg_path_excludes; provenance, read by no control.
     since: 1
     sensitivity: public
     collector: pkgverify
