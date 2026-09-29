@@ -852,7 +852,7 @@ func resolveRules(files []sudoersFile) (rules []sudoRule, unresolved int) {
 					if past {
 						// The rows past the budget are not read: the last row
 						// says so, and the answers that need them are absent.
-						rule.unresolvedBy = []string{"the rules past " + strconv.Itoa(sudoRowBudget)}
+						rule.unresolvedBy = []string{"the rules past the first " + strconv.Itoa(sudoRowBudget) + " commands"}
 					}
 					spent += cost
 					rule.Resolved = len(rule.unresolvedBy) == 0

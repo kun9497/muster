@@ -281,7 +281,7 @@ func TestWalkACLGrantsWidenOnly(t *testing.T) {
 // goes on and still finishes. An errno that is neither a denial nor a
 // vanished file is xattr_error, the errno in detail.
 func TestWalkXattrErrorsAreSkipsNotStops(t *testing.T) {
-	a := capHost(map[string]uint32{"/usr/bin/a": 0o755, "/usr/bin/b": 0o755, "/usr/bin/c": 0o755, "/usr/bin/d": 0o755, "/usr/bin/e": 0o755, "/usr/bin/f": 0o755})
+	a := capHost(map[string]uint32{"/usr/bin/a": 0o755, "/usr/bin/b": 0o755, "/usr/bin/c": 0o755, "/usr/bin/d": 0o755, "/usr/bin/e": 0o755, "/usr/bin/f": 0o755, "/usr/bin/g": 0o755})
 	a.dirs = map[string]bool{rpmDBDir: true}
 	a.cmds = map[string]cmdResult{cmdKey(rpmCommand): {file: "rpm.qa-files.sample"}}
 	a.xattrErrs["/usr/bin/a"] = unix.EACCES
@@ -290,6 +290,7 @@ func TestWalkXattrErrorsAreSkipsNotStops(t *testing.T) {
 	a.xattrErrs["/usr/bin/d"] = unix.EIO
 	a.setACL("/usr/bin/e", []byte{1, 2, 3})
 	a.xattrErrs["/usr/bin/f"] = unix.ENOENT
+	a.xattrErrs["/usr/bin/g"] = unix.ENXIO // a device or socket put in the entry's place (P-3)
 	b := walkRun(t, a)
 	if e := env(t, b, "walk.complete"); e.Value != true {
 		t.Fatalf("walk.complete = %+v, want true", e)
@@ -303,6 +304,7 @@ func TestWalkXattrErrorsAreSkipsNotStops(t *testing.T) {
 	checkRow(t, skipped, "/usr/bin/c", map[string]any{"reason": "xattr_undecoded"})
 	checkRow(t, skipped, "/usr/bin/d", map[string]any{"reason": "xattr_error", "detail": unix.EIO.Error()})
 	checkRow(t, skipped, "/usr/bin/f", map[string]any{"reason": "vanished", "detail": unix.ENOENT.Error()})
+	checkRow(t, skipped, "/usr/bin/g", map[string]any{"reason": "vanished", "detail": unix.ENXIO.Error()})
 	checkRow(t, skipped, "/usr/bin/e", map[string]any{"reason": "xattr_undecoded"})
 	for _, p := range []string{"/usr/bin/b", "/usr/bin/c", "/usr/bin/e"} {
 		if rowField(rowFor(t, skipped, p), "detail") == "" {

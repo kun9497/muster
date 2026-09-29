@@ -421,7 +421,7 @@ func TestResolveRulesDepthAndCycles(t *testing.T) {
 	if len(rules) != sudoRowBudget+1 || unresolved != 1 || rules[len(rules)-1].Resolved {
 		t.Errorf("row budget: %d rules, %d unresolved", len(rules), unresolved)
 	}
-	if got := unresolvedNames(rules); !reflect.DeepEqual(got, []string{"the rules past 65536"}) {
+	if got := unresolvedNames(rules); !reflect.DeepEqual(got, []string{"the rules past the first 65536 commands"}) {
 		t.Errorf("row budget names %q", got)
 	}
 	// An undefined Cmnd_Alias or Runas_Alias leaves the row unresolved: what
@@ -542,7 +542,7 @@ func TestSudoRulesWideSpecStaysBounded(t *testing.T) {
 	if unresolved != 1 || rules[len(rules)-1].Resolved {
 		t.Errorf("%d rules, %d unresolved: the rows past the budget must be unresolved", len(rules), unresolved)
 	}
-	if got := unresolvedNames(rules); !reflect.DeepEqual(got, []string{"the rules past 65536"}) {
+	if got := unresolvedNames(rules); !reflect.DeepEqual(got, []string{"the rules past the first 65536 commands"}) {
 		t.Errorf("names %q", got)
 	}
 }

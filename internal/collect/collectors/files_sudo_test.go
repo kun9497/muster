@@ -403,7 +403,7 @@ func TestSudoRuleFacts(t *testing.T) {
 	}
 	okValue(t, e["sudo.rules_unresolved"], 1, "wide rules_unresolved")
 	for _, k := range []string{"sudo.nopasswd_all", "sudo.authenticate_disabled"} {
-		if e[k].Status != facts.StatusAbsent || e[k].Reason != "1 rule could not be resolved: the rules past 65536 — the answer needs them" {
+		if e[k].Status != facts.StatusAbsent || e[k].Reason != "1 rule could not be resolved: the rules past the first 65536 commands — the answer needs them" {
 			t.Errorf("wide: %s = %+v", k, e[k])
 		}
 	}

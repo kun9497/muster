@@ -83,8 +83,9 @@ func (w *walker) capabilityRow(e collect.DirEntry, p string) {
 
 // xattrSkipReason maps an entry's attribute failure onto walk.skipped's
 // closed vocabulary: a file this process may not open is xattr_denied; one
-// that is not the file the listing named is vanished, and one that is gone
-// or is a link now is vanished with the errno in detail; any other errno
+// that is not the file the listing named is vanished, and one that is gone,
+// is a link now, or was replaced by a device or socket (ENXIO on the open)
+// is vanished with the errno in detail; any other errno
 // (EIO, ENOMEM, …) is xattr_error with the errno in detail, so nothing is
 // lost and the vocabulary stays closed.
 func xattrSkipReason(err error) (reason, detail string) {
@@ -96,7 +97,7 @@ func xattrSkipReason(err error) (reason, detail string) {
 	}
 	var errno unix.Errno
 	if errors.As(err, &errno) {
-		if errno == unix.ENOENT || errno == unix.ELOOP || errno == unix.ENOTDIR {
+		if errno == unix.ENOENT || errno == unix.ELOOP || errno == unix.ENOTDIR || errno == unix.ENXIO {
 			return "vanished", errno.Error()
 		}
 		return "xattr_error", errno.Error()
