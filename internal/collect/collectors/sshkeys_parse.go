@@ -195,7 +195,9 @@ func restricts(options []string) bool {
 }
 
 // decodeKeyBlob reads the RFC 4251 wire form of a public key: its inner type
-// string and the size ssh-keygen -l prints (sshkey_size). A certificate is
+// string and the size ssh-keygen -l prints (sshkey_size). Every field of a
+// plain key is read and nothing may follow them: sshkey_from_blob refuses
+// trailing bytes, and a blob sshd refuses is no key. A certificate is
 // recorded with bits 0 (V-8); only its type is read.
 func decodeKeyBlob(blob []byte) (typ string, bits int, ok bool) {
 	t, rest, ok := sshString(blob)
@@ -203,55 +205,87 @@ func decodeKeyBlob(blob []byte) (typ string, bits int, ok bool) {
 		return "", 0, false
 	}
 	typ = string(t)
-	switch {
-	case strings.HasSuffix(typ, "-cert-v01@openssh.com"):
+	if strings.HasSuffix(typ, "-cert-v01@openssh.com") {
 		return typ, 0, true
+	}
+	switch {
 	case typ == "ssh-rsa":
-		// string type, mpint e, mpint n: the modulus bit length, which is
-		// exact whether or not the encoder wrote the sign byte.
-		_, rest, ok = sshMpint(rest)
-		if !ok {
+		// string type, mpint e, mpint n: the modulus bit length, exact
+		// whether or not the encoder wrote the sign byte. A zero e or n is
+		// no RSA key; a short modulus keeps its true length, which
+		// min_rsa_bits judges.
+		var e, n []byte
+		if e, rest, ok = sshMpint(rest); !ok || isZero(e) {
 			return "", 0, false
 		}
-		n, _, ok := sshMpint(rest)
-		if !ok {
+		if n, rest, ok = sshMpint(rest); !ok || isZero(n) {
 			return "", 0, false
 		}
-		return typ, new(big.Int).SetBytes(n).BitLen(), true
+		bits = new(big.Int).SetBytes(n).BitLen()
 	case typ == "ssh-dss":
 		// string type, mpint p, q, g, y: the size of p.
-		p, _, ok := sshMpint(rest)
-		if !ok {
+		var p []byte
+		if p, rest, ok = sshMpint(rest); !ok || isZero(p) {
 			return "", 0, false
 		}
-		return typ, new(big.Int).SetBytes(p).BitLen(), true
+		for range 3 {
+			if _, rest, ok = sshMpint(rest); !ok {
+				return "", 0, false
+			}
+		}
+		bits = new(big.Int).SetBytes(p).BitLen()
 	case typ == "ssh-ed25519", typ == "sk-ssh-ed25519@openssh.com":
-		pk, _, ok := sshString(rest)
-		if !ok || len(pk) != 32 {
+		// string type, string key (32 octets) [, string application].
+		var pk []byte
+		if pk, rest, ok = sshString(rest); !ok || len(pk) != 32 {
 			return "", 0, false
 		}
-		return typ, 256, true
+		if typ != "ssh-ed25519" {
+			if _, rest, ok = sshString(rest); !ok {
+				return "", 0, false
+			}
+		}
+		bits = 256
 	case strings.HasPrefix(typ, "ecdsa-sha2-"), typ == "sk-ecdsa-sha2-nistp256@openssh.com":
-		// string type, string curve, string Q: the curve must be the one the
-		// type names (sshd's curve mismatch).
-		curve, _, ok := sshString(rest)
-		if !ok {
-			return "", 0, false
-		}
+		// string type, string curve, string Q [, string application]: the
+		// curve must be the one the type names (sshd's curve mismatch).
+		sk := typ == "sk-ecdsa-sha2-nistp256@openssh.com"
 		want := strings.TrimPrefix(typ, "ecdsa-sha2-")
-		if typ == "sk-ecdsa-sha2-nistp256@openssh.com" {
+		if sk {
 			want = "nistp256"
 		}
-		size := map[string]int{"nistp256": 256, "nistp384": 384, "nistp521": 521}[want]
-		if string(curve) != want || size == 0 {
+		bits = map[string]int{"nistp256": 256, "nistp384": 384, "nistp521": 521}[want]
+		var curve []byte
+		if curve, rest, ok = sshString(rest); !ok || string(curve) != want || bits == 0 {
 			return "", 0, false
 		}
-		if typ != "ecdsa-sha2-"+want {
-			size = 256 // the sk- types' fixed keybits
+		if _, rest, ok = sshString(rest); !ok {
+			return "", 0, false
 		}
-		return typ, size, true
+		if sk {
+			if _, rest, ok = sshString(rest); !ok {
+				return "", 0, false
+			}
+			bits = 256 // the sk- types' fixed keybits
+		}
+	default:
+		return "", 0, false
 	}
-	return "", 0, false
+	if len(rest) != 0 {
+		return "", 0, false
+	}
+	return typ, bits, true
+}
+
+// isZero reports whether an mpint's magnitude is zero (RFC 4251 stores zero
+// as the empty string).
+func isZero(mag []byte) bool {
+	for _, c := range mag {
+		if c != 0 {
+			return false
+		}
+	}
+	return true
 }
 
 // sshString reads an RFC 4251 string: a uint32 big-endian length and that

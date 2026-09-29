@@ -70,6 +70,7 @@ type keyFile struct {
 	keys      []authorizedKey
 	unparsed  int
 	truncated bool
+	linked    bool // a symlink in the path: exists, never read (V-50)
 }
 
 func runSshkeys(_ context.Context, a collect.Access, b *collect.Builder) error {
@@ -84,7 +85,8 @@ func runSshkeys(_ context.Context, a collect.Access, b *collect.Builder) error {
 		return nil
 	}
 	users, _ := parsePasswd(data)
-	shells, _ := loginShells(a)
+	shells, shellsEnv := loginShells(a)
+	shellsBad, shellsUntrusted := untrustedShells(shellsEnv)
 
 	inputs := []facts.Source{{Kind: "file", Path: passwdPath}}
 	truncated, keysCut := meta.Truncated, false
@@ -92,18 +94,20 @@ func runSshkeys(_ context.Context, a collect.Access, b *collect.Builder) error {
 	var rows []any
 	var undeclared []string
 	var poison *facts.Envelope
+	var linked []string
 	rootPaths, allPaths := map[string]bool{}, map[string]bool{}
-	type rsaRow struct {
-		user, path string
-		key        authorizedKey
-	}
-	var rsa []rsaRow
+	// firstUser is, per file read, the account first in sort order whose
+	// home names it: ssh.rsa_keys lists a shared file's keys once, under
+	// that account, as the counts count them once.
+	firstUser := map[string]string{}
+	shellsDecided := false
 
 	for _, u := range users {
 		if u.home == "" {
 			continue
 		}
 		if !declared(a, path.Join(u.home, ".ssh", authorizedKeysNames[0])) {
+			shellsDecided = true
 			if interactive(u.shell, shells) {
 				undeclared = append(undeclared, undeclaredHome(u))
 			}
@@ -117,6 +121,8 @@ func runSshkeys(_ context.Context, a collect.Access, b *collect.Builder) error {
 				f = readKeyFile(a, p)
 				files[p] = f
 				switch {
+				case f.linked:
+					linked = append(linked, p)
 				case f.status == "ok" && f.exists:
 					inputs = append(inputs, facts.Source{Kind: "file", Path: p})
 					// A file past the read cap is silence past its end for
@@ -128,20 +134,21 @@ func runSshkeys(_ context.Context, a collect.Access, b *collect.Builder) error {
 					poison = &f.env
 				}
 			}
-			rows = append(rows, keyRow(u, p, f, false, f.reason))
-			if f.status != "ok" || !f.exists {
+			rows = append(rows, keyRow(u, p, f, f.linked, f.reason))
+			if f.status != "ok" || !f.exists || f.linked {
 				continue
 			}
 			allPaths[p] = true
 			if u.uid == 0 {
 				rootPaths[p] = true
 			}
-			for _, k := range f.keys {
-				if k.Type == "ssh-rsa" {
-					rsa = append(rsa, rsaRow{u.name, p, k})
-				}
+			if first, ok := firstUser[p]; !ok || u.name < first {
+				firstUser[p] = u.name
 			}
 		}
+	}
+	if shellsDecided && !shellsUntrusted {
+		inputs = append(inputs, facts.Source{Kind: "file", Path: shellsPath})
 	}
 
 	src := &facts.Source{Kind: "derived", Inputs: inputs}
@@ -152,21 +159,34 @@ func runSshkeys(_ context.Context, a collect.Access, b *collect.Builder) error {
 	shown, cut := capRows(orEmpty(rows), authorizedKeysRows)
 	b.Set(sshAuthorizedKeys, withTruncation(collect.OK(shown, src), cut || keysCut || truncated))
 
-	// The three counts are an inventory: a file that could not be read (C3)
+	// The three counts are an inventory: a file that could not be read (C3),
+	// an /etc/shells that cannot say which accounts are interactive (S3, as
+	// files.go guards it), a symlink sshd follows and muster does not (V-50)
 	// or an interactive home muster declined to visit (C4) is a hole in it,
 	// and the counts say so rather than count around it.
+	var hole *facts.Envelope
 	switch {
 	case poison != nil:
 		e := *poison
-		e.Source = src
-		for _, k := range keys[1:] {
-			b.Set(k, e)
+		hole = &e
+	case shellsUntrusted:
+		hole = &shellsBad
+	case len(linked) > 0 || len(undeclared) > 0:
+		var parts []string
+		if len(linked) > 0 {
+			slices.Sort(linked)
+			parts = append(parts, "not examined - muster does not follow symlinks: "+strings.Join(linked, ", "))
 		}
-		return nil
-	case len(undeclared) > 0:
-		e := undeclaredHomes(undeclared, src)
+		if len(undeclared) > 0 {
+			parts = append(parts, undeclaredHomes(undeclared, nil).Reason)
+		}
+		e := collect.Absent(strings.Join(parts, "; "))
+		hole = &e
+	}
+	if hole != nil {
+		hole.Source = src
 		for _, k := range keys[1:] {
-			b.Set(k, e)
+			b.Set(k, *hole)
 		}
 		return nil
 	}
@@ -178,6 +198,18 @@ func runSshkeys(_ context.Context, a collect.Access, b *collect.Builder) error {
 			}
 			if k.Type == "ssh-dss" {
 				dsaCount++
+			}
+		}
+	}
+	type rsaRow struct {
+		user, path string
+		key        authorizedKey
+	}
+	var rsa []rsaRow
+	for p := range allPaths {
+		for _, k := range files[p].keys {
+			if k.Type == "ssh-rsa" {
+				rsa = append(rsa, rsaRow{firstUser[p], p, k})
 			}
 		}
 	}
@@ -199,8 +231,8 @@ func runSshkeys(_ context.Context, a collect.Access, b *collect.Builder) error {
 
 // readKeyFile reads one authorized_keys path. A missing file (or a missing
 // .ssh, or a home that is a file) is a reading: no keys. A file that exists
-// and cannot be read — denied, or a symlink muster does not follow — is the
-// read's status (C3/C4).
+// and cannot be read is the read's status (C3); a symlink in the path is an
+// unfollowed row (V-50).
 func readKeyFile(a collect.Access, p string) *keyFile {
 	data, meta, err := a.ReadFile(p, authorizedKeysLimit)
 	switch {
@@ -210,6 +242,11 @@ func readKeyFile(a collect.Access, p string) *keyFile {
 			keys: keys, unparsed: unparsed, truncated: meta.Truncated}
 	case errors.Is(err, fs.ErrNotExist), errors.Is(err, unix.ENOTDIR):
 		return &keyFile{status: "ok"}
+	case errors.Is(err, collect.ErrSymlink):
+		// V-50: sshd follows the link and muster does not, so the file is
+		// there and was not examined; the answer is a look, not an error.
+		return &keyFile{status: "ok", exists: true, linked: true,
+			reason: "not examined - muster does not follow symlinks: " + p}
 	}
 	// The path is named exactly once (D16): the primitive may already have
 	// put it in front of the error's text.
@@ -226,7 +263,7 @@ func keyRow(u passwdRow, p string, f *keyFile, unfollowed bool, reason string) m
 		status = ""
 	}
 	mode, uid := -1, -1
-	if f.exists {
+	if f.exists && !f.linked {
 		mode, uid = f.mode, f.uid
 	}
 	keys := []any{}

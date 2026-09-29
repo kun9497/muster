@@ -3,6 +3,7 @@ package collectors
 import (
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/binary"
 	"reflect"
 	"strconv"
 	"strings"
@@ -77,6 +78,9 @@ func expectedKeygen(t *testing.T) []keygenLine {
 	t.Helper()
 	var out []keygenLine
 	for _, l := range strings.Split(strings.TrimSpace(string(readSeed(t, "authorized_keys.generated.expected"))), "\n") {
+		if strings.HasPrefix(l, "#") {
+			continue
+		}
 		f := strings.Fields(l)
 		bits, err := strconv.Atoi(f[0])
 		if err != nil || len(f) < 4 {
@@ -201,5 +205,82 @@ func TestKeyTypeNames(t *testing.T) {
 		if !keyTypeNames[n] {
 			t.Errorf("%s missing", n)
 		}
+	}
+}
+
+// wireString is an RFC 4251 string; the synthetic blobs below are built from
+// it so no fixture holds a key body.
+func wireString(b []byte) []byte {
+	return append(binary.BigEndian.AppendUint32(nil, uint32(len(b))), b...)
+}
+
+func wireBlob(fields ...[]byte) []byte {
+	var out []byte
+	for _, f := range fields {
+		out = append(out, wireString(f)...)
+	}
+	return out
+}
+
+// synthDSA is an ssh-dss line whose p is 1024 bits: no one's key.
+func synthDSA() string {
+	p := append([]byte{0x00, 0x80}, make([]byte, 127)...)
+	blob := wireBlob([]byte("ssh-dss"), p, []byte{2}, []byte{2}, []byte{2})
+	return "ssh-dss " + base64.StdEncoding.EncodeToString(blob) + " synthetic-dsa"
+}
+
+// TestDecodeKeyBlobSynthetic pins every key shape decodeKeyBlob reads, on
+// every platform, with blobs of no one's key (spec §6, Minor 5).
+func TestDecodeKeyBlobSynthetic(t *testing.T) {
+	b := func(s string) []byte { return []byte(s) }
+	bytesOf := func(first byte, n int) []byte { out := make([]byte, n); out[0] = first; return out }
+	e := []byte{1, 0, 1}
+	n2048 := append([]byte{0}, bytesOf(0x80, 256)...)
+	n2047 := bytesOf(0x7f, 256) // top bit clear: no sign byte
+	n512 := append([]byte{0}, bytesOf(0x80, 64)...)
+	pk := make([]byte, 32)
+	q := func(n int) []byte { return bytesOf(4, n) }
+	cases := []struct {
+		name, word string
+		blob       []byte
+		typ        string // "" = unparsed
+		bits       int
+	}{
+		{"rsa 2048", "ssh-rsa", wireBlob(b("ssh-rsa"), e, n2048), "ssh-rsa", 2048},
+		{"rsa without the leading zero", "ssh-rsa", wireBlob(b("ssh-rsa"), e, n2047), "ssh-rsa", 2047},
+		{"rsa 512 keeps its length", "ssh-rsa", wireBlob(b("ssh-rsa"), e, n512), "ssh-rsa", 512},
+		{"rsa empty n", "ssh-rsa", wireBlob(b("ssh-rsa"), e, nil), "", 0},
+		{"rsa empty e", "ssh-rsa", wireBlob(b("ssh-rsa"), nil, n2048), "", 0},
+		{"rsa missing n", "ssh-rsa", wireBlob(b("ssh-rsa"), e), "", 0},
+		{"rsa negative n", "ssh-rsa", wireBlob(b("ssh-rsa"), e, bytesOf(0x80, 256)), "", 0},
+		{"rsa trailing junk", "ssh-rsa", append(wireBlob(b("ssh-rsa"), e, n2048), b("junk")...), "", 0},
+		{"rsa-sha2-256 over ssh-rsa", "rsa-sha2-256", wireBlob(b("ssh-rsa"), e, n2048), "ssh-rsa", 2048},
+		{"dss", "ssh-dss", wireBlob(b("ssh-dss"), append([]byte{0}, bytesOf(0x80, 128)...), []byte{2}, []byte{2}, []byte{2}), "ssh-dss", 1024},
+		{"dss missing y", "ssh-dss", wireBlob(b("ssh-dss"), append([]byte{0}, bytesOf(0x80, 128)...), []byte{2}, []byte{2}), "", 0},
+		{"ed25519 trailing byte", "ssh-ed25519", append(wireBlob(b("ssh-ed25519"), pk), 0), "", 0},
+		{"ed25519 short key", "ssh-ed25519", wireBlob(b("ssh-ed25519"), pk[:31]), "", 0},
+		{"sk-ed25519", "sk-ssh-ed25519@openssh.com", wireBlob(b("sk-ssh-ed25519@openssh.com"), pk, b("ssh:")), "sk-ssh-ed25519@openssh.com", 256},
+		{"sk-ed25519 without application", "sk-ssh-ed25519@openssh.com", wireBlob(b("sk-ssh-ed25519@openssh.com"), pk), "", 0},
+		{"ecdsa 256", "ecdsa-sha2-nistp256", wireBlob(b("ecdsa-sha2-nistp256"), b("nistp256"), q(65)), "ecdsa-sha2-nistp256", 256},
+		{"ecdsa 384", "ecdsa-sha2-nistp384", wireBlob(b("ecdsa-sha2-nistp384"), b("nistp384"), q(97)), "ecdsa-sha2-nistp384", 384},
+		{"ecdsa 521", "ecdsa-sha2-nistp521", wireBlob(b("ecdsa-sha2-nistp521"), b("nistp521"), q(133)), "ecdsa-sha2-nistp521", 521},
+		{"ecdsa curve mismatch", "ecdsa-sha2-nistp384", wireBlob(b("ecdsa-sha2-nistp384"), b("nistp256"), q(65)), "", 0},
+		{"ecdsa missing Q", "ecdsa-sha2-nistp256", wireBlob(b("ecdsa-sha2-nistp256"), b("nistp256")), "", 0},
+		{"sk-ecdsa", "sk-ecdsa-sha2-nistp256@openssh.com", wireBlob(b("sk-ecdsa-sha2-nistp256@openssh.com"), b("nistp256"), q(65), b("ssh:")), "sk-ecdsa-sha2-nistp256@openssh.com", 256},
+		{"webauthn over sk-ecdsa", "webauthn-sk-ecdsa-sha2-nistp256@openssh.com", wireBlob(b("sk-ecdsa-sha2-nistp256@openssh.com"), b("nistp256"), q(65), b("ssh:")), "sk-ecdsa-sha2-nistp256@openssh.com", 256},
+		{"rsa-sha2-256 cert over an rsa cert", "rsa-sha2-256-cert-v01@openssh.com", wireBlob(b("ssh-rsa-cert-v01@openssh.com"), b("nonce"), e, n2048), "ssh-rsa-cert-v01@openssh.com", 0},
+		{"rsa-sha2-256 cert over a plain rsa", "rsa-sha2-256-cert-v01@openssh.com", wireBlob(b("ssh-rsa"), e, n2048), "", 0},
+	}
+	for _, c := range cases {
+		keys, unparsed := parseAuthorizedKeys([]byte(c.word + " " + base64.StdEncoding.EncodeToString(c.blob) + " c\n"))
+		switch {
+		case c.typ == "" && (len(keys) != 0 || unparsed != 1):
+			t.Errorf("%s: keys %+v unparsed %d, want unparsed", c.name, keys, unparsed)
+		case c.typ != "" && (len(keys) != 1 || keys[0].Type != c.typ || keys[0].Bits != c.bits):
+			t.Errorf("%s: keys %+v unparsed %d, want %s %d", c.name, keys, unparsed, c.typ, c.bits)
+		}
+	}
+	if k, n := parseAuthorizedKeys([]byte(synthDSA() + "\n")); n != 0 || len(k) != 1 || k[0].Type != "ssh-dss" || k[0].Bits != 1024 {
+		t.Errorf("synthDSA: keys %+v unparsed %d", k, n)
 	}
 }

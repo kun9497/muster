@@ -4,7 +4,6 @@ package collectors
 
 import (
 	"encoding/base64"
-	"encoding/binary"
 	"fmt"
 	"io/fs"
 	"reflect"
@@ -32,18 +31,6 @@ func sshkeysAccess(passwd string) *fsAccess {
 		modes:    map[string]uint32{},
 		owners:   map[string]uint32{},
 	}
-}
-
-// synthDSA is an ssh-dss line whose p is 1024 bits: no one's key, built from
-// RFC 4251 fields so no fixture holds a key body.
-func synthDSA() string {
-	str := func(b []byte) []byte { return append(binary.BigEndian.AppendUint32(nil, uint32(len(b))), b...) }
-	p := append([]byte{0x00, 0x80}, make([]byte, 127)...)
-	blob := append(str([]byte("ssh-dss")), str(p)...)
-	for range 3 {
-		blob = append(blob, str([]byte{0x02})...)
-	}
-	return "ssh-dss " + base64.StdEncoding.EncodeToString(blob) + " synthetic-dsa"
 }
 
 // generatedLine is line n (1-based) of the throw-away key seed, and its
@@ -140,9 +127,9 @@ func TestSshkeysFacts(t *testing.T) {
 		t.Errorf("rsa_keys %v, want %v", rsa, wantRSA)
 	}
 	e := env(t, b, sshRootKeyCount)
-	if e.Source == nil || e.Source.Kind != "derived" || len(e.Source.Inputs) != 3 ||
-		e.Source.Inputs[0].Path != passwdPath || e.Source.Inputs[1].Path != rootAK || e.Source.Inputs[2].Path != aliceAK {
-		t.Errorf("source %+v, want derived from passwd and the two files read", e.Source)
+	if e.Source == nil || e.Source.Kind != "derived" || len(e.Source.Inputs) != 4 ||
+		e.Source.Inputs[0].Path != passwdPath || e.Source.Inputs[1].Path != rootAK || e.Source.Inputs[2].Path != aliceAK || e.Source.Inputs[3].Path != shellsPath {
+		t.Errorf("source %+v, want derived from passwd, the two files read and /etc/shells (it decided daemon was not interactive)", e.Source)
 	}
 
 	// An interactive account homed outside the declaration is a hole in the
@@ -186,16 +173,66 @@ func TestSshkeysDeniedHomePoisonsCounts(t *testing.T) {
 		}
 	}
 
-	// A symlink muster does not follow is the read's error, on the row and
-	// on the counts (C4).
-	a = sshkeysAccess("root:x:0:0:root:/root:/bin/bash\n")
-	a.fails[rootAK] = fmt.Errorf("%s: %w", rootAK, collect.ErrSymlink)
-	b = build(t, "sshkeys", a)
-	if r := keyRows(t, b)[0]; r["read_status"] != "error" || r["reason"] != rootAK+": symbolic link in path" {
-		t.Errorf("symlink row %s", rowShape(r))
+}
+
+// V-50: a symlink sshd follows and muster does not is an unfollowed row that
+// exists, and the counts are absent naming the path: the answer is a look,
+// never an error. Both a linked file and a linked .ssh directory (every read
+// under it answers ErrSymlink) are pinned.
+func TestSshkeysSymlinkIsUnfollowed(t *testing.T) {
+	a := sshkeysAccess("root:x:0:0:root:/root:/bin/bash\nalice:x:1000:1000::/home/alice:/bin/bash\n")
+	a.fails[rootAK] = fmt.Errorf("%s: %w", rootAK, collect.ErrSymlink) // the file is a link
+	for _, p := range []string{aliceAK, aliceAK + "2"} {               // alice's .ssh is a link
+		a.fails[p] = fmt.Errorf("%s: %w", p, collect.ErrSymlink)
 	}
-	if e := env(t, b, sshRootKeyCount); e.Status != facts.StatusError {
-		t.Errorf("root_key_count on a symlink: %+v", e)
+	b := build(t, "sshkeys", a)
+	var got []string
+	for _, r := range keyRows(t, b) {
+		got = append(got, rowShape(r))
+	}
+	want := []string{
+		`alice 1000 /home/alice/.ssh/authorized_keys exists=true mode=-1 owner=-1 keys=0 unparsed=0 unfollowed=true status="" reason="not examined - muster does not follow symlinks: /home/alice/.ssh/authorized_keys"`,
+		`alice 1000 /home/alice/.ssh/authorized_keys2 exists=true mode=-1 owner=-1 keys=0 unparsed=0 unfollowed=true status="" reason="not examined - muster does not follow symlinks: /home/alice/.ssh/authorized_keys2"`,
+		`root 0 /root/.ssh/authorized_keys exists=true mode=-1 owner=-1 keys=0 unparsed=0 unfollowed=true status="" reason="not examined - muster does not follow symlinks: /root/.ssh/authorized_keys"`,
+		`root 0 /root/.ssh/authorized_keys2 exists=false mode=-1 owner=-1 keys=0 unparsed=0 unfollowed=false status="ok" reason=""`,
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("rows\n got %s\nwant %s", strings.Join(got, "\n     "), strings.Join(want, "\n     "))
+	}
+	wantReason := "not examined - muster does not follow symlinks: " + aliceAK + ", " + aliceAK + "2, " + rootAK
+	for _, k := range []string{sshRootKeyCount, sshDSAKeyCount, sshRSAKeys} {
+		if e := env(t, b, k); e.Status != facts.StatusAbsent || e.Reason != wantReason || e.Source == nil {
+			t.Errorf("%s: %+v, want absent %q", k, e, wantReason)
+		}
+	}
+}
+
+// Important 2 (S3, as files.go guards it): an /etc/shells that is denied, or
+// missing so the libc default (no /bin/bash) stands in, cannot say that a
+// bash account homed outside the declaration is interactive, so the counts
+// carry that envelope; the inventory still lists its rows.
+func TestSshkeysUntrustedShells(t *testing.T) {
+	for _, c := range []struct {
+		name   string
+		shells func(a *fsAccess)
+	}{
+		{"denied", func(a *fsAccess) {
+			delete(a.contents, shellsPath)
+			a.fails[shellsPath] = &fs.PathError{Op: "open", Path: shellsPath, Err: unix.EACCES}
+		}},
+		{"missing", func(a *fsAccess) { delete(a.contents, shellsPath) }},
+	} {
+		a := sshkeysAccess("root:x:0:0:root:/root:/bin/bash\nsvc:x:998:998::/srv/svc:/bin/bash\n")
+		c.shells(a)
+		b := build(t, "sshkeys", a)
+		if rows := keyRows(t, b); len(rows) != 3 {
+			t.Errorf("%s: %d rows, want root's two and svc's", c.name, len(rows))
+		}
+		for _, k := range []string{sshRootKeyCount, sshDSAKeyCount, sshRSAKeys} {
+			if e := env(t, b, k); e.Status != facts.StatusDenied || e.Source == nil {
+				t.Errorf("%s: %s: %+v, want denied", c.name, k, e)
+			}
+		}
 	}
 }
 
@@ -241,6 +278,24 @@ func TestSshkeysSharedHomeCountsOnce(t *testing.T) {
 	if n := len(keyRows(t, b)); n != 4 {
 		t.Errorf("%d rows, want one per account and file", n)
 	}
+	// Minor 4: ssh.rsa_keys lists a shared file's key once, under the first
+	// account in sort order, as the counts count it once. A 512-bit modulus
+	// keeps its true length (Important 1): min_rsa_bits judges it.
+	a.contents[rootAK] = []byte(synthRSA512() + "\n")
+	b = build(t, "sshkeys", a)
+	rsa := okList(t, b, sshRSAKeys)
+	if len(rsa) != 1 {
+		t.Fatalf("rsa_keys %v, want one row", rsa)
+	}
+	if r := rsa[0].(map[string]any); r["user"] != "root" || r["path"] != rootAK || r["bits"] != 512 || r["line"] != 1 {
+		t.Errorf("rsa_keys row %v", r)
+	}
+}
+
+// synthRSA512 is an ssh-rsa line whose modulus is 512 bits: no one's key.
+func synthRSA512() string {
+	n := append([]byte{0, 0x80}, make([]byte, 63)...)
+	return "ssh-rsa " + base64.StdEncoding.EncodeToString(wireBlob([]byte("ssh-rsa"), []byte{1, 0, 1}, n)) + " synthetic-512"
 }
 
 func TestSshkeysPasswdUnreadable(t *testing.T) {
