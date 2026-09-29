@@ -54,6 +54,7 @@ type fsAccess struct {
 	stats       map[string]statResult        // host path -> full Stat() shape (R93; Task 5 relies on this)
 	xattrs      map[string][]string          // host path -> extended attribute names
 	xattrValues map[string]map[string][]byte // host path -> attribute name -> value, served by Getxattr
+	xattrErrs   map[string]error             // host path -> the XattrErr ReadDir reports for that entry under Xattrs (V-32)
 	writable    map[string]bool              // host path -> Writable answer
 	globErr     error                        // when set, every Glob fails with it
 
@@ -86,6 +87,10 @@ type fsAccess struct {
 	// readDirs records every path ReadDir was asked for, in order, so a
 	// test can assert what the traversal descended into and what it did not.
 	readDirs []string
+
+	// readDirOpts records the options each ReadDir call was given, parallel to
+	// readDirs, so a test can assert what the caller asked to be read.
+	readDirOpts []collect.ReadDirOptions
 }
 
 // statResult is the one shape fsAccess.Stat renders into a collect.ReadMeta
@@ -277,8 +282,14 @@ func (a *fsAccess) Getxattr(p, name string) ([]byte, error) {
 // entries come back sorted, as collect.ReadDir sorts them, or reversed when
 // shuffle is set; either way they are a copy, so a tree listed twice is the
 // same tree twice.
-func (a *fsAccess) ReadDir(p string, expect collect.Identity) (collect.Listing, error) {
+//
+// Under opts.Xattrs a regular entry with an execute bit carries what
+// xattrValues holds for its path (security.capability, system.posix_acl_access)
+// and the error xattrErrs holds for it, the way hostAccess reads them; every
+// other entry, and every entry without Xattrs, carries none.
+func (a *fsAccess) ReadDir(p string, expect collect.Identity, opts collect.ReadDirOptions) (collect.Listing, error) {
 	a.readDirs = append(a.readDirs, p)
+	a.readDirOpts = append(a.readDirOpts, opts)
 	if err := a.dirErrs[p]; err != nil {
 		return collect.Listing{}, fmt.Errorf("%s: %w", p, err)
 	}
@@ -291,6 +302,18 @@ func (a *fsAccess) ReadDir(p string, expect collect.Identity) (collect.Listing, 
 	}
 	entries := slices.Clone(l.Entries)
 	slices.SortFunc(entries, func(x, y collect.DirEntry) int { return strings.Compare(x.Name, y.Name) })
+	if opts.Xattrs {
+		for i := range entries {
+			e := &entries[i]
+			if e.Kind != "regular" || e.Mode&0o111 == 0 {
+				continue
+			}
+			child := path.Join(p, e.Name)
+			e.Caps = a.xattrValues[child]["security.capability"]
+			e.ACL = a.xattrValues[child][aclXattrName]
+			e.XattrErr = a.xattrErrs[child]
+		}
+	}
 	if a.shuffle {
 		slices.Reverse(entries)
 	}
@@ -3558,7 +3581,7 @@ func TestFSAccessTreeDouble(t *testing.T) {
 		dirErrs: map[string]error{"/srv/denied": unix.EACCES},
 	}
 
-	l, err := a.ReadDir("/srv", collect.Identity{})
+	l, err := a.ReadDir("/srv", collect.Identity{}, collect.ReadDirOptions{})
 	if err != nil {
 		t.Fatalf("ReadDir(/srv): %v", err)
 	}
@@ -3570,10 +3593,10 @@ func TestFSAccessTreeDouble(t *testing.T) {
 	}
 
 	// A matching identity lists; a mismatched one vanishes, named by its path.
-	if _, err := a.ReadDir("/srv", collect.Identity{Dev: 64, Ino: 2}); err != nil {
+	if _, err := a.ReadDir("/srv", collect.Identity{Dev: 64, Ino: 2}, collect.ReadDirOptions{}); err != nil {
 		t.Errorf("ReadDir with the scripted identity: %v", err)
 	}
-	_, err = a.ReadDir("/srv", collect.Identity{Dev: 64, Ino: 3})
+	_, err = a.ReadDir("/srv", collect.Identity{Dev: 64, Ino: 3}, collect.ReadDirOptions{})
 	if !errors.Is(err, collect.ErrVanished) {
 		t.Errorf("identity mismatch: err = %v, want ErrVanished", err)
 	}
@@ -3581,17 +3604,17 @@ func TestFSAccessTreeDouble(t *testing.T) {
 		t.Errorf("identity mismatch: err = %v, want the path named", err)
 	}
 
-	_, err = a.ReadDir("/nope", collect.Identity{})
+	_, err = a.ReadDir("/nope", collect.Identity{}, collect.ReadDirOptions{})
 	if !errors.Is(err, os.ErrNotExist) || !strings.Contains(err.Error(), "/nope") {
 		t.Errorf("unscripted path: err = %v, want ErrNotExist naming the path", err)
 	}
-	_, err = a.ReadDir("/srv/denied", collect.Identity{})
+	_, err = a.ReadDir("/srv/denied", collect.Identity{}, collect.ReadDirOptions{})
 	if !errors.Is(err, unix.EACCES) || !strings.Contains(err.Error(), "/srv/denied") {
 		t.Errorf("dirErrs path: err = %v, want EACCES naming the path", err)
 	}
 
 	a.shuffle = true
-	l, err = a.ReadDir("/srv", collect.Identity{})
+	l, err = a.ReadDir("/srv", collect.Identity{}, collect.ReadDirOptions{})
 	if err != nil {
 		t.Fatalf("ReadDir(/srv) shuffled: %v", err)
 	}
@@ -3616,4 +3639,75 @@ func entryNames(l collect.Listing) []string {
 		out = append(out, e.Name)
 	}
 	return out
+}
+
+// TestFSAccessReadDirServesXattrs pins the xattr half of the double: under
+// Xattrs a regular entry with an execute bit carries the scripted
+// capability, ACL and error for its path; a 0644 file, a directory, a
+// symlink, and every entry of a listing asked for without Xattrs carry
+// none; and each call's options are recorded.
+func TestFSAccessReadDirServesXattrs(t *testing.T) {
+	caps, acl := []byte{1, 2, 3}, []byte{4, 5, 6}
+	a := &fsAccess{
+		tree: map[string]collect.Listing{"/": {
+			Self: collect.DirEntry{Kind: "dir", Mode: 0o755, Dev: 64, Ino: 2},
+			Entries: []collect.DirEntry{
+				{Name: "x", Kind: "regular", Mode: 0o755, Dev: 64, Ino: 10},
+				{Name: "d", Kind: "regular", Mode: 0o111, Dev: 64, Ino: 11},
+				{Name: "r", Kind: "regular", Mode: 0o644, Dev: 64, Ino: 12},
+				{Name: "s", Kind: "dir", Mode: 0o755, Dev: 64, Ino: 13},
+				{Name: "l", Kind: "symlink", Mode: 0o777, Dev: 64, Ino: 14},
+			},
+		}},
+		xattrValues: map[string]map[string][]byte{
+			"/x": {"security.capability": caps, aclXattrName: acl},
+			"/r": {"security.capability": caps, aclXattrName: acl},
+			"/s": {"security.capability": caps, aclXattrName: acl},
+			"/l": {"security.capability": caps, aclXattrName: acl},
+		},
+		xattrErrs: map[string]error{"/d": unix.EACCES, "/r": unix.EACCES},
+	}
+	byName := func(l collect.Listing) map[string]collect.DirEntry {
+		m := map[string]collect.DirEntry{}
+		for _, e := range l.Entries {
+			m[e.Name] = e
+		}
+		return m
+	}
+
+	l, err := a.ReadDir("/", collect.Identity{}, collect.ReadDirOptions{Xattrs: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := byName(l)
+	if x := got["x"]; !slices.Equal(x.Caps, caps) || !slices.Equal(x.ACL, acl) || x.XattrErr != nil {
+		t.Errorf("x = %+v, want the scripted caps and ACL", x)
+	}
+	if d := got["d"]; !errors.Is(d.XattrErr, unix.EACCES) || d.Caps != nil || d.ACL != nil {
+		t.Errorf("d = %+v, want the scripted EACCES only", d)
+	}
+	for _, n := range []string{"r", "s", "l"} {
+		if e := got[n]; e.Caps != nil || e.ACL != nil || e.XattrErr != nil {
+			t.Errorf("%s = %+v, want no attributes (not an executable regular file)", n, e)
+		}
+	}
+
+	l, err = a.ReadDir("/", collect.Identity{}, collect.ReadDirOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for n, e := range byName(l) {
+		if e.Caps != nil || e.ACL != nil || e.XattrErr != nil {
+			t.Errorf("without Xattrs %s = %+v, want no attributes", n, e)
+		}
+	}
+	if want := []collect.ReadDirOptions{{Xattrs: true}, {}}; !slices.Equal(a.readDirOpts, want) {
+		t.Errorf("readDirOpts = %+v, want %+v", a.readDirOpts, want)
+	}
+	// The scripted tree itself is untouched: the attributes live on the copy.
+	for _, e := range a.tree["/"].Entries {
+		if e.Caps != nil || e.ACL != nil || e.XattrErr != nil {
+			t.Errorf("the script's %s was modified: %+v", e.Name, e)
+		}
+	}
 }

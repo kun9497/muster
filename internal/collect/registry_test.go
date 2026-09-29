@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"unsafe"
@@ -842,11 +843,13 @@ func TestGlobDirIsTheLiteralDirectory(t *testing.T) {
 type recordingWalkAccess struct {
 	fakeAccess
 	dirs  []string
+	opts  []ReadDirOptions
 	links []string
 }
 
-func (r *recordingWalkAccess) ReadDir(p string, _ Identity) (Listing, error) {
+func (r *recordingWalkAccess) ReadDir(p string, _ Identity, opts ReadDirOptions) (Listing, error) {
 	r.dirs = append(r.dirs, p)
+	r.opts = append(r.opts, opts)
 	return Listing{}, nil
 }
 
@@ -862,7 +865,7 @@ func (r *recordingWalkAccess) Readlink(p string) (string, error) {
 func TestGuardReadDirNeedsTheWalkLicence(t *testing.T) {
 	inner := &recordingWalkAccess{}
 	noWalk := Guard(inner, Collector{Name: "t", Declare: Declaration{Reads: []string{"/etc", "/etc/*"}, Needs: "root"}})
-	if _, err := noWalk.ReadDir("/etc", Identity{}); !errors.Is(err, ErrUndeclared) {
+	if _, err := noWalk.ReadDir("/etc", Identity{}, ReadDirOptions{Xattrs: true}); !errors.Is(err, ErrUndeclared) {
 		t.Errorf("readdir without the walk licence: err = %v, want ErrUndeclared", err)
 	}
 	if len(inner.dirs) != 0 {
@@ -877,12 +880,17 @@ func TestGuardReadDirNeedsTheWalkLicence(t *testing.T) {
 	// walk's boundaries are its own, not the Reads globs.
 	walker := Guard(inner, Collector{Name: "w", Declare: Declaration{Walk: true, Needs: "root"}})
 	for _, p := range []string{"/", "/etc", "/home/alice/.ssh"} {
-		if _, err := walker.ReadDir(p, Identity{}); err != nil {
+		if _, err := walker.ReadDir(p, Identity{}, ReadDirOptions{Xattrs: p != "/etc"}); err != nil {
 			t.Errorf("readdir %s under the walk licence: %v", p, err)
 		}
 	}
 	if len(inner.dirs) != 3 {
 		t.Errorf("inner saw %v, want all three paths", inner.dirs)
+	}
+	// The options reach inner as given: the guard licenses the listing, it
+	// does not decide what is read with it.
+	if want := []ReadDirOptions{{Xattrs: true}, {}, {Xattrs: true}}; !slices.Equal(inner.opts, want) {
+		t.Errorf("inner got options %+v, want %+v", inner.opts, want)
 	}
 	if v := walker.Violations(); len(v) != 0 {
 		t.Errorf("violations = %v, want none", v)
@@ -892,7 +900,7 @@ func TestGuardReadDirNeedsTheWalkLicence(t *testing.T) {
 	// way allowedPath cleans one for every other method.
 	before := len(inner.dirs)
 	for _, p := range []string{"etc", "/etc/../etc", "/etc/"} {
-		if _, err := walker.ReadDir(p, Identity{}); err == nil {
+		if _, err := walker.ReadDir(p, Identity{}, ReadDirOptions{}); err == nil {
 			t.Errorf("readdir %q must be refused", p)
 		}
 	}
@@ -955,7 +963,7 @@ func TestListActionsRendersTheWalkRow(t *testing.T) {
 	want := Action{
 		Collector: "w",
 		Kind:      "walk",
-		Target:    "every local filesystem, no symlink followed, boundaries and exclusions as declared",
+		Target:    "every local filesystem, no symlink followed, boundaries and exclusions as declared; the capability and ACL attributes of executables are read",
 		Needs:     "root",
 	}
 	if walkRows[0] != want {

@@ -122,7 +122,7 @@ func traverse(ctx context.Context, a collect.Access, plan mountPlan, ids idTable
 			w.r.complete, w.r.stopReason, w.r.lastPath = false, reason, f.path
 			break
 		}
-		l, err := w.a.ReadDir(f.path, f.ident)
+		l, err := w.a.ReadDir(f.path, f.ident, collect.ReadDirOptions{Xattrs: true})
 		if err != nil {
 			reason, detail := skipReason(err)
 			w.addSkip(f.path, reason, detail)

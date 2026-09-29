@@ -3,6 +3,8 @@
 package collect
 
 import (
+	"bytes"
+	"encoding/binary"
 	"errors"
 	"io/fs"
 	"os"
@@ -11,6 +13,7 @@ import (
 	"strings"
 	"syscall"
 	"testing"
+	"time"
 
 	"golang.org/x/sys/unix"
 )
@@ -68,7 +71,7 @@ func entryByName(l Listing, name string) (DirEntry, bool) {
 
 func TestReadDirListsEveryKindSorted(t *testing.T) {
 	_, a := walkTree(t)
-	l, err := hostAccess{}.ReadDir(a, Identity{})
+	l, err := hostAccess{}.ReadDir(a, Identity{}, ReadDirOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -121,7 +124,7 @@ func TestReadDirListsEveryKindSorted(t *testing.T) {
 
 func TestReadDirDoesNotFollowSymlinks(t *testing.T) {
 	_, a := walkTree(t)
-	l, err := hostAccess{}.ReadDir(a, Identity{})
+	l, err := hostAccess{}.ReadDir(a, Identity{}, ReadDirOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -154,13 +157,13 @@ func TestReadDirRefusesASymlinkedPath(t *testing.T) {
 	if err := os.Symlink(a, link); err != nil {
 		t.Fatal(err)
 	}
-	if l, err := (hostAccess{}).ReadDir(link, Identity{}); !errors.Is(err, ErrSymlink) {
+	if l, err := (hostAccess{}).ReadDir(link, Identity{}, ReadDirOptions{}); !errors.Is(err, ErrSymlink) {
 		t.Errorf("err = %v, want ErrSymlink (listing %+v)", err, l)
 	} else if len(l.Entries) != 0 {
 		t.Errorf("a refused listing must be empty, got %+v", l.Entries)
 	}
 	// An intermediate symlink is refused the same way.
-	if _, err := (hostAccess{}).ReadDir(filepath.Join(link, "d"), Identity{}); !errors.Is(err, ErrSymlink) {
+	if _, err := (hostAccess{}).ReadDir(filepath.Join(link, "d"), Identity{}, ReadDirOptions{}); !errors.Is(err, ErrSymlink) {
 		t.Errorf("intermediate symlink: err = %v, want ErrSymlink", err)
 	}
 }
@@ -168,12 +171,12 @@ func TestReadDirRefusesASymlinkedPath(t *testing.T) {
 func TestReadDirIdentityMismatchIsVanished(t *testing.T) {
 	_, a := walkTree(t)
 	other := filepath.Join(a, "d")
-	l, err := hostAccess{}.ReadDir(other, Identity{})
+	l, err := hostAccess{}.ReadDir(other, Identity{}, ReadDirOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	expect := Identity{Dev: l.Self.Dev, Ino: l.Self.Ino}
-	got, err := hostAccess{}.ReadDir(a, expect)
+	got, err := hostAccess{}.ReadDir(a, expect, ReadDirOptions{})
 	if !errors.Is(err, ErrVanished) {
 		t.Fatalf("err = %v, want ErrVanished", err)
 	}
@@ -182,18 +185,18 @@ func TestReadDirIdentityMismatchIsVanished(t *testing.T) {
 	}
 	// The matching identity is accepted, so the check is not simply always
 	// failing on a non-zero expect.
-	self, err := hostAccess{}.ReadDir(a, Identity{})
+	self, err := hostAccess{}.ReadDir(a, Identity{}, ReadDirOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := (hostAccess{}).ReadDir(a, Identity{Dev: self.Self.Dev, Ino: self.Self.Ino}); err != nil {
+	if _, err := (hostAccess{}).ReadDir(a, Identity{Dev: self.Self.Dev, Ino: self.Self.Ino}, ReadDirOptions{}); err != nil {
 		t.Errorf("matching identity: err = %v", err)
 	}
 }
 
 func TestReadDirCarriesTheMountID(t *testing.T) {
 	_, a := walkTree(t)
-	l, err := hostAccess{}.ReadDir(a, Identity{})
+	l, err := hostAccess{}.ReadDir(a, Identity{}, ReadDirOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -261,7 +264,7 @@ func TestReadDirOnAnUnreadableDirectory(t *testing.T) {
 		_, a := walkTree(t)
 		shut := filepath.Join(a, "d")
 		chmod(t, shut, 0o000)
-		l, err := hostAccess{}.ReadDir(shut, Identity{})
+		l, err := hostAccess{}.ReadDir(shut, Identity{}, ReadDirOptions{})
 		if err != nil {
 			t.Fatalf("root must be able to list a 0o000 directory: %v", err)
 		}
@@ -277,7 +280,7 @@ func TestReadDirOnAnUnreadableDirectory(t *testing.T) {
 		_, a := walkTree(t)
 		shut := filepath.Join(a, "d")
 		chmod(t, shut, 0o000)
-		l, err := hostAccess{}.ReadDir(shut, Identity{})
+		l, err := hostAccess{}.ReadDir(shut, Identity{}, ReadDirOptions{})
 		if !errors.Is(err, fs.ErrPermission) {
 			t.Fatalf("err = %v, want a permission error", err)
 		}
@@ -314,7 +317,7 @@ func stubEntryStat(t *testing.T, errs map[string]error) {
 func TestReadDirDropsAVanishedEntry(t *testing.T) {
 	_, a := walkTree(t)
 	stubEntryStat(t, map[string]error{"f": unix.ENOENT})
-	l, err := hostAccess{}.ReadDir(a, Identity{})
+	l, err := hostAccess{}.ReadDir(a, Identity{}, ReadDirOptions{})
 	if err != nil {
 		t.Fatalf("a vanished entry must not fail the listing: %v", err)
 	}
@@ -337,7 +340,7 @@ func TestReadDirDropsAVanishedEntry(t *testing.T) {
 func TestReadDirFailsOnAnUnstatableEntry(t *testing.T) {
 	_, a := walkTree(t)
 	stubEntryStat(t, map[string]error{"p": unix.EIO})
-	l, err := hostAccess{}.ReadDir(a, Identity{})
+	l, err := hostAccess{}.ReadDir(a, Identity{}, ReadDirOptions{})
 	if !errors.Is(err, unix.EIO) {
 		t.Fatalf("err = %v, want it to wrap EIO", err)
 	}
@@ -354,7 +357,7 @@ func TestReadDirFailsOnAnUnstatableEntry(t *testing.T) {
 // listing: fakeAccess embeds it without overriding either method.
 func TestNoWalkAccessRefusesBothWalkMethods(t *testing.T) {
 	var a Access = &fakeAccess{}
-	l, err := a.ReadDir("/etc", Identity{})
+	l, err := a.ReadDir("/etc", Identity{}, ReadDirOptions{})
 	if !errors.Is(err, ErrNoWalk) {
 		t.Errorf("ReadDir: err = %v, want ErrNoWalk", err)
 	}
@@ -368,4 +371,274 @@ func TestNoWalkAccessRefusesBothWalkMethods(t *testing.T) {
 	if target != "" {
 		t.Errorf("Readlink returned %q", target)
 	}
+}
+
+// --- the xattr option (P-3, V-10) -----------------------------------------
+
+// aclEnt is one entry of a POSIX access ACL in its xattr form.
+type aclEnt struct {
+	tag, perm uint16
+	id        uint32
+}
+
+// aclBlob encodes entries as the v2 system.posix_acl_access value: a
+// little-endian version word, then {tag u16, perm u16, id u32} per entry.
+func aclBlob(ents ...aclEnt) []byte {
+	b := binary.LittleEndian.AppendUint32(nil, 2)
+	for _, e := range ents {
+		b = binary.LittleEndian.AppendUint16(b, e.tag)
+		b = binary.LittleEndian.AppendUint16(b, e.perm)
+		b = binary.LittleEndian.AppendUint32(b, e.id)
+	}
+	return b
+}
+
+// extendedACL is an access ACL the kernel actually stores. A minimal ACL
+// (user::, group::, other:: alone) is equivalent to the mode bits, and
+// ext4, xfs and tmpfs fold it into the mode and remove the attribute
+// (posix_acl_update_mode), so a test that set one would read back ENODATA.
+// The named user and the mask make it extended; groupPerm is also the mask,
+// which the kernel copies into the group mode bits, so ownerPerm/groupPerm/
+// otherPerm decide the mode the file is left with.
+func extendedACL(ownerPerm, groupPerm, otherPerm uint16) []byte {
+	const undefined = 0xffffffff
+	return aclBlob(
+		aclEnt{0x01, ownerPerm, undefined}, // USER_OBJ
+		aclEnt{0x02, groupPerm, 4242},      // USER 4242
+		aclEnt{0x04, groupPerm, undefined}, // GROUP_OBJ
+		aclEnt{0x10, groupPerm, undefined}, // MASK
+		aclEnt{0x20, otherPerm, undefined}, // OTHER
+	)
+}
+
+// setACL sets blob as p's access ACL, or skips the test when the
+// filesystem the temp dir is on cannot hold one.
+func setACL(t *testing.T, p string, blob []byte) {
+	t.Helper()
+	if err := unix.Setxattr(p, xattrACLAccess, blob, 0); err != nil {
+		if errors.Is(err, unix.EOPNOTSUPP) || errors.Is(err, unix.EPERM) {
+			t.Skipf("the temp dir's filesystem cannot hold an access ACL: %v", err)
+		}
+		t.Fatalf("setxattr %s: %v", p, err)
+	}
+}
+
+// mkexec creates a regular file with exactly mode.
+func mkexec(t *testing.T, p string, mode uint32) {
+	t.Helper()
+	mkfile(t, p, "#!/bin/sh\n", 0o600)
+	chmod(t, p, mode)
+}
+
+func mustEntry(t *testing.T, l Listing, name string) DirEntry {
+	t.Helper()
+	e, ok := entryByName(l, name)
+	if !ok {
+		t.Fatalf("no entry %q in %+v", name, l.Entries)
+	}
+	return e
+}
+
+func noXattrs(t *testing.T, e DirEntry) {
+	t.Helper()
+	if e.Caps != nil || e.ACL != nil || e.XattrErr != nil {
+		t.Errorf("%s: Caps=%x ACL=%x XattrErr=%v, want all nil", e.Name, e.Caps, e.ACL, e.XattrErr)
+	}
+}
+
+// Under Xattrs the attributes of an executable regular file are read, and a
+// file with no execute bit is not opened at all: the ACL set on the 0644
+// file is there, and the listing does not report it.
+func TestReadDirXattrsReadsExecutablesOnly(t *testing.T) {
+	d := t.TempDir()
+	x, r, n := filepath.Join(d, "x"), filepath.Join(d, "r"), filepath.Join(d, "n")
+	mkexec(t, x, 0o755)
+	mkexec(t, r, 0o644)
+	mkexec(t, n, 0o755)
+	xacl, racl := extendedACL(7, 5, 5), extendedACL(6, 4, 4)
+	setACL(t, x, xacl)
+	setACL(t, r, racl)
+	l, err := hostAccess{}.ReadDir(d, Identity{}, ReadDirOptions{Xattrs: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ex := mustEntry(t, l, "x")
+	if ex.Mode != 0o755 {
+		t.Fatalf("x: mode = %#o, want 0755 (the ACL's mask must keep the execute bits)", ex.Mode)
+	}
+	if !bytes.Equal(ex.ACL, xacl) || ex.Caps != nil || ex.XattrErr != nil {
+		t.Errorf("x: ACL=%x Caps=%x XattrErr=%v, want ACL %x and nothing else", ex.ACL, ex.Caps, ex.XattrErr, xacl)
+	}
+	er := mustEntry(t, l, "r")
+	if er.Mode != 0o644 {
+		t.Fatalf("r: mode = %#o, want 0644", er.Mode)
+	}
+	noXattrs(t, er)
+	noXattrs(t, mustEntry(t, l, "n"))
+}
+
+// Xattrs:false reads nothing, whatever the file carries; the same listing
+// under Xattrs:true carries the bytes the test set.
+func TestReadDirXattrsOptOut(t *testing.T) {
+	d := t.TempDir()
+	x := filepath.Join(d, "x")
+	mkexec(t, x, 0o755)
+	blob := extendedACL(7, 5, 5)
+	setACL(t, x, blob)
+
+	l, err := hostAccess{}.ReadDir(d, Identity{}, ReadDirOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	noXattrs(t, mustEntry(t, l, "x"))
+
+	l, err = hostAccess{}.ReadDir(d, Identity{}, ReadDirOptions{Xattrs: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	e := mustEntry(t, l, "x")
+	if !bytes.Equal(e.ACL, blob) {
+		t.Errorf("ACL = %x, want %x", e.ACL, blob)
+	}
+	if e.Caps != nil || e.XattrErr != nil {
+		t.Errorf("Caps=%x XattrErr=%v, want nil", e.Caps, e.XattrErr)
+	}
+}
+
+// A FIFO with execute bits is not a regular file and is never opened —
+// opening one is the classic way a walk blocks forever, and even the
+// O_NONBLOCK open would land on the identity check and report it vanished.
+func TestReadDirXattrsSkipsNonRegular(t *testing.T) {
+	d := t.TempDir()
+	p := filepath.Join(d, "p")
+	if err := syscall.Mkfifo(p, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	chmod(t, p, 0o755)
+	type result struct {
+		l   Listing
+		err error
+	}
+	done := make(chan result, 1)
+	go func() {
+		l, err := hostAccess{}.ReadDir(d, Identity{}, ReadDirOptions{Xattrs: true})
+		done <- result{l, err}
+	}()
+	var res result
+	select {
+	case res = <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("ReadDir blocked on a FIFO")
+	}
+	if res.err != nil {
+		t.Fatal(res.err)
+	}
+	e := mustEntry(t, res.l, "p")
+	if e.Kind != "fifo" || e.Mode != 0o755 {
+		t.Fatalf("p: kind %q mode %#o, want fifo 0755", e.Kind, e.Mode)
+	}
+	noXattrs(t, e)
+}
+
+// A symlink (mode 0777, so every execute bit is set) to an executable is
+// listed as the link it is; its target's attributes are never read.
+func TestReadDirXattrsNeverFollows(t *testing.T) {
+	d := t.TempDir()
+	x := filepath.Join(d, "x")
+	mkexec(t, x, 0o755)
+	if err := os.Symlink("x", filepath.Join(d, "l")); err != nil {
+		t.Fatal(err)
+	}
+	l, err := hostAccess{}.ReadDir(d, Identity{}, ReadDirOptions{Xattrs: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	e := mustEntry(t, l, "l")
+	if e.Kind != "symlink" {
+		t.Fatalf("l: kind %q, want symlink", e.Kind)
+	}
+	noXattrs(t, e)
+}
+
+// A file whose (dev, ino) at open is not the one statx reported was
+// replaced in between: its attributes belong to some other file, so the
+// entry says ErrVanished and carries none — and the rest of the listing is
+// unaffected.
+func TestReadDirXattrsIdentityMismatchIsVanished(t *testing.T) {
+	d := t.TempDir()
+	x, y := filepath.Join(d, "x"), filepath.Join(d, "y")
+	mkexec(t, x, 0o755)
+	mkexec(t, y, 0o755)
+	blob := extendedACL(7, 5, 5)
+	setACL(t, x, blob)
+	setACL(t, y, blob)
+	real := statEntry
+	statEntry = func(dirfd int, name string, flags int) (DirEntry, error) {
+		e, err := real(dirfd, name, flags)
+		if name == "x" {
+			e.Ino++
+		}
+		return e, err
+	}
+	t.Cleanup(func() { statEntry = real })
+
+	l, err := hostAccess{}.ReadDir(d, Identity{}, ReadDirOptions{Xattrs: true})
+	if err != nil {
+		t.Fatalf("a replaced entry must not fail the listing: %v", err)
+	}
+	ex := mustEntry(t, l, "x")
+	if !errors.Is(ex.XattrErr, ErrVanished) {
+		t.Errorf("x: XattrErr = %v, want ErrVanished", ex.XattrErr)
+	}
+	if ex.Caps != nil || ex.ACL != nil {
+		t.Errorf("x: Caps=%x ACL=%x, want nil for a replaced file", ex.Caps, ex.ACL)
+	}
+	ey := mustEntry(t, l, "y")
+	if !bytes.Equal(ey.ACL, blob) || ey.XattrErr != nil {
+		t.Errorf("y: ACL=%x XattrErr=%v, want its ACL and no error", ey.ACL, ey.XattrErr)
+	}
+}
+
+// A 0111 executable cannot be opened for reading by anyone but root: the
+// refusal is recorded on that entry, and the listing still returns. Root
+// (DAC_OVERRIDE) opens it. Both halves are subtests, so the one this uid
+// cannot prove is SKIPped by name.
+func TestReadDirXattrsDeniedIsRecordedPerEntry(t *testing.T) {
+	root := os.Geteuid() == 0
+	list := func(t *testing.T) Listing {
+		t.Helper()
+		d := t.TempDir()
+		mkexec(t, filepath.Join(d, "x"), 0o111)
+		mkexec(t, filepath.Join(d, "y"), 0o755)
+		l, err := hostAccess{}.ReadDir(d, Identity{}, ReadDirOptions{Xattrs: true})
+		if err != nil {
+			t.Fatalf("a denied entry must not fail the listing: %v", err)
+		}
+		if len(l.Entries) != 2 {
+			t.Fatalf("entries = %+v, want x and y", l.Entries)
+		}
+		return l
+	}
+
+	t.Run("root opens it", func(t *testing.T) {
+		if !root {
+			t.Skipf("needs euid 0; this run is euid %d (the lab host covers this half)", os.Geteuid())
+		}
+		noXattrs(t, mustEntry(t, list(t), "x"))
+	})
+
+	t.Run("anyone else is denied", func(t *testing.T) {
+		if root {
+			t.Skip("needs a non-root euid; root bypasses DAC, so only the CI runner covers this half")
+		}
+		l := list(t)
+		ex := mustEntry(t, l, "x")
+		if !errors.Is(ex.XattrErr, unix.EACCES) {
+			t.Errorf("x: XattrErr = %v, want EACCES", ex.XattrErr)
+		}
+		if ex.Caps != nil || ex.ACL != nil {
+			t.Errorf("x: Caps=%x ACL=%x, want nil", ex.Caps, ex.ACL)
+		}
+		noXattrs(t, mustEntry(t, l, "y"))
+	})
 }

@@ -46,7 +46,10 @@ type Access interface {
 	// non-zero, is the (dev, ino) the caller believes path has; a mismatch
 	// is ErrVanished. It is licensed by Declaration.Walk, not by
 	// Declaration.Reads — the walk's boundaries are its own.
-	ReadDir(path string, expect Identity) (Listing, error)
+	// opts says what is read beyond each entry's stat: with Xattrs, the
+	// capability and access-ACL attributes of every executable regular
+	// entry, which the walk licence covers too.
+	ReadDir(path string, expect Identity, opts ReadDirOptions) (Listing, error)
 
 	// Readlink returns the target of the symlink at path, stored form,
 	// unresolved. It is a read like Stat and is licensed by
@@ -471,14 +474,14 @@ func (g *guardedAccess) Stat(p string) (ReadMeta, error) {
 // it. Unlike the other methods this one does not silently substitute the
 // cleaned form — the walk builds its paths from listings it made itself, so
 // an unclean one means the caller has a bug, not a spelling.
-func (g *guardedAccess) ReadDir(p string, expect Identity) (Listing, error) {
+func (g *guardedAccess) ReadDir(p string, expect Identity, opts ReadDirOptions) (Listing, error) {
 	if !g.decl.Walk {
 		return Listing{}, g.violate("readdir " + p)
 	}
 	if !path.IsAbs(p) || path.Clean(p) != p {
 		return Listing{}, fmt.Errorf("%s: readdir path %q must be absolute and clean", g.name, p)
 	}
-	return g.inner.ReadDir(p, expect)
+	return g.inner.ReadDir(p, expect, opts)
 }
 
 // Readlink is a read: authorised against Declaration.Reads exactly as Stat
@@ -549,8 +552,10 @@ type Action struct {
 
 // walkTarget is what a declared walk is printed as. The traversal has no
 // finite path list to enumerate, so the row names the boundaries instead —
-// which is the thing a change-control reviewer is actually approving.
-const walkTarget = "every local filesystem, no symlink followed, boundaries and exclusions as declared"
+// which is the thing a change-control reviewer is actually approving. The
+// attributes ReadDirOptions.Xattrs reads are named there as well: they are
+// read from files the walk opens, which a listing alone never does.
+const walkTarget = "every local filesystem, no symlink followed, boundaries and exclusions as declared; the capability and ACL attributes of executables are read"
 
 // ListActions renders the registry as the document a change-control
 // reviewer reads: every path read, every command run, the walk a collector

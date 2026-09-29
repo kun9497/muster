@@ -41,7 +41,22 @@ type DirEntry struct {
 	MntIDKnown bool
 
 	Size int64
+
+	Caps     []byte // security.capability, nil when absent or not asked for
+	ACL      []byte // system.posix_acl_access, nil when absent or not asked for
+	XattrErr error  // the open/fstat/fgetxattr failure for this entry, nil when none; wraps the errno or ErrVanished
 }
+
+// ReadDirOptions says what a listing reads beyond the stat of each entry.
+//
+// Xattrs: read Caps/ACL of every regular entry with an execute bit. Each such
+// entry is opened relative to the listed directory (never following a
+// symlink, never blocking, never acquiring a terminal), checked to still be
+// the regular file statx reported, and its security.capability and
+// system.posix_acl_access read from that fd. A failure is the entry's
+// XattrErr, never the listing's: one unreadable executable must not cost
+// the walk the directory it sits in.
+type ReadDirOptions struct{ Xattrs bool } // Xattrs: read Caps/ACL of every regular entry with an execute bit
 
 // Listing is one directory: the directory itself (Self, whose Name is
 // always empty — it is not one of its own entries) and its children sorted
@@ -51,6 +66,11 @@ type Listing struct {
 	Self    DirEntry
 	Entries []DirEntry
 }
+
+// The two attributes ReadDirOptions.Xattrs reads from each executable: its
+// file capabilities and its POSIX access ACL.
+var xattrCapability = "security.capability"
+var xattrACLAccess = "system.posix_acl_access"
 
 // ErrVanished means the directory that was opened is not the one the
 // listing named: its (dev, ino) no longer matches the Identity the caller
@@ -73,7 +93,9 @@ var ErrNoWalk = errors.New("this Access does not implement the walk")
 // with a silently empty listing.
 type NoWalkAccess struct{}
 
-func (NoWalkAccess) ReadDir(string, Identity) (Listing, error) { return Listing{}, ErrNoWalk }
+func (NoWalkAccess) ReadDir(string, Identity, ReadDirOptions) (Listing, error) {
+	return Listing{}, ErrNoWalk
+}
 
 func (NoWalkAccess) Readlink(string) (string, error) { return "", ErrNoWalk }
 
@@ -95,7 +117,11 @@ func (NoWalkAccess) Readlink(string) (string, error) { return "", ErrNoWalk }
 // the alternative would be to lose the whole listing over one temporary
 // file. Any other statx failure fails the listing, named by the entry it
 // happened on.
-func (hostAccess) ReadDir(p string, expect Identity) (Listing, error) {
+//
+// opts.Xattrs adds the attributes of every regular entry with an execute
+// bit (readEntryXattrs); a failure there is that entry's XattrErr and
+// never fails the listing.
+func (hostAccess) ReadDir(p string, expect Identity, opts ReadDirOptions) (Listing, error) {
 	fd, err := openDirNoFollow(rewriteProcSelf(p), unix.O_RDONLY|unix.O_DIRECTORY|unix.O_NOFOLLOW|unix.O_CLOEXEC)
 	if err != nil {
 		return Listing{}, err
@@ -123,9 +149,83 @@ func (hostAccess) ReadDir(p string, expect Identity) (Listing, error) {
 			return Listing{}, fmt.Errorf("%s/%s: %w", p, n, err)
 		}
 		e.Name = n
+		if opts.Xattrs && e.Kind == "regular" && e.Mode&0o111 != 0 {
+			readEntryXattrs(fd, &e)
+		}
 		out.Entries = append(out.Entries, e)
 	}
 	return out, nil
+}
+
+// readEntryXattrs reads the capability and access-ACL attributes of the
+// listed entry e, relative to the listing's own directory fd, and records
+// them (or the failure) on e. The caller has already decided e is a regular
+// file with an execute bit, from the statx the listing made.
+//
+// The open is O_NOFOLLOW (a symlink put in the file's place is ELOOP, never
+// followed), O_NONBLOCK and O_NOCTTY (a FIFO or tty put in its place can
+// neither block the walk nor become its controlling terminal) and
+// O_RDONLY, which is all fgetxattr needs. The fd is then fstat'ed: an
+// object that is not a regular file, or not the (dev, ino) statx reported,
+// replaced the entry between the two calls, and its attributes would
+// describe something the listing never saw — that is ErrVanished, and
+// nothing is read. statxAt stores Mkdev(major, minor), the same glibc dev_t
+// encoding Stat_t.Dev carries, so the two compare directly.
+//
+// An attribute that is not set (ENODATA), or a filesystem that has no
+// attributes of that namespace (EOPNOTSUPP), is nil with no error. Any other
+// failure is XattrErr, the first one winning; the open's error is left
+// unwrapped for the walk to classify.
+func readEntryXattrs(dirfd int, e *DirEntry) {
+	ofd, err := unix.Openat(dirfd, e.Name, unix.O_RDONLY|unix.O_NOFOLLOW|unix.O_NONBLOCK|unix.O_NOCTTY|unix.O_CLOEXEC, 0)
+	if err != nil {
+		e.XattrErr = err
+		return
+	}
+	defer unix.Close(ofd)
+	var st unix.Stat_t
+	if err := unix.Fstat(ofd, &st); err != nil {
+		e.XattrErr = err
+		return
+	}
+	if st.Mode&unix.S_IFMT != unix.S_IFREG || uint64(st.Dev) != e.Dev || st.Ino != e.Ino {
+		e.XattrErr = ErrVanished
+		return
+	}
+	caps, cerr := fgetxattrOpt(ofd, xattrCapability)
+	acl, aerr := fgetxattrOpt(ofd, xattrACLAccess)
+	e.Caps, e.ACL = caps, acl
+	if cerr != nil {
+		e.XattrErr = cerr
+	} else if aerr != nil {
+		e.XattrErr = aerr
+	}
+}
+
+// fgetxattrOpt reads one attribute of an open fd, sized from the attribute
+// itself and re-sized once on ERANGE (the value grew between the two
+// calls), as Getxattr does. An attribute that is not there, or a
+// filesystem that does not support it, is nil with no error.
+func fgetxattrOpt(fd int, name string) ([]byte, error) {
+	v, err := fgetxattrSized(fd, name)
+	if errors.Is(err, unix.ERANGE) {
+		v, err = fgetxattrSized(fd, name)
+	}
+	if errors.Is(err, unix.ENODATA) || errors.Is(err, unix.EOPNOTSUPP) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", name, err)
+	}
+	return v, nil
+}
+
+func fgetxattrSized(fd int, name string) ([]byte, error) {
+	size, err := unix.Fgetxattr(fd, name, nil)
+	if err != nil {
+		return nil, err
+	}
+	return readXattr(fd, name, size)
 }
 
 // openDirNoFollow opens p as a directory through openNoFollow and names a

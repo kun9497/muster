@@ -759,7 +759,7 @@ func TestWalkDeclaresItself(t *testing.T) {
 		switch {
 		case act.Kind == "walk":
 			walkRow = true
-			if act.Needs != "root" || act.Target != "every local filesystem, no symlink followed, boundaries and exclusions as declared" {
+			if act.Needs != "root" || act.Target != "every local filesystem, no symlink followed, boundaries and exclusions as declared; the capability and ACL attributes of executables are read" {
 				t.Errorf("walk row = %+v", act)
 			}
 		case act.Kind == "command":
