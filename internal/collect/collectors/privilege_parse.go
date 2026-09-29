@@ -20,11 +20,9 @@ func parseLdSoPreload(data []byte) []string {
 		if i := strings.IndexByte(line, '#'); i >= 0 {
 			line = line[:i]
 		}
-		for _, tok := range strings.FieldsFunc(line, func(r rune) bool {
+		out = append(out, strings.FieldsFunc(line, func(r rune) bool {
 			return strings.ContainsRune(ldSoPreloadSeparators, r)
-		}) {
-			out = append(out, tok)
-		}
+		})...)
 	}
 	return out
 }

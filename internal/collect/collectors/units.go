@@ -511,11 +511,17 @@ func (r *unitsRun) execRow(unit, directive, command string) map[string]any {
 	statPath, meta, ok, err := r.statExec(p)
 	flagPath := p
 	if ok && errors.Is(err, collect.ErrSymlink) && meta.Kind == "symlink" {
-		// A symlinked executable: its owner is judged, and one hop to its
-		// target, which is judged in its place (a deploy's
-		// /usr/local/bin/app → /opt/app/current/app).
+		// A symlinked executable: its owner and its directory are judged
+		// (whoever may write the directory may replace the link, D5-2), and
+		// one hop to its target, which is judged in its place (a deploy's
+		// /usr/local/bin/app → /opt/app/bin/app). exists and kind are the
+		// link's; stat_path and stat_status are the target's, so a link to
+		// a missing target reads exists true, stat_status missing (D5-4).
 		row["exists"], row["kind"] = true, "symlink"
 		r.judge(unit, p, "", meta, true)
+		if meta.ParentUntrusted {
+			r.flag(unit, p, "parent_writable")
+		}
 		target, isLink := linkTarget(r.a, statPath)
 		if !isLink || !declared(r.a, target) {
 			row["stat_status"] = "link_undeclared"

@@ -169,7 +169,9 @@ func (hostAccess) ReadDir(p string, expect Identity, opts ReadDirOptions) (Listi
 // object that is not a regular file, or not the (dev, ino) statx reported,
 // replaced the entry between the two calls, and its attributes would
 // describe something the listing never saw — that is ErrVanished, and
-// nothing is read. statxAt stores Mkdev(major, minor), the same glibc dev_t
+// nothing is read (an object put in the entry's place between the calls
+// is opened once — read-only, non-blocking, no controlling tty — before it
+// is rejected; the check can only follow the open). statxAt stores Mkdev(major, minor), the same glibc dev_t
 // encoding Stat_t.Dev carries, so the two compare directly.
 //
 // An attribute that is not set (ENODATA), or a filesystem that has no

@@ -168,7 +168,7 @@ func (hostAccess) ReadFileBinary(p string, limit int64) ([]byte, ReadMeta, error
 func (hostAccess) Stat(p string) (ReadMeta, error) { return Stat(rewriteProcSelf(p)) }
 
 // GlobDir is the literal directory a pattern lists: the longest leading part
-// with no "*", "?" or "[", reduced to its parent when the segment that part
+// with no unescaped "*", "?" or "[", reduced to its parent when the segment that part
 // ends in is the one holding the meta-character. The pattern is cleaned
 // first, so a dynamic pattern carrying a trailing slash still names a
 // directory. A pattern with no meta-character at all is its own answer —
@@ -188,13 +188,28 @@ func (hostAccess) Stat(p string) (ReadMeta, error) { return Stat(rewriteProcSelf
 // It is exported so the collectors' test double can key its denied-directory
 // map on the same rule the primitive probes, instead of a hand copy that can
 // silently go stale.
+//
+// A backslash quotes the character after it, as filepath.Glob reads it, so
+// the directory is the unescaped path: an escaped systemd instance's
+// drop-in directory (globEscape's "\\x2d") is probed as it is named on
+// disk, not with the backslash the pattern inserted (D5-1).
 func GlobDir(pattern string) string {
 	p := path.Clean(pattern)
-	i := strings.IndexAny(p, "*?[")
-	if i < 0 {
-		return p
+	var lit strings.Builder
+	for i := 0; i < len(p); i++ {
+		c := p[i]
+		switch c {
+		case '*', '?', '[':
+			return path.Dir(lit.String() + string(c))
+		case '\\':
+			if i+1 < len(p) {
+				i++
+				c = p[i]
+			}
+		}
+		lit.WriteByte(c)
 	}
-	return path.Dir(p[:i+1])
+	return lit.String()
 }
 
 // Glob is filepath.Glob, with the directory it is about to list probed
@@ -268,12 +283,17 @@ type xattrHandle struct {
 // container runtimes' control sockets and their ACLs) is reopened with
 // O_PATH|O_NOFOLLOW through the same openNoFollow (no symlink in any
 // component) and read through /proc/self/fd/N, which names the inode already
-// open, never the path again. The fd is fstat'd first and anything but a
-// socket keeps the original ENXIO (a device with no driver), so this branch
-// serves sockets alone.
+// open, never the path again. The same route serves a socket the caller may
+// not open for reading: the kernel checks read permission (EACCES, or EPERM
+// under an LSM) before it reaches the socket's ENXIO, yet listxattr(2) and
+// getxattr(2) need no permission on the file itself (V-66), so a non-root
+// run reads a root:docker 0660 socket's ACL as root does. The fd is fstat'd
+// first and anything but a socket keeps the original error — ENXIO for a
+// device with no driver, EACCES for a regular file such as /etc/shadow — so
+// this branch serves sockets alone.
 func openXattr(p string) (xattrHandle, error) {
 	fd, _, err := openNoFollow(p, openFlags)
-	if err == nil || !errors.Is(err, unix.ENXIO) {
+	if err == nil || !(errors.Is(err, unix.ENXIO) || errors.Is(err, unix.EACCES) || errors.Is(err, unix.EPERM)) {
 		return xattrHandle{fd: fd}, err
 	}
 	pfd, _, perr := openNoFollow(p, unix.O_PATH|unix.O_NOFOLLOW|unix.O_CLOEXEC)

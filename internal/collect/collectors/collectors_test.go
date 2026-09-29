@@ -43,21 +43,22 @@ type fsAccess struct {
 	// under test here walks a tree yet.
 	collect.NoWalkAccess
 
-	files       map[string]string            // host path -> testdata file name
-	contents    map[string][]byte            // host path -> literal bytes, for content no fixture file should hold (a multi-megabyte index)
-	dirs        map[string]bool              // host path -> exists, but is not a readable file
-	links       map[string]string            // host path -> symlink target, stored form (Readlink; Stat is ErrSymlink)
-	cmds        map[string]cmdResult         // command line -> canned outcome
-	fails       map[string]error             // host path -> error returned instead of content
-	truncated   map[string]bool              // host path -> ReadFile reports the read hit the cap (R70)
-	modes       map[string]uint32            // host path -> raw 0o7777 bits (fallback consulted when stats has no entry)
-	owners      map[string]uint32            // host path -> the uid ReadFile's meta reports (0 when unset), as the host primitive's fstat does
-	stats       map[string]statResult        // host path -> full Stat() shape (R93; Task 5 relies on this)
-	xattrs      map[string][]string          // host path -> extended attribute names
-	xattrValues map[string]map[string][]byte // host path -> attribute name -> value, served by Getxattr
-	xattrErrs   map[string]error             // host path -> the XattrErr ReadDir reports for that entry under Xattrs (V-32)
-	writable    map[string]bool              // host path -> Writable answer
-	globErr     error                        // when set, every Glob fails with it
+	files         map[string]string            // host path -> testdata file name
+	contents      map[string][]byte            // host path -> literal bytes, for content no fixture file should hold (a multi-megabyte index)
+	dirs          map[string]bool              // host path -> exists, but is not a readable file
+	links         map[string]string            // host path -> symlink target, stored form (Readlink; Stat is ErrSymlink)
+	untrustedDirs map[string]bool              // directory -> ReadMeta.ParentUntrusted for a symlink's Stat in it
+	cmds          map[string]cmdResult         // command line -> canned outcome
+	fails         map[string]error             // host path -> error returned instead of content
+	truncated     map[string]bool              // host path -> ReadFile reports the read hit the cap (R70)
+	modes         map[string]uint32            // host path -> raw 0o7777 bits (fallback consulted when stats has no entry)
+	owners        map[string]uint32            // host path -> the uid ReadFile's meta reports (0 when unset), as the host primitive's fstat does
+	stats         map[string]statResult        // host path -> full Stat() shape (R93; Task 5 relies on this)
+	xattrs        map[string][]string          // host path -> extended attribute names
+	xattrValues   map[string]map[string][]byte // host path -> attribute name -> value, served by Getxattr
+	xattrErrs     map[string]error             // host path -> the XattrErr ReadDir reports for that entry under Xattrs (V-32)
+	writable      map[string]bool              // host path -> Writable answer
+	globErr       error                        // when set, every Glob fails with it
 
 	// deniedDirs are the literal glob directories this process may not
 	// search: a pattern whose literal directory (globDirOf, the rule
@@ -186,7 +187,7 @@ func (a *fsAccess) Stat(p string) (collect.ReadMeta, error) {
 	// primitive answers it: Stat never follows the final component, and the
 	// walk'''s plan learns a relocated container-storage root that way.
 	if _, ok := a.links[p]; ok {
-		return collect.ReadMeta{Tier: "openat2", Kind: "symlink", Mode: 0o777}, fmt.Errorf("%s: %w", p, collect.ErrSymlink)
+		return collect.ReadMeta{Tier: "openat2", Kind: "symlink", Mode: 0o777, ParentUntrusted: a.untrustedDirs[path.Dir(p)]}, fmt.Errorf("%s: %w", p, collect.ErrSymlink)
 	}
 	if err, ok := a.fails[p]; ok {
 		return collect.ReadMeta{}, err

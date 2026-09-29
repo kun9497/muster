@@ -124,16 +124,18 @@ func lastlogRows(a collect.Access, prows []passwdRow, pmeta collect.ReadMeta) fa
 
 // loginCapableEnv wraps loginCapable in its envelope. A shadow that exists
 // and could not be read is the answer for every row's inactivity field (C3),
-// and so is an unreadable /etc/shells, which decides who is interactive: the
-// libc fallback set loginShells keeps for shell_valid is not the host's list.
-// A missing /etc/shells is the libc default and a missing shadow is a known
-// state (R138); both keep the leaf ok.
+// and so is an /etc/shells that cannot be read or does not exist, which
+// decides who is interactive: the libc fallback set loginShells keeps for
+// shell_valid omits /bin/bash and is not the host's list, so the leaf is
+// denied with the fallback's reason, as the files and sshkeys siblings
+// write it (S3, V-67). A missing shadow is a known state (R138) and keeps
+// the leaf ok.
 func loginCapableEnv(prows []passwdRow, byName map[string]shadowRow, haveShadow bool, serr error, smeta, pmeta collect.ReadMeta, uidMin int, shells map[string]bool, shellsEnv facts.Envelope) facts.Envelope {
 	if !haveShadow {
 		return readErrorEnv(shadowPath, serr)
 	}
-	if shellsEnv.Status != facts.StatusOK {
-		return shellsEnv
+	if e, untrusted := untrustedShells(shellsEnv); untrusted {
+		return e
 	}
 	e := collect.OK(loginCapable(prows, byName, haveShadow, uidMin, shells), &facts.Source{Kind: "derived", Inputs: []facts.Source{
 		{Kind: "file", Path: passwdPath}, {Kind: "file", Path: shadowPath}, {Kind: "file", Path: shellsPath},

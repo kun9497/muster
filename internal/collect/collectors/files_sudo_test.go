@@ -394,4 +394,17 @@ func TestSudoRuleFacts(t *testing.T) {
 	if l, _ := e["sudo.nopasswd_all"].Value.([]any); !slices.Equal(l, []any{"last"}) {
 		t.Errorf("nopasswd_all past the cap = %+v", e["sudo.nopasswd_all"])
 	}
+
+	// V-65: a wide specification past the row budget publishes what fits and
+	// makes the answers absent, naming the budget (V-41).
+	e = sudoRuleEnvs(t, sudoAccess(wideSpec(10000), nil))
+	if e["sudo.rules"].Status != facts.StatusOK {
+		t.Errorf("wide: rules = %+v", e["sudo.rules"].Status)
+	}
+	okValue(t, e["sudo.rules_unresolved"], 1, "wide rules_unresolved")
+	for _, k := range []string{"sudo.nopasswd_all", "sudo.authenticate_disabled"} {
+		if e[k].Status != facts.StatusAbsent || e[k].Reason != "1 rule could not be resolved: the rules past 65536 — the answer needs them" {
+			t.Errorf("wide: %s = %+v", k, e[k])
+		}
+	}
 }

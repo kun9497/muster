@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 )
 
 // P-2: the sudoers user specifications, aliases and Defaults scopes, read to
@@ -493,5 +494,84 @@ func TestAuthenticateDisabledScopes(t *testing.T) {
 	}
 	if authenticateDisabled(files) {
 		t.Error("a later file's authenticate did not win")
+	}
+}
+
+// wideSpec is one user specification naming n principals and n commands,
+// no alias: every row shares the one command list.
+func wideSpec(n int) string {
+	var b strings.Builder
+	for i := 0; i < n; i++ {
+		if i > 0 {
+			b.WriteByte(',')
+		}
+		fmt.Fprintf(&b, "u%d", i)
+	}
+	b.WriteString(" ALL=(ALL) NOPASSWD: ")
+	for i := 0; i < n; i++ {
+		if i > 0 {
+			b.WriteByte(',')
+		}
+		fmt.Fprintf(&b, "/%d", i)
+	}
+	return b.String() + "\n"
+}
+
+// V-65: a wide specification under the read limit — 10,000 principals ×
+// 10,000 commands, no alias — must not make the published rows copy every
+// principal's command list. The row budget charges the commands a row
+// carries, so the commands the rows publish stay bounded, the rest is
+// unresolved, and the answers that need it turn absent.
+func TestSudoRulesWideSpecStaysBounded(t *testing.T) {
+	const n = 10000
+	start := time.Now()
+	rules, unresolved := resolveOne(t, wideSpec(n), mainSudoers)
+	rows, _ := sudoRuleRows(rules)
+	if d := time.Since(start); d > 5*time.Second {
+		t.Errorf("resolving and publishing took %v", d)
+	}
+	carried := 0
+	for _, r := range rows {
+		carried += len(r.(map[string]any)["commands"].([]any))
+	}
+	// Every resolved row fits the budget; the one row that says the rest was
+	// not read carries its own list.
+	if carried > sudoRowBudget+n {
+		t.Errorf("the published rows carry %d commands (budget %d + one row of %d)", carried, sudoRowBudget, n)
+	}
+	if unresolved != 1 || rules[len(rules)-1].Resolved {
+		t.Errorf("%d rules, %d unresolved: the rows past the budget must be unresolved", len(rules), unresolved)
+	}
+	if got := unresolvedNames(rules); !reflect.DeepEqual(got, []string{"the rules past 65536"}) {
+		t.Errorf("names %q", got)
+	}
+}
+
+// V-65: the published list is cut to sudoRuleCap before any row is built,
+// so the rules past the cap copy nothing.
+func TestSudoRuleRowsCutBeforeBuilding(t *testing.T) {
+	cmds := make([]string, 100)
+	for i := range cmds {
+		cmds[i] = fmt.Sprintf("/c%d", i)
+	}
+	rules := make([]sudoRule, sudoRuleCap+1000)
+	for i := range rules {
+		rules[i] = sudoRule{File: mainSudoers, Line: 1, Principal: fmt.Sprintf("u%d", i), Kind: "user", Commands: cmds}
+	}
+	rows, cut := sudoRuleRows(rules)
+	if len(rows) != sudoRuleCap || !cut {
+		t.Fatalf("%d rows, cut %t; want %d, true", len(rows), cut, sudoRuleCap)
+	}
+	if first := rows[0].(map[string]any)["principal"]; first != "u0" {
+		t.Errorf("first row %v", first)
+	}
+	if _, cut := sudoRuleRows(rules[:sudoRuleCap]); cut {
+		t.Error("a list at the cap is not cut")
+	}
+	// Each shown row copies its commands (one allocation each) and a few
+	// more for its map and slices; the rows past the cap must copy nothing.
+	allocs := testing.AllocsPerRun(1, func() { sudoRuleRows(rules) })
+	if limit := float64(sudoRuleCap * (len(cmds) + 10)); allocs > limit {
+		t.Errorf("%.0f allocations, want at most %.0f: the rows past the cap were built", allocs, limit)
 	}
 }

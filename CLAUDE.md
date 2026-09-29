@@ -80,7 +80,7 @@ regenerates them from public images and `-check` compares.
 - `ReadDir(path, expect, ReadDirOptions{Xattrs: true})` — licensed by `Declaration.Walk` alone — opens each
   regular entry with an execute bit from the directory fd, `fstat`-checks it and reads `security.capability`
   and `system.posix_acl_access` onto the `DirEntry`; an entry whose attributes could not be read is a
-  `walk.skipped` row (`xattr_denied`, `xattr_undecoded`, `vanished`) and never stops the walk. A capability
+  `walk.skipped` row (`xattr_denied`, `xattr_undecoded`, `xattr_error`, `vanished`) and never stops the walk. A capability
   is declared by the host's own package metadata — rpm's `%{FILECAPS}` (the walk's rpm query carries it as
   the fifth tab field) or the owning dpkg package's `postinst` `setcap` call (literal, `$NAME=` or
   `$(dpkg-divert --truename …)` variable, or `- <path> < <file>`) — never by a reference list; the canonical
@@ -94,13 +94,13 @@ regenerates them from public images and `-check` compares.
   `units.exec_writable` `absent` (MANUAL naming it); a lone `;` separates commands; `parent_writable` judges the
   executable's directory.
 - The sudo reader parses user specifications with aliases resolved (depth 8, budgets of 65536 members and
-  rows); a comment line ends at its newline even inside a continuation; `#<digits>` is a uid; an unresolved
+  of 65536 commands the rows carry; `sudo.rules` is cut to 2000 before a row is built); a comment line ends at its newline even inside a continuation; `#<digits>` is a uid; an unresolved
   alias, netgroup or non-Unix group makes `sudo.nopasswd_all` and `sudo.authenticate_disabled` `absent` (MANUAL).
   `accounts.login_capable` is every interactive non-system account, root and password-locked accounts included;
   `lastlog` is decoded by `runtime.GOARCH` (292 bytes on amd64, ppc64le, riscv64; 296 on arm64, s390x). `sshkeys`
   never stores a key body; a symlinked `authorized_keys` reads MANUAL; `rsa-sha2-*` words carry RSA keys. A
   runtime socket's xattrs are read through an `O_PATH` fd's `/proc/self/fd` entry (a socket cannot be opened
-  for reading). `/var/run/…` is never declared — it is a symlink.
+  for reading, and a caller its mode refuses gets EACCES first — the route serves both). `/var/run/…` is never declared — it is a symlink.
 
 ## Stage-2 conventions
 

@@ -548,6 +548,32 @@ func TestUnitsSymlinkedExecutableOneHop(t *testing.T) {
 		t.Errorf("exec_writable %v", got)
 	}
 
+	// D5-2: whoever may write the link's directory may replace the link, so
+	// that directory is judged too.
+	a = unitsAccess("l.service")
+	unitText(a, usrUnits+"/l.service", "[Service]\nExecStart=/usr/local/bin/app\n")
+	a.links["/usr/local/bin/app"] = "/opt/app/bin"
+	a.untrustedDirs = map[string]bool{"/usr/local/bin": true}
+	exe(a, "/opt/app/bin", 0o755, 0, 0)
+	b = build(t, "units", a)
+	if got := writableRows(t, b); !reflect.DeepEqual(got, []string{"l.service /usr/local/bin/app parent_writable"}) {
+		t.Errorf("writable link directory: exec_writable %v", got)
+	}
+
+	// D5-4: a link whose target is missing: the link exists (exists, kind),
+	// its target does not (stat_status, stat_path), and nothing is judged.
+	a = unitsAccess("l.service")
+	unitText(a, usrUnits+"/l.service", "[Service]\nExecStart=/usr/local/bin/app\n")
+	a.links["/usr/local/bin/app"] = "/opt/app/gone"
+	b = build(t, "units", a)
+	e = unitRows(t, b)["l.service"]["exec"].([]any)[0].(map[string]any)
+	if e["exists"] != true || e["kind"] != "symlink" || e["stat_status"] != "missing" || e["stat_path"] != "/opt/app/gone" || e["mode"] != -1 {
+		t.Errorf("dangling link row %v", e)
+	}
+	if got := writableRows(t, b); len(got) != 0 {
+		t.Errorf("dangling link: exec_writable %v", got)
+	}
+
 	a = unitsAccess("l.service")
 	unitText(a, usrUnits+"/l.service", "[Service]\nExecStart=/usr/local/bin/app\n")
 	a.links["/usr/local/bin/app"] = "/srv/app/run"
@@ -570,6 +596,19 @@ func TestUnitsEscapedInstanceDropIn(t *testing.T) {
 	b := build(t, "units", a)
 	if got := execPaths(t, unitRows(t, b)[unit]); !reflect.DeepEqual(got, []string{"ExecStart /usr/lib/systemd/systemd-fsck", "ExecStartPost /usr/bin/inst"}) {
 		t.Errorf("exec %v", got)
+	}
+
+	// D5-1: the escaped instance's own drop-in directory, unsearchable, is
+	// the denial it is — the probe names the directory as it is on disk,
+	// never an empty list read as "no drop-ins".
+	a.deniedDirs = map[string]bool{etcUnits + "/" + unit + ".d": true}
+	b = build(t, "units", a)
+	row := unitRows(t, b)[unit]
+	if row["read_status"] != "denied" || !strings.HasPrefix(row["reason"].(string), etcUnits+"/systemd-fsck@dev-disk-by") {
+		t.Errorf("denied instance drop-in directory: row %v", row)
+	}
+	if w := env(t, b, "units.exec_writable"); w.Status != facts.StatusAbsent {
+		t.Errorf("exec_writable %+v, want absent naming the unit", w)
 	}
 }
 

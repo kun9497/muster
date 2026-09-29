@@ -182,7 +182,7 @@ every plan is under `docs/superpowers/plans/`):
   `system.posix_acl_access` attributes of every executable it lists, from the
   open directory fd after an identity check; the walk uses it (licensed by its
   `Walk` declaration alone) and never stops for an attribute it cannot read
-  (`walk.skipped` gains `xattr_denied` and `xattr_undecoded`). `walk.capabilities`
+  (`walk.skipped` gains `xattr_denied`, `xattr_undecoded` and `xattr_error`). `walk.capabilities`
   joins each capability with the package's own declaration — rpm's `%{FILECAPS}`
   (the rpm query's fifth field) or the dpkg `postinst` `setcap` call, in its
   literal, variable, `dpkg-divert --truename` and `- <path> < <file>` forms — and

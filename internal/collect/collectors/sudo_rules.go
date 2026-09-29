@@ -26,8 +26,9 @@ const (
 	// sudoRuleCap bounds the published sudo.rules list (V-12).
 	sudoRuleCap = 2000
 	// sudoExpandBudget bounds the alias members one resolveRules call emits
-	// and sudoRowBudget the rows it builds; past either, what is left is
-	// unresolved rather than read, so the answers turn absent, never wrong.
+	// and sudoRowBudget the commands its rows carry (one at least per row);
+	// past either, what is left is unresolved rather than read, so the
+	// answers turn absent, never wrong.
 	sudoExpandBudget = 1 << 16
 	sudoRowBudget    = 1 << 16
 
@@ -810,6 +811,7 @@ func resolveRules(files []sudoersFile) (rules []sudoRule, unresolved int) {
 		}
 	}
 	rules = []sudoRule{}
+	spent := 0 // commands (one at least per row) the rows carry, bounded by sudoRowBudget
 	for _, f := range files {
 		for _, spec := range f.Specs {
 			var runs []sudoRun
@@ -841,17 +843,24 @@ func resolveRules(files []sudoersFile) (rules []sudoRule, unresolved int) {
 						rule.unresolvedBy = append(rule.unresolvedBy, pr.why)
 					}
 					rule.unresolvedBy = append(rule.unresolvedBy, run.why...)
-					if len(rules) == sudoRowBudget {
+					// A row costs its commands (one at least): every row of
+					// a specification shares one command list, but the row
+					// that publishes it copies it, so the budget counts what
+					// the rows carry, not how many there are (V-65).
+					cost := max(1, len(run.commands))
+					past := spent+cost > sudoRowBudget
+					if past {
 						// The rows past the budget are not read: the last row
 						// says so, and the answers that need them are absent.
 						rule.unresolvedBy = []string{"the rules past " + strconv.Itoa(sudoRowBudget)}
 					}
+					spent += cost
 					rule.Resolved = len(rule.unresolvedBy) == 0
 					if !rule.Resolved {
 						unresolved++
 					}
 					rules = append(rules, rule)
-					if len(rules) > sudoRowBudget {
+					if past {
 						return rules, unresolved
 					}
 				}
@@ -859,6 +868,25 @@ func resolveRules(files []sudoersFile) (rules []sudoRule, unresolved int) {
 		}
 	}
 	return rules, unresolved
+}
+
+// sudoRuleRows is the published sudo.rules list: the first sudoRuleCap
+// rules, cut before any row is built so nothing past the cap is copied
+// (V-65), and whether the list was cut.
+func sudoRuleRows(rules []sudoRule) ([]any, bool) {
+	shown := rules[:min(len(rules), sudoRuleCap)]
+	rows := make([]any, 0, len(shown))
+	for _, r := range shown {
+		cmds := make([]any, 0, len(r.Commands))
+		for _, c := range r.Commands {
+			cmds = append(cmds, c)
+		}
+		rows = append(rows, map[string]any{
+			"file": r.File, "line": r.Line, "principal": r.Principal, "kind": r.Kind, "negated": r.Negated,
+			"runas": r.Runas, "nopasswd": r.NoPasswd, "commands": cmds, "resolved": r.Resolved,
+		})
+	}
+	return rows, len(rules) > len(shown)
 }
 
 // unresolvedNames is what the unresolved rules need, sorted and unique.

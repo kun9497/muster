@@ -219,6 +219,11 @@ func TestAccountsInactivityFacts(t *testing.T) {
 			a.fails = map[string]error{"/etc/passwd": os.ErrPermission}
 			return a
 		},
+		"shells missing": func() *fsAccess {
+			a := inactivityAccess()
+			delete(a.contents, "/etc/shells")
+			return a
+		},
 		"useradd denied, lastlog denied": func() *fsAccess {
 			a := inactivityAccess()
 			a.fails = map[string]error{"/etc/default/useradd": os.ErrPermission, "/var/log/lastlog": os.ErrPermission}
@@ -250,6 +255,12 @@ func TestAccountsInactivityFacts(t *testing.T) {
 
 	if e := env(t, results["shadow denied"], "accounts.login_capable"); e.Status != facts.StatusDenied || !strings.HasPrefix(e.Reason, "/etc/shadow: ") {
 		t.Errorf("shadow denied: login_capable %+v, want denied naming /etc/shadow (C3)", e)
+	}
+	// V-67: without /etc/shells the libc fallback set omits /bin/bash, so
+	// who is interactive is unknown: denied with the fallback's reason, as
+	// files.home_dirs and ssh.authorized_keys write it (S3), never ok.
+	if e := env(t, results["shells missing"], "accounts.login_capable"); e.Status != facts.StatusDenied || e.Reason != "libc default; /etc/shells does not exist" {
+		t.Errorf("shells missing: login_capable %+v, want denied with the libc fallback's reason (S3)", e)
 	}
 	if e := env(t, results["shadow denied"], "accounts.useradd.inactive"); e.Status != facts.StatusOK || e.Value != -1 {
 		t.Errorf("shadow denied: useradd.inactive %+v must not depend on shadow", e)

@@ -1,6 +1,7 @@
 package collectors
 
 import (
+	"encoding/hex"
 	"os"
 	"strings"
 	"testing"
@@ -150,6 +151,38 @@ func TestCapTextMajorityDefault(t *testing.T) {
 		back, err := parseCapText(capText(cs))
 		if err != nil || !sameCaps(back, cs) {
 			t.Errorf("parseCapText(capText(%+v)) = %+v, %v", cs, back, err)
+		}
+	}
+}
+
+// A LOW-1: capText is held to libcap's own cap_to_text(3) bytes. Each blob
+// is the security.capability value setcap wrote and each text what getcap
+// printed for it, measured with libcap 2.44 (Ubuntu 22.04, kernel 5.15, 41
+// named bits); the majority default is libcap's, all=ep included.
+func TestCapTextMatchesLibcap(t *testing.T) {
+	for _, c := range []struct{ hex, getcap string }{
+		{"01000002ffffffff00000000ff01000000000000", "=ep"},
+		{"0100000200300000000000000000000000000000", "cap_net_admin,cap_net_raw=ep"},
+		{"01000002ffffdfff00000000ff01000000000000", "=ep cap_sys_admin-ep"},
+		{"01000002ffffffffffffffffff010000ff010000", "=eip"},
+		{"0000000280000000002000000000000000000000", "cap_net_raw=i cap_setuid+p"},
+		{"00000002ffffffff00200000ff01000000000000", "=p cap_net_raw+i"},
+		{"0100000200200000000000000000000000000000", "cap_net_raw=ep"},
+	} {
+		raw, err := hex.DecodeString(c.hex)
+		if err != nil {
+			t.Fatal(err)
+		}
+		cs, err := decodeVfsCap(raw)
+		if err != nil {
+			t.Fatalf("%s: %v", c.hex, err)
+		}
+		if got := capText(cs); got != c.getcap {
+			t.Errorf("capText(%s) = %q, getcap printed %q", c.hex, got, c.getcap)
+		}
+		back, err := parseCapText(c.getcap)
+		if err != nil || !sameCaps(back, cs) {
+			t.Errorf("parseCapText(%q) = %+v, %v; want %+v", c.getcap, back, err, cs)
 		}
 	}
 }

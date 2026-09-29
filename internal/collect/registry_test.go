@@ -829,6 +829,11 @@ func TestGlobDirIsTheLiteralDirectory(t *testing.T) {
 		{"/var/cache/dnf/*/repodata/repomd.xml", "/var/cache/dnf"},
 		{"/etc/rc?.d/S*", "/etc"}, // "?" counts as a meta-character too
 		{"/etc/[a-z]*.conf", "/etc"},
+		// D5-1: a backslash quotes the next character, so the directory is
+		// the unescaped name — an escaped systemd instance's drop-ins.
+		{`/etc/systemd/system/systemd-fsck@dev-disk-by\\x2duuid-1.service.d/*.conf`, `/etc/systemd/system/systemd-fsck@dev-disk-by\x2duuid-1.service.d`},
+		{`/etc/a\*b/*.conf`, "/etc/a*b"}, // an escaped meta-character is literal
+		{`/etc/a\*b`, "/etc/a*b"},        // and a pattern of escapes alone is its own answer, unescaped
 	} {
 		if got := GlobDir(c.pattern); got != c.want {
 			t.Errorf("GlobDir(%q) = %q, want %q", c.pattern, got, c.want)
@@ -1058,5 +1063,48 @@ func TestHostAccessXattrOnASocket(t *testing.T) {
 	v, err := (hostAccess{}).Getxattr(p, "system.posix_acl_access")
 	if err != nil || len(v) != len(acl) {
 		t.Fatalf("Getxattr after setfacl: %d bytes, %v", len(v), err)
+	}
+}
+
+// V-66: a caller the socket's mode does not admit is refused the O_RDONLY
+// open with EACCES before the socket's ENXIO, yet reading its xattrs needs
+// no permission on the socket; the O_PATH route must serve it (a non-root
+// run on a root:docker 0660 socket). A regular file the caller cannot read
+// keeps EACCES. Root is admitted, gets ENXIO and reads the socket either
+// way; the non-root half runs on the lab as nobody.
+func TestHostAccessXattrOnAnUnreadableSocket(t *testing.T) {
+	dir, err := os.MkdirTemp("", "mx")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(dir) })
+	p := filepath.Join(dir, "s")
+	l, err := net.Listen("unix", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { l.Close() })
+	if err := os.Chmod(p, 0); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := (hostAccess{}).Llistxattr(p); err != nil {
+		t.Errorf("Llistxattr on a 0000 socket (euid %d): %v", os.Geteuid(), err)
+	}
+	if _, err := (hostAccess{}).Getxattr(p, "system.posix_acl_access"); err != nil && !errors.Is(err, unix.ENODATA) && !errors.Is(err, unix.EOPNOTSUPP) {
+		t.Errorf("Getxattr on a 0000 socket (euid %d): %v, want ENODATA", os.Geteuid(), err)
+	}
+	f := filepath.Join(dir, "f")
+	if err := os.WriteFile(f, []byte("x"), 0); err != nil {
+		t.Fatal(err)
+	}
+	_, err = (hostAccess{}).Llistxattr(f)
+	if os.Geteuid() == 0 {
+		if err != nil {
+			t.Errorf("Llistxattr on a 0000 file as root: %v", err)
+		}
+		return
+	}
+	if !errors.Is(err, unix.EACCES) {
+		t.Errorf("Llistxattr on a 0000 regular file (euid %d): %v, want EACCES", os.Geteuid(), err)
 	}
 }

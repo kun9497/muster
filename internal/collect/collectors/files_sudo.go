@@ -310,18 +310,7 @@ func sudoLogFacts(b *collect.Builder, a collect.Access, main sudoersRead) {
 		}
 		return rules[i].Line < rules[j].Line
 	})
-	rows := make([]any, 0, len(rules))
-	for _, r := range rules {
-		cmds := make([]any, 0, len(r.Commands))
-		for _, c := range r.Commands {
-			cmds = append(cmds, c)
-		}
-		rows = append(rows, map[string]any{
-			"file": r.File, "line": r.Line, "principal": r.Principal, "kind": r.Kind, "negated": r.Negated,
-			"runas": r.Runas, "nopasswd": r.NoPasswd, "commands": cmds, "resolved": r.Resolved,
-		})
-	}
-	rows, cut := capRows(rows, sudoRuleCap)
+	rows, cut := sudoRuleRows(rules)
 	b.Set("sudo.rules", withTruncation(ok(rows), cut))
 	b.Set("sudo.rules_unresolved", ok(unresolved))
 	if unresolved > 0 {

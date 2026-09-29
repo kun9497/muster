@@ -34,16 +34,22 @@ const (
 )
 
 // capabilityRow reads one executable's attributes into the two lists. An
-// entry whose attributes could not be read is a skip and nothing else
-// (V-39): whatever else the listing carries for it was not read from the
-// file the walk listed. A capability attribute that does not decode is a
-// skip too — the kernel would refuse it, so it is no capability, but a
-// reader should see that the walk met one.
+// entry whose attributes could not be read is a skip (V-39). ReadDir sets
+// Caps only when it read the capability from the verified fd, so a
+// capability beside a failure means the ACL read failed after it: the
+// capability row is emitted as well as the skip (V-68), never lost to a
+// failure of the other attribute. Anything else with a failure is the skip
+// alone. A capability attribute that does not decode is a skip too — the
+// kernel would refuse it, so it is no capability, but a reader should see
+// that the walk met one.
 func (w *walker) capabilityRow(e collect.DirEntry, p string) {
 	if e.XattrErr != nil {
 		reason, detail := xattrSkipReason(e.XattrErr)
 		w.addSkip(p, reason, detail)
-		return
+		if e.Caps == nil {
+			return
+		}
+		e.ACL = nil // not read: the failure was the ACL's
 	}
 	if e.Caps != nil {
 		cs, err := decodeVfsCap(e.Caps)
@@ -77,9 +83,10 @@ func (w *walker) capabilityRow(e collect.DirEntry, p string) {
 
 // xattrSkipReason maps an entry's attribute failure onto walk.skipped's
 // closed vocabulary: a file this process may not open is xattr_denied; one
-// that is gone, is a link now, or is not the file the listing named is
-// vanished with the errno in detail; any other errno is vanished too, with
-// its text, so nothing is lost and the vocabulary stays closed.
+// that is not the file the listing named is vanished, and one that is gone
+// or is a link now is vanished with the errno in detail; any other errno
+// (EIO, ENOMEM, …) is xattr_error with the errno in detail, so nothing is
+// lost and the vocabulary stays closed.
 func xattrSkipReason(err error) (reason, detail string) {
 	switch {
 	case errors.Is(err, unix.EACCES), errors.Is(err, unix.EPERM), errors.Is(err, fs.ErrPermission):
@@ -89,9 +96,15 @@ func xattrSkipReason(err error) (reason, detail string) {
 	}
 	var errno unix.Errno
 	if errors.As(err, &errno) {
-		return "vanished", errno.Error()
+		if errno == unix.ENOENT || errno == unix.ELOOP || errno == unix.ENOTDIR {
+			return "vanished", errno.Error()
+		}
+		return "xattr_error", errno.Error()
 	}
-	return "vanished", err.Error()
+	if errors.Is(err, fs.ErrNotExist) || errors.Is(err, collect.ErrSymlink) {
+		return "vanished", err.Error()
+	}
+	return "xattr_error", err.Error()
 }
 
 // aclWidens is the access-ACL entries that grant a named user or group

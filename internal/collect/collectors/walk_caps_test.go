@@ -277,18 +277,19 @@ func TestWalkACLGrantsWidenOnly(t *testing.T) {
 	}
 }
 
-// V-39: an entry whose attributes could not be read is a skip, whatever the
-// double also put in Caps; the walk goes on and still finishes.
+// V-39: an entry whose attributes could not be read is a skip; the walk
+// goes on and still finishes. An errno that is neither a denial nor a
+// vanished file is xattr_error, the errno in detail.
 func TestWalkXattrErrorsAreSkipsNotStops(t *testing.T) {
-	a := capHost(map[string]uint32{"/usr/bin/a": 0o755, "/usr/bin/b": 0o755, "/usr/bin/c": 0o755, "/usr/bin/d": 0o755, "/usr/bin/e": 0o755})
+	a := capHost(map[string]uint32{"/usr/bin/a": 0o755, "/usr/bin/b": 0o755, "/usr/bin/c": 0o755, "/usr/bin/d": 0o755, "/usr/bin/e": 0o755, "/usr/bin/f": 0o755})
 	a.dirs = map[string]bool{rpmDBDir: true}
 	a.cmds = map[string]cmdResult{cmdKey(rpmCommand): {file: "rpm.qa-files.sample"}}
-	a.setCaps("/usr/bin/a", netRawEP)
 	a.xattrErrs["/usr/bin/a"] = unix.EACCES
 	a.xattrErrs["/usr/bin/b"] = collect.ErrVanished
 	a.setCaps("/usr/bin/c", []byte{0, 0, 0, 9, 0, 0, 0, 0, 0, 0, 0, 0})
 	a.xattrErrs["/usr/bin/d"] = unix.EIO
 	a.setACL("/usr/bin/e", []byte{1, 2, 3})
+	a.xattrErrs["/usr/bin/f"] = unix.ENOENT
 	b := walkRun(t, a)
 	if e := env(t, b, "walk.complete"); e.Value != true {
 		t.Fatalf("walk.complete = %+v, want true", e)
@@ -300,7 +301,8 @@ func TestWalkXattrErrorsAreSkipsNotStops(t *testing.T) {
 	checkRow(t, skipped, "/usr/bin/a", map[string]any{"reason": "xattr_denied", "detail": ""})
 	checkRow(t, skipped, "/usr/bin/b", map[string]any{"reason": "vanished"})
 	checkRow(t, skipped, "/usr/bin/c", map[string]any{"reason": "xattr_undecoded"})
-	checkRow(t, skipped, "/usr/bin/d", map[string]any{"reason": "vanished", "detail": unix.EIO.Error()})
+	checkRow(t, skipped, "/usr/bin/d", map[string]any{"reason": "xattr_error", "detail": unix.EIO.Error()})
+	checkRow(t, skipped, "/usr/bin/f", map[string]any{"reason": "vanished", "detail": unix.ENOENT.Error()})
 	checkRow(t, skipped, "/usr/bin/e", map[string]any{"reason": "xattr_undecoded"})
 	for _, p := range []string{"/usr/bin/b", "/usr/bin/c", "/usr/bin/e"} {
 		if rowField(rowFor(t, skipped, p), "detail") == "" {
@@ -448,4 +450,18 @@ func TestWalkPostinstUnresolvedSetcapSaysSo(t *testing.T) {
 		"package": "tool", "package_declared": false, "declared_caps": "", "reference": refPostinst,
 		"reason": "/var/lib/dpkg/info/tool.postinst: a setcap call muster could not resolve",
 	})
+}
+
+// V-68: a capability read from the verified fd stands when the ACL read of
+// the same file then failed: the row is emitted, and so is the skip naming
+// the ACL's failure.
+func TestWalkCapabilityKeptWhenTheACLReadFails(t *testing.T) {
+	a := capHost(map[string]uint32{"/usr/bin/a": 0o755})
+	a.dirs = map[string]bool{rpmDBDir: true}
+	a.cmds = map[string]cmdResult{cmdKey(rpmCommand): {file: "rpm.qa-files.sample"}}
+	a.setCaps("/usr/bin/a", netRawEP)
+	a.xattrErrs["/usr/bin/a"] = fmt.Errorf("%s: %w", aclXattrName, unix.EIO)
+	b := walkRun(t, a)
+	checkRow(t, walkRows(t, b, "walk.capabilities"), "/usr/bin/a", map[string]any{"caps": "cap_net_raw=ep"})
+	checkRow(t, walkRows(t, b, "walk.skipped"), "/usr/bin/a", map[string]any{"reason": "xattr_error"})
 }
