@@ -22,10 +22,11 @@
         "permit_root_login": {
           "effective": {
             "status": "ok",
-            "value": "prohibit-password",
+            "value": "without-password",
             "source": {
               "kind": "command",
-              "cmd": "/usr/sbin/sshd -T"
+              "cmd": "/usr/sbin/sshd -G",
+              "exit_code": 0
             }
           }
         }

@@ -672,10 +672,11 @@ func TestCheckEndToEndJSONAndTable(t *testing.T) {
 		t.Errorf("table output:\n%s", table.String())
 	}
 
-	// R26: full-fail.json flips root_remote_login to FAIL, and its
-	// PermitRootLogin yes opens root_authorized_keys' gate (NOT_APPLICABLE on
-	// full-pass.json, PASS here); the other one hundred and two controls are
-	// unchanged from full-pass.json.
+	// R26: full-fail.json flips root_remote_login and the nine 2G
+	// *_disabled services to FAIL, and its PermitRootLogin yes opens
+	// root_authorized_keys' gate (NOT_APPLICABLE on full-pass.json, PASS
+	// here); the other ninety-three controls are unchanged from
+	// full-pass.json.
 	var failJSON bytes.Buffer
 	if code := run([]string{"check", "--facts", "testdata/full-fail.json", "--format", "json"}, &failJSON, &errb); code != exitFindings {
 		t.Fatalf("exit %d, want 1 for a FAIL; stderr %q", code, errb.String())

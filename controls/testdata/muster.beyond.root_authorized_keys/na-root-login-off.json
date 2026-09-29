@@ -21,7 +21,8 @@
             "value": "no",
             "source": {
               "kind": "command",
-              "cmd": "/usr/sbin/sshd -T"
+              "cmd": "/usr/sbin/sshd -G",
+              "exit_code": 0
             }
           }
         }
