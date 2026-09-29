@@ -236,7 +236,8 @@ cap_net_raw+ep`(2020년 전에 빌드된 rpm 헤더가 아직 싣는 것) — �
   `acl_entries` 사실이 이미 쓰는 POSIX ACL 디코더 `decodeACL([]byte)`로 디코드. 상한·정렬. 읽는 컨트롤
   없음(§1).
 
-`walk.stats`에 두 목록의 상한 카운터가 더해집니다("열세 필드" 주석과 레지스트리 설명이 함께 바뀜).
+`walk.stats`에 두 목록의 상한 카운터가 `truncated_counts` 안에 더해집니다(열세 필드 레코드는 그대로;
+레지스트리 설명이 두 카운터를 적음).
 
 ### P-4 — `units` 수집기
 
@@ -268,6 +269,8 @@ root)와 `Exec*=` 지시자(`ExecStart`, `ExecStartPre`, `ExecStartPost`, `ExecC
 판정하지 않음. 수집기가 stat할 수 있는 실행파일은 고정 선언 집합 — `/usr/bin/*`, `/usr/sbin/*`, `/bin/*`,
 `/sbin/*`, `/usr/local/bin/*`, `/usr/local/sbin/*`, `/usr/lib/*`, `/usr/lib/*/*`, `/usr/lib/*/*/*`,
 `/usr/libexec/*`, `/usr/libexec/*/*`, `/lib/*`, `/lib/*/*`, `/opt/*/*`, `/opt/*/bin/*`, `/snap/bin/*`,
+`/usr/share/*/*`, `/usr/share/*/*/*`(기본 Ubuntu는 `unattended-upgrade-shutdown`을 거기서 돌림, V-44) —
+LXD의 `lxd-agent` 같은 `/run/*` 에이전트와 `/var/lib/*` 바이너리는 집합 밖이라 LXD 게스트는 MANUAL로 읽음 —
 `/etc/init.d/*` — 이고, 그 밖의 경로는 C4: exec 행은 `stat_status: undeclared`이고 `units.exec_writable`은
 경로를 적은 `absent`(MANUAL). 합친 `User=`가 `root`/`0`이 아닌 서비스는 범위 밖: 그 실행파일은 root의 힘
 없이 돕니다.
@@ -385,7 +388,7 @@ RHEL-09-432025(`rhel9` V2R9), UBTU-22-432010(`ubuntu2204` V2R9), UBTU-24-300021(
 
 | id | 중요도 | 추가 게이트 | 판정 | `absent_means` |
 |---|---|---|---|---|
-| `account_inactivity_lock` | 중 | — | `{ fact: accounts.login_capable, op: none, subject: name, where: { field: inactive_unset, op: eq, expected: true } }`; `{ fact: accounts.login_capable, op: none, subject: name, where: { field: inactive, op: gt, expected: "${max_inactive_days}" } }`; `{ fact: accounts.useradd.inactive, op: gte, expected: 0 }`; `{ fact: accounts.useradd.inactive, op: lte, expected: "${max_inactive_days}" }` — `INACTIVE=0`(만료 즉시 비활성)은 둘 다 통과 | fail — 닿지 않음: leaf는 `ok`거나 읽기 상태(`_mutants.yaml` 행 셋) |
+| `account_inactivity_lock` | 중 | — | `{ fact: accounts.login_capable, op: none, subject: name, where: { field: inactive_unset, op: eq, expected: true } }`; `{ fact: accounts.login_capable, op: none, subject: name, where: { field: inactive, op: gt, expected: "${max_inactive_days}" } }`; `{ fact: accounts.useradd.inactive, op: gte, expected: 0 }`; `{ fact: accounts.useradd.inactive, op: lte, expected: "${max_inactive_days}" }` — `INACTIVE=0`(만료 즉시 비활성)은 둘 다 통과 | fail — `/etc/passwd`가 없을 때 닿음(`fail-no-passwd.json`); `_mutants.yaml` 행 없음 |
 | `sudo_nopasswd_all` | 상 | `sudo.installed eq true` | `{ fact: sudo.nopasswd_all, op: none, where: { op: not_in, expected: "${allowed_nopasswd_principals}" } }`(기본 `[]`); `{ fact: sudo.authenticate_disabled, op: eq, expected: false }` | manual — 체인을 다 읽지 못했거나 규칙을 풀지 못함: 빠진 줄이 태그를 실을 수 있음(`manual-include-outside.json`, `manual-unresolved-alias.json`) |
 | `file_capabilities_declared` | 상 | (deep 게이트: `walk.complete`) | `{ fact: walk.capabilities, op: none, subject: path, where: { field: package_declared, op: eq, expected: false } }` | manual — 패키지 데이터베이스가 없는 호스트는 join된 walk 목록 전부를 `absent`("no package database")로 만듦: 대조할 선언이 없음, setuid 선례(`manual-no-package-db.json`) |
 | `root_unit_exec_writable` | 상 | `env.has_systemd eq true` | `{ fact: units.exec_writable, op: none, subject: path, where: { field: why, op: present } }` | manual — 범위 안 유닛 파일이나 drop-in이 존재하는데 읽을 수 없음(`manual-unit-unreadable.json`) |
@@ -472,7 +475,7 @@ OpenSSH는 7.0에서 DSA를 실행 시 기본 비활성화하고, 9.8에서 기�
   채우고(EL9 스냅샷은 빠져 있던 walk와 sshd 모양을 얻어 표가 아홉 행에서 열일곱 행으로 자람);
   `hosts_test.go`가 각 여덟 행을 고정: `account_inactivity_lock` FAIL, `sudo_nopasswd_all` PASS,
   `file_capabilities_declared` PASS(Ubuntu: `postinst`가 선언한 파일 넷; EL9: `%{FILECAPS}`가 선언한
-  `ping`), `root_unit_exec_writable` PASS, `ld_so_preload_empty` PASS, `container_runtime_access` PASS(소켓
+  `arping`, `clockdiff`, `newuidmap`, `newgidmap` — 거기서 `ping`은 capability가 없음, V-58), `root_unit_exec_writable` PASS, `ld_so_preload_empty` PASS, `container_runtime_access` PASS(소켓
   없음), `root_authorized_keys` PASS(게이트 성립 — `prohibit-password` — 키 0), `ssh_key_quality` PASS.
 
 ## 6. 테스트, CI, 문서 (P-9 … P-12)
@@ -525,7 +528,7 @@ unpackaged`, `package_declared: false`로 실리는지 확인; `if: always()` �
 적는지(둘 다 러너 이미지에서 예상; 첫 실행이 확인하고 이미지가 다르면 단계를 고침),
 `accounts.useradd.inactive`가 -1인지 확인; "check the root snapshot" 단계는 `test $code -ne 2`를
 유지(exit 1이 예상: `sudo_nopasswd_all`, `container_runtime_access`, `account_inactivity_lock`이 거기서
-정직하게 FAIL). 비root 잡: 새 denied 키 아홉이 matrix 행과 같음. 컨테이너 잡: 지금처럼 `run.complete` 참;
+정직하게 FAIL). 비root 잡: 새 denied 키 여덟이 matrix 행과 같음. 컨테이너 잡: 지금처럼 `run.complete` 참;
 일반 이미지의 `no-systemd.unsupported` 행에 `units.*`. 잊기 쉬운 산출물, 이름을 적음:
 `cmd/muster/controls_test.go`의 `ok: 104 controls`(세 곳); `cmd/muster/e2e_test.go`의 전수 상태 표와
 `testdata/full-pass.json` / `full-fail.json`에 여덟(deep 게이트 컨트롤은 `package_files_unmodified`처럼

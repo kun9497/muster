@@ -90,7 +90,7 @@ regenerates them from public images and `-check` compares.
   fixed command (`systemctl list-units --type=service --state=active --plain --no-legend`); `Exec*` first tokens
   are stat-ed only inside a declared executable set (`/usr/bin/*`, `/usr/sbin/*`, `/usr/lib/**`, `/usr/libexec/**`,
   `/usr/local/{bin,sbin}/*`, `/usr/share/*/*`, `/opt/*/*`, `/snap/bin/*`, `/etc/init.d/*`, the merged-`/usr`
-  aliases) — a path outside it, a linked or missing unit file, or a unit file muster could not read makes
+  aliases) — a path outside it, a linked unit file, an active unit whose file is missing, or a unit file muster could not read makes
   `units.exec_writable` `absent` (MANUAL naming it); a lone `;` separates commands; `parent_writable` judges the
   executable's directory.
 - The sudo reader parses user specifications with aliases resolved (depth 8, budgets of 65536 members and

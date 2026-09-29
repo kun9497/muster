@@ -384,6 +384,7 @@ Executed 2026-09-29 in the worktree `stage3c2a-privilege` over main `69c467f`, s
 - **V-61 (the capabilities pair's scope).** The oracle pair walks `/usr/bin`, `/usr/sbin`, `/usr/lib`, `/usr/libexec`, `/usr/local/bin` and `/usr/local/sbin` only (the runner's `/usr/local/lib` alone holds 345 k world-writable entries) and runs `getcap -r` over the same six; the CI probe under `/usr/local/bin` is inside it, so `compared 0` fails; `walk.stats` is logged before any assertion.
 - **V-62 (the lastlog pair proves a date).** The pair logs how many comparisons carried a date; CI plants one with `sudo lastlog -S -u runner` before the oracle step (as it plants the sshd drop-in) and greps `oracle lastlog: dated [1-9]`; without `/var/log/lastlog` the pair skips on the absent fact (shadow's lastlog exits 1 there).
 - **V-63 (Task 10's fix round).** The Ubuntu snapshot has fifteen `root_services` rows and `exec_unresolved` 13: `cloud-init-local.service` left it (the snapshot says `env.cloud_init false`) and no other in-scope stock unit names a bare command, so none was invented — the `_notes` says why. A getcap line splits at the first blank whose remainder parses as a capability text (multi-clause texts and `[rootid=N]` contain blanks; `TestOracleGetcapLineSplits`). The CI grep is `oracle lastlog: compared [1-9][0-9]*, dated [1-9]`.
+- **V-64 (a second pre-existing sshd defect, from the whole-branch review).** U-01 `root_remote_login` allows `no` and `prohibit-password`, but `sshd -T` (8.9p1) and `sshd -G` (9.9p1) both print the compiled default as `without-password` (the first `multistate_permitrootlogin` spelling), so a stock host reads U-01 FAIL — `examples/ubuntu-24.04-vm-report.json` already shows it. `root_authorized_keys` is unaffected (its gate is `ne no`). The V-60 treatment: one sshd hotfix after the merge normalises the spelling (or widens `allowed`, whichever U-01's design meant) and fixes the crypto-policies Include.
 - **V-60 (a pre-existing defect surfaced).** On stock EL9 the sshd collector writes `sshd.permit_root_login.persisted` as `error` because `50-redhat.conf`'s `Include /etc/crypto-policies/back-ends/opensshserver.config` lies outside its declaration; C4 says `absent` naming the path. It predates this branch and no 3C-2a control reads `persisted`; it goes to a separate hotfix pull request after the merge (the fuzz hotfix precedent).
 
 ### What the reviews found
@@ -395,7 +396,7 @@ Executed 2026-09-29 in the worktree `stage3c2a-privilege` over main `69c467f`, s
 
 ### Deviations from the spec, as shipped
 
-- `absent_means` of `file_capabilities_declared` is `manual`, not `fail` (V-27): a host with no package database makes every joined walk list `absent` — nothing to declare against, the setuid precedent. `_mutants.yaml` gained three rows for `ld_so_preload_empty` only (spec §5 had said twelve).
+- `absent_means` of `file_capabilities_declared` is `manual`, not `fail` (V-27): a host with no package database makes every joined walk list `absent` — nothing to declare against, the setuid precedent. `_mutants.yaml` gained three rows for `ld_so_preload_empty` only (the plan's file structure had said twelve; the spec's P-9 has said three since the pre-flight fold).
 - `container_runtime_access` has four clauses, and socket rows eleven fields (V-51).
 - `unitExecReads` has the two `/usr/share` globs (V-44); the merged-`/usr` aliases resolve into `/usr` (V-45).
 - The sudoers lexer classifies before joining (V-42/V-43), and `rsa-sha2-*` words are RSA (V-48) — both corrections to the spec's P-2/P-5 wording, folded.
@@ -419,4 +420,4 @@ Executed 2026-09-29 in the worktree `stage3c2a-privilege` over main `69c467f`, s
 - The RPM family's walk cost with the xattr pass (unmeasured until an EL VM exists — a container cannot walk its overlay root).
 - Root's counts `absent` (MANUAL) when one of root's key files has `unparsed > 0` — today an unparsed line in root's file is evidence only and the control judges the parsed keys (the description says so).
 - From Task 5's re-review (Low/Nit): `GlobDir` keeps the inserted `\`, so an escaped instance's `.d` directory loses the EACCES probe; the directory of a symlinked executable's link is never judged; a symlink with a missing target reads `exists true` / `stat_status missing`.
-- The sshd collector's `persisted` `error` on stock EL9 (V-60) — a hotfix after the merge.
+- The sshd collector's `persisted` `error` on stock EL9 (V-60) and U-01's `without-password` spelling (V-64) — one sshd hotfix after the merge.
