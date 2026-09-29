@@ -40,7 +40,7 @@
             },
             {
               "kind": "file",
-              "path": "/etc/systemd/system/agent.service"
+              "path": "/etc/systemd/system/backup.service"
             }
           ]
         }
