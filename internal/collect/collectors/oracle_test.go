@@ -1269,8 +1269,8 @@ func TestOracleLastlog(t *testing.T) {
 			t.Errorf("lastlog: %s (uid %d): collector %q, lastlog -u %q", name, uid, got[uid], want)
 		}
 		compared++
-		if want != "" || got[uid] != "" {
-			dated++
+		if want != "" && got[uid] == want {
+			dated++ // both sides carry the same date
 		}
 	}
 	t.Logf("oracle lastlog: compared %d, dated %d", compared, dated)
@@ -1331,8 +1331,10 @@ type oracleCap struct {
 // text after the path may itself hold blanks (`cap_a=ep cap_b+i`, a trailing
 // `[rootid=N]`), and so may the path, so no fixed blank is the separator: the
 // split is the first blank whose remainder — past an old-libcap `= ` — is a
-// capability text parseCapText accepts. A path's own words are never one: a
-// clause needs an operator and known capability names.
+// capability text parseCapText accepts. A path's own words are rarely one —
+// a clause needs an operator and, but for a bare `=ep`, known capability
+// names — so only a pathological path under /usr (one holding " =ep") could
+// split early, and that shows as a mismatch, a failure, never a false pass.
 func oracleGetcapLine(line string) (oracleCap, bool) {
 	const rootidMark = " [rootid="
 	for i := 0; i < len(line); i++ {
@@ -1531,8 +1533,14 @@ func TestOracleSudoers(t *testing.T) {
 // on every Linux run rather than only when the oracles are enabled: both
 // libcap spellings, a multi-clause text, a rootid, and a path with a blank.
 func TestOracleGetcapLineSplits(t *testing.T) {
-	ping, _ := parseCapText("cap_net_raw=ep")
-	multi, _ := parseCapText("cap_net_raw=ep cap_setuid+i")
+	ping, err := parseCapText("cap_net_raw=ep")
+	if err != nil {
+		t.Fatal(err)
+	}
+	multi, err := parseCapText("cap_net_raw=ep cap_setuid+i")
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, tc := range []struct {
 		line string
 		want oracleCap
