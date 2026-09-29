@@ -1152,6 +1152,32 @@ keys:
     since: 1
     sensitivity: public
     collector: files
+  - key: sudo.rules
+    type: list<record>
+    description: "Evidence: the user specifications of /etc/sudoers and the files it includes, one row per principal per privilege (a ':' starts a privilege afresh) per run of one Runas_Spec - file, line, principal, kind (user, group, uid, gid, all, and alias, netgroup or nonunix on an unresolved row), negated, runas (the spec's text with Runas_Alias substituted, empty when none), nopasswd (some command of the row carries NOPASSWD, the tag persisting along the list until PASSWD), commands (Cmnd_Alias substituted, ALL spelled ALL, negated commands kept with their !) and resolved (false for an undefined alias, a cycle, an alias nested deeper than eight, a netgroup, a non-Unix group or a line that does not parse); sorted by file and line, truncated at 2000 rows. The read's status when a sudoers file cannot be read; absent naming the path when an include is outside the declaration or a drop-in is a symlink; an empty list without /etc/sudoers."
+    since: 1
+    sensitivity: internal
+    collector: files
+    subject_kind: user
+  - key: sudo.nopasswd_all
+    type: list<string>
+    description: "The principals other than root and #0 - ALL included, spelled ALL - that sudo.rules grants the ALL command itself under NOPASSWD, whatever the runas and whatever the list negates beside it; negated principals grant nothing. Sorted, unique, judged from the local files. Absent naming them when a rule could not be resolved, and degraded with sudo.rules otherwise; an empty list without /etc/sudoers."
+    since: 1
+    sensitivity: public
+    collector: files
+    subject_kind: user
+  - key: sudo.authenticate_disabled
+    type: bool
+    description: "Whether !authenticate is in force, after the Defaults lines are applied in sudo's order (a later line winning for the same scope), for the unscoped Defaults or for any Defaults:User_List or Defaults>Runas_List; Defaults@host and Defaults!command are counted in sudo.defaults.scoped_count and do not set it. Absent naming them when a rule could not be resolved, and degraded with sudo.rules otherwise; false without /etc/sudoers."
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: sudo.rules_unresolved
+    type: int
+    description: "How many sudo.rules rows are resolved false; degraded with sudo.rules, 0 without /etc/sudoers."
+    since: 1
+    sensitivity: public
+    collector: files
   - key: accounts.login_defs.pass_max_days
     type: setting<int>
     description: PASS_MAX_DAYS - persisted in login.defs, effective as the maximum over existing accounts' shadow fields.

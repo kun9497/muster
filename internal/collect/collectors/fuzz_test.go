@@ -1387,3 +1387,23 @@ func FuzzParseSudoersDefaults(f *testing.F) {
 		fuzzBody(t, "parseSudoersDefaults", func() any { return parseSudoersDefaults(data) }, len(data))
 	})
 }
+
+func FuzzParseSudoers(f *testing.F) {
+	seeds(f, "testdata/sudoers*")
+	f.Add([]byte("User_Alias A = B, !%g : B = A\nCmnd_Alias C = sha256:abc /bin/x \\, y, !ALL\n" +
+		"A, +ng, \"%:Domain Admins\" h1, h2 = (ALL : %#0) NOPASSWD: TIMEOUT=5 C, PASSWD: /bin/b : ALL = ALL\n" +
+		"#1000 ALL = \\\n NOPASSWD: ALL\n#1 comment\nDefaults>root !authenticate\nDefaults:a,b !authenticate\n"))
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "parseSudoers", func() any {
+			parsed := parseSudoers(data, sudoersPath)
+			rules, unresolved := resolveRules([]sudoersFile{parsed})
+			// The rows are principals times privileges, which can pass the
+			// input's length; resolveRules bounds them at sudoRowBudget, and
+			// they are compared for determinism as one text.
+			if len(rules) > sudoRowBudget+1 {
+				t.Fatalf("resolveRules built %d rows (budget %d)", len(rules), sudoRowBudget)
+			}
+			return []any{parsed, fmt.Sprintf("%+v", rules), unresolved, nopasswdAll(rules), authenticateDisabled([]sudoersFile{parsed})}
+		}, len(data))
+	})
+}

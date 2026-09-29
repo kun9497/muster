@@ -3,6 +3,7 @@
 package collectors
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -145,8 +146,8 @@ func TestFilesPublishesEverySudoKey(t *testing.T) {
 			keys = append(keys, k.Key)
 		}
 	}
-	if len(keys) != 6 {
-		t.Fatalf("the registry declares %d sudo.* keys, want 6", len(keys))
+	if len(keys) != 10 {
+		t.Fatalf("the registry declares %d sudo.* keys, want 10", len(keys))
 	}
 	deniedMain := sudoAccess("", nil)
 	deniedMain.fails[sudoersPath] = unix.EACCES
@@ -227,5 +228,170 @@ func TestSudoLogIncludeOutsideTheDeclaration(t *testing.T) {
 				t.Errorf("%q: %s = %+v, want absent %q", c.main, name, e, c.reason)
 			}
 		}
+	}
+}
+
+// wantSudoRuleKeys are the four leaves of P-2.
+var wantSudoRuleKeys = []string{"sudo.rules", "sudo.nopasswd_all", "sudo.authenticate_disabled", "sudo.rules_unresolved"}
+
+func sudoRuleEnvs(t *testing.T, a *fsAccess) map[string]facts.Envelope {
+	t.Helper()
+	b := build(t, "files", a)
+	out := map[string]facts.Envelope{}
+	for _, k := range wantSudoRuleKeys {
+		out[k] = env(t, b, k)
+	}
+	return out
+}
+
+// P-2: the rules follow the chain the logging leaves read, and degrade
+// with them.
+func TestSudoRuleFacts(t *testing.T) {
+	// The stock Ubuntu file and cloud-init's drop-in: every rule, sorted by
+	// file and line, and the one passwordless ALL.
+	a := sudoAccess("", nil)
+	a.files[sudoersPath] = "sudoers.ubuntu"
+	a.files["/etc/sudoers.d/90-cloud-init-users"] = "sudoers_d.90-cloud-init-users"
+	e := sudoRuleEnvs(t, a)
+	rules := e["sudo.rules"]
+	rows, _ := rules.Value.([]any)
+	if rules.Status != facts.StatusOK || len(rows) != 4 {
+		t.Fatalf("sudo.rules = %+v", rules)
+	}
+	var got []string
+	for _, r := range rows {
+		m := r.(map[string]any)
+		got = append(got, fmt.Sprintf("%s:%d %s %s %v %v", m["file"], m["line"], m["principal"], m["kind"], m["nopasswd"], m["commands"]))
+		for _, f := range []string{"file", "line", "principal", "kind", "negated", "runas", "nopasswd", "commands", "resolved"} {
+			if _, ok := m[f]; !ok {
+				t.Errorf("row %v lacks %s", m, f)
+			}
+		}
+		if len(m) != 9 {
+			t.Errorf("row %v carries %d fields, want 9", m, len(m))
+		}
+	}
+	want := []string{
+		"/etc/sudoers:44 root user false [ALL]",
+		"/etc/sudoers:47 %admin group false [ALL]",
+		"/etc/sudoers:50 %sudo group false [ALL]",
+		"/etc/sudoers.d/90-cloud-init-users:4 ubuntu user true [ALL]",
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("rows\n got %q\nwant %q", got, want)
+	}
+	if rules.Source == nil || rules.Source.Kind != "derived" || len(rules.Source.Inputs) != 2 {
+		t.Errorf("rules source %+v", rules.Source)
+	}
+	np := e["sudo.nopasswd_all"]
+	if l, _ := np.Value.([]any); np.Status != facts.StatusOK || !slices.Equal(l, []any{"ubuntu"}) {
+		t.Errorf("nopasswd_all = %+v", np)
+	}
+	okValue(t, e["sudo.authenticate_disabled"], false, "authenticate_disabled")
+	okValue(t, e["sudo.rules_unresolved"], 0, "rules_unresolved")
+
+	// An unresolved rule: the rules and the count stand, the two answers are
+	// absent naming what could not be resolved.
+	e = sudoRuleEnvs(t, sudoAccess("+admins ALL = NOPASSWD: ALL\nroot ALL = ALL\nUser_Alias OPS = GHOST\nOPS ALL = ALL\n", nil))
+	if rows, _ := e["sudo.rules"].Value.([]any); e["sudo.rules"].Status != facts.StatusOK || len(rows) != 3 {
+		t.Errorf("rules = %+v", e["sudo.rules"])
+	}
+	okValue(t, e["sudo.rules_unresolved"], 2, "rules_unresolved")
+	for _, k := range []string{"sudo.nopasswd_all", "sudo.authenticate_disabled"} {
+		if e[k].Status != facts.StatusAbsent || e[k].Reason != "2 rules could not be resolved: +admins, GHOST — the answer needs them" {
+			t.Errorf("%s = %+v", k, e[k])
+		}
+	}
+	e = sudoRuleEnvs(t, sudoAccess("+admins ALL = ALL\n", nil))
+	if r := e["sudo.nopasswd_all"].Reason; r != "1 rule could not be resolved: +admins — the answer needs them" {
+		t.Errorf("one unresolved: %q", r)
+	}
+
+	// Defaults !authenticate in a drop-in, and the main file's later line
+	// after the includedir winning over it (sudo's order).
+	e = sudoRuleEnvs(t, sudoAccess("@includedir /etc/sudoers.d\n", map[string]string{"/etc/sudoers.d/10": "Defaults !authenticate\n"}))
+	okValue(t, e["sudo.authenticate_disabled"], true, "drop-in !authenticate")
+	e = sudoRuleEnvs(t, sudoAccess("@includedir /etc/sudoers.d\nDefaults authenticate\n", map[string]string{"/etc/sudoers.d/10": "Defaults !authenticate\n"}))
+	okValue(t, e["sudo.authenticate_disabled"], false, "main line after the includedir")
+	e = sudoRuleEnvs(t, sudoAccess("Defaults authenticate\n@includedir /etc/sudoers.d\n", map[string]string{"/etc/sudoers.d/10": "Defaults !authenticate\n"}))
+	okValue(t, e["sudo.authenticate_disabled"], true, "main line before the includedir")
+	// Between two includes: the line is applied after the first file and
+	// before the second.
+	e = sudoRuleEnvs(t, sudoAccess("@include /etc/sudoers.d/a\nDefaults !authenticate\n@include /etc/sudoers.d/b\n",
+		map[string]string{"/etc/sudoers.d/a": "Defaults env_reset\n", "/etc/sudoers.d/b": "Defaults authenticate\n"}))
+	okValue(t, e["sudo.authenticate_disabled"], false, "the second include after the main line")
+	e = sudoRuleEnvs(t, sudoAccess("@include /etc/sudoers.d/a\nDefaults authenticate\n@include /etc/sudoers.d/b\n",
+		map[string]string{"/etc/sudoers.d/a": "Defaults !authenticate\n", "/etc/sudoers.d/b": "Defaults env_reset\n"}))
+	okValue(t, e["sudo.authenticate_disabled"], false, "the main line after the first include")
+
+	// A host-scoped !authenticate is counted, not applied (§1 parks it).
+	b := build(t, "files", sudoAccess("Defaults@web !authenticate\n", nil))
+	okValue(t, env(t, b, "sudo.authenticate_disabled"), false, "Defaults@web")
+	okValue(t, env(t, b, "sudo.defaults.scoped_count"), 1, "Defaults@web scoped_count")
+
+	// An include outside the declaration and a symlinked drop-in: all four
+	// absent, with the logging leaves.
+	e = sudoRuleEnvs(t, sudoAccess("root ALL = ALL\n@include /etc/sudoers.local\n", nil))
+	for _, k := range wantSudoRuleKeys {
+		if e[k].Status != facts.StatusAbsent || e[k].Reason != "include /etc/sudoers.local is outside the collector's declaration" {
+			t.Errorf("include outside: %s = %+v", k, e[k])
+		}
+	}
+	a = sudoAccess("@includedir /etc/sudoers.d\n", map[string]string{"/etc/sudoers.d/10": "alice ALL = NOPASSWD: ALL\n"})
+	a.links = map[string]string{"/etc/sudoers.d/10": "/srv/sudo"}
+	e = sudoRuleEnvs(t, a)
+	for _, k := range wantSudoRuleKeys {
+		if e[k].Status != facts.StatusAbsent || e[k].Reason != "a symlinked drop-in was not read: /etc/sudoers.d/10" {
+			t.Errorf("symlinked drop-in: %s = %+v", k, e[k])
+		}
+	}
+	// A denied drop-in: the read's status on all four (C3).
+	a = sudoAccess("@includedir /etc/sudoers.d\n", map[string]string{"/etc/sudoers.d/90-x": "alice ALL = NOPASSWD: ALL\n"})
+	a.fails["/etc/sudoers.d/90-x"] = unix.EACCES
+	e = sudoRuleEnvs(t, a)
+	for _, k := range wantSudoRuleKeys {
+		if e[k].Status != facts.StatusDenied || !strings.HasPrefix(e[k].Reason, "/etc/sudoers.d/90-x: ") {
+			t.Errorf("denied drop-in: %s = %+v", k, e[k])
+		}
+	}
+	// The main file denied.
+	a = sudoAccess("", nil)
+	a.fails[sudoersPath] = unix.EACCES
+	a.stats[sudoersPath] = statResult{mode: 0o440, kind: "regular"}
+	e = sudoRuleEnvs(t, a)
+	for _, k := range wantSudoRuleKeys {
+		if e[k].Status != facts.StatusDenied || !strings.HasPrefix(e[k].Reason, sudoersPath+": ") {
+			t.Errorf("denied main: %s = %+v", k, e[k])
+		}
+	}
+
+	// sudo not installed: facts, derived.
+	e = sudoRuleEnvs(t, sudoAccess("", nil))
+	for k, v := range map[string]any{"sudo.authenticate_disabled": false, "sudo.rules_unresolved": 0} {
+		okValue(t, e[k], v, k)
+	}
+	for _, k := range []string{"sudo.rules", "sudo.nopasswd_all"} {
+		if l, ok := e[k].Value.([]any); e[k].Status != facts.StatusOK || !ok || len(l) != 0 {
+			t.Errorf("no sudo: %s = %+v", k, e[k])
+		}
+	}
+	for _, k := range wantSudoRuleKeys {
+		if s := e[k].Source; s == nil || s.Kind != "derived" {
+			t.Errorf("no sudo: %s source %+v", k, s)
+		}
+	}
+
+	// 2001 rules: the first 2000, truncated; the answers still read every rule.
+	var big strings.Builder
+	for i := 0; i < 2000; i++ {
+		fmt.Fprintf(&big, "u%d ALL = ALL\n", i)
+	}
+	big.WriteString("last ALL = NOPASSWD: ALL\n")
+	e = sudoRuleEnvs(t, sudoAccess(big.String(), nil))
+	if rows, _ := e["sudo.rules"].Value.([]any); e["sudo.rules"].Status != facts.StatusOK || len(rows) != 2000 || !e["sudo.rules"].Truncated {
+		t.Errorf("2001 rules: %d rows truncated=%t", len(rows), e["sudo.rules"].Truncated)
+	}
+	if l, _ := e["sudo.nopasswd_all"].Value.([]any); !slices.Equal(l, []any{"last"}) {
+		t.Errorf("nopasswd_all past the cap = %+v", e["sudo.nopasswd_all"])
 	}
 }

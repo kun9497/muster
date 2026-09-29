@@ -4,6 +4,7 @@ package collectors
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"path"
 	"regexp"
@@ -235,11 +236,18 @@ func logTree(a collect.Access, groups map[int]string, gmeta collect.ReadMeta, ge
 	return de, fe
 }
 
-// --- sudo's logging defaults (spec I-6) ---------------------------------
+// --- sudo's logging defaults (spec I-6) and its rules (P-2) --------------
 
-// sudoLogKeys degrade together: C3 makes a sudoers file that cannot be read
-// the answer for every value it could set.
-var sudoLogKeys = []string{"sudo.log.syslog", "sudo.log.logfile", "sudo.defaults.scoped_count"}
+// sudoLogKeys and sudoRuleKeys degrade together: C3 makes a sudoers file
+// that cannot be read the answer for every value it could set, and a file
+// muster did not read (an include outside the declaration, a symlinked
+// drop-in) leaves every one of them absent naming it.
+var (
+	sudoLogKeys  = []string{"sudo.log.syslog", "sudo.log.logfile", "sudo.defaults.scoped_count"}
+	sudoRuleKeys = []string{"sudo.rules", "sudo.nopasswd_all", "sudo.authenticate_disabled", "sudo.rules_unresolved"}
+)
+
+func sudoChainKeys() []string { return append(slices.Clone(sudoLogKeys), sudoRuleKeys...) }
 
 // sudoMaxDepth bounds the include recursion, so two files including each
 // other through different spellings cannot loop.
@@ -249,17 +257,23 @@ const sudoMaxDepth = 8
 // sudo.defaults.scoped_count from /etc/sudoers (the read writeSudoDerived
 // made) and the files it includes, in sudoers(5)'s order, later lines
 // winning. Only unscoped Defaults are interpreted; scoped ones are counted.
+// The same walk writes the four rule leaves (P-2).
 func sudoLogFacts(b *collect.Builder, a collect.Access, main sudoersRead) {
 	if main.err != nil {
 		if errors.Is(main.err, fs.ErrNotExist) {
 			// No sudoers file: sudo's compiled-in defaults, a fact.
-			b.Set("sudo.log.syslog", collect.OK(true, &facts.Source{Kind: "derived"}))
-			b.Set("sudo.log.logfile", collect.OK("", &facts.Source{Kind: "derived"}))
-			b.Set("sudo.defaults.scoped_count", collect.OK(0, &facts.Source{Kind: "derived"}))
+			derived := func() *facts.Source { return &facts.Source{Kind: "derived"} }
+			b.Set("sudo.log.syslog", collect.OK(true, derived()))
+			b.Set("sudo.log.logfile", collect.OK("", derived()))
+			b.Set("sudo.defaults.scoped_count", collect.OK(0, derived()))
+			b.Set("sudo.rules", collect.OK([]any{}, derived()))
+			b.Set("sudo.nopasswd_all", collect.OK([]any{}, derived()))
+			b.Set("sudo.authenticate_disabled", collect.OK(false, derived()))
+			b.Set("sudo.rules_unresolved", collect.OK(0, derived()))
 			return
 		}
 		e := readErrorEnv(sudoersPath, main.err)
-		for _, k := range sudoLogKeys {
+		for _, k := range sudoChainKeys() {
 			b.Set(k, e)
 		}
 		return
@@ -267,7 +281,7 @@ func sudoLogFacts(b *collect.Builder, a collect.Access, main sudoersRead) {
 	s := &sudoLogScan{a: a, syslog: true, seen: map[string]bool{sudoersPath: true}}
 	s.file(sudoersPath, main.data, main.meta, 0)
 	if s.failure != nil {
-		for _, k := range sudoLogKeys {
+		for _, k := range sudoChainKeys() {
 			b.Set(k, *s.failure)
 		}
 		return
@@ -276,7 +290,7 @@ func sudoLogFacts(b *collect.Builder, a collect.Access, main sudoersRead) {
 		// sudo follows the link and muster does not, so what the drop-in
 		// sets is unknown: absent, naming it (C4), never a guessed value.
 		e := collect.Absent("a symlinked drop-in was not read: " + strings.Join(s.skipped, ", "))
-		for _, k := range sudoLogKeys {
+		for _, k := range sudoChainKeys() {
 			b.Set(k, e)
 		}
 		return
@@ -288,6 +302,47 @@ func sudoLogFacts(b *collect.Builder, a collect.Access, main sudoersRead) {
 	b.Set("sudo.log.syslog", ok(s.syslog))
 	b.Set("sudo.log.logfile", ok(s.logfile))
 	b.Set("sudo.defaults.scoped_count", ok(s.scoped))
+
+	rules, unresolved := resolveRules(s.files)
+	sort.SliceStable(rules, func(i, j int) bool {
+		if rules[i].File != rules[j].File {
+			return rules[i].File < rules[j].File
+		}
+		return rules[i].Line < rules[j].Line
+	})
+	rows := make([]any, 0, len(rules))
+	for _, r := range rules {
+		cmds := make([]any, 0, len(r.Commands))
+		for _, c := range r.Commands {
+			cmds = append(cmds, c)
+		}
+		rows = append(rows, map[string]any{
+			"file": r.File, "line": r.Line, "principal": r.Principal, "kind": r.Kind, "negated": r.Negated,
+			"runas": r.Runas, "nopasswd": r.NoPasswd, "commands": cmds, "resolved": r.Resolved,
+		})
+	}
+	rows, cut := capRows(rows, sudoRuleCap)
+	b.Set("sudo.rules", withTruncation(ok(rows), cut))
+	b.Set("sudo.rules_unresolved", ok(unresolved))
+	if unresolved > 0 {
+		// What an alias, a netgroup or a non-Unix group stands for is not
+		// in the files muster read: the answer is absent naming them (P-2).
+		noun := "rules"
+		if unresolved == 1 {
+			noun = "rule"
+		}
+		e := withSource(collect.Absent(fmt.Sprintf("%d %s could not be resolved: %s — the answer needs them",
+			unresolved, noun, strings.Join(unresolvedNames(rules), ", "))), src())
+		b.Set("sudo.nopasswd_all", e)
+		b.Set("sudo.authenticate_disabled", e)
+		return
+	}
+	principals := []any{}
+	for _, p := range nopasswdAll(rules) {
+		principals = append(principals, p)
+	}
+	b.Set("sudo.nopasswd_all", ok(principals))
+	b.Set("sudo.authenticate_disabled", ok(authenticateDisabled(s.files)))
 }
 
 // sudoLogScan applies the sudoers files in the order sudo reads them.
@@ -300,7 +355,8 @@ type sudoLogScan struct {
 	truncated bool
 	seen      map[string]bool
 	failure   *facts.Envelope
-	skipped   []string // symlinked drop-ins, never read
+	skipped   []string      // symlinked drop-ins, never read
+	files     []sudoersFile // what parseSudoers read, in sudo's order (sudoSegments)
 }
 
 func (s *sudoLogScan) fail(e facts.Envelope) {
@@ -312,6 +368,18 @@ func (s *sudoLogScan) fail(e facts.Envelope) {
 func (s *sudoLogScan) file(p string, data []byte, meta collect.ReadMeta, depth int) {
 	s.inputs = append(s.inputs, facts.Source{Kind: "file", Path: p})
 	s.truncated = s.truncated || meta.Truncated
+	// The rules reader reads the same bytes. Its Defaults are split at the
+	// include directives, so a line after a directive is applied after the
+	// files the directive reads, as sudo applies it.
+	segs := sudoSegments(parseSudoers(data, p))
+	s.files = append(s.files, segs[0])
+	next := 1
+	nextSegment := func() {
+		if next < len(segs) {
+			s.files = append(s.files, segs[next])
+			next++
+		}
+	}
 	for _, e := range parseSudoersDefaults(data) {
 		if s.failure != nil {
 			return
@@ -335,9 +403,14 @@ func (s *sudoLogScan) file(p string, data []byte, meta collect.ReadMeta, depth i
 			}
 		case sudoIncludeDir:
 			s.includeDir(e.arg, depth)
+			nextSegment()
 		case sudoInclude:
 			s.include(e.arg, depth)
+			nextSegment()
 		}
+	}
+	for next < len(segs) {
+		nextSegment()
 	}
 }
 
@@ -413,10 +486,8 @@ func (s *sudoLogScan) read(p string, depth int) {
 
 // The kinds of sudoers line the logging leaves care about.
 const (
-	sudoDefaults   = "defaults"
-	sudoScoped     = "scoped"
-	sudoIncludeDir = "includedir"
-	sudoInclude    = "include"
+	sudoDefaults = "defaults"
+	sudoScoped   = "scoped"
 )
 
 // sudoersEntry is one sudoers line that matters to sudo.log.*: an unscoped
@@ -426,14 +497,6 @@ type sudoersEntry struct {
 	kind    string
 	options []sudoOption
 	arg     string
-}
-
-// sudoOption is one Defaults option: its name, whether it was negated with
-// "!", and its value with quotes removed ("" when it has none).
-type sudoOption struct {
-	name    string
-	negated bool
-	value   string
 }
 
 // parseSudoersDefaults reads a sudoers file for its Defaults lines and
@@ -481,76 +544,6 @@ func parseSudoersDefaults(data []byte) []sudoersEntry {
 		case c == ' ' || c == '\t':
 			out = append(out, sudoersEntry{kind: sudoDefaults, options: sudoOptions(rest)})
 		}
-	}
-	return out
-}
-
-// sudoDirective recognises @include, @includedir and their # spellings.
-func sudoDirective(s string) (kind, arg string, ok bool) {
-	f := strings.Fields(s)
-	if len(f) < 2 {
-		return "", "", false
-	}
-	switch f[0] {
-	case "@includedir", "#includedir":
-		return sudoIncludeDir, strings.Trim(f[1], `"`), true
-	case "@include", "#include":
-		return sudoInclude, strings.Trim(f[1], `"`), true
-	}
-	return "", "", false
-}
-
-// sudoOptions splits a Defaults option list on the commas outside double
-// quotes, stops at an unquoted comment, and reads each option.
-func sudoOptions(s string) []sudoOption {
-	var parts []string
-	var b strings.Builder
-	quoted, escaped := false, false
-scan:
-	for _, r := range s {
-		switch {
-		case escaped:
-			escaped = false
-		case r == '\\':
-			escaped = true
-		case r == '"':
-			quoted = !quoted
-		case r == ',' && !quoted:
-			parts = append(parts, b.String())
-			b.Reset()
-			continue
-		case r == '#' && !quoted:
-			break scan
-		}
-		b.WriteRune(r)
-	}
-	parts = append(parts, b.String())
-	var out []sudoOption
-	for _, p := range parts {
-		p = strings.TrimSpace(p)
-		neg := false
-		for strings.HasPrefix(p, "!") {
-			neg = !neg
-			p = strings.TrimSpace(p[1:])
-		}
-		name, rest := p, ""
-		if end := strings.IndexAny(p, "=+- \t"); end >= 0 {
-			name, rest = p[:end], strings.TrimSpace(p[end:])
-		}
-		if name == "" {
-			continue
-		}
-		value := ""
-		for _, op := range []string{"+=", "-=", "="} {
-			if v, ok := strings.CutPrefix(rest, op); ok {
-				value = strings.TrimSpace(v)
-				break
-			}
-		}
-		if len(value) >= 2 && value[0] == '"' && value[len(value)-1] == '"' {
-			value = value[1 : len(value)-1]
-		}
-		out = append(out, sudoOption{name: name, negated: neg, value: value})
 	}
 	return out
 }
