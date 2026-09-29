@@ -149,16 +149,70 @@ func mergeUnitFiles(files []unitFile) unitFile {
 // "!" and is stripped the same way.
 const execPrefixes = "@-:+!|"
 
-// execFirstToken is the executable a command line runs: the prefixes are
-// stripped and the first item is unquoted per systemd.syntax(7). resolved is
-// true only for an absolute, clean path with no % specifier — a bare name
-// (searched in systemd's built-in PATH since v239), a variable, a specifier
-// such as a template's %i or %I, or a malformed quote is not a path muster
-// can stat.
+// execCommands splits an Exec*= value into its commands: a word that is a
+// lone, unquoted ";" separates two commands (systemd's config_parse_exec;
+// "\;" is a literal argument). Each command is returned as written.
+func execCommands(line string) []string {
+	var out []string
+	start := 0
+	i := 0
+	for i < len(line) {
+		for i < len(line) && (line[i] == ' ' || line[i] == '\t') {
+			i++
+		}
+		if i >= len(line) {
+			break
+		}
+		wordStart := i
+		quote := byte(0)
+		for i < len(line) {
+			c := line[i]
+			if quote != 0 {
+				switch c {
+				case quote:
+					quote = 0
+				case '\\':
+					i++
+				}
+				i++
+				continue
+			}
+			if c == ' ' || c == '\t' {
+				break
+			}
+			switch c {
+			case '"', '\'':
+				quote = c
+			case '\\':
+				i++
+			}
+			i++
+		}
+		if i > len(line) {
+			i = len(line)
+		}
+		if line[wordStart:i] == ";" {
+			if s := strings.TrimSpace(line[start:wordStart]); s != "" {
+				out = append(out, s)
+			}
+			start = i
+		}
+	}
+	if s := strings.TrimSpace(line[start:]); s != "" {
+		out = append(out, s)
+	}
+	return out
+}
+
+// execFirstToken is the executable a command line runs: the first item is
+// unquoted per systemd.syntax(7) and then the prefixes are stripped, in
+// systemd's order. resolved is true only for an absolute, clean path with no
+// % specifier — a bare name (searched in systemd's built-in PATH since
+// v239), a variable, a specifier such as a template's %i or %I, or a
+// malformed quote is not a path muster can stat.
 func execFirstToken(line string) (string, bool) {
-	s := strings.TrimLeft(line, " \t")
-	s = strings.TrimLeft(s, execPrefixes)
-	tok, ok := unquoteFirstItem(s)
+	tok, ok := unquoteFirstItem(strings.TrimLeft(line, " \t"))
+	tok = strings.TrimLeft(tok, execPrefixes)
 	if !ok || tok == "" {
 		return tok, false
 	}
@@ -166,25 +220,24 @@ func execFirstToken(line string) (string, bool) {
 	return tok, resolved
 }
 
-// unquoteFirstItem reads the first whitespace-separated item of s. A quote
-// opens only at the start of the item and must be closed; C escapes are
+// unquoteFirstItem reads the first whitespace-separated item of s the way
+// systemd's extract_first_word does with EXTRACT_UNQUOTE|EXTRACT_CUNESCAPE:
+// a quote opens anywhere in the word and must be closed, and C escapes are
 // undone inside and outside quotes. ok is false for a malformed item.
 func unquoteFirstItem(s string) (string, bool) {
 	var b strings.Builder
 	quote := byte(0)
-	if s != "" && (s[0] == '"' || s[0] == '\'') {
-		quote = s[0]
-		s = s[1:]
-	}
 	for i := 0; i < len(s); {
 		c := s[i]
 		switch {
 		case quote != 0 && c == quote:
-			rest := s[i+1:]
-			if rest != "" && rest[0] != ' ' && rest[0] != '\t' {
-				return b.String(), false
-			}
-			return b.String(), true
+			quote = 0
+			i++
+			continue
+		case quote == 0 && (c == '"' || c == '\''):
+			quote = c
+			i++
+			continue
 		case quote == 0 && (c == ' ' || c == '\t'):
 			return b.String(), true
 		case c == '\\':
@@ -199,10 +252,7 @@ func unquoteFirstItem(s string) (string, bool) {
 		b.WriteByte(c)
 		i++
 	}
-	if quote != 0 {
-		return b.String(), false
-	}
-	return b.String(), true
+	return b.String(), quote == 0
 }
 
 // unitEscape decodes one C escape of systemd.syntax(7) after its backslash,

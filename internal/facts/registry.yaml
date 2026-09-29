@@ -3025,14 +3025,14 @@ keys:
     collector: fim
   - key: units.root_services
     type: list<record>
-    description: "The system services in scope - enabled (a .wants or .requires link in any tree of the systemd.unit(5) search path names them) or active (systemctl list-units lists them) - whose merged User= is unset, root or 0, one row per unit sorted by unit with unit, enabled, active, user, unit_file (file, symlink or missing), files (the unit file and each drop-in read, with path, mode, uid and gid), exec (one row per Exec* command line with directive, path, resolved, stat_status, stat_path, exists, kind, mode, uid, gid, group_writable and other_writable; mode, uid and gid -1 when not stat-ed), read_status (ok, denied or error) and reason. A unit file that is a symlink to /dev/null is a mask and out of scope. Capped at 500 units; evidence."
+    description: "The system services in scope - enabled (a .wants or .requires link in any tree of the systemd.unit(5) search path names them) or active (systemctl list-units lists them) - whose merged User= is unset, root or 0, one row per unit sorted by unit with unit, enabled, active, user, unit_file (file, symlink or missing), files (the unit file and each drop-in read, with path, mode, uid and gid), exec (one row per command of each Exec* line - a lone ; separates two - with directive, path, resolved, stat_status (ok, missing, unresolved, undeclared, symlink_in_path, link_undeclared, link_chain, denied or error), stat_path (the path stat-ed: the /usr spelling of a merged-/usr alias, or a symlink's one-hop target), exists, kind, mode, uid, gid, group_writable and other_writable; mode, uid and gid -1 when not stat-ed), read_status (ok, denied or error) and reason. A unit file that is a symlink to /dev/null, or empty, is a mask and out of scope; User=%i names the instance. Capped at 500 units; evidence."
     since: 1
     sensitivity: internal
     collector: units
     subject_kind: unit
   - key: units.exec_writable
     type: list<record>
-    description: "The judged subset of units.root_services, sorted by unit, path and why: an executable owned by a uid other than 0, group-writable or other-writable (why owner, group_writable or other_writable; a symlink judged by its owner only), and a unit file or drop-in with the same properties (why prefixed unit_file:). Absent, naming the unit and path, when an in-scope unit file or drop-in exists and cannot be read, or an executable is outside the collector's declaration or cannot be stat-ed."
+    description: "The judged subset of units.root_services, sorted by unit, path and why: an executable owned by a uid other than 0, group-writable or other-writable, or in a directory that is not root-owned or is group/other-writable (why owner, group_writable, other_writable or parent_writable; a symlinked executable judged by its owner and by its target one hop on), and a unit file or drop-in with the same properties (why prefixed unit_file:). Absent, naming the unit and path, when an in-scope unit file or drop-in exists and cannot be read, a unit file is a symlink not followed, an active unit has no unit file, or an executable (or its symlink target) is outside the collector's declaration or cannot be stat-ed."
     since: 1
     sensitivity: public
     collector: units

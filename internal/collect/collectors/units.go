@@ -43,6 +43,8 @@ var unitExecReads = []string{
 	"/usr/bin/*", "/usr/sbin/*", "/bin/*", "/sbin/*", "/usr/local/bin/*", "/usr/local/sbin/*",
 	"/usr/lib/*", "/usr/lib/*/*", "/usr/lib/*/*/*", "/usr/libexec/*", "/usr/libexec/*/*",
 	"/lib/*", "/lib/*/*", "/opt/*/*", "/opt/*/bin/*", "/snap/bin/*", "/etc/init.d/*",
+	// V-44: stock Ubuntu's unattended-upgrades.service runs a script under /usr/share.
+	"/usr/share/*/*", "/usr/share/*/*/*",
 }
 
 // unitAliasDirs are the merged-/usr aliases a command line spells a path
@@ -98,6 +100,7 @@ type unitsRun struct {
 	unknown  string // the first reason units.exec_writable is absent
 	aliases  map[string]bool
 	cut      bool
+	probe    bool // the unit being read is past the cap: it flags nothing
 }
 
 func runUnits(ctx context.Context, a collect.Access, b *collect.Builder) error {
@@ -147,22 +150,23 @@ func runUnits(ctx context.Context, a collect.Access, b *collect.Builder) error {
 	}
 	slices.Sort(units)
 
-	// The pass over the units stops one row past the cap: that row is what
-	// says the list was cut, and nothing after it is read.
+	// Once the cap is reached the pass only asks whether one more unit is in
+	// scope — that is what says the list was cut — and a unit past the cap
+	// contributes nothing to the other two leaves.
 	var rows []any
-	var counts []int
+	unresolved := 0
+	cut := false
 	for _, u := range units {
-		if len(rows) > unitRowCap {
+		r.probe = len(rows) == unitRowCap
+		row, n, ok := r.unit(u, enabled[u], active[u])
+		if !ok {
+			continue
+		}
+		if r.probe {
+			cut = true
 			break
 		}
-		if row, n, ok := r.unit(u, enabled[u], active[u]); ok {
-			rows = append(rows, row)
-			counts = append(counts, n)
-		}
-	}
-	rows, cut := capRows(rows, unitRowCap)
-	unresolved := 0
-	for _, n := range counts[:len(rows)] {
+		rows = append(rows, row)
 		unresolved += n
 	}
 	cut = cut || r.cut
@@ -230,12 +234,15 @@ func (r *unitsRun) cite(p string) {
 
 // markUnknown records the first reason the writable answer is unknown.
 func (r *unitsRun) markUnknown(reason string) {
-	if r.unknown == "" {
+	if r.unknown == "" && !r.probe {
 		r.unknown = reason
 	}
 }
 
 func (r *unitsRun) flag(unit, p, why string) {
+	if r.probe {
+		return
+	}
 	k := unit + "\x00" + p + "\x00" + why
 	if r.seen[k] {
 		return
@@ -329,7 +336,7 @@ func (r *unitsRun) dropinsFor(names []string) ([]string, map[string]collect.Read
 	var order []string
 	for _, d := range unitSearchPath {
 		for _, n := range names {
-			pattern := d + "/" + n + ".d/*.conf"
+			pattern := d + "/" + globEscape(n) + ".d/*.conf"
 			matches, err := r.a.Glob(pattern)
 			if err != nil {
 				e := globReadError(pattern, err, collect.ErrorEnv(pattern+": "+err.Error()))
@@ -388,9 +395,17 @@ func (r *unitsRun) unit(unit string, enabled, active bool) (map[string]any, int,
 	case "masked":
 		return nil, 0, false
 	case "missing":
+		// V-47: an active unit muster found no file for runs something
+		// unknown as root; a dangling .wants link that is only enabled runs
+		// nothing.
+		if active {
+			r.markUnknown("unit file not found: " + unit + " (unit_file missing)")
+		}
 		return row, 1, true
 	case "symlink":
+		// V-47: a linked unit file — the file that decides is not read.
 		row["unit_file"] = "symlink"
+		r.markUnknown("unit file not followed: " + unit + " " + l.path + " (unit_file symlink)")
 		return row, 1, true
 	case "error":
 		row["unit_file"] = "file"
@@ -428,6 +443,11 @@ func (r *unitsRun) unit(unit string, enabled, active bool) (map[string]any, int,
 			fail("error", p+": binary content")
 			continue
 		}
+		if p == l.path && len(data) == 0 && !rmeta.Truncated {
+			// systemd.unit(5): an empty unit file is a mask, like a
+			// /dev/null link.
+			return nil, 0, false
+		}
 		r.cut = r.cut || rmeta.Truncated
 		parsed = append(parsed, parseUnitFile(data))
 	}
@@ -437,8 +457,14 @@ func (r *unitsRun) unit(unit string, enabled, active bool) (map[string]any, int,
 	if merged.User != nil {
 		user = *merged.User
 	}
+	if _, inst := templateOf(unit); inst {
+		// User=%i (user@.service): the instance is the user.
+		instance := unit[strings.IndexByte(unit, '@')+1 : strings.LastIndexByte(unit, '.')]
+		user = strings.NewReplacer("%i", instance, "%I", instance).Replace(user)
+	}
 	row["user"] = user
-	if row["read_status"] == "ok" && user != "" && user != "root" && user != "0" {
+	// A User= still carrying a specifier cannot be named, so it stays in scope.
+	if row["read_status"] == "ok" && user != "" && user != "root" && user != "0" && !strings.Contains(user, "%") {
 		// Its executables run without root's power. An unreadable file could
 		// set User= back, so a unit with one stays in scope.
 		return nil, 0, false
@@ -450,12 +476,14 @@ func (r *unitsRun) unit(unit string, enabled, active bool) (map[string]any, int,
 	var execs []any
 	n := 0
 	for _, d := range execDirectives {
-		for _, command := range merged.Exec[d] {
-			er := r.execRow(unit, d, command)
-			if er["resolved"] == false {
-				n++
+		for _, cmdline := range merged.Exec[d] {
+			for _, command := range execCommands(cmdline) {
+				er := r.execRow(unit, d, command)
+				if er["resolved"] == false {
+					n++
+				}
+				execs = append(execs, er)
 			}
-			execs = append(execs, er)
 		}
 	}
 	if execs != nil {
@@ -464,7 +492,7 @@ func (r *unitsRun) unit(unit string, enabled, active bool) (map[string]any, int,
 	return row, n, true
 }
 
-// execRow is one command line's executable, every field present (V-9).
+// execRow is one command's executable, every field present (V-9).
 func (r *unitsRun) execRow(unit, directive, command string) map[string]any {
 	p, resolved := execFirstToken(command)
 	row := map[string]any{
@@ -475,32 +503,44 @@ func (r *unitsRun) execRow(unit, directive, command string) map[string]any {
 	if !resolved {
 		return row
 	}
-	statPath := p
 	if !declared(r.a, p) {
 		row["stat_status"] = "undeclared"
 		r.markUnknown("executable outside the collector's declaration: " + unit + " " + p)
 		return row
 	}
-	meta, err := r.a.Stat(p)
-	if errors.Is(err, collect.ErrSymlink) && meta.Kind != "symlink" {
-		// A symlinked directory above the executable: the merged-/usr
-		// aliases are read through their /usr spelling, anything else is
-		// not followed.
-		alt, ok := r.usrSpelling(p)
-		if !ok {
-			row["stat_status"] = "symlink_in_path"
-			r.markUnknown("executable path runs through a symbolic link muster does not follow: " + unit + " " + p)
+	statPath, meta, ok, err := r.statExec(p)
+	flagPath := p
+	if ok && errors.Is(err, collect.ErrSymlink) && meta.Kind == "symlink" {
+		// A symlinked executable: its owner is judged, and one hop to its
+		// target, which is judged in its place (a deploy's
+		// /usr/local/bin/app → /opt/app/current/app).
+		row["exists"], row["kind"] = true, "symlink"
+		r.judge(unit, p, "", meta, true)
+		target, isLink := linkTarget(r.a, statPath)
+		if !isLink || !declared(r.a, target) {
+			row["stat_status"] = "link_undeclared"
+			row["stat_path"] = target
+			r.markUnknown("executable is a symbolic link to a path outside the collector's declaration: " + unit + " " + p + " -> " + target)
 			return row
 		}
-		statPath = alt
-		meta, err = r.a.Stat(alt)
+		statPath, meta, ok, err = r.statExec(target)
+		flagPath = statPath
+		if ok && errors.Is(err, collect.ErrSymlink) && meta.Kind == "symlink" {
+			row["stat_status"] = "link_chain"
+			row["stat_path"] = statPath
+			r.markUnknown("executable is a chain of symbolic links muster follows one hop of: " + unit + " " + p + " -> " + statPath)
+			return row
+		}
 	}
 	row["stat_path"] = statPath
-	symlink := false
 	switch {
+	case !ok || errors.Is(err, collect.ErrSymlink):
+		// A symlinked directory above the executable that is not a
+		// merged-/usr alias: not followed.
+		row["stat_status"] = "symlink_in_path"
+		r.markUnknown("executable path runs through a symbolic link muster does not follow: " + unit + " " + statPath)
+		return row
 	case err == nil:
-	case errors.Is(err, collect.ErrSymlink) && meta.Kind == "symlink":
-		symlink = true
 	case notPresent(err):
 		row["stat_status"] = "missing"
 		return row
@@ -515,14 +555,50 @@ func (r *unitsRun) execRow(unit, directive, command string) map[string]any {
 		kind = "regular"
 	}
 	row["stat_status"] = "ok"
-	row["exists"], row["kind"] = true, kind
-	row["mode"], row["uid"], row["gid"] = int(meta.Mode), int(meta.UID), int(meta.GID)
-	if !symlink {
-		row["group_writable"] = meta.Mode&0o020 != 0
-		row["other_writable"] = meta.Mode&0o002 != 0
+	if row["kind"] == "" {
+		row["kind"] = kind
 	}
-	r.judge(unit, p, "", meta, symlink)
+	row["exists"] = true
+	row["mode"], row["uid"], row["gid"] = int(meta.Mode), int(meta.UID), int(meta.GID)
+	row["group_writable"] = meta.Mode&0o020 != 0
+	row["other_writable"] = meta.Mode&0o002 != 0
+	r.judge(unit, flagPath, "", meta, false)
+	if meta.ParentUntrusted {
+		// V-46: whoever may write the directory may replace the file.
+		r.flag(unit, flagPath, "parent_writable")
+	}
 	return row
+}
+
+// statExec stats an executable, reading a merged-/usr alias through its
+// /usr spelling. ok is false for a symlinked directory above p that is not
+// such an alias; the path returned is the one stat-ed.
+func (r *unitsRun) statExec(p string) (string, collect.ReadMeta, bool, error) {
+	meta, err := r.a.Stat(p)
+	if !errors.Is(err, collect.ErrSymlink) || meta.Kind == "symlink" {
+		return p, meta, true, err
+	}
+	alt, ok := r.usrSpelling(p)
+	if !ok {
+		return p, meta, false, err
+	}
+	meta, err = r.a.Stat(alt)
+	return alt, meta, true, err
+}
+
+// globEscape quotes the glob metacharacters of a unit name — systemd's
+// \x2d escapes in an instance name among them — so its drop-in directory
+// pattern matches the name literally.
+func globEscape(s string) string {
+	var b strings.Builder
+	for _, c := range s {
+		switch c {
+		case '\\', '*', '?', '[':
+			b.WriteByte('\\')
+		}
+		b.WriteRune(c)
+	}
+	return b.String()
 }
 
 // usrSpelling is the /usr path of p when p's first directory is a

@@ -1376,6 +1376,14 @@ func FuzzParseListUnits(f *testing.F) {
 	})
 }
 
+func FuzzExecCommands(f *testing.F) {
+	seeds(f, "testdata/units/*")
+	f.Add([]byte(`/bin/true ; /opt/x/evil \; "a ; b" ;`))
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "execCommands", func() any { return execCommands(string(data)) }, len(data))
+	})
+}
+
 func FuzzExecFirstToken(f *testing.F) {
 	seeds(f, "testdata/units/*")
 	f.Add([]byte(`-@"/opt/my app/\x41run" arg`))

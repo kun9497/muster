@@ -375,6 +375,10 @@ func TestUnitsAliasInSameDirectory(t *testing.T) {
 	if n := unresolvedCount(t, b); n != 1 {
 		t.Errorf("unresolved %d", n)
 	}
+	// V-47: the linked unit's file is not read, so the answer is unknown.
+	if w := env(t, b, "units.exec_writable"); w.Status != facts.StatusAbsent || !strings.Contains(w.Reason, "other.service") {
+		t.Errorf("exec_writable %+v", w)
+	}
 }
 
 func TestUnitsExecOutsideDeclarationIsAbsent(t *testing.T) {
@@ -466,5 +470,184 @@ func TestUnitsNoSystemdAndCaps(t *testing.T) {
 	}
 	if n := unresolvedCount(t, b); n != unitRowCap {
 		t.Errorf("unresolved %d", n)
+	}
+}
+
+// --- fix round 1 -------------------------------------------------------
+
+// A lone ";" word runs a second command as root: it gets its own row and
+// is judged.
+func TestUnitsSemicolonSeparatesCommands(t *testing.T) {
+	a := unitsAccess("semi.service")
+	unitText(a, usrUnits+"/semi.service", "[Service]\nExecStartPre=/bin/true ; /opt/x/evil\nExecStart=/usr/bin/semi\n")
+	exe(a, "/bin/true", 0o755, 0, 0)
+	exe(a, "/opt/x/evil", 0o777, 0, 0)
+	exe(a, "/usr/bin/semi", 0o755, 0, 0)
+	b := build(t, "units", a)
+	want := []string{"ExecStartPre /bin/true", "ExecStartPre /opt/x/evil", "ExecStart /usr/bin/semi"}
+	if got := execPaths(t, unitRows(t, b)["semi.service"]); !reflect.DeepEqual(got, want) {
+		t.Errorf("exec %v", got)
+	}
+	if got := writableRows(t, b); !reflect.DeepEqual(got, []string{"semi.service /opt/x/evil group_writable", "semi.service /opt/x/evil other_writable"}) {
+		t.Errorf("exec_writable %v", got)
+	}
+}
+
+// V-47: a linked unit file, and an active unit with no file, are unknown; an
+// enabled-only unit whose .wants link dangles runs nothing.
+func TestUnitsLinkedOrMissingActiveIsAbsent(t *testing.T) {
+	a := unitsAccess()
+	a.links[etcUnits+"/multi-user.target.wants/app.service"] = etcUnits + "/app.service"
+	a.links[etcUnits+"/app.service"] = "/home/dev/app.service"
+	b := build(t, "units", a)
+	if w := env(t, b, "units.exec_writable"); w.Status != facts.StatusAbsent || !strings.Contains(w.Reason, "app.service "+etcUnits+"/app.service (unit_file symlink)") {
+		t.Errorf("linked: %+v", w)
+	}
+
+	b = build(t, "units", unitsAccess("ghost.service"))
+	if w := env(t, b, "units.exec_writable"); w.Status != facts.StatusAbsent || !strings.Contains(w.Reason, "ghost.service (unit_file missing)") {
+		t.Errorf("active missing: %+v", w)
+	}
+
+	a = unitsAccess()
+	a.links[etcUnits+"/multi-user.target.wants/gone.service"] = usrUnits + "/gone.service"
+	b = build(t, "units", a)
+	if got := writableRows(t, b); len(got) != 0 {
+		t.Errorf("enabled-only missing: %v", got)
+	}
+	if r := unitRows(t, b)["gone.service"]; r["unit_file"] != "missing" || unresolvedCount(t, b) != 1 {
+		t.Errorf("row %v", r)
+	}
+}
+
+// V-46: a root-owned 0755 binary in a directory a non-root user may write
+// can be replaced by that user.
+func TestUnitsParentWritable(t *testing.T) {
+	a := unitsAccess("p.service")
+	unitText(a, usrUnits+"/p.service", "[Service]\nExecStart=/opt/app/run\n")
+	a.stats["/opt/app/run"] = statResult{mode: 0o755, kind: "regular", parentUntrusted: true}
+	b := build(t, "units", a)
+	if got := writableRows(t, b); !reflect.DeepEqual(got, []string{"p.service /opt/app/run parent_writable"}) {
+		t.Errorf("exec_writable %v", got)
+	}
+}
+
+// A symlinked executable is followed one hop to a declared target, which is
+// judged; a target outside the declaration is unknown.
+func TestUnitsSymlinkedExecutableOneHop(t *testing.T) {
+	a := unitsAccess("l.service")
+	unitText(a, usrUnits+"/l.service", "[Service]\nExecStart=/usr/local/bin/app\n")
+	a.links["/usr/local/bin/app"] = "../../../opt/app/current"
+	exe(a, "/opt/app/current", 0o755, 1000, 1000)
+	b := build(t, "units", a)
+	e := unitRows(t, b)["l.service"]["exec"].([]any)[0].(map[string]any)
+	if e["kind"] != "symlink" || e["stat_path"] != "/opt/app/current" || e["uid"] != 1000 || e["stat_status"] != "ok" {
+		t.Errorf("row %v", e)
+	}
+	if got := writableRows(t, b); !reflect.DeepEqual(got, []string{"l.service /opt/app/current owner"}) {
+		t.Errorf("exec_writable %v", got)
+	}
+
+	a = unitsAccess("l.service")
+	unitText(a, usrUnits+"/l.service", "[Service]\nExecStart=/usr/local/bin/app\n")
+	a.links["/usr/local/bin/app"] = "/srv/app/run"
+	exe(a, "/srv/app/run", 0o777, 1000, 0)
+	b = build(t, "units", a)
+	if w := env(t, b, "units.exec_writable"); w.Status != facts.StatusAbsent || !strings.Contains(w.Reason, "l.service /usr/local/bin/app -> /srv/app/run") {
+		t.Errorf("exec_writable %+v", w)
+	}
+}
+
+// Minor 6: systemd's \x2d escape in an instance name is a glob escape to
+// filepath.Glob; the name is quoted so its own drop-in directory matches.
+func TestUnitsEscapedInstanceDropIn(t *testing.T) {
+	unit := `systemd-fsck@dev-disk-by\x2duuid-1.service`
+	a := unitsAccess(unit)
+	unitText(a, usrUnits+"/systemd-fsck@.service", "[Service]\nExecStart=/usr/lib/systemd/systemd-fsck\n")
+	unitText(a, etcUnits+"/"+unit+".d/10-x.conf", "[Service]\nExecStartPost=/usr/bin/inst\n")
+	exe(a, "/usr/lib/systemd/systemd-fsck", 0o755, 0, 0)
+	exe(a, "/usr/bin/inst", 0o755, 0, 0)
+	b := build(t, "units", a)
+	if got := execPaths(t, unitRows(t, b)[unit]); !reflect.DeepEqual(got, []string{"ExecStart /usr/lib/systemd/systemd-fsck", "ExecStartPost /usr/bin/inst"}) {
+		t.Errorf("exec %v", got)
+	}
+}
+
+// Minor 8: user@.service's User=%i names the instance; root's user manager
+// stays in scope, another user's does not.
+func TestUnitsUserInstance(t *testing.T) {
+	a := unitsAccess("user@0.service", "user@1000.service")
+	unitText(a, usrUnits+"/user@.service", "[Service]\nUser=%i\nExecStart=/usr/lib/systemd/systemd --user\n")
+	exe(a, "/usr/lib/systemd/systemd", 0o755, 0, 0)
+	b := build(t, "units", a)
+	rows := unitRows(t, b)
+	if r := rows["user@0.service"]; r == nil || r["user"] != "0" {
+		t.Errorf("user@0 %v", r)
+	}
+	if _, ok := rows["user@1000.service"]; ok {
+		t.Errorf("user@1000 is in scope")
+	}
+}
+
+// Minor 10: an executable that cannot be stat-ed, and a drop-in that is a
+// symlink other than a mask, are both unknown.
+func TestUnitsExecStatDeniedAndSymlinkDropIn(t *testing.T) {
+	a := unitsAccess("d.service")
+	unitText(a, usrUnits+"/d.service", "[Service]\nExecStart=/usr/bin/hidden\n")
+	a.fails["/usr/bin/hidden"] = fmt.Errorf("/usr/bin/hidden: %w", unix.EACCES)
+	b := build(t, "units", a)
+	e := unitRows(t, b)["d.service"]["exec"].([]any)[0].(map[string]any)
+	if e["stat_status"] != "denied" || e["exists"] != false {
+		t.Errorf("row %v", e)
+	}
+	if w := env(t, b, "units.exec_writable"); w.Status != facts.StatusAbsent || !strings.Contains(w.Reason, "d.service /usr/bin/hidden") {
+		t.Errorf("exec_writable %+v", w)
+	}
+
+	a = unitsAccess("s.service")
+	unitText(a, usrUnits+"/s.service", "[Service]\nExecStart=/usr/bin/s\n")
+	a.links[etcUnits+"/s.service.d/a.conf"] = "/opt/confs/a.conf"
+	exe(a, "/usr/bin/s", 0o755, 0, 0)
+	b = build(t, "units", a)
+	if r := unitRows(t, b)["s.service"]; r["read_status"] != "error" || !strings.Contains(r["reason"].(string), etcUnits+"/s.service.d/a.conf") {
+		t.Errorf("row %v", r)
+	}
+	if w := env(t, b, "units.exec_writable"); w.Status != facts.StatusAbsent || !strings.Contains(w.Reason, "s.service.d/a.conf") {
+		t.Errorf("exec_writable %+v", w)
+	}
+}
+
+// Minor 11: an empty unit file is a mask.
+func TestUnitsEmptyUnitFileIsAMask(t *testing.T) {
+	a := unitsAccess("empty.service")
+	unitText(a, etcUnits+"/empty.service", "")
+	unitText(a, usrUnits+"/empty.service", "[Service]\nExecStart=/usr/bin/x\n")
+	b := build(t, "units", a)
+	if rows := unitRows(t, b); len(rows) != 0 {
+		t.Errorf("rows %v", rows)
+	}
+}
+
+// Minor 9: a unit past the cap contributes nothing to exec_writable.
+func TestUnitsPastTheCapFlagsNothing(t *testing.T) {
+	var many []string
+	for i := 0; i < unitRowCap+1; i++ {
+		many = append(many, fmt.Sprintf("u%03d.service", i))
+	}
+	a := unitsAccess(many...)
+	last := fmt.Sprintf("u%03d.service", unitRowCap)
+	unitText(a, usrUnits+"/"+last, "[Service]\nExecStart=/usr/bin/bad\n")
+	exe(a, "/usr/bin/bad", 0o777, 0, 0)
+	for i := 0; i < unitRowCap; i++ {
+		unitText(a, fmt.Sprintf("%s/u%03d.service", usrUnits, i), "[Service]\nExecStart=/usr/bin/ok\n")
+	}
+	exe(a, "/usr/bin/ok", 0o755, 0, 0)
+	b := build(t, "units", a)
+	w := env(t, b, "units.exec_writable")
+	if w.Status != facts.StatusOK || !w.Truncated || len(w.Value.([]any)) != 0 {
+		t.Errorf("exec_writable %+v", w)
+	}
+	if rows := okList(t, b, "units.root_services"); len(rows) != unitRowCap {
+		t.Errorf("%d rows", len(rows))
 	}
 }

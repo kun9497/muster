@@ -49,6 +49,7 @@ var fuzzTargets = []string{
 	"FuzzDecodeACL",
 	"FuzzDecodeVfsCap",
 	"FuzzDnfAutomaticApply",
+	"FuzzExecCommands",
 	"FuzzExecFirstToken",
 	"FuzzFirstLine",
 	"FuzzFirstSettingLine",

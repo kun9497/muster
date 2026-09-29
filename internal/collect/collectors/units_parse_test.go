@@ -33,7 +33,10 @@ func TestExecFirstToken(t *testing.T) {
 		{"$BIN arg", "$BIN", false},
 		{"/usr/bin/../bin/x", "/usr/bin/../bin/x", false},
 		{`"/opt/unterminated`, "/opt/unterminated", false},
-		{`"/opt/a"b`, "/opt/a", false},
+		{`"/opt/a"b`, "/opt/ab", true},
+		// systemd unquotes the first word and then strips the prefixes.
+		{`"-/bin/x" arg`, "/bin/x", true},
+		{`-"/opt/my app/run"`, "/opt/my app/run", true},
 		{"", "", false},
 		{"-", "", false},
 	} {
@@ -122,5 +125,22 @@ func TestParseListUnits(t *testing.T) {
 	}
 	if got := parseListUnits([]byte("● failed.service loaded failed failed X\n\n")); !reflect.DeepEqual(got, []string{"failed.service"}) {
 		t.Errorf("bullet: %q", got)
+	}
+}
+
+// A lone unquoted ";" word separates two commands in one directive
+// (systemd's config_parse_exec); an escaped or quoted one does not.
+func TestExecCommands(t *testing.T) {
+	for line, want := range map[string][]string{
+		"/bin/true ; /opt/x/evil":        {"/bin/true", "/opt/x/evil"},
+		"/bin/a x;y ; /bin/b ; ; /bin/c": {"/bin/a x;y", "/bin/b", "/bin/c"},
+		`/bin/echo \; x`:                 {`/bin/echo \; x`},
+		`"/opt/a ; b" ";" x ; /c`:        {`"/opt/a ; b" ";" x`, "/c"},
+		"  ;  ":                          nil,
+		"/usr/sbin/sshd -D $SSHD_OPTS":   {"/usr/sbin/sshd -D $SSHD_OPTS"},
+	} {
+		if got := execCommands(line); !reflect.DeepEqual(got, want) {
+			t.Errorf("execCommands(%q) = %q, want %q", line, got, want)
+		}
 	}
 }

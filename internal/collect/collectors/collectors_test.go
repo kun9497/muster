@@ -103,6 +103,9 @@ type statResult struct {
 	mode     uint32
 	uid, gid uint32
 	kind     string
+	// parentUntrusted is ReadMeta.ParentUntrusted: the parent directory is not
+	// root-owned, or is group/other-writable.
+	parentUntrusted bool
 	// mtime is the modification time Stat reports (Ruling I-27). A seed
 	// that leaves it zero makes ReadMeta.ModTime zero, which is how a
 	// collector learns the time is NOT known and must omit any age it
@@ -176,7 +179,7 @@ func (a *fsAccess) Stat(p string) (collect.ReadMeta, error) {
 	// content read is denied) — exactly a 0440 root-owned file seen by a
 	// non-root run. A path present only in fails still fails its Stat.
 	if s, ok := a.stats[p]; ok {
-		return collect.ReadMeta{Tier: "openat2", Mode: s.mode, UID: s.uid, GID: s.gid, Kind: s.kind, ModTime: s.mtime}, nil
+		return collect.ReadMeta{Tier: "openat2", Mode: s.mode, UID: s.uid, GID: s.gid, Kind: s.kind, ModTime: s.mtime, ParentUntrusted: s.parentUntrusted}, nil
 	}
 	// A symlink is ErrSymlink with the path wrapped, exactly as the host
 	// primitive answers it: Stat never follows the final component, and the
