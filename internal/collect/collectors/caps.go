@@ -292,7 +292,8 @@ func capList(s string) (uint64, error) {
 
 // capIndex is one list element's bit, or -1 for "all". A name is matched
 // whole and without regard to case; a number is read as strtoul(3) base 0
-// reads it and must fit the attribute's 64 bits.
+// reads it — decimal, 0x hex or leading-0 octal, never Go's _ separators or
+// 0b/0o prefixes — and must fit the attribute's 64 bits.
 func capIndex(name string) (int, error) {
 	lower := strings.ToLower(name)
 	if lower == "all" {
@@ -302,6 +303,9 @@ func capIndex(name string) (int, error) {
 		if lower == known {
 			return n, nil
 		}
+	}
+	if strings.Contains(name, "_") || strings.HasPrefix(lower, "0b") || strings.HasPrefix(lower, "0o") {
+		return 0, fmt.Errorf("unknown capability %q", name)
 	}
 	if v, err := strconv.ParseUint(name, 0, 8); err == nil && v < capMaxBits {
 		return int(v), nil

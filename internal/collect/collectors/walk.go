@@ -325,8 +325,9 @@ func idFileOutcome(failures map[string]facts.Envelope) (failed facts.Envelope, f
 // per capped list, the two attribute lists of P-3 included. It is
 // provenance — no control reads it — and it is what tells a reviewer
 // whether the walk saw what it should have: how much it looked at, why it
-// stopped, how many rows each list refused, which container configuration it could not read, which homes the
-// hidden rule used, and whether it managed to step out of the way.
+// stopped, how many rows each list refused, which container configuration
+// it could not read, which homes the hidden rule used, and whether it
+// managed to step out of the way.
 func walkStats(plan mountPlan, r walkResult, nice, ioprio bool) map[string]any {
 	counts := map[string]any{"skipped": r.lists.truncatedCounts[capSkipped]}
 	for _, l := range findingLists {

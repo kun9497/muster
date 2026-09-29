@@ -75,7 +75,7 @@ func TestDecodeVfsCapRejectsSizeMismatch(t *testing.T) {
 // V-3: every spelling a declaration source may use for one set is one set.
 func TestParseCapTextSpellings(t *testing.T) {
 	want := capSet{Permitted: 1 << 13, Effective: true}
-	for _, s := range []string{"cap_net_raw+ep", "cap_net_raw=ep", "CAP_NET_RAW=pe", "13=ep", "cap_net_raw=+ep", "= cap_net_raw+ep"} {
+	for _, s := range []string{"cap_net_raw+ep", "cap_net_raw=ep", "CAP_NET_RAW=pe", "13=ep", "0xd=ep", "015=ep", "cap_net_raw=+ep", "= cap_net_raw+ep"} {
 		got, err := parseCapText(s)
 		if err != nil || !sameCaps(got, want) {
 			t.Errorf("parseCapText(%q) = %+v, %v; want %+v", s, got, err, want)
@@ -111,7 +111,7 @@ func TestParseCapTextSpellings(t *testing.T) {
 	if capText(flagOnly) != "=" || !sameCaps(flagOnly, capSet{}) {
 		t.Errorf("flag-only set renders %q and compares %v, want \"=\" and equal to empty", capText(flagOnly), sameCaps(flagOnly, capSet{}))
 	}
-	for _, bad := range []string{"cap_bogus=p", "", "cap_net_raw", "cap_net_raw+", "+ep", "cap_net_raw=x", "64=p"} {
+	for _, bad := range []string{"cap_bogus=p", "", "cap_net_raw", "cap_net_raw+", "+ep", "cap_net_raw=x", "64=p", "1_3=ep", "0b1101=ep", "0o15=ep"} {
 		if cs, err := parseCapText(bad); err == nil {
 			t.Errorf("parseCapText(%q) = %+v, want an error", bad, cs)
 		}

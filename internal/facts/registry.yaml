@@ -1563,7 +1563,7 @@ keys:
     subject_kind: file
   - key: walk.capabilities
     type: list<record>
-    description: Executables carrying file capabilities (security.capability) found by the deep walk - path, caps (the cap_to_text canonical form over 41 named bits), rootid, package, package_declared, declared_caps (the owning package's declaration as written - rpm FILECAPS or the postinst setcap text, "(from file)" when setcap reads a file), reference (rpmdb, postinst or unpackaged), reason (why a postinst could not be read, else empty); sorted by path; truncated at 2000 rows.
+    description: Executables carrying file capabilities (security.capability) found by the deep walk - path, caps (the cap_to_text canonical form over 41 named bits), rootid, package, package_declared, declared_caps (the owning package's declaration as written - rpm FILECAPS or the postinst setcap text, "(from file)" when setcap reads a file), reference (rpmdb, postinst or unpackaged), reason (why the declaration could not be read or does not apply - an unreadable postinst, a setcap call muster could not resolve, a non-zero rootid - else empty); sorted by path; truncated at 2000 rows.
     since: 1
     sensitivity: internal
     collector: walk

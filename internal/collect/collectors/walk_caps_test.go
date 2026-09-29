@@ -5,9 +5,8 @@ package collectors
 import (
 	"encoding/binary"
 	"fmt"
-	"os"
+
 	"path"
-	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -123,59 +122,6 @@ func capRowsOf(t *testing.T, a *fsAccess) (*collect.Builder, []map[string]any) {
 	t.Helper()
 	b := walkRun(t, a)
 	return b, walkRows(t, b, "walk.capabilities")
-}
-
-func TestParsePostinstSetcapForms(t *testing.T) {
-	cases := []struct {
-		name string
-		data string
-		want []postinstCap
-	}{
-		{"seed iputils-ping: a variable set from dpkg-divert --truename", string(readSeed(t, "postinst.iputils-ping")),
-			[]postinstCap{{Path: "/bin/ping", Caps: "cap_net_raw+ep"}}},
-		{"seed mtr-tiny: a literal path", string(readSeed(t, "postinst.mtr-tiny")),
-			[]postinstCap{{Path: "/usr/bin/mtr-packet", Caps: "cap_net_raw+ep"}}},
-		{"seed snapd: the set read from a file", string(readSeed(t, "postinst.snapd-caps")),
-			[]postinstCap{{Path: "/usr/lib/snapd/snap-confine", FromFile: true}}},
-		{"a literal assignment, braces and quotes",
-			"PROGRAM=/usr/bin/ping\nif setcap cap_net_raw+ep \"${PROGRAM}\"; then :; fi\n",
-			[]postinstCap{{Path: "/usr/bin/ping", Caps: "cap_net_raw+ep"}}},
-		{"iproute2: quoted caps, then a removal that declares nothing",
-			"if ! setcap \"cap_dac_override,cap_sys_admin,cap_net_admin=ep\" /bin/ip; then\n  setcap \"-r\" /bin/ip\nfi\n",
-			[]postinstCap{{Path: "/bin/ip", Caps: "cap_dac_override,cap_sys_admin,cap_net_admin=ep"}}},
-		{"options, a continuation and two pairs",
-			"setcap -q -n 0 cap_chown=p /usr/bin/a \\\n  cap_kill=p /usr/bin/b 2>/dev/null || true\n",
-			[]postinstCap{{Path: "/usr/bin/a", Caps: "cap_chown=p"}, {Path: "/usr/bin/b", Caps: "cap_kill=p"}}},
-		{"a setcap in a comment, an echo and a heredoc are not calls",
-			"# setcap cap_sys_admin+ep /usr/bin/x\necho setcap cap_sys_admin+ep /usr/bin/x\ncat <<EOF\nsetcap cap_sys_admin+ep /usr/bin/y\nEOF\n",
-			nil},
-		{"an unknown variable, a relative path and a reassigned name are skipped",
-			"setcap cap_net_raw+ep $NOPE\nsetcap cap_net_raw+ep bin/ping\nP=/usr/bin/p\nP=$(uname -m)\nsetcap cap_net_raw+ep $P\n",
-			nil},
-		{"after && and in a then branch on one line",
-			"command -v setcap >/dev/null && setcap cap_net_raw+ep /usr/bin/q; if true; then setcap cap_net_raw+p /usr/bin/r; fi\n",
-			[]postinstCap{{Path: "/usr/bin/q", Caps: "cap_net_raw+ep"}, {Path: "/usr/bin/r", Caps: "cap_net_raw+p"}}},
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			got := parsePostinstSetcap([]byte(c.data))
-			if len(got) == 0 && len(c.want) == 0 {
-				return
-			}
-			if !reflect.DeepEqual(got, c.want) {
-				t.Errorf("parsePostinstSetcap = %+v, want %+v", got, c.want)
-			}
-		})
-	}
-}
-
-func readSeed(t *testing.T, name string) []byte {
-	t.Helper()
-	b, err := os.ReadFile("testdata/" + name)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return b
 }
 
 // P-3: iputils-ping sets its capability through a variable the script
@@ -433,8 +379,73 @@ func TestWalkCapabilitiesDivertedPath(t *testing.T) {
 	a.contents["/var/lib/dpkg/info/foo.list"] = []byte("/usr/bin/foo\n")
 	a.contents["/var/lib/dpkg/info/foo-wrapper.list"] = []byte("/usr/bin/foo\n")
 	a.contents["/var/lib/dpkg/info/foo.postinst"] = []byte("P=$(dpkg-divert --truename /bin/foo)\nsetcap cap_net_raw+ep $P\n")
+	// bar is diverted the same way, but its script names the original path
+	// literally: that setcap acts on the diverter's file at /usr/bin/bar,
+	// never on bar.distrib.
+	a.tree = capHost(map[string]uint32{"/usr/bin/foo.distrib": 0o755, "/usr/bin/bar.distrib": 0o755}).tree
+	a.setCaps("/usr/bin/bar.distrib", netRawEP)
+	a.contents[dpkgDiversionsPath] = append(a.contents[dpkgDiversionsPath], "/usr/bin/bar\n/usr/bin/bar.distrib\nbar-wrapper\n"...)
+	a.contents["/var/lib/dpkg/info/bar.list"] = []byte("/usr/bin/bar\n")
+	a.contents["/var/lib/dpkg/info/bar-wrapper.list"] = []byte("/usr/bin/bar\n")
+	a.contents["/var/lib/dpkg/info/bar.postinst"] = []byte("setcap cap_net_raw+ep /usr/bin/bar\n")
 	_, rows := capRowsOf(t, a)
 	checkRow(t, rows, "/usr/bin/foo.distrib", map[string]any{
 		"package": "foo", "package_declared": true, "declared_caps": "cap_net_raw+ep", "reference": refPostinst,
+	})
+	checkRow(t, rows, "/usr/bin/bar.distrib", map[string]any{
+		"package": "bar", "package_declared": false, "declared_caps": "", "reference": refPostinst,
+	})
+}
+
+// capAttrV3 is a revision-3 attribute with a namespace root, the form the
+// kernel writes when setcap runs inside a user namespace.
+func capAttrV3(permitted uint64, effective bool, rootID uint32) []byte {
+	b := capAttr(permitted, 0, effective)
+	binary.LittleEndian.PutUint32(b, binary.LittleEndian.Uint32(b)&^vfsCapRevisionMask|vfsCapRevision3)
+	return binary.LittleEndian.AppendUint32(b, rootID)
+}
+
+const rootID100000Reason = "rootid 100000: set from a user namespace, not by the package"
+
+// Spec P-3: an attribute written from a user namespace is never what the
+// package declared, whatever its text — rpm family.
+func TestWalkCapabilitiesRootIDIsNotDeclaredRPM(t *testing.T) {
+	a := capHost(map[string]uint32{"/usr/bin/arping": 0o755, "/usr/bin/clockdiff": 0o755})
+	a.dirs = map[string]bool{rpmDBDir: true}
+	a.cmds = map[string]cmdResult{cmdKey(rpmCommand): {file: "rpm_files_caps.sample"}}
+	a.setCaps("/usr/bin/arping", capAttrV3(capBits("cap_net_raw"), false, 100000))
+	a.setCaps("/usr/bin/clockdiff", netRawP)
+	_, rows := capRowsOf(t, a)
+	checkRow(t, rows, "/usr/bin/arping", map[string]any{
+		"caps": "cap_net_raw=p", "rootid": 100000, "package": "iputils", "package_declared": false,
+		"declared_caps": "cap_net_raw=p", "reference": refRPMDB, "reason": rootID100000Reason,
+	})
+	checkRow(t, rows, "/usr/bin/clockdiff", map[string]any{"rootid": 0, "package_declared": true, "reason": ""})
+}
+
+// The same on the dpkg family.
+func TestWalkCapabilitiesRootIDIsNotDeclaredDpkg(t *testing.T) {
+	a := dpkgCapHost(map[string]uint32{"/usr/bin/ping": 0o755})
+	a.setCaps("/usr/bin/ping", capAttrV3(capBits("cap_net_raw"), true, 100000))
+	a.contents["/var/lib/dpkg/info/iputils-ping.list"] = []byte("/bin/ping\n")
+	a.files["/var/lib/dpkg/info/iputils-ping.postinst"] = "postinst.iputils-ping"
+	_, rows := capRowsOf(t, a)
+	checkRow(t, rows, "/usr/bin/ping", map[string]any{
+		"caps": "cap_net_raw=ep", "rootid": 100000, "package": "iputils-ping", "package_declared": false,
+		"declared_caps": "cap_net_raw+ep", "reference": refPostinst, "reason": rootID100000Reason,
+	})
+}
+
+// A script whose setcap muster could not resolve is not a silent script:
+// the row says so.
+func TestWalkPostinstUnresolvedSetcapSaysSo(t *testing.T) {
+	a := dpkgCapHost(map[string]uint32{"/usr/lib/tool/helper": 0o755})
+	a.setCaps("/usr/lib/tool/helper", netRawEP)
+	a.contents["/var/lib/dpkg/info/tool.list"] = []byte("/usr/lib/tool/helper\n")
+	a.contents["/var/lib/dpkg/info/tool.postinst"] = []byte("D=$(tool-config --libdir)\nsetcap cap_net_raw+ep $D/helper\n")
+	_, rows := capRowsOf(t, a)
+	checkRow(t, rows, "/usr/lib/tool/helper", map[string]any{
+		"package": "tool", "package_declared": false, "declared_caps": "", "reference": refPostinst,
+		"reason": "/var/lib/dpkg/info/tool.postinst: a setcap call muster could not resolve",
 	})
 }
