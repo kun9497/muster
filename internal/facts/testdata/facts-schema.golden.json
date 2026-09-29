@@ -2722,9 +2722,29 @@
       "SubjectKind": "file"
     },
     {
+      "Key": "walk.capabilities",
+      "Type": "list\u003crecord\u003e",
+      "Description": "Executables carrying file capabilities (security.capability) found by the deep walk - path, caps (the cap_to_text canonical form over 41 named bits), rootid, package, package_declared, declared_caps (the owning package's declaration as written - rpm FILECAPS or the postinst setcap text, \"(from file)\" when setcap reads a file), reference (rpmdb, postinst or unpackaged), reason (why a postinst could not be read, else empty); sorted by path; truncated at 2000 rows.",
+      "Since": 1,
+      "Sensitivity": "internal",
+      "Collector": "walk",
+      "DefaultOn": "",
+      "SubjectKind": "file"
+    },
+    {
+      "Key": "walk.acl_grants",
+      "Type": "list\u003crecord\u003e",
+      "Description": "Executables whose access ACL grants a named user or group write or execute beyond the owning group's entry, the mask applied - path, entries (the widening entries in getfacl spelling with numeric ids); sorted by path; truncated at 2000 rows; evidence, read by no control.",
+      "Since": 1,
+      "Sensitivity": "internal",
+      "Collector": "walk",
+      "DefaultOn": "",
+      "SubjectKind": "file"
+    },
+    {
       "Key": "walk.skipped",
       "Type": "list\u003crecord\u003e",
-      "Description": "Every root the walk did not enter - path, reason (excluded_type, pseudo_path, container_storage, excluded_by_flag, bind_duplicate, denied, vanished, unlisted_mount) and detail (the fstype, link, configuration file or errno behind the reason, else empty); sorted by path; provenance, read by no control.",
+      "Description": "Every root the walk did not enter and every executable whose attributes it could not read - path, reason (excluded_type, pseudo_path, container_storage, excluded_by_flag, bind_duplicate, denied, vanished, unlisted_mount, xattr_denied, xattr_undecoded) and detail (the fstype, link, configuration file, errno or decoding error behind the reason, else empty); sorted by path; provenance, read by no control.",
       "Since": 1,
       "Sensitivity": "internal",
       "Collector": "walk",
@@ -2734,7 +2754,7 @@
     {
       "Key": "walk.stats",
       "Type": "record",
-      "Description": "The walk's own account of itself - entries, dirs, files, symlinks, stop_reason, last_path, truncated_counts, allowlisted_hidden, config_unreadable, home_roots, mnt_id_fallback, nice_applied, ioprio_applied; provenance, read by no control.",
+      "Description": "The walk's own account of itself - entries, dirs, files, symlinks, stop_reason, last_path, truncated_counts (one counter per capped list, capabilities and acl_grants included), allowlisted_hidden, config_unreadable, home_roots, mnt_id_fallback, nice_applied, ioprio_applied; provenance, read by no control.",
       "Since": 1,
       "Sensitivity": "internal",
       "Collector": "walk",

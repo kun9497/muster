@@ -53,17 +53,20 @@ func fuzzBody(t *testing.T, name string, run func() []any, inputLen int) {
 }
 
 func FuzzParseRPMFileLine(f *testing.F) {
+	f.Add("bash\t0100755\troot\troot\t\t/usr/bin/bash")
+	f.Add("at\t0104755\troot\troot\t\t/usr/bin/at")
+	f.Add("iputils\t100755\troot\troot\tcap_net_raw=p\t/usr/bin/arping")
+	f.Add("vendor\t100755\troot\troot\t= cap_net_raw+p\t/opt/v/a\tb")
+	f.Add("coreutils\t0102755\troot\troot\t\t/usr/bin/a file with spaces")
+	f.Add("shadow-utils\tnotoctal\troot\troot\t\t/usr/bin/su")
+	f.Add("\t0100755\troot\troot\t\t/usr/bin/bash")
+	f.Add("bash\t0100755\troot\troot\t\trelative/path")
 	f.Add("bash\t0100755\troot\troot\t/usr/bin/bash")
-	f.Add("at\t0104755\troot\troot\t/usr/bin/at")
-	f.Add("coreutils\t0102755\troot\troot\t/usr/bin/a file with spaces")
-	f.Add("shadow-utils\tnotoctal\troot\troot\t/usr/bin/su")
-	f.Add("\t0100755\troot\troot\t/usr/bin/bash")
-	f.Add("bash\t0100755\troot\troot\trelative/path")
 	f.Add("")
 	f.Fuzz(func(t *testing.T, line string) {
 		fuzzBody(t, "ParseRPMFileLine", func() []any {
-			pkg, mode, owner, group, p, ok := ParseRPMFileLine(line)
-			return []any{pkg, mode, owner, group, p, ok}
+			pkg, mode, owner, group, caps, p, ok := ParseRPMFileLine(line)
+			return []any{pkg, mode, owner, group, caps, p, ok}
 		}, len(line))
 	})
 }

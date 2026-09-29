@@ -145,9 +145,9 @@ func walkStatsValue(t *testing.T, b *collect.Builder) map[string]any {
 	return m
 }
 
-// allWalkKeys is the nine keys a walk that ran writes.
+// allWalkKeys is the eleven keys a walk that ran writes.
 var allWalkKeys = []string{
-	"walk.complete", "walk.hidden", "walk.skipped", "walk.stats",
+	"walk.acl_grants", "walk.capabilities", "walk.complete", "walk.hidden", "walk.skipped", "walk.stats",
 	"walk.sticky_missing", "walk.suid_sgid", "walk.suid_sgid_unverified",
 	"walk.unowned", "walk.world_writable",
 }
@@ -157,9 +157,9 @@ var allWalkKeys = []string{
 // owned by a uid nothing accounts for.
 var walkUnownedPaths = []string{"/home/alice", "/home/alice/.bashrc", "/usr/bin/link"}
 
-// walkJoinedKeys are the four lists the package join decides; the join's
+// walkJoinedKeys are the five lists the package join decides; the join's
 // failure reaches these and nothing else.
-var walkJoinedKeys = []string{"walk.hidden", "walk.suid_sgid", "walk.suid_sgid_unverified", "walk.world_writable"}
+var walkJoinedKeys = []string{"walk.capabilities", "walk.hidden", "walk.suid_sgid", "walk.suid_sgid_unverified", "walk.world_writable"}
 
 // W-1: without --deep the collector writes no key at all, so walk.* stays
 // absent from an ordinary snapshot and the controls read MANUAL rather than
@@ -290,11 +290,18 @@ func TestWalkUnwalkableRootIsUnsupported(t *testing.T) {
 	}
 }
 
-// The whole collector over one host: nine keys, every list ok, the join's
+// The whole collector over one host: eleven keys, every list ok, the join's
 // fields on the rows a control reads, and walk.stats carrying exactly the
 // thirteen fields the registry names.
 func TestWalkHappyPath(t *testing.T) {
 	a := walkAccess()
+	// P-3: python3 carries a capability its package does not declare (the
+	// rpm table's caps column is empty for it), and su an ACL that lets
+	// uid 1000 write it.
+	a.xattrValues = map[string]map[string][]byte{
+		"/usr/bin/python3": {"security.capability": netRawEP},
+		"/usr/bin/su":      {aclXattrName: aclOf(7, [3]uint32{0x02, 7, 1000})},
+	}
 	b := walkRun(t, a)
 
 	if got := walkKeys(b); !slices.Equal(got, allWalkKeys) {
@@ -319,6 +326,9 @@ func TestWalkHappyPath(t *testing.T) {
 		// is owned by a uid nothing on this host accounts for.
 		"walk.unowned": {"/home/alice", "/home/alice/.bashrc", "/usr/bin/link"},
 		"walk.hidden":  {"/etc/.pwd.lock", "/usr/sbin/.h"},
+		// P-3: the two attribute lists.
+		"walk.capabilities": {"/usr/bin/python3"},
+		"walk.acl_grants":   {"/usr/bin/su"},
 	}
 	for _, key := range sortedKeys(lists) {
 		if got := rowPaths(walkRows(t, b, key)); !slices.Equal(got, lists[key]) {
@@ -338,6 +348,11 @@ func TestWalkHappyPath(t *testing.T) {
 	checkRow(t, walkRows(t, b, "walk.suid_sgid"), "/usr/bin/su", map[string]any{
 		"package": "util-linux", "package_declared": true, "reference": refRPMDB,
 	})
+	checkRow(t, walkRows(t, b, "walk.capabilities"), "/usr/bin/python3", map[string]any{
+		"caps": "cap_net_raw=ep", "rootid": 0, "package": "python3", "package_declared": false,
+		"declared_caps": "", "reference": refRPMDB, "reason": "",
+	})
+	checkRow(t, walkRows(t, b, "walk.acl_grants"), "/usr/bin/su", map[string]any{"entries": []any{"user:1000:rwx"}})
 	// The joined lists cite the command that decided them; the rest cite the
 	// walk itself.
 	for _, key := range walkJoinedKeys {
@@ -345,7 +360,7 @@ func TestWalkHappyPath(t *testing.T) {
 			t.Errorf("%s source = %+v, want the rpm command", key, src)
 		}
 	}
-	for _, key := range []string{"walk.complete", "walk.sticky_missing", "walk.unowned", "walk.skipped", "walk.stats"} {
+	for _, key := range []string{"walk.complete", "walk.sticky_missing", "walk.unowned", "walk.acl_grants", "walk.skipped", "walk.stats"} {
 		if src := env(t, b, key).Source; src == nil || src.Kind != "derived" {
 			t.Errorf("%s source = %+v, want derived", key, src)
 		}
@@ -385,7 +400,7 @@ func TestWalkHappyPath(t *testing.T) {
 	if !ok {
 		t.Fatalf("truncated_counts is %#v, not a record", stats["truncated_counts"])
 	}
-	wantCounts := []string{"hidden", "skipped", "sticky_missing", "suid_sgid", "suid_sgid_unverified", "unowned", "world_writable"}
+	wantCounts := []string{"acl_grants", "capabilities", "hidden", "skipped", "sticky_missing", "suid_sgid", "suid_sgid_unverified", "unowned", "world_writable"}
 	if got := sortedKeys(counts); !slices.Equal(got, wantCounts) {
 		t.Errorf("truncated_counts fields = %v, want %v", got, wantCounts)
 	}

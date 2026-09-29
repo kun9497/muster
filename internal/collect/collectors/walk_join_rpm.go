@@ -16,9 +16,13 @@ import (
 
 // rpmCommand asks the rpm database for a line per packaged FILE: the owning
 // package, the file's mode, its owner and group as rpm recorded them
-// (names, never ids) and the path. The "=" prefix repeats the package name
-// on every line, and the path is last, so a line splits on the first four
-// tabs and whitespace in a path is harmless.
+// (names, never ids), the file capabilities the package declares and the
+// path. The "=" prefix repeats the package name on every line, and the path
+// is last, so a line splits on the first five tabs and whitespace in a path
+// is harmless. The caps column is conditional (V-5, V-24): a package whose
+// header has no FILECAPS tag at all prints an empty field rather than
+// "(none)", and a file without capabilities in a package that has some
+// prints an empty string too, so "" always means "declares none".
 //
 // A large host has close to a million packaged files at roughly 80 bytes a
 // line, hence the 256 MiB cap and the two-minute timeout: the cap is a limit
@@ -28,7 +32,7 @@ import (
 // nothing (W-8).
 var rpmCommand = collect.Command{
 	Path:      "/usr/bin/rpm",
-	Args:      []string{"-qa", "--qf", "[%{=NAME}\t%{FILEMODES:octal}\t%{FILEUSERNAME}\t%{FILEGROUPNAME}\t%{FILENAMES}\n]"},
+	Args:      []string{"-qa", "--qf", "[%{=NAME}\t%{FILEMODES:octal}\t%{FILEUSERNAME}\t%{FILEGROUPNAME}\t%|FILECAPS?{%{FILECAPS}}|\t%{FILENAMES}\n]"},
 	Timeout:   120 * time.Second,
 	MaxOutput: 256 << 20,
 }
@@ -45,8 +49,8 @@ const rpmMaxLine = 64 << 10
 
 // rpmFile is one row of the file table, for a candidate path only.
 type rpmFile struct {
-	pkg, owner, group string
-	mode              int
+	pkg, owner, group, caps string
+	mode                    int
 }
 
 // joinRPM runs the file-table query and decides every candidate from it. The
@@ -112,11 +116,11 @@ func rpmFileTable(stdout []byte, cands map[string]bool, truncated bool) (map[str
 	sc := bufio.NewScanner(bytes.NewReader(stdout))
 	sc.Buffer(make([]byte, 0, bufio.MaxScanTokenSize), rpmMaxLine)
 	for sc.Scan() {
-		pkg, mode, owner, group, p, ok := pkgfiles.ParseRPMFileLine(sc.Text())
+		pkg, mode, owner, group, caps, p, ok := pkgfiles.ParseRPMFileLine(sc.Text())
 		if !ok || !cands[p] {
 			continue
 		}
-		table[p] = rpmFile{pkg: pkg, owner: owner, group: group, mode: mode}
+		table[p] = rpmFile{pkg: pkg, owner: owner, group: group, caps: caps, mode: mode}
 	}
 	if err := sc.Err(); err != nil {
 		return nil, err
@@ -161,4 +165,5 @@ func applyRPM(r *walkResult, table map[string]rpmFile) {
 		row["package_declared"] = true
 		row["reference"] = refRPMDB
 	}
+	applyRPMCaps(r, table)
 }

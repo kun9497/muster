@@ -42,15 +42,16 @@ var walkCollector = collect.Collector{
 // licensed by Declaration.Walk, not by this list (a glob could not honestly
 // describe "every local filesystem"); these are the fixed files the plan,
 // the id tables and the join open: the mount table, the four id files, the
-// three container configuration files, dpkg's four database paths and rpm's
-// directory, the fixed container-storage set the plan probes for symlinks,
-// and the six merged-/usr aliases the join canonicalises through. Sorted,
+// three container configuration files, dpkg's four database paths, the
+// maintainer scripts the capability join reads and rpm's directory, the
+// fixed container-storage set the plan probes for symlinks, and the six
+// merged-/usr aliases the join canonicalises through. Sorted,
 // so --list-actions prints the same document however this file is edited.
 func walkReads() []string {
 	out := []string{
 		mountinfoPath, passwdPath, groupPath, subuidPath, subgidPath,
 		dockerDaemonPath, containersStoragePath, containerdConfigPath,
-		dpkgStatusPath, dpkgInfoGlob, dpkgDiversionsPath, dpkgStatOverridePath, rpmDBDir,
+		dpkgStatusPath, dpkgInfoGlob, dpkgPostinstGlob, dpkgDiversionsPath, dpkgStatOverridePath, rpmDBDir,
 	}
 	out = append(out, collect.ContainerStorageRoots()...)
 	out = append(out, usrAliases...)
@@ -64,9 +65,9 @@ func walkReads() []string {
 // reassigns it.
 var walkTraverse = traverse
 
-// findingList is one of the six lists a control or a warning reads: the key
-// it is written under, the cap index whose truncation flag it carries, and
-// which outside answer decides it. joined: the package join (W-6) — such a
+// findingList is one of the eight lists a control, a warning or a reader
+// reads: the key it is written under, the cap index whose truncation flag it
+// carries, and which outside answer decides it. joined: the package join (W-6) — such a
 // list cites the join's evidence and, when the join failed, carries its
 // envelope instead of rows. ids: the id tables (W-5) — an id file that
 // could not be read answers for the whole list (C3). sticky_missing is
@@ -85,6 +86,8 @@ var findingLists = []findingList{
 	{key: "walk.sticky_missing", cap: capStickyMissing},
 	{key: "walk.unowned", cap: capUnowned, ids: true},
 	{key: "walk.hidden", cap: capHidden, joined: true},
+	{key: "walk.capabilities", cap: capCapabilities, joined: true},
+	{key: "walk.acl_grants", cap: capACLGrants},
 }
 
 // idFileOrder is the order idFileOutcome consults the four id files in.
@@ -101,7 +104,7 @@ type walkOutcome struct {
 
 // runWalk is the collector (W-1, §7). Every branch writes only the keys it
 // names: a walk that was not asked for writes none, a walk that may not run
-// writes walk.complete alone, and a walk that ran writes all nine.
+// writes walk.complete alone, and a walk that ran writes all eleven.
 func runWalk(ctx context.Context, a collect.Access, b *collect.Builder) error {
 	opts, ok := b.Walk()
 	if !ok {
@@ -220,7 +223,7 @@ func walkTree(ctx context.Context, a collect.Access, plan mountPlan, ids idTable
 
 // writeWalkPanic answers for a defect in muster itself. A panic leaves the
 // lists half-built and nothing may be read from them, so every one of the
-// nine keys carries the same error naming the panic: a reader sees a broken
+// eleven keys carries the same error naming the panic: a reader sees a broken
 // walk, and no control reads a list that a crash decided the contents of.
 func writeWalkPanic(b *collect.Builder, panicked string) {
 	e := collect.ErrorEnv("the walk panicked: " + panicked)
@@ -232,7 +235,7 @@ func writeWalkPanic(b *collect.Builder, panicked string) {
 	}
 }
 
-// writeWalkFacts writes the nine keys of a walk that ran (§7).
+// writeWalkFacts writes the eleven keys of a walk that ran (§7).
 func writeWalkFacts(b *collect.Builder, plan mountPlan, out walkOutcome, jo joinOutcome, idFail map[string]facts.Envelope, derived *facts.Source) {
 	r := &out.r
 	b.Set("walk.complete", collect.OK(r.complete, derived))
@@ -249,8 +252,8 @@ func writeWalkFacts(b *collect.Builder, plan mountPlan, out walkOutcome, jo join
 // could decide carries the failure and no rows at all — the rows are built
 // only on the path that keeps them, so an unanswerable fact can never also
 // publish a value somebody might read past the status. The source says what
-// decided the list: the walk itself for the two it judged alone, the
-// package database for the four the join decided.
+// decided the list: the walk itself for the three it judged alone, the
+// package database for the five the join decided.
 func listEnvelope(l findingList, r *walkResult, jo joinOutcome, idFail map[string]facts.Envelope, derived *facts.Source) facts.Envelope {
 	if l.joined && jo.failed != nil {
 		// The join is one operation: a table nobody could read leaves every
@@ -318,10 +321,11 @@ func idFileOutcome(failures map[string]facts.Envelope) (failed facts.Envelope, f
 }
 
 // walkStats is the walk's own account of itself: the thirteen fields the
-// registry names, and no fourteenth. It is provenance — no control reads it
-// — and it is what tells a reviewer whether the walk saw what it should
-// have: how much it looked at, why it stopped, how many rows each list
-// refused, which container configuration it could not read, which homes the
+// registry names, and no fourteenth; truncated_counts carries one counter
+// per capped list, the two attribute lists of P-3 included. It is
+// provenance — no control reads it — and it is what tells a reviewer
+// whether the walk saw what it should have: how much it looked at, why it
+// stopped, how many rows each list refused, which container configuration it could not read, which homes the
 // hidden rule used, and whether it managed to step out of the way.
 func walkStats(plan mountPlan, r walkResult, nice, ioprio bool) map[string]any {
 	counts := map[string]any{"skipped": r.lists.truncatedCounts[capSkipped]}

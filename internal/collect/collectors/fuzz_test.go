@@ -585,6 +585,33 @@ func FuzzDecodeACL(f *testing.F) {
 	})
 }
 
+func FuzzDecodeVfsCap(f *testing.F) {
+	seeds(f, "testdata/vfscap.*")
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "decodeVfsCap", func() any {
+			cs, err := decodeVfsCap(data)
+			if err != nil {
+				return []any{true}
+			}
+			// What decodes renders, and the rendering parses back to the
+			// same set: the join compares through exactly that round trip.
+			text := capText(cs)
+			back, perr := parseCapText(text)
+			if perr != nil || !sameCaps(back, cs) {
+				t.Fatalf("capText %q does not parse back to %+v: %+v, %v", text, cs, back, perr)
+			}
+			return []any{cs, text}
+		}, len(data))
+	})
+}
+
+func FuzzParsePostinstSetcap(f *testing.F) {
+	seeds(f, "testdata/postinst.*")
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "parsePostinstSetcap", func() any { return parsePostinstSetcap(data) }, len(data))
+	})
+}
+
 // ---------------------------------------------------------------------------
 // Mounts, sockets and the walk's id tables
 // ---------------------------------------------------------------------------
@@ -619,7 +646,7 @@ func FuzzParseProcNet(f *testing.F) {
 }
 
 func FuzzRPMFileTable(f *testing.F) {
-	seeds(f, "testdata/rpm.qa-files.*")
+	seeds(f, "testdata/rpm.qa-files.*", "testdata/rpm_files_caps.sample")
 	f.Fuzz(func(t *testing.T, data []byte) {
 		fuzzBody(t, "rpmFileTable", func() any {
 			whole, errWhole := rpmFileTable(data, map[string]bool{"/usr/bin/su": true, "/usr/bin/at": true}, false)

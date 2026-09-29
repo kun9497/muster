@@ -10,38 +10,44 @@ import "testing"
 func TestPkgfilesParsers(t *testing.T) {
 	t.Run("rpm file line", func(t *testing.T) {
 		cases := []struct {
-			name, line        string
-			pkg               string
-			mode              int
-			owner, group, out string
-			ok                bool
+			name, line              string
+			pkg                     string
+			mode                    int
+			owner, group, caps, out string
+			ok                      bool
 		}{
-			{"regular", "bash\t0100755\troot\troot\t/usr/bin/bash", "bash", 0o755, "root", "root", "/usr/bin/bash", true},
-			{"setuid", "util-linux\t0104755\troot\troot\t/usr/bin/su", "util-linux", 0o4755, "root", "root", "/usr/bin/su", true},
-			{"setgid names the group rpm recorded", "util-linux\t0102755\troot\ttty\t/usr/bin/wall", "util-linux", 0o2755, "root", "tty", "/usr/bin/wall", true},
-			{"sticky directory", "filesystem\t0041777\troot\troot\t/tmp", "filesystem", 0o1777, "root", "root", "/tmp", true},
-			// The path is last and the line splits on the FIRST four tabs,
+			{"regular", "bash\t0100755\troot\troot\t\t/usr/bin/bash", "bash", 0o755, "root", "root", "", "/usr/bin/bash", true},
+			{"setuid", "util-linux\t0104755\troot\troot\t\t/usr/bin/su", "util-linux", 0o4755, "root", "root", "", "/usr/bin/su", true},
+			{"setgid names the group rpm recorded", "util-linux\t0102755\troot\ttty\t\t/usr/bin/wall", "util-linux", 0o2755, "root", "tty", "", "/usr/bin/wall", true},
+			{"sticky directory", "filesystem\t0041777\troot\troot\t\t/tmp", "filesystem", 0o1777, "root", "root", "", "/tmp", true},
+			// The caps column is the fifth field, as rpm printed it: the
+			// libcap text of the build host, either spelling (V-24).
+			{"file capabilities", "iputils\t100755\troot\troot\tcap_net_raw=p\t/usr/bin/arping", "iputils", 0o755, "root", "root", "cap_net_raw=p", "/usr/bin/arping", true},
+			{"old libcap spelling", "iputils\t100755\troot\troot\t= cap_net_raw+p\t/usr/bin/arping", "iputils", 0o755, "root", "root", "= cap_net_raw+p", "/usr/bin/arping", true},
+			// The path is last and the line splits on the FIRST five tabs,
 			// so a space — or another tab — inside a path survives whole.
-			{"path with a space", "vendor-data\t0100644\troot\troot\t/opt/vendor/data files/readme.txt", "vendor-data", 0o644, "root", "root", "/opt/vendor/data files/readme.txt", true},
-			{"path with a tab", "vendor-data\t0100644\troot\troot\t/opt/vendor/od\td/x", "vendor-data", 0o644, "root", "root", "/opt/vendor/od\td/x", true},
-			{"short line", "bash\t0100755\troot\troot", "", 0, "", "", "", false},
-			{"unparsable mode", "bash\tnot-a-mode\troot\troot\t/usr/bin/bash", "", 0, "", "", "", false},
-			{"relative path", "bash\t0100755\troot\troot\tusr/bin/bash", "", 0, "", "", "", false},
-			{"no package name", "\t0100755\troot\troot\t/usr/bin/bash", "", 0, "", "", "", false},
-			{"empty line", "", "", 0, "", "", "", false},
+			{"path with a space", "vendor-data\t0100644\troot\troot\t\t/opt/vendor/data files/readme.txt", "vendor-data", 0o644, "root", "root", "", "/opt/vendor/data files/readme.txt", true},
+			{"path with a tab", "vendor-data\t0100644\troot\troot\t\t/opt/vendor/od\td/x", "vendor-data", 0o644, "root", "root", "", "/opt/vendor/od\td/x", true},
+			{"path with a tab after caps", "vendor\t0100755\troot\troot\tcap_net_raw=p\t/opt/v/a\tb", "vendor", 0o755, "root", "root", "cap_net_raw=p", "/opt/v/a\tb", true},
+			{"five fields, the pre-caps query", "bash\t0100755\troot\troot\t/usr/bin/bash", "", 0, "", "", "", "", false},
+			{"short line", "bash\t0100755\troot\troot", "", 0, "", "", "", "", false},
+			{"unparsable mode", "bash\tnot-a-mode\troot\troot\t\t/usr/bin/bash", "", 0, "", "", "", "", false},
+			{"relative path", "bash\t0100755\troot\troot\t\tusr/bin/bash", "", 0, "", "", "", "", false},
+			{"no package name", "\t0100755\troot\troot\t\t/usr/bin/bash", "", 0, "", "", "", "", false},
+			{"empty line", "", "", 0, "", "", "", "", false},
 		}
 		for _, c := range cases {
 			t.Run(c.name, func(t *testing.T) {
-				pkg, mode, owner, group, p, ok := ParseRPMFileLine(c.line)
+				pkg, mode, owner, group, caps, p, ok := ParseRPMFileLine(c.line)
 				if ok != c.ok {
 					t.Fatalf("ok = %v, want %v", ok, c.ok)
 				}
 				if !ok {
 					return
 				}
-				if pkg != c.pkg || mode != c.mode || owner != c.owner || group != c.group || p != c.out {
-					t.Errorf("= (%q, %o, %q, %q, %q), want (%q, %o, %q, %q, %q)",
-						pkg, mode, owner, group, p, c.pkg, c.mode, c.owner, c.group, c.out)
+				if pkg != c.pkg || mode != c.mode || owner != c.owner || group != c.group || caps != c.caps || p != c.out {
+					t.Errorf("= (%q, %o, %q, %q, %q, %q), want (%q, %o, %q, %q, %q, %q)",
+						pkg, mode, owner, group, caps, p, c.pkg, c.mode, c.owner, c.group, c.caps, c.out)
 				}
 			})
 		}

@@ -22,13 +22,17 @@ import (
 )
 
 // ParseRPMFileLine reads one line of
-// `rpm -qa --qf '[%{=NAME}\t%{FILEMODES:octal}\t%{FILEUSERNAME}\t%{FILEGROUPNAME}\t%{FILENAMES}\n]'`:
+// `rpm -qa --qf '[%{=NAME}\t%{FILEMODES:octal}\t%{FILEUSERNAME}\t%{FILEGROUPNAME}\t%|FILECAPS?{%{FILECAPS}}|\t%{FILENAMES}\n]'`:
 //
-//	bash<TAB>0100755<TAB>root<TAB>root<TAB>/usr/bin/bash
+//	bash<TAB>0100755<TAB>root<TAB>root<TAB><TAB>/usr/bin/bash
+//	iputils<TAB>100755<TAB>root<TAB>root<TAB>cap_net_raw=p<TAB>/usr/bin/arping
 //
-// The path is last and the line is split on the FIRST four tabs, so a path
+// The path is last and the line is split on the FIRST five tabs, so a path
 // containing a space — or a tab — survives whole; rpm records the owner and
 // group as NAMES, never as ids, and they are reported as it recorded them.
+// The fifth field is the file's capabilities in the libcap text of the host
+// that built the package, "" when it declares none; it is returned as rpm
+// printed it, and comparing it is the caller's business.
 // The mode field is the full st_mode in octal (0104755 for a setuid file),
 // masked here to 0o7777: the file-TYPE bits are discarded deliberately, so a
 // symlink or a directory row reads as a mode-only row like any other. The
@@ -36,16 +40,16 @@ import (
 // its own stat, and it never makes a symlink a mode candidate — and a caller
 // that needed it would be asking this parser a question rpm's own format
 // string was not asked.
-func ParseRPMFileLine(line string) (pkg string, mode int, owner, group string, p string, ok bool) {
-	f := strings.SplitN(line, "\t", 5)
-	if len(f) < 5 || f[0] == "" || !strings.HasPrefix(f[4], "/") {
-		return "", 0, "", "", "", false
+func ParseRPMFileLine(line string) (pkg string, mode int, owner, group, caps, p string, ok bool) {
+	f := strings.SplitN(line, "\t", 6)
+	if len(f) < 6 || f[0] == "" || !strings.HasPrefix(f[5], "/") {
+		return "", 0, "", "", "", "", false
 	}
 	m, err := strconv.ParseUint(f[1], 8, 32)
 	if err != nil {
-		return "", 0, "", "", "", false
+		return "", 0, "", "", "", "", false
 	}
-	return f[0], int(m) & 0o7777, f[2], f[3], f[4], true
+	return f[0], int(m) & 0o7777, f[2], f[3], f[4], f[5], true
 }
 
 // ParseTarTV reads one line of `tar -tv` over a .deb's filesystem tarball:

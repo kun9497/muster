@@ -60,9 +60,10 @@ type joinOutcome struct {
 	source    *facts.Source
 }
 
-// joinCandidates joins every candidate of walk.suid_sgid, walk.world_writable
-// and walk.hidden to the host's package database and, on dpkg, to the
-// release's reference list. It mutates r.
+// joinCandidates joins every candidate of walk.suid_sgid, walk.world_writable,
+// walk.hidden and walk.capabilities to the host's package database and, on
+// dpkg, to the release's reference list and the packages' postinst
+// scripts. It mutates r.
 func joinCandidates(ctx context.Context, a collect.Access, hdr *facts.Run, plan mountPlan, r *walkResult) joinOutcome {
 	cands := candidateSet(r)
 	family := detectFamily(a)
@@ -101,12 +102,14 @@ func detectFamily(a collect.Access) string {
 	return "none"
 }
 
-// candidateSet is every path the join will look up. The three lists are the
+// candidateSet is every path the join will look up. The four lists are the
 // only ones with package fields: sticky_missing and unowned are judged by
-// what they are, not by what a package says, and skipped is provenance.
+// what they are, not by what a package says, acl_grants carries no package
+// field (an ACL is the administrator's, never a package's), and skipped is
+// provenance.
 func candidateSet(r *walkResult) map[string]bool {
-	out := make(map[string]bool, len(r.lists.suid)+len(r.lists.worldWritable)+len(r.lists.hidden))
-	for _, rows := range [][]map[string]any{r.lists.suid, r.lists.worldWritable, r.lists.hidden} {
+	out := make(map[string]bool, len(r.lists.suid)+len(r.lists.worldWritable)+len(r.lists.hidden)+len(r.lists.capabilities))
+	for _, rows := range [][]map[string]any{r.lists.suid, r.lists.worldWritable, r.lists.hidden, r.lists.capabilities} {
 		for _, row := range rows {
 			out[rowField(row, "path")] = true
 		}

@@ -59,11 +59,14 @@ type statOverride struct {
 //   - listPath: the path the reference list would hold the file under, set
 //     only for a diverted candidate (the list holds what the package
 //     shipped, not where dpkg put it);
+//   - listFile: the .list file that gave the owner, whose postinst the
+//     capability join reads (V-22: the multi-arch name is the file's own);
 //   - overrides, versions: the statoverride entry and the installed version.
 type dpkgIndex struct {
 	owner        map[string]string
 	declaredPath map[string]string
 	listPath     map[string]string
+	listFile     map[string]string
 	overrides    map[string]statOverride
 	versions     map[string]string
 }
@@ -73,6 +76,7 @@ func newDpkgIndex() dpkgIndex {
 		owner:        map[string]string{},
 		declaredPath: map[string]string{},
 		listPath:     map[string]string{},
+		listFile:     map[string]string{},
 		overrides:    map[string]statOverride{},
 		versions:     map[string]string{},
 	}
@@ -105,6 +109,10 @@ func joinDpkg(a collect.Access, hdr *facts.Run, plan mountPlan, cands map[string
 	j.readOverrides(cands)
 	j.readVersions()
 	applyDpkg(r, j.idx, j.referenceList(hdr))
+	if j.out.failed == nil {
+		// A failed join publishes no row, so there is no script to read.
+		j.applyDpkgCaps(r)
+	}
 	return j.out
 }
 
@@ -259,6 +267,7 @@ func (j *dpkgJoin) readLists(cands map[string]bool, divs []diversion) {
 					continue
 				}
 				j.idx.owner[w.cand] = pkg
+				j.idx.listFile[w.cand] = f
 				if raw != w.cand {
 					j.idx.declaredPath[w.cand] = raw
 				}
