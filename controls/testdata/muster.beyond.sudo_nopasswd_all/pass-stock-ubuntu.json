@@ -1,0 +1,135 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none",
+        "source": {
+          "kind": "file",
+          "path": "/proc/1/cgroup"
+        }
+      }
+    },
+    "sudo": {
+      "installed": {
+        "status": "ok",
+        "value": true,
+        "source": {
+          "kind": "file",
+          "path": "/etc/sudoers"
+        }
+      },
+      "rules": {
+        "status": "ok",
+        "value": [
+          {
+            "file": "/etc/sudoers",
+            "line": 47,
+            "principal": "root",
+            "kind": "user",
+            "negated": false,
+            "runas": "(ALL:ALL)",
+            "nopasswd": false,
+            "commands": [
+              "ALL"
+            ],
+            "resolved": true
+          },
+          {
+            "file": "/etc/sudoers",
+            "line": 50,
+            "principal": "admin",
+            "kind": "group",
+            "negated": false,
+            "runas": "(ALL)",
+            "nopasswd": false,
+            "commands": [
+              "ALL"
+            ],
+            "resolved": true
+          },
+          {
+            "file": "/etc/sudoers",
+            "line": 53,
+            "principal": "sudo",
+            "kind": "group",
+            "negated": false,
+            "runas": "(ALL:ALL)",
+            "nopasswd": false,
+            "commands": [
+              "ALL"
+            ],
+            "resolved": true
+          }
+        ],
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "file",
+              "path": "/etc/sudoers"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/sudoers.d/README"
+            }
+          ]
+        }
+      },
+      "nopasswd_all": {
+        "status": "ok",
+        "value": [],
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "file",
+              "path": "/etc/sudoers"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/sudoers.d/README"
+            }
+          ]
+        }
+      },
+      "authenticate_disabled": {
+        "status": "ok",
+        "value": false,
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "file",
+              "path": "/etc/sudoers"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/sudoers.d/README"
+            }
+          ]
+        }
+      },
+      "rules_unresolved": {
+        "status": "ok",
+        "value": 0,
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "file",
+              "path": "/etc/sudoers"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/sudoers.d/README"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

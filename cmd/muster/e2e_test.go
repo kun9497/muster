@@ -112,6 +112,10 @@ func TestCheckEndToEndWaiversTurnFailIntoWaived(t *testing.T) {
 		"muster.beyond.sudo_logging":                        "PASS",
 		"muster.beyond.file_integrity_tool":                 "PASS",
 		"muster.beyond.package_files_unmodified":            "MANUAL",
+		"muster.beyond.account_inactivity_lock":             "PASS",
+		"muster.beyond.sudo_nopasswd_all":                   "PASS",
+		"muster.beyond.file_capabilities_declared":          "MANUAL",
+		"muster.beyond.root_unit_exec_writable":             "PASS",
 		"muster.account.root_remote_login":                  "WAIVED",
 		"muster.account.password_policy":                    "PASS",
 		"muster.file.passwd_permissions":                    "PASS",
@@ -545,7 +549,7 @@ func TestCheckEndToEndJSONAndTable(t *testing.T) {
 	if _, declared := params["muster.service.telnet_disabled"]; declared {
 		t.Errorf("only controls that declare params belong in check.params: %v", params)
 	}
-	// R26: full-pass.json must produce exactly the ninety-six embedded
+	// R26: full-pass.json must produce exactly the one hundred embedded
 	// controls' documented statuses, not merely "some PASS rows appear
 	// somewhere in the output".
 	assertStatuses(t, out1.Bytes(), map[string]string{
@@ -577,6 +581,10 @@ func TestCheckEndToEndJSONAndTable(t *testing.T) {
 		"muster.beyond.sudo_logging":                        "PASS",
 		"muster.beyond.file_integrity_tool":                 "PASS",
 		"muster.beyond.package_files_unmodified":            "MANUAL",
+		"muster.beyond.account_inactivity_lock":             "PASS",
+		"muster.beyond.sudo_nopasswd_all":                   "PASS",
+		"muster.beyond.file_capabilities_declared":          "MANUAL",
+		"muster.beyond.root_unit_exec_writable":             "PASS",
 		"muster.account.root_remote_login":                  "PASS",
 		"muster.account.password_policy":                    "PASS",
 		"muster.file.passwd_permissions":                    "PASS",
@@ -657,7 +665,7 @@ func TestCheckEndToEndJSONAndTable(t *testing.T) {
 	}
 
 	// R26: full-fail.json flips only root_remote_login to FAIL; the other
-	// ninety-five controls are unchanged from full-pass.json.
+	// ninety-nine controls are unchanged from full-pass.json.
 	var failJSON bytes.Buffer
 	if code := run([]string{"check", "--facts", "testdata/full-fail.json", "--format", "json"}, &failJSON, &errb); code != exitFindings {
 		t.Fatalf("exit %d, want 1 for a FAIL; stderr %q", code, errb.String())
@@ -691,6 +699,10 @@ func TestCheckEndToEndJSONAndTable(t *testing.T) {
 		"muster.beyond.sudo_logging":                        "PASS",
 		"muster.beyond.file_integrity_tool":                 "PASS",
 		"muster.beyond.package_files_unmodified":            "MANUAL",
+		"muster.beyond.account_inactivity_lock":             "PASS",
+		"muster.beyond.sudo_nopasswd_all":                   "PASS",
+		"muster.beyond.file_capabilities_declared":          "MANUAL",
+		"muster.beyond.root_unit_exec_writable":             "PASS",
 		"muster.account.root_remote_login":                  "FAIL",
 		"muster.account.password_policy":                    "PASS",
 		"muster.file.passwd_permissions":                    "PASS",

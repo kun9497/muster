@@ -294,6 +294,14 @@
           "kind": "file",
           "path": "/proc/1/cgroup"
         }
+      },
+      "has_systemd": {
+        "status": "ok",
+        "value": true,
+        "source": {
+          "kind": "file",
+          "path": "/run/systemd/system"
+        }
       }
     },
     "services": {
@@ -529,6 +537,114 @@
               }
             ]
           }
+        }
+      },
+      "rules": {
+        "status": "ok",
+        "value": [
+          {
+            "file": "/etc/sudoers",
+            "line": 47,
+            "principal": "root",
+            "kind": "user",
+            "negated": false,
+            "runas": "(ALL:ALL)",
+            "nopasswd": false,
+            "commands": [
+              "ALL"
+            ],
+            "resolved": true
+          },
+          {
+            "file": "/etc/sudoers",
+            "line": 50,
+            "principal": "admin",
+            "kind": "group",
+            "negated": false,
+            "runas": "(ALL)",
+            "nopasswd": false,
+            "commands": [
+              "ALL"
+            ],
+            "resolved": true
+          },
+          {
+            "file": "/etc/sudoers",
+            "line": 53,
+            "principal": "sudo",
+            "kind": "group",
+            "negated": false,
+            "runas": "(ALL:ALL)",
+            "nopasswd": false,
+            "commands": [
+              "ALL"
+            ],
+            "resolved": true
+          }
+        ],
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "file",
+              "path": "/etc/sudoers"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/sudoers.d/README"
+            }
+          ]
+        }
+      },
+      "nopasswd_all": {
+        "status": "ok",
+        "value": [],
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "file",
+              "path": "/etc/sudoers"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/sudoers.d/README"
+            }
+          ]
+        }
+      },
+      "authenticate_disabled": {
+        "status": "ok",
+        "value": false,
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "file",
+              "path": "/etc/sudoers"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/sudoers.d/README"
+            }
+          ]
+        }
+      },
+      "rules_unresolved": {
+        "status": "ok",
+        "value": 0,
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "file",
+              "path": "/etc/sudoers"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/sudoers.d/README"
+            }
+          ]
         }
       }
     },
@@ -1572,6 +1688,162 @@
             {
               "kind": "sys",
               "path": "/sys/block"
+            }
+          ]
+        }
+      }
+    },
+    "accounts": {
+      "login_capable": {
+        "status": "ok",
+        "value": [
+          {
+            "name": "root",
+            "uid": 0,
+            "inactive": -1,
+            "expire": -1,
+            "inactive_unset": true,
+            "locked": true
+          },
+          {
+            "name": "ubuntu",
+            "uid": 1000,
+            "inactive": -1,
+            "expire": -1,
+            "inactive_unset": true,
+            "locked": false
+          }
+        ],
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "file",
+              "path": "/etc/passwd"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/shadow"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/shells"
+            }
+          ]
+        }
+      },
+      "useradd": {
+        "inactive": {
+          "status": "ok",
+          "value": -1,
+          "reason": "INACTIVE is commented out in /etc/default/useradd (useradd's default is -1, never)",
+          "source": {
+            "kind": "file",
+            "path": "/etc/default/useradd"
+          }
+        }
+      }
+    },
+    "walk": {
+      "complete": {
+        "status": "ok",
+        "value": true,
+        "source": {
+          "kind": "derived"
+        }
+      },
+      "capabilities": {
+        "status": "ok",
+        "value": [
+          {
+            "path": "/usr/bin/mtr-packet",
+            "caps": "cap_net_raw=ep",
+            "rootid": 0,
+            "package": "mtr-tiny",
+            "package_declared": true,
+            "declared_caps": "cap_net_raw+ep",
+            "reference": "postinst",
+            "reason": ""
+          },
+          {
+            "path": "/usr/bin/ping",
+            "caps": "cap_net_raw=ep",
+            "rootid": 0,
+            "package": "iputils-ping",
+            "package_declared": true,
+            "declared_caps": "cap_net_raw+ep",
+            "reference": "postinst",
+            "reason": ""
+          },
+          {
+            "path": "/usr/lib/snapd/snap-confine",
+            "caps": "cap_chown,cap_dac_override,cap_dac_read_search,cap_fowner,cap_setgid,cap_setuid,cap_sys_chroot,cap_sys_ptrace,cap_sys_admin,cap_sys_resource=p",
+            "rootid": 0,
+            "package": "snapd",
+            "package_declared": true,
+            "declared_caps": "(from file)",
+            "reference": "postinst",
+            "reason": ""
+          },
+          {
+            "path": "/usr/lib/x86_64-linux-gnu/gstreamer1.0/gstreamer-1.0/gst-ptp-helper",
+            "caps": "cap_net_bind_service,cap_net_admin=ep",
+            "rootid": 0,
+            "package": "libgstreamer1.0-0",
+            "package_declared": true,
+            "declared_caps": "cap_net_bind_service,cap_net_admin+ep",
+            "reference": "postinst",
+            "reason": ""
+          }
+        ],
+        "source": {
+          "kind": "derived"
+        }
+      },
+      "acl_grants": {
+        "status": "ok",
+        "value": [],
+        "source": {
+          "kind": "derived"
+        }
+      }
+    },
+    "units": {
+      "root_services": {
+        "status": "ok",
+        "value": [],
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "command",
+              "cmd": "/usr/bin/systemctl list-units --type=service --state=active --plain --no-legend"
+            }
+          ]
+        }
+      },
+      "exec_writable": {
+        "status": "ok",
+        "value": [],
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "command",
+              "cmd": "/usr/bin/systemctl list-units --type=service --state=active --plain --no-legend"
+            }
+          ]
+        }
+      },
+      "exec_unresolved": {
+        "status": "ok",
+        "value": 14,
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "command",
+              "cmd": "/usr/bin/systemctl list-units --type=service --state=active --plain --no-legend"
             }
           ]
         }

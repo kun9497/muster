@@ -1,0 +1,37 @@
+{
+  "synthetic": true,
+  "_expect": {
+    "reason_code": "permission_denied",
+    "exit_code": 2
+  },
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none",
+        "source": {
+          "kind": "file",
+          "path": "/proc/1/cgroup"
+        }
+      }
+    },
+    "accounts": {
+      "login_capable": {
+        "status": "denied",
+        "reason": "/etc/shadow: requires root or CAP_DAC_READ_SEARCH"
+      },
+      "useradd": {
+        "inactive": {
+          "status": "ok",
+          "value": 35,
+          "source": {
+            "kind": "file",
+            "path": "/etc/default/useradd"
+          }
+        }
+      }
+    }
+  }
+}

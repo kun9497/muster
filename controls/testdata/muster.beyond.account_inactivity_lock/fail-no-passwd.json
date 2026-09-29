@@ -1,0 +1,39 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none",
+        "source": {
+          "kind": "file",
+          "path": "/proc/1/cgroup"
+        }
+      }
+    },
+    "accounts": {
+      "login_capable": {
+        "status": "absent",
+        "reason": "not present"
+      },
+      "useradd": {
+        "inactive": {
+          "status": "ok",
+          "value": -1,
+          "reason": "file does not exist",
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "file",
+                "path": "/etc/default/useradd"
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}

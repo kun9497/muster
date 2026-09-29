@@ -76,10 +76,11 @@
 
 ## Beyond the guide
 
-28 controls muster checks that the guide does not ask for.
+32 controls muster checks that the guide does not ask for.
 
 | Control | Imp. | Automation | Fact keys read | STIG ids |
 |---|---|---|---|---|
+| muster.beyond.account_inactivity_lock | 중 | auto | accounts.login_capable, accounts.useradd.inactive, env.container | RHEL-09-411050, UBTU-22-411035, UBTU-24-200260 |
 | muster.beyond.aslr_and_link_protection | 상 | auto | env.container, kernel.sysctl.protected_fifos, kernel.sysctl.protected_hardlinks, kernel.sysctl.protected_regular, kernel.sysctl.protected_symlinks, kernel.sysctl.randomize_va_space | RHEL-09-213030, RHEL-09-213035, RHEL-09-213070, UBTU-22-213020, UBTU-24-700310 |
 | muster.beyond.audit_disk_actions | 중 | auto | audit.conf.admin_space_left_action, audit.conf.disk_error_action, audit.conf.disk_full_action, audit.conf.max_log_file_action, audit.conf.space_left_action, env.container, services.auditd.installed | RHEL-09-653020, RHEL-09-653025, RHEL-09-653040, RHEL-09-653050, RHEL-09-653055, UBTU-22-653030, UBTU-22-653040, UBTU-24-900960 |
 | muster.beyond.audit_immutable | 중 | auto | audit.immutable, env.container, services.auditd.installed | RHEL-09-654275, UBTU-24-909000 |
@@ -90,15 +91,18 @@
 | muster.beyond.bootloader_password | 중 | auto | boot.grub_password_set, env.container | RHEL-09-212010, UBTU-22-212010, UBTU-24-102000 |
 | muster.beyond.core_dump_policy | 중 | partial | coredump.core_pattern, coredump.limits.hard_core, coredump.systemd.process_size_max, coredump.systemd.storage, env.container | RHEL-09-213040, RHEL-09-213085, RHEL-09-213090, RHEL-09-213095 |
 | muster.beyond.dev_shm_mount_options | 중 | auto | env.container, mounts.dev_shm.separate, mounts.points | RHEL-09-231110, RHEL-09-231115, RHEL-09-231120 |
+| muster.beyond.file_capabilities_declared | 상 | auto | env.container, walk.capabilities | — |
 | muster.beyond.file_integrity_tool | 중 | auto | env.container, fim.aide.database_present, fim.aide.scheduled, fim.tool | RHEL-09-651010, RHEL-09-651015, UBTU-22-651010, UBTU-22-651015, UBTU-22-651025, UBTU-24-100100, UBTU-24-100110, UBTU-24-100120 |
 | muster.beyond.home_mount_options | 하 | auto | env.container, mounts.home.separate, mounts.points | RHEL-09-231045, RHEL-09-231050 |
 | muster.beyond.kernel_pointer_exposure | 중 | auto | env.container, kernel.sysctl.dmesg_restrict, kernel.sysctl.kptr_restrict | RHEL-09-213010, RHEL-09-213025, UBTU-22-213010, UBTU-24-600140 |
 | muster.beyond.package_files_unmodified | 상 | auto | env.container, packages.verify.modified | — |
 | muster.beyond.ptrace_restriction | 중 | auto | env.container, kernel.sysctl.perf_event_paranoid, kernel.sysctl.yama_ptrace_scope | RHEL-09-213015, RHEL-09-213080 |
 | muster.beyond.remote_log_forwarding | 하 | auto | env.container, logging.journal_upload.url, logging.rsyslog.forwards_remote, services.journal_upload.active, services.journal_upload.enabled, services.syslog.active | RHEL-09-652055 |
+| muster.beyond.root_unit_exec_writable | 상 | auto | env.container, env.has_systemd, units.exec_writable | — |
 | muster.beyond.secure_boot_enabled | 중 | auto | boot.firmware, boot.secure_boot, env.container | — |
 | muster.beyond.separate_partitions | 중 | partial | env.container, mounts.points | RHEL-09-231010, RHEL-09-231015, RHEL-09-231020, RHEL-09-231025, RHEL-09-231030, RHEL-09-231035 |
 | muster.beyond.sudo_logging | 중 | auto | env.container, sudo.installed, sudo.log.logfile, sudo.log.syslog | — |
+| muster.beyond.sudo_nopasswd_all | 상 | auto | env.container, sudo.authenticate_disabled, sudo.installed, sudo.nopasswd_all | RHEL-09-432025, UBTU-22-432010, UBTU-24-300021 |
 | muster.beyond.suid_dumpable_disabled | 중 | auto | coredump.suid_dumpable, env.container | — |
 | muster.beyond.swap_encrypted | 중 | auto | env.container, swap.encrypted | — |
 | muster.beyond.sysrq_restricted | 중 | auto | env.container, kernel.sysctl.sysrq | — |
@@ -111,7 +115,7 @@
 
 ## Fact keys used by controls
 
-210 of 473 registered keys are read by a control (4 by the engine); 259 unused.
+217 of 473 registered keys are read by a control (4 by the engine); 252 unused.
 
 | Collector | Registered | Used by a control | Read by the engine | Unused |
 |---|---|---|---|---|
@@ -119,12 +123,12 @@
 | sockets | 1 | 0 | 0 | sockets.listening |
 | sshd | 11 | 4 | 2 | sshd.version, sshd.options.max_auth_tries, sshd.options.banner, sshd.include_sources, sshd.banner_file.exists |
 | banners | 10 | 2 | 0 | banners.issue.nonempty, banners.issue.os_escapes, banners.issue.mode, banners.issue_net.mode, banners.motd.nonempty, banners.motd.mode, banners.motd_d, banners.dynamic_motd |
-| files | 108 | 46 | 0 | files.etc_passwd.acl_present, files.etc_passwd.group, files.etc_passwd.group_readable, files.etc_passwd.group_writable, files.etc_passwd.other_readable, files.etc_passwd.other_writable, files.etc_shadow.gid, files.etc_shadow.group, files.etc_shadow.group_readable, files.etc_shadow.group_writable, files.etc_shadow.other_readable, files.etc_shadow.other_writable, files.etc_shadow.acl_present, files.etc_hosts.gid, files.etc_hosts.group, files.etc_hosts.group_readable, files.etc_hosts.group_writable, files.etc_hosts.other_readable, files.etc_hosts.other_writable, files.etc_hosts.acl_present, files.etc_services.gid, files.etc_services.group, files.etc_services.group_readable, files.etc_services.group_writable, files.etc_services.other_readable, files.etc_services.other_writable, files.etc_services.acl_present, files.etc_hosts_lpd.gid, files.etc_hosts_lpd.group, files.etc_hosts_lpd.group_readable, files.etc_hosts_lpd.group_writable, files.etc_hosts_lpd.other_readable, files.etc_hosts_lpd.other_writable, files.etc_hosts_lpd.acl_present, files.root_home.mode, files.root_home.gid, files.root_home.acl_present, files.etc_hosts_equiv.mode, files.etc_hosts_equiv.uid, files.dev_entries, files.etc_sudoers.gid, files.etc_sudoers.acl_present, files.etc_sudoers_d.mode, files.etc_sudoers_d.uid, files.etc_sudoers_d.gid, files.etc_sudoers_d.acl_present, files.etc_hosts_allow_lines, files.etc_hosts_deny_lines, sudo.includedir, sudo.secure_path, sudo.defaults.scoped_count, sudo.rules, sudo.nopasswd_all, sudo.authenticate_disabled, sudo.rules_unresolved, files.etc_exports.gid, files.etc_exports.group, files.etc_exports.group_readable, files.etc_exports.group_writable, files.etc_exports.other_readable, files.etc_exports.other_writable, files.etc_exports.acl_present |
-| accounts | 25 | 13 | 0 | accounts.login_defs.pass_warn_age, accounts.login_defs.uid_min, accounts.login_defs.sys_uid_max, accounts.login_defs.sha_crypt_min_rounds, accounts.login_defs.home_mode, accounts.login_defs.env_supath, accounts.login_defs.env_path, accounts.parse_failures, accounts.groups, accounts.login_capable, accounts.useradd.inactive, accounts.lastlog |
+| files | 108 | 48 | 0 | files.etc_passwd.acl_present, files.etc_passwd.group, files.etc_passwd.group_readable, files.etc_passwd.group_writable, files.etc_passwd.other_readable, files.etc_passwd.other_writable, files.etc_shadow.gid, files.etc_shadow.group, files.etc_shadow.group_readable, files.etc_shadow.group_writable, files.etc_shadow.other_readable, files.etc_shadow.other_writable, files.etc_shadow.acl_present, files.etc_hosts.gid, files.etc_hosts.group, files.etc_hosts.group_readable, files.etc_hosts.group_writable, files.etc_hosts.other_readable, files.etc_hosts.other_writable, files.etc_hosts.acl_present, files.etc_services.gid, files.etc_services.group, files.etc_services.group_readable, files.etc_services.group_writable, files.etc_services.other_readable, files.etc_services.other_writable, files.etc_services.acl_present, files.etc_hosts_lpd.gid, files.etc_hosts_lpd.group, files.etc_hosts_lpd.group_readable, files.etc_hosts_lpd.group_writable, files.etc_hosts_lpd.other_readable, files.etc_hosts_lpd.other_writable, files.etc_hosts_lpd.acl_present, files.root_home.mode, files.root_home.gid, files.root_home.acl_present, files.etc_hosts_equiv.mode, files.etc_hosts_equiv.uid, files.dev_entries, files.etc_sudoers.gid, files.etc_sudoers.acl_present, files.etc_sudoers_d.mode, files.etc_sudoers_d.uid, files.etc_sudoers_d.gid, files.etc_sudoers_d.acl_present, files.etc_hosts_allow_lines, files.etc_hosts_deny_lines, sudo.includedir, sudo.secure_path, sudo.defaults.scoped_count, sudo.rules, sudo.rules_unresolved, files.etc_exports.gid, files.etc_exports.group, files.etc_exports.group_readable, files.etc_exports.group_writable, files.etc_exports.other_readable, files.etc_exports.other_writable, files.etc_exports.acl_present |
+| accounts | 25 | 15 | 0 | accounts.login_defs.pass_warn_age, accounts.login_defs.uid_min, accounts.login_defs.sys_uid_max, accounts.login_defs.sha_crypt_min_rounds, accounts.login_defs.home_mode, accounts.login_defs.env_supath, accounts.login_defs.env_path, accounts.parse_failures, accounts.groups, accounts.lastlog |
 | pam | 28 | 9 | 0 | pam.stacks, pam.managing_layer, pam.parse_complete, pam.pwquality.local_users_only, pam.pwquality.minclass, pam.pwquality.dcredit, pam.pwquality.ucredit, pam.pwquality.lcredit, pam.pwquality.ocredit, pam.pwquality.enforce_for_root, pam.password.remember, pam.faillock.unlock_time, pam.faillock.fail_interval, pam.faillock.even_deny_root, pam.faillock.root_unlock_time, pam.su.wheel_control, pam.su.wheel_group, pam.su.wheel_args, pam.umask_module.args |
-| os | 2 | 1 | 0 | env.has_systemd |
+| os | 2 | 2 | 0 | — |
 | env | 7 | 4 | 0 | env.shell.tmout_readonly, env.shell.tmout_settings, env.shell.umask_settings |
-| walk | 11 | 6 | 1 | walk.capabilities, walk.acl_grants, walk.skipped, walk.stats |
+| walk | 11 | 7 | 1 | walk.acl_grants, walk.skipped, walk.stats |
 | cron | 3 | 2 | 0 | cron.timers |
 | firewall | 8 | 2 | 0 | firewall.enabled, firewall.default_policy.input, firewall.default_policy.forward, firewall.normalization_confidence, firewall.rules, firewall.raw_dumps |
 | timesync | 4 | 1 | 0 | time_sync.provider, time_sync.servers, time_sync.synchronized |
@@ -144,6 +148,6 @@
 | swap | 3 | 1 | 0 | swap.present, swap.devices |
 | audit | 34 | 14 | 0 | audit.rules.loaded_count, audit.rules.persisted_count, audit.rules.persisted, audit.status.enabled, audit.status.failure, audit.status.lost, audit.status.backlog_limit, audit.conf.log_file, audit.conf.log_group, audit.log_file.gid, audit.log_file.group_readable, audit.log_file.group_writable, audit.log_file.other_readable, audit.log_file.other_writable, audit.log_file.acl_present, audit.log_dir.mode, audit.log_dir.gid, audit.log_dir.group, audit.log_dir.group_readable, audit.log_dir.acl_present |
 | fim | 9 | 3 | 0 | fim.aide.installed, fim.aide.config_path, fim.aide.database_path, fim.aide.database_modified, fim.aide.schedules, fim.other_tools |
-| units | 3 | 0 | 0 | units.root_services, units.exec_writable, units.exec_unresolved |
+| units | 3 | 1 | 0 | units.root_services, units.exec_unresolved |
 | sshkeys | 4 | 0 | 0 | ssh.authorized_keys, ssh.root_key_count, ssh.dsa_key_count, ssh.rsa_keys |
 | privilege | 3 | 0 | 0 | privilege.ld_so_preload, privilege.runtime_sockets, privilege.runtime_group_members |

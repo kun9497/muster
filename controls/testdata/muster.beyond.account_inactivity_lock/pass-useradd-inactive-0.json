@@ -1,0 +1,67 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none",
+        "source": {
+          "kind": "file",
+          "path": "/proc/1/cgroup"
+        }
+      }
+    },
+    "accounts": {
+      "login_capable": {
+        "status": "ok",
+        "value": [
+          {
+            "name": "alice",
+            "uid": 1000,
+            "inactive": 0,
+            "expire": -1,
+            "inactive_unset": false,
+            "locked": false
+          },
+          {
+            "name": "root",
+            "uid": 0,
+            "inactive": 0,
+            "expire": -1,
+            "inactive_unset": false,
+            "locked": false
+          }
+        ],
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "file",
+              "path": "/etc/passwd"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/shadow"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/shells"
+            }
+          ]
+        }
+      },
+      "useradd": {
+        "inactive": {
+          "status": "ok",
+          "value": 0,
+          "source": {
+            "kind": "file",
+            "path": "/etc/default/useradd"
+          }
+        }
+      }
+    }
+  }
+}

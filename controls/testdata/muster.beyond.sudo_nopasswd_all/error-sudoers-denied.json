@@ -1,0 +1,47 @@
+{
+  "synthetic": true,
+  "_expect": {
+    "reason_code": "permission_denied",
+    "exit_code": 2
+  },
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none",
+        "source": {
+          "kind": "file",
+          "path": "/proc/1/cgroup"
+        }
+      }
+    },
+    "sudo": {
+      "installed": {
+        "status": "ok",
+        "value": true,
+        "source": {
+          "kind": "file",
+          "path": "/etc/sudoers"
+        }
+      },
+      "rules": {
+        "status": "denied",
+        "reason": "/etc/sudoers: requires root or CAP_DAC_READ_SEARCH"
+      },
+      "nopasswd_all": {
+        "status": "denied",
+        "reason": "/etc/sudoers: requires root or CAP_DAC_READ_SEARCH"
+      },
+      "authenticate_disabled": {
+        "status": "denied",
+        "reason": "/etc/sudoers: requires root or CAP_DAC_READ_SEARCH"
+      },
+      "rules_unresolved": {
+        "status": "denied",
+        "reason": "/etc/sudoers: requires root or CAP_DAC_READ_SEARCH"
+      }
+    }
+  }
+}

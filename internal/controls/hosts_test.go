@@ -55,6 +55,10 @@ var stockUbuntu2204 = map[string]check.Status{
 	"muster.beyond.sudo_logging":                        check.PASS,          // 3C-1: sudo's default syslog
 	"muster.beyond.file_integrity_tool":                 check.FAIL,          // 3C-1: no tool
 	"muster.beyond.package_files_unmodified":            check.PASS,          // 3C-1: --deep, only conffiles differ
+	"muster.beyond.account_inactivity_lock":             check.FAIL,          // 3C-2a: INACTIVE commented out, root and the user unset
+	"muster.beyond.sudo_nopasswd_all":                   check.PASS,          // 3C-2a: root, %admin, %sudo, all with a password
+	"muster.beyond.file_capabilities_declared":          check.PASS,          // 3C-2a: the four files postinst declares
+	"muster.beyond.root_unit_exec_writable":             check.PASS,          // 3C-2a: nothing a non-root user can write
 }
 
 // stockEL9 is the 3C-1 spec's EL9 reading (§4): a stock Rocky 9 install —

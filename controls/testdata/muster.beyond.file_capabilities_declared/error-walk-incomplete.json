@@ -1,0 +1,46 @@
+{
+  "synthetic": true,
+  "_expect": {
+    "reason_code": "walk_incomplete",
+    "exit_code": 2
+  },
+  "schema_version": 1,
+  "run": {
+    "deep": true
+  },
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none",
+        "source": {
+          "kind": "file",
+          "path": "/proc/1/cgroup"
+        }
+      }
+    },
+    "walk": {
+      "complete": {
+        "status": "ok",
+        "value": false,
+        "source": {
+          "kind": "derived"
+        }
+      },
+      "capabilities": {
+        "status": "ok",
+        "value": [],
+        "source": {
+          "kind": "derived"
+        }
+      },
+      "acl_grants": {
+        "status": "ok",
+        "value": [],
+        "source": {
+          "kind": "derived"
+        }
+      }
+    }
+  }
+}
