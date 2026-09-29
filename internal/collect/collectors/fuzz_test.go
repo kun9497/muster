@@ -1361,6 +1361,32 @@ func FuzzParseListTimers(f *testing.F) {
 	})
 }
 
+func FuzzParseUnitFile(f *testing.F) {
+	seeds(f, "testdata/units/*")
+	f.Add([]byte("[Service]\nExecStart=/a \\\n# c\n -x\nExecStart=\nUser = 0\n"))
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "parseUnitFile", func() any { return mergeUnitFiles([]unitFile{parseUnitFile(data)}) }, len(data))
+	})
+}
+
+func FuzzParseListUnits(f *testing.F) {
+	seeds(f, "testdata/list_units.*")
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "parseListUnits", func() any { return parseListUnits(data) }, len(data))
+	})
+}
+
+func FuzzExecFirstToken(f *testing.F) {
+	seeds(f, "testdata/units/*")
+	f.Add([]byte(`-@"/opt/my app/\x41run" arg`))
+	f.Add([]byte(`!!/usr/lib/%I/\u00e9`))
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "execFirstToken", func() any {
+			p, ok := execFirstToken(string(data))
+			return []any{p, ok}
+		}, len(data))
+	})
+}
 func FuzzCronDailyRun(f *testing.F) {
 	seeds(f, "testdata/default_aide.sample")
 	f.Add([]byte("CRON_DAILY_RUN=\"no\"\n"))

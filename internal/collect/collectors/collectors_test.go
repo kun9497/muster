@@ -231,6 +231,14 @@ func (a *fsAccess) Glob(pattern string) ([]string, error) {
 			out = append(out, p)
 		}
 	}
+	// A symlink is a directory entry like any other: the host's Glob lists
+	// it without following it (the units collector's .wants links and its
+	// /dev/null drop-in masks).
+	for p := range a.links {
+		if ok, _ := path.Match(pattern, p); ok && !slices.Contains(out, p) {
+			out = append(out, p)
+		}
+	}
 	slices.Sort(out)
 	return out, nil
 }

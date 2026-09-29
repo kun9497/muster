@@ -1,0 +1,5 @@
+cron.service                   loaded active running        Regular background program processing daemon
+getty@tty1.service             loaded active running        Getty on tty1
+ssh.service                    loaded active running        OpenBSD Secure Shell server
+systemd-journald.service       loaded active running        Journal Service
+unattended-upgrades.service    loaded active running reload Unattended Upgrades Shutdown
