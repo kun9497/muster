@@ -60,6 +60,15 @@ jobs:
       # daemon, aide so fim.tool reads aide on a real host.
       - name: install openssh-server, auditd and aide
         run: sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq openssh-server auditd aide aide-common
+      # P-12: one file capability no package declares, on a walked path
+      # outside .github/walk-excludes, so the capability join's "unpackaged"
+      # branch runs on a real host. The runner image is expected to carry
+      # setcap already; the install is the fallback. The file is removed by
+      # the always() step at the end of the job.
+      - name: plant an undeclared file capability
+        run: |
+          command -v setcap || sudo apt-get install -y -qq libcap2-bin
+          sudo cp /bin/true /usr/local/bin/muster-cap-probe && sudo setcap cap_net_raw+ep /usr/local/bin/muster-cap-probe
       - name: collect as root
         run: |
           set +e
@@ -111,6 +120,16 @@ jobs:
       - name: auditd, the verify and aide read what the runner has
         run: |
           jq -e '.facts.services.auditd.active.value == true and .facts.audit.rules.present.runtime.status == "ok" and .facts.audit.rules.present.runtime.value == false and .facts.packages.verify.complete.value == true and .facts.packages.verify.tool.value == "dpkg" and .facts.fim.tool.value == "aide"' "$RUNNER_TEMP/muster/root.json"
+      # P-12: the planted capability is found and judged unpackaged, and the
+      # runner's privilege facts are what its image is expected to carry -
+      # no preload, runner's own passwordless sudo, runner in docker's group,
+      # useradd's INACTIVE unset. These describe the runner, not muster: the
+      # first run confirms them, and a mismatch is corrected here, never in
+      # the collector.
+      - name: the capability probe and the runner's privilege facts
+        run: |
+          jq -e '[.facts.walk.capabilities.value[] | select(.path == "/usr/local/bin/muster-cap-probe")] | length == 1 and (.facts.walk.capabilities.value[] | select(.path == "/usr/local/bin/muster-cap-probe") | .reference == "unpackaged" and .package_declared == false)' "$RUNNER_TEMP/muster/root.json"
+          jq -e '.facts.privilege.ld_so_preload.value == [] and .facts.sudo.nopasswd_all.value == ["runner"] and ([.facts.privilege.runtime_group_members.value[] | .member] | index("runner") != null) and .facts.accounts.useradd.inactive.value == -1' "$RUNNER_TEMP/muster/root.json"
       - name: check the root snapshot
         run: |
           sudo chown "$(id -u)" "$RUNNER_TEMP/muster/root.json"
@@ -173,11 +192,19 @@ jobs:
           grep -q 'oracle sshd: compared [1-9]' "$RUNNER_TEMP/oracle.log"
           grep -q 'oracle audit: compared [1-9]' "$RUNNER_TEMP/oracle.log"
           grep -q 'oracle verify: compared' "$RUNNER_TEMP/oracle.log"
+          grep -q 'oracle units: compared [1-9]' "$RUNNER_TEMP/oracle.log"
+          grep -q 'oracle keys: compared [1-9]' "$RUNNER_TEMP/oracle.log"
+          grep -q 'oracle lastlog: compared [1-9]' "$RUNNER_TEMP/oracle.log"
+          grep -q 'oracle capabilities: compared [1-9]' "$RUNNER_TEMP/oracle.log"
+          grep -q 'oracle sudoers: compared 1' "$RUNNER_TEMP/oracle.log"
       - name: take the oracle drop-in back out
         # P-1: the runner is thrown away, but a step that exists to undo a
         # change must run whether or not the thing it guarded passed.
         if: always()
         run: sudo rm -f /etc/ssh/sshd_config.d/99-muster-oracle.conf
+      - name: take the capability probe back out
+        if: always()
+        run: sudo rm -f /usr/local/bin/muster-cap-probe
 
   collect-nonroot:
     runs-on: ubuntu-24.04

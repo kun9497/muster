@@ -21,9 +21,14 @@ const hostRoot = fixtureRoot + "/_hosts"
 // spec §4: what a stock Ubuntu 22.04 host — BIOS, a plain swap file, no
 // separate /tmp or /var, sysrq 176, suid_dumpable 2, apport's core pattern,
 // the distribution's blacklists only, no auditd, no AIDE, rsyslog writing
-// locally, sudo's compiled-in syslog, and `--deep` finding only the two
-// conffiles the installer rewrites — reads for the controls beyond the
-// guide. The snapshot beside it carries that host's facts; a verdict that
+// locally, sudo's compiled-in syslog, `--deep` finding only the two
+// conffiles the installer rewrites, INACTIVE commented out in
+// /etc/default/useradd, `%sudo` with a password, the four file capabilities
+// their postinst declares, no /etc/ld.so.preload, no container runtime
+// socket (so no runtime group with a member), sshd's compiled-in
+// prohibit-password (sshd -T prints without-password), no key in root's
+// authorized_keys, and no DSA or short RSA key — reads for the controls
+// beyond the guide. The snapshot beside it carries that host's facts; a verdict that
 // moves is a defect in the control or in the collector shape the snapshot
 // copies, and this table is what decides which.
 var stockUbuntu2204 = map[string]check.Status{
@@ -71,19 +76,33 @@ var stockUbuntu2204 = map[string]check.Status{
 // upstream auditd.conf (syslog at space_left, suspend at admin_space_left,
 // disk_full and disk_error), the 0700 log directory and 0600 log, no AIDE,
 // rsyslog writing locally, sudo's default syslog, and rpm -Va finding only
-// the installer's chrony.conf among the files rpm tracks. The snapshot
-// carries env, the header and the 3C-1 facts only, so the table names the
-// nine 3C-1 controls and nothing else.
+// the installer's chrony.conf among the files rpm tracks — and the 3C-2a
+// reading measured in the Rocky 9 init image (V-18, V-23): INACTIVE=-1 in
+// /etc/default/useradd and root unset, `%wheel` with a password, the four
+// file capabilities rpm's FILECAPS declares (iputils' arping and clockdiff,
+// shadow-utils' newgidmap and newuidmap; ping carries none), no root service
+// a non-root user can rewrite, no /etc/ld.so.preload, no runtime socket,
+// sshd's compiled-in prohibit-password and no key at all. The snapshot
+// carries env, the header, the 3C-1 facts and the 3C-2a facts, so the table
+// names those seventeen controls and nothing else.
 var stockEL9 = map[string]check.Status{
-	"muster.beyond.auditd_active":            check.PASS, // installed, active, enabled
-	"muster.beyond.audit_rules_loaded":       check.FAIL, // No rules; rules.d has control lines only
-	"muster.beyond.audit_immutable":          check.FAIL, // enabled 1, no -e 2
-	"muster.beyond.audit_disk_actions":       check.FAIL, // upstream suspend ×3
-	"muster.beyond.audit_log_permissions":    check.PASS, // 0600 root in 0700 root
-	"muster.beyond.remote_log_forwarding":    check.FAIL, // nothing leaves the host
-	"muster.beyond.sudo_logging":             check.PASS, // sudo's default syslog
-	"muster.beyond.file_integrity_tool":      check.FAIL, // no AIDE on a stock install
-	"muster.beyond.package_files_unmodified": check.PASS, // --deep, only a conffile differs
+	"muster.beyond.auditd_active":              check.PASS, // installed, active, enabled
+	"muster.beyond.audit_rules_loaded":         check.FAIL, // No rules; rules.d has control lines only
+	"muster.beyond.audit_immutable":            check.FAIL, // enabled 1, no -e 2
+	"muster.beyond.audit_disk_actions":         check.FAIL, // upstream suspend ×3
+	"muster.beyond.audit_log_permissions":      check.PASS, // 0600 root in 0700 root
+	"muster.beyond.remote_log_forwarding":      check.FAIL, // nothing leaves the host
+	"muster.beyond.sudo_logging":               check.PASS, // sudo's default syslog
+	"muster.beyond.file_integrity_tool":        check.FAIL, // no AIDE on a stock install
+	"muster.beyond.package_files_unmodified":   check.PASS, // --deep, only a conffile differs
+	"muster.beyond.account_inactivity_lock":    check.FAIL, // 3C-2a: INACTIVE=-1, root unset
+	"muster.beyond.sudo_nopasswd_all":          check.PASS, // 3C-2a: root and %wheel, both with a password
+	"muster.beyond.file_capabilities_declared": check.PASS, // 3C-2a: the four files FILECAPS declares
+	"muster.beyond.root_unit_exec_writable":    check.PASS, // 3C-2a: nothing a non-root user can write
+	"muster.beyond.ld_so_preload_empty":        check.PASS, // 3C-2a: no /etc/ld.so.preload
+	"muster.beyond.container_runtime_access":   check.PASS, // 3C-2a: no runtime socket
+	"muster.beyond.root_authorized_keys":       check.PASS, // 3C-2a: prohibit-password lets keys through, root has none
+	"muster.beyond.ssh_key_quality":            check.PASS, // 3C-2a: no key at all
 }
 
 // B-11 and I-10: one synthetic snapshot per stock host pins its verdicts
@@ -93,7 +112,7 @@ var stockEL9 = map[string]check.Status{
 //
 // SCOPE: the Ubuntu snapshot carries the facts of the collectors the beyond
 // controls read and env.container, and nothing else; the EL9 snapshot
-// carries only the 3C-1 facts. The whole embedded set is evaluated against
+// carries the 3C-1 and the 3C-2a facts only. The whole embedded set is evaluated against
 // each — Evaluate takes the whole set, and running only the tabled controls
 // would not prove that the beyond scope is reached at all — but the other
 // controls' results are ERROR(missing_fact) for the keys a snapshot omits
@@ -130,8 +149,8 @@ func TestStockHostsPinTheBeyondVerdicts(t *testing.T) {
 			t.Errorf("%s is beyond the guide and the stock Ubuntu table does not say what this host reads for it", id)
 		}
 	}
-	if len(stockEL9) != 9 {
-		t.Errorf("the stock EL9 table names %d controls, want the nine of 3C-1", len(stockEL9))
+	if len(stockEL9) != 17 {
+		t.Errorf("the stock EL9 table names %d controls, want the nine of 3C-1 and the eight of 3C-2a", len(stockEL9))
 	}
 
 	for _, host := range []struct {
