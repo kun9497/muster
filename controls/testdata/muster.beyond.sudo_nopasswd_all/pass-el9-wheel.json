@@ -41,7 +41,7 @@
           {
             "file": "/etc/sudoers",
             "line": 107,
-            "principal": "wheel",
+            "principal": "%wheel",
             "kind": "group",
             "negated": false,
             "runas": "(ALL)",

@@ -38,11 +38,11 @@
           },
           {
             "path": "/usr/bin/mtr-packet",
-            "caps": "cap_net_raw,cap_dac_override=ep",
+            "caps": "cap_net_raw=ep",
             "rootid": 0,
             "package": "mtr-tiny",
             "package_declared": false,
-            "declared_caps": "cap_net_raw+ep",
+            "declared_caps": "",
             "reference": "postinst",
             "reason": ""
           }

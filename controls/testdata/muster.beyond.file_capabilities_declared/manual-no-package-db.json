@@ -25,10 +25,7 @@
       },
       "capabilities": {
         "status": "absent",
-        "reason": "no package database",
-        "source": {
-          "kind": "derived"
-        }
+        "reason": "no package database"
       },
       "acl_grants": {
         "status": "ok",

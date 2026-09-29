@@ -18,8 +18,7 @@
         "status": "ok",
         "value": false,
         "source": {
-          "kind": "file",
-          "path": "/etc/sudoers"
+          "kind": "derived"
         }
       },
       "rules": {

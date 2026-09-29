@@ -41,7 +41,7 @@
           {
             "file": "/etc/sudoers",
             "line": 50,
-            "principal": "admin",
+            "principal": "%admin",
             "kind": "group",
             "negated": false,
             "runas": "(ALL)",
@@ -54,7 +54,7 @@
           {
             "file": "/etc/sudoers",
             "line": 53,
-            "principal": "sudo",
+            "principal": "%sudo",
             "kind": "group",
             "negated": false,
             "runas": "(ALL:ALL)",
@@ -88,6 +88,10 @@
             {
               "kind": "file",
               "path": "/etc/sudoers.d/README"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/sudoers.d/ops"
             }
           ]
         }
@@ -105,6 +109,10 @@
             {
               "kind": "file",
               "path": "/etc/sudoers.d/README"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/sudoers.d/ops"
             }
           ]
         }
@@ -122,6 +130,10 @@
             {
               "kind": "file",
               "path": "/etc/sudoers.d/README"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/sudoers.d/ops"
             }
           ]
         }
@@ -139,6 +151,10 @@
             {
               "kind": "file",
               "path": "/etc/sudoers.d/README"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/sudoers.d/ops"
             }
           ]
         }
