@@ -4830,6 +4830,46 @@
       "Collector": "units",
       "DefaultOn": "",
       "SubjectKind": ""
+    },
+    {
+      "Key": "ssh.authorized_keys",
+      "Type": "list\u003crecord\u003e",
+      "Description": "The authorized_keys and authorized_keys2 files (the two AuthorizedKeysFile defaults of sshd_config(5)) under the .ssh directory of every /etc/passwd account with a home path, one row per account and file sorted by user and path with user, uid, path, exists, mode, owner_uid (both -1 when no file was read), keys (line, type, bits, fingerprint, options, restricted; the key body is never stored; capped at 200 per file), unparsed (lines that are neither a comment, blank nor a key sshd would read), unfollowed, read_status (ok, denied or error; empty on an unfollowed row) and reason. A home outside the collector's declaration is one row with path empty and unfollowed true; a file that cannot be read, or is a symlink muster does not follow, is a row with the read's status. Capped at 500 rows; evidence.",
+      "Since": 1,
+      "Sensitivity": "internal",
+      "Collector": "sshkeys",
+      "DefaultOn": "",
+      "SubjectKind": "user"
+    },
+    {
+      "Key": "ssh.root_key_count",
+      "Type": "int",
+      "Description": "How many keys the authorized_keys files of the uid-0 accounts hold, both defaults counted (on EL, where sshd reads only authorized_keys, a key in authorized_keys2 is a stale one for review). The read's status, naming the path, when one of the files exists and cannot be read; absent, naming the account and home, when an interactive account's home is outside the collector's declaration.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sshkeys",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "ssh.dsa_key_count",
+      "Type": "int",
+      "Description": "How many ssh-dss keys (not DSA certificates) the authorized_keys files read hold, across every account. Degraded as ssh.root_key_count is.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sshkeys",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "ssh.rsa_keys",
+      "Type": "list\u003crecord\u003e",
+      "Description": "Every RSA key whose modulus was read (the ssh-rsa type, or a signature-only rsa-sha2-* word over an ssh-rsa blob, which sshd reads as the same key), sorted by user, path and line, with user, path, line, bits (the modulus bit length ssh-keygen -l prints) and fingerprint (SHA256:, unpadded base64). Capped at 2000 rows; degraded as ssh.root_key_count is.",
+      "Since": 1,
+      "Sensitivity": "internal",
+      "Collector": "sshkeys",
+      "DefaultOn": "",
+      "SubjectKind": "key"
     }
   ]
 }

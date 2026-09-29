@@ -1441,3 +1441,14 @@ func FuzzParseSudoers(f *testing.F) {
 		}, len(data))
 	})
 }
+
+func FuzzParseAuthorizedKeys(f *testing.F) {
+	seeds(f, "testdata/authorized_keys.*")
+	f.Add([]byte(`command="echo \"a,b\"",restrict ssh-ed25519 ` + zeroEd25519 + "\n,,x\n\"\n"))
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "parseAuthorizedKeys", func() any {
+			keys, unparsed := parseAuthorizedKeys(data)
+			return []any{keys, unparsed}
+		}, len(data))
+	})
+}

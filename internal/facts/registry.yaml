@@ -3043,3 +3043,29 @@ keys:
     since: 1
     sensitivity: public
     collector: units
+  - key: ssh.authorized_keys
+    type: list<record>
+    description: "The authorized_keys and authorized_keys2 files (the two AuthorizedKeysFile defaults of sshd_config(5)) under the .ssh directory of every /etc/passwd account with a home path, one row per account and file sorted by user and path with user, uid, path, exists, mode, owner_uid (both -1 when no file was read), keys (line, type, bits, fingerprint, options, restricted; the key body is never stored; capped at 200 per file), unparsed (lines that are neither a comment, blank nor a key sshd would read), unfollowed, read_status (ok, denied or error; empty on an unfollowed row) and reason. A home outside the collector's declaration is one row with path empty and unfollowed true; a file that cannot be read, or is a symlink muster does not follow, is a row with the read's status. Capped at 500 rows; evidence."
+    since: 1
+    sensitivity: internal
+    collector: sshkeys
+    subject_kind: user
+  - key: ssh.root_key_count
+    type: int
+    description: "How many keys the authorized_keys files of the uid-0 accounts hold, both defaults counted (on EL, where sshd reads only authorized_keys, a key in authorized_keys2 is a stale one for review). The read's status, naming the path, when one of the files exists and cannot be read; absent, naming the account and home, when an interactive account's home is outside the collector's declaration."
+    since: 1
+    sensitivity: public
+    collector: sshkeys
+  - key: ssh.dsa_key_count
+    type: int
+    description: "How many ssh-dss keys (not DSA certificates) the authorized_keys files read hold, across every account. Degraded as ssh.root_key_count is."
+    since: 1
+    sensitivity: public
+    collector: sshkeys
+  - key: ssh.rsa_keys
+    type: list<record>
+    description: "Every RSA key whose modulus was read (the ssh-rsa type, or a signature-only rsa-sha2-* word over an ssh-rsa blob, which sshd reads as the same key), sorted by user, path and line, with user, path, line, bits (the modulus bit length ssh-keygen -l prints) and fingerprint (SHA256:, unpadded base64). Capped at 2000 rows; degraded as ssh.root_key_count is."
+    since: 1
+    sensitivity: internal
+    collector: sshkeys
+    subject_kind: key

@@ -51,6 +51,7 @@ type fsAccess struct {
 	fails       map[string]error             // host path -> error returned instead of content
 	truncated   map[string]bool              // host path -> ReadFile reports the read hit the cap (R70)
 	modes       map[string]uint32            // host path -> raw 0o7777 bits (fallback consulted when stats has no entry)
+	owners      map[string]uint32            // host path -> the uid ReadFile's meta reports (0 when unset), as the host primitive's fstat does
 	stats       map[string]statResult        // host path -> full Stat() shape (R93; Task 5 relies on this)
 	xattrs      map[string][]string          // host path -> extended attribute names
 	xattrValues map[string]map[string][]byte // host path -> attribute name -> value, served by Getxattr
@@ -159,7 +160,7 @@ func (a *fsAccess) readFile(p string, limit int64, keepBinary bool) ([]byte, col
 			return b, collect.ReadMeta{Tier: "openat2", Size: int64(len(b)), Mode: a.mode(p, 0o644), Truncated: a.truncated[p]}, err
 		}
 	}
-	meta := collect.ReadMeta{Tier: "openat2", Size: int64(len(b)), Mode: a.mode(p, 0o644), Truncated: a.truncated[p]}
+	meta := collect.ReadMeta{Tier: "openat2", Size: int64(len(b)), Mode: a.mode(p, 0o644), UID: a.owners[p], Truncated: a.truncated[p]}
 	if limit > 0 && int64(len(b)) > limit {
 		b = b[:limit]
 		meta.Truncated = true

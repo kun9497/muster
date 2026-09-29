@@ -111,7 +111,7 @@
 
 ## Fact keys used by controls
 
-210 of 466 registered keys are read by a control (4 by the engine); 252 unused.
+210 of 470 registered keys are read by a control (4 by the engine); 256 unused.
 
 | Collector | Registered | Used by a control | Read by the engine | Unused |
 |---|---|---|---|---|
@@ -145,3 +145,4 @@
 | audit | 34 | 14 | 0 | audit.rules.loaded_count, audit.rules.persisted_count, audit.rules.persisted, audit.status.enabled, audit.status.failure, audit.status.lost, audit.status.backlog_limit, audit.conf.log_file, audit.conf.log_group, audit.log_file.gid, audit.log_file.group_readable, audit.log_file.group_writable, audit.log_file.other_readable, audit.log_file.other_writable, audit.log_file.acl_present, audit.log_dir.mode, audit.log_dir.gid, audit.log_dir.group, audit.log_dir.group_readable, audit.log_dir.acl_present |
 | fim | 9 | 3 | 0 | fim.aide.installed, fim.aide.config_path, fim.aide.database_path, fim.aide.database_modified, fim.aide.schedules, fim.other_tools |
 | units | 3 | 0 | 0 | units.root_services, units.exec_writable, units.exec_unresolved |
+| sshkeys | 4 | 0 | 0 | ssh.authorized_keys, ssh.root_key_count, ssh.dsa_key_count, ssh.rsa_keys |
