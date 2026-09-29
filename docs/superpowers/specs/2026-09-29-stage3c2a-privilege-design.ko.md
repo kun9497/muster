@@ -250,10 +250,16 @@ root)와 `Exec*=` 지시자(`ExecStart`, `ExecStartPre`, `ExecStartPost`, `ExecC
 지시자의 첫 토큰이 실행파일: 접두 문자 `@ - : + ! !! |`를 벗기고("Command lines"; `!!`는 systemd 258이
 무시하고 `|`는 거기서 새로 생김), 인용을 제거; 절대 경로가
 아닌 토큰(systemd 239부터 허용)이나 `%` 지정자(`%i`, `%I`, 템플릿)를 가진 토큰은 `resolved: false`이고
-판정하지 않음. 합친 `User=`가 `root`/`0`이 아닌 서비스는 범위 밖: 그 실행파일은 root의 힘 없이 돕니다.
+판정하지 않음. 수집기가 stat할 수 있는 실행파일은 고정 선언 집합 — `/usr/bin/*`, `/usr/sbin/*`, `/bin/*`,
+`/sbin/*`, `/usr/local/bin/*`, `/usr/local/sbin/*`, `/usr/lib/*`, `/usr/lib/*/*`, `/usr/lib/*/*/*`,
+`/usr/libexec/*`, `/usr/libexec/*/*`, `/lib/*`, `/lib/*/*`, `/opt/*/*`, `/opt/*/bin/*`, `/snap/bin/*`,
+`/etc/init.d/*` — 이고, 그 밖의 경로는 C4: exec 행은 `stat_status: undeclared`이고 `units.exec_writable`은
+경로를 적은 `absent`(MANUAL). 합친 `User=`가 `root`/`0`이 아닌 서비스는 범위 밖: 그 실행파일은 root의 힘
+없이 돕니다.
 
-- `units.root_services` — `list<record>` `{unit, enabled, active, user, unit_file, files, exec}`:
-  `unit_file` ∈ file | symlink | missing; `files`는 읽은 유닛 파일과 각 drop-in `{path, mode, uid, gid}`;
+- `units.root_services` — `list<record>` `{unit, enabled, active, user, unit_file, files, exec, read_status,
+  reason}`(`read_status`는 `ok` | `denied` | `error`, `reason`은 유닛 파일이나 drop-in을 읽지 못한 경우가
+  아니면 `""`): `unit_file` ∈ file | symlink | missing; `files`는 읽은 유닛 파일과 각 drop-in `{path, mode, uid, gid}`;
   `exec`는 `Exec*` 첫 토큰마다 한 행 `{directive, path, exists, kind, mode, uid, gid, group_writable,
   other_writable, resolved}`, 경로의 `Stat`에서(모든 행에 모든 필드 — 없는 파일은 `exists: false`에 `mode
   -1`, `uid -1`, `gid -1`, 두 writable 플래그 false; 경로의 심볼릭 링크는 `kind: symlink`, 따라가지 않고
@@ -281,8 +287,11 @@ with systemd"라 답함) 세 leaf는 `unsupported`(`fim` 타이머 목록의 모
 카운트를 그 경로를 적은 `absent`로 만듭니다** — 구멍 난 인벤토리는 인벤토리가 아니므로, `/srv` 아래에
 홈을 둔 사용자가 있는 호스트는 두 키 컨트롤을 홈을 적은 MANUAL로 읽습니다.
 
-- `ssh.authorized_keys` — `list<record>` `{user, uid, path, exists, mode, owner_uid, keys, unparsed}`,
-  `sensitivity: internal`: 존재하는 파일마다 한 행(그리고 파일 없는 사용자마다 `exists: false` 행 하나 —
+- `ssh.authorized_keys` — `list<record>` `{user, uid, path, exists, mode, owner_uid, keys, unparsed,
+  unfollowed, read_status, reason}`, `sensitivity: internal`: 존재하는 파일마다 한 행(그리고 파일 없는
+  사용자마다 `exists: false` 행 하나 — 홈이 선언 밖인 사용자는 `unfollowed: true`와 이유를 가진 행, 읽지
+  못한 파일은 `read_status: denied`/`error`와 이유를 가진 행; 모든 행이 모든 필드를 싣고 해당 없으면
+  `""`/`false` —
   "키 없음"이 침묵이 아니라 읽기가 되게); `keys`는 `{line, type, bits, fingerprint, options, restricted}`
   목록. 디코드(`sshd(8)` AUTHORIZED_KEYS FILE FORMAT, RFC 4253 §6.6): 옵션 필드는 첫 단어가 키 유형이
   아닐 때만 존재하고 그 인용값은 `,`와 `\"`를 품을 수 있음; 키 blob은 base64이고 안쪽 유형 문자열이 유형
@@ -410,9 +419,11 @@ OpenSSH는 7.0에서 DSA를 실행 시 기본 비활성화하고, 9.8에서 기�
   0700이라 행과 세 카운트가 `denied`; `ssh_key_quality`는 그것을 적은 ERROR, `root_authorized_keys`는
   게이트를 읽을 수 있는 곳(Ubuntu의 `sshd_config`는 0644)에서 ERROR, 없는 곳(EL9)에서 NOT_APPLICABLE.
   `privilege.*`는 podman 소켓 디렉터리가 없는 곳에서 전부 답함. capability matrix의 `nonroot.denied` 행에
-  키 아홉 — `accounts.login_capable`, `sudo.rules`, `sudo.nopasswd_all`, `sudo.authenticate_disabled`,
-  `sudo.rules_unresolved`, `ssh.authorized_keys`, `ssh.root_key_count`, `ssh.dsa_key_count`, `ssh.rsa_keys`
-  — 가 더해지고; 비root CI 잡이 행을 증명.
+  키 여덟 — `accounts.login_capable`, `sudo.rules`, `sudo.nopasswd_all`, `sudo.authenticate_disabled`,
+  `sudo.rules_unresolved`, `ssh.root_key_count`, `ssh.dsa_key_count`, `ssh.rsa_keys` — 가 더해지고;
+  `ssh.authorized_keys` 자체는 읽지 못한 행에 `read_status: denied`를 둔 채 `ok`로 남음(`_notes` 항목이
+  그렇게 말함); `/run/podman`(0700)이 있는 호스트의 비root 실행은 `privilege.runtime_sockets`를
+  `denied`로 읽음(사실이며 matrix 행은 아님); 비root CI 잡이 행을 증명.
 - **컨테이너.** 모든 beyond 컨트롤은 게이트로 NOT_APPLICABLE. 수집기는 그래도 완료해 `run.complete`가
   참이어야 함: `units`는 일반 이미지에서 `unsupported`(`systemctl` 없음; R220이 답한 것으로 셈), init
   이미지에서 `ok`(거기선 systemd가 PID 1), `privilege`는 소켓을 못 찾음(`exists: false` 행), 파일 리더는
