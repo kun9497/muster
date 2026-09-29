@@ -140,7 +140,9 @@ uid(`#1000`), `%#`는 gid, `#include` / `#includedir`는 지시자, 그 밖의 `
   `sudoedit`는 명령 단어.
 - alias는 체인의 모든 파일을 읽은 뒤 치환으로 깊이 8까지 풉니다(sudo는 파싱 뒤에 풀므로 사용 뒤의
   정의도 셈); 순환, 미정의 alias, netgroup, 비Unix 그룹은 행을 `resolved: false`로 두고, 예산 —
-  해석 한 번에 alias 멤버 65536과 행 65536 — 을 넘는 것도 그러하므로 조작된 파일은 부분 답이 아니라
+  해석 한 번에 alias 멤버 65536과 행들에 걸친 명령 65536(행은 명령 수만큼 비용을 내므로, 합해서 그보다
+  많은 명령을 지닌 정상 sudoers는 MANUAL로 읽힘 — V-65) — 을 넘는 것도 그러하므로 조작된 파일은 부분 답이
+  아니라
   `absent`로 읽힙니다. 명령 앞의 `sha224:`…`sha512:` digest는 명령과 한 단어로 남습니다(그 `=` 패딩이
   줄을 가르지 않음).
 - `Defaults` 줄: 범위 없음, `Defaults:User_List`, `Defaults>Runas_List`, `Defaults@Host_List`,
@@ -185,9 +187,10 @@ capability는 힘이 없습니다(`capabilities(7)`). 비용은 가족별입니�
 계획의 첫 과제가 둘 다 — lab(Ubuntu 22.04)과 EL9 이미지 — 재고 walk 예산 대비 늘어난 시간을 기록합니다.
 
 **오류.** 열기의 `EACCES` / `EPERM` → 경로를 `walk.skipped`에 `xattr_denied` 이유로; `ENOENT`, `ELOOP`,
-`ENXIO`, 또는 `fstat` 뒤 정체 불일치 → `vanished`(errno를 `detail`에); 읽기의 `EOPNOTSUPP` / `ENODATA` →
+`ENXIO`, `ENOTDIR`, 또는 `fstat` 뒤 정체 불일치 → `vanished`(errno를 `detail`에); 열기의 그 밖의 errno →
+`xattr_error`(errno를 `detail`에, V-68); 읽기의 `EOPNOTSUPP` / `ENODATA` →
 속성 없음, 행 없음; `ERANGE` → `Getxattr`처럼 한 번 재조정. muster가 디코드하지 않는 버전의 capability
-xattr → `walk.skipped` 이유 `xattr_undecoded`. `walk.skipped`의 닫힌 어휘에 그 둘이 더해지고 설명은
+xattr → `walk.skipped` 이유 `xattr_undecoded`. `walk.skipped`의 닫힌 어휘에 그 셋이 더해지고 설명은
 "walk가 들어가지 않은 모든 루트와 속성을 읽을 수 없었던 모든 실행파일"이 되며;
 `walk.stats.truncated_counts`에 새 목록 둘의 키가 더해집니다. walk는 xattr 때문에 멈추지 않습니다.
 
@@ -452,10 +455,11 @@ OpenSSH는 7.0에서 DSA를 실행 시 기본 비활성화하고, 9.8에서 기�
   키 여덟 — `accounts.login_capable`, `sudo.rules`, `sudo.nopasswd_all`, `sudo.authenticate_disabled`,
   `sudo.rules_unresolved`, `ssh.root_key_count`, `ssh.dsa_key_count`, `ssh.rsa_keys` — 가 더해지고;
   `ssh.authorized_keys` 자체는 읽지 못한 행에 `read_status: denied`를 둔 채 `ok`로 남음(`_notes` 항목이
-  그렇게 말함); `privilege.ld_so_preload`는 답하고; `privilege.runtime_sockets`와
-  `privilege.runtime_group_members`는 비root 실행이 살필 수 없는 런타임 소켓이 있는 어느 호스트에서든 —
-  랩에서 측정된 `/run/docker.sock`(root:docker 0660), `/run/podman`(0700) — `denied`로 읽고, 하나도 없는
-  곳에서만 온전히 답함(사실이며 matrix 행은 아님); 비root CI 잡이 행을 증명.
+  그렇게 말함); `privilege.*`는 온전히 답함: 소켓의 xattr은 보통 open이 거부될 때마다(소켓이면 ENXIO, 호출자가
+  읽을 수 없는 것이면 EACCES — V-66) 호출자 자신의 `O_PATH` fd를 통해 읽으므로 0660
+  `/run/docker.sock`은 그룹 밖 호출자에게도 답하고; `/run/podman`(0700)이 있는 호스트만 거기서
+  `privilege.runtime_sockets`를 `denied`로 읽음 — 부모의 검색 권한, 사실이며 matrix 행은 아님; 비root CI
+  잡이 행을 증명.
 - **컨테이너.** 모든 beyond 컨트롤은 게이트로 NOT_APPLICABLE. 수집기는 그래도 완료해 `run.complete`가
   참이어야 함: `units`는 일반 이미지에서 `unsupported`(`systemctl` 없음; R220이 답한 것으로 셈), init
   이미지에서 `ok`(거기선 systemd가 PID 1), `privilege`는 소켓을 못 찾음(`exists: false` 행), 파일 리더는
@@ -566,6 +570,8 @@ README/README.ko 상태와 로드맵; CHANGELOG Controls(여덟, 세트 버전, 
 - 다른 경로로 설정된 `AuthorizedKeysFile`(과 `authorized_keys2`를 셀지 결정하기 위해 유효값을 읽는 것);
   `AuthorizedKeysCommand`; `from=` / `restrict` 없는 일반 사용자의 키; 인증 기관(`TrustedUserCAKeys`);
   인증서 키 디코드.
+- 선언된 실행파일 집합의 `/opt/<vendor>/<product>/<bin>` 배치(`/opt/*/*/*`) — 오늘 그런 대상은
+  `link_undeclared`이고 컨트롤은 그것을 적은 MANUAL로 읽음.
 - alias 이름 아래 놓인 drop-in(`ssh.service`에 대한 `sshd.service.d`); `User=` 없는 `DynamicUser=`(root로
   읽음 — 최악이 false FAIL); split-`/usr` 호스트(`/lib/systemd/system`은 검색 경로에 없음; 지원 릴리스에
   split-`/usr`는 없음); xattr 패스를 포함한 RPM 가족의 walk 비용(거기선 모든 `.so`가 0755 — EL VM이 생길
