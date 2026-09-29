@@ -553,6 +553,31 @@ func FuzzParseShadow(f *testing.F) {
 	})
 }
 
+// Both record layouts run over every input: the size is the host's in the
+// collector, and a fuzzer on amd64 must still reach the 296 decoder.
+func FuzzParseLastlog(f *testing.F) {
+	seeds(f, "testdata/lastlog*")
+	f.Fuzz(func(t *testing.T, data []byte) {
+		uids := map[int]string{0: "root", 1: "daemon", 1000: "alice"}
+		fuzzBody(t, "parseLastlog", func() any {
+			return []any{parseLastlog(data, 292, uids), parseLastlog(data, 296, uids)}
+		}, len(data))
+	})
+}
+
+func FuzzParseUseraddDefaults(f *testing.F) {
+	seeds(f, "testdata/useradd.default.*")
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "parseUseraddDefaults", func() any {
+			inactive, reason := parseUseraddDefaults(data)
+			if inactive < -1 {
+				t.Fatalf("inactive %d is below -1", inactive)
+			}
+			return []any{inactive, reason}
+		}, len(data))
+	})
+}
+
 func FuzzParseSubIDs(f *testing.F) {
 	seeds(f, "testdata/subuid*", "testdata/subgid*")
 	f.Fuzz(func(t *testing.T, data []byte) {

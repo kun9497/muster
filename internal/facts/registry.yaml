@@ -1291,6 +1291,26 @@ keys:
     since: 1
     sensitivity: public
     collector: accounts
+  - key: accounts.login_capable
+    type: list<record>
+    description: "The accounts the inactivity policy has to cover - every account with an interactive shell (listed in /etc/shells and not nologin or false) that is not a system account (0 < uid < UID_MIN), so root is included and so are password-locked accounts, which may still log in with a key - as name, uid, inactive and expire (shadow fields 7 and 8, -1 when empty), inactive_unset (inactive is -1) and locked, sorted by name. With no /etc/shadow every row is inactive_unset; carries the read's status when /etc/shadow exists and cannot be read, when /etc/shells cannot be read, or when /etc/passwd cannot be read."
+    since: 1
+    sensitivity: internal
+    collector: accounts
+    subject_kind: user
+  - key: accounts.useradd.inactive
+    type: int
+    description: "INACTIVE from /etc/default/useradd - the days after a password expires before useradd's new accounts are disabled - read as useradd does (a line starting at column one, strtol base 0, the last line wins); -1 when the line is absent, commented, empty, not a number or below -1, or the file does not exist, with the reason saying which; carries the read's status when the file exists and cannot be read."
+    since: 1
+    sensitivity: public
+    collector: accounts
+  - key: accounts.lastlog
+    type: list<record>
+    description: "Evidence only: the /var/log/lastlog record of each /etc/passwd uid - name, uid, last_login (RFC 3339 UTC, empty when the account never logged in), line and host - decoded with the running architecture's record size (292 or 296 bytes, named in the reason), sorted by name, truncated at 2000 rows or when the 32 MiB read limit cut off a uid's record; absent where shadow 4.15 replaced lastlog with lastlog2."
+    since: 1
+    sensitivity: internal
+    collector: accounts
+    subject_kind: user
   - key: pam.stacks
     type: list<record>
     description: The expanded PAM stacks of login, sshd, su, sudo, passwd and other (those whose /etc/pam.d file exists) - service, type, control, module, args, path, line - with @include, include and substack spliced where they stand and authselect's symlinks resolved by name into /etc/authselect, never by following the link. Backslash line continuation and a pam.conf-only host are not handled.
