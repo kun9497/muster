@@ -95,9 +95,10 @@ capability 참조 목록 — 호스트 자신의 패키지 메타데이터가 �
   `noshadow`)에선 필드가 존재할 수 없음: 그런 행은 전부 `inactive_unset: true`이고, 호스트는 U-04에서처럼
   여기서도 FAIL. `name` 정렬. `/etc/shadow`가 있는데 못 읽었으면 읽기 상태(C3): 비root 읽기는 `denied`.
 - `accounts.useradd.inactive` — `int`: `/etc/default/useradd`(`useradd -D`의 파일)의 `INACTIVE` 값, 새
-  계정에서 암호 만료 뒤 계정이 비활성화되기까지의 일수; 줄이 없거나, 주석이거나, 비었거나(`INACTIVE=`),
-  숫자가 아니면 -1(이유가 어느 쪽인지 적음 — `useradd(8)`과 shadow의 `get_defaults`는 넷 다 "never"로 봄);
-  공백이나 인용부호로 둘러싸인 값은 `useradd -D -f`가 쓰는 대로 읽음. 파일이 있는데 못 읽으면 읽기
+  계정에서 암호 만료 뒤 계정이 비활성화되기까지의 일수; 줄이 없거나, 주석이거나, 비었거나(`INACTIVE=`), 숫자가
+  아니거나, -1 아래면 -1(이유가 어느 쪽인지 적음 — `useradd(8)`과 shadow의 `get_defaults`는 모두 "never"로
+  봄); 값은 C `strtol`의 base 0처럼 읽고(`030`은 24), 줄은 첫 칸에서 시작해야 하며(`get_defaults`는
+  접두를 비교), 뒤의 `INACTIVE=` 줄이 앞의 것을 덮어씀. 파일이 있는데 못 읽으면 읽기
   상태(C3): Debian/Ubuntu는 0644, EL은 0600(`shadow-utils` `%attr`)이라 비root 읽기는 릴리스에 따르고
   capability matrix는 행 대신 `_notes` 항목을 둡니다. EL은 `INACTIVE=-1`을 써서 배포하고 Ubuntu는 줄을
   주석으로 배포; 둘 다 -1.
@@ -105,8 +106,9 @@ capability 참조 목록 — 호스트 자신의 패키지 메타데이터가 �
   internal`: `/var/log/lastlog`을 `ReadFileBinary`로 32 MiB 상한까지 읽어 uid로 색인된 고정 레코드로
   디코드 — glibc의 `struct lastlog`은 `ll_time`, `char ll_line[32]`, `char ll_host[256]`이고 `ll_time`은
   32비트 time ABI와 x86_64(`__WORDSIZE_TIME64_COMPAT32`)에서 `int32_t`, 그 밖에선 `__time_t`이므로 레코드는
-  amd64/386/arm에서 292바이트, arm64·ppc64le·s390x·riscv64에서 296바이트; 크기는 `runtime.GOARCH`에서
-  오고 `parseLastlog(data, recordSize)`에 넘기며 leaf의 이유에 기록. `accounts.users`의 uid만 디코드;
+  amd64·386·arm·ppc64le·riscv64·mips64(`__WORDSIZE_TIME64_COMPAT32`가 켜진 곳)에서 292바이트,
+  arm64·s390x·loong64에서 296바이트; glibc 2.40이 32비트 필드를 부호 없는 것으로 바꿨으므로 `uint32`로
+  읽음; 크기는 `runtime.GOARCH`에서 오고 `parseLastlog(data, recordSize)`에 넘기며 leaf의 이유에 기록. `accounts.users`의 uid만 디코드;
   `last_login`은 RFC 3339 UTC, 레코드가 0이면 `""`("로그인한 적 없음"). 읽기 상한 너머의 uid는 디코드하지
   않고 leaf는 `truncated: true`. 상한 2000행, `name` 정렬. 파일은 0664 `root:utmp`라 비root 실행도
   읽음. shadow < 4.15인 곳 — Ubuntu 22.04와 24.04, EL9, Debian 12 — 에 있고; Debian 13 / Ubuntu 24.10부터는
@@ -188,13 +190,16 @@ inheritable 두 쌍, 하위·상위 워드), 버전 3(버전 2 + capability가 �
 effective 플래그는 `magic_etc`에. muster가 아는 이름표 너머의 capability 인덱스는 `cap_N`으로 표기. 행의
 `caps`는 (permitted, inheritable, effective) 삼중에서 렌더한 **`cap_to_text(3)` 정규 문자열** —
 `cap_net_raw=ep`, `cap_chown,cap_setuid=p` — 인데, 두 선언 출처와 `getcap`이 공유하는 형식이 그것이기
-때문; `rootid`는 기록되고(v1/v2는 0) `rootid`가 0이 아닌 v3 행도 다른 행처럼 판정됩니다: 오늘 초기 사용자
+때문; 렌더러는 이름 있는 비트 수를 41(5.9+ 커널의 `cap_max_bits`)로 고정해 문자열이 호스트에 의존하지
+않게 하고, 텍스트 파서는 libcap의 두 표기 — libcap ≥ 2.41의 `cap_net_raw=ep`와 옛 빌드의 `=
+cap_net_raw+ep`(2020년 전에 빌드된 rpm 헤더가 아직 싣는 것) — 를 모두 받음; `rootid`는 기록되고(v1/v2는 0) `rootid`가 0이 아닌 v3 행도 다른 행처럼 판정됩니다: 오늘 초기 사용자
 네임스페이스에선 힘이 없어도, 패키지가 선언하지 않은 capability인 것은 그대로.
 
 **선언.** setuid join의 세 출처가 여기선 둘이 됩니다. capability는 패키지가 세우는 곳에서 선언되기
 때문입니다:
-- rpm: `%{FILECAPS}` 태그 — walk의 선언된 rpm 질의에 그 열이 더해지고(`--qf "[…\t%{FILECAPS}\n]"`,
-  없으면 빈 값) `--list-actions`의 명령 행이 바뀌며 계획이 그렇게 말합니다. `reference: rpmdb`; 태그의
+- rpm: `%{FILECAPS}` 태그 — walk의 선언된 rpm 질의에 그 열이 더해지고(`--qf "[…\t%|FILECAPS?{%{FILECAPS}}|\n]"`
+  — 조건식은 헤더에 capability가 하나도 없는 패키지에 `(none)`이 아닌 빈 필드를 찍음) `--list-actions`의
+  명령 행이 바뀌며 계획이 그렇게 말합니다. `reference: rpmdb`; 태그의
   문자열이 같은 정규 `caps`로 렌더되면 `package_declared` true.
 - dpkg: `.deb`는 xattr을 실을 수 없고; 패키지의 `postinst`가 설치 시 `setcap`으로 세웁니다. join은 소유
   패키지의 `/var/lib/dpkg/info/<pkg>[:<arch>].postinst`(그 glob이 walk의 `Reads`에 더해짐)를 읽어 세 형식을
@@ -242,7 +247,8 @@ effective 플래그는 `magic_etc`에. muster가 아는 이름표 너머의 capa
 (`mergeDropins`는 단일값이라 `Exec*=` 목록을 합칠 수 없음): `[Service]`의 `User=`(마지막이 이김; `0`은
 root)와 `Exec*=` 지시자(`ExecStart`, `ExecStartPre`, `ExecStartPost`, `ExecCondition`, `ExecReload`,
 `ExecStop`, `ExecStopPost`), 뒤 파일의 빈 `ExecStart=`는 앞의 목록을 초기화(`systemd.service(5)`). 각
-지시자의 첫 토큰이 실행파일: 접두 문자 `@ - : + ! !!`를 벗기고("Command lines"), 인용을 제거; 절대 경로가
+지시자의 첫 토큰이 실행파일: 접두 문자 `@ - : + ! !! |`를 벗기고("Command lines"; `!!`는 systemd 258이
+무시하고 `|`는 거기서 새로 생김), 인용을 제거; 절대 경로가
 아닌 토큰(systemd 239부터 허용)이나 `%` 지정자(`%i`, `%I`, 템플릿)를 가진 토큰은 `resolved: false`이고
 판정하지 않음. 합친 `User=`가 `root`/`0`이 아닌 서비스는 범위 밖: 그 실행파일은 root의 힘 없이 돕니다.
 
@@ -307,8 +313,8 @@ muster가 못 읽은 파일(C3)은 그 행과 세 카운트에 읽기 상태를 
 설정하는 `/var/run/crio/crio.sock`은 거기로 풀리고, `/var/run`은 읽기 프리미티브가 모든 릴리스에서
 거절하는 심볼릭 링크이므로 물리 경로가 선언된 경로입니다. `Needs: none`.
 
-- `privilege.ld_so_preload` — `list<string>`: `/etc/ld.so.preload`의 주석·빈 줄 아닌 항목(`ld.so(8)`: 줄마다
-  라이브러리 하나, 공백 구분). 파일 없음은 `ok` 빈 목록 — 정상 상태; 있는데 못 읽으면 읽기 상태(C3).
+- `privilege.ld_so_preload` — `list<string>`: `/etc/ld.so.preload`의 주석·빈 줄 아닌 항목(glibc 로더: 항목은 공백·탭·개행·`:`로
+  구분되고 `#`는 줄 어디서든 주석을 시작함). 파일 없음은 `ok` 빈 목록 — 정상 상태; 있는데 못 읽으면 읽기 상태(C3).
 - `privilege.runtime_sockets` — `list<record>` `{path, exists, mode, uid, gid, group, group_writable,
   other_writable}`: API가 root인 네 런타임의 제어 소켓(소켓에 쓸 수 있는 클라이언트는 privileged
   컨테이너를 띄울 수 있음). 모든 행이 모든 필드를 실음: 없는 소켓(경로나 어느 부모의 `ENOENT`)은 `exists:
@@ -386,8 +392,9 @@ capability로든 컨테이너를 만들고; 거기 쓸 수 있는 그룹은 root
 `root_authorized_keys` — root 파일의 키는 `PermitRootLogin`이 키를 허용하는 곳 어디서든 암호 프롬프트
 없는 root 로그인(`prohibit-password`가 정확히 그것을 허용); root 로그인이 꺼져 있을 때, sshd가 없을 때,
 설정을 읽을 수 없을 때 NOT_APPLICABLE; `authorized_keys2`는 모든 릴리스에서 셈. `ssh_key_quality` —
-OpenSSH는 7.0에서 DSA를 기본 비활성화하고 9.8에서 제거했으므로 `ssh-dss` 줄은 잘해야 죽은 무게이고
-오래된 서버에선 다운그레이드 표적; 2048비트 아래 RSA 키는 OpenSSH 자체 `ssh-keygen(1)`이 2014년부터
+OpenSSH는 7.0에서 DSA를 실행 시 기본 비활성화하고, 9.8에서 기본 빌드에서 빼고, 10.0에서 제거했으므로(EL9의
+9.9p1은 아직 넣어 빌드함) `ssh-dss` 줄은 대부분의 서버에서 죽은 무게이고 아직 받는 서버에선 다운그레이드
+표적; 2048비트 아래 RSA 키는 OpenSSH 자체 `ssh-keygen(1)`이 2014년부터
 기본으로 만든 크기 아래; 인증서와 `sk-*` 키는 기록만 하고 판정하지 않음.
 
 ## 5. 환경 (P-8)
@@ -417,8 +424,9 @@ OpenSSH는 7.0에서 DSA를 기본 비활성화하고 9.8에서 제거했으므�
   24.10부터 없음. capability 선언: EL9는 rpm `%{FILECAPS}`, dpkg 가족은 `postinst` — 참조 목록 없음, 출처
   없는 릴리스 없음. `INACTIVE`: 셋 다 -1(EL은 쓰고 Ubuntu는 주석) — stock FAIL. sudoers: EL `%wheel
   ALL=(ALL) ALL`, Ubuntu `%sudo ALL=(ALL:ALL) ALL` — PASS; cloud-init의 `90-cloud-init-users`와 GitHub
-  러너의 `runner` — FAIL. OpenSSH: 22.04는 8.9, 24.04는 9.6, EL9는 8.7 — 모두 기본으로 DSA를 거부하므로
-  컨트롤이 표시하는 `ssh-dss` 줄은 서버가 이미 무시하는 것; `RequiredRSASize`는 9.1부터(24.04만), 기본
+  러너의 `runner` — FAIL. OpenSSH: 22.04는 8.9, 24.04는 9.6, EL9는 8.7이고 뒤 마이너에서 9.9로 리베이스 — 모두 실행 시
+  기본으로 DSA를 거부하므로(EL9 빌드에는 아직 들어 있음) 컨트롤이 표시하는 `ssh-dss` 줄은 관리자가
+  다시 켜지 않았다면 서버가 무시하는 것; `RequiredRSASize`는 9.1부터(24.04만), 기본
   1024; EL은 `AuthorizedKeysFile`을 첫 기본값 하나로 둠.
 - **Stock 스냅샷.** `controls/testdata/_hosts/ubuntu-22.04-stock.json`과 `el9-stock.json`에 새 키를
   채우고(EL9 스냅샷은 빠져 있던 walk와 sshd 모양을 얻어 표가 아홉 행에서 열일곱 행으로 자람);

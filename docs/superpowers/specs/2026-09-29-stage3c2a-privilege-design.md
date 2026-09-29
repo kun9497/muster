@@ -117,10 +117,10 @@ Three leaves are added.
   carries the read's status (C3): the non-root reading is `denied`.
 - `accounts.useradd.inactive` — `int`: the `INACTIVE` value of `/etc/default/useradd`
   (`useradd -D`'s file), the number of days after a password expires before the account is
-  disabled for new accounts; -1 when the line is absent, commented, empty (`INACTIVE=`) or
-  non-numeric (the reason says which — `useradd(8)` and shadow's `get_defaults` treat every one
-  as "never"); a value written with surrounding spaces or quotes is read as `useradd -D -f`
-  writes it. A file that exists and cannot be read is the read's status (C3): the file is 0644
+  disabled for new accounts; -1 when the line is absent, commented, empty (`INACTIVE=`), non-numeric or below -1 (the
+  reason says which — `useradd(8)` and shadow's `get_defaults` treat every one as "never"); the
+  value is read as C `strtol` with base 0 does (`030` is 24), the line must start at column one
+  (`get_defaults` matches the prefix), and a later `INACTIVE=` line overwrites an earlier one. A file that exists and cannot be read is the read's status (C3): the file is 0644
   on Debian/Ubuntu and 0600 on EL (`shadow-utils` `%attr`), so the non-root reading is
   release-dependent and the capability matrix carries a `_notes` entry instead of a row. EL
   ships `INACTIVE=-1` written out; Ubuntu ships the line commented; both read -1.
@@ -129,8 +129,9 @@ Three leaves are added.
   and decoded as fixed records indexed by uid — glibc's `struct lastlog` is `ll_time`,
   `char ll_line[32]`, `char ll_host[256]`, where `ll_time` is `int32_t` on the 32-bit-time
   ABIs and x86_64 (`__WORDSIZE_TIME64_COMPAT32`) and `__time_t` elsewhere, so the record is
-  292 bytes on amd64/386/arm and 296 on arm64, ppc64le, s390x and riscv64; the size comes from
-  `runtime.GOARCH`, is passed to `parseLastlog(data, recordSize)` and is recorded in the leaf's
+  292 bytes on amd64, 386, arm, ppc64le, riscv64 and mips64 (`__WORDSIZE_TIME64_COMPAT32` is set
+  there) and 296 on arm64, s390x and loong64; glibc 2.40 made the 32-bit field unsigned, so it is
+  read as `uint32`; the size comes from `runtime.GOARCH`, is passed to `parseLastlog(data, recordSize)` and is recorded in the leaf's
   reason. Only the uids of `accounts.users` are decoded; `last_login` is RFC 3339 UTC or `""`
   when the record is zero ("never logged in"). A uid whose record lies past the read limit is
   not decoded and the leaf is `truncated: true`. Capped at 2000 rows, sorted by `name`. The
@@ -232,14 +233,18 @@ u32 pair), version 2 (two pairs, permitted and inheritable, low and high words) 
 flag in `magic_etc`. Capability indexes above the name table muster knows are spelled `cap_N`.
 The row's `caps` is the **`cap_to_text(3)` canonical string** rendered from the (permitted,
 inheritable, effective) triple — `cap_net_raw=ep`, `cap_chown,cap_setuid=p` — because that is
-the one form both declaration sources and `getcap` share; `rootid` is recorded (0 for v1/v2)
+the one form both declaration sources and `getcap` share; the renderer fixes the named-bit count
+at 41 (`cap_max_bits` of a 5.9+ kernel) so the string does not depend on the host, and the
+text parser accepts both libcap spellings — the `cap_net_raw=ep` of libcap ≥ 2.41 and the
+`= cap_net_raw+ep` of older builds, which rpm headers built before 2020 still carry; `rootid` is recorded (0 for v1/v2)
 and a v3 row with a non-zero `rootid` is judged like any other: inert in the initial user
 namespace today, still a capability the package did not declare.
 
 **Declaration.** The setuid join's three sources become two here, because capabilities are
 declared where packages set them:
 - rpm: the `%{FILECAPS}` tag — the walk's declared rpm query gains that column
-  (`--qf "[…\t%{FILECAPS}\n]"`, empty when none), so the `--list-actions` command row changes
+  (`--qf "[…\t%|FILECAPS?{%{FILECAPS}}|\n]"` — the conditional prints an empty field, not
+  `(none)`, for a package whose header has no capability at all), so the `--list-actions` command row changes
   and the plan says so. `reference: rpmdb`; `package_declared` is true when the tag's string
   renders to the same canonical `caps`.
 - dpkg: a `.deb` cannot ship an xattr; the package's `postinst` sets it at install time with
@@ -297,8 +302,8 @@ merger of their own (`mergeDropins` is single-valued and cannot merge `Exec*=` l
 `[Service]` `User=` (last wins; `0` is root) and the `Exec*=` directives (`ExecStart`,
 `ExecStartPre`, `ExecStartPost`, `ExecCondition`, `ExecReload`, `ExecStop`, `ExecStopPost`),
 where an empty `ExecStart=` in a later file resets the list before it (`systemd.service(5)`).
-The first token of each directive is the executable: prefix characters `@ - : + ! !!` are
-stripped ("Command lines"), quotes removed; a token that is not an absolute path (allowed
+The first token of each directive is the executable: prefix characters `@ - : + ! !! |` are
+stripped ("Command lines"; `!!` is ignored by systemd 258 and `|` is new there), quotes removed; a token that is not an absolute path (allowed
 since systemd 239) or that carries a `%` specifier (`%i`, `%I` in a template) is `resolved:
 false` and not judged. A service whose merged `User=` is anything but `root`/`0` is out of
 scope: its executables run without root's power.
@@ -377,7 +382,8 @@ sockets `/run/docker.sock`, `/run/containerd/containerd.sock`, `/run/podman/podm
 the declared one. `Needs: none`.
 
 - `privilege.ld_so_preload` — `list<string>`: the non-comment, non-blank entries of
-  `/etc/ld.so.preload` (`ld.so(8)`: one library per line, whitespace-separated). A missing
+  `/etc/ld.so.preload` (glibc's loader: entries separated by space, tab, newline or `:`, and a
+  `#` starts a comment anywhere on a line). A missing
   file is an `ok` empty list — the normal state; a file that exists and cannot be read is the
   read's status (C3).
 - `privilege.runtime_sockets` — `list<record>` `{path, exists, mode, uid, gid, group,
@@ -472,8 +478,9 @@ GitHub runner reads FAIL. `root_authorized_keys` — a key in root's file is a r
 without a password prompt wherever `PermitRootLogin` allows keys (`prohibit-password` allows
 exactly that); NOT_APPLICABLE when root login is off, when sshd is absent, and when the
 setting could not be read; `authorized_keys2` is counted on every release. `ssh_key_quality` —
-OpenSSH disabled DSA by default in 7.0 and removed it in 9.8, so an `ssh-dss` line is dead
-weight at best and a downgrade target on an old server; an RSA key below 2048 bits is under
+OpenSSH disabled DSA at run time by default in 7.0, stopped building it by default in 9.8 and
+removed it in 10.0 (EL9's 9.9p1 is still built with it), so an `ssh-dss` line is dead weight on
+most servers and a downgrade target on one that still accepts it; an RSA key below 2048 bits is under
 the size OpenSSH's own `ssh-keygen(1)` has generated by default since 2014; certificate and
 `sk-*` keys are recorded and not judged.
 
@@ -509,8 +516,9 @@ the size OpenSSH's own `ssh-keygen(1)` has generated by default since 2014; cert
   `postinst` on the dpkg family — no reference list, no release without a source. `INACTIVE`:
   -1 on all three (EL writes it, Ubuntu comments it) — stock FAIL. sudoers: EL `%wheel ALL=(ALL)
   ALL`, Ubuntu `%sudo ALL=(ALL:ALL) ALL` — PASS; cloud-init's `90-cloud-init-users` and the
-  GitHub runner's `runner` — FAIL. OpenSSH: 22.04 ships 8.9, 24.04 9.6, EL9 8.7 — all refuse
-  DSA by default, so a `ssh-dss` line the control flags is one the server already ignores;
+  GitHub runner's `runner` — FAIL. OpenSSH: 22.04 ships 8.9, 24.04 9.6, EL9 8.7 rebased to 9.9 in later minors — all refuse
+  DSA at run time by default (EL9's build still contains it), so a `ssh-dss` line the control
+  flags is one the server ignores unless an administrator re-enabled it;
   `RequiredRSASize` exists from 9.1 (24.04 only), default 1024; EL sets `AuthorizedKeysFile` to
   the first default alone.
 - **Stock snapshots.** `controls/testdata/_hosts/ubuntu-22.04-stock.json` and
