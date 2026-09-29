@@ -1,0 +1,29 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none",
+        "source": {
+          "kind": "file",
+          "path": "/proc/1/cgroup"
+        }
+      }
+    },
+    "privilege": {
+      "ld_so_preload": {
+        "status": "ok",
+        "value": [
+          "/usr/local/lib/libhide.so"
+        ],
+        "source": {
+          "kind": "file",
+          "path": "/etc/ld.so.preload"
+        }
+      }
+    }
+  }
+}

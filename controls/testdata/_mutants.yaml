@@ -258,3 +258,33 @@
     packages.verify.modified as an ok list (writeVerifyUnknown included) -- never absent. So no
     snapshot collect writes reaches absent_means, and the value it names cannot change any
     fixture's answer.
+
+- control: muster.beyond.ld_so_preload_empty
+  mutant: "absent_means ->pass"
+  reason: >-
+    ldSoPreload (internal/collect/collectors/privilege.go) writes privilege.ld_so_preload as an ok
+    empty list when /etc/ld.so.preload does not exist (ENOENT, the normal state) and as the read's
+    status (denied or error, naming the path) when it exists and cannot be read -- never absent on
+    a host that boots (only ENOTDIR, /etc not being a directory, would map to absent).
+    So no snapshot collect writes reaches absent_means, and the value it names cannot change any
+    fixture's answer.
+
+- control: muster.beyond.ld_so_preload_empty
+  mutant: "absent_means ->not_applicable"
+  reason: >-
+    ldSoPreload (internal/collect/collectors/privilege.go) writes privilege.ld_so_preload as an ok
+    empty list when /etc/ld.so.preload does not exist (ENOENT, the normal state) and as the read's
+    status (denied or error, naming the path) when it exists and cannot be read -- never absent on
+    a host that boots (only ENOTDIR, /etc not being a directory, would map to absent).
+    So no snapshot collect writes reaches absent_means, and the value it names cannot change any
+    fixture's answer.
+
+- control: muster.beyond.ld_so_preload_empty
+  mutant: "absent_means ->manual"
+  reason: >-
+    ldSoPreload (internal/collect/collectors/privilege.go) writes privilege.ld_so_preload as an ok
+    empty list when /etc/ld.so.preload does not exist (ENOENT, the normal state) and as the read's
+    status (denied or error, naming the path) when it exists and cannot be read -- never absent on
+    a host that boots (only ENOTDIR, /etc not being a directory, would map to absent).
+    So no snapshot collect writes reaches absent_means, and the value it names cannot change any
+    fixture's answer.

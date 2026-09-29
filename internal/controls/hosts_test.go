@@ -59,6 +59,10 @@ var stockUbuntu2204 = map[string]check.Status{
 	"muster.beyond.sudo_nopasswd_all":                   check.PASS,          // 3C-2a: root, %admin, %sudo, all with a password
 	"muster.beyond.file_capabilities_declared":          check.PASS,          // 3C-2a: the four files postinst declares
 	"muster.beyond.root_unit_exec_writable":             check.PASS,          // 3C-2a: nothing a non-root user can write
+	"muster.beyond.ld_so_preload_empty":                 check.PASS,          // 3C-2a: no /etc/ld.so.preload
+	"muster.beyond.container_runtime_access":            check.PASS,          // 3C-2a: no runtime socket
+	"muster.beyond.root_authorized_keys":                check.PASS,          // 3C-2a: prohibit-password lets keys through, root has none
+	"muster.beyond.ssh_key_quality":                     check.PASS,          // 3C-2a: the user's one ed25519 key
 }
 
 // stockEL9 is the 3C-1 spec's EL9 reading (§4): a stock Rocky 9 install —

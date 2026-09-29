@@ -23,7 +23,7 @@ references and, later, offered as selectable profiles.
 > 3C-1 — the deep filesystem walk, the first checks beyond the guide, audit
 > pipeline health and package integrity — are merged. 67 of the 67 items are enrolled (68 controls:
 > 57 auto, 7 partial, 4 manual with the evidence attached),
-> and 32 beyond the guide. `collect --deep`
+> and 36 beyond the guide. `collect --deep`
 > walks the local filesystems once, under a time and entry budget, without
 > following a symlink or entering a remote mount or a container layer, and
 > joins every setuid, world-writable, unowned or hidden entry to the package

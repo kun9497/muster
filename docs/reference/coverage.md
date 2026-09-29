@@ -76,7 +76,7 @@
 
 ## Beyond the guide
 
-32 controls muster checks that the guide does not ask for.
+36 controls muster checks that the guide does not ask for.
 
 | Control | Imp. | Automation | Fact keys read | STIG ids |
 |---|---|---|---|---|
@@ -89,18 +89,22 @@
 | muster.beyond.auditd_active | 상 | auto | env.container, services.auditd.active, services.auditd.enabled, services.auditd.installed | RHEL-09-653010, RHEL-09-653015, UBTU-22-653010, UBTU-24-100400 |
 | muster.beyond.bootloader_config_permissions | 상 | auto | boot.grub_cfg.gid, boot.grub_cfg.mode, boot.grub_cfg.uid, env.container | RHEL-09-212025, RHEL-09-212030 |
 | muster.beyond.bootloader_password | 중 | auto | boot.grub_password_set, env.container | RHEL-09-212010, UBTU-22-212010, UBTU-24-102000 |
+| muster.beyond.container_runtime_access | 상 | auto | env.container, privilege.runtime_group_members, privilege.runtime_sockets | — |
 | muster.beyond.core_dump_policy | 중 | partial | coredump.core_pattern, coredump.limits.hard_core, coredump.systemd.process_size_max, coredump.systemd.storage, env.container | RHEL-09-213040, RHEL-09-213085, RHEL-09-213090, RHEL-09-213095 |
 | muster.beyond.dev_shm_mount_options | 중 | auto | env.container, mounts.dev_shm.separate, mounts.points | RHEL-09-231110, RHEL-09-231115, RHEL-09-231120 |
 | muster.beyond.file_capabilities_declared | 상 | auto | env.container, walk.capabilities | — |
 | muster.beyond.file_integrity_tool | 중 | auto | env.container, fim.aide.database_present, fim.aide.scheduled, fim.tool | RHEL-09-651010, RHEL-09-651015, UBTU-22-651010, UBTU-22-651015, UBTU-22-651025, UBTU-24-100100, UBTU-24-100110, UBTU-24-100120 |
 | muster.beyond.home_mount_options | 하 | auto | env.container, mounts.home.separate, mounts.points | RHEL-09-231045, RHEL-09-231050 |
 | muster.beyond.kernel_pointer_exposure | 중 | auto | env.container, kernel.sysctl.dmesg_restrict, kernel.sysctl.kptr_restrict | RHEL-09-213010, RHEL-09-213025, UBTU-22-213010, UBTU-24-600140 |
+| muster.beyond.ld_so_preload_empty | 상 | auto | env.container, privilege.ld_so_preload | — |
 | muster.beyond.package_files_unmodified | 상 | auto | env.container, packages.verify.modified | — |
 | muster.beyond.ptrace_restriction | 중 | auto | env.container, kernel.sysctl.perf_event_paranoid, kernel.sysctl.yama_ptrace_scope | RHEL-09-213015, RHEL-09-213080 |
 | muster.beyond.remote_log_forwarding | 하 | auto | env.container, logging.journal_upload.url, logging.rsyslog.forwards_remote, services.journal_upload.active, services.journal_upload.enabled, services.syslog.active | RHEL-09-652055 |
+| muster.beyond.root_authorized_keys | 중 | auto | env.container, ssh.root_key_count, sshd.options.permit_root_login | — |
 | muster.beyond.root_unit_exec_writable | 상 | auto | env.container, env.has_systemd, units.exec_writable | — |
 | muster.beyond.secure_boot_enabled | 중 | auto | boot.firmware, boot.secure_boot, env.container | — |
 | muster.beyond.separate_partitions | 중 | partial | env.container, mounts.points | RHEL-09-231010, RHEL-09-231015, RHEL-09-231020, RHEL-09-231025, RHEL-09-231030, RHEL-09-231035 |
+| muster.beyond.ssh_key_quality | 중 | auto | env.container, ssh.dsa_key_count, ssh.rsa_keys | — |
 | muster.beyond.sudo_logging | 중 | auto | env.container, sudo.installed, sudo.log.logfile, sudo.log.syslog | — |
 | muster.beyond.sudo_nopasswd_all | 상 | auto | env.container, sudo.authenticate_disabled, sudo.installed, sudo.nopasswd_all | RHEL-09-432025, UBTU-22-432010, UBTU-24-300021 |
 | muster.beyond.suid_dumpable_disabled | 중 | auto | coredump.suid_dumpable, env.container | — |
@@ -115,7 +119,7 @@
 
 ## Fact keys used by controls
 
-217 of 473 registered keys are read by a control (4 by the engine); 252 unused.
+223 of 473 registered keys are read by a control (4 by the engine); 246 unused.
 
 | Collector | Registered | Used by a control | Read by the engine | Unused |
 |---|---|---|---|---|
@@ -149,5 +153,5 @@
 | audit | 34 | 14 | 0 | audit.rules.loaded_count, audit.rules.persisted_count, audit.rules.persisted, audit.status.enabled, audit.status.failure, audit.status.lost, audit.status.backlog_limit, audit.conf.log_file, audit.conf.log_group, audit.log_file.gid, audit.log_file.group_readable, audit.log_file.group_writable, audit.log_file.other_readable, audit.log_file.other_writable, audit.log_file.acl_present, audit.log_dir.mode, audit.log_dir.gid, audit.log_dir.group, audit.log_dir.group_readable, audit.log_dir.acl_present |
 | fim | 9 | 3 | 0 | fim.aide.installed, fim.aide.config_path, fim.aide.database_path, fim.aide.database_modified, fim.aide.schedules, fim.other_tools |
 | units | 3 | 1 | 0 | units.root_services, units.exec_unresolved |
-| sshkeys | 4 | 0 | 0 | ssh.authorized_keys, ssh.root_key_count, ssh.dsa_key_count, ssh.rsa_keys |
-| privilege | 3 | 0 | 0 | privilege.ld_so_preload, privilege.runtime_sockets, privilege.runtime_group_members |
+| sshkeys | 4 | 3 | 0 | ssh.authorized_keys |
+| privilege | 3 | 3 | 0 | — |

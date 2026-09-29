@@ -1,0 +1,21 @@
+id: muster.beyond.root_authorized_keys
+title_en: root's authorized_keys files hold no key wherever sshd lets root log in
+title_ko: sshd 가 root 로그인을 허용하는 곳에서는 root 의 authorized_keys 파일에 키가 없다
+description_en: A key in root's authorized_keys file is a root login without a password prompt wherever PermitRootLogin lets keys through, and prohibit-password - OpenSSH's compiled default - allows exactly that; whoever holds the private half, or a forgotten copy of it on a laptop or a build server, is root, and sudo's record of who became root is bypassed. muster counts the keys in authorized_keys and authorized_keys2 under the home of every uid-0 account and fails the host when there is one. authorized_keys2 is counted on every release, EL included, whose sshd_config names only the first file, so a key there is a stale one to review rather than a false alarm. It is rated 중 because the key is still a credential someone has to hold, but one that leaves no trail of the person behind the login. The control reads NOT_APPLICABLE in three cases - PermitRootLogin no is in force; sshd is not installed; the effective value could not be read, because neither sshd -T nor the files answered (a non-root run on EL9, whose sshd_config is 0600, or a socket-activated daemon that would not answer). In the last case the compiled default prohibit-password accepts keys and the control does not see it; muster accepts that miss rather than judge root's keys where root login may be off, where a key would be a FAIL nothing can use. A root key limited to a forced command (command="..." or restrict), the shape PermitRootLogin forced-commands-only expects, still reads FAIL, since the gate cannot be written with a second condition; waive it. An interactive account homed outside the paths muster reads, or a key file behind a symlink muster does not follow, is a hole in the inventory and reads MANUAL naming it; /root is 0700, so a non-root run reads ERROR where the setting is readable.
+description_ko: root 의 authorized_keys 파일에 있는 키는 PermitRootLogin 이 키를 허용하는 곳이면 어디서나 비밀번호를 묻지 않는 root 로그인이며, OpenSSH 의 컴파일 기본값인 prohibit-password 가 바로 그것을 허용합니다. 개인 키를 가진 사람, 또는 노트북이나 빌드 서버에 잊힌 그 사본을 가진 사람은 root 이고, 누가 root 가 되었는지 남기는 sudo 의 기록도 거치지 않습니다. muster 는 uid 0 인 모든 계정의 홈 아래 authorized_keys 와 authorized_keys2 의 키를 세어 하나라도 있으면 호스트를 실패로 판정합니다. authorized_keys2 는 sshd_config 가 첫 번째 파일만 지정하는 EL 을 포함해 모든 릴리스에서 셉니다. 그곳의 키는 오탐이 아니라 검토할 묵은 키입니다. 키는 여전히 누군가 가지고 있어야 하는 자격 증명이지만 로그인한 사람의 흔적을 남기지 않으므로 중요도는 중 입니다. 이 통제 항목은 세 경우에 NOT_APPLICABLE 입니다. PermitRootLogin no 가 적용된 경우, sshd 가 설치되지 않은 경우, 그리고 sshd -T 도 파일도 답하지 않아 실제 값을 읽을 수 없는 경우입니다(sshd_config 가 0600 인 EL9 에서 root 가 아닌 실행, 또는 답하지 않는 소켓 활성화 데몬). 마지막 경우에는 컴파일 기본값 prohibit-password 가 키를 받아들이지만 이 통제 항목은 그것을 보지 못합니다. root 로그인이 꺼져 있을 수 있는 곳에서 root 의 키를 판정하면 아무도 쓸 수 없는 키가 FAIL 이 되므로, muster 는 이 누락을 받아들입니다. 강제 명령으로 제한된 root 키(command="..." 또는 restrict)는 PermitRootLogin forced-commands-only 가 기대하는 형태이지만, 두 번째 조건으로 게이트를 쓸 수 없으므로 여전히 FAIL 이며 예외(waiver)로 처리합니다. muster 가 읽는 경로 밖에 홈이 있는 대화형 계정이나 muster 가 따라가지 않는 심볼릭 링크 뒤의 키 파일은 목록의 구멍이므로 그것을 밝힌 MANUAL 입니다. /root 는 0700 이므로 root 가 아닌 실행은 설정을 읽을 수 있는 곳에서 ERROR 입니다.
+category: beyond
+importance: 중
+automation: auto
+references: { nist_800_53: ["IA-5(2)"] }
+requires_facts: ">=1"
+applies_when:
+  - { fact: env.container, op: eq, expected: none }
+  - { fact: sshd.options.permit_root_login, op: ne, expected: "no" }
+absent_means: manual
+checks:
+  - { fact: ssh.root_key_count, op: eq, expected: 0 }
+remediation:
+  text_en: Make sure another way in exists first - a named account with sudo and its own key - and test it in a second session. Then copy root's files (cp -a /root/.ssh/authorized_keys /root/.ssh/authorized_keys.bak, and the same for authorized_keys2) and remove the keys, or set PermitRootLogin no in sshd_config and reload sshd. Restore with cp -a <file>.bak <file>, or the previous PermitRootLogin line and a reload.
+  text_ko: 먼저 다른 접근 경로, 즉 sudo 권한과 자기 키를 가진 이름 있는 계정이 있는지 확인하고 두 번째 세션에서 시험합니다. 그다음 root 의 파일을 복사하고(cp -a /root/.ssh/authorized_keys /root/.ssh/authorized_keys.bak, authorized_keys2 도 같게) 키를 지우거나, sshd_config 에 PermitRootLogin no 를 설정하고 sshd 를 reload 합니다. cp -a <file>.bak <file> 로, 또는 이전 PermitRootLogin 줄과 reload 로 되돌립니다.
+  risk: lockout_risk
+  idempotent: true

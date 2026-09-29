@@ -1,0 +1,134 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none",
+        "source": {
+          "kind": "file",
+          "path": "/proc/1/cgroup"
+        }
+      }
+    },
+    "privilege": {
+      "runtime_sockets": {
+        "status": "ok",
+        "value": [
+          {
+            "path": "/run/docker.sock",
+            "exists": true,
+            "kind": "socket",
+            "mode": 432,
+            "uid": 1000,
+            "gid": 999,
+            "group": "docker",
+            "group_writable": true,
+            "other_writable": false,
+            "owner_nonroot": true,
+            "acl_present": false
+          },
+          {
+            "path": "/run/containerd/containerd.sock",
+            "exists": false,
+            "kind": "",
+            "mode": -1,
+            "uid": -1,
+            "gid": -1,
+            "group": "",
+            "group_writable": false,
+            "other_writable": false,
+            "owner_nonroot": false,
+            "acl_present": false
+          },
+          {
+            "path": "/run/podman/podman.sock",
+            "exists": false,
+            "kind": "",
+            "mode": -1,
+            "uid": -1,
+            "gid": -1,
+            "group": "",
+            "group_writable": false,
+            "other_writable": false,
+            "owner_nonroot": false,
+            "acl_present": false
+          },
+          {
+            "path": "/run/crio/crio.sock",
+            "exists": false,
+            "kind": "",
+            "mode": -1,
+            "uid": -1,
+            "gid": -1,
+            "group": "",
+            "group_writable": false,
+            "other_writable": false,
+            "owner_nonroot": false,
+            "acl_present": false
+          }
+        ],
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "file",
+              "path": "/run/docker.sock"
+            },
+            {
+              "kind": "file",
+              "path": "/run/containerd/containerd.sock"
+            },
+            {
+              "kind": "file",
+              "path": "/run/podman/podman.sock"
+            },
+            {
+              "kind": "file",
+              "path": "/run/crio/crio.sock"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/group"
+            }
+          ]
+        }
+      },
+      "runtime_group_members": {
+        "status": "ok",
+        "value": [],
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "file",
+              "path": "/run/docker.sock"
+            },
+            {
+              "kind": "file",
+              "path": "/run/containerd/containerd.sock"
+            },
+            {
+              "kind": "file",
+              "path": "/run/podman/podman.sock"
+            },
+            {
+              "kind": "file",
+              "path": "/run/crio/crio.sock"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/group"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/passwd"
+            }
+          ]
+        }
+      }
+    }
+  }
+}
