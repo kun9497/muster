@@ -2,7 +2,7 @@
   "synthetic": true,
   "_notes": [
     "Synthetic, shaped like the lab's root --deep reading of Ubuntu 22.04 on 2026-09-29 (3C-2a V-18); nothing in it was copied from that host but package paths.",
-    "units.root_services lists sixteen of the stock host's in-scope root services: the eleven that name thirteen commands without a path, snapd.aa-prompt-listener.service (enabled, no unit file), ssh, cron, rsyslog and systemd-journald. Those thirteen commands and the missing unit file are units.exec_unresolved 14; the host's other root services are shaped like the four resolved ones and flag nothing.",
+    "units.root_services lists fifteen of the stock host's in-scope root services: the ten that name twelve commands without a path, snapd.aa-prompt-listener.service (enabled, no unit file), ssh, cron, rsyslog and systemd-journald. Those twelve commands and the missing unit file are units.exec_unresolved 13; the host's other root services are shaped like the four resolved ones and flag nothing. cloud-init-local.service, which the lab runs, is left out: this is the non-cloud reading (run.env.cloud_init false), and no other in-scope unit of the lab names a bare command.",
     "sshd.options.permit_root_login is OpenSSH's compiled default prohibit-password, which the 8.9p1 sshd (no -G) prints through sshd -T as without-password.",
     "muster.beyond.root_authorized_keys reads PASS because this is the non-cloud image (run.env.cloud_init false) and root has no key: on a cloud image cloud-init writes a forced-command key into root's authorized_keys, and that host reads FAIL.",
     "privilege.runtime_sockets: no container runtime is installed, so every socket row is exists false and no runtime group has a member."
@@ -1851,39 +1851,6 @@
         "status": "ok",
         "value": [
           {
-            "unit": "cloud-init-local.service",
-            "enabled": true,
-            "active": true,
-            "user": "",
-            "unit_file": "file",
-            "files": [
-              {
-                "path": "/usr/lib/systemd/system/cloud-init-local.service",
-                "mode": 420,
-                "uid": 0,
-                "gid": 0
-              }
-            ],
-            "exec": [
-              {
-                "directive": "ExecStart",
-                "path": "cloud-init",
-                "resolved": false,
-                "stat_path": "",
-                "stat_status": "unresolved",
-                "exists": false,
-                "kind": "",
-                "mode": -1,
-                "uid": -1,
-                "gid": -1,
-                "group_writable": false,
-                "other_writable": false
-              }
-            ],
-            "read_status": "ok",
-            "reason": ""
-          },
-          {
             "unit": "cron.service",
             "enabled": true,
             "active": true,
@@ -2479,10 +2446,6 @@
             },
             {
               "kind": "file",
-              "path": "/usr/lib/systemd/system/cloud-init-local.service"
-            },
-            {
-              "kind": "file",
               "path": "/usr/lib/systemd/system/cron.service"
             },
             {
@@ -2553,10 +2516,6 @@
             },
             {
               "kind": "file",
-              "path": "/usr/lib/systemd/system/cloud-init-local.service"
-            },
-            {
-              "kind": "file",
               "path": "/usr/lib/systemd/system/cron.service"
             },
             {
@@ -2616,7 +2575,7 @@
       },
       "exec_unresolved": {
         "status": "ok",
-        "value": 14,
+        "value": 13,
         "source": {
           "kind": "derived",
           "inputs": [
@@ -2624,10 +2583,6 @@
               "kind": "command",
               "cmd": "/usr/bin/systemctl list-units --type=service --state=active --plain --no-legend",
               "exit_code": 0
-            },
-            {
-              "kind": "file",
-              "path": "/usr/lib/systemd/system/cloud-init-local.service"
             },
             {
               "kind": "file",
