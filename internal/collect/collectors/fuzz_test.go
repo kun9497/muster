@@ -1452,3 +1452,11 @@ func FuzzParseAuthorizedKeys(f *testing.F) {
 		}, len(data))
 	})
 }
+
+func FuzzParseLdSoPreload(f *testing.F) {
+	seeds(f, "testdata/ld.so.preload.*")
+	f.Add([]byte("a#b:c\n\t:d\r\n#"))
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "parseLdSoPreload", func() any { return parseLdSoPreload(data) }, len(data))
+	})
+}

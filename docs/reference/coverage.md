@@ -111,7 +111,7 @@
 
 ## Fact keys used by controls
 
-210 of 470 registered keys are read by a control (4 by the engine); 256 unused.
+210 of 473 registered keys are read by a control (4 by the engine); 259 unused.
 
 | Collector | Registered | Used by a control | Read by the engine | Unused |
 |---|---|---|---|---|
@@ -146,3 +146,4 @@
 | fim | 9 | 3 | 0 | fim.aide.installed, fim.aide.config_path, fim.aide.database_path, fim.aide.database_modified, fim.aide.schedules, fim.other_tools |
 | units | 3 | 0 | 0 | units.root_services, units.exec_writable, units.exec_unresolved |
 | sshkeys | 4 | 0 | 0 | ssh.authorized_keys, ssh.root_key_count, ssh.dsa_key_count, ssh.rsa_keys |
+| privilege | 3 | 0 | 0 | privilege.ld_so_preload, privilege.runtime_sockets, privilege.runtime_group_members |

@@ -80,6 +80,7 @@ var fuzzTargets = []string{
 	"FuzzParseIptablesSave",
 	"FuzzParseKV",
 	"FuzzParseLastlog",
+	"FuzzParseLdSoPreload",
 	"FuzzParseLimitsCore",
 	"FuzzParseListTimers",
 	"FuzzParseListUnits",

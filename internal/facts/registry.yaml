@@ -3069,3 +3069,24 @@ keys:
     sensitivity: internal
     collector: sshkeys
     subject_kind: key
+  - key: privilege.ld_so_preload
+    type: list<string>
+    description: "The entries of /etc/ld.so.preload, the shared objects the dynamic loader loads into every program, in file order, as glibc's loader reads them: a # starts a comment anywhere on a line, entries are separated by space, tab, newline or colon, empty entries dropped. A missing file is an empty list (the normal state); a file that exists and cannot be read is the read's status, naming the path."
+    since: 1
+    sensitivity: public
+    collector: privilege
+    subject_kind: file
+  - key: privilege.runtime_sockets
+    type: list<record>
+    description: "The control sockets of the four container runtimes whose API is root (/run/docker.sock, /run/containerd/containerd.sock, /run/podman/podman.sock, /run/crio/crio.sock, at their physical paths), one row each in that order with path, exists, mode (the 0o7777 bits), uid, gid, group (the name /etc/group gives the gid; empty when /etc/group cannot be read), group_writable and other_writable. A socket that does not exist (the path or a parent missing) is exists false, mode, uid and gid -1, group empty, both flags false; a stat that fails otherwise (/run/podman is 0700, so a non-root run on a podman host) is the read's status on the whole list, naming the path."
+    since: 1
+    sensitivity: public
+    collector: privilege
+    subject_kind: file
+  - key: privilege.runtime_group_members
+    type: list<record>
+    description: "For every existing group-writable socket of privilege.runtime_sockets, the accounts other than uid 0 that hold its gid, judged from the local files: the supplementary members of every /etc/group line with that gid and the /etc/passwd accounts whose primary gid it is, one row per group, member and socket with group, member, uid (-1 when /etc/passwd does not name the member) and socket, sorted by group, member and socket. Empty when no socket is group-writable or its group is empty; the status of privilege.runtime_sockets when that is not ok, else /etc/group's or /etc/passwd's read status, naming the path, when either cannot be read (absent when /etc/group does not exist)."
+    since: 1
+    sensitivity: public
+    collector: privilege
+    subject_kind: user
