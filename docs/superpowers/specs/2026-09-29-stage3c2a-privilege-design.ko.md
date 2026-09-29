@@ -99,8 +99,8 @@ capability 참조 목록 — 호스트 자신의 패키지 메타데이터가 �
   아니거나, -1 아래면 -1(이유가 어느 쪽인지 적음 — `useradd(8)`과 shadow의 `get_defaults`는 모두 "never"로
   봄); 값은 C `strtol`의 base 0처럼 읽고(`030`은 24), 줄은 첫 칸에서 시작해야 하며(`get_defaults`는
   접두를 비교), 뒤의 `INACTIVE=` 줄이 앞의 것을 덮어씀. 파일이 있는데 못 읽으면 읽기
-  상태(C3): Debian/Ubuntu는 0644, EL은 0600(`shadow-utils` `%attr`)이라 비root 읽기는 릴리스에 따르고
-  capability matrix는 행 대신 `_notes` 항목을 둡니다. EL은 `INACTIVE=-1`을 써서 배포하고 Ubuntu는 줄을
+  상태(C3): 파일은 Debian/Ubuntu와 배포된 Rocky 9에서 0644(측정; `shadow-utils` `%attr`을 0600으로 읽었던
+  것)라 비root 읽기는 릴리스의 패키징에 따르고 capability matrix는 행 대신 `_notes` 항목을 둡니다. EL은 `INACTIVE=-1`을 써서 배포하고 Ubuntu는 줄을
   주석으로 배포; 둘 다 -1.
 - `accounts.lastlog` — `list<record>` `{name, uid, last_login, line, host}`, 근거 전용, `sensitivity:
   internal`: `/var/log/lastlog`을 `ReadFileBinary`로 32 MiB 상한까지 읽어 uid로 색인된 고정 레코드로
@@ -122,8 +122,10 @@ sudo 리더는 이미 체인을 걷습니다 — `/etc/sudoers`, `@includedir` /
 `absent`로 멈춥니다(`/dev/null` 링크는 마스크; 3C-1, J-40/J-49). 같은 걷기가 이제 읽는 모든 줄에서 두
 가지를 더 파싱합니다(`sudoers(5)`): alias 정의(`User_Alias`, `Runas_Alias`, `Cmnd_Alias`;
 `Host_Alias`는 읽고 무시)와 user specification. 렉서도 함께 바뀝니다: 숫자가 뒤따르는 `#`는
-uid(`#1000`), `%#`는 gid, `#include` / `#includedir`는 지시자, 그 밖의 `#`는 주석 시작; 논리 줄은 어느
-문자로 시작하든 분류 전에 `\` 이음으로 합칩니다(지금의 Defaults 리더는 `#`로 시작하는 모든 줄을
+uid(`#1000`), `%#`는 gid, `#include` / `#includedir`는 지시자, 그 밖의 `#`는 주석 시작; 줄은 먼저
+분류하고 그 다음 `\` 이음으로 합칩니다 — 주석 줄은 무엇으로 끝나든 그 줄바꿈에서 끝나고, 줄을 합치는
+중에 만난 주석은 그 줄을 닫습니다(sudo의 렉서는 `\`-줄바꿈을 공백으로 읽은 뒤 주석을 끝까지 읽음);
+`#1000 ALL = \` 줄은 규칙이라 그대로 이어집니다(지금의 Defaults 리더는 `#`로 시작하는 모든 줄을
 주석으로 봄). 문법은 `sudoers(5)`에서:
 
 - `User_List host_list = Cmnd_Spec_List [: host_list = Cmnd_Spec_List …]` — `User_List`는 쉼표로 구분된
@@ -136,7 +138,11 @@ uid(`#1000`), `%#`는 gid, `#include` / `#includedir`는 지시자, 그 밖의 `
   텍스트를 기록하고 판정에서 구별하지 않음.
 - 명령 목록 `ALL, !/usr/bin/su`는 여전히 `ALL`을 줌(man 페이지는 부정이 보안 수단이 아니라 함);
   `sudoedit`는 명령 단어.
-- alias는 치환으로 깊이 8까지 풀고; 순환, 미정의 alias, netgroup, 비Unix 그룹은 행을 `resolved: false`로.
+- alias는 체인의 모든 파일을 읽은 뒤 치환으로 깊이 8까지 풉니다(sudo는 파싱 뒤에 풀므로 사용 뒤의
+  정의도 셈); 순환, 미정의 alias, netgroup, 비Unix 그룹은 행을 `resolved: false`로 두고, 예산 —
+  해석 한 번에 alias 멤버 65536과 행 65536 — 을 넘는 것도 그러하므로 조작된 파일은 부분 답이 아니라
+  `absent`로 읽힙니다. 명령 앞의 `sha224:`…`sha512:` digest는 명령과 한 단어로 남습니다(그 `=` 패딩이
+  줄을 가르지 않음).
 - `Defaults` 줄: 범위 없음, `Defaults:User_List`, `Defaults>Runas_List`, `Defaults@Host_List`,
   `Defaults!Cmnd_List`; 같은 플래그에 대해 뒤의 줄이 앞의 줄을 이김(`sudo.log.*` 선례).
 
@@ -192,8 +198,9 @@ effective 플래그는 `magic_etc`에. muster가 아는 이름표 너머의 capa
 `cap_net_raw=ep`, `cap_chown,cap_setuid=p` — 인데, 두 선언 출처와 `getcap`이 공유하는 형식이 그것이기
 때문; 렌더러는 이름 있는 비트 수를 41(5.9+ 커널의 `cap_max_bits`)로 고정해 문자열이 호스트에 의존하지
 않게 하고, 텍스트 파서는 libcap의 두 표기 — libcap ≥ 2.41의 `cap_net_raw=ep`와 옛 빌드의 `=
-cap_net_raw+ep`(2020년 전에 빌드된 rpm 헤더가 아직 싣는 것) — 를 모두 받음; `rootid`는 기록되고(v1/v2는 0) `rootid`가 0이 아닌 v3 행도 다른 행처럼 판정됩니다: 오늘 초기 사용자
-네임스페이스에선 힘이 없어도, 패키지가 선언하지 않은 capability인 것은 그대로.
+cap_net_raw+ep`(2020년 전에 빌드된 rpm 헤더가 아직 싣는 것) — 를 모두 받음; `rootid`는 기록되고(v1/v2는 0) `rootid`가 0이 아닌 v3 행은 결코 `package_declared`가 아닙니다: rpm 헤더도
+`-n` 없는 postinst `setcap`도 그런 것을 쓰지 않으므로 사용자 네임스페이스에서 세워진 것 — 오늘 초기
+네임스페이스에선 힘이 없어도, 패키지가 선언하지 않은 capability인 것은 그대로(이유에 적음).
 
 **선언.** setuid join의 세 출처가 여기선 둘이 됩니다. capability는 패키지가 세우는 곳에서 선언되기
 때문입니다:
@@ -202,10 +209,14 @@ cap_net_raw+ep`(2020년 전에 빌드된 rpm 헤더가 아직 싣는 것) — �
   명령 행이 바뀌며 계획이 그렇게 말합니다. `reference: rpmdb`; 태그의
   문자열이 같은 정규 `caps`로 렌더되면 `package_declared` true.
 - dpkg: `.deb`는 xattr을 실을 수 없고; 패키지의 `postinst`가 설치 시 `setcap`으로 세웁니다. join은 소유
-  패키지의 `/var/lib/dpkg/info/<pkg>[:<arch>].postinst`(그 glob이 walk의 `Reads`에 더해짐)를 읽어 세 형식을
+  패키지의 `/var/lib/dpkg/info/<pkg>[:<arch>].postinst`(그 glob이 walk의 `Reads`에 더해짐; postinst는 경로를
+  소유한 `.list` 파일을 통해 찾으므로 multi-arch `libgstreamer1.0-0:amd64.postinst`도 풀림)를 읽어 네 형식을
   인식: 리터럴 경로의 `setcap <caps> <path>`; 스크립트 앞에서 `NAME=<path>`가 리터럴로 대입된 `setcap
-  <caps> $NAME`(`iputils-ping`의 `PROGRAM`); 그리고 `setcap [-q] - <path> < <file>`(snapd는 `snap-confine`의
-  집합을 배포된 파일에서 읽음). `reference: postinst`; 스크립트가 `setcap` 호출에서 그 경로를 부르고,
+  <caps> $NAME`; `NAME=$(dpkg-divert --truename <path>)`(`iputils-ping`의 `PROGRAM` — 안의 리터럴이 선언된
+  경로이고, 우회(divert)된 파일에 맞을 수 있는 형식은 이것만); 그리고 `setcap [-q] - <path> < <file>`이나
+  `setcap -`로의 파이프(snapd는 `snap-confine`의 집합을 배포된 파일에서 읽음). muster가 풀 수 없는 `setcap`
+  호출(명령으로 대입된 변수)은 행을 "a setcap call muster could not resolve" 이유의 미선언으로 두고;
+  없거나 읽을 수 없는 스크립트는 읽기 이유의 미선언으로 둠 — join 자체는 postinst 때문에 실패하지 않음. `reference: postinst`; 스크립트가 `setcap` 호출에서 그 경로를 부르고,
   caps 텍스트가 리터럴인 곳에서는 같은 정규 `caps`로 렌더되면 `package_declared` true;
   `declared_caps`는 그 텍스트이거나 세 번째 형식이면 `"(from file)"`. lab에서 `setcap`을 부르는 스크립트
   다섯 — `iproute2`, `iputils-ping`, `libgstreamer1.0-0`, `mtr-tiny`, `snapd` — 이 `getcap -r /usr`가
@@ -218,8 +229,9 @@ cap_net_raw+ep`(2020년 전에 빌드된 rpm 헤더가 아직 싣는 것) — �
 
 - `walk.capabilities` — `list<record>` `{path, caps, rootid, package, package_declared, declared_caps,
   reference}`. `listCaps`(2000) 상한, `path` 정렬.
-- `walk.acl_grants` — `list<record>` `{path, entries}`, 근거 전용: 접근 ACL이 모드가 주는 것 너머로
-  named user/group에 쓰기나 실행을 주는 실행파일(mask 적용, `acl(5)`); `entries`는 **숫자 id**의
+- `walk.acl_grants` — `list<record>` `{path, entries}`, 근거 전용: 접근 ACL이 mask 적용 뒤 named user/group에 소유 그룹의
+  `group::` 항목보다 많은 쓰기나 실행을 주는 실행파일(`acl(5)`: named 항목이 있으면 모드의 그룹 부류가
+  곧 mask이므로 "모드 너머"는 그룹 항목 너머를 뜻함); `entries`는 **숫자 id**의
   `getfacl` 표기(`user:1000:rwx` — 디코더는 이름을 풀지 않고, check 쪽은 풀 수 없음). 고정 경로
   `acl_entries` 사실이 이미 쓰는 POSIX ACL 디코더 `decodeACL([]byte)`로 디코드. 상한·정렬. 읽는 컨트롤
   없음(§1).
@@ -241,9 +253,12 @@ cap_net_raw+ep`(2020년 전에 빌드된 rpm 헤더가 아직 싣는 것) — �
 나열)일 때 **범위 안**입니다. 각각 유닛 파일을 systemd 우선순위로 트리에서 찾고; 인스턴스
 `foo@bar.service`는 템플릿 `foo@.service`로 찾고; `/dev/null` 심볼릭 링크인 유닛 파일은 마스크라 범위
 밖; 대상이 같은 디렉터리의 맨 유닛 이름인 심볼릭 링크(Ubuntu의 `sshd.service → ssh.service` alias)는
-**이름으로** 한 번 따라감 — `Readlink` 뒤 그 이름을 찾음; 그 밖의 심볼릭 링크와 어느 트리에도 없는
-유닛은 `unit_file: symlink` / `unit_file: missing` 행이고 `exec_unresolved`에 세며 실행파일은 판정하지
-않음. 유닛 파일과 모든 트리의 `.d/*.conf` drop-in을 systemd 순서로 읽어 자체 병합기로 합칩니다
+**이름으로** 한 번 따라감 — `Readlink` 뒤 그 이름을 찾음; 그 밖의 심볼릭 링크는 링크된 유닛, 어느 트리에도
+없는 유닛은 missing: `unit_file: symlink` / `unit_file: missing` 행이고 `exec_unresolved`에 세며 실행파일은
+판정하지 않음 — 그리고 링크된 유닛이나 ACTIVE인 missing 유닛은 `units.exec_writable`을 유닛을 적은
+`absent`로 만듦(무엇이 도는지 모름; enabled만 되고 `.wants` 링크가 끊긴 유닛은 아무것도 돌지 않으니
+unresolved에 그침). 크기 0의 유닛 파일은 systemd 마스크라 범위 밖. `Exec*=` 값의 홀로 선 `;` 단어는
+명령을 나눔(`\;`는 리터럴 인자): 명령마다 exec 행 하나, 각각 판정. 유닛 파일과 모든 트리의 `.d/*.conf` drop-in을 systemd 순서로 읽어 자체 병합기로 합칩니다
 (`mergeDropins`는 단일값이라 `Exec*=` 목록을 합칠 수 없음): `[Service]`의 `User=`(마지막이 이김; `0`은
 root)와 `Exec*=` 지시자(`ExecStart`, `ExecStartPre`, `ExecStartPost`, `ExecCondition`, `ExecReload`,
 `ExecStop`, `ExecStopPost`), 뒤 파일의 빈 `ExecStart=`는 앞의 목록을 초기화(`systemd.service(5)`). 각
@@ -262,9 +277,13 @@ root)와 `Exec*=` 지시자(`ExecStart`, `ExecStartPre`, `ExecStartPost`, `ExecC
   아니면 `""`): `unit_file` ∈ file | symlink | missing; `files`는 읽은 유닛 파일과 각 drop-in `{path, mode, uid, gid}`;
   `exec`는 `Exec*` 첫 토큰마다 한 행 `{directive, path, exists, kind, mode, uid, gid, group_writable,
   other_writable, resolved}`, 경로의 `Stat`에서(모든 행에 모든 필드 — 없는 파일은 `exists: false`에 `mode
-  -1`, `uid -1`, `gid -1`, 두 writable 플래그 false; 경로의 심볼릭 링크는 `kind: symlink`, 따라가지 않고
-  링크 자체의 소유자로만 판정). 근거, `sensitivity: internal`, 상한 500 유닛, `unit` 정렬.
-- `units.exec_writable` — `list<record>` `{unit, path, why}`: 판정용 부분집합 — 소유 uid가 0이 아니거나,
+  -1`, `uid -1`, `gid -1`, 두 writable 플래그 false; 경로의 심볼릭 링크는 한 홉 따라감: 선언 집합 안의 대상은
+  stat하여 판정하고 `stat_path`에 적으며, 밖의 대상이나 두 번째 링크는 `units.exec_writable`을 링크를
+  적은 `absent`로 만듦; `stat_status`는 `ok`, `undeclared`, `denied`, `error`; merged-`/usr` 별칭
+  `/bin`, `/sbin`, `/lib`은 링크를 통해 `/usr`로 풀림). 근거, `sensitivity: internal`, 상한 500 유닛, `unit` 정렬.
+- `units.exec_writable` — `list<record>` `{unit, path, why}`: 판정용 부분집합 — 디렉터리를 비root 사용자가
+  쓸 수 있는 실행파일(`why: parent_writable` — 부모가 uid 0 소유가 아니거나 group/other-writable; Debian의
+  `root:staff` 2775 `/usr/local/*`은 사실대로 FAIL을 읽음), 소유 uid가 0이 아니거나,
   group-writable이거나, other-writable인 실행파일(`why` ∈ `owner`, `group_writable`, `other_writable`),
   그리고 같은 세 성질의 유닛 파일이나 drop-in(`why`에 `unit_file:` 접두). `unit`, `path` 정렬. 범위 안의
   유닛 파일이나 drop-in이 존재하는데 읽을 수 없으면 유닛과 경로를 적은 **`absent`**: 읽을 수 없는 파일이
@@ -295,7 +314,8 @@ with systemd"라 답함) 세 leaf는 `unsupported`(`fim` 타이머 목록의 모
   "키 없음"이 침묵이 아니라 읽기가 되게); `keys`는 `{line, type, bits, fingerprint, options, restricted}`
   목록. 디코드(`sshd(8)` AUTHORIZED_KEYS FILE FORMAT, RFC 4253 §6.6): 옵션 필드는 첫 단어가 키 유형이
   아닐 때만 존재하고 그 인용값은 `,`와 `\"`를 품을 수 있음; 키 blob은 base64이고 안쪽 유형 문자열이 유형
-  단어와 같아야 하며 아니면 그 줄은 `unparsed`; `ssh-rsa`의 `bits`는 modulus `n`의 선행 `0x00`(최상위
+  단어와 같아야 하며(서명 전용 단어 `rsa-sha2-256` / `rsa-sha2-512`는 `ssh-rsa` blob을 싣고 sshd에겐 같은
+  RSA 키) 아니면 그 줄은 `unparsed`; 뒤에 남는 바이트나 잘못된 필드가 있는 blob도 `unparsed`; `ssh-rsa`의 `bits`는 modulus `n`의 선행 `0x00`(최상위
   비트가 1이면 있음 — 2048비트 키는 `n`을 257바이트로 인코딩)을 벗긴 뒤의 비트 길이;
   `ecdsa-sha2-nistpXXX`는 안쪽 곡선 이름의 곡선 크기; `ssh-ed25519`와 `sk-*` 유형은 256; `ssh-dss`는 1024;
   인증서 유형(`*-cert-v01@openssh.com`)은 0(기록되고 컨트롤은 무시); `fingerprint`는 `SHA256:` + 디코드한
@@ -307,11 +327,14 @@ with systemd"라 답함) 세 leaf는 `unsupported`(`fim` 타이머 목록의 모
   무시하는 것 — `root_authorized_keys`의 설명이 카운트에 그것이 포함된다고 말함(root의 오래된 키 파일은
   살펴볼 일이지 오탐이 아님).
 - `ssh.dsa_key_count` — `int`: 읽은 모든 파일의 `ssh-dss` 키 수.
-- `ssh.rsa_keys` — `list<record>` `{user, path, line, bits, fingerprint}`: modulus를 읽은 모든 `ssh-rsa`
-  키(blob이 디코드되지 않는 것은 `unparsed`에 있고 여기엔 없으므로 모든 행이 `bits`를 실음). `user`,
+- `ssh.rsa_keys` — `list<record>` `{user, path, line, bits, fingerprint}`: modulus를 읽은 모든 RSA 키,
+  두 계정이 공유하는 파일은 이름순 첫 계정 아래 한 번(blob이 디코드되지 않는 것은 `unparsed`에 있고 여기엔 없으므로 모든 행이 `bits`를 실음). `user`,
   `path`, `line` 정렬.
 
-muster가 못 읽은 파일(C3)은 그 행과 세 카운트에 읽기 상태를 둡니다. 비root 실행에서 결정적인 거부는
+muster가 못 읽은 파일(C3)은 그 행과 세 카운트에 읽기 상태를
+둡니다; sshd는 따라가고 muster는 따라가지 않는 심볼릭 링크 키 파일이나 `.ssh` 경로는 `unfollowed: true`
+행이고 세 카운트를 그것을 적은 `absent`로 둡니다(MANUAL); 신뢰할 수 없는 `/etc/shells`(읽을 수 없음, 또는
+libc 대체)은 그 상태를 세 카운트에 둡니다. 비root 실행에서 결정적인 거부는
 `/root` 자체(0700; matrix 단계가 이미 `! test -r /root`를 확인)이므로 세 카운트는 `denied`이고 두 키
 컨트롤은 그것을 적은 ERROR — 단 `root_authorized_keys`는 게이트를 읽을 수 없을 때 예외(§4).
 
@@ -324,16 +347,20 @@ muster가 못 읽은 파일(C3)은 그 행과 세 카운트에 읽기 상태를 
 
 - `privilege.ld_so_preload` — `list<string>`: `/etc/ld.so.preload`의 주석·빈 줄 아닌 항목(glibc 로더: 항목은 공백·탭·개행·`:`로
   구분되고 `#`는 줄 어디서든 주석을 시작함). 파일 없음은 `ok` 빈 목록 — 정상 상태; 있는데 못 읽으면 읽기 상태(C3).
-- `privilege.runtime_sockets` — `list<record>` `{path, exists, mode, uid, gid, group, group_writable,
-  other_writable}`: API가 root인 네 런타임의 제어 소켓(소켓에 쓸 수 있는 클라이언트는 privileged
-  컨테이너를 띄울 수 있음). 모든 행이 모든 필드를 실음: 없는 소켓(경로나 어느 부모의 `ENOENT`)은 `exists:
+- `privilege.runtime_sockets` — `list<record>` `{path, exists, kind, mode, uid, gid, group, group_writable,
+  other_writable, owner_nonroot, acl_present}`: API가 root인 네 런타임의 제어 소켓(소켓에 쓸 수 있는
+  클라이언트는 privileged 컨테이너를 띄울 수 있음); `owner_nonroot`(uid ≠ 0)와 `acl_present`(소켓의 접근
+  ACL)는 그룹 없이 API에 닿는 다른 두 길을 적음. 소켓은 읽기로 열 수 없으므로 xattr은 `O_PATH` fd 자신의
+  `/proc/self/fd` 항목 — 이미 열린 inode, 경로를 다시 푸는 것이 아님 — 을 통해 읽고; stat이 소켓을 찾은
+  뒤 실패한 xattr 읽기는 leaf의 error이지 결코 "없음"이 아님. 모든 행이 모든 필드를 실음: 없는 소켓(경로나 어느 부모의 `ENOENT`)은 `exists:
   false`, `mode -1`, `uid -1`, `gid -1`, `group ""`, 두 writable 플래그 false; 그 밖으로 실패하는 stat(podman
   호스트의 비root 실행에서 0750 root인 `/run/podman`의 `EACCES`)은 leaf에 경로를 앞에 붙인 읽기
   상태(C3). `group`은 gid로 `/etc/group`에서. `/run/podman/podman.sock`은 root의 `podman.socket`이 활성일
   때만 존재.
 - `privilege.runtime_group_members` — `list<record>` `{group, member, uid, socket}`: 존재하고
   group-writable인 소켓마다 그 그룹의 uid ≠ 0 멤버 — `/etc/group`의 보조 멤버와 primary gid가 그 그룹인
-  `/etc/passwd` 사용자 — (group, member)마다 한 행. `group`, `member` 정렬. 소켓이 없거나 모든 그룹이 비어
+  `/etc/passwd` 사용자 — (group, member, socket)마다 한 행, 상한 2000행. `group`, `member` 정렬. 읽을 수 없는
+  `/etc/passwd`는 이 leaf만 떨어뜨림(소켓 행의 `group`은 `/etc/group`에서 옴). 소켓이 없거나 모든 그룹이 비어
   있으면 빈 목록(lab의 `docker` 그룹이 그러함; GitHub 러너의 것은 아님 — `runner`가 들어 있음).
 
 `/etc/group`이나 `/etc/passwd`를 못 읽으면 `runtime_sockets`의 `group`과 `runtime_group_members` 전체가
@@ -360,10 +387,10 @@ RHEL-09-432025(`rhel9` V2R9), UBTU-22-432010(`ubuntu2204` V2R9), UBTU-24-300021(
 |---|---|---|---|---|
 | `account_inactivity_lock` | 중 | — | `{ fact: accounts.login_capable, op: none, subject: name, where: { field: inactive_unset, op: eq, expected: true } }`; `{ fact: accounts.login_capable, op: none, subject: name, where: { field: inactive, op: gt, expected: "${max_inactive_days}" } }`; `{ fact: accounts.useradd.inactive, op: gte, expected: 0 }`; `{ fact: accounts.useradd.inactive, op: lte, expected: "${max_inactive_days}" }` — `INACTIVE=0`(만료 즉시 비활성)은 둘 다 통과 | fail — 닿지 않음: leaf는 `ok`거나 읽기 상태(`_mutants.yaml` 행 셋) |
 | `sudo_nopasswd_all` | 상 | `sudo.installed eq true` | `{ fact: sudo.nopasswd_all, op: none, where: { op: not_in, expected: "${allowed_nopasswd_principals}" } }`(기본 `[]`); `{ fact: sudo.authenticate_disabled, op: eq, expected: false }` | manual — 체인을 다 읽지 못했거나 규칙을 풀지 못함: 빠진 줄이 태그를 실을 수 있음(`manual-include-outside.json`, `manual-unresolved-alias.json`) |
-| `file_capabilities_declared` | 상 | (deep 게이트: `walk.complete`) | `{ fact: walk.capabilities, op: none, subject: path, where: { field: package_declared, op: eq, expected: false } }` | fail — 닿지 않음: deep 아닌 실행은 스크리닝 전 deep 게이트에서 MANUAL(행 셋) |
+| `file_capabilities_declared` | 상 | (deep 게이트: `walk.complete`) | `{ fact: walk.capabilities, op: none, subject: path, where: { field: package_declared, op: eq, expected: false } }` | manual — 패키지 데이터베이스가 없는 호스트는 join된 walk 목록 전부를 `absent`("no package database")로 만듦: 대조할 선언이 없음, setuid 선례(`manual-no-package-db.json`) |
 | `root_unit_exec_writable` | 상 | `env.has_systemd eq true` | `{ fact: units.exec_writable, op: none, subject: path, where: { field: why, op: present } }` | manual — 범위 안 유닛 파일이나 drop-in이 존재하는데 읽을 수 없음(`manual-unit-unreadable.json`) |
 | `ld_so_preload_empty` | 상 | — | `{ fact: privilege.ld_so_preload, op: none, where: { op: not_in, expected: "${allowed_preload}" } }`(기본 `[]`) | fail — 닿지 않음: 없는 파일은 `ok` 빈 목록(행 셋) |
-| `container_runtime_access` | 상 | — | `{ fact: privilege.runtime_sockets, op: none, subject: path, where: { field: other_writable, op: eq, expected: true } }`; `{ fact: privilege.runtime_group_members, op: none, subject: member, where: { field: member, op: not_in, expected: "${allowed_runtime_group_members}" } }`(기본 `[]`) | fail — 닿지 않음: 소켓 없음은 `exists: false` 행(행 셋) |
+| `container_runtime_access` | 상 | — | `{ fact: privilege.runtime_sockets, op: none, subject: path, where: { field: other_writable, op: eq, expected: true } }`; `owner_nonroot`와 `acl_present`에 같은 절; `{ fact: privilege.runtime_group_members, op: none, subject: member, where: { field: member, op: not_in, expected: "${allowed_runtime_group_members}" } }`(기본 `[]`) | fail — `/etc/group`이 없으면 멤버 leaf가 `absent`(`fail-no-group.json`); 소켓 없음은 `exists: false` 행 |
 | `root_authorized_keys` | 중 | `sshd.options.permit_root_login ne no`(`default_on: effective`) | `{ fact: ssh.root_key_count, op: eq, expected: 0 }` | manual — root의 홈이 선언 패턴 밖, 또는 다른 사용자의 홈이 그러함(`manual-home-outside.json`) |
 | `ssh_key_quality` | 중 | — | `{ fact: ssh.dsa_key_count, op: eq, expected: 0 }`; `{ fact: ssh.rsa_keys, op: none, subject: fingerprint, where: { field: bits, op: lt, expected: "${min_rsa_bits}" } }`(기본 2048) | manual — 사용자의 홈이 선언 패턴 밖(`manual-home-outside.json`); `unparsed` 줄은 근거만이며 설명이 판정은 파싱된 키에 대한 것이라 말함 |
 
@@ -412,8 +439,8 @@ OpenSSH는 7.0에서 DSA를 실행 시 기본 비활성화하고, 9.8에서 기�
   xattr 패스는 `--deep` 아래서만 돌고 실행파일만 엽니다; 계획의 첫 과제가 lab(Ubuntu 22.04)과 EL9
   이미지에서 재고 늘어난 시간을 러너의 15m 예산 대비 기록.
 - **비root.** `accounts.login_capable` — `/etc/shadow`는 root 전용, `denied`(C3), 컨트롤은 ERROR;
-  `accounts.useradd.inactive`는 Debian/Ubuntu(0644)에서 답하고 EL(0600)에서 `denied` — 행이 아니라 matrix
-  `_notes` 항목; `accounts.lastlog`는 답함(0664). `sudo.*` 규칙 leaf 넷은 `denied`(`/etc/sudoers`는 0440).
+  `accounts.useradd.inactive`는 파일이 0644인 곳(Debian/Ubuntu, 측정된 Rocky 9)에서 답하고 릴리스가 0600으로
+  배포하는 곳에서 `denied` — 행이 아니라 matrix `_notes` 항목; `accounts.lastlog`는 답함(0664). `sudo.*` 규칙 leaf 넷은 `denied`(`/etc/sudoers`는 0440).
   `units.*`는 답함: 유닛 파일은 world-readable, `list-units`는 권한 불필요, 실행파일은 stat 가능; root
   전용 drop-in은 `units.exec_writable`을 그것을 적은 `absent`로(root 때처럼 MANUAL). `ssh.*`: `/root`가
   0700이라 행과 세 카운트가 `denied`; `ssh_key_quality`는 그것을 적은 ERROR, `root_authorized_keys`는
@@ -422,8 +449,10 @@ OpenSSH는 7.0에서 DSA를 실행 시 기본 비활성화하고, 9.8에서 기�
   키 여덟 — `accounts.login_capable`, `sudo.rules`, `sudo.nopasswd_all`, `sudo.authenticate_disabled`,
   `sudo.rules_unresolved`, `ssh.root_key_count`, `ssh.dsa_key_count`, `ssh.rsa_keys` — 가 더해지고;
   `ssh.authorized_keys` 자체는 읽지 못한 행에 `read_status: denied`를 둔 채 `ok`로 남음(`_notes` 항목이
-  그렇게 말함); `/run/podman`(0700)이 있는 호스트의 비root 실행은 `privilege.runtime_sockets`를
-  `denied`로 읽음(사실이며 matrix 행은 아님); 비root CI 잡이 행을 증명.
+  그렇게 말함); `privilege.ld_so_preload`는 답하고; `privilege.runtime_sockets`와
+  `privilege.runtime_group_members`는 비root 실행이 살필 수 없는 런타임 소켓이 있는 어느 호스트에서든 —
+  랩에서 측정된 `/run/docker.sock`(root:docker 0660), `/run/podman`(0700) — `denied`로 읽고, 하나도 없는
+  곳에서만 온전히 답함(사실이며 matrix 행은 아님); 비root CI 잡이 행을 증명.
 - **컨테이너.** 모든 beyond 컨트롤은 게이트로 NOT_APPLICABLE. 수집기는 그래도 완료해 `run.complete`가
   참이어야 함: `units`는 일반 이미지에서 `unsupported`(`systemctl` 없음; R220이 답한 것으로 셈), init
   이미지에서 `ok`(거기선 systemd가 PID 1), `privilege`는 소켓을 못 찾음(`exists: false` 행), 파일 리더는
@@ -457,9 +486,10 @@ OpenSSH는 7.0에서 DSA를 실행 시 기본 비활성화하고, 9.8에서 기�
 `fail-rsa-1024.json`. 목록 파라미터는 기본이 `[]`라 mutant도 fixture도 없음; 완화는 목록 파라미터마다
 `eval_test.go` 도출 행 하나(`Options.Params`로 principal / 라이브러리 / 멤버를 적고 PASS를 기대). 모든
 fixture는 `synthetic: true`, 컨트롤이 부르는 키 전부 존재, 판정 행마다 모든 필드(원칙 3). `_mutants.yaml`
-행: `account_inactivity_lock`, `file_capabilities_declared`, `ld_so_preload_empty`,
-`container_runtime_access`의 `absent_means → pass | not_applicable | manual` 행 열둘, 각각 §4 마지막 열의
-불변식을 인용; 그 밖은 기대하지 않음 — MANUAL 컨트롤 넷은 `manual-*` fixture로 `absent`에 닿음. 뮤테이션
+행: `ld_so_preload_empty`의 `absent_means → pass | not_applicable | manual` 행 셋만(없는 파일은 `ok []`, 그
+밖의 실패는 하드 상태 — leaf는 결코 `absent`가 아님); 다른 모든 컨트롤은 fixture로 `absent`에 닿음 —
+`fail-no-passwd.json`(`account_inactivity_lock`), `manual-no-package-db.json`(`file_capabilities_declared`),
+`fail-no-group.json`(`container_runtime_access`), 그리고 MANUAL 컨트롤 넷의 `manual-*` fixture. 뮤테이션
 테스트: 생존 0.
 
 **P-10 파서와 퍼즈 대상.** `[]byte` 진입점마다 단위 테스트와 시드가 있는
@@ -533,6 +563,10 @@ README/README.ko 상태와 로드맵; CHANGELOG Controls(여덟, 세트 버전, 
 - 다른 경로로 설정된 `AuthorizedKeysFile`(과 `authorized_keys2`를 셀지 결정하기 위해 유효값을 읽는 것);
   `AuthorizedKeysCommand`; `from=` / `restrict` 없는 일반 사용자의 키; 인증 기관(`TrustedUserCAKeys`);
   인증서 키 디코드.
+- alias 이름 아래 놓인 drop-in(`ssh.service`에 대한 `sshd.service.d`); `User=` 없는 `DynamicUser=`(root로
+  읽음 — 최악이 false FAIL); split-`/usr` 호스트(`/lib/systemd/system`은 검색 경로에 없음; 지원 릴리스에
+  split-`/usr`는 없음); xattr 패스를 포함한 RPM 가족의 walk 비용(거기선 모든 `.so`가 0755 — EL VM이 생길
+  때까지 미측정, 컨테이너는 자기 overlay 루트를 걷지 못함).
 - enabled도 active도 아닌 서비스; `.socket`, `.timer`, `.path` 유닛의 실행파일; 실행파일 뒤에 쓰기 가능한
   스크립트를 부르는 `ExecStart` 인자(인터프리터 뒤의 경로); 상대 첫 토큰에 대한 systemd의 검색 경로.
 - rootless podman의 소켓; `/etc/security/access.conf`; `pam_wheel`; U-45 너머의 `su` 제한.

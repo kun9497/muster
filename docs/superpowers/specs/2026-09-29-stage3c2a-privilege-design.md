@@ -121,8 +121,9 @@ Three leaves are added.
   reason says which — `useradd(8)` and shadow's `get_defaults` treat every one as "never"); the
   value is read as C `strtol` with base 0 does (`030` is 24), the line must start at column one
   (`get_defaults` matches the prefix), and a later `INACTIVE=` line overwrites an earlier one. A file that exists and cannot be read is the read's status (C3): the file is 0644
-  on Debian/Ubuntu and 0600 on EL (`shadow-utils` `%attr`), so the non-root reading is
-  release-dependent and the capability matrix carries a `_notes` entry instead of a row. EL
+  on Debian/Ubuntu and on Rocky 9 as shipped (measured; `shadow-utils` `%attr` had been read as 0600),
+  so the non-root reading is a matter of the release's packaging and the capability matrix carries a
+  `_notes` entry instead of a row. EL
   ships `INACTIVE=-1` written out; Ubuntu ships the line commented; both read -1.
 - `accounts.lastlog` — `list<record>` `{name, uid, last_login, line, host}`, evidence only,
   `sensitivity: internal`: `/var/log/lastlog` read with `ReadFileBinary` to a limit of 32 MiB
@@ -149,8 +150,10 @@ mask; 3C-1, J-40/J-49). The same walk now parses two more things from every line
 (`sudoers(5)`): alias definitions (`User_Alias`, `Runas_Alias`, `Cmnd_Alias`; `Host_Alias` is
 read and ignored) and user specifications. The lexer changes with it: a `#` followed by a
 digit is a uid (`#1000`), `%#` a gid, `#include` / `#includedir` are directives, and every
-other `#` starts a comment; a logical line is joined across `\` continuations before it is
-classified, whichever character it starts with (today's Defaults reader files every `#`-led
+other `#` starts a comment; a line is classified first and then joined across `\` continuations —
+a comment line is complete at its newline whatever it ends with, and a comment reached while a
+line is being joined closes that line, as sudo's lexer reads the `\`-newline as a blank and then
+the comment to its end; a `#1000 ALL = \` line, being a rule, still continues (today's Defaults reader files every `#`-led
 line as a comment). Grammar, from `sudoers(5)`:
 
 - `User_List host_list = Cmnd_Spec_List [: host_list = Cmnd_Spec_List …]` — a `User_List`
@@ -165,8 +168,12 @@ line as a comment). Grammar, from `sudoers(5)`:
   spec's text and does not distinguish them for the verdict.
 - A command list `ALL, !/usr/bin/su` still grants `ALL` (the man page calls negation no
   security measure); `sudoedit` is a command word.
-- Aliases are resolved by substitution to a depth of eight; a cycle, an undefined alias, a
-  netgroup or a non-Unix group leaves the row `resolved: false`.
+- Aliases are resolved by substitution to a depth of eight, after every file of the chain was read
+  (sudo resolves after parsing, so a definition after its use counts); a cycle, an undefined alias, a
+  netgroup or a non-Unix group leaves the row `resolved: false`, and so does anything past the
+  budgets — 65536 alias members and 65536 rows per resolution — so a crafted file reads `absent`,
+  never a partial answer. A `sha224:`…`sha512:` digest before a command stays one word with it
+  (its `=` padding never splits the line).
 - `Defaults` lines: unscoped, `Defaults:User_List`, `Defaults>Runas_List`, `Defaults@Host_List`,
   `Defaults!Cmnd_List`; a later line wins over an earlier one for the same flag (the
   `sudo.log.*` precedent).
@@ -237,8 +244,9 @@ the one form both declaration sources and `getcap` share; the renderer fixes the
 at 41 (`cap_max_bits` of a 5.9+ kernel) so the string does not depend on the host, and the
 text parser accepts both libcap spellings — the `cap_net_raw=ep` of libcap ≥ 2.41 and the
 `= cap_net_raw+ep` of older builds, which rpm headers built before 2020 still carry; `rootid` is recorded (0 for v1/v2)
-and a v3 row with a non-zero `rootid` is judged like any other: inert in the initial user
-namespace today, still a capability the package did not declare.
+and a v3 row with a non-zero `rootid` is never `package_declared`: neither rpm's header nor a
+postinst `setcap` without `-n` writes one, so it was set from a user namespace — inert in the
+initial namespace today, still a capability the package did not declare (the reason says so).
 
 **Declaration.** The setuid join's three sources become two here, because capabilities are
 declared where packages set them:
@@ -249,10 +257,16 @@ declared where packages set them:
   renders to the same canonical `caps`.
 - dpkg: a `.deb` cannot ship an xattr; the package's `postinst` sets it at install time with
   `setcap`. The join reads the owning package's `/var/lib/dpkg/info/<pkg>[:<arch>].postinst`
-  (the glob joins the walk's `Reads`) and recognises three forms: `setcap <caps> <path>` with a
-  literal path; `setcap <caps> $NAME` where `NAME=<path>` is assigned literally earlier in the
-  script (`iputils-ping`'s `PROGRAM`); and `setcap [-q] - <path> < <file>` (snapd reads
-  `snap-confine`'s set from a shipped file). `reference: postinst`; `package_declared` is true
+  (the glob joins the walk's `Reads`; the postinst is found through the `.list` file that owned the
+  path, so a multi-arch `libgstreamer1.0-0:amd64.postinst` resolves) and recognises four forms:
+  `setcap <caps> <path>` with a literal path; `setcap <caps> $NAME` where `NAME=<path>` is assigned
+  literally earlier in the script; `NAME=$(dpkg-divert --truename <path>)` (`iputils-ping`'s
+  `PROGRAM` — the literal inside is the declared path, and only this form may match a diverted
+  file); and `setcap [-q] - <path> < <file>` or a pipe into `setcap -` (snapd reads `snap-confine`'s
+  set from a shipped file). A `setcap` call muster cannot resolve (a variable assigned by a command)
+  leaves the row undeclared with the reason "a setcap call muster could not resolve"; a script that
+  is missing or unreadable leaves the row undeclared with the read's reason — the join itself never
+  fails on a postinst. `reference: postinst`; `package_declared` is true
   when the script names the path in a `setcap` invocation and, where the caps text is literal,
   it renders to the same canonical `caps`; `declared_caps` is that text, or `"(from file)"`
   for the third form. On the lab the five scripts that call `setcap` — `iproute2`,
@@ -268,8 +282,9 @@ declared where packages set them:
 - `walk.capabilities` — `list<record>` `{path, caps, rootid, package, package_declared,
   declared_caps, reference}`. Capped by `listCaps` (2000), sorted by `path`.
 - `walk.acl_grants` — `list<record>` `{path, entries}`, evidence only: the executables whose
-  access ACL grants write or execute to a named user or group beyond what the mode grants
-  (the mask applied, `acl(5)`); `entries` in `getfacl` spelling with **numeric ids**
+  access ACL grants a named user or group, after the mask is applied, more write or execute than the
+  owning group's own `group::` entry grants (`acl(5)`: with named entries the mode's group class IS
+  the mask, so "beyond the mode" means beyond the group entry); `entries` in `getfacl` spelling with **numeric ids**
   (`user:1000:rwx` — the decoder never resolves names, and the check side cannot). Decoded by
   `decodeACL([]byte)`, the POSIX ACL decoder the fixed-path `acl_entries` facts already use.
   Capped, sorted. No control reads it (§1).
@@ -295,8 +310,12 @@ systemd's precedence; an instance `foo@bar.service` is looked up as its template
 `foo@.service`; a unit file that is a symlink to `/dev/null` is a mask and the unit is out of
 scope; a symlink whose target is a bare unit name in the same directory (Ubuntu's
 `sshd.service → ssh.service` alias) is followed **by name** — `Readlink`, then that name is
-looked up — once; any other symlink, and a unit no tree holds, is a row `unit_file: symlink` /
-`unit_file: missing`, counted in `exec_unresolved`, its executables unjudged. The unit file
+looked up — once; any other symlink is a linked unit and a unit no tree holds is missing: rows
+`unit_file: symlink` / `unit_file: missing`, counted in `exec_unresolved`, their executables
+unjudged — and, for a linked unit or an ACTIVE missing one, `units.exec_writable` is `absent` naming
+the unit (what runs is unknown; an enabled-only dangling `.wants` link runs nothing and stays merely
+unresolved). An empty (size-0) unit file is a systemd mask and out of scope. A lone `;` word in an
+`Exec*=` value separates commands (`\;` is a literal argument): one exec row per command, each judged. The unit file
 and its `.d/*.conf` drop-ins from every tree are read in systemd's order and merged by a
 merger of their own (`mergeDropins` is single-valued and cannot merge `Exec*=` lists):
 `[Service]` `User=` (last wins; `0` is root) and the `Exec*=` directives (`ExecStart`,
@@ -319,10 +338,15 @@ scope: its executables run without root's power.
   `{path, mode, uid, gid}`; `exec` one row per `Exec*` first token, `{directive, path, exists,
   kind, mode, uid, gid, group_writable, other_writable, resolved}` from `Stat` of the path
   (every field present on every row — a missing file is `exists: false` with `mode -1`,
-  `uid -1`, `gid -1`, both writable flags false; a symlink at the path is `kind: symlink`, not
-  followed, judged by the link's own owner only). Evidence, `sensitivity: internal`, capped at
+  `uid -1`, `gid -1`, both writable flags false; a symlink at the path is followed one hop: a target
+  inside the declared set is stat-ed and judged with `stat_path` naming it, a target outside it or a
+  second link makes `units.exec_writable` `absent` naming the link; `stat_status` says `ok`,
+  `undeclared`, `denied` or `error`; the merged-`/usr` aliases `/bin`, `/sbin`, `/lib` resolve
+  through their link into `/usr`). Evidence, `sensitivity: internal`, capped at
   500 units, sorted by `unit`.
-- `units.exec_writable` — `list<record>` `{unit, path, why}`: the judged subset — an
+- `units.exec_writable` — `list<record>` `{unit, path, why}`: the judged subset — an executable
+  whose directory a non-root user can write (`why: parent_writable` — the parent not owned by uid 0,
+  or group/other-writable; Debian's `root:staff` 2775 `/usr/local/*` reads FAIL truthfully), an
   executable owned by a uid other than 0, or group-writable, or other-writable (`why` ∈
   `owner`, `group_writable`, `other_writable`), and a unit file or drop-in with the same
   three properties (`why` prefixed `unit_file:`). Sorted by `unit`, `path`. **`absent`**,
@@ -359,7 +383,9 @@ home.
   `{line, type, bits, fingerprint, options, restricted}`. Decoding (`sshd(8)` AUTHORIZED_KEYS
   FILE FORMAT, RFC 4253 §6.6): the options field exists iff the first word is not a key type,
   and its quoted values may hold `,` and `\"`; the key blob is base64 and its inner type string
-  must equal the type word, else the line is `unparsed`; `bits` for `ssh-rsa` is the bit length
+  must equal the type word (the signature-only words `rsa-sha2-256` / `rsa-sha2-512` carry an `ssh-rsa`
+  blob and are the same RSA key to sshd), else the line is `unparsed`; a blob with trailing bytes
+  or a malformed field is `unparsed`; `bits` for `ssh-rsa` is the bit length
   of the modulus `n` after its leading `0x00` (present when the top bit is set — a 2048-bit key
   encodes `n` in 257 bytes) is stripped; for `ecdsa-sha2-nistpXXX` the curve size from the
   inner curve name; 256 for `ssh-ed25519` and the `sk-*` types; 1024 for `ssh-dss`; 0 for
@@ -373,11 +399,14 @@ home.
   `authorized_keys2` there is one sshd ignores — the description of `root_authorized_keys`
   says the count includes it (a stale key file for root is a review, not a false alarm).
 - `ssh.dsa_key_count` — `int`: `ssh-dss` keys across all files read.
-- `ssh.rsa_keys` — `list<record>` `{user, path, line, bits, fingerprint}`: every `ssh-rsa`
-  key whose modulus was read (one whose blob does not decode is in `unparsed`, never here, so
+- `ssh.rsa_keys` — `list<record>` `{user, path, line, bits, fingerprint}`: every RSA
+  key whose modulus was read, a file two accounts share listed once under the first account by name (one whose blob does not decode is in `unparsed`, never here, so
   every row carries `bits`). Sorted by `user`, `path`, `line`.
 
-A file muster could not read (C3) puts the read's status on that row and on the three counts.
+A file muster could not read (C3) puts the read's status on that row and on the three counts; a
+symlinked key file or `.ssh` path, which sshd follows and muster does not, is a row `unfollowed:
+true` and leaves the three counts `absent` naming it (MANUAL); an untrusted `/etc/shells` (unreadable,
+or the libc fallback) puts its status on the three counts.
 In a non-root run the load-bearing denial is `/root` itself (0700; the matrix step already
 asserts `! test -r /root`), so the three counts are `denied` and both key controls read ERROR
 naming it — except `root_authorized_keys` when its gate cannot be read (§4).
@@ -395,9 +424,14 @@ the declared one. `Needs: none`.
   `#` starts a comment anywhere on a line). A missing
   file is an `ok` empty list — the normal state; a file that exists and cannot be read is the
   read's status (C3).
-- `privilege.runtime_sockets` — `list<record>` `{path, exists, mode, uid, gid, group,
-  group_writable, other_writable}`: the control sockets of the four runtimes whose API is root
-  (a client that can write to the socket can start a privileged container). Every row carries
+- `privilege.runtime_sockets` — `list<record>` `{path, exists, kind, mode, uid, gid, group,
+  group_writable, other_writable, owner_nonroot, acl_present}`: the control sockets of the four
+  runtimes whose API is root (a client that can write to the socket can start a privileged container);
+  `owner_nonroot` (uid ≠ 0) and `acl_present` (an access ACL on the socket) name the two other ways
+  an account reaches the API without a group. A socket cannot be opened for reading, so its xattrs
+  are read through an `O_PATH` fd's own `/proc/self/fd` entry — the inode already open, never the
+  path again; an xattr read that fails after the stat found the socket is the leaf's error, never
+  "not there". Every row carries
   every field: a socket that does not exist (`ENOENT` on the path or any parent) is `exists:
   false`, `mode -1`, `uid -1`, `gid -1`, `group ""`, both writable flags false; a stat that
   fails otherwise (`EACCES` on `/run/podman`, 0750 root, in a non-root run on a podman host)
@@ -406,7 +440,9 @@ the declared one. `Needs: none`.
 - `privilege.runtime_group_members` — `list<record>` `{group, member, uid, socket}`: for
   every existing socket that is group-writable, the members of its group with uid ≠ 0 —
   supplementary members from `/etc/group` and users whose primary gid is that group from
-  `/etc/passwd` — one row per (group, member). Sorted by `group`, `member`. Empty when no
+  `/etc/passwd` — one row per (group, member, socket), capped at 2000 rows. Sorted by `group`, `member`.
+  An unreadable `/etc/passwd` degrades this leaf alone (the socket rows' `group` comes from
+  `/etc/group`). Empty when no
   socket exists or every group is empty (the lab's `docker` group is; the GitHub runner's is
   not — `runner` is in it).
 
@@ -438,10 +474,10 @@ rules: non-privileged users must not execute privileged functions); the two key 
 |---|---|---|---|---|
 | `account_inactivity_lock` | 중 | — | `{ fact: accounts.login_capable, op: none, subject: name, where: { field: inactive_unset, op: eq, expected: true } }`; `{ fact: accounts.login_capable, op: none, subject: name, where: { field: inactive, op: gt, expected: "${max_inactive_days}" } }`; `{ fact: accounts.useradd.inactive, op: gte, expected: 0 }`; `{ fact: accounts.useradd.inactive, op: lte, expected: "${max_inactive_days}" }` — `INACTIVE=0` (disable at expiry) passes both | fail — never reached: the leaves are `ok` or a read's status (three `_mutants.yaml` rows) |
 | `sudo_nopasswd_all` | 상 | `sudo.installed eq true` | `{ fact: sudo.nopasswd_all, op: none, where: { op: not_in, expected: "${allowed_nopasswd_principals}" } }` (default `[]`); `{ fact: sudo.authenticate_disabled, op: eq, expected: false }` | manual — the chain was not fully read, or rules could not be resolved: the missing lines could carry the tag (`manual-include-outside.json`, `manual-unresolved-alias.json`) |
-| `file_capabilities_declared` | 상 | (deep gate: `walk.complete`) | `{ fact: walk.capabilities, op: none, subject: path, where: { field: package_declared, op: eq, expected: false } }` | fail — never reached: a non-deep run is MANUAL at the deep gate before screening (three rows) |
+| `file_capabilities_declared` | 상 | (deep gate: `walk.complete`) | `{ fact: walk.capabilities, op: none, subject: path, where: { field: package_declared, op: eq, expected: false } }` | manual — a host with no package database makes every joined walk list `absent` ("no package database"): nothing to declare against, the setuid precedent (`manual-no-package-db.json`) |
 | `root_unit_exec_writable` | 상 | `env.has_systemd eq true` | `{ fact: units.exec_writable, op: none, subject: path, where: { field: why, op: present } }` | manual — an in-scope unit file or drop-in exists and could not be read (`manual-unit-unreadable.json`) |
 | `ld_so_preload_empty` | 상 | — | `{ fact: privilege.ld_so_preload, op: none, where: { op: not_in, expected: "${allowed_preload}" } }` (default `[]`) | fail — never reached: a missing file is an `ok` empty list (three rows) |
-| `container_runtime_access` | 상 | — | `{ fact: privilege.runtime_sockets, op: none, subject: path, where: { field: other_writable, op: eq, expected: true } }`; `{ fact: privilege.runtime_group_members, op: none, subject: member, where: { field: member, op: not_in, expected: "${allowed_runtime_group_members}" } }` (default `[]`) | fail — never reached: no socket is a row with `exists: false` (three rows) |
+| `container_runtime_access` | 상 | — | `{ fact: privilege.runtime_sockets, op: none, subject: path, where: { field: other_writable, op: eq, expected: true } }`; the same with `owner_nonroot` and with `acl_present`; `{ fact: privilege.runtime_group_members, op: none, subject: member, where: { field: member, op: not_in, expected: "${allowed_runtime_group_members}" } }` (default `[]`) | fail — a missing `/etc/group` makes the members leaf `absent` (`fail-no-group.json`); no socket is a row with `exists: false` |
 | `root_authorized_keys` | 중 | `sshd.options.permit_root_login ne no` (`default_on: effective`) | `{ fact: ssh.root_key_count, op: eq, expected: 0 }` | manual — root's home is outside the declared patterns, or another user's is (`manual-home-outside.json`) |
 | `ssh_key_quality` | 중 | — | `{ fact: ssh.dsa_key_count, op: eq, expected: 0 }`; `{ fact: ssh.rsa_keys, op: none, subject: fingerprint, where: { field: bits, op: lt, expected: "${min_rsa_bits}" } }` (default 2048) | manual — a user's home is outside the declared patterns (`manual-home-outside.json`); `unparsed` lines are evidence only and the description says the verdict covers parsed keys |
 
@@ -500,16 +536,17 @@ the size OpenSSH's own `ssh-keygen(1)` has generated by default since 2014; cert
   only; the plan's first task measures it on the lab (Ubuntu 22.04) and in an EL9 image and
   records the added time against the 15 m runner budget.
 - **Non-root.** `accounts.login_capable` — `/etc/shadow` is root-only, `denied` (C3), the
-  control ERROR; `accounts.useradd.inactive` answers on Debian/Ubuntu (0644) and is `denied` on
-  EL (0600) — a matrix `_notes` entry, not a row; `accounts.lastlog` answers (0664). The four
+  control ERROR; `accounts.useradd.inactive` answers where the file is 0644 (Debian/Ubuntu, Rocky 9 as measured) and
+  is `denied` where a release ships it 0600 — a matrix `_notes` entry, not a row; `accounts.lastlog` answers (0664). The four
   `sudo.*` rule leaves are `denied` (`/etc/sudoers` is 0440). `units.*` answer: unit files are
   world-readable, `list-units` needs no privilege, executables are stat-able; a root-only
   drop-in makes `units.exec_writable` `absent` naming it (MANUAL, as for root). `ssh.*`: `/root`
   is 0700, so the rows and the three counts are `denied`; `ssh_key_quality` reads ERROR naming
   it, `root_authorized_keys` ERROR where the gate is readable (Ubuntu's `sshd_config` is 0644)
-  and NOT_APPLICABLE where it is not (EL9). `privilege.*` answer in full where no podman socket
-  directory exists (a host with `/run/podman`, 0700, reads `privilege.runtime_sockets` `denied`
-  there — truthful, and not a matrix row). The capability matrix's `nonroot.denied` row gains
+  and NOT_APPLICABLE where it is not (EL9). `privilege.ld_so_preload` answers; `privilege.runtime_sockets` and
+  `privilege.runtime_group_members` read `denied` on any host with a runtime socket a non-root run
+  cannot examine — `/run/docker.sock` (root:docker 0660) as measured on the lab, `/run/podman`
+  (0700) — and answer in full only where none exists (truthful, and not a matrix row). The capability matrix's `nonroot.denied` row gains
   eight keys — `accounts.login_capable`, `sudo.rules`, `sudo.nopasswd_all`,
   `sudo.authenticate_disabled`, `sudo.rules_unresolved`, `ssh.root_key_count`,
   `ssh.dsa_key_count`, `ssh.rsa_keys`; `ssh.authorized_keys` itself stays `ok` with
@@ -555,11 +592,12 @@ default ±1): `pass-inactive-exactly-35.json` (a row with `inactive: 35` and `us
 no mutant and get no fixture; the relaxation is one `eval_test.go` derivation row per list
 parameter (`Options.Params` naming the principal / library / member, expecting PASS). Every
 fixture `synthetic: true`, every key the control names present, every judged row carrying
-every field (principle 3). `_mutants.yaml` rows: the twelve `absent_means → pass |
-not_applicable | manual` rows of `account_inactivity_lock`, `file_capabilities_declared`,
-`ld_so_preload_empty` and `container_runtime_access`, each citing the invariant in §4's last
-column; nothing else is expected — the four MANUAL controls reach `absent` through their
-`manual-*` fixtures. Mutation test: zero survivors.
+every field (principle 3). `_mutants.yaml` rows: the three `absent_means → pass |
+not_applicable | manual` rows of `ld_so_preload_empty` alone (a missing file is `ok []`, any other
+failure a hard status — the leaf is never `absent`); every other control reaches `absent` through a
+fixture — `fail-no-passwd.json` (`account_inactivity_lock`), `manual-no-package-db.json`
+(`file_capabilities_declared`), `fail-no-group.json` (`container_runtime_access`) and the
+`manual-*` fixtures of the four MANUAL controls. Mutation test: zero survivors.
 
 **P-10 parsers and fuzz targets.** Unit tests and a `Fuzz<Name>` with seeds for every
 `[]byte` entry point (`TestEveryParserHasAFuzzTarget` enforces it): `parseSudoers` (alias
@@ -649,6 +687,11 @@ reference list.
 - `AuthorizedKeysFile` set to another path (and reading the effective value to decide whether
   `authorized_keys2` counts); `AuthorizedKeysCommand`; keys of ordinary users without `from=` /
   `restrict`; certificate authorities (`TrustedUserCAKeys`); decoding certificate keys.
+- Drop-ins filed under an alias name (`sshd.service.d` for `ssh.service`); `DynamicUser=` without
+  `User=` (read as root — a false FAIL at worst); split-`/usr` hosts (`/lib/systemd/system` is not
+  in the search path; no supported release is split-`/usr`); the RPM family's walk cost with the
+  xattr pass (every `.so` is 0755 there — unmeasured until an EL VM is available, a container
+  cannot walk its overlay root).
 - Services neither enabled nor active; `.socket`, `.timer` and `.path` units' executables;
   `ExecStart` arguments that name a writable script after the executable (an interpreter
   followed by a path); systemd's search path for a relative first token.

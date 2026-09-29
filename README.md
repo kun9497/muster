@@ -14,14 +14,15 @@ the Linux server asset class: KISA is the primary standard, and global
 benchmarks (CIS Benchmarks, DISA STIG, NIST SP 800-53) are attached as
 references and, later, offered as selectable profiles.
 
-> **Status: stage 3C-1 merged (September 2026).** Stage 1 — the skeleton:
+> **Status: stage 3C-2a merged (September 2026).** Stage 1 — the skeleton:
 > `collect`, `check`, waivers, exit codes, eight controls end to end — stage 2
 > — every automatable KISA item, from the foundations with DISA STIG and NIST
 > SP 800-53 references through accounts, PAM, sshd, home directories, system
 > files, services, the firewall, logging, NFS, SNMP, patch hygiene, FTP, mail
-> and DNS to the closing coverage-and-reference gate — and stages 3A, 3B and
-> 3C-1 — the deep filesystem walk, the first checks beyond the guide, audit
-> pipeline health and package integrity — are merged. 67 of the 67 items are enrolled (68 controls:
+> and DNS to the closing coverage-and-reference gate — and stages 3A, 3B,
+> 3C-1 and 3C-2a — the deep filesystem walk, the first checks beyond the guide,
+> audit pipeline health and package integrity, and who holds root's power
+> without being root — are merged. 67 of the 67 items are enrolled (68 controls:
 > 57 auto, 7 partial, 4 manual with the evidence attached),
 > and 36 beyond the guide. `collect --deep`
 > walks the local filesystems once, under a time and entry budget, without
@@ -191,9 +192,14 @@ titles, never their discussion, check and fix text. See
    forwarding, sudo's own log, the file-integrity tool, and whole-database
    package verification (`rpm -Va` / `dpkg --verify` under `--deep`, the noise
    filter recorded) — nine controls from three collectors and two extensions.
-   Next (3C-2): file capabilities and ACLs, `authorized_keys` inventory,
-   processes running deleted binaries, root-equivalent paths, exposure of
-   listening sockets versus firewall rules. Profiles select controls and parameters: `kisa-unix-2026`
+   3C-2a (merged): privilege — file capabilities judged against the package's
+   own declaration, root services' writable executables, `ld.so.preload`,
+   container-runtime sockets and their groups, passwordless `ALL` in sudoers,
+   the inactivity policy over every interactive account, root's authorized keys
+   and SSH key quality — eight controls from three extended collectors and three
+   new ones. Next (3C-2b): the process collector, processes running deleted
+   binaries, exposure of listening sockets versus firewall rules, network
+   sysctls. Profiles select controls and parameters: `kisa-unix-2026`
    stays the default, and a `cis-<distro>-l1` profile covers the CIS Level 1
    server recommendations for the target distributions, with `references.cis`
    as those controls' primary reference.
