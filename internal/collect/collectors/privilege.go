@@ -88,12 +88,21 @@ func runPrivilege(_ context.Context, a collect.Access, b *collect.Builder) error
 		meta, err := a.Stat(p)
 		if err == nil {
 			// V-51: an ACL entry grants the socket to someone no group
-			// row names. A failed read is the leaf's status, as a stat is.
-			var present bool
-			if _, present, err = aclEntries(a, p); err == nil {
+			// row names. V-53: the stat found the socket, so a failed ACL
+			// read is the leaf's status, never "not there" — an ENOENT
+			// here (no procfs for the /proc/self/fd route) is an error.
+			_, present, aerr := aclEntries(a, p)
+			if aerr == nil {
 				socks = append(socks, socketStat{path: p, exists: true, kind: meta.Kind, mode: int(meta.Mode), uid: int(meta.UID), gid: int(meta.GID), acl: present})
-				continue
+			} else if sockErr == nil {
+				e := socketErrorEnv(p, aerr)
+				if errors.Is(aerr, fs.ErrNotExist) || errors.Is(aerr, unix.ENOTDIR) {
+					e = collect.ErrorEnv(p + ": the stat found it, the ACL read did not: " + aerr.Error())
+				}
+				e.Source = &facts.Source{Kind: "file", Path: p}
+				sockErr = &e
 			}
+			continue
 		}
 		switch {
 		case errors.Is(err, fs.ErrNotExist), errors.Is(err, unix.ENOTDIR):

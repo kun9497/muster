@@ -262,8 +262,9 @@ type xattrHandle struct {
 }
 
 // openXattr opens p through the no-follow primitive for an xattr call.
-// Opening a unix socket with O_RDONLY is ENXIO, and an O_PATH fd answers
-// Flistxattr and Fgetxattr with EBADF (Linux 5.15), so a socket (V-51: the
+// Opening a unix socket with O_RDONLY is ENXIO, and the f*xattr calls have
+// long answered an O_PATH fd with EBADF; the /proc/self/fd route below works
+// on every kernel muster supports. So a socket (V-51: the
 // container runtimes' control sockets and their ACLs) is reopened with
 // O_PATH|O_NOFOLLOW through the same openNoFollow (no symlink in any
 // component) and read through /proc/self/fd/N, which names the inode already

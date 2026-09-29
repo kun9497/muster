@@ -401,3 +401,20 @@ func TestPrivilegeTruncation(t *testing.T) {
 		t.Errorf("sockets truncated by /etc/passwd")
 	}
 }
+
+// V-53: once the stat found the socket, an xattr read that fails, even with
+// ENOENT (no procfs for the /proc/self/fd route), is the leaf's error,
+// never a socket that is not there.
+func TestPrivilegeXattrNotExistAfterStatIsError(t *testing.T) {
+	for _, errno := range []error{unix.ENOENT, unix.ENOTDIR} {
+		a := privilegeAccess(stockGroup, stockPasswd)
+		a.stats[dockerSock] = statResult{kind: "socket", mode: 0o660, uid: 0, gid: 999}
+		a.fails[dockerSock] = &fs.PathError{Op: "listxattr", Path: "/proc/self/fd/3", Err: errno}
+		b := build(t, "privilege", a)
+		for _, k := range []string{"privilege.runtime_sockets", "privilege.runtime_group_members"} {
+			if e := env(t, b, k); e.Status != facts.StatusError || !strings.HasPrefix(e.Reason, dockerSock+": ") {
+				t.Errorf("%v, %s: %+v", errno, k, e)
+			}
+		}
+	}
+}
