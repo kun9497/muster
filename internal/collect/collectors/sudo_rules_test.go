@@ -282,6 +282,17 @@ func TestParseSudoersUidContinuation(t *testing.T) {
 	if !authenticateDisabled([]sudoersFile{f}) {
 		t.Error("the Defaults line after a continued comment was swallowed")
 	}
+	// V-43: a comment reached while joining closes the logical line; the
+	// line after it starts fresh.
+	rules, _ = resolveOne(t, "bob ALL = /bin/ls \\\n# c \\\nalice ALL = NOPASSWD: ALL\n", mainSudoers)
+	wantRules(t, rules, []string{
+		`bob user neg=false runas="" nopasswd=false ["/bin/ls"] resolved=true`,
+		`alice user neg=false runas="" nopasswd=true ["ALL"] resolved=true`,
+	})
+	wantStrings(t, "nopasswd_all after a comment mid-continuation", nopasswdAll(rules), []string{"alice"})
+	if len(rules) == 2 && (rules[0].Line != 1 || rules[1].Line != 3) {
+		t.Errorf("lines %d %d, want 1 3", rules[0].Line, rules[1].Line)
+	}
 	// A uid line still continues, and so does #-1.
 	rules, _ = resolveOne(t, "#-1 ALL = \\\n NOPASSWD: ALL\n", mainSudoers)
 	wantRules(t, rules, []string{`#-1 uid neg=false runas="" nopasswd=true ["ALL"] resolved=true`})

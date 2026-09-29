@@ -138,21 +138,29 @@ type sudoLogicalLine struct {
 	text string
 }
 
-// sudoLogicalLines classifies, then joins (V-42): a line that starts a
+// sudoLogicalLines classifies, then joins (V-42, V-43): a line that starts a
 // comment ends at its newline, a trailing "\" notwithstanding, as sudo's
 // lexer ends it; every other line — a "#1000" uid line included — is joined
-// with the next while it ends in "\".
+// with the next while it ends in "\", until a comment line closes it.
 func sudoLogicalLines(data []byte) []sudoLogicalLine {
 	var out []sudoLogicalLine
 	var cur strings.Builder
 	start, joining := 0, false
 	for i, raw := range strings.Split(string(data), "\n") {
 		t := strings.TrimRight(strings.TrimSuffix(raw, "\r"), " \t")
+		if sudoCommentLine(strings.TrimSpace(t)) {
+			// V-43: a comment reached while joining closes the logical
+			// line — sudo reads the "\"-newline as a blank, then the
+			// comment to its newline — and is dropped.
+			if joining {
+				out = append(out, sudoLogicalLine{n: start, text: strings.TrimSpace(cur.String())})
+				cur.Reset()
+				joining = false
+			}
+			continue
+		}
 		if !joining {
 			start = i + 1
-			if sudoCommentLine(strings.TrimSpace(t)) {
-				continue
-			}
 		}
 		if strings.HasSuffix(t, `\`) {
 			cur.WriteString(strings.TrimSuffix(t, `\`))
