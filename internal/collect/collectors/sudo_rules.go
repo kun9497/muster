@@ -25,7 +25,7 @@ const (
 	sudoAliasDepth = 8
 	// sudoRuleCap bounds the published sudo.rules list (V-12).
 	sudoRuleCap = 2000
-	// sudoExpandBudget bounds the alias expansions of one resolveRules call
+	// sudoExpandBudget bounds the alias members one resolveRules call emits
 	// and sudoRowBudget the rows it builds; past either, what is left is
 	// unresolved rather than read, so the answers turn absent, never wrong.
 	sudoExpandBudget = 1 << 16
@@ -115,6 +115,17 @@ var sudoCmndOptions = map[string]bool{
 
 var sudoDigests = map[string]bool{"sha224": true, "sha256": true, "sha384": true, "sha512": true}
 
+// sudoDigestWord is an algorithm and its digest as the lexer joins them.
+func sudoDigestWord(s string) bool {
+	alg, _, ok := strings.Cut(s, ":")
+	return ok && sudoDigests[alg]
+}
+
+// sudoDigestByte is a character of a hex or base64 digest, padding included.
+func sudoDigestByte(c byte) bool {
+	return c >= '0' && c <= '9' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c == '+' || c == '/' || c == '='
+}
+
 var sudoAliasTypes = map[string]string{
 	"User_Alias": "User_Alias", "Runas_Alias": "Runas_Alias", "Host_Alias": "Host_Alias",
 	"Cmnd_Alias": "Cmnd_Alias", "Cmd_Alias": "Cmnd_Alias",
@@ -127,9 +138,10 @@ type sudoLogicalLine struct {
 	text string
 }
 
-// sudoLogicalLines joins every line ending in "\" with the next, whatever
-// it starts with — a comment that continues swallows the next line — before
-// anything is classified.
+// sudoLogicalLines classifies, then joins (V-42): a line that starts a
+// comment ends at its newline, a trailing "\" notwithstanding, as sudo's
+// lexer ends it; every other line — a "#1000" uid line included — is joined
+// with the next while it ends in "\".
 func sudoLogicalLines(data []byte) []sudoLogicalLine {
 	var out []sudoLogicalLine
 	var cur strings.Builder
@@ -138,6 +150,9 @@ func sudoLogicalLines(data []byte) []sudoLogicalLine {
 		t := strings.TrimRight(strings.TrimSuffix(raw, "\r"), " \t")
 		if !joining {
 			start = i + 1
+			if sudoCommentLine(strings.TrimSpace(t)) {
+				continue
+			}
 		}
 		if strings.HasSuffix(t, `\`) {
 			cur.WriteString(strings.TrimSuffix(t, `\`))
@@ -154,6 +169,25 @@ func sudoLogicalLines(data []byte) []sudoLogicalLine {
 		out = append(out, sudoLogicalLine{n: start, text: strings.TrimSpace(cur.String())})
 	}
 	return out
+}
+
+// sudoCommentLine is a line whose first token is a comment: a "#" that is
+// neither an include directive nor the start of a uid (#1000, #-1).
+func sudoCommentLine(s string) bool {
+	if !strings.HasPrefix(s, "#") {
+		return false
+	}
+	if _, _, ok := sudoDirective(s); ok {
+		return false
+	}
+	return !sudoUIDStart(s[1:])
+}
+
+// sudoUIDStart is whether what follows a "#" makes it a uid: a digit, or
+// "-" and a digit.
+func sudoUIDStart(s string) bool {
+	s = strings.TrimPrefix(s, "-")
+	return s != "" && s[0] >= '0' && s[0] <= '9'
 }
 
 // parseSudoers reads one sudoers file for its aliases, user specifications,
@@ -244,7 +278,7 @@ func sudoLex(s string) []sudoTok {
 		case c == ' ' || c == '\t':
 			flush()
 		case c == '#' && !inWord:
-			if i+1 < len(s) && s[i+1] >= '0' && s[i+1] <= '9' {
+			if sudoUIDStart(s[i+1:]) {
 				w.WriteByte(c)
 				inWord = true
 				continue
@@ -255,6 +289,17 @@ func sudoLex(s string) []sudoTok {
 			toks = append(toks, sudoTok{'!', "!"})
 		case c == ':' && inWord && w.String() == "%":
 			w.WriteByte(c) // %:nonunix_group
+		case c == ':' && inWord && sudoDigests[w.String()]:
+			// A Digest_Spec: the hex or base64 digest, "=" padding
+			// included, is one word with its algorithm (sha224:0Gom…==).
+			w.WriteByte(c)
+			for i+1 < len(s) && (s[i+1] == ' ' || s[i+1] == '\t') {
+				i++
+			}
+			for i+1 < len(s) && sudoDigestByte(s[i+1]) {
+				i++
+				w.WriteByte(s[i])
+			}
 		case c == ',' || c == '=' || c == ':' || c == '(' || c == ')':
 			flush()
 			toks = append(toks, sudoTok{c, string(c)})
@@ -335,27 +380,33 @@ func (p *sudoParser) list() ([]string, bool) {
 }
 
 // cmnd reads Digest_List? "!"* command, the command's words joined by one
-// blank.
+// blank; a digest list stays in front of the command it pins
+// (sha256:ab…,sha512:cd… /bin/ls).
 func (p *sudoParser) cmnd() (string, bool) {
 	neg := p.bangs()
-	for p.is('w') && sudoDigests[p.peek(0).text] && p.peek(1).kind == ':' {
-		p.i += 2
-		if p.is('w') {
+	var digests []string
+	for p.is('w') && sudoDigestWord(p.peek(0).text) {
+		digests = append(digests, p.peek(0).text)
+		p.i++
+		if p.is(',') && p.peek(1).kind == 'w' && sudoDigestWord(p.peek(1).text) {
 			p.i++
-		}
-		for p.is(',') && p.peek(1).kind == 'w' && sudoDigests[p.peek(1).text] {
-			p.i++
+			continue
 		}
 		if p.bangs() {
 			neg = !neg
 		}
+		break
 	}
 	var words []string
+	if len(digests) > 0 {
+		words = append(words, strings.Join(digests, ","))
+	}
+	lead := len(words)
 	for p.is('w') {
 		words = append(words, p.peek(0).text)
 		p.i++
 	}
-	if len(words) == 0 {
+	if len(words) == lead {
 		return "", false
 	}
 	text := strings.Join(words, " ")
@@ -563,15 +614,20 @@ func sudoNegation(s string) (string, bool) {
 
 type sudoResolver struct {
 	aliases map[string]map[string][]string
-	steps   int // alias expansions so far, bounded by sudoExpandBudget
+	steps   int // alias members emitted so far, bounded by sudoExpandBudget
 }
 
-// spent counts one alias expansion and says whether the budget is gone: an
-// alias whose expansion would pass it is left unresolved, so a file of
-// aliases that multiply each other cannot grow without bound.
-func (r *sudoResolver) spent() bool {
-	r.steps++
-	return r.steps > sudoExpandBudget
+// charge counts the members an alias expansion is about to emit and says
+// whether they would pass the budget: that alias is then left unresolved
+// rather than expanded (its one unresolved marker stands for a member
+// already charged), so aliases that multiply each other emit at most twice
+// sudoExpandBudget members over one resolveRules call.
+func (r *sudoResolver) charge(n int) bool {
+	if r.steps+n > sudoExpandBudget {
+		return true
+	}
+	r.steps += n
+	return false
 }
 
 type sudoPrincipal struct {
@@ -594,7 +650,7 @@ func (r *sudoResolver) principals(tok string, neg bool, depth int, visiting map[
 	switch kind {
 	case "alias":
 		members, defined := r.members("User_Alias", name)
-		if !defined || visiting[name] || depth >= sudoAliasDepth || r.spent() {
+		if !defined || visiting[name] || depth >= sudoAliasDepth || r.charge(len(members)) {
 			return []sudoPrincipal{{name: name, kind: kind, neg: neg, why: name}}
 		}
 		visiting[name] = true
@@ -625,7 +681,7 @@ func (r *sudoResolver) commands(text string, neg bool, depth int, visiting map[s
 		return []sudoResolvedCmd{{text: name, neg: neg, ok: true}}
 	}
 	members, defined := r.members("Cmnd_Alias", name)
-	if !defined || visiting[name] || depth >= sudoAliasDepth || r.spent() {
+	if !defined || visiting[name] || depth >= sudoAliasDepth || r.charge(len(members)) {
 		return []sudoResolvedCmd{{text: name, neg: neg, why: name}}
 	}
 	visiting[name] = true
@@ -648,7 +704,7 @@ func (r *sudoResolver) runasMembers(tok string, neg bool, depth int, visiting ma
 		return []string{name}
 	}
 	members, defined := r.members("Runas_Alias", name)
-	if !defined || visiting[name] || depth >= sudoAliasDepth || r.spent() {
+	if !defined || visiting[name] || depth >= sudoAliasDepth || r.charge(len(members)) {
 		*why = append(*why, name)
 		if neg {
 			name = "!" + name
@@ -726,7 +782,11 @@ func (r *sudoResolver) runs(priv sudoPrivilege) []sudoRun {
 // principal per privilege per run of a Runas_Spec, substituting aliases to
 // a depth of eight. A cycle, an undefined alias, a netgroup, a non-Unix
 // group or a specification that did not parse leaves the row unresolved.
-// Aliases are global across the files, the first definition winning.
+// Aliases are global across the files, the first definition winning, and
+// are merged before any rule is resolved: sudo resolves an alias when it
+// matches, after reading every file, so a definition after its use (later
+// in the file or in a later drop-in) counts. Hosts are not judged: every
+// specification counts as if its Host_List matched this host.
 func resolveRules(files []sudoersFile) (rules []sudoRule, unresolved int) {
 	r := &sudoResolver{aliases: map[string]map[string][]string{}}
 	for _, f := range files {

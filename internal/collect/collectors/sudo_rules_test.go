@@ -267,11 +267,89 @@ func TestParseSudoersUidContinuation(t *testing.T) {
 	if len(rules) != 0 || unresolved != 0 {
 		t.Errorf("comments read as rules: %q (%d)", rulesText(rules), unresolved)
 	}
-	// A comment that continues swallows the next line; a quoted "#" is text.
-	rules, _ = resolveOne(t, "# note \\\nalice ALL = ALL\nbob ALL = /bin/echo \"#x\"\n", mainSudoers)
-	wantRules(t, rules, []string{`bob user neg=false runas="" nopasswd=false ["/bin/echo #x"] resolved=true`})
-	if rules[0].Line != 3 {
-		t.Errorf("line %d, want 3", rules[0].Line)
+	// V-42: a comment ends at its newline, a trailing "\" notwithstanding
+	// (sudo's lexer), so the next line is read; a quoted "#" is text.
+	f := parseSudoers([]byte("# note \\\nalice ALL = NOPASSWD: ALL\nbob ALL = /bin/echo \"#x\"\n# more \\\nDefaults !authenticate\n"), mainSudoers)
+	rules, _ = resolveRules([]sudoersFile{f})
+	wantRules(t, rules, []string{
+		`alice user neg=false runas="" nopasswd=true ["ALL"] resolved=true`,
+		`bob user neg=false runas="" nopasswd=false ["/bin/echo #x"] resolved=true`,
+	})
+	if len(rules) != 2 || rules[0].Line != 2 || rules[1].Line != 3 {
+		t.Errorf("lines of %q, want 2 3", rulesText(rules))
+	}
+	wantStrings(t, "nopasswd_all after a continued comment", nopasswdAll(rules), []string{"alice"})
+	if !authenticateDisabled([]sudoersFile{f}) {
+		t.Error("the Defaults line after a continued comment was swallowed")
+	}
+	// A uid line still continues, and so does #-1.
+	rules, _ = resolveOne(t, "#-1 ALL = \\\n NOPASSWD: ALL\n", mainSudoers)
+	wantRules(t, rules, []string{`#-1 uid neg=false runas="" nopasswd=true ["ALL"] resolved=true`})
+}
+
+// A Digest_Spec is part of the command: the "=" of base64 padding never
+// splits the line.
+func TestParseSudoersDigest(t *testing.T) {
+	rules, unresolved := resolveOne(t, "alice ALL = NOPASSWD: sha224:0GomF8mNN3wlDt1HD9XldjJ3SNgpFdbjO1+NsQ== /bin/ls, sha256:abcd,sha512:ef01 /bin/cat\n", mainSudoers)
+	wantRules(t, rules, []string{
+		`alice user neg=false runas="" nopasswd=true ["sha224:0GomF8mNN3wlDt1HD9XldjJ3SNgpFdbjO1+NsQ== /bin/ls" "sha256:abcd,sha512:ef01 /bin/cat"] resolved=true`,
+	})
+	if unresolved != 0 {
+		t.Errorf("unresolved %d", unresolved)
+	}
+	rules, _ = resolveOne(t, "Cmnd_Alias LS = sha256:AAAA= /bin/ls\nbob ALL = LS\n", mainSudoers)
+	wantRules(t, rules, []string{`bob user neg=false runas="" nopasswd=false ["sha256:AAAA= /bin/ls"] resolved=true`})
+}
+
+// Aliases are resolved after every file is read, as sudo resolves them, so a
+// definition after its use counts.
+func TestResolveRulesForwardReference(t *testing.T) {
+	rules, unresolved := resolveRules([]sudoersFile{
+		parseSudoers([]byte("LATE ALL = NOPASSWD: ALL\n"), mainSudoers),
+		parseSudoers([]byte("User_Alias LATE = zoe\n"), "/etc/sudoers.d/90"),
+	})
+	wantRules(t, rules, []string{`zoe user neg=false runas="" nopasswd=true ["ALL"] resolved=true`})
+	if unresolved != 0 {
+		t.Errorf("unresolved %d", unresolved)
+	}
+}
+
+// Finding 2: the expansion budget is charged per member emitted, so an
+// alias naming a 4000-member alias 4000 times stops at the budget.
+func TestResolveRulesMemberBudget(t *testing.T) {
+	var b strings.Builder
+	b.WriteString("User_Alias B = u0")
+	for i := 1; i < 4000; i++ {
+		fmt.Fprintf(&b, ", u%d", i)
+	}
+	b.WriteString("\nUser_Alias A = B")
+	for i := 1; i < 4000; i++ {
+		b.WriteString(", B")
+	}
+	b.WriteString("\nCmnd_Alias C = /c0")
+	for i := 1; i < 4000; i++ {
+		fmt.Fprintf(&b, ", /c%d", i)
+	}
+	b.WriteString("\nCmnd_Alias D = C")
+	for i := 1; i < 4000; i++ {
+		b.WriteString(", C")
+	}
+	b.WriteString("\nA ALL = NOPASSWD: ALL\nroot ALL = D\n")
+	r := &sudoResolver{aliases: parseSudoers([]byte(b.String()), mainSudoers).Aliases}
+	members := r.principals("A", false, 0, map[string]bool{})
+	if len(members) > sudoExpandBudget || r.steps > sudoExpandBudget {
+		t.Errorf("principals built %d members after %d steps (budget %d)", len(members), r.steps, sudoExpandBudget)
+	}
+	cmds := (&sudoResolver{aliases: r.aliases}).commands("D", false, 0, map[string]bool{})
+	if len(cmds) > sudoExpandBudget {
+		t.Errorf("commands built %d (budget %d)", len(cmds), sudoExpandBudget)
+	}
+	rules, unresolved := resolveOne(t, b.String(), mainSudoers)
+	if len(rules) > sudoRowBudget+1 || unresolved == 0 {
+		t.Errorf("%d rules, %d unresolved", len(rules), unresolved)
+	}
+	if names := unresolvedNames(rules); !reflect.DeepEqual(names, []string{"B", "D"}) {
+		t.Errorf("names %q, want the aliases past the budget", names)
 	}
 }
 
@@ -376,6 +454,9 @@ func TestAuthenticateDisabledScopes(t *testing.T) {
 		{"Defaults authenticate\nDefaults:alice !authenticate\n", true, 1},
 		{"Defaults !!authenticate\n", false, 0},
 		{"Defaults env_reset\n", false, 0},
+		{"Defaults:%sudo !authenticate\n", true, 1},
+		{`Defaults env_keep += "X !authenticate"` + "\n", false, 0},
+		{`Defaults env_keep += "!authenticate"` + "\n", false, 0},
 		{"# Defaults !authenticate\n", false, 0},
 	} {
 		f := parseSudoers([]byte(c.data), mainSudoers)
