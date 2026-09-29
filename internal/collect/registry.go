@@ -233,12 +233,12 @@ func (hostAccess) Glob(pattern string) ([]string, error) {
 // the path, which resolves every component but the last and would defeat
 // the guarantee this package exists to give.
 func (hostAccess) Llistxattr(p string) ([]string, error) {
-	fd, _, err := openNoFollow(rewriteProcSelf(p), openFlags)
+	h, err := openXattr(rewriteProcSelf(p))
 	if err != nil {
 		return nil, err
 	}
-	defer unix.Close(fd)
-	size, err := unix.Flistxattr(fd, nil)
+	defer h.close()
+	size, err := h.list(nil)
 	if err != nil {
 		return nil, err
 	}
@@ -246,11 +246,61 @@ func (hostAccess) Llistxattr(p string) ([]string, error) {
 		return nil, nil
 	}
 	buf := make([]byte, size)
-	n, err := unix.Flistxattr(fd, buf)
+	n, err := h.list(buf)
 	if err != nil {
 		return nil, err
 	}
 	return splitXattrNames(buf[:n]), nil
+}
+
+// xattrHandle is an open file whose extended attributes Llistxattr and
+// Getxattr read: through the fd itself or, for a socket, which cannot be
+// opened for reading, through proc, the /proc/self/fd path of an O_PATH fd.
+type xattrHandle struct {
+	fd   int
+	proc string
+}
+
+// openXattr opens p through the no-follow primitive for an xattr call.
+// Opening a unix socket with O_RDONLY is ENXIO, and an O_PATH fd answers
+// Flistxattr and Fgetxattr with EBADF (Linux 5.15), so a socket (V-51: the
+// container runtimes' control sockets and their ACLs) is reopened with
+// O_PATH|O_NOFOLLOW through the same openNoFollow (no symlink in any
+// component) and read through /proc/self/fd/N, which names the inode already
+// open, never the path again. The fd is fstat'd first and anything but a
+// socket keeps the original ENXIO (a device with no driver), so this branch
+// serves sockets alone.
+func openXattr(p string) (xattrHandle, error) {
+	fd, _, err := openNoFollow(p, openFlags)
+	if err == nil || !errors.Is(err, unix.ENXIO) {
+		return xattrHandle{fd: fd}, err
+	}
+	pfd, _, perr := openNoFollow(p, unix.O_PATH|unix.O_NOFOLLOW|unix.O_CLOEXEC)
+	if perr != nil {
+		return xattrHandle{fd: -1}, err
+	}
+	var st unix.Stat_t
+	if serr := unix.Fstat(pfd, &st); serr != nil || st.Mode&unix.S_IFMT != unix.S_IFSOCK {
+		unix.Close(pfd)
+		return xattrHandle{fd: -1}, err
+	}
+	return xattrHandle{fd: pfd, proc: "/proc/self/fd/" + strconv.Itoa(pfd)}, nil
+}
+
+func (h xattrHandle) close() { unix.Close(h.fd) }
+
+func (h xattrHandle) list(buf []byte) (int, error) {
+	if h.proc != "" {
+		return unix.Listxattr(h.proc, buf)
+	}
+	return unix.Flistxattr(h.fd, buf)
+}
+
+func (h xattrHandle) get(name string, buf []byte) (int, error) {
+	if h.proc != "" {
+		return unix.Getxattr(h.proc, name, buf)
+	}
+	return unix.Fgetxattr(h.fd, name, buf)
 }
 
 // splitXattrNames splits the NUL-separated name list Flistxattr fills in.
@@ -277,21 +327,22 @@ func splitXattrNames(buf []byte) []string {
 // again, and a second ERANGE is returned to the caller as the error it is,
 // never a silently truncated value.
 func (hostAccess) Getxattr(p, name string) ([]byte, error) {
-	fd, _, err := openNoFollow(rewriteProcSelf(p), openFlags)
+	h, err := openXattr(rewriteProcSelf(p))
 	if err != nil {
 		return nil, err
 	}
-	defer unix.Close(fd)
-	size, err := unix.Fgetxattr(fd, name, nil)
+	defer h.close()
+	get := func(buf []byte) (int, error) { return h.get(name, buf) }
+	size, err := get(nil)
 	if err != nil {
 		return nil, err
 	}
-	v, err := readXattr(fd, name, size)
+	v, err := readXattrWith(get, size)
 	if errors.Is(err, unix.ERANGE) {
-		if size, err = unix.Fgetxattr(fd, name, nil); err != nil {
+		if size, err = get(nil); err != nil {
 			return nil, err
 		}
-		v, err = readXattr(fd, name, size)
+		v, err = readXattrWith(get, size)
 	}
 	if err != nil {
 		return nil, err
@@ -303,11 +354,17 @@ func (hostAccess) Getxattr(p, name string) ([]byte, error) {
 // size is an empty attribute: there is nothing to read, and a zero-length
 // destination would make Fgetxattr a second sizing call rather than a read.
 func readXattr(fd int, name string, size int) ([]byte, error) {
+	return readXattrWith(func(buf []byte) (int, error) { return unix.Fgetxattr(fd, name, buf) }, size)
+}
+
+// readXattrWith is readXattr over any getter: an fd's Fgetxattr, or a
+// socket's /proc/self/fd path (openXattr).
+func readXattrWith(get func([]byte) (int, error), size int) ([]byte, error) {
 	if size <= 0 {
 		return nil, nil
 	}
 	buf := make([]byte, size)
-	n, err := unix.Fgetxattr(fd, name, buf)
+	n, err := get(buf)
 	if err != nil {
 		return nil, err
 	}

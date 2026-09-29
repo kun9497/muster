@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"net"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -1002,5 +1003,60 @@ func TestListActionsRendersTheWalkRow(t *testing.T) {
 	}
 	if !strings.Contains(buf.String(), "walk") || !strings.Contains(buf.String(), want.Target) {
 		t.Errorf("table is missing the walk row:\n%s", buf.String())
+	}
+}
+
+// V-51: opening a unix socket for reading is ENXIO, so the xattr calls
+// reach a socket through an O_PATH fd and its /proc/self/fd path. The
+// socket's ACL must read as it is, and a symlink to a socket must still be
+// refused.
+func TestHostAccessXattrOnASocket(t *testing.T) {
+	dir, err := os.MkdirTemp("", "mx")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(dir) })
+	p := filepath.Join(dir, "s")
+	l, err := net.Listen("unix", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { l.Close() })
+
+	names, err := (hostAccess{}).Llistxattr(p)
+	if err != nil {
+		t.Fatalf("Llistxattr on a socket: %v", err)
+	}
+	if slices.Contains(names, "system.posix_acl_access") {
+		t.Fatalf("a fresh socket lists an ACL: %v", names)
+	}
+	link := filepath.Join(dir, "link")
+	if err := os.Symlink(p, link); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := (hostAccess{}).Llistxattr(link); !errors.Is(err, ErrSymlink) {
+		t.Errorf("Llistxattr through a symlink to a socket: %v, want ErrSymlink", err)
+	}
+	if _, err := (hostAccess{}).Getxattr(link, "system.posix_acl_access"); !errors.Is(err, ErrSymlink) {
+		t.Errorf("Getxattr through a symlink to a socket: %v, want ErrSymlink", err)
+	}
+
+	// user::rw- user:1000:rw- group::rw- mask::rw- other::---
+	acl := []byte{2, 0, 0, 0,
+		0x01, 0, 6, 0, 0xff, 0xff, 0xff, 0xff,
+		0x02, 0, 6, 0, 0xe8, 0x03, 0, 0,
+		0x04, 0, 6, 0, 0xff, 0xff, 0xff, 0xff,
+		0x10, 0, 6, 0, 0xff, 0xff, 0xff, 0xff,
+		0x20, 0, 0, 0, 0xff, 0xff, 0xff, 0xff}
+	if err := unix.Lsetxattr(p, "system.posix_acl_access", acl, 0); err != nil {
+		t.Skipf("this filesystem takes no ACL on a socket: %v", err)
+	}
+	names, err = (hostAccess{}).Llistxattr(p)
+	if err != nil || !slices.Contains(names, "system.posix_acl_access") {
+		t.Fatalf("Llistxattr after setfacl: %v, %v", names, err)
+	}
+	v, err := (hostAccess{}).Getxattr(p, "system.posix_acl_access")
+	if err != nil || len(v) != len(acl) {
+		t.Fatalf("Getxattr after setfacl: %d bytes, %v", len(v), err)
 	}
 }

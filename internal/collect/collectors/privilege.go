@@ -27,6 +27,10 @@ const (
 	privilegeGroupMembers  = "privilege.runtime_group_members"
 	socketGroupWritableBit = 0o020
 	socketOtherWritableBit = 0o002
+
+	// runtimeMembersRows caps privilege.runtime_group_members (V-12's
+	// 2000-row idiom); past it the envelope is truncated.
+	runtimeMembersRows = 2000
 )
 
 // runtimeSockets are the control sockets of the four runtimes, at their
@@ -49,9 +53,11 @@ var privilegeCollector = collect.Collector{
 type socketStat struct {
 	path   string
 	exists bool
+	kind   string // the stat's Kind: socket, or whatever sits at the path
 	mode   int
 	uid    int
 	gid    int
+	acl    bool // a system.posix_acl_access attribute is set (V-51)
 }
 
 func runPrivilege(_ context.Context, a collect.Access, b *collect.Builder) error {
@@ -61,6 +67,8 @@ func runPrivilege(_ context.Context, a collect.Access, b *collect.Builder) error
 	var groups []groupRow
 	names := map[int]string{}
 	if groupErr == nil {
+		// A malformed line is dropped, as the accounts collector drops it;
+		// its count is accounts.parse_failures, not repeated here.
 		groups, _ = parseGroup(groupData)
 		for _, g := range groups {
 			if _, dup := names[g.gid]; !dup && g.gid >= 0 {
@@ -78,13 +86,20 @@ func runPrivilege(_ context.Context, a collect.Access, b *collect.Builder) error
 	for _, p := range runtimeSockets {
 		inputs = append(inputs, facts.Source{Kind: "file", Path: p})
 		meta, err := a.Stat(p)
+		if err == nil {
+			// V-51: an ACL entry grants the socket to someone no group
+			// row names. A failed read is the leaf's status, as a stat is.
+			var present bool
+			if _, present, err = aclEntries(a, p); err == nil {
+				socks = append(socks, socketStat{path: p, exists: true, kind: meta.Kind, mode: int(meta.Mode), uid: int(meta.UID), gid: int(meta.GID), acl: present})
+				continue
+			}
+		}
 		switch {
-		case err == nil:
-			socks = append(socks, socketStat{path: p, exists: true, mode: int(meta.Mode), uid: int(meta.UID), gid: int(meta.GID)})
 		case errors.Is(err, fs.ErrNotExist), errors.Is(err, unix.ENOTDIR):
 			socks = append(socks, socketStat{path: p, mode: -1, uid: -1, gid: -1})
 		case sockErr == nil:
-			e := readErrorEnv(p, err)
+			e := socketErrorEnv(p, err)
 			e.Source = &facts.Source{Kind: "file", Path: p}
 			sockErr = &e
 		}
@@ -108,12 +123,15 @@ func runPrivilege(_ context.Context, a collect.Access, b *collect.Builder) error
 		rows = append(rows, map[string]any{
 			"path":           s.path,
 			"exists":         s.exists,
+			"kind":           s.kind,
 			"mode":           s.mode,
 			"uid":            s.uid,
 			"gid":            s.gid,
 			"group":          group,
 			"group_writable": s.exists && s.mode&socketGroupWritableBit != 0,
 			"other_writable": s.exists && s.mode&socketOtherWritableBit != 0,
+			"owner_nonroot":  s.exists && s.uid != 0,
+			"acl_present":    s.acl,
 		})
 	}
 	// A truncated /etc/group may be missing the very line a name was
@@ -132,11 +150,22 @@ func runPrivilege(_ context.Context, a collect.Access, b *collect.Builder) error
 		b.Set(privilegeGroupMembers, e)
 		return nil
 	}
-	users, _ := parsePasswd(passwdData)
-	members := groupMembers(socks, names, groups, users)
+	users, _ := parsePasswd(passwdData) // malformed lines dropped, as for /etc/group
+
+	members, cut := capRows(groupMembers(socks, names, groups, users), runtimeMembersRows)
 	memberInputs := append(inputs, facts.Source{Kind: "file", Path: groupPath}, facts.Source{Kind: "file", Path: passwdPath})
-	b.Set(privilegeGroupMembers, withTruncation(collect.OK(members, &facts.Source{Kind: "derived", Inputs: memberInputs}), groupMeta.Truncated || passwdMeta.Truncated))
+	b.Set(privilegeGroupMembers, withTruncation(collect.OK(members, &facts.Source{Kind: "derived", Inputs: memberInputs}), cut || groupMeta.Truncated || passwdMeta.Truncated))
 	return nil
+}
+
+// socketErrorEnv is a failed socket read's envelope, naming the path once:
+// the primitive's ErrSymlink already carries it ("<p>: symbolic link in
+// path"), every other error gets it prefixed (C3).
+func socketErrorEnv(p string, err error) facts.Envelope {
+	if errors.Is(err, collect.ErrSymlink) {
+		return collect.FromReadError(err, collect.ReadMeta{})
+	}
+	return readErrorEnv(p, err)
 }
 
 // ldSoPreload is the privilege.ld_so_preload envelope: a missing file is the

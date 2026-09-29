@@ -28,7 +28,7 @@ const (
 // socketRowFields and memberRowFields are the fields every row carries
 // (V-9), existing or not.
 var (
-	socketRowFields = []string{"path", "exists", "mode", "uid", "gid", "group", "group_writable", "other_writable"}
+	socketRowFields = []string{"path", "exists", "kind", "mode", "uid", "gid", "group", "group_writable", "other_writable", "owner_nonroot", "acl_present"}
 	memberRowFields = []string{"group", "member", "uid", "socket"}
 )
 
@@ -73,8 +73,9 @@ func rowsOf(t *testing.T, b *collect.Builder, key string, fields []string) []map
 }
 
 func socketShape(r map[string]any) string {
-	return fmt.Sprintf("%s exists=%v mode=%v uid=%v gid=%v group=%q gw=%v ow=%v",
-		r["path"], r["exists"], r["mode"], r["uid"], r["gid"], r["group"], r["group_writable"], r["other_writable"])
+	return fmt.Sprintf("%s exists=%v kind=%q mode=%v uid=%v gid=%v group=%q gw=%v ow=%v nonroot=%v acl=%v",
+		r["path"], r["exists"], r["kind"], r["mode"], r["uid"], r["gid"], r["group"], r["group_writable"], r["other_writable"],
+		r["owner_nonroot"], r["acl_present"])
 }
 
 func memberShape(r map[string]any) string {
@@ -90,7 +91,7 @@ func shapes(rows []map[string]any, f func(map[string]any) string) []string {
 }
 
 func absentSocket(p string) string {
-	return p + ` exists=false mode=-1 uid=-1 gid=-1 group="" gw=false ow=false`
+	return p + ` exists=false kind="" mode=-1 uid=-1 gid=-1 group="" gw=false ow=false nonroot=false acl=false`
 }
 
 func TestPrivilegePreload(t *testing.T) {
@@ -123,7 +124,7 @@ func TestPrivilegeRuntimeSockets(t *testing.T) {
 
 	got := shapes(rowsOf(t, b, "privilege.runtime_sockets", socketRowFields), socketShape)
 	want := []string{
-		dockerSock + ` exists=true mode=432 uid=0 gid=999 group="docker" gw=true ow=false`,
+		dockerSock + ` exists=true kind="socket" mode=432 uid=0 gid=999 group="docker" gw=true ow=false nonroot=false acl=false`,
 		absentSocket(containerdSock),
 		absentSocket(podmanSock),
 		absentSocket(crioSock),
@@ -294,5 +295,109 @@ func TestPrivilegePublishesEveryKey(t *testing.T) {
 		if !reflect.DeepEqual(rec.stated, runtimeSockets) {
 			t.Errorf("%s: stated %v, want %v", name, rec.stated, runtimeSockets)
 		}
+	}
+}
+
+// V-51: a non-root owner or a POSIX ACL reaches the runtime API without the
+// group, so both are recorded on every row; kind says what is at the path.
+func TestPrivilegeSocketOwnerACLAndKind(t *testing.T) {
+	a := privilegeAccess(stockGroup, stockPasswd)
+	a.stats[dockerSock] = statResult{kind: "socket", mode: 0o660, uid: 1000, gid: 999}
+	b := build(t, "privilege", a)
+	if r := rowsOf(t, b, "privilege.runtime_sockets", socketRowFields)[0]; r["owner_nonroot"] != true || r["acl_present"] != false {
+		t.Errorf("uid 1000: %s", socketShape(r))
+	}
+
+	a = privilegeAccess(stockGroup, stockPasswd)
+	a.stats[dockerSock] = statResult{kind: "socket", mode: 0o660, uid: 0, gid: 999}
+	a.xattrValues = map[string]map[string][]byte{dockerSock: {aclXattrName: fiveEntryACL()}}
+	b = build(t, "privilege", a)
+	if r := rowsOf(t, b, "privilege.runtime_sockets", socketRowFields)[0]; r["acl_present"] != true || r["owner_nonroot"] != false {
+		t.Errorf("ACL: %s", socketShape(r))
+	}
+
+	a = privilegeAccess(stockGroup, stockPasswd)
+	a.stats[dockerSock] = statResult{kind: "regular", mode: 0o644, uid: 0, gid: 0}
+	b = build(t, "privilege", a)
+	if r := rowsOf(t, b, "privilege.runtime_sockets", socketRowFields)[0]; r["kind"] != "regular" || r["exists"] != true {
+		t.Errorf("regular file: %s", socketShape(r))
+	}
+
+	// An xattr read that fails is the whole leaf's status, as a stat is.
+	a = privilegeAccess(stockGroup, stockPasswd)
+	a.stats[dockerSock] = statResult{kind: "socket", mode: 0o660, uid: 0, gid: 999}
+	a.fails[dockerSock] = deniedErr("flistxattr", dockerSock)
+	b = build(t, "privilege", a)
+	for _, k := range []string{"privilege.runtime_sockets", "privilege.runtime_group_members"} {
+		if e := env(t, b, k); e.Status != facts.StatusDenied || !strings.HasPrefix(e.Reason, dockerSock+": ") {
+			t.Errorf("xattr denied, %s: %+v", k, e)
+		}
+	}
+
+	// A symlink at a socket path is an error naming the path once.
+	a = privilegeAccess(stockGroup, stockPasswd)
+	a.links = map[string]string{dockerSock: "/elsewhere"}
+	b = build(t, "privilege", a)
+	e := env(t, b, "privilege.runtime_sockets")
+	if e.Status != facts.StatusError || strings.Count(e.Reason, dockerSock) != 1 || !strings.HasPrefix(e.Reason, dockerSock+": ") {
+		t.Errorf("symlink: %+v", e)
+	}
+}
+
+func TestPrivilegeNeutralRowAndUnknownMember(t *testing.T) {
+	a := privilegeAccess("docker:x:999:ghost\n", stockPasswd)
+	a.stats[dockerSock] = statResult{kind: "socket", mode: 0o660, uid: 0, gid: 999}
+	b := build(t, "privilege", a)
+	rows := rowsOf(t, b, "privilege.runtime_sockets", socketRowFields)
+	neutral := map[string]any{"path": crioSock, "exists": false, "kind": "", "mode": -1, "uid": -1, "gid": -1, "group": "",
+		"group_writable": false, "other_writable": false, "owner_nonroot": false, "acl_present": false}
+	if !reflect.DeepEqual(rows[3], neutral) {
+		t.Errorf("neutral row %#v\nwant %#v", rows[3], neutral)
+	}
+	// ghost is in /etc/group but not /etc/passwd: uid -1, still a row.
+	got := shapes(rowsOf(t, b, "privilege.runtime_group_members", memberRowFields), memberShape)
+	want := []string{"docker bob 1002 " + dockerSock, "docker ghost -1 " + dockerSock}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("members %v, want %v", got, want)
+	}
+}
+
+func TestPrivilegeTruncation(t *testing.T) {
+	var names []string
+	for i := 0; i < 4096; i++ {
+		names = append(names, fmt.Sprintf("m%04d", i))
+	}
+	a := privilegeAccess("docker:x:999:"+strings.Join(names, ",")+"\n", stockPasswd)
+	a.stats[dockerSock] = statResult{kind: "socket", mode: 0o660, uid: 0, gid: 999}
+	b := build(t, "privilege", a)
+	if rows := okList(t, b, "privilege.runtime_group_members"); len(rows) != runtimeMembersRows {
+		t.Errorf("%d member rows, want %d", len(rows), runtimeMembersRows)
+	}
+	if e := env(t, b, "privilege.runtime_group_members"); !e.Truncated {
+		t.Errorf("members past the cap not truncated: %+v", e.Status)
+	}
+	if e := env(t, b, "privilege.runtime_sockets"); e.Truncated {
+		t.Errorf("sockets truncated by the members cap")
+	}
+
+	// A truncated /etc/group read may miss the line a name or a member
+	// came from: both leaves say so.
+	a = privilegeAccess(stockGroup, stockPasswd)
+	a.stats[dockerSock] = statResult{kind: "socket", mode: 0o660, uid: 0, gid: 999}
+	a.truncated = map[string]bool{groupPath: true}
+	b = build(t, "privilege", a)
+	for _, k := range []string{"privilege.runtime_sockets", "privilege.runtime_group_members"} {
+		if e := env(t, b, k); !e.Truncated {
+			t.Errorf("%s not truncated after a truncated /etc/group", k)
+		}
+	}
+	// A truncated /etc/passwd, the members only.
+	a.truncated = map[string]bool{passwdPath: true}
+	b = build(t, "privilege", a)
+	if e := env(t, b, "privilege.runtime_group_members"); !e.Truncated {
+		t.Errorf("members not truncated after a truncated /etc/passwd")
+	}
+	if e := env(t, b, "privilege.runtime_sockets"); e.Truncated {
+		t.Errorf("sockets truncated by /etc/passwd")
 	}
 }
