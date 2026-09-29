@@ -1306,7 +1306,7 @@ keys:
     collector: accounts
   - key: accounts.lastlog
     type: list<record>
-    description: "Evidence only: the /var/log/lastlog record of each /etc/passwd uid - name, uid, last_login (RFC 3339 UTC, empty when the account never logged in), line and host - decoded with the running architecture's record size (292 or 296 bytes, named in the reason), sorted by name, truncated at 2000 rows or when the 32 MiB read limit cut off a uid's record; absent where shadow 4.15 replaced lastlog with lastlog2."
+    description: "Evidence only: the /var/log/lastlog record of each /etc/passwd uid, one row per uid named by the first account in /etc/passwd order that has it - name, uid, last_login (RFC 3339 UTC, empty when the account never logged in), line and host - decoded with the running architecture's record size (292 or 296 bytes, named in the reason), sorted by name, truncated at 2000 rows or when the 32 MiB read limit cut off a uid's record; absent where shadow 4.15 replaced lastlog with lastlog2."
     since: 1
     sensitivity: internal
     collector: accounts

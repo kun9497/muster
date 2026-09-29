@@ -108,7 +108,7 @@ func lastlogRows(a collect.Access, prows []passwdRow, pmeta collect.ReadMeta) fa
 	uids := uidsOf(prows)
 	if meta.Truncated {
 		for uid := range uids {
-			if (int64(uid)+1)*int64(size) > int64(len(data)) {
+			if uid >= len(data)/size { // division, never uid*size: a huge uid would wrap
 				delete(uids, uid)
 			}
 		}

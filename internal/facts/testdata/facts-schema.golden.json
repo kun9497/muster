@@ -2304,7 +2304,7 @@
     {
       "Key": "accounts.lastlog",
       "Type": "list\u003crecord\u003e",
-      "Description": "Evidence only: the /var/log/lastlog record of each /etc/passwd uid - name, uid, last_login (RFC 3339 UTC, empty when the account never logged in), line and host - decoded with the running architecture's record size (292 or 296 bytes, named in the reason), sorted by name, truncated at 2000 rows or when the 32 MiB read limit cut off a uid's record; absent where shadow 4.15 replaced lastlog with lastlog2.",
+      "Description": "Evidence only: the /var/log/lastlog record of each /etc/passwd uid, one row per uid named by the first account in /etc/passwd order that has it - name, uid, last_login (RFC 3339 UTC, empty when the account never logged in), line and host - decoded with the running architecture's record size (292 or 296 bytes, named in the reason), sorted by name, truncated at 2000 rows or when the 32 MiB read limit cut off a uid's record; absent where shadow 4.15 replaced lastlog with lastlog2.",
       "Since": 1,
       "Sensitivity": "internal",
       "Collector": "accounts",

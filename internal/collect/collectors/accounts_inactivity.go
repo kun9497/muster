@@ -182,9 +182,12 @@ func parseLastlog(data []byte, recordSize int, uids map[int]string) []any {
 			continue
 		}
 		r := row{name: name, uid: uid}
-		off := int64(uid) * int64(recordSize)
-		if off+int64(recordSize) <= int64(len(data)) {
-			rec := data[off : off+int64(recordSize)]
+		// Bounded by division before any multiplication: a passwd uid
+		// such as 2^62-1 would wrap uid*recordSize negative and pass an
+		// offset test. uid < len/size is "the whole record is in data".
+		if uid < len(data)/recordSize {
+			off := uid * recordSize
+			rec := data[off : off+recordSize]
 			var secs int64
 			if timeSize == 4 {
 				secs = int64(binary.NativeEndian.Uint32(rec))

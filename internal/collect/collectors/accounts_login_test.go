@@ -258,8 +258,12 @@ func TestAccountsInactivityFacts(t *testing.T) {
 		t.Errorf("shadow denied: lastlog %+v must not depend on shadow", e)
 	}
 	// The passwd-failure branch: without the accounts there is nothing to
-	// select, join or index, so all three carry the passwd read's status.
-	for _, k := range []string{"accounts.login_capable", "accounts.useradd.inactive", "accounts.lastlog"} {
+	// select or index, so those two carry the passwd read's status; the
+	// useradd default is its own file and keeps its own reading.
+	if e := env(t, results["passwd denied"], "accounts.useradd.inactive"); e.Status != facts.StatusOK || e.Value != -1 || !strings.Contains(e.Reason, "INACTIVE=-1") {
+		t.Errorf("passwd denied: useradd.inactive %+v, want the file's own reading (ok -1, INACTIVE=-1)", e)
+	}
+	for _, k := range []string{"accounts.login_capable", "accounts.lastlog"} {
 		if e := env(t, results["passwd denied"], k); e.Status != facts.StatusDenied {
 			t.Errorf("passwd denied: %s %+v, want the passwd read's status", k, e)
 		}

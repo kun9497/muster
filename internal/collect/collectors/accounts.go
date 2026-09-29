@@ -304,7 +304,7 @@ func runAccounts(_ context.Context, a collect.Access, b *collect.Builder) error 
 		b.Set("accounts.shadow_in_use", e)
 		b.Set("accounts.parse_failures", e)
 		b.Set("accounts.login_capable", e)
-		b.Set("accounts.useradd.inactive", e)
+		b.Set("accounts.useradd.inactive", useraddInactive(a)) // its own file: never the passwd read's status
 		b.Set("accounts.lastlog", e)
 		return nil
 	}

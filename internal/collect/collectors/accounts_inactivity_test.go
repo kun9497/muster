@@ -3,6 +3,7 @@ package collectors
 import (
 	"bytes"
 	"encoding/binary"
+	"math"
 	"os"
 	"runtime"
 	"strings"
@@ -178,6 +179,17 @@ func TestParseLastlogBothLayouts(t *testing.T) {
 	top := lastlogBytes(292, 1, map[int]lastlogRecord{0: {0xFFFFFFFF, "tty1", ""}})
 	if r := lastlogRowsByName(t, parseLastlog(top, 292, map[int]string{0: "root"}))["root"]; r["last_login"] != "2106-02-07T06:28:15Z" {
 		t.Errorf("292: the time must be read as uint32: %v", r)
+	}
+	// A uid whose offset would overflow is past the file: the zero record,
+	// never a wrapped offset and a panic.
+	// 2^62-1 and 2^63-1 on 64-bit ints.
+	for _, huge := range []int{math.MaxInt >> 1, math.MaxInt} {
+		for _, size := range []int{292, 296} {
+			rows := lastlogRowsByName(t, parseLastlog(make([]byte, 2*size), size, map[int]string{huge: "huge"}))
+			if r := rows["huge"]; r == nil || r["uid"] != huge || r["last_login"] != "" || r["line"] != "" {
+				t.Errorf("%d: uid %d must be a zero row: %v", size, huge, rows)
+			}
+		}
 	}
 	// An unknown record size decodes nothing rather than guessing.
 	if rows := parseLastlog(lastlogSeed(292), 300, uids); rows == nil || len(rows) != 0 {

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"math"
 	"os"
 	"path"
 	"path/filepath"
@@ -558,7 +559,9 @@ func FuzzParseShadow(f *testing.F) {
 func FuzzParseLastlog(f *testing.F) {
 	seeds(f, "testdata/lastlog*")
 	f.Fuzz(func(t *testing.T, data []byte) {
-		uids := map[int]string{0: "root", 1: "daemon", 1000: "alice"}
+		// The huge uid keeps the offset arithmetic guarded: uid*recordSize
+		// wraps for it, and the decoder must answer a zero row, not panic.
+		uids := map[int]string{0: "root", 1: "daemon", 1000: "alice", math.MaxInt >> 1: "huge"}
 		fuzzBody(t, "parseLastlog", func() any {
 			return []any{parseLastlog(data, 292, uids), parseLastlog(data, 296, uids)}
 		}, len(data))
