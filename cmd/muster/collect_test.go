@@ -117,7 +117,8 @@ func TestCollectListActionsOnLinux(t *testing.T) {
 	}
 	// R60: /proc/self/status is read by the "muster" pseudo-collector, so
 	// the action list names it like any other declared read.
-	for _, want := range []string{`"kind": "read"`, `"kind": "command"`, `"kind": "write"`, "/usr/sbin/sshd -T", "/proc/self/status", "/usr/bin/rpm -Va", "/usr/sbin/auditctl -s"} {
+	for _, want := range []string{`"kind": "read"`, `"kind": "command"`, `"kind": "write"`, "/usr/sbin/sshd -T", "/proc/self/status", "/usr/bin/rpm -Va", "/usr/sbin/auditctl -s",
+		"/usr/bin/systemctl list-units --type=service --state=active --plain --no-legend", `%|FILECAPS?{%{FILECAPS}}|`} {
 		if !strings.Contains(out.String(), want) {
 			t.Errorf("missing %q", want)
 		}

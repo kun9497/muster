@@ -30,15 +30,22 @@ import (
 //   - The oracle's own output is parsed HERE, by code this file owns, never
 //     by the function under test. An oracle that shares a parser with the
 //     parser it judges cannot disagree with it.
-//   - Nothing is written, started, stopped or installed. Every command is a
-//     query (`sshd -T`, `getent`, `findmnt`, `systemctl show`, `sysctl -n`,
-//     `dpkg --verify` or `rpm -Va`, `auditctl -s` and `-l`), run through the
-//     same exec discipline the collectors use.
+//   - Nothing is written to the host's configuration, started, stopped or
+//     installed. Every command is a query (`sshd -T`, `getent`, `findmnt`,
+//     `systemctl show`, `sysctl -n`, `dpkg --verify` or `rpm -Va`,
+//     `auditctl -s` and `-l`, `lastlog -u`, `getcap -r`, `visudo -c`), run
+//     through the same exec discipline the collectors use. The one writer is
+//     the keys pair's `ssh-keygen`, and it writes only under t.TempDir(),
+//     which the test removes: no key reaches a declared path or a snapshot.
 //   - A pair whose oracle binary is not on this machine skips, naming the
 //     binary; that is the only skip an enabled run may produce — besides,
 //     for the audit pair, J-1's "auditctl cannot reach the kernel" (exit 4
-//     or 255, a container) — and the CI job on the runner VM, which has
-//     every binary and a running auditd, asserts there are none.
+//     or 255, a container), and for the capabilities pair a run without
+//     root (the walk needs it) or a container, whose overlay root the walk
+//     reads as unsupported, and for the lastlog pair a host with no
+//     /var/log/lastlog (shadow 4.15 and later) — and the CI job on the
+//     runner VM, which has every binary and a running auditd, asserts
+//     there are none.
 //     A binary that IS there and refuses to answer fails the pair: a daemon
 //     that will not print its own configuration is a finding, not a gap.
 //
@@ -992,4 +999,564 @@ func TestOracleAudit(t *testing.T) {
 		}
 	}
 	t.Logf("oracle audit: compared %d", compared)
+}
+
+// --- units --------------------------------------------------------------
+
+// oracleUnitsSample is how many in-scope units the units pair asks systemd
+// about: enough to cover a daemon, a oneshot and a template instance on a
+// stock host, few enough that the pair stays a handful of systemctl calls.
+const oracleUnitsSample = 5
+
+// oracleExecPath is the path= of the first `{ … }` command in a `systemctl
+// show` ExecStart value — `{ path=/usr/sbin/sshd ; argv[]=/usr/sbin/sshd -D
+// … }` — which is the executable systemd resolved, prefixes gone. "" when the
+// value names no command.
+func oracleExecPath(v string) string {
+	_, rest, ok := strings.Cut(v, "path=")
+	if !ok {
+		return ""
+	}
+	p, _, _ := strings.Cut(rest, " ;")
+	return strings.TrimSpace(p)
+}
+
+// oracleUser folds the two spellings of "runs as root": the collector's row
+// says "" for a unit without User=, and `systemctl show` prints an empty
+// User= for it.
+func oracleUser(u string) string {
+	if u == "" {
+		return "root"
+	}
+	return u
+}
+
+// TestOracleUnits: for up to five root services whose unit file the collector
+// read, systemd's own merged view of the unit (its file and drop-ins) runs
+// the same first ExecStart executable, as the same user, as the collector's
+// row says. A row whose first ExecStart the collector left unresolved (a
+// bare name systemd looks up itself) is not sampled: its path is systemd's
+// search, not the file's.
+func TestOracleUnits(t *testing.T) {
+	oracleEnabled(t)
+	bin := oracleBinary(t, systemctlPath)
+	b := build(t, "units", collect.Host())
+	compared := 0
+	for _, r := range okList(t, b, "units.root_services") {
+		if compared == oracleUnitsSample {
+			break
+		}
+		row := r.(map[string]any)
+		if row["unit_file"] != "file" || row["read_status"] != "ok" {
+			continue
+		}
+		var first map[string]any
+		for _, e := range row["exec"].([]any) {
+			if er := e.(map[string]any); er["directive"] == "ExecStart" {
+				first = er
+				break
+			}
+		}
+		if first == nil || first["resolved"] != true {
+			continue
+		}
+		unit := row["unit"].(string)
+		var execStart, user, state string
+		seen := false
+		for _, line := range oracleLines(oracleOutput(t, bin, "show", "-p", "ExecStart,User,UnitFileState", unit)) {
+			k, v, ok := strings.Cut(line, "=")
+			if !ok {
+				continue
+			}
+			switch k {
+			case "ExecStart":
+				if !seen {
+					execStart, seen = v, true
+				}
+			case "User":
+				user = v
+			case "UnitFileState":
+				state = v
+			}
+		}
+		if got, want := first["path"], oracleExecPath(execStart); got != want {
+			t.Errorf("units: %s (UnitFileState %s): first ExecStart collector %v, systemctl %q", unit, state, got, want)
+		}
+		if got, want := oracleUser(row["user"].(string)), oracleUser(user); got != want {
+			t.Errorf("units: %s (UnitFileState %s): User collector %q, systemctl %q", unit, state, got, want)
+		}
+		compared++
+	}
+	if compared == 0 {
+		t.Error("units: no root service with a read unit file and a resolved ExecStart, so this pair proved nothing")
+	}
+	t.Logf("oracle units: compared %d", compared)
+}
+
+// --- authorized_keys ----------------------------------------------------
+
+const sshKeygenPath = "/usr/bin/ssh-keygen"
+
+// oracleKeygen runs ssh-keygen and returns its exit code; unlike
+// oracleOutput a non-zero exit is the caller's to judge, because `-t dsa`
+// failing on a build without DSA is an answer, not a broken oracle.
+func oracleKeygen(t *testing.T, args ...string) int {
+	t.Helper()
+	out := collect.RunCommand(context.Background(), collect.Command{
+		Path: sshKeygenPath, Args: args, Timeout: 60 * time.Second, MaxOutput: 1 << 20,
+	})
+	if out.Err != nil || out.TimedOut {
+		t.Fatalf("ssh-keygen %s could not be run: %v (timed out %v)", strings.Join(args, " "), out.Err, out.TimedOut)
+	}
+	return out.ExitCode
+}
+
+// oracleKeyTypes maps the type word of a .pub line to the name ssh-keygen -l
+// prints in parentheses. The map is the oracle's knowledge of ssh-keygen's
+// vocabulary, never a rule the parser has to follow.
+var oracleKeyTypes = map[string]string{
+	"ssh-ed25519":         "ED25519",
+	"ecdsa-sha2-nistp256": "ECDSA",
+	"ssh-rsa":             "RSA",
+	"ssh-dss":             "DSA",
+}
+
+// TestOracleAuthorizedKeys is a parser oracle: it makes its own keys under
+// t.TempDir(), writes an authorized_keys from their .pub lines — the first
+// behind `restrict,command="x"` — and holds parseAuthorizedKeys's type, bits
+// and fingerprint for every line to what `ssh-keygen -l -f` prints for the
+// same .pub. Nothing under a declared path is read or written, and the
+// directory goes with the test.
+func TestOracleAuthorizedKeys(t *testing.T) {
+	oracleEnabled(t)
+	oracleBinary(t, sshKeygenPath)
+	dir := t.TempDir()
+	specs := []struct{ typ, bits string }{
+		{"ed25519", ""},
+		{"ecdsa", "256"},
+		{"rsa", "3072"},
+		{"dsa", ""},
+	}
+	type want struct{ typ, bits, fp string }
+	var (
+		file  strings.Builder
+		wants []want
+	)
+	for _, s := range specs {
+		f := dir + "/" + s.typ
+		args := []string{"-t", s.typ, "-N", "", "-q", "-C", "muster-oracle", "-f", f}
+		if s.bits != "" {
+			args = append(args, "-b", s.bits)
+		}
+		if code := oracleKeygen(t, args...); code != 0 {
+			if s.typ == "dsa" {
+				t.Logf("ssh-keygen -t dsa exited %d: this build makes no DSA keys, so none is compared", code)
+				continue
+			}
+			t.Fatalf("ssh-keygen -t %s exited %d", s.typ, code)
+		}
+		pub, err := os.ReadFile(f + ".pub")
+		if err != nil {
+			t.Fatal(err)
+		}
+		fields := strings.Fields(oracleLines(oracleOutput(t, sshKeygenPath, "-l", "-f", f+".pub"))[0])
+		if len(fields) < 3 {
+			t.Fatalf("ssh-keygen -l -f %s.pub printed %q", f, fields)
+		}
+		wants = append(wants, want{typ: strings.Trim(fields[len(fields)-1], "()"), bits: fields[0], fp: fields[1]})
+		if len(wants) == 1 {
+			file.WriteString(`restrict,command="x" `)
+		}
+		file.WriteString(strings.TrimSpace(string(pub)) + "\n")
+	}
+	keys, unparsed := parseAuthorizedKeys([]byte(file.String()))
+	if unparsed != 0 || len(keys) != len(wants) {
+		t.Fatalf("keys: the parser read %d keys and %d unparsed lines from %d .pub lines", len(keys), unparsed, len(wants))
+	}
+	for i, k := range keys {
+		w := wants[i]
+		if oracleKeyTypes[k.Type] != w.typ || strconv.Itoa(k.Bits) != w.bits || k.Fingerprint != w.fp {
+			t.Errorf("keys: line %d: parser %s %d %s, ssh-keygen -l %s %s %s", k.Line, k.Type, k.Bits, k.Fingerprint, w.typ, w.bits, w.fp)
+		}
+		if restricted := i == 0; k.Restricted != restricted {
+			t.Errorf("keys: line %d: restricted %v, want %v (options %q)", k.Line, k.Restricted, restricted, k.Options)
+		}
+	}
+	t.Logf("oracle keys: compared %d", len(keys))
+}
+
+// --- lastlog ------------------------------------------------------------
+
+const lastlogBinPath = "/usr/bin/lastlog"
+
+// oracleLastlog asks lastlog(8) about one account: "" for "**Never logged
+// in**", else the login time in RFC 3339 UTC. The date is the last six
+// fields of the second line, `%a %b %e %H:%M:%S %z %Y` (V-33 said five; the
+// lab's lastlog printed six — the weekday is one): the port and host columns
+// before it may be empty, so the line is not split by column.
+func oracleLastlog(t *testing.T, name string) string {
+	t.Helper()
+	lines := oracleLines(oracleOutput(t, lastlogBinPath, "-u", name))
+	if len(lines) < 2 {
+		t.Fatalf("lastlog -u %s printed %d lines", name, len(lines))
+	}
+	if strings.Contains(lines[1], "**Never logged in**") {
+		return ""
+	}
+	f := strings.Fields(lines[1])
+	if len(f) < 7 {
+		t.Fatalf("lastlog -u %s: %q has no date", name, lines[1])
+	}
+	when, err := time.Parse("Mon Jan 2 15:04:05 -0700 2006", strings.Join(f[len(f)-6:], " "))
+	if err != nil {
+		t.Fatalf("lastlog -u %s: %q: %v", name, lines[1], err)
+	}
+	return when.UTC().Format(time.RFC3339)
+}
+
+// TestOracleLastlog: the collector's accounts.lastlog rows for root and for
+// the account running the test — the one sudo was invoked by when SUDO_UID
+// is set (V-33) — say what lastlog(8) prints for them. A comparison where
+// neither side has a date proves only that both say "never", which a decoder
+// that read nothing would also say, so the pair counts the dated ones apart
+// (V-62) and CI plants a login for the runner to make one. Where
+// /var/log/lastlog is absent the fact is absent and shadow's lastlog exits 1
+// on the missing file, so there is nothing to compare: the pair skips.
+func TestOracleLastlog(t *testing.T) {
+	oracleEnabled(t)
+	oracleBinary(t, lastlogBinPath)
+	b := build(t, "accounts", collect.Host())
+	names := map[int]string{}
+	for _, u := range okList(t, b, "accounts.users") {
+		row := u.(map[string]any)
+		if uid := row["uid"].(int); names[uid] == "" {
+			names[uid] = row["name"].(string)
+		}
+	}
+	self := os.Getuid()
+	if s := os.Getenv("SUDO_UID"); s != "" {
+		n, err := strconv.Atoi(s)
+		if err != nil {
+			t.Fatalf("SUDO_UID %q: %v", s, err)
+		}
+		self = n
+	}
+	uids := []int{0}
+	if self != 0 {
+		uids = append(uids, self)
+	}
+	e := env(t, b, "accounts.lastlog")
+	switch e.Status {
+	case facts.StatusOK:
+	case facts.StatusAbsent:
+		t.Skipf("accounts.lastlog is absent (%s): lastlog(8) has no file to read either", e.Reason)
+	default:
+		t.Fatalf("accounts.lastlog is %s%s", e.Status, reasonSuffix(e.Reason))
+	}
+	got := map[int]string{}
+	for _, r := range e.Value.([]any) {
+		row := r.(map[string]any)
+		got[row["uid"].(int)] = row["last_login"].(string)
+	}
+	compared, dated := 0, 0
+	for _, uid := range uids {
+		name := names[uid]
+		if name == "" {
+			t.Fatalf("lastlog: uid %d is not in accounts.users", uid)
+		}
+		want := oracleLastlog(t, name)
+		if got[uid] != want {
+			t.Errorf("lastlog: %s (uid %d): collector %q, lastlog -u %q", name, uid, got[uid], want)
+		}
+		compared++
+		if want != "" && got[uid] == want {
+			dated++ // both sides carry the same date
+		}
+	}
+	t.Logf("oracle lastlog: compared %d, dated %d", compared, dated)
+}
+
+// --- file capabilities --------------------------------------------------
+
+const getcapPath = "/usr/sbin/getcap"
+
+// oracleCapDirs are the directories the capabilities pair walks and asks
+// getcap about (V-61): where executables live. /usr/share, /usr/local/lib,
+// /usr/src, /usr/include and the rest are out — the CI collect excludes some
+// of them for their size, and a pair that walked more than the collect does
+// could run out of budget where the collect did not. The CI probe,
+// /usr/local/bin/muster-cap-probe, is inside.
+var oracleCapDirs = []string{"/usr/bin", "/usr/sbin", "/usr/lib", "/usr/libexec", "/usr/local/bin", "/usr/local/sbin"}
+
+// oracleCapExclude is every path the walk has to leave out for it to cover
+// oracleCapDirs and nothing else: each top-level entry of / but /usr, each
+// entry of /usr but bin, sbin, lib, libexec and local, and each entry of
+// /usr/local but bin and sbin. WalkOptions.Include names container-storage
+// roots only, so the narrowing is by exclusion.
+func oracleCapExclude(t *testing.T) []string {
+	t.Helper()
+	var out []string
+	for _, level := range []struct {
+		dir  string
+		keep []string
+	}{
+		{"/", []string{"usr"}},
+		{"/usr", []string{"bin", "sbin", "lib", "libexec", "local"}},
+		{"/usr/local", []string{"bin", "sbin"}},
+	} {
+		entries, err := os.ReadDir(level.dir)
+		if err != nil {
+			if level.dir == "/usr/local" && os.IsNotExist(err) {
+				continue
+			}
+			t.Fatal(err)
+		}
+		for _, e := range entries {
+			if !slices.Contains(level.keep, e.Name()) {
+				out = append(out, strings.TrimSuffix(level.dir, "/")+"/"+e.Name())
+			}
+		}
+	}
+	return out
+}
+
+// oracleCap is one file's capabilities as the pair compares them: the path,
+// the canonical text of the set parseCapText reads, and the rootid.
+type oracleCap struct {
+	path, caps string
+	rootid     int
+}
+
+// oracleGetcapLine splits one `getcap -r` line into its path and set. The
+// text after the path may itself hold blanks (`cap_a=ep cap_b+i`, a trailing
+// `[rootid=N]`), and so may the path, so no fixed blank is the separator: the
+// split is the first blank whose remainder — past an old-libcap `= ` — is a
+// capability text parseCapText accepts. A path's own words are rarely one —
+// a clause needs an operator and, but for a bare `=ep`, known capability
+// names — so only a pathological path under /usr (one holding " =ep") could
+// split early, and that shows as a mismatch, a failure, never a false pass.
+func oracleGetcapLine(line string) (oracleCap, bool) {
+	const rootidMark = " [rootid="
+	for i := 0; i < len(line); i++ {
+		if line[i] != ' ' {
+			continue
+		}
+		p, rest := line[:i], strings.TrimSpace(line[i+1:])
+		if strings.HasPrefix(rest, "= ") {
+			rest = strings.TrimSpace(rest[2:])
+		}
+		rootid := 0
+		if at := strings.LastIndex(rest, rootidMark); at >= 0 && strings.HasSuffix(rest, "]") {
+			n, err := strconv.Atoi(rest[at+len(rootidMark) : len(rest)-1])
+			if err != nil {
+				continue
+			}
+			rootid, rest = n, rest[:at]
+		}
+		set, err := parseCapText(rest)
+		if err != nil {
+			continue
+		}
+		return oracleCap{path: p, caps: capText(set), rootid: rootid}, true
+	}
+	return oracleCap{}, false
+}
+
+// oracleGetcap reads `getcap -r` output in both libcap spellings — `path
+// caps` (2.41 and later) and `path = caps` — with an optional trailing
+// `[rootid=N]`. Only executables are kept: the walk opens nothing else for
+// its attributes (a capability on a file nobody can execute is inert), and a
+// file that is not one is logged, not compared.
+func oracleGetcap(t *testing.T, stdout []byte) map[oracleCap]bool {
+	t.Helper()
+	out := map[oracleCap]bool{}
+	for _, line := range oracleLines(stdout) {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		c, ok := oracleGetcapLine(line)
+		if !ok {
+			t.Fatalf("getcap: %q is not a path and a capability text", line)
+		}
+		if fi, err := os.Lstat(c.path); err != nil || !fi.Mode().IsRegular() || fi.Mode().Perm()&0o111 == 0 {
+			t.Logf("getcap lists %s, which is not an executable regular file: not compared", c.path)
+			continue
+		}
+		out[c] = true
+	}
+	return out
+}
+
+// TestOracleCapabilities runs the walk in-process over oracleCapDirs alone and
+// holds its walk.capabilities rows to `getcap -r` over the same directories,
+// as a set of (path, canonical caps, rootid). A run that compares nothing
+// fails, as the units pair does: the CI runner carries the planted probe, and
+// a stock host its distribution's own capability files.
+func TestOracleCapabilities(t *testing.T) {
+	oracleEnabled(t)
+	bin := oracleBinary(t, getcapPath)
+	if os.Geteuid() != 0 {
+		t.Skip("the walk needs root")
+	}
+	reg, err := facts.LoadRegistry()
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := collect.NewBuilder(reg)
+	b.SetWalk(collect.WalkOptions{Budget: 10 * time.Minute, MaxEntries: 6_000_000, Exclude: oracleCapExclude(t)})
+	b.Begin("walk")
+	c := collectorNamed(t, "walk")
+	g := collect.Guard(collect.Host(), c)
+	if err := c.Run(context.Background(), g, b); err != nil {
+		t.Fatalf("walk: %v", err)
+	}
+	if v := g.Violations(); len(v) != 0 {
+		t.Fatalf("walk reached outside its declaration: %v", v)
+	}
+	// Printed before anything is asserted, so a walk cut short is read next
+	// to its counts and stop reason rather than guessed at.
+	complete := env(t, b, "walk.complete")
+	t.Logf("walk.complete: %s %v%s", complete.Status, complete.Value, reasonSuffix(complete.Reason))
+	if stats, err := json.Marshal(env(t, b, "walk.stats").Value); err == nil {
+		t.Logf("walk.stats: %s", stats)
+	}
+	if e := env(t, b, "walk.capabilities"); e.Status == facts.StatusUnsupported {
+		t.Skipf("walk.capabilities is unsupported here (%s): a container's overlay root", e.Reason)
+	}
+	if complete.Status != facts.StatusOK || complete.Value != true {
+		t.Fatalf("walk.complete: %s %v%s", complete.Status, complete.Value, reasonSuffix(complete.Reason))
+	}
+	if env(t, b, "walk.capabilities").Truncated {
+		t.Fatal("walk.capabilities is truncated; the sets cannot be compared")
+	}
+	got := map[oracleCap]bool{}
+	for _, r := range okList(t, b, "walk.capabilities") {
+		row := r.(map[string]any)
+		set, err := parseCapText(row["caps"].(string))
+		if err != nil {
+			t.Fatalf("walk.capabilities %s: %q: %v", row["path"], row["caps"], err)
+		}
+		got[oracleCap{path: row["path"].(string), caps: capText(set), rootid: row["rootid"].(int)}] = true
+	}
+	args := []string{"-r"}
+	for _, d := range oracleCapDirs {
+		if fi, err := os.Lstat(d); err == nil && fi.IsDir() {
+			args = append(args, d)
+		}
+	}
+	// oracleOutput's 30 s is a query's budget; getcap -r reads an attribute
+	// of every file under the six directories, which on the runner image is
+	// hundreds of thousands.
+	out := collect.RunCommand(context.Background(), collect.Command{
+		Path: bin, Args: args, Timeout: 10 * time.Minute, MaxOutput: 8 << 20,
+	})
+	line := bin + " " + strings.Join(args, " ")
+	switch {
+	case out.Err != nil:
+		t.Fatalf("%s could not be run: %v", line, out.Err)
+	case out.TimedOut:
+		t.Fatalf("%s timed out", line)
+	case out.ExitCode != 0:
+		t.Fatalf("%s exited %d: %s", line, out.ExitCode, strings.TrimSpace(string(out.Stderr)))
+	case out.Truncated:
+		t.Fatalf("%s produced more output than the oracle reads", line)
+	}
+	want := oracleGetcap(t, out.Stdout)
+	for _, c := range oracleSortedCaps(got) {
+		if !want[c] {
+			t.Errorf("capabilities: the walk lists %s %s (rootid %d), %s does not", c.path, c.caps, c.rootid, line)
+		}
+	}
+	for _, c := range oracleSortedCaps(want) {
+		if !got[c] {
+			t.Errorf("capabilities: %s lists %s %s (rootid %d), the walk does not", line, c.path, c.caps, c.rootid)
+		}
+	}
+	if len(want) == 0 {
+		t.Fatalf("capabilities: %s found no executable with a capability, so this pair proved nothing", line)
+	}
+	t.Logf("oracle capabilities: compared %d", len(want))
+}
+
+// oracleSortedCaps keeps the mismatch report in path order, as
+// oracleSortedNames does for the accounts pair.
+func oracleSortedCaps(set map[oracleCap]bool) []oracleCap {
+	out := make([]oracleCap, 0, len(set))
+	for c := range set {
+		out = append(out, c)
+	}
+	slices.SortFunc(out, func(a, b oracleCap) int {
+		if c := strings.Compare(a.path, b.path); c != 0 {
+			return c
+		}
+		return strings.Compare(a.caps, b.caps)
+	})
+	return out
+}
+
+// --- sudoers ------------------------------------------------------------
+
+const visudoPath = "/usr/sbin/visudo"
+
+// TestOracleSudoers only validates: `visudo -c -f /etc/sudoers` checks the
+// whole include chain and must exit 0, and the collector must have resolved
+// every rule it read. A policy comparison would need `sudo -l`, which runs
+// sudo's policy on the host and is not a query. The one unresolved rule a
+// valid host may have is a +netgroup principal, whose members live in the
+// name service, not in the files; it is logged, not failed.
+func TestOracleSudoers(t *testing.T) {
+	oracleEnabled(t)
+	bin := oracleBinary(t, visudoPath)
+	oracleOutput(t, bin, "-c", "-f", "/etc/sudoers")
+	b := build(t, "files", collect.Host())
+	e := env(t, b, "sudo.rules_unresolved")
+	if e.Status != facts.StatusOK {
+		t.Fatalf("sudo.rules_unresolved is %s%s, but visudo read the files", e.Status, reasonSuffix(e.Reason))
+	}
+	if n := e.Value.(int); n != 0 {
+		netgroups := 0
+		for _, r := range okList(t, b, "sudo.rules") {
+			if row := r.(map[string]any); row["kind"] == "netgroup" && row["resolved"] == false {
+				netgroups++
+			}
+		}
+		if netgroups == n {
+			t.Logf("sudoers: %d rules name a +netgroup, whose members the files do not hold", n)
+		} else {
+			t.Errorf("sudoers: %d rules unresolved (%d of them +netgroup), on files visudo accepts", n, netgroups)
+		}
+	}
+	t.Logf("oracle sudoers: compared 1")
+}
+
+// The getcap line splitter is the oracle's own parser, so it is pinned here
+// on every Linux run rather than only when the oracles are enabled: both
+// libcap spellings, a multi-clause text, a rootid, and a path with a blank.
+func TestOracleGetcapLineSplits(t *testing.T) {
+	ping, err := parseCapText("cap_net_raw=ep")
+	if err != nil {
+		t.Fatal(err)
+	}
+	multi, err := parseCapText("cap_net_raw=ep cap_setuid+i")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		line string
+		want oracleCap
+	}{
+		{"/usr/bin/ping cap_net_raw=ep", oracleCap{"/usr/bin/ping", capText(ping), 0}},
+		{"/usr/bin/ping = cap_net_raw+ep", oracleCap{"/usr/bin/ping", capText(ping), 0}},
+		{"/usr/bin/a b cap_net_raw=ep", oracleCap{"/usr/bin/a b", capText(ping), 0}},
+		{"/usr/bin/x cap_net_raw=ep cap_setuid+i", oracleCap{"/usr/bin/x", capText(multi), 0}},
+		{"/usr/bin/y cap_net_raw=ep [rootid=1000]", oracleCap{"/usr/bin/y", capText(ping), 1000}},
+	} {
+		got, ok := oracleGetcapLine(tc.line)
+		if !ok || got != tc.want {
+			t.Errorf("%q: %+v %v, want %+v", tc.line, got, ok, tc.want)
+		}
+	}
+	if _, ok := oracleGetcapLine("/usr/bin/nothing"); ok {
+		t.Error("a line without a capability text split")
+	}
 }

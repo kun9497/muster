@@ -1,0 +1,27 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "docker",
+        "source": {
+          "kind": "file",
+          "path": "/proc/1/cgroup"
+        }
+      }
+    },
+    "privilege": {
+      "ld_so_preload": {
+        "status": "ok",
+        "value": [],
+        "source": {
+          "kind": "file",
+          "path": "/etc/ld.so.preload"
+        }
+      }
+    }
+  }
+}

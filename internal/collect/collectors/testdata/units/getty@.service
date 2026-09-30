@@ -1,0 +1,27 @@
+[Unit]
+Description=Getty on %I
+Documentation=man:agetty(8) man:systemd-getty-generator(8)
+After=systemd-user-sessions.service plymouth-quit-wait.service getty-pre.target
+Before=getty.target
+IgnoreOnIsolate=yes
+ConditionPathExists=/dev/tty0
+
+[Service]
+# The first ExecStart is systemd's getty@.service; the ExecStartPre below is
+# synthetic: a first token carrying the %I specifier (Review Focus 4).
+ExecStart=-/sbin/agetty -o '-p -- \u' --noclear %I $TERM
+ExecStartPre=/usr/lib/getty/%I-prepare
+Type=idle
+Restart=always
+RestartSec=0
+UtmpIdentifier=%I
+TTYPath=/dev/%I
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
+IgnoreSIGPIPE=no
+SendSIGHUP=yes
+
+[Install]
+WantedBy=getty.target
+DefaultInstance=tty1

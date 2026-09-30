@@ -1,0 +1,6 @@
+# throw-away keys generated once with ssh-keygen OpenSSH_9.7p1 (off-lab); private halves deleted
+256 SHA256:PGKt1cFWXBiZXBVpOuCba+Sl5C5MEDmdn+umv7zUpfs t (ED25519)
+256 SHA256:uIdF2XjYtjR19rdoKcO7n08tSWNlAeRUgEZN2ofo8cc t (ECDSA)
+2048 SHA256:M+HKngGa3zlwWlkHD/shz6cvx5Ib/AZyPrGkYpneGVY t (RSA)
+1024 SHA256:fYYQGKFsnB4hDUsromQb2a0FI3Ram/AIkptyNzrPGoQ t (RSA)
+256 SHA256:PGKt1cFWXBiZXBVpOuCba+Sl5C5MEDmdn+umv7zUpfs t (ED25519-CERT)

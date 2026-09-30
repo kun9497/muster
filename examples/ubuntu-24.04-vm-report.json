@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
   "run": {
-    "muster_version": "81855c8",
-    "commit": "81855c8",
-    "controls_version": "kisa-unix-2026+2026.09.23",
-    "controls_digest": "sha256:f3337dac3ea8281886a8618f4cc136ddf62b3258dbfb113c560b5aeca854f41d",
+    "muster_version": "37dfcc8",
+    "commit": "37dfcc8",
+    "controls_version": "kisa-unix-2026+2026.09.29",
+    "controls_digest": "sha256:1622ceeeba7f9b7bbe1d2bb23562a921bfec21f7fd82833ec4af40a5515813ad",
     "guide_edition": "kisa-unix-2026",
-    "collected_at": "2026-09-28T08:17:31Z",
+    "collected_at": "2026-09-30T00:18:48Z",
     "host": {
       "hostname": "github-runner",
       "machine_id_hash": "4d7193c17275652cce0569a44b2c249f54db99d23e0fd447ae531341cacc9ee5",
@@ -39,7 +39,7 @@
       {
         "name": "accounts",
         "status": "ok",
-        "ms": 0
+        "ms": 1
       },
       {
         "name": "audit",
@@ -55,7 +55,7 @@
       {
         "name": "boot",
         "status": "ok",
-        "ms": 20
+        "ms": 6
       },
       {
         "name": "coredump",
@@ -65,7 +65,7 @@
       {
         "name": "cron",
         "status": "ok",
-        "ms": 827,
+        "ms": 853,
         "cmd": "/usr/bin/systemctl list-unit-files --type=timer --no-legend --no-pager"
       },
       {
@@ -76,12 +76,12 @@
       {
         "name": "env",
         "status": "ok",
-        "ms": 8
+        "ms": 4
       },
       {
         "name": "files",
         "status": "ok",
-        "ms": 16
+        "ms": 18
       },
       {
         "name": "fim",
@@ -92,7 +92,7 @@
       {
         "name": "firewall",
         "status": "ok",
-        "ms": 11,
+        "ms": 19,
         "cmd": "/usr/sbin/nft list ruleset"
       },
       {
@@ -113,7 +113,7 @@
       {
         "name": "modules",
         "status": "ok",
-        "ms": 24
+        "ms": 42
       },
       {
         "name": "mounts",
@@ -144,19 +144,24 @@
       {
         "name": "patch",
         "status": "ok",
-        "ms": 1837,
+        "ms": 2002,
         "cmd": "/usr/bin/apt-get -s upgrade -o Debug::NoLocking=1"
       },
       {
         "name": "pkgverify",
         "status": "ok",
-        "ms": 582154,
+        "ms": 1114464,
         "cmd": "/usr/bin/rpm -Va"
+      },
+      {
+        "name": "privilege",
+        "status": "ok",
+        "ms": 0
       },
       {
         "name": "services",
         "status": "ok",
-        "ms": 319,
+        "ms": 323,
         "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState atftpd.service"
       },
       {
@@ -167,13 +172,18 @@
       {
         "name": "sockets",
         "status": "ok",
-        "ms": 9
+        "ms": 11
       },
       {
         "name": "sshd",
         "status": "ok",
-        "ms": 13,
+        "ms": 14,
         "cmd": "/usr/sbin/sshd -G"
+      },
+      {
+        "name": "sshkeys",
+        "status": "ok",
+        "ms": 0
       },
       {
         "name": "swap",
@@ -183,19 +193,25 @@
       {
         "name": "sysctl",
         "status": "ok",
-        "ms": 1
+        "ms": 0
       },
       {
         "name": "timesync",
         "status": "ok",
-        "ms": 56,
+        "ms": 54,
         "cmd": "/usr/bin/timedatectl show-timesync --all"
+      },
+      {
+        "name": "units",
+        "status": "ok",
+        "ms": 52,
+        "cmd": "/usr/bin/systemctl list-units --type=service --state=active --plain --no-legend"
       },
       {
         "name": "walk",
         "status": "ok",
-        "ms": 11900,
-        "cmd": "/usr/bin/rpm -qa --qf [%{=NAME}\t%{FILEMODES:octal}\t%{FILEUSERNAME}\t%{FILEGROUPNAME}\t%{FILENAMES}\n]"
+        "ms": 13253,
+        "cmd": "/usr/bin/rpm -qa --qf [%{=NAME}\t%{FILEMODES:octal}\t%{FILEUSERNAME}\t%{FILEGROUPNAME}\t%|FILECAPS?{%{FILECAPS}}|\t%{FILENAMES}\n]"
       }
     ],
     "redaction": {
@@ -207,11 +223,11 @@
     "partial_failures": []
   },
   "check": {
-    "muster_version": "81855c8",
-    "commit": "81855c8",
-    "controls_version": "kisa-unix-2026+2026.09.23",
-    "controls_digest": "sha256:f3337dac3ea8281886a8618f4cc136ddf62b3258dbfb113c560b5aeca854f41d",
-    "snapshot_digest": "sha256:33eea7f61aaaa7e1b7c3a0639f99c542cd33d542f2d6ad9266b6ccf50dc6a8e1",
+    "muster_version": "37dfcc8",
+    "commit": "37dfcc8",
+    "controls_version": "kisa-unix-2026+2026.09.29",
+    "controls_digest": "sha256:1622ceeeba7f9b7bbe1d2bb23562a921bfec21f7fd82833ec4af40a5515813ad",
+    "snapshot_digest": "sha256:2aa71062600bd5479bc54b96228690c5ce2fe70378f170b377a0e176db9db588",
     "guide_edition": "kisa-unix-2026",
     "waivers": {
       "applied": 0,
@@ -304,6 +320,9 @@
           "nuucp"
         ]
       },
+      "muster.beyond.account_inactivity_lock": {
+        "max_inactive_days": 35
+      },
       "muster.beyond.audit_disk_actions": {
         "allowed_disk_error_actions": [
           "syslog",
@@ -356,6 +375,12 @@
           384
         ]
       },
+      "muster.beyond.container_runtime_access": {
+        "allowed_runtime_group_members": []
+      },
+      "muster.beyond.ld_so_preload_empty": {
+        "allowed_preload": []
+      },
       "muster.beyond.separate_partitions": {
         "required_separate": [
           "/tmp",
@@ -365,6 +390,12 @@
           "/var/log/audit",
           "/home"
         ]
+      },
+      "muster.beyond.ssh_key_quality": {
+        "min_rsa_bits": 2048
+      },
+      "muster.beyond.sudo_nopasswd_all": {
+        "allowed_nopasswd_principals": []
       },
       "muster.beyond.sysrq_restricted": {
         "allowed_sysrq": [
@@ -496,13 +527,13 @@
   "summary": {
     "automatic": {
       "high": {
-        "pass": 18,
-        "fail": 12,
+        "pass": 20,
+        "fail": 15,
         "warn": 0
       },
       "medium": {
         "pass": 13,
-        "fail": 9,
+        "fail": 10,
         "warn": 0
       },
       "low": {
@@ -511,7 +542,7 @@
         "warn": 0
       }
     },
-    "manual_review": 13,
+    "manual_review": 15,
     "undecidable": {
       "error": 0,
       "not_applicable": 24,
@@ -547,16 +578,16 @@
         }
       },
       "beyond": {
-        "controls": 28,
+        "controls": 36,
         "automatic": {
           "high": {
-            "pass": 2,
-            "fail": 2,
+            "pass": 4,
+            "fail": 5,
             "warn": 0
           },
           "medium": {
             "pass": 4,
-            "fail": 7,
+            "fail": 8,
             "warn": 0
           },
           "low": {
@@ -565,7 +596,7 @@
             "warn": 0
           }
         },
-        "manual_review": 2,
+        "manual_review": 4,
         "undecidable": {
           "error": 0,
           "not_applicable": 8,
@@ -6076,7 +6107,7 @@
         {
           "fact": "patch.metadata_age_s",
           "status": "ok",
-          "value": 643390,
+          "value": 787467,
           "source": {
             "kind": "file",
             "path": "/var/lib/apt/periodic/update-success-stamp"
@@ -9322,6 +9353,160 @@
       "severity": "high"
     },
     {
+      "id": "muster.beyond.container_runtime_access",
+      "title_en": "No account other than root can reach a container runtime's API socket",
+      "title_ko": "root 가 아닌 어떤 계정도 컨테이너 런타임의 API 소켓에 접근할 수 없다",
+      "category": "beyond",
+      "importance": "상",
+      "automation": "auto",
+      "status": "FAIL",
+      "reason": "clause does not hold: privilege.runtime_group_members none where member not_in []",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "none",
+          "source": {
+            "kind": "file",
+            "path": "/proc/1/comm"
+          }
+        },
+        {
+          "fact": "privilege.runtime_sockets",
+          "status": "ok",
+          "value": "4 elements; none matching",
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "file",
+                "path": "/run/docker.sock"
+              },
+              {
+                "kind": "file",
+                "path": "/run/containerd/containerd.sock"
+              },
+              {
+                "kind": "file",
+                "path": "/run/podman/podman.sock"
+              },
+              {
+                "kind": "file",
+                "path": "/run/crio/crio.sock"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/group"
+              }
+            ]
+          }
+        },
+        {
+          "fact": "privilege.runtime_group_members",
+          "status": "ok",
+          "value": "1 elements; matching: user:runner",
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "file",
+                "path": "/run/docker.sock"
+              },
+              {
+                "kind": "file",
+                "path": "/run/containerd/containerd.sock"
+              },
+              {
+                "kind": "file",
+                "path": "/run/podman/podman.sock"
+              },
+              {
+                "kind": "file",
+                "path": "/run/crio/crio.sock"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/group"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/passwd"
+              }
+            ]
+          }
+        }
+      ],
+      "observations": [
+        {
+          "subject": "user:runner",
+          "expected": "not not_in []",
+          "actual": "runner",
+          "verdict": "fail"
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "muster.beyond.file_capabilities_declared",
+      "title_en": "Every executable carrying file capabilities has them because its package declares them",
+      "title_ko": "파일 capability 를 가진 모든 실행 파일은 그 패키지가 선언했기 때문에 그것을 가진다",
+      "category": "beyond",
+      "importance": "상",
+      "automation": "auto",
+      "status": "PASS",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "none",
+          "source": {
+            "kind": "file",
+            "path": "/proc/1/comm"
+          }
+        },
+        {
+          "fact": "walk.capabilities",
+          "status": "ok",
+          "value": "4 elements; none matching",
+          "source": {
+            "kind": "file",
+            "path": "/var/lib/dpkg/info"
+          }
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "muster.beyond.ld_so_preload_empty",
+      "title_en": "/etc/ld.so.preload names no library other than the ones allowed on purpose",
+      "title_ko": "/etc/ld.so.preload 에는 의도적으로 허용한 것 말고는 어떤 라이브러리도 없다",
+      "category": "beyond",
+      "importance": "상",
+      "automation": "auto",
+      "status": "PASS",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "none",
+          "source": {
+            "kind": "file",
+            "path": "/proc/1/comm"
+          }
+        },
+        {
+          "fact": "privilege.ld_so_preload",
+          "status": "ok",
+          "value": "0 elements; none matching",
+          "source": {
+            "kind": "file",
+            "path": "/etc/ld.so.preload"
+          }
+        }
+      ],
+      "severity": "high"
+    },
+    {
       "id": "muster.beyond.package_files_unmodified",
       "title_en": "Every packaged file still matches the package database",
       "title_ko": "패키지로 설치된 모든 파일이 패키지 데이터베이스와 여전히 일치한다",
@@ -9360,6 +9545,782 @@
         }
       ],
       "severity": "high"
+    },
+    {
+      "id": "muster.beyond.root_unit_exec_writable",
+      "title_en": "No service that runs as root executes a file, or reads a unit file, that a non-root user can change",
+      "title_ko": "root 로 실행되는 서비스는 root 가 아닌 사용자가 바꿀 수 있는 파일을 실행하거나 그런 unit 파일을 읽지 않는다",
+      "category": "beyond",
+      "importance": "상",
+      "automation": "auto",
+      "status": "FAIL",
+      "reason": "clause does not hold: units.exec_writable none where why present",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "none",
+          "source": {
+            "kind": "file",
+            "path": "/proc/1/comm"
+          }
+        },
+        {
+          "fact": "env.has_systemd",
+          "status": "ok",
+          "value": true,
+          "source": {
+            "kind": "file",
+            "path": "/run/systemd/system"
+          }
+        },
+        {
+          "fact": "units.exec_writable",
+          "status": "ok",
+          "value": "6 elements; matching: unit:/usr/share/netplan/netplan.script, unit:/usr/share/netplan/netplan.script, unit:/usr/share/netplan/netplan.script, unit:/opt/primer/primer, unit:/opt/primer/primer, +1 more",
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "command",
+                "cmd": "/usr/bin/systemctl list-units --type=service --state=active --plain --no-legend",
+                "exit_code": 0
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/ModemManager.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/apparmor.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/blk-availability.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/chrony.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/cloud-config.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/cloud-final.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/cloud-init-local.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/cloud-init.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/console-setup.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/containerd.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/cron.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/dbus.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/dmesg.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/docker.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/e2scrub_reap.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/ephemeral-disk-warning.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/finalrd.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/getty-static.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/getty@.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/grub-common.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/grub-initrd-fallback.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/haveged.service"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/systemd/system/hosted-compute-agent.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/hv-fcopy-daemon.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/hv-kvp-daemon.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/hv-vss-daemon.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/keyboard-setup.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/kmod-static-nodes.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/ldconfig.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/lvm2-monitor.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/multipathd.service"
+              },
+              {
+                "kind": "file",
+                "path": "/run/systemd/system/netplan-ovs-cleanup.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/networkd-dispatcher.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/nvmefc-boot-connections.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/nvmf-autoconnect.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/open-iscsi.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/open-vm-tools.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/packagekit-offline-update.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/php8.3-fpm.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/plymouth-halt.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/plymouth-kexec.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/plymouth-poweroff.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/plymouth-quit-wait.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/plymouth-quit.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/plymouth-read-write.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/plymouth-reboot.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/plymouth-start.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/plymouth-switch-root-initramfs.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/plymouth-switch-root.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/podman-auto-update.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/podman-clean-transient.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/podman-restart.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/podman.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/polkit.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/pollinate.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/postgresql@.service"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/systemd/system/primer.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/rsyslog.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/secureboot-db.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/serial-getty@.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/setvtrgb.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/snapd.apparmor.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/snapd.autoimport.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/snapd.core-fixup.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/snapd.recovery-chooser-trigger.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/snapd.seeded.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/snapd.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/snapd.system-shutdown.service"
+              },
+              {
+                "kind": "file",
+                "path": "/run/systemd/generator.late/sphinxsearch.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/ssl-cert.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/sysstat.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/systemd-battery-check.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/systemd-binfmt.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/systemd-bsod.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/systemd-firstboot.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/systemd-fsck-root.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/systemd-fsck@.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/systemd-hwdb-update.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/systemd-journal-catalog-update.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/systemd-journal-flush.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/systemd-journald.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/systemd-journald.service.d/nice.conf"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/systemd-logind.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/systemd-logind.service.d/dbus.conf"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/systemd-machine-id-commit.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/systemd-modules-load.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/systemd-networkd-wait-online.service"
+              },
+              {
+                "kind": "file",
+                "path": "/run/systemd/system/systemd-networkd-wait-online.service.d/10-netplan.conf"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/systemd-networkd.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/systemd-pcrmachine.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/systemd-pcrphase-initrd.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/systemd-pcrphase-sysinit.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/systemd-pcrphase.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/systemd-pstore.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/systemd-random-seed.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/systemd-remount-fs.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/systemd-repart.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/systemd-resolved.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/systemd-sysctl.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/systemd-sysusers.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/systemd-timedated.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/systemd-tmpfiles-setup-dev-early.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/systemd-tmpfiles-setup-dev.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/systemd-tmpfiles-setup.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/systemd-tpm2-setup-early.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/systemd-tpm2-setup.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/systemd-udev-trigger.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/systemd-udevd.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/systemd-udevd.service.d/syscall-architecture.conf"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/systemd-update-done.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/systemd-update-utmp-runlevel.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/systemd-update-utmp.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/systemd-user-sessions.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/ua-reboot-cmds.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/ubuntu-advantage.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/udisks2.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/ufw.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/user-runtime-dir@.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/user@.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/user@.service.d/10-login-barrier.conf"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/user@.service.d/timeout.conf"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/vgauth.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/walinuxagent-network-setup.service"
+              },
+              {
+                "kind": "file",
+                "path": "/usr/lib/systemd/system/walinuxagent.service"
+              },
+              {
+                "kind": "file",
+                "path": "/run/systemd/system.control/walinuxagent.service.d/50-CPUQuota.conf"
+              }
+            ]
+          }
+        }
+      ],
+      "observations": [
+        {
+          "subject": "unit:/usr/share/netplan/netplan.script",
+          "expected": "not present",
+          "actual": "group_writable",
+          "verdict": "fail"
+        },
+        {
+          "subject": "unit:/usr/share/netplan/netplan.script",
+          "expected": "not present",
+          "actual": "other_writable",
+          "verdict": "fail"
+        },
+        {
+          "subject": "unit:/usr/share/netplan/netplan.script",
+          "expected": "not present",
+          "actual": "parent_writable",
+          "verdict": "fail"
+        },
+        {
+          "subject": "unit:/opt/primer/primer",
+          "expected": "not present",
+          "actual": "group_writable",
+          "verdict": "fail"
+        },
+        {
+          "subject": "unit:/opt/primer/primer",
+          "expected": "not present",
+          "actual": "other_writable",
+          "verdict": "fail"
+        },
+        {
+          "subject": "unit:/opt/primer/primer",
+          "expected": "not present",
+          "actual": "parent_writable",
+          "verdict": "fail"
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "muster.beyond.sudo_nopasswd_all",
+      "title_en": "No principal may run every command through sudo without a password, and sudo never skips authentication",
+      "title_ko": "어떤 주체도 비밀번호 없이 sudo 로 모든 명령을 실행할 수 없고, sudo 는 인증을 건너뛰지 않는다",
+      "category": "beyond",
+      "importance": "상",
+      "automation": "auto",
+      "status": "FAIL",
+      "reason": "clause does not hold: sudo.nopasswd_all none where value not_in []",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "none",
+          "source": {
+            "kind": "file",
+            "path": "/proc/1/comm"
+          }
+        },
+        {
+          "fact": "sudo.installed",
+          "status": "ok",
+          "value": true,
+          "source": {
+            "kind": "file",
+            "path": "/etc/sudoers"
+          }
+        },
+        {
+          "fact": "sudo.nopasswd_all",
+          "status": "ok",
+          "value": "2 elements; matching: user:packer, user:runner",
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "file",
+                "path": "/etc/sudoers"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/sudoers.d/90-cloud-init-users"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/sudoers.d/README"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/sudoers.d/runner"
+              }
+            ]
+          }
+        },
+        {
+          "fact": "sudo.authenticate_disabled",
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "file",
+                "path": "/etc/sudoers"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/sudoers.d/90-cloud-init-users"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/sudoers.d/README"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/sudoers.d/runner"
+              }
+            ]
+          }
+        }
+      ],
+      "observations": [
+        {
+          "subject": "user:packer",
+          "expected": "not not_in []",
+          "actual": "packer",
+          "verdict": "fail"
+        },
+        {
+          "subject": "user:runner",
+          "expected": "not not_in []",
+          "actual": "runner",
+          "verdict": "fail"
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "muster.beyond.account_inactivity_lock",
+      "title_en": "Accounts that can log in are disabled a bounded number of days after their password expires, and useradd gives new accounts the same bound",
+      "title_ko": "로그인할 수 있는 계정은 비밀번호가 만료된 뒤 정해진 날짜 안에 비활성화되고, useradd 도 새 계정에 같은 기한을 준다",
+      "category": "beyond",
+      "importance": "중",
+      "automation": "auto",
+      "status": "FAIL",
+      "reason": "clause does not hold: accounts.login_capable none where inactive_unset eq true",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "none",
+          "source": {
+            "kind": "file",
+            "path": "/proc/1/comm"
+          }
+        },
+        {
+          "fact": "accounts.login_capable",
+          "status": "ok",
+          "value": "3 elements; matching: user:packer, user:root, user:runner",
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "file",
+                "path": "/etc/passwd"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/shadow"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/shells"
+              }
+            ]
+          }
+        },
+        {
+          "fact": "accounts.login_capable",
+          "status": "ok",
+          "value": "3 elements; none matching",
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "file",
+                "path": "/etc/passwd"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/shadow"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/shells"
+              }
+            ]
+          }
+        },
+        {
+          "fact": "accounts.useradd.inactive",
+          "status": "ok",
+          "value": -1,
+          "source": {
+            "kind": "file",
+            "path": "/etc/default/useradd"
+          }
+        }
+      ],
+      "observations": [
+        {
+          "subject": "user:packer",
+          "expected": "not eq true",
+          "actual": true,
+          "verdict": "fail"
+        },
+        {
+          "subject": "user:root",
+          "expected": "not eq true",
+          "actual": true,
+          "verdict": "fail"
+        },
+        {
+          "subject": "user:runner",
+          "expected": "not eq true",
+          "actual": true,
+          "verdict": "fail"
+        }
+      ],
+      "severity": "medium"
     },
     {
       "id": "muster.beyond.audit_disk_actions",
@@ -9781,6 +10742,64 @@
       "severity": "medium"
     },
     {
+      "id": "muster.beyond.root_authorized_keys",
+      "title_en": "root's authorized_keys files hold no key wherever sshd lets root log in",
+      "title_ko": "sshd 가 root 로그인을 허용하는 곳에서는 root 의 authorized_keys 파일에 키가 없다",
+      "category": "beyond",
+      "importance": "중",
+      "automation": "auto",
+      "status": "MANUAL",
+      "reason": "absent needs review: ssh.root_key_count is absent on this host",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "none",
+          "source": {
+            "kind": "file",
+            "path": "/proc/1/comm"
+          }
+        },
+        {
+          "fact": "sshd.options.permit_root_login",
+          "status": "ok",
+          "value": "without-password",
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/sbin/sshd -G",
+            "exit_code": 0
+          },
+          "side": "effective"
+        },
+        {
+          "fact": "ssh.root_key_count",
+          "status": "absent",
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "file",
+                "path": "/etc/passwd"
+              },
+              {
+                "kind": "file",
+                "path": "/root/.ssh/authorized_keys"
+              },
+              {
+                "kind": "file",
+                "path": "/home/packer/.ssh/authorized_keys"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/shells"
+              }
+            ]
+          }
+        }
+      ],
+      "severity": "medium"
+    },
+    {
       "id": "muster.beyond.secure_boot_enabled",
       "title_en": "UEFI Secure Boot is enforcing",
       "title_ko": "UEFI 보안 부팅이 적용되고 있다",
@@ -9885,6 +10904,78 @@
           "expected": true,
           "actual": false,
           "verdict": "fail"
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.beyond.ssh_key_quality",
+      "title_en": "No authorized_keys file holds a DSA key or an RSA key shorter than the minimum",
+      "title_ko": "어떤 authorized_keys 파일에도 DSA 키나 최소 길이보다 짧은 RSA 키가 없다",
+      "category": "beyond",
+      "importance": "중",
+      "automation": "auto",
+      "status": "MANUAL",
+      "reason": "absent needs review: ssh.dsa_key_count is absent on this host",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "none",
+          "source": {
+            "kind": "file",
+            "path": "/proc/1/comm"
+          }
+        },
+        {
+          "fact": "ssh.dsa_key_count",
+          "status": "absent",
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "file",
+                "path": "/etc/passwd"
+              },
+              {
+                "kind": "file",
+                "path": "/root/.ssh/authorized_keys"
+              },
+              {
+                "kind": "file",
+                "path": "/home/packer/.ssh/authorized_keys"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/shells"
+              }
+            ]
+          }
+        },
+        {
+          "fact": "ssh.rsa_keys",
+          "status": "absent",
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "file",
+                "path": "/etc/passwd"
+              },
+              {
+                "kind": "file",
+                "path": "/root/.ssh/authorized_keys"
+              },
+              {
+                "kind": "file",
+                "path": "/home/packer/.ssh/authorized_keys"
+              },
+              {
+                "kind": "file",
+                "path": "/etc/shells"
+              }
+            ]
+          }
         }
       ],
       "severity": "medium"

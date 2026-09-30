@@ -1,0 +1,44 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "docker",
+        "source": {
+          "kind": "file",
+          "path": "/proc/1/cgroup"
+        }
+      },
+      "has_systemd": {
+        "status": "ok",
+        "value": true,
+        "source": {
+          "kind": "file",
+          "path": "/run/systemd/system"
+        }
+      }
+    },
+    "units": {
+      "exec_writable": {
+        "status": "ok",
+        "value": [],
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "command",
+              "cmd": "/usr/bin/systemctl list-units --type=service --state=active --plain --no-legend"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/systemd/system/agent.service"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

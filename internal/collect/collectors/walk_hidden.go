@@ -97,6 +97,8 @@ const (
 	capUnowned
 	capHidden // the hidden entries that are NOT allowlisted
 	capSkipped
+	capCapabilities
+	capACLGrants
 	capCount
 )
 
@@ -106,7 +108,7 @@ const (
 // the two thousandth row will not add to, while the hidden and skipped
 // lists are what a reader uses to judge whether the walk saw what it should
 // have, and are worth carrying further.
-var listCaps = [capCount]int{2000, 2000, 2000, 2000, 2000, 10000, 10000}
+var listCaps = [capCount]int{2000, 2000, 2000, 2000, 2000, 10000, 10000, 2000, 2000}
 
 // allowlistedHiddenCap bounds the separate count-and-sample the walk keeps
 // of hidden entries it DID pass over, so a reviewer can see what the

@@ -1,0 +1,63 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {
+    "deep": true
+  },
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none",
+        "source": {
+          "kind": "file",
+          "path": "/proc/1/cgroup"
+        }
+      }
+    },
+    "walk": {
+      "complete": {
+        "status": "ok",
+        "value": true,
+        "source": {
+          "kind": "derived"
+        }
+      },
+      "capabilities": {
+        "status": "ok",
+        "value": [
+          {
+            "path": "/usr/bin/ping",
+            "caps": "cap_net_raw=ep",
+            "rootid": 0,
+            "package": "iputils-ping",
+            "package_declared": true,
+            "declared_caps": "cap_net_raw+ep",
+            "reference": "postinst",
+            "reason": ""
+          },
+          {
+            "path": "/usr/bin/newuidmap",
+            "caps": "cap_setuid=ep",
+            "rootid": 0,
+            "package": "shadow-utils",
+            "package_declared": true,
+            "declared_caps": "cap_setuid=ep",
+            "reference": "rpmdb",
+            "reason": ""
+          }
+        ],
+        "source": {
+          "kind": "derived"
+        }
+      },
+      "acl_grants": {
+        "status": "ok",
+        "value": [],
+        "source": {
+          "kind": "derived"
+        }
+      }
+    }
+  }
+}

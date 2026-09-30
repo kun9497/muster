@@ -1,0 +1,164 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none",
+        "source": {
+          "kind": "file",
+          "path": "/proc/1/cgroup"
+        }
+      }
+    },
+    "sudo": {
+      "installed": {
+        "status": "ok",
+        "value": true,
+        "source": {
+          "kind": "file",
+          "path": "/etc/sudoers"
+        }
+      },
+      "rules": {
+        "status": "ok",
+        "value": [
+          {
+            "file": "/etc/sudoers",
+            "line": 47,
+            "principal": "root",
+            "kind": "user",
+            "negated": false,
+            "runas": "(ALL:ALL)",
+            "nopasswd": false,
+            "commands": [
+              "ALL"
+            ],
+            "resolved": true
+          },
+          {
+            "file": "/etc/sudoers",
+            "line": 50,
+            "principal": "%admin",
+            "kind": "group",
+            "negated": false,
+            "runas": "(ALL)",
+            "nopasswd": false,
+            "commands": [
+              "ALL"
+            ],
+            "resolved": true
+          },
+          {
+            "file": "/etc/sudoers",
+            "line": 53,
+            "principal": "%sudo",
+            "kind": "group",
+            "negated": false,
+            "runas": "(ALL:ALL)",
+            "nopasswd": false,
+            "commands": [
+              "ALL"
+            ],
+            "resolved": true
+          },
+          {
+            "file": "/etc/sudoers.d/ops",
+            "line": 1,
+            "principal": "ADMINS",
+            "kind": "alias",
+            "negated": false,
+            "runas": "(ALL)",
+            "nopasswd": true,
+            "commands": [
+              "ALL"
+            ],
+            "resolved": false
+          }
+        ],
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "file",
+              "path": "/etc/sudoers"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/sudoers.d/README"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/sudoers.d/ops"
+            }
+          ]
+        }
+      },
+      "nopasswd_all": {
+        "status": "absent",
+        "reason": "1 rule could not be resolved: ADMINS — the answer needs them",
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "file",
+              "path": "/etc/sudoers"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/sudoers.d/README"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/sudoers.d/ops"
+            }
+          ]
+        }
+      },
+      "authenticate_disabled": {
+        "status": "absent",
+        "reason": "1 rule could not be resolved: ADMINS — the answer needs them",
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "file",
+              "path": "/etc/sudoers"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/sudoers.d/README"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/sudoers.d/ops"
+            }
+          ]
+        }
+      },
+      "rules_unresolved": {
+        "status": "ok",
+        "value": 1,
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "file",
+              "path": "/etc/sudoers"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/sudoers.d/README"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/sudoers.d/ops"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

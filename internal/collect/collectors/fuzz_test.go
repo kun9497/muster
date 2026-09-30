@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"math"
 	"os"
 	"path"
 	"path/filepath"
@@ -553,6 +554,33 @@ func FuzzParseShadow(f *testing.F) {
 	})
 }
 
+// Both record layouts run over every input: the size is the host's in the
+// collector, and a fuzzer on amd64 must still reach the 296 decoder.
+func FuzzParseLastlog(f *testing.F) {
+	seeds(f, "testdata/lastlog*")
+	f.Fuzz(func(t *testing.T, data []byte) {
+		// The huge uid keeps the offset arithmetic guarded: uid*recordSize
+		// wraps for it, and the decoder must answer a zero row, not panic.
+		uids := map[int]string{0: "root", 1: "daemon", 1000: "alice", math.MaxInt >> 1: "huge"}
+		fuzzBody(t, "parseLastlog", func() any {
+			return []any{parseLastlog(data, 292, uids), parseLastlog(data, 296, uids)}
+		}, len(data))
+	})
+}
+
+func FuzzParseUseraddDefaults(f *testing.F) {
+	seeds(f, "testdata/useradd.default.*")
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "parseUseraddDefaults", func() any {
+			inactive, reason := parseUseraddDefaults(data)
+			if inactive < -1 {
+				t.Fatalf("inactive %d is below -1", inactive)
+			}
+			return []any{inactive, reason}
+		}, len(data))
+	})
+}
+
 func FuzzParseSubIDs(f *testing.F) {
 	seeds(f, "testdata/subuid*", "testdata/subgid*")
 	f.Fuzz(func(t *testing.T, data []byte) {
@@ -582,6 +610,33 @@ func FuzzDecodeACL(f *testing.F) {
 			entries, err := decodeACL(data)
 			return []any{entries, err != nil}
 		}, len(data))
+	})
+}
+
+func FuzzDecodeVfsCap(f *testing.F) {
+	seeds(f, "testdata/vfscap.*")
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "decodeVfsCap", func() any {
+			cs, err := decodeVfsCap(data)
+			if err != nil {
+				return []any{true}
+			}
+			// What decodes renders, and the rendering parses back to the
+			// same set: the join compares through exactly that round trip.
+			text := capText(cs)
+			back, perr := parseCapText(text)
+			if perr != nil || !sameCaps(back, cs) {
+				t.Fatalf("capText %q does not parse back to %+v: %+v, %v", text, cs, back, perr)
+			}
+			return []any{cs, text}
+		}, len(data))
+	})
+}
+
+func FuzzParsePostinstSetcap(f *testing.F) {
+	seeds(f, "testdata/postinst.*")
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "parsePostinstSetcap", func() any { return parsePostinstSetcap(data) }, len(data))
 	})
 }
 
@@ -619,7 +674,7 @@ func FuzzParseProcNet(f *testing.F) {
 }
 
 func FuzzRPMFileTable(f *testing.F) {
-	seeds(f, "testdata/rpm.qa-files.*")
+	seeds(f, "testdata/rpm.qa-files.*", "testdata/rpm_files_caps.sample")
 	f.Fuzz(func(t *testing.T, data []byte) {
 		fuzzBody(t, "rpmFileTable", func() any {
 			whole, errWhole := rpmFileTable(data, map[string]bool{"/usr/bin/su": true, "/usr/bin/at": true}, false)
@@ -1306,6 +1361,40 @@ func FuzzParseListTimers(f *testing.F) {
 	})
 }
 
+func FuzzParseUnitFile(f *testing.F) {
+	seeds(f, "testdata/units/*")
+	f.Add([]byte("[Service]\nExecStart=/a \\\n# c\n -x\nExecStart=\nUser = 0\n"))
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "parseUnitFile", func() any { return mergeUnitFiles([]unitFile{parseUnitFile(data)}) }, len(data))
+	})
+}
+
+func FuzzParseListUnits(f *testing.F) {
+	seeds(f, "testdata/list_units.*")
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "parseListUnits", func() any { return parseListUnits(data) }, len(data))
+	})
+}
+
+func FuzzExecCommands(f *testing.F) {
+	seeds(f, "testdata/units/*")
+	f.Add([]byte(`/bin/true ; /opt/x/evil \; "a ; b" ;`))
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "execCommands", func() any { return execCommands(string(data)) }, len(data))
+	})
+}
+
+func FuzzExecFirstToken(f *testing.F) {
+	seeds(f, "testdata/units/*")
+	f.Add([]byte(`-@"/opt/my app/\x41run" arg`))
+	f.Add([]byte(`!!/usr/lib/%I/\u00e9`))
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "execFirstToken", func() any {
+			p, ok := execFirstToken(string(data))
+			return []any{p, ok}
+		}, len(data))
+	})
+}
 func FuzzCronDailyRun(f *testing.F) {
 	seeds(f, "testdata/default_aide.sample")
 	f.Add([]byte("CRON_DAILY_RUN=\"no\"\n"))
@@ -1330,5 +1419,44 @@ func FuzzParseSudoersDefaults(f *testing.F) {
 	f.Add([]byte("Defaults env_keep += \"LANG LC_ALL\", !syslog, logfile=\"/var/log/sudo.log\", \\\n  syslog=authpriv\nDefaults:root !syslog\n"))
 	f.Fuzz(func(t *testing.T, data []byte) {
 		fuzzBody(t, "parseSudoersDefaults", func() any { return parseSudoersDefaults(data) }, len(data))
+	})
+}
+
+func FuzzParseSudoers(f *testing.F) {
+	seeds(f, "testdata/sudoers*")
+	f.Add([]byte("User_Alias A = B, !%g : B = A\nCmnd_Alias C = sha256:abc /bin/x \\, y, !ALL\n" +
+		"A, +ng, \"%:Domain Admins\" h1, h2 = (ALL : %#0) NOPASSWD: TIMEOUT=5 C, PASSWD: /bin/b : ALL = ALL\n" +
+		"#1000 ALL = \\\n NOPASSWD: ALL\n#1 comment\nDefaults>root !authenticate\nDefaults:a,b !authenticate\n"))
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "parseSudoers", func() any {
+			parsed := parseSudoers(data, sudoersPath)
+			rules, unresolved := resolveRules([]sudoersFile{parsed})
+			// The rows are principals times privileges, which can pass the
+			// input's length; resolveRules bounds them at sudoRowBudget, and
+			// they are compared for determinism as one text.
+			if len(rules) > sudoRowBudget+1 {
+				t.Fatalf("resolveRules built %d rows (budget %d)", len(rules), sudoRowBudget)
+			}
+			return []any{parsed, fmt.Sprintf("%+v", rules), unresolved, nopasswdAll(rules), authenticateDisabled([]sudoersFile{parsed})}
+		}, len(data))
+	})
+}
+
+func FuzzParseAuthorizedKeys(f *testing.F) {
+	seeds(f, "testdata/authorized_keys.*")
+	f.Add([]byte(`command="echo \"a,b\"",restrict ssh-ed25519 ` + zeroEd25519 + "\n,,x\n\"\n"))
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "parseAuthorizedKeys", func() any {
+			keys, unparsed := parseAuthorizedKeys(data)
+			return []any{keys, unparsed}
+		}, len(data))
+	})
+}
+
+func FuzzParseLdSoPreload(f *testing.F) {
+	seeds(f, "testdata/ld.so.preload.*")
+	f.Add([]byte("a#b:c\n\t:d\r\n#"))
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "parseLdSoPreload", func() any { return parseLdSoPreload(data) }, len(data))
 	})
 }

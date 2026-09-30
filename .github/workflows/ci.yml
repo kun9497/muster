@@ -60,6 +60,15 @@ jobs:
       # daemon, aide so fim.tool reads aide on a real host.
       - name: install openssh-server, auditd and aide
         run: sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq openssh-server auditd aide aide-common
+      # P-12: one file capability no package declares, on a walked path
+      # outside .github/walk-excludes, so the capability join's "unpackaged"
+      # branch runs on a real host. The runner image is expected to carry
+      # setcap already; the install is the fallback. The file is removed by
+      # the always() step at the end of the job.
+      - name: plant an undeclared file capability
+        run: |
+          command -v setcap || sudo apt-get install -y -qq libcap2-bin
+          sudo cp /bin/true /usr/local/bin/muster-cap-probe && sudo setcap cap_net_raw+ep /usr/local/bin/muster-cap-probe
       - name: collect as root
         run: |
           set +e
@@ -111,6 +120,16 @@ jobs:
       - name: auditd, the verify and aide read what the runner has
         run: |
           jq -e '.facts.services.auditd.active.value == true and .facts.audit.rules.present.runtime.status == "ok" and .facts.audit.rules.present.runtime.value == false and .facts.packages.verify.complete.value == true and .facts.packages.verify.tool.value == "dpkg" and .facts.fim.tool.value == "aide"' "$RUNNER_TEMP/muster/root.json"
+      # P-12: the planted capability is found and judged unpackaged, and the
+      # runner's privilege facts are what its image is expected to carry -
+      # no preload, runner among the passwordless sudo principals (the image
+      # carries packer's rule beside runner's - the first run read both), runner
+      # in docker's group, useradd's INACTIVE unset. These describe the runner,
+      # not muster: a mismatch is corrected here, never in the collector.
+      - name: the capability probe and the runner's privilege facts
+        run: |
+          jq -e '(.facts.walk.capabilities.value | map(select(.path == "/usr/local/bin/muster-cap-probe"))) as $p | ($p | length) == 1 and $p[0].reference == "unpackaged" and $p[0].package_declared == false' "$RUNNER_TEMP/muster/root.json"
+          jq -e '.facts.privilege.ld_so_preload.value == [] and (.facts.sudo.nopasswd_all.value | index("runner") != null) and any(.facts.privilege.runtime_group_members.value[]; .member == "runner" and .group == "docker") and .facts.accounts.useradd.inactive.value == -1' "$RUNNER_TEMP/muster/root.json"
       - name: check the root snapshot
         run: |
           sudo chown "$(id -u)" "$RUNNER_TEMP/muster/root.json"
@@ -159,10 +178,23 @@ jobs:
           # oracle's -T would exit 255 on that alone.
           sudo mkdir -p /run/sshd
           sudo /usr/sbin/sshd -t
+      - name: give the lastlog oracle a dated record
+        run: |
+          # V-62: nobody has logged in to the runner through PAM, so root's
+          # and runner's lastlog records are both "never", and a pair that
+          # compares two "never"s would pass on a decoder that read nothing.
+          # This writes the runner's /var/log/lastlog - the runner's own
+          # file, like the sshd drop-in above - setting runner's record to
+          # now, so the pair has a date to compare.
+          sudo lastlog -S -u runner
       - name: the parsers agree with the daemons (oracle)
         run: |
           set -o pipefail
           # J-24: the verify pair runs dpkg --verify twice, up to 30m each.
+          # N-3: the worst case under -timeout 90m is that 2x30m, plus the
+          # capabilities pair's walk over the six executable directories
+          # (10m budget) and its getcap -r over the same six (10m): 80m,
+          # the other pairs being seconds.
           sudo env PATH="$PATH" GOFLAGS="$GOFLAGS" MUSTER_ORACLE=1 go test ./internal/collect/collectors/ -run Oracle -count=1 -v -timeout 90m 2>&1 | tee "$RUNNER_TEMP/oracle.log"
           ! grep -q -- '--- SKIP' "$RUNNER_TEMP/oracle.log"
           # A pair that compared nothing is not a pair that agreed: the sshd
@@ -173,11 +205,20 @@ jobs:
           grep -q 'oracle sshd: compared [1-9]' "$RUNNER_TEMP/oracle.log"
           grep -q 'oracle audit: compared [1-9]' "$RUNNER_TEMP/oracle.log"
           grep -q 'oracle verify: compared' "$RUNNER_TEMP/oracle.log"
+          grep -q 'oracle units: compared [1-9]' "$RUNNER_TEMP/oracle.log"
+          grep -q 'oracle keys: compared [1-9]' "$RUNNER_TEMP/oracle.log"
+          grep -q 'oracle lastlog: compared [1-9]' "$RUNNER_TEMP/oracle.log"
+          grep -q 'oracle lastlog: compared [1-9][0-9]*, dated [1-9]' "$RUNNER_TEMP/oracle.log"
+          grep -q 'oracle capabilities: compared [1-9]' "$RUNNER_TEMP/oracle.log"
+          grep -q 'oracle sudoers: compared 1' "$RUNNER_TEMP/oracle.log"
       - name: take the oracle drop-in back out
         # P-1: the runner is thrown away, but a step that exists to undo a
         # change must run whether or not the thing it guarded passed.
         if: always()
         run: sudo rm -f /etc/ssh/sshd_config.d/99-muster-oracle.conf
+      - name: take the capability probe back out
+        if: always()
+        run: sudo rm -f /usr/local/bin/muster-cap-probe
 
   collect-nonroot:
     runs-on: ubuntu-24.04

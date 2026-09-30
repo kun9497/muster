@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
   "run": {
-    "muster_version": "81855c8",
-    "commit": "81855c8",
-    "controls_version": "kisa-unix-2026+2026.09.23",
-    "controls_digest": "sha256:f3337dac3ea8281886a8618f4cc136ddf62b3258dbfb113c560b5aeca854f41d",
+    "muster_version": "37dfcc8",
+    "commit": "37dfcc8",
+    "controls_version": "kisa-unix-2026+2026.09.29",
+    "controls_digest": "sha256:1622ceeeba7f9b7bbe1d2bb23562a921bfec21f7fd82833ec4af40a5515813ad",
     "guide_edition": "kisa-unix-2026",
-    "collected_at": "2026-09-28T08:17:22Z",
+    "collected_at": "2026-09-30T00:18:36Z",
     "host": {
       "hostname": "ubuntu-container",
       "machine_id_hash": "",
@@ -36,7 +36,7 @@
       {
         "name": "accounts",
         "status": "ok",
-        "ms": 10
+        "ms": 21
       },
       {
         "name": "audit",
@@ -57,7 +57,7 @@
       {
         "name": "coredump",
         "status": "ok",
-        "ms": 45
+        "ms": 18
       },
       {
         "name": "cron",
@@ -73,12 +73,12 @@
       {
         "name": "env",
         "status": "ok",
-        "ms": 6
+        "ms": 7
       },
       {
         "name": "files",
         "status": "ok",
-        "ms": 7
+        "ms": 8
       },
       {
         "name": "fim",
@@ -131,24 +131,29 @@
       {
         "name": "os",
         "status": "ok",
-        "ms": 5
+        "ms": 6
       },
       {
         "name": "pam",
         "status": "ok",
-        "ms": 11
+        "ms": 56
       },
       {
         "name": "patch",
         "status": "ok",
-        "ms": 572,
+        "ms": 868,
         "cmd": "/usr/bin/apt-get -s upgrade -o Debug::NoLocking=1"
       },
       {
         "name": "pkgverify",
         "status": "ok",
-        "ms": 7941,
+        "ms": 11167,
         "cmd": "/usr/bin/rpm -Va"
+      },
+      {
+        "name": "privilege",
+        "status": "ok",
+        "ms": 0
       },
       {
         "name": "services",
@@ -173,6 +178,11 @@
         "cmd": "/usr/sbin/sshd -G"
       },
       {
+        "name": "sshkeys",
+        "status": "ok",
+        "ms": 0
+      },
+      {
         "name": "swap",
         "status": "ok",
         "ms": 0
@@ -189,10 +199,16 @@
         "cmd": "/usr/bin/timedatectl show-timesync --all"
       },
       {
+        "name": "units",
+        "status": "ok",
+        "ms": 0,
+        "cmd": "/usr/bin/systemctl list-units --type=service --state=active --plain --no-legend"
+      },
+      {
         "name": "walk",
         "status": "ok",
         "ms": 0,
-        "cmd": "/usr/bin/rpm -qa --qf [%{=NAME}\t%{FILEMODES:octal}\t%{FILEUSERNAME}\t%{FILEGROUPNAME}\t%{FILENAMES}\n]"
+        "cmd": "/usr/bin/rpm -qa --qf [%{=NAME}\t%{FILEMODES:octal}\t%{FILEUSERNAME}\t%{FILEGROUPNAME}\t%|FILECAPS?{%{FILECAPS}}|\t%{FILENAMES}\n]"
       }
     ],
     "redaction": {
@@ -528,6 +544,196 @@
           "path": "/etc/group"
         }
       },
+      "lastlog": {
+        "status": "ok",
+        "value": [
+          {
+            "host": "",
+            "last_login": "",
+            "line": "",
+            "name": "_apt",
+            "uid": 42
+          },
+          {
+            "host": "",
+            "last_login": "",
+            "line": "",
+            "name": "backup",
+            "uid": 34
+          },
+          {
+            "host": "",
+            "last_login": "",
+            "line": "",
+            "name": "bin",
+            "uid": 2
+          },
+          {
+            "host": "",
+            "last_login": "",
+            "line": "",
+            "name": "daemon",
+            "uid": 1
+          },
+          {
+            "host": "",
+            "last_login": "",
+            "line": "",
+            "name": "games",
+            "uid": 5
+          },
+          {
+            "host": "",
+            "last_login": "",
+            "line": "",
+            "name": "irc",
+            "uid": 39
+          },
+          {
+            "host": "",
+            "last_login": "",
+            "line": "",
+            "name": "list",
+            "uid": 38
+          },
+          {
+            "host": "",
+            "last_login": "",
+            "line": "",
+            "name": "lp",
+            "uid": 7
+          },
+          {
+            "host": "",
+            "last_login": "",
+            "line": "",
+            "name": "mail",
+            "uid": 8
+          },
+          {
+            "host": "",
+            "last_login": "",
+            "line": "",
+            "name": "man",
+            "uid": 6
+          },
+          {
+            "host": "",
+            "last_login": "",
+            "line": "",
+            "name": "news",
+            "uid": 9
+          },
+          {
+            "host": "",
+            "last_login": "",
+            "line": "",
+            "name": "nobody",
+            "uid": 65534
+          },
+          {
+            "host": "",
+            "last_login": "",
+            "line": "",
+            "name": "proxy",
+            "uid": 13
+          },
+          {
+            "host": "",
+            "last_login": "",
+            "line": "",
+            "name": "root",
+            "uid": 0
+          },
+          {
+            "host": "",
+            "last_login": "",
+            "line": "",
+            "name": "sync",
+            "uid": 4
+          },
+          {
+            "host": "",
+            "last_login": "",
+            "line": "",
+            "name": "sys",
+            "uid": 3
+          },
+          {
+            "host": "",
+            "last_login": "",
+            "line": "",
+            "name": "ubuntu",
+            "uid": 1000
+          },
+          {
+            "host": "",
+            "last_login": "",
+            "line": "",
+            "name": "uucp",
+            "uid": 10
+          },
+          {
+            "host": "",
+            "last_login": "",
+            "line": "",
+            "name": "www-data",
+            "uid": 33
+          }
+        ],
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "file",
+              "path": "/etc/passwd"
+            },
+            {
+              "kind": "file",
+              "path": "/var/log/lastlog"
+            }
+          ]
+        },
+        "reason": "record size 292"
+      },
+      "login_capable": {
+        "status": "ok",
+        "value": [
+          {
+            "expire": -1,
+            "inactive": -1,
+            "inactive_unset": true,
+            "locked": true,
+            "name": "root",
+            "uid": 0
+          },
+          {
+            "expire": -1,
+            "inactive": -1,
+            "inactive_unset": true,
+            "locked": true,
+            "name": "ubuntu",
+            "uid": 1000
+          }
+        ],
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "file",
+              "path": "/etc/passwd"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/shadow"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/shells"
+            }
+          ]
+        }
+      },
       "login_defs": {
         "encrypt_method": {
           "status": "ok",
@@ -756,6 +962,17 @@
         "source": {
           "kind": "file",
           "path": "/etc/shells"
+        }
+      },
+      "useradd": {
+        "inactive": {
+          "status": "ok",
+          "value": -1,
+          "source": {
+            "kind": "file",
+            "path": "/etc/default/useradd"
+          },
+          "reason": "INACTIVE is commented out in /etc/default/useradd (useradd's default is -1, never)"
         }
       },
       "users": {
@@ -4461,7 +4678,7 @@
               "path-include=/usr/share/doc/*/changelog.*"
             ],
             "dpkg_path_excludes_error": [],
-            "duration_ms": 7935,
+            "duration_ms": 11162,
             "exit_code": 0,
             "lines": 1506,
             "packages_without_digests": 0,
@@ -5514,7 +5731,7 @@
       },
       "days_since_last_install": {
         "status": "ok",
-        "value": 17,
+        "value": 18,
         "source": {
           "kind": "file",
           "path": "/var/log/dpkg.log"
@@ -5561,6 +5778,131 @@
       "security_metadata_available": {
         "status": "ok",
         "value": false
+      }
+    },
+    "privilege": {
+      "ld_so_preload": {
+        "status": "ok",
+        "value": [],
+        "source": {
+          "kind": "file",
+          "path": "/etc/ld.so.preload"
+        }
+      },
+      "runtime_group_members": {
+        "status": "ok",
+        "value": [],
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "file",
+              "path": "/run/docker.sock"
+            },
+            {
+              "kind": "file",
+              "path": "/run/containerd/containerd.sock"
+            },
+            {
+              "kind": "file",
+              "path": "/run/podman/podman.sock"
+            },
+            {
+              "kind": "file",
+              "path": "/run/crio/crio.sock"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/group"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/passwd"
+            }
+          ]
+        }
+      },
+      "runtime_sockets": {
+        "status": "ok",
+        "value": [
+          {
+            "acl_present": false,
+            "exists": false,
+            "gid": -1,
+            "group": "",
+            "group_writable": false,
+            "kind": "",
+            "mode": -1,
+            "other_writable": false,
+            "owner_nonroot": false,
+            "path": "/run/docker.sock",
+            "uid": -1
+          },
+          {
+            "acl_present": false,
+            "exists": false,
+            "gid": -1,
+            "group": "",
+            "group_writable": false,
+            "kind": "",
+            "mode": -1,
+            "other_writable": false,
+            "owner_nonroot": false,
+            "path": "/run/containerd/containerd.sock",
+            "uid": -1
+          },
+          {
+            "acl_present": false,
+            "exists": false,
+            "gid": -1,
+            "group": "",
+            "group_writable": false,
+            "kind": "",
+            "mode": -1,
+            "other_writable": false,
+            "owner_nonroot": false,
+            "path": "/run/podman/podman.sock",
+            "uid": -1
+          },
+          {
+            "acl_present": false,
+            "exists": false,
+            "gid": -1,
+            "group": "",
+            "group_writable": false,
+            "kind": "",
+            "mode": -1,
+            "other_writable": false,
+            "owner_nonroot": false,
+            "path": "/run/crio/crio.sock",
+            "uid": -1
+          }
+        ],
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "file",
+              "path": "/run/docker.sock"
+            },
+            {
+              "kind": "file",
+              "path": "/run/containerd/containerd.sock"
+            },
+            {
+              "kind": "file",
+              "path": "/run/podman/podman.sock"
+            },
+            {
+              "kind": "file",
+              "path": "/run/crio/crio.sock"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/group"
+            }
+          ]
+        }
       }
     },
     "services": {
@@ -6012,6 +6354,350 @@
         }
       }
     },
+    "ssh": {
+      "authorized_keys": {
+        "status": "ok",
+        "value": [
+          {
+            "exists": false,
+            "keys": [],
+            "mode": -1,
+            "owner_uid": -1,
+            "path": "",
+            "read_status": "",
+            "reason": "home path outside the collector's declaration",
+            "uid": 42,
+            "unfollowed": true,
+            "unparsed": 0,
+            "user": "_apt"
+          },
+          {
+            "exists": false,
+            "keys": [],
+            "mode": -1,
+            "owner_uid": -1,
+            "path": "",
+            "read_status": "",
+            "reason": "home path outside the collector's declaration",
+            "uid": 34,
+            "unfollowed": true,
+            "unparsed": 0,
+            "user": "backup"
+          },
+          {
+            "exists": false,
+            "keys": [],
+            "mode": -1,
+            "owner_uid": -1,
+            "path": "",
+            "read_status": "",
+            "reason": "home path outside the collector's declaration",
+            "uid": 2,
+            "unfollowed": true,
+            "unparsed": 0,
+            "user": "bin"
+          },
+          {
+            "exists": false,
+            "keys": [],
+            "mode": -1,
+            "owner_uid": -1,
+            "path": "",
+            "read_status": "",
+            "reason": "home path outside the collector's declaration",
+            "uid": 1,
+            "unfollowed": true,
+            "unparsed": 0,
+            "user": "daemon"
+          },
+          {
+            "exists": false,
+            "keys": [],
+            "mode": -1,
+            "owner_uid": -1,
+            "path": "",
+            "read_status": "",
+            "reason": "home path outside the collector's declaration",
+            "uid": 5,
+            "unfollowed": true,
+            "unparsed": 0,
+            "user": "games"
+          },
+          {
+            "exists": false,
+            "keys": [],
+            "mode": -1,
+            "owner_uid": -1,
+            "path": "",
+            "read_status": "",
+            "reason": "home path outside the collector's declaration",
+            "uid": 39,
+            "unfollowed": true,
+            "unparsed": 0,
+            "user": "irc"
+          },
+          {
+            "exists": false,
+            "keys": [],
+            "mode": -1,
+            "owner_uid": -1,
+            "path": "",
+            "read_status": "",
+            "reason": "home path outside the collector's declaration",
+            "uid": 38,
+            "unfollowed": true,
+            "unparsed": 0,
+            "user": "list"
+          },
+          {
+            "exists": false,
+            "keys": [],
+            "mode": -1,
+            "owner_uid": -1,
+            "path": "",
+            "read_status": "",
+            "reason": "home path outside the collector's declaration",
+            "uid": 7,
+            "unfollowed": true,
+            "unparsed": 0,
+            "user": "lp"
+          },
+          {
+            "exists": false,
+            "keys": [],
+            "mode": -1,
+            "owner_uid": -1,
+            "path": "",
+            "read_status": "",
+            "reason": "home path outside the collector's declaration",
+            "uid": 8,
+            "unfollowed": true,
+            "unparsed": 0,
+            "user": "mail"
+          },
+          {
+            "exists": false,
+            "keys": [],
+            "mode": -1,
+            "owner_uid": -1,
+            "path": "",
+            "read_status": "",
+            "reason": "home path outside the collector's declaration",
+            "uid": 6,
+            "unfollowed": true,
+            "unparsed": 0,
+            "user": "man"
+          },
+          {
+            "exists": false,
+            "keys": [],
+            "mode": -1,
+            "owner_uid": -1,
+            "path": "",
+            "read_status": "",
+            "reason": "home path outside the collector's declaration",
+            "uid": 9,
+            "unfollowed": true,
+            "unparsed": 0,
+            "user": "news"
+          },
+          {
+            "exists": false,
+            "keys": [],
+            "mode": -1,
+            "owner_uid": -1,
+            "path": "",
+            "read_status": "",
+            "reason": "home path outside the collector's declaration",
+            "uid": 65534,
+            "unfollowed": true,
+            "unparsed": 0,
+            "user": "nobody"
+          },
+          {
+            "exists": false,
+            "keys": [],
+            "mode": -1,
+            "owner_uid": -1,
+            "path": "",
+            "read_status": "",
+            "reason": "home path outside the collector's declaration",
+            "uid": 13,
+            "unfollowed": true,
+            "unparsed": 0,
+            "user": "proxy"
+          },
+          {
+            "exists": false,
+            "keys": [],
+            "mode": -1,
+            "owner_uid": -1,
+            "path": "/root/.ssh/authorized_keys",
+            "read_status": "ok",
+            "reason": "",
+            "uid": 0,
+            "unfollowed": false,
+            "unparsed": 0,
+            "user": "root"
+          },
+          {
+            "exists": false,
+            "keys": [],
+            "mode": -1,
+            "owner_uid": -1,
+            "path": "/root/.ssh/authorized_keys2",
+            "read_status": "ok",
+            "reason": "",
+            "uid": 0,
+            "unfollowed": false,
+            "unparsed": 0,
+            "user": "root"
+          },
+          {
+            "exists": false,
+            "keys": [],
+            "mode": -1,
+            "owner_uid": -1,
+            "path": "",
+            "read_status": "",
+            "reason": "home path outside the collector's declaration",
+            "uid": 4,
+            "unfollowed": true,
+            "unparsed": 0,
+            "user": "sync"
+          },
+          {
+            "exists": false,
+            "keys": [],
+            "mode": -1,
+            "owner_uid": -1,
+            "path": "",
+            "read_status": "",
+            "reason": "home path outside the collector's declaration",
+            "uid": 3,
+            "unfollowed": true,
+            "unparsed": 0,
+            "user": "sys"
+          },
+          {
+            "exists": false,
+            "keys": [],
+            "mode": -1,
+            "owner_uid": -1,
+            "path": "/home/ubuntu/.ssh/authorized_keys",
+            "read_status": "ok",
+            "reason": "",
+            "uid": 1000,
+            "unfollowed": false,
+            "unparsed": 0,
+            "user": "ubuntu"
+          },
+          {
+            "exists": false,
+            "keys": [],
+            "mode": -1,
+            "owner_uid": -1,
+            "path": "/home/ubuntu/.ssh/authorized_keys2",
+            "read_status": "ok",
+            "reason": "",
+            "uid": 1000,
+            "unfollowed": false,
+            "unparsed": 0,
+            "user": "ubuntu"
+          },
+          {
+            "exists": false,
+            "keys": [],
+            "mode": -1,
+            "owner_uid": -1,
+            "path": "",
+            "read_status": "",
+            "reason": "home path outside the collector's declaration",
+            "uid": 10,
+            "unfollowed": true,
+            "unparsed": 0,
+            "user": "uucp"
+          },
+          {
+            "exists": false,
+            "keys": [],
+            "mode": -1,
+            "owner_uid": -1,
+            "path": "",
+            "read_status": "",
+            "reason": "home path outside the collector's declaration",
+            "uid": 33,
+            "unfollowed": true,
+            "unparsed": 0,
+            "user": "www-data"
+          }
+        ],
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "file",
+              "path": "/etc/passwd"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/shells"
+            }
+          ]
+        }
+      },
+      "dsa_key_count": {
+        "status": "ok",
+        "value": 0,
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "file",
+              "path": "/etc/passwd"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/shells"
+            }
+          ]
+        }
+      },
+      "root_key_count": {
+        "status": "ok",
+        "value": 0,
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "file",
+              "path": "/etc/passwd"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/shells"
+            }
+          ]
+        }
+      },
+      "rsa_keys": {
+        "status": "ok",
+        "value": [],
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "file",
+              "path": "/etc/passwd"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/shells"
+            }
+          ]
+        }
+      }
+    },
     "sshd": {
       "banner_file": {
         "exists": {
@@ -6108,6 +6794,13 @@
       }
     },
     "sudo": {
+      "authenticate_disabled": {
+        "status": "ok",
+        "value": false,
+        "source": {
+          "kind": "derived"
+        }
+      },
       "defaults": {
         "scoped_count": {
           "status": "ok",
@@ -6145,6 +6838,27 @@
           "source": {
             "kind": "derived"
           }
+        }
+      },
+      "nopasswd_all": {
+        "status": "ok",
+        "value": [],
+        "source": {
+          "kind": "derived"
+        }
+      },
+      "rules": {
+        "status": "ok",
+        "value": [],
+        "source": {
+          "kind": "derived"
+        }
+      },
+      "rules_unresolved": {
+        "status": "ok",
+        "value": 0,
+        "source": {
+          "kind": "derived"
         }
       },
       "secure_path": {
@@ -6212,7 +6926,29 @@
         "reason": "timedatectl unavailable: fork/exec /usr/bin/timedatectl: no such file or directory"
       }
     },
+    "units": {
+      "exec_unresolved": {
+        "status": "unsupported",
+        "reason": "no systemd on this host or inside this container"
+      },
+      "exec_writable": {
+        "status": "unsupported",
+        "reason": "no systemd on this host or inside this container"
+      },
+      "root_services": {
+        "status": "unsupported",
+        "reason": "no systemd on this host or inside this container"
+      }
+    },
     "walk": {
+      "acl_grants": {
+        "status": "unsupported",
+        "reason": "root filesystem is overlay; the walk answers for a host, not for a container layer"
+      },
+      "capabilities": {
+        "status": "unsupported",
+        "reason": "root filesystem is overlay; the walk answers for a host, not for a container layer"
+      },
       "complete": {
         "status": "ok",
         "value": true,
@@ -6324,6 +7060,8 @@
           "stop_reason": "",
           "symlinks": 0,
           "truncated_counts": {
+            "acl_grants": 0,
+            "capabilities": 0,
             "hidden": 0,
             "skipped": 0,
             "sticky_missing": 0,

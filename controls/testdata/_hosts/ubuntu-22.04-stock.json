@@ -1,10 +1,17 @@
 {
   "synthetic": true,
+  "_notes": [
+    "Synthetic, shaped like the lab's root --deep reading of Ubuntu 22.04 on 2026-09-29 (3C-2a V-18); nothing in it was copied from that host but package paths.",
+    "units.root_services lists fifteen of the stock host's in-scope root services: the ten that name twelve commands without a path, snapd.aa-prompt-listener.service (enabled, no unit file), ssh, cron, rsyslog and systemd-journald. Those twelve commands and the missing unit file are units.exec_unresolved 13; the host's other root services are shaped like the four resolved ones and flag nothing. cloud-init-local.service, which the lab runs, is left out: this is the non-cloud reading (run.env.cloud_init false), and no other in-scope unit of the lab names a bare command.",
+    "sshd.options.permit_root_login is OpenSSH's compiled default prohibit-password, which the 8.9p1 sshd (no -G) prints through sshd -T as without-password.",
+    "muster.beyond.root_authorized_keys reads PASS because this is the non-cloud image (run.env.cloud_init false) and root has no key: on a cloud image cloud-init writes a forced-command key into root's authorized_keys, and that host reads FAIL.",
+    "privilege.runtime_sockets: no container runtime is installed, so every socket row is exists false and no runtime group has a member."
+  ],
   "schema_version": 1,
   "run": {
     "muster_version": "synthetic",
     "commit": "synthetic",
-    "controls_version": "kisa-unix-2026+2026.09.23",
+    "controls_version": "kisa-unix-2026+2026.09.29",
     "controls_digest": "",
     "guide_edition": "kisa-unix-2026",
     "collected_at": "2026-09-18T00:00:00Z",
@@ -32,6 +39,11 @@
       "cloud_init": false
     },
     "collectors": [
+      {
+        "name": "accounts",
+        "status": "ok",
+        "ms": 0
+      },
       {
         "name": "audit",
         "status": "ok",
@@ -83,7 +95,22 @@
         "ms": 0
       },
       {
+        "name": "privilege",
+        "status": "ok",
+        "ms": 0
+      },
+      {
         "name": "services",
+        "status": "ok",
+        "ms": 0
+      },
+      {
+        "name": "sshd",
+        "status": "ok",
+        "ms": 0
+      },
+      {
+        "name": "sshkeys",
         "status": "ok",
         "ms": 0
       },
@@ -94,6 +121,16 @@
       },
       {
         "name": "sysctl",
+        "status": "ok",
+        "ms": 0
+      },
+      {
+        "name": "units",
+        "status": "ok",
+        "ms": 0
+      },
+      {
+        "name": "walk",
         "status": "ok",
         "ms": 0
       }
@@ -293,6 +330,14 @@
         "source": {
           "kind": "file",
           "path": "/proc/1/cgroup"
+        }
+      },
+      "has_systemd": {
+        "status": "ok",
+        "value": true,
+        "source": {
+          "kind": "file",
+          "path": "/run/systemd/system"
         }
       }
     },
@@ -529,6 +574,114 @@
               }
             ]
           }
+        }
+      },
+      "rules": {
+        "status": "ok",
+        "value": [
+          {
+            "file": "/etc/sudoers",
+            "line": 47,
+            "principal": "root",
+            "kind": "user",
+            "negated": false,
+            "runas": "(ALL:ALL)",
+            "nopasswd": false,
+            "commands": [
+              "ALL"
+            ],
+            "resolved": true
+          },
+          {
+            "file": "/etc/sudoers",
+            "line": 50,
+            "principal": "%admin",
+            "kind": "group",
+            "negated": false,
+            "runas": "(ALL)",
+            "nopasswd": false,
+            "commands": [
+              "ALL"
+            ],
+            "resolved": true
+          },
+          {
+            "file": "/etc/sudoers",
+            "line": 53,
+            "principal": "%sudo",
+            "kind": "group",
+            "negated": false,
+            "runas": "(ALL:ALL)",
+            "nopasswd": false,
+            "commands": [
+              "ALL"
+            ],
+            "resolved": true
+          }
+        ],
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "file",
+              "path": "/etc/sudoers"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/sudoers.d/README"
+            }
+          ]
+        }
+      },
+      "nopasswd_all": {
+        "status": "ok",
+        "value": [],
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "file",
+              "path": "/etc/sudoers"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/sudoers.d/README"
+            }
+          ]
+        }
+      },
+      "authenticate_disabled": {
+        "status": "ok",
+        "value": false,
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "file",
+              "path": "/etc/sudoers"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/sudoers.d/README"
+            }
+          ]
+        }
+      },
+      "rules_unresolved": {
+        "status": "ok",
+        "value": 0,
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "file",
+              "path": "/etc/sudoers"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/sudoers.d/README"
+            }
+          ]
         }
       }
     },
@@ -1574,6 +1727,1646 @@
               "path": "/sys/block"
             }
           ]
+        }
+      }
+    },
+    "accounts": {
+      "login_capable": {
+        "status": "ok",
+        "value": [
+          {
+            "name": "root",
+            "uid": 0,
+            "inactive": -1,
+            "expire": -1,
+            "inactive_unset": true,
+            "locked": true
+          },
+          {
+            "name": "ubuntu",
+            "uid": 1000,
+            "inactive": -1,
+            "expire": -1,
+            "inactive_unset": true,
+            "locked": false
+          }
+        ],
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "file",
+              "path": "/etc/passwd"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/shadow"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/shells"
+            }
+          ]
+        }
+      },
+      "useradd": {
+        "inactive": {
+          "status": "ok",
+          "value": -1,
+          "reason": "INACTIVE is commented out in /etc/default/useradd (useradd's default is -1, never)",
+          "source": {
+            "kind": "file",
+            "path": "/etc/default/useradd"
+          }
+        }
+      }
+    },
+    "walk": {
+      "complete": {
+        "status": "ok",
+        "value": true,
+        "source": {
+          "kind": "derived"
+        }
+      },
+      "capabilities": {
+        "status": "ok",
+        "value": [
+          {
+            "path": "/usr/bin/mtr-packet",
+            "caps": "cap_net_raw=ep",
+            "rootid": 0,
+            "package": "mtr-tiny",
+            "package_declared": true,
+            "declared_caps": "cap_net_raw+ep",
+            "reference": "postinst",
+            "reason": ""
+          },
+          {
+            "path": "/usr/bin/ping",
+            "caps": "cap_net_raw=ep",
+            "rootid": 0,
+            "package": "iputils-ping",
+            "package_declared": true,
+            "declared_caps": "cap_net_raw+ep",
+            "reference": "postinst",
+            "reason": ""
+          },
+          {
+            "path": "/usr/lib/snapd/snap-confine",
+            "caps": "cap_chown,cap_dac_override,cap_dac_read_search,cap_fowner,cap_setgid,cap_setuid,cap_sys_chroot,cap_sys_ptrace,cap_sys_admin,cap_sys_resource=p",
+            "rootid": 0,
+            "package": "snapd",
+            "package_declared": true,
+            "declared_caps": "(from file)",
+            "reference": "postinst",
+            "reason": ""
+          },
+          {
+            "path": "/usr/lib/x86_64-linux-gnu/gstreamer1.0/gstreamer-1.0/gst-ptp-helper",
+            "caps": "cap_net_bind_service,cap_net_admin=ep",
+            "rootid": 0,
+            "package": "libgstreamer1.0-0",
+            "package_declared": true,
+            "declared_caps": "cap_net_bind_service,cap_net_admin+ep",
+            "reference": "postinst",
+            "reason": ""
+          }
+        ],
+        "source": {
+          "kind": "file",
+          "path": "/var/lib/dpkg/info"
+        }
+      },
+      "acl_grants": {
+        "status": "ok",
+        "value": [],
+        "source": {
+          "kind": "derived"
+        }
+      }
+    },
+    "units": {
+      "root_services": {
+        "status": "ok",
+        "value": [
+          {
+            "unit": "cron.service",
+            "enabled": true,
+            "active": true,
+            "user": "",
+            "unit_file": "file",
+            "files": [
+              {
+                "path": "/usr/lib/systemd/system/cron.service",
+                "mode": 420,
+                "uid": 0,
+                "gid": 0
+              }
+            ],
+            "exec": [
+              {
+                "directive": "ExecStart",
+                "path": "/usr/sbin/cron",
+                "resolved": true,
+                "stat_path": "/usr/sbin/cron",
+                "stat_status": "ok",
+                "exists": true,
+                "kind": "regular",
+                "mode": 493,
+                "uid": 0,
+                "gid": 0,
+                "group_writable": false,
+                "other_writable": false
+              }
+            ],
+            "read_status": "ok",
+            "reason": ""
+          },
+          {
+            "unit": "getty-static.service",
+            "enabled": true,
+            "active": false,
+            "user": "",
+            "unit_file": "file",
+            "files": [
+              {
+                "path": "/usr/lib/systemd/system/getty-static.service",
+                "mode": 420,
+                "uid": 0,
+                "gid": 0
+              }
+            ],
+            "exec": [
+              {
+                "directive": "ExecStart",
+                "path": "systemctl",
+                "resolved": false,
+                "stat_path": "",
+                "stat_status": "unresolved",
+                "exists": false,
+                "kind": "",
+                "mode": -1,
+                "uid": -1,
+                "gid": -1,
+                "group_writable": false,
+                "other_writable": false
+              }
+            ],
+            "read_status": "ok",
+            "reason": ""
+          },
+          {
+            "unit": "grub-common.service",
+            "enabled": true,
+            "active": false,
+            "user": "",
+            "unit_file": "file",
+            "files": [
+              {
+                "path": "/usr/lib/systemd/system/grub-common.service",
+                "mode": 420,
+                "uid": 0,
+                "gid": 0
+              }
+            ],
+            "exec": [
+              {
+                "directive": "ExecStartPre",
+                "path": "/bin/sh",
+                "resolved": true,
+                "stat_path": "/usr/bin/dash",
+                "stat_status": "ok",
+                "exists": true,
+                "kind": "symlink",
+                "mode": 493,
+                "uid": 0,
+                "gid": 0,
+                "group_writable": false,
+                "other_writable": false
+              },
+              {
+                "directive": "ExecStart",
+                "path": "grub-editenv",
+                "resolved": false,
+                "stat_path": "",
+                "stat_status": "unresolved",
+                "exists": false,
+                "kind": "",
+                "mode": -1,
+                "uid": -1,
+                "gid": -1,
+                "group_writable": false,
+                "other_writable": false
+              },
+              {
+                "directive": "ExecStartPost",
+                "path": "/bin/sh",
+                "resolved": true,
+                "stat_path": "/usr/bin/dash",
+                "stat_status": "ok",
+                "exists": true,
+                "kind": "symlink",
+                "mode": 493,
+                "uid": 0,
+                "gid": 0,
+                "group_writable": false,
+                "other_writable": false
+              }
+            ],
+            "read_status": "ok",
+            "reason": ""
+          },
+          {
+            "unit": "rsyslog.service",
+            "enabled": true,
+            "active": true,
+            "user": "",
+            "unit_file": "file",
+            "files": [
+              {
+                "path": "/usr/lib/systemd/system/rsyslog.service",
+                "mode": 420,
+                "uid": 0,
+                "gid": 0
+              }
+            ],
+            "exec": [
+              {
+                "directive": "ExecStart",
+                "path": "/usr/sbin/rsyslogd",
+                "resolved": true,
+                "stat_path": "/usr/sbin/rsyslogd",
+                "stat_status": "ok",
+                "exists": true,
+                "kind": "regular",
+                "mode": 493,
+                "uid": 0,
+                "gid": 0,
+                "group_writable": false,
+                "other_writable": false
+              }
+            ],
+            "read_status": "ok",
+            "reason": ""
+          },
+          {
+            "unit": "snapd.aa-prompt-listener.service",
+            "enabled": true,
+            "active": false,
+            "user": "",
+            "unit_file": "missing",
+            "files": [],
+            "exec": [],
+            "read_status": "ok",
+            "reason": ""
+          },
+          {
+            "unit": "ssh.service",
+            "enabled": true,
+            "active": true,
+            "user": "",
+            "unit_file": "file",
+            "files": [
+              {
+                "path": "/usr/lib/systemd/system/ssh.service",
+                "mode": 420,
+                "uid": 0,
+                "gid": 0
+              }
+            ],
+            "exec": [
+              {
+                "directive": "ExecStartPre",
+                "path": "/usr/sbin/sshd",
+                "resolved": true,
+                "stat_path": "/usr/sbin/sshd",
+                "stat_status": "ok",
+                "exists": true,
+                "kind": "regular",
+                "mode": 493,
+                "uid": 0,
+                "gid": 0,
+                "group_writable": false,
+                "other_writable": false
+              },
+              {
+                "directive": "ExecStart",
+                "path": "/usr/sbin/sshd",
+                "resolved": true,
+                "stat_path": "/usr/sbin/sshd",
+                "stat_status": "ok",
+                "exists": true,
+                "kind": "regular",
+                "mode": 493,
+                "uid": 0,
+                "gid": 0,
+                "group_writable": false,
+                "other_writable": false
+              },
+              {
+                "directive": "ExecReload",
+                "path": "/usr/sbin/sshd",
+                "resolved": true,
+                "stat_path": "/usr/sbin/sshd",
+                "stat_status": "ok",
+                "exists": true,
+                "kind": "regular",
+                "mode": 493,
+                "uid": 0,
+                "gid": 0,
+                "group_writable": false,
+                "other_writable": false
+              },
+              {
+                "directive": "ExecReload",
+                "path": "/bin/kill",
+                "resolved": true,
+                "stat_path": "/usr/bin/kill",
+                "stat_status": "ok",
+                "exists": true,
+                "kind": "regular",
+                "mode": 493,
+                "uid": 0,
+                "gid": 0,
+                "group_writable": false,
+                "other_writable": false
+              }
+            ],
+            "read_status": "ok",
+            "reason": ""
+          },
+          {
+            "unit": "systemd-boot-system-token.service",
+            "enabled": true,
+            "active": false,
+            "user": "",
+            "unit_file": "file",
+            "files": [
+              {
+                "path": "/usr/lib/systemd/system/systemd-boot-system-token.service",
+                "mode": 420,
+                "uid": 0,
+                "gid": 0
+              }
+            ],
+            "exec": [
+              {
+                "directive": "ExecStart",
+                "path": "bootctl",
+                "resolved": false,
+                "stat_path": "",
+                "stat_status": "unresolved",
+                "exists": false,
+                "kind": "",
+                "mode": -1,
+                "uid": -1,
+                "gid": -1,
+                "group_writable": false,
+                "other_writable": false
+              }
+            ],
+            "read_status": "ok",
+            "reason": ""
+          },
+          {
+            "unit": "systemd-journal-flush.service",
+            "enabled": true,
+            "active": true,
+            "user": "",
+            "unit_file": "file",
+            "files": [
+              {
+                "path": "/usr/lib/systemd/system/systemd-journal-flush.service",
+                "mode": 420,
+                "uid": 0,
+                "gid": 0
+              }
+            ],
+            "exec": [
+              {
+                "directive": "ExecStart",
+                "path": "journalctl",
+                "resolved": false,
+                "stat_path": "",
+                "stat_status": "unresolved",
+                "exists": false,
+                "kind": "",
+                "mode": -1,
+                "uid": -1,
+                "gid": -1,
+                "group_writable": false,
+                "other_writable": false
+              },
+              {
+                "directive": "ExecStop",
+                "path": "journalctl",
+                "resolved": false,
+                "stat_path": "",
+                "stat_status": "unresolved",
+                "exists": false,
+                "kind": "",
+                "mode": -1,
+                "uid": -1,
+                "gid": -1,
+                "group_writable": false,
+                "other_writable": false
+              }
+            ],
+            "read_status": "ok",
+            "reason": ""
+          },
+          {
+            "unit": "systemd-journald.service",
+            "enabled": true,
+            "active": true,
+            "user": "",
+            "unit_file": "file",
+            "files": [
+              {
+                "path": "/usr/lib/systemd/system/systemd-journald.service",
+                "mode": 420,
+                "uid": 0,
+                "gid": 0
+              }
+            ],
+            "exec": [
+              {
+                "directive": "ExecStart",
+                "path": "/lib/systemd/systemd-journald",
+                "resolved": true,
+                "stat_path": "/usr/lib/systemd/systemd-journald",
+                "stat_status": "ok",
+                "exists": true,
+                "kind": "regular",
+                "mode": 493,
+                "uid": 0,
+                "gid": 0,
+                "group_writable": false,
+                "other_writable": false
+              }
+            ],
+            "read_status": "ok",
+            "reason": ""
+          },
+          {
+            "unit": "systemd-machine-id-commit.service",
+            "enabled": true,
+            "active": false,
+            "user": "",
+            "unit_file": "file",
+            "files": [
+              {
+                "path": "/usr/lib/systemd/system/systemd-machine-id-commit.service",
+                "mode": 420,
+                "uid": 0,
+                "gid": 0
+              }
+            ],
+            "exec": [
+              {
+                "directive": "ExecStart",
+                "path": "systemd-machine-id-setup",
+                "resolved": false,
+                "stat_path": "",
+                "stat_status": "unresolved",
+                "exists": false,
+                "kind": "",
+                "mode": -1,
+                "uid": -1,
+                "gid": -1,
+                "group_writable": false,
+                "other_writable": false
+              }
+            ],
+            "read_status": "ok",
+            "reason": ""
+          },
+          {
+            "unit": "systemd-sysusers.service",
+            "enabled": true,
+            "active": true,
+            "user": "",
+            "unit_file": "file",
+            "files": [
+              {
+                "path": "/usr/lib/systemd/system/systemd-sysusers.service",
+                "mode": 420,
+                "uid": 0,
+                "gid": 0
+              }
+            ],
+            "exec": [
+              {
+                "directive": "ExecStart",
+                "path": "systemd-sysusers",
+                "resolved": false,
+                "stat_path": "",
+                "stat_status": "unresolved",
+                "exists": false,
+                "kind": "",
+                "mode": -1,
+                "uid": -1,
+                "gid": -1,
+                "group_writable": false,
+                "other_writable": false
+              }
+            ],
+            "read_status": "ok",
+            "reason": ""
+          },
+          {
+            "unit": "systemd-tmpfiles-setup-dev.service",
+            "enabled": true,
+            "active": true,
+            "user": "",
+            "unit_file": "file",
+            "files": [
+              {
+                "path": "/usr/lib/systemd/system/systemd-tmpfiles-setup-dev.service",
+                "mode": 420,
+                "uid": 0,
+                "gid": 0
+              }
+            ],
+            "exec": [
+              {
+                "directive": "ExecStart",
+                "path": "systemd-tmpfiles",
+                "resolved": false,
+                "stat_path": "",
+                "stat_status": "unresolved",
+                "exists": false,
+                "kind": "",
+                "mode": -1,
+                "uid": -1,
+                "gid": -1,
+                "group_writable": false,
+                "other_writable": false
+              }
+            ],
+            "read_status": "ok",
+            "reason": ""
+          },
+          {
+            "unit": "systemd-tmpfiles-setup.service",
+            "enabled": true,
+            "active": true,
+            "user": "",
+            "unit_file": "file",
+            "files": [
+              {
+                "path": "/usr/lib/systemd/system/systemd-tmpfiles-setup.service",
+                "mode": 420,
+                "uid": 0,
+                "gid": 0
+              }
+            ],
+            "exec": [
+              {
+                "directive": "ExecStart",
+                "path": "systemd-tmpfiles",
+                "resolved": false,
+                "stat_path": "",
+                "stat_status": "unresolved",
+                "exists": false,
+                "kind": "",
+                "mode": -1,
+                "uid": -1,
+                "gid": -1,
+                "group_writable": false,
+                "other_writable": false
+              }
+            ],
+            "read_status": "ok",
+            "reason": ""
+          },
+          {
+            "unit": "systemd-udev-trigger.service",
+            "enabled": true,
+            "active": true,
+            "user": "",
+            "unit_file": "file",
+            "files": [
+              {
+                "path": "/usr/lib/systemd/system/systemd-udev-trigger.service",
+                "mode": 420,
+                "uid": 0,
+                "gid": 0
+              }
+            ],
+            "exec": [
+              {
+                "directive": "ExecStart",
+                "path": "udevadm",
+                "resolved": false,
+                "stat_path": "",
+                "stat_status": "unresolved",
+                "exists": false,
+                "kind": "",
+                "mode": -1,
+                "uid": -1,
+                "gid": -1,
+                "group_writable": false,
+                "other_writable": false
+              },
+              {
+                "directive": "ExecStart",
+                "path": "udevadm",
+                "resolved": false,
+                "stat_path": "",
+                "stat_status": "unresolved",
+                "exists": false,
+                "kind": "",
+                "mode": -1,
+                "uid": -1,
+                "gid": -1,
+                "group_writable": false,
+                "other_writable": false
+              }
+            ],
+            "read_status": "ok",
+            "reason": ""
+          },
+          {
+            "unit": "systemd-udevd.service",
+            "enabled": true,
+            "active": true,
+            "user": "",
+            "unit_file": "file",
+            "files": [
+              {
+                "path": "/usr/lib/systemd/system/systemd-udevd.service",
+                "mode": 420,
+                "uid": 0,
+                "gid": 0
+              }
+            ],
+            "exec": [
+              {
+                "directive": "ExecStart",
+                "path": "/lib/systemd/systemd-udevd",
+                "resolved": true,
+                "stat_path": "/usr/bin/udevadm",
+                "stat_status": "ok",
+                "exists": true,
+                "kind": "symlink",
+                "mode": 493,
+                "uid": 0,
+                "gid": 0,
+                "group_writable": false,
+                "other_writable": false
+              },
+              {
+                "directive": "ExecReload",
+                "path": "udevadm",
+                "resolved": false,
+                "stat_path": "",
+                "stat_status": "unresolved",
+                "exists": false,
+                "kind": "",
+                "mode": -1,
+                "uid": -1,
+                "gid": -1,
+                "group_writable": false,
+                "other_writable": false
+              }
+            ],
+            "read_status": "ok",
+            "reason": ""
+          }
+        ],
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "command",
+              "cmd": "/usr/bin/systemctl list-units --type=service --state=active --plain --no-legend",
+              "exit_code": 0
+            },
+            {
+              "kind": "file",
+              "path": "/usr/lib/systemd/system/cron.service"
+            },
+            {
+              "kind": "file",
+              "path": "/usr/lib/systemd/system/getty-static.service"
+            },
+            {
+              "kind": "file",
+              "path": "/usr/lib/systemd/system/grub-common.service"
+            },
+            {
+              "kind": "file",
+              "path": "/usr/lib/systemd/system/rsyslog.service"
+            },
+            {
+              "kind": "file",
+              "path": "/usr/lib/systemd/system/ssh.service"
+            },
+            {
+              "kind": "file",
+              "path": "/usr/lib/systemd/system/systemd-boot-system-token.service"
+            },
+            {
+              "kind": "file",
+              "path": "/usr/lib/systemd/system/systemd-journal-flush.service"
+            },
+            {
+              "kind": "file",
+              "path": "/usr/lib/systemd/system/systemd-journald.service"
+            },
+            {
+              "kind": "file",
+              "path": "/usr/lib/systemd/system/systemd-machine-id-commit.service"
+            },
+            {
+              "kind": "file",
+              "path": "/usr/lib/systemd/system/systemd-sysusers.service"
+            },
+            {
+              "kind": "file",
+              "path": "/usr/lib/systemd/system/systemd-tmpfiles-setup-dev.service"
+            },
+            {
+              "kind": "file",
+              "path": "/usr/lib/systemd/system/systemd-tmpfiles-setup.service"
+            },
+            {
+              "kind": "file",
+              "path": "/usr/lib/systemd/system/systemd-udev-trigger.service"
+            },
+            {
+              "kind": "file",
+              "path": "/usr/lib/systemd/system/systemd-udevd.service"
+            }
+          ]
+        }
+      },
+      "exec_writable": {
+        "status": "ok",
+        "value": [],
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "command",
+              "cmd": "/usr/bin/systemctl list-units --type=service --state=active --plain --no-legend",
+              "exit_code": 0
+            },
+            {
+              "kind": "file",
+              "path": "/usr/lib/systemd/system/cron.service"
+            },
+            {
+              "kind": "file",
+              "path": "/usr/lib/systemd/system/getty-static.service"
+            },
+            {
+              "kind": "file",
+              "path": "/usr/lib/systemd/system/grub-common.service"
+            },
+            {
+              "kind": "file",
+              "path": "/usr/lib/systemd/system/rsyslog.service"
+            },
+            {
+              "kind": "file",
+              "path": "/usr/lib/systemd/system/ssh.service"
+            },
+            {
+              "kind": "file",
+              "path": "/usr/lib/systemd/system/systemd-boot-system-token.service"
+            },
+            {
+              "kind": "file",
+              "path": "/usr/lib/systemd/system/systemd-journal-flush.service"
+            },
+            {
+              "kind": "file",
+              "path": "/usr/lib/systemd/system/systemd-journald.service"
+            },
+            {
+              "kind": "file",
+              "path": "/usr/lib/systemd/system/systemd-machine-id-commit.service"
+            },
+            {
+              "kind": "file",
+              "path": "/usr/lib/systemd/system/systemd-sysusers.service"
+            },
+            {
+              "kind": "file",
+              "path": "/usr/lib/systemd/system/systemd-tmpfiles-setup-dev.service"
+            },
+            {
+              "kind": "file",
+              "path": "/usr/lib/systemd/system/systemd-tmpfiles-setup.service"
+            },
+            {
+              "kind": "file",
+              "path": "/usr/lib/systemd/system/systemd-udev-trigger.service"
+            },
+            {
+              "kind": "file",
+              "path": "/usr/lib/systemd/system/systemd-udevd.service"
+            }
+          ]
+        }
+      },
+      "exec_unresolved": {
+        "status": "ok",
+        "value": 13,
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "command",
+              "cmd": "/usr/bin/systemctl list-units --type=service --state=active --plain --no-legend",
+              "exit_code": 0
+            },
+            {
+              "kind": "file",
+              "path": "/usr/lib/systemd/system/cron.service"
+            },
+            {
+              "kind": "file",
+              "path": "/usr/lib/systemd/system/getty-static.service"
+            },
+            {
+              "kind": "file",
+              "path": "/usr/lib/systemd/system/grub-common.service"
+            },
+            {
+              "kind": "file",
+              "path": "/usr/lib/systemd/system/rsyslog.service"
+            },
+            {
+              "kind": "file",
+              "path": "/usr/lib/systemd/system/ssh.service"
+            },
+            {
+              "kind": "file",
+              "path": "/usr/lib/systemd/system/systemd-boot-system-token.service"
+            },
+            {
+              "kind": "file",
+              "path": "/usr/lib/systemd/system/systemd-journal-flush.service"
+            },
+            {
+              "kind": "file",
+              "path": "/usr/lib/systemd/system/systemd-journald.service"
+            },
+            {
+              "kind": "file",
+              "path": "/usr/lib/systemd/system/systemd-machine-id-commit.service"
+            },
+            {
+              "kind": "file",
+              "path": "/usr/lib/systemd/system/systemd-sysusers.service"
+            },
+            {
+              "kind": "file",
+              "path": "/usr/lib/systemd/system/systemd-tmpfiles-setup-dev.service"
+            },
+            {
+              "kind": "file",
+              "path": "/usr/lib/systemd/system/systemd-tmpfiles-setup.service"
+            },
+            {
+              "kind": "file",
+              "path": "/usr/lib/systemd/system/systemd-udev-trigger.service"
+            },
+            {
+              "kind": "file",
+              "path": "/usr/lib/systemd/system/systemd-udevd.service"
+            }
+          ]
+        }
+      }
+    },
+    "privilege": {
+      "ld_so_preload": {
+        "status": "ok",
+        "value": [],
+        "source": {
+          "kind": "file",
+          "path": "/etc/ld.so.preload"
+        }
+      },
+      "runtime_sockets": {
+        "status": "ok",
+        "value": [
+          {
+            "path": "/run/docker.sock",
+            "exists": false,
+            "kind": "",
+            "mode": -1,
+            "uid": -1,
+            "gid": -1,
+            "group": "",
+            "group_writable": false,
+            "other_writable": false,
+            "owner_nonroot": false,
+            "acl_present": false
+          },
+          {
+            "path": "/run/containerd/containerd.sock",
+            "exists": false,
+            "kind": "",
+            "mode": -1,
+            "uid": -1,
+            "gid": -1,
+            "group": "",
+            "group_writable": false,
+            "other_writable": false,
+            "owner_nonroot": false,
+            "acl_present": false
+          },
+          {
+            "path": "/run/podman/podman.sock",
+            "exists": false,
+            "kind": "",
+            "mode": -1,
+            "uid": -1,
+            "gid": -1,
+            "group": "",
+            "group_writable": false,
+            "other_writable": false,
+            "owner_nonroot": false,
+            "acl_present": false
+          },
+          {
+            "path": "/run/crio/crio.sock",
+            "exists": false,
+            "kind": "",
+            "mode": -1,
+            "uid": -1,
+            "gid": -1,
+            "group": "",
+            "group_writable": false,
+            "other_writable": false,
+            "owner_nonroot": false,
+            "acl_present": false
+          }
+        ],
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "file",
+              "path": "/run/docker.sock"
+            },
+            {
+              "kind": "file",
+              "path": "/run/containerd/containerd.sock"
+            },
+            {
+              "kind": "file",
+              "path": "/run/podman/podman.sock"
+            },
+            {
+              "kind": "file",
+              "path": "/run/crio/crio.sock"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/group"
+            }
+          ]
+        }
+      },
+      "runtime_group_members": {
+        "status": "ok",
+        "value": [],
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "file",
+              "path": "/run/docker.sock"
+            },
+            {
+              "kind": "file",
+              "path": "/run/containerd/containerd.sock"
+            },
+            {
+              "kind": "file",
+              "path": "/run/podman/podman.sock"
+            },
+            {
+              "kind": "file",
+              "path": "/run/crio/crio.sock"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/group"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/passwd"
+            }
+          ]
+        }
+      }
+    },
+    "ssh": {
+      "authorized_keys": {
+        "status": "ok",
+        "value": [
+          {
+            "user": "_apt",
+            "uid": 100,
+            "path": "",
+            "exists": false,
+            "mode": -1,
+            "owner_uid": -1,
+            "keys": [],
+            "unparsed": 0,
+            "unfollowed": true,
+            "read_status": "",
+            "reason": "home path outside the collector's declaration"
+          },
+          {
+            "user": "backup",
+            "uid": 34,
+            "path": "",
+            "exists": false,
+            "mode": -1,
+            "owner_uid": -1,
+            "keys": [],
+            "unparsed": 0,
+            "unfollowed": true,
+            "read_status": "",
+            "reason": "home path outside the collector's declaration"
+          },
+          {
+            "user": "bin",
+            "uid": 2,
+            "path": "",
+            "exists": false,
+            "mode": -1,
+            "owner_uid": -1,
+            "keys": [],
+            "unparsed": 0,
+            "unfollowed": true,
+            "read_status": "",
+            "reason": "home path outside the collector's declaration"
+          },
+          {
+            "user": "daemon",
+            "uid": 1,
+            "path": "",
+            "exists": false,
+            "mode": -1,
+            "owner_uid": -1,
+            "keys": [],
+            "unparsed": 0,
+            "unfollowed": true,
+            "read_status": "",
+            "reason": "home path outside the collector's declaration"
+          },
+          {
+            "user": "fwupd-refresh",
+            "uid": 112,
+            "path": "",
+            "exists": false,
+            "mode": -1,
+            "owner_uid": -1,
+            "keys": [],
+            "unparsed": 0,
+            "unfollowed": true,
+            "read_status": "",
+            "reason": "home path outside the collector's declaration"
+          },
+          {
+            "user": "games",
+            "uid": 5,
+            "path": "",
+            "exists": false,
+            "mode": -1,
+            "owner_uid": -1,
+            "keys": [],
+            "unparsed": 0,
+            "unfollowed": true,
+            "read_status": "",
+            "reason": "home path outside the collector's declaration"
+          },
+          {
+            "user": "gnats",
+            "uid": 41,
+            "path": "",
+            "exists": false,
+            "mode": -1,
+            "owner_uid": -1,
+            "keys": [],
+            "unparsed": 0,
+            "unfollowed": true,
+            "read_status": "",
+            "reason": "home path outside the collector's declaration"
+          },
+          {
+            "user": "irc",
+            "uid": 39,
+            "path": "",
+            "exists": false,
+            "mode": -1,
+            "owner_uid": -1,
+            "keys": [],
+            "unparsed": 0,
+            "unfollowed": true,
+            "read_status": "",
+            "reason": "home path outside the collector's declaration"
+          },
+          {
+            "user": "landscape",
+            "uid": 111,
+            "path": "",
+            "exists": false,
+            "mode": -1,
+            "owner_uid": -1,
+            "keys": [],
+            "unparsed": 0,
+            "unfollowed": true,
+            "read_status": "",
+            "reason": "home path outside the collector's declaration"
+          },
+          {
+            "user": "list",
+            "uid": 38,
+            "path": "",
+            "exists": false,
+            "mode": -1,
+            "owner_uid": -1,
+            "keys": [],
+            "unparsed": 0,
+            "unfollowed": true,
+            "read_status": "",
+            "reason": "home path outside the collector's declaration"
+          },
+          {
+            "user": "lp",
+            "uid": 7,
+            "path": "",
+            "exists": false,
+            "mode": -1,
+            "owner_uid": -1,
+            "keys": [],
+            "unparsed": 0,
+            "unfollowed": true,
+            "read_status": "",
+            "reason": "home path outside the collector's declaration"
+          },
+          {
+            "user": "lxd",
+            "uid": 999,
+            "path": "",
+            "exists": false,
+            "mode": -1,
+            "owner_uid": -1,
+            "keys": [],
+            "unparsed": 0,
+            "unfollowed": true,
+            "read_status": "",
+            "reason": "home path outside the collector's declaration"
+          },
+          {
+            "user": "mail",
+            "uid": 8,
+            "path": "",
+            "exists": false,
+            "mode": -1,
+            "owner_uid": -1,
+            "keys": [],
+            "unparsed": 0,
+            "unfollowed": true,
+            "read_status": "",
+            "reason": "home path outside the collector's declaration"
+          },
+          {
+            "user": "man",
+            "uid": 6,
+            "path": "",
+            "exists": false,
+            "mode": -1,
+            "owner_uid": -1,
+            "keys": [],
+            "unparsed": 0,
+            "unfollowed": true,
+            "read_status": "",
+            "reason": "home path outside the collector's declaration"
+          },
+          {
+            "user": "messagebus",
+            "uid": 103,
+            "path": "",
+            "exists": false,
+            "mode": -1,
+            "owner_uid": -1,
+            "keys": [],
+            "unparsed": 0,
+            "unfollowed": true,
+            "read_status": "",
+            "reason": "home path outside the collector's declaration"
+          },
+          {
+            "user": "news",
+            "uid": 9,
+            "path": "",
+            "exists": false,
+            "mode": -1,
+            "owner_uid": -1,
+            "keys": [],
+            "unparsed": 0,
+            "unfollowed": true,
+            "read_status": "",
+            "reason": "home path outside the collector's declaration"
+          },
+          {
+            "user": "nobody",
+            "uid": 65534,
+            "path": "",
+            "exists": false,
+            "mode": -1,
+            "owner_uid": -1,
+            "keys": [],
+            "unparsed": 0,
+            "unfollowed": true,
+            "read_status": "",
+            "reason": "home path outside the collector's declaration"
+          },
+          {
+            "user": "pollinate",
+            "uid": 105,
+            "path": "",
+            "exists": false,
+            "mode": -1,
+            "owner_uid": -1,
+            "keys": [],
+            "unparsed": 0,
+            "unfollowed": true,
+            "read_status": "",
+            "reason": "home path outside the collector's declaration"
+          },
+          {
+            "user": "proxy",
+            "uid": 13,
+            "path": "",
+            "exists": false,
+            "mode": -1,
+            "owner_uid": -1,
+            "keys": [],
+            "unparsed": 0,
+            "unfollowed": true,
+            "read_status": "",
+            "reason": "home path outside the collector's declaration"
+          },
+          {
+            "user": "root",
+            "uid": 0,
+            "path": "/root/.ssh/authorized_keys",
+            "exists": false,
+            "mode": -1,
+            "owner_uid": -1,
+            "keys": [],
+            "unparsed": 0,
+            "unfollowed": false,
+            "read_status": "ok",
+            "reason": ""
+          },
+          {
+            "user": "root",
+            "uid": 0,
+            "path": "/root/.ssh/authorized_keys2",
+            "exists": false,
+            "mode": -1,
+            "owner_uid": -1,
+            "keys": [],
+            "unparsed": 0,
+            "unfollowed": false,
+            "read_status": "ok",
+            "reason": ""
+          },
+          {
+            "user": "sshd",
+            "uid": 106,
+            "path": "",
+            "exists": false,
+            "mode": -1,
+            "owner_uid": -1,
+            "keys": [],
+            "unparsed": 0,
+            "unfollowed": true,
+            "read_status": "",
+            "reason": "home path outside the collector's declaration"
+          },
+          {
+            "user": "sync",
+            "uid": 4,
+            "path": "",
+            "exists": false,
+            "mode": -1,
+            "owner_uid": -1,
+            "keys": [],
+            "unparsed": 0,
+            "unfollowed": true,
+            "read_status": "",
+            "reason": "home path outside the collector's declaration"
+          },
+          {
+            "user": "sys",
+            "uid": 3,
+            "path": "",
+            "exists": false,
+            "mode": -1,
+            "owner_uid": -1,
+            "keys": [],
+            "unparsed": 0,
+            "unfollowed": true,
+            "read_status": "",
+            "reason": "home path outside the collector's declaration"
+          },
+          {
+            "user": "syslog",
+            "uid": 107,
+            "path": "/home/syslog/.ssh/authorized_keys",
+            "exists": false,
+            "mode": -1,
+            "owner_uid": -1,
+            "keys": [],
+            "unparsed": 0,
+            "unfollowed": false,
+            "read_status": "ok",
+            "reason": ""
+          },
+          {
+            "user": "syslog",
+            "uid": 107,
+            "path": "/home/syslog/.ssh/authorized_keys2",
+            "exists": false,
+            "mode": -1,
+            "owner_uid": -1,
+            "keys": [],
+            "unparsed": 0,
+            "unfollowed": false,
+            "read_status": "ok",
+            "reason": ""
+          },
+          {
+            "user": "systemd-network",
+            "uid": 101,
+            "path": "",
+            "exists": false,
+            "mode": -1,
+            "owner_uid": -1,
+            "keys": [],
+            "unparsed": 0,
+            "unfollowed": true,
+            "read_status": "",
+            "reason": "home path outside the collector's declaration"
+          },
+          {
+            "user": "systemd-resolve",
+            "uid": 102,
+            "path": "",
+            "exists": false,
+            "mode": -1,
+            "owner_uid": -1,
+            "keys": [],
+            "unparsed": 0,
+            "unfollowed": true,
+            "read_status": "",
+            "reason": "home path outside the collector's declaration"
+          },
+          {
+            "user": "systemd-timesync",
+            "uid": 104,
+            "path": "",
+            "exists": false,
+            "mode": -1,
+            "owner_uid": -1,
+            "keys": [],
+            "unparsed": 0,
+            "unfollowed": true,
+            "read_status": "",
+            "reason": "home path outside the collector's declaration"
+          },
+          {
+            "user": "tcpdump",
+            "uid": 109,
+            "path": "",
+            "exists": false,
+            "mode": -1,
+            "owner_uid": -1,
+            "keys": [],
+            "unparsed": 0,
+            "unfollowed": true,
+            "read_status": "",
+            "reason": "home path outside the collector's declaration"
+          },
+          {
+            "user": "tss",
+            "uid": 110,
+            "path": "",
+            "exists": false,
+            "mode": -1,
+            "owner_uid": -1,
+            "keys": [],
+            "unparsed": 0,
+            "unfollowed": true,
+            "read_status": "",
+            "reason": "home path outside the collector's declaration"
+          },
+          {
+            "user": "ubuntu",
+            "uid": 1000,
+            "path": "/home/ubuntu/.ssh/authorized_keys",
+            "exists": true,
+            "mode": 384,
+            "owner_uid": 1000,
+            "keys": [
+              {
+                "line": 1,
+                "type": "ssh-ed25519",
+                "bits": 256,
+                "fingerprint": "SHA256:synthetic0ubuntu0ed25519000000000000000000",
+                "options": [],
+                "restricted": false
+              }
+            ],
+            "unparsed": 0,
+            "unfollowed": false,
+            "read_status": "ok",
+            "reason": ""
+          },
+          {
+            "user": "ubuntu",
+            "uid": 1000,
+            "path": "/home/ubuntu/.ssh/authorized_keys2",
+            "exists": false,
+            "mode": -1,
+            "owner_uid": -1,
+            "keys": [],
+            "unparsed": 0,
+            "unfollowed": false,
+            "read_status": "ok",
+            "reason": ""
+          },
+          {
+            "user": "usbmux",
+            "uid": 113,
+            "path": "",
+            "exists": false,
+            "mode": -1,
+            "owner_uid": -1,
+            "keys": [],
+            "unparsed": 0,
+            "unfollowed": true,
+            "read_status": "",
+            "reason": "home path outside the collector's declaration"
+          },
+          {
+            "user": "uucp",
+            "uid": 10,
+            "path": "",
+            "exists": false,
+            "mode": -1,
+            "owner_uid": -1,
+            "keys": [],
+            "unparsed": 0,
+            "unfollowed": true,
+            "read_status": "",
+            "reason": "home path outside the collector's declaration"
+          },
+          {
+            "user": "uuidd",
+            "uid": 108,
+            "path": "",
+            "exists": false,
+            "mode": -1,
+            "owner_uid": -1,
+            "keys": [],
+            "unparsed": 0,
+            "unfollowed": true,
+            "read_status": "",
+            "reason": "home path outside the collector's declaration"
+          },
+          {
+            "user": "www-data",
+            "uid": 33,
+            "path": "",
+            "exists": false,
+            "mode": -1,
+            "owner_uid": -1,
+            "keys": [],
+            "unparsed": 0,
+            "unfollowed": true,
+            "read_status": "",
+            "reason": "home path outside the collector's declaration"
+          }
+        ],
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "file",
+              "path": "/etc/passwd"
+            },
+            {
+              "kind": "file",
+              "path": "/home/ubuntu/.ssh/authorized_keys"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/shells"
+            }
+          ]
+        }
+      },
+      "root_key_count": {
+        "status": "ok",
+        "value": 0,
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "file",
+              "path": "/etc/passwd"
+            },
+            {
+              "kind": "file",
+              "path": "/home/ubuntu/.ssh/authorized_keys"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/shells"
+            }
+          ]
+        }
+      },
+      "dsa_key_count": {
+        "status": "ok",
+        "value": 0,
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "file",
+              "path": "/etc/passwd"
+            },
+            {
+              "kind": "file",
+              "path": "/home/ubuntu/.ssh/authorized_keys"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/shells"
+            }
+          ]
+        }
+      },
+      "rsa_keys": {
+        "status": "ok",
+        "value": [],
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "file",
+              "path": "/etc/passwd"
+            },
+            {
+              "kind": "file",
+              "path": "/home/ubuntu/.ssh/authorized_keys"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/shells"
+            }
+          ]
+        }
+      }
+    },
+    "sshd": {
+      "options": {
+        "permit_root_login": {
+          "runtime": {
+            "status": "ok",
+            "value": "without-password",
+            "source": {
+              "kind": "command",
+              "cmd": "/usr/sbin/sshd -T",
+              "exit_code": 0
+            }
+          },
+          "effective": {
+            "status": "ok",
+            "value": "without-password",
+            "source": {
+              "kind": "command",
+              "cmd": "/usr/sbin/sshd -T",
+              "exit_code": 0
+            }
+          }
         }
       }
     }

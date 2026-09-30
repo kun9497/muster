@@ -1,0 +1,5 @@
+shadow-utils	100755	root	root	cap_setgid=ep	/usr/bin/newgidmap
+shadow-utils	100755	root	root	cap_setuid=ep	/usr/bin/newuidmap
+iputils	100755	root	root	cap_net_raw=p	/usr/bin/arping
+iputils	100755	root	root	cap_net_raw=p	/usr/bin/clockdiff
+iputils	100755	root	root		/usr/bin/ping

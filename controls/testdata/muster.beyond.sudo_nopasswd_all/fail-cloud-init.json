@@ -1,0 +1,166 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none",
+        "source": {
+          "kind": "file",
+          "path": "/proc/1/cgroup"
+        }
+      }
+    },
+    "sudo": {
+      "installed": {
+        "status": "ok",
+        "value": true,
+        "source": {
+          "kind": "file",
+          "path": "/etc/sudoers"
+        }
+      },
+      "rules": {
+        "status": "ok",
+        "value": [
+          {
+            "file": "/etc/sudoers",
+            "line": 47,
+            "principal": "root",
+            "kind": "user",
+            "negated": false,
+            "runas": "(ALL:ALL)",
+            "nopasswd": false,
+            "commands": [
+              "ALL"
+            ],
+            "resolved": true
+          },
+          {
+            "file": "/etc/sudoers",
+            "line": 50,
+            "principal": "%admin",
+            "kind": "group",
+            "negated": false,
+            "runas": "(ALL)",
+            "nopasswd": false,
+            "commands": [
+              "ALL"
+            ],
+            "resolved": true
+          },
+          {
+            "file": "/etc/sudoers",
+            "line": 53,
+            "principal": "%sudo",
+            "kind": "group",
+            "negated": false,
+            "runas": "(ALL:ALL)",
+            "nopasswd": false,
+            "commands": [
+              "ALL"
+            ],
+            "resolved": true
+          },
+          {
+            "file": "/etc/sudoers.d/90-cloud-init-users",
+            "line": 2,
+            "principal": "ubuntu",
+            "kind": "user",
+            "negated": false,
+            "runas": "(ALL)",
+            "nopasswd": true,
+            "commands": [
+              "ALL"
+            ],
+            "resolved": true
+          }
+        ],
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "file",
+              "path": "/etc/sudoers"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/sudoers.d/README"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/sudoers.d/90-cloud-init-users"
+            }
+          ]
+        }
+      },
+      "nopasswd_all": {
+        "status": "ok",
+        "value": [
+          "ubuntu"
+        ],
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "file",
+              "path": "/etc/sudoers"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/sudoers.d/README"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/sudoers.d/90-cloud-init-users"
+            }
+          ]
+        }
+      },
+      "authenticate_disabled": {
+        "status": "ok",
+        "value": false,
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "file",
+              "path": "/etc/sudoers"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/sudoers.d/README"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/sudoers.d/90-cloud-init-users"
+            }
+          ]
+        }
+      },
+      "rules_unresolved": {
+        "status": "ok",
+        "value": 0,
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "file",
+              "path": "/etc/sudoers"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/sudoers.d/README"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/sudoers.d/90-cloud-init-users"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

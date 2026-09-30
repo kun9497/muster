@@ -46,7 +46,10 @@ type Access interface {
 	// non-zero, is the (dev, ino) the caller believes path has; a mismatch
 	// is ErrVanished. It is licensed by Declaration.Walk, not by
 	// Declaration.Reads — the walk's boundaries are its own.
-	ReadDir(path string, expect Identity) (Listing, error)
+	// opts says what is read beyond each entry's stat: with Xattrs, the
+	// capability and access-ACL attributes of every executable regular
+	// entry, which the walk licence covers too.
+	ReadDir(path string, expect Identity, opts ReadDirOptions) (Listing, error)
 
 	// Readlink returns the target of the symlink at path, stored form,
 	// unresolved. It is a read like Stat and is licensed by
@@ -165,7 +168,7 @@ func (hostAccess) ReadFileBinary(p string, limit int64) ([]byte, ReadMeta, error
 func (hostAccess) Stat(p string) (ReadMeta, error) { return Stat(rewriteProcSelf(p)) }
 
 // GlobDir is the literal directory a pattern lists: the longest leading part
-// with no "*", "?" or "[", reduced to its parent when the segment that part
+// with no unescaped "*", "?" or "[", reduced to its parent when the segment that part
 // ends in is the one holding the meta-character. The pattern is cleaned
 // first, so a dynamic pattern carrying a trailing slash still names a
 // directory. A pattern with no meta-character at all is its own answer —
@@ -185,13 +188,28 @@ func (hostAccess) Stat(p string) (ReadMeta, error) { return Stat(rewriteProcSelf
 // It is exported so the collectors' test double can key its denied-directory
 // map on the same rule the primitive probes, instead of a hand copy that can
 // silently go stale.
+//
+// A backslash quotes the character after it, as filepath.Glob reads it, so
+// the directory is the unescaped path: an escaped systemd instance's
+// drop-in directory (globEscape's "\\x2d") is probed as it is named on
+// disk, not with the backslash the pattern inserted (D5-1).
 func GlobDir(pattern string) string {
 	p := path.Clean(pattern)
-	i := strings.IndexAny(p, "*?[")
-	if i < 0 {
-		return p
+	var lit strings.Builder
+	for i := 0; i < len(p); i++ {
+		c := p[i]
+		switch c {
+		case '*', '?', '[':
+			return path.Dir(lit.String() + string(c))
+		case '\\':
+			if i+1 < len(p) {
+				i++
+				c = p[i]
+			}
+		}
+		lit.WriteByte(c)
 	}
-	return path.Dir(p[:i+1])
+	return lit.String()
 }
 
 // Glob is filepath.Glob, with the directory it is about to list probed
@@ -230,12 +248,12 @@ func (hostAccess) Glob(pattern string) ([]string, error) {
 // the path, which resolves every component but the last and would defeat
 // the guarantee this package exists to give.
 func (hostAccess) Llistxattr(p string) ([]string, error) {
-	fd, _, err := openNoFollow(rewriteProcSelf(p), openFlags)
+	h, err := openXattr(rewriteProcSelf(p))
 	if err != nil {
 		return nil, err
 	}
-	defer unix.Close(fd)
-	size, err := unix.Flistxattr(fd, nil)
+	defer h.close()
+	size, err := h.list(nil)
 	if err != nil {
 		return nil, err
 	}
@@ -243,11 +261,67 @@ func (hostAccess) Llistxattr(p string) ([]string, error) {
 		return nil, nil
 	}
 	buf := make([]byte, size)
-	n, err := unix.Flistxattr(fd, buf)
+	n, err := h.list(buf)
 	if err != nil {
 		return nil, err
 	}
 	return splitXattrNames(buf[:n]), nil
+}
+
+// xattrHandle is an open file whose extended attributes Llistxattr and
+// Getxattr read: through the fd itself or, for a socket, which cannot be
+// opened for reading, through proc, the /proc/self/fd path of an O_PATH fd.
+type xattrHandle struct {
+	fd   int
+	proc string
+}
+
+// openXattr opens p through the no-follow primitive for an xattr call.
+// Opening a unix socket with O_RDONLY is ENXIO, and the f*xattr calls have
+// long answered an O_PATH fd with EBADF; the /proc/self/fd route below works
+// on every kernel muster supports. So a socket (V-51: the
+// container runtimes' control sockets and their ACLs) is reopened with
+// O_PATH|O_NOFOLLOW through the same openNoFollow (no symlink in any
+// component) and read through /proc/self/fd/N, which names the inode already
+// open, never the path again. The same route serves a socket the caller may
+// not open for reading: the kernel checks read permission (EACCES, or EPERM
+// under an LSM) before it reaches the socket's ENXIO, yet listxattr(2) and
+// getxattr(2) need no permission on the file itself (V-66), so a non-root
+// run reads a root:docker 0660 socket's ACL as root does. The fd is fstat'd
+// first and anything but a socket keeps the original error — ENXIO for a
+// device with no driver, EACCES for a regular file such as /etc/shadow — so
+// this branch serves sockets alone.
+func openXattr(p string) (xattrHandle, error) {
+	fd, _, err := openNoFollow(p, openFlags)
+	if err == nil || !(errors.Is(err, unix.ENXIO) || errors.Is(err, unix.EACCES) || errors.Is(err, unix.EPERM)) {
+		return xattrHandle{fd: fd}, err
+	}
+	pfd, _, perr := openNoFollow(p, unix.O_PATH|unix.O_NOFOLLOW|unix.O_CLOEXEC)
+	if perr != nil {
+		return xattrHandle{fd: -1}, err
+	}
+	var st unix.Stat_t
+	if serr := unix.Fstat(pfd, &st); serr != nil || st.Mode&unix.S_IFMT != unix.S_IFSOCK {
+		unix.Close(pfd)
+		return xattrHandle{fd: -1}, err
+	}
+	return xattrHandle{fd: pfd, proc: "/proc/self/fd/" + strconv.Itoa(pfd)}, nil
+}
+
+func (h xattrHandle) close() { unix.Close(h.fd) }
+
+func (h xattrHandle) list(buf []byte) (int, error) {
+	if h.proc != "" {
+		return unix.Listxattr(h.proc, buf)
+	}
+	return unix.Flistxattr(h.fd, buf)
+}
+
+func (h xattrHandle) get(name string, buf []byte) (int, error) {
+	if h.proc != "" {
+		return unix.Getxattr(h.proc, name, buf)
+	}
+	return unix.Fgetxattr(h.fd, name, buf)
 }
 
 // splitXattrNames splits the NUL-separated name list Flistxattr fills in.
@@ -274,21 +348,22 @@ func splitXattrNames(buf []byte) []string {
 // again, and a second ERANGE is returned to the caller as the error it is,
 // never a silently truncated value.
 func (hostAccess) Getxattr(p, name string) ([]byte, error) {
-	fd, _, err := openNoFollow(rewriteProcSelf(p), openFlags)
+	h, err := openXattr(rewriteProcSelf(p))
 	if err != nil {
 		return nil, err
 	}
-	defer unix.Close(fd)
-	size, err := unix.Fgetxattr(fd, name, nil)
+	defer h.close()
+	get := func(buf []byte) (int, error) { return h.get(name, buf) }
+	size, err := get(nil)
 	if err != nil {
 		return nil, err
 	}
-	v, err := readXattr(fd, name, size)
+	v, err := readXattrWith(get, size)
 	if errors.Is(err, unix.ERANGE) {
-		if size, err = unix.Fgetxattr(fd, name, nil); err != nil {
+		if size, err = get(nil); err != nil {
 			return nil, err
 		}
-		v, err = readXattr(fd, name, size)
+		v, err = readXattrWith(get, size)
 	}
 	if err != nil {
 		return nil, err
@@ -300,11 +375,17 @@ func (hostAccess) Getxattr(p, name string) ([]byte, error) {
 // size is an empty attribute: there is nothing to read, and a zero-length
 // destination would make Fgetxattr a second sizing call rather than a read.
 func readXattr(fd int, name string, size int) ([]byte, error) {
+	return readXattrWith(func(buf []byte) (int, error) { return unix.Fgetxattr(fd, name, buf) }, size)
+}
+
+// readXattrWith is readXattr over any getter: an fd's Fgetxattr, or a
+// socket's /proc/self/fd path (openXattr).
+func readXattrWith(get func([]byte) (int, error), size int) ([]byte, error) {
 	if size <= 0 {
 		return nil, nil
 	}
 	buf := make([]byte, size)
-	n, err := unix.Fgetxattr(fd, name, buf)
+	n, err := get(buf)
 	if err != nil {
 		return nil, err
 	}
@@ -471,14 +552,14 @@ func (g *guardedAccess) Stat(p string) (ReadMeta, error) {
 // it. Unlike the other methods this one does not silently substitute the
 // cleaned form — the walk builds its paths from listings it made itself, so
 // an unclean one means the caller has a bug, not a spelling.
-func (g *guardedAccess) ReadDir(p string, expect Identity) (Listing, error) {
+func (g *guardedAccess) ReadDir(p string, expect Identity, opts ReadDirOptions) (Listing, error) {
 	if !g.decl.Walk {
 		return Listing{}, g.violate("readdir " + p)
 	}
 	if !path.IsAbs(p) || path.Clean(p) != p {
 		return Listing{}, fmt.Errorf("%s: readdir path %q must be absolute and clean", g.name, p)
 	}
-	return g.inner.ReadDir(p, expect)
+	return g.inner.ReadDir(p, expect, opts)
 }
 
 // Readlink is a read: authorised against Declaration.Reads exactly as Stat
@@ -549,8 +630,10 @@ type Action struct {
 
 // walkTarget is what a declared walk is printed as. The traversal has no
 // finite path list to enumerate, so the row names the boundaries instead —
-// which is the thing a change-control reviewer is actually approving.
-const walkTarget = "every local filesystem, no symlink followed, boundaries and exclusions as declared"
+// which is the thing a change-control reviewer is actually approving. The
+// attributes ReadDirOptions.Xattrs reads are named there as well: they are
+// read from files the walk opens, which a listing alone never does.
+const walkTarget = "every local filesystem, no symlink followed, boundaries and exclusions as declared; the capability and ACL attributes of executables are read"
 
 // ListActions renders the registry as the document a change-control
 // reviewer reads: every path read, every command run, the walk a collector

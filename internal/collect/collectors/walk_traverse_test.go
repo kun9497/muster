@@ -451,6 +451,16 @@ func TestTraverseSortsEveryCandidate(t *testing.T) {
 	if got, want := sortedReadDirs(a), sortedKeys(a.tree); !slices.Equal(got, want) {
 		t.Errorf("listed %v, want every scripted directory: %v", got, want)
 	}
+	// Every listing asks for the attributes of the executables it holds: the
+	// capability and ACL rows are built from them (P-3).
+	for i, o := range a.readDirOpts {
+		if o != (collect.ReadDirOptions{Xattrs: true}) {
+			t.Errorf("ReadDir(%s) options = %+v, want Xattrs", a.readDirs[i], o)
+		}
+	}
+	if len(a.readDirOpts) != len(a.readDirs) {
+		t.Errorf("%d options recorded for %d listings", len(a.readDirOpts), len(a.readDirs))
+	}
 }
 
 // A directory that cannot be listed is one skipped row and nothing else: its

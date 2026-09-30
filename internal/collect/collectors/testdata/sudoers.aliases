@@ -1,0 +1,13 @@
+# The alias example of sudoers(5) EXAMPLES (sudo 1.9), trimmed to the lines
+# the rules reader resolves.
+User_Alias	FULLTIMERS = millert, mikef, dowdy
+Runas_Alias	OP = root, operator
+Runas_Alias	ADMINGRP = adm, oper
+Host_Alias	SERVERS = primary, mail, www, ns
+Cmnd_Alias	PAGERS = /usr/bin/more, /usr/bin/pg, /usr/bin/less
+Defaults:FULLTIMERS	!lecture,runchroot=*
+Defaults@SERVERS	log_year, logfile=/var/log/sudo.log
+Defaults!PAGERS		noexec
+FULLTIMERS	ALL = NOPASSWD: ALL
+%opers		ALL = (: ADMINGRP) /usr/sbin/
+bob		SPARC = (OP) ALL : SGI = (OP) ALL

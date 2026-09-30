@@ -1,0 +1,31 @@
+{
+  "synthetic": true,
+  "_expect": {
+    "reason_code": "permission_denied",
+    "exit_code": 2
+  },
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none",
+        "source": {
+          "kind": "file",
+          "path": "/proc/1/cgroup"
+        }
+      }
+    },
+    "privilege": {
+      "ld_so_preload": {
+        "status": "denied",
+        "reason": "/etc/ld.so.preload: requires root or CAP_DAC_READ_SEARCH",
+        "source": {
+          "kind": "file",
+          "path": "/etc/ld.so.preload"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,97 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none",
+        "source": {
+          "kind": "file",
+          "path": "/proc/1/cgroup"
+        }
+      }
+    },
+    "ssh": {
+      "authorized_keys": {
+        "status": "ok",
+        "value": [
+          {
+            "user": "root",
+            "uid": 0,
+            "path": "/root/.ssh/authorized_keys",
+            "exists": true,
+            "mode": -1,
+            "owner_uid": -1,
+            "keys": [],
+            "unparsed": 0,
+            "unfollowed": true,
+            "read_status": "",
+            "reason": "not examined - muster does not follow symlinks: /root/.ssh/authorized_keys"
+          },
+          {
+            "user": "root",
+            "uid": 0,
+            "path": "/root/.ssh/authorized_keys2",
+            "exists": false,
+            "mode": -1,
+            "owner_uid": -1,
+            "keys": [],
+            "unparsed": 0,
+            "unfollowed": false,
+            "read_status": "ok",
+            "reason": ""
+          }
+        ],
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "file",
+              "path": "/etc/passwd"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/shells"
+            }
+          ]
+        }
+      },
+      "dsa_key_count": {
+        "status": "absent",
+        "reason": "not examined - muster does not follow symlinks: /root/.ssh/authorized_keys",
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "file",
+              "path": "/etc/passwd"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/shells"
+            }
+          ]
+        }
+      },
+      "rsa_keys": {
+        "status": "absent",
+        "reason": "not examined - muster does not follow symlinks: /root/.ssh/authorized_keys",
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "file",
+              "path": "/etc/passwd"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/shells"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

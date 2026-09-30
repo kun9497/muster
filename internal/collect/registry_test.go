@@ -9,9 +9,11 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"net"
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"unsafe"
@@ -827,6 +829,11 @@ func TestGlobDirIsTheLiteralDirectory(t *testing.T) {
 		{"/var/cache/dnf/*/repodata/repomd.xml", "/var/cache/dnf"},
 		{"/etc/rc?.d/S*", "/etc"}, // "?" counts as a meta-character too
 		{"/etc/[a-z]*.conf", "/etc"},
+		// D5-1: a backslash quotes the next character, so the directory is
+		// the unescaped name — an escaped systemd instance's drop-ins.
+		{`/etc/systemd/system/systemd-fsck@dev-disk-by\\x2duuid-1.service.d/*.conf`, `/etc/systemd/system/systemd-fsck@dev-disk-by\x2duuid-1.service.d`},
+		{`/etc/a\*b/*.conf`, "/etc/a*b"}, // an escaped meta-character is literal
+		{`/etc/a\*b`, "/etc/a*b"},        // and a pattern of escapes alone is its own answer, unescaped
 	} {
 		if got := GlobDir(c.pattern); got != c.want {
 			t.Errorf("GlobDir(%q) = %q, want %q", c.pattern, got, c.want)
@@ -842,11 +849,13 @@ func TestGlobDirIsTheLiteralDirectory(t *testing.T) {
 type recordingWalkAccess struct {
 	fakeAccess
 	dirs  []string
+	opts  []ReadDirOptions
 	links []string
 }
 
-func (r *recordingWalkAccess) ReadDir(p string, _ Identity) (Listing, error) {
+func (r *recordingWalkAccess) ReadDir(p string, _ Identity, opts ReadDirOptions) (Listing, error) {
 	r.dirs = append(r.dirs, p)
+	r.opts = append(r.opts, opts)
 	return Listing{}, nil
 }
 
@@ -862,7 +871,7 @@ func (r *recordingWalkAccess) Readlink(p string) (string, error) {
 func TestGuardReadDirNeedsTheWalkLicence(t *testing.T) {
 	inner := &recordingWalkAccess{}
 	noWalk := Guard(inner, Collector{Name: "t", Declare: Declaration{Reads: []string{"/etc", "/etc/*"}, Needs: "root"}})
-	if _, err := noWalk.ReadDir("/etc", Identity{}); !errors.Is(err, ErrUndeclared) {
+	if _, err := noWalk.ReadDir("/etc", Identity{}, ReadDirOptions{Xattrs: true}); !errors.Is(err, ErrUndeclared) {
 		t.Errorf("readdir without the walk licence: err = %v, want ErrUndeclared", err)
 	}
 	if len(inner.dirs) != 0 {
@@ -877,12 +886,17 @@ func TestGuardReadDirNeedsTheWalkLicence(t *testing.T) {
 	// walk's boundaries are its own, not the Reads globs.
 	walker := Guard(inner, Collector{Name: "w", Declare: Declaration{Walk: true, Needs: "root"}})
 	for _, p := range []string{"/", "/etc", "/home/alice/.ssh"} {
-		if _, err := walker.ReadDir(p, Identity{}); err != nil {
+		if _, err := walker.ReadDir(p, Identity{}, ReadDirOptions{Xattrs: p != "/etc"}); err != nil {
 			t.Errorf("readdir %s under the walk licence: %v", p, err)
 		}
 	}
 	if len(inner.dirs) != 3 {
 		t.Errorf("inner saw %v, want all three paths", inner.dirs)
+	}
+	// The options reach inner as given: the guard licenses the listing, it
+	// does not decide what is read with it.
+	if want := []ReadDirOptions{{Xattrs: true}, {}, {Xattrs: true}}; !slices.Equal(inner.opts, want) {
+		t.Errorf("inner got options %+v, want %+v", inner.opts, want)
 	}
 	if v := walker.Violations(); len(v) != 0 {
 		t.Errorf("violations = %v, want none", v)
@@ -892,7 +906,7 @@ func TestGuardReadDirNeedsTheWalkLicence(t *testing.T) {
 	// way allowedPath cleans one for every other method.
 	before := len(inner.dirs)
 	for _, p := range []string{"etc", "/etc/../etc", "/etc/"} {
-		if _, err := walker.ReadDir(p, Identity{}); err == nil {
+		if _, err := walker.ReadDir(p, Identity{}, ReadDirOptions{}); err == nil {
 			t.Errorf("readdir %q must be refused", p)
 		}
 	}
@@ -955,7 +969,7 @@ func TestListActionsRendersTheWalkRow(t *testing.T) {
 	want := Action{
 		Collector: "w",
 		Kind:      "walk",
-		Target:    "every local filesystem, no symlink followed, boundaries and exclusions as declared",
+		Target:    "every local filesystem, no symlink followed, boundaries and exclusions as declared; the capability and ACL attributes of executables are read",
 		Needs:     "root",
 	}
 	if walkRows[0] != want {
@@ -994,5 +1008,103 @@ func TestListActionsRendersTheWalkRow(t *testing.T) {
 	}
 	if !strings.Contains(buf.String(), "walk") || !strings.Contains(buf.String(), want.Target) {
 		t.Errorf("table is missing the walk row:\n%s", buf.String())
+	}
+}
+
+// V-51: opening a unix socket for reading is ENXIO, so the xattr calls
+// reach a socket through an O_PATH fd and its /proc/self/fd path. The
+// socket's ACL must read as it is, and a symlink to a socket must still be
+// refused.
+func TestHostAccessXattrOnASocket(t *testing.T) {
+	dir, err := os.MkdirTemp("", "mx")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(dir) })
+	p := filepath.Join(dir, "s")
+	l, err := net.Listen("unix", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { l.Close() })
+
+	names, err := (hostAccess{}).Llistxattr(p)
+	if err != nil {
+		t.Fatalf("Llistxattr on a socket: %v", err)
+	}
+	if slices.Contains(names, "system.posix_acl_access") {
+		t.Fatalf("a fresh socket lists an ACL: %v", names)
+	}
+	link := filepath.Join(dir, "link")
+	if err := os.Symlink(p, link); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := (hostAccess{}).Llistxattr(link); !errors.Is(err, ErrSymlink) {
+		t.Errorf("Llistxattr through a symlink to a socket: %v, want ErrSymlink", err)
+	}
+	if _, err := (hostAccess{}).Getxattr(link, "system.posix_acl_access"); !errors.Is(err, ErrSymlink) {
+		t.Errorf("Getxattr through a symlink to a socket: %v, want ErrSymlink", err)
+	}
+
+	// user::rw- user:1000:rw- group::rw- mask::rw- other::---
+	acl := []byte{2, 0, 0, 0,
+		0x01, 0, 6, 0, 0xff, 0xff, 0xff, 0xff,
+		0x02, 0, 6, 0, 0xe8, 0x03, 0, 0,
+		0x04, 0, 6, 0, 0xff, 0xff, 0xff, 0xff,
+		0x10, 0, 6, 0, 0xff, 0xff, 0xff, 0xff,
+		0x20, 0, 0, 0, 0xff, 0xff, 0xff, 0xff}
+	if err := unix.Lsetxattr(p, "system.posix_acl_access", acl, 0); err != nil {
+		t.Skipf("this filesystem takes no ACL on a socket: %v", err)
+	}
+	names, err = (hostAccess{}).Llistxattr(p)
+	if err != nil || !slices.Contains(names, "system.posix_acl_access") {
+		t.Fatalf("Llistxattr after setfacl: %v, %v", names, err)
+	}
+	v, err := (hostAccess{}).Getxattr(p, "system.posix_acl_access")
+	if err != nil || len(v) != len(acl) {
+		t.Fatalf("Getxattr after setfacl: %d bytes, %v", len(v), err)
+	}
+}
+
+// V-66: a caller the socket's mode does not admit is refused the O_RDONLY
+// open with EACCES before the socket's ENXIO, yet reading its xattrs needs
+// no permission on the socket; the O_PATH route must serve it (a non-root
+// run on a root:docker 0660 socket). A regular file the caller cannot read
+// keeps EACCES. Root is admitted, gets ENXIO and reads the socket either
+// way; the non-root half runs on the lab as nobody.
+func TestHostAccessXattrOnAnUnreadableSocket(t *testing.T) {
+	dir, err := os.MkdirTemp("", "mx")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(dir) })
+	p := filepath.Join(dir, "s")
+	l, err := net.Listen("unix", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { l.Close() })
+	if err := os.Chmod(p, 0); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := (hostAccess{}).Llistxattr(p); err != nil {
+		t.Errorf("Llistxattr on a 0000 socket (euid %d): %v", os.Geteuid(), err)
+	}
+	if _, err := (hostAccess{}).Getxattr(p, "system.posix_acl_access"); err != nil && !errors.Is(err, unix.ENODATA) && !errors.Is(err, unix.EOPNOTSUPP) {
+		t.Errorf("Getxattr on a 0000 socket (euid %d): %v, want ENODATA", os.Geteuid(), err)
+	}
+	f := filepath.Join(dir, "f")
+	if err := os.WriteFile(f, []byte("x"), 0); err != nil {
+		t.Fatal(err)
+	}
+	_, err = (hostAccess{}).Llistxattr(f)
+	if os.Geteuid() == 0 {
+		if err != nil {
+			t.Errorf("Llistxattr on a 0000 file as root: %v", err)
+		}
+		return
+	}
+	if !errors.Is(err, unix.EACCES) {
+		t.Errorf("Llistxattr on a 0000 regular file (euid %d): %v, want EACCES", os.Geteuid(), err)
 	}
 }

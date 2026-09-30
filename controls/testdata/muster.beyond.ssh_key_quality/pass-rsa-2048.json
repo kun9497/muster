@@ -1,0 +1,77 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none",
+        "source": {
+          "kind": "file",
+          "path": "/proc/1/cgroup"
+        }
+      }
+    },
+    "ssh": {
+      "dsa_key_count": {
+        "status": "ok",
+        "value": 0,
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "file",
+              "path": "/etc/passwd"
+            },
+            {
+              "kind": "file",
+              "path": "/root/.ssh/authorized_keys"
+            },
+            {
+              "kind": "file",
+              "path": "/home/alice/.ssh/authorized_keys"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/shells"
+            }
+          ]
+        }
+      },
+      "rsa_keys": {
+        "status": "ok",
+        "value": [
+          {
+            "user": "alice",
+            "path": "/home/alice/.ssh/authorized_keys",
+            "line": 1,
+            "bits": 2048,
+            "fingerprint": "SHA256:syntheticrsa2048alice1000000000000000000000"
+          }
+        ],
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "file",
+              "path": "/etc/passwd"
+            },
+            {
+              "kind": "file",
+              "path": "/root/.ssh/authorized_keys"
+            },
+            {
+              "kind": "file",
+              "path": "/home/alice/.ssh/authorized_keys"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/shells"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

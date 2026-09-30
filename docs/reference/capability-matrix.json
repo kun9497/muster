@@ -1,6 +1,7 @@
 {
   "nonroot": {
     "denied": [
+      "accounts.login_capable",
       "accounts.shadow_in_use",
       "audit.conf.admin_space_left_action",
       "audit.conf.disk_error_action",
@@ -38,10 +39,17 @@
       "files.root_home.acl_present",
       "kernel.sysctl.bpf_jit_harden",
       "packages.verify.complete",
+      "ssh.dsa_key_count",
+      "ssh.root_key_count",
+      "ssh.rsa_keys",
+      "sudo.authenticate_disabled",
       "sudo.defaults.scoped_count",
       "sudo.includedir",
       "sudo.log.logfile",
       "sudo.log.syslog",
+      "sudo.nopasswd_all",
+      "sudo.rules",
+      "sudo.rules_unresolved",
       "sudo.secure_path",
       "walk.complete"
     ]
@@ -51,7 +59,10 @@
       "services.ssh.installed",
       "services.ntp.installed",
       "services.syslog.installed",
-      "services.ftp.installed"
+      "services.ftp.installed",
+      "units.root_services",
+      "units.exec_writable",
+      "units.exec_unresolved"
     ]
   },
   "container": {
@@ -63,10 +74,15 @@
       "walk.unowned",
       "walk.hidden",
       "kernel.modules",
-      "swap.encrypted"
+      "swap.encrypted",
+      "walk.capabilities",
+      "walk.acl_grants"
     ]
   },
   "_notes": {
+    "accounts.useradd.inactive": [
+      "NOT in the nonroot row: what an unprivileged run reads is decided by the file's mode, not by the runner's capability. /etc/default/useradd is 0644 on Debian and Ubuntu, so the run reads it; the 3C-2a spec expected 0600 on EL, where the same run reads it denied, and the Rocky 9 image measured for the stock snapshot (V-18) ships it 0644. A release that makes it 0600 reads denied without root, truthfully."
+    ],
     "audit.log_file.mode": [
       "NOT in the nonroot row, and neither are audit.log_file.uid, audit.log_file.gid or the same three of audit.log_dir: on a non-root host with auditd installed every one of the eighteen audit.log_file.* and audit.log_dir.* leaves reads denied, because auditd.conf (0640 in the 0750 /etc/audit) cannot be read, so the path the leaves are about is unknown and the read's status is the answer for all of them (C3). The row's rule keeps every mode, uid and gid leaf out, since a stat of a fixed path needs no read permission (M-34); the row lists the other twelve."
     ],
@@ -75,6 +91,12 @@
     ],
     "kernel.sysctl.protected_symlinks": [
       "NOT in the nonroot row, and neither are protected_hardlinks, protected_fifos or protected_regular (K-31): /proc/sys/fs/protected_* is 0600 on some kernels (the 5.15 lab host) and 0644 on others (the 6.x GitHub runner), so what an unprivileged run reads for these four keys is the kernel's choice and not a capability the matrix can assert. bpf_jit_harden is 0600 on both and stays."
+    ],
+    "privilege.runtime_sockets": [
+      "NOT in the nonroot row (V-35): whether a non-root run can read a runtime socket's attributes is the host's packages' choice, not the runner's capability. /run/podman is 0700, so a host that has it reads this key denied without root (the run cannot search the directory). Where it does not, every socket row answers in full without root: a socket's attributes are read through an O_PATH fd, which needs no permission on the socket itself (V-66). The non-root CI job asserts nothing about privilege.*."
+    ],
+    "ssh.authorized_keys": [
+      "NOT in the nonroot row (V-21): the inventory itself stays ok on a non-root run, with read_status denied on each row whose file it could not read (/root is 0700), so the denial is in the rows and not in the envelope. The three counts derived from it - ssh.root_key_count, ssh.dsa_key_count and ssh.rsa_keys - are denied there and are in the row."
     ],
     "swap.encrypted": [
       "Unsupported in a container only because the host's swap is a FILE reached through an overlay root (the CI runner's /mnt/swapfile), whose source is not a block device the container's kernel lists (K-16); a host whose swap is a partition resolves it through sysfs and answers a value, in a container as anywhere else."

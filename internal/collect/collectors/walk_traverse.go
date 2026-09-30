@@ -52,6 +52,11 @@ func (c walkClock) elapsed() time.Duration {
 type walkLists struct {
 	suid, suidUnverified, worldWritable, stickyMissing, unowned, hidden, skipped []map[string]any
 
+	// capabilities and aclGrants are the executables whose attributes the
+	// listing read (P-3); the join fills the capability rows' package
+	// fields, and the ACL rows carry none.
+	capabilities, aclGrants []map[string]any
+
 	truncated         [capCount]bool
 	truncatedCounts   [capCount]int
 	allowlistedHidden int
@@ -122,7 +127,7 @@ func traverse(ctx context.Context, a collect.Access, plan mountPlan, ids idTable
 			w.r.complete, w.r.stopReason, w.r.lastPath = false, reason, f.path
 			break
 		}
-		l, err := w.a.ReadDir(f.path, f.ident)
+		l, err := w.a.ReadDir(f.path, f.ident, collect.ReadDirOptions{Xattrs: true})
 		if err != nil {
 			reason, detail := skipReason(err)
 			w.addSkip(f.path, reason, detail)
@@ -341,11 +346,11 @@ func (w *walker) deviceEntered(dev uint64) bool {
 	return false
 }
 
-// candidates applies the four conditions of W-4 plus the hidden rule to one
-// entry. The unowned rule sees every kind, symlinks included — a symlink
-// has an owner, and find -nouser reports it; the mode-based rules see every
-// entry that is not a symlink, whose own mode says nothing about the file it
-// names.
+// candidates applies the four conditions of W-4, the hidden rule and the
+// attribute rows of P-3 to one entry. The unowned rule sees every kind,
+// symlinks included — a symlink has an owner, and find -nouser reports it;
+// the mode-based rules see every entry that is not a symlink, whose own mode
+// says nothing about the file it names.
 func (w *walker) candidates(f frame, e collect.DirEntry, p string) {
 	uidKnown, uidClass := w.ids.uidKnown(e.UID)
 	gidKnown, gidClass := w.ids.gidKnown(e.GID)
@@ -384,6 +389,12 @@ func (w *walker) candidates(f frame, e collect.DirEntry, p string) {
 			"declared_mode": nil, "declared_owner": "", "declared_group": "", "declared_path": "",
 			"reference": "unpackaged",
 		})
+	}
+	// Only an executable is opened for its attributes: a capability on a
+	// file nobody can execute is inert (capabilities(7)), and an ACL on one
+	// grants nothing this list is about.
+	if e.Kind == "regular" && e.Mode&0o111 != 0 {
+		w.capabilityRow(e, p)
 	}
 }
 
@@ -474,6 +485,10 @@ func (l *walkLists) at(i int) *[]map[string]any {
 		return &l.hidden
 	case capSkipped:
 		return &l.skipped
+	case capCapabilities:
+		return &l.capabilities
+	case capACLGrants:
+		return &l.aclGrants
 	}
 	panic("walk: no list for cap index")
 }

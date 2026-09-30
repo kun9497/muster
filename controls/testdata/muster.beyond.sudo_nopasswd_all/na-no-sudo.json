@@ -1,0 +1,54 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none",
+        "source": {
+          "kind": "file",
+          "path": "/proc/1/cgroup"
+        }
+      }
+    },
+    "sudo": {
+      "installed": {
+        "status": "ok",
+        "value": false,
+        "source": {
+          "kind": "derived"
+        }
+      },
+      "rules": {
+        "status": "ok",
+        "value": [],
+        "source": {
+          "kind": "derived"
+        }
+      },
+      "nopasswd_all": {
+        "status": "ok",
+        "value": [],
+        "source": {
+          "kind": "derived"
+        }
+      },
+      "authenticate_disabled": {
+        "status": "ok",
+        "value": false,
+        "source": {
+          "kind": "derived"
+        }
+      },
+      "rules_unresolved": {
+        "status": "ok",
+        "value": 0,
+        "source": {
+          "kind": "derived"
+        }
+      }
+    }
+  }
+}

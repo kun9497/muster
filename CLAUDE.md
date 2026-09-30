@@ -1,7 +1,7 @@
 # muster — working notes for Claude
 
 Design: `docs/superpowers/specs/2026-09-02-muster-design.md` (English canonical, Korean pair). It is also the
-decision log (D01–D30). Read it before changing any contract: facts schema, control ids, exit codes,
+decision log (D01–D31). Read it before changing any contract: facts schema, control ids, exit codes,
 waiver keys, output format.
 
 ## Build and test
@@ -74,6 +74,33 @@ regenerates them from public images and `-check` compares.
   augenrules loads `rules.d/*.rules` in `ls -v` version order and, without rules.d, `/etc/audit/audit.rules`.
   `fim.tool` is `aide` / `none`, or `absent` naming the other tools found (that host reads MANUAL).
   `controls/testdata/_hosts/` holds the stock Ubuntu 22.04 and EL9 readings.
+
+## Privilege (stage 3C-2a)
+
+- `ReadDir(path, expect, ReadDirOptions{Xattrs: true})` — licensed by `Declaration.Walk` alone — opens each
+  regular entry with an execute bit from the directory fd, `fstat`-checks it and reads `security.capability`
+  and `system.posix_acl_access` onto the `DirEntry`; an entry whose attributes could not be read is a
+  `walk.skipped` row (`xattr_denied`, `xattr_undecoded`, `xattr_error`, `vanished`) and never stops the walk. A capability
+  is declared by the host's own package metadata — rpm's `%{FILECAPS}` (the walk's rpm query carries it as
+  the fifth tab field) or the owning dpkg package's `postinst` `setcap` call (literal, `$NAME=` or
+  `$(dpkg-divert --truename …)` variable, or `- <path> < <file>`) — never by a reference list; the canonical
+  text is `cap_to_text(3)` with 41 named bits, and both libcap spellings are parsed. A `rootid ≠ 0` attribute
+  is never declared. `walk.acl_grants` is evidence no control reads.
+- `units` judges the `.service` units that are enabled or active, from the ten-directory search path, with one
+  fixed command (`systemctl list-units --type=service --state=active --plain --no-legend`); `Exec*` first tokens
+  are stat-ed only inside a declared executable set (`/usr/bin/*`, `/usr/sbin/*`, `/usr/lib/**`, `/usr/libexec/**`,
+  `/usr/local/{bin,sbin}/*`, `/usr/share/*/*`, `/opt/*/*`, `/snap/bin/*`, `/etc/init.d/*`, the merged-`/usr`
+  aliases) — a path outside it, a linked unit file, an active unit whose file is missing, or a unit file muster could not read makes
+  `units.exec_writable` `absent` (MANUAL naming it); a lone `;` separates commands; `parent_writable` judges the
+  executable's directory.
+- The sudo reader parses user specifications with aliases resolved (depth 8, budgets of 65536 members and
+  of 65536 commands the rows carry; `sudo.rules` is cut to 2000 before a row is built); a comment line ends at its newline even inside a continuation; `#<digits>` is a uid; an unresolved
+  alias, netgroup or non-Unix group makes `sudo.nopasswd_all` and `sudo.authenticate_disabled` `absent` (MANUAL).
+  `accounts.login_capable` is every interactive non-system account, root and password-locked accounts included;
+  `lastlog` is decoded by `runtime.GOARCH` (292 bytes on amd64, ppc64le, riscv64; 296 on arm64, s390x). `sshkeys`
+  never stores a key body; a symlinked `authorized_keys` reads MANUAL; `rsa-sha2-*` words carry RSA keys. A
+  runtime socket's xattrs are read through an `O_PATH` fd's `/proc/self/fd` entry (a socket cannot be opened
+  for reading, and a caller its mode refuses gets EACCES first — the route serves both). `/var/run/…` is never declared — it is a symlink.
 
 ## Stage-2 conventions
 

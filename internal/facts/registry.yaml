@@ -1152,6 +1152,32 @@ keys:
     since: 1
     sensitivity: public
     collector: files
+  - key: sudo.rules
+    type: list<record>
+    description: "Evidence: the user specifications of /etc/sudoers and the files it includes, one row per principal per privilege (a ':' starts a privilege afresh) per run of one Runas_Spec, the Host_List not judged (every specification counts as if for this host) - file, line, principal, kind (user, group, uid, gid, all, and alias, netgroup or nonunix on an unresolved row), negated, runas (the spec's text with Runas_Alias substituted, empty when none), nopasswd (some command of the row carries NOPASSWD, the tag persisting along the list until PASSWD), commands (Cmnd_Alias substituted, ALL spelled ALL, negated commands kept with their !) and resolved (false for an undefined alias, a cycle, an alias nested deeper than eight, a netgroup, a non-Unix group or a line that does not parse); sorted by file and line, truncated at 2000 rows. The read's status when a sudoers file cannot be read; absent naming the path when an include is outside the declaration or a drop-in is a symlink; an empty list without /etc/sudoers."
+    since: 1
+    sensitivity: internal
+    collector: files
+    subject_kind: user
+  - key: sudo.nopasswd_all
+    type: list<string>
+    description: "The principals other than root and #0 - ALL included, spelled ALL - that sudo.rules grants the ALL command itself under NOPASSWD, whatever the runas and whatever the list negates beside it; negated principals grant nothing. Sorted, unique, judged from the local files. Absent naming them when a rule could not be resolved, and degraded with sudo.rules otherwise; an empty list without /etc/sudoers."
+    since: 1
+    sensitivity: public
+    collector: files
+    subject_kind: user
+  - key: sudo.authenticate_disabled
+    type: bool
+    description: "Whether !authenticate is in force, after the Defaults lines are applied in sudo's order (a later line winning for the same scope), for the unscoped Defaults or for any Defaults:User_List or Defaults>Runas_List; Defaults@host and Defaults!command are counted in sudo.defaults.scoped_count and do not set it. Absent naming them when a rule could not be resolved, and degraded with sudo.rules otherwise; false without /etc/sudoers."
+    since: 1
+    sensitivity: public
+    collector: files
+  - key: sudo.rules_unresolved
+    type: int
+    description: "How many sudo.rules rows are resolved false; degraded with sudo.rules, 0 without /etc/sudoers."
+    since: 1
+    sensitivity: public
+    collector: files
   - key: accounts.login_defs.pass_max_days
     type: setting<int>
     description: PASS_MAX_DAYS - persisted in login.defs, effective as the maximum over existing accounts' shadow fields.
@@ -1291,6 +1317,26 @@ keys:
     since: 1
     sensitivity: public
     collector: accounts
+  - key: accounts.login_capable
+    type: list<record>
+    description: "The accounts the inactivity policy has to cover - every account with an interactive shell (listed in /etc/shells and not nologin or false) that is not a system account (0 < uid < UID_MIN), so root is included and so are password-locked accounts, which may still log in with a key - as name, uid, inactive and expire (shadow fields 7 and 8, -1 when empty), inactive_unset (inactive is -1) and locked, sorted by name. With no /etc/shadow every row is inactive_unset; carries the read's status when /etc/shadow exists and cannot be read, when /etc/shells cannot be read or does not exist (denied: the libc fallback set is not the host's list), or when /etc/passwd cannot be read."
+    since: 1
+    sensitivity: internal
+    collector: accounts
+    subject_kind: user
+  - key: accounts.useradd.inactive
+    type: int
+    description: "INACTIVE from /etc/default/useradd - the days after a password expires before useradd's new accounts are disabled - read as useradd does (a line starting at column one, strtol base 0, the last line wins); -1 when the line is absent, commented, empty, not a number or below -1, or the file does not exist, with the reason saying which; carries the read's status when the file exists and cannot be read."
+    since: 1
+    sensitivity: public
+    collector: accounts
+  - key: accounts.lastlog
+    type: list<record>
+    description: "Evidence only: the /var/log/lastlog record of each /etc/passwd uid, one row per uid named by the first account in /etc/passwd order that has it - name, uid, last_login (RFC 3339 UTC, empty when the account never logged in), line and host - decoded with the running architecture's record size (292 or 296 bytes, named in the reason), sorted by name, truncated at 2000 rows or when the 32 MiB read limit cut off a uid's record; absent where shadow 4.15 replaced lastlog with lastlog2."
+    since: 1
+    sensitivity: internal
+    collector: accounts
+    subject_kind: user
   - key: pam.stacks
     type: list<record>
     description: The expanded PAM stacks of login, sshd, su, sudo, passwd and other (those whose /etc/pam.d file exists) - service, type, control, module, args, path, line - with @include, include and substack spliced where they stand and authselect's symlinks resolved by name into /etc/authselect, never by following the link. Backslash line continuation and a pam.conf-only host are not handled.
@@ -1561,16 +1607,30 @@ keys:
     sensitivity: internal
     collector: walk
     subject_kind: file
+  - key: walk.capabilities
+    type: list<record>
+    description: Executables carrying file capabilities (security.capability) found by the deep walk - path, caps (the cap_to_text canonical form over 41 named bits), rootid, package, package_declared, declared_caps (the owning package's declaration as written - rpm FILECAPS or the postinst setcap text, "(from file)" when setcap reads a file), reference (rpmdb, postinst or unpackaged), reason (why the declaration could not be read or does not apply - an unreadable postinst, a setcap call muster could not resolve, a non-zero rootid - else empty); sorted by path; truncated at 2000 rows.
+    since: 1
+    sensitivity: internal
+    collector: walk
+    subject_kind: file
+  - key: walk.acl_grants
+    type: list<record>
+    description: Executables whose access ACL grants a named user or group write or execute beyond the owning group's entry, the mask applied - path, entries (the widening entries in getfacl spelling with numeric ids); sorted by path; truncated at 2000 rows; evidence, read by no control.
+    since: 1
+    sensitivity: internal
+    collector: walk
+    subject_kind: file
   - key: walk.skipped
     type: list<record>
-    description: Every root the walk did not enter - path, reason (excluded_type, pseudo_path, container_storage, excluded_by_flag, bind_duplicate, denied, vanished, unlisted_mount) and detail (the fstype, link, configuration file or errno behind the reason, else empty); sorted by path; provenance, read by no control.
+    description: Every root the walk did not enter and every executable whose attributes it could not read - path, reason (excluded_type, pseudo_path, container_storage, excluded_by_flag, bind_duplicate, denied, vanished, unlisted_mount, xattr_denied, xattr_undecoded, xattr_error) and detail (the fstype, link, configuration file, errno or decoding error behind the reason, else empty); sorted by path; provenance, read by no control.
     since: 1
     sensitivity: internal
     collector: walk
     subject_kind: file
   - key: walk.stats
     type: record
-    description: The walk's own account of itself - entries, dirs, files, symlinks, stop_reason, last_path, truncated_counts, allowlisted_hidden, config_unreadable, home_roots, mnt_id_fallback, nice_applied, ioprio_applied; provenance, read by no control.
+    description: The walk's own account of itself - entries, dirs, files, symlinks, stop_reason, last_path, truncated_counts (one counter per capped list, capabilities and acl_grants included), allowlisted_hidden, config_unreadable, home_roots, mnt_id_fallback, nice_applied, ioprio_applied; provenance, read by no control.
     since: 1
     sensitivity: internal
     collector: walk
@@ -2963,3 +3023,70 @@ keys:
     since: 1
     sensitivity: public
     collector: fim
+  - key: units.root_services
+    type: list<record>
+    description: "The system services in scope - enabled (a .wants or .requires link in any tree of the systemd.unit(5) search path names them) or active (systemctl list-units lists them) - whose merged User= is unset, root or 0, one row per unit sorted by unit with unit, enabled, active, user, unit_file (file, symlink or missing), files (the unit file and each drop-in read, with path, mode, uid and gid), exec (one row per command of each Exec* line - a lone ; separates two - with directive, path, resolved, stat_status (ok, missing, unresolved, undeclared, symlink_in_path, link_undeclared, link_chain, denied or error), stat_path (the path stat-ed: the /usr spelling of a merged-/usr alias, or a symlink's one-hop target), exists and kind (of path itself: for a symlink the link, which exists even when stat_status says its target at stat_path is missing), mode, uid, gid, group_writable and other_writable; mode, uid and gid -1 when not stat-ed), read_status (ok, denied or error) and reason. A unit file that is a symlink to /dev/null, or empty, is a mask and out of scope; User=%i names the instance. Capped at 500 units; evidence."
+    since: 1
+    sensitivity: internal
+    collector: units
+    subject_kind: unit
+  - key: units.exec_writable
+    type: list<record>
+    description: "The judged subset of units.root_services, sorted by unit, path and why: an executable owned by a uid other than 0, group-writable or other-writable, or in a directory that is not root-owned or is group/other-writable (why owner, group_writable, other_writable or parent_writable; a symlinked executable judged by its owner and its directory, and by its target one hop on), and a unit file or drop-in owned by a uid other than 0, group-writable or other-writable (why unit_file:owner, unit_file:group_writable or unit_file:other_writable; its directory is not judged). Absent, naming the unit and path, when an in-scope unit file or drop-in exists and cannot be read, a unit file is a symlink not followed, an active unit has no unit file, or an executable (or its symlink target) is outside the collector's declaration or cannot be stat-ed."
+    since: 1
+    sensitivity: public
+    collector: units
+    subject_kind: unit
+  - key: units.exec_unresolved
+    type: int
+    description: "How many units.root_services exec rows are resolved false (a command that is not an absolute path, or carries a % specifier), plus the units whose unit_file is symlink or missing; evidence."
+    since: 1
+    sensitivity: public
+    collector: units
+  - key: ssh.authorized_keys
+    type: list<record>
+    description: "The authorized_keys and authorized_keys2 files (the two AuthorizedKeysFile defaults of sshd_config(5)) under the .ssh directory of every /etc/passwd account with a home path, one row per account and file sorted by user and path with user, uid, path, exists, mode, owner_uid (both -1 when no file was read), keys (line, type, bits, fingerprint, options, restricted; the key body is never stored; capped at 200 per file), unparsed (lines that are neither a comment, blank nor a key sshd would read), unfollowed, read_status (ok, denied or error; empty on an unfollowed row) and reason. A home outside the collector's declaration is one row with path empty and unfollowed true; a file behind a symlink (the file or its .ssh), which sshd follows and muster does not, is a row with exists and unfollowed true; a file that cannot be read is a row with the read's status. Capped at 500 rows; evidence."
+    since: 1
+    sensitivity: internal
+    collector: sshkeys
+    subject_kind: user
+  - key: ssh.root_key_count
+    type: int
+    description: "How many keys the authorized_keys files of the uid-0 accounts hold, both defaults counted (on EL, where sshd reads only authorized_keys, a key in authorized_keys2 is a stale one for review). The read's status, naming the path, when one of the files exists and cannot be read; /etc/shells' status (denied for the libc default) when it cannot say which accounts are interactive; absent, naming the path, when a file is behind a symlink muster does not follow, and naming the account and home when an interactive account's home is outside the collector's declaration."
+    since: 1
+    sensitivity: public
+    collector: sshkeys
+  - key: ssh.dsa_key_count
+    type: int
+    description: "How many ssh-dss keys (not DSA certificates) the authorized_keys files read hold, across every account. Degraded as ssh.root_key_count is."
+    since: 1
+    sensitivity: public
+    collector: sshkeys
+  - key: ssh.rsa_keys
+    type: list<record>
+    description: "Every RSA key whose modulus was read (the ssh-rsa type, or a signature-only rsa-sha2-* word over an ssh-rsa blob, which sshd reads as the same key), one row per key and file (a file two accounts share is listed once, under the first account by name), sorted by user, path and line, with user, path, line, bits (the modulus bit length ssh-keygen -l prints) and fingerprint (SHA256:, unpadded base64). Capped at 2000 rows; degraded as ssh.root_key_count is."
+    since: 1
+    sensitivity: internal
+    collector: sshkeys
+    subject_kind: key
+  - key: privilege.ld_so_preload
+    type: list<string>
+    description: "The entries of /etc/ld.so.preload, the shared objects the dynamic loader loads into every program, in file order, as glibc's loader reads them: a # starts a comment anywhere on a line, entries are separated by space, tab, newline or colon, empty entries dropped. A missing file is an empty list (the normal state); a file that exists and cannot be read is the read's status, naming the path."
+    since: 1
+    sensitivity: public
+    collector: privilege
+    subject_kind: file
+  - key: privilege.runtime_sockets
+    type: list<record>
+    description: "The control sockets of the four container runtimes whose API is root (/run/docker.sock, /run/containerd/containerd.sock, /run/podman/podman.sock, /run/crio/crio.sock, at their physical paths), one row each in that order with path, exists (something is at the path), kind (socket, or what the stat found there: regular, dir, ...), mode (the 0o7777 bits), uid, gid, group (the name /etc/group gives the gid; empty when /etc/group cannot be read), group_writable, other_writable, owner_nonroot (the owner is not uid 0, so that account reaches the API) and acl_present (a POSIX access ACL is set, whose named entries reach the API without the group; group_writable then reads the ACL mask). A socket that does not exist (the path or a parent missing) is exists false, kind empty, mode, uid and gid -1, group empty, every flag false; a stat or ACL read that fails otherwise (/run/podman is 0700, so a non-root run on a podman host) is the read's status on the whole list, naming the path."
+    since: 1
+    sensitivity: public
+    collector: privilege
+    subject_kind: file
+  - key: privilege.runtime_group_members
+    type: list<record>
+    description: "For every existing group-writable socket of privilege.runtime_sockets, the accounts other than uid 0 that hold its gid, judged from the local files: the supplementary members of every /etc/group line with that gid and the /etc/passwd accounts whose primary gid it is, one row per group, member and socket with group, member, uid (-1 when /etc/passwd does not name the member) and socket, sorted by group, member and socket. Empty when no socket is group-writable or its group is empty; the status of privilege.runtime_sockets when that is not ok, else /etc/group's or /etc/passwd's read status, naming the path, when either cannot be read (absent when /etc/group does not exist)."
+    since: 1
+    sensitivity: public
+    collector: privilege
+    subject_kind: user

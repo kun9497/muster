@@ -1,0 +1,2 @@
+# comment
+/usr/lib/libfoo.so  /usr/lib/libbar.so:/opt/x.so # trailing

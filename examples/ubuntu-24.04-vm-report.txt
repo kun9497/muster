@@ -1,8 +1,8 @@
-muster 81855c8 · controls kisa-unix-2026+2026.09.23 · guide kisa-unix-2026 · host github-runner · collected 2026-09-28T08:17:31Z
-automatic  high 18/12/0  medium 13/9/0  low 3/4/0  (pass/fail/warn)
-manual review 13  ·  undecidable error 0 / n-a 24 / waived 0  ·  facts failed 0  ·  waivers expiring within 30d 0
+muster 37dfcc8 · controls kisa-unix-2026+2026.09.29 · guide kisa-unix-2026 · host github-runner · collected 2026-09-30T00:18:48Z
+automatic  high 20/15/0  medium 13/10/0  low 3/4/0  (pass/fail/warn)
+manual review 15  ·  undecidable error 0 / n-a 24 / waived 0  ·  facts failed 0  ·  waivers expiring within 30d 0
 KISA 2026 (68 controls): pass 28 fail 13 warn 0 manual 11 n/a 16 error 0 waived 0
-beyond the guide (28 controls): pass 6 fail 12 warn 0 manual 2 n/a 8 error 0 waived 0
+beyond the guide (36 controls): pass 8 fail 16 warn 0 manual 4 n/a 8 error 0 waived 0
 
 FAIL           high   muster.account.cron_permissions                    cron 설정 파일이 0640 이하로 …
     reason: clause does not hold: cron.files each require mode in [0 32 128 160 256 288 384 416]
@@ -117,7 +117,7 @@ WARN           high   muster.file.world_writable                         예상�
 WARN           high   muster.patch.security_updates                      캐시된 패키지 메타데이터에 대…
     reason: clause does not hold: patch.metadata_age_s lte 604800
     patch.manager = apt  (/var/lib/dpkg/status)
-    patch.metadata_age_s = 643390  (/var/lib/apt/periodic/update-success-stamp)
+    patch.metadata_age_s = 787467  (/var/lib/apt/periodic/update-success-stamp)
     patch.pending_security_count = 0  (/usr/bin/apt-get -s upgrade -o Debug::NoLocking=1)
 PASS           high   muster.service.automount_disabled                  automount 서비스가 활성화되어 …
 NOT_APPLICABLE high   muster.service.dns_version                         네임서버가 벤더가 패치한 수준…
@@ -224,11 +224,47 @@ FAIL           high   muster.beyond.auditd_active                        감사 
     services.auditd.active = false  (/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState auditd.service)
     services.auditd.enabled = false  (/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState auditd.service)
 PASS           high   muster.beyond.bootloader_config_permissions        부트로더 설정 파일을 root 만 …
+FAIL           high   muster.beyond.container_runtime_access             root 가 아닌 어떤 계정도 컨테…
+    reason: clause does not hold: privilege.runtime_group_members none where member not_in []
+    env.container = none  (/proc/1/comm)
+    privilege.runtime_sockets = 4 elements; none matching
+    privilege.runtime_group_members = 1 elements; matching: user:runner
+    user:runner: expected not not_in [], actual runner (fail)
+PASS           high   muster.beyond.file_capabilities_declared           파일 capability 를 가진 모든 …
+PASS           high   muster.beyond.ld_so_preload_empty                  /etc/ld.so.preload 에는 의도적…
 FAIL           high   muster.beyond.package_files_unmodified             패키지로 설치된 모든 파일이 패…
     reason: clause does not hold: packages.verify.modified none where path present
     env.container = none  (/proc/1/comm)
     packages.verify.modified = 1 elements; matching: file:/etc/cron.daily/google-chrome  (/usr/bin/dpkg --verify)
     file:/etc/cron.daily/google-chrome: expected not present, actual /etc/cron.daily/google-chrome (fail)
+FAIL           high   muster.beyond.root_unit_exec_writable              root 로 실행되는 서비스는 root…
+    reason: clause does not hold: units.exec_writable none where why present
+    env.container = none  (/proc/1/comm)
+    env.has_systemd = true  (/run/systemd/system)
+    units.exec_writable = 6 elements; matching: unit:/usr/share/netplan/netplan.script, unit:/usr/share/netplan/netplan.script, unit:/usr/share/netplan/netplan.script, unit:/opt/primer/primer, unit:/opt/primer/primer, +1 more
+    unit:/usr/share/netplan/netplan.script: expected not present, actual group_writable (fail)
+    unit:/usr/share/netplan/netplan.script: expected not present, actual other_writable (fail)
+    unit:/usr/share/netplan/netplan.script: expected not present, actual parent_writable (fail)
+    unit:/opt/primer/primer: expected not present, actual group_writable (fail)
+    unit:/opt/primer/primer: expected not present, actual other_writable (fail)
+    (+1 more, use --all)
+FAIL           high   muster.beyond.sudo_nopasswd_all                    어떤 주체도 비밀번호 없이 sudo…
+    reason: clause does not hold: sudo.nopasswd_all none where value not_in []
+    env.container = none  (/proc/1/comm)
+    sudo.installed = true  (/etc/sudoers)
+    sudo.nopasswd_all = 2 elements; matching: user:packer, user:runner
+    sudo.authenticate_disabled = false
+    user:packer: expected not not_in [], actual packer (fail)
+    user:runner: expected not not_in [], actual runner (fail)
+FAIL           medium muster.beyond.account_inactivity_lock              로그인할 수 있는 계정은 비밀번…
+    reason: clause does not hold: accounts.login_capable none where inactive_unset eq true
+    env.container = none  (/proc/1/comm)
+    accounts.login_capable = 3 elements; matching: user:packer, user:root, user:runner
+    accounts.login_capable = 3 elements; none matching
+    accounts.useradd.inactive = -1  (/etc/default/useradd)
+    user:packer: expected not eq true, actual true (fail)
+    user:root: expected not eq true, actual true (fail)
+    user:runner: expected not eq true, actual true (fail)
 NOT_APPLICABLE medium muster.beyond.audit_disk_actions                   감사 로그 저장 공간이 부족해지…
     reason: applies_when does not hold: services.auditd.installed eq true
 NOT_APPLICABLE medium muster.beyond.audit_immutable                      감사 설정이 지금도, 다음 부팅…
@@ -254,6 +290,8 @@ FAIL           medium muster.beyond.file_integrity_tool                  파일 
     fim.tool = none
 PASS           medium muster.beyond.kernel_pointer_exposure              커널이 포인터와 메시지 버퍼를 …
 PASS           medium muster.beyond.ptrace_restriction                   한 프로세스가 자신이 띄우지 않…
+MANUAL         medium muster.beyond.root_authorized_keys                 sshd 가 root 로그인을 허용하는…
+    reason: absent needs review: ssh.root_key_count is absent on this host
 FAIL           medium muster.beyond.secure_boot_enabled                  UEFI 보안 부팅이 적용되고 있다
     reason: clause does not hold: boot.secure_boot eq true
     env.container = none  (/proc/1/comm)
@@ -269,6 +307,8 @@ WARN           medium muster.beyond.separate_partitions                  사용�
     mount:/var/tmp: expected true, actual false (fail)
     mount:/var/log: expected true, actual false (fail)
     (+1 more, use --all)
+MANUAL         medium muster.beyond.ssh_key_quality                      어떤 authorized_keys 파일에도 …
+    reason: absent needs review: ssh.dsa_key_count is absent on this host
 PASS           medium muster.beyond.sudo_logging                         sudo 가 실행하는 모든 명령을 s…
 FAIL           medium muster.beyond.suid_dumpable_disabled               권한이 바뀐 프로그램은 코어를 …
     reason: clause does not hold: coredump.suid_dumpable eq 0

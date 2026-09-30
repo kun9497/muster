@@ -1,0 +1,39 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none",
+        "source": {
+          "kind": "file",
+          "path": "/proc/1/cgroup"
+        }
+      },
+      "has_systemd": {
+        "status": "ok",
+        "value": false,
+        "source": {
+          "kind": "file",
+          "path": "/run/systemd/system"
+        }
+      }
+    },
+    "units": {
+      "exec_writable": {
+        "status": "unsupported",
+        "reason": "no systemd on this host or inside this container"
+      },
+      "root_services": {
+        "status": "unsupported",
+        "reason": "no systemd on this host or inside this container"
+      },
+      "exec_unresolved": {
+        "status": "unsupported",
+        "reason": "no systemd on this host or inside this container"
+      }
+    }
+  }
+}

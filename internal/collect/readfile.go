@@ -181,9 +181,10 @@ func readFile(p string, limit int64, keepBinary bool) ([]byte, ReadMeta, error) 
 }
 
 // Stat resolves like ReadFile but only stats the final component; a final
-// symlink is ErrSymlink, never followed. Kind and Rdev are filled for any
-// file type before that check, so Kind == "symlink" is only ever seen
-// alongside the ErrSymlink return, never on a nil-error result.
+// symlink is ErrSymlink, never followed. Kind, Rdev and ParentUntrusted are
+// filled for any file type before that check, so Kind == "symlink" is only
+// ever seen alongside the ErrSymlink return, never on a nil-error result,
+// and a symlink's directory is judged as a file's is (D5-2).
 func Stat(p string) (ReadMeta, error) {
 	fd, tier, err := openNoFollow(p, unix.O_PATH|unix.O_NOFOLLOW|unix.O_CLOEXEC)
 	meta := ReadMeta{Tier: tier}
@@ -196,10 +197,10 @@ func Stat(p string) (ReadMeta, error) {
 		return meta, err
 	}
 	fillMeta(&meta, &st)
+	meta.ParentUntrusted = parentUntrusted(p)
 	if st.Mode&unix.S_IFMT == unix.S_IFLNK {
 		return meta, fmt.Errorf("%s: %w", p, ErrSymlink)
 	}
-	meta.ParentUntrusted = parentUntrusted(p)
 	return meta, nil
 }
 

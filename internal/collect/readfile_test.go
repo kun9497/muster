@@ -164,8 +164,13 @@ func TestStatReportsSymlinkAndParentTrust(t *testing.T) {
 		t.Error("world-writable parent must set ParentUntrusted")
 	}
 	os.Symlink(p, filepath.Join(dir, "l"))
-	if _, err := Stat(filepath.Join(dir, "l")); !errors.Is(err, ErrSymlink) {
+	lmeta, err := Stat(filepath.Join(dir, "l"))
+	if !errors.Is(err, ErrSymlink) {
 		t.Errorf("err=%v", err)
+	}
+	// D5-2: a symlink's directory is judged as a file's is.
+	if lmeta.Kind != "symlink" || !lmeta.ParentUntrusted {
+		t.Errorf("a symlink in a world-writable directory: %+v, want ParentUntrusted", lmeta)
 	}
 }
 

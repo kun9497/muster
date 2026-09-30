@@ -1,0 +1,25 @@
+id: muster.beyond.container_runtime_access
+title_en: No account other than root can reach a container runtime's API socket
+title_ko: root 가 아닌 어떤 계정도 컨테이너 런타임의 API 소켓에 접근할 수 없다
+description_en: The API socket of docker, containerd, podman or cri-o creates containers with any host path mounted and any capability granted, so whoever can write to it is root on the host without an exploit; docker's own post-installation notes call the docker group root-equivalent. muster stats the four sockets at their physical paths under /run and fails the host when one exists and is writable by others, is owned by an account other than root, or carries a POSIX ACL - a socket's ACL entry or its non-root owner hands out the API as surely as its group does - or when an account other than uid 0 belongs to the group that can write to a socket and is not in params.allowed_runtime_group_members. A host with no runtime has no socket and passes, and so does a runtime's stock 0660 root:docker socket whose group is empty; the GitHub runner reads FAIL, since runner is in docker. It is rated 상 because membership of that group is root with one command. The members are judged from the local files, so a passing host that also resolves accounts through a remote NSS source reads WARN instead of PASS; a FAIL stays FAIL. A host without /etc/group cannot say who the members are and reads FAIL; a socket muster could not stat, or an /etc/group or /etc/passwd it could not read, reads ERROR naming it.
+description_ko: docker, containerd, podman, cri-o 의 API 소켓은 호스트의 어떤 경로든 마운트하고 어떤 capability 든 부여한 컨테이너를 만들므로, 그 소켓에 쓸 수 있는 사람은 익스플로잇 없이 호스트의 root 입니다. docker 의 설치 후 안내 문서도 docker 그룹을 root 와 같은 것이라고 말합니다. muster 는 /run 아래의 실제 경로에서 네 소켓을 stat 하고, 소켓이 있으면서 다른 사용자가 쓸 수 있거나, root 가 아닌 계정이 소유하거나, POSIX ACL 을 가지면 호스트를 실패로 판정합니다. 소켓의 ACL 항목이나 root 가 아닌 소유자는 그룹과 똑같이 API 를 넘겨줍니다. 또한 소켓에 쓸 수 있는 그룹에 uid 0 이 아닌 계정이 속해 있고 그 계정이 params.allowed_runtime_group_members 에 없으면 실패입니다. 런타임이 없는 호스트는 소켓이 없어 통과하며, 그룹이 비어 있는 런타임 기본 0660 root:docker 소켓도 통과합니다. GitHub 러너는 runner 가 docker 에 속해 있으므로 FAIL 입니다. 그 그룹의 구성원은 명령 하나로 root 가 되므로 중요도는 상 입니다. 구성원은 로컬 파일로 판정하므로, 원격 NSS 소스로도 계정을 조회하는 호스트는 통과할 때 PASS 대신 WARN 이며 FAIL 은 그대로 FAIL 입니다. /etc/group 이 없는 호스트는 구성원을 말할 수 없어 FAIL 이며, muster 가 stat 하지 못한 소켓이나 읽지 못한 /etc/group 또는 /etc/passwd 는 그것을 밝힌 ERROR 입니다.
+category: beyond
+importance: 상
+automation: auto
+references: { nist_800_53: ["AC-6(10)"] }
+requires_facts: ">=1"
+applies_when:
+  - { fact: env.container, op: eq, expected: none }
+absent_means: fail
+params:
+  allowed_runtime_group_members: { type: list<string>, default: [], description: "accounts, spelled as privilege.runtime_group_members spells member, that may belong to a runtime socket's group on purpose - a CI runner's account" }
+checks:
+  - { fact: privilege.runtime_sockets, op: none, subject: path, where: { field: other_writable, op: eq, expected: true } }
+  - { fact: privilege.runtime_sockets, op: none, subject: path, where: { field: owner_nonroot, op: eq, expected: true } }
+  - { fact: privilege.runtime_sockets, op: none, subject: path, where: { field: acl_present, op: eq, expected: true } }
+  - { fact: privilege.runtime_group_members, op: none, subject: member, where: { field: member, op: not_in, expected: "${allowed_runtime_group_members}" } }
+remediation:
+  text_en: Record the group's members and the socket's owner, mode and ACL first (getent group <group>; stat -c '%U:%G %a' <socket>; getfacl <socket>), then remove each account that should not reach the API from the group (gpasswd -d <user> <group>), and let the runtime recreate the socket root-owned and 0660 without an ACL (setfacl -b <socket>, or the runtime's socket unit, then restart it). An account that needs containers can use a rootless runtime instead. Restore with gpasswd -a <user> <group> and the recorded settings; a removed member keeps access in sessions opened before the change until they log out.
+  text_ko: 먼저 그룹의 구성원과 소켓의 소유자, mode, ACL 을 기록합니다(getent group <group>; stat -c '%U:%G %a' <socket>; getfacl <socket>). 그다음 API 에 접근하면 안 되는 계정을 그룹에서 빼고(gpasswd -d <user> <group>), 런타임이 소켓을 root 소유 0660 에 ACL 없이 다시 만들게 합니다(setfacl -b <socket>, 또는 런타임의 socket unit 을 고친 뒤 다시 시작). 컨테이너가 필요한 계정은 rootless 런타임을 쓸 수 있습니다. gpasswd -a <user> <group> 와 기록한 설정으로 되돌리며, 뺀 구성원은 변경 전에 연 세션에서 로그아웃할 때까지 접근을 유지합니다.
+  risk: restart_service
+  idempotent: true

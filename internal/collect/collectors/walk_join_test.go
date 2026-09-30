@@ -334,11 +334,11 @@ func TestJoinRPMCappedCaptureDropsTheCutLine(t *testing.T) {
 func TestJoinIsBoundedByCandidates(t *testing.T) {
 	var b strings.Builder
 	for i := 0; i < 1000; i++ {
-		fmt.Fprintf(&b, "filler-%d\t0100644\troot\troot\t/usr/share/filler/%d\n", i, i)
+		fmt.Fprintf(&b, "filler-%d\t0100644\troot\troot\t\t/usr/share/filler/%d\n", i, i)
 	}
-	b.WriteString("util-linux\t0104755\troot\troot\t/usr/bin/su\n")
-	b.WriteString("python3\t0100755\troot\troot\t/usr/bin/python3\n")
-	b.WriteString("sysstat\t0100600\troot\troot\t/usr/sbin/.h\n")
+	b.WriteString("util-linux\t0104755\troot\troot\t\t/usr/bin/su\n")
+	b.WriteString("python3\t0100755\troot\troot\t\t/usr/bin/python3\n")
+	b.WriteString("sysstat\t0100600\troot\troot\t\t/usr/sbin/.h\n")
 	cands := map[string]bool{"/usr/bin/su": true, "/usr/bin/python3": true, "/usr/sbin/.h": true}
 
 	table, err := rpmFileTable([]byte(b.String()), cands, false)
@@ -353,7 +353,7 @@ func TestJoinIsBoundedByCandidates(t *testing.T) {
 // A line longer than the scanner's buffer stops the stream; the join says so
 // rather than reporting the rest of the table as unpackaged.
 func TestJoinRPMOverlongLineIsAnError(t *testing.T) {
-	line := "pkg\t0100644\troot\troot\t/usr/share/" + strings.Repeat("x", 70<<10) + "\n"
+	line := "pkg\t0100644\troot\troot\t\t/usr/share/" + strings.Repeat("x", 70<<10) + "\n"
 	if _, err := rpmFileTable([]byte(line), map[string]bool{"/usr/bin/su": true}, false); err == nil {
 		t.Fatal("rpmFileTable accepted a line over the buffer")
 	}

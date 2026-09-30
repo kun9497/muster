@@ -17,6 +17,23 @@ regexes = [
 id = "ssh-public-key-material"
 description = "SSH public key body committed in a fixture (fingerprints are fine, bodies are not)"
 regex = '''ssh-(rsa|ed25519|dss|ecdsa)\s+AAAA[0-9A-Za-z+/]{40,}'''
+[rules.allowlist]
+# The sshkeys parser's seeds (P-5). The first literal is the research note's
+# synthetic vector, an Ed25519 "public key" of 32 zero bytes that is no one's
+# key. The other three are the throw-away public halves in
+# internal/collect/collectors/testdata/authorized_keys.generated, generated
+# once for the seed with ssh-keygen and whose private halves were deleted on
+# the spot. Each is an exact literal, never a path: any other key body
+# committed anywhere still trips the rule. The rule's capture group makes the
+# secret the type word alone, so the literals are matched against the whole
+# match (regexTarget).
+regexTarget = "match"
+regexes = [
+  '''AAAAC3NzaC1lZDI1NTE5AAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA''',
+  '''AAAAC3NzaC1lZDI1NTE5AAAAIMWGCF5TbEgEBu7XZf7A6SaK6eaBGHRqbIiVItZdoII''',
+  '''AAAAB3NzaC1yc2EAAAADAQABAAABAQC5tP6l4i\+rfLRu5APQxpGGaRDtZ4JWj4odFnVdySRe''',
+  '''AAAAB3NzaC1yc2EAAAADAQABAAAAgQDRXbuvYk33Fpqf5GFviuA\+MOF3jKjF3pK4xzb4nBEi''',
+]
 
 [[rules]]
 id = "private-key-block"

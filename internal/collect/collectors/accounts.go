@@ -20,7 +20,7 @@ const (
 
 var accountsCollector = collect.Collector{
 	Name:    "accounts",
-	Declare: collect.Declaration{Reads: []string{loginDefsPath, passwdPath, shadowPath, groupPath, shellsPath, nsswitchPath, sssdConfPath}, Needs: "root"},
+	Declare: collect.Declaration{Reads: []string{loginDefsPath, passwdPath, shadowPath, groupPath, shellsPath, nsswitchPath, sssdConfPath, useraddDefaultsPath, lastlogPath}, Needs: "root"},
 	Run:     runAccounts,
 }
 
@@ -303,6 +303,9 @@ func runAccounts(_ context.Context, a collect.Access, b *collect.Builder) error 
 		b.Set("accounts.admin_group_members", e)
 		b.Set("accounts.shadow_in_use", e)
 		b.Set("accounts.parse_failures", e)
+		b.Set("accounts.login_capable", e)
+		b.Set("accounts.useradd.inactive", useraddInactive(a)) // its own file: never the passwd read's status
+		b.Set("accounts.lastlog", e)
 		return nil
 	}
 	prows, failures := parsePasswd(pwData)
@@ -324,6 +327,9 @@ func runAccounts(_ context.Context, a collect.Access, b *collect.Builder) error 
 	ue := collect.OKRead(users, &facts.Source{Kind: "file", Path: passwdPath}, pmeta)
 	ue.Truncated = ue.Truncated || (serr == nil && smeta.Truncated)
 	b.Set("accounts.users", ue)
+	b.Set("accounts.login_capable", loginCapableEnv(prows, byName, haveShadow, serr, smeta, pmeta, defs.intOr("UID_MIN", 1000), shells, shellsEnv))
+	b.Set("accounts.useradd.inactive", useraddInactive(a))
+	b.Set("accounts.lastlog", lastlogRows(a, prows, pmeta))
 	joined := &facts.Source{Kind: "derived", Inputs: []facts.Source{{Kind: "file", Path: passwdPath}, {Kind: "file", Path: groupPath}}}
 	if gerr != nil {
 		b.Set("accounts.groups", groupErr())

@@ -1,0 +1,4 @@
+# Synthetic: a Cmnd_Alias under NOPASSWD, then a PASSWD command that
+# overrides the inherited tag (sudoers(5) tag inheritance).
+Cmnd_Alias NGINX_CTL = /usr/bin/systemctl restart nginx, /usr/bin/systemctl reload nginx
+%deploy ALL=(root) NOPASSWD: NGINX_CTL, PASSWD: /usr/bin/journalctl

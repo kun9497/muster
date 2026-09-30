@@ -1,0 +1,12 @@
+#!/bin/sh
+# synthetic: the shape of a maintainer script that reads the capability set
+# from a file the package ships
+set -e
+
+case "$1" in
+    configure)
+        if command -v setcap >/dev/null 2>&1; then
+            setcap -q - /usr/lib/snapd/snap-confine < /usr/lib/snapd/snap-confine.caps
+        fi
+        ;;
+esac

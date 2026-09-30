@@ -11,6 +11,24 @@ verdict on an existing snapshot is at least a minor release and appears under
 
 ### Controls
 
+Control set `kisa-unix-2026+2026.09.29` (was `+2026.09.23`). Eight more controls
+beyond the KISA guide (36 in all), written from `shadow(5)`, `useradd(8)`,
+`sudoers(5)`, `capabilities(7)`, `systemd.service(5)`, `ld.so(8)`, `sshd(8)` and
+`ssh-keygen(1)` in muster's own words: an inactivity policy over every
+interactive account (root and password-locked accounts included), passwordless
+`ALL` in sudoers with aliases resolved, file capabilities the owning package did
+not declare, root services whose executables or their directories a non-root user
+can write, `ld.so.preload`, container-runtime sockets and the
+groups, owners and ACL entries that can reach them, root's authorized keys where
+`PermitRootLogin` accepts keys, and DSA or short RSA keys. Every one is
+NOT_APPLICABLE inside a container. Read as shipped: every stock release fails the
+inactivity lock (`INACTIVE` -1), a cloud image and the GitHub runner fail
+passwordless sudo, and the runner fails runtime access (`runner` in `docker`);
+what muster could not read — an include or a home outside its declaration, a
+linked or unreadable unit file, an executable outside the declared set, an
+unresolved sudoers alias — reads MANUAL naming the path. The 68 controls for the
+67 items are unchanged.
+
 Control set `kisa-unix-2026+2026.09.23` (was `+2026.09.18`). Nine more controls
 beyond the KISA guide (28 in all), written from `auditd.conf(5)`, `auditctl(8)`,
 `augenrules(8)`, `aide(1)`, `sudoers(5)`, `rpm(8)` and `dpkg(1)` in muster's own
@@ -160,6 +178,44 @@ every plan is under `docs/superpowers/plans/`):
 
 ### Collectors
 
+- `ReadDir` takes an option that reads the `security.capability` and
+  `system.posix_acl_access` attributes of every executable it lists, from the
+  open directory fd after an identity check; the walk uses it (licensed by its
+  `Walk` declaration alone) and never stops for an attribute it cannot read
+  (`walk.skipped` gains `xattr_denied`, `xattr_undecoded` and `xattr_error`). `walk.capabilities`
+  joins each capability with the package's own declaration — rpm's `%{FILECAPS}`
+  (the rpm query's fifth field) or the dpkg `postinst` `setcap` call, in its
+  literal, variable, `dpkg-divert --truename` and `- <path> < <file>` forms — and
+  renders the canonical `cap_to_text(3)` text with 41 named bits, accepting both
+  libcap spellings; a `rootid ≠ 0` attribute is never declared. `walk.acl_grants`
+  records executables whose ACL widens their mode.
+- `accounts` derives `login_capable` (every interactive non-system account with
+  its inactivity field), reads `/etc/default/useradd`'s `INACTIVE` as `useradd`
+  does (`strtol` base 0, values below -1 rejected, the last line wins) and decodes
+  `/var/log/lastlog` by architecture (292- or 296-byte records) as evidence.
+- The sudo reader parses user specifications with `User_Alias`, `Runas_Alias` and
+  `Cmnd_Alias` resolved to depth 8 under member and row budgets, tags and runas
+  inherited along a command list and reset at `:`, negation kept, digests kept
+  with their command, a comment ending at its newline even inside a
+  continuation, and `#<digits>` read as a uid; `sudo.nopasswd_all` and
+  `sudo.authenticate_disabled` (unscoped, `Defaults:` and `Defaults>` scopes) are
+  `absent` when a rule could not be resolved.
+- `units` (new) reads the enabled or active `.service` units from systemd's
+  ten-directory search path with one fixed `systemctl list-units`, merges
+  drop-ins by name and precedence, splits `Exec*` lines on a lone `;`, follows a
+  symlinked executable one hop and judges the executable's directory too; an
+  executable outside the declared set, a linked or missing unit file or an
+  unreadable one leaves `units.exec_writable` `absent`.
+- `sshkeys` (new) inventories `authorized_keys` and `authorized_keys2` of every
+  local account without their bodies — type, bits (RSA by modulus length), SHA256
+  fingerprint, options — counts root's, DSA and RSA keys, and reads `rsa-sha2-*`
+  words as the RSA keys they carry; a symlinked key file or a home outside the
+  declaration leaves the counts `absent`.
+- `privilege` (new) reads `/etc/ld.so.preload` as glibc's loader does and the
+  four container runtimes' control sockets at their `/run` paths with their
+  group, owner and ACL, plus the accounts that hold a writable socket's group; a
+  socket's xattrs are read through an `O_PATH` fd's `/proc/self/fd` entry, since
+  a socket cannot be opened for reading.
 - `audit` reads the audit daemon's rules from `/etc/audit/rules.d/*.rules` in
   the `ls -v` order augenrules loads them (falling back to `/etc/audit/audit.rules`
   when the directory is missing, as augenrules does), the last `-e` line, the
@@ -253,6 +309,14 @@ every plan is under `docs/superpowers/plans/`):
 
 ### Tooling
 
+- D31 (root's power outside root is one family of controls); the capability
+  matrix's `nonroot.denied` row gains eight keys, `no-systemd.unsupported` the
+  three `units.*` keys and `container.unsupported` the two new walk lists; five
+  oracle pairs (units against `systemctl show`, the key parser against
+  `ssh-keygen -l`, lastlog against `lastlog -u`, the walk's capabilities against
+  `getcap -r` over the six executable directories of `/usr`, sudoers validated by `visudo -c`); the CI root job plants a
+  `setcap` probe under `/usr/local/bin` before the collect and expects it read as
+  unpackaged.
 - `collect --verify-timeout <dur>` (default 30m) and `--no-verify` (both need
   `--deep`); a `--deep` run's default `--timeout` is now walk budget +
   verify timeout + 5m. A pre-existing `collect --deep --timeout <30m` is

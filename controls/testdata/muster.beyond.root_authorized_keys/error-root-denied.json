@@ -1,0 +1,63 @@
+{
+  "synthetic": true,
+  "_expect": {
+    "reason_code": "permission_denied",
+    "exit_code": 2
+  },
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none",
+        "source": {
+          "kind": "file",
+          "path": "/proc/1/cgroup"
+        }
+      }
+    },
+    "sshd": {
+      "options": {
+        "permit_root_login": {
+          "effective": {
+            "status": "ok",
+            "value": "without-password",
+            "source": {
+              "kind": "command",
+              "cmd": "/usr/sbin/sshd -G",
+              "exit_code": 0
+            }
+          }
+        }
+      }
+    },
+    "ssh": {
+      "root_key_count": {
+        "status": "denied",
+        "reason": "/root/.ssh/authorized_keys: requires root or CAP_DAC_READ_SEARCH",
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "file",
+              "path": "/etc/passwd"
+            },
+            {
+              "kind": "file",
+              "path": "/root/.ssh/authorized_keys"
+            },
+            {
+              "kind": "file",
+              "path": "/home/alice/.ssh/authorized_keys"
+            },
+            {
+              "kind": "file",
+              "path": "/etc/shells"
+            }
+          ]
+        }
+      }
+    }
+  }
+}
