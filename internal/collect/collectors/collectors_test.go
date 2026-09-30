@@ -834,12 +834,60 @@ func TestSshdIncludeOutsideDeclarationIsRecordedNotViolated(t *testing.T) {
 	a := &fsAccess{files: map[string]string{"/etc/ssh/sshd_config": "sshd_config_outside_include"}}
 	b := build(t, "sshd", a) // build fails the test on any violation
 	s := setting(t, b, "sshd.options.permit_root_login")
-	if s.Persisted == nil || s.Persisted.Status != facts.StatusError {
+	// C4: a path the model declined to read is absent naming it, never
+	// error — stock EL9's 50-redhat.conf includes the crypto-policies file,
+	// and that host's collect must still read complete.
+	if s.Persisted == nil || s.Persisted.Status != facts.StatusAbsent {
 		t.Fatalf("persisted %+v", s.Persisted)
 	}
 	if !strings.Contains(s.Persisted.Reason, "/etc/ssh/other/*.conf") ||
 		!strings.Contains(s.Persisted.Reason, "outside the collector's declaration") {
 		t.Errorf("reason %q", s.Persisted.Reason)
+	}
+	if s.Persisted.Source == nil || s.Persisted.Source.Path != "/etc/ssh/sshd_config" || s.Persisted.Source.Line != 1 {
+		t.Errorf("an absent Include keeps the file and line it was read from (C4): %+v", s.Persisted.Source)
+	}
+	// C3: with no daemon answer, a Banner line past the undeclared Include
+	// was never seen, so the banner leaves carry the absent envelope — a
+	// definite "no banner" here would let U-62 WARN on evidence not read.
+	for _, k := range []string{"sshd.banner_file.exists", "sshd.banner_file.nonempty"} {
+		e := env(t, b, k)
+		if e.Status != facts.StatusAbsent || !strings.Contains(e.Reason, "/etc/ssh/other/*.conf") {
+			t.Errorf("%s = %+v, want absent naming the Include", k, e)
+		}
+	}
+	if w := b.Worst("sshd"); w != facts.StatusOK {
+		t.Errorf(`Worst("sshd") = %s, want ok — an undeclared Include is not a partial run`, w)
+	}
+}
+
+// V-64: sshd -G and -T print PermitRootLogin's compiled default as the
+// pre-7.0 word "without-password" whatever the file says, and a control
+// names one spelling; both the daemon's and the file's word are stored as
+// "prohibit-password", so a stock host reads the modern value on every side.
+func TestSshdFoldsWithoutPasswordToProhibitPassword(t *testing.T) {
+	a := &fsAccess{
+		files: map[string]string{"/etc/ssh/sshd_config": "sshd_config_without_password"},
+		cmds:  map[string]cmdResult{"/usr/sbin/sshd -G": {file: "sshd_G_without_password.txt"}},
+	}
+	s := setting(t, build(t, "sshd", a), "sshd.options.permit_root_login")
+	if s.Runtime == nil || s.Runtime.Value != "prohibit-password" {
+		t.Errorf("runtime %+v, want prohibit-password", s.Runtime)
+	}
+	if s.Persisted == nil || s.Persisted.Value != "prohibit-password" {
+		t.Errorf("persisted %+v, want prohibit-password", s.Persisted)
+	}
+	if s.Effective.Value != "prohibit-password" {
+		t.Errorf("effective %+v, want prohibit-password", s.Effective)
+	}
+	// Every other value is stored as sshd folds it, never rewritten.
+	a = &fsAccess{
+		files: map[string]string{"/etc/ssh/sshd_config": "sshd_config"},
+		cmds:  map[string]cmdResult{"/usr/sbin/sshd -G": {file: "sshd_G.txt"}},
+	}
+	s = setting(t, build(t, "sshd", a), "sshd.options.permit_root_login")
+	if s.Runtime == nil || s.Runtime.Value != "no" {
+		t.Errorf("runtime %+v, want no", s.Runtime)
 	}
 }
 

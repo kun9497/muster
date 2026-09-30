@@ -934,7 +934,7 @@
     {
       "Key": "sshd.options.permit_root_login",
       "Type": "setting\u003cstring\u003e",
-      "Description": "Effective PermitRootLogin value (daemon-reported versus parsed files).",
+      "Description": "Effective PermitRootLogin value (daemon-reported versus parsed files). The pre-7.0 spelling without-password, which sshd -T and -G print for the compiled default whatever the file says, is stored as prohibit-password on every side; the other values are stored lower-cased, as sshd matches them.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "sshd",
@@ -4834,7 +4834,7 @@
     {
       "Key": "ssh.authorized_keys",
       "Type": "list\u003crecord\u003e",
-      "Description": "The authorized_keys and authorized_keys2 files (the two AuthorizedKeysFile defaults of sshd_config(5)) under the .ssh directory of every /etc/passwd account with a home path, one row per account and file sorted by user and path with user, uid, path, exists, mode, owner_uid (both -1 when no file was read), keys (line, type, bits, fingerprint, options, restricted; the key body is never stored; capped at 200 per file), unparsed (lines that are neither a comment, blank nor a key sshd would read), unfollowed, read_status (ok, denied or error; empty on an unfollowed row) and reason. A home outside the collector's declaration is one row with path empty and unfollowed true; a file behind a symlink (the file or its .ssh), which sshd follows and muster does not, is a row with exists and unfollowed true; a file that cannot be read is a row with the read's status. Capped at 500 rows; evidence.",
+      "Description": "The authorized_keys and authorized_keys2 files (the two AuthorizedKeysFile defaults of sshd_config(5)) under the .ssh directory of every /etc/passwd account with a home path, one row per account and file sorted by user and path with user, uid, path, exists, mode, owner_uid (both -1 when no file was read), keys (line, type, bits, fingerprint, options, restricted; the key body is never stored; capped at 200 per file), unparsed (lines that are neither a comment, blank nor a key sshd would read), unfollowed, read_status (ok, denied or error; empty on an unfollowed row and on the row of a home outside the declaration) and reason. A home outside the collector's declaration is one row with path empty, exists false, unfollowed false and the reason; a file behind a symlink (the file or its .ssh), which sshd follows and muster does not, is a row with exists and unfollowed true; a file that cannot be read is a row with the read's status. Capped at 500 rows; evidence.",
       "Since": 1,
       "Sensitivity": "internal",
       "Collector": "sshkeys",

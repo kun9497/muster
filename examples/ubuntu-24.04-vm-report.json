@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
   "run": {
-    "muster_version": "37dfcc8",
-    "commit": "37dfcc8",
+    "muster_version": "be82b78",
+    "commit": "be82b78",
     "controls_version": "kisa-unix-2026+2026.09.29",
     "controls_digest": "sha256:1622ceeeba7f9b7bbe1d2bb23562a921bfec21f7fd82833ec4af40a5515813ad",
     "guide_edition": "kisa-unix-2026",
-    "collected_at": "2026-09-30T00:18:48Z",
+    "collected_at": "2026-09-30T04:21:24Z",
     "host": {
       "hostname": "github-runner",
       "machine_id_hash": "4d7193c17275652cce0569a44b2c249f54db99d23e0fd447ae531341cacc9ee5",
@@ -39,7 +39,7 @@
       {
         "name": "accounts",
         "status": "ok",
-        "ms": 1
+        "ms": 7
       },
       {
         "name": "audit",
@@ -55,7 +55,7 @@
       {
         "name": "boot",
         "status": "ok",
-        "ms": 6
+        "ms": 25
       },
       {
         "name": "coredump",
@@ -65,7 +65,7 @@
       {
         "name": "cron",
         "status": "ok",
-        "ms": 853,
+        "ms": 920,
         "cmd": "/usr/bin/systemctl list-unit-files --type=timer --no-legend --no-pager"
       },
       {
@@ -76,23 +76,23 @@
       {
         "name": "env",
         "status": "ok",
-        "ms": 4
+        "ms": 10
       },
       {
         "name": "files",
         "status": "ok",
-        "ms": 18
+        "ms": 19
       },
       {
         "name": "fim",
         "status": "ok",
-        "ms": 11,
+        "ms": 10,
         "cmd": "/usr/bin/systemctl list-timers --all --no-legend --no-pager"
       },
       {
         "name": "firewall",
         "status": "ok",
-        "ms": 19,
+        "ms": 21,
         "cmd": "/usr/sbin/nft list ruleset"
       },
       {
@@ -113,7 +113,7 @@
       {
         "name": "modules",
         "status": "ok",
-        "ms": 42
+        "ms": 23
       },
       {
         "name": "mounts",
@@ -139,18 +139,18 @@
       {
         "name": "pam",
         "status": "ok",
-        "ms": 2
+        "ms": 1
       },
       {
         "name": "patch",
         "status": "ok",
-        "ms": 2002,
+        "ms": 1816,
         "cmd": "/usr/bin/apt-get -s upgrade -o Debug::NoLocking=1"
       },
       {
         "name": "pkgverify",
         "status": "ok",
-        "ms": 1114464,
+        "ms": 636386,
         "cmd": "/usr/bin/rpm -Va"
       },
       {
@@ -161,7 +161,7 @@
       {
         "name": "services",
         "status": "ok",
-        "ms": 323,
+        "ms": 338,
         "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState atftpd.service"
       },
       {
@@ -172,12 +172,12 @@
       {
         "name": "sockets",
         "status": "ok",
-        "ms": 11
+        "ms": 13
       },
       {
         "name": "sshd",
         "status": "ok",
-        "ms": 14,
+        "ms": 15,
         "cmd": "/usr/sbin/sshd -G"
       },
       {
@@ -198,7 +198,7 @@
       {
         "name": "timesync",
         "status": "ok",
-        "ms": 54,
+        "ms": 56,
         "cmd": "/usr/bin/timedatectl show-timesync --all"
       },
       {
@@ -210,7 +210,7 @@
       {
         "name": "walk",
         "status": "ok",
-        "ms": 13253,
+        "ms": 12394,
         "cmd": "/usr/bin/rpm -qa --qf [%{=NAME}\t%{FILEMODES:octal}\t%{FILEUSERNAME}\t%{FILEGROUPNAME}\t%|FILECAPS?{%{FILECAPS}}|\t%{FILENAMES}\n]"
       }
     ],
@@ -223,11 +223,11 @@
     "partial_failures": []
   },
   "check": {
-    "muster_version": "37dfcc8",
-    "commit": "37dfcc8",
+    "muster_version": "be82b78",
+    "commit": "be82b78",
     "controls_version": "kisa-unix-2026+2026.09.29",
     "controls_digest": "sha256:1622ceeeba7f9b7bbe1d2bb23562a921bfec21f7fd82833ec4af40a5515813ad",
-    "snapshot_digest": "sha256:2aa71062600bd5479bc54b96228690c5ce2fe70378f170b377a0e176db9db588",
+    "snapshot_digest": "sha256:15d32872c630afc12f286009befb5cb6aff575d0b54ee1c655666debf784ddc0",
     "guide_edition": "kisa-unix-2026",
     "waivers": {
       "applied": 0,
@@ -528,8 +528,8 @@
     "automatic": {
       "high": {
         "pass": 20,
-        "fail": 15,
-        "warn": 0
+        "fail": 14,
+        "warn": 1
       },
       "medium": {
         "pass": 13,
@@ -556,8 +556,8 @@
         "automatic": {
           "high": {
             "pass": 16,
-            "fail": 10,
-            "warn": 0
+            "fail": 9,
+            "warn": 1
           },
           "medium": {
             "pass": 9,
@@ -1207,8 +1207,8 @@
       "category": "account",
       "importance": "상",
       "automation": "auto",
-      "status": "FAIL",
-      "reason": "clause does not hold: sshd.options.permit_root_login in [no prohibit-password]; collection was degraded: personas not collected",
+      "status": "WARN",
+      "reason": "collection was degraded: personas not collected",
       "degraded": "personas not collected",
       "evidence": [
         {
@@ -1224,7 +1224,7 @@
         {
           "fact": "sshd.options.permit_root_login",
           "status": "ok",
-          "value": "without-password",
+          "value": "prohibit-password",
           "source": {
             "kind": "command",
             "cmd": "/usr/sbin/sshd -G",
@@ -6107,7 +6107,7 @@
         {
           "fact": "patch.metadata_age_s",
           "status": "ok",
-          "value": 787467,
+          "value": 802023,
           "source": {
             "kind": "file",
             "path": "/var/lib/apt/periodic/update-success-stamp"
@@ -10763,7 +10763,7 @@
         {
           "fact": "sshd.options.permit_root_login",
           "status": "ok",
-          "value": "without-password",
+          "value": "prohibit-password",
           "source": {
             "kind": "command",
             "cmd": "/usr/sbin/sshd -G",

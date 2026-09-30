@@ -374,16 +374,16 @@ gains the three keys.
 declares, `/home/*`, `/home/*/*`, `/root` — `/.ssh/authorized_keys` and
 `/.ssh/authorized_keys2`, the two defaults of `AuthorizedKeysFile` in `sshd_config(5)`.
 `Needs: none`. The users are `/etc/passwd`'s local accounts with a home path, as `files_home`
-selects them; a home outside the declared patterns leaves that user's row `unfollowed` with the
-path (C4) **and makes the three counts `absent` naming it** — an inventory with a hole is not an
+selects them; a home outside the declared patterns leaves that user's row unexamined — an empty
+path and the reason (C4) **and makes the three counts `absent` naming it** — an inventory with a hole is not an
 inventory, so a host with a user homed under `/srv` reads both key controls MANUAL naming the
 home.
 
 - `ssh.authorized_keys` — `list<record>` `{user, uid, path, exists, mode, owner_uid, keys,
   unparsed, unfollowed, read_status, reason}`, `sensitivity: internal`: one row per file that
   exists (and one `exists: false` row per user with no file, so "no keys" is a reading, not
-  silence; a user whose home is outside the declaration is a row with `unfollowed: true` and
-  the reason; a file that could not be read is a row with `read_status: denied`/`error` and
+  silence; a user whose home is outside the declaration is a row with an empty path, `exists: false`
+  and the reason (`unfollowed` is the symlink flag and stays false); a file that could not be read is a row with `read_status: denied`/`error` and
   the reason — every row carries every field, `""`/`false` when not applicable); `keys` a list of
   `{line, type, bits, fingerprint, options, restricted}`. Decoding (`sshd(8)` AUTHORIZED_KEYS
   FILE FORMAT, RFC 4253 §6.6): the options field exists iff the first word is not a key type,

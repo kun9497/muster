@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
   "run": {
-    "muster_version": "37dfcc8",
-    "commit": "37dfcc8",
+    "muster_version": "be82b78",
+    "commit": "be82b78",
     "controls_version": "kisa-unix-2026+2026.09.29",
     "controls_digest": "sha256:1622ceeeba7f9b7bbe1d2bb23562a921bfec21f7fd82833ec4af40a5515813ad",
     "guide_edition": "kisa-unix-2026",
-    "collected_at": "2026-09-30T00:18:36Z",
+    "collected_at": "2026-09-30T04:21:13Z",
     "host": {
       "hostname": "ubuntu-container",
       "machine_id_hash": "",
@@ -36,18 +36,18 @@
       {
         "name": "accounts",
         "status": "ok",
-        "ms": 21
+        "ms": 47
       },
       {
         "name": "audit",
         "status": "ok",
-        "ms": 2,
+        "ms": 31,
         "cmd": "/usr/sbin/auditctl -l"
       },
       {
         "name": "banners",
         "status": "ok",
-        "ms": 1
+        "ms": 7
       },
       {
         "name": "boot",
@@ -57,12 +57,12 @@
       {
         "name": "coredump",
         "status": "ok",
-        "ms": 18
+        "ms": 58
       },
       {
         "name": "cron",
         "status": "ok",
-        "ms": 2,
+        "ms": 18,
         "cmd": "/usr/bin/systemctl list-unit-files --type=timer --no-legend --no-pager"
       },
       {
@@ -73,17 +73,17 @@
       {
         "name": "env",
         "status": "ok",
-        "ms": 7
+        "ms": 18
       },
       {
         "name": "files",
         "status": "ok",
-        "ms": 8
+        "ms": 19
       },
       {
         "name": "fim",
         "status": "ok",
-        "ms": 5,
+        "ms": 6,
         "cmd": "/usr/bin/systemctl list-timers --all --no-legend --no-pager"
       },
       {
@@ -131,23 +131,23 @@
       {
         "name": "os",
         "status": "ok",
-        "ms": 6
+        "ms": 13
       },
       {
         "name": "pam",
         "status": "ok",
-        "ms": 56
+        "ms": 19
       },
       {
         "name": "patch",
         "status": "ok",
-        "ms": 868,
+        "ms": 924,
         "cmd": "/usr/bin/apt-get -s upgrade -o Debug::NoLocking=1"
       },
       {
         "name": "pkgverify",
         "status": "ok",
-        "ms": 11167,
+        "ms": 9780,
         "cmd": "/usr/bin/rpm -Va"
       },
       {
@@ -169,7 +169,7 @@
       {
         "name": "sockets",
         "status": "ok",
-        "ms": 9
+        "ms": 10
       },
       {
         "name": "sshd",
@@ -4678,7 +4678,7 @@
               "path-include=/usr/share/doc/*/changelog.*"
             ],
             "dpkg_path_excludes_error": [],
-            "duration_ms": 11162,
+            "duration_ms": 9775,
             "exit_code": 0,
             "lines": 1506,
             "packages_without_digests": 0,
@@ -5731,7 +5731,7 @@
       },
       "days_since_last_install": {
         "status": "ok",
-        "value": 18,
+        "value": 19,
         "source": {
           "kind": "file",
           "path": "/var/log/dpkg.log"
@@ -6367,7 +6367,7 @@
             "read_status": "",
             "reason": "home path outside the collector's declaration",
             "uid": 42,
-            "unfollowed": true,
+            "unfollowed": false,
             "unparsed": 0,
             "user": "_apt"
           },
@@ -6380,7 +6380,7 @@
             "read_status": "",
             "reason": "home path outside the collector's declaration",
             "uid": 34,
-            "unfollowed": true,
+            "unfollowed": false,
             "unparsed": 0,
             "user": "backup"
           },
@@ -6393,7 +6393,7 @@
             "read_status": "",
             "reason": "home path outside the collector's declaration",
             "uid": 2,
-            "unfollowed": true,
+            "unfollowed": false,
             "unparsed": 0,
             "user": "bin"
           },
@@ -6406,7 +6406,7 @@
             "read_status": "",
             "reason": "home path outside the collector's declaration",
             "uid": 1,
-            "unfollowed": true,
+            "unfollowed": false,
             "unparsed": 0,
             "user": "daemon"
           },
@@ -6419,7 +6419,7 @@
             "read_status": "",
             "reason": "home path outside the collector's declaration",
             "uid": 5,
-            "unfollowed": true,
+            "unfollowed": false,
             "unparsed": 0,
             "user": "games"
           },
@@ -6432,7 +6432,7 @@
             "read_status": "",
             "reason": "home path outside the collector's declaration",
             "uid": 39,
-            "unfollowed": true,
+            "unfollowed": false,
             "unparsed": 0,
             "user": "irc"
           },
@@ -6445,7 +6445,7 @@
             "read_status": "",
             "reason": "home path outside the collector's declaration",
             "uid": 38,
-            "unfollowed": true,
+            "unfollowed": false,
             "unparsed": 0,
             "user": "list"
           },
@@ -6458,7 +6458,7 @@
             "read_status": "",
             "reason": "home path outside the collector's declaration",
             "uid": 7,
-            "unfollowed": true,
+            "unfollowed": false,
             "unparsed": 0,
             "user": "lp"
           },
@@ -6471,7 +6471,7 @@
             "read_status": "",
             "reason": "home path outside the collector's declaration",
             "uid": 8,
-            "unfollowed": true,
+            "unfollowed": false,
             "unparsed": 0,
             "user": "mail"
           },
@@ -6484,7 +6484,7 @@
             "read_status": "",
             "reason": "home path outside the collector's declaration",
             "uid": 6,
-            "unfollowed": true,
+            "unfollowed": false,
             "unparsed": 0,
             "user": "man"
           },
@@ -6497,7 +6497,7 @@
             "read_status": "",
             "reason": "home path outside the collector's declaration",
             "uid": 9,
-            "unfollowed": true,
+            "unfollowed": false,
             "unparsed": 0,
             "user": "news"
           },
@@ -6510,7 +6510,7 @@
             "read_status": "",
             "reason": "home path outside the collector's declaration",
             "uid": 65534,
-            "unfollowed": true,
+            "unfollowed": false,
             "unparsed": 0,
             "user": "nobody"
           },
@@ -6523,7 +6523,7 @@
             "read_status": "",
             "reason": "home path outside the collector's declaration",
             "uid": 13,
-            "unfollowed": true,
+            "unfollowed": false,
             "unparsed": 0,
             "user": "proxy"
           },
@@ -6562,7 +6562,7 @@
             "read_status": "",
             "reason": "home path outside the collector's declaration",
             "uid": 4,
-            "unfollowed": true,
+            "unfollowed": false,
             "unparsed": 0,
             "user": "sync"
           },
@@ -6575,7 +6575,7 @@
             "read_status": "",
             "reason": "home path outside the collector's declaration",
             "uid": 3,
-            "unfollowed": true,
+            "unfollowed": false,
             "unparsed": 0,
             "user": "sys"
           },
@@ -6614,7 +6614,7 @@
             "read_status": "",
             "reason": "home path outside the collector's declaration",
             "uid": 10,
-            "unfollowed": true,
+            "unfollowed": false,
             "unparsed": 0,
             "user": "uucp"
           },
@@ -6627,7 +6627,7 @@
             "read_status": "",
             "reason": "home path outside the collector's declaration",
             "uid": 33,
-            "unfollowed": true,
+            "unfollowed": false,
             "unparsed": 0,
             "user": "www-data"
           }
@@ -6701,18 +6701,12 @@
     "sshd": {
       "banner_file": {
         "exists": {
-          "status": "ok",
-          "value": false,
-          "source": {
-            "kind": "derived"
-          }
+          "status": "absent",
+          "reason": "not present"
         },
         "nonempty": {
-          "status": "ok",
-          "value": false,
-          "source": {
-            "kind": "derived"
-          }
+          "status": "absent",
+          "reason": "not present"
         }
       },
       "collect_method": {

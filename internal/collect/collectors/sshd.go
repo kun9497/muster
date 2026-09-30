@@ -152,10 +152,13 @@ func runSshd(ctx context.Context, a collect.Access, b *collect.Builder) error {
 	//    status — not a definite "no banner" — is the answer for both
 	//    banner_file leaves; a false here would hide the read failure and
 	//    publish the module's default as if it were the host's state.
+	//    An absent parse — the config walk stopped at an Include outside
+	//    the declaration (C4) — is the same: what a Banner line past it
+	//    would have said was never seen.
 	if daemon == nil {
 		if e, ok := parsed["banner"]; ok {
 			switch e.Status {
-			case facts.StatusDenied, facts.StatusError, facts.StatusTimeout:
+			case facts.StatusDenied, facts.StatusError, facts.StatusTimeout, facts.StatusAbsent:
 				b.Set("sshd.banner_file.exists", e)
 				b.Set("sshd.banner_file.nonempty", e)
 				return nil
@@ -520,9 +523,14 @@ func parseSshdConfig(a collect.Access, file, keyword string, depth int) (facts.E
 			for _, pattern := range f[1:] {
 				// R55/R75: an Include outside the declaration is recorded
 				// and expansion stops. It is never requested, so it raises
-				// no guard violation and the collector still succeeds.
+				// no guard violation and the collector still succeeds. C4:
+				// a path the model declined to read is absent naming it,
+				// never error — stock EL9 includes the crypto-policies file
+				// from 50-redhat.conf, and that host's run is complete.
 				if !declared(a, pattern) {
-					return collect.ErrorEnv("Include " + pattern + " is outside the collector's declaration"), true
+					e := collect.Absent("Include " + pattern + " is outside the collector's declaration")
+					e.Source = &facts.Source{Kind: "file", Path: file, Line: i + 1, Raw: sourceRaw(raw)}
+					return e, true
 				}
 				matches, err := a.Glob(pattern)
 				if err != nil {
@@ -614,12 +622,24 @@ func configTokens(line string) []string {
 // Paths, ciphers and command lines are NOT folded — their case is theirs.
 var multistate = map[string]bool{permitRootLogin: true}
 
-// keywordValue is the value stored for one parsed keyword.
+// keywordValue is the value stored for one parsed keyword. PermitRootLogin
+// has two spellings of one setting: "without-password" is the pre-7.0 word
+// for "prohibit-password", sshd accepts both, and `sshd -T`/`-G` print
+// whichever spelling the daemon's own table lists first — "without-password"
+// on every release muster supports, whatever the file says (G-20). The
+// daemon's presentation is not a second value, so both words are stored as
+// the modern one and a control names one spelling; the oracle knows the
+// synonym for comparing the file with the daemon.
 func keywordValue(keyword, value string) string {
-	if multistate[strings.ToLower(keyword)] {
-		return strings.ToLower(value)
+	key := strings.ToLower(keyword)
+	if !multistate[key] {
+		return value
 	}
-	return value
+	v := strings.ToLower(value)
+	if key == permitRootLogin && v == "without-password" {
+		return "prohibit-password"
+	}
+	return v
 }
 
 // declared asks the guard whether pattern is inside the collector's

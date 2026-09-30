@@ -143,9 +143,10 @@ func oracleLines(b []byte) []string {
 //
 // So a one-way map onto "prohibit-password" would report a mismatch on a host
 // configured with either spelling, including the modern one the guides
-// recommend. muster stores what the FILE says, which is right; the synonym is
-// the daemon's presentation, and knowing that is the oracle's job. Every
-// other value still has to match exactly.
+// recommend. muster stores both words as "prohibit-password" on every side
+// (they are one setting to sshd; the raw source keeps the file's spelling),
+// and the daemon still prints the old word, so the map folds both sides
+// before comparing. Every other value still has to match exactly.
 var sshdOracleAliases = map[string]string{
 	"without-password":  "prohibit-password",
 	"prohibit-password": "prohibit-password",

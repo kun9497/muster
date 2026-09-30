@@ -176,6 +176,18 @@ every plan is under `docs/superpowers/plans/`):
 | 2L FTP, mail and DNS (the first `manual` controls) | PR #11 | 64 |
 | 2M the coverage and reference gate | this version | 64 |
 
+U-01 `root_remote_login` no longer fails a host whose `PermitRootLogin` is the
+compiled default or `prohibit-password`: `sshd -T` and `-G` print that value in
+the pre-7.0 spelling `without-password`, which the control did not list, so
+every stock release read FAIL. The collector now stores both spellings as
+`prohibit-password` (they are one setting to sshd), so a host collected with
+this release reads PASS; a snapshot taken by an earlier release still carries
+`without-password` and still reads FAIL until it is collected again — the
+verdict of a re-collected host changes, so this is a minor release (D16). On
+the same host shape, U-12 `session_timeout` reads FAIL instead of ERROR and
+U-62 `login_banner` MANUAL instead of ERROR when sshd does not answer and the
+configuration walk stopped at an `Include` outside the declaration (below).
+
 ### Collectors
 
 - `ReadDir` takes an option that reads the `security.capability` and
@@ -419,6 +431,17 @@ every plan is under `docs/superpowers/plans/`):
   facts that must be `denied` without root and `unsupported` without systemd.
   The e2e status maps are exhaustive.
 - `CONTRIBUTING.md` (with its Korean pair) describes the workflow.
+
+### Fixed
+- `sshd`: an `Include` naming a path outside the collector's declaration is
+  `absent` naming it (C4), no longer `error` — stock EL9's `50-redhat.conf`
+  includes the crypto-policies file, and that host's `collect` reads complete
+  (exit 0) instead of partial.
+- `sshd`: `PermitRootLogin`'s pre-7.0 spelling `without-password` is stored
+  as `prohibit-password` on every side (see Controls).
+- `sshkeys`: an account whose home lies outside the collector's declaration
+  is a row with an empty path and the reason; it no longer carries the
+  symlink flag `unfollowed`.
 
 ## Stage 1 (2026-09-03)
 
