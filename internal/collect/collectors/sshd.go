@@ -520,9 +520,12 @@ func parseSshdConfig(a collect.Access, file, keyword string, depth int) (facts.E
 			for _, pattern := range f[1:] {
 				// R55/R75: an Include outside the declaration is recorded
 				// and expansion stops. It is never requested, so it raises
-				// no guard violation and the collector still succeeds.
+				// no guard violation and the collector still succeeds. C4:
+				// a path the model declined to read is absent naming it,
+				// never error — stock EL9 includes the crypto-policies file
+				// from 50-redhat.conf, and that host's run is complete.
 				if !declared(a, pattern) {
-					return collect.ErrorEnv("Include " + pattern + " is outside the collector's declaration"), true
+					return collect.Absent("Include " + pattern + " is outside the collector's declaration"), true
 				}
 				matches, err := a.Glob(pattern)
 				if err != nil {
@@ -614,10 +617,21 @@ func configTokens(line string) []string {
 // Paths, ciphers and command lines are NOT folded — their case is theirs.
 var multistate = map[string]bool{permitRootLogin: true}
 
-// keywordValue is the value stored for one parsed keyword.
+// keywordValue is the value stored for one parsed keyword. PermitRootLogin
+// has two spellings of one setting: "without-password" is the pre-7.0 word
+// for "prohibit-password", sshd accepts both, and `sshd -T`/`-G` print
+// whichever spelling the daemon's own table lists first — "without-password"
+// on every release muster supports, whatever the file says (G-20). The
+// daemon's presentation is not a second value, so both words are stored as
+// the modern one and a control names one spelling; the oracle knows the
+// synonym for comparing the file with the daemon.
 func keywordValue(keyword, value string) string {
 	if multistate[strings.ToLower(keyword)] {
-		return strings.ToLower(value)
+		v := strings.ToLower(value)
+		if strings.ToLower(keyword) == permitRootLogin && v == "without-password" {
+			return "prohibit-password"
+		}
+		return v
 	}
 	return value
 }

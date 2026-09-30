@@ -2105,7 +2105,7 @@
             "owner_uid": -1,
             "keys": [],
             "unparsed": 0,
-            "unfollowed": true,
+            "unfollowed": false,
             "read_status": "",
             "reason": "home path outside the collector's declaration"
           },
@@ -2118,7 +2118,7 @@
             "owner_uid": -1,
             "keys": [],
             "unparsed": 0,
-            "unfollowed": true,
+            "unfollowed": false,
             "read_status": "",
             "reason": "home path outside the collector's declaration"
           },
@@ -2131,7 +2131,7 @@
             "owner_uid": -1,
             "keys": [],
             "unparsed": 0,
-            "unfollowed": true,
+            "unfollowed": false,
             "read_status": "",
             "reason": "home path outside the collector's declaration"
           },
@@ -2144,7 +2144,7 @@
             "owner_uid": -1,
             "keys": [],
             "unparsed": 0,
-            "unfollowed": true,
+            "unfollowed": false,
             "read_status": "",
             "reason": "home path outside the collector's declaration"
           },
@@ -2157,7 +2157,7 @@
             "owner_uid": -1,
             "keys": [],
             "unparsed": 0,
-            "unfollowed": true,
+            "unfollowed": false,
             "read_status": "",
             "reason": "home path outside the collector's declaration"
           },
@@ -2170,7 +2170,7 @@
             "owner_uid": -1,
             "keys": [],
             "unparsed": 0,
-            "unfollowed": true,
+            "unfollowed": false,
             "read_status": "",
             "reason": "home path outside the collector's declaration"
           },
@@ -2183,7 +2183,7 @@
             "owner_uid": -1,
             "keys": [],
             "unparsed": 0,
-            "unfollowed": true,
+            "unfollowed": false,
             "read_status": "",
             "reason": "home path outside the collector's declaration"
           },
@@ -2196,7 +2196,7 @@
             "owner_uid": -1,
             "keys": [],
             "unparsed": 0,
-            "unfollowed": true,
+            "unfollowed": false,
             "read_status": "",
             "reason": "home path outside the collector's declaration"
           },
@@ -2209,7 +2209,7 @@
             "owner_uid": -1,
             "keys": [],
             "unparsed": 0,
-            "unfollowed": true,
+            "unfollowed": false,
             "read_status": "",
             "reason": "home path outside the collector's declaration"
           },
@@ -2222,7 +2222,7 @@
             "owner_uid": -1,
             "keys": [],
             "unparsed": 0,
-            "unfollowed": true,
+            "unfollowed": false,
             "read_status": "",
             "reason": "home path outside the collector's declaration"
           },
@@ -2287,7 +2287,7 @@
             "owner_uid": -1,
             "keys": [],
             "unparsed": 0,
-            "unfollowed": true,
+            "unfollowed": false,
             "read_status": "",
             "reason": "home path outside the collector's declaration"
           },
@@ -2300,7 +2300,7 @@
             "owner_uid": -1,
             "keys": [],
             "unparsed": 0,
-            "unfollowed": true,
+            "unfollowed": false,
             "read_status": "",
             "reason": "home path outside the collector's declaration"
           },
@@ -2313,7 +2313,7 @@
             "owner_uid": -1,
             "keys": [],
             "unparsed": 0,
-            "unfollowed": true,
+            "unfollowed": false,
             "read_status": "",
             "reason": "home path outside the collector's declaration"
           },
@@ -2326,7 +2326,7 @@
             "owner_uid": -1,
             "keys": [],
             "unparsed": 0,
-            "unfollowed": true,
+            "unfollowed": false,
             "read_status": "",
             "reason": "home path outside the collector's declaration"
           },
@@ -2339,7 +2339,7 @@
             "owner_uid": -1,
             "keys": [],
             "unparsed": 0,
-            "unfollowed": true,
+            "unfollowed": false,
             "read_status": "",
             "reason": "home path outside the collector's declaration"
           }
@@ -2415,7 +2415,7 @@
         "permit_root_login": {
           "runtime": {
             "status": "ok",
-            "value": "without-password",
+            "value": "prohibit-password",
             "source": {
               "kind": "command",
               "cmd": "/usr/sbin/sshd -G",
@@ -2424,7 +2424,7 @@
           },
           "effective": {
             "status": "ok",
-            "value": "without-password",
+            "value": "prohibit-password",
             "source": {
               "kind": "command",
               "cmd": "/usr/sbin/sshd -G",

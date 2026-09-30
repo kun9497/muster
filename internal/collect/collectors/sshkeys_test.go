@@ -100,7 +100,7 @@ func TestSshkeysFacts(t *testing.T) {
 	want := []string{
 		`alice 1000 /home/alice/.ssh/authorized_keys exists=true mode=420 owner=1000 keys=2 unparsed=1 unfollowed=false status="ok" reason=""`,
 		`alice 1000 /home/alice/.ssh/authorized_keys2 exists=false mode=-1 owner=-1 keys=0 unparsed=0 unfollowed=false status="ok" reason=""`,
-		`daemon 1  exists=false mode=-1 owner=-1 keys=0 unparsed=0 unfollowed=true status="" reason="home path outside the collector's declaration"`,
+		`daemon 1  exists=false mode=-1 owner=-1 keys=0 unparsed=0 unfollowed=false status="" reason="home path outside the collector's declaration"`,
 		`root 0 /root/.ssh/authorized_keys exists=true mode=384 owner=0 keys=1 unparsed=0 unfollowed=false status="ok" reason=""`,
 		`root 0 /root/.ssh/authorized_keys2 exists=false mode=-1 owner=-1 keys=0 unparsed=0 unfollowed=false status="ok" reason=""`,
 	}
@@ -139,7 +139,7 @@ func TestSshkeysFacts(t *testing.T) {
 	b = build(t, "sshkeys", a)
 	rows := keyRows(t, b)
 	svc := rows[len(rows)-1]
-	if rowShape(svc) != `svc 998  exists=false mode=-1 owner=-1 keys=0 unparsed=0 unfollowed=true status="" reason="home path outside the collector's declaration"` {
+	if rowShape(svc) != `svc 998  exists=false mode=-1 owner=-1 keys=0 unparsed=0 unfollowed=false status="" reason="home path outside the collector's declaration"` {
 		t.Errorf("svc row %s", rowShape(svc))
 	}
 	for _, k := range []string{sshRootKeyCount, sshDSAKeyCount, sshRSAKeys} {

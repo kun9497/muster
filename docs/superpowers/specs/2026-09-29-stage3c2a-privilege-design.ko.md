@@ -308,13 +308,13 @@ with systemd"라 답함) 세 leaf는 `unsupported`(`fim` 타이머 목록의 모
 `Reads`: `/etc/passwd`, `/etc/shells`, 그리고 `files` 수집기가 선언하는 홈 패턴 `/home/*`, `/home/*/*`,
 `/root` 아래의 `/.ssh/authorized_keys`와 `/.ssh/authorized_keys2` — `sshd_config(5)`의
 `AuthorizedKeysFile` 기본값 둘. `Needs: none`. 사용자는 `/etc/passwd`의 홈 경로가 있는 로컬 계정,
-`files_home`이 고르는 대로; 선언 패턴 밖의 홈은 그 사용자 행을 경로와 함께 `unfollowed`로 두고(C4) **세
+`files_home`이 고르는 대로; 선언 패턴 밖의 홈은 그 사용자 행을 살피지 않은 채 — 빈 경로와 이유로 — 두고(C4) **세
 카운트를 그 경로를 적은 `absent`로 만듭니다** — 구멍 난 인벤토리는 인벤토리가 아니므로, `/srv` 아래에
 홈을 둔 사용자가 있는 호스트는 두 키 컨트롤을 홈을 적은 MANUAL로 읽습니다.
 
 - `ssh.authorized_keys` — `list<record>` `{user, uid, path, exists, mode, owner_uid, keys, unparsed,
   unfollowed, read_status, reason}`, `sensitivity: internal`: 존재하는 파일마다 한 행(그리고 파일 없는
-  사용자마다 `exists: false` 행 하나 — 홈이 선언 밖인 사용자는 `unfollowed: true`와 이유를 가진 행, 읽지
+  사용자마다 `exists: false` 행 하나 — 홈이 선언 밖인 사용자는 빈 경로, `exists: false`, 이유를 가진 행(`unfollowed`는 심볼릭 링크 플래그라 false), 읽지
   못한 파일은 `read_status: denied`/`error`와 이유를 가진 행; 모든 행이 모든 필드를 싣고 해당 없으면
   `""`/`false` —
   "키 없음"이 침묵이 아니라 읽기가 되게); `keys`는 `{line, type, bits, fingerprint, options, restricted}`

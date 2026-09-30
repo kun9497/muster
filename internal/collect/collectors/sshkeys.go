@@ -111,7 +111,9 @@ func runSshkeys(_ context.Context, a collect.Access, b *collect.Builder) error {
 			if interactive(u.shell, shells) {
 				undeclared = append(undeclared, undeclaredHome(u))
 			}
-			rows = append(rows, keyRow(u, "", &keyFile{}, true, homeOutside))
+			// The row says why nothing was examined; unfollowed is the
+			// symlink flag and stays false here (the path is empty).
+			rows = append(rows, keyRow(u, "", &keyFile{}, false, homeOutside))
 			continue
 		}
 		for _, name := range authorizedKeysNames {

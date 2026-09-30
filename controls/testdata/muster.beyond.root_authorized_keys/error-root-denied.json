@@ -22,7 +22,7 @@
         "permit_root_login": {
           "effective": {
             "status": "ok",
-            "value": "without-password",
+            "value": "prohibit-password",
             "source": {
               "kind": "command",
               "cmd": "/usr/sbin/sshd -G",
