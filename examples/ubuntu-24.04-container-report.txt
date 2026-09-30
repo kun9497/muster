@@ -1,4 +1,4 @@
-muster 37dfcc8 · controls kisa-unix-2026+2026.09.29 · guide kisa-unix-2026 · host ubuntu-container · collected 2026-09-30T00:18:36Z
+muster be82b78 · controls kisa-unix-2026+2026.09.29 · guide kisa-unix-2026 · host ubuntu-container · collected 2026-09-30T04:21:13Z
 automatic  high 10/7/0  medium 8/0/0  low 3/1/0  (pass/fail/warn)
 manual review 4  ·  undecidable error 0 / n-a 71 / waived 0  ·  facts failed 0  ·  waivers expiring within 30d 0
 KISA 2026 (68 controls): pass 21 fail 8 warn 0 manual 4 n/a 35 error 0 waived 0
