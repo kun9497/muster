@@ -4,7 +4,7 @@
     "Synthetic. The 3C-1 facts are the spec's stock Rocky 9 reading; the 3C-2a families are shaped like rockylinux/rockylinux:9-ubi-init measured on 2026-09-29 (V-18, V-23) - booted with systemd for units.*, with iputils, libcap, openssh-server and sudo installed - and carry env.container none, as the stock VM would.",
     "walk.capabilities: the walk cannot run in a container (V-23), so its rows are what rpm -qa --qf's FILECAPS column declares there - iputils' arping and clockdiff (cap_net_raw=p; ping carries none) and shadow-utils' newgidmap and newuidmap (cap_setgid=ep, cap_setuid=ep). getcap -r /usr in the image listed only the two iputils files, which dnf had just installed; the image's own layer carries no security.capability on the shadow-utils pair, and rpm sets the header's capabilities when it installs a package on a host.",
     "units.root_services is the init image's seventeen in-scope root services, six commands named without a path among them; a VM install runs more services shaped the same.",
-    "sshd.options.permit_root_login is the compiled default prohibit-password, which the image's 9.9p1 sshd prints through sshd -G as without-password.",
+    "sshd.options.permit_root_login is the compiled default prohibit-password, which the image's 9.9p1 sshd prints through sshd -G as without-password and muster stores as prohibit-password; the persisted side, absent because 50-redhat.conf includes the crypto-policies file outside the declaration, is omitted here as no control reads it.",
     "accounts.login_capable is root alone, locked, as the image has it; an installer-created wheel account would be a second unset row and change nothing."
   ],
   "schema_version": 1,

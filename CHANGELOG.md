@@ -180,8 +180,13 @@ U-01 `root_remote_login` no longer fails a host whose `PermitRootLogin` is the
 compiled default or `prohibit-password`: `sshd -T` and `-G` print that value in
 the pre-7.0 spelling `without-password`, which the control did not list, so
 every stock release read FAIL. The collector now stores both spellings as
-`prohibit-password` (they are one setting to sshd); a verdict changes, so this
-is a minor release (D16).
+`prohibit-password` (they are one setting to sshd), so a host collected with
+this release reads PASS; a snapshot taken by an earlier release still carries
+`without-password` and still reads FAIL until it is collected again — the
+verdict of a re-collected host changes, so this is a minor release (D16). On
+the same host shape, U-12 `session_timeout` reads FAIL instead of ERROR and
+U-62 `login_banner` MANUAL instead of ERROR when sshd does not answer and the
+configuration walk stopped at an `Include` outside the declaration (below).
 
 ### Collectors
 

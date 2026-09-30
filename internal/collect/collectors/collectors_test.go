@@ -844,6 +844,21 @@ func TestSshdIncludeOutsideDeclarationIsRecordedNotViolated(t *testing.T) {
 		!strings.Contains(s.Persisted.Reason, "outside the collector's declaration") {
 		t.Errorf("reason %q", s.Persisted.Reason)
 	}
+	if s.Persisted.Source == nil || s.Persisted.Source.Path != "/etc/ssh/sshd_config" || s.Persisted.Source.Line != 1 {
+		t.Errorf("an absent Include keeps the file and line it was read from (C4): %+v", s.Persisted.Source)
+	}
+	// C3: with no daemon answer, a Banner line past the undeclared Include
+	// was never seen, so the banner leaves carry the absent envelope — a
+	// definite "no banner" here would let U-62 WARN on evidence not read.
+	for _, k := range []string{"sshd.banner_file.exists", "sshd.banner_file.nonempty"} {
+		e := env(t, b, k)
+		if e.Status != facts.StatusAbsent || !strings.Contains(e.Reason, "/etc/ssh/other/*.conf") {
+			t.Errorf("%s = %+v, want absent naming the Include", k, e)
+		}
+	}
+	if w := b.Worst("sshd"); w != facts.StatusOK {
+		t.Errorf(`Worst("sshd") = %s, want ok — an undeclared Include is not a partial run`, w)
+	}
 }
 
 // V-64: sshd -G and -T print PermitRootLogin's compiled default as the

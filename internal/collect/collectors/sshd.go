@@ -152,10 +152,13 @@ func runSshd(ctx context.Context, a collect.Access, b *collect.Builder) error {
 	//    status — not a definite "no banner" — is the answer for both
 	//    banner_file leaves; a false here would hide the read failure and
 	//    publish the module's default as if it were the host's state.
+	//    An absent parse — the config walk stopped at an Include outside
+	//    the declaration (C4) — is the same: what a Banner line past it
+	//    would have said was never seen.
 	if daemon == nil {
 		if e, ok := parsed["banner"]; ok {
 			switch e.Status {
-			case facts.StatusDenied, facts.StatusError, facts.StatusTimeout:
+			case facts.StatusDenied, facts.StatusError, facts.StatusTimeout, facts.StatusAbsent:
 				b.Set("sshd.banner_file.exists", e)
 				b.Set("sshd.banner_file.nonempty", e)
 				return nil
@@ -525,7 +528,9 @@ func parseSshdConfig(a collect.Access, file, keyword string, depth int) (facts.E
 				// never error — stock EL9 includes the crypto-policies file
 				// from 50-redhat.conf, and that host's run is complete.
 				if !declared(a, pattern) {
-					return collect.Absent("Include " + pattern + " is outside the collector's declaration"), true
+					e := collect.Absent("Include " + pattern + " is outside the collector's declaration")
+					e.Source = &facts.Source{Kind: "file", Path: file, Line: i + 1, Raw: sourceRaw(raw)}
+					return e, true
 				}
 				matches, err := a.Glob(pattern)
 				if err != nil {
@@ -626,14 +631,15 @@ var multistate = map[string]bool{permitRootLogin: true}
 // the modern one and a control names one spelling; the oracle knows the
 // synonym for comparing the file with the daemon.
 func keywordValue(keyword, value string) string {
-	if multistate[strings.ToLower(keyword)] {
-		v := strings.ToLower(value)
-		if strings.ToLower(keyword) == permitRootLogin && v == "without-password" {
-			return "prohibit-password"
-		}
-		return v
+	key := strings.ToLower(keyword)
+	if !multistate[key] {
+		return value
 	}
-	return value
+	v := strings.ToLower(value)
+	if key == permitRootLogin && v == "without-password" {
+		return "prohibit-password"
+	}
+	return v
 }
 
 // declared asks the guard whether pattern is inside the collector's
