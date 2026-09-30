@@ -122,14 +122,14 @@ jobs:
           jq -e '.facts.services.auditd.active.value == true and .facts.audit.rules.present.runtime.status == "ok" and .facts.audit.rules.present.runtime.value == false and .facts.packages.verify.complete.value == true and .facts.packages.verify.tool.value == "dpkg" and .facts.fim.tool.value == "aide"' "$RUNNER_TEMP/muster/root.json"
       # P-12: the planted capability is found and judged unpackaged, and the
       # runner's privilege facts are what its image is expected to carry -
-      # no preload, runner's own passwordless sudo, runner in docker's group,
-      # useradd's INACTIVE unset. These describe the runner, not muster: the
-      # first run confirms them, and a mismatch is corrected here, never in
-      # the collector.
+      # no preload, runner among the passwordless sudo principals (the image
+      # carries packer's rule beside runner's - the first run read both), runner
+      # in docker's group, useradd's INACTIVE unset. These describe the runner,
+      # not muster: a mismatch is corrected here, never in the collector.
       - name: the capability probe and the runner's privilege facts
         run: |
-          jq -e '[.facts.walk.capabilities.value[] | select(.path == "/usr/local/bin/muster-cap-probe")] | length == 1 and (.facts.walk.capabilities.value[] | select(.path == "/usr/local/bin/muster-cap-probe") | .reference == "unpackaged" and .package_declared == false)' "$RUNNER_TEMP/muster/root.json"
-          jq -e '.facts.privilege.ld_so_preload.value == [] and .facts.sudo.nopasswd_all.value == ["runner"] and any(.facts.privilege.runtime_group_members.value[]; .member == "runner" and .group == "docker") and .facts.accounts.useradd.inactive.value == -1' "$RUNNER_TEMP/muster/root.json"
+          jq -e '(.facts.walk.capabilities.value | map(select(.path == "/usr/local/bin/muster-cap-probe"))) as $p | ($p | length) == 1 and $p[0].reference == "unpackaged" and $p[0].package_declared == false' "$RUNNER_TEMP/muster/root.json"
+          jq -e '.facts.privilege.ld_so_preload.value == [] and (.facts.sudo.nopasswd_all.value | index("runner") != null) and any(.facts.privilege.runtime_group_members.value[]; .member == "runner" and .group == "docker") and .facts.accounts.useradd.inactive.value == -1' "$RUNNER_TEMP/muster/root.json"
       - name: check the root snapshot
         run: |
           sudo chown "$(id -u)" "$RUNNER_TEMP/muster/root.json"

@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
   "run": {
-    "muster_version": "81855c8",
-    "commit": "81855c8",
-    "controls_version": "kisa-unix-2026+2026.09.23",
-    "controls_digest": "sha256:f3337dac3ea8281886a8618f4cc136ddf62b3258dbfb113c560b5aeca854f41d",
+    "muster_version": "37dfcc8",
+    "commit": "37dfcc8",
+    "controls_version": "kisa-unix-2026+2026.09.29",
+    "controls_digest": "sha256:1622ceeeba7f9b7bbe1d2bb23562a921bfec21f7fd82833ec4af40a5515813ad",
     "guide_edition": "kisa-unix-2026",
-    "collected_at": "2026-09-28T08:17:22Z",
+    "collected_at": "2026-09-30T00:18:36Z",
     "host": {
       "hostname": "ubuntu-container",
       "machine_id_hash": "",
@@ -36,7 +36,7 @@
       {
         "name": "accounts",
         "status": "ok",
-        "ms": 10
+        "ms": 21
       },
       {
         "name": "audit",
@@ -57,7 +57,7 @@
       {
         "name": "coredump",
         "status": "ok",
-        "ms": 45
+        "ms": 18
       },
       {
         "name": "cron",
@@ -73,12 +73,12 @@
       {
         "name": "env",
         "status": "ok",
-        "ms": 6
+        "ms": 7
       },
       {
         "name": "files",
         "status": "ok",
-        "ms": 7
+        "ms": 8
       },
       {
         "name": "fim",
@@ -131,24 +131,29 @@
       {
         "name": "os",
         "status": "ok",
-        "ms": 5
+        "ms": 6
       },
       {
         "name": "pam",
         "status": "ok",
-        "ms": 11
+        "ms": 56
       },
       {
         "name": "patch",
         "status": "ok",
-        "ms": 572,
+        "ms": 868,
         "cmd": "/usr/bin/apt-get -s upgrade -o Debug::NoLocking=1"
       },
       {
         "name": "pkgverify",
         "status": "ok",
-        "ms": 7941,
+        "ms": 11167,
         "cmd": "/usr/bin/rpm -Va"
+      },
+      {
+        "name": "privilege",
+        "status": "ok",
+        "ms": 0
       },
       {
         "name": "services",
@@ -173,6 +178,11 @@
         "cmd": "/usr/sbin/sshd -G"
       },
       {
+        "name": "sshkeys",
+        "status": "ok",
+        "ms": 0
+      },
+      {
         "name": "swap",
         "status": "ok",
         "ms": 0
@@ -189,10 +199,16 @@
         "cmd": "/usr/bin/timedatectl show-timesync --all"
       },
       {
+        "name": "units",
+        "status": "ok",
+        "ms": 0,
+        "cmd": "/usr/bin/systemctl list-units --type=service --state=active --plain --no-legend"
+      },
+      {
         "name": "walk",
         "status": "ok",
         "ms": 0,
-        "cmd": "/usr/bin/rpm -qa --qf [%{=NAME}\t%{FILEMODES:octal}\t%{FILEUSERNAME}\t%{FILEGROUPNAME}\t%{FILENAMES}\n]"
+        "cmd": "/usr/bin/rpm -qa --qf [%{=NAME}\t%{FILEMODES:octal}\t%{FILEUSERNAME}\t%{FILEGROUPNAME}\t%|FILECAPS?{%{FILECAPS}}|\t%{FILENAMES}\n]"
       }
     ],
     "redaction": {
@@ -204,11 +220,11 @@
     "partial_failures": []
   },
   "check": {
-    "muster_version": "81855c8",
-    "commit": "81855c8",
-    "controls_version": "kisa-unix-2026+2026.09.23",
-    "controls_digest": "sha256:f3337dac3ea8281886a8618f4cc136ddf62b3258dbfb113c560b5aeca854f41d",
-    "snapshot_digest": "sha256:c9c109d846191c998440f69904f7872c79e961e9a48b02becf1efa677f1adae5",
+    "muster_version": "37dfcc8",
+    "commit": "37dfcc8",
+    "controls_version": "kisa-unix-2026+2026.09.29",
+    "controls_digest": "sha256:1622ceeeba7f9b7bbe1d2bb23562a921bfec21f7fd82833ec4af40a5515813ad",
+    "snapshot_digest": "sha256:9fbf86eae535614a4923717a55c69d8141e41d37c224928797dc0ffe60ef9760",
     "guide_edition": "kisa-unix-2026",
     "waivers": {
       "applied": 0,
@@ -301,6 +317,9 @@
           "nuucp"
         ]
       },
+      "muster.beyond.account_inactivity_lock": {
+        "max_inactive_days": 35
+      },
       "muster.beyond.audit_disk_actions": {
         "allowed_disk_error_actions": [
           "syslog",
@@ -353,6 +372,12 @@
           384
         ]
       },
+      "muster.beyond.container_runtime_access": {
+        "allowed_runtime_group_members": []
+      },
+      "muster.beyond.ld_so_preload_empty": {
+        "allowed_preload": []
+      },
       "muster.beyond.separate_partitions": {
         "required_separate": [
           "/tmp",
@@ -362,6 +387,12 @@
           "/var/log/audit",
           "/home"
         ]
+      },
+      "muster.beyond.ssh_key_quality": {
+        "min_rsa_bits": 2048
+      },
+      "muster.beyond.sudo_nopasswd_all": {
+        "allowed_nopasswd_principals": []
       },
       "muster.beyond.sysrq_restricted": {
         "allowed_sysrq": [
@@ -511,7 +542,7 @@
     "manual_review": 4,
     "undecidable": {
       "error": 0,
-      "not_applicable": 63,
+      "not_applicable": 71,
       "waived": 0
     },
     "facts_failed": 0,
@@ -544,7 +575,7 @@
         }
       },
       "beyond": {
-        "controls": 28,
+        "controls": 36,
         "automatic": {
           "high": {
             "pass": 0,
@@ -565,7 +596,7 @@
         "manual_review": 0,
         "undecidable": {
           "error": 0,
-          "not_applicable": 28,
+          "not_applicable": 36,
           "waived": 0
         }
       }
@@ -2972,6 +3003,72 @@
       "severity": "high"
     },
     {
+      "id": "muster.beyond.container_runtime_access",
+      "title_en": "No account other than root can reach a container runtime's API socket",
+      "title_ko": "root 가 아닌 어떤 계정도 컨테이너 런타임의 API 소켓에 접근할 수 없다",
+      "category": "beyond",
+      "importance": "상",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when does not hold: env.container eq none",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "docker",
+          "source": {
+            "kind": "file",
+            "path": "/.dockerenv"
+          }
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "muster.beyond.file_capabilities_declared",
+      "title_en": "Every executable carrying file capabilities has them because its package declares them",
+      "title_ko": "파일 capability 를 가진 모든 실행 파일은 그 패키지가 선언했기 때문에 그것을 가진다",
+      "category": "beyond",
+      "importance": "상",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when does not hold: env.container eq none",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "docker",
+          "source": {
+            "kind": "file",
+            "path": "/.dockerenv"
+          }
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "muster.beyond.ld_so_preload_empty",
+      "title_en": "/etc/ld.so.preload names no library other than the ones allowed on purpose",
+      "title_ko": "/etc/ld.so.preload 에는 의도적으로 허용한 것 말고는 어떤 라이브러리도 없다",
+      "category": "beyond",
+      "importance": "상",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when does not hold: env.container eq none",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "docker",
+          "source": {
+            "kind": "file",
+            "path": "/.dockerenv"
+          }
+        }
+      ],
+      "severity": "high"
+    },
+    {
       "id": "muster.beyond.package_files_unmodified",
       "title_en": "Every packaged file still matches the package database",
       "title_ko": "패키지로 설치된 모든 파일이 패키지 데이터베이스와 여전히 일치한다",
@@ -2992,6 +3089,72 @@
         }
       ],
       "severity": "high"
+    },
+    {
+      "id": "muster.beyond.root_unit_exec_writable",
+      "title_en": "No service that runs as root executes a file, or reads a unit file, that a non-root user can change",
+      "title_ko": "root 로 실행되는 서비스는 root 가 아닌 사용자가 바꿀 수 있는 파일을 실행하거나 그런 unit 파일을 읽지 않는다",
+      "category": "beyond",
+      "importance": "상",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when does not hold: env.container eq none",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "docker",
+          "source": {
+            "kind": "file",
+            "path": "/.dockerenv"
+          }
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "muster.beyond.sudo_nopasswd_all",
+      "title_en": "No principal may run every command through sudo without a password, and sudo never skips authentication",
+      "title_ko": "어떤 주체도 비밀번호 없이 sudo 로 모든 명령을 실행할 수 없고, sudo 는 인증을 건너뛰지 않는다",
+      "category": "beyond",
+      "importance": "상",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when does not hold: env.container eq none",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "docker",
+          "source": {
+            "kind": "file",
+            "path": "/.dockerenv"
+          }
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "muster.beyond.account_inactivity_lock",
+      "title_en": "Accounts that can log in are disabled a bounded number of days after their password expires, and useradd gives new accounts the same bound",
+      "title_ko": "로그인할 수 있는 계정은 비밀번호가 만료된 뒤 정해진 날짜 안에 비활성화되고, useradd 도 새 계정에 같은 기한을 준다",
+      "category": "beyond",
+      "importance": "중",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when does not hold: env.container eq none",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "docker",
+          "source": {
+            "kind": "file",
+            "path": "/.dockerenv"
+          }
+        }
+      ],
+      "severity": "medium"
     },
     {
       "id": "muster.beyond.audit_disk_actions",
@@ -3204,6 +3367,38 @@
       "severity": "medium"
     },
     {
+      "id": "muster.beyond.root_authorized_keys",
+      "title_en": "root's authorized_keys files hold no key wherever sshd lets root log in",
+      "title_ko": "sshd 가 root 로그인을 허용하는 곳에서는 root 의 authorized_keys 파일에 키가 없다",
+      "category": "beyond",
+      "importance": "중",
+      "automation": "auto",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when: sshd.options.permit_root_login is absent on this host",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "docker",
+          "source": {
+            "kind": "file",
+            "path": "/.dockerenv"
+          }
+        },
+        {
+          "fact": "sshd.options.permit_root_login",
+          "status": "absent",
+          "side": "persisted"
+        },
+        {
+          "fact": "sshd.options.permit_root_login",
+          "status": "absent",
+          "side": "effective"
+        }
+      ],
+      "severity": "medium"
+    },
+    {
       "id": "muster.beyond.secure_boot_enabled",
       "title_en": "UEFI Secure Boot is enforcing",
       "title_ko": "UEFI 보안 부팅이 적용되고 있다",
@@ -3232,6 +3427,28 @@
       "category": "beyond",
       "importance": "중",
       "automation": "partial",
+      "status": "NOT_APPLICABLE",
+      "reason": "applies_when does not hold: env.container eq none",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "docker",
+          "source": {
+            "kind": "file",
+            "path": "/.dockerenv"
+          }
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.beyond.ssh_key_quality",
+      "title_en": "No authorized_keys file holds a DSA key or an RSA key shorter than the minimum",
+      "title_ko": "어떤 authorized_keys 파일에도 DSA 키나 최소 길이보다 짧은 RSA 키가 없다",
+      "category": "beyond",
+      "importance": "중",
+      "automation": "auto",
       "status": "NOT_APPLICABLE",
       "reason": "applies_when does not hold: env.container eq none",
       "evidence": [
