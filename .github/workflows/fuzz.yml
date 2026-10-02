@@ -40,7 +40,8 @@ jobs:
           set -euo pipefail
           collectors=$(go test -list '^Fuzz' ./internal/collect/collectors/ | grep '^Fuzz')
           pkgfiles=$(go test -list '^Fuzz' ./internal/pkgfiles/ | grep '^Fuzz')
-          targets=$( { echo "$collectors" | sed 's#^#./internal/collect/collectors/ #'; echo "$pkgfiles" | sed 's#^#./internal/pkgfiles/ #'; } | sort )
+          pkgindex=$(go test -list '^Fuzz' ./internal/pkgindex/ | grep '^Fuzz')
+          targets=$( { echo "$collectors" | sed 's#^#./internal/collect/collectors/ #'; echo "$pkgfiles" | sed 's#^#./internal/pkgfiles/ #'; echo "$pkgindex" | sed 's#^#./internal/pkgindex/ #'; } | sort )
           i=0; ran=0; failed=0
           while read -r pkg name; do
             if [ $((i % 4)) -eq ${{ matrix.shard }} ]; then

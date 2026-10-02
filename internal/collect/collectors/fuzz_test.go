@@ -673,17 +673,6 @@ func FuzzParseProcNet(f *testing.F) {
 	})
 }
 
-func FuzzRPMFileTable(f *testing.F) {
-	seeds(f, "testdata/rpm.qa-files.*", "testdata/rpm_files_caps.sample")
-	f.Fuzz(func(t *testing.T, data []byte) {
-		fuzzBody(t, "rpmFileTable", func() any {
-			whole, errWhole := rpmFileTable(data, map[string]bool{"/usr/bin/su": true, "/usr/bin/at": true}, false)
-			cut, errCut := rpmFileTable(data, map[string]bool{"/usr/bin/su": true, "/usr/bin/at": true}, true)
-			return []any{whole, errWhole != nil, cut, errCut != nil}
-		}, len(data))
-	})
-}
-
 // ---------------------------------------------------------------------------
 // The package databases
 // ---------------------------------------------------------------------------

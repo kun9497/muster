@@ -116,7 +116,6 @@ var fuzzTargets = []string{
 	"FuzzParseVsftpdInto",
 	"FuzzParseXinetd",
 	"FuzzProftpdClosingName",
-	"FuzzRPMFileTable",
 	"FuzzReadInetd",
 	"FuzzSNMPParse",
 	"FuzzSNMPStripComment",
@@ -185,6 +184,10 @@ var notParsers = map[string]string{
 		"takes an action string that file has already split off a logical line; it " +
 		"re-emits the PREVIOUS line's selector, so it inherits file's per-facility " +
 		"amplification. FuzzParseRsyslogSelector fuzzes the action strings it is handed.",
+	"rpmFileTable": "a one-line wrapper over pkgindex.RPMFileTable, kept so the walk's tests " +
+		"read the table under the name they pin (W-34); the parser and its target, " +
+		"FuzzRPMFileTable, live in internal/pkgindex (W-37), and no target here reaches " +
+		"the wrapper because nothing in this package but the tests calls it.",
 }
 
 // stringParamNames are the parameter names that make a string parameter host
