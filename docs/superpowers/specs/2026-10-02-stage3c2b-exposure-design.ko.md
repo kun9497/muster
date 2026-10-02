@@ -274,7 +274,8 @@ sysctl.d line sets …"로 읽힘 — 틀린 증거, 판정 아님(B-3). 그 파
 
 `category: beyond` 컨트롤 열셋, id `muster.beyond.<name>`, `controls/beyond/` 아래, 모두
 `env.container eq none` 게이트(컨테이너의 프로세스·방화벽·네트워크 네임스페이스는 호스트의 정책이 아님),
-`automation: auto`. 중요도는 각 설명이 이름 댄 1차 원문에서 muster가 매긴 것입니다.
+`automation: auto`, 모든 beyond 컨트롤처럼 `title_en`/`title_ko`와 `remediation` 블록을 지님. 중요도는 각
+설명이 이름 댄 1차 원문에서 muster가 매긴 것입니다.
 
 | # | id | 중요도 | 절(`checks`) | absent_means |
 |---|---|---|---|---|

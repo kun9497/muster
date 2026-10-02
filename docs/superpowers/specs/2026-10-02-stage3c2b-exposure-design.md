@@ -323,8 +323,9 @@ kernel defaults.
 
 Thirteen `category: beyond` controls, ids `muster.beyond.<name>` under `controls/beyond/`, every
 one gated on `env.container eq none` (a container's processes, firewall and network namespace are
-not the host's policy), `automation: auto`. Importance is muster's own rating from the primary
-source named in each description.
+not the host's policy), `automation: auto`, with `title_en`/`title_ko` and a `remediation` block as
+every beyond control carries. Importance is muster's own rating from the primary source named in each
+description.
 
 | # | id | importance | clauses (`checks`) | absent_means |
 |---|---|---|---|---|
