@@ -233,8 +233,9 @@ true`로 기록):
 
 ### P-4 `net.sysctl.*`(`sysctl` 수집기)
 
-키 스물일곱, `since: 1`. 스물다섯은 `setting<int>`에 `default_on: effective`(= runtime, B-3), `sysctl.d`의
-두 홈이 persisted 면; 둘은 증거:
+키 스물일곱, `since: 1`. 스물여섯은 `setting<int>`에 `default_on: effective`(= runtime, B-3), `sysctl.d`의
+두 홈이 persisted 면(스물넷은 `checks`가 판정, `disable_ipv6` 둘은 IPv6 컨트롤의 `applies_when`이 읽음);
+하나는 증거:
 
 | 키 | sysctl |
 |---|---|

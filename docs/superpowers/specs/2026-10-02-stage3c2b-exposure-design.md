@@ -280,8 +280,9 @@ control 1 as exposed-everything and U-28 FAIL: cause and consequence, said in bo
 
 ### P-4 `net.sysctl.*` (the `sysctl` collector)
 
-Twenty-seven keys, `since: 1`. Twenty-five are `setting<int>` with `default_on: effective`
-(= runtime, B-3) and the two homes of `sysctl.d` as the persisted side; two are evidence:
+Twenty-seven keys, `since: 1`. Twenty-six are `setting<int>` with `default_on: effective`
+(= runtime, B-3) and the two homes of `sysctl.d` as the persisted side (twenty-four judged by
+`checks`, the two `disable_ipv6` read by the IPv6 controls' `applies_when`); one is evidence:
 
 | key | sysctl |
 |---|---|
