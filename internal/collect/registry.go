@@ -77,6 +77,16 @@ type Declaration struct {
 	// both unreadable and a lie. --list-actions prints it as one "walk" row
 	// naming the boundaries instead.
 	Walk bool
+
+	// Facts are the facts this collector reads from a collector that ran
+	// before it, as globs over fact keys matched with path.Match. `*` stops
+	// only at `/`, so it crosses a `.`: one glob per family (`firewall.*`)
+	// covers the family and its nested keys, and is the idiom.
+	// Builder.Get outside them panics, and --list-actions prints one "fact"
+	// row per glob. Collectors run in name order (All), so every family named
+	// here must be written by a collector whose name sorts first — a test in
+	// the collectors package holds that.
+	Facts []string
 }
 
 // Collector is one registered fact source.
@@ -623,7 +633,7 @@ func (g *guardedAccess) Run(ctx context.Context, c Command) Output {
 // Action is one row of --list-actions (spec §9).
 type Action struct {
 	Collector string `json:"collector"`
-	Kind      string `json:"kind"` // read | command | walk | write
+	Kind      string `json:"kind"` // command | fact | read | walk | write
 	Target    string `json:"target"`
 	Needs     string `json:"needs"`
 }
@@ -637,7 +647,8 @@ const walkTarget = "every local filesystem, no symlink followed, boundaries and 
 
 // ListActions renders the registry as the document a change-control
 // reviewer reads: every path read, every command run, the walk a collector
-// declares, the single write. A /proc/self target is printed in its declared
+// declares, every fact glob it reads from an earlier collector, the single
+// write. A /proc/self target is printed in its declared
 // form, never the pid muster substitutes at run time (R40). The result is
 // sorted by (collector, kind, target) so the document is deterministic
 // regardless of the order a collector declared its reads and commands in —
@@ -653,6 +664,9 @@ func ListActions() []Action {
 		}
 		if c.Declare.Walk {
 			out = append(out, Action{Collector: c.Name, Kind: "walk", Target: walkTarget, Needs: c.Declare.Needs})
+		}
+		for _, f := range c.Declare.Facts {
+			out = append(out, Action{Collector: c.Name, Kind: "fact", Target: f, Needs: c.Declare.Needs})
 		}
 	}
 	out = append(out, Action{Collector: "muster", Kind: "write", Target: DefaultSnapshotDir + "/<hostname>-<time>-<digest>.json", Needs: "root"})

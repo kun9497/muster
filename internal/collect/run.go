@@ -386,7 +386,7 @@ func acquire(o Options) (*Lock, error) {
 // recover and the same global deadline.
 func runCollector(ctx context.Context, c Collector, o Options, b *Builder) facts.CollectorRun {
 	g := Guard(o.Access, c)
-	b.Begin(c.Name)
+	b.Begin(c.Name, c.Declare.Facts...)
 	start := o.Now()
 	status, reason := callRun(ctx, c, g, b)
 	// A violation outranks whatever the collector itself reported: a

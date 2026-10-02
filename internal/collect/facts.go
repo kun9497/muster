@@ -5,6 +5,7 @@ package collect
 import (
 	"errors"
 	"io/fs"
+	"path"
 	"slices"
 	"sort"
 	"strings"
@@ -21,13 +22,14 @@ import (
 // safe for concurrent use — collectors run sequentially against one
 // Builder, never in parallel.
 type Builder struct {
-	reg     *facts.Registry
-	tree    map[string]any
-	header  *facts.Run
-	current string
-	keys    map[string][]string // collector name -> keys set under it (R71)
-	walk    *WalkOptions        // nil until SetWalk: --deep was not given
-	verify  *VerifyOptions      // nil until SetVerify: --deep was not given, or --no-verify was
+	reg      *facts.Registry
+	tree     map[string]any
+	header   *facts.Run
+	current  string
+	keys     map[string][]string // collector name -> keys set under it (R71)
+	declared map[string][]string // collector name -> the fact globs it may Get (W-32)
+	walk     *WalkOptions        // nil until SetWalk: --deep was not given
+	verify   *VerifyOptions      // nil until SetVerify: --deep was not given, or --no-verify was
 }
 
 func NewBuilder(reg *facts.Registry) *Builder {
@@ -92,8 +94,42 @@ func (b *Builder) Verify() (VerifyOptions, bool) {
 }
 
 // Begin marks name as the collector whose keys are being set from here on,
-// so Keys and Worst can later be asked about it (R71).
-func (b *Builder) Begin(name string) { b.current = name }
+// so Keys and Worst can later be asked about it (R71), and records the fact
+// globs that collector may read with Get (W-32): runCollector passes
+// c.Declare.Facts. A Begin without facts licenses no Get.
+func (b *Builder) Begin(name string, globs ...string) {
+	b.current = name
+	if b.declared == nil {
+		b.declared = map[string][]string{}
+	}
+	b.declared[name] = slices.Clone(globs)
+}
+
+// Get returns the envelope an earlier collector set under key. The key must
+// match one of the globs the current collector declared (path.Match, so
+// `firewall.*` matches `firewall.backend` and, since `*` stops only at `/`, the
+// nested `firewall.default_policy.input` too — one glob covers a family); any
+// other key panics, a programming error the collectors' declaration test
+// catches, exactly as an undeclared read is. A key nobody set, an
+// unregistered key and a setting key are (Envelope{}, false): only
+// envelopes are read across collectors.
+func (b *Builder) Get(key string) (facts.Envelope, bool) {
+	declared := false
+	for _, glob := range b.declared[b.current] {
+		if ok, _ := path.Match(glob, key); ok {
+			declared = true
+			break
+		}
+	}
+	if !declared {
+		panic("collect: " + b.current + " reads undeclared fact " + key)
+	}
+	e, ok := b.leaf(key).(facts.Envelope)
+	if !ok {
+		return facts.Envelope{}, false
+	}
+	return e, true
+}
 
 // place descends b.tree by key's dotted segments and stores leaf at the
 // end. A key whose path collides with a leaf already set at a shorter or
