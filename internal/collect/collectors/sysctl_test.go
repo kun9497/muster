@@ -420,15 +420,17 @@ func TestSysctlDeclarationCoversItsReads(t *testing.T) {
 	a := &fsAccess{files: procSysSeeds()}
 	b := buildBegun(t, "sysctl", a)
 	keys := b.Keys("sysctl")
-	if len(keys) != 39 {
-		t.Errorf("wrote %d keys, want the twelve of B-2 and the twenty-seven of P-4: %v", len(keys), keys)
+	if len(keys) != 40 {
+		t.Errorf("wrote %d keys, want the twelve of B-2, the twenty-seven of P-4 and the derived ipv6_disabled (W-79): %v", len(keys), keys)
 	}
-	if !slices.Contains(keys, "net.sysctl.ipv6_bindv6only") {
-		t.Error("net.sysctl.ipv6_bindv6only was not written")
+	for _, k := range []string{"net.sysctl.ipv6_bindv6only", "net.sysctl.ipv6_disabled"} {
+		if !slices.Contains(keys, k) {
+			t.Errorf("%s was not written", k)
+		}
 	}
 	net, ok := leaf(t, b, "net.sysctl").(map[string]any)
-	if !ok || len(net) != 27 {
-		t.Errorf("net.sysctl carries %d leaves (%T), want 27", len(net), leaf(t, b, "net.sysctl"))
+	if !ok || len(net) != 28 {
+		t.Errorf("net.sysctl carries %d leaves (%T), want 28", len(net), leaf(t, b, "net.sysctl"))
 	}
 	tree, ok := leaf(t, b, "kernel.sysctl").(map[string]any)
 	if !ok {
@@ -820,5 +822,36 @@ func TestSysctlConcreteAfterExclusionSetsTheKey(t *testing.T) {
 	b := build(t, "sysctl", a)
 	if got := persistedOK(t, b, "net.sysctl.ipv4_all_rp_filter"); got.Value != 1 || got.Source.Path != "/etc/sysctl.d/30-c.conf" {
 		t.Errorf("all.rp_filter persisted %+v, want 1 from 30-c.conf", got)
+	}
+}
+
+// W-79: net.sysctl.ipv6_disabled is 1 only when disable_ipv6 is 1 on all AND
+// on default; one leaf alone leaves IPv6 live on the present interfaces. A
+// kernel without IPv6 reads absent with the fixed reason, never 0.
+func TestSysctlIPv6DisabledDerived(t *testing.T) {
+	const allP = "/proc/sys/net/ipv6/conf/all/disable_ipv6"
+	const defP = "/proc/sys/net/ipv6/conf/default/disable_ipv6"
+	for _, c := range []struct {
+		all, def, want int
+	}{{0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {1, 1, 1}} {
+		a := netSysAccess(nil)
+		a.contents[allP] = []byte(fmt.Sprintf("%d\n", c.all))
+		a.contents[defP] = []byte(fmt.Sprintf("%d\n", c.def))
+		b := build(t, "sysctl", a)
+		e, ok := leaf(t, b, "net.sysctl.ipv6_disabled").(facts.Envelope)
+		if !ok {
+			t.Fatalf("net.sysctl.ipv6_disabled is %T, want a plain envelope", leaf(t, b, "net.sysctl.ipv6_disabled"))
+		}
+		if e.Status != facts.StatusOK || e.Value != c.want {
+			t.Errorf("all=%d default=%d: %+v, want ok %d", c.all, c.def, e, c.want)
+		}
+		if e.Source == nil || len(e.Source.Inputs) != 2 || e.Source.Inputs[0].Path != allP || e.Source.Inputs[1].Path != defP {
+			t.Errorf("all=%d default=%d: source %+v, want the two disable_ipv6 paths", c.all, c.def, e.Source)
+		}
+	}
+	b := build(t, "sysctl", netSysAccess(func(p string) bool { return p == defP }))
+	e := leaf(t, b, "net.sysctl.ipv6_disabled").(facts.Envelope)
+	if e.Status != facts.StatusAbsent || !strings.Contains(e.Reason, "IPv6 is not built or is disabled") {
+		t.Errorf("a missing default/disable_ipv6: %+v, want absent: IPv6 is not built or is disabled", e)
 	}
 }

@@ -15,86 +15,80 @@
     },
     "net": {
       "sysctl": {
-        "ipv6_all_accept_redirects": {
+        "ipv6_all_forwarding": {
           "runtime": {
             "status": "ok",
             "value": 0,
             "source": {
               "kind": "proc",
-              "path": "/proc/sys/net/ipv6/conf/all/accept_redirects"
+              "path": "/proc/sys/net/ipv6/conf/all/forwarding"
             }
           },
           "persisted": {
-            "status": "ok",
-            "value": 0,
-            "source": {
-              "kind": "file",
-              "path": "/etc/sysctl.d/60-network-hardening.conf",
-              "line": 1,
-              "raw": "net.ipv6.conf.all.accept_redirects = 0"
-            }
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv6.conf.all.forwarding"
           },
           "effective": {
             "status": "ok",
             "value": 0,
             "source": {
               "kind": "proc",
-              "path": "/proc/sys/net/ipv6/conf/all/accept_redirects"
+              "path": "/proc/sys/net/ipv6/conf/all/forwarding"
             }
           },
           "winner": {
             "kind": "proc",
-            "path": "/proc/sys/net/ipv6/conf/all/accept_redirects"
+            "path": "/proc/sys/net/ipv6/conf/all/forwarding"
           }
         },
-        "ipv6_default_accept_redirects": {
+        "ipv6_default_forwarding": {
           "runtime": {
             "status": "ok",
             "value": 0,
             "source": {
               "kind": "proc",
-              "path": "/proc/sys/net/ipv6/conf/default/accept_redirects"
+              "path": "/proc/sys/net/ipv6/conf/default/forwarding"
             }
           },
           "persisted": {
-            "status": "ok",
-            "value": 0,
-            "source": {
-              "kind": "file",
-              "path": "/etc/sysctl.d/60-network-hardening.conf",
-              "line": 2,
-              "raw": "net.ipv6.conf.default.accept_redirects = 0"
-            }
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv6.conf.default.forwarding"
           },
           "effective": {
             "status": "ok",
             "value": 0,
             "source": {
               "kind": "proc",
-              "path": "/proc/sys/net/ipv6/conf/default/accept_redirects"
+              "path": "/proc/sys/net/ipv6/conf/default/forwarding"
             }
           },
           "winner": {
             "kind": "proc",
-            "path": "/proc/sys/net/ipv6/conf/default/accept_redirects"
+            "path": "/proc/sys/net/ipv6/conf/default/forwarding"
           }
         },
         "ipv6_all_disable_ipv6": {
           "runtime": {
             "status": "ok",
-            "value": 0,
+            "value": 1,
             "source": {
               "kind": "proc",
               "path": "/proc/sys/net/ipv6/conf/all/disable_ipv6"
             }
           },
           "persisted": {
-            "status": "absent",
-            "reason": "no sysctl.d line sets net.ipv6.conf.all.disable_ipv6"
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "file",
+              "path": "/etc/sysctl.d/60-disable-ipv6.conf",
+              "line": 1,
+              "raw": "net.ipv6.conf.all.disable_ipv6 = 1"
+            }
           },
           "effective": {
             "status": "ok",
-            "value": 0,
+            "value": 1,
             "source": {
               "kind": "proc",
               "path": "/proc/sys/net/ipv6/conf/all/disable_ipv6"

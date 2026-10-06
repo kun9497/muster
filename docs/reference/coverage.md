@@ -99,10 +99,10 @@
 | muster.beyond.icmp_broadcast_and_bogus_ignored | 하 | auto | env.container, net.sysctl.ipv4_icmp_echo_ignore_broadcasts, net.sysctl.ipv4_icmp_ignore_bogus_error_responses | RHEL-09-253055, RHEL-09-253060 |
 | muster.beyond.icmp_redirects_ignored | 중 | auto | env.container, net.sysctl.ipv4_all_accept_redirects, net.sysctl.ipv4_all_secure_redirects, net.sysctl.ipv4_all_send_redirects, net.sysctl.ipv4_default_accept_redirects, net.sysctl.ipv4_default_secure_redirects, net.sysctl.ipv4_default_send_redirects | RHEL-09-253015, RHEL-09-253040, RHEL-09-253065, RHEL-09-253070 |
 | muster.beyond.ip_forwarding_disabled | 중 | auto | env.container, net.sysctl.ipv4_ip_forward | RHEL-09-253075 |
-| muster.beyond.ipv6_forwarding_disabled | 중 | auto | env.container, net.sysctl.ipv6_all_disable_ipv6, net.sysctl.ipv6_all_forwarding, net.sysctl.ipv6_default_disable_ipv6, net.sysctl.ipv6_default_forwarding | RHEL-09-254025 |
-| muster.beyond.ipv6_redirects_ignored | 중 | auto | env.container, net.sysctl.ipv6_all_accept_redirects, net.sysctl.ipv6_all_disable_ipv6, net.sysctl.ipv6_default_accept_redirects, net.sysctl.ipv6_default_disable_ipv6 | RHEL-09-254015, RHEL-09-254035 |
-| muster.beyond.ipv6_router_advertisements_ignored | 중 | auto | env.container, net.sysctl.ipv6_all_accept_ra, net.sysctl.ipv6_all_disable_ipv6, net.sysctl.ipv6_default_accept_ra, net.sysctl.ipv6_default_disable_ipv6 | RHEL-09-254010, RHEL-09-254030 |
-| muster.beyond.ipv6_source_routing_rejected | 중 | auto | env.container, net.sysctl.ipv6_all_accept_source_route, net.sysctl.ipv6_all_disable_ipv6, net.sysctl.ipv6_default_accept_source_route, net.sysctl.ipv6_default_disable_ipv6 | RHEL-09-254020, RHEL-09-254040 |
+| muster.beyond.ipv6_forwarding_disabled | 중 | auto | env.container, net.sysctl.ipv6_all_forwarding, net.sysctl.ipv6_default_forwarding, net.sysctl.ipv6_disabled | RHEL-09-254025 |
+| muster.beyond.ipv6_redirects_ignored | 중 | auto | env.container, net.sysctl.ipv6_all_accept_redirects, net.sysctl.ipv6_default_accept_redirects, net.sysctl.ipv6_disabled | RHEL-09-254015, RHEL-09-254035 |
+| muster.beyond.ipv6_router_advertisements_ignored | 중 | auto | env.container, net.sysctl.ipv6_all_accept_ra, net.sysctl.ipv6_default_accept_ra, net.sysctl.ipv6_disabled | RHEL-09-254010, RHEL-09-254030 |
+| muster.beyond.ipv6_source_routing_rejected | 중 | auto | env.container, net.sysctl.ipv6_all_accept_source_route, net.sysctl.ipv6_default_accept_source_route, net.sysctl.ipv6_disabled | RHEL-09-254020, RHEL-09-254040 |
 | muster.beyond.kernel_pointer_exposure | 중 | auto | env.container, kernel.sysctl.dmesg_restrict, kernel.sysctl.kptr_restrict | RHEL-09-213010, RHEL-09-213025, UBTU-22-213010, UBTU-24-600140 |
 | muster.beyond.ld_so_preload_empty | 상 | auto | env.container, privilege.ld_so_preload | — |
 | muster.beyond.listeners_packaged | 중 | auto | env.container, processes.unpackaged_listeners | — |
@@ -110,7 +110,7 @@
 | muster.beyond.package_files_unmodified | 상 | auto | env.container, packages.verify.modified | — |
 | muster.beyond.ptrace_restriction | 중 | auto | env.container, kernel.sysctl.perf_event_paranoid, kernel.sysctl.yama_ptrace_scope | RHEL-09-213015, RHEL-09-213080 |
 | muster.beyond.remote_log_forwarding | 하 | auto | env.container, logging.journal_upload.url, logging.rsyslog.forwards_remote, services.journal_upload.active, services.journal_upload.enabled, services.syslog.active | RHEL-09-652055 |
-| muster.beyond.reverse_path_filtering | 중 | auto | env.container, net.sysctl.ipv4_all_log_martians, net.sysctl.ipv4_all_rp_filter, net.sysctl.ipv4_default_log_martians, net.sysctl.ipv4_default_rp_filter | RHEL-09-253035, RHEL-09-253050 |
+| muster.beyond.reverse_path_filtering | 중 | auto | env.container, net.sysctl.ipv4_all_log_martians, net.sysctl.ipv4_all_rp_filter, net.sysctl.ipv4_default_log_martians, net.sysctl.ipv4_default_rp_filter | RHEL-09-253025, RHEL-09-253030, RHEL-09-253035, RHEL-09-253050 |
 | muster.beyond.root_authorized_keys | 중 | auto | env.container, ssh.root_key_count, sshd.options.permit_root_login | — |
 | muster.beyond.root_unit_exec_writable | 상 | auto | env.container, env.has_systemd, units.exec_writable | — |
 | muster.beyond.secure_boot_enabled | 중 | auto | boot.firmware, boot.secure_boot, env.container | — |
@@ -132,7 +132,7 @@
 
 ## Fact keys used by controls
 
-252 of 509 registered keys are read by a control (4 by the engine); 253 unused.
+251 of 510 registered keys are read by a control (4 by the engine); 255 unused.
 
 | Collector | Registered | Used by a control | Read by the engine | Unused |
 |---|---|---|---|---|
@@ -158,7 +158,7 @@
 | ftp | 17 | 6 | 0 | ftp.implementation, ftp.config_files, ftp.parse_complete, ftp.unmodelled, ftp.local_enabled, ftp.tcp_wrappers, ftp.userlist_enable, ftp.userlist_deny, ftp.userlist_file, ftp.banner_source, ftp.banner_text |
 | mail | 10 | 7 | 0 | mail.config_files, mail.postfix.smtpd_recipient_restrictions, mail.postfix.disable_vrfy_command |
 | dns | 7 | 2 | 0 | dns.config_files, dns.parse_complete, dns.unmodelled, dns.options.allow_transfer, dns.options.allow_update |
-| sysctl | 39 | 38 | 0 | net.sysctl.ipv6_bindv6only |
+| sysctl | 40 | 37 | 0 | net.sysctl.ipv6_all_disable_ipv6, net.sysctl.ipv6_default_disable_ipv6, net.sysctl.ipv6_bindv6only |
 | coredump | 6 | 5 | 0 | coredump.limits.sources |
 | boot | 13 | 6 | 0 | boot.grub_cfg.path, boot.grub_cfg.group, boot.grub_cfg.group_readable, boot.grub_cfg.group_writable, boot.grub_cfg.other_readable, boot.grub_cfg.other_writable, boot.grub_cfg.acl_present |
 | mounts | 5 | 5 | 0 | — |

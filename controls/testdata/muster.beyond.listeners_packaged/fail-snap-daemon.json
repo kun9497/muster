@@ -56,7 +56,7 @@
                 "name": "lxd",
                 "exe": "/snap/lxd/24061/sbin/lxd",
                 "exe_deleted": false,
-                "mnt_ns": "host",
+                "mnt_ns": "foreign",
                 "package": "snap:lxd",
                 "package_status": "snap"
               }

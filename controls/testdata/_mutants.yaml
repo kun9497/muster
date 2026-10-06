@@ -340,131 +340,143 @@
 - control: muster.beyond.ipv6_forwarding_disabled
   mutant: "absent_means ->pass"
   reason: >-
-    The gate keys net.sysctl.ipv6_all_disable_ipv6 and net.sysctl.ipv6_default_disable_ipv6 and
-    this control's judged keys are read by one collector (runSysctl,
-    internal/collect/collectors/sysctl.go) from the one /proc/sys/net/ipv6 tree, and readProcSys
-    writes a missing file there as absent "IPv6 is not built or is disabled" -- they go absent
-    together. applies_when screens before absent_means (screen, internal/check/eval.go), so an
-    absent gate decides the control first and no collector-shaped snapshot reaches absent_means
-    with both gates holding; the value it names cannot change any fixture's answer.
+    The gate net.sysctl.ipv6_disabled is derived by runSysctl (ipv6Disabled,
+    internal/collect/collectors/sysctl.go) from net.ipv6.conf.all.disable_ipv6 and
+    net.ipv6.conf.default.disable_ipv6, and readProcSys reads those and this control's judged
+    keys from the one /proc/sys/net/ipv6/conf tree, writing a missing file there as absent "IPv6
+    is not built or is disabled" - so the gate is absent whenever a judged key is, and the
+    kernel publishes every conf knob or none. applies_when screens before absent_means (screen,
+    internal/check/eval.go), so no collector-shaped snapshot reaches absent_means with the gate
+    holding; the value it names cannot change any fixture's answer.
 
 - control: muster.beyond.ipv6_forwarding_disabled
   mutant: "absent_means ->fail"
   reason: >-
-    The gate keys net.sysctl.ipv6_all_disable_ipv6 and net.sysctl.ipv6_default_disable_ipv6 and
-    this control's judged keys are read by one collector (runSysctl,
-    internal/collect/collectors/sysctl.go) from the one /proc/sys/net/ipv6 tree, and readProcSys
-    writes a missing file there as absent "IPv6 is not built or is disabled" -- they go absent
-    together. applies_when screens before absent_means (screen, internal/check/eval.go), so an
-    absent gate decides the control first and no collector-shaped snapshot reaches absent_means
-    with both gates holding; the value it names cannot change any fixture's answer.
+    The gate net.sysctl.ipv6_disabled is derived by runSysctl (ipv6Disabled,
+    internal/collect/collectors/sysctl.go) from net.ipv6.conf.all.disable_ipv6 and
+    net.ipv6.conf.default.disable_ipv6, and readProcSys reads those and this control's judged
+    keys from the one /proc/sys/net/ipv6/conf tree, writing a missing file there as absent "IPv6
+    is not built or is disabled" - so the gate is absent whenever a judged key is, and the
+    kernel publishes every conf knob or none. applies_when screens before absent_means (screen,
+    internal/check/eval.go), so no collector-shaped snapshot reaches absent_means with the gate
+    holding; the value it names cannot change any fixture's answer.
 
 - control: muster.beyond.ipv6_forwarding_disabled
   mutant: "absent_means ->manual"
   reason: >-
-    The gate keys net.sysctl.ipv6_all_disable_ipv6 and net.sysctl.ipv6_default_disable_ipv6 and
-    this control's judged keys are read by one collector (runSysctl,
-    internal/collect/collectors/sysctl.go) from the one /proc/sys/net/ipv6 tree, and readProcSys
-    writes a missing file there as absent "IPv6 is not built or is disabled" -- they go absent
-    together. applies_when screens before absent_means (screen, internal/check/eval.go), so an
-    absent gate decides the control first and no collector-shaped snapshot reaches absent_means
-    with both gates holding; the value it names cannot change any fixture's answer.
+    The gate net.sysctl.ipv6_disabled is derived by runSysctl (ipv6Disabled,
+    internal/collect/collectors/sysctl.go) from net.ipv6.conf.all.disable_ipv6 and
+    net.ipv6.conf.default.disable_ipv6, and readProcSys reads those and this control's judged
+    keys from the one /proc/sys/net/ipv6/conf tree, writing a missing file there as absent "IPv6
+    is not built or is disabled" - so the gate is absent whenever a judged key is, and the
+    kernel publishes every conf knob or none. applies_when screens before absent_means (screen,
+    internal/check/eval.go), so no collector-shaped snapshot reaches absent_means with the gate
+    holding; the value it names cannot change any fixture's answer.
 
 - control: muster.beyond.ipv6_redirects_ignored
   mutant: "absent_means ->pass"
   reason: >-
-    The gate keys net.sysctl.ipv6_all_disable_ipv6 and net.sysctl.ipv6_default_disable_ipv6 and
-    this control's judged keys are read by one collector (runSysctl,
-    internal/collect/collectors/sysctl.go) from the one /proc/sys/net/ipv6 tree, and readProcSys
-    writes a missing file there as absent "IPv6 is not built or is disabled" -- they go absent
-    together. applies_when screens before absent_means (screen, internal/check/eval.go), so an
-    absent gate decides the control first and no collector-shaped snapshot reaches absent_means
-    with both gates holding; the value it names cannot change any fixture's answer.
+    The gate net.sysctl.ipv6_disabled is derived by runSysctl (ipv6Disabled,
+    internal/collect/collectors/sysctl.go) from net.ipv6.conf.all.disable_ipv6 and
+    net.ipv6.conf.default.disable_ipv6, and readProcSys reads those and this control's judged
+    keys from the one /proc/sys/net/ipv6/conf tree, writing a missing file there as absent "IPv6
+    is not built or is disabled" - so the gate is absent whenever a judged key is, and the
+    kernel publishes every conf knob or none. applies_when screens before absent_means (screen,
+    internal/check/eval.go), so no collector-shaped snapshot reaches absent_means with the gate
+    holding; the value it names cannot change any fixture's answer.
 
 - control: muster.beyond.ipv6_redirects_ignored
   mutant: "absent_means ->fail"
   reason: >-
-    The gate keys net.sysctl.ipv6_all_disable_ipv6 and net.sysctl.ipv6_default_disable_ipv6 and
-    this control's judged keys are read by one collector (runSysctl,
-    internal/collect/collectors/sysctl.go) from the one /proc/sys/net/ipv6 tree, and readProcSys
-    writes a missing file there as absent "IPv6 is not built or is disabled" -- they go absent
-    together. applies_when screens before absent_means (screen, internal/check/eval.go), so an
-    absent gate decides the control first and no collector-shaped snapshot reaches absent_means
-    with both gates holding; the value it names cannot change any fixture's answer.
+    The gate net.sysctl.ipv6_disabled is derived by runSysctl (ipv6Disabled,
+    internal/collect/collectors/sysctl.go) from net.ipv6.conf.all.disable_ipv6 and
+    net.ipv6.conf.default.disable_ipv6, and readProcSys reads those and this control's judged
+    keys from the one /proc/sys/net/ipv6/conf tree, writing a missing file there as absent "IPv6
+    is not built or is disabled" - so the gate is absent whenever a judged key is, and the
+    kernel publishes every conf knob or none. applies_when screens before absent_means (screen,
+    internal/check/eval.go), so no collector-shaped snapshot reaches absent_means with the gate
+    holding; the value it names cannot change any fixture's answer.
 
 - control: muster.beyond.ipv6_redirects_ignored
   mutant: "absent_means ->manual"
   reason: >-
-    The gate keys net.sysctl.ipv6_all_disable_ipv6 and net.sysctl.ipv6_default_disable_ipv6 and
-    this control's judged keys are read by one collector (runSysctl,
-    internal/collect/collectors/sysctl.go) from the one /proc/sys/net/ipv6 tree, and readProcSys
-    writes a missing file there as absent "IPv6 is not built or is disabled" -- they go absent
-    together. applies_when screens before absent_means (screen, internal/check/eval.go), so an
-    absent gate decides the control first and no collector-shaped snapshot reaches absent_means
-    with both gates holding; the value it names cannot change any fixture's answer.
+    The gate net.sysctl.ipv6_disabled is derived by runSysctl (ipv6Disabled,
+    internal/collect/collectors/sysctl.go) from net.ipv6.conf.all.disable_ipv6 and
+    net.ipv6.conf.default.disable_ipv6, and readProcSys reads those and this control's judged
+    keys from the one /proc/sys/net/ipv6/conf tree, writing a missing file there as absent "IPv6
+    is not built or is disabled" - so the gate is absent whenever a judged key is, and the
+    kernel publishes every conf knob or none. applies_when screens before absent_means (screen,
+    internal/check/eval.go), so no collector-shaped snapshot reaches absent_means with the gate
+    holding; the value it names cannot change any fixture's answer.
 
 - control: muster.beyond.ipv6_source_routing_rejected
   mutant: "absent_means ->pass"
   reason: >-
-    The gate keys net.sysctl.ipv6_all_disable_ipv6 and net.sysctl.ipv6_default_disable_ipv6 and
-    this control's judged keys are read by one collector (runSysctl,
-    internal/collect/collectors/sysctl.go) from the one /proc/sys/net/ipv6 tree, and readProcSys
-    writes a missing file there as absent "IPv6 is not built or is disabled" -- they go absent
-    together. applies_when screens before absent_means (screen, internal/check/eval.go), so an
-    absent gate decides the control first and no collector-shaped snapshot reaches absent_means
-    with both gates holding; the value it names cannot change any fixture's answer.
+    The gate net.sysctl.ipv6_disabled is derived by runSysctl (ipv6Disabled,
+    internal/collect/collectors/sysctl.go) from net.ipv6.conf.all.disable_ipv6 and
+    net.ipv6.conf.default.disable_ipv6, and readProcSys reads those and this control's judged
+    keys from the one /proc/sys/net/ipv6/conf tree, writing a missing file there as absent "IPv6
+    is not built or is disabled" - so the gate is absent whenever a judged key is, and the
+    kernel publishes every conf knob or none. applies_when screens before absent_means (screen,
+    internal/check/eval.go), so no collector-shaped snapshot reaches absent_means with the gate
+    holding; the value it names cannot change any fixture's answer.
 
 - control: muster.beyond.ipv6_source_routing_rejected
   mutant: "absent_means ->fail"
   reason: >-
-    The gate keys net.sysctl.ipv6_all_disable_ipv6 and net.sysctl.ipv6_default_disable_ipv6 and
-    this control's judged keys are read by one collector (runSysctl,
-    internal/collect/collectors/sysctl.go) from the one /proc/sys/net/ipv6 tree, and readProcSys
-    writes a missing file there as absent "IPv6 is not built or is disabled" -- they go absent
-    together. applies_when screens before absent_means (screen, internal/check/eval.go), so an
-    absent gate decides the control first and no collector-shaped snapshot reaches absent_means
-    with both gates holding; the value it names cannot change any fixture's answer.
+    The gate net.sysctl.ipv6_disabled is derived by runSysctl (ipv6Disabled,
+    internal/collect/collectors/sysctl.go) from net.ipv6.conf.all.disable_ipv6 and
+    net.ipv6.conf.default.disable_ipv6, and readProcSys reads those and this control's judged
+    keys from the one /proc/sys/net/ipv6/conf tree, writing a missing file there as absent "IPv6
+    is not built or is disabled" - so the gate is absent whenever a judged key is, and the
+    kernel publishes every conf knob or none. applies_when screens before absent_means (screen,
+    internal/check/eval.go), so no collector-shaped snapshot reaches absent_means with the gate
+    holding; the value it names cannot change any fixture's answer.
 
 - control: muster.beyond.ipv6_source_routing_rejected
   mutant: "absent_means ->manual"
   reason: >-
-    The gate keys net.sysctl.ipv6_all_disable_ipv6 and net.sysctl.ipv6_default_disable_ipv6 and
-    this control's judged keys are read by one collector (runSysctl,
-    internal/collect/collectors/sysctl.go) from the one /proc/sys/net/ipv6 tree, and readProcSys
-    writes a missing file there as absent "IPv6 is not built or is disabled" -- they go absent
-    together. applies_when screens before absent_means (screen, internal/check/eval.go), so an
-    absent gate decides the control first and no collector-shaped snapshot reaches absent_means
-    with both gates holding; the value it names cannot change any fixture's answer.
+    The gate net.sysctl.ipv6_disabled is derived by runSysctl (ipv6Disabled,
+    internal/collect/collectors/sysctl.go) from net.ipv6.conf.all.disable_ipv6 and
+    net.ipv6.conf.default.disable_ipv6, and readProcSys reads those and this control's judged
+    keys from the one /proc/sys/net/ipv6/conf tree, writing a missing file there as absent "IPv6
+    is not built or is disabled" - so the gate is absent whenever a judged key is, and the
+    kernel publishes every conf knob or none. applies_when screens before absent_means (screen,
+    internal/check/eval.go), so no collector-shaped snapshot reaches absent_means with the gate
+    holding; the value it names cannot change any fixture's answer.
 
 - control: muster.beyond.ipv6_router_advertisements_ignored
   mutant: "absent_means ->pass"
   reason: >-
-    The gate keys net.sysctl.ipv6_all_disable_ipv6 and net.sysctl.ipv6_default_disable_ipv6 and
-    this control's judged keys are read by one collector (runSysctl,
-    internal/collect/collectors/sysctl.go) from the one /proc/sys/net/ipv6 tree, and readProcSys
-    writes a missing file there as absent "IPv6 is not built or is disabled" -- they go absent
-    together. applies_when screens before absent_means (screen, internal/check/eval.go), so an
-    absent gate decides the control first and no collector-shaped snapshot reaches absent_means
-    with both gates holding; the value it names cannot change any fixture's answer.
+    The gate net.sysctl.ipv6_disabled is derived by runSysctl (ipv6Disabled,
+    internal/collect/collectors/sysctl.go) from net.ipv6.conf.all.disable_ipv6 and
+    net.ipv6.conf.default.disable_ipv6, and readProcSys reads those and this control's judged
+    keys from the one /proc/sys/net/ipv6/conf tree, writing a missing file there as absent "IPv6
+    is not built or is disabled" - so the gate is absent whenever a judged key is, and the
+    kernel publishes every conf knob or none. applies_when screens before absent_means (screen,
+    internal/check/eval.go), so no collector-shaped snapshot reaches absent_means with the gate
+    holding; the value it names cannot change any fixture's answer.
 
 - control: muster.beyond.ipv6_router_advertisements_ignored
   mutant: "absent_means ->fail"
   reason: >-
-    The gate keys net.sysctl.ipv6_all_disable_ipv6 and net.sysctl.ipv6_default_disable_ipv6 and
-    this control's judged keys are read by one collector (runSysctl,
-    internal/collect/collectors/sysctl.go) from the one /proc/sys/net/ipv6 tree, and readProcSys
-    writes a missing file there as absent "IPv6 is not built or is disabled" -- they go absent
-    together. applies_when screens before absent_means (screen, internal/check/eval.go), so an
-    absent gate decides the control first and no collector-shaped snapshot reaches absent_means
-    with both gates holding; the value it names cannot change any fixture's answer.
+    The gate net.sysctl.ipv6_disabled is derived by runSysctl (ipv6Disabled,
+    internal/collect/collectors/sysctl.go) from net.ipv6.conf.all.disable_ipv6 and
+    net.ipv6.conf.default.disable_ipv6, and readProcSys reads those and this control's judged
+    keys from the one /proc/sys/net/ipv6/conf tree, writing a missing file there as absent "IPv6
+    is not built or is disabled" - so the gate is absent whenever a judged key is, and the
+    kernel publishes every conf knob or none. applies_when screens before absent_means (screen,
+    internal/check/eval.go), so no collector-shaped snapshot reaches absent_means with the gate
+    holding; the value it names cannot change any fixture's answer.
 
 - control: muster.beyond.ipv6_router_advertisements_ignored
   mutant: "absent_means ->manual"
   reason: >-
-    The gate keys net.sysctl.ipv6_all_disable_ipv6 and net.sysctl.ipv6_default_disable_ipv6 and
-    this control's judged keys are read by one collector (runSysctl,
-    internal/collect/collectors/sysctl.go) from the one /proc/sys/net/ipv6 tree, and readProcSys
-    writes a missing file there as absent "IPv6 is not built or is disabled" -- they go absent
-    together. applies_when screens before absent_means (screen, internal/check/eval.go), so an
-    absent gate decides the control first and no collector-shaped snapshot reaches absent_means
-    with both gates holding; the value it names cannot change any fixture's answer.
+    The gate net.sysctl.ipv6_disabled is derived by runSysctl (ipv6Disabled,
+    internal/collect/collectors/sysctl.go) from net.ipv6.conf.all.disable_ipv6 and
+    net.ipv6.conf.default.disable_ipv6, and readProcSys reads those and this control's judged
+    keys from the one /proc/sys/net/ipv6/conf tree, writing a missing file there as absent "IPv6
+    is not built or is disabled" - so the gate is absent whenever a judged key is, and the
+    kernel publishes every conf knob or none. applies_when screens before absent_means (screen,
+    internal/check/eval.go), so no collector-shaped snapshot reaches absent_means with the gate
+    holding; the value it names cannot change any fixture's answer.

@@ -15,86 +15,80 @@
     },
     "net": {
       "sysctl": {
-        "ipv6_all_accept_redirects": {
+        "ipv6_all_accept_source_route": {
           "runtime": {
             "status": "ok",
             "value": 0,
             "source": {
               "kind": "proc",
-              "path": "/proc/sys/net/ipv6/conf/all/accept_redirects"
+              "path": "/proc/sys/net/ipv6/conf/all/accept_source_route"
             }
           },
           "persisted": {
-            "status": "ok",
-            "value": 0,
-            "source": {
-              "kind": "file",
-              "path": "/etc/sysctl.d/60-network-hardening.conf",
-              "line": 1,
-              "raw": "net.ipv6.conf.all.accept_redirects = 0"
-            }
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv6.conf.all.accept_source_route"
           },
           "effective": {
             "status": "ok",
             "value": 0,
             "source": {
               "kind": "proc",
-              "path": "/proc/sys/net/ipv6/conf/all/accept_redirects"
+              "path": "/proc/sys/net/ipv6/conf/all/accept_source_route"
             }
           },
           "winner": {
             "kind": "proc",
-            "path": "/proc/sys/net/ipv6/conf/all/accept_redirects"
+            "path": "/proc/sys/net/ipv6/conf/all/accept_source_route"
           }
         },
-        "ipv6_default_accept_redirects": {
+        "ipv6_default_accept_source_route": {
           "runtime": {
             "status": "ok",
             "value": 0,
             "source": {
               "kind": "proc",
-              "path": "/proc/sys/net/ipv6/conf/default/accept_redirects"
+              "path": "/proc/sys/net/ipv6/conf/default/accept_source_route"
             }
           },
           "persisted": {
-            "status": "ok",
-            "value": 0,
-            "source": {
-              "kind": "file",
-              "path": "/etc/sysctl.d/60-network-hardening.conf",
-              "line": 2,
-              "raw": "net.ipv6.conf.default.accept_redirects = 0"
-            }
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv6.conf.default.accept_source_route"
           },
           "effective": {
             "status": "ok",
             "value": 0,
             "source": {
               "kind": "proc",
-              "path": "/proc/sys/net/ipv6/conf/default/accept_redirects"
+              "path": "/proc/sys/net/ipv6/conf/default/accept_source_route"
             }
           },
           "winner": {
             "kind": "proc",
-            "path": "/proc/sys/net/ipv6/conf/default/accept_redirects"
+            "path": "/proc/sys/net/ipv6/conf/default/accept_source_route"
           }
         },
         "ipv6_all_disable_ipv6": {
           "runtime": {
             "status": "ok",
-            "value": 0,
+            "value": 1,
             "source": {
               "kind": "proc",
               "path": "/proc/sys/net/ipv6/conf/all/disable_ipv6"
             }
           },
           "persisted": {
-            "status": "absent",
-            "reason": "no sysctl.d line sets net.ipv6.conf.all.disable_ipv6"
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "file",
+              "path": "/etc/sysctl.d/60-disable-ipv6.conf",
+              "line": 1,
+              "raw": "net.ipv6.conf.all.disable_ipv6 = 1"
+            }
           },
           "effective": {
             "status": "ok",
-            "value": 0,
+            "value": 1,
             "source": {
               "kind": "proc",
               "path": "/proc/sys/net/ipv6/conf/all/disable_ipv6"
@@ -108,19 +102,25 @@
         "ipv6_default_disable_ipv6": {
           "runtime": {
             "status": "ok",
-            "value": 0,
+            "value": 1,
             "source": {
               "kind": "proc",
               "path": "/proc/sys/net/ipv6/conf/default/disable_ipv6"
             }
           },
           "persisted": {
-            "status": "absent",
-            "reason": "no sysctl.d line sets net.ipv6.conf.default.disable_ipv6"
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "file",
+              "path": "/etc/sysctl.d/60-disable-ipv6.conf",
+              "line": 2,
+              "raw": "net.ipv6.conf.default.disable_ipv6 = 1"
+            }
           },
           "effective": {
             "status": "ok",
-            "value": 0,
+            "value": 1,
             "source": {
               "kind": "proc",
               "path": "/proc/sys/net/ipv6/conf/default/disable_ipv6"
@@ -133,7 +133,7 @@
         },
         "ipv6_disabled": {
           "status": "ok",
-          "value": 0,
+          "value": 1,
           "source": {
             "kind": "derived",
             "inputs": [

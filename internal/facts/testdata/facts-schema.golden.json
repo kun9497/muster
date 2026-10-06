@@ -4452,6 +4452,16 @@
       "SubjectKind": ""
     },
     {
+      "Key": "net.sysctl.ipv6_disabled",
+      "Type": "int",
+      "Description": "Derived from the runtime sides of net.ipv6.conf.all.disable_ipv6 and net.ipv6.conf.default.disable_ipv6 - 1 when IPv6 is turned off the common way, on all and default together; 0 otherwise, since a kernel that disabled only default still speaks IPv6 on its present interfaces. The gate of the four IPv6 controls, and the same predicate the exposure verdict uses for an enabled family. When either read is not ok, the worse of the two statuses with that read's reason (absent \"IPv6 is not built or is disabled\" when the kernel has no IPv6).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
       "Key": "coredump.core_pattern",
       "Type": "string",
       "Description": "kernel.core_pattern verbatim - the file name pattern a core dump is written to, or the \"|\" pipe of the handler that takes it.",

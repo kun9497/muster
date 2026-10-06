@@ -70,6 +70,10 @@
             "status": "absent",
             "reason": "/proc/sys/net/ipv6/conf/default/disable_ipv6 does not exist: IPv6 is not built or is disabled"
           }
+        },
+        "ipv6_disabled": {
+          "status": "absent",
+          "reason": "/proc/sys/net/ipv6/conf/all/disable_ipv6 does not exist: IPv6 is not built or is disabled"
         }
       }
     }

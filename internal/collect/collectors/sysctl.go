@@ -43,11 +43,68 @@ func sysctlReads() []string {
 func runSysctl(_ context.Context, a collect.Access, b *collect.Builder) error {
 	scan := sysctlFiles(a)
 	winners := mergeSysctl(scan.files)
+	runtime := map[string]facts.Envelope{}
 	for _, l := range sysctlLeaves {
-		b.SetSetting(l.leaf, sysctlSetting(a, l.sysctlKey, scan, winners))
+		s := sysctlSetting(a, l.sysctlKey, scan, winners)
+		runtime[l.leaf] = *s.Runtime
+		b.SetSetting(l.leaf, s)
 	}
 	b.Set(sysctlBindV6OnlyLeaf, readProcSys(a, sysctlBindV6OnlyPath))
+	b.Set(sysctlIPv6DisabledLeaf, ipv6Disabled(runtime[sysctlDisableAllLeaf], runtime[sysctlDisableDefaultLeaf]))
 	return nil
+}
+
+// The derived gate of the IPv6 controls (W-79): IPv6 is off the common way
+// only when disable_ipv6 is 1 on all AND on default, the predicate the
+// exposure verdict uses too (W-76). One leaf alone is no gate: default=1
+// with all=0 leaves IPv6 live on every present interface.
+const (
+	sysctlIPv6DisabledLeaf   = "net.sysctl.ipv6_disabled"
+	sysctlDisableAllLeaf     = "net.sysctl.ipv6_all_disable_ipv6"
+	sysctlDisableDefaultLeaf = "net.sysctl.ipv6_default_disable_ipv6"
+)
+
+// ipv6DisabledRank orders the statuses a derived leaf can inherit: a read
+// that failed outweighs one that found nothing, so the worse of the two
+// reads is the answer when either is not ok.
+func ipv6DisabledRank(s facts.Status) int {
+	switch s {
+	case facts.StatusOK:
+		return 0
+	case facts.StatusAbsent:
+		return 1
+	case facts.StatusUnsupported:
+		return 2
+	case facts.StatusDenied:
+		return 3
+	case facts.StatusTimeout:
+		return 4
+	default: // error
+		return 5
+	}
+}
+
+// ipv6Disabled derives net.sysctl.ipv6_disabled from the runtime sides of
+// the two disable_ipv6 settings: 1 iff both read 1, else 0; when either is
+// not ok, the worse read's status and reason (a missing file keeps "IPv6 is
+// not built or is disabled").
+func ipv6Disabled(all, def facts.Envelope) facts.Envelope {
+	if all.Status != facts.StatusOK || def.Status != facts.StatusOK {
+		w := all
+		if ipv6DisabledRank(def.Status) > ipv6DisabledRank(all.Status) {
+			w = def
+		}
+		return facts.Envelope{Status: w.Status, Reason: w.Reason}
+	}
+	v := 0
+	if all.Value == 1 && def.Value == 1 {
+		v = 1
+	}
+	src := &facts.Source{Kind: "derived", Inputs: []facts.Source{
+		{Kind: "proc", Path: sysctlIPv6Prefix + "conf/all/disable_ipv6"},
+		{Kind: "proc", Path: sysctlIPv6Prefix + "conf/default/disable_ipv6"},
+	}}
+	return collect.OK(v, src)
 }
 
 // sysctlSetting builds one leaf's two-home envelope (K-3). Effective is a

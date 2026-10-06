@@ -15,56 +15,56 @@
     },
     "net": {
       "sysctl": {
-        "ipv6_all_accept_redirects": {
+        "ipv6_all_accept_ra": {
           "runtime": {
             "status": "ok",
-            "value": 1,
+            "value": 0,
             "source": {
               "kind": "proc",
-              "path": "/proc/sys/net/ipv6/conf/all/accept_redirects"
+              "path": "/proc/sys/net/ipv6/conf/all/accept_ra"
             }
           },
           "persisted": {
             "status": "absent",
-            "reason": "no sysctl.d line sets net.ipv6.conf.all.accept_redirects"
+            "reason": "no sysctl.d line sets net.ipv6.conf.all.accept_ra"
           },
           "effective": {
             "status": "ok",
-            "value": 1,
+            "value": 0,
             "source": {
               "kind": "proc",
-              "path": "/proc/sys/net/ipv6/conf/all/accept_redirects"
+              "path": "/proc/sys/net/ipv6/conf/all/accept_ra"
             }
           },
           "winner": {
             "kind": "proc",
-            "path": "/proc/sys/net/ipv6/conf/all/accept_redirects"
+            "path": "/proc/sys/net/ipv6/conf/all/accept_ra"
           }
         },
-        "ipv6_default_accept_redirects": {
+        "ipv6_default_accept_ra": {
           "runtime": {
             "status": "ok",
-            "value": 1,
+            "value": 0,
             "source": {
               "kind": "proc",
-              "path": "/proc/sys/net/ipv6/conf/default/accept_redirects"
+              "path": "/proc/sys/net/ipv6/conf/default/accept_ra"
             }
           },
           "persisted": {
             "status": "absent",
-            "reason": "no sysctl.d line sets net.ipv6.conf.default.accept_redirects"
+            "reason": "no sysctl.d line sets net.ipv6.conf.default.accept_ra"
           },
           "effective": {
             "status": "ok",
-            "value": 1,
+            "value": 0,
             "source": {
               "kind": "proc",
-              "path": "/proc/sys/net/ipv6/conf/default/accept_redirects"
+              "path": "/proc/sys/net/ipv6/conf/default/accept_ra"
             }
           },
           "winner": {
             "kind": "proc",
-            "path": "/proc/sys/net/ipv6/conf/default/accept_redirects"
+            "path": "/proc/sys/net/ipv6/conf/default/accept_ra"
           }
         },
         "ipv6_all_disable_ipv6": {
@@ -123,6 +123,23 @@
           "winner": {
             "kind": "proc",
             "path": "/proc/sys/net/ipv6/conf/default/disable_ipv6"
+          }
+        },
+        "ipv6_disabled": {
+          "status": "ok",
+          "value": 0,
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "proc",
+                "path": "/proc/sys/net/ipv6/conf/all/disable_ipv6"
+              },
+              {
+                "kind": "proc",
+                "path": "/proc/sys/net/ipv6/conf/default/disable_ipv6"
+              }
+            ]
           }
         }
       }

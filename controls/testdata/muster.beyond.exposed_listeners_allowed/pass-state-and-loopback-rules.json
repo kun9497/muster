@@ -100,7 +100,7 @@
             "iif": "lo",
             "ctstate": "",
             "action": "accept",
-            "unmodelled": "",
+            "unmodelled": false,
             "raw": "iif \"lo\" accept"
           },
           {
@@ -116,7 +116,7 @@
             "iif": "",
             "ctstate": "established,related",
             "action": "accept",
-            "unmodelled": "",
+            "unmodelled": false,
             "raw": "ct state established,related accept"
           },
           {
@@ -132,7 +132,7 @@
             "iif": "",
             "ctstate": "",
             "action": "accept",
-            "unmodelled": "",
+            "unmodelled": false,
             "raw": "tcp dport 22 accept"
           }
         ],
