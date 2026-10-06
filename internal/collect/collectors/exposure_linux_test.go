@@ -311,6 +311,43 @@ func TestProcessesExposureIPv6DisabledIsNotAFamily(t *testing.T) {
 		t.Errorf("stats %v, want ipv6_disabled and 5432 and 8080 filtered", st)
 	}
 
+	// W-86: all=1 and default=1 with eth1 re-enabled is IPv6 live on eth1
+	// (the kernel's drop test is the device's own flag), so [::]:8080 is a
+	// v6 candidate again and the v4-only ruleset leaves it unchained. eth0=1
+	// and lo=0 change nothing.
+	const eth0, eth1, loP = "/proc/sys/net/ipv6/conf/eth0/disable_ipv6", "/proc/sys/net/ipv6/conf/eth1/disable_ipv6", "/proc/sys/net/ipv6/conf/lo/disable_ipv6"
+	a.contents[eth0] = []byte("1\n")
+	a.contents[loP] = []byte("0\n")
+	b = seedFirewall(t, ufwCapture(t), "full", collect.OK(true, nil), "ufw")
+	buildOn(t, "processes", a, b)
+	if m := exposedRow(t, b, "tcp/8080"); m != nil {
+		t.Errorf("eth0=1 lo=0: tcp/8080 on :: exposed %v with IPv6 disabled", m)
+	}
+	if st := env(t, b, "exposure.stats").Value.(map[string]any); st["ipv6_disabled"] != true {
+		t.Errorf("eth0=1 lo=0: stats %v, want ipv6_disabled true", st)
+	}
+	a.contents[eth1] = []byte("0\n")
+	b = seedFirewall(t, ufwCapture(t), "full", collect.OK(true, nil), "ufw")
+	buildOn(t, "processes", a, b)
+	if m := exposedRow(t, b, "tcp/8080"); m == nil || m["via"] != "no_chain_in_family" {
+		t.Errorf("eth1=0: tcp/8080 on :: %v, want exposed via no_chain_in_family", m)
+	}
+	if st := env(t, b, "exposure.stats").Value.(map[string]any); st["ipv6_disabled"] != false {
+		t.Errorf("eth1=0: stats %v, want ipv6_disabled false", st)
+	}
+	// An interface file that exists and cannot be read is the answer for
+	// every v6 candidate (C3).
+	a.fails[eth1] = fmt.Errorf("%s: %w", eth1, unix.EACCES)
+	b = seedFirewall(t, ufwCapture(t), "full", collect.OK(true, nil), "ufw")
+	buildOn(t, "processes", a, b)
+	if e := env(t, b, "exposure.exposed"); e.Status != facts.StatusDenied || !strings.Contains(e.Reason, eth1) {
+		t.Errorf("an unreadable eth1: exposure.exposed %+v, want denied naming %s", e, eth1)
+	}
+	delete(a.fails, eth1)
+	for _, p := range []string{eth0, eth1, loP} {
+		delete(a.contents, p)
+	}
+
 	a.contents[procDisableV6Default] = []byte("0\n")
 	b = seedFirewall(t, ufwCapture(t), "full", collect.OK(true, nil), "ufw")
 	buildOn(t, "processes", a, b)

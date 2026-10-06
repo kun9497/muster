@@ -6,6 +6,8 @@ import (
 	"context"
 	"errors"
 	"io/fs"
+	"path"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -32,11 +34,11 @@ var sysctlCollector = collect.Collector{
 }
 
 func sysctlReads() []string {
-	reads := make([]string, 0, len(sysctlLeaves)+len(sysctlDirs)+2)
+	reads := make([]string, 0, len(sysctlLeaves)+len(sysctlDirs)+3)
 	for _, l := range sysctlLeaves {
 		reads = append(reads, l.path)
 	}
-	reads = append(reads, sysctlBindV6OnlyPath)
+	reads = append(reads, sysctlBindV6OnlyPath, sysctlDisableV6Glob)
 	return append(reads, sysctlPersistedReads()...)
 }
 
@@ -50,19 +52,48 @@ func runSysctl(_ context.Context, a collect.Access, b *collect.Builder) error {
 		b.SetSetting(l.leaf, s)
 	}
 	b.Set(sysctlBindV6OnlyLeaf, readProcSys(a, sysctlBindV6OnlyPath))
-	b.Set(sysctlIPv6DisabledLeaf, ipv6Disabled(runtime[sysctlDisableAllLeaf], runtime[sysctlDisableDefaultLeaf]))
+	b.Set(sysctlIPv6DisabledLeaf, ipv6Disabled(a, runtime[sysctlDisableAllLeaf], runtime[sysctlDisableDefaultLeaf]))
 	return nil
 }
 
-// The derived gate of the IPv6 controls (W-79): IPv6 is off the common way
-// only when disable_ipv6 is 1 on all AND on default, the predicate the
-// exposure verdict uses too (W-76). One leaf alone is no gate: default=1
-// with all=0 leaves IPv6 live on every present interface.
+// The derived gate of the IPv6 controls (W-79, W-86): IPv6 is off only
+// when disable_ipv6 is 1 on all, on default AND on every present interface
+// but lo, the predicate the exposure verdict uses too (W-76). One leaf alone
+// is no gate: default=1 with all=0 leaves IPv6 live on every present
+// interface, and all=1, default=1 with conf.eth1.disable_ipv6=0 (the "IPv6 on
+// one interface" recipe) leaves it live on eth1 — the kernel's drop test is
+// the device's own flag, which a later per-interface write re-enables.
 const (
 	sysctlIPv6DisabledLeaf   = "net.sysctl.ipv6_disabled"
 	sysctlDisableAllLeaf     = "net.sysctl.ipv6_all_disable_ipv6"
 	sysctlDisableDefaultLeaf = "net.sysctl.ipv6_default_disable_ipv6"
+	// sysctlDisableV6Glob is every conf/<name>/disable_ipv6, all and
+	// default included; both this collector and processes declare it.
+	sysctlDisableV6Glob = sysctlIPv6Prefix + "conf/*/disable_ipv6"
 )
+
+// ipv6InterfaceFiles lists the per-interface disable_ipv6 files of W-86:
+// every conf/<if> but all, default (read as settings of their own) and lo
+// (loopback traffic never comes from off the host), sorted. A conf directory
+// this run may not list is the answer for the predicate (C3); a kernel
+// without IPv6 has no conf directory and lists nothing.
+func ipv6InterfaceFiles(a collect.Access) ([]string, *facts.Envelope) {
+	matches, err := a.Glob(sysctlDisableV6Glob)
+	if err != nil {
+		e := readFailure(sysctlDisableV6Glob, err)
+		return nil, &e
+	}
+	out := make([]string, 0, len(matches))
+	for _, m := range matches {
+		switch path.Base(path.Dir(m)) {
+		case "all", "default", "lo":
+			continue
+		}
+		out = append(out, m)
+	}
+	slices.Sort(out)
+	return out, nil
+}
 
 // ipv6DisabledRank orders the statuses a derived leaf can inherit: a read
 // that failed outweighs one that found nothing, so the worse of the two
@@ -85,26 +116,45 @@ func ipv6DisabledRank(s facts.Status) int {
 }
 
 // ipv6Disabled derives net.sysctl.ipv6_disabled from the runtime sides of
-// the two disable_ipv6 settings: 1 iff both read 1, else 0; when either is
-// not ok, the worse read's status and reason (a missing file keeps "IPv6 is
-// not built or is disabled").
-func ipv6Disabled(all, def facts.Envelope) facts.Envelope {
-	// The two inputs are the source on every branch: a failed read keeps
+// the two disable_ipv6 settings and every present interface's own file
+// (W-86): 1 iff every one reads 1, else 0; when any read is not ok, the
+// worst read's status and reason (a missing all or default keeps "IPv6 is
+// not built or is disabled"). An interface whose file vanished between the
+// listing and the read is gone, not a value.
+func ipv6Disabled(a collect.Access, all, def facts.Envelope) facts.Envelope {
+	// Every file read is the source on every branch: a failed read keeps
 	// the evidence of what was read (C4).
 	src := &facts.Source{Kind: "derived", Inputs: []facts.Source{
 		{Kind: "proc", Path: sysctlIPv6Prefix + "conf/all/disable_ipv6"},
 		{Kind: "proc", Path: sysctlIPv6Prefix + "conf/default/disable_ipv6"},
 	}}
-	if all.Status != facts.StatusOK || def.Status != facts.StatusOK {
-		w := all
-		if ipv6DisabledRank(def.Status) > ipv6DisabledRank(all.Status) {
-			w = def
+	reads := []facts.Envelope{all, def}
+	ifaces, globFail := ipv6InterfaceFiles(a)
+	if globFail != nil {
+		reads = append(reads, *globFail)
+	}
+	for _, p := range ifaces {
+		e := readProcSys(a, p)
+		if e.Status == facts.StatusAbsent {
+			continue
 		}
+		src.Inputs = append(src.Inputs, facts.Source{Kind: "proc", Path: p})
+		reads = append(reads, e)
+	}
+	w := reads[0]
+	for _, e := range reads[1:] {
+		if ipv6DisabledRank(e.Status) > ipv6DisabledRank(w.Status) {
+			w = e
+		}
+	}
+	if w.Status != facts.StatusOK {
 		return facts.Envelope{Status: w.Status, Reason: w.Reason, Source: src}
 	}
-	v := 0
-	if all.Value == 1 && def.Value == 1 {
-		v = 1
+	v := 1
+	for _, e := range reads {
+		if e.Value != 1 {
+			v = 0
+		}
 	}
 	return collect.OK(v, src)
 }

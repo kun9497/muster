@@ -152,7 +152,7 @@ func TestCollectListActionsOnLinux(t *testing.T) {
 		"read none /proc/1/ns/mnt", "read none /proc/[0-9]*/cmdline", "read none /proc/[0-9]*/exe",
 		"read none /proc/[0-9]*/fd/*", "read none /proc/[0-9]*/mountinfo", "read none /proc/[0-9]*/ns/mnt", "read none /proc/[0-9]*/root", "read none /proc/[0-9]*/task/*/fd/*", "read none /proc/[0-9]*/status",
 		"read none /proc/self/net/tcp", "read none /proc/self/net/tcp6", "read none /proc/self/net/udp", "read none /proc/self/net/udp6",
-		"read none /proc/sys/net/ipv6/bindv6only", "read none /proc/sys/net/ipv6/conf/all/disable_ipv6", "read none /proc/sys/net/ipv6/conf/default/disable_ipv6", "read none /sbin",
+		"read none /proc/sys/net/ipv6/bindv6only", "read none /proc/sys/net/ipv6/conf/*/disable_ipv6", "read none /proc/sys/net/ipv6/conf/all/disable_ipv6", "read none /proc/sys/net/ipv6/conf/default/disable_ipv6", "read none /sbin",
 		"read none /var/lib/dpkg/diversions", "read none /var/lib/dpkg/info/*.list", "read none /var/lib/dpkg/statoverride",
 		"read none /var/lib/dpkg/status", "read none /var/lib/rpm",
 	}
@@ -193,7 +193,7 @@ func TestCollectListActionsOnLinux(t *testing.T) {
 		"read none /proc/sys/net/ipv4/tcp_syncookies",
 		"read none /proc/sys/net/ipv6/conf/all/accept_ra", "read none /proc/sys/net/ipv6/conf/default/accept_ra",
 		"read none /proc/sys/net/ipv6/conf/all/disable_ipv6", "read none /proc/sys/net/ipv6/conf/default/disable_ipv6",
-		"read none /proc/sys/net/ipv6/bindv6only",
+		"read none /proc/sys/net/ipv6/conf/*/disable_ipv6", "read none /proc/sys/net/ipv6/bindv6only",
 	}
 	slices.Sort(gotSysctl)
 	slices.Sort(wantSysctl)

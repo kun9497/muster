@@ -21,10 +21,10 @@ type exposureInputs struct {
 	Rules      []fwRule
 	BindV6Only int  // net.ipv6.bindv6only: 0 lets a socket on :: take v4 traffic too
 	HasV6      bool // a v6 socket table exists, so the host speaks v6 (W-40)
-	// V6Disabled is net.ipv6.conf.all.disable_ipv6 and
-	// net.ipv6.conf.default.disable_ipv6 both 1: the tcp6 and udp6 tables
-	// still exist, but the kernel drops every inbound IPv6 packet, so v6 is
-	// not an enabled family and no v6 candidate can be reached (W-76).
+	// V6Disabled is disable_ipv6 1 on all, on default and on every present
+	// interface but lo: the tcp6 and udp6 tables still exist, but the kernel
+	// drops every inbound IPv6 packet, so v6 is not an enabled family and no
+	// v6 candidate can be reached (W-76, W-86).
 	V6Disabled bool
 	// BaseFamilies are the families (v4, v6, inet) that hold an input filter
 	// base chain. A base chain with no rule leaves no row in Rules, so the

@@ -388,6 +388,7 @@ func TestSysctlDeclarationCoversItsReads(t *testing.T) {
 		"/proc/sys/net/ipv4/ip_forward",
 		"/proc/sys/net/ipv4/tcp_syncookies",
 		"/proc/sys/net/ipv6/bindv6only",
+		"/proc/sys/net/ipv6/conf/*/disable_ipv6",
 		"/proc/sys/net/ipv6/conf/all/accept_ra",
 		"/proc/sys/net/ipv6/conf/all/accept_redirects",
 		"/proc/sys/net/ipv6/conf/all/accept_source_route",
@@ -851,8 +852,69 @@ func TestSysctlIPv6DisabledDerived(t *testing.T) {
 			t.Errorf("all=%d default=%d: source %+v, want the two disable_ipv6 paths", c.all, c.def, e.Source)
 		}
 	}
-	b := build(t, "sysctl", netSysAccess(func(p string) bool { return p == defP }))
+	// W-86: every present interface but lo has its own flag, and the
+	// kernel's drop test is that flag — one interface re-enabled after
+	// all=1 speaks IPv6. lo is never read into the predicate.
+	const eth0 = "/proc/sys/net/ipv6/conf/eth0/disable_ipv6"
+	const eth1 = "/proc/sys/net/ipv6/conf/eth1/disable_ipv6"
+	const loP = "/proc/sys/net/ipv6/conf/lo/disable_ipv6"
+	for _, c := range []struct {
+		name   string
+		ifaces map[string]string
+		want   int
+		inputs []string
+	}{
+		{"eth0=1", map[string]string{eth0: "1\n", loP: "0\n"}, 1, []string{allP, defP, eth0}},
+		{"eth1=0", map[string]string{eth0: "1\n", eth1: "0\n", loP: "1\n"}, 0, []string{allP, defP, eth0, eth1}},
+	} {
+		a := netSysAccess(nil)
+		a.contents[allP] = []byte("1\n")
+		a.contents[defP] = []byte("1\n")
+		for p, v := range c.ifaces {
+			a.contents[p] = []byte(v)
+		}
+		b := build(t, "sysctl", a)
+		e := leaf(t, b, "net.sysctl.ipv6_disabled").(facts.Envelope)
+		if e.Status != facts.StatusOK || e.Value != c.want {
+			t.Errorf("all=1 default=1 %s: %+v, want ok %d", c.name, e, c.want)
+		}
+		var got []string
+		if e.Source != nil {
+			for _, in := range e.Source.Inputs {
+				got = append(got, in.Path)
+			}
+		}
+		if !slices.Equal(got, c.inputs) {
+			t.Errorf("all=1 default=1 %s: source inputs %v, want %v", c.name, got, c.inputs)
+		}
+	}
+	// An interface file that exists and cannot be read is the answer (C3),
+	// and it stays in the source.
+	a := netSysAccess(nil)
+	a.contents[allP] = []byte("1\n")
+	a.contents[defP] = []byte("1\n")
+	a.contents[eth0] = []byte("1\n")
+	a.fails = map[string]error{eth0: fs.ErrPermission}
+	b := build(t, "sysctl", a)
 	e := leaf(t, b, "net.sysctl.ipv6_disabled").(facts.Envelope)
+	if e.Status != facts.StatusDenied || !strings.Contains(e.Reason, eth0) {
+		t.Errorf("an unreadable eth0: %+v, want denied naming %s", e, eth0)
+	}
+	if e.Source == nil || len(e.Source.Inputs) != 3 || e.Source.Inputs[2].Path != eth0 {
+		t.Errorf("an unreadable eth0: source %+v, want all, default and eth0", e.Source)
+	}
+	// A conf directory this run may not list is the answer too.
+	a = netSysAccess(nil)
+	a.contents[allP] = []byte("1\n")
+	a.contents[defP] = []byte("1\n")
+	a.deniedDirs = map[string]bool{"/proc/sys/net/ipv6/conf": true}
+	b = build(t, "sysctl", a)
+	if e := leaf(t, b, "net.sysctl.ipv6_disabled").(facts.Envelope); e.Status != facts.StatusDenied || !strings.Contains(e.Reason, "/proc/sys/net/ipv6/conf") {
+		t.Errorf("an unlistable conf directory: %+v, want denied naming it", e)
+	}
+
+	b = build(t, "sysctl", netSysAccess(func(p string) bool { return p == defP }))
+	e = leaf(t, b, "net.sysctl.ipv6_disabled").(facts.Envelope)
 	if e.Status != facts.StatusAbsent || !strings.Contains(e.Reason, "IPv6 is not built or is disabled") {
 		t.Errorf("a missing default/disable_ipv6: %+v, want absent: IPv6 is not built or is disabled", e)
 	}

@@ -86,7 +86,7 @@ func processesReads() []string {
 		"/proc/[0-9]*/mountinfo",
 		"/proc/[0-9]*/root",
 		procInitMntNS,
-		procBindV6Only, procDisableV6All, procDisableV6Default,
+		procBindV6Only, procDisableV6All, procDisableV6Default, sysctlDisableV6Glob,
 	}
 	out = append(out, usrAliases...)
 	out = append(out, procNetPaths()...)
@@ -1044,13 +1044,26 @@ func writeExposure(a collect.Access, b *collect.Builder, ls []listener, lst fact
 	// that exists and cannot be read is the answer for every :: listener (C3).
 	bind, _, bindFail := readProcInt(a, procBindV6Only)
 	in.BindV6Only = bind
-	// disable_ipv6 on all and default both 1: the kernel drops every inbound
-	// IPv6 packet, so v6 is no enabled family (W-76). Either file unreadable
-	// is the answer for every v6 candidate (C3); v6 then stays enabled.
+	// disable_ipv6 1 on all, on default and on every present interface but
+	// lo: the kernel drops every inbound IPv6 packet, so v6 is no enabled
+	// family (W-76, W-86). The drop test is the device's own flag, so one
+	// interface re-enabled after all=1 speaks IPv6. Any file unreadable, or
+	// the conf directory unlistable, is the answer for every v6 candidate
+	// (C3); v6 then stays enabled.
 	allOff, allOK, allFail := readProcInt(a, procDisableV6All)
 	defOff, defOK, defFail := readProcInt(a, procDisableV6Default)
-	v6Fail := cmp.Or(allFail, defFail)
-	in.V6Disabled = v6Fail == nil && allOK && defOK && allOff == 1 && defOff == 1
+	off := allOK && defOK && allOff == 1 && defOff == 1
+	ifaces, ifFail := ipv6InterfaceFiles(a)
+	v6Fail := cmp.Or(allFail, defFail, ifFail)
+	for _, p := range ifaces {
+		n, present, fail := readProcInt(a, p)
+		v6Fail = cmp.Or(v6Fail, fail)
+		// A file that vanished since the listing is an interface gone.
+		if present && n != 1 {
+			off = false
+		}
+	}
+	in.V6Disabled = v6Fail == nil && off
 
 	listenersOK := lst.Status == facts.StatusOK
 	var cands []listener
