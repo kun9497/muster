@@ -123,7 +123,7 @@ jobs:
               # three 3C-2b listener lists). No apostrophe may appear in this
               # jq program: the shell holds it in single quotes.
               def scrubaddr:
-                if (.addr | type) == "string" and (.addr | test("^(127\.|::1$|0\.0\.0\.0$|::$)") | not)
+                if (.addr | type) == "string" and (.addr | test("^(127\\.|::1$|0\\.0\\.0\\.0$|::$)") | not)
                 then .addr = (if (.addr | test(":")) then "2001:db8::1" else "192.0.2.1" end)
                 else . end;
               .run.host.hostname = $host
