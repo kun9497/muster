@@ -263,6 +263,10 @@ jobs:
           # --deep without root: pkgverify writes its one denied key, and the
           # unreadable auditd.conf is the answer for every audit.conf leaf.
           jq -e '.facts.packages.verify.complete.status == "denied" and .facts.audit.conf.log_file.status == "denied"' "$RUNNER_TEMP/muster/user.json"
+          # Spec §5's non-root reading (a hypothesis until the first run; the
+          # run corrects this step, never the collector): the process list is
+          # read, and other accounts' exe links carry their denial per row.
+          jq -e '.facts.processes.list.status == "ok" and any(.facts.processes.list.value[]; .exe_read_status == "denied")' "$RUNNER_TEMP/muster/user.json"
       - name: every PASS is clean and something is ERROR without root
         run: |
           set +e
@@ -426,6 +430,10 @@ jobs:
           sudo chown "$(id -u)" "$RUNNER_TEMP/muster/containers/c.json"
           test -s "$RUNNER_TEMP/muster/containers/c.json"
           jq -e '.run.env.container != "none"' "$RUNNER_TEMP/muster/containers/c.json"
+          # Spec §5: inside a container processes.* read the namespace (a
+          # hypothesis until the first run corrects the step, never the
+          # collector).
+          jq -e '.facts.processes.list.status == "ok"' "$RUNNER_TEMP/muster/containers/c.json"
           if [ "${{ matrix.init }}" = "true" ]; then
             jq -e '.facts.services.ssh.installed.status == "ok"' "$RUNNER_TEMP/muster/containers/c.json"
             # C-1: the Rocky/Alma 9 images ship no libwrap, so the presence
@@ -493,6 +501,9 @@ jobs:
           test "$files" = "$RUNNER_TEMP/muster/out/s.json"
           test "$(stat -c '%a' "$RUNNER_TEMP/muster/out/s.json")" = "600"
           jq -e '.run.complete == true and .run.env.container != "none"' "$RUNNER_TEMP/muster/out/s.json"
+          # muster runs alone in this container, so the list may hold one row;
+          # it is still read (a hypothesis until the first run).
+          jq -e '.facts.processes.list.status == "ok"' "$RUNNER_TEMP/muster/out/s.json"
       - name: every fact the capability matrix calls container-unsupported reads unsupported
         run: |
           jq -e --slurpfile m docs/reference/capability-matrix.json '
