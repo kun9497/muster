@@ -17,6 +17,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -1812,6 +1813,9 @@ func TestOracleDeletedExecutable(t *testing.T) {
 	}
 	cmd := exec.Command(cp)
 	cmd.Env = append(os.Environ(), oracleSleeperEnv+"=1")
+	// A parent killed without its defers (a -timeout panic, SIGKILL) would
+	// orphan the sleeper for its 300 s; the kernel kills it with the parent.
+	cmd.SysProcAttr = &syscall.SysProcAttr{Pdeathsig: syscall.SIGKILL}
 	if err := cmd.Start(); err != nil {
 		if errors.Is(err, fs.ErrPermission) {
 			t.Fatalf("start %s: %v - the temporary directory (TMPDIR=%q) is likely mounted noexec; point TMPDIR at an exec mount to run this pair", cp, err, os.Getenv("TMPDIR"))
