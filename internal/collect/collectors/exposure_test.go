@@ -219,6 +219,29 @@ func TestExposureInetChainCoversBoth(t *testing.T) {
 	}
 }
 
+// S7: an inet input chain beside a chain of one concrete family covers the
+// other family too. nftables.service's `table inet filter` plus a legacy
+// script's `table ip filter` INPUT DROP: a v6 listener on a port no rule
+// admits is filtered by the inet chain, never no_chain_in_family because v6
+// has no chain of its own.
+func TestExposureInetChainCoversTheFamilyBesideAConcreteOne(t *testing.T) {
+	in := full(accept("inet", "input", "proto=tcp dport=22"))
+	in.HasV6, in.BindV6Only = true, 1
+	in.BaseFamilies = map[string]bool{"inet": true, "v4": true}
+	ls := []listener{lsn("tcp", "v6", "::", 5432), lsn("tcp", "v6", "2001:db8::10", 5433)}
+	rows, exposed := decided(t, ls, in)
+	if len(exposed) != 0 {
+		t.Errorf("exposed %+v, want none", exposed)
+	}
+	for _, c := range []struct {
+		service, addr string
+	}{{"tcp/5432", "::"}, {"tcp/5433", "2001:db8::10"}} {
+		if r := expRow(t, rows, c.service, c.addr); r.Exposed || r.Via != viaFiltered {
+			t.Errorf("%s on %s %+v, want filtered by the inet chain, not no_chain_in_family", c.service, c.addr, r)
+		}
+	}
+}
+
 func TestExposureDualStackBindAsksBothFamilies(t *testing.T) {
 	in := full(accept("v4", "INPUT", "proto=tcp dport=80"), accept("v6", "INPUT", "proto=tcp dport=22"))
 	in.HasV6 = true
