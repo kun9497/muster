@@ -1059,10 +1059,17 @@ func writeExposure(a collect.Access, b *collect.Builder, ls []listener, lst fact
 	}
 	rows, exposed, opaque, manual := decideExposure(cands, in)
 
+	// The firewall's source once: the confidence and the rule table are
+	// written from the same capture, so the rules' source stands for both,
+	// and the confidence's only when the rules carry none.
 	src := &facts.Source{Kind: "derived"}
-	for _, e := range []facts.Envelope{conf, rulesEnv, lst} {
-		if e.Source != nil {
-			src.Inputs = append(src.Inputs, *e.Source)
+	fwSrc := rulesEnv.Source
+	if fwSrc == nil {
+		fwSrc = conf.Source
+	}
+	for _, s := range []*facts.Source{fwSrc, lst.Source} {
+		if s != nil {
+			src.Inputs = append(src.Inputs, *s)
 		}
 	}
 

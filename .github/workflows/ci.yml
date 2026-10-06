@@ -227,7 +227,8 @@ jobs:
           grep -q 'oracle deleted-exe: compared 1' "$RUNNER_TEMP/oracle.log"
           # Every key the pair walks counts once it agrees (a value, a knob
           # neither side finds, or a refused read), so the count is the key
-          # list's length on any kernel: 12 + 26 + bindv6only.
+          # list's length on any kernel: 12 + 26 + bindv6only. A new sysctl
+          # leaf bumps this number.
           grep -q 'oracle sysctl: compared 39' "$RUNNER_TEMP/oracle.log"
       - name: take the oracle drop-in back out
         # P-1: the runner is thrown away, but a step that exists to undo a

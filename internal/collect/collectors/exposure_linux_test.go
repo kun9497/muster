@@ -329,3 +329,20 @@ func TestProcessesExposureIPv6DisabledIsNotAFamily(t *testing.T) {
 		t.Errorf("exposure.exposed %+v, want denied naming disable_ipv6", e)
 	}
 }
+
+// The exposure envelopes cite the firewall's capture once and the listeners
+// once: the confidence and the rule table come from the same capture, so
+// listing both would repeat its source.
+func TestProcessesExposureCitesTheFirewallOnce(t *testing.T) {
+	b := seedFirewall(t, ufwCapture(t), "full", collect.OK(true, nil), "ufw")
+	buildOn(t, "processes", webHost(), b)
+	for _, k := range exposureKeys {
+		e := env(t, b, k)
+		if e.Source == nil || e.Source.Kind != "derived" || len(e.Source.Inputs) != 2 {
+			t.Fatalf("%s source %+v, want derived from two inputs", k, e.Source)
+		}
+		if in := e.Source.Inputs; in[0].Kind != "command" || in[0].Cmd != iptablesSave || in[1].Kind != "derived" {
+			t.Errorf("%s inputs %+v, want the firewall's command, then the listeners", k, in)
+		}
+	}
+}

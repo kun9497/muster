@@ -6,6 +6,8 @@ import (
 	"cmp"
 	"context"
 	"encoding/json"
+	"errors"
+	"io/fs"
 	"maps"
 	"net"
 	"os"
@@ -41,9 +43,10 @@ import (
 //     `auditctl -s` and `-l`, `lastlog -u`, `getcap -r`, `visudo -c`,
 //     `ss -tulpnH`), run through the same exec discipline the collectors
 //     use. The two writers are the keys pair's `ssh-keygen` and the
-//     deleted-executable pair's copy of sleep, and both write only under
-//     t.TempDir(), which the test removes: no key reaches a declared path or
-//     a snapshot, and the copy runs as the test's own child, which it kills.
+//     deleted-executable pair's copy of the test binary, and both write
+//     only under t.TempDir(), which the test removes: no key reaches a
+//     declared path or a snapshot, and the copy runs as the test's own
+//     child, which it kills.
 //   - A pair whose oracle binary is not on this machine skips, naming the
 //     binary; that is the only skip an enabled run may produce — besides,
 //     for the audit pair, J-1's "auditctl cannot reach the kernel" (exit 4
@@ -1634,8 +1637,8 @@ func oracleSSLine(line string) (oracleSocket, []int, bool) {
 // ss asks the kernel over netlink and names the holders itself. Every row
 // muster lists must be a socket ss lists, every pid ss names in its users
 // column must be among the row's owners (a kernel-owned row has none), and
-// every socket ss lists must be a row — so a row the parser drops is caught
-// as surely as one it invents. The firewall collector runs first on the same
+// every socket ss lists must be a row (when the list is not truncated) — so
+// a row the parser drops is caught as surely as one it invents. The firewall collector runs first on the same
 // builder, as in a run, so the exposure derivation reads real facts; its
 // commands are queries too.
 func TestOracleListeners(t *testing.T) {
@@ -1655,9 +1658,11 @@ func TestOracleListeners(t *testing.T) {
 
 	e := env(t, b, "processes.listeners")
 	switch {
-	case e.Status == facts.StatusAbsent:
+	case e.Status == facts.StatusAbsent && strings.Contains(e.Reason, "pid view may be partial"):
 		// W-67/W-69: a partial pid view (a container) leaves an unheld
-		// socket unjudged; there is no owner list to compare.
+		// socket unjudged; there is no owner list to compare. Any other
+		// absent (a W-70 zombie-leader owner) is a reading this pair
+		// cannot vouch for, and fails below like every other status.
 		t.Skipf("processes.listeners is absent%s: no owner list to compare", reasonSuffix(e.Reason))
 	case e.Status != facts.StatusOK:
 		t.Fatalf("processes.listeners is %s%s", e.Status, reasonSuffix(e.Reason))
@@ -1719,9 +1724,15 @@ func TestOracleListeners(t *testing.T) {
 		}
 		compared++
 	}
-	for _, k := range oracleSortedSockets(ss) {
-		if rows[k] == nil {
-			t.Errorf("listeners: ss lists %s/%d on %s, muster does not", k.proto, k.port, k.addr)
+	// The reverse direction holds only for a whole list: a list cut at
+	// procListenersCap cannot prove that a socket ss names is missing.
+	if e.Truncated {
+		t.Logf("listeners: processes.listeners is truncated at %d rows; the reverse direction is not compared", procListenersCap)
+	} else {
+		for _, k := range oracleSortedSockets(ss) {
+			if rows[k] == nil {
+				t.Errorf("listeners: ss lists %s/%d on %s, muster does not", k.proto, k.port, k.addr)
+			}
 		}
 	}
 	if compared == 0 {
@@ -1775,22 +1786,36 @@ func TestOracleSSLineSplits(t *testing.T) {
 
 // TestOracleDeletedExecutable makes the one fact the kernel and the test
 // both know for certain: a process whose executable was unlinked after it
-// started. The test copies sleep into its own t.TempDir(), starts the copy,
-// removes it, and asks the collector; the child is the test's own process
-// and is killed before the test returns, so nothing on the host changes.
+// started. The test copies its own binary into t.TempDir(), starts the copy
+// as a sleeper (oracleSleeperEnv, below), removes the copy, and asks the
+// collector; the child is the test's own process and is killed before the
+// test returns, so nothing on the host changes.
+//
+// The copy is the test binary, not /bin/sleep: on EL's coreutils-single
+// /usr/bin/sleep is a 52-byte script whose interpreter is the multi-call
+// /usr/bin/coreutils, so a copy of it runs with /usr/bin/coreutils as its
+// exe and nothing is deleted (W-82, measured in the rocky and alma init
+// images). The test binary is an executable on every host the pair runs on.
 func TestOracleDeletedExecutable(t *testing.T) {
 	oracleEnabled(t)
-	src := oracleBinary(t, "/bin/sleep")
-	data, err := os.ReadFile(src)
+	self, err := os.Executable()
 	if err != nil {
 		t.Fatal(err)
 	}
-	cp := filepath.Join(t.TempDir(), "muster-oracle-sleep")
+	data, err := os.ReadFile(self)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cp := filepath.Join(t.TempDir(), "muster-oracle-sleeper")
 	if err := os.WriteFile(cp, data, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	cmd := exec.Command(cp, "300")
+	cmd := exec.Command(cp)
+	cmd.Env = append(os.Environ(), oracleSleeperEnv+"=1")
 	if err := cmd.Start(); err != nil {
+		if errors.Is(err, fs.ErrPermission) {
+			t.Fatalf("start %s: %v - the temporary directory (TMPDIR=%q) is likely mounted noexec; point TMPDIR at an exec mount to run this pair", cp, err, os.Getenv("TMPDIR"))
+		}
 		t.Fatalf("start %s: %v", cp, err)
 	}
 	defer func() {
@@ -1800,20 +1825,59 @@ func TestOracleDeletedExecutable(t *testing.T) {
 	if err := os.Remove(cp); err != nil {
 		t.Fatal(err)
 	}
+	// The preconditions, read here and not by the collector: the child is
+	// alive (a zombie is rightly not listed) and runs the copy itself.
+	pid := cmd.Process.Pid
+	if st := oracleProcState(t, pid); st == "" || st == "Z" {
+		t.Fatalf("deleted-exe: the sleeper (pid %d) is not running (state %q) before the collect", pid, st)
+	}
+	if exe, err := os.Readlink("/proc/" + strconv.Itoa(pid) + "/exe"); err != nil || !strings.HasPrefix(exe, cp) {
+		t.Fatalf("deleted-exe: the sleeper (pid %d) runs %q (%v), not the copy %s", pid, exe, err, cp)
+	}
 
 	b := build(t, "processes", collect.Host())
 	found := false
 	for _, r := range okList(t, b, "processes.deleted_executables") {
 		row := r.(map[string]any)
-		if row["pid"] == cmd.Process.Pid {
+		if row["pid"] == pid {
 			found = true
 			if exe, _ := row["exe"].(string); !strings.HasPrefix(exe, cp) {
-				t.Errorf("deleted-exe: pid %d's exe is %q, want %s", cmd.Process.Pid, exe, cp)
+				t.Errorf("deleted-exe: pid %d's exe is %q, want %s", pid, exe, cp)
 			}
 		}
 	}
 	if !found {
-		t.Fatalf("deleted-exe: pid %d runs the unlinked %s, and processes.deleted_executables does not list it", cmd.Process.Pid, cp)
+		t.Fatalf("deleted-exe: pid %d runs the unlinked %s, and processes.deleted_executables does not list it", pid, cp)
 	}
 	t.Logf("oracle deleted-exe: compared 1")
+}
+
+// oracleProcState is the State letter of /proc/<pid>/status, or "" when the
+// process is gone; read here, not by the collector's parser (rule 1).
+func oracleProcState(t *testing.T, pid int) string {
+	t.Helper()
+	b, err := os.ReadFile("/proc/" + strconv.Itoa(pid) + "/status")
+	if err != nil {
+		return ""
+	}
+	for _, line := range oracleLines(b) {
+		if v, ok := strings.CutPrefix(line, "State:"); ok {
+			f := strings.Fields(v)
+			if len(f) > 0 {
+				return f[0]
+			}
+		}
+	}
+	return ""
+}
+
+// oracleSleeperEnv turns a copy of this test binary into the deleted-exe
+// pair's child: set, the binary sleeps before any test runs and exits.
+const oracleSleeperEnv = "MUSTER_ORACLE_SLEEPER"
+
+func init() {
+	if os.Getenv(oracleSleeperEnv) == "1" {
+		time.Sleep(300 * time.Second)
+		os.Exit(0)
+	}
 }
