@@ -239,7 +239,7 @@ func TestParseIptablesRuleRecordsSelectors(t *testing.T) {
 		{`-A INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT`, fwRule{Ctstate: "related,established", Action: "accept"}},
 		{`-A INPUT -p tcp -m multiport --dports 22,80,443 -j ACCEPT`, fwRule{Proto: "tcp", Dport: "22,80,443", Action: "accept"}},
 		{`-A INPUT -p tcp -m tcp --dport 1000:2000 -j ACCEPT`, fwRule{Proto: "tcp", Dport: "1000:2000", Action: "accept"}},
-		{`-A INPUT -d 10.0.0.1/32 -j ACCEPT`, fwRule{Daddr: "10.0.0.1/32", Action: "accept"}},
+		{`-A INPUT -d 198.51.100.1/32 -j ACCEPT`, fwRule{Daddr: "198.51.100.1/32", Action: "accept"}},
 		{`-A INPUT -j ufw-before-input`, fwRule{Action: "jump ufw-before-input"}},
 		{`-A INPUT -m owner --uid-owner 0 -j ACCEPT`, fwRule{Action: "accept", Unmodelled: true}},
 	}
@@ -275,7 +275,7 @@ func TestClassifyRule(t *testing.T) {
 		{fwRule{Action: "jump ufw-user-input"}, "irrelevant"},
 		{fwRule{Action: "log"}, "irrelevant"},
 		{fwRule{Action: "accept", Unmodelled: true}, "opaque"},
-		{fwRule{Action: "accept", Daddr: "10.0.0.1"}, "opaque"},
+		{fwRule{Action: "accept", Daddr: "198.51.100.1"}, "opaque"},
 		{fwRule{Action: ""}, "opaque"},
 	}
 	// …
