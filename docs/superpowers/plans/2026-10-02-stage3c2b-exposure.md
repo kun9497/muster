@@ -528,6 +528,16 @@ measurement behind it.
 - Oracles on the lab: listeners 24, deleted-exe 1, sysctl 39 (12 + 26 + `bindv6only`); the deleted-exe pair
   PASSes in the rocky 9 and alma 9 init containers (`compared 1`), where the listeners pair skips (no `ss`).
 - Kernel-socket measurement: WireGuard `udp/51820` inode 363387305 / udp6 363387306 (W-66).
+- GitHub runner (ubuntu-24.04 image; PR #20, CI runs 37436494836/37440289967/37441803650 green first
+  time, examples run 37443536311): 160 processes (119 kernel threads), fd_reads 1076, dpkg index 113 ms,
+  elapsed 164 ms; `full`/`open_policy` (X-9 held, the CI assert stood); examples VM exposed tcp/22 v4+v6
+  and udp/68 → control 1 PASS; the root job's image also served tcp/25 → FAIL there; control 8 FAIL
+  (24.04: `default.accept_source_route` 1, nothing persisted — hypothesis confirmed), ip_forwarding FAIL
+  (docker), no_deleted_executables FAIL; thirteen = 6 PASS / 7 FAIL; U-28 FAIL (D16), U-01 WARN; oracles
+  on the runner: listeners 11, deleted-exe 1, sysctl 39. The examples rewrite needed three fixes for the
+  new address-bearing facts (the listener rows' `addr`, rule text fields) — G-23's lesson again: every
+  new fact that can carry an address needs a rewrite line, and the jq program must be edited by copying
+  a working line (single-quoted shell string: no apostrophes, doubled backslashes).
 
 ### Parked
 

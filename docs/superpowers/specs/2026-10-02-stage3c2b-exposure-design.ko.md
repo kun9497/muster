@@ -398,7 +398,12 @@ W-79) — 권장 방식으로, `all`, `default`와 모든 인터페이스에서 
   행 — 꺼진 ufw, DHCP 클라이언트, 외부 리스너 없음, 삭제된 실행파일 없음 — 은 가설로 남고 `_notes`가
   어느 쪽인지 밝힘. **Ubuntu 24.04**는 `50-default.conf`를 배포하지 않으므로(W-77)
   `default.accept_source_route`를 persisted하는 것이 없고 커널 기본값은 `1`(`ipv4_devconf_dflt`): 기본
-  24.04는 컨트롤 8도 FAIL — 열셋 중 다섯(6, 7, 8, 10, 13). GitHub 러너(24.04)는 브랜치가 푸시된 뒤 examples 실행이 읽고(W-84), 그 판독은 계획의 Execution notes에 적습니다.
+  24.04는 컨트롤 8도 FAIL — 열셋 중 다섯(6, 7, 8, 10, 13). GitHub 러너(24.04; examples 실행과 CI root 잡, W-84)에서 측정: ufw 설치·비활성 → `full`, `open_policy`;
+  examples VM은 `tcp/22`(v4, v6)와 `udp/68`을 노출하고 모두 허용 → 컨트롤 1 PASS, CI root 잡의 이미지는
+  와일드카드의 `tcp/25`도 서비스해 거기선 컨트롤 1 FAIL(이미지는 기본 호스트가 아님); 컨트롤 8 FAIL
+  (`default.accept_source_route` 1, persisted 없음 — 가설 성립), `ip_forwarding` FAIL(docker),
+  `no_deleted_executables` FAIL(이미지 빌드 뒤 업그레이드된 데몬); 열셋은 PASS 6 / FAIL 7; U-28 FAIL(D16),
+  U-01 WARN.
 - **기본 EL9(가설).** firewalld 활성(`backend firewalld`, 그 nft 규칙 집합): `filter_INPUT` 체인이 규칙을
   가진 채 기본 accept라 정규화기가 오늘 `partial`로 분류하고 앞으로도 그러함 — 기본 EL9에서 컨트롤 1은
   MANUAL이고 설명이 그렇게 적음; firewalld 존 모델의 1급 정규화는 보류(§8). 프로세스 사실은

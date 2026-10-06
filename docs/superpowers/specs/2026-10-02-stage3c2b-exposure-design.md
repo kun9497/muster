@@ -476,7 +476,13 @@ remote-NSS WARN.
   the hypothesis and `_notes` says which is which. **Ubuntu 24.04** ships no `50-default.conf`
   (W-77), so nothing persists `default.accept_source_route`, whose kernel default is `1`
   (`ipv4_devconf_dflt`): a stock 24.04 reads control 8 FAIL too — five of the thirteen (6, 7, 8,
-  10, 13). The GitHub runner (24.04) is read by the examples run once the branch is pushed (W-84); its reading goes into the plan's Execution notes.
+  10, 13). Measured on the GitHub runner (24.04; the examples run and the CI root job, W-84): ufw installed and
+  inactive → `full`, `open_policy`; the examples VM exposed `tcp/22` (v4, v6) and `udp/68`, all allowed →
+  control 1 PASS, while the CI root job's image also served `tcp/25` on the wildcard → control 1 FAIL
+  there (an image is not a stock host); control 8 FAILs (`default.accept_source_route` 1, nothing
+  persisted — the hypothesis held), `ip_forwarding` FAILs (docker), `no_deleted_executables` FAILs
+  (daemons upgraded since the image was built); the thirteen read 6 PASS / 7 FAIL; U-28 FAIL (D16),
+  U-01 WARN.
 - **Stock EL9 (hypothesis).** firewalld active (`backend firewalld`, its nft ruleset): its
   `filter_INPUT` chain accepts by default with rules, which the normaliser classes `partial`
   today and still does — control 1 reads MANUAL on stock EL9 and the description says so;
