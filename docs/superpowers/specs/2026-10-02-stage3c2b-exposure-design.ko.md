@@ -82,8 +82,11 @@ rpm 질의)을 얻습니다. 리포트의 `scopes.beyond` 개수는 열셋 늘�
 ### P-1 `processes.*`
 
 선언: `Reads` `/proc/[0-9]*/status`, `/proc/[0-9]*/cmdline`, `/proc/[0-9]*/exe`, `/proc/[0-9]*/fd/*`,
-`/proc/[0-9]*/ns/mnt`, `/proc/1/ns/mnt`, 패키지 색인의 읽기, 소켓 표 넷 `/proc/self/net/{tcp,udp,tcp6,udp6}`;
-`Commands` rpm 질의(walk와 공유); `Facts` `firewall.*`, `net.sysctl.ipv6_bindv6only`. `Needs: none`. pid는
+`/proc/[0-9]*/task/*/fd/*`(zombie 리더의 살아 있는 스레드, W-68), `/proc/[0-9]*/ns/mnt`, `/proc/[0-9]*/mountinfo`와
+`/proc/[0-9]*/root`(실행파일을 내주는 마운트, W-65), `/proc/1/ns/mnt`, `/proc/sys/net/ipv6/bindv6only`와
+`/proc/sys/net/ipv6/conf/{all,default}/disable_ipv6`(P-3), 패키지 색인의 읽기, 소켓 표 넷
+`/proc/self/net/{tcp,udp,tcp6,udp6}`; `Commands` rpm 질의(walk와 공유); `Facts` `firewall.*`(`net.sysctl.*`은
+`processes` 뒤에 정렬되므로 그 sysctl 셋은 여기서 `/proc`로 읽음, W-47). `Needs: none`. pid는
 `Glob("/proc/[0-9]*/status")`로 열거하고; fd 표 하나는 `Glob("/proc/<pid>/fd/*")`로(호스트 `Glob`은 검색할
 수 없는 디렉터리를 빈 매치가 아니라 `denied`로 보고); `exe`, `fd/*`, `ns/mnt`는 `Readlink`로만 — magic
 link의 텍스트이고 대상은 결코 열지 않음(`ReadDir`는 `Walk`만의 면허라 쓰지 않음).
@@ -99,9 +102,15 @@ link의 텍스트이고 대상은 결코 열지 않음(`ReadDir`는 `Walk`만의
   있었을 때 true — exec 뒤 unlink되거나 교체된 실행파일에 대한 `proc(5)`의 표기: 업그레이드되고 아직
   재시작 안 된 데몬, 시작 뒤 디스크에서 지워진 바이너리, `memfd:` 실행파일이 같게 읽히며 설명은 memfd를
   의심스러운 경우로 이름 댑니다. `exe_read_status`는 `ok`, `denied`(비root 실행에서 다른 계정의 프로세스,
-  EACCES), `error`. `mnt_ns`는 프로세스의 `ns/mnt`가 pid 1의 것과 같으면 `host`, 아니면 `foreign`(호스트에서
-  본 컨테이너, chroot — 그 `exe` 경로는 다른 루트의 경로라 호스트 색인에 물어선 안 됨). `package`는
-  `host` 프로세스에 대한 색인의 `exe` 소유자, 또는 `/snap/<name>/` 아래 `exe`에 대한 `snap:<name>`;
+  EACCES), `error`. `mnt_ns`는 프로세스의 `exe`를 내주는 마운트가 같은 경로에 대한 pid 1의 것과 같은 키 — 가장 긴 마운트
+  지점 접두의 장치·루트 기준 경로·타입·소스, 부모 체인의 모든 조상이 제 마운트 지점의 최상위(W-63, W-65,
+  W-72; 한 지점의 마운트들 중 마지막 나열이 이김, W-73) — 를 가지고 `Readlink /proc/<pid>/root`가 `/`이면
+  `host`, 아니면 `foreign`(overlay 루트를 가진, 호스트에서 본 컨테이너, `/usr` 위의 bind, chroot — 그 `exe`
+  경로는 다른 루트의 경로라 호스트 색인에 물어선 안 됨). `ns/mnt`의 동일성은 기준이 아닙니다: systemd의
+  `PrivateTmp`/`ProtectSystem`은 수십 개의 기본 서비스에 호스트 자신의 파일 위로 자기 마운트 네임스페이스를
+  줍니다. `mountinfo`나 root 링크 읽기 실패는 `ns_read_status: error`와 소유자 실패이지 조용한 `foreign`이
+  아닙니다. `package`는
+  `host` 프로세스에 대한 색인의 `exe` 소유자, 또는 `/snap/<name>/<revision>/` 아래 `exe`에 대한 `snap:<name>`(접두가 색인보다 먼저 정함, W-64);
   `package_status`는 `packaged`, `unpackaged`, `snap`(`/snap/*`), `flatpak`(`/var/lib/flatpak/*`,
   `~/.local/share/flatpak/*`), `appimage`(`/tmp/.mount_*`), `foreign_ns`, `no_index`(색인을 만들 수
   없었음). `deleted` 실행파일도 다른 것처럼 조회(경로가 여전히 소유될 수 있음). `sensitivity: internal`.
@@ -113,12 +122,17 @@ link의 텍스트이고 대상은 결코 열지 않음(`ReadDir`는 `Walk`만의
   owners}`: 호스트의 모든 listening 소켓 — `sockets.listening`이 싣는 행을 여기서 다시 읽음(R232: 수집기마다
   한 번) — `proto`는 `tcp`/`udp`로 접고 `family`는 표에서 `v4`/`v6`, `owners`는 소켓을 가진 프로세스들:
   `list<{pid, uid, name, exe, exe_deleted, mnt_ns, package, package_status}>`, `pid` 정렬, 상한 64(소켓
-  활성화 서비스는 pid 1과 서비스가 가짐; prefork 서버는 모든 워커가). `owner_status`는 `ok`; 표의
-  inode가 `0`이면 `kernel`(커널 소유 소켓: nfsd, ksmbd, WireGuard, rpc 콜백 — `owners` 빔, 본성상 패키지로
-  판정); 모든 fd 표를 읽었는데 inode를 가진 프로세스가 없으면 `unmatched`(다른 네트워크 네임스페이스의
-  소켓, 두 읽기 사이에 닫힌 소켓); fd 표를 읽지 못했으면 `denied`. inode `-1`(파싱 안 된 열)은 leaf의
-  `error`. fd 표가 하나라도 `denied`면 leaf가 `denied`; 소켓이 하나라도 `unmatched`면 leaf는 그것을 적은
-  `absent`(컨트롤 2는 MANUAL — 아무도 갖지 않은 소켓은 인벤토리의 구멍이지 통과가 아님). 상한
+  활성화 서비스는 pid 1과 서비스가 가짐; prefork 서버는 모든 워커가). `owner_status`는 `ok`; 모든 fd 표를
+  온전히 읽었는데 — denied도 예산 초과도 없고, pid 1의 행과 그 `ns/mnt`·`mountinfo`를 읽었고, 커널 스레드가
+  적어도 하나 보이는데(커널 스레드는 최초 pid 네임스페이스에서만 보이고 `hidepid`가 숨김) — inode를 가진
+  표가 없으면 `kernel`: 커널 소유 소켓(nfsd, ksmbd, WireGuard, rpc 콜백)도 다른 소켓처럼 0이 아닌 inode를
+  가지기 때문(측정: WireGuard의 `udp/51820`이 inode 363387305로 읽힘; W-66, W-69) — `owners` 빔,
+  `owners_count` 0, 본성상 패키지로 판정; 표를 온전히 읽지 못했거나 pid 시야가 부분적이면 — 컨테이너,
+  `hidepid`(W-67) — `unmatched`; inode `-1`(파싱 안 된 열)은 `error`. `owners_count`가 전체이고 `owners`는
+  pid 순 처음 64. 살아 있는 스레드가 소켓을 가진 zombie 리더는 한 예산 아래 `task/*/fd/*`로 읽고(W-68),
+  살아 있는 스레드 없는 zombie 리더는 소유자 실패(W-70). fd 표가 하나라도 `denied`면 leaf가 `denied`;
+  소켓이 하나라도 `unmatched`이거나 소유자가 하나라도 실패하면 leaf는 그것을 적은 `absent`(컨트롤 2는
+  MANUAL — 아무도 갖지 않은 소켓은 인벤토리의 구멍이지 통과가 아님). 상한
   2000행; `proto`, `port`, `addr` 정렬. 소켓 표나 색인이 잘렸으면 `truncated: true`.
 - `processes.unpackaged_listeners` — `list<record>` `{proto, family, addr, port, pid, name, exe,
   package_status}`: 판정용 부분집합 — 소유자의 `package_status`가 `unpackaged`, `snap`, `flatpak`,
@@ -165,11 +179,20 @@ EACCES는 행의 `exe_read_status`/`owner_status`이고 판정 leaf의 `denied`;
 접기: 모든 input base chain에 대해, 그것이 jump/goto하는 모든 체인의 규칙을 dump 순서로 `depth + 1`로
 덧붙임 — 깊이 4, base chain당 접힌 규칙 2000까지(ufw의 accept는 깊이 2: `INPUT → ufw-before-input →
 ufw-user-input`); 두 번 방문되는 체인은 한 번만; 깊이나 행 예산을 넘는 jump는 jump 행 자체에
-`unmodelled`를 켜 분류기가 `opaque`로 읽음. 체인 안·체인 간 규칙 순서는 무시(drop이 앞서든 accept를 셈 —
+`unmodelled`를 켜 분류기가 `opaque`로 읽음. 만든 대로: 체인은 전체에 한 번이 아니라 거기 닿는 조건 집합마다
+한 번 접힘(ufw의 포트별 jump 여섯이 각각 대상의 DROP을 접음; W-60); jump 행 자신의 선택자 — `proto`,
+`dport`, `saddr`, `daddr`, `iif`, `ctstate` — 는 그 행을 거쳐 접힌 모든 행의 빈 필드에 물려지고, 둘 다 있고
+다르면 `unmodelled`(W-54); 따라간 jump 행은 `unmodelled`를 지우고 `irrelevant`로, 따라가지 못한 것은
+그대로(W-51); verdict가 없는 규칙(ufw `limit`의 `-m recent --set`)은 `action: none` → `irrelevant`로,
+인식 안 된 verdict 단어와 구별되며 그쪽은 `opaque`(W-55); `.` 연결 피연산자는 필드를 비운 `unmodelled`(W-56);
+`ct state dnat`/`snat`은 `opaque`(W-58); 레코드는 `table`도 실어 열네 필드(W-59). 체인 안·체인 간 규칙
+순서는 무시(drop이 앞서든 accept를 셈 —
 보수적; §8). `restricts_inbound`와 `normalization_confidence`는 오늘처럼 base chain의 정책과 규칙 유무로
 계산하되 확장 하나(X-9): 백엔드가 설정됐지만 input base chain도 inbound 규칙도 없는 family — 꺼진 `ufw`,
 테이블이 비워진 채 멈춘 firewalld, 빈 규칙 집합의 `nftables` 서비스 — 는 `partial` "no input base chain
-found"가 아니라 `restricts_inbound: false`의 `full`. 그래서 U-28의 둘째 메커니즘(`restricts_inbound eq
+found"가 아니라 `restricts_inbound: false`의 `full`. 빈 nft 규칙 집합은 먼저 `iptables-legacy-save`와 교차
+확인합니다: nft dump가 볼 수 없는 legacy 규칙, iptables-nft의 "iptables-legacy tables present" 경고, 잘린
+legacy dump는 `partial`(W-57, W-61) — 모두-accept-규칙-없음 가지에서도. 그래서 U-28의 둘째 메커니즘(`restricts_inbound eq
 true`)은 MANUAL이던 곳에서 FAIL로 읽힘: 호스트에 방화벽이 없고 컨트롤이 그렇게 말함. 방화벽 자체의
 fixture에 `fail-ufw-inactive.json`; CHANGELOG는 판정 변화를 Controls에 기록(D16).
 
@@ -178,7 +201,11 @@ fixture에 `fail-ufw-inactive.json`; CHANGELOG는 판정 변화를 Controls에 �
 입력: `processes.listeners`, `firewall.normalization_confidence`, `firewall.restricts_inbound`, `firewall.rules`,
 `firewall.backend`(`Builder.Get`으로, 선언됨), 그리고 `net.sysctl.ipv6_bindv6only`(`sysctl`이 쓰는데
 `processes` 뒤에 정렬되므로 이것만 `/proc/sys/net/ipv6/bindv6only`를 직접 읽음, `Reads`에 선언; IPv6 없는
-커널엔 그 파일도 판정할 v6 리스너도 없음).
+커널엔 그 파일도 판정할 v6 리스너도 없음). 같은 종류의 읽기 둘 더, `/proc/sys/net/ipv6/conf/{all,default}/
+disable_ipv6`: 둘 다 `1`이면 v6는 켜진 family가 아니고 — `tcp6` 표는 있어도 커널이 거기서 inbound IPv6를
+버림 — `::`나 v6 리스너는 `via: ipv6_disabled`, `exposure.stats.ipv6_disabled` true(W-76; P-4의
+`ipv6_disabled`와 같은 술어). input base chain의 family는 행이 아니라 방화벽의 `raw_dumps`를 다시 파싱해
+얻습니다(W-74).
 
 모든 input base chain의 접힌 모든 행을 분류:
 
@@ -196,7 +223,9 @@ fixture에 `fail-ufw-inactive.json`; CHANGELOG는 판정 변화를 Controls에 �
   `action`.
 
 노출은 `normalization_confidence`가 `full`이고 리스너 family의 input base chain에 `opaque` 행이 없을
-때만 정합니다(`inet`은 두 family에 모두 셈). 그다음 루프백 외 리스너마다(루프백은 `127.0.0.0/8`과 `::1`;
+때만 정합니다(`inet`은 두 family에 모두 셈) — 불투명은 family별이라 v6에만 있는 `opaque` 행은 v4 리스너를
+정하게 둡니다(W-75); 정해지지 않은 리스너는 `exposure.listeners`에서 `via: undecided`. 그다음 루프백 외
+리스너마다(루프백은 `127.0.0.0/8`과 `::1`;
 링크로컬 — `fe80::/10`, `169.254.0.0/16` — 은 링크의 모든 이웃이 닿을 수 있으므로 후보이고 `link_local:
 true`로 기록):
 
@@ -223,9 +252,9 @@ true`로 기록):
   `exposure.opaque_rules`. 방화벽을 읽지 못했으면 그 읽기의 상태(`unsupported` — root인데 `nft`/`iptables`
   바이너리 없음; `denied`); `processes.listeners`가 `ok`가 아니면 그 상태; 어느 입력이든 잘렸으면
   `truncated`.
-- `exposure.opaque_rules` — `list<record>` `{chain, via_chain, family, action, raw}`.
+- `exposure.opaque_rules` — `list<record>` `{chain, via_chain, table, family, action, raw}`.
 - `exposure.stats` — 레코드 `{confidence, manual_reason, listeners, exposed, filtered, loopback, link_local,
-  kernel_owned, opaque_rules, folded_rules}`.
+  kernel_owned, opaque_rules, folded_rules, ipv6_disabled}`.
 
 방화벽 바이너리가 전혀 없는 호스트는 `firewall.* unsupported`로 읽혀 컨트롤 1이 NOT_APPLICABLE이면서
 모든 것이 닿습니다 — U-28이 그 호스트를 읽는 방식과 같고, 설명이 그렇게 적습니다. 백엔드는 설정됐지만
@@ -233,9 +262,8 @@ true`로 기록):
 
 ### P-4 `net.sysctl.*`(`sysctl` 수집기)
 
-키 스물일곱, `since: 1`. 스물여섯은 `setting<int>`에 `default_on: effective`(= runtime, B-3), `sysctl.d`의
-두 홈이 persisted 면(스물넷은 `checks`가 판정, `disable_ipv6` 둘은 IPv6 컨트롤의 `applies_when`이 읽음);
-하나는 증거:
+키 스물여덟, `since: 1`. 스물여섯은 `setting<int>`에 `default_on: effective`(= runtime, B-3), `sysctl.d`의
+두 홈이 persisted 면(스물넷은 `checks`가 판정, `disable_ipv6` 둘은 파생 게이트의 입력); 둘은 평범한 `int`:
 
 | 키 | sysctl |
 |---|---|
@@ -253,8 +281,9 @@ true`로 기록):
 | `ipv4_icmp_ignore_bogus_error_responses` | `net.ipv4.icmp_ignore_bogus_error_responses` |
 | `ipv4_tcp_syncookies` | `net.ipv4.tcp_syncookies` |
 | `ipv6_all_accept_ra`, `ipv6_default_accept_ra` | `net.ipv6.conf.{all,default}.accept_ra` |
-| `ipv6_all_disable_ipv6`, `ipv6_default_disable_ipv6` | `net.ipv6.conf.{all,default}.disable_ipv6`(IPv6 컨트롤의 게이트) |
+| `ipv6_all_disable_ipv6`, `ipv6_default_disable_ipv6` | `net.ipv6.conf.{all,default}.disable_ipv6`(`ipv6_disabled`의 입력) |
 | `ipv6_bindv6only`(`int`, 증거) | `net.ipv6.bindv6only`(P-3를 위해 `processes`가 읽음) |
+| `ipv6_disabled`(`int`, 파생) | 두 `disable_ipv6` runtime 값이 모두 `1`이면 `1`, 아니면 `0`; 어느 한쪽이 `ok`가 아니면 더 나쁜 읽기의 상태; `source`는 `/proc` 경로 둘. IPv6 컨트롤의 유일한 게이트이자 P-3 `via: ipv6_disabled`의 술어(W-79) |
 
 `all`은 지금의 모든 인터페이스에, `default`는 이후 생기는 모든 인터페이스에 적용됩니다(`ip-sysctl.rst`);
 `all`은 조이고 `default`는 느슨한 호스트는 새 인터페이스 — 컨테이너의 veth, VPN — 에 느슨한 값을
@@ -262,11 +291,16 @@ true`로 기록):
 (`/proc/sys/net/ipv6` 없음 — `ipv6.disable=1` 부트 매개변수)은 모든 `ipv6_*` 키를 "IPv6 is not built or is
 disabled" 이유의 `absent`로 만들고(`readProcSys`의 "does not exist"를 `/proc/sys/net/ipv6` 접두로 특별
 처리); 흔한 방식으로 꺼진 IPv6 — `all`과 `default`의 `disable_ipv6 = 1` — 는 파일을 기본값으로 남기므로
-IPv6 컨트롤은 `disable_ipv6` 키 둘이 `0`임을 게이트로 둡니다(§4).
+IPv6 컨트롤은 파생 키 `ipv6_disabled`가 `0`임을 게이트로 둡니다 — 키 하나인 이유는 `applies_when` 절이
+AND로 묶이고, `default`만 끈 호스트는 지금 있는 인터페이스에서 여전히 IPv6를 말하기 때문(W-79; §4).
 
-persisted 파서는 systemd의 `/usr/lib/sysctl.d/50-default.conf`가 쓰는 것을 배웁니다: glob 키
+persisted 파서는 systemd가 `/usr/lib/sysctl.d/50-default.conf`를 배포하는 곳(Ubuntu 22.04, EL9; Ubuntu
+24.04는 배포하지 않고 네트워크 기본값은 procps의 `10-network-security.conf`나 커널에서 옴 — W-77)에서 그
+파일이 쓰는 것을 배웁니다: glob 키
 (`net.ipv4.conf.*.rp_filter = 2`, 맞는 모든 키에 적용)와 `-key` 줄(`-net.ipv4.conf.all.rp_filter`, 그 키를
-glob에서 제외). 없으면 `rp_filter`와 `accept_source_route`의 persisted 면이 모든 systemd 호스트에서 "no
+glob에서 제외). glob은 점으로 나눈 성분마다 맞춥니다(`*`는 성분 하나, `[!…]`는 glob(3)의 표기); 구체적인
+줄은 파일 순서와 무관하게 어떤 glob보다 이기고; 한 키에 대한 제외 줄이 여럿이면 마지막이 이기며(W-78);
+되풀이된 glob은 처음 자리를 지킵니다. 없으면 `rp_filter`와 `accept_source_route`의 persisted 면이 모든 systemd 호스트에서 "no
 sysctl.d line sets …"로 읽힘 — 틀린 증거, 판정 아님(B-3). 그 파일이 §5의 기본 가설이 커널 기본값과 다른
 이유이기도 합니다.
 
@@ -293,16 +327,17 @@ sysctl.d line sets …"로 읽힘 — 틀린 증거, 판정 아님(B-3). 그 파
 | 12 | `syn_cookies_enabled` | 중 | `ipv4_tcp_syncookies eq 1` | fail |
 | 13 | `ipv6_router_advertisements_ignored` | 중 | `ipv6_all_accept_ra in ${allowed_accept_ra}`, `ipv6_default_accept_ra in ${allowed_accept_ra}`; `params.allowed_accept_ra: list<int>` 기본 `[0]`(SLAAC 주소의 서버는 `1`을 이름 댐; `2`는 포워딩 호스트에서 RA를 받는 유일한 값) | not_applicable |
 
-IPv6 컨트롤 넷(5, 7, 9, 13)은 `applies_when` 절 둘을 더 가집니다: `net.sysctl.ipv6_all_disable_ipv6 eq 0`과
-`net.sysctl.ipv6_default_disable_ipv6 eq 0` — 권장 방식으로 IPv6를 끈 호스트는 쓰지 않는 기본값으로 FAIL이
-아니라 NOT_APPLICABLE로 읽힙니다. `rp_filter`는 1(strict)과 2(loose — systemd의 배포 값, 비대칭 라우팅에
+IPv6 컨트롤 넷(5, 7, 9, 13)은 `applies_when` 절 하나를 더 가집니다: `net.sysctl.ipv6_disabled eq 0`(P-4;
+W-79) — 권장 방식으로, `all`과 `default`에서 함께 IPv6를 끈 호스트는 쓰지 않는 기본값으로 FAIL이 아니라
+NOT_APPLICABLE로 읽히고; 둘 중 하나만 끈 호스트는 여전히 IPv6를 말하므로 판정됩니다. `rp_filter`는 1(strict)과 2(loose — systemd의 배포 값, 비대칭 라우팅에
 맞음)를 받고; 0은 FAIL. `secure_redirects`는 `accept_redirects`가 0이면 무의미하지만 벤치마크들처럼 그래도
 판정하며 설명이 그렇게 적습니다.
 
 컨트롤 1의 `service` 계약: 소문자 `<tcp|udp>/<port>`, 정확 일치, 범위나 와일드카드 없음(`TCP/22`, `tcp/*`는
 아무것에도 맞지 않음 — lint는 오타와 포트를 구분할 수 없어 시도하지 않음). 한 데몬의 `0.0.0.0`과 `::`
-소켓은 하나의 `service`라 waiver 하나가 둘을 덮습니다. 컨트롤 2의 `allowed_executables`는 경로를 이름
-댑니다(`/usr/local/sbin/mydaemon`, `/snap/lxd/current/bin/lxd`); snap 데몬은 있는 그대로 정직한 FAIL(호스트의
+소켓은 하나의 `service`라 waiver 하나가 둘을 덮습니다. 컨트롤 2의 `allowed_executables`는 `/proc/<pid>/exe`가 풀어 주는 대로의 경로를 이름
+댑니다(`/usr/local/sbin/mydaemon`; snap의 `/snap/lxd/<revision>/bin/lxd`는 refresh마다 바뀌므로 자기 snap은
+경로보다 컨트롤에 대한 waiver로 허용하는 쪽이 낫습니다 — W-80); snap 데몬은 있는 그대로 정직한 FAIL(호스트의
 패키지 관리자가 설치하지 않음)이고 설명이 그렇게 적으며, `foreign_ns`는 호스트의 네트워크 네임스페이스에서
 서비스하는 컨테이너의 프로세스를 뜻한다고도 적습니다.
 
@@ -316,7 +351,7 @@ IPv6 컨트롤 넷(5, 7, 9, 13)은 `applies_when` 절 둘을 더 가집니다: `
 컨트롤 2 `CM-7(5)`; 컨트롤 3 `CM-7(5)`, `SI-2(6)`; 컨트롤 4–13 `CM-6`, 컨트롤 12는 `SC-5`, `SC-5(2)`도.
 `references.stig`(rhel9 V2R9, ubuntu2204 V2R9, ubuntu2404 V1R6): 4 `RHEL-09-253075`; 5 `RHEL-09-254025`; 6
 `RHEL-09-253015`, `-253040`, `-253065`, `-253070`; 7 `RHEL-09-254015`, `-254035`; 8 `RHEL-09-253020`, `-253045`;
-9 `RHEL-09-254020`, `-254040`; 10 `RHEL-09-253035`, `-253050`; 11 `RHEL-09-253055`, `-253060`; 12
+9 `RHEL-09-254020`, `-254040`; 10 `RHEL-09-253025`, `-253030`, `-253035`, `-253050`(W-81); 11 `RHEL-09-253055`, `-253060`; 12
 `RHEL-09-253010`, `UBTU-22-253010`, `UBTU-24-600190`; 13 `RHEL-09-254010`, `-254030`; 컨트롤 1–3은 없음.
 `subject_kind`: 어느 subject도 사용자나 그룹이 아니라 어떤 컨트롤도 원격 NSS WARN을 일으키지 않습니다.
 
@@ -329,32 +364,56 @@ IPv6 컨트롤 넷(5, 7, 9, 13)은 `applies_when` 절 둘을 더 가집니다: `
 - **systemd 없음.** 변화 없음.
 - **컨테이너.** 모든 컨트롤이 게이트로 NOT_APPLICABLE. 수집기는 그래도 돕니다: `processes.*`는 컨테이너의
   pid 네임스페이스를 읽어 `ok`; 가려진 `/proc`는 `unsupported`(`sockets` 선례 — 새 `container.unsupported`
-  행 없음); `net.sysctl.*`는 네임스페이스 값(`ok`); 모든 프로세스가 컨테이너의 pid 1 기준 `mnt_ns: host`.
+  행 없음); `net.sysctl.*`는 네임스페이스 값(`ok`); 모든 프로세스가 컨테이너의 pid 1 기준 `mnt_ns: host`. 비특권 컨테이너에선 다른 uid의 프로세스만
+  `exe`/`fd` 링크를 거절합니다(`ubuntu:24.04`에서 측정): 프로세스 leaf가 `denied`로 읽히고, 수집기의 최악
+  상태가 `run.complete`를 정하는 기존 규칙에 따라 그런 다중 uid 컨테이너의 `docker exec` collect는 컨트롤이
+  NOT_APPLICABLE인데도 종료 코드 1(W-83); 계약 잡은 muster를 유일한 프로세스로 돌려 complete로 남습니다.
 - **기본 Ubuntu 22.04 / 24.04(가설; 랩이 측정, 3C-2a의 V-18).** `ufw` 설치·비활성 → X-9 → `full`,
   `restricts_inbound: false` → 루프백 외 모든 리스너 노출: sshd `tcp/22`와 DHCP 클라이언트 `udp/68` →
   컨트롤 1은 기본 허용 목록으로 PASS; U-28은 그 호스트에서 FAIL(D16). systemd-resolved(`127.0.0.53`)와
   chrony(`udp/323`)는 루프백. 컨트롤 2 PASS(모든 리스너가 dpkg 소유; 24.04 서버의 `ssh.socket` 리스너는
-  pid 1과 sshd가 가지며 둘 다 패키지); 컨트롤 3은 재부팅된 호스트에서 PASS. sysctl(커널 기본값, 그 위에
-  `50-default.conf`의 `rp_filter 2`와 `default.accept_source_route 0`, 그 위에 Ubuntu의
-  `10-network-security.conf`): `ip_forward 0` PASS(docker 호스트는 1); `accept_redirects` 1/1 FAIL;
+  pid 1과 sshd가 가지며 둘 다 패키지); 컨트롤 3은 재부팅된 호스트에서 PASS. sysctl(커널 기본값, 그 위에 이름 순의 `sysctl.d` 체인 — `all`과 `default`에 `rp_filter 2`를 두는 Ubuntu의
+  `/etc/sysctl.d/10-network-security.conf`, 그다음 `default.rp_filter 2`를 다시 두고
+  `default.accept_source_route 0`을 두는 systemd의 `/usr/lib/sysctl.d/50-default.conf`): `ip_forward 0` PASS(docker 호스트는 1); `accept_redirects` 1/1 FAIL;
   `secure_redirects` 1/1 FAIL; `send_redirects` 1/1 FAIL; `accept_source_route` 0/0 PASS; `rp_filter` 2/2 PASS,
   `log_martians` 0/0 → 컨트롤 10 FAIL; `echo_ignore_broadcasts 1`, `bogus 1` PASS; `syncookies 1` PASS; ipv6
   `accept_redirects 1` FAIL, `accept_source_route 0` PASS, `accept_ra 1` FAIL, `forwarding 0` PASS. 열셋 중
-  넷이 기본 호스트에서 FAIL(6, 7, 10, 13), docker 호스트에선 다섯(4); 설명이 그렇게 적고 랩 측정이 핀.
+  넷이 기본 호스트에서 FAIL(6, 7, 10, 13), docker 호스트에선 다섯(4); 설명이 그렇게 적고 랩 측정이 핀. 측정(Task 7, 랩의 22.04 — 기본이 아님: docker, kubelet, ufw 활성):
+  `normalization_confidence partial`(docker 체인) → 컨트롤 1 MANUAL; 리스너 24, 소유자 모두 맞음, 커널 소유
+  없음; sysctl runtime 값은 `ip_forward 1`과 `all.accept_redirects 0`(포워딩이 켜지면 커널이 지움)을 빼고
+  가설대로; `all.rp_filter`는 `10-network-security.conf` 5행(4행은 `default`), `default.rp_filter`는
+  `50-default.conf` 25행, `default.accept_source_route`는 그 30행이 persisted. 랩이 보여 줄 수 없는 기본
+  행 — 꺼진 ufw, DHCP 클라이언트, 외부 리스너 없음, 삭제된 실행파일 없음 — 은 가설로 남고 `_notes`가
+  어느 쪽인지 밝힘. **Ubuntu 24.04**는 `50-default.conf`를 배포하지 않으므로(W-77)
+  `default.accept_source_route`를 persisted하는 것이 없고 커널 기본값은 `1`(`ipv4_devconf_dflt`): 기본
+  24.04는 컨트롤 8도 FAIL — 열셋 중 다섯(6, 7, 8, 10, 13). GitHub 러너(24.04)는 브랜치가 푸시된 뒤 examples 실행이 읽고(W-84), 그 판독은 계획의 Execution notes에 적습니다.
 - **기본 EL9(가설).** firewalld 활성(`backend firewalld`, 그 nft 규칙 집합): `filter_INPUT` 체인이 규칙을
   가진 채 기본 accept라 정규화기가 오늘 `partial`로 분류하고 앞으로도 그러함 — 기본 EL9에서 컨트롤 1은
   MANUAL이고 설명이 그렇게 적음; firewalld 존 모델의 1급 정규화는 보류(§8). 프로세스 사실은
   `rockylinux/rockylinux:9-ubi-init`(sshd)에서 측정; sysctl의 runtime 면은 컨테이너에서 측정 불가(네임스페이스
-  값)이고 persisted 면은 측정 가능(이미지의 `50-default.conf`): EL9 `_hosts` 행은 persisted 판독을 runtime의
-  가설로 싣고 `_notes`가 EL VM이 생길 때까지 그렇다고 밝힘.
+  값)이고 persisted 면은 측정 가능: EL9 `_hosts` 행은 persisted 판독을 runtime의 가설로 싣고 `_notes`가 EL
+  VM이 생길 때까지 그렇다고 밝힘. 측정(Task 7): 이미지는 `50-default.conf`를 배포하지 않고 — VM에서는
+  `systemd-udev`가 제공 — `rocky-release`의 `50-redhat.conf`가 그 뒤에 읽혀 `default.rp_filter 1`(6행), glob
+  `*.rp_filter 1`, `all` 제외를 두므로 `default.rp_filter`는 `2`가 아니라 `1`, `all.rp_filter`는 커널의 `0` —
+  컨트롤 10은 어느 쪽이든 `log_martians`로 FAIL. firewalld의 규칙 집합은 25행으로 접히고 그중 7이
+  `opaque`(자체의 `ct status dnat accept`, 정책 jump 다섯, `meta l4proto { icmp, ipv6-icmp } accept`)라
+  정규화기가 `full`이어도 거기선 컨트롤 1이 MANUAL. sshd는 `tcp/22` v4·v6, 둘 다 패키지.
 - **GitHub 러너(root 잡).** `ufw` 비활성 → X-9 → 노출 판정됨: sshd `tcp/22`와 DHCP 클라이언트
   `udp/68`(둘 다 기본 목록에), 그리고 이미지의 에이전트가 listen하는 것 — examples 실행이 말해 주고 CI
   단언은 첫 실행 뒤에 씀(수집기는 절대 아님); 컨트롤 2는 PASS 예상; 컨트롤 3은 측정 뒤 단언(빌드되고
   재부팅 안 된 이미지는 업그레이드된 데몬을 돌릴 수 있음); sysctl 컨트롤은 위 Ubuntu 모양.
+- **알려진 한계(만든 대로).** docker 호스트(`DOCKER-USER`/`FORWARD` 체인은 규칙을 가진 input 아닌 inbound
+  체인)와 firewalld 호스트(규칙을 가진 기본 accept `filter_INPUT`)는 2H 단계 정규화기 아래
+  `normalization_confidence partial`로 읽혀 컨트롤 1이 둘 다 MANUAL — 랩과 EL9 컨테이너에서 측정; 설명이
+  그렇게 적고 존 모델은 보류로 남습니다(§8). `bindv6only` 1인 호스트에서 데몬이 스스로 `IPV6_V6ONLY`를 끈
+  `::` 소켓은 v6만으로 읽힙니다(family 하나만큼 과소 노출). v4는 nft 규칙, v6는 legacy `ip6tables` 규칙인
+  호스트는 v6가 `no_chain_in_family`로 읽힙니다 — legacy 교차 확인은 빈 nft 규칙 집합만 덮습니다. 패키지
+  색인은 필요한 수집기마다 다시 만들며 약 130 ms(dpkg) 또는 110 ms(rpm) — X-4가 섭니다, 캐시 없음.
 
 ## 6. 테스트, CI, 문서
 
-- **Fixture.** 컨트롤 1: `pass-ssh-only`(X-9 모양), `pass-filtered`(drop 정책, `port_rule` 22만, 5432 리스너),
+- **Fixture.** 컨트롤 1: `pass-ssh-only`(X-9 모양), `pass-filtered`(drop 정책, `port_rule` 22만, 5432 리스너,
+  22에서 듣는 것은 없음 — 거기 sshd가 있으면 노출이라 목록이 비지 않음),
   `pass-state-and-loopback-rules`(수제 규칙: `iif lo accept`, `ct state established,related accept`, `tcp dport
   22 accept`, 정책 drop — 5432는 filtered), `pass-ufw-folded`(ufw 체인 접음, `ufw-user-input`이 22만 허용),
   `fail-ufw-folded-http`(… 그리고 80, nginx listen), `fail-open-policy-dns`, `fail-any-port-rule`,
@@ -371,17 +430,26 @@ IPv6 컨트롤 넷(5, 7, 9, 13)은 `applies_when` 절 둘을 더 가집니다: `
   판독이 FAIL인 곳의 `fail-stock-ubuntu`, `fail-all-absent`(판정 키 전부 absent — IPv4 컨트롤의 `absent_means`
   변이를 죽이는 3B 선례), `pass-persisted-drift`(runtime은 맞고 `sysctl.d`는 틀림 — 설정의 effective 면은
   runtime이므로 PASS; 3B처럼 drift는 보고하되 판정하지 않음), `na-container`; IPv6 컨트롤은
-  `na-no-ipv6`(키 absent)와 `na-ipv6-disabled`(`disable_ipv6` 1)를 더함. 방화벽 수집기의 fixture는 U-28을 위한
+  `na-no-ipv6`(키 absent), `na-ipv6-disabled-both`(`ipv6_disabled` 1), 그리고 `disable_ipv6` leaf 하나만 켠 판정
+  PASS/FAIL 쌍(leaf 하나로는 게이트가 닫히지 않음을 증명, W-79)을 더함. 방화벽 수집기의 fixture는 U-28을 위한
   `fail-ufw-inactive.json`을 얻음(X-9). 모든 fixture `synthetic: true`; 판정되는 모든 행이 모든 필드를
   실음(3C-2a V-9).
-- **변이 테스트.** 생존 0. `_mutants.yaml`에 컨트롤 3의 `absent_means` 행 셋(leaf는 `/proc`만으로 쓰여 결코
-  `absent`가 아님); 그 밖의 모든 컨트롤은 fixture로 `absent`에 닿음.
+- **변이 테스트.** 생존 0. `_mutants.yaml`에 행 열일곱: 컨트롤 3의 `absent_means` 셋과 `where` 경계 ±1(leaf는 `/proc`만으로
+  쓰여 결코 `absent`가 아님; pid는 음수가 아님), 그리고 IPv6 컨트롤 넷의 `absent_means` 행 열둘(게이트
+  `ipv6_disabled`는 판정 키와 같은 `/proc/sys/net/ipv6/conf` 표에서 파생되고 커널은 그 표를 한 번에 만들므로
+  게이트가 `ok 0`인데 판정 키가 `absent`일 수 없음 — W-20, W-79); 그 밖의 모든 컨트롤은 fixture로 `absent`에
+  닿음.
 - **오라클(랩 root; CI root 잡).** `TestOracleListeners`: `processes.listeners`를 `ss -tulpnH`(iproute2, 고정
   인자; 오라클 자신의 명령)와 비교 — 모든 행의 proto/port가 맞고 `ss`가 `users:(…)`에 이름 대는 모든
-  pid가 `owners`에 있음; `compared N` 로그. `TestOracleSysctlNet`: 기존 sysctl 오라클의 `sysctl -n` 비교를
-  스물일곱 키로 확장. `TestOracleDeletedExecutable`: 테스트가 `/bin/sleep`을 `t.TempDir()`에 복사해 실행하고
-  사본을 unlink한 뒤 수집기를 돌려 자기 자식의 행이 `exe_deleted: true`로 읽히는지 단언; 자식은 테스트가
-  종료(호스트의 어떤 것도 바뀌지 않음). 랩 레시피에 `docker run --net=host` 프로브를 더해 `mnt_ns: foreign`과
+  pid가 `owners`에 있음; `compared N` 로그. 기존 `TestOracleSysctl`이 설정 스물여섯과 `bindv6only`도 비교 — 3B의 열둘과 함께 39 키, 통과하는 어느
+  커널에서나 키 목록의 길이이므로 CI는 정확한 수를 grep. `TestOracleListeners`는 역방향도 확인 — `ss`가
+  나열하는 모든 소켓이 행 — 하고 root가 아니거나 `processes.listeners`가 `absent`(컨테이너의 부분 pid
+  시야)면 skip; 랩은 24를 비교. `TestOracleDeletedExecutable`: 테스트가 자기 테스트 바이너리를 `t.TempDir()`에 복사해 사본을
+  sleeper로 실행하고(`MUSTER_ORACLE_SLEEPER=1`, helper-process 패턴) 사본을 unlink한 뒤 수집기를 돌려 자기
+  자식의 행이 `exe_deleted: true`로 읽히는지 단언; 자식은 테스트가 종료(호스트의 어떤 것도 바뀌지 않음).
+  `/bin/sleep`이 아닌 이유: EL9에서 그것은 `coreutils --coreutils-prog-shebang`으로 가는 52바이트 shebang
+  스크립트(`coreutils-single`)라 그 사본은 결코 삭제된 `exe`를 갖지 않음(rocky·alma init 이미지에서 측정;
+  W-85). 랩 레시피에 `docker run --net=host` 프로브를 더해 `mnt_ns: foreign`과
   overlayfs가 도는 컨테이너의 `exe`에 `(deleted)`를 찍지 않음을 측정. 방화벽 접기는 랩에서 아무것도 켜지
   않고 증명: 랩의 규칙 집합을 읽기 전용으로 dump하고 접힌 행을 계획의 측정 태스크에서
   `iptables-save`/`nft list ruleset`과 손으로 비교. `exposure.*`에는 물을 데몬이 없고; 분류기는 확장된 파서가
@@ -392,7 +460,9 @@ IPv6 컨트롤 넷(5, 7, 9, 13)은 `applies_when` 절 둘을 더 가집니다: `
   (`meta l4proto { tcp, udp }`, `--dports 22,80`, `1000:2000`, `tcp dport vmap { 22 : accept }`).
 - **Capability matrix.** `nonroot.denied` += `processes.deleted_executables`, `processes.listeners`,
   `processes.unpackaged_listeners`, `exposure.exposed`; `_notes` += `processes.list`(denied 행을 가진 ok),
-  방화벽 바이너리 없는 호스트의 `exposure.exposed`(unsupported → NOT_APPLICABLE, U-28처럼).
+  방화벽 바이너리 없는 호스트의 `exposure.exposed`(unsupported → NOT_APPLICABLE, U-28처럼; docker나 firewalld 호스트에선 `partial` → MANUAL);
+  비특권 컨테이너의 `processes.listeners`(`ubuntu:24.04`에서 측정: 다른 uid의 프로세스만 `exe`/`fd` 링크를
+  거절해 leaf를 `denied`로 만듦).
 - **CI.** root 잡: `processes.stats.index_source == "dpkg"`, `exposure.listeners`의 `tcp/22` 행, 오라클
   `compared`/행 grep 셋에 대한 `jq` 단언; 노출 단언(`exposure.stats.confidence`와 러너가 실제로 읽는 `via`)은
   §5대로 첫 실행이 정함. 비root 잡은 matrix로 `denied` 키 넷을 단언; 컨테이너 잡은 새것 없음.
@@ -419,7 +489,7 @@ IPv6 컨트롤 넷(5, 7, 9, 13)은 `applies_when` 절 둘을 더 가집니다: `
   의존은 `TestDeclaredFactsAreWrittenBeforeTheyAreRead`(선언된 모든 사실의 수집기가 읽는 쪽 앞에 정렬)가
   고정; 선언된 사실이 없을 때 쓰인 `exposure.*` 키는 그것을 적은 `error`(프로그래밍 오류이지 호스트 상태가
   아님).
-- 스키마 버전 불변: `net.sysctl.*` 키 스물일곱과 `processes.*`/`exposure.*` 키 아홉, 모두 `since: 1`;
+- 스키마 버전 불변: `net.sysctl.*` 키 스물여덟과 `processes.*`/`exposure.*` 키 아홉, 모두 `since: 1`;
   `firewall.rules` 행에 필드 여덟(C2). 사실 골든은 새 항목으로 재생성; `sockets.listening`의 설명 변경은 설명
   전용.
 - X-9의 확장은 비활성 백엔드 호스트에서 U-28의 판정을 바꿈(MANUAL → FAIL): Controls CHANGELOG 항목,

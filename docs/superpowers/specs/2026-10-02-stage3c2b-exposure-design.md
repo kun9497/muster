@@ -99,9 +99,13 @@ globs, its declared facts, and the rpm query it shares with the walk). The repor
 ### P-1 `processes.*`
 
 Declaration: `Reads` `/proc/[0-9]*/status`, `/proc/[0-9]*/cmdline`, `/proc/[0-9]*/exe`,
-`/proc/[0-9]*/fd/*`, `/proc/[0-9]*/ns/mnt`, `/proc/1/ns/mnt`, the package index's reads and the
+`/proc/[0-9]*/fd/*`, `/proc/[0-9]*/task/*/fd/*` (a zombie leader's live threads, W-68),
+`/proc/[0-9]*/ns/mnt`, `/proc/[0-9]*/mountinfo` and `/proc/[0-9]*/root` (the mount that serves the
+executable, W-65), `/proc/1/ns/mnt`, `/proc/sys/net/ipv6/bindv6only` and
+`/proc/sys/net/ipv6/conf/{all,default}/disable_ipv6` (P-3), the package index's reads and the
 four socket tables `/proc/self/net/{tcp,udp,tcp6,udp6}`; `Commands` the rpm query (shared with
-the walk); `Facts` `firewall.*`, `net.sysctl.ipv6_bindv6only`. `Needs: none`. Pids are
+the walk); `Facts` `firewall.*` (`net.sysctl.*` sorts after `processes`, so its three sysctls are
+read from `/proc` here, W-47). `Needs: none`. Pids are
 enumerated with `Glob("/proc/[0-9]*/status")`; one fd table with `Glob("/proc/<pid>/fd/*")`
 (the host `Glob` reports a directory it may not search as `denied`, never as an empty match);
 `exe`, `fd/*` and `ns/mnt` are read with `Readlink` only — a magic link's text, the target never
@@ -122,10 +126,16 @@ A pid that vanishes between listing and reading leaves no row and increments
   yet restarted, a binary removed from disk after it started, and a `memfd:` executable read the
   same, and the description names the memfd case as the suspicious one. `exe_read_status` is
   `ok`, `denied` (another account's process in a non-root run, EACCES) or `error`. `mnt_ns` is
-  `host` when the process's `ns/mnt` equals pid 1's, `foreign` otherwise (a container seen from
-  the host, a chroot — its `exe` path is a path in another root and the host's index must not be
-  asked about it). `package` is the index's owner of `exe` for a `host` process, or `snap:<name>`
-  for an `exe` under `/snap/<name>/`; `package_status` is `packaged`, `unpackaged`, `snap`
+  `host` when the mount that serves the process's `exe` keys like pid 1's for the same path — the
+  device, root-relative path, type and source of the longest mount-point prefix, every ancestor
+  on its parent chain the topmost at its own mount point (W-63, W-65, W-72; among mounts on one
+  point the last listed wins, W-73) — and `Readlink /proc/<pid>/root` is `/`; `foreign` otherwise
+  (a container seen from the host with its overlay root, a bind over `/usr`, a chroot — its `exe`
+  path is a path in another root and the host's index must not be asked about it). Equality of
+  `ns/mnt` is not the test: systemd's `PrivateTmp`/`ProtectSystem` give dozens of stock services
+  their own mount namespace over the host's own files. A `mountinfo` or root-link failure is
+  `ns_read_status: error` and an owner failure, never a quiet `foreign`. `package` is the index's owner of `exe` for a `host` process, or `snap:<name>`
+  for an `exe` under `/snap/<name>/<revision>/` (the prefix decides before the index is asked, W-64); `package_status` is `packaged`, `unpackaged`, `snap`
   (`/snap/*`), `flatpak` (`/var/lib/flatpak/*`, `~/.local/share/flatpak/*`), `appimage`
   (`/tmp/.mount_*`), `foreign_ns`, or `no_index` (the index could not be built). A `deleted`
   executable is looked up like any other (its path may still be owned). `sensitivity: internal`.
@@ -140,14 +150,19 @@ A pid that vanishes between listing and reading leaves no row and increments
   `family` `v4`/`v6` from the table it came from, and `owners` the processes holding the socket:
   `list<{pid, uid, name, exe, exe_deleted, mnt_ns, package, package_status}>` sorted by `pid`,
   capped at 64 (a socket-activated service is held by pid 1 and the service; a prefork server
-  by every worker). `owner_status` is `ok`; `kernel` when the table's inode is `0` (a
-  kernel-owned socket: nfsd, ksmbd, WireGuard, rpc callbacks — `owners` empty, judged packaged
-  by nature); `unmatched` when every fd table was read and no process holds the inode (another
-  network namespace's socket, or one closed between the two reads); `denied` when an fd table
-  could not be read. An inode of `-1` (an unparsed column) is the leaf's `error`. When any fd
-  table was `denied`, the leaf is `denied`; when any socket is `unmatched`, the leaf is `absent`
-  naming it (control 2 reads MANUAL — a socket nobody holds is a hole in the inventory, never a
-  pass). Capped at 2000 rows; sorted by `proto`, `port`, `addr`. `truncated: true` when the
+  by every worker). `owner_status` is `ok`; `kernel` when no fd table holds the inode after every table was read
+  whole — none denied, none budget-cut, pid 1's row with its `ns/mnt` and `mountinfo` read, and at
+  least one kernel thread in sight (kernel threads are visible only in the initial pid namespace
+  and hidden by `hidepid`) — because a kernel-owned socket (nfsd, ksmbd, WireGuard, rpc callbacks)
+  carries a non-zero inode like any other (measured: WireGuard's `udp/51820` read inode 363387305;
+  W-66, W-69) — `owners` empty, `owners_count` 0, judged packaged by nature; `unmatched` when a
+  table could not be read whole or the pid view is partial — a container, `hidepid` (W-67);
+  `error` for an inode of `-1` (an unparsed column). `owners_count` is the total and `owners` the
+  first 64 by pid. A zombie leader whose live threads hold the socket is read through
+  `task/*/fd/*` under the one budget (W-68); a zombie leader with no live thread is an owner
+  failure (W-70). When any fd table was `denied`, the leaf is `denied`; when any socket is
+  `unmatched` or any owner failed, the leaf is `absent` naming it (control 2 reads MANUAL — a
+  socket nobody holds is a hole in the inventory, never a pass). Capped at 2000 rows; sorted by `proto`, `port`, `addr`. `truncated: true` when the
   socket tables or the index were cut.
 - `processes.unpackaged_listeners` — `list<record>` `{proto, family, addr, port, pid, name,
   exe, package_status}`: the judged subset — one row per (listener, owner) whose owner's
@@ -200,13 +215,25 @@ Folding: for every input base chain, the rules of every chain it jumps or goes t
 in dump order with `depth + 1`, to a depth of 4 and 2000 folded rows per base chain (ufw's
 accepts sit at depth 2: `INPUT → ufw-before-input → ufw-user-input`); a chain visited twice is
 visited once; a jump past the depth or the row budget sets `unmodelled` on the jump row itself,
-so the classifier reads it `opaque`. Rule order inside and across chains is ignored (an accept
+so the classifier reads it `opaque`. As built: a chain is folded once per distinct set of
+conditions carried to it, not once in total (ufw's six port-specific jumps each fold their
+target's DROP; W-60); the jump row's own selectors — `proto`, `dport`, `saddr`, `daddr`, `iif`,
+`ctstate` — are carried onto every row folded through it where that row's field is empty, both
+set and different → `unmodelled` (W-54); a jump row that was followed clears `unmodelled` and
+classifies `irrelevant`, one that could not be followed keeps it (W-51); a rule with no verdict
+(the `-m recent --set` of ufw's `limit`) is `action: none` → `irrelevant`, distinct from an
+unrecognised verdict word, which stays `opaque` (W-55); a `.` concatenation operand is `unmodelled`
+with the field empty (W-56); `ct state dnat`/`snat` read `opaque` (W-58); the record also carries
+`table` — fourteen fields (W-59). Rule order inside and across chains is ignored (an accept
 counts whether or not a drop precedes it — conservative; §8). `restricts_inbound` and
 `normalization_confidence` are computed as today from the base chains' policies and rule
 presence, with one widening (X-9): a family with a backend configured but no input base chain
 and no inbound rule — `ufw` disabled, firewalld stopped with its tables flushed, an `nftables`
 service with an empty ruleset — is `full` with `restricts_inbound: false`, no longer `partial`
-"no input base chain found". U-28's second mechanism (`restricts_inbound eq true`) therefore
+"no input base chain found". An empty nft ruleset is cross-checked against `iptables-legacy-save`
+first: legacy rules the nft dump cannot see, iptables-nft's "iptables-legacy tables present"
+warning or a truncated legacy dump read `partial` (W-57, W-61) — on the all-accept-no-rules branch
+too. U-28's second mechanism (`restricts_inbound eq true`) therefore
 reads FAIL where it read MANUAL: the host has no firewall, and the control says so. The
 firewall's own fixtures gain `fail-ufw-inactive.json`; the CHANGELOG records the verdict change
 under Controls (D16).
@@ -217,7 +244,12 @@ Inputs: `processes.listeners`, `firewall.normalization_confidence`, `firewall.re
 `firewall.rules`, `firewall.backend` (through `Builder.Get`, declared), and
 `net.sysctl.ipv6_bindv6only` (written by `sysctl`, which sorts after `processes` — so this one is
 read from `/proc/sys/net/ipv6/bindv6only` directly, declared in `Reads`; a kernel without IPv6
-has no such file and no v6 listeners to decide).
+has no such file and no v6 listeners to decide). Two more reads of the same kind,
+`/proc/sys/net/ipv6/conf/{all,default}/disable_ipv6`: when both read `1`, v6 is not an enabled
+family — the kernel drops inbound IPv6 there though the `tcp6` tables exist — and a `::` or v6
+listener reads `via: ipv6_disabled`, `exposure.stats.ipv6_disabled` true (W-76; the same
+predicate as P-4's `ipv6_disabled`). The input base chains' families come from the firewall's
+`raw_dumps` re-parsed, not from the rows (W-74).
 
 Classification of every folded row of every input base chain:
 
@@ -236,7 +268,9 @@ Classification of every folded row of every input base chain:
   jump past the fold budget, an empty `action`.
 
 Exposure is decided only when `normalization_confidence` is `full` and no `opaque` row exists in
-an input base chain of the listener's family (`inet` counts for both). Then, per non-loopback
+an input base chain of the listener's family (`inet` counts for both) — opacity is per family, so
+a v6-only `opaque` row leaves the v4 listeners decided (W-75); a listener not decided reads
+`via: undecided` in `exposure.listeners`. Then, per non-loopback
 listener (loopback is `127.0.0.0/8` and `::1`; a link-local address — `fe80::/10`,
 `169.254.0.0/16` — is reachable by every neighbour on the link and IS a candidate, recorded
 `link_local: true`):
@@ -269,9 +303,9 @@ Keys:
   `exposure.stats.manual_reason`, and `exposure.opaque_rules`. The firewall read's status when
   the firewall could not be read (`unsupported` — no `nft`/`iptables` binary as root; `denied`);
   `processes.listeners`'s status when that is not `ok`; `truncated` when either input was.
-- `exposure.opaque_rules` — `list<record>` `{chain, via_chain, family, action, raw}`.
+- `exposure.opaque_rules` — `list<record>` `{chain, via_chain, table, family, action, raw}`.
 - `exposure.stats` — record `{confidence, manual_reason, listeners, exposed, filtered, loopback,
-  link_local, kernel_owned, opaque_rules, folded_rules}`.
+  link_local, kernel_owned, opaque_rules, folded_rules, ipv6_disabled}`.
 
 A host with no firewall binary at all reads `firewall.* unsupported` and control 1
 NOT_APPLICABLE while everything is reachable — consistent with U-28's own reading of that host,
@@ -280,9 +314,9 @@ control 1 as exposed-everything and U-28 FAIL: cause and consequence, said in bo
 
 ### P-4 `net.sysctl.*` (the `sysctl` collector)
 
-Twenty-seven keys, `since: 1`. Twenty-six are `setting<int>` with `default_on: effective`
+Twenty-eight keys, `since: 1`. Twenty-six are `setting<int>` with `default_on: effective`
 (= runtime, B-3) and the two homes of `sysctl.d` as the persisted side (twenty-four judged by
-`checks`, the two `disable_ipv6` read by the IPv6 controls' `applies_when`); one is evidence:
+`checks`, the two `disable_ipv6` the inputs of the derived gate); two are plain `int`:
 
 | key | sysctl |
 |---|---|
@@ -300,8 +334,9 @@ Twenty-seven keys, `since: 1`. Twenty-six are `setting<int>` with `default_on: e
 | `ipv4_icmp_ignore_bogus_error_responses` | `net.ipv4.icmp_ignore_bogus_error_responses` |
 | `ipv4_tcp_syncookies` | `net.ipv4.tcp_syncookies` |
 | `ipv6_all_accept_ra`, `ipv6_default_accept_ra` | `net.ipv6.conf.{all,default}.accept_ra` |
-| `ipv6_all_disable_ipv6`, `ipv6_default_disable_ipv6` | `net.ipv6.conf.{all,default}.disable_ipv6` (the gate of the IPv6 controls) |
+| `ipv6_all_disable_ipv6`, `ipv6_default_disable_ipv6` | `net.ipv6.conf.{all,default}.disable_ipv6` (the inputs of `ipv6_disabled`) |
 | `ipv6_bindv6only` (`int`, evidence) | `net.ipv6.bindv6only` (read by `processes` for P-3) |
+| `ipv6_disabled` (`int`, derived) | `1` iff both `disable_ipv6` runtime values are `1`, else `0`; the worse read's status when either is not `ok`; `source` the two `/proc` paths. The one gate of the IPv6 controls and the predicate of P-3's `via: ipv6_disabled` (W-79) |
 
 `all` applies to every interface now, `default` to every interface created later
 (`ip-sysctl.rst`); a host whose `all` is tight and `default` loose gives a new interface — a
@@ -310,11 +345,18 @@ collected (§8). A kernel without IPv6 (`/proc/sys/net/ipv6` absent — the `ipv
 parameter) makes every `ipv6_*` key `absent` with the reason "IPv6 is not built or is disabled"
 (a special case of `readProcSys`'s "does not exist" keyed on the `/proc/sys/net/ipv6` prefix);
 IPv6 turned off the common way — `disable_ipv6 = 1` on `all` and `default` — leaves the files
-present with their defaults, so the IPv6 controls gate on both `disable_ipv6` keys being `0` (§4).
+present with their defaults, so the IPv6 controls gate on the derived `ipv6_disabled` being `0` — one key, because
+`applies_when` clauses are ANDed and a host with only `default` disabled still speaks IPv6 on its
+present interfaces (W-79; §4).
 
-The persisted parser learns what systemd's `/usr/lib/sysctl.d/50-default.conf` writes: a glob key
+The persisted parser learns what systemd's `/usr/lib/sysctl.d/50-default.conf` writes where systemd
+ships it (Ubuntu 22.04, EL9; Ubuntu 24.04 ships none, its network defaults come from procps'
+`10-network-security.conf` or the kernel — W-77): a glob key
 (`net.ipv4.conf.*.rp_filter = 2`, applied to every matching key) and a `-key` line (`-net.ipv4.
-conf.all.rp_filter`, excluding that key from the glob). Without it the persisted side of
+conf.all.rp_filter`, excluding that key from the glob). A glob is matched per dotted component (`*`
+matches one component, `[!…]` as glob(3) spells it); a concrete line beats any glob whatever the
+file order; among exclusion lines for one key the last wins (W-78); a repeated glob keeps its
+first place. Without it the persisted side of
 `rp_filter` and `accept_source_route` read "no sysctl.d line sets …" on every systemd host —
 wrong evidence, no verdict (B-3). That file is also why the stock hypotheses in §5 differ from the
 kernel defaults.
@@ -343,17 +385,19 @@ description.
 | 12 | `syn_cookies_enabled` | 중 | `ipv4_tcp_syncookies eq 1` | fail |
 | 13 | `ipv6_router_advertisements_ignored` | 중 | `ipv6_all_accept_ra in ${allowed_accept_ra}`, `ipv6_default_accept_ra in ${allowed_accept_ra}`; `params.allowed_accept_ra: list<int>` default `[0]` (a SLAAC-addressed server names `1`; `2` is the only value that accepts RAs on a forwarding host) | not_applicable |
 
-The four IPv6 controls (5, 7, 9, 13) carry two more `applies_when` clauses:
-`net.sysctl.ipv6_all_disable_ipv6 eq 0` and `net.sysctl.ipv6_default_disable_ipv6 eq 0` — a host
-that turned IPv6 off the recommended way reads NOT_APPLICABLE, not FAIL on defaults it never
-uses. `rp_filter` accepts 1 (strict) and 2 (loose — systemd's shipped value, right for asymmetric
+The four IPv6 controls (5, 7, 9, 13) carry one more `applies_when` clause:
+`net.sysctl.ipv6_disabled eq 0` (P-4; W-79) — a host that turned IPv6 off the recommended way, on
+`all` and `default` together, reads NOT_APPLICABLE, not FAIL on defaults it never uses; a host that
+disabled only one of the two is judged, because it still speaks IPv6. `rp_filter` accepts 1 (strict) and 2 (loose — systemd's shipped value, right for asymmetric
 routing); 0 FAILs. `secure_redirects` is moot once `accept_redirects` is 0 and is judged anyway,
 as the benchmarks do; the description says so.
 
 Control 1's `service` contract: lower-case `<tcp|udp>/<port>`, exact match, no ranges or
 wildcards (`TCP/22`, `tcp/*` match nothing — lint could not tell a typo from a port and does not
 try). The `0.0.0.0` and `::` sockets of one daemon are one `service`, so one waiver covers both.
-Control 2's `allowed_executables` names paths (`/usr/local/sbin/mydaemon`, `/snap/lxd/current/bin/lxd`);
+Control 2's `allowed_executables` names paths as `/proc/<pid>/exe` resolves them
+(`/usr/local/sbin/mydaemon`; a snap's `/snap/lxd/<revision>/bin/lxd`, which changes on every
+refresh, so a snap you own is better allowed by a waiver on the control — W-80);
 a snap daemon is an honest FAIL as read (the host's package manager did not install it) and the
 description says so, as it says that `foreign_ns` means a container's process serving on the
 host's network namespace.
@@ -371,7 +415,7 @@ control 1 `CM-7`, `CM-6`; control 2 `CM-7(5)`; control 3 `CM-7(5)`, `SI-2(6)`; c
 `CM-6`, control 12 also `SC-5`, `SC-5(2)`. `references.stig` (rhel9 V2R9, ubuntu2204 V2R9,
 ubuntu2404 V1R6): 4 `RHEL-09-253075`; 5 `RHEL-09-254025`; 6 `RHEL-09-253015`, `-253040`,
 `-253065`, `-253070`; 7 `RHEL-09-254015`, `-254035`; 8 `RHEL-09-253020`, `-253045`; 9
-`RHEL-09-254020`, `-254040`; 10 `RHEL-09-253035`, `-253050`; 11 `RHEL-09-253055`, `-253060`; 12
+`RHEL-09-254020`, `-254040`; 10 `RHEL-09-253025`, `-253030`, `-253035`, `-253050` (W-81); 11 `RHEL-09-253055`, `-253060`; 12
 `RHEL-09-253010`, `UBTU-22-253010`, `UBTU-24-600190`; 13 `RHEL-09-254010`, `-254030`; controls 1–3
 none. `subject_kind`: none of the subjects is a user or group, so no control triggers the
 remote-NSS WARN.
@@ -387,39 +431,72 @@ remote-NSS WARN.
 - **Container.** Every control NOT_APPLICABLE through the gate. The collectors still run:
   `processes.*` read the container's pid namespace (`ok`); a masked `/proc` is `unsupported` (the
   `sockets` precedent — no new `container.unsupported` row); `net.sysctl.*` read the namespace's
-  values (`ok`); every process is `mnt_ns: host` relative to the container's pid 1.
+  values (`ok`); every process is `mnt_ns: host` relative to the container's pid 1. In an unprivileged container
+  only a process under another uid refuses its `exe`/`fd` links (measured in `ubuntu:24.04`): the
+  process leaves read `denied` and, by the standing rule that a collector's worst status decides
+  `run.complete`, a `docker exec` collect in such a multi-uid container exits 1 while its controls
+  read NOT_APPLICABLE (W-83); the contract job runs muster as the only process and stays complete.
 - **Stock Ubuntu 22.04 / 24.04 (hypothesis; the lab measures, V-18 of 3C-2a).** `ufw`
   installed and disabled → X-9 → `full`, `restricts_inbound: false` → every non-loopback
   listener exposed: sshd `tcp/22` and the DHCP client `udp/68` → control 1 PASS with the default
   allow list; U-28 reads FAIL on that host (D16). systemd-resolved (`127.0.0.53`) and chrony
   (`udp/323`) are loopback. Control 2 PASS (every listener dpkg-owned; a 24.04 server's
   `ssh.socket` listener is held by pid 1 and sshd, both packaged); control 3 PASS on a rebooted
-  host. Sysctls (kernel defaults, then `50-default.conf`'s `rp_filter 2` and
-  `default.accept_source_route 0`, then Ubuntu's `10-network-security.conf`): `ip_forward 0` PASS
+  host. Sysctls (kernel defaults, then the `sysctl.d` chain in name order — Ubuntu's
+  `/etc/sysctl.d/10-network-security.conf` with `rp_filter 2` on `all` and `default`, then systemd's
+  `/usr/lib/sysctl.d/50-default.conf` with `default.rp_filter 2` again and
+  `default.accept_source_route 0`): `ip_forward 0` PASS
   (1 on a docker host); `accept_redirects` 1/1 FAIL; `secure_redirects` 1/1 FAIL;
   `send_redirects` 1/1 FAIL; `accept_source_route` 0/0 PASS; `rp_filter` 2/2 PASS, `log_martians`
   0/0 → control 10 FAIL; `echo_ignore_broadcasts 1`, `bogus 1` PASS; `syncookies 1` PASS; ipv6
   `accept_redirects 1` FAIL, `accept_source_route 0` PASS, `accept_ra 1` FAIL, `forwarding 0`
   PASS. Four of the thirteen read FAIL on a stock host (6, 7, 10, 13), five on a docker host (4);
-  the descriptions say so and the lab measurement is the pin.
+  the descriptions say so and the lab measurement is the pin. Measured (Task 7, the lab's
+  22.04 — not stock: docker, a kubelet, ufw active): `normalization_confidence partial` (the
+  docker chains) → control 1 MANUAL; 24 listeners, every owner matched, none kernel-owned; the
+  sysctl runtime values read as hypothesised except `ip_forward 1` and `all.accept_redirects 0`
+  (the kernel clears it when forwarding is on); `all.rp_filter` persisted by
+  `10-network-security.conf` line 5 (line 4 is `default`), `default.rp_filter` by
+  `50-default.conf` line 25, `default.accept_source_route` by its line 30. The stock rows the lab
+  cannot show — ufw inactive, the DHCP client, no foreign listener, no deleted executable — stay
+  the hypothesis and `_notes` says which is which. **Ubuntu 24.04** ships no `50-default.conf`
+  (W-77), so nothing persists `default.accept_source_route`, whose kernel default is `1`
+  (`ipv4_devconf_dflt`): a stock 24.04 reads control 8 FAIL too — five of the thirteen (6, 7, 8,
+  10, 13). The GitHub runner (24.04) is read by the examples run once the branch is pushed (W-84); its reading goes into the plan's Execution notes.
 - **Stock EL9 (hypothesis).** firewalld active (`backend firewalld`, its nft ruleset): its
   `filter_INPUT` chain accepts by default with rules, which the normaliser classes `partial`
   today and still does — control 1 reads MANUAL on stock EL9 and the description says so;
   firewalld's zone model as a first-class normalisation is parked (§8). The process facts are
   measured in `rockylinux/rockylinux:9-ubi-init` (sshd); the sysctls' runtime side cannot be
-  measured in a container (the namespace's values) and the persisted side can (the image's
-  `50-default.conf`): the EL9 `_hosts` rows carry the persisted reading as the hypothesis for the
-  runtime one, and `_notes` says so until an EL VM exists.
+  measured in a container (the namespace's values) and the persisted side can: the EL9 `_hosts`
+  rows carry the persisted reading as the hypothesis for the runtime one, and `_notes` says so
+  until an EL VM exists. Measured (Task 7): the image ships no `50-default.conf` — `systemd-udev`
+  provides it on a VM — and `rocky-release`'s `50-redhat.conf`, read after it, sets
+  `default.rp_filter 1` (line 6), globs `*.rp_filter 1` and excludes `all`; so `default.rp_filter`
+  is `1`, not `2`, and `all.rp_filter` the kernel's `0` — control 10 FAILs on `log_martians` either
+  way. firewalld's ruleset folds to 25 rows with 7 `opaque` (its own `ct status dnat accept`, the
+  five policy jumps, `meta l4proto { icmp, ipv6-icmp } accept`), so even a `full` normaliser would
+  read control 1 MANUAL there. sshd on `tcp/22` v4 and v6, both packaged.
 - **The GitHub runner (root job).** `ufw` disabled → X-9 → exposure decided: sshd `tcp/22` and
   the DHCP client `udp/68` (both in the default list), plus whatever the image's agents listen on
   — the examples run tells, and the CI assert is written after the first run (never the
   collector); control 2 expected PASS; control 3 measured before it is asserted (an image built
   and not rebooted may run upgraded daemons); the sysctl controls read the Ubuntu shape above.
+- **Known limits (as built).** A docker host (its `DOCKER-USER`/`FORWARD` chains are a non-input
+  inbound chain with rules) and a firewalld host (a default-accept `filter_INPUT` with rules) read
+  `normalization_confidence partial` under the stage-2H normaliser, so control 1 is MANUAL on both
+  — measured on the lab and in the EL9 container; the descriptions say so and the zone model stays
+  parked (§8). A socket bound to `::` on a host with `bindv6only` 1 whose daemon cleared
+  `IPV6_V6ONLY` itself is read v6-only (under-exposed by one family). A host with nft rules for v4
+  and legacy `ip6tables` rules for v6 reads v6 `no_chain_in_family` — the legacy cross-check covers
+  an empty nft ruleset only. The package index is rebuilt by each collector that needs it and costs
+  about 130 ms (dpkg) or 110 ms (rpm) — X-4 stands, no cache.
 
 ## 6. Tests, CI and documents
 
 - **Fixtures.** Control 1: `pass-ssh-only` (X-9 shape), `pass-filtered` (drop policy, `port_rule`
-  22 only, a listener on 5432), `pass-state-and-loopback-rules` (the hand-written ruleset:
+  22 only, a listener on 5432 and nothing listening on 22 — an sshd there would be exposed and
+  the list not empty), `pass-state-and-loopback-rules` (the hand-written ruleset:
   `iif lo accept`, `ct state established,related accept`, `tcp dport 22 accept`, policy drop —
   5432 filtered), `pass-ufw-folded` (ufw's chains folded, `ufw-user-input` allows 22 only),
   `fail-ufw-folded-http` (… and 80, nginx listening), `fail-open-policy-dns`, `fail-any-port-rule`,
@@ -439,19 +516,30 @@ remote-NSS WARN.
   `fail-all-absent` (every judged key absent — the 3B precedent that kills the `absent_means`
   mutants of the IPv4 controls), `pass-persisted-drift` (runtime right, `sysctl.d` wrong — the
   setting's effective side is runtime, so PASS; drift is reported, not judged, as 3B does),
-  `na-container`; the IPv6 controls add `na-no-ipv6` (keys absent) and `na-ipv6-disabled`
-  (`disable_ipv6` 1). The firewall collector's fixtures gain `fail-ufw-inactive.json` for U-28
+  `na-container`; the IPv6 controls add `na-no-ipv6` (keys absent), `na-ipv6-disabled-both` (`ipv6_disabled` 1)
+  and a judged PASS/FAIL pair with only one `disable_ipv6` leaf set, proving one leaf alone does
+  not gate (W-79). The firewall collector's fixtures gain `fail-ufw-inactive.json` for U-28
   (X-9). Every fixture `synthetic: true`; every judged row carries every field (3C-2a V-9).
-- **Mutation test.** Zero survivors. `_mutants.yaml` gains the three `absent_means` rows of
-  control 3 (the leaf is written from `/proc` alone and is never `absent`); every other control
-  reaches `absent` through a fixture.
+- **Mutation test.** Zero survivors. `_mutants.yaml` gains seventeen rows: control 3's three
+  `absent_means` and its `where` bound ±1 (the leaf is written from `/proc` alone and is never
+  `absent`; a pid is never negative), and the twelve `absent_means` rows of the four IPv6
+  controls (their gate `ipv6_disabled` derives from the same `/proc/sys/net/ipv6/conf` table as
+  their judged keys, which the kernel creates whole, so a judged key cannot be `absent` while the
+  gate reads `ok 0` — W-20, W-79); every other control reaches `absent` through a fixture.
 - **Oracles (lab root; CI root job).** `TestOracleListeners`: `processes.listeners` against
   `ss -tulpnH` (iproute2, fixed arguments; the oracle's own command): for every row the
   proto/port match and every pid `ss` names in `users:(…)` is among `owners`; `compared N`
-  logged. `TestOracleSysctlNet`: the existing sysctl oracle's `sysctl -n` comparison extended to
-  the twenty-seven keys. `TestOracleDeletedExecutable`: the test copies `/bin/sleep` into
-  `t.TempDir()`, starts it, unlinks the copy, runs the collector and asserts its child's row reads
-  `exe_deleted: true`; the child is killed by the test (nothing on the host changes). The lab
+  logged. The existing `TestOracleSysctl` compares the twenty-six settings and `bindv6only` too — 39
+  keys with 3B's twelve, the key list's length on any kernel that passes, so CI greps the exact
+  count. `TestOracleListeners` also checks the reverse direction — every socket `ss` lists is a
+  row — and skips without root or when `processes.listeners` is `absent` (a container's partial
+  pid view); the lab compared 24. `TestOracleDeletedExecutable`: the test copies its own test binary into
+  `t.TempDir()`, starts the copy as a sleeper (`MUSTER_ORACLE_SLEEPER=1`, the helper-process
+  pattern), unlinks the copy, runs the collector and asserts its child's row reads
+  `exe_deleted: true`; the child is killed by the test (nothing on the host changes). Not
+  `/bin/sleep`: on EL9 that is a 52-byte shebang script onto `coreutils --coreutils-prog-shebang`
+  (`coreutils-single`), so a copy of it never has a deleted `exe` (measured in the rocky and alma
+  init images; W-85). The lab
   recipe adds a `docker run --net=host` probe to measure `mnt_ns: foreign` and that overlayfs does
   not print `(deleted)` for a running container's `exe`. The firewall fold is proven on the lab
   by enabling nothing: the lab's ruleset is dumped read-only and its folded rows compared with
@@ -466,7 +554,9 @@ remote-NSS WARN.
 - **Capability matrix.** `nonroot.denied` += `processes.deleted_executables`,
   `processes.listeners`, `processes.unpackaged_listeners`, `exposure.exposed`; `_notes` +=
   `processes.list` (ok with denied rows), `exposure.exposed` on a host without a firewall binary
-  (unsupported → NOT_APPLICABLE, as U-28).
+  (unsupported → NOT_APPLICABLE, as U-28) and on a docker or firewalld host (`partial` → MANUAL);
+  `processes.listeners` in an unprivileged container, where (measured in `ubuntu:24.04`) only a
+  process under another uid refuses its `exe`/`fd` links and makes the leaves `denied`.
 - **CI.** Root job: `jq` asserts on `processes.stats.index_source == "dpkg"`, a `tcp/22` row in
   `exposure.listeners`, and the three oracle `compared`/row greps; the first run decides the
   exposure assert (`exposure.stats.confidence` and the `via` the runner actually reads), as §5
@@ -499,7 +589,7 @@ remote-NSS WARN.
   dependency is pinned by `TestDeclaredFactsAreWrittenBeforeTheyAreRead` (every declared fact's
   collector sorts before the reader); an `exposure.*` key written when a declared fact is missing
   reads `error` naming it (a programming error, never a host state).
-- Schema version unchanged: twenty-seven `net.sysctl.*` keys and nine `processes.*`/`exposure.*`
+- Schema version unchanged: twenty-eight `net.sysctl.*` keys and nine `processes.*`/`exposure.*`
   keys, all `since: 1`; `firewall.rules` rows gain eight fields (C2). The facts golden regenerates
   with the new entries; `sockets.listening`'s description change is description-only.
 - The X-9 widening changes U-28's verdict on an inactive-backend host (MANUAL → FAIL): a

@@ -1,7 +1,7 @@
 # muster — working notes for Claude
 
 Design: `docs/superpowers/specs/2026-09-02-muster-design.md` (English canonical, Korean pair). It is also the
-decision log (D01–D31). Read it before changing any contract: facts schema, control ids, exit codes,
+decision log (D01–D32). Read it before changing any contract: facts schema, control ids, exit codes,
 waiver keys, output format.
 
 ## Build and test
@@ -101,6 +101,42 @@ regenerates them from public images and `-check` compares.
   never stores a key body; a symlinked `authorized_keys` reads MANUAL; `rsa-sha2-*` words carry RSA keys. A
   runtime socket's xattrs are read through an `O_PATH` fd's `/proc/self/fd` entry (a socket cannot be opened
   for reading, and a caller its mode refuses gets EACCES first — the route serves both). `/var/run/…` is never declared — it is a symlink.
+
+## Exposure (stage 3C-2b)
+
+- `processes` enumerates `/proc/[0-9]*` with `Glob` and reads `exe`, `fd/*`, `ns/mnt`, `root` and `mountinfo` with
+  `Readlink`/`ReadFile` only (a magic link's text, never its target). A listening socket's `owners` are the
+  processes whose fd tables hold `socket:[inode]` (a zombie leader with live threads through `task/*/fd/*`);
+  a socket nobody holds is the kernel's (`owner_status: kernel` — WireGuard measured, kernel sockets have
+  non-zero inodes) only when every fd table was read whole and pid 1 plus a kernel thread are in sight;
+  inside a container, or when the pid view is partial (`hidepid`), it is `unmatched` and the listener leaves
+  are `absent` (MANUAL). `mnt_ns` is `host` when the mount serving the exe keys like pid 1's for the same
+  path (systemd's PrivateTmp services are the host's; an overlay root or a bind over `/usr` is `foreign`);
+  `package_status` is `packaged`, `unpackaged`, `snap` (by the `/snap/<name>/<rev>/` prefix), `flatpak`,
+  `appimage`, `foreign_ns` or `no_index`. The package index is `internal/pkgindex`, built per collector over
+  its own candidates (~130 ms dpkg, ~110 ms rpm). `Declaration.Facts` lets a collector `Get` an earlier
+  collector's facts (`processes` reads `firewall.*`); `TestDeclaredFactsAreWrittenBeforeTheyAreRead` pins the
+  name order.
+- `firewall.rules` rows carry `{chain, via_chain, depth, table, family, proto, dport, saddr, daddr, iif, ctstate,
+  action, unmodelled, raw}`; the user chains an input filter base chain jumps to are folded (depth 4, 2000 rows
+  per base, once per distinct set of carried conditions, the jump's conditions inherited); a protocol set, a
+  vmap, a `.` concatenation or an unknown match is `unmodelled`. A configured but inactive backend (ufw
+  disabled) normalises `full` + `restricts_inbound false` — U-28 FAILs there (D16) — unless an empty nft
+  ruleset hides iptables-legacy rules (cross-checked). Confidence and `restricts_inbound` read base chains
+  only.
+- `exposure.*` is written by `processes`: classes `deny`, `irrelevant` (no verdict, a folded jump, a non-tcp/udp
+  protocol from the closed list), `loopback_only`, `state_only` (established/related/invalid only),
+  `port_rule`/`any_port` (only when not unmodelled), `opaque`. Decided only at `full` with no `opaque` row in
+  the listener's family (`inet` counts for both); an enabled family with no input base chain exposes its
+  listeners (`no_chain_in_family`); IPv6 disabled by sysctl on `all` and `default` is not an enabled family;
+  `::` is a v4 candidate when `bindv6only` is 0; link-local is a candidate, loopback never listed. `service`
+  is `tcp/<port>`; the default allow list is `tcp/22`, `udp/68`, `udp/546`. A docker host (FORWARD rules) and a
+  firewalld host read `partial` → `exposed_listeners_allowed` MANUAL.
+- `net.sysctl.*` are 28 keys read as the kernel ones (B-3) — 26 settings, `ipv6_bindv6only` and the derived
+  `ipv6_disabled` (1 iff `all` and `default` both disable IPv6: the one gate of the four IPv6 controls and of the
+  exposure join, W-79); the `sysctl.d` parser follows systemd: a glob key
+  (`*?[`, `[!…]`) applies to every unexcluded match, a `-key` line excludes it from globs (last line wins), a
+  concrete line beats any glob. Ubuntu 24.04 ships no `50-default.conf`.
 
 ## Stage-2 conventions
 

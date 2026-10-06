@@ -380,12 +380,155 @@ func TestParsePortSpec(t *testing.T) {
 
 ## Execution notes
 
-### Rulings settled during execution (X-10 …)
+Executed 2026-10-06 in the worktree `stage3c2b-exposure` over main `0c2a8d5`, by the SDD pipeline of
+this plan: one implementer per task (opus; a fresh one after four fix rounds), one task reviewer (opus),
+scoped re-reviews (opus where the round changed behaviour, sonnet otherwise), the controller writing
+the documents and ruling on every deviation. Every ruling below is also in the SDD ledger with the
+measurement behind it.
+
+### Rulings settled during execution (W-48 …)
+
+- **W-48** the Task 1 baseline is 47 Join/Walk/Caps tests (the pre-flight's 42 was wrong). **W-49** a
+  `Facts` glob is anchored at the family (`path.Match`'s `*` crosses `.`, so `firewall.*` covers nested
+  keys); a setting inside the glob is allowed and `Get` returns `(Envelope{}, false)` for it. **W-50**
+  `pkgindex.Index.Source *facts.Source`.
+- **W-51** on a jump row `unmodelled` is redefined by the fold — cleared on a jump it followed
+  (→ `irrelevant`), set on one it could not (→ `opaque`). **W-52** `portSpec` → `fwPortSpec` (services.go
+  owns `portSpec`). **W-53** the ufw end-to-end fixtures are the 2H dumps grown by `allow 80/tcp`.
+- **W-54** the fold carries the jump row's conditions (`proto`, `dport`, `saddr`, `daddr`, `iif`,
+  `ctstate`) onto every row folded through it where that row's field is empty; both set and different →
+  `unmodelled`. **W-55** a rule with no verdict (`-m recent --set`; an nft rule ending without a verdict
+  word) is `action: none` → `irrelevant`, distinct from an unrecognised verdict word (→ `opaque`); an
+  unknown nft statement word reads `none` too (no accepting target exists). **W-56** a `.` concatenation
+  operand → `unmodelled` with the field empty; `irrelevant` only for a protocol in a closed list of known
+  non-tcp/udp names. **W-57/W-61** an empty nft read is cross-checked against `iptables-legacy-save`;
+  legacy rules, iptables-nft's "iptables-legacy tables present" warning or a truncated legacy dump read
+  `partial` — on the all-accept-no-rules branch too (Debian's stock `nftables.conf` + legacy rules would
+  otherwise read a false U-28 FAIL). **W-58** `ct state dnat`/`snat` → `opaque`. **W-59** rows carry
+  `table` — fourteen fields. **W-60** a chain is folded once per distinct set of carried conditions
+  reaching it (ufw end-to-end: v4 50 / v6 46 rows). **W-62** the ufw fixtures carry `limit 22/tcp` and
+  `allow 80/tcp`.
+- **W-63/W-65** `mnt_ns` keys on the mount that serves the exe (longest mount-point prefix:
+  `dev + path.Join(root, exe − mountpoint)` + fstype + source) compared with pid 1's key for the same
+  path, plus `Readlink /proc/<pid>/root == "/"` — `ns/mnt` equality made 88 stock systemd services
+  (`PrivateTmp`, `ProtectSystem`) `foreign` and every stock host FAIL control 2. **W-64** `snap` by the
+  `/snap/<name>/<rev>/` prefix before the index is asked. **W-66** MEASURED: a kernel socket's inode is not
+  0 (WireGuard `udp/51820` in a privileged ubuntu:24.04 container: inode 363387305, udp6 363387306), so the
+  W-8 premise fell; an unheld socket after every table was read whole is `owner_status: kernel`. **W-67**
+  inside a container the pid view may be partial → `unmatched` → the listener leaves `absent`. **W-68** a
+  zombie leader with live threads is read through `task/*/fd/*` under the one budget. **W-69** `kernel`
+  also requires pid 1's row with its `ns/mnt` and `mountinfo` read and at least one kernel thread in sight
+  (`hidepid` hides both). **W-70** a zombie leader holding a socket is an owner failure (`absent`) →
+  MANUAL. **W-71** the budget test needs no clock seam: the double sets `processesBudget = -1` inside its
+  Readlink. **W-72** a row counts only if every ancestor on its parent chain is the topmost at its own mount
+  point (a `/usr/lib` child mount under a later bind over `/usr`). **W-73** among mounts on one point the
+  last listed wins (kernel creation order; mount ids are reused).
+- **W-74** `BaseFamilies` come from the firewall's `raw_dumps` re-parsed. **W-75** opacity is per family.
+  **W-76** v6 is not an enabled family when both `disable_ipv6` files read 1 (`via: ipv6_disabled`,
+  `exposure.stats.ipv6_disabled`); an unreadable `bindv6only` with a `::` socket is that read's status
+  (C3).
+- **W-77** the `50-default.conf` fixture is systemd 249's from ubuntu:22.04; Ubuntu 24.04 ships none (its
+  network defaults come from procps' `10-network-security.conf` or the kernel). **W-78** among exclusion
+  lines for one key the last wins; `[!…]` is rewritten to `[^…]` per component; a repeated glob keeps its
+  first place.
+- **W-79** `applies_when` is ANDed, so two `disable_ipv6 eq 0` gates read NOT_APPLICABLE when only one leaf
+  is 1 — a host with `default.disable_ipv6 = 1` and `all = 0` still speaks IPv6 and would miss a FAIL. The
+  `sysctl` collector derives `net.sysctl.ipv6_disabled` (1 iff both read 1; the worse read's status
+  otherwise; `source` the two `/proc` paths) and the four IPv6 controls gate on it alone — the same
+  predicate as W-76. P-4 is 28 keys. **W-80** the allow entry is the path as `/proc/<pid>/exe` resolves
+  it (a snap's carries the revision — a waiver fits better). **W-81** control 10 cites `RHEL-09-253025`
+  and `-253030` (the `log_martians` items) too.
+- **W-82 → W-85** the deleted-exe oracle cannot run a copy of `/bin/sleep`: on EL9 that is a 52-byte
+  shebang script onto `coreutils --coreutils-prog-shebang=sleep` (`coreutils-single`), so the copy's `exe`
+  is `/usr/bin/coreutils` and nothing is deleted (the review's argv[0] theory was wrong; measured in the
+  rocky and alma init images). The test copies its own binary into `t.TempDir()` and runs it as a sleeper
+  through `MUSTER_ORACLE_SLEEPER=1` (an `init()` hook; `Pdeathsig: SIGKILL`), asserts the child alive and
+  its `exe` the copy, then unlinks and collects. **W-83** the run-status rule stands: in an unprivileged
+  multi-uid container another uid's process refuses its `exe`/`fd` links, the process leaves read `denied`
+  and `collect` exits 1 while every control reading them is NOT_APPLICABLE; the contract job (muster the
+  only process) stays complete. **W-84** the examples refresh follows the last control-description edit
+  (a later edit resets the examples gate's byte comparison to "skipped"); the runner's reading then goes
+  into spec §5 and here in a docs-only follow-up.
 
 ### What the reviews found
 
+- Task 1 (foundations, pkgindex): approved; the declaration test's panic path and the `Get` miss semantics
+  tightened (W-49).
+- Task 2 (firewall fold): one fix round of eleven items; the Important residuals were the fuzz row bound
+  and the legacy cross-check on the all-accept branch (W-61); the re-reviewer ran fourteen rule shapes
+  through a scratch copy and found the fold byte-identical over fifty runs.
+- Task 3 (processes): four fix rounds. Two Important findings changed the model — the mount-key test
+  (`ns/mnt` equality was a false FAIL on every stock host, W-63/W-65) and the kernel-socket inode premise
+  (measured, W-66); then `hidepid`'s partial pid view (a false PASS: every unheld socket read `kernel`,
+  W-69) and the zombie leader with an unpackaged daemon (W-70); the ancestor-chain visibility (W-72) and
+  a spuriously-failing timing test (W-71). The fourth round went to a fresh implementer; the controller
+  checked the production diff and broke nine assertions deliberately, each red.
+- Task 4 (exposure): approved with one Important — IPv6 disabled by sysctl still counted as an enabled
+  family (W-76). Two known limits recorded (bindv6only vs `IPV6_V6ONLY`; nft + legacy ip6tables).
+- Task 5 (sysctl): approved with three Minors on systemd parity (`[!…]`, a repeated glob's place, an
+  exclusion followed by a concrete line — W-78).
+- Task 6 (controls): approved, 0 Blocking; the one Important was the ANDed IPv6 gate (W-79); the Minors
+  were description truths (the snap path, per-control params, EL9's rp_filter, 24.04) and two fixture
+  shapes the collector never writes.
+- Task 7 (measure, oracles, CI): spec approved; quality rejected once on the deleted-exe oracle's sleeper
+  (B-1 → W-85); the reverse-direction listeners oracle accepted; the exposure source carried the firewall
+  source twice (fixed).
+- Whole-branch review: see the ledger entry of the run (added below after it completes).
+
 ### Deviations from the spec, as shipped
+
+- P-1: `mnt_ns` is the exe's mount key, not `ns/mnt` equality (W-63/W-65/W-72/W-73); `owner_status:
+  kernel` is the unheld socket after a whole read with pid 1 and a kernel thread in sight, not inode 0
+  (W-66/W-69); `owners_count`; zombie leaders (W-68/W-70). The declaration gained `task/*/fd/*`,
+  `mountinfo`, `root` and the two `disable_ipv6` reads.
+- P-2: the fold carries jump conditions and folds once per condition set (W-54/W-60); `action: none`;
+  fourteen fields; the legacy cross-check (W-57/W-61).
+- P-3: per-family opacity (W-75); `BaseFamilies` from `raw_dumps` (W-74); `via: undecided`;
+  `ipv6_disabled` (W-76); `exposure.opaque_rules` carries `table`.
+- P-4: 28 keys — the derived `ipv6_disabled` (W-79); `50-default.conf` where shipped (W-77); last-line
+  exclusion (W-78).
+- §4: one IPv6 gate key; control 10's two extra STIG ids; the snap example path.
+- §5: EL9's `default.rp_filter` is 1 from `rocky-release`'s `50-redhat.conf` (the image ships no
+  `50-default.conf`; a VM gets it from `systemd-udev`), `all.rp_filter` the kernel's 0 — control 10 FAILs
+  on `log_martians` either way; firewalld's ruleset has 7 `opaque` rows of its own; the Ubuntu `sysctl.d`
+  order is `10-network-security.conf` then `50-default.conf`; stock 24.04 fails control 8 too (no persisted
+  `accept_source_route` over the kernel's `default` 1) — the examples run confirms.
+- §6: `pass-filtered` has nothing listening on 22 (the spec's version could not be an empty list);
+  `_mutants.yaml` gained 17 rows, not 3 (control 3's five and the twelve IPv6 gate rows); the deleted-exe
+  oracle plants a copy of the test binary (W-85); `TestOracleSysctl` is extended rather than a new pair;
+  the sysctl grep is the exact `compared 39`; the listeners oracle checks both directions.
+- `cmd/muster/controls_test.go` (three `ok: 104 controls` asserts → 117) and
+  `TestSysctlDeclarationCoversItsReads` (39 → 40 keys, 27 → 28 net leaves) were edited though no task
+  listed them — both count what the collector writes.
 
 ### Numbers
 
+- Controls 104 → 117 (36 → 49 beyond); set `kisa-unix-2026+2026.09.29` → `+2026.10.02` (D16: U-28's
+  verdict on an inactive backend). Fixtures: 115 new (control 1: 17, control 2: 11, control 3: 5, the ten
+  sysctl controls 82). Mutation: 1990 generated, 0 surviving, 47 excluded (+17 rows).
+- Facts: 5 `processes.*`, 4 `exposure.*`, 28 `net.sysctl.*`; `firewall.rules` rows 5 → 14 fields;
+  schema version unchanged.
+- Index cost (X-4): dpkg 128–154 ms on the lab, rpm 105–125 ms in the EL9 container — rebuilt per
+  collector, no cache (W-41 stands).
+- Lab (22.04, docker + kubelet + ufw active, root): 388 processes (151 user, 237 kernel threads), 24
+  listeners (every owner matched, none kernel), 12 unpackaged-listener rows (9 `foreign_ns`, 3
+  `unpackaged`), 7 deleted executables, 16 folded rules, `partial` → control 1 MANUAL; the thirteen read
+  1 MANUAL / 7 FAIL / 5 PASS. EL9 container: 8 processes, 2 listeners (sshd v4/v6), 25 folded / 7 opaque
+  rows, `partial`.
+- Oracles on the lab: listeners 24, deleted-exe 1, sysctl 39 (12 + 26 + `bindv6only`); the deleted-exe pair
+  PASSes in the rocky 9 and alma 9 init containers (`compared 1`), where the listeners pair skips (no `ss`).
+- Kernel-socket measurement: WireGuard `udp/51820` inode 363387305 / udp6 363387306 (W-66).
+
 ### Parked
+
+- Rule order (an accept counts whether or not a drop precedes it); user chains beyond depth 4 / 2000 rows
+  — firewalld's `filter_IN_policy_allow-host-ipv6_*` jumps sit past the depth and read `opaque` (evidence
+  only; no control reads them); the zone model as a first-class normalisation.
+- A revision-independent allow-list spelling for snaps (today the path carries the revision; a waiver
+  fits); a snap/flatpak manifest as a second declaration source.
+- `bindv6only` 1 with `IPV6_V6ONLY` cleared by the daemon (read v6-only); nft for v4 with legacy ip6tables
+  for v6 (v6 reads `no_chain_in_family`); per-interface sysctls; `/opt/*/*/*` executables; multiple
+  network namespaces; named sets as port selectors.
+- An EL VM to measure the EL9 runtime sysctls (the `_hosts` rows carry the persisted winners as the
+  hypothesis); nfsd/ksmbd kernel sockets unmeasured (not loaded on the lab).
+- A future `net.sysctl.*` key must bump the CI `compared 39` (a comment in `ci.yml` says so).
