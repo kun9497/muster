@@ -110,7 +110,7 @@ regenerates them from public images and `-check` compares.
   a socket nobody holds is the kernel's (`owner_status: kernel` — WireGuard measured, kernel sockets have
   non-zero inodes) only when every fd table was read whole and pid 1 plus a kernel thread are in sight;
   inside a container, or when the pid view is partial (`hidepid`), it is `unmatched` and the listener leaves
-  are `absent` (MANUAL). `mnt_ns` is `host` when the mount serving the exe keys like pid 1's for the same
+  are `absent` (MANUAL). `mnt_ns` is `host` when the process's `ns/mnt` equals pid 1's or, in another namespace, when the mount serving the exe keys like pid 1's for the same
   path (systemd's PrivateTmp services are the host's; an overlay root or a bind over `/usr` is `foreign`);
   `package_status` is `packaged`, `unpackaged`, `snap` (by the `/snap/<name>/<rev>/` prefix), `flatpak`,
   `appimage`, `foreign_ns` or `no_index`. The package index is `internal/pkgindex`, built per collector over

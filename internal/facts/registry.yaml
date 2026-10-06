@@ -1758,7 +1758,7 @@ keys:
     collector: firewall
   - key: firewall.raw_dumps
     type: list<record>
-    description: The captured kernel ruleset dumps, each with source (the command), content (capped at 64 KiB) and truncated, and stderr (capped the same) on the iptables-save cross-check when that command printed any - iptables-nft's "iptables-legacy tables present" warning arrives there; the raw evidence the normaliser parses.
+    description: The captured kernel ruleset dumps, each with source (the command), content (capped at 64 KiB) and truncated, and stderr (capped at 64 KiB too; only content's cap sets truncated) on the iptables-save cross-check when that command printed any - iptables-nft's "iptables-legacy tables present" warning arrives there; the raw evidence the normaliser parses.
     since: 1
     sensitivity: internal
     collector: firewall

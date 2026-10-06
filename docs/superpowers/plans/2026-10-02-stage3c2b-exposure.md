@@ -307,7 +307,7 @@ func TestParsePortSpec(t *testing.T) {
 - [ ] **Step 2: Failing collector tests** (linux, `processes_test.go`), through `build(t, "processes", a)` with an `fsAccess` whose `files` hold `/proc/<pid>/status`, `/proc/<pid>/cmdline`, `/proc/self/net/*` tables, `links` hold `/proc/<pid>/exe`, `/proc/<pid>/fd/N`, `/proc/<pid>/ns/mnt`, `/proc/1/ns/mnt`, and `cmds`/`files` hold the index inputs:
   - `TestProcessesListsUserKernelAndZombie` (kinds; `exe_read_status`; `exe_deleted`);
   - `TestProcessesListenerOwnedByTwoProcesses` (pid 1 and sshd hold inode 7 → `owners` two rows, sorted);
-  - `TestProcessesKernelSocketIsOwnerStatusKernel` (inode 0);
+  - `TestProcessesInodeZeroIsUnmatchedNotKernel` (inode 0 → `unmatched`, W-89);
   - `TestProcessesUnmatchedSocketMakesTheLeavesAbsent` (inode 99 held by nobody → `processes.listeners` and `unpackaged_listeners` absent naming `tcp/2049`);
   - `TestProcessesDeniedFdTableMakesTheLeavesDenied` (`deniedDirs["/proc/42/fd"]`);
   - `TestProcessesDeniedExeMakesDeletedExecutablesDenied`;
@@ -403,7 +403,7 @@ measurement behind it.
   word) is `action: none` → `irrelevant`, distinct from an unrecognised verdict word (→ `opaque`); an
   unknown nft statement word reads `none` too (no accepting target exists). **W-56** a `.` concatenation
   operand → `unmodelled` with the field empty; `irrelevant` only for a protocol in a closed list of known
-  non-tcp/udp names. **W-57/W-61** an empty nft read is cross-checked against `iptables-legacy-save`;
+  non-tcp/udp names. **W-57/W-61** an empty nft read is cross-checked against the declared `iptables-save` (iptables-nft, whose "iptables-legacy tables present" warning arrives on stderr);
   legacy rules, iptables-nft's "iptables-legacy tables present" warning or a truncated legacy dump read
   `partial` — on the all-accept-no-rules branch too (Debian's stock `nftables.conf` + legacy rules would
   otherwise read a false U-28 FAIL). **W-58** `ct state dnat`/`snat` → `opaque`. **W-59** rows carry
@@ -435,7 +435,7 @@ measurement behind it.
   first place.
 - **W-79** `applies_when` is ANDed, so two `disable_ipv6 eq 0` gates read NOT_APPLICABLE when only one leaf
   is 1 — a host with `default.disable_ipv6 = 1` and `all = 0` still speaks IPv6 and would miss a FAIL. The
-  `sysctl` collector derives `net.sysctl.ipv6_disabled` (1 iff both read 1; the worse read's status
+  `sysctl` collector derives `net.sysctl.ipv6_disabled` (1 iff both read 1 — widened to every interface by W-86; the worse read's status
   otherwise; `source` the two `/proc` paths) and the four IPv6 controls gate on it alone — the same
   predicate as W-76. P-4 is 28 keys. **W-80** the allow entry is the path as `/proc/<pid>/exe` resolves
   it (a snap's carries the revision — a waiver fits better). **W-81** control 10 cites `RHEL-09-253025`
@@ -488,7 +488,7 @@ measurement behind it.
 
 - P-1: `mnt_ns` is the exe's mount key, not `ns/mnt` equality (W-63/W-65/W-72/W-73); `owner_status:
   kernel` is the unheld socket after a whole read with pid 1 and a kernel thread in sight, not inode 0
-  (W-66/W-69); `owners_count`; zombie leaders (W-68/W-70). The declaration gained `task/*/fd/*`,
+  (W-66/W-69); `owners_count`; zombie leaders (W-68/W-70). The declaration gained `task/*/fd/*`, the `conf/*/disable_ipv6` glob (W-86),
   `mountinfo`, `root` and the two `disable_ipv6` reads.
 - P-2: the fold carries jump conditions and folds once per condition set (W-54/W-60); `action: none`;
   fourteen fields; the legacy cross-check (W-57/W-61).

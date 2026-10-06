@@ -161,7 +161,8 @@ A pid that vanishes between listing and reading leaves no row and increments
   and hidden by `hidepid`) — because a kernel-owned socket (nfsd, ksmbd, WireGuard, rpc callbacks)
   carries a non-zero inode like any other (measured: WireGuard's `udp/51820` read inode 363387305;
   W-66, W-69) — `owners` empty, `owners_count` 0, judged packaged by nature; `unmatched` when a
-  table could not be read whole or the pid view is partial — a container, `hidepid` (W-67);
+  table could not be read whole or the pid view is partial — a container, `hidepid` (W-67) — or when the
+  row's inode is 0 (an orphaned or closing socket no fd table can name — never `kernel`, W-89);
   `error` for an inode of `-1` (an unparsed column). `owners_count` is the total and `owners` the
   first 64 by pid. A zombie leader whose live threads hold the socket is read through
   `task/*/fd/*` under the one budget (W-68); a zombie leader with no live thread is an owner
@@ -235,9 +236,10 @@ counts whether or not a drop precedes it — conservative; §8). `restricts_inbo
 presence, with one widening (X-9): a family with a backend configured but no input base chain
 and no inbound rule — `ufw` disabled, firewalld stopped with its tables flushed, an `nftables`
 service with an empty ruleset — is `full` with `restricts_inbound: false`, no longer `partial`
-"no input base chain found". An empty nft ruleset is cross-checked against `iptables-legacy-save`
-first: legacy rules the nft dump cannot see, iptables-nft's "iptables-legacy tables present"
-warning or a truncated legacy dump read `partial` (W-57, W-61) — on the all-accept-no-rules branch
+"no input base chain found". An empty nft ruleset is cross-checked against the declared `iptables-save`
+first (iptables-nft on such hosts, which prints the "iptables-legacy tables present" warning on
+stderr instead of the legacy rules): legacy rules the nft dump cannot see, that warning (stdout or
+stderr, recorded in the dump's `stderr`) or a truncated legacy dump read `partial` (W-57, W-61) — on the all-accept-no-rules branch
 too. U-28's second mechanism (`restricts_inbound eq true`) therefore
 reads FAIL where it read MANUAL: the host has no firewall, and the control says so. The
 firewall's own fixtures gain `fail-ufw-inactive.json`; the CHANGELOG records the verdict change
@@ -494,7 +496,7 @@ remote-NSS WARN.
   — the examples run tells; the CI assert (`exposure.stats.confidence == "full"`) is written as a
   hypothesis and the first run corrects the step, never the collector; control 2 expected PASS; control 3 measured before it is asserted (an image built
   and not rebooted may run upgraded daemons); the sysctl controls read the Ubuntu shape above.
-- **Known limits (as built).** Under the stage-2H normaliser control 1 reads MANUAL when an input filter base chain with policy accept carries rules (firewalld's `filter_INPUT`; the lab's ufw and `kubearmor` INPUT chains), when input policies differ across chains or families, or when a dump was truncated — docker's `FORWARD`/`DOCKER-USER` chains never feed confidence (the forward hook reaches `default_policy.forward` only), so a docker host with an empty accept INPUT is decided as open (W-87). A firewalld host
+- **Known limits (as built).** Under the stage-2H normaliser control 1 reads MANUAL when an input filter base chain with policy accept carries rules (firewalld's `filter_INPUT`; the lab's ufw and `kubearmor` INPUT chains), when input policies differ across chains or families, when a filter chain on the ingress or prerouting hook carries rules, when a dump was truncated, or when an nft ruleset that restricts nothing stands beside iptables-legacy rules (the `iptables-save` cross-check) — docker's `FORWARD`/`DOCKER-USER` chains never feed confidence (the forward hook reaches `default_policy.forward` only), so a docker host with an empty accept INPUT is decided as open (W-87). A firewalld host
   (default-accept `filter_INPUT` with rules) and the lab (ufw + `kubearmor` accept chains with rules)
   read `partial` → MANUAL, measured; the descriptions say so and the zone model stays parked (§8). A socket bound to `::` on a host with `bindv6only` 1 whose daemon cleared
   `IPV6_V6ONLY` itself is read v6-only (under-exposed by one family). A host with nft rules for v4
@@ -566,7 +568,8 @@ remote-NSS WARN.
 - **Capability matrix.** `nonroot.denied` += `processes.deleted_executables`,
   `processes.listeners`, `processes.unpackaged_listeners`, `exposure.exposed`; `_notes` +=
   `processes.list` (ok with denied rows), `exposure.exposed` on a host without a firewall binary
-  (unsupported → NOT_APPLICABLE, as U-28) and on a docker or firewalld host (`partial` → MANUAL);
+  (unsupported → NOT_APPLICABLE, as U-28) and on a firewalld host, or any host whose accept-policy input
+  chain carries rules (`partial` → MANUAL);
   `processes.listeners` in an unprivileged container, where (measured in `ubuntu:24.04`) only a
   process under another uid refuses its `exe`/`fd` links and makes the leaves `denied`.
 - **CI.** Root job: `jq` asserts on `processes.stats.index_source == "dpkg"`, a `tcp/22` row in

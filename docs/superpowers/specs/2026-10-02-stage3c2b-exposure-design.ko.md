@@ -132,7 +132,8 @@ link의 텍스트이고 대상은 결코 열지 않음(`ReadDir`는 `Walk`만의
   표가 없으면 `kernel`: 커널 소유 소켓(nfsd, ksmbd, WireGuard, rpc 콜백)도 다른 소켓처럼 0이 아닌 inode를
   가지기 때문(측정: WireGuard의 `udp/51820`이 inode 363387305로 읽힘; W-66, W-69) — `owners` 빔,
   `owners_count` 0, 본성상 패키지로 판정; 표를 온전히 읽지 못했거나 pid 시야가 부분적이면 — 컨테이너,
-  `hidepid`(W-67) — `unmatched`; inode `-1`(파싱 안 된 열)은 `error`. `owners_count`가 전체이고 `owners`는
+  `hidepid`(W-67) — 또는 행의 inode가 0이면(어느 fd 표도 이름 댈 수 없는 고아·닫히는 소켓 — 결코 `kernel`이
+  아님, W-89) `unmatched`; inode `-1`(파싱 안 된 열)은 `error`. `owners_count`가 전체이고 `owners`는
   pid 순 처음 64. 살아 있는 스레드가 소켓을 가진 zombie 리더는 한 예산 아래 `task/*/fd/*`로 읽고(W-68),
   살아 있는 스레드 없는 zombie 리더는 소유자 실패(W-70). fd 표가 하나라도 `denied`면 leaf가 `denied`;
   소켓이 하나라도 `unmatched`이거나 소유자가 하나라도 실패하면 leaf는 그것을 적은 `absent`(컨트롤 2는
@@ -194,9 +195,10 @@ ufw-user-input`); 두 번 방문되는 체인은 한 번만; 깊이나 행 예�
 보수적; §8). `restricts_inbound`와 `normalization_confidence`는 오늘처럼 base chain의 정책과 규칙 유무로
 계산하되 확장 하나(X-9): 백엔드가 설정됐지만 input base chain도 inbound 규칙도 없는 family — 꺼진 `ufw`,
 테이블이 비워진 채 멈춘 firewalld, 빈 규칙 집합의 `nftables` 서비스 — 는 `partial` "no input base chain
-found"가 아니라 `restricts_inbound: false`의 `full`. 빈 nft 규칙 집합은 먼저 `iptables-legacy-save`와 교차
-확인합니다: nft dump가 볼 수 없는 legacy 규칙, iptables-nft의 "iptables-legacy tables present" 경고, 잘린
-legacy dump는 `partial`(W-57, W-61) — 모두-accept-규칙-없음 가지에서도. 그래서 U-28의 둘째 메커니즘(`restricts_inbound eq
+found"가 아니라 `restricts_inbound: false`의 `full`. 빈 nft 규칙 집합은 먼저 선언된 `iptables-save`와 교차
+확인합니다(그런 호스트에선 iptables-nft이며, legacy 규칙 대신 "iptables-legacy tables present" 경고를 stderr에
+찍음): nft dump가 볼 수 없는 legacy 규칙, 그 경고(stdout이든 stderr든, dump의 `stderr`에 기록), 잘린 legacy
+dump는 `partial`(W-57, W-61) — 모두-accept-규칙-없음 가지에서도. 그래서 U-28의 둘째 메커니즘(`restricts_inbound eq
 true`)은 MANUAL이던 곳에서 FAIL로 읽힘: 호스트에 방화벽이 없고 컨트롤이 그렇게 말함. 방화벽 자체의
 fixture에 `fail-ufw-inactive.json`; CHANGELOG는 판정 변화를 Controls에 기록(D16).
 
@@ -412,7 +414,7 @@ W-79) — 권장 방식으로, `all`, `default`와 모든 인터페이스에서 
   `udp/68`(둘 다 기본 목록에), 그리고 이미지의 에이전트가 listen하는 것 — examples 실행이 말해 주고 CI
   단언(`exposure.stats.confidence == "full"`)은 가설로 쓰고 첫 실행이 단계를 고침(수집기는 절대 아님); 컨트롤 2는 PASS 예상; 컨트롤 3은 측정 뒤 단언(빌드되고
   재부팅 안 된 이미지는 업그레이드된 데몬을 돌릴 수 있음); sysctl 컨트롤은 위 Ubuntu 모양.
-- **알려진 한계(만든 대로).** 2H 단계 정규화기 아래 컨트롤 1은 정책 accept인 input filter base chain이 규칙을 가질 때(firewalld의 `filter_INPUT`; 랩의 ufw와 `kubearmor` INPUT 체인), input 정책이 체인이나 family마다 다를 때, dump가 잘렸을 때 MANUAL로 읽힙니다 — docker의 `FORWARD`/`DOCKER-USER` 체인은 신뢰도에 닿지 않으므로(forward hook은 `default_policy.forward`에만 닿음) INPUT이 빈 accept인 docker 호스트는 열림으로 판정됩니다(W-87). firewalld 호스트(규칙을 가진
+- **알려진 한계(만든 대로).** 2H 단계 정규화기 아래 컨트롤 1은 정책 accept인 input filter base chain이 규칙을 가질 때(firewalld의 `filter_INPUT`; 랩의 ufw와 `kubearmor` INPUT 체인), input 정책이 체인이나 family마다 다를 때, ingress나 prerouting hook의 filter 체인이 규칙을 가질 때, dump가 잘렸을 때, 아무것도 제한하지 않는 nft 규칙 집합 옆에 iptables-legacy 규칙이 있을 때(`iptables-save` 교차 확인) MANUAL로 읽힙니다 — docker의 `FORWARD`/`DOCKER-USER` 체인은 신뢰도에 닿지 않으므로(forward hook은 `default_policy.forward`에만 닿음) INPUT이 빈 accept인 docker 호스트는 열림으로 판정됩니다(W-87). firewalld 호스트(규칙을 가진
   기본 accept `filter_INPUT`)와 랩(규칙을 가진 ufw + `kubearmor` accept 체인)은 `partial` → MANUAL로 읽힘, 측정;
   설명이 그렇게 적고 존 모델은 보류로 남습니다(§8). `bindv6only` 1인 호스트에서 데몬이 스스로 `IPV6_V6ONLY`를 끈
   `::` 소켓은 v6만으로 읽힙니다(family 하나만큼 과소 노출). v4는 nft 규칙, v6는 legacy `ip6tables` 규칙인
@@ -471,7 +473,8 @@ W-79) — 권장 방식으로, `all`, `default`와 모든 인터페이스에서 
   (`meta l4proto { tcp, udp }`, `--dports 22,80`, `1000:2000`, `tcp dport vmap { 22 : accept }`).
 - **Capability matrix.** `nonroot.denied` += `processes.deleted_executables`, `processes.listeners`,
   `processes.unpackaged_listeners`, `exposure.exposed`; `_notes` += `processes.list`(denied 행을 가진 ok),
-  방화벽 바이너리 없는 호스트의 `exposure.exposed`(unsupported → NOT_APPLICABLE, U-28처럼; docker나 firewalld 호스트에선 `partial` → MANUAL);
+  방화벽 바이너리 없는 호스트의 `exposure.exposed`(unsupported → NOT_APPLICABLE, U-28처럼; firewalld 호스트나 accept 정책 input 체인이 규칙을 가진 호스트에선
+  `partial` → MANUAL);
   비특권 컨테이너의 `processes.listeners`(`ubuntu:24.04`에서 측정: 다른 uid의 프로세스만 `exe`/`fd` 링크를
   거절해 leaf를 `denied`로 만듦).
 - **CI.** root 잡: `processes.stats.index_source == "dpkg"`, `exposure.listeners`의 `tcp/22` 행, 오라클

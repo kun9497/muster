@@ -1100,6 +1100,9 @@ func writeExposure(a collect.Access, b *collect.Builder, ls []listener, lst fact
 	defOff, defOK, defFail := readProcInt(a, procDisableV6Default)
 	off := allOK && defOK && allOff == 1 && defOff == 1
 	ifaces, ifFail := ipv6InterfaceFiles(a)
+	// The first failure in path order is carried (all, default, then the
+	// interfaces sorted); the sysctl collector's derived key carries the
+	// worst-ranked one instead — both name a file, neither decides.
 	v6Fail := cmp.Or(allFail, defFail, ifFail)
 	for _, p := range ifaces {
 		n, present, fail := readProcInt(a, p)
