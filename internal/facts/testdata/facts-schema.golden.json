@@ -904,12 +904,102 @@
     {
       "Key": "sockets.listening",
       "Type": "list\u003crecord\u003e",
-      "Description": "Listening TCP/UDP sockets with proto, address, port, inode, pid and executable.",
+      "Description": "Listening TCP/UDP sockets with proto, address, port and inode.",
       "Since": 1,
       "Sensitivity": "internal",
       "Collector": "sockets",
       "DefaultOn": "",
       "SubjectKind": "port"
+    },
+    {
+      "Key": "processes.list",
+      "Type": "list\u003crecord\u003e",
+      "Description": "Every process /proc lists, one row per pid sorted by pid, with pid, ppid, uid (the real uid), name, cmd (the first NUL-separated token of the command line, from at most 4 KiB), exe (the exe link's text without proc(5)'s \" (deleted)\" suffix), exe_deleted (the link carried it: the executable was unlinked or replaced after it started - an upgraded daemon not yet restarted, a binary removed from disk, or a memfd: executable, the suspicious case), exe_read_status (ok, denied or error; empty on a kernel thread or a zombie), kind (kernel: the Kthread flag, or pid 2 or a child of pid 2 where the kernel does not print it; zombie: state Z; user otherwise), mnt_ns (host when the ns/mnt link equals pid 1's, or when the process's root link is / and the mount its exe lies on names the same file pid 1 sees at that path - the device, the path within it, the type and the source of the longest mount point prefixing exe, as a systemd service with PrivateTmp= or ProtectSystem= sees it; foreign otherwise - a container, a bind or extension image over /usr or the exe, or a process with another root seen from the host; empty when it was not read, or when the root link or a mountinfo it needs could not be read, which is the row's ns_read_status), ns_read_status (ok, denied or error; empty on a kernel thread or a zombie), package and package_status (for a user process whose exe and namespace were read: snap with package snap:\u003cname\u003e for an exe under /snap/\u003cname\u003e/\u003crev\u003e/ in any namespace, then foreign_ns for a foreign process - never looked up, the path is in another root - then flatpak, appimage, packaged with the owning package, unpackaged, or no_index when the package index could not be built; empty otherwise). An executable whose file name itself ends in \" (deleted)\" cannot be told apart from a deleted one. A process that exits between the listing and the read leaves no row. Capped at 4096 rows; truncated also when the 5-second enumeration budget ran out.",
+      "Since": 1,
+      "Sensitivity": "internal",
+      "Collector": "processes",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "processes.deleted_executables",
+      "Type": "list\u003crecord\u003e",
+      "Description": "The judged subset of processes.list: the user processes whose executable was deleted or replaced since it started, sorted by pid, with pid, uid, name and exe. The status of the read when any status file or any user process's exe could not be read (denied in a non-root run), never the readable subset; never absent. Truncated when the enumeration budget ran out.",
+      "Since": 1,
+      "Sensitivity": "internal",
+      "Collector": "processes",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "processes.listeners",
+      "Type": "list\u003crecord\u003e",
+      "Description": "Every listening socket of the kernel's tcp, tcp6, udp and udp6 tables, sorted by proto, port and addr, with proto (tcp or udp), family (v4 or v6, from the table), addr, port, loopback, link_local, inode, owner_status, owners (the processes whose fd table holds the socket, sorted by pid and capped at 64, each with pid, uid, name, exe, exe_deleted, mnt_ns, package and package_status) and owners_count (how many hold it, before the cap). owner_status is ok; kernel when no process holds the socket, every fd table was read whole, the run sees pid 1 (its ns/mnt and mountinfo read) and at least one kernel thread, and the run is not inside a container (a kernel-owned socket carries a real inode no fd table names - measured for WireGuard, whose udp and udp6 listen sockets print non-zero inodes; nfsd was not measured; owners empty); denied when an fd table could not be read; unmatched when no process holds it and a table failed otherwise, the enumeration budget ran out, or the pid view may be partial - inside a container, or without pid 1 or a kernel thread in sight (hidepid, a private pid namespace) - (the leaf is then absent, naming the socket); unmatched too on a row with inode 0, an orphaned or closing socket no fd table can name, never kernel whatever the reads (the leaf is then absent, naming the socket and \"inode 0\"); error on a row whose inode did not parse. A zombie thread-group leader with live threads is read through its tasks' fd tables, and a socket it holds makes the leaf absent naming it: its exe and namespace cannot be read, so the owner cannot be judged. Socket inode numbers come from a 32-bit counter that can wrap on a long-lived host, which can only add a spurious owner, never hide one. The status of the read when an fd table, or the exe or ns/mnt of a process holding a socket, could not be read; error when a table row's inode did not parse, a process holds more than 65536 fds or an fd link could not be read. Capped at 2000 rows; truncated when a socket table or the package index was cut or the enumeration budget ran out.",
+      "Since": 1,
+      "Sensitivity": "internal",
+      "Collector": "processes",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "processes.unpackaged_listeners",
+      "Type": "list\u003crecord\u003e",
+      "Description": "The judged subset of processes.listeners: one row per listening socket and holding process whose package_status is unpackaged, snap, flatpak, appimage or foreign_ns (a process whose executable was deleted is processes.deleted_executables' and is not repeated), sorted as processes.listeners, with proto, family, addr, port, pid, name, exe and package_status. Carries processes.listeners' status when that is not ok, and the package index's when it could not be built (absent \"no package database\" on a host with neither dpkg nor rpm), a failure never marked truncated. Capped at 2000 rows; truncated as processes.listeners.",
+      "Since": 1,
+      "Sensitivity": "internal",
+      "Collector": "processes",
+      "DefaultOn": "",
+      "SubjectKind": "file"
+    },
+    {
+      "Key": "processes.stats",
+      "Type": "record",
+      "Description": "The process collector's account of itself - count (rows read), kernel_threads, zombies, foreign_ns, denied (reads refused), vanished (processes that exited under the read), fd_reads, index_source (dpkg or rpm, or none when the host has neither or the index could not be built), index_ms and elapsed_ms; provenance, read by no control.",
+      "Since": 1,
+      "Sensitivity": "internal",
+      "Collector": "processes",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "exposure.listeners",
+      "Type": "list\u003crecord\u003e",
+      "Description": "Every listening socket not on loopback (127.0.0.0/8, ::1), sorted by proto, port and addr, with service (tcp/\u003cport\u003e or udp/\u003cport\u003e - the string an allow list names, never tcp6), proto, family (v4 or v6), addr, port, link_local (fe80::/10 or 169.254.0.0/16 - reachable by every neighbour on the link, so a candidate like any other), owner_status, owners and owners_count as in processes.listeners (a socket the kernel holds has no owner), exposed, via, rule_chain, rule_source and rule_raw. via is how the verdict was reached: no_chain_in_family (the host speaks the family - v6 when a tcp6 or udp6 table exists and disable_ipv6 is not 1 on all, default and every present interface except lo - and no input base chain of it, or of an inet table, exists while the other family has one), open_policy (restricts_inbound is false), any_port_rule (an accept with no protocol, port, interface or destination), rule (an accept of the listener's protocol whose port, range or set takes the port; rule_chain, rule_source - the rule's source address as written - and rule_raw name it), filtered (no path in), ipv6_disabled (only v6 traffic could reach the socket and IPv6 is disabled on all, default and every present interface except lo, so the kernel drops it), or undecided (the verdict could not be read; see exposure.stats). A socket on 0.0.0.0 asks the v4 rules; on :: the v6 rules and, when net.ipv6.bindv6only is 0, the v4 rules too, exposed when either lets it in; a specific address asks its own family; with IPv6 disabled the v6 rules are never asked. Rules are read from firewall.rules as classified for exposure: drop and reject rows never open a path; an accept on lo, one for established or related traffic only, one for a protocol other than tcp or udp, and log, return and followed-jump rows cannot reach a listener; any other accept the model cannot read is opaque. Rule order is ignored: an accept counts whether or not a drop precedes it. Evidence; carries the firewall read's status when it did not answer and processes.listeners' status when that is not ok. Capped at 2000 rows.",
+      "Since": 1,
+      "Sensitivity": "internal",
+      "Collector": "processes",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "exposure.exposed",
+      "Type": "list\u003crecord\u003e",
+      "Description": "The judged subset of exposure.listeners: one row per listening socket a packet from off the host can reach, with service, proto, family, addr, port, pid, name and package (the holder with the lowest pid; exposure.listeners has them all; pid -1 and empty name and package for a socket the kernel holds), via, rule_chain and rule_source. Absent when some non-loopback listener's verdict cannot be read - normalization confidence is partial (with no non-loopback listener the leaf is an empty list), or an opaque rule sits in every family that could admit the listener and none of its other families lets it in (an opaque rule blocks only the family it is in, inet blocking both) - with the cause in exposure.stats.manual_reason and the rules in exposure.opaque_rules. A host with no firewall binary reads the firewall's unsupported status, though everything is reachable; a host whose backend is configured but restricts nothing reads every listener exposed via open_policy (U-28 reads FAIL there for the same cause). The status of processes.listeners when that is not ok, of net.ipv6.bindv6only when it exists, cannot be read and a socket listens on ::, of a net.ipv6.conf disable_ipv6 file (all, default or a present interface) when it exists and cannot be read, or the conf directory cannot be listed, and a socket takes v6 traffic; error naming the firewall fact when the firewall collector did not run. Truncated when processes.listeners or firewall.rules was cut. Capped at 2000 rows.",
+      "Since": 1,
+      "Sensitivity": "internal",
+      "Collector": "processes",
+      "DefaultOn": "",
+      "SubjectKind": "port"
+    },
+    {
+      "Key": "exposure.opaque_rules",
+      "Type": "list\u003crecord\u003e",
+      "Description": "The rows of firewall.rules the exposure verdict cannot read, in rule order, with chain, via_chain, table, family, action and raw: an accept the parser left a match unmodelled on, an accept with a destination address and no port, a jump the fold could not follow, or a rule whose verdict was not read. One blocks only its own family (an inet one both): it makes exposure.exposed absent when a non-loopback listener has no other family that lets it in. Evidence. Capped at 2000 rows.",
+      "Since": 1,
+      "Sensitivity": "internal",
+      "Collector": "processes",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "exposure.stats",
+      "Type": "record",
+      "Description": "The exposure verdict's account of itself - confidence (firewall.normalization_confidence), manual_reason (why exposure.exposed is absent or carries another read's status, empty when it was decided), listeners (non-loopback listening sockets), exposed, filtered (decided and not exposed, ipv6_disabled included), loopback (listening sockets left out on loopback), link_local, kernel_owned (non-loopback sockets no process holds), opaque_rules, folded_rules (the rows of firewall.rules read) and ipv6_disabled (disable_ipv6 1 on all, default and every present interface except lo); provenance, read by no control.",
+      "Since": 1,
+      "Sensitivity": "internal",
+      "Collector": "processes",
+      "DefaultOn": "",
+      "SubjectKind": ""
     },
     {
       "Key": "sshd.collect_method",
@@ -2904,7 +2994,7 @@
     {
       "Key": "firewall.restricts_inbound",
       "Type": "bool",
-      "Description": "Whether the ruleset restricts inbound traffic by default (derived by normalisation); absent when confidence is below full (accept-with-rules, mixed policies, a missing policy, a non-input inbound chain with rules, or a truncated dump); the unsupported/denied envelope when the ruleset could not be read.",
+      "Description": "Whether the ruleset restricts inbound traffic by default (derived by normalisation) - true when every input filter chain is drop/reject; false when every input filter chain is accept with zero rules, or when there is no input base chain and no inbound rule at all; absent when confidence is below full (accept-with-rules, mixed policies, a missing policy, a non-input inbound chain with rules, a truncated dump, or an nf_tables ruleset that restricts nothing - empty, or accept chains with no rule - beside an iptables-save cross-check that finds legacy rules or iptables-nft's warning that legacy tables are present); the unsupported/denied envelope when the ruleset could not be read.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "firewall",
@@ -2914,7 +3004,7 @@
     {
       "Key": "firewall.normalization_confidence",
       "Type": "string",
-      "Description": "Confidence in the normalised inbound judgement - full (every input filter chain is drop/reject, or every input filter chain is accept with zero rules) or partial (everything else - accept-with-rules, mixed policies, a missing policy, a non-input inbound chain with rules, or a truncated dump); the unsupported/denied envelope when the ruleset could not be read.",
+      "Description": "Confidence in the normalised inbound judgement - full (every input filter chain is drop/reject, every input filter chain is accept with zero rules, or there is no input base chain and no inbound rule at all) or partial (everything else - accept-with-rules, mixed policies, a missing policy, a non-input inbound chain with rules, a truncated dump, or an nf_tables ruleset that restricts nothing - empty, or accept chains with no rule - beside an iptables-save cross-check that finds legacy rules or iptables-nft's warning that legacy tables are present); the unsupported/denied envelope when the ruleset could not be read.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "firewall",
@@ -2924,7 +3014,7 @@
     {
       "Key": "firewall.rules",
       "Type": "list\u003crecord\u003e",
-      "Description": "The normalised inbound-affecting rules, each with chain, action, protocol, dport (a string, since ports may be ranges or sets) and source; the unsupported/denied envelope when the ruleset could not be read.",
+      "Description": "The inbound rule table: the rules of every filter base chain on the input hook, with the rules of every user chain it jumps or goes to folded in (same family and table, depth at most 4, at most 2000 folded rows per base chain); a folded row carries the conditions of the jumps that led to it (a field it leaves empty is taken from the jump, a field both set differently makes it unmodelled), and a chain is folded once per distinct set of such conditions. Each row has the fourteen fields chain, via_chain (the input base chain that reached it), table (the chain's table; via_chain, table and family name a base chain), depth (0 for the base chain), family (v4, v6 or inet), proto, dport (a port, range or set as written), saddr, daddr, iif, ctstate, action (accept, drop, reject, return, jump X, goto X, continue, queue, log, none for a rule with no verdict, or empty when the verdict was not read), unmodelled (a match the parser does not model, or a jump the fold could not follow) and raw (the rule line, capped at 512 bytes); empty strings and false where a selector is absent. Bridge, arp and netdev tables contribute no row. The unsupported/denied envelope when the ruleset could not be read.",
       "Since": 1,
       "Sensitivity": "internal",
       "Collector": "firewall",
@@ -2934,7 +3024,7 @@
     {
       "Key": "firewall.raw_dumps",
       "Type": "list\u003crecord\u003e",
-      "Description": "The captured kernel ruleset dumps, each with source (the command), content (capped at 64 KiB) and truncated; the raw evidence the normaliser parses.",
+      "Description": "The captured kernel ruleset dumps, each with source (the command), content (capped at 64 KiB) and truncated, and stderr (capped at 64 KiB too; only content's cap sets truncated) on the iptables-save cross-check when that command printed any - iptables-nft's \"iptables-legacy tables present\" warning arrives there; the raw evidence the normaliser parses.",
       "Since": 1,
       "Sensitivity": "internal",
       "Collector": "firewall",
@@ -4089,6 +4179,286 @@
       "Sensitivity": "public",
       "Collector": "sysctl",
       "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "net.sysctl.ipv4_ip_forward",
+      "Type": "setting\u003cint\u003e",
+      "Description": "net.ipv4.ip_forward - whether the host routes IPv4 packets between its interfaces; runtime from /proc/sys, persisted from the sysctl.d chain.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "net.sysctl.ipv6_all_forwarding",
+      "Type": "setting\u003cint\u003e",
+      "Description": "net.ipv6.conf.all.forwarding - whether every current interface forwards IPv6 packets (and acts as a router); runtime from /proc/sys, persisted from the sysctl.d chain; absent when the kernel has no IPv6 (ipv6.disable=1 or not built).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "net.sysctl.ipv6_default_forwarding",
+      "Type": "setting\u003cint\u003e",
+      "Description": "net.ipv6.conf.default.forwarding - the IPv6 forwarding value an interface created later starts with; runtime from /proc/sys, persisted from the sysctl.d chain; absent when the kernel has no IPv6 (ipv6.disable=1 or not built).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "net.sysctl.ipv4_all_accept_redirects",
+      "Type": "setting\u003cint\u003e",
+      "Description": "net.ipv4.conf.all.accept_redirects - whether every current interface lets an ICMP redirect change the IPv4 routing table; runtime from /proc/sys, persisted from the sysctl.d chain.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "net.sysctl.ipv4_default_accept_redirects",
+      "Type": "setting\u003cint\u003e",
+      "Description": "net.ipv4.conf.default.accept_redirects - the ICMP redirect acceptance an interface created later starts with; runtime from /proc/sys, persisted from the sysctl.d chain.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "net.sysctl.ipv4_all_secure_redirects",
+      "Type": "setting\u003cint\u003e",
+      "Description": "net.ipv4.conf.all.secure_redirects - whether every current interface accepts an ICMP redirect from a listed default gateway; runtime from /proc/sys, persisted from the sysctl.d chain.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "net.sysctl.ipv4_default_secure_redirects",
+      "Type": "setting\u003cint\u003e",
+      "Description": "net.ipv4.conf.default.secure_redirects - the gateway-redirect acceptance an interface created later starts with; runtime from /proc/sys, persisted from the sysctl.d chain.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "net.sysctl.ipv4_all_send_redirects",
+      "Type": "setting\u003cint\u003e",
+      "Description": "net.ipv4.conf.all.send_redirects - whether every current interface sends ICMP redirects, which only a router should; runtime from /proc/sys, persisted from the sysctl.d chain.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "net.sysctl.ipv4_default_send_redirects",
+      "Type": "setting\u003cint\u003e",
+      "Description": "net.ipv4.conf.default.send_redirects - the redirect sending an interface created later starts with; runtime from /proc/sys, persisted from the sysctl.d chain.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "net.sysctl.ipv6_all_accept_redirects",
+      "Type": "setting\u003cint\u003e",
+      "Description": "net.ipv6.conf.all.accept_redirects - whether every current interface lets an ICMPv6 redirect change the routing table; runtime from /proc/sys, persisted from the sysctl.d chain; absent when the kernel has no IPv6 (ipv6.disable=1 or not built).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "net.sysctl.ipv6_default_accept_redirects",
+      "Type": "setting\u003cint\u003e",
+      "Description": "net.ipv6.conf.default.accept_redirects - the ICMPv6 redirect acceptance an interface created later starts with; runtime from /proc/sys, persisted from the sysctl.d chain; absent when the kernel has no IPv6 (ipv6.disable=1 or not built).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "net.sysctl.ipv4_all_accept_source_route",
+      "Type": "setting\u003cint\u003e",
+      "Description": "net.ipv4.conf.all.accept_source_route - whether every current interface accepts an IPv4 packet that names its own route; runtime from /proc/sys, persisted from the sysctl.d chain.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "net.sysctl.ipv4_default_accept_source_route",
+      "Type": "setting\u003cint\u003e",
+      "Description": "net.ipv4.conf.default.accept_source_route - the IPv4 source-route acceptance an interface created later starts with; runtime from /proc/sys, persisted from the sysctl.d chain.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "net.sysctl.ipv6_all_accept_source_route",
+      "Type": "setting\u003cint\u003e",
+      "Description": "net.ipv6.conf.all.accept_source_route - whether every current interface accepts an IPv6 routing-header packet; runtime from /proc/sys, persisted from the sysctl.d chain; absent when the kernel has no IPv6 (ipv6.disable=1 or not built).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "net.sysctl.ipv6_default_accept_source_route",
+      "Type": "setting\u003cint\u003e",
+      "Description": "net.ipv6.conf.default.accept_source_route - the IPv6 source-route acceptance an interface created later starts with; runtime from /proc/sys, persisted from the sysctl.d chain; absent when the kernel has no IPv6 (ipv6.disable=1 or not built).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "net.sysctl.ipv4_all_rp_filter",
+      "Type": "setting\u003cint\u003e",
+      "Description": "net.ipv4.conf.all.rp_filter - reverse-path filtering on every current interface - 0 off, 1 strict, 2 loose; runtime from /proc/sys, persisted from the sysctl.d chain.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "net.sysctl.ipv4_default_rp_filter",
+      "Type": "setting\u003cint\u003e",
+      "Description": "net.ipv4.conf.default.rp_filter - the reverse-path filtering an interface created later starts with; runtime from /proc/sys, persisted from the sysctl.d chain.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "net.sysctl.ipv4_all_log_martians",
+      "Type": "setting\u003cint\u003e",
+      "Description": "net.ipv4.conf.all.log_martians - whether a packet with an impossible source address is logged on every current interface; runtime from /proc/sys, persisted from the sysctl.d chain.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "net.sysctl.ipv4_default_log_martians",
+      "Type": "setting\u003cint\u003e",
+      "Description": "net.ipv4.conf.default.log_martians - the martian logging an interface created later starts with; runtime from /proc/sys, persisted from the sysctl.d chain.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "net.sysctl.ipv4_icmp_echo_ignore_broadcasts",
+      "Type": "setting\u003cint\u003e",
+      "Description": "net.ipv4.icmp_echo_ignore_broadcasts - whether an ICMP echo sent to a broadcast or multicast address goes unanswered; runtime from /proc/sys, persisted from the sysctl.d chain.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "net.sysctl.ipv4_icmp_ignore_bogus_error_responses",
+      "Type": "setting\u003cint\u003e",
+      "Description": "net.ipv4.icmp_ignore_bogus_error_responses - whether a malformed ICMP error reply is dropped without a log line; runtime from /proc/sys, persisted from the sysctl.d chain.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "net.sysctl.ipv4_tcp_syncookies",
+      "Type": "setting\u003cint\u003e",
+      "Description": "net.ipv4.tcp_syncookies - whether the kernel answers with SYN cookies when the SYN backlog overflows; runtime from /proc/sys, persisted from the sysctl.d chain.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "net.sysctl.ipv6_all_accept_ra",
+      "Type": "setting\u003cint\u003e",
+      "Description": "net.ipv6.conf.all.accept_ra - whether every current interface takes addresses and routes from IPv6 router advertisements; runtime from /proc/sys, persisted from the sysctl.d chain; absent when the kernel has no IPv6 (ipv6.disable=1 or not built).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "net.sysctl.ipv6_default_accept_ra",
+      "Type": "setting\u003cint\u003e",
+      "Description": "net.ipv6.conf.default.accept_ra - the router-advertisement acceptance an interface created later starts with; runtime from /proc/sys, persisted from the sysctl.d chain; absent when the kernel has no IPv6 (ipv6.disable=1 or not built).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "net.sysctl.ipv6_all_disable_ipv6",
+      "Type": "setting\u003cint\u003e",
+      "Description": "net.ipv6.conf.all.disable_ipv6 - whether IPv6 is switched off on every current interface - the gate of the IPv6 controls; runtime from /proc/sys, persisted from the sysctl.d chain; absent when the kernel has no IPv6 (ipv6.disable=1 or not built).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "net.sysctl.ipv6_default_disable_ipv6",
+      "Type": "setting\u003cint\u003e",
+      "Description": "net.ipv6.conf.default.disable_ipv6 - whether IPv6 starts switched off on an interface created later - the gate of the IPv6 controls; runtime from /proc/sys, persisted from the sysctl.d chain; absent when the kernel has no IPv6 (ipv6.disable=1 or not built).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "net.sysctl.ipv6_bindv6only",
+      "Type": "int",
+      "Description": "net.ipv6.bindv6only from /proc/sys - whether a socket bound to \"::\" stays IPv6-only by default instead of also accepting IPv4; evidence the processes collector reads. Absent when the kernel has no IPv6 (ipv6.disable=1 or not built).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "net.sysctl.ipv6_disabled",
+      "Type": "int",
+      "Description": "Derived from the runtime sides of net.ipv6.conf.all.disable_ipv6 and net.ipv6.conf.default.disable_ipv6 and from net.ipv6.conf.\u003cinterface\u003e.disable_ipv6 of every present interface - 1 when disable_ipv6 is 1 on all, default and every present interface except lo; 0 otherwise, since a kernel that disabled only default still speaks IPv6 on its present interfaces, and one interface set back to 0 after all=1 speaks IPv6 on that interface. The gate of the four IPv6 controls, and the same predicate the exposure verdict uses for an enabled family. The source lists every file read. When any read is not ok (or the conf directory cannot be listed), the worst status with that read's reason (absent \"IPv6 is not built or is disabled\" when the kernel has no IPv6).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "",
       "SubjectKind": ""
     },
     {

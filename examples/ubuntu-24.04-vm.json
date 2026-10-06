@@ -1,15 +1,15 @@
 {
   "schema_version": 1,
   "run": {
-    "muster_version": "be82b78",
-    "commit": "be82b78",
-    "controls_version": "kisa-unix-2026+2026.09.29",
-    "controls_digest": "sha256:1622ceeeba7f9b7bbe1d2bb23562a921bfec21f7fd82833ec4af40a5515813ad",
+    "muster_version": "17b0d96",
+    "commit": "17b0d96",
+    "controls_version": "kisa-unix-2026+2026.10.02",
+    "controls_digest": "sha256:663acb91eee0a218cac42d72184b53e026addf12b5f6f5f38280e19197dc0da0",
     "guide_edition": "kisa-unix-2026",
-    "collected_at": "2026-09-30T04:21:24Z",
+    "collected_at": "2026-10-06T09:31:44Z",
     "host": {
       "hostname": "github-runner",
-      "machine_id_hash": "4d7193c17275652cce0569a44b2c249f54db99d23e0fd447ae531341cacc9ee5",
+      "machine_id_hash": "e2708aa39d82e1c19d1f0bcd0ab61b4aa24242d269affa028e793d3e410ca9e0",
       "kernel": "",
       "os_release": {
         "id": "ubuntu",
@@ -39,7 +39,7 @@
       {
         "name": "accounts",
         "status": "ok",
-        "ms": 7
+        "ms": 1
       },
       {
         "name": "audit",
@@ -55,17 +55,17 @@
       {
         "name": "boot",
         "status": "ok",
-        "ms": 25
+        "ms": 16
       },
       {
         "name": "coredump",
         "status": "ok",
-        "ms": 0
+        "ms": 1
       },
       {
         "name": "cron",
         "status": "ok",
-        "ms": 920,
+        "ms": 860,
         "cmd": "/usr/bin/systemctl list-unit-files --type=timer --no-legend --no-pager"
       },
       {
@@ -76,23 +76,23 @@
       {
         "name": "env",
         "status": "ok",
-        "ms": 10
+        "ms": 15
       },
       {
         "name": "files",
         "status": "ok",
-        "ms": 19
+        "ms": 18
       },
       {
         "name": "fim",
         "status": "ok",
-        "ms": 10,
+        "ms": 11,
         "cmd": "/usr/bin/systemctl list-timers --all --no-legend --no-pager"
       },
       {
         "name": "firewall",
         "status": "ok",
-        "ms": 21,
+        "ms": 25,
         "cmd": "/usr/sbin/nft list ruleset"
       },
       {
@@ -113,7 +113,7 @@
       {
         "name": "modules",
         "status": "ok",
-        "ms": 23
+        "ms": 14
       },
       {
         "name": "mounts",
@@ -139,18 +139,18 @@
       {
         "name": "pam",
         "status": "ok",
-        "ms": 1
+        "ms": 2
       },
       {
         "name": "patch",
         "status": "ok",
-        "ms": 1816,
+        "ms": 2112,
         "cmd": "/usr/bin/apt-get -s upgrade -o Debug::NoLocking=1"
       },
       {
         "name": "pkgverify",
         "status": "ok",
-        "ms": 636386,
+        "ms": 492309,
         "cmd": "/usr/bin/rpm -Va"
       },
       {
@@ -159,9 +159,15 @@
         "ms": 0
       },
       {
+        "name": "processes",
+        "status": "ok",
+        "ms": 156,
+        "cmd": "/usr/bin/rpm -qa --qf [%{=NAME}\t%{FILEMODES:octal}\t%{FILEUSERNAME}\t%{FILEGROUPNAME}\t%|FILECAPS?{%{FILECAPS}}|\t%{FILENAMES}\n]"
+      },
+      {
         "name": "services",
         "status": "ok",
-        "ms": 338,
+        "ms": 337,
         "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState atftpd.service"
       },
       {
@@ -172,12 +178,12 @@
       {
         "name": "sockets",
         "status": "ok",
-        "ms": 13
+        "ms": 12
       },
       {
         "name": "sshd",
         "status": "ok",
-        "ms": 15,
+        "ms": 13,
         "cmd": "/usr/sbin/sshd -G"
       },
       {
@@ -193,24 +199,24 @@
       {
         "name": "sysctl",
         "status": "ok",
-        "ms": 0
+        "ms": 2
       },
       {
         "name": "timesync",
         "status": "ok",
-        "ms": 56,
+        "ms": 62,
         "cmd": "/usr/bin/timedatectl show-timesync --all"
       },
       {
         "name": "units",
         "status": "ok",
-        "ms": 52,
+        "ms": 53,
         "cmd": "/usr/bin/systemctl list-units --type=service --state=active --plain --no-legend"
       },
       {
         "name": "walk",
         "status": "ok",
-        "ms": 12394,
+        "ms": 10199,
         "cmd": "/usr/bin/rpm -qa --qf [%{=NAME}\t%{FILEMODES:octal}\t%{FILEUSERNAME}\t%{FILEGROUPNAME}\t%|FILECAPS?{%{FILECAPS}}|\t%{FILENAMES}\n]"
       }
     ],
@@ -2080,7 +2086,7 @@
             "hash_algo": "",
             "home": "/var/run/sphinxsearch",
             "inactive": -1,
-            "last_change": 20716,
+            "last_change": 20723,
             "locked": true,
             "max": -1,
             "min": -1,
@@ -2101,7 +2107,7 @@
             "hash_algo": "",
             "home": "/",
             "inactive": -1,
-            "last_change": 20716,
+            "last_change": 20723,
             "locked": true,
             "max": -1,
             "min": -1,
@@ -2122,7 +2128,7 @@
             "hash_algo": "",
             "home": "/nonexistent",
             "inactive": -1,
-            "last_change": 20716,
+            "last_change": 20723,
             "locked": true,
             "max": -1,
             "min": -1,
@@ -2143,7 +2149,7 @@
             "hash_algo": "",
             "home": "/var/lib/postgresql",
             "inactive": -1,
-            "last_change": 20716,
+            "last_change": 20723,
             "locked": true,
             "max": -1,
             "min": -1,
@@ -2164,7 +2170,7 @@
             "hash_algo": "$6$",
             "home": "/home/packer",
             "inactive": -1,
-            "last_change": 20716,
+            "last_change": 20723,
             "locked": false,
             "max": 99999,
             "min": 0,
@@ -2185,7 +2191,7 @@
             "hash_algo": "",
             "home": "/home/runner",
             "inactive": -1,
-            "last_change": 20716,
+            "last_change": 20723,
             "locked": true,
             "max": 99999,
             "min": 0,
@@ -3337,6 +3343,282 @@
           "source": {
             "kind": "derived"
           }
+        }
+      }
+    },
+    "exposure": {
+      "exposed": {
+        "status": "ok",
+        "value": [
+          {
+            "addr": "0.0.0.0",
+            "family": "v4",
+            "name": "systemd",
+            "package": "systemd",
+            "pid": 1,
+            "port": 22,
+            "proto": "tcp",
+            "rule_chain": "",
+            "rule_source": "",
+            "service": "tcp/22",
+            "via": "open_policy"
+          },
+          {
+            "addr": "::",
+            "family": "v6",
+            "name": "systemd",
+            "package": "systemd",
+            "pid": 1,
+            "port": 22,
+            "proto": "tcp",
+            "rule_chain": "",
+            "rule_source": "",
+            "service": "tcp/22",
+            "via": "open_policy"
+          },
+          {
+            "addr": "192.0.2.1",
+            "family": "v4",
+            "name": "systemd-network",
+            "package": "systemd",
+            "pid": 718,
+            "port": 68,
+            "proto": "udp",
+            "rule_chain": "",
+            "rule_source": "",
+            "service": "udp/68",
+            "via": "open_policy"
+          }
+        ],
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "command",
+              "cmd": "/usr/sbin/nft list ruleset",
+              "exit_code": 0
+            },
+            {
+              "kind": "derived",
+              "inputs": [
+                {
+                  "kind": "proc",
+                  "path": "/proc/self/net/tcp"
+                },
+                {
+                  "kind": "proc",
+                  "path": "/proc/self/net/tcp6"
+                },
+                {
+                  "kind": "proc",
+                  "path": "/proc/self/net/udp"
+                },
+                {
+                  "kind": "proc",
+                  "path": "/proc/self/net/udp6"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "listeners": {
+        "status": "ok",
+        "value": [
+          {
+            "addr": "0.0.0.0",
+            "exposed": true,
+            "family": "v4",
+            "link_local": false,
+            "owner_status": "ok",
+            "owners": [
+              {
+                "exe": "/usr/lib/systemd/systemd",
+                "exe_deleted": false,
+                "mnt_ns": "host",
+                "name": "systemd",
+                "package": "systemd",
+                "package_status": "packaged",
+                "pid": 1,
+                "uid": 0
+              }
+            ],
+            "owners_count": 1,
+            "port": 22,
+            "proto": "tcp",
+            "rule_chain": "",
+            "rule_raw": "",
+            "rule_source": "",
+            "service": "tcp/22",
+            "via": "open_policy"
+          },
+          {
+            "addr": "::",
+            "exposed": true,
+            "family": "v6",
+            "link_local": false,
+            "owner_status": "ok",
+            "owners": [
+              {
+                "exe": "/usr/lib/systemd/systemd",
+                "exe_deleted": false,
+                "mnt_ns": "host",
+                "name": "systemd",
+                "package": "systemd",
+                "package_status": "packaged",
+                "pid": 1,
+                "uid": 0
+              }
+            ],
+            "owners_count": 1,
+            "port": 22,
+            "proto": "tcp",
+            "rule_chain": "",
+            "rule_raw": "",
+            "rule_source": "",
+            "service": "tcp/22",
+            "via": "open_policy"
+          },
+          {
+            "addr": "192.0.2.1",
+            "exposed": true,
+            "family": "v4",
+            "link_local": false,
+            "owner_status": "ok",
+            "owners": [
+              {
+                "exe": "/usr/lib/systemd/systemd-networkd",
+                "exe_deleted": false,
+                "mnt_ns": "host",
+                "name": "systemd-network",
+                "package": "systemd",
+                "package_status": "packaged",
+                "pid": 718,
+                "uid": 998
+              }
+            ],
+            "owners_count": 1,
+            "port": 68,
+            "proto": "udp",
+            "rule_chain": "",
+            "rule_raw": "",
+            "rule_source": "",
+            "service": "udp/68",
+            "via": "open_policy"
+          }
+        ],
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "command",
+              "cmd": "/usr/sbin/nft list ruleset",
+              "exit_code": 0
+            },
+            {
+              "kind": "derived",
+              "inputs": [
+                {
+                  "kind": "proc",
+                  "path": "/proc/self/net/tcp"
+                },
+                {
+                  "kind": "proc",
+                  "path": "/proc/self/net/tcp6"
+                },
+                {
+                  "kind": "proc",
+                  "path": "/proc/self/net/udp"
+                },
+                {
+                  "kind": "proc",
+                  "path": "/proc/self/net/udp6"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "opaque_rules": {
+        "status": "ok",
+        "value": [],
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "command",
+              "cmd": "/usr/sbin/nft list ruleset",
+              "exit_code": 0
+            },
+            {
+              "kind": "derived",
+              "inputs": [
+                {
+                  "kind": "proc",
+                  "path": "/proc/self/net/tcp"
+                },
+                {
+                  "kind": "proc",
+                  "path": "/proc/self/net/tcp6"
+                },
+                {
+                  "kind": "proc",
+                  "path": "/proc/self/net/udp"
+                },
+                {
+                  "kind": "proc",
+                  "path": "/proc/self/net/udp6"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "stats": {
+        "status": "ok",
+        "value": {
+          "confidence": "full",
+          "exposed": 3,
+          "filtered": 0,
+          "folded_rules": 0,
+          "ipv6_disabled": false,
+          "kernel_owned": 0,
+          "link_local": 0,
+          "listeners": 3,
+          "loopback": 6,
+          "manual_reason": "",
+          "opaque_rules": 0
+        },
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "command",
+              "cmd": "/usr/sbin/nft list ruleset",
+              "exit_code": 0
+            },
+            {
+              "kind": "derived",
+              "inputs": [
+                {
+                  "kind": "proc",
+                  "path": "/proc/self/net/tcp"
+                },
+                {
+                  "kind": "proc",
+                  "path": "/proc/self/net/tcp6"
+                },
+                {
+                  "kind": "proc",
+                  "path": "/proc/self/net/udp"
+                },
+                {
+                  "kind": "proc",
+                  "path": "/proc/self/net/udp6"
+                }
+              ]
+            }
+          ]
         }
       }
     },
@@ -5758,7 +6040,7 @@
             "group_writable": false,
             "mode": 1517,
             "other_writable": false,
-            "path": "/var/log/journal/fa19dc2cce724d98816ef2caca855cd7",
+            "path": "/var/log/journal/bb9ebc7b4ed8498385fd3b7f0a389054",
             "uid": 0
           },
           {
@@ -6074,7 +6356,7 @@
             "group_writable": false,
             "mode": 420,
             "other_writable": false,
-            "path": "/var/log/sysstat/sa20",
+            "path": "/var/log/sysstat/sa06",
             "uid": 0
           },
           {
@@ -6083,7 +6365,7 @@
             "group_writable": false,
             "mode": 420,
             "other_writable": false,
-            "path": "/var/log/sysstat/sa30",
+            "path": "/var/log/sysstat/sa27",
             "uid": 0
           },
           {
@@ -9374,7 +9656,7 @@
       },
       "normalization_confidence": {
         "status": "ok",
-        "value": "partial",
+        "value": "full",
         "source": {
           "kind": "command",
           "cmd": "/usr/sbin/nft list ruleset",
@@ -9385,8 +9667,13 @@
         "status": "ok",
         "value": [
           {
-            "content": "table ip security {\n\tchain OUTPUT {\n\t\ttype filter hook output priority 150; policy accept;\n\t\tip daddr 168.63.129.16 tcp dport 53 counter packets 0 bytes 0 accept\n\t\tip daddr 168.63.129.16 ip protocol tcp skuid 0 counter packets 319 bytes 174659 accept\n\t\tip daddr 168.63.129.16 ip protocol tcp ct state invalid,new counter packets 0 bytes 0 drop\n\t}\n}\ntable ip nat {\n\tchain DOCKER {\n\t\tiifname \"docker0\" counter packets 0 bytes 0 return\n\t}\n\n\tchain PREROUTING {\n\t\ttype nat hook prerouting priority dstnat; policy accept;\n\t\tfib daddr type local counter packets 2 bytes 368 jump DOCKER\n\t}\n\n\tchain OUTPUT {\n\t\ttype nat hook output priority dstnat; policy accept;\n\t\tip daddr != 127.0.0.0/8 fib daddr type local counter packets 0 bytes 0 jump DOCKER\n\t}\n\n\tchain POSTROUTING {\n\t\ttype nat hook postrouting priority srcnat; policy accept;\n\t\tip saddr 198.51.100.0/16 oifname != \"docker0\" counter packets 0 bytes 0 masquerade\n\t}\n}\ntable ip filter {\n\tchain DOCKER {\n\t\tiifname != \"docker0\" oifname \"docker0\" counter packets 0 bytes 0 drop\n\t}\n\n\tchain DOCKER-FORWARD {\n\t\tcounter packets 0 bytes 0 jump DOCKER-CT\n\t\tcounter packets 0 bytes 0 jump DOCKER-ISOLATION-STAGE-1\n\t\tcounter packets 0 bytes 0 jump DOCKER-BRIDGE\n\t\tiifname \"docker0\" counter packets 0 bytes 0 accept\n\t}\n\n\tchain DOCKER-BRIDGE {\n\t\toifname \"docker0\" counter packets 0 bytes 0 jump DOCKER\n\t}\n\n\tchain DOCKER-CT {\n\t\toifname \"docker0\" ct state related,established counter packets 0 bytes 0 accept\n\t}\n\n\tchain DOCKER-ISOLATION-STAGE-1 {\n\t\tiifname \"docker0\" oifname != \"docker0\" counter packets 0 bytes 0 jump DOCKER-ISOLATION-STAGE-2\n\t}\n\n\tchain DOCKER-ISOLATION-STAGE-2 {\n\t\toifname \"docker0\" counter packets 0 bytes 0 drop\n\t}\n\n\tchain FORWARD {\n\t\ttype filter hook forward priority filter; policy drop;\n\t\tcounter packets 0 bytes 0 jump DOCKER-USER\n\t\tcounter packets 0 bytes 0 jump DOCKER-FORWARD\n\t}\n\n\tchain DOCKER-USER {\n\t\tcounter packets 0 bytes 0 return\n\t}\n}\ntable ip6 nat {\n\tchain DOCKER {\n\t}\n\n\tchain PREROUTING {\n\t\ttype nat hook prerouting priority dstnat; policy accept;\n\t\tfib daddr type local counter packets 0 bytes 0 jump DOCKER\n\t}\n\n\tchain OUTPUT {\n\t\ttype nat hook output priority dstnat; policy accept;\n\t\tip6 daddr != ::1 fib daddr type local counter packets 0 bytes 0 jump DOCKER\n\t}\n}\ntable ip6 filter {\n\tchain DOCKER {\n\t}\n\n\tchain DOCKER-FORWARD {\n\t\tcounter packets 0 bytes 0 jump DOCKER-CT\n\t\tcounter packets 0 bytes 0 jump DOCKER-ISOLATION-STAGE-1\n\t\tcounter packets 0 bytes 0 jump DOCKER-BRIDGE\n\t}\n\n\tchain DOCKER-BRIDGE {\n\t}\n\n\tchain DOCKER-CT {\n\t}\n\n\tchain DOCKER-ISOLATION-STAGE-1 {\n\t}\n\n\tchain DOCKER-ISOLATION-STAGE-2 {\n\t}\n\n\tchain FORWARD {\n\t\ttype filter hook forward priority filter; policy accept;\n\t\tcounter packets 0 bytes 0 jump DOCKER-USER\n\t\tcounter packets 0 bytes 0 jump DOCKER-FORWARD\n\t}\n\n\tchain DOCKER-USER {\n\t\tcounter packets 0 bytes 0 return\n\t}\n}\n",
+            "content": "table ip security {\n\tchain OUTPUT {\n\t\ttype filter hook output priority 150; policy accept;\n\t\tip daddr 168.63.129.16 tcp dport 53 counter packets 0 bytes 0 accept\n\t\tip daddr 168.63.129.16 ip protocol tcp skuid 0 counter packets 336 bytes 158439 accept\n\t\tip daddr 168.63.129.16 ip protocol tcp ct state invalid,new counter packets 0 bytes 0 drop\n\t}\n}\ntable ip nat {\n\tchain DOCKER {\n\t\tiifname \"docker0\" counter packets 0 bytes 0 return\n\t}\n\n\tchain PREROUTING {\n\t\ttype nat hook prerouting priority dstnat; policy accept;\n\t\tfib daddr type local counter packets 0 bytes 0 jump DOCKER\n\t}\n\n\tchain OUTPUT {\n\t\ttype nat hook output priority dstnat; policy accept;\n\t\tip daddr != 127.0.0.0/8 fib daddr type local counter packets 0 bytes 0 jump DOCKER\n\t}\n\n\tchain POSTROUTING {\n\t\ttype nat hook postrouting priority srcnat; policy accept;\n\t\tip saddr 198.51.100.0/16 oifname != \"docker0\" counter packets 0 bytes 0 masquerade\n\t}\n}\ntable ip filter {\n\tchain DOCKER {\n\t\tiifname != \"docker0\" oifname \"docker0\" counter packets 0 bytes 0 drop\n\t}\n\n\tchain DOCKER-FORWARD {\n\t\tcounter packets 0 bytes 0 jump DOCKER-CT\n\t\tcounter packets 0 bytes 0 jump DOCKER-ISOLATION-STAGE-1\n\t\tcounter packets 0 bytes 0 jump DOCKER-BRIDGE\n\t\tiifname \"docker0\" counter packets 0 bytes 0 accept\n\t}\n\n\tchain DOCKER-BRIDGE {\n\t\toifname \"docker0\" counter packets 0 bytes 0 jump DOCKER\n\t}\n\n\tchain DOCKER-CT {\n\t\toifname \"docker0\" ct state related,established counter packets 0 bytes 0 accept\n\t}\n\n\tchain DOCKER-ISOLATION-STAGE-1 {\n\t\tiifname \"docker0\" oifname != \"docker0\" counter packets 0 bytes 0 jump DOCKER-ISOLATION-STAGE-2\n\t}\n\n\tchain DOCKER-ISOLATION-STAGE-2 {\n\t\toifname \"docker0\" counter packets 0 bytes 0 drop\n\t}\n\n\tchain FORWARD {\n\t\ttype filter hook forward priority filter; policy drop;\n\t\tcounter packets 0 bytes 0 jump DOCKER-USER\n\t\tcounter packets 0 bytes 0 jump DOCKER-FORWARD\n\t}\n\n\tchain DOCKER-USER {\n\t\tcounter packets 0 bytes 0 return\n\t}\n}\ntable ip6 nat {\n\tchain DOCKER {\n\t}\n\n\tchain PREROUTING {\n\t\ttype nat hook prerouting priority dstnat; policy accept;\n\t\tfib daddr type local counter packets 0 bytes 0 jump DOCKER\n\t}\n\n\tchain OUTPUT {\n\t\ttype nat hook output priority dstnat; policy accept;\n\t\tip6 daddr != ::1 fib daddr type local counter packets 0 bytes 0 jump DOCKER\n\t}\n}\ntable ip6 filter {\n\tchain DOCKER {\n\t}\n\n\tchain DOCKER-FORWARD {\n\t\tcounter packets 0 bytes 0 jump DOCKER-CT\n\t\tcounter packets 0 bytes 0 jump DOCKER-ISOLATION-STAGE-1\n\t\tcounter packets 0 bytes 0 jump DOCKER-BRIDGE\n\t}\n\n\tchain DOCKER-BRIDGE {\n\t}\n\n\tchain DOCKER-CT {\n\t}\n\n\tchain DOCKER-ISOLATION-STAGE-1 {\n\t}\n\n\tchain DOCKER-ISOLATION-STAGE-2 {\n\t}\n\n\tchain FORWARD {\n\t\ttype filter hook forward priority filter; policy accept;\n\t\tcounter packets 0 bytes 0 jump DOCKER-USER\n\t\tcounter packets 0 bytes 0 jump DOCKER-FORWARD\n\t}\n\n\tchain DOCKER-USER {\n\t\tcounter packets 0 bytes 0 return\n\t}\n}\n",
             "source": "/usr/sbin/nft list ruleset",
+            "truncated": false
+          },
+          {
+            "content": "# Generated by iptables-save v1.8.10 (nf_tables) on Tue Oct  6 09:31:45 2026\n*security\n:INPUT ACCEPT [0:0]\n:FORWARD ACCEPT [0:0]\n:OUTPUT ACCEPT [4896:579138]\n-A OUTPUT -d 168.63.129.16/32 -p tcp -m tcp --dport 53 -j ACCEPT\n-A OUTPUT -d 168.63.129.16/32 -p tcp -m owner --uid-owner 0 -j ACCEPT\n-A OUTPUT -d 168.63.129.16/32 -p tcp -m conntrack --ctstate INVALID,NEW -j DROP\nCOMMIT\n# Completed on Tue Oct  6 09:31:45 2026\n# Generated by iptables-save v1.8.10 (nf_tables) on Tue Oct  6 09:31:45 2026\n*filter\n:INPUT ACCEPT [0:0]\n:FORWARD DROP [0:0]\n:OUTPUT ACCEPT [0:0]\n:DOCKER - [0:0]\n:DOCKER-BRIDGE - [0:0]\n:DOCKER-CT - [0:0]\n:DOCKER-FORWARD - [0:0]\n:DOCKER-ISOLATION-STAGE-1 - [0:0]\n:DOCKER-ISOLATION-STAGE-2 - [0:0]\n:DOCKER-USER - [0:0]\n-A FORWARD -j DOCKER-USER\n-A FORWARD -j DOCKER-FORWARD\n-A DOCKER ! -i docker0 -o docker0 -j DROP\n-A DOCKER-BRIDGE -o docker0 -j DOCKER\n-A DOCKER-CT -o docker0 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT\n-A DOCKER-FORWARD -j DOCKER-CT\n-A DOCKER-FORWARD -j DOCKER-ISOLATION-STAGE-1\n-A DOCKER-FORWARD -j DOCKER-BRIDGE\n-A DOCKER-FORWARD -i docker0 -j ACCEPT\n-A DOCKER-ISOLATION-STAGE-1 -i docker0 ! -o docker0 -j DOCKER-ISOLATION-STAGE-2\n-A DOCKER-ISOLATION-STAGE-2 -o docker0 -j DROP\n-A DOCKER-USER -j RETURN\nCOMMIT\n# Completed on Tue Oct  6 09:31:45 2026\n# Generated by iptables-save v1.8.10 (nf_tables) on Tue Oct  6 09:31:45 2026\n*nat\n:PREROUTING ACCEPT [0:0]\n:INPUT ACCEPT [0:0]\n:OUTPUT ACCEPT [205:15639]\n:POSTROUTING ACCEPT [205:15639]\n:DOCKER - [0:0]\n-A PREROUTING -m addrtype --dst-type LOCAL -j DOCKER\n-A OUTPUT ! -d 127.0.0.0/8 -m addrtype --dst-type LOCAL -j DOCKER\n-A POSTROUTING -s 198.51.100.0/16 ! -o docker0 -j MASQUERADE\n-A DOCKER -i docker0 -j RETURN\nCOMMIT\n# Completed on Tue Oct  6 09:31:45 2026\n",
+            "source": "/usr/sbin/iptables-save",
             "truncated": false
           }
         ],
@@ -9397,8 +9684,14 @@
         }
       },
       "restricts_inbound": {
-        "status": "absent",
-        "reason": "firewall confidence partial: ruleset not normalisable; no input base chain found; see firewall.raw_dumps"
+        "status": "ok",
+        "value": false,
+        "source": {
+          "kind": "command",
+          "cmd": "/usr/sbin/nft list ruleset",
+          "exit_code": 0
+        },
+        "reason": "no input base chain and no inbound rule: nothing restricts inbound"
       },
       "rules": {
         "status": "ok",
@@ -10970,6 +11263,735 @@
         }
       }
     },
+    "net": {
+      "sysctl": {
+        "ipv4_all_accept_redirects": {
+          "runtime": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/all/accept_redirects"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv4.conf.all.accept_redirects"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/all/accept_redirects"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/conf/all/accept_redirects"
+          }
+        },
+        "ipv4_all_accept_source_route": {
+          "runtime": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/all/accept_source_route"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv4.conf.all.accept_source_route"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/all/accept_source_route"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/conf/all/accept_source_route"
+          }
+        },
+        "ipv4_all_log_martians": {
+          "runtime": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/all/log_martians"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv4.conf.all.log_martians"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/all/log_martians"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/conf/all/log_martians"
+          }
+        },
+        "ipv4_all_rp_filter": {
+          "runtime": {
+            "status": "ok",
+            "value": 2,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/all/rp_filter"
+            }
+          },
+          "persisted": {
+            "status": "ok",
+            "value": 2,
+            "source": {
+              "kind": "file",
+              "path": "/etc/sysctl.d/10-network-security.conf",
+              "line": 5,
+              "raw": "net.ipv4.conf.all.rp_filter=2"
+            }
+          },
+          "effective": {
+            "status": "ok",
+            "value": 2,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/all/rp_filter"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/conf/all/rp_filter"
+          }
+        },
+        "ipv4_all_secure_redirects": {
+          "runtime": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/all/secure_redirects"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv4.conf.all.secure_redirects"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/all/secure_redirects"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/conf/all/secure_redirects"
+          }
+        },
+        "ipv4_all_send_redirects": {
+          "runtime": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/all/send_redirects"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv4.conf.all.send_redirects"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/all/send_redirects"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/conf/all/send_redirects"
+          }
+        },
+        "ipv4_default_accept_redirects": {
+          "runtime": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/default/accept_redirects"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv4.conf.default.accept_redirects"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/default/accept_redirects"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/conf/default/accept_redirects"
+          }
+        },
+        "ipv4_default_accept_source_route": {
+          "runtime": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/default/accept_source_route"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv4.conf.default.accept_source_route"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/default/accept_source_route"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/conf/default/accept_source_route"
+          }
+        },
+        "ipv4_default_log_martians": {
+          "runtime": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/default/log_martians"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv4.conf.default.log_martians"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/default/log_martians"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/conf/default/log_martians"
+          }
+        },
+        "ipv4_default_rp_filter": {
+          "runtime": {
+            "status": "ok",
+            "value": 2,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/default/rp_filter"
+            }
+          },
+          "persisted": {
+            "status": "ok",
+            "value": 2,
+            "source": {
+              "kind": "file",
+              "path": "/etc/sysctl.d/10-network-security.conf",
+              "line": 4,
+              "raw": "net.ipv4.conf.default.rp_filter=2"
+            }
+          },
+          "effective": {
+            "status": "ok",
+            "value": 2,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/default/rp_filter"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/conf/default/rp_filter"
+          }
+        },
+        "ipv4_default_secure_redirects": {
+          "runtime": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/default/secure_redirects"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv4.conf.default.secure_redirects"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/default/secure_redirects"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/conf/default/secure_redirects"
+          }
+        },
+        "ipv4_default_send_redirects": {
+          "runtime": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/default/send_redirects"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv4.conf.default.send_redirects"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/default/send_redirects"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/conf/default/send_redirects"
+          }
+        },
+        "ipv4_icmp_echo_ignore_broadcasts": {
+          "runtime": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/icmp_echo_ignore_broadcasts"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv4.icmp_echo_ignore_broadcasts"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/icmp_echo_ignore_broadcasts"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/icmp_echo_ignore_broadcasts"
+          }
+        },
+        "ipv4_icmp_ignore_bogus_error_responses": {
+          "runtime": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/icmp_ignore_bogus_error_responses"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv4.icmp_ignore_bogus_error_responses"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/icmp_ignore_bogus_error_responses"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/icmp_ignore_bogus_error_responses"
+          }
+        },
+        "ipv4_ip_forward": {
+          "runtime": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/ip_forward"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv4.ip_forward"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/ip_forward"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/ip_forward"
+          }
+        },
+        "ipv4_tcp_syncookies": {
+          "runtime": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/tcp_syncookies"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv4.tcp_syncookies"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/tcp_syncookies"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/tcp_syncookies"
+          }
+        },
+        "ipv6_all_accept_ra": {
+          "runtime": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv6/conf/all/accept_ra"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv6.conf.all.accept_ra"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv6/conf/all/accept_ra"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv6/conf/all/accept_ra"
+          }
+        },
+        "ipv6_all_accept_redirects": {
+          "runtime": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv6/conf/all/accept_redirects"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv6.conf.all.accept_redirects"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv6/conf/all/accept_redirects"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv6/conf/all/accept_redirects"
+          }
+        },
+        "ipv6_all_accept_source_route": {
+          "runtime": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv6/conf/all/accept_source_route"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv6.conf.all.accept_source_route"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv6/conf/all/accept_source_route"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv6/conf/all/accept_source_route"
+          }
+        },
+        "ipv6_all_disable_ipv6": {
+          "runtime": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv6/conf/all/disable_ipv6"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv6.conf.all.disable_ipv6"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv6/conf/all/disable_ipv6"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv6/conf/all/disable_ipv6"
+          }
+        },
+        "ipv6_all_forwarding": {
+          "runtime": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv6/conf/all/forwarding"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv6.conf.all.forwarding"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv6/conf/all/forwarding"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv6/conf/all/forwarding"
+          }
+        },
+        "ipv6_bindv6only": {
+          "status": "ok",
+          "value": 0,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv6/bindv6only"
+          }
+        },
+        "ipv6_default_accept_ra": {
+          "runtime": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv6/conf/default/accept_ra"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv6.conf.default.accept_ra"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv6/conf/default/accept_ra"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv6/conf/default/accept_ra"
+          }
+        },
+        "ipv6_default_accept_redirects": {
+          "runtime": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv6/conf/default/accept_redirects"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv6.conf.default.accept_redirects"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv6/conf/default/accept_redirects"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv6/conf/default/accept_redirects"
+          }
+        },
+        "ipv6_default_accept_source_route": {
+          "runtime": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv6/conf/default/accept_source_route"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv6.conf.default.accept_source_route"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv6/conf/default/accept_source_route"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv6/conf/default/accept_source_route"
+          }
+        },
+        "ipv6_default_disable_ipv6": {
+          "runtime": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv6/conf/default/disable_ipv6"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv6.conf.default.disable_ipv6"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv6/conf/default/disable_ipv6"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv6/conf/default/disable_ipv6"
+          }
+        },
+        "ipv6_default_forwarding": {
+          "runtime": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv6/conf/default/forwarding"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv6.conf.default.forwarding"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv6/conf/default/forwarding"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv6/conf/default/forwarding"
+          }
+        },
+        "ipv6_disabled": {
+          "status": "ok",
+          "value": 0,
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "proc",
+                "path": "/proc/sys/net/ipv6/conf/all/disable_ipv6"
+              },
+              {
+                "kind": "proc",
+                "path": "/proc/sys/net/ipv6/conf/default/disable_ipv6"
+              },
+              {
+                "kind": "proc",
+                "path": "/proc/sys/net/ipv6/conf/docker0/disable_ipv6"
+              },
+              {
+                "kind": "proc",
+                "path": "/proc/sys/net/ipv6/conf/enP31119s1/disable_ipv6"
+              },
+              {
+                "kind": "proc",
+                "path": "/proc/sys/net/ipv6/conf/eth0/disable_ipv6"
+              }
+            ]
+          }
+        }
+      }
+    },
     "nfs": {
       "exports": {
         "status": "ok",
@@ -11061,7 +12083,7 @@
           {
             "arch": "amd64",
             "name": "apparmor",
-            "version": "4.0.1really4.0.1-0ubuntu0.24.04.7"
+            "version": "4.0.1really4.0.1-0ubuntu0.24.04.8"
           },
           {
             "arch": "all",
@@ -11376,7 +12398,7 @@
           {
             "arch": "amd64",
             "name": "containerd.io",
-            "version": "2.3.5-1~ubuntu.24.04~noble"
+            "version": "2.3.6-1~ubuntu.24.04~noble"
           },
           {
             "arch": "amd64",
@@ -11456,7 +12478,7 @@
           {
             "arch": "amd64",
             "name": "curl",
-            "version": "8.5.0-2ubuntu10.13"
+            "version": "8.5.0-2ubuntu10.15"
           },
           {
             "arch": "amd64",
@@ -11561,7 +12583,7 @@
           {
             "arch": "amd64",
             "name": "dmidecode",
-            "version": "3.5-3ubuntu0.1"
+            "version": "3.5-3ubuntu0.2"
           },
           {
             "arch": "amd64",
@@ -11921,7 +12943,7 @@
           {
             "arch": "amd64",
             "name": "gir1.2-glib-2.0",
-            "version": "2.80.0-6ubuntu3.8"
+            "version": "2.80.0-6ubuntu3.9"
           },
           {
             "arch": "amd64",
@@ -11981,12 +13003,12 @@
           {
             "arch": "amd64",
             "name": "google-chrome-stable",
-            "version": "153.0.8010.52-1"
+            "version": "154.0.8037.57-1"
           },
           {
             "arch": "amd64",
             "name": "google-cloud-cli",
-            "version": "585.0.0-0"
+            "version": "586.0.0-0"
           },
           {
             "arch": "amd64",
@@ -12256,7 +13278,7 @@
           {
             "arch": "amd64",
             "name": "kubectl",
-            "version": "1.37.0-ubuntu24.04u1"
+            "version": "1.37.1-1.1"
           },
           {
             "arch": "amd64",
@@ -12296,7 +13318,7 @@
           {
             "arch": "amd64",
             "name": "libapparmor1",
-            "version": "4.0.1really4.0.1-0ubuntu0.24.04.7"
+            "version": "4.0.1really4.0.1-0ubuntu0.24.04.8"
           },
           {
             "arch": "amd64",
@@ -12406,12 +13428,12 @@
           {
             "arch": "all",
             "name": "libaudit-common",
-            "version": "1:3.1.2-2.1build1.1"
+            "version": "1:3.1.2-2.1ubuntu0.1"
           },
           {
             "arch": "amd64",
             "name": "libaudit1",
-            "version": "1:3.1.2-2.1build1.1"
+            "version": "1:3.1.2-2.1ubuntu0.1"
           },
           {
             "arch": "amd64",
@@ -12716,12 +13738,12 @@
           {
             "arch": "amd64",
             "name": "libcurl3t64-gnutls",
-            "version": "8.5.0-2ubuntu10.13"
+            "version": "8.5.0-2ubuntu10.15"
           },
           {
             "arch": "amd64",
             "name": "libcurl4t64",
-            "version": "8.5.0-2ubuntu10.13"
+            "version": "8.5.0-2ubuntu10.15"
           },
           {
             "arch": "amd64",
@@ -12876,12 +13898,12 @@
           {
             "arch": "amd64",
             "name": "libexpat1",
-            "version": "2.6.1-2ubuntu0.4"
+            "version": "2.6.1-2ubuntu0.6"
           },
           {
             "arch": "amd64",
             "name": "libexpat1-dev",
-            "version": "2.6.1-2ubuntu0.4"
+            "version": "2.6.1-2ubuntu0.6"
           },
           {
             "arch": "amd64",
@@ -13086,17 +14108,17 @@
           {
             "arch": "amd64",
             "name": "libglib2.0-0t64",
-            "version": "2.80.0-6ubuntu3.8"
+            "version": "2.80.0-6ubuntu3.9"
           },
           {
             "arch": "amd64",
             "name": "libglib2.0-bin",
-            "version": "2.80.0-6ubuntu3.8"
+            "version": "2.80.0-6ubuntu3.9"
           },
           {
             "arch": "all",
             "name": "libglib2.0-data",
-            "version": "2.80.0-6ubuntu3.8"
+            "version": "2.80.0-6ubuntu3.9"
           },
           {
             "arch": "amd64",
@@ -13326,7 +14348,7 @@
           {
             "arch": "amd64",
             "name": "libisns0t64",
-            "version": "0.101-0.3build3"
+            "version": "0.101-0.3ubuntu0.1"
           },
           {
             "arch": "amd64",
@@ -13906,7 +14928,7 @@
           {
             "arch": "amd64",
             "name": "libpcap0.8t64",
-            "version": "1.10.4-4.1ubuntu3"
+            "version": "1.10.4-4.1ubuntu3.1"
           },
           {
             "arch": "amd64",
@@ -13916,7 +14938,7 @@
           {
             "arch": "amd64",
             "name": "libpciaccess0",
-            "version": "0.17-3ubuntu0.24.04.2"
+            "version": "0.17-3ubuntu0.24.04.3"
           },
           {
             "arch": "amd64",
@@ -14791,12 +15813,12 @@
           {
             "arch": "amd64",
             "name": "libxml2",
-            "version": "2.9.14+dfsg-1.3ubuntu3.8"
+            "version": "2.9.14+dfsg-1.3ubuntu3.9"
           },
           {
             "arch": "amd64",
             "name": "libxml2-dev",
-            "version": "2.9.14+dfsg-1.3ubuntu3.8"
+            "version": "2.9.14+dfsg-1.3ubuntu3.9"
           },
           {
             "arch": "amd64",
@@ -14971,7 +15993,7 @@
           {
             "arch": "all",
             "name": "linux-cloud-tools-common",
-            "version": "6.8.0-139.139"
+            "version": "6.8.0-142.142"
           },
           {
             "arch": "amd64",
@@ -14996,7 +16018,7 @@
           {
             "arch": "amd64",
             "name": "linux-libc-dev",
-            "version": "6.8.0-139.139"
+            "version": "6.8.0-142.142"
           },
           {
             "arch": "amd64",
@@ -15016,7 +16038,7 @@
           {
             "arch": "all",
             "name": "linux-tools-common",
-            "version": "6.8.0-139.139"
+            "version": "6.8.0-142.142"
           },
           {
             "arch": "amd64",
@@ -15251,7 +16273,7 @@
           {
             "arch": "amd64",
             "name": "microsoft-edge-stable",
-            "version": "153.0.4234.48-1"
+            "version": "154.0.4258.37-1"
           },
           {
             "arch": "amd64",
@@ -16416,7 +17438,7 @@
           {
             "arch": "amd64",
             "name": "rsyslog",
-            "version": "8.2312.0-3ubuntu9.3"
+            "version": "8.2312.0-3ubuntu9.4"
           },
           {
             "arch": "amd64",
@@ -16626,7 +17648,7 @@
           {
             "arch": "amd64",
             "name": "sudo",
-            "version": "1.9.15p5-3ubuntu5.24.04.2"
+            "version": "1.9.15p5-3ubuntu5.24.04.3"
           },
           {
             "arch": "amd64",
@@ -16991,7 +18013,7 @@
           {
             "arch": "all",
             "name": "xserver-common",
-            "version": "2:21.1.12-1ubuntu1.6"
+            "version": "2:21.1.12-1ubuntu1.8"
           },
           {
             "arch": "all",
@@ -17001,7 +18023,7 @@
           {
             "arch": "amd64",
             "name": "xvfb",
-            "version": "2:21.1.12-1ubuntu1.6"
+            "version": "2:21.1.12-1ubuntu1.8"
           },
           {
             "arch": "amd64",
@@ -17208,7 +18230,7 @@
           "value": {
             "dpkg_path_excludes": [],
             "dpkg_path_excludes_error": [],
-            "duration_ms": 636373,
+            "duration_ms": 492296,
             "exit_code": 0,
             "lines": 10,
             "packages_without_digests": 1,
@@ -18874,7 +19896,7 @@
       },
       "metadata_age_s": {
         "status": "ok",
-        "value": 802023,
+        "value": 734252,
         "source": {
           "kind": "file",
           "path": "/var/lib/apt/periodic/update-success-stamp"
@@ -19049,6 +20071,2593 @@
             {
               "kind": "file",
               "path": "/etc/group"
+            }
+          ]
+        }
+      }
+    },
+    "processes": {
+      "deleted_executables": {
+        "status": "ok",
+        "value": [
+          {
+            "exe": "/tmp/provjobd2458088724",
+            "name": "provjobd2458088",
+            "pid": 2085,
+            "uid": 0
+          }
+        ],
+        "source": {
+          "kind": "proc",
+          "path": "/proc"
+        }
+      },
+      "list": {
+        "status": "ok",
+        "value": [
+          {
+            "cmd": "/sbin/init",
+            "exe": "/usr/lib/systemd/systemd",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "systemd",
+            "ns_read_status": "ok",
+            "package": "systemd",
+            "package_status": "packaged",
+            "pid": 1,
+            "ppid": 0,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kthreadd",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 2,
+            "ppid": 0,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "pool_workqueue_release",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 3,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/R-rcu_gp",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 4,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/R-sync_wq",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 5,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/R-kvfree_rcu_reclaim",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 6,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/R-slub_flushwq",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 7,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/R-netns",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 8,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/0:0H-events_highpri",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 10,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/u16:0-flush-8:0",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 12,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/R-mm_percpu_wq",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 13,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "ksoftirqd/0",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 14,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "rcu_sched",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 15,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "rcu_exp_par_gp_kthread_worker/0",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 16,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "rcu_exp_gp_kthread_worker",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 17,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "migration/0",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 18,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "idle_inject/0",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 19,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "cpuhp/0",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 20,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "cpuhp/2",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 21,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "idle_inject/2",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 22,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "migration/2",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 23,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "ksoftirqd/2",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 24,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/2:0H-events_highpri",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 26,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "cpuhp/1",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 27,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "idle_inject/1",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 28,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "migration/1",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 29,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "ksoftirqd/1",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 30,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/1:0H-events_highpri",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 32,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "cpuhp/3",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 33,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "idle_inject/3",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 34,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "migration/3",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 35,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "ksoftirqd/3",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 36,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/3:0H-events_highpri",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 38,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kdevtmpfs",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 39,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/R-inet_frag_wq",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 40,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "rcu_tasks_rude_kthread",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 41,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "rcu_tasks_trace_kthread",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 42,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kauditd",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 43,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "khungtaskd",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 44,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/u16:1-events_power_efficient",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 45,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "oom_reaper",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 46,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/u16:2-events_power_efficient",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 47,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/R-writeback",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 48,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kcompactd0",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 49,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "ksmd",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 50,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "khugepaged",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 51,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/R-kblockd",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 52,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/R-blkcg_punt_bio",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 53,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/R-kintegrityd",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 54,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "irq/9-acpi",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 55,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/3:1-mm_percpu_wq",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 56,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/1:1-cgroup_free",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 57,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/2:1-cgroup_free",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 58,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/R-tpm_dev_wq",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 59,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/R-ata_sff",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 60,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/R-md",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 61,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/R-md_bitmap",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 62,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/R-edac-poller",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 63,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/R-hv_vmbus_con",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 64,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/R-hv_vmbus_rescind",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 65,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/R-hv_pri_chan",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 66,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/R-hv_sub_chan",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 67,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/R-devfreq_wq",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 68,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "watchdogd",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 69,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/R-quota_events_unbound",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 70,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/1:1H-kblockd",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 71,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kswapd0",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 72,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "ecryptfs-kthread",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 73,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/R-kthrotld",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 74,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/R-nfit",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 75,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "scsi_eh_0",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 76,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "scsi_eh_1",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 77,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/R-scsi_tmf_0",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 78,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/R-scsi_tmf_1",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 79,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/R-nvme-wq",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 80,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/R-nvme-reset-wq",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 81,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/R-nvme-delete-wq",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 82,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/R-nvme-auth-wq",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 83,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/u16:3-flush-8:0",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 84,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/R-mld",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 86,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/R-ipv6_addrconf",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 87,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "hv_balloon",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 88,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/R-kstrp",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 89,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/u17:0",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 91,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/0:1H-kblockd",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 102,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "jbd2/sda1-8",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 103,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/R-ext4-rsv-conversion",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 104,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/2:1H-kblockd",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 105,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/3:1H-kblockd",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 108,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "/usr/lib/systemd/systemd-journald",
+            "exe": "/usr/lib/systemd/systemd-journald",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "systemd-journal",
+            "ns_read_status": "ok",
+            "package": "systemd",
+            "package_status": "packaged",
+            "pid": 155,
+            "ppid": 1,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/R-kmpathd",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 177,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/R-kmpath_handlerd",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 178,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/0:2-events",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 179,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/2:3-events",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 197,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "/sbin/multipathd",
+            "exe": "/usr/sbin/multipathd",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "multipathd",
+            "ns_read_status": "ok",
+            "package": "multipath-tools",
+            "package_status": "packaged",
+            "pid": 221,
+            "ppid": 1,
+            "uid": 0
+          },
+          {
+            "cmd": "/usr/lib/systemd/systemd-udevd",
+            "exe": "/usr/bin/udevadm",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "systemd-udevd",
+            "ns_read_status": "ok",
+            "package": "udev",
+            "package_status": "packaged",
+            "pid": 226,
+            "ppid": 1,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "psimon",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 237,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/1:3-mm_percpu_wq",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 372,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "/usr/lib/linux-tools/6.17.0-1022-azure/hv_kvp_daemon",
+            "exe": "/usr/lib/linux-azure-6.17-tools-6.17.0-1022/hv_kvp_daemon",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "hv_kvp_daemon",
+            "ns_read_status": "ok",
+            "package": "linux-azure-6.17-cloud-tools-6.17.0-1022",
+            "package_status": "packaged",
+            "pid": 391,
+            "ppid": 1,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "jbd2/sda16-8",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 423,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/R-ext4-rsv-conversion",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 424,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "/usr/lib/systemd/systemd-resolved",
+            "exe": "/usr/lib/systemd/systemd-resolved",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "systemd-resolve",
+            "ns_read_status": "ok",
+            "package": "systemd-resolved",
+            "package_status": "packaged",
+            "pid": 513,
+            "ppid": 1,
+            "uid": 991
+          },
+          {
+            "cmd": "/usr/sbin/haveged",
+            "exe": "/usr/sbin/haveged",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "haveged",
+            "ns_read_status": "ok",
+            "package": "haveged",
+            "package_status": "packaged",
+            "pid": 579,
+            "ppid": 1,
+            "uid": 0
+          },
+          {
+            "cmd": "/usr/lib/systemd/systemd-networkd",
+            "exe": "/usr/lib/systemd/systemd-networkd",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "systemd-network",
+            "ns_read_status": "ok",
+            "package": "systemd",
+            "package_status": "packaged",
+            "pid": 718,
+            "ppid": 1,
+            "uid": 998
+          },
+          {
+            "cmd": "@dbus-daemon",
+            "exe": "/usr/bin/dbus-daemon",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "dbus-daemon",
+            "ns_read_status": "ok",
+            "package": "dbus-daemon",
+            "package_status": "packaged",
+            "pid": 1002,
+            "ppid": 1,
+            "uid": 101
+          },
+          {
+            "cmd": "/usr/bin/python3",
+            "exe": "/usr/bin/python3.12",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "networkd-dispat",
+            "ns_read_status": "ok",
+            "package": "python3.12-minimal",
+            "package_status": "packaged",
+            "pid": 1006,
+            "ppid": 1,
+            "uid": 0
+          },
+          {
+            "cmd": "php-fpm: master process (/etc/php/8.3/fpm/php-fpm.conf)",
+            "exe": "/usr/sbin/php-fpm8.3",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "php-fpm8.3",
+            "ns_read_status": "ok",
+            "package": "php8.3-fpm",
+            "package_status": "packaged",
+            "pid": 1009,
+            "ppid": 1,
+            "uid": 0
+          },
+          {
+            "cmd": "/usr/lib/polkit-1/polkitd",
+            "exe": "/usr/lib/polkit-1/polkitd",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "polkitd",
+            "ns_read_status": "ok",
+            "package": "polkitd",
+            "package_status": "packaged",
+            "pid": 1014,
+            "ppid": 1,
+            "uid": 989
+          },
+          {
+            "cmd": "/usr/lib/systemd/systemd-logind",
+            "exe": "/usr/lib/systemd/systemd-logind",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "systemd-logind",
+            "ns_read_status": "ok",
+            "package": "systemd",
+            "package_status": "packaged",
+            "pid": 1041,
+            "ppid": 1,
+            "uid": 0
+          },
+          {
+            "cmd": "/usr/libexec/udisks2/udisksd",
+            "exe": "/usr/libexec/udisks2/udisksd",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "udisksd",
+            "ns_read_status": "ok",
+            "package": "udisks2",
+            "package_status": "packaged",
+            "pid": 1043,
+            "ppid": 1,
+            "uid": 0
+          },
+          {
+            "cmd": "/usr/bin/python3",
+            "exe": "/usr/bin/python3.12",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "python3",
+            "ns_read_status": "ok",
+            "package": "python3.12-minimal",
+            "package_status": "packaged",
+            "pid": 1045,
+            "ppid": 1,
+            "uid": 0
+          },
+          {
+            "cmd": "/usr/sbin/cron",
+            "exe": "/usr/sbin/cron",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "cron",
+            "ns_read_status": "ok",
+            "package": "cron",
+            "package_status": "packaged",
+            "pid": 1076,
+            "ppid": 1,
+            "uid": 0
+          },
+          {
+            "cmd": "/usr/bin/containerd",
+            "exe": "/usr/bin/containerd",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "containerd",
+            "ns_read_status": "ok",
+            "package": "containerd.io",
+            "package_status": "packaged",
+            "pid": 1109,
+            "ppid": 1,
+            "uid": 0
+          },
+          {
+            "cmd": "/sbin/agetty",
+            "exe": "/usr/sbin/agetty",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "agetty",
+            "ns_read_status": "ok",
+            "package": "util-linux",
+            "package_status": "packaged",
+            "pid": 1119,
+            "ppid": 1,
+            "uid": 0
+          },
+          {
+            "cmd": "/sbin/agetty",
+            "exe": "/usr/sbin/agetty",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "agetty",
+            "ns_read_status": "ok",
+            "package": "util-linux",
+            "package_status": "packaged",
+            "pid": 1129,
+            "ppid": 1,
+            "uid": 0
+          },
+          {
+            "cmd": "/usr/sbin/chronyd",
+            "exe": "/usr/sbin/chronyd",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "chronyd",
+            "ns_read_status": "ok",
+            "package": "chrony",
+            "package_status": "packaged",
+            "pid": 1153,
+            "ppid": 1,
+            "uid": 109
+          },
+          {
+            "cmd": "/usr/sbin/chronyd",
+            "exe": "/usr/sbin/chronyd",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "chronyd",
+            "ns_read_status": "ok",
+            "package": "chrony",
+            "package_status": "packaged",
+            "pid": 1156,
+            "ppid": 1153,
+            "uid": 109
+          },
+          {
+            "cmd": "/usr/sbin/rsyslogd",
+            "exe": "/usr/sbin/rsyslogd",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "rsyslogd",
+            "ns_read_status": "ok",
+            "package": "rsyslog",
+            "package_status": "packaged",
+            "pid": 1157,
+            "ppid": 1,
+            "uid": 102
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/3:3-cgroup_free",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 1180,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "/usr/lib/systemd/systemd",
+            "exe": "/usr/lib/systemd/systemd",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "systemd",
+            "ns_read_status": "ok",
+            "package": "systemd",
+            "package_status": "packaged",
+            "pid": 1204,
+            "ppid": 1,
+            "uid": 1001
+          },
+          {
+            "cmd": "/usr/sbin/ModemManager",
+            "exe": "/usr/sbin/ModemManager",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "ModemManager",
+            "ns_read_status": "ok",
+            "package": "modemmanager",
+            "package_status": "packaged",
+            "pid": 1211,
+            "ppid": 1,
+            "uid": 0
+          },
+          {
+            "cmd": "(sd-pam)",
+            "exe": "/usr/lib/systemd/systemd-executor",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "(sd-pam)",
+            "ns_read_status": "ok",
+            "package": "systemd",
+            "package_status": "packaged",
+            "pid": 1232,
+            "ppid": 1204,
+            "uid": 1001
+          },
+          {
+            "cmd": "/usr/bin/dockerd",
+            "exe": "/usr/bin/dockerd",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "dockerd",
+            "ns_read_status": "ok",
+            "package": "docker-ce",
+            "package_status": "packaged",
+            "pid": 1283,
+            "ppid": 1,
+            "uid": 0
+          },
+          {
+            "cmd": "php-fpm: pool www",
+            "exe": "/usr/sbin/php-fpm8.3",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "php-fpm8.3",
+            "ns_read_status": "ok",
+            "package": "php8.3-fpm",
+            "package_status": "packaged",
+            "pid": 1293,
+            "ppid": 1009,
+            "uid": 33
+          },
+          {
+            "cmd": "php-fpm: pool www",
+            "exe": "/usr/sbin/php-fpm8.3",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "php-fpm8.3",
+            "ns_read_status": "ok",
+            "package": "php8.3-fpm",
+            "package_status": "packaged",
+            "pid": 1294,
+            "ppid": 1009,
+            "uid": 33
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/R-tls-strp",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 1351,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "/usr/bin/python3",
+            "exe": "/usr/bin/python3.12",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "python3",
+            "ns_read_status": "ok",
+            "package": "python3.12-minimal",
+            "package_status": "packaged",
+            "pid": 1435,
+            "ppid": 1045,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "psimon",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 2062,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "/opt/hca/hosted-compute-agent",
+            "exe": "/opt/hca/hosted-compute-agent",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "hosted-compute-",
+            "ns_read_status": "ok",
+            "package": "",
+            "package_status": "unpackaged",
+            "pid": 2065,
+            "ppid": 1,
+            "uid": 1001
+          },
+          {
+            "cmd": "sudo",
+            "exe": "/usr/bin/sudo",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "sudo",
+            "ns_read_status": "ok",
+            "package": "sudo",
+            "package_status": "packaged",
+            "pid": 2083,
+            "ppid": 2065,
+            "uid": 1001
+          },
+          {
+            "cmd": "/tmp/provjobd2458088724",
+            "exe": "/tmp/provjobd2458088724",
+            "exe_deleted": true,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "provjobd2458088",
+            "ns_read_status": "ok",
+            "package": "",
+            "package_status": "unpackaged",
+            "pid": 2085,
+            "ppid": 2083,
+            "uid": 0
+          },
+          {
+            "cmd": "/home/runner/actions-runner/cached/2.337.0/bin/Runner.Listener",
+            "exe": "/home/runner/actions-runner/cached/2.337.0/bin/Runner.Listener",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "Runner.Listener",
+            "ns_read_status": "ok",
+            "package": "",
+            "package_status": "unpackaged",
+            "pid": 2119,
+            "ppid": 2065,
+            "uid": 1001
+          },
+          {
+            "cmd": "/home/runner/actions-runner/cached/2.337.0/bin/Runner.Worker",
+            "exe": "/home/runner/actions-runner/cached/2.337.0/bin/Runner.Worker",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "Runner.Worker",
+            "ns_read_status": "ok",
+            "package": "",
+            "package_status": "unpackaged",
+            "pid": 2139,
+            "ppid": 2119,
+            "uid": 1001
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/R-mlx5_cmd_798f:00:02.0",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 2294,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/R-mlx5_health798f:00:02.0",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 2295,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/R-mlx5_page_allocator",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 2296,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/R-mlx5_events",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 2297,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "ptp1",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 2304,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/R-mlx5_fc",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 2305,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/R-mlx5_hv_vhca",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 2306,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/R-mlx5e",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 2307,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/R-mlx5e_arfs",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 2308,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/R-ib-comp-wq",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 2320,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/R-ib-comp-unb-wq",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 2321,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/R-ib_mcast",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 2322,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/R-ib_nl_sa_wq",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 2323,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/R-mkey_cache",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 2324,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/0:3-events",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 2577,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "/usr/bin/bash",
+            "exe": "/usr/bin/bash",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "bash",
+            "ns_read_status": "ok",
+            "package": "bash",
+            "package_status": "packaged",
+            "pid": 2660,
+            "ppid": 2139,
+            "uid": 1001
+          },
+          {
+            "cmd": "sudo",
+            "exe": "/usr/bin/sudo",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "sudo",
+            "ns_read_status": "ok",
+            "package": "sudo",
+            "package_status": "packaged",
+            "pid": 2662,
+            "ppid": 2660,
+            "uid": 1001
+          },
+          {
+            "cmd": "./bin/muster",
+            "exe": "/home/runner/work/muster/muster/bin/muster",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "muster",
+            "ns_read_status": "ok",
+            "package": "",
+            "package_status": "unpackaged",
+            "pid": 2663,
+            "ppid": 2662,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/0:0",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 2869,
+            "ppid": 2,
+            "uid": 0
+          }
+        ],
+        "source": {
+          "kind": "proc",
+          "path": "/proc"
+        }
+      },
+      "listeners": {
+        "status": "ok",
+        "value": [
+          {
+            "addr": "0.0.0.0",
+            "family": "v4",
+            "inode": 6833,
+            "link_local": false,
+            "loopback": false,
+            "owner_status": "ok",
+            "owners": [
+              {
+                "exe": "/usr/lib/systemd/systemd",
+                "exe_deleted": false,
+                "mnt_ns": "host",
+                "name": "systemd",
+                "package": "systemd",
+                "package_status": "packaged",
+                "pid": 1,
+                "uid": 0
+              }
+            ],
+            "owners_count": 1,
+            "port": 22,
+            "proto": "tcp"
+          },
+          {
+            "addr": "::",
+            "family": "v6",
+            "inode": 6835,
+            "link_local": false,
+            "loopback": false,
+            "owner_status": "ok",
+            "owners": [
+              {
+                "exe": "/usr/lib/systemd/systemd",
+                "exe_deleted": false,
+                "mnt_ns": "host",
+                "name": "systemd",
+                "package": "systemd",
+                "package_status": "packaged",
+                "pid": 1,
+                "uid": 0
+              }
+            ],
+            "owners_count": 1,
+            "port": 22,
+            "proto": "tcp"
+          },
+          {
+            "addr": "127.0.0.53",
+            "family": "v4",
+            "inode": 5495,
+            "link_local": false,
+            "loopback": true,
+            "owner_status": "ok",
+            "owners": [
+              {
+                "exe": "/usr/lib/systemd/systemd-resolved",
+                "exe_deleted": false,
+                "mnt_ns": "host",
+                "name": "systemd-resolve",
+                "package": "systemd-resolved",
+                "package_status": "packaged",
+                "pid": 513,
+                "uid": 991
+              }
+            ],
+            "owners_count": 1,
+            "port": 53,
+            "proto": "tcp"
+          },
+          {
+            "addr": "127.0.0.54",
+            "family": "v4",
+            "inode": 5497,
+            "link_local": false,
+            "loopback": true,
+            "owner_status": "ok",
+            "owners": [
+              {
+                "exe": "/usr/lib/systemd/systemd-resolved",
+                "exe_deleted": false,
+                "mnt_ns": "host",
+                "name": "systemd-resolve",
+                "package": "systemd-resolved",
+                "package_status": "packaged",
+                "pid": 513,
+                "uid": 991
+              }
+            ],
+            "owners_count": 1,
+            "port": 53,
+            "proto": "tcp"
+          },
+          {
+            "addr": "127.0.0.53",
+            "family": "v4",
+            "inode": 5494,
+            "link_local": false,
+            "loopback": true,
+            "owner_status": "ok",
+            "owners": [
+              {
+                "exe": "/usr/lib/systemd/systemd-resolved",
+                "exe_deleted": false,
+                "mnt_ns": "host",
+                "name": "systemd-resolve",
+                "package": "systemd-resolved",
+                "package_status": "packaged",
+                "pid": 513,
+                "uid": 991
+              }
+            ],
+            "owners_count": 1,
+            "port": 53,
+            "proto": "udp"
+          },
+          {
+            "addr": "127.0.0.54",
+            "family": "v4",
+            "inode": 5496,
+            "link_local": false,
+            "loopback": true,
+            "owner_status": "ok",
+            "owners": [
+              {
+                "exe": "/usr/lib/systemd/systemd-resolved",
+                "exe_deleted": false,
+                "mnt_ns": "host",
+                "name": "systemd-resolve",
+                "package": "systemd-resolved",
+                "package_status": "packaged",
+                "pid": 513,
+                "uid": 991
+              }
+            ],
+            "owners_count": 1,
+            "port": 53,
+            "proto": "udp"
+          },
+          {
+            "addr": "192.0.2.1",
+            "family": "v4",
+            "inode": 6627,
+            "link_local": false,
+            "loopback": false,
+            "owner_status": "ok",
+            "owners": [
+              {
+                "exe": "/usr/lib/systemd/systemd-networkd",
+                "exe_deleted": false,
+                "mnt_ns": "host",
+                "name": "systemd-network",
+                "package": "systemd",
+                "package_status": "packaged",
+                "pid": 718,
+                "uid": 998
+              }
+            ],
+            "owners_count": 1,
+            "port": 68,
+            "proto": "udp"
+          },
+          {
+            "addr": "127.0.0.1",
+            "family": "v4",
+            "inode": 6034,
+            "link_local": false,
+            "loopback": true,
+            "owner_status": "ok",
+            "owners": [
+              {
+                "exe": "/usr/sbin/chronyd",
+                "exe_deleted": false,
+                "mnt_ns": "host",
+                "name": "chronyd",
+                "package": "chrony",
+                "package_status": "packaged",
+                "pid": 1153,
+                "uid": 109
+              }
+            ],
+            "owners_count": 1,
+            "port": 323,
+            "proto": "udp"
+          },
+          {
+            "addr": "::1",
+            "family": "v6",
+            "inode": 6035,
+            "link_local": false,
+            "loopback": true,
+            "owner_status": "ok",
+            "owners": [
+              {
+                "exe": "/usr/sbin/chronyd",
+                "exe_deleted": false,
+                "mnt_ns": "host",
+                "name": "chronyd",
+                "package": "chrony",
+                "package_status": "packaged",
+                "pid": 1153,
+                "uid": 109
+              }
+            ],
+            "owners_count": 1,
+            "port": 323,
+            "proto": "udp"
+          }
+        ],
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "proc",
+              "path": "/proc/self/net/tcp"
+            },
+            {
+              "kind": "proc",
+              "path": "/proc/self/net/tcp6"
+            },
+            {
+              "kind": "proc",
+              "path": "/proc/self/net/udp"
+            },
+            {
+              "kind": "proc",
+              "path": "/proc/self/net/udp6"
+            }
+          ]
+        }
+      },
+      "stats": {
+        "status": "ok",
+        "value": {
+          "count": 152,
+          "denied": 0,
+          "elapsed_ms": 156,
+          "fd_reads": 932,
+          "foreign_ns": 0,
+          "index_ms": 109,
+          "index_source": "dpkg",
+          "kernel_threads": 115,
+          "vanished": 0,
+          "zombies": 0
+        },
+        "source": {
+          "kind": "proc",
+          "path": "/proc"
+        }
+      },
+      "unpackaged_listeners": {
+        "status": "ok",
+        "value": [],
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "proc",
+              "path": "/proc/self/net/tcp"
+            },
+            {
+              "kind": "proc",
+              "path": "/proc/self/net/tcp6"
+            },
+            {
+              "kind": "proc",
+              "path": "/proc/self/net/udp"
+            },
+            {
+              "kind": "proc",
+              "path": "/proc/self/net/udp6"
+            },
+            {
+              "kind": "file",
+              "path": "/var/lib/dpkg/info"
             }
           ]
         }
@@ -20113,64 +23722,64 @@
         "status": "ok",
         "value": [
           {
-            "addr": "127.0.0.53",
-            "inode": 9292,
+            "addr": "127.0.0.54",
+            "inode": 5497,
             "loopback": true,
             "port": 53,
             "proto": "tcp"
           },
           {
             "addr": "0.0.0.0",
-            "inode": 5091,
+            "inode": 6833,
             "loopback": false,
             "port": 22,
             "proto": "tcp"
           },
           {
-            "addr": "127.0.0.54",
-            "inode": 9294,
+            "addr": "127.0.0.53",
+            "inode": 5495,
             "loopback": true,
             "port": 53,
             "proto": "tcp"
           },
           {
             "addr": "::",
-            "inode": 7862,
+            "inode": 6835,
             "loopback": false,
             "port": 22,
             "proto": "tcp6"
           },
           {
             "addr": "127.0.0.54",
-            "inode": 9293,
+            "inode": 5496,
             "loopback": true,
             "port": 53,
             "proto": "udp"
           },
           {
             "addr": "127.0.0.53",
-            "inode": 9291,
+            "inode": 5494,
             "loopback": true,
             "port": 53,
             "proto": "udp"
           },
           {
             "addr": "192.0.2.1",
-            "inode": 4951,
+            "inode": 6627,
             "loopback": false,
             "port": 68,
             "proto": "udp"
           },
           {
             "addr": "127.0.0.1",
-            "inode": 8972,
+            "inode": 6034,
             "loopback": true,
             "port": 323,
             "proto": "udp"
           },
           {
             "addr": "::1",
-            "inode": 8973,
+            "inode": 6035,
             "loopback": true,
             "port": 323,
             "proto": "udp6"
@@ -20442,7 +24051,7 @@
             "keys": [
               {
                 "bits": 2048,
-                "fingerprint": "SHA256:Afyr4Vbc3QcovCJaJz+Lj9oOXq87A+D6hYYi+Sh8RlQ",
+                "fingerprint": "SHA256:h1UgoLHT6qInWaImboki+J4uEnW8F9/g+zppdhPigqc",
                 "line": 1,
                 "options": [],
                 "restricted": false,
@@ -20529,7 +24138,7 @@
             "keys": [
               {
                 "bits": 2048,
-                "fingerprint": "SHA256:qiaBiqp4gMnjg391GUrkEFKFKsJ+F5RLufkqSxz5pyE",
+                "fingerprint": "SHA256:9nhRkwgc7fPJLq4+iiiTz8AOUlz07fU0gVEuSJOI9tE",
                 "line": 1,
                 "options": [
                   "no-port-forwarding",
@@ -20542,7 +24151,7 @@
               },
               {
                 "bits": 2048,
-                "fingerprint": "SHA256:Afyr4Vbc3QcovCJaJz+Lj9oOXq87A+D6hYYi+Sh8RlQ",
+                "fingerprint": "SHA256:h1UgoLHT6qInWaImboki+J4uEnW8F9/g+zppdhPigqc",
                 "line": 2,
                 "options": [
                   "no-port-forwarding",
@@ -28820,7 +32429,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/aws-cli/v2/2.36.49/dist/awscli/botocore/.changes",
+            "path": "/usr/local/aws-cli/v2/2.37.4/dist/awscli/botocore/.changes",
             "reference": "unpackaged",
             "uid": 0
           },
@@ -28910,7 +32519,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/doc/julia/html/en/.documenter-siteinfo.json",
+            "path": "/usr/local/julia1.13.1/share/doc/julia/html/en/.documenter-siteinfo.json",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -28919,7 +32528,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/Compiler/.gitignore",
+            "path": "/usr/local/julia1.13.1/share/julia/Compiler/.gitignore",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -28928,7 +32537,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/base/.gitignore",
+            "path": "/usr/local/julia1.13.1/share/julia/base/.gitignore",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -28937,7 +32546,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/base/JuliaSyntax/.github",
+            "path": "/usr/local/julia1.13.1/share/julia/base/JuliaSyntax/.github",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -28946,7 +32555,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/base/JuliaSyntax/.gitignore",
+            "path": "/usr/local/julia1.13.1/share/julia/base/JuliaSyntax/.gitignore",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -28955,7 +32564,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/base/JuliaSyntax/.mailmap",
+            "path": "/usr/local/julia1.13.1/share/julia/base/JuliaSyntax/.mailmap",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -28964,7 +32573,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/base/JuliaSyntax/sysimage/.gitignore",
+            "path": "/usr/local/julia1.13.1/share/julia/base/JuliaSyntax/sysimage/.gitignore",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -28973,7 +32582,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/ArgTools/.ci",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/ArgTools/.ci",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -28982,7 +32591,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/ArgTools/.github",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/ArgTools/.github",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -28991,7 +32600,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/ArgTools/.gitignore",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/ArgTools/.gitignore",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29000,7 +32609,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/DelimitedFiles/.ci",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/DelimitedFiles/.ci",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29009,7 +32618,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/DelimitedFiles/.codecov.yml",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/DelimitedFiles/.codecov.yml",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29018,7 +32627,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/DelimitedFiles/.github",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/DelimitedFiles/.github",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29027,7 +32636,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/DelimitedFiles/.gitignore",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/DelimitedFiles/.gitignore",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29036,7 +32645,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Distributed/.github",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/Distributed/.github",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29045,7 +32654,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Distributed/.gitignore",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/Distributed/.gitignore",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29054,7 +32663,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Distributed/docs/.gitignore",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/Distributed/docs/.gitignore",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29063,7 +32672,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Downloads/.ci",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/Downloads/.ci",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29072,7 +32681,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Downloads/.github",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/Downloads/.github",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29081,7 +32690,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Downloads/.gitignore",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/Downloads/.gitignore",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29090,7 +32699,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/JuliaSyntaxHighlighting/.github",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/JuliaSyntaxHighlighting/.github",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29099,7 +32708,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/JuliaSyntaxHighlighting/.gitignore",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/JuliaSyntaxHighlighting/.gitignore",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29108,7 +32717,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/LazyArtifacts/.github",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/LazyArtifacts/.github",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29117,7 +32726,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/LibCURL/.ci",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/LibCURL/.ci",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29126,7 +32735,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/LibCURL/.github",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/LibCURL/.github",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29135,7 +32744,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/LibCURL/.gitignore",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/LibCURL/.gitignore",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29144,7 +32753,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/LinearAlgebra/.buildkite",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/LinearAlgebra/.buildkite",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29153,7 +32762,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/LinearAlgebra/.codecov.yml",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/LinearAlgebra/.codecov.yml",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29162,7 +32771,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/LinearAlgebra/.github",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/LinearAlgebra/.github",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29171,7 +32780,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/LinearAlgebra/.gitignore",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/LinearAlgebra/.gitignore",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29180,7 +32789,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/NetworkOptions/.codecov.yml",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/NetworkOptions/.codecov.yml",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29189,7 +32798,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/NetworkOptions/.github",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/NetworkOptions/.github",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29198,7 +32807,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/NetworkOptions/.gitignore",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/NetworkOptions/.gitignore",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29207,7 +32816,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Pkg/.codecov.yml",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/Pkg/.codecov.yml",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29216,7 +32825,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Pkg/.git-blame-ignore-revs",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/Pkg/.git-blame-ignore-revs",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29225,7 +32834,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Pkg/.github",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/Pkg/.github",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29234,7 +32843,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Pkg/.gitignore",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/Pkg/.gitignore",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29243,7 +32852,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Pkg/.pre-commit-config.yaml",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/Pkg/.pre-commit-config.yaml",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29252,7 +32861,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Pkg/test/test_packages/.gitignore",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/Pkg/test/test_packages/.gitignore",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29261,7 +32870,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Pkg/test/test_packages/AugmentedPlatform/.pkg",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/Pkg/test/test_packages/AugmentedPlatform/.pkg",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29270,7 +32879,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Pkg/test/test_packages/BigProject/.gitignore",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/Pkg/test/test_packages/BigProject/.gitignore",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29279,7 +32888,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Pkg/test/test_packages/BigProject/SubModule/.gitignore",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/Pkg/test/test_packages/BigProject/SubModule/.gitignore",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29288,7 +32897,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Pkg/test/test_packages/BigProject/SubModule2/.gitignore",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/Pkg/test/test_packages/BigProject/SubModule2/.gitignore",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29297,7 +32906,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Pkg/test/test_packages/BuildProjectFixedDeps/.gitignore",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/Pkg/test/test_packages/BuildProjectFixedDeps/.gitignore",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29306,7 +32915,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Pkg/test/test_packages/force_latest_compatible_version/BothOldAndNew/.gitignore",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/Pkg/test/test_packages/force_latest_compatible_version/BothOldAndNew/.gitignore",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29315,7 +32924,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Pkg/test/test_packages/force_latest_compatible_version/DirectDepWithoutCompatEntry/.gitignore",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/Pkg/test/test_packages/force_latest_compatible_version/DirectDepWithoutCompatEntry/.gitignore",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29324,7 +32933,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Pkg/test/test_packages/force_latest_compatible_version/NewOnly/.gitignore",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/Pkg/test/test_packages/force_latest_compatible_version/NewOnly/.gitignore",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29333,7 +32942,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Pkg/test/test_packages/force_latest_compatible_version/OldOnly1/.gitignore",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/Pkg/test/test_packages/force_latest_compatible_version/OldOnly1/.gitignore",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29342,7 +32951,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Pkg/test/test_packages/force_latest_compatible_version/OldOnly2/.gitignore",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/Pkg/test/test_packages/force_latest_compatible_version/OldOnly2/.gitignore",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29351,7 +32960,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/SHA/.ci",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/SHA/.ci",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29360,7 +32969,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/SHA/.github",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/SHA/.github",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29369,7 +32978,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/SHA/.gitignore",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/SHA/.gitignore",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29378,7 +32987,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/SHA/docs/.gitignore",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/SHA/docs/.gitignore",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29387,7 +32996,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/SparseArrays/.ci",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/SparseArrays/.ci",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29396,7 +33005,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/SparseArrays/.codecov.yml",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/SparseArrays/.codecov.yml",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29405,7 +33014,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/SparseArrays/.github",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/SparseArrays/.github",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29414,7 +33023,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/SparseArrays/.gitignore",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/SparseArrays/.gitignore",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29423,7 +33032,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/SparseArrays/gen/.gitignore",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/SparseArrays/gen/.gitignore",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29432,7 +33041,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Statistics/.ci",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/Statistics/.ci",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29441,7 +33050,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Statistics/.github",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/Statistics/.github",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29450,7 +33059,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/StyledStrings/.github",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/StyledStrings/.github",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29459,7 +33068,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/StyledStrings/.gitignore",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/StyledStrings/.gitignore",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29468,7 +33077,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/SuiteSparse/.ci",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/SuiteSparse/.ci",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29477,7 +33086,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/SuiteSparse/.devcontainer",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/SuiteSparse/.devcontainer",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29486,7 +33095,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/SuiteSparse/.github",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/SuiteSparse/.github",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29495,7 +33104,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/TOML/.gitignore",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/TOML/.gitignore",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29504,7 +33113,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Tar/.ci",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/Tar/.ci",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29513,7 +33122,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Tar/.github",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/Tar/.github",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29522,7 +33131,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Tar/.gitignore",
+            "path": "/usr/local/julia1.13.1/share/julia/stdlib/v1.13/Tar/.gitignore",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29531,7 +33140,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/test/.gitignore",
+            "path": "/usr/local/julia1.13.1/share/julia/test/.gitignore",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29540,7 +33149,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/test/clangsa/.gitignore",
+            "path": "/usr/local/julia1.13.1/share/julia/test/clangsa/.gitignore",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29549,7 +33158,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/test/embedding/.gitignore",
+            "path": "/usr/local/julia1.13.1/share/julia/test/embedding/.gitignore",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29558,7 +33167,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/test/gcext/.gitignore",
+            "path": "/usr/local/julia1.13.1/share/julia/test/gcext/.gitignore",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29567,7 +33176,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/julia1.13.0/share/julia/test/llvmpasses/.gitignore",
+            "path": "/usr/local/julia1.13.1/share/julia/test/llvmpasses/.gitignore",
             "reference": "unpackaged",
             "uid": 1000
           },
@@ -29576,7 +33185,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/n/versions/node/22.23.2/lib/node_modules/npm/.npmrc",
+            "path": "/usr/local/n/versions/node/22.23.3/lib/node_modules/npm/.npmrc",
             "reference": "unpackaged",
             "uid": 0
           },
@@ -29585,7 +33194,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/n/versions/node/22.23.2/lib/node_modules/npm/node_modules/node-gyp/.release-please-manifest.json",
+            "path": "/usr/local/n/versions/node/22.23.3/lib/node_modules/npm/node_modules/node-gyp/.release-please-manifest.json",
             "reference": "unpackaged",
             "uid": 0
           },
@@ -29594,7 +33203,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/n/versions/node/22.23.2/lib/node_modules/npm/node_modules/node-gyp/gyp/.release-please-manifest.json",
+            "path": "/usr/local/n/versions/node/22.23.3/lib/node_modules/npm/node_modules/node-gyp/gyp/.release-please-manifest.json",
             "reference": "unpackaged",
             "uid": 0
           },
@@ -29603,7 +33212,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/n/versions/node/22.23.2/lib/node_modules/npm/node_modules/qrcode-terminal/.travis.yml",
+            "path": "/usr/local/n/versions/node/22.23.3/lib/node_modules/npm/node_modules/qrcode-terminal/.travis.yml",
             "reference": "unpackaged",
             "uid": 0
           },
@@ -30008,7 +33617,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/var/lib/gems/3.2.0/gems/domain_name-0.6.20260907/.document",
+            "path": "/var/lib/gems/3.2.0/gems/domain_name-0.6.20260921/.document",
             "reference": "unpackaged",
             "uid": 0
           },
@@ -30017,7 +33626,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/var/lib/gems/3.2.0/gems/domain_name-0.6.20260907/.github",
+            "path": "/var/lib/gems/3.2.0/gems/domain_name-0.6.20260921/.github",
             "reference": "unpackaged",
             "uid": 0
           },
@@ -30026,7 +33635,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/var/lib/gems/3.2.0/gems/domain_name-0.6.20260907/.gitignore",
+            "path": "/var/lib/gems/3.2.0/gems/domain_name-0.6.20260921/.gitignore",
             "reference": "unpackaged",
             "uid": 0
           },
@@ -30179,7 +33788,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/var/lib/gems/3.2.0/gems/google-apis-androidpublisher_v3-0.108.0/.yardopts",
+            "path": "/var/lib/gems/3.2.0/gems/google-apis-androidpublisher_v3-0.109.0/.yardopts",
             "reference": "unpackaged",
             "uid": 0
           },
@@ -30215,7 +33824,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/var/lib/gems/3.2.0/gems/google-apis-storage_v1-0.67.0/.yardopts",
+            "path": "/var/lib/gems/3.2.0/gems/google-apis-storage_v1-0.68.0/.yardopts",
             "reference": "unpackaged",
             "uid": 0
           },
@@ -30494,7 +34103,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/var/lib/gems/3.2.0/gems/representable-3.2.0/.github",
+            "path": "/var/lib/gems/3.2.0/gems/representable-3.3.0/.github",
             "reference": "unpackaged",
             "uid": 0
           },
@@ -30503,7 +34112,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/var/lib/gems/3.2.0/gems/representable-3.2.0/.gitignore",
+            "path": "/var/lib/gems/3.2.0/gems/representable-3.3.0/.gitignore",
             "reference": "unpackaged",
             "uid": 0
           },
@@ -31284,9 +34893,9 @@
         "value": {
           "allowlisted_hidden": 204,
           "config_unreadable": [],
-          "dirs": 34701,
-          "entries": 246315,
-          "files": 206224,
+          "dirs": 34706,
+          "entries": 246647,
+          "files": 206554,
           "home_roots": [
             {
               "kind": "user",
@@ -31424,7 +35033,7 @@
           "mnt_id_fallback": false,
           "nice_applied": true,
           "stop_reason": "",
-          "symlinks": 5384,
+          "symlinks": 5381,
           "truncated_counts": {
             "acl_grants": 0,
             "capabilities": 4,
@@ -31434,7 +35043,7 @@
             "suid_sgid": 24,
             "suid_sgid_unverified": 0,
             "unowned": 0,
-            "world_writable": 545
+            "world_writable": 544
           }
         },
         "source": {
@@ -34506,16 +38115,6 @@
             "kind": "regular",
             "package": "google-chrome-stable",
             "package_declared": false,
-            "path": "/opt/google/chrome/libsapisid.so",
-            "reference": "unlisted",
-            "sticky": false,
-            "uid": 0
-          },
-          {
-            "gid": 0,
-            "kind": "regular",
-            "package": "google-chrome-stable",
-            "package_declared": false,
             "path": "/opt/google/chrome/libvk_swiftshader.so",
             "reference": "unlisted",
             "sticky": false,
@@ -37046,7 +40645,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/tmp/systemd-private-198f3827d6f5479fb8ac8de79b10ffe5-ModemManager.service-jlZJph/tmp",
+            "path": "/tmp/systemd-private-3c3977533bb44807900214673cd54fce-ModemManager.service-tYm8hb/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -37056,7 +40655,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/tmp/systemd-private-198f3827d6f5479fb8ac8de79b10ffe5-chrony.service-a3HGjb/tmp",
+            "path": "/tmp/systemd-private-3c3977533bb44807900214673cd54fce-chrony.service-kMY3M5/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -37066,7 +40665,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/tmp/systemd-private-198f3827d6f5479fb8ac8de79b10ffe5-haveged.service-tv29Fx/tmp",
+            "path": "/tmp/systemd-private-3c3977533bb44807900214673cd54fce-haveged.service-ciyuWm/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -37076,7 +40675,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/tmp/systemd-private-198f3827d6f5479fb8ac8de79b10ffe5-polkit.service-S7r6jF/tmp",
+            "path": "/tmp/systemd-private-3c3977533bb44807900214673cd54fce-polkit.service-mi3lYF/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -37086,7 +40685,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/tmp/systemd-private-198f3827d6f5479fb8ac8de79b10ffe5-systemd-logind.service-qhnJRk/tmp",
+            "path": "/tmp/systemd-private-3c3977533bb44807900214673cd54fce-systemd-logind.service-fMv0da/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -37096,7 +40695,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/tmp/systemd-private-198f3827d6f5479fb8ac8de79b10ffe5-systemd-resolved.service-gWv28v/tmp",
+            "path": "/tmp/systemd-private-3c3977533bb44807900214673cd54fce-systemd-resolved.service-VgNs4T/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -37106,7 +40705,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/tmp/systemd-private-198f3827d6f5479fb8ac8de79b10ffe5-systemd-timedated.service-Pluky6/tmp",
+            "path": "/tmp/systemd-private-3c3977533bb44807900214673cd54fce-systemd-timedated.service-Jt6ORQ/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -37426,7 +41025,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/var/tmp/systemd-private-198f3827d6f5479fb8ac8de79b10ffe5-ModemManager.service-zlAS1R/tmp",
+            "path": "/var/tmp/systemd-private-3c3977533bb44807900214673cd54fce-ModemManager.service-jb2ege/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -37436,7 +41035,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/var/tmp/systemd-private-198f3827d6f5479fb8ac8de79b10ffe5-chrony.service-uJzjiN/tmp",
+            "path": "/var/tmp/systemd-private-3c3977533bb44807900214673cd54fce-chrony.service-c927TV/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -37446,7 +41045,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/var/tmp/systemd-private-198f3827d6f5479fb8ac8de79b10ffe5-haveged.service-KZjuEM/tmp",
+            "path": "/var/tmp/systemd-private-3c3977533bb44807900214673cd54fce-haveged.service-XA3A7k/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -37456,7 +41055,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/var/tmp/systemd-private-198f3827d6f5479fb8ac8de79b10ffe5-polkit.service-705Gn2/tmp",
+            "path": "/var/tmp/systemd-private-3c3977533bb44807900214673cd54fce-polkit.service-6KMKve/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -37466,7 +41065,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/var/tmp/systemd-private-198f3827d6f5479fb8ac8de79b10ffe5-systemd-logind.service-Vnu2tY/tmp",
+            "path": "/var/tmp/systemd-private-3c3977533bb44807900214673cd54fce-systemd-logind.service-cWQLPp/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -37476,7 +41075,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/var/tmp/systemd-private-198f3827d6f5479fb8ac8de79b10ffe5-systemd-resolved.service-v7TcFr/tmp",
+            "path": "/var/tmp/systemd-private-3c3977533bb44807900214673cd54fce-systemd-resolved.service-4PSegC/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -37486,7 +41085,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/var/tmp/systemd-private-198f3827d6f5479fb8ac8de79b10ffe5-systemd-timedated.service-zrHfwm/tmp",
+            "path": "/var/tmp/systemd-private-3c3977533bb44807900214673cd54fce-systemd-timedated.service-OddSAO/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0

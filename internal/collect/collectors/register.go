@@ -64,6 +64,7 @@ func init() {
 	collect.Register(unitsCollector)
 	collect.Register(sshkeysCollector)
 	collect.Register(privilegeCollector)
+	collect.Register(processesCollector)
 }
 
 // filesSource renders the provenance of a value computed from files: a plain

@@ -1,0 +1,34 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none",
+        "source": {
+          "kind": "file",
+          "path": "/proc/1/cgroup"
+        }
+      }
+    },
+    "processes": {
+      "deleted_executables": {
+        "status": "ok",
+        "value": [
+          {
+            "pid": 4242,
+            "uid": 1000,
+            "name": "kworker",
+            "exe": "/memfd:payload"
+          }
+        ],
+        "source": {
+          "kind": "proc",
+          "path": "/proc"
+        }
+      }
+    }
+  }
+}

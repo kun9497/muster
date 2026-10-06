@@ -3,13 +3,21 @@
 package collectors
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
+	"errors"
+	"io/fs"
+	"maps"
+	"net"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -33,17 +41,25 @@ import (
 //   - Nothing is written to the host's configuration, started, stopped or
 //     installed. Every command is a query (`sshd -T`, `getent`, `findmnt`,
 //     `systemctl show`, `sysctl -n`, `dpkg --verify` or `rpm -Va`,
-//     `auditctl -s` and `-l`, `lastlog -u`, `getcap -r`, `visudo -c`), run
-//     through the same exec discipline the collectors use. The one writer is
-//     the keys pair's `ssh-keygen`, and it writes only under t.TempDir(),
-//     which the test removes: no key reaches a declared path or a snapshot.
+//     `auditctl -s` and `-l`, `lastlog -u`, `getcap -r`, `visudo -c`,
+//     `ss -tulpnH`), run through the same exec discipline the collectors
+//     use. The two writers are the keys pair's `ssh-keygen` and the
+//     deleted-executable pair's copy of the test binary, and both write
+//     only under t.TempDir(), which the test removes: no key reaches a
+//     declared path or a snapshot, and the copy runs as the test's own
+//     child, which it kills.
 //   - A pair whose oracle binary is not on this machine skips, naming the
 //     binary; that is the only skip an enabled run may produce — besides,
 //     for the audit pair, J-1's "auditctl cannot reach the kernel" (exit 4
 //     or 255, a container), and for the capabilities pair a run without
 //     root (the walk needs it) or a container, whose overlay root the walk
 //     reads as unsupported, and for the lastlog pair a host with no
-//     /var/log/lastlog (shadow 4.15 and later) — and the CI job on the
+//     /var/log/lastlog (shadow 4.15 and later), and for the listeners pair a
+//     run without root (other accounts' fd tables are closed to it) or one
+//     whose pid view is partial (a container, where processes.listeners is
+//     absent, W-67), and for the deleted-executable pair a run without root
+//     (another account's exe link is denied, and
+//     processes.deleted_executables carries that denial) — and the CI job on the
 //     runner VM, which has every binary and a running auditd, asserts
 //     there are none.
 //     A binary that IS there and refuses to answer fails the pair: a daemon
@@ -730,8 +746,13 @@ func TestOracleSysctl(t *testing.T) {
 	c := collectorNamed(t, "sysctl")
 	g := collect.Guard(collect.Host(), c)
 
-	compared := 0
+	keys := make([]sysctlKey, 0, len(sysctlLeaves)+1)
 	for _, l := range sysctlLeaves {
+		keys = append(keys, l.sysctlKey)
+	}
+	keys = append(keys, sysctlKey{"net.ipv6.bindv6only", sysctlBindV6OnlyPath})
+	compared := 0
+	for _, l := range keys {
 		have := readProcSys(g, l.path)
 		want := oracleSysctlValue(t, bin, l.key)
 		switch {
@@ -1559,5 +1580,313 @@ func TestOracleGetcapLineSplits(t *testing.T) {
 	}
 	if _, ok := oracleGetcapLine("/usr/bin/nothing"); ok {
 		t.Error("a line without a capability text split")
+	}
+}
+
+// --- listeners ----------------------------------------------------------
+
+// ssPath is iproute2's socket statistics tool: an independent reader of the
+// kernel's socket tables (it asks netlink, not /proc/net) that also names
+// the processes holding each socket.
+const ssPath = "/usr/bin/ss"
+
+// oracleSocket identifies one listening socket the way both sides can name
+// it: the protocol without its family, the address in Go's canonical text
+// (a v4-mapped v6 address prints as its v4 form on both sides) and the port.
+type oracleSocket struct {
+	proto, addr string
+	port        int
+}
+
+var ssPidPattern = regexp.MustCompile(`pid=([0-9]+)`)
+
+// oracleSSLine splits one line of `ss -tulpnH`: Netid, State, Recv-Q,
+// Send-Q, the local address, the peer, and the process column when a holder
+// is known. ss prints a v6 wildcard that is not v6-only as `*`, brackets a
+// numeric v6 address and appends `%<interface>` to a socket bound to one.
+func oracleSSLine(line string) (oracleSocket, []int, bool) {
+	f := strings.Fields(line)
+	if len(f) < 6 || (f[0] != "tcp" && f[0] != "udp") {
+		return oracleSocket{}, nil, false
+	}
+	local := f[4]
+	i := strings.LastIndexByte(local, ':')
+	if i < 0 {
+		return oracleSocket{}, nil, false
+	}
+	port, err := strconv.Atoi(local[i+1:])
+	if err != nil {
+		return oracleSocket{}, nil, false
+	}
+	host, _, _ := strings.Cut(local[:i], "%")
+	host = strings.TrimSuffix(strings.TrimPrefix(host, "["), "]")
+	if host == "*" {
+		host = "::"
+	}
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return oracleSocket{}, nil, false
+	}
+	pids := []int{}
+	for _, m := range ssPidPattern.FindAllStringSubmatch(strings.Join(f[6:], " "), -1) {
+		n, _ := strconv.Atoi(m[1])
+		pids = append(pids, n)
+	}
+	return oracleSocket{f[0], ip.String(), port}, pids, true
+}
+
+// TestOracleListeners compares processes.listeners with `ss -tulpnH`. The
+// collector reads /proc/net/{tcp,udp}{,6} and walks every /proc/<pid>/fd;
+// ss asks the kernel over netlink and names the holders itself. Every row
+// muster lists must be a socket ss lists, every pid ss names in its users
+// column must be among the row's owners (a kernel-owned row has none), and
+// every socket ss lists must be a row (when the list is not truncated) — so
+// a row the parser drops is caught as surely as one it invents. The firewall collector runs first on the same
+// builder, as in a run, so the exposure derivation reads real facts; its
+// commands are queries too.
+func TestOracleListeners(t *testing.T) {
+	oracleEnabled(t)
+	bin := oracleBinary(t, ssPath)
+	if os.Geteuid() != 0 {
+		t.Skip("the listeners pair needs root: other accounts' fd tables are closed to this run, and ss names no holder it cannot read")
+	}
+	reg, err := facts.LoadRegistry()
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := collect.NewBuilder(reg)
+	buildOn(t, "firewall", collect.Host(), b)
+	buildOn(t, "processes", collect.Host(), b)
+	stdout := oracleOutput(t, bin, "-tulpnH")
+
+	e := env(t, b, "processes.listeners")
+	switch {
+	case e.Status == facts.StatusAbsent && strings.Contains(e.Reason, "pid view may be partial"):
+		// W-67/W-69: a partial pid view (a container) leaves an unheld
+		// socket unjudged; there is no owner list to compare. Any other
+		// absent (a W-70 zombie-leader owner) is a reading this pair
+		// cannot vouch for, and fails below like every other status.
+		t.Skipf("processes.listeners is absent%s: no owner list to compare", reasonSuffix(e.Reason))
+	case e.Status != facts.StatusOK:
+		t.Fatalf("processes.listeners is %s%s", e.Status, reasonSuffix(e.Reason))
+	}
+
+	ss := map[oracleSocket][]int{}
+	for _, line := range oracleLines(stdout) {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		k, pids, ok := oracleSSLine(line)
+		if !ok {
+			t.Fatalf("ss printed a line the oracle cannot read: %q", line)
+		}
+		ss[k] = append(ss[k], pids...)
+	}
+
+	type held struct {
+		owners map[int]bool
+		capped bool
+		kernel bool
+	}
+	rows := map[oracleSocket]*held{}
+	for _, r := range e.Value.([]any) {
+		row := r.(map[string]any)
+		k := oracleSocket{row["proto"].(string), row["addr"].(string), row["port"].(int)}
+		h := rows[k]
+		if h == nil {
+			h = &held{owners: map[int]bool{}}
+			rows[k] = h
+		}
+		owners := row["owners"].([]any)
+		for _, o := range owners {
+			h.owners[o.(map[string]any)["pid"].(int)] = true
+		}
+		h.capped = h.capped || row["owners_count"].(int) > len(owners)
+		h.kernel = h.kernel || row["owner_status"] == "kernel"
+	}
+
+	compared := 0
+	for _, k := range oracleSortedSockets(rows) {
+		h := rows[k]
+		pids, ok := ss[k]
+		if !ok {
+			t.Errorf("listeners: muster lists %s/%d on %s, ss does not", k.proto, k.port, k.addr)
+			continue
+		}
+		switch {
+		case h.kernel && len(h.owners) == 0 && len(pids) != 0:
+			t.Errorf("listeners: %s/%d on %s is the kernel's to muster, ss names pids %v", k.proto, k.port, k.addr, pids)
+		case h.capped:
+			// The row carries the first procOwnersCap holders only.
+		default:
+			for _, p := range pids {
+				if !h.owners[p] {
+					t.Errorf("listeners: %s/%d on %s: ss names pid %d, muster's owners are %v", k.proto, k.port, k.addr, p, slices.Sorted(maps.Keys(h.owners)))
+				}
+			}
+		}
+		compared++
+	}
+	// The reverse direction holds only for a whole list: a list cut at
+	// procListenersCap cannot prove that a socket ss names is missing.
+	if e.Truncated {
+		t.Logf("listeners: processes.listeners is truncated at %d rows; the reverse direction is not compared", procListenersCap)
+	} else {
+		for _, k := range oracleSortedSockets(ss) {
+			if rows[k] == nil {
+				t.Errorf("listeners: ss lists %s/%d on %s, muster does not", k.proto, k.port, k.addr)
+			}
+		}
+	}
+	if compared == 0 {
+		t.Fatal("listeners: nothing listens on this host, so this pair proved nothing")
+	}
+	t.Logf("oracle listeners: compared %d", compared)
+}
+
+func oracleSortedSockets[V any](m map[oracleSocket]V) []oracleSocket {
+	out := make([]oracleSocket, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	slices.SortFunc(out, func(x, y oracleSocket) int {
+		return cmp.Or(cmp.Compare(x.proto, y.proto), cmp.Compare(x.port, y.port), cmp.Compare(x.addr, y.addr))
+	})
+	return out
+}
+
+// The ss line splitter is the oracle's own parser, pinned on every Linux run
+// like the getcap one: a v4 socket with a holder, the bracketed v6 wildcard,
+// the dual-stack `*`, an interface-bound address, a v4-mapped address, a
+// holder whose name has a blank, and a socket with no holder.
+func TestOracleSSLineSplits(t *testing.T) {
+	for _, tc := range []struct {
+		line string
+		want oracleSocket
+		pids []int
+	}{
+		{`tcp   LISTEN 0 128 0.0.0.0:22 0.0.0.0:* users:(("sshd",pid=845,fd=3))`, oracleSocket{"tcp", "0.0.0.0", 22}, []int{845}},
+		{`tcp   LISTEN 0 128 [::]:22 [::]:* users:(("sshd",pid=845,fd=4))`, oracleSocket{"tcp", "::", 22}, []int{845}},
+		{`tcp   LISTEN 0 511 *:80 *:* users:(("apache2",pid=7,fd=4),("apache2",pid=9,fd=4))`, oracleSocket{"tcp", "::", 80}, []int{7, 9}},
+		{`udp   UNCONN 0 0 127.0.0.53%lo:53 0.0.0.0:* users:(("systemd-resolve",pid=612,fd=13))`, oracleSocket{"udp", "127.0.0.53", 53}, []int{612}},
+		{`udp   UNCONN 0 0 [fe80::1]%eth0:546 [::]:* users:(("dhclient",pid=3,fd=5))`, oracleSocket{"udp", "fe80::1", 546}, []int{3}},
+		{`tcp   LISTEN 0 4096 [::ffff:127.0.0.1]:631 *:* users:(("a b",pid=11,fd=6))`, oracleSocket{"tcp", "127.0.0.1", 631}, []int{11}},
+		{`udp   UNCONN 0 0 0.0.0.0:2049 0.0.0.0:*`, oracleSocket{"udp", "0.0.0.0", 2049}, []int{}},
+	} {
+		got, pids, ok := oracleSSLine(tc.line)
+		if !ok || got != tc.want || !slices.Equal(pids, tc.pids) {
+			t.Errorf("%q: %+v %v %v, want %+v %v", tc.line, got, pids, ok, tc.want, tc.pids)
+		}
+	}
+	for _, bad := range []string{"", "Netid State", "raw UNCONN 0 0 0.0.0.0:1 0.0.0.0:*", "tcp LISTEN 0 1 nohost 0.0.0.0:*"} {
+		if _, _, ok := oracleSSLine(bad); ok {
+			t.Errorf("%q split", bad)
+		}
+	}
+}
+
+// --- deleted executables ------------------------------------------------
+
+// TestOracleDeletedExecutable makes the one fact the kernel and the test
+// both know for certain: a process whose executable was unlinked after it
+// started. The test copies its own binary into t.TempDir(), starts the copy
+// as a sleeper (oracleSleeperEnv, below), removes the copy, and asks the
+// collector; the child is the test's own process and is killed before the
+// test returns, so nothing on the host changes.
+//
+// The copy is the test binary, not /bin/sleep: on EL's coreutils-single
+// /usr/bin/sleep is a 52-byte script whose interpreter is the multi-call
+// /usr/bin/coreutils, so a copy of it runs with /usr/bin/coreutils as its
+// exe and nothing is deleted (W-82, measured in the rocky and alma init
+// images). The test binary is an executable on every host the pair runs on.
+func TestOracleDeletedExecutable(t *testing.T) {
+	oracleEnabled(t)
+	if os.Geteuid() != 0 {
+		t.Skip("the deleted-executable pair needs root: another account's exe link is denied, and processes.deleted_executables carries that denial")
+	}
+	self, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(self)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cp := filepath.Join(t.TempDir(), "muster-oracle-sleeper")
+	if err := os.WriteFile(cp, data, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command(cp)
+	cmd.Env = append(os.Environ(), oracleSleeperEnv+"=1")
+	// A parent killed without its defers (a -timeout panic, SIGKILL) would
+	// orphan the sleeper for its 300 s; the kernel kills it with the parent.
+	cmd.SysProcAttr = &syscall.SysProcAttr{Pdeathsig: syscall.SIGKILL}
+	if err := cmd.Start(); err != nil {
+		if errors.Is(err, fs.ErrPermission) {
+			t.Fatalf("start %s: %v - the temporary directory (TMPDIR=%q) is likely mounted noexec; point TMPDIR at an exec mount to run this pair", cp, err, os.Getenv("TMPDIR"))
+		}
+		t.Fatalf("start %s: %v", cp, err)
+	}
+	defer func() {
+		_ = cmd.Process.Kill()
+		_ = cmd.Wait()
+	}()
+	if err := os.Remove(cp); err != nil {
+		t.Fatal(err)
+	}
+	// The preconditions, read here and not by the collector: the child is
+	// alive (a zombie is rightly not listed) and runs the copy itself.
+	pid := cmd.Process.Pid
+	if st := oracleProcState(t, pid); st == "" || st == "Z" {
+		t.Fatalf("deleted-exe: the sleeper (pid %d) is not running (state %q) before the collect", pid, st)
+	}
+	if exe, err := os.Readlink("/proc/" + strconv.Itoa(pid) + "/exe"); err != nil || !strings.HasPrefix(exe, cp) {
+		t.Fatalf("deleted-exe: the sleeper (pid %d) runs %q (%v), not the copy %s", pid, exe, err, cp)
+	}
+
+	b := build(t, "processes", collect.Host())
+	found := false
+	for _, r := range okList(t, b, "processes.deleted_executables") {
+		row := r.(map[string]any)
+		if row["pid"] == pid {
+			found = true
+			if exe, _ := row["exe"].(string); !strings.HasPrefix(exe, cp) {
+				t.Errorf("deleted-exe: pid %d's exe is %q, want %s", pid, exe, cp)
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("deleted-exe: pid %d runs the unlinked %s, and processes.deleted_executables does not list it", pid, cp)
+	}
+	t.Logf("oracle deleted-exe: compared 1")
+}
+
+// oracleProcState is the State letter of /proc/<pid>/status, or "" when the
+// process is gone; read here, not by the collector's parser (rule 1).
+func oracleProcState(t *testing.T, pid int) string {
+	t.Helper()
+	b, err := os.ReadFile("/proc/" + strconv.Itoa(pid) + "/status")
+	if err != nil {
+		return ""
+	}
+	for _, line := range oracleLines(b) {
+		if v, ok := strings.CutPrefix(line, "State:"); ok {
+			f := strings.Fields(v)
+			if len(f) > 0 {
+				return f[0]
+			}
+		}
+	}
+	return ""
+}
+
+// oracleSleeperEnv turns a copy of this test binary into the deleted-exe
+// pair's child: set, the binary sleeps before any test runs and exits.
+const oracleSleeperEnv = "MUSTER_ORACLE_SLEEPER"
+
+func init() {
+	if os.Getenv(oracleSleeperEnv) == "1" {
+		time.Sleep(300 * time.Second)
+		os.Exit(0)
 	}
 }

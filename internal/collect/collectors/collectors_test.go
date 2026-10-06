@@ -239,8 +239,12 @@ func (a *fsAccess) Glob(pattern string) ([]string, error) {
 	// A symlink is a directory entry like any other: the host's Glob lists
 	// it without following it (the units collector's .wants links and its
 	// /dev/null drop-in masks).
+	seen := make(map[string]bool, len(out))
+	for _, p := range out {
+		seen[p] = true
+	}
 	for p := range a.links {
-		if ok, _ := path.Match(pattern, p); ok && !slices.Contains(out, p) {
+		if ok, _ := path.Match(pattern, p); ok && !seen[p] {
 			out = append(out, p)
 		}
 	}
@@ -335,11 +339,17 @@ func (a *fsAccess) ReadDir(p string, expect collect.Identity, opts collect.ReadD
 }
 
 // Readlink serves the links map in stored form, unresolved. A path that is
-// not a link answers the way readlinkat does: EINVAL when it exists as
-// something else, ENOENT when it does not exist at all.
+// not a link answers the way readlinkat does: the seeded failure when fails
+// holds one (W-45: a denied /proc/<pid>/exe), else EINVAL when it exists as
+// something else, ENOENT when it does not exist at all. The links map wins
+// over fails, in the order Stat consults them: a link seeded with an
+// ErrSymlink failure is a link whose READ fails and whose Readlink answers.
 func (a *fsAccess) Readlink(p string) (string, error) {
 	if t, ok := a.links[p]; ok {
 		return t, nil
+	}
+	if err, ok := a.fails[p]; ok {
+		return "", err
 	}
 	if _, ok := a.files[p]; ok {
 		return "", unix.EINVAL
@@ -407,9 +417,18 @@ func build(t *testing.T, name string, a collect.Access) *collect.Builder {
 	if err != nil {
 		t.Fatalf("load registry: %v", err)
 	}
-	b := collect.NewBuilder(reg)
+	return buildOn(t, name, a, collect.NewBuilder(reg))
+}
+
+// buildOn is build on a builder the test prepared — one that already holds
+// the facts an earlier collector would have written (W-32). The collector
+// begins with its declared facts, exactly as runCollector begins it, so a Get
+// outside them panics here as it would in a run.
+func buildOn(t *testing.T, name string, a collect.Access, b *collect.Builder) *collect.Builder {
+	t.Helper()
 	c := collectorNamed(t, name)
 	g := collect.Guard(a, c)
+	b.Begin(name, c.Declare.Facts...)
 	if err := c.Run(context.Background(), g, b); err != nil {
 		t.Fatalf("%s: %v", name, err)
 	}
@@ -2665,13 +2684,75 @@ func TestEveryCollectorStaysInsideItsDeclaration(t *testing.T) {
 	for _, c := range collect.All() {
 		g := collect.Guard(a, c)
 		b := collect.NewBuilder(reg)
-		if err := c.Run(context.Background(), g, b); err != nil {
-			t.Errorf("%s: %v", c.Name, err)
-		}
+		b.Begin(c.Name, c.Declare.Facts...)
+		// A Get outside the declared facts panics (W-32); the recover files
+		// it against this collector instead of taking the test binary down.
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					t.Errorf("%s panicked: %v", c.Name, r)
+				}
+			}()
+			if err := c.Run(context.Background(), g, b); err != nil {
+				t.Errorf("%s: %v", c.Name, err)
+			}
+		}()
 		if v := g.Violations(); len(v) != 0 {
 			t.Errorf("%s touched undeclared targets: %v", c.Name, v)
 		}
 	}
+}
+
+// TestDeclaredFactsAreWrittenBeforeTheyAreRead (W-32, spec §7): collectors
+// run in name order, so every family a collector names in Declare.Facts must
+// be written by a collector that sorts before it — otherwise Get would read
+// an empty tree on every real run and the test doubles, which seed the facts
+// by hand, would never notice. The family's writer is the registry's
+// `collector:` field of every key the glob matches; a glob that matches no
+// registered key is a declaration of nothing and fails too.
+func TestDeclaredFactsAreWrittenBeforeTheyAreRead(t *testing.T) {
+	reg, err := facts.LoadRegistry()
+	if err != nil {
+		t.Fatalf("load registry: %v", err)
+	}
+	order := map[string]int{}
+	for i, c := range collect.All() {
+		order[c.Name] = i
+	}
+	checked := 0
+	for _, c := range collect.All() {
+		for _, glob := range c.Declare.Facts {
+			checked++
+			matched := 0
+			for _, e := range reg.Keys {
+				if ok, _ := path.Match(glob, e.Key); !ok {
+					continue
+				}
+				matched++
+				if reg.IsSetting(e) {
+					// A family glob (`firewall.*`) may span a setting, which
+					// Get answers (Envelope{}, false); naming one outright
+					// declares a read that can never succeed.
+					if glob == e.Key {
+						t.Errorf("%s declares the setting %s: only envelopes are read across collectors", c.Name, e.Key)
+					}
+				}
+				w, ok := order[e.Collector]
+				switch {
+				case !ok:
+					t.Errorf("%s reads %s, written by %q, which is not a registered collector", c.Name, e.Key, e.Collector)
+				case e.Collector == c.Name:
+					t.Errorf("%s declares %s, a fact it writes itself", c.Name, e.Key)
+				case w > order[c.Name]:
+					t.Errorf("%s reads %s, but its writer %s runs after it", c.Name, e.Key, e.Collector)
+				}
+			}
+			if matched == 0 {
+				t.Errorf("%s declares %s, which matches no registered key", c.Name, glob)
+			}
+		}
+	}
+	t.Logf("%d declared fact globs checked across %d collectors", checked, len(order))
 }
 
 func TestEveryDeclaredTargetIsAbsolute(t *testing.T) {

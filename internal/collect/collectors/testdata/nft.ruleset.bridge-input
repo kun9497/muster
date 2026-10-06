@@ -1,0 +1,11 @@
+table bridge filter {
+	chain input {
+		type filter hook input priority filter; policy drop;
+		meta l4proto tcp tcp dport 22 accept
+	}
+}
+table inet filter {
+	chain input {
+		type filter hook input priority filter; policy accept;
+	}
+}

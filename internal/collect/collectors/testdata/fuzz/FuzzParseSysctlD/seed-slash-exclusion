@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("net/ipv4/conf/*/accept_source_route = 0\n-net/ipv4/conf/all/accept_source_route\n-\n- \n")

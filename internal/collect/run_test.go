@@ -134,6 +134,51 @@ func TestRunRecordsTheDeclaredCommand(t *testing.T) {
 	}
 }
 
+// W-32: runCollector hands Begin the collector's declared facts, so a
+// collector reads what an earlier one wrote, and one that reads a fact it did
+// not declare is filed as an error rather than taking the binary down.
+func TestRunLetsACollectorReadTheFactsItDeclared(t *testing.T) {
+	Reset()
+	defer Reset()
+	Register(Collector{Name: "afw", Declare: Declaration{Needs: "none"}, Run: func(ctx context.Context, a Access, b *Builder) error {
+		b.Set("firewall.backend", OK("ufw", nil))
+		return nil
+	}})
+	Register(Collector{Name: "breader", Declare: Declaration{Needs: "none", Facts: []string{"firewall.*"}}, Run: func(ctx context.Context, a Access, b *Builder) error {
+		e, ok := b.Get("firewall.backend")
+		b.Set("services.ssh.installed", OK(ok && e.Value == "ufw", nil))
+		return nil
+	}})
+	Register(Collector{Name: "cundeclared", Declare: Declaration{Needs: "none"}, Run: func(ctx context.Context, a Access, b *Builder) error {
+		b.Get("firewall.backend")
+		return nil
+	}})
+	dir := t.TempDir()
+	out, err := Run(context.Background(), Options{Out: filepath.Join(dir, "s.json"), Access: quietAccess{}}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c := collectorRun(t, out, "breader"); c.Status != "ok" {
+		t.Errorf("breader = %+v, want ok", c)
+	}
+	if c := collectorRun(t, out, "cundeclared"); c.Status != "error" || !strings.Contains(c.Reason, "cundeclared reads undeclared fact firewall.backend") {
+		t.Errorf("cundeclared = %+v, want an error naming the undeclared fact", c)
+	}
+	f, err := os.Open(out.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	snap, err := facts.Load(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reg, _ := facts.LoadRegistry()
+	if r, _ := reg.Resolve(snap, "services.ssh.installed"); r.Envelope.Value != true {
+		t.Errorf("breader did not read afw's fact: %+v", r)
+	}
+}
+
 // collectorRun finds one collector's entry in the run header. The registry
 // always carries the built-in "muster" collector (R60), so a test that
 // registered one collector still sees more than one entry.

@@ -33,12 +33,16 @@
       "audit.status.lost",
       "cron.dirs",
       "cron.files",
+      "exposure.exposed",
       "files.etc_shadow.acl_entries",
       "files.etc_shadow.acl_present",
       "files.etc_sudoers.acl_present",
       "files.root_home.acl_present",
       "kernel.sysctl.bpf_jit_harden",
       "packages.verify.complete",
+      "processes.deleted_executables",
+      "processes.listeners",
+      "processes.unpackaged_listeners",
       "ssh.dsa_key_count",
       "ssh.root_key_count",
       "ssh.rsa_keys",
@@ -86,6 +90,9 @@
     "audit.log_file.mode": [
       "NOT in the nonroot row, and neither are audit.log_file.uid, audit.log_file.gid or the same three of audit.log_dir: on a non-root host with auditd installed every one of the eighteen audit.log_file.* and audit.log_dir.* leaves reads denied, because auditd.conf (0640 in the 0750 /etc/audit) cannot be read, so the path the leaves are about is unknown and the read's status is the answer for all of them (C3). The row's rule keeps every mode, uid and gid leaf out, since a stat of a fixed path needs no read permission (M-34); the row lists the other twelve."
     ],
+    "exposure.exposed": [
+      "In the nonroot row with the three processes.* keys it rests on: the owners of every listener are read through other accounts' /proc/<pid>/fd and exe links, so without root the join is denied and controls 1-3 read ERROR. Where it answers, it is unsupported on a host with no firewall binary (the firewall's own unsupported, which the evaluator reads as NOT_APPLICABLE, as U-28 does), and absent naming the cause when the firewall's normalisation is partial - an accept-policy input filter chain that carries rules (stock EL9's firewalld filter_INPUT; ufw beside another table's INPUT), input policies that differ across chains or families, a filter chain on the ingress or prerouting hook with rules, a truncated dump, or an nft ruleset that restricts nothing beside iptables-legacy rules; docker's FORWARD chains never enter confidence - which reads MANUAL."
+    ],
     "fim.aide.database_present": [
       "NOT in any row: whether an unprivileged run can see the AIDE database depends on the release, not on the capability - /var/lib/aide is readable on Ubuntu 22.04 and 0700 on EL9 and Ubuntu 24.04 - so the matrix does not assert it."
     ],
@@ -94,6 +101,12 @@
     ],
     "privilege.runtime_sockets": [
       "NOT in the nonroot row (V-35): whether a non-root run can read a runtime socket's attributes is the host's packages' choice, not the runner's capability. /run/podman is 0700, so a host that has it reads this key denied without root (the run cannot search the directory). Where it does not, every socket row answers in full without root: a socket's attributes are read through an O_PATH fd, which needs no permission on the socket itself (V-66). The non-root CI job asserts nothing about privilege.*."
+    ],
+    "processes.list": [
+      "NOT in the nonroot row: the process list stays ok without root. Every process is listed from its world-readable /proc/<pid>/status; a row whose exe link the run may not read (another account's process) carries exe_read_status denied and no package, so the denial is in the rows and not in the envelope."
+    ],
+    "processes.listeners": [
+      "In the nonroot row (another account's fd links are closed to the run). Inside an unprivileged container root lacks CAP_SYS_PTRACE and cannot readlink the exe or fd links of a process running under another uid, so the leaves read denied there too (W-43; measured in ubuntu:24.04, where one sleep run as nobody made processes.deleted_executables, processes.listeners and processes.unpackaged_listeners denied while that row of processes.list read exe_read_status denied). Inside a container that can read them (CI's --privileged --cgroupns=host init containers) the pid namespace may hide a socket's holder, so a socket no visible process holds is unmatched and processes.listeners and processes.unpackaged_listeners read absent naming the partial pid view (W-67) - MANUAL, never the kernel's, and not a partial run."
     ],
     "ssh.authorized_keys": [
       "NOT in the nonroot row (V-21): the inventory itself stays ok on a non-root run, with read_status denied on each row whose file it could not read (/root is 0700), so the denial is in the rows and not in the envelope. The three counts derived from it - ssh.root_key_count, ssh.dsa_key_count and ssh.rsa_keys - are denied there and are in the row."

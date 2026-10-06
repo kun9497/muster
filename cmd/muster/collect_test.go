@@ -2,9 +2,11 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -125,6 +127,78 @@ func TestCollectListActionsOnLinux(t *testing.T) {
 	}
 	if errb.Len() != 0 {
 		t.Errorf("stderr must stay empty, got %q", errb.String())
+	}
+	// The processes collector's rows, exhaustively: every read, the rpm
+	// query it shares with the walk and the firewall facts it reads.
+	var actions []struct{ Collector, Kind, Target, Needs string }
+	if err := json.Unmarshal(out.Bytes(), &actions); err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, a := range actions {
+		if a.Collector != "processes" {
+			continue
+		}
+		target := a.Target
+		if a.Kind == "command" && strings.HasPrefix(target, "/usr/bin/rpm -qa --qf ") && strings.Contains(target, `%|FILECAPS?{%{FILECAPS}}|`) {
+			target = "/usr/bin/rpm -qa --qf <the walk's file query>"
+		}
+		got = append(got, a.Kind+" "+a.Needs+" "+target)
+	}
+	want := []string{
+		"command none /usr/bin/rpm -qa --qf <the walk's file query>",
+		"fact none firewall.*",
+		"read none /bin", "read none /lib", "read none /lib32", "read none /lib64", "read none /libx32",
+		"read none /proc/1/ns/mnt", "read none /proc/[0-9]*/cmdline", "read none /proc/[0-9]*/exe",
+		"read none /proc/[0-9]*/fd/*", "read none /proc/[0-9]*/mountinfo", "read none /proc/[0-9]*/ns/mnt", "read none /proc/[0-9]*/root", "read none /proc/[0-9]*/task/*/fd/*", "read none /proc/[0-9]*/status",
+		"read none /proc/self/net/tcp", "read none /proc/self/net/tcp6", "read none /proc/self/net/udp", "read none /proc/self/net/udp6",
+		"read none /proc/sys/net/ipv6/bindv6only", "read none /proc/sys/net/ipv6/conf/*/disable_ipv6", "read none /proc/sys/net/ipv6/conf/all/disable_ipv6", "read none /proc/sys/net/ipv6/conf/default/disable_ipv6", "read none /sbin",
+		"read none /var/lib/dpkg/diversions", "read none /var/lib/dpkg/info/*.list", "read none /var/lib/dpkg/statoverride",
+		"read none /var/lib/dpkg/status", "read none /var/lib/rpm",
+	}
+	slices.Sort(got)
+	slices.Sort(want)
+	if !slices.Equal(got, want) {
+		t.Errorf("processes rows\n got %q\nwant %q", got, want)
+	}
+
+	// The sysctl collector's rows, exhaustively: the twelve kernel files of
+	// B-2, the twenty-seven network files of P-4 and the sysctl.d chain.
+	var gotSysctl []string
+	for _, a := range actions {
+		if a.Collector == "sysctl" {
+			gotSysctl = append(gotSysctl, a.Kind+" "+a.Needs+" "+a.Target)
+		}
+	}
+	wantSysctl := []string{
+		"read none /etc/sysctl.conf", "read none /etc/sysctl.d/*.conf", "read none /run/sysctl.d/*.conf",
+		"read none /usr/lib/sysctl.d/*.conf", "read none /usr/local/lib/sysctl.d/*.conf",
+		"read none /proc/sys/fs/protected_fifos", "read none /proc/sys/fs/protected_hardlinks",
+		"read none /proc/sys/fs/protected_regular", "read none /proc/sys/fs/protected_symlinks",
+		"read none /proc/sys/kernel/dmesg_restrict", "read none /proc/sys/kernel/kptr_restrict",
+		"read none /proc/sys/kernel/perf_event_paranoid", "read none /proc/sys/kernel/randomize_va_space",
+		"read none /proc/sys/kernel/sysrq", "read none /proc/sys/kernel/unprivileged_bpf_disabled",
+		"read none /proc/sys/kernel/yama/ptrace_scope", "read none /proc/sys/net/core/bpf_jit_harden",
+		"read none /proc/sys/net/ipv4/ip_forward",
+		"read none /proc/sys/net/ipv6/conf/all/forwarding", "read none /proc/sys/net/ipv6/conf/default/forwarding",
+		"read none /proc/sys/net/ipv4/conf/all/accept_redirects", "read none /proc/sys/net/ipv4/conf/default/accept_redirects",
+		"read none /proc/sys/net/ipv4/conf/all/secure_redirects", "read none /proc/sys/net/ipv4/conf/default/secure_redirects",
+		"read none /proc/sys/net/ipv4/conf/all/send_redirects", "read none /proc/sys/net/ipv4/conf/default/send_redirects",
+		"read none /proc/sys/net/ipv6/conf/all/accept_redirects", "read none /proc/sys/net/ipv6/conf/default/accept_redirects",
+		"read none /proc/sys/net/ipv4/conf/all/accept_source_route", "read none /proc/sys/net/ipv4/conf/default/accept_source_route",
+		"read none /proc/sys/net/ipv6/conf/all/accept_source_route", "read none /proc/sys/net/ipv6/conf/default/accept_source_route",
+		"read none /proc/sys/net/ipv4/conf/all/rp_filter", "read none /proc/sys/net/ipv4/conf/default/rp_filter",
+		"read none /proc/sys/net/ipv4/conf/all/log_martians", "read none /proc/sys/net/ipv4/conf/default/log_martians",
+		"read none /proc/sys/net/ipv4/icmp_echo_ignore_broadcasts", "read none /proc/sys/net/ipv4/icmp_ignore_bogus_error_responses",
+		"read none /proc/sys/net/ipv4/tcp_syncookies",
+		"read none /proc/sys/net/ipv6/conf/all/accept_ra", "read none /proc/sys/net/ipv6/conf/default/accept_ra",
+		"read none /proc/sys/net/ipv6/conf/all/disable_ipv6", "read none /proc/sys/net/ipv6/conf/default/disable_ipv6",
+		"read none /proc/sys/net/ipv6/conf/*/disable_ipv6", "read none /proc/sys/net/ipv6/bindv6only",
+	}
+	slices.Sort(gotSysctl)
+	slices.Sort(wantSysctl)
+	if !slices.Equal(gotSysctl, wantSysctl) {
+		t.Errorf("sysctl rows\n got %q\nwant %q", gotSysctl, wantSysctl)
 	}
 }
 

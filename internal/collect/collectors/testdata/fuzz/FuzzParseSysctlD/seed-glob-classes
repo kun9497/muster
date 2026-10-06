@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("net.ipv?.conf.[ad]*.forwarding = 0\nnet.ipv4.conf.[.rp_filter = 1\n-net.ipv4.conf.*.log_martians\n")

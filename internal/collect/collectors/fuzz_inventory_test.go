@@ -41,6 +41,8 @@ import (
 var fuzzTargets = []string{
 	"FuzzAptPeriodicUnattended",
 	"FuzzAttrValue",
+	"FuzzCapDump",
+	"FuzzClassifyRule",
 	"FuzzCountAptSecurity",
 	"FuzzCountDnfAdvisories",
 	"FuzzCronDailyRun",
@@ -53,6 +55,7 @@ var fuzzTargets = []string{
 	"FuzzExecFirstToken",
 	"FuzzFirstLine",
 	"FuzzFirstSettingLine",
+	"FuzzFoldChains",
 	"FuzzGrubPasswordSet",
 	"FuzzListsRoot",
 	"FuzzModuleStates",
@@ -69,6 +72,7 @@ var fuzzTargets = []string{
 	"FuzzParseAuditdConf",
 	"FuzzParseAuthorizedKeys",
 	"FuzzParseChronySources",
+	"FuzzParseCmdline",
 	"FuzzParseCoredumpConf",
 	"FuzzParseDaemonDump",
 	"FuzzParseDnfCheckUpdate",
@@ -76,6 +80,7 @@ var fuzzTargets = []string{
 	"FuzzParseDpkgStatus",
 	"FuzzParseDropin",
 	"FuzzParseExportsContent",
+	"FuzzParseFdLink",
 	"FuzzParseGroup",
 	"FuzzParseIptablesSave",
 	"FuzzParseKV",
@@ -92,10 +97,12 @@ var fuzzTargets = []string{
 	"FuzzParsePAMFile",
 	"FuzzParsePamListfiles",
 	"FuzzParsePasswd",
+	"FuzzParsePortSpec",
 	"FuzzParsePostfixInto",
 	"FuzzParsePostinstSetcap",
 	"FuzzParseProcModules",
 	"FuzzParseProcNet",
+	"FuzzParseProcStatus",
 	"FuzzParseProcSwaps",
 	"FuzzParseProftpd",
 	"FuzzParsePureFtpdInto",
@@ -116,7 +123,6 @@ var fuzzTargets = []string{
 	"FuzzParseVsftpdInto",
 	"FuzzParseXinetd",
 	"FuzzProftpdClosingName",
-	"FuzzRPMFileTable",
 	"FuzzReadInetd",
 	"FuzzSNMPParse",
 	"FuzzSNMPStripComment",
@@ -185,6 +191,10 @@ var notParsers = map[string]string{
 		"takes an action string that file has already split off a logical line; it " +
 		"re-emits the PREVIOUS line's selector, so it inherits file's per-facility " +
 		"amplification. FuzzParseRsyslogSelector fuzzes the action strings it is handed.",
+	"rpmFileTable": "a one-line wrapper over pkgindex.RPMFileTable, kept so the walk's tests " +
+		"read the table under the name they pin (W-34); the parser and its target, " +
+		"FuzzRPMFileTable, live in internal/pkgindex (W-37), and no target here reaches " +
+		"the wrapper because nothing in this package but the tests calls it.",
 }
 
 // stringParamNames are the parameter names that make a string parameter host

@@ -116,13 +116,18 @@ func runFirewall(ctx context.Context, a collect.Access, b *collect.Builder) erro
 
 	name, nameSrc := cfg.backend(cr)
 	b.Set("firewall.backend", collect.OK(name, nameSrc))
-	b.Set("firewall.raw_dumps", withTruncation(collect.OK(cr.dumps, cr.src), cr.truncated))
 
 	// Normalise the captured ruleset (Task 2). Parse EVERY base chain on an
 	// inbound-relevant hook (input/forward, plus the earlier ingress/prerouting
-	// filter chains, S2), across families, plus the inbound rules those chains
-	// carry (evidence).
-	bases, rules := normalizeRuleset(cr)
+	// filter chains, S2), across families, plus the rule table: every input
+	// filter base chain's rules with the user chains it reaches folded in
+	// (X-8). The confidence below reads the base chains only — the folded rows
+	// never change it (W-44).
+	bases, folded := normalizeRuleset(cr)
+	rules := make([]any, 0, len(folded))
+	for _, r := range folded {
+		rules = append(rules, r.record())
+	}
 	b.Set("firewall.rules", collect.OK(rules, cr.src))
 	// Categorise the base chains. Only a filter chain can restrict inbound: a
 	// nat INPUT base chain (created by any iptables-nft save/restore, some
@@ -149,6 +154,19 @@ func runFirewall(ctx context.Context, a collect.Access, b *collect.Builder) erro
 		}
 	}
 
+	// W-57: an nf_tables ruleset that restricts nothing proves nothing when
+	// the rules live in x_tables — iptables-legacy, common on Docker and
+	// Kubernetes hosts that also have nftables installed. In both cases that
+	// would read full + ok:false — no input base chain (X-9), or input chains
+	// that accept with zero rules (Debian's stock nftables.conf loaded beside
+	// a legacy ufw, R-2) — the declared iptables-save is read as a
+	// cross-check, and its dump joins the evidence (its truncation too, R-4).
+	legacy, legacyTruncated := false, false
+	if cr.tool == "nft" && !cr.truncated && !inboundPathHasRules && (len(inputs) == 0 || allAcceptNoRules(inputs)) {
+		legacy, legacyTruncated = crossCheckLegacy(ctx, a, &cr)
+	}
+	b.Set("firewall.raw_dumps", withTruncation(collect.OK(cr.dumps, cr.src), cr.truncated || legacyTruncated))
+
 	// Ruling H-16 — the `full`-confidence boundary. The v1 normaliser claims
 	// `full` ONLY in the two cases it can decide without modelling the rule
 	// engine, and deliberately UNDER-claims (partial → restricts_inbound
@@ -161,9 +179,12 @@ func runFirewall(ctx context.Context, a collect.Access, b *collect.Builder) erro
 	//     policy accept AND carries ZERO rules (no jump/goto/verdict lines) AND
 	//     no earlier inbound-path filter chain (ingress, or a raw/mangle
 	//     prerouting) carries rules (S2), so the ruleset demonstrably does
-	//     nothing inbound; also the readable-empty
-	//     backend `none` case (nothing hooks input, netfilter accepts by
-	//     default).
+	//     nothing inbound; also the case where no input base chain exists and
+	//     no earlier inbound-path chain carries rules, for EVERY backend name
+	//     (X-9): nothing hooks input and netfilter accepts by default, whether
+	//     nothing is configured (`none`) or a backend is configured but
+	//     inactive — ufw disabled, firewalld stopped with its tables flushed,
+	//     an nftables service with an empty ruleset.
 	//   - EVERYTHING ELSE → partial → restricts_inbound absent: an accept-policy
 	//     chain that CARRIES rules (firewalld's filter_INPUT policy accept +
 	//     terminal reject, or classic RHEL `:INPUT ACCEPT` + `-A INPUT -j
@@ -180,33 +201,37 @@ func runFirewall(ctx context.Context, a collect.Access, b *collect.Builder) erro
 		// H-22: a partial ruleset can never yield a confident answer.
 		confidence = "partial"
 		restricts = collect.Absent("firewall confidence partial: a captured dump was truncated; see firewall.raw_dumps")
-	case len(inputs) == 0 && name == "none" && !inboundPathHasRules:
+	case len(inputs) == 0 && !inboundPathHasRules && legacy:
+		confidence = "partial"
+		restricts = collect.Absent("nft ruleset empty but iptables-legacy carries rules; see firewall.raw_dumps")
+	case len(inputs) == 0 && !inboundPathHasRules:
 		confidence = "full"
 		restricts = collect.OK(false, cr.src)
+		if name != "none" {
+			restricts.Reason = "no input base chain and no inbound rule: nothing restricts inbound"
+		}
 	case len(inputs) == 0:
 		confidence = "partial"
 		restricts = collect.Absent("firewall confidence partial: ruleset not normalisable; no input base chain found; see firewall.raw_dumps")
 	default:
-		allDeny, allAcceptNoRules := true, true
+		allDeny := true
 		for _, c := range inputs {
 			if !(c.policy == "drop" || c.policy == "reject") {
 				allDeny = false
-			}
-			if !(c.policy == "accept" && !c.hasRules) {
-				allAcceptNoRules = false
 			}
 		}
 		// S2: any filter chain on an earlier inbound hook (ingress or a
 		// raw/mangle prerouting) that carries rules means the ruleset is not
 		// demonstrably inert inbound — never a confident ok:false here.
-		if inboundPathHasRules {
-			allAcceptNoRules = false
-		}
+		acceptNoRules := allAcceptNoRules(inputs) && !inboundPathHasRules
 		switch {
 		case allDeny:
 			confidence = "full"
 			restricts = collect.OK(true, cr.src)
-		case allAcceptNoRules:
+		case acceptNoRules && legacy:
+			confidence = "partial"
+			restricts = collect.Absent("nft input chains accept with no rule but iptables-legacy carries rules; see firewall.raw_dumps")
+		case acceptNoRules:
 			confidence = "full"
 			restricts = collect.OK(false, cr.src)
 		default:
@@ -228,50 +253,131 @@ func runFirewall(ctx context.Context, a collect.Access, b *collect.Builder) erro
 	return nil
 }
 
-// baseChain is one parsed base chain (a chain that attaches to a netfilter
-// hook and therefore carries a default policy): its hook
-// (input/forward/ingress/prerouting), the family it lives in, its chain type
-// (filter/nat/route — only a filter chain can restrict, N1), its default
-// policy (drop/reject/accept, or "" when the dump omitted the policy line) and
-// whether it carries any rules.
-type baseChain struct {
-	hook      string
-	family    string
-	chainType string
-	policy    string
-	hasRules  bool
-}
-
 // normalizeRuleset parses the captured dumps into the base chains and the
-// inbound rules (evidence). nft answers with a single ruleset dump; the
+// folded inbound rule table. nft answers with a single ruleset dump; the
 // iptables path answers with a v4 and (optionally) a v6 dump, each parsed with
-// its family. Rule order follows the dump order, which is deterministic.
-func normalizeRuleset(cr capture) ([]baseChain, []any) {
+// its family. Every chain of every dump is kept (keyed by family, table and
+// name, W-33) so foldChains can follow an input base chain's jumps; rule order
+// follows the dump order, which is deterministic.
+func normalizeRuleset(cr capture) ([]baseChain, []fwRule) {
 	bases := []baseChain{}
-	rules := []any{}
+	byChain := map[chainKey][]fwRule{}
 	for _, d := range cr.dumps {
 		rec, ok := d.(map[string]any)
 		if !ok {
 			continue
 		}
 		content, _ := rec["content"].(string)
+		var b []baseChain
+		var by map[chainKey][]fwRule
 		if cr.tool == "nft" {
-			b, r := parseNftRuleset(content)
-			bases = append(bases, b...)
-			rules = append(rules, r...)
+			b, by = parseNftRuleset(content)
+		} else {
+			// The dump's source is the command line (commandString): the v6
+			// dump comes from ip6tables-save, the only source carrying "ip6".
+			family := "v4"
+			if src, _ := rec["source"].(string); strings.Contains(src, "ip6") {
+				family = "v6"
+			}
+			b, by = parseIptablesSave(family, content)
+		}
+		bases = append(bases, b...)
+		for k, rules := range by {
+			byChain[k] = append(byChain[k], rules...)
+		}
+	}
+	return bases, foldChains(bases, byChain)
+}
+
+// inputBaseFamilies reads firewall.raw_dumps back into the families (v4, v6,
+// inet) that hold an input filter base chain, the way normalizeRuleset parsed
+// them: a base chain with no rule leaves no row in firewall.rules, so the rows
+// alone cannot tell an empty drop chain from no chain at all (spec P-3's
+// no_chain_in_family). When nft answered, only its dump is read — the legacy
+// iptables-save a cross-check appended never joined the base chains.
+func inputBaseFamilies(dumps []any) map[string]bool {
+	cr := capture{tool: "iptables"}
+	nftSrc := collect.Output{}.Source(nftListRulesetCmd).Cmd
+	for _, d := range dumps {
+		if rec, ok := d.(map[string]any); ok && rec["source"] == nftSrc {
+			cr.tool = "nft"
+		}
+	}
+	for _, d := range dumps {
+		rec, ok := d.(map[string]any)
+		if !ok || (cr.tool == "nft" && rec["source"] != nftSrc) {
 			continue
 		}
-		// The dump's source is the command line (commandString): the v6 dump
-		// comes from ip6tables-save, the only source carrying "ip6".
-		family := "v4"
-		if src, _ := rec["source"].(string); strings.Contains(src, "ip6") {
-			family = "v6"
-		}
-		b, r := parseIptablesSave(family, content)
-		bases = append(bases, b...)
-		rules = append(rules, r...)
+		cr.dumps = append(cr.dumps, rec)
 	}
-	return bases, rules
+	bases, _ := normalizeRuleset(cr)
+	out := map[string]bool{}
+	for _, bc := range bases {
+		if bc.hook == "input" && bc.chainType == "filter" {
+			out[bc.family] = true
+		}
+	}
+	return out
+}
+
+// crossCheckLegacy runs the declared iptables-save after an empty nft read,
+// appends its dump to the capture's evidence and reports whether x_tables
+// restricts inbound there (W-57), and whether that dump was truncated (R-4).
+// A failed read reports false: the nft answer stands.
+//
+// iptables-nft prints its "iptables-legacy tables present" warning on
+// stderr (the leading # keeps a 2>&1 pipe into iptables-restore harmless),
+// so the warning is looked for in both streams, and the stderr the command
+// printed rides in the record as stderr so the evidence shows the cause.
+func crossCheckLegacy(ctx context.Context, a collect.Access, cr *capture) (restricts, truncated bool) {
+	out := a.Run(ctx, iptablesSaveCmd)
+	if !cmdOK(out) {
+		return false, false
+	}
+	rec := dumpRecord(out.Source(iptablesSaveCmd).Cmd, out)
+	stderr := ""
+	if len(out.Stderr) > 0 {
+		stderr, _ = capDump(out.Stderr)
+		rec["stderr"] = stderr
+	}
+	cr.dumps = append(cr.dumps, rec)
+	content, _ := rec["content"].(string)
+	truncated = rec["truncated"] == true
+	return truncated || legacyWarning(stderr) || iptablesLegacyRestricts(content), truncated
+}
+
+// legacyWarning reports iptables-nft's notice that x_tables holds legacy
+// tables it does not read.
+func legacyWarning(text string) bool {
+	return strings.Contains(text, "tables-legacy tables present")
+}
+
+// allAcceptNoRules reports input chains that all have policy accept and carry
+// no rule (and that there is at least one).
+func allAcceptNoRules(inputs []baseChain) bool {
+	for _, c := range inputs {
+		if c.policy != "accept" || c.hasRules {
+			return false
+		}
+	}
+	return len(inputs) > 0
+}
+
+// iptablesLegacyRestricts reports whether an iptables-save dump read beside an
+// empty nf_tables ruleset holds an inbound restriction: a filter INPUT with a
+// policy other than ACCEPT or any rule, or iptables-nft's warning that legacy
+// tables are present (which it prints instead of reading them).
+func iptablesLegacyRestricts(content string) bool {
+	if legacyWarning(content) {
+		return true
+	}
+	bases, _ := parseIptablesSave("v4", content)
+	for _, bc := range bases {
+		if bc.hook == "input" && (bc.policy != "accept" || bc.hasRules) {
+			return true
+		}
+	}
+	return false
 }
 
 // runtimePolicy is the runtime side of a default_policy setting: the common
@@ -298,13 +404,18 @@ func runtimePolicy(cr capture, chains []baseChain) facts.Envelope {
 // stack, so a table's sets/maps/nested blocks never confuse the chain and
 // table boundaries. It returns every base chain on an inbound-relevant hook
 // (input/forward, plus ingress/prerouting so S2's earlier-hook filters are
-// seen) and the rules the input chains carry. Continuation lines of a wrapped
-// anonymous set are rejoined first (N2) so a wrapped rule is one record.
-func parseNftRuleset(content string) ([]baseChain, []any) {
+// seen) and the rules of every chain of every ip, ip6 and inet table, keyed by
+// family, table and name (W-33). A bridge, arp or netdev table never joins the
+// input chains (W-4): its input/forward chains are not base chains here and
+// its rules are not kept, though its ingress/prerouting filter chains still
+// count for S2. Continuation lines of a wrapped anonymous set are rejoined
+// first (N2) so a wrapped rule is one row.
+func parseNftRuleset(content string) ([]baseChain, map[chainKey][]fwRule) {
 	bases := []baseChain{}
-	rules := []any{}
+	byChain := map[chainKey][]fwRule{}
 	var stack []string // block kind per open brace: "table", "chain" or "other"
-	curFamily, curChain := "", ""
+	curFamily, curTable := "", ""
+	foreign := false // the current table is bridge/arp/netdev
 	var cur baseChain
 	isBase := false // the current chain hooks an inbound-relevant point
 	for _, line := range joinWrappedNftLines(splitLines([]byte(content))) {
@@ -322,7 +433,7 @@ func parseNftRuleset(content string) ([]baseChain, []any) {
 					}
 					isBase = false
 				case "table":
-					curFamily = ""
+					curFamily, curTable, foreign = "", "", false
 				}
 			}
 			continue
@@ -335,20 +446,33 @@ func parseNftRuleset(content string) ([]baseChain, []any) {
 		if len(f) == 0 {
 			continue
 		}
-		if len(f) > 0 && line[len(line)-1] == '{' {
+		if line[len(line)-1] == '{' {
 			switch {
 			case len(stack) == 0 && f[0] == "table":
-				if len(f) >= 2 {
-					curFamily = f[1]
+				// `table <family> <name> {`; nft defaults the family to ip.
+				family, name := "ip", ""
+				switch {
+				case len(f) >= 4:
+					family, name = f[1], f[2]
+				case len(f) == 3:
+					name = f[1]
 				}
+				curFamily, foreign = nftFamily(family)
+				curTable = name
 				stack = append(stack, "table")
-			case len(stack) == 1 && f[0] == "chain":
-				curChain = ""
+			case len(stack) == 1 && stack[0] == "table" && f[0] == "chain":
+				name := ""
 				if len(f) >= 2 {
-					curChain = f[1]
+					name = f[1]
 				}
-				cur = baseChain{family: curFamily}
+				cur = baseChain{name: name, table: curTable, family: curFamily}
 				isBase = false
+				if !foreign {
+					k := chainKey{curFamily, curTable, name}
+					if _, ok := byChain[k]; !ok {
+						byChain[k] = []fwRule{}
+					}
+				}
 				stack = append(stack, "chain")
 			default:
 				stack = append(stack, "other")
@@ -366,10 +490,12 @@ func parseNftRuleset(content string) ([]baseChain, []any) {
 			}
 			switch hook {
 			case "input", "forward":
-				isBase = true
-				cur.hook = hook
-				cur.chainType = ctype
-				cur.policy = nftPolicy(f)
+				if !foreign {
+					isBase = true
+					cur.hook = hook
+					cur.chainType = ctype
+					cur.policy = nftPolicy(f)
+				}
 			case "ingress", "prerouting":
 				// S2: an ingress or prerouting chain counts only when it is a
 				// filter chain; a type nat prerouting (Docker's DNAT) is not an
@@ -383,14 +509,39 @@ func parseNftRuleset(content string) ([]baseChain, []any) {
 			}
 			continue
 		}
+		// A chain-level `comment "…"` line (nft ≥ 0.9.7) is no rule (M-4).
+		if nftCommentOnly(f) {
+			continue
+		}
 		if isBase {
 			cur.hasRules = true
-			if cur.hook == "input" {
-				rules = append(rules, parseNftRule(curChain, f))
-			}
+		}
+		if !foreign {
+			r := parseNftRule(cur.name, f)
+			r.Family = curFamily
+			r.Raw = capRaw(line)
+			k := chainKey{curFamily, curTable, cur.name}
+			byChain[k] = append(byChain[k], r)
 		}
 	}
-	return bases, rules
+	return bases, byChain
+}
+
+// nftFamily maps an nft table family to a row family (W-4): ip → v4, ip6 →
+// v6, inet → inet. foreign is true for the bridge, arp and netdev families,
+// whose chains never join the input chains; any other word is kept as written.
+func nftFamily(family string) (string, bool) {
+	switch family {
+	case "ip":
+		return "v4", false
+	case "ip6":
+		return "v6", false
+	case "inet":
+		return "inet", false
+	case "bridge", "arp", "netdev":
+		return family, true
+	}
+	return family, false
 }
 
 // joinWrappedNftLines rejoins the continuation lines `nft list ruleset` emits
@@ -427,20 +578,6 @@ func joinWrappedNftLines(raw []string) []string {
 	return out
 }
 
-// braceDelta is the number of '{' minus the number of '}' in s.
-func braceDelta(s string) int {
-	d := 0
-	for i := 0; i < len(s); i++ {
-		switch s[i] {
-		case '{':
-			d++
-		case '}':
-			d--
-		}
-	}
-	return d
-}
-
 // nftHook returns the token following "hook" in a base-chain type line.
 func nftHook(f []string) string {
 	for i := 0; i < len(f)-1; i++ {
@@ -462,65 +599,19 @@ func nftPolicy(f []string) string {
 	return ""
 }
 
-// parseNftRule turns one nft rule line into an evidence record. It captures
-// only what is cheap and unambiguous — the L4 protocol, the destination port
-// (a string, since nft ports may be ranges or sets), the source address and
-// the terminal verdict — and leaves the rest to firewall.raw_dumps.
-func parseNftRule(chain string, f []string) map[string]any {
-	rec := map[string]any{"chain": chain, "proto": "", "dport": "", "saddr": "", "action": ""}
-	for i := 0; i < len(f); i++ {
-		switch f[i] {
-		case "tcp", "udp":
-			rec["proto"] = f[i]
-		case "dport":
-			rec["dport"] = nftPortSpec(f, i+1)
-		case "saddr":
-			if i+1 < len(f) {
-				rec["saddr"] = f[i+1]
-			}
-		case "accept", "drop", "reject", "return", "continue", "queue":
-			rec["action"] = f[i]
-		case "jump", "goto":
-			if i+1 < len(f) {
-				rec["action"] = f[i] + " " + f[i+1]
-			} else {
-				rec["action"] = f[i]
-			}
-		}
-	}
-	return rec
-}
-
-// nftPortSpec reads a destination-port operand starting at index i: a single
-// token, or a "{ ... }" set gathered until the closing brace.
-func nftPortSpec(f []string, i int) string {
-	if i >= len(f) {
-		return ""
-	}
-	if f[i] != "{" {
-		return f[i]
-	}
-	var parts []string
-	for ; i < len(f); i++ {
-		parts = append(parts, f[i])
-		if strings.Contains(f[i], "}") {
-			break
-		}
-	}
-	return strings.Join(parts, " ")
-}
-
 // parseIptablesSave parses one iptables-save / ip6tables-save dump. The
 // `*filter` table's INPUT and FORWARD hooks are the base chains with a default
 // policy; their `:CHAIN POLICY` line gives the policy and their `-A CHAIN`
-// lines both mark the chain as carrying rules and (for INPUT) become evidence.
-// A `-A PREROUTING`/`-A INPUT` line under the `*raw` or `*mangle` tables is an
-// earlier inbound-path rule (anti-spoof, blocklists): S2 records it as a
-// filter chain on the prerouting hook carrying rules so it blocks the
-// confident ok:false path, without giving it a policy of its own.
-func parseIptablesSave(family, content string) ([]baseChain, []any) {
+// lines mark the chain as carrying rules. Every chain of every table is kept
+// — declared by its `:CHAIN` line, filled by its `-A CHAIN` lines — keyed by
+// family, table and name (W-33), so the fold can follow INPUT's jumps into
+// the user chains. A `-A PREROUTING`/`-A INPUT` line under the `*raw` or
+// `*mangle` tables is an earlier inbound-path rule (anti-spoof, blocklists):
+// S2 records it as a filter chain on the prerouting hook carrying rules so it
+// blocks the confident ok:false path, without giving it a policy of its own.
+func parseIptablesSave(family, content string) ([]baseChain, map[chainKey][]fwRule) {
 	bases := []baseChain{}
-	rules := []any{}
+	byChain := map[chainKey][]fwRule{}
 	table := ""
 	for _, raw := range splitLines([]byte(content)) {
 		line := trimSpaceASCII(raw)
@@ -532,41 +623,48 @@ func parseIptablesSave(family, content string) ([]baseChain, []any) {
 			table = line[1:]
 		case line == "COMMIT":
 			table = ""
-		case line[0] == ':' && table == "filter":
+		case line[0] == ':' && table != "":
+			f := strings.Fields(line)
+			if len(f) < 1 || f[0] == ":" {
+				continue
+			}
+			name := strings.TrimPrefix(f[0], ":")
+			if k := (chainKey{family, table, name}); byChain[k] == nil {
+				byChain[k] = []fwRule{}
+			}
+			if table != "filter" || len(f) < 2 {
+				continue
+			}
+			if hook := iptablesHook(name); hook != "" {
+				bases = append(bases, baseChain{name: name, table: table, hook: hook, family: family, chainType: "filter", policy: strings.ToLower(f[1])})
+			}
+		case strings.HasPrefix(line, "-A ") && table != "":
 			f := strings.Fields(line)
 			if len(f) < 2 {
 				continue
 			}
-			hook := iptablesHook(strings.TrimPrefix(f[0], ":"))
-			if hook != "" {
-				bases = append(bases, baseChain{hook: hook, family: family, chainType: "filter", policy: strings.ToLower(f[1])})
-			}
-		case strings.HasPrefix(line, "-A ") && table == "filter":
-			f := strings.Fields(line)
-			if len(f) < 2 {
-				continue
-			}
-			hook := iptablesHook(f[1])
-			if hook == "" {
-				continue
-			}
-			for j := range bases {
-				if bases[j].hook == hook && bases[j].family == family {
-					bases[j].hasRules = true
+			r := parseIptablesRule(f[1], f)
+			r.Family = family
+			r.Raw = capRaw(line)
+			k := chainKey{family, table, f[1]}
+			byChain[k] = append(byChain[k], r)
+			switch table {
+			case "filter":
+				if hook := iptablesHook(f[1]); hook != "" {
+					for j := range bases {
+						if bases[j].hook == hook && bases[j].family == family {
+							bases[j].hasRules = true
+						}
+					}
+				}
+			case "raw", "mangle":
+				if f[1] == "PREROUTING" || f[1] == "INPUT" {
+					bases = append(bases, baseChain{name: f[1], table: table, hook: "prerouting", family: family, chainType: "filter", hasRules: true})
 				}
 			}
-			if hook == "input" {
-				rules = append(rules, parseIptablesRule(f[1], f))
-			}
-		case strings.HasPrefix(line, "-A ") && (table == "raw" || table == "mangle"):
-			f := strings.Fields(line)
-			if len(f) < 2 || (f[1] != "PREROUTING" && f[1] != "INPUT") {
-				continue
-			}
-			bases = append(bases, baseChain{hook: "prerouting", family: family, chainType: "filter", hasRules: true})
 		}
 	}
-	return bases, rules
+	return bases, byChain
 }
 
 // iptablesHook maps a built-in chain name to the hook it attaches to; "" for a
@@ -580,25 +678,6 @@ func iptablesHook(chain string) string {
 	default:
 		return ""
 	}
-}
-
-// parseIptablesRule turns one `-A` line into an evidence record, reading the
-// protocol, destination port, source and jump target.
-func parseIptablesRule(chain string, f []string) map[string]any {
-	rec := map[string]any{"chain": chain, "proto": "", "dport": "", "saddr": "", "action": ""}
-	for i := 0; i < len(f)-1; i++ {
-		switch f[i] {
-		case "-p":
-			rec["proto"] = f[i+1]
-		case "--dport":
-			rec["dport"] = f[i+1]
-		case "-s":
-			rec["saddr"] = f[i+1]
-		case "-j":
-			rec["action"] = strings.ToLower(f[i+1])
-		}
-	}
-	return rec
 }
 
 // envp returns a pointer to a copy of e, for the Setting side fields.
@@ -625,17 +704,21 @@ func cmdReason(what string, out collect.Output) string {
 // a rune boundary and marking it truncated when the content was cut here or
 // the exec layer already truncated the capture (H-22).
 func dumpRecord(source string, out collect.Output) map[string]any {
-	content := out.Stdout
-	truncated := out.Truncated
-	if len(content) > rawDumpCap {
-		cut := rawDumpCap
-		for cut > 0 && !utf8.RuneStart(content[cut]) {
-			cut--
-		}
-		content = content[:cut]
-		truncated = true
+	content, cut := capDump(out.Stdout)
+	return map[string]any{"source": source, "content": content, "truncated": out.Truncated || cut}
+}
+
+// capDump is a dump's text capped at rawDumpCap on a rune boundary, and
+// whether the cap cut it.
+func capDump(b []byte) (string, bool) {
+	if len(b) <= rawDumpCap {
+		return string(b), false
 	}
-	return map[string]any{"source": source, "content": string(content), "truncated": truncated}
+	cut := rawDumpCap
+	for cut > 0 && !utf8.RuneStart(b[cut]) {
+		cut--
+	}
+	return string(b[:cut]), true
 }
 
 // captureRuleset runs `nft list ruleset`; on any failure it falls back to

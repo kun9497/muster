@@ -1,8 +1,8 @@
-muster be82b78 · controls kisa-unix-2026+2026.09.29 · guide kisa-unix-2026 · host github-runner · collected 2026-09-30T04:21:24Z
-automatic  high 20/14/1  medium 13/10/0  low 3/4/0  (pass/fail/warn)
-manual review 15  ·  undecidable error 0 / n-a 24 / waived 0  ·  facts failed 0  ·  waivers expiring within 30d 0
-KISA 2026 (68 controls): pass 28 fail 12 warn 1 manual 11 n/a 16 error 0 waived 0
-beyond the guide (36 controls): pass 8 fail 16 warn 0 manual 4 n/a 8 error 0 waived 0
+muster 17b0d96 · controls kisa-unix-2026+2026.10.02 · guide kisa-unix-2026 · host github-runner · collected 2026-10-06T09:31:44Z
+automatic  high 21/15/1  medium 17/17/0  low 4/4/0  (pass/fail/warn)
+manual review 14  ·  undecidable error 0 / n-a 24 / waived 0  ·  facts failed 0  ·  waivers expiring within 30d 0
+KISA 2026 (68 controls): pass 28 fail 13 warn 1 manual 10 n/a 16 error 0 waived 0
+beyond the guide (49 controls): pass 14 fail 23 warn 0 manual 4 n/a 8 error 0 waived 0
 
 FAIL           high   muster.account.cron_permissions                    cron 설정 파일이 0640 이하로 …
     reason: clause does not hold: cron.files each require mode in [0 32 128 160 256 288 384 416]
@@ -59,8 +59,11 @@ FAIL           high   muster.file.hosts_permissions                      /etc/ho
     files.etc_hosts.mode = 420  (/etc/hosts)
 PASS           high   muster.file.inetd_conf_permissions                 inetd/xinetd 설정이 root 소유…
     reason: absent counts as pass: no mechanism applies to this host
-MANUAL         high   muster.file.ip_port_restriction                    접속 IP 및 포트가 제한되어 있다
-    reason: absent needs review: firewall.restricts_inbound is absent on this host
+FAIL           high   muster.file.ip_port_restriction                    접속 IP 및 포트가 제한되어 있다
+    reason: clause does not hold: firewall.restricts_inbound eq true
+    firewall.backend = ufw  (/etc/ufw/ufw.conf)
+    files.etc_hosts_deny_all = false  (/etc/hosts.deny)
+    firewall.restricts_inbound = false  (/usr/sbin/nft list ruleset)
 PASS           high   muster.file.passwd_permissions                     /etc/passwd 가 root 소유이고 …
 MANUAL         high   muster.file.rhosts_forbidden                       .rhosts 나 hosts.equiv 가 무조…
     reason: absent needs review: files.user_rhosts is absent on this host
@@ -107,17 +110,17 @@ FAIL           high   muster.file.syslog_conf_permissions                syslog 
 PASS           high   muster.file.unowned_files                          모든 파일과 디렉터리의 소유자…
 WARN           high   muster.file.world_writable                         예상치 못한 world-writable 파…
     reason: clause does not hold: walk.world_writable each require package_declared eq true
-    walk.world_writable = 545 elements; 522 selected; failing: file:/opt, file:/opt/actionarchivecache, file:/opt/actionarchivecache/actions_cache, file:/opt/actionarchivecache/actions_cache/0057852bfaa89a56745cba8c7296529d2fc…  (/var/lib/dpkg/info)
+    walk.world_writable = 544 elements; 521 selected; failing: file:/opt, file:/opt/actionarchivecache, file:/opt/actionarchivecache/actions_cache, file:/opt/actionarchivecache/actions_cache/0057852bfaa89a56745cba8c7296529d2fc…  (/var/lib/dpkg/info)
     file:/opt: expected true, actual false (fail)
     file:/opt/actionarchivecache: expected true, actual false (fail)
     file:/opt/actionarchivecache/actions_cache: expected true, actual false (fail)
     file:/opt/actionarchivecache/actions_cache/0057852bfaa89a56745cba8c7296529d2fc39830.tar.gz: expected true, actual false (fail)
     file:/opt/actionarchivecache/actions_cache/0400d5f644dc74513175e3cd8d07132dd4860809.tar.gz: expected true, actual false (fail)
-    (+517 more, use --all)
+    (+516 more, use --all)
 WARN           high   muster.patch.security_updates                      캐시된 패키지 메타데이터에 대…
     reason: clause does not hold: patch.metadata_age_s lte 604800
     patch.manager = apt  (/var/lib/dpkg/status)
-    patch.metadata_age_s = 802023  (/var/lib/apt/periodic/update-success-stamp)
+    patch.metadata_age_s = 734252  (/var/lib/apt/periodic/update-success-stamp)
     patch.pending_security_count = 0  (/usr/bin/apt-get -s upgrade -o Debug::NoLocking=1)
 PASS           high   muster.service.automount_disabled                  automount 서비스가 활성화되어 …
 NOT_APPLICABLE high   muster.service.dns_version                         네임서버가 벤더가 패치한 수준…
@@ -230,6 +233,7 @@ FAIL           high   muster.beyond.container_runtime_access             root �
     privilege.runtime_sockets = 4 elements; none matching
     privilege.runtime_group_members = 1 elements; matching: user:runner
     user:runner: expected not not_in [], actual runner (fail)
+PASS           high   muster.beyond.exposed_listeners_allowed            호스트 밖에서 패킷이 도달할 수…
 PASS           high   muster.beyond.file_capabilities_declared           파일 capability 를 가진 모든 …
 PASS           high   muster.beyond.ld_so_preload_empty                  /etc/ld.so.preload 에는 의도적…
 FAIL           high   muster.beyond.package_files_unmodified             패키지로 설치된 모든 파일이 패…
@@ -288,8 +292,48 @@ FAIL           medium muster.beyond.file_integrity_tool                  파일 
     reason: clause does not hold: fim.tool ne none
     env.container = none  (/proc/1/comm)
     fim.tool = none
+FAIL           medium muster.beyond.icmp_redirects_ignored               호스트는 IPv4 ICMP 리다이렉트…
+    reason: clause does not hold: net.sysctl.ipv4_default_accept_redirects eq 0
+    env.container = none  (/proc/1/comm)
+    net.sysctl.ipv4_all_accept_redirects@effective = 0  (/proc/sys/net/ipv4/conf/all/accept_redirects)
+    net.sysctl.ipv4_default_accept_redirects@effective = 1  (/proc/sys/net/ipv4/conf/default/accept_redirects)
+    net.sysctl.ipv4_all_secure_redirects@effective = 1  (/proc/sys/net/ipv4/conf/all/secure_redirects)
+    net.sysctl.ipv4_default_secure_redirects@effective = 1  (/proc/sys/net/ipv4/conf/default/secure_redirects)
+    net.sysctl.ipv4_all_send_redirects@effective = 1  (/proc/sys/net/ipv4/conf/all/send_redirects)
+    net.sysctl.ipv4_default_send_redirects@effective = 1  (/proc/sys/net/ipv4/conf/default/send_redirects)
+FAIL           medium muster.beyond.ip_forwarding_disabled               호스트는 의도한 경우가 아니면 …
+    reason: clause does not hold: net.sysctl.ipv4_ip_forward in [0]
+    env.container = none  (/proc/1/comm)
+    net.sysctl.ipv4_ip_forward@effective = 1  (/proc/sys/net/ipv4/ip_forward)
+PASS           medium muster.beyond.ipv6_forwarding_disabled             호스트는 의도한 경우가 아니면 …
+FAIL           medium muster.beyond.ipv6_redirects_ignored               호스트는 IPv6 ICMP 리다이렉트…
+    reason: clause does not hold: net.sysctl.ipv6_all_accept_redirects eq 0
+    env.container = none  (/proc/1/comm)
+    net.sysctl.ipv6_disabled = 0
+    net.sysctl.ipv6_all_accept_redirects@effective = 1  (/proc/sys/net/ipv6/conf/all/accept_redirects)
+    net.sysctl.ipv6_default_accept_redirects@effective = 1  (/proc/sys/net/ipv6/conf/default/accept_redirects)
+FAIL           medium muster.beyond.ipv6_router_advertisements_ignored   호스트는 의도한 경우가 아니면 …
+    reason: clause does not hold: net.sysctl.ipv6_all_accept_ra in [0]
+    env.container = none  (/proc/1/comm)
+    net.sysctl.ipv6_disabled = 0
+    net.sysctl.ipv6_all_accept_ra@effective = 1  (/proc/sys/net/ipv6/conf/all/accept_ra)
+    net.sysctl.ipv6_default_accept_ra@effective = 1  (/proc/sys/net/ipv6/conf/default/accept_ra)
+PASS           medium muster.beyond.ipv6_source_routing_rejected         호스트는 소스 라우팅된 IPv6 패…
 PASS           medium muster.beyond.kernel_pointer_exposure              커널이 포인터와 메시지 버퍼를 …
+PASS           medium muster.beyond.listeners_packaged                   수신 소켓을 제공하는 모든 프로…
+FAIL           medium muster.beyond.no_deleted_executables               시작된 뒤 삭제되거나 교체된 파…
+    reason: clause does not hold: processes.deleted_executables none where pid gte 0
+    env.container = none  (/proc/1/comm)
+    processes.deleted_executables = 1 elements; matching: item:2085  (/proc)
+    item:2085: expected not gte 0, actual 2085 (fail)
 PASS           medium muster.beyond.ptrace_restriction                   한 프로세스가 자신이 띄우지 않…
+FAIL           medium muster.beyond.reverse_path_filtering               호스트는 들어온 인터페이스로 …
+    reason: clause does not hold: net.sysctl.ipv4_all_log_martians eq 1
+    env.container = none  (/proc/1/comm)
+    net.sysctl.ipv4_all_rp_filter@effective = 2  (/proc/sys/net/ipv4/conf/all/rp_filter)
+    net.sysctl.ipv4_default_rp_filter@effective = 2  (/proc/sys/net/ipv4/conf/default/rp_filter)
+    net.sysctl.ipv4_all_log_martians@effective = 0  (/proc/sys/net/ipv4/conf/all/log_martians)
+    net.sysctl.ipv4_default_log_martians@effective = 0  (/proc/sys/net/ipv4/conf/default/log_martians)
 MANUAL         medium muster.beyond.root_authorized_keys                 sshd 가 root 로그인을 허용하는…
     reason: absent needs review: ssh.root_key_count is absent on this host
 FAIL           medium muster.beyond.secure_boot_enabled                  UEFI 보안 부팅이 적용되고 있다
@@ -307,6 +351,11 @@ WARN           medium muster.beyond.separate_partitions                  사용�
     mount:/var/tmp: expected true, actual false (fail)
     mount:/var/log: expected true, actual false (fail)
     (+1 more, use --all)
+FAIL           medium muster.beyond.source_routing_rejected              호스트는 소스 라우팅된 IPv4 패…
+    reason: clause does not hold: net.sysctl.ipv4_default_accept_source_route eq 0
+    env.container = none  (/proc/1/comm)
+    net.sysctl.ipv4_all_accept_source_route@effective = 0  (/proc/sys/net/ipv4/conf/all/accept_source_route)
+    net.sysctl.ipv4_default_accept_source_route@effective = 1  (/proc/sys/net/ipv4/conf/default/accept_source_route)
 MANUAL         medium muster.beyond.ssh_key_quality                      어떤 authorized_keys 파일에도 …
     reason: absent needs review: ssh.dsa_key_count is absent on this host
 PASS           medium muster.beyond.sudo_logging                         sudo 가 실행하는 모든 명령을 s…
@@ -316,6 +365,7 @@ FAIL           medium muster.beyond.suid_dumpable_disabled               권한�
     coredump.suid_dumpable@effective = 2  (/proc/sys/fs/suid_dumpable)
 NOT_APPLICABLE medium muster.beyond.swap_encrypted                       모든 스왑 장치가 암호화되어 있…
     reason: [unsupported_env] swap.encrypted: /dev/root is not a block device this kernel lists under /sys/block, so there is nothing to decide encryption from
+PASS           medium muster.beyond.syn_cookies_enabled                  호스트는 SYN 플러드에 SYN 쿠키…
 FAIL           medium muster.beyond.sysrq_restricted                     매직 SysRq 키가 비활성화되어 …
     reason: clause does not hold: kernel.sysctl.sysrq in [0]
     env.container = none  (/proc/1/comm)
@@ -333,6 +383,7 @@ NOT_APPLICABLE medium muster.beyond.var_tmp_mount_options                /var/tm
     reason: no mechanism applies to this host
 NOT_APPLICABLE low    muster.beyond.home_mount_options                   /home 이 nodev 와 nosuid 로 마…
     reason: no mechanism applies to this host
+PASS           low    muster.beyond.icmp_broadcast_and_bogus_ignored     호스트는 브로드캐스트 ICMP ech…
 FAIL           low    muster.beyond.remote_log_forwarding                로그 메시지가 기록되는 즉시 다…
     reason: clause does not hold: logging.rsyslog.forwards_remote eq true
     env.container = none  (/proc/1/comm)

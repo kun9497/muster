@@ -1,0 +1,85 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none",
+        "source": {
+          "kind": "file",
+          "path": "/proc/1/cgroup"
+        }
+      }
+    },
+    "net": {
+      "sysctl": {
+        "ipv4_icmp_echo_ignore_broadcasts": {
+          "runtime": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/icmp_echo_ignore_broadcasts"
+            }
+          },
+          "persisted": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "file",
+              "path": "/etc/sysctl.d/60-network-hardening.conf",
+              "line": 1,
+              "raw": "net.ipv4.icmp_echo_ignore_broadcasts = 0"
+            }
+          },
+          "effective": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/icmp_echo_ignore_broadcasts"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/icmp_echo_ignore_broadcasts"
+          }
+        },
+        "ipv4_icmp_ignore_bogus_error_responses": {
+          "runtime": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/icmp_ignore_bogus_error_responses"
+            }
+          },
+          "persisted": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "file",
+              "path": "/etc/sysctl.d/60-network-hardening.conf",
+              "line": 2,
+              "raw": "net.ipv4.icmp_ignore_bogus_error_responses = 0"
+            }
+          },
+          "effective": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/icmp_ignore_bogus_error_responses"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/icmp_ignore_bogus_error_responses"
+          }
+        }
+      }
+    }
+  }
+}

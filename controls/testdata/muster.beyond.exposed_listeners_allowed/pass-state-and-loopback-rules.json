@@ -1,0 +1,146 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none",
+        "source": {
+          "kind": "file",
+          "path": "/proc/1/cgroup"
+        }
+      }
+    },
+    "exposure": {
+      "exposed": {
+        "status": "ok",
+        "value": [],
+        "source": {
+          "kind": "derived"
+        }
+      },
+      "listeners": {
+        "status": "ok",
+        "value": [
+          {
+            "service": "tcp/5432",
+            "proto": "tcp",
+            "family": "v4",
+            "addr": "0.0.0.0",
+            "port": 5432,
+            "link_local": false,
+            "owner_status": "ok",
+            "owners": [
+              {
+                "pid": 990,
+                "uid": 114,
+                "name": "postgres",
+                "exe": "/usr/lib/postgresql/14/bin/postgres",
+                "exe_deleted": false,
+                "mnt_ns": "host",
+                "package": "postgresql-14",
+                "package_status": "packaged"
+              }
+            ],
+            "owners_count": 1,
+            "exposed": false,
+            "via": "filtered",
+            "rule_chain": "",
+            "rule_source": "",
+            "rule_raw": ""
+          }
+        ],
+        "source": {
+          "kind": "derived"
+        }
+      },
+      "opaque_rules": {
+        "status": "ok",
+        "value": [],
+        "source": {
+          "kind": "derived"
+        }
+      },
+      "stats": {
+        "status": "ok",
+        "value": {
+          "confidence": "full",
+          "manual_reason": "",
+          "listeners": 1,
+          "exposed": 0,
+          "filtered": 1,
+          "loopback": 2,
+          "link_local": 0,
+          "kernel_owned": 0,
+          "opaque_rules": 0,
+          "folded_rules": 3,
+          "ipv6_disabled": false
+        },
+        "source": {
+          "kind": "derived"
+        }
+      }
+    },
+    "firewall": {
+      "rules": {
+        "status": "ok",
+        "value": [
+          {
+            "chain": "input",
+            "via_chain": "input",
+            "table": "filter",
+            "depth": 0,
+            "family": "inet",
+            "proto": "",
+            "dport": "",
+            "saddr": "",
+            "daddr": "",
+            "iif": "lo",
+            "ctstate": "",
+            "action": "accept",
+            "unmodelled": false,
+            "raw": "iif \"lo\" accept"
+          },
+          {
+            "chain": "input",
+            "via_chain": "input",
+            "table": "filter",
+            "depth": 0,
+            "family": "inet",
+            "proto": "",
+            "dport": "",
+            "saddr": "",
+            "daddr": "",
+            "iif": "",
+            "ctstate": "established,related",
+            "action": "accept",
+            "unmodelled": false,
+            "raw": "ct state established,related accept"
+          },
+          {
+            "chain": "input",
+            "via_chain": "input",
+            "table": "filter",
+            "depth": 0,
+            "family": "inet",
+            "proto": "tcp",
+            "dport": "22",
+            "saddr": "",
+            "daddr": "",
+            "iif": "",
+            "ctstate": "",
+            "action": "accept",
+            "unmodelled": false,
+            "raw": "tcp dport 22 accept"
+          }
+        ],
+        "source": {
+          "kind": "command",
+          "cmd": "nft list ruleset"
+        }
+      }
+    }
+  }
+}

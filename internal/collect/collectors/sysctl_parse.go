@@ -20,8 +20,8 @@ import (
 // safe to review.
 type sysctlKey struct{ key, path string }
 
-// sysctlLeaves are the twelve kernel self-protection sysctls of spec B-2, in
-// the spec's order. Adding one is a registry change and a control change;
+// sysctlLeaves are the twelve kernel self-protection sysctls of spec B-2 and
+// the twenty-six network settings of spec P-4, each in its spec's order. Adding one is a registry change and a control change;
 // this table alone is not the contract.
 var sysctlLeaves = []struct {
 	leaf string // the registered fact key
@@ -39,7 +39,50 @@ var sysctlLeaves = []struct {
 	{"kernel.sysctl.protected_hardlinks", sysctlKey{"fs.protected_hardlinks", "/proc/sys/fs/protected_hardlinks"}},
 	{"kernel.sysctl.protected_fifos", sysctlKey{"fs.protected_fifos", "/proc/sys/fs/protected_fifos"}},
 	{"kernel.sysctl.protected_regular", sysctlKey{"fs.protected_regular", "/proc/sys/fs/protected_regular"}},
+
+	// The network sysctls of spec P-4, in its order. ipv6_bindv6only is not
+	// here: it is an int evidence key, not a setting, and runSysctl writes it
+	// apart (W-39).
+	{"net.sysctl.ipv4_ip_forward", sysctlKey{"net.ipv4.ip_forward", "/proc/sys/net/ipv4/ip_forward"}},
+	{"net.sysctl.ipv6_all_forwarding", sysctlKey{"net.ipv6.conf.all.forwarding", "/proc/sys/net/ipv6/conf/all/forwarding"}},
+	{"net.sysctl.ipv6_default_forwarding", sysctlKey{"net.ipv6.conf.default.forwarding", "/proc/sys/net/ipv6/conf/default/forwarding"}},
+	{"net.sysctl.ipv4_all_accept_redirects", sysctlKey{"net.ipv4.conf.all.accept_redirects", "/proc/sys/net/ipv4/conf/all/accept_redirects"}},
+	{"net.sysctl.ipv4_default_accept_redirects", sysctlKey{"net.ipv4.conf.default.accept_redirects", "/proc/sys/net/ipv4/conf/default/accept_redirects"}},
+	{"net.sysctl.ipv4_all_secure_redirects", sysctlKey{"net.ipv4.conf.all.secure_redirects", "/proc/sys/net/ipv4/conf/all/secure_redirects"}},
+	{"net.sysctl.ipv4_default_secure_redirects", sysctlKey{"net.ipv4.conf.default.secure_redirects", "/proc/sys/net/ipv4/conf/default/secure_redirects"}},
+	{"net.sysctl.ipv4_all_send_redirects", sysctlKey{"net.ipv4.conf.all.send_redirects", "/proc/sys/net/ipv4/conf/all/send_redirects"}},
+	{"net.sysctl.ipv4_default_send_redirects", sysctlKey{"net.ipv4.conf.default.send_redirects", "/proc/sys/net/ipv4/conf/default/send_redirects"}},
+	{"net.sysctl.ipv6_all_accept_redirects", sysctlKey{"net.ipv6.conf.all.accept_redirects", "/proc/sys/net/ipv6/conf/all/accept_redirects"}},
+	{"net.sysctl.ipv6_default_accept_redirects", sysctlKey{"net.ipv6.conf.default.accept_redirects", "/proc/sys/net/ipv6/conf/default/accept_redirects"}},
+	{"net.sysctl.ipv4_all_accept_source_route", sysctlKey{"net.ipv4.conf.all.accept_source_route", "/proc/sys/net/ipv4/conf/all/accept_source_route"}},
+	{"net.sysctl.ipv4_default_accept_source_route", sysctlKey{"net.ipv4.conf.default.accept_source_route", "/proc/sys/net/ipv4/conf/default/accept_source_route"}},
+	{"net.sysctl.ipv6_all_accept_source_route", sysctlKey{"net.ipv6.conf.all.accept_source_route", "/proc/sys/net/ipv6/conf/all/accept_source_route"}},
+	{"net.sysctl.ipv6_default_accept_source_route", sysctlKey{"net.ipv6.conf.default.accept_source_route", "/proc/sys/net/ipv6/conf/default/accept_source_route"}},
+	{"net.sysctl.ipv4_all_rp_filter", sysctlKey{"net.ipv4.conf.all.rp_filter", "/proc/sys/net/ipv4/conf/all/rp_filter"}},
+	{"net.sysctl.ipv4_default_rp_filter", sysctlKey{"net.ipv4.conf.default.rp_filter", "/proc/sys/net/ipv4/conf/default/rp_filter"}},
+	{"net.sysctl.ipv4_all_log_martians", sysctlKey{"net.ipv4.conf.all.log_martians", "/proc/sys/net/ipv4/conf/all/log_martians"}},
+	{"net.sysctl.ipv4_default_log_martians", sysctlKey{"net.ipv4.conf.default.log_martians", "/proc/sys/net/ipv4/conf/default/log_martians"}},
+	{"net.sysctl.ipv4_icmp_echo_ignore_broadcasts", sysctlKey{"net.ipv4.icmp_echo_ignore_broadcasts", "/proc/sys/net/ipv4/icmp_echo_ignore_broadcasts"}},
+	{"net.sysctl.ipv4_icmp_ignore_bogus_error_responses", sysctlKey{"net.ipv4.icmp_ignore_bogus_error_responses", "/proc/sys/net/ipv4/icmp_ignore_bogus_error_responses"}},
+	{"net.sysctl.ipv4_tcp_syncookies", sysctlKey{"net.ipv4.tcp_syncookies", "/proc/sys/net/ipv4/tcp_syncookies"}},
+	{"net.sysctl.ipv6_all_accept_ra", sysctlKey{"net.ipv6.conf.all.accept_ra", "/proc/sys/net/ipv6/conf/all/accept_ra"}},
+	{"net.sysctl.ipv6_default_accept_ra", sysctlKey{"net.ipv6.conf.default.accept_ra", "/proc/sys/net/ipv6/conf/default/accept_ra"}},
+	{"net.sysctl.ipv6_all_disable_ipv6", sysctlKey{"net.ipv6.conf.all.disable_ipv6", "/proc/sys/net/ipv6/conf/all/disable_ipv6"}},
+	{"net.sysctl.ipv6_default_disable_ipv6", sysctlKey{"net.ipv6.conf.default.disable_ipv6", "/proc/sys/net/ipv6/conf/default/disable_ipv6"}},
 }
+
+// sysctlBindV6Only is net.ipv6.bindv6only, the evidence key of spec P-4: the
+// processes collector reads it to know whether a "::" socket also accepts
+// IPv4 (P-3). It is a plain int, so it is not a sysctlLeaves row (W-39).
+const (
+	sysctlBindV6OnlyLeaf = "net.sysctl.ipv6_bindv6only"
+	sysctlBindV6OnlyPath = "/proc/sys/net/ipv6/bindv6only"
+)
+
+// sysctlIPv6Prefix is the /proc/sys directory a kernel without IPv6 does not
+// have (the ipv6.disable=1 boot parameter, or IPv6 not built): a missing file
+// under it says that, not merely that one knob is unknown (spec P-4).
+const sysctlIPv6Prefix = "/proc/sys/net/ipv6/"
 
 // The persisted half of a sysctl: sysctl.d(5)'s four directories in
 // DESCENDING precedence — a base name in an earlier one masks the same name
@@ -77,10 +120,18 @@ func sysctlPersistedReads() []string {
 // records the "-" prefix, which tells systemd-sysctl not to complain when
 // the kernel has no such knob; the assignment itself still applies, so it is
 // evidence rather than a filter.
+//
+// glob marks a key with a glob character in it ("net.ipv4.conf.*.rp_filter
+// = 2"): systemd-sysctl applies it to every variable it matches that no line
+// names explicitly. exclude marks a "-key" line with no "=" at all
+// ("-net.ipv4.conf.all.rp_filter"): it assigns nothing and keeps the globs
+// off that key (sysctl.d(5); systemd's own 50-default.conf ships both).
 type sysctlAssign struct {
 	key           string
 	value         string
 	ignoreMissing bool
+	glob          bool
+	exclude       bool
 	line          int
 	raw           string
 }
@@ -191,22 +242,123 @@ func sysctlFiles(a collect.Access) sysctlScan {
 	return s
 }
 
-// mergeSysctl reduces the chain to one winner per variable: the files are
-// already in application order, so the last assignment seen wins.
-func mergeSysctl(files []sysctlFile) map[string]sysctlWinner {
-	out := map[string]sysctlWinner{}
+// sysctlEntry is one line that survived the merge: a value, or an exclusion.
+type sysctlEntry struct {
+	sysctlWinner
+	pattern string // the key as written; a glob for a glob entry
+	exclude bool
+}
+
+// sysctlWinners is the merged chain: the last line naming each key exactly,
+// and the glob lines in the order they apply.
+type sysctlWinners struct {
+	exact map[string]sysctlEntry
+	globs []sysctlEntry
+}
+
+// mergeSysctl reduces the chain the way systemd-sysctl does. The files are
+// already in application order, and a later line for the same key - an
+// assignment or a "-key" exclusion - replaces the earlier one, so the last
+// line naming a key exactly is the one that counts. Glob lines are kept in
+// the order they apply. A later line with the same pattern follows
+// systemd's parse_file: when its value and its exclusion flag equal the
+// entry already there, that entry stays where it is (and keeps citing its
+// own line); only a different line replaces it and moves to the end.
+func mergeSysctl(files []sysctlFile) sysctlWinners {
+	w := sysctlWinners{exact: map[string]sysctlEntry{}}
 	for _, f := range files {
 		for _, as := range f.assigns {
-			out[as.key] = sysctlWinner{value: as.value, file: f.path, line: as.line, raw: as.raw}
+			e := sysctlEntry{
+				sysctlWinner: sysctlWinner{value: as.value, file: f.path, line: as.line, raw: as.raw},
+				pattern:      as.key,
+				exclude:      as.exclude,
+			}
+			if !as.glob {
+				w.exact[as.key] = e
+				continue
+			}
+			i := slices.IndexFunc(w.globs, func(g sysctlEntry) bool { return g.pattern == as.key })
+			if i >= 0 {
+				if old := w.globs[i]; old.value == e.value && old.exclude == e.exclude {
+					continue
+				}
+				w.globs = slices.Delete(w.globs, i, i+1)
+			}
+			w.globs = append(w.globs, e)
 		}
 	}
-	return out
+	return w
+}
+
+// lookup is the persisted value of one concrete variable. A line naming the
+// key exactly beats every glob WHATEVER the file order - systemd-sysctl
+// skips a glob for any key the chain names explicitly - and when that line
+// is a "-key" exclusion nothing is assigned at all. Otherwise the last glob
+// that matches it and assigns a value wins.
+func (w sysctlWinners) lookup(key string) (sysctlWinner, bool) {
+	if e, ok := w.exact[key]; ok {
+		if e.exclude {
+			return sysctlWinner{}, false
+		}
+		return e.sysctlWinner, true
+	}
+	for i := len(w.globs) - 1; i >= 0; i-- {
+		g := w.globs[i]
+		if !g.exclude && sysctlGlobMatch(g.pattern, key) {
+			return g.sysctlWinner, true
+		}
+	}
+	return sysctlWinner{}, false
+}
+
+// sysctlGlobMatch matches a dotted glob key against a dotted variable one
+// component at a time: systemd-sysctl expands the glob as a /proc/sys path,
+// so "*" stands for one directory and never crosses a ".". glob(3) negates a
+// class with "[!...]", which path.Match spells "[^...]".
+func sysctlGlobMatch(pattern, key string) bool {
+	pp := strings.Split(pattern, ".")
+	kp := strings.Split(key, ".")
+	if len(pp) != len(kp) {
+		return false
+	}
+	for i := range pp {
+		if ok, err := path.Match(globNegation(pp[i]), kp[i]); err != nil || !ok {
+			return false
+		}
+	}
+	return true
+}
+
+// globNegation rewrites the "[!" that opens a bracket class to path.Match's
+// "[^". A "[!" inside a class, or after a backslash, is left alone.
+func globNegation(p string) string {
+	if !strings.Contains(p, "[!") {
+		return p
+	}
+	b := []byte(p)
+	inClass := false
+	for i := 0; i < len(b); i++ {
+		switch {
+		case !inClass && b[i] == '\\':
+			i++
+		case !inClass && b[i] == '[':
+			inClass = true
+			if i+1 < len(b) && b[i+1] == '!' {
+				b[i+1] = '^'
+				i++
+			}
+		case inClass && b[i] == ']':
+			inClass = false
+		}
+	}
+	return string(b)
 }
 
 // parseSysctlD reads one sysctl.d file. Blank lines and lines whose first
-// non-space character is "#" or ";" are comments; a line with no "=" is not
-// an assignment; a leading "-" is the ignore-if-missing prefix; and the key
-// may be spelled with slashes.
+// non-space character is "#" or ";" are comments; a leading "-" is the
+// ignore-if-missing prefix; a "-key" line with no "=" excludes that key from
+// the globs, and any other line with no "=" is not an assignment; a key with
+// a glob character in it is a glob; and the key may be spelled with slashes.
 func parseSysctlD(data []byte) []sysctlAssign {
 	var out []sysctlAssign
 	for i, raw := range splitLines(data) {
@@ -219,7 +371,7 @@ func parseSysctlD(data []byte) []sysctlAssign {
 			line = strings.TrimSpace(line[1:])
 		}
 		k, v, ok := strings.Cut(line, "=")
-		if !ok {
+		if !ok && !ignore {
 			continue
 		}
 		k = normalizeSysctlName(strings.TrimSpace(k))
@@ -230,6 +382,8 @@ func parseSysctlD(data []byte) []sysctlAssign {
 			key:           k,
 			value:         strings.TrimSpace(v),
 			ignoreMissing: ignore,
+			glob:          strings.ContainsAny(k, "*?["),
+			exclude:       !ok,
 			line:          i + 1,
 			raw:           sourceRaw(raw),
 		})

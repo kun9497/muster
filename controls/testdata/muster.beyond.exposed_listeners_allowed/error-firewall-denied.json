@@ -1,0 +1,27 @@
+{
+  "synthetic": true,
+  "_expect": {
+    "reason_code": "permission_denied",
+    "exit_code": 2
+  },
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none",
+        "source": {
+          "kind": "file",
+          "path": "/proc/1/cgroup"
+        }
+      }
+    },
+    "exposure": {
+      "exposed": {
+        "status": "denied",
+        "reason": "firewall.normalization_confidence: reading the kernel firewall ruleset requires root: nft list ruleset: Operation not permitted (you must be root)"
+      }
+    }
+  }
+}

@@ -120,6 +120,19 @@ func TestCheckEndToEndWaiversTurnFailIntoWaived(t *testing.T) {
 		"muster.beyond.container_runtime_access":            "PASS",
 		"muster.beyond.root_authorized_keys":                "PASS",
 		"muster.beyond.ssh_key_quality":                     "PASS",
+		"muster.beyond.exposed_listeners_allowed":           "PASS",
+		"muster.beyond.listeners_packaged":                  "PASS",
+		"muster.beyond.no_deleted_executables":              "PASS",
+		"muster.beyond.ip_forwarding_disabled":              "PASS",
+		"muster.beyond.ipv6_forwarding_disabled":            "PASS",
+		"muster.beyond.icmp_redirects_ignored":              "PASS",
+		"muster.beyond.ipv6_redirects_ignored":              "PASS",
+		"muster.beyond.source_routing_rejected":             "PASS",
+		"muster.beyond.ipv6_source_routing_rejected":        "PASS",
+		"muster.beyond.reverse_path_filtering":              "PASS",
+		"muster.beyond.icmp_broadcast_and_bogus_ignored":    "PASS",
+		"muster.beyond.syn_cookies_enabled":                 "PASS",
+		"muster.beyond.ipv6_router_advertisements_ignored":  "PASS",
 		"muster.account.root_remote_login":                  "WAIVED",
 		"muster.account.password_policy":                    "PASS",
 		"muster.file.passwd_permissions":                    "PASS",
@@ -553,7 +566,7 @@ func TestCheckEndToEndJSONAndTable(t *testing.T) {
 	if _, declared := params["muster.service.telnet_disabled"]; declared {
 		t.Errorf("only controls that declare params belong in check.params: %v", params)
 	}
-	// R26: full-pass.json must produce exactly the one hundred and four embedded
+	// R26: full-pass.json must produce exactly the one hundred and seventeen embedded
 	// controls' documented statuses, not merely "some PASS rows appear
 	// somewhere in the output".
 	assertStatuses(t, out1.Bytes(), map[string]string{
@@ -593,6 +606,19 @@ func TestCheckEndToEndJSONAndTable(t *testing.T) {
 		"muster.beyond.container_runtime_access":            "PASS",
 		"muster.beyond.root_authorized_keys":                "NOT_APPLICABLE",
 		"muster.beyond.ssh_key_quality":                     "PASS",
+		"muster.beyond.exposed_listeners_allowed":           "PASS",
+		"muster.beyond.listeners_packaged":                  "PASS",
+		"muster.beyond.no_deleted_executables":              "PASS",
+		"muster.beyond.ip_forwarding_disabled":              "PASS",
+		"muster.beyond.ipv6_forwarding_disabled":            "PASS",
+		"muster.beyond.icmp_redirects_ignored":              "PASS",
+		"muster.beyond.ipv6_redirects_ignored":              "PASS",
+		"muster.beyond.source_routing_rejected":             "PASS",
+		"muster.beyond.ipv6_source_routing_rejected":        "PASS",
+		"muster.beyond.reverse_path_filtering":              "PASS",
+		"muster.beyond.icmp_broadcast_and_bogus_ignored":    "PASS",
+		"muster.beyond.syn_cookies_enabled":                 "PASS",
+		"muster.beyond.ipv6_router_advertisements_ignored":  "PASS",
 		"muster.account.root_remote_login":                  "PASS",
 		"muster.account.password_policy":                    "PASS",
 		"muster.file.passwd_permissions":                    "PASS",
@@ -675,7 +701,7 @@ func TestCheckEndToEndJSONAndTable(t *testing.T) {
 	// R26: full-fail.json flips root_remote_login and the nine 2G
 	// *_disabled services to FAIL, and its PermitRootLogin yes opens
 	// root_authorized_keys' gate (NOT_APPLICABLE on full-pass.json, PASS
-	// here); the other ninety-three controls are unchanged from
+	// here); the other one hundred and six controls are unchanged from
 	// full-pass.json.
 	var failJSON bytes.Buffer
 	if code := run([]string{"check", "--facts", "testdata/full-fail.json", "--format", "json"}, &failJSON, &errb); code != exitFindings {
@@ -718,6 +744,19 @@ func TestCheckEndToEndJSONAndTable(t *testing.T) {
 		"muster.beyond.container_runtime_access":            "PASS",
 		"muster.beyond.root_authorized_keys":                "PASS",
 		"muster.beyond.ssh_key_quality":                     "PASS",
+		"muster.beyond.exposed_listeners_allowed":           "PASS",
+		"muster.beyond.listeners_packaged":                  "PASS",
+		"muster.beyond.no_deleted_executables":              "PASS",
+		"muster.beyond.ip_forwarding_disabled":              "PASS",
+		"muster.beyond.ipv6_forwarding_disabled":            "PASS",
+		"muster.beyond.icmp_redirects_ignored":              "PASS",
+		"muster.beyond.ipv6_redirects_ignored":              "PASS",
+		"muster.beyond.source_routing_rejected":             "PASS",
+		"muster.beyond.ipv6_source_routing_rejected":        "PASS",
+		"muster.beyond.reverse_path_filtering":              "PASS",
+		"muster.beyond.icmp_broadcast_and_bogus_ignored":    "PASS",
+		"muster.beyond.syn_cookies_enabled":                 "PASS",
+		"muster.beyond.ipv6_router_advertisements_ignored":  "PASS",
 		"muster.account.root_remote_login":                  "FAIL",
 		"muster.account.password_policy":                    "PASS",
 		"muster.file.passwd_permissions":                    "PASS",

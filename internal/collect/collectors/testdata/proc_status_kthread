@@ -1,0 +1,18 @@
+Name:	kworker/0:1-events
+Umask:	0000
+State:	I (idle)
+Tgid:	31
+Ngid:	0
+Pid:	31
+PPid:	2
+TracerPid:	0
+Uid:	0	0	0	0
+Gid:	0	0	0	0
+FDSize:	64
+Groups:	
+NStgid:	31
+NSpid:	31
+NSpgid:	0
+NSsid:	0
+Kthread:	1
+Threads:	1

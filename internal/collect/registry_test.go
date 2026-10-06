@@ -947,6 +947,34 @@ func TestGuardReadlinkIsARead(t *testing.T) {
 	}
 }
 
+// W-32: one "fact" row per declared fact glob, with the collector's Needs,
+// sorted with its own rows ("command" < "fact" < "read").
+func TestListActionsRendersTheFactRows(t *testing.T) {
+	Reset()
+	defer Reset()
+	Register(Collector{Name: "procs", Declare: Declaration{
+		Reads:    []string{"/proc/[0-9]*/status"},
+		Commands: []Command{{Path: "/usr/bin/rpm", Args: []string{"-qa"}}},
+		Facts:    []string{"sockets.*", "firewall.*"},
+		Needs:    "root",
+	}, Run: noopRun})
+	var got []Action
+	for _, a := range ListActions() {
+		if a.Collector == "procs" {
+			got = append(got, a)
+		}
+	}
+	want := []Action{
+		{Collector: "procs", Kind: "command", Target: "/usr/bin/rpm -qa", Needs: "root"},
+		{Collector: "procs", Kind: "fact", Target: "firewall.*", Needs: "root"},
+		{Collector: "procs", Kind: "fact", Target: "sockets.*", Needs: "root"},
+		{Collector: "procs", Kind: "read", Target: "/proc/[0-9]*/status", Needs: "root"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("rows\n got %+v\nwant %+v", got, want)
+	}
+}
+
 // §9: a collector that declares the walk contributes exactly one "walk" row
 // to --list-actions, with the fixed target sentence, sorted among its reads
 // by the existing (collector, kind, target) order.

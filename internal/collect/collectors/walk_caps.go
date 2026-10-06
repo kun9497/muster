@@ -202,9 +202,9 @@ func applyRPMCaps(r *walkResult, table map[string]rpmFile) {
 		if !ok {
 			continue
 		}
-		row["package"] = f.pkg
-		row["package_declared"] = declaresCaps(row, f.caps)
-		row["declared_caps"] = f.caps
+		row["package"] = f.Pkg
+		row["package_declared"] = declaresCaps(row, f.Caps)
+		row["declared_caps"] = f.Caps
 		row["reference"] = refRPMDB
 		row["reason"] = rootIDReason(row)
 	}
@@ -246,7 +246,7 @@ func (j *dpkgJoin) applyDpkgCaps(r *walkResult) {
 	cache := map[string]read{}
 	for _, row := range r.lists.capabilities {
 		p := rowField(row, "path")
-		pkg, owned := j.idx.owner[p]
+		pkg, owned := j.idx.Owner[p]
 		if !owned {
 			continue
 		}
@@ -254,7 +254,7 @@ func (j *dpkgJoin) applyDpkgCaps(r *walkResult) {
 		row["package_declared"] = false
 		row["declared_caps"] = ""
 		row["reference"] = refPostinst
-		lf := j.idx.listFile[p]
+		lf := j.idx.ListFile[p]
 		rd, seen := cache[lf]
 		if !seen {
 			rd.caps, rd.err = j.readPostinst(lf)
@@ -291,7 +291,7 @@ func (j *dpkgJoin) applyDpkgCaps(r *walkResult) {
 // names the path says what the package did declare. unresolved reports
 // whether the script had a setcap call muster could not read.
 func (j *dpkgJoin) postinstDecides(row map[string]any, p string, calls []postinstCap) (declared bool, text string, unresolved bool) {
-	shipped := j.idx.listPath[p]
+	shipped := j.idx.ListPath[p]
 	named := false
 	for _, c := range calls {
 		if c.Unresolved {

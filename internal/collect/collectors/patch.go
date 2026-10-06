@@ -14,6 +14,7 @@ import (
 
 	"github.com/kun9497/muster/internal/collect"
 	"github.com/kun9497/muster/internal/facts"
+	"github.com/kun9497/muster/internal/pkgindex"
 )
 
 // The patch collector answers "is this host patched" from CACHED package
@@ -31,7 +32,7 @@ import (
 // "dnf is not installed on this Ubuntu host" as an error would make
 // `run.complete` false on a perfectly healthy host.
 const (
-	dpkgStatusPath = "/var/lib/dpkg/status"
+	dpkgStatusPath = pkgindex.DpkgStatusPath
 	dpkgLogPath    = "/var/log/dpkg.log"
 
 	aptListsDir     = "/var/lib/apt/lists"
@@ -59,7 +60,7 @@ const (
 	// database is a DIRECTORY - the read primitive refuses a non-regular
 	// file outright, so it may only ever be stat-ed, never read.
 	dnfConfPath = "/etc/dnf/dnf.conf"
-	rpmDBDir    = "/var/lib/rpm"
+	rpmDBDir    = pkgindex.RPMDBDir
 )
 
 // patchReadLimit caps the package database and the dpkg log, both of which
@@ -682,41 +683,14 @@ func dpkgPackages(a collect.Access) facts.Envelope {
 // parseDpkgStatus reads the RFC-822-style stanzas of /var/lib/dpkg/status.
 // Only a package whose Status is "install ok installed" is installed: a
 // package that was removed but not purged keeps a stanza with its
-// configuration files and would otherwise be reported as present.
+// configuration files and would otherwise be reported as present. The
+// stanzas are read by pkgindex.ParseDpkgStatus, the one parser of the file,
+// which the package index takes the installed versions from as well.
 func parseDpkgStatus(data []byte) []any {
 	recs := []any{}
-	var name, version, arch, status string
-	flush := func() {
-		if name != "" && status == "install ok installed" {
-			recs = append(recs, map[string]any{"name": name, "version": version, "arch": arch})
-		}
-		name, version, arch, status = "", "", "", ""
+	for _, p := range pkgindex.ParseDpkgStatus(data) {
+		recs = append(recs, map[string]any{"name": p.Name, "version": p.Version, "arch": p.Arch})
 	}
-	for _, line := range splitLines(data) {
-		if strings.TrimSpace(line) == "" {
-			flush()
-			continue
-		}
-		if line[0] == ' ' || line[0] == '\t' {
-			continue // a folded continuation of the previous field
-		}
-		k, v, ok := strings.Cut(line, ":")
-		if !ok {
-			continue
-		}
-		v = strings.TrimSpace(v)
-		switch k {
-		case "Package":
-			name = v
-		case "Version":
-			version = v
-		case "Architecture":
-			arch = v
-		case "Status":
-			status = v
-		}
-	}
-	flush()
 	sortPackageRecords(recs)
 	return recs
 }

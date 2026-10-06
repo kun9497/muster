@@ -117,6 +117,15 @@ jobs:
                 | gsub("\\b192\\.168\\.\\d{1,3}\\.(?<d>\\d{1,3})\\b"; "198.51.100." + .d);
               def scrubstr: if type == "string" then rfc1918 else . end;
               def scrubfield(name): if (.[name] | type) == "string" then .[name] |= rfc1918 else . end;
+              # The addr of a listener row is the address of the socket itself:
+              # loopback and the wildcards stay, anything else becomes the
+              # documentation address of its family (the sockets list and the
+              # three 3C-2b listener lists). No apostrophe may appear in this
+              # jq program: the shell holds it in single quotes.
+              def scrubaddr:
+                if (.addr | type) == "string" and (.addr | test("^(127\\.|::1$|0\\.0\\.0\\.0$|::$)") | not)
+                then .addr = (if (.addr | test(":")) then "2001:db8::1" else "192.0.2.1" end)
+                else . end;
               .run.host.hostname = $host
               | .run.host.boot_id = ""
               | .run.host.kernel = ""
@@ -128,9 +137,20 @@ jobs:
                   else . end)
                 else . end
               | if (.facts.firewall.raw_dumps.value | type) == "array"
-                then .facts.firewall.raw_dumps.value |= map(scrubfield("content")) else . end
+                then .facts.firewall.raw_dumps.value |= map(scrubfield("content") | scrubfield("stderr")) else . end
               | if (.facts.firewall.rules.value | type) == "array"
-                then .facts.firewall.rules.value |= map(scrubfield("saddr")) else . end
+                then .facts.firewall.rules.value |= map(scrubfield("saddr") | scrubfield("daddr") | scrubfield("raw")) else . end
+              # 3C-2b: the listener rows of the process collector and the exposure
+              # join carry the address of the socket and, on an exposed row, the
+              # source and text of the matching rule; the opaque rules carry their text.
+              | if (.facts.processes.listeners.value | type) == "array"
+                then .facts.processes.listeners.value |= map(scrubaddr) else . end
+              | if (.facts.exposure.listeners.value | type) == "array"
+                then .facts.exposure.listeners.value |= map(scrubaddr | scrubfield("rule_source") | scrubfield("rule_raw")) else . end
+              | if (.facts.exposure.exposed.value | type) == "array"
+                then .facts.exposure.exposed.value |= map(scrubaddr | scrubfield("rule_source") | scrubfield("rule_raw")) else . end
+              | if (.facts.exposure.opaque_rules.value | type) == "array"
+                then .facts.exposure.opaque_rules.value |= map(scrubfield("raw")) else . end
               | if (.facts.files.etc_hosts_allow_lines.value | type) == "array"
                 then .facts.files.etc_hosts_allow_lines.value |= map(scrubstr) else . end
               | if (.facts.files.etc_hosts_deny_lines.value | type) == "array"
@@ -156,7 +176,8 @@ jobs:
               and .run.host.boot_id == ""
               and .run.host.kernel == ""
               and .run.host.uptime_s == 0
-              and ([.facts.sockets.listening.value // [] | .[]
+              and ([(.facts.sockets.listening.value // []), (.facts.processes.listeners.value // []),
+                    (.facts.exposure.listeners.value // []), (.facts.exposure.exposed.value // []) | .[]
                     | select(.addr | test("^(127\\.|::1$|0\\.0\\.0\\.0$|::$|192\\.0\\.2\\.1$|2001:db8::1$)") | not)]
                    | length == 0)
             ' "$1" > /dev/null

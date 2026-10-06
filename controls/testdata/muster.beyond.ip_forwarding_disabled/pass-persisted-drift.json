@@ -1,0 +1,53 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none",
+        "source": {
+          "kind": "file",
+          "path": "/proc/1/cgroup"
+        }
+      }
+    },
+    "net": {
+      "sysctl": {
+        "ipv4_ip_forward": {
+          "runtime": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/ip_forward"
+            }
+          },
+          "persisted": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "file",
+              "path": "/etc/sysctl.d/60-network-hardening.conf",
+              "line": 1,
+              "raw": "net.ipv4.ip_forward = 1"
+            }
+          },
+          "effective": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/ip_forward"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/ip_forward"
+          }
+        }
+      }
+    }
+  }
+}

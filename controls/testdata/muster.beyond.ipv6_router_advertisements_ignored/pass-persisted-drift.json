@@ -1,0 +1,154 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none",
+        "source": {
+          "kind": "file",
+          "path": "/proc/1/cgroup"
+        }
+      }
+    },
+    "net": {
+      "sysctl": {
+        "ipv6_all_accept_ra": {
+          "runtime": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv6/conf/all/accept_ra"
+            }
+          },
+          "persisted": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "file",
+              "path": "/etc/sysctl.d/60-network-hardening.conf",
+              "line": 1,
+              "raw": "net.ipv6.conf.all.accept_ra = 1"
+            }
+          },
+          "effective": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv6/conf/all/accept_ra"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv6/conf/all/accept_ra"
+          }
+        },
+        "ipv6_default_accept_ra": {
+          "runtime": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv6/conf/default/accept_ra"
+            }
+          },
+          "persisted": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "file",
+              "path": "/etc/sysctl.d/60-network-hardening.conf",
+              "line": 2,
+              "raw": "net.ipv6.conf.default.accept_ra = 1"
+            }
+          },
+          "effective": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv6/conf/default/accept_ra"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv6/conf/default/accept_ra"
+          }
+        },
+        "ipv6_all_disable_ipv6": {
+          "runtime": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv6/conf/all/disable_ipv6"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv6.conf.all.disable_ipv6"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv6/conf/all/disable_ipv6"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv6/conf/all/disable_ipv6"
+          }
+        },
+        "ipv6_default_disable_ipv6": {
+          "runtime": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv6/conf/default/disable_ipv6"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv6.conf.default.disable_ipv6"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv6/conf/default/disable_ipv6"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv6/conf/default/disable_ipv6"
+          }
+        },
+        "ipv6_disabled": {
+          "status": "ok",
+          "value": 0,
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "proc",
+                "path": "/proc/sys/net/ipv6/conf/all/disable_ipv6"
+              },
+              {
+                "kind": "proc",
+                "path": "/proc/sys/net/ipv6/conf/default/disable_ipv6"
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}

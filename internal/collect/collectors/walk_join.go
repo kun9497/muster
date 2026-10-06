@@ -8,6 +8,7 @@ import (
 	"github.com/kun9497/muster/docs/reference/suid"
 	"github.com/kun9497/muster/internal/collect"
 	"github.com/kun9497/muster/internal/facts"
+	"github.com/kun9497/muster/internal/pkgindex"
 )
 
 // The package join (W-6, W-7) answers, for every candidate the traversal
@@ -40,7 +41,7 @@ const (
 	refPostinst        = "postinst" // the package sets the mode at install time
 	refNone            = "none"     // there is no reference list for this release
 
-	noPackageDBReason = "no package database"
+	noPackageDBReason = pkgindex.NoPackageDBReason
 )
 
 // loadReferenceList is suid.Load behind a variable so a test can serve a
@@ -66,41 +67,34 @@ type joinOutcome struct {
 // scripts. It mutates r.
 func joinCandidates(ctx context.Context, a collect.Access, hdr *facts.Run, plan mountPlan, r *walkResult) joinOutcome {
 	cands := candidateSet(r)
-	family := detectFamily(a)
-	var out joinOutcome
-	switch family {
-	case "rpm":
-		out = joinRPM(ctx, a, cands, r)
-	case "dpkg":
-		out = joinDpkg(a, hdr, plan, cands, r)
-	default:
-		// Not an error: a host built without a package manager (or a
-		// minimal image) simply cannot answer, and absent_means: manual
-		// turns that into MANUAL rather than into a false PASS.
-		e := collect.Absent(noPackageDBReason)
-		out.failed = &e
+	// The index is read by pkgindex, shared with the process collector; a
+	// host with neither database comes back FamilyNone with the absent
+	// envelope, which absent_means: manual turns into MANUAL rather than
+	// into a false PASS.
+	ix, truncated, failed := pkgindex.Build(ctx, a, cands, pkgindex.Options{USRMerged: plan.usrMerged})
+	out := joinOutcome{family: string(ix.Family), failed: failed, truncated: truncated, source: ix.Source}
+	switch ix.Family {
+	case pkgindex.FamilyRPM:
+		// The rpm database carries modes, so there is nothing it cannot
+		// decide: a path it holds is declared (or not) by the mode rpm
+		// recorded, and a path it does not hold is unpackaged. The
+		// reference list is never consulted — on this family it is
+		// cross-check evidence for the maintainer, not an input (W-7).
+		if failed == nil {
+			applyRPM(r, ix.RPM)
+		}
+	case pkgindex.FamilyDpkg:
+		joinDpkg(a, hdr, plan, ix.Dpkg, &out, r)
 	}
-	out.family = family
 	splitUnverified(r)
 	r.lists.sort()
 	return out
 }
 
-// detectFamily names the package database, by the same two artefacts
-// patch.go uses (W-6) and in the same order, so one host can never be an apt
-// host to the patch collector and an rpm host to the walk. pathPresent, not
-// exists, for /var/lib/rpm: it is a directory, sometimes a symlink, and a
-// path that refuses to be stat-ed for any reason other than "not found" is
-// still occupied.
-func detectFamily(a collect.Access) string {
-	if exists(a, dpkgStatusPath) {
-		return "dpkg"
-	}
-	if pathPresent(a, rpmDBDir) {
-		return "rpm"
-	}
-	return "none"
-}
+// detectFamily is pkgindex.DetectFamily as the string the walk's tests and
+// joinOutcome compare: one detection for every collector, so one host can
+// never be an apt host to the patch collector and an rpm host to the walk.
+func detectFamily(a collect.Access) string { return string(pkgindex.DetectFamily(a)) }
 
 // candidateSet is every path the join will look up. The four lists are the
 // only ones with package fields: sticky_missing and unowned are judged by

@@ -130,6 +130,18 @@ jobs:
         run: |
           jq -e '(.facts.walk.capabilities.value | map(select(.path == "/usr/local/bin/muster-cap-probe"))) as $p | ($p | length) == 1 and $p[0].reference == "unpackaged" and $p[0].package_declared == false' "$RUNNER_TEMP/muster/root.json"
           jq -e '.facts.privilege.ld_so_preload.value == [] and (.facts.sudo.nopasswd_all.value | index("runner") != null) and any(.facts.privilege.runtime_group_members.value[]; .member == "runner" and .group == "docker") and .facts.accounts.useradd.inactive.value == -1' "$RUNNER_TEMP/muster/root.json"
+      # 3C-2b: the process index is dpkg's and sshd's tcp/22 is among the
+      # listeners the exposure join reads. The verdict assert is a HYPOTHESIS
+      # (spec §5): the runner's ufw is installed and disabled, so X-9 decides
+      # the firewall full with restricts_inbound false. These describe the
+      # runner, not muster: the first run corrects this step, never the
+      # collector. The counts are printed before anything is asserted.
+      - name: the runner's processes and exposure
+        run: |
+          jq '.facts.processes.stats.value, .facts.exposure.stats.value, [.facts.exposure.exposed.value[]? | "\(.service) \(.family) \(.via)"], .facts.firewall.backend.value' "$RUNNER_TEMP/muster/root.json"
+          jq -e '.facts.processes.stats.value.index_source == "dpkg"' "$RUNNER_TEMP/muster/root.json"
+          jq -e 'any(.facts.exposure.listeners.value[]; .service == "tcp/22")' "$RUNNER_TEMP/muster/root.json"
+          jq -e '.facts.exposure.stats.value.confidence == "full"' "$RUNNER_TEMP/muster/root.json"
       - name: check the root snapshot
         run: |
           sudo chown "$(id -u)" "$RUNNER_TEMP/muster/root.json"
@@ -211,6 +223,13 @@ jobs:
           grep -q 'oracle lastlog: compared [1-9][0-9]*, dated [1-9]' "$RUNNER_TEMP/oracle.log"
           grep -q 'oracle capabilities: compared [1-9]' "$RUNNER_TEMP/oracle.log"
           grep -q 'oracle sudoers: compared 1' "$RUNNER_TEMP/oracle.log"
+          grep -q 'oracle listeners: compared [1-9]' "$RUNNER_TEMP/oracle.log"
+          grep -q 'oracle deleted-exe: compared 1' "$RUNNER_TEMP/oracle.log"
+          # Every key the pair walks counts once it agrees (a value, a knob
+          # neither side finds, or a refused read), so the count is the key
+          # list's length on any kernel: 12 + 26 + bindv6only. A new sysctl
+          # leaf bumps this number.
+          grep -q 'oracle sysctl: compared 39' "$RUNNER_TEMP/oracle.log"
       - name: take the oracle drop-in back out
         # P-1: the runner is thrown away, but a step that exists to undo a
         # change must run whether or not the thing it guarded passed.
@@ -244,6 +263,10 @@ jobs:
           # --deep without root: pkgverify writes its one denied key, and the
           # unreadable auditd.conf is the answer for every audit.conf leaf.
           jq -e '.facts.packages.verify.complete.status == "denied" and .facts.audit.conf.log_file.status == "denied"' "$RUNNER_TEMP/muster/user.json"
+          # Spec §5's non-root reading (a hypothesis until the first run; the
+          # run corrects this step, never the collector): the process list is
+          # read, and other accounts' exe links carry their denial per row.
+          jq -e '.facts.processes.list.status == "ok" and any(.facts.processes.list.value[]; .exe_read_status == "denied")' "$RUNNER_TEMP/muster/user.json"
       - name: every PASS is clean and something is ERROR without root
         run: |
           set +e
@@ -407,6 +430,10 @@ jobs:
           sudo chown "$(id -u)" "$RUNNER_TEMP/muster/containers/c.json"
           test -s "$RUNNER_TEMP/muster/containers/c.json"
           jq -e '.run.env.container != "none"' "$RUNNER_TEMP/muster/containers/c.json"
+          # Spec §5: inside a container processes.* read the namespace (a
+          # hypothesis until the first run corrects the step, never the
+          # collector).
+          jq -e '.facts.processes.list.status == "ok"' "$RUNNER_TEMP/muster/containers/c.json"
           if [ "${{ matrix.init }}" = "true" ]; then
             jq -e '.facts.services.ssh.installed.status == "ok"' "$RUNNER_TEMP/muster/containers/c.json"
             # C-1: the Rocky/Alma 9 images ship no libwrap, so the presence
@@ -474,6 +501,9 @@ jobs:
           test "$files" = "$RUNNER_TEMP/muster/out/s.json"
           test "$(stat -c '%a' "$RUNNER_TEMP/muster/out/s.json")" = "600"
           jq -e '.run.complete == true and .run.env.container != "none"' "$RUNNER_TEMP/muster/out/s.json"
+          # muster runs alone in this container, so the list may hold one row;
+          # it is still read (a hypothesis until the first run).
+          jq -e '.facts.processes.list.status == "ok"' "$RUNNER_TEMP/muster/out/s.json"
       - name: every fact the capability matrix calls container-unsupported reads unsupported
         run: |
           jq -e --slurpfile m docs/reference/capability-matrix.json '

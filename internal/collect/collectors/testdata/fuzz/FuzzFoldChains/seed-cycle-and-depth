@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("table ip filter {\n\tchain INPUT {\n\t\ttype filter hook input priority filter; policy drop;\n\t\tjump a\n\t}\n\tchain a {\n\t\tjump b\n\t\ttcp dport 22 accept\n\t}\n\tchain b {\n\t\tjump a\n\t\tjump INPUT\n\t\tjump c\n\t}\n\tchain c {\n\t\tjump d\n\t}\n\tchain d {\n\t\tjump e\n\t}\n\tchain e {\n\t\tjump f\n\t}\n\tchain f {\n\t\taccept\n\t}\n}\n")

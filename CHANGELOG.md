@@ -11,6 +11,32 @@ verdict on an existing snapshot is at least a minor release and appears under
 
 ### Controls
 
+Control set `kisa-unix-2026+2026.10.02` (was `+2026.09.29`). Thirteen more controls
+beyond the KISA guide (49 in all), written from `proc(5)`, `ip-sysctl.rst`,
+`nft(8)`, `iptables-save(8)`, `sysctl.d(5)` and `systemd.exec(5)` in muster's own
+words: an exposed listener not on the host's allow list (`tcp/22`, `udp/68`,
+`udp/546` by default — the allow list is the host's own declaration of what it
+serves), a listener whose executable the package manager did not install (a snap,
+a flatpak or a container's process included), a process running a deleted
+executable, and ten network sysctls — forwarding, ICMP redirects, source routing,
+reverse-path filtering with martian logging, broadcast and bogus ICMP, SYN
+cookies, router advertisements — judged on `all` and `default`, IPv4 and IPv6
+apart so a kernel without IPv6 (or with it disabled on `all`, `default` and
+every interface) reads NOT_APPLICABLE. Read as shipped: stock Ubuntu 22.04 fails the
+ICMP-redirect, IPv6-redirect, martian-logging and router-advertisement controls,
+and 24.04 the source-routing one too (it persists no `accept_source_route` over
+the kernel's `default` of 1); a host whose accept-policy input chain carries rules (firewalld's
+`filter_INPUT`, ufw beside another table's INPUT chain) reads the exposure control
+MANUAL under the normaliser's confidence rule; docker's FORWARD chains never enter
+it, so a docker host with an empty accept INPUT is decided.
+
+U-28 `ip_port_restriction` now reads FAIL on a host whose firewall backend is
+installed but inactive (ufw disabled — stock Ubuntu Server and the GitHub
+runner): a ruleset with no input base chain and no inbound rule restricts
+nothing, whatever package is installed; it read MANUAL. A verdict changes, so
+this is a minor release (D16). The 68 controls for the 67 items are otherwise
+unchanged.
+
 Control set `kisa-unix-2026+2026.09.29` (was `+2026.09.23`). Eight more controls
 beyond the KISA guide (36 in all), written from `shadow(5)`, `useradd(8)`,
 `sudoers(5)`, `capabilities(7)`, `systemd.service(5)`, `ld.so(8)`, `sshd(8)` and
@@ -189,6 +215,38 @@ U-62 `login_banner` MANUAL instead of ERROR when sshd does not answer and the
 configuration walk stopped at an `Include` outside the declaration (below).
 
 ### Collectors
+- `processes` (new) reads every process from `/proc` — status, command, executable
+  (` (deleted)` noted), mount namespace by the mount that serves the executable,
+  the package it came from — and every listening socket's owners through the
+  `fd` links (a zombie leader's through its live threads); a socket nobody holds
+  after every table was read whole, with pid 1 and a kernel thread in sight, is
+  the kernel's (WireGuard measured: kernel sockets carry non-zero inodes); inside
+  a container or a partial pid view it is `unmatched` and the listener leaves read
+  `absent`. In an unprivileged container another uid's process refuses its links,
+  so the process leaves read `denied` and the run is partial (exit 1) while the
+  controls read NOT_APPLICABLE — the standing worst-status rule. Keys:
+  `processes.list`, `processes.listeners`, `processes.unpackaged_listeners`,
+  `processes.deleted_executables`, `processes.stats`.
+- `exposure.*` (written by `processes`) joins the listeners with the firewall's
+  rule table: `exposure.listeners`, `exposure.exposed`, `exposure.opaque_rules`,
+  `exposure.stats`; decided only at full confidence with no opaque rule in the
+  listener's family; an enabled family with no input chain exposes its listeners;
+  IPv6 disabled by sysctl on every interface is not an enabled family; `::` asks both families when
+  `bindv6only` is 0.
+- `firewall.rules` rows grew from five fields to fourteen (`via_chain`, `depth`,
+  `table`, `family`, `daddr`, `iif`, `ctstate`, `unmodelled`, `raw`); the user chains
+  an input filter base chain jumps to are folded in (depth 4, 2000 rows per base,
+  once per distinct set of carried conditions, the jump's conditions inherited);
+  protocol sets, vmaps, `.` concatenations and unknown matches are `unmodelled`;
+  an empty nft ruleset is cross-checked against iptables-legacy before it is
+  called open.
+- `sysctl` gains 28 `net.sysctl.*` keys (the derived `ipv6_disabled` among them, the one
+  gate of the IPv6 controls) and reads `sysctl.d` glob keys and `-key`
+  exclusions as systemd does (`[!…]` included; a concrete line beats any glob;
+  the last line wins).
+- `internal/pkgindex` holds the dpkg and rpm readers the walk's join and the
+  process collector share; `Declaration.Facts` + `Builder.Get` let a collector
+  read a declared fact an earlier collector wrote.
 
 - `ReadDir` takes an option that reads the `security.capability` and
   `system.posix_acl_access` attributes of every executable it lists, from the
@@ -320,6 +378,12 @@ configuration walk stopped at an `Include` outside the declaration (below).
   Found by the nightly fuzz workflow; the input is committed as its seed.
 
 ### Tooling
+- D32 (exposure is the join of listeners, processes and the firewall as
+  configured; the allow list is the host's declaration); the capability matrix's
+  `nonroot.denied` row gains four keys; three oracle pairs (listeners against
+  `ss -tulpnH`, a deleted executable the test itself plants and removes, the
+  sysctl pair over 39 keys); the CI root job asserts the runner's exposure
+  reading.
 
 - D31 (root's power outside root is one family of controls); the capability
   matrix's `nonroot.denied` row gains eight keys, `no-systemd.unsupported` the
