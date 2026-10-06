@@ -452,6 +452,45 @@ func TestSysctlDeclarationCoversItsReads(t *testing.T) {
 	}
 }
 
+// S9: every net.sysctl leaf names its sysctl variable, and the table must
+// read that variable. The expected key is derived from the leaf name alone
+// (ipv4_all_rp_filter is net.ipv4.conf.all.rp_filter, ipv4_tcp_syncookies is
+// net.ipv4.tcp_syncookies), never from the row under test, so a swapped
+// all/default pair or a copy-pasted path is caught.
+func TestSysctlNetLeafNamesItsVariable(t *testing.T) {
+	n := 0
+	for _, l := range sysctlLeaves {
+		name, ok := strings.CutPrefix(l.leaf, "net.sysctl.")
+		if !ok {
+			continue
+		}
+		n++
+		fam, rest, ok := strings.Cut(name, "_")
+		if !ok || (fam != "ipv4" && fam != "ipv6") {
+			t.Errorf("%s: the leaf name does not start with ipv4_ or ipv6_", l.leaf)
+			continue
+		}
+		want := "net." + fam + "."
+		switch {
+		case strings.HasPrefix(rest, "all_"):
+			want += "conf.all." + strings.TrimPrefix(rest, "all_")
+		case strings.HasPrefix(rest, "default_"):
+			want += "conf.default." + strings.TrimPrefix(rest, "default_")
+		default:
+			want += rest
+		}
+		if l.key != want {
+			t.Errorf("%s reads %s, want %s", l.leaf, l.key, want)
+		}
+		if wantPath := "/proc/sys/" + strings.ReplaceAll(want, ".", "/"); l.path != wantPath {
+			t.Errorf("%s reads %s, want %s", l.leaf, l.path, wantPath)
+		}
+	}
+	if n != 26 {
+		t.Errorf("%d net.sysctl settings, want the twenty-six of P-4", n)
+	}
+}
+
 func TestParseSysctlD(t *testing.T) {
 	got := parseSysctlD([]byte("" +
 		"# a comment\n" +
