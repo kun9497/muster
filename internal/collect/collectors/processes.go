@@ -326,12 +326,20 @@ func procPath(pid int, rest string) string { return "/proc/" + strconv.Itoa(pid)
 // is not there any more.
 func (s *procScan) readStatus(pid int) (st procStatus, gone bool, fail *facts.Envelope) {
 	p := procPath(pid, "status")
-	data, _, err := s.a.ReadFile(p, procStatusLimit)
+	data, meta, err := s.a.ReadFile(p, procStatusLimit)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) || errors.Is(err, unix.ESRCH) {
 			return procStatus{}, true, nil
 		}
 		e := readFailure(p, err)
+		return procStatus{}, false, &e
+	}
+	if meta.Truncated {
+		// Groups: precedes Kthread: and Threads:, so a file cut at the limit
+		// parses with no threads and no kthread flag while every line before
+		// the cut still parses. A cut status is a failure, as a cut mountinfo
+		// is (S4).
+		e := collect.ErrorEnv(fmt.Sprintf("%s: cut at the %d-byte limit", p, procStatusLimit))
 		return procStatus{}, false, &e
 	}
 	st, err = parseProcStatus(data)

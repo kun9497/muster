@@ -286,6 +286,26 @@ func TestProcessesDeniedFdTableMakesTheLeavesDenied(t *testing.T) {
 	}
 }
 
+// S4: a status file cut at the read limit is a failure, never a parse of
+// the bytes before the cut (Groups: precedes Threads: and Kthread:, so a cut
+// file would read a thread-less leader). The listener leaves and
+// deleted_executables carry it, naming the path and the limit.
+func TestProcessesCutStatusIsAFailure(t *testing.T) {
+	a := procHost(tcpTable([2]int{22, 7}, [2]int{5432, 9}), sshdProc(map[int]string{3: "socket:[7]"}), initProc(nil),
+		fakeProc{pid: 950, ppid: 1, uid: 113, name: "postgres", exe: "/usr/lib/postgresql/14/bin/postgres", fds: map[int]string{5: "socket:[9]"}})
+	a.truncated = map[string]bool{procPath(950, "status"): true}
+	b := build(t, "processes", a)
+	want := fmt.Sprintf("%s: cut at the %d-byte limit", procPath(950, "status"), procStatusLimit)
+	for _, k := range []string{"processes.listeners", "processes.unpackaged_listeners", "processes.deleted_executables"} {
+		if e := env(t, b, k); e.Status != facts.StatusError || e.Reason != want {
+			t.Errorf("%s = %+v, want error %q", k, e, want)
+		}
+	}
+	if _, ok := rowsByPid(t, okList(t, b, "processes.list"))[950]; ok {
+		t.Errorf("pid 950 is listed from a cut status file")
+	}
+}
+
 func TestProcessesDeniedExeMakesDeletedExecutablesDenied(t *testing.T) {
 	a := procHost(tcpTable([2]int{22, 7}), sshdProc(map[int]string{3: "socket:[7]"}), initProc(nil),
 		fakeProc{pid: 42, ppid: 1, uid: 1000, name: "other", exe: "/usr/bin/other"})
