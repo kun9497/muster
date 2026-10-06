@@ -395,8 +395,9 @@ measurement behind it.
 - **W-51** on a jump row `unmodelled` is redefined by the fold — cleared on a jump it followed
   (→ `irrelevant`), set on one it could not (→ `opaque`). **W-52** `portSpec` → `fwPortSpec` (services.go
   owns `portSpec`). **W-53** test and brief addresses come from the RFC 5737 documentation ranges; a 10/8 host address that
-  reached a commit is allowlisted by that commit's hash in `.gitleaks.toml` (336765d, f64f5ed — the e916e0a
-  precedent), never by a path or a literal.
+  reached a commit is allowlisted by that commit's hash in `.gitleaks.toml` (17c959e, f64f5ed — the e916e0a
+  precedent; the first hash is the Task 2 commit's after the pre-push history rewrite that folded one
+  fix-up commit and unified the trailers), never by a path or a literal.
 - **W-54** the fold carries the jump row's conditions (`proto`, `dport`, `saddr`, `daddr`, `iif`,
   `ctstate`) onto every row folded through it where that row's field is empty; both set and different →
   `unmodelled`. **W-55** a rule with no verdict (`-m recent --set`; an nft rule ending without a verdict

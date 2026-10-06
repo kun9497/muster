@@ -87,12 +87,13 @@ regexes = ['''^(?:10\.0\.0\.0|172\.16\.0\.0|172\.17\.0\.0|192\.168\.0\.0)$''']
 # still sees the history. The commit, not the literal, is allowlisted.
 # Likewise one commit carried a 10/8 host address in two parser test cases
 # (a destination selector copied from the plan's brief); the next commit
-# moved them to the RFC 5737 range. The commit, not the literal, is allowlisted.
+# moved them to the RFC 5737 range. The commit, not the literal, is allowlisted
+# (its hash is the one after the branch's history was rewritten before the push).
 # The 3C-2b plan's commit spelled the same 10/8 host address in its classifier
 # test sketch (the brief those two parser cases were copied from); the plan's
 # text was moved to the RFC 5737 range at the end of the stage. The commit, not
 # the literal, is allowlisted.
-commits = ['''e916e0a54b53d99a7ddd95b7cbd25fd5a0d5fe13''', '''336765dfdcf25faa1fd2768830c794c5adecc8aa''', '''f64f5ed9c20620468bc2ae07cafcac9502b80472''']
+commits = ['''e916e0a54b53d99a7ddd95b7cbd25fd5a0d5fe13''', '''17c959e6be182dddb911ad164b497b9570dda531''', '''f64f5ed9c20620468bc2ae07cafcac9502b80472''']
 
 [[rules]]
 id = "non-personal-email"
