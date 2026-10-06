@@ -35,7 +35,7 @@ func ufwCapture(t *testing.T) capture {
 func TestExposureUfwDumpDecidesHTTP(t *testing.T) {
 	cr := ufwCapture(t)
 	_, rules := normalizeRuleset(cr)
-	in := exposureInputs{Confidence: "full", Restricts: truePtr(), Rules: rules, Backend: "ufw", BaseFamilies: inputBaseFamilies(cr.dumps)}
+	in := exposureInputs{Confidence: "full", Restricts: truePtr(), Rules: rules, BaseFamilies: inputBaseFamilies(cr.dumps)}
 	ls := []listener{lsn("tcp", "v4", "0.0.0.0", 80), lsn("tcp", "v4", "0.0.0.0", 22), lsn("tcp", "v4", "0.0.0.0", 5432)}
 	rows, exposed, opaque, reason := decideExposure(ls, in)
 	if reason != "" || len(opaque) != 0 {
@@ -268,9 +268,64 @@ func TestProcessesExposureBindV6OnlyUnreadable(t *testing.T) {
 	a.contents["/proc/sys/net/ipv6/bindv6only"] = []byte("0\n")
 	b = seedFirewall(t, ufwCapture(t), "full", collect.OK(true, nil), "ufw")
 	buildOn(t, "processes", a, b)
+	if m := exposedRow(t, b, "tcp/8080"); m == nil || m["addr"] != "::" || m["via"] != "no_chain_in_family" {
+		t.Errorf("tcp/8080 on :: %v, want exposed via no_chain_in_family", m)
+	}
+}
+
+// exposedRow is the exposure.exposed row of one service, or nil.
+func exposedRow(t *testing.T, b *collect.Builder, service string) map[string]any {
+	t.Helper()
 	for _, r := range okList(t, b, "exposure.exposed") {
-		if m := r.(map[string]any); m["service"] == "tcp/8080" && m["via"] != "no_chain_in_family" {
-			t.Errorf("tcp/8080 on :: %v, want via no_chain_in_family", m)
+		if m := r.(map[string]any); m["service"] == service {
+			return m
 		}
+	}
+	return nil
+}
+
+// dualStackWebHost is webHost with nginx also on [::]:8080 and bindv6only 0.
+func dualStackWebHost() *fsAccess {
+	a := webHost()
+	a.contents["/proc/self/net/tcp6"] = []byte(procNetHeader + tcpRow(0, "00000000000000000000000000000000", 8080, 11, tcpListen))
+	a.links[procPath(900, "fd/7")] = "socket:[11]"
+	a.contents[procBindV6Only] = []byte("0\n")
+	return a
+}
+
+// W-76: with disable_ipv6 1 on all and default the tcp6 table still exists,
+// but no inbound IPv6 packet reaches the host: v6 is no enabled family, so a
+// v4-only ruleset does not leave it unchained, and [::]:8080 is decided by its
+// v4 side (ufw has no accept for 8080). One file 0 is the old reading; an
+// unreadable file is the read's status (C3).
+func TestProcessesExposureIPv6DisabledIsNotAFamily(t *testing.T) {
+	a := dualStackWebHost()
+	a.contents[procDisableV6All] = []byte("1\n")
+	a.contents[procDisableV6Default] = []byte("1\n")
+	b := seedFirewall(t, ufwCapture(t), "full", collect.OK(true, nil), "ufw")
+	buildOn(t, "processes", a, b)
+	if m := exposedRow(t, b, "tcp/8080"); m != nil {
+		t.Errorf("tcp/8080 on :: exposed %v with IPv6 disabled", m)
+	}
+	if st := env(t, b, "exposure.stats").Value.(map[string]any); st["ipv6_disabled"] != true || st["filtered"] != 2 {
+		t.Errorf("stats %v, want ipv6_disabled and 5432 and 8080 filtered", st)
+	}
+
+	a.contents[procDisableV6Default] = []byte("0\n")
+	b = seedFirewall(t, ufwCapture(t), "full", collect.OK(true, nil), "ufw")
+	buildOn(t, "processes", a, b)
+	if m := exposedRow(t, b, "tcp/8080"); m == nil || m["via"] != "no_chain_in_family" {
+		t.Errorf("default 0: tcp/8080 on :: %v, want exposed via no_chain_in_family", m)
+	}
+	if st := env(t, b, "exposure.stats").Value.(map[string]any); st["ipv6_disabled"] != false {
+		t.Errorf("stats %v", st)
+	}
+
+	delete(a.contents, procDisableV6All)
+	a.fails[procDisableV6All] = fmt.Errorf("%s: %w", procDisableV6All, unix.EACCES)
+	b = seedFirewall(t, ufwCapture(t), "full", collect.OK(true, nil), "ufw")
+	buildOn(t, "processes", a, b)
+	if e := env(t, b, "exposure.exposed"); e.Status != facts.StatusDenied || !strings.Contains(e.Reason, "disable_ipv6") {
+		t.Errorf("exposure.exposed %+v, want denied naming disable_ipv6", e)
 	}
 }

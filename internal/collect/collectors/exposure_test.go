@@ -42,7 +42,7 @@ func falsePtr() *bool { v := false; return &v }
 
 // full is a decided, restricting firewall over the given rows.
 func full(rules ...fwRule) exposureInputs {
-	return exposureInputs{Confidence: "full", Restricts: truePtr(), Rules: rules, Backend: "nftables", BindV6Only: 0, HasV6: false}
+	return exposureInputs{Confidence: "full", Restricts: truePtr(), Rules: rules, BindV6Only: 0, HasV6: false}
 }
 
 func expRow(t *testing.T, rows []exposureRow, service, addr string) exposureRow {
@@ -324,5 +324,67 @@ func TestExposureNoCandidateIsDecided(t *testing.T) {
 	rows, exposed, _, reason := decideExposure([]listener{lsn("tcp", "v4", "127.0.0.1", 631)}, in)
 	if reason != "" || len(rows) != 0 || len(exposed) != 0 {
 		t.Errorf("reason %q rows %+v exposed %+v", reason, rows, exposed)
+	}
+}
+
+// W-76: IPv6 disabled by sysctl is no enabled family. A v4-only ruleset does
+// not leave v6 unchained; a dual-stack socket is decided by its v4 side; a
+// socket only v6 traffic reaches is unreachable.
+func TestExposureIPv6DisabledIsNotAFamily(t *testing.T) {
+	in := full(accept("v4", "INPUT", "proto=tcp dport=22"))
+	in.HasV6, in.V6Disabled = true, true
+	ls := []listener{lsn("tcp", "v6", "::", 5432), lsn("tcp", "v6", "::", 22), lsn("tcp", "v6", "2001:db8::10", 8080)}
+	rows, _ := decided(t, ls, in)
+	if r := expRow(t, rows, "tcp/5432", "::"); r.Exposed || r.Via != viaFiltered {
+		t.Errorf("[::]:5432 %+v, want filtered by its v4 side", r)
+	}
+	if r := expRow(t, rows, "tcp/22", "::"); !r.Exposed || r.Via != viaRule {
+		t.Errorf("[::]:22 %+v, want exposed by the v4 rule", r)
+	}
+	if r := expRow(t, rows, "tcp/8080", "2001:db8::10"); r.Exposed || r.Via != viaV6Off {
+		t.Errorf("a v6 address %+v, want via ipv6_disabled", r)
+	}
+	in.BindV6Only = 1
+	rows, _ = decided(t, ls, in)
+	if r := expRow(t, rows, "tcp/22", "::"); r.Exposed || r.Via != viaV6Off {
+		t.Errorf("bindv6only 1: [::]:22 %+v, want via ipv6_disabled", r)
+	}
+	// Enabled again: the old reading.
+	in.BindV6Only, in.V6Disabled = 0, false
+	rows, _ = decided(t, ls, in)
+	if r := expRow(t, rows, "tcp/5432", "::"); !r.Exposed || r.Via != viaNoChain {
+		t.Errorf("IPv6 on: [::]:5432 %+v, want via no_chain_in_family", r)
+	}
+}
+
+// W-75: a dual-stack socket is decided when one family exposes it, whatever
+// the other's opacity; it stays undecided when the only family that could
+// decide it filters and the other is opaque.
+func TestExposureDualStackOpacity(t *testing.T) {
+	op4 := accept("v4", "INPUT", "proto=tcp unmodelled")
+	op4.Raw = "-A INPUT -p tcp -m owner --uid-owner 0 -j ACCEPT"
+	op6 := accept("v6", "INPUT", "proto=tcp unmodelled")
+	op6.Raw = "-A INPUT -p tcp -m owner --uid-owner 0 -j ACCEPT"
+	ls := []listener{lsn("tcp", "v6", "::", 5432)}
+	for _, c := range []struct {
+		name    string
+		rules   []fwRule
+		exposed bool
+		reason  string
+	}{
+		{"v4 opaque, v6 filters", []fwRule{op4, accept("v6", "INPUT", "proto=tcp dport=22")}, false, "(filter, v4)"},
+		{"v4 opaque, v6 accepts", []fwRule{op4, accept("v6", "INPUT", "proto=tcp dport=5432")}, true, ""},
+		{"v6 opaque, v4 filters", []fwRule{op6, accept("v4", "INPUT", "proto=tcp dport=22")}, false, "(filter, v6)"},
+		{"v6 opaque, v4 accepts", []fwRule{op6, accept("v4", "INPUT", "proto=tcp dport=5432")}, true, ""},
+	} {
+		in := full(c.rules...)
+		in.HasV6 = true
+		rows, exposed, _, reason := decideExposure(ls, in)
+		switch {
+		case c.exposed && (len(exposed) != 1 || exposed[0].Via != viaRule || reason != ""):
+			t.Errorf("%s: exposed %+v reason %q, want exposed via rule", c.name, exposed, reason)
+		case !c.exposed && (len(exposed) != 0 || rows[0].Via != viaUndecided || !strings.Contains(reason, c.reason)):
+			t.Errorf("%s: rows %+v reason %q, want undecided naming %s", c.name, rows, reason, c.reason)
+		}
 	}
 }

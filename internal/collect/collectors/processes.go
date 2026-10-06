@@ -86,7 +86,7 @@ func processesReads() []string {
 		"/proc/[0-9]*/mountinfo",
 		"/proc/[0-9]*/root",
 		procInitMntNS,
-		"/proc/sys/net/ipv6/bindv6only",
+		procBindV6Only, procDisableV6All, procDisableV6Default,
 	}
 	out = append(out, usrAliases...)
 	out = append(out, procNetPaths()...)
@@ -940,6 +940,34 @@ func (s *procScan) listenerEnvs(ls []listener, inodeBad string, socks socketTabl
 	return lst, unp
 }
 
+// The IPv6 sysctls the exposure verdict reads from /proc/sys: the sysctl
+// collector sorts after this one (W-47, W-76).
+const (
+	procBindV6Only       = "/proc/sys/net/ipv6/bindv6only"
+	procDisableV6All     = "/proc/sys/net/ipv6/conf/all/disable_ipv6"
+	procDisableV6Default = "/proc/sys/net/ipv6/conf/default/disable_ipv6"
+)
+
+// readProcInt reads one integer sysctl file. A kernel without IPv6 has no
+// such file (present false, no failure); a file that exists and cannot be
+// read or parsed is the failure (C3).
+func readProcInt(a collect.Access, p string) (n int, present bool, fail *facts.Envelope) {
+	data, _, err := a.ReadFile(p, 64)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return 0, false, nil
+		}
+		e := readFailure(p, err)
+		return 0, false, &e
+	}
+	n, err = strconv.Atoi(strings.TrimSpace(string(data)))
+	if err != nil {
+		e := collect.ErrorEnv(p + ": not an integer")
+		return 0, false, &e
+	}
+	return n, true, nil
+}
+
 // exposureFirewallKeys are the firewall facts the exposure verdict reads, in
 // the order their failure is reported.
 var exposureFirewallKeys = []string{
@@ -1008,27 +1036,21 @@ func writeExposure(a collect.Access, b *collect.Builder, ls []listener, lst fact
 			rules = append(rules, fwRuleFromRecord(m))
 		}
 	}
-	backend, _ := fw["firewall.backend"].Value.(string)
 	dumps, _ := fw["firewall.raw_dumps"].Value.([]any)
 
-	in := exposureInputs{Confidence: confidence, Restricts: restricts, Rules: rules, Backend: backend, HasV6: hasV6,
+	in := exposureInputs{Confidence: confidence, Restricts: restricts, Rules: rules, HasV6: hasV6,
 		BaseFamilies: inputBaseFamilies(dumps)}
-	// bindv6only decides whether a socket on :: takes v4 traffic. A kernel
-	// without IPv6 has no such file and no v6 socket to ask about; a file
+	// bindv6only decides whether a socket on :: takes v4 traffic; a file
 	// that exists and cannot be read is the answer for every :: listener (C3).
-	var bindFail *facts.Envelope
-	const bindPath = "/proc/sys/net/ipv6/bindv6only"
-	if data, _, err := a.ReadFile(bindPath, 64); err == nil {
-		if n, err := strconv.Atoi(strings.TrimSpace(string(data))); err == nil {
-			in.BindV6Only = n
-		} else {
-			e := collect.ErrorEnv(bindPath + ": not an integer")
-			bindFail = &e
-		}
-	} else if !errors.Is(err, fs.ErrNotExist) {
-		e := readFailure(bindPath, err)
-		bindFail = &e
-	}
+	bind, _, bindFail := readProcInt(a, procBindV6Only)
+	in.BindV6Only = bind
+	// disable_ipv6 on all and default both 1: the kernel drops every inbound
+	// IPv6 packet, so v6 is no enabled family (W-76). Either file unreadable
+	// is the answer for every v6 candidate (C3); v6 then stays enabled.
+	allOff, allOK, allFail := readProcInt(a, procDisableV6All)
+	defOff, defOK, defFail := readProcInt(a, procDisableV6Default)
+	v6Fail := cmp.Or(allFail, defFail)
+	in.V6Disabled = v6Fail == nil && allOK && defOK && allOff == 1 && defOff == 1
 
 	listenersOK := lst.Status == facts.StatusOK
 	var cands []listener
@@ -1058,7 +1080,7 @@ func writeExposure(a collect.Access, b *collect.Builder, ls []listener, lst fact
 	stats := map[string]any{
 		"confidence": confidence, "manual_reason": manual, "listeners": len(rows), "exposed": len(exposed),
 		"filtered": 0, "loopback": 0, "link_local": 0, "kernel_owned": 0,
-		"opaque_rules": len(opaque), "folded_rules": len(rules),
+		"opaque_rules": len(opaque), "folded_rules": len(rules), "ipv6_disabled": in.V6Disabled,
 	}
 	if !listenersOK {
 		e := carry("processes.listeners", lst)
@@ -1074,7 +1096,7 @@ func writeExposure(a collect.Access, b *collect.Builder, ls []listener, lst fact
 		}
 	}
 	for _, r := range rows {
-		if r.Via == viaFiltered {
+		if r.Via == viaFiltered || r.Via == viaV6Off {
 			stats["filtered"] = stats["filtered"].(int) + 1
 		}
 		if r.LinkLocal {
@@ -1097,13 +1119,17 @@ func writeExposure(a collect.Access, b *collect.Builder, ls []listener, lst fact
 	b.Set("exposure.listeners", lstEnv)
 
 	var exp facts.Envelope
-	anyDual := false
+	anyDual, anyV6 := false, false
 	for _, r := range rows {
 		anyDual = anyDual || r.Addr == "::"
+		anyV6 = anyV6 || slices.Contains(candidateFamilies(r.Addr, in.BindV6Only), "v6")
 	}
 	switch {
 	case bindFail != nil && anyDual:
 		exp = carry("net.ipv6.bindv6only", *bindFail)
+		stats["manual_reason"] = exp.Reason
+	case v6Fail != nil && anyV6:
+		exp = carry("net.ipv6.conf.disable_ipv6", *v6Fail)
 		stats["manual_reason"] = exp.Reason
 	case manual != "":
 		exp = collect.Absent(manual)

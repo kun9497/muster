@@ -19,9 +19,13 @@ type exposureInputs struct {
 	Confidence string // firewall.normalization_confidence: full or partial
 	Restricts  *bool  // firewall.restricts_inbound; nil when absent
 	Rules      []fwRule
-	Backend    string
 	BindV6Only int  // net.ipv6.bindv6only: 0 lets a socket on :: take v4 traffic too
 	HasV6      bool // a v6 socket table exists, so the host speaks v6 (W-40)
+	// V6Disabled is net.ipv6.conf.all.disable_ipv6 and
+	// net.ipv6.conf.default.disable_ipv6 both 1: the tcp6 and udp6 tables
+	// still exist, but the kernel drops every inbound IPv6 packet, so v6 is
+	// not an enabled family and no v6 candidate can be reached (W-76).
+	V6Disabled bool
 	// BaseFamilies are the families (v4, v6, inet) that hold an input filter
 	// base chain. A base chain with no rule leaves no row in Rules, so the
 	// rows alone cannot tell "no chain in this family" from "a drop chain
@@ -41,7 +45,8 @@ type exposureRow struct {
 	Exposed                      bool
 	// Via is how the verdict was reached: no_chain_in_family, open_policy,
 	// any_port_rule or rule when exposed; filtered when no path in was
-	// found; undecided when the verdict could not be read.
+	// found; ipv6_disabled when the socket takes v6 traffic alone and IPv6 is
+	// disabled by sysctl; undecided when the verdict could not be read.
 	Via                            string
 	RuleChain, RuleSource, RuleRaw string
 }
@@ -53,6 +58,7 @@ const (
 	viaAnyPort   = "any_port_rule"
 	viaRule      = "rule"
 	viaFiltered  = "filtered"
+	viaV6Off     = "ipv6_disabled"
 	viaUndecided = "undecided"
 )
 
@@ -130,7 +136,7 @@ func decideExposure(ls []listener, in exposureInputs) (rows []exposureRow, expos
 		}
 	}
 	hasChain := func(fam string) bool { return chain[fam] || chain["inet"] }
-	enabled := map[string]bool{"v4": true, "v6": in.HasV6}
+	enabled := map[string]bool{"v4": true, "v6": in.HasV6 && !in.V6Disabled}
 	other := map[string]string{"v4": "v6", "v6": "v4"}
 	firstOpaque := func(fam string) *fwRule {
 		for i := range opaque {
@@ -180,12 +186,23 @@ func decideExposure(ls []listener, in exposureInputs) (rows []exposureRow, expos
 		if row.Owners == nil {
 			row.Owners = []owner{}
 		}
+		fams := candidateFamilies(l.Addr, in.BindV6Only)
+		if in.V6Disabled {
+			fams = slices.DeleteFunc(fams, func(f string) bool { return f == "v6" })
+		}
 		undecided := ""
-		if in.Confidence != "full" {
+		switch {
+		case len(fams) == 0:
+			// Only v6 traffic could reach it, and the kernel drops every
+			// inbound IPv6 packet: unreachable whatever the firewall says.
+			row.Via = viaV6Off
+			rows = append(rows, row)
+			continue
+		case in.Confidence != "full":
 			undecided = "normalization confidence is " + in.Confidence
-		} else {
+		default:
 			stopped := ""
-			for _, fam := range candidateFamilies(l.Addr, in.BindV6Only) {
+			for _, fam := range fams {
 				if o := firstOpaque(fam); o != nil {
 					if stopped == "" {
 						stopped = opaqueReason(*o)
