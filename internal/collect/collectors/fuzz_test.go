@@ -3,6 +3,7 @@
 package collectors
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -15,6 +16,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/kun9497/muster/internal/collect"
 )
@@ -1321,6 +1323,27 @@ func FuzzFirstLine(f *testing.F) {
 	seeds(f, "testdata/stderr.*")
 	f.Fuzz(func(t *testing.T, data []byte) {
 		fuzzBody(t, "firstLine", func() any { return firstLine(data) }, len(data))
+	})
+}
+
+// FuzzCapDump: the raw-dump cap returns a prefix of its input no longer than
+// rawDumpCap, cut on a rune boundary, and says it cut exactly when the input
+// was longer than the cap.
+func FuzzCapDump(f *testing.F) {
+	seeds(f, "testdata/iptables-save.*", "testdata/nft.ruleset.drop", "testdata/stderr.*")
+	f.Add(append(bytes.Repeat([]byte("a"), rawDumpCap-1), "\u00e9\u00e9"...))
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "capDump", func() any {
+			s, cut := capDump(data)
+			return []any{s, cut}
+		}, len(data))
+		s, cut := capDump(data)
+		if len(s) > rawDumpCap || !bytes.HasPrefix(data, []byte(s)) || cut != (len(data) > rawDumpCap) {
+			t.Fatalf("capDump(%d bytes) = %d bytes, cut %v", len(data), len(s), cut)
+		}
+		if cut && utf8.Valid(data) && !utf8.ValidString(s) {
+			t.Fatalf("capDump split a rune of valid UTF-8 input")
+		}
 	})
 }
 

@@ -41,6 +41,7 @@ import (
 var fuzzTargets = []string{
 	"FuzzAptPeriodicUnattended",
 	"FuzzAttrValue",
+	"FuzzCapDump",
 	"FuzzClassifyRule",
 	"FuzzCountAptSecurity",
 	"FuzzCountDnfAdvisories",

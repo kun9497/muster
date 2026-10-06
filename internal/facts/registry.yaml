@@ -1740,13 +1740,13 @@ keys:
     default_on: both
   - key: firewall.restricts_inbound
     type: bool
-    description: Whether the ruleset restricts inbound traffic by default (derived by normalisation); absent when confidence is below full (accept-with-rules, mixed policies, a missing policy, a non-input inbound chain with rules, or a truncated dump); the unsupported/denied envelope when the ruleset could not be read.
+    description: Whether the ruleset restricts inbound traffic by default (derived by normalisation) - true when every input filter chain is drop/reject; false when every input filter chain is accept with zero rules, or when there is no input base chain and no inbound rule at all; absent when confidence is below full (accept-with-rules, mixed policies, a missing policy, a non-input inbound chain with rules, a truncated dump, or an nf_tables ruleset that restricts nothing - empty, or accept chains with no rule - beside an iptables-save cross-check that finds legacy rules or iptables-nft's warning that legacy tables are present); the unsupported/denied envelope when the ruleset could not be read.
     since: 1
     sensitivity: public
     collector: firewall
   - key: firewall.normalization_confidence
     type: string
-    description: Confidence in the normalised inbound judgement - full (every input filter chain is drop/reject, or every input filter chain is accept with zero rules) or partial (everything else - accept-with-rules, mixed policies, a missing policy, a non-input inbound chain with rules, or a truncated dump); the unsupported/denied envelope when the ruleset could not be read.
+    description: Confidence in the normalised inbound judgement - full (every input filter chain is drop/reject, every input filter chain is accept with zero rules, or there is no input base chain and no inbound rule at all) or partial (everything else - accept-with-rules, mixed policies, a missing policy, a non-input inbound chain with rules, a truncated dump, or an nf_tables ruleset that restricts nothing - empty, or accept chains with no rule - beside an iptables-save cross-check that finds legacy rules or iptables-nft's warning that legacy tables are present); the unsupported/denied envelope when the ruleset could not be read.
     since: 1
     sensitivity: public
     collector: firewall
