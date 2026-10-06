@@ -57,7 +57,9 @@ import (
 //     /var/log/lastlog (shadow 4.15 and later), and for the listeners pair a
 //     run without root (other accounts' fd tables are closed to it) or one
 //     whose pid view is partial (a container, where processes.listeners is
-//     absent, W-67) — and the CI job on the
+//     absent, W-67), and for the deleted-executable pair a run without root
+//     (another account's exe link is denied, and
+//     processes.deleted_executables carries that denial) — and the CI job on the
 //     runner VM, which has every binary and a running auditd, asserts
 //     there are none.
 //     A binary that IS there and refuses to answer fails the pair: a daemon
@@ -1799,6 +1801,9 @@ func TestOracleSSLineSplits(t *testing.T) {
 // images). The test binary is an executable on every host the pair runs on.
 func TestOracleDeletedExecutable(t *testing.T) {
 	oracleEnabled(t)
+	if os.Geteuid() != 0 {
+		t.Skip("the deleted-executable pair needs root: another account's exe link is denied, and processes.deleted_executables carries that denial")
+	}
 	self, err := os.Executable()
 	if err != nil {
 		t.Fatal(err)
