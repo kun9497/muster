@@ -227,15 +227,18 @@ func TestProcessesListenerOwnedByTwoProcesses(t *testing.T) {
 	}
 }
 
-func TestProcessesKernelSocketIsOwnerStatusKernel(t *testing.T) {
-	a := procHost(tcpTable([2]int{2049, 0}), initProc(nil))
+// W-89: a LISTEN row with inode 0 is not the kernel's socket (the kernel
+// numbers its own sockets, W-66) but an orphaned or closing one no fd table
+// can name: unmatched, and the listener leaves absent (MANUAL) naming
+// "inode 0" even when every fd table was read whole.
+func TestProcessesInodeZeroIsUnmatchedNotKernel(t *testing.T) {
+	a := procHost(tcpTable([2]int{22, 7}, [2]int{2049, 0}), sshdProc(map[int]string{3: "socket:[7]"}), initProc(nil), kthreadd)
 	b := build(t, "processes", a)
-	ls := listenerRows(t, b)
-	if len(ls) != 1 || ls[0]["owner_status"] != "kernel" || len(ls[0]["owners"].([]any)) != 0 {
-		t.Fatalf("%v", ls)
-	}
-	if got := okList(t, b, "processes.unpackaged_listeners"); len(got) != 0 {
-		t.Errorf("a kernel socket is packaged by nature: %v", got)
+	for _, k := range []string{"processes.listeners", "processes.unpackaged_listeners"} {
+		e := env(t, b, k)
+		if e.Status != facts.StatusAbsent || !strings.Contains(e.Reason, "tcp/2049 on 0.0.0.0 has inode 0") {
+			t.Errorf("%s = %+v, want absent naming the inode-0 socket", k, e)
+		}
 	}
 }
 

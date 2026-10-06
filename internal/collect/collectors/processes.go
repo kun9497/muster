@@ -835,13 +835,18 @@ func (s *procScan) listenerEnvs(ls []listener, inodeBad string, socks socketTabl
 		// table was refused, yet the holder may be out of sight (W-69).
 		partial = "pid 1 or the kernel threads are not visible to this run, so the pid view may be partial"
 	}
-	var unheld []string
+	var unheld, zeroInode []string
 	var ownerFail *facts.Envelope
 	for i := range ls {
 		l := &ls[i]
 		switch {
 		case l.Inode == 0:
-			l.OwnerStatus = "kernel"
+			// The kernel numbers every socket, its own included (W-66); a
+			// LISTEN row with inode 0 is an orphaned or closing socket no
+			// fd table can name, so its owner is unknown, never the
+			// kernel's, whatever the whole-read test says (W-89).
+			l.OwnerStatus = "unmatched"
+			zeroInode = append(zeroInode, fmt.Sprintf("%s/%d on %s", l.Proto, l.Port, l.Addr))
 			continue
 		case l.Inode < 0:
 			l.OwnerStatus = "error"
@@ -901,8 +906,15 @@ func (s *procScan) listenerEnvs(ls []listener, inodeBad string, socks socketTabl
 		fail = s.statusFail.env
 	case s.fdError.env != nil:
 		fail = s.fdError.env
-	case len(unheld) > 0:
-		e := collect.Absent("no process this run can see holds the listening socket " + strings.Join(unheld, ", ") + "; " + partial)
+	case len(unheld) > 0 || len(zeroInode) > 0:
+		var why []string
+		if len(unheld) > 0 {
+			why = append(why, "no process this run can see holds the listening socket "+strings.Join(unheld, ", ")+"; "+partial)
+		}
+		if len(zeroInode) > 0 {
+			why = append(why, "the listening socket "+strings.Join(zeroInode, ", ")+" has inode 0, which no fd table can hold, so its owner cannot be read")
+		}
+		e := collect.Absent(strings.Join(why, "; "))
 		fail = &e
 	}
 	if fail != nil {

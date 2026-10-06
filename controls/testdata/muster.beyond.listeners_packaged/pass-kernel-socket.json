@@ -47,7 +47,7 @@
             "port": 2049,
             "loopback": false,
             "link_local": false,
-            "inode": 0,
+            "inode": 363387305,
             "owner_status": "kernel",
             "owners": [],
             "owners_count": 0
