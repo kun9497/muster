@@ -761,9 +761,64 @@ func TestSysctlGlobMatch(t *testing.T) {
 		{"net.ipv?.conf.all.rp_filter", "net.ipv6.conf.all.rp_filter", true},
 		{"net.ipv4.conf.[ad]*.rp_filter", "net.ipv4.conf.all.rp_filter", true},
 		{"net.ipv4.conf.[.rp_filter", "net.ipv4.conf.[.rp_filter", false},
+		// glob(3)'s "[!...]" negation, which path.Match spells "[^...]".
+		{"net.ipv4.conf.[!d]*.rp_filter", "net.ipv4.conf.all.rp_filter", true},
+		{"net.ipv4.conf.[!d]*.rp_filter", "net.ipv4.conf.default.rp_filter", false},
+		{"net.ipv4.conf.[^d]*.rp_filter", "net.ipv4.conf.all.rp_filter", true},
+		{"net.ipv4.conf.[a!]*.rp_filter", "net.ipv4.conf.all.rp_filter", true},
 	} {
 		if got := sysctlGlobMatch(tc.pattern, tc.key); got != tc.want {
 			t.Errorf("sysctlGlobMatch(%q, %q) = %v, want %v", tc.pattern, tc.key, got, tc.want)
 		}
+	}
+}
+
+// glob(3)'s negated class reaches the merge: "[!d]*" sets all, not default.
+func TestSysctlGlobNegationSetsTheOtherKey(t *testing.T) {
+	a := netSysAccess(nil)
+	a.contents["/etc/sysctl.d/10-a.conf"] = []byte("net.ipv4.conf.[!d]*.rp_filter = 1\n")
+	b := build(t, "sysctl", a)
+	if got := persistedOK(t, b, "net.sysctl.ipv4_all_rp_filter"); got.Value != 1 {
+		t.Errorf("all.rp_filter persisted %+v, want 1 from the negated class", got)
+	}
+	if got := persisted(t, b, "net.sysctl.ipv4_default_rp_filter"); got.Status != facts.StatusAbsent {
+		t.Errorf("default.rp_filter persisted %+v, want absent: [!d] excludes it", got)
+	}
+}
+
+// systemd's parse_file keeps an existing glob entry IN PLACE when a later
+// line repeats its pattern with the same value, so the repeat does not move
+// it past a narrower glob in between: all.rp_filter ends up 1 from 20-b.
+func TestSysctlRepeatedEqualGlobKeepsItsPlace(t *testing.T) {
+	a := netSysAccess(nil)
+	a.contents["/etc/sysctl.d/10-a.conf"] = []byte("net.ipv4.conf.*.rp_filter = 2\n")
+	a.contents["/etc/sysctl.d/20-b.conf"] = []byte("net.ipv4.conf.a*.rp_filter = 1\n")
+	a.contents["/etc/sysctl.d/30-c.conf"] = []byte("net.ipv4.conf.*.rp_filter = 2\n")
+	b := build(t, "sysctl", a)
+	if got := persistedOK(t, b, "net.sysctl.ipv4_all_rp_filter"); got.Value != 1 || got.Source.Path != "/etc/sysctl.d/20-b.conf" {
+		t.Errorf("all.rp_filter persisted %+v, want 1 from 20-b.conf", got)
+	}
+	// The kept entry cites its own, earlier line.
+	if got := persistedOK(t, b, "net.sysctl.ipv4_default_rp_filter"); got.Value != 2 || got.Source.Path != "/etc/sysctl.d/10-a.conf" {
+		t.Errorf("default.rp_filter persisted %+v, want 2 citing 10-a.conf", got)
+	}
+
+	// A DIFFERENT value replaces the entry and moves it to the end.
+	a.contents["/etc/sysctl.d/30-c.conf"] = []byte("net.ipv4.conf.*.rp_filter = 0\n")
+	b = build(t, "sysctl", a)
+	if got := persistedOK(t, b, "net.sysctl.ipv4_all_rp_filter"); got.Value != 0 || got.Source.Path != "/etc/sysctl.d/30-c.conf" {
+		t.Errorf("all.rp_filter persisted %+v, want 0 from 30-c.conf", got)
+	}
+}
+
+// An exclusion is not sticky: a later concrete line for the same key
+// replaces it, as any later line does.
+func TestSysctlConcreteAfterExclusionSetsTheKey(t *testing.T) {
+	a := netSysAccess(nil)
+	a.contents["/etc/sysctl.d/20-b.conf"] = []byte("-net.ipv4.conf.all.rp_filter\n")
+	a.contents["/etc/sysctl.d/30-c.conf"] = []byte("net.ipv4.conf.all.rp_filter = 1\n")
+	b := build(t, "sysctl", a)
+	if got := persistedOK(t, b, "net.sysctl.ipv4_all_rp_filter"); got.Value != 1 || got.Source.Path != "/etc/sysctl.d/30-c.conf" {
+		t.Errorf("all.rp_filter persisted %+v, want 1 from 30-c.conf", got)
 	}
 }

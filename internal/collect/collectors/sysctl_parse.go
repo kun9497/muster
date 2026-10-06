@@ -260,8 +260,10 @@ type sysctlWinners struct {
 // already in application order, and a later line for the same key - an
 // assignment or a "-key" exclusion - replaces the earlier one, so the last
 // line naming a key exactly is the one that counts. Glob lines are kept in
-// the order they apply; a later line with the same pattern replaces an
-// earlier one and moves to its place, as systemd's ordered table does.
+// the order they apply. A later line with the same pattern follows
+// systemd's parse_file: when its value and its exclusion flag equal the
+// entry already there, that entry stays where it is (and keeps citing its
+// own line); only a different line replaces it and moves to the end.
 func mergeSysctl(files []sysctlFile) sysctlWinners {
 	w := sysctlWinners{exact: map[string]sysctlEntry{}}
 	for _, f := range files {
@@ -275,7 +277,13 @@ func mergeSysctl(files []sysctlFile) sysctlWinners {
 				w.exact[as.key] = e
 				continue
 			}
-			w.globs = slices.DeleteFunc(w.globs, func(g sysctlEntry) bool { return g.pattern == as.key })
+			i := slices.IndexFunc(w.globs, func(g sysctlEntry) bool { return g.pattern == as.key })
+			if i >= 0 {
+				if old := w.globs[i]; old.value == e.value && old.exclude == e.exclude {
+					continue
+				}
+				w.globs = slices.Delete(w.globs, i, i+1)
+			}
 			w.globs = append(w.globs, e)
 		}
 	}
@@ -305,7 +313,8 @@ func (w sysctlWinners) lookup(key string) (sysctlWinner, bool) {
 
 // sysctlGlobMatch matches a dotted glob key against a dotted variable one
 // component at a time: systemd-sysctl expands the glob as a /proc/sys path,
-// so "*" stands for one directory and never crosses a ".".
+// so "*" stands for one directory and never crosses a ".". glob(3) negates a
+// class with "[!...]", which path.Match spells "[^...]".
 func sysctlGlobMatch(pattern, key string) bool {
 	pp := strings.Split(pattern, ".")
 	kp := strings.Split(key, ".")
@@ -313,11 +322,36 @@ func sysctlGlobMatch(pattern, key string) bool {
 		return false
 	}
 	for i := range pp {
-		if ok, err := path.Match(pp[i], kp[i]); err != nil || !ok {
+		if ok, err := path.Match(globNegation(pp[i]), kp[i]); err != nil || !ok {
 			return false
 		}
 	}
 	return true
+}
+
+// globNegation rewrites the "[!" that opens a bracket class to path.Match's
+// "[^". A "[!" inside a class, or after a backslash, is left alone.
+func globNegation(p string) string {
+	if !strings.Contains(p, "[!") {
+		return p
+	}
+	b := []byte(p)
+	inClass := false
+	for i := 0; i < len(b); i++ {
+		switch {
+		case !inClass && b[i] == '\\':
+			i++
+		case !inClass && b[i] == '[':
+			inClass = true
+			if i+1 < len(b) && b[i+1] == '!' {
+				b[i+1] = '^'
+				i++
+			}
+		case inClass && b[i] == ']':
+			inClass = false
+		}
+	}
+	return string(b)
 }
 
 // parseSysctlD reads one sysctl.d file. Blank lines and lines whose first
