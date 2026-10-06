@@ -154,15 +154,18 @@ func runFirewall(ctx context.Context, a collect.Access, b *collect.Builder) erro
 		}
 	}
 
-	// W-57: an empty nf_tables ruleset proves nothing when the rules live in
-	// x_tables — iptables-legacy, common on Docker and Kubernetes hosts that
-	// also have nftables installed. In exactly the X-9 case the declared
-	// iptables-save is read as a cross-check, and its dump joins the evidence.
-	legacy := false
-	if cr.tool == "nft" && !cr.truncated && len(inputs) == 0 && !inboundPathHasRules {
-		legacy = crossCheckLegacy(ctx, a, &cr)
+	// W-57: an nf_tables ruleset that restricts nothing proves nothing when
+	// the rules live in x_tables — iptables-legacy, common on Docker and
+	// Kubernetes hosts that also have nftables installed. In both cases that
+	// would read full + ok:false — no input base chain (X-9), or input chains
+	// that accept with zero rules (Debian's stock nftables.conf loaded beside
+	// a legacy ufw, R-2) — the declared iptables-save is read as a
+	// cross-check, and its dump joins the evidence (its truncation too, R-4).
+	legacy, legacyTruncated := false, false
+	if cr.tool == "nft" && !cr.truncated && !inboundPathHasRules && (len(inputs) == 0 || allAcceptNoRules(inputs)) {
+		legacy, legacyTruncated = crossCheckLegacy(ctx, a, &cr)
 	}
-	b.Set("firewall.raw_dumps", withTruncation(collect.OK(cr.dumps, cr.src), cr.truncated))
+	b.Set("firewall.raw_dumps", withTruncation(collect.OK(cr.dumps, cr.src), cr.truncated || legacyTruncated))
 
 	// Ruling H-16 — the `full`-confidence boundary. The v1 normaliser claims
 	// `full` ONLY in the two cases it can decide without modelling the rule
@@ -211,26 +214,24 @@ func runFirewall(ctx context.Context, a collect.Access, b *collect.Builder) erro
 		confidence = "partial"
 		restricts = collect.Absent("firewall confidence partial: ruleset not normalisable; no input base chain found; see firewall.raw_dumps")
 	default:
-		allDeny, allAcceptNoRules := true, true
+		allDeny := true
 		for _, c := range inputs {
 			if !(c.policy == "drop" || c.policy == "reject") {
 				allDeny = false
-			}
-			if !(c.policy == "accept" && !c.hasRules) {
-				allAcceptNoRules = false
 			}
 		}
 		// S2: any filter chain on an earlier inbound hook (ingress or a
 		// raw/mangle prerouting) that carries rules means the ruleset is not
 		// demonstrably inert inbound — never a confident ok:false here.
-		if inboundPathHasRules {
-			allAcceptNoRules = false
-		}
+		acceptNoRules := allAcceptNoRules(inputs) && !inboundPathHasRules
 		switch {
 		case allDeny:
 			confidence = "full"
 			restricts = collect.OK(true, cr.src)
-		case allAcceptNoRules:
+		case acceptNoRules && legacy:
+			confidence = "partial"
+			restricts = collect.Absent("nft input chains accept with no rule but iptables-legacy carries rules; see firewall.raw_dumps")
+		case acceptNoRules:
 			confidence = "full"
 			restricts = collect.OK(false, cr.src)
 		default:
@@ -290,17 +291,29 @@ func normalizeRuleset(cr capture) ([]baseChain, []fwRule) {
 
 // crossCheckLegacy runs the declared iptables-save after an empty nft read,
 // appends its dump to the capture's evidence and reports whether x_tables
-// restricts inbound there (W-57). A failed read reports false: the nft
-// answer stands.
-func crossCheckLegacy(ctx context.Context, a collect.Access, cr *capture) bool {
+// restricts inbound there (W-57), and whether that dump was truncated (R-4).
+// A failed read reports false: the nft answer stands.
+func crossCheckLegacy(ctx context.Context, a collect.Access, cr *capture) (restricts, truncated bool) {
 	out := a.Run(ctx, iptablesSaveCmd)
 	if !cmdOK(out) {
-		return false
+		return false, false
 	}
 	rec := dumpRecord(out.Source(iptablesSaveCmd).Cmd, out)
 	cr.dumps = append(cr.dumps, rec)
 	content, _ := rec["content"].(string)
-	return rec["truncated"] == true || iptablesLegacyRestricts(content)
+	truncated = rec["truncated"] == true
+	return truncated || iptablesLegacyRestricts(content), truncated
+}
+
+// allAcceptNoRules reports input chains that all have policy accept and carry
+// no rule (and that there is at least one).
+func allAcceptNoRules(inputs []baseChain) bool {
+	for _, c := range inputs {
+		if c.policy != "accept" || c.hasRules {
+			return false
+		}
+	}
+	return len(inputs) > 0
 }
 
 // iptablesLegacyRestricts reports whether an iptables-save dump read beside an

@@ -694,6 +694,13 @@ type ruleClass string
 // loopback_only; state_only (every state established, related or invalid,
 // W-58); port_rule or any_port only when nothing was left unmodelled; else
 // opaque. A jump the fold could not follow carries unmodelled and is opaque.
+//
+// In nft an unknown statement word cannot be told from an unknown match, so a
+// rule of unknown statements and no verdict word (`xt target "TPROXY"`,
+// `synproxy …`) is `action: none`, irrelevant — safe, because no such
+// statement accepts a packet the way a verdict does (R-3). "An unrecognised
+// verdict stays opaque" is the iptables `-j <unknown>` case, a jump the fold
+// cannot follow.
 func classifyRule(r fwRule) ruleClass {
 	switch a := r.Action; {
 	case a == "drop" || a == "reject":

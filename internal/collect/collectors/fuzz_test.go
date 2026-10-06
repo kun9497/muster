@@ -955,13 +955,16 @@ func FuzzParsePortSpec(f *testing.F) {
 
 // FuzzFoldChains folds a dump parsed both ways (nft and iptables-save). The
 // fold must terminate and stay within its budget: per input base chain, at
-// most foldMaxRows folded rows and no row deeper than foldMaxDepth. A chain is
-// visited once per base chain, so the rows of one base chain never outnumber
-// the dump's rules — the bound fuzzBody checks is that, per base chain.
+// most foldMaxRows folded rows and no row deeper than foldMaxDepth. A base
+// chain's own rows never outnumber the dump's rules, and the fold adds at most
+// foldMaxRows per base chain — a chain is folded once per distinct carried
+// conditions (W-60), so a few short jumps can fan one chain out to the budget
+// (R-1). The bound fuzzBody checks is the sum of the two.
 func FuzzFoldChains(f *testing.F) {
 	seeds(f, "testdata/nft.ruleset.ufw-allow-80", "testdata/iptables-save.ufw-allow-80")
 	f.Add([]byte(nftRuleSeed))
 	f.Add([]byte(iptablesRuleSeed))
+	f.Add([]byte(foldFanOutSeed(40, 50)))
 	f.Fuzz(func(t *testing.T, data []byte) {
 		nb, nby := parseNftRuleset(string(data))
 		ib, iby := parseIptablesSave("v4", string(data))
@@ -988,7 +991,7 @@ func FuzzFoldChains(f *testing.F) {
 				}
 			}
 			return rows
-		}, len(data)*max(1, inputs))
+		}, len(data)*max(1, inputs)+foldMaxRows*inputs)
 	})
 }
 
@@ -1543,4 +1546,36 @@ func FuzzParseLdSoPreload(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte) {
 		fuzzBody(t, "parseLdSoPreload", func() any { return parseLdSoPreload(data) }, len(data))
 	})
+}
+
+// foldFanOutSeed is the shape that fans a fold out to its budget (R-1): an
+// input chain of n short jumps, each under its own interface, into one chain
+// of m rows. Folded once per distinct conditions, it yields n·m rows (capped
+// at foldMaxRows) from a dump far smaller than that.
+func foldFanOutSeed(n, m int) string {
+	var s strings.Builder
+	s.WriteString("table ip t {\n\tchain in {\n\t\ttype filter hook input priority filter; policy drop;\n")
+	for i := 0; i < n; i++ {
+		fmt.Fprintf(&s, "\t\tiif e%d jump x\n", i)
+	}
+	s.WriteString("\t}\n\tchain x {\n")
+	for i := 0; i < m; i++ {
+		s.WriteString("\t\ta\n")
+	}
+	s.WriteString("\t}\n}\n")
+	return s.String()
+}
+
+// The fan-out seed really is past the old bound (R-1): its rows outnumber
+// len(data)×inputs, and the widened bound still holds them.
+func TestFoldFanOutSeedNeedsTheWidenedBound(t *testing.T) {
+	data := foldFanOutSeed(40, 50)
+	bases, by := parseNftRuleset(data)
+	rows := foldChains(bases, by)
+	if len(rows) <= len(data)+listSlack {
+		t.Fatalf("%d rows from %d bytes: the seed no longer exceeds the old bound", len(rows), len(data))
+	}
+	if len(rows) > len(data)+foldMaxRows+listSlack {
+		t.Fatalf("%d rows from %d bytes exceed the widened bound", len(rows), len(data))
+	}
 }

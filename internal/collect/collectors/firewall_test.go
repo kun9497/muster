@@ -738,3 +738,49 @@ func TestParseNftRulesetChainCommentIsInert(t *testing.T) {
 		t.Errorf("rows %+v, want none", rules)
 	}
 }
+
+// R-2: Debian's stock nftables.conf (an inet input chain, policy accept, no
+// rule) loaded beside a ufw running on iptables-legacy. The accept-no-rules
+// reading is no proof either: partial, restricts_inbound absent.
+func TestFirewallNftAcceptNoRulesButLegacyFullIsPartial(t *testing.T) {
+	const stock = "table inet filter {\n\tchain input {\n\t\ttype filter hook input priority filter; policy accept;\n\t}\n" +
+		"\tchain forward {\n\t\ttype filter hook forward priority filter; policy accept;\n\t}\n}\n"
+	a := firewallAccess(
+		map[string]string{"/etc/ufw/ufw.conf": "ufw.conf"},
+		map[string]cmdResult{nftListRuleset: {stdout: []byte(stock)}, iptablesSave: {file: "iptables-save.ufw-allow-80"}},
+	)
+	b := buildBegun(t, "firewall", a)
+	if e := env(t, b, "firewall.normalization_confidence"); e.Value != "partial" {
+		t.Errorf("confidence %+v, want partial", e)
+	}
+	e := env(t, b, "firewall.restricts_inbound")
+	if e.Status != facts.StatusAbsent || e.Reason != "nft input chains accept with no rule but iptables-legacy carries rules; see firewall.raw_dumps" {
+		t.Errorf("restricts_inbound %+v, want absent with the legacy reason", e)
+	}
+
+	// The same nft ruleset with an empty legacy side stays full + ok:false.
+	a = firewallAccess(
+		map[string]string{"/etc/nftables.conf": "nftables.conf"},
+		map[string]cmdResult{nftListRuleset: {stdout: []byte(stock)}, iptablesSave: {stdout: []byte{}}},
+	)
+	b = buildBegun(t, "firewall", a)
+	if e := env(t, b, "firewall.restricts_inbound"); e.Status != facts.StatusOK || e.Value != false {
+		t.Errorf("restricts_inbound %+v, want ok false", e)
+	}
+}
+
+// R-4: a truncated legacy dump marks the raw_dumps envelope truncated, as a
+// truncated primary dump does.
+func TestFirewallTruncatedLegacyDumpMarksRawDumps(t *testing.T) {
+	a := firewallAccess(nil, map[string]cmdResult{
+		nftListRuleset: {stdout: []byte{}},
+		iptablesSave:   {stdout: []byte("*filter\n:INPUT ACCEPT [0:0]\nCOMMIT\n"), truncated: true},
+	})
+	b := buildBegun(t, "firewall", a)
+	if e := env(t, b, "firewall.raw_dumps"); !e.Truncated {
+		t.Errorf("raw_dumps %+v, want the envelope truncated", e)
+	}
+	if e := env(t, b, "firewall.normalization_confidence"); e.Value != "partial" {
+		t.Errorf("confidence %+v, want partial (W-61)", e)
+	}
+}
