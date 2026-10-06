@@ -353,3 +353,21 @@ func TestBuildStaysInsideTheDeclaredReads(t *testing.T) {
 		t.Errorf("rpm Owner(sshd) = %q %v", pkg, ok)
 	}
 }
+
+// FuzzFirstLine (here, beside the linux-tagged rpm.go it reaches, not in the
+// untagged fuzz_test.go): the first non-blank line of a command's stderr, the reason
+// a failed rpm query carries. It is a line of the input, trimmed, so never
+// longer than the input.
+func FuzzFirstLine(f *testing.F) {
+	seeds(f, "stderr.*")
+	f.Add([]byte("\n\n  rpmdb: open failed \r\nsecond\n"))
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "firstLine", func() (any, int) {
+			s := firstLine(data)
+			if len(s) > len(data) {
+				t.Fatalf("firstLine returned %d bytes from %d", len(s), len(data))
+			}
+			return s, 0
+		}, len(data))
+	})
+}
