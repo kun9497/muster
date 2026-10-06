@@ -73,7 +73,7 @@ func TestParseIptablesRuleRecordsSelectors(t *testing.T) {
 		{`-A INPUT -m state --state NEW -p tcp --dport 22 -j ACCEPT`, fwRule{Ctstate: "new", Proto: "tcp", Dport: "22", Action: "accept"}},
 		{`-A INPUT -p tcp -m multiport --dports 22,80,443 -j ACCEPT`, fwRule{Proto: "tcp", Dport: "22,80,443", Action: "accept"}},
 		{`-A INPUT -p tcp -m tcp --dport 1000:2000 -j ACCEPT`, fwRule{Proto: "tcp", Dport: "1000:2000", Action: "accept"}},
-		{`-A INPUT -d 10.0.0.1/32 -j ACCEPT`, fwRule{Daddr: "10.0.0.1/32", Action: "accept"}},
+		{`-A INPUT -d 203.0.113.1/32 -j ACCEPT`, fwRule{Daddr: "203.0.113.1/32", Action: "accept"}},
 		{`-A INPUT -s 192.0.2.0/24 -p udp -m udp --sport 67 --dport 68 -j ACCEPT`, fwRule{Saddr: "192.0.2.0/24", Proto: "udp", Dport: "68", Action: "accept"}},
 		{`-A INPUT -j ufw-before-input`, fwRule{Action: "jump ufw-before-input"}},
 		{`-A INPUT -g ufw-before-input`, fwRule{Action: "goto ufw-before-input"}},
@@ -365,7 +365,7 @@ func TestClassifyRule(t *testing.T) {
 		{fwRule{Action: "accept", Proto: "tcp", Dport: "ssh"}, "opaque"},
 		{fwRule{Action: "accept", Proto: "tcp"}, "opaque"},
 		{fwRule{Action: "accept", Iif: "eth0"}, "opaque"},
-		{fwRule{Action: "accept", Daddr: "10.0.0.1"}, "opaque"},
+		{fwRule{Action: "accept", Daddr: "203.0.113.1"}, "opaque"},
 		{fwRule{Action: ""}, "opaque"},
 	}
 	for _, c := range cases {
