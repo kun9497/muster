@@ -347,6 +347,10 @@ func TestProcessesDeniedNsMntMakesTheLeavesDenied(t *testing.T) {
 	if e := env(t, b, "processes.listeners"); e.Status != facts.StatusDenied || !strings.Contains(e.Reason, procInitMntNS) {
 		t.Errorf("listeners = %+v, want denied naming pid 1's ns link", e)
 	}
+	// The refused pid 1 link is one refused read, counted like the others.
+	if s := env(t, b, "processes.stats").Value.(map[string]any); s["denied"] != 1 {
+		t.Errorf("stats %v, want denied 1 for pid 1's ns link", s)
+	}
 }
 
 func TestProcessesForeignMountNamespaceIsNotLookedUp(t *testing.T) {

@@ -224,6 +224,12 @@ func runProcesses(ctx context.Context, a collect.Access, b *collect.Builder) err
 		s.hostNS = t
 	} else {
 		e := readFailure(procInitMntNS, err)
+		if e.Status == facts.StatusDenied {
+			// A refused read like any other. readNS then reads no
+			// process's ns/mnt (each carries this failure), so the one
+			// refusal is counted once, here.
+			s.denied++
+		}
 		s.hostErr = &e
 	}
 
