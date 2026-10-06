@@ -382,4 +382,34 @@ func TestProcessesExposureCitesTheFirewallOnce(t *testing.T) {
 			t.Errorf("%s inputs %+v, want the firewall's command, then the listeners", k, in)
 		}
 	}
+
+	// S8/S18: a degraded exposure leaf keeps the source it was derived from
+	// (C4) — the absent verdict of a partial confidence, and the listeners'
+	// failure carried to the two leaves built from them.
+	b = seedFirewall(t, ufwCapture(t), "partial", collect.Absent("firewall confidence partial"), "ufw")
+	buildOn(t, "processes", webHost(), b)
+	e := env(t, b, "exposure.exposed")
+	if e.Status != facts.StatusAbsent || e.Source == nil || len(e.Source.Inputs) != 2 || e.Source.Inputs[0].Cmd != iptablesSave {
+		t.Errorf("partial: exposure.exposed %+v, want absent citing the firewall's capture and the listeners", e)
+	}
+
+	a := webHost()
+	a.deniedDirs = map[string]bool{"/proc/950/fd": true}
+	b = seedFirewall(t, ufwCapture(t), "full", collect.OK(true, nil), "ufw")
+	buildOn(t, "processes", a, b)
+	for _, k := range []string{"exposure.listeners", "exposure.exposed"} {
+		e := env(t, b, k)
+		if e.Status != facts.StatusDenied || e.Source == nil || len(e.Source.Inputs) == 0 || e.Source.Inputs[0].Cmd != iptablesSave {
+			t.Errorf("denied listeners: %s %+v, want denied citing the firewall's capture", k, e)
+		}
+	}
+
+	// A firewall read that did not answer is carried with the source too.
+	b = seedFirewallFailed(t, collect.Denied("reading the kernel firewall ruleset requires root"))
+	buildOn(t, "processes", webHost(), b)
+	for _, k := range exposureKeys {
+		if e := env(t, b, k); e.Status != facts.StatusDenied || e.Source == nil || e.Source.Kind != "derived" || len(e.Source.Inputs) != 1 {
+			t.Errorf("denied firewall: %s %+v, want denied with the derived source citing the listeners", k, e)
+		}
+	}
 }

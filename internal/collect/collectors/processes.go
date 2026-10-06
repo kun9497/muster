@@ -995,9 +995,28 @@ var exposureFirewallKeys = []string{
 }
 
 // carry is a failure envelope handed on to a derived leaf: its status, with
-// the key it came from named in the reason.
-func carry(key string, e facts.Envelope) facts.Envelope {
-	return facts.Envelope{Status: e.Status, Reason: key + ": " + e.Reason}
+// the key it came from named in the reason, and the derived leaf's source —
+// a degraded leaf keeps the evidence it was derived from (C4).
+func carry(key string, e facts.Envelope, src *facts.Source) facts.Envelope {
+	return facts.Envelope{Status: e.Status, Reason: key + ": " + e.Reason, Source: src}
+}
+
+// exposureSource is the source of every exposure.* envelope, whatever its
+// status: the firewall's capture once and the listeners once. The confidence
+// and the rule table are written from the same capture, so the rules' source
+// stands for both, and the confidence's only when the rules carry none.
+func exposureSource(fw map[string]facts.Envelope, lst facts.Envelope) *facts.Source {
+	src := &facts.Source{Kind: "derived"}
+	fwSrc := fw["firewall.rules"].Source
+	if fwSrc == nil {
+		fwSrc = fw["firewall.normalization_confidence"].Source
+	}
+	for _, s := range []*facts.Source{fwSrc, lst.Source} {
+		if s != nil {
+			src.Inputs = append(src.Inputs, *s)
+		}
+	}
+	return src
 }
 
 // writeExposure derives the four exposure.* keys (spec P-3) from the
@@ -1027,9 +1046,10 @@ func writeExposure(a collect.Access, b *collect.Builder, ls []listener, lst fact
 		fw[k] = e
 	}
 	conf := fw["firewall.normalization_confidence"]
+	src := exposureSource(fw, lst)
 	for _, k := range exposureFirewallKeys[:4] {
 		if fw[k].Status != facts.StatusOK {
-			setAll(carry(k, fw[k]))
+			setAll(carry(k, fw[k], src))
 			return
 		}
 	}
@@ -1045,7 +1065,7 @@ func writeExposure(a collect.Access, b *collect.Builder, ls []listener, lst fact
 	} else if confidence == "full" {
 		// A full normalisation always answers restricts_inbound; one that
 		// did not is that read's failure.
-		setAll(carry("firewall.restricts_inbound", r))
+		setAll(carry("firewall.restricts_inbound", r, src))
 		return
 	}
 	rulesEnv := fw["firewall.rules"]
@@ -1092,20 +1112,6 @@ func writeExposure(a collect.Access, b *collect.Builder, ls []listener, lst fact
 	}
 	rows, exposed, opaque, manual := decideExposure(cands, in)
 
-	// The firewall's source once: the confidence and the rule table are
-	// written from the same capture, so the rules' source stands for both,
-	// and the confidence's only when the rules carry none.
-	src := &facts.Source{Kind: "derived"}
-	fwSrc := rulesEnv.Source
-	if fwSrc == nil {
-		fwSrc = conf.Source
-	}
-	for _, s := range []*facts.Source{fwSrc, lst.Source} {
-		if s != nil {
-			src.Inputs = append(src.Inputs, *s)
-		}
-	}
-
 	opaqueList := make([]any, 0, min(len(opaque), procListenersCap))
 	for i, r := range opaque {
 		if i == procListenersCap {
@@ -1123,7 +1129,7 @@ func writeExposure(a collect.Access, b *collect.Builder, ls []listener, lst fact
 		"opaque_rules": len(opaque), "folded_rules": len(rules), "ipv6_disabled": in.V6Disabled,
 	}
 	if !listenersOK {
-		e := carry("processes.listeners", lst)
+		e := carry("processes.listeners", lst, src)
 		b.Set("exposure.listeners", e)
 		b.Set("exposure.exposed", e)
 		stats["manual_reason"] = e.Reason
@@ -1166,13 +1172,14 @@ func writeExposure(a collect.Access, b *collect.Builder, ls []listener, lst fact
 	}
 	switch {
 	case bindFail != nil && anyDual:
-		exp = carry("net.ipv6.bindv6only", *bindFail)
+		exp = carry("net.ipv6.bindv6only", *bindFail, src)
 		stats["manual_reason"] = exp.Reason
 	case v6Fail != nil && anyV6:
-		exp = carry("net.ipv6.conf.disable_ipv6", *v6Fail)
+		exp = carry("net.ipv6.conf.disable_ipv6", *v6Fail, src)
 		stats["manual_reason"] = exp.Reason
 	case manual != "":
 		exp = collect.Absent(manual)
+		exp.Source = src
 	default:
 		expList := make([]any, 0, min(len(exposed), procListenersCap))
 		for i, r := range exposed {
