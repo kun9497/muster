@@ -904,12 +904,62 @@
     {
       "Key": "sockets.listening",
       "Type": "list\u003crecord\u003e",
-      "Description": "Listening TCP/UDP sockets with proto, address, port, inode, pid and executable.",
+      "Description": "Listening TCP/UDP sockets with proto, address, port and inode.",
       "Since": 1,
       "Sensitivity": "internal",
       "Collector": "sockets",
       "DefaultOn": "",
       "SubjectKind": "port"
+    },
+    {
+      "Key": "processes.list",
+      "Type": "list\u003crecord\u003e",
+      "Description": "Every process /proc lists, one row per pid sorted by pid, with pid, ppid, uid (the real uid), name, cmd (the first NUL-separated token of the command line, from at most 4 KiB), exe (the exe link's text without proc(5)'s \" (deleted)\" suffix), exe_deleted (the link carried it: the executable was unlinked or replaced after it started - an upgraded daemon not yet restarted, a binary removed from disk, or a memfd: executable, the suspicious case), exe_read_status (ok, denied or error; empty on a kernel thread or a zombie), kind (kernel: the Kthread flag, or pid 2 or a child of pid 2 where the kernel does not print it; zombie: state Z; user otherwise), mnt_ns (host when the ns/mnt link equals pid 1's, or when the process's own mount namespace still shows pid 1's root mount at / - the device, root, type and source of the mountinfo row mounted on /, as a systemd service with PrivateTmp= or ProtectSystem= sees it; foreign otherwise - a container or a service with another root seen from the host; empty when it was not read), ns_read_status (ok, denied or error; empty on a kernel thread or a zombie), package and package_status (for a user process whose exe was read: packaged with the owning package, unpackaged, snap with package snap:\u003cname\u003e, flatpak, appimage, foreign_ns - never looked up, the path is in another root - or no_index when the package index could not be built; empty otherwise). A process that exits between the listing and the read leaves no row. Capped at 4096 rows; truncated also when the 5-second enumeration budget ran out.",
+      "Since": 1,
+      "Sensitivity": "internal",
+      "Collector": "processes",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "processes.deleted_executables",
+      "Type": "list\u003crecord\u003e",
+      "Description": "The judged subset of processes.list: the user processes whose executable was deleted or replaced since it started, sorted by pid, with pid, uid, name and exe. The status of the read when any status file or any user process's exe could not be read (denied in a non-root run), never the readable subset; never absent. Truncated when the enumeration budget ran out.",
+      "Since": 1,
+      "Sensitivity": "internal",
+      "Collector": "processes",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "processes.listeners",
+      "Type": "list\u003crecord\u003e",
+      "Description": "Every listening socket of the kernel's tcp, tcp6, udp and udp6 tables, sorted by proto, port and addr, with proto (tcp or udp), family (v4 or v6, from the table), addr, port, loopback, link_local, inode, owner_status and owners (the processes whose fd table holds the socket, sorted by pid and capped at 64, each with pid, uid, name, exe, exe_deleted, mnt_ns, package and package_status). owner_status is ok, kernel (inode 0: a socket the kernel itself holds, such as nfsd or WireGuard; owners empty), unmatched or denied. The status of the read when an fd table, or the exe or ns/mnt of a process holding a socket, could not be read; error when a table row's inode did not parse or a process holds more than 65536 fds; absent, naming the socket, when every fd table was read and no process holds one (another network namespace's socket, or one closed between the two reads). Capped at 2000 rows; truncated when a socket table or the package index was cut or the enumeration budget ran out.",
+      "Since": 1,
+      "Sensitivity": "internal",
+      "Collector": "processes",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "processes.unpackaged_listeners",
+      "Type": "list\u003crecord\u003e",
+      "Description": "The judged subset of processes.listeners: one row per listening socket and holding process whose package_status is unpackaged, snap, flatpak, appimage or foreign_ns (a process whose executable was deleted is processes.deleted_executables' and is not repeated), sorted as processes.listeners, with proto, family, addr, port, pid, name, exe and package_status. Carries processes.listeners' status when that is not ok, and the package index's when it could not be built (absent \"no package database\" on a host with neither dpkg nor rpm). Capped at 2000 rows; truncated as processes.listeners.",
+      "Since": 1,
+      "Sensitivity": "internal",
+      "Collector": "processes",
+      "DefaultOn": "",
+      "SubjectKind": "file"
+    },
+    {
+      "Key": "processes.stats",
+      "Type": "record",
+      "Description": "The process collector's account of itself - count (rows read), kernel_threads, zombies, foreign_ns, denied (reads refused), vanished (processes that exited under the read), fd_reads, index_source (dpkg, rpm or none), index_ms and elapsed_ms; provenance, read by no control.",
+      "Since": 1,
+      "Sensitivity": "internal",
+      "Collector": "processes",
+      "DefaultOn": "",
+      "SubjectKind": ""
     },
     {
       "Key": "sshd.collect_method",

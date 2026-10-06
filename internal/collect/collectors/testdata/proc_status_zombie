@@ -1,0 +1,12 @@
+Name:	defunct-child
+State:	Z (zombie)
+Tgid:	4242
+Ngid:	0
+Pid:	4242
+PPid:	4200
+TracerPid:	0
+Uid:	1000	1000	1000	1000
+Gid:	1000	1000	1000	1000
+FDSize:	0
+Groups:	1000
+Threads:	1

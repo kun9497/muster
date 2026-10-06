@@ -112,7 +112,8 @@ func (b *Builder) Begin(name string, globs ...string) {
 // other key panics, a programming error the collectors' declaration test
 // catches, exactly as an undeclared read is. A key nobody set, an
 // unregistered key and a setting key are (Envelope{}, false): only
-// envelopes are read across collectors.
+// envelopes are read across collectors. The envelope's Value is the one the
+// writer stored, shared and not copied: a reader never modifies it.
 func (b *Builder) Get(key string) (facts.Envelope, bool) {
 	declared := false
 	for _, glob := range b.declared[b.current] {

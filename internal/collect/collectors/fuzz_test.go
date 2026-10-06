@@ -1579,3 +1579,51 @@ func TestFoldFanOutSeedNeedsTheWidenedBound(t *testing.T) {
 		t.Fatalf("%d rows from %d bytes exceed the widened bound", len(rows), len(data))
 	}
 }
+
+// ---------------------------------------------------------------------------
+// The process collector (W-37)
+// ---------------------------------------------------------------------------
+
+func FuzzParseProcStatus(f *testing.F) {
+	seeds(f, "testdata/proc_status_*")
+	f.Add([]byte("Name:\tx\nState:\tS\nPPid:\t1\nUid:\t0\t0\t0\t0\nKthread:\t1\n"))
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "parseProcStatus", func() any {
+			st, err := parseProcStatus(data)
+			if err == nil && (len(st.State) != 1 || st.PPid < 0 || st.Uid < 0 || len(st.Name) > len(data)) {
+				t.Fatalf("%q parsed to %+v", data, st)
+			}
+			return []any{st, err == nil}
+		}, len(data))
+	})
+}
+
+func FuzzParseCmdline(f *testing.F) {
+	for _, s := range []string{"/usr/sbin/sshd\x00-D\x00", "sshd: alice [priv]", "", "\x00", strings.Repeat("a", cmdlineCap+1)} {
+		f.Add([]byte(s))
+	}
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "parseCmdline", func() any {
+			s := parseCmdline(data)
+			if len(s) > cmdlineCap || strings.IndexByte(s, 0) >= 0 {
+				t.Fatalf("%q -> %q", data, s)
+			}
+			return s
+		}, len(data))
+	})
+}
+
+func FuzzParseFdLink(f *testing.F) {
+	for _, s := range []string{"socket:[123]", "socket:[0]", "pipe:[4]", "/dev/null", "anon_inode:[eventpoll]", "socket:[]", "socket:[-1]"} {
+		f.Add([]byte(s))
+	}
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "parseFdLink", func() any {
+			n, ok := parseFdLink(string(data))
+			if ok && (n < 0 || !strings.HasPrefix(string(data), "socket:[") || !strings.HasSuffix(string(data), "]")) {
+				t.Fatalf("%q -> %d", data, n)
+			}
+			return []any{n, ok}
+		}, len(data))
+	})
+}

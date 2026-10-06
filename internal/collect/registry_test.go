@@ -947,9 +947,6 @@ func TestGuardReadlinkIsARead(t *testing.T) {
 	}
 }
 
-// §9: a collector that declares the walk contributes exactly one "walk" row
-// to --list-actions, with the fixed target sentence, sorted among its reads
-// by the existing (collector, kind, target) order.
 // W-32: one "fact" row per declared fact glob, with the collector's Needs,
 // sorted with its own rows ("command" < "fact" < "read").
 func TestListActionsRendersTheFactRows(t *testing.T) {
@@ -978,6 +975,9 @@ func TestListActionsRendersTheFactRows(t *testing.T) {
 	}
 }
 
+// §9: a collector that declares the walk contributes exactly one "walk" row
+// to --list-actions, with the fixed target sentence, sorted among its reads
+// by the existing (collector, kind, target) order.
 func TestListActionsRendersTheWalkRow(t *testing.T) {
 	Reset()
 	defer Reset()

@@ -86,6 +86,9 @@ type socketTables struct {
 	// truncated reports that a table hit procNetLimit, so rows are missing
 	// and no caller may treat the list as exhaustive.
 	truncated bool
+	// v6 reports that a v6 table (tcp6 or udp6) was read: the host has IPv6
+	// sockets to list, whatever they hold (W-40).
+	v6 bool
 }
 
 // listeningSockets parses the four tables into the records
@@ -114,6 +117,7 @@ func listeningSockets(a collect.Access) (socketTables, error) {
 			return socketTables{}, fmt.Errorf("%s: %w", tbl.path, err)
 		}
 		t.truncated = t.truncated || meta.Truncated
+		t.v6 = t.v6 || strings.HasSuffix(tbl.proto, "6")
 		inputs = append(inputs, facts.Source{Kind: "proc", Path: tbl.path})
 		t.list = append(t.list, parseProcNet(data, tbl.proto)...)
 	}

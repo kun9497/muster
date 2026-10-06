@@ -2,9 +2,11 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -125,6 +127,39 @@ func TestCollectListActionsOnLinux(t *testing.T) {
 	}
 	if errb.Len() != 0 {
 		t.Errorf("stderr must stay empty, got %q", errb.String())
+	}
+	// The processes collector's rows, exhaustively: every read, the rpm
+	// query it shares with the walk and the firewall facts it reads.
+	var actions []struct{ Collector, Kind, Target, Needs string }
+	if err := json.Unmarshal(out.Bytes(), &actions); err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, a := range actions {
+		if a.Collector != "processes" {
+			continue
+		}
+		target := a.Target
+		if a.Kind == "command" && strings.HasPrefix(target, "/usr/bin/rpm -qa --qf ") && strings.Contains(target, `%|FILECAPS?{%{FILECAPS}}|`) {
+			target = "/usr/bin/rpm -qa --qf <the walk's file query>"
+		}
+		got = append(got, a.Kind+" "+a.Needs+" "+target)
+	}
+	want := []string{
+		"command none /usr/bin/rpm -qa --qf <the walk's file query>",
+		"fact none firewall.*",
+		"read none /bin", "read none /lib", "read none /lib32", "read none /lib64", "read none /libx32",
+		"read none /proc/1/ns/mnt", "read none /proc/[0-9]*/cmdline", "read none /proc/[0-9]*/exe",
+		"read none /proc/[0-9]*/fd/*", "read none /proc/[0-9]*/mountinfo", "read none /proc/[0-9]*/ns/mnt", "read none /proc/[0-9]*/status",
+		"read none /proc/self/net/tcp", "read none /proc/self/net/tcp6", "read none /proc/self/net/udp", "read none /proc/self/net/udp6",
+		"read none /proc/sys/net/ipv6/bindv6only", "read none /sbin",
+		"read none /var/lib/dpkg/diversions", "read none /var/lib/dpkg/info/*.list", "read none /var/lib/dpkg/statoverride",
+		"read none /var/lib/dpkg/status", "read none /var/lib/rpm",
+	}
+	slices.Sort(got)
+	slices.Sort(want)
+	if !slices.Equal(got, want) {
+		t.Errorf("processes rows\n got %q\nwant %q", got, want)
 	}
 }
 

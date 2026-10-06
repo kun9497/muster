@@ -322,3 +322,34 @@ func TestBuildRPMFailures(t *testing.T) {
 		}
 	}
 }
+
+// A caller that declares DpkgReads, RPMReads and RPMCommand licenses every
+// access Build makes, on either family: run under collect.Guard with exactly
+// that declaration, Build records no violation (Task 1 review, item b).
+func TestBuildStaysInsideTheDeclaredReads(t *testing.T) {
+	decl := collect.Declaration{
+		Reads:    append(slices.Clone(DpkgReads), RPMReads...),
+		Commands: []collect.Command{RPMCommand},
+		Needs:    "none",
+	}
+	rpmHost := &fakeAccess{dirs: map[string]bool{RPMDBDir: true},
+		out: collect.Output{Stdout: []byte("openssh-server\t0100755\troot\troot\t\t/usr/sbin/sshd\n")}}
+	diverted := dpkgHost()
+	diverted.files[DpkgDiversionsPath] = "/usr/bin/foo\n/usr/bin/foo.distrib\nfoo-wrapper\n"
+	for name, a := range map[string]collect.Access{"dpkg": diverted, "rpm": rpmHost} {
+		g := collect.Guard(a, collect.Collector{Name: "caller", Declare: decl})
+		ix, _, failed := Build(context.Background(), g, map[string]bool{"/usr/bin/su": true, "/usr/sbin/sshd": true}, Options{USRMerged: merged, RPMTimeout: time.Second})
+		if v := g.Violations(); len(v) != 0 {
+			t.Errorf("%s: Build touched undeclared targets: %v", name, v)
+		}
+		if failed != nil || string(ix.Family) != name {
+			t.Errorf("%s: family %s failed %+v", name, ix.Family, failed)
+		}
+	}
+	if pkg, ok := func() (string, bool) {
+		ix, _, _ := Build(context.Background(), collect.Guard(rpmHost, collect.Collector{Name: "caller", Declare: decl}), map[string]bool{"/usr/sbin/sshd": true}, Options{})
+		return ix.Owner("/usr/sbin/sshd")
+	}(); !ok || pkg != "openssh-server" {
+		t.Errorf("rpm Owner(sshd) = %q %v", pkg, ok)
+	}
+}

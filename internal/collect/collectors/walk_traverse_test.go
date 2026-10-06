@@ -29,7 +29,7 @@ import (
 // ever set by hand; buildTree fills the rest.
 type entOpt func(*collect.DirEntry)
 
-func owner(uid, gid uint32) entOpt { return func(e *collect.DirEntry) { e.UID, e.GID = uid, gid } }
+func ownedBy(uid, gid uint32) entOpt { return func(e *collect.DirEntry) { e.UID, e.GID = uid, gid } }
 
 // inode pins an entry's inode number, which is how a test scripts two names
 // for one directory (a bind alias) or an entry whose identity will not match
@@ -306,30 +306,30 @@ func mainTree() (*fsAccess, mountPlan) {
 			treeDir("var", 0o755),
 		},
 		"/etc":             {treeFile(".pwd.lock", 0o600)},
-		"/home":            {treeDir(".snapshots", 0o755), treeDir("alice", 0o700, owner(1000, 1000))},
+		"/home":            {treeDir(".snapshots", 0o755), treeDir("alice", 0o700, ownedBy(1000, 1000))},
 		"/home/.snapshots": {},
-		"/home/alice":      {treeFile(".bashrc", 0o644, owner(1000, 1000))},
+		"/home/alice":      {treeFile(".bashrc", 0o644, ownedBy(1000, 1000))},
 		"/tmp":             {treeDir(".X11-unix", 0o1777)},
 		"/tmp/.X11-unix":   {},
 		"/usr":             {treeDir("bin", 0o755), treeDir("sbin", 0o755)},
 		"/usr/bin": {
-			treeLink("link", owner(70000, 0)),
+			treeLink("link", ownedBy(70000, 0)),
 			treeFile("passwd", 0o4755),
 			treeFile("python3", 0o755),
 			treeFile("su", 0o4755),
 		},
-		"/usr/sbin":            {treeFile(".hidden-helper", 0o755, owner(70000, 0))},
+		"/usr/sbin":            {treeFile(".hidden-helper", 0o755, ownedBy(70000, 0))},
 		"/var":                 {treeDir("lib", 0o755), treeDir("tmp", 0o755), treeDir("www", 0o755)},
-		"/var/lib":             {treeDir("postgresql", 0o700, owner(113, 113)), treeDir("x", 0o755), treeDir("y", 0o755), treeDir("z", 0o755)},
-		"/var/lib/postgresql":  {treeFile(".psql_history", 0o600, owner(113, 113))},
+		"/var/lib":             {treeDir("postgresql", 0o700, ownedBy(113, 113)), treeDir("x", 0o755), treeDir("y", 0o755), treeDir("z", 0o755)},
+		"/var/lib/postgresql":  {treeFile(".psql_history", 0o600, ownedBy(113, 113))},
 		"/var/lib/x":           {treeDir("spool", 0o777)},
 		"/var/lib/x/spool":     {},
-		"/var/lib/y":           {treeFile("f", 0o644, owner(100005, 0))},
-		"/var/lib/z":           {treeFile("g", 0o644, owner(61200, 0))},
+		"/var/lib/y":           {treeFile("f", 0o644, ownedBy(100005, 0))},
+		"/var/lib/z":           {treeFile("g", 0o644, ownedBy(61200, 0))},
 		"/var/tmp":             {treeDir("open", 0o777)},
 		"/var/tmp/open":        {},
-		"/var/www":             {treeDir("html", 0o755, owner(33, 33))},
-		"/var/www/html":        {treeDir(".cache", 0o755, owner(33, 33))},
+		"/var/www":             {treeDir("html", 0o755, ownedBy(33, 33))},
+		"/var/www/html":        {treeDir(".cache", 0o755, ownedBy(33, 33))},
 		"/var/www/html/.cache": {},
 	}
 	// The mount ids are deliberately not in mount-point order: mountinfo

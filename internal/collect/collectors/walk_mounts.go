@@ -504,12 +504,25 @@ func (p *mountPlan) readConfig(a collect.Access, file string) ([]byte, bool) {
 // into /usr, so the package join can canonicalise a file list that still
 // says /bin/su on a merged-/usr host.
 func (p *mountPlan) readUsrMerged(a collect.Access) {
+	for alias, target := range readUsrMerged(a) {
+		p.usrMerged[alias] = target
+	}
+}
+
+// readUsrMerged is the merged-/usr table (alias -> target under /usr) of
+// this host. The walk and the process collector both hand it to
+// pkgindex.Options.USRMerged, so a .list line that still says
+// /lib/systemd/systemd-resolved matches the /usr/lib path the kernel reports
+// for the running executable (W-35). Each caller declares usrAliases.
+func readUsrMerged(a collect.Access) map[string]string {
+	out := map[string]string{}
 	for _, alias := range usrAliases {
 		target, ok := linkTarget(a, alias)
 		if ok && underOrEqual(target, "/usr") {
-			p.usrMerged[alias] = target
+			out[alias] = target
 		}
 	}
+	return out
 }
 
 // linkTarget reports where a symlink at p points, as an absolute clean

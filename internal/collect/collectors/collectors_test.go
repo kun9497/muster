@@ -239,8 +239,12 @@ func (a *fsAccess) Glob(pattern string) ([]string, error) {
 	// A symlink is a directory entry like any other: the host's Glob lists
 	// it without following it (the units collector's .wants links and its
 	// /dev/null drop-in masks).
+	seen := make(map[string]bool, len(out))
+	for _, p := range out {
+		seen[p] = true
+	}
 	for p := range a.links {
-		if ok, _ := path.Match(pattern, p); ok && !slices.Contains(out, p) {
+		if ok, _ := path.Match(pattern, p); ok && !seen[p] {
 			out = append(out, p)
 		}
 	}
@@ -335,11 +339,17 @@ func (a *fsAccess) ReadDir(p string, expect collect.Identity, opts collect.ReadD
 }
 
 // Readlink serves the links map in stored form, unresolved. A path that is
-// not a link answers the way readlinkat does: EINVAL when it exists as
-// something else, ENOENT when it does not exist at all.
+// not a link answers the way readlinkat does: the seeded failure when fails
+// holds one (W-45: a denied /proc/<pid>/exe), else EINVAL when it exists as
+// something else, ENOENT when it does not exist at all. The links map wins
+// over fails, in the order Stat consults them: a link seeded with an
+// ErrSymlink failure is a link whose READ fails and whose Readlink answers.
 func (a *fsAccess) Readlink(p string) (string, error) {
 	if t, ok := a.links[p]; ok {
 		return t, nil
+	}
+	if err, ok := a.fails[p]; ok {
+		return "", err
 	}
 	if _, ok := a.files[p]; ok {
 		return "", unix.EINVAL

@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("socket:[4026532001]")
