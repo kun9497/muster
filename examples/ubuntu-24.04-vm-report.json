@@ -1,15 +1,15 @@
 {
   "schema_version": 1,
   "run": {
-    "muster_version": "be82b78",
-    "commit": "be82b78",
-    "controls_version": "kisa-unix-2026+2026.09.29",
-    "controls_digest": "sha256:1622ceeeba7f9b7bbe1d2bb23562a921bfec21f7fd82833ec4af40a5515813ad",
+    "muster_version": "17b0d96",
+    "commit": "17b0d96",
+    "controls_version": "kisa-unix-2026+2026.10.02",
+    "controls_digest": "sha256:663acb91eee0a218cac42d72184b53e026addf12b5f6f5f38280e19197dc0da0",
     "guide_edition": "kisa-unix-2026",
-    "collected_at": "2026-09-30T04:21:24Z",
+    "collected_at": "2026-10-06T09:31:44Z",
     "host": {
       "hostname": "github-runner",
-      "machine_id_hash": "4d7193c17275652cce0569a44b2c249f54db99d23e0fd447ae531341cacc9ee5",
+      "machine_id_hash": "e2708aa39d82e1c19d1f0bcd0ab61b4aa24242d269affa028e793d3e410ca9e0",
       "kernel": "",
       "os_release": {
         "id": "ubuntu",
@@ -39,7 +39,7 @@
       {
         "name": "accounts",
         "status": "ok",
-        "ms": 7
+        "ms": 1
       },
       {
         "name": "audit",
@@ -55,17 +55,17 @@
       {
         "name": "boot",
         "status": "ok",
-        "ms": 25
+        "ms": 16
       },
       {
         "name": "coredump",
         "status": "ok",
-        "ms": 0
+        "ms": 1
       },
       {
         "name": "cron",
         "status": "ok",
-        "ms": 920,
+        "ms": 860,
         "cmd": "/usr/bin/systemctl list-unit-files --type=timer --no-legend --no-pager"
       },
       {
@@ -76,23 +76,23 @@
       {
         "name": "env",
         "status": "ok",
-        "ms": 10
+        "ms": 15
       },
       {
         "name": "files",
         "status": "ok",
-        "ms": 19
+        "ms": 18
       },
       {
         "name": "fim",
         "status": "ok",
-        "ms": 10,
+        "ms": 11,
         "cmd": "/usr/bin/systemctl list-timers --all --no-legend --no-pager"
       },
       {
         "name": "firewall",
         "status": "ok",
-        "ms": 21,
+        "ms": 25,
         "cmd": "/usr/sbin/nft list ruleset"
       },
       {
@@ -113,7 +113,7 @@
       {
         "name": "modules",
         "status": "ok",
-        "ms": 23
+        "ms": 14
       },
       {
         "name": "mounts",
@@ -139,18 +139,18 @@
       {
         "name": "pam",
         "status": "ok",
-        "ms": 1
+        "ms": 2
       },
       {
         "name": "patch",
         "status": "ok",
-        "ms": 1816,
+        "ms": 2112,
         "cmd": "/usr/bin/apt-get -s upgrade -o Debug::NoLocking=1"
       },
       {
         "name": "pkgverify",
         "status": "ok",
-        "ms": 636386,
+        "ms": 492309,
         "cmd": "/usr/bin/rpm -Va"
       },
       {
@@ -159,9 +159,15 @@
         "ms": 0
       },
       {
+        "name": "processes",
+        "status": "ok",
+        "ms": 156,
+        "cmd": "/usr/bin/rpm -qa --qf [%{=NAME}\t%{FILEMODES:octal}\t%{FILEUSERNAME}\t%{FILEGROUPNAME}\t%|FILECAPS?{%{FILECAPS}}|\t%{FILENAMES}\n]"
+      },
+      {
         "name": "services",
         "status": "ok",
-        "ms": 338,
+        "ms": 337,
         "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState atftpd.service"
       },
       {
@@ -172,12 +178,12 @@
       {
         "name": "sockets",
         "status": "ok",
-        "ms": 13
+        "ms": 12
       },
       {
         "name": "sshd",
         "status": "ok",
-        "ms": 15,
+        "ms": 13,
         "cmd": "/usr/sbin/sshd -G"
       },
       {
@@ -193,24 +199,24 @@
       {
         "name": "sysctl",
         "status": "ok",
-        "ms": 0
+        "ms": 2
       },
       {
         "name": "timesync",
         "status": "ok",
-        "ms": 56,
+        "ms": 62,
         "cmd": "/usr/bin/timedatectl show-timesync --all"
       },
       {
         "name": "units",
         "status": "ok",
-        "ms": 52,
+        "ms": 53,
         "cmd": "/usr/bin/systemctl list-units --type=service --state=active --plain --no-legend"
       },
       {
         "name": "walk",
         "status": "ok",
-        "ms": 12394,
+        "ms": 10199,
         "cmd": "/usr/bin/rpm -qa --qf [%{=NAME}\t%{FILEMODES:octal}\t%{FILEUSERNAME}\t%{FILEGROUPNAME}\t%|FILECAPS?{%{FILECAPS}}|\t%{FILENAMES}\n]"
       }
     ],
@@ -223,11 +229,11 @@
     "partial_failures": []
   },
   "check": {
-    "muster_version": "be82b78",
-    "commit": "be82b78",
-    "controls_version": "kisa-unix-2026+2026.09.29",
-    "controls_digest": "sha256:1622ceeeba7f9b7bbe1d2bb23562a921bfec21f7fd82833ec4af40a5515813ad",
-    "snapshot_digest": "sha256:15d32872c630afc12f286009befb5cb6aff575d0b54ee1c655666debf784ddc0",
+    "muster_version": "17b0d96",
+    "commit": "17b0d96",
+    "controls_version": "kisa-unix-2026+2026.10.02",
+    "controls_digest": "sha256:663acb91eee0a218cac42d72184b53e026addf12b5f6f5f38280e19197dc0da0",
+    "snapshot_digest": "sha256:80a6a071fbe7a6303c78a80edddd6dc1d492375f5f10797bcfbfa99a7d530b30",
     "guide_edition": "kisa-unix-2026",
     "waivers": {
       "applied": 0,
@@ -378,8 +384,33 @@
       "muster.beyond.container_runtime_access": {
         "allowed_runtime_group_members": []
       },
+      "muster.beyond.exposed_listeners_allowed": {
+        "allowed_ports": [
+          "tcp/22",
+          "udp/68",
+          "udp/546"
+        ]
+      },
+      "muster.beyond.ip_forwarding_disabled": {
+        "allowed_forward": [
+          0
+        ]
+      },
+      "muster.beyond.ipv6_forwarding_disabled": {
+        "allowed_forward": [
+          0
+        ]
+      },
+      "muster.beyond.ipv6_router_advertisements_ignored": {
+        "allowed_accept_ra": [
+          0
+        ]
+      },
       "muster.beyond.ld_so_preload_empty": {
         "allowed_preload": []
+      },
+      "muster.beyond.listeners_packaged": {
+        "allowed_executables": []
       },
       "muster.beyond.separate_partitions": {
         "required_separate": [
@@ -527,22 +558,22 @@
   "summary": {
     "automatic": {
       "high": {
-        "pass": 20,
-        "fail": 14,
+        "pass": 21,
+        "fail": 15,
         "warn": 1
       },
       "medium": {
-        "pass": 13,
-        "fail": 10,
+        "pass": 17,
+        "fail": 17,
         "warn": 0
       },
       "low": {
-        "pass": 3,
+        "pass": 4,
         "fail": 4,
         "warn": 0
       }
     },
-    "manual_review": 15,
+    "manual_review": 14,
     "undecidable": {
       "error": 0,
       "not_applicable": 24,
@@ -556,7 +587,7 @@
         "automatic": {
           "high": {
             "pass": 16,
-            "fail": 9,
+            "fail": 10,
             "warn": 1
           },
           "medium": {
@@ -570,7 +601,7 @@
             "warn": 0
           }
         },
-        "manual_review": 11,
+        "manual_review": 10,
         "undecidable": {
           "error": 0,
           "not_applicable": 16,
@@ -578,20 +609,20 @@
         }
       },
       "beyond": {
-        "controls": 36,
+        "controls": 49,
         "automatic": {
           "high": {
-            "pass": 4,
+            "pass": 5,
             "fail": 5,
             "warn": 0
           },
           "medium": {
-            "pass": 4,
-            "fail": 8,
+            "pass": 8,
+            "fail": 15,
             "warn": 0
           },
           "low": {
-            "pass": 0,
+            "pass": 1,
             "fail": 3,
             "warn": 0
           }
@@ -1443,8 +1474,8 @@
       "category": "file",
       "importance": "상",
       "automation": "auto",
-      "status": "MANUAL",
-      "reason": "absent needs review: firewall.restricts_inbound is absent on this host",
+      "status": "FAIL",
+      "reason": "clause does not hold: firewall.restricts_inbound eq true",
       "evidence": [
         {
           "fact": "firewall.backend",
@@ -1466,7 +1497,13 @@
         },
         {
           "fact": "firewall.restricts_inbound",
-          "status": "absent"
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/sbin/nft list ruleset",
+            "exit_code": 0
+          }
         }
       ],
       "mechanism": 2,
@@ -2942,7 +2979,7 @@
         {
           "fact": "walk.world_writable",
           "status": "ok",
-          "value": "545 elements; 522 selected; failing: file:/opt, file:/opt/actionarchivecache, file:/opt/actionarchivecache/actions_cache, file:/opt/actionarchivecache/actions_cache/0057852bfaa89a56745cba8c7296529d2fc39830.tar.gz, file:/opt/actionarchivecache/actions_cache/0400d5f644dc74513175e3cd8d07132dd4860809.tar.gz, +517 more",
+          "value": "544 elements; 521 selected; failing: file:/opt, file:/opt/actionarchivecache, file:/opt/actionarchivecache/actions_cache, file:/opt/actionarchivecache/actions_cache/0057852bfaa89a56745cba8c7296529d2fc39830.tar.gz, file:/opt/actionarchivecache/actions_cache/0400d5f644dc74513175e3cd8d07132dd4860809.tar.gz, +516 more",
           "source": {
             "kind": "file",
             "path": "/var/lib/dpkg/info"
@@ -4422,12 +4459,6 @@
         },
         {
           "subject": "file:/opt/google/chrome/libqt6_shim.so",
-          "expected": true,
-          "actual": false,
-          "verdict": "fail"
-        },
-        {
-          "subject": "file:/opt/google/chrome/libsapisid.so",
           "expected": true,
           "actual": false,
           "verdict": "fail"
@@ -6107,7 +6138,7 @@
         {
           "fact": "patch.metadata_age_s",
           "status": "ok",
-          "value": 802023,
+          "value": 734252,
           "source": {
             "kind": "file",
             "path": "/var/lib/apt/periodic/update-success-stamp"
@@ -8442,151 +8473,151 @@
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/aws-cli/v2/2.36.49/dist/awscli/botocore/.changes",
+          "subject": "file:/usr/local/aws-cli/v2/2.37.4/dist/awscli/botocore/.changes",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.13.0/share/doc/julia/html/en/.documenter-siteinfo.json",
+          "subject": "file:/usr/local/julia1.13.1/share/doc/julia/html/en/.documenter-siteinfo.json",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.13.0/share/julia/base/JuliaSyntax/.mailmap",
+          "subject": "file:/usr/local/julia1.13.1/share/julia/base/JuliaSyntax/.mailmap",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.13.0/share/julia/stdlib/v1.13/ArgTools/.ci",
+          "subject": "file:/usr/local/julia1.13.1/share/julia/stdlib/v1.13/ArgTools/.ci",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.13.0/share/julia/stdlib/v1.13/DelimitedFiles/.ci",
+          "subject": "file:/usr/local/julia1.13.1/share/julia/stdlib/v1.13/DelimitedFiles/.ci",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.13.0/share/julia/stdlib/v1.13/DelimitedFiles/.codecov.yml",
+          "subject": "file:/usr/local/julia1.13.1/share/julia/stdlib/v1.13/DelimitedFiles/.codecov.yml",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Downloads/.ci",
+          "subject": "file:/usr/local/julia1.13.1/share/julia/stdlib/v1.13/Downloads/.ci",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.13.0/share/julia/stdlib/v1.13/LibCURL/.ci",
+          "subject": "file:/usr/local/julia1.13.1/share/julia/stdlib/v1.13/LibCURL/.ci",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.13.0/share/julia/stdlib/v1.13/LinearAlgebra/.buildkite",
+          "subject": "file:/usr/local/julia1.13.1/share/julia/stdlib/v1.13/LinearAlgebra/.buildkite",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.13.0/share/julia/stdlib/v1.13/LinearAlgebra/.codecov.yml",
+          "subject": "file:/usr/local/julia1.13.1/share/julia/stdlib/v1.13/LinearAlgebra/.codecov.yml",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.13.0/share/julia/stdlib/v1.13/NetworkOptions/.codecov.yml",
+          "subject": "file:/usr/local/julia1.13.1/share/julia/stdlib/v1.13/NetworkOptions/.codecov.yml",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Pkg/.codecov.yml",
+          "subject": "file:/usr/local/julia1.13.1/share/julia/stdlib/v1.13/Pkg/.codecov.yml",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Pkg/.git-blame-ignore-revs",
+          "subject": "file:/usr/local/julia1.13.1/share/julia/stdlib/v1.13/Pkg/.git-blame-ignore-revs",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Pkg/.pre-commit-config.yaml",
+          "subject": "file:/usr/local/julia1.13.1/share/julia/stdlib/v1.13/Pkg/.pre-commit-config.yaml",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Pkg/test/test_packages/AugmentedPlatform/.pkg",
+          "subject": "file:/usr/local/julia1.13.1/share/julia/stdlib/v1.13/Pkg/test/test_packages/AugmentedPlatform/.pkg",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.13.0/share/julia/stdlib/v1.13/SHA/.ci",
+          "subject": "file:/usr/local/julia1.13.1/share/julia/stdlib/v1.13/SHA/.ci",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.13.0/share/julia/stdlib/v1.13/SparseArrays/.ci",
+          "subject": "file:/usr/local/julia1.13.1/share/julia/stdlib/v1.13/SparseArrays/.ci",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.13.0/share/julia/stdlib/v1.13/SparseArrays/.codecov.yml",
+          "subject": "file:/usr/local/julia1.13.1/share/julia/stdlib/v1.13/SparseArrays/.codecov.yml",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Statistics/.ci",
+          "subject": "file:/usr/local/julia1.13.1/share/julia/stdlib/v1.13/Statistics/.ci",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.13.0/share/julia/stdlib/v1.13/SuiteSparse/.ci",
+          "subject": "file:/usr/local/julia1.13.1/share/julia/stdlib/v1.13/SuiteSparse/.ci",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.13.0/share/julia/stdlib/v1.13/SuiteSparse/.devcontainer",
+          "subject": "file:/usr/local/julia1.13.1/share/julia/stdlib/v1.13/SuiteSparse/.devcontainer",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.13.0/share/julia/stdlib/v1.13/Tar/.ci",
+          "subject": "file:/usr/local/julia1.13.1/share/julia/stdlib/v1.13/Tar/.ci",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/n/versions/node/22.23.2/lib/node_modules/npm/.npmrc",
+          "subject": "file:/usr/local/n/versions/node/22.23.3/lib/node_modules/npm/.npmrc",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/n/versions/node/22.23.2/lib/node_modules/npm/node_modules/node-gyp/.release-please-manifest.json",
+          "subject": "file:/usr/local/n/versions/node/22.23.3/lib/node_modules/npm/node_modules/node-gyp/.release-please-manifest.json",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/n/versions/node/22.23.2/lib/node_modules/npm/node_modules/node-gyp/gyp/.release-please-manifest.json",
+          "subject": "file:/usr/local/n/versions/node/22.23.3/lib/node_modules/npm/node_modules/node-gyp/gyp/.release-please-manifest.json",
           "expected": true,
           "actual": false,
           "verdict": "fail"
@@ -8718,7 +8749,7 @@
           "verdict": "fail"
         },
         {
-          "subject": "file:/var/lib/gems/3.2.0/gems/domain_name-0.6.20260907/.document",
+          "subject": "file:/var/lib/gems/3.2.0/gems/domain_name-0.6.20260921/.document",
           "expected": true,
           "actual": false,
           "verdict": "fail"
@@ -8778,7 +8809,7 @@
           "verdict": "fail"
         },
         {
-          "subject": "file:/var/lib/gems/3.2.0/gems/google-apis-androidpublisher_v3-0.108.0/.yardopts",
+          "subject": "file:/var/lib/gems/3.2.0/gems/google-apis-androidpublisher_v3-0.109.0/.yardopts",
           "expected": true,
           "actual": false,
           "verdict": "fail"
@@ -8802,7 +8833,7 @@
           "verdict": "fail"
         },
         {
-          "subject": "file:/var/lib/gems/3.2.0/gems/google-apis-storage_v1-0.67.0/.yardopts",
+          "subject": "file:/var/lib/gems/3.2.0/gems/google-apis-storage_v1-0.68.0/.yardopts",
           "expected": true,
           "actual": false,
           "verdict": "fail"
@@ -9442,6 +9473,63 @@
           "expected": "not not_in []",
           "actual": "runner",
           "verdict": "fail"
+        }
+      ],
+      "severity": "high"
+    },
+    {
+      "id": "muster.beyond.exposed_listeners_allowed",
+      "title_en": "Every listening service a packet from off the host can reach is one the host declares it serves",
+      "title_ko": "호스트 밖에서 패킷이 도달할 수 있는 모든 수신 서비스는 호스트가 제공한다고 선언한 서비스이다",
+      "category": "beyond",
+      "importance": "상",
+      "automation": "auto",
+      "status": "PASS",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "none",
+          "source": {
+            "kind": "file",
+            "path": "/proc/1/comm"
+          }
+        },
+        {
+          "fact": "exposure.exposed",
+          "status": "ok",
+          "value": "3 elements; none matching",
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "command",
+                "cmd": "/usr/sbin/nft list ruleset",
+                "exit_code": 0
+              },
+              {
+                "kind": "derived",
+                "inputs": [
+                  {
+                    "kind": "proc",
+                    "path": "/proc/self/net/tcp"
+                  },
+                  {
+                    "kind": "proc",
+                    "path": "/proc/self/net/tcp6"
+                  },
+                  {
+                    "kind": "proc",
+                    "path": "/proc/self/net/udp"
+                  },
+                  {
+                    "kind": "proc",
+                    "path": "/proc/self/net/udp6"
+                  }
+                ]
+              }
+            ]
+          }
         }
       ],
       "severity": "high"
@@ -10660,6 +10748,406 @@
       "severity": "medium"
     },
     {
+      "id": "muster.beyond.icmp_redirects_ignored",
+      "title_en": "The host neither accepts nor sends IPv4 ICMP redirects",
+      "title_ko": "호스트는 IPv4 ICMP 리다이렉트를 받아들이지도 보내지도 않는다",
+      "category": "beyond",
+      "importance": "중",
+      "automation": "auto",
+      "status": "FAIL",
+      "reason": "clause does not hold: net.sysctl.ipv4_default_accept_redirects eq 0",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "none",
+          "source": {
+            "kind": "file",
+            "path": "/proc/1/comm"
+          }
+        },
+        {
+          "fact": "net.sysctl.ipv4_all_accept_redirects",
+          "status": "ok",
+          "value": 0,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/conf/all/accept_redirects"
+          },
+          "side": "effective"
+        },
+        {
+          "fact": "net.sysctl.ipv4_default_accept_redirects",
+          "status": "ok",
+          "value": 1,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/conf/default/accept_redirects"
+          },
+          "side": "effective"
+        },
+        {
+          "fact": "net.sysctl.ipv4_all_secure_redirects",
+          "status": "ok",
+          "value": 1,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/conf/all/secure_redirects"
+          },
+          "side": "effective"
+        },
+        {
+          "fact": "net.sysctl.ipv4_default_secure_redirects",
+          "status": "ok",
+          "value": 1,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/conf/default/secure_redirects"
+          },
+          "side": "effective"
+        },
+        {
+          "fact": "net.sysctl.ipv4_all_send_redirects",
+          "status": "ok",
+          "value": 1,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/conf/all/send_redirects"
+          },
+          "side": "effective"
+        },
+        {
+          "fact": "net.sysctl.ipv4_default_send_redirects",
+          "status": "ok",
+          "value": 1,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/conf/default/send_redirects"
+          },
+          "side": "effective"
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.beyond.ip_forwarding_disabled",
+      "title_en": "The host does not route IPv4 packets between its interfaces unless it is meant to",
+      "title_ko": "호스트는 의도한 경우가 아니면 인터페이스 사이에서 IPv4 패킷을 라우팅하지 않는다",
+      "category": "beyond",
+      "importance": "중",
+      "automation": "auto",
+      "status": "FAIL",
+      "reason": "clause does not hold: net.sysctl.ipv4_ip_forward in [0]",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "none",
+          "source": {
+            "kind": "file",
+            "path": "/proc/1/comm"
+          }
+        },
+        {
+          "fact": "net.sysctl.ipv4_ip_forward",
+          "status": "ok",
+          "value": 1,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/ip_forward"
+          },
+          "side": "effective"
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.beyond.ipv6_forwarding_disabled",
+      "title_en": "The host does not route IPv6 packets between its interfaces unless it is meant to",
+      "title_ko": "호스트는 의도한 경우가 아니면 인터페이스 사이에서 IPv6 패킷을 라우팅하지 않는다",
+      "category": "beyond",
+      "importance": "중",
+      "automation": "auto",
+      "status": "PASS",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "none",
+          "source": {
+            "kind": "file",
+            "path": "/proc/1/comm"
+          }
+        },
+        {
+          "fact": "net.sysctl.ipv6_disabled",
+          "status": "ok",
+          "value": 0,
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "proc",
+                "path": "/proc/sys/net/ipv6/conf/all/disable_ipv6"
+              },
+              {
+                "kind": "proc",
+                "path": "/proc/sys/net/ipv6/conf/default/disable_ipv6"
+              },
+              {
+                "kind": "proc",
+                "path": "/proc/sys/net/ipv6/conf/docker0/disable_ipv6"
+              },
+              {
+                "kind": "proc",
+                "path": "/proc/sys/net/ipv6/conf/enP31119s1/disable_ipv6"
+              },
+              {
+                "kind": "proc",
+                "path": "/proc/sys/net/ipv6/conf/eth0/disable_ipv6"
+              }
+            ]
+          }
+        },
+        {
+          "fact": "net.sysctl.ipv6_all_forwarding",
+          "status": "ok",
+          "value": 0,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv6/conf/all/forwarding"
+          },
+          "side": "effective"
+        },
+        {
+          "fact": "net.sysctl.ipv6_default_forwarding",
+          "status": "ok",
+          "value": 0,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv6/conf/default/forwarding"
+          },
+          "side": "effective"
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.beyond.ipv6_redirects_ignored",
+      "title_en": "The host does not accept IPv6 ICMP redirects",
+      "title_ko": "호스트는 IPv6 ICMP 리다이렉트를 받아들이지 않는다",
+      "category": "beyond",
+      "importance": "중",
+      "automation": "auto",
+      "status": "FAIL",
+      "reason": "clause does not hold: net.sysctl.ipv6_all_accept_redirects eq 0",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "none",
+          "source": {
+            "kind": "file",
+            "path": "/proc/1/comm"
+          }
+        },
+        {
+          "fact": "net.sysctl.ipv6_disabled",
+          "status": "ok",
+          "value": 0,
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "proc",
+                "path": "/proc/sys/net/ipv6/conf/all/disable_ipv6"
+              },
+              {
+                "kind": "proc",
+                "path": "/proc/sys/net/ipv6/conf/default/disable_ipv6"
+              },
+              {
+                "kind": "proc",
+                "path": "/proc/sys/net/ipv6/conf/docker0/disable_ipv6"
+              },
+              {
+                "kind": "proc",
+                "path": "/proc/sys/net/ipv6/conf/enP31119s1/disable_ipv6"
+              },
+              {
+                "kind": "proc",
+                "path": "/proc/sys/net/ipv6/conf/eth0/disable_ipv6"
+              }
+            ]
+          }
+        },
+        {
+          "fact": "net.sysctl.ipv6_all_accept_redirects",
+          "status": "ok",
+          "value": 1,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv6/conf/all/accept_redirects"
+          },
+          "side": "effective"
+        },
+        {
+          "fact": "net.sysctl.ipv6_default_accept_redirects",
+          "status": "ok",
+          "value": 1,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv6/conf/default/accept_redirects"
+          },
+          "side": "effective"
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.beyond.ipv6_router_advertisements_ignored",
+      "title_en": "The host does not take its IPv6 addresses and routes from router advertisements unless it is meant to",
+      "title_ko": "호스트는 의도한 경우가 아니면 라우터 광고로 IPv6 주소와 경로를 받지 않는다",
+      "category": "beyond",
+      "importance": "중",
+      "automation": "auto",
+      "status": "FAIL",
+      "reason": "clause does not hold: net.sysctl.ipv6_all_accept_ra in [0]",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "none",
+          "source": {
+            "kind": "file",
+            "path": "/proc/1/comm"
+          }
+        },
+        {
+          "fact": "net.sysctl.ipv6_disabled",
+          "status": "ok",
+          "value": 0,
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "proc",
+                "path": "/proc/sys/net/ipv6/conf/all/disable_ipv6"
+              },
+              {
+                "kind": "proc",
+                "path": "/proc/sys/net/ipv6/conf/default/disable_ipv6"
+              },
+              {
+                "kind": "proc",
+                "path": "/proc/sys/net/ipv6/conf/docker0/disable_ipv6"
+              },
+              {
+                "kind": "proc",
+                "path": "/proc/sys/net/ipv6/conf/enP31119s1/disable_ipv6"
+              },
+              {
+                "kind": "proc",
+                "path": "/proc/sys/net/ipv6/conf/eth0/disable_ipv6"
+              }
+            ]
+          }
+        },
+        {
+          "fact": "net.sysctl.ipv6_all_accept_ra",
+          "status": "ok",
+          "value": 1,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv6/conf/all/accept_ra"
+          },
+          "side": "effective"
+        },
+        {
+          "fact": "net.sysctl.ipv6_default_accept_ra",
+          "status": "ok",
+          "value": 1,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv6/conf/default/accept_ra"
+          },
+          "side": "effective"
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.beyond.ipv6_source_routing_rejected",
+      "title_en": "The host rejects source-routed IPv6 packets",
+      "title_ko": "호스트는 소스 라우팅된 IPv6 패킷을 거부한다",
+      "category": "beyond",
+      "importance": "중",
+      "automation": "auto",
+      "status": "PASS",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "none",
+          "source": {
+            "kind": "file",
+            "path": "/proc/1/comm"
+          }
+        },
+        {
+          "fact": "net.sysctl.ipv6_disabled",
+          "status": "ok",
+          "value": 0,
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "proc",
+                "path": "/proc/sys/net/ipv6/conf/all/disable_ipv6"
+              },
+              {
+                "kind": "proc",
+                "path": "/proc/sys/net/ipv6/conf/default/disable_ipv6"
+              },
+              {
+                "kind": "proc",
+                "path": "/proc/sys/net/ipv6/conf/docker0/disable_ipv6"
+              },
+              {
+                "kind": "proc",
+                "path": "/proc/sys/net/ipv6/conf/enP31119s1/disable_ipv6"
+              },
+              {
+                "kind": "proc",
+                "path": "/proc/sys/net/ipv6/conf/eth0/disable_ipv6"
+              }
+            ]
+          }
+        },
+        {
+          "fact": "net.sysctl.ipv6_all_accept_source_route",
+          "status": "ok",
+          "value": 0,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv6/conf/all/accept_source_route"
+          },
+          "side": "effective"
+        },
+        {
+          "fact": "net.sysctl.ipv6_default_accept_source_route",
+          "status": "ok",
+          "value": 0,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv6/conf/default/accept_source_route"
+          },
+          "side": "effective"
+        }
+      ],
+      "severity": "medium"
+    },
+    {
       "id": "muster.beyond.kernel_pointer_exposure",
       "title_en": "The kernel hides its pointers and its message buffer from unprivileged readers",
       "title_ko": "커널이 포인터와 메시지 버퍼를 비권한 사용자에게 숨긴다",
@@ -10701,6 +11189,96 @@
       "severity": "medium"
     },
     {
+      "id": "muster.beyond.listeners_packaged",
+      "title_en": "Every process serving a listening socket runs an executable the host's package manager installed",
+      "title_ko": "수신 소켓을 제공하는 모든 프로세스는 호스트의 패키지 관리자가 설치한 실행 파일을 실행한다",
+      "category": "beyond",
+      "importance": "중",
+      "automation": "auto",
+      "status": "PASS",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "none",
+          "source": {
+            "kind": "file",
+            "path": "/proc/1/comm"
+          }
+        },
+        {
+          "fact": "processes.unpackaged_listeners",
+          "status": "ok",
+          "value": "0 elements; none matching",
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "proc",
+                "path": "/proc/self/net/tcp"
+              },
+              {
+                "kind": "proc",
+                "path": "/proc/self/net/tcp6"
+              },
+              {
+                "kind": "proc",
+                "path": "/proc/self/net/udp"
+              },
+              {
+                "kind": "proc",
+                "path": "/proc/self/net/udp6"
+              },
+              {
+                "kind": "file",
+                "path": "/var/lib/dpkg/info"
+              }
+            ]
+          }
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.beyond.no_deleted_executables",
+      "title_en": "No running process executes a file that has been deleted or replaced since it started",
+      "title_ko": "시작된 뒤 삭제되거나 교체된 파일을 실행하는 프로세스가 없다",
+      "category": "beyond",
+      "importance": "중",
+      "automation": "auto",
+      "status": "FAIL",
+      "reason": "clause does not hold: processes.deleted_executables none where pid gte 0",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "none",
+          "source": {
+            "kind": "file",
+            "path": "/proc/1/comm"
+          }
+        },
+        {
+          "fact": "processes.deleted_executables",
+          "status": "ok",
+          "value": "1 elements; matching: item:2085",
+          "source": {
+            "kind": "proc",
+            "path": "/proc"
+          }
+        }
+      ],
+      "observations": [
+        {
+          "subject": "item:2085",
+          "expected": "not gte 0",
+          "actual": 2085,
+          "verdict": "fail"
+        }
+      ],
+      "severity": "medium"
+    },
+    {
       "id": "muster.beyond.ptrace_restriction",
       "title_en": "One process cannot attach a debugger to another it did not start",
       "title_ko": "한 프로세스가 자신이 띄우지 않은 프로세스에 디버거를 붙일 수 없다",
@@ -10735,6 +11313,68 @@
           "source": {
             "kind": "proc",
             "path": "/proc/sys/kernel/perf_event_paranoid"
+          },
+          "side": "effective"
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.beyond.reverse_path_filtering",
+      "title_en": "The host drops IPv4 packets whose source could not have come in on their interface, and logs them",
+      "title_ko": "호스트는 들어온 인터페이스로 올 수 없는 출발지의 IPv4 패킷을 버리고 기록한다",
+      "category": "beyond",
+      "importance": "중",
+      "automation": "auto",
+      "status": "FAIL",
+      "reason": "clause does not hold: net.sysctl.ipv4_all_log_martians eq 1",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "none",
+          "source": {
+            "kind": "file",
+            "path": "/proc/1/comm"
+          }
+        },
+        {
+          "fact": "net.sysctl.ipv4_all_rp_filter",
+          "status": "ok",
+          "value": 2,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/conf/all/rp_filter"
+          },
+          "side": "effective"
+        },
+        {
+          "fact": "net.sysctl.ipv4_default_rp_filter",
+          "status": "ok",
+          "value": 2,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/conf/default/rp_filter"
+          },
+          "side": "effective"
+        },
+        {
+          "fact": "net.sysctl.ipv4_all_log_martians",
+          "status": "ok",
+          "value": 0,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/conf/all/log_martians"
+          },
+          "side": "effective"
+        },
+        {
+          "fact": "net.sysctl.ipv4_default_log_martians",
+          "status": "ok",
+          "value": 0,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/conf/default/log_martians"
           },
           "side": "effective"
         }
@@ -10904,6 +11544,48 @@
           "expected": true,
           "actual": false,
           "verdict": "fail"
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.beyond.source_routing_rejected",
+      "title_en": "The host rejects source-routed IPv4 packets",
+      "title_ko": "호스트는 소스 라우팅된 IPv4 패킷을 거부한다",
+      "category": "beyond",
+      "importance": "중",
+      "automation": "auto",
+      "status": "FAIL",
+      "reason": "clause does not hold: net.sysctl.ipv4_default_accept_source_route eq 0",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "none",
+          "source": {
+            "kind": "file",
+            "path": "/proc/1/comm"
+          }
+        },
+        {
+          "fact": "net.sysctl.ipv4_all_accept_source_route",
+          "status": "ok",
+          "value": 0,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/conf/all/accept_source_route"
+          },
+          "side": "effective"
+        },
+        {
+          "fact": "net.sysctl.ipv4_default_accept_source_route",
+          "status": "ok",
+          "value": 1,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/conf/default/accept_source_route"
+          },
+          "side": "effective"
         }
       ],
       "severity": "medium"
@@ -11092,6 +11774,37 @@
         {
           "fact": "swap.encrypted",
           "status": "unsupported"
+        }
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "muster.beyond.syn_cookies_enabled",
+      "title_en": "The host answers a SYN flood with SYN cookies",
+      "title_ko": "호스트는 SYN 플러드에 SYN 쿠키로 응답한다",
+      "category": "beyond",
+      "importance": "중",
+      "automation": "auto",
+      "status": "PASS",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "none",
+          "source": {
+            "kind": "file",
+            "path": "/proc/1/comm"
+          }
+        },
+        {
+          "fact": "net.sysctl.ipv4_tcp_syncookies",
+          "status": "ok",
+          "value": 1,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/tcp_syncookies"
+          },
+          "side": "effective"
         }
       ],
       "severity": "medium"
@@ -11450,6 +12163,47 @@
             "kind": "proc",
             "path": "/proc/self/mountinfo"
           }
+        }
+      ],
+      "severity": "low"
+    },
+    {
+      "id": "muster.beyond.icmp_broadcast_and_bogus_ignored",
+      "title_en": "The host ignores broadcast ICMP echo requests and bogus ICMP error responses",
+      "title_ko": "호스트는 브로드캐스트 ICMP echo 요청과 잘못된 ICMP 오류 응답을 무시한다",
+      "category": "beyond",
+      "importance": "하",
+      "automation": "auto",
+      "status": "PASS",
+      "evidence": [
+        {
+          "fact": "env.container",
+          "status": "ok",
+          "value": "none",
+          "source": {
+            "kind": "file",
+            "path": "/proc/1/comm"
+          }
+        },
+        {
+          "fact": "net.sysctl.ipv4_icmp_echo_ignore_broadcasts",
+          "status": "ok",
+          "value": 1,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/icmp_echo_ignore_broadcasts"
+          },
+          "side": "effective"
+        },
+        {
+          "fact": "net.sysctl.ipv4_icmp_ignore_bogus_error_responses",
+          "status": "ok",
+          "value": 1,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/icmp_ignore_bogus_error_responses"
+          },
+          "side": "effective"
         }
       ],
       "severity": "low"
