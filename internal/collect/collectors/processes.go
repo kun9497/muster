@@ -457,8 +457,25 @@ func (s *procScan) readNS(r *procRow) {
 		s.noteOwnerFail(r.pid, e)
 		return
 	}
+	host := t == s.hostNS
+	if !host {
+		var fail *facts.Envelope
+		if host, fail = s.seesHostExe(r, t); fail != nil {
+			// A root link or a mountinfo that could not be read is the
+			// row's failure, never a quiet foreign (R-3).
+			e := *fail
+			if e.Status != facts.StatusDenied {
+				e.Status = facts.StatusError
+			} else {
+				s.denied++
+			}
+			r.nsStatus = string(e.Status)
+			s.noteOwnerFail(r.pid, e)
+			return
+		}
+	}
 	r.nsStatus = "ok"
-	if t == s.hostNS || s.seesHostExe(r, t) {
+	if host {
 		r.mntNS = nsHost
 	} else {
 		r.mntNS = nsForeign
@@ -466,27 +483,38 @@ func (s *procScan) readNS(r *procRow) {
 	}
 }
 
-// nsMounts is one parsed mountinfo; ok is false when it could not be read
-// or parsed.
+// nsMounts is one namespace's parsed mountinfo.
 type nsMounts struct {
 	rows []mountRow
-	ok   bool
 }
 
 // mountsOf is the mountinfo of the namespace ns, read through pid the first
 // time the namespace is met.
-func (s *procScan) mountsOf(ns string, pid int) nsMounts {
+func (s *procScan) mountsOf(ns string, pid int) (nsMounts, *facts.Envelope) {
 	if m, ok := s.mounts[ns]; ok {
-		return m
+		return m, nil
 	}
-	var m nsMounts
-	if data, _, err := s.a.ReadFile(procPath(pid, "mountinfo"), mountinfoReadLimit); err == nil {
-		if rows, err := parseMountinfo(data); err == nil {
-			m = nsMounts{rows: rows, ok: true}
-		}
+	p := procPath(pid, "mountinfo")
+	data, meta, err := s.a.ReadFile(p, mountinfoReadLimit)
+	if err != nil {
+		e := readFailure(p, err)
+		return nsMounts{}, &e
 	}
+	if meta.Truncated {
+		// A cut table may lack the very mount the exe lies on.
+		e := collect.ErrorEnv(fmt.Sprintf("%s: cut at the %d-byte limit", p, mountinfoReadLimit))
+		return nsMounts{}, &e
+	}
+	rows, err := parseMountinfo(data)
+	if err != nil {
+		e := collect.ErrorEnv(p + ": " + err.Error())
+		return nsMounts{}, &e
+	}
+	// Only a table that was read is memoised: a failure is this process's,
+	// and the next process of the namespace may read it (R-3).
+	m := nsMounts{rows: rows}
 	s.mounts[ns] = m
-	return m
+	return m, nil
 }
 
 // seesHostExe reports whether a process in a mount namespace of its own
@@ -495,24 +523,38 @@ func (s *procScan) mountsOf(ns string, pid int) nsMounts {
 // of its own (systemd-resolved on a stock host); ProtectSystem='s read-only
 // bind of /usr names the same file on the same device, so it is host. A
 // container (an overlay at /), a bind over the exe or over /usr from
-// elsewhere, an extension image, a root other than / (RootDirectory=, a
-// debug pod's chroot /host) or a table that cannot be read is not: its exe
-// text names a file the host's index must not be asked about.
-func (s *procScan) seesHostExe(r *procRow, ns string) bool {
+// elsewhere, an extension image or a root other than / (RootDirectory=, a
+// debug pod's chroot /host) is not: its exe text names a file the host's
+// index must not be asked about. A root link or a mountinfo that cannot be
+// read is the failure returned (R-3).
+func (s *procScan) seesHostExe(r *procRow, ns string) (bool, *facts.Envelope) {
 	if r.exeStatus != "ok" || r.exe == "" {
-		return false
+		return false, nil
 	}
-	if root, err := s.a.Readlink(procPath(r.pid, "root")); err != nil || root != "/" {
-		return false
+	rp := procPath(r.pid, "root")
+	root, err := s.a.Readlink(rp)
+	if err != nil {
+		e := readFailure(rp, err)
+		return false, &e
 	}
-	host := s.mountsOf(s.hostNS, 1)
-	mine := s.mountsOf(ns, r.pid)
-	if !host.ok || !mine.ok {
-		return false
+	if root != "/" {
+		return false, nil
+	}
+	host, fail := s.mountsOf(s.hostNS, 1)
+	if fail != nil {
+		return false, fail
+	}
+	mine, fail := s.mountsOf(ns, r.pid)
+	if fail != nil {
+		return false, fail
 	}
 	hk, hok := exeMountKey(host.rows, r.exe)
 	k, ok := exeMountKey(mine.rows, r.exe)
-	return hok && ok && k == hk
+	if !hok || !ok {
+		e := collect.ErrorEnv(fmt.Sprintf("no mountinfo row of pid %d or pid 1 lies under %s", r.pid, r.exe))
+		return false, &e
+	}
+	return k == hk, nil
 }
 
 // exeMountKey names the file at exe as a mount table resolves it: the
@@ -520,25 +562,57 @@ func (s *procScan) seesHostExe(r *procRow, ns string) bool {
 // of exe past the mount point), the type and the source of the topmost mount
 // whose mount point is the longest path prefix of exe.
 func exeMountKey(rows []mountRow, exe string) (string, bool) {
-	best := -1
-	for i, m := range rows {
+	longest := -1
+	var cands []mountRow
+	for _, m := range rows {
 		mp := m.mountPoint
 		if mp != "/" && exe != mp && !strings.HasPrefix(exe, mp+"/") {
 			continue
 		}
-		if best < 0 || len(mp) >= len(rows[best].mountPoint) {
-			best = i
+		switch {
+		case len(mp) > longest:
+			longest, cands = len(mp), []mountRow{m}
+		case len(mp) == longest:
+			cands = append(cands, m)
 		}
 	}
-	if best < 0 {
+	if len(cands) == 0 {
 		return "", false
 	}
-	m := rows[best]
+	// Mounts stacked on one point: the topmost is the one no other of them
+	// is mounted on (its id is nobody's parent there); among several such,
+	// the last listed (R-4).
+	m := cands[len(cands)-1]
+	for i := len(cands) - 1; i >= 0; i-- {
+		covered := false
+		for _, o := range cands {
+			if o.parent == cands[i].id && o.id != cands[i].id {
+				covered = true
+				break
+			}
+		}
+		if !covered {
+			m = cands[i]
+			break
+		}
+	}
 	rel := strings.TrimPrefix(exe, m.mountPoint)
 	if m.mountPoint == "/" {
 		rel = exe
 	}
 	return m.dev + " " + path.Join(m.root, rel) + " " + m.fstype + " " + m.source, true
+}
+
+// pidViewWhole reports whether this run sees the initial pid namespace
+// whole: pid 1's row is there, its ns/mnt and mountinfo were read, and a
+// kernel thread was seen (kernel threads live in the initial pid namespace
+// only, and hidepid hides them from a non-root run) (W-69).
+func (s *procScan) pidViewWhole() bool {
+	if _, ok := s.rows[1]; !ok || s.hostErr != nil || s.kernel == 0 {
+		return false
+	}
+	_, fail := s.mountsOf(s.hostNS, 1)
+	return fail == nil
 }
 
 func (s *procScan) noteOwnerFail(pid int, e facts.Envelope) {
@@ -622,9 +696,7 @@ func (s *procScan) listEnv(rows []*procRow, src *facts.Source) facts.Envelope {
 func (s *procScan) deletedEnv(rows []*procRow, src *facts.Source) facts.Envelope {
 	for _, f := range []failure{s.statusFail, s.exeFail} {
 		if f.env != nil {
-			e := *f.env
-			e.Truncated = s.budgetHit
-			return e
+			return *f.env // a failure keeps its own cause (R-5)
 		}
 	}
 	list := []any{}
@@ -685,7 +757,16 @@ func (s *procScan) listenerEnvs(ls []listener, inodeBad string, socks socketTabl
 	// socket (--net=host without --pid=host): an unheld socket is then a
 	// hole in the inventory, never the kernel's (W-67). An empty Container
 	// is not a container (J-31).
-	inContainer := s.container != "" && s.container != "none"
+	partial := ""
+	switch {
+	case s.container != "" && s.container != "none":
+		partial = "inside a " + s.container + " container the pid view may be partial"
+	case !s.pidViewWhole():
+		// hidepid=2/invisible, or a pid namespace the os collector does not
+		// call a container (unshare -p --mount-proc, PrivatePIDs=): no
+		// table was refused, yet the holder may be out of sight (W-69).
+		partial = "pid 1 or the kernel threads are not visible to this run, so the pid view may be partial"
+	}
 	var unheld []string
 	var ownerFail *facts.Envelope
 	for i := range ls {
@@ -709,6 +790,13 @@ func (s *procScan) listenerEnvs(ls []listener, inodeBad string, socks socketTabl
 				e := e
 				ownerFail = &e
 			}
+			if r.kind == kindZombie && ownerFail == nil {
+				// A zombie leader's live threads hold the socket, but its
+				// exe and namespace cannot be read: the owner cannot be
+				// judged, so neither can the leaves (W-70).
+				e := collect.Absent(fmt.Sprintf("owner %d is a zombie leader: exe and namespace unreadable", pid))
+				ownerFail = &e
+			}
 			l.Owners = append(l.Owners, r.owner())
 		}
 		switch {
@@ -716,7 +804,7 @@ func (s *procScan) listenerEnvs(ls []listener, inodeBad string, socks socketTabl
 			l.OwnerStatus = "ok"
 		case s.fdDenied.env != nil:
 			l.OwnerStatus = "denied"
-		case allRead && !inContainer:
+		case allRead && partial == "":
 			// A kernel-owned socket has a real inode that no fd table
 			// holds (measured: WireGuard's udp and udp6 sockets; nfsd was
 			// not measured); one closed between the two reads is no longer
@@ -746,8 +834,7 @@ func (s *procScan) listenerEnvs(ls []listener, inodeBad string, socks socketTabl
 	case s.fdError.env != nil:
 		fail = s.fdError.env
 	case len(unheld) > 0:
-		e := collect.Absent("no process this run can see holds the listening socket " + strings.Join(unheld, ", ") +
-			"; inside a " + s.container + " container the pid view may be partial")
+		e := collect.Absent("no process this run can see holds the listening socket " + strings.Join(unheld, ", ") + "; " + partial)
 		fail = &e
 	}
 	if fail != nil {
