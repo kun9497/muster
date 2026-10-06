@@ -700,6 +700,28 @@ func TestFirewallNftEmptyButLegacyFullIsPartial(t *testing.T) {
 	if e := env(t, b, "firewall.normalization_confidence"); e.Value != "partial" {
 		t.Errorf("confidence with the legacy warning %+v, want partial", e)
 	}
+
+	// S1: the real iptables-nft prints that warning on stderr, with an empty
+	// dump on stdout. It counts the same, and the record carries it.
+	const warning = "# Warning: iptables-legacy tables present, use iptables-legacy to see them\n"
+	a = firewallAccess(nil, map[string]cmdResult{
+		nftListRuleset: {stdout: []byte{}},
+		iptablesSave:   {stdout: []byte{}, stderr: warning},
+	})
+	b = buildBegun(t, "firewall", a)
+	if e := env(t, b, "firewall.normalization_confidence"); e.Value != "partial" {
+		t.Errorf("confidence with the legacy warning on stderr %+v, want partial", e)
+	}
+	dumps = okList(t, b, "firewall.raw_dumps")
+	if len(dumps) != 2 {
+		t.Fatalf("raw_dumps %v, want the nft dump and the iptables-save cross-check", dumps)
+	}
+	if rec := dumps[1].(map[string]any); rec["stderr"] != warning || rec["content"] != "" {
+		t.Errorf("cross-check record %v, want the warning as stderr and an empty content", rec)
+	}
+	if _, ok := dumps[0].(map[string]any)["stderr"]; ok {
+		t.Errorf("nft record %v carries a stderr it never had", dumps[0])
+	}
 }
 
 // The inverse of W-57: both readings empty (or an accept INPUT with no rule)

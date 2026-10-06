@@ -3024,7 +3024,7 @@
     {
       "Key": "firewall.raw_dumps",
       "Type": "list\u003crecord\u003e",
-      "Description": "The captured kernel ruleset dumps, each with source (the command), content (capped at 64 KiB) and truncated; the raw evidence the normaliser parses.",
+      "Description": "The captured kernel ruleset dumps, each with source (the command), content (capped at 64 KiB) and truncated, and stderr (capped the same) on the iptables-save cross-check when that command printed any - iptables-nft's \"iptables-legacy tables present\" warning arrives there; the raw evidence the normaliser parses.",
       "Since": 1,
       "Sensitivity": "internal",
       "Collector": "firewall",

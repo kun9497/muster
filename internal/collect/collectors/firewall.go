@@ -324,16 +324,32 @@ func inputBaseFamilies(dumps []any) map[string]bool {
 // appends its dump to the capture's evidence and reports whether x_tables
 // restricts inbound there (W-57), and whether that dump was truncated (R-4).
 // A failed read reports false: the nft answer stands.
+//
+// iptables-nft prints its "iptables-legacy tables present" warning on
+// stderr (the leading # keeps a 2>&1 pipe into iptables-restore harmless),
+// so the warning is looked for in both streams, and the stderr the command
+// printed rides in the record as stderr so the evidence shows the cause.
 func crossCheckLegacy(ctx context.Context, a collect.Access, cr *capture) (restricts, truncated bool) {
 	out := a.Run(ctx, iptablesSaveCmd)
 	if !cmdOK(out) {
 		return false, false
 	}
 	rec := dumpRecord(out.Source(iptablesSaveCmd).Cmd, out)
+	stderr := ""
+	if len(out.Stderr) > 0 {
+		stderr, _ = capDump(out.Stderr)
+		rec["stderr"] = stderr
+	}
 	cr.dumps = append(cr.dumps, rec)
 	content, _ := rec["content"].(string)
 	truncated = rec["truncated"] == true
-	return truncated || iptablesLegacyRestricts(content), truncated
+	return truncated || legacyWarning(stderr) || iptablesLegacyRestricts(content), truncated
+}
+
+// legacyWarning reports iptables-nft's notice that x_tables holds legacy
+// tables it does not read.
+func legacyWarning(text string) bool {
+	return strings.Contains(text, "tables-legacy tables present")
 }
 
 // allAcceptNoRules reports input chains that all have policy accept and carry
@@ -352,7 +368,7 @@ func allAcceptNoRules(inputs []baseChain) bool {
 // policy other than ACCEPT or any rule, or iptables-nft's warning that legacy
 // tables are present (which it prints instead of reading them).
 func iptablesLegacyRestricts(content string) bool {
-	if strings.Contains(content, "iptables-legacy tables present") {
+	if legacyWarning(content) {
 		return true
 	}
 	bases, _ := parseIptablesSave("v4", content)
@@ -688,17 +704,21 @@ func cmdReason(what string, out collect.Output) string {
 // a rune boundary and marking it truncated when the content was cut here or
 // the exec layer already truncated the capture (H-22).
 func dumpRecord(source string, out collect.Output) map[string]any {
-	content := out.Stdout
-	truncated := out.Truncated
-	if len(content) > rawDumpCap {
-		cut := rawDumpCap
-		for cut > 0 && !utf8.RuneStart(content[cut]) {
-			cut--
-		}
-		content = content[:cut]
-		truncated = true
+	content, cut := capDump(out.Stdout)
+	return map[string]any{"source": source, "content": content, "truncated": out.Truncated || cut}
+}
+
+// capDump is a dump's text capped at rawDumpCap on a rune boundary, and
+// whether the cap cut it.
+func capDump(b []byte) (string, bool) {
+	if len(b) <= rawDumpCap {
+		return string(b), false
 	}
-	return map[string]any{"source": source, "content": string(content), "truncated": truncated}
+	cut := rawDumpCap
+	for cut > 0 && !utf8.RuneStart(b[cut]) {
+		cut--
+	}
+	return string(b[:cut]), true
 }
 
 // captureRuleset runs `nft list ruleset`; on any failure it falls back to
