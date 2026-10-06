@@ -50,6 +50,11 @@ var processesBudget = 5 * time.Second
 const processesIndexTimeout = 30 * time.Second
 
 const (
+	// procTaskFdGlob licenses a zombie leader's task fd tables (W-68). The
+	// task segment is * rather than [0-9]*: the guard matches the pattern
+	// handed to Glob, /proc/<pid>/task/*/fd/*, against the declaration, and
+	// a literal * in that pattern is not a digit.
+	procTaskFdGlob = "/proc/[0-9]*/task/*/fd/*"
 	procStatusGlob = "/proc/[0-9]*/status"
 	procInitMntNS  = "/proc/1/ns/mnt"
 )
@@ -76,6 +81,7 @@ func processesReads() []string {
 		"/proc/[0-9]*/cmdline",
 		"/proc/[0-9]*/exe",
 		"/proc/[0-9]*/fd/*",
+		procTaskFdGlob,
 		"/proc/[0-9]*/ns/mnt",
 		"/proc/[0-9]*/mountinfo",
 		"/proc/[0-9]*/root",
@@ -105,6 +111,7 @@ type procRow struct {
 	mntNS          string // host | foreign | "" when not read
 	nsStatus       string // ok | denied | error; "" on a kernel thread or a zombie
 	pkg, pkgStatus string
+	threads        int // the status Threads count (W-68)
 }
 
 func (r procRow) record() map[string]any {
@@ -168,7 +175,10 @@ type procScan struct {
 	fdOverrun  failure // an fd table past procFdCap
 	ownerFail  map[int]facts.Envelope
 
-	budgetHit                                           bool
+	budgetHit bool
+	// container is the run header's Env.Container: inside one, the pid
+	// namespace may hide the processes holding a host socket (W-67).
+	container                                           string
 	kernel, zombies, foreign, denied, vanished, fdReads int
 }
 
@@ -198,7 +208,7 @@ func runProcesses(ctx context.Context, a collect.Access, b *collect.Builder) err
 		return nil
 	}
 
-	s := &procScan{a: a, rows: map[int]*procRow{}, wanted: map[int]bool{}, holders: map[int][]int{}, ownerFail: map[int]facts.Envelope{}, mounts: map[string]nsMounts{}}
+	s := &procScan{a: a, rows: map[int]*procRow{}, wanted: map[int]bool{}, holders: map[int][]int{}, ownerFail: map[int]facts.Envelope{}, mounts: map[string]nsMounts{}, container: b.Header().Env.Container}
 	var listeners []listener
 	inodeBad := ""
 	if sockErr == nil {
@@ -344,7 +354,7 @@ func (s *procScan) scan(pid int) {
 		s.statusFail.set(*fail)
 		return
 	}
-	r := &procRow{pid: pid, ppid: st.PPid, uid: st.Uid, name: st.Name}
+	r := &procRow{pid: pid, ppid: st.PPid, uid: st.Uid, name: st.Name, threads: st.Threads}
 	switch {
 	case st.HasKthread && st.Kthread, !st.HasKthread && (pid == 2 || st.PPid == 2):
 		r.kind = kindKernel
@@ -541,7 +551,15 @@ func (s *procScan) noteOwnerFail(pid int, e facts.Envelope) {
 // returns false when the process is gone (the table ENOENT).
 func (s *procScan) readFds(r *procRow) bool {
 	dir := procPath(r.pid, "fd")
-	links, err := s.a.Glob(dir + "/*")
+	pattern := dir + "/*"
+	if r.kind == kindZombie && r.threads > 1 {
+		// A zombie leader's own fd/ is empty once it has exited, but its
+		// live threads still hold the group's files: read them through the
+		// tasks, every link counted against the one budget (W-68).
+		dir = procPath(r.pid, "task")
+		pattern = dir + "/*/fd/*"
+	}
+	links, err := s.a.Glob(pattern)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			return false
@@ -663,6 +681,12 @@ func (s *procScan) listenerEnvs(ls []listener, inodeBad string, socks socketTabl
 	// does "no process holds it" mean the kernel does (W-66).
 	allRead := s.fdDenied.env == nil && s.fdOverrun.env == nil && s.fdError.env == nil &&
 		s.statusFail.env == nil && !s.budgetHit
+	// Inside a container the pid namespace may hide the holder of a host
+	// socket (--net=host without --pid=host): an unheld socket is then a
+	// hole in the inventory, never the kernel's (W-67). An empty Container
+	// is not a container (J-31).
+	inContainer := s.container != "" && s.container != "none"
+	var unheld []string
 	var ownerFail *facts.Envelope
 	for i := range ls {
 		l := &ls[i]
@@ -692,11 +716,15 @@ func (s *procScan) listenerEnvs(ls []listener, inodeBad string, socks socketTabl
 			l.OwnerStatus = "ok"
 		case s.fdDenied.env != nil:
 			l.OwnerStatus = "denied"
-		case allRead:
-			// A kernel-owned socket (WireGuard, nfsd, lockd, ksmbd) has a
-			// real inode that no fd table holds; one closed between the two
-			// reads is no longer a listener.
+		case allRead && !inContainer:
+			// A kernel-owned socket has a real inode that no fd table
+			// holds (measured: WireGuard's udp and udp6 sockets; nfsd was
+			// not measured); one closed between the two reads is no longer
+			// a listener.
 			l.OwnerStatus = "kernel"
+		case allRead:
+			l.OwnerStatus = "unmatched"
+			unheld = append(unheld, fmt.Sprintf("%s/%d on %s (inode %d)", l.Proto, l.Port, l.Addr, l.Inode))
 		default:
 			l.OwnerStatus = "unmatched"
 		}
@@ -717,6 +745,10 @@ func (s *procScan) listenerEnvs(ls []listener, inodeBad string, socks socketTabl
 		fail = s.statusFail.env
 	case s.fdError.env != nil:
 		fail = s.fdError.env
+	case len(unheld) > 0:
+		e := collect.Absent("no process this run can see holds the listening socket " + strings.Join(unheld, ", ") +
+			"; inside a " + s.container + " container the pid view may be partial")
+		fail = &e
 	}
 	if fail != nil {
 		return *fail, *fail

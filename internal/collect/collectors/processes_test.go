@@ -23,7 +23,9 @@ import (
 type fakeProc struct {
 	pid, ppid, uid int
 	name, state    string
-	kthread        string // "", "0" or "1": the Kthread line, printed only when set
+	kthread        string            // "", "0" or "1": the Kthread line, printed only when set
+	threads        int               // the Threads line, printed only when > 0
+	tasks          map[string]string // task fd links: "<tid>/<fd>" -> link text
 	cmdline        string
 	exe            string // "" leaves the link out (a kernel thread's ENOENT)
 	ns             string // "" -> the host's namespace
@@ -42,6 +44,9 @@ func procStatusText(p fakeProc) string {
 		p.name, state, p.pid, p.pid, p.ppid, p.uid, p.uid, p.uid, p.uid)
 	if p.kthread != "" {
 		s += "Kthread:\t" + p.kthread + "\n"
+	}
+	if p.threads > 0 {
+		s += "Threads:\t" + strconv.Itoa(p.threads) + "\n"
 	}
 	return s
 }
@@ -103,6 +108,10 @@ func addProc(a *fsAccess, p fakeProc) {
 	case "-":
 	default:
 		a.links[procPath(p.pid, "root")] = p.root
+	}
+	for k, t := range p.tasks {
+		tid, fd, _ := strings.Cut(k, "/")
+		a.links[procPath(p.pid, "task/"+tid+"/fd/"+fd)] = t
 	}
 	for fd, t := range p.fds {
 		a.links[procPath(p.pid, "fd/"+strconv.Itoa(fd))] = t
@@ -759,5 +768,54 @@ func TestProcessesTruncationGoesOnAnswersOnly(t *testing.T) {
 	}
 	if e := env(t, b, "processes.unpackaged_listeners"); e.Status != facts.StatusAbsent || e.Truncated {
 		t.Errorf("unpackaged %+v, want absent without the truncation", e)
+	}
+}
+
+// W-67: inside a container the pid view may be partial, so a socket no
+// visible process holds is unmatched and both leaves absent naming it; on
+// the host (none, or an Env the os collector could not fill) the same
+// reading is the kernel's.
+func TestProcessesUnheldSocketInsideAContainerIsAbsent(t *testing.T) {
+	reg, err := facts.LoadRegistry()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, container := range []string{"docker", "none", ""} {
+		a := procHost(tcpTable([2]int{22, 7}, [2]int{2049, 363387305}), sshdProc(map[int]string{3: "socket:[7]"}), initProc(nil))
+		b := collect.NewBuilder(reg)
+		b.Header().Env.Container = container
+		b = buildOn(t, "processes", a, b)
+		if container != "docker" {
+			if ls := listenerRows(t, b); ls[1]["owner_status"] != "kernel" {
+				t.Errorf("container %q: %v", container, ls[1])
+			}
+			continue
+		}
+		for _, k := range []string{"processes.listeners", "processes.unpackaged_listeners"} {
+			e := env(t, b, k)
+			if e.Status != facts.StatusAbsent || !strings.Contains(e.Reason, "tcp/2049") || !strings.Contains(e.Reason, "docker container") {
+				t.Errorf("%s = %+v, want absent naming tcp/2049 and the container", k, e)
+			}
+		}
+	}
+}
+
+// W-68: a zombie leader whose live threads hold the socket: its own fd/ is
+// empty, the socket is found through its tasks, and the owner is the leader.
+func TestProcessesZombieLeaderThreadsHoldTheSocket(t *testing.T) {
+	leader := fakeProc{pid: 950, ppid: 1, name: "srv", state: "Z (zombie)", threads: 2,
+		tasks: map[string]string{"951/3": "socket:[60]", "951/4": "/dev/null"}}
+	b := build(t, "processes", procHost(tcpTable([2]int{9090, 60}), initProc(nil), leader))
+	ls := listenerRows(t, b)
+	if len(ls) != 1 || ls[0]["owner_status"] != "ok" || ls[0]["owners_count"] != 1 ||
+		ls[0]["owners"].([]any)[0].(map[string]any)["pid"] != 950 {
+		t.Fatalf("listeners %v", ls)
+	}
+	// With Threads: 1 the tasks are not consulted, and the socket nobody
+	// else holds is the kernel's.
+	leader.threads = 1
+	b = build(t, "processes", procHost(tcpTable([2]int{9090, 60}), initProc(nil), leader))
+	if ls := listenerRows(t, b); ls[0]["owner_status"] != "kernel" {
+		t.Errorf("a one-thread zombie: %v", ls)
 	}
 }

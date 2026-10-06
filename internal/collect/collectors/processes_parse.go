@@ -27,6 +27,7 @@ type procStatus struct {
 	State      string
 	Kthread    bool
 	HasKthread bool
+	Threads    int // the thread count; 0 when not printed (W-68)
 }
 
 // errProcStatus is a status file that lacks a line every process has.
@@ -65,6 +66,10 @@ func parseProcStatus(data []byte) (procStatus, error) {
 			}
 		case "Kthread":
 			st.HasKthread, st.Kthread = true, val == "1"
+		case "Threads":
+			if n, err := strconv.Atoi(val); err == nil && n >= 0 {
+				st.Threads = n
+			}
 		}
 	}
 	if !seen.name || !seen.state || !seen.ppid || !seen.uid {

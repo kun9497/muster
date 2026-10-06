@@ -23,9 +23,9 @@ func TestParseProcStatus(t *testing.T) {
 		file string
 		want procStatus
 	}{
-		{"proc_status_sshd", procStatus{Name: "sshd", PPid: 1, Uid: 0, State: "S", HasKthread: true}},
-		{"proc_status_kthread", procStatus{Name: "kworker/0:1-events", PPid: 2, Uid: 0, State: "I", HasKthread: true, Kthread: true}},
-		{"proc_status_zombie", procStatus{Name: "defunct-child", PPid: 4200, Uid: 1000, State: "Z"}},
+		{"proc_status_sshd", procStatus{Name: "sshd", PPid: 1, Uid: 0, State: "S", HasKthread: true, Threads: 1}},
+		{"proc_status_kthread", procStatus{Name: "kworker/0:1-events", PPid: 2, Uid: 0, State: "I", HasKthread: true, Kthread: true, Threads: 1}},
+		{"proc_status_zombie", procStatus{Name: "defunct-child", PPid: 4200, Uid: 1000, State: "Z", Threads: 1}},
 	} {
 		got, err := parseProcStatus(readProcFixture(t, tc.file))
 		if err != nil {

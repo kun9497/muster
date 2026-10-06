@@ -150,7 +150,7 @@ func TestCollectListActionsOnLinux(t *testing.T) {
 		"fact none firewall.*",
 		"read none /bin", "read none /lib", "read none /lib32", "read none /lib64", "read none /libx32",
 		"read none /proc/1/ns/mnt", "read none /proc/[0-9]*/cmdline", "read none /proc/[0-9]*/exe",
-		"read none /proc/[0-9]*/fd/*", "read none /proc/[0-9]*/mountinfo", "read none /proc/[0-9]*/ns/mnt", "read none /proc/[0-9]*/root", "read none /proc/[0-9]*/status",
+		"read none /proc/[0-9]*/fd/*", "read none /proc/[0-9]*/mountinfo", "read none /proc/[0-9]*/ns/mnt", "read none /proc/[0-9]*/root", "read none /proc/[0-9]*/task/*/fd/*", "read none /proc/[0-9]*/status",
 		"read none /proc/self/net/tcp", "read none /proc/self/net/tcp6", "read none /proc/self/net/udp", "read none /proc/self/net/udp6",
 		"read none /proc/sys/net/ipv6/bindv6only", "read none /sbin",
 		"read none /var/lib/dpkg/diversions", "read none /var/lib/dpkg/info/*.list", "read none /var/lib/dpkg/statoverride",
