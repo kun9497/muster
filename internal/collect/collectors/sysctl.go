@@ -89,21 +89,23 @@ func ipv6DisabledRank(s facts.Status) int {
 // not ok, the worse read's status and reason (a missing file keeps "IPv6 is
 // not built or is disabled").
 func ipv6Disabled(all, def facts.Envelope) facts.Envelope {
+	// The two inputs are the source on every branch: a failed read keeps
+	// the evidence of what was read (C4).
+	src := &facts.Source{Kind: "derived", Inputs: []facts.Source{
+		{Kind: "proc", Path: sysctlIPv6Prefix + "conf/all/disable_ipv6"},
+		{Kind: "proc", Path: sysctlIPv6Prefix + "conf/default/disable_ipv6"},
+	}}
 	if all.Status != facts.StatusOK || def.Status != facts.StatusOK {
 		w := all
 		if ipv6DisabledRank(def.Status) > ipv6DisabledRank(all.Status) {
 			w = def
 		}
-		return facts.Envelope{Status: w.Status, Reason: w.Reason}
+		return facts.Envelope{Status: w.Status, Reason: w.Reason, Source: src}
 	}
 	v := 0
 	if all.Value == 1 && def.Value == 1 {
 		v = 1
 	}
-	src := &facts.Source{Kind: "derived", Inputs: []facts.Source{
-		{Kind: "proc", Path: sysctlIPv6Prefix + "conf/all/disable_ipv6"},
-		{Kind: "proc", Path: sysctlIPv6Prefix + "conf/default/disable_ipv6"},
-	}}
 	return collect.OK(v, src)
 }
 

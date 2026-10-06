@@ -130,6 +130,18 @@ jobs:
         run: |
           jq -e '(.facts.walk.capabilities.value | map(select(.path == "/usr/local/bin/muster-cap-probe"))) as $p | ($p | length) == 1 and $p[0].reference == "unpackaged" and $p[0].package_declared == false' "$RUNNER_TEMP/muster/root.json"
           jq -e '.facts.privilege.ld_so_preload.value == [] and (.facts.sudo.nopasswd_all.value | index("runner") != null) and any(.facts.privilege.runtime_group_members.value[]; .member == "runner" and .group == "docker") and .facts.accounts.useradd.inactive.value == -1' "$RUNNER_TEMP/muster/root.json"
+      # 3C-2b: the process index is dpkg's and sshd's tcp/22 is among the
+      # listeners the exposure join reads. The verdict assert is a HYPOTHESIS
+      # (spec §5): the runner's ufw is installed and disabled, so X-9 decides
+      # the firewall full with restricts_inbound false. These describe the
+      # runner, not muster: the first run corrects this step, never the
+      # collector. The counts are printed before anything is asserted.
+      - name: the runner's processes and exposure
+        run: |
+          jq '.facts.processes.stats.value, .facts.exposure.stats.value, [.facts.exposure.exposed.value[]? | "\(.service) \(.family) \(.via)"], .facts.firewall.backend.value' "$RUNNER_TEMP/muster/root.json"
+          jq -e '.facts.processes.stats.value.index_source == "dpkg"' "$RUNNER_TEMP/muster/root.json"
+          jq -e 'any(.facts.exposure.listeners.value[]; .service == "tcp/22")' "$RUNNER_TEMP/muster/root.json"
+          jq -e '.facts.exposure.stats.value.confidence == "full"' "$RUNNER_TEMP/muster/root.json"
       - name: check the root snapshot
         run: |
           sudo chown "$(id -u)" "$RUNNER_TEMP/muster/root.json"
@@ -211,6 +223,12 @@ jobs:
           grep -q 'oracle lastlog: compared [1-9][0-9]*, dated [1-9]' "$RUNNER_TEMP/oracle.log"
           grep -q 'oracle capabilities: compared [1-9]' "$RUNNER_TEMP/oracle.log"
           grep -q 'oracle sudoers: compared 1' "$RUNNER_TEMP/oracle.log"
+          grep -q 'oracle listeners: compared [1-9]' "$RUNNER_TEMP/oracle.log"
+          grep -q 'oracle deleted-exe: compared 1' "$RUNNER_TEMP/oracle.log"
+          # Every key the pair walks counts once it agrees (a value, a knob
+          # neither side finds, or a refused read), so the count is the key
+          # list's length on any kernel: 12 + 26 + bindv6only.
+          grep -q 'oracle sysctl: compared 39' "$RUNNER_TEMP/oracle.log"
       - name: take the oracle drop-in back out
         # P-1: the runner is thrown away, but a step that exists to undo a
         # change must run whether or not the thing it guarded passed.

@@ -3,7 +3,9 @@
 package collectors
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"path"
 	"reflect"
 	"slices"
@@ -853,5 +855,41 @@ func TestSysctlIPv6DisabledDerived(t *testing.T) {
 	e := leaf(t, b, "net.sysctl.ipv6_disabled").(facts.Envelope)
 	if e.Status != facts.StatusAbsent || !strings.Contains(e.Reason, "IPv6 is not built or is disabled") {
 		t.Errorf("a missing default/disable_ipv6: %+v, want absent: IPv6 is not built or is disabled", e)
+	}
+	if e.Source == nil || len(e.Source.Inputs) != 2 || e.Source.Inputs[0].Path != allP || e.Source.Inputs[1].Path != defP {
+		t.Errorf("a missing default/disable_ipv6: source %+v, want the two disable_ipv6 paths", e.Source)
+	}
+}
+
+// The worse of the two reads is the derived leaf's status, whichever side
+// it is on: a refused or failed read outweighs one that found nothing, and
+// a failure never reads ok 0.
+func TestSysctlIPv6DisabledTakesTheWorseRead(t *testing.T) {
+	const allP = "/proc/sys/net/ipv6/conf/all/disable_ipv6"
+	const defP = "/proc/sys/net/ipv6/conf/default/disable_ipv6"
+	ioErr := errors.New("input/output error")
+	for _, c := range []struct {
+		name     string
+		drop     string           // the path whose file is missing
+		fails    map[string]error // the paths whose read fails
+		want     facts.Status
+		wantPath string // the path the reason names
+	}{
+		{"all absent, default error", allP, map[string]error{defP: ioErr}, facts.StatusError, defP},
+		{"all error, default absent", defP, map[string]error{allP: ioErr}, facts.StatusError, allP},
+		{"all denied, default absent", defP, map[string]error{allP: fs.ErrPermission}, facts.StatusDenied, allP},
+		{"all ok, default error", "", map[string]error{defP: ioErr}, facts.StatusError, defP},
+		{"all denied, default error", "", map[string]error{allP: fs.ErrPermission, defP: ioErr}, facts.StatusError, defP},
+	} {
+		a := netSysAccess(func(p string) bool { return p == c.drop })
+		if c.drop != allP {
+			a.contents[allP] = []byte("1\n")
+		}
+		a.fails = c.fails
+		b := build(t, "sysctl", a)
+		e := leaf(t, b, "net.sysctl.ipv6_disabled").(facts.Envelope)
+		if e.Status != c.want || !strings.Contains(e.Reason, c.wantPath) {
+			t.Errorf("%s: %+v, want %s naming %s", c.name, e, c.want, c.wantPath)
+		}
 	}
 }

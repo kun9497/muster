@@ -6,7 +6,7 @@
     "units.root_services is the init image's seventeen in-scope root services, six commands named without a path among them; a VM install runs more services shaped the same.",
     "sshd.options.permit_root_login is the compiled default prohibit-password, which the image's 9.9p1 sshd prints through sshd -G as without-password and muster stores as prohibit-password; the persisted side, absent because 50-redhat.conf includes the crypto-policies file outside the declaration, is omitted here as no control reads it.",
     "accounts.login_capable is root alone, locked, as the image has it; an installer-created wheel account would be a second unset row and change nothing.",
-    "3C-2b (hypothesis of spec §5, pinned before Task 7 measures): firewalld active, whose filter_INPUT chain accepts by default with rules, so the normaliser reads partial and exposure.exposed is absent with that cause while sshd listens on 0.0.0.0 and :: (tcp/22) - muster.beyond.exposed_listeners_allowed reads MANUAL; chronyd's 127.0.0.1 and ::1 sockets are the two loopback listeners. Every listener is rpm-owned and no process runs a deleted executable. The net.sysctl runtime side cannot be measured in a container (it reads the namespace's values), so these rows carry the persisted winners of 50-default.conf - default.rp_filter 2 and default.accept_source_route 0, its glob excluded from all.accept_source_route and all.rp_filter - over the kernel's defaults as the hypothesis for the runtime side, until an EL VM is measured."
+    "3C-2b (Task 7, measured on 2026-10-06 in rockylinux/rockylinux:9-ubi-init run --privileged --cgroupns=host, with openssh-server, firewalld, iproute and systemd-udev installed and sshd and firewalld started inside the container; V-18): firewalld reads partial - its filter_INPUT chain accepts by default with rules - so exposure.exposed is absent with that cause while sshd (rpm-packaged, host mount namespace) listens on 0.0.0.0 and :: (tcp/22), undecided: muster.beyond.exposed_listeners_allowed reads MANUAL. The fold of firewalld's ruleset gives 25 rows and the seven opaque rows pinned here (ct status dnat accept, the five jumps of filter_IN_policy_allow-host-ipv6, and filter_IN_public's icmp/ipv6-icmp set accept); index_source is rpm. Hypothesis, not measured: the two loopback listeners are chronyd's 127.0.0.1 and ::1 sockets - the stock VM runs chronyd, the init image does not. The image ships no /usr/lib/sysctl.d/50-default.conf; systemd-udev, which every EL9 VM carries, ships it, and rocky-release's 50-redhat.conf sorts after it and sets net.ipv4.conf.default.rp_filter = 1 on line 6 (with the * glob and the all exclusion). The persisted winners are therefore default.rp_filter 1 (50-redhat.conf) and default.accept_source_route 0 (50-default.conf line 30), with nothing persisted for all.rp_filter or all.accept_source_route. The runtime side cannot be measured in a container - a new namespace inherits its IPv4 conf values from the host's - so these rows carry those persisted winners over the kernel's defaults as the hypothesis for the runtime side, until an EL VM is measured."
   ],
   "schema_version": 1,
   "run": {
@@ -2543,7 +2543,64 @@
       },
       "opaque_rules": {
         "status": "ok",
-        "value": [],
+        "value": [
+          {
+            "family": "inet",
+            "table": "firewalld",
+            "via_chain": "filter_INPUT",
+            "chain": "filter_INPUT",
+            "action": "accept",
+            "raw": "ct status dnat accept"
+          },
+          {
+            "family": "inet",
+            "table": "firewalld",
+            "via_chain": "filter_INPUT",
+            "chain": "filter_IN_policy_allow-host-ipv6",
+            "action": "jump filter_IN_policy_allow-host-ipv6_pre",
+            "raw": "jump filter_IN_policy_allow-host-ipv6_pre"
+          },
+          {
+            "family": "inet",
+            "table": "firewalld",
+            "via_chain": "filter_INPUT",
+            "chain": "filter_IN_policy_allow-host-ipv6",
+            "action": "jump filter_IN_policy_allow-host-ipv6_log",
+            "raw": "jump filter_IN_policy_allow-host-ipv6_log"
+          },
+          {
+            "family": "inet",
+            "table": "firewalld",
+            "via_chain": "filter_INPUT",
+            "chain": "filter_IN_policy_allow-host-ipv6",
+            "action": "jump filter_IN_policy_allow-host-ipv6_deny",
+            "raw": "jump filter_IN_policy_allow-host-ipv6_deny"
+          },
+          {
+            "family": "inet",
+            "table": "firewalld",
+            "via_chain": "filter_INPUT",
+            "chain": "filter_IN_policy_allow-host-ipv6",
+            "action": "jump filter_IN_policy_allow-host-ipv6_allow",
+            "raw": "jump filter_IN_policy_allow-host-ipv6_allow"
+          },
+          {
+            "family": "inet",
+            "table": "firewalld",
+            "via_chain": "filter_INPUT",
+            "chain": "filter_IN_policy_allow-host-ipv6",
+            "action": "jump filter_IN_policy_allow-host-ipv6_post",
+            "raw": "jump filter_IN_policy_allow-host-ipv6_post"
+          },
+          {
+            "family": "inet",
+            "table": "firewalld",
+            "via_chain": "filter_INPUT",
+            "chain": "filter_IN_public",
+            "action": "accept",
+            "raw": "meta l4proto { icmp, ipv6-icmp } accept"
+          }
+        ],
         "source": {
           "kind": "derived"
         }
@@ -2559,8 +2616,8 @@
           "loopback": 2,
           "link_local": 0,
           "kernel_owned": 0,
-          "opaque_rules": 0,
-          "folded_rules": 14,
+          "opaque_rules": 7,
+          "folded_rules": 25,
           "ipv6_disabled": false
         },
         "source": {
@@ -2995,7 +3052,7 @@
         "ipv4_default_rp_filter": {
           "runtime": {
             "status": "ok",
-            "value": 2,
+            "value": 1,
             "source": {
               "kind": "proc",
               "path": "/proc/sys/net/ipv4/conf/default/rp_filter"
@@ -3003,17 +3060,17 @@
           },
           "persisted": {
             "status": "ok",
-            "value": 2,
+            "value": 1,
             "source": {
               "kind": "file",
-              "path": "/usr/lib/sysctl.d/50-default.conf",
-              "line": 25,
-              "raw": "net.ipv4.conf.default.rp_filter = 2"
+              "path": "/usr/lib/sysctl.d/50-redhat.conf",
+              "line": 6,
+              "raw": "net.ipv4.conf.default.rp_filter = 1"
             }
           },
           "effective": {
             "status": "ok",
-            "value": 2,
+            "value": 1,
             "source": {
               "kind": "proc",
               "path": "/proc/sys/net/ipv4/conf/default/rp_filter"

@@ -27,8 +27,9 @@ const hostRoot = fixtureRoot + "/_hosts"
 // their postinst declares, no /etc/ld.so.preload, no container runtime
 // socket (so no runtime group with a member), sshd's compiled-in
 // prohibit-password (sshd -T prints without-password), no key in root's
-// authorized_keys, and no DSA or short RSA key — and, for 3C-2b (spec §5,
-// the hypothesis Task 7 measures), ufw installed and inactive so sshd and the
+// authorized_keys, and no DSA or short RSA key — and, for 3C-2b (spec §5;
+// Task 7 measured the lab, which is not stock, and pinned what a stock host
+// shares with it), ufw installed and inactive so sshd and the
 // DHCP client are exposed through the open policy, every listener packaged,
 // no deleted executable, and the kernel's network defaults with systemd's
 // and procps' rp_filter and source-route lines on top — reads for the
@@ -100,9 +101,11 @@ var stockUbuntu2204 = map[string]check.Status{
 // shadow-utils' newgidmap and newuidmap; ping carries none), no root service
 // a non-root user can rewrite, no /etc/ld.so.preload, no runtime socket,
 // sshd's compiled-in prohibit-password and no key at all — and the 3C-2b
-// hypothesis of spec §5: firewalld reads partial so the exposure verdict is
-// MANUAL, every listener rpm-owned, no deleted executable, and the network
-// sysctls as 50-default.conf persists them over the kernel's defaults. The
+// reading Task 7 measured in the same image with firewalld started:
+// firewalld reads partial so the exposure verdict is MANUAL, every listener
+// rpm-owned, no deleted executable, and the network sysctls as
+// 50-default.conf and 50-redhat.conf persist them over the kernel's
+// defaults (the runtime side is a hypothesis until an EL VM). The
 // snapshot carries env, the header, the 3C-1, 3C-2a and 3C-2b facts, so the
 // table names those thirty controls and nothing else.
 var stockEL9 = map[string]check.Status{
@@ -132,7 +135,7 @@ var stockEL9 = map[string]check.Status{
 	"muster.beyond.ipv6_redirects_ignored":             check.FAIL,   // 3C-2b: accept_redirects 1/1
 	"muster.beyond.source_routing_rejected":            check.PASS,   // 3C-2b: 0/0
 	"muster.beyond.ipv6_source_routing_rejected":       check.PASS,   // 3C-2b: 0/0
-	"muster.beyond.reverse_path_filtering":             check.FAIL,   // 3C-2b: rp_filter 0/2, log_martians 0/0 (persisted hypothesis)
+	"muster.beyond.reverse_path_filtering":             check.FAIL,   // 3C-2b: rp_filter 0/1, log_martians 0/0 (persisted hypothesis)
 	"muster.beyond.icmp_broadcast_and_bogus_ignored":   check.PASS,   // 3C-2b: 1, 1
 	"muster.beyond.syn_cookies_enabled":                check.PASS,   // 3C-2b: 1
 	"muster.beyond.ipv6_router_advertisements_ignored": check.FAIL,   // 3C-2b: accept_ra 1/1

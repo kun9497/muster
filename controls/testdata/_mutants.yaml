@@ -344,8 +344,8 @@
     internal/collect/collectors/sysctl.go) from net.ipv6.conf.all.disable_ipv6 and
     net.ipv6.conf.default.disable_ipv6, and readProcSys reads those and this control's judged
     keys from the one /proc/sys/net/ipv6/conf tree, writing a missing file there as absent "IPv6
-    is not built or is disabled" - so the gate is absent whenever a judged key is, and the
-    kernel publishes every conf knob or none. applies_when screens before absent_means (screen,
+    is not built or is disabled", and the kernel publishes every conf knob or none - so the
+    gate is absent whenever a judged key is. applies_when screens before absent_means (screen,
     internal/check/eval.go), so no collector-shaped snapshot reaches absent_means with the gate
     holding; the value it names cannot change any fixture's answer.
 
@@ -356,8 +356,8 @@
     internal/collect/collectors/sysctl.go) from net.ipv6.conf.all.disable_ipv6 and
     net.ipv6.conf.default.disable_ipv6, and readProcSys reads those and this control's judged
     keys from the one /proc/sys/net/ipv6/conf tree, writing a missing file there as absent "IPv6
-    is not built or is disabled" - so the gate is absent whenever a judged key is, and the
-    kernel publishes every conf knob or none. applies_when screens before absent_means (screen,
+    is not built or is disabled", and the kernel publishes every conf knob or none - so the
+    gate is absent whenever a judged key is. applies_when screens before absent_means (screen,
     internal/check/eval.go), so no collector-shaped snapshot reaches absent_means with the gate
     holding; the value it names cannot change any fixture's answer.
 
@@ -368,8 +368,8 @@
     internal/collect/collectors/sysctl.go) from net.ipv6.conf.all.disable_ipv6 and
     net.ipv6.conf.default.disable_ipv6, and readProcSys reads those and this control's judged
     keys from the one /proc/sys/net/ipv6/conf tree, writing a missing file there as absent "IPv6
-    is not built or is disabled" - so the gate is absent whenever a judged key is, and the
-    kernel publishes every conf knob or none. applies_when screens before absent_means (screen,
+    is not built or is disabled", and the kernel publishes every conf knob or none - so the
+    gate is absent whenever a judged key is. applies_when screens before absent_means (screen,
     internal/check/eval.go), so no collector-shaped snapshot reaches absent_means with the gate
     holding; the value it names cannot change any fixture's answer.
 
@@ -380,8 +380,8 @@
     internal/collect/collectors/sysctl.go) from net.ipv6.conf.all.disable_ipv6 and
     net.ipv6.conf.default.disable_ipv6, and readProcSys reads those and this control's judged
     keys from the one /proc/sys/net/ipv6/conf tree, writing a missing file there as absent "IPv6
-    is not built or is disabled" - so the gate is absent whenever a judged key is, and the
-    kernel publishes every conf knob or none. applies_when screens before absent_means (screen,
+    is not built or is disabled", and the kernel publishes every conf knob or none - so the
+    gate is absent whenever a judged key is. applies_when screens before absent_means (screen,
     internal/check/eval.go), so no collector-shaped snapshot reaches absent_means with the gate
     holding; the value it names cannot change any fixture's answer.
 
@@ -392,8 +392,8 @@
     internal/collect/collectors/sysctl.go) from net.ipv6.conf.all.disable_ipv6 and
     net.ipv6.conf.default.disable_ipv6, and readProcSys reads those and this control's judged
     keys from the one /proc/sys/net/ipv6/conf tree, writing a missing file there as absent "IPv6
-    is not built or is disabled" - so the gate is absent whenever a judged key is, and the
-    kernel publishes every conf knob or none. applies_when screens before absent_means (screen,
+    is not built or is disabled", and the kernel publishes every conf knob or none - so the
+    gate is absent whenever a judged key is. applies_when screens before absent_means (screen,
     internal/check/eval.go), so no collector-shaped snapshot reaches absent_means with the gate
     holding; the value it names cannot change any fixture's answer.
 
@@ -404,8 +404,8 @@
     internal/collect/collectors/sysctl.go) from net.ipv6.conf.all.disable_ipv6 and
     net.ipv6.conf.default.disable_ipv6, and readProcSys reads those and this control's judged
     keys from the one /proc/sys/net/ipv6/conf tree, writing a missing file there as absent "IPv6
-    is not built or is disabled" - so the gate is absent whenever a judged key is, and the
-    kernel publishes every conf knob or none. applies_when screens before absent_means (screen,
+    is not built or is disabled", and the kernel publishes every conf knob or none - so the
+    gate is absent whenever a judged key is. applies_when screens before absent_means (screen,
     internal/check/eval.go), so no collector-shaped snapshot reaches absent_means with the gate
     holding; the value it names cannot change any fixture's answer.
 
@@ -416,8 +416,8 @@
     internal/collect/collectors/sysctl.go) from net.ipv6.conf.all.disable_ipv6 and
     net.ipv6.conf.default.disable_ipv6, and readProcSys reads those and this control's judged
     keys from the one /proc/sys/net/ipv6/conf tree, writing a missing file there as absent "IPv6
-    is not built or is disabled" - so the gate is absent whenever a judged key is, and the
-    kernel publishes every conf knob or none. applies_when screens before absent_means (screen,
+    is not built or is disabled", and the kernel publishes every conf knob or none - so the
+    gate is absent whenever a judged key is. applies_when screens before absent_means (screen,
     internal/check/eval.go), so no collector-shaped snapshot reaches absent_means with the gate
     holding; the value it names cannot change any fixture's answer.
 
@@ -428,8 +428,8 @@
     internal/collect/collectors/sysctl.go) from net.ipv6.conf.all.disable_ipv6 and
     net.ipv6.conf.default.disable_ipv6, and readProcSys reads those and this control's judged
     keys from the one /proc/sys/net/ipv6/conf tree, writing a missing file there as absent "IPv6
-    is not built or is disabled" - so the gate is absent whenever a judged key is, and the
-    kernel publishes every conf knob or none. applies_when screens before absent_means (screen,
+    is not built or is disabled", and the kernel publishes every conf knob or none - so the
+    gate is absent whenever a judged key is. applies_when screens before absent_means (screen,
     internal/check/eval.go), so no collector-shaped snapshot reaches absent_means with the gate
     holding; the value it names cannot change any fixture's answer.
 
@@ -440,8 +440,8 @@
     internal/collect/collectors/sysctl.go) from net.ipv6.conf.all.disable_ipv6 and
     net.ipv6.conf.default.disable_ipv6, and readProcSys reads those and this control's judged
     keys from the one /proc/sys/net/ipv6/conf tree, writing a missing file there as absent "IPv6
-    is not built or is disabled" - so the gate is absent whenever a judged key is, and the
-    kernel publishes every conf knob or none. applies_when screens before absent_means (screen,
+    is not built or is disabled", and the kernel publishes every conf knob or none - so the
+    gate is absent whenever a judged key is. applies_when screens before absent_means (screen,
     internal/check/eval.go), so no collector-shaped snapshot reaches absent_means with the gate
     holding; the value it names cannot change any fixture's answer.
 
@@ -452,8 +452,8 @@
     internal/collect/collectors/sysctl.go) from net.ipv6.conf.all.disable_ipv6 and
     net.ipv6.conf.default.disable_ipv6, and readProcSys reads those and this control's judged
     keys from the one /proc/sys/net/ipv6/conf tree, writing a missing file there as absent "IPv6
-    is not built or is disabled" - so the gate is absent whenever a judged key is, and the
-    kernel publishes every conf knob or none. applies_when screens before absent_means (screen,
+    is not built or is disabled", and the kernel publishes every conf knob or none - so the
+    gate is absent whenever a judged key is. applies_when screens before absent_means (screen,
     internal/check/eval.go), so no collector-shaped snapshot reaches absent_means with the gate
     holding; the value it names cannot change any fixture's answer.
 
@@ -464,8 +464,8 @@
     internal/collect/collectors/sysctl.go) from net.ipv6.conf.all.disable_ipv6 and
     net.ipv6.conf.default.disable_ipv6, and readProcSys reads those and this control's judged
     keys from the one /proc/sys/net/ipv6/conf tree, writing a missing file there as absent "IPv6
-    is not built or is disabled" - so the gate is absent whenever a judged key is, and the
-    kernel publishes every conf knob or none. applies_when screens before absent_means (screen,
+    is not built or is disabled", and the kernel publishes every conf knob or none - so the
+    gate is absent whenever a judged key is. applies_when screens before absent_means (screen,
     internal/check/eval.go), so no collector-shaped snapshot reaches absent_means with the gate
     holding; the value it names cannot change any fixture's answer.
 
@@ -476,7 +476,7 @@
     internal/collect/collectors/sysctl.go) from net.ipv6.conf.all.disable_ipv6 and
     net.ipv6.conf.default.disable_ipv6, and readProcSys reads those and this control's judged
     keys from the one /proc/sys/net/ipv6/conf tree, writing a missing file there as absent "IPv6
-    is not built or is disabled" - so the gate is absent whenever a judged key is, and the
-    kernel publishes every conf knob or none. applies_when screens before absent_means (screen,
+    is not built or is disabled", and the kernel publishes every conf knob or none - so the
+    gate is absent whenever a judged key is. applies_when screens before absent_means (screen,
     internal/check/eval.go), so no collector-shaped snapshot reaches absent_means with the gate
     holding; the value it names cannot change any fixture's answer.
