@@ -27,6 +27,7 @@ type fakeProc struct {
 	cmdline        string
 	exe            string // "" leaves the link out (a kernel thread's ENOENT)
 	ns             string // "" -> the host's namespace
+	root           string // the root link: "" -> "/"; "-" leaves it out
 	fds            map[int]string
 }
 
@@ -96,6 +97,13 @@ func addProc(a *fsAccess, p fakeProc) {
 		ns = hostMntNS
 	}
 	a.links[procPath(p.pid, "ns/mnt")] = ns
+	switch p.root {
+	case "":
+		a.links[procPath(p.pid, "root")] = "/"
+	case "-":
+	default:
+		a.links[procPath(p.pid, "root")] = p.root
+	}
 	for fd, t := range p.fds {
 		a.links[procPath(p.pid, "fd/"+strconv.Itoa(fd))] = t
 	}
@@ -221,17 +229,31 @@ func TestProcessesKernelSocketIsOwnerStatusKernel(t *testing.T) {
 	}
 }
 
-func TestProcessesUnmatchedSocketMakesTheLeavesAbsent(t *testing.T) {
-	a := procHost(tcpTable([2]int{22, 7}, [2]int{2049, 99}), sshdProc(map[int]string{3: "socket:[7]"}), initProc(nil))
+// W-66: a kernel-owned socket has a real inode (the lab's WireGuard socket
+// printed 363387305). When every fd table was read whole and none holds the
+// inode, the socket is the kernel's; when a table failed, it is unmatched
+// and the leaf carries the failure.
+func TestProcessesUnheldSocketIsTheKernels(t *testing.T) {
+	a := procHost(tcpTable([2]int{22, 7}, [2]int{2049, 363387305}), sshdProc(map[int]string{3: "socket:[7]"}), initProc(nil))
 	b := build(t, "processes", a)
-	for _, k := range []string{"processes.listeners", "processes.unpackaged_listeners"} {
-		e := env(t, b, k)
-		if e.Status != facts.StatusAbsent || !strings.Contains(e.Reason, "tcp/2049") {
-			t.Errorf("%s = %+v, want absent naming tcp/2049", k, e)
-		}
+	ls := listenerRows(t, b)
+	if len(ls) != 2 || ls[1]["port"] != 2049 || ls[1]["owner_status"] != "kernel" || len(ls[1]["owners"].([]any)) != 0 || ls[1]["owners_count"] != 0 {
+		t.Fatalf("%v", ls)
 	}
-	if e := env(t, b, "processes.deleted_executables"); e.Status != facts.StatusOK {
-		t.Errorf("deleted_executables %+v", e)
+	if got := okList(t, b, "processes.unpackaged_listeners"); len(got) != 0 {
+		t.Errorf("a kernel socket is packaged by nature: %v", got)
+	}
+
+	a = procHost(tcpTable([2]int{22, 7}, [2]int{2049, 363387305}), sshdProc(map[int]string{3: "socket:[7]"}), initProc(nil),
+		fakeProc{pid: 42, ppid: 1, name: "other", exe: "/usr/bin/other", fds: map[int]string{3: "socket:[1]"}})
+	a.fails[procPath(42, "fd/3")] = fmt.Errorf("%s: %w", procPath(42, "fd/3"), unix.EIO)
+	delete(a.links, procPath(42, "fd/3"))
+	a.contents[procPath(42, "fd/3")] = []byte("x") // listed by Glob, its readlink fails
+	b = build(t, "processes", a)
+	for _, k := range []string{"processes.listeners", "processes.unpackaged_listeners"} {
+		if e := env(t, b, k); e.Status != facts.StatusError || !strings.Contains(e.Reason, "/proc/42/fd/3") {
+			t.Errorf("%s = %+v, want error naming the fd link (never kernel on a partial read)", k, e)
+		}
 	}
 }
 
@@ -243,7 +265,7 @@ func TestProcessesDeniedFdTableMakesTheLeavesDenied(t *testing.T) {
 	for _, k := range []string{"processes.listeners", "processes.unpackaged_listeners"} {
 		e := env(t, b, k)
 		if e.Status != facts.StatusDenied || !strings.Contains(e.Reason, "/proc/42/fd") {
-			t.Errorf("%s = %+v, want denied naming /proc/42/fd (denied outranks the unmatched socket)", k, e)
+			t.Errorf("%s = %+v, want denied naming /proc/42/fd (an unheld socket is not the kernel's when a table was refused)", k, e)
 		}
 	}
 	if e := env(t, b, "processes.deleted_executables"); e.Status != facts.StatusOK {
@@ -381,6 +403,9 @@ func TestProcessesFailedIndexIsNoIndexNotUnpackaged(t *testing.T) {
 	if e.Status != facts.StatusDenied || !strings.Contains(e.Reason, pkgindex.DpkgDiversionsPath) {
 		t.Errorf("unpackaged = %+v, want the index read's status naming the file", e)
 	}
+	if st := env(t, b, "processes.stats").Value.(map[string]any); st["index_source"] != "none" {
+		t.Errorf("stats %v: a failed build is no index source", st)
+	}
 	for _, l := range listenerRows(t, b) {
 		for _, o := range l["owners"].([]any) {
 			if s := o.(map[string]any)["package_status"]; s != "no_index" {
@@ -482,6 +507,11 @@ func TestProcessesBudgetOverrunTruncatesEveryJudgedLeaf(t *testing.T) {
 			t.Errorf("%s = %+v, want truncated", k, e)
 		}
 	}
+	// No table was read, so the unheld socket is unmatched, never the
+	// kernel's (W-66).
+	if ls := listenerRows(t, b); len(ls) != 1 || ls[0]["owner_status"] != "unmatched" {
+		t.Errorf("listeners %v", ls)
+	}
 }
 
 // vanishing serves a status file once: the second read finds the process
@@ -557,33 +587,49 @@ func TestProcessesBadInodeIsAnError(t *testing.T) {
 const (
 	hostMountinfo    = "29 1 253:0 / / rw,relatime shared:1 - ext4 /dev/mapper/vg-root rw\n30 29 0:26 / /proc rw,nosuid shared:12 - proc proc rw\n"
 	sandboxMountinfo = "612 611 253:0 / / ro,relatime master:1 - ext4 /dev/mapper/vg-root rw\n613 612 0:26 / /proc rw,nosuid - proc proc rw\n640 612 253:0 /tmp/systemd-private-x/tmp /tmp rw,relatime - ext4 /dev/mapper/vg-root rw\n"
+	protectMountinfo = "612 611 253:0 / / rw,relatime master:1 - ext4 /dev/mapper/vg-root rw\n615 612 253:0 /usr /usr ro,relatime master:1 - ext4 /dev/mapper/vg-root rw\n"
+	bindUsrMountinfo = "612 611 253:0 / / rw,relatime master:1 - ext4 /dev/mapper/vg-root rw\n616 612 253:0 /opt/vendor/usr /usr ro,relatime - ext4 /dev/mapper/vg-root rw\n"
+	bindExeMountinfo = "612 611 253:0 / / rw,relatime master:1 - ext4 /dev/mapper/vg-root rw\n617 612 253:0 /tmp/x /usr/sbin/sshd rw,relatime - ext4 /dev/mapper/vg-root rw\n"
+	sysextMountinfo  = "612 611 253:0 / / rw,relatime master:1 - ext4 /dev/mapper/vg-root rw\n618 612 0:61 / /usr ro,relatime - overlay overlay ro,lowerdir=/run/extensions/x\n"
 	overlayMountinfo = "900 880 0:52 / / rw,relatime - overlay overlay rw,lowerdir=/var/lib/docker/overlay2/l/A\n"
 	rootDirMountinfo = "700 699 253:0 /srv/jail / rw,relatime - ext4 /dev/mapper/vg-root rw\n"
 )
 
-// A systemd service with PrivateTmp= or ProtectSystem= has a mount namespace
-// of its own and still sees the host's root filesystem at /: its exe names
-// the host's file and is looked up (the lab's systemd-resolved). An overlay
-// at / (a container) or another root within the filesystem (RootDirectory=)
-// is foreign.
+// W-65: a process in a mount namespace of its own is host only when its
+// exe's own mount names the file pid 1 sees at that path. A systemd service
+// with PrivateTmp= (the host's / at /) or ProtectSystem= (a read-only bind of
+// /usr from the same device) is host and is looked up (the lab's
+// systemd-resolved); a bind of another directory over /usr or over the exe,
+// an extension overlay on /usr, a container's overlay at /, a root within
+// the filesystem (RootDirectory=), a root link other than / (a debug pod's
+// chroot /host) or an unreadable mountinfo is foreign.
 func TestProcessesSandboxedServiceSeesTheHostRoot(t *testing.T) {
-	resolved := fakeProc{pid: 600, ppid: 1, uid: 101, name: "systemd-resolve", exe: "/usr/lib/systemd/systemd-resolved", ns: "mnt:[4026532301]", fds: map[int]string{12: "socket:[30]"}}
-	boxed := fakeProc{pid: 3000, ppid: 2990, name: "sshd", exe: "/usr/sbin/sshd", ns: "mnt:[4026532999]"}
-	jailed := fakeProc{pid: 3100, ppid: 1, name: "sshd", exe: "/usr/sbin/sshd", ns: "mnt:[4026533000]"}
-	unread := fakeProc{pid: 3200, ppid: 1, name: "sshd", exe: "/usr/sbin/sshd", ns: "mnt:[4026533001]"}
 	tcp := []byte(procNetHeader + tcpRow(0, "3500007F", 53, 30, tcpListen))
-	a := procHost(tcp, initProc(nil), resolved, boxed, jailed, unread)
+	a := procHost(tcp, initProc(nil),
+		fakeProc{pid: 600, ppid: 1, uid: 101, name: "systemd-resolve", exe: "/usr/lib/systemd/systemd-resolved", ns: "mnt:[4026532301]", fds: map[int]string{12: "socket:[30]"}},
+		fakeProc{pid: 610, ppid: 1, name: "sshd", exe: "/usr/sbin/sshd", ns: "mnt:[4026532310]"},
+		fakeProc{pid: 620, ppid: 1, name: "sshd", exe: "/usr/sbin/sshd", ns: "mnt:[4026532320]"},
+		fakeProc{pid: 630, ppid: 1, name: "sshd", exe: "/usr/sbin/sshd", ns: "mnt:[4026532330]"},
+		fakeProc{pid: 640, ppid: 1, name: "sshd", exe: "/usr/sbin/sshd", ns: "mnt:[4026532340]"},
+		fakeProc{pid: 3000, ppid: 2990, name: "sshd", exe: "/usr/sbin/sshd", ns: "mnt:[4026532999]"},
+		fakeProc{pid: 3100, ppid: 1, name: "sshd", exe: "/usr/sbin/sshd", ns: "mnt:[4026533000]"},
+		fakeProc{pid: 3200, ppid: 1, name: "sshd", exe: "/usr/sbin/sshd", ns: "mnt:[4026533001]"},
+		fakeProc{pid: 3300, ppid: 1, name: "sshd", exe: "/usr/sbin/sshd", ns: "mnt:[4026533002]", root: "/host"},
+	)
 	a.links["/lib"] = "usr/lib"
-	a.contents[procPath(1, "mountinfo")] = []byte(hostMountinfo)
-	a.contents[procPath(600, "mountinfo")] = []byte(sandboxMountinfo)
-	a.contents[procPath(3000, "mountinfo")] = []byte(overlayMountinfo)
-	a.contents[procPath(3100, "mountinfo")] = []byte(rootDirMountinfo)
+	for pid, mi := range map[int]string{1: hostMountinfo, 600: sandboxMountinfo, 610: protectMountinfo, 620: bindUsrMountinfo,
+		630: bindExeMountinfo, 640: sysextMountinfo, 3000: overlayMountinfo, 3100: rootDirMountinfo, 3300: sandboxMountinfo} {
+		a.contents[procPath(pid, "mountinfo")] = []byte(mi)
+	}
 	b := build(t, "processes", a)
 	rows := rowsByPid(t, okList(t, b, "processes.list"))
 	if r := rows[600]; r["mnt_ns"] != "host" || r["package_status"] != "packaged" || r["package"] != "systemd" {
-		t.Errorf("sandboxed resolved %v, want host and packaged by systemd", r)
+		t.Errorf("PrivateTmp resolved %v, want host and packaged by systemd", r)
 	}
-	for _, pid := range []int{3000, 3100, 3200} {
+	if r := rows[610]; r["mnt_ns"] != "host" || r["package"] != "openssh-server" {
+		t.Errorf("ProtectSystem shape %v, want host and packaged", r)
+	}
+	for _, pid := range []int{620, 630, 640, 3000, 3100, 3200, 3300} {
 		if r := rows[pid]; r["mnt_ns"] != "foreign" || r["package_status"] != "foreign_ns" {
 			t.Errorf("pid %d %v, want foreign", pid, r)
 		}
@@ -591,7 +637,7 @@ func TestProcessesSandboxedServiceSeesTheHostRoot(t *testing.T) {
 	if got := okList(t, b, "processes.unpackaged_listeners"); len(got) != 0 {
 		t.Errorf("unpackaged %v", got)
 	}
-	if s := env(t, b, "processes.stats").Value.(map[string]any); s["foreign_ns"] != 3 {
+	if s := env(t, b, "processes.stats").Value.(map[string]any); s["foreign_ns"] != 7 {
 		t.Errorf("stats %v", s)
 	}
 	// Without pid 1's mountinfo nothing can be matched to it: foreign.
@@ -599,5 +645,119 @@ func TestProcessesSandboxedServiceSeesTheHostRoot(t *testing.T) {
 	b = build(t, "processes", a)
 	if r := rowsByPid(t, okList(t, b, "processes.list"))[600]; r["mnt_ns"] != "foreign" {
 		t.Errorf("no host mountinfo: %v", r)
+	}
+}
+
+// M-3: one namespace's mountinfo is read once, through its first process.
+func TestProcessesReadsOneMountinfoPerNamespace(t *testing.T) {
+	a := procHost(tcpTable(), initProc(nil),
+		fakeProc{pid: 610, ppid: 1, name: "a", exe: "/usr/sbin/sshd", ns: "mnt:[4026532310]"},
+		fakeProc{pid: 611, ppid: 610, name: "b", exe: "/usr/sbin/sshd", ns: "mnt:[4026532310]"})
+	a.contents[procPath(1, "mountinfo")] = []byte(hostMountinfo)
+	a.contents[procPath(610, "mountinfo")] = []byte(protectMountinfo)
+	a.contents[procPath(611, "mountinfo")] = []byte(protectMountinfo)
+	b := build(t, "processes", a)
+	if r := rowsByPid(t, okList(t, b, "processes.list"))[611]; r["mnt_ns"] != "host" {
+		t.Errorf("row %v", r)
+	}
+	n := 0
+	for _, p := range a.reads {
+		if strings.HasSuffix(p, "/mountinfo") {
+			n++
+		}
+	}
+	if n != 2 {
+		t.Errorf("%d mountinfo reads, want 2 (pid 1 and the namespace once): %v", n, a.reads)
+	}
+}
+
+// W-64: a snap is named by its /snap/<name>/<rev>/ path in the namespace
+// snap-confine gave it; the row keeps mnt_ns foreign and the foreign count.
+func TestProcessesForeignNamespaceSnapIsSnap(t *testing.T) {
+	a := procHost(tcpTable([2]int{8443, 40}), initProc(nil),
+		fakeProc{pid: 700, ppid: 1, name: "lxd", exe: "/snap/lxd/24322/bin/lxd", ns: "mnt:[4026532700]", fds: map[int]string{3: "socket:[40]"}})
+	b := build(t, "processes", a)
+	r := rowsByPid(t, okList(t, b, "processes.list"))[700]
+	if r["mnt_ns"] != "foreign" || r["package_status"] != "snap" || r["package"] != "snap:lxd" {
+		t.Errorf("row %v", r)
+	}
+	unp := okList(t, b, "processes.unpackaged_listeners")
+	if len(unp) != 1 || unp[0].(map[string]any)["package_status"] != "snap" {
+		t.Errorf("unpackaged %v", unp)
+	}
+	if s := env(t, b, "processes.stats").Value.(map[string]any); s["foreign_ns"] != 1 {
+		t.Errorf("stats %v", s)
+	}
+}
+
+// M-1: a socket held by 65 processes shows 64 owners and owners_count 65,
+// and the 65th, the only unpackaged one, is still judged.
+func TestProcessesSixtyFifthOwnerIsJudged(t *testing.T) {
+	a := procHost(tcpTable([2]int{80, 50}), initProc(nil))
+	for i := 0; i < 65; i++ {
+		exe := "/usr/sbin/sshd"
+		if i == 64 {
+			exe = "/opt/w/worker"
+		}
+		addProc(a, fakeProc{pid: 1000 + i, ppid: 1, name: "w", exe: exe, fds: map[int]string{3: "socket:[50]"}})
+	}
+	b := build(t, "processes", a)
+	ls := listenerRows(t, b)
+	if len(ls) != 1 || len(ls[0]["owners"].([]any)) != 64 || ls[0]["owners_count"] != 65 {
+		t.Fatalf("listeners %v", ls)
+	}
+	unp := okList(t, b, "processes.unpackaged_listeners")
+	if len(unp) != 1 || unp[0].(map[string]any)["pid"] != 1064 {
+		t.Errorf("unpackaged %v, want the 65th owner", unp)
+	}
+}
+
+// flakyExe answers ENOENT the first time a process's exe is read, as a link
+// read in a race does.
+type flakyExe struct {
+	*fsAccess
+	exe   string
+	reads int
+}
+
+func (f *flakyExe) Readlink(p string) (string, error) {
+	if p == f.exe {
+		f.reads++
+		if f.reads == 1 {
+			return "", fs.ErrNotExist
+		}
+	}
+	return f.fsAccess.Readlink(p)
+}
+
+// M-4: one ENOENT on a live process's exe is read again before it is filed
+// as an error.
+func TestProcessesExeIsReadAgainAfterOneENOENT(t *testing.T) {
+	a := procHost(tcpTable(), initProc(nil), fakeProc{pid: 66, ppid: 1, name: "x", exe: "/usr/sbin/sshd"})
+	b := build(t, "processes", &flakyExe{fsAccess: a, exe: procPath(66, "exe")})
+	if r := rowsByPid(t, okList(t, b, "processes.list"))[66]; r["exe_read_status"] != "ok" || r["exe"] != "/usr/sbin/sshd" {
+		t.Errorf("row %v", r)
+	}
+	if e := env(t, b, "processes.deleted_executables"); e.Status != facts.StatusOK {
+		t.Errorf("deleted_executables %+v", e)
+	}
+}
+
+// M-6: a cut socket table marks the listeners answer truncated, but an
+// absent index envelope keeps its own cause.
+func TestProcessesTruncationGoesOnAnswersOnly(t *testing.T) {
+	a := procHost(tcpTable([2]int{22, 7}), initProc(nil), sshdProc(map[int]string{3: "socket:[7]"}))
+	for p := range maps.Clone(a.contents) {
+		if strings.HasPrefix(p, "/var/lib/dpkg/") {
+			delete(a.contents, p)
+		}
+	}
+	a.truncated = map[string]bool{"/proc/self/net/tcp": true}
+	b := build(t, "processes", a)
+	if e := env(t, b, "processes.listeners"); e.Status != facts.StatusOK || !e.Truncated {
+		t.Errorf("listeners %+v, want ok and truncated", e)
+	}
+	if e := env(t, b, "processes.unpackaged_listeners"); e.Status != facts.StatusAbsent || e.Truncated {
+		t.Errorf("unpackaged %+v, want absent without the truncation", e)
 	}
 }

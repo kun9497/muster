@@ -141,21 +141,22 @@ var unpackagedStatuses = map[string]bool{
 	pkgUnpackaged: true, pkgSnap: true, pkgFlatpak: true, pkgAppImage: true, pkgForeignNS: true,
 }
 
-// packageStatusFor says where exe came from. A process outside the host's
-// mount namespace names a path in another root, so the host's index is never
-// asked about it; the snap, flatpak and AppImage shapes are decided by the
-// path alone; everything else is the index's answer, and an index that could
-// not be built (Family neither dpkg nor rpm — the zero Index a failed build
-// is passed as, or a host with no database) is no_index, never unpackaged.
+// packageStatusFor says where exe came from. A snap is named by its
+// /snap/<name>/<rev>/ path first, whatever namespace it runs in — snap-confine
+// gives a strictly confined snap a namespace of its own, and /snap is bound
+// into it, so the path is the snap's own (W-64). Any other process outside
+// the host's mount namespace names a path in another root, so the host's
+// index is never asked about it; the flatpak and AppImage shapes are decided
+// by the path alone; everything else is the index's answer, and an index
+// that could not be built (Family neither dpkg nor rpm — the zero Index a
+// failed build is passed as, or a host with no database) is no_index, never
+// unpackaged.
 func packageStatusFor(exe string, mntNS string, idx pkgindex.Index) (pkg, status string) {
+	if name, ok := snapName(exe); ok {
+		return "snap:" + name, pkgSnap
+	}
 	if mntNS != nsHost {
 		return "", pkgForeignNS
-	}
-	if rest, ok := strings.CutPrefix(exe, "/snap/"); ok {
-		name, _, _ := strings.Cut(rest, "/")
-		if name != "" {
-			return "snap:" + name, pkgSnap
-		}
 	}
 	if strings.HasPrefix(exe, "/var/lib/flatpak/") || isHomeFlatpak(exe) {
 		return "", pkgFlatpak
@@ -170,6 +171,29 @@ func packageStatusFor(exe string, mntNS string, idx pkgindex.Index) (pkg, status
 		return p, pkgPackaged
 	}
 	return "", pkgUnpackaged
+}
+
+// snapName is <name> of an exe under /snap/<name>/<rev>/, where rev is a
+// revision number or a local one (x<digits>).
+func snapName(exe string) (string, bool) {
+	rest, ok := strings.CutPrefix(exe, "/snap/")
+	if !ok {
+		return "", false
+	}
+	parts := strings.SplitN(rest, "/", 3)
+	if len(parts) < 3 || parts[0] == "" || parts[2] == "" {
+		return "", false
+	}
+	rev := strings.TrimPrefix(parts[1], "x")
+	if rev == "" {
+		return "", false
+	}
+	for _, c := range rev {
+		if c < '0' || c > '9' {
+			return "", false
+		}
+	}
+	return parts[0], true
 }
 
 // isHomeFlatpak is /home/<user>/.local/share/flatpak/..., a per-user
@@ -208,7 +232,7 @@ func (o owner) record() map[string]any {
 
 // listener is one listening socket of the host with the processes holding
 // it. Proto is tcp or udp and Family v4 or v6, folded from the table the row
-// came from; OwnerStatus is ok, kernel, unmatched or denied.
+// came from; OwnerStatus is ok, kernel, unmatched, denied or error.
 type listener struct {
 	Proto, Family, Addr string
 	Port                int
@@ -218,7 +242,8 @@ type listener struct {
 	Owners              []owner
 }
 
-// record is the processes.listeners row; owners are capped at ownersCap.
+// record is the processes.listeners row; owners are capped at ownersCap and
+// owners_count is how many there were before the cap.
 func (l listener) record(ownersCap int) map[string]any {
 	owners := make([]any, 0, min(len(l.Owners), ownersCap))
 	for i, o := range l.Owners {
@@ -230,7 +255,7 @@ func (l listener) record(ownersCap int) map[string]any {
 	return map[string]any{
 		"proto": l.Proto, "family": l.Family, "addr": l.Addr, "port": l.Port,
 		"loopback": l.Loopback, "link_local": l.LinkLocal, "inode": l.Inode,
-		"owner_status": l.OwnerStatus, "owners": owners,
+		"owner_status": l.OwnerStatus, "owners": owners, "owners_count": len(l.Owners),
 	}
 }
 
