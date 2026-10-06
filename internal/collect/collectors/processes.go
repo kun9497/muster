@@ -64,8 +64,8 @@ var processesCollector = collect.Collector{
 	Declare: collect.Declaration{
 		Reads:    processesReads(),
 		Commands: []collect.Command{pkgindex.RPMCommand},
-		// Declared now, read by the exposure derivation (Task 4); the
-		// firewall collector sorts before this one.
+		// The exposure derivation reads the firewall's facts; the firewall
+		// collector sorts before this one.
 		Facts: []string{"firewall.*"},
 		Needs: "none",
 	},
@@ -189,6 +189,7 @@ func runProcesses(ctx context.Context, a collect.Access, b *collect.Builder) err
 		for _, k := range keys {
 			b.Set(k, e)
 		}
+		writeExposure(a, b, nil, e, false)
 	}
 
 	socks, sockErr := listeningSockets(a)
@@ -292,6 +293,7 @@ func runProcesses(ctx context.Context, a collect.Access, b *collect.Builder) err
 	}
 	b.Set("processes.listeners", lst)
 	b.Set("processes.unpackaged_listeners", unp)
+	writeExposure(a, b, listeners, lst, socks.v6)
 
 	stats := map[string]any{
 		"count": len(s.rows), "kernel_threads": s.kernel, "zombies": s.zombies, "foreign_ns": s.foreign,
@@ -936,4 +938,188 @@ func (s *procScan) listenerEnvs(ls []listener, inodeBad string, socks socketTabl
 	unp := collect.OK(unpList, unpSrc)
 	unp.Truncated = lst.Truncated || len(unpRows) > procListenersCap
 	return lst, unp
+}
+
+// exposureFirewallKeys are the firewall facts the exposure verdict reads, in
+// the order their failure is reported.
+var exposureFirewallKeys = []string{
+	"firewall.normalization_confidence", "firewall.rules", "firewall.backend", "firewall.raw_dumps", "firewall.restricts_inbound",
+}
+
+// carry is a failure envelope handed on to a derived leaf: its status, with
+// the key it came from named in the reason.
+func carry(key string, e facts.Envelope) facts.Envelope {
+	return facts.Envelope{Status: e.Status, Reason: key + ": " + e.Reason}
+}
+
+// writeExposure derives the four exposure.* keys (spec P-3) from the
+// listeners and the firewall's facts. A firewall fact that was not written is
+// a programming error (firewall sorts before processes, so only a run that
+// left it out can miss it): every key is an error naming it. A firewall read
+// that did not answer is every key's status (unsupported reads
+// NOT_APPLICABLE, denied ERROR). processes.listeners that is not ok is the
+// status of the two leaves built from it. An undecided verdict makes
+// exposure.exposed absent with the cause, written also to
+// exposure.stats.manual_reason, since the evaluator renders an absent judged
+// leaf without the collector's reason (W-3).
+func writeExposure(a collect.Access, b *collect.Builder, ls []listener, lst facts.Envelope, hasV6 bool) {
+	keys := []string{"exposure.listeners", "exposure.exposed", "exposure.opaque_rules", "exposure.stats"}
+	setAll := func(e facts.Envelope) {
+		for _, k := range keys {
+			b.Set(k, e)
+		}
+	}
+	fw := map[string]facts.Envelope{}
+	for _, k := range exposureFirewallKeys {
+		e, ok := b.Get(k)
+		if !ok {
+			setAll(collect.ErrorEnv(k + " was not written before the processes collector ran"))
+			return
+		}
+		fw[k] = e
+	}
+	conf := fw["firewall.normalization_confidence"]
+	for _, k := range exposureFirewallKeys[:4] {
+		if fw[k].Status != facts.StatusOK {
+			setAll(carry(k, fw[k]))
+			return
+		}
+	}
+	confidence, _ := conf.Value.(string)
+	var restricts *bool
+	if r := fw["firewall.restricts_inbound"]; r.Status == facts.StatusOK {
+		v, ok := r.Value.(bool)
+		if !ok {
+			setAll(collect.ErrorEnv("firewall.restricts_inbound: not a bool"))
+			return
+		}
+		restricts = &v
+	} else if confidence == "full" {
+		// A full normalisation always answers restricts_inbound; one that
+		// did not is that read's failure.
+		setAll(carry("firewall.restricts_inbound", r))
+		return
+	}
+	rulesEnv := fw["firewall.rules"]
+	rawRules, _ := rulesEnv.Value.([]any)
+	rules := make([]fwRule, 0, len(rawRules))
+	for _, r := range rawRules {
+		if m, ok := r.(map[string]any); ok {
+			rules = append(rules, fwRuleFromRecord(m))
+		}
+	}
+	backend, _ := fw["firewall.backend"].Value.(string)
+	dumps, _ := fw["firewall.raw_dumps"].Value.([]any)
+
+	in := exposureInputs{Confidence: confidence, Restricts: restricts, Rules: rules, Backend: backend, HasV6: hasV6,
+		BaseFamilies: inputBaseFamilies(dumps)}
+	// bindv6only decides whether a socket on :: takes v4 traffic. A kernel
+	// without IPv6 has no such file and no v6 socket to ask about; a file
+	// that exists and cannot be read is the answer for every :: listener (C3).
+	var bindFail *facts.Envelope
+	const bindPath = "/proc/sys/net/ipv6/bindv6only"
+	if data, _, err := a.ReadFile(bindPath, 64); err == nil {
+		if n, err := strconv.Atoi(strings.TrimSpace(string(data))); err == nil {
+			in.BindV6Only = n
+		} else {
+			e := collect.ErrorEnv(bindPath + ": not an integer")
+			bindFail = &e
+		}
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		e := readFailure(bindPath, err)
+		bindFail = &e
+	}
+
+	listenersOK := lst.Status == facts.StatusOK
+	var cands []listener
+	if listenersOK {
+		cands = ls
+	}
+	rows, exposed, opaque, manual := decideExposure(cands, in)
+
+	src := &facts.Source{Kind: "derived"}
+	for _, e := range []facts.Envelope{conf, rulesEnv, lst} {
+		if e.Source != nil {
+			src.Inputs = append(src.Inputs, *e.Source)
+		}
+	}
+
+	opaqueList := make([]any, 0, min(len(opaque), procListenersCap))
+	for i, r := range opaque {
+		if i == procListenersCap {
+			break
+		}
+		opaqueList = append(opaqueList, opaqueRecord(r))
+	}
+	opaqueEnv := collect.OK(opaqueList, src)
+	opaqueEnv.Truncated = rulesEnv.Truncated || len(opaque) > procListenersCap
+	b.Set("exposure.opaque_rules", opaqueEnv)
+
+	stats := map[string]any{
+		"confidence": confidence, "manual_reason": manual, "listeners": len(rows), "exposed": len(exposed),
+		"filtered": 0, "loopback": 0, "link_local": 0, "kernel_owned": 0,
+		"opaque_rules": len(opaque), "folded_rules": len(rules),
+	}
+	if !listenersOK {
+		e := carry("processes.listeners", lst)
+		b.Set("exposure.listeners", e)
+		b.Set("exposure.exposed", e)
+		stats["manual_reason"] = e.Reason
+		b.Set("exposure.stats", collect.OK(stats, src))
+		return
+	}
+	for _, l := range ls {
+		if l.Loopback || isLoopback(l.Addr) {
+			stats["loopback"] = stats["loopback"].(int) + 1
+		}
+	}
+	for _, r := range rows {
+		if r.Via == viaFiltered {
+			stats["filtered"] = stats["filtered"].(int) + 1
+		}
+		if r.LinkLocal {
+			stats["link_local"] = stats["link_local"].(int) + 1
+		}
+		if r.OwnerStatus == "kernel" {
+			stats["kernel_owned"] = stats["kernel_owned"].(int) + 1
+		}
+	}
+
+	list := make([]any, 0, min(len(rows), procListenersCap))
+	for i, r := range rows {
+		if i == procListenersCap {
+			break
+		}
+		list = append(list, r.record(procOwnersCap))
+	}
+	lstEnv := collect.OK(list, src)
+	lstEnv.Truncated = lst.Truncated || len(rows) > procListenersCap
+	b.Set("exposure.listeners", lstEnv)
+
+	var exp facts.Envelope
+	anyDual := false
+	for _, r := range rows {
+		anyDual = anyDual || r.Addr == "::"
+	}
+	switch {
+	case bindFail != nil && anyDual:
+		exp = carry("net.ipv6.bindv6only", *bindFail)
+		stats["manual_reason"] = exp.Reason
+	case manual != "":
+		exp = collect.Absent(manual)
+	default:
+		expList := make([]any, 0, min(len(exposed), procListenersCap))
+		for i, r := range exposed {
+			if i == procListenersCap {
+				break
+			}
+			expList = append(expList, r.exposedRecord())
+		}
+		exp = collect.OK(expList, src)
+		// The cut goes on an answer only: a failure keeps its own cause
+		// (M-6).
+		exp.Truncated = lst.Truncated || rulesEnv.Truncated || len(exposed) > procListenersCap
+	}
+	b.Set("exposure.exposed", exp)
+	b.Set("exposure.stats", collect.OK(stats, src))
 }

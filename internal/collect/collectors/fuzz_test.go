@@ -933,6 +933,46 @@ func FuzzParseIptablesSave(f *testing.F) {
 	})
 }
 
+// FuzzClassifyRule reads one rule line both ways (nft and iptables-save) and
+// classifies the rows: the classifier must answer one of its seven classes,
+// and a row it calls port_rule must carry an enumerable port.
+func FuzzClassifyRule(f *testing.F) {
+	for _, s := range []string{
+		// The review's six byte-identical accepts, and the protocol set.
+		"-A INPUT -i lo -j ACCEPT",
+		"-A INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT",
+		"ct state established,related accept",
+		`iifname "lo" accept`,
+		"ip daddr 192.0.2.1 accept",
+		"-A INPUT -d 192.0.2.1/32 -j ACCEPT",
+		"meta l4proto { tcp, udp } th dport 53 accept",
+		"tcp dport { 22, 80 } accept",
+		"-A INPUT -p tcp -m multiport --dports 22,80,443 -j ACCEPT",
+		"tcp dport vmap { 22 : accept }",
+		"accept",
+	} {
+		f.Add([]byte(s))
+	}
+	classes := map[ruleClass]bool{"deny": true, "port_rule": true, "any_port": true, "loopback_only": true, "state_only": true, "irrelevant": true, "opaque": true}
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fields := strings.Fields(string(data))
+		fuzzBody(t, "classifyRule", func() any {
+			var out []ruleClass
+			for _, r := range []fwRule{parseNftRule("input", fields), parseIptablesRule("INPUT", fields)} {
+				c := classifyRule(r)
+				if !classes[c] {
+					t.Fatalf("%q classified %q", data, c)
+				}
+				if c == "port_rule" && parsePortSpec(r.Dport).Unmodelled {
+					t.Fatalf("%q is a port_rule with an unenumerable port %q", data, r.Dport)
+				}
+				out = append(out, c)
+			}
+			return out
+		}, len(data))
+	})
+}
+
 // FuzzParsePortSpec reads one destination-port operand. A spec is either
 // unmodelled or enumerable, never both, and an unmodelled one matches nothing.
 func FuzzParsePortSpec(f *testing.F) {

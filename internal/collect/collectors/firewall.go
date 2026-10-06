@@ -289,6 +289,37 @@ func normalizeRuleset(cr capture) ([]baseChain, []fwRule) {
 	return bases, foldChains(bases, byChain)
 }
 
+// inputBaseFamilies reads firewall.raw_dumps back into the families (v4, v6,
+// inet) that hold an input filter base chain, the way normalizeRuleset parsed
+// them: a base chain with no rule leaves no row in firewall.rules, so the rows
+// alone cannot tell an empty drop chain from no chain at all (spec P-3's
+// no_chain_in_family). When nft answered, only its dump is read — the legacy
+// iptables-save a cross-check appended never joined the base chains.
+func inputBaseFamilies(dumps []any) map[string]bool {
+	cr := capture{tool: "iptables"}
+	nftSrc := collect.Output{}.Source(nftListRulesetCmd).Cmd
+	for _, d := range dumps {
+		if rec, ok := d.(map[string]any); ok && rec["source"] == nftSrc {
+			cr.tool = "nft"
+		}
+	}
+	for _, d := range dumps {
+		rec, ok := d.(map[string]any)
+		if !ok || (cr.tool == "nft" && rec["source"] != nftSrc) {
+			continue
+		}
+		cr.dumps = append(cr.dumps, rec)
+	}
+	bases, _ := normalizeRuleset(cr)
+	out := map[string]bool{}
+	for _, bc := range bases {
+		if bc.hook == "input" && bc.chainType == "filter" {
+			out[bc.family] = true
+		}
+	}
+	return out
+}
+
 // crossCheckLegacy runs the declared iptables-save after an empty nft read,
 // appends its dump to the capture's evidence and reports whether x_tables
 // restricts inbound there (W-57), and whether that dump was truncated (R-4).
