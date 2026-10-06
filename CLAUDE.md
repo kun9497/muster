@@ -128,13 +128,14 @@ regenerates them from public images and `-check` compares.
   protocol from the closed list), `loopback_only`, `state_only` (established/related/invalid only),
   `port_rule`/`any_port` (only when not unmodelled), `opaque`. Decided only at `full` with no `opaque` row in
   the listener's family (`inet` counts for both); an enabled family with no input base chain exposes its
-  listeners (`no_chain_in_family`); IPv6 disabled by sysctl on `all` and `default` is not an enabled family;
+  listeners (`no_chain_in_family`); IPv6 disabled by sysctl on `all`, `default` and every interface but `lo` is not an enabled family (W-86);
   `::` is a v4 candidate when `bindv6only` is 0; link-local is a candidate, loopback never listed. `service`
-  is `tcp/<port>`; the default allow list is `tcp/22`, `udp/68`, `udp/546`. A docker host (FORWARD rules) and a
-  firewalld host read `partial` → `exposed_listeners_allowed` MANUAL.
+  is `tcp/<port>`; the default allow list is `tcp/22`, `udp/68`, `udp/546`. An accept-policy input chain that carries rules
+  (firewalld's `filter_INPUT`; ufw beside another table's INPUT) reads `partial` → `exposed_listeners_allowed`
+  MANUAL; docker's FORWARD chains never enter confidence, so a docker host with an empty accept INPUT is decided.
 - `net.sysctl.*` are 28 keys read as the kernel ones (B-3) — 26 settings, `ipv6_bindv6only` and the derived
-  `ipv6_disabled` (1 iff `all` and `default` both disable IPv6: the one gate of the four IPv6 controls and of the
-  exposure join, W-79); the `sysctl.d` parser follows systemd: a glob key
+  `ipv6_disabled` (1 iff `all`, `default` and every present interface but `lo` disable IPv6: the one gate of the four IPv6
+  controls and of the exposure join, W-79/W-86); the `sysctl.d` parser follows systemd: a glob key
   (`*?[`, `[!…]`) applies to every unexcluded match, a `-key` line excludes it from globs (last line wins), a
   concrete line beats any glob. Ubuntu 24.04 ships no `50-default.conf`.
 

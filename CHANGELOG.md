@@ -21,13 +21,14 @@ a flatpak or a container's process included), a process running a deleted
 executable, and ten network sysctls — forwarding, ICMP redirects, source routing,
 reverse-path filtering with martian logging, broadcast and bogus ICMP, SYN
 cookies, router advertisements — judged on `all` and `default`, IPv4 and IPv6
-apart so a kernel without IPv6 (or with it disabled on `all` and `default`
-together) reads NOT_APPLICABLE. Read as shipped: stock Ubuntu 22.04 fails the
+apart so a kernel without IPv6 (or with it disabled on `all`, `default` and
+every interface) reads NOT_APPLICABLE. Read as shipped: stock Ubuntu 22.04 fails the
 ICMP-redirect, IPv6-redirect, martian-logging and router-advertisement controls,
 and 24.04 the source-routing one too (it persists no `accept_source_route` over
-the kernel's `default` of 1); a docker or firewalld host reads the exposure
-control MANUAL (the normaliser's confidence rule: a non-input inbound chain with
-rules, a default-accept chain with rules).
+the kernel's `default` of 1); a host whose accept-policy input chain carries rules (firewalld's
+`filter_INPUT`, ufw beside another table's INPUT chain) reads the exposure control
+MANUAL under the normaliser's confidence rule; docker's FORWARD chains never enter
+it, so a docker host with an empty accept INPUT is decided.
 
 U-28 `ip_port_restriction` now reads FAIL on a host whose firewall backend is
 installed but inactive (ufw disabled — stock Ubuntu Server and the GitHub
@@ -230,7 +231,7 @@ configuration walk stopped at an `Include` outside the declaration (below).
   rule table: `exposure.listeners`, `exposure.exposed`, `exposure.opaque_rules`,
   `exposure.stats`; decided only at full confidence with no opaque rule in the
   listener's family; an enabled family with no input chain exposes its listeners;
-  IPv6 disabled by sysctl is not an enabled family; `::` asks both families when
+  IPv6 disabled by sysctl on every interface is not an enabled family; `::` asks both families when
   `bindv6only` is 0.
 - `firewall.rules` rows grew from five fields to fourteen (`via_chain`, `depth`,
   `table`, `family`, `daddr`, `iif`, `ctstate`, `unmodelled`, `raw`); the user chains

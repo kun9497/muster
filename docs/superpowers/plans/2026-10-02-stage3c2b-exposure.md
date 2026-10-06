@@ -394,7 +394,9 @@ measurement behind it.
   `pkgindex.Index.Source *facts.Source`.
 - **W-51** on a jump row `unmodelled` is redefined by the fold — cleared on a jump it followed
   (→ `irrelevant`), set on one it could not (→ `opaque`). **W-52** `portSpec` → `fwPortSpec` (services.go
-  owns `portSpec`). **W-53** the ufw end-to-end fixtures are the 2H dumps grown by `allow 80/tcp`.
+  owns `portSpec`). **W-53** test and brief addresses come from the RFC 5737 documentation ranges; a 10/8 host address that
+  reached a commit is allowlisted by that commit's hash in `.gitleaks.toml` (336765d, f64f5ed — the e916e0a
+  precedent), never by a path or a literal.
 - **W-54** the fold carries the jump row's conditions (`proto`, `dport`, `saddr`, `daddr`, `iif`,
   `ctstate`) onto every row folded through it where that row's field is empty; both set and different →
   `unmodelled`. **W-55** a rule with no verdict (`-m recent --set`; an nft rule ending without a verdict
@@ -438,6 +440,13 @@ measurement behind it.
   predicate as W-76. P-4 is 28 keys. **W-80** the allow entry is the path as `/proc/<pid>/exe` resolves
   it (a snap's carries the revision — a waiver fits better). **W-81** control 10 cites `RHEL-09-253025`
   and `-253030` (the `log_martians` items) too.
+- **W-86** IPv6 is "disabled" only when `all`, `default` and every present interface but `lo` read
+  `disable_ipv6 = 1` (the whole-branch review's S6: `all = 1` with one interface re-enabled speaks IPv6).
+  **W-87** the normaliser's `partial` on the lab is measured: accept-policy input chains carrying rules — ufw's
+  `filter INPUT` beside a `kubearmor` table's INPUT — not docker's FORWARD chains, which never enter
+  confidence; every "docker host reads MANUAL" sentence was corrected. **W-88** a process in pid 1's mount
+  namespace is `host` by `ns/mnt` equality alone (a chroot inside it keeps host paths); the exe-mount key
+  decides for other namespaces. **W-89** a LISTEN row with inode 0 is `unmatched` → MANUAL, never `kernel`.
 - **W-82 → W-85** the deleted-exe oracle cannot run a copy of `/bin/sleep`: on EL9 that is a 52-byte
   shebang script onto `coreutils --coreutils-prog-shebang=sleep` (`coreutils-single`), so the copy's `exe`
   is `/usr/bin/coreutils` and nothing is deleted (the review's argv[0] theory was wrong; measured in the
@@ -505,7 +514,7 @@ measurement behind it.
 
 - Controls 104 → 117 (36 → 49 beyond); set `kisa-unix-2026+2026.09.29` → `+2026.10.02` (D16: U-28's
   verdict on an inactive backend). Fixtures: 115 new (control 1: 17, control 2: 11, control 3: 5, the ten
-  sysctl controls 82). Mutation: 1990 generated, 0 surviving, 47 excluded (+17 rows).
+  sysctl controls 82). Mutation at the end of Task 8: 1974 generated, 4 invalid, 1923 killed, 0 surviving, 47 excluded (+17 rows).
 - Facts: 5 `processes.*`, 4 `exposure.*`, 28 `net.sysctl.*`; `firewall.rules` rows 5 → 14 fields;
   schema version unchanged.
 - Index cost (X-4): dpkg 128–154 ms on the lab, rpm 105–125 ms in the EL9 container — rebuilt per
