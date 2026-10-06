@@ -878,8 +878,10 @@ func TestExeMountKeyTakesTheTopmostStackedMount(t *testing.T) {
 	}
 }
 
-// slowDeniedExe refuses one exe after a pause longer than the enumeration
-// budget, so the run is cut after it.
+// slowDeniedExe refuses one exe and spends the enumeration budget while
+// doing so, so the run is cut after it. The collector runs on the test's
+// goroutine, so the budget is set here without a race and without a clock
+// (W-71).
 type slowDeniedExe struct {
 	*fsAccess
 	exe string
@@ -887,7 +889,7 @@ type slowDeniedExe struct {
 
 func (d *slowDeniedExe) Readlink(p string) (string, error) {
 	if p == d.exe {
-		time.Sleep(100 * time.Millisecond)
+		processesBudget = -1
 		return "", fmt.Errorf("%s: %w", p, unix.EACCES)
 	}
 	return d.fsAccess.Readlink(p)
@@ -898,7 +900,7 @@ func (d *slowDeniedExe) Readlink(p string) (string, error) {
 func TestProcessesDeletedFailureIsNotMarkedTruncated(t *testing.T) {
 	a := procHost(tcpTable(), initProc(nil), fakeProc{pid: 42, ppid: 1, name: "x", exe: "/usr/bin/x"}, sshdProc(nil))
 	old := processesBudget
-	processesBudget = 50 * time.Millisecond
+	processesBudget = time.Hour
 	defer func() { processesBudget = old }()
 	b := build(t, "processes", &slowDeniedExe{fsAccess: a, exe: procPath(42, "exe")})
 	if e := env(t, b, "processes.list"); !e.Truncated {
@@ -920,5 +922,165 @@ func TestProcessesFailedMountinfoIsNotMemoised(t *testing.T) {
 	rows := rowsByPid(t, okList(t, b, "processes.list"))
 	if rows[610]["ns_read_status"] != "error" || rows[611]["mnt_ns"] != "host" || rows[611]["ns_read_status"] != "ok" {
 		t.Errorf("610 %v\n611 %v", rows[610], rows[611])
+	}
+}
+
+// F-2: a mount whose parent chain passes through a mount hidden at its own
+// point is hidden too: the /usr/lib child left under a later bind over /usr
+// never wins the longest prefix, whatever order the unrelated rows take.
+// Of the two mounts on /usr the later listed is the topmost when neither is
+// mounted on the other; when the bind is mounted on the old /usr (the shape
+// a plain mount --bind makes), the order does not matter at all.
+func TestExeMountKeyIgnoresAMountHiddenByAnOvermount(t *testing.T) {
+	root := mountRow{id: 1, parent: 0, dev: "253:0", root: "/", mountPoint: "/", fstype: "ext4", source: "/dev/vda1"}
+	usr := mountRow{id: 20, parent: 1, dev: "253:0", root: "/usr", mountPoint: "/usr", fstype: "ext4", source: "/dev/vda1"}
+	lib := mountRow{id: 25, parent: 20, dev: "253:1", root: "/", mountPoint: "/usr/lib", fstype: "ext4", source: "/dev/vdb1"}
+	bind := mountRow{id: 30, parent: 1, dev: "253:2", root: "/vendor/usr", mountPoint: "/usr", fstype: "ext4", source: "/dev/vdc1"}
+	const want = "253:2 /vendor/usr/lib/x ext4 /dev/vdc1"
+	for _, rows := range [][]mountRow{{root, usr, lib, bind}, {lib, usr, bind, root}} {
+		if k, ok := exeMountKey(rows, "/usr/lib/x"); !ok || k != want {
+			t.Errorf("rows %v: key %q, want the bind's", rows, k)
+		}
+	}
+	onUsr := bind
+	onUsr.parent = 20
+	for _, rows := range [][]mountRow{{root, usr, lib, onUsr}, {onUsr, lib, usr, root}} {
+		if k, ok := exeMountKey(rows, "/usr/lib/x"); !ok || k != want {
+			t.Errorf("rows %v: key %q, want the bind's", rows, k)
+		}
+	}
+	// Without the bind the child is visible and is the exe's mount.
+	if k, ok := exeMountKey([]mountRow{lib, usr, root}, "/usr/lib/x"); !ok || k != "253:1 /x ext4 /dev/vdb1" {
+		t.Errorf("key %q, want the /usr/lib mount's", k)
+	}
+}
+
+func mountinfoReads(a *fsAccess, p string) int {
+	n := 0
+	for _, r := range a.reads {
+		if r == p {
+			n++
+		}
+	}
+	return n
+}
+
+// F-3: a failure of pid 1's table and a table cut at the limit are read once
+// per namespace, not once per process; a process that vanished under the
+// read (ENOENT, ESRCH) leaves the table to the namespace's next process:
+// pid 1's is then read for each of the three and once more for the
+// pid-view check (W-69).
+func TestProcessesFailedMountinfoIsMemoisedUnlessVanished(t *testing.T) {
+	procs := []fakeProc{initProc(nil), kthreadd,
+		{pid: 610, ppid: 1, name: "a", exe: "/usr/sbin/sshd", ns: "mnt:[4026532310]"},
+		{pid: 620, ppid: 1, name: "b", exe: "/usr/sbin/sshd", ns: "mnt:[4026532320]"},
+		{pid: 621, ppid: 620, name: "c", exe: "/usr/sbin/sshd", ns: "mnt:[4026532320]"}}
+	host := procPath(1, "mountinfo")
+	for _, tc := range []struct {
+		name  string
+		err   error
+		reads int
+	}{
+		{"pid 1 EIO", unix.EIO, 1},
+		{"pid 1 EACCES", unix.EACCES, 1},
+		{"pid 1 ESRCH", unix.ESRCH, 4},
+		{"pid 1 ENOENT", fs.ErrNotExist, 4},
+	} {
+		a := procHost(tcpTable(), procs...)
+		delete(a.contents, host)
+		a.fails[host] = fmt.Errorf("%s: %w", host, tc.err)
+		b := build(t, "processes", a)
+		if n := mountinfoReads(a, host); n != tc.reads {
+			t.Errorf("%s: pid 1's table read %d times, want %d", tc.name, n, tc.reads)
+		}
+		rows := rowsByPid(t, okList(t, b, "processes.list"))
+		for _, pid := range []int{610, 620, 621} {
+			if r := rows[pid]; r["mnt_ns"] != "" || r["ns_read_status"] == "ok" {
+				t.Errorf("%s: pid %d %v, want the table's failure", tc.name, pid, r)
+			}
+		}
+	}
+
+	// A pid 1 table with no row the parser takes is every process's too.
+	a := procHost(tcpTable(), procs...)
+	a.contents[host] = []byte("garbage\n")
+	b := build(t, "processes", a)
+	if n := mountinfoReads(a, host); n != 1 {
+		t.Errorf("unparsable: pid 1's table read %d times, want 1", n)
+	}
+	if r := rowsByPid(t, okList(t, b, "processes.list"))[621]; r["mnt_ns"] != "" || r["ns_read_status"] != "error" {
+		t.Errorf("unparsable: pid 621 %v, want error", r)
+	}
+
+	// A cut table of a namespace of its own: read once, through its first
+	// process, and the failure is every process's of it.
+	a = procHost(tcpTable(), procs...)
+	for _, pid := range []int{610, 620, 621} {
+		a.contents[procPath(pid, "mountinfo")] = []byte(protectMountinfo)
+	}
+	a.truncated = map[string]bool{procPath(620, "mountinfo"): true}
+	b = build(t, "processes", a)
+	if n, m := mountinfoReads(a, procPath(620, "mountinfo")), mountinfoReads(a, procPath(621, "mountinfo")); n != 1 || m != 0 {
+		t.Errorf("cut table read %d times through 620 and %d through 621, want 1 and 0", n, m)
+	}
+	rows := rowsByPid(t, okList(t, b, "processes.list"))
+	for _, pid := range []int{620, 621} {
+		if r := rows[pid]; r["mnt_ns"] != "" || r["ns_read_status"] != "error" {
+			t.Errorf("pid %d %v, want error", pid, r)
+		}
+	}
+	if r := rows[610]; r["mnt_ns"] != "host" {
+		t.Errorf("pid 610 %v, want host", r)
+	}
+}
+
+// F-4, F-5: every way a namespace of its own cannot be matched to pid 1's is
+// the row's ns_read_status and the owner's failure on both listener leaves,
+// never a quiet foreign: a table cut at the limit (pid 1's or the process's),
+// a root link that cannot be read, a table with no row under the exe, and an
+// exe that could not be read.
+func TestProcessesUnmatchedNamespaceIsTheOwnersFailure(t *testing.T) {
+	const pid = 600
+	for _, tc := range []struct {
+		name, status, reason string
+		edit                 func(a *fsAccess)
+	}{
+		{"pid 1's table cut", "error", "/proc/1/mountinfo: cut at", func(a *fsAccess) {
+			a.truncated = map[string]bool{procPath(1, "mountinfo"): true}
+		}},
+		{"own table cut", "error", "/proc/600/mountinfo: cut at", func(a *fsAccess) {
+			a.truncated = map[string]bool{procPath(pid, "mountinfo"): true}
+		}},
+		{"root link denied", "denied", "/proc/600/root", func(a *fsAccess) { denyLink(a, procPath(pid, "root")) }},
+		{"root link EIO", "error", "/proc/600/root", func(a *fsAccess) {
+			delete(a.links, procPath(pid, "root"))
+			a.fails[procPath(pid, "root")] = fmt.Errorf("%s: %w", procPath(pid, "root"), unix.EIO)
+		}},
+		{"no row under the exe", "error", "no mountinfo row of pid 600", func(a *fsAccess) {
+			a.contents[procPath(pid, "mountinfo")] = []byte("613 612 0:26 / /proc rw,nosuid - proc proc rw\n")
+		}},
+		{"exe denied", "denied", "/proc/600/exe", func(a *fsAccess) { denyLink(a, procPath(pid, "exe")) }},
+		{"exe EIO", "error", "/proc/600/exe", func(a *fsAccess) {
+			delete(a.links, procPath(pid, "exe"))
+			a.fails[procPath(pid, "exe")] = fmt.Errorf("%s: %w", procPath(pid, "exe"), unix.EIO)
+		}},
+	} {
+		a := procHost(tcpTable([2]int{53, 30}), initProc(nil), kthreadd,
+			fakeProc{pid: pid, ppid: 1, uid: 101, name: "systemd-resolve", exe: "/usr/lib/systemd/systemd-resolved", ns: "mnt:[4026532301]", fds: map[int]string{12: "socket:[30]"}})
+		a.contents[procPath(pid, "mountinfo")] = []byte(sandboxMountinfo)
+		tc.edit(a)
+		b := build(t, "processes", a)
+		r := rowsByPid(t, okList(t, b, "processes.list"))[pid]
+		if r["mnt_ns"] != "" || r["ns_read_status"] != tc.status {
+			t.Errorf("%s: row %v, want mnt_ns \"\" and ns_read_status %s", tc.name, r, tc.status)
+		}
+		for _, k := range []string{"processes.listeners", "processes.unpackaged_listeners"} {
+			if e := env(t, b, k); string(e.Status) != tc.status || !strings.Contains(e.Reason, tc.reason) {
+				t.Errorf("%s: %s = %+v, want %s naming %q", tc.name, k, e, tc.status, tc.reason)
+			}
+		}
+		if s := env(t, b, "processes.stats").Value.(map[string]any); s["foreign_ns"] != 0 {
+			t.Errorf("%s: stats %v, want no foreign process", tc.name, s)
+		}
 	}
 }

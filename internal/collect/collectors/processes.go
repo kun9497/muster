@@ -458,6 +458,13 @@ func (s *procScan) readNS(r *procRow) {
 		return
 	}
 	host := t == s.hostNS
+	if !host && r.exeStatus != "ok" {
+		// Which file a namespace of its own names cannot be told without
+		// the exe: the exe's failure is the row's, never a quiet foreign
+		// (F-5). readExe already noted it for the owner and counted a denial.
+		r.nsStatus = r.exeStatus
+		return
+	}
 	if !host {
 		var fail *facts.Envelope
 		if host, fail = s.seesHostExe(r, t); fail != nil {
@@ -483,35 +490,47 @@ func (s *procScan) readNS(r *procRow) {
 	}
 }
 
-// nsMounts is one namespace's parsed mountinfo.
+// nsMounts is one namespace's parsed mountinfo, or the failure a read of it
+// met that the next process of the namespace would meet again (F-3).
 type nsMounts struct {
 	rows []mountRow
+	fail *facts.Envelope
 }
 
 // mountsOf is the mountinfo of the namespace ns, read through pid the first
 // time the namespace is met.
 func (s *procScan) mountsOf(ns string, pid int) (nsMounts, *facts.Envelope) {
 	if m, ok := s.mounts[ns]; ok {
-		return m, nil
+		return m, m.fail
 	}
 	p := procPath(pid, "mountinfo")
 	data, meta, err := s.a.ReadFile(p, mountinfoReadLimit)
 	if err != nil {
 		e := readFailure(p, err)
+		// A process that vanished under the read leaves the namespace to
+		// its next process (R-3); any other failure of pid 1's table is
+		// every process's, and is not read again per process (F-3).
+		if pid == 1 && !errors.Is(err, fs.ErrNotExist) && !errors.Is(err, unix.ESRCH) {
+			s.mounts[ns] = nsMounts{fail: &e}
+		}
 		return nsMounts{}, &e
 	}
 	if meta.Truncated {
-		// A cut table may lack the very mount the exe lies on.
+		// A cut table may lack the very mount the exe lies on. The cut is
+		// the namespace's size, not a race: every process of it would read
+		// the same 4 MiB and discard them (F-3).
 		e := collect.ErrorEnv(fmt.Sprintf("%s: cut at the %d-byte limit", p, mountinfoReadLimit))
+		s.mounts[ns] = nsMounts{fail: &e}
 		return nsMounts{}, &e
 	}
 	rows, err := parseMountinfo(data)
 	if err != nil {
 		e := collect.ErrorEnv(p + ": " + err.Error())
+		if pid == 1 {
+			s.mounts[ns] = nsMounts{fail: &e}
+		}
 		return nsMounts{}, &e
 	}
-	// Only a table that was read is memoised: a failure is this process's,
-	// and the next process of the namespace may read it (R-3).
 	m := nsMounts{rows: rows}
 	s.mounts[ns] = m
 	return m, nil
@@ -528,7 +547,7 @@ func (s *procScan) mountsOf(ns string, pid int) (nsMounts, *facts.Envelope) {
 // index must not be asked about. A root link or a mountinfo that cannot be
 // read is the failure returned (R-3).
 func (s *procScan) seesHostExe(r *procRow, ns string) (bool, *facts.Envelope) {
-	if r.exeStatus != "ok" || r.exe == "" {
+	if r.exe == "" {
 		return false, nil
 	}
 	rp := procPath(r.pid, "root")
@@ -559,48 +578,87 @@ func (s *procScan) seesHostExe(r *procRow, ns string) (bool, *facts.Envelope) {
 
 // exeMountKey names the file at exe as a mount table resolves it: the
 // device, the path within that device (the mount's root joined with the rest
-// of exe past the mount point), the type and the source of the topmost mount
-// whose mount point is the longest path prefix of exe.
+// of exe past the mount point), the type and the source of the visible mount
+// whose mount point is the longest path prefix of exe. A mount is visible
+// when it and every mount on its parent chain is the topmost at its own
+// mount point: a /usr/lib mount left under a later bind over /usr is hidden
+// by the bind and never chosen (F-2).
 func exeMountKey(rows []mountRow, exe string) (string, bool) {
-	longest := -1
-	var cands []mountRow
-	for _, m := range rows {
+	top := topMounts(rows)
+	byID := make(map[int]int, len(rows))
+	for i, m := range rows {
+		byID[m.id] = i
+	}
+	// The chain is walked from the mount up; a parent at its child's own
+	// mount point is the mount the child is stacked on, which the child
+	// covers by design, so it is passed over rather than judged.
+	visible := func(i int) bool {
+		if top[rows[i].mountPoint] != i {
+			return false
+		}
+		for range len(rows) + 1 {
+			j, ok := byID[rows[i].parent]
+			if !ok || j == i {
+				return true
+			}
+			if rows[j].mountPoint != rows[i].mountPoint && top[rows[j].mountPoint] != j {
+				return false
+			}
+			i = j
+		}
+		return false // a parent cycle, which no kernel table holds
+	}
+	best := -1
+	for i, m := range rows {
 		mp := m.mountPoint
 		if mp != "/" && exe != mp && !strings.HasPrefix(exe, mp+"/") {
 			continue
 		}
-		switch {
-		case len(mp) > longest:
-			longest, cands = len(mp), []mountRow{m}
-		case len(mp) == longest:
-			cands = append(cands, m)
+		if best >= 0 && len(mp) <= len(rows[best].mountPoint) {
+			continue
+		}
+		if visible(i) {
+			best = i
 		}
 	}
-	if len(cands) == 0 {
+	if best < 0 {
 		return "", false
 	}
-	// Mounts stacked on one point: the topmost is the one no other of them
-	// is mounted on (its id is nobody's parent there); among several such,
-	// the last listed (R-4).
-	m := cands[len(cands)-1]
-	for i := len(cands) - 1; i >= 0; i-- {
-		covered := false
-		for _, o := range cands {
-			if o.parent == cands[i].id && o.id != cands[i].id {
-				covered = true
-				break
-			}
-		}
-		if !covered {
-			m = cands[i]
-			break
-		}
-	}
+	m := rows[best]
 	rel := strings.TrimPrefix(exe, m.mountPoint)
 	if m.mountPoint == "/" {
 		rel = exe
 	}
 	return m.dev + " " + path.Join(m.root, rel) + " " + m.fstype + " " + m.source, true
+}
+
+// topMounts maps each mount point to the index of its topmost row. Mounts
+// stacked on one point: the topmost is the one no other of them is mounted
+// on (its id is nobody's parent there); among several such, the last listed,
+// as the kernel lists a namespace's mounts in the order they were made (R-4).
+func topMounts(rows []mountRow) map[string]int {
+	at := map[string][]int{}
+	for i, m := range rows {
+		at[m.mountPoint] = append(at[m.mountPoint], i)
+	}
+	top := make(map[string]int, len(at))
+	for mp, idx := range at {
+		top[mp] = idx[len(idx)-1]
+		for k := len(idx) - 1; k >= 0; k-- {
+			covered := false
+			for _, o := range idx {
+				if o != idx[k] && rows[o].parent == rows[idx[k]].id {
+					covered = true
+					break
+				}
+			}
+			if !covered {
+				top[mp] = idx[k]
+				break
+			}
+		}
+	}
+	return top
 }
 
 // pidViewWhole reports whether this run sees the initial pid namespace
