@@ -119,7 +119,7 @@
 
 ## Fact keys used by controls
 
-223 of 482 registered keys are read by a control (4 by the engine); 255 unused.
+223 of 509 registered keys are read by a control (4 by the engine); 282 unused.
 
 | Collector | Registered | Used by a control | Read by the engine | Unused |
 |---|---|---|---|---|
@@ -145,7 +145,7 @@
 | ftp | 17 | 6 | 0 | ftp.implementation, ftp.config_files, ftp.parse_complete, ftp.unmodelled, ftp.local_enabled, ftp.tcp_wrappers, ftp.userlist_enable, ftp.userlist_deny, ftp.userlist_file, ftp.banner_source, ftp.banner_text |
 | mail | 10 | 7 | 0 | mail.config_files, mail.postfix.smtpd_recipient_restrictions, mail.postfix.disable_vrfy_command |
 | dns | 7 | 2 | 0 | dns.config_files, dns.parse_complete, dns.unmodelled, dns.options.allow_transfer, dns.options.allow_update |
-| sysctl | 12 | 12 | 0 | — |
+| sysctl | 39 | 12 | 0 | net.sysctl.ipv4_ip_forward, net.sysctl.ipv6_all_forwarding, net.sysctl.ipv6_default_forwarding, net.sysctl.ipv4_all_accept_redirects, net.sysctl.ipv4_default_accept_redirects, net.sysctl.ipv4_all_secure_redirects, net.sysctl.ipv4_default_secure_redirects, net.sysctl.ipv4_all_send_redirects, net.sysctl.ipv4_default_send_redirects, net.sysctl.ipv6_all_accept_redirects, net.sysctl.ipv6_default_accept_redirects, net.sysctl.ipv4_all_accept_source_route, net.sysctl.ipv4_default_accept_source_route, net.sysctl.ipv6_all_accept_source_route, net.sysctl.ipv6_default_accept_source_route, net.sysctl.ipv4_all_rp_filter, net.sysctl.ipv4_default_rp_filter, net.sysctl.ipv4_all_log_martians, net.sysctl.ipv4_default_log_martians, net.sysctl.ipv4_icmp_echo_ignore_broadcasts, net.sysctl.ipv4_icmp_ignore_bogus_error_responses, net.sysctl.ipv4_tcp_syncookies, net.sysctl.ipv6_all_accept_ra, net.sysctl.ipv6_default_accept_ra, net.sysctl.ipv6_all_disable_ipv6, net.sysctl.ipv6_default_disable_ipv6, net.sysctl.ipv6_bindv6only |
 | coredump | 6 | 5 | 0 | coredump.limits.sources |
 | boot | 13 | 6 | 0 | boot.grub_cfg.path, boot.grub_cfg.group, boot.grub_cfg.group_readable, boot.grub_cfg.group_writable, boot.grub_cfg.other_readable, boot.grub_cfg.other_writable, boot.grub_cfg.acl_present |
 | mounts | 5 | 5 | 0 | — |

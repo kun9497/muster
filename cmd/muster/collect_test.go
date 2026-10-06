@@ -161,6 +161,45 @@ func TestCollectListActionsOnLinux(t *testing.T) {
 	if !slices.Equal(got, want) {
 		t.Errorf("processes rows\n got %q\nwant %q", got, want)
 	}
+
+	// The sysctl collector's rows, exhaustively: the twelve kernel files of
+	// B-2, the twenty-seven network files of P-4 and the sysctl.d chain.
+	var gotSysctl []string
+	for _, a := range actions {
+		if a.Collector == "sysctl" {
+			gotSysctl = append(gotSysctl, a.Kind+" "+a.Needs+" "+a.Target)
+		}
+	}
+	wantSysctl := []string{
+		"read none /etc/sysctl.conf", "read none /etc/sysctl.d/*.conf", "read none /run/sysctl.d/*.conf",
+		"read none /usr/lib/sysctl.d/*.conf", "read none /usr/local/lib/sysctl.d/*.conf",
+		"read none /proc/sys/fs/protected_fifos", "read none /proc/sys/fs/protected_hardlinks",
+		"read none /proc/sys/fs/protected_regular", "read none /proc/sys/fs/protected_symlinks",
+		"read none /proc/sys/kernel/dmesg_restrict", "read none /proc/sys/kernel/kptr_restrict",
+		"read none /proc/sys/kernel/perf_event_paranoid", "read none /proc/sys/kernel/randomize_va_space",
+		"read none /proc/sys/kernel/sysrq", "read none /proc/sys/kernel/unprivileged_bpf_disabled",
+		"read none /proc/sys/kernel/yama/ptrace_scope", "read none /proc/sys/net/core/bpf_jit_harden",
+		"read none /proc/sys/net/ipv4/ip_forward",
+		"read none /proc/sys/net/ipv6/conf/all/forwarding", "read none /proc/sys/net/ipv6/conf/default/forwarding",
+		"read none /proc/sys/net/ipv4/conf/all/accept_redirects", "read none /proc/sys/net/ipv4/conf/default/accept_redirects",
+		"read none /proc/sys/net/ipv4/conf/all/secure_redirects", "read none /proc/sys/net/ipv4/conf/default/secure_redirects",
+		"read none /proc/sys/net/ipv4/conf/all/send_redirects", "read none /proc/sys/net/ipv4/conf/default/send_redirects",
+		"read none /proc/sys/net/ipv6/conf/all/accept_redirects", "read none /proc/sys/net/ipv6/conf/default/accept_redirects",
+		"read none /proc/sys/net/ipv4/conf/all/accept_source_route", "read none /proc/sys/net/ipv4/conf/default/accept_source_route",
+		"read none /proc/sys/net/ipv6/conf/all/accept_source_route", "read none /proc/sys/net/ipv6/conf/default/accept_source_route",
+		"read none /proc/sys/net/ipv4/conf/all/rp_filter", "read none /proc/sys/net/ipv4/conf/default/rp_filter",
+		"read none /proc/sys/net/ipv4/conf/all/log_martians", "read none /proc/sys/net/ipv4/conf/default/log_martians",
+		"read none /proc/sys/net/ipv4/icmp_echo_ignore_broadcasts", "read none /proc/sys/net/ipv4/icmp_ignore_bogus_error_responses",
+		"read none /proc/sys/net/ipv4/tcp_syncookies",
+		"read none /proc/sys/net/ipv6/conf/all/accept_ra", "read none /proc/sys/net/ipv6/conf/default/accept_ra",
+		"read none /proc/sys/net/ipv6/conf/all/disable_ipv6", "read none /proc/sys/net/ipv6/conf/default/disable_ipv6",
+		"read none /proc/sys/net/ipv6/bindv6only",
+	}
+	slices.Sort(gotSysctl)
+	slices.Sort(wantSysctl)
+	if !slices.Equal(gotSysctl, wantSysctl) {
+		t.Errorf("sysctl rows\n got %q\nwant %q", gotSysctl, wantSysctl)
+	}
 }
 
 // W-12: --deep travels from the command line to the header of the snapshot

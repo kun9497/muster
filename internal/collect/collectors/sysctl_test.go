@@ -337,8 +337,9 @@ func TestSysctlPersistedNonIntegerIsAnError(t *testing.T) {
 	}
 }
 
-// The twelve keys of B-2 and no others, each written once, and a declaration
-// that covers every path the collector reaches for (K-4).
+// The twelve keys of B-2 and the twenty-seven of P-4 and no others, each
+// written once, and a declaration that covers every path the collector
+// reaches for (K-4).
 func TestSysctlDeclarationCoversItsReads(t *testing.T) {
 	c := collectorNamed(t, "sysctl")
 	if c.Declare.Needs != "none" {
@@ -368,6 +369,33 @@ func TestSysctlDeclarationCoversItsReads(t *testing.T) {
 		"/proc/sys/kernel/unprivileged_bpf_disabled",
 		"/proc/sys/kernel/yama/ptrace_scope",
 		"/proc/sys/net/core/bpf_jit_harden",
+		"/proc/sys/net/ipv4/conf/all/accept_redirects",
+		"/proc/sys/net/ipv4/conf/all/accept_source_route",
+		"/proc/sys/net/ipv4/conf/all/log_martians",
+		"/proc/sys/net/ipv4/conf/all/rp_filter",
+		"/proc/sys/net/ipv4/conf/all/secure_redirects",
+		"/proc/sys/net/ipv4/conf/all/send_redirects",
+		"/proc/sys/net/ipv4/conf/default/accept_redirects",
+		"/proc/sys/net/ipv4/conf/default/accept_source_route",
+		"/proc/sys/net/ipv4/conf/default/log_martians",
+		"/proc/sys/net/ipv4/conf/default/rp_filter",
+		"/proc/sys/net/ipv4/conf/default/secure_redirects",
+		"/proc/sys/net/ipv4/conf/default/send_redirects",
+		"/proc/sys/net/ipv4/icmp_echo_ignore_broadcasts",
+		"/proc/sys/net/ipv4/icmp_ignore_bogus_error_responses",
+		"/proc/sys/net/ipv4/ip_forward",
+		"/proc/sys/net/ipv4/tcp_syncookies",
+		"/proc/sys/net/ipv6/bindv6only",
+		"/proc/sys/net/ipv6/conf/all/accept_ra",
+		"/proc/sys/net/ipv6/conf/all/accept_redirects",
+		"/proc/sys/net/ipv6/conf/all/accept_source_route",
+		"/proc/sys/net/ipv6/conf/all/disable_ipv6",
+		"/proc/sys/net/ipv6/conf/all/forwarding",
+		"/proc/sys/net/ipv6/conf/default/accept_ra",
+		"/proc/sys/net/ipv6/conf/default/accept_redirects",
+		"/proc/sys/net/ipv6/conf/default/accept_source_route",
+		"/proc/sys/net/ipv6/conf/default/disable_ipv6",
+		"/proc/sys/net/ipv6/conf/default/forwarding",
 		"/run/sysctl.d/*.conf",
 		"/usr/lib/sysctl.d/*.conf",
 		"/usr/local/lib/sysctl.d/*.conf",
@@ -392,8 +420,15 @@ func TestSysctlDeclarationCoversItsReads(t *testing.T) {
 	a := &fsAccess{files: procSysSeeds()}
 	b := buildBegun(t, "sysctl", a)
 	keys := b.Keys("sysctl")
-	if len(keys) != 12 {
-		t.Errorf("wrote %d keys, want the twelve of B-2: %v", len(keys), keys)
+	if len(keys) != 39 {
+		t.Errorf("wrote %d keys, want the twelve of B-2 and the twenty-seven of P-4: %v", len(keys), keys)
+	}
+	if !slices.Contains(keys, "net.sysctl.ipv6_bindv6only") {
+		t.Error("net.sysctl.ipv6_bindv6only was not written")
+	}
+	net, ok := leaf(t, b, "net.sysctl").(map[string]any)
+	if !ok || len(net) != 27 {
+		t.Errorf("net.sysctl carries %d leaves (%T), want 27", len(net), leaf(t, b, "net.sysctl"))
 	}
 	tree, ok := leaf(t, b, "kernel.sysctl").(map[string]any)
 	if !ok {
@@ -422,12 +457,19 @@ func TestParseSysctlD(t *testing.T) {
 		"net/ipv4/conf/eth0.1/rp_filter = 1\n" +
 		"   kernel.sysrq\t=\t176   \n" +
 		"no equals\n" +
-		"= 3\n"))
+		"= 3\n" +
+		"net.ipv4.conf.*.rp_filter = 2\n" +
+		"-net.ipv4.conf.all.rp_filter\n" +
+		"-net/ipv4/conf/all/accept_source_route\n" +
+		"-\n"))
 	want := []sysctlAssign{
 		{key: "kernel.foo", value: "1", ignoreMissing: true, line: 4, raw: "-kernel.foo = 1"},
 		{key: "kernel.yama.ptrace_scope", value: "2", line: 5, raw: "kernel/yama/ptrace_scope = 2"},
 		{key: "net.ipv4.conf.eth0.1.rp_filter", value: "1", line: 6, raw: "net/ipv4/conf/eth0.1/rp_filter = 1"},
 		{key: "kernel.sysrq", value: "176", line: 7, raw: "   kernel.sysrq\t=\t176   "},
+		{key: "net.ipv4.conf.*.rp_filter", value: "2", glob: true, line: 10, raw: "net.ipv4.conf.*.rp_filter = 2"},
+		{key: "net.ipv4.conf.all.rp_filter", ignoreMissing: true, exclude: true, line: 11, raw: "-net.ipv4.conf.all.rp_filter"},
+		{key: "net.ipv4.conf.all.accept_source_route", ignoreMissing: true, exclude: true, line: 12, raw: "-net/ipv4/conf/all/accept_source_route"},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("parseSysctlD =\n%+v\nwant\n%+v", got, want)
@@ -527,5 +569,201 @@ func TestSysctlAbsentPersistedCarriesTheChainsTruncation(t *testing.T) {
 	}
 	if !got.Truncated {
 		t.Errorf("persisted %+v, want truncated: %s was cut at the read cap", got, cut)
+	}
+}
+
+// netSysValues gives each of the twenty-seven P-4 files a distinct value, so
+// a leaf wired to the wrong file reads the wrong number.
+func netSysValues() map[string]int {
+	out := map[string]int{}
+	for i, l := range sysctlLeaves {
+		if strings.HasPrefix(l.leaf, "net.sysctl.") {
+			out[l.path] = 100 + i
+		}
+	}
+	out[sysctlBindV6OnlyPath] = 1
+	return out
+}
+
+func netSysAccess(drop func(string) bool) *fsAccess {
+	a := &fsAccess{files: procSysSeeds(), contents: map[string][]byte{}}
+	for p, v := range netSysValues() {
+		if drop != nil && drop(p) {
+			continue
+		}
+		a.contents[p] = []byte(fmt.Sprintf("%d\n", v))
+	}
+	return a
+}
+
+// Every P-4 file is read into its own key: twenty-six settings whose runtime
+// (and so effective) side is the /proc/sys number, and bindv6only as a plain
+// int envelope.
+func TestSysctlNetLeavesAreRead(t *testing.T) {
+	vals := netSysValues()
+	b := build(t, "sysctl", netSysAccess(nil))
+	n := 0
+	for _, l := range sysctlLeaves {
+		if !strings.HasPrefix(l.leaf, "net.sysctl.") {
+			continue
+		}
+		n++
+		s := setting(t, b, l.leaf)
+		if s.Runtime == nil || s.Runtime.Status != facts.StatusOK || s.Runtime.Value != vals[l.path] {
+			t.Errorf("%s runtime %+v, want ok %d from %s", l.leaf, s.Runtime, vals[l.path], l.path)
+		}
+		if s.Effective == nil || s.Effective.Value != vals[l.path] {
+			t.Errorf("%s effective %+v, want the runtime %d", l.leaf, s.Effective, vals[l.path])
+		}
+	}
+	if n != 26 {
+		t.Errorf("%d net.sysctl settings in sysctlLeaves, want 26", n)
+	}
+	e, ok := leaf(t, b, "net.sysctl.ipv6_bindv6only").(facts.Envelope)
+	if !ok {
+		t.Fatalf("net.sysctl.ipv6_bindv6only is %T, want a plain envelope", leaf(t, b, "net.sysctl.ipv6_bindv6only"))
+	}
+	if e.Status != facts.StatusOK || e.Value != 1 {
+		t.Errorf("bindv6only %+v, want ok 1", e)
+	}
+	want := facts.Source{Kind: "proc", Path: sysctlBindV6OnlyPath}
+	if !sameSource(e.Source, &want) {
+		t.Errorf("bindv6only source %+v, want %+v", e.Source, want)
+	}
+}
+
+// A kernel booted with ipv6.disable=1 has no /proc/sys/net/ipv6 at all: every
+// ipv6 key is absent saying so, and the IPv4 keys are untouched (spec P-4).
+func TestSysctlIPv6AbsentReadsNotBuilt(t *testing.T) {
+	b := build(t, "sysctl", netSysAccess(func(p string) bool { return strings.HasPrefix(p, "/proc/sys/net/ipv6/") }))
+	check := func(key string, e facts.Envelope) {
+		t.Helper()
+		if e.Status != facts.StatusAbsent || !strings.Contains(e.Reason, "IPv6 is not built or is disabled") {
+			t.Errorf("%s %+v, want absent: IPv6 is not built or is disabled", key, e)
+		}
+	}
+	v6 := 0
+	for _, l := range sysctlLeaves {
+		s := setting(t, b, l.leaf)
+		switch {
+		case strings.HasPrefix(l.leaf, "net.sysctl.ipv6_"):
+			v6++
+			check(l.leaf, *s.Runtime)
+			check(l.leaf, *s.Effective)
+		case strings.HasPrefix(l.leaf, "net.sysctl.ipv4_"):
+			if s.Runtime.Status != facts.StatusOK {
+				t.Errorf("%s runtime %+v, want ok: only IPv6 is gone", l.leaf, s.Runtime)
+			}
+		}
+	}
+	if v6 != 10 {
+		t.Errorf("%d ipv6 settings, want 10", v6)
+	}
+	check("net.sysctl.ipv6_bindv6only", leaf(t, b, "net.sysctl.ipv6_bindv6only").(facts.Envelope))
+
+	// The reason is IPv6's own: a missing knob elsewhere keeps the plain one.
+	a := netSysAccess(nil)
+	delete(a.files, "/proc/sys/kernel/yama/ptrace_scope")
+	y := setting(t, build(t, "sysctl", a), "kernel.sysctl.yama_ptrace_scope")
+	if y.Runtime.Status != facts.StatusAbsent || strings.Contains(y.Runtime.Reason, "IPv6") {
+		t.Errorf("a missing Yama knob: %+v, want absent without the IPv6 reason", y.Runtime)
+	}
+}
+
+// systemd's own 50-default.conf, verbatim from ubuntu:22.04's systemd
+// package: a concrete default line, a glob for every interface, and a "-key"
+// exclusion for "all". Ubuntu comments out the rp_filter exclusion and keeps
+// the accept_source_route one, so the same file shows both outcomes.
+func TestParseSysctlDGlobAndExclusion(t *testing.T) {
+	a := netSysAccess(nil)
+	a.files["/usr/lib/sysctl.d/50-default.conf"] = "sysctl.d-50-default.ubuntu2204.conf"
+	b := build(t, "sysctl", a)
+
+	// The concrete line, not the glob below it.
+	if got := persistedOK(t, b, "net.sysctl.ipv4_default_rp_filter"); got.Value != 2 || got.Source.Line != 25 {
+		t.Errorf("default.rp_filter persisted %+v, want 2 from line 25", got)
+	}
+	// No line names all.rp_filter and the exclusion is commented out, so the
+	// glob reaches it.
+	if got := persistedOK(t, b, "net.sysctl.ipv4_all_rp_filter"); got.Value != 2 || got.Source.Line != 26 ||
+		got.Source.Raw != "net.ipv4.conf.*.rp_filter = 2" {
+		t.Errorf("all.rp_filter persisted %+v, want 2 from the glob on line 26", got)
+	}
+	if got := persistedOK(t, b, "net.sysctl.ipv4_default_accept_source_route"); got.Value != 0 || got.Source.Line != 30 {
+		t.Errorf("default.accept_source_route persisted %+v, want 0 from line 30", got)
+	}
+	// -net.ipv4.conf.all.accept_source_route keeps the glob off that key.
+	got := persisted(t, b, "net.sysctl.ipv4_all_accept_source_route")
+	if got.Status != facts.StatusAbsent || !strings.Contains(got.Reason, "no sysctl.d line sets net.ipv4.conf.all.accept_source_route") {
+		t.Errorf("all.accept_source_route persisted %+v, want absent: the glob excludes it", got)
+	}
+	// A key no line and no glob names.
+	got = persisted(t, b, "net.sysctl.ipv4_ip_forward")
+	if got.Status != facts.StatusAbsent || !strings.Contains(got.Reason, "no sysctl.d line sets net.ipv4.ip_forward") {
+		t.Errorf("ip_forward persisted %+v, want absent", got)
+	}
+	// "conf.*" is one component: the glob does not reach the ipv6 tree.
+	if got := persisted(t, b, "net.sysctl.ipv6_all_accept_source_route"); got.Status != facts.StatusAbsent {
+		t.Errorf("ipv6 all.accept_source_route persisted %+v, want absent", got)
+	}
+}
+
+// systemd-sysctl skips a glob for every key the chain names explicitly, so a
+// concrete line wins even when the glob comes from a LATER file (W-46).
+func TestSysctlConcreteBeatsGlob(t *testing.T) {
+	a := netSysAccess(nil)
+	a.contents["/etc/sysctl.d/10-concrete.conf"] = []byte("net.ipv4.conf.all.send_redirects = 0\n")
+	a.contents["/etc/sysctl.d/90-glob.conf"] = []byte("" +
+		"net.ipv4.conf.*.send_redirects = 1\n" +
+		"net.ipv4.conf.*.log_martians = 1\n" +
+		"net.ipv4.conf.*.log_martians = 0\n")
+	b := build(t, "sysctl", a)
+
+	got := persistedOK(t, b, "net.sysctl.ipv4_all_send_redirects")
+	if got.Value != 0 || got.Source.Path != "/etc/sysctl.d/10-concrete.conf" {
+		t.Errorf("all.send_redirects persisted %+v, want 0 from the concrete line in the earlier file", got)
+	}
+	// The glob still sets the key no line names.
+	got = persistedOK(t, b, "net.sysctl.ipv4_default_send_redirects")
+	if got.Value != 1 || got.Source.Path != "/etc/sysctl.d/90-glob.conf" {
+		t.Errorf("default.send_redirects persisted %+v, want 1 from the glob", got)
+	}
+	// The last of two globs wins.
+	if got := persistedOK(t, b, "net.sysctl.ipv4_all_log_martians"); got.Value != 0 || got.Source.Line != 3 {
+		t.Errorf("all.log_martians persisted %+v, want 0 from line 3", got)
+	}
+}
+
+// A "-key" line after a concrete line replaces it, as systemd's table does: the
+// key is then set by nothing, neither the earlier line nor a glob.
+func TestSysctlExclusionAfterConcreteLeavesTheKeyUnset(t *testing.T) {
+	a := netSysAccess(nil)
+	a.contents["/etc/sysctl.d/10-a.conf"] = []byte("net.ipv4.conf.all.rp_filter = 1\nnet.ipv4.conf.*.rp_filter = 2\n")
+	a.contents["/etc/sysctl.d/20-b.conf"] = []byte("-net.ipv4.conf.all.rp_filter\n")
+	b := build(t, "sysctl", a)
+	if got := persisted(t, b, "net.sysctl.ipv4_all_rp_filter"); got.Status != facts.StatusAbsent {
+		t.Errorf("all.rp_filter persisted %+v, want absent", got)
+	}
+	if got := persistedOK(t, b, "net.sysctl.ipv4_default_rp_filter"); got.Value != 2 {
+		t.Errorf("default.rp_filter persisted %+v, want 2 from the glob", got)
+	}
+}
+
+func TestSysctlGlobMatch(t *testing.T) {
+	for _, tc := range []struct {
+		pattern, key string
+		want         bool
+	}{
+		{"net.ipv4.conf.*.rp_filter", "net.ipv4.conf.all.rp_filter", true},
+		{"net.ipv4.conf.*.rp_filter", "net.ipv4.conf.default.rp_filter", true},
+		{"net.ipv4.conf.*.rp_filter", "net.ipv4.conf.eth0.1.rp_filter", false},
+		{"net.ipv4.*", "net.ipv4.conf.all.rp_filter", false},
+		{"net.ipv?.conf.all.rp_filter", "net.ipv6.conf.all.rp_filter", true},
+		{"net.ipv4.conf.[ad]*.rp_filter", "net.ipv4.conf.all.rp_filter", true},
+		{"net.ipv4.conf.[.rp_filter", "net.ipv4.conf.[.rp_filter", false},
+	} {
+		if got := sysctlGlobMatch(tc.pattern, tc.key); got != tc.want {
+			t.Errorf("sysctlGlobMatch(%q, %q) = %v, want %v", tc.pattern, tc.key, got, tc.want)
+		}
 	}
 }

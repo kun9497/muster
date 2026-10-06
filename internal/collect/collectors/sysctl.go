@@ -14,7 +14,8 @@ import (
 )
 
 // sysctlCollector writes the twelve kernel self-protection sysctls of spec
-// B-2 as two-home settings.
+// B-2 and the twenty-six network settings of spec P-4 as two-home settings,
+// and net.ipv6.bindv6only as a plain int (P-4's one evidence key).
 //
 // B-3: there is NO sysctl binary in the declaration and no command at all —
 // /proc/sys is the kernel's own answer and reading it needs no program. The
@@ -31,10 +32,11 @@ var sysctlCollector = collect.Collector{
 }
 
 func sysctlReads() []string {
-	reads := make([]string, 0, len(sysctlLeaves)+len(sysctlDirs)+1)
+	reads := make([]string, 0, len(sysctlLeaves)+len(sysctlDirs)+2)
 	for _, l := range sysctlLeaves {
 		reads = append(reads, l.path)
 	}
+	reads = append(reads, sysctlBindV6OnlyPath)
 	return append(reads, sysctlPersistedReads()...)
 }
 
@@ -44,6 +46,7 @@ func runSysctl(_ context.Context, a collect.Access, b *collect.Builder) error {
 	for _, l := range sysctlLeaves {
 		b.SetSetting(l.leaf, sysctlSetting(a, l.sysctlKey, scan, winners))
 	}
+	b.Set(sysctlBindV6OnlyLeaf, readProcSys(a, sysctlBindV6OnlyPath))
 	return nil
 }
 
@@ -51,7 +54,7 @@ func runSysctl(_ context.Context, a collect.Access, b *collect.Builder) error {
 // COPY of runtime rather than the same envelope, and the winner a copy of
 // its source, so nothing downstream can change one side by writing to
 // another (R147).
-func sysctlSetting(a collect.Access, k sysctlKey, scan sysctlScan, winners map[string]sysctlWinner) facts.Setting {
+func sysctlSetting(a collect.Access, k sysctlKey, scan sysctlScan, winners sysctlWinners) facts.Setting {
 	runtime := readProcSys(a, k.path)
 	effective := copyEnvelope(runtime)
 	persisted := sysctlPersisted(k, scan, winners)
@@ -73,6 +76,9 @@ func readProcSys(a collect.Access, p string) facts.Envelope {
 	data, meta, err := a.ReadFile(p, readLimit)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
+			if strings.HasPrefix(p, sysctlIPv6Prefix) {
+				return collect.Absent(p + " does not exist: IPv6 is not built or is disabled")
+			}
 			return collect.Absent(p + " does not exist")
 		}
 		return readErrorEnv(p, err)
@@ -90,13 +96,13 @@ func readProcSys(a collect.Access, p string) facts.Envelope {
 }
 
 // sysctlPersisted is the sysctl.d side of one variable.
-func sysctlPersisted(k sysctlKey, scan sysctlScan, winners map[string]sysctlWinner) facts.Envelope {
+func sysctlPersisted(k sysctlKey, scan sysctlScan, winners sysctlWinners) facts.Envelope {
 	// C3: a file of the chain that exists and could not be read is the
 	// answer for every value the chain could have set.
 	if scan.readErr != nil {
 		return *scan.readErr
 	}
-	w, ok := winners[k.key]
+	w, ok := winners.lookup(k.key)
 	if !ok {
 		// "No line sets it" is a conclusion about bytes that were all read.
 		// A file of the chain cut at the read cap may have carried that line

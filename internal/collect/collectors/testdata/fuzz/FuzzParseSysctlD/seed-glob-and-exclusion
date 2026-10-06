@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("net.ipv4.conf.default.rp_filter = 2\nnet.ipv4.conf.*.rp_filter = 2\n-net.ipv4.conf.all.rp_filter\n")

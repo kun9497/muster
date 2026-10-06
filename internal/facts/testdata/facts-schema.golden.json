@@ -4182,6 +4182,276 @@
       "SubjectKind": ""
     },
     {
+      "Key": "net.sysctl.ipv4_ip_forward",
+      "Type": "setting\u003cint\u003e",
+      "Description": "net.ipv4.ip_forward - whether the host routes IPv4 packets between its interfaces; runtime from /proc/sys, persisted from the sysctl.d chain.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "net.sysctl.ipv6_all_forwarding",
+      "Type": "setting\u003cint\u003e",
+      "Description": "net.ipv6.conf.all.forwarding - whether every current interface forwards IPv6 packets (and acts as a router); runtime from /proc/sys, persisted from the sysctl.d chain; absent when the kernel has no IPv6 (ipv6.disable=1 or not built).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "net.sysctl.ipv6_default_forwarding",
+      "Type": "setting\u003cint\u003e",
+      "Description": "net.ipv6.conf.default.forwarding - the IPv6 forwarding value an interface created later starts with; runtime from /proc/sys, persisted from the sysctl.d chain; absent when the kernel has no IPv6 (ipv6.disable=1 or not built).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "net.sysctl.ipv4_all_accept_redirects",
+      "Type": "setting\u003cint\u003e",
+      "Description": "net.ipv4.conf.all.accept_redirects - whether every current interface lets an ICMP redirect change the IPv4 routing table; runtime from /proc/sys, persisted from the sysctl.d chain.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "net.sysctl.ipv4_default_accept_redirects",
+      "Type": "setting\u003cint\u003e",
+      "Description": "net.ipv4.conf.default.accept_redirects - the ICMP redirect acceptance an interface created later starts with; runtime from /proc/sys, persisted from the sysctl.d chain.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "net.sysctl.ipv4_all_secure_redirects",
+      "Type": "setting\u003cint\u003e",
+      "Description": "net.ipv4.conf.all.secure_redirects - whether every current interface accepts an ICMP redirect from a listed default gateway; runtime from /proc/sys, persisted from the sysctl.d chain.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "net.sysctl.ipv4_default_secure_redirects",
+      "Type": "setting\u003cint\u003e",
+      "Description": "net.ipv4.conf.default.secure_redirects - the gateway-redirect acceptance an interface created later starts with; runtime from /proc/sys, persisted from the sysctl.d chain.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "net.sysctl.ipv4_all_send_redirects",
+      "Type": "setting\u003cint\u003e",
+      "Description": "net.ipv4.conf.all.send_redirects - whether every current interface sends ICMP redirects, which only a router should; runtime from /proc/sys, persisted from the sysctl.d chain.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "net.sysctl.ipv4_default_send_redirects",
+      "Type": "setting\u003cint\u003e",
+      "Description": "net.ipv4.conf.default.send_redirects - the redirect sending an interface created later starts with; runtime from /proc/sys, persisted from the sysctl.d chain.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "net.sysctl.ipv6_all_accept_redirects",
+      "Type": "setting\u003cint\u003e",
+      "Description": "net.ipv6.conf.all.accept_redirects - whether every current interface lets an ICMPv6 redirect change the routing table; runtime from /proc/sys, persisted from the sysctl.d chain; absent when the kernel has no IPv6 (ipv6.disable=1 or not built).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "net.sysctl.ipv6_default_accept_redirects",
+      "Type": "setting\u003cint\u003e",
+      "Description": "net.ipv6.conf.default.accept_redirects - the ICMPv6 redirect acceptance an interface created later starts with; runtime from /proc/sys, persisted from the sysctl.d chain; absent when the kernel has no IPv6 (ipv6.disable=1 or not built).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "net.sysctl.ipv4_all_accept_source_route",
+      "Type": "setting\u003cint\u003e",
+      "Description": "net.ipv4.conf.all.accept_source_route - whether every current interface accepts an IPv4 packet that names its own route; runtime from /proc/sys, persisted from the sysctl.d chain.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "net.sysctl.ipv4_default_accept_source_route",
+      "Type": "setting\u003cint\u003e",
+      "Description": "net.ipv4.conf.default.accept_source_route - the IPv4 source-route acceptance an interface created later starts with; runtime from /proc/sys, persisted from the sysctl.d chain.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "net.sysctl.ipv6_all_accept_source_route",
+      "Type": "setting\u003cint\u003e",
+      "Description": "net.ipv6.conf.all.accept_source_route - whether every current interface accepts an IPv6 routing-header packet; runtime from /proc/sys, persisted from the sysctl.d chain; absent when the kernel has no IPv6 (ipv6.disable=1 or not built).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "net.sysctl.ipv6_default_accept_source_route",
+      "Type": "setting\u003cint\u003e",
+      "Description": "net.ipv6.conf.default.accept_source_route - the IPv6 source-route acceptance an interface created later starts with; runtime from /proc/sys, persisted from the sysctl.d chain; absent when the kernel has no IPv6 (ipv6.disable=1 or not built).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "net.sysctl.ipv4_all_rp_filter",
+      "Type": "setting\u003cint\u003e",
+      "Description": "net.ipv4.conf.all.rp_filter - reverse-path filtering on every current interface - 0 off, 1 strict, 2 loose; runtime from /proc/sys, persisted from the sysctl.d chain.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "net.sysctl.ipv4_default_rp_filter",
+      "Type": "setting\u003cint\u003e",
+      "Description": "net.ipv4.conf.default.rp_filter - the reverse-path filtering an interface created later starts with; runtime from /proc/sys, persisted from the sysctl.d chain.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "net.sysctl.ipv4_all_log_martians",
+      "Type": "setting\u003cint\u003e",
+      "Description": "net.ipv4.conf.all.log_martians - whether a packet with an impossible source address is logged on every current interface; runtime from /proc/sys, persisted from the sysctl.d chain.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "net.sysctl.ipv4_default_log_martians",
+      "Type": "setting\u003cint\u003e",
+      "Description": "net.ipv4.conf.default.log_martians - the martian logging an interface created later starts with; runtime from /proc/sys, persisted from the sysctl.d chain.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "net.sysctl.ipv4_icmp_echo_ignore_broadcasts",
+      "Type": "setting\u003cint\u003e",
+      "Description": "net.ipv4.icmp_echo_ignore_broadcasts - whether an ICMP echo sent to a broadcast or multicast address goes unanswered; runtime from /proc/sys, persisted from the sysctl.d chain.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "net.sysctl.ipv4_icmp_ignore_bogus_error_responses",
+      "Type": "setting\u003cint\u003e",
+      "Description": "net.ipv4.icmp_ignore_bogus_error_responses - whether a malformed ICMP error reply is dropped without a log line; runtime from /proc/sys, persisted from the sysctl.d chain.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "net.sysctl.ipv4_tcp_syncookies",
+      "Type": "setting\u003cint\u003e",
+      "Description": "net.ipv4.tcp_syncookies - whether the kernel answers with SYN cookies when the SYN backlog overflows; runtime from /proc/sys, persisted from the sysctl.d chain.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "net.sysctl.ipv6_all_accept_ra",
+      "Type": "setting\u003cint\u003e",
+      "Description": "net.ipv6.conf.all.accept_ra - whether every current interface takes addresses and routes from IPv6 router advertisements; runtime from /proc/sys, persisted from the sysctl.d chain; absent when the kernel has no IPv6 (ipv6.disable=1 or not built).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "net.sysctl.ipv6_default_accept_ra",
+      "Type": "setting\u003cint\u003e",
+      "Description": "net.ipv6.conf.default.accept_ra - the router-advertisement acceptance an interface created later starts with; runtime from /proc/sys, persisted from the sysctl.d chain; absent when the kernel has no IPv6 (ipv6.disable=1 or not built).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "net.sysctl.ipv6_all_disable_ipv6",
+      "Type": "setting\u003cint\u003e",
+      "Description": "net.ipv6.conf.all.disable_ipv6 - whether IPv6 is switched off on every current interface - the gate of the IPv6 controls; runtime from /proc/sys, persisted from the sysctl.d chain; absent when the kernel has no IPv6 (ipv6.disable=1 or not built).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "net.sysctl.ipv6_default_disable_ipv6",
+      "Type": "setting\u003cint\u003e",
+      "Description": "net.ipv6.conf.default.disable_ipv6 - whether IPv6 starts switched off on an interface created later - the gate of the IPv6 controls; runtime from /proc/sys, persisted from the sysctl.d chain; absent when the kernel has no IPv6 (ipv6.disable=1 or not built).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "effective",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "net.sysctl.ipv6_bindv6only",
+      "Type": "int",
+      "Description": "net.ipv6.bindv6only from /proc/sys - whether a socket bound to \"::\" stays IPv6-only by default instead of also accepting IPv4; evidence the processes collector reads. Absent when the kernel has no IPv6 (ipv6.disable=1 or not built).",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "sysctl",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
       "Key": "coredump.core_pattern",
       "Type": "string",
       "Description": "kernel.core_pattern verbatim - the file name pattern a core dump is written to, or the \"|\" pipe of the handler that takes it.",

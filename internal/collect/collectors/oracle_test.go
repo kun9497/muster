@@ -730,8 +730,13 @@ func TestOracleSysctl(t *testing.T) {
 	c := collectorNamed(t, "sysctl")
 	g := collect.Guard(collect.Host(), c)
 
-	compared := 0
+	keys := make([]sysctlKey, 0, len(sysctlLeaves)+1)
 	for _, l := range sysctlLeaves {
+		keys = append(keys, l.sysctlKey)
+	}
+	keys = append(keys, sysctlKey{"net.ipv6.bindv6only", sysctlBindV6OnlyPath})
+	compared := 0
+	for _, l := range keys {
 		have := readProcSys(g, l.path)
 		want := oracleSysctlValue(t, bin, l.key)
 		switch {
