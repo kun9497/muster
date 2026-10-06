@@ -1,0 +1,20 @@
+id: muster.beyond.no_deleted_executables
+title_en: No running process executes a file that has been deleted or replaced since it started
+title_ko: 시작된 뒤 삭제되거나 교체된 파일을 실행하는 프로세스가 없다
+description_en: When a package upgrade replaces a daemon's binary, the running process keeps executing the old one - the fixed code is on disk and the vulnerable code is still serving - and the kernel marks the process's exe link "(deleted)". muster reads that link for every user process and lists the ones it marks in processes.deleted_executables; the control fails when there is one. The usual answer is a restart after an upgrade, which needrestart on Debian and Ubuntu and dnf needs-restarting on EL report the same way; the rarer one is a binary removed from disk under a running process, which is how a dropped implant hides, and a memfd executable (a program run from an anonymous memory file, its exe link naming memfd) reads deleted too and is the case to look at first. The primary sources are NIST SP 800-53 SI-2(6), removing previous versions of software after an update, and CM-7(5); muster rates it 중 because the usual cause is a missed restart that leaves a patched vulnerability open, and the rare one deserves an investigation. The fact is read from /proc alone and is never absent - a non-root run, which cannot read other accounts' exe links, reads ERROR. A host rebooted after its last upgrade passes; one upgraded and not restarted fails until its daemons are.
+description_ko: 패키지 업그레이드가 데몬의 바이너리를 교체해도 실행 중인 프로세스는 옛 바이너리를 계속 실행합니다. 고친 코드는 디스크에 있고 취약한 코드가 여전히 서비스하며, 커널은 그 프로세스의 exe 링크에 "(deleted)" 를 표시합니다. muster 는 모든 사용자 프로세스의 이 링크를 읽어 표시된 것을 processes.deleted_executables 에 나열하고, 하나라도 있으면 실패로 판정합니다. 흔한 해법은 업그레이드 뒤의 재시작이며 Debian·Ubuntu 의 needrestart 와 EL 의 dnf needs-restarting 이 같은 것을 알려 줍니다. 드문 경우는 실행 중인 프로세스 아래에서 디스크의 바이너리를 지운 것으로, 투입된 악성 코드가 숨는 방식입니다. memfd 실행 파일(익명 메모리 파일에서 실행한 프로그램으로 exe 링크가 memfd 를 가리킴)도 삭제된 것으로 읽히며 가장 먼저 살펴볼 경우입니다. 1차 근거는 NIST SP 800-53 SI-2(6)(업데이트 후 이전 버전 소프트웨어 제거)와 CM-7(5)입니다. 흔한 원인은 고친 취약점을 열어 두는 놓친 재시작이고 드문 원인은 조사할 만한 것이므로 muster 는 중요도를 중으로 둡니다. 이 사실은 /proc 만으로 읽으며 absent 가 되지 않습니다. 다른 계정의 exe 링크를 읽을 수 없는 root 가 아닌 실행은 ERROR 입니다. 마지막 업그레이드 뒤 재부팅한 호스트는 통과하고, 업그레이드한 뒤 재시작하지 않은 호스트는 데몬을 재시작할 때까지 실패합니다.
+category: beyond
+importance: 중
+automation: auto
+references: { nist_800_53: ["CM-7(5)", "SI-2(6)"] }
+requires_facts: ">=1"
+applies_when:
+  - { fact: env.container, op: eq, expected: none }
+absent_means: fail
+checks:
+  - { fact: processes.deleted_executables, op: none, subject: pid, where: { field: pid, op: gte, expected: 0 } }
+remediation:
+  text_en: Restart the services the list names (systemctl restart <unit>), or reboot when the list includes pid 1, the session manager or many library-heavy daemons; needrestart (Debian, Ubuntu) or dnf needs-restarting -s (EL) names the units. A process whose executable nobody upgraded, or a memfd one, is to be investigated before it is killed - copy /proc/<pid>/exe out first, since it is the only copy left.
+  text_ko: 목록에 있는 서비스를 재시작하거나(systemctl restart <unit>), 목록에 pid 1, 세션 관리자 또는 라이브러리를 많이 쓰는 여러 데몬이 있으면 재부팅합니다. needrestart(Debian, Ubuntu) 또는 dnf needs-restarting -s(EL)가 유닛을 알려 줍니다. 아무도 업그레이드하지 않은 실행 파일이나 memfd 실행 파일을 가진 프로세스는 종료하기 전에 조사합니다. 남은 유일한 사본이므로 먼저 /proc/<pid>/exe 를 복사해 둡니다.
+  risk: restart_service
+  idempotent: true

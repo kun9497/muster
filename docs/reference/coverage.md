@@ -76,7 +76,7 @@
 
 ## Beyond the guide
 
-36 controls muster checks that the guide does not ask for.
+49 controls muster checks that the guide does not ask for.
 
 | Control | Imp. | Automation | Fact keys read | STIG ids |
 |---|---|---|---|---|
@@ -92,23 +92,36 @@
 | muster.beyond.container_runtime_access | 상 | auto | env.container, privilege.runtime_group_members, privilege.runtime_sockets | — |
 | muster.beyond.core_dump_policy | 중 | partial | coredump.core_pattern, coredump.limits.hard_core, coredump.systemd.process_size_max, coredump.systemd.storage, env.container | RHEL-09-213040, RHEL-09-213085, RHEL-09-213090, RHEL-09-213095 |
 | muster.beyond.dev_shm_mount_options | 중 | auto | env.container, mounts.dev_shm.separate, mounts.points | RHEL-09-231110, RHEL-09-231115, RHEL-09-231120 |
+| muster.beyond.exposed_listeners_allowed | 상 | auto | env.container, exposure.exposed | — |
 | muster.beyond.file_capabilities_declared | 상 | auto | env.container, walk.capabilities | — |
 | muster.beyond.file_integrity_tool | 중 | auto | env.container, fim.aide.database_present, fim.aide.scheduled, fim.tool | RHEL-09-651010, RHEL-09-651015, UBTU-22-651010, UBTU-22-651015, UBTU-22-651025, UBTU-24-100100, UBTU-24-100110, UBTU-24-100120 |
 | muster.beyond.home_mount_options | 하 | auto | env.container, mounts.home.separate, mounts.points | RHEL-09-231045, RHEL-09-231050 |
+| muster.beyond.icmp_broadcast_and_bogus_ignored | 하 | auto | env.container, net.sysctl.ipv4_icmp_echo_ignore_broadcasts, net.sysctl.ipv4_icmp_ignore_bogus_error_responses | RHEL-09-253055, RHEL-09-253060 |
+| muster.beyond.icmp_redirects_ignored | 중 | auto | env.container, net.sysctl.ipv4_all_accept_redirects, net.sysctl.ipv4_all_secure_redirects, net.sysctl.ipv4_all_send_redirects, net.sysctl.ipv4_default_accept_redirects, net.sysctl.ipv4_default_secure_redirects, net.sysctl.ipv4_default_send_redirects | RHEL-09-253015, RHEL-09-253040, RHEL-09-253065, RHEL-09-253070 |
+| muster.beyond.ip_forwarding_disabled | 중 | auto | env.container, net.sysctl.ipv4_ip_forward | RHEL-09-253075 |
+| muster.beyond.ipv6_forwarding_disabled | 중 | auto | env.container, net.sysctl.ipv6_all_disable_ipv6, net.sysctl.ipv6_all_forwarding, net.sysctl.ipv6_default_disable_ipv6, net.sysctl.ipv6_default_forwarding | RHEL-09-254025 |
+| muster.beyond.ipv6_redirects_ignored | 중 | auto | env.container, net.sysctl.ipv6_all_accept_redirects, net.sysctl.ipv6_all_disable_ipv6, net.sysctl.ipv6_default_accept_redirects, net.sysctl.ipv6_default_disable_ipv6 | RHEL-09-254015, RHEL-09-254035 |
+| muster.beyond.ipv6_router_advertisements_ignored | 중 | auto | env.container, net.sysctl.ipv6_all_accept_ra, net.sysctl.ipv6_all_disable_ipv6, net.sysctl.ipv6_default_accept_ra, net.sysctl.ipv6_default_disable_ipv6 | RHEL-09-254010, RHEL-09-254030 |
+| muster.beyond.ipv6_source_routing_rejected | 중 | auto | env.container, net.sysctl.ipv6_all_accept_source_route, net.sysctl.ipv6_all_disable_ipv6, net.sysctl.ipv6_default_accept_source_route, net.sysctl.ipv6_default_disable_ipv6 | RHEL-09-254020, RHEL-09-254040 |
 | muster.beyond.kernel_pointer_exposure | 중 | auto | env.container, kernel.sysctl.dmesg_restrict, kernel.sysctl.kptr_restrict | RHEL-09-213010, RHEL-09-213025, UBTU-22-213010, UBTU-24-600140 |
 | muster.beyond.ld_so_preload_empty | 상 | auto | env.container, privilege.ld_so_preload | — |
+| muster.beyond.listeners_packaged | 중 | auto | env.container, processes.unpackaged_listeners | — |
+| muster.beyond.no_deleted_executables | 중 | auto | env.container, processes.deleted_executables | — |
 | muster.beyond.package_files_unmodified | 상 | auto | env.container, packages.verify.modified | — |
 | muster.beyond.ptrace_restriction | 중 | auto | env.container, kernel.sysctl.perf_event_paranoid, kernel.sysctl.yama_ptrace_scope | RHEL-09-213015, RHEL-09-213080 |
 | muster.beyond.remote_log_forwarding | 하 | auto | env.container, logging.journal_upload.url, logging.rsyslog.forwards_remote, services.journal_upload.active, services.journal_upload.enabled, services.syslog.active | RHEL-09-652055 |
+| muster.beyond.reverse_path_filtering | 중 | auto | env.container, net.sysctl.ipv4_all_log_martians, net.sysctl.ipv4_all_rp_filter, net.sysctl.ipv4_default_log_martians, net.sysctl.ipv4_default_rp_filter | RHEL-09-253035, RHEL-09-253050 |
 | muster.beyond.root_authorized_keys | 중 | auto | env.container, ssh.root_key_count, sshd.options.permit_root_login | — |
 | muster.beyond.root_unit_exec_writable | 상 | auto | env.container, env.has_systemd, units.exec_writable | — |
 | muster.beyond.secure_boot_enabled | 중 | auto | boot.firmware, boot.secure_boot, env.container | — |
 | muster.beyond.separate_partitions | 중 | partial | env.container, mounts.points | RHEL-09-231010, RHEL-09-231015, RHEL-09-231020, RHEL-09-231025, RHEL-09-231030, RHEL-09-231035 |
+| muster.beyond.source_routing_rejected | 중 | auto | env.container, net.sysctl.ipv4_all_accept_source_route, net.sysctl.ipv4_default_accept_source_route | RHEL-09-253020, RHEL-09-253045 |
 | muster.beyond.ssh_key_quality | 중 | auto | env.container, ssh.dsa_key_count, ssh.rsa_keys | — |
 | muster.beyond.sudo_logging | 중 | auto | env.container, sudo.installed, sudo.log.logfile, sudo.log.syslog | — |
 | muster.beyond.sudo_nopasswd_all | 상 | auto | env.container, sudo.authenticate_disabled, sudo.installed, sudo.nopasswd_all | RHEL-09-432025, UBTU-22-432010, UBTU-24-300021 |
 | muster.beyond.suid_dumpable_disabled | 중 | auto | coredump.suid_dumpable, env.container | — |
 | muster.beyond.swap_encrypted | 중 | auto | env.container, swap.encrypted | — |
+| muster.beyond.syn_cookies_enabled | 중 | auto | env.container, net.sysctl.ipv4_tcp_syncookies | RHEL-09-253010, UBTU-22-253010, UBTU-24-600190 |
 | muster.beyond.sysrq_restricted | 중 | auto | env.container, kernel.sysctl.sysrq | — |
 | muster.beyond.tmp_mount_options | 중 | auto | env.container, mounts.points, mounts.tmp.separate | RHEL-09-231125, RHEL-09-231130, RHEL-09-231135 |
 | muster.beyond.uncommon_filesystems_disabled | 하 | auto | env.container, kernel.modules | RHEL-09-231195 |
@@ -119,13 +132,13 @@
 
 ## Fact keys used by controls
 
-223 of 509 registered keys are read by a control (4 by the engine); 282 unused.
+252 of 509 registered keys are read by a control (4 by the engine); 253 unused.
 
 | Collector | Registered | Used by a control | Read by the engine | Unused |
 |---|---|---|---|---|
 | services | 88 | 45 | 0 | services.ssh.active, services.ssh.unit_file_state, services.ssh.enabled, services.telnet.installed, services.telnet.active, services.telnet.unit_file_state, services.telnet.enabled, services.finger.installed, services.finger.unit_file_state, services.rservices.installed, services.rservices.unit_file_state, services.dos_services.installed, services.dos_services.unit_file_state, services.nfs_server.unit_file_state, services.automount.installed, services.automount.unit_file_state, services.rpcbind.installed, services.rpcbind.unit_file_state, services.nis.installed, services.nis.unit_file_state, services.tftp.installed, services.tftp.unit_file_state, services.talk.installed, services.talk.unit_file_state, services.snmp.unit_file_state, services.ntp.unit_file_state, services.ntp.enabled, services.syslog.installed, services.syslog.unit_file_state, services.syslog.enabled, services.auditd.unit_file_state, services.journal_upload.installed, services.journal_upload.unit_file_state, services.ftp.unit_file_state, services.ftp.enabled, services.ftp.reachable, services.mail.active, services.mail.unit_file_state, services.mail.enabled, services.dns.active, services.dns.unit_file_state, services.dns.enabled, services.dns.reachable |
 | sockets | 1 | 0 | 0 | sockets.listening |
-| processes | 9 | 0 | 0 | processes.list, processes.deleted_executables, processes.listeners, processes.unpackaged_listeners, processes.stats, exposure.listeners, exposure.exposed, exposure.opaque_rules, exposure.stats |
+| processes | 9 | 3 | 0 | processes.list, processes.listeners, processes.stats, exposure.listeners, exposure.opaque_rules, exposure.stats |
 | sshd | 11 | 4 | 2 | sshd.version, sshd.options.max_auth_tries, sshd.options.banner, sshd.include_sources, sshd.banner_file.exists |
 | banners | 10 | 2 | 0 | banners.issue.nonempty, banners.issue.os_escapes, banners.issue.mode, banners.issue_net.mode, banners.motd.nonempty, banners.motd.mode, banners.motd_d, banners.dynamic_motd |
 | files | 108 | 48 | 0 | files.etc_passwd.acl_present, files.etc_passwd.group, files.etc_passwd.group_readable, files.etc_passwd.group_writable, files.etc_passwd.other_readable, files.etc_passwd.other_writable, files.etc_shadow.gid, files.etc_shadow.group, files.etc_shadow.group_readable, files.etc_shadow.group_writable, files.etc_shadow.other_readable, files.etc_shadow.other_writable, files.etc_shadow.acl_present, files.etc_hosts.gid, files.etc_hosts.group, files.etc_hosts.group_readable, files.etc_hosts.group_writable, files.etc_hosts.other_readable, files.etc_hosts.other_writable, files.etc_hosts.acl_present, files.etc_services.gid, files.etc_services.group, files.etc_services.group_readable, files.etc_services.group_writable, files.etc_services.other_readable, files.etc_services.other_writable, files.etc_services.acl_present, files.etc_hosts_lpd.gid, files.etc_hosts_lpd.group, files.etc_hosts_lpd.group_readable, files.etc_hosts_lpd.group_writable, files.etc_hosts_lpd.other_readable, files.etc_hosts_lpd.other_writable, files.etc_hosts_lpd.acl_present, files.root_home.mode, files.root_home.gid, files.root_home.acl_present, files.etc_hosts_equiv.mode, files.etc_hosts_equiv.uid, files.dev_entries, files.etc_sudoers.gid, files.etc_sudoers.acl_present, files.etc_sudoers_d.mode, files.etc_sudoers_d.uid, files.etc_sudoers_d.gid, files.etc_sudoers_d.acl_present, files.etc_hosts_allow_lines, files.etc_hosts_deny_lines, sudo.includedir, sudo.secure_path, sudo.defaults.scoped_count, sudo.rules, sudo.rules_unresolved, files.etc_exports.gid, files.etc_exports.group, files.etc_exports.group_readable, files.etc_exports.group_writable, files.etc_exports.other_readable, files.etc_exports.other_writable, files.etc_exports.acl_present |
@@ -145,7 +158,7 @@
 | ftp | 17 | 6 | 0 | ftp.implementation, ftp.config_files, ftp.parse_complete, ftp.unmodelled, ftp.local_enabled, ftp.tcp_wrappers, ftp.userlist_enable, ftp.userlist_deny, ftp.userlist_file, ftp.banner_source, ftp.banner_text |
 | mail | 10 | 7 | 0 | mail.config_files, mail.postfix.smtpd_recipient_restrictions, mail.postfix.disable_vrfy_command |
 | dns | 7 | 2 | 0 | dns.config_files, dns.parse_complete, dns.unmodelled, dns.options.allow_transfer, dns.options.allow_update |
-| sysctl | 39 | 12 | 0 | net.sysctl.ipv4_ip_forward, net.sysctl.ipv6_all_forwarding, net.sysctl.ipv6_default_forwarding, net.sysctl.ipv4_all_accept_redirects, net.sysctl.ipv4_default_accept_redirects, net.sysctl.ipv4_all_secure_redirects, net.sysctl.ipv4_default_secure_redirects, net.sysctl.ipv4_all_send_redirects, net.sysctl.ipv4_default_send_redirects, net.sysctl.ipv6_all_accept_redirects, net.sysctl.ipv6_default_accept_redirects, net.sysctl.ipv4_all_accept_source_route, net.sysctl.ipv4_default_accept_source_route, net.sysctl.ipv6_all_accept_source_route, net.sysctl.ipv6_default_accept_source_route, net.sysctl.ipv4_all_rp_filter, net.sysctl.ipv4_default_rp_filter, net.sysctl.ipv4_all_log_martians, net.sysctl.ipv4_default_log_martians, net.sysctl.ipv4_icmp_echo_ignore_broadcasts, net.sysctl.ipv4_icmp_ignore_bogus_error_responses, net.sysctl.ipv4_tcp_syncookies, net.sysctl.ipv6_all_accept_ra, net.sysctl.ipv6_default_accept_ra, net.sysctl.ipv6_all_disable_ipv6, net.sysctl.ipv6_default_disable_ipv6, net.sysctl.ipv6_bindv6only |
+| sysctl | 39 | 38 | 0 | net.sysctl.ipv6_bindv6only |
 | coredump | 6 | 5 | 0 | coredump.limits.sources |
 | boot | 13 | 6 | 0 | boot.grub_cfg.path, boot.grub_cfg.group, boot.grub_cfg.group_readable, boot.grub_cfg.group_writable, boot.grub_cfg.other_readable, boot.grub_cfg.other_writable, boot.grub_cfg.acl_present |
 | mounts | 5 | 5 | 0 | — |

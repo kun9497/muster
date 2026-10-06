@@ -1,0 +1,25 @@
+id: muster.beyond.syn_cookies_enabled
+title_en: The host answers a SYN flood with SYN cookies
+title_ko: 호스트는 SYN 플러드에 SYN 쿠키로 응답한다
+description_en: A SYN flood fills a listening socket's queue of half-open connections until legitimate clients are refused; with net.ipv4.tcp_syncookies at 1 the kernel, once the queue overflows, answers with a cookie encoded in the sequence number and keeps no state until the client completes the handshake, so the service stays reachable. The value must be 1. The kernel's Documentation/networking/ip-sysctl.rst describes it; muster rates it 중 because a SYN flood takes down every TCP service on the host at once and the cookie costs nothing until the queue is full. muster judges the effective, running value; the sysctl.d side rides along as drift. A kernel that publishes no value reads FAIL. Stock Ubuntu and EL9 pass with 1.
+description_ko: SYN 플러드는 수신 소켓의 반쯤 열린 연결 대기열을 채워 정상 클라이언트가 거부되게 합니다. net.ipv4.tcp_syncookies 가 1 이면 커널은 대기열이 넘친 뒤 순서 번호에 담은 쿠키로 응답하고 클라이언트가 핸드셰이크를 마칠 때까지 상태를 두지 않으므로 서비스에 계속 도달할 수 있습니다. 값은 1 이어야 합니다. 커널 문서 Documentation/networking/ip-sysctl.rst 가 이 값을 설명합니다. SYN 플러드는 호스트의 모든 TCP 서비스를 한꺼번에 멈추게 하고 쿠키는 대기열이 찰 때까지 비용이 없으므로 muster 는 중요도를 중으로 둡니다. muster 는 실행 중인 실효값을 판정하고 sysctl.d 쪽은 차이로 함께 보고합니다. 값을 내놓지 않는 커널은 FAIL 입니다. 기본 Ubuntu 와 EL9 은 1 로 통과합니다.
+category: beyond
+importance: 중
+automation: auto
+references:
+  stig:
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-253010 }
+    - { benchmark: ubuntu2204, version: V2R9, id: UBTU-22-253010 }
+    - { benchmark: ubuntu2404, version: V1R6, id: UBTU-24-600190 }
+  nist_800_53: ["CM-6", "SC-5", "SC-5(2)"]
+requires_facts: ">=1"
+applies_when:
+  - { fact: env.container, op: eq, expected: none }
+absent_means: fail
+checks:
+  - { fact: net.sysctl.ipv4_tcp_syncookies, op: eq, expected: 1 }
+remediation:
+  text_en: Write net.ipv4.tcp_syncookies = 1 into a file under /etc/sysctl.d and apply it with sysctl --system; it takes effect at once.
+  text_ko: /etc/sysctl.d 아래 파일에 net.ipv4.tcp_syncookies = 1 을 적고 sysctl --system 으로 적용합니다. 즉시 반영됩니다.
+  risk: none
+  idempotent: true

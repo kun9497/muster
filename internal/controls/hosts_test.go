@@ -27,8 +27,12 @@ const hostRoot = fixtureRoot + "/_hosts"
 // their postinst declares, no /etc/ld.so.preload, no container runtime
 // socket (so no runtime group with a member), sshd's compiled-in
 // prohibit-password (sshd -T prints without-password), no key in root's
-// authorized_keys, and no DSA or short RSA key — reads for the controls
-// beyond the guide. The snapshot beside it carries that host's facts; a verdict that
+// authorized_keys, and no DSA or short RSA key — and, for 3C-2b (spec §5,
+// the hypothesis Task 7 measures), ufw installed and inactive so sshd and the
+// DHCP client are exposed through the open policy, every listener packaged,
+// no deleted executable, and the kernel's network defaults with systemd's
+// and procps' rp_filter and source-route lines on top — reads for the
+// controls beyond the guide. The snapshot beside it carries that host's facts; a verdict that
 // moves is a defect in the control or in the collector shape the snapshot
 // copies, and this table is what decides which.
 var stockUbuntu2204 = map[string]check.Status{
@@ -68,6 +72,19 @@ var stockUbuntu2204 = map[string]check.Status{
 	"muster.beyond.container_runtime_access":            check.PASS,          // 3C-2a: no runtime socket
 	"muster.beyond.root_authorized_keys":                check.PASS,          // 3C-2a: prohibit-password lets keys through, root has none
 	"muster.beyond.ssh_key_quality":                     check.PASS,          // 3C-2a: the user's one ed25519 key
+	"muster.beyond.exposed_listeners_allowed":           check.PASS,          // 3C-2b: ufw inactive (X-9), tcp/22 and udp/68 via open_policy, both allowed
+	"muster.beyond.listeners_packaged":                  check.PASS,          // 3C-2b: every listener dpkg-owned
+	"muster.beyond.no_deleted_executables":              check.PASS,          // 3C-2b: a rebooted host
+	"muster.beyond.ip_forwarding_disabled":              check.PASS,          // 3C-2b: 0 (1 on a docker host)
+	"muster.beyond.ipv6_forwarding_disabled":            check.PASS,          // 3C-2b: 0/0
+	"muster.beyond.icmp_redirects_ignored":              check.FAIL,          // 3C-2b: accept, secure and send 1/1
+	"muster.beyond.ipv6_redirects_ignored":              check.FAIL,          // 3C-2b: accept_redirects 1/1
+	"muster.beyond.source_routing_rejected":             check.PASS,          // 3C-2b: 0/0
+	"muster.beyond.ipv6_source_routing_rejected":        check.PASS,          // 3C-2b: 0/0
+	"muster.beyond.reverse_path_filtering":              check.FAIL,          // 3C-2b: rp_filter 2/2, log_martians 0/0
+	"muster.beyond.icmp_broadcast_and_bogus_ignored":    check.PASS,          // 3C-2b: 1, 1
+	"muster.beyond.syn_cookies_enabled":                 check.PASS,          // 3C-2b: 1
+	"muster.beyond.ipv6_router_advertisements_ignored":  check.FAIL,          // 3C-2b: accept_ra 1/1
 }
 
 // stockEL9 is the 3C-1 spec's EL9 reading (§4): a stock Rocky 9 install —
@@ -82,27 +99,43 @@ var stockUbuntu2204 = map[string]check.Status{
 // file capabilities rpm's FILECAPS declares (iputils' arping and clockdiff,
 // shadow-utils' newgidmap and newuidmap; ping carries none), no root service
 // a non-root user can rewrite, no /etc/ld.so.preload, no runtime socket,
-// sshd's compiled-in prohibit-password and no key at all. The snapshot
-// carries env, the header, the 3C-1 facts and the 3C-2a facts, so the table
-// names those seventeen controls and nothing else.
+// sshd's compiled-in prohibit-password and no key at all — and the 3C-2b
+// hypothesis of spec §5: firewalld reads partial so the exposure verdict is
+// MANUAL, every listener rpm-owned, no deleted executable, and the network
+// sysctls as 50-default.conf persists them over the kernel's defaults. The
+// snapshot carries env, the header, the 3C-1, 3C-2a and 3C-2b facts, so the
+// table names those thirty controls and nothing else.
 var stockEL9 = map[string]check.Status{
-	"muster.beyond.auditd_active":              check.PASS, // installed, active, enabled
-	"muster.beyond.audit_rules_loaded":         check.FAIL, // No rules; rules.d has control lines only
-	"muster.beyond.audit_immutable":            check.FAIL, // enabled 1, no -e 2
-	"muster.beyond.audit_disk_actions":         check.FAIL, // upstream suspend ×3
-	"muster.beyond.audit_log_permissions":      check.PASS, // 0600 root in 0700 root
-	"muster.beyond.remote_log_forwarding":      check.FAIL, // nothing leaves the host
-	"muster.beyond.sudo_logging":               check.PASS, // sudo's default syslog
-	"muster.beyond.file_integrity_tool":        check.FAIL, // no AIDE on a stock install
-	"muster.beyond.package_files_unmodified":   check.PASS, // --deep, only a conffile differs
-	"muster.beyond.account_inactivity_lock":    check.FAIL, // 3C-2a: INACTIVE=-1, root unset
-	"muster.beyond.sudo_nopasswd_all":          check.PASS, // 3C-2a: root and %wheel, both with a password
-	"muster.beyond.file_capabilities_declared": check.PASS, // 3C-2a: the four files FILECAPS declares
-	"muster.beyond.root_unit_exec_writable":    check.PASS, // 3C-2a: nothing a non-root user can write
-	"muster.beyond.ld_so_preload_empty":        check.PASS, // 3C-2a: no /etc/ld.so.preload
-	"muster.beyond.container_runtime_access":   check.PASS, // 3C-2a: no runtime socket
-	"muster.beyond.root_authorized_keys":       check.PASS, // 3C-2a: prohibit-password lets keys through, root has none
-	"muster.beyond.ssh_key_quality":            check.PASS, // 3C-2a: no key at all
+	"muster.beyond.auditd_active":                      check.PASS,   // installed, active, enabled
+	"muster.beyond.audit_rules_loaded":                 check.FAIL,   // No rules; rules.d has control lines only
+	"muster.beyond.audit_immutable":                    check.FAIL,   // enabled 1, no -e 2
+	"muster.beyond.audit_disk_actions":                 check.FAIL,   // upstream suspend ×3
+	"muster.beyond.audit_log_permissions":              check.PASS,   // 0600 root in 0700 root
+	"muster.beyond.remote_log_forwarding":              check.FAIL,   // nothing leaves the host
+	"muster.beyond.sudo_logging":                       check.PASS,   // sudo's default syslog
+	"muster.beyond.file_integrity_tool":                check.FAIL,   // no AIDE on a stock install
+	"muster.beyond.package_files_unmodified":           check.PASS,   // --deep, only a conffile differs
+	"muster.beyond.account_inactivity_lock":            check.FAIL,   // 3C-2a: INACTIVE=-1, root unset
+	"muster.beyond.sudo_nopasswd_all":                  check.PASS,   // 3C-2a: root and %wheel, both with a password
+	"muster.beyond.file_capabilities_declared":         check.PASS,   // 3C-2a: the four files FILECAPS declares
+	"muster.beyond.root_unit_exec_writable":            check.PASS,   // 3C-2a: nothing a non-root user can write
+	"muster.beyond.ld_so_preload_empty":                check.PASS,   // 3C-2a: no /etc/ld.so.preload
+	"muster.beyond.container_runtime_access":           check.PASS,   // 3C-2a: no runtime socket
+	"muster.beyond.root_authorized_keys":               check.PASS,   // 3C-2a: prohibit-password lets keys through, root has none
+	"muster.beyond.ssh_key_quality":                    check.PASS,   // 3C-2a: no key at all
+	"muster.beyond.exposed_listeners_allowed":          check.MANUAL, // 3C-2b: firewalld reads partial, sshd listening
+	"muster.beyond.listeners_packaged":                 check.PASS,   // 3C-2b: every listener rpm-owned
+	"muster.beyond.no_deleted_executables":             check.PASS,   // 3C-2b: nothing runs a deleted executable
+	"muster.beyond.ip_forwarding_disabled":             check.PASS,   // 3C-2b: 0
+	"muster.beyond.ipv6_forwarding_disabled":           check.PASS,   // 3C-2b: 0/0
+	"muster.beyond.icmp_redirects_ignored":             check.FAIL,   // 3C-2b: accept, secure and send 1/1
+	"muster.beyond.ipv6_redirects_ignored":             check.FAIL,   // 3C-2b: accept_redirects 1/1
+	"muster.beyond.source_routing_rejected":            check.PASS,   // 3C-2b: 0/0
+	"muster.beyond.ipv6_source_routing_rejected":       check.PASS,   // 3C-2b: 0/0
+	"muster.beyond.reverse_path_filtering":             check.FAIL,   // 3C-2b: rp_filter 0/2, log_martians 0/0 (persisted hypothesis)
+	"muster.beyond.icmp_broadcast_and_bogus_ignored":   check.PASS,   // 3C-2b: 1, 1
+	"muster.beyond.syn_cookies_enabled":                check.PASS,   // 3C-2b: 1
+	"muster.beyond.ipv6_router_advertisements_ignored": check.FAIL,   // 3C-2b: accept_ra 1/1
 }
 
 // B-11 and I-10: one synthetic snapshot per stock host pins its verdicts
@@ -112,7 +145,7 @@ var stockEL9 = map[string]check.Status{
 //
 // SCOPE: the Ubuntu snapshot carries the facts of the collectors the beyond
 // controls read and env.container, and nothing else; the EL9 snapshot
-// carries the 3C-1 and the 3C-2a facts only. The whole embedded set is evaluated against
+// carries the 3C-1, the 3C-2a and the 3C-2b facts only. The whole embedded set is evaluated against
 // each — Evaluate takes the whole set, and running only the tabled controls
 // would not prove that the beyond scope is reached at all — but the other
 // controls' results are ERROR(missing_fact) for the keys a snapshot omits
@@ -149,8 +182,8 @@ func TestStockHostsPinTheBeyondVerdicts(t *testing.T) {
 			t.Errorf("%s is beyond the guide and the stock Ubuntu table does not say what this host reads for it", id)
 		}
 	}
-	if len(stockEL9) != 17 {
-		t.Errorf("the stock EL9 table names %d controls, want the nine of 3C-1 and the eight of 3C-2a", len(stockEL9))
+	if len(stockEL9) != 30 {
+		t.Errorf("the stock EL9 table names %d controls, want the nine of 3C-1, the eight of 3C-2a and the thirteen of 3C-2b", len(stockEL9))
 	}
 
 	for _, host := range []struct {

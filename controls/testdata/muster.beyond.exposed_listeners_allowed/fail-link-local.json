@@ -1,0 +1,101 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none",
+        "source": {
+          "kind": "file",
+          "path": "/proc/1/cgroup"
+        }
+      }
+    },
+    "exposure": {
+      "exposed": {
+        "status": "ok",
+        "value": [
+          {
+            "service": "tcp/9100",
+            "proto": "tcp",
+            "family": "v6",
+            "addr": "fe80::1",
+            "port": 9100,
+            "pid": 1455,
+            "name": "prometheus-node",
+            "package": "prometheus-node-exporter",
+            "via": "open_policy",
+            "rule_chain": "",
+            "rule_source": ""
+          }
+        ],
+        "source": {
+          "kind": "derived"
+        }
+      },
+      "listeners": {
+        "status": "ok",
+        "value": [
+          {
+            "service": "tcp/9100",
+            "proto": "tcp",
+            "family": "v6",
+            "addr": "fe80::1",
+            "port": 9100,
+            "link_local": true,
+            "owner_status": "ok",
+            "owners": [
+              {
+                "pid": 1455,
+                "uid": 65534,
+                "name": "prometheus-node",
+                "exe": "/usr/bin/prometheus-node-exporter",
+                "exe_deleted": false,
+                "mnt_ns": "host",
+                "package": "prometheus-node-exporter",
+                "package_status": "packaged"
+              }
+            ],
+            "owners_count": 1,
+            "exposed": true,
+            "via": "open_policy",
+            "rule_chain": "",
+            "rule_source": "",
+            "rule_raw": ""
+          }
+        ],
+        "source": {
+          "kind": "derived"
+        }
+      },
+      "opaque_rules": {
+        "status": "ok",
+        "value": [],
+        "source": {
+          "kind": "derived"
+        }
+      },
+      "stats": {
+        "status": "ok",
+        "value": {
+          "confidence": "full",
+          "manual_reason": "",
+          "listeners": 1,
+          "exposed": 1,
+          "filtered": 0,
+          "loopback": 2,
+          "link_local": 1,
+          "kernel_owned": 0,
+          "opaque_rules": 0,
+          "folded_rules": 0,
+          "ipv6_disabled": false
+        },
+        "source": {
+          "kind": "derived"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "docker",
+        "source": {
+          "kind": "file",
+          "path": "/proc/1/cgroup"
+        }
+      }
+    },
+    "processes": {
+      "deleted_executables": {
+        "status": "ok",
+        "value": [
+          {
+            "pid": 701,
+            "uid": 104,
+            "name": "rsyslogd",
+            "exe": "/usr/sbin/rsyslogd"
+          }
+        ],
+        "source": {
+          "kind": "proc",
+          "path": "/proc"
+        }
+      }
+    }
+  }
+}

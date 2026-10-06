@@ -1,0 +1,81 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none",
+        "source": {
+          "kind": "file",
+          "path": "/proc/1/cgroup"
+        }
+      }
+    },
+    "processes": {
+      "listeners": {
+        "status": "ok",
+        "value": [
+          {
+            "proto": "tcp",
+            "family": "v4",
+            "addr": "0.0.0.0",
+            "port": 22,
+            "loopback": false,
+            "link_local": false,
+            "inode": 23517,
+            "owner_status": "ok",
+            "owners": [
+              {
+                "pid": 812,
+                "uid": 0,
+                "name": "sshd",
+                "exe": "/usr/sbin/sshd",
+                "exe_deleted": false,
+                "mnt_ns": "host",
+                "package": "openssh-server",
+                "package_status": "packaged"
+              }
+            ],
+            "owners_count": 1
+          }
+        ],
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "proc",
+              "path": "/proc/net/tcp"
+            },
+            {
+              "kind": "proc",
+              "path": "/proc/net/udp"
+            }
+          ]
+        }
+      },
+      "unpackaged_listeners": {
+        "status": "ok",
+        "value": [],
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "proc",
+              "path": "/proc/net/tcp"
+            },
+            {
+              "kind": "proc",
+              "path": "/proc/net/udp"
+            },
+            {
+              "kind": "file",
+              "path": "/var/lib/dpkg/info"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

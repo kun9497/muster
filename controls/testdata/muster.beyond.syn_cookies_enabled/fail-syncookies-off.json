@@ -1,0 +1,47 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none",
+        "source": {
+          "kind": "file",
+          "path": "/proc/1/cgroup"
+        }
+      }
+    },
+    "net": {
+      "sysctl": {
+        "ipv4_tcp_syncookies": {
+          "runtime": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/tcp_syncookies"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv4.tcp_syncookies"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/tcp_syncookies"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/tcp_syncookies"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,77 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none",
+        "source": {
+          "kind": "file",
+          "path": "/proc/1/cgroup"
+        }
+      }
+    },
+    "net": {
+      "sysctl": {
+        "ipv6_all_accept_redirects": {
+          "runtime": {
+            "status": "absent",
+            "reason": "/proc/sys/net/ipv6/conf/all/accept_redirects does not exist: IPv6 is not built or is disabled"
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv6.conf.all.accept_redirects"
+          },
+          "effective": {
+            "status": "absent",
+            "reason": "/proc/sys/net/ipv6/conf/all/accept_redirects does not exist: IPv6 is not built or is disabled"
+          }
+        },
+        "ipv6_default_accept_redirects": {
+          "runtime": {
+            "status": "absent",
+            "reason": "/proc/sys/net/ipv6/conf/default/accept_redirects does not exist: IPv6 is not built or is disabled"
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv6.conf.default.accept_redirects"
+          },
+          "effective": {
+            "status": "absent",
+            "reason": "/proc/sys/net/ipv6/conf/default/accept_redirects does not exist: IPv6 is not built or is disabled"
+          }
+        },
+        "ipv6_all_disable_ipv6": {
+          "runtime": {
+            "status": "absent",
+            "reason": "/proc/sys/net/ipv6/conf/all/disable_ipv6 does not exist: IPv6 is not built or is disabled"
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv6.conf.all.disable_ipv6"
+          },
+          "effective": {
+            "status": "absent",
+            "reason": "/proc/sys/net/ipv6/conf/all/disable_ipv6 does not exist: IPv6 is not built or is disabled"
+          }
+        },
+        "ipv6_default_disable_ipv6": {
+          "runtime": {
+            "status": "absent",
+            "reason": "/proc/sys/net/ipv6/conf/default/disable_ipv6 does not exist: IPv6 is not built or is disabled"
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv6.conf.default.disable_ipv6"
+          },
+          "effective": {
+            "status": "absent",
+            "reason": "/proc/sys/net/ipv6/conf/default/disable_ipv6 does not exist: IPv6 is not built or is disabled"
+          }
+        }
+      }
+    }
+  }
+}

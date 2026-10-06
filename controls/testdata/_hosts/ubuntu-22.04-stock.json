@@ -5,7 +5,8 @@
     "units.root_services lists fifteen of the stock host's in-scope root services: the ten that name twelve commands without a path, snapd.aa-prompt-listener.service (enabled, no unit file), ssh, cron, rsyslog and systemd-journald. Those twelve commands and the missing unit file are units.exec_unresolved 13; the host's other root services are shaped like the four resolved ones and flag nothing. cloud-init-local.service, which the lab runs, is left out: this is the non-cloud reading (run.env.cloud_init false), and no other in-scope unit of the lab names a bare command.",
     "sshd.options.permit_root_login is OpenSSH's compiled default prohibit-password, which the 8.9p1 sshd (no -G) prints through sshd -T as without-password.",
     "muster.beyond.root_authorized_keys reads PASS because this is the non-cloud image (run.env.cloud_init false) and root has no key: on a cloud image cloud-init writes a forced-command key into root's authorized_keys, and that host reads FAIL.",
-    "privilege.runtime_sockets: no container runtime is installed, so every socket row is exists false and no runtime group has a member."
+    "privilege.runtime_sockets: no container runtime is installed, so every socket row is exists false and no runtime group has a member.",
+    "3C-2b (hypothesis of spec §5, pinned before Task 7 measures): ufw installed and inactive, so the firewall reads full with restricts_inbound false (X-9) and every non-loopback listener is exposed via open_policy - sshd on 0.0.0.0 and :: (tcp/22) and systemd-networkd's DHCP client (udp/68), all in the default allow list; systemd-resolved's 127.0.0.53 sockets are the two loopback listeners. Every listener is dpkg-owned and no process runs a deleted executable (a rebooted host). The net.sysctl rows are the kernel's defaults with 10-network-security.conf's all.rp_filter and 50-default.conf's default.rp_filter and default.accept_source_route on top (its glob for all.accept_source_route is excluded), so redirects, IPv6 redirects, log_martians and accept_ra read FAIL."
   ],
   "schema_version": 1,
   "run": {
@@ -3366,6 +3367,907 @@
               "cmd": "/usr/sbin/sshd -T",
               "exit_code": 0
             }
+          }
+        }
+      }
+    },
+    "processes": {
+      "deleted_executables": {
+        "status": "ok",
+        "value": [],
+        "source": {
+          "kind": "proc",
+          "path": "/proc"
+        }
+      },
+      "unpackaged_listeners": {
+        "status": "ok",
+        "value": [],
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "proc",
+              "path": "/proc/net/tcp"
+            },
+            {
+              "kind": "proc",
+              "path": "/proc/net/tcp6"
+            },
+            {
+              "kind": "proc",
+              "path": "/proc/net/udp"
+            },
+            {
+              "kind": "proc",
+              "path": "/proc/net/udp6"
+            },
+            {
+              "kind": "file",
+              "path": "/var/lib/dpkg/info"
+            }
+          ]
+        }
+      }
+    },
+    "exposure": {
+      "exposed": {
+        "status": "ok",
+        "value": [
+          {
+            "service": "tcp/22",
+            "proto": "tcp",
+            "family": "v4",
+            "addr": "0.0.0.0",
+            "port": 22,
+            "pid": 845,
+            "name": "sshd",
+            "package": "openssh-server",
+            "via": "open_policy",
+            "rule_chain": "",
+            "rule_source": ""
+          },
+          {
+            "service": "tcp/22",
+            "proto": "tcp",
+            "family": "v6",
+            "addr": "::",
+            "port": 22,
+            "pid": 845,
+            "name": "sshd",
+            "package": "openssh-server",
+            "via": "open_policy",
+            "rule_chain": "",
+            "rule_source": ""
+          },
+          {
+            "service": "udp/68",
+            "proto": "udp",
+            "family": "v4",
+            "addr": "0.0.0.0",
+            "port": 68,
+            "pid": 612,
+            "name": "systemd-network",
+            "package": "systemd",
+            "via": "open_policy",
+            "rule_chain": "",
+            "rule_source": ""
+          }
+        ],
+        "source": {
+          "kind": "derived"
+        }
+      },
+      "listeners": {
+        "status": "ok",
+        "value": [
+          {
+            "service": "tcp/22",
+            "proto": "tcp",
+            "family": "v4",
+            "addr": "0.0.0.0",
+            "port": 22,
+            "link_local": false,
+            "owner_status": "ok",
+            "owners": [
+              {
+                "pid": 845,
+                "uid": 0,
+                "name": "sshd",
+                "exe": "/usr/sbin/sshd",
+                "exe_deleted": false,
+                "mnt_ns": "host",
+                "package": "openssh-server",
+                "package_status": "packaged"
+              }
+            ],
+            "owners_count": 1,
+            "exposed": true,
+            "via": "open_policy",
+            "rule_chain": "",
+            "rule_source": "",
+            "rule_raw": ""
+          },
+          {
+            "service": "tcp/22",
+            "proto": "tcp",
+            "family": "v6",
+            "addr": "::",
+            "port": 22,
+            "link_local": false,
+            "owner_status": "ok",
+            "owners": [
+              {
+                "pid": 845,
+                "uid": 0,
+                "name": "sshd",
+                "exe": "/usr/sbin/sshd",
+                "exe_deleted": false,
+                "mnt_ns": "host",
+                "package": "openssh-server",
+                "package_status": "packaged"
+              }
+            ],
+            "owners_count": 1,
+            "exposed": true,
+            "via": "open_policy",
+            "rule_chain": "",
+            "rule_source": "",
+            "rule_raw": ""
+          },
+          {
+            "service": "udp/68",
+            "proto": "udp",
+            "family": "v4",
+            "addr": "0.0.0.0",
+            "port": 68,
+            "link_local": false,
+            "owner_status": "ok",
+            "owners": [
+              {
+                "pid": 612,
+                "uid": 100,
+                "name": "systemd-network",
+                "exe": "/usr/lib/systemd/systemd-networkd",
+                "exe_deleted": false,
+                "mnt_ns": "host",
+                "package": "systemd",
+                "package_status": "packaged"
+              }
+            ],
+            "owners_count": 1,
+            "exposed": true,
+            "via": "open_policy",
+            "rule_chain": "",
+            "rule_source": "",
+            "rule_raw": ""
+          }
+        ],
+        "source": {
+          "kind": "derived"
+        }
+      },
+      "opaque_rules": {
+        "status": "ok",
+        "value": [],
+        "source": {
+          "kind": "derived"
+        }
+      },
+      "stats": {
+        "status": "ok",
+        "value": {
+          "confidence": "full",
+          "manual_reason": "",
+          "listeners": 3,
+          "exposed": 3,
+          "filtered": 0,
+          "loopback": 2,
+          "link_local": 0,
+          "kernel_owned": 0,
+          "opaque_rules": 0,
+          "folded_rules": 0,
+          "ipv6_disabled": false
+        },
+        "source": {
+          "kind": "derived"
+        }
+      }
+    },
+    "net": {
+      "sysctl": {
+        "ipv4_ip_forward": {
+          "runtime": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/ip_forward"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv4.ip_forward"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/ip_forward"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/ip_forward"
+          }
+        },
+        "ipv6_all_forwarding": {
+          "runtime": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv6/conf/all/forwarding"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv6.conf.all.forwarding"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv6/conf/all/forwarding"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv6/conf/all/forwarding"
+          }
+        },
+        "ipv6_default_forwarding": {
+          "runtime": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv6/conf/default/forwarding"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv6.conf.default.forwarding"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv6/conf/default/forwarding"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv6/conf/default/forwarding"
+          }
+        },
+        "ipv4_all_accept_redirects": {
+          "runtime": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/all/accept_redirects"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv4.conf.all.accept_redirects"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/all/accept_redirects"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/conf/all/accept_redirects"
+          }
+        },
+        "ipv4_default_accept_redirects": {
+          "runtime": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/default/accept_redirects"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv4.conf.default.accept_redirects"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/default/accept_redirects"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/conf/default/accept_redirects"
+          }
+        },
+        "ipv4_all_secure_redirects": {
+          "runtime": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/all/secure_redirects"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv4.conf.all.secure_redirects"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/all/secure_redirects"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/conf/all/secure_redirects"
+          }
+        },
+        "ipv4_default_secure_redirects": {
+          "runtime": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/default/secure_redirects"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv4.conf.default.secure_redirects"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/default/secure_redirects"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/conf/default/secure_redirects"
+          }
+        },
+        "ipv4_all_send_redirects": {
+          "runtime": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/all/send_redirects"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv4.conf.all.send_redirects"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/all/send_redirects"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/conf/all/send_redirects"
+          }
+        },
+        "ipv4_default_send_redirects": {
+          "runtime": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/default/send_redirects"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv4.conf.default.send_redirects"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/default/send_redirects"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/conf/default/send_redirects"
+          }
+        },
+        "ipv6_all_accept_redirects": {
+          "runtime": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv6/conf/all/accept_redirects"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv6.conf.all.accept_redirects"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv6/conf/all/accept_redirects"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv6/conf/all/accept_redirects"
+          }
+        },
+        "ipv6_default_accept_redirects": {
+          "runtime": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv6/conf/default/accept_redirects"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv6.conf.default.accept_redirects"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv6/conf/default/accept_redirects"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv6/conf/default/accept_redirects"
+          }
+        },
+        "ipv4_all_accept_source_route": {
+          "runtime": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/all/accept_source_route"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv4.conf.all.accept_source_route"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/all/accept_source_route"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/conf/all/accept_source_route"
+          }
+        },
+        "ipv4_default_accept_source_route": {
+          "runtime": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/default/accept_source_route"
+            }
+          },
+          "persisted": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "file",
+              "path": "/usr/lib/sysctl.d/50-default.conf",
+              "line": 30,
+              "raw": "net.ipv4.conf.default.accept_source_route = 0"
+            }
+          },
+          "effective": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/default/accept_source_route"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/conf/default/accept_source_route"
+          }
+        },
+        "ipv6_all_accept_source_route": {
+          "runtime": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv6/conf/all/accept_source_route"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv6.conf.all.accept_source_route"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv6/conf/all/accept_source_route"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv6/conf/all/accept_source_route"
+          }
+        },
+        "ipv6_default_accept_source_route": {
+          "runtime": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv6/conf/default/accept_source_route"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv6.conf.default.accept_source_route"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv6/conf/default/accept_source_route"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv6/conf/default/accept_source_route"
+          }
+        },
+        "ipv4_all_rp_filter": {
+          "runtime": {
+            "status": "ok",
+            "value": 2,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/all/rp_filter"
+            }
+          },
+          "persisted": {
+            "status": "ok",
+            "value": 2,
+            "source": {
+              "kind": "file",
+              "path": "/etc/sysctl.d/10-network-security.conf",
+              "line": 4,
+              "raw": "net.ipv4.conf.all.rp_filter=2"
+            }
+          },
+          "effective": {
+            "status": "ok",
+            "value": 2,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/all/rp_filter"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/conf/all/rp_filter"
+          }
+        },
+        "ipv4_default_rp_filter": {
+          "runtime": {
+            "status": "ok",
+            "value": 2,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/default/rp_filter"
+            }
+          },
+          "persisted": {
+            "status": "ok",
+            "value": 2,
+            "source": {
+              "kind": "file",
+              "path": "/usr/lib/sysctl.d/50-default.conf",
+              "line": 25,
+              "raw": "net.ipv4.conf.default.rp_filter = 2"
+            }
+          },
+          "effective": {
+            "status": "ok",
+            "value": 2,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/default/rp_filter"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/conf/default/rp_filter"
+          }
+        },
+        "ipv4_all_log_martians": {
+          "runtime": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/all/log_martians"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv4.conf.all.log_martians"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/all/log_martians"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/conf/all/log_martians"
+          }
+        },
+        "ipv4_default_log_martians": {
+          "runtime": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/default/log_martians"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv4.conf.default.log_martians"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/default/log_martians"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/conf/default/log_martians"
+          }
+        },
+        "ipv4_icmp_echo_ignore_broadcasts": {
+          "runtime": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/icmp_echo_ignore_broadcasts"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv4.icmp_echo_ignore_broadcasts"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/icmp_echo_ignore_broadcasts"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/icmp_echo_ignore_broadcasts"
+          }
+        },
+        "ipv4_icmp_ignore_bogus_error_responses": {
+          "runtime": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/icmp_ignore_bogus_error_responses"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv4.icmp_ignore_bogus_error_responses"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/icmp_ignore_bogus_error_responses"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/icmp_ignore_bogus_error_responses"
+          }
+        },
+        "ipv4_tcp_syncookies": {
+          "runtime": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/tcp_syncookies"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv4.tcp_syncookies"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/tcp_syncookies"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/tcp_syncookies"
+          }
+        },
+        "ipv6_all_accept_ra": {
+          "runtime": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv6/conf/all/accept_ra"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv6.conf.all.accept_ra"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv6/conf/all/accept_ra"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv6/conf/all/accept_ra"
+          }
+        },
+        "ipv6_default_accept_ra": {
+          "runtime": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv6/conf/default/accept_ra"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv6.conf.default.accept_ra"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv6/conf/default/accept_ra"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv6/conf/default/accept_ra"
+          }
+        },
+        "ipv6_all_disable_ipv6": {
+          "runtime": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv6/conf/all/disable_ipv6"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv6.conf.all.disable_ipv6"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv6/conf/all/disable_ipv6"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv6/conf/all/disable_ipv6"
+          }
+        },
+        "ipv6_default_disable_ipv6": {
+          "runtime": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv6/conf/default/disable_ipv6"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv6.conf.default.disable_ipv6"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv6/conf/default/disable_ipv6"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv6/conf/default/disable_ipv6"
           }
         }
       }

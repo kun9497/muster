@@ -1,0 +1,128 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none",
+        "source": {
+          "kind": "file",
+          "path": "/proc/1/cgroup"
+        }
+      }
+    },
+    "exposure": {
+      "exposed": {
+        "status": "ok",
+        "value": [
+          {
+            "service": "tcp/8080",
+            "proto": "tcp",
+            "family": "v6",
+            "addr": "::",
+            "port": 8080,
+            "pid": 2290,
+            "name": "python3",
+            "package": "python3.10-minimal",
+            "via": "no_chain_in_family",
+            "rule_chain": "",
+            "rule_source": ""
+          }
+        ],
+        "source": {
+          "kind": "derived"
+        }
+      },
+      "listeners": {
+        "status": "ok",
+        "value": [
+          {
+            "service": "tcp/8080",
+            "proto": "tcp",
+            "family": "v4",
+            "addr": "0.0.0.0",
+            "port": 8080,
+            "link_local": false,
+            "owner_status": "ok",
+            "owners": [
+              {
+                "pid": 2290,
+                "uid": 1000,
+                "name": "python3",
+                "exe": "/usr/bin/python3.10",
+                "exe_deleted": false,
+                "mnt_ns": "host",
+                "package": "python3.10-minimal",
+                "package_status": "packaged"
+              }
+            ],
+            "owners_count": 1,
+            "exposed": false,
+            "via": "filtered",
+            "rule_chain": "",
+            "rule_source": "",
+            "rule_raw": ""
+          },
+          {
+            "service": "tcp/8080",
+            "proto": "tcp",
+            "family": "v6",
+            "addr": "::",
+            "port": 8080,
+            "link_local": false,
+            "owner_status": "ok",
+            "owners": [
+              {
+                "pid": 2290,
+                "uid": 1000,
+                "name": "python3",
+                "exe": "/usr/bin/python3.10",
+                "exe_deleted": false,
+                "mnt_ns": "host",
+                "package": "python3.10-minimal",
+                "package_status": "packaged"
+              }
+            ],
+            "owners_count": 1,
+            "exposed": true,
+            "via": "no_chain_in_family",
+            "rule_chain": "",
+            "rule_source": "",
+            "rule_raw": ""
+          }
+        ],
+        "source": {
+          "kind": "derived"
+        }
+      },
+      "opaque_rules": {
+        "status": "ok",
+        "value": [],
+        "source": {
+          "kind": "derived"
+        }
+      },
+      "stats": {
+        "status": "ok",
+        "value": {
+          "confidence": "full",
+          "manual_reason": "",
+          "listeners": 2,
+          "exposed": 1,
+          "filtered": 1,
+          "loopback": 2,
+          "link_local": 0,
+          "kernel_owned": 0,
+          "opaque_rules": 0,
+          "folded_rules": 3,
+          "ipv6_disabled": false
+        },
+        "source": {
+          "kind": "derived"
+        }
+      }
+    }
+  }
+}

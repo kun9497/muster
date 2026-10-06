@@ -1,0 +1,23 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none",
+        "source": {
+          "kind": "file",
+          "path": "/proc/1/cgroup"
+        }
+      }
+    },
+    "exposure": {
+      "exposed": {
+        "status": "unsupported",
+        "reason": "firewall.normalization_confidence: no readable kernel firewall ruleset: neither nft nor iptables-save is installed"
+      }
+    }
+  }
+}

@@ -1,0 +1,25 @@
+id: muster.beyond.ip_forwarding_disabled
+title_en: The host does not route IPv4 packets between its interfaces unless it is meant to
+title_ko: 호스트는 의도한 경우가 아니면 인터페이스 사이에서 IPv4 패킷을 라우팅하지 않는다
+description_en: With net.ipv4.ip_forward set to 1 the kernel passes IPv4 packets from one interface to another, which turns a host with two networks into a bridge between them and lets traffic reach a network the host's firewall was never asked about. The kernel's Documentation/networking/ip-sysctl.rst describes the knob; muster rates it 중 because forwarding is only dangerous on a host that sits on more than one network, but on such a host it quietly undoes the segmentation around it. The value must be in params.allowed_forward, default [0]. A router, a VPN gateway and a container host forward on purpose - docker, podman and Kubernetes set ip_forward to 1 - so a docker host FAILs as shipped and names 1 in the parameter once it accepts the role. muster judges the effective value, the one the running kernel uses, so a value set by hand at runtime counts; the sysctl.d side rides along as drift and is not judged. A kernel that publishes no value at all reads FAIL. Stock Ubuntu and EL9 pass with 0; a docker host fails with 1.
+description_ko: net.ipv4.ip_forward 가 1 이면 커널은 한 인터페이스에서 받은 IPv4 패킷을 다른 인터페이스로 넘기며, 두 네트워크에 걸친 호스트를 둘 사이의 다리로 만들고 호스트의 방화벽이 판단한 적 없는 네트워크까지 트래픽이 닿게 합니다. 커널 문서 Documentation/networking/ip-sysctl.rst 가 이 값을 설명합니다. 포워딩은 둘 이상의 네트워크에 걸친 호스트에서만 위험하지만 그런 호스트에서는 주변의 망 분리를 조용히 무너뜨리므로 muster 는 중요도를 중으로 둡니다. 값은 params.allowed_forward(기본값 [0])에 있어야 합니다. 라우터, VPN 게이트웨이, 컨테이너 호스트는 의도적으로 포워딩합니다. docker, podman, Kubernetes 가 ip_forward 를 1 로 설정하므로 docker 호스트는 그대로 FAIL 이며, 그 역할을 받아들였다면 파라미터에 1 을 적습니다. muster 는 실행 중인 커널이 쓰는 실효값을 판정하므로 런타임에 직접 설정한 값도 인정되고, sysctl.d 쪽은 차이(drift)로 함께 보고될 뿐 판정하지 않습니다. 값을 전혀 내놓지 않는 커널은 FAIL 입니다. 기본 Ubuntu 와 EL9 은 0 으로 통과하고, docker 호스트는 1 로 실패합니다.
+category: beyond
+importance: 중
+automation: auto
+references:
+  stig:
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-253075 }
+  nist_800_53: ["CM-6"]
+requires_facts: ">=1"
+applies_when:
+  - { fact: env.container, op: eq, expected: none }
+absent_means: fail
+params:
+  allowed_forward: { type: list<int>, default: [0], description: "forwarding values the host accepts - 0 for a host that only serves; a router or a container host names 1" }
+checks:
+  - { fact: net.sysctl.ipv4_ip_forward, op: in, expected: "${allowed_forward}" }
+remediation:
+  text_en: Write net.ipv4.ip_forward = 0 into a file under /etc/sysctl.d, for example /etc/sysctl.d/60-network-hardening.conf, and apply it with sysctl --system; it takes effect at once. Check first that the host is not a router, VPN gateway or container host - turning forwarding off there cuts its clients and containers off the network; such a host names 1 in params.allowed_forward instead.
+  text_ko: /etc/sysctl.d 아래 파일(예 /etc/sysctl.d/60-network-hardening.conf)에 net.ipv4.ip_forward = 0 을 적고 sysctl --system 으로 적용합니다. 즉시 반영됩니다. 먼저 호스트가 라우터, VPN 게이트웨이, 컨테이너 호스트가 아닌지 확인하십시오. 그런 호스트에서 포워딩을 끄면 클라이언트와 컨테이너가 네트워크에서 끊기므로, 대신 params.allowed_forward 에 1 을 적습니다.
+  risk: none
+  idempotent: true

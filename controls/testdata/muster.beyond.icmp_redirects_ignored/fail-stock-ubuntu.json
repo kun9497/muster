@@ -1,0 +1,177 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none",
+        "source": {
+          "kind": "file",
+          "path": "/proc/1/cgroup"
+        }
+      }
+    },
+    "net": {
+      "sysctl": {
+        "ipv4_all_accept_redirects": {
+          "runtime": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/all/accept_redirects"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv4.conf.all.accept_redirects"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/all/accept_redirects"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/conf/all/accept_redirects"
+          }
+        },
+        "ipv4_default_accept_redirects": {
+          "runtime": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/default/accept_redirects"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv4.conf.default.accept_redirects"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/default/accept_redirects"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/conf/default/accept_redirects"
+          }
+        },
+        "ipv4_all_secure_redirects": {
+          "runtime": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/all/secure_redirects"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv4.conf.all.secure_redirects"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/all/secure_redirects"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/conf/all/secure_redirects"
+          }
+        },
+        "ipv4_default_secure_redirects": {
+          "runtime": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/default/secure_redirects"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv4.conf.default.secure_redirects"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/default/secure_redirects"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/conf/default/secure_redirects"
+          }
+        },
+        "ipv4_all_send_redirects": {
+          "runtime": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/all/send_redirects"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv4.conf.all.send_redirects"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/all/send_redirects"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/conf/all/send_redirects"
+          }
+        },
+        "ipv4_default_send_redirects": {
+          "runtime": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/default/send_redirects"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv4.conf.default.send_redirects"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/default/send_redirects"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/conf/default/send_redirects"
+          }
+        }
+      }
+    }
+  }
+}

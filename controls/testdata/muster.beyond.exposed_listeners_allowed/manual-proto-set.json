@@ -1,0 +1,93 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none",
+        "source": {
+          "kind": "file",
+          "path": "/proc/1/cgroup"
+        }
+      }
+    },
+    "exposure": {
+      "exposed": {
+        "status": "absent",
+        "reason": "opaque accept rule in input (filter, inet): meta l4proto { tcp, udp } th dport 53 accept"
+      },
+      "listeners": {
+        "status": "ok",
+        "value": [
+          {
+            "service": "udp/53",
+            "proto": "udp",
+            "family": "v4",
+            "addr": "0.0.0.0",
+            "port": 53,
+            "link_local": false,
+            "owner_status": "ok",
+            "owners": [
+              {
+                "pid": 1022,
+                "uid": 112,
+                "name": "named",
+                "exe": "/usr/sbin/named",
+                "exe_deleted": false,
+                "mnt_ns": "host",
+                "package": "bind9",
+                "package_status": "packaged"
+              }
+            ],
+            "owners_count": 1,
+            "exposed": false,
+            "via": "undecided",
+            "rule_chain": "",
+            "rule_source": "",
+            "rule_raw": ""
+          }
+        ],
+        "source": {
+          "kind": "derived"
+        }
+      },
+      "opaque_rules": {
+        "status": "ok",
+        "value": [
+          {
+            "chain": "input",
+            "via_chain": "input",
+            "table": "filter",
+            "family": "inet",
+            "action": "accept",
+            "raw": "meta l4proto { tcp, udp } th dport 53 accept"
+          }
+        ],
+        "source": {
+          "kind": "derived"
+        }
+      },
+      "stats": {
+        "status": "ok",
+        "value": {
+          "confidence": "full",
+          "manual_reason": "opaque accept rule in input (filter, inet): meta l4proto { tcp, udp } th dport 53 accept",
+          "listeners": 1,
+          "exposed": 0,
+          "filtered": 0,
+          "loopback": 2,
+          "link_local": 0,
+          "kernel_owned": 0,
+          "opaque_rules": 1,
+          "folded_rules": 3,
+          "ipv6_disabled": false
+        },
+        "source": {
+          "kind": "derived"
+        }
+      }
+    }
+  }
+}

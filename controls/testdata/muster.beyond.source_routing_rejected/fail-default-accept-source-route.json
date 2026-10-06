@@ -1,0 +1,73 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none",
+        "source": {
+          "kind": "file",
+          "path": "/proc/1/cgroup"
+        }
+      }
+    },
+    "net": {
+      "sysctl": {
+        "ipv4_all_accept_source_route": {
+          "runtime": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/all/accept_source_route"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv4.conf.all.accept_source_route"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/all/accept_source_route"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/conf/all/accept_source_route"
+          }
+        },
+        "ipv4_default_accept_source_route": {
+          "runtime": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/default/accept_source_route"
+            }
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv4.conf.default.accept_source_route"
+          },
+          "effective": {
+            "status": "ok",
+            "value": 1,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/default/accept_source_route"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/conf/default/accept_source_route"
+          }
+        }
+      }
+    }
+  }
+}

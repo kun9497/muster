@@ -24,7 +24,7 @@ references and, later, offered as selectable profiles.
 > audit pipeline health and package integrity, and who holds root's power
 > without being root — are merged. 67 of the 67 items are enrolled (68 controls:
 > 57 auto, 7 partial, 4 manual with the evidence attached),
-> and 36 beyond the guide. `collect --deep`
+> and 49 beyond the guide. `collect --deep`
 > walks the local filesystems once, under a time and entry budget, without
 > following a symlink or entering a remote mount or a container layer, and
 > joins every setuid, world-writable, unowned or hidden entry to the package

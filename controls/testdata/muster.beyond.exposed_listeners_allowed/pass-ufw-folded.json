@@ -1,0 +1,101 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none",
+        "source": {
+          "kind": "file",
+          "path": "/proc/1/cgroup"
+        }
+      }
+    },
+    "exposure": {
+      "exposed": {
+        "status": "ok",
+        "value": [
+          {
+            "service": "tcp/22",
+            "proto": "tcp",
+            "family": "v4",
+            "addr": "0.0.0.0",
+            "port": 22,
+            "pid": 812,
+            "name": "sshd",
+            "package": "openssh-server",
+            "via": "rule",
+            "rule_chain": "ufw-user-input",
+            "rule_source": ""
+          }
+        ],
+        "source": {
+          "kind": "derived"
+        }
+      },
+      "listeners": {
+        "status": "ok",
+        "value": [
+          {
+            "service": "tcp/22",
+            "proto": "tcp",
+            "family": "v4",
+            "addr": "0.0.0.0",
+            "port": 22,
+            "link_local": false,
+            "owner_status": "ok",
+            "owners": [
+              {
+                "pid": 812,
+                "uid": 0,
+                "name": "sshd",
+                "exe": "/usr/sbin/sshd",
+                "exe_deleted": false,
+                "mnt_ns": "host",
+                "package": "openssh-server",
+                "package_status": "packaged"
+              }
+            ],
+            "owners_count": 1,
+            "exposed": true,
+            "via": "rule",
+            "rule_chain": "ufw-user-input",
+            "rule_source": "",
+            "rule_raw": "-A ufw-user-input -p tcp -m tcp --dport 22 -j ACCEPT"
+          }
+        ],
+        "source": {
+          "kind": "derived"
+        }
+      },
+      "opaque_rules": {
+        "status": "ok",
+        "value": [],
+        "source": {
+          "kind": "derived"
+        }
+      },
+      "stats": {
+        "status": "ok",
+        "value": {
+          "confidence": "full",
+          "manual_reason": "",
+          "listeners": 1,
+          "exposed": 1,
+          "filtered": 0,
+          "loopback": 2,
+          "link_local": 0,
+          "kernel_owned": 0,
+          "opaque_rules": 0,
+          "folded_rules": 41,
+          "ipv6_disabled": false
+        },
+        "source": {
+          "kind": "derived"
+        }
+      }
+    }
+  }
+}

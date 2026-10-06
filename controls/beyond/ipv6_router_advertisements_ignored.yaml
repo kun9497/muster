@@ -1,0 +1,29 @@
+id: muster.beyond.ipv6_router_advertisements_ignored
+title_en: The host does not take its IPv6 addresses and routes from router advertisements unless it is meant to
+title_ko: 호스트는 의도한 경우가 아니면 라우터 광고로 IPv6 주소와 경로를 받지 않는다
+description_en: A router advertisement tells every IPv6 host on the link which prefix to address itself from and which router to send through; a host that accepts them from anyone lets a neighbour announce itself as the default router and take the host's IPv6 traffic, even on a network where nobody configured IPv6. net.ipv6.conf.all.accept_ra and net.ipv6.conf.default.accept_ra must both be in params.allowed_accept_ra, default [0]. A server addressed by SLAAC needs advertisements and names 1; 2 is the value that accepts them even on a forwarding host. The kernel's Documentation/networking/ip-sysctl.rst describes them; muster rates it 중 because the attack needs only a place on the link and redirects every IPv6 connection at once. muster judges the effective, running value; the sysctl.d side rides along as drift. The control reads NOT_APPLICABLE when the kernel has no IPv6 (built without it, or booted with ipv6.disable=1) and when IPv6 is switched off on all and on default interfaces through disable_ipv6. Stock Ubuntu and EL9 FAIL - the kernel accepts advertisements by default, which a host addressed by SLAAC relies on.
+description_ko: 라우터 광고는 링크의 모든 IPv6 호스트에 어떤 프리픽스로 주소를 정하고 어떤 라우터로 보낼지 알립니다. 누구의 광고든 받아들이는 호스트는 이웃이 자신을 기본 라우터로 알리고 호스트의 IPv6 트래픽을 가져가게 두며, 아무도 IPv6 를 설정하지 않은 네트워크에서도 마찬가지입니다. net.ipv6.conf.all.accept_ra 와 net.ipv6.conf.default.accept_ra 가 모두 params.allowed_accept_ra(기본값 [0])에 있어야 합니다. SLAAC 로 주소를 받는 서버는 광고가 필요하므로 1 을 적고, 2 는 포워딩하는 호스트에서도 광고를 받아들이는 값입니다. 커널 문서 Documentation/networking/ip-sysctl.rst 가 두 값을 설명합니다. 공격에는 링크의 자리 하나만 있으면 되고 모든 IPv6 연결을 한꺼번에 돌리므로 muster 는 중요도를 중으로 둡니다. muster 는 실행 중인 실효값을 판정하고 sysctl.d 쪽은 차이로 함께 보고합니다. 커널에 IPv6 가 없거나(빌드하지 않았거나 ipv6.disable=1 로 부팅) disable_ipv6 로 all 과 default 인터페이스 모두에서 IPv6 를 끈 경우 NOT_APPLICABLE 입니다. 기본 Ubuntu 와 EL9 은 FAIL 입니다. 커널이 기본으로 광고를 받아들이며, SLAAC 로 주소를 받는 호스트는 이에 의존합니다.
+category: beyond
+importance: 중
+automation: auto
+references:
+  stig:
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-254010 }
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-254030 }
+  nist_800_53: ["CM-6"]
+requires_facts: ">=1"
+applies_when:
+  - { fact: env.container, op: eq, expected: none }
+  - { fact: net.sysctl.ipv6_all_disable_ipv6, op: eq, expected: 0 }
+  - { fact: net.sysctl.ipv6_default_disable_ipv6, op: eq, expected: 0 }
+absent_means: not_applicable
+params:
+  allowed_accept_ra: { type: list<int>, default: [0], description: "accept_ra values the host accepts - 0 for a statically addressed host; a server addressed by SLAAC names 1 (2 on a forwarding host)" }
+checks:
+  - { fact: net.sysctl.ipv6_all_accept_ra, op: in, expected: "${allowed_accept_ra}" }
+  - { fact: net.sysctl.ipv6_default_accept_ra, op: in, expected: "${allowed_accept_ra}" }
+remediation:
+  text_en: On a host with a static IPv6 address, or none, write net.ipv6.conf.all.accept_ra = 0 and net.ipv6.conf.default.accept_ra = 0 into a file under /etc/sysctl.d and apply it with sysctl --system. Check first how the host gets its IPv6 address - a host addressed by SLAAC loses its address and default route; it names 1 in params.allowed_accept_ra instead.
+  text_ko: 정적 IPv6 주소를 쓰거나 IPv6 주소가 없는 호스트는 /etc/sysctl.d 아래 파일에 net.ipv6.conf.all.accept_ra = 0 과 net.ipv6.conf.default.accept_ra = 0 을 적고 sysctl --system 으로 적용합니다. 먼저 호스트가 IPv6 주소를 어떻게 받는지 확인하십시오. SLAAC 로 주소를 받는 호스트는 주소와 기본 경로를 잃으므로 대신 params.allowed_accept_ra 에 1 을 적습니다.
+  risk: none
+  idempotent: true

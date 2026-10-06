@@ -1,0 +1,35 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none",
+        "source": {
+          "kind": "file",
+          "path": "/proc/1/cgroup"
+        }
+      }
+    },
+    "net": {
+      "sysctl": {
+        "ipv4_ip_forward": {
+          "runtime": {
+            "status": "absent",
+            "reason": "/proc/sys/net/ipv4/ip_forward does not exist"
+          },
+          "persisted": {
+            "status": "absent",
+            "reason": "no sysctl.d line sets net.ipv4.ip_forward"
+          },
+          "effective": {
+            "status": "absent",
+            "reason": "/proc/sys/net/ipv4/ip_forward does not exist"
+          }
+        }
+      }
+    }
+  }
+}

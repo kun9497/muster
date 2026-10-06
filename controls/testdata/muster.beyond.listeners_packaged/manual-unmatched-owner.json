@@ -1,0 +1,27 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none",
+        "source": {
+          "kind": "file",
+          "path": "/proc/1/cgroup"
+        }
+      }
+    },
+    "processes": {
+      "listeners": {
+        "status": "absent",
+        "reason": "no process this run can see holds the listening socket tcp/8080 on 0.0.0.0 (inode 48213); pid 1 or the kernel threads are not visible to this run, so the pid view may be partial"
+      },
+      "unpackaged_listeners": {
+        "status": "absent",
+        "reason": "no process this run can see holds the listening socket tcp/8080 on 0.0.0.0 (inode 48213); pid 1 or the kernel threads are not visible to this run, so the pid view may be partial"
+      }
+    }
+  }
+}

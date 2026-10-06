@@ -1,0 +1,31 @@
+id: muster.beyond.icmp_redirects_ignored
+title_en: The host neither accepts nor sends IPv4 ICMP redirects
+title_ko: 호스트는 IPv4 ICMP 리다이렉트를 받아들이지도 보내지도 않는다
+description_en: An ICMP redirect tells a host to send traffic for a destination through another gateway; accepted from anyone on the link, it lets a neighbour put itself in the middle of the host's connections, and a host that sends them is acting as a router it should not be. Six values decide it, each for all interfaces and for the default a new interface starts with - accept_redirects, secure_redirects (accept a redirect only from a gateway already in the routing table) and send_redirects - and every one must be 0. The kernel's Documentation/networking/ip-sysctl.rst describes them; muster rates it 중 because the attack needs a foothold on the same link but then redirects traffic silently. secure_redirects is moot once accept_redirects is 0 and is judged anyway, so the host stays safe if accept_redirects is ever turned back on. muster judges the effective, running value; the sysctl.d side rides along as drift. A kernel that publishes none of the values reads FAIL. Stock Ubuntu and EL9 FAIL - the kernel's defaults accept, trust and send redirects and neither distribution changes them.
+description_ko: ICMP 리다이렉트는 어떤 목적지로 가는 트래픽을 다른 게이트웨이로 보내라고 호스트에 알립니다. 링크의 누구에게서나 받아들이면 이웃이 호스트의 연결 한가운데에 끼어들 수 있고, 리다이렉트를 보내는 호스트는 하지 말아야 할 라우터 역할을 하고 있는 것입니다. 여섯 값이 이를 결정합니다. accept_redirects, secure_redirects(라우팅 테이블에 이미 있는 게이트웨이의 리다이렉트만 받아들임), send_redirects 를 각각 모든 인터페이스(all)와 새 인터페이스가 시작하는 기본값(default)에 대해 보며, 모두 0 이어야 합니다. 커널 문서 Documentation/networking/ip-sysctl.rst 가 이 값들을 설명합니다. 공격에는 같은 링크의 발판이 필요하지만 그다음에는 트래픽을 조용히 돌리므로 muster 는 중요도를 중으로 둡니다. secure_redirects 는 accept_redirects 가 0 이면 의미가 없지만 그래도 판정하여, accept_redirects 가 다시 켜지더라도 호스트가 안전하게 남게 합니다. muster 는 실행 중인 실효값을 판정하고 sysctl.d 쪽은 차이로 함께 보고합니다. 값을 하나도 내놓지 않는 커널은 FAIL 입니다. 기본 Ubuntu 와 EL9 은 FAIL 입니다. 커널 기본값이 리다이렉트를 받아들이고 신뢰하고 보내며 두 배포판 모두 이를 바꾸지 않습니다.
+category: beyond
+importance: 중
+automation: auto
+references:
+  stig:
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-253015 }
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-253040 }
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-253065 }
+    - { benchmark: rhel9, version: V2R9, id: RHEL-09-253070 }
+  nist_800_53: ["CM-6"]
+requires_facts: ">=1"
+applies_when:
+  - { fact: env.container, op: eq, expected: none }
+absent_means: fail
+checks:
+  - { fact: net.sysctl.ipv4_all_accept_redirects, op: eq, expected: 0 }
+  - { fact: net.sysctl.ipv4_default_accept_redirects, op: eq, expected: 0 }
+  - { fact: net.sysctl.ipv4_all_secure_redirects, op: eq, expected: 0 }
+  - { fact: net.sysctl.ipv4_default_secure_redirects, op: eq, expected: 0 }
+  - { fact: net.sysctl.ipv4_all_send_redirects, op: eq, expected: 0 }
+  - { fact: net.sysctl.ipv4_default_send_redirects, op: eq, expected: 0 }
+remediation:
+  text_en: Write the six values as 0 - net.ipv4.conf.all.accept_redirects, net.ipv4.conf.default.accept_redirects, the same two for secure_redirects and for send_redirects - into a file under /etc/sysctl.d, for example /etc/sysctl.d/60-network-hardening.conf, and apply it with sysctl --system; they take effect at once. A host that really routes for its link may need send_redirects; such a host waives the finding.
+  text_ko: net.ipv4.conf.all.accept_redirects, net.ipv4.conf.default.accept_redirects 와 secure_redirects, send_redirects 의 같은 두 값, 모두 여섯 값을 0 으로 /etc/sysctl.d 아래 파일(예 /etc/sysctl.d/60-network-hardening.conf)에 적고 sysctl --system 으로 적용합니다. 즉시 반영됩니다. 실제로 링크를 위해 라우팅하는 호스트는 send_redirects 가 필요할 수 있으며 그런 호스트는 예외(waiver)로 처리합니다.
+  risk: none
+  idempotent: true

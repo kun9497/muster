@@ -1,0 +1,85 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none",
+        "source": {
+          "kind": "file",
+          "path": "/proc/1/cgroup"
+        }
+      }
+    },
+    "net": {
+      "sysctl": {
+        "ipv4_all_accept_source_route": {
+          "runtime": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/all/accept_source_route"
+            }
+          },
+          "persisted": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "file",
+              "path": "/etc/sysctl.d/60-network-hardening.conf",
+              "line": 1,
+              "raw": "net.ipv4.conf.all.accept_source_route = 0"
+            }
+          },
+          "effective": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/all/accept_source_route"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/conf/all/accept_source_route"
+          }
+        },
+        "ipv4_default_accept_source_route": {
+          "runtime": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/default/accept_source_route"
+            }
+          },
+          "persisted": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "file",
+              "path": "/etc/sysctl.d/60-network-hardening.conf",
+              "line": 2,
+              "raw": "net.ipv4.conf.default.accept_source_route = 0"
+            }
+          },
+          "effective": {
+            "status": "ok",
+            "value": 0,
+            "source": {
+              "kind": "proc",
+              "path": "/proc/sys/net/ipv4/conf/default/accept_source_route"
+            }
+          },
+          "winner": {
+            "kind": "proc",
+            "path": "/proc/sys/net/ipv4/conf/default/accept_source_route"
+          }
+        }
+      }
+    }
+  }
+}

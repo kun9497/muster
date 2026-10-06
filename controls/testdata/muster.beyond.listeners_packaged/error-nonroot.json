@@ -1,0 +1,31 @@
+{
+  "synthetic": true,
+  "_expect": {
+    "reason_code": "permission_denied",
+    "exit_code": 2
+  },
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none",
+        "source": {
+          "kind": "file",
+          "path": "/proc/1/cgroup"
+        }
+      }
+    },
+    "processes": {
+      "listeners": {
+        "status": "denied",
+        "reason": "/proc/1/fd: requires root or CAP_DAC_READ_SEARCH"
+      },
+      "unpackaged_listeners": {
+        "status": "denied",
+        "reason": "/proc/1/fd: requires root or CAP_DAC_READ_SEARCH"
+      }
+    }
+  }
+}
