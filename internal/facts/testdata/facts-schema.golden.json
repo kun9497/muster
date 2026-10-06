@@ -2924,7 +2924,7 @@
     {
       "Key": "firewall.rules",
       "Type": "list\u003crecord\u003e",
-      "Description": "The normalised inbound-affecting rules, each with chain, action, protocol, dport (a string, since ports may be ranges or sets) and source; the unsupported/denied envelope when the ruleset could not be read.",
+      "Description": "The inbound rule table: the rules of every filter base chain on the input hook, with the rules of every user chain it jumps or goes to folded in (same family and table, depth at most 4, at most 2000 folded rows per base chain, each chain visited once). Each row has the thirteen fields chain, via_chain (the input base chain that reached it), depth (0 for the base chain), family (v4, v6 or inet), proto, dport (a port, range or set as written), saddr, daddr, iif, ctstate, action (accept, drop, reject, return, jump X, goto X, continue, queue, log or empty), unmodelled (a match the parser does not model, or a jump the fold could not follow) and raw (the rule line, capped at 512 bytes); empty strings and false where a selector is absent. Bridge, arp and netdev tables contribute no row. The unsupported/denied envelope when the ruleset could not be read.",
       "Since": 1,
       "Sensitivity": "internal",
       "Collector": "firewall",

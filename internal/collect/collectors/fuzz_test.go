@@ -295,15 +295,24 @@ const listSlack = 64
 // rawEllipsis is the marker sourceRaw appends when it cut a line at rawCap.
 const rawEllipsis = "…"
 
-// rawWithinCap is the contract exactly: at most rawCap bytes of the file's
+// rawWithinCapOf is the contract exactly: at most limit bytes of the file's
 // own line, plus the marker when — and only when — the line was cut. Bounding
-// the whole string at rawCap+len(rawEllipsis) would let an uncut line run
+// the whole string at limit+len(rawEllipsis) would let an uncut line run
 // three bytes over the cap unnoticed.
-func rawWithinCap(s string) bool {
+func rawWithinCapOf(s string, limit int) bool {
 	if strings.HasSuffix(s, rawEllipsis) {
-		return len(s)-len(rawEllipsis) <= rawCap
+		return len(s)-len(rawEllipsis) <= limit
 	}
-	return len(s) <= rawCap
+	return len(s) <= limit
+}
+
+// rawCapOf is the cap of a raw field of type tp: a firewall rule row carries
+// up to fwRawCap bytes of its rule line (W-4), every other row rawCap.
+func rawCapOf(tp reflect.Type) int {
+	if tp == reflect.TypeOf(fwRule{}) {
+		return fwRawCap
+	}
+	return rawCap
 }
 
 // modulePath is muster's import path. The bound walk descends into muster's
@@ -388,9 +397,9 @@ func (w *boundWalk) walk(v reflect.Value, at string, depth int) {
 			// for the field name rather than for that type so a parser that
 			// starts storing evidence is bounded the day it does.
 			if fv.Kind() == reflect.String && rawFields[strings.ToLower(f.Name)] {
-				if s := fv.String(); !rawWithinCap(s) {
+				if s, limit := fv.String(), rawCapOf(tp); !rawWithinCapOf(s, limit) {
 					w.t.Fatalf("%s stored a %d-byte %s at %s.%s (cap %d, plus %q only when it cut)",
-						w.parser, len(s), f.Name, at, f.Name, rawCap, rawEllipsis)
+						w.parser, len(s), f.Name, at, f.Name, limit, rawEllipsis)
 				}
 			}
 			w.walk(fv, at+"."+f.Name, depth+1)
@@ -876,8 +885,31 @@ func FuzzOSEscapes(f *testing.F) {
 // Firewalls
 // ---------------------------------------------------------------------------
 
+// nftRuleSeed is a ruleset carrying the rule shapes the 3C-2b parser models
+// or deliberately leaves unmodelled: a protocol set, a vmap, the
+// iptables-nft counters, a fib match, a limit before a jump.
+const nftRuleSeed = "table inet filter {\n\tchain input {\n\t\ttype filter hook input priority filter; policy drop;\n" +
+	"\t\tmeta l4proto { tcp, udp } th dport 53 accept\n" +
+	"\t\ttcp dport vmap { 22 : accept, 80 : drop }\n" +
+	"\t\tiifname \"lo\" counter packets 0 bytes 0 accept\n" +
+	"\t\tct state related,established counter packets 0 bytes 0 accept\n" +
+	"\t\tfib daddr type local counter packets 0 bytes 0 return\n" +
+	"\t\tlimit rate 3/minute burst 10 packets counter packets 0 bytes 0 jump ufw-logging-deny\n" +
+	"\t}\n\tchain ufw-logging-deny {\n\t\tlog prefix \"[UFW BLOCK] \"\n\t}\n}\n"
+
+// iptablesRuleSeed is the iptables-save counterpart: multiport, a port range,
+// a negation, a user chain jumped to and an extension target.
+const iptablesRuleSeed = "*filter\n:INPUT DROP [0:0]\n:user - [0:0]\n" +
+	"-A INPUT -p tcp -m multiport --dports 22,80,443 -j ACCEPT\n" +
+	"-A INPUT -p tcp -m tcp --dport 1000:2000 -j ACCEPT\n" +
+	"-A INPUT ! -i lo -m comment --comment \"two words\" -j user\n" +
+	"-A INPUT -j MARK --set-xmark 0x1/0xffffffff\n" +
+	"-A user -m limit --limit 3/min --limit-burst 10 -j LOG --log-prefix \"[UFW BLOCK] \"\n" +
+	"COMMIT\n"
+
 func FuzzParseNftRuleset(f *testing.F) {
 	seeds(f, "testdata/nft.ruleset.*", "testdata/nftables.conf")
+	f.Add([]byte(nftRuleSeed))
 	f.Fuzz(func(t *testing.T, data []byte) {
 		fuzzBody(t, "parseNftRuleset", func() any {
 			chains, records := parseNftRuleset(string(data))
@@ -888,12 +920,72 @@ func FuzzParseNftRuleset(f *testing.F) {
 
 func FuzzParseIptablesSave(f *testing.F) {
 	seeds(f, "testdata/iptables-save.*", "testdata/ip6tables-save.*")
+	f.Add([]byte(iptablesRuleSeed))
 	f.Fuzz(func(t *testing.T, data []byte) {
 		fuzzBody(t, "parseIptablesSave", func() any {
 			v4chains, v4records := parseIptablesSave("v4", string(data))
 			v6chains, v6records := parseIptablesSave("v6", string(data))
 			return []any{v4chains, v4records, v6chains, v6records}
 		}, len(data))
+	})
+}
+
+// FuzzParsePortSpec reads one destination-port operand. A spec is either
+// unmodelled or enumerable, never both, and an unmodelled one matches nothing.
+func FuzzParsePortSpec(f *testing.F) {
+	for _, s := range []string{"22", "1000-2000", "1000:2000", "{ 22, 80 }", "22,80,443", "ssh", "@ports", "{ 22, 8000-8080 }", "65536", ""} {
+		f.Add([]byte(s))
+	}
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "parsePortSpec", func() any {
+			p := parsePortSpec(string(data))
+			if p.Unmodelled && (len(p.Members) != 0 || len(p.Ranges) != 0 || p.matches(0)) {
+				t.Fatalf("an unmodelled spec %q carries ports", data)
+			}
+			if len(p.Members)+len(p.Ranges) > portSpecMaxMembers {
+				t.Fatalf("%q enumerated %d elements, the cap is %d", data, len(p.Members)+len(p.Ranges), portSpecMaxMembers)
+			}
+			return p
+		}, len(data))
+	})
+}
+
+// FuzzFoldChains folds a dump parsed both ways (nft and iptables-save). The
+// fold must terminate and stay within its budget: per input base chain, at
+// most foldMaxRows folded rows and no row deeper than foldMaxDepth. A chain is
+// visited once per base chain, so the rows of one base chain never outnumber
+// the dump's rules — the bound fuzzBody checks is that, per base chain.
+func FuzzFoldChains(f *testing.F) {
+	seeds(f, "testdata/nft.ruleset.ufw-allow-80", "testdata/iptables-save.ufw-allow-80")
+	f.Add([]byte(nftRuleSeed))
+	f.Add([]byte(iptablesRuleSeed))
+	f.Fuzz(func(t *testing.T, data []byte) {
+		nb, nby := parseNftRuleset(string(data))
+		ib, iby := parseIptablesSave("v4", string(data))
+		inputs := 0
+		for _, bc := range append(slices.Clone(nb), ib...) {
+			if bc.hook == "input" && bc.chainType == "filter" {
+				inputs++
+			}
+		}
+		fuzzBody(t, "foldChains", func() any {
+			rows := append(foldChains(nb, nby), foldChains(ib, iby)...)
+			folded := map[string]int{}
+			for _, r := range rows {
+				if r.Depth > foldMaxDepth {
+					t.Fatalf("row at depth %d (cap %d): %+v", r.Depth, foldMaxDepth, r)
+				}
+				if r.Depth > 0 {
+					folded[r.Family+"\x00"+r.ViaChain]++
+				}
+			}
+			for k, n := range folded {
+				if n > foldMaxRows*inputs {
+					t.Fatalf("%q folded %d rows (cap %d per base chain)", k, n, foldMaxRows)
+				}
+			}
+			return rows
+		}, len(data)*max(1, inputs))
 	})
 }
 

@@ -4,7 +4,9 @@ package collectors
 
 import (
 	"context"
+	"os"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -387,7 +389,231 @@ func TestParseNftRulesetFieldlessLineInChain(t *testing.T) {
 		t.Errorf("base chains = %+v, want none (nothing declares a hook and no chain closes)", bases)
 	}
 	if len(rules) != 0 {
-		t.Errorf("rules = %v, want none", rules)
+		t.Errorf("rules = %v, want none (a chain outside a table block is no chain)", rules)
+	}
+}
+
+// fwRowsOf returns firewall.rules as rows, asserting that every row carries the
+// thirteen fields of W-4 and nothing else.
+func fwRowsOf(t *testing.T, b *collect.Builder) []fwRule {
+	t.Helper()
+	fields := []string{"action", "chain", "ctstate", "daddr", "depth", "dport", "family", "iif", "proto", "raw", "saddr", "unmodelled", "via_chain"}
+	var rows []fwRule
+	for _, v := range okList(t, b, "firewall.rules") {
+		m, ok := v.(map[string]any)
+		if !ok {
+			t.Fatalf("a firewall.rules row is %T, not a record", v)
+		}
+		var keys []string
+		for k := range m {
+			keys = append(keys, k)
+		}
+		slices.Sort(keys)
+		if !slices.Equal(keys, fields) {
+			t.Fatalf("row fields %v, want %v", keys, fields)
+		}
+		rows = append(rows, fwRuleFromRecord(m))
+	}
+	return rows
+}
+
+// X-8: ufw's chains under iptables-save fold into the INPUT base chain; the
+// `allow 80/tcp` accept is a depth-2 row via INPUT (INPUT → ufw-before-input →
+// ufw-user-input), and nothing of FORWARD or OUTPUT is folded.
+func TestFirewallFoldsUfwChains(t *testing.T) {
+	a := firewallAccess(
+		map[string]string{"/etc/ufw/ufw.conf": "ufw.conf"},
+		map[string]cmdResult{
+			nftListRuleset: {exitCode: 1, stderr: "sh: nft: command not found\n"},
+			iptablesSave:   {file: "iptables-save.ufw-allow-80"},
+			ip6tablesSave:  {exitCode: 1, stderr: "ip6tables-save: not found\n"},
+		},
+	)
+	b := buildBegun(t, "firewall", a)
+	rows := fwRowsOf(t, b)
+	var http []fwRule
+	for _, r := range rows {
+		if r.ViaChain != "INPUT" || r.Family != "v4" {
+			t.Errorf("row %+v is not folded under the v4 INPUT", r)
+		}
+		if strings.Contains(r.Chain, "forward") || strings.Contains(r.Chain, "output") {
+			t.Errorf("a FORWARD/OUTPUT chain was folded: %+v", r)
+		}
+		if r.Dport == "80" {
+			http = append(http, r)
+		}
+	}
+	want := fwRule{Chain: "ufw-user-input", ViaChain: "INPUT", Depth: 2, Family: "v4", Proto: "tcp", Dport: "80", Action: "accept",
+		Raw: "-A ufw-user-input -p tcp -m tcp --dport 80 -j ACCEPT"}
+	if len(http) != 1 || http[0] != want {
+		t.Fatalf("the allow 80/tcp rows %+v, want exactly %+v", http, want)
+	}
+	if e := env(t, b, "firewall.backend"); e.Value != "ufw" {
+		t.Errorf("backend %+v, want ufw", e)
+	}
+}
+
+// W-36: ufw's stock before/after chains decide — under both iptables-save
+// and the iptables-nft `nft list ruleset` rendering, no folded v4 INPUT row is
+// opaque, and the tcp port rules are exactly the two allows, 22 and 80.
+func TestFirewallUfwBeforeRulesDecide(t *testing.T) {
+	for _, c := range []struct {
+		name, tool, source, file string
+	}{
+		{"iptables-save", "iptables", iptablesSave, "testdata/iptables-save.ufw-allow-80"},
+		{"nft", "nft", nftListRuleset, "testdata/nft.ruleset.ufw-allow-80"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			data, err := os.ReadFile(c.file)
+			if err != nil {
+				t.Fatal(err)
+			}
+			cr := capture{tool: c.tool, ok: true, dumps: []any{map[string]any{"source": c.source, "content": string(data), "truncated": false}}}
+			bases, rows := normalizeRuleset(cr)
+			if len(bases) == 0 {
+				t.Fatal("no base chain parsed")
+			}
+			var tcpPorts []string
+			for _, r := range rows {
+				if r.ViaChain != "INPUT" || r.Family != "v4" {
+					t.Errorf("row not under the v4 INPUT: %+v", r)
+				}
+				switch classifyRule(r) {
+				case "opaque":
+					t.Errorf("opaque row: %+v", r)
+				case "port_rule":
+					if r.Proto == "tcp" {
+						tcpPorts = append(tcpPorts, r.Dport)
+					}
+				}
+			}
+			if !slices.Equal(tcpPorts, []string{"22", "80"}) {
+				t.Errorf("tcp port rules %v, want [22 80]", tcpPorts)
+			}
+			// INPUT 6 + ufw-before-input 13 + ufw-logging-deny 2 +
+			// ufw-not-local 5 + ufw-user-input 2 + ufw-after-input 7 +
+			// ufw-skip-to-policy-input 1 + ufw-after-logging-input 1; the
+			// logging, reject and track input chains are empty.
+			if len(rows) != 37 {
+				t.Errorf("%d folded rows, want the 37 rules of the chains INPUT reaches", len(rows))
+			}
+		})
+	}
+}
+
+// W-44: folding never changes the confidence. ufw's INPUT is policy drop and
+// carries only jumps; with its user chains folded in (accepts among them) it
+// stays full + restricts_inbound ok:true. An accept-policy INPUT whose only
+// rule is a jump into a chain of accepts stays partial, as before the fold.
+func TestFirewallFoldedRulesDoNotChangeConfidence(t *testing.T) {
+	a := firewallAccess(
+		map[string]string{"/etc/ufw/ufw.conf": "ufw.conf"},
+		map[string]cmdResult{nftListRuleset: {file: "nft.ruleset.ufw-allow-80"}},
+	)
+	b := buildBegun(t, "firewall", a)
+	if e := env(t, b, "firewall.normalization_confidence"); e.Value != "full" {
+		t.Errorf("confidence %+v, want full", e)
+	}
+	if e := env(t, b, "firewall.restricts_inbound"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("restricts_inbound %+v, want ok true", e)
+	}
+	deep := 0
+	for _, r := range fwRowsOf(t, b) {
+		if r.Depth > 0 && r.Action == "accept" {
+			deep++
+		}
+	}
+	if deep == 0 {
+		t.Error("no folded accept: the test no longer exercises the fold")
+	}
+
+	const acceptJump = "table ip filter {\n" +
+		"\tchain INPUT {\n\t\ttype filter hook input priority filter; policy accept;\n\t\tjump user\n\t}\n" +
+		"\tchain user {\n\t\ttcp dport 22 accept\n\t}\n}\n"
+	a = firewallAccess(
+		map[string]string{"/etc/nftables.conf": "nftables.conf"},
+		map[string]cmdResult{nftListRuleset: {stdout: []byte(acceptJump)}},
+	)
+	b = buildBegun(t, "firewall", a)
+	if e := env(t, b, "firewall.normalization_confidence"); e.Value != "partial" {
+		t.Errorf("confidence %+v, want partial (an accept-policy chain carries rules)", e)
+	}
+	if rows := fwRowsOf(t, b); len(rows) != 2 || rows[1].Depth != 1 || rows[1].Dport != "22" {
+		t.Errorf("rows %+v, want the jump and the folded accept", rows)
+	}
+}
+
+// X-9: ufw installed but disabled leaves the kernel ruleset empty — no input
+// base chain and no inbound rule. That is no firewall: full confidence and
+// restricts_inbound ok:false, with the reason said, no longer partial.
+func TestFirewallInactiveUfwNormalisesFull(t *testing.T) {
+	a := firewallAccess(
+		map[string]string{"/etc/ufw/ufw.conf": "ufw.conf.disabled"},
+		map[string]cmdResult{nftListRuleset: {stdout: []byte{}}},
+	)
+	b := buildBegun(t, "firewall", a)
+	if e := env(t, b, "firewall.backend"); e.Value != "ufw" {
+		t.Fatalf("backend %+v, want ufw", e)
+	}
+	if e := env(t, b, "firewall.normalization_confidence"); e.Status != facts.StatusOK || e.Value != "full" {
+		t.Errorf("confidence %+v, want ok full (X-9)", e)
+	}
+	e := env(t, b, "firewall.restricts_inbound")
+	if e.Status != facts.StatusOK || e.Value != false {
+		t.Errorf("restricts_inbound %+v, want ok false (X-9)", e)
+	}
+	if e.Reason != "no input base chain and no inbound rule: nothing restricts inbound" {
+		t.Errorf("restricts_inbound reason %q", e.Reason)
+	}
+	if rows := fwRowsOf(t, b); len(rows) != 0 {
+		t.Errorf("rows %+v, want none", rows)
+	}
+	en := setting(t, b, "firewall.enabled")
+	if en.Persisted == nil || en.Persisted.Value != false {
+		t.Errorf("enabled persisted %+v, want ok false (ENABLED=no)", en.Persisted)
+	}
+}
+
+// W-4: a bridge table's input chain is not an input base chain. Here it would
+// have made the policies disagree (bridge drop, inet accept) and its accept
+// would have been a row; ignored, the inet accept chain with no rules decides.
+func TestFirewallBridgeTableIsIgnored(t *testing.T) {
+	a := firewallAccess(
+		map[string]string{"/etc/nftables.conf": "nftables.conf"},
+		map[string]cmdResult{nftListRuleset: {file: "nft.ruleset.bridge-input"}},
+	)
+	b := buildBegun(t, "firewall", a)
+	if e := env(t, b, "firewall.normalization_confidence"); e.Value != "full" {
+		t.Errorf("confidence %+v, want full (the bridge chain does not count)", e)
+	}
+	if e := env(t, b, "firewall.restricts_inbound"); e.Status != facts.StatusOK || e.Value != false {
+		t.Errorf("restricts_inbound %+v, want ok false", e)
+	}
+	if rows := fwRowsOf(t, b); len(rows) != 0 {
+		t.Errorf("rows %+v, want none (the bridge table's rule is not a row)", rows)
+	}
+	if s := setting(t, b, "firewall.default_policy.input"); s.Runtime == nil || s.Runtime.Value != "accept" {
+		t.Errorf("default_policy.input runtime %+v, want accept (the inet chain alone)", s.Runtime)
+	}
+}
+
+// Every row carries its family and the raw line; the dual-stack nft fixture's
+// ip and ip6 input chains give v4 and v6 rows.
+func TestFirewallRowsCarryFamilyAndRaw(t *testing.T) {
+	a := firewallAccess(
+		map[string]string{"/etc/nftables.conf": "nftables.conf"},
+		map[string]cmdResult{nftListRuleset: {file: "nft.ruleset.dualstack-drop"}},
+	)
+	b := buildBegun(t, "firewall", a)
+	families := map[string]bool{}
+	for _, r := range fwRowsOf(t, b) {
+		families[r.Family] = true
+		if r.Raw == "" || r.Depth != 0 || r.ViaChain != r.Chain {
+			t.Errorf("base-chain row %+v: want raw, depth 0, via_chain = chain", r)
+		}
+	}
+	if !families["v4"] || !families["v6"] {
+		t.Errorf("families %v, want v4 and v6", families)
 	}
 }
 
@@ -411,7 +637,7 @@ func TestParseNftRulesetBlankLineInChainIsIgnored(t *testing.T) {
 		"\t}\n" +
 		"}\n"
 	wantBases, wantRules := parseNftRuleset(packed)
-	if len(wantBases) != 1 || len(wantRules) != 2 {
+	if len(wantBases) != 1 || len(wantRules[chainKey{"inet", "filter", "input"}]) != 2 {
 		t.Fatalf("the packed ruleset itself parsed as %+v / %v, want one base chain and two rules", wantBases, wantRules)
 	}
 	gotBases, gotRules := parseNftRuleset(spaced)
