@@ -891,6 +891,9 @@ func FuzzOSEscapes(f *testing.F) {
 const nftRuleSeed = "table inet filter {\n\tchain input {\n\t\ttype filter hook input priority filter; policy drop;\n" +
 	"\t\tmeta l4proto { tcp, udp } th dport 53 accept\n" +
 	"\t\ttcp dport vmap { 22 : accept, 80 : drop }\n" +
+	"\t\tmeta l4proto . th dport { tcp . 22, udp . 53 } accept\n" +
+	"\t\tct state vmap { established : accept, invalid : drop }\n" +
+	"\t\tcomment \"a chain comment\"\n" +
 	"\t\tiifname \"lo\" counter packets 0 bytes 0 accept\n" +
 	"\t\tct state related,established counter packets 0 bytes 0 accept\n" +
 	"\t\tfib daddr type local counter packets 0 bytes 0 return\n" +
@@ -925,7 +928,7 @@ func FuzzParseIptablesSave(f *testing.F) {
 		fuzzBody(t, "parseIptablesSave", func() any {
 			v4chains, v4records := parseIptablesSave("v4", string(data))
 			v6chains, v6records := parseIptablesSave("v6", string(data))
-			return []any{v4chains, v4records, v6chains, v6records}
+			return []any{v4chains, v4records, v6chains, v6records, iptablesLegacyRestricts(string(data))}
 		}, len(data))
 	})
 }

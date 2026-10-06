@@ -32,6 +32,17 @@ func TestParseNftRuleRecordsSelectors(t *testing.T) {
 		{`counter packets 0 bytes 0 accept`, fwRule{Action: "accept"}}, // counter is inert
 		{`tcp dport 22 accept comment "ssh in"`, fwRule{Proto: "tcp", Dport: "22", Action: "accept"}},
 		{`meta mark 0x1 accept`, fwRule{Action: "accept", Unmodelled: true}},
+		// A concatenation (W-56) records no selector: the field stays empty.
+		{`meta l4proto . th dport { tcp . 22, udp . 53 } accept`, fwRule{Action: "accept", Unmodelled: true}},
+		{`meta l4proto . th dport @allowed accept`, fwRule{Action: "accept", Unmodelled: true}},
+		{`ip protocol . th dport { tcp . 22 } accept`, fwRule{Action: "accept", Unmodelled: true}},
+		{`ct state . tcp dport { new . 22 } accept`, fwRule{Action: "accept", Unmodelled: true}},
+		{`ip saddr . tcp dport vmap { 192.0.2.1 . 22 : accept }`, fwRule{Unmodelled: true}},
+		// A verdict map (M-1) leaves the field and the action unread.
+		{`ct state vmap { established : accept, related : accept, invalid : drop }`, fwRule{Unmodelled: true}},
+		// No verdict at all (W-55).
+		{`counter packets 0 bytes 0`, fwRule{Action: "none"}},
+		{`meta l4proto tcp tcp dport 22 ct state new # recent: SET name: DEFAULT side: source counter packets 0 bytes 0`, fwRule{Proto: "tcp", Dport: "22", Ctstate: "new", Action: "none", Unmodelled: true}},
 		{`reject with icmpx type admin-prohibited`, fwRule{Action: "reject"}},
 		{`log prefix "Host INPUT Allow host" group 0 accept`, fwRule{Action: "accept"}},
 		{`iifname != "lo" accept`, fwRule{Action: "accept", Unmodelled: true}},
@@ -89,6 +100,9 @@ func TestParseIptablesRuleRecordsSelectors(t *testing.T) {
 		{`-A PREROUTING -j MARK --set-xmark 0x1/0xffffffff`, fwRule{Action: "jump MARK"}},
 		{`-A INPUT -j NFQUEUE --queue-num 1`, fwRule{Action: "jump NFQUEUE"}},
 		{`-A INPUT -j QUEUE`, fwRule{Action: "queue"}},
+		// No target at all (W-55): ufw limit's companion row.
+		{`-A ufw-user-input -p tcp -m tcp --dport 22 -m conntrack --ctstate NEW -m recent --set --name DEFAULT --mask 255.255.255.255 --rsource`, fwRule{Proto: "tcp", Dport: "22", Ctstate: "new", Action: "none", Unmodelled: true}},
+		{`-A INPUT -m conntrack --ctstate RELATED,ESTABLISHED,DNAT -j ACCEPT`, fwRule{Ctstate: "related,established,dnat", Action: "accept"}},
 	}
 	for _, c := range cases {
 		f := strings.Fields(c.line)
@@ -318,6 +332,156 @@ func TestFoldChainsKeepsFamiliesApart(t *testing.T) {
 	}
 }
 
+// nftRows parses nft rule lines into one chain's rows.
+func nftRows(lines ...string) []fwRule {
+	var out []fwRule
+	for _, l := range lines {
+		out = append(out, parseNftRule("", strings.Fields(l)))
+	}
+	return out
+}
+
+// iptRows parses iptables-save `-A` lines into rows.
+func iptRows(lines ...string) []fwRule {
+	var out []fwRule
+	for _, l := range lines {
+		f := strings.Fields(l)
+		out = append(out, parseIptablesRule(f[1], f))
+	}
+	return out
+}
+
+// W-54: a row folded through a jump carries the jump's match. `tcp dport 22
+// jump ssh_in` into `ip saddr … accept` is a tcp/22 port rule from that
+// source, never an any-port accept.
+func TestFoldChainsCarriesTheJumpsMatch(t *testing.T) {
+	by := map[chainKey][]fwRule{
+		v4("INPUT"):  nftRows(`tcp dport 22 jump ssh_in`, `drop`),
+		v4("ssh_in"): nftRows(`ip saddr 192.0.2.0/24 accept`, `drop`),
+	}
+	rows := foldChains([]baseChain{inputV4}, by)
+	if len(rows) != 4 {
+		t.Fatalf("rows %+v, want 4", rows)
+	}
+	acc := rows[1]
+	if acc.Chain != "ssh_in" || acc.Proto != "tcp" || acc.Dport != "22" || acc.Saddr != "192.0.2.0/24" || acc.Unmodelled {
+		t.Errorf("the folded accept %+v, want tcp/22 from 192.0.2.0/24", acc)
+	}
+	if got := classifyRule(acc); got != "port_rule" {
+		t.Errorf("the folded accept classifies %q, want port_rule", got)
+	}
+	for _, r := range rows {
+		if classifyRule(r) == "any_port" {
+			t.Errorf("an any-port row survived the fold: %+v", r)
+		}
+	}
+
+	// Both set and different: unmodelled. The jump's unmodelled match
+	// (here a mark) carries over too.
+	by = map[chainKey][]fwRule{
+		v4("INPUT"): nftRows(`tcp dport 22 jump a`, `meta mark 0x1 jump b`),
+		v4("a"):     nftRows(`tcp dport 80 accept`),
+		v4("b"):     nftRows(`accept`),
+	}
+	rows = foldChains([]baseChain{inputV4}, by)
+	if r := rows[1]; r.Dport != "80" || !r.Unmodelled || classifyRule(r) != "opaque" {
+		t.Errorf("a conflicting port %+v, want unmodelled (opaque)", r)
+	}
+	if r := rows[3]; !r.Unmodelled || classifyRule(r) != "opaque" {
+		t.Errorf("an accept behind an unmodelled jump %+v, want opaque", r)
+	}
+	if rows[0].Unmodelled || rows[2].Unmodelled {
+		t.Errorf("followed jumps are unmodelled: %+v / %+v", rows[0], rows[2])
+	}
+}
+
+// Nested jumps accumulate their conditions, and a chain reached under two
+// different conditions is folded under each.
+func TestFoldChainsAccumulatesNestedConditions(t *testing.T) {
+	by := map[chainKey][]fwRule{
+		v4("INPUT"): nftRows(`iifname "eth1" jump zone`, `tcp dport 443 jump svc`),
+		v4("zone"):  nftRows(`tcp dport 8080 jump svc`),
+		v4("svc"):   nftRows(`ip saddr 198.51.100.0/24 accept`),
+	}
+	rows := foldChains([]baseChain{inputV4}, by)
+	var accepts []fwRule
+	for _, r := range rows {
+		if r.Action == "accept" {
+			accepts = append(accepts, r)
+		}
+	}
+	if len(accepts) != 2 {
+		t.Fatalf("accepts %+v, want svc folded under each path", accepts)
+	}
+	deep, flat := accepts[0], accepts[1]
+	if deep.Depth != 2 || deep.Iif != "eth1" || deep.Dport != "8080" || deep.Proto != "tcp" || deep.Saddr != "198.51.100.0/24" {
+		t.Errorf("the nested fold %+v, want iif eth1 + tcp/8080 + the source", deep)
+	}
+	if flat.Depth != 1 || flat.Iif != "" || flat.Dport != "443" {
+		t.Errorf("the direct fold %+v, want tcp/443 without the interface", flat)
+	}
+}
+
+// firewalld's iptables backend sends a trusted interface to an ACCEPT-target
+// zone (`-i docker0 -g IN_trusted`, `-A IN_trusted -j ACCEPT`). Folded with
+// its jump's interface, the accept is iif docker0 with no port — opaque, never
+// an any-port accept that exposes every listener.
+func TestFoldChainsFirewalldTrustedZoneIsOpaque(t *testing.T) {
+	by := map[chainKey][]fwRule{
+		v4("INPUT"):       iptRows(`-A INPUT -i lo -j ACCEPT`, `-A INPUT -j INPUT_ZONES`, `-A INPUT -m conntrack --ctstate INVALID -j DROP`, `-A INPUT -j REJECT --reject-with icmp-host-prohibited`),
+		v4("INPUT_ZONES"): iptRows(`-A INPUT_ZONES -i docker0 -g IN_trusted`, `-A INPUT_ZONES -g IN_public`),
+		v4("IN_trusted"):  iptRows(`-A IN_trusted -j ACCEPT`),
+		v4("IN_public"):   iptRows(`-A IN_public -p tcp -m tcp --dport 22 -m conntrack --ctstate NEW,UNTRACKED -j ACCEPT`),
+	}
+	rows := foldChains([]baseChain{inputV4}, by)
+	var trusted, ssh *fwRule
+	for i, r := range rows {
+		switch r.Chain {
+		case "IN_trusted":
+			trusted = &rows[i]
+		case "IN_public":
+			ssh = &rows[i]
+		}
+		if classifyRule(r) == "any_port" {
+			t.Errorf("any-port row: %+v", r)
+		}
+	}
+	if trusted == nil || trusted.Iif != "docker0" || trusted.Depth != 2 || classifyRule(*trusted) != "opaque" {
+		t.Errorf("the trusted zone's accept %+v, want iif docker0 at depth 2, opaque", trusted)
+	}
+	if ssh == nil || classifyRule(*ssh) != "port_rule" {
+		t.Errorf("the public zone's ssh rule %+v, want a port_rule", ssh)
+	}
+}
+
+// `ufw limit 22/tcp`: the `--set` row has no verdict (irrelevant), the
+// `--update` jump leads to LOG and REJECT, and ufw-user-limit-accept's bare
+// ACCEPT inherits tcp/22 from its jump — a port rule, nothing opaque.
+func TestFoldChainsUfwLimitIsAPortRule(t *testing.T) {
+	by := map[chainKey][]fwRule{
+		v4("INPUT"): iptRows(`-A INPUT -j ufw-user-input`),
+		v4("ufw-user-input"): iptRows(
+			`-A ufw-user-input -p tcp -m tcp --dport 22 -m conntrack --ctstate NEW -m recent --set --name DEFAULT --mask 255.255.255.255 --rsource`,
+			`-A ufw-user-input -p tcp -m tcp --dport 22 -m conntrack --ctstate NEW -m recent --update --seconds 30 --hitcount 6 --name DEFAULT --mask 255.255.255.255 --rsource -j ufw-user-limit`,
+			`-A ufw-user-input -p tcp -m tcp --dport 22 -j ufw-user-limit-accept`),
+		v4("ufw-user-limit"):        iptRows(`-A ufw-user-limit -m limit --limit 3/min -j LOG --log-prefix "[UFW LIMIT BLOCK] "`, `-A ufw-user-limit -j REJECT --reject-with icmp-port-unreachable`),
+		v4("ufw-user-limit-accept"): iptRows(`-A ufw-user-limit-accept -j ACCEPT`),
+	}
+	rows := foldChains([]baseChain{inputV4}, by)
+	var ports []string
+	for _, r := range rows {
+		switch classifyRule(r) {
+		case "opaque", "any_port":
+			t.Errorf("row %+v classifies %q", r, classifyRule(r))
+		case "port_rule":
+			ports = append(ports, r.Proto+"/"+r.Dport+"@"+r.Chain)
+		}
+	}
+	if !slices.Equal(ports, []string{"tcp/22@ufw-user-limit-accept"}) {
+		t.Errorf("port rules %v, want the limit-accept's tcp/22", ports)
+	}
+}
+
 func TestFoldChainsIgnoresANatChainOfTheSameName(t *testing.T) {
 	by := map[chainKey][]fwRule{
 		v4("INPUT"):          {{Action: "jump KUBE-NODEPORTS"}},
@@ -350,6 +514,20 @@ func TestClassifyRule(t *testing.T) {
 		{fwRule{Action: "accept", Ctstate: "new,established", Proto: "tcp", Dport: "22"}, "port_rule"},
 		{fwRule{Action: "accept", Ctstate: "untracked", Proto: "tcp", Dport: "22"}, "port_rule"},
 		{fwRule{Action: "accept", Proto: "icmp"}, "irrelevant"},
+		{fwRule{Action: "accept", Proto: "ipv6-icmp", Unmodelled: true}, "irrelevant"},
+		{fwRule{Action: "accept", Proto: "sctp", Dport: "22"}, "irrelevant"},
+		{fwRule{Action: "accept", Proto: "50"}, "irrelevant"},
+		{fwRule{Action: "accept", Proto: ".", Unmodelled: true}, "opaque"},
+		{fwRule{Action: "accept", Proto: "all"}, "opaque"},
+		{fwRule{Action: "accept", Proto: "0"}, "opaque"},
+		{fwRule{Action: "accept", Proto: "comp"}, "opaque"},
+		{fwRule{Action: "accept", Proto: "mystery"}, "opaque"},
+		{fwRule{Action: "accept", Ctstate: "related,established,dnat"}, "opaque"},
+		{fwRule{Action: "accept", Ctstate: "snat"}, "opaque"},
+		{fwRule{Action: "accept", Ctstate: "invalid"}, "state_only"},
+		{fwRule{Action: "none"}, "irrelevant"},
+		{fwRule{Action: "none", Proto: "tcp", Dport: "22", Unmodelled: true}, "irrelevant"},
+		{fwRule{Action: "masquerade"}, "opaque"},
 		{fwRule{Action: "accept", Proto: "icmp", Unmodelled: true}, "irrelevant"},
 		{fwRule{Action: "jump ufw-user-input"}, "irrelevant"},
 		{fwRule{Action: "goto ufw-user-input"}, "irrelevant"},
@@ -434,12 +612,12 @@ func TestParsePortSpec(t *testing.T) {
 }
 
 // record and fwRuleFromRecord are inverses, and the record carries the
-// thirteen fields of W-4 and nothing else.
+// fourteen fields of W-4 and W-59 and nothing else.
 func TestFwRuleRecordRoundTrip(t *testing.T) {
-	r := fwRule{Chain: "ufw-user-input", ViaChain: "INPUT", Depth: 2, Family: "v4", Proto: "tcp", Dport: "80",
+	r := fwRule{Chain: "ufw-user-input", ViaChain: "INPUT", Table: "filter", Depth: 2, Family: "v4", Proto: "tcp", Dport: "80",
 		Saddr: "192.0.2.0/24", Daddr: "198.51.100.1", Iif: "eth0", Ctstate: "new", Action: "accept", Unmodelled: true, Raw: "-A ufw-user-input …"}
 	m := r.record()
-	want := []string{"action", "chain", "ctstate", "daddr", "depth", "dport", "family", "iif", "proto", "raw", "saddr", "unmodelled", "via_chain"}
+	want := []string{"action", "chain", "ctstate", "daddr", "depth", "dport", "family", "iif", "proto", "raw", "saddr", "table", "unmodelled", "via_chain"}
 	var keys []string
 	for k := range m {
 		keys = append(keys, k)

@@ -116,7 +116,6 @@ func runFirewall(ctx context.Context, a collect.Access, b *collect.Builder) erro
 
 	name, nameSrc := cfg.backend(cr)
 	b.Set("firewall.backend", collect.OK(name, nameSrc))
-	b.Set("firewall.raw_dumps", withTruncation(collect.OK(cr.dumps, cr.src), cr.truncated))
 
 	// Normalise the captured ruleset (Task 2). Parse EVERY base chain on an
 	// inbound-relevant hook (input/forward, plus the earlier ingress/prerouting
@@ -155,6 +154,16 @@ func runFirewall(ctx context.Context, a collect.Access, b *collect.Builder) erro
 		}
 	}
 
+	// W-57: an empty nf_tables ruleset proves nothing when the rules live in
+	// x_tables — iptables-legacy, common on Docker and Kubernetes hosts that
+	// also have nftables installed. In exactly the X-9 case the declared
+	// iptables-save is read as a cross-check, and its dump joins the evidence.
+	legacy := false
+	if cr.tool == "nft" && !cr.truncated && len(inputs) == 0 && !inboundPathHasRules {
+		legacy = crossCheckLegacy(ctx, a, &cr)
+	}
+	b.Set("firewall.raw_dumps", withTruncation(collect.OK(cr.dumps, cr.src), cr.truncated))
+
 	// Ruling H-16 — the `full`-confidence boundary. The v1 normaliser claims
 	// `full` ONLY in the two cases it can decide without modelling the rule
 	// engine, and deliberately UNDER-claims (partial → restricts_inbound
@@ -189,6 +198,9 @@ func runFirewall(ctx context.Context, a collect.Access, b *collect.Builder) erro
 		// H-22: a partial ruleset can never yield a confident answer.
 		confidence = "partial"
 		restricts = collect.Absent("firewall confidence partial: a captured dump was truncated; see firewall.raw_dumps")
+	case len(inputs) == 0 && !inboundPathHasRules && legacy:
+		confidence = "partial"
+		restricts = collect.Absent("nft ruleset empty but iptables-legacy carries rules; see firewall.raw_dumps")
 	case len(inputs) == 0 && !inboundPathHasRules:
 		confidence = "full"
 		restricts = collect.OK(false, cr.src)
@@ -274,6 +286,38 @@ func normalizeRuleset(cr capture) ([]baseChain, []fwRule) {
 		}
 	}
 	return bases, foldChains(bases, byChain)
+}
+
+// crossCheckLegacy runs the declared iptables-save after an empty nft read,
+// appends its dump to the capture's evidence and reports whether x_tables
+// restricts inbound there (W-57). A failed read reports false: the nft
+// answer stands.
+func crossCheckLegacy(ctx context.Context, a collect.Access, cr *capture) bool {
+	out := a.Run(ctx, iptablesSaveCmd)
+	if !cmdOK(out) {
+		return false
+	}
+	rec := dumpRecord(out.Source(iptablesSaveCmd).Cmd, out)
+	cr.dumps = append(cr.dumps, rec)
+	content, _ := rec["content"].(string)
+	return rec["truncated"] == true || iptablesLegacyRestricts(content)
+}
+
+// iptablesLegacyRestricts reports whether an iptables-save dump read beside an
+// empty nf_tables ruleset holds an inbound restriction: a filter INPUT with a
+// policy other than ACCEPT or any rule, or iptables-nft's warning that legacy
+// tables are present (which it prints instead of reading them).
+func iptablesLegacyRestricts(content string) bool {
+	if strings.Contains(content, "iptables-legacy tables present") {
+		return true
+	}
+	bases, _ := parseIptablesSave("v4", content)
+	for _, bc := range bases {
+		if bc.hook == "input" && (bc.policy != "accept" || bc.hasRules) {
+			return true
+		}
+	}
+	return false
 }
 
 // runtimePolicy is the runtime side of a default_policy setting: the common
@@ -403,6 +447,10 @@ func parseNftRuleset(content string) ([]baseChain, map[chainKey][]fwRule) {
 					cur.policy = nftPolicy(f)
 				}
 			}
+			continue
+		}
+		// A chain-level `comment "…"` line (nft ≥ 0.9.7) is no rule (M-4).
+		if nftCommentOnly(f) {
 			continue
 		}
 		if isBase {

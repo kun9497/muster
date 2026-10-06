@@ -31,6 +31,7 @@ const (
 // a jump row, the fold redefines Unmodelled as "the jump was not followed".
 type fwRule struct {
 	Chain, ViaChain string
+	Table           string // the chain's table: via_chain, table and family name a base chain (W-59)
 	Depth           int
 	Family          string // v4 | v6 | inet
 	Proto           string // tcp, udp, another literal, or ""
@@ -38,7 +39,7 @@ type fwRule struct {
 	Saddr, Daddr    string // the address or set text as written
 	Iif             string
 	Ctstate         string // lower-cased, comma-separated
-	Action          string // accept, drop, reject, return, jump X, goto X, continue, queue, log, or ""
+	Action          string // accept, drop, reject, return, jump X, goto X, continue, queue, log, none (no verdict), or "" (unread)
 	Unmodelled      bool
 	Raw             string
 }
@@ -48,6 +49,7 @@ func (r fwRule) record() map[string]any {
 	return map[string]any{
 		"chain":      r.Chain,
 		"via_chain":  r.ViaChain,
+		"table":      r.Table,
 		"depth":      r.Depth,
 		"family":     r.Family,
 		"proto":      r.Proto,
@@ -68,7 +70,7 @@ func (r fwRule) record() map[string]any {
 func fwRuleFromRecord(m map[string]any) fwRule {
 	s := func(k string) string { v, _ := m[k].(string); return v }
 	r := fwRule{
-		Chain: s("chain"), ViaChain: s("via_chain"), Family: s("family"), Proto: s("proto"), Dport: s("dport"),
+		Chain: s("chain"), ViaChain: s("via_chain"), Table: s("table"), Family: s("family"), Proto: s("proto"), Dport: s("dport"),
 		Saddr: s("saddr"), Daddr: s("daddr"), Iif: s("iif"), Ctstate: s("ctstate"), Action: s("action"), Raw: s("raw"),
 	}
 	switch d := m["depth"].(type) {
@@ -135,6 +137,15 @@ func protoName(p string) string {
 // via_chain and depth are the caller's.
 func parseNftRule(chain string, f []string) fwRule {
 	r := fwRule{Chain: chain, Raw: capRaw(strings.Join(f, " "))}
+	verdictMap := false // a vmap carries the verdicts: the rule is not verdict-less
+	// bad reports an operand that leaves its selector unrecorded: a negation,
+	// nothing, a concatenation (W-56) or a verdict map (W-6, M-1).
+	bad := func(v string, neg bool) bool {
+		if v == "vmap" || v == "map" {
+			verdictMap = true
+		}
+		return neg || v == "" || v == "." || v == "vmap" || v == "map"
+	}
 	for i := 0; i < len(f); i++ {
 		switch t := f[i]; t {
 		case "counter":
@@ -149,7 +160,7 @@ func parseNftRule(chain string, f []string) fwRule {
 		case "iif", "iifname":
 			v, next, neg, _ := nftValue(f, i+1)
 			i = next
-			if neg || v == "" {
+			if bad(v, neg) {
 				r.Unmodelled = true
 			} else {
 				r.Iif = unquote(v)
@@ -158,7 +169,7 @@ func parseNftRule(chain string, f []string) fwRule {
 			if i+1 < len(f) && f[i+1] == "state" {
 				v, next, neg, _ := nftValue(f, i+2)
 				i = next
-				if neg || v == "" {
+				if bad(v, neg) {
 					r.Unmodelled = true
 				} else {
 					r.Ctstate = ctStates(v)
@@ -175,7 +186,7 @@ func parseNftRule(chain string, f []string) fwRule {
 			v, next, neg, set := nftValue(f, i+2)
 			i = next
 			switch {
-			case neg || v == "":
+			case bad(v, neg):
 				r.Unmodelled = true
 			case field == "saddr":
 				r.Saddr = v
@@ -199,7 +210,7 @@ func parseNftRule(chain string, f []string) fwRule {
 			v, next, neg, set := nftValue(f, i+2)
 			i = next
 			switch {
-			case neg || v == "":
+			case bad(v, neg):
 				r.Unmodelled = true
 			case field == "l4proto":
 				if set {
@@ -226,7 +237,7 @@ func parseNftRule(chain string, f []string) fwRule {
 			switch {
 			case field == "sport":
 				// a source port narrows; inert, as --sport is
-			case neg || v == "" || v == "vmap" || v == "map":
+			case bad(v, neg):
 				r.Unmodelled = true
 			case field == "dport":
 				r.Dport = v
@@ -264,11 +275,28 @@ func parseNftRule(chain string, f []string) fwRule {
 		case "{":
 			_, i, _, _ = nftValue(f, i)
 			r.Unmodelled = true
+		case "vmap", "map":
+			verdictMap = true
+			r.Unmodelled = true
 		default:
 			r.Unmodelled = true
 		}
 	}
+	// No verdict word at all (W-55): the rule can admit nothing. A vmap's
+	// verdicts are unread, so its rule keeps the empty (opaque) action.
+	if r.Action == "" && !verdictMap {
+		r.Action = "none"
+	}
 	return r
+}
+
+// isNftVerdict reports a verdict word, which ends a concatenation's operand.
+func isNftVerdict(s string) bool {
+	switch s {
+	case "accept", "drop", "reject", "return", "continue", "queue", "jump", "goto":
+		return true
+	}
+	return false
 }
 
 func isNftLogOption(s string) bool {
@@ -281,8 +309,11 @@ func isNftLogOption(s string) bool {
 
 // nftValue reads the operand starting at f[i]: an optional `!=`, then one
 // token, a `{ … }` set (gathered to its closing brace), a quoted string that
-// spans fields, or a `vmap`/`map` keyword with its set (returned as the
-// keyword). next is the index of the operand's last field.
+// spans fields, a `vmap`/`map` keyword with its set (returned as the
+// keyword), or a concatenation (`meta l4proto . th dport { tcp . 22 }`,
+// W-56), returned as "." — or as "vmap" when it ends in a verdict map — with
+// the rest of its keys and its right-hand side consumed. next is the index of
+// the operand's last field.
 func nftValue(f []string, i int) (v string, next int, neg, set bool) {
 	if i < len(f) && f[i] == "!=" {
 		neg = true
@@ -292,6 +323,22 @@ func nftValue(f []string, i int) (v string, next int, neg, set bool) {
 		return "", len(f) - 1, neg, false
 	}
 	switch tok := f[i]; {
+	case tok == ".":
+		v := "."
+		for j := i + 1; j < len(f); j++ {
+			switch t := f[j]; {
+			case t == "vmap" || t == "map":
+				v = t
+			case strings.HasPrefix(t, "{"):
+				_, end := gatherSet(f, j)
+				return v, end, neg, true
+			case strings.HasPrefix(t, "@"):
+				return v, j, neg, true
+			case isNftVerdict(t):
+				return v, j - 1, neg, false
+			}
+		}
+		return v, len(f) - 1, neg, false
 	case tok == "vmap" || tok == "map":
 		if i+1 < len(f) && strings.HasPrefix(f[i+1], "{") {
 			_, end := gatherSet(f, i+1)
@@ -467,6 +514,10 @@ func parseIptablesRule(chain string, f []string) fwRule {
 			}
 		}
 	}
+	// No -j/-g at all (W-55): the rule can admit nothing.
+	if r.Action == "" {
+		r.Action = "none"
+	}
 	return r
 }
 
@@ -515,20 +566,30 @@ func jumpTarget(action string) (string, bool) {
 // foldChains returns the rows of every filter base chain on the input hook,
 // each followed by the rows of the chains its jumps and gotos reach, resolved
 // within the base chain's family and table only (W-33): depth at most 4, at
-// most 2000 folded rows per base chain, each chain visited once per base
-// chain. A jump the fold could not follow — past the depth or the budget, or
-// to a chain the dump does not hold (MARK, CT, …) — is marked unmodelled, so
-// the classifier reads it opaque; a jump it did follow is not, whatever its
-// match, since the rules it leads to are folded in unconditionally. Rule
-// order is ignored (spec P-2). Folded rows never feed confidence (W-44).
+// most 2000 folded rows per base chain.
+//
+// A row folded through a jump carries the jump's conditions (W-54): each of
+// proto, dport, saddr, daddr, iif and ctstate the row leaves empty is taken
+// from the jump, a field both set to different values makes the row
+// unmodelled, and the jump's own unmodelled match carries over; nested jumps
+// accumulate. A chain is folded once per distinct set of carried conditions
+// (once, when they are equal — ufw's six `-j ufw-skip-to-policy-input` with
+// six ports each fold its one DROP), and a jump back into a chain on the
+// current path is a cycle, followed by what is already folded.
+//
+// A jump the fold could not follow — past the depth or the budget, or to a
+// chain the dump does not hold (MARK, CT, …) — is marked unmodelled, so the
+// classifier reads it opaque; a jump it did follow is not, since its
+// conditions now live on the rows it led to. Rule order is ignored (spec
+// P-2). Folded rows never feed confidence (W-44).
 func foldChains(bases []baseChain, byChain map[chainKey][]fwRule) []fwRule {
 	out := []fwRule{}
 	for _, bc := range bases {
 		if bc.hook != "input" || bc.chainType != "filter" {
 			continue
 		}
-		s := &foldState{bc: bc, by: byChain, visited: map[string]bool{bc.name: true}, budget: foldMaxRows}
-		s.chain(bc.name, 0, &out)
+		s := &foldState{bc: bc, by: byChain, visited: map[string]bool{}, onPath: map[string]bool{bc.name: true}, budget: foldMaxRows}
+		s.chain(bc.name, 0, foldCtx{}, &out)
 	}
 	return out
 }
@@ -536,15 +597,55 @@ func foldChains(bases []baseChain, byChain map[chainKey][]fwRule) []fwRule {
 type foldState struct {
 	bc      baseChain
 	by      map[chainKey][]fwRule
-	visited map[string]bool
+	visited map[string]bool // chain name + carried conditions, folded already
+	onPath  map[string]bool // chains on the current jump path (cycles)
 	budget  int
 }
 
-// chain appends the rows of the named chain at depth and reports whether
-// every one of them fitted in the budget. A jump in it that could not be
-// followed is marked on its own row; that alone already makes the base
+// foldCtx is the conditions a chain is reached under: the selectors of the
+// jumps that led to it, and whether any of them left a match unmodelled.
+type foldCtx struct {
+	Proto, Dport, Saddr, Daddr, Iif, Ctstate string
+	Unmodelled                               bool
+}
+
+func ctxOf(r fwRule) foldCtx {
+	return foldCtx{r.Proto, r.Dport, r.Saddr, r.Daddr, r.Iif, r.Ctstate, r.Unmodelled}
+}
+
+func (c foldCtx) key() string {
+	u := "0"
+	if c.Unmodelled {
+		u = "1"
+	}
+	return strings.Join([]string{c.Proto, c.Dport, c.Saddr, c.Daddr, c.Iif, c.Ctstate, u}, "\x00")
+}
+
+// apply intersects a folded row with the conditions it was reached under.
+func (c foldCtx) apply(r fwRule) fwRule {
+	for _, p := range []struct {
+		own *string
+		inh string
+	}{{&r.Proto, c.Proto}, {&r.Dport, c.Dport}, {&r.Saddr, c.Saddr}, {&r.Daddr, c.Daddr}, {&r.Iif, c.Iif}, {&r.Ctstate, c.Ctstate}} {
+		switch {
+		case p.inh == "":
+		case *p.own == "":
+			*p.own = p.inh
+		case *p.own != p.inh:
+			r.Unmodelled = true
+		}
+	}
+	if c.Unmodelled {
+		r.Unmodelled = true
+	}
+	return r
+}
+
+// chain appends the rows of the named chain at depth, under ctx, and reports
+// whether every one of them fitted in the budget. A jump in it that could not
+// be followed is marked on its own row; that alone already makes the base
 // chain's fold opaque, so it does not propagate to the jumps above it.
-func (s *foldState) chain(name string, depth int, out *[]fwRule) bool {
+func (s *foldState) chain(name string, depth int, ctx foldCtx, out *[]fwRule) bool {
 	for _, r := range s.by[chainKey{s.bc.family, s.bc.table, name}] {
 		if depth > 0 {
 			if s.budget == 0 {
@@ -552,37 +653,47 @@ func (s *foldState) chain(name string, depth int, out *[]fwRule) bool {
 			}
 			s.budget--
 		}
-		r.Chain, r.ViaChain, r.Depth, r.Family = name, s.bc.name, depth, s.bc.family
+		r = ctx.apply(r)
+		r.Chain, r.ViaChain, r.Depth, r.Family, r.Table = name, s.bc.name, depth, s.bc.family, s.bc.table
 		at := len(*out)
 		*out = append(*out, r)
 		if target, ok := jumpTarget(r.Action); ok {
-			(*out)[at].Unmodelled = !s.follow(target, depth, out)
+			(*out)[at].Unmodelled = !s.follow(target, depth, ctxOf(r), out)
 		}
 	}
 	return true
 }
 
-// follow folds a jump's target one level deeper; true when the target was
-// folded whole, now or earlier in this base chain's fold.
-func (s *foldState) follow(target string, depth int, out *[]fwRule) bool {
-	if s.visited[target] {
+// follow folds a jump's target one level deeper under ctx; true when the
+// target was folded whole under these conditions, now or earlier in this base
+// chain's fold, or is a chain on the current path.
+func (s *foldState) follow(target string, depth int, ctx foldCtx, out *[]fwRule) bool {
+	if s.onPath[target] {
+		return true
+	}
+	k := target + "\x00" + ctx.key()
+	if s.visited[k] {
 		return true
 	}
 	if _, ok := s.by[chainKey{s.bc.family, s.bc.table, target}]; !ok || depth+1 > foldMaxDepth {
 		return false
 	}
-	s.visited[target] = true
-	return s.chain(target, depth+1, out)
+	s.visited[k] = true
+	s.onPath[target] = true
+	whole := s.chain(target, depth+1, ctx, out)
+	delete(s.onPath, target)
+	return whole
 }
 
 // ruleClass is what a row means to the exposure verdict (W-5, W-36).
 type ruleClass string
 
 // classifyRule reads one row, in W-36's order: deny; irrelevant (log, return,
-// continue, a followed jump/goto, an accept of a literal protocol other than
-// tcp/udp — whatever unmodelled says); loopback_only; state_only; port_rule
-// or any_port only when nothing was left unmodelled; else opaque. A jump the
-// fold could not follow carries unmodelled and is opaque.
+// continue, no verdict at all (W-55), a followed jump/goto, an accept of a
+// known protocol other than tcp/udp (W-56) — whatever unmodelled says);
+// loopback_only; state_only (every state established, related or invalid,
+// W-58); port_rule or any_port only when nothing was left unmodelled; else
+// opaque. A jump the fold could not follow carries unmodelled and is opaque.
 func classifyRule(r fwRule) ruleClass {
 	switch a := r.Action; {
 	case a == "drop" || a == "reject":
@@ -592,7 +703,7 @@ func classifyRule(r fwRule) ruleClass {
 			return "opaque"
 		}
 		return "irrelevant"
-	case a == "log" || a == "return" || a == "continue":
+	case a == "log" || a == "return" || a == "continue" || a == "none":
 		return "irrelevant"
 	case a != "accept":
 		return "opaque"
@@ -600,11 +711,17 @@ func classifyRule(r fwRule) ruleClass {
 	l4 := r.Proto == "tcp" || r.Proto == "udp"
 	switch {
 	case r.Proto != "" && !l4:
-		return "irrelevant"
+		if otherProtocol(r.Proto) {
+			return "irrelevant"
+		}
+		return "opaque"
 	case r.Iif == "lo":
 		return "loopback_only"
 	case r.Ctstate != "" && !admitsNew(r.Ctstate):
-		return "state_only"
+		if onlyKnownStates(r.Ctstate) {
+			return "state_only"
+		}
+		return "opaque"
 	case r.Unmodelled:
 		return "opaque"
 	case l4 && r.Dport != "" && !parsePortSpec(r.Dport).Unmodelled:
@@ -615,6 +732,18 @@ func classifyRule(r fwRule) ruleClass {
 	return "opaque"
 }
 
+// otherProtocol reports a protocol that is known not to be tcp or udp: a name
+// from a closed list, or a protocol number other than 0, 6 and 17 (W-56).
+// Any other literal — `.`, `all`, `0`, an unknown word — is not.
+func otherProtocol(p string) bool {
+	switch p {
+	case "icmp", "icmpv6", "ipv6-icmp", "igmp", "esp", "ah", "gre", "sctp", "dccp", "udplite":
+		return true
+	}
+	n, ok := portNumber(p)
+	return ok && n >= 1 && n <= 255 && n != 6 && n != 17
+}
+
 // admitsNew reports whether a conntrack state list lets a new connection in.
 func admitsNew(ctstate string) bool {
 	for _, s := range strings.Split(ctstate, ",") {
@@ -623,6 +752,18 @@ func admitsNew(ctstate string) bool {
 		}
 	}
 	return false
+}
+
+// onlyKnownStates reports a state list of established, related and invalid
+// alone; a dnat or snat state (firewalld's RELATED,ESTABLISHED,DNAT) lets a
+// redirected new connection in (W-58).
+func onlyKnownStates(ctstate string) bool {
+	for _, s := range strings.Split(ctstate, ",") {
+		if s != "established" && s != "related" && s != "invalid" {
+			return false
+		}
+	}
+	return true
 }
 
 // fwPortSpec is an enumerable destination-port operand (W-6). The Interfaces
@@ -700,4 +841,14 @@ func (p fwPortSpec) matches(port int) bool {
 		}
 	}
 	return false
+}
+
+// nftCommentOnly reports a line that is a lone `comment "…"` statement — a
+// chain's own comment, which nft prints inside the chain block (M-4).
+func nftCommentOnly(f []string) bool {
+	if len(f) < 2 || f[0] != "comment" {
+		return false
+	}
+	_, end, neg, _ := nftValue(f, 1)
+	return !neg && end == len(f)-1
 }

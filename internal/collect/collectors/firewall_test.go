@@ -394,10 +394,10 @@ func TestParseNftRulesetFieldlessLineInChain(t *testing.T) {
 }
 
 // fwRowsOf returns firewall.rules as rows, asserting that every row carries the
-// thirteen fields of W-4 and nothing else.
+// fourteen fields of W-4 and W-59 and nothing else.
 func fwRowsOf(t *testing.T, b *collect.Builder) []fwRule {
 	t.Helper()
-	fields := []string{"action", "chain", "ctstate", "daddr", "depth", "dport", "family", "iif", "proto", "raw", "saddr", "unmodelled", "via_chain"}
+	fields := []string{"action", "chain", "ctstate", "daddr", "depth", "dport", "family", "iif", "proto", "raw", "saddr", "table", "unmodelled", "via_chain"}
 	var rows []fwRule
 	for _, v := range okList(t, b, "firewall.rules") {
 		m, ok := v.(map[string]any)
@@ -443,7 +443,7 @@ func TestFirewallFoldsUfwChains(t *testing.T) {
 			http = append(http, r)
 		}
 	}
-	want := fwRule{Chain: "ufw-user-input", ViaChain: "INPUT", Depth: 2, Family: "v4", Proto: "tcp", Dport: "80", Action: "accept",
+	want := fwRule{Chain: "ufw-user-input", ViaChain: "INPUT", Table: "filter", Depth: 2, Family: "v4", Proto: "tcp", Dport: "80", Action: "accept",
 		Raw: "-A ufw-user-input -p tcp -m tcp --dport 80 -j ACCEPT"}
 	if len(http) != 1 || http[0] != want {
 		t.Fatalf("the allow 80/tcp rows %+v, want exactly %+v", http, want)
@@ -453,49 +453,66 @@ func TestFirewallFoldsUfwChains(t *testing.T) {
 	}
 }
 
-// W-36: ufw's stock before/after chains decide — under both iptables-save
-// and the iptables-nft `nft list ruleset` rendering, no folded v4 INPUT row is
-// opaque, and the tcp port rules are exactly the two allows, 22 and 80.
+// W-36, W-54, W-55: ufw's stock before/after chains decide — under both
+// iptables-save (v4 and the ip6tables-save twin) and the iptables-nft
+// `nft list ruleset` rendering (ip and ip6 tables), with `limit 22/tcp` and
+// `allow 80/tcp`: no folded INPUT row is opaque, and in each family the tcp
+// port rules are exactly 22 (ufw-user-limit-accept's ACCEPT, carrying its
+// jump's tcp/22) and 80.
 func TestFirewallUfwBeforeRulesDecide(t *testing.T) {
+	read := func(file string) string {
+		data, err := os.ReadFile(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(data)
+	}
+	dump := func(source, file string) map[string]any {
+		return map[string]any{"source": source, "content": read(file), "truncated": false}
+	}
 	for _, c := range []struct {
-		name, tool, source, file string
+		name string
+		cr   capture
 	}{
-		{"iptables-save", "iptables", iptablesSave, "testdata/iptables-save.ufw-allow-80"},
-		{"nft", "nft", nftListRuleset, "testdata/nft.ruleset.ufw-allow-80"},
+		{"iptables-save", capture{tool: "iptables", ok: true, dumps: []any{
+			dump(iptablesSave, "testdata/iptables-save.ufw-allow-80"), dump(ip6tablesSave, "testdata/ip6tables-save.ufw-allow-80")}}},
+		{"nft", capture{tool: "nft", ok: true, dumps: []any{dump(nftListRuleset, "testdata/nft.ruleset.ufw-allow-80")}}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			data, err := os.ReadFile(c.file)
-			if err != nil {
-				t.Fatal(err)
-			}
-			cr := capture{tool: c.tool, ok: true, dumps: []any{map[string]any{"source": c.source, "content": string(data), "truncated": false}}}
-			bases, rows := normalizeRuleset(cr)
+			bases, rows := normalizeRuleset(c.cr)
 			if len(bases) == 0 {
 				t.Fatal("no base chain parsed")
 			}
-			var tcpPorts []string
+			tcpPorts := map[string][]string{}
+			count := map[string]int{}
 			for _, r := range rows {
-				if r.ViaChain != "INPUT" || r.Family != "v4" {
-					t.Errorf("row not under the v4 INPUT: %+v", r)
+				if r.ViaChain != "INPUT" || r.Table != "filter" {
+					t.Errorf("row not under a filter INPUT: %+v", r)
 				}
+				count[r.Family]++
 				switch classifyRule(r) {
-				case "opaque":
-					t.Errorf("opaque row: %+v", r)
+				case "opaque", "any_port":
+					t.Errorf("%s row: %+v", classifyRule(r), r)
 				case "port_rule":
 					if r.Proto == "tcp" {
-						tcpPorts = append(tcpPorts, r.Dport)
+						tcpPorts[r.Family] = append(tcpPorts[r.Family], r.Dport)
 					}
 				}
 			}
-			if !slices.Equal(tcpPorts, []string{"22", "80"}) {
-				t.Errorf("tcp port rules %v, want [22 80]", tcpPorts)
+			for _, fam := range []string{"v4", "v6"} {
+				if !slices.Equal(tcpPorts[fam], []string{"22", "80"}) {
+					t.Errorf("%s tcp port rules %v, want [22 80]", fam, tcpPorts[fam])
+				}
 			}
-			// INPUT 6 + ufw-before-input 13 + ufw-logging-deny 2 +
-			// ufw-not-local 5 + ufw-user-input 2 + ufw-after-input 7 +
-			// ufw-skip-to-policy-input 1 + ufw-after-logging-input 1; the
-			// logging, reject and track input chains are empty.
-			if len(rows) != 37 {
-				t.Errorf("%d folded rows, want the 37 rules of the chains INPUT reaches", len(rows))
+			// v4: INPUT 6 + ufw-before-input 13 + ufw-logging-deny 2 (under
+			// ct state invalid) + ufw-not-local 5 + ufw-logging-deny 2 again
+			// (under not-local's limit) + ufw-user-input 4 + ufw-user-limit 2
+			// + ufw-user-limit-accept 1 + ufw-after-input 7 +
+			// ufw-skip-to-policy-input 7 (once per distinct jump) +
+			// ufw-after-logging-input 1. v6 has no not-local chain and 18
+			// before-input rules: 6 + 18 + 2 + 4 + 2 + 1 + 6 + 6 + 1.
+			if count["v4"] != 50 || count["v6"] != 46 || len(count) != 2 {
+				t.Errorf("rows per family %v, want v4 50 and v6 46", count)
 			}
 		})
 	}
@@ -646,5 +663,78 @@ func TestParseNftRulesetBlankLineInChainIsIgnored(t *testing.T) {
 	}
 	if !reflect.DeepEqual(gotRules, wantRules) {
 		t.Errorf("rules with blank lines = %v, want %v", gotRules, wantRules)
+	}
+}
+
+// W-57: nft answers with an empty ruleset while iptables-legacy holds the
+// rules (`:INPUT DROP` in x_tables). That is no proof of "no firewall": the
+// confidence is partial, restricts_inbound absent, and the legacy dump joins
+// the evidence.
+func TestFirewallNftEmptyButLegacyFullIsPartial(t *testing.T) {
+	a := firewallAccess(
+		map[string]string{"/etc/ufw/ufw.conf": "ufw.conf"},
+		map[string]cmdResult{
+			nftListRuleset: {stdout: []byte{}},
+			iptablesSave:   {file: "iptables-save.ufw-allow-80"},
+		},
+	)
+	b := buildBegun(t, "firewall", a)
+	if e := env(t, b, "firewall.normalization_confidence"); e.Value != "partial" {
+		t.Errorf("confidence %+v, want partial", e)
+	}
+	e := env(t, b, "firewall.restricts_inbound")
+	if e.Status != facts.StatusAbsent || e.Reason != "nft ruleset empty but iptables-legacy carries rules; see firewall.raw_dumps" {
+		t.Errorf("restricts_inbound %+v, want absent with the legacy reason", e)
+	}
+	dumps := okList(t, b, "firewall.raw_dumps")
+	if len(dumps) != 2 || dumps[1].(map[string]any)["source"] != iptablesSave {
+		t.Errorf("raw_dumps %v, want the nft dump and the iptables-save cross-check", dumps)
+	}
+
+	// iptables-nft's own warning that legacy tables exist counts the same.
+	a = firewallAccess(nil, map[string]cmdResult{
+		nftListRuleset: {stdout: []byte{}},
+		iptablesSave:   {stdout: []byte("# Warning: iptables-legacy tables present, use iptables-legacy-save to see them\n")},
+	})
+	b = buildBegun(t, "firewall", a)
+	if e := env(t, b, "firewall.normalization_confidence"); e.Value != "partial" {
+		t.Errorf("confidence with the legacy warning %+v, want partial", e)
+	}
+}
+
+// The inverse of W-57: both readings empty (or an accept INPUT with no rule)
+// stays X-9's full + ok:false.
+func TestFirewallNftAndLegacyEmptyStaysFull(t *testing.T) {
+	for name, legacy := range map[string]string{
+		"empty":  "",
+		"accept": "*filter\n:INPUT ACCEPT [0:0]\n:FORWARD ACCEPT [0:0]\n:OUTPUT ACCEPT [0:0]\nCOMMIT\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			a := firewallAccess(
+				map[string]string{"/etc/ufw/ufw.conf": "ufw.conf.disabled"},
+				map[string]cmdResult{nftListRuleset: {stdout: []byte{}}, iptablesSave: {stdout: []byte(legacy)}},
+			)
+			b := buildBegun(t, "firewall", a)
+			if e := env(t, b, "firewall.normalization_confidence"); e.Value != "full" {
+				t.Errorf("confidence %+v, want full", e)
+			}
+			if e := env(t, b, "firewall.restricts_inbound"); e.Status != facts.StatusOK || e.Value != false {
+				t.Errorf("restricts_inbound %+v, want ok false", e)
+			}
+		})
+	}
+}
+
+// M-4: a chain's own `comment "…"` line is no rule — no row, and it does not
+// make an accept-policy chain "carry rules".
+func TestParseNftRulesetChainCommentIsInert(t *testing.T) {
+	const ruleset = "table inet filter {\n\tchain input {\n\t\ttype filter hook input priority filter; policy accept;\n" +
+		"\t\tcomment \"the host's input chain\"\n\t}\n}\n"
+	bases, by := parseNftRuleset(ruleset)
+	if len(bases) != 1 || bases[0].hasRules {
+		t.Errorf("bases %+v, want one input chain carrying no rule", bases)
+	}
+	if rules := by[chainKey{"inet", "filter", "input"}]; len(rules) != 0 {
+		t.Errorf("rows %+v, want none", rules)
 	}
 }
