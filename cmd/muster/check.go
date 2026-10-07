@@ -158,7 +158,7 @@ func newCheckBlock(set *controls.Set, snap *facts.Snapshot, reg *facts.Registry,
 		for _, c := range set.Controls {
 			known[c.ID] = true
 		}
-		tally := wf.Apply(results, known, time.Now().UTC(), warn)
+		tally := wf.Apply(results, known, nil, time.Now().UTC(), warn)
 		cb.Waivers = report.WaiversBlock{Path: wf.Path, Digest: wf.Digest, Applied: tally.Applied, NotApplied: tally.NotApplied, Expired: tally.Expired, Unknown: tally.Unknown, ExpiringSoon: tally.ExpiringSoon}
 	}
 	return results, cb

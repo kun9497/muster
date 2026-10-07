@@ -107,10 +107,24 @@ func (w Waiver) expiringSoon(now time.Time) bool {
 // Apply mutates results in place. Only FAIL and WARN are waivable; a waiver
 // that matches any other status is recorded as not applied so the reader
 // sees it, and the exit code is untouched.
-func (f *File) Apply(results []check.Result, known map[string]bool, now time.Time, warn func(string)) Applied {
+//
+// known is the evaluated subset's ids; excluded is the set of controls the
+// profile excludes (nil when none). A waiver naming an excluded control is
+// counted not applied and warned, whatever its expiry -- it names a real
+// control, so it is never unknown, and it is never silently dropped.
+func (f *File) Apply(results []check.Result, known, excluded map[string]bool, now time.Time, warn func(string)) Applied {
 	var tally Applied
 	byControl := map[string][]Waiver{}
 	for _, w := range f.Waivers {
+		if excluded[w.Control] {
+			tally.NotApplied++
+			msg := fmt.Sprintf("waiver for %s not applied: excluded by profile", w.Control)
+			if w.Subject != "" {
+				msg += fmt.Sprintf(" (subject %s)", w.Subject)
+			}
+			warn(msg)
+			continue
+		}
 		if !known[w.Control] {
 			tally.Unknown++
 			warn(fmt.Sprintf("waiver names unknown control %s", w.Control))
