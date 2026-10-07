@@ -2035,7 +2035,7 @@ git commit -m "Fuzz the profile and tuning parsers nightly and lint the built-in
 
 ### Numbers
 
-- 18 commits over `364d30d` before the examples refresh (the design, the plan, the pre-flight fold, seven tasks, the fix wave, this document commit); 59 files, +5568/−170; Go 34 files (+2683/−119), of which tests 19 files (+1810/−51); `controls/` untouched (the control digest and `controls/VERSION` unchanged); two new packages (`internal/profile`, `internal/tuning`) with two fuzz targets in the nightly shard; 117 controls, the built-in `default` selects 117 of 117, the example profile 68 of 117 with 49 excluded; reviews: 7 task reviews (opus) + 3 scoped re-reviews, the whole-branch workflow 63 agents, the fix-wave re-review 1 (opus).
+- 19 commits over `364d30d` (the design, the plan, the pre-flight fold, seven tasks, the fix wave, the document commit, the examples refresh from run 37578597739); 59 files, +5568/−170; Go 34 files (+2683/−119), of which tests 19 files (+1810/−51); `controls/` untouched (the control digest and `controls/VERSION` unchanged); two new packages (`internal/profile`, `internal/tuning`) with two fuzz targets in the nightly shard; 117 controls, the built-in `default` selects 117 of 117, the example profile 68 of 117 with 49 excluded; reviews: 7 task reviews (opus) + 3 scoped re-reviews, the whole-branch workflow 63 agents, the fix-wave re-review 1 (opus).
 
 ### Parked
 

@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
   "run": {
-    "muster_version": "17b0d96",
-    "commit": "17b0d96",
+    "muster_version": "5c0f7a8",
+    "commit": "5c0f7a8",
     "controls_version": "kisa-unix-2026+2026.10.02",
     "controls_digest": "sha256:663acb91eee0a218cac42d72184b53e026addf12b5f6f5f38280e19197dc0da0",
     "guide_edition": "kisa-unix-2026",
-    "collected_at": "2026-10-06T09:31:44Z",
+    "collected_at": "2026-10-07T05:54:12Z",
     "host": {
       "hostname": "ubuntu-container",
       "machine_id_hash": "",
@@ -78,7 +78,7 @@
       {
         "name": "files",
         "status": "ok",
-        "ms": 3
+        "ms": 2
       },
       {
         "name": "fim",
@@ -141,13 +141,13 @@
       {
         "name": "patch",
         "status": "ok",
-        "ms": 31,
+        "ms": 23,
         "cmd": "/usr/bin/apt-get -s upgrade -o Debug::NoLocking=1"
       },
       {
         "name": "pkgverify",
         "status": "ok",
-        "ms": 216,
+        "ms": 165,
         "cmd": "/usr/bin/rpm -Va"
       },
       {
@@ -158,7 +158,7 @@
       {
         "name": "processes",
         "status": "ok",
-        "ms": 14,
+        "ms": 12,
         "cmd": "/usr/bin/rpm -qa --qf [%{=NAME}\t%{FILEMODES:octal}\t%{FILEUSERNAME}\t%{FILEGROUPNAME}\t%|FILECAPS?{%{FILECAPS}}|\t%{FILENAMES}\n]"
       },
       {
@@ -196,7 +196,7 @@
       {
         "name": "sysctl",
         "status": "ok",
-        "ms": 3
+        "ms": 2
       },
       {
         "name": "timesync",
@@ -226,12 +226,23 @@
     "partial_failures": []
   },
   "check": {
-    "muster_version": "17b0d96",
-    "commit": "17b0d96",
+    "muster_version": "5c0f7a8",
+    "commit": "5c0f7a8",
     "controls_version": "kisa-unix-2026+2026.10.02",
     "controls_digest": "sha256:663acb91eee0a218cac42d72184b53e026addf12b5f6f5f38280e19197dc0da0",
-    "snapshot_digest": "sha256:0e477cc2ad2435ecfa8206bc64c58295188acd6f7a9d5a4f6c1393033d1d454a",
+    "snapshot_digest": "sha256:71f18a2bd7eb3db1edbd542d55f3b52aa70c103fb92933f2b9df47dfc3059052",
     "guide_edition": "kisa-unix-2026",
+    "profile": {
+      "name": "default",
+      "source": "builtin",
+      "digest": "sha256:f4db63e671d12ad73cca111ca4132cb5459983bc32409b21c571067674bf9c78",
+      "extends": [
+        "builtin:default"
+      ],
+      "selected": 117,
+      "excluded": 0,
+      "excluded_ids": []
+    },
     "waivers": {
       "applied": 0,
       "not_applied": 0,
@@ -550,6 +561,130 @@
       "muster.service.snmp_community_strength": {
         "min_length": 8
       }
+    },
+    "param_sources": {
+      "muster.account.cron_permissions": {
+        "allowed_modes": "default"
+      },
+      "muster.account.lockout_threshold": {
+        "max_attempts": "default"
+      },
+      "muster.account.password_hash_algorithm": {
+        "allowed_hashes": "default",
+        "allowed_methods": "default",
+        "allowed_pam_hashes": "default"
+      },
+      "muster.account.password_policy": {
+        "max_days": "default",
+        "min_classes": "default",
+        "min_days": "default",
+        "min_len": "default"
+      },
+      "muster.account.root_remote_login": {
+        "allowed": "default"
+      },
+      "muster.account.session_timeout": {
+        "max_count": "default",
+        "max_idle": "default",
+        "max_interval": "default"
+      },
+      "muster.account.sudoers_permissions": {
+        "allowed_modes": "default"
+      },
+      "muster.account.umask_policy": {
+        "acceptable": "default"
+      },
+      "muster.account.unnecessary_accounts": {
+        "unnecessary": "default"
+      },
+      "muster.beyond.account_inactivity_lock": {
+        "max_inactive_days": "default"
+      },
+      "muster.beyond.audit_disk_actions": {
+        "allowed_disk_error_actions": "default",
+        "allowed_disk_full_actions": "default",
+        "allowed_rotate_actions": "default",
+        "allowed_space_actions": "default"
+      },
+      "muster.beyond.audit_log_permissions": {
+        "allowed_groups": "default",
+        "allowed_modes": "default"
+      },
+      "muster.beyond.bootloader_config_permissions": {
+        "allowed_modes": "default"
+      },
+      "muster.beyond.container_runtime_access": {
+        "allowed_runtime_group_members": "default"
+      },
+      "muster.beyond.exposed_listeners_allowed": {
+        "allowed_ports": "default"
+      },
+      "muster.beyond.ip_forwarding_disabled": {
+        "allowed_forward": "default"
+      },
+      "muster.beyond.ipv6_forwarding_disabled": {
+        "allowed_forward": "default"
+      },
+      "muster.beyond.ipv6_router_advertisements_ignored": {
+        "allowed_accept_ra": "default"
+      },
+      "muster.beyond.ld_so_preload_empty": {
+        "allowed_preload": "default"
+      },
+      "muster.beyond.listeners_packaged": {
+        "allowed_executables": "default"
+      },
+      "muster.beyond.separate_partitions": {
+        "required_separate": "default"
+      },
+      "muster.beyond.ssh_key_quality": {
+        "min_rsa_bits": "default"
+      },
+      "muster.beyond.sudo_nopasswd_all": {
+        "allowed_nopasswd_principals": "default"
+      },
+      "muster.beyond.sysrq_restricted": {
+        "allowed_sysrq": "default"
+      },
+      "muster.file.hosts_lpd_permissions": {
+        "allowed_modes": "default"
+      },
+      "muster.file.hosts_permissions": {
+        "allowed_modes": "default"
+      },
+      "muster.file.inetd_conf_permissions": {
+        "allowed_modes": "default"
+      },
+      "muster.file.log_dir_permissions": {
+        "allowed_groups": "default"
+      },
+      "muster.file.services_permissions": {
+        "allowed_modes": "default"
+      },
+      "muster.file.shadow_permissions": {
+        "allowed_modes": "default"
+      },
+      "muster.file.suid_sgid": {
+        "forbidden_suid": "default"
+      },
+      "muster.file.syslog_conf_permissions": {
+        "allowed_modes": "default"
+      },
+      "muster.log.syslog_policy": {
+        "facilities": "default"
+      },
+      "muster.patch.security_updates": {
+        "max_metadata_age_s": "default"
+      },
+      "muster.service.ftpusers_permissions": {
+        "allowed_modes": "default"
+      },
+      "muster.service.nfs_export_access": {
+        "allowed_modes": "default"
+      },
+      "muster.service.snmp_community_strength": {
+        "min_length": "default"
+      }
     }
   },
   "summary": {
@@ -740,7 +875,8 @@
           "verdict": "pass"
         }
       ],
-      "severity": "high"
+      "severity": "high",
+      "severity_source": "importance"
     },
     {
       "id": "muster.account.lockout_threshold",
@@ -799,7 +935,8 @@
           "status": "absent"
         }
       ],
-      "severity": "high"
+      "severity": "high",
+      "severity_source": "importance"
     },
     {
       "id": "muster.account.password_policy",
@@ -900,7 +1037,8 @@
           "status": "absent"
         }
       ],
-      "severity": "high"
+      "severity": "high",
+      "severity_source": "importance"
     },
     {
       "id": "muster.account.root_home_and_path",
@@ -940,7 +1078,8 @@
         }
       ],
       "mechanism": 2,
-      "severity": "high"
+      "severity": "high",
+      "severity_source": "importance"
     },
     {
       "id": "muster.account.root_only_uid_zero",
@@ -969,7 +1108,8 @@
           "verdict": "pass"
         }
       ],
-      "severity": "high"
+      "severity": "high",
+      "severity_source": "importance"
     },
     {
       "id": "muster.account.root_remote_login",
@@ -986,7 +1126,8 @@
           "status": "unsupported"
         }
       ],
-      "severity": "high"
+      "severity": "high",
+      "severity_source": "importance"
     },
     {
       "id": "muster.account.shadow_passwords",
@@ -1025,7 +1166,8 @@
           }
         }
       ],
-      "severity": "high"
+      "severity": "high",
+      "severity_source": "importance"
     },
     {
       "id": "muster.account.su_restricted",
@@ -1080,7 +1222,8 @@
           }
         }
       ],
-      "severity": "high"
+      "severity": "high",
+      "severity_source": "importance"
     },
     {
       "id": "muster.file.dev_no_stale_files",
@@ -1101,7 +1244,8 @@
           }
         }
       ],
-      "severity": "high"
+      "severity": "high",
+      "severity_source": "importance"
     },
     {
       "id": "muster.file.env_file_permissions",
@@ -1122,7 +1266,8 @@
           }
         }
       ],
-      "severity": "high"
+      "severity": "high",
+      "severity_source": "importance"
     },
     {
       "id": "muster.file.hosts_permissions",
@@ -1153,7 +1298,8 @@
           }
         }
       ],
-      "severity": "high"
+      "severity": "high",
+      "severity_source": "importance"
     },
     {
       "id": "muster.file.inetd_conf_permissions",
@@ -1174,7 +1320,8 @@
           "status": "absent"
         }
       ],
-      "severity": "high"
+      "severity": "high",
+      "severity_source": "importance"
     },
     {
       "id": "muster.file.ip_port_restriction",
@@ -1191,7 +1338,8 @@
           "status": "unsupported"
         }
       ],
-      "severity": "high"
+      "severity": "high",
+      "severity_source": "importance"
     },
     {
       "id": "muster.file.passwd_permissions",
@@ -1239,7 +1387,8 @@
           }
         }
       ],
-      "severity": "high"
+      "severity": "high",
+      "severity_source": "importance"
     },
     {
       "id": "muster.file.rhosts_forbidden",
@@ -1268,7 +1417,8 @@
           }
         }
       ],
-      "severity": "high"
+      "severity": "high",
+      "severity_source": "importance"
     },
     {
       "id": "muster.file.services_permissions",
@@ -1289,7 +1439,8 @@
           "status": "absent"
         }
       ],
-      "severity": "high"
+      "severity": "high",
+      "severity_source": "importance"
     },
     {
       "id": "muster.file.shadow_permissions",
@@ -1329,7 +1480,8 @@
           }
         }
       ],
-      "severity": "high"
+      "severity": "high",
+      "severity_source": "importance"
     },
     {
       "id": "muster.file.startup_script_permissions",
@@ -1388,7 +1540,8 @@
           "verdict": "pass"
         }
       ],
-      "severity": "high"
+      "severity": "high",
+      "severity_source": "importance"
     },
     {
       "id": "muster.file.suid_sgid",
@@ -1410,7 +1563,8 @@
           "status": "unsupported"
         }
       ],
-      "severity": "high"
+      "severity": "high",
+      "severity_source": "importance"
     },
     {
       "id": "muster.file.suid_sgid_unverified",
@@ -1428,7 +1582,8 @@
           "status": "unsupported"
         }
       ],
-      "severity": "high"
+      "severity": "high",
+      "severity_source": "importance"
     },
     {
       "id": "muster.file.syslog_conf_permissions",
@@ -1476,7 +1631,8 @@
           }
         }
       ],
-      "severity": "high"
+      "severity": "high",
+      "severity_source": "importance"
     },
     {
       "id": "muster.file.unowned_files",
@@ -1525,7 +1681,8 @@
         }
       ],
       "mechanism": 1,
-      "severity": "high"
+      "severity": "high",
+      "severity_source": "importance"
     },
     {
       "id": "muster.file.world_writable",
@@ -1543,7 +1700,8 @@
           "status": "unsupported"
         }
       ],
-      "severity": "high"
+      "severity": "high",
+      "severity_source": "importance"
     },
     {
       "id": "muster.patch.security_updates",
@@ -1573,7 +1731,8 @@
           "status": "absent"
         }
       ],
-      "severity": "high"
+      "severity": "high",
+      "severity_source": "importance"
     },
     {
       "id": "muster.service.automount_disabled",
@@ -1595,7 +1754,8 @@
           "status": "unsupported"
         }
       ],
-      "severity": "high"
+      "severity": "high",
+      "severity_source": "importance"
     },
     {
       "id": "muster.service.dns_version",
@@ -1620,7 +1780,8 @@
           }
         }
       ],
-      "severity": "high"
+      "severity": "high",
+      "severity_source": "importance"
     },
     {
       "id": "muster.service.dns_zone_transfer",
@@ -1645,7 +1806,8 @@
           }
         }
       ],
-      "severity": "high"
+      "severity": "high",
+      "severity_source": "importance"
     },
     {
       "id": "muster.service.dos_services_disabled",
@@ -1671,7 +1833,8 @@
           "status": "unsupported"
         }
       ],
-      "severity": "high"
+      "severity": "high",
+      "severity_source": "importance"
     },
     {
       "id": "muster.service.finger_disabled",
@@ -1697,7 +1860,8 @@
           "status": "unsupported"
         }
       ],
-      "severity": "high"
+      "severity": "high",
+      "severity_source": "importance"
     },
     {
       "id": "muster.service.ftp_anonymous",
@@ -1714,7 +1878,8 @@
           "status": "unsupported"
         }
       ],
-      "severity": "high"
+      "severity": "high",
+      "severity_source": "importance"
     },
     {
       "id": "muster.service.mail_relay",
@@ -1739,7 +1904,8 @@
           }
         }
       ],
-      "severity": "high"
+      "severity": "high",
+      "severity_source": "importance"
     },
     {
       "id": "muster.service.mail_user_execution",
@@ -1764,7 +1930,8 @@
           }
         }
       ],
-      "severity": "high"
+      "severity": "high",
+      "severity_source": "importance"
     },
     {
       "id": "muster.service.mail_version",
@@ -1789,7 +1956,8 @@
           }
         }
       ],
-      "severity": "high"
+      "severity": "high",
+      "severity_source": "importance"
     },
     {
       "id": "muster.service.nfs_export_access",
@@ -1806,7 +1974,8 @@
           "status": "unsupported"
         }
       ],
-      "severity": "high"
+      "severity": "high",
+      "severity_source": "importance"
     },
     {
       "id": "muster.service.nfs_server_disabled",
@@ -1832,7 +2001,8 @@
           "status": "unsupported"
         }
       ],
-      "severity": "high"
+      "severity": "high",
+      "severity_source": "importance"
     },
     {
       "id": "muster.service.nis_disabled",
@@ -1878,7 +2048,8 @@
           }
         }
       ],
-      "severity": "high"
+      "severity": "high",
+      "severity_source": "importance"
     },
     {
       "id": "muster.service.rpcbind_disabled",
@@ -1904,7 +2075,8 @@
           "status": "unsupported"
         }
       ],
-      "severity": "high"
+      "severity": "high",
+      "severity_source": "importance"
     },
     {
       "id": "muster.service.rservices_disabled",
@@ -1930,7 +2102,8 @@
           "status": "unsupported"
         }
       ],
-      "severity": "high"
+      "severity": "high",
+      "severity_source": "importance"
     },
     {
       "id": "muster.service.snmp_access_control",
@@ -1947,7 +2120,8 @@
           "status": "unsupported"
         }
       ],
-      "severity": "high"
+      "severity": "high",
+      "severity_source": "importance"
     },
     {
       "id": "muster.service.snmp_version",
@@ -1964,7 +2138,8 @@
           "status": "unsupported"
         }
       ],
-      "severity": "high"
+      "severity": "high",
+      "severity_source": "importance"
     },
     {
       "id": "muster.service.tftp_talk_disabled",
@@ -2002,7 +2177,8 @@
           "status": "unsupported"
         }
       ],
-      "severity": "high"
+      "severity": "high",
+      "severity_source": "importance"
     },
     {
       "id": "muster.account.admin_group_minimal",
@@ -2032,7 +2208,8 @@
           }
         }
       ],
-      "severity": "medium"
+      "severity": "medium",
+      "severity_source": "importance"
     },
     {
       "id": "muster.account.password_hash_algorithm",
@@ -2105,7 +2282,8 @@
           "verdict": "pass"
         }
       ],
-      "severity": "medium"
+      "severity": "medium",
+      "severity_source": "importance"
     },
     {
       "id": "muster.account.sudoers_permissions",
@@ -2126,7 +2304,8 @@
           }
         }
       ],
-      "severity": "medium"
+      "severity": "medium",
+      "severity_source": "importance"
     },
     {
       "id": "muster.account.umask_policy",
@@ -2164,7 +2343,8 @@
           }
         }
       ],
-      "severity": "medium"
+      "severity": "medium",
+      "severity_source": "importance"
     },
     {
       "id": "muster.account.unique_uids",
@@ -2185,7 +2365,8 @@
           }
         }
       ],
-      "severity": "medium"
+      "severity": "medium",
+      "severity_source": "importance"
     },
     {
       "id": "muster.file.home_dir_exists",
@@ -2232,7 +2413,8 @@
           "verdict": "pass"
         }
       ],
-      "severity": "medium"
+      "severity": "medium",
+      "severity_source": "importance"
     },
     {
       "id": "muster.file.home_dir_permissions",
@@ -2291,7 +2473,8 @@
           "verdict": "pass"
         }
       ],
-      "severity": "medium"
+      "severity": "medium",
+      "severity_source": "importance"
     },
     {
       "id": "muster.file.log_dir_permissions",
@@ -2380,7 +2563,8 @@
           "verdict": "pass"
         }
       ],
-      "severity": "medium"
+      "severity": "medium",
+      "severity_source": "importance"
     },
     {
       "id": "muster.log.syslog_policy",
@@ -2401,7 +2585,8 @@
           }
         }
       ],
-      "severity": "medium"
+      "severity": "medium",
+      "severity_source": "importance"
     },
     {
       "id": "muster.log.time_sync",
@@ -2418,7 +2603,8 @@
           "status": "unsupported"
         }
       ],
-      "severity": "medium"
+      "severity": "medium",
+      "severity_source": "importance"
     },
     {
       "id": "muster.service.dns_dynamic_update",
@@ -2443,7 +2629,8 @@
           }
         }
       ],
-      "severity": "medium"
+      "severity": "medium",
+      "severity_source": "importance"
     },
     {
       "id": "muster.service.ftp_account_shell",
@@ -2489,7 +2676,8 @@
           "verdict": "pass"
         }
       ],
-      "severity": "medium"
+      "severity": "medium",
+      "severity_source": "importance"
     },
     {
       "id": "muster.service.ftp_unencrypted",
@@ -2506,7 +2694,8 @@
           "status": "unsupported"
         }
       ],
-      "severity": "medium"
+      "severity": "medium",
+      "severity_source": "importance"
     },
     {
       "id": "muster.service.ftpusers_root",
@@ -2523,7 +2712,8 @@
           "status": "unsupported"
         }
       ],
-      "severity": "medium"
+      "severity": "medium",
+      "severity_source": "importance"
     },
     {
       "id": "muster.service.mail_expn_vrfy",
@@ -2540,7 +2730,8 @@
           "status": "unsupported"
         }
       ],
-      "severity": "medium"
+      "severity": "medium",
+      "severity_source": "importance"
     },
     {
       "id": "muster.service.snmp_community_strength",
@@ -2557,7 +2748,8 @@
           "status": "unsupported"
         }
       ],
-      "severity": "medium"
+      "severity": "medium",
+      "severity_source": "importance"
     },
     {
       "id": "muster.service.snmp_disabled",
@@ -2583,7 +2775,8 @@
           "status": "unsupported"
         }
       ],
-      "severity": "medium"
+      "severity": "medium",
+      "severity_source": "importance"
     },
     {
       "id": "muster.service.telnet_disabled",
@@ -2601,7 +2794,8 @@
           "status": "unsupported"
         }
       ],
-      "severity": "medium"
+      "severity": "medium",
+      "severity_source": "importance"
     },
     {
       "id": "muster.account.primary_group_exists",
@@ -2631,7 +2825,8 @@
           }
         }
       ],
-      "severity": "low"
+      "severity": "low",
+      "severity_source": "importance"
     },
     {
       "id": "muster.account.session_timeout",
@@ -2662,7 +2857,8 @@
           "side": "effective"
         }
       ],
-      "severity": "low"
+      "severity": "low",
+      "severity_source": "importance"
     },
     {
       "id": "muster.account.system_account_shells",
@@ -2798,7 +2994,8 @@
           "verdict": "pass"
         }
       ],
-      "severity": "low"
+      "severity": "low",
+      "severity_source": "importance"
     },
     {
       "id": "muster.account.unnecessary_accounts",
@@ -2834,7 +3031,8 @@
           "verdict": "fail"
         }
       ],
-      "severity": "low"
+      "severity": "low",
+      "severity_source": "importance"
     },
     {
       "id": "muster.file.hidden_entries",
@@ -2852,7 +3050,8 @@
           "status": "unsupported"
         }
       ],
-      "severity": "low"
+      "severity": "low",
+      "severity_source": "importance"
     },
     {
       "id": "muster.file.hosts_lpd_permissions",
@@ -2873,7 +3072,8 @@
           "status": "absent"
         }
       ],
-      "severity": "low"
+      "severity": "low",
+      "severity_source": "importance"
     },
     {
       "id": "muster.service.ftp_banner",
@@ -2890,7 +3090,8 @@
           "status": "unsupported"
         }
       ],
-      "severity": "low"
+      "severity": "low",
+      "severity_source": "importance"
     },
     {
       "id": "muster.service.ftpusers_permissions",
@@ -2907,7 +3108,8 @@
           "status": "unsupported"
         }
       ],
-      "severity": "low"
+      "severity": "low",
+      "severity_source": "importance"
     },
     {
       "id": "muster.service.login_banner",
@@ -2939,7 +3141,8 @@
         }
       ],
       "mechanism": 2,
-      "severity": "low"
+      "severity": "low",
+      "severity_source": "importance"
     },
     {
       "id": "muster.beyond.aslr_and_link_protection",
@@ -2961,7 +3164,8 @@
           }
         }
       ],
-      "severity": "high"
+      "severity": "high",
+      "severity_source": "importance"
     },
     {
       "id": "muster.beyond.audit_rules_loaded",
@@ -2987,7 +3191,8 @@
           "status": "unsupported"
         }
       ],
-      "severity": "high"
+      "severity": "high",
+      "severity_source": "importance"
     },
     {
       "id": "muster.beyond.auditd_active",
@@ -3009,7 +3214,8 @@
           }
         }
       ],
-      "severity": "high"
+      "severity": "high",
+      "severity_source": "importance"
     },
     {
       "id": "muster.beyond.bootloader_config_permissions",
@@ -3031,7 +3237,8 @@
           }
         }
       ],
-      "severity": "high"
+      "severity": "high",
+      "severity_source": "importance"
     },
     {
       "id": "muster.beyond.container_runtime_access",
@@ -3053,7 +3260,8 @@
           }
         }
       ],
-      "severity": "high"
+      "severity": "high",
+      "severity_source": "importance"
     },
     {
       "id": "muster.beyond.exposed_listeners_allowed",
@@ -3075,7 +3283,8 @@
           }
         }
       ],
-      "severity": "high"
+      "severity": "high",
+      "severity_source": "importance"
     },
     {
       "id": "muster.beyond.file_capabilities_declared",
@@ -3097,7 +3306,8 @@
           }
         }
       ],
-      "severity": "high"
+      "severity": "high",
+      "severity_source": "importance"
     },
     {
       "id": "muster.beyond.ld_so_preload_empty",
@@ -3119,7 +3329,8 @@
           }
         }
       ],
-      "severity": "high"
+      "severity": "high",
+      "severity_source": "importance"
     },
     {
       "id": "muster.beyond.package_files_unmodified",
@@ -3141,7 +3352,8 @@
           }
         }
       ],
-      "severity": "high"
+      "severity": "high",
+      "severity_source": "importance"
     },
     {
       "id": "muster.beyond.root_unit_exec_writable",
@@ -3163,7 +3375,8 @@
           }
         }
       ],
-      "severity": "high"
+      "severity": "high",
+      "severity_source": "importance"
     },
     {
       "id": "muster.beyond.sudo_nopasswd_all",
@@ -3185,7 +3398,8 @@
           }
         }
       ],
-      "severity": "high"
+      "severity": "high",
+      "severity_source": "importance"
     },
     {
       "id": "muster.beyond.account_inactivity_lock",
@@ -3207,7 +3421,8 @@
           }
         }
       ],
-      "severity": "medium"
+      "severity": "medium",
+      "severity_source": "importance"
     },
     {
       "id": "muster.beyond.audit_disk_actions",
@@ -3233,7 +3448,8 @@
           "status": "unsupported"
         }
       ],
-      "severity": "medium"
+      "severity": "medium",
+      "severity_source": "importance"
     },
     {
       "id": "muster.beyond.audit_immutable",
@@ -3259,7 +3475,8 @@
           "status": "unsupported"
         }
       ],
-      "severity": "medium"
+      "severity": "medium",
+      "severity_source": "importance"
     },
     {
       "id": "muster.beyond.audit_log_permissions",
@@ -3285,7 +3502,8 @@
           "status": "unsupported"
         }
       ],
-      "severity": "medium"
+      "severity": "medium",
+      "severity_source": "importance"
     },
     {
       "id": "muster.beyond.bootloader_password",
@@ -3307,7 +3525,8 @@
           }
         }
       ],
-      "severity": "medium"
+      "severity": "medium",
+      "severity_source": "importance"
     },
     {
       "id": "muster.beyond.core_dump_policy",
@@ -3329,7 +3548,8 @@
           }
         }
       ],
-      "severity": "medium"
+      "severity": "medium",
+      "severity_source": "importance"
     },
     {
       "id": "muster.beyond.dev_shm_mount_options",
@@ -3351,7 +3571,8 @@
           }
         }
       ],
-      "severity": "medium"
+      "severity": "medium",
+      "severity_source": "importance"
     },
     {
       "id": "muster.beyond.file_integrity_tool",
@@ -3373,7 +3594,8 @@
           }
         }
       ],
-      "severity": "medium"
+      "severity": "medium",
+      "severity_source": "importance"
     },
     {
       "id": "muster.beyond.icmp_redirects_ignored",
@@ -3395,7 +3617,8 @@
           }
         }
       ],
-      "severity": "medium"
+      "severity": "medium",
+      "severity_source": "importance"
     },
     {
       "id": "muster.beyond.ip_forwarding_disabled",
@@ -3417,7 +3640,8 @@
           }
         }
       ],
-      "severity": "medium"
+      "severity": "medium",
+      "severity_source": "importance"
     },
     {
       "id": "muster.beyond.ipv6_forwarding_disabled",
@@ -3439,7 +3663,8 @@
           }
         }
       ],
-      "severity": "medium"
+      "severity": "medium",
+      "severity_source": "importance"
     },
     {
       "id": "muster.beyond.ipv6_redirects_ignored",
@@ -3461,7 +3686,8 @@
           }
         }
       ],
-      "severity": "medium"
+      "severity": "medium",
+      "severity_source": "importance"
     },
     {
       "id": "muster.beyond.ipv6_router_advertisements_ignored",
@@ -3483,7 +3709,8 @@
           }
         }
       ],
-      "severity": "medium"
+      "severity": "medium",
+      "severity_source": "importance"
     },
     {
       "id": "muster.beyond.ipv6_source_routing_rejected",
@@ -3505,7 +3732,8 @@
           }
         }
       ],
-      "severity": "medium"
+      "severity": "medium",
+      "severity_source": "importance"
     },
     {
       "id": "muster.beyond.kernel_pointer_exposure",
@@ -3527,7 +3755,8 @@
           }
         }
       ],
-      "severity": "medium"
+      "severity": "medium",
+      "severity_source": "importance"
     },
     {
       "id": "muster.beyond.listeners_packaged",
@@ -3549,7 +3778,8 @@
           }
         }
       ],
-      "severity": "medium"
+      "severity": "medium",
+      "severity_source": "importance"
     },
     {
       "id": "muster.beyond.no_deleted_executables",
@@ -3571,7 +3801,8 @@
           }
         }
       ],
-      "severity": "medium"
+      "severity": "medium",
+      "severity_source": "importance"
     },
     {
       "id": "muster.beyond.ptrace_restriction",
@@ -3593,7 +3824,8 @@
           }
         }
       ],
-      "severity": "medium"
+      "severity": "medium",
+      "severity_source": "importance"
     },
     {
       "id": "muster.beyond.reverse_path_filtering",
@@ -3615,7 +3847,8 @@
           }
         }
       ],
-      "severity": "medium"
+      "severity": "medium",
+      "severity_source": "importance"
     },
     {
       "id": "muster.beyond.root_authorized_keys",
@@ -3647,7 +3880,8 @@
           "side": "effective"
         }
       ],
-      "severity": "medium"
+      "severity": "medium",
+      "severity_source": "importance"
     },
     {
       "id": "muster.beyond.secure_boot_enabled",
@@ -3669,7 +3903,8 @@
           }
         }
       ],
-      "severity": "medium"
+      "severity": "medium",
+      "severity_source": "importance"
     },
     {
       "id": "muster.beyond.separate_partitions",
@@ -3691,7 +3926,8 @@
           }
         }
       ],
-      "severity": "medium"
+      "severity": "medium",
+      "severity_source": "importance"
     },
     {
       "id": "muster.beyond.source_routing_rejected",
@@ -3713,7 +3949,8 @@
           }
         }
       ],
-      "severity": "medium"
+      "severity": "medium",
+      "severity_source": "importance"
     },
     {
       "id": "muster.beyond.ssh_key_quality",
@@ -3735,7 +3972,8 @@
           }
         }
       ],
-      "severity": "medium"
+      "severity": "medium",
+      "severity_source": "importance"
     },
     {
       "id": "muster.beyond.sudo_logging",
@@ -3757,7 +3995,8 @@
           }
         }
       ],
-      "severity": "medium"
+      "severity": "medium",
+      "severity_source": "importance"
     },
     {
       "id": "muster.beyond.suid_dumpable_disabled",
@@ -3779,7 +4018,8 @@
           }
         }
       ],
-      "severity": "medium"
+      "severity": "medium",
+      "severity_source": "importance"
     },
     {
       "id": "muster.beyond.swap_encrypted",
@@ -3801,7 +4041,8 @@
           }
         }
       ],
-      "severity": "medium"
+      "severity": "medium",
+      "severity_source": "importance"
     },
     {
       "id": "muster.beyond.syn_cookies_enabled",
@@ -3823,7 +4064,8 @@
           }
         }
       ],
-      "severity": "medium"
+      "severity": "medium",
+      "severity_source": "importance"
     },
     {
       "id": "muster.beyond.sysrq_restricted",
@@ -3845,7 +4087,8 @@
           }
         }
       ],
-      "severity": "medium"
+      "severity": "medium",
+      "severity_source": "importance"
     },
     {
       "id": "muster.beyond.tmp_mount_options",
@@ -3867,7 +4110,8 @@
           }
         }
       ],
-      "severity": "medium"
+      "severity": "medium",
+      "severity_source": "importance"
     },
     {
       "id": "muster.beyond.uncommon_network_protocols_disabled",
@@ -3889,7 +4133,8 @@
           }
         }
       ],
-      "severity": "medium"
+      "severity": "medium",
+      "severity_source": "importance"
     },
     {
       "id": "muster.beyond.usb_storage_disabled",
@@ -3911,7 +4156,8 @@
           }
         }
       ],
-      "severity": "medium"
+      "severity": "medium",
+      "severity_source": "importance"
     },
     {
       "id": "muster.beyond.var_tmp_mount_options",
@@ -3933,7 +4179,8 @@
           }
         }
       ],
-      "severity": "medium"
+      "severity": "medium",
+      "severity_source": "importance"
     },
     {
       "id": "muster.beyond.home_mount_options",
@@ -3955,7 +4202,8 @@
           }
         }
       ],
-      "severity": "low"
+      "severity": "low",
+      "severity_source": "importance"
     },
     {
       "id": "muster.beyond.icmp_broadcast_and_bogus_ignored",
@@ -3977,7 +4225,8 @@
           }
         }
       ],
-      "severity": "low"
+      "severity": "low",
+      "severity_source": "importance"
     },
     {
       "id": "muster.beyond.remote_log_forwarding",
@@ -3999,7 +4248,8 @@
           }
         }
       ],
-      "severity": "low"
+      "severity": "low",
+      "severity_source": "importance"
     },
     {
       "id": "muster.beyond.uncommon_filesystems_disabled",
@@ -4021,7 +4271,8 @@
           }
         }
       ],
-      "severity": "low"
+      "severity": "low",
+      "severity_source": "importance"
     },
     {
       "id": "muster.beyond.unprivileged_bpf_restricted",
@@ -4043,7 +4294,8 @@
           }
         }
       ],
-      "severity": "low"
+      "severity": "low",
+      "severity_source": "importance"
     }
   ]
 }
