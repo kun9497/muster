@@ -28,6 +28,8 @@ jobs:
         run: go test -race ./...
       - name: controls lint
         run: go run ./cmd/muster controls lint --references docs/reference
+      - name: controls lint, built-in profile
+        run: go run ./cmd/muster controls lint --references docs/reference --profile default
       - name: coverage table is current
         run: go run ./tools/coverage -check
       - name: build

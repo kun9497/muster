@@ -178,9 +178,13 @@ source (`Output.Source`).
   testdata, and `TestEveryParserHasAFuzzTarget` fails when a new function or
   method that takes `[]byte` has none (a helper reached only through a parent
   is declared in `coveredThrough`; bytes that are not host input, in
-  `notParsers` with a reason). Pull requests run the seeds only; the nightly `fuzz.yml`
-  runs each target for a minute over four shards. `make fuzz TARGET=<name>
-  TIME=<duration>` runs one locally. A crash lands as the corpus file Go
+  `notParsers` with a reason). The profile and tuning parsers in
+  `internal/profile` and `internal/tuning` have one each (`FuzzParseProfile`,
+  `FuzzParseTuning`). Pull requests run the seeds only; the nightly `fuzz.yml`
+  runs every target for a minute over four shards.
+  `make fuzz TARGET=<name> TIME=<duration>` runs one locally, and
+  `FUZZPKG=./internal/profile/` (or another package) picks a target outside
+  the collectors. A crash lands as the corpus file Go
   writes under `testdata/fuzz/`, with the fix in its own commit.
 - `MUSTER_ORACLE=1 go test ./internal/collect/collectors -run Oracle` (Linux,
   as root) compares the sshd, passwd/group, mountinfo and services parsers
