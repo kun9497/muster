@@ -19,15 +19,15 @@
 - **Z-5 — No host access in the new packages.** `internal/profile` and `internal/tuning` import none of `os`, `os/exec`, `net`, `syscall`; they read files only through the `open func(string) ([]byte, error)` the caller passes; `path/filepath` is allowed (pure string work); warnings go through `warn func(string)`.
 - **Z-6 — The evaluator is untouched.** No edit to `internal/check` except none; `check.Options.Params` receives the merged map; `Evaluate` runs over the subset.
 - **Z-7 — Contracts that stay.** Exit codes (`report.ExitCode` reads statuses); `--fail-on` semantics; the `ok: %d controls, set %s` lint line byte-identical; `controls list`'s four-column row format; `maskedCheckKeys` unchanged; the controls digest unchanged (no YAML edit, `controls/VERSION` stays `kisa-unix-2026+2026.10.02`); schema_version unchanged.
-- **Z-8 — Naming.** Built-in names: `default` and its alias `kisa-unix-2026`; a built-in's result/chain spelling is `builtin` / `builtin:default`; a file's is `file:<path>` (the flag's path as given; a chain file's cleaned opened path). Warning texts, verbatim: `profile parameter <id>.<param> ignored: excluded by profile`, `tuning parameter <id>.<param> ignored: excluded by profile`, `severity entry <glob> matches only excluded controls`, `waiver for <id> not applied: excluded by profile`. Refusal texts start with the file's path (`<path>: …`) and reach the user as `muster: <reason>`.
-- **Z-9 — Tests before code, every task; commits end with the two trailers (`Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`, `Claude-Session: https://claude.ai/code/session_01LjfwtnJHSH7afTYL99Pmom`); never amend/rebase/stash/push; documents in English and Korean in the same commit (Task 7).
-- **Z-10 — Gates per task (W-16 of 3C-2b, carried):** `gofmt -l .` empty; `go vet ./...` and `GOOS=linux GOARCH=amd64 go vet ./...`; Windows `go test ./... -count=1`; the lab (root, through the two read-only scripts only) `go test ./... -count=1` + `staticcheck ./...` silent for Tasks 4–6 (Tasks 1–3 are pure and need no lab run); `go run ./cmd/muster controls lint --references docs/reference` (`ok: 117 controls, set kisa-unix-2026+2026.10.02`); `go run ./tools/coverage -check`; `gitleaks git --log-opts="<base>..HEAD" --no-banner --redact` clean; the host-string grep 0.
+- **Z-8 — Naming.** Built-in names: `default` and its alias `kisa-unix-2026`; a built-in's result/chain spelling is `builtin` / `builtin:default`; a file's is `file:<path>` (the flag's path as given; a chain file's cleaned opened path). Warning texts, verbatim: `profile parameter <id>.<param> ignored: excluded by profile`, `tuning parameter <id>.<param> ignored: excluded by profile`, `severity entry <glob> matches only excluded controls`, `waiver for <id> not applied: excluded by profile`. Refusal texts wrap the package's `ErrInvalid` and name the file as `<sentinel>: <path>: <reason>` (the waiver precedent — `invalid profile: site.yaml: …`); inside an `extends` chain the referring file and the `extends` value come first (`<referrer>: extends <value>: …`); they reach the user as `muster: <reason>`.
+- **Z-9 — Tests before code, every task; commits end with the two trailers (`Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`, `Claude-Session: https://claude.ai/code/session_01LjfwtnJHSH7afTYL99Pmom`); never amend/rebase/stash/push; documents in English and Korean in the same commit (Task 7). The `git commit -m` lines in the tasks show the subject only: every commit is written with a body saying why and the two trailers appended.
+- **Z-10 — Gates per task (W-16 of 3C-2b, carried):** `gofmt -l .` empty; `go vet ./...` and `GOOS=linux GOARCH=amd64 go vet ./...`; Windows `go test ./... -count=1`; the lab (root, through the two read-only scripts only) `go test ./... -count=1` + `staticcheck ./...` silent for Tasks 4–6 (Tasks 1–3 are pure and need no lab run); `go run ./cmd/muster controls lint --references docs/reference` (`ok: 117 controls, set kisa-unix-2026+2026.10.02`); `go run ./tools/coverage -check`; `gitleaks git --log-opts="<base>..HEAD" --no-banner --redact` clean; the host-string grep 0. **Z-10a (pre-flight):** from Task 5 on, `cmd/muster`'s `TestExamplesLoadAndCheck` reads red by design — the controls digest is unchanged, so the gate byte-compares the committed `examples/*-report.*`, which lack `check.profile`, `check.param_sources`, `severity_source` and the table's line 2 — until Task 7 refreshes `examples/` from the branch's `examples.yml` run (W-84); Tasks 5 and 6 run the gate as `go test ./... -count=1 -skip TestExamplesLoadAndCheck` and say so in their reports.
 
 ## Review Focus
 
 1. **A profile value for a control the profile excludes.** Expected: one warning (`profile parameter <id>.<param> ignored: excluded by profile`), the value in `Resolved.Params` and the digest but in neither `check.params` nor `check.param_sources`, exit 0. Pinned in Task 3 (`TestMergeWarnsAndDropsValuesForExcludedControls`) and Task 6 (e2e `TestCheckProfileTuningForExcludedControlWarns`).
 2. **A chain that reaches one file through two spellings (`./a.yaml` and `a.yaml`).** Expected: refused as a cycle by the cleaned path, not as "chain over four files". Pinned in Task 3 (`TestResolveRefusesACycleSpelledTwoWays`).
-3. **`--profile Default` (a typo that is no built-in and no path).** Expected: refused naming the built-ins, never opened as a file. Pinned in Task 3 (`TestSourceOf`) and Task 6 (e2e `TestCheckProfileUnknownNameNamesTheBuiltins`).
+3. **`--profile Default` (a typo that is no built-in and no path).** Expected: refused naming the built-ins, never opened as a file. Pinned in Task 3 (`TestSourceOf` classifies it a name; `TestResolveRefusals`' tail refuses `Default` naming the built-ins through a `files` map that fails the test if opened) and Task 6 (e2e `TestCheckProfileUnknownNameNamesTheBuiltins`).
 4. **A waiver on a control the profile excludes, expired or not.** Expected: counted `not_applied` once, warned, never `unknown`, never silently dropped. Pinned in Task 4 (`TestApplyCountsAnExcludedWaiverAsNotApplied`, incl. the expired and subject-level cases).
 5. **A group-writable profile, chain file or tuning file when `check` runs as root.** Expected: refused naming that path, exit 2, empty stdout. Pinned in Task 6 (e2e `TestCheckRootRefusesWritableProfileFiles`, skipped unless euid 0 — the CI root job runs it).
 
@@ -226,7 +226,7 @@ git commit -m "Give the control set a subset view and share the parameter typing
 ### Task 2: `internal/tuning` — parse and load a site's values
 
 **Files:**
-- Create: `internal/tuning/tuning.go`, `internal/tuning/tuning_test.go`, `internal/tuning/fuzz_test.go`, `internal/tuning/testdata/fuzz/FuzzParseTuning/seed1` (and `seed2`), `internal/tuning/imports_test.go`, `internal/tuning/fuzz_inventory_test.go`
+- Create: `internal/tuning/tuning.go`, `internal/tuning/tuning_test.go`, `internal/tuning/fuzz_test.go` (seeds as `f.Add` literals — **Z-12:** nothing under `testdata/fuzz/` is written by hand; Go's engine reads that directory as its corpus in the `go test fuzz v1` encoding and refuses raw YAML there), `internal/tuning/imports_test.go`, `internal/tuning/fuzz_inventory_test.go`
 - Test: as above
 
 **Interfaces:**
@@ -238,6 +238,7 @@ git commit -m "Give the control set a subset view and share the parameter typing
   type File struct{ Params map[string]map[string]any `yaml:"params"` }
   type Tuning struct{ Params map[string]map[string]any; Path, Digest string }
   func Parse(data []byte) (*File, error)
+  func Validate(set *controls.Set, params map[string]map[string]any) error
   func Load(set *controls.Set, path string, open func(string) ([]byte, error)) (*Tuning, error)
   ```
   `Load` reads through `open`, parses strictly, refuses an unknown control (`<path>: tuning names unknown control <id>`), an unknown parameter (`<path>: control <id> has no parameter <name>`) or a mistyped value (`<path>: <id>.<name>: value … is not a <type>`), and returns the map as decoded plus `sha256:` of the bytes. It never sees the selection (the exclusion warning is `profile.Merge`'s).
@@ -294,7 +295,7 @@ func TestLoadReadsValidatesAndDigests(t *testing.T) {
 
 func TestLoadRefusals(t *testing.T) {
 	cases := map[string]string{
-		"unknown key":       "params: {}\nseverity: []\n",
+		"unknown key":       "params: {}\nseverity: []\n", // the error must name the key: asserted below
 		"unknown control":   "params:\n  muster.no.such:\n    x: 1\n",
 		"unknown parameter": "params:\n  muster.account.password_policy:\n    max_len: 1\n",
 		"wrong type":        "params:\n  muster.account.password_policy:\n    min_len: twelve\n",
@@ -309,6 +310,9 @@ func TestLoadRefusals(t *testing.T) {
 		}
 		if !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "t.yaml") {
 			t.Errorf("%s: error %v should wrap ErrInvalid and name the path", name, err)
+		}
+		if name == "unknown key" && !strings.Contains(err.Error(), "severity") {
+			t.Errorf("the unknown key must be named: %v", err)
 		}
 	}
 }
@@ -328,21 +332,13 @@ func TestLoadOpenErrorAndEmptyFile(t *testing.T) {
 // internal/tuning/fuzz_test.go
 package tuning
 
-import (
-	"os"
-	"path/filepath"
-	"testing"
-)
+import "testing"
 
 func FuzzParseTuning(f *testing.F) {
-	seeds, _ := filepath.Glob("testdata/fuzz/FuzzParseTuning/seed*")
-	for _, s := range seeds {
-		b, err := os.ReadFile(s)
-		if err != nil {
-			f.Fatal(err)
-		}
-		f.Add(b)
-	}
+	// Seeds are literals (Z-12): the valid file of TestLoadReadsValidatesAndDigests,
+	// an empty params map and a list parameter.
+	f.Add([]byte("params:\n  muster.account.password_policy:\n    min_len: 12\n  muster.beyond.exposed_listeners_allowed:\n    allowed_ports: [tcp/22, tcp/443]\n"))
+	f.Add([]byte("params: {}\n"))
 	f.Add([]byte("params:\n  a.b:\n    c: [1, 2]\n"))
 	f.Fuzz(func(t *testing.T, data []byte) {
 		file, err := Parse(data)
@@ -352,8 +348,6 @@ func FuzzParseTuning(f *testing.F) {
 	})
 }
 ```
-
-Seeds: `testdata/fuzz/FuzzParseTuning/seed1` = the `src` of `TestLoadReadsValidatesAndDigests`; `seed2` = `params: {}\n`.
 
 ```go
 // internal/tuning/imports_test.go
@@ -528,11 +522,21 @@ type Tuning struct {
 // Parse decodes a tuning file strictly (Z-2). An empty file is a File with
 // no params.
 func Parse(data []byte) (*File, error) {
+	f, err := parse(data)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrInvalid, err)
+	}
+	return f, nil
+}
+
+// parse is Parse without the sentinel, so Load can wrap once with the path
+// and the YAML message (the unknown key, the syntax error) survives (Z-14).
+func parse(data []byte) (*File, error) {
 	var f File
 	dec := yaml.NewDecoder(bytes.NewReader(data))
 	dec.KnownFields(true)
 	if err := dec.Decode(&f); err != nil && err != io.EOF {
-		return nil, fmt.Errorf("%w: %v", ErrInvalid, err)
+		return nil, err
 	}
 	return &f, nil
 }
@@ -546,9 +550,9 @@ func Load(set *controls.Set, path string, open func(string) ([]byte, error)) (*T
 	if err != nil {
 		return nil, err
 	}
-	f, err := Parse(data)
+	f, err := parse(data)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %s: %v", ErrInvalid, path, errors.Unwrap(err))
+		return nil, fmt.Errorf("%w: %s: %v", ErrInvalid, path, err)
 	}
 	if err := Validate(set, f.Params); err != nil {
 		return nil, fmt.Errorf("%w: %s: %v", ErrInvalid, path, err)
@@ -569,7 +573,7 @@ func Validate(set *controls.Set, params map[string]map[string]any) error {
 	for _, id := range ids {
 		c, ok := set.ByID(id)
 		if !ok {
-			return fmt.Errorf("tuning names unknown control %s", id)
+			return fmt.Errorf("params name unknown control %s", id) // neutral: the profile loader shares this (Z-19)
 		}
 		names := make([]string, 0, len(params[id]))
 		for n := range params[id] {
@@ -595,7 +599,7 @@ Note: the test set in `tuning_test.go` is built through `Subset` so `ByID` works
 - [ ] **Step 4: Run the tests and the fuzz seeds**
 
 Run: `go test ./internal/tuning -count=1 -v | tail -20` and `go test ./internal/tuning -run '^$' -fuzz FuzzParseTuning -fuzztime 10s`
-Expected: all PASS, incl. `TestEveryParserHasAFuzzTarget` (inventory = `Parse`) and `TestTuningPackageHasNoHostImports`; no crash in 10 s.
+Expected: all PASS, incl. `TestEveryParserHasAFuzzTarget` (inventory = `Parse` and `parse`, both direct callees of the target — call `parse` from the fuzz body too, or list it; the inventory test must pass as the package stands) and `TestTuningPackageHasNoHostImports`; no crash in 10 s.
 
 - [ ] **Step 5: Commit**
 
@@ -609,7 +613,7 @@ git commit -m "Add the tuning package: a site's parameter values, strictly typed
 ### Task 3: `internal/profile` — parse, classify, resolve, merge, digest
 
 **Files:**
-- Create: `internal/profile/profile.go` (types, `Parse`, `SourceOf`, built-ins), `internal/profile/resolve.go` (`Resolve`, chain, globs, severity, digest), `internal/profile/merge.go` (`Merge`), `internal/profile/profile_test.go`, `internal/profile/resolve_test.go`, `internal/profile/merge_test.go`, `internal/profile/fuzz_test.go`, `internal/profile/testdata/fuzz/FuzzParseProfile/seed1`, `internal/profile/testdata/*.yaml` (`base.yaml`, `child.yaml`, `cycle-a.yaml`, `cycle-b.yaml`, `five-1.yaml`…`five-5.yaml`), `internal/profile/imports_test.go`, `internal/profile/fuzz_inventory_test.go` (copy Task 2's two test files with the package name and `fuzzTargets = []string{"FuzzParseProfile"}`)
+- Create: `internal/profile/profile.go` (types, `Parse`, `SourceOf`, built-ins), `internal/profile/resolve.go` (`Resolve`, chain, globs, severity, digest), `internal/profile/merge.go` (`Merge`), `internal/profile/profile_test.go`, `internal/profile/resolve_test.go`, `internal/profile/merge_test.go`, `internal/profile/fuzz_test.go` (seeds as `f.Add` literals, Z-12 — the `site.yaml` text of `TestResolveChainIncludeExcludeParamsSeverity`, `profile: a\ninclude: ["muster.*"]\n`, and the built-in's YAML spelling), `internal/profile/imports_test.go`, `internal/profile/fuzz_inventory_test.go` (copy Task 2's two test files with the package name and `fuzzTargets = []string{"FuzzParseProfile"}`). No `testdata/` files: every test builds its files in memory through the `files` helper (Z-24).
 
 **Interfaces:**
 - Consumes: `controls.Set` (`Controls`, `ByID`, `Subset`), `controls.CheckParamValue`, `tuning.Tuning`, `tuning.Validate`.
@@ -691,6 +695,7 @@ package profile
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -710,10 +715,13 @@ func set() *controls.Set {
 	return s.Subset([]string{"muster.account.password_policy", "muster.beyond.exposed_listeners_allowed", "muster.beyond.no_deleted_executables", "muster.file.ip_port_restriction", "muster.file.world_writable"})
 }
 
-// files is an in-memory filesystem for open; keys are cleaned paths.
+// files is an in-memory filesystem for open. Keys are written with forward
+// slashes; the lookup normalises the opened path to that spelling so the
+// helper works on Windows, where filepath.Clean rewrites the separator
+// (Z-11). An absolute key must be given as filepath.ToSlash of the path.
 func files(m map[string]string) func(string) ([]byte, error) {
 	return func(p string) ([]byte, error) {
-		if s, ok := m[filepath.Clean(p)]; ok {
+		if s, ok := m[filepath.ToSlash(filepath.Clean(p))]; ok {
 			return []byte(s), nil
 		}
 		return nil, os.ErrNotExist
@@ -779,8 +787,8 @@ func TestResolveRefusesACycleSpelledTwoWays(t *testing.T) {
 		"b.yaml": "profile: b\nextends: a.yaml\n",
 	})
 	_, err := Resolve(set(), Source{Path: "./a.yaml"}, fs, noWarn(t))
-	if err == nil || !strings.Contains(err.Error(), "cycle") {
-		t.Fatalf("want a cycle error, got %v", err)
+	if err == nil || !strings.Contains(err.Error(), "b.yaml: extends a.yaml closes a cycle") {
+		t.Fatalf("want the cycle named from the file that closed it, got %v", err)
 	}
 }
 
@@ -835,8 +843,16 @@ func TestResolveRefusals(t *testing.T) {
 			t.Errorf("%s: %v should wrap ErrInvalid and name the file", name, err)
 		}
 	}
-	if _, err := Resolve(set(), Source{Name: "nope"}, nil, func(string) {}); err == nil || !strings.Contains(err.Error(), "default, kisa-unix-2026") {
-		t.Errorf("an unknown built-in name must list the built-ins: %v", err)
+	neverOpen := func(p string) ([]byte, error) { t.Errorf("a name must never be opened as a file: %s", p); return nil, os.ErrNotExist }
+	for _, name := range []string{"nope", "Default", "site_web"} {
+		if _, err := Resolve(set(), Source{Name: name}, neverOpen, func(string) {}); err == nil || !strings.Contains(err.Error(), "default, kisa-unix-2026") {
+			t.Errorf("%s: an unknown built-in name must list the built-ins: %v", name, err)
+		}
+	}
+	// Inside a chain the refusal names the referring file and the extends value.
+	_, err := Resolve(set(), Source{Path: "x.yaml"}, files(map[string]string{"x.yaml": "profile: x\nextends: gone.yaml\ninclude: [\"muster.*\"]\n"}), func(string) {})
+	if err == nil || !strings.Contains(err.Error(), "x.yaml: extends gone.yaml:") {
+		t.Errorf("a missing chain file names the referrer and the value: %v", err)
 	}
 }
 
@@ -858,7 +874,7 @@ func TestResolveWarnsForSeverityOnExcludedOnlyAndKeepsTheEntry(t *testing.T) {
 func TestResolveNoOpExcludeIsSilentAndAbsoluteExtendsOpensAsGiven(t *testing.T) {
 	abs := filepath.Join(t.TempDir(), "base.yaml")
 	fs := files(map[string]string{
-		abs:      "profile: base\ninclude: [\"muster.*\"]\n",
+		filepath.ToSlash(abs): "profile: base\ninclude: [\"muster.*\"]\n",
 		"c.yaml": "profile: c\nextends: " + abs + "\nexclude: [\"muster.beyond.*\"]\n",
 		"d.yaml": "profile: d\nextends: c.yaml\nexclude: [\"muster.beyond.*\"]\n",
 	})
@@ -897,10 +913,33 @@ func TestDigestNamesContentOnly(t *testing.T) {
 	if !strings.HasPrefix(ra.Digest, "sha256:") {
 		t.Errorf("digest %q", ra.Digest)
 	}
+	// A chain value for an excluded control is inside the digest (Z-23).
+	e1 := "profile: e\nextends: default\nexclude: [\"muster.beyond.*\"]\nparams:\n  muster.beyond.exposed_listeners_allowed: {allowed_ports: [tcp/1]}\n"
+	e2 := strings.Replace(e1, "tcp/1", "tcp/2", 1)
+	re1, _ := Resolve(set(), Source{Path: "e.yaml"}, files(map[string]string{"e.yaml": e1}), func(string) {})
+	re2, _ := Resolve(set(), Source{Path: "e.yaml"}, files(map[string]string{"e.yaml": e2}), func(string) {})
+	if re1.Digest == re2.Digest {
+		t.Errorf("an excluded control's chain value must be inside the digest")
+	}
+}
+
+func TestResolveChildWinsASharedParameter(t *testing.T) {
+	fs := files(map[string]string{
+		"base.yaml":  "profile: base\nextends: default\nparams:\n  muster.account.password_policy: {min_len: 10}\n  muster.beyond.exposed_listeners_allowed: {allowed_ports: [tcp/9]}\n",
+		"child.yaml": "profile: child\nextends: base.yaml\nparams:\n  muster.account.password_policy: {min_len: 12}\n",
+	})
+	r, err := Resolve(set(), Source{Path: "child.yaml"}, fs, noWarn(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Params["muster.account.password_policy"]["min_len"] != 12 {
+		t.Errorf("the child wins a shared parameter: %v", r.Params)
+	}
+	if got := r.Params["muster.beyond.exposed_listeners_allowed"]["allowed_ports"].([]any); len(got) != 1 || got[0] != "tcp/9" {
+		t.Errorf("the parent's other parameter is kept: %v", r.Params)
+	}
 }
 ```
-
-(`fmt` must be imported in `resolve_test.go`.)
 
 ```go
 // internal/profile/merge_test.go
@@ -1005,8 +1044,8 @@ var ErrInvalid = errors.New("invalid profile")
 // SeverityEntry maps the controls a glob selects to a severity level; the
 // last matching entry wins.
 type SeverityEntry struct {
-	Controls string `yaml:"controls"`
-	Level    string `yaml:"level"`
+	Controls string `yaml:"controls" json:"controls"` // the json tags spell the digest's canonical form (Z-20)
+	Level    string `yaml:"level" json:"level"`
 }
 
 // File is a profile file as decoded.
@@ -1060,11 +1099,21 @@ func builtin(name string) (*File, string, bool) {
 
 // Parse decodes a profile file strictly (Z-2).
 func Parse(data []byte) (*File, error) {
+	f, err := parse(data)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrInvalid, err)
+	}
+	return f, nil
+}
+
+// parse is Parse without the sentinel; loadChain wraps once with the path so
+// the YAML message survives (Z-14).
+func parse(data []byte) (*File, error) {
 	var f File
 	dec := yaml.NewDecoder(bytes.NewReader(data))
 	dec.KnownFields(true)
 	if err := dec.Decode(&f); err != nil && err != io.EOF {
-		return nil, fmt.Errorf("%w: %v", ErrInvalid, err)
+		return nil, err
 	}
 	return &f, nil
 }
@@ -1213,6 +1262,9 @@ func loadChain(src Source, open func(string) ([]byte, error)) ([]link, error) {
 		if cur.Name != "" {
 			f, canon, ok := builtin(cur.Name)
 			if !ok {
+				if referrer != "" {
+					return nil, fmt.Errorf("%w: %s: extends %s: unknown profile; the built-ins are %s", ErrInvalid, referrer, cur.Name, joinNames())
+				}
 				return nil, fmt.Errorf("%w: unknown profile %q; the built-ins are %s", ErrInvalid, cur.Name, joinNames())
 			}
 			l = link{file: f, label: "builtin:" + canon, where: "builtin:" + canon}
@@ -1226,16 +1278,19 @@ func loadChain(src Source, open func(string) ([]byte, error)) ([]link, error) {
 			// (the flag's file is labelled as given): ./a.yaml and a.yaml are
 			// one file.
 			if seen["file:"+p] {
-				return nil, fmt.Errorf("%w: %s: extends cycle through %s", ErrInvalid, p, p)
+				return nil, fmt.Errorf("%w: %s: extends %s closes a cycle through %s", ErrInvalid, referrer, cur.Path, p)
 			}
 			seen["file:"+p] = true
 			data, err := open(p)
 			if err != nil {
+				if referrer != "" {
+					return nil, fmt.Errorf("%w: %s: extends %s: %v", ErrInvalid, referrer, cur.Path, err)
+				}
 				return nil, fmt.Errorf("%w: %s: %v", ErrInvalid, p, err)
 			}
-			f, err := Parse(data)
+			f, err := parse(data)
 			if err != nil {
-				return nil, fmt.Errorf("%w: %s: %v", ErrInvalid, p, errors.Unwrap(err))
+				return nil, fmt.Errorf("%w: %s: %v", ErrInvalid, p, err)
 			}
 			if f.Profile == "" {
 				return nil, fmt.Errorf("%w: %s: profile name is required", ErrInvalid, p)
@@ -1318,7 +1373,7 @@ func digest(r *Resolved) string {
 }
 ```
 
-Note the two subtleties the tests pin: the cycle check uses the label of a *file* (`file:<cleaned>`), so `./a.yaml` and `a.yaml` collide; the chain length counts the built-in. A built-in has no `extends` and ends the walk. `errors` must be imported in `resolve.go`.
+Note the subtleties the tests pin: the cycle identity is the cleaned opened path (`file:<cleaned>`), so `./a.yaml` and `a.yaml` collide, and the error names the referrer, the `extends` value and the path; refusals inside a chain name the referrer first (Z-13); the chain length counts the built-in; a built-in has no `extends` and ends the walk. On Windows a chain entry's cleaned path uses `\` (the test's `filepath.Clean` matches it).
 
 - [ ] **Step 5: Implement `merge.go`**
 
@@ -1386,7 +1441,7 @@ func sortedKeys(m map[string]any) []string {
 }
 ```
 
-(`sort` imported.) Then `fuzz_test.go` with `FuzzParseProfile` on the Task 2 model (seed1 = the `src` of `TestResolveChainIncludeExcludeParamsSeverity`'s `site.yaml`), `imports_test.go` and `fuzz_inventory_test.go` copied from Task 2 with `package profile` / `internal/profile` / `fuzzTargets = []string{"FuzzParseProfile"}`.
+(`sort` imported.) Then `fuzz_test.go` with `FuzzParseProfile` on the Task 2 model (three `f.Add` literals, Z-12; the body calls `Parse` and `parse` so the inventory test covers both), `imports_test.go` and `fuzz_inventory_test.go` copied from Task 2 with `package profile` / `internal/profile` / `fuzzTargets = []string{"FuzzParseProfile"}`.
 
 - [ ] **Step 6: Run everything**
 
@@ -1407,7 +1462,7 @@ git commit -m "Add the profile package: parse, classify, resolve the extends cha
 **Files:**
 - Modify: `internal/waiver/waiver.go:107-125` (`Apply`)
 - Modify: `internal/waiver/waiver_test.go` (the nine call sites gain `nil` or a map as the new third argument)
-- Modify: `cmd/muster/check.go:139` (the call site — keep compiling: pass `nil` now; Task 6 passes the real set)
+- Modify: `cmd/muster/check.go:161` (the `wf.Apply` call site — keep compiling: pass `nil` now; Task 6 passes the real set)
 
 **Interfaces:**
 - Produces: `func (f *File) Apply(results []check.Result, known, excluded map[string]bool, now time.Time, warn func(string)) Applied` — checks per waiver in the order excluded → unknown → expired → rows; an id in `excluded` increments `NotApplied` and warns `waiver for <id> not applied: excluded by profile` (the subject, when set, is appended as ` (subject <s>)`), whatever its expiry; `known` is the evaluated subset's ids; a nil `excluded` is allowed.
@@ -1468,7 +1523,7 @@ func (f *File) Apply(results []check.Result, known, excluded map[string]bool, no
 			// … unchanged
 ```
 
-Update the nine test call sites (`f.Apply(rs, known, nil, now, warn)`) and `check.go:139` (`wf.Apply(results, known, nil, time.Now().UTC(), warn)`).
+Update the nine test call sites (`f.Apply(rs, known, nil, now, warn)`) and `check.go:161` (`wf.Apply(results, known, nil, time.Now().UTC(), warn)`).
 
 - [ ] **Step 4: Run the suite**
 
@@ -1488,7 +1543,7 @@ git commit -m "Count a waiver on a control the profile excludes as not applied, 
 
 **Files:**
 - Modify: `internal/report/report.go` (`CheckBlock`, `Row`, `Build`), `internal/report/json.go` (comment), `internal/report/table.go:116-134` (the profile line)
-- Modify: `internal/report/report_test.go` (`sampleReport`, the two `Build` calls, a new severity test), `internal/report/table_test.go` (four `Build` calls; `TestTableScopeLinesAndSeparator`/`TestTableQuietHidesPassAndManual` line positions if they index lines)
+- Modify: `internal/report/report_test.go` (`sampleReport`, the two `Build` calls, a new severity test), `internal/report/table_test.go` (four `Build` calls; `TestTableScopeLinesAndSeparator` indexes header lines 0–5 and shifts by one), `cmd/muster/check.go:211` and `cmd/muster/examples_test.go:45` (**Z-15:** the two remaining `Build` callers pass `nil` as the new fourth argument so the tree builds at this commit; Task 6 replaces the `nil`)
 - Regenerate: `internal/report/testdata/basic.json.golden`, `basic.table.golden`, `basic.table.narrow.golden`
 
 **Interfaces:**
@@ -1648,12 +1703,12 @@ Update `json.go`'s comment ("the only map" → "the maps (check.params, check.pa
 - [ ] **Step 4: Regenerate the goldens, review the diff, run the package**
 
 Run: `go test ./internal/report -run TestJSON -update`, `go test ./internal/report -run TestTableGolden -update`, then `git diff internal/report/testdata | head -80` and `go test ./internal/report -count=1`
-Expected: the JSON golden gains `profile` (with the fixture), `severity_source` on every row, no other change; both table goldens gain line 2 `profile default (6 controls)`; all tests PASS (fix any test that indexed header lines by position).
+Expected: the JSON golden gains `profile` (with the fixture), `severity_source` on every row, no other change; both table goldens gain line 2 `profile default (6 controls)`; all tests PASS (fix any test that indexed header lines by position). Then `go build ./... && go test ./... -count=1 -skip TestExamplesLoadAndCheck` — that one test is the expected red until Task 7 (Z-10a); say so in the report.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add internal/report
+git add internal/report cmd/muster/check.go cmd/muster/examples_test.go
 git commit -m "Record the profile, the tuning file, the parameter sources and the severity in force in the report"
 ```
 
@@ -1683,7 +1738,7 @@ git commit -m "Record the profile, the tuning file, the parameter sources and th
   func resolveSelection(profileArg, tuningPath string, set *controls.Set, warn func(string)) (*Selection, error)
   func newCheckBlock(sel *Selection, snap *facts.Snapshot, reg *facts.Registry, wf *waiver.File, warn func(string)) ([]check.Result, report.CheckBlock)
   ```
-  `resolveSelection` builds `open := func(p string) ([]byte, error) { if ok, why := trustedFile(p); !ok { return nil, fmt.Errorf("refusing %s: %s", p, why) }; return os.ReadFile(p) }`, calls `profile.SourceOf`, `profile.Resolve`, `tuning.Load` (when `tuningPath != ""`), `profile.Merge`, `set.Subset`; `Profile.ExcludedIDs` is the sorted complement; an error is returned as is (the caller prints `muster: <err>`).
+  `resolveSelection` builds `open := func(p string) ([]byte, error) { if ok, why := trustedFile(p); !ok { return nil, fmt.Errorf("refusing %s: %s", p, why) }; return os.ReadFile(p) }`, calls `profile.SourceOf`, `profile.Resolve`, `tuning.Load` (when `tuningPath != ""`), `profile.Merge`, `set.Subset`; `Profile.ExcludedIDs` is the sorted complement; an error is returned as is (the caller prints `muster: <err>`). `selection.go` also defines the one warning sink the three commands share (**Z-16**): `func warnTo(w io.Writer) func(string) { return func(msg string) { fmt.Fprintf(w, "muster: warning: %s\n", msg) } }` (import `io`); `runCheck` uses it in place of its inline closure.
 
 - [ ] **Step 1: Fixtures**
 
@@ -1808,13 +1863,16 @@ Tests to write (each named, each asserting structure):
 - `TestCheckProfileChainOfTwoRecordsTheOpenedPaths` — `chain-child.yaml` + `chain-base.yaml` staged together → `extends == ["builtin:default", "file:<cleaned staged chain-base path>", "file:<staged child path as given>"]`, `excluded_ids == [muster.beyond.no_deleted_executables]`, every `muster.beyond.*` row has `severity_source == "profile"` and `severity == "low"`, a guide row has `"importance"`.
 - `TestCheckProfileOneControlWithTuningFlipsTheVerdict` — facts `../../controls/testdata/muster.beyond.exposed_listeners_allowed/fail-ufw-folded-http.json`, `profiles/one-control.yaml`, `tuning/ports.yaml` → exit 0, one row PASS, `check.param_sources[id].allowed_ports == "tuning"`, `check.params[id].allowed_ports` has four entries, `check.tuning.path` set; without `--tuning` the row is FAIL and exit 1.
 - `TestCheckProfileTuningForExcludedControlWarns` — `full-pass.json`, `exclude-beyond.yaml`, `tuning/excluded.yaml` → exit 0, stderr contains `muster: warning: tuning parameter muster.beyond.exposed_listeners_allowed.allowed_ports ignored: excluded by profile`, `check.params` lacks that id.
-- `TestCheckProfileWaiverOnExcludedControlIsNotApplied` — `full-fail.json`, `exclude-beyond.yaml`, a waiver file naming `muster.beyond.no_deleted_executables` → `check.waivers.not_applied == 1`, `unknown == 0`, the warning text.
+- `TestCheckProfileWaiverOnExcludedControlIsNotApplied` — `full-fail.json`, `exclude-beyond.yaml`, a waiver file naming `muster.beyond.no_deleted_executables` → exit `exitFindings` (the guide's FAILs stand), `check.waivers.not_applied == 1`, `unknown == 0`, the warning text.
 - `TestCheckProfileUnknownNameNamesTheBuiltins` — `--profile Default` and `--profile site` → exit 2, empty stdout, stderr contains `default, kisa-unix-2026`.
 - `TestCheckProfileDefaultBlock` — no flags → `check.profile == {name default, source builtin, extends [builtin:default], selected 117, excluded 0, excluded_ids []}`, no `tuning` key.
 - `TestCheckRootRefusesWritableProfileFiles` — `if os.Geteuid() != 0 { t.Skip(…) }`; stage `chain-child.yaml`+`chain-base.yaml`, `tuning/ports.yaml`; for each of the three files in turn `os.Chmod(path, 0o664)` → exit 2, stderr names that path, stdout empty; restore `0o600` after each.
 - `TestControlsLintProfileAndListProfile` — `controls lint <repo flags> --profile default` → stdout contains both `ok: 117 controls` and `ok: profile default selects 117 of 117 controls, 0 excluded`; `--profile testdata/profiles/exclude-beyond.yaml` (staged) → `selects 68 of 117 controls, 49 excluded`; a typo profile (`include: ["muster.nothing.*"]`) → exit 2 naming the pattern; `controls list --profile <staged exclude-beyond>` → 68 lines of four tab-separated columns, none starting `muster.beyond.`.
 - `check_test.go`: `TestCheckBadProfileFileIsExit2` and `TestCheckBadTuningFileIsExit2` on the `TestCheckBadWaiverFileIsExit2` model.
 - `selection_test.go`: `resolveSelection("default", "", set, warn)` → 117 selected, `Known` 117, `Excluded` empty, `Profile.Source == "builtin"`; `resolveSelection("Default", …)` → error naming the built-ins.
+- `check_test.go`: `parseCheckArgs([]string{"--facts", "s", "--profile", "a", "--profile", "b", "--tuning", "t1", "--tuning", "t2"})` → `profile == "b"`, `tuning == "t2"` (Z-21: a repeated flag keeps the last value).
+- `TestControlsLintProfileWarningExitsZero`: `controls lint <repo flags> --profile <staged chain-child-with-severity-on-excluded>` (a profile whose `severity` entry matches only excluded controls) → exit 0, stdout has the `ok: profile` line, stderr has `muster: warning: severity entry … matches only excluded controls` (Z-21).
+- Hoist the full-pass and full-fail status maps of `TestCheckEndToEndJSONAndTable` into `fullPassWant()`/`fullFailWant()` helpers first (Z-26); the guide-only map is the full map filtered by `!strings.HasPrefix(id, "muster.beyond.")` and the 49 excluded ids are the complement, sorted, so both come from one source.
 
 - [ ] **Step 3: Run to verify failure**
 
@@ -1924,7 +1982,7 @@ func resolveSelection(profileArg, tuningPath string, set *controls.Set, warn fun
 
 - [ ] **Step 9: Run the gates**
 
-Run: `gofmt -l .`; `go vet ./... && GOOS=linux GOARCH=amd64 go vet ./...`; `go test ./... -count=1`; `go run ./cmd/muster controls lint --references docs/reference --profile default`; `go run ./tools/coverage -check`; `python -X utf8 -c "import yaml;yaml.safe_load(open('.github/workflows/ci.yml',encoding='utf-8'));yaml.safe_load(open('.github/workflows/fuzz.yml',encoding='utf-8'))"`; on the lab as root `go test ./... -count=1` (the root-mode refusal test runs there) and `staticcheck ./...`.
+Run: `gofmt -l .`; `go vet ./... && GOOS=linux GOARCH=amd64 go vet ./...`; `go test ./... -count=1 -skip TestExamplesLoadAndCheck` (Z-10a: that test is the expected red until Task 7 refreshes `examples/`; run it once anyway and quote its "not what this binary produces" failure in the report as the evidence the refresh is needed); `go run ./cmd/muster controls lint --references docs/reference --profile default`; `go run ./tools/coverage -check`; `python -X utf8 -c "import yaml;yaml.safe_load(open('.github/workflows/ci.yml',encoding='utf-8'));yaml.safe_load(open('.github/workflows/fuzz.yml',encoding='utf-8'))"`; on the lab as root `go test ./... -count=1 -skip TestExamplesLoadAndCheck` (the root-mode refusal test runs there) and `staticcheck ./...`.
 Expected: all green; the lab run shows `TestCheckRootRefusesWritableProfileFiles` PASS (not SKIP).
 
 - [ ] **Step 10: Commit** (two commits: the command and tests; the CI/fuzz/Makefile/CONTRIBUTING edits)
@@ -1948,13 +2006,15 @@ git commit -m "Fuzz the profile and tuning parsers nightly and lint the built-in
 
 - [ ] **Step 1: Fold the documents** (the controller writes a fold script with `--check`, as in 3C-2b; English and Korean in one commit).
 - [ ] **Step 2: Whole-branch review** as an ultracode workflow: fresh finders by area (profile/tuning packages; waiver/report/cmd wiring; e2e/CI/fuzz; documents and contracts) → refuters → critic; fix wave; scoped re-review.
-- [ ] **Step 3: Final gates** on Windows and the lab (root, `-race`, staticcheck).
-- [ ] **Step 4: Merge menu** (the user's word): push → the branch's `examples.yml` run → `examples/` refreshed (reports gain `check.profile`, `check.param_sources`, `severity_source`, the table's line 2) → PR → CI → merge → cleanup.
+- [ ] **Step 3: Examples first** (the user's word, since it needs a push): push → the branch's `examples.yml` run → `make examples-fetch RUN=<id>` into `C:/Users/ssk/muster-lab/backups/examples-<run>/`, copy into `examples/` → commit "Refresh the example snapshots from the branch's examples run" (reports gain `check.profile`, `check.param_sources`, `severity_source`, the table's line 2) → `TestExamplesLoadAndCheck` green again (Z-10a).
+- [ ] **Step 4: Final gates** on Windows and the lab (root, `-race`, staticcheck) with the whole suite, then the merge menu: PR → CI → merge → cleanup.
 - [ ] **Step 5: Execution notes** — rulings Z-11…, reviews, deviations, numbers, parked.
 
 ## Execution notes
 
 ### Rulings settled during execution (Z-11 …)
+
+- Pre-flight (two fresh reviews + skeptics, 46 agents; 22 survivors, 8 nits): Z-11 the in-memory `files` helper normalises with `filepath.ToSlash(filepath.Clean(p))` (Windows); Z-12 fuzz seeds are `f.Add` literals, never files under `testdata/fuzz/`; Z-13 refusals inside a chain name the referrer and the `extends` value, the cycle error names the file that closed it; Z-14 `parse` without the sentinel so the YAML message survives one wrap; Z-15 Task 5 passes `nil` to `Build` in `cmd/muster` so every commit builds; Z-16 `warnTo` in `selection.go`; Z-10a the examples gate is red from Task 5 to the refresh (`-skip`); Z-18 the refusal-text wording of Z-8; Z-19 `Validate`'s neutral message; Z-20 `SeverityEntry` json tags; Z-21 tests for the repeated flag and the lint warning exit 0; Z-22 commit subjects shown, trailers appended; Z-23 tests for child-wins and the excluded value in the digest; Z-24 no `testdata/*.yaml` in `internal/profile`; Z-25 `Apply` call site line 161; Z-26 hoisted e2e status maps; Z-1's field order keeps `waivers` before `params` (the spec's example order is illustrative).
 
 ### What the reviews found
 
