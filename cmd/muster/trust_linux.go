@@ -9,8 +9,9 @@ import (
 )
 
 // trustedFile refuses, when running as root, a data file that someone other
-// than root could have written (spec §4.4, §6.7): a waiver file on the host
-// is the one data file that can turn a FAIL into a clean run.
+// than root could have written (spec §4.4, §6.7): a waiver, profile or tuning
+// file on the host can change what check reports -- turn a FAIL into a clean
+// run, drop a control from the run or relax the value it judges against.
 func trustedFile(path string) (bool, string) {
 	if os.Geteuid() != 0 {
 		return true, ""

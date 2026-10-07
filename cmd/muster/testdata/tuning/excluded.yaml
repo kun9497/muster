@@ -1,0 +1,4 @@
+# A value for a control exclude-beyond.yaml excludes.
+params:
+  muster.beyond.exposed_listeners_allowed:
+    allowed_ports: [tcp/80]

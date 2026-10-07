@@ -569,7 +569,48 @@ func TestCheckEndToEndJSONAndTable(t *testing.T) {
 	// R26: full-pass.json must produce exactly the one hundred and seventeen embedded
 	// controls' documented statuses, not merely "some PASS rows appear
 	// somewhere in the output".
-	assertStatuses(t, out1.Bytes(), map[string]string{
+	assertStatuses(t, out1.Bytes(), fullPassWant())
+	assertManualEvidenceIsPresent(t, out1.Bytes())
+
+	var table bytes.Buffer
+	if code := run([]string{"check", "--facts", "testdata/full-fail.json", "--color", "never"}, &table, &errb); code != exitFindings {
+		t.Fatalf("exit %d, want 1 for a FAIL; stderr %q", code, errb.String())
+	}
+	if !bytes.Contains(table.Bytes(), []byte("muster.account.root_remote_login")) || bytes.Contains(table.Bytes(), []byte("\x1b")) {
+		t.Errorf("table output:\n%s", table.String())
+	}
+
+	// R26: full-fail.json flips root_remote_login and the nine 2G
+	// *_disabled services to FAIL, and its PermitRootLogin yes opens
+	// root_authorized_keys' gate (NOT_APPLICABLE on full-pass.json, PASS
+	// here); the other one hundred and six controls are unchanged from
+	// full-pass.json.
+	var failJSON bytes.Buffer
+	if code := run([]string{"check", "--facts", "testdata/full-fail.json", "--format", "json"}, &failJSON, &errb); code != exitFindings {
+		t.Fatalf("exit %d, want 1 for a FAIL; stderr %q", code, errb.String())
+	}
+	assertStatuses(t, failJSON.Bytes(), fullFailWant())
+	assertManualEvidenceIsPresent(t, failJSON.Bytes())
+
+	// R26: every run() call's exit code is asserted, including --quiet's,
+	// and --quiet must hide PASS rows while still showing the FAIL row.
+	var quiet bytes.Buffer
+	if code := run([]string{"check", "--facts", "testdata/full-fail.json", "--quiet", "--fail-on", "none"}, &quiet, &errb); code != exitOK {
+		t.Fatalf("exit %d, want 0 with --fail-on none; stderr %q", code, errb.String())
+	}
+	if bytes.Contains(quiet.Bytes(), []byte("muster.service.telnet_disabled")) {
+		t.Error("--quiet must hide PASS rows")
+	}
+	if !bytes.Contains(quiet.Bytes(), []byte("muster.account.root_remote_login")) {
+		t.Error("--quiet must still show the FAIL row")
+	}
+}
+
+// fullPassWant is every embedded control's status on testdata/full-pass.json
+// (R26), one source for the full-set test and the profile tests that filter it
+// (Z-26).
+func fullPassWant() map[string]string {
+	return map[string]string{
 		"muster.beyond.kernel_pointer_exposure":             "PASS",
 		"muster.beyond.ptrace_restriction":                  "PASS",
 		"muster.beyond.unprivileged_bpf_restricted":         "PASS",
@@ -687,27 +728,14 @@ func TestCheckEndToEndJSONAndTable(t *testing.T) {
 		"muster.service.dns_zone_transfer":                  "PASS",
 		"muster.service.dns_dynamic_update":                 "PASS",
 		"muster.service.dns_version":                        "MANUAL",
-	})
-	assertManualEvidenceIsPresent(t, out1.Bytes())
+	}
+}
 
-	var table bytes.Buffer
-	if code := run([]string{"check", "--facts", "testdata/full-fail.json", "--color", "never"}, &table, &errb); code != exitFindings {
-		t.Fatalf("exit %d, want 1 for a FAIL; stderr %q", code, errb.String())
-	}
-	if !bytes.Contains(table.Bytes(), []byte("muster.account.root_remote_login")) || bytes.Contains(table.Bytes(), []byte("\x1b")) {
-		t.Errorf("table output:\n%s", table.String())
-	}
-
-	// R26: full-fail.json flips root_remote_login and the nine 2G
-	// *_disabled services to FAIL, and its PermitRootLogin yes opens
-	// root_authorized_keys' gate (NOT_APPLICABLE on full-pass.json, PASS
-	// here); the other one hundred and six controls are unchanged from
-	// full-pass.json.
-	var failJSON bytes.Buffer
-	if code := run([]string{"check", "--facts", "testdata/full-fail.json", "--format", "json"}, &failJSON, &errb); code != exitFindings {
-		t.Fatalf("exit %d, want 1 for a FAIL; stderr %q", code, errb.String())
-	}
-	assertStatuses(t, failJSON.Bytes(), map[string]string{
+// fullFailWant is every embedded control's status on testdata/full-fail.json
+// (R26), one source for the full-set test and the profile tests that filter it
+// (Z-26).
+func fullFailWant() map[string]string {
+	return map[string]string{
 		"muster.beyond.kernel_pointer_exposure":             "PASS",
 		"muster.beyond.ptrace_restriction":                  "PASS",
 		"muster.beyond.unprivileged_bpf_restricted":         "PASS",
@@ -825,19 +853,445 @@ func TestCheckEndToEndJSONAndTable(t *testing.T) {
 		"muster.service.dns_zone_transfer":                  "PASS",
 		"muster.service.dns_dynamic_update":                 "PASS",
 		"muster.service.dns_version":                        "MANUAL",
-	})
-	assertManualEvidenceIsPresent(t, failJSON.Bytes())
+	}
+}
 
-	// R26: every run() call's exit code is asserted, including --quiet's,
-	// and --quiet must hide PASS rows while still showing the FAIL row.
-	var quiet bytes.Buffer
-	if code := run([]string{"check", "--facts", "testdata/full-fail.json", "--quiet", "--fail-on", "none"}, &quiet, &errb); code != exitOK {
-		t.Fatalf("exit %d, want 0 with --fail-on none; stderr %q", code, errb.String())
+// stageFiles copies testdata files into a temp dir with their relative
+// layout (the waiver precedent: the CI root job runs this package as root
+// and trustedFile refuses files it did not own).
+func stageFiles(t *testing.T, rel ...string) string {
+	t.Helper()
+	dir := t.TempDir()
+	for _, r := range rel {
+		b, err := os.ReadFile(filepath.Join("testdata", r))
+		if err != nil {
+			t.Fatal(err)
+		}
+		dst := filepath.Join(dir, r)
+		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(dst, b, 0o600); err != nil {
+			t.Fatal(err)
+		}
 	}
-	if bytes.Contains(quiet.Bytes(), []byte("muster.service.telnet_disabled")) {
-		t.Error("--quiet must hide PASS rows")
+	return dir
+}
+
+// assertSelection keeps M-17's exhaustiveness for a profile run: the
+// evaluated ids are exactly want's keys with those statuses, the excluded
+// ids are exactly excluded, and together they are the embedded set.
+func assertSelection(t *testing.T, jsonBytes []byte, want map[string]string, excluded []string) {
+	t.Helper()
+	var rep struct {
+		Check struct {
+			Profile struct {
+				Selected    int      `json:"selected"`
+				Excluded    int      `json:"excluded"`
+				ExcludedIDs []string `json:"excluded_ids"`
+			} `json:"profile"`
+		} `json:"check"`
+		Results []struct {
+			ID     string `json:"id"`
+			Status string `json:"status"`
+		} `json:"results"`
 	}
-	if !bytes.Contains(quiet.Bytes(), []byte("muster.account.root_remote_login")) {
-		t.Error("--quiet must still show the FAIL row")
+	if err := json.Unmarshal(jsonBytes, &rep); err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]string{}
+	for _, r := range rep.Results {
+		got[r.ID] = r.Status
+	}
+	for id, st := range want {
+		if got[id] != st {
+			t.Errorf("%s: status %q, want %q", id, got[id], st)
+		}
+	}
+	for id := range got {
+		if _, named := want[id]; !named {
+			t.Errorf("%s evaluated but not named by want", id)
+		}
+	}
+	if strings.Join(rep.Check.Profile.ExcludedIDs, ",") != strings.Join(excluded, ",") {
+		t.Errorf("excluded_ids %v, want %v", rep.Check.Profile.ExcludedIDs, excluded)
+	}
+	set, err := controls.LoadDefault()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(want)+len(excluded) != len(set.Controls) || rep.Check.Profile.Selected+rep.Check.Profile.Excluded != len(set.Controls) {
+		t.Errorf("%d evaluated + %d excluded != %d loaded", len(want), len(excluded), len(set.Controls))
+	}
+}
+
+// guideOnly splits a full-set status map into the guide's statuses and the
+// sorted beyond ids, so the exclude-beyond expectations come from the one
+// source the full-set test asserts (Z-26).
+func guideOnly(full map[string]string) (map[string]string, []string) {
+	guide := map[string]string{}
+	var beyond []string
+	for id, st := range full {
+		if strings.HasPrefix(id, "muster.beyond.") {
+			beyond = append(beyond, id)
+			continue
+		}
+		guide[id] = st
+	}
+	sort.Strings(beyond)
+	return guide, beyond
+}
+
+// profileReport is the slice of the report the profile tests read.
+type profileReport struct {
+	Check struct {
+		Profile struct {
+			Name        string   `json:"name"`
+			Source      string   `json:"source"`
+			Digest      string   `json:"digest"`
+			Extends     []string `json:"extends"`
+			Selected    int      `json:"selected"`
+			Excluded    int      `json:"excluded"`
+			ExcludedIDs []string `json:"excluded_ids"`
+		} `json:"profile"`
+		Tuning *struct {
+			Path   string `json:"path"`
+			Digest string `json:"digest"`
+		} `json:"tuning"`
+		Waivers struct {
+			NotApplied int `json:"not_applied"`
+			Unknown    int `json:"unknown"`
+		} `json:"waivers"`
+		Params       map[string]map[string]any    `json:"params"`
+		ParamSources map[string]map[string]string `json:"param_sources"`
+	} `json:"check"`
+	Results []struct {
+		ID             string `json:"id"`
+		Status         string `json:"status"`
+		Severity       string `json:"severity"`
+		SeveritySource string `json:"severity_source"`
+	} `json:"results"`
+}
+
+func decodeProfileReport(t *testing.T, b []byte) profileReport {
+	t.Helper()
+	var rep profileReport
+	if err := json.Unmarshal(b, &rep); err != nil {
+		t.Fatalf("stdout is not a report: %v\n%s", err, b)
+	}
+	return rep
+}
+
+// Spec §6: a profile that excludes every beyond control evaluates the 68
+// guide controls alone, names the 49 it left out, and records the file and
+// the chain it came from.
+func TestCheckProfileExcludeBeyondEvaluatesTheGuideOnly(t *testing.T) {
+	dir := stageFiles(t, "profiles/exclude-beyond.yaml")
+	prof := filepath.Join(dir, "profiles", "exclude-beyond.yaml")
+	var out, errb bytes.Buffer
+	if code := run([]string{"check", "--facts", "testdata/full-fail.json", "--profile", prof, "--format", "json"}, &out, &errb); code != exitFindings {
+		t.Fatalf("exit %d, want %d; stderr %q", code, exitFindings, errb.String())
+	}
+	guide, beyond := guideOnly(fullFailWant())
+	if len(guide) != 68 || len(beyond) != 49 {
+		t.Fatalf("%d guide + %d beyond, want 68 + 49", len(guide), len(beyond))
+	}
+	assertSelection(t, out.Bytes(), guide, beyond)
+	rep := decodeProfileReport(t, out.Bytes())
+	p := rep.Check.Profile
+	if p.Name != "exclude-beyond" || p.Source != "file:"+prof {
+		t.Errorf("profile %q source %q, want exclude-beyond file:%s", p.Name, p.Source, prof)
+	}
+	if want := []string{"builtin:default", "file:" + prof}; strings.Join(p.Extends, "|") != strings.Join(want, "|") {
+		t.Errorf("extends %v, want %v", p.Extends, want)
+	}
+	if !strings.HasPrefix(p.Digest, "sha256:") {
+		t.Errorf("digest %q", p.Digest)
+	}
+
+	out.Reset()
+	errb.Reset()
+	if code := run([]string{"check", "--facts", "testdata/full-pass.json", "--profile", prof, "--format", "json"}, &out, &errb); code != exitOK {
+		t.Fatalf("full-pass: exit %d, want 0; stderr %q", code, errb.String())
+	}
+	guide, beyond = guideOnly(fullPassWant())
+	assertSelection(t, out.Bytes(), guide, beyond)
+}
+
+// Spec §3/§5: a chain of two files records the child as given and the parent
+// by the cleaned path it was opened at; the parent's severity entry rates
+// every selected beyond row, and a guide row keeps its importance.
+func TestCheckProfileChainOfTwoRecordsTheOpenedPaths(t *testing.T) {
+	dir := stageFiles(t, "profiles/chain-child.yaml", "profiles/chain-base.yaml")
+	child := filepath.Join(dir, "profiles", "chain-child.yaml")
+	base := filepath.Clean(filepath.Join(dir, "profiles", "chain-base.yaml"))
+	var out, errb bytes.Buffer
+	if code := run([]string{"check", "--facts", "testdata/full-pass.json", "--profile", child, "--format", "json"}, &out, &errb); code != exitOK {
+		t.Fatalf("exit %d, want 0; stderr %q", code, errb.String())
+	}
+	rep := decodeProfileReport(t, out.Bytes())
+	p := rep.Check.Profile
+	if want := []string{"builtin:default", "file:" + base, "file:" + child}; strings.Join(p.Extends, "|") != strings.Join(want, "|") {
+		t.Errorf("extends %v, want %v", p.Extends, want)
+	}
+	want := fullPassWant()
+	delete(want, "muster.beyond.no_deleted_executables")
+	assertSelection(t, out.Bytes(), want, []string{"muster.beyond.no_deleted_executables"})
+	beyondRows, guideRows := 0, 0
+	for _, r := range rep.Results {
+		if strings.HasPrefix(r.ID, "muster.beyond.") {
+			beyondRows++
+			if r.SeveritySource != "profile" || r.Severity != "low" {
+				t.Errorf("%s: severity %q from %q, want low from profile", r.ID, r.Severity, r.SeveritySource)
+			}
+		} else {
+			guideRows++
+			if r.SeveritySource != "importance" {
+				t.Errorf("%s: severity_source %q, want importance", r.ID, r.SeveritySource)
+			}
+		}
+	}
+	if beyondRows != 48 || guideRows != 68 {
+		t.Errorf("%d beyond rows + %d guide rows, want 48 + 68", beyondRows, guideRows)
+	}
+}
+
+// Spec §4: a tuning file's value is the one in force -- tcp/80 declared turns
+// the folded-http FAIL into a PASS, and the result says where the value came
+// from.
+func TestCheckProfileOneControlWithTuningFlipsTheVerdict(t *testing.T) {
+	const id = "muster.beyond.exposed_listeners_allowed"
+	snap := filepath.Join("..", "..", "controls", "testdata", id, "fail-ufw-folded-http.json")
+	dir := stageFiles(t, "profiles/one-control.yaml", "tuning/ports.yaml")
+	prof := filepath.Join(dir, "profiles", "one-control.yaml")
+	tun := filepath.Join(dir, "tuning", "ports.yaml")
+	var out, errb bytes.Buffer
+	if code := run([]string{"check", "--facts", snap, "--profile", prof, "--tuning", tun, "--format", "json"}, &out, &errb); code != exitOK {
+		t.Fatalf("exit %d, want 0; stderr %q", code, errb.String())
+	}
+	rep := decodeProfileReport(t, out.Bytes())
+	if len(rep.Results) != 1 || rep.Results[0].ID != id || rep.Results[0].Status != "PASS" {
+		t.Fatalf("results %+v, want one PASS row for %s", rep.Results, id)
+	}
+	if rep.Check.ParamSources[id]["allowed_ports"] != "tuning" {
+		t.Errorf("param_sources %v, want %s.allowed_ports from tuning", rep.Check.ParamSources, id)
+	}
+	if ports, ok := rep.Check.Params[id]["allowed_ports"].([]any); !ok || len(ports) != 4 {
+		t.Errorf("params[%s].allowed_ports = %v, want the four tuned entries", id, rep.Check.Params[id]["allowed_ports"])
+	}
+	if rep.Check.Tuning == nil || rep.Check.Tuning.Path != tun || !strings.HasPrefix(rep.Check.Tuning.Digest, "sha256:") {
+		t.Errorf("tuning block %+v, want path %s and a digest", rep.Check.Tuning, tun)
+	}
+
+	out.Reset()
+	errb.Reset()
+	if code := run([]string{"check", "--facts", snap, "--profile", prof, "--format", "json"}, &out, &errb); code != exitFindings {
+		t.Fatalf("without --tuning: exit %d, want %d; stderr %q", code, exitFindings, errb.String())
+	}
+	rep = decodeProfileReport(t, out.Bytes())
+	if len(rep.Results) != 1 || rep.Results[0].Status != "FAIL" {
+		t.Errorf("without --tuning: results %+v, want one FAIL row", rep.Results)
+	}
+	if rep.Check.Tuning != nil || rep.Check.ParamSources[id]["allowed_ports"] != "default" {
+		t.Errorf("without --tuning: tuning %+v, param_sources %v", rep.Check.Tuning, rep.Check.ParamSources)
+	}
+}
+
+// Review focus 1: a tuning value for a control the profile excludes is
+// warned about and dropped, never an error.
+func TestCheckProfileTuningForExcludedControlWarns(t *testing.T) {
+	const id = "muster.beyond.exposed_listeners_allowed"
+	dir := stageFiles(t, "profiles/exclude-beyond.yaml", "tuning/excluded.yaml")
+	prof := filepath.Join(dir, "profiles", "exclude-beyond.yaml")
+	tun := filepath.Join(dir, "tuning", "excluded.yaml")
+	var out, errb bytes.Buffer
+	if code := run([]string{"check", "--facts", "testdata/full-pass.json", "--profile", prof, "--tuning", tun, "--format", "json"}, &out, &errb); code != exitOK {
+		t.Fatalf("exit %d, want 0; stderr %q", code, errb.String())
+	}
+	if want := "muster: warning: tuning parameter " + id + ".allowed_ports ignored: excluded by profile\n"; !strings.Contains(errb.String(), want) {
+		t.Errorf("stderr %q lacks %q", errb.String(), want)
+	}
+	rep := decodeProfileReport(t, out.Bytes())
+	if _, ok := rep.Check.Params[id]; ok {
+		t.Errorf("check.params carries an excluded control: %v", rep.Check.Params[id])
+	}
+	if _, ok := rep.Check.ParamSources[id]; ok {
+		t.Errorf("check.param_sources carries an excluded control: %v", rep.Check.ParamSources[id])
+	}
+	if rep.Check.Tuning == nil || rep.Check.Tuning.Path != tun {
+		t.Errorf("tuning block %+v, want path %s", rep.Check.Tuning, tun)
+	}
+}
+
+// Review focus 4: a waiver on a control the profile excludes is counted
+// not_applied and warned, never unknown; the guide's FAILs still exit 1.
+func TestCheckProfileWaiverOnExcludedControlIsNotApplied(t *testing.T) {
+	dir := stageFiles(t, "profiles/exclude-beyond.yaml")
+	prof := filepath.Join(dir, "profiles", "exclude-beyond.yaml")
+	w := filepath.Join(dir, "waivers.yaml")
+	body := "waivers:\n  - control: muster.beyond.no_deleted_executables\n    reason: synthetic waiver on a control the profile excludes\n    expires: 2099-12-31\n"
+	if err := os.WriteFile(w, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var out, errb bytes.Buffer
+	if code := run([]string{"check", "--facts", "testdata/full-fail.json", "--profile", prof, "--waivers", w, "--format", "json"}, &out, &errb); code != exitFindings {
+		t.Fatalf("exit %d, want %d; stderr %q", code, exitFindings, errb.String())
+	}
+	rep := decodeProfileReport(t, out.Bytes())
+	if rep.Check.Waivers.NotApplied != 1 || rep.Check.Waivers.Unknown != 0 {
+		t.Errorf("waivers %+v, want not_applied 1 and unknown 0", rep.Check.Waivers)
+	}
+	if want := "muster: warning: waiver for muster.beyond.no_deleted_executables not applied: excluded by profile\n"; !strings.Contains(errb.String(), want) {
+		t.Errorf("stderr %q lacks %q", errb.String(), want)
+	}
+}
+
+// Review focus 3: a name that is no built-in is refused naming the built-ins,
+// never opened as a file.
+func TestCheckProfileUnknownNameNamesTheBuiltins(t *testing.T) {
+	for _, name := range []string{"Default", "site"} {
+		var out, errb bytes.Buffer
+		if code := run([]string{"check", "--facts", "testdata/full-pass.json", "--profile", name}, &out, &errb); code != exitError {
+			t.Errorf("--profile %s: exit %d, want %d", name, code, exitError)
+		}
+		if out.Len() != 0 {
+			t.Errorf("--profile %s: stdout %q, want empty", name, out.String())
+		}
+		if !strings.Contains(errb.String(), "default, kisa-unix-2026") || !strings.Contains(errb.String(), `"`+name+`"`) {
+			t.Errorf("--profile %s: stderr %q does not name it and the built-ins", name, errb.String())
+		}
+	}
+}
+
+// Spec §5: every check carries a profile block, the built-in default when no
+// flag names one, and no tuning block without --tuning.
+func TestCheckProfileDefaultBlock(t *testing.T) {
+	var out, errb bytes.Buffer
+	if code := run([]string{"check", "--facts", "testdata/full-pass.json", "--format", "json"}, &out, &errb); code != exitOK {
+		t.Fatalf("exit %d, want 0; stderr %q", code, errb.String())
+	}
+	var doc struct {
+		Check map[string]json.RawMessage `json:"check"`
+	}
+	if err := json.Unmarshal(out.Bytes(), &doc); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := doc.Check["tuning"]; ok {
+		t.Errorf("check.tuning present without --tuning: %s", doc.Check["tuning"])
+	}
+	p := decodeProfileReport(t, out.Bytes()).Check.Profile
+	if p.Name != "default" || p.Source != "builtin" || strings.Join(p.Extends, "|") != "builtin:default" ||
+		p.Selected != 117 || p.Excluded != 0 || p.ExcludedIDs == nil || len(p.ExcludedIDs) != 0 || !strings.HasPrefix(p.Digest, "sha256:") {
+		t.Errorf("profile block %+v, want default/builtin/[builtin:default]/117/0/[]", p)
+	}
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(doc.Check["profile"], &raw); err != nil {
+		t.Fatal(err)
+	}
+	if string(raw["excluded_ids"]) != "[]" {
+		t.Errorf("excluded_ids must render as [] not null: %s", raw["excluded_ids"])
+	}
+}
+
+// Review focus 5: run as root, check refuses a group-writable profile, chain
+// file or tuning file, naming that path, before anything reaches stdout.
+func TestCheckRootRefusesWritableProfileFiles(t *testing.T) {
+	if os.Geteuid() != 0 {
+		t.Skip("the trusted-file rule applies only to a root run; the CI root job and the lab run this as root")
+	}
+	dir := stageFiles(t, "profiles/chain-child.yaml", "profiles/chain-base.yaml", "tuning/ports.yaml")
+	child := filepath.Join(dir, "profiles", "chain-child.yaml")
+	base := filepath.Join(dir, "profiles", "chain-base.yaml")
+	tun := filepath.Join(dir, "tuning", "ports.yaml")
+	args := []string{"check", "--facts", "testdata/full-pass.json", "--profile", child, "--tuning", tun, "--format", "json"}
+	var out, errb bytes.Buffer
+	if code := run(args, &out, &errb); code != exitOK {
+		t.Fatalf("all files 0600: exit %d, want 0; stderr %q", code, errb.String())
+	}
+	for _, p := range []string{child, base, tun} {
+		if err := os.Chmod(p, 0o664); err != nil {
+			t.Fatal(err)
+		}
+		out.Reset()
+		errb.Reset()
+		code := run(args, &out, &errb)
+		if err := os.Chmod(p, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if code != exitError || out.Len() != 0 || !strings.Contains(errb.String(), p+" is group- or world-writable") {
+			t.Errorf("%s 0664: exit %d, stdout %d bytes, stderr %q; want exit 2, empty stdout, the path named", p, code, out.Len(), errb.String())
+		}
+	}
+}
+
+// Spec §5: lint resolves a profile against the set it has just linted and
+// says what it selects; list prints the profile's subset in its four columns.
+func TestControlsLintProfileAndListProfile(t *testing.T) {
+	lint := func(profileArg string) []string {
+		return []string{"lint", "--fixtures", repoFixtures, "--references", repoReferences, "--kisa", repoKisa, "--profile", profileArg}
+	}
+	var out, errb bytes.Buffer
+	if code := runControls(lint("default"), &out, &errb); code != exitOK {
+		t.Fatalf("--profile default: exit %d; stderr %q", code, errb.String())
+	}
+	if !strings.Contains(out.String(), "ok: 117 controls") || !strings.Contains(out.String(), "ok: profile default selects 117 of 117 controls, 0 excluded\n") {
+		t.Errorf("--profile default: stdout %q", out.String())
+	}
+	dir := stageFiles(t, "profiles/exclude-beyond.yaml")
+	prof := filepath.Join(dir, "profiles", "exclude-beyond.yaml")
+	out.Reset()
+	errb.Reset()
+	if code := runControls(lint(prof), &out, &errb); code != exitOK {
+		t.Fatalf("--profile exclude-beyond: exit %d; stderr %q", code, errb.String())
+	}
+	if !strings.Contains(out.String(), "ok: profile exclude-beyond selects 68 of 117 controls, 49 excluded\n") {
+		t.Errorf("--profile exclude-beyond: stdout %q", out.String())
+	}
+	typo := filepath.Join(dir, "typo.yaml")
+	if err := os.WriteFile(typo, []byte("profile: typo\ninclude: [\"muster.nothing.*\"]\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	out.Reset()
+	errb.Reset()
+	if code := runControls(lint(typo), &out, &errb); code != exitError {
+		t.Errorf("typo profile: exit %d, want %d", code, exitError)
+	}
+	if !strings.Contains(errb.String(), `"muster.nothing.*"`) || strings.Contains(out.String(), "ok: profile") {
+		t.Errorf("typo profile: stdout %q stderr %q; want the pattern named and no ok: profile line", out.String(), errb.String())
+	}
+
+	out.Reset()
+	errb.Reset()
+	if code := runControls([]string{"list", "--profile", prof}, &out, &errb); code != exitOK {
+		t.Fatalf("list --profile: exit %d; stderr %q", code, errb.String())
+	}
+	lines := strings.Split(strings.TrimSuffix(out.String(), "\n"), "\n")
+	if len(lines) != 68 {
+		t.Errorf("list --profile: %d lines, want 68", len(lines))
+	}
+	for _, l := range lines {
+		if len(strings.Split(l, "\t")) != 4 || strings.HasPrefix(l, "muster.beyond.") {
+			t.Errorf("list --profile: line %q", l)
+		}
+	}
+}
+
+// Z-21: a profile whose severity entry matches only controls it excludes is
+// warned about, never refused -- lint still exits 0 and prints its line.
+func TestControlsLintProfileWarningExitsZero(t *testing.T) {
+	prof := filepath.Join(t.TempDir(), "sev-excluded.yaml")
+	body := "profile: sev-excluded\nextends: default\nexclude: [muster.beyond.no_deleted_executables]\nseverity:\n  - { controls: muster.beyond.no_deleted_executables, level: low }\n"
+	if err := os.WriteFile(prof, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var out, errb bytes.Buffer
+	if code := runControls([]string{"lint", "--fixtures", repoFixtures, "--references", repoReferences, "--kisa", repoKisa, "--profile", prof}, &out, &errb); code != exitOK {
+		t.Fatalf("exit %d, want 0; stderr %q", code, errb.String())
+	}
+	if !strings.Contains(out.String(), "ok: profile sev-excluded selects 116 of 117 controls, 1 excluded\n") {
+		t.Errorf("stdout %q", out.String())
+	}
+	if want := "muster: warning: severity entry muster.beyond.no_deleted_executables matches only excluded controls\n"; !strings.Contains(errb.String(), want) {
+		t.Errorf("stderr %q lacks %q", errb.String(), want)
 	}
 }

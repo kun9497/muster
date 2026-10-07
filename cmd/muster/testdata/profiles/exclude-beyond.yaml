@@ -1,0 +1,4 @@
+# The KISA guide alone: the built-in default without the controls beyond it.
+profile: exclude-beyond
+extends: default
+exclude: ["muster.beyond.*"]

@@ -1,0 +1,4 @@
+# Extends chain-base.yaml by a path relative to this file.
+profile: chain-child
+extends: chain-base.yaml
+exclude: [muster.beyond.no_deleted_executables]

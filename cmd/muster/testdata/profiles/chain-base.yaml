@@ -1,0 +1,5 @@
+# The parent of chain-child.yaml: every beyond control rated low.
+profile: chain-base
+extends: default
+severity:
+  - { controls: "muster.beyond.*", level: low }
