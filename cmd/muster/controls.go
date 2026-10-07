@@ -30,6 +30,14 @@ flags (lint):
                         references.kisa id must be an item of the edition it is filed under, the
                         control's importance must match the item's, and every current-edition item
                         must be claimed by at least one control or listed in kisa_deferred.json
+  --profile <name|path>
+                        also resolve this profile (a built-in or a profile file) against the set
+                        and say how many controls it selects; a profile that does not resolve
+                        fails the lint
+
+flags (list):
+  --profile <name|path>
+                        list only the controls this profile selects (default: every control)
 
 flags (new): run "muster controls new" with no arguments to see them
 `
@@ -161,6 +169,7 @@ func runControls(args []string, stdout, stderr io.Writer) int {
 		fixtures := defaultFixtureDir
 		references := ""
 		kisaDir := defaultKISADir
+		profileArg, profileGiven := "", false
 		rest := args[1:]
 		for i := 0; i < len(rest); i++ {
 			switch rest[i] {
@@ -185,6 +194,13 @@ func runControls(args []string, stdout, stderr io.Writer) int {
 				}
 				i++
 				kisaDir = rest[i]
+			case "--profile":
+				if i+1 >= len(rest) {
+					fmt.Fprintf(stderr, "muster: flag %s needs a value\n%s", rest[i], controlsUsage)
+					return exitError
+				}
+				i++
+				profileArg, profileGiven = rest[i], true
 			default:
 				fmt.Fprintf(stderr, "muster: unknown flag %s\n%s", rest[i], controlsUsage)
 				return exitError
@@ -244,11 +260,47 @@ func runControls(args []string, stdout, stderr io.Writer) int {
 			return exitError
 		}
 		fmt.Fprintf(stdout, "ok: %d controls, set %s\n", len(set.Controls), set.Version)
+		// Stage 3D-1: a profile is resolved against the set just linted, through
+		// the seam check uses, so a pattern that matches nothing fails here
+		// rather than on the host. Its warnings are stderr and never fail it.
+		if profileGiven {
+			sel, err := resolveSelection(profileArg, nil, set, warnTo(stderr))
+			if err != nil {
+				fmt.Fprintf(stderr, "muster: %v\n", err)
+				return exitError
+			}
+			fmt.Fprintf(stdout, "ok: profile %s selects %d of %d controls, %d excluded\n", sel.Profile.Name, sel.Profile.Selected, len(set.Controls), sel.Profile.Excluded)
+		}
 		return exitOK
 	case "new":
 		return runControlsNew(args[1:], set, stdout, stderr)
 	case "list":
-		for _, c := range set.Controls {
+		profileArg, profileGiven := "", false
+		rest := args[1:]
+		for i := 0; i < len(rest); i++ {
+			switch rest[i] {
+			case "--profile":
+				if i+1 >= len(rest) {
+					fmt.Fprintf(stderr, "muster: flag %s needs a value\n%s", rest[i], controlsUsage)
+					return exitError
+				}
+				i++
+				profileArg, profileGiven = rest[i], true
+			default:
+				fmt.Fprintf(stderr, "muster: unknown flag %s\n%s", rest[i], controlsUsage)
+				return exitError
+			}
+		}
+		sub := set
+		if profileGiven {
+			sel, err := resolveSelection(profileArg, nil, set, warnTo(stderr))
+			if err != nil {
+				fmt.Fprintf(stderr, "muster: %v\n", err)
+				return exitError
+			}
+			sub = sel.Subset
+		}
+		for _, c := range sub.Controls {
 			fmt.Fprintf(stdout, "%s\t%s\t%s\t%s\n", c.ID, c.Importance, c.Automation, c.TitleEn)
 		}
 		return exitOK

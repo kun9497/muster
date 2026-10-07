@@ -20,6 +20,9 @@ const checkUsage = `usage: muster check --facts <snapshot.json|-> [flags]
 flags:
   --format table|json        output format (default table)
   --waivers <file>           waiver file (reason mandatory, expiry optional)
+  --profile <name|path>      which controls to evaluate: a built-in (default, kisa-unix-2026)
+                             or a profile file (default: the built-in default)
+  --tuning <file>            site parameter values, over the profile's and the controls' defaults
   --allow-error              compute the exit code from findings even when controls are ERROR
   --fail-on fail|warn|manual|none   what exits 1 (default fail)
   --quiet                    hide PASS, NOT_APPLICABLE, WAIVED and MANUAL rows
@@ -29,11 +32,13 @@ flags:
 
 type checkFlags struct {
 	facts, format, waivers, failOn, color string
+	profile, tuning                       string
+	tuningGiven                           bool // --tuning was given, even as ""
 	allowError, quiet, all                bool
 }
 
 func parseCheckArgs(args []string) (checkFlags, error) {
-	f := checkFlags{format: "table", failOn: "fail", color: "auto"}
+	f := checkFlags{format: "table", failOn: "fail", color: "auto", profile: "default"}
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		next := func() (string, error) {
@@ -51,6 +56,11 @@ func parseCheckArgs(args []string) (checkFlags, error) {
 			f.format, err = next()
 		case "--waivers":
 			f.waivers, err = next()
+		case "--profile":
+			f.profile, err = next()
+		case "--tuning":
+			f.tuning, err = next()
+			f.tuningGiven = true
 		case "--fail-on":
 			f.failOn, err = next()
 		case "--color":
@@ -119,8 +129,9 @@ func openFacts(path string) (*facts.Snapshot, []byte, error) {
 }
 
 // newCheckBlock is everything check does between a loaded snapshot and
-// report.Build: it evaluates the snapshot, records the parameter values in
-// force, applies the waiver file and returns the provenance block the report
+// report.Build: it evaluates the snapshot over the selection's subset with
+// the parameter values in force, records those values and their sources,
+// applies the waiver file and returns the provenance block the report
 // carries. warn receives the body of each warning line -- the caller decides
 // where warnings go, so the command can prefix them and a test can collect
 // them (spec §7.4: warnings are stderr, never stdout).
@@ -129,13 +140,15 @@ func openFacts(path string) (*facts.Snapshot, []byte, error) {
 // through this function. A committed report is only evidence that this
 // binary produces it if the bytes the test compares came through the same
 // code, so there is one implementation and not two that can drift.
-func newCheckBlock(set *controls.Set, snap *facts.Snapshot, reg *facts.Registry, wf *waiver.File, warn func(string)) ([]check.Result, report.CheckBlock) {
-	opts := check.Options{}
+func newCheckBlock(sel *Selection, snap *facts.Snapshot, reg *facts.Registry, wf *waiver.File, warn func(string)) ([]check.Result, report.CheckBlock) {
+	set := sel.Subset
+	opts := check.Options{Params: sel.Params}
 	results := check.Evaluate(snap, set, reg, opts)
 	cb := report.CheckBlock{
 		MusterVersion: version, Commit: commit,
 		ControlsVersion: set.Version, ControlsDigest: set.Digest,
 		SnapshotDigest: snap.Digest(), GuideEdition: "kisa-unix-2026",
+		Profile: sel.Profile, Tuning: sel.Tuning,
 	}
 	// I5/R30: record the parameter values that were actually in force, for
 	// every control that declares any (spec §6.6, §9). encoding/json sorts
@@ -149,16 +162,20 @@ func newCheckBlock(set *controls.Set, snap *facts.Snapshot, reg *facts.Registry,
 			cb.Params = make(map[string]map[string]any, len(set.Controls))
 		}
 		cb.Params[c.ID] = check.ParamValues(c, opts.Params[c.ID])
+		if src := sel.Sources[c.ID]; len(src) > 0 {
+			if cb.ParamSources == nil {
+				cb.ParamSources = make(map[string]map[string]string, len(set.Controls))
+			}
+			cb.ParamSources[c.ID] = src
+		}
 	}
 	if snap.Run.ControlsDigest != "" && snap.Run.ControlsDigest != set.Digest {
 		warn(fmt.Sprintf("snapshot was collected with control set %s; evaluating with %s", snap.Run.ControlsVersion, set.Version))
 	}
 	if wf != nil {
-		known := map[string]bool{}
-		for _, c := range set.Controls {
-			known[c.ID] = true
-		}
-		tally := wf.Apply(results, known, time.Now().UTC(), warn)
+		// A waiver on a control the profile excludes is not_applied, never
+		// unknown: known is the subset, excluded the rest of the loaded set.
+		tally := wf.Apply(results, sel.Known, sel.Excluded, time.Now().UTC(), warn)
 		cb.Waivers = report.WaiversBlock{Path: wf.Path, Digest: wf.Digest, Applied: tally.Applied, NotApplied: tally.NotApplied, Expired: tally.Expired, Unknown: tally.Unknown, ExpiringSoon: tally.ExpiringSoon}
 	}
 	return results, cb
@@ -185,6 +202,18 @@ func runCheck(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "muster: %v\n", err)
 		return exitError
 	}
+	warn := warnTo(stderr)
+	// The full set goes in: the merge warns about a value for a control the
+	// profile excludes, which only the full set still names.
+	var tuningPath *string
+	if f.tuningGiven {
+		tuningPath = &f.tuning
+	}
+	sel, err := resolveSelection(f.profile, tuningPath, set, warn)
+	if err != nil {
+		fmt.Fprintf(stderr, "muster: %v\n", err)
+		return exitError
+	}
 	var wf *waiver.File
 	if f.waivers != "" {
 		if ok, why := trustedFile(f.waivers); !ok {
@@ -207,8 +236,8 @@ func runCheck(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "muster: warning: check does not need root")
 	}
 
-	results, cb := newCheckBlock(set, snap, reg, wf, func(msg string) { fmt.Fprintf(stderr, "muster: warning: %s\n", msg) })
-	rep := report.Build(snap, results, cb)
+	results, cb := newCheckBlock(sel, snap, reg, wf, warn)
+	rep := report.Build(snap, results, cb, sel.SeverityByID)
 
 	switch f.format {
 	case "json":

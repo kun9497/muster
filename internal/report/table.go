@@ -82,6 +82,24 @@ func escape(s string) string {
 	return b.String()
 }
 
+// profileLine is the table's second line (spec §5 "Table"): the profile in
+// force, how much of the control set it selects, and the tuning file. The
+// name and the path are file-derived, so both go through escape.
+func profileLine(cb CheckBlock) string {
+	p := cb.Profile
+	total := p.Selected + p.Excluded
+	var s string
+	if p.Excluded == 0 {
+		s = fmt.Sprintf("profile %s (%d controls", escape(p.Name), total)
+	} else {
+		s = fmt.Sprintf("profile %s (%d of %d, %d excluded", escape(p.Name), p.Selected, total, p.Excluded)
+	}
+	if cb.Tuning != nil {
+		s += "; tuning " + escape(cb.Tuning.Path)
+	}
+	return s + ")"
+}
+
 var statusColor = map[check.Status]string{
 	check.PASS: "32", check.FAIL: "31", check.WARN: "33", check.ERROR: "35",
 	check.MANUAL: "36", check.NotApplicable: "90", check.WAIVED: "90",
@@ -120,6 +138,7 @@ func WriteTable(w io.Writer, r *Report, o TableOptions) error {
 	fmt.Fprintf(w, "muster %s · controls %s · guide %s · host %s · collected %s\n",
 		escape(r.Check.MusterVersion), escape(r.Check.ControlsVersion), escape(r.Check.GuideEdition),
 		escape(r.Run.Host.Hostname), escape(r.Run.CollectedAt))
+	fmt.Fprintln(w, profileLine(r.Check))
 	fmt.Fprintf(w, "automatic  high %d/%d/%d  medium %d/%d/%d  low %d/%d/%d  (pass/fail/warn)\n",
 		s.Automatic.High.Pass, s.Automatic.High.Fail, s.Automatic.High.Warn,
 		s.Automatic.Medium.Pass, s.Automatic.Medium.Fail, s.Automatic.Medium.Warn,

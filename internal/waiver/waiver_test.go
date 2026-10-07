@@ -25,6 +25,21 @@ func TestLoadRefusesReasonlessUnknownKeyAndBadDate(t *testing.T) {
 	}
 }
 
+// Fix wave item 4: one YAML document per file. A second document used to be
+// ignored, so its waivers silently never applied while the digest changed.
+func TestLoadRefusesASecondDocument(t *testing.T) {
+	two := "waivers:\n  - control: muster.a.b\n    reason: r\n---\nwaivers: []\n"
+	f, err := Load(strings.NewReader(two), "w.yaml")
+	if f != nil || !errors.Is(err, ErrInvalid) || err.Error() != "invalid waiver file: w.yaml: more than one YAML document" {
+		t.Errorf("Load: %+v %v, want the path and the second document named", f, err)
+	}
+	for _, one := range []string{"", "---\n", "# only a comment\n", "---\nwaivers: []\n"} {
+		if _, err := Load(strings.NewReader(one), "w.yaml"); err != nil {
+			t.Errorf("Load(%q): %v, want one document accepted", one, err)
+		}
+	}
+}
+
 // I8/R33: two entries for the same (control, subject) meant the second was
 // silently dropped, which D12 forbids -- a waiver is counted and reasoned,
 // never silent. Load refuses the file instead.
@@ -63,7 +78,7 @@ func TestWaiverExpiringTodayStillApplies(t *testing.T) {
 	}
 	rs := results()
 	var warnings []string
-	a := f.Apply(rs, map[string]bool{"muster.a.fail": true}, now, func(s string) { warnings = append(warnings, s) })
+	a := f.Apply(rs, map[string]bool{"muster.a.fail": true}, nil, now, func(s string) { warnings = append(warnings, s) })
 	if rs[0].Status != check.WAIVED {
 		t.Errorf("a waiver expiring today still applies: %+v (warnings %v)", rs[0], warnings)
 	}
@@ -72,7 +87,7 @@ func TestWaiverExpiringTodayStillApplies(t *testing.T) {
 	}
 	// One day later it has expired.
 	rs = results()
-	a = f.Apply(rs, map[string]bool{"muster.a.fail": true}, now.AddDate(0, 0, 1), func(string) {})
+	a = f.Apply(rs, map[string]bool{"muster.a.fail": true}, nil, now.AddDate(0, 0, 1), func(string) {})
 	if rs[0].Status != check.FAIL || a.Expired != 1 {
 		t.Errorf("the day after expiry it must stop waiving: %+v tally=%+v", rs[0], a)
 	}
@@ -101,7 +116,7 @@ func TestApplyWaivesFailNeverError(t *testing.T) {
 	f, _ := Load(strings.NewReader("waivers:\n  - control: muster.a.fail\n    reason: r\n  - control: muster.a.err\n    reason: r\n"), "w.yaml")
 	rs := results()
 	var warnings []string
-	a := f.Apply(rs, map[string]bool{"muster.a.fail": true, "muster.a.err": true, "muster.a.obs": true}, now, func(s string) { warnings = append(warnings, s) })
+	a := f.Apply(rs, map[string]bool{"muster.a.fail": true, "muster.a.err": true, "muster.a.obs": true}, nil, now, func(s string) { warnings = append(warnings, s) })
 	if rs[0].Status != check.WAIVED || rs[0].Waiver == nil || !rs[0].Waiver.Applied {
 		t.Errorf("FAIL must be waived: %+v", rs[0])
 	}
@@ -117,7 +132,7 @@ func TestApplySubjectLevelAndExpiry(t *testing.T) {
 	f, _ := Load(strings.NewReader("waivers:\n  - control: muster.a.obs\n    subject: file:/a\n    reason: r\n    expires: 2026-09-10\n  - control: muster.a.fail\n    reason: r\n    expires: 2026-01-01\n  - control: muster.zzz\n    reason: r\n"), "w.yaml")
 	rs := results()
 	var warnings []string
-	a := f.Apply(rs, map[string]bool{"muster.a.fail": true, "muster.a.err": true, "muster.a.obs": true}, now, func(s string) { warnings = append(warnings, s) })
+	a := f.Apply(rs, map[string]bool{"muster.a.fail": true, "muster.a.err": true, "muster.a.obs": true}, nil, now, func(s string) { warnings = append(warnings, s) })
 	if rs[2].Status != check.WARN || rs[2].Observations[0].Verdict != "waived" || rs[2].Observations[1].Verdict != "fail" {
 		t.Errorf("subject waiver must waive one observation and keep the result: %+v", rs[2])
 	}
@@ -136,7 +151,7 @@ func TestApplySubjectLevelAndExpiry(t *testing.T) {
 func TestApplyWaivesResultWhenAllObservationsWaived(t *testing.T) {
 	f, _ := Load(strings.NewReader("waivers:\n  - control: muster.a.obs\n    subject: file:/a\n    reason: r\n  - control: muster.a.obs\n    subject: file:/b\n    reason: r\n"), "w.yaml")
 	rs := results()
-	f.Apply(rs, map[string]bool{"muster.a.obs": true}, now, func(string) {})
+	f.Apply(rs, map[string]bool{"muster.a.obs": true}, nil, now, func(string) {})
 	if rs[2].Status != check.WAIVED {
 		t.Errorf("%+v", rs[2])
 	}
@@ -145,7 +160,7 @@ func TestApplyWaivesResultWhenAllObservationsWaived(t *testing.T) {
 func TestApplyTwoSubjectWaivers(t *testing.T) {
 	f, _ := Load(strings.NewReader("waivers:\n  - control: muster.a.obs\n    subject: file:/a\n    reason: r1\n    expires: 2026-09-20\n  - control: muster.a.obs\n    subject: file:/b\n    reason: r2\n    expires: 2026-09-20\n"), "w.yaml")
 	rs := results()
-	a := f.Apply(rs, map[string]bool{"muster.a.obs": true}, now, func(string) {})
+	a := f.Apply(rs, map[string]bool{"muster.a.obs": true}, nil, now, func(string) {})
 	if rs[2].Status != check.WAIVED || rs[2].Waiver == nil || rs[2].Waiver.Subject != "file:/a, file:/b" {
 		t.Errorf("two subject waivers: %+v", rs[2])
 	}
@@ -158,7 +173,7 @@ func TestApplyControlAndSubjectWaivers(t *testing.T) {
 	f, _ := Load(strings.NewReader("waivers:\n  - control: muster.a.fail\n    reason: r1\n  - control: muster.a.fail\n    subject: file:/a\n    reason: r2\n"), "w.yaml")
 	rs := results()
 	var warnings []string
-	a := f.Apply(rs, map[string]bool{"muster.a.fail": true, "muster.a.err": true, "muster.a.obs": true}, now, func(s string) { warnings = append(warnings, s) })
+	a := f.Apply(rs, map[string]bool{"muster.a.fail": true, "muster.a.err": true, "muster.a.obs": true}, nil, now, func(s string) { warnings = append(warnings, s) })
 	if rs[0].Status != check.WAIVED {
 		t.Errorf("should be waived: %+v", rs[0])
 	}
@@ -175,7 +190,7 @@ func TestApplyNoMatchingObservation(t *testing.T) {
 	f, _ := Load(strings.NewReader("waivers:\n  - control: muster.a.obs\n    subject: file:/zzz\n    reason: r\n"), "w.yaml")
 	rs := results()
 	var warnings []string
-	a := f.Apply(rs, map[string]bool{"muster.a.fail": true, "muster.a.err": true, "muster.a.obs": true}, now, func(s string) { warnings = append(warnings, s) })
+	a := f.Apply(rs, map[string]bool{"muster.a.fail": true, "muster.a.err": true, "muster.a.obs": true}, nil, now, func(s string) { warnings = append(warnings, s) })
 	if rs[2].Status != check.WARN {
 		t.Errorf("status should still be WARN: %+v", rs[2])
 	}
@@ -192,8 +207,42 @@ func TestApplyExpiringSoonBoundary(t *testing.T) {
 	// Expires exactly 30 days from now should count as expiring soon
 	f, _ := Load(strings.NewReader("waivers:\n  - control: muster.a.fail\n    reason: r\n    expires: 2026-10-02\n"), "w.yaml")
 	rs := results()
-	a := f.Apply(rs, map[string]bool{"muster.a.fail": true, "muster.a.err": true, "muster.a.obs": true}, now, func(string) {})
+	a := f.Apply(rs, map[string]bool{"muster.a.fail": true, "muster.a.err": true, "muster.a.obs": true}, nil, now, func(string) {})
 	if a.ExpiringSoon != 1 {
 		t.Errorf("entry expiring exactly 30 days should count as expiring soon: %d", a.ExpiringSoon)
+	}
+}
+
+// A waiver naming a control the profile excludes is counted not_applied and
+// warned -- never unknown, never silently dropped -- whatever its expiry, and
+// with its subject named when it has one (spec 3D-1 §2, §5).
+func TestApplyCountsAnExcludedWaiverAsNotApplied(t *testing.T) {
+	f := &File{Waivers: []Waiver{
+		{Control: "muster.beyond.x", Reason: "r"},
+		{Control: "muster.beyond.x", Subject: "file:/a", Reason: "r"},
+		{Control: "muster.beyond.y", Reason: "r", Expires: "2000-01-01"}, // excluded AND expired
+		{Control: "muster.nope", Reason: "r"},
+	}}
+	rs := results()
+	known := map[string]bool{"muster.a.fail": true, "muster.a.err": true, "muster.a.obs": true}
+	excluded := map[string]bool{"muster.beyond.x": true, "muster.beyond.y": true}
+	var warnings []string
+	tally := f.Apply(rs, known, excluded, now, func(m string) { warnings = append(warnings, m) })
+	if tally.NotApplied != 3 || tally.Unknown != 1 || tally.Expired != 0 || tally.Applied != 0 {
+		t.Errorf("tally %+v: want not_applied 3 (one expired, one with a subject), unknown 1, expired 0", tally)
+	}
+	want := []string{
+		"waiver for muster.beyond.x not applied: excluded by profile",
+		"waiver for muster.beyond.x not applied: excluded by profile (subject file:/a)",
+		"waiver for muster.beyond.y not applied: excluded by profile",
+		"waiver names unknown control muster.nope",
+	}
+	if strings.Join(warnings, "\n") != strings.Join(want, "\n") {
+		t.Errorf("warnings:\n%s\nwant:\n%s", strings.Join(warnings, "\n"), strings.Join(want, "\n"))
+	}
+	for _, r := range rs {
+		if r.Waiver != nil {
+			t.Errorf("%s: no row carries an excluded waiver: %+v", r.ID, r.Waiver)
+		}
 	}
 }

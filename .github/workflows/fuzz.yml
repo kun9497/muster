@@ -41,7 +41,9 @@ jobs:
           collectors=$(go test -list '^Fuzz' ./internal/collect/collectors/ | grep '^Fuzz')
           pkgfiles=$(go test -list '^Fuzz' ./internal/pkgfiles/ | grep '^Fuzz')
           pkgindex=$(go test -list '^Fuzz' ./internal/pkgindex/ | grep '^Fuzz')
-          targets=$( { echo "$collectors" | sed 's#^#./internal/collect/collectors/ #'; echo "$pkgfiles" | sed 's#^#./internal/pkgfiles/ #'; echo "$pkgindex" | sed 's#^#./internal/pkgindex/ #'; } | sort )
+          profile=$(go test -list '^Fuzz' ./internal/profile/ | grep '^Fuzz')
+          tuning=$(go test -list '^Fuzz' ./internal/tuning/ | grep '^Fuzz')
+          targets=$( { echo "$collectors" | sed 's#^#./internal/collect/collectors/ #'; echo "$pkgfiles" | sed 's#^#./internal/pkgfiles/ #'; echo "$pkgindex" | sed 's#^#./internal/pkgindex/ #'; echo "$profile" | sed 's#^#./internal/profile/ #'; echo "$tuning" | sed 's#^#./internal/tuning/ #'; } | sort )
           i=0; ran=0; failed=0
           while read -r pkg name; do
             if [ $((i % 4)) -eq ${{ matrix.shard }} ]; then

@@ -1,0 +1,4 @@
+# Declares tcp/80 on top of the control's default list.
+params:
+  muster.beyond.exposed_listeners_allowed:
+    allowed_ports: [tcp/22, udp/68, udp/546, tcp/80]

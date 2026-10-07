@@ -1,0 +1,18 @@
+# An example tuning file: one site's parameter values (stage 3D-1).
+#
+# A tuning file carries numbers, never a selection: exact control ids,
+# declared parameters, values typed against the control's declaration.
+# It is applied after the profile's own `params` (default < profile <
+# tuning). Run it with
+#
+#   muster check --facts snapshot.json --tuning docs/examples/profiles/tuning.yaml
+#
+# The result's `check.tuning` block names the file and its digest, and
+# `check.param_sources` reads `tuning` for the two values below. A value
+# for a control the profile excludes is a warning, never an error, so this
+# file survives a profile swap.
+params:
+  muster.beyond.exposed_listeners_allowed:
+    allowed_ports: [tcp/22, udp/68, udp/546, tcp/443]
+  muster.account.password_policy:
+    min_len: 12

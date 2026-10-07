@@ -16,7 +16,9 @@ import (
 
 var update = flag.Bool("update", false, "rewrite golden files")
 
-func sampleReport(t *testing.T) *Report {
+// sampleSnapshot is the snapshot sampleReport builds over: one ok and one
+// skipped collector, no facts.
+func sampleSnapshot(t *testing.T) *facts.Snapshot {
 	t.Helper()
 	snap, err := facts.Load(strings.NewReader(`{"schema_version":1,"run":{"muster_version":"0.1.0","collected_at":"2026-09-02T06:00:00Z",
 	  "host":{"hostname":"web-01"},"collectors":[{"name":"sshd","status":"ok","ms":41},{"name":"walk","status":"skipped","ms":0}],
@@ -24,6 +26,12 @@ func sampleReport(t *testing.T) *Report {
 	if err != nil {
 		t.Fatal(err)
 	}
+	return snap
+}
+
+func sampleReport(t *testing.T) *Report {
+	t.Helper()
+	snap := sampleSnapshot(t)
 	results := []check.Result{
 		{ID: "muster.file.world_writable", Importance: "상", Automation: "partial", Status: check.WARN, Reason: "observations need human review",
 			Observations: []check.Observation{{Subject: "file:/var/tmp/x", Expected: true, Actual: false, Verdict: "fail"}}},
@@ -36,8 +44,34 @@ func sampleReport(t *testing.T) *Report {
 		{ID: "muster.log.review", Importance: "하", Automation: "manual", Status: check.MANUAL, Reason: "interview"},
 	}
 	cb := CheckBlock{MusterVersion: "0.1.0", Commit: "abc1234", ControlsVersion: "kisa-unix-2026+2026.09.09", ControlsDigest: "sha256:c", SnapshotDigest: snap.Digest(), GuideEdition: "kisa-unix-2026",
-		Waivers: WaiversBlock{Path: "w.yaml", Digest: "sha256:w", Applied: 1, ExpiringSoon: 1}}
-	return Build(snap, results, cb)
+		Profile: ProfileBlock{Name: "default", Source: "builtin", Digest: "sha256:p", Extends: []string{"builtin:default"}, Selected: 6, Excluded: 0, ExcludedIDs: []string{}},
+		Waivers: WaiversBlock{Path: "w.yaml", Digest: "sha256:w", Applied: 1, ExpiringSoon: 1}, ParamSources: nil}
+	return Build(snap, results, cb, nil)
+}
+
+func TestBuildAppliesTheSeverityMapAndNamesItsSource(t *testing.T) {
+	snap := sampleSnapshot(t)
+	results := []check.Result{
+		{ID: "muster.file.world_writable", Importance: "하", Status: check.FAIL},
+		{ID: "muster.account.a", Importance: "상", Status: check.PASS},
+	}
+	rep := Build(snap, results, CheckBlock{}, map[string]string{"muster.file.world_writable": "high"})
+	byID := map[string]Row{}
+	for _, r := range rep.Results {
+		byID[r.ID] = r
+	}
+	if r := byID["muster.file.world_writable"]; r.Severity != "high" || r.SeveritySource != "profile" {
+		t.Errorf("overridden row: %q %q", r.Severity, r.SeveritySource)
+	}
+	if r := byID["muster.account.a"]; r.Severity != "high" || r.SeveritySource != "importance" {
+		t.Errorf("derived row: %q %q", r.Severity, r.SeveritySource)
+	}
+	if rep.Summary.Automatic.High.Fail != 1 || rep.Summary.Automatic.Low.Fail != 0 {
+		t.Errorf("the summary counts the severity in force: %+v", rep.Summary.Automatic)
+	}
+	if rep.Check.Profile.ExcludedIDs == nil || rep.Check.Profile.Extends == nil {
+		t.Errorf("nil slices must render as []: %+v", rep.Check.Profile)
+	}
 }
 
 func TestBuildSortsAndSummarises(t *testing.T) {
@@ -129,7 +163,7 @@ func buildWith(t *testing.T, results []check.Result) *Report {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return Build(snap, results, CheckBlock{MusterVersion: "0.1.0", GuideEdition: "kisa-unix-2026"})
+	return Build(snap, results, CheckBlock{MusterVersion: "0.1.0", GuideEdition: "kisa-unix-2026"}, nil)
 }
 
 // addScopes folds two scopes into one, which is what B-9 promises the split

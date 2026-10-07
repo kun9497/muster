@@ -33,6 +33,25 @@ func (s *Set) ByID(id string) (*Control, bool) {
 	return &s.Controls[i], true
 }
 
+// Subset is a view of the set holding, in the set's order, the controls whose
+// id is in ids (an id the set does not know is ignored). It carries the full
+// set's Version and Digest: the controls digest names the embedded YAML,
+// never a selection (stage 3D-1, Y-7).
+func (s *Set) Subset(ids []string) *Set {
+	want := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		want[id] = true
+	}
+	sub := &Set{Version: s.Version, Digest: s.Digest, byID: map[string]int{}}
+	for _, c := range s.Controls {
+		if want[c.ID] {
+			sub.byID[c.ID] = len(sub.Controls)
+			sub.Controls = append(sub.Controls, c)
+		}
+	}
+	return sub
+}
+
 // LoadDefault loads the control set embedded in the binary (D15).
 func LoadDefault() (*Set, error) { return LoadFS(controlsembed.FS) }
 

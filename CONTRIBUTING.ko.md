@@ -140,9 +140,11 @@ KISA 항목이 아닌 컨트롤은 `category: beyond`, id `muster.beyond.<name>`
 - `internal/collect/collectors`와 `internal/pkgfiles`의 모든 파서 진입점에는 그 파서의
   testdata에서 시드를 얻는 `Fuzz<Name>` 타깃이 있고, `[]byte`를 받는 새 함수나 메서드에
   타깃이 없으면 `TestEveryParserHasAFuzzTarget`이 실패합니다(부모를 통해서만 닿는 헬퍼는
-  `coveredThrough`에, 호스트 입력이 아닌 바이트는 이유와 함께 `notParsers`에 선언). 풀 리퀘스트는 시드만 돌리고, 밤마다 도는 `fuzz.yml`이 타깃마다
-  1분씩 샤드 4개로 퍼징합니다. `make fuzz TARGET=<name> TIME=<duration>`은 하나를 로컬에서
-  돌립니다. 크래시는 Go가 `testdata/fuzz/` 아래에 쓰는 코퍼스 파일로 들어가고, 수정은
+  `coveredThrough`에, 호스트 입력이 아닌 바이트는 이유와 함께 `notParsers`에 선언). `internal/profile`과 `internal/tuning`의 프로파일·튜닝 파서에도
+  타깃이 하나씩 있습니다(`FuzzParseProfile`, `FuzzParseTuning`). 풀 리퀘스트는 시드만 돌리고,
+  밤마다 도는 `fuzz.yml`이 모든 타깃을 하나에 1분씩 샤드 4개로 퍼징합니다.
+  `make fuzz TARGET=<name> TIME=<duration>`은 하나를 로컬에서 돌리며, 수집기 밖의 타깃은
+  `FUZZPKG=./internal/profile/`(또는 다른 패키지)로 고릅니다. 크래시는 Go가 `testdata/fuzz/` 아래에 쓰는 코퍼스 파일로 들어가고, 수정은
   별도 커밋입니다.
 - `MUSTER_ORACLE=1 go test ./internal/collect/collectors -run Oracle`(Linux, root)은
   sshd·passwd/group·mountinfo·services 파서를 그 호스트의 `sshd -T`, `getent`, `findmnt`,

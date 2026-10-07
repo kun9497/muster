@@ -27,6 +27,7 @@ lint:
 
 lint-controls:
 	go run $(PKG) controls lint --references docs/reference
+	go run $(PKG) controls lint --references docs/reference --profile default
 
 coverage:
 	go run ./tools/coverage

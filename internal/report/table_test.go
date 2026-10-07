@@ -157,7 +157,7 @@ func TestTableRendersAnAbsentActualAsNoSuchField(t *testing.T) {
 	}
 	cb := CheckBlock{MusterVersion: "0.1.0", Commit: "abc1234", ControlsVersion: "kisa-unix-2026+2026.09.09", ControlsDigest: "sha256:c", SnapshotDigest: snap.Digest(), GuideEdition: "kisa-unix-2026"}
 	var buf bytes.Buffer
-	WriteTable(&buf, Build(snap, results, cb), TableOptions{})
+	WriteTable(&buf, Build(snap, results, cb, nil), TableOptions{})
 	out := buf.String()
 	if !strings.Contains(out, "actual (no such field)") {
 		t.Errorf("an observation with no actual value must say so:\n%s", out)
@@ -178,7 +178,7 @@ func TestTableEscapesObservationAndWaiverFields(t *testing.T) {
 			Waiver: &check.WaiverNote{Applied: true, Reason: "safe", Expires: "\x1b]0;evil\a"}},
 	}
 	cb := CheckBlock{MusterVersion: "0.1.0", Commit: "abc1234", ControlsVersion: "kisa-unix-2026+2026.09.09", ControlsDigest: "sha256:c", SnapshotDigest: snap.Digest(), GuideEdition: "kisa-unix-2026"}
-	r := Build(snap, results, cb)
+	r := Build(snap, results, cb, nil)
 
 	var buf bytes.Buffer
 	WriteTable(&buf, r, TableOptions{})
@@ -249,10 +249,11 @@ func TestTablePoisonedSnapshotWritesNoRawControlBytes(t *testing.T) {
 			Waiver:   &check.WaiverNote{Applied: false, NotAppliedBecause: poison}},
 	}
 	cb := CheckBlock{MusterVersion: poison, Commit: poison, ControlsVersion: poison, ControlsDigest: poison,
-		SnapshotDigest: poison, GuideEdition: poison, Waivers: WaiversBlock{Path: poison, Digest: poison}}
+		SnapshotDigest: poison, GuideEdition: poison, Waivers: WaiversBlock{Path: poison, Digest: poison},
+		Profile: ProfileBlock{Name: poison, Selected: 1}, Tuning: &TuningBlock{Path: poison}}
 
 	var buf bytes.Buffer
-	if err := WriteTable(&buf, Build(snap, results, cb), TableOptions{Width: 100}); err != nil {
+	if err := WriteTable(&buf, Build(snap, results, cb, nil), TableOptions{Width: 100}); err != nil {
 		t.Fatal(err)
 	}
 	for _, b := range []byte{0x1b, '\r', 0x07} {
@@ -276,7 +277,7 @@ func TestTableEvidenceNamesStatusForNonOKFacts(t *testing.T) {
 			{Fact: "files.etc_passwd.mode", Status: facts.StatusOK, Value: 420},
 		}}}
 	var buf bytes.Buffer
-	if err := WriteTable(&buf, Build(snap, results, CheckBlock{}), TableOptions{Width: 100}); err != nil {
+	if err := WriteTable(&buf, Build(snap, results, CheckBlock{}, nil), TableOptions{Width: 100}); err != nil {
 		t.Fatal(err)
 	}
 	out := buf.String()
@@ -309,6 +310,7 @@ func TestTableScopeLinesAndSeparator(t *testing.T) {
 	lines := strings.Split(buf.String(), "\n")
 	want := []string{
 		"muster 0.1.0 · controls kisa-unix-2026+2026.09.09 · guide kisa-unix-2026 · host web-01 · collected 2026-09-02T06:00:00Z",
+		"profile default (6 controls)",
 		"automatic  high 0/1/0  medium 1/0/0  low 0/0/0  (pass/fail/warn)",
 		"manual review 2  ·  undecidable error 1 / n-a 0 / waived 1  ·  facts failed 1  ·  waivers expiring within 30d 1",
 		"KISA 2026 (6 controls): pass 1 fail 1 warn 0 manual 2 n/a 0 error 1 waived 1",
@@ -419,4 +421,33 @@ func scopeLineNumbers(line string) (controls, sum int, ok bool) {
 		sum += v
 	}
 	return n, sum, true
+}
+
+func TestTablePrintsTheProfileLine(t *testing.T) {
+	rep := sampleReportWithTitles(t)
+	rep.Check.Profile = ProfileBlock{Name: "site\x1b[31m", Source: "file:s.yaml", Extends: []string{"builtin:default", "file:s.yaml"}, Selected: 4, Excluded: 2, ExcludedIDs: []string{"a", "b"}}
+	rep.Check.Tuning = &TuningBlock{Path: "t.yaml", Digest: "sha256:t"}
+	var b bytes.Buffer
+	if err := WriteTable(&b, rep, TableOptions{Width: 100}); err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(b.String(), "\n")
+	if lines[1] != "profile site\\x1b[31m (4 of 6, 2 excluded; tuning t.yaml)" { // escape's spelling of ESC
+		t.Errorf("line 2 = %q", lines[1])
+	}
+	// The nothing-excluded form escapes the name and the tuning path too.
+	rep.Check.Profile = ProfileBlock{Name: "all\x1b[31m", Source: "file:a.yaml", Extends: []string{"builtin:default", "file:a.yaml"}, Selected: 6, ExcludedIDs: []string{}}
+	rep.Check.Tuning = &TuningBlock{Path: "t" + "\x1b[31m" + ".yaml", Digest: "sha256:t"}
+	b.Reset()
+	_ = WriteTable(&b, rep, TableOptions{Width: 100})
+	if l := strings.Split(b.String(), "\n")[1]; l != "profile all\\x1b[31m (6 controls; tuning t\\x1b[31m.yaml)" { // escape's spelling of ESC
+		t.Errorf("line 2 = %q", l)
+	}
+	rep.Check.Profile = ProfileBlock{Name: "default", Source: "builtin", Extends: []string{"builtin:default"}, Selected: 6, ExcludedIDs: []string{}}
+	rep.Check.Tuning = nil
+	b.Reset()
+	_ = WriteTable(&b, rep, TableOptions{Width: 100})
+	if l := strings.Split(b.String(), "\n")[1]; l != "profile default (6 controls)" {
+		t.Errorf("line 2 = %q", l)
+	}
 }
