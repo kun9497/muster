@@ -11,8 +11,16 @@ import (
 // Merge computes the parameter values in force for every selected control
 // that declares params — default < profile < tuning — and each value's
 // source. A profile or tuning value for a control the selection excludes
-// is warned once per (control, parameter) and dropped (Y-8). t may be nil.
+// is warned once per (control, parameter), in sorted parameter order, and
+// dropped (Y-8). t may be nil; a nil warn is a no-op.
+//
+// set must be the FULL loaded set, not set.Subset(r.IDs): the exclusion
+// warnings come from walking the controls the selection left out, so a
+// subset silently loses every one of them.
 func Merge(set *controls.Set, r *Resolved, t *tuning.Tuning, warn func(string)) (map[string]map[string]any, map[string]map[string]string) {
+	if warn == nil {
+		warn = func(string) {}
+	}
 	selected := map[string]bool{}
 	for _, id := range r.IDs {
 		selected[id] = true

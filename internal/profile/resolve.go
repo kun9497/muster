@@ -15,14 +15,14 @@ import (
 
 // Resolved is a profile resolved against a control set.
 type Resolved struct {
-	Name         string
-	Source       string
-	Chain        []string
-	IDs          []string
-	Params       map[string]map[string]any
-	Severity     []SeverityEntry
-	SeverityByID map[string]string
-	Digest       string
+	Name         string                    // the leaf's profile name; "default" for the built-in and its alias
+	Source       string                    // "builtin" or "file:<the flag's path as given>"
+	Chain        []string                  // root first: "builtin:default", "file:<cleaned path>", …
+	IDs          []string                  // the selected control ids, sorted
+	Params       map[string]map[string]any // the chain's own values, child over parent, selected or not
+	Severity     []SeverityEntry           // parent entries then child entries, in file order
+	SeverityByID map[string]string         // over the selected ids, the last matching entry winning
+	Digest       string                    // "sha256:" of the canonical JSON of {ids, params, severity}
 }
 
 const maxChain = 4
@@ -38,9 +38,15 @@ type link struct {
 
 // Resolve walks the extends chain root-first and applies include/exclude,
 // params and severity per file (spec §3). open reads a file by path; warn
-// receives the severity warning. Every refusal wraps ErrInvalid and names
-// the file.
+// receives the severity warning (nil is a no-op). Every refusal wraps
+// ErrInvalid and names the file; an empty src (SourceOf("")) is refused.
 func Resolve(set *controls.Set, src Source, open func(string) ([]byte, error), warn func(string)) (*Resolved, error) {
+	if warn == nil {
+		warn = func(string) {}
+	}
+	if src.Name == "" && src.Path == "" {
+		return nil, fmt.Errorf("%w: profile source is empty", ErrInvalid)
+	}
 	chain, err := loadChain(src, open)
 	if err != nil {
 		return nil, err
@@ -71,6 +77,9 @@ func Resolve(set *controls.Set, src Source, open func(string) ([]byte, error), w
 			return nil, fmt.Errorf("%w: %s: %v", ErrInvalid, l.where, err)
 		}
 		for id, ps := range l.file.Params {
+			if len(ps) == 0 {
+				continue // `id: {}` sets no value: the same content, and digest, as the key's absence
+			}
 			if r.Params[id] == nil {
 				r.Params[id] = map[string]any{}
 			}

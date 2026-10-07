@@ -14,7 +14,7 @@ import (
 func set() *controls.Set {
 	s := &controls.Set{Version: "v", Digest: "sha256:d", Controls: []controls.Control{
 		{ID: "muster.account.password_policy", Importance: "상", Params: map[string]controls.Param{"min_len": {Type: "int", Default: 8}}},
-		{ID: "muster.beyond.exposed_listeners_allowed", Importance: "중", Params: map[string]controls.Param{"allowed_ports": {Type: "list<string>", Default: []any{"tcp/22"}}}},
+		{ID: "muster.beyond.exposed_listeners_allowed", Importance: "중", Params: map[string]controls.Param{"allowed_ports": {Type: "list<string>", Default: []any{"tcp/22"}}, "allowed_foo": {Type: "list<int>", Default: []any{1}}}},
 		{ID: "muster.beyond.no_deleted_executables", Importance: "중"},
 		{ID: "muster.file.ip_port_restriction", Importance: "상"},
 		{ID: "muster.file.world_writable", Importance: "하"},
@@ -150,10 +150,25 @@ func TestResolveRefusals(t *testing.T) {
 			t.Errorf("%s: %v should wrap ErrInvalid and name the file", name, err)
 		}
 	}
-	neverOpen := func(p string) ([]byte, error) {
-		t.Errorf("a name must never be opened as a file: %s", p)
-		return nil, os.ErrNotExist
+	// Rows whose reason is pinned beyond the file name.
+	reasons := map[string]string{
+		"malformed pattern":    "syntax error in pattern", // path.Match's verdict, not only "matches no control"
+		"missing profile name": "x.yaml: profile name is required",
 	}
+	for name, want := range reasons {
+		_, err := Resolve(set(), Source{Path: "x.yaml"}, files(map[string]string{"x.yaml": cases[name]}), func(string) {})
+		if err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("%s: %v should say %q", name, err, want)
+		}
+	}
+	// An empty --profile value is a refusal, never the zero Source walked as a file.
+	if got := SourceOf(""); got != (Source{}) {
+		t.Errorf("SourceOf(\"\") = %+v, want the zero Source", got)
+	}
+	if _, err := Resolve(set(), SourceOf(""), neverOpenT(t), func(string) {}); err == nil || !errors.Is(err, ErrInvalid) || err.Error() != "invalid profile: profile source is empty" {
+		t.Errorf("an empty source: %v", err)
+	}
+	neverOpen := neverOpenT(t)
 	for _, name := range []string{"nope", "Default", "site_web"} {
 		if _, err := Resolve(set(), Source{Name: name}, neverOpen, func(string) {}); err == nil || !strings.Contains(err.Error(), "default, kisa-unix-2026") {
 			t.Errorf("%s: an unknown built-in name must list the built-ins: %v", name, err)
@@ -163,6 +178,28 @@ func TestResolveRefusals(t *testing.T) {
 	_, err := Resolve(set(), Source{Path: "x.yaml"}, files(map[string]string{"x.yaml": "profile: x\nextends: gone.yaml\ninclude: [\"muster.*\"]\n"}), func(string) {})
 	if err == nil || !strings.Contains(err.Error(), "x.yaml: extends gone.yaml:") {
 		t.Errorf("a missing chain file names the referrer and the value: %v", err)
+	}
+}
+
+// neverOpenT is an open function that fails the test when called: a name or
+// an empty source must never reach the filesystem.
+func neverOpenT(t *testing.T) func(string) ([]byte, error) {
+	return func(p string) ([]byte, error) {
+		t.Errorf("a name must never be opened as a file: %s", p)
+		return nil, os.ErrNotExist
+	}
+}
+
+func TestResolveAndMergeTreatANilWarnAsANoOp(t *testing.T) {
+	// Both calls would warn: the severity entry matches only excluded
+	// controls, and the profile value is for an excluded control.
+	src := "profile: x\nextends: default\nexclude: [\"muster.beyond.*\"]\nparams:\n  muster.beyond.exposed_listeners_allowed: {allowed_ports: [tcp/1]}\nseverity:\n  - { controls: \"muster.beyond.*\", level: low }\n"
+	r, err := Resolve(set(), Source{Path: "x.yaml"}, files(map[string]string{"x.yaml": src}), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if params, _ := Merge(set(), r, nil, nil); len(params) != 1 {
+		t.Errorf("params %v", params)
 	}
 }
 
@@ -230,6 +267,39 @@ func TestDigestNamesContentOnly(t *testing.T) {
 	re2, _ := Resolve(set(), Source{Path: "e.yaml"}, files(map[string]string{"e.yaml": e2}), func(string) {})
 	if re1.Digest == re2.Digest {
 		t.Errorf("an excluded control's chain value must be inside the digest")
+	}
+	// The severity list is inside the digest: a level and the order both count
+	// (the last matching entry wins, so the order is content).
+	two := "profile: s\nextends: default\nseverity:\n  - { controls: \"muster.file.*\", level: low }\n  - { controls: muster.file.world_writable, level: high }\n"
+	level := strings.Replace(two, "level: high", "level: medium", 1)
+	swapped := "profile: s\nextends: default\nseverity:\n  - { controls: muster.file.world_writable, level: high }\n  - { controls: \"muster.file.*\", level: low }\n"
+	rs, _ := Resolve(set(), Source{Path: "s.yaml"}, files(map[string]string{"s.yaml": two}), noWarn(t))
+	rl, _ := Resolve(set(), Source{Path: "s.yaml"}, files(map[string]string{"s.yaml": level}), noWarn(t))
+	rw, _ := Resolve(set(), Source{Path: "s.yaml"}, files(map[string]string{"s.yaml": swapped}), noWarn(t))
+	if rs.Digest == rl.Digest {
+		t.Errorf("a changed severity level must change the digest")
+	}
+	if rs.Digest == rw.Digest {
+		t.Errorf("swapping two severity entries must change the digest")
+	}
+	// `id: {}` sets no value: it digests as the key's absence.
+	empty := "profile: s\nextends: default\nparams:\n  muster.file.world_writable: {}\nseverity:\n  - { controls: \"muster.file.*\", level: low }\n  - { controls: muster.file.world_writable, level: high }\n"
+	re, _ := Resolve(set(), Source{Path: "s.yaml"}, files(map[string]string{"s.yaml": empty}), noWarn(t))
+	if re.Digest != rs.Digest {
+		t.Errorf("an empty params entry changed the digest: %s vs %s", re.Digest, rs.Digest)
+	}
+	if _, has := re.Params["muster.file.world_writable"]; has {
+		t.Errorf("an empty params entry created a key: %v", re.Params)
+	}
+	// The contract of spec §3 "Digest": this literal is the published digest
+	// of a fixed profile over the test set — ids, params and severity in the
+	// canonical JSON, and the SeverityEntry json tags (controls, level). A
+	// change here is a change of the published digest, never a golden refresh.
+	// It is sha256 of exactly (no trailing newline):
+	// {"ids":["muster.account.password_policy","muster.file.ip_port_restriction","muster.file.world_writable"],"params":{"muster.account.password_policy":{"min_len":12}},"severity":[{"controls":"muster.file.*","level":"low"}]}
+	const pinned = "sha256:0dffaf3f02ebabbfe9844fbd4f79491f407f0cfa4ba012a1fe783011e3ff94ab"
+	if ra.Digest != pinned {
+		t.Errorf("the digest of the fixed profile is %s, the contract pins %s", ra.Digest, pinned)
 	}
 }
 
