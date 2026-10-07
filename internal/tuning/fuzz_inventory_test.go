@@ -16,6 +16,10 @@ var fuzzTargets = []string{"FuzzParseTuning"}
 
 func TestEveryParserHasAFuzzTarget(t *testing.T) {
 	inventory := byteTakers(t)
+	slices.Sort(inventory)
+	if want := []string{"Parse", "parse"}; !slices.Equal(inventory, want) {
+		t.Errorf("the []byte takers are %v, want %v (an empty scan must not pass)", inventory, want)
+	}
 	targets := fuzzTargetCalls(t)
 	var declared []string
 	for name := range targets {

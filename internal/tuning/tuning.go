@@ -86,7 +86,7 @@ func Validate(set *controls.Set, params map[string]map[string]any) error {
 	for _, id := range ids {
 		c, ok := set.ByID(id)
 		if !ok {
-			return fmt.Errorf("params name unknown control %s", id) // neutral: the profile loader shares this (Z-19)
+			return fmt.Errorf("params name unknown control %q", id) // neutral: the profile loader shares this (Z-19)
 		}
 		names := make([]string, 0, len(params[id]))
 		for n := range params[id] {
@@ -96,7 +96,7 @@ func Validate(set *controls.Set, params map[string]map[string]any) error {
 		for _, n := range names {
 			p, declared := c.Params[n]
 			if !declared {
-				return fmt.Errorf("control %s has no parameter %s", id, n)
+				return fmt.Errorf("control %q has no parameter %q", id, n)
 			}
 			if err := controls.CheckParamValue(p.Type, params[id][n]); err != nil {
 				return fmt.Errorf("%s.%s: %v", id, n, err)
