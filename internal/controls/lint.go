@@ -313,42 +313,7 @@ func citedKISA(c *Control) []string {
 // implements, not which keys its YAML happens to carry.
 func citesKISA(c *Control) bool { return len(citedKISA(c)) > 0 }
 
-func paramDefaultMatches(p Param) bool {
-	switch p.Type {
-	case "string":
-		_, ok := p.Default.(string)
-		return ok
-	case "int":
-		_, ok := p.Default.(int)
-		return ok
-	case "bool":
-		_, ok := p.Default.(bool)
-		return ok
-	case "list<string>":
-		xs, ok := p.Default.([]any)
-		if !ok {
-			return false
-		}
-		for _, x := range xs {
-			if _, ok := x.(string); !ok {
-				return false
-			}
-		}
-		return true
-	case "list<int>":
-		xs, ok := p.Default.([]any)
-		if !ok {
-			return false
-		}
-		for _, x := range xs {
-			if _, ok := x.(int); !ok {
-				return false
-			}
-		}
-		return true
-	}
-	return false
-}
+func paramDefaultMatches(p Param) bool { return CheckParamValue(p.Type, p.Default) == nil }
 
 // lintKISACoverage is the set-level half of M-2: coverage is a property of
 // the whole set, not of any one file, so its problems carry no control id and
