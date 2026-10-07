@@ -52,8 +52,8 @@ func TestLoadRefusals(t *testing.T) {
 		"unknown key":        {"params: {}\nseverity: []\n", "field severity not found in type tuning.File"},
 		"unknown control":    {"params:\n  muster.no.such:\n    x: 1\n", `params name unknown control "muster.no.such"`},
 		"unknown parameter":  {"params:\n  muster.account.password_policy:\n    max_len: 1\n", `control "muster.account.password_policy" has no parameter "max_len"`},
-		"wrong type":         {"params:\n  muster.account.password_policy:\n    min_len: twelve\n", "muster.account.password_policy.min_len: value twelve is not a int"},
-		"list of wrong kind": {"params:\n  muster.beyond.exposed_listeners_allowed:\n    allowed_ports: [22]\n", "allowed_ports: value [22] is not a list<string>"},
+		"wrong type":         {"params:\n  muster.account.password_policy:\n    min_len: twelve\n", "muster.account.password_policy.min_len: value twelve is not of type int"},
+		"list of wrong kind": {"params:\n  muster.beyond.exposed_listeners_allowed:\n    allowed_ports: [22]\n", "allowed_ports: value [22] is not of type list<string>"},
 		"not a map":          {"params: 3\n", "cannot unmarshal !!int `3` into map[string]map[string]interface {}"},
 	}
 	for name, c := range cases {
@@ -84,9 +84,37 @@ func TestValidateFirstErrorIsDeterministic(t *testing.T) {
 	}
 }
 
+// Fix wave item 1: an empty path is refused before anything is opened.
+func TestLoadRefusesAnEmptyPathWithoutOpening(t *testing.T) {
+	_, err := Load(set(), "", func(p string) ([]byte, error) {
+		t.Errorf("open called with %q for an empty path", p)
+		return nil, os.ErrNotExist
+	})
+	if !errors.Is(err, ErrInvalid) || err.Error() != "invalid tuning file: tuning path is empty" {
+		t.Errorf("Load(\"\"): %v, want invalid tuning file: tuning path is empty", err)
+	}
+}
+
+// Fix wave item 4: one YAML document per file, through Parse and Load.
+func TestLoadRefusesASecondDocument(t *testing.T) {
+	two := "params:\n  muster.account.password_policy:\n    min_len: 12\n---\nparams: {}\n"
+	if f, err := Parse([]byte(two)); f != nil || !errors.Is(err, ErrInvalid) || err.Error() != "invalid tuning file: more than one YAML document" {
+		t.Errorf("Parse: %+v %v, want the second document refused", f, err)
+	}
+	if _, err := Load(set(), "t.yaml", openString(two)); !errors.Is(err, ErrInvalid) || err.Error() != "invalid tuning file: t.yaml: more than one YAML document" {
+		t.Errorf("Load: %v, want the path and the second document named", err)
+	}
+	for _, one := range []string{"", "---\n", "# only a comment\n", "---\nparams: {}\n"} {
+		if _, err := Load(set(), "t.yaml", openString(one)); err != nil {
+			t.Errorf("Load(%q): %v, want one document accepted", one, err)
+		}
+	}
+}
+
 func TestLoadOpenErrorAndEmptyFile(t *testing.T) {
-	if _, err := Load(set(), "missing.yaml", func(string) ([]byte, error) { return nil, os.ErrNotExist }); err == nil {
-		t.Errorf("Load swallowed the open error")
+	_, err := Load(set(), "missing.yaml", func(string) ([]byte, error) { return nil, os.ErrNotExist })
+	if !errors.Is(err, ErrInvalid) || err.Error() != "invalid tuning file: missing.yaml: "+os.ErrNotExist.Error() {
+		t.Errorf("open error: %v, want it wrapped as invalid tuning file naming the path", err)
 	}
 	tn, err := Load(set(), "empty.yaml", openString(""))
 	if err != nil || len(tn.Params) != 0 {

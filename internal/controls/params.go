@@ -18,7 +18,7 @@ func CheckParamValue(typ string, v any) error {
 	case "list<string>", "list<int>":
 		xs, isList := v.([]any)
 		if !isList {
-			return fmt.Errorf("value %v is not a %s", v, typ)
+			return fmt.Errorf("value %v is not of type %s", v, typ)
 		}
 		ok = true
 		for _, x := range xs {
@@ -35,7 +35,7 @@ func CheckParamValue(typ string, v any) error {
 		return fmt.Errorf("unknown parameter type %q", typ)
 	}
 	if !ok {
-		return fmt.Errorf("value %v is not a %s", v, typ)
+		return fmt.Errorf("value %v is not of type %s", v, typ)
 	}
 	return nil
 }

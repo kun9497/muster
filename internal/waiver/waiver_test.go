@@ -25,6 +25,21 @@ func TestLoadRefusesReasonlessUnknownKeyAndBadDate(t *testing.T) {
 	}
 }
 
+// Fix wave item 4: one YAML document per file. A second document used to be
+// ignored, so its waivers silently never applied while the digest changed.
+func TestLoadRefusesASecondDocument(t *testing.T) {
+	two := "waivers:\n  - control: muster.a.b\n    reason: r\n---\nwaivers: []\n"
+	f, err := Load(strings.NewReader(two), "w.yaml")
+	if f != nil || !errors.Is(err, ErrInvalid) || err.Error() != "invalid waiver file: w.yaml: more than one YAML document" {
+		t.Errorf("Load: %+v %v, want the path and the second document named", f, err)
+	}
+	for _, one := range []string{"", "---\n", "# only a comment\n", "---\nwaivers: []\n"} {
+		if _, err := Load(strings.NewReader(one), "w.yaml"); err != nil {
+			t.Errorf("Load(%q): %v, want one document accepted", one, err)
+		}
+	}
+}
+
 // I8/R33: two entries for the same (control, subject) meant the second was
 // silently dropped, which D12 forbids -- a waiver is counted and reasoned,
 // never silent. Load refuses the file instead.

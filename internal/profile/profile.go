@@ -93,6 +93,10 @@ func parse(data []byte) (*File, error) {
 	if err := dec.Decode(&f); err != nil && err != io.EOF {
 		return nil, err
 	}
+	// One document per file: a second one used to be ignored without a word.
+	if err := dec.Decode(new(any)); err != io.EOF {
+		return nil, errors.New("more than one YAML document")
+	}
 	return &f, nil
 }
 

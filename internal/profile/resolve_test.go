@@ -62,7 +62,10 @@ func TestResolveChainIncludeExcludeParamsSeverity(t *testing.T) {
 		"profiles/base.yaml": "profile: base\nextends: default\nexclude: [\"muster.beyond.*\"]\nseverity:\n  - { controls: \"muster.file.*\", level: low }\n",
 		"profiles/site.yaml": "profile: site\nextends: base.yaml\ninclude: [muster.beyond.exposed_listeners_allowed]\nparams:\n  muster.beyond.exposed_listeners_allowed:\n    allowed_ports: [tcp/22, tcp/443]\n  muster.beyond.no_deleted_executables: {}\nseverity:\n  - { controls: muster.file.world_writable, level: high }\n",
 	})
-	r, err := Resolve(set(), Source{Path: "profiles/site.yaml"}, fs, noWarn(t))
+	// The flag's file is labelled as given ("./" kept), a chain file by its
+	// cleaned opened path; the as-given spelling differs from the cleaned one
+	// on every platform.
+	r, err := Resolve(set(), Source{Path: "./profiles/site.yaml"}, fs, noWarn(t))
 	if err != nil {
 		t.Fatalf("Resolve: %v", err)
 	}
@@ -70,11 +73,11 @@ func TestResolveChainIncludeExcludeParamsSeverity(t *testing.T) {
 	if strings.Join(r.IDs, ",") != strings.Join(wantIDs, ",") {
 		t.Errorf("ids %v, want %v (the child re-includes one beyond control)", r.IDs, wantIDs)
 	}
-	wantChain := []string{"builtin:default", "file:" + filepath.Clean("profiles/base.yaml"), "file:profiles/site.yaml"}
+	wantChain := []string{"builtin:default", "file:" + filepath.Clean("profiles/base.yaml"), "file:./profiles/site.yaml"}
 	if strings.Join(r.Chain, ",") != strings.Join(wantChain, ",") {
 		t.Errorf("chain %v, want %v", r.Chain, wantChain)
 	}
-	if r.Source != "file:profiles/site.yaml" || r.Name != "site" {
+	if r.Source != "file:./profiles/site.yaml" || r.Name != "site" || r.Source != r.Chain[len(r.Chain)-1] {
 		t.Errorf("source/name %q %q", r.Source, r.Name)
 	}
 	if r.SeverityByID["muster.file.world_writable"] != "high" || r.SeverityByID["muster.file.ip_port_restriction"] != "low" {

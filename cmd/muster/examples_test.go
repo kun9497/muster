@@ -41,7 +41,7 @@ func reportsFor(t *testing.T, snap *facts.Snapshot, set *controls.Set) (jsonRepo
 	// A snapshot collected against an older control set warns, and that is
 	// not a failure here: F-12 keeps an example valid as long as it loads
 	// and evaluates.
-	sel, err := resolveSelection("default", "", set, func(msg string) { t.Logf("check warning: %s", msg) })
+	sel, err := resolveSelection("default", nil, set, func(msg string) { t.Logf("check warning: %s", msg) })
 	if err != nil {
 		t.Fatalf("resolve default profile: %v", err)
 	}

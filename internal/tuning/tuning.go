@@ -51,6 +51,10 @@ func parse(data []byte) (*File, error) {
 	if err := dec.Decode(&f); err != nil && err != io.EOF {
 		return nil, err
 	}
+	// One document per file: a second one used to be ignored without a word.
+	if err := dec.Decode(new(any)); err != io.EOF {
+		return nil, errors.New("more than one YAML document")
+	}
 	return &f, nil
 }
 
@@ -59,9 +63,12 @@ func parse(data []byte) (*File, error) {
 // wrong shape refuses the file naming the path. The digest is sha256 of the
 // bytes, as the waiver file's is.
 func Load(set *controls.Set, path string, open func(string) ([]byte, error)) (*Tuning, error) {
+	if path == "" {
+		return nil, fmt.Errorf("%w: tuning path is empty", ErrInvalid)
+	}
 	data, err := open(path)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %s: %v", ErrInvalid, path, err)
 	}
 	f, err := parse(data)
 	if err != nil {

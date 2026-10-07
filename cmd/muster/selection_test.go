@@ -15,7 +15,7 @@ func TestResolveSelectionDefaultSelectsTheWholeSet(t *testing.T) {
 		t.Fatal(err)
 	}
 	var warnings []string
-	sel, err := resolveSelection("default", "", set, func(m string) { warnings = append(warnings, m) })
+	sel, err := resolveSelection("default", nil, set, func(m string) { warnings = append(warnings, m) })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,7 +54,7 @@ func TestResolveSelectionRefusesAnUnknownName(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sel, err := resolveSelection("Default", "", set, func(string) {})
+	sel, err := resolveSelection("Default", nil, set, func(string) {})
 	if err == nil || sel != nil {
 		t.Fatalf("sel %v err %v, want a refusal", sel, err)
 	}

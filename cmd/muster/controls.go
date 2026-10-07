@@ -169,7 +169,7 @@ func runControls(args []string, stdout, stderr io.Writer) int {
 		fixtures := defaultFixtureDir
 		references := ""
 		kisaDir := defaultKISADir
-		profileArg := ""
+		profileArg, profileGiven := "", false
 		rest := args[1:]
 		for i := 0; i < len(rest); i++ {
 			switch rest[i] {
@@ -200,7 +200,7 @@ func runControls(args []string, stdout, stderr io.Writer) int {
 					return exitError
 				}
 				i++
-				profileArg = rest[i]
+				profileArg, profileGiven = rest[i], true
 			default:
 				fmt.Fprintf(stderr, "muster: unknown flag %s\n%s", rest[i], controlsUsage)
 				return exitError
@@ -263,8 +263,8 @@ func runControls(args []string, stdout, stderr io.Writer) int {
 		// Stage 3D-1: a profile is resolved against the set just linted, through
 		// the seam check uses, so a pattern that matches nothing fails here
 		// rather than on the host. Its warnings are stderr and never fail it.
-		if profileArg != "" {
-			sel, err := resolveSelection(profileArg, "", set, warnTo(stderr))
+		if profileGiven {
+			sel, err := resolveSelection(profileArg, nil, set, warnTo(stderr))
 			if err != nil {
 				fmt.Fprintf(stderr, "muster: %v\n", err)
 				return exitError
@@ -275,7 +275,7 @@ func runControls(args []string, stdout, stderr io.Writer) int {
 	case "new":
 		return runControlsNew(args[1:], set, stdout, stderr)
 	case "list":
-		profileArg := ""
+		profileArg, profileGiven := "", false
 		rest := args[1:]
 		for i := 0; i < len(rest); i++ {
 			switch rest[i] {
@@ -285,15 +285,15 @@ func runControls(args []string, stdout, stderr io.Writer) int {
 					return exitError
 				}
 				i++
-				profileArg = rest[i]
+				profileArg, profileGiven = rest[i], true
 			default:
 				fmt.Fprintf(stderr, "muster: unknown flag %s\n%s", rest[i], controlsUsage)
 				return exitError
 			}
 		}
 		sub := set
-		if profileArg != "" {
-			sel, err := resolveSelection(profileArg, "", set, warnTo(stderr))
+		if profileGiven {
+			sel, err := resolveSelection(profileArg, nil, set, warnTo(stderr))
 			if err != nil {
 				fmt.Fprintf(stderr, "muster: %v\n", err)
 				return exitError

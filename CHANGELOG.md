@@ -30,6 +30,11 @@ verdict on an existing snapshot is at least a minor release and appears under
 ### Changed
 - `controls list` takes flags (`--profile <name|path>`) and refuses an unknown
   argument with exit 2; it used to ignore extra arguments. Its rows are unchanged.
+- `controls lint --profile ""` and `controls list --profile ""` refuse the empty
+  value like `check`; `--tuning ""` is refused too.
+- A profile, tuning or waiver file with more than one YAML document is refused
+  (`more than one YAML document`); the loaders used to read the first document and
+  ignore the rest.
 
 ### Controls
 

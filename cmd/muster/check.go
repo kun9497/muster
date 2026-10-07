@@ -21,7 +21,7 @@ flags:
   --format table|json        output format (default table)
   --waivers <file>           waiver file (reason mandatory, expiry optional)
   --profile <name|path>      which controls to evaluate: a built-in (default, kisa-unix-2026)
-                             or a profile file (default default)
+                             or a profile file (default: the built-in default)
   --tuning <file>            site parameter values, over the profile's and the controls' defaults
   --allow-error              compute the exit code from findings even when controls are ERROR
   --fail-on fail|warn|manual|none   what exits 1 (default fail)
@@ -33,6 +33,7 @@ flags:
 type checkFlags struct {
 	facts, format, waivers, failOn, color string
 	profile, tuning                       string
+	tuningGiven                           bool // --tuning was given, even as ""
 	allowError, quiet, all                bool
 }
 
@@ -59,6 +60,7 @@ func parseCheckArgs(args []string) (checkFlags, error) {
 			f.profile, err = next()
 		case "--tuning":
 			f.tuning, err = next()
+			f.tuningGiven = true
 		case "--fail-on":
 			f.failOn, err = next()
 		case "--color":
@@ -203,7 +205,11 @@ func runCheck(args []string, stdout, stderr io.Writer) int {
 	warn := warnTo(stderr)
 	// The full set goes in: the merge warns about a value for a control the
 	// profile excludes, which only the full set still names.
-	sel, err := resolveSelection(f.profile, f.tuning, set, warn)
+	var tuningPath *string
+	if f.tuningGiven {
+		tuningPath = &f.tuning
+	}
+	sel, err := resolveSelection(f.profile, tuningPath, set, warn)
 	if err != nil {
 		fmt.Fprintf(stderr, "muster: %v\n", err)
 		return exitError

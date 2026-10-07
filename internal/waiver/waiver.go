@@ -50,6 +50,11 @@ func Load(r io.Reader, path string) (*File, error) {
 	if err := dec.Decode(&f); err != nil && err != io.EOF {
 		return nil, fmt.Errorf("%w: %s: %v", ErrInvalid, path, err)
 	}
+	// One document per file: a second one used to be ignored, so its waivers
+	// never applied while the digest changed.
+	if err := dec.Decode(new(any)); err != io.EOF {
+		return nil, fmt.Errorf("%w: %s: more than one YAML document", ErrInvalid, path)
+	}
 	// I8/R33: (control, subject) is the identity of a waiver. A repeated pair
 	// used to be dropped without a word, which contradicts D12: a waiver is
 	// counted and reasoned, never silent. Refusing the file at load is the

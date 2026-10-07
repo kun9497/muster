@@ -8,7 +8,8 @@ func FuzzParseTuning(f *testing.F) {
 	f.Add([]byte("params:\n  muster.account.password_policy:\n    min_len: 12\n  muster.beyond.exposed_listeners_allowed:\n    allowed_ports: [tcp/22, tcp/443]\n"))
 	f.Add([]byte("params: {}\n"))
 	f.Add([]byte("params:\n  a.b:\n    c: [1, 2]\n"))
-	f.Add([]byte("params: [\n")) // malformed: Parse must refuse it with a nil file
+	f.Add([]byte("params: [\n"))                                  // malformed: Parse must refuse it with a nil file
+	f.Add([]byte("params:\n  a.b:\n    c: 1\n---\nparams: {}\n")) // two documents: refused
 	f.Fuzz(func(t *testing.T, data []byte) {
 		file, err := Parse(data)
 		if err != nil && file != nil {

@@ -73,6 +73,18 @@ func TestCheckBadTuningFileIsExit2(t *testing.T) {
 	}
 }
 
+// Fix wave item 5: the usage names the profile default as the built-in one,
+// never as "default default".
+func TestCheckUsageNamesTheBuiltinDefault(t *testing.T) {
+	var out, errb bytes.Buffer
+	if code := run([]string{"check"}, &out, &errb); code != exitError {
+		t.Fatalf("check without --facts: exit %d, want %d", code, exitError)
+	}
+	if !strings.Contains(errb.String(), "or a profile file (default: the built-in default)\n") || strings.Contains(errb.String(), "(default default)") {
+		t.Errorf("usage %q", errb.String())
+	}
+}
+
 // Z-21: a repeated --profile or --tuning keeps the last value, as every other
 // value flag of check does.
 func TestParseCheckArgsRepeatedProfileAndTuningKeepTheLast(t *testing.T) {
@@ -80,10 +92,14 @@ func TestParseCheckArgsRepeatedProfileAndTuningKeepTheLast(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if f.profile != "b" || f.tuning != "t2" {
+	if f.profile != "b" || f.tuning != "t2" || !f.tuningGiven {
 		t.Errorf("profile %q tuning %q, want b and t2", f.profile, f.tuning)
 	}
-	if f, err = parseCheckArgs([]string{"--facts", "s"}); err != nil || f.profile != "default" || f.tuning != "" {
+	if f, err = parseCheckArgs([]string{"--facts", "s"}); err != nil || f.profile != "default" || f.tuning != "" || f.tuningGiven {
 		t.Errorf("defaults: profile %q tuning %q err %v, want default and none", f.profile, f.tuning, err)
+	}
+	// Fix wave item 1: an empty value is given, not absent.
+	if f, err = parseCheckArgs([]string{"--facts", "s", "--tuning", ""}); err != nil || f.tuning != "" || !f.tuningGiven {
+		t.Errorf("--tuning \"\": tuning %q given %v err %v, want an empty value that was given", f.tuning, f.tuningGiven, err)
 	}
 }

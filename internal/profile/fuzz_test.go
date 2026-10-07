@@ -9,6 +9,7 @@ func FuzzParseProfile(f *testing.F) {
 	f.Add([]byte("profile: site\nextends: base.yaml\ninclude: [muster.beyond.exposed_listeners_allowed]\nparams:\n  muster.beyond.exposed_listeners_allowed:\n    allowed_ports: [tcp/22, tcp/443]\n  muster.beyond.no_deleted_executables: {}\nseverity:\n  - { controls: muster.file.world_writable, level: high }\n"))
 	f.Add([]byte("profile: a\ninclude: [\"muster.*\"]\n"))
 	f.Add([]byte("profile: default\ninclude: [\"muster.*\"]\n"))
+	f.Add([]byte("profile: a\ninclude: [\"muster.*\"]\n---\nprofile: second\nbogus: 1\n")) // two documents: refused
 	f.Fuzz(func(t *testing.T, data []byte) {
 		file, err := Parse(data)
 		if err != nil && file != nil {

@@ -31,11 +31,13 @@ type Selection struct {
 // resolution, the tuning load, the merge and the subset -- no logic of its
 // own beyond the wiring (main design §4.2). set must be the full loaded set:
 // the merge warns about values for the controls the profile excludes, which a
-// subset no longer names.
-func resolveSelection(profileArg, tuningPath string, set *controls.Set, warn func(string)) (*Selection, error) {
+// subset no longer names. tuningPath is nil when --tuning was not given; a
+// given value, the empty one included, goes to tuning.Load, which refuses an
+// empty path the way profile.Resolve refuses an empty profile.
+func resolveSelection(profileArg string, tuningPath *string, set *controls.Set, warn func(string)) (*Selection, error) {
 	open := func(p string) ([]byte, error) {
 		if ok, why := trustedFile(p); !ok {
-			return nil, fmt.Errorf("refusing %s: %s", p, why)
+			return nil, fmt.Errorf("refusing: %s", why) // why names the path
 		}
 		return os.ReadFile(p)
 	}
@@ -45,8 +47,8 @@ func resolveSelection(profileArg, tuningPath string, set *controls.Set, warn fun
 	}
 	var tn *tuning.Tuning
 	var tb *report.TuningBlock
-	if tuningPath != "" {
-		if tn, err = tuning.Load(set, tuningPath, open); err != nil {
+	if tuningPath != nil {
+		if tn, err = tuning.Load(set, *tuningPath, open); err != nil {
 			return nil, err
 		}
 		tb = &report.TuningBlock{Path: tn.Path, Digest: tn.Digest}

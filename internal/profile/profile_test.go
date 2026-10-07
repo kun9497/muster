@@ -1,6 +1,9 @@
 package profile
 
-import "testing"
+import (
+	"errors"
+	"testing"
+)
 
 func TestSourceOf(t *testing.T) {
 	cases := map[string]Source{
@@ -30,5 +33,25 @@ func TestParseIsStrict(t *testing.T) {
 	f, err := Parse([]byte("profile: a\nseverity:\n  - { controls: \"muster.*\", level: low }\n"))
 	if err != nil || f.Profile != "a" || len(f.Severity) != 1 || f.Severity[0].Level != "low" {
 		t.Errorf("Parse: %+v %v", f, err)
+	}
+}
+
+// Fix wave item 4: one YAML document per file. A second document used to be
+// ignored without a word; it refuses the file now, through Parse and through
+// the chain, which names the path.
+func TestParseRefusesASecondDocument(t *testing.T) {
+	two := "profile: a\ninclude: [\"muster.*\"]\n---\nprofile: second\nbogus: 1\n"
+	f, err := Parse([]byte(two))
+	if f != nil || !errors.Is(err, ErrInvalid) || err.Error() != "invalid profile: more than one YAML document" {
+		t.Errorf("Parse: %+v %v, want the second document refused", f, err)
+	}
+	_, err = Resolve(set(), Source{Path: "p.yaml"}, files(map[string]string{"p.yaml": two}), noWarn(t))
+	if !errors.Is(err, ErrInvalid) || err.Error() != "invalid profile: p.yaml: more than one YAML document" {
+		t.Errorf("Resolve: %v, want the path and the second document named", err)
+	}
+	for _, one := range []string{"", "---\n", "# only a comment\n", "---\nprofile: a\n"} {
+		if _, err := Parse([]byte(one)); err != nil {
+			t.Errorf("Parse(%q): %v, want one document accepted", one, err)
+		}
 	}
 }

@@ -987,7 +987,10 @@ func decodeProfileReport(t *testing.T, b []byte) profileReport {
 // the chain it came from.
 func TestCheckProfileExcludeBeyondEvaluatesTheGuideOnly(t *testing.T) {
 	dir := stageFiles(t, "profiles/exclude-beyond.yaml")
-	prof := filepath.Join(dir, "profiles", "exclude-beyond.yaml")
+	// Fix wave item 3: the path carries a "." element filepath.Clean removes
+	// on every platform, so the as-given label is told from the cleaned one.
+	sep := string(os.PathSeparator)
+	prof := filepath.Join(dir, "profiles") + sep + "." + sep + "exclude-beyond.yaml"
 	var out, errb bytes.Buffer
 	if code := run([]string{"check", "--facts", "testdata/full-fail.json", "--profile", prof, "--format", "json"}, &out, &errb); code != exitFindings {
 		t.Fatalf("exit %d, want %d; stderr %q", code, exitFindings, errb.String())
@@ -1094,6 +1097,32 @@ func TestCheckProfileOneControlWithTuningFlipsTheVerdict(t *testing.T) {
 	}
 	if rep.Check.Tuning != nil || rep.Check.ParamSources[id]["allowed_ports"] != "default" {
 		t.Errorf("without --tuning: tuning %+v, param_sources %v", rep.Check.Tuning, rep.Check.ParamSources)
+	}
+}
+
+// Fix wave items 1 and 4: --tuning given an empty value, a missing file or a
+// file of two YAML documents refuses the run with exit 2, nothing on stdout
+// and one line naming the tuning file.
+func TestCheckTuningRefusals(t *testing.T) {
+	two := filepath.Join(t.TempDir(), "two.yaml")
+	if err := os.WriteFile(two, []byte("params: {}\n---\nparams: {}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cases := []struct{ tuning, prefix, want string }{
+		{"", "muster: invalid tuning file: tuning path is empty\n", ""},
+		{"nosuch.yaml", "muster: invalid tuning file: nosuch.yaml: ", "nosuch.yaml"},
+		{two, "muster: invalid tuning file: " + two + ": more than one YAML document\n", ""},
+	}
+	for _, c := range cases {
+		var out, errb bytes.Buffer
+		code := run([]string{"check", "--facts", "testdata/full-pass.json", "--tuning", c.tuning, "--format", "json"}, &out, &errb)
+		if code != exitError || out.Len() != 0 {
+			t.Errorf("--tuning %q: exit %d, stdout %d bytes; want exit 2 and empty stdout", c.tuning, code, out.Len())
+		}
+		msg := errb.String()
+		if !strings.HasPrefix(msg, c.prefix) || strings.Count(msg, "\n") != 1 || !strings.Contains(strings.TrimPrefix(msg, c.prefix), c.want) {
+			t.Errorf("--tuning %q: stderr %q; want one line starting %q and then naming %q", c.tuning, msg, c.prefix, c.want)
+		}
 	}
 }
 
@@ -1218,8 +1247,8 @@ func TestCheckRootRefusesWritableProfileFiles(t *testing.T) {
 		if err := os.Chmod(p, 0o600); err != nil {
 			t.Fatal(err)
 		}
-		if code != exitError || out.Len() != 0 || !strings.Contains(errb.String(), p+" is group- or world-writable") {
-			t.Errorf("%s 0664: exit %d, stdout %d bytes, stderr %q; want exit 2, empty stdout, the path named", p, code, out.Len(), errb.String())
+		if code != exitError || out.Len() != 0 || !strings.Contains(errb.String(), "refusing: "+p+" is group- or world-writable") {
+			t.Errorf("%s 0664: exit %d, stdout %d bytes, stderr %q; want exit 2, empty stdout, the path named once after refusing:", p, code, out.Len(), errb.String())
 		}
 	}
 }
@@ -1258,6 +1287,30 @@ func TestControlsLintProfileAndListProfile(t *testing.T) {
 	}
 	if !strings.Contains(errb.String(), `"muster.nothing.*"`) || strings.Contains(out.String(), "ok: profile") {
 		t.Errorf("typo profile: stdout %q stderr %q; want the pattern named and no ok: profile line", out.String(), errb.String())
+	}
+
+	// Fix wave item 1: an empty value given explicitly reaches the resolution
+	// and is refused the way check refuses it; lint prints no profile line.
+	out.Reset()
+	errb.Reset()
+	if code := runControls(lint(""), &out, &errb); code != exitError {
+		t.Errorf("lint --profile \"\": exit %d, want %d", code, exitError)
+	}
+	if want := "muster: invalid profile: profile source is empty\n"; !strings.Contains(errb.String(), want) {
+		t.Errorf("lint --profile \"\": stderr %q lacks %q", errb.String(), want)
+	}
+	for _, l := range strings.Split(out.String(), "\n") {
+		if strings.HasPrefix(l, "ok: profile") {
+			t.Errorf("lint --profile \"\": stdout carries %q", l)
+		}
+	}
+	out.Reset()
+	errb.Reset()
+	if code := runControls([]string{"list", "--profile", ""}, &out, &errb); code != exitError {
+		t.Errorf("list --profile \"\": exit %d, want %d", code, exitError)
+	}
+	if out.Len() != 0 || !strings.Contains(errb.String(), "muster: invalid profile: profile source is empty\n") {
+		t.Errorf("list --profile \"\": stdout %d bytes, stderr %q; want empty stdout and the refusal", out.Len(), errb.String())
 	}
 
 	out.Reset()

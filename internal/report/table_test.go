@@ -249,7 +249,8 @@ func TestTablePoisonedSnapshotWritesNoRawControlBytes(t *testing.T) {
 			Waiver:   &check.WaiverNote{Applied: false, NotAppliedBecause: poison}},
 	}
 	cb := CheckBlock{MusterVersion: poison, Commit: poison, ControlsVersion: poison, ControlsDigest: poison,
-		SnapshotDigest: poison, GuideEdition: poison, Waivers: WaiversBlock{Path: poison, Digest: poison}}
+		SnapshotDigest: poison, GuideEdition: poison, Waivers: WaiversBlock{Path: poison, Digest: poison},
+		Profile: ProfileBlock{Name: poison, Selected: 1}, Tuning: &TuningBlock{Path: poison}}
 
 	var buf bytes.Buffer
 	if err := WriteTable(&buf, Build(snap, results, cb, nil), TableOptions{Width: 100}); err != nil {
@@ -433,6 +434,14 @@ func TestTablePrintsTheProfileLine(t *testing.T) {
 	lines := strings.Split(b.String(), "\n")
 	if lines[1] != "profile site\\x1b[31m (4 of 6, 2 excluded; tuning t.yaml)" { // escape's spelling of ESC
 		t.Errorf("line 2 = %q", lines[1])
+	}
+	// The nothing-excluded form escapes the name and the tuning path too.
+	rep.Check.Profile = ProfileBlock{Name: "all\x1b[31m", Source: "file:a.yaml", Extends: []string{"builtin:default", "file:a.yaml"}, Selected: 6, ExcludedIDs: []string{}}
+	rep.Check.Tuning = &TuningBlock{Path: "t" + "\x1b[31m" + ".yaml", Digest: "sha256:t"}
+	b.Reset()
+	_ = WriteTable(&b, rep, TableOptions{Width: 100})
+	if l := strings.Split(b.String(), "\n")[1]; l != "profile all\\x1b[31m (6 controls; tuning t\\x1b[31m.yaml)" { // escape's spelling of ESC
+		t.Errorf("line 2 = %q", l)
 	}
 	rep.Check.Profile = ProfileBlock{Name: "default", Source: "builtin", Extends: []string{"builtin:default"}, Selected: 6, ExcludedIDs: []string{}}
 	rep.Check.Tuning = nil
