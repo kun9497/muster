@@ -56,6 +56,8 @@ references and, later, offered as selectable profiles.
 sudo muster collect --out host.json      # on the host, as root: facts snapshot
 muster check --facts host.json           # anywhere, no root: table + exit code
 muster check --facts host.json --format json
+muster check --facts host.json --profile docs/examples/profiles/exclude-beyond.yaml   # the KISA guide alone
+muster check --facts host.json --tuning docs/examples/profiles/tuning.yaml            # a site's parameter values
 muster controls lint --references docs/reference   # the control set's own gate
 ```
 
@@ -156,8 +158,9 @@ criterion. `muster controls lint` refuses a STIG or
 NIST id that is not in the committed index and cross-checks every KISA item
 number against the 67-item inventory, so an item can be neither forgotten nor
 mis-claimed (an item may be judged by more than one control, as U-23 is, but
-every citation must name a real item). From stage 3 a `cis-<distro>-l1`
-profile can select controls and parameters from the same collector. muster records the
+every citation must name a real item). Since stage 3D-1 a profile (`check --profile`)
+selects controls and parameters from the same collector; the `cis-<distro>-l1` profile
+waits for an index of CIS recommendation numbers (3D-1b). muster records the
 numbers, never the benchmark text, and certifies no level of CIS or STIG
 compliance. The STIG and NIST identifiers a control may cite are generated
 into `docs/reference/stig/` from DISA's public files by `tools/refindex`.
@@ -186,7 +189,7 @@ titles, never their discussion, check and fix text. See
    self-protection sysctls and the core-dump policy, the boot chain, separate
    partitions and mount options, swap encryption, module blacklists — from six
    read-only collectors, with the summary split into the guide and beyond it;
-   a FAIL beyond the guide counts for the exit code until profiles arrive.
+   a FAIL beyond the guide counts for the exit code unless a profile excludes the control (3D-1).
    3C-1 (merged): audit pipeline health and package integrity — the audit
    daemon's rules, immutability, disk actions and log permissions, log
    forwarding, sudo's own log, the file-integrity tool, and whole-database
@@ -222,6 +225,12 @@ the GitHub Actions runner VM with `--deep` — so the shape of the output can be
 read without running anything. Neither comes from anyone's host: the
 `examples.yml` workflow collects them and rewrites the host identity before they
 are kept, and a test checks them end to end on every change.
+
+[`docs/examples/profiles/`](docs/examples/profiles/) holds an example profile
+(`exclude-beyond.yaml`: the KISA guide alone, the controls beyond it excluded by one
+id glob) and an example tuning file (`tuning.yaml`: one site's parameter values).
+`check --profile <name|path>` and `check --tuning <path>` take them; the result
+records both, with every value's source and every excluded id.
 
 ## Documents and contributing
 

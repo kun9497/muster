@@ -73,7 +73,9 @@ check.Evaluate(snap, subset, reg, Options{Params}) ──► waiver.Apply(result
 report.Build(snap, results, cb, severity) ──► JSON / table / exit code
 ```
 
-- **`internal/profile` (new).** `Parse([]byte) (*File, error)` — strict YAML. `SourceOf(s string)
+- **`internal/profile` (new).** `Parse([]byte) (*File, error)` — strict YAML, one document per file
+  (a second YAML document refuses the file: `more than one YAML document`; the tuning and waiver loaders
+  apply the same rule). `SourceOf(s string)
   Source` — the one name-versus-path classifier (§3), used for the flag and for every `extends`
   value; `Source{Name string; Path string}`. `Resolve(set *controls.Set, src Source, open
   func(path string) ([]byte, error), warn func(string)) (*Resolved, error)` — follows `extends`
@@ -87,8 +89,8 @@ report.Build(snap, results, cb, severity) ──► JSON / table / exit code
   and the ONE owner of the excluded-control warnings: a profile or tuning value for a control the
   selection excludes is warned once per (control, parameter) — `profile parameter <id>.<param>
   ignored: excluded by profile` / `tuning parameter <id>.<param> ignored: excluded by profile` —
-  and dropped; a nil tuning is the no-`--tuning` case. `Builtins()` returns the embedded `default` as a Go literal (there is no
-  YAML file for it). Depends on `internal/controls` and `internal/tuning` only; never writes to
+  and dropped; a nil tuning is the no-`--tuning` case. The built-in `default` is a Go literal in the package (there is no
+  YAML file for it); `Builtins()` lists the built-in names, canonical first, for refusals. Depends on `internal/controls` and `internal/tuning` only; never writes to
   stderr (§7.4).
 - **`internal/tuning` (new, small).** `Parse([]byte)`, `Load(set, path, open)` — the `params:`
   map validated for unknown controls, unknown parameters and types against the full set; returns
@@ -136,8 +138,8 @@ severity:                         # ordered: a later entry wins
 
 - **Globs.** A pattern is matched against the control id with `path.Match`; `*` crosses `.` (the
   rule `Builder.Get` uses for fact globs, `internal/collect/facts.go`), so `muster.beyond.*` is
-  every beyond control and `muster.file.*` one category. `?` and `[…]` are allowed. A pattern
-  `path.Match` rejects refuses the file naming the pattern; a well-formed pattern that matches no
+  every beyond control and `muster.file.*` one category. `?` and `[…]` are allowed (a class negates with `[^…]`, as `path.Match` reads it,
+  not the shell's `[!…]`). A pattern `path.Match` rejects refuses the file naming the pattern; a well-formed pattern that matches no
   control of the loaded set refuses it too (a typo never silently selects nothing). Patterns are
   validated against the loaded set, not the selection: an `exclude` that removes nothing is legal
   and silent.
@@ -196,7 +198,8 @@ asked. Its digest is `sha256` of the file's bytes, as the waiver file's is.
 
 ## 5. Integration
 
-- **Flags.** `check --profile <name|path>` (default `default`) and `check --tuning <path>`;
+- **Flags.** `check --profile <name|path>` (default `default`) and `check --tuning <path>`; an empty
+  value given to either flag is refused by every command that takes it (exit 2), never read as the flag's absence;
   `controls lint --profile <name|path>` runs the existing lint and then resolves the profile
   against the embedded set, printing `ok: profile <name> selects N of M controls, K excluded`
   after the existing `ok:` line (a refusal exits 2, warnings go to stderr with exit 0; the

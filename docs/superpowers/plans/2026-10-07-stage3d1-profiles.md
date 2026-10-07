@@ -2006,7 +2006,7 @@ git commit -m "Fuzz the profile and tuning parsers nightly and lint the built-in
 
 - [ ] **Step 1: Fold the documents** (the controller writes a fold script with `--check`, as in 3C-2b; English and Korean in one commit).
 - [ ] **Step 2: Whole-branch review** as an ultracode workflow: fresh finders by area (profile/tuning packages; waiver/report/cmd wiring; e2e/CI/fuzz; documents and contracts) → refuters → critic; fix wave; scoped re-review.
-- [ ] **Step 3: Examples first** (the user's word, since it needs a push): push → the branch's `examples.yml` run → `make examples-fetch RUN=<id>` into `C:/Users/ssk/muster-lab/backups/examples-<run>/`, copy into `examples/` → commit "Refresh the example snapshots from the branch's examples run" (reports gain `check.profile`, `check.param_sources`, `severity_source`, the table's line 2) → `TestExamplesLoadAndCheck` green again (Z-10a).
+- [ ] **Step 3: Examples first** (the user's word, since it needs a push): push → the branch's `examples.yml` run → `make examples-fetch RUN=<id>` into a backup directory outside the repository, copy into `examples/` → commit "Refresh the example snapshots from the branch's examples run" (reports gain `check.profile`, `check.param_sources`, `severity_source`, the table's line 2) → `TestExamplesLoadAndCheck` green again (Z-10a).
 - [ ] **Step 4: Final gates** on Windows and the lab (root, `-race`, staticcheck) with the whole suite, then the merge menu: PR → CI → merge → cleanup.
 - [ ] **Step 5: Execution notes** — rulings Z-11…, reviews, deviations, numbers, parked.
 
@@ -2018,8 +2018,28 @@ git commit -m "Fuzz the profile and tuning parsers nightly and lint the built-in
 
 ### What the reviews found
 
+- Per-task reviews (opus; sonnet re-reviews): Task 2 one fix round (reason-text assertions, `Validate`'s sorted first error, Z-27 empty-map rule); Task 3 one fix round (the digest's severity entries pinned by literal, Z-27..Z-29); Tasks 1, 4, 5, 6 approved with deferred minors. Every deferred minor went to the whole-branch triage.
+- Whole-branch review (ultracode workflow, 63 agents: five finders by area, three refuters per non-Nit finding, a completeness critic): 29 findings, 17 survivors, 0 Blocking, 1 Important (the README pair carried only the roadmap sentence, not the `--profile`/`--tuning` usage and the example files §6 promised), the rest Minor/Nit. Fixed in one wave (`af0239c`) plus the controller's document commit: `controls lint/list --profile ""` now refuse like `check` and `--tuning ""` is refused (Z-30); a second YAML document refuses a profile, tuning or waiver file (Z-31); the profile line's escaping of the tuning path and of the name in the `(N controls)` form is pinned; the as-given source label is pinned with a `./` path that `filepath.Clean` rewrites on every platform (it was pinned on Windows only); `value … is not of type <T>`; the root refusal names the path once; the usage reads `(default: the built-in default)`; README usage lines and the example-files paragraph, two stale README sentences (3B's "until profiles arrive", the CIS-profile sentence), §4.3's inputs, §6.6/D33 "each row carries its severity", the Builtins() sentence of §2, glob negation `[^…]`, the plan's local backup path.
+- Refuted: the examples gate red at HEAD (Z-10a, by design until the refresh).
+
 ### Deviations from the spec, as shipped
+
+- Z-27: an empty `params` map (`id: {}` or `id: null`) sets nothing and is absent from `Resolved.Params` and the digest.
+- Z-28: an empty profile source (`--profile ""`) is refused `profile source is empty`; `extends: ""` reads as no `extends` (a root file), not a refusal.
+- Z-29: the built-in's digest literal is pinned (`sha256:0dffaf3f…94ab`) so a change to the canonical form is a visible test failure, not a silent drift.
+- Z-30: an empty value given to `--profile` or `--tuning` is never the flag's absence — every command that takes the flag refuses it with exit 2 (`controls lint`, `controls list`, `check`); `resolveSelection` takes the tuning path as `*string` (nil = absent). A missing tuning file carries the `invalid tuning file:` sentinel (the Task 2 ruling reversed for symmetry with the profile's refusal).
+- Z-31: one YAML document per profile, tuning or waiver file; a second document refuses the file (`more than one YAML document`). Two edges accepted as read: a second document that is itself a syntax error is reported as a second document (the file is refused either way), and a trailing lone `---` is a second, empty document and is refused. `---\n` alone, a comments-only file and a single document after a leading `---` stay accepted. The waiver loader takes an `io.Reader`, so it has no fuzz target (the `[]byte` rule does not cover it).
+- `Builtins()` returns the built-in names (for refusals); the embedded `default` is the unexported literal — §2 reworded.
+- `controls list` refuses an unknown argument with exit 2 (it ignored extras before) — CHANGELOG "Changed".
+- The lint severity-warning profile of Task 6's test is written to a temp dir (no `testdata/*.yaml` under `internal/profile`, Z-24).
 
 ### Numbers
 
+- 18 commits over `364d30d` before the examples refresh (the design, the plan, the pre-flight fold, seven tasks, the fix wave, this document commit); 59 files, +5568/−170; Go 34 files (+2683/−119), of which tests 19 files (+1810/−51); `controls/` untouched (the control digest and `controls/VERSION` unchanged); two new packages (`internal/profile`, `internal/tuning`) with two fuzz targets in the nightly shard; 117 controls, the built-in `default` selects 117 of 117, the example profile 68 of 117 with 49 excluded; reviews: 7 task reviews (opus) + 3 scoped re-reviews, the whole-branch workflow 63 agents, the fix-wave re-review 1 (opus).
+
 ### Parked
+
+- A `~:` (null) mapping key under `params` is dropped by yaml.v3's mapping decoder without an error (a non-string key that fails to unmarshal is skipped); refusing it needs a `yaml.Node` pass over `params`. Every other wrong shape is refused.
+- On Windows a missing profile file's refusal names the cleaned path, not the one given (Task 6 N-4; Linux shows the same string either way).
+- No symlink rule for the trusted files (`trustedFile` follows `os.Stat`), as the waiver file has none.
+- The CIS profile (`cis-<distro>-l1`) waits for the index of CIS recommendation numbers (3D-1b); `fix --dry-run` is 3D-2; the remaining flags are 3D-3.

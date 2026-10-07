@@ -49,6 +49,8 @@
 sudo muster collect --out host.json      # 호스트에서 root로: 사실 스냅샷
 muster check --facts host.json           # 어디서든, root 없이: 표 + 종료 코드
 muster check --facts host.json --format json
+muster check --facts host.json --profile docs/examples/profiles/exclude-beyond.yaml   # KISA 가이드만
+muster check --facts host.json --tuning docs/examples/profiles/tuning.yaml            # 사이트의 파라미터 값
 muster controls lint --references docs/reference   # 컨트롤 세트 자체의 게이트
 ```
 
@@ -135,8 +137,9 @@ DISA STIG 규칙 id, 20개가 NIST SP 800-53 통제 id, 13개가 CIS 벤치마�
 `muster controls lint`는 커밋된 색인에 없는 STIG·NIST id를 거부하고, 모든 KISA
 항목 번호를 67개 항목 인벤토리와 교차 검사하므로 항목이 빠지거나 잘못 등재될 수
 없습니다(U-23처럼 한 항목을 여러 컨트롤이 판정할 수는 있지만, 모든 인용은 실재하는
-항목이어야 합니다). 3단계부터는 같은 수집기 위에서 `cis-<배포판>-l1` 프로파일이 컨트롤과
-파라미터를 고를 수 있습니다. muster는 번호만 기록하고 벤치마크 본문은 담지 않으며,
+항목이어야 합니다). 3D-1단계부터는 같은 수집기 위에서 프로파일(`check --profile`)이 컨트롤과
+파라미터를 고르며, `cis-<배포판>-l1` 프로파일은 CIS 권고 번호 색인을 기다립니다(3D-1b).
+muster는 번호만 기록하고 벤치마크 본문은 담지 않으며,
 CIS나 STIG 준수 여부를 인증하지 않습니다. 컨트롤이 인용할 수 있는 STIG·NIST
 식별자는 DISA의 공개 파일로부터 `tools/refindex`가 `docs/reference/stig/`에
 생성합니다. 이 저장소가 옮겨 오는 것은 STIG와 CCI 식별자, 심각도, 제목뿐이며,
@@ -159,7 +162,7 @@ CIS나 STIG 준수 여부를 인증하지 않습니다. 컨트롤이 인용할 �
    이미지로부터 릴리스별 선언 모드 기준 목록을 생성. 3B(병합됨): 가이드 밖의 첫
    컨트롤 19개 — 커널 자기보호 sysctl과 코어덤프 정책, 부트 체인, 별도 파티션과 마운트
    옵션, 스왑 암호화, 모듈 블랙리스트 — 를 읽기 전용 수집기 여섯으로, 요약은 가이드와
-   가이드 밖으로 나뉨. 가이드 밖 FAIL도 프로파일이 오기 전까지는 종료 코드에 셈.
+   가이드 밖으로 나뉨. 가이드 밖 FAIL도 프로파일이 그 컨트롤을 제외하지 않는 한 종료 코드에 셈(3D-1).
    3C-1(병합됨): 감사 파이프라인 상태와 패키지 무결성 — 감사 데몬의 규칙·불변·디스크
    처리·로그 권한, 로그 전달, sudo 자체 로그, 파일 무결성 도구, 전체 데이터베이스
    패키지 검증(`--deep`에서 `rpm -Va` / `dpkg --verify`, 잡음 필터를 기록) — 수집기
@@ -188,6 +191,11 @@ CIS나 STIG 준수 여부를 인증하지 않습니다. 컨트롤이 인용할 �
 `--deep`으로 수집한 것 — 아무것도 돌리지 않고 출력의 모양을 읽을 수 있도록. 둘 다 누구의
 호스트에서도 오지 않았습니다. `examples.yml` 워크플로가 수집하고 보관 전에 호스트 정체를
 지우며, 테스트가 변경 때마다 끝까지 검사합니다.
+
+[`docs/examples/profiles/`](docs/examples/profiles/)에는 예시 프로파일(`exclude-beyond.yaml`:
+가이드 밖 컨트롤을 id 글롭 하나로 제외한 KISA 가이드만)과 예시 튜닝 파일(`tuning.yaml`: 한
+사이트의 파라미터 값)이 있습니다. `check --profile <name|path>`와 `check --tuning <path>`가
+받으며, 결과는 둘을 값마다의 출처와 제외된 id 전부와 함께 기록합니다.
 
 ## 문서와 기여
 

@@ -12,7 +12,7 @@ waiver keys, output format.
   `go test ./...` and rely on CI, which runs on Linux, for the race build).
 - `make lint` — `gofmt -l .` then `go vet ./...`.
 - `make lint-controls` — `go run ./cmd/muster controls lint` (passes `--references docs/reference`, so
-  STIG/NIST ids must be in the generated index).
+  STIG/NIST ids must be in the generated index), then once more with `--profile default`.
 - `make fmt` — `gofmt -l -w .` to fix formatting in place.
 - `make coverage` — `go run ./tools/coverage` regenerates `docs/reference/coverage.md`; CI runs
   `go run ./tools/coverage -check` and fails when it is stale. `make refindex` — `go run ./tools/refindex`
@@ -144,7 +144,7 @@ regenerates them from public images and `-check` compares.
 - `check --profile <name|path>` (default `default`; `kisa-unix-2026` is its alias) and `check --tuning <path>` are
   resolved by `cmd/muster`'s `resolveSelection` BEFORE evaluation: `profile.Resolve` walks the `extends` chain (at most
   four files, the built-in counted, identified by cleaned opened paths) and applies `parent ∪ include − exclude` per
-  file (id globs through `path.Match`, `*` crosses `.`; a malformed or unmatched pattern refuses the file), keeps every
+  file (id globs through `path.Match`, `*` crosses `.`, a class negates with `[^…]`; a malformed or unmatched pattern refuses the file), keeps every
   chain value in `Resolved.Params`, appends `severity` entries (last match wins over the selected ids), and digests the
   content only (`{ids, params, severity}` — never the name, path or chain); `tuning.Load` validates a site's `params:`
   against the FULL set; `profile.Merge` is the one owner of the excluded-control warnings (`profile parameter
@@ -154,12 +154,14 @@ regenerates them from public images and `-check` compares.
   built-ins), anything else a path; `extends` resolves relative to the referring file, an absolute value as given. Files
   are read only through the `open` the command passes (`trustedFile` + `os.ReadFile`: as root, root-owned and not
   group/other-writable, chain files included); `internal/profile` and `internal/tuning` never import `os`, `os/exec`,
-  `net` or `syscall` (a test enforces it) and never write stderr (`warn`).
+  `net` or `syscall` (a test enforces it) and never write stderr (`warn`). A profile, tuning or waiver file holds ONE
+  YAML document (a second refuses it); an empty `--profile` or `--tuning` value is refused by every command that
+  takes it, never read as the flag's absence.
 - The result is additive and lives in `check`: `profile {name, source, digest, extends, selected, excluded,
   excluded_ids}`, `tuning {path, digest}` (absent without `--tuning`), `params` (controls that declare params, as
   before), `param_sources` (same keys; `default` | `profile` | `tuning`), each row's `severity_source` (`importance` |
   `profile`); the table's second line is `profile <name> (<selected> of <total>, <excluded> excluded[; tuning <path>])`
-  or `(<total> controls)`. `waiver.Apply(results, known, excluded, …)` counts a waiver on an excluded control
+  or `profile <name> (<total> controls[; tuning <path>])`. `waiver.Apply(results, known, excluded, …)` counts a waiver on an excluded control
   `not_applied` (warned, no row). The exit code and `--fail-on` read statuses, not severity. `controls lint --profile`
   (full lint + the profile line; CI runs it with `default`) and `controls list --profile` (the four-column rows of the
   selection) share the same resolution. The examples gate byte-compares reports, so a change to the `check` block

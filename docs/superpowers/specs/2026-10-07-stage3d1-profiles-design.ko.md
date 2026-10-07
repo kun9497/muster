@@ -65,7 +65,8 @@ check.Evaluate(snap, subset, reg, Options{Params}) ──► waiver.Apply(result
 report.Build(snap, results, cb, severity) ──► JSON / 표 / 종료 코드
 ```
 
-- **`internal/profile`(신규).** `Parse([]byte) (*File, error)` — 엄격한 YAML. `SourceOf(s string)
+- **`internal/profile`(신규).** `Parse([]byte) (*File, error)` — 엄격한 YAML, 파일당 문서 하나(두 번째
+  YAML 문서는 파일을 거부: `more than one YAML document`; 튜닝과 waiver 로더도 같은 규칙). `SourceOf(s string)
   Source` — 이름-대-경로 분류기 하나(§3), 플래그와 모든 `extends` 값에 씀; `Source{Name string; Path string}`.
   `Resolve(set *controls.Set, src Source, open func(path string) ([]byte, error), warn func(string))
   (*Resolved, error)` — `open`을 통해 `extends`를 따라가고(그래서 무엇이 읽을 수 있는 파일인지는 호출자가
@@ -77,8 +78,8 @@ report.Build(snap, results, cb, severity) ──► JSON / 표 / 종료 코드
   sources)` — 파라미터별 출처를 가진 삼단 병합이자 제외 컨트롤 경고의 유일한 소유자: 선택이 제외한 컨트롤의
   프로파일·튜닝 값은 (컨트롤, 파라미터)마다 한 번 — `profile parameter <id>.<param> ignored: excluded by
   profile` / `tuning parameter <id>.<param> ignored: excluded by profile` — 경고하고 버림; nil 튜닝이
-  `--tuning` 없는 경우. `Builtins()`는 임베드된
-  `default`를 Go 리터럴로 돌려줌(그것의 YAML 파일은 없음). `internal/controls`와 `internal/tuning`에만 의존;
+  `--tuning` 없는 경우. 내장 `default`는
+  패키지 안의 Go 리터럴(그것의 YAML 파일은 없음); `Builtins()`는 거부 메시지를 위해 내장 이름을 정식 이름부터 나열. `internal/controls`와 `internal/tuning`에만 의존;
   stderr에 직접 쓰지 않음(§7.4).
 - **`internal/tuning`(신규, 작음).** `Parse([]byte)`, `Load(set, path, open)` — 전체 세트에 대해 미지
   컨트롤·미지 파라미터·타입을 검증한 `params:` 맵; 컨트롤별 맵과 파일 다이제스트를 돌려줌. 선택은 모름;
@@ -121,7 +122,8 @@ severity:                         # 순서 있음: 뒤 항목이 이김
 
 - **글롭.** 패턴은 `path.Match`로 컨트롤 id에 맞추며 `*`는 `.`을 가로지릅니다(`Builder.Get`이 사실 글롭에
   쓰는 규칙, `internal/collect/facts.go`). 그래서 `muster.beyond.*`는 beyond 컨트롤 전부, `muster.file.*`는 한
-  범주입니다. `?`와 `[…]`를 허용합니다. `path.Match`가 거절하는 패턴은 패턴을 이름 대며 파일을 거부하고,
+  범주입니다. `?`와 `[…]`를 허용합니다(부정 클래스는 `path.Match`가 읽는 `[^…]`이지 셸의 `[!…]`가 아님).
+  `path.Match`가 거절하는 패턴은 패턴을 이름 대며 파일을 거부하고,
   적재된 세트의 어느 컨트롤에도 맞지 않는 올바른 패턴도 거부합니다(오타가 조용히 아무것도 안 고르는 일은
   없음). 패턴은 선택이 아니라 적재된 세트에 대해 검증합니다: 아무것도 빼지 않는 `exclude`는 합법이고
   조용합니다.
@@ -169,7 +171,8 @@ params:
 
 ## 5. 통합
 
-- **플래그.** `check --profile <name|path>`(기본 `default`)와 `check --tuning <path>`;
+- **플래그.** `check --profile <name|path>`(기본 `default`)와 `check --tuning <path>`; 두 플래그 중 어느 것에든
+  빈 값을 주면 그 플래그를 받는 모든 명령이 거부(종료 2)하고 플래그가 없는 것으로 읽지 않음;
   `controls lint --profile <name|path>`는 기존 lint를 돌린 뒤 임베드된 세트에 대해 프로파일을 해결하고 기존
   `ok:` 줄 뒤에 `ok: profile <name> selects N of M controls, K excluded`를 찍음(거부는 종료 2, 경고는 stderr에
   종료 0; 전체 lint가 요구하는 디렉터리는 여전히 필요 — 유지보수자와 CI의 명령); `controls list --profile
