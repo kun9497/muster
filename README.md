@@ -14,7 +14,7 @@ the Linux server asset class: KISA is the primary standard, and global
 benchmarks (CIS Benchmarks, DISA STIG, NIST SP 800-53) are attached as
 references and, later, offered as selectable profiles.
 
-> **Status: stage 3C-2b merged (October 2026).** Stage 1 — the skeleton:
+> **Status: stage 3D-1 merged (October 2026).** Stage 1 — the skeleton:
 > `collect`, `check`, waivers, exit codes, eight controls end to end — stage 2
 > — every automatable KISA item, from the foundations with DISA STIG and NIST
 > SP 800-53 references through accounts, PAM, sshd, home directories, system
@@ -192,6 +192,9 @@ titles, never their discussion, check and fix text. See
    forwarding, sudo's own log, the file-integrity tool, and whole-database
    package verification (`rpm -Va` / `dpkg --verify` under `--deep`, the noise
    filter recorded) — nine controls from three collectors and two extensions.
+   3D-1 (merged): profiles and tuning — `check --profile` selects controls by id globs,
+   overrides parameters and severities and chains through `extends`; `check --tuning`
+   layers a site's values; the result records both with every value's source.
    3C-2b (merged): exposure — every listening socket's owners and packages, deleted
    executables still running, the exposure cross-check against the firewall's folded
    rule table, the network sysctls — thirteen controls. 3C-2a (merged): privilege — file capabilities judged against the package's
@@ -199,10 +202,10 @@ titles, never their discussion, check and fix text. See
    container-runtime sockets and their groups, passwordless `ALL` in sudoers,
    the inactivity policy over every interactive account, root's authorized keys
    and SSH key quality — eight controls from three extended collectors and three
-   new ones. Next (3D): `fix --dry-run`, the CIS profile. Profiles select controls and parameters: `kisa-unix-2026`
-   stays the default, and a `cis-<distro>-l1` profile covers the CIS Level 1
-   server recommendations for the target distributions, with `references.cis`
-   as those controls' primary reference.
+   new ones. Next (3D-1b): the `cis-<distro>-l1` profile over an index of CIS
+   recommendation numbers (`references.cis` on every selected control); then 3D-2
+   `fix --dry-run` and 3D-3 (`--anonymize`, `--max-age`). `kisa-unix-2026` stays
+   the default profile.
 4. **Public release.** Snapshot diff, SARIF, bilingual docs, signed reproducible
    builds with SBOM, deb/rpm packages, and a differential comparison against
    Lynis.

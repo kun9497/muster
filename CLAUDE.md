@@ -1,7 +1,7 @@
 # muster — working notes for Claude
 
 Design: `docs/superpowers/specs/2026-09-02-muster-design.md` (English canonical, Korean pair). It is also the
-decision log (D01–D32). Read it before changing any contract: facts schema, control ids, exit codes,
+decision log (D01–D33). Read it before changing any contract: facts schema, control ids, exit codes,
 waiver keys, output format.
 
 ## Build and test
@@ -138,6 +138,32 @@ regenerates them from public images and `-check` compares.
   controls and of the exposure join, W-79/W-86); the `sysctl.d` parser follows systemd: a glob key
   (`*?[`, `[!…]`) applies to every unexcluded match, a `-key` line excludes it from globs (last line wins), a
   concrete line beats any glob. Ubuntu 24.04 ships no `50-default.conf`.
+
+## Profiles (stage 3D-1)
+
+- `check --profile <name|path>` (default `default`; `kisa-unix-2026` is its alias) and `check --tuning <path>` are
+  resolved by `cmd/muster`'s `resolveSelection` BEFORE evaluation: `profile.Resolve` walks the `extends` chain (at most
+  four files, the built-in counted, identified by cleaned opened paths) and applies `parent ∪ include − exclude` per
+  file (id globs through `path.Match`, `*` crosses `.`; a malformed or unmatched pattern refuses the file), keeps every
+  chain value in `Resolved.Params`, appends `severity` entries (last match wins over the selected ids), and digests the
+  content only (`{ids, params, severity}` — never the name, path or chain); `tuning.Load` validates a site's `params:`
+  against the FULL set; `profile.Merge` is the one owner of the excluded-control warnings (`profile parameter
+  <id>.<param> ignored: excluded by profile`, `tuning parameter …`) and returns the values in force with their sources.
+  `check` evaluates `set.Subset(ids)` with the unchanged evaluator; an excluded control is neither evaluated nor listed.
+- A value without a separator or `.yaml`/`.yml` suffix is a NAME (`Default`, `site_web` are refused naming the
+  built-ins), anything else a path; `extends` resolves relative to the referring file, an absolute value as given. Files
+  are read only through the `open` the command passes (`trustedFile` + `os.ReadFile`: as root, root-owned and not
+  group/other-writable, chain files included); `internal/profile` and `internal/tuning` never import `os`, `os/exec`,
+  `net` or `syscall` (a test enforces it) and never write stderr (`warn`).
+- The result is additive and lives in `check`: `profile {name, source, digest, extends, selected, excluded,
+  excluded_ids}`, `tuning {path, digest}` (absent without `--tuning`), `params` (controls that declare params, as
+  before), `param_sources` (same keys; `default` | `profile` | `tuning`), each row's `severity_source` (`importance` |
+  `profile`); the table's second line is `profile <name> (<selected> of <total>, <excluded> excluded[; tuning <path>])`
+  or `(<total> controls)`. `waiver.Apply(results, known, excluded, …)` counts a waiver on an excluded control
+  `not_applied` (warned, no row). The exit code and `--fail-on` read statuses, not severity. `controls lint --profile`
+  (full lint + the profile line; CI runs it with `default`) and `controls list --profile` (the four-column rows of the
+  selection) share the same resolution. The examples gate byte-compares reports, so a change to the `check` block
+  needs an examples refresh from the branch's `examples.yml` run before the merge.
 
 ## Stage-2 conventions
 

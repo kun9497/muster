@@ -9,6 +9,28 @@ verdict on an existing snapshot is at least a minor release and appears under
 
 ## [Unreleased]
 
+### Added
+- `check --profile <name|path>` and `check --tuning <path>` (stage 3D-1, D33). A
+  profile is the list of questions asked: `include`/`exclude` by control-id globs,
+  `params` and an ordered `severity` list, chained through `extends` (four files at
+  most); the built-in `default` is every control (`kisa-unix-2026` is its alias).
+  A tuning file carries one site's `params` after the profile's. An excluded
+  control is neither evaluated nor listed; a value for one is a warning, never an
+  error. The result's `check` block gains `profile` (name, source, a content
+  digest, the `extends` chain, selected/excluded counts and the excluded ids),
+  `tuning` (path, digest), `param_sources` beside `params`, and every row gains
+  `severity_source`; the table prints a `profile …` line under its header. A waiver
+  on an excluded control is `not_applied` with a warning, never `unknown`.
+  `controls lint --profile` and `controls list --profile` resolve a profile against
+  the embedded set. As root, profile, chain and tuning files must be root-owned and
+  not group/other-writable, as the waiver file must. New packages `internal/profile`
+  and `internal/tuning`, fuzzed nightly. The example profile and tuning file live
+  under `docs/examples/profiles/`. No control changes: `controls/VERSION` stays.
+
+### Changed
+- `controls list` takes flags (`--profile <name|path>`) and refuses an unknown
+  argument with exit 2; it used to ignore extra arguments. Its rows are unchanged.
+
 ### Controls
 
 Control set `kisa-unix-2026+2026.10.02` (was `+2026.09.29`). Thirteen more controls

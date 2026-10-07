@@ -1,0 +1,14 @@
+# An example profile: the KISA 2026 guide alone (stage 3D-1).
+#
+# A profile is the list of questions `muster check` asks a host. This one
+# extends the built-in `default` (every control) and removes the controls
+# beyond the guide by their id glob. Run it with
+#
+#   muster check --facts snapshot.json --profile docs/examples/profiles/exclude-beyond.yaml
+#
+# The result's `check.profile` block names it, its content digest, the
+# `extends` chain and the 49 excluded ids; the table's second line reads
+# `profile exclude-beyond (68 of 117, 49 excluded)`.
+profile: exclude-beyond
+extends: default
+exclude: ["muster.beyond.*"]
