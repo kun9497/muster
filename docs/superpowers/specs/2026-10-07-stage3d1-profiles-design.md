@@ -57,14 +57,14 @@ check-side work that runs on every platform, and `fix --dry-run` (3D-2) then has
 controls.LoadDefault()
    │
    ▼
-profile.Resolve(set, src, open, warn) ──► Resolved{IDs, Params (chain values), Severity (ordered), Digest, Chain}
+profile.Resolve(set, src, open, warn) ──► Resolved{IDs, Params (chain values), Severity (ordered), SeverityByID, Digest, Chain}
    │                                                  │
    │      tuning.Load(set, path, open) ──► Tuning{Params, Digest}
    ▼                                                  ▼
 profile.Merge(set, resolved, tuning, warn) ──► params in force + sources (default < profile < tuning)
    │
    ▼
-cmd/muster resolveSelection(flags, set, warn) ──► Selection{subset, params, sources, severity map, blocks}
+cmd/muster resolveSelection(profileArg, tuningPath, set, warn) ──► Selection{subset, params, sources, SeverityByID, blocks}
    │
    ▼
 check.Evaluate(snap, subset, reg, Options{Params}) ──► waiver.Apply(results, known, excluded, now, warn)
@@ -79,10 +79,15 @@ report.Build(snap, results, cb, severity) ──► JSON / table / exit code
   func(path string) ([]byte, error), warn func(string)) (*Resolved, error)` — follows `extends`
   through `open` (so the caller decides what a readable file is: `cmd/muster` wraps `trustedFile`
   and `os.ReadFile`, tests pass `os.ReadFile`), applies include/exclude, validates params and
-  severity against the set, warns for a param or severity entry that touches only excluded
-  controls, computes the digest. `Merge(set, resolved, tuning, warn) (params, sources)` — the
-  three-way merge with per-parameter provenance; it warns for a tuning parameter on an excluded
-  control and drops it. `Builtins()` returns the embedded `default` as a Go literal (there is no
+  severity against the set, keeps every chain value in `Resolved.Params` (selected or not — the
+  file's resolved content), derives `Resolved.SeverityByID` over the selected ids (last matching
+  entry wins) and warns `severity entry <glob> matches only excluded controls` for an entry that
+  reaches no selected control (the entry stays in the list), computes the digest. `Merge(set,
+  resolved, tuning, warn) (params, sources)` — the three-way merge with per-parameter provenance
+  and the ONE owner of the excluded-control warnings: a profile or tuning value for a control the
+  selection excludes is warned once per (control, parameter) — `profile parameter <id>.<param>
+  ignored: excluded by profile` / `tuning parameter <id>.<param> ignored: excluded by profile` —
+  and dropped; a nil tuning is the no-`--tuning` case. `Builtins()` returns the embedded `default` as a Go literal (there is no
   YAML file for it). Depends on `internal/controls` and `internal/tuning` only; never writes to
   stderr (§7.4).
 - **`internal/tuning` (new, small).** `Parse([]byte)`, `Load(set, path, open)` — the `params:`
@@ -106,10 +111,12 @@ report.Build(snap, results, cb, severity) ──► JSON / table / exit code
 - **`internal/report`.** `Build(snap, results, cb, severity map[string]string)` records
   `severity_source` on each row; `CheckBlock` gains `Profile`, `Tuning` and `ParamSources`; the
   table prints one profile line.
-- **`cmd/muster`.** One helper, `resolveSelection(flags, set, warn) (*Selection, error)`: the
-  flags → `SourceOf` → `Resolve` with the trusted `open` → `tuning.Load` → `Merge` → `Subset`; no
-  logic of its own beyond the wiring (main design §4.2). `check`, the examples test (G-14: one
-  implementation) and, in 3D-2, `fix` call it. `check --profile`, `check --tuning`;
+- **`cmd/muster`.** One helper, `resolveSelection(profileArg, tuningPath string, set
+  *controls.Set, warn func(string)) (*Selection, error)`: `SourceOf` → `Resolve` with the trusted
+  `open` → `tuning.Load` (when `tuningPath` is set) → `Merge` → `Subset`; no logic of its own beyond
+  the wiring (main design §4.2). `check`, `controls lint --profile` and `controls list --profile`
+  (both with an empty `tuningPath`; the trusted `open` applies to them as root too), the examples
+  test (`"default", ""`; G-14: one implementation) and, in 3D-2, `fix` call it. `check --profile`, `check --tuning`;
   `controls lint --profile`; `controls list --profile`.
 
 ## 3. The profile file
@@ -139,7 +146,8 @@ severity:                         # ordered: a later entry wins
   them when it is none of them — so `Default`, `site_web` or `kisa.unix.2026` are refused as
   unknown names, never opened as files. Anything else is a **path** (`filepath` rules on every
   platform): relative to the working directory for the flag, relative to the referring file's
-  directory for `extends`, recorded as the cleaned path muster opened. The grammar
+  directory for `extends` (an absolute `extends` value is opened as given), recorded as the cleaned
+  path muster opened. The grammar
   `[a-z0-9][a-z0-9-]*` constrains what a built-in and a file's `profile:` field may be called; a
   file whose `profile:` repeats a built-in name is refused. A repeated flag keeps the last value,
   as every `check` flag does.
@@ -155,10 +163,11 @@ severity:                         # ordered: a later entry wins
 - **Params.** The value is decoded against the control's declared `params.<name>.type`
   (`int`, `string`, `bool`, `list<int>`, `list<string>` — the existing vocabulary, through
   `controls.CheckParamValue`); a wrong type, an unknown parameter or an unknown control refuses
-  the file. A parameter for a control the resolved selection excludes is a warning (Y-8) and the
-  value is dropped.
+  the file. A parameter for a control the resolved selection excludes stays in `Resolved.Params` and is
+  warned and dropped by `Merge` (Y-8); it reaches neither `params` nor `param_sources`.
 - **Severity.** `level` ∈ {high, medium, low}; the last matching entry wins; an entry whose glob
-  matches no control refuses the file; one that matches only excluded controls warns.
+  matches no control refuses the file; one that matches only excluded controls warns and stays in the list (and the digest); the
+  per-id map the report receives is derived over the selected ids, last entry winning.
 - **Empty selection** refuses the file ("profile selects no control").
 - **Digest.** `sha256` of the canonical JSON of the resolved content only — `{ids: sorted,
   params: the values the chain sets (child over parent; never a control default, never the
@@ -166,7 +175,9 @@ severity:                         # ordered: a later entry wins
   name, the source and the chain are recorded beside it, never inside it, so two files that select
   the same controls with the same values and the same severity entries have the same digest
   whatever their names, paths or the order of their `include` lists; a changed value changes it; a
-  control set that ships a new default does not.
+  control set that ships a new default does not; a chain value for an excluded control is inside
+  it (the digest names the file's resolved content — a swap that re-includes the control changes
+  the selection, not the values).
 
 ## 4. The tuning file
 
@@ -200,8 +211,8 @@ asked. Its digest is `sha256` of the file's bytes, as the waiver file's is.
   path before reading it, so an untrusted chain file is refused at the point it is reached and
   the error names that path. As a non-root user nothing is checked. No symlink rule.
 - **Flow.** `resolveSelection`: load the set → `SourceOf(--profile)` → `Resolve` → `tuning.Load`
-  → `Merge` (default < profile < tuning, each value's source noted; a value for an excluded
-  control warned and dropped) → `set.Subset(ids)`. Then `check.Evaluate(snap, subset, reg,
+  → `Merge` (default < profile < tuning, each value's source noted; a profile or tuning value for
+  an excluded control warned once and dropped) → `set.Subset(ids)`. Then `check.Evaluate(snap, subset, reg,
   Options{Params})` → `waiver.Apply(results, known, excluded, now, warn)` → `report.Build(snap,
   results, cb, severity)` → render → the exit code from the evaluated results. A load failure of
   either file prints `muster: <reason>` and returns `exitError` (2), as a bad waiver file does.
@@ -223,9 +234,9 @@ asked. Its digest is `sha256` of the file's bytes, as the waiver file's is.
 
   `source` is `builtin` or `file:<path>` — the flag's path as given, a chain file's cleaned opened
   path; `extends` lists the chain root-first with the same spellings; `excluded_ids` is `[]` when
-  nothing is excluded, never omitted. `params` keeps its shape (the values in force for every
-  evaluated control, and evaluated controls only — a value for an excluded control appears nowhere
-  in the result); `param_sources` names `default`, `profile` or `tuning` per parameter. Each row
+  nothing is excluded, never omitted. `params` keeps its shape (one entry per evaluated control that declares `params`, as today —
+  a value for an excluded control appears nowhere in the result); `param_sources` has the same
+  keys, one source — `default`, `profile` or `tuning` — per declared parameter. Each row
   gains `severity_source` (`importance` | `profile`) beside the existing `severity`. Without
   `--profile` the block reads `{"name": "default", "source": "builtin", "extends":
   ["builtin:default"], "selected": 117, "excluded": 0, "excluded_ids": []}`; without `--tuning`
@@ -234,6 +245,9 @@ asked. Its digest is `sha256` of the file's bytes, as the waiver file's is.
   `profile <name> (<selected> of <total>, <excluded> excluded[; tuning <path>])`, with
   `(<total> controls[; tuning <path>])` when nothing is excluded — `profile default (117
   controls)`, `profile site-web-2026 (115 of 117, 2 excluded; tuning tuning.yaml)`.
+  `Profile` is a struct the renderers always print, and a nil `excluded_ids` renders as `[]`; the
+  report goldens' `CheckBlock` carries a profile fixture (`default`, all of its controls) so the
+  line they pin is a realistic one.
 - **Ordering and exit code.** Rows sort by scope, severity, id as today, so a profile's severity
   moves rows; `--fail-on` and the exit code read statuses, not severity — unchanged. The summary's
   high/medium/low buckets count the severity in force.
@@ -244,16 +258,20 @@ asked. Its digest is `sha256` of the file's bytes, as the waiver file's is.
 
 - **`internal/profile`**: table tests over `testdata/*.yaml` — the extends chain (four files, a
   fifth refused, a cycle spelled `./a.yaml` and `a.yaml`, a missing file, an unknown name, the
-  alias, a chain of two whose entries are the cleaned opened paths), include then exclude, a child
+  alias, an absolute `extends`, a chain of two whose chain-file entry is the cleaned opened path and
+  whose flagged entry is the path as given), include then exclude, a child
   re-including what a parent excluded, globs crossing dots, a malformed pattern, an unmatched
   pattern, an exclude that removes nothing, params typing per declared type, severity order, the
   built-in, a file naming a built-in, empty selection, `SourceOf` (`Default`, `site_web`,
   `a/b.yaml`, `b.yml`, a Windows path), digest determinism (a reordered `include`, a renamed
   profile and a moved file → the same digest; a changed value → another; a new control default →
-  the same), warnings through `warn`; `Merge` (default < profile < tuning with sources; a tuning
-  and a profile value on an excluded control → the warning and no entry). `FuzzParseProfile` and
-  `FuzzParseTuning` with seeds; a one-line test in each new package pins its fuzz targets
-  (`go test -list ^Fuzz`), and `fuzz.yml` gains `./internal/profile` and `./internal/tuning` in its
+  the same), warnings through `warn`; `Merge` (default < profile < tuning with sources; a nil tuning; a tuning
+  and a profile value on an excluded control → one warning each with the stated text and no
+  entry); the severity map derived from the ordered list; an imports test on the model of
+  `internal/check/imports_test.go` for both new packages (neither imports `os`, `os/exec`, `net` or
+  `syscall`, so reads go through `open` alone and nothing reaches stderr). `FuzzParseProfile` and
+  `FuzzParseTuning` with seeds; an inventory test in each new package on the collectors' model
+  (`go/parser` over the package's sources) pins its fuzz targets, and `fuzz.yml` gains `./internal/profile` and `./internal/tuning` in its
   package listing — the pull request that edits it runs the shards (G-27); `make fuzz TARGET=…
   FUZZPKG=./internal/profile/` is noted in CONTRIBUTING.
 - **`internal/controls`**: `Subset` keeps order, version, digest and `ByID`; `CheckParamValue`
@@ -268,12 +286,16 @@ asked. Its digest is `sha256` of the file's bytes, as the waiver file's is.
   because the CI root job runs this package as root): `testdata/profiles/exclude-beyond.yaml` on
   `full-pass.json` and `full-fail.json` → 68 of 117 evaluated, 49 `excluded_ids`, the exit code
   unchanged for the evaluated set; a chain of two files → the `extends` entries; a tuning file
-  flipping `fail-ufw-folded-http`'s FAIL to PASS with `param_sources` = `tuning` (the exposure
-  parameter precedent); a tuning parameter for an excluded control → exit 0, the warning text, no
+  flipping `fail-ufw-folded-http`'s FAIL to PASS, paired with a one-control profile (`include:
+  [muster.beyond.exposed_listeners_allowed]` → 1 selected, 116 excluded — also the proof of
+  `include` and of the exit code following the evaluated set), asserting the row's status and
+  `param_sources` = `tuning` (the precedent is `internal/check/exposure_controls_test.go`, a unit
+  test over one control); a tuning parameter for an excluded control → exit 0, the warning text, no
   entry in `params`; a waiver on an excluded control → the `not_applied` tally and the warning
   text; `--profile Default` and `--profile site` → the error names the built-ins; as root
-  (`os.Geteuid() == 0`, the CI root job) a group-writable profile, chain file and tuning file are
-  each refused naming the path; `controls lint --profile` with a typo → the error names the
+  (`os.Geteuid() == 0`, the CI root job; skipped otherwise) a profile, a chain file and a tuning
+  file made group-writable with `os.Chmod` after the write (the umask strips the bit at creation)
+  are each refused naming the path; `controls lint --profile` with a typo → the error names the
   pattern; `controls list --profile` → the four-column rows of the selection. The examples test
   resolves `default` through `resolveSelection` — the only change to that gate; the list-actions
   test is untouched.
@@ -285,7 +307,12 @@ asked. Its digest is `sha256` of the file's bytes, as the waiver file's is.
   two packages.
 - **Documents.** Main design: §6.6 rewritten as realised; **D33** (a profile is the list of
   questions asked and a tuning file the site's values; both are recorded in the result with their
-  sources; an excluded control is not evaluated); §4.2's package table gains `internal/profile`
+  sources; an excluded control is not evaluated; severity is derived from importance unless a
+  profile overrides it; a waiver on an excluded control is `not_applied`, never `unknown` or
+  silent); §4.3 (+ profile and tuning files among `check`'s inputs); §6.5 ("with the reason" →
+  "with the reason where a row exists"); §6.7 (one sentence on the excluded outcome, its warning,
+  and that it is counted but carried by no row); §9's determinism bullet ("same profile and
+  tuning"); §4.2's package table gains `internal/profile`
   and `internal/tuning` (resolve against a set; never touch the host or write stderr); §4.4's
   root-refusal sentence names profile, chain and tuning files; §7.2 lists a refused profile or
   tuning file among `check`'s exit-2 causes; §9's provenance bullet gains the `check` block's new

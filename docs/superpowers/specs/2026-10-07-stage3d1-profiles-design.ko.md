@@ -49,14 +49,14 @@
 controls.LoadDefault()
    │
    ▼
-profile.Resolve(set, src, open, warn) ──► Resolved{IDs, Params(체인이 정한 값), Severity(순서 있음), Digest, Chain}
+profile.Resolve(set, src, open, warn) ──► Resolved{IDs, Params(체인이 정한 값), Severity(순서 있음), SeverityByID, Digest, Chain}
    │                                                  │
    │      tuning.Load(set, path, open) ──► Tuning{Params, Digest}
    ▼                                                  ▼
 profile.Merge(set, resolved, tuning, warn) ──► 적용 params + 출처(기본 < 프로파일 < 튜닝)
    │
    ▼
-cmd/muster resolveSelection(flags, set, warn) ──► Selection{subset, params, sources, severity 맵, blocks}
+cmd/muster resolveSelection(profileArg, tuningPath, set, warn) ──► Selection{subset, params, sources, SeverityByID, blocks}
    │
    ▼
 check.Evaluate(snap, subset, reg, Options{Params}) ──► waiver.Apply(results, known, excluded, now, warn)
@@ -70,9 +70,14 @@ report.Build(snap, results, cb, severity) ──► JSON / 표 / 종료 코드
   `Resolve(set *controls.Set, src Source, open func(path string) ([]byte, error), warn func(string))
   (*Resolved, error)` — `open`을 통해 `extends`를 따라가고(그래서 무엇이 읽을 수 있는 파일인지는 호출자가
   정함: `cmd/muster`는 `trustedFile`과 `os.ReadFile`을 감싸고, 테스트는 `os.ReadFile`을 넘김),
-  include/exclude를 적용하며, params·severity를 세트에 대해 검증하고, 제외된 컨트롤만 건드리는 param이나
-  severity 항목에 경고하며, 다이제스트를 계산. `Merge(set, resolved, tuning, warn) (params, sources)` —
-  파라미터별 출처를 가진 삼단 병합; 제외된 컨트롤의 튜닝 파라미터에 경고하고 버림. `Builtins()`는 임베드된
+  include/exclude를 적용하며, params·severity를 세트에 대해 검증하고, 체인의 모든 값을(선택 여부와 무관하게 —
+  파일의 해결된 내용) `Resolved.Params`에 두고, 선택된 id 위로 `Resolved.SeverityByID`를 파생하며(마지막으로
+  맞는 항목이 이김) 선택된 컨트롤에 하나도 닿지 않는 항목에 `severity entry <glob> matches only excluded
+  controls`를 경고하고(항목은 목록에 남음), 다이제스트를 계산. `Merge(set, resolved, tuning, warn) (params,
+  sources)` — 파라미터별 출처를 가진 삼단 병합이자 제외 컨트롤 경고의 유일한 소유자: 선택이 제외한 컨트롤의
+  프로파일·튜닝 값은 (컨트롤, 파라미터)마다 한 번 — `profile parameter <id>.<param> ignored: excluded by
+  profile` / `tuning parameter <id>.<param> ignored: excluded by profile` — 경고하고 버림; nil 튜닝이
+  `--tuning` 없는 경우. `Builtins()`는 임베드된
   `default`를 Go 리터럴로 돌려줌(그것의 YAML 파일은 없음). `internal/controls`와 `internal/tuning`에만 의존;
   stderr에 직접 쓰지 않음(§7.4).
 - **`internal/tuning`(신규, 작음).** `Parse([]byte)`, `Load(set, path, open)` — 전체 세트에 대해 미지
@@ -92,9 +97,11 @@ report.Build(snap, results, cb, severity) ──► JSON / 표 / 종료 코드
   관심사: `report.Row.Severity`).
 - **`internal/report`.** `Build(snap, results, cb, severity map[string]string)`가 행마다
   `severity_source`를 기록; `CheckBlock`에 `Profile`, `Tuning`, `ParamSources`; 표는 프로파일 줄 하나를 찍음.
-- **`cmd/muster`.** 도우미 하나 `resolveSelection(flags, set, warn) (*Selection, error)`: 플래그 →
-  `SourceOf` → 신뢰 `open`을 가진 `Resolve` → `tuning.Load` → `Merge` → `Subset`; 배선 외의 자기 논리는
-  없음(메인 설계 §4.2). `check`, examples 테스트(G-14: 구현 하나), 그리고 3D-2의 `fix`가 이것을 부름.
+- **`cmd/muster`.** 도우미 하나 `resolveSelection(profileArg, tuningPath string, set *controls.Set,
+  warn func(string)) (*Selection, error)`: `SourceOf` → 신뢰 `open`을 가진 `Resolve` → (`tuningPath`가
+  있으면) `tuning.Load` → `Merge` → `Subset`; 배선 외의 자기 논리는 없음(메인 설계 §4.2). `check`,
+  `controls lint --profile`과 `controls list --profile`(둘 다 빈 `tuningPath`; root에선 신뢰 `open`이 거기에도
+  적용), examples 테스트(`"default", ""`; G-14: 구현 하나), 그리고 3D-2의 `fix`가 이것을 부름.
   `check --profile`, `check --tuning`; `controls lint --profile`; `controls list --profile`.
 
 ## 3. 프로파일 파일
@@ -122,7 +129,7 @@ severity:                         # 순서 있음: 뒤 항목이 이김
   `kisa-unix-2026`)에서 찾고, 그중 어느 것도 아니면 내장 목록을 대며 거부합니다 — 그래서 `Default`,
   `site_web`, `kisa.unix.2026`은 미지 이름으로 거부되지 파일로 열리지 않습니다. 그 밖은 **경로**(모든
   플랫폼에서 `filepath` 규칙): 플래그는 작업 디렉터리 기준, `extends`는 참조하는 파일의 디렉터리 기준 상대
-  경로이고, muster가 연 정리된 경로로 기록됩니다. 문법 `[a-z0-9][a-z0-9-]*`는 내장과 파일의 `profile:` 필드가
+  경로이며(절대 `extends` 값은 받은 그대로 엶), muster가 연 정리된 경로로 기록됩니다. 문법 `[a-z0-9][a-z0-9-]*`는 내장과 파일의 `profile:` 필드가
   가질 수 있는 이름을 제한합니다; `profile:`이 내장 이름을 되풀이하는 파일은 거부. 되풀이된 플래그는
   `check`의 모든 플래그처럼 마지막 값을 씁니다.
 - **해결.** `extends` 체인을 뿌리부터 걷습니다; 체인은 내장을 포함해 최대 파일 넷이며 정리된 열린 경로로
@@ -133,15 +140,18 @@ severity:                         # 순서 있음: 뒤 항목이 이김
   ["muster.*"]}`; `kisa-unix-2026`은 같은 객체의 이름이며 그것으로 풀립니다(결과와 체인에는 `default`로 보임).
 - **Params.** 값은 컨트롤이 선언한 `params.<name>.type`(`int`, `string`, `bool`, `list<int>`,
   `list<string>` — 기존 어휘, `controls.CheckParamValue`를 통해)으로 디코딩; 틀린 타입, 미지 파라미터, 미지
-  컨트롤은 파일 거부. 해결된 선택이 제외한 컨트롤의 파라미터는 경고(Y-8)이고 값은 버려집니다.
+  컨트롤은 파일 거부. 해결된 선택이 제외한 컨트롤의 파라미터는 `Resolved.Params`에 남고
+  `Merge`가 경고하고 버립니다(Y-8); `params`에도 `param_sources`에도 닿지 않습니다.
 - **Severity.** `level` ∈ {high, medium, low}; 마지막으로 맞는 항목이 이김; 어느 컨트롤에도 안 맞는 글롭의
-  항목은 파일 거부; 제외된 컨트롤에만 맞는 항목은 경고.
+  항목은 파일 거부; 제외된 컨트롤에만 맞는 항목은 경고하되 목록(과 다이제스트)에 남음; 리포트가 받는 id별 맵은 선택된 id
+  위로 파생되고 마지막 항목이 이김.
 - **빈 선택**은 파일 거부("profile selects no control").
 - **다이제스트.** 해결된 내용만의 정규 JSON — `{ids: 정렬, params: 체인이 정한 값(자식이 부모를 덮음;
   컨트롤 기본값도 튜닝도 결코 아님)을 컨트롤·파라미터 순 정렬, severity: [{controls, level}…] 순서대로}` —
   의 `sha256`. 이름·출처·체인은 그 옆에 기록되지 안에 들어가지 않으므로, 같은 컨트롤을 같은 값·같은 심각도
   항목으로 고르는 두 파일은 이름·경로·`include` 순서가 달라도 같은 다이제스트를 가지고, 값이 바뀌면
-  달라지며, 컨트롤 세트가 새 기본값을 배포해도 달라지지 않습니다.
+  달라지며, 컨트롤 세트가 새 기본값을 배포해도 달라지지 않고, 제외된 컨트롤의 체인 값도 그 안에 듭니다
+  (다이제스트는 파일의 해결된 내용의 이름 — 그 컨트롤을 다시 넣는 교체는 값이 아니라 선택을 바꿈).
 
 ## 4. 튜닝 파일
 
@@ -171,7 +181,8 @@ params:
   넘기는 `open` 함수가 읽기 전에 경로를 검사하므로, 신뢰되지 않는 체인 파일은 닿는 지점에서 거부되고 오류가
   그 경로를 댐. 비root에선 아무것도 검사하지 않음. 심볼릭 링크 규칙 없음.
 - **흐름.** `resolveSelection`: 세트 적재 → `SourceOf(--profile)` → `Resolve` → `tuning.Load` →
-  `Merge`(기본 < 프로파일 < 튜닝, 값마다 출처 기록; 제외된 컨트롤의 값은 경고하고 버림) → `set.Subset(ids)`.
+  `Merge`(기본 < 프로파일 < 튜닝, 값마다 출처 기록; 제외된 컨트롤의 프로파일·튜닝 값은 한 번 경고하고 버림) →
+  `set.Subset(ids)`.
   그다음 `check.Evaluate(snap, subset, reg, Options{Params})` → `waiver.Apply(results, known, excluded, now,
   warn)` → `report.Build(snap, results, cb, severity)` → 렌더 → 평가된 결과로 종료 코드. 두 파일의 로드 실패는
   waiver 파일 실패처럼 `muster: <reason>`을 찍고 `exitError`(2)를 돌려줌.
@@ -193,8 +204,9 @@ params:
 
   `source`는 `builtin` 또는 `file:<경로>` — 플래그의 경로는 받은 그대로, 체인 파일은 정리된 열린 경로;
   `extends`는 같은 표기로 체인을 뿌리부터 나열; `excluded_ids`는 제외가 없으면 `[]`이지 생략되지 않음.
-  `params`는 모양을 유지(평가된 모든 컨트롤의 적용값이며 평가된 컨트롤만 — 제외된 컨트롤의 값은 결과
-  어디에도 나타나지 않음); `param_sources`가 파라미터마다 `default`, `profile`, `tuning`을 댐. 각 행은 기존
+  `params`는 모양을 유지(오늘처럼 `params`를 선언한
+  평가된 컨트롤마다 항목 하나 — 제외된 컨트롤의 값은 결과 어디에도 나타나지 않음); `param_sources`는 같은
+  키에 선언된 파라미터마다 출처 하나 — `default`, `profile`, `tuning`. 각 행은 기존
   `severity` 옆에 `severity_source`(`importance` | `profile`)를 얻음. `--profile` 없이는 블록이 `{"name":
   "default", "source": "builtin", "extends": ["builtin:default"], "selected": 117, "excluded": 0,
   "excluded_ids": []}`로 읽히고, `--tuning` 없이는 `tuning` 키가 없음.
@@ -202,6 +214,8 @@ params:
   `profile <name> (<selected> of <total>, <excluded> excluded[; tuning <path>])`, 제외가 없으면
   `(<total> controls[; tuning <path>])` — `profile default (117 controls)`,
   `profile site-web-2026 (115 of 117, 2 excluded; tuning tuning.yaml)`.
+  `Profile`은 렌더러가 항상 찍는 구조체이고 nil `excluded_ids`는 `[]`로 렌더; 리포트 골든의 `CheckBlock`은
+  프로파일 픽스처(`default`, 그 컨트롤 전부)를 실어 고정되는 줄이 현실적인 것이 되게 함.
 - **순서와 종료 코드.** 행은 오늘처럼 범위, 심각도, id로 정렬되므로 프로파일의 심각도가 행을 옮김;
   `--fail-on`과 종료 코드는 심각도가 아니라 상태를 읽음 — 불변. 요약의 high/medium/low 버킷은 적용 중인
   심각도를 셈.
@@ -211,14 +225,17 @@ params:
 ## 6. 테스트, CI, 문서
 
 - **`internal/profile`**: `testdata/*.yaml` 위 표 테스트 — extends 체인(파일 넷, 다섯째 거부, `./a.yaml`과
-  `a.yaml`로 쓴 순환, 없는 파일, 미지 이름, 별칭, 항목이 정리된 열린 경로인 두 파일 체인), include 뒤
-  exclude, 부모가 뺀 것을 자식이 다시 넣기, 점을 가로지르는 글롭, 잘못된 패턴, 안 맞는 패턴, 아무것도 빼지
+  `a.yaml`로 쓴 순환, 없는 파일, 미지 이름, 별칭, 절대 `extends`, 체인 파일 항목은 정리된 열린 경로이고 플래그 항목은
+  받은 그대로인 두 파일 체인), include 뒤 exclude, 부모가 뺀 것을 자식이 다시 넣기, 점을 가로지르는 글롭, 잘못된 패턴, 안 맞는 패턴, 아무것도 빼지
   않는 exclude, 선언된 타입별 params 타입 검증, severity 순서, 내장, 내장 이름을 쓴 파일, 빈 선택,
   `SourceOf`(`Default`, `site_web`, `a/b.yaml`, `b.yml`, Windows 경로), 다이제스트 결정성(`include` 순서
   바꿈·프로파일 이름 바꿈·파일 옮김 → 같은 다이제스트; 값 바꿈 → 다른 값; 새 컨트롤 기본값 → 같음),
-  `warn`을 통한 경고; `Merge`(출처를 가진 기본 < 프로파일 < 튜닝; 제외된 컨트롤의 튜닝·프로파일 값 → 경고와
-  항목 없음). 시드를 가진 `FuzzParseProfile`과 `FuzzParseTuning`; 새 패키지마다 자기 fuzz 타깃을 고정하는 한
-  줄 테스트(`go test -list ^Fuzz`), `fuzz.yml`의 패키지 목록에 `./internal/profile`과 `./internal/tuning`
+  `warn`을 통한 경고; `Merge`(출처를 가진 기본 < 프로파일 < 튜닝; nil 튜닝; 제외된 컨트롤의 튜닝·프로파일 값 → 각각 정해진
+  문구의 경고 하나와 항목 없음); 순서 있는 목록에서 파생한 심각도 맵; 두 새 패키지에
+  `internal/check/imports_test.go` 모델의 imports 테스트(둘 다 `os`, `os/exec`, `net`, `syscall`을 import하지
+  않으므로 읽기는 `open`으로만 가고 stderr에 닿는 것이 없음). 시드를 가진 `FuzzParseProfile`과
+  `FuzzParseTuning`; 새 패키지마다 수집기 모델의 인벤토리 테스트(패키지 소스 위의 `go/parser`)가 자기 fuzz
+  타깃을 고정, `fuzz.yml`의 패키지 목록에 `./internal/profile`과 `./internal/tuning`
   추가 — 그 파일을 고치는 PR이 샤드를 돌림(G-27); `make fuzz TARGET=… FUZZPKG=./internal/profile/`을
   CONTRIBUTING에 적음.
 - **`internal/controls`**: `Subset`이 순서·버전·다이제스트·`ByID`를 유지; `CheckParamValue`가 lint의 타입
@@ -231,10 +248,13 @@ params:
   `t.TempDir()`에 복사 — waiver 테스트의 D12 선례, CI root 잡이 이 패키지를 root로 돌리므로):
   `full-pass.json`과 `full-fail.json`에 `testdata/profiles/exclude-beyond.yaml` → 117 중 68 평가,
   `excluded_ids` 49, 평가된 집합에 대해 종료 코드 불변; 두 파일 체인 → `extends` 항목들;
-  `fail-ufw-folded-http`의 FAIL을 PASS로 뒤집는 튜닝 파일과 `param_sources` = `tuning`(exposure 파라미터
-  선례); 제외된 컨트롤의 튜닝 파라미터 → 종료 0, 경고 문구, `params`에 항목 없음; 제외된 컨트롤의 waiver →
+  `fail-ufw-folded-http`의 FAIL을 PASS로 뒤집는 튜닝 파일 — 컨트롤 하나짜리 프로파일(`include:
+  [muster.beyond.exposed_listeners_allowed]` → 선택 1, 제외 116 — `include`와 평가된 집합을 따르는 종료
+  코드의 증명이기도 함)과 짝지어 행의 상태와 `param_sources` = `tuning`을 단언(선례는 컨트롤 하나 위의 단위
+  테스트 `internal/check/exposure_controls_test.go`); 제외된 컨트롤의 튜닝 파라미터 → 종료 0, 경고 문구, `params`에 항목 없음; 제외된 컨트롤의 waiver →
   `not_applied` 집계와 경고 문구; `--profile Default`와 `--profile site` → 내장 목록을 대는 오류; root로
-  (`os.Geteuid() == 0`, CI root 잡) 그룹 쓰기 가능한 프로파일·체인 파일·튜닝 파일이 각각 경로를 대며 거부;
+  (`os.Geteuid() == 0`, CI root 잡; 아니면 skip) 쓴 뒤 `os.Chmod`로 그룹 쓰기 가능하게 만든(umask가 생성 시
+  비트를 지움) 프로파일·체인 파일·튜닝 파일이 각각 경로를 대며 거부;
   오타가 든 `controls lint --profile` → 패턴을 이름 대는 오류; `controls list --profile` → 선택의 네 열 행.
   examples 테스트는 `resolveSelection`으로 `default`를 해결 — 그 게이트의 유일한 변경; list-actions 테스트는
   손대지 않음.
@@ -243,7 +263,11 @@ params:
   머지 전에 브랜치의 `examples.yml` 실행에서 examples를 갱신(3C-2b 선례, W-84).
 - **CI.** 새 잡 없음: `test` 잡에 `controls lint --profile default` 추가; `fuzz.yml`에 패키지 둘 추가.
 - **문서.** 메인 설계: §6.6을 실현된 대로 다시 씀; **D33**(프로파일은 묻는 질문의 목록이고 튜닝 파일은
-  사이트의 값; 둘 다 출처와 함께 결과에 기록; 제외된 컨트롤은 평가하지 않음); §4.2의 패키지 표에
+  사이트의 값; 둘 다 출처와 함께 결과에 기록; 제외된 컨트롤은 평가하지 않음; 심각도는 프로파일이 덮어쓰지
+  않는 한 중요도에서 유도; 제외된 컨트롤의 waiver는 `not_applied`이지 결코 `unknown`도 침묵도 아님); §4.3
+  (`check`의 입력에 프로파일·튜닝 파일 추가); §6.5("이유와 함께" → "행이 있는 곳에선 이유와 함께"); §6.7
+  (제외 결과·그 경고·집계되되 어느 행도 싣지 않음을 말하는 한 문장); §9의 결정성 항목("같은 프로파일과
+  튜닝"); §4.2의 패키지 표에
   `internal/profile`과 `internal/tuning`(세트에 대해 해결; 호스트를 건드리거나 stderr에 쓰지 않음); §4.4의
   root 거부 문장이 프로파일·체인·튜닝 파일을 이름 댐; §7.2가 `check`의 종료 2 원인에 거부된 프로파일·튜닝
   파일을 더함; §9의 출처 항목이 `check` 블록의 새 필드를 얻고 심각도 항목은 "프로파일의 `severity` 항목이
