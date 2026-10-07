@@ -57,6 +57,17 @@
     "controls_digest": "sha256:c",
     "snapshot_digest": "sha256:3ca89c25dccde2eb154173d105a799bd6a025f3521885e1514dfbd43cee113f7",
     "guide_edition": "kisa-unix-2026",
+    "profile": {
+      "name": "default",
+      "source": "builtin",
+      "digest": "sha256:p",
+      "extends": [
+        "builtin:default"
+      ],
+      "selected": 6,
+      "excluded": 0,
+      "excluded_ids": []
+    },
     "waivers": {
       "path": "w.yaml",
       "digest": "sha256:w",
@@ -162,7 +173,8 @@
         "reason": "r",
         "expires": "2026-09-20"
       },
-      "severity": "high"
+      "severity": "high",
+      "severity_source": "importance"
     },
     {
       "id": "muster.account.root_remote_login",
@@ -187,7 +199,8 @@
           "side": "effective"
         }
       ],
-      "severity": "high"
+      "severity": "high",
+      "severity_source": "importance"
     },
     {
       "id": "muster.file.passwd_permissions",
@@ -199,7 +212,8 @@
       "status": "ERROR",
       "reason_code": "permission_denied",
       "reason": "needs root",
-      "severity": "high"
+      "severity": "high",
+      "severity_source": "importance"
     },
     {
       "id": "muster.file.world_writable",
@@ -218,7 +232,8 @@
           "verdict": "fail"
         }
       ],
-      "severity": "high"
+      "severity": "high",
+      "severity_source": "importance"
     },
     {
       "id": "muster.service.telnet_disabled",
@@ -228,7 +243,8 @@
       "importance": "중",
       "automation": "auto",
       "status": "PASS",
-      "severity": "medium"
+      "severity": "medium",
+      "severity_source": "importance"
     },
     {
       "id": "muster.log.review",
@@ -239,7 +255,8 @@
       "automation": "manual",
       "status": "MANUAL",
       "reason": "interview",
-      "severity": "low"
+      "severity": "low",
+      "severity_source": "importance"
     }
   ]
 }

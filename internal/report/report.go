@@ -36,17 +36,41 @@ type WaiversBlock struct {
 	ExpiringSoon int    `json:"expiring_soon"`
 }
 
-// CheckBlock names the evaluating binary, control set, snapshot and waivers
-// (spec §9 "Result provenance").
+// ProfileBlock names the profile in force: what it is called, where it came
+// from, the chain it extends (in walk order), its content digest and how
+// many controls it selects and excludes. Every check carries one, the
+// built-in default included, so a reader never has to infer it.
+type ProfileBlock struct {
+	Name        string   `json:"name"`
+	Source      string   `json:"source"`
+	Digest      string   `json:"digest"`
+	Extends     []string `json:"extends"`
+	Selected    int      `json:"selected"`
+	Excluded    int      `json:"excluded"`
+	ExcludedIDs []string `json:"excluded_ids"`
+}
+
+// TuningBlock names the site tuning file, when one was given.
+type TuningBlock struct {
+	Path   string `json:"path"`
+	Digest string `json:"digest"`
+}
+
+// CheckBlock names the evaluating binary, control set, snapshot, profile,
+// tuning and waivers (spec §9 "Result provenance"). The field order is the
+// JSON's order and is part of the contract.
 type CheckBlock struct {
-	MusterVersion   string                    `json:"muster_version"`
-	Commit          string                    `json:"commit"`
-	ControlsVersion string                    `json:"controls_version"`
-	ControlsDigest  string                    `json:"controls_digest"`
-	SnapshotDigest  string                    `json:"snapshot_digest"`
-	GuideEdition    string                    `json:"guide_edition"`
-	Waivers         WaiversBlock              `json:"waivers"`
-	Params          map[string]map[string]any `json:"params,omitempty"`
+	MusterVersion   string                       `json:"muster_version"`
+	Commit          string                       `json:"commit"`
+	ControlsVersion string                       `json:"controls_version"`
+	ControlsDigest  string                       `json:"controls_digest"`
+	SnapshotDigest  string                       `json:"snapshot_digest"`
+	GuideEdition    string                       `json:"guide_edition"`
+	Profile         ProfileBlock                 `json:"profile"`
+	Tuning          *TuningBlock                 `json:"tuning,omitempty"`
+	Waivers         WaiversBlock                 `json:"waivers"`
+	Params          map[string]map[string]any    `json:"params,omitempty"`
+	ParamSources    map[string]map[string]string `json:"param_sources,omitempty"`
 }
 
 type StatusCounts struct {
@@ -145,10 +169,13 @@ func count(into *ScopeCounts, row Row) {
 	}
 }
 
-// Row is one result plus its derived severity.
+// Row is one result plus the severity in force and where it came from:
+// "profile" when the profile's severity map names the control, else
+// "importance" (derived from the KISA importance).
 type Row struct {
 	check.Result
-	Severity string `json:"severity"`
+	Severity       string `json:"severity"`
+	SeveritySource string `json:"severity_source"`
 }
 
 type Report struct {
@@ -162,11 +189,25 @@ type Report struct {
 // Build sorts by scope, then severity, then id, and computes the summary.
 // The guide comes first and beyond it after, so a high beyond row prints
 // below a low guide row (B-9); a report with no beyond row therefore sorts
-// exactly as it did before the split.
-func Build(snap *facts.Snapshot, results []check.Result, cb CheckBlock) *Report {
+// exactly as it did before the split. severity is the profile's severity in
+// force by control id; a control it does not name keeps the severity its
+// importance derives. The sort and the summary both read the severity in
+// force.
+func Build(snap *facts.Snapshot, results []check.Result, cb CheckBlock, severity map[string]string) *Report {
+	// A nil slice would encode as null; the contract is a list (Z-4).
+	if cb.Profile.ExcludedIDs == nil {
+		cb.Profile.ExcludedIDs = []string{}
+	}
+	if cb.Profile.Extends == nil {
+		cb.Profile.Extends = []string{}
+	}
 	rows := make([]Row, 0, len(results))
 	for _, r := range results {
-		rows = append(rows, Row{Result: r, Severity: Severity(r.Importance)})
+		row := Row{Result: r, Severity: Severity(r.Importance), SeveritySource: "importance"}
+		if lvl, ok := severity[r.ID]; ok {
+			row.Severity, row.SeveritySource = lvl, "profile"
+		}
+		rows = append(rows, row)
 	}
 	sort.SliceStable(rows, func(i, j int) bool {
 		if si, sj := scopeRank[scopeOf(rows[i].Category)], scopeRank[scopeOf(rows[j].Category)]; si != sj {

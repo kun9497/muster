@@ -208,7 +208,7 @@ func runCheck(args []string, stdout, stderr io.Writer) int {
 	}
 
 	results, cb := newCheckBlock(set, snap, reg, wf, func(msg string) { fmt.Fprintf(stderr, "muster: warning: %s\n", msg) })
-	rep := report.Build(snap, results, cb)
+	rep := report.Build(snap, results, cb, nil)
 
 	switch f.format {
 	case "json":

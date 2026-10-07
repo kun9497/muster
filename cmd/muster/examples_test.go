@@ -42,7 +42,7 @@ func reportsFor(t *testing.T, snap *facts.Snapshot, set *controls.Set) (jsonRepo
 	// not a failure here: F-12 keeps an example valid as long as it loads
 	// and evaluates.
 	results, cb := newCheckBlock(set, snap, reg, nil, func(msg string) { t.Logf("check warning: %s", msg) })
-	rep := report.Build(snap, results, cb)
+	rep := report.Build(snap, results, cb, nil)
 	var j, tb bytes.Buffer
 	if err := report.WriteJSON(&j, rep); err != nil {
 		t.Fatalf("write json: %v", err)
