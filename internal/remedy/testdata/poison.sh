@@ -3,7 +3,7 @@
 # muster fix --dry-run: review before running. muster never runs this file.
 # snapshot: host host\x1b[31m\n# $(id) `id`, collected 2026\x1b[31m\n# $(id) `id`; controls v\x1b[31m\n# $(id) `id` d\x1b[31m\n# $(id) `id`
 # profile p\x1b[31m\n# $(id) `id` (pd\x1b[31m\n# $(id) `id`); max-risk lockout_risk
-# planned 2 (script 1, text only 1); above max-risk 0; not planned: error 0, manual 0, warn_degraded 0
+# planned 2 (script 1, text only 1); above max-risk 0; not planned: error 1, manual 0, warn_degraded 1
 set -u
 umask 077
 [ "$(id -u)" -eq 0 ] || { printf 'muster-fix: run as root\n' >&2; exit 2; }

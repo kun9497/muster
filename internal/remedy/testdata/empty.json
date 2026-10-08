@@ -50,10 +50,10 @@
       "name": "default",
       "source": "",
       "digest": "sha256:p0",
-      "extends": null,
+      "extends": [],
       "selected": 0,
       "excluded": 0,
-      "excluded_ids": null
+      "excluded_ids": []
     },
     "waivers": {
       "applied": 0,

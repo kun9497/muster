@@ -29,7 +29,9 @@ func scriptReport(rows ...report.Row) *report.Report {
 	rep.Run = facts.Run{Host: facts.Host{Hostname: "host-a"}, CollectedAt: "2026-10-08T00:00:00Z"}
 	rep.Check = report.CheckBlock{
 		ControlsVersion: "test+1", ControlsDigest: "sha256:c0",
-		Profile: report.ProfileBlock{Name: "default", Digest: "sha256:p0"},
+		// report.Build turns nil profile lists into [] (report.go); the
+		// fixture carries the shape the command emits.
+		Profile: report.ProfileBlock{Name: "default", Digest: "sha256:p0", Extends: []string{}, ExcludedIDs: []string{}},
 	}
 	return rep
 }
@@ -49,13 +51,15 @@ func mustBuild(t *testing.T, rep *report.Report, set *controls.Set, opts Options
 func fullPlan(t *testing.T) *Plan {
 	errRow := row("x.error", "ERROR", "fact missing", "", "high")
 	errRow.ReasonCode = check.MissingFact
+	partial := row("muster.test.f_partial", "WARN", "observations need human review", "", "high")
+	partial.Automation = "partial" // as its control declares
 	rep := scriptReport(
 		row("muster.test.a_none", "FAIL", "clause does not hold: files.etc_hosts.mode in [0 420]", "", "low"),
 		row("muster.test.b_restart", "FAIL", "clause does not hold", "", "medium"),
 		row("muster.test.c_lockout", "FAIL", "clause does not hold", "", "high"),
 		row("muster.test.d_reboot", "FAIL", "clause does not hold", "", "high"),
 		row("muster.test.e_param", "FAIL", "mode 777", "", "high"),
-		row("muster.test.f_partial", "WARN", "observations need human review", "", "high"),
+		partial,
 		errRow,
 		row("x.manual", "MANUAL", "review", "", "medium"),
 		row("x.degraded", "WARN", check.ReasonDegradedPrefix+"not applied", "not applied", "low"),
@@ -132,6 +136,11 @@ func poisonPlan(t *testing.T) *Plan {
 		r.TitleEn, r.TitleKo = "title "+poison, "제목 "+poison
 		rows = append(rows, r)
 	}
+	// Not-planned rows carry snapshot text too: an ERROR and a degraded WARN.
+	errRow := row("muster.test.p_error", "ERROR", "value "+poison, "", "high")
+	errRow.ReasonCode = check.MissingFact
+	rows = append(rows, errRow,
+		row("muster.test.p_degraded", "WARN", check.ReasonDegradedPrefix+poison, poison, "low"))
 	rep := scriptReport(rows...)
 	rep.Run.Host.Hostname = "host" + poison
 	rep.Run.CollectedAt = "2026" + poison
@@ -140,6 +149,9 @@ func poisonPlan(t *testing.T) *Plan {
 	p := mustBuild(t, rep, setFrom(t, poisonControls), Options{})
 	if len(p.Items) != 2 || !strings.ContainsRune(p.Items[0].TextEn+p.Items[1].TextEn, 0x1b) {
 		t.Fatal("poison controls carry no ESC: the fixture is not poisoned")
+	}
+	if len(p.NotPlanned) != 2 {
+		t.Fatalf("poison not-planned rows = %d, want 2 (error, warn_degraded)", len(p.NotPlanned))
 	}
 	return p
 }

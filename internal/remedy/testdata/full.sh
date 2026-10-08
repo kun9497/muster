@@ -67,7 +67,7 @@ fix_muster_test_a_none
 
 # ---- 4/6 muster.test.b_restart [risk restart_service] [fail, medium]
 # why: clause does not hold
-# do:  fix b
+# do:  fix b <a & b>
 # ko:  조치 b
 fix_muster_test_b_restart() {
   ( set -e

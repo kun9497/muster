@@ -51,7 +51,7 @@ remediation:
 `,
 	"muster.test.b_restart": `automation: auto
 remediation:
-  text_en: fix b
+  text_en: "fix b <a & b>"
   text_ko: 조치 b
   risk: restart_service
   idempotent: true

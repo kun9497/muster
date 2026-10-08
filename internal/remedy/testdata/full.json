@@ -50,10 +50,10 @@
       "name": "default",
       "source": "",
       "digest": "sha256:p0",
-      "extends": null,
+      "extends": [],
       "selected": 0,
       "excluded": 0,
-      "excluded_ids": null
+      "excluded_ids": []
     },
     "waivers": {
       "applied": 0,
@@ -94,7 +94,7 @@
       "severity_source": "importance",
       "risk": "none",
       "idempotent": true,
-      "automation": "auto",
+      "automation": "partial",
       "reason": "observations need human review",
       "text_en": "fix f",
       "text_ko": "조치 f",
@@ -138,7 +138,7 @@
       "idempotent": true,
       "automation": "auto",
       "reason": "clause does not hold",
-      "text_en": "fix b",
+      "text_en": "fix b <a & b>",
       "text_ko": "조치 b",
       "script": true,
       "text_only_reason": "",

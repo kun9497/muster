@@ -3,10 +3,14 @@ package remedy
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"unicode/utf8"
+
+	"github.com/kun9497/muster/internal/report"
 )
 
 func golden(t *testing.T, name string, got []byte) {
@@ -56,9 +60,96 @@ func TestTablePoisoned(t *testing.T) {
 	if bytes.IndexByte(out, 0x07) >= 0 {
 		t.Fatalf("poisoned table carries a raw BEL:\n%q", out)
 	}
-	// four header lines, a blank, the column header, three lines per item
-	if got, want := len(lines(out)), 6+3*len(p.Items); got != want {
+	if !bytes.Contains(out, []byte("\nnot planned:\n")) {
+		t.Fatalf("poisoned table has no not-planned section:\n%s", out)
+	}
+	// four header lines, a blank, the column header, three lines per item,
+	// then a blank, "not planned:" and one line per not-planned row
+	if got, want := len(lines(out)), 8+3*len(p.Items)+len(p.NotPlanned); got != want {
 		t.Fatalf("poisoned table has %d lines, want %d: an injected newline split one\n%s", got, want, out)
+	}
+}
+
+// TestTableCutsLongReasons: a why: reason and a not-planned reason are
+// snapshot text and are cut at report.MaxCell runes, ending in "…".
+func TestTableCutsLongReasons(t *testing.T) {
+	long := strings.Repeat("가", 300)
+	errRow := row("muster.test.z_error", "ERROR", long, "", "high")
+	rep := scriptReport(row("muster.test.a_none", "FAIL", long, "", "low"), errRow)
+	out := Table(mustBuild(t, rep, testSet(t), Options{}), false)
+	for _, prefix := range []string{"   why: ", "  muster.test.z_error  error          "} {
+		var l string
+		for _, x := range lines(out) {
+			if strings.HasPrefix(x, prefix) {
+				l = x
+			}
+		}
+		if l == "" {
+			t.Fatalf("no line with prefix %q in\n%s", prefix, out)
+		}
+		cell := strings.TrimPrefix(l, prefix)
+		if want := strings.Repeat("가", report.MaxCell) + "…"; cell != want {
+			t.Fatalf("line %q: cell has %d runes, want %d then …", prefix, utf8.RuneCountInString(cell), report.MaxCell)
+		}
+	}
+}
+
+// TestJSONKeepsHTMLBytes: like check's JSON, fix's JSON does not escape <, >
+// or & (SetEscapeHTML(false)).
+func TestJSONKeepsHTMLBytes(t *testing.T) {
+	out := string(JSON(fullPlan(t)))
+	if !strings.Contains(out, `"text_en": "fix b <a & b>"`) {
+		t.Fatalf("JSON does not keep <a & b> literally:\n%s", out)
+	}
+	esc := string([]byte{'\\', 'u', '0', '0'}) // the prefix of json's HTML escapes
+	if strings.Contains(out, esc+"3c") || strings.Contains(out, esc+"26") || strings.Contains(out, esc+"3e") {
+		t.Fatal("JSON escapes HTML bytes")
+	}
+}
+
+// TestTableTwoDigitNumberColumn: with ten or more items the # column is two
+// wide, and the header and every row start the risk cell at one offset.
+func TestTableTwoDigitNumberColumn(t *testing.T) {
+	var rows []report.Row
+	for i := 1; i <= 11; i++ {
+		rows = append(rows, row(fmt.Sprintf("muster.test.n%02d", i), "FAIL", "clause does not hold", "", "high"))
+	}
+	p := mustBuild(t, scriptReport(rows...), testSet(t), Options{})
+	if len(p.Items) != 11 {
+		t.Fatalf("items = %d, want 11", len(p.Items))
+	}
+	ls := lines(Table(p, false))
+	header := ls[5]
+	if !strings.HasPrefix(header, "#  ") {
+		t.Fatalf("column header = %q", header)
+	}
+	want := strings.Index(header, "risk")
+	if want != 4 { // "#" padded to two, then two spaces
+		t.Fatalf("header risk offset = %d, want 4: %q", want, header)
+	}
+	n := 0
+	for _, l := range ls[6:] {
+		if strings.HasPrefix(l, "   ") {
+			continue // why: / do:
+		}
+		n++
+		if got := strings.Index(l, "none "); got != want {
+			t.Fatalf("row %q starts its risk cell at %d, want %d", l, got, want)
+		}
+	}
+	if n != 11 {
+		t.Fatalf("item rows = %d, want 11", n)
+	}
+}
+
+// TestPlanItemCopiesAutomation: the item carries the row's automation.
+func TestPlanItemCopiesAutomation(t *testing.T) {
+	p := fullPlan(t)
+	if got := itemByID(t, p, "muster.test.f_partial").Automation; got != "partial" {
+		t.Fatalf("f_partial automation = %q, want partial", got)
+	}
+	if got := itemByID(t, p, "muster.test.a_none").Automation; got != "auto" {
+		t.Fatalf("a_none automation = %q, want auto", got)
 	}
 }
 

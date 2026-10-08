@@ -61,7 +61,7 @@ fix_muster_test_a_none
 
 # ---- 3/5 muster.test.b_restart [risk restart_service] [fail, medium] -- above max-risk none, NOT RUN
 # why: clause does not hold
-# do:  fix b
+# do:  fix b <a & b>
 # ko:  조치 b
 # fix_muster_test_b_restart() {
 #   ( set -e
