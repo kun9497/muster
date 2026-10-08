@@ -325,7 +325,7 @@ func finish(r Result, c *controls.Control, all clauseOutcome) Result {
 		// as secondary text rather than as the verdict.
 		if !all.HardFail && sideMismatch(all.Degraded) {
 			r.Status = WARN
-			r.Reason = "setting holds on one side only: " + all.Degraded
+			r.Reason = ReasonSideOnlyPrefix + all.Degraded
 			return r
 		}
 		if c.Automation == "partial" {
@@ -340,12 +340,12 @@ func finish(r Result, c *controls.Control, all clauseOutcome) Result {
 			}
 		}
 		if all.Degraded != "" {
-			r.Reason += "; collection was degraded: " + all.Degraded
+			r.Reason += "; " + ReasonDegradedPrefix + all.Degraded
 		}
 		return r
 	}
 	if all.Degraded != "" {
-		r.Status, r.Degraded, r.Reason = WARN, all.Degraded, "collection was degraded: "+all.Degraded
+		r.Status, r.Degraded, r.Reason = WARN, all.Degraded, ReasonDegradedPrefix+all.Degraded
 		return r
 	}
 	r.Status = PASS
@@ -526,7 +526,7 @@ func (e *env) absentMeans(r Result, c *controls.Control, keys []string, why stri
 	case "pass":
 		r.Status, r.Reason = PASS, "absent counts as pass: "+why
 	case "fail":
-		r.Status, r.Reason = FAIL, "absent counts as fail: "+why
+		r.Status, r.Reason = FAIL, ReasonAbsentFailPrefix+why
 	case "manual":
 		r.Status, r.Reason = MANUAL, "absent needs review: "+why
 	default:

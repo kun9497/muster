@@ -28,7 +28,8 @@ func ColorEnabled(flag, noColorEnv, term string, isTTY bool) bool {
 	return isTTY && noColorEnv == "" && term != "dumb"
 }
 
-const maxCell = 200
+// MaxCell is the number of input runes Escape keeps before it cuts.
+const MaxCell = 200
 
 // beyondSeparator marks, in the row block, where the KISA guide's verdict
 // ends and muster's own checks begin (B-9).
@@ -53,51 +54,77 @@ func scopeLine(c ScopeCounts) string {
 		c.Undecidable.Waived)
 }
 
-// escape neutralises anything a hostile snapshot could use to repaint the
-// terminal (spec §7.4): C0/C1 controls, ESC, CR; tabs survive.
-func escape(s string) string {
+// escapeRune writes one rune the way Escape and EscapeNoCut render it: C0/C1
+// controls, ESC and CR are spelled out; tabs survive.
+func escapeRune(b *strings.Builder, r rune) {
+	switch {
+	case r == '\t':
+		b.WriteRune(r)
+	case r == '\r':
+		b.WriteString(`\r`)
+	case r == '\n':
+		b.WriteString(`\n`)
+	case r == 0x1b:
+		b.WriteString(`\x1b`)
+	case r < 0x20 || (r >= 0x7f && r <= 0x9f):
+		fmt.Fprintf(b, `\u%04x`, r)
+	default:
+		b.WriteRune(r)
+	}
+}
+
+// Escape neutralises anything a hostile snapshot could use to repaint the
+// terminal (spec §7.4) and cuts at MaxCell runes.
+func Escape(s string) string {
 	var b strings.Builder
 	n := 0
 	for _, r := range s {
-		if n >= maxCell {
+		if n >= MaxCell {
 			b.WriteString("…")
 			break
 		}
 		n++
-		switch {
-		case r == '\t':
-			b.WriteRune(r)
-		case r == '\r':
-			b.WriteString(`\r`)
-		case r == '\n':
-			b.WriteString(`\n`)
-		case r == 0x1b:
-			b.WriteString(`\x1b`)
-		case r < 0x20 || (r >= 0x7f && r <= 0x9f):
-			fmt.Fprintf(&b, `\u%04x`, r)
-		default:
-			b.WriteRune(r)
-		}
+		escapeRune(&b, r)
 	}
 	return b.String()
 }
 
-// profileLine is the table's second line (spec §5 "Table"): the profile in
+// EscapeNoCut is Escape without the cut: for control text, which is the
+// plan's payload and is kept to one line by lint (stage 3D-2).
+func EscapeNoCut(s string) string {
+	var b strings.Builder
+	for _, r := range s {
+		escapeRune(&b, r)
+	}
+	return b.String()
+}
+
+// ProfileLine is the table's second line (spec §5 "Table"): the profile in
 // force, how much of the control set it selects, and the tuning file. The
-// name and the path are file-derived, so both go through escape.
-func profileLine(cb CheckBlock) string {
-	p := cb.Profile
+// name and the path are file-derived, so both go through Escape.
+func ProfileLine(p ProfileBlock, t *TuningBlock) string {
 	total := p.Selected + p.Excluded
 	var s string
 	if p.Excluded == 0 {
-		s = fmt.Sprintf("profile %s (%d controls", escape(p.Name), total)
+		s = fmt.Sprintf("profile %s (%d controls", Escape(p.Name), total)
 	} else {
-		s = fmt.Sprintf("profile %s (%d of %d, %d excluded", escape(p.Name), p.Selected, total, p.Excluded)
+		s = fmt.Sprintf("profile %s (%d of %d, %d excluded", Escape(p.Name), p.Selected, total, p.Excluded)
 	}
-	if cb.Tuning != nil {
-		s += "; tuning " + escape(cb.Tuning.Path)
+	if t != nil {
+		s += "; tuning " + Escape(t.Path)
 	}
 	return s + ")"
+}
+
+// HeaderLine is the first line of check's table and of fix's (stage 3D-2),
+// without its newline. The versions are the report block's, never run's.
+// C1/R20: every string on this line is snapshot- or file-derived and a
+// snapshot from a compromised host is a normal input (spec §7.4), so all of
+// them go through Escape, not only the hostname.
+func HeaderLine(run facts.Run, musterVersion, controlsVersion, guideEdition string) string {
+	return fmt.Sprintf("muster %s · controls %s · guide %s · host %s · collected %s",
+		Escape(musterVersion), Escape(controlsVersion), Escape(guideEdition),
+		Escape(run.Host.Hostname), Escape(run.CollectedAt))
 }
 
 var statusColor = map[check.Status]string{
@@ -105,7 +132,19 @@ var statusColor = map[check.Status]string{
 	check.MANUAL: "36", check.NotApplicable: "90", check.WAIVED: "90",
 }
 
-func paint(on bool, code, s string) string {
+// StatusColor is the ANSI code check's table paints a status with.
+func StatusColor(s check.Status) string { return statusColor[s] }
+
+// Title is the table's title rule: Korean first, English when empty.
+func Title(ko, en string) string {
+	if ko == "" {
+		return en
+	}
+	return ko
+}
+
+// Paint wraps s in the ANSI colour code when on; an empty code paints nothing.
+func Paint(on bool, code, s string) string {
 	if !on || code == "" {
 		return s
 	}
@@ -132,13 +171,8 @@ func WriteTable(w io.Writer, r *Report, o TableOptions) error {
 		o.MaxObservations = 5
 	}
 	s := r.Summary
-	// C1/R20: every string on this line is snapshot- or file-derived and a
-	// snapshot from a compromised host is a normal input (spec §7.4), so all
-	// of them go through escape, not only the hostname.
-	fmt.Fprintf(w, "muster %s · controls %s · guide %s · host %s · collected %s\n",
-		escape(r.Check.MusterVersion), escape(r.Check.ControlsVersion), escape(r.Check.GuideEdition),
-		escape(r.Run.Host.Hostname), escape(r.Run.CollectedAt))
-	fmt.Fprintln(w, profileLine(r.Check))
+	fmt.Fprintln(w, HeaderLine(r.Run, r.Check.MusterVersion, r.Check.ControlsVersion, r.Check.GuideEdition))
+	fmt.Fprintln(w, ProfileLine(r.Check.Profile, r.Check.Tuning))
 	fmt.Fprintf(w, "automatic  high %d/%d/%d  medium %d/%d/%d  low %d/%d/%d  (pass/fail/warn)\n",
 		s.Automatic.High.Pass, s.Automatic.High.Fail, s.Automatic.High.Warn,
 		s.Automatic.Medium.Pass, s.Automatic.Medium.Fail, s.Automatic.Medium.Warn,
@@ -154,7 +188,7 @@ func WriteTable(w io.Writer, r *Report, o TableOptions) error {
 
 	idWidth := 12
 	for _, row := range r.Results {
-		if l := displayWidth(escape(row.ID)); l > idWidth {
+		if l := displayWidth(Escape(row.ID)); l > idWidth {
 			idWidth = l
 		}
 	}
@@ -175,20 +209,17 @@ func WriteTable(w io.Writer, r *Report, o TableOptions) error {
 			fmt.Fprintf(w, "%s\n", beyondSeparator)
 			separated = true
 		}
-		title := row.TitleKo
-		if title == "" {
-			title = row.TitleEn
-		}
-		status := paint(o.Color, statusColor[row.Status], padRight(escape(string(row.Status)), 14))
-		fmt.Fprintf(w, "%s %s %s  %s\n", status, padRight(escape(row.Severity), 6), padRight(escape(row.ID), idWidth), truncateWidth(escape(title), titleWidth))
+		title := Title(row.TitleKo, row.TitleEn)
+		status := Paint(o.Color, StatusColor(row.Status), padRight(Escape(string(row.Status)), 14))
+		fmt.Fprintf(w, "%s %s %s  %s\n", status, padRight(Escape(row.Severity), 6), padRight(Escape(row.ID), idWidth), truncateWidth(Escape(title), titleWidth))
 		if row.Reason != "" {
-			fmt.Fprintf(w, "    reason: %s\n", escape(reasonLine(row)))
+			fmt.Fprintf(w, "    reason: %s\n", Escape(ReasonLine(row)))
 		}
 		if row.Waiver != nil {
 			if row.Waiver.Applied {
-				fmt.Fprintf(w, "    waived: %s (expires %s)\n", escape(row.Waiver.Reason), orNone(escape(row.Waiver.Expires)))
+				fmt.Fprintf(w, "    waived: %s (expires %s)\n", Escape(row.Waiver.Reason), orNone(Escape(row.Waiver.Expires)))
 			} else {
-				fmt.Fprintf(w, "    waiver not applied: %s\n", escape(row.Waiver.NotAppliedBecause))
+				fmt.Fprintf(w, "    waiver not applied: %s\n", Escape(row.Waiver.NotAppliedBecause))
 			}
 		}
 		if row.Status == check.FAIL || row.Status == check.WARN || row.Status == check.ERROR {
@@ -196,10 +227,10 @@ func WriteTable(w io.Writer, r *Report, o TableOptions) error {
 				// M9: a fact that is not ok has no value; naming the status is
 				// the honest rendering, "= <nil>" is not.
 				if ev.Status != facts.StatusOK {
-					fmt.Fprintf(w, "    %s%s: %s%s\n", escape(ev.Fact), sideSuffix(ev.Side), escape(string(ev.Status)), sourceSuffix(ev))
+					fmt.Fprintf(w, "    %s%s: %s%s\n", Escape(ev.Fact), sideSuffix(ev.Side), Escape(string(ev.Status)), sourceSuffix(ev))
 					continue
 				}
-				fmt.Fprintf(w, "    %s%s = %s%s\n", escape(ev.Fact), sideSuffix(ev.Side), escape(fmt.Sprint(ev.Value)), sourceSuffix(ev))
+				fmt.Fprintf(w, "    %s%s = %s%s\n", Escape(ev.Fact), sideSuffix(ev.Side), Escape(fmt.Sprint(ev.Value)), sourceSuffix(ev))
 			}
 			shown := 0
 			failing := 0
@@ -209,7 +240,7 @@ func WriteTable(w io.Writer, r *Report, o TableOptions) error {
 				}
 				failing++
 				if shown < o.MaxObservations {
-					fmt.Fprintf(w, "    %s: expected %v, actual %v (%s)\n", escape(ob.Subject), escape(fmt.Sprint(ob.Expected)), escape(actualText(ob.Actual)), escape(ob.Verdict))
+					fmt.Fprintf(w, "    %s: expected %v, actual %v (%s)\n", Escape(ob.Subject), Escape(fmt.Sprint(ob.Expected)), Escape(actualText(ob.Actual)), Escape(ob.Verdict))
 					shown++
 				}
 			}
@@ -234,7 +265,9 @@ func actualText(v any) string {
 	return fmt.Sprint(v)
 }
 
-func reasonLine(row Row) string {
+// ReasonLine is a row's reason as the table prints it: "[code] reason", or
+// the bare reason when the row carries no code.
+func ReasonLine(row Row) string {
 	if row.ReasonCode != "" {
 		return fmt.Sprintf("[%s] %s", row.ReasonCode, row.Reason)
 	}
@@ -252,7 +285,7 @@ func sideSuffix(side string) string {
 	if side == "" {
 		return ""
 	}
-	return "@" + escape(side)
+	return "@" + Escape(side)
 }
 
 // sourceSuffix names the file and line, or the command, a value came from.
@@ -263,11 +296,11 @@ func sourceSuffix(ev check.Evidence) string {
 	}
 	switch {
 	case ev.Source.Path != "" && ev.Source.Line > 0:
-		return fmt.Sprintf("  (%s:%d)", escape(ev.Source.Path), ev.Source.Line)
+		return fmt.Sprintf("  (%s:%d)", Escape(ev.Source.Path), ev.Source.Line)
 	case ev.Source.Path != "":
-		return "  (" + escape(ev.Source.Path) + ")"
+		return "  (" + Escape(ev.Source.Path) + ")"
 	case ev.Source.Cmd != "":
-		return "  (" + escape(ev.Source.Cmd) + ")"
+		return "  (" + Escape(ev.Source.Cmd) + ")"
 	}
 	return ""
 }
