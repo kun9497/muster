@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/kun9497/muster/internal/check"
@@ -446,7 +447,9 @@ func runScriptStreams(t *testing.T, p *Plan, dir, backupDir string) (string, str
 	cmd := exec.Command("sh", path)
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(), "MUSTER_BACKUP="+backupDir)
-	var all, stderr bytes.Buffer
+	// os/exec copies stdout and stderr from two goroutines; both write all.
+	var all syncBuf
+	var stderr bytes.Buffer
 	cmd.Stdout = &all
 	cmd.Stderr = io.MultiWriter(&all, &stderr)
 	err := cmd.Run()
@@ -460,6 +463,24 @@ func runScriptStreams(t *testing.T, p *Plan, dir, backupDir string) (string, str
 		t.Fatalf("sh: %v", err)
 		return "", "", -1
 	}
+}
+
+// syncBuf is a bytes.Buffer safe for the two writers os/exec runs.
+type syncBuf struct {
+	mu sync.Mutex
+	b  bytes.Buffer
+}
+
+func (s *syncBuf) Write(p []byte) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.b.Write(p)
+}
+
+func (s *syncBuf) String() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.b.String()
 }
 
 func exists(path string) bool {
