@@ -20,9 +20,10 @@ references and, later, offered as selectable profiles.
 > SP 800-53 references through accounts, PAM, sshd, home directories, system
 > files, services, the firewall, logging, NFS, SNMP, patch hygiene, FTP, mail
 > and DNS to the closing coverage-and-reference gate — and stages 3A, 3B,
-> 3C-1 and 3C-2a — the deep filesystem walk, the first checks beyond the guide,
-> audit pipeline health and package integrity, and who holds root's power
-> without being root — are merged. 67 of the 67 items are enrolled (68 controls:
+> 3C-1, 3C-2a, 3C-2b, 3D-1 and 3D-2 — the deep filesystem walk, the first checks
+> beyond the guide, audit pipeline health and package integrity, who holds
+> root's power without being root, exposure, profiles and tuning, and the
+> `fix --dry-run` review script — are merged. 67 of the 67 items are enrolled (68 controls:
 > 57 auto, 7 partial, 4 manual with the evidence attached),
 > and 49 beyond the guide. `collect --deep`
 > walks the local filesystems once, under a time and entry budget, without

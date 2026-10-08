@@ -262,11 +262,17 @@ remediation:
   backup: [/etc/ssh/sshd_config.d/00-muster.conf, /etc/securetty]
   script: |
     if command -v sshd >/dev/null 2>&1; then
+      [ -d /run/sshd ] || mkdir -p /run/sshd
       printf 'PermitRootLogin no\n' > /etc/ssh/sshd_config.d/00-muster.conf
       chmod 644 /etc/ssh/sshd_config.d/00-muster.conf
       sshd -t
+      if systemctl is-active --quiet sshd.service; then systemctl reload sshd.service; fi
+      if systemctl is-active --quiet ssh.service; then systemctl reload ssh.service; fi
     fi
-  validate: "if command -v sshd >/dev/null 2>&1; then sshd -T 2>/dev/null | grep -qx 'permitrootlogin no'; fi"
+    if [ -f /etc/securetty ]; then
+      sed -i '/^[[:space:]]*pts\//d' /etc/securetty
+    fi
+  validate: "if command -v sshd >/dev/null 2>&1; then sshd -T -C user=root,host=localhost,addr=127.0.0.1 2>/dev/null | grep -qx 'permitrootlogin no'; fi"
   rollback: |
     rm -f /etc/ssh/sshd_config.d/00-muster.conf
     if command -v sshd >/dev/null 2>&1; then sshd -t; fi
@@ -405,7 +411,7 @@ Result JSON goes to stdout and nothing else does; warnings, progress and `-v` lo
 
 ### 7.5 `fix --dry-run`
 
-`muster fix --dry-run --facts <snapshot> [--profile …] [--tuning …] [--waivers …] [--max-risk …] [--format table|json|script]` reads what `check` reads, through `check`'s own helpers, and keeps the rows whose status is `FAIL` or `WARN` after waivers; a degraded pass, `ERROR` and `MANUAL` rows are listed as not planned. Items are ordered by remediation risk, then the severity in force, then id. The table and JSON are the plan; the script is one POSIX `sh` file the operator reads and runs by hand: one function per control, backups first, the control's `script`, then its `validate`, and on failure the declared `rollback` and then a restore of the backups. `--dry-run` is mandatory — `fix` without it is refused with `fix never applies a remediation (D24); run fix --dry-run`. `fix` exits `0` whenever a plan was produced, findings or not, and `2` when it could not be; it never exits `1`, so no CI counts findings through it. The script exits `0`, `1` (a block failed; its backups are kept) or `2` (not root, or no usable backup directory). A block's `done` means its commands ran and its `validate` held; whether the control now passes is `check`'s to say. Design: `2026-10-07-stage3d2-fix-dry-run-design.md` (D34).
+`muster fix --dry-run --facts <snapshot> [--profile …] [--tuning …] [--waivers …] [--max-risk …] [--format table|json|script]` reads what `check` reads, through `check`'s own helpers, and keeps the rows whose status is `FAIL` or `WARN` after waivers; a degraded pass, `ERROR` and `MANUAL` rows are listed as not planned. Items are ordered by remediation risk, then the severity in force, then id. The table and JSON are the plan; the script is one POSIX `sh` file the operator reads and runs by hand: one function per control, backups first, the control's `script`, then its `validate`, and on failure the declared `rollback` and then a restore of the backups. `--dry-run` is mandatory — `fix` without it is refused with `fix never applies a remediation (D24); run fix --dry-run`. `fix` exits `0` whenever a plan was produced, findings or not, and `2` when it could not be; it never exits `1`, so no CI counts findings through it. The script exits `0`, `1` (a block failed; its backups are kept) or `2` (not root, or no usable backup directory: one that is not absolute and clean, or not root-owned and root-only-writable). A block's `done` means its commands ran and its `validate` held; whether the control now passes is `check`'s to say. Design: `2026-10-07-stage3d2-fix-dry-run-design.md` (D34).
 
 ## 8. Security of the tool itself
 

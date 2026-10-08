@@ -18,6 +18,7 @@ verdict on an existing snapshot is at least a minor release and appears under
   the declared rollback then a restore. `--max-risk` caps what the script runs;
   items above it are commented out. muster never runs the script. `fix` exits 0
   whenever it produced a plan and 2 when it could not; `--dry-run` is mandatory.
+  The script refuses a backup directory root does not own or others can write.
   New package `internal/remedy`; `examples/` gains the fix reports.
 - `check --profile <name|path>` and `check --tuning <path>` (stage 3D-1, D33). A
   profile is the list of questions asked: `include`/`exclude` by control-id globs,
@@ -55,11 +56,15 @@ verdict on an existing snapshot is at least a minor release and appears under
 Control set `kisa-unix-2026+2026.10.08` (was `+2026.10.02`). The sixteen
 controls that carry a remediation script are rewritten for the review script:
 file permissions declare their file as `backup`, guard its existence and
-validate owner and mode with `stat`; the ten service controls loop over their
-logical service's units with a `systemctl cat` guard, roll back in two passes
-(unmask, then enable) and validate the printed enablement state; root remote
-login writes `00-muster.conf` (sshd keeps the first value it reads). No verdict
-changes.
+validate owner and mode with `stat`; the ten service controls act on each of
+their logical service's units (a loop, or an `if` for one unit) behind a
+`systemctl cat` guard, roll back in two passes (unmask, then enable) and
+validate the printed enablement state; root remote login writes
+`00-muster.conf` (sshd keeps the first value it reads), reloads a running sshd
+and validates persona root. Two risks now name the operational impact:
+`hosts_permissions` is `restart_service` (at 0600 non-root processes cannot read
+/etc/hosts) and `nis_disabled` is `lockout_risk` (stopping ypbind cuts NIS
+accounts off). No verdict changes.
 
 Control set `kisa-unix-2026+2026.10.02` (was `+2026.09.29`). Thirteen more controls
 beyond the KISA guide (49 in all), written from `proc(5)`, `ip-sysctl.rst`,

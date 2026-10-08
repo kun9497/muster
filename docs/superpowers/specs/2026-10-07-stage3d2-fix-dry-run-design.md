@@ -146,8 +146,8 @@ given below (`Problem.String` prints `path: rule: message`, so the messages carr
 name and the message substring. "One line" means no line break after one trailing newline is trimmed; an
 empty `script`/`validate`/`rollback` string reads as absent; "blank" means whitespace only:
 
-- `text_en` and `text_ko` are required wherever `remediation` is present, carry no newline, carriage
-  return or C0 byte, and are at most 1000 runes — `text_%s is blank` / `text_%s carries a line break or
+- `text_en` and `text_ko` are required wherever `remediation` is present, carry no C0 or C1 control
+  character or DEL (a newline and a carriage return among them), and are at most 1000 runes — `text_%s is blank` / `text_%s carries a line break or
   control character` / `text_%s is longer than 1000 runes`. The same no-control-character rule applies to
   `title_en`/`title_ko` under rule `titles` — `title_%s carries a line break or control character` (every
   shipped control already conforms; this is a pin).
@@ -221,13 +221,13 @@ their order, the guards and the validate's clauses; the literal bodies are writt
 
 | control | backup | script (shape) | validate | rollback |
 |---|---|---|---|---|
-| `file/hosts_permissions` | `/etc/hosts` | `[ -f /etc/hosts ]`; `chown root:root /etc/hosts`; `chmod 600 /etc/hosts` | `stat -c '%u %g %a' /etc/hosts \| grep -qx '0 0 600'` | restore_backup |
+| `file/hosts_permissions` (risk `restart_service`, Z-27: at 0600 non-root processes cannot read /etc/hosts) | `/etc/hosts` | `[ -f /etc/hosts ]`; `chown root:root /etc/hosts`; `chmod 600 /etc/hosts` | `stat -c '%u %g %a' /etc/hosts \| grep -qx '0 0 600'` | restore_backup |
 | `file/services_permissions` | `/etc/services` | as above with `644` | `… \| grep -qx '0 0 644'` | restore_backup |
 | `file/hosts_lpd_permissions` | `/etc/hosts.lpd` | as above with `600` | `… \| grep -qx '0 0 600'` | restore_backup |
 | `file/passwd_permissions` | `/etc/passwd` | `[ -f /etc/passwd ]`; `chown root:root`; `chmod 644`; guarded `setfacl -b` | `stat -c '%u %g %a' /etc/passwd \| grep -qx '0 0 644'` | restore_backup |
 | `file/shadow_permissions` | `/etc/shadow` | `[ -f /etc/shadow ]`; `chown root`; `chmod 400`; guarded `setfacl -b` (the group is the distribution's: `shadow` on Debian, `root` on EL — not judged, not set) | `stat -c '%u %a' /etc/shadow \| grep -qx '0 400'` | restore_backup |
 | `service/*_disabled` (10) | none (unit state is not a file) | per-unit loop over the row's `provesInstall` units: `systemctl cat` guard, `disable --now`, best-effort `mask` (`|| true`: a unit whose file is in `/etc/systemd/system` cannot be masked) | one AND-list over the same units: `for`-free, e.g. `! systemctl is-active --quiet telnet.socket && case "$(systemctl is-enabled telnet.socket 2>/dev/null)" in enabled\|enabled-runtime) false;; esac && …` (one clause pair per unit) | declared: two passes over the units, each `systemctl cat`-guarded — `unmask` every unit, then `enable --now` every unit (systemd will not start a socket whose service is still masked); every unit the script names is re-enabled (the pre-change state is not recorded, §8) |
-| `account/root_remote_login` | `/etc/ssh/sshd_config.d/00-muster.conf`, `/etc/securetty` | guarded by `command -v sshd`: `/run/sshd` guard, `printf 'PermitRootLogin no\n' > /etc/ssh/sshd_config.d/00-muster.conf`, `chmod 644` on it, `sshd -t`; guarded `sed -i '/^pts\//d' /etc/securetty` | `if command -v sshd >/dev/null 2>&1; then sshd -T 2>/dev/null \| grep -qx 'permitrootlogin no'; fi` | declared: `rm -f /etc/ssh/sshd_config.d/00-muster.conf`, guarded `sshd -t`; `restore` puts `/etc/securetty` back |
+| `account/root_remote_login` | `/etc/ssh/sshd_config.d/00-muster.conf`, `/etc/securetty` | guarded by `command -v sshd`: `/run/sshd` guard, `printf 'PermitRootLogin no\n' > /etc/ssh/sshd_config.d/00-muster.conf`, `chmod 644` on it, `sshd -t`, then `systemctl reload` of `sshd.service`/`ssh.service` when active (Z-30: the live daemon must take the change); guarded `sed -i '/^[[:space:]]*pts\//d' /etc/securetty` | `if command -v sshd >/dev/null 2>&1; then sshd -T -C user=root,host=localhost,addr=127.0.0.1 2>/dev/null \| grep -qx 'permitrootlogin no'; fi` (persona root, as the judgment reads it, Z-30) | declared: `rm -f /etc/ssh/sshd_config.d/00-muster.conf`, guarded `sshd -t` and reload; `restore` puts `/etc/securetty` back |
 
 `controls/VERSION` moves (the sixteen change) and so does the set digest; no judgment changes, so no
 fixture's expected status changes and `TestEveryMutantIsKilled` is unaffected (the fields are outside
@@ -315,6 +315,7 @@ case "$MUSTER_BACKUP" in
   *) printf 'muster-fix: MUSTER_BACKUP must be a clean absolute path\n' >&2; exit 2;;
 esac
 mkdir -p "$MUSTER_BACKUP" || exit 2
+[ -n "$(find "$MUSTER_BACKUP" -maxdepth 0 -type d -user 0 ! -perm /022 2>/dev/null)" ] || { printf 'muster-fix: MUSTER_BACKUP must be a root-owned directory that only root can write\n' >&2; exit 2; }
 log() { printf 'muster-fix: %s\n' "$*"; }
 backup() {
   for p in "$@"; do
@@ -598,7 +599,7 @@ not planned:
 
 ## 8. Parked
 
-- Host proof of the twelve rewritten bodies the round-trip does not seed (eight service controls and the
+- Host proof of the twelve rewritten bodies the round-trip does not seed (nine service controls and the
   `passwd`, `services`, `hosts_lpd` permission scripts, plus whichever the first run shows unseeded); they
   are proven syntactically this cycle (3D-2b).
 - Scripts for the controls beyond the sixteen (3D-2b, content with host proof per control): sysctl

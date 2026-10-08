@@ -133,7 +133,7 @@ remediation:
 잘라낸 뒤 줄바꿈이 없다는 뜻이고, 빈 `script`/`validate`/`rollback` 문자열은 없는 것으로 읽으며, "비어 있음"은
 공백뿐이라는 뜻:
 
-- `remediation`이 있으면 `text_en`과 `text_ko`가 필수이고, 개행·캐리지 리턴·C0 바이트가 없으며, 1000룬
+- `remediation`이 있으면 `text_en`과 `text_ko`가 필수이고, C0·C1 제어 문자나 DEL(개행과 캐리지 리턴 포함)이 없으며, 1000룬
   이하 — `text_%s is blank` / `text_%s carries a line break or control character` / `text_%s is longer than
   1000 runes`. 같은 제어 문자 금지 규칙이 규칙 `titles` 아래 `title_en`/`title_ko`에도 — `title_%s carries a
   line break or control character`(배포된 모든 컨트롤이 이미 따름; 고정).
@@ -200,13 +200,13 @@ remediation:
 
 | 컨트롤 | backup | script(형태) | validate | rollback |
 |---|---|---|---|---|
-| `file/hosts_permissions` | `/etc/hosts` | `[ -f /etc/hosts ]`; `chown root:root /etc/hosts`; `chmod 600 /etc/hosts` | `stat -c '%u %g %a' /etc/hosts \| grep -qx '0 0 600'` | restore_backup |
+| `file/hosts_permissions` (risk `restart_service`, Z-27: at 0600 non-root processes cannot read /etc/hosts) | `/etc/hosts` | `[ -f /etc/hosts ]`; `chown root:root /etc/hosts`; `chmod 600 /etc/hosts` | `stat -c '%u %g %a' /etc/hosts \| grep -qx '0 0 600'` | restore_backup |
 | `file/services_permissions` | `/etc/services` | 위와 같되 `644` | `… \| grep -qx '0 0 644'` | restore_backup |
 | `file/hosts_lpd_permissions` | `/etc/hosts.lpd` | 위와 같되 `600` | `… \| grep -qx '0 0 600'` | restore_backup |
 | `file/passwd_permissions` | `/etc/passwd` | `[ -f /etc/passwd ]`; `chown root:root`; `chmod 644`; 보호된 `setfacl -b` | `stat -c '%u %g %a' /etc/passwd \| grep -qx '0 0 644'` | restore_backup |
 | `file/shadow_permissions` | `/etc/shadow` | `[ -f /etc/shadow ]`; `chown root`; `chmod 400`; 보호된 `setfacl -b`(그룹은 배포판의 것: Debian은 `shadow`, EL은 `root` — 판정하지도 정하지도 않음) | `stat -c '%u %a' /etc/shadow \| grep -qx '0 400'` | restore_backup |
 | `service/*_disabled`(10) | 없음(유닛 상태는 파일이 아님) | 행의 `provesInstall` 유닛에 대한 유닛별 루프: `systemctl cat` 보호, `disable --now`, 최선 노력 `mask`(`|| true`: 유닛 파일이 `/etc/systemd/system`에 있으면 마스크할 수 없음) | 같은 유닛에 대한 AND 목록 하나: `for` 없이, 예: `! systemctl is-active --quiet telnet.socket && case "$(systemctl is-enabled telnet.socket 2>/dev/null)" in enabled\|enabled-runtime) false;; esac && …`(유닛마다 절 한 쌍) | 선언: 유닛에 대한 두 패스, 각각 `systemctl cat` 보호 — 모든 유닛을 `unmask`한 뒤 모든 유닛을 `enable --now`(systemd는 서비스가 아직 마스크된 소켓을 시작하지 않음); 스크립트가 이름 대는 모든 유닛을 다시 켬(변경 전 상태는 기록하지 않음, §8) |
-| `account/root_remote_login` | `/etc/ssh/sshd_config.d/00-muster.conf`, `/etc/securetty` | `command -v sshd`로 보호: `/run/sshd` 보호, `printf 'PermitRootLogin no\n' > /etc/ssh/sshd_config.d/00-muster.conf`, 거기에 `chmod 644`, `sshd -t`; 보호된 `sed -i '/^pts\//d' /etc/securetty` | `if command -v sshd >/dev/null 2>&1; then sshd -T 2>/dev/null \| grep -qx 'permitrootlogin no'; fi` | 선언: `rm -f /etc/ssh/sshd_config.d/00-muster.conf`, 보호된 `sshd -t`; `restore`가 `/etc/securetty`를 되돌림 |
+| `account/root_remote_login` | `/etc/ssh/sshd_config.d/00-muster.conf`, `/etc/securetty` | `command -v sshd`로 보호: `/run/sshd` 보호, `printf 'PermitRootLogin no\n' > /etc/ssh/sshd_config.d/00-muster.conf`, 거기에 `chmod 644`, `sshd -t`, 그다음 활성인 `sshd.service`/`ssh.service`를 `systemctl reload`(Z-30: 실행 중인 데몬이 변경을 받아야 함); 보호된 `sed -i '/^[[:space:]]*pts\//d' /etc/securetty` | `if command -v sshd >/dev/null 2>&1; then sshd -T -C user=root,host=localhost,addr=127.0.0.1 2>/dev/null \| grep -qx 'permitrootlogin no'; fi` (persona root, as the judgment reads it, Z-30) | 선언: `rm -f /etc/ssh/sshd_config.d/00-muster.conf`, 보호된 `sshd -t`와 reload; `restore`가 `/etc/securetty`를 되돌림 |
 
 `controls/VERSION`이 움직이고(열여섯이 바뀜) 세트 다이제스트도 움직입니다; 판정은 바뀌지 않으므로 어느
 픽스처의 기대 상태도 바뀌지 않고 `TestEveryMutantIsKilled`도 영향 없음(필드가 모든 판정 밖). CHANGELOG가
@@ -292,6 +292,7 @@ case "$MUSTER_BACKUP" in
   *) printf 'muster-fix: MUSTER_BACKUP must be a clean absolute path\n' >&2; exit 2;;
 esac
 mkdir -p "$MUSTER_BACKUP" || exit 2
+[ -n "$(find "$MUSTER_BACKUP" -maxdepth 0 -type d -user 0 ! -perm /022 2>/dev/null)" ] || { printf 'muster-fix: MUSTER_BACKUP must be a root-owned directory that only root can write\n' >&2; exit 2; }
 log() { printf 'muster-fix: %s\n' "$*"; }
 backup() {
   for p in "$@"; do
@@ -558,7 +559,7 @@ not planned:
 
 ## 8. 보류
 
-- 라운드트립이 심지 않는 재작성 본문 열둘의 호스트 증명(서비스 컨트롤 여덟과 `passwd`, `services`,
+- 라운드트립이 심지 않는 재작성 본문 열둘의 호스트 증명(서비스 컨트롤 아홉과 `passwd`, `services`,
   `hosts_lpd` 권한 스크립트, 그리고 첫 실행이 심기지 않았다고 보여 주는 것); 이번 사이클에는 구문으로
   증명합니다(3D-2b).
 - 열여섯 밖 컨트롤의 스크립트(3D-2b, 컨트롤마다 호스트 증명이 붙는 콘텐츠): sysctl 설정, 나머지 파일

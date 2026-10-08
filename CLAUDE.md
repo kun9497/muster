@@ -191,7 +191,14 @@ regenerates them from public images and `-check` compares.
   `enable --now` every unit (systemd will not start a socket whose service is masked). A one-unit body uses `if`
   (SC2043). Bodies are shellcheck-clean at the default severity; `all-scripted.sh` renders every shipped body.
 - The `fix-roundtrip` CI job seeds failures in throwaway containers (init images and ubuntu:22.04), plans, runs the
-  script there, re-collects and requires the seeded ids PASS/NA; it is the only place a generated script ever runs.
+  script there, re-collects and requires the seeded ids PASS/NA; it is the only place a shipped remediation body runs
+  against real system paths (the remedy Linux tests run rendered synthetic plans under a temp dir). The examples gate
+  byte-compares `examples/<snap>-fix-report.{json,txt,sh}` (script whole, JSON masked under `fix`, table without line 1),
+  so a body or plan change needs an examples refresh from the branch's `examples.yml` run before the merge.
+- Risk is the operational impact, not the guide's: `hosts_permissions` is `restart_service` (0600 breaks non-root
+  `/etc/hosts` reads), `nis_disabled` is `lockout_risk` (stopping ypbind cuts NIS accounts). The sshd body reloads a
+  running `sshd`/`ssh` and validates persona root (`sshd -T -C user=root,…`). The script refuses a `MUSTER_BACKUP` that
+  root does not own or others can write (a planted backup would be restored over `/etc/shadow`).
 
 ## Stage-2 conventions
 
