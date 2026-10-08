@@ -10,6 +10,11 @@ import (
 // rootCheckLine is the prologue's root check; the Linux tests drop it.
 const rootCheckLine = `[ "$(id -u)" -eq 0 ] || { printf 'muster-fix: run as root\n' >&2; exit 2; }`
 
+// backupOwnerLine refuses a MUSTER_BACKUP that root does not own or that
+// group or other can write (Z-28); the Linux tests drop it unless they run as
+// root, since a non-root user's temp dir is never root-owned.
+const backupOwnerLine = `[ -n "$(find "$MUSTER_BACKUP" -maxdepth 0 -type d -user 0 ! -perm /022 2>/dev/null)" ] || { printf 'muster-fix: MUSTER_BACKUP must be a root-owned directory that only root can write\n' >&2; exit 2; }`
+
 const prologue = `set -u
 umask 077
 ` + rootCheckLine + `
@@ -20,6 +25,7 @@ case "$MUSTER_BACKUP" in
   *) printf 'muster-fix: MUSTER_BACKUP must be a clean absolute path\n' >&2; exit 2;;
 esac
 mkdir -p "$MUSTER_BACKUP" || exit 2
+` + backupOwnerLine + `
 log() { printf 'muster-fix: %s\n' "$*"; }
 backup() {
   for p in "$@"; do

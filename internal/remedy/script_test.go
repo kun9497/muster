@@ -398,6 +398,29 @@ func TestScriptBlankBodyLineAboveTheCapIsAHash(t *testing.T) {
 	}
 }
 
+// N-1: the block header escapes the id. Build refuses such an id, so the plan
+// is built by hand; the header line carries the escaped spelling and no raw
+// newline or ESC byte.
+func TestScriptHeaderEscapesTheID(t *testing.T) {
+	p := &Plan{Fix: FixBlock{MaxRisk: "lockout_risk"}, Items: []Item{{
+		ID: "muster.test.a\nb\x1bc", Status: "fail", Severity: "high", Risk: "none",
+		Planned: true, TextOnlyReason: "no_script",
+	}}}
+	const want = `# ---- 1/1 muster.test.a\nb\x1bc [risk none] [fail, high]`
+	var header string
+	for _, l := range lines(Script(p)) {
+		if strings.HasPrefix(l, "# ---- 1/1 ") {
+			header = l
+		}
+	}
+	if header != want {
+		t.Errorf("header line %q, want %q", header, want)
+	}
+	if strings.ContainsAny(header, "\n\x1b") {
+		t.Errorf("header line carries a raw byte: %q", header)
+	}
+}
+
 func TestScriptIsDeterministic(t *testing.T) {
 	a, b := Script(fullPlan(t)), Script(fullPlan(t))
 	if !bytes.Equal(a, b) {
@@ -434,11 +457,19 @@ func runScript(t *testing.T, p *Plan, dir, backupDir string) (string, int) {
 func runScriptStreams(t *testing.T, p *Plan, dir, backupDir string) (string, string, int) {
 	t.Helper()
 	src := string(Script(p))
-	// The test's one transformation: drop the root check so sh runs it as
-	// any user; the bodies act only inside t.TempDir().
+	// The test's transformations: drop the root check so sh runs it as any
+	// user (the bodies act only inside t.TempDir()), and, unless the test
+	// runs as root, the backup-owner check, which a non-root user's temp dir
+	// never passes.
 	trimmed := strings.Replace(src, rootCheckLine+"\n", "", 1)
 	if trimmed == src {
 		t.Fatal("the script carries no root-check line")
+	}
+	if !strings.Contains(trimmed, "\n"+backupOwnerLine+"\n") {
+		t.Fatal("the script carries no backup-owner line")
+	}
+	if os.Geteuid() != 0 {
+		trimmed = strings.Replace(trimmed, backupOwnerLine+"\n", "", 1)
 	}
 	path := filepath.Join(dir, "fix.sh")
 	if err := os.WriteFile(path, []byte(trimmed), 0o600); err != nil {
@@ -642,6 +673,47 @@ func TestScriptRefusesAnUncleanBackupPath(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// Z-28: a pre-created MUSTER_BACKUP that group can write is refused with exit
+// 2 before any block runs or any backup is copied. The check reads uid 0, so
+// the test runs only as root (the lab): CI's test job is not root, its temp
+// dirs are never root-owned, and runScriptStreams drops the check there.
+func TestScriptRefusesABackupDirOnlyRootMustWrite(t *testing.T) {
+	needSh(t)
+	if os.Geteuid() != 0 {
+		t.Skip("the backup-directory check needs a root-owned directory: run as root")
+	}
+	tmp := t.TempDir()
+	f, bk := filepath.Join(tmp, "f"), filepath.Join(tmp, "bk")
+	if err := os.WriteFile(f, []byte("original"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(bk, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(bk, 0o770); err != nil {
+		t.Fatal(err)
+	}
+	marker := filepath.Join(tmp, "ran")
+	p := &Plan{Fix: FixBlock{MaxRisk: "lockout_risk"}, Items: []Item{{
+		ID: "muster.test.backup_dir", Status: "fail", Severity: "high", Risk: "none",
+		Script: true, Planned: true, Rollback: "restore_backup", Backup: []string{f},
+		ScriptBody: "printf ran > " + marker,
+	}}}
+	out, stderr, code := runScriptStreams(t, p, tmp, bk)
+	if code != 2 {
+		t.Fatalf("exit %d, want 2\n%s", code, out)
+	}
+	if !strings.Contains(stderr, "muster-fix: MUSTER_BACKUP must be a root-owned directory that only root can write\n") {
+		t.Errorf("no refusal on stderr: %q", stderr)
+	}
+	if exists(marker) {
+		t.Error("a block ran")
+	}
+	if ents, err := os.ReadDir(bk); err != nil || len(ents) != 0 {
+		t.Errorf("the backup directory holds %v (%v), want it empty", ents, err)
 	}
 }
 

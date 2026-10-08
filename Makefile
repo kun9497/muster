@@ -47,9 +47,11 @@ suidindex-check:
 	go run ./tools/suidindex -check
 
 # sh -n and shellcheck over the review scripts: the remedy goldens and the
-# committed fix examples (a glob that matches nothing is skipped).
+# committed fix examples. At least the five remedy goldens must be checked;
+# only the examples glob may match nothing.
 shellcheck:
-	@for f in internal/remedy/testdata/*.sh examples/*-fix-report.sh; do [ -e "$$f" ] || continue; sh -n "$$f" || exit 1; shellcheck -s sh "$$f" || exit 1; done
+	@n=0; for f in internal/remedy/testdata/*.sh; do sh -n "$$f" || exit 1; shellcheck -s sh "$$f" || exit 1; n=$$((n+1)); done; [ "$$n" -ge 5 ] || { echo "shellcheck: $$n remedy goldens checked, want at least 5"; exit 1; }
+	@for f in examples/*-fix-report.sh; do [ -e "$$f" ] || continue; sh -n "$$f" || exit 1; shellcheck -s sh "$$f" || exit 1; done
 
 # One fuzz target for a short time; the seed corpus already runs in `make
 # test`, so this is for the target you are working on. The nightly fuzz

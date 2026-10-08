@@ -29,7 +29,14 @@ jobs:
       - name: review scripts parse and pass shellcheck
         run: |
           command -v shellcheck || { sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck; }
-          for f in internal/remedy/testdata/*.sh examples/*-fix-report.sh; do
+          n=0
+          for f in internal/remedy/testdata/*.sh; do
+            sh -n "$f"
+            shellcheck -s sh "$f"
+            n=$((n+1))
+          done
+          [ "$n" -ge 5 ]
+          for f in examples/*-fix-report.sh; do
             [ -e "$f" ] || continue
             sh -n "$f"
             shellcheck -s sh "$f"
@@ -492,6 +499,7 @@ jobs:
   fix-roundtrip:
     runs-on: ubuntu-24.04
     needs: test
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -539,6 +547,7 @@ jobs:
           docker exec "$cid" /m/muster collect --out /out/before.json || true
           sudo chown "$(id -u)" "$d/before.json"
           ./bin/muster fix --dry-run --facts "$d/before.json" --format json > "$d/plan.json"
+          test -s "$d/plan.json"
           ./bin/muster fix --dry-run --facts "$d/before.json" --format script > "$d/fix.sh"
           for id in ${{ matrix.seeded }}; do
             jq -e --arg id "$id" '[.items[] | select(.id == $id and .planned and .script)] | length == 1' "$d/plan.json" > /dev/null \
@@ -550,6 +559,7 @@ jobs:
           set +e
           ./bin/muster check --facts "$d/after.json" --format json > "$d/after-report.json"
           set -e
+          test -s "$d/after-report.json"
           for id in ${{ matrix.seeded }}; do
             jq -e --arg id "$id" '[.results[] | select(.id == $id and (.status == "PASS" or .status == "NOT_APPLICABLE"))] | length == 1' "$d/after-report.json" > /dev/null \
               || { echo "$id did not pass after the script"; jq --arg id "$id" '.results[] | select(.id == $id)' "$d/after-report.json"; exit 1; }

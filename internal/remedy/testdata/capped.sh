@@ -14,6 +14,7 @@ case "$MUSTER_BACKUP" in
   *) printf 'muster-fix: MUSTER_BACKUP must be a clean absolute path\n' >&2; exit 2;;
 esac
 mkdir -p "$MUSTER_BACKUP" || exit 2
+[ -n "$(find "$MUSTER_BACKUP" -maxdepth 0 -type d -user 0 ! -perm /022 2>/dev/null)" ] || { printf 'muster-fix: MUSTER_BACKUP must be a root-owned directory that only root can write\n' >&2; exit 2; }
 log() { printf 'muster-fix: %s\n' "$*"; }
 backup() {
   for p in "$@"; do

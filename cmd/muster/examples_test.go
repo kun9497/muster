@@ -533,6 +533,36 @@ func TestExampleStalenessGate(t *testing.T) {
 // retagControlsDigest returns report with a different <block>.controls_digest,
 // which is how a report collected against an older control set differs from
 // one this build could reproduce.
+// readExample reads a committed example file; a missing one is a failure
+// that names the file and the refresh (Z-14), never a skip.
+func readExample(path, what string) ([]byte, error) {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("every example snapshot needs its %s beside it: %v; refresh the examples (see examples/README.md)", what, err)
+	}
+	return b, nil
+}
+
+// W3/W5: a missing committed report or fix file fails naming the refresh.
+func TestReadExampleNamesTheRefresh(t *testing.T) {
+	missing := filepath.Join(t.TempDir(), "x-fix-report.json")
+	if _, err := readExample(missing, "fix reports"); err == nil {
+		t.Fatal("a missing example file read without an error")
+	} else {
+		msg := err.Error()
+		if !strings.HasPrefix(msg, "every example snapshot needs its fix reports beside it: ") ||
+			!strings.HasSuffix(msg, "; refresh the examples (see examples/README.md)") || !strings.Contains(msg, missing) {
+			t.Errorf("the failure %q does not name the file and the refresh", msg)
+		}
+	}
+	if err := os.WriteFile(missing, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if b, err := readExample(missing, "fix reports"); err != nil || string(b) != "x" {
+		t.Errorf("readExample of a present file: %q, %v", b, err)
+	}
+}
+
 func retagControlsDigest(t *testing.T, report []byte, block, digest string) []byte {
 	t.Helper()
 	var doc map[string]any
@@ -606,13 +636,13 @@ func TestExamplesLoadAndCheck(t *testing.T) {
 			}
 
 			base := strings.TrimSuffix(f, ".json")
-			wantJSON, err := os.ReadFile(base + "-report.json")
+			wantJSON, err := readExample(base+"-report.json", "JSON report")
 			if err != nil {
-				t.Fatalf("every example snapshot needs its JSON report beside it: %v", err)
+				t.Fatal(err)
 			}
-			wantTable, err := os.ReadFile(base + "-report.txt")
+			wantTable, err := readExample(base+"-report.txt", "table report")
 			if err != nil {
-				t.Fatalf("every example snapshot needs its table report beside it: %v", err)
+				t.Fatal(err)
 			}
 			problems, note := checkExampleReports(filepath.Base(f), gotJSON, wantJSON, gotTable, wantTable, set.Digest)
 			if note != "" {
@@ -623,12 +653,13 @@ func TestExamplesLoadAndCheck(t *testing.T) {
 			}
 
 			// The fix outputs of the same report (Z-14): a missing file is
-			// a hard failure naming the refresh, never a skip.
+			// a hard failure that ends "; refresh the examples (see
+			// examples/README.md)", never a skip.
 			gotFJ, gotFT, gotFS := fixReportsFor(t, rep, set)
 			var want [3][]byte
 			for i, ext := range []string{"json", "txt", "sh"} {
-				if want[i], err = os.ReadFile(base + "-fix-report." + ext); err != nil {
-					t.Fatalf("every example snapshot needs its fix reports beside it: %v", err)
+				if want[i], err = readExample(base+"-fix-report."+ext, "fix reports"); err != nil {
+					t.Fatal(err)
 				}
 			}
 			problems, note = checkFixReports(filepath.Base(f), gotFJ, want[0], gotFT, want[1], gotFS, want[2], set.Digest)

@@ -17,8 +17,9 @@ builds this repository, and both are rewritten (below) before they are kept.
 | `ubuntu-24.04-vm-report.json` / `-report.txt` | `muster check` on that snapshot, as JSON and as the table. |
 | `ubuntu-24.04-vm-fix-report.json` / `-fix-report.txt` / `-fix-report.sh` | `muster fix --dry-run --max-risk lockout_risk` on that snapshot, as JSON, as the table and as the review script. |
 
-When a refresh is pending, the twelve files may be missing; the test that checks the examples
-then skips, saying so.
+When no snapshot is committed, the test that checks the examples skips, saying so. When a
+refresh is pending, the check reports' byte comparison is skipped with a digest note, but a
+missing fix file fails the test and names the refresh.
 
 Produced by run [`35548200943`](https://github.com/kun9497/muster/actions/runs/35548200943) of [`.github/workflows/examples.yml`](../.github/workflows/examples.yml).
 The snapshot headers carry the rest of the provenance: `muster_version`, `commit`,
@@ -89,8 +90,9 @@ between a release binary and `go test` (`muster_version`, `commit`, `controls_ve
 `controls_digest`) and the table's first line. It plans `fix --dry-run --max-risk lockout_risk`
 from the same evaluation and compares the three fix files the same way: the plan JSON with
 those four fields of its `fix` block masked, the table without its first line, and the review
-script byte for byte (its `# snapshot:` line carries no muster version or commit). A missing fix
-file is a failure that names the refresh, not a skip.
+script byte for byte (its `# snapshot:` line carries no muster version or commit). A missing
+report or fix file fails the test with a message ending `; refresh the examples (see
+examples/README.md)`; it is never a skip.
 
 A stale example never fails the suite. The test reads the committed report's own
 `check.controls_digest` (and the plan's `fix.controls_digest`) and compares it with the
