@@ -27,6 +27,7 @@ restore() {
   for p in "$@"; do
     { [ -e "$MUSTER_BACKUP$p" ] || [ -L "$MUSTER_BACKUP$p" ]; } || continue
     if [ -d "$p" ]; then log "restore: $p is now a directory, left as is"; rc=1; continue; fi
+    if [ -L "$p" ]; then rm -f "$p" || { log "restore: $p failed"; rc=1; continue; }; fi
     cp -a "$MUSTER_BACKUP$p" "$p" || { log "restore: $p failed"; rc=1; }
   done
   return $rc

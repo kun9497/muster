@@ -33,6 +33,7 @@ restore() {
   for p in "$@"; do
     { [ -e "$MUSTER_BACKUP$p" ] || [ -L "$MUSTER_BACKUP$p" ]; } || continue
     if [ -d "$p" ]; then log "restore: $p is now a directory, left as is"; rc=1; continue; fi
+    if [ -L "$p" ]; then rm -f "$p" || { log "restore: $p failed"; rc=1; continue; }; fi
     cp -a "$MUSTER_BACKUP$p" "$p" || { log "restore: $p failed"; rc=1; }
   done
   return $rc
@@ -116,7 +117,7 @@ func failurePath(it Item, pfx string) []string {
 // status read on the next: a call that is an operand of ||, &&, if or !
 // would switch set -e off inside every subshell it runs (spec §5).
 func block(n, total int, it Item, maxRisk string) []string {
-	header := fmt.Sprintf("# ---- %d/%d %s [risk %s] [%s, %s]", n, total, it.ID, it.Risk, it.Status, it.Severity)
+	header := fmt.Sprintf("# ---- %d/%d %s [risk %s] [%s, %s]", n, total, report.EscapeNoCut(it.ID), it.Risk, it.Status, it.Severity)
 	if !it.Planned {
 		header += fmt.Sprintf(" -- above max-risk %s, NOT RUN", maxRisk)
 	}

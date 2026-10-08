@@ -159,6 +159,12 @@ func Build(rep *report.Report, set *controls.Set, opts Options) (*Plan, error) {
 				p.Summary.NotPlanned.WarnDegraded++
 				continue
 			}
+			// Z-26: an item's id reaches the script's command lines
+			// (function name, log text); lint holds the embedded set to
+			// the id grammar, and the planner refuses anything else.
+			if !controls.ValidControlID(row.ID) {
+				return nil, fmt.Errorf("refusing to plan %q: not a control id (muster.<category>.<name>)", row.ID)
+			}
 			p.Items = append(p.Items, item(row, set, cb, maxRank))
 		}
 	}

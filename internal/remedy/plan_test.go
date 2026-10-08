@@ -2,6 +2,7 @@ package remedy
 
 import (
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -204,6 +205,27 @@ func TestPlanRejectsUnknownMaxRisk(t *testing.T) {
 		if !strings.Contains(err.Error(), w) {
 			t.Errorf("error %q does not name %s", err, w)
 		}
+	}
+}
+
+// Z-26: an id outside the control-id grammar would reach the script's
+// command lines; Build refuses it, naming the id, for FAIL and WARN alike.
+func TestPlanRefusesAnUnexpectedID(t *testing.T) {
+	for _, bad := range []string{"muster.test.x\nPWN #", "muster.test.$(id)", "x1", "Muster.test.a"} {
+		for _, status := range []string{"FAIL", "WARN"} {
+			p, err := Build(testReport(row(bad, status, "r", "", "high")), testSet(t), Options{})
+			if err == nil || p != nil {
+				t.Fatalf("%q (%s): got plan %v err %v", bad, status, p, err)
+			}
+			if !strings.Contains(err.Error(), fmt.Sprintf("%q", bad)) {
+				t.Errorf("error %q does not name %q", err, bad)
+			}
+		}
+	}
+	// Rows the plan does not act on are not items: their ids never reach a
+	// command line, so they are not refused.
+	if _, err := Build(testReport(row("x1", "MANUAL", "r", "", "high"), row("p2", "PASS", "", "", "low")), testSet(t), Options{}); err != nil {
+		t.Fatalf("a non-item row was refused: %v", err)
 	}
 }
 

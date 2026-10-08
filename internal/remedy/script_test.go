@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"flag"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -345,6 +346,45 @@ func TestScriptEveryLineIsTemplateBodyOrComment(t *testing.T) {
 	}
 }
 
+// M-2: above the cap a blank body line is "#" alone (no trailing space), so
+// the commented block has no empty line and nothing after it runs; planned,
+// the same blank line stays empty.
+func TestScriptBlankBodyLineAboveTheCapIsAHash(t *testing.T) {
+	it := Item{ID: "muster.test.blank", Status: "fail", Severity: "high", Risk: "lockout_risk",
+		Reason: "r", TextEn: "e", TextKo: "k", Script: true, Rollback: "declared", ScriptBody: "true\n\nfalse", RollbackBody: "true\n\ntrue"}
+	p := &Plan{Fix: FixBlock{MaxRisk: "none"}, Items: []Item{it}}
+	ls := lines(Script(p))
+	start := -1
+	for i, l := range ls {
+		if strings.HasPrefix(l, "# ---- 1/1 muster.test.blank") {
+			start = i
+		}
+	}
+	if start < 0 || !strings.HasSuffix(ls[start], "-- above max-risk none, NOT RUN") {
+		t.Fatalf("no above-cap header for the blank-line item")
+	}
+	hashes, reachedEnd := 0, false
+	for i := start; i < len(ls) && ls[i] != ""; i++ {
+		if ls[i] == "#" {
+			hashes++
+		}
+		if !strings.HasPrefix(ls[i], "#") || strings.HasSuffix(ls[i], " ") {
+			t.Errorf("line %d of the commented block: %q", i+1, ls[i])
+		}
+		reachedEnd = reachedEnd || ls[i] == "# "+callStatusLine
+	}
+	if hashes != 2 || !reachedEnd {
+		t.Fatalf("commented block: %d blank-body \"#\" lines, reached its last line %v; want 2 and true", hashes, reachedEnd)
+	}
+
+	p.Items[0].Planned = true
+	p.Fix.MaxRisk = "lockout_risk"
+	planned := string(Script(p))
+	if !strings.Contains(planned, "    true\n\n    false\n") || strings.Contains(planned, "\n#\n") {
+		t.Errorf("a planned blank body line is not left empty:\n%s", planned)
+	}
+}
+
 func TestScriptIsDeterministic(t *testing.T) {
 	a, b := Script(fullPlan(t)), Script(fullPlan(t))
 	if !bytes.Equal(a, b) {
@@ -372,6 +412,14 @@ func TestScriptAllScriptedCoversTheShippedSet(t *testing.T) {
 // it with MUSTER_BACKUP set; it returns stdout+stderr and the exit code.
 func runScript(t *testing.T, p *Plan, dir, backupDir string) (string, int) {
 	t.Helper()
+	out, _, code := runScriptStreams(t, p, dir, backupDir)
+	return out, code
+}
+
+// runScriptStreams is runScript with stderr also returned on its own. The
+// working directory is dir, so a relative MUSTER_BACKUP stays inside it.
+func runScriptStreams(t *testing.T, p *Plan, dir, backupDir string) (string, string, int) {
+	t.Helper()
 	src := string(Script(p))
 	// The test's one transformation: drop the root check so sh runs it as
 	// any user; the bodies act only inside t.TempDir().
@@ -384,17 +432,183 @@ func runScript(t *testing.T, p *Plan, dir, backupDir string) (string, int) {
 		t.Fatal(err)
 	}
 	cmd := exec.Command("sh", path)
+	cmd.Dir = dir
 	cmd.Env = append(os.Environ(), "MUSTER_BACKUP="+backupDir)
-	out, err := cmd.CombinedOutput()
+	var all, stderr bytes.Buffer
+	cmd.Stdout = &all
+	cmd.Stderr = io.MultiWriter(&all, &stderr)
+	err := cmd.Run()
 	var ee *exec.ExitError
 	switch {
 	case err == nil:
-		return string(out), 0
+		return all.String(), stderr.String(), 0
 	case errors.As(err, &ee):
-		return string(out), ee.ExitCode()
+		return all.String(), stderr.String(), ee.ExitCode()
 	default:
 		t.Fatalf("sh: %v", err)
-		return "", -1
+		return "", "", -1
+	}
+}
+
+func exists(path string) bool {
+	_, err := os.Lstat(path)
+	return err == nil
+}
+
+// I-1(a): a backup that cannot be made stops the block before its body. The
+// first declared path cannot be copied (its backup directory is a regular
+// file); the second can, so a backup() that went on past the first failure
+// would return 0 and the body would run.
+func TestScriptBackupFailureStopsTheBlock(t *testing.T) {
+	needSh(t)
+	tmp := t.TempDir()
+	for _, d := range []string{"a", "b"} {
+		if err := os.Mkdir(filepath.Join(tmp, d), 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	fa, fb := filepath.Join(tmp, "a", "f"), filepath.Join(tmp, "b", "g")
+	for _, f := range []string{fa, fb} {
+		if err := os.WriteFile(f, []byte("original"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	bk := filepath.Join(tmp, "bk")
+	if err := os.MkdirAll(bk+tmp, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(bk+filepath.Join(tmp, "a"), []byte("not a directory"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	marker := filepath.Join(tmp, "ran")
+	p := &Plan{Fix: FixBlock{MaxRisk: "lockout_risk"}, Items: []Item{{
+		ID: "muster.test.backup_fails", Status: "fail", Severity: "high", Risk: "none",
+		Script: true, Planned: true, Rollback: "restore_backup", Backup: []string{fa, fb},
+		ScriptBody: "printf ran > " + marker,
+	}}}
+	out, code := runScript(t, p, tmp, bk)
+	if code != 1 {
+		t.Fatalf("exit %d, want 1\n%s", code, out)
+	}
+	if exists(marker) {
+		t.Errorf("the body ran although the backup failed\n%s", out)
+	}
+	if !strings.Contains(out, "muster.test.backup_fails: backup failed, nothing changed") {
+		t.Errorf("no backup-failed line\n%s", out)
+	}
+	if !strings.Contains(out, "1 block(s) failed") {
+		t.Errorf("the epilogue did not count the failed block\n%s", out)
+	}
+}
+
+// I-1(b): existence is -e || -L, so a dangling symlink with a relative
+// target is backed up and restored as the same link.
+func TestScriptDanglingRelativeSymlinkIsRestoredAsALink(t *testing.T) {
+	needSh(t)
+	tmp := t.TempDir()
+	link := filepath.Join(tmp, "link")
+	if err := os.Symlink("nowhere", link); err != nil {
+		t.Fatal(err)
+	}
+	p := &Plan{Fix: FixBlock{MaxRisk: "lockout_risk"}, Items: []Item{{
+		ID: "muster.test.symlink", Status: "fail", Severity: "high", Risk: "none",
+		Script: true, Planned: true, Rollback: "restore_backup", Backup: []string{link},
+		ScriptBody: "rm -f " + link + "\nprintf file > " + link + "\nfalse",
+	}}}
+	out, code := runScript(t, p, tmp, filepath.Join(tmp, "bk"))
+	if code != 1 {
+		t.Fatalf("exit %d, want 1\n%s", code, out)
+	}
+	target, err := os.Readlink(link)
+	if err != nil || target != "nowhere" {
+		t.Errorf("after restore %s reads as link %q (%v); want the link to nowhere\n%s", link, target, err, out)
+	}
+}
+
+// Z-25: restore never writes through a destination symlink. The body swaps
+// the backed-up file for a link to another file and fails; restore removes
+// the link and puts the original file back, leaving the link's target alone.
+func TestScriptRestoreNeverWritesThroughASymlink(t *testing.T) {
+	needSh(t)
+	tmp := t.TempDir()
+	f, victim := filepath.Join(tmp, "f"), filepath.Join(tmp, "victim")
+	if err := os.WriteFile(f, []byte("original"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(victim, []byte("victim"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	p := &Plan{Fix: FixBlock{MaxRisk: "lockout_risk"}, Items: []Item{{
+		ID: "muster.test.through_link", Status: "fail", Severity: "high", Risk: "none",
+		Script: true, Planned: true, Rollback: "restore_backup", Backup: []string{f},
+		ScriptBody: "rm -f " + f + "\nln -s " + victim + " " + f + "\nfalse",
+	}}}
+	out, code := runScript(t, p, tmp, filepath.Join(tmp, "bk"))
+	if code != 1 {
+		t.Fatalf("exit %d, want 1\n%s", code, out)
+	}
+	if got := readFile(t, victim); got != "victim" {
+		t.Errorf("restore wrote through the link: victim is %q\n%s", got, out)
+	}
+	fi, err := os.Lstat(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !fi.Mode().IsRegular() {
+		t.Fatalf("%s is %v after restore, want a regular file\n%s", f, fi.Mode().Type(), out)
+	}
+	if got := readFile(t, f); got != "original" {
+		t.Errorf("%s is %q after restore, want the original\n%s", f, got, out)
+	}
+}
+
+// I-1(c): a MUSTER_BACKUP that is not a clean absolute path exits 2 with the
+// refusal on stderr, before any directory is made or any block runs. Every
+// value but "/" lies under the test's own directory, so a regression creates
+// nothing outside it.
+func TestScriptRefusesAnUncleanBackupPath(t *testing.T) {
+	needSh(t)
+	for _, v := range []struct{ name, val string }{
+		{"root", "/"},
+		{"double slash", "/"},
+		{"dot component", "/a/./b"},
+		{"dotdot component", "/a/../b"},
+		{"trailing dot", "/a/."},
+		{"trailing dotdot", "/a/.."},
+		{"relative", "rel"},
+	} {
+		t.Run(v.name, func(t *testing.T) {
+			tmp := t.TempDir()
+			val := v.val
+			switch v.name {
+			case "double slash":
+				val = "/" + tmp + "/x"
+			case "root", "relative":
+			default:
+				val = tmp + val
+			}
+			marker := filepath.Join(tmp, "ran")
+			p := &Plan{Fix: FixBlock{MaxRisk: "lockout_risk"}, Items: []Item{{
+				ID: "muster.test.refused", Status: "fail", Severity: "high", Risk: "none",
+				Script: true, Planned: true, Rollback: "declared",
+				ScriptBody: "printf ran > " + marker, RollbackBody: "true",
+			}}}
+			out, stderr, code := runScriptStreams(t, p, tmp, val)
+			if code != 2 {
+				t.Fatalf("MUSTER_BACKUP=%q: exit %d, want 2\n%s", val, code, out)
+			}
+			if !strings.Contains(stderr, "muster-fix: MUSTER_BACKUP must be a clean absolute path") {
+				t.Errorf("MUSTER_BACKUP=%q: no refusal on stderr: %q", val, stderr)
+			}
+			if exists(marker) {
+				t.Errorf("MUSTER_BACKUP=%q: a block ran", val)
+			}
+			for _, d := range []string{"a", "rel", "x"} {
+				if exists(filepath.Join(tmp, d)) {
+					t.Errorf("MUSTER_BACKUP=%q: %s was created", val, d)
+				}
+			}
+		})
 	}
 }
 
