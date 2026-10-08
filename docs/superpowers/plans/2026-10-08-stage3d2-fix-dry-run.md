@@ -46,6 +46,9 @@
 - **Z-16** `stdoutIsTTY(w io.Writer) bool` is lifted from `runCheck` and shared.
 - **Z-17** The `shellcheck` CI step and Make target guard each glob with `[ -e "$f" ] || continue`, so a missing `examples/*-fix-report.sh` before the refresh is skipped there (the examples gate is what goes red).
 - **Z-19** The spec's `remedy.Plan(rep, set, opts)` function is `remedy.Build(rep, set, opts) (*Plan, error)`: Go cannot name a type and a function `Plan` in one package.
+- **Z-20** (pre-flight P6) The script's second line is `# shellcheck disable=SC2181`: the bare call line plus `[ "$?" -eq 0 ]` is required (X-4), and SC2181 is the style note against exactly that. A comment line, so the template contract holds. If the lab's shellcheck flags another template line, the Task 5 implementer adds its code to the same directive and records it.
+- **Z-21** (pre-flight P1/P2) The five file-permission controls gain their `backup:` line in Task 2 (data only), so the new `script without rollback or backup` rule leaves the shipped set clean; Task 3 rewrites their bodies.
+- **Z-22** (pre-flight P11) The examples gate compares the fix script byte for byte, `# snapshot:` line included (it carries no muster version or commit, and the comparison runs only when the digests match).
 - **Z-18** Design §7's document list gains the gaps the map found: §4.2 package table row for `internal/remedy`, §4.4/§8 "Data files" naming `fix`, README status line and the stale "Applying fixes … later" bullet, CLAUDE.md Build/Layout/Tests lines, CHANGELOG `### Tooling`, THREAT_MODEL's stale data-file sentence.
 
 ## Review Focus
@@ -109,7 +112,7 @@ Write the four small helpers in the test file by lifting each named case's `fact
 
 ```go
 func TestHeaderLineIsCheckLineOne(t *testing.T) {
-	r := sampleReportWithTitles()
+	r := sampleReportWithTitles(t)
 	var b bytes.Buffer
 	if err := WriteTable(&b, r, TableOptions{Width: 100}); err != nil {
 		t.Fatal(err)
@@ -142,7 +145,7 @@ func TestProfileLineForms(t *testing.T) {
 func TestEscapeNoCutKeepsLength(t *testing.T) {
 	long := strings.Repeat("가", 300) + "\n\x1b"
 	got := EscapeNoCut(long)
-	if strings.Contains(got, "…") || !strings.HasSuffix(got, `\n\x1b`) || len([]rune(got)) != 300+4 {
+	if strings.Contains(got, "…") || !strings.HasSuffix(got, `\n\x1b`) || len([]rune(got)) != 300+6 { // \n is 2 runes, \x1b is 4
 		t.Fatalf("EscapeNoCut cut or mis-escaped: %d runes, tail %q", len([]rune(got)), got[len(got)-8:])
 	}
 	if Escape(long) == got {
@@ -262,11 +265,12 @@ In `WriteTable`: line 1 becomes `fmt.Fprintln(w, HeaderLine(r.Run, r.Check.Muste
 - Modify: `internal/controls/schema.go:104-111`
 - Modify: `internal/controls/lint.go` (imports add `path`, `unicode/utf8`; titles rule at ~100-102; remediation rules at ~115-120 → `lintRemediation`)
 - Test: `internal/controls/lint_test.go` (`TestLintRules` gets a `msg` field, Z-15)
+- Modify (data only, Z-21): `controls/file/{hosts,services,hosts_lpd,passwd,shadow}_permissions.yaml` gain `backup: [<their file>]` under `remediation:` (`/etc/hosts`, `/etc/services`, `/etc/hosts.lpd`, `/etc/passwd`, `/etc/shadow`)
 
 **Interfaces:**
 - Produces: `Remediation.Backup []string \`yaml:"backup,omitempty"\``, `Remediation.Validate string \`yaml:"validate,omitempty"\``.
 
-- [ ] **Step 1: Write the failing tests.** Add `msg string` to the `TestLintRules` case struct; after the existing `got[c.rule]` assertion add `if c.msg != "" && !hasMessage(ps, c.rule, c.msg) { t.Errorf("%s: no %q message in %v", c.name, c.msg, ps) }`. Add one case per rule, each built from `goodControl`'s shape with only the `remediation:` block changed:
+- [ ] **Step 1: Write the failing tests.** Add `msg string` and `absent bool` to the `TestLintRules` case struct. The loop becomes `ps := lintOne(t, c.yaml, LintOptions{CustomFuncs: map[string]bool{}}); got := rules(ps)`; when `c.absent` assert `!got[c.rule]`, otherwise keep today's `got[c.rule]` check and add `if c.msg != "" && !hasMessage(ps, c.rule, c.msg) { t.Errorf("%s: no %q message in %v", c.name, c.msg, ps) }`. Add one case per rule, each built from `goodControl`'s shape with only the `remediation:` block changed:
 
 | name | remediation block (YAML flow or block) | rule | msg |
 |---|---|---|---|
@@ -288,7 +292,7 @@ In `WriteTable`: line 1 becomes `fmt.Fprintln(w, HeaderLine(r.Run, r.Check.Muste
 | `script blank` | `script: " ", rollback: "true"` | remediation | `script is blank` |
 | `rollback here-document` | `script: "true", rollback: "cat <<EOF\nx\nEOF"` | remediation | `rollback carries a here-document` |
 
-And two accept cases (rule absent): a block scalar `validate: |` with one line plus its trailing newline; `script: ""` (empty reads as absent) with no `rollback`.
+And two accept cases (`absent: true`, rule `remediation`): `remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true", rollback: "true" }` plus a block-scalar `validate: |` carrying one line (its trailing newline is trimmed); and `script: ""` (empty reads as absent) with no `rollback`.
 
 - [ ] **Step 2: Run** `go test ./internal/controls -run TestLintRules -count=1` — FAIL (unknown field `backup`, missing messages).
 
@@ -379,7 +383,7 @@ func lintRemediation(r *Remediation, add func(rule, format string, args ...any))
 
 (`*?[` are outside the charset, so the glob case is the charset message.)
 
-- [ ] **Step 4: Run** `go test ./internal/controls -count=1` (including `TestEveryMutantIsKilled`) and `go run ./cmd/muster controls lint --references docs/reference` — PASS / `ok:`; the shipped set is clean (no shipped control uses the new fields yet).
+- [ ] **Step 4: Run** `go test ./internal/controls -count=1` (including `TestEveryMutantIsKilled`) and `go run ./cmd/muster controls lint --references docs/reference` — PASS / `ok:`; the shipped set is clean once the five file controls declare their backup path (Z-21; Task 3 rewrites their bodies). Before adding those five lines, confirm the lint names exactly those five controls with `script without rollback or backup`.
 
 - [ ] **Step 5: Comment out the `script without rollback or backup` rule, run, see the case red; restore.**
 
@@ -458,6 +462,22 @@ shadow (owner and mode only; the group is the distribution's):
     done
 ```
 
+A control with one unit (automount_disabled: `autofs.service`; snmp_disabled: `snmpd.service`) uses the `if` form, because a `for` over one word is shellcheck SC2043:
+
+```yaml
+  script: |
+    if systemctl cat autofs.service >/dev/null 2>&1; then
+      systemctl disable --now autofs.service
+      systemctl mask autofs.service
+    fi
+  validate: '! systemctl is-active --quiet autofs.service && case "$(systemctl is-enabled autofs.service 2>/dev/null)" in enabled|enabled-runtime) false;; esac'
+  rollback: |
+    if systemctl cat autofs.service >/dev/null 2>&1; then
+      systemctl unmask autofs.service
+      systemctl enable --now autofs.service
+    fi
+```
+
 Units per control (sockets before their services):
 
 | control | units |
@@ -473,7 +493,11 @@ Units per control (sockets before their services):
 | tftp_talk_disabled | `tftp.socket tftp.service tftpd.service tftpd-hpa.service atftpd.socket atftpd.service talk.socket ntalk.socket` |
 | snmp_disabled | `snmpd.service` |
 
-`telnet_disabled` appends to `text_en`: ` A telnet started by inetd or xinetd is not stopped by the script; remove its entry there.` and to `text_ko`: ` inetd나 xinetd가 띄우는 telnet은 스크립트가 멈추지 않습니다. 거기서 항목을 지우십시오.` The same sentence (with the service's name) goes to `finger`, `rservices`, `dos_services` and `tftp_talk` (the rows with `inetdNames`).
+`telnet_disabled` appends to `text_en`: ` A telnet started by inetd or xinetd is not stopped by the script; remove its entry there.` and to `text_ko`: ` inetd나 xinetd가 띄우는 telnet은 스크립트가 멈추지 않습니다. 거기서 항목을 지우십시오.` The same shape goes to the other rows with `inetdNames`:
+- finger: ` A finger started by inetd or xinetd is not stopped by the script; remove its entry there.` / ` inetd나 xinetd가 띄우는 finger는 스크립트가 멈추지 않습니다. 거기서 항목을 지우십시오.`
+- rservices: ` An rsh, rlogin or rexec started by inetd or xinetd is not stopped by the script; remove its entry there.` / ` inetd나 xinetd가 띄우는 rsh, rlogin, rexec는 스크립트가 멈추지 않습니다. 거기서 항목을 지우십시오.`
+- dos_services: ` An echo, discard, daytime or chargen started by inetd or xinetd is not stopped by the script; remove its entry there.` / ` inetd나 xinetd가 띄우는 echo, discard, daytime, chargen은 스크립트가 멈추지 않습니다. 거기서 항목을 지우십시오.`
+- tftp_talk: ` A tftp, talk or ntalk started by inetd or xinetd is not stopped by the script; remove its entry there.` / ` inetd나 xinetd가 띄우는 tftp, talk, ntalk는 스크립트가 멈추지 않습니다. 거기서 항목을 지우십시오.`
 
 **root_remote_login:**
 
@@ -495,7 +519,7 @@ Units per control (sockets before their services):
     if command -v sshd >/dev/null 2>&1; then sshd -t; fi
 ```
 
-Its `text_en`/`text_ko` change `90-muster.conf` to `00-muster.conf` and append: ` sshd keeps the first value it reads: a drop-in that sorts before 00-muster.conf, or a PermitRootLogin line before the Include in sshd_config, still wins.` / ` sshd는 처음 읽은 값을 지키므로 00-muster.conf보다 먼저 정렬되는 드롭인이나 sshd_config의 Include 앞 PermitRootLogin 줄이 여전히 이깁니다.`
+Its `text_en`/`text_ko` keep their wording, with "a file under /etc/ssh/sshd_config.d/" becoming "/etc/ssh/sshd_config.d/00-muster.conf" ("/etc/ssh/sshd_config.d/ 아래 파일에" becoming "/etc/ssh/sshd_config.d/00-muster.conf 파일에"), and append: ` sshd keeps the first value it reads: a drop-in that sorts before 00-muster.conf, or a PermitRootLogin line before the Include in sshd_config, still wins.` / ` sshd는 처음 읽은 값을 지키므로 00-muster.conf보다 먼저 정렬되는 드롭인이나 sshd_config의 Include 앞 PermitRootLogin 줄이 여전히 이깁니다.`
 
 - [ ] **Step 1: Write the failing pin test** `internal/collect/collectors/remediation_units_test.go`:
 
@@ -859,7 +883,7 @@ func tuned(sources map[string]string) bool {
 func TestScriptGolden(t *testing.T)                          // five plans → five goldens; -update rewrites
 func TestScriptBlocksAreIndependent(t *testing.T)           // for full.sh: each planned scripted item has one "fix_<fn>() {" line, one bare "fix_<fn>" line,
                                                              // and the next line is exactly `[ "$?" -eq 0 ] || failed=$((failed+1))`; no line starting with "fix_" contains "||", "&&", "if " or "!";
-                                                             // capped.sh: every line between an "-- above max-risk" header and the next "# ---- " header starts with "#"
+                                                             // capped.sh: from each "-- above max-risk" header up to the first empty line (blocks contain no empty line; one separates blocks and the epilogue), every line starts with "#"
 func TestScriptFailurePathRollbackThenRestore(t *testing.T) // the "both" block: inside each failure branch the rollback subshell line precedes the "restore " line
 func TestScriptEveryLineIsTemplateBodyOrComment(t *testing.T) // poison plan (ESC, "\n", "#", "$(id)" in host, reason, titles, texts): every output line is a template line,
                                                              // a body line (from the plan's declared bodies), or starts with "#"; and no line outside comments contains "$(id)" or "\x1b"
@@ -870,7 +894,7 @@ func TestScriptReusedBackupKeepsTheFirstCopy(t *testing.T)    // Linux only; see
 ```
 
 The two Linux tests render a synthetic plan whose bodies act only inside `t.TempDir()`, remove the root-check line (`strings.Replace(script, rootCheckLine+"\n", "", 1)` — the test's one transformation, named in a comment), set `MUSTER_BACKUP` to a temp dir, and run `sh` on the file:
-- body-failure: item with `backup: [<tmp>/f]`, `ScriptBody: "false\nprintf ran > <tmp>/after"`, `RollbackBody: "printf rb > <tmp>/rb"`; after `sh`, exit code 1, `<tmp>/after` absent, `<tmp>/rb` present, `<tmp>/f` restored to its original bytes.
+- body-failure: item with `backup: [<tmp>/f]`, `ScriptBody: "printf changed > <tmp>/f\nfalse\nprintf ran > <tmp>/after"`, `RollbackBody: "printf rb > <tmp>/rb"`; after `sh`, exit code 1, `<tmp>/after` absent, `<tmp>/rb` present, `<tmp>/f` restored to its original bytes.
 - reused backup: item with `backup: [<tmp>/f]`, body `printf two > <tmp>/f`, validate `false`; run once (f becomes original again by restore); change f to `edited`; run again with the same `MUSTER_BACKUP`; f is the original (the first copy), and stdout contains `backup exists, keeping the first`.
 
 - [ ] **Step 2: Run** — FAIL (undefined `Script`).
@@ -929,7 +953,7 @@ var textOnlyPhrase = map[string]string{
 func Script(p *Plan) []byte {
 	var b strings.Builder
 	s := p.Summary
-	b.WriteString("#!/bin/sh\n# muster fix --dry-run: review before running. muster never runs this file.\n")
+	b.WriteString("#!/bin/sh\n# shellcheck disable=SC2181\n# muster fix --dry-run: review before running. muster never runs this file.\n") // Z-20
 	fmt.Fprintf(&b, "# snapshot: host %s, collected %s; controls %s %s\n",
 		report.Escape(p.Run.Host.Hostname), report.Escape(p.Run.CollectedAt), report.Escape(p.Fix.ControlsVersion), report.Escape(p.Fix.ControlsDigest))
 	fmt.Fprintf(&b, "# profile %s (%s); max-risk %s\n", report.Escape(p.Fix.Profile.Name), report.Escape(p.Fix.Profile.Digest), p.Fix.MaxRisk)
@@ -952,6 +976,10 @@ func Script(p *Plan) []byte {
 func indent(body, pfx string) []string {
 	var out []string
 	for _, l := range strings.Split(strings.TrimSuffix(body, "\n"), "\n") {
+		if l == "" {
+			out = append(out, "") // no trailing whitespace; block() comments it as "#" above the cap
+			continue
+		}
 		out = append(out, pfx+l)
 	}
 	return out
@@ -1021,7 +1049,7 @@ func block(n, total int, it Item, maxRisk string) []string {
 }
 ```
 
-- [ ] **Step 4: Run** `go test ./internal/remedy -count=1 -update` once, read every golden line by line (in the report: what each golden shows), then without `-update`. On the lab: `go test ./internal/remedy -count=1` (the two Linux tests run), `sh -n` and `shellcheck -s sh` over `internal/remedy/testdata/*.sh` if shellcheck is present.
+- [ ] **Step 4: Run** `go test ./internal/remedy -count=1 -update` once, then on the lab `shellcheck -s sh` over the five goldens (install nothing on the lab host: if shellcheck is absent there, run it inside a throwaway `koalaman/shellcheck-alpine` or `ubuntu:24.04` container with the testdata directory mounted read-only); any code it raises on a template line is added to the Z-20 directive and recorded in the report. Read every golden line by line (in the report: what each golden shows), then without `-update`. On the lab: `go test ./internal/remedy -count=1` (the two Linux tests run), `sh -n` and `shellcheck -s sh` over `internal/remedy/testdata/*.sh` if shellcheck is present.
 
 - [ ] **Step 5: Change the call line to `fn+" || failed=$((failed+1))"`, run on the lab, see `TestScriptBlocksAreIndependent` and `TestScriptBodyFailureReachesTheFailurePath` red; restore.**
 
@@ -1310,13 +1338,14 @@ func fixReportsFor(t *testing.T, rep *report.Report, set *controls.Set) (jsonPla
 }
 ```
 
-`reportsFor` returns `rep` too (or a sibling builds it once). In `TestExamplesLoadAndCheck`, per snapshot after the check comparison: read `<b>-fix-report.json/.txt/.sh` (missing → `t.Fatalf("every example snapshot needs its fix reports beside it: %v", err)`); if the committed `fix.controls_digest` differs from `set.Digest` → note and skip (G-24); else compare masked JSON (block `"fix"`), `tableBody` of the table, and the script with its `# snapshot:` line removed — problems name `%s-fix-report.%s is not what this binary produces from %s; refresh the examples (see examples/README.md)`. Extend `TestExampleReportHelpers`/`TestExampleStalenessGate` for the `"fix"` block name.
+`reportsFor` returns `rep` too (or a sibling builds it once). In `TestExamplesLoadAndCheck`, per snapshot after the check comparison: read `<b>-fix-report.json/.txt/.sh` (missing → `t.Fatalf("every example snapshot needs its fix reports beside it: %v", err)`); if the committed `fix.controls_digest` differs from `set.Digest` → note and skip (G-24); else compare masked JSON (block `"fix"`), `tableBody` of the table, and the script byte for byte (Z-22) — problems name `%s-fix-report.%s is not what this binary produces from %s; refresh the examples (see examples/README.md)`. Extend `TestExampleReportHelpers`/`TestExampleStalenessGate` for the `"fix"` block name.
 
 - [ ] **Step 1: Write the failing e2e tests** in `fix_test.go` (`run([]string{"fix", …}, &out, &errb)` as the existing tests do; `type failWriter struct{}` whose `Write` returns `errors.New("closed")`):
 
 ```go
 func TestFixRefusesWithoutDryRun(t *testing.T)          // ["fix","--facts",ff]; ["fix","apply","--dry-run","--facts",ff]; ["fix","--dry-run","apply","--facts",ff];
                                                         // ["fix","--bogus","apply","--dry-run","--facts",ff]; ["fix","--facts","--dry-run"] → exit 2, stderr starts "muster: fix never applies a remediation (D24); run fix --dry-run\n", stdout empty
+func TestFixDryRunAfterTheFactsValue(t *testing.T)    // ["fix","--facts",ff,"--dry-run"] → exit 0, a table on stdout (the pre-pass skips a value without swallowing a later --dry-run)
 func TestFixUnknownFlag(t *testing.T)                   // ["fix","--dry-run","--facts",ff,"--bogus"] → 2, "muster: unknown flag --bogus"
 func TestFixMaxRiskOutsideTheList(t *testing.T)         // --max-risk high → 2, names the four words
 func TestFixThreeFormats(t *testing.T)                  // full-fail.json: table/json/script exit 0; JSON decodes into remedy.Plan; 10 items; the lockout item last; two runs byte-equal per format
@@ -1355,7 +1384,7 @@ func TestFixUsageListed(t *testing.T)                   // run(["help"]) output 
 ```yaml
       - name: review scripts parse and pass shellcheck
         run: |
-          command -v shellcheck || sudo apt-get install -y -qq shellcheck
+          command -v shellcheck || { sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck; }
           for f in internal/remedy/testdata/*.sh examples/*-fix-report.sh; do
             [ -e "$f" ] || continue
             sh -n "$f"
@@ -1442,7 +1471,7 @@ and add `shellcheck` to `.PHONY`.
           done
 ```
 
-- [ ] **Step 4: `examples.yml`** report loop, after the two `check` lines (same `set +e … set -e` region):
+- [ ] **Step 4: `examples.yml`** report loop: after `test -s "$b-report.txt"` and before the two `jq -e` lines — outside the `set +e` region, so a fix exit 2 or an empty file stops the step (fix exits 0 for any plan); indent to the run block's 12 spaces:
 
 ```sh
   NO_COLOR=1 "$GITHUB_WORKSPACE/bin/muster" fix --dry-run --facts "$f" --max-risk lockout_risk --format json > "$b-fix-report.json"
@@ -1481,7 +1510,9 @@ Whole-branch review workflow → one fix wave + scoped re-review → Execution n
 
 ## Execution notes
 
-### Rulings settled during execution (Z-20 …)
+### Rulings settled during execution (Z-23 …)
+
+- Pre-flight (three fresh reviewers + three refuters each, 57 agents): 12 survivors (2 Blocking — the lint rule turning the shipped set red before Task 3), 6 refuted, 4 nits, all folded: Z-20..Z-22, the corrected rune count, the capped-block clause, the single-unit `if` form, the examples.yml placement, the lint table's `absent` field, the body that changes `f` before failing, the literal inetd sentences, the root_remote_login text edit, `apt-get update` before installing shellcheck, and the `--dry-run` after `--facts` case.
 
 ### What the reviews found
 
