@@ -389,6 +389,25 @@ func TestExampleReportHelpers(t *testing.T) {
 		bytes.Equal(tableBody(failFixTable), tableBody(fixTable)) || bytes.Equal(failFixScript, fixScript) {
 		t.Error("two different snapshots produced the same fix output")
 	}
+
+	// The gates compare the tables without their header line: a committed
+	// table whose first line names another binary, host or time is not a
+	// problem, for check's table and for fix's, while the same body after an
+	// extra line is.
+	otherHeader := func(tbl []byte) []byte { return append([]byte("muster other · host elsewhere\n"), tableBody(tbl)...) }
+	if bytes.Equal(otherHeader(firstTable), firstTable) || bytes.Equal(otherHeader(fixTable), fixTable) {
+		t.Fatal("the re-headed tables are the same bytes; the check below would prove nothing")
+	}
+	if problems, note := checkExampleReports("x.json", firstJSON, firstJSON, firstTable, otherHeader(firstTable), set.Digest); len(problems) != 0 || note != "" {
+		t.Errorf("check's gate reported a header-only difference: %v / %q", problems, note)
+	}
+	if problems, note := checkFixReports("x.json", fixJSON, fixJSON, fixTable, otherHeader(fixTable), fixScript, fixScript, set.Digest); len(problems) != 0 || note != "" {
+		t.Errorf("fix's gate reported a header-only difference: %v / %q", problems, note)
+	}
+	shifted := append([]byte("muster x\n"), otherHeader(fixTable)...)
+	if problems, _ := checkFixReports("x.json", fixJSON, fixJSON, fixTable, shifted, fixScript, fixScript, set.Digest); len(problems) != 1 || !strings.HasPrefix(problems[0], "x-fix-report.txt ") {
+		t.Errorf("fix's gate missed a body difference: %v", problems)
+	}
 }
 
 // TestExampleStalenessGate is ruling G-24, driven the way the example gate

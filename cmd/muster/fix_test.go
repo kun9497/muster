@@ -320,6 +320,90 @@ func TestFixFailingStdoutIsExit2(t *testing.T) {
 	}
 }
 
+// --tuning has check's semantics: the plan carries the tuning block, and an
+// item whose parameters the site tuned is text only (the declared script
+// assumes the defaults).
+func TestFixTuningMakesTheItemTextOnly(t *testing.T) {
+	tun := filepath.Join(t.TempDir(), "tuning.yaml")
+	body := "params:\n  muster.file.hosts_permissions:\n    allowed_modes: [0, 256, 384]\n"
+	if err := os.WriteFile(tun, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	p := planJSON(t, "--facts", hostsCopy(t), "--tuning", tun)
+	if p.Fix.Tuning == nil || p.Fix.Tuning.Path != tun || !strings.HasPrefix(p.Fix.Tuning.Digest, "sha256:") {
+		t.Fatalf("tuning block %+v, want path %s and a digest", p.Fix.Tuning, tun)
+	}
+	var found bool
+	for _, it := range p.Items {
+		if it.ID != "muster.file.hosts_permissions" {
+			continue
+		}
+		found = true
+		if it.Script || it.TextOnlyReason != "params_tuned" {
+			t.Errorf("hosts_permissions: script %v, text_only_reason %q; want false and params_tuned", it.Script, it.TextOnlyReason)
+		}
+	}
+	if !found {
+		t.Error("hosts_permissions (0644, not in the tuned modes) is not an item")
+	}
+	if untuned := planJSON(t, "--facts", hostsCopy(t)); untuned.Fix.Tuning != nil {
+		t.Errorf("a plan without --tuning carries a tuning block %+v", untuned.Fix.Tuning)
+	}
+}
+
+// --tuning "" is refused, as check refuses it, with the same words.
+func TestFixEmptyTuningIsRefusedAsCheckRefusesIt(t *testing.T) {
+	code, out, errb := runFixArgs(t, "--dry-run", "--facts", fullFail, "--tuning", "")
+	if code != exitError || len(out) != 0 {
+		t.Fatalf("exit %d stdout %q, want 2 and empty", code, out)
+	}
+	var cout, cerr bytes.Buffer
+	if c := run([]string{"check", "--facts", fullFail, "--tuning", ""}, &cout, &cerr); c != exitError {
+		t.Fatalf("check --tuning \"\": exit %d", c)
+	}
+	if string(errb) != cerr.String() || !strings.HasPrefix(string(errb), "muster: ") {
+		t.Errorf("fix stderr %q, check stderr %q; want the same refusal", errb, cerr.String())
+	}
+}
+
+// --no-color after --color always means never; --color always alone paints.
+func TestFixColorFlags(t *testing.T) {
+	_, painted, _ := runFixArgs(t, "--dry-run", "--facts", fullFail, "--color", "always")
+	if !bytes.Contains(painted, []byte("\x1b[")) {
+		t.Error("--color always did not paint the table")
+	}
+	code, plain, errb := runFixArgs(t, "--dry-run", "--facts", fullFail, "--color", "always", "--no-color")
+	if code != exitOK || bytes.Contains(plain, []byte("\x1b")) {
+		t.Errorf("--color always --no-color: exit %d, stderr %q, escape in table %v", code, errb, bytes.Contains(plain, []byte("\x1b")))
+	}
+}
+
+func TestStdoutIsTTY(t *testing.T) {
+	if stdoutIsTTY(&bytes.Buffer{}) {
+		t.Error("a bytes.Buffer is a tty")
+	}
+	fh, err := os.CreateTemp(t.TempDir(), "out")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer fh.Close()
+	if stdoutIsTTY(fh) {
+		t.Error("a regular file is a tty")
+	}
+}
+
+// The root warning is pinned where the test runs as root (the lab, CI's
+// root job); elsewhere it cannot be produced.
+func TestFixWarnsAsRoot(t *testing.T) {
+	if os.Geteuid() != 0 {
+		t.Skip("needs root")
+	}
+	code, _, errb := runFixArgs(t, "--dry-run", "--facts", fullFail)
+	if code != exitOK || !strings.Contains(string(errb), "muster: warning: fix does not need root\n") {
+		t.Errorf("exit %d, stderr %q", code, errb)
+	}
+}
+
 func TestFixUsageListed(t *testing.T) {
 	var out, errb bytes.Buffer
 	if code := run([]string{"help"}, &out, &errb); code != exitOK {
