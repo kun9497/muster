@@ -16,9 +16,9 @@ checks:
   - { fact: files.etc_hosts.uid, op: eq, expected: 0 }
   - { fact: files.etc_hosts.mode, op: in, expected: "${allowed_modes}" }
 remediation:
-  text_en: chown root:root /etc/hosts; chmod 600 /etc/hosts
-  text_ko: chown root:root /etc/hosts; chmod 600 /etc/hosts
-  risk: none
+  text_en: chown root:root /etc/hosts; chmod 600 /etc/hosts. At 0600 non-root processes can no longer read /etc/hosts, so services that resolve names through it fail; a site that keeps 0644 relaxes allowed_modes, and the plan then leaves the script out.
+  text_ko: chown root:root /etc/hosts; chmod 600 /etc/hosts. 0600에서는 root가 아닌 프로세스가 /etc/hosts를 읽지 못해 그것으로 이름을 푸는 서비스가 실패합니다. 0644를 유지하는 사이트는 allowed_modes를 완화하고 그러면 계획이 스크립트를 뺍니다.
+  risk: restart_service
   idempotent: true
   backup: [/etc/hosts]
   script: |

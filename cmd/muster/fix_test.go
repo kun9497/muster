@@ -50,8 +50,8 @@ func planJSON(t *testing.T, args ...string) remedy.Plan {
 }
 
 // hostsCopy is full-fail.json with /etc/hosts at 0644, which makes
-// muster.file.hosts_permissions FAIL: the file-permission shape (risk none,
-// a script, a backup to restore).
+// muster.file.hosts_permissions FAIL: the file-permission shape (risk
+// restart_service, a script, a backup to restore).
 func hostsCopy(t *testing.T) string {
 	t.Helper()
 	b, err := os.ReadFile(fullFail)
@@ -151,8 +151,11 @@ func TestFixThreeFormats(t *testing.T) {
 			if len(p.Items) != 10 {
 				t.Fatalf("%d items, want 10", len(p.Items))
 			}
-			if last := p.Items[len(p.Items)-1]; last.ID != "muster.account.root_remote_login" || last.Risk != "lockout_risk" {
-				t.Errorf("last item %s (%s), want the lockout item root_remote_login", last.ID, last.Risk)
+			// Z-29: the two lockout items close the plan, by id.
+			for i, id := range []string{"muster.account.root_remote_login", "muster.service.nis_disabled"} {
+				if it := p.Items[len(p.Items)-2+i]; it.ID != id || it.Risk != "lockout_risk" {
+					t.Errorf("item %d is %s (%s), want the lockout item %s", len(p.Items)-1+i, it.ID, it.Risk, id)
+				}
 			}
 		}
 	}
@@ -204,34 +207,45 @@ func TestFixFilePermissionShape(t *testing.T) {
 	if len(p.Items) == 0 {
 		t.Fatal("no items")
 	}
+	// Z-27: hosts is restart_service; at high severity it sorts first among
+	// them by id (muster.file < muster.service), and nothing is risk none.
 	it := p.Items[0]
-	if it.ID != "muster.file.hosts_permissions" || it.Risk != "none" || !it.Script || it.Rollback != "restore_backup" {
-		t.Errorf("item 1 is %s risk %s script %v rollback %s, want hosts_permissions, none, true, restore_backup",
+	if it.ID != "muster.file.hosts_permissions" || it.Risk != "restart_service" || !it.Script || it.Rollback != "restore_backup" {
+		t.Errorf("item 1 is %s risk %s script %v rollback %s, want hosts_permissions, restart_service, true, restore_backup",
 			it.ID, it.Risk, it.Script, it.Rollback)
+	}
+	// --max-risk none leaves the 0600 chmod out: it breaks non-root
+	// resolution through /etc/hosts.
+	for _, it := range planJSON(t, "--facts", hostsCopy(t), "--max-risk", "none").Items {
+		if it.ID == "muster.file.hosts_permissions" && it.Planned {
+			t.Error("hosts_permissions is planned at --max-risk none")
+		}
 	}
 }
 
 func TestFixMaxRiskMarksTheLockoutItem(t *testing.T) {
 	p := planJSON(t, "--facts", fullFail, "--max-risk", "restart_service")
-	found := false
+	// Z-29: nis_disabled is lockout_risk beside root_remote_login.
+	lockout := map[string]bool{"muster.account.root_remote_login": true, "muster.service.nis_disabled": true}
+	found := 0
 	for _, it := range p.Items {
-		if it.ID == "muster.account.root_remote_login" {
-			found = true
+		if lockout[it.ID] {
+			found++
 			if it.Planned {
-				t.Error("root_remote_login is planned above max-risk restart_service")
+				t.Errorf("%s is planned above max-risk restart_service", it.ID)
 			}
 		} else if !it.Planned {
 			t.Errorf("%s (%s) is not planned at max-risk restart_service", it.ID, it.Risk)
 		}
 	}
-	if !found || p.Summary.AboveMaxRisk != 1 {
-		t.Errorf("found %v, summary.above_max_risk %d, want the item and 1", found, p.Summary.AboveMaxRisk)
+	if found != 2 || p.Summary.AboveMaxRisk != 2 {
+		t.Errorf("found %d, summary.above_max_risk %d, want both lockout items and 2", found, p.Summary.AboveMaxRisk)
 	}
 	code, out, errb := runFixArgs(t, "--dry-run", "--facts", fullFail, "--max-risk", "restart_service", "--format", "script")
 	if code != exitOK {
 		t.Fatalf("exit %d; stderr %q", code, errb)
 	}
-	_, after, ok := strings.Cut(string(out), "\n# ---- 10/10 muster.account.root_remote_login ")
+	_, after, ok := strings.Cut(string(out), "\n# ---- 9/10 muster.account.root_remote_login ")
 	if !ok {
 		t.Fatalf("the script has no block header for root_remote_login:\n%s", out)
 	}

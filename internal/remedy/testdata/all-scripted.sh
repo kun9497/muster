@@ -34,36 +34,7 @@ restore() {
 }
 failed=0
 
-# ---- 1/16 muster.file.hosts_permissions [risk none] [fail, high]
-# why: clause does not hold
-# do:  chown root:root /etc/hosts; chmod 600 /etc/hosts
-# ko:  chown root:root /etc/hosts; chmod 600 /etc/hosts
-fix_muster_file_hosts_permissions() {
-  backup /etc/hosts || { log "muster.file.hosts_permissions: backup failed, nothing changed"; return 1; }
-  ( set -e
-    [ -f /etc/hosts ]
-    chown root:root /etc/hosts
-    chmod 600 /etc/hosts
-  ); rc=$?
-  if [ "$rc" -ne 0 ]; then
-    log "muster.file.hosts_permissions: script failed (rc $rc), rolling back"
-    restore /etc/hosts || log "muster.file.hosts_permissions: ROLLBACK INCOMPLETE, backups in $MUSTER_BACKUP"
-    return 1
-  fi
-  ( set -e
-    stat -c '%u %g %a' /etc/hosts | grep -qx '0 0 600'
-  ); rc=$?
-  if [ "$rc" -ne 0 ]; then
-    log "muster.file.hosts_permissions: validate failed, rolling back"
-    restore /etc/hosts || log "muster.file.hosts_permissions: ROLLBACK INCOMPLETE, backups in $MUSTER_BACKUP"
-    return 1
-  fi
-  log "muster.file.hosts_permissions: done"
-}
-fix_muster_file_hosts_permissions
-[ "$?" -eq 0 ] || failed=$((failed+1))
-
-# ---- 2/16 muster.file.passwd_permissions [risk none] [fail, high]
+# ---- 1/16 muster.file.passwd_permissions [risk none] [fail, high]
 # why: clause does not hold
 # do:  chown root:root /etc/passwd; chmod 644 /etc/passwd; setfacl -b /etc/passwd
 # ko:  chown root:root /etc/passwd; chmod 644 /etc/passwd; setfacl -b /etc/passwd
@@ -93,7 +64,7 @@ fix_muster_file_passwd_permissions() {
 fix_muster_file_passwd_permissions
 [ "$?" -eq 0 ] || failed=$((failed+1))
 
-# ---- 3/16 muster.file.services_permissions [risk none] [fail, high]
+# ---- 2/16 muster.file.services_permissions [risk none] [fail, high]
 # why: clause does not hold
 # do:  chown root:root /etc/services; chmod 644 /etc/services
 # ko:  chown root:root /etc/services; chmod 644 /etc/services
@@ -122,7 +93,7 @@ fix_muster_file_services_permissions() {
 fix_muster_file_services_permissions
 [ "$?" -eq 0 ] || failed=$((failed+1))
 
-# ---- 4/16 muster.file.shadow_permissions [risk none] [fail, high]
+# ---- 3/16 muster.file.shadow_permissions [risk none] [fail, high]
 # why: clause does not hold
 # do:  chown root /etc/shadow; chmod 400 /etc/shadow; setfacl -b /etc/shadow. On Debian and Ubuntu unix_chkpwd reads /etc/shadow through group shadow; a site that keeps 0640 relaxes allowed_modes, and the plan then leaves the script out.
 # ko:  chown root /etc/shadow; chmod 400 /etc/shadow; setfacl -b /etc/shadow. Debian과 Ubuntu에서는 unix_chkpwd가 shadow 그룹으로 /etc/shadow를 읽으므로, 0640을 유지하는 사이트는 allowed_modes를 완화하고 그러면 계획이 스크립트를 뺍니다.
@@ -152,7 +123,7 @@ fix_muster_file_shadow_permissions() {
 fix_muster_file_shadow_permissions
 [ "$?" -eq 0 ] || failed=$((failed+1))
 
-# ---- 5/16 muster.file.hosts_lpd_permissions [risk none] [fail, low]
+# ---- 4/16 muster.file.hosts_lpd_permissions [risk none] [fail, low]
 # why: clause does not hold
 # do:  chown root:root /etc/hosts.lpd; chmod 600 /etc/hosts.lpd
 # ko:  chown root:root /etc/hosts.lpd; chmod 600 /etc/hosts.lpd
@@ -179,6 +150,35 @@ fix_muster_file_hosts_lpd_permissions() {
   log "muster.file.hosts_lpd_permissions: done"
 }
 fix_muster_file_hosts_lpd_permissions
+[ "$?" -eq 0 ] || failed=$((failed+1))
+
+# ---- 5/16 muster.file.hosts_permissions [risk restart_service] [fail, high]
+# why: clause does not hold
+# do:  chown root:root /etc/hosts; chmod 600 /etc/hosts. At 0600 non-root processes can no longer read /etc/hosts, so services that resolve names through it fail; a site that keeps 0644 relaxes allowed_modes, and the plan then leaves the script out.
+# ko:  chown root:root /etc/hosts; chmod 600 /etc/hosts. 0600에서는 root가 아닌 프로세스가 /etc/hosts를 읽지 못해 그것으로 이름을 푸는 서비스가 실패합니다. 0644를 유지하는 사이트는 allowed_modes를 완화하고 그러면 계획이 스크립트를 뺍니다.
+fix_muster_file_hosts_permissions() {
+  backup /etc/hosts || { log "muster.file.hosts_permissions: backup failed, nothing changed"; return 1; }
+  ( set -e
+    [ -f /etc/hosts ]
+    chown root:root /etc/hosts
+    chmod 600 /etc/hosts
+  ); rc=$?
+  if [ "$rc" -ne 0 ]; then
+    log "muster.file.hosts_permissions: script failed (rc $rc), rolling back"
+    restore /etc/hosts || log "muster.file.hosts_permissions: ROLLBACK INCOMPLETE, backups in $MUSTER_BACKUP"
+    return 1
+  fi
+  ( set -e
+    stat -c '%u %g %a' /etc/hosts | grep -qx '0 0 600'
+  ); rc=$?
+  if [ "$rc" -ne 0 ]; then
+    log "muster.file.hosts_permissions: validate failed, rolling back"
+    restore /etc/hosts || log "muster.file.hosts_permissions: ROLLBACK INCOMPLETE, backups in $MUSTER_BACKUP"
+    return 1
+  fi
+  log "muster.file.hosts_permissions: done"
+}
+fix_muster_file_hosts_permissions
 [ "$?" -eq 0 ] || failed=$((failed+1))
 
 # ---- 6/16 muster.service.automount_disabled [risk restart_service] [fail, high]
@@ -372,57 +372,7 @@ fix_muster_service_nfs_server_disabled() {
 fix_muster_service_nfs_server_disabled
 [ "$?" -eq 0 ] || failed=$((failed+1))
 
-# ---- 10/16 muster.service.nis_disabled [risk restart_service] [fail, high]
-# why: clause does not hold
-# do:  Stop and disable ypserv and ypbind (systemctl disable --now ypserv.service ypbind.service) and remove nis/nisplus from the passwd and group lines of /etc/nsswitch.conf.
-# ko:  ypserv 와 ypbind 를 중지·비활성화하고 (systemctl disable --now ypserv.service ypbind.service) /etc/nsswitch.conf 의 passwd·group 줄에서 nis·nisplus 를 제거합니다.
-fix_muster_service_nis_disabled() {
-  ( set -e
-    for u in ypserv.service ypbind.service ypxfrd.service yppasswdd.service; do
-      systemctl cat "$u" >/dev/null 2>&1 || continue
-      systemctl disable --now "$u"
-      systemctl mask "$u" || true
-    done
-  ); rc=$?
-  if [ "$rc" -ne 0 ]; then
-    log "muster.service.nis_disabled: script failed (rc $rc), rolling back"
-    ( set -e
-      for u in ypserv.service ypbind.service ypxfrd.service yppasswdd.service; do
-        systemctl cat "$u" >/dev/null 2>&1 || continue
-        systemctl unmask "$u"
-      done
-      for u in ypserv.service ypbind.service ypxfrd.service yppasswdd.service; do
-        systemctl cat "$u" >/dev/null 2>&1 || continue
-        systemctl enable --now "$u"
-      done
-    ); rrc=$?
-    [ "$rrc" -eq 0 ] || log "muster.service.nis_disabled: rollback failed (rc $rrc)"
-    return 1
-  fi
-  ( set -e
-    ! systemctl is-active --quiet ypserv.service && case "$(systemctl is-enabled ypserv.service 2>/dev/null)" in enabled|enabled-runtime) false;; esac && ! systemctl is-active --quiet ypbind.service && case "$(systemctl is-enabled ypbind.service 2>/dev/null)" in enabled|enabled-runtime) false;; esac && ! systemctl is-active --quiet ypxfrd.service && case "$(systemctl is-enabled ypxfrd.service 2>/dev/null)" in enabled|enabled-runtime) false;; esac && ! systemctl is-active --quiet yppasswdd.service && case "$(systemctl is-enabled yppasswdd.service 2>/dev/null)" in enabled|enabled-runtime) false;; esac
-  ); rc=$?
-  if [ "$rc" -ne 0 ]; then
-    log "muster.service.nis_disabled: validate failed, rolling back"
-    ( set -e
-      for u in ypserv.service ypbind.service ypxfrd.service yppasswdd.service; do
-        systemctl cat "$u" >/dev/null 2>&1 || continue
-        systemctl unmask "$u"
-      done
-      for u in ypserv.service ypbind.service ypxfrd.service yppasswdd.service; do
-        systemctl cat "$u" >/dev/null 2>&1 || continue
-        systemctl enable --now "$u"
-      done
-    ); rrc=$?
-    [ "$rrc" -eq 0 ] || log "muster.service.nis_disabled: rollback failed (rc $rrc)"
-    return 1
-  fi
-  log "muster.service.nis_disabled: done"
-}
-fix_muster_service_nis_disabled
-[ "$?" -eq 0 ] || failed=$((failed+1))
-
-# ---- 11/16 muster.service.rpcbind_disabled [risk restart_service] [fail, high]
+# ---- 10/16 muster.service.rpcbind_disabled [risk restart_service] [fail, high]
 # why: clause does not hold
 # do:  Stop and mask rpcbind (systemctl disable --now rpcbind.service rpcbind.socket) unless another RPC service on this host genuinely requires it.
 # ko:  이 호스트의 다른 RPC 서비스가 실제로 필요로 하지 않는다면 rpcbind 를 중지·mask 합니다 (systemctl disable --now rpcbind.service rpcbind.socket).
@@ -472,7 +422,7 @@ fix_muster_service_rpcbind_disabled() {
 fix_muster_service_rpcbind_disabled
 [ "$?" -eq 0 ] || failed=$((failed+1))
 
-# ---- 12/16 muster.service.rservices_disabled [risk restart_service] [fail, high]
+# ---- 11/16 muster.service.rservices_disabled [risk restart_service] [fail, high]
 # why: clause does not hold
 # do:  Disable and mask the rsh, rlogin and rexec services or remove the r-services package, and remove any inetd/xinetd r-services entries. An rsh, rlogin or rexec started by inetd or xinetd is not stopped by the script; remove its entry there.
 # ko:  rsh, rlogin, rexec 서비스를 비활성화·mask 하거나 r-services 패키지를 제거하고, inetd/xinetd 의 r-services 항목을 제거합니다. inetd나 xinetd가 띄우는 rsh, rlogin, rexec는 스크립트가 멈추지 않습니다. 거기서 항목을 지우십시오.
@@ -522,7 +472,7 @@ fix_muster_service_rservices_disabled() {
 fix_muster_service_rservices_disabled
 [ "$?" -eq 0 ] || failed=$((failed+1))
 
-# ---- 13/16 muster.service.tftp_talk_disabled [risk restart_service] [fail, high]
+# ---- 12/16 muster.service.tftp_talk_disabled [risk restart_service] [fail, high]
 # why: clause does not hold
 # do:  Stop and disable the tftp and talk (and ntalk) services or sockets and remove their inetd/xinetd entries. A tftp, talk or ntalk started by inetd or xinetd is not stopped by the script; remove its entry there.
 # ko:  tftp 와 talk(ntalk 포함) 서비스·소켓을 중지·비활성화하거나 inetd/xinetd 의 해당 항목을 제거합니다. inetd나 xinetd가 띄우는 tftp, talk, ntalk는 스크립트가 멈추지 않습니다. 거기서 항목을 지우십시오.
@@ -572,7 +522,7 @@ fix_muster_service_tftp_talk_disabled() {
 fix_muster_service_tftp_talk_disabled
 [ "$?" -eq 0 ] || failed=$((failed+1))
 
-# ---- 14/16 muster.service.snmp_disabled [risk restart_service] [fail, medium]
+# ---- 13/16 muster.service.snmp_disabled [risk restart_service] [fail, medium]
 # why: clause does not hold
 # do:  Stop and disable the SNMP agent (systemctl disable --now snmpd.service) unless it is required, in which case harden it under the U-59/U-60/U-61 controls.
 # ko:  SNMP 에이전트가 필요하지 않다면 중지·비활성화하고 (systemctl disable --now snmpd.service), 필요하다면 U-59/U-60/U-61 점검에 따라 강화합니다.
@@ -613,7 +563,7 @@ fix_muster_service_snmp_disabled() {
 fix_muster_service_snmp_disabled
 [ "$?" -eq 0 ] || failed=$((failed+1))
 
-# ---- 15/16 muster.service.telnet_disabled [risk restart_service] [fail, medium]
+# ---- 14/16 muster.service.telnet_disabled [risk restart_service] [fail, medium]
 # why: clause does not hold
 # do:  Stop and mask the telnet socket and service, or remove the telnet server package; use SSH instead. A telnet started by inetd or xinetd is not stopped by the script; remove its entry there.
 # ko:  telnet 소켓과 서비스를 중지·mask 하거나 telnet 서버 패키지를 제거하고, 대신 SSH 를 사용합니다. inetd나 xinetd가 띄우는 telnet은 스크립트가 멈추지 않습니다. 거기서 항목을 지우십시오.
@@ -663,11 +613,11 @@ fix_muster_service_telnet_disabled() {
 fix_muster_service_telnet_disabled
 [ "$?" -eq 0 ] || failed=$((failed+1))
 
-# ---- 16/16 muster.account.root_remote_login [risk lockout_risk] [fail, high]
+# ---- 15/16 muster.account.root_remote_login [risk lockout_risk] [fail, high]
 # keep a second session open; a lockout here needs console access
 # why: clause does not hold
-# do:  Set PermitRootLogin no in /etc/ssh/sshd_config.d/00-muster.conf, validate with sshd -t, then restart sshd while keeping a second session open. Where /etc/securetty lists pts/* entries instead, remove those lines so no pseudo-terminal can be used for a securetty-gated root login. sshd keeps the first value it reads: a drop-in that sorts before 00-muster.conf, or a PermitRootLogin line before the Include in sshd_config, still wins.
-# ko:  /etc/ssh/sshd_config.d/00-muster.conf 파일에 PermitRootLogin no 를 넣고 sshd -t 로 검증한 뒤, 다른 세션을 열어 둔 채 sshd 를 재시작합니다. 대신 /etc/securetty 에 pts/* 항목이 있다면 그 줄을 제거하여 securetty 로 통제되는 root 로그인에 가상 터미널을 쓸 수 없게 합니다. sshd는 처음 읽은 값을 지키므로 00-muster.conf보다 먼저 정렬되는 드롭인이나 sshd_config의 Include 앞 PermitRootLogin 줄이 여전히 이깁니다.
+# do:  Set PermitRootLogin no in /etc/ssh/sshd_config.d/00-muster.conf, validate with sshd -t, then restart sshd while keeping a second session open. Where /etc/securetty lists pts/* entries instead, remove those lines so no pseudo-terminal can be used for a securetty-gated root login. sshd keeps the first value it reads: a drop-in that sorts before 00-muster.conf, or a PermitRootLogin line before the Include in sshd_config, still wins. The script reloads a running sshd; a Match block that sets PermitRootLogin for root also wins, and the validate then fails and rolls back.
+# ko:  /etc/ssh/sshd_config.d/00-muster.conf 파일에 PermitRootLogin no 를 넣고 sshd -t 로 검증한 뒤, 다른 세션을 열어 둔 채 sshd 를 재시작합니다. 대신 /etc/securetty 에 pts/* 항목이 있다면 그 줄을 제거하여 securetty 로 통제되는 root 로그인에 가상 터미널을 쓸 수 없게 합니다. sshd는 처음 읽은 값을 지키므로 00-muster.conf보다 먼저 정렬되는 드롭인이나 sshd_config의 Include 앞 PermitRootLogin 줄이 여전히 이깁니다. 스크립트는 실행 중인 sshd를 다시 읽게 합니다. root에 PermitRootLogin을 정하는 Match 블록도 이기며, 그러면 validate가 실패하고 롤백합니다.
 fix_muster_account_root_remote_login() {
   backup /etc/ssh/sshd_config.d/00-muster.conf /etc/securetty || { log "muster.account.root_remote_login: backup failed, nothing changed"; return 1; }
   ( set -e
@@ -676,9 +626,11 @@ fix_muster_account_root_remote_login() {
       printf 'PermitRootLogin no\n' > /etc/ssh/sshd_config.d/00-muster.conf
       chmod 644 /etc/ssh/sshd_config.d/00-muster.conf
       sshd -t
+      if systemctl is-active --quiet sshd.service; then systemctl reload sshd.service; fi
+      if systemctl is-active --quiet ssh.service; then systemctl reload ssh.service; fi
     fi
     if [ -f /etc/securetty ]; then
-      sed -i '/^pts\//d' /etc/securetty
+      sed -i '/^[[:space:]]*pts\//d' /etc/securetty
     fi
   ); rc=$?
   if [ "$rc" -ne 0 ]; then
@@ -686,19 +638,27 @@ fix_muster_account_root_remote_login() {
     ( set -e
       rm -f /etc/ssh/sshd_config.d/00-muster.conf
       if command -v sshd >/dev/null 2>&1; then sshd -t; fi
+      if command -v sshd >/dev/null 2>&1; then
+        if systemctl is-active --quiet sshd.service; then systemctl reload sshd.service; fi
+        if systemctl is-active --quiet ssh.service; then systemctl reload ssh.service; fi
+      fi
     ); rrc=$?
     [ "$rrc" -eq 0 ] || log "muster.account.root_remote_login: rollback failed (rc $rrc)"
     restore /etc/ssh/sshd_config.d/00-muster.conf /etc/securetty || log "muster.account.root_remote_login: ROLLBACK INCOMPLETE, backups in $MUSTER_BACKUP"
     return 1
   fi
   ( set -e
-    if command -v sshd >/dev/null 2>&1; then sshd -T 2>/dev/null | grep -qx 'permitrootlogin no'; fi
+    if command -v sshd >/dev/null 2>&1; then sshd -T -C user=root,host=localhost,addr=127.0.0.1 2>/dev/null | grep -qx 'permitrootlogin no'; fi
   ); rc=$?
   if [ "$rc" -ne 0 ]; then
     log "muster.account.root_remote_login: validate failed, rolling back"
     ( set -e
       rm -f /etc/ssh/sshd_config.d/00-muster.conf
       if command -v sshd >/dev/null 2>&1; then sshd -t; fi
+      if command -v sshd >/dev/null 2>&1; then
+        if systemctl is-active --quiet sshd.service; then systemctl reload sshd.service; fi
+        if systemctl is-active --quiet ssh.service; then systemctl reload ssh.service; fi
+      fi
     ); rrc=$?
     [ "$rrc" -eq 0 ] || log "muster.account.root_remote_login: rollback failed (rc $rrc)"
     restore /etc/ssh/sshd_config.d/00-muster.conf /etc/securetty || log "muster.account.root_remote_login: ROLLBACK INCOMPLETE, backups in $MUSTER_BACKUP"
@@ -707,6 +667,57 @@ fix_muster_account_root_remote_login() {
   log "muster.account.root_remote_login: done"
 }
 fix_muster_account_root_remote_login
+[ "$?" -eq 0 ] || failed=$((failed+1))
+
+# ---- 16/16 muster.service.nis_disabled [risk lockout_risk] [fail, high]
+# keep a second session open; a lockout here needs console access
+# why: clause does not hold
+# do:  Stop and disable ypserv and ypbind (systemctl disable --now ypserv.service ypbind.service) and remove nis/nisplus from the passwd and group lines of /etc/nsswitch.conf. On a host whose accounts come from NIS, stopping ypbind cuts those accounts off; change nsswitch first.
+# ko:  ypserv 와 ypbind 를 중지·비활성화하고 (systemctl disable --now ypserv.service ypbind.service) /etc/nsswitch.conf 의 passwd·group 줄에서 nis·nisplus 를 제거합니다. 계정을 NIS에서 받는 호스트에서 ypbind를 멈추면 그 계정이 끊깁니다. 먼저 nsswitch를 바꾸십시오.
+fix_muster_service_nis_disabled() {
+  ( set -e
+    for u in ypserv.service ypbind.service ypxfrd.service yppasswdd.service; do
+      systemctl cat "$u" >/dev/null 2>&1 || continue
+      systemctl disable --now "$u"
+      systemctl mask "$u" || true
+    done
+  ); rc=$?
+  if [ "$rc" -ne 0 ]; then
+    log "muster.service.nis_disabled: script failed (rc $rc), rolling back"
+    ( set -e
+      for u in ypserv.service ypbind.service ypxfrd.service yppasswdd.service; do
+        systemctl cat "$u" >/dev/null 2>&1 || continue
+        systemctl unmask "$u"
+      done
+      for u in ypserv.service ypbind.service ypxfrd.service yppasswdd.service; do
+        systemctl cat "$u" >/dev/null 2>&1 || continue
+        systemctl enable --now "$u"
+      done
+    ); rrc=$?
+    [ "$rrc" -eq 0 ] || log "muster.service.nis_disabled: rollback failed (rc $rrc)"
+    return 1
+  fi
+  ( set -e
+    ! systemctl is-active --quiet ypserv.service && case "$(systemctl is-enabled ypserv.service 2>/dev/null)" in enabled|enabled-runtime) false;; esac && ! systemctl is-active --quiet ypbind.service && case "$(systemctl is-enabled ypbind.service 2>/dev/null)" in enabled|enabled-runtime) false;; esac && ! systemctl is-active --quiet ypxfrd.service && case "$(systemctl is-enabled ypxfrd.service 2>/dev/null)" in enabled|enabled-runtime) false;; esac && ! systemctl is-active --quiet yppasswdd.service && case "$(systemctl is-enabled yppasswdd.service 2>/dev/null)" in enabled|enabled-runtime) false;; esac
+  ); rc=$?
+  if [ "$rc" -ne 0 ]; then
+    log "muster.service.nis_disabled: validate failed, rolling back"
+    ( set -e
+      for u in ypserv.service ypbind.service ypxfrd.service yppasswdd.service; do
+        systemctl cat "$u" >/dev/null 2>&1 || continue
+        systemctl unmask "$u"
+      done
+      for u in ypserv.service ypbind.service ypxfrd.service yppasswdd.service; do
+        systemctl cat "$u" >/dev/null 2>&1 || continue
+        systemctl enable --now "$u"
+      done
+    ); rrc=$?
+    [ "$rrc" -eq 0 ] || log "muster.service.nis_disabled: rollback failed (rc $rrc)"
+    return 1
+  fi
+  log "muster.service.nis_disabled: done"
+}
+fix_muster_service_nis_disabled
 [ "$?" -eq 0 ] || failed=$((failed+1))
 
 if [ "$failed" -eq 0 ]; then
