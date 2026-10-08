@@ -530,9 +530,6 @@ func TestExampleStalenessGate(t *testing.T) {
 	}
 }
 
-// retagControlsDigest returns report with a different <block>.controls_digest,
-// which is how a report collected against an older control set differs from
-// one this build could reproduce.
 // readExample reads a committed example file; a missing one is a failure
 // that names the file and the refresh (Z-14), never a skip.
 func readExample(path, what string) ([]byte, error) {
@@ -563,6 +560,9 @@ func TestReadExampleNamesTheRefresh(t *testing.T) {
 	}
 }
 
+// retagControlsDigest returns report with a different <block>.controls_digest,
+// which is how a report collected against an older control set differs from
+// one this build could reproduce.
 func retagControlsDigest(t *testing.T, report []byte, block, digest string) []byte {
 	t.Helper()
 	var doc map[string]any

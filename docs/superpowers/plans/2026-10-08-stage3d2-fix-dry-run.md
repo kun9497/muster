@@ -1522,10 +1522,39 @@ Whole-branch review workflow → one fix wave + scoped re-review → Execution n
 
 - Pre-flight (three fresh reviewers + three refuters each, 57 agents): 12 survivors (2 Blocking — the lint rule turning the shipped set red before Task 3), 6 refuted, 4 nits, all folded: Z-20..Z-22, the corrected rune count, the capped-block clause, the single-unit `if` form, the examples.yml placement, the lint table's `absent` field, the body that changes `f` before failing, the literal inetd sentences, the root_remote_login text edit, `apt-get update` before installing shellcheck, and the `--dry-run` after `--facts` case.
 
+- Z-27 (whole-branch W1/W2): `hosts_permissions` is `restart_service` — at 0600 non-root processes cannot read /etc/hosts, so `--max-risk none` must not run it; the text says a site keeping 0644 relaxes `allowed_modes`. Z-28 (W4): the script refuses a `MUSTER_BACKUP` that root does not own or that group/other can write (a planted "backup" would be restored over /etc/shadow). Z-29 (W7): `nis_disabled` is `lockout_risk` (stopping ypbind on a NIS client cuts its accounts). Z-30 (critic): the sshd body reloads a running `sshd`/`ssh` after `sshd -t`, and the validate reads persona root (`sshd -T -C user=root,host=localhost,addr=127.0.0.1`), so a Match block for root fails and rolls back. `./internal/remedy/` joins CI's sudo test step so the root-only reject test runs on every PR.
+
 ### What the reviews found
+
+- Controller: Fable 5.1 wrote the design and ran its first review; its usage ran out mid round two (2026-10-08) and the user moved the session to Opus 5.5, which ran the second spec review, the plan, the pre-flight, SDD and the whole-branch review. Commits from then on carry the Opus trailer.
+- Spec reviews: round one 68 survivors (9 Blocking — the remedy↔report import cycle, `( set -e … ) ||` disabling -e, fail-open backup/restore, rollback suppressing restore, …); round two 28 (6 Blocking — the call site still disabling -e, inetd/xinetd in the telnet units, the sshd drop-in losing to an earlier one). Pre-flight 12 (2 Blocking — Task 2's lint rule failing the shipped set before Task 3).
+- Task reviews (opus each, sonnet/opus re-reviews): fix rounds on Tasks 2–7; the real bugs they found were the per-unit service rollback leaving `rpcbind.socket` not listening while its service was masked (reproduced in a container, Z-23), `restore` writing through a destination symlink (Z-25), and a data race in a remedy test helper (9252cb3); everything else was missing tests, each closed by killing the surviving mutant.
+- Whole-branch review (69 agents, five areas, three refuters each, a critic): 13 survivors + 2 critic, 0 Blocking; fixed in one wave (4e7bd0c, e2d0e4d) plus a document fold (39db245); re-review ALL ADDRESSED with container proofs (the live sshd reloaded, PID unchanged, journal shows SIGHUP; a Match block rolls back; a group-writable, 1777, foreign-owned or symlinked MUSTER_BACKUP exits 2).
+- Lab rehearsals of the round trip (Task 8 and its review): ubuntu:22.04 plans hosts and shadow, almalinux/9-init and rockylinux 9-ubi-init plan rpcbind, root_remote_login and hosts; every script exited 0 and every seeded control was PASS after re-collecting. The first real `fix-roundtrip` run on the GitHub runner is recorded at merge.
 
 ### Deviations from the spec, as shipped
 
+- Z-19: the planner function is `remedy.Build` (the spec's `remedy.Plan(...)`), because the type is `Plan`.
+- Z-2/Z-4/Z-3/Z-1: `report.Title(ko, en)`, `report.ProfileLine(p, t)`, `report.HeaderLine(run, musterVersion, controlsVersion, guideEdition)` and `report.StatusColor` as a function.
+- Z-20: the script's line 2 is `# shellcheck disable=SC2181` (the bare call plus `[ "$?" -eq 0 ]` is required).
+- Z-23/Z-24: service rollbacks run two passes; `mask` is best effort.
+- Z-27/Z-29: two controls' risk is the operational impact, not a literal reading of the guide.
+- Z-30: the sshd body reloads the daemon (the spec's validate "proves the step" now covers the live daemon too).
+- The root-only backup-directory reject test skips in CI's non-root test job and runs in the sudo step; the harness strips the ownership line only when not root, after asserting it is present.
+
 ### Numbers
 
+- 27 commits over `a171306` before the examples refresh (design and two folds, plan and pre-flight fold, nine tasks with their fix rounds, the race fix, three document commits, the whole-branch fix wave and doc fold, these notes); 66 files, +8452/−255; Go 23 files (+3683/−156), of which tests 12 files (+2769/−67).
+- `controls/VERSION` `kisa-unix-2026+2026.10.08`; 117 controls, 16 with a script; no verdict change.
+- New package `internal/remedy` (plan, script, table, JSON); five script goldens (`full`, `empty`, `capped`, `poison`, `all-scripted`), three table and two JSON goldens.
+
 ### Parked
+
+- Host proof of the twelve rewritten bodies the round trip does not seed (nine service controls; passwd, services, hosts_lpd) — 3D-2b.
+- A guard that the script runs on the host the snapshot came from (machine id or hostname) — 3D-2b.
+- The pin test checks only `.service`/`.socket` tokens (Task 3 N1).
+- Two controls declaring the same backup path (none today; a set-level lint later).
+- `report.Escape` passing U+2028/U+2029/bidi controls (sh unaffected).
+- The service rollback re-enabling every unit it names, whatever its state before (spec §8; recording the pre-change state is 3D-2b).
+- A file script setting the guide's mode when the row failed on another leaf (Task 3 Q4).
+- systemd's verbose output when a re-run disables already-masked units.
