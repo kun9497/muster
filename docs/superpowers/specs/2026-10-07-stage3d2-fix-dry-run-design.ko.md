@@ -2,7 +2,7 @@
 
 영어 원본: `2026-10-07-stage3d2-fix-dry-run-design.md`. 메인 설계: `2026-09-02-muster-design.ko.md`
 (§4.1 명령, §6.2 스키마, §6.5 상태, §6.6 프로파일, §7 출력, §10.2 로드맵, D24, D33). 프로파일:
-`2026-10-07-stage3d1-profiles-design.ko.md`. 리뷰 이력: fresh 리뷰 워크플로 한 번(261 에이전트)을 이 개정판에
+`2026-10-07-stage3d1-profiles-design.ko.md`. 리뷰 이력: fresh 리뷰 워크플로 두 번(261, 115 에이전트)을 이 개정판에
 접어 넣었습니다. 접은 판정은 아래 X 목록과 §2–§7의 "만들어진 대로" 문장들입니다.
 
 ## 1. 범위와 의도
@@ -20,8 +20,8 @@
 명령에 치환하지 않습니다.
 
 - **X-1 — `fix`는 적용하지 않는다.** 유일한 모드는 `--dry-run`이고 필수입니다: 그것 없는 `muster fix`와
-  다른 모드 단어가 붙은 `fix`는 종료 2와 `fix never applies a remediation (D24); run fix --dry-run`으로
-  거부합니다. 플래그를 필수로 두는 이유는 훗날 누가 "fix"를 읽어도 조용히 적용될 수 없게 하기 위함입니다.
+  인수 중 어디든 위치 단어(`apply` 같은 모드 단어)가 있는 `fix`는 종료 2와 `fix never applies a remediation
+  (D24); run fix --dry-run`으로 거부하며 — 다른 어떤 플래그 오류보다 먼저 검사합니다(§6). 플래그를 필수로 두는 이유는 훗날 누가 "fix"를 읽어도 조용히 적용될 수 없게 하기 위함입니다.
   스크립트는 stdout의 파일이고 muster는 그것을 실행하지 않으며, `internal/remedy`는 `os/exec`를 결코
   임포트하지 않습니다.
 - **X-2 — 적용 중인 프로파일의 실패, 평가기가 분류한 대로.** 계획의 항목은 waiver 파일이 적용된 뒤 상태가
@@ -46,7 +46,7 @@
   스크립트 본문에서 경로를 유도하지 않고, 스냅샷 값이나 파라미터를 명령에 치환하지 않습니다. 컨트롤의
   파라미터가 판정을 완화만 하는 곳에서 스크립트는 가이드의 기본값을 적용합니다(파일 권한 스크립트 다섯은
   가이드의 모드를 정함); 컨트롤의 파라미터가 프로파일이나 튜닝 파일에서 와 적용 중이면 항목은 텍스트
-  전용(`params tuned`)이라, 계획이 사이트가 의도적으로 완화한 것을 조이는 일이 없습니다. 명령이 파라미터
+  전용(`text_only_reason: params_tuned`)이라, 계획이 사이트가 의도적으로 완화한 것을 조이는 일이 없습니다. 명령이 파라미터
   값을 실어야 하는 교정은 이번 사이클에 `script`를 갖지 않습니다(§8).
 - **X-6 — 되돌릴 길이 없으면 스크립트도 없다.** 린트는 `rollback`도 비어 있지 않은 `backup`도 없는
   `script`, `idempotent`가 아닌 컨트롤의 `script`, `script` 없는 `backup`이나 `validate`, 여러 줄
@@ -66,8 +66,9 @@
   이미 따르는 다이제스트 규칙 아래 비교합니다.
 - **X-10 — `validate`는 단계를 증명하지 판정을 증명하지 않는다.** 블록의 `done`은 그 명령이 돌았고 그
   검사가 성립했다는 뜻이고, 컨트롤이 이제 통과하는지는 `check`가 말합니다. 스크립트의 꼬리말이 그렇게 말하고
-  다음에 돌릴 두 명령을 댑니다; 라운드트립 잡(§7)이 열여섯 스크립트가 지정 이미지에서 컨트롤을 `PASS`로
-  돌린다는 증명입니다.
+  다음에 돌릴 두 명령을 댑니다. 라운드트립 잡(§7)은 지정 이미지에서 심어 둔 컨트롤의 스크립트가 그것을
+  고친다는 것을 증명하고, 열여섯의 나머지 본문은 구문으로 증명되며(`sh -n`, 전체 스크립트 골든에 대한
+  shellcheck) 호스트 증명은 3D-2b에서 받습니다(§8).
 
 ## 2. 아키텍처
 
@@ -86,10 +87,11 @@ Plan ──remedy.Table / remedy.JSON / remedy.Script──▶ stdout
   않습니다.
 - **`internal/report`(확장, 내보내기만).** fix 렌더러가 공유하는 조각을 동작 그대로 내보냅니다: `Escape`(제어
   문자를 글자로 적고 `MaxCell`에서 `…`로 자름), `EscapeNoCut`(자르기 없는 같은 switch — 계획의 본체인
-  컨트롤 텍스트용), `MaxCell`, `Paint`, `StatusColor`, `ProfileLine(cb CheckBlock) string`, `ReasonLine(row
-  Row) string`, `Title(row Row) string`(`title_ko`, 없으면 `title_en`), `HeaderLine(run facts.Run, cb
-  CheckBlock) string` — check 표의 첫 줄을 `WriteTable`에서 끌어낸 것으로, 두 표가 함수 하나를 불러 줄이
-  바이트 동일하게 남습니다. `Row`, `Report`, `Build`는 그대로; `report`는 `remedy`를 임포트하지 않습니다.
+  컨트롤 텍스트용), `MaxCell`, `Paint`, `StatusColor`, `ProfileLine(p ProfileBlock, t *TuningBlock) string`,
+  `ReasonLine(row Row) string`, `Title(row Row) string`(`title_ko`, 없으면 `title_en`; 지금은 `WriteTable` 안에
+  인라인), `HeaderLine(run facts.Run, musterVersion, controlsVersion, guideEdition string) string` — check 표의
+  첫 줄을 `WriteTable`에서 끌어낸 것으로, 두 표가 함수 하나를 불러 줄이 바이트 동일하게 남고, fix 표는 둘 다를
+  자기 `FixBlock`에서 채웁니다. `Row`, `Report`, `Build`는 그대로; `report`는 `remedy`를 임포트하지 않습니다.
 - **`internal/check`(확장, 상수만).** 평가기가 이미 쓰는 reason 모양 셋을 내보낸 상수로: `ReasonDegradedPrefix
   = "collection was degraded: "`, `ReasonSideOnlyPrefix = "setting holds on one side only: "`,
   `ReasonAbsentFailPrefix = "absent counts as fail: "`; `eval.go`가 reason을 만드는 곳에서 그것을 쓰고,
@@ -98,11 +100,11 @@ Plan ──remedy.Table / remedy.JSON / remedy.Script──▶ stdout
 - **`internal/controls`(확장).** `Remediation`에 `Backup []string`(`yaml:"backup,omitempty"`)과 `Validate
   string`(`yaml:"validate,omitempty"`); `Lint`에 §3의 규칙; strict 로더는 변경 없음(미지 키는 이미 거부).
 - **`cmd/muster`(확장).** `fix` 디스패치; `runFix`는 `fixFlags`를 파싱한 뒤 `runCheck`가 부르는 헬퍼를 같은
-  순서로 정확히 부릅니다 — `openFacts`, `resolveSelection`, waiver 적재(`runCheck`에서 `loadWaivers(path
+  순서로 정확히 부릅니다 — `openFacts`, 컨트롤 세트와 레지스트리 적재, `resolveSelection`, waiver 적재(`runCheck`에서 `loadWaivers(path
   string) (*waiver.File, error)`로 끌어올리고 `runCheck`도 같은 커밋에서 그것으로 바꿈), `newCheckBlock`(예시
   테스트도 쓰는 G-14 심), `report.Build` — 그리고 `*report.Report`를 `remedy.Plan`에 넘깁니다. 새 평가 함수
-  없음, 심을 건너는 플래그 구조체 없음. `fix`는 euid 0에서 check의 root 경고(`fix does not need root`)를
-  찍습니다.
+  없음, 심을 건너는 플래그 구조체 없음. euid 0에서 `fix`는 check가 자기 root 경고를 찍는 곳인 stderr에
+  `muster: warning: fix does not need root`를 찍습니다.
 - 구조상 순환 없음: `remedy → report → check`, `remedy → check`; `remedy`를 임포트하는 것은
   `cmd/muster`뿐.
 
@@ -117,7 +119,7 @@ remediation:
   text_ko: /etc/ssh/sshd_config.d/ 아래 파일에 PermitRootLogin no 를 넣고 sshd -t 로 검증한 뒤 …
   risk: lockout_risk               # none | restart_service | reboot_required | lockout_risk
   idempotent: true
-  backup: [/etc/ssh/sshd_config.d/90-muster.conf, /etc/securetty]
+  backup: [/etc/ssh/sshd_config.d/00-muster.conf, /etc/securetty]
   script: |
     …
   validate: if command -v sshd >/dev/null 2>&1; then sshd -T 2>/dev/null | grep -qx 'permitrootlogin no'; fi
@@ -125,29 +127,33 @@ remediation:
     …
 ```
 
-**린트 규칙** — 각각 컨트롤과 필드를 이름 대는 문제(지금처럼 `add("remediation", …)`), 각각 `TestLintRules`
-케이스 하나(다른 모든 린트 규칙처럼 `lintOne`을 통한 인라인 YAML)로 규칙 이름과 메시지 부분 문자열을 단언:
+**린트 규칙** — 각각 규칙이 `remediation`(제목 규칙은 `titles`)이고 메시지가 아래와 같은 문제(`Problem.String`이
+`path: rule: message`를 찍으므로 메시지에는 접두사가 없음), 각각 `TestLintRules` 케이스 하나(다른 모든 린트
+규칙처럼 `lintOne`을 통한 인라인 YAML)로 규칙 이름과 메시지 부분 문자열을 단언. "한 줄"은 끝 개행 하나를
+잘라낸 뒤 줄바꿈이 없다는 뜻이고, 빈 `script`/`validate`/`rollback` 문자열은 없는 것으로 읽으며, "비어 있음"은
+공백뿐이라는 뜻:
 
 - `remediation`이 있으면 `text_en`과 `text_ko`가 필수이고, 개행·캐리지 리턴·C0 바이트가 없으며, 1000룬
-  이하 — `remediation: text_%s is blank` / `carries a line break or control character` / `is longer than 1000
-  runes`. 같은 제어 문자 금지 규칙이 `title_en`/`title_ko`에도(배포된 모든 컨트롤이 이미 따름; 고정).
+  이하 — `text_%s is blank` / `text_%s carries a line break or control character` / `text_%s is longer than
+  1000 runes`. 같은 제어 문자 금지 규칙이 규칙 `titles` 아래 `title_en`/`title_ko`에도 — `title_%s carries a
+  line break or control character`(배포된 모든 컨트롤이 이미 따름; 고정).
 - `risk`는 네 단어 중 하나(변경 없음).
-- `script`는 `idempotent: true`를 요구 — `remediation: script requires idempotent: true`(비멱등 컨트롤 둘,
+- `script`는 `idempotent: true`를 요구 — `script requires idempotent: true`(비멱등 컨트롤 둘,
   `file/dev_no_stale_files`와 `file/ip_port_restriction`은 스크립트가 없음).
-- `script`는 되돌릴 길을 요구: `rollback`이 비어 있지 않거나 `backup`이 비어 있지 않음 — `remediation:
-  script without rollback or backup`.
-- `backup`과 `validate`는 `script`를 요구 — `remediation: backup without script` / `remediation: validate
-  without script`.
-- 모든 `backup` 항목은 절대 경로이고 자기 `path.Clean`과 같으며 `/`로 끝나지 않고 `^/[A-Za-z0-9._@:+/-]+$`에
-  맞으며(그래서 `sh`에서 맨 단어로 안전; 공백·따옴표·`$`·백틱·`;`·글롭 문자 없음) 목록 안에서 유일 —
-  `remediation: backup path %q is not absolute` / `is not clean` / `names a directory` / `carries a
-  character the script cannot carry` / `is repeated`. 순서는 작성자의 것이고 생성기가 지킵니다. 항목은 일반
-  파일이나 심볼릭 링크를 이름 대고 디렉터리는 아닙니다(`restore`는 디렉터리를 바꿔 넣을 수 없음); 아직 없을
-  수 있는 경로는 허용(`backup`은 건너뛰고 `restore`는 `rollback`에 맡김).
-- `validate`는 한 줄 — `remediation: validate must be one line`. 여러 조건은 `&&`로 잇고, 부정 조건은 그 한
+- `script`는 되돌릴 길을 요구: `rollback`이 비어 있지 않거나 `backup`이 비어 있지 않음 — `script without rollback or
+  backup`.
+- `backup`과 `validate`는 `script`를 요구 — `backup without script` / `validate without
+  script`.
+- 모든 `backup` 항목은 절대 경로이고 자기 `path.Clean`과 같으며(그래서 끝에 `/`가 없음)
+  `^/[A-Za-z0-9._@:+/-]+$`에 맞으며(그래서 `sh`에서 맨 단어로 안전; 공백·따옴표·`$`·백틱·`;`·글롭 문자 없음)
+  목록 안에서 유일 — `backup path %q is not absolute` / `backup path %q is not clean` / `backup path %q carries
+  a character the script cannot carry` / `backup path %q is repeated`. 순서는 작성자의 것이고 생성기가
+  지킵니다. 항목은 일반 파일이나 심볼릭 링크를 이름 대고 디렉터리는 아닙니다(`restore`는 디렉터리인 대상을
+  거부함, §5); 아직 없을 수 있는 경로는 허용(`backup`은 건너뛰고 `restore`는 `rollback`에 맡김).
+- `validate`는 한 줄 — `validate must be one line`. 여러 조건은 `&&`로 잇고, 부정 조건은 그 한
   AND 목록 안에 `! cmd`로 쓰며, 목록의 상태가 판정입니다.
-- `script`, `validate`, `rollback`은 있으면 트림 뒤 비어 있지 않고 — `remediation: %s is blank` —
-  here-document(`<<`)가 없음 — `remediation: %s carries a here-document`(생성기가 본문을 들여쓰므로
+- `script`, `validate`, `rollback`은 있으면 비어 있지 않고 — `%s is blank` — here-document(`<<`)가 없음 —
+  `%s carries a here-document`(생성기가 본문을 들여쓰므로
   종결자가 0열에서 밀려남).
 - 린트는 셸을 파싱하지 않습니다. 전체 스크립트 골든(§7)에 대한 CI의 `shellcheck`와 `sh -n`이 본문의
   게이트입니다.
@@ -159,10 +165,12 @@ remediation:
 - 유닛을 다루는 본문은 유닛마다, 존재 확인을 하고 하므로 이 배포판이 싣지 않는 유닛은 건너뛰고 진짜
   실패는 드러납니다: `for u in telnet.socket telnet.service telnetd.service; do systemctl cat "$u" >/dev/null
   2>&1 || continue; systemctl disable --now "$u"; systemctl mask "$u"; done`. 서비스 컨트롤의 script·validate·
-  rollback의 유닛 목록은 `internal/collect/collectors/services.go`에서 그 논리 서비스 행의 `units` 목록
-  (`tftp_talk_disabled`는 `tftp`와 `talk` 행)을 그대로; `cmd/muster`의 테스트(두 패키지를 임포트할 수 있음)가
-  수집기가 조사하는 모든 유닛이 컨트롤의 스크립트에 있음을 고정합니다. 슈퍼서버(inetd/xinetd)가 띄우는
-  서비스는 스크립트가 교정하지 않습니다; `text_en`이 그렇게 말하고 블록 뒤에도 `reachable` 리프가 컨트롤을
+  rollback의 유닛 목록은 `internal/collect/collectors/services.go`에서 그 논리 서비스 행의 유닛 중
+  `provesInstall`이 true인 것(서비스 자신인 유닛; `tftp_talk_disabled`는 `tftp`와 `talk` 행)입니다 —
+  `inetd.service`/`xinetd.service`는 서비스의 호스트로서 조사되며 스크립트에 결코 들어가지 않습니다. 그것을
+  고정하는 테스트는 `internal/collect/collectors`에 있고(표처럼 Linux 태그; 임베드된 컨트롤 세트를 읽음), 행의
+  `provesInstall: true` 유닛이 모두 컨트롤의 script·validate·rollback에 있고 `provesInstall: false` 유닛은
+  하나도 없음을 단언합니다. 슈퍼서버가 띄우는 서비스는 스크립트가 교정하지 않습니다; `text_en`이 그렇게 말하고 블록 뒤에도 `reachable` 리프가 컨트롤을
   `FAIL`로 둘 수 있습니다.
 - 파일을 다루는 본문은 먼저 파일이 있는지 확인하고 없으면 블록을 실패시킵니다(첫 명령 `[ -f /etc/hosts ]`)
   — 없는 파일은 잘못된 모드와 다른 발견이고, 계획이 그런 행을 이미 텍스트 전용으로 만들었으므로(X-2) 이
@@ -171,26 +179,34 @@ remediation:
   >/dev/null 2>&1; then setfacl -b /etc/passwd; fi`(`acl` 패키지는 모든 최소 이미지에 있지 않음).
 - 스크립트는 `umask 077` 아래 돕니다: 남이 읽어야 하는 파일을 만드는 본문은 모드를 명시적으로 정하고
   (`chmod 644`) validate가 그것을 검사합니다.
-- `validate`는 컨트롤이 판정하고 스크립트가 정하는 리프만 정확히 검사하고 그 밖은 아닙니다: 파일 컨트롤은
-  숫자 소유자/그룹/모드를 `stat -c`로 비교하고, 서비스 컨트롤은 종료 코드가 아니라 찍힌 활성화 상태를
-  읽습니다(`systemctl is-enabled`는 `static`, `indirect`, `alias`에도 0으로 끝남).
+- `validate`는 스크립트가 정한 것 중 `stat`이나 데몬 질의가 보여 줄 수 있는 것을 검사하고, 스크립트가 정하지
+  않은 것은 검사하지 않습니다: 파일 컨트롤은 숫자 소유자, 그룹(스크립트가 정하는 곳에서), 모드를 `stat -c`로
+  비교하고, 서비스 컨트롤은 종료 코드가 아니라 찍힌 활성화 상태를 읽으며(`systemctl is-enabled`는 `static`,
+  `indirect`, `alias`에도 0으로 끝남), sshd 컨트롤은 `sshd -T`에 묻습니다. ACL 제거와 `/etc/securetty` 편집은
+  validate가 다시 검사하지 않습니다: `check`가 증명합니다(X-10).
 - 본문은 POSIX `sh`이고 기본 심각도에서 shellcheck를 통과합니다(`A && B || C`는 `if`로); `make shellcheck`가
   전체 스크립트 골든에 대해 로컬에서 같은 것을 돌립니다.
 - 선언된 `rollback`은 스크립트가 만들었거나 한 것을 되돌립니다(드롭인 제거, 유닛 재활성화); 생성기의
   `restore`가 그 뒤에 선언된 백업을 되돌리므로 rollback이 파일을 복원할 필요는 없습니다.
+- sshd 본문에는 동작하는 `sshd -t`가 필요합니다: 호스트 키가 있고, 소켓 활성화 호스트에서는 권한 분리
+  디렉터리(`[ -d /run/sshd ] || mkdir -p /run/sshd`, `command -v sshd`로 보호)가 있어야 하며, 그래도
+  `sshd -t`가 실패하는 곳에서는 블록이 안전하게 실패하고 롤백합니다. sshd는 키워드마다 처음 읽은 값을 지키고
+  드롭인을 사전 순으로 포함하므로 드롭인은 `00-muster.conf`입니다; 그보다 앞에 정렬되는 드롭인이나
+  `sshd_config`의 `Include` 앞에 있는 `PermitRootLogin` 줄은 여전히 이깁니다 — `text_en`이 그렇게 말하고, 그때
+  validate가 실패하고 블록이 롤백합니다.
 
-**열여섯(X-7), 이번 사이클에 재작성된 대로.** 아래의 정확한 문자열이 계약입니다. 구현자는 복사하고,
-골든이 렌더링하고, 라운드트립이 증명합니다.
+**열여섯(X-7), 이번 사이클에 재작성된 대로.** 표는 각 본문의 형태 — 명령, 그 순서, 보호, validate의 절 —
+를 정합니다. 문자 그대로의 본문은 계획에 쓰이고, `all-scripted.sh`가 렌더링하며 그 골든이 고정합니다.
 
 | 컨트롤 | backup | script(형태) | validate | rollback |
 |---|---|---|---|---|
 | `file/hosts_permissions` | `/etc/hosts` | `[ -f /etc/hosts ]`; `chown root:root /etc/hosts`; `chmod 600 /etc/hosts` | `stat -c '%u %g %a' /etc/hosts \| grep -qx '0 0 600'` | restore_backup |
 | `file/services_permissions` | `/etc/services` | 위와 같되 `644` | `… \| grep -qx '0 0 644'` | restore_backup |
 | `file/hosts_lpd_permissions` | `/etc/hosts.lpd` | 위와 같되 `600` | `… \| grep -qx '0 0 600'` | restore_backup |
-| `file/passwd_permissions` | `/etc/passwd` | `[ -f …]`; `chown root:root`; `chmod 644`; 보호된 `setfacl -b` | `stat -c '%u %g %a' /etc/passwd \| grep -qx '0 0 644'` | restore_backup |
-| `file/shadow_permissions` | `/etc/shadow` | `[ -f …]`; `chown root`; `chmod 400`; 보호된 `setfacl -b`(그룹은 배포판의 것: Debian은 `shadow`, EL은 `root` — 판정하지도 정하지도 않음) | `stat -c '%u %a' /etc/shadow \| grep -qx '0 400'` | restore_backup |
-| `service/*_disabled`(10) | 없음(유닛 상태는 파일이 아님) | 수집기의 `units`에 대한 유닛별 루프: `systemctl cat` 보호, `disable --now`, `mask` | 같은 유닛에 대한 AND 목록 하나: `for` 없이, 예: `! systemctl is-active --quiet telnet.socket && case "$(systemctl is-enabled telnet.socket 2>/dev/null)" in enabled\|enabled-runtime) false;; esac && …`(유닛마다 절 한 쌍) | 선언: 유닛별 루프, `systemctl cat` 보호, `unmask`, 스크립트가 이름 대는 모든 유닛에 `enable --now`(변경 전 상태는 기록하지 않음, §8) |
-| `account/root_remote_login` | `/etc/ssh/sshd_config.d/90-muster.conf`, `/etc/securetty` | 보호된 sshd 드롭인(`chmod 644`), `sshd -t`; 보호된 `sed -i '/^pts\//d' /etc/securetty` | `if command -v sshd >/dev/null 2>&1; then sshd -T 2>/dev/null \| grep -qx 'permitrootlogin no'; fi` | 선언: `rm -f /etc/ssh/sshd_config.d/90-muster.conf`, 보호된 `sshd -t`; `restore`가 `/etc/securetty`를 되돌림 |
+| `file/passwd_permissions` | `/etc/passwd` | `[ -f /etc/passwd ]`; `chown root:root`; `chmod 644`; 보호된 `setfacl -b` | `stat -c '%u %g %a' /etc/passwd \| grep -qx '0 0 644'` | restore_backup |
+| `file/shadow_permissions` | `/etc/shadow` | `[ -f /etc/shadow ]`; `chown root`; `chmod 400`; 보호된 `setfacl -b`(그룹은 배포판의 것: Debian은 `shadow`, EL은 `root` — 판정하지도 정하지도 않음) | `stat -c '%u %a' /etc/shadow \| grep -qx '0 400'` | restore_backup |
+| `service/*_disabled`(10) | 없음(유닛 상태는 파일이 아님) | 행의 `provesInstall` 유닛에 대한 유닛별 루프: `systemctl cat` 보호, `disable --now`, `mask` | 같은 유닛에 대한 AND 목록 하나: `for` 없이, 예: `! systemctl is-active --quiet telnet.socket && case "$(systemctl is-enabled telnet.socket 2>/dev/null)" in enabled\|enabled-runtime) false;; esac && …`(유닛마다 절 한 쌍) | 선언: 유닛별 루프, `systemctl cat` 보호, `unmask`, 스크립트가 이름 대는 모든 유닛에 `enable --now`(변경 전 상태는 기록하지 않음, §8) |
+| `account/root_remote_login` | `/etc/ssh/sshd_config.d/00-muster.conf`, `/etc/securetty` | `command -v sshd`로 보호: `/run/sshd` 보호, `printf 'PermitRootLogin no\n' > /etc/ssh/sshd_config.d/00-muster.conf`, 거기에 `chmod 644`, `sshd -t`; 보호된 `sed -i '/^pts\//d' /etc/securetty` | `if command -v sshd >/dev/null 2>&1; then sshd -T 2>/dev/null \| grep -qx 'permitrootlogin no'; fi` | 선언: `rm -f /etc/ssh/sshd_config.d/00-muster.conf`, 보호된 `sshd -t`; `restore`가 `/etc/securetty`를 되돌림 |
 
 `controls/VERSION`이 움직이고(열여섯이 바뀜) 세트 다이제스트도 움직입니다; 판정은 바뀌지 않으므로 어느
 픽스처의 기대 상태도 바뀌지 않고 `TestEveryMutantIsKilled`도 영향 없음(필드가 모든 판정 밖). CHANGELOG가
@@ -203,11 +219,11 @@ Controls 아래 기록합니다.
 
 ```
 Plan
-  schema_version  int                  report.ReportSchemaVersion(계획은 새 문서; §5.7 변경 없음)
+  schema_version  int                  remedy.PlanSchemaVersion(= 1; 계획 자신의 것, 계획 모양이 바뀔 때만 올림)
   run             facts.Run            스냅샷의 run 블록, check의 것과 바이트 동일
   fix             FixBlock             muster_version, commit, controls_version, controls_digest, snapshot_digest,
                                        guide_edition, profile(ProfileBlock), tuning(*TuningBlock, --tuning 없으면
-                                       생략), waivers(check의 WaiverBlock), max_risk
+                                       생략), waivers(report.WaiversBlock), max_risk
   items           []Item               순서: risk 순위 ↑, 심각도 순위(high, medium, low), id
   not_planned     []NotPlanned         {id, status: error | manual | warn_degraded, reason} id 순
   summary         Summary              planned, above_max_risk, with_script, text_only, waived, clean,
@@ -245,6 +261,9 @@ Item
   `by_risk`에 셉니다. `with_script`와 `text_only`는 계획된 항목을 나눕니다.
 - 항목은 컨트롤 하나입니다. 실패 주체가 여럿인 `each` 컨트롤은 `reason`이 행의 것인 항목 하나이고, 주체별
   세부는 `check`의 몫입니다. 주체가 모두 면제된 컨트롤은 `WAIVED`.
+- `not_planned[].reason`은 `Item.reason`처럼 `report.ReasonLine(row)`.
+- 항목은 모든 항목에 걸쳐 계획 순서로 1..N 번호를 받고(N = `len(items)`), 상한 밖 항목도 번호를 유지합니다.
+  `by_risk`는 모든 항목을 세므로 네 수의 합은 `len(items)` = `planned + above_max_risk`.
 - 빈 목록은 `null`이 아니라 `[]`; `not_planned`는 비어도 있음.
 
 ## 5. 스크립트
@@ -267,21 +286,25 @@ set -u
 umask 077
 [ "$(id -u)" -eq 0 ] || { printf 'muster-fix: run as root\n' >&2; exit 2; }
 MUSTER_BACKUP="${MUSTER_BACKUP:-/var/backups/muster/$(date +%Y%m%dT%H%M%S)}"
-case "$MUSTER_BACKUP" in /?*) ;; *) printf 'muster-fix: MUSTER_BACKUP must be an absolute path\n' >&2; exit 2;; esac
+case "$MUSTER_BACKUP" in
+  /|//*|*/.|*/..|*/./*|*/../*) printf 'muster-fix: MUSTER_BACKUP must be a clean absolute path\n' >&2; exit 2;;
+  /?*) ;;
+  *) printf 'muster-fix: MUSTER_BACKUP must be a clean absolute path\n' >&2; exit 2;;
+esac
 mkdir -p "$MUSTER_BACKUP" || exit 2
 log() { printf 'muster-fix: %s\n' "$*"; }
 backup() {
   for p in "$@"; do
-    [ -e "$p" ] || continue
-    if [ -e "$MUSTER_BACKUP$p" ]; then log "$p: backup exists, keeping the first"; continue; fi
+    { [ -e "$p" ] || [ -L "$p" ]; } || continue
+    if [ -e "$MUSTER_BACKUP$p" ] || [ -L "$MUSTER_BACKUP$p" ]; then log "$p: backup exists, keeping the first"; continue; fi
     mkdir -p "$MUSTER_BACKUP$(dirname "$p")" && cp -a "$p" "$MUSTER_BACKUP$p" || return 1
   done
 }
 restore() {
   rc=0
   for p in "$@"; do
-    [ -e "$MUSTER_BACKUP$p" ] || continue
-    if [ -d "$p" ] && [ ! -L "$p" ]; then log "restore: $p is now a directory, left as is"; rc=1; continue; fi
+    { [ -e "$MUSTER_BACKUP$p" ] || [ -L "$MUSTER_BACKUP$p" ]; } || continue
+    if [ -d "$p" ]; then log "restore: $p is now a directory, left as is"; rc=1; continue; fi
     cp -a "$MUSTER_BACKUP$p" "$p" || { log "restore: $p failed"; rc=1; }
   done
   return $rc
@@ -289,16 +312,19 @@ restore() {
 failed=0
 ```
 
-- `backup`은 없는 선언 경로를 건너뛰고, 백업 디렉터리에 이미 있는 사본은 덮어쓰지 않으며(같은
-  `MUSTER_BACKUP`으로 두 번 돌려도 첫 원본 사본이 남음), 첫 실패한 복사에서 1을 돌려줍니다. `restore`는
-  사본이 있는 모든 경로를 되돌리고, 디렉터리가 된 대상은 거부하며, 하나라도 되돌릴 수 없으면 1을
-  돌려줍니다.
+- 존재는 내내 `-e || -L`이므로, 심볼릭 링크(끊겼든 상대 대상이든)는 링크로 백업되고 복원됩니다. `backup`은
+  없는 선언 경로를 건너뛰고, 백업 디렉터리에 이미 있는 사본은 덮어쓰지 않으며, 첫 실패한 복사에서 1을
+  돌려줍니다. `restore`는 사본이 있는 모든 경로를 되돌리고, 디렉터리인 대상(디렉터리를 가리키는 링크 포함)은
+  거부하며, 하나라도 되돌릴 수 없으면 1을 돌려줍니다. `MUSTER_BACKUP` 디렉터리를 다시 쓰면 첫 실행의 사본이
+  남습니다: 나중 실행에서 실패한 블록은 파일을 첫 실행 전 상태로 되돌리고 그 사이의 편집은 버립니다 — 의도된
+  것이며(첫 사본이 원본), 꼬리말이 어느 디렉터리를 썼는지 말합니다. `/`, `//…`, `.`이나 `..` 구성 요소가 있는
+  경로는 거부합니다.
 
 스크립트가 있는 계획 항목(`<fn>`은 `fix_` + id의 모든 `.`을 `_`로; id 문법이 그 밖은 허용하지 않음):
 
 ```sh
-# ---- 1/7 muster.file.hosts_permissions [risk none] [fail, high]
-# why: a clause does not hold: files.etc_hosts.mode in [0 128 256 384]
+# ---- 1/8 muster.file.hosts_permissions [risk none] [fail, high]
+# why: clause does not hold: files.etc_hosts.mode in [0 128 256 384]
 # do:  chown root:root /etc/hosts; chmod 600 /etc/hosts
 # ko:  chown root:root /etc/hosts; chmod 600 /etc/hosts
 fix_muster_file_hosts_permissions() {
@@ -323,20 +349,26 @@ fix_muster_file_hosts_permissions() {
   fi
   log "muster.file.hosts_permissions: done"
 }
-fix_muster_file_hosts_permissions || failed=$((failed+1))
+fix_muster_file_hosts_permissions
+[ "$?" -eq 0 ] || failed=$((failed+1))
 ```
 
-- **서브셸이 조건이 아닌 이유.** `( set -e … ); rc=$?`는 본문을 평범한 명령으로 돌리므로 안에서 `set -e`가
-  살아 있습니다; `||`의 왼쪽이나 `if` 안의 서브셸은 POSIX가 `-e`를 무시해 마지막 명령의 상태만 셉니다.
-  validate와 선언된 rollback 서브셸도 같은 모양입니다.
+- **서브셸도 호출도 조건이 아닌 이유.** `( set -e … ); rc=$?`는 본문을 평범한 명령으로 돌리므로 안에서
+  `set -e`가 살아 있습니다. POSIX는 명령이 `||`/`&&`의 피연산자, `if`/`while`의 조건이거나 `!`로 부정될 때 그
+  명령이 돌리는 모든 것에 대해 `-e`를 무시합니다 — 그 자리의 서브셸도, 마찬가지로 그 자리에서 불린 함수도
+  그렇고, 함수는 안의 모든 서브셸을 함께 끌고 갑니다. 그래서 블록 함수는 자기 줄에서 평범한 명령으로 부르고
+  그 상태는 다음 줄에서 읽으며(`[ "$?" -eq 0 ] || failed=…`), 어떤 호출 줄도 `||`, `&&`, `if`, `!`를 싣지
+  않습니다. validate와 선언된 rollback 서브셸도 같은 서브셸 모양입니다.
 - `backup` 줄은 컨트롤이 경로를 선언할 때만 나오고(그러면 블록은 실패한 복사에서 멈춤), validate 서브셸은
   선언될 때만 나옵니다. 실패 경로는: 선언된 `rollback` 본문을 자기 `( set -e … ); rc=$?` 서브셸에서(실패는
   `rollback failed (rc N)`으로 로그, 재시도 없음), 그다음 백업이 선언됐으면 `restore <경로들>` — `both`는
   둘을 그 순서로 돌립니다.
 - `lockout_risk` 항목은 헤더 뒤에 주석 한 줄이 더 붙습니다: `# keep a second session open; a lockout here
   needs console access`.
-- 스크립트 없는 계획 항목은 주석 블록만: 헤더, `why:`, `do:`, `ko:`, 그리고 `# text only: <no script declared
-  | the finding is an absent file | params tuned, see check.params>`; 함수도 호출도 없음.
+- 스크립트 없는 계획 항목은 주석 블록만: 헤더, `why:`, `do:`, `ko:`, 그리고 `# text only: <phrase>` — phrase는
+  `text_only_reason`에서 일대일로 대응(`no_script` → `no script declared`, `absent` → `the finding is an absent
+  file`, `params_tuned` → `params tuned, see muster check --format json: check.param_sources`); 함수도 호출도
+  없음.
 - `--max-risk` 밖 항목은 헤더 줄을 접두사 없이 한 번, `-- above max-risk <level>, NOT RUN`으로 끝나게
   렌더링하고, 블록의 이어지는 모든 줄은 빈 줄 포함 `#` 다음 공백과 그 줄(줄이 비어 있지 않을 때), 비어
   있으면 `#`만; 이미 주석인 줄은 다시 접두사를 붙이지 않습니다. 상한 밖 텍스트 전용 항목은 헤더 접미사만
@@ -356,7 +388,7 @@ log "a block's done means its commands ran and its check held; run muster collec
 
 빈 계획은 머리말, `# nothing to fix` 한 줄, 꼬리말을 렌더링하므로 여전히 0으로 끝나는 유효한 스크립트입니다.
 
-테스트로 고정하는 안전 계약(§7): 출력의 모든 줄은 템플릿 텍스트, 선언된 본문의 줄, 또는 `#` 주석 중
+테스트로 고정하는 안전 계약(§7): 어떤 블록 호출 줄도 `||`/`&&`/`if`/`!`의 피연산자가 아님; 출력의 모든 줄은 템플릿 텍스트, 선언된 본문의 줄, 또는 `#` 주석 중
 하나 — 스냅샷이나 컨트롤에서 온 것은 그 밖 어디에도 없음; 두 번 렌더가 바이트 동일; 생성기는 시계를
 부르지 않음; 모든 골든의 출력이 기본 심각도의 `sh -n`과 `shellcheck -s sh`를 통과; 독 계획(host·reason·
 제목·텍스트에 ESC·개행·`#`)의 모든 유래 바이트가 주석 줄 안에 있음.
@@ -378,21 +410,25 @@ flags:
   --color auto|always|never    colour (default auto); --no-color = never
 ```
 
-- `--dry-run`은 인수 어딘가에 있어야 합니다(X-1). `fix` 뒤의 다른 첫 단어(`apply`, `run`, …)나 부재는 X-1
-  거부입니다.
+- `--dry-run`은 다른 플래그와 같은 플래그이고 인수 중 어디에나 올 수 있습니다. 플래그 파싱 전에, `-`로
+  시작하지 않고 플래그의 값도 아닌 인수(어디에 있든 `apply`나 `run` 같은 모드 단어)나 `--dry-run`의 부재는
+  정확한 텍스트의 X-1 거부입니다. 그 밖의 미지 플래그는 모두 `unknown flag <x>`, 종료 2.
 - `--profile`, `--tuning`, `--waivers`는 check와 정확히 같은 의미·거부·경고(`profile.Resolve`,
   `tuning.Load`, root에서의 신뢰 파일 규칙, `warnTo(stderr)`). 빈 `--profile`/`--tuning` 값은 check가
   거부하듯 거부(CLAUDE.md, Profiles).
 - 네 단어 밖의 `--max-risk`는 단어들을 이름 대며 종료 2로 거부.
 - `--fail-on`, `--allow-error`, `--quiet`, `--all` 없음: `fix`는 판정하지 않고 모든 항목을 보여 줍니다.
 
-**흐름.** `runFix`: 플래그 파싱 → 컨트롤 세트와 레지스트리 적재 → `openFacts`(스냅샷은 신뢰하지 않는
-입력으로 check처럼 읽음; `facts.Load`가 거부하는 스냅샷은 종료 2) → `resolveSelection` → `loadWaivers` →
-`newCheckBlock` → `report.Build` → `remedy.Plan` → `--format`의 렌더러 → stdout. 경고는 `muster: warning: `
-접두사의 stderr 줄이고 controls 다이제스트 불일치 경고도 포함.
+**흐름.** `runFix`, `runCheck`의 순서로: 플래그 파싱(X-1 검사가 먼저) → `openFacts`(스냅샷은 신뢰하지 않는
+입력으로 check처럼 읽음; `facts.Load`가 거부하는 스냅샷은 종료 2) → 컨트롤 세트와 레지스트리 적재 →
+`resolveSelection` → `loadWaivers` → root 경고 → `newCheckBlock` → `report.Build` → `remedy.Plan` →
+`--format`의 렌더러 → stdout. 경고는 `muster: warning: ` 접두사의 stderr 줄입니다: fix의 root 경고, 그리고
+`resolveSelection`, `profile.Merge`, `newCheckBlock`이 이미 내보내는 프로파일·튜닝·waiver 경고가 같은
+`warnTo(stderr)`를 거칩니다.
 
 **종료 코드.** `0`: 계획을 만들었음(항목이 있든 없든). `2`: 만들 수 없음 — 플래그 오류, X-1 거부,
-`facts.Load`가 거부하는 스냅샷, 프로파일·튜닝·waiver 거부, 목록 밖의 `--max-risk` 단어. **`1`은 없음**:
+`facts.Load`가 거부하는 스냅샷, 프로파일·튜닝·waiver 거부, 목록 밖의 `--max-risk` 단어, 또는 stdout 쓰기 실패(`muster: write: <err>`,
+메인 설계 §7.4) — 부분 스크립트를 성공으로 보고하는 일은 없습니다. **`1`은 없음**:
 `fix`는 호스트를 판정하지 않고 `check`가 합니다. 메인 설계의 종료 코드 계약(D11)은 `check`와 `collect`의
 것이고 그대로입니다; 문서가 한 문장으로 `fix`는 발견이 있어도 0으로 끝난다고 말해 어떤 CI도 그것으로
 발견을 세지 않게 합니다. `ERROR` 행은 `fix`의 종료 코드를 바꾸지 않고 `not_planned`입니다.
@@ -403,35 +439,38 @@ flags:
 ```
 muster <version> · controls <controls_version> · guide <guide_edition> · host <host> · collected <collected_at>
 fix --dry-run · <report.ProfileLine, 두 형태 중 하나> · max-risk <level>
-planned 7 (script 4, text only 3) · above max-risk 1 · waived 1 · clean 94 · not planned: error 0, manual 14, warn_degraded 0
-by risk: none 5 · restart_service 1 · reboot_required 0 · lockout_risk 1
+planned 7 (script 4, text only 3) · above max-risk 1 · waived 1 · clean 92 · not planned: error 1, manual 14, warn_degraded 1
+by risk: none 6 · restart_service 1 · reboot_required 0 · lockout_risk 1
 
 #  risk             id                              status  sev   script  rollback        title
-1  none             muster.file.hosts_permissions   fail    high  yes     restore_backup  /etc/hosts 파일 소유자와 권한
-   why: a clause does not hold: files.etc_hosts.mode in [0 128 256 384]
+1  none             muster.file.hosts_permissions   fail    high  yes     restore_backup  <title_ko>
+   why: clause does not hold: files.etc_hosts.mode in [0 128 256 384]
    do:  chown root:root /etc/hosts; chmod 600 /etc/hosts
 2  none             muster.account.password_policy  fail    high  no      -               …
    why: …
-   do:  … (text only: params tuned)
+   do:  … (text only: params_tuned)
 …
 6  lockout_risk     muster.account.root_remote_login  fail  high  yes     both            … (above max-risk)
    why: …
    do:  …
 
 not planned:
-  muster.beyond.audit_rules_persisted  error          [missing_fact] …
-  muster.service.nfs_exports           manual         …
-  muster.account.root_remote_login     warn_degraded  collection was degraded: …
+  muster.beyond.audit_rules_loaded     error          [missing_fact] …
+  muster.service.nfs_export_access     manual         …
+  muster.account.lockout_threshold     warn_degraded  collection was degraded: …
 ```
 
 - 1행은 `report.HeaderLine`, check의 것과 바이트 동일. 2행의 프로파일 부분은 `report.ProfileLine`. `title`
   칸은 `report.Title`(`title_ko`, 없으면 `title_en` — check의 표처럼)이고 `do:`는 `text_ko`, 없으면
   `text_en` — 표는 check처럼 한국어 우선; JSON은 두 언어를 다 싣고 스크립트의 주석도 둘을 싣습니다(`do:`
-  영어, `ko:` 한국어). 텍스트 전용 항목의 `do:` 줄은 `(text only: <이유>)`로 끝납니다.
+  영어, `ko:` 한국어). 텍스트 전용 항목의 `do:` 줄은 `(text only: <text_only_reason>)`로, enum 단어 그대로
+  끝납니다; `script` 칸은 `yes`/`no`를, `rollback` 칸은 enum 단어를(`none`이면 `-`) 찍고, `#` 열은 항목의
+  번호입니다(§4).
 - 색이 켜지면 `risk` 칸(`lockout_risk` 빨강, `reboot_required` 자홍, `restart_service` 노랑, `none` 무색)과
   `status` 칸(check의 상태 색)을 칠합니다.
-- 스냅샷 유래 문자열은 `report.Escape`(`MaxCell`에서 자름), 컨트롤 텍스트는 `report.EscapeNoCut`을 거칩니다;
-  `not planned:` 블록은 행마다 한 줄이고 한 칸으로 잘리지 않습니다.
+- 스냅샷 유래 문자열은 `report.Escape`(`MaxCell`에서 자름), 컨트롤 텍스트는 `report.EscapeNoCut`을 거칩니다.
+  `not planned:` 행은 각각 한 줄: id, status, `report.Escape(reason)`(check의 표가 자르듯 `MaxCell`에서 자름);
+  행들이 한 칸으로 합쳐지지 않습니다.
 - 빈 계획은 머리 네 줄, 빈 줄, `nothing to fix`.
 
 **JSON**(`remedy.JSON`): `{"schema_version": …, "run": …, "fix": …, "items": […], "not_planned": […],
@@ -447,8 +486,10 @@ not planned:
   `TestPlanMarksItemsAboveMaxRisk`, `TestPlanRollbackVocabulary`, `TestPlanEmpty`, `TestPlanHasNoMap`(`Plan`
   리플렉션), `TestScriptGolden`(`-update`; 골든: `full.sh`, `empty.sh`, `capped.sh`, `poison.sh`,
   `all-scripted.sh` — 임베드 세트의 모든 스크립트 컨트롤이 실패한 계획 항목인 합성 계획이라 모든 본문이
-  렌더링됨), `TestScriptBlocksAreIndependent`(스크립트 있는 계획 항목마다 함수 하나·호출 하나; 상한 밖 블록의
-  모든 줄이 주석), `TestScriptFailurePathRollbackThenRestore`(`both` 블록은 rollback 서브셸이 `restore` 줄
+  렌더링됨), `TestScriptBlocksAreIndependent`(스크립트 있는 계획 항목마다 함수 하나·맨 호출 줄 하나, 어떤 호출 줄도
+  `||`, `&&`, `if`, `!`를 싣지 않음; 상한 밖 블록의 모든 줄이 주석),
+  `TestScriptBodyFailureReachesTheFailurePath`(Linux: 첫 본문 명령이 `false`인 렌더링된 블록이 1을 돌려주고,
+  이어지는 본문 명령은 돌지 않으며, rollback과 restore는 돎), `TestScriptFailurePathRollbackThenRestore`(`both` 블록은 rollback 서브셸이 `restore` 줄
   앞), `TestScriptEveryLineIsTemplateBodyOrComment`(안전 계약, 컨트롤 텍스트도 독인 계획에 대해),
   `TestScriptIsDeterministic`, `TestTableGolden`, `TestJSONGolden`(`-update`), `TestTablePoisoned`,
   `TestJSONEmptyListsAreArrays`, `TestRemedyImports`.
@@ -457,11 +498,12 @@ not planned:
 - `internal/controls`: §3 규칙마다 `TestLintRules` 케이스 하나; 배포 세트는 린트 통과.
 - `cmd/muster` e2e, `full-fail.json`으로(그 `FAIL` 행에 `root_remote_login`과 서비스 컨트롤 아홉이 있어
   lockout과 서비스 모양을 덮음; 파일 권한 실패는 `t.TempDir()` 아래 픽스처 사본에 더해 파일 모양을 덮음):
-  세 형식; `--dry-run` 없는 `fix` → 2와 X-1 텍스트; `fix apply --dry-run` → 2; 미지 플래그 → 2; `--max-risk
+  세 형식; `--dry-run` 없는 `fix` → 2와 X-1 텍스트; `fix apply --dry-run`과 `fix --dry-run apply` → 2와 X-1
+  텍스트; `fix --facts f.json --dry-run` → 0; 미지 플래그 → 2; 실패하는 stdout writer → 2; `--max-risk
   restart_service`가 lockout 항목을 표시; 실패 컨트롤을 제외하는 `--profile`이 계획에서 뺌; `--waivers`가
   하나를 `waived`로; `--format script`가 `sh -n` 통과(Linux만, 그 밖에선 스킵); `TestFixAgreesWithCheck`:
-  `check --format json`의 `FAIL`/`WARN` 행 id가 계획의 항목 더하기 `warn_degraded` 행과 같고 그 밖엔 없음;
-  `TestServiceScriptsNameTheCollectorsUnits`(수집기 행의 모든 유닛이 컨트롤의 스크립트에 있음).
+  `check --format json`의 `FAIL`/`WARN` 행 id가 계획의 항목 더하기 `warn_degraded` 행과 같고 그 밖엔 없음.
+  `TestServiceScriptsNameTheCollectorsUnits`는 `internal/collect/collectors`에 있음(§3).
 - 예시: 두 스냅샷의 `examples/<snapshot>-fix-report.json`, `-fix-report.txt`, `-fix-report.sh`를
   `examples.yml`이 `--max-risk lockout_risk`와 `NO_COLOR=1`로 만듦. 접미사 `-report.json`이 게이트의 스냅샷
   글롭이 계획을 스냅샷으로 읽는 것을 막습니다. 게이트는 `runFix`가 쓰는 같은 함수로 fix 출력 셋을 렌더링하고,
@@ -479,9 +521,10 @@ not planned:
 - 새 `fix-roundtrip` 잡은 실패를 심은 뒤 스크립트가 고치는 것을 증명합니다 — 컨테이너 매트릭스의 init
   이미지(`rockylinux/rockylinux:9-ubi-init`, `almalinux/9-init`, `systemctl`이 답하는 곳)와 `ubuntu:22.04`에서;
   호스트는 건드리지 않습니다. 컨테이너마다: (1) 심기 — init 이미지에선 `dnf install -y rpcbind
-  openssh-server acl`, `systemctl enable --now rpcbind.socket`, `printf 'PermitRootLogin yes\n' >
-  /etc/ssh/sshd_config.d/00-ci.conf`, `chmod 644 /etc/hosts`; `ubuntu:22.04`에선 `apt-get install -y acl`,
-  `chmod 644 /etc/hosts`(`/etc/shadow`는 거기서 이미 `0640`); (2) `collect` → `fix --dry-run --format script
+  openssh-server acl`, `ssh-keygen -A`, `systemctl enable --now rpcbind.socket sshd`, `printf 'PermitRootLogin
+  yes\n' > /etc/ssh/sshd_config.d/99-ci.conf`(스크립트의 `00-muster.conf` 뒤에 정렬되므로 스크립트의 값이
+  이김: sshd는 처음 읽은 값을 지킴), `chmod 644 /etc/hosts`; `ubuntu:22.04`에선 `apt-get update -qq &&
+  DEBIAN_FRONTEND=noninteractive apt-get install -y -qq acl`, `chmod 644 /etc/hosts`(`/etc/shadow`는 거기서 이미 `0640`); (2) `collect` → `fix --dry-run --format script
   > /tmp/fix.sh`; (3) 계획이 심은 id를 `script: true`인 계획 항목으로 나열함을 단언(init 이미지:
   `muster.service.rpcbind_disabled`, `muster.account.root_remote_login`, `muster.file.hosts_permissions`;
   ubuntu: `hosts_permissions`, `shadow_permissions`) — 아무것도 계획하지 않은 실행은 아무것도 증명하지 않는
@@ -492,7 +535,11 @@ not planned:
 
 **문서**(영어와 한국어를 같은 커밋에).
 
-- 메인 설계: §4.1 명령 표에 `fix --dry-run`; §4.3 데이터 흐름 그림에 계획; §6.2 스키마 예시와 필드 목록에
+- 메인 설계: §4.1 서브커맨드 문장이 `fix --dry-run`을 "이후에"에서 목록으로 옮기고 예시 블록에
+  `muster fix --dry-run --facts host.json --format script > fix.sh`; §4.3 데이터 흐름 그림에 계획; §4.4가
+  `check`와 `fix`를 프로파일·튜닝·waiver 파일의 독자로 이름 대고, 둘 다 root에서 같은 신뢰 파일 규칙 아래;
+  §8 "쓰기"에: `fix --dry-run`은 stdout에만 쓰고, 그것이 찍는 검토용 스크립트는 muster가 결코 실행하지
+  않음; §6.2 스키마 예시와 필드 목록에
   `backup`과 `validate`와 린트 규칙; 새 §7.5 "`fix --dry-run`"(입력, 형식, 종료 코드, 템플릿 계약, "fix는
   발견이 있어도 0으로 끝남"); §10.2가 3D-2 병합을 표시; **D34** — "`fix`는 적용하지 않는다: 산출물은 검토용
   스크립트이고, 블록은 컨트롤당 하나로 독립이며 백업 먼저·실패 시 롤백 다음 복원이다; 무엇을 백업·검증·
@@ -509,6 +556,9 @@ not planned:
 
 ## 8. 보류
 
+- 라운드트립이 심지 않는 재작성 본문 열둘의 호스트 증명(서비스 컨트롤 여덟과 `passwd`, `services`,
+  `hosts_lpd` 권한 스크립트, 그리고 첫 실행이 심기지 않았다고 보여 주는 것); 이번 사이클에는 구문으로
+  증명합니다(3D-2b).
 - 열여섯 밖 컨트롤의 스크립트(3D-2b, 컨트롤마다 호스트 증명이 붙는 콘텐츠): sysctl 설정, 나머지 파일
   권한, PAM과 sshd 옵션. 명령이 파라미터 값(`min_len`, `allowed_ports`)을 실어야 하는 교정은 치환 규칙이
   먼저 필요하고, 그때까지 텍스트(X-5).
