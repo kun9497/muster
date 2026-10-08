@@ -26,13 +26,16 @@ remediation:
     for u in rsh.socket rlogin.socket rexec.socket; do
       systemctl cat "$u" >/dev/null 2>&1 || continue
       systemctl disable --now "$u"
-      systemctl mask "$u"
+      systemctl mask "$u" || true
     done
   validate: '! systemctl is-active --quiet rsh.socket && case "$(systemctl is-enabled rsh.socket 2>/dev/null)" in enabled|enabled-runtime) false;; esac && ! systemctl is-active --quiet rlogin.socket && case "$(systemctl is-enabled rlogin.socket 2>/dev/null)" in enabled|enabled-runtime) false;; esac && ! systemctl is-active --quiet rexec.socket && case "$(systemctl is-enabled rexec.socket 2>/dev/null)" in enabled|enabled-runtime) false;; esac'
   rollback: |
     for u in rsh.socket rlogin.socket rexec.socket; do
       systemctl cat "$u" >/dev/null 2>&1 || continue
       systemctl unmask "$u"
+    done
+    for u in rsh.socket rlogin.socket rexec.socket; do
+      systemctl cat "$u" >/dev/null 2>&1 || continue
       systemctl enable --now "$u"
     done
 decision: D19

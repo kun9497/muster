@@ -23,13 +23,16 @@ remediation:
     for u in finger.socket fingerd.service; do
       systemctl cat "$u" >/dev/null 2>&1 || continue
       systemctl disable --now "$u"
-      systemctl mask "$u"
+      systemctl mask "$u" || true
     done
   validate: '! systemctl is-active --quiet finger.socket && case "$(systemctl is-enabled finger.socket 2>/dev/null)" in enabled|enabled-runtime) false;; esac && ! systemctl is-active --quiet fingerd.service && case "$(systemctl is-enabled fingerd.service 2>/dev/null)" in enabled|enabled-runtime) false;; esac'
   rollback: |
     for u in finger.socket fingerd.service; do
       systemctl cat "$u" >/dev/null 2>&1 || continue
       systemctl unmask "$u"
+    done
+    for u in finger.socket fingerd.service; do
+      systemctl cat "$u" >/dev/null 2>&1 || continue
       systemctl enable --now "$u"
     done
 decision: D19

@@ -21,13 +21,16 @@ remediation:
     for u in telnet.socket telnet.service telnetd.service; do
       systemctl cat "$u" >/dev/null 2>&1 || continue
       systemctl disable --now "$u"
-      systemctl mask "$u"
+      systemctl mask "$u" || true
     done
   validate: '! systemctl is-active --quiet telnet.socket && case "$(systemctl is-enabled telnet.socket 2>/dev/null)" in enabled|enabled-runtime) false;; esac && ! systemctl is-active --quiet telnet.service && case "$(systemctl is-enabled telnet.service 2>/dev/null)" in enabled|enabled-runtime) false;; esac && ! systemctl is-active --quiet telnetd.service && case "$(systemctl is-enabled telnetd.service 2>/dev/null)" in enabled|enabled-runtime) false;; esac'
   rollback: |
     for u in telnet.socket telnet.service telnetd.service; do
       systemctl cat "$u" >/dev/null 2>&1 || continue
       systemctl unmask "$u"
+    done
+    for u in telnet.socket telnet.service telnetd.service; do
+      systemctl cat "$u" >/dev/null 2>&1 || continue
       systemctl enable --now "$u"
     done
 decision: D19

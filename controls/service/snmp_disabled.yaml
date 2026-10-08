@@ -22,7 +22,7 @@ remediation:
   script: |
     if systemctl cat snmpd.service >/dev/null 2>&1; then
       systemctl disable --now snmpd.service
-      systemctl mask snmpd.service
+      systemctl mask snmpd.service || true
     fi
   validate: '! systemctl is-active --quiet snmpd.service && case "$(systemctl is-enabled snmpd.service 2>/dev/null)" in enabled|enabled-runtime) false;; esac'
   rollback: |

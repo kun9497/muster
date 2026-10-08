@@ -9,6 +9,9 @@ import (
 	"github.com/kun9497/muster/internal/controls"
 )
 
+// unitToken is a systemd unit name a remediation body can carry.
+var unitToken = regexp.MustCompile(`[A-Za-z0-9@_.-]+\.(service|socket)`)
+
 // TestServiceScriptsNameTheCollectorsUnits pins stage 3D-2 §3: a service
 // control's script, validate and rollback name exactly the provesInstall
 // units of its logical service's row, never a super-server unit.
@@ -42,13 +45,18 @@ func TestServiceScriptsNameTheCollectorsUnits(t *testing.T) {
 			t.Fatalf("%s: no remediation", id)
 		}
 		r := c.Remediation
+		bodies := []struct{ name, text string }{{"script", r.Script}, {"validate", r.Validate}, {"rollback", r.Rollback}}
+		own := map[string]bool{}
 		for _, n := range names {
 			svc, ok := byName[n]
 			if !ok {
 				t.Fatalf("%s: no logical service %q", id, n)
 			}
 			for _, u := range svc.units {
-				for _, body := range []struct{ name, text string }{{"script", r.Script}, {"validate", r.Validate}, {"rollback", r.Rollback}} {
+				if u.provesInstall {
+					own[u.name] = true
+				}
+				for _, body := range bodies {
 					has := word(u.name).MatchString(body.text)
 					if u.provesInstall && !has {
 						t.Errorf("%s: %s does not name %s", id, body.name, u.name)
@@ -56,6 +64,15 @@ func TestServiceScriptsNameTheCollectorsUnits(t *testing.T) {
 					if !u.provesInstall && has {
 						t.Errorf("%s: %s names %s, a host of the service", id, body.name, u.name)
 					}
+				}
+			}
+		}
+		// Exactly: every unit any body names is a provesInstall unit of the
+		// control's own row or rows, so a stray unit from another row fails.
+		for _, body := range bodies {
+			for _, u := range unitToken.FindAllString(body.text, -1) {
+				if !own[u] {
+					t.Errorf("%s: %s names %s, not a provesInstall unit of its row", id, body.name, u)
 				}
 			}
 		}

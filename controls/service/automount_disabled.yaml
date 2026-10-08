@@ -21,7 +21,7 @@ remediation:
   script: |
     if systemctl cat autofs.service >/dev/null 2>&1; then
       systemctl disable --now autofs.service
-      systemctl mask autofs.service
+      systemctl mask autofs.service || true
     fi
   validate: '! systemctl is-active --quiet autofs.service && case "$(systemctl is-enabled autofs.service 2>/dev/null)" in enabled|enabled-runtime) false;; esac'
   rollback: |
