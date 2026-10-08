@@ -12,7 +12,7 @@
 1차 기준이고, 글로벌 벤치마크(CIS Benchmarks, DISA STIG, NIST SP 800-53)는
 참조로 붙이며 이후에는 선택 가능한 프로파일로 제공합니다.
 
-> **상태: 3D-1단계 병합 (2026년 10월).** 1단계 — 뼈대: `collect`, `check`,
+> **상태: 3D-2단계 병합 (2026년 10월).** 1단계 — 뼈대: `collect`, `check`,
 > waiver, 종료 코드, 끝까지 흐르는 컨트롤 여덟 개 — 와 2단계 — 자동 판정 가능한
 > KISA 항목 전체: DISA STIG·NIST SP 800-53 참조를 갖춘 기반 작업부터 계정, PAM,
 > sshd, 홈 디렉터리, 시스템 파일, 서비스, 방화벽, 로깅, NFS·SNMP·패치 위생,
@@ -51,6 +51,7 @@ muster check --facts host.json           # 어디서든, root 없이: 표 + 종�
 muster check --facts host.json --format json
 muster check --facts host.json --profile docs/examples/profiles/exclude-beyond.yaml   # KISA 가이드만
 muster check --facts host.json --tuning docs/examples/profiles/tuning.yaml            # 사이트의 파라미터 값
+muster fix --dry-run --facts host.json --format script > fix.sh                       # 검토용 스크립트. muster는 결코 실행하지 않음
 muster controls lint --references docs/reference   # 컨트롤 세트 자체의 게이트
 ```
 
@@ -104,8 +105,9 @@ muster controls lint --references docs/reference   # 컨트롤 세트 자체의 
 - **컨테이너·Kubernetes 벤치마크** — kube-bench가 있습니다.
 - **외부 포트 스캔.** 네트워크 점검은 호스트 내부 관점만입니다: 리스닝 소켓, 방화벽
   규칙, 불필요한 서비스.
-- **조치 실행.** 판정하는 모든 컨트롤이 조치 문구·위험 등급·롤백을 담고 있어 이후
-  검토용 스크립트를 생성할 수 있지만, muster가 실행하지는 않습니다.
+- **조치 실행.** 판정하는 모든 컨트롤이 조치 문구·위험 등급·롤백을 담고 있습니다.
+  `fix --dry-run`이 호스트의 실패를 위험도 순서의 계획과 검토용 스크립트로 바꾸며,
+  muster가 그것을 실행하지는 않습니다.
 - **다른 자산군.** Windows, DBMS, 웹/WAS, 네트워크·보안 장비는 KISA 가이드에서
   별도 절입니다. muster의 컨트롤·리포트 계약을 공유하는 형제 도구로 만들지, 이
   코드베이스에는 넣지 않습니다.
@@ -173,10 +175,14 @@ CIS나 STIG 준수 여부를 인증하지 않습니다. 컨트롤이 인용할 �
    여덟. 3D-1(병합): 프로파일과 튜닝 — `check --profile`이 id 글롭으로 컨트롤을 고르고
    파라미터와 심각도를 덮어쓰며 `extends`로 이어지고, `check --tuning`이 사이트의 값을
    얹으며, 결과가 둘을 값마다의 출처와 함께 기록합니다.
+   3D-2(병합): `fix --dry-run` — 적용 중인 프로파일의 실패를 위험도 순서의 계획(표,
+   JSON)과 POSIX `sh` 검토용 스크립트로. 컨트롤마다 블록 하나에 선언된 백업, 한 줄짜리
+   validate, 롤백 후 복원을 갖춥니다. muster는 결코 그것을 실행하지 않으며, CI 작업이
+   시드한 스크립트를 일회용 컨테이너에서 증명합니다.
    3C-2b(병합): 노출 — 모든 리스닝 소켓의 소유자와 패키지, 삭제된 바이너리로 도는
    프로세스, 접힌 방화벽 규칙 표에 대한 노출 교차 판정, 네트워크 sysctl — 컨트롤 열셋.
    다음(3D-1b): CIS 권고 번호 색인 위의 `cis-<배포판>-l1` 프로파일(고르는 모든 컨트롤에
-   `references.cis`); 그다음 3D-2 `fix --dry-run`, 3D-3(`--anonymize`, `--max-age`).
+   `references.cis`); 그다음 3D-3(`--anonymize`, `--max-age`).
    `kisa-unix-2026`이 기본 프로파일로 남습니다.
 4. **공개 릴리스.** 스냅샷 diff, SARIF, 한/영 문서, SBOM이 붙은 서명·재현 빌드,
    deb/rpm 패키지, Lynis와의 차분 비교.
@@ -191,6 +197,9 @@ CIS나 STIG 준수 여부를 인증하지 않습니다. 컨트롤이 인용할 �
 `--deep`으로 수집한 것 — 아무것도 돌리지 않고 출력의 모양을 읽을 수 있도록. 둘 다 누구의
 호스트에서도 오지 않았습니다. `examples.yml` 워크플로가 수집하고 보관 전에 호스트 정체를
 지우며, 테스트가 변경 때마다 끝까지 검사합니다.
+
+각 스냅샷의 리포트 옆의 `examples/<snapshot>-fix-report.{json,txt,sh}`는 `fix --dry-run`이
+그것으로 무엇을 만드는지 보여 줍니다: JSON과 표로 된 계획, 그리고 검토용 스크립트.
 
 [`docs/examples/profiles/`](docs/examples/profiles/)에는 예시 프로파일(`exclude-beyond.yaml`:
 가이드 밖 컨트롤을 id 글롭 하나로 제외한 KISA 가이드만)과 예시 튜닝 파일(`tuning.yaml`: 한

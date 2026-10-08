@@ -1,7 +1,7 @@
 # muster — working notes for Claude
 
 Design: `docs/superpowers/specs/2026-09-02-muster-design.md` (English canonical, Korean pair). It is also the
-decision log (D01–D33). Read it before changing any contract: facts schema, control ids, exit codes,
+decision log (D01–D34). Read it before changing any contract: facts schema, control ids, exit codes,
 waiver keys, output format.
 
 ## Build and test
@@ -13,6 +13,8 @@ waiver keys, output format.
 - `make lint` — `gofmt -l .` then `go vet ./...`.
 - `make lint-controls` — `go run ./cmd/muster controls lint` (passes `--references docs/reference`, so
   STIG/NIST ids must be in the generated index), then once more with `--profile default`.
+- `make shellcheck` — `sh -n` and `shellcheck -s sh` over `internal/remedy/testdata/*.sh` and `examples/*-fix-report.sh`
+  (CI runs the same step in the `test` job).
 - `make fmt` — `gofmt -l -w .` to fix formatting in place.
 - `make coverage` — `go run ./tools/coverage` regenerates `docs/reference/coverage.md`; CI runs
   `go run ./tools/coverage -check` and fails when it is stale. `make refindex` — `go run ./tools/refindex`
@@ -25,7 +27,7 @@ waiver keys, output format.
 
 ## Layout
 
-`cmd/muster` dispatch only. `internal/facts` snapshot types and the key registry. `internal/controls`
+`cmd/muster` dispatch only. `internal/remedy` the fix plan and its renderers (pure: no `os`, `os/exec`, `net`, `syscall`, `time`). `internal/facts` snapshot types and the key registry. `internal/controls`
 schema, strict loader, lint. `internal/check` the pure evaluator — it must never import `os/exec`, `net`
 or touch the host (a test enforces it). `internal/waiver` waivers, applied after evaluation. `internal/report`
 renderers and the exit code. `controls/` the embedded control set and its fixtures. `collect` is Linux-only
@@ -167,6 +169,30 @@ regenerates them from public images and `-check` compares.
   selection) share the same resolution. The examples gate byte-compares reports, so a change to the `check` block
   needs an examples refresh from the branch's `examples.yml` run before the merge.
 
+## Fix (stage 3D-2)
+
+- `fix --dry-run` (mandatory; anything else is `fix never applies a remediation (D24); run fix --dry-run`, exit 2) runs
+  `runCheck`'s own helpers (`openFacts` → set/registry → `resolveSelection` → `loadWaivers` → `newCheckBlock` →
+  `report.Build`) and hands the report to `remedy.Build`; `--format table|json|script`, `--max-risk` the one knob. It
+  exits 0 with findings (judging is check's) and 2 when no plan could be made, a failing stdout included. Items are
+  FAIL/WARN rows after waivers, ordered risk → severity in force → id; a degraded pass (`Reason ==
+  check.ReasonDegradedPrefix + Degraded`), ERROR and MANUAL are `not_planned`; an absent-means-fail row and a control
+  whose parameter the profile or tuning set are text-only. `Build` refuses an id outside the id grammar.
+- The script: `# shellcheck disable=SC2181` on line 2; the root check and the MUSTER_BACKUP refusals (`/`, `//…`, `.`
+  and `..` components, relative) exit 2; `backup` skips absent paths, keeps a first copy, returns 1 on a failed copy and
+  the block stops; each body runs in `( set -e … ); rc=$?` and each block function is called as a bare line followed by
+  `[ "$?" -eq 0 ] || failed=$((failed+1))` — POSIX turns `-e` off for anything run as an operand of `||`/`&&`/`if`/`!`;
+  on failure the declared `rollback` runs, then `restore` (which never writes through a destination symlink and refuses
+  a directory). Snapshot text lives only in `#` comments (`report.Escape`), control text through `report.EscapeNoCut`.
+- Remediation bodies (lint + CONTRIBUTING): a `script` needs `idempotent: true` and a `rollback` or `backup`; `validate`
+  is one line, `&&`-joined; no here-document; `backup` paths absolute, clean, `^/[A-Za-z0-9._@:+/-]+$`. Service bodies
+  loop over the row's `provesInstall` units in `services.go` (pinned exactly by a Linux test beside the table), guard
+  each with `systemctl cat`, `disable --now` strictly and `mask … || true`; rollbacks unmask every unit, then
+  `enable --now` every unit (systemd will not start a socket whose service is masked). A one-unit body uses `if`
+  (SC2043). Bodies are shellcheck-clean at the default severity; `all-scripted.sh` renders every shipped body.
+- The `fix-roundtrip` CI job seeds failures in throwaway containers (init images and ubuntu:22.04), plans, runs the
+  script there, re-collects and requires the seeded ids PASS/NA; it is the only place a generated script ever runs.
+
 ## Stage-2 conventions
 
 - **C1** — `files.*` owns permission facts of a fixed candidate path list (`/etc/passwd`, `/etc/hosts`, …). A path that must be discovered from a daemon's configuration belongs to that daemon's collector.
@@ -201,6 +227,7 @@ regenerates them from public images and `-check` compares.
   the call and confirm the suite goes red; if it stays green, the implementation is tested, not the feature.
 - Assert something that differs when the call is gone. Prefer structural assertions to substrings.
 - Golden files: `go test ./internal/report -run TestJSON -update`, `-run TestTableGolden -update`,
+  `go test ./internal/remedy -run 'TestScriptGolden|TestTableGolden|TestJSONGolden' -update`,
   `go test ./internal/facts -run TestFactsSchemaGolden -update`. Review the diff before committing a
   regenerated golden; a facts golden change means a `since` entry or a schema version bump, except a
   description-only edit, which regenerates the golden with neither (say so in the commit).

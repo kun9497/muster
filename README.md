@@ -14,7 +14,7 @@ the Linux server asset class: KISA is the primary standard, and global
 benchmarks (CIS Benchmarks, DISA STIG, NIST SP 800-53) are attached as
 references and, later, offered as selectable profiles.
 
-> **Status: stage 3D-1 merged (October 2026).** Stage 1 — the skeleton:
+> **Status: stage 3D-2 merged (October 2026).** Stage 1 — the skeleton:
 > `collect`, `check`, waivers, exit codes, eight controls end to end — stage 2
 > — every automatable KISA item, from the foundations with DISA STIG and NIST
 > SP 800-53 references through accounts, PAM, sshd, home directories, system
@@ -58,6 +58,7 @@ muster check --facts host.json           # anywhere, no root: table + exit code
 muster check --facts host.json --format json
 muster check --facts host.json --profile docs/examples/profiles/exclude-beyond.yaml   # the KISA guide alone
 muster check --facts host.json --tuning docs/examples/profiles/tuning.yaml            # a site's parameter values
+muster fix --dry-run --facts host.json --format script > fix.sh                       # a review script; muster never runs it
 muster controls lint --references docs/reference   # the control set's own gate
 ```
 
@@ -121,8 +122,8 @@ muster controls lint --references docs/reference   # the control set's own gate
 - **External port scanning.** Network checks are host-internal only: listening
   sockets, firewall rules, unnecessary services.
 - **Applying fixes.** Every judged control carries its remediation text, risk
-  level and rollback, so a script can be generated for review later; muster
-  never executes one.
+  level and rollback; `fix --dry-run` turns a host's failures into a
+  risk-ordered plan and a review script, and muster never executes it.
 - **Other asset classes.** Windows, DBMS, web/WAS, network and security devices
   have their own sections of the KISA guide. They would be sibling tools sharing
   muster's control and report contracts, never part of this codebase.
@@ -198,6 +199,11 @@ titles, never their discussion, check and fix text. See
    3D-1 (merged): profiles and tuning — `check --profile` selects controls by id globs,
    overrides parameters and severities and chains through `extends`; `check --tuning`
    layers a site's values; the result records both with every value's source.
+   3D-2 (merged): `fix --dry-run` — the failures of the profile in force as a
+   risk-ordered plan (table, JSON) and a POSIX `sh` review script, one block per
+   control with declared backups, a one-line validate and rollback-then-restore;
+   muster never runs it, and a CI job proves the seeded scripts in throwaway
+   containers.
    3C-2b (merged): exposure — every listening socket's owners and packages, deleted
    executables still running, the exposure cross-check against the firewall's folded
    rule table, the network sysctls — thirteen controls. 3C-2a (merged): privilege — file capabilities judged against the package's
@@ -206,8 +212,8 @@ titles, never their discussion, check and fix text. See
    the inactivity policy over every interactive account, root's authorized keys
    and SSH key quality — eight controls from three extended collectors and three
    new ones. Next (3D-1b): the `cis-<distro>-l1` profile over an index of CIS
-   recommendation numbers (`references.cis` on every selected control); then 3D-2
-   `fix --dry-run` and 3D-3 (`--anonymize`, `--max-age`). `kisa-unix-2026` stays
+   recommendation numbers (`references.cis` on every selected control); then 3D-3
+   (`--anonymize`, `--max-age`). `kisa-unix-2026` stays
    the default profile.
 4. **Public release.** Snapshot diff, SARIF, bilingual docs, signed reproducible
    builds with SBOM, deb/rpm packages, and a differential comparison against
@@ -225,6 +231,10 @@ the GitHub Actions runner VM with `--deep` — so the shape of the output can be
 read without running anything. Neither comes from anyone's host: the
 `examples.yml` workflow collects them and rewrites the host identity before they
 are kept, and a test checks them end to end on every change.
+
+Beside each snapshot's report, `examples/<snapshot>-fix-report.{json,txt,sh}` show
+what `fix --dry-run` makes of it: the plan as JSON and as a table, and the review
+script.
 
 [`docs/examples/profiles/`](docs/examples/profiles/) holds an example profile
 (`exclude-beyond.yaml`: the KISA guide alone, the controls beyond it excluded by one

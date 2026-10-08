@@ -70,6 +70,24 @@ KISA 항목이 아닌 컨트롤은 `category: beyond`, id `muster.beyond.<name>`
 뼈대를 만듭니다(`--kisa-id` 없음). `setting` 키를 읽는 픽스처는 부재를 뜻할 때 키를 두되
 `effective` 쪽을 `absent`로 둡니다.
 
+### 조치 본문
+
+`fix --dry-run`은 컨트롤의 `script`, `validate`, `rollback`을 검토용 스크립트로 렌더링하므로
+이들은 코드입니다. `script`에는 `idempotent: true`와 되돌릴 길 — `rollback`, 비어 있지 않은
+`backup`, 또는 둘 다 — 이 필요합니다. 본문은 서브셸에서 `set -e` 아래 돕니다. 정당하게
+실패할 수 있는 명령은 자기 줄에 `|| true`로 그렇다고 말하고, 끝에 붙인 `; true`는 결코
+쓰지 않으며, 운영자가 봐야 할 오류를 `2>/dev/null`로 숨기지 않습니다. 파일에 작용하는
+본문은 먼저 그 파일이 있는지 확인하고, 선택적 도구를 부르는 본문은 `command -v`로
+감쌉니다. 서비스 본문은 `services.go`에 있는 논리 서비스의 `provesInstall` 유닛을 돌며
+(Linux 테스트가 그 목록을 정확히 고정), 각각을 `systemctl cat`으로 감싸고, disable은 엄격히,
+mask는 `|| true`로 합니다. 그 rollback은 모든 유닛을 unmask한 다음 모든 유닛을 enable합니다.
+유닛이 하나인 본문은 단어 하나짜리 `for`가 아니라 `if`를 씁니다. `validate`는 조건을
+`&&`로 이은 한 줄이며 스크립트가 설정한 것만 확인합니다. `backup` 경로는 절대·정규 경로이고
+`[A-Za-z0-9._@:+/-]` 안의 문자만 씁니다. here-document는 쓰지 않습니다. 스크립트는
+`umask 077` 아래 돌므로, 다른 사람이 읽는 파일을 만드는 본문은 그 모드를 설정합니다.
+`make shellcheck`와 `go test ./internal/remedy -run TestScriptGolden -update`
+(`all-scripted.sh` 골든이 배포되는 모든 본문을 렌더링)가 변경을 검사합니다.
+
 ## 팩트 추가
 
 - 키를 먼저 등록합니다. `{key, type, description, since, sensitivity, collector}`(설정은
@@ -129,7 +147,8 @@ KISA 항목이 아닌 컨트롤은 `category: beyond`, id `muster.beyond.<name>`
   것입니다.
 - 기능이 사라졌을 때 달라지는 것을 단언하세요. 부분 문자열보다 구조적 단언을 우선합니다.
 - 골든: `go test ./internal/report -run TestJSON -update`, `-run TestTableGolden -update`,
-  위의 팩트 골든. 재생성된 골든은 커밋 전에 모두 검토합니다.
+  위의 팩트 골든, 그리고
+  `go test ./internal/remedy -run 'TestScriptGolden|TestTableGolden|TestJSONGolden' -update`. 재생성된 골든은 커밋 전에 모두 검토합니다.
 - 픽스처는 제 몫을 해야 합니다. `go test ./internal/controls -run
   TestEveryMutantIsKilled`는 모든 컨트롤을 변이시키고(연산자 뒤집기, 기대값 이동, 절과
   메커니즘 제거, `absent_means` 변경) 변이체마다 다르게 답하는 픽스처를 요구합니다.
@@ -156,7 +175,8 @@ KISA 항목이 아닌 컨트롤은 `category: beyond`, id `muster.beyond.<name>`
   스냅샷으로 바꿔 넣지 마세요.
 - CI는 race 빌드, lint, coverage 검사, 러너 VM에서의 root 수집, 비root 수집, 컨테이너
   매트릭스(Ubuntu 22.04/24.04, Rocky 9, AlmaLinux 9, Debian 12는 카나리), 읽기 전용 계약
-  실행, 데몬 오라클, 그리고 capability matrix(`docs/reference/capability-matrix.json`:
+  실행, 데몬 오라클, 검토용 스크립트에 대한 `sh -n`과 shellcheck, `fix-roundtrip` 잡(시드한
+  실패를 생성된 스크립트가 일회용 컨테이너에서 고침), 그리고 capability matrix(`docs/reference/capability-matrix.json`:
   root 없이 `denied`여야 하는 팩트와 systemd 없이 `unsupported`여야 하는 팩트)를 돌립니다.
 
 ## 문서
