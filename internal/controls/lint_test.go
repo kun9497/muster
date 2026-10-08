@@ -94,6 +94,14 @@ func TestLintRules(t *testing.T) {
 		{name: "validate two lines", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true", rollback: "true", validate: "a\nb" }`), rule: "remediation", msg: "validate must be one line"},
 		{name: "script blank", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: " ", rollback: "true" }`), rule: "remediation", msg: "script is blank"},
 		{name: "rollback here-document", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true", rollback: "cat <<EOF\nx\nEOF" }`), rule: "remediation", msg: "rollback carries a here-document"},
+		{name: "title_ko control char", yaml: strings.Replace(goodControl, "title_ko: 좋음", `title_ko: "제목\u0007"`, 1), rule: "titles", msg: "title_ko carries a line break or control character"},
+		{name: "title DEL", yaml: strings.Replace(goodControl, "title_en: Good", `title_en: "t\u007f"`, 1), rule: "titles", msg: "title_en carries a line break or control character"},
+		{name: "text C1 char", yaml: rem(`remediation: { text_en: "a\u009bb", text_ko: 조치, risk: none, idempotent: true }`), rule: "remediation", msg: "text_en carries a line break or control character"},
+		{name: "validate blank", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true", rollback: "true", validate: " " }`), rule: "remediation", msg: "validate is blank"},
+		{name: "validate here-document", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true", rollback: "true", validate: "cat <<EOF" }`), rule: "remediation", msg: "validate carries a here-document"},
+		{name: "text_ko 1001 Hangul runes", yaml: rem(`remediation: { text_en: t, text_ko: ` + strings.Repeat("가", 1001) + `, risk: none, idempotent: true }`), rule: "remediation", msg: "text_ko is longer than 1000 runes"},
+		{name: "accept text_ko of exactly 1000 Hangul runes", yaml: rem(`remediation: { text_en: t, text_ko: ` + strings.Repeat("가", 1000) + `, risk: none, idempotent: true }`), rule: "remediation", absent: true},
+		{name: "unknown risk", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: bogus, idempotent: true }`), rule: "remediation", msg: `unknown remediation risk "bogus"`},
 		{name: "accept script, rollback and a block-scalar validate", yaml: rem(`remediation:
   text_en: t
   text_ko: 조치
