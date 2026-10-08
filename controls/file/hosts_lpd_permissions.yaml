@@ -21,3 +21,4 @@ remediation:
   risk: none
   idempotent: true
   script: chown root:root /etc/hosts.lpd && chmod 600 /etc/hosts.lpd
+  backup: [/etc/hosts.lpd]

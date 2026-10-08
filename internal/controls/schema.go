@@ -102,12 +102,14 @@ type References struct {
 }
 
 type Remediation struct {
-	TextEn     string `yaml:"text_en"`
-	TextKo     string `yaml:"text_ko"`
-	Risk       string `yaml:"risk"` // none | restart_service | reboot_required | lockout_risk
-	Idempotent bool   `yaml:"idempotent"`
-	Script     string `yaml:"script,omitempty"`
-	Rollback   string `yaml:"rollback,omitempty"`
+	TextEn     string   `yaml:"text_en"`
+	TextKo     string   `yaml:"text_ko"`
+	Risk       string   `yaml:"risk"` // none | restart_service | reboot_required | lockout_risk
+	Idempotent bool     `yaml:"idempotent"`
+	Script     string   `yaml:"script,omitempty"`
+	Rollback   string   `yaml:"rollback,omitempty"`
+	Backup     []string `yaml:"backup,omitempty"`
+	Validate   string   `yaml:"validate,omitempty"`
 }
 
 // Control is one YAML file (spec §6.2).

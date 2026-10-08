@@ -21,3 +21,4 @@ remediation:
   risk: none
   idempotent: true
   script: chown root:root /etc/hosts && chmod 600 /etc/hosts
+  backup: [/etc/hosts]

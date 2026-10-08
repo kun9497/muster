@@ -21,4 +21,5 @@ remediation:
   risk: none
   idempotent: true
   script: chown root:root /etc/passwd && chmod 644 /etc/passwd && setfacl -b /etc/passwd
+  backup: [/etc/passwd]
 decision: D26

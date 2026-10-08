@@ -21,3 +21,4 @@ remediation:
   risk: none
   idempotent: true
   script: chown root:root /etc/services && chmod 644 /etc/services
+  backup: [/etc/services]

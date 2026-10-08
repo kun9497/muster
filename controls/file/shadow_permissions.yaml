@@ -28,3 +28,4 @@ remediation:
   risk: none
   idempotent: true
   script: chown root /etc/shadow && chmod 400 /etc/shadow && setfacl -b /etc/shadow
+  backup: [/etc/shadow]
