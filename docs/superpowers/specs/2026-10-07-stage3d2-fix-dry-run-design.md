@@ -328,6 +328,7 @@ restore() {
   for p in "$@"; do
     { [ -e "$MUSTER_BACKUP$p" ] || [ -L "$MUSTER_BACKUP$p" ]; } || continue
     if [ -d "$p" ]; then log "restore: $p is now a directory, left as is"; rc=1; continue; fi
+    if [ -L "$p" ]; then rm -f "$p" || { log "restore: $p failed"; rc=1; continue; }; fi
     cp -a "$MUSTER_BACKUP$p" "$p" || { log "restore: $p failed"; rc=1; }
   done
   return $rc
@@ -338,13 +339,14 @@ failed=0
 - Existence is `-e || -L` throughout, so a symlink (dangling or with a relative target) is backed up and
   restored as a link. `backup` skips a declared path that does not exist, never overwrites a copy already
   in the backup directory, and returns 1 at the first copy that fails. `restore` puts back every path that
-  has a copy, refuses a destination that is a directory (a link to one included), and returns 1 if
-  anything could not be restored. Reusing a `MUSTER_BACKUP` directory keeps the copy from the first run:
+  has a copy, refuses a destination that is a directory (a link to one included), removes a destination that became a
+  symlink before copying (it never writes through a link, Z-25), and returns 1 if anything could not be restored. Reusing a `MUSTER_BACKUP` directory keeps the copy from the first run:
   a block that fails in a later run restores the file as it was before the first run, discarding edits
   made in between — by design (the first copy is the original), and the epilogue says which directory was
   used. `/`, `//…` and paths with `.` or `..` components are refused.
 
-A planned item with a script (`<fn>` is `fix_` + the id with every `.` as `_`; the id grammar admits
+`remedy.Build` refuses an item whose id does not match the lint's id grammar (Z-26, defence in depth); the
+header renders the id through `report.EscapeNoCut`. A planned item with a script (`<fn>` is `fix_` + the id with every `.` as `_`; the id grammar admits
 nothing else):
 
 ```sh

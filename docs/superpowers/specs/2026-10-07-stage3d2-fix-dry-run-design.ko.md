@@ -305,6 +305,7 @@ restore() {
   for p in "$@"; do
     { [ -e "$MUSTER_BACKUP$p" ] || [ -L "$MUSTER_BACKUP$p" ]; } || continue
     if [ -d "$p" ]; then log "restore: $p is now a directory, left as is"; rc=1; continue; fi
+    if [ -L "$p" ]; then rm -f "$p" || { log "restore: $p failed"; rc=1; continue; }; fi
     cp -a "$MUSTER_BACKUP$p" "$p" || { log "restore: $p failed"; rc=1; }
   done
   return $rc
@@ -315,12 +316,13 @@ failed=0
 - 존재는 내내 `-e || -L`이므로, 심볼릭 링크(끊겼든 상대 대상이든)는 링크로 백업되고 복원됩니다. `backup`은
   없는 선언 경로를 건너뛰고, 백업 디렉터리에 이미 있는 사본은 덮어쓰지 않으며, 첫 실패한 복사에서 1을
   돌려줍니다. `restore`는 사본이 있는 모든 경로를 되돌리고, 디렉터리인 대상(디렉터리를 가리키는 링크 포함)은
-  거부하며, 하나라도 되돌릴 수 없으면 1을 돌려줍니다. `MUSTER_BACKUP` 디렉터리를 다시 쓰면 첫 실행의 사본이
+  거부하고, 심볼릭 링크가 된 대상은 복사 전에 지우며(링크를 통해 쓰지 않음, Z-25), 하나라도 되돌릴 수 없으면 1을 돌려줍니다. `MUSTER_BACKUP` 디렉터리를 다시 쓰면 첫 실행의 사본이
   남습니다: 나중 실행에서 실패한 블록은 파일을 첫 실행 전 상태로 되돌리고 그 사이의 편집은 버립니다 — 의도된
   것이며(첫 사본이 원본), 꼬리말이 어느 디렉터리를 썼는지 말합니다. `/`, `//…`, `.`이나 `..` 구성 요소가 있는
   경로는 거부합니다.
 
-스크립트가 있는 계획 항목(`<fn>`은 `fix_` + id의 모든 `.`을 `_`로; id 문법이 그 밖은 허용하지 않음):
+`remedy.Build`는 id가 린트의 id 문법에 맞지 않는 항목을 거부합니다(Z-26, 다중 방어); 헤더는 id를
+`report.EscapeNoCut`으로 렌더링합니다. 스크립트가 있는 계획 항목(`<fn>`은 `fix_` + id의 모든 `.`을 `_`로; id 문법이 그 밖은 허용하지 않음):
 
 ```sh
 # ---- 1/8 muster.file.hosts_permissions [risk none] [fail, high]

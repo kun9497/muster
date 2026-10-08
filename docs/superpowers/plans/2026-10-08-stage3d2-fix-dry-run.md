@@ -930,6 +930,7 @@ restore() {
   for p in "$@"; do
     { [ -e "$MUSTER_BACKUP$p" ] || [ -L "$MUSTER_BACKUP$p" ]; } || continue
     if [ -d "$p" ]; then log "restore: $p is now a directory, left as is"; rc=1; continue; fi
+    if [ -L "$p" ]; then rm -f "$p" || { log "restore: $p failed"; rc=1; continue; }; fi
     cp -a "$MUSTER_BACKUP$p" "$p" || { log "restore: $p failed"; rc=1; }
   done
   return $rc
@@ -1514,6 +1515,8 @@ Whole-branch review workflow → one fix wave + scoped re-review → Execution n
 ## Execution notes
 
 ### Rulings settled during execution (Z-23 …)
+
+- Z-25 (Task 5 review M-1): `restore` removes a destination symlink before `cp` (never writes through a link). Z-26 (M-3): `remedy.Build` refuses an id outside `^muster\.[a-z]+\.[a-z0-9_]+$`; the script header renders the id through `EscapeNoCut`. Parked: two controls declaring the same backup path (none overlap today; a set-level lint later); `Escape` passing U+2028/U+2029/bidi controls (sh unaffected); the rollback starting a unit that was inactive before (§8); systemd's verbose output on a re-run.
 
 - Z-23 (Task 3 review Q1): multi-unit service rollbacks run two passes — unmask every unit, then `enable --now` every unit; the per-unit form left `rpcbind.socket` not listening while `rpcbind.service` was still masked (reproduced on almalinux/9-init). Z-24 (Q2): `mask` is best effort (`|| true`); `disable --now` stays strict and the validate checks disabled + inactive. The pin test checks the unit lists exactly (Q3). The shadow text names Debian/Ubuntu's `unix_chkpwd` group read and the `allowed_modes` relaxation (Q4).
 
