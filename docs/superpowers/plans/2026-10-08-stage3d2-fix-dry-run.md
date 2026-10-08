@@ -451,13 +451,16 @@ shadow (owner and mode only; the group is the distribution's):
     for u in U1 … Un; do
       systemctl cat "$u" >/dev/null 2>&1 || continue
       systemctl disable --now "$u"
-      systemctl mask "$u"
+      systemctl mask "$u" || true
     done
   validate: '! systemctl is-active --quiet U1 && case "$(systemctl is-enabled U1 2>/dev/null)" in enabled|enabled-runtime) false;; esac && … (the same pair for every unit, joined by " && ")'
   rollback: |
     for u in U1 … Un; do
       systemctl cat "$u" >/dev/null 2>&1 || continue
       systemctl unmask "$u"
+    done
+    for u in U1 … Un; do
+      systemctl cat "$u" >/dev/null 2>&1 || continue
       systemctl enable --now "$u"
     done
 ```
@@ -468,7 +471,7 @@ A control with one unit (automount_disabled: `autofs.service`; snmp_disabled: `s
   script: |
     if systemctl cat autofs.service >/dev/null 2>&1; then
       systemctl disable --now autofs.service
-      systemctl mask autofs.service
+      systemctl mask autofs.service || true
     fi
   validate: '! systemctl is-active --quiet autofs.service && case "$(systemctl is-enabled autofs.service 2>/dev/null)" in enabled|enabled-runtime) false;; esac'
   rollback: |
@@ -1511,6 +1514,8 @@ Whole-branch review workflow → one fix wave + scoped re-review → Execution n
 ## Execution notes
 
 ### Rulings settled during execution (Z-23 …)
+
+- Z-23 (Task 3 review Q1): multi-unit service rollbacks run two passes — unmask every unit, then `enable --now` every unit; the per-unit form left `rpcbind.socket` not listening while `rpcbind.service` was still masked (reproduced on almalinux/9-init). Z-24 (Q2): `mask` is best effort (`|| true`); `disable --now` stays strict and the validate checks disabled + inactive. The pin test checks the unit lists exactly (Q3). The shadow text names Debian/Ubuntu's `unix_chkpwd` group read and the `allowed_modes` relaxation (Q4).
 
 - Pre-flight (three fresh reviewers + three refuters each, 57 agents): 12 survivors (2 Blocking — the lint rule turning the shipped set red before Task 3), 6 refuted, 4 nits, all folded: Z-20..Z-22, the corrected rune count, the capped-block clause, the single-unit `if` form, the examples.yml placement, the lint table's `absent` field, the body that changes `f` before failing, the literal inetd sentences, the root_remote_login text edit, `apt-get update` before installing shellcheck, and the `--dry-run` after `--facts` case.
 
