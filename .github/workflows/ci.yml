@@ -26,6 +26,14 @@ jobs:
         run: go run honnef.co/go/tools/cmd/staticcheck@2025.1.1 ./...
       - name: test
         run: go test -race ./...
+      - name: review scripts parse and pass shellcheck
+        run: |
+          command -v shellcheck || { sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck; }
+          for f in internal/remedy/testdata/*.sh examples/*-fix-report.sh; do
+            [ -e "$f" ] || continue
+            sh -n "$f"
+            shellcheck -s sh "$f"
+          done
       - name: controls lint
         run: go run ./cmd/muster controls lint --references docs/reference
       - name: controls lint, built-in profile
@@ -480,6 +488,72 @@ jobs:
               | ($k | split(".")) as $p
               | (.facts | getpath($p) | (.status // .effective.status))
               | select(. != "unsupported") ] | length == 0' "$RUNNER_TEMP/muster/containers/c.json"
+
+  fix-roundtrip:
+    runs-on: ubuntu-24.04
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: rockylinux/rockylinux:9-ubi-init
+            init: "true"
+            seeded: "muster.service.rpcbind_disabled muster.account.root_remote_login muster.file.hosts_permissions"
+          - image: almalinux/9-init
+            init: "true"
+            seeded: "muster.service.rpcbind_disabled muster.account.root_remote_login muster.file.hosts_permissions"
+          - image: ubuntu:22.04
+            init: "false"
+            seeded: "muster.file.hosts_permissions muster.file.shadow_permissions"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.5"
+      - name: build muster
+        run: CGO_ENABLED=0 go build -trimpath -o bin/muster ./cmd/muster
+      - name: seed, plan, run the script, check again
+        run: |
+          set -eu
+          d="$RUNNER_TEMP/rt"; mkdir -m 700 "$d"
+          if [ "${{ matrix.init }}" = "true" ]; then
+            cid=$(docker run -d --privileged --cgroupns=host -v "$PWD/bin:/m:ro" -v "$d:/out" ${{ matrix.image }} /sbin/init)
+            for i in $(seq 1 30); do
+              state=$(docker exec "$cid" systemctl is-system-running --wait 2>/dev/null || true)
+              case "$state" in running|degraded) break ;; esac
+              sleep 1
+            done
+          else
+            cid=$(docker run -d -v "$PWD/bin:/m:ro" -v "$d:/out" ${{ matrix.image }} sleep infinity)
+          fi
+          trap 'docker rm -f "$cid" >/dev/null 2>&1 || true' EXIT
+          if [ "${{ matrix.init }}" = "true" ]; then
+            docker exec "$cid" dnf install -y -q rpcbind openssh-server acl
+            docker exec "$cid" ssh-keygen -A
+            docker exec "$cid" systemctl enable --now rpcbind.socket sshd
+            docker exec "$cid" sh -c "printf 'PermitRootLogin yes\n' > /etc/ssh/sshd_config.d/99-ci.conf"
+          else
+            docker exec "$cid" sh -c 'apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq acl'
+          fi
+          docker exec "$cid" chmod 644 /etc/hosts
+          docker exec "$cid" /m/muster collect --out /out/before.json || true
+          sudo chown "$(id -u)" "$d/before.json"
+          ./bin/muster fix --dry-run --facts "$d/before.json" --format json > "$d/plan.json"
+          ./bin/muster fix --dry-run --facts "$d/before.json" --format script > "$d/fix.sh"
+          for id in ${{ matrix.seeded }}; do
+            jq -e --arg id "$id" '[.items[] | select(.id == $id and .planned and .script)] | length == 1' "$d/plan.json" > /dev/null \
+              || { echo "seeded $id is not a planned scripted item"; jq '.items[] | {id, planned, script, text_only_reason}' "$d/plan.json"; exit 1; }
+          done
+          docker exec "$cid" sh /out/fix.sh
+          docker exec "$cid" /m/muster collect --out /out/after.json || true
+          sudo chown "$(id -u)" "$d/after.json"
+          set +e
+          ./bin/muster check --facts "$d/after.json" --format json > "$d/after-report.json"
+          set -e
+          for id in ${{ matrix.seeded }}; do
+            jq -e --arg id "$id" '[.results[] | select(.id == $id and (.status == "PASS" or .status == "NOT_APPLICABLE"))] | length == 1' "$d/after-report.json" > /dev/null \
+              || { echo "$id did not pass after the script"; jq --arg id "$id" '.results[] | select(.id == $id)' "$d/after-report.json"; exit 1; }
+          done
 
   collect-contract:
     runs-on: ubuntu-24.04

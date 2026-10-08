@@ -1,6 +1,7 @@
 # Example snapshots and reports
 
-What a real `muster collect` snapshot and the reports `muster check` makes from it look like,
+What a real `muster collect` snapshot, the reports `muster check` makes from it and the plan
+`muster fix --dry-run` makes from the same reading look like,
 so nobody has to run anything to see the shape of the output.
 
 **No file in this directory comes from anyone's host.** One snapshot is collected inside a
@@ -11,10 +12,12 @@ builds this repository, and both are rewritten (below) before they are kept.
 | --- | --- |
 | `ubuntu-24.04-container.json` | `muster collect --deep` inside the public `ubuntu:24.04` image: an overlay root, no systemd, the walk lists `unsupported`. |
 | `ubuntu-24.04-container-report.json` / `-report.txt` | `muster check` on that snapshot, as JSON and as the table. |
+| `ubuntu-24.04-container-fix-report.json` / `-fix-report.txt` / `-fix-report.sh` | `muster fix --dry-run --max-risk lockout_risk` on that snapshot, as JSON, as the table and as the review script. |
 | `ubuntu-24.04-vm.json` | `muster collect --deep` on the GitHub Actions `ubuntu-24.04` runner VM, with the walk exclusions of `.github/walk-excludes` — the same file `ci.yml` reads — so the walk lists carry real rows. |
 | `ubuntu-24.04-vm-report.json` / `-report.txt` | `muster check` on that snapshot, as JSON and as the table. |
+| `ubuntu-24.04-vm-fix-report.json` / `-fix-report.txt` / `-fix-report.sh` | `muster fix --dry-run --max-risk lockout_risk` on that snapshot, as JSON, as the table and as the review script. |
 
-When a refresh is pending, the six files may be missing; the test that checks the examples
+When a refresh is pending, the twelve files may be missing; the test that checks the examples
 then skips, saying so.
 
 Produced by run [`35548200943`](https://github.com/kun9497/muster/actions/runs/35548200943) of [`.github/workflows/examples.yml`](../.github/workflows/examples.yml).
@@ -39,6 +42,9 @@ sudo ./bin/muster collect --deep --walk-budget 15m --walk-max-entries 6000000 \
 # the reports, after the rewrite below
 NO_COLOR=1 ./bin/muster check --facts <snapshot> --format json > <snapshot>-report.json
 NO_COLOR=1 ./bin/muster check --facts <snapshot> --format table > <snapshot>-report.txt
+NO_COLOR=1 ./bin/muster fix --dry-run --facts <snapshot> --max-risk lockout_risk --format json > <snapshot>-fix-report.json
+NO_COLOR=1 ./bin/muster fix --dry-run --facts <snapshot> --max-risk lockout_risk --format table > <snapshot>-fix-report.txt
+NO_COLOR=1 ./bin/muster fix --dry-run --facts <snapshot> --max-risk lockout_risk --format script > <snapshot>-fix-report.sh
 ```
 
 ## The rewrite
@@ -80,11 +86,15 @@ before they are committed — update the run id above, and commit.
 `cmd/muster/examples_test.go` reloads every snapshot here, re-runs `check` in process and
 compares both reports byte for byte, ignoring only the four provenance fields that differ
 between a release binary and `go test` (`muster_version`, `commit`, `controls_version`,
-`controls_digest`) and the table's first line.
+`controls_digest`) and the table's first line. It plans `fix --dry-run --max-risk lockout_risk`
+from the same evaluation and compares the three fix files the same way: the plan JSON with
+those four fields of its `fix` block masked, the table without its first line, and the review
+script byte for byte (its `# snapshot:` line carries no muster version or commit). A missing fix
+file is a failure that names the refresh, not a skip.
 
 A stale example never fails the suite. The test reads the committed report's own
-`check.controls_digest` and compares it with the digest of the control set this build
-embeds: when they differ, the example was collected against a set whose verdicts this
+`check.controls_digest` (and the plan's `fix.controls_digest`) and compares it with the
+digest of the control set this build embeds: when they differ, the example was collected against a set whose verdicts this
 binary cannot reproduce, so the test logs `collected against control set <digest>, this
 build is <digest>; byte comparison skipped` and skips **only** that comparison. Loading the
 snapshot, evaluating it and the assertion that no control ends in `ERROR(internal_error)`

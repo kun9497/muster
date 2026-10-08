@@ -11,7 +11,7 @@ LDFLAGS := -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.dat
 TIME    ?= 60s
 FUZZPKG ?= ./internal/collect/collectors/
 
-.PHONY: build test lint fmt tidy lint-controls coverage refindex refindex-check suidindex suidindex-check fuzz examples-fetch clean
+.PHONY: build test lint fmt tidy lint-controls coverage refindex refindex-check suidindex suidindex-check fuzz shellcheck examples-fetch clean
 
 build:
 	CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)" -o bin/$(BINARY) $(PKG)
@@ -45,6 +45,11 @@ suidindex:
 
 suidindex-check:
 	go run ./tools/suidindex -check
+
+# sh -n and shellcheck over the review scripts: the remedy goldens and the
+# committed fix examples (a glob that matches nothing is skipped).
+shellcheck:
+	@for f in internal/remedy/testdata/*.sh examples/*-fix-report.sh; do [ -e "$$f" ] || continue; sh -n "$$f" || exit 1; shellcheck -s sh "$$f" || exit 1; done
 
 # One fuzz target for a short time; the seed corpus already runs in `make
 # test`, so this is for the target you are working on. The nightly fuzz
