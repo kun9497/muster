@@ -1,6 +1,7 @@
 package remedy
 
 import (
+	"encoding/json"
 	"reflect"
 	"strings"
 	"testing"
@@ -269,5 +270,152 @@ func TestPlanCopiesProvenance(t *testing.T) {
 	}
 	if p.SchemaVersion != PlanSchemaVersion || PlanSchemaVersion != 1 {
 		t.Fatalf("schema version %d", p.SchemaVersion)
+	}
+}
+
+// A parameter in force from a profile is tuned as much as one from a tuning
+// file: the declared script assumes the defaults (review I-1).
+func TestPlanTunedByProfile(t *testing.T) {
+	rep := testReport(row("muster.test.e_param", "FAIL", "mode 777", "", "high"))
+	rep.Check.ParamSources = map[string]map[string]string{"muster.test.e_param": {"mode": "profile"}}
+	it := itemByID(t, build(t, rep, Options{}), "muster.test.e_param")
+	if it.TextOnlyReason != "params_tuned" || it.Script || it.ScriptBody != "" {
+		t.Fatalf("profile-tuned item: text_only_reason %q script %v body %q", it.TextOnlyReason, it.Script, it.ScriptBody)
+	}
+}
+
+// absent is judged before params_tuned (review M-1).
+func TestPlanAbsentBeforeTuned(t *testing.T) {
+	rep := testReport(row("muster.test.e_param", "FAIL", check.ReasonAbsentFailPrefix+"no file", "", "high"))
+	rep.Check.ParamSources = map[string]map[string]string{"muster.test.e_param": {"mode": "tuning"}}
+	if it := itemByID(t, build(t, rep, Options{}), "muster.test.e_param"); it.TextOnlyReason != "absent" {
+		t.Fatalf("text_only_reason %q, want absent", it.TextOnlyReason)
+	}
+}
+
+// Only a WARN whose Degraded is set and whose whole reason is the degraded
+// prefix plus it is a degraded pass; either half missing keeps the item
+// (review M-2).
+func TestPlanDegradedGuardNeedsBothHalves(t *testing.T) {
+	rep := testReport(
+		row("muster.test.a_none", "WARN", check.ReasonDegradedPrefix, "", "high"),
+		row("muster.test.b_restart", "FAIL", check.ReasonDegradedPrefix+"x", "x", "high"),
+	)
+	p := build(t, rep, Options{})
+	if len(p.NotPlanned) != 0 || p.Summary.NotPlanned != (NotPlannedCounts{}) {
+		t.Fatalf("not_planned %+v counts %+v", p.NotPlanned, p.Summary.NotPlanned)
+	}
+	if a := itemByID(t, p, "muster.test.a_none"); a.Status != "warn" {
+		t.Errorf("a_none status %q", a.Status)
+	}
+	if b := itemByID(t, p, "muster.test.b_restart"); b.Status != "fail" {
+		t.Errorf("b_restart status %q", b.Status)
+	}
+}
+
+// The absent test reads the bare reason (Z-6), while the item's reason is
+// the reason line, code included (review M-3).
+func TestPlanAbsentWithReasonCode(t *testing.T) {
+	r := row("muster.test.c_lockout", "FAIL", check.ReasonAbsentFailPrefix+"no file", "", "high")
+	r.ReasonCode = check.Truncated
+	it := itemByID(t, build(t, testReport(r), Options{}), "muster.test.c_lockout")
+	if it.TextOnlyReason != "absent" || it.Script {
+		t.Errorf("text_only_reason %q script %v, want absent and no script", it.TextOnlyReason, it.Script)
+	}
+	if want := "[truncated] absent counts as fail: no file"; it.Reason != want || it.Reason != report.ReasonLine(r) {
+		t.Errorf("reason %q, want %q", it.Reason, want)
+	}
+}
+
+// Every field of a scripted item, the script-only ones included (review M-4).
+func TestPlanItemCopiesEveryField(t *testing.T) {
+	r := row("muster.test.c_lockout", "FAIL", "PermitRootLogin yes", "", "low")
+	r.SeveritySource = "profile"
+	it := itemByID(t, build(t, testReport(r), Options{}), "muster.test.c_lockout")
+	want := Item{
+		ID: "muster.test.c_lockout", TitleEn: "muster.test.c_lockout en", TitleKo: "muster.test.c_lockout ko",
+		Status: "fail", Severity: "low", SeveritySource: "profile", Risk: "lockout_risk", Idempotent: true,
+		Automation: "auto", Reason: "PermitRootLogin yes", TextEn: "fix c", TextKo: "조치 c", Script: true,
+		TextOnlyReason: "", Rollback: "both", Backup: []string{"/etc/ssh/sshd_config"}, Validate: true, Planned: true,
+		SourceStatus: check.FAIL, ScriptBody: "sed -i s/a/b/ /etc/ssh/sshd_config", ValidateCmd: "sshd -t",
+		RollbackBody: "systemctl reload ssh",
+	}
+	if !reflect.DeepEqual(it, want) {
+		t.Fatalf("item:\n got %+v\nwant %+v", it, want)
+	}
+}
+
+// A row whose control the set does not carry is a text-only item of risk
+// none, so it is planned under every cap; a text-only item whose risk is
+// above the cap is not (review M-5).
+func TestPlanItemWithoutRemediationIsPlanned(t *testing.T) {
+	rep := testReport(
+		row("muster.test.zz_unknown", "FAIL", "r", "", "high"),
+		row("muster.test.d_reboot", "FAIL", "r", "", "high"),
+	)
+	for _, maxRisk := range []string{"none", ""} {
+		p := build(t, rep, Options{MaxRisk: maxRisk})
+		z := itemByID(t, p, "muster.test.zz_unknown")
+		if z.Risk != "none" || z.TextOnlyReason != "no_script" || !z.Planned || z.Rollback != "none" || z.Script {
+			t.Errorf("max-risk %q: unknown item %+v", maxRisk, z)
+		}
+		d := itemByID(t, p, "muster.test.d_reboot")
+		if wantPlanned := maxRisk == ""; d.Planned != wantPlanned || d.TextOnlyReason != "no_script" {
+			t.Errorf("max-risk %q: d_reboot planned %v (want %v) text_only_reason %q", maxRisk, d.Planned, wantPlanned, d.TextOnlyReason)
+		}
+	}
+}
+
+// The plan's JSON carries no script body field, and a text-only item's
+// backup and the empty lists are [] (review N-2).
+func TestPlanJSONShape(t *testing.T) {
+	rep := testReport(
+		row("muster.test.c_lockout", "FAIL", "r", "", "high"),
+		row("muster.test.d_reboot", "FAIL", "r", "", "high"),
+	)
+	data, err := json.Marshal(build(t, rep, Options{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got struct {
+		Items      []map[string]json.RawMessage `json:"items"`
+		NotPlanned json.RawMessage              `json:"not_planned"`
+	}
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatal(err)
+	}
+	if string(got.NotPlanned) != "[]" {
+		t.Errorf("not_planned %s, want []", got.NotPlanned)
+	}
+	if len(got.Items) != 2 {
+		t.Fatalf("items: %d", len(got.Items))
+	}
+	for _, it := range got.Items {
+		for _, k := range []string{"SourceStatus", "ScriptBody", "ValidateCmd", "RollbackBody", "source_status", "script_body", "validate_cmd", "rollback_body"} {
+			if _, ok := it[k]; ok {
+				t.Errorf("item %s carries %s", it["id"], k)
+			}
+		}
+	}
+	// reboot_required sorts before lockout_risk.
+	if id := string(got.Items[0]["id"]); id != `"muster.test.d_reboot"` {
+		t.Fatalf("first item %s", id)
+	}
+	if b := string(got.Items[0]["backup"]); b != "[]" {
+		t.Errorf("text-only backup %s, want []", b)
+	}
+	empty, err := json.Marshal(build(t, testReport(row("p1", "PASS", "", "", "high")), Options{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var e struct {
+		Items      json.RawMessage `json:"items"`
+		NotPlanned json.RawMessage `json:"not_planned"`
+	}
+	if err := json.Unmarshal(empty, &e); err != nil {
+		t.Fatal(err)
+	}
+	if string(e.Items) != "[]" || string(e.NotPlanned) != "[]" {
+		t.Errorf("empty plan items %s not_planned %s", e.Items, e.NotPlanned)
 	}
 }
