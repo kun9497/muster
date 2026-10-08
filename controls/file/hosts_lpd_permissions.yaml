@@ -20,5 +20,9 @@ remediation:
   text_ko: chown root:root /etc/hosts.lpd; chmod 600 /etc/hosts.lpd
   risk: none
   idempotent: true
-  script: chown root:root /etc/hosts.lpd && chmod 600 /etc/hosts.lpd
   backup: [/etc/hosts.lpd]
+  script: |
+    [ -f /etc/hosts.lpd ]
+    chown root:root /etc/hosts.lpd
+    chmod 600 /etc/hosts.lpd
+  validate: "stat -c '%u %g %a' /etc/hosts.lpd | grep -qx '0 0 600'"

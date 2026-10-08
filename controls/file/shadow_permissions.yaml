@@ -27,5 +27,10 @@ remediation:
   text_ko: chown root /etc/shadow; chmod 400 /etc/shadow; setfacl -b /etc/shadow
   risk: none
   idempotent: true
-  script: chown root /etc/shadow && chmod 400 /etc/shadow && setfacl -b /etc/shadow
   backup: [/etc/shadow]
+  script: |
+    [ -f /etc/shadow ]
+    chown root /etc/shadow
+    chmod 400 /etc/shadow
+    if command -v setfacl >/dev/null 2>&1; then setfacl -b /etc/shadow; fi
+  validate: "stat -c '%u %a' /etc/shadow | grep -qx '0 400'"

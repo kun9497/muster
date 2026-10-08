@@ -20,5 +20,9 @@ remediation:
   text_ko: chown root:root /etc/hosts; chmod 600 /etc/hosts
   risk: none
   idempotent: true
-  script: chown root:root /etc/hosts && chmod 600 /etc/hosts
   backup: [/etc/hosts]
+  script: |
+    [ -f /etc/hosts ]
+    chown root:root /etc/hosts
+    chmod 600 /etc/hosts
+  validate: "stat -c '%u %g %a' /etc/hosts | grep -qx '0 0 600'"

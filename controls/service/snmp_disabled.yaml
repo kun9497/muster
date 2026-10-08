@@ -19,6 +19,15 @@ remediation:
   text_ko: SNMP 에이전트가 필요하지 않다면 중지·비활성화하고 (systemctl disable --now snmpd.service), 필요하다면 U-59/U-60/U-61 점검에 따라 강화합니다.
   risk: restart_service
   idempotent: true
-  script: systemctl disable --now snmpd.service 2>/dev/null; true
-  rollback: systemctl enable --now snmpd.service 2>/dev/null; true
+  script: |
+    if systemctl cat snmpd.service >/dev/null 2>&1; then
+      systemctl disable --now snmpd.service
+      systemctl mask snmpd.service
+    fi
+  validate: '! systemctl is-active --quiet snmpd.service && case "$(systemctl is-enabled snmpd.service 2>/dev/null)" in enabled|enabled-runtime) false;; esac'
+  rollback: |
+    if systemctl cat snmpd.service >/dev/null 2>&1; then
+      systemctl unmask snmpd.service
+      systemctl enable --now snmpd.service
+    fi
 decision: D19

@@ -20,6 +20,11 @@ remediation:
   text_ko: chown root:root /etc/passwd; chmod 644 /etc/passwd; setfacl -b /etc/passwd
   risk: none
   idempotent: true
-  script: chown root:root /etc/passwd && chmod 644 /etc/passwd && setfacl -b /etc/passwd
   backup: [/etc/passwd]
+  script: |
+    [ -f /etc/passwd ]
+    chown root:root /etc/passwd
+    chmod 644 /etc/passwd
+    if command -v setfacl >/dev/null 2>&1; then setfacl -b /etc/passwd; fi
+  validate: "stat -c '%u %g %a' /etc/passwd | grep -qx '0 0 644'"
 decision: D26

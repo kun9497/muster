@@ -22,6 +22,17 @@ remediation:
   text_ko: ypserv 와 ypbind 를 중지·비활성화하고 (systemctl disable --now ypserv.service ypbind.service) /etc/nsswitch.conf 의 passwd·group 줄에서 nis·nisplus 를 제거합니다.
   risk: restart_service
   idempotent: true
-  script: systemctl disable --now ypserv.service ypbind.service 2>/dev/null; true
-  rollback: systemctl enable --now ypserv.service ypbind.service 2>/dev/null; true
+  script: |
+    for u in ypserv.service ypbind.service ypxfrd.service yppasswdd.service; do
+      systemctl cat "$u" >/dev/null 2>&1 || continue
+      systemctl disable --now "$u"
+      systemctl mask "$u"
+    done
+  validate: '! systemctl is-active --quiet ypserv.service && case "$(systemctl is-enabled ypserv.service 2>/dev/null)" in enabled|enabled-runtime) false;; esac && ! systemctl is-active --quiet ypbind.service && case "$(systemctl is-enabled ypbind.service 2>/dev/null)" in enabled|enabled-runtime) false;; esac && ! systemctl is-active --quiet ypxfrd.service && case "$(systemctl is-enabled ypxfrd.service 2>/dev/null)" in enabled|enabled-runtime) false;; esac && ! systemctl is-active --quiet yppasswdd.service && case "$(systemctl is-enabled yppasswdd.service 2>/dev/null)" in enabled|enabled-runtime) false;; esac'
+  rollback: |
+    for u in ypserv.service ypbind.service ypxfrd.service yppasswdd.service; do
+      systemctl cat "$u" >/dev/null 2>&1 || continue
+      systemctl unmask "$u"
+      systemctl enable --now "$u"
+    done
 decision: D19

@@ -15,10 +15,21 @@ checks:
   - { fact: services.dos_services.enabled, op: eq, expected: false }
   - { fact: services.dos_services.reachable, op: eq, expected: false }
 remediation:
-  text_en: Disable and mask the echo, discard, daytime and chargen services or remove their inetd/xinetd entries.
-  text_ko: echo, discard, daytime, chargen 서비스를 비활성화·mask 하거나 inetd/xinetd 의 해당 항목을 제거합니다.
+  text_en: Disable and mask the echo, discard, daytime and chargen services or remove their inetd/xinetd entries. An echo, discard, daytime or chargen started by inetd or xinetd is not stopped by the script; remove its entry there.
+  text_ko: echo, discard, daytime, chargen 서비스를 비활성화·mask 하거나 inetd/xinetd 의 해당 항목을 제거합니다. inetd나 xinetd가 띄우는 echo, discard, daytime, chargen은 스크립트가 멈추지 않습니다. 거기서 항목을 지우십시오.
   risk: restart_service
   idempotent: true
-  script: systemctl disable --now echo.socket discard.socket daytime.socket chargen.socket 2>/dev/null; systemctl mask echo.socket discard.socket daytime.socket chargen.socket 2>/dev/null; true
-  rollback: systemctl unmask echo.socket discard.socket daytime.socket chargen.socket 2>/dev/null; true
+  script: |
+    for u in echo.socket discard.socket daytime.socket chargen.socket; do
+      systemctl cat "$u" >/dev/null 2>&1 || continue
+      systemctl disable --now "$u"
+      systemctl mask "$u"
+    done
+  validate: '! systemctl is-active --quiet echo.socket && case "$(systemctl is-enabled echo.socket 2>/dev/null)" in enabled|enabled-runtime) false;; esac && ! systemctl is-active --quiet discard.socket && case "$(systemctl is-enabled discard.socket 2>/dev/null)" in enabled|enabled-runtime) false;; esac && ! systemctl is-active --quiet daytime.socket && case "$(systemctl is-enabled daytime.socket 2>/dev/null)" in enabled|enabled-runtime) false;; esac && ! systemctl is-active --quiet chargen.socket && case "$(systemctl is-enabled chargen.socket 2>/dev/null)" in enabled|enabled-runtime) false;; esac'
+  rollback: |
+    for u in echo.socket discard.socket daytime.socket chargen.socket; do
+      systemctl cat "$u" >/dev/null 2>&1 || continue
+      systemctl unmask "$u"
+      systemctl enable --now "$u"
+    done
 decision: D19

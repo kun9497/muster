@@ -31,18 +31,23 @@ mechanisms:
     checks:
       - { fact: files.etc_securetty_lines, op: none, where: { op: matches, expected: "^pts/" } }
 remediation:
-  text_en: Set PermitRootLogin no in a file under /etc/ssh/sshd_config.d/, validate with sshd -t, then restart sshd while keeping a second session open. Where /etc/securetty lists pts/* entries instead, remove those lines so no pseudo-terminal can be used for a securetty-gated root login.
-  text_ko: /etc/ssh/sshd_config.d/ 아래 파일에 PermitRootLogin no 를 넣고 sshd -t 로 검증한 뒤, 다른 세션을 열어 둔 채 sshd 를 재시작합니다. 대신 /etc/securetty 에 pts/* 항목이 있다면 그 줄을 제거하여 securetty 로 통제되는 root 로그인에 가상 터미널을 쓸 수 없게 합니다.
+  text_en: 'Set PermitRootLogin no in /etc/ssh/sshd_config.d/00-muster.conf, validate with sshd -t, then restart sshd while keeping a second session open. Where /etc/securetty lists pts/* entries instead, remove those lines so no pseudo-terminal can be used for a securetty-gated root login. sshd keeps the first value it reads: a drop-in that sorts before 00-muster.conf, or a PermitRootLogin line before the Include in sshd_config, still wins.'
+  text_ko: /etc/ssh/sshd_config.d/00-muster.conf 파일에 PermitRootLogin no 를 넣고 sshd -t 로 검증한 뒤, 다른 세션을 열어 둔 채 sshd 를 재시작합니다. 대신 /etc/securetty 에 pts/* 항목이 있다면 그 줄을 제거하여 securetty 로 통제되는 root 로그인에 가상 터미널을 쓸 수 없게 합니다. sshd는 처음 읽은 값을 지키므로 00-muster.conf보다 먼저 정렬되는 드롭인이나 sshd_config의 Include 앞 PermitRootLogin 줄이 여전히 이깁니다.
   risk: lockout_risk
   idempotent: true
+  backup: [/etc/ssh/sshd_config.d/00-muster.conf, /etc/securetty]
   script: |
     if command -v sshd >/dev/null 2>&1; then
-      printf 'PermitRootLogin no\n' > /etc/ssh/sshd_config.d/90-muster.conf && sshd -t
+      [ -d /run/sshd ] || mkdir -p /run/sshd
+      printf 'PermitRootLogin no\n' > /etc/ssh/sshd_config.d/00-muster.conf
+      chmod 644 /etc/ssh/sshd_config.d/00-muster.conf
+      sshd -t
     fi
     if [ -f /etc/securetty ]; then
       sed -i '/^pts\//d' /etc/securetty
     fi
+  validate: "if command -v sshd >/dev/null 2>&1; then sshd -T 2>/dev/null | grep -qx 'permitrootlogin no'; fi"
   rollback: |
-    rm -f /etc/ssh/sshd_config.d/90-muster.conf
-    command -v sshd >/dev/null 2>&1 && sshd -t || true
+    rm -f /etc/ssh/sshd_config.d/00-muster.conf
+    if command -v sshd >/dev/null 2>&1; then sshd -t; fi
 decision: D09
