@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "run": {
+    "muster_version": "",
+    "commit": "",
+    "controls_version": "",
+    "controls_digest": "",
+    "guide_edition": "",
+    "collected_at": "2026-10-08T00:00:00Z",
+    "host": {
+      "hostname": "host-a",
+      "machine_id_hash": "",
+      "kernel": "",
+      "os_release": {
+        "id": "",
+        "version_id": "",
+        "family": ""
+      },
+      "boot_id": "",
+      "uptime_s": 0
+    },
+    "euid": 0,
+    "capabilities": null,
+    "env": {
+      "container": "",
+      "virt": "",
+      "wsl": false,
+      "chroot": false,
+      "has_systemd": false,
+      "sysctl_writable": false,
+      "cloud_init": false
+    },
+    "collectors": null,
+    "redaction": {
+      "profile": "",
+      "include_secrets": false
+    },
+    "deep": false,
+    "complete": false,
+    "partial_failures": null
+  },
+  "fix": {
+    "muster_version": "",
+    "commit": "",
+    "controls_version": "test+1",
+    "controls_digest": "sha256:c0",
+    "snapshot_digest": "",
+    "guide_edition": "",
+    "profile": {
+      "name": "default",
+      "source": "",
+      "digest": "sha256:p0",
+      "extends": null,
+      "selected": 0,
+      "excluded": 0,
+      "excluded_ids": null
+    },
+    "waivers": {
+      "applied": 0,
+      "not_applied": 0,
+      "expired": 0,
+      "unknown": 0,
+      "expiring_soon": 0
+    },
+    "max_risk": "lockout_risk"
+  },
+  "items": [],
+  "not_planned": [],
+  "summary": {
+    "planned": 0,
+    "above_max_risk": 0,
+    "with_script": 0,
+    "text_only": 0,
+    "waived": 0,
+    "clean": 1,
+    "not_planned": {
+      "error": 0,
+      "manual": 0,
+      "warn_degraded": 0
+    },
+    "by_risk": {
+      "none": 0,
+      "restart_service": 0,
+      "reboot_required": 0,
+      "lockout_risk": 0
+    }
+  }
+}
