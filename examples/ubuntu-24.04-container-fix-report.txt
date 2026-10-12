@@ -1,0 +1,40 @@
+muster 7f79d8f · controls kisa-unix-2026+2026.10.08 · guide kisa-unix-2026 · host ubuntu-container · collected 2026-10-12T07:12:39Z
+fix --dry-run · profile default (117 controls) · max-risk lockout_risk
+planned 10 (script 2, text only 8) · above max-risk 0 · waived 0 · clean 105 · not planned: error 0, manual 2, warn_degraded 0
+by risk: none 7 · restart_service 1 · reboot_required 0 · lockout_risk 2
+
+#   risk             id                                   status  sev     script  rollback        title
+1   none             muster.account.cron_permissions      fail    high    no      -               cron 설정 파일이 0640 이하로 엄격하며 소유가 적절하다
+   why: clause does not hold: cron.files each require mode in [0 32 128 160 256 288 384 416]
+   do:  crontab 형식 파일(/etc/crontab, /etc/cron.d/*, 사용자별 스풀)에 chmod 0640 을 적용하고 시스템 파일을 root 로 chown 하며, /etc/cron.{hourly,daily,weekly,monthly} 주기 스크립트 디렉터리와 그 스크립트에는 (run-parts 를 깨뜨리는 0640 이 아니라) chmod go-w 를 적용하고, cron 디렉터리에 chmod o-w 를 적용합니다. (text only: no_script)
+2   none             muster.account.password_policy       fail    high    no      -               비밀번호 사용 기간·길이·복잡성 정책이 설정되고 강제된다
+   why: absent counts as fail: accounts.login_defs.pass_min_len is absent on this host
+   do:  /etc/login.defs 에 PASS_MAX_DAYS, PASS_MIN_DAYS, PASS_MIN_LEN 을 설정하고 기존 계정에는 chage 로 사용 기간 값을 적용하며, libpam-pwquality 를 설치하거나 (Debian 계열) authselect 프로파일에 pam_pwquality 를 유지한 뒤 (RHEL 계열) /etc/security/pwquality.conf 에 minlen 과 minclass (또는 네 credit) 를 설정합니다. (text only: no_script)
+3   none             muster.file.services_permissions     fail    high    no      -               /etc/services 가 root 소유이고 그룹과 다른 사용자가 쓸 수 없다
+   why: absent counts as fail: files.etc_services.uid is absent on this host
+   do:  chown root:root /etc/services; chmod 644 /etc/services (text only: absent)
+4   none             muster.file.shadow_permissions       fail    high    yes     restore_backup  /etc/shadow 가 root 소유이고 root 만 읽을 수 있다
+   why: clause does not hold: files.etc_shadow.mode in [0 256]
+   do:  chown root /etc/shadow; chmod 400 /etc/shadow; setfacl -b /etc/shadow. Debian과 Ubuntu에서는 unix_chkpwd가 shadow 그룹으로 /etc/shadow를 읽으므로, 0640을 유지하는 사이트는 allowed_modes를 완화하고 그러면 계획이 스크립트를 뺍니다.
+5   none             muster.account.session_timeout       fail    low     no      -               유휴 SSH 세션이 정해진 시간이 지나면 끊긴다
+   why: absent counts as fail: no mechanism applies to this host
+   do:  /etc/ssh/sshd_config.d/ 아래 파일에 ClientAliveInterval 300 과 ClientAliveCountMax 1 을 설정하고 sshd -t 로 검증한 뒤 sshd 를 재시작합니다. 이 컨트롤은 두 방식 중 어느 쪽이든 인정하므로, 대안으로 시스템 프로파일 파일에 대화형 셸 TMOUT 을 설정하고 export 할 수 있습니다 - 예를 들어 /etc/profile.d/ 아래 파일에 "readonly TMOUT=600; export TMOUT" 를 둡니다. (text only: no_script)
+6   none             muster.account.unnecessary_accounts  warn    low     no      -               불필요한 계정이 제거되어 있다
+   why: clause does not hold: accounts.users none where name in [lp uucp nuucp]
+   do:  호스트에서 해당 계정으로 실행되는 것이 없음을 확인한 뒤 (ps -u <name>; find / -user <name>) userdel <name> 으로 제거합니다. (text only: no_script)
+7   none             muster.service.login_banner          warn    low     no      -               로그인 시 경고 메시지가 표시된다
+   why: clause does not hold: banners.issue_net.os_escapes eq false
+   do:  sshd 의 Banner 를 경고 문구가 담긴 파일로 지정하고(/etc/ssh/sshd_config.d/ 에 Banner /etc/issue.net, sshd -t 로 검증 후 재시작) /etc/issue 와 /etc/issue.net 의 배포판 문자열을 인가된 사용 경고로 바꿉니다. (text only: no_script)
+8   restart_service  muster.file.hosts_permissions        fail    high    yes     restore_backup  /etc/hosts 가 root 소유이고 root 만 읽을 수 있다
+   why: clause does not hold: files.etc_hosts.mode in [0 128 256 384]
+   do:  chown root:root /etc/hosts; chmod 600 /etc/hosts. 0600에서는 root가 아닌 프로세스가 /etc/hosts를 읽지 못해 그것으로 이름을 푸는 서비스가 실패합니다. 0644를 유지하는 사이트는 allowed_modes를 완화하고 그러면 계획이 스크립트를 뺍니다.
+9   lockout_risk     muster.account.lockout_threshold     fail    high    no      -               로그인 실패가 정해진 횟수를 넘으면 계정이 잠긴다
+   why: absent counts as fail: pam.faillock.deny is absent on this host
+   do:  RHEL 계열은 authselect enable-feature with-faillock 을 실행하고 /etc/security/faillock.conf 에 deny 를 설정하며, Debian 계열은 common-auth 에 pam_faillock.so preauth 와 authfail 줄, common-account 에 pam_faillock.so 줄을 추가하거나 pam-auth-update 프로파일을 쓴 뒤 /etc/security/faillock.conf 에 deny 를 설정합니다. (text only: no_script)
+10  lockout_risk     muster.account.su_restricted         fail    high    no      -               PAM 이 su 를 wheel 그룹으로 제한한다
+   why: clause does not hold: pam.su.wheel_required eq true
+   do:  /etc/pam.d/su 에서 "auth required pam_wheel.so use_uid" 줄의 주석을 풀거나 추가하고, 관리자를 wheel 그룹 (또는 group= 으로 지정한 그룹) 에 넣습니다. (text only: no_script)
+
+not planned:
+  muster.log.syslog_policy       manual         absent needs review: no mechanism applies to this host
+  muster.patch.security_updates  manual         absent needs review: patch.metadata_age_s is absent on this host

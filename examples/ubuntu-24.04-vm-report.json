@@ -1,15 +1,15 @@
 {
   "schema_version": 1,
   "run": {
-    "muster_version": "5c0f7a8",
-    "commit": "5c0f7a8",
-    "controls_version": "kisa-unix-2026+2026.10.02",
-    "controls_digest": "sha256:663acb91eee0a218cac42d72184b53e026addf12b5f6f5f38280e19197dc0da0",
+    "muster_version": "7f79d8f",
+    "commit": "7f79d8f",
+    "controls_version": "kisa-unix-2026+2026.10.08",
+    "controls_digest": "sha256:0391129e9fb2ab8b86f88a710d40a0e1c7c9ddf7bfa38858ca10adbbdf164948",
     "guide_edition": "kisa-unix-2026",
-    "collected_at": "2026-10-07T05:54:12Z",
+    "collected_at": "2026-10-12T07:12:49Z",
     "host": {
       "hostname": "github-runner",
-      "machine_id_hash": "e2708aa39d82e1c19d1f0bcd0ab61b4aa24242d269affa028e793d3e410ca9e0",
+      "machine_id_hash": "c0fe69bdd4f04f3a67964c2595a9f17ab726e115e5a90ca116969c55aa7235a8",
       "kernel": "",
       "os_release": {
         "id": "ubuntu",
@@ -39,7 +39,7 @@
       {
         "name": "accounts",
         "status": "ok",
-        "ms": 8
+        "ms": 0
       },
       {
         "name": "audit",
@@ -55,7 +55,7 @@
       {
         "name": "boot",
         "status": "ok",
-        "ms": 11
+        "ms": 27
       },
       {
         "name": "coredump",
@@ -65,7 +65,7 @@
       {
         "name": "cron",
         "status": "ok",
-        "ms": 673,
+        "ms": 686,
         "cmd": "/usr/bin/systemctl list-unit-files --type=timer --no-legend --no-pager"
       },
       {
@@ -76,23 +76,23 @@
       {
         "name": "env",
         "status": "ok",
-        "ms": 3
+        "ms": 9
       },
       {
         "name": "files",
         "status": "ok",
-        "ms": 14
+        "ms": 15
       },
       {
         "name": "fim",
         "status": "ok",
-        "ms": 7,
+        "ms": 8,
         "cmd": "/usr/bin/systemctl list-timers --all --no-legend --no-pager"
       },
       {
         "name": "firewall",
         "status": "ok",
-        "ms": 18,
+        "ms": 25,
         "cmd": "/usr/sbin/nft list ruleset"
       },
       {
@@ -113,7 +113,7 @@
       {
         "name": "modules",
         "status": "ok",
-        "ms": 11
+        "ms": 41
       },
       {
         "name": "mounts",
@@ -139,18 +139,18 @@
       {
         "name": "pam",
         "status": "ok",
-        "ms": 1
+        "ms": 4
       },
       {
         "name": "patch",
         "status": "ok",
-        "ms": 1409,
+        "ms": 2272,
         "cmd": "/usr/bin/apt-get -s upgrade -o Debug::NoLocking=1"
       },
       {
         "name": "pkgverify",
         "status": "ok",
-        "ms": 786891,
+        "ms": 760007,
         "cmd": "/usr/bin/rpm -Va"
       },
       {
@@ -161,13 +161,13 @@
       {
         "name": "processes",
         "status": "ok",
-        "ms": 105,
+        "ms": 129,
         "cmd": "/usr/bin/rpm -qa --qf [%{=NAME}\t%{FILEMODES:octal}\t%{FILEUSERNAME}\t%{FILEGROUPNAME}\t%|FILECAPS?{%{FILECAPS}}|\t%{FILENAMES}\n]"
       },
       {
         "name": "services",
         "status": "ok",
-        "ms": 263,
+        "ms": 264,
         "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState atftpd.service"
       },
       {
@@ -178,12 +178,12 @@
       {
         "name": "sockets",
         "status": "ok",
-        "ms": 11
+        "ms": 8
       },
       {
         "name": "sshd",
         "status": "ok",
-        "ms": 10,
+        "ms": 12,
         "cmd": "/usr/sbin/sshd -G"
       },
       {
@@ -199,24 +199,24 @@
       {
         "name": "sysctl",
         "status": "ok",
-        "ms": 1
+        "ms": 2
       },
       {
         "name": "timesync",
         "status": "ok",
-        "ms": 39,
+        "ms": 45,
         "cmd": "/usr/bin/timedatectl show-timesync --all"
       },
       {
         "name": "units",
         "status": "ok",
-        "ms": 36,
+        "ms": 42,
         "cmd": "/usr/bin/systemctl list-units --type=service --state=active --plain --no-legend"
       },
       {
         "name": "walk",
         "status": "ok",
-        "ms": 13044,
+        "ms": 19326,
         "cmd": "/usr/bin/rpm -qa --qf [%{=NAME}\t%{FILEMODES:octal}\t%{FILEUSERNAME}\t%{FILEGROUPNAME}\t%|FILECAPS?{%{FILECAPS}}|\t%{FILENAMES}\n]"
       }
     ],
@@ -229,11 +229,11 @@
     "partial_failures": []
   },
   "check": {
-    "muster_version": "5c0f7a8",
-    "commit": "5c0f7a8",
-    "controls_version": "kisa-unix-2026+2026.10.02",
-    "controls_digest": "sha256:663acb91eee0a218cac42d72184b53e026addf12b5f6f5f38280e19197dc0da0",
-    "snapshot_digest": "sha256:028729076a81059ce8abf52b5a9a8ff4801f512b1f2973072ef4f5bbf67e525c",
+    "muster_version": "7f79d8f",
+    "commit": "7f79d8f",
+    "controls_version": "kisa-unix-2026+2026.10.08",
+    "controls_digest": "sha256:0391129e9fb2ab8b86f88a710d40a0e1c7c9ddf7bfa38858ca10adbbdf164948",
+    "snapshot_digest": "sha256:7f418175b2bfec620773db31b62ee9d572d6c5d4563b81865585e3e645581157",
     "guide_edition": "kisa-unix-2026",
     "profile": {
       "name": "default",
@@ -3835,6 +3835,12 @@
           "verdict": "fail"
         },
         {
+          "subject": "file:/opt/actionarchivecache/actions_setup-node/7f84f1d52d0c56afb45c62fee31a93b843cea4d6.tar.gz",
+          "expected": true,
+          "actual": false,
+          "verdict": "fail"
+        },
+        {
           "subject": "file:/opt/actionarchivecache/actions_setup-node/820762786026740c76f36085b0efc47a31fe5020.tar.gz",
           "expected": true,
           "actual": false,
@@ -3848,12 +3854,6 @@
         },
         {
           "subject": "file:/opt/actionarchivecache/actions_setup-node/8f152de45cc393bb48ce5d89d36b731f54556e65.tar.gz",
-          "expected": true,
-          "actual": false,
-          "verdict": "fail"
-        },
-        {
-          "subject": "file:/opt/actionarchivecache/actions_setup-node/94196ee1d15439c1b6651cd87ef14e88ec435966.tar.gz",
           "expected": true,
           "actual": false,
           "verdict": "fail"
@@ -3920,6 +3920,12 @@
         },
         {
           "subject": "file:/opt/actionarchivecache/actions_setup-python/0066b88440aa9562be742e2c60ee750fc57d8849.tar.gz",
+          "expected": true,
+          "actual": false,
+          "verdict": "fail"
+        },
+        {
+          "subject": "file:/opt/actionarchivecache/actions_setup-python/06da6279cdbca41027908073e81a4544dc79c06b.tar.gz",
           "expected": true,
           "actual": false,
           "verdict": "fail"
@@ -4052,12 +4058,6 @@
         },
         {
           "subject": "file:/opt/actionarchivecache/actions_setup-python/7010ec794f55ed6e9a6b0fa34cdfcc5bbc6137b2.tar.gz",
-          "expected": true,
-          "actual": false,
-          "verdict": "fail"
-        },
-        {
-          "subject": "file:/opt/actionarchivecache/actions_setup-python/751276eafca55f10f252026015f43c488f2322ba.tar.gz",
           "expected": true,
           "actual": false,
           "verdict": "fail"
@@ -4363,19 +4363,19 @@
           "verdict": "fail"
         },
         {
-          "subject": "file:/opt/actionarchivecache/github_codeql-action/313a0b99225f41fe3a5666e8fa7b2d8048c194ec.tar.gz",
+          "subject": "file:/opt/actionarchivecache/github_codeql-action/1c5b675653bb5c22dbe9b12b556ec555138e09fd.tar.gz",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/opt/actionarchivecache/github_codeql-action/cdf488f595d80d6e07e03d4674febd5ab45fa938.tar.gz",
+          "subject": "file:/opt/actionarchivecache/github_codeql-action/2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2.tar.gz",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/opt/actionarchivecache/github_codeql-action/db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28.tar.gz",
+          "subject": "file:/opt/actionarchivecache/github_codeql-action/7b6a151fb55e03ce158c75249f8880ea01aabebf.tar.gz",
           "expected": true,
           "actual": false,
           "verdict": "fail"
@@ -4387,19 +4387,19 @@
           "verdict": "fail"
         },
         {
-          "subject": "file:/opt/actionarchivecache/github_gh-aw-actions/49459c75b37a0b82b4ecb15e1079972cc3353bc9.tar.gz",
+          "subject": "file:/opt/actionarchivecache/github_gh-aw-actions/2fbab69bfca02bebd76cd0fc43f2d12acfed994f.tar.gz",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/opt/actionarchivecache/github_gh-aw-actions/be41add0f204de343293628bb99a72a3894cfd7a.tar.gz",
+          "subject": "file:/opt/actionarchivecache/github_gh-aw-actions/924af5fdc64061cfbf66fb584c8b07e2ac230c60.tar.gz",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/opt/actionarchivecache/github_gh-aw-actions/d462c12b8f1f616b55fed699787b0280c594e592.tar.gz",
+          "subject": "file:/opt/actionarchivecache/github_gh-aw-actions/925900cb40de9cb7652268d0cd14e00f9b7d2189.tar.gz",
           "expected": true,
           "actual": false,
           "verdict": "fail"
@@ -6296,7 +6296,7 @@
         {
           "fact": "patch.metadata_age_s",
           "status": "ok",
-          "value": 807600,
+          "value": 638372,
           "source": {
             "kind": "file",
             "path": "/var/lib/apt/periodic/update-success-stamp"
@@ -8266,7 +8266,7 @@
         {
           "fact": "walk.hidden",
           "status": "ok",
-          "value": "371 elements; 167 selected; failing: file:/etc/.java, file:/etc/skel/.bash_profile, file:/etc/skel/.cargo, file:/etc/skel/.composer, file:/etc/skel/.config, +102 more",
+          "value": "370 elements; 166 selected; failing: file:/etc/.java, file:/etc/skel/.bash_profile, file:/etc/skel/.cargo, file:/etc/skel/.composer, file:/etc/skel/.config, +102 more",
           "source": {
             "kind": "file",
             "path": "/var/lib/dpkg/info"
@@ -8372,12 +8372,6 @@
         },
         {
           "subject": "file:/usr/lib/google-cloud-sdk/platform/bundledpythonunix/lib/python3.14/lib-dynload/.empty",
-          "expected": true,
-          "actual": true,
-          "verdict": "pass"
-        },
-        {
-          "subject": "file:/usr/lib/google-cloud-sdk/platform/bundledpythonunix/lib/python3.14/site-packages/setuptools/_vendor/.lock",
           "expected": true,
           "actual": true,
           "verdict": "pass"
@@ -8671,7 +8665,7 @@
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/aws-cli/v2/2.37.4/dist/awscli/botocore/.changes",
+          "subject": "file:/usr/local/aws-cli/v2/2.37.9/dist/awscli/botocore/.changes",
           "expected": true,
           "actual": false,
           "verdict": "fail"
@@ -9055,7 +9049,7 @@
           "verdict": "fail"
         },
         {
-          "subject": "file:/var/lib/gems/3.2.0/gems/google-cloud-storage-1.62.0/.yardopts",
+          "subject": "file:/var/lib/gems/3.2.0/gems/google-cloud-storage-1.62.1/.yardopts",
           "expected": true,
           "actual": false,
           "verdict": "fail"
@@ -11124,7 +11118,7 @@
               },
               {
                 "kind": "proc",
-                "path": "/proc/sys/net/ipv6/conf/ens1/disable_ipv6"
+                "path": "/proc/sys/net/ipv6/conf/enP14628s1/disable_ipv6"
               },
               {
                 "kind": "proc",
@@ -11197,7 +11191,7 @@
               },
               {
                 "kind": "proc",
-                "path": "/proc/sys/net/ipv6/conf/ens1/disable_ipv6"
+                "path": "/proc/sys/net/ipv6/conf/enP14628s1/disable_ipv6"
               },
               {
                 "kind": "proc",
@@ -11270,7 +11264,7 @@
               },
               {
                 "kind": "proc",
-                "path": "/proc/sys/net/ipv6/conf/ens1/disable_ipv6"
+                "path": "/proc/sys/net/ipv6/conf/enP14628s1/disable_ipv6"
               },
               {
                 "kind": "proc",
@@ -11342,7 +11336,7 @@
               },
               {
                 "kind": "proc",
-                "path": "/proc/sys/net/ipv6/conf/ens1/disable_ipv6"
+                "path": "/proc/sys/net/ipv6/conf/enP14628s1/disable_ipv6"
               },
               {
                 "kind": "proc",
@@ -11491,7 +11485,7 @@
         {
           "fact": "processes.deleted_executables",
           "status": "ok",
-          "value": "1 elements; matching: item:1873",
+          "value": "1 elements; matching: item:1877",
           "source": {
             "kind": "proc",
             "path": "/proc"
@@ -11500,9 +11494,9 @@
       ],
       "observations": [
         {
-          "subject": "item:1873",
+          "subject": "item:1877",
           "expected": "not gte 0",
-          "actual": 1873,
+          "actual": 1877,
           "verdict": "fail"
         }
       ],
