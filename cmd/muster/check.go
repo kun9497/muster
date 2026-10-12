@@ -181,6 +181,35 @@ func newCheckBlock(sel *Selection, snap *facts.Snapshot, reg *facts.Registry, wf
 	return results, cb
 }
 
+// loadWaivers reads the waiver file check and fix share (Z-13). An empty
+// path means no waiver file, as --waivers "" always has; a file the trust
+// gate refuses is "refusing waiver file: <why>".
+func loadWaivers(path string) (*waiver.File, error) {
+	if path == "" {
+		return nil, nil
+	}
+	if ok, why := trustedFile(path); !ok {
+		return nil, fmt.Errorf("refusing waiver file: %s", why)
+	}
+	fh, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer fh.Close()
+	return waiver.Load(fh, path)
+}
+
+// stdoutIsTTY reports whether w is a character device, which is what
+// --color auto asks (Z-16).
+func stdoutIsTTY(w io.Writer) bool {
+	fh, ok := w.(*os.File)
+	if !ok {
+		return false
+	}
+	st, err := fh.Stat()
+	return err == nil && st.Mode()&os.ModeCharDevice != 0
+}
+
 func runCheck(args []string, stdout, stderr io.Writer) int {
 	f, err := parseCheckArgs(args)
 	if err != nil {
@@ -214,23 +243,10 @@ func runCheck(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "muster: %v\n", err)
 		return exitError
 	}
-	var wf *waiver.File
-	if f.waivers != "" {
-		if ok, why := trustedFile(f.waivers); !ok {
-			fmt.Fprintf(stderr, "muster: refusing waiver file: %s\n", why)
-			return exitError
-		}
-		fh, err := os.Open(f.waivers)
-		if err != nil {
-			fmt.Fprintf(stderr, "muster: %v\n", err)
-			return exitError
-		}
-		wf, err = waiver.Load(fh, f.waivers)
-		fh.Close()
-		if err != nil {
-			fmt.Fprintf(stderr, "muster: %v\n", err)
-			return exitError
-		}
+	wf, err := loadWaivers(f.waivers)
+	if err != nil {
+		fmt.Fprintf(stderr, "muster: %v\n", err)
+		return exitError
 	}
 	if os.Geteuid() == 0 {
 		fmt.Fprintln(stderr, "muster: warning: check does not need root")
@@ -246,13 +262,7 @@ func runCheck(args []string, stdout, stderr io.Writer) int {
 			return exitError
 		}
 	default:
-		isTTY := false
-		if fh, ok := stdout.(*os.File); ok {
-			if st, err := fh.Stat(); err == nil && st.Mode()&os.ModeCharDevice != 0 {
-				isTTY = true
-			}
-		}
-		opts := report.TableOptions{Color: report.ColorEnabled(f.color, os.Getenv("NO_COLOR"), os.Getenv("TERM"), isTTY), Quiet: f.quiet}
+		opts := report.TableOptions{Color: report.ColorEnabled(f.color, os.Getenv("NO_COLOR"), os.Getenv("TERM"), stdoutIsTTY(stdout)), Quiet: f.quiet}
 		if f.all {
 			opts.MaxObservations = 1 << 30
 		}

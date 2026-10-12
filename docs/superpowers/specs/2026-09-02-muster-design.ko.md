@@ -73,9 +73,10 @@
 sudo muster collect --out host.json      # 호스트에서, root로
 muster check --facts host.json           # 어디서나, root 불필요
 muster check --facts host.json --format json
+muster fix --dry-run --facts host.json --format script > fix.sh   # 검토용 스크립트. muster는 결코 실행하지 않음
 ```
 
-서브커맨드는 `collect`, `check`, `controls`(`lint`, `list`. 2단계부터 `new`), `snapshot`(`info`, `extract`. 4단계부터 `ls`, `rm`, `prune`), `version`이고, 이후에 `fix --dry-run`과 `explain`이 더해집니다. 인자는 assay와 마찬가지로 직접 디스패치하며, CLI 프레임워크는 쓰지 않습니다 (D28).
+서브커맨드는 `collect`, `check`, `fix --dry-run`(3D-2단계), `controls`(`lint`, `list`. 2단계부터 `new`), `snapshot`(`info`, `extract`. 4단계부터 `ls`, `rm`, `prune`), `version`이고, 이후에 `explain`이 더해집니다. 인자는 assay와 마찬가지로 직접 디스패치하며, CLI 프레임워크는 쓰지 않습니다 (D28).
 
 ### 4.2 패키지
 
@@ -90,6 +91,7 @@ muster check --facts host.json --format json
 | `internal/profile` | 프로파일 파일: 파싱, 이름/경로 분류, 컨트롤 세트에 대한 `extends` 체인 해결, 튜닝 병합(3D-1) | 호스트를 건드리거나 stderr에 쓰는 것 — 파일은 호출자의 `open`으로, 경고는 `warn`으로 |
 | `internal/tuning` | 컨트롤 세트에 대해 검증된 사이트의 파라미터 값(3D-1) | 호스트를 건드리는 것, 선택을 보는 것(제외 경고는 병합의 몫) |
 | `internal/report` | 테이블과 JSON 렌더러(4단계에서 SARIF), 결정성, 이스케이프 | 판정 계산 |
+| `internal/remedy` | 리포트로부터 만드는 조치 계획과 그 테이블, JSON, 검토 스크립트 렌더러(3D-2) | `os`, `os/exec`, `net`, `syscall`, `time` import, 무엇이든 실행하는 것, 호스트의 값을 명령에 치환하는 것(테스트로 강제) |
 
 ### 4.3 데이터 흐름
 
@@ -99,11 +101,12 @@ host ──collect (root, 레지스트리가 선언한 것만 읽음)──▶ s
 snapshot.json + controls (내장) + profile (+ extends 체인) + tuning + waivers + params
      ──check (root 불필요, 스냅샷을 신뢰할 수 없는 입력으로 취급)──▶ results
 results ──renderers──▶ table / JSON ──▶ exit code (2 > 1 > 0)
+results ──fix --dry-run──▶ plan ──▶ table / JSON / review script (exit 0, muster가 결코 실행하지 않음)
 ```
 
 ### 4.4 신뢰 경계
 
-root로 도는 프로세스(`collect`)는 코드 수준 레지스트리가 선언한 것만 읽고 화이트리스트에 있는 명령만 실행합니다. 컨트롤 파일, waiver 파일, 이전 스냅샷은 절대 파싱하지 않습니다. 데이터 파일은 `check`만 읽습니다. `check`는 root가 필요 없고 root로 실행되면 경고합니다. 컨트롤은 바이너리에 내장되어 배포됩니다. 외부 컨트롤 디렉터리(`--controls-dir`, 4단계)는 명시적으로 선택해야 하고, 파일별 다이제스트와 함께 기록되며, 내장 id와 충돌하면 거부됩니다. `check`를 root로 실행할 때, root 소유가 아니거나 group/other 쓰기가 가능한 waiver 파일, 프로파일 파일(그 `extends` 체인의 모든 파일), 튜닝 파일, 컨트롤 파일은 거부됩니다 (D14, D15, D33).
+root로 도는 프로세스(`collect`)는 코드 수준 레지스트리가 선언한 것만 읽고 화이트리스트에 있는 명령만 실행합니다. 컨트롤 파일, waiver 파일, 이전 스냅샷은 절대 파싱하지 않습니다. 데이터 파일은 `check`와 `fix --dry-run`만 읽습니다. 둘은 root가 필요 없고 root로 실행되면 경고합니다. 컨트롤은 바이너리에 내장되어 배포됩니다. 외부 컨트롤 디렉터리(`--controls-dir`, 4단계)는 명시적으로 선택해야 하고, 파일별 다이제스트와 함께 기록되며, 내장 id와 충돌하면 거부됩니다. `check`나 `fix`를 root로 실행할 때, root 소유가 아니거나 group/other 쓰기가 가능한 waiver 파일, 프로파일 파일(그 `extends` 체인의 모든 파일), 튜닝 파일, 컨트롤 파일은 거부됩니다 (D14, D15, D33).
 
 ### 4.5 배포판 차이를 흡수하는 곳
 
@@ -252,17 +255,31 @@ mechanisms:                      # `when`이 성립하는 첫 메커니즘이 �
       - { fact: files.etc_securetty_lines, op: none,
           where: { op: matches, expected: "^pts/" } }
 remediation:
-  text_en: Set PermitRootLogin no in sshd_config(.d), validate with sshd -t, restart sshd.
-  text_ko: sshd_config(.d)에 PermitRootLogin no 를 설정하고 sshd -t 로 검증 후 재시작
+  text_en: Set PermitRootLogin no in /etc/ssh/sshd_config.d/00-muster.conf, validate with sshd -t, restart sshd.
+  text_ko: /etc/ssh/sshd_config.d/00-muster.conf 에 PermitRootLogin no 를 설정하고 sshd -t 로 검증 후 재시작
   risk: lockout_risk             # none | restart_service | reboot_required | lockout_risk
   idempotent: true
+  backup: [/etc/ssh/sshd_config.d/00-muster.conf, /etc/securetty]
   script: |
-    printf 'PermitRootLogin no\n' > /etc/ssh/sshd_config.d/90-muster.conf && sshd -t
-  rollback: rm -f /etc/ssh/sshd_config.d/90-muster.conf && sshd -t
+    if command -v sshd >/dev/null 2>&1; then
+      [ -d /run/sshd ] || mkdir -p /run/sshd
+      printf 'PermitRootLogin no\n' > /etc/ssh/sshd_config.d/00-muster.conf
+      chmod 644 /etc/ssh/sshd_config.d/00-muster.conf
+      sshd -t
+      if systemctl is-active --quiet sshd.service; then systemctl reload sshd.service; fi
+      if systemctl is-active --quiet ssh.service; then systemctl reload ssh.service; fi
+    fi
+    if [ -f /etc/securetty ]; then
+      sed -i '/^[[:space:]]*pts\//d' /etc/securetty
+    fi
+  validate: "if command -v sshd >/dev/null 2>&1; then sshd -T -C user=root,host=localhost,addr=127.0.0.1 2>/dev/null | grep -qx 'permitrootlogin no'; fi"
+  rollback: |
+    rm -f /etc/ssh/sshd_config.d/00-muster.conf
+    if command -v sshd >/dev/null 2>&1; then sshd -t; fi
 decision: D09
 ```
 
-필드는 다음과 같습니다. `id`, `title_en`, `title_ko`, `description_en`, `description_ko`(자체 문구), `category`, `importance`, `automation`, `manual_reason`(`automation: manual`일 때 필수), `references`(`kisa`는 판본을 키로 하는 항목 id, `cis`는 benchmark/version/`rec`. `isms_p`와 `nist_800_53` 키는 예약되어 있고 비어 있음), `requires_facts`, `applies_when`, `absent_means`(`absent`가 될 수 있는 팩트를 참조하는 모든 컨트롤에 필수), `params`, `checks`·`mechanisms`·`custom` 중 정확히 하나, `remediation`(`automation: auto`이거나 `partial`일 때 필수), `decision`(13절을 가리키는 선택적 포인터).
+필드는 다음과 같습니다. `id`, `title_en`, `title_ko`, `description_en`, `description_ko`(자체 문구), `category`, `importance`, `automation`, `manual_reason`(`automation: manual`일 때 필수), `references`(`kisa`는 판본을 키로 하는 항목 id, `cis`는 benchmark/version/`rec`. `isms_p`와 `nist_800_53` 키는 예약되어 있고 비어 있음), `requires_facts`, `applies_when`, `absent_means`(`absent`가 될 수 있는 팩트를 참조하는 모든 컨트롤에 필수), `params`, `checks`·`mechanisms`·`custom` 중 정확히 하나, `remediation`(`automation: auto`이거나 `partial`일 때 필수: `text_en`, `text_ko`, `risk`, `idempotent`, 그리고 선택적으로 `script`, `validate`, `rollback`, `backup`. lint는 모든 `script`에 되돌릴 길 — `rollback` 또는 `backup` — 을, `script`가 있으면 `idempotent: true`를, 한 줄짜리 `validate`를, 본문에 here-document가 없음을, 셸에 안전한 문자 집합으로 된 절대·정규 `backup` 경로를 요구함. 3D-2단계), `decision`(13절을 가리키는 선택적 포인터).
 
 ### 6.3 판단 어휘
 
@@ -392,6 +409,10 @@ waivers:
 
 결과 JSON은 stdout으로 가고 그 밖의 것은 아무것도 stdout으로 가지 않습니다. 경고, 진행 상황, `-v` 로그는 stderr로 갑니다. 로그 파일은 결코 쓰지 않습니다. stdout이 닫혔거나 실패하면 2로 종료합니다. 테이블 출력은 근거 값에 들어 있는 C0/C1 제어 문자, ANSI 시퀀스, 캐리지 리턴을 이스케이프하고 긴 값을 자릅니다. 침해된 호스트에서 온 스냅샷도 정상적인 입력이기 때문입니다.
 
+### 7.5 `fix --dry-run`
+
+`muster fix --dry-run --facts <snapshot> [--profile …] [--tuning …] [--waivers …] [--max-risk …] [--format table|json|script]`는 `check`가 읽는 것을 `check` 자신의 헬퍼로 읽고, waiver 적용 후 상태가 `FAIL`이나 `WARN`인 행을 남깁니다. 하향된 통과, `ERROR`, `MANUAL` 행은 계획하지 않은 것으로 나열됩니다. 항목은 조치 위험, 그다음 적용 중인 심각도, 그다음 id 순으로 정렬됩니다. 테이블과 JSON이 계획이고, 스크립트는 운영자가 읽고 손으로 실행하는 POSIX `sh` 파일 하나입니다. 컨트롤마다 함수 하나이며, 백업이 먼저, 그다음 컨트롤의 `script`, 그다음 그 `validate`이고, 실패하면 선언된 `rollback`을 실행한 뒤 백업을 복원합니다. `--dry-run`은 필수입니다 — 그것 없는 `fix`는 `fix never applies a remediation (D24); run fix --dry-run`으로 거부됩니다. `fix`는 발견 사항이 있든 없든 계획을 만들었으면 `0`, 만들 수 없었으면 `2`로 종료합니다. 결코 `1`로 종료하지 않으므로 어떤 CI도 이것으로 발견 사항을 세지 않습니다. 스크립트는 `0`, `1`(블록 하나가 실패함. 그 백업은 보존됨), `2`(root가 아니거나 쓸 수 있는 백업 디렉터리가 없음: 절대·정규 경로가 아니거나 root 소유·root만 쓰기 가능이 아닌 것)로 종료합니다. 블록의 `done`은 그 명령들이 실행되었고 그 `validate`가 성립했다는 뜻입니다. 그 컨트롤이 이제 통과하는지는 `check`가 말할 일입니다. 설계: `2026-10-07-stage3d2-fix-dry-run-design.ko.md` (D34).
+
 ## 8. 도구 자체의 보안
 
 muster는 남의 프로덕션 호스트에서 root로 돌고, 그 출력은 공격자가 바랄 수 있는 가장 농축된 호스트 기술서입니다. 아래는 지침이 아니라 테스트로 확인하는 계약입니다 (D14).
@@ -400,8 +421,8 @@ muster는 남의 프로덕션 호스트에서 root로 돌고, 그 출력은 공�
 - **읽기.** 모든 파일 읽기는 두 계층을 가진 하나의 프리미티브를 거치며, 어느 계층을 썼는지는 팩트의 `source`에 기록됩니다. 1계층은 `RESOLVE_NO_SYMLINKS|RESOLVE_NO_MAGICLINKS`를 준 `openat2`입니다(리눅스 5.6 이상. 첫 릴리스의 모든 대상이 여기 해당합니다). 경로의 어느 구성 요소에 있든 심볼릭 링크를 거부합니다. 2계층은 `openat2`를 거부하는 커널이나 seccomp 프로파일을 위한 것으로, `/`부터 `openat(O_NOFOLLOW|O_DIRECTORY|O_CLOEXEC)`으로 경로를 구성 요소 단위로 걸어가며 같은 보장을 줍니다. 어느 계층도 경로의 어디에서든 심볼릭 링크를 따라가지 않습니다. `os.Root`는 자기 루트 안의 링크를 따라가므로 쓰지 않습니다. 연 다음에는 `fstat`으로 일반 파일임을 확인합니다(FIFO, 디바이스, 소켓은 거부합니다). 크기 상한이 적용됩니다. NUL 바이트가 있으면 그 파일을 바이너리로 표시하고 내용을 저장하지 않습니다. 단, 설계상 바이너리인 소수의 파일(4바이트 속성 워드로 시작하는 EFI 변수. 3B단계)은 그 규칙만 뺀 같은 프리미티브 `ReadFileBinary`로 읽습니다. 부모 디렉터리가 world-writable이거나 root 소유가 아니면 `path_untrusted`를 설정합니다.
 - **워크.** 기본적으로 꺼져 있습니다(`--deep`). 로컬 파일시스템만 대상으로 하며 `/proc/self/mountinfo`로 판단합니다. `nfs`, `cifs`, `smb3`, `fuse.*`, `sshfs`, `afs`, overlay와 snap 마운트는 제외합니다. autofs 마운트 지점은 부모가 `AT_NO_AUTOMOUNT`로 나열만 하고 절대 열지 않습니다. `/proc`, `/sys`, `/dev`, `/run`은 건너뜁니다. 심볼릭 링크는 따라가지 않습니다. `(dev, ino)` 집합으로 순환을 끊습니다. 시간과 개수 예산이 다하면 `complete=false`로 워크를 끝냅니다. `nice`와 `ionice`가 최선 노력으로 우선순위를 낮춥니다(3A단계, W-3).
 - **검증.** 기본적으로 꺼져 있고 워크와 함께 돕니다(`--deep`, root; `--no-verify`면 제외). 인자가 고정된 `rpm -Va` 또는 `dpkg --verify`로 패키지 데이터베이스 전체를, 자체 `--verify-timeout`(기본 30분)과 64 MiB 출력 상한 아래 검증합니다. 종료 코드는 데이터입니다(rpm의 1은 "차이 있음", dpkg는 언제나 0). 판정이 무시하는 잡음 — 설정 파일, 문서, dpkg의 `path-exclude` 경로, ghost, mtime만 다른 행, 검사 불가 행, 상태 메모만 있는 행 — 은 이름 붙은 규칙으로 걸러지고 스냅샷이 그 규칙과 개수를 기록합니다(3C-1단계).
-- **쓰기.** 스냅샷은 `collect`가 쓰는 유일한 파일입니다. 어떤 서브커맨드도 서비스를 재시작하지 않고, 설정을 바꾸지 않고, 네트워크 연결을 만들지 않고, 패키지 메타데이터를 갱신하지 않고, 업데이트를 확인하지 않고, 텔레메트리를 보내지 않습니다. CI는 네트워크 없는 컨테이너에서 읽기 전용 바인드 마운트 위에 `collect`를 돌려 이를 증명합니다.
-- **데이터 파일.** root는 컨트롤, waiver, 옛 스냅샷을 결코 파싱하지 않습니다. `check`는 root일 때 쓰기 가능한 데이터 파일을 거부하고, 스냅샷을 적대적 입력으로 다룹니다(디코드 한도, 그 안의 무엇도 실행하지 않음, 그 안의 경로를 출력 경로로 재사용하지 않음, 이스케이프한 렌더링).
+- **쓰기.** 스냅샷은 `collect`가 쓰는 유일한 파일입니다. `fix --dry-run`은 stdout에만 쓰고, 그것이 출력하는 검토 스크립트를 muster는 결코 실행하지 않습니다. 어떤 서브커맨드도 서비스를 재시작하지 않고, 설정을 바꾸지 않고, 네트워크 연결을 만들지 않고, 패키지 메타데이터를 갱신하지 않고, 업데이트를 확인하지 않고, 텔레메트리를 보내지 않습니다. CI는 네트워크 없는 컨테이너에서 읽기 전용 바인드 마운트 위에 `collect`를 돌려 이를 증명합니다.
+- **데이터 파일.** root는 컨트롤, waiver, 옛 스냅샷을 결코 파싱하지 않습니다. `check`와 `fix`는 root일 때 쓰기 가능한 데이터 파일을 거부하고, 스냅샷을 적대적 입력으로 다룹니다(디코드 한도, 그 안의 무엇도 실행하지 않음, 그 안의 경로를 출력 경로로 재사용하지 않음, 이스케이프한 렌더링).
 - **스냅샷 기밀성.** 기본적으로 편집합니다(5.6절). 0700 디렉터리 안의 0600 파일입니다. 기본 위치는 결코 `/tmp`가 아닙니다. 잠금과 보존 정책을 갖춘 수명 주기가 있습니다(5.9절). 공유용 `--anonymize` 모드(호스트명, 주소, 사용자 이름의 안정적 해싱)는 익명화한 스냅샷과 원본 스냅샷이 동일한 판정을 낳는지 확인하는 불변식 테스트와 함께 3단계에 도착합니다.
 - **한계는 암시하지 않고 명시합니다.** `THREAT_MODEL.md`가 신뢰 경계를 기록하고, 이미 침해된 호스트(`LD_PRELOAD`, 교체된 바이너리, 되돌려진 설정)는 muster가 `PASS`를 보고하게 만들 수 있음을 분명히 말합니다. muster는 침입 탐지 도구가 아닙니다. `SECURITY.md`는 신고 경로와 지원 버전을 알립니다.
 - **릴리스 무결성**(4단계): 재현 가능한 정적 빌드(`CGO_ENABLED=0 -trimpath`, 고정한 Go 버전), `checksums.txt`, GitHub 아티팩트 어테스테이션(SLSA Build L2임을 그대로 명시), 키 없는 cosign 서명, SBOM, CI의 `govulncheck`, deb와 rpm 패키지, 설치 안내보다 앞에 오는 검증 안내, `curl | sh` 없음.
@@ -444,7 +465,7 @@ muster는 남의 프로덕션 호스트에서 root로 돌고, 그 출력은 공�
 
 **2단계 — 두 배포판, 자동화 가능한 모든 항목.** 수집기를 완성합니다. sshd(`-G` → `-T` → 파싱 폴백. 사용한 방법을 기록. Match 페르소나. include 소스), 서비스(소켓 활성화, masked/static/indirect, 논리 이름), PAM(authselect / pam-auth-update / 수동 설정 탐지, 스택 확장, 소스를 갖춘 파생 pwquality와 faillock), 방화벽(백엔드 탐지, 원본 덤프, 신뢰도를 갖춘 최소한의 정규화 모델), 함수로서의 로깅(journald만 있는 호스트), 네트워크 sysctl(커널이 파라미터마다 `all`과 인터페이스별 값을 합성하는 방식을 반영합니다. `rp_filter`는 최댓값, `send_redirects`는 논리 OR, `accept_redirects`는 해당 인터페이스의 forwarding에 따라 달라집니다. `default`는 앞으로 생길 인터페이스를 위한 템플릿으로 수집하며 유효 값으로 접어 넣지 않고, IPv6 쌍도 함께 다룹니다), `/proc/sys` 트리 전체, MAC 상태(SELinux/AppArmor, 런타임 대 설정), NSS 원격 소스 탐지, inetd/xinetd, 배너, 시각 동기화, `snmpd.conf`(활성화된 버전, 기본값 여부·길이·출처 제한으로 편집한 커뮤니티), 캐시된 메타데이터로 보는 패치 위생, 계정 상태(해시 알고리즘, 빈 비밀번호), `env` 블록, ACL 항목. auto와 partial 58개 항목 전부를 픽스처와 함께 등록하고, deferred 9개 항목을 근거를 갖춘 manual로 등록합니다. 매핑이 있는 모든 컨트롤에 `references.stig`와 `references.nist_800_53`을 더합니다(3절). 2단계는 열두 개의 플랜으로 실행합니다. 2A 기반(파일 권한 팩트 템플릿, 드롭인 병합 헬퍼, 커버리지 표 생성기, CI 매트릭스 뼈대, 참조 인덱스 생성기, 어휘 추가), 2B 계정, 2C PAM, 2D sshd와 배너, 2E 홈 디렉터리와 셸 환경, 2G 서비스와 슈퍼서버, 2F 시스템 파일·시작 스크립트·cron, 2H 방화벽, 2I 로깅과 시각 동기화, 2J NFS·SNMP·패치 위생, 2L FTP/메일/DNS 근거와 deferred 항목 등재, 2M 커버리지·참조 게이트입니다. 워크에 의존하는 U-15, U-23, U-25, U-33은 3A단계를 기다렸습니다. Rocky와 AlmaLinux는 2단계 동안 CI의 init 컨테이너로 검증하고, 실제 VM 실행은 공개 릴리스 전에 합니다. CI 매트릭스(`ubuntu:22.04`, `ubuntu:24.04`, `rockylinux/rockylinux:9-ubi-init`, `almalinux/9-init`, 카나리아로 `debian:12`), GitHub 러너 VM에서의 `sudo muster collect`, 능력 매트릭스 테스트, 비 root 잡. 커버리지 표를 생성해 커밋합니다. 파서 오라클 테스트. 공개 이미지에서 뜬 예시 스냅샷. `snapshot extract`, `controls new`, `CONTRIBUTING.md`.
 
-**3단계 — 같은 수집기로 얻는, 목록 너머의 고가치 점검.** 3A(병합됨): 워크 자체와, 패키지 소유·선언 모드와의 결합(rpm의 파일 표. dpkg의 목록, `statoverride`, 릴리스별 기준 목록) — `2026-09-16-stage3a-walk-design.ko.md`. 3B(병합됨): 가이드 밖의 첫 컨트롤 19개 — 커널 자기 보호 sysctl과 세 소스를 보는 코어 덤프 정책, 부트 체인(grub.cfg 권한과 비밀번호, 시큐어 부트 상태), 분리된 파티션과 마운트 옵션, 스왑 암호화, 빌트인 탐지를 포함한 모듈 블랙리스트 — 를 읽기 전용 수집기 여섯으로, 그리고 리포트의 두 범위 — `2026-09-18-stage3b-kernel-boot-mount-design.ko.md`. 3C-1(병합됨): 감사 파이프라인 상태와 패키지 무결성 — 감사 데몬의 규칙·불변·디스크 처리·로그 권한, 로그 전달, sudo 자체 로그, 파일 무결성 도구, 인자 고정의 전체 데이터베이스 패키지 검증(W-8 종결: `CommandTemplate` 없음) — 을 수집기 셋과 확장 둘로, deep 게이트는 계열의 표로 넓혀(D30) — `2026-09-23-stage3c1-audit-integrity-design.ko.md`. 3C-2a(병합됨): privilege — 패키지 자신의 선언에 대해 판정하는 워크의 파일 capability(ACL은 기록), root 서비스의 쓰기 가능한 실행파일과 디렉터리, `ld.so.preload`, 컨테이너 런타임 소켓과 거기 쓸 수 있는 그룹, alias를 푼 sudoers의 암호 없는 `ALL`, 모든 대화형 계정에 대한 비활성 정책(휴면 목록은 근거; root의 `PATH`는 이미 `root_home_and_path`), root의 authorized keys와 SSH 키 품질 — 확장 수집기 셋과 새 수집기 셋에서 컨트롤 여덟, `ReadDir`가 실행파일의 속성을 읽음(D31) — `2026-09-29-stage3c2a-privilege-design.ko.md`. 3C-2b(병합): 노출 — 모든 listening 소켓의 소유자와 패키지를 가진 process 수집기, 삭제된 실행 파일로 도는 프로세스, 접힌 방화벽 규칙 표에 대한 full 신뢰도의 노출 교차 점검(꺼진 백엔드는 방화벽 없음으로 읽음 — U-28이 거기서 바뀜), 네트워크 sysctl — 새 수집기 하나, 확장된 방화벽 수집기, 확장된 `sysctl` 수집기, 공유 패키지 색인에서 컨트롤 열셋(D32) — `2026-10-02-stage3c2b-exposure-design.ko.md`. 3D-1(병합): 프로파일과 튜닝의 실현(6.6절) — 프로파일은 id 글롭으로 컨트롤을 고르고 파라미터와 심각도를 덮어쓰며 `extends`로 이어지고; 튜닝 파일은 그 뒤에 사이트의 값을 실으며; 둘 다 평가 전에 해결되어 값마다의 출처와 함께 결과에 기록됨; 내장 `default`(D33) — `2026-10-07-stage3d1-profiles-design.ko.md`. 그 다음 3D-1b: CIS 권고 번호 색인 위의 `cis-<배포판>-l1` 프로파일, 고르는 모든 컨트롤이 `references.cis` 항목을 가짐; 3D-2: 위험도 순서, 백업, 검증 명령, 롤백을 갖춘 `fix --dry-run`; 3D-3: 불변식 테스트를 갖춘 `--anonymize`, `--max-age`. (컨트롤 YAML 뮤테이션 테스트와 파서 퍼징은 3F에서 왔습니다.)
+**3단계 — 같은 수집기로 얻는, 목록 너머의 고가치 점검.** 3A(병합됨): 워크 자체와, 패키지 소유·선언 모드와의 결합(rpm의 파일 표. dpkg의 목록, `statoverride`, 릴리스별 기준 목록) — `2026-09-16-stage3a-walk-design.ko.md`. 3B(병합됨): 가이드 밖의 첫 컨트롤 19개 — 커널 자기 보호 sysctl과 세 소스를 보는 코어 덤프 정책, 부트 체인(grub.cfg 권한과 비밀번호, 시큐어 부트 상태), 분리된 파티션과 마운트 옵션, 스왑 암호화, 빌트인 탐지를 포함한 모듈 블랙리스트 — 를 읽기 전용 수집기 여섯으로, 그리고 리포트의 두 범위 — `2026-09-18-stage3b-kernel-boot-mount-design.ko.md`. 3C-1(병합됨): 감사 파이프라인 상태와 패키지 무결성 — 감사 데몬의 규칙·불변·디스크 처리·로그 권한, 로그 전달, sudo 자체 로그, 파일 무결성 도구, 인자 고정의 전체 데이터베이스 패키지 검증(W-8 종결: `CommandTemplate` 없음) — 을 수집기 셋과 확장 둘로, deep 게이트는 계열의 표로 넓혀(D30) — `2026-09-23-stage3c1-audit-integrity-design.ko.md`. 3C-2a(병합됨): privilege — 패키지 자신의 선언에 대해 판정하는 워크의 파일 capability(ACL은 기록), root 서비스의 쓰기 가능한 실행파일과 디렉터리, `ld.so.preload`, 컨테이너 런타임 소켓과 거기 쓸 수 있는 그룹, alias를 푼 sudoers의 암호 없는 `ALL`, 모든 대화형 계정에 대한 비활성 정책(휴면 목록은 근거; root의 `PATH`는 이미 `root_home_and_path`), root의 authorized keys와 SSH 키 품질 — 확장 수집기 셋과 새 수집기 셋에서 컨트롤 여덟, `ReadDir`가 실행파일의 속성을 읽음(D31) — `2026-09-29-stage3c2a-privilege-design.ko.md`. 3C-2b(병합): 노출 — 모든 listening 소켓의 소유자와 패키지를 가진 process 수집기, 삭제된 실행 파일로 도는 프로세스, 접힌 방화벽 규칙 표에 대한 full 신뢰도의 노출 교차 점검(꺼진 백엔드는 방화벽 없음으로 읽음 — U-28이 거기서 바뀜), 네트워크 sysctl — 새 수집기 하나, 확장된 방화벽 수집기, 확장된 `sysctl` 수집기, 공유 패키지 색인에서 컨트롤 열셋(D32) — `2026-10-02-stage3c2b-exposure-design.ko.md`. 3D-1(병합): 프로파일과 튜닝의 실현(6.6절) — 프로파일은 id 글롭으로 컨트롤을 고르고 파라미터와 심각도를 덮어쓰며 `extends`로 이어지고; 튜닝 파일은 그 뒤에 사이트의 값을 실으며; 둘 다 평가 전에 해결되어 값마다의 출처와 함께 결과에 기록됨; 내장 `default`(D33) — `2026-10-07-stage3d1-profiles-design.ko.md`. 그 다음 3D-1b: CIS 권고 번호 색인 위의 `cis-<배포판>-l1` 프로파일, 고르는 모든 컨트롤이 `references.cis` 항목을 가짐; 3D-2(병합): `fix --dry-run` — 적용 중인 프로파일의 실패를 위험도 순서의 계획(테이블, JSON)과 muster가 결코 실행하지 않는 검토 스크립트로, 컨트롤마다 선언된 백업, 한 줄짜리 validate, 롤백 후 복원을 갖추고, 스크립트를 가진 컨트롤 열여섯을 이를 위해 다시 쓰고 CI에 시드한 왕복 검증을 둠 (D34) — `2026-10-07-stage3d2-fix-dry-run-design.ko.md`; 3D-3: 불변식 테스트를 갖춘 `--anonymize`, `--max-age`. (컨트롤 YAML 뮤테이션 테스트와 파서 퍼징은 3F에서 왔습니다.)
 
 **4단계 — 공개 릴리스.** 서버 변화와 규칙 변화를 구분하는 스냅샷 diff. 스키마 검증을 갖춘 SARIF. 드리프트 확인을 갖춘 완전한 이중 언어 문서 한 쌍. 릴리스 무결성(8절). `--controls-dir`. `snapshot ls|rm|prune`과 타이머 유닛. 패키지의 설치/업그레이드/제거 계약(remove는 스냅샷을 남기고 경고하며, purge는 삭제합니다). DCO와, 벤치마크 본문을 복사했는지 묻는 PR 템플릿. README 포지셔닝 표와 데모. 커버리지 공백 탐지기 역할을 하는 Lynis 차분 비교(버전 고정, `lynis-report.dat` 파싱, 매핑 표, 이미지별 기준선).
 
@@ -528,6 +549,7 @@ assay에서 얻은 두 교훈은 "헬퍼는 커버되는데 아무도 호출하�
 - **D31 — root 밖에 놓인 root의 힘은 한 컨트롤 가족이며, 각각 읽은 대로 판정하고 `params`나 waiver로만 완화한다.** 3C-2a는 그런 경로 여섯 — 선언되지 않은 파일 capability(패키지 자신의 선언 — rpm의 `%{FILECAPS}` 헤더나 dpkg `postinst`의 `setcap` 호출 — 에 대해 판정하고 참조 목록은 쓰지 않음), 비root 사용자가 다시 쓸 수 있거나 그 디렉터리에 쓸 수 있는 root 서비스의 실행파일, `ld.so.preload` 항목, 컨테이너 런타임 소켓의 쓰기 가능한 그룹·비root 소유자·ACL 항목, sudoers의 암호 없는 `ALL`(alias를 풀고, 풀지 못하는 것은 MANUAL), 비활성 정책이 덮지 않는 대화형 계정(root와 암호 잠긴 계정 포함) — 과 그 옆의 키 컨트롤 둘(`PermitRootLogin`이 키를 받는 곳의 root authorized keys; DSA와 짧은 RSA 키)을 더한다. muster가 결정하는 파일을 읽지 못한 곳 — 선언 밖의 include나 홈, 링크된 또는 읽을 수 없는 유닛 파일, 선언 집합 밖의 실행파일 — 에서 컨트롤은 경로를 적은 MANUAL(C4)이고, 호스트가 배포된 그대로인 곳에서 판정은 배포 상태의 것이며 FAIL도 포함한다: 모든 stock 릴리스가 비활성 잠금에서 실패하고, 클라우드 이미지와 GitHub 러너가 암호 없는 sudo에서 실패한다. 이를 위해 읽기 프리미티브 하나가 자랐다: `ReadDir`가 나열하는 실행파일의 capability와 ACL 속성을 walk에 한해 읽는다. 되돌리기: 새 root 동등 경로는 이 가족의 행이지 새 규칙이 아닙니다.
 - **D32 — 노출은 리스너·프로세스·설정된 방화벽의 join으로 읽고, 허용 목록은 호스트 자신의 선언이다.** 3C-2b 단계는 모든 listening 소켓을 그것을 가진 프로세스들(`/proc/<pid>/fd` 링크; 모든 표를 다 읽고 pid 1과 커널 스레드가 보이는데도 아무도 갖지 않은 소켓은 커널의 것)과 함께 읽고, 각 실행파일이 나온 패키지(walk가 이미 만드는 색인, exe가 놓인 마운트 기준 — 자기 마운트 네임스페이스의 systemd 서비스는 여전히 호스트의 것, 호스트에서 본 컨테이너는 아님)를 읽고, 규칙마다 family·선택자·원문을 싣고 input base chain이 jump하는 사용자 체인을 접어 넣은(jump의 조건이 닿는 행에 물려짐) 방화벽 규칙 표를 읽습니다. 정규화가 확신하고 리스너 family의 accept 규칙이 그 프로토콜과 포트에 맞으면 — 또는 아무것도 inbound를 제한하지 않으면, 설치됐지만 꺼진 ufw도 그러하므로 — 리스너는 노출입니다. 표가 표현하지 못하는 규칙(모델링하지 않은 선택자, 프로토콜 집합, DNAT 상태)은 추측이 아니라 MANUAL을 만들고; 규칙을 가진 accept 정책 input 체인(firewalld의 `filter_INPUT`)은 정규화기의 기존 신뢰도 규칙으로 MANUAL로 읽히고, docker 호스트의 FORWARD 체인은 거기 들어가지 않습니다. 컨트롤 셋이 join을 읽은 대로 판정하고 — `allowed_ports`에 없는 노출 서비스, 패키지 관리자가 설치하지 않은 리스너(snap, flatpak, 컨테이너의 프로세스 포함), 삭제된 실행파일을 도는 프로세스 — 열이 네트워크 sysctl을 `all`과 `default`에서, 컨트롤마다 `absent_means`가 하나가 되도록 IPv4와 IPv6를 따로 판정합니다. 완화는 매개변수나 waiver이지 더 느슨한 읽기가 아닙니다. 되돌리기: 접기가 실을 수 없는 방화벽 의미는 모델링된 추측이 아니라 `opaque` 부류와 MANUAL이 됩니다.
 - **D33 — 프로파일은 묻는 질문의 목록이고 튜닝 파일은 사이트의 값이며, 둘 다 출처와 함께 결과에 기록되고, 제외된 컨트롤은 평가하지 않는다.** 3D-1단계는 프로파일(파일 또는 내장 `default`)을 선택된 컨트롤 id, `extends` 체인이 정한 파라미터 값, 순서 있는 심각도 목록으로 읽고, 그 위에 튜닝 파일의 값을 얹습니다(기본 < 프로파일 < 튜닝); `check`는 같은 평가기로 선택만 평가하고, 결과의 `check` 블록은 프로파일, 그 내용 다이제스트, 체인, 제외된 id, 튜닝 파일, 적용된 모든 파라미터 값과 그 출처를 대고, 결과의 각 행은 자기 심각도와 그 출처를 싣습니다. 심각도는 프로파일이 덮어쓰지 않는 한 중요도에서 유도합니다. 제외된 컨트롤의 waiver는 적용되지 않음이지 결코 unknown도 침묵도 아닙니다. 제외된 컨트롤의 값은 경고라 사이트의 튜닝은 프로파일 교체를 견딥니다. `check`를 root로 실행할 때 프로파일, 그 체인, 튜닝 파일은 waiver 파일처럼 root 소유이고 group/other 쓰기 불가여야 합니다. CIS 프로파일은 CIS 권고 번호 색인을 기다립니다. 되돌리기: id 글롭으로 표현할 수 없는 선택 규칙은 기존 규칙의 느슨한 읽기가 아니라 새 선택자 키가 됩니다.
+- **D34 — `fix`는 결코 적용하지 않는다.** 산출물은 검토 스크립트이며, 그 블록은 컨트롤마다 하나이고 서로 독립이며 백업이 먼저이고 실패하면 롤백 후 복원합니다. 무엇을 백업하고 검증하고 되돌릴지는 컨트롤에 선언되며 결코 추론하지 않습니다. 호스트의 값은 명령에 치환하지 않으며, `validate`는 판정이 아니라 그 단계를 증명합니다. `fix --dry-run`은 `check`가 읽는 것을 같은 헬퍼로 정확히 읽으므로 실패의 정의가 둘이 되지 않습니다. 판정은 `check`의 몫이므로 발견 사항이 있어도 `0`으로 종료합니다. 되돌리기: 적용 모드는 자기 결정을 가진 새 명령이지, 결코 `fix`의 플래그가 아닙니다.
 - **D28 — Go, 최소 의존성, CLI 프레임워크 없음, 정적 바이너리 하나.** assay와 같은 선택이고 이유도 같습니다. 망 분리된 호스트에 복사할 파일 하나, 런타임 없음, 그리고 감사할 수 있을 만큼 짧은 의존성 목록입니다. 되돌리기: 의도한 바 없습니다.
 
 ## 14. 열린 쟁점

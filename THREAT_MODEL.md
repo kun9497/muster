@@ -14,7 +14,9 @@ The contracts here are tested; the design specification (section 8) is the sourc
   though its mode and owner were read.
 - `check` does not need root and warns when run as root. It treats the snapshot as untrusted input
   (size and nesting limits, no execution of anything it contains, escaped rendering) and, when root,
-  refuses waiver and control files that are not root-owned or are group/other-writable.
+  refuses waiver, profile, tuning and control files that are not root-owned or are group/other-writable.
+- `fix --dry-run` reads what `check` reads, under the same rules, and writes its plan and review script to
+  stdout only. muster never executes the script; the operator reviews and runs it by hand.
 - Controls are embedded in the binary. An external control directory is opt-in, logged with digests and
   refused on id collision.
 

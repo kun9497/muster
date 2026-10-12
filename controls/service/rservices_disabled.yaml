@@ -18,10 +18,24 @@ checks:
   - { fact: services.rservices.enabled, op: eq, expected: false }
   - { fact: services.rservices.reachable, op: eq, expected: false }
 remediation:
-  text_en: Disable and mask the rsh, rlogin and rexec services or remove the r-services package, and remove any inetd/xinetd r-services entries.
-  text_ko: rsh, rlogin, rexec 서비스를 비활성화·mask 하거나 r-services 패키지를 제거하고, inetd/xinetd 의 r-services 항목을 제거합니다.
+  text_en: Disable and mask the rsh, rlogin and rexec services or remove the r-services package, and remove any inetd/xinetd r-services entries. An rsh, rlogin or rexec started by inetd or xinetd is not stopped by the script; remove its entry there.
+  text_ko: rsh, rlogin, rexec 서비스를 비활성화·mask 하거나 r-services 패키지를 제거하고, inetd/xinetd 의 r-services 항목을 제거합니다. inetd나 xinetd가 띄우는 rsh, rlogin, rexec는 스크립트가 멈추지 않습니다. 거기서 항목을 지우십시오.
   risk: restart_service
   idempotent: true
-  script: systemctl disable --now rsh.socket rlogin.socket rexec.socket 2>/dev/null; systemctl mask rsh.socket rlogin.socket rexec.socket 2>/dev/null; true
-  rollback: systemctl unmask rsh.socket rlogin.socket rexec.socket 2>/dev/null; true
+  script: |
+    for u in rsh.socket rlogin.socket rexec.socket; do
+      systemctl cat "$u" >/dev/null 2>&1 || continue
+      systemctl disable --now "$u"
+      systemctl mask "$u" || true
+    done
+  validate: '! systemctl is-active --quiet rsh.socket && case "$(systemctl is-enabled rsh.socket 2>/dev/null)" in enabled|enabled-runtime) false;; esac && ! systemctl is-active --quiet rlogin.socket && case "$(systemctl is-enabled rlogin.socket 2>/dev/null)" in enabled|enabled-runtime) false;; esac && ! systemctl is-active --quiet rexec.socket && case "$(systemctl is-enabled rexec.socket 2>/dev/null)" in enabled|enabled-runtime) false;; esac'
+  rollback: |
+    for u in rsh.socket rlogin.socket rexec.socket; do
+      systemctl cat "$u" >/dev/null 2>&1 || continue
+      systemctl unmask "$u"
+    done
+    for u in rsh.socket rlogin.socket rexec.socket; do
+      systemctl cat "$u" >/dev/null 2>&1 || continue
+      systemctl enable --now "$u"
+    done
 decision: D19

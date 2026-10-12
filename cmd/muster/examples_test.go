@@ -13,6 +13,7 @@ import (
 
 	"github.com/kun9497/muster/internal/controls"
 	"github.com/kun9497/muster/internal/facts"
+	"github.com/kun9497/muster/internal/remedy"
 	"github.com/kun9497/muster/internal/report"
 )
 
@@ -34,6 +35,13 @@ var maskedCheckKeys = []string{"commit", "controls_digest", "controls_version", 
 // does, through the check block the command itself uses (G-14).
 func reportsFor(t *testing.T, snap *facts.Snapshot, set *controls.Set) (jsonReport, tableReport []byte) {
 	t.Helper()
+	return renderReports(t, checkReportFor(t, snap, set))
+}
+
+// checkReportFor evaluates one snapshot the way `muster check` and `muster
+// fix` both do, under the built-in default profile and no waivers.
+func checkReportFor(t *testing.T, snap *facts.Snapshot, set *controls.Set) *report.Report {
+	t.Helper()
 	reg, err := facts.LoadRegistry()
 	if err != nil {
 		t.Fatalf("load registry: %v", err)
@@ -46,7 +54,12 @@ func reportsFor(t *testing.T, snap *facts.Snapshot, set *controls.Set) (jsonRepo
 		t.Fatalf("resolve default profile: %v", err)
 	}
 	results, cb := newCheckBlock(sel, snap, reg, nil, func(msg string) { t.Logf("check warning: %s", msg) })
-	rep := report.Build(snap, results, cb, sel.SeverityByID)
+	return report.Build(snap, results, cb, sel.SeverityByID)
+}
+
+// renderReports renders check's JSON and table reports of rep.
+func renderReports(t *testing.T, rep *report.Report) (jsonReport, tableReport []byte) {
+	t.Helper()
 	var j, tb bytes.Buffer
 	if err := report.WriteJSON(&j, rep); err != nil {
 		t.Fatalf("write json: %v", err)
@@ -59,17 +72,30 @@ func reportsFor(t *testing.T, snap *facts.Snapshot, set *controls.Set) (jsonRepo
 	return j.Bytes(), tb.Bytes()
 }
 
-// maskReportBytes drops maskedCheckKeys from a JSON report and re-marshals
-// it. encoding/json sorts map keys, so two masked reports of the same content
-// are the same bytes whatever order the originals were written in.
-func maskReportBytes(data []byte) ([]byte, error) {
+// fixReportsFor renders the three outputs of `muster fix --dry-run` from the
+// report check produced, at the default max-risk (Z-14).
+func fixReportsFor(t *testing.T, rep *report.Report, set *controls.Set) (jsonPlan, tablePlan, script []byte) {
+	t.Helper()
+	p, err := remedy.Build(rep, set, remedy.Options{MaxRisk: "lockout_risk"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return remedy.JSON(p), remedy.Table(p, false), remedy.Script(p)
+}
+
+// maskReportBytes drops maskedCheckKeys from the named provenance block
+// ("check" for a check report, "fix" for a fix plan; the two blocks carry the
+// same four fields) and re-marshals it. encoding/json sorts map keys, so two
+// masked reports of the same content are the same bytes whatever order the
+// originals were written in.
+func maskReportBytes(data []byte, block string) ([]byte, error) {
 	var doc map[string]any
 	if err := json.Unmarshal(data, &doc); err != nil {
 		return nil, fmt.Errorf("report is not JSON: %w", err)
 	}
-	cb, ok := doc["check"].(map[string]any)
+	cb, ok := doc[block].(map[string]any)
 	if !ok {
-		return nil, fmt.Errorf("report has no check block: %v", doc["check"])
+		return nil, fmt.Errorf("report has no %s block: %v", block, doc[block])
 	}
 	for _, k := range maskedCheckKeys {
 		delete(cb, k)
@@ -79,30 +105,35 @@ func maskReportBytes(data []byte) ([]byte, error) {
 
 // maskReport is maskReportBytes for a caller that has a *testing.T and for
 // which a malformed report is simply the end of the test.
-func maskReport(t *testing.T, data []byte) []byte {
+func maskReport(t *testing.T, data []byte, block string) []byte {
 	t.Helper()
-	out, err := maskReportBytes(data)
+	out, err := maskReportBytes(data, block)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return out
 }
 
-// reportControlsDigest returns a report's check.controls_digest, or the error
-// that says the bytes are not JSON at all. A report that parses but carries no
-// digest reads as "", which never equals a real digest, so it is treated as a
-// set this build cannot reproduce; bytes that do not parse are a damaged file,
-// not another control set, and the caller must say so rather than skip them.
-func reportControlsDigest(data []byte) (string, error) {
-	var doc struct {
-		Check struct {
-			ControlsDigest string `json:"controls_digest"`
-		} `json:"check"`
-	}
+// reportControlsDigest returns a report's <block>.controls_digest, or the
+// error that says the bytes are not JSON at all. A report that parses but
+// carries no digest reads as "", which never equals a real digest, so it is
+// treated as a set this build cannot reproduce; bytes that do not parse are a
+// damaged file, not another control set, and the caller must say so rather
+// than skip them.
+func reportControlsDigest(data []byte, block string) (string, error) {
+	var doc map[string]json.RawMessage
 	if err := json.Unmarshal(data, &doc); err != nil {
 		return "", err
 	}
-	return doc.Check.ControlsDigest, nil
+	var b struct {
+		ControlsDigest string `json:"controls_digest"`
+	}
+	if raw, ok := doc[block]; ok {
+		if err := json.Unmarshal(raw, &b); err != nil {
+			return "", err
+		}
+	}
+	return b.ControlsDigest, nil
 }
 
 // checkExampleReports is the comparison half of the F-12 gate on one example:
@@ -124,7 +155,7 @@ func checkExampleReports(name string, gotJSON, wantJSON, gotTable, wantTable []b
 	// A committed report that does not parse has no digest to compare, but it
 	// is a damaged file rather than another control set: skipping it would
 	// hide a truncated or half-written report behind the staleness note.
-	committed, err := reportControlsDigest(wantJSON)
+	committed, err := reportControlsDigest(wantJSON, "check")
 	if err != nil {
 		return []string{fmt.Sprintf("%s-report.json does not parse as JSON: %v; refresh the examples (see examples/README.md)",
 			strings.TrimSuffix(name, ".json"), err)}, ""
@@ -133,11 +164,11 @@ func checkExampleReports(name string, gotJSON, wantJSON, gotTable, wantTable []b
 		return nil, fmt.Sprintf("examples/%s: collected against control set %s, this build is %s; byte comparison skipped",
 			name, committed, buildDigest)
 	}
-	maskedGot, err := maskReportBytes(gotJSON)
+	maskedGot, err := maskReportBytes(gotJSON, "check")
 	if err != nil {
 		return []string{fmt.Sprintf("%s: the report this build produced %v", name, err)}, ""
 	}
-	maskedWant, err := maskReportBytes(wantJSON)
+	maskedWant, err := maskReportBytes(wantJSON, "check")
 	if err != nil {
 		return []string{fmt.Sprintf("%s: the committed report %v", name, err)}, ""
 	}
@@ -150,6 +181,44 @@ func checkExampleReports(name string, gotJSON, wantJSON, gotTable, wantTable []b
 		problems = append(problems, fmt.Sprintf(
 			"%s-report.txt is not what this binary produces from %s; refresh the examples (see examples/README.md)",
 			strings.TrimSuffix(name, ".json"), name))
+	}
+	return problems, ""
+}
+
+// checkFixReports is checkExampleReports for the three fix outputs of one
+// example: the plan JSON masked under its "fix" block, the table without its
+// header line, and the review script byte for byte (Z-22: it carries no
+// muster version or commit, and the comparison runs only when the committed
+// plan's fix.controls_digest is this build's set, G-24).
+func checkFixReports(name string, gotJSON, wantJSON, gotTable, wantTable, gotScript, wantScript []byte, buildDigest string) (problems []string, note string) {
+	base := strings.TrimSuffix(name, ".json")
+	committed, err := reportControlsDigest(wantJSON, "fix")
+	if err != nil {
+		return []string{fmt.Sprintf("%s-fix-report.json does not parse as JSON: %v; refresh the examples (see examples/README.md)", base, err)}, ""
+	}
+	if committed != buildDigest {
+		return nil, fmt.Sprintf("examples/%s: fix reports collected against control set %s, this build is %s; byte comparison skipped",
+			name, committed, buildDigest)
+	}
+	maskedGot, err := maskReportBytes(gotJSON, "fix")
+	if err != nil {
+		return []string{fmt.Sprintf("%s: the plan this build produced %v", name, err)}, ""
+	}
+	maskedWant, err := maskReportBytes(wantJSON, "fix")
+	if err != nil {
+		return []string{fmt.Sprintf("%s: the committed plan %v", name, err)}, ""
+	}
+	stale := func(ext string) string {
+		return fmt.Sprintf("%s-fix-report.%s is not what this binary produces from %s; refresh the examples (see examples/README.md)", base, ext, name)
+	}
+	if !bytes.Equal(maskedGot, maskedWant) {
+		problems = append(problems, stale("json"))
+	}
+	if !bytes.Equal(tableBody(gotTable), tableBody(wantTable)) {
+		problems = append(problems, stale("txt"))
+	}
+	if !bytes.Equal(gotScript, wantScript) {
+		problems = append(problems, stale("sh"))
 	}
 	return problems, ""
 }
@@ -195,7 +264,7 @@ func TestExampleReportHelpers(t *testing.T) {
 	if err := json.Unmarshal(firstJSON, &orig); err != nil {
 		t.Fatalf("unmarshal report: %v", err)
 	}
-	if err := json.Unmarshal(maskReport(t, firstJSON), &masked); err != nil {
+	if err := json.Unmarshal(maskReport(t, firstJSON, "check"), &masked); err != nil {
 		t.Fatalf("unmarshal masked report: %v", err)
 	}
 	origCheck, _ := orig["check"].(map[string]any)
@@ -254,11 +323,90 @@ func TestExampleReportHelpers(t *testing.T) {
 	if !bytes.Contains(failJSON, []byte(`"observations"`)) {
 		t.Fatal("full-fail.json was expected to produce observations")
 	}
-	if bytes.Equal(maskReport(t, failJSON), maskReport(t, firstJSON)) {
+	if bytes.Equal(maskReport(t, failJSON, "check"), maskReport(t, firstJSON, "check")) {
 		t.Error("two different snapshots produced the same masked JSON report")
 	}
 	if bytes.Equal(tableBody(failTable), tableBody(firstTable)) {
 		t.Error("two different snapshots produced the same table body")
+	}
+
+	// The fix outputs (Z-14): the same bytes twice, the mask under the "fix"
+	// block removes the same four fields and nothing else, and a different
+	// snapshot is a different plan in all three formats.
+	passRep := checkReportFor(t, pass, set)
+	fixJSON, fixTable, fixScript := fixReportsFor(t, passRep, set)
+	j2, t2, s2 := fixReportsFor(t, checkReportFor(t, pass, set), set)
+	if !bytes.Equal(fixJSON, j2) || !bytes.Equal(fixTable, t2) || !bytes.Equal(fixScript, s2) {
+		t.Error("the fix outputs of one snapshot are not the same bytes twice")
+	}
+	if _, err := maskReportBytes(fixJSON, "check"); err == nil {
+		t.Error("a fix plan masked under the check block did not fail")
+	}
+	var origFix, maskedFix map[string]any
+	if err := json.Unmarshal(fixJSON, &origFix); err != nil {
+		t.Fatalf("unmarshal plan: %v", err)
+	}
+	if err := json.Unmarshal(maskReport(t, fixJSON, "fix"), &maskedFix); err != nil {
+		t.Fatalf("unmarshal masked plan: %v", err)
+	}
+	of, _ := origFix["fix"].(map[string]any)
+	mf, _ := maskedFix["fix"].(map[string]any)
+	if of == nil || mf == nil {
+		t.Fatalf("fix block: orig %T masked %T", origFix["fix"], maskedFix["fix"])
+	}
+	removed = nil
+	for k := range of {
+		if _, kept := mf[k]; !kept {
+			removed = append(removed, k)
+		}
+	}
+	sort.Strings(removed)
+	if !reflect.DeepEqual(removed, maskedCheckKeys) {
+		t.Errorf("maskReport(fix) removed %v, want exactly %v", removed, maskedCheckKeys)
+	}
+	for _, k := range []string{"snapshot_digest", "guide_edition", "profile", "waivers", "max_risk"} {
+		if !reflect.DeepEqual(of[k], mf[k]) {
+			t.Errorf("maskReport(fix) changed fix.%s", k)
+		}
+	}
+	delete(origFix, "fix")
+	delete(maskedFix, "fix")
+	if !reflect.DeepEqual(origFix, maskedFix) {
+		t.Error("maskReport(fix) changed the plan outside its fix block")
+	}
+	if d, err := reportControlsDigest(fixJSON, "fix"); err != nil || d != set.Digest {
+		t.Errorf("the plan's fix.controls_digest is %q (err %v), want %q", d, err, set.Digest)
+	}
+	if d, err := reportControlsDigest(fixJSON, "check"); err != nil || d != "" {
+		t.Errorf("a plan read as a check report carries digest %q (err %v), want none", d, err)
+	}
+	if h, _, _ := bytes.Cut(fixTable, []byte("\n")); !bytes.HasPrefix(h, []byte("muster ")) ||
+		!bytes.Contains(tableBody(fixTable), []byte("nothing to fix")) {
+		t.Errorf("the fix table is not a header line then the plan:\n%s", fixTable)
+	}
+	failFixJSON, failFixTable, failFixScript := fixReportsFor(t, checkReportFor(t, fail, set), set)
+	if bytes.Equal(maskReport(t, failFixJSON, "fix"), maskReport(t, fixJSON, "fix")) ||
+		bytes.Equal(tableBody(failFixTable), tableBody(fixTable)) || bytes.Equal(failFixScript, fixScript) {
+		t.Error("two different snapshots produced the same fix output")
+	}
+
+	// The gates compare the tables without their header line: a committed
+	// table whose first line names another binary, host or time is not a
+	// problem, for check's table and for fix's, while the same body after an
+	// extra line is.
+	otherHeader := func(tbl []byte) []byte { return append([]byte("muster other · host elsewhere\n"), tableBody(tbl)...) }
+	if bytes.Equal(otherHeader(firstTable), firstTable) || bytes.Equal(otherHeader(fixTable), fixTable) {
+		t.Fatal("the re-headed tables are the same bytes; the check below would prove nothing")
+	}
+	if problems, note := checkExampleReports("x.json", firstJSON, firstJSON, firstTable, otherHeader(firstTable), set.Digest); len(problems) != 0 || note != "" {
+		t.Errorf("check's gate reported a header-only difference: %v / %q", problems, note)
+	}
+	if problems, note := checkFixReports("x.json", fixJSON, fixJSON, fixTable, otherHeader(fixTable), fixScript, fixScript, set.Digest); len(problems) != 0 || note != "" {
+		t.Errorf("fix's gate reported a header-only difference: %v / %q", problems, note)
+	}
+	shifted := append([]byte("muster x\n"), otherHeader(fixTable)...)
+	if problems, _ := checkFixReports("x.json", fixJSON, fixJSON, fixTable, shifted, fixScript, fixScript, set.Digest); len(problems) != 1 || !strings.HasPrefix(problems[0], "x-fix-report.txt ") {
+		t.Errorf("fix's gate missed a body difference: %v", problems)
 	}
 }
 
@@ -281,7 +429,7 @@ func TestExampleStalenessGate(t *testing.T) {
 
 	// The report this build just produced carries this build's digest, which
 	// is what makes the gate open at all.
-	if got, err := reportControlsDigest(gotJSON); err != nil || got != set.Digest {
+	if got, err := reportControlsDigest(gotJSON, "check"); err != nil || got != set.Digest {
 		t.Fatalf("this build's own report carries controls_digest %q (err %v), want %q", got, err, set.Digest)
 	}
 
@@ -308,7 +456,7 @@ func TestExampleStalenessGate(t *testing.T) {
 
 	// 3. The same mismatch, but the committed report names another control
 	//    set: nothing is reported and the note names both digests.
-	stale := retagControlsDigest(t, otherJSON, "sha256:0000000000000000")
+	stale := retagControlsDigest(t, otherJSON, "check", "sha256:0000000000000000")
 	problems, note = checkExampleReports("x.json", gotJSON, stale, gotTable, otherTable, set.Digest)
 	if len(problems) != 0 {
 		t.Errorf("an example of another control set was compared anyway: %v", problems)
@@ -335,23 +483,95 @@ func TestExampleStalenessGate(t *testing.T) {
 
 	// A report that parses but names another control set still takes the
 	// skip, so the new branch reports damage only.
-	if _, err := reportControlsDigest(stale); err != nil {
+	if _, err := reportControlsDigest(stale, "check"); err != nil {
 		t.Errorf("a well-formed report of another control set does not parse: %v", err)
+	}
+
+	// The same four cases for the fix outputs, gated on fix.controls_digest
+	// (Z-14, Z-22).
+	gotFJ, gotFT, gotFS := fixReportsFor(t, checkReportFor(t, pass, set), set)
+	otherFJ, otherFT, otherFS := fixReportsFor(t, checkReportFor(t, fail, set), set)
+	problems, note = checkFixReports("x.json", gotFJ, gotFJ, gotFT, gotFT, gotFS, gotFS, set.Digest)
+	if len(problems) != 0 || note != "" {
+		t.Errorf("current fix reports reported %v / %q", problems, note)
+	}
+	problems, note = checkFixReports("x.json", gotFJ, otherFJ, gotFT, otherFT, gotFS, otherFS, set.Digest)
+	if note != "" || len(problems) != 3 {
+		t.Errorf("mismatching fix reports: note %q, %d problems, want one per file: %v", note, len(problems), problems)
+	}
+	for i, ext := range []string{"json", "txt", "sh"} {
+		if i < len(problems) && !strings.HasPrefix(problems[i], "x-fix-report."+ext+" is not what this binary produces from x.json") {
+			t.Errorf("problem %d %q does not name x-fix-report.%s", i, problems[i], ext)
+		}
+	}
+	// Only the script differs: the byte comparison of the script catches it.
+	problems, _ = checkFixReports("x.json", gotFJ, gotFJ, gotFT, gotFT, gotFS, append(append([]byte{}, gotFS...), '#'), set.Digest)
+	if len(problems) != 1 || !strings.HasPrefix(problems[0], "x-fix-report.sh ") {
+		t.Errorf("a changed script reported %v, want the .sh only", problems)
+	}
+	staleFix := retagControlsDigest(t, otherFJ, "fix", "sha256:0000000000000000")
+	problems, note = checkFixReports("x.json", gotFJ, staleFix, gotFT, otherFT, gotFS, otherFS, set.Digest)
+	if len(problems) != 0 {
+		t.Errorf("fix reports of another control set were compared anyway: %v", problems)
+	}
+	for _, want := range []string{"x.json", "sha256:0000000000000000", set.Digest, "skipped"} {
+		if !strings.Contains(note, want) {
+			t.Errorf("the fix note %q does not name %q", note, want)
+		}
+	}
+	problems, note = checkFixReports("x.json", gotFJ, []byte("not json"), gotFT, otherFT, gotFS, otherFS, set.Digest)
+	if note != "" || len(problems) != 1 || !strings.Contains(problems[0], "x-fix-report.json") {
+		t.Errorf("a corrupt committed plan: note %q, problems %v", note, problems)
+	}
+	// A check report's digest says nothing about the fix block.
+	problems, note = checkFixReports("x.json", gotFJ, gotJSON, gotFT, gotFT, gotFS, gotFS, set.Digest)
+	if len(problems) != 0 || note == "" {
+		t.Errorf("a check report in place of a plan: problems %v, note %q, want the skip", problems, note)
 	}
 }
 
-// retagControlsDigest returns report with a different check.controls_digest,
+// readExample reads a committed example file; a missing one is a failure
+// that names the file and the refresh (Z-14), never a skip.
+func readExample(path, what string) ([]byte, error) {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("every example snapshot needs its %s beside it: %v; refresh the examples (see examples/README.md)", what, err)
+	}
+	return b, nil
+}
+
+// W3/W5: a missing committed report or fix file fails naming the refresh.
+func TestReadExampleNamesTheRefresh(t *testing.T) {
+	missing := filepath.Join(t.TempDir(), "x-fix-report.json")
+	if _, err := readExample(missing, "fix reports"); err == nil {
+		t.Fatal("a missing example file read without an error")
+	} else {
+		msg := err.Error()
+		if !strings.HasPrefix(msg, "every example snapshot needs its fix reports beside it: ") ||
+			!strings.HasSuffix(msg, "; refresh the examples (see examples/README.md)") || !strings.Contains(msg, missing) {
+			t.Errorf("the failure %q does not name the file and the refresh", msg)
+		}
+	}
+	if err := os.WriteFile(missing, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if b, err := readExample(missing, "fix reports"); err != nil || string(b) != "x" {
+		t.Errorf("readExample of a present file: %q, %v", b, err)
+	}
+}
+
+// retagControlsDigest returns report with a different <block>.controls_digest,
 // which is how a report collected against an older control set differs from
 // one this build could reproduce.
-func retagControlsDigest(t *testing.T, report []byte, digest string) []byte {
+func retagControlsDigest(t *testing.T, report []byte, block, digest string) []byte {
 	t.Helper()
 	var doc map[string]any
 	if err := json.Unmarshal(report, &doc); err != nil {
 		t.Fatalf("report is not JSON: %v", err)
 	}
-	cb, ok := doc["check"].(map[string]any)
+	cb, ok := doc[block].(map[string]any)
 	if !ok {
-		t.Fatalf("report has no check block")
+		t.Fatalf("report has no %s block", block)
 	}
 	cb["controls_digest"] = digest
 	out, err := json.Marshal(doc)
@@ -390,7 +610,8 @@ func TestExamplesLoadAndCheck(t *testing.T) {
 			if err != nil {
 				t.Fatalf("%s does not load: %v", f, err)
 			}
-			gotJSON, gotTable := reportsFor(t, snap, set)
+			rep := checkReportFor(t, snap, set)
+			gotJSON, gotTable := renderReports(t, rep)
 
 			// ERROR(internal_error) is the status the evaluator gives a
 			// control whose evaluation it had to recover from a panic; a real
@@ -415,15 +636,33 @@ func TestExamplesLoadAndCheck(t *testing.T) {
 			}
 
 			base := strings.TrimSuffix(f, ".json")
-			wantJSON, err := os.ReadFile(base + "-report.json")
+			wantJSON, err := readExample(base+"-report.json", "JSON report")
 			if err != nil {
-				t.Fatalf("every example snapshot needs its JSON report beside it: %v", err)
+				t.Fatal(err)
 			}
-			wantTable, err := os.ReadFile(base + "-report.txt")
+			wantTable, err := readExample(base+"-report.txt", "table report")
 			if err != nil {
-				t.Fatalf("every example snapshot needs its table report beside it: %v", err)
+				t.Fatal(err)
 			}
 			problems, note := checkExampleReports(filepath.Base(f), gotJSON, wantJSON, gotTable, wantTable, set.Digest)
+			if note != "" {
+				t.Log(note)
+			}
+			for _, p := range problems {
+				t.Error(p)
+			}
+
+			// The fix outputs of the same report (Z-14): a missing file is
+			// a hard failure that ends "; refresh the examples (see
+			// examples/README.md)", never a skip.
+			gotFJ, gotFT, gotFS := fixReportsFor(t, rep, set)
+			var want [3][]byte
+			for i, ext := range []string{"json", "txt", "sh"} {
+				if want[i], err = readExample(base+"-fix-report."+ext, "fix reports"); err != nil {
+					t.Fatal(err)
+				}
+			}
+			problems, note = checkFixReports(filepath.Base(f), gotFJ, want[0], gotFT, want[1], gotFS, want[2], set.Digest)
 			if note != "" {
 				t.Log(note)
 			}

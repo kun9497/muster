@@ -18,10 +18,24 @@ checks:
   - { fact: accounts.nss.passwd_sources, op: none, where: { op: in, expected: ["nis", "nisplus"] } }
   - { fact: accounts.nss.group_sources, op: none, where: { op: in, expected: ["nis", "nisplus"] } }
 remediation:
-  text_en: Stop and disable ypserv and ypbind (systemctl disable --now ypserv.service ypbind.service) and remove nis/nisplus from the passwd and group lines of /etc/nsswitch.conf.
-  text_ko: ypserv 와 ypbind 를 중지·비활성화하고 (systemctl disable --now ypserv.service ypbind.service) /etc/nsswitch.conf 의 passwd·group 줄에서 nis·nisplus 를 제거합니다.
-  risk: restart_service
+  text_en: Stop and disable ypserv and ypbind (systemctl disable --now ypserv.service ypbind.service) and remove nis/nisplus from the passwd and group lines of /etc/nsswitch.conf. On a host whose accounts come from NIS, stopping ypbind cuts those accounts off; change nsswitch first.
+  text_ko: ypserv 와 ypbind 를 중지·비활성화하고 (systemctl disable --now ypserv.service ypbind.service) /etc/nsswitch.conf 의 passwd·group 줄에서 nis·nisplus 를 제거합니다. 계정을 NIS에서 받는 호스트에서 ypbind를 멈추면 그 계정이 끊깁니다. 먼저 nsswitch를 바꾸십시오.
+  risk: lockout_risk
   idempotent: true
-  script: systemctl disable --now ypserv.service ypbind.service 2>/dev/null; true
-  rollback: systemctl enable --now ypserv.service ypbind.service 2>/dev/null; true
+  script: |
+    for u in ypserv.service ypbind.service ypxfrd.service yppasswdd.service; do
+      systemctl cat "$u" >/dev/null 2>&1 || continue
+      systemctl disable --now "$u"
+      systemctl mask "$u" || true
+    done
+  validate: '! systemctl is-active --quiet ypserv.service && case "$(systemctl is-enabled ypserv.service 2>/dev/null)" in enabled|enabled-runtime) false;; esac && ! systemctl is-active --quiet ypbind.service && case "$(systemctl is-enabled ypbind.service 2>/dev/null)" in enabled|enabled-runtime) false;; esac && ! systemctl is-active --quiet ypxfrd.service && case "$(systemctl is-enabled ypxfrd.service 2>/dev/null)" in enabled|enabled-runtime) false;; esac && ! systemctl is-active --quiet yppasswdd.service && case "$(systemctl is-enabled yppasswdd.service 2>/dev/null)" in enabled|enabled-runtime) false;; esac'
+  rollback: |
+    for u in ypserv.service ypbind.service ypxfrd.service yppasswdd.service; do
+      systemctl cat "$u" >/dev/null 2>&1 || continue
+      systemctl unmask "$u"
+    done
+    for u in ypserv.service ypbind.service ypxfrd.service yppasswdd.service; do
+      systemctl cat "$u" >/dev/null 2>&1 || continue
+      systemctl enable --now "$u"
+    done
 decision: D19

@@ -49,6 +49,14 @@ const (
 	degradedRemoteNSS = "remote NSS account source; judged on local files only"
 )
 
+// The three reason shapes the evaluator writes and fix --dry-run reads
+// (stage 3D-2 X-2): exported so a consumer never parses prose.
+const (
+	ReasonDegradedPrefix   = "collection was degraded: "
+	ReasonSideOnlyPrefix   = "setting holds on one side only: "
+	ReasonAbsentFailPrefix = "absent counts as fail: "
+)
+
 // sideMismatch reports whether d is the "holds on one side only" degradation
 // of spec §6.3, the only kind that can soften a failing clause to WARN.
 func sideMismatch(d string) bool {

@@ -20,4 +20,9 @@ remediation:
   text_ko: chown root:root /etc/services; chmod 644 /etc/services
   risk: none
   idempotent: true
-  script: chown root:root /etc/services && chmod 644 /etc/services
+  backup: [/etc/services]
+  script: |
+    [ -f /etc/services ]
+    chown root:root /etc/services
+    chmod 644 /etc/services
+  validate: "stat -c '%u %g %a' /etc/services | grep -qx '0 0 644'"

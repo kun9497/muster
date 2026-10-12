@@ -90,6 +90,25 @@ sentence why it has the importance it has. Every such control gates on
 scaffolds one (no `--kisa-id`). A fixture that reads a `setting` key carries
 the key present with its `effective` side `absent` when it means to be absent.
 
+### Remediation bodies
+
+`fix --dry-run` renders a control's `script`, `validate` and `rollback` into a
+review script, so they are code. A `script` needs `idempotent: true` and a way
+back: a `rollback`, a non-empty `backup`, or both. Bodies run under `set -e` in
+a subshell: a command that may legitimately fail says so with `|| true` on its
+own line, never a trailing `; true`, and no `2>/dev/null` hides an error the
+operator should see. A body acting on a file checks it exists first; one calling
+an optional tool guards it with `command -v`. A service body loops over the
+logical service's `provesInstall` units in `services.go` (a Linux test pins the
+list exactly), guards each with `systemctl cat`, disables strictly and masks
+`|| true`; its rollback unmasks every unit, then enables every unit. A body with
+one unit uses `if`, not a one-word `for`. `validate` is one line, conditions
+joined with `&&`, and checks only what the script set. `backup` paths are
+absolute and clean, in `[A-Za-z0-9._@:+/-]`. No here-document. The script runs
+under `umask 077`, so a body that creates a file others read sets its mode.
+`make shellcheck` and `go test ./internal/remedy -run TestScriptGolden -update`
+(the `all-scripted.sh` golden renders every shipped body) check your change.
+
 ## Adding a fact
 
 - Register the key first: `{key, type, description, since, sensitivity,
@@ -162,7 +181,8 @@ source (`Output.Source`).
 - Assert something that differs when the feature is gone. Prefer structural
   assertions to substrings.
 - Goldens: `go test ./internal/report -run TestJSON -update`,
-  `-run TestTableGolden -update`, and the facts golden above. Review every
+  `-run TestTableGolden -update`, the facts golden above, and
+  `go test ./internal/remedy -run 'TestScriptGolden|TestTableGolden|TestJSONGolden' -update`. Review every
   regenerated golden before committing it.
 - A fixture must earn its place. `go test ./internal/controls -run
   TestEveryMutantIsKilled` mutates every control (operators flipped, expected
@@ -200,7 +220,9 @@ source (`Output.Source`).
 - CI runs the race build, the lint, the coverage check, a root collect on the
   runner VM, a non-root collect, the container matrix (Ubuntu 22.04/24.04,
   Rocky 9, AlmaLinux 9, Debian 12 as a canary), the read-only contract run,
-  the daemon oracles, and the capability matrix
+  the daemon oracles, `sh -n` and shellcheck over the review scripts, the
+  `fix-roundtrip` job (seeded failures repaired by the generated script in
+  throwaway containers), and the capability matrix
   (`docs/reference/capability-matrix.json`): facts that must be `denied`
   without root and `unsupported` without systemd.
 

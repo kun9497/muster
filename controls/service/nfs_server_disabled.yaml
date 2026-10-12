@@ -19,6 +19,20 @@ remediation:
   text_ko: 이 호스트가 실제로 NFS 로 파일시스템을 공유해야 하는 것이 아니라면 NFS 서버를 중지·비활성화합니다 (systemctl disable --now nfs-server.service).
   risk: restart_service
   idempotent: true
-  script: systemctl disable --now nfs-server.service 2>/dev/null; true
-  rollback: systemctl enable --now nfs-server.service 2>/dev/null; true
+  script: |
+    for u in nfs-server.service nfs-kernel-server.service; do
+      systemctl cat "$u" >/dev/null 2>&1 || continue
+      systemctl disable --now "$u"
+      systemctl mask "$u" || true
+    done
+  validate: '! systemctl is-active --quiet nfs-server.service && case "$(systemctl is-enabled nfs-server.service 2>/dev/null)" in enabled|enabled-runtime) false;; esac && ! systemctl is-active --quiet nfs-kernel-server.service && case "$(systemctl is-enabled nfs-kernel-server.service 2>/dev/null)" in enabled|enabled-runtime) false;; esac'
+  rollback: |
+    for u in nfs-server.service nfs-kernel-server.service; do
+      systemctl cat "$u" >/dev/null 2>&1 || continue
+      systemctl unmask "$u"
+    done
+    for u in nfs-server.service nfs-kernel-server.service; do
+      systemctl cat "$u" >/dev/null 2>&1 || continue
+      systemctl enable --now "$u"
+    done
 decision: D19

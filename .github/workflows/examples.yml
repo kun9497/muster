@@ -225,6 +225,10 @@ jobs:
             echo "$f: check json exit $jcode, table exit $tcode"
             test -s "$b-report.json"
             test -s "$b-report.txt"
+            NO_COLOR=1 "$GITHUB_WORKSPACE/bin/muster" fix --dry-run --facts "$f" --max-risk lockout_risk --format json > "$b-fix-report.json"
+            NO_COLOR=1 "$GITHUB_WORKSPACE/bin/muster" fix --dry-run --facts "$f" --max-risk lockout_risk --format table > "$b-fix-report.txt"
+            NO_COLOR=1 "$GITHUB_WORKSPACE/bin/muster" fix --dry-run --facts "$f" --max-risk lockout_risk --format script > "$b-fix-report.sh"
+            test -s "$b-fix-report.json"; test -s "$b-fix-report.txt"; test -s "$b-fix-report.sh"
             jq -e '.check.guide_edition == "kisa-unix-2026"' "$b-report.json" > /dev/null
             jq -e '[.results[] | select(.status == "ERROR" and .reason_code == "internal_error")] | length == 0' "$b-report.json" > /dev/null
           done

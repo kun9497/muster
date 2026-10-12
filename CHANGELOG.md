@@ -10,6 +10,16 @@ verdict on an existing snapshot is at least a minor release and appears under
 ## [Unreleased]
 
 ### Added
+- `fix --dry-run` (stage 3D-2, D34). It reads what `check` reads, keeps the
+  failures of the profile in force after waivers, and renders a risk-ordered
+  plan as a table (`--format table`), JSON (`--format json`, plan schema 1) or a
+  POSIX `sh` review script (`--format script`) with one block per control:
+  declared backups, the control's script, a one-line validate, and on failure
+  the declared rollback then a restore. `--max-risk` caps what the script runs;
+  items above it are commented out. muster never runs the script. `fix` exits 0
+  whenever it produced a plan and 2 when it could not; `--dry-run` is mandatory.
+  The script refuses a backup directory root does not own or others can write.
+  New package `internal/remedy`; `examples/` gains the fix reports.
 - `check --profile <name|path>` and `check --tuning <path>` (stage 3D-1, D33). A
   profile is the list of questions asked: `include`/`exclude` by control-id globs,
   `params` and an ordered `severity` list, chained through `extends` (four files at
@@ -28,6 +38,11 @@ verdict on an existing snapshot is at least a minor release and appears under
   under `docs/examples/profiles/`. No control changes: `controls/VERSION` stays.
 
 ### Changed
+- `controls lint` checks the remediation block: `text_en`/`text_ko` one line and
+  at most 1000 runes, titles free of control characters, a `rollback` or `backup`
+  for every `script`, `idempotent: true` with a `script`, a one-line `validate`,
+  no here-document in a body, and absolute, clean, shell-safe `backup` paths.
+  `check`'s output is unchanged.
 - `controls list` takes flags (`--profile <name|path>`) and refuses an unknown
   argument with exit 2; it used to ignore extra arguments. Its rows are unchanged.
 - `controls lint --profile ""` and `controls list --profile ""` refuse the empty
@@ -37,6 +52,19 @@ verdict on an existing snapshot is at least a minor release and appears under
   ignore the rest.
 
 ### Controls
+
+Control set `kisa-unix-2026+2026.10.08` (was `+2026.10.02`). The sixteen
+controls that carry a remediation script are rewritten for the review script:
+file permissions declare their file as `backup`, guard its existence and
+validate owner and mode with `stat`; the ten service controls act on each of
+their logical service's units (a loop, or an `if` for one unit) behind a
+`systemctl cat` guard, roll back in two passes (unmask, then enable) and
+validate the printed enablement state; root remote login writes
+`00-muster.conf` (sshd keeps the first value it reads), reloads a running sshd
+and validates persona root. Two risks now name the operational impact:
+`hosts_permissions` is `restart_service` (at 0600 non-root processes cannot read
+/etc/hosts) and `nis_disabled` is `lockout_risk` (stopping ypbind cuts NIS
+accounts off). No verdict changes.
 
 Control set `kisa-unix-2026+2026.10.02` (was `+2026.09.29`). Thirteen more controls
 beyond the KISA guide (49 in all), written from `proc(5)`, `ip-sysctl.rst`,
@@ -405,6 +433,10 @@ configuration walk stopped at an `Include` outside the declaration (below).
   Found by the nightly fuzz workflow; the input is committed as its seed.
 
 ### Tooling
+- `make shellcheck` and a CI step run `sh -n` and `shellcheck -s sh` over the
+  review-script goldens and the example fix scripts; a `fix-roundtrip` job seeds
+  failures in throwaway init and Ubuntu containers, runs the generated script
+  there and requires the seeded controls to pass afterwards (stage 3D-2).
 - D32 (exposure is the join of listeners, processes and the firewall as
   configured; the allow list is the host's declaration); the capability matrix's
   `nonroot.denied` row gains four keys; three oracle pairs (listeners against

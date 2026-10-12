@@ -18,6 +18,15 @@ remediation:
   text_ko: 이 호스트가 자동 마운트 공유에 실제로 의존하지 않는다면 autofs 를 중지·비활성화합니다 (systemctl disable --now autofs.service).
   risk: restart_service
   idempotent: true
-  script: systemctl disable --now autofs.service 2>/dev/null; true
-  rollback: systemctl enable --now autofs.service 2>/dev/null; true
+  script: |
+    if systemctl cat autofs.service >/dev/null 2>&1; then
+      systemctl disable --now autofs.service
+      systemctl mask autofs.service || true
+    fi
+  validate: '! systemctl is-active --quiet autofs.service && case "$(systemctl is-enabled autofs.service 2>/dev/null)" in enabled|enabled-runtime) false;; esac'
+  rollback: |
+    if systemctl cat autofs.service >/dev/null 2>&1; then
+      systemctl unmask autofs.service
+      systemctl enable --now autofs.service
+    fi
 decision: D19

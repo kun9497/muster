@@ -37,6 +37,7 @@ const usage = `usage: muster <command> [flags]
 commands:
   collect    gather host facts as root and write a snapshot (Linux)
   check      evaluate a facts snapshot against the embedded controls
+  fix        plan the remediation of a snapshot's failures (--dry-run only)
   controls   lint, list or scaffold the embedded controls
   snapshot   extract the leaves a control reads from a snapshot into a fixture skeleton
   version    print version, commit and build date
@@ -72,6 +73,8 @@ func run(args []string, stdout, stderr io.Writer) (code int) {
 		return runCollect(args[1:], stdout, stderr)
 	case "check":
 		return runCheck(args[1:], stdout, stderr)
+	case "fix":
+		return runFix(args[1:], stdout, stderr)
 	case "controls":
 		return runControls(args[1:], stdout, stderr)
 	case "snapshot":

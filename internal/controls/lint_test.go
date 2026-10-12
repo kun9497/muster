@@ -68,11 +68,50 @@ func TestLintCleanControlHasNoProblems(t *testing.T) {
 }
 
 func TestLintRules(t *testing.T) {
+	const goodRemediation = "remediation: { text_en: t, text_ko: 조치, risk: lockout_risk, idempotent: true }"
+	rem := func(block string) string { return strings.Replace(goodControl, goodRemediation, block, 1) }
 	cases := []struct {
-		name string
-		yaml string
-		rule string
+		name   string
+		yaml   string
+		rule   string
+		msg    string
+		absent bool
 	}{
+		{name: "text_en blank", yaml: rem(`remediation: { text_en: " ", text_ko: 조치, risk: none, idempotent: true }`), rule: "remediation", msg: "text_en is blank"},
+		{name: "text_ko line break", yaml: rem(`remediation: { text_en: t, text_ko: "a\nb", risk: none, idempotent: true }`), rule: "remediation", msg: "text_ko carries a line break or control character"},
+		{name: "text_en too long", yaml: rem(`remediation: { text_en: ` + strings.Repeat("a", 1001) + `, text_ko: 조치, risk: none, idempotent: true }`), rule: "remediation", msg: "text_en is longer than 1000 runes"},
+		{name: "title control char", yaml: strings.Replace(goodControl, "title_en: Good", `title_en: "t\u0007"`, 1), rule: "titles", msg: "title_en carries a line break or control character"},
+		{name: "script not idempotent", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: false, script: "true", rollback: "true" }`), rule: "remediation", msg: "script requires idempotent: true"},
+		{name: "script without way back", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true" }`), rule: "remediation", msg: "script without rollback or backup"},
+		{name: "backup without script", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, backup: [/etc/hosts] }`), rule: "remediation", msg: "backup without script"},
+		{name: "validate without script", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, validate: "true" }`), rule: "remediation", msg: "validate without script"},
+		{name: "backup relative", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true", backup: [etc/hosts] }`), rule: "remediation", msg: `backup path "etc/hosts" is not absolute`},
+		{name: "backup unclean", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true", backup: [/etc//hosts] }`), rule: "remediation", msg: `backup path "/etc//hosts" is not clean`},
+		{name: "backup trailing slash", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true", backup: [/etc/] }`), rule: "remediation", msg: `backup path "/etc/" is not clean`},
+		{name: "backup charset", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true", backup: ["/etc/my file"] }`), rule: "remediation", msg: `backup path "/etc/my file" carries a character the script cannot carry`},
+		{name: "backup glob", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true", backup: ["/etc/*.conf"] }`), rule: "remediation", msg: "carries a character the script cannot carry"},
+		{name: "backup repeated", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true", backup: [/etc/hosts, /etc/hosts] }`), rule: "remediation", msg: `backup path "/etc/hosts" is repeated`},
+		{name: "validate two lines", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true", rollback: "true", validate: "a\nb" }`), rule: "remediation", msg: "validate must be one line"},
+		{name: "script blank", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: " ", rollback: "true" }`), rule: "remediation", msg: "script is blank"},
+		{name: "rollback here-document", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true", rollback: "cat <<EOF\nx\nEOF" }`), rule: "remediation", msg: "rollback carries a here-document"},
+		{name: "title_ko control char", yaml: strings.Replace(goodControl, "title_ko: 좋음", `title_ko: "제목\u0007"`, 1), rule: "titles", msg: "title_ko carries a line break or control character"},
+		{name: "title DEL", yaml: strings.Replace(goodControl, "title_en: Good", `title_en: "t\u007f"`, 1), rule: "titles", msg: "title_en carries a line break or control character"},
+		{name: "text C1 char", yaml: rem(`remediation: { text_en: "a\u009bb", text_ko: 조치, risk: none, idempotent: true }`), rule: "remediation", msg: "text_en carries a line break or control character"},
+		{name: "validate blank", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true", rollback: "true", validate: " " }`), rule: "remediation", msg: "validate is blank"},
+		{name: "validate here-document", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true", rollback: "true", validate: "cat <<EOF" }`), rule: "remediation", msg: "validate carries a here-document"},
+		{name: "text_ko 1001 Hangul runes", yaml: rem(`remediation: { text_en: t, text_ko: ` + strings.Repeat("가", 1001) + `, risk: none, idempotent: true }`), rule: "remediation", msg: "text_ko is longer than 1000 runes"},
+		{name: "accept text_ko of exactly 1000 Hangul runes", yaml: rem(`remediation: { text_en: t, text_ko: ` + strings.Repeat("가", 1000) + `, risk: none, idempotent: true }`), rule: "remediation", absent: true},
+		{name: "unknown risk", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: bogus, idempotent: true }`), rule: "remediation", msg: `unknown remediation risk "bogus"`},
+		{name: "accept script, rollback and a block-scalar validate", yaml: rem(`remediation:
+  text_en: t
+  text_ko: 조치
+  risk: none
+  idempotent: true
+  script: "true"
+  rollback: "true"
+  validate: |
+    sshd -t`), rule: "remediation", absent: true},
+		{name: "accept empty script without rollback", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "" }`), rule: "remediation", absent: true},
 		{"bad id", `id: U-01
 title_en: t
 title_ko: 제목
@@ -80,14 +119,14 @@ category: account
 importance: 상
 automation: manual
 manual_reason: r
-`, "id_format"},
+`, "id_format", "", false},
 		{"manual without reason", `id: muster.account.x
 title_en: t
 title_ko: 제목
 category: account
 importance: 상
 automation: manual
-`, "manual_reason"},
+`, "manual_reason", "", false},
 		{"auto without remediation", `id: muster.account.x
 title_en: t
 title_ko: 제목
@@ -96,7 +135,7 @@ importance: 상
 automation: auto
 absent_means: fail
 checks: [{ fact: services.ssh.installed, op: eq, expected: true }]
-`, "remediation"},
+`, "remediation", "", false},
 		{"unregistered fact", `id: muster.account.x
 title_en: t
 title_ko: 제목
@@ -106,7 +145,7 @@ automation: auto
 absent_means: fail
 checks: [{ fact: nope.key, op: eq, expected: true }]
 remediation: { text_en: t, text_ko: 조치, risk: none }
-`, "fact_key"},
+`, "fact_key", "", false},
 		{"present with expected", `id: muster.account.x
 title_en: t
 title_ko: 제목
@@ -116,7 +155,7 @@ automation: auto
 absent_means: fail
 checks: [{ fact: services.ssh.installed, op: present, expected: true }]
 remediation: { text_en: t, text_ko: 조치, risk: none }
-`, "clause_grammar"},
+`, "clause_grammar", "", false},
 		{"bad regex", `id: muster.account.x
 title_en: t
 title_ko: 제목
@@ -126,7 +165,7 @@ automation: auto
 absent_means: fail
 checks: [{ fact: files.etc_securetty_lines, op: none, where: { op: matches, expected: "(" } }]
 remediation: { text_en: t, text_ko: 조치, risk: none }
-`, "clause_grammar"},
+`, "clause_grammar", "", false},
 		{"on without setting", `id: muster.account.x
 title_en: t
 title_ko: 제목
@@ -136,7 +175,7 @@ automation: auto
 absent_means: fail
 checks: [{ fact: services.ssh.installed, on: runtime, op: eq, expected: true }]
 remediation: { text_en: t, text_ko: 조치, risk: none }
-`, "clause_grammar"},
+`, "clause_grammar", "", false},
 		{"undeclared param", `id: muster.account.x
 title_en: t
 title_ko: 제목
@@ -146,7 +185,7 @@ automation: auto
 absent_means: fail
 checks: [{ fact: services.ssh.installed, op: eq, expected: "${nope}" }]
 remediation: { text_en: t, text_ko: 조치, risk: none }
-`, "param"},
+`, "param", "", false},
 		{"kisa ref format", `id: muster.account.x
 title_en: t
 title_ko: 제목
@@ -155,7 +194,7 @@ importance: 상
 automation: manual
 manual_reason: r
 references: { kisa: { "2026": ["U-1"] } }
-`, "references_kisa"},
+`, "references_kisa", "", false},
 		{"missing absent_means", `id: muster.account.x
 title_en: t
 title_ko: 제목
@@ -164,7 +203,7 @@ importance: 상
 automation: auto
 checks: [{ fact: services.ssh.installed, op: eq, expected: true }]
 remediation: { text_en: t, text_ko: 조치, risk: none }
-`, "absent_means"},
+`, "absent_means", "", false},
 		{"two judgments", `id: muster.account.x
 title_en: t
 title_ko: 제목
@@ -175,7 +214,7 @@ absent_means: fail
 checks: [{ fact: services.ssh.installed, op: eq, expected: true }]
 custom: Whatever
 remediation: { text_en: t, text_ko: 조치, risk: none }
-`, "judgment"},
+`, "judgment", "", false},
 		{"sub-clause param not declared", `id: muster.account.x
 title_en: t
 title_ko: 제목
@@ -186,7 +225,7 @@ absent_means: fail
 requires_facts: ">=1"
 checks: [{ fact: walk.world_writable, op: each, subject: path, require: { field: package_declared, op: eq, expected: "${nope}" } }]
 remediation: { text_en: t, text_ko: 조치, risk: none }
-`, "param"},
+`, "param", "", false},
 		{"record element sub-clause needs field", `id: muster.account.x
 title_en: t
 title_ko: 제목
@@ -197,7 +236,7 @@ absent_means: fail
 requires_facts: ">=1"
 checks: [{ fact: walk.world_writable, op: each, subject: path, require: { op: eq, expected: true } }]
 remediation: { text_en: t, text_ko: 조치, risk: none }
-`, "clause_grammar"},
+`, "clause_grammar", "", false},
 		{"scalar element sub-clause has no field", `id: muster.account.x
 title_en: t
 title_ko: 제목
@@ -208,7 +247,7 @@ absent_means: fail
 requires_facts: ">=1"
 checks: [{ fact: files.etc_securetty_lines, op: none, where: { field: something, op: matches, expected: "^pts/" } }]
 remediation: { text_en: t, text_ko: 조치, risk: none }
-`, "clause_grammar"},
+`, "clause_grammar", "", false},
 		{"missing title_ko", `id: muster.account.x
 title_en: t
 category: account
@@ -216,7 +255,7 @@ importance: 상
 automation: manual
 manual_reason: r
 requires_facts: ">=1"
-`, "titles"},
+`, "titles", "", false},
 		{"bad category", `id: muster.account.x
 title_en: t
 title_ko: 제목
@@ -225,7 +264,7 @@ importance: 상
 automation: manual
 manual_reason: r
 requires_facts: ">=1"
-`, "category"},
+`, "category", "", false},
 		{"bad importance", `id: muster.account.x
 title_en: t
 title_ko: 제목
@@ -234,7 +273,7 @@ importance: high
 automation: manual
 manual_reason: r
 requires_facts: ">=1"
-`, "importance"},
+`, "importance", "", false},
 		{"bad automation", `id: muster.account.x
 title_en: t
 title_ko: 제목
@@ -242,7 +281,7 @@ category: account
 importance: 상
 automation: maybe
 requires_facts: ">=1"
-`, "automation"},
+`, "automation", "", false},
 		{"missing requires_facts", `id: muster.account.x
 title_en: t
 title_ko: 제목
@@ -250,7 +289,7 @@ category: account
 importance: 상
 automation: manual
 manual_reason: r
-`, "requires_facts"},
+`, "requires_facts", "", false},
 		{"cis missing rec", `id: muster.account.x
 title_en: t
 title_ko: 제목
@@ -260,7 +299,7 @@ automation: manual
 manual_reason: r
 requires_facts: ">=1"
 references: { cis: [{ benchmark: ubuntu-22.04, version: "2.0.0" }] }
-`, "references_cis"},
+`, "references_cis", "", false},
 		{"unknown custom func", `id: muster.account.x
 title_en: t
 title_ko: 제목
@@ -271,13 +310,23 @@ absent_means: fail
 requires_facts: ">=1"
 custom: NotRegistered
 remediation: { text_en: t, text_ko: 조치, risk: none }
-`, "custom_func"},
+`, "custom_func", "", false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			got := rules(lintOne(t, c.yaml, LintOptions{CustomFuncs: map[string]bool{}}))
+			ps := lintOne(t, c.yaml, LintOptions{CustomFuncs: map[string]bool{}})
+			got := rules(ps)
+			if c.absent {
+				if got[c.rule] {
+					t.Fatalf("want no rule %q; got %v", c.rule, ps)
+				}
+				return
+			}
 			if !got[c.rule] {
 				t.Fatalf("want rule %q among %v", c.rule, got)
+			}
+			if c.msg != "" && !hasMessage(ps, c.rule, c.msg) {
+				t.Errorf("%s: no %q message in %v", c.name, c.msg, ps)
 			}
 		})
 	}

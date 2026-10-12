@@ -380,6 +380,9 @@ func TestDerivationTable(t *testing.T) {
 				if !strings.Contains(r.Reason, "sshd -T unavailable") {
 					t.Errorf("reason must name the fallback: %q", r.Reason)
 				}
+				if r.Reason != ReasonDegradedPrefix+r.Degraded {
+					t.Errorf("degraded pass reason must be exactly the prefix and the degradation: %q", r.Reason)
+				}
 			}},
 		{"13 sshd parse fallback leaves a failing result at FAIL",
 			`{"sshd":{"collect_method":{"status":"ok","value":"parse"},"personas_collected":{"status":"ok","value":true},` +
@@ -396,6 +399,9 @@ func TestDerivationTable(t *testing.T) {
 				}
 				if !strings.Contains(r.Reason, "remote NSS") {
 					t.Errorf("reason must name the degradation: %q", r.Reason)
+				}
+				if r.Reason != ReasonDegradedPrefix+r.Degraded {
+					t.Errorf("degraded pass reason must be exactly the prefix and the degradation: %q", r.Reason)
 				}
 			}},
 		{"13 remote NSS source leaves a failing account control at FAIL",
@@ -771,4 +777,69 @@ func TestEvaluateIsolatesPanics(t *testing.T) {
 	if res[0].Status != ERROR || res[0].ReasonCode != InternalError {
 		t.Fatalf("%+v", res[0])
 	}
+}
+
+// TestWarnReasonShapes pins the three reason prefixes fix --dry-run reads
+// (stage 3D-2 X-2): only the degraded pass is exactly prefix + Degraded.
+func TestWarnReasonShapes(t *testing.T) {
+	// The degraded pass: every clause held, collection degraded.
+	r := degradedPassResult(t)
+	if r.Status != WARN || r.Reason != ReasonDegradedPrefix+r.Degraded || r.Degraded == "" {
+		t.Fatalf("degraded pass: status %s reason %q degraded %q", r.Status, r.Reason, r.Degraded)
+	}
+	// A hard FAIL with a secondary degradation is never the exact shape.
+	f := hardFailWithDegradation(t)
+	if f.Status != FAIL || f.Reason == ReasonDegradedPrefix+f.Degraded {
+		t.Fatalf("hard fail must not match the degraded-pass shape: %s %q", f.Status, f.Reason)
+	}
+	if !strings.Contains(f.Reason, "; "+ReasonDegradedPrefix) {
+		t.Fatalf("hard fail keeps the secondary degraded text: %q", f.Reason)
+	}
+	// Side-only WARN.
+	s := sideOnlyResult(t)
+	if s.Status != WARN || !strings.HasPrefix(s.Reason, ReasonSideOnlyPrefix) {
+		t.Fatalf("side only: %s %q", s.Status, s.Reason)
+	}
+	// Absent means fail.
+	a := absentFailResult(t)
+	if a.Status != FAIL || !strings.HasPrefix(a.Reason, ReasonAbsentFailPrefix) {
+		t.Fatalf("absent fail: %s %q", a.Status, a.Reason)
+	}
+}
+
+// evalSingle evaluates one control over factsJSON and returns its only result.
+func evalSingle(t *testing.T, factsJSON string, c controls.Control) Result {
+	t.Helper()
+	res := Evaluate(snap(t, factsJSON), one(c), reg, Options{})
+	if len(res) != 1 {
+		t.Fatalf("want 1 result, got %d", len(res))
+	}
+	return res[0]
+}
+
+// degradedPassResult is the "13 sshd parse fallback degrades a holding
+// result to WARN" case of TestDerivationTable.
+func degradedPassResult(t *testing.T) Result {
+	return evalSingle(t, `{"sshd":{"collect_method":{"status":"ok","value":"parse"},"personas_collected":{"status":"ok","value":true},`+
+		`"options":{"permit_root_login":{"effective":{"status":"ok","value":"no"}}}}}`,
+		permitRootLoginControl("auto", "fail"))
+}
+
+// hardFailWithDegradation is the "12 hard failure is not shadowed by another
+// clause's side mismatch" case: a FAIL whose reason keeps "reverts on reboot".
+func hardFailWithDegradation(t *testing.T) Result {
+	return evalSingle(t, `{"accounts":{"login_defs":{"pass_max_days":{"runtime":{"status":"ok","value":99999},"persisted":{"status":"ok","value":99999}},`+
+		`"pass_min_days":{"runtime":{"status":"ok","value":1},"persisted":{"status":"ok","value":0}}}}}`,
+		passwordPolicyControl())
+}
+
+// sideOnlyResult is the "both sides ok mismatched degrades not applied" case.
+func sideOnlyResult(t *testing.T) Result {
+	return evalSingle(t, `{"accounts":{"login_defs":{"pass_max_days":{"runtime":{"status":"ok","value":99999},"persisted":{"status":"ok","value":90}}}}}`,
+		passMaxDaysControl("auto"))
+}
+
+// absentFailResult is the "8 absent means fail plain fact carries evidence" case.
+func absentFailResult(t *testing.T) Result {
+	return evalSingle(t, `{"services":{"telnet":{"reachable":{"status":"absent"}}}}`, telnetControl("auto", "fail"))
 }

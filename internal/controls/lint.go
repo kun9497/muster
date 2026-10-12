@@ -3,10 +3,12 @@ package controls
 import (
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/kun9497/muster/internal/facts"
 )
@@ -50,6 +52,7 @@ var (
 	kisaYearRe      = regexp.MustCompile(`^[0-9]{4}$`)
 	kisaItemRe      = regexp.MustCompile(`^U-[0-9]{2}$`)
 	paramRefRe      = regexp.MustCompile(`^\$\{([a-z][a-z0-9_]*)\}$`)
+	backupPathRe    = regexp.MustCompile(`^/[A-Za-z0-9._@:+/-]+$`)
 
 	categories       = []string{"account", "file", "service", "patch", "log", "beyond"}
 	validCategory    = set(categories...)
@@ -85,6 +88,77 @@ func set(xs ...string) map[string]bool {
 	return m
 }
 
+func hasControlRune(s string) bool {
+	for _, r := range s {
+		if r < 0x20 || r == 0x7f || (r >= 0x80 && r <= 0x9f) {
+			return true
+		}
+	}
+	return false
+}
+
+// oneLine trims one trailing newline (a YAML block scalar's) and reports
+// whether a line break is left.
+func oneLine(s string) bool { return !strings.ContainsAny(strings.TrimSuffix(s, "\n"), "\r\n") }
+
+func lintRemediation(r *Remediation, add func(rule, format string, args ...any)) {
+	if !validRisk[r.Risk] {
+		add("remediation", "unknown remediation risk %q", r.Risk)
+	}
+	for _, tx := range []struct{ name, v string }{{"text_en", r.TextEn}, {"text_ko", r.TextKo}} {
+		switch {
+		case strings.TrimSpace(tx.v) == "":
+			add("remediation", "%s is blank", tx.name)
+		case hasControlRune(tx.v):
+			add("remediation", "%s carries a line break or control character", tx.name)
+		case utf8.RuneCountInString(tx.v) > 1000:
+			add("remediation", "%s is longer than 1000 runes", tx.name)
+		}
+	}
+	for _, body := range []struct{ name, v string }{{"script", r.Script}, {"validate", r.Validate}, {"rollback", r.Rollback}} {
+		if body.v == "" {
+			continue // empty reads as absent
+		}
+		if strings.TrimSpace(body.v) == "" {
+			add("remediation", "%s is blank", body.name)
+		}
+		if strings.Contains(body.v, "<<") {
+			add("remediation", "%s carries a here-document", body.name)
+		}
+	}
+	hasScript := strings.TrimSpace(r.Script) != ""
+	if hasScript && !r.Idempotent {
+		add("remediation", "script requires idempotent: true")
+	}
+	if hasScript && strings.TrimSpace(r.Rollback) == "" && len(r.Backup) == 0 {
+		add("remediation", "script without rollback or backup")
+	}
+	if !hasScript && len(r.Backup) > 0 {
+		add("remediation", "backup without script")
+	}
+	if !hasScript && r.Validate != "" {
+		add("remediation", "validate without script")
+	}
+	if r.Validate != "" && !oneLine(r.Validate) {
+		add("remediation", "validate must be one line")
+	}
+	seen := map[string]bool{}
+	for _, p := range r.Backup {
+		switch {
+		case !strings.HasPrefix(p, "/"):
+			add("remediation", "backup path %q is not absolute", p)
+		case path.Clean(p) != p:
+			add("remediation", "backup path %q is not clean", p)
+		case !backupPathRe.MatchString(p):
+			add("remediation", "backup path %q carries a character the script cannot carry", p)
+		}
+		if seen[p] {
+			add("remediation", "backup path %q is repeated", p)
+		}
+		seen[p] = true
+	}
+}
+
 // Lint applies every rule of spec §6.8 to set and returns the problems sorted
 // by path then rule. An empty result means the set is clean.
 func Lint(s *Set, reg *facts.Registry, opts LintOptions) []Problem {
@@ -99,6 +173,11 @@ func Lint(s *Set, reg *facts.Registry, opts LintOptions) []Problem {
 		}
 		if c.TitleEn == "" || c.TitleKo == "" {
 			add("titles", "title_en and title_ko are required")
+		}
+		for _, tt := range []struct{ name, v string }{{"title_en", c.TitleEn}, {"title_ko", c.TitleKo}} {
+			if hasControlRune(tt.v) {
+				add("titles", "%s carries a line break or control character", tt.name)
+			}
 		}
 		if !validCategory[c.Category] {
 			add("category", "unknown category %q", c.Category)
@@ -115,8 +194,8 @@ func Lint(s *Set, reg *facts.Registry, opts LintOptions) []Problem {
 		if (c.Automation == "auto" || c.Automation == "partial") && c.Remediation == nil {
 			add("remediation", "%s controls must carry remediation", c.Automation)
 		}
-		if c.Remediation != nil && !validRisk[c.Remediation.Risk] {
-			add("remediation", "unknown remediation risk %q", c.Remediation.Risk)
+		if c.Remediation != nil {
+			lintRemediation(c.Remediation, add)
 		}
 		judgments := 0
 		if len(c.Checks) > 0 {

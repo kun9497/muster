@@ -1,0 +1,16 @@
+muster  · controls v\x1b[31m\n# $(id) `id` · guide  · host host\x1b[31m\n# $(id) `id` · collected 2026\x1b[31m\n# $(id) `id`
+fix --dry-run · profile p\x1b[31m\n# $(id) `id` (0 controls) · max-risk lockout_risk
+planned 2 (script 1, text only 1) · above max-risk 0 · waived 0 · clean 0 · not planned: error 1, manual 0, warn_degraded 1
+by risk: none 1 · restart_service 0 · reboot_required 0 · lockout_risk 1
+
+#  risk             id                    status  sev     script  rollback        title
+1  none             muster.test.p_text    fail    high    no      -               제목 \x1b[31m\n# $(id) `id`
+   why: value \x1b[31m\n# $(id) `id`
+   do:  글 \n# $(id) (text only: no_script)
+2  lockout_risk     muster.test.p_script  fail    high    yes     both            제목 \x1b[31m\n# $(id) `id`
+   why: value \x1b[31m\n# $(id) `id`
+   do:  조치 \x1b[31m\n# $(id)
+
+not planned:
+  muster.test.p_degraded  warn_degraded  collection was degraded: \x1b[31m\n# $(id) `id`
+  muster.test.p_error     error          [missing_fact] value \x1b[31m\n# $(id) `id`

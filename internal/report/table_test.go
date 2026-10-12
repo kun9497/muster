@@ -24,7 +24,7 @@ func TestDisplayWidthCountsHangulAsTwo(t *testing.T) {
 
 func TestEscapeNeutralisesTerminalSequences(t *testing.T) {
 	in := "PASS\x1b[32m fake \r\x07 tab\tok"
-	got := escape(in)
+	got := Escape(in)
 	if strings.ContainsAny(got, "\x1b\r\x07") {
 		t.Fatalf("control bytes survived: %q", got)
 	}
@@ -32,20 +32,20 @@ func TestEscapeNeutralisesTerminalSequences(t *testing.T) {
 		t.Error("tab must survive")
 	}
 	long := strings.Repeat("가", 300)
-	if w := len([]rune(escape(long))); w != 201 {
+	if w := len([]rune(Escape(long))); w != 201 {
 		t.Errorf("truncation to 200 runes + ellipsis, got %d", w)
 	}
 
 	// Test escape on observation Expected with control character
 	obsExpected := "\x1b[31mX"
-	escaped := escape(obsExpected)
+	escaped := Escape(obsExpected)
 	if strings.Contains(escaped, "\x1b") {
 		t.Fatalf("observation Expected ESC survived: %q", escaped)
 	}
 
 	// Test escape on waiver Expires with control character
 	waiverExpires := "\x1b]0;evil\a"
-	escaped = escape(waiverExpires)
+	escaped = Escape(waiverExpires)
 	if strings.ContainsAny(escaped, "\x1b\a") {
 		t.Fatalf("waiver Expires control chars survived: %q", escaped)
 	}
@@ -449,5 +449,47 @@ func TestTablePrintsTheProfileLine(t *testing.T) {
 	_ = WriteTable(&b, rep, TableOptions{Width: 100})
 	if l := strings.Split(b.String(), "\n")[1]; l != "profile default (6 controls)" {
 		t.Errorf("line 2 = %q", l)
+	}
+}
+
+func TestHeaderLineIsCheckLineOne(t *testing.T) {
+	r := sampleReportWithTitles(t)
+	var b bytes.Buffer
+	if err := WriteTable(&b, r, TableOptions{Width: 100}); err != nil {
+		t.Fatal(err)
+	}
+	first := strings.SplitN(b.String(), "\n", 2)[0]
+	got := HeaderLine(r.Run, r.Check.MusterVersion, r.Check.ControlsVersion, r.Check.GuideEdition)
+	if got != first {
+		t.Fatalf("HeaderLine %q != table line 1 %q", got, first)
+	}
+}
+
+func TestProfileLineForms(t *testing.T) {
+	esc := "\x1b[31m"
+	cases := []struct {
+		p    ProfileBlock
+		t    *TuningBlock
+		want string
+	}{
+		{ProfileBlock{Name: "site" + esc, Selected: 4, Excluded: 2}, &TuningBlock{Path: "t.yaml"}, `profile site\x1b[31m (4 of 6, 2 excluded; tuning t.yaml)`},
+		{ProfileBlock{Name: "all" + esc, Selected: 6}, &TuningBlock{Path: "t" + esc + ".yaml"}, `profile all\x1b[31m (6 controls; tuning t\x1b[31m.yaml)`},
+		{ProfileBlock{Name: "default", Selected: 6}, nil, `profile default (6 controls)`},
+	}
+	for _, c := range cases {
+		if got := ProfileLine(c.p, c.t); got != c.want {
+			t.Errorf("ProfileLine = %q, want %q", got, c.want)
+		}
+	}
+}
+
+func TestEscapeNoCutKeepsLength(t *testing.T) {
+	long := strings.Repeat("가", 300) + "\n\x1b"
+	got := EscapeNoCut(long)
+	if strings.Contains(got, "…") || !strings.HasSuffix(got, `\n\x1b`) || len([]rune(got)) != 300+6 { // \n is 2 runes, \x1b is 4
+		t.Fatalf("EscapeNoCut cut or mis-escaped: %d runes, tail %q", len([]rune(got)), got[len(got)-8:])
+	}
+	if Escape(long) == got {
+		t.Fatal("Escape must still cut at MaxCell")
 	}
 }
