@@ -17,6 +17,13 @@ The contracts here are tested; the design specification (section 8) is the sourc
   refuses waiver, profile, tuning and control files that are not root-owned or are group/other-writable.
 - `fix --dry-run` reads what `check` reads, under the same rules, and writes its plan and review script to
   stdout only. muster never executes the script; the operator reviews and runs it by hand.
+- The review script carries the snapshot's `host.machine_id_hash` (the sha256 of `/etc/machine-id`, never
+  the id itself) as its one host value in a command, admitted only as 64 lowercase hex characters, which
+  carry no shell syntax. Before it changes anything, as root, it hashes the running host's
+  `/etc/machine-id` and exits 2 when the hashes differ or the id cannot be read; `MUSTER_ANY_HOST=1` runs it
+  anyway with a warning. A service block records each unit's enablement and activity under
+  `$MUSTER_BACKUP/muster-units/` and, when the block fails, restores that state rather than enabling every
+  unit; the script refuses a backup directory root does not own or others can write.
 - Controls are embedded in the binary. An external control directory is opt-in, logged with digests and
   refused on id collision.
 
@@ -40,6 +47,14 @@ and sockets, and caps size. The deep walk is off by default, stays on local file
   can make muster report `PASS`. muster is not an intrusion detector and does not attest the host.
 - muster evaluates configuration, not exposure: it does not scan ports from outside or match CVEs.
 - Results depend on the control set version; a report names the set it was produced with.
+- The review script's host guard stops a script planned from one snapshot running on another host; it is
+  not an authentication. It fails open when the snapshot has no well-formed hash (a container without a
+  machine id, a symlinked or malformed `/etc/machine-id`, a hand-edited snapshot): the script then carries
+  no guard and says so in a comment (`# host guard: off (the snapshot has no machine id)`). It does not
+  catch a crafted snapshot, which can carry any hash. It cannot tell apart hosts cloned from one image
+  without regenerating the id. It fails closed on one edge: an id surrounded by Unicode whitespace the
+  collector trims (U+00A0, U+0085) but the script's `tr -d '[:space:]'` keeps is hashed by the collector and
+  not by the script, so the guard refuses its own host; `MUSTER_ANY_HOST=1` overrides it.
 
 ## Reporting
 

@@ -14,16 +14,16 @@ the Linux server asset class: KISA is the primary standard, and global
 benchmarks (CIS Benchmarks, DISA STIG, NIST SP 800-53) are attached as
 references and, later, offered as selectable profiles.
 
-> **Status: stage 3D-2 merged (October 2026).** Stage 1 — the skeleton:
+> **Status: stage 3D-2b merged (October 2026).** Stage 1 — the skeleton:
 > `collect`, `check`, waivers, exit codes, eight controls end to end — stage 2
 > — every automatable KISA item, from the foundations with DISA STIG and NIST
 > SP 800-53 references through accounts, PAM, sshd, home directories, system
 > files, services, the firewall, logging, NFS, SNMP, patch hygiene, FTP, mail
 > and DNS to the closing coverage-and-reference gate — and stages 3A, 3B,
-> 3C-1, 3C-2a, 3C-2b, 3D-1 and 3D-2 — the deep filesystem walk, the first checks
+> 3C-1, 3C-2a, 3C-2b, 3D-1, 3D-2 and 3D-2b — the deep filesystem walk, the first checks
 > beyond the guide, audit pipeline health and package integrity, who holds
 > root's power without being root, exposure, profiles and tuning, and the
-> `fix --dry-run` review script — are merged. 67 of the 67 items are enrolled (68 controls:
+> `fix --dry-run` review script and its proof on real hosts — are merged. 67 of the 67 items are enrolled (68 controls:
 > 57 auto, 7 partial, 4 manual with the evidence attached),
 > and 49 beyond the guide. `collect --deep`
 > walks the local filesystems once, under a time and entry budget, without
@@ -205,6 +205,13 @@ titles, never their discussion, check and fix text. See
    control with declared backups, a one-line validate and rollback-then-restore;
    muster never runs it, and a CI job proves the seeded scripts in throwaway
    containers.
+   3D-2b (merged): the review script, proven — a host guard refuses a script on a
+   host whose machine id differs from the snapshot's (`MUSTER_ANY_HOST=1`
+   overrides); service controls declare their units, and a failed block puts each
+   unit's recorded enablement and activity back; file scripts only clear bits; a
+   table holds every scripted control to the round-trip rows that prove it (Rocky 9,
+   AlmaLinux 9, Debian 12, Ubuntu 22.04) or to the reason none can, and each init
+   row also proves the guard and the rollback of a deliberately failed run.
    3C-2b (merged): exposure — every listening socket's owners and packages, deleted
    executables still running, the exposure cross-check against the firewall's folded
    rule table, the network sysctls — thirteen controls. 3C-2a (merged): privilege — file capabilities judged against the package's
@@ -212,7 +219,8 @@ titles, never their discussion, check and fix text. See
    container-runtime sockets and their groups, passwordless `ALL` in sudoers,
    the inactivity policy over every interactive account, root's authorized keys
    and SSH key quality — eight controls from three extended collectors and three
-   new ones. Next (3D-1b): the `cis-<distro>-l1` profile over an index of CIS
+   new ones. Next: 3D-2c, scripts for controls beyond the sixteen and the rule for
+   substituting a profile's or tuning's parameter into a script; 3D-1b, the `cis-<distro>-l1` profile over an index of CIS
    recommendation numbers (`references.cis` on every selected control); then 3D-3
    (`--anonymize`, `--max-age`). `kisa-unix-2026` stays
    the default profile.

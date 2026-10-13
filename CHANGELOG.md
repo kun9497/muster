@@ -10,6 +10,38 @@ verdict on an existing snapshot is at least a minor release and appears under
 ## [Unreleased]
 
 ### Added
+- The review script's host guard (stage 3D-2b). The script carries the
+  snapshot's `run.host.machine_id_hash` and, before it changes anything,
+  hashes the running host's `/etc/machine-id`: a different or unreadable id
+  exits 2 with one line on stderr, and `MUSTER_ANY_HOST=1` runs it anyway with
+  a warning. A snapshot without a well-formed hash turns the guard off, and the
+  script says so in a comment where the guard would stand. The hash is the one
+  host value admitted into a command (D34 amended), and only as 64 lowercase
+  hex characters.
+- `remediation.units` (stage 3D-2b): a service control declares the units it
+  acts on, and the script records each unit's enablement and activity, and the
+  active units that stopping it would stop, under
+  `$MUSTER_BACKUP/muster-units/` before the block runs (`save_units`). On
+  failure `restore_units` puts that state back in seven passes — unmask,
+  enable what was enabled, re-disable an `Also=` partner, re-mask what was
+  masked, start what was active, start the stopped dependants, read the
+  enablement back — and logs every unit it could not restore. A first record is
+  kept across runs with the same `MUSTER_BACKUP`, except an `absent` one. Lint
+  gains `units_charset`, `units_order`, `units_needs_script`,
+  `units_exclusive`, `units_variable`, `backup_reserved` and
+  `script_needs_validate` per control, and `backup_path_shared` and
+  `units_shared` over the set.
+- The round-trip table `controls/testdata/_roundtrip.yaml`: every scripted
+  control names the `fix-roundtrip` rows that seed and repair it, the declared
+  units those rows do not exercise, or why no row can
+  (`dos_services_disabled`, `finger_disabled` and `rservices_disabled` ship
+  only for inetd on Debian and have no package in the EL9 images).
+  `TestEveryScriptedControlIsInTheRoundtripTable` holds it equal to the
+  shipped set and the CI matrix. The matrix gains a Debian 12 init row built in
+  the job, and every init row adds a failure run (each block's validate forced
+  false must leave units, owners, modes, checksums and ACLs as recorded) and a
+  guard run (a script planned in another container must exit 2 and change
+  nothing).
 - `fix --dry-run` (stage 3D-2, D34). It reads what `check` reads, keeps the
   failures of the profile in force after waivers, and renders a risk-ordered
   plan as a table (`--format table`), JSON (`--format json`, plan schema 1) or a
@@ -38,6 +70,26 @@ verdict on an existing snapshot is at least a minor release and appears under
   under `docs/examples/profiles/`. No control changes: `controls/VERSION` stays.
 
 ### Changed
+- `Escape` and `EscapeNoCut` spell out every format rune (`unicode.Cf`: the
+  soft hyphen, the bidirectional controls, the zero-width runes, the tag
+  block), the line and paragraph separators U+2028/U+2029 and the Hangul
+  fillers U+115F, U+1160, U+3164 and U+FFA0 as `\u%04x` (or `\U%08x`),
+  wherever text is escaped: check's and fix's tables, the review script's
+  comments, waiver, profile, tuning and control text. Output changes only where
+  such a rune occurs; no shipped control text carries one.
+- The plan's rollback vocabulary gains `units` (`none | declared |
+  restore_backup | units | both`).
+- The review script's prologue runs `set -u`, `umask 077`, `log()`, the hash
+  helper, the root check, the host guard, the `MUSTER_BACKUP` checks and the
+  helpers, in that order; its exit 2 now has three causes (not root, another
+  host, an unusable backup directory), none of which has run anything. A fixed
+  `# validate` comment precedes every validate.
+- A snapshot's `run.host.machine_id_hash` is empty when `/etc/machine-id`,
+  trimmed, is not 32 lowercase hex characters (`uninitialized`, uppercase, a
+  short id); any non-empty content used to be hashed. `FuzzMachineIDHash`
+  covers the parser.
+- The plan JSON gains `fix.host_guard` (`on` | `off`, after `fix.max_risk`) and
+  each item's `units` (after `backup`; `[]` when none). Plan schema stays 1.
 - `controls lint` checks the remediation block: `text_en`/`text_ko` one line and
   at most 1000 runes, titles free of control characters, a `rollback` or `backup`
   for every `script`, `idempotent: true` with a `script`, a one-line `validate`,
@@ -52,6 +104,18 @@ verdict on an existing snapshot is at least a minor release and appears under
   ignore the rest.
 
 ### Controls
+
+Control set `kisa-unix-2026+2026.10.13` (was `+2026.10.08`). Remediation
+blocks only; no `checks`, `params` or verdict changes. The ten service controls
+declare their units in `units`, run a two-pass body over `$UNITS` — resolve
+every name first and skip an alias of a listed unit, then `systemctl --quiet
+disable --now` and `systemctl --quiet mask … || true` — and lose their
+hand-written rollbacks to the recorded unit state. The five file controls clear
+the forbidden bits symbolically (`chmod u-xs,g-rwxs,o-rwxt` and kin), so a
+file already stricter than the guide keeps its mode, run `setfacl -b` before
+`chmod`, and validate with a single `case` over the modes of their default
+`allowed_modes` ending `*) false`; their `text_en`/`text_ko` say the script
+only clears bits.
 
 Control set `kisa-unix-2026+2026.10.08` (was `+2026.10.02`). The sixteen
 controls that carry a remediation script are rewritten for the review script:
@@ -433,6 +497,15 @@ configuration walk stopped at an `Include` outside the declaration (below).
   Found by the nightly fuzz workflow; the input is committed as its seed.
 
 ### Tooling
+- `make shellcheck` and the CI shellcheck step also cover `ci/roundtrip/*.sh`
+  (at least five). The `fix-roundtrip` job keys its rows (`rocky9-init`,
+  `almalinux9-init`, `debian12-init` built from
+  `ci/roundtrip/debian12-init.Dockerfile`, `ubuntu2204`), boots init rows
+  through `ci/roundtrip/wait.sh`, moves the seeds into `ci/roundtrip/<key>.sh`
+  (`rocky9-init` regenerates the machine id its image ships), adds the failure
+  and guard runs on every init row, and its timeout rises to 40 minutes.
+  `TestFileScriptsRepairOnARealFile` runs the five shipped file bodies on temp
+  files as root; under `CI=true` a missing `setfacl` fails it.
 - `make shellcheck` and a CI step run `sh -n` and `shellcheck -s sh` over the
   review-script goldens and the example fix scripts; a `fix-roundtrip` job seeds
   failures in throwaway init and Ubuntu containers, runs the generated script
@@ -556,6 +629,11 @@ configuration walk stopped at an `Include` outside the declaration (below).
 - `CONTRIBUTING.md` (with its Korean pair) describes the workflow.
 
 ### Fixed
+- `nfs_server_disabled`'s script failed on every Debian and Ubuntu NFS server:
+  `nfs-kernel-server.service` is an alias of `nfs-server.service` there, and
+  the body disabled the alias after masking the unit (`Unit not loaded`, exit
+  5), rolling the block back. The two-pass body skips the alias; the
+  `debian12-init` round trip proves it.
 - `sshd`: an `Include` naming a path outside the collector's declaration is
   `absent` naming it (C4), no longer `error` — stock EL9's `50-redhat.conf`
   includes the crypto-policies file, and that host's `collect` reads complete

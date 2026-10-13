@@ -21,6 +21,15 @@ When no snapshot is committed, the test that checks the examples skips, saying s
 refresh is pending, the check reports' byte comparison is skipped with a digest note, but a
 missing fix file fails the test and names the refresh.
 
+The fix reports carry the review script's host guard (stage 3D-2b): the plan JSON's
+`fix.host_guard` and, in the script's prologue, either the guard or the comment that stands
+where it would. The VM snapshot has a `run.host.machine_id_hash`, so its plan reads
+`host_guard: on` and its script carries `MUSTER_SNAPSHOT_HOST=<that hash>` and refuses any
+host whose `/etc/machine-id` hashes otherwise — the runner VM it was planned on is gone, so
+replaying that script anywhere exits 2 unless `MUSTER_ANY_HOST=1` is set. The container
+snapshot has no machine id (`machine_id_hash` is empty), so its plan reads `host_guard: off`
+and its script carries `# host guard: off (the snapshot has no machine id)` instead.
+
 Produced by run [`35548200943`](https://github.com/kun9497/muster/actions/runs/35548200943) of [`.github/workflows/examples.yml`](../.github/workflows/examples.yml).
 The snapshot headers carry the rest of the provenance: `muster_version`, `commit`,
 `collected_at` and `host.os_release` — the workflow builds the binary with `make build`, so those
