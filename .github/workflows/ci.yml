@@ -171,7 +171,7 @@ jobs:
           jq -e '.results | map(select(.status=="ERROR")) | length == 0' "$RUNNER_TEMP/muster/root-report.json"
           jq -e '.check.guide_edition == "kisa-unix-2026"' "$RUNNER_TEMP/muster/root-report.json"
       - name: sudo-run linux tests
-        run: sudo env PATH="$PATH" GOFLAGS="$GOFLAGS" go test ./internal/collect/... ./internal/remedy/ ./cmd/muster/ -count=1
+        run: sudo env PATH="$PATH" GOFLAGS="$GOFLAGS" CI="$CI" go test ./internal/collect/... ./internal/remedy/ ./cmd/muster/ -count=1
       # P-1: the corpus is taken BEFORE the oracle drop-in is written, so it
       # is the image's real files by construction rather than by the removal
       # step below having run -- exactly how the init-container job already

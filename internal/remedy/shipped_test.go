@@ -228,6 +228,10 @@ func TestFileScriptsRepairOnARealFile(t *testing.T) {
 					if pre, post, _ := run(c.allowed[len(c.allowed)-1], true); pre == 0 || post != 0 {
 						t.Errorf("acl: validate %d before (want non-zero), %d after (want 0)", pre, post)
 					}
+				} else if os.Getenv("CI") == "true" {
+					t.Fatal("setfacl is required under CI: the ACL branch proves setfacl -b runs before chmod")
+				} else {
+					t.Log("setfacl not on PATH: the ACL branch was skipped (it proves setfacl -b runs before chmod)")
 				}
 			}
 			if _, _, after := run(c.stricter, false); after != strconv.FormatUint(uint64(c.stricter), 8) {
