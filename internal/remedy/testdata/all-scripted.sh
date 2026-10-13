@@ -267,8 +267,13 @@ fix_muster_service_automount_disabled() {
   save_units autofs.service || { log "muster.service.automount_disabled: backup failed, nothing changed"; return 1; }
   ( set -e
     UNITS='autofs.service'
+    todo=
     for u in $UNITS; do
       systemctl cat "$u" >/dev/null 2>&1 || continue
+      [ "$(systemctl show -p Id --value "$u" 2>/dev/null)" = "$u" ] || continue
+      todo="$todo $u"
+    done
+    for u in $todo; do
       systemctl --quiet disable --now "$u"
       systemctl --quiet mask "$u" || true
     done
@@ -300,8 +305,13 @@ fix_muster_service_dos_services_disabled() {
   save_units echo.socket discard.socket daytime.socket chargen.socket || { log "muster.service.dos_services_disabled: backup failed, nothing changed"; return 1; }
   ( set -e
     UNITS='echo.socket discard.socket daytime.socket chargen.socket'
+    todo=
     for u in $UNITS; do
       systemctl cat "$u" >/dev/null 2>&1 || continue
+      [ "$(systemctl show -p Id --value "$u" 2>/dev/null)" = "$u" ] || continue
+      todo="$todo $u"
+    done
+    for u in $todo; do
       systemctl --quiet disable --now "$u"
       systemctl --quiet mask "$u" || true
     done
@@ -333,8 +343,13 @@ fix_muster_service_finger_disabled() {
   save_units finger.socket fingerd.service || { log "muster.service.finger_disabled: backup failed, nothing changed"; return 1; }
   ( set -e
     UNITS='finger.socket fingerd.service'
+    todo=
     for u in $UNITS; do
       systemctl cat "$u" >/dev/null 2>&1 || continue
+      [ "$(systemctl show -p Id --value "$u" 2>/dev/null)" = "$u" ] || continue
+      todo="$todo $u"
+    done
+    for u in $todo; do
       systemctl --quiet disable --now "$u"
       systemctl --quiet mask "$u" || true
     done
@@ -366,8 +381,13 @@ fix_muster_service_nfs_server_disabled() {
   save_units nfs-server.service nfs-kernel-server.service || { log "muster.service.nfs_server_disabled: backup failed, nothing changed"; return 1; }
   ( set -e
     UNITS='nfs-server.service nfs-kernel-server.service'
+    todo=
     for u in $UNITS; do
       systemctl cat "$u" >/dev/null 2>&1 || continue
+      [ "$(systemctl show -p Id --value "$u" 2>/dev/null)" = "$u" ] || continue
+      todo="$todo $u"
+    done
+    for u in $todo; do
       systemctl --quiet disable --now "$u"
       systemctl --quiet mask "$u" || true
     done
@@ -399,8 +419,13 @@ fix_muster_service_rpcbind_disabled() {
   save_units rpcbind.socket rpcbind.service || { log "muster.service.rpcbind_disabled: backup failed, nothing changed"; return 1; }
   ( set -e
     UNITS='rpcbind.socket rpcbind.service'
+    todo=
     for u in $UNITS; do
       systemctl cat "$u" >/dev/null 2>&1 || continue
+      [ "$(systemctl show -p Id --value "$u" 2>/dev/null)" = "$u" ] || continue
+      todo="$todo $u"
+    done
+    for u in $todo; do
       systemctl --quiet disable --now "$u"
       systemctl --quiet mask "$u" || true
     done
@@ -432,8 +457,13 @@ fix_muster_service_rservices_disabled() {
   save_units rsh.socket rlogin.socket rexec.socket || { log "muster.service.rservices_disabled: backup failed, nothing changed"; return 1; }
   ( set -e
     UNITS='rsh.socket rlogin.socket rexec.socket'
+    todo=
     for u in $UNITS; do
       systemctl cat "$u" >/dev/null 2>&1 || continue
+      [ "$(systemctl show -p Id --value "$u" 2>/dev/null)" = "$u" ] || continue
+      todo="$todo $u"
+    done
+    for u in $todo; do
       systemctl --quiet disable --now "$u"
       systemctl --quiet mask "$u" || true
     done
@@ -465,8 +495,13 @@ fix_muster_service_tftp_talk_disabled() {
   save_units tftp.socket tftp.service tftpd.service tftpd-hpa.service atftpd.socket atftpd.service talk.socket ntalk.socket || { log "muster.service.tftp_talk_disabled: backup failed, nothing changed"; return 1; }
   ( set -e
     UNITS='tftp.socket tftp.service tftpd.service tftpd-hpa.service atftpd.socket atftpd.service talk.socket ntalk.socket'
+    todo=
     for u in $UNITS; do
       systemctl cat "$u" >/dev/null 2>&1 || continue
+      [ "$(systemctl show -p Id --value "$u" 2>/dev/null)" = "$u" ] || continue
+      todo="$todo $u"
+    done
+    for u in $todo; do
       systemctl --quiet disable --now "$u"
       systemctl --quiet mask "$u" || true
     done
@@ -498,8 +533,13 @@ fix_muster_service_snmp_disabled() {
   save_units snmpd.service || { log "muster.service.snmp_disabled: backup failed, nothing changed"; return 1; }
   ( set -e
     UNITS='snmpd.service'
+    todo=
     for u in $UNITS; do
       systemctl cat "$u" >/dev/null 2>&1 || continue
+      [ "$(systemctl show -p Id --value "$u" 2>/dev/null)" = "$u" ] || continue
+      todo="$todo $u"
+    done
+    for u in $todo; do
       systemctl --quiet disable --now "$u"
       systemctl --quiet mask "$u" || true
     done
@@ -531,8 +571,13 @@ fix_muster_service_telnet_disabled() {
   save_units telnet.socket telnet.service telnetd.service || { log "muster.service.telnet_disabled: backup failed, nothing changed"; return 1; }
   ( set -e
     UNITS='telnet.socket telnet.service telnetd.service'
+    todo=
     for u in $UNITS; do
       systemctl cat "$u" >/dev/null 2>&1 || continue
+      [ "$(systemctl show -p Id --value "$u" 2>/dev/null)" = "$u" ] || continue
+      todo="$todo $u"
+    done
+    for u in $todo; do
       systemctl --quiet disable --now "$u"
       systemctl --quiet mask "$u" || true
     done
@@ -622,8 +667,13 @@ fix_muster_service_nis_disabled() {
   save_units ypserv.service ypbind.service ypxfrd.service yppasswdd.service || { log "muster.service.nis_disabled: backup failed, nothing changed"; return 1; }
   ( set -e
     UNITS='ypserv.service ypbind.service ypxfrd.service yppasswdd.service'
+    todo=
     for u in $UNITS; do
       systemctl cat "$u" >/dev/null 2>&1 || continue
+      [ "$(systemctl show -p Id --value "$u" 2>/dev/null)" = "$u" ] || continue
+      todo="$todo $u"
+    done
+    for u in $todo; do
       systemctl --quiet disable --now "$u"
       systemctl --quiet mask "$u" || true
     done

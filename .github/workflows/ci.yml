@@ -545,8 +545,9 @@ jobs:
               muster.file.hosts_lpd_permissions muster.file.hosts_permissions
               muster.file.passwd_permissions muster.file.services_permissions
               muster.file.shadow_permissions muster.service.automount_disabled
-              muster.service.nis_disabled muster.service.rpcbind_disabled
-              muster.service.snmp_disabled muster.service.tftp_talk_disabled
+              muster.service.nfs_server_disabled muster.service.nis_disabled
+              muster.service.rpcbind_disabled muster.service.snmp_disabled
+              muster.service.tftp_talk_disabled
           - key: ubuntu2204
             image: ubuntu:22.04
             init: "false"

@@ -21,8 +21,13 @@ remediation:
   idempotent: true
   units: [snmpd.service]
   script: |
+    todo=
     for u in $UNITS; do
       systemctl cat "$u" >/dev/null 2>&1 || continue
+      [ "$(systemctl show -p Id --value "$u" 2>/dev/null)" = "$u" ] || continue
+      todo="$todo $u"
+    done
+    for u in $todo; do
       systemctl --quiet disable --now "$u"
       systemctl --quiet mask "$u" || true
     done

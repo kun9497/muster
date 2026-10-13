@@ -27,9 +27,7 @@
 - id: muster.service.finger_disabled
   unproven: no systemd unit on Debian (fingerd ships only for inetd) and no package in the EL9 images' enabled repositories
 - id: muster.service.nfs_server_disabled
-  images: [almalinux9-init, rocky9-init]
-  unproven_units:
-    nfs-kernel-server.service: no package in the EL9 images' enabled repositories; Debian ships it only as an alias of nfs-server.service, and once the body has masked nfs-server.service its disable --now on the alias fails (unit not loaded, rc 5), so debian12-init does not seed NFS
+  images: [almalinux9-init, debian12-init, rocky9-init]
 - id: muster.service.nis_disabled
   images: [debian12-init]
 - id: muster.service.rpcbind_disabled
