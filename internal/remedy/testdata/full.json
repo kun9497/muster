@@ -9,7 +9,7 @@
     "collected_at": "2026-10-08T00:00:00Z",
     "host": {
       "hostname": "host-a",
-      "machine_id_hash": "",
+      "machine_id_hash": "3eb1bd439947eb762998e566ccc2e099c791118b2f40579cc4f7da2b5061b7f9",
       "kernel": "",
       "os_release": {
         "id": "",
@@ -63,7 +63,7 @@
       "expiring_soon": 0
     },
     "max_risk": "lockout_risk",
-    "host_guard": "off"
+    "host_guard": "on"
   },
   "items": [
     {

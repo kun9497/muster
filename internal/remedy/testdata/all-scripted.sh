@@ -6,7 +6,9 @@
 # planned 16 (script 16, text only 0); above max-risk 0; not planned: error 0, manual 0, warn_degraded 0
 set -u
 umask 077
+log() { printf 'muster-fix: %s\n' "$*"; }
 [ "$(id -u)" -eq 0 ] || { printf 'muster-fix: run as root\n' >&2; exit 2; }
+# host guard: off (the snapshot has no machine id)
 MUSTER_BACKUP="${MUSTER_BACKUP:-/var/backups/muster/$(date +%Y%m%dT%H%M%S)}"
 case "$MUSTER_BACKUP" in
   /|//*|*/.|*/..|*/./*|*/../*) printf 'muster-fix: MUSTER_BACKUP must be a clean absolute path\n' >&2; exit 2;;
@@ -15,7 +17,6 @@ case "$MUSTER_BACKUP" in
 esac
 mkdir -p "$MUSTER_BACKUP" || exit 2
 [ -n "$(find "$MUSTER_BACKUP" -maxdepth 0 -type d -user 0 ! -perm /022 2>/dev/null)" ] || { printf 'muster-fix: MUSTER_BACKUP must be a root-owned directory that only root can write\n' >&2; exit 2; }
-log() { printf 'muster-fix: %s\n' "$*"; }
 backup() {
   for p in "$@"; do
     { [ -e "$p" ] || [ -L "$p" ]; } || continue
@@ -24,14 +25,85 @@ backup() {
   done
 }
 restore() {
-  rc=0
+  brc=0
   for p in "$@"; do
     { [ -e "$MUSTER_BACKUP$p" ] || [ -L "$MUSTER_BACKUP$p" ]; } || continue
-    if [ -d "$p" ]; then log "restore: $p is now a directory, left as is"; rc=1; continue; fi
-    if [ -L "$p" ]; then rm -f "$p" || { log "restore: $p failed"; rc=1; continue; }; fi
-    cp -a "$MUSTER_BACKUP$p" "$p" || { log "restore: $p failed"; rc=1; }
+    if [ -d "$p" ]; then log "restore: $p is now a directory, left as is"; brc=1; continue; fi
+    if [ -L "$p" ]; then rm -f "$p" || { log "restore: $p failed"; brc=1; continue; }; fi
+    cp -a "$MUSTER_BACKUP$p" "$p" || { log "restore: $p failed"; brc=1; }
   done
-  return $rc
+  return $brc
+}
+save_units() {
+  mkdir -p "$MUSTER_BACKUP/muster-units" || return 1
+  for u in "$@"; do
+    f="$MUSTER_BACKUP/muster-units/$u"
+    if [ -f "$f" ] && ! grep -qx 'absent absent' "$f"; then log "$u: unit state exists, keeping the first"; continue; fi
+    if systemctl cat -- "$u" >/dev/null 2>&1; then
+      ue=$(systemctl is-enabled -- "$u" 2>/dev/null) || :
+      ua=$(systemctl is-active -- "$u" 2>/dev/null) || :
+      printf '%s %s\n' "${ue:-unknown}" "${ua:-unknown}" > "$f" || return 1
+      : > "$f.deps" || return 1
+      for d in $(systemctl show -p RequiredBy -p BoundBy -p ConsistsOf --value -- "$u" 2>/dev/null); do
+        if systemctl is-active --quiet -- "$d"; then printf '%s\n' "$d" >> "$f.deps" || return 1; fi
+      done
+    else
+      printf 'absent absent\n' > "$f" || return 1
+    fi
+  done
+}
+restore_units() {
+  urc=0
+  for u in "$@"; do
+    [ -f "$MUSTER_BACKUP/muster-units/$u" ] || continue
+    read -r ue ua < "$MUSTER_BACKUP/muster-units/$u"
+    [ "$ue" = absent ] || systemctl --quiet unmask -- "$u" || urc=1
+  done
+  for u in "$@"; do
+    [ -f "$MUSTER_BACKUP/muster-units/$u" ] || continue
+    read -r ue ua < "$MUSTER_BACKUP/muster-units/$u"
+    case "$ue" in
+      enabled) systemctl --quiet enable -- "$u" || urc=1;;
+      enabled-runtime) systemctl --quiet enable --runtime -- "$u" || urc=1;;
+      linked|linked-runtime) log "$u: was $ue; the link is not restored"; urc=1;;
+    esac
+  done
+  for u in "$@"; do
+    [ -f "$MUSTER_BACKUP/muster-units/$u" ] || continue
+    read -r ue ua < "$MUSTER_BACKUP/muster-units/$u"
+    case "$ue" in
+      disabled) now=$(systemctl is-enabled -- "$u" 2>/dev/null) || :
+        case "$now" in enabled|enabled-runtime) systemctl --quiet disable -- "$u" || urc=1;; esac;;
+    esac
+  done
+  for u in "$@"; do
+    [ -f "$MUSTER_BACKUP/muster-units/$u" ] || continue
+    read -r ue ua < "$MUSTER_BACKUP/muster-units/$u"
+    case "$ue" in
+      masked) systemctl --quiet mask -- "$u" || urc=1;;
+      masked-runtime) systemctl --quiet mask --runtime -- "$u" || urc=1;;
+    esac
+  done
+  for u in "$@"; do
+    [ -f "$MUSTER_BACKUP/muster-units/$u" ] || continue
+    read -r ue ua < "$MUSTER_BACKUP/muster-units/$u"
+    case "$ue" in masked|masked-runtime) continue;; esac
+    case "$ua" in active|activating|reloading) systemctl --quiet start -- "$u" || urc=1;; esac
+  done
+  for u in "$@"; do
+    [ -f "$MUSTER_BACKUP/muster-units/$u.deps" ] || continue
+    while read -r d; do
+      systemctl is-active --quiet -- "$d" || systemctl --quiet start -- "$d" || urc=1
+    done < "$MUSTER_BACKUP/muster-units/$u.deps"
+  done
+  for u in "$@"; do
+    [ -f "$MUSTER_BACKUP/muster-units/$u" ] || continue
+    read -r ue ua < "$MUSTER_BACKUP/muster-units/$u"
+    [ "$ue" = absent ] && continue
+    now=$(systemctl is-enabled -- "$u" 2>/dev/null) || :
+    [ "${now:-unknown}" = "$ue" ] || { log "$u: enablement not restored (was $ue, now ${now:-unknown})"; urc=1; }
+  done
+  return $urc
 }
 failed=0
 
@@ -52,6 +124,7 @@ fix_muster_file_passwd_permissions() {
     restore /etc/passwd || log "muster.file.passwd_permissions: ROLLBACK INCOMPLETE, backups in $MUSTER_BACKUP"
     return 1
   fi
+  # validate
   ( set -e
     stat -c '%u %g %a' /etc/passwd | grep -qx '0 0 644'
   ); rc=$?
@@ -81,6 +154,7 @@ fix_muster_file_services_permissions() {
     restore /etc/services || log "muster.file.services_permissions: ROLLBACK INCOMPLETE, backups in $MUSTER_BACKUP"
     return 1
   fi
+  # validate
   ( set -e
     stat -c '%u %g %a' /etc/services | grep -qx '0 0 644'
   ); rc=$?
@@ -111,6 +185,7 @@ fix_muster_file_shadow_permissions() {
     restore /etc/shadow || log "muster.file.shadow_permissions: ROLLBACK INCOMPLETE, backups in $MUSTER_BACKUP"
     return 1
   fi
+  # validate
   ( set -e
     stat -c '%u %a' /etc/shadow | grep -qx '0 400'
   ); rc=$?
@@ -140,6 +215,7 @@ fix_muster_file_hosts_lpd_permissions() {
     restore /etc/hosts.lpd || log "muster.file.hosts_lpd_permissions: ROLLBACK INCOMPLETE, backups in $MUSTER_BACKUP"
     return 1
   fi
+  # validate
   ( set -e
     stat -c '%u %g %a' /etc/hosts.lpd | grep -qx '0 0 600'
   ); rc=$?
@@ -169,6 +245,7 @@ fix_muster_file_hosts_permissions() {
     restore /etc/hosts || log "muster.file.hosts_permissions: ROLLBACK INCOMPLETE, backups in $MUSTER_BACKUP"
     return 1
   fi
+  # validate
   ( set -e
     stat -c '%u %g %a' /etc/hosts | grep -qx '0 0 600'
   ); rc=$?
@@ -204,6 +281,7 @@ fix_muster_service_automount_disabled() {
     [ "$rrc" -eq 0 ] || log "muster.service.automount_disabled: rollback failed (rc $rrc)"
     return 1
   fi
+  # validate
   ( set -e
     ! systemctl is-active --quiet autofs.service && case "$(systemctl is-enabled autofs.service 2>/dev/null)" in enabled|enabled-runtime) false;; esac
   ); rc=$?
@@ -250,6 +328,7 @@ fix_muster_service_dos_services_disabled() {
     [ "$rrc" -eq 0 ] || log "muster.service.dos_services_disabled: rollback failed (rc $rrc)"
     return 1
   fi
+  # validate
   ( set -e
     ! systemctl is-active --quiet echo.socket && case "$(systemctl is-enabled echo.socket 2>/dev/null)" in enabled|enabled-runtime) false;; esac && ! systemctl is-active --quiet discard.socket && case "$(systemctl is-enabled discard.socket 2>/dev/null)" in enabled|enabled-runtime) false;; esac && ! systemctl is-active --quiet daytime.socket && case "$(systemctl is-enabled daytime.socket 2>/dev/null)" in enabled|enabled-runtime) false;; esac && ! systemctl is-active --quiet chargen.socket && case "$(systemctl is-enabled chargen.socket 2>/dev/null)" in enabled|enabled-runtime) false;; esac
   ); rc=$?
@@ -300,6 +379,7 @@ fix_muster_service_finger_disabled() {
     [ "$rrc" -eq 0 ] || log "muster.service.finger_disabled: rollback failed (rc $rrc)"
     return 1
   fi
+  # validate
   ( set -e
     ! systemctl is-active --quiet finger.socket && case "$(systemctl is-enabled finger.socket 2>/dev/null)" in enabled|enabled-runtime) false;; esac && ! systemctl is-active --quiet fingerd.service && case "$(systemctl is-enabled fingerd.service 2>/dev/null)" in enabled|enabled-runtime) false;; esac
   ); rc=$?
@@ -350,6 +430,7 @@ fix_muster_service_nfs_server_disabled() {
     [ "$rrc" -eq 0 ] || log "muster.service.nfs_server_disabled: rollback failed (rc $rrc)"
     return 1
   fi
+  # validate
   ( set -e
     ! systemctl is-active --quiet nfs-server.service && case "$(systemctl is-enabled nfs-server.service 2>/dev/null)" in enabled|enabled-runtime) false;; esac && ! systemctl is-active --quiet nfs-kernel-server.service && case "$(systemctl is-enabled nfs-kernel-server.service 2>/dev/null)" in enabled|enabled-runtime) false;; esac
   ); rc=$?
@@ -400,6 +481,7 @@ fix_muster_service_rpcbind_disabled() {
     [ "$rrc" -eq 0 ] || log "muster.service.rpcbind_disabled: rollback failed (rc $rrc)"
     return 1
   fi
+  # validate
   ( set -e
     ! systemctl is-active --quiet rpcbind.socket && case "$(systemctl is-enabled rpcbind.socket 2>/dev/null)" in enabled|enabled-runtime) false;; esac && ! systemctl is-active --quiet rpcbind.service && case "$(systemctl is-enabled rpcbind.service 2>/dev/null)" in enabled|enabled-runtime) false;; esac
   ); rc=$?
@@ -450,6 +532,7 @@ fix_muster_service_rservices_disabled() {
     [ "$rrc" -eq 0 ] || log "muster.service.rservices_disabled: rollback failed (rc $rrc)"
     return 1
   fi
+  # validate
   ( set -e
     ! systemctl is-active --quiet rsh.socket && case "$(systemctl is-enabled rsh.socket 2>/dev/null)" in enabled|enabled-runtime) false;; esac && ! systemctl is-active --quiet rlogin.socket && case "$(systemctl is-enabled rlogin.socket 2>/dev/null)" in enabled|enabled-runtime) false;; esac && ! systemctl is-active --quiet rexec.socket && case "$(systemctl is-enabled rexec.socket 2>/dev/null)" in enabled|enabled-runtime) false;; esac
   ); rc=$?
@@ -500,6 +583,7 @@ fix_muster_service_tftp_talk_disabled() {
     [ "$rrc" -eq 0 ] || log "muster.service.tftp_talk_disabled: rollback failed (rc $rrc)"
     return 1
   fi
+  # validate
   ( set -e
     ! systemctl is-active --quiet tftp.socket && case "$(systemctl is-enabled tftp.socket 2>/dev/null)" in enabled|enabled-runtime) false;; esac && ! systemctl is-active --quiet tftp.service && case "$(systemctl is-enabled tftp.service 2>/dev/null)" in enabled|enabled-runtime) false;; esac && ! systemctl is-active --quiet tftpd.service && case "$(systemctl is-enabled tftpd.service 2>/dev/null)" in enabled|enabled-runtime) false;; esac && ! systemctl is-active --quiet tftpd-hpa.service && case "$(systemctl is-enabled tftpd-hpa.service 2>/dev/null)" in enabled|enabled-runtime) false;; esac && ! systemctl is-active --quiet atftpd.socket && case "$(systemctl is-enabled atftpd.socket 2>/dev/null)" in enabled|enabled-runtime) false;; esac && ! systemctl is-active --quiet atftpd.service && case "$(systemctl is-enabled atftpd.service 2>/dev/null)" in enabled|enabled-runtime) false;; esac && ! systemctl is-active --quiet talk.socket && case "$(systemctl is-enabled talk.socket 2>/dev/null)" in enabled|enabled-runtime) false;; esac && ! systemctl is-active --quiet ntalk.socket && case "$(systemctl is-enabled ntalk.socket 2>/dev/null)" in enabled|enabled-runtime) false;; esac
   ); rc=$?
@@ -545,6 +629,7 @@ fix_muster_service_snmp_disabled() {
     [ "$rrc" -eq 0 ] || log "muster.service.snmp_disabled: rollback failed (rc $rrc)"
     return 1
   fi
+  # validate
   ( set -e
     ! systemctl is-active --quiet snmpd.service && case "$(systemctl is-enabled snmpd.service 2>/dev/null)" in enabled|enabled-runtime) false;; esac
   ); rc=$?
@@ -591,6 +676,7 @@ fix_muster_service_telnet_disabled() {
     [ "$rrc" -eq 0 ] || log "muster.service.telnet_disabled: rollback failed (rc $rrc)"
     return 1
   fi
+  # validate
   ( set -e
     ! systemctl is-active --quiet telnet.socket && case "$(systemctl is-enabled telnet.socket 2>/dev/null)" in enabled|enabled-runtime) false;; esac && ! systemctl is-active --quiet telnet.service && case "$(systemctl is-enabled telnet.service 2>/dev/null)" in enabled|enabled-runtime) false;; esac && ! systemctl is-active --quiet telnetd.service && case "$(systemctl is-enabled telnetd.service 2>/dev/null)" in enabled|enabled-runtime) false;; esac
   ); rc=$?
@@ -648,6 +734,7 @@ fix_muster_account_root_remote_login() {
     restore /etc/ssh/sshd_config.d/00-muster.conf /etc/securetty || log "muster.account.root_remote_login: ROLLBACK INCOMPLETE, backups in $MUSTER_BACKUP"
     return 1
   fi
+  # validate
   ( set -e
     if command -v sshd >/dev/null 2>&1; then sshd -T -C user=root,host=localhost,addr=127.0.0.1 2>/dev/null | grep -qx 'permitrootlogin no'; fi
   ); rc=$?
@@ -698,6 +785,7 @@ fix_muster_service_nis_disabled() {
     [ "$rrc" -eq 0 ] || log "muster.service.nis_disabled: rollback failed (rc $rrc)"
     return 1
   fi
+  # validate
   ( set -e
     ! systemctl is-active --quiet ypserv.service && case "$(systemctl is-enabled ypserv.service 2>/dev/null)" in enabled|enabled-runtime) false;; esac && ! systemctl is-active --quiet ypbind.service && case "$(systemctl is-enabled ypbind.service 2>/dev/null)" in enabled|enabled-runtime) false;; esac && ! systemctl is-active --quiet ypxfrd.service && case "$(systemctl is-enabled ypxfrd.service 2>/dev/null)" in enabled|enabled-runtime) false;; esac && ! systemctl is-active --quiet yppasswdd.service && case "$(systemctl is-enabled yppasswdd.service 2>/dev/null)" in enabled|enabled-runtime) false;; esac
   ); rc=$?
