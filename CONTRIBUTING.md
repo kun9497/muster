@@ -126,7 +126,9 @@ alias of a listed unit (Debian's `nfs-kernel-server.service` is an alias of
 `nfs-server.service`; disabling it after the mask fails). An alias of a unit
 you did not list is skipped too, so declare the real unit. A file body clears
 the forbidden bits symbolically (`chmod u-xs,g-rwxs,o-rwxt`, never an absolute
-mode, so a stricter file stays as it is) and runs `setfacl -b` before `chmod`.
+mode, so a stricter file stays as it is); a body that removes an ACL (the two
+that do: `passwd_permissions`, `shadow_permissions`) runs `setfacl -b` before
+`chmod`.
 `validate` is one line — conditions joined with `&&`, or a single `case` whose
 last arm is `*) false` (a `case` that matches nothing exits 0) — and checks only
 what the script set; a file validate lists the control's default allowed modes.

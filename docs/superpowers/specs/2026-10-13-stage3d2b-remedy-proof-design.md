@@ -49,8 +49,9 @@ control: scripts for further controls, and the parameter-substitution rule they 
 
 ## 2. The host guard (Q-1)
 
-**Collector.** `internal/collect/collectors` extracts `MachineIDHash(data []byte) string`: it trims with
-`strings.TrimSpace` and returns the sha256 hex of the result only when that result matches `^[0-9a-f]{32}$`,
+**Collector.** `internal/collect/collectors` extracts `MachineIDHash(data []byte) string`: it trims ASCII
+whitespace only (space, `\t`, `\n`, `\r`, `\v`, `\f` — the C locale's `[:space:]`, which the helper deletes) and
+returns the sha256 hex of the result only when that result matches `^[0-9a-f]{32}$`,
 and `""` otherwise. `runOS` calls it. An `/etc/machine-id` holding `uninitialized`, uppercase, a short id or
 junk therefore yields no hash, where today any non-empty content is hashed (Q-6). `FuzzMachineIDHash`
 (seeds: a valid id with LF, with CRLF, `uninitialized`, empty, 31 hex characters, an id with an interior space)
@@ -91,8 +92,10 @@ fi
 With the guard off, neither the helper nor the guard is emitted; one comment line stands where the guard
 would: `# host guard: off (the snapshot has no machine id)`. The header lines are unchanged in both cases.
 
-- **Collector and helper agree.** Both accept exactly a 32-lowercase-hex id. The collector trims the ends;
-  the helper deletes every whitespace character. Where they could differ — an id with interior whitespace —
+- **Collector and helper agree.** Both accept exactly a 32-lowercase-hex id, and both treat the same six ASCII
+  bytes as whitespace; Unicode whitespace (U+00A0, U+0085) is neither trimmed nor deleted, so such an id yields
+  no hash on either side. The collector trims the ends; the helper deletes every ASCII whitespace character.
+  Where they could differ — an id with interior whitespace —
   the collector yields no hash, so the guard is off and the helper is never emitted. With the guard on the
   snapshot's id was valid, and on the same host the helper computes the same value. Anything the helper
   cannot read or hash (missing, unreadable or empty file, `uninitialized`, `sha256sum` absent) yields an
@@ -206,7 +209,10 @@ restore_units() {
     read -r ue ua < "$MUSTER_BACKUP/muster-units/$u"
     case "$ue" in
       disabled) now=$(systemctl is-enabled -- "$u" 2>/dev/null) || :
-        case "$now" in enabled|enabled-runtime) systemctl --quiet disable -- "$u" || urc=1;; esac;;
+        case "$now" in
+          enabled) systemctl --quiet disable -- "$u" || urc=1;;
+          enabled-runtime) systemctl --quiet disable --runtime -- "$u" || urc=1;;
+        esac;;
     esac
   done
   for u in "$@"; do
@@ -356,7 +362,7 @@ does not seed a provider and its dependant unless the probe showed that the depe
 
 **The matrix.** The rows gain a `key` (`rocky9-init`, `almalinux9-init`, `ubuntu2204`, `debian12-init`) and,
 for the built row, `build: debian12-init` naming its local tag `muster-ci/debian12-init`. The image is built in
-the job from this inline Dockerfile:
+the job from this Dockerfile, committed as `ci/roundtrip/debian12-init.Dockerfile`:
 
 ```dockerfile
 FROM debian:12
@@ -369,8 +375,11 @@ STOPSIGNAL SIGRTMIN+3
 CMD ["/sbin/init"]
 ```
 
-Emptying `/etc/machine-id` makes systemd generate a fresh id at each container's first boot, as the EL init
-images do when they ship it empty. The probe confirms that for every init image.
+Emptying `/etc/machine-id` makes systemd generate a fresh id at each container's first boot. The probe
+records every init image's id. As built: `almalinux9-init` ships the file empty, but `rocky9-init` ships a
+populated id, so its seed script regenerates it (`rm -f /etc/machine-id; systemd-machine-id-setup`) before
+anything is collected, and the Debian image is built with `docker build -f
+ci/roundtrip/debian12-init.Dockerfile` from the committed file, not from an inline one.
 
 - **Boot.** Every init row (built or pulled) is started with `--privileged --cgroupns=host` and waited for by
   `ci/roundtrip/wait.sh <cid> <key>`. That script polls `timeout 60 docker exec <cid> systemctl
@@ -393,7 +402,7 @@ loosens the files:
 - `install -m 644 /dev/null /etc/hosts.lpd`;
 - `chmod 644 /etc/hosts`.
 
-Each seed script ends with its own settle check over its own two lists, `START_UNITS` and `ENABLE_ONLY_UNITS`.
+Each init row's seed script ends with its own settle check over its own two lists, `START_UNITS` and `ENABLE_ONLY_UNITS`.
 Every unit in the first must be `active`, every unit in the second must be `inactive`, and anything else
 fails the job naming the unit. A seed that would remove the host's own access is out of scope; none of the
 sixteen needs one.

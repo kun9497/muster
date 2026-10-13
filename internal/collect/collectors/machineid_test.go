@@ -25,6 +25,9 @@ func TestMachineIDHashRefusesMalformedIDs(t *testing.T) {
 		{"interior space", id[:16] + " " + id[16:], ""},
 		{"whitespace only", " \n\t", ""},
 		{"empty", "", ""},
+		{"VT and FF", "\v" + id + "\f", want},
+		{"wrapped in U+00A0", " " + id + " ", ""},
+		{"followed by U+0085", id + "\u0085", ""},
 	} {
 		if got := MachineIDHash([]byte(c.in)); got != c.want {
 			t.Errorf("%s: MachineIDHash(%q) = %q, want %q", c.name, c.in, got, c.want)

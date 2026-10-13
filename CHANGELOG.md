@@ -91,8 +91,8 @@ verdict on an existing snapshot is at least a minor release and appears under
 - The plan JSON gains `fix.host_guard` (`on` | `off`, after `fix.max_risk`) and
   each item's `units` (after `backup`; `[]` when none). Plan schema stays 1.
 - `controls lint` checks the remediation block: `text_en`/`text_ko` one line and
-  at most 1000 runes, titles free of control characters, a `rollback` or `backup`
-  for every `script`, `idempotent: true` with a `script`, a one-line `validate`,
+  at most 1000 runes, titles free of control characters, a `rollback`, `backup`
+  or `units` and a `validate` for every `script` (widened in 3D-2b), `idempotent: true` with a `script`, a one-line `validate`,
   no here-document in a body, and absolute, clean, shell-safe `backup` paths.
   `check`'s output is unchanged.
 - `controls list` takes flags (`--profile <name|path>`) and refuses an unknown
@@ -112,8 +112,9 @@ every name first and skip an alias of a listed unit, then `systemctl --quiet
 disable --now` and `systemctl --quiet mask … || true` — and lose their
 hand-written rollbacks to the recorded unit state. The five file controls clear
 the forbidden bits symbolically (`chmod u-xs,g-rwxs,o-rwxt` and kin), so a
-file already stricter than the guide keeps its mode, run `setfacl -b` before
-`chmod`, and validate with a single `case` over the modes of their default
+file already stricter than the guide keeps its mode (the two that remove an ACL,
+`passwd_permissions` and `shadow_permissions`, run `setfacl -b` before
+`chmod`), and validate with a single `case` over the modes of their default
 `allowed_modes` ending `*) false`; their `text_en`/`text_ko` say the script
 only clears bits.
 

@@ -103,7 +103,8 @@ done
 건너뜁니다(Debian의 `nfs-kernel-server.service`는 `nfs-server.service`의 별칭이며, mask 뒤에
 그것을 disable하면 실패합니다). 목록에 없는 유닛의 별칭도 건너뛰므로 실제 유닛을
 선언하세요. 파일 본문은 금지된 비트를 기호 모드로 지우고(`chmod u-xs,g-rwxs,o-rwxt`; 절대
-모드를 쓰지 않으므로 더 엄격한 파일은 그대로 남음) `chmod` 전에 `setfacl -b`를 실행합니다.
+모드를 쓰지 않으므로 더 엄격한 파일은 그대로 남음). ACL을 제거하는 본문(그렇게 하는 두 개:
+`passwd_permissions`, `shadow_permissions`)은 `chmod` 전에 `setfacl -b`를 실행합니다.
 `validate`는 한 줄 — `&&`로 이은 조건, 또는 마지막 갈래가 `*) false`인 `case` 하나(아무것도
 맞지 않는 `case`는 0으로 끝남) — 이며 스크립트가 설정한 것만 확인합니다. 파일 validate는
 컨트롤의 기본 허용 모드를 나열합니다. `backup` 경로는 절대·정규 경로이고

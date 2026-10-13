@@ -48,7 +48,7 @@
 ## 2. 호스트 가드 (Q-1)
 
 **Collector.** `internal/collect/collectors`는 `MachineIDHash(data []byte) string`을 뽑아냅니다. 이 함수는
-`strings.TrimSpace`로 다듬은 결과가 `^[0-9a-f]{32}$`에 맞을 때만 그 sha256 16진수를 돌려주고, 아니면 `""`를
+ASCII 공백(공백, `\t`, `\n`, `\r`, `\v`, `\f` — 헬퍼가 지우는 C 로캘의 `[:space:]`)만 다듬고, 그 결과가 `^[0-9a-f]{32}$`에 맞을 때만 그 sha256 16진수를 돌려주고, 아니면 `""`를
 돌려줍니다. `runOS`가 그것을 부릅니다. 그래서 `/etc/machine-id`에 `uninitialized`, 대문자, 짧은 id, 잡문자가 있으면
 해시가 생기지 않습니다. 지금은 비어 있지만 않으면 무엇이든 해시합니다(Q-6). `FuzzMachineIDHash`(시드: LF가 붙은
 올바른 id, CRLF가 붙은 id, `uninitialized`, 빈 값, 16진수 31자, 중간에 공백이 있는 id)는 출력이 `""`이거나 소문자
@@ -88,8 +88,9 @@ fi
 가드가 꺼져 있으면 헬퍼도 가드도 내보내지 않고, 가드가 있었을 자리에 주석 한 줄
 `# host guard: off (the snapshot has no machine id)`만 둡니다. 두 경우 모두 헤더 줄은 그대로입니다.
 
-- **collector와 헬퍼는 일치한다.** 둘 다 정확히 소문자 16진수 32자인 id만 받아들입니다. collector는 양 끝을
-  다듬고, 헬퍼는 공백 문자를 모두 지웁니다. 둘이 달라질 수 있는 경우는 중간에 공백이 있는 id뿐입니다. 그때는
+- **collector와 헬퍼는 일치한다.** 둘 다 정확히 소문자 16진수 32자인 id만 받아들이고, 같은 ASCII 여섯 바이트를
+  공백으로 봅니다. 유니코드 공백(U+00A0, U+0085)은 다듬지도 지우지도 않으므로, 그런 id는 양쪽 모두에서 해시가
+  생기지 않습니다. collector는 양 끝을 다듬고, 헬퍼는 ASCII 공백 문자를 모두 지웁니다. 둘이 달라질 수 있는 경우는 중간에 공백이 있는 id뿐입니다. 그때는
   collector가 해시를 내지 않으므로 가드가 꺼지고 헬퍼도 내보내지 않습니다. 가드가 켜져 있다면 스냅샷의 id가
   올바랐다는 뜻이고, 같은 호스트에서 헬퍼는 같은 값을 계산합니다. 헬퍼가 읽거나 해시할 수 없는 경우(파일이 없음,
   읽을 수 없음, 빈 파일, `uninitialized`, `sha256sum` 없음)에는 `here`가 비어 거부되고, stderr에는 거부 문구 말고는
@@ -205,7 +206,10 @@ restore_units() {
     read -r ue ua < "$MUSTER_BACKUP/muster-units/$u"
     case "$ue" in
       disabled) now=$(systemctl is-enabled -- "$u" 2>/dev/null) || :
-        case "$now" in enabled|enabled-runtime) systemctl --quiet disable -- "$u" || urc=1;; esac;;
+        case "$now" in
+          enabled) systemctl --quiet disable -- "$u" || urc=1;;
+          enabled-runtime) systemctl --quiet disable --runtime -- "$u" || urc=1;;
+        esac;;
     esac
   done
   for u in "$@"; do
@@ -349,8 +353,8 @@ control마다 항목이 하나씩, id 순으로 들어갑니다. 항목은 어�
 보였을 때만 허용합니다.
 
 **matrix.** 행에 `key`(`rocky9-init`, `almalinux9-init`, `ubuntu2204`, `debian12-init`)가 생기고, 빌드하는 행에는
-로컬 태그 `muster-ci/debian12-init`을 가리키는 `build: debian12-init`이 붙습니다. 이미지는 job 안에서 다음 inline
-Dockerfile로 빌드합니다.
+로컬 태그 `muster-ci/debian12-init`을 가리키는 `build: debian12-init`이 붙습니다. 이미지는 job 안에서
+`ci/roundtrip/debian12-init.Dockerfile`로 커밋된 다음 Dockerfile로 빌드합니다.
 
 ```dockerfile
 FROM debian:12
@@ -363,8 +367,11 @@ STOPSIGNAL SIGRTMIN+3
 CMD ["/sbin/init"]
 ```
 
-`/etc/machine-id`를 비워 두면, EL init 이미지가 그 파일을 비운 채로 배포할 때처럼 systemd가 컨테이너마다 첫 부팅에서
-새 id를 만듭니다. 사전 점검이 init 이미지마다 이를 확인합니다.
+`/etc/machine-id`를 비워 두면 systemd가 컨테이너마다 첫 부팅에서 새 id를 만듭니다. 사전 점검은 init 이미지마다
+id를 기록합니다. 만들어진 대로: `almalinux9-init`은 그 파일을 비운 채로 배포하지만 `rocky9-init`은 채워진 id를
+배포하므로, 그 시드 스크립트가 무엇이든 수집하기 전에 id를 다시 만듭니다(`rm -f /etc/machine-id;
+systemd-machine-id-setup`). Debian 이미지는 inline Dockerfile이 아니라 커밋된 파일에서 `docker build -f
+ci/roundtrip/debian12-init.Dockerfile`로 빌드합니다.
 
 - **부팅.** init 행은 빌드했든 받아 왔든 모두 `--privileged --cgroupns=host`로 띄우고 `ci/roundtrip/wait.sh <cid> <key>`로
   기다립니다. 이 스크립트는 `timeout 60 docker exec <cid> systemctl is-system-running --wait`를 최대 30번 돕니다. 상태가
@@ -383,7 +390,7 @@ CMD ["/sbin/init"]
 - `install -m 644 /dev/null /etc/hosts.lpd`
 - `chmod 644 /etc/hosts`
 
-시드 스크립트는 각자의 두 목록 `START_UNITS`와 `ENABLE_ONLY_UNITS`에 대한 안정 확인으로 끝납니다. 앞의 목록에 있는
+init 행의 시드 스크립트는 각자의 두 목록 `START_UNITS`와 `ENABLE_ONLY_UNITS`에 대한 안정 확인으로 끝납니다. 앞의 목록에 있는
 유닛은 `active`, 뒤의 목록에 있는 유닛은 `inactive`여야 하고, 그 밖의 상태면 유닛 이름을 적고 job이 실패합니다.
 호스트 자신의 접근을 빼앗는 시드는 범위 밖이고, 16개 중 그런 시드가 필요한 것은 없습니다.
 

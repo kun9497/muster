@@ -52,9 +52,7 @@ and sockets, and caps size. The deep walk is off by default, stays on local file
   machine id, a symlinked or malformed `/etc/machine-id`, a hand-edited snapshot): the script then carries
   no guard and says so in a comment (`# host guard: off (the snapshot has no machine id)`). It does not
   catch a crafted snapshot, which can carry any hash. It cannot tell apart hosts cloned from one image
-  without regenerating the id. It fails closed on one edge: an id surrounded by Unicode whitespace the
-  collector trims (U+00A0, U+0085) but the script's `tr -d '[:space:]'` keeps is hashed by the collector and
-  not by the script, so the guard refuses its own host; `MUSTER_ANY_HOST=1` overrides it.
+  without regenerating the id.
 
 ## Reporting
 

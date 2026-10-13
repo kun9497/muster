@@ -88,7 +88,10 @@ restore_units() {
     read -r ue ua < "$MUSTER_BACKUP/muster-units/$u"
     case "$ue" in
       disabled) now=$(systemctl is-enabled -- "$u" 2>/dev/null) || :
-        case "$now" in enabled|enabled-runtime) systemctl --quiet disable -- "$u" || urc=1;; esac;;
+        case "$now" in
+          enabled) systemctl --quiet disable -- "$u" || urc=1;;
+          enabled-runtime) systemctl --quiet disable --runtime -- "$u" || urc=1;;
+        esac;;
     esac
   done
   for u in "$@"; do

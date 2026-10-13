@@ -28,6 +28,7 @@ func TestHostGuardHashMatchesTheCollector(t *testing.T) {
 		{"trailing LF", id + "\n", false}, {"CRLF", id + "\r\n", false}, {"leading blanks", "  " + id, false}, {"leading LF", "\n" + id, false},
 		{"uninitialized", "uninitialized\n", false}, {"uppercase", strings.ToUpper(id), false}, {"31", id[:31], false},
 		{"whitespace", " \n", false}, {"empty", "", false}, {"missing", "", true},
+		{"VT FF", "\v" + id + "\f", false}, {"U+00A0", " " + id + " ", false}, {"U+0085", id + "\u0085", false},
 	} {
 		p := filepath.Join(dir, "mid-"+strings.ReplaceAll(c.name, " ", "_"))
 		if !c.missing {
@@ -92,5 +93,20 @@ func TestScriptRefusesAnotherHost(t *testing.T) {
 	_, stderr, code = runScriptWith(t, guardPlan(t, same), dir, filepath.Join(dir, "bk-missing"), missing)
 	if code != 2 || stderr != refusal {
 		t.Fatalf("missing id: exit %d stderr %q", code, stderr)
+	}
+}
+
+// TestScriptGuardRechecksTheHash pins that the renderer, not only Build,
+// admits the hash: a hand-built plan that says "on" with an empty or
+// malformed hash renders the guard-off comment and no MUSTER_SNAPSHOT_HOST.
+func TestScriptGuardRechecksTheHash(t *testing.T) {
+	for _, hash := range []string{"", strings.Repeat("a", 63), strings.Repeat("A", 64), strings.Repeat("a", 64) + "; true"} {
+		s := string(Script(&Plan{Fix: FixBlock{MaxRisk: "lockout_risk", HostGuard: "on", MachineIDHash: hash}}))
+		if strings.Contains(s, "MUSTER_SNAPSHOT_HOST") || strings.Contains(s, "muster_machine_id_hash") {
+			t.Errorf("hash %q: the guard is rendered:\n%s", hash, s)
+		}
+		if !strings.Contains(s, "\n"+guardOff+"\n") {
+			t.Errorf("hash %q: no guard-off comment:\n%s", hash, s)
+		}
 	}
 }

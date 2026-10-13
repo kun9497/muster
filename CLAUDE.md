@@ -197,7 +197,8 @@ regenerates them from public images and `-check` compares.
   32 lowercase hex, `sha256sum`) hashes `/etc/machine-id` and a mismatch or an unreadable id exits 2 with one stderr
   line; `MUSTER_ANY_HOST=1` (read only when the hashes differ) runs with a warning. Off: one comment line
   `# host guard: off (the snapshot has no machine id)`. The collector's `MachineIDHash` hashes only a
-  `strings.TrimSpace`d 32-lowercase-hex id (else `""`); `TestHostGuardHashMatchesTheCollector` pins the two together.
+  32-lowercase-hex id trimmed of ASCII whitespace only (`strings.Trim(…, " \t\n\r\v\f")`, the set the helper's `tr`
+  deletes; else `""`); `TestHostGuardHashMatchesTheCollector` pins the two together.
 - Units (Q-2): `remediation.units` lists `.service`/`.socket` names; lint `units_charset` (pattern, no duplicates; a
   template unit needs an instance), `units_order` (`<n>.socket` before `<n>.service`), `units_needs_script`,
   `units_exclusive` (no `rollback`, no `backup` beside units), `units_variable` (`$UNITS` only in a `script` that
@@ -222,7 +223,8 @@ regenerates them from public images and `-check` compares.
   `nfs-server.service`), pass 2 runs `systemctl --quiet disable --now` strictly and `systemctl --quiet mask … || true`
   over `todo`; no hand-written rollback (the unit state is the way back), and one-unit bodies loop too (SC2043 fires
   only on a literal one-word list). The five file controls clear bits symbolically (`chmod u-xs,g-rwxs,o-rwxt` and
-  kin, so a stricter file is never loosened), run `setfacl -b` before `chmod`, and validate with a `case` over the
+  kin, so a stricter file is never loosened) — the two that remove an ACL (`passwd_permissions`,
+  `shadow_permissions`) run `setfacl -b` before `chmod` — and validate with a `case` over the
   default `allowed_modes` (`TestFileValidatesAcceptTheDefaultModes` regenerates them byte for byte). Bodies are
   shellcheck-clean at the default severity; `all-scripted.sh` renders every shipped body.
 - `controls/testdata/_roundtrip.yaml` (ignored by the fixture harness) names, per scripted control sorted by id, the

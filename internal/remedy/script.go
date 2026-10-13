@@ -112,7 +112,10 @@ restore_units() {
     read -r ue ua < "$MUSTER_BACKUP/muster-units/$u"
     case "$ue" in
       disabled) now=$(systemctl is-enabled -- "$u" 2>/dev/null) || :
-        case "$now" in enabled|enabled-runtime) systemctl --quiet disable -- "$u" || urc=1;; esac;;
+        case "$now" in
+          enabled) systemctl --quiet disable -- "$u" || urc=1;;
+          enabled-runtime) systemctl --quiet disable --runtime -- "$u" || urc=1;;
+        esac;;
     esac
   done
   for u in "$@"; do
@@ -146,11 +149,12 @@ restore_units() {
 }`
 
 // prologue is the script's fixed part for this plan (3D-2b §2 order): the
-// guard and its helper only when the snapshot carried a well-formed hash.
+// guard and its helper only when the snapshot carried a well-formed hash,
+// re-checked here so a hand-built plan cannot put another value in the script.
 func prologue(p *Plan) string {
 	var b strings.Builder
 	b.WriteString(prologueHead + "\n")
-	if p.Fix.HostGuard == "on" {
+	if p.Fix.HostGuard == "on" && machineHashRe.MatchString(p.Fix.MachineIDHash) {
 		b.WriteString(MachineIDHashHelper + "\n" + rootCheckLine + "\n")
 		b.WriteString("MUSTER_SNAPSHOT_HOST=" + p.Fix.MachineIDHash + "\n" + guardBody + "\n")
 	} else {

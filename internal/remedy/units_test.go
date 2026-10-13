@@ -14,6 +14,11 @@ import (
 // deps/<u> the units that stopping <u> stops, fail/<u> makes mask fail. An
 // enabled field of "-" makes is-enabled print nothing (recorded "unknown"),
 // and enable refuses while an Also= partner is masked, as systemd does.
+// enable and disable leave a static or indirect unit's enablement alone;
+// enable --runtime (and its Also= partner) is enabled-runtime, which only
+// disable --runtime clears (disable --runtime leaves a persistent enabled).
+// mask keeps the enablement it hid (premask/<u>) and unmask brings it back,
+// as removing the /dev/null link does.
 const systemctlStub = `printf '%s\n' "$*" >> "$STUB/calls"
 q= rt= now= verb= u=
 for a in "$@"; do
@@ -32,18 +37,30 @@ case "$verb" in
   is-active) get || { [ -n "$q" ] || echo inactive; exit 3; }; [ -n "$q" ] || echo "$sa"; [ "$sa" = active ];;
   show) if [ -f "$STUB/deps/$u" ]; then cat "$STUB/deps/$u"; fi;;
   enable) get || exit 1; [ -f "$STUB/noinstall/$u" ] && exit 0
-    case "$se" in masked*) exit 1;; esac
+    case "$se" in masked*) exit 1;; static|indirect) exit 0;; esac
     if [ -f "$STUB/also/$u" ]; then read -r pe pa < "$STUB/state/$(cat "$STUB/also/$u")"; case "$pe" in masked*) exit 1;; esac; fi
     if [ -n "$rt" ]; then put enabled-runtime "$sa"; else put enabled "$sa"; fi
-    if [ -f "$STUB/also/$u" ]; then p=$(cat "$STUB/also/$u"); read -r pe pa < "$STUB/state/$p"; printf 'enabled %s\n' "$pa" > "$STUB/state/$p"; fi;;
+    if [ -f "$STUB/also/$u" ]; then p=$(cat "$STUB/also/$u"); read -r pe pa < "$STUB/state/$p"
+      if [ -n "$rt" ]; then printf 'enabled-runtime %s\n' "$pa" > "$STUB/state/$p"; else printf 'enabled %s\n' "$pa" > "$STUB/state/$p"; fi
+    fi;;
   disable) get || exit 1
-    if [ -n "$now" ]; then put disabled inactive; else put disabled "$sa"; fi
+    case "$se" in
+      static|indirect) ne=$se;;
+      enabled-runtime) if [ -n "$rt" ]; then ne=disabled; else ne=$se; fi;;
+      enabled) if [ -n "$rt" ]; then ne=$se; else ne=disabled; fi;;
+      *) ne=disabled;;
+    esac
+    if [ -n "$now" ]; then put "$ne" inactive; else put "$ne" "$sa"; fi
     if [ -n "$now" ] && [ -f "$STUB/deps/$u" ]; then
       for d in $(cat "$STUB/deps/$u"); do read -r de da < "$STUB/state/$d"; printf '%s inactive\n' "$de" > "$STUB/state/$d"; done
     fi;;
   mask) [ -f "$STUB/fail/$u" ] && exit 1; get || exit 1
+    case "$se" in masked*) ;; *) mkdir -p "$STUB/premask"; printf '%s\n' "$se" > "$STUB/premask/$u";; esac
     if [ -n "$rt" ]; then put masked-runtime "$sa"; else put masked "$sa"; fi;;
-  unmask) get || exit 1; case "$se" in masked*) put disabled "$sa";; esac;;
+  unmask) get || exit 1
+    case "$se" in masked*)
+      if [ -f "$STUB/premask/$u" ]; then put "$(cat "$STUB/premask/$u")" "$sa"; rm -f "$STUB/premask/$u"; else put disabled "$sa"; fi;;
+    esac;;
   start) get || exit 1; case "$se" in masked*) exit 1;; esac; put "$se" active;;
   *) exit 1;;
 esac
@@ -115,10 +132,11 @@ func TestUnitHelpersRestoreRecordedState(t *testing.T) {
 		{"masked-runtime", []string{"a.service"}, map[string]string{"a.service": "masked-runtime inactive"}, nil, map[string]string{"a.service": "masked-runtime inactive"}, nil, false},
 		{"masked active", []string{"a.service"}, map[string]string{"a.service": "masked active"}, nil, map[string]string{"a.service": "masked inactive"}, nil, false},
 		{"linked", []string{"a.service"}, map[string]string{"a.service": "linked active"}, nil, nil, []string{"a.service: was linked; the link is not restored"}, true},
-		{"static", []string{"a.service"}, map[string]string{"a.service": "static active"}, nil, nil, []string{"a.service: enablement not restored (was static, now disabled)"}, true},
+		{"static", []string{"a.service"}, map[string]string{"a.service": "static active"}, nil, map[string]string{"a.service": "static active"}, nil, false},
 		{"absent", []string{"a.service"}, map[string]string{}, nil, map[string]string{"a.service": "absent"}, nil, false},
 		{"no install section", []string{"a.service"}, map[string]string{"a.service": "enabled active"}, func(t *testing.T, s string) { touch(t, s, "noinstall/a.service") }, nil, []string{"a.service: enablement not restored (was enabled, now disabled)"}, true},
 		{"also partner", []string{"a.socket", "a.service"}, map[string]string{"a.socket": "disabled inactive", "a.service": "enabled active"}, func(t *testing.T, s string) { write(t, s, "also/a.service", "a.socket") }, map[string]string{"a.socket": "disabled inactive", "a.service": "enabled active"}, nil, false},
+		{"also partner runtime", []string{"a.socket", "a.service"}, map[string]string{"a.socket": "disabled inactive", "a.service": "enabled-runtime active"}, func(t *testing.T, s string) { write(t, s, "also/a.service", "a.socket") }, map[string]string{"a.socket": "disabled inactive", "a.service": "enabled-runtime active"}, nil, false},
 		{"masked socket enabled service", []string{"a.socket", "a.service"}, map[string]string{"a.socket": "masked inactive", "a.service": "enabled active"}, func(t *testing.T, s string) { write(t, s, "also/a.service", "a.socket") }, map[string]string{"a.socket": "masked inactive", "a.service": "enabled active"}, nil, false},
 		{"unknown", []string{"a.service"}, map[string]string{"a.service": "- active"}, nil, nil, []string{"a.service: enablement not restored (was unknown, now disabled)"}, true},
 		{"dependant restarted", []string{"a.service"}, map[string]string{"a.service": "enabled active", "dep.service": "enabled active"}, func(t *testing.T, s string) { write(t, s, "deps/a.service", "dep.service") }, map[string]string{"a.service": "enabled active", "dep.service": "enabled active"}, nil, false},
@@ -161,6 +179,7 @@ func TestUnitHelpersRestoreRecordedState(t *testing.T) {
 // unmask, enable, re-disable, re-mask, start, dependants (3D-2b §3 passes).
 var wantCalls = map[string][]string{
 	"also partner":                  {"unmask a.socket", "unmask a.service", "enable a.service", "disable a.socket", "start a.service"},
+	"also partner runtime":          {"unmask a.socket", "unmask a.service", "enable a.service", "disable a.socket", "start a.service"},
 	"masked socket enabled service": {"unmask a.socket", "unmask a.service", "enable a.service", "mask a.socket", "start a.service"},
 	"dependant restarted":           {"unmask a.service", "enable a.service", "start a.service", "start dep.service"},
 }
