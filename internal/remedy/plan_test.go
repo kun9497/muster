@@ -157,6 +157,7 @@ func TestPlanRollbackVocabulary(t *testing.T) {
 		row("muster.test.c_lockout", "FAIL", "r", "", "high"),
 		row("muster.test.d_reboot", "FAIL", "r", "", "high"),
 		row("muster.test.e_param", "FAIL", "r", "", "high"),
+		row("muster.test.g_units", "FAIL", "r", "", "high"),
 	)
 	rep.Check.ParamSources = map[string]map[string]string{"muster.test.e_param": {"mode": "default"}}
 	p := build(t, rep, Options{})
@@ -172,6 +173,7 @@ func TestPlanRollbackVocabulary(t *testing.T) {
 		"muster.test.c_lockout": {"both", []string{"/etc/ssh/sshd_config"}, true, true},
 		"muster.test.d_reboot":  {"none", []string{}, false, false},
 		"muster.test.e_param":   {"restore_backup", []string{"/etc/group"}, true, false},
+		"muster.test.g_units":   {"units", []string{}, true, true},
 	}
 	for id, w := range want {
 		it := itemByID(t, p, id)
@@ -282,7 +284,7 @@ func TestPlanCopiesProvenance(t *testing.T) {
 	want := FixBlock{
 		MusterVersion: "mv", Commit: "abc", ControlsVersion: "cv", ControlsDigest: "sha256:cd",
 		SnapshotDigest: "sha256:sd", GuideEdition: "2026", Profile: rep.Check.Profile,
-		Tuning: rep.Check.Tuning, Waivers: rep.Check.Waivers, MaxRisk: "none",
+		Tuning: rep.Check.Tuning, Waivers: rep.Check.Waivers, MaxRisk: "none", HostGuard: "off",
 	}
 	if !reflect.DeepEqual(p.Fix, want) {
 		t.Fatalf("fix block:\n got %+v\nwant %+v", p.Fix, want)
@@ -360,7 +362,7 @@ func TestPlanItemCopiesEveryField(t *testing.T) {
 		Automation: "auto", Reason: "PermitRootLogin yes", TextEn: "fix c", TextKo: "조치 c", Script: true,
 		TextOnlyReason: "", Rollback: "both", Backup: []string{"/etc/ssh/sshd_config"}, Validate: true, Planned: true,
 		SourceStatus: check.FAIL, ScriptBody: "sed -i s/a/b/ /etc/ssh/sshd_config", ValidateCmd: "sshd -t",
-		RollbackBody: "systemctl reload ssh",
+		RollbackBody: "systemctl reload ssh", Units: []string{},
 	}
 	if !reflect.DeepEqual(it, want) {
 		t.Fatalf("item:\n got %+v\nwant %+v", it, want)
@@ -394,6 +396,7 @@ func TestPlanJSONShape(t *testing.T) {
 	rep := testReport(
 		row("muster.test.c_lockout", "FAIL", "r", "", "high"),
 		row("muster.test.d_reboot", "FAIL", "r", "", "high"),
+		row("muster.test.g_units", "FAIL", "r", "", "high"),
 	)
 	data, err := json.Marshal(build(t, rep, Options{}))
 	if err != nil {
@@ -402,6 +405,9 @@ func TestPlanJSONShape(t *testing.T) {
 	var got struct {
 		Items      []map[string]json.RawMessage `json:"items"`
 		NotPlanned json.RawMessage              `json:"not_planned"`
+		Fix        struct {
+			HostGuard *string `json:"host_guard"`
+		} `json:"fix"`
 	}
 	if err := json.Unmarshal(data, &got); err != nil {
 		t.Fatal(err)
@@ -409,7 +415,10 @@ func TestPlanJSONShape(t *testing.T) {
 	if string(got.NotPlanned) != "[]" {
 		t.Errorf("not_planned %s, want []", got.NotPlanned)
 	}
-	if len(got.Items) != 2 {
+	if got.Fix.HostGuard == nil {
+		t.Error("fix.host_guard missing")
+	}
+	if len(got.Items) != 3 {
 		t.Fatalf("items: %d", len(got.Items))
 	}
 	for _, it := range got.Items {
@@ -419,12 +428,22 @@ func TestPlanJSONShape(t *testing.T) {
 			}
 		}
 	}
-	// reboot_required sorts before lockout_risk.
-	if id := string(got.Items[0]["id"]); id != `"muster.test.d_reboot"` {
-		t.Fatalf("first item %s", id)
+	byID := map[string]map[string]json.RawMessage{}
+	for _, it := range got.Items {
+		byID[string(it["id"])] = it
 	}
-	if b := string(got.Items[0]["backup"]); b != "[]" {
+	d, g := byID[`"muster.test.d_reboot"`], byID[`"muster.test.g_units"`]
+	if d == nil || g == nil {
+		t.Fatalf("items by id: %v", byID)
+	}
+	if b := string(d["backup"]); b != "[]" {
 		t.Errorf("text-only backup %s, want []", b)
+	}
+	if u := string(d["units"]); u != "[]" {
+		t.Errorf("text-only units %s, want []", u)
+	}
+	if u := string(g["units"]); u != `["g.socket","g.service"]` {
+		t.Errorf("g_units units %s", u)
 	}
 	empty, err := json.Marshal(build(t, testReport(row("p1", "PASS", "", "", "high")), Options{}))
 	if err != nil {
@@ -439,5 +458,36 @@ func TestPlanJSONShape(t *testing.T) {
 	}
 	if string(e.Items) != "[]" || string(e.NotPlanned) != "[]" {
 		t.Errorf("empty plan items %s not_planned %s", e.Items, e.NotPlanned)
+	}
+}
+
+func TestPlanHostGuard(t *testing.T) {
+	h := strings.Repeat("c", 64) // any 64 lowercase hex
+	for _, c := range []struct{ in, guard, hash string }{
+		{h, "on", h},
+		{"", "off", ""},
+		{strings.ToUpper(h), "off", ""},
+		{h[:63], "off", ""},
+		{h + "'; id; '", "off", ""},
+	} {
+		rep := testReport(row("muster.test.a_none", "FAIL", "r", "", "high"))
+		rep.Run.Host.MachineIDHash = c.in
+		p := build(t, rep, Options{})
+		if p.Fix.HostGuard != c.guard || p.Fix.MachineIDHash != c.hash {
+			t.Errorf("hash %q: guard %q hash %q, want %q %q", c.in, p.Fix.HostGuard, p.Fix.MachineIDHash, c.guard, c.hash)
+		}
+	}
+}
+
+func TestPlanRefusesAnUnsafeUnit(t *testing.T) {
+	set := testSet(t)
+	for i := range set.Controls {
+		if set.Controls[i].ID == "muster.test.g_units" {
+			set.Controls[i].Remediation.Units = []string{"g.socket", "x';id;'.service"}
+		}
+	}
+	_, err := Build(testReport(row("muster.test.g_units", "FAIL", "r", "", "high")), set, Options{})
+	if err == nil || !strings.Contains(err.Error(), `refusing to plan muster.test.g_units: unit "x';id;'.service"`) {
+		t.Fatalf("err = %v", err)
 	}
 }

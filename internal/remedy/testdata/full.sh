@@ -3,7 +3,7 @@
 # muster fix --dry-run: review before running. muster never runs this file.
 # snapshot: host host-a, collected 2026-10-08T00:00:00Z; controls test+1 sha256:c0
 # profile default (sha256:p0); max-risk lockout_risk
-# planned 6 (script 3, text only 3); above max-risk 0; not planned: error 1, manual 1, warn_degraded 1
+# planned 7 (script 4, text only 3); above max-risk 0; not planned: error 1, manual 1, warn_degraded 1
 set -u
 umask 077
 [ "$(id -u)" -eq 0 ] || { printf 'muster-fix: run as root\n' >&2; exit 2; }
@@ -35,19 +35,19 @@ restore() {
 }
 failed=0
 
-# ---- 1/6 muster.test.e_param [risk none] [fail, high]
+# ---- 1/7 muster.test.e_param [risk none] [fail, high]
 # why: mode 777
 # do:  fix e
 # ko:  조치 e
 # text only: params tuned, see muster check --format json: check.param_sources
 
-# ---- 2/6 muster.test.f_partial [risk none] [warn, high]
+# ---- 2/7 muster.test.f_partial [risk none] [warn, high]
 # why: observations need human review
 # do:  fix f
 # ko:  조치 f
 # text only: no script declared
 
-# ---- 3/6 muster.test.a_none [risk none] [fail, low]
+# ---- 3/7 muster.test.a_none [risk none] [fail, low]
 # why: clause does not hold: files.etc_hosts.mode in [0 420]
 # do:  fix a
 # ko:  조치 a
@@ -66,7 +66,7 @@ fix_muster_test_a_none() {
 fix_muster_test_a_none
 [ "$?" -eq 0 ] || failed=$((failed+1))
 
-# ---- 4/6 muster.test.b_restart [risk restart_service] [fail, medium]
+# ---- 4/7 muster.test.b_restart [risk restart_service] [fail, medium]
 # why: clause does not hold
 # do:  fix b <a & b>
 # ko:  조치 b
@@ -87,13 +87,37 @@ fix_muster_test_b_restart() {
 fix_muster_test_b_restart
 [ "$?" -eq 0 ] || failed=$((failed+1))
 
-# ---- 5/6 muster.test.d_reboot [risk reboot_required] [fail, high]
+# ---- 5/7 muster.test.g_units [risk restart_service] [fail, medium]
+# why: clause does not hold
+# do:  t
+# ko:  조치
+fix_muster_test_g_units() {
+  ( set -e
+    for u in $UNITS; do systemctl --quiet disable --now "$u"; done
+  ); rc=$?
+  if [ "$rc" -ne 0 ]; then
+    log "muster.test.g_units: script failed (rc $rc), rolling back"
+    return 1
+  fi
+  ( set -e
+    ! systemctl is-active --quiet g.service
+  ); rc=$?
+  if [ "$rc" -ne 0 ]; then
+    log "muster.test.g_units: validate failed, rolling back"
+    return 1
+  fi
+  log "muster.test.g_units: done"
+}
+fix_muster_test_g_units
+[ "$?" -eq 0 ] || failed=$((failed+1))
+
+# ---- 6/7 muster.test.d_reboot [risk reboot_required] [fail, high]
 # why: clause does not hold
 # do:  fix d
 # ko:  조치 d
 # text only: no script declared
 
-# ---- 6/6 muster.test.c_lockout [risk lockout_risk] [fail, high]
+# ---- 7/7 muster.test.c_lockout [risk lockout_risk] [fail, high]
 # keep a second session open; a lockout here needs console access
 # why: clause does not hold
 # do:  fix c

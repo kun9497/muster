@@ -88,6 +88,17 @@ remediation:
   script: chmod 644 /etc/group
   backup: [/etc/group]
 `,
+	"muster.test.g_units": `automation: auto
+remediation:
+  text_en: t
+  text_ko: 조치
+  risk: restart_service
+  idempotent: true
+  units: [g.socket, g.service]
+  script: |
+    for u in $UNITS; do systemctl --quiet disable --now "$u"; done
+  validate: "! systemctl is-active --quiet g.service"
+`,
 	"muster.test.f_partial": `automation: partial
 remediation:
   text_en: fix f

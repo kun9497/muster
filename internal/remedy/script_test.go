@@ -58,6 +58,7 @@ func fullPlan(t *testing.T) *Plan {
 		row("muster.test.a_none", "FAIL", "clause does not hold: files.etc_hosts.mode in [0 420]", "", "low"),
 		row("muster.test.b_restart", "FAIL", "clause does not hold", "", "medium"),
 		row("muster.test.c_lockout", "FAIL", "clause does not hold", "", "high"),
+		row("muster.test.g_units", "FAIL", "clause does not hold", "", "medium"),
 		row("muster.test.d_reboot", "FAIL", "clause does not hold", "", "high"),
 		row("muster.test.e_param", "FAIL", "mode 777", "", "high"),
 		partial,
@@ -230,8 +231,8 @@ func TestScriptBlocksAreIndependent(t *testing.T) {
 			t.Errorf("%s: %d definitions, %d bare calls; want 1 and 1", fn, defs, calls)
 		}
 	}
-	if scripted != 3 {
-		t.Fatalf("full plan has %d planned scripted items, want 3", scripted)
+	if scripted != 4 {
+		t.Fatalf("full plan has %d planned scripted items, want 4", scripted)
 	}
 	for _, l := range ls {
 		if strings.HasPrefix(l, "fix_") {

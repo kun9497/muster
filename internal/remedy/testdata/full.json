@@ -62,7 +62,8 @@
       "unknown": 0,
       "expiring_soon": 0
     },
-    "max_risk": "lockout_risk"
+    "max_risk": "lockout_risk",
+    "host_guard": "off"
   },
   "items": [
     {
@@ -82,6 +83,7 @@
       "text_only_reason": "params_tuned",
       "rollback": "none",
       "backup": [],
+      "units": [],
       "validate": false,
       "planned": true
     },
@@ -102,6 +104,7 @@
       "text_only_reason": "no_script",
       "rollback": "none",
       "backup": [],
+      "units": [],
       "validate": false,
       "planned": true
     },
@@ -124,6 +127,7 @@
       "backup": [
         "/etc/hosts"
       ],
+      "units": [],
       "validate": false,
       "planned": true
     },
@@ -144,7 +148,32 @@
       "text_only_reason": "",
       "rollback": "declared",
       "backup": [],
+      "units": [],
       "validate": false,
+      "planned": true
+    },
+    {
+      "id": "muster.test.g_units",
+      "title_en": "muster.test.g_units en",
+      "title_ko": "muster.test.g_units ko",
+      "status": "fail",
+      "severity": "medium",
+      "severity_source": "importance",
+      "risk": "restart_service",
+      "idempotent": true,
+      "automation": "auto",
+      "reason": "clause does not hold",
+      "text_en": "t",
+      "text_ko": "조치",
+      "script": true,
+      "text_only_reason": "",
+      "rollback": "units",
+      "backup": [],
+      "units": [
+        "g.socket",
+        "g.service"
+      ],
+      "validate": true,
       "planned": true
     },
     {
@@ -164,6 +193,7 @@
       "text_only_reason": "no_script",
       "rollback": "none",
       "backup": [],
+      "units": [],
       "validate": false,
       "planned": true
     },
@@ -186,6 +216,7 @@
       "backup": [
         "/etc/ssh/sshd_config"
       ],
+      "units": [],
       "validate": true,
       "planned": true
     }
@@ -208,9 +239,9 @@
     }
   ],
   "summary": {
-    "planned": 6,
+    "planned": 7,
     "above_max_risk": 0,
-    "with_script": 3,
+    "with_script": 4,
     "text_only": 3,
     "waived": 0,
     "clean": 1,
@@ -221,7 +252,7 @@
     },
     "by_risk": {
       "none": 3,
-      "restart_service": 1,
+      "restart_service": 2,
       "reboot_required": 1,
       "lockout_risk": 1
     }

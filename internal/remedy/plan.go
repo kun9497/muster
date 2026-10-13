@@ -6,6 +6,7 @@ package remedy
 
 import (
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -17,6 +18,9 @@ import (
 
 // PlanSchemaVersion is the plan JSON's own schema version.
 const PlanSchemaVersion = 1
+
+// machineHashRe is the one shape of machine-id hash a script may carry.
+var machineHashRe = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
 // Options are the planner's knobs. MaxRisk "" means lockout_risk.
 type Options struct{ MaxRisk string }
@@ -35,6 +39,8 @@ type FixBlock struct {
 	Tuning          *report.TuningBlock `json:"tuning,omitempty"`
 	Waivers         report.WaiversBlock `json:"waivers"`
 	MaxRisk         string              `json:"max_risk"`
+	HostGuard       string              `json:"host_guard"` // on | off (3D-2b Q-1)
+	MachineIDHash   string              `json:"-"`          // the snapshot's, when well formed; the script's guard compares it
 }
 
 // Item is one FAIL or WARN row the plan addresses, with its control's
@@ -55,8 +61,9 @@ type Item struct {
 	TextKo         string   `json:"text_ko"`
 	Script         bool     `json:"script"`
 	TextOnlyReason string   `json:"text_only_reason"` // "" | no_script | absent | params_tuned
-	Rollback       string   `json:"rollback"`         // none | declared | restore_backup | both
+	Rollback       string   `json:"rollback"`         // none | declared | restore_backup | units | both
 	Backup         []string `json:"backup"`
+	Units          []string `json:"units"`
 	Validate       bool     `json:"validate"`
 	Planned        bool     `json:"planned"`
 
@@ -127,12 +134,17 @@ func Build(rep *report.Report, set *controls.Set, opts Options) (*Plan, error) {
 		return nil, fmt.Errorf("--max-risk must be none, restart_service, reboot_required or lockout_risk, got %q", opts.MaxRisk)
 	}
 	cb := rep.Check
+	hash, guard := "", "off"
+	if machineHashRe.MatchString(rep.Run.Host.MachineIDHash) {
+		hash, guard = rep.Run.Host.MachineIDHash, "on"
+	}
 	p := &Plan{
 		SchemaVersion: PlanSchemaVersion,
 		Run:           rep.Run,
 		Fix: FixBlock{MusterVersion: cb.MusterVersion, Commit: cb.Commit, ControlsVersion: cb.ControlsVersion,
 			ControlsDigest: cb.ControlsDigest, SnapshotDigest: cb.SnapshotDigest, GuideEdition: cb.GuideEdition,
-			Profile: cb.Profile, Tuning: cb.Tuning, Waivers: cb.Waivers, MaxRisk: maxRisk},
+			Profile: cb.Profile, Tuning: cb.Tuning, Waivers: cb.Waivers, MaxRisk: maxRisk,
+			HostGuard: guard, MachineIDHash: hash},
 		Items:      []Item{},
 		NotPlanned: []NotPlanned{},
 	}
@@ -166,6 +178,11 @@ func Build(rep *report.Report, set *controls.Set, opts Options) (*Plan, error) {
 				return nil, fmt.Errorf("refusing to plan %q: not a control id (muster.<category>.<name>)", row.ID)
 			}
 			p.Items = append(p.Items, item(row, set, cb, maxRank))
+			for _, u := range p.Items[len(p.Items)-1].Units {
+				if !controls.ValidUnitName(u) {
+					return nil, fmt.Errorf("refusing to plan %s: unit %q is not a unit name a script can carry", row.ID, u)
+				}
+			}
 		}
 	}
 	sort.SliceStable(p.Items, func(i, j int) bool {
@@ -207,7 +224,7 @@ func Build(rep *report.Report, set *controls.Set, opts Options) (*Plan, error) {
 func item(row report.Row, set *controls.Set, cb report.CheckBlock, maxRank int) Item {
 	it := Item{ID: row.ID, TitleEn: row.TitleEn, TitleKo: row.TitleKo, Status: strings.ToLower(string(row.Status)),
 		Severity: row.Severity, SeveritySource: row.SeveritySource, Automation: row.Automation,
-		Reason: report.ReasonLine(row), Risk: "none", Rollback: "none", Backup: []string{}, SourceStatus: row.Status}
+		Reason: report.ReasonLine(row), Risk: "none", Rollback: "none", Backup: []string{}, Units: []string{}, SourceStatus: row.Status}
 	c, ok := set.ByID(row.ID)
 	if !ok || c.Remediation == nil {
 		it.TextOnlyReason = "no_script"
@@ -229,10 +246,13 @@ func item(row report.Row, set *controls.Set, cb report.CheckBlock, maxRank int) 
 		it.ScriptBody, it.ValidateCmd, it.RollbackBody = r.Script, strings.TrimSuffix(r.Validate, "\n"), r.Rollback
 		it.Backup = append([]string{}, r.Backup...)
 		it.Validate = r.Validate != ""
-		hasRB, hasBK := strings.TrimSpace(r.Rollback) != "", len(r.Backup) > 0
+		it.Units = append([]string{}, r.Units...)
+		hasRB, hasBK, hasU := strings.TrimSpace(r.Rollback) != "", len(r.Backup) > 0, len(r.Units) > 0
 		switch {
 		case hasRB && hasBK:
 			it.Rollback = "both"
+		case hasU:
+			it.Rollback = "units"
 		case hasRB:
 			it.Rollback = "declared"
 		default:
