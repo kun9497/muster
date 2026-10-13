@@ -5,12 +5,12 @@ by risk: none 1 · restart_service 0 · reboot_required 0 · lockout_risk 1
 
 #  risk             id                    status  sev     script  rollback        title
 1  none             muster.test.p_text    fail    high    no      -               제목 \x1b[31m\n# $(id) `id`
-   why: value \x1b[31m\n# $(id) `id`
+   why: value \x1b[31m\n# $(id) `id`\u00ad\u061c\u200b\u200d\u202e\u2028\u2029\u2066\ufeff\u3164\U000e0001
    do:  글 \n# $(id) (text only: no_script)
 2  lockout_risk     muster.test.p_script  fail    high    yes     both            제목 \x1b[31m\n# $(id) `id`
-   why: value \x1b[31m\n# $(id) `id`
+   why: value \x1b[31m\n# $(id) `id`\u00ad\u061c\u200b\u200d\u202e\u2028\u2029\u2066\ufeff\u3164\U000e0001
    do:  조치 \x1b[31m\n# $(id)
 
 not planned:
   muster.test.p_degraded  warn_degraded  collection was degraded: \x1b[31m\n# $(id) `id`
-  muster.test.p_error     error          [missing_fact] value \x1b[31m\n# $(id) `id`
+  muster.test.p_error     error          [missing_fact] value \x1b[31m\n# $(id) `id`\u00ad\u061c\u200b\u200d\u202e\u2028\u2029\u2066\ufeff\u3164\U000e0001

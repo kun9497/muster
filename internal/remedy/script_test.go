@@ -95,12 +95,30 @@ func emptyPlan(t *testing.T) *Plan {
 
 const poison = "\x1b[31m\n# $(id) `id`"
 
+// spelledSample is the format, separator and filler runes report.Escape spells
+// out (T-9): soft hyphen, ALM, ZWSP, ZWJ, RLO, LS, PS, LRI, BOM, Hangul filler
+// and a tag character.
+var spelledSample = []rune{0x00ad, 0x061c, 0x200b, 0x200d, 0x202e, 0x2028, 0x2029, 0x2066, 0xfeff, 0x3164, 0xe0001}
+
+// assertSpelled checks the sample is covered by report.SpelledOut and absent raw.
+func assertSpelled(t *testing.T, name string, out []byte) {
+	t.Helper()
+	for _, r := range spelledSample {
+		if !report.SpelledOut(r) {
+			t.Errorf("U+%04X is not spelled out by report.SpelledOut", r)
+		}
+		if bytes.ContainsRune(out, r) {
+			t.Errorf("%s: raw U+%04X reached the output", name, r)
+		}
+	}
+}
+
 // poisonControls carry ESC, BEL, a newline, '#' and command substitutions
 // in both texts (YAML's "\e" is ESC, "\a" BEL).
 var poisonControls = map[string]string{
 	"muster.test.p_script": `automation: auto
 remediation:
-  text_en: "do \e[31m\n# $(id) ` + "`id`" + `"
+  text_en: "do \e[31m\n# $(id) ` + "`id`" + `\u00ad\u061c\u200b\u200d\u202e\u2028\u2029\u2066\ufeff\u3164\U000E0001"
   text_ko: "조치 \e[31m\n# $(id)"
   risk: lockout_risk
   idempotent: true
@@ -142,12 +160,12 @@ func setFrom(t *testing.T, ctl map[string]string) *controls.Set {
 func poisonPlan(t *testing.T) *Plan {
 	var rows []report.Row
 	for _, id := range []string{"muster.test.p_script", "muster.test.p_text"} {
-		r := row(id, "FAIL", "value "+poison, "", "high")
+		r := row(id, "FAIL", "value "+poison+string(spelledSample), "", "high")
 		r.TitleEn, r.TitleKo = "title "+poison, "제목 "+poison
 		rows = append(rows, r)
 	}
 	// Not-planned rows carry snapshot text too: an ERROR and a degraded WARN.
-	errRow := row("muster.test.p_error", "ERROR", "value "+poison, "", "high")
+	errRow := row("muster.test.p_error", "ERROR", "value "+poison+string(spelledSample), "", "high")
 	errRow.ReasonCode = check.MissingFact
 	rows = append(rows, errRow,
 		row("muster.test.p_degraded", "WARN", check.ReasonDegradedPrefix+poison, poison, "low"))
@@ -366,6 +384,7 @@ func TestScriptEveryLineIsTemplateBodyOrComment(t *testing.T) {
 		if bytes.IndexByte(out, 0x1b) >= 0 || bytes.IndexByte(out, '\a') >= 0 || bytes.IndexByte(out, '\r') >= 0 {
 			t.Errorf("%s: a raw control byte reached the script", g.name)
 		}
+		assertSpelled(t, g.name, out)
 		ok := templateLines(p)
 		for i, l := range lines(out) {
 			if strings.HasPrefix(l, "#") {

@@ -108,15 +108,15 @@ restore_units() {
 failed=0
 
 # ---- 1/2 muster.test.p_text [risk none] [fail, high]
-# why: value \x1b[31m\n# $(id) `id`
+# why: value \x1b[31m\n# $(id) `id`\u00ad\u061c\u200b\u200d\u202e\u2028\u2029\u2066\ufeff\u3164\U000e0001
 # do:  text \x1b]0;x\u0007\n$(id)
 # ko:  글 \n# $(id)
 # text only: no script declared
 
 # ---- 2/2 muster.test.p_script [risk lockout_risk] [fail, high]
 # keep a second session open; a lockout here needs console access
-# why: value \x1b[31m\n# $(id) `id`
-# do:  do \x1b[31m\n# $(id) `id`
+# why: value \x1b[31m\n# $(id) `id`\u00ad\u061c\u200b\u200d\u202e\u2028\u2029\u2066\ufeff\u3164\U000e0001
+# do:  do \x1b[31m\n# $(id) `id`\u00ad\u061c\u200b\u200d\u202e\u2028\u2029\u2066\ufeff\u3164\U000e0001
 # ko:  조치 \x1b[31m\n# $(id)
 fix_muster_test_p_script() {
   backup /etc/hosts || { log "muster.test.p_script: backup failed, nothing changed"; return 1; }

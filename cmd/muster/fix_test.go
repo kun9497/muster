@@ -418,6 +418,34 @@ func TestFixWarnsAsRoot(t *testing.T) {
 	}
 }
 
+// TestFixHostGuard: the guard is on only for a snapshot that carries a machine-id
+// hash, and then the script names it on its own line.
+func TestFixHostGuard(t *testing.T) {
+	raw, err := os.ReadFile(fullFail)
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := strings.Repeat("c", 64)
+	with := bytes.Replace(raw, []byte(`"hostname":`), []byte(`"machine_id_hash":"`+h+`","hostname":`), 1)
+	if bytes.Equal(with, raw) {
+		t.Fatal("fixture has no hostname key to anchor on")
+	}
+	p := filepath.Join(t.TempDir(), "h.json")
+	if err := os.WriteFile(p, with, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := planJSON(t, "--facts", p).Fix.HostGuard; got != "on" {
+		t.Errorf("with hash: host_guard %q", got)
+	}
+	if got := planJSON(t, "--facts", fullFail).Fix.HostGuard; got != "off" {
+		t.Errorf("without hash: host_guard %q", got)
+	}
+	code, out, _ := runFixArgs(t, "--dry-run", "--facts", p, "--format", "script")
+	if code != 0 || !bytes.Contains(out, []byte("\nMUSTER_SNAPSHOT_HOST="+h+"\n")) {
+		t.Fatalf("script: exit %d, guard line missing", code)
+	}
+}
+
 func TestFixUsageListed(t *testing.T) {
 	var out, errb bytes.Buffer
 	if code := run([]string{"help"}, &out, &errb); code != exitOK {

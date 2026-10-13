@@ -60,6 +60,7 @@ func TestTablePoisoned(t *testing.T) {
 	if bytes.IndexByte(out, 0x07) >= 0 {
 		t.Fatalf("poisoned table carries a raw BEL:\n%q", out)
 	}
+	assertSpelled(t, "table", out)
 	if !bytes.Contains(out, []byte("\nnot planned:\n")) {
 		t.Fatalf("poisoned table has no not-planned section:\n%s", out)
 	}

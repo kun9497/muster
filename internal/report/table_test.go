@@ -2,6 +2,7 @@ package report
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -192,10 +193,31 @@ func TestTableEscapesObservationAndWaiverFields(t *testing.T) {
 // a bell. Every snapshot-derived string in the test below carries it.
 const poison = "\x1b[2J\x1b[H\r\a"
 
+var spelledSample = []rune{0x00ad, 0x061c, 0x200b, 0x200d, 0x202e, 0x2028, 0x2029, 0x2066, 0xfeff, 0x3164, 0xe0001}
+
+func TestEscapeSpellsOutBidiAndSeparators(t *testing.T) {
+	for _, r := range spelledSample {
+		if !SpelledOut(r) {
+			t.Errorf("U+%04X not spelled out", r)
+		}
+		got := Escape(string(r))
+		want := fmt.Sprintf(`\u%04x`, r)
+		if r > 0xffff {
+			want = fmt.Sprintf(`\U%08x`, r)
+		}
+		if got != want {
+			t.Errorf("Escape(U+%04X) = %q, want %q", r, got, want)
+		}
+	}
+	if Escape("한글 a") != "한글 a" || SpelledOut('한') {
+		t.Error("plain Hangul and ASCII must pass through")
+	}
+}
+
 // poisonStrings sets every string reachable from v to poison, so the test
 // also covers run-header fields the table does not render today but might
 // tomorrow (spec §7.4, D24).
-func poisonStrings(v reflect.Value) {
+func poisonStrings(v reflect.Value, poison string) {
 	switch v.Kind() {
 	case reflect.String:
 		if v.CanSet() {
@@ -203,15 +225,15 @@ func poisonStrings(v reflect.Value) {
 		}
 	case reflect.Pointer:
 		if !v.IsNil() {
-			poisonStrings(v.Elem())
+			poisonStrings(v.Elem(), poison)
 		}
 	case reflect.Struct:
 		for i := 0; i < v.NumField(); i++ {
-			poisonStrings(v.Field(i))
+			poisonStrings(v.Field(i), poison)
 		}
 	case reflect.Slice, reflect.Array:
 		for i := 0; i < v.Len(); i++ {
-			poisonStrings(v.Index(i))
+			poisonStrings(v.Index(i), poison)
 		}
 	}
 }
@@ -230,7 +252,8 @@ func TestTablePoisonedSnapshotWritesNoRawControlBytes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	poisonStrings(reflect.ValueOf(&snap.Run).Elem())
+	poison := poison + string(spelledSample)
+	poisonStrings(reflect.ValueOf(&snap.Run).Elem(), poison)
 
 	results := []check.Result{
 		{ID: "muster.account.root_remote_login", TitleEn: poison, TitleKo: poison, Category: poison, Importance: "상", Automation: "auto",
@@ -259,6 +282,11 @@ func TestTablePoisonedSnapshotWritesNoRawControlBytes(t *testing.T) {
 	for _, b := range []byte{0x1b, '\r', 0x07} {
 		if i := bytes.IndexByte(buf.Bytes(), b); i >= 0 {
 			t.Errorf("raw %#x reached the terminal at offset %d:\n%q", b, i, buf.String())
+		}
+	}
+	for _, r := range spelledSample {
+		if strings.ContainsRune(buf.String(), r) {
+			t.Errorf("raw U+%04X reached the terminal:\n%q", r, buf.String())
 		}
 	}
 }
