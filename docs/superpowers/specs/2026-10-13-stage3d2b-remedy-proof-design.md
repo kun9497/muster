@@ -112,9 +112,10 @@ would: `# host guard: off (the snapshot has no machine id)`. The header lines ar
   renders it from that constant. `TestHostGuardHashMatchesTheCollector` (`internal/remedy`, Linux build tag;
   a test import of `collectors`, which the purity test — it reads `.Imports`, not `.TestImports` — allows)
   runs the helper with `sh` over temp files. For an id with a trailing newline, CRLF, leading blanks and a
-  leading newline it requires the collector's value. For `uninitialized`, uppercase, 31 characters, an
-  interior space, whitespace only, an empty file and a missing path it requires that collector and helper
-  both yield empty output.
+  leading newline it requires the collector's value. For `uninitialized`, uppercase, 31 characters,
+  whitespace only, an empty file and a missing path it requires that collector and helper both yield empty
+  output. For an id with an interior space it requires only that the collector yields no hash: the two
+  differ there by design, and the helper is never emitted for such a snapshot.
 - **Guard tests** (`internal/remedy`, Linux, through the rendered script with a temp machine-id path
   substituted for `/etc/machine-id` by `strings.Replace`, the test asserting that the replacement happened):
   equal hashes pass; a mismatch exits 2, prints exactly the refusal line on stderr and never creates

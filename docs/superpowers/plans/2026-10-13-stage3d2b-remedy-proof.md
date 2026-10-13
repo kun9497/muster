@@ -22,7 +22,8 @@
 - Nothing in the Go suite reaches the runner's systemd: unit helpers are executed only against a stub `systemctl` first on `PATH`.
 - Documents are English canonical with the `.ko.md` pair in the same commit where a pair exists. `THREAT_MODEL.md` and `examples/README.md` have no pair. Identifiers stay English.
 - Commits use the personal identity (pinned) and the trailer `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. Never push, amend, rebase or stash.
-- From Task 6 on, the examples gate (`TestExamplesLoadAndCheck`) is red until the examples refresh (a merge step). Locally run `go test ./... -skip TestExamplesLoadAndCheck` and quote its failure once.
+- The examples gate (`TestExamplesLoadAndCheck`) does not go red on this branch. From Task 6 on, `controls/VERSION` and the control YAML change the set's digest, and the gate skips its byte comparison with a note (G-24). Quote the note once. The merge-step refresh re-pins the examples.
+- The task order puts the template (Tasks 4–5) before the bodies that need it (Task 6). Every commit's review script is runnable: no shipped body uses `$UNITS` before the template emits `UNITS=`.
 - On Windows the `internal/collect/...` tests and every `needSh`/Linux test do not run; the lab run (root) and CI cover them.
 
 ## Rulings carried from the code map (the spec as built)
@@ -43,11 +44,11 @@
 
 ## Review Focus
 
-1. **A host whose `/etc/machine-id` reads `uninitialized` or is empty**, planned on itself. The collector writes no hash, the script carries the guard-off comment and runs. (Task 1: `TestMachineIDHashRefusesMalformedIDs`; Task 6: `TestScriptGuardOffWithoutAHash`.)
-2. **The operator re-runs a failed script with the same `MUSTER_BACKUP` after installing a unit.** The `absent` record is rewritten, so the second failure restores the now-present unit's real state. (Task 6: the `absent then present` case of `TestUnitHelpersRestoreRecordedState`.)
-3. **`/etc/shadow` at `0000` (RHEL's stock mode).** The symbolic script leaves it at `0000` and the validate accepts it. (Task 4: the `0000` row of `TestFileScriptsRepairOnARealFile`.)
-4. **A unit name with `'`, `;` or a leading `-` reaching the plan from a hand-edited control set.** `remedy.Build` refuses the plan and nothing renders. (Task 5: `TestPlanRefusesAnUnsafeUnit`.)
-5. **The script copied to a second host and run there without `MUSTER_ANY_HOST`.** Exit 2, exactly the refusal line on stderr, `MUSTER_BACKUP` never created. (Task 6: `TestScriptRefusesAnotherHost`; Task 8: the CI guard run.)
+1. **A host whose `/etc/machine-id` reads `uninitialized` or is empty**, planned on itself. The collector writes no hash, the script carries the guard-off comment and runs. (Task 1: `TestMachineIDHashRefusesMalformedIDs`; Task 5: `TestScriptGuardOffWithoutAHash`.)
+2. **The operator re-runs a failed script with the same `MUSTER_BACKUP` after installing a unit.** The `absent` record is rewritten, so the second failure restores the now-present unit's real state. (Task 5: the absent-then-present half of `TestUnitHelpersKeepTheFirstRecord`.)
+3. **`/etc/shadow` at `0000` (RHEL's stock mode).** The symbolic script leaves it at `0000` and the validate accepts it. (Task 6: the `0000` row of `TestFileScriptsRepairOnARealFile`.)
+4. **A unit name with `'`, `;` or a leading `-` reaching the plan from a hand-edited control set.** `remedy.Build` refuses the plan and nothing renders. (Task 4: `TestPlanRefusesAnUnsafeUnit`.)
+5. **The script copied to a second host and run there without `MUSTER_ANY_HOST`.** Exit 2, exactly the refusal line on stderr, `MUSTER_BACKUP` never created. (Task 5: `TestScriptRefusesAnotherHost`; Task 8: the CI guard run.)
 
 ---
 
@@ -58,7 +59,11 @@
 The spec's image assignments are a hypothesis (§4 "The probe"). This task measures them; Task 8 writes the table from the result.
 
 - [ ] **Step 1: Write `probe.sh`.** It takes an image and a `--build-debian` flag, starts the container the way §4 does (`--privileged --cgroupns=host`, `/sbin/init`, the Debian Dockerfile of spec §4 built as `muster-ci/debian12-init`), and prints one line per unit of the ten service controls (`automount: autofs.service`; `dos_services: echo.socket discard.socket daytime.socket chargen.socket`; `finger: finger.socket fingerd.service`; `nfs_server: nfs-server.service nfs-kernel-server.service`; `nis: ypserv.service ypbind.service ypxfrd.service yppasswdd.service`; `rpcbind: rpcbind.socket rpcbind.service`; `rservices: rsh.socket rlogin.socket rexec.socket`; `snmp: snmpd.service`; `telnet: telnet.socket telnet.service telnetd.service`; `tftp_talk: tftp.socket tftp.service tftpd.service tftpd-hpa.service atftpd.socket atftpd.service talk.socket ntalk.socket`). Each line has five fields: the package that ships it (EL: `dnf provides '*/<unit>'`; Debian: `apt-get install` of the candidate package named in the table below, then `systemctl cat <unit>`; candidates `autofs`, `openbsd-inetd`, `fingerd`, `nfs-kernel-server`, `nis`, `rpcbind`, `rsh-server`, `snmpd`, `telnetd`, `tftpd-hpa`, `atftpd`, `talkd`), whether `systemctl enable --now` makes it `active`, its `Also=` (`systemctl show -p Also --value`), the units that `Requires=`/`BindsTo=`/`PartOf=` it (`systemctl show -p RequiredBy -p BoundBy -p ConsistsOf --value`), and the state after `systemctl reset-failed`. It also prints the image's `/etc/machine-id` content length at first boot of two containers and whether the two ids differ.
-- [ ] **Step 2: Run it on the lab** for `rockylinux/rockylinux:9-ubi-init`, `almalinux/9-init` and the built `debian12-init`. On Debian, install under `policy-rc.d` exit 101 as the seeds will. Record the output verbatim in `probe.md`.
+- [ ] **Step 2: Run it on the lab** for `rockylinux/rockylinux:9-ubi-init`, `almalinux/9-init` and the built `debian12-init`.
+  - `lab-sync` excludes `.superpowers/`, so send the files over `lab-run`'s stdin, e.g. `lab-run.sh 'mkdir -p /root/muster-probe && cat > /root/muster-probe/probe.sh' < .superpowers/sdd/2026-10-13-stage3d2b-remedy-proof/probe.sh`.
+  - Send the spec §4 Dockerfile the same way, as `/root/muster-probe/debian12-init.Dockerfile`, and build it with `docker build -f`.
+  - On Debian, install under `policy-rc.d` exit 101 as the seeds will.
+  - Record the output verbatim in `probe.md`.
 - [ ] **Step 3: Decide the table.** In `probe.md`, write one `_roundtrip.yaml` entry per scripted control (sixteen):
   - `images` where the probe made every exercised unit `active`, or `enable` alone for a unit that cannot start in a container;
   - `unproven_units` for declared units the rows do not exercise;
@@ -168,15 +173,32 @@ func FuzzMachineIDHash(f *testing.F) {
 
   Add `"FuzzMachineIDHash",` to `fuzzTargets` between `"FuzzListsRoot"` and `"FuzzModuleStates"`. If `regexp` is not yet imported in `fuzz_test.go`, add it.
 
+  Drive the call site too. CLAUDE.md requires that deleting the new call turns the suite red, and `TestOSFillsTheRunHeader`'s fixture id is valid, so it hashes the same either way. Add the fixture files `internal/collect/collectors/testdata/machine-id-uninitialized` (`uninitialized\n`) and `testdata/machine-id-upper` (`0123456789ABCDEF0123456789ABCDEF\n`), and in `collectors_test.go` (Linux tag, beside `TestOSFillsTheRunHeader`):
+
+```go
+func TestOSLeavesNoHashForAMalformedMachineID(t *testing.T) {
+	for _, fixture := range []string{"machine-id-uninitialized", "machine-id-upper"} {
+		a := osAccess()
+		a.files["/etc/machine-id"] = fixture
+		b := build(t, "os", a)
+		if h := b.Header().Host.MachineIDHash; h != "" {
+			t.Errorf("%s: machine_id_hash %q, want empty", fixture, h)
+		}
+	}
+}
+```
+
 - [ ] **Step 5: Run** on the lab (Linux):
 
   ```
-  go test ./internal/collect/collectors -run 'TestMachineIDHash|TestOSFillsTheRunHeader|TestEveryParserHasAFuzzTarget|FuzzMachineIDHash' -count=1
+  go test ./internal/collect/collectors -run 'TestMachineIDHash|TestOSFillsTheRunHeader|TestOSLeavesNoHash|TestEveryParserHasAFuzzTarget|FuzzMachineIDHash' -count=1
   ```
 
   Expected: PASS. `TestOSFillsTheRunHeader`'s fixture id is valid, so it stays green.
 
-- [ ] **Step 6: Mutation check.** Delete the `!machineIDRe.MatchString(id)` guard (hash any trimmed id), run `TestMachineIDHashRefusesMalformedIDs`, and see it go red. Restore.
+- [ ] **Step 6: Mutation check.**
+  1. Delete the `!machineIDRe.MatchString(id)` guard, so that any trimmed id is hashed. Run `TestMachineIDHashRefusesMalformedIDs` and see it go red. Restore.
+  2. Restore the old `readTrim` + `sha256` block in `os.go`, in place of the `MachineIDHash` call. See `TestOSLeavesNoHashForAMalformedMachineID` go red. Restore.
 - [ ] **Step 7: Commit** "Hash only a well-formed machine id, so a malformed one leaves the snapshot without a host identity". The body names the `machine_id_hash` header change (Q-6) and the fuzz target.
 
 ---
@@ -354,7 +376,656 @@ func lintSharedRemediation(s *Set) []Problem {
 
 ---
 
-### Task 4: The sixteen remediation blocks rewritten, the unit pin, the file validates
+### Task 4: The plan — `HostGuard`, `Units`, the `units` rollback value
+
+**Files:**
+- Modify: `internal/remedy/plan.go:27-38` (FixBlock), `43-67` (Item), `129-138` (fill), `162-168` (unit check), `228-240` (rollback switch)
+- Test: `internal/remedy/plan_test.go` (`TestPlanCopiesProvenance` ~271-298, `TestPlanItemCopiesEveryField` ~353-371, `TestPlanRollbackVocabulary` ~153-197, `TestPlanJSONShape` ~393-443, new `TestPlanHostGuard`, new `TestPlanRefusesAnUnsafeUnit`)
+- Modify: `internal/remedy/fixture_test.go:42-98` (T-8: `g_units`)
+
+**Interfaces:**
+- Consumes: `controls.ValidUnitName` (Task 3).
+- Produces:
+  - `FixBlock.HostGuard string` (`json:"host_guard"`, `"on"`|`"off"`, after `MaxRisk`);
+  - `FixBlock.MachineIDHash string` (`json:"-"`);
+  - `Item.Units []string` (`json:"units"`, after `Backup`, `[]` when none);
+  - `Item.Rollback` gains `"units"`.
+
+- [ ] **Step 1: Write the failing tests.** Add `g_units` to `testControls` (T-8). Write its YAML with the same `controlHead` shape as `b_restart` and this remediation:
+
+```yaml
+remediation:
+  text_en: t
+  text_ko: 조치
+  risk: restart_service
+  idempotent: true
+  units: [g.socket, g.service]
+  script: |
+    for u in $UNITS; do systemctl --quiet disable --now "$u"; done
+  validate: "! systemctl is-active --quiet g.service"
+```
+
+  In `plan_test.go`:
+
+```go
+func TestPlanHostGuard(t *testing.T) {
+	h := strings.Repeat("c", 64) // any 64 lowercase hex
+	for _, c := range []struct{ in, guard, hash string }{
+		{h, "on", h},
+		{"", "off", ""},
+		{strings.ToUpper(h), "off", ""},
+		{h[:63], "off", ""},
+		{h + "'; id; '", "off", ""},
+	} {
+		rep := testReport(row("muster.test.a_none", "FAIL", "r", "", "high"))
+		rep.Run.Host.MachineIDHash = c.in
+		p := build(t, rep, Options{})
+		if p.Fix.HostGuard != c.guard || p.Fix.MachineIDHash != c.hash {
+			t.Errorf("hash %q: guard %q hash %q, want %q %q", c.in, p.Fix.HostGuard, p.Fix.MachineIDHash, c.guard, c.hash)
+		}
+	}
+}
+
+func TestPlanRefusesAnUnsafeUnit(t *testing.T) {
+	set := testSet(t)
+	for i := range set.Controls {
+		if set.Controls[i].ID == "muster.test.g_units" {
+			set.Controls[i].Remediation.Units = []string{"g.socket", "x';id;'.service"}
+		}
+	}
+	_, err := Build(testReport(row("muster.test.g_units", "FAIL", "r", "", "high")), set, Options{})
+	if err == nil || !strings.Contains(err.Error(), `refusing to plan muster.test.g_units: unit "x';id;'.service"`) {
+		t.Fatalf("err = %v", err)
+	}
+}
+```
+
+  `testReport` and `testSet` are the fixture helpers. If `Build` needs a report from `scriptReport`, use the helper that `TestPlanRefusesAnUnexpectedID` uses (`plan_test.go:213-230`).
+
+  Then extend the existing tests:
+  - **`fullPlan`** (`script_test.go:52-71`): add `row("muster.test.g_units", "FAIL", "clause does not hold", "", "medium")` to its `scriptReport` rows and update its doc comment. Adding the control to `testControls` alone puts no item in a plan, because every plan builds from an explicit row list.
+  - **`TestPlanRollbackVocabulary`**: add a `muster.test.g_units` FAIL row to its report, and the entry `"muster.test.g_units": {"units", []string{}, true, true}` to its `want`. That is the positional form of the test's `rb` struct; check the field order at `plan_test.go:153-197`.
+  - **`TestPlanJSONShape`**:
+    - add a `g_units` row;
+    - change the item count it asserts from 2 to 3;
+    - look items up by id instead of by index (`g_units` is `restart_service` and sorts first, so `Items[0]` moves);
+    - assert that the text-only item's JSON carries `"units":[]` and that `g_units` carries `"units":["g.socket","g.service"]`, compact, as `json.Marshal` writes them;
+    - give the decoded struct `Fix struct{ HostGuard *string \`json:"host_guard"\` } \`json:"fix"\`` and require it to be non-nil.
+  - **`TestPlanCopiesProvenance`**: `want` gains `HostGuard: "off"`.
+  - **`TestPlanItemCopiesEveryField`**: `want` gains `Units: []string{}`.
+
+- [ ] **Step 2: Run** `go test ./internal/remedy -run 'TestPlan' -count=1`. Expected: FAIL (unknown fields).
+- [ ] **Step 3: Implement.** In `FixBlock`, after `MaxRisk`:
+
+```go
+	HostGuard       string              `json:"host_guard"` // on | off (3D-2b Q-1)
+	MachineIDHash   string              `json:"-"`          // the snapshot's, when well formed; the script's guard compares it
+```
+
+  In `Item`, after `Backup`: `Units []string \`json:"units"\``. Update the `Rollback` comment to `none | declared | restore_backup | units | both`. In `Build`'s FixBlock fill:
+
+```go
+	hash, guard := "", "off"
+	if machineHashRe.MatchString(rep.Run.Host.MachineIDHash) {
+		hash, guard = rep.Run.Host.MachineIDHash, "on"
+	}
+```
+
+  Set `HostGuard: guard, MachineIDHash: hash`. Declare `var machineHashRe = regexp.MustCompile(\`^[0-9a-f]{64}$\`)` (add `regexp` to the imports). After `p.Items = append(p.Items, item(row, set, cb, maxRank))`, check the units:
+
+```go
+			for _, u := range p.Items[len(p.Items)-1].Units {
+				if !controls.ValidUnitName(u) {
+					return nil, fmt.Errorf("refusing to plan %s: unit %q is not a unit name a script can carry", row.ID, u)
+				}
+			}
+```
+
+  In `item()`, the text-only initialiser gains `Units: []string{}`. The script branch sets `it.Units = append([]string{}, r.Units...)`, and its switch becomes:
+
+```go
+		hasRB, hasBK, hasU := strings.TrimSpace(r.Rollback) != "", len(r.Backup) > 0, len(r.Units) > 0
+		switch {
+		case hasRB && hasBK:
+			it.Rollback = "both"
+		case hasU:
+			it.Rollback = "units"
+		case hasRB:
+			it.Rollback = "declared"
+		default:
+			it.Rollback = "restore_backup"
+		}
+```
+
+- [ ] **Step 4: Run** `go test ./internal/remedy -count=1`. Expected: the plan tests PASS. The `full.*` goldens and the counts that include `g_units` fail. `all-scripted.sh` does not move here: the rollback word is never rendered, and the shipped set is unchanged until Task 6.
+  - Fix the counts the new `fullPlan` item moves: scripted goes 3 → 4 in `TestScriptBlocksAreIndependent`, plus `TestPlanClassifiesEveryRow`'s counts if it uses `fullPlan`, and the `# planned` header line. Change nothing else.
+  - Run `go test ./internal/remedy -run 'TestTableGolden|TestJSONGolden|TestScriptGolden' -update`. Read the diff: one `g_units` item, `units` arrays, `host_guard: "off"`, and `full.sh`'s new block, still without `UNITS=`, which Task 5 adds; the fixture body is never executed. Then run again without `-update`. Every test is green at this commit.
+- [ ] **Step 5: Mutation check.** Return `guard = "on"` unconditionally, see `TestPlanHostGuard` go red, and restore. Remove the unit loop in `Build`, see `TestPlanRefusesAnUnsafeUnit` go red, and restore.
+- [ ] **Step 6: Commit** "Plan the host guard and each item's units: on only for a well-formed hash, the units rollback, unsafe unit names refused". The body names T-3, T-4 and T-8.
+
+---
+
+### Task 5: The script — prologue, guard, unit helpers, `# validate`
+
+**Files:**
+- Modify: `internal/remedy/script.go` (whole prologue; `failurePath` 106-120; `block` 125-172)
+- Test: `internal/remedy/script_test.go` (`templateLines` 306-335, `runScriptStreams` 457-497, `fullPlan` 52-71, `poisonPlan` 133-158, new tests)
+- Test: `internal/remedy/hostguard_test.go` (new; imports `internal/collect/collectors`, untagged per T-10)
+- Test: `internal/remedy/units_test.go` (new)
+- Goldens: `internal/remedy/testdata/*.sh`
+
+**Interfaces:**
+- Consumes: `FixBlock.MachineIDHash`, `FixBlock.HostGuard`, `Item.Units` (Task 4); `collectors.MachineIDHash` (Task 2).
+- Produces:
+  - `const MachineIDHashHelper string`;
+  - `func prologue(p *Plan) string`;
+  - the template lines `MUSTER_SNAPSHOT_HOST=<64 hex>`, `# host guard: off (the snapshot has no machine id)`, `  save_units <u…> || { log "<id>: backup failed, nothing changed"; return 1; }`, `    UNITS='<u…>'`, `    restore_units <u…> || log "<id>: ROLLBACK INCOMPLETE, backups in $MUSTER_BACKUP"`, `  # validate`.
+
+- [ ] **Step 1: Write the failing tests.** In `script_test.go`, adding the imports `crypto/sha256`, `encoding/hex` and `regexp`:
+  - `fullPlan` sets `rep.Run.Host.MachineIDHash` to the sha256 of `0123456789abcdef0123456789abcdef`, computed in the test with `crypto/sha256` (T-8). Its `g_units` row comes from Task 4.
+  - `poisonPlan` sets it to `"'; id; '" + strings.Repeat("a", 56)` and asserts `p.Fix.HostGuard == "off"`.
+  - `templateLines(p)` starts from `strings.Split(prologue(p)+epilogue, "\n")`. Per item with `Units` it adds the `save_units`, `UNITS=` and `restore_units` lines in their exact rendered forms, and per item with `Validate` it adds `"  # validate"`.
+  - `TestScriptEveryLineIsTemplateBodyOrComment` additionally requires that the only non-comment line containing a 64-hex run is `MUSTER_SNAPSHOT_HOST=<p.Fix.MachineIDHash>`, and that the poison hash string never appears on a non-comment line.
+  - Add `runOpts`/`runScriptWith` (T-7). `runScriptStreams` becomes `runScriptWith(t, p, dir, backupDir, runOpts{})`, and the env is built from `os.Environ()` minus any `MUSTER_ANY_HOST=` entry.
+
+```go
+type runOpts struct {
+	replace    [][2]string // applied to the rendered script, each must change it
+	pathPrefix string      // prepended to PATH
+	env        []string
+}
+```
+
+  New tests in `script_test.go`:
+
+```go
+func TestScriptGuardOffWithoutAHash(t *testing.T) {
+	s := string(Script(emptyPlan(t)))
+	if !strings.Contains(s, "\n# host guard: off (the snapshot has no machine id)\n") || strings.Contains(s, "muster_machine_id_hash") || strings.Contains(s, "MUSTER_SNAPSHOT_HOST") {
+		t.Fatalf("guard-off prologue wrong:\n%s", s)
+	}
+}
+
+func TestScriptPrologueOrder(t *testing.T) {
+	s := string(Script(fullPlan(t)))
+	order := []string{"set -u\n", "umask 077\n", "log() {", "muster_machine_id_hash() {", rootCheckLine, "MUSTER_SNAPSHOT_HOST=", `MUSTER_BACKUP="${MUSTER_BACKUP:-`, `mkdir -p "$MUSTER_BACKUP" || exit 2`, backupOwnerLine, "backup() {", "restore() {", "save_units() {", "restore_units() {", "failed=0\n"}
+	at := 0
+	for _, o := range order {
+		i := strings.Index(s[at:], o)
+		if i < 0 {
+			t.Fatalf("prologue: %q missing or out of order", o)
+		}
+		at += i + len(o)
+	}
+}
+
+func TestScriptUnitsBlockOrder(t *testing.T) {
+	ls := lines(Script(fullPlan(t)))
+	fn := fnName("muster.test.g_units")
+	in, saw := false, map[string]int{}
+	for i, l := range ls {
+		if l == fn+"() {" {
+			in = true
+		}
+		if !in {
+			continue
+		}
+		switch {
+		case strings.HasPrefix(l, "  save_units g.socket g.service || "):
+			saw["save"] = i
+		case l == "    UNITS='g.socket g.service'":
+			if ls[i-1] != "  ( set -e" {
+				t.Errorf("UNITS= not the first body line: after %q", ls[i-1])
+			}
+			saw["units"] = i
+		case strings.HasPrefix(l, "    restore_units g.socket g.service || log "):
+			saw["restore"]++
+		case l == "  # validate":
+			if ls[i+1] != "  ( set -e" {
+				t.Errorf("# validate not before the validate subshell")
+			}
+			saw["marker"] = i
+		case l == "}":
+			in = false
+		}
+	}
+	if saw["save"] == 0 || saw["units"] <= saw["save"] || saw["restore"] != 2 || saw["marker"] == 0 {
+		t.Fatalf("units block shape: %v", saw)
+	}
+}
+```
+
+  `hostguard_test.go`:
+
+```go
+package remedy
+
+import (
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/kun9497/muster/internal/collect/collectors"
+)
+
+// TestHostGuardHashMatchesTheCollector pins 3D-2b §2: on every id the
+// collector hashes, the script's helper computes the same value; on every id
+// it refuses, both yield nothing.
+func TestHostGuardHashMatchesTheCollector(t *testing.T) {
+	needSh(t)
+	const id = "0123456789abcdef0123456789abcdef"
+	dir := t.TempDir()
+	helper := filepath.Join(dir, "h.sh")
+	if err := os.WriteFile(helper, []byte(MachineIDHashHelper+"\nmuster_machine_id_hash \"$1\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct {
+		name, content string
+		missing       bool
+	}{
+		{"trailing LF", id + "\n", false}, {"CRLF", id + "\r\n", false}, {"leading blanks", "  " + id, false}, {"leading LF", "\n" + id, false},
+		{"uninitialized", "uninitialized\n", false}, {"uppercase", strings.ToUpper(id), false}, {"31", id[:31], false},
+		{"whitespace", " \n", false}, {"empty", "", false}, {"missing", "", true},
+	} {
+		p := filepath.Join(dir, "mid-"+strings.ReplaceAll(c.name, " ", "_"))
+		if !c.missing {
+			if err := os.WriteFile(p, []byte(c.content), 0o600); err != nil {
+				t.Fatal(err)
+			}
+		}
+		out, err := exec.Command("sh", helper, p).Output()
+		if err != nil {
+			t.Fatalf("%s: helper: %v", c.name, err)
+		}
+		want := ""
+		if !c.missing {
+			want = collectors.MachineIDHash([]byte(c.content))
+		}
+		if got := strings.TrimSpace(string(out)); got != want {
+			t.Errorf("%s: helper %q, collector %q", c.name, got, want)
+		}
+	}
+	// The one input on which the two differ by design (spec §2): an id with
+	// interior whitespace. The collector yields no hash, so the guard is off
+	// and the helper is never emitted; what the helper would print is moot.
+	if h := collectors.MachineIDHash([]byte(id[:16] + " " + id[16:])); h != "" {
+		t.Fatalf("interior space: the collector must yield no hash, got %q", h)
+	}
+}
+
+func guardPlan(t *testing.T, hash string) *Plan {
+	t.Helper()
+	return &Plan{Fix: FixBlock{MaxRisk: "lockout_risk", HostGuard: "on", MachineIDHash: hash}}
+}
+
+func TestScriptRefusesAnotherHost(t *testing.T) {
+	needSh(t)
+	const id = "0123456789abcdef0123456789abcdef"
+	dir := t.TempDir()
+	mid := filepath.Join(dir, "machine-id")
+	if err := os.WriteFile(mid, []byte(id+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	same := collectors.MachineIDHash([]byte(id))
+	other := strings.Repeat("b", 64)
+	repl := runOpts{replace: [][2]string{{"muster_machine_id_hash /etc/machine-id", "muster_machine_id_hash " + mid}}}
+	const refusal = "muster-fix: planned for another host (machine id differs); set MUSTER_ANY_HOST=1 to run it anyway\n"
+
+	backup := filepath.Join(dir, "bk-same")
+	if _, _, code := runScriptWith(t, guardPlan(t, same), dir, backup, repl); code != 0 {
+		t.Fatalf("same host: exit %d", code)
+	}
+	backup = filepath.Join(dir, "bk-other")
+	_, stderr, code := runScriptWith(t, guardPlan(t, other), dir, backup, repl)
+	if code != 2 || stderr != refusal || exists(backup) {
+		t.Fatalf("other host: exit %d stderr %q backup created %v", code, stderr, exists(backup))
+	}
+	o := repl
+	o.env = []string{"MUSTER_ANY_HOST=1"}
+	all, _, code := runScriptWith(t, guardPlan(t, other), dir, filepath.Join(dir, "bk-any"), o)
+	if code != 0 || !strings.Contains(all, "muster-fix: warning: this host's machine id differs from the snapshot's; running because MUSTER_ANY_HOST=1") {
+		t.Fatalf("override: exit %d out %q", code, all)
+	}
+	missing := runOpts{replace: [][2]string{{"muster_machine_id_hash /etc/machine-id", "muster_machine_id_hash " + filepath.Join(dir, "none")}}}
+	_, stderr, code = runScriptWith(t, guardPlan(t, same), dir, filepath.Join(dir, "bk-missing"), missing)
+	if code != 2 || stderr != refusal {
+		t.Fatalf("missing id: exit %d stderr %q", code, stderr)
+	}
+}
+```
+
+
+  `units_test.go` holds the stub, the plan and the two tests:
+
+```go
+package remedy
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+// systemctlStub stands in for systemctl in the unit-helper tests: one state
+// file per unit under $STUB/state/<u> ("<enabled> <active>"), every call
+// appended to $STUB/calls. noinstall/<u> makes enable a silent no-op (a unit
+// with no [Install] section), also/<u> names a partner enable turns on,
+// deps/<u> the units that stopping <u> stops, fail/<u> makes mask fail. An
+// enabled field of "-" makes is-enabled print nothing (recorded "unknown"),
+// and enable refuses while an Also= partner is masked, as systemd does.
+const systemctlStub = `printf '%s\n' "$*" >> "$STUB/calls"
+q= rt= now= verb= u=
+for a in "$@"; do
+  case "$a" in
+    --quiet) q=1;; --runtime) rt=1;; --now) now=1;;
+    --|--value|-p|RequiredBy|BoundBy|ConsistsOf) ;;
+    *) if [ -z "$verb" ]; then verb=$a; else u=$a; fi;;
+  esac
+done
+f="$STUB/state/$u"
+get() { [ -f "$f" ] || return 1; read -r se sa < "$f"; }
+put() { printf '%s %s\n' "$1" "$2" > "$f"; }
+case "$verb" in
+  cat) [ -f "$f" ];;
+  is-enabled) get || { echo not-found; exit 1; }; [ "$se" = - ] && exit 1; echo "$se"; case "$se" in enabled|enabled-runtime) exit 0;; esac; exit 1;;
+  is-active) get || { [ -n "$q" ] || echo inactive; exit 3; }; [ -n "$q" ] || echo "$sa"; [ "$sa" = active ];;
+  show) if [ -f "$STUB/deps/$u" ]; then cat "$STUB/deps/$u"; fi;;
+  enable) get || exit 1; [ -f "$STUB/noinstall/$u" ] && exit 0
+    case "$se" in masked*) exit 1;; esac
+    if [ -f "$STUB/also/$u" ]; then read -r pe pa < "$STUB/state/$(cat "$STUB/also/$u")"; case "$pe" in masked*) exit 1;; esac; fi
+    if [ -n "$rt" ]; then put enabled-runtime "$sa"; else put enabled "$sa"; fi
+    if [ -f "$STUB/also/$u" ]; then p=$(cat "$STUB/also/$u"); read -r pe pa < "$STUB/state/$p"; printf 'enabled %s\n' "$pa" > "$STUB/state/$p"; fi;;
+  disable) get || exit 1
+    if [ -n "$now" ]; then put disabled inactive; else put disabled "$sa"; fi
+    if [ -n "$now" ] && [ -f "$STUB/deps/$u" ]; then
+      for d in $(cat "$STUB/deps/$u"); do read -r de da < "$STUB/state/$d"; printf '%s inactive\n' "$de" > "$STUB/state/$d"; done
+    fi;;
+  mask) [ -f "$STUB/fail/$u" ] && exit 1; get || exit 1
+    if [ -n "$rt" ]; then put masked-runtime "$sa"; else put masked "$sa"; fi;;
+  unmask) get || exit 1; case "$se" in masked*) put disabled "$sa";; esac;;
+  start) get || exit 1; case "$se" in masked*) exit 1;; esac; put "$se" active;;
+  *) exit 1;;
+esac
+`
+
+func unitsPlan(units []string) *Plan {
+	return &Plan{Fix: FixBlock{MaxRisk: "lockout_risk", HostGuard: "off"}, Items: []Item{{
+		ID: "muster.test.u", Risk: "restart_service", Status: "fail", Severity: "high",
+		Script: true, Planned: true, Units: units, Backup: []string{}, Rollback: "units",
+		// the last command fails (the stub rejects an unknown verb) and marks
+		// in $STUB/calls where the body ends and the rollback begins
+		ScriptBody:  "for u in $UNITS; do\n  systemctl --quiet disable --now -- \"$u\"\n  systemctl --quiet mask -- \"$u\" || true\ndone\nsystemctl body-done\n",
+		Validate:    true,
+		ValidateCmd: "true",
+	}}}
+}
+
+// newStub returns the stub's bin directory (put first on PATH) and its state root.
+func newStub(t *testing.T, before map[string]string) (bin, stub string) {
+	t.Helper()
+	bin, stub = t.TempDir(), t.TempDir()
+	writeStub(t, bin, "systemctl", systemctlStub)
+	for u, s := range before {
+		write(t, stub, "state/"+u, s)
+	}
+	return bin, stub
+}
+
+func write(t *testing.T, root, rel, content string) {
+	t.Helper()
+	p := filepath.Join(root, rel)
+	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(p, []byte(content+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func touch(t *testing.T, root, rel string) { t.Helper(); write(t, root, rel, "") }
+
+func state(t *testing.T, stub, u string) string {
+	t.Helper()
+	b, err := os.ReadFile(filepath.Join(stub, "state", u))
+	if err != nil {
+		return "absent"
+	}
+	return strings.TrimSpace(string(b))
+}
+
+// TestUnitHelpersRestoreRecordedState drives each recorded state through a
+// failed units block against the stub and checks the end state and the
+// logs (3D-2b §3).
+func TestUnitHelpersRestoreRecordedState(t *testing.T) {
+	needSh(t)
+	cases := []struct {
+		name     string
+		units    []string
+		before   map[string]string // unit -> "<enabled> <active>"
+		setup    func(t *testing.T, stub string)
+		after    map[string]string // nil: only the logs and the failure are checked
+		logs     []string
+		wantFail bool // ROLLBACK INCOMPLETE expected
+	}{
+		{"enabled active", []string{"a.service"}, map[string]string{"a.service": "enabled active"}, nil, map[string]string{"a.service": "enabled active"}, nil, false},
+		{"enabled-runtime", []string{"a.service"}, map[string]string{"a.service": "enabled-runtime active"}, nil, map[string]string{"a.service": "enabled-runtime active"}, nil, false},
+		{"disabled active", []string{"a.service"}, map[string]string{"a.service": "disabled active"}, nil, map[string]string{"a.service": "disabled active"}, nil, false},
+		{"masked", []string{"a.service"}, map[string]string{"a.service": "masked inactive"}, nil, map[string]string{"a.service": "masked inactive"}, nil, false},
+		{"masked-runtime", []string{"a.service"}, map[string]string{"a.service": "masked-runtime inactive"}, nil, map[string]string{"a.service": "masked-runtime inactive"}, nil, false},
+		{"masked active", []string{"a.service"}, map[string]string{"a.service": "masked active"}, nil, map[string]string{"a.service": "masked inactive"}, nil, false},
+		{"linked", []string{"a.service"}, map[string]string{"a.service": "linked active"}, nil, nil, []string{"a.service: was linked; the link is not restored"}, true},
+		{"static", []string{"a.service"}, map[string]string{"a.service": "static active"}, nil, nil, []string{"a.service: enablement not restored (was static, now disabled)"}, true},
+		{"absent", []string{"a.service"}, map[string]string{}, nil, map[string]string{"a.service": "absent"}, nil, false},
+		{"no install section", []string{"a.service"}, map[string]string{"a.service": "enabled active"}, func(t *testing.T, s string) { touch(t, s, "noinstall/a.service") }, nil, []string{"a.service: enablement not restored (was enabled, now disabled)"}, true},
+		{"also partner", []string{"a.socket", "a.service"}, map[string]string{"a.socket": "disabled inactive", "a.service": "enabled active"}, func(t *testing.T, s string) { write(t, s, "also/a.service", "a.socket") }, map[string]string{"a.socket": "disabled inactive", "a.service": "enabled active"}, nil, false},
+		{"masked socket enabled service", []string{"a.socket", "a.service"}, map[string]string{"a.socket": "masked inactive", "a.service": "enabled active"}, func(t *testing.T, s string) { write(t, s, "also/a.service", "a.socket") }, map[string]string{"a.socket": "masked inactive", "a.service": "enabled active"}, nil, false},
+		{"unknown", []string{"a.service"}, map[string]string{"a.service": "- active"}, nil, nil, []string{"a.service: enablement not restored (was unknown, now disabled)"}, true},
+		{"dependant restarted", []string{"a.service"}, map[string]string{"a.service": "enabled active", "dep.service": "enabled active"}, func(t *testing.T, s string) { write(t, s, "deps/a.service", "dep.service") }, map[string]string{"a.service": "enabled active", "dep.service": "enabled active"}, nil, false},
+		{"mask fails", []string{"a.service"}, map[string]string{"a.service": "masked inactive"}, func(t *testing.T, s string) { touch(t, s, "fail/a.service") }, nil, []string{"muster.test.u: ROLLBACK INCOMPLETE"}, true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			bin, stub := newStub(t, c.before)
+			if c.setup != nil {
+				c.setup(t, stub)
+			}
+			dir := t.TempDir()
+			all, _, code := runScriptWith(t, unitsPlan(c.units), dir, filepath.Join(dir, "bk"), runOpts{pathPrefix: bin, env: []string{"STUB=" + stub}})
+			if code != 1 || !strings.Contains(all, "muster.test.u: script failed (rc 1), rolling back") {
+				t.Fatalf("exit %d, want 1 with the script-failed line:\n%s", code, all)
+			}
+			for _, l := range c.logs {
+				if !strings.Contains(all, l) {
+					t.Errorf("output lacks %q:\n%s", l, all)
+				}
+			}
+			if got := strings.Contains(all, "ROLLBACK INCOMPLETE"); got != c.wantFail {
+				t.Errorf("ROLLBACK INCOMPLETE %v, want %v:\n%s", got, c.wantFail, all)
+			}
+			for u, want := range c.after {
+				if got := state(t, stub, u); got != want {
+					t.Errorf("%s: %q, want %q", u, got, want)
+				}
+			}
+			if want, ok := wantCalls[c.name]; ok {
+				if got := rollbackCalls(t, stub); strings.Join(got, "; ") != strings.Join(want, "; ") {
+					t.Errorf("rollback calls\n got %v\nwant %v", got, want)
+				}
+			}
+		})
+	}
+}
+
+// wantCalls pins the order of the state-changing calls the rollback makes:
+// unmask, enable, re-disable, re-mask, start, dependants (3D-2b §3 passes).
+var wantCalls = map[string][]string{
+	"also partner":                  {"unmask a.socket", "unmask a.service", "enable a.service", "disable a.socket", "start a.service"},
+	"masked socket enabled service": {"unmask a.socket", "unmask a.service", "enable a.service", "mask a.socket", "start a.service"},
+	"dependant restarted":           {"unmask a.service", "enable a.service", "start a.service", "start dep.service"},
+}
+
+// rollbackCalls returns the stub's state-changing calls after the body's
+// body-done marker, flags stripped: "unmask a.socket".
+func rollbackCalls(t *testing.T, stub string) []string {
+	t.Helper()
+	b, err := os.ReadFile(filepath.Join(stub, "calls"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out []string
+	after := false
+	for _, l := range strings.Split(strings.TrimSpace(string(b)), "\n") {
+		if l == "body-done" {
+			after = true
+			continue
+		}
+		var w []string
+		for _, f := range strings.Fields(l) {
+			switch f {
+			case "--quiet", "--runtime", "--now", "--":
+			default:
+				w = append(w, f)
+			}
+		}
+		if after && len(w) == 2 {
+			switch w[0] {
+			case "unmask", "enable", "disable", "mask", "start":
+				out = append(out, w[0]+" "+w[1])
+			}
+		}
+	}
+	return out
+}
+
+// TestUnitHelpersKeepTheFirstRecord pins the first-record rule and its one
+// exception: a record of an absent unit is rewritten once the unit exists.
+func TestUnitHelpersKeepTheFirstRecord(t *testing.T) {
+	needSh(t)
+	dir := t.TempDir()
+	bk := filepath.Join(dir, "bk")
+	bin, stub := newStub(t, map[string]string{"a.service": "enabled active"})
+	opts := runOpts{pathPrefix: bin, env: []string{"STUB=" + stub}}
+	if _, _, code := runScriptWith(t, unitsPlan([]string{"a.service"}), dir, bk, opts); code != 1 {
+		t.Fatalf("first run exit %d", code)
+	}
+	write(t, stub, "state/a.service", "disabled inactive") // the operator changed it between runs
+	all, _, code := runScriptWith(t, unitsPlan([]string{"a.service"}), dir, bk, opts)
+	if code != 1 || !strings.Contains(all, "a.service: unit state exists, keeping the first") || state(t, stub, "a.service") != "enabled active" {
+		t.Fatalf("second run: exit %d state %q:\n%s", code, state(t, stub, "a.service"), all)
+	}
+
+	bk2 := filepath.Join(dir, "bk2")
+	bin2, stub2 := newStub(t, map[string]string{})
+	opts2 := runOpts{pathPrefix: bin2, env: []string{"STUB=" + stub2}}
+	if _, _, code := runScriptWith(t, unitsPlan([]string{"b.service"}), dir, bk2, opts2); code != 1 {
+		t.Fatalf("absent run exit %d", code)
+	}
+	write(t, stub2, "state/b.service", "enabled active") // installed between runs
+	all, _, code = runScriptWith(t, unitsPlan([]string{"b.service"}), dir, bk2, opts2)
+	if code != 1 || strings.Contains(all, "b.service: unit state exists") || state(t, stub2, "b.service") != "enabled active" {
+		t.Fatalf("absent then present: exit %d state %q:\n%s", code, state(t, stub2, "b.service"), all)
+	}
+}
+```
+
+  `writeStub` writes `#!/bin/sh\n` + body at 0o755 (`shipped_test.go:51`). `runScriptWith` puts `pathPrefix` first on `PATH`. If `write`/`touch` collide with existing helper names in the package, rename them `stubWrite`/`stubTouch`.
+
+- [ ] **Step 2: Run** `go test ./internal/remedy -count=1` (Windows compiles; the Linux subtests skip) and on the lab. Expected: FAIL (`undefined: prologue`, `undefined: MachineIDHashHelper`, missing lines).
+- [ ] **Step 3: Implement `script.go`.** Replace the `prologue` const with pieces and a builder:
+
+```go
+// MachineIDHashHelper computes the host identity the snapshot carries
+// (collectors.MachineIDHash): the sha256 of a 32-lowercase-hex machine id,
+// nothing for anything else. Its errors go nowhere: the guard's refusal is
+// the only line a failure prints (3D-2b §2).
+const MachineIDHashHelper = `muster_machine_id_hash() {
+  id=$( { tr -d '[:space:]' < "$1"; } 2>/dev/null ) || id=
+  case "$id" in *[!0-9a-f]*|'') return 0;; esac
+  [ "${#id}" -eq 32 ] || return 0
+  { printf '%s' "$id" | sha256sum | cut -d' ' -f1; } 2>/dev/null
+}`
+
+const guardOff = "# host guard: off (the snapshot has no machine id)"
+
+const guardBody = `here=$(muster_machine_id_hash /etc/machine-id)
+if [ "$here" != "$MUSTER_SNAPSHOT_HOST" ]; then
+  if [ "${MUSTER_ANY_HOST:-}" = 1 ]; then
+    log "warning: this host's machine id differs from the snapshot's; running because MUSTER_ANY_HOST=1"
+  else
+    printf 'muster-fix: planned for another host (machine id differs); set MUSTER_ANY_HOST=1 to run it anyway\n' >&2
+    exit 2
+  fi
+fi`
+```
+
+  `prologueHead` is `set -u`, `umask 077` and `log() { printf 'muster-fix: %s\n' "$*"; }`. `prologueBackup` is the `MUSTER_BACKUP` default, the `case`, the `mkdir`, `backupOwnerLine`, `backup()` and `restore()`; in `restore()` rename `rc` to `brc` (T-6). `unitHelpers` is the two functions of spec §3, verbatim. Then:
+
+```go
+// prologue is the script's fixed part for this plan (3D-2b §2 order): the
+// guard and its helper only when the snapshot carried a well-formed hash.
+func prologue(p *Plan) string {
+	var b strings.Builder
+	b.WriteString(prologueHead + "\n")
+	if p.Fix.HostGuard == "on" {
+		b.WriteString(MachineIDHashHelper + "\n" + rootCheckLine + "\n")
+		b.WriteString("MUSTER_SNAPSHOT_HOST=" + p.Fix.MachineIDHash + "\n" + guardBody + "\n")
+	} else {
+		b.WriteString(rootCheckLine + "\n" + guardOff + "\n")
+	}
+	b.WriteString(prologueBackup + "\n" + unitHelpers + "\nfailed=0\n")
+	return b.String()
+}
+```
+
+  `HostGuard == "on"` is only ever set with a hash that matched `^[0-9a-f]{64}$` (Task 4). `Script` writes `prologue(p)` where it wrote the const.
+
+  In `block()`, this snippet replaces the existing `lines = append(lines, "  ( set -e")` that opens the body subshell (`script.go:146`); keep the backup line above it:
+
+```go
+		if len(it.Units) > 0 {
+			lines = append(lines, fmt.Sprintf(`  save_units %s || { log "%s: backup failed, nothing changed"; return 1; }`, strings.Join(it.Units, " "), it.ID))
+		}
+		lines = append(lines, "  ( set -e")
+		if len(it.Units) > 0 {
+			lines = append(lines, "    UNITS='"+strings.Join(it.Units, " ")+"'")
+		}
+```
+
+  Before the validate subshell: `lines = append(lines, "  # validate", "  ( set -e", …)`. In `failurePath`, after the rollback subshell and before the restore line:
+
+```go
+	if len(it.Units) > 0 {
+		out = append(out, fmt.Sprintf(`%srestore_units %s || log "%s: ROLLBACK INCOMPLETE, backups in $MUSTER_BACKUP"`, pfx, strings.Join(it.Units, " "), it.ID))
+	}
+```
+
+- [ ] **Step 4: Run.**
+  1. `go test ./internal/remedy -run 'TestScriptGolden|TestJSONGolden|TestTableGolden' -update`. `full.json` moves too: `run.host.machine_id_hash` is set and `fix.host_guard` becomes `"on"`.
+  2. Read every golden diff:
+     - the prologue order;
+     - `full.sh` guard-on with the fixture hash;
+     - `empty.sh`, `capped.sh` and `poison.sh` guard-off;
+     - the `# validate` markers;
+     - `g_units`' `save_units`/`UNITS=`/`restore_units`;
+     - `all-scripted.sh`'s `# validate` markers and its new prologue (its `UNITS=` lines arrive with Task 6, which declares the shipped units);
+     - `restore()`'s `brc`;
+     - `full.json`'s hash and `host_guard: "on"`.
+  3. Run `go test ./internal/remedy -count=1` (Windows), then as root on the lab with `-race`, then `make shellcheck` on the lab (or note that CI covers it).
+- [ ] **Step 5: Mutation check.**
+  1. Emit the guard before `log()` (swap the two writes), and see `TestScriptPrologueOrder` and `TestScriptRefusesAnotherHost`'s override assertion go red.
+  2. Drop pass 7 from `unitHelpers`, and see the `no install section` case go red.
+  3. Drop the `# validate` marker, and see `TestScriptUnitsBlockOrder` go red.
+  4. Swap passes 2 and 4 of `restore_units` (mask before enable), and see the `masked socket enabled service` case go red: its `enable` refuses while the partner is masked, and its call order changes.
+
+  Restore each.
+- [ ] **Step 6: Commit** "Guard the review script by the snapshot's machine id, record and restore unit state, and mark every validate". The body names T-5, T-6 and T-7, the prologue order, and "goldens regenerated: prologue, guard, units, markers".
+
+---
+
+### Task 6: The sixteen remediation blocks rewritten, the unit pin, the file validates
 
 **Files:**
 - Modify: `controls/service/{automount,dos_services,finger,nfs_server,nis,rpcbind,rservices,snmp,telnet,tftp_talk}_disabled.yaml` (remediation blocks)
@@ -366,7 +1037,7 @@ func lintSharedRemediation(s *Set) []Problem {
 
 **Interfaces:**
 - Consumes: `Remediation.Units` (Task 3).
-- Produces: the shipped blocks the goldens of Task 6 render.
+- Produces: the shipped blocks the goldens of Task 5 render.
 
 - [ ] **Step 1: Write the failing pin test.** Replace the body of `remediation_units_test.go` after `unitToken`:
 
@@ -507,8 +1178,20 @@ func TestFileValidatesAcceptTheDefaultModes(t *testing.T) {
 		"muster.file.services_permissions":  {"%u %g %a", "0 0"},
 		"muster.file.shadow_permissions":    {"%u %a", "0"},
 	}
-	if len(owners) != 5 {
-		t.Fatal("five file controls")
+	shipped := map[string]bool{}
+	for i := range set.Controls {
+		c := &set.Controls[i]
+		if c.Category == "file" && c.Remediation != nil && strings.TrimSpace(c.Remediation.Script) != "" {
+			shipped[c.ID] = true
+		}
+	}
+	if len(shipped) != 5 || len(owners) != 5 {
+		t.Fatalf("scripted file controls %v, want exactly the five of the owner table", shipped)
+	}
+	for id := range shipped {
+		if _, ok := owners[id]; !ok {
+			t.Errorf("%s: scripted file control missing from the owner table", id)
+		}
 	}
 	for id, o := range owners {
 		c, ok := set.ByID(id)
@@ -533,7 +1216,7 @@ func TestFileValidatesAcceptTheDefaultModes(t *testing.T) {
 }
 ```
 
-  Write `modeClauseList(t, c controls.Control) []any` and `toInt(t, v any) int` in the same file. The first finds the check whose `fact` ends `.mode` with `op: in` and returns its `Expected` as `[]any`; read `schema.go`'s check type for the field names. The second accepts `int`, `int64`, `uint64` and `float64`. If the YAML decoder yields a type it does not know, `t.Fatalf` with that type.
+  Write `modeClauseList(t *testing.T, c *controls.Control) []any` (`set.ByID` returns a pointer) and `toInt(t, v any) int` in the same file. The first finds the check whose `fact` ends `.mode` with `op: in` and returns its `Expected` as `[]any`; read `schema.go`'s check type for the field names. The second accepts `int`, `int64`, `uint64` and `float64`. If the YAML decoder yields a type it does not know, `t.Fatalf` with that type.
 
   Append to `internal/remedy/shipped_test.go`:
 
@@ -554,9 +1237,9 @@ func TestFileScriptsRepairOnARealFile(t *testing.T) {
 		stricter uint32
 	}{
 		{"muster.file.hosts_permissions", []uint32{0, 0o200, 0o400, 0o600}, []uint32{0o644, 0o666, 0o4600, 0o1600}, 0o400},
-		{"muster.file.hosts_lpd_permissions", []uint32{0, 0o600}, []uint32{0o644, 0o2600}, 0o400},
-		{"muster.file.passwd_permissions", []uint32{0o644, 0o444, 0o600}, []uint32{0o664, 0o666, 0o755}, 0o444},
-		{"muster.file.services_permissions", []uint32{0o644, 0o400}, []uint32{0o666, 0o744}, 0o400},
+		{"muster.file.hosts_lpd_permissions", []uint32{0, 0o200, 0o400, 0o600}, []uint32{0o644, 0o2600}, 0o400},
+		{"muster.file.passwd_permissions", []uint32{0, 0o4, 0o40, 0o44, 0o200, 0o204, 0o240, 0o244, 0o400, 0o404, 0o440, 0o444, 0o600, 0o604, 0o640, 0o644}, []uint32{0o664, 0o666, 0o755}, 0o444},
+		{"muster.file.services_permissions", []uint32{0, 0o4, 0o40, 0o44, 0o200, 0o204, 0o240, 0o244, 0o400, 0o404, 0o440, 0o444, 0o600, 0o604, 0o640, 0o644}, []uint32{0o666, 0o744}, 0o400},
 		{"muster.file.shadow_permissions", []uint32{0, 0o400}, []uint32{0o640, 0o600, 0o4400}, 0},
 	}
 	for _, c := range cases {
@@ -708,587 +1391,9 @@ func TestFileScriptsRepairOnARealFile(t *testing.T) {
   go run ./tools/coverage -check
   ```
 
-  Expected: PASS and `ok:`. Then run `go test ./internal/remedy -count=1`. Expected: the `all-scripted` golden and `TestScriptAllScriptedCoversTheShippedSet` change. Regenerate with `-update` **only** for `all-scripted.sh`, read the diff (ten loops over `$UNITS`, no service rollbacks, symbolic chmods), and note that the `UNITS=` lines arrive in Task 6. On the lab, render each body through `sh -n`, and through `shellcheck -s sh` if the lab has it.
+  Expected: PASS and `ok:`. Then run `go test ./internal/remedy -count=1`. Expected: only the `all-scripted.sh` golden changes (`TestScriptAllScriptedCoversTheShippedSet` keeps 16/16). Regenerate it with `go test ./internal/remedy -run TestScriptGolden -update` and read the diff: the ten service blocks gain `save_units`, `UNITS=` and `restore_units` from Task 5's template and lose their rollback subshells; the file blocks show symbolic chmods and `case` validates. On the lab, render each body through `sh -n`, and through `shellcheck -s sh` if the lab has it.
 - [ ] **Step 6: Mutation check.** Put a literal `rpcbind.socket` back into the rpcbind script, see the pin test go red, and restore. Drop `*) false` from the hosts validate, see `TestFileValidatesAcceptTheDefaultModes` go red, and restore.
 - [ ] **Step 7: Commit** "Declare the ten service controls' units and drop their rollbacks; clear file bits symbolically with validates over the default modes". The body names the VERSION bump, T-11 and "no judgment changed".
-
----
-
-### Task 5: The plan — `HostGuard`, `Units`, the `units` rollback value
-
-**Files:**
-- Modify: `internal/remedy/plan.go:27-38` (FixBlock), `43-67` (Item), `129-138` (fill), `162-168` (unit check), `228-240` (rollback switch)
-- Test: `internal/remedy/plan_test.go` (`TestPlanCopiesProvenance` ~271-298, `TestPlanItemCopiesEveryField` ~353-371, `TestPlanRollbackVocabulary` ~153-197, `TestPlanJSONShape` ~393-443, new `TestPlanHostGuard`, new `TestPlanRefusesAnUnsafeUnit`)
-- Modify: `internal/remedy/fixture_test.go:42-98` (T-8: `g_units`)
-
-**Interfaces:**
-- Consumes: `controls.ValidUnitName` (Task 3).
-- Produces:
-  - `FixBlock.HostGuard string` (`json:"host_guard"`, `"on"`|`"off"`, after `MaxRisk`);
-  - `FixBlock.MachineIDHash string` (`json:"-"`);
-  - `Item.Units []string` (`json:"units"`, after `Backup`, `[]` when none);
-  - `Item.Rollback` gains `"units"`.
-
-- [ ] **Step 1: Write the failing tests.** Add `g_units` to `testControls` (T-8). Write its YAML with the same `controlHead` shape as `b_restart` and this remediation:
-
-```yaml
-remediation:
-  text_en: t
-  text_ko: 조치
-  risk: restart_service
-  idempotent: true
-  units: [g.socket, g.service]
-  script: |
-    for u in $UNITS; do systemctl --quiet disable --now "$u"; done
-  validate: "! systemctl is-active --quiet g.service"
-```
-
-  In `plan_test.go`:
-
-```go
-func TestPlanHostGuard(t *testing.T) {
-	h := strings.Repeat("c", 64) // any 64 lowercase hex
-	for _, c := range []struct{ in, guard, hash string }{
-		{h, "on", h},
-		{"", "off", ""},
-		{strings.ToUpper(h), "off", ""},
-		{h[:63], "off", ""},
-		{h + "'; id; '", "off", ""},
-	} {
-		rep := testReport(row("muster.test.a_none", "FAIL", "r", "", "high"))
-		rep.Run.Host.MachineIDHash = c.in
-		p := build(t, rep, Options{})
-		if p.Fix.HostGuard != c.guard || p.Fix.MachineIDHash != c.hash {
-			t.Errorf("hash %q: guard %q hash %q, want %q %q", c.in, p.Fix.HostGuard, p.Fix.MachineIDHash, c.guard, c.hash)
-		}
-	}
-}
-
-func TestPlanRefusesAnUnsafeUnit(t *testing.T) {
-	set := testSet(t)
-	for i := range set.Controls {
-		if set.Controls[i].ID == "muster.test.g_units" {
-			set.Controls[i].Remediation.Units = []string{"g.socket", "x';id;'.service"}
-		}
-	}
-	_, err := Build(testReport(row("muster.test.g_units", "FAIL", "r", "", "high")), set, Options{})
-	if err == nil || !strings.Contains(err.Error(), `refusing to plan muster.test.g_units: unit "x';id;'.service"`) {
-		t.Fatalf("err = %v", err)
-	}
-}
-```
-
-  (`testReport` and `testSet` are the fixture helpers; if `Build` needs a report from `scriptReport`, use the helper `TestPlanRefusesAnUnexpectedID` uses at `plan_test.go:213-230`.) Extend `TestPlanRollbackVocabulary`'s `want` with `"muster.test.g_units": {rollback: "units", backup: 0, script: true, validate: true}` (match the existing struct's fields), and add its FAIL row to the report the test builds. Extend `TestPlanJSONShape` to assert that a text-only item's JSON has `"units": []`, that `g_units` has `"units": ["g.socket", "g.service"]`, and that `fix.host_guard` exists. Update `TestPlanCopiesProvenance`'s `want` with `HostGuard: "off"` and `TestPlanItemCopiesEveryField`'s `want` with `Units: []string{}`.
-
-- [ ] **Step 2: Run** `go test ./internal/remedy -run 'TestPlan' -count=1`. Expected: FAIL (unknown fields).
-- [ ] **Step 3: Implement.** In `FixBlock`, after `MaxRisk`:
-
-```go
-	HostGuard       string              `json:"host_guard"` // on | off (3D-2b Q-1)
-	MachineIDHash   string              `json:"-"`          // the snapshot's, when well formed; the script's guard compares it
-```
-
-  In `Item`, after `Backup`: `Units []string \`json:"units"\``. Update the `Rollback` comment to `none | declared | restore_backup | units | both`. In `Build`'s FixBlock fill:
-
-```go
-	hash, guard := "", "off"
-	if machineHashRe.MatchString(rep.Run.Host.MachineIDHash) {
-		hash, guard = rep.Run.Host.MachineIDHash, "on"
-	}
-```
-
-  Set `HostGuard: guard, MachineIDHash: hash`. Declare `var machineHashRe = regexp.MustCompile(\`^[0-9a-f]{64}$\`)` (add `regexp` to the imports). After `p.Items = append(p.Items, item(row, set, cb, maxRank))`, check the units:
-
-```go
-			for _, u := range p.Items[len(p.Items)-1].Units {
-				if !controls.ValidUnitName(u) {
-					return nil, fmt.Errorf("refusing to plan %s: unit %q is not a unit name a script can carry", row.ID, u)
-				}
-			}
-```
-
-  In `item()`, the text-only initialiser gains `Units: []string{}`. The script branch sets `it.Units = append([]string{}, r.Units...)`, and its switch becomes:
-
-```go
-		hasRB, hasBK, hasU := strings.TrimSpace(r.Rollback) != "", len(r.Backup) > 0, len(r.Units) > 0
-		switch {
-		case hasRB && hasBK:
-			it.Rollback = "both"
-		case hasU:
-			it.Rollback = "units"
-		case hasRB:
-			it.Rollback = "declared"
-		default:
-			it.Rollback = "restore_backup"
-		}
-```
-
-- [ ] **Step 4: Run** `go test ./internal/remedy -count=1`. Expected: the plan tests PASS. Goldens (`full.json`, `full.table`, `full.sh`, `all-scripted.sh`) and the count assertions that include `g_units` fail.
-  - Fix the counts: in `TestScriptBlocksAreIndependent`, scripted goes 3 → 4. Fix every count the new item moves, and nothing else.
-  - Run `go test ./internal/remedy -run 'TestTableGolden|TestJSONGolden' -update`, read the diff (one `g_units` item, `units` arrays, `host_guard: "off"`), and run again without `-update`.
-  - `TestScriptGolden` stays red until Task 6. Note it, and do not update `.sh` goldens here.
-- [ ] **Step 5: Mutation check.** Return `guard = "on"` unconditionally, see `TestPlanHostGuard` go red, and restore. Remove the unit loop in `Build`, see `TestPlanRefusesAnUnsafeUnit` go red, and restore.
-- [ ] **Step 6: Commit** "Plan the host guard and each item's units: on only for a well-formed hash, the units rollback, unsafe unit names refused". The body names T-3, T-4 and T-8, and notes that the script goldens are red until the next commit.
-
----
-
-### Task 6: The script — prologue, guard, unit helpers, `# validate`
-
-**Files:**
-- Modify: `internal/remedy/script.go` (whole prologue; `failurePath` 106-120; `block` 125-172)
-- Test: `internal/remedy/script_test.go` (`templateLines` 306-335, `runScriptStreams` 457-497, `fullPlan` 52-71, `poisonPlan` 133-158, new tests)
-- Test: `internal/remedy/hostguard_test.go` (new; imports `internal/collect/collectors`, untagged per T-10)
-- Test: `internal/remedy/units_test.go` (new)
-- Goldens: `internal/remedy/testdata/*.sh`
-
-**Interfaces:**
-- Consumes: `FixBlock.MachineIDHash`, `FixBlock.HostGuard`, `Item.Units` (Task 5); `collectors.MachineIDHash` (Task 2).
-- Produces:
-  - `const MachineIDHashHelper string`;
-  - `func prologue(p *Plan) string`;
-  - the template lines `MUSTER_SNAPSHOT_HOST=<64 hex>`, `# host guard: off (the snapshot has no machine id)`, `  save_units <u…> || { log "<id>: backup failed, nothing changed"; return 1; }`, `    UNITS='<u…>'`, `    restore_units <u…> || log "<id>: ROLLBACK INCOMPLETE, backups in $MUSTER_BACKUP"`, `  # validate`.
-
-- [ ] **Step 1: Write the failing tests.** In `script_test.go`:
-  - `fullPlan` sets `rep.Run.Host.MachineIDHash` to the sha256 of `0123456789abcdef0123456789abcdef` (compute it in the test with `crypto/sha256`, T-8).
-  - `poisonPlan` sets it to `"'; id; '" + strings.Repeat("a", 56)` and asserts `p.Fix.HostGuard == "off"`.
-  - `templateLines(p)` starts from `strings.Split(prologue(p)+epilogue, "\n")`. Per item with `Units` it adds the `save_units`, `UNITS=` and `restore_units` lines in their exact rendered forms, and per item with `Validate` it adds `"  # validate"`.
-  - `TestScriptEveryLineIsTemplateBodyOrComment` additionally requires that the only non-comment line containing a 64-hex run is `MUSTER_SNAPSHOT_HOST=<p.Fix.MachineIDHash>`, and that the poison hash string never appears on a non-comment line.
-  - Add `runOpts`/`runScriptWith` (T-7). `runScriptStreams` becomes `runScriptWith(t, p, dir, backupDir, runOpts{})`, and the env is built from `os.Environ()` minus any `MUSTER_ANY_HOST=` entry.
-
-```go
-type runOpts struct {
-	replace    [][2]string // applied to the rendered script, each must change it
-	pathPrefix string      // prepended to PATH
-	env        []string
-}
-```
-
-  New tests in `script_test.go`:
-
-```go
-func TestScriptGuardOffWithoutAHash(t *testing.T) {
-	s := string(Script(emptyPlan(t)))
-	if !strings.Contains(s, "\n# host guard: off (the snapshot has no machine id)\n") || strings.Contains(s, "muster_machine_id_hash") || strings.Contains(s, "MUSTER_SNAPSHOT_HOST") {
-		t.Fatalf("guard-off prologue wrong:\n%s", s)
-	}
-}
-
-func TestScriptPrologueOrder(t *testing.T) {
-	s := string(Script(fullPlan(t)))
-	order := []string{"set -u\n", "umask 077\n", "log() {", "muster_machine_id_hash() {", rootCheckLine, "MUSTER_SNAPSHOT_HOST=", `MUSTER_BACKUP="${MUSTER_BACKUP:-`, `mkdir -p "$MUSTER_BACKUP" || exit 2`, backupOwnerLine, "backup() {", "restore() {", "save_units() {", "restore_units() {", "failed=0\n"}
-	at := 0
-	for _, o := range order {
-		i := strings.Index(s[at:], o)
-		if i < 0 {
-			t.Fatalf("prologue: %q missing or out of order", o)
-		}
-		at += i + len(o)
-	}
-}
-
-func TestScriptUnitsBlockOrder(t *testing.T) {
-	ls := lines(Script(fullPlan(t)))
-	fn := fnName("muster.test.g_units")
-	in, saw := false, map[string]int{}
-	for i, l := range ls {
-		if l == fn+"() {" {
-			in = true
-		}
-		if !in {
-			continue
-		}
-		switch {
-		case strings.HasPrefix(l, "  save_units g.socket g.service || "):
-			saw["save"] = i
-		case l == "    UNITS='g.socket g.service'":
-			if ls[i-1] != "  ( set -e" {
-				t.Errorf("UNITS= not the first body line: after %q", ls[i-1])
-			}
-			saw["units"] = i
-		case strings.HasPrefix(l, "    restore_units g.socket g.service || log "):
-			saw["restore"]++
-		case l == "  # validate":
-			if ls[i+1] != "  ( set -e" {
-				t.Errorf("# validate not before the validate subshell")
-			}
-			saw["marker"] = i
-		case l == "}":
-			in = false
-		}
-	}
-	if saw["save"] == 0 || saw["units"] <= saw["save"] || saw["restore"] != 2 || saw["marker"] == 0 {
-		t.Fatalf("units block shape: %v", saw)
-	}
-}
-```
-
-  `hostguard_test.go`:
-
-```go
-package remedy
-
-import (
-	"os"
-	"os/exec"
-	"path/filepath"
-	"strings"
-	"testing"
-
-	"github.com/kun9497/muster/internal/collect/collectors"
-)
-
-// TestHostGuardHashMatchesTheCollector pins 3D-2b §2: on every id the
-// collector hashes, the script's helper computes the same value; on every id
-// it refuses, both yield nothing.
-func TestHostGuardHashMatchesTheCollector(t *testing.T) {
-	needSh(t)
-	const id = "0123456789abcdef0123456789abcdef"
-	dir := t.TempDir()
-	helper := filepath.Join(dir, "h.sh")
-	if err := os.WriteFile(helper, []byte(MachineIDHashHelper+"\nmuster_machine_id_hash \"$1\"\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	for _, c := range []struct {
-		name, content string
-		missing       bool
-	}{
-		{"trailing LF", id + "\n", false}, {"CRLF", id + "\r\n", false}, {"leading blanks", "  " + id, false}, {"leading LF", "\n" + id, false},
-		{"uninitialized", "uninitialized\n", false}, {"uppercase", strings.ToUpper(id), false}, {"31", id[:31], false},
-		{"interior space", id[:16] + " " + id[16:], false}, {"whitespace", " \n", false}, {"empty", "", false}, {"missing", "", true},
-	} {
-		p := filepath.Join(dir, "mid-"+strings.ReplaceAll(c.name, " ", "_"))
-		if !c.missing {
-			if err := os.WriteFile(p, []byte(c.content), 0o600); err != nil {
-				t.Fatal(err)
-			}
-		}
-		out, err := exec.Command("sh", helper, p).Output()
-		if err != nil {
-			t.Fatalf("%s: helper: %v", c.name, err)
-		}
-		want := ""
-		if !c.missing {
-			want = collectors.MachineIDHash([]byte(c.content))
-		}
-		if got := strings.TrimSpace(string(out)); got != want {
-			t.Errorf("%s: helper %q, collector %q", c.name, got, want)
-		}
-	}
-}
-
-func guardPlan(t *testing.T, hash string) *Plan {
-	t.Helper()
-	return &Plan{Fix: FixBlock{MaxRisk: "lockout_risk", HostGuard: "on", MachineIDHash: hash}}
-}
-
-func TestScriptRefusesAnotherHost(t *testing.T) {
-	needSh(t)
-	const id = "0123456789abcdef0123456789abcdef"
-	dir := t.TempDir()
-	mid := filepath.Join(dir, "machine-id")
-	if err := os.WriteFile(mid, []byte(id+"\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	same := collectors.MachineIDHash([]byte(id))
-	other := strings.Repeat("b", 64)
-	repl := runOpts{replace: [][2]string{{"muster_machine_id_hash /etc/machine-id", "muster_machine_id_hash " + mid}}}
-	const refusal = "muster-fix: planned for another host (machine id differs); set MUSTER_ANY_HOST=1 to run it anyway\n"
-
-	backup := filepath.Join(dir, "bk-same")
-	if _, _, code := runScriptWith(t, guardPlan(t, same), dir, backup, repl); code != 0 {
-		t.Fatalf("same host: exit %d", code)
-	}
-	backup = filepath.Join(dir, "bk-other")
-	_, stderr, code := runScriptWith(t, guardPlan(t, other), dir, backup, repl)
-	if code != 2 || stderr != refusal || exists(backup) {
-		t.Fatalf("other host: exit %d stderr %q backup created %v", code, stderr, exists(backup))
-	}
-	o := repl
-	o.env = []string{"MUSTER_ANY_HOST=1"}
-	all, _, code := runScriptWith(t, guardPlan(t, other), dir, filepath.Join(dir, "bk-any"), o)
-	if code != 0 || !strings.Contains(all, "muster-fix: warning: this host's machine id differs from the snapshot's; running because MUSTER_ANY_HOST=1") {
-		t.Fatalf("override: exit %d out %q", code, all)
-	}
-	missing := runOpts{replace: [][2]string{{"muster_machine_id_hash /etc/machine-id", "muster_machine_id_hash " + filepath.Join(dir, "none")}}}
-	_, stderr, code = runScriptWith(t, guardPlan(t, same), dir, filepath.Join(dir, "bk-missing"), missing)
-	if code != 2 || stderr != refusal {
-		t.Fatalf("missing id: exit %d stderr %q", code, stderr)
-	}
-}
-```
-
-
-  `units_test.go` holds the stub, the plan and the two tests:
-
-```go
-package remedy
-
-import (
-	"os"
-	"path/filepath"
-	"strings"
-	"testing"
-)
-
-// systemctlStub stands in for systemctl in the unit-helper tests: one state
-// file per unit under $STUB/state/<u> ("<enabled> <active>"), every call
-// appended to $STUB/calls. noinstall/<u> makes enable a silent no-op (a unit
-// with no [Install] section), also/<u> names a partner enable turns on,
-// deps/<u> the units that stopping <u> stops, fail/<u> makes mask fail.
-const systemctlStub = `printf '%s\n' "$*" >> "$STUB/calls"
-q= rt= now= verb= u=
-for a in "$@"; do
-  case "$a" in
-    --quiet) q=1;; --runtime) rt=1;; --now) now=1;;
-    --|--value|-p|RequiredBy|BoundBy|ConsistsOf) ;;
-    *) if [ -z "$verb" ]; then verb=$a; else u=$a; fi;;
-  esac
-done
-f="$STUB/state/$u"
-get() { [ -f "$f" ] || return 1; read -r se sa < "$f"; }
-put() { printf '%s %s\n' "$1" "$2" > "$f"; }
-case "$verb" in
-  cat) [ -f "$f" ];;
-  is-enabled) get || { echo not-found; exit 1; }; echo "$se"; case "$se" in enabled|enabled-runtime) exit 0;; esac; exit 1;;
-  is-active) get || { [ -n "$q" ] || echo inactive; exit 3; }; [ -n "$q" ] || echo "$sa"; [ "$sa" = active ];;
-  show) if [ -f "$STUB/deps/$u" ]; then cat "$STUB/deps/$u"; fi;;
-  enable) get || exit 1; [ -f "$STUB/noinstall/$u" ] && exit 0
-    case "$se" in masked*) exit 1;; esac
-    if [ -n "$rt" ]; then put enabled-runtime "$sa"; else put enabled "$sa"; fi
-    if [ -f "$STUB/also/$u" ]; then p=$(cat "$STUB/also/$u"); read -r pe pa < "$STUB/state/$p"; printf 'enabled %s\n' "$pa" > "$STUB/state/$p"; fi;;
-  disable) get || exit 1
-    if [ -n "$now" ]; then put disabled inactive; else put disabled "$sa"; fi
-    if [ -n "$now" ] && [ -f "$STUB/deps/$u" ]; then
-      for d in $(cat "$STUB/deps/$u"); do read -r de da < "$STUB/state/$d"; printf '%s inactive\n' "$de" > "$STUB/state/$d"; done
-    fi;;
-  mask) [ -f "$STUB/fail/$u" ] && exit 1; get || exit 1
-    if [ -n "$rt" ]; then put masked-runtime "$sa"; else put masked "$sa"; fi;;
-  unmask) get || exit 1; case "$se" in masked*) put disabled "$sa";; esac;;
-  start) get || exit 1; case "$se" in masked*) exit 1;; esac; put "$se" active;;
-  *) exit 1;;
-esac
-`
-
-func unitsPlan(units []string) *Plan {
-	return &Plan{Fix: FixBlock{MaxRisk: "lockout_risk", HostGuard: "off"}, Items: []Item{{
-		ID: "muster.test.u", Risk: "restart_service", Status: "fail", Severity: "high",
-		Script: true, Planned: true, Units: units, Backup: []string{}, Rollback: "units",
-		ScriptBody:  "for u in $UNITS; do\n  systemctl --quiet disable --now -- \"$u\"\n  systemctl --quiet mask -- \"$u\" || true\ndone\nfalse\n",
-		Validate:    true,
-		ValidateCmd: "true",
-	}}}
-}
-
-// newStub returns the stub's bin directory (put first on PATH) and its state root.
-func newStub(t *testing.T, before map[string]string) (bin, stub string) {
-	t.Helper()
-	bin, stub = t.TempDir(), t.TempDir()
-	writeStub(t, bin, "systemctl", systemctlStub)
-	for u, s := range before {
-		write(t, stub, "state/"+u, s)
-	}
-	return bin, stub
-}
-
-func write(t *testing.T, root, rel, content string) {
-	t.Helper()
-	p := filepath.Join(root, rel)
-	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(p, []byte(content+"\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func touch(t *testing.T, root, rel string) { t.Helper(); write(t, root, rel, "") }
-
-func state(t *testing.T, stub, u string) string {
-	t.Helper()
-	b, err := os.ReadFile(filepath.Join(stub, "state", u))
-	if err != nil {
-		return "absent"
-	}
-	return strings.TrimSpace(string(b))
-}
-
-// TestUnitHelpersRestoreRecordedState drives each recorded state through a
-// failed units block against the stub and checks the end state and the
-// logs (3D-2b §3).
-func TestUnitHelpersRestoreRecordedState(t *testing.T) {
-	needSh(t)
-	cases := []struct {
-		name     string
-		units    []string
-		before   map[string]string // unit -> "<enabled> <active>"
-		setup    func(t *testing.T, stub string)
-		after    map[string]string // nil: only the logs and the failure are checked
-		logs     []string
-		wantFail bool // ROLLBACK INCOMPLETE expected
-	}{
-		{"enabled active", []string{"a.service"}, map[string]string{"a.service": "enabled active"}, nil, map[string]string{"a.service": "enabled active"}, nil, false},
-		{"enabled-runtime", []string{"a.service"}, map[string]string{"a.service": "enabled-runtime active"}, nil, map[string]string{"a.service": "enabled-runtime active"}, nil, false},
-		{"disabled active", []string{"a.service"}, map[string]string{"a.service": "disabled active"}, nil, map[string]string{"a.service": "disabled active"}, nil, false},
-		{"masked", []string{"a.service"}, map[string]string{"a.service": "masked inactive"}, nil, map[string]string{"a.service": "masked inactive"}, nil, false},
-		{"masked-runtime", []string{"a.service"}, map[string]string{"a.service": "masked-runtime inactive"}, nil, map[string]string{"a.service": "masked-runtime inactive"}, nil, false},
-		{"masked active", []string{"a.service"}, map[string]string{"a.service": "masked active"}, nil, map[string]string{"a.service": "masked inactive"}, nil, false},
-		{"linked", []string{"a.service"}, map[string]string{"a.service": "linked active"}, nil, nil, []string{"a.service: was linked; the link is not restored"}, true},
-		{"static", []string{"a.service"}, map[string]string{"a.service": "static active"}, nil, nil, []string{"a.service: enablement not restored (was static, now disabled)"}, true},
-		{"absent", []string{"a.service"}, map[string]string{}, nil, map[string]string{"a.service": "absent"}, nil, false},
-		{"no install section", []string{"a.service"}, map[string]string{"a.service": "enabled active"}, func(t *testing.T, s string) { touch(t, s, "noinstall/a.service") }, nil, []string{"a.service: enablement not restored (was enabled, now disabled)"}, true},
-		{"also partner", []string{"a.socket", "a.service"}, map[string]string{"a.socket": "disabled inactive", "a.service": "enabled active"}, func(t *testing.T, s string) { write(t, s, "also/a.service", "a.socket") }, map[string]string{"a.socket": "disabled inactive", "a.service": "enabled active"}, nil, false},
-		{"masked socket enabled service", []string{"a.socket", "a.service"}, map[string]string{"a.socket": "masked inactive", "a.service": "enabled active"}, nil, map[string]string{"a.socket": "masked inactive", "a.service": "enabled active"}, nil, false},
-		{"dependant restarted", []string{"a.service"}, map[string]string{"a.service": "enabled active", "dep.service": "enabled active"}, func(t *testing.T, s string) { write(t, s, "deps/a.service", "dep.service") }, map[string]string{"a.service": "enabled active", "dep.service": "enabled active"}, nil, false},
-		{"mask fails", []string{"a.service"}, map[string]string{"a.service": "masked inactive"}, func(t *testing.T, s string) { touch(t, s, "fail/a.service") }, nil, []string{"muster.test.u: ROLLBACK INCOMPLETE"}, true},
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			bin, stub := newStub(t, c.before)
-			if c.setup != nil {
-				c.setup(t, stub)
-			}
-			dir := t.TempDir()
-			all, _, code := runScriptWith(t, unitsPlan(c.units), dir, filepath.Join(dir, "bk"), runOpts{pathPrefix: bin, env: []string{"STUB=" + stub}})
-			if code != 1 || !strings.Contains(all, "muster.test.u: script failed (rc 1), rolling back") {
-				t.Fatalf("exit %d, want 1 with the script-failed line:\n%s", code, all)
-			}
-			for _, l := range c.logs {
-				if !strings.Contains(all, l) {
-					t.Errorf("output lacks %q:\n%s", l, all)
-				}
-			}
-			if got := strings.Contains(all, "ROLLBACK INCOMPLETE"); got != c.wantFail {
-				t.Errorf("ROLLBACK INCOMPLETE %v, want %v:\n%s", got, c.wantFail, all)
-			}
-			for u, want := range c.after {
-				if got := state(t, stub, u); got != want {
-					t.Errorf("%s: %q, want %q", u, got, want)
-				}
-			}
-		})
-	}
-}
-
-// TestUnitHelpersKeepTheFirstRecord pins the first-record rule and its one
-// exception: a record of an absent unit is rewritten once the unit exists.
-func TestUnitHelpersKeepTheFirstRecord(t *testing.T) {
-	needSh(t)
-	dir := t.TempDir()
-	bk := filepath.Join(dir, "bk")
-	bin, stub := newStub(t, map[string]string{"a.service": "enabled active"})
-	opts := runOpts{pathPrefix: bin, env: []string{"STUB=" + stub}}
-	if _, _, code := runScriptWith(t, unitsPlan([]string{"a.service"}), dir, bk, opts); code != 1 {
-		t.Fatalf("first run exit %d", code)
-	}
-	write(t, stub, "state/a.service", "disabled inactive") // the operator changed it between runs
-	all, _, code := runScriptWith(t, unitsPlan([]string{"a.service"}), dir, bk, opts)
-	if code != 1 || !strings.Contains(all, "a.service: unit state exists, keeping the first") || state(t, stub, "a.service") != "enabled active" {
-		t.Fatalf("second run: exit %d state %q:\n%s", code, state(t, stub, "a.service"), all)
-	}
-
-	bk2 := filepath.Join(dir, "bk2")
-	bin2, stub2 := newStub(t, map[string]string{})
-	opts2 := runOpts{pathPrefix: bin2, env: []string{"STUB=" + stub2}}
-	if _, _, code := runScriptWith(t, unitsPlan([]string{"b.service"}), dir, bk2, opts2); code != 1 {
-		t.Fatalf("absent run exit %d", code)
-	}
-	write(t, stub2, "state/b.service", "enabled active") // installed between runs
-	all, _, code = runScriptWith(t, unitsPlan([]string{"b.service"}), dir, bk2, opts2)
-	if code != 1 || strings.Contains(all, "b.service: unit state exists") || state(t, stub2, "b.service") != "enabled active" {
-		t.Fatalf("absent then present: exit %d state %q:\n%s", code, state(t, stub2, "b.service"), all)
-	}
-}
-```
-
-  `writeStub` writes `#!/bin/sh\n` + body at 0o755 (`shipped_test.go:51`). `runScriptWith` puts `pathPrefix` first on `PATH`. If `write`/`touch` collide with existing helper names in the package, rename them `stubWrite`/`stubTouch`.
-
-- [ ] **Step 2: Run** `go test ./internal/remedy -count=1` (Windows compiles; the Linux subtests skip) and on the lab. Expected: FAIL (`undefined: prologue`, `undefined: MachineIDHashHelper`, missing lines).
-- [ ] **Step 3: Implement `script.go`.** Replace the `prologue` const with pieces and a builder:
-
-```go
-// MachineIDHashHelper computes the host identity the snapshot carries
-// (collectors.MachineIDHash): the sha256 of a 32-lowercase-hex machine id,
-// nothing for anything else. Its errors go nowhere: the guard's refusal is
-// the only line a failure prints (3D-2b §2).
-const MachineIDHashHelper = `muster_machine_id_hash() {
-  id=$( { tr -d '[:space:]' < "$1"; } 2>/dev/null ) || id=
-  case "$id" in *[!0-9a-f]*|'') return 0;; esac
-  [ "${#id}" -eq 32 ] || return 0
-  { printf '%s' "$id" | sha256sum | cut -d' ' -f1; } 2>/dev/null
-}`
-
-const guardOff = "# host guard: off (the snapshot has no machine id)"
-
-const guardBody = `here=$(muster_machine_id_hash /etc/machine-id)
-if [ "$here" != "$MUSTER_SNAPSHOT_HOST" ]; then
-  if [ "${MUSTER_ANY_HOST:-}" = 1 ]; then
-    log "warning: this host's machine id differs from the snapshot's; running because MUSTER_ANY_HOST=1"
-  else
-    printf 'muster-fix: planned for another host (machine id differs); set MUSTER_ANY_HOST=1 to run it anyway\n' >&2
-    exit 2
-  fi
-fi`
-```
-
-  `prologueHead` is `set -u`, `umask 077` and `log() { printf 'muster-fix: %s\n' "$*"; }`. `prologueBackup` is the `MUSTER_BACKUP` default, the `case`, the `mkdir`, `backupOwnerLine`, `backup()` and `restore()`; in `restore()` rename `rc` to `brc` (T-6). `unitHelpers` is the two functions of spec §3, verbatim. Then:
-
-```go
-// prologue is the script's fixed part for this plan (3D-2b §2 order): the
-// guard and its helper only when the snapshot carried a well-formed hash.
-func prologue(p *Plan) string {
-	var b strings.Builder
-	b.WriteString(prologueHead + "\n")
-	if p.Fix.HostGuard == "on" {
-		b.WriteString(MachineIDHashHelper + "\n" + rootCheckLine + "\n")
-		b.WriteString("MUSTER_SNAPSHOT_HOST=" + p.Fix.MachineIDHash + "\n" + guardBody + "\n")
-	} else {
-		b.WriteString(rootCheckLine + "\n" + guardOff + "\n")
-	}
-	b.WriteString(prologueBackup + "\n" + unitHelpers + "\nfailed=0\n")
-	return b.String()
-}
-```
-
-  `HostGuard == "on"` is only ever set with a hash that matched `^[0-9a-f]{64}$` (Task 5). `Script` writes `prologue(p)` where it wrote the const.
-
-  In `block()`, after the backup line:
-
-```go
-		if len(it.Units) > 0 {
-			lines = append(lines, fmt.Sprintf(`  save_units %s || { log "%s: backup failed, nothing changed"; return 1; }`, strings.Join(it.Units, " "), it.ID))
-		}
-		lines = append(lines, "  ( set -e")
-		if len(it.Units) > 0 {
-			lines = append(lines, "    UNITS='"+strings.Join(it.Units, " ")+"'")
-		}
-```
-
-  Before the validate subshell: `lines = append(lines, "  # validate", "  ( set -e", …)`. In `failurePath`, after the rollback subshell and before the restore line:
-
-```go
-	if len(it.Units) > 0 {
-		out = append(out, fmt.Sprintf(`%srestore_units %s || log "%s: ROLLBACK INCOMPLETE, backups in $MUSTER_BACKUP"`, pfx, strings.Join(it.Units, " "), it.ID))
-	}
-```
-
-- [ ] **Step 4: Run.**
-  1. `go test ./internal/remedy -run TestScriptGolden -update`.
-  2. Read every golden diff:
-     - the prologue order;
-     - `full.sh` guard-on with the fixture hash;
-     - `empty.sh`, `capped.sh` and `poison.sh` guard-off;
-     - the `# validate` markers;
-     - `g_units`' `save_units`/`UNITS=`/`restore_units`;
-     - `all-scripted.sh`'s ten `UNITS=` lines;
-     - `restore()`'s `brc`.
-  3. Run `go test ./internal/remedy -count=1` (Windows), then as root on the lab with `-race`, then `make shellcheck` on the lab (or note that CI covers it).
-- [ ] **Step 5: Mutation check.**
-  1. Emit the guard before `log()` (swap the two writes), and see `TestScriptPrologueOrder` and `TestScriptRefusesAnotherHost`'s override assertion go red.
-  2. Drop pass 7 from `unitHelpers`, and see the `no install section` case go red.
-  3. Drop the `# validate` marker, and see `TestScriptUnitsBlockOrder` go red.
-
-  Restore each.
-- [ ] **Step 6: Commit** "Guard the review script by the snapshot's machine id, record and restore unit state, and mark every validate". The body names T-5, T-6 and T-7, the prologue order, and "goldens regenerated: prologue, guard, units, markers".
 
 ---
 
@@ -1303,7 +1408,7 @@ func prologue(p *Plan) string {
 **Interfaces:**
 - Produces: `func SpelledOut(r rune) bool`, which is true for `unicode.Cf`, `unicode.Zl`, `unicode.Zp`, U+115F, U+1160, U+3164 and U+FFA0.
 
-- [ ] **Step 1: Write the failing tests.**
+- [ ] **Step 1: Write the failing tests.** `table_test.go` gains the import `fmt` if absent.
 
 ```go
 var spelledSample = []rune{0x00ad, 0x061c, 0x200b, 0x200d, 0x202e, 0x2028, 0x2029, 0x2066, 0xfeff, 0x3164, 0xe0001}
@@ -1400,7 +1505,7 @@ func SpelledOut(r rune) bool {
 - Modify: `Makefile:49-54`
 
 **Interfaces:**
-- Consumes: the table decided in Task 1; the `# validate` marker and `host_guard` (Task 6).
+- Consumes: the table decided in Task 1; the `# validate` marker and `host_guard` (Task 5).
 
 - [ ] **Step 1: Write the failing test** `roundtrip_test.go`:
 
@@ -1409,7 +1514,6 @@ package controls_test
 
 import (
 	"os"
-	"sort"
 	"strings"
 	"testing"
 
@@ -1491,8 +1595,15 @@ func TestEveryScriptedControlIsInTheRoundtripTable(t *testing.T) {
 			seen[k] = true
 		}
 	}
-	if !sort.StringsAreSorted(ids) {
-		t.Error("table not sorted by id")
+	for i := 1; i < len(ids); i++ {
+		if ids[i-1] >= ids[i] {
+			t.Errorf("table not strictly sorted by id at %s", ids[i])
+		}
+	}
+	for id := range scripted {
+		if !contains(ids, id) {
+			t.Errorf("%s: scripted control missing from the table", id)
+		}
 	}
 	if len(ids) != len(scripted) {
 		t.Errorf("table has %d ids, set has %d scripted", len(ids), len(scripted))
@@ -1601,7 +1712,8 @@ exit "$bad"
 
 ```sh
 printf '#!/bin/sh\nexit 101\n' > /usr/sbin/policy-rc.d; chmod 755 /usr/sbin/policy-rc.d
-apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends <packages>
+apt-get update -qq
+DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends <packages>
 rm -f /usr/sbin/policy-rc.d
 systemctl reset-failed
 ```
@@ -1662,7 +1774,7 @@ record() { # record <cid>: unit states and backup-path stats/checksums/ACLs of t
     printf '%s %s %s\n' "$u" "$(docker exec "$1" systemctl is-enabled -- "$u" 2>/dev/null || :)" "$(docker exec "$1" systemctl is-active -- "$u" 2>/dev/null || :)"
   done
   jq -r '.items[] | select(.planned and .script) | .backup[]' "$d/fail/plan.json" | sort -u | while read -r p; do
-    docker exec "$1" sh -c 'p=$1; if [ -e "$p" ] || [ -L "$p" ]; then printf "%s %s %s\n" "$p" "$(stat -c "%u %g %a" "$p")" "$(sha256sum < "$p" | cut -d" " -f1)"; command -v getfacl >/dev/null && getfacl -cp "$p" 2>/dev/null; else printf "%s absent\n" "$p"; fi' _ "$p"
+    docker exec "$1" sh -c 'p=$1; if [ -e "$p" ] || [ -L "$p" ]; then printf "%s %s %s\n" "$p" "$(stat -c "%u %g %a" "$p")" "$(sha256sum < "$p" | cut -d" " -f1)"; if command -v getfacl >/dev/null; then getfacl -cp "$p" 2>/dev/null || :; fi; else printf "%s absent\n" "$p"; fi' _ "$p"
   done
 }
 record "$c2" > "$d/fail/record-before"
@@ -1713,7 +1825,7 @@ diff "$d/fail/record-before" "$d/fail/record-after"
 **Files:** main design EN/KO (D34 L552, §4.2 L94, §6.2 L282, §6.8 L370, §7.5 L414, §10.2 L468), `CLAUDE.md` (L3-4 "D01–D34" stays; L16-17; the Fix section L172-201), `CONTRIBUTING.md` L93-110 and L220-227, `CONTRIBUTING.ko.md` L73-89 and L176-180, `README.md` L17-28 and L203-218, `README.ko.md` L15-23 and L178-186, `THREAT_MODEL.md` (Trust boundary L18-19, Limits L37-42), `examples/README.md` (L3-4, L68, L86-95), `CHANGELOG.md` (Added L12, Changed L40, Controls L54, Tooling L435). Line numbers are the code map's §ci-report 4-11.
 
 - [ ] **Step 1:** Write each change the spec §6 lists, in EN and KO together. The CLAUDE.md sentences to replace are the eight named in spec §6. The `fix-roundtrip` sentence also mentions `TestFileScriptsRepairOnARealFile`, which runs shipped file bodies on temp files.
-- [ ] **Step 2:** Run `go run ./tools/coverage -check` and `make lint-controls`. Run `grep -n "enable --now every unit\|A one-unit body uses\|rollback or backup;" CLAUDE.md CONTRIBUTING*.md` and expect no hits.
+- [ ] **Step 2:** Run `go run ./tools/coverage -check` and `make lint-controls`. Run, before the edits, `grep -nF -e '`rollback` or `backup`;' -e '`enable --now` every unit' -e 'A one-unit body uses' -e 'A body with one unit uses' CLAUDE.md CONTRIBUTING.md` and confirm every pattern hits. Run it again after the edits and expect no hits. The patterns carry the backticks as the files spell them; a pattern that hits nothing before the edit proves nothing.
 - [ ] **Step 3: Commit** "Record stage 3D-2b in the documents: D34's hash exception, units, the round-trip table, the guard's limits".
 
 ---
@@ -1732,4 +1844,16 @@ The steps after the user says to merge:
 
 ## Execution notes
 
-(Filled in during execution: rulings T-14 onward, the probe's table, the CI times.)
+### Pre-flight (one fresh-review workflow, 82 agents: five lenses, three refuters per finding, a critic)
+
+- 18 survivors and 2 critic findings, all folded; 7 refuted.
+- **T-14** (critic K2): the template tasks (now 4 and 5) precede the body rewrite (now 6). Under the old order, the commits of Tasks 4 and 5 shipped ten service blocks that used `$UNITS` before the template set it, and every one would fail under set -u.
+- **T-15** (S1, blocking): the interior-space id leaves the helper/collector agreement table. It is asserted on its own: the collector yields no hash. Spec §2's test sentence is corrected in the same commit.
+- **T-16** (S2): fullPlan gains its g_units row in Task 4, and Task 4 regenerates all three full goldens, so every commit is green.
+- **T-17** (S4): the stub records a body-done marker. wantCalls pins the rollback's call order for three cases. The stub's enable refuses while an Also= partner is masked. An unknown case is added. A pass-2/pass-4 swap is a listed mutation.
+- **T-18** (S5): TestOSLeavesNoHashForAMalformedMachineID drives runOS's call.
+- **T-19** (S8): the examples gate skips under G-24 from Task 6 on, and never goes red.
+- The other folds: S3, S6, S7, S9–S18 and K1, in the tasks they name.
+
+
+(Filled in during execution: rulings T-20 onward, the probe's table, the CI times.)

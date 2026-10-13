@@ -108,8 +108,9 @@ fi
   렌더합니다. `TestHostGuardHashMatchesTheCollector`(`internal/remedy`, Linux 빌드 태그)는 헬퍼를 `sh`로 임시 파일에
   돌립니다. `collectors`는 테스트에서만 import하고, purity 테스트는 `.TestImports`가 아니라 `.Imports`를 읽으므로
   허용됩니다. 끝에 줄바꿈, CRLF, 앞쪽 공백, 앞쪽 줄바꿈이 있는 id에서는 collector의 값과 같아야 합니다.
-  `uninitialized`, 대문자, 31자, 중간 공백, 공백뿐인 파일, 빈 파일, 없는 경로에서는 collector와 헬퍼가 모두 빈
-  출력이어야 합니다.
+  `uninitialized`, 대문자, 31자, 공백뿐인 파일, 빈 파일, 없는 경로에서는 collector와 헬퍼가 모두 빈 출력이어야
+  합니다. 중간에 공백이 있는 id에서는 collector가 해시를 내지 않는다는 것만 확인합니다. 둘은 그 입력에서 설계상 다르고,
+  그런 스냅샷에는 헬퍼를 내보내지 않기 때문입니다.
 - **가드 테스트.** `internal/remedy`의 Linux 테스트로, 렌더한 스크립트에서 `strings.Replace`로 `/etc/machine-id`를
   임시 machine-id 경로로 바꾸고 바뀌었는지 확인한 뒤 실행합니다. 확인하는 동작은 다음과 같습니다.
   - 해시가 같으면 통과합니다.
