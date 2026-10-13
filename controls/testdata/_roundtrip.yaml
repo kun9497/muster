@@ -1,0 +1,52 @@
+# The round-trip table (3D-2b §4): one entry per scripted control, sorted by id.
+# `images` names the fix-roundtrip matrix rows (their `key`) that seed the control,
+# run its review script and check it again; `unproven_units` names the declared units
+# those rows do not exercise; `unproven` says why no row exercises the control at all.
+# Each reason names one of three causes: no systemd unit (the server ships only for
+# inetd), no package in the image's enabled repositories, or the unit cannot run in a
+# container. The assignments are the Task 1 probe's measurements.
+# TestEveryScriptedControlIsInTheRoundtripTable (internal/controls) pins this file to
+# the fix-roundtrip job of .github/workflows/ci.yml: every row's `seeded` list equals
+# the ids whose `images` name that row. The fixture harness never loads this file.
+- id: muster.account.root_remote_login
+  images: [almalinux9-init, rocky9-init]
+- id: muster.file.hosts_lpd_permissions
+  images: [almalinux9-init, debian12-init, rocky9-init, ubuntu2204]
+- id: muster.file.hosts_permissions
+  images: [almalinux9-init, debian12-init, rocky9-init, ubuntu2204]
+- id: muster.file.passwd_permissions
+  images: [almalinux9-init, debian12-init, rocky9-init, ubuntu2204]
+- id: muster.file.services_permissions
+  images: [almalinux9-init, debian12-init, rocky9-init, ubuntu2204]
+- id: muster.file.shadow_permissions
+  images: [debian12-init, ubuntu2204]
+- id: muster.service.automount_disabled
+  images: [almalinux9-init, debian12-init, rocky9-init]
+- id: muster.service.dos_services_disabled
+  unproven: no systemd unit on Debian (echo, discard, daytime and chargen ship only for inetd) and no package in the EL9 images' enabled repositories
+- id: muster.service.finger_disabled
+  unproven: no systemd unit on Debian (fingerd ships only for inetd) and no package in the EL9 images' enabled repositories
+- id: muster.service.nfs_server_disabled
+  images: [almalinux9-init, rocky9-init]
+  unproven_units:
+    nfs-kernel-server.service: no package in the EL9 images' enabled repositories; Debian ships it only as an alias of nfs-server.service, and once the body has masked nfs-server.service its disable --now on the alias fails (unit not loaded, rc 5), so debian12-init does not seed NFS
+- id: muster.service.nis_disabled
+  images: [debian12-init]
+- id: muster.service.rpcbind_disabled
+  images: [almalinux9-init, debian12-init, rocky9-init]
+- id: muster.service.rservices_disabled
+  unproven: no systemd unit on Debian (rsh-server ships only for inetd) and no package in the EL9 images' enabled repositories
+- id: muster.service.snmp_disabled
+  images: [almalinux9-init, debian12-init, rocky9-init]
+- id: muster.service.telnet_disabled
+  images: [almalinux9-init, rocky9-init]
+  unproven_units:
+    telnet.service: no package in the image's enabled repositories (EL9 ships telnet.socket and the telnet@.service template)
+    telnetd.service: no systemd unit (Debian's telnetd ships only for inetd)
+- id: muster.service.tftp_talk_disabled
+  images: [almalinux9-init, debian12-init, rocky9-init]
+  unproven_units:
+    ntalk.socket: no systemd unit (talkd ships only for inetd)
+    talk.socket: no systemd unit (talkd ships only for inetd)
+    tftpd-hpa.service: no package in the image's enabled repositories installs beside atftpd (the two conflict)
+    tftpd.service: no package in the image's enabled repositories

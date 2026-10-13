@@ -41,6 +41,13 @@ jobs:
             sh -n "$f"
             shellcheck -s sh "$f"
           done
+          n=0
+          for f in ci/roundtrip/*.sh; do
+            sh -n "$f"
+            shellcheck -s sh "$f"
+            n=$((n+1))
+          done
+          [ "$n" -ge 5 ]
       - name: controls lint
         run: go run ./cmd/muster controls lint --references docs/reference
       - name: controls lint, built-in profile
@@ -496,23 +503,57 @@ jobs:
               | (.facts | getpath($p) | (.status // .effective.status))
               | select(. != "unsupported") ] | length == 0' "$RUNNER_TEMP/muster/containers/c.json"
 
+  # The round trip (3D-2b §4). Each row seeds the controls its `seeded` names
+  # (pinned to controls/testdata/_roundtrip.yaml by
+  # TestEveryScriptedControlIsInTheRoundtripTable), plans, runs the review
+  # script and checks again. On init rows a second container then proves the
+  # guard (the first container's script is refused) and the failure path (a
+  # validate forced false in every block leaves units and files as they were).
   fix-roundtrip:
     runs-on: ubuntu-24.04
     needs: test
-    timeout-minutes: 20
+    timeout-minutes: 40
     strategy:
       fail-fast: false
       matrix:
         include:
-          - image: rockylinux/rockylinux:9-ubi-init
+          - key: rocky9-init
+            image: rockylinux/rockylinux:9-ubi-init
             init: "true"
-            seeded: "muster.service.rpcbind_disabled muster.account.root_remote_login muster.file.hosts_permissions"
-          - image: almalinux/9-init
+            seeded: >-
+              muster.account.root_remote_login muster.file.hosts_lpd_permissions
+              muster.file.hosts_permissions muster.file.passwd_permissions
+              muster.file.services_permissions muster.service.automount_disabled
+              muster.service.nfs_server_disabled muster.service.rpcbind_disabled
+              muster.service.snmp_disabled muster.service.telnet_disabled
+              muster.service.tftp_talk_disabled
+          - key: almalinux9-init
+            image: almalinux/9-init
             init: "true"
-            seeded: "muster.service.rpcbind_disabled muster.account.root_remote_login muster.file.hosts_permissions"
-          - image: ubuntu:22.04
+            seeded: >-
+              muster.account.root_remote_login muster.file.hosts_lpd_permissions
+              muster.file.hosts_permissions muster.file.passwd_permissions
+              muster.file.services_permissions muster.service.automount_disabled
+              muster.service.nfs_server_disabled muster.service.rpcbind_disabled
+              muster.service.snmp_disabled muster.service.telnet_disabled
+              muster.service.tftp_talk_disabled
+          - key: debian12-init
+            image: muster-ci/debian12-init
+            build: debian12-init
+            init: "true"
+            seeded: >-
+              muster.file.hosts_lpd_permissions muster.file.hosts_permissions
+              muster.file.passwd_permissions muster.file.services_permissions
+              muster.file.shadow_permissions muster.service.automount_disabled
+              muster.service.nis_disabled muster.service.rpcbind_disabled
+              muster.service.snmp_disabled muster.service.tftp_talk_disabled
+          - key: ubuntu2204
+            image: ubuntu:22.04
             init: "false"
-            seeded: "muster.file.hosts_permissions muster.file.shadow_permissions"
+            seeded: >-
+              muster.file.hosts_lpd_permissions muster.file.hosts_permissions
+              muster.file.passwd_permissions muster.file.services_permissions
+              muster.file.shadow_permissions
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -520,50 +561,81 @@ jobs:
           go-version: "1.25.5"
       - name: build muster
         run: CGO_ENABLED=0 go build -trimpath -o bin/muster ./cmd/muster
-      - name: seed, plan, run the script, check again
+      - name: build the init image
+        if: matrix.build != ''
+        run: docker build -t muster-ci/debian12-init -f ci/roundtrip/debian12-init.Dockerfile ci/roundtrip
+      - name: seed, plan, run the script, check again; then the guard and failure runs
         run: |
           set -eu
-          d="$RUNNER_TEMP/rt"; mkdir -m 700 "$d"
-          if [ "${{ matrix.init }}" = "true" ]; then
-            cid=$(docker run -d --privileged --cgroupns=host -v "$PWD/bin:/m:ro" -v "$d:/out" ${{ matrix.image }} /sbin/init)
-            for i in $(seq 1 30); do
-              state=$(docker exec "$cid" systemctl is-system-running --wait 2>/dev/null || true)
-              case "$state" in running|degraded) break ;; esac
-              sleep 1
+          d="$RUNNER_TEMP/rt"; mkdir -m 700 "$d" "$d/repair" "$d/fail"
+          start() { # start <dir>: prints the container id
+            if [ "${{ matrix.init }}" = "true" ]; then
+              docker run -d --privileged --cgroupns=host -v "$PWD/bin:/m:ro" -v "$PWD/ci/roundtrip:/ci:ro" -v "$1:/out" "${{ matrix.image }}" /sbin/init
+            else
+              docker run -d -v "$PWD/bin:/m:ro" -v "$PWD/ci/roundtrip:/ci:ro" -v "$1:/out" "${{ matrix.image }}" sleep infinity
+            fi
+          }
+          c1=$(start "$d/repair"); c2=
+          trap 'docker rm -f $c1 $c2 >/dev/null 2>&1 || true' EXIT
+          [ "${{ matrix.init }}" = "true" ] && sh ci/roundtrip/wait.sh "$c1" "${{ matrix.key }}"
+          docker exec "$c1" sh /ci/${{ matrix.key }}.sh
+          plan() { # plan <cid> <dir>: collect, then the JSON plan and the script into <dir>
+            docker exec "$1" /m/muster collect --out /out/before.json || true
+            sudo chown "$(id -u)" "$2/before.json"
+            ./bin/muster fix --dry-run --facts "$2/before.json" --format json > "$2/plan.json"
+            ./bin/muster fix --dry-run --facts "$2/before.json" --format script > "$2/fix.sh"
+            test -s "$2/plan.json"; test -s "$2/fix.sh"
+          }
+          plan "$c1" "$d/repair"
+          for id in ${{ matrix.seeded }}; do
+            jq -e --arg id "$id" '[.items[] | select(.id == $id and .planned and .script)] | length == 1' "$d/repair/plan.json" > /dev/null \
+              || { echo "seeded $id is not a planned scripted item"; jq '.items[] | {id, planned, script, text_only_reason}' "$d/repair/plan.json"; exit 1; }
+          done
+          docker exec "$c1" sh /out/fix.sh
+          docker exec "$c1" /m/muster collect --out /out/after.json || true
+          sudo chown "$(id -u)" "$d/repair/after.json"
+          set +e; ./bin/muster check --facts "$d/repair/after.json" --format json > "$d/repair/after-report.json"; set -e
+          for id in ${{ matrix.seeded }}; do
+            jq -e --arg id "$id" '[.results[] | select(.id == $id and (.status == "PASS" or .status == "NOT_APPLICABLE"))] | length == 1' "$d/repair/after-report.json" > /dev/null \
+              || { echo "$id did not pass after the script"; jq --arg id "$id" '.results[] | select(.id == $id)' "$d/repair/after-report.json"; exit 1; }
+          done
+          [ "${{ matrix.init }}" = "true" ] || exit 0
+          # failure and guard runs (3D-2b §4)
+          c2=$(start "$d/fail"); sh ci/roundtrip/wait.sh "$c2" "${{ matrix.key }}"
+          docker exec "$c2" sh /ci/${{ matrix.key }}.sh
+          plan "$c2" "$d/fail"
+          h1=$(jq -r .run.host.machine_id_hash "$d/repair/plan.json"); h2=$(jq -r .run.host.machine_id_hash "$d/fail/plan.json")
+          g1=$(jq -r .fix.host_guard "$d/repair/plan.json"); g2=$(jq -r .fix.host_guard "$d/fail/plan.json")
+          [ "$g1" = on ] && [ "$g2" = on ] && [ -n "$h1" ] && [ "$h1" != "$h2" ] \
+            || { echo "${{ matrix.key }}: the two containers need distinct machine ids (guard $g1/$g2, hash $h1/$h2)"; exit 1; }
+          record() { # record <cid>: unit states and backup-path stats/checksums/ACLs of the planned scripted items
+            jq -r '.items[] | select(.planned and .script) | .units[]' "$d/fail/plan.json" | sort -u > "$d/fail/units"
+            : > "$d/fail/deps"
+            while read -r u; do docker exec "$1" systemctl show -p RequiredBy -p BoundBy -p ConsistsOf --value -- "$u" | tr ' ' '\n' >> "$d/fail/deps" || :; done < "$d/fail/units"
+            sort -u "$d/fail/units" "$d/fail/deps" | sed '/^$/d' | while read -r u; do
+              printf '%s %s %s\n' "$u" "$(docker exec "$1" systemctl is-enabled -- "$u" 2>/dev/null || :)" "$(docker exec "$1" systemctl is-active -- "$u" 2>/dev/null || :)"
             done
-          else
-            cid=$(docker run -d -v "$PWD/bin:/m:ro" -v "$d:/out" ${{ matrix.image }} sleep infinity)
-          fi
-          trap 'docker rm -f "$cid" >/dev/null 2>&1 || true' EXIT
-          if [ "${{ matrix.init }}" = "true" ]; then
-            docker exec "$cid" dnf install -y -q rpcbind openssh-server acl
-            docker exec "$cid" ssh-keygen -A
-            docker exec "$cid" systemctl enable --now rpcbind.socket sshd
-            docker exec "$cid" sh -c "printf 'PermitRootLogin yes\n' > /etc/ssh/sshd_config.d/99-ci.conf"
-          else
-            docker exec "$cid" sh -c 'apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq acl'
-          fi
-          docker exec "$cid" chmod 644 /etc/hosts
-          docker exec "$cid" /m/muster collect --out /out/before.json || true
-          sudo chown "$(id -u)" "$d/before.json"
-          ./bin/muster fix --dry-run --facts "$d/before.json" --format json > "$d/plan.json"
-          test -s "$d/plan.json"
-          ./bin/muster fix --dry-run --facts "$d/before.json" --format script > "$d/fix.sh"
-          for id in ${{ matrix.seeded }}; do
-            jq -e --arg id "$id" '[.items[] | select(.id == $id and .planned and .script)] | length == 1' "$d/plan.json" > /dev/null \
-              || { echo "seeded $id is not a planned scripted item"; jq '.items[] | {id, planned, script, text_only_reason}' "$d/plan.json"; exit 1; }
-          done
-          docker exec "$cid" sh /out/fix.sh
-          docker exec "$cid" /m/muster collect --out /out/after.json || true
-          sudo chown "$(id -u)" "$d/after.json"
-          set +e
-          ./bin/muster check --facts "$d/after.json" --format json > "$d/after-report.json"
-          set -e
-          test -s "$d/after-report.json"
-          for id in ${{ matrix.seeded }}; do
-            jq -e --arg id "$id" '[.results[] | select(.id == $id and (.status == "PASS" or .status == "NOT_APPLICABLE"))] | length == 1' "$d/after-report.json" > /dev/null \
-              || { echo "$id did not pass after the script"; jq --arg id "$id" '.results[] | select(.id == $id)' "$d/after-report.json"; exit 1; }
-          done
+            jq -r '.items[] | select(.planned and .script) | .backup[]' "$d/fail/plan.json" | sort -u | while read -r p; do
+              docker exec "$1" sh -c 'p=$1; if [ -e "$p" ] || [ -L "$p" ]; then printf "%s %s %s\n" "$p" "$(stat -c "%u %g %a" "$p")" "$(sha256sum < "$p" | cut -d" " -f1)"; if command -v getfacl >/dev/null; then getfacl -cp "$p" 2>/dev/null || :; fi; else printf "%s absent\n" "$p"; fi' _ "$p"
+            done
+          }
+          record "$c2" > "$d/fail/record-before"
+          cp "$d/repair/fix.sh" "$d/fail/repair-fix.sh"
+          set +e; docker exec "$c2" sh /out/repair-fix.sh > "$d/fail/guard.out" 2>&1; gc=$?; set -e
+          [ "$gc" -eq 2 ] && grep -qx 'muster-fix: planned for another host (machine id differs); set MUSTER_ANY_HOST=1 to run it anyway' "$d/fail/guard.out" \
+            || { echo "guard run: exit $gc"; cat "$d/fail/guard.out"; exit 1; }
+          record "$c2" > "$d/fail/record-guard"; diff "$d/fail/record-before" "$d/fail/record-guard"
+          awk 'prev == "  # validate" { print; getline; print "    false"; prev = ""; next } { print; prev = $0 }' "$d/fail/fix.sh" > "$d/fail/broken.sh"
+          blocks=$(jq '[.items[] | select(.planned and .script)] | length' "$d/fail/plan.json")
+          changed=$(diff "$d/fail/fix.sh" "$d/fail/broken.sh" | grep -c '^>' || :)
+          [ "$changed" -eq "$blocks" ] || { echo "rewrite changed $changed lines for $blocks blocks"; exit 1; }
+          set +e; docker exec "$c2" sh /out/broken.sh > "$d/fail/broken.out" 2>&1; bc=$?; set -e
+          cat "$d/fail/broken.out"
+          [ "$bc" -eq 1 ] || { echo "failure run: exit $bc, want 1"; exit 1; }
+          [ "$(grep -c 'validate failed, rolling back' "$d/fail/broken.out")" -eq "$blocks" ] || { echo "not every block rolled back"; exit 1; }
+          ! grep -qE 'ROLLBACK INCOMPLETE|not restored|rollback failed' "$d/fail/broken.out" || { echo "a rollback was incomplete"; exit 1; }
+          record "$c2" > "$d/fail/record-after"
+          diff "$d/fail/record-before" "$d/fail/record-after"
 
   collect-contract:
     runs-on: ubuntu-24.04
