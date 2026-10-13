@@ -4,8 +4,6 @@ package collectors
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"strconv"
 	"strings"
 
@@ -156,10 +154,7 @@ func runOS(_ context.Context, a collect.Access, b *collect.Builder) error {
 	h.Hostname = readTrim(a, "/etc/hostname")
 	// Only the hash of the machine id ever leaves the host: it identifies
 	// a snapshot's origin across runs without naming the machine.
-	if id := readTrim(a, "/etc/machine-id"); id != "" {
-		sum := sha256.Sum256([]byte(id))
-		h.MachineIDHash = hex.EncodeToString(sum[:])
-	}
+	h.MachineIDHash = MachineIDHash([]byte(readTrim(a, "/etc/machine-id")))
 	h.Kernel = readTrim(a, "/proc/sys/kernel/osrelease")
 	h.BootID = readTrim(a, "/proc/sys/kernel/random/boot_id")
 	if up := strings.Fields(readTrim(a, "/proc/uptime")); len(up) > 0 {

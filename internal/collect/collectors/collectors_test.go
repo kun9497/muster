@@ -2589,6 +2589,17 @@ func osDoubleWithDockerAndSystemd(t *testing.T) *fsAccess {
 	return a
 }
 
+func TestOSLeavesNoHashForAMalformedMachineID(t *testing.T) {
+	for _, fixture := range []string{"machine-id-uninitialized", "machine-id-upper"} {
+		a := osAccess()
+		a.files["/etc/machine-id"] = fixture
+		b := build(t, "os", a)
+		if h := b.Header().Host.MachineIDHash; h != "" {
+			t.Errorf("%s: machine_id_hash %q, want empty", fixture, h)
+		}
+	}
+}
+
 func TestOSFillsTheRunHeader(t *testing.T) {
 	b := build(t, "os", osAccess())
 	tree := b.Tree()

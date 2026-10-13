@@ -58,6 +58,7 @@ var fuzzTargets = []string{
 	"FuzzFoldChains",
 	"FuzzGrubPasswordSet",
 	"FuzzListsRoot",
+	"FuzzMachineIDHash",
 	"FuzzModuleStates",
 	"FuzzNSSSources",
 	"FuzzNTPFile",
