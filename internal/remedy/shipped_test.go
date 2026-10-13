@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -150,5 +151,88 @@ func TestShippedRootLoginValidateReadsPersonaRoot(t *testing.T) {
 		if (code == 0) != (v.want == 0) {
 			t.Errorf("persona root %s: validate exit %d, want %d\n%s", v.root, code, v.want, out)
 		}
+	}
+}
+
+// TestFileScriptsRepairOnARealFile runs each shipped file body on a temp copy
+// owned 0:0 (root only; CI's sudo step runs it): at every allowed mode the
+// validate holds; at a loosened mode it fails, the body runs, and it then
+// holds; a file stricter than the guide keeps its mode (3D-2b Q-4).
+func TestFileScriptsRepairOnARealFile(t *testing.T) {
+	needSh(t)
+	if os.Geteuid() != 0 {
+		t.Skip("needs root to chown the temp file to 0:0")
+	}
+	cases := []struct {
+		id       string
+		allowed  []uint32 // numeric modes, special bits included (chmod takes them as octal)
+		loosened []uint32
+		stricter uint32
+	}{
+		{"muster.file.hosts_permissions", []uint32{0, 0o200, 0o400, 0o600}, []uint32{0o644, 0o666, 0o4600, 0o1600}, 0o400},
+		{"muster.file.hosts_lpd_permissions", []uint32{0, 0o200, 0o400, 0o600}, []uint32{0o644, 0o2600}, 0o400},
+		{"muster.file.passwd_permissions", []uint32{0, 0o4, 0o40, 0o44, 0o200, 0o204, 0o240, 0o244, 0o400, 0o404, 0o440, 0o444, 0o600, 0o604, 0o640, 0o644}, []uint32{0o664, 0o666, 0o755}, 0o444},
+		{"muster.file.services_permissions", []uint32{0, 0o4, 0o40, 0o44, 0o200, 0o204, 0o240, 0o244, 0o400, 0o404, 0o440, 0o444, 0o600, 0o604, 0o640, 0o644}, []uint32{0o666, 0o744}, 0o400},
+		{"muster.file.shadow_permissions", []uint32{0, 0o400}, []uint32{0o640, 0o600, 0o4400}, 0},
+	}
+	for _, c := range cases {
+		t.Run(c.id, func(t *testing.T) {
+			r := shippedRemediation(t, c.id)
+			orig := r.Backup[0]
+			bin := t.TempDir() // runBody prepends it to PATH; nothing is stubbed here
+			// run sets the temp file to mode (and a wide ACL when acl), runs the
+			// validate, the body and the validate again, and returns both exits
+			// and the mode %a prints afterwards.
+			run := func(mode uint32, acl bool) (pre, post int, after string) {
+				dir := t.TempDir()
+				f := filepath.Join(dir, "target")
+				if err := os.WriteFile(f, []byte("x\n"), 0o600); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Chown(f, 0, 0); err != nil {
+					t.Fatal(err)
+				}
+				if out, err := exec.Command("chmod", strconv.FormatUint(uint64(mode), 8), f).CombinedOutput(); err != nil {
+					t.Fatalf("chmod %o: %v %s", mode, err, out)
+				}
+				if acl {
+					if out, err := exec.Command("setfacl", "-m", "u:nobody:rw,g::rw", f).CombinedOutput(); err != nil {
+						t.Fatalf("setfacl: %v %s", err, out)
+					}
+				}
+				body := strings.ReplaceAll(r.Script, orig, f)
+				val := strings.ReplaceAll(r.Validate, orig, f)
+				_, pre = runBody(t, dir, bin, val)
+				if out, code := runBody(t, dir, bin, body); code != 0 {
+					t.Fatalf("body exit %d at %o: %s", code, mode, out)
+				}
+				_, post = runBody(t, dir, bin, val)
+				out, err := exec.Command("stat", "-c", "%a", f).Output()
+				if err != nil {
+					t.Fatal(err)
+				}
+				return pre, post, strings.TrimSpace(string(out))
+			}
+			for _, m := range c.allowed {
+				if pre, post, _ := run(m, false); pre != 0 || post != 0 {
+					t.Errorf("allowed %o: validate %d before, %d after", m, pre, post)
+				}
+			}
+			for _, m := range c.loosened {
+				if pre, post, _ := run(m, false); pre == 0 || post != 0 {
+					t.Errorf("loosened %o: validate %d before (want non-zero), %d after (want 0)", m, pre, post)
+				}
+			}
+			if strings.Contains(r.Script, "setfacl") {
+				if _, err := exec.LookPath("setfacl"); err == nil {
+					if pre, post, _ := run(c.allowed[len(c.allowed)-1], true); pre == 0 || post != 0 {
+						t.Errorf("acl: validate %d before (want non-zero), %d after (want 0)", pre, post)
+					}
+				}
+			}
+			if _, _, after := run(c.stricter, false); after != strconv.FormatUint(uint64(c.stricter), 8) {
+				t.Errorf("stricter %o became %s", c.stricter, after)
+			}
+		})
 	}
 }

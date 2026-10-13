@@ -19,20 +19,12 @@ remediation:
   text_ko: finger 서비스를 비활성화·mask 하거나 finger 서버 패키지를 제거하고, inetd/xinetd 의 finger 항목을 제거합니다. inetd나 xinetd가 띄우는 finger는 스크립트가 멈추지 않습니다. 거기서 항목을 지우십시오.
   risk: restart_service
   idempotent: true
+  units: [finger.socket, fingerd.service]
   script: |
-    for u in finger.socket fingerd.service; do
+    for u in $UNITS; do
       systemctl cat "$u" >/dev/null 2>&1 || continue
-      systemctl disable --now "$u"
-      systemctl mask "$u" || true
+      systemctl --quiet disable --now "$u"
+      systemctl --quiet mask "$u" || true
     done
   validate: '! systemctl is-active --quiet finger.socket && case "$(systemctl is-enabled finger.socket 2>/dev/null)" in enabled|enabled-runtime) false;; esac && ! systemctl is-active --quiet fingerd.service && case "$(systemctl is-enabled fingerd.service 2>/dev/null)" in enabled|enabled-runtime) false;; esac'
-  rollback: |
-    for u in finger.socket fingerd.service; do
-      systemctl cat "$u" >/dev/null 2>&1 || continue
-      systemctl unmask "$u"
-    done
-    for u in finger.socket fingerd.service; do
-      systemctl cat "$u" >/dev/null 2>&1 || continue
-      systemctl enable --now "$u"
-    done
 decision: D19

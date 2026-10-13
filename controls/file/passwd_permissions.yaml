@@ -16,15 +16,15 @@ checks:
   - { fact: files.etc_passwd.mode, op: in, expected: [0, 4, 32, 36, 128, 132, 160, 164, 256, 260, 288, 292, 384, 388, 416, 420] } # 0644 or any subset of its bits; any group/other write or any execute bit fails
   - { fact: files.etc_passwd.acl_entries, op: none, where: { op: matches, expected: "^(user|group):[^:]+:" } } # a named entry widens access whatever its bits
 remediation:
-  text_en: chown root:root /etc/passwd; chmod 644 /etc/passwd; setfacl -b /etc/passwd
-  text_ko: chown root:root /etc/passwd; chmod 644 /etc/passwd; setfacl -b /etc/passwd
+  text_en: chown root:root /etc/passwd; chmod 644 /etc/passwd; setfacl -b /etc/passwd (the script only clears bits; a stricter file is left as it is)
+  text_ko: chown root:root /etc/passwd; chmod 644 /etc/passwd; setfacl -b /etc/passwd (스크립트는 비트를 지우기만 하므로 더 엄격한 파일은 그대로 둡니다)
   risk: none
   idempotent: true
   backup: [/etc/passwd]
   script: |
     [ -f /etc/passwd ]
     chown root:root /etc/passwd
-    chmod 644 /etc/passwd
     if command -v setfacl >/dev/null 2>&1; then setfacl -b /etc/passwd; fi
-  validate: "stat -c '%u %g %a' /etc/passwd | grep -qx '0 0 644'"
+    chmod u-xs,g-wxs,o-wxt /etc/passwd
+  validate: "case \"$(stat -c '%u %g %a' /etc/passwd)\" in '0 0 0'|'0 0 4'|'0 0 40'|'0 0 44'|'0 0 200'|'0 0 204'|'0 0 240'|'0 0 244'|'0 0 400'|'0 0 404'|'0 0 440'|'0 0 444'|'0 0 600'|'0 0 604'|'0 0 640'|'0 0 644') ;; *) false;; esac"
 decision: D26

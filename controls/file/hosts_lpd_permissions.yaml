@@ -16,13 +16,13 @@ checks:
   - { fact: files.etc_hosts_lpd.uid, op: eq, expected: 0 }
   - { fact: files.etc_hosts_lpd.mode, op: in, expected: "${allowed_modes}" }
 remediation:
-  text_en: chown root:root /etc/hosts.lpd; chmod 600 /etc/hosts.lpd
-  text_ko: chown root:root /etc/hosts.lpd; chmod 600 /etc/hosts.lpd
+  text_en: chown root:root /etc/hosts.lpd; chmod 600 /etc/hosts.lpd (the script only clears bits; a stricter file is left as it is)
+  text_ko: chown root:root /etc/hosts.lpd; chmod 600 /etc/hosts.lpd (스크립트는 비트를 지우기만 하므로 더 엄격한 파일은 그대로 둡니다)
   risk: none
   idempotent: true
   backup: [/etc/hosts.lpd]
   script: |
     [ -f /etc/hosts.lpd ]
     chown root:root /etc/hosts.lpd
-    chmod 600 /etc/hosts.lpd
-  validate: "stat -c '%u %g %a' /etc/hosts.lpd | grep -qx '0 0 600'"
+    chmod u-xs,g-rwxs,o-rwxt /etc/hosts.lpd
+  validate: "case \"$(stat -c '%u %g %a' /etc/hosts.lpd)\" in '0 0 0'|'0 0 200'|'0 0 400'|'0 0 600') ;; *) false;; esac"
