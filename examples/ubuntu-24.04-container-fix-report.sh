@@ -1,12 +1,14 @@
 #!/bin/sh
 # shellcheck disable=SC2181
 # muster fix --dry-run: review before running. muster never runs this file.
-# snapshot: host ubuntu-container, collected 2026-10-12T07:12:39Z; controls kisa-unix-2026+2026.10.08 sha256:0391129e9fb2ab8b86f88a710d40a0e1c7c9ddf7bfa38858ca10adbbdf164948
+# snapshot: host ubuntu-container, collected 2026-10-13T08:25:27Z; controls kisa-unix-2026+2026.10.13 sha256:f19aabb3a5704b459246b30850f221e08d90369f7e043e16db157d39648342e1
 # profile default (sha256:f4db63e671d12ad73cca111ca4132cb5459983bc32409b21c571067674bf9c78); max-risk lockout_risk
 # planned 10 (script 2, text only 8); above max-risk 0; not planned: error 0, manual 2, warn_degraded 0
 set -u
 umask 077
+log() { printf 'muster-fix: %s\n' "$*"; }
 [ "$(id -u)" -eq 0 ] || { printf 'muster-fix: run as root\n' >&2; exit 2; }
+# host guard: off (the snapshot has no machine id)
 MUSTER_BACKUP="${MUSTER_BACKUP:-/var/backups/muster/$(date +%Y%m%dT%H%M%S)}"
 case "$MUSTER_BACKUP" in
   /|//*|*/.|*/..|*/./*|*/../*) printf 'muster-fix: MUSTER_BACKUP must be a clean absolute path\n' >&2; exit 2;;
@@ -15,7 +17,6 @@ case "$MUSTER_BACKUP" in
 esac
 mkdir -p "$MUSTER_BACKUP" || exit 2
 [ -n "$(find "$MUSTER_BACKUP" -maxdepth 0 -type d -user 0 ! -perm /022 2>/dev/null)" ] || { printf 'muster-fix: MUSTER_BACKUP must be a root-owned directory that only root can write\n' >&2; exit 2; }
-log() { printf 'muster-fix: %s\n' "$*"; }
 backup() {
   for p in "$@"; do
     { [ -e "$p" ] || [ -L "$p" ]; } || continue
@@ -24,14 +25,88 @@ backup() {
   done
 }
 restore() {
-  rc=0
+  brc=0
   for p in "$@"; do
     { [ -e "$MUSTER_BACKUP$p" ] || [ -L "$MUSTER_BACKUP$p" ]; } || continue
-    if [ -d "$p" ]; then log "restore: $p is now a directory, left as is"; rc=1; continue; fi
-    if [ -L "$p" ]; then rm -f "$p" || { log "restore: $p failed"; rc=1; continue; }; fi
-    cp -a "$MUSTER_BACKUP$p" "$p" || { log "restore: $p failed"; rc=1; }
+    if [ -d "$p" ]; then log "restore: $p is now a directory, left as is"; brc=1; continue; fi
+    if [ -L "$p" ]; then rm -f "$p" || { log "restore: $p failed"; brc=1; continue; }; fi
+    cp -a "$MUSTER_BACKUP$p" "$p" || { log "restore: $p failed"; brc=1; }
   done
-  return $rc
+  return $brc
+}
+save_units() {
+  mkdir -p "$MUSTER_BACKUP/muster-units" || return 1
+  for u in "$@"; do
+    f="$MUSTER_BACKUP/muster-units/$u"
+    if [ -f "$f" ] && ! grep -qx 'absent absent' "$f"; then log "$u: unit state exists, keeping the first"; continue; fi
+    if systemctl cat -- "$u" >/dev/null 2>&1; then
+      ue=$(systemctl is-enabled -- "$u" 2>/dev/null) || :
+      ua=$(systemctl is-active -- "$u" 2>/dev/null) || :
+      printf '%s %s\n' "${ue:-unknown}" "${ua:-unknown}" > "$f" || return 1
+      : > "$f.deps" || return 1
+      for d in $(systemctl show -p RequiredBy -p BoundBy -p ConsistsOf --value -- "$u" 2>/dev/null); do
+        if systemctl is-active --quiet -- "$d"; then printf '%s\n' "$d" >> "$f.deps" || return 1; fi
+      done
+    else
+      printf 'absent absent\n' > "$f" || return 1
+    fi
+  done
+}
+restore_units() {
+  urc=0
+  for u in "$@"; do
+    [ -f "$MUSTER_BACKUP/muster-units/$u" ] || continue
+    read -r ue ua < "$MUSTER_BACKUP/muster-units/$u"
+    [ "$ue" = absent ] || systemctl --quiet unmask -- "$u" || urc=1
+  done
+  for u in "$@"; do
+    [ -f "$MUSTER_BACKUP/muster-units/$u" ] || continue
+    read -r ue ua < "$MUSTER_BACKUP/muster-units/$u"
+    case "$ue" in
+      enabled) systemctl --quiet enable -- "$u" || urc=1;;
+      enabled-runtime) systemctl --quiet enable --runtime -- "$u" || urc=1;;
+      linked|linked-runtime) log "$u: was $ue; the link is not restored"; urc=1;;
+    esac
+  done
+  for u in "$@"; do
+    [ -f "$MUSTER_BACKUP/muster-units/$u" ] || continue
+    read -r ue ua < "$MUSTER_BACKUP/muster-units/$u"
+    case "$ue" in
+      disabled) now=$(systemctl is-enabled -- "$u" 2>/dev/null) || :
+        case "$now" in
+          enabled) systemctl --quiet disable -- "$u" || urc=1;;
+          enabled-runtime) systemctl --quiet disable --runtime -- "$u" || urc=1;;
+        esac;;
+    esac
+  done
+  for u in "$@"; do
+    [ -f "$MUSTER_BACKUP/muster-units/$u" ] || continue
+    read -r ue ua < "$MUSTER_BACKUP/muster-units/$u"
+    case "$ue" in
+      masked) systemctl --quiet mask -- "$u" || urc=1;;
+      masked-runtime) systemctl --quiet mask --runtime -- "$u" || urc=1;;
+    esac
+  done
+  for u in "$@"; do
+    [ -f "$MUSTER_BACKUP/muster-units/$u" ] || continue
+    read -r ue ua < "$MUSTER_BACKUP/muster-units/$u"
+    case "$ue" in masked|masked-runtime) continue;; esac
+    case "$ua" in active|activating|reloading) systemctl --quiet start -- "$u" || urc=1;; esac
+  done
+  for u in "$@"; do
+    [ -f "$MUSTER_BACKUP/muster-units/$u.deps" ] || continue
+    while read -r d; do
+      systemctl is-active --quiet -- "$d" || systemctl --quiet start -- "$d" || urc=1
+    done < "$MUSTER_BACKUP/muster-units/$u.deps"
+  done
+  for u in "$@"; do
+    [ -f "$MUSTER_BACKUP/muster-units/$u" ] || continue
+    read -r ue ua < "$MUSTER_BACKUP/muster-units/$u"
+    [ "$ue" = absent ] && continue
+    now=$(systemctl is-enabled -- "$u" 2>/dev/null) || :
+    [ "${now:-unknown}" = "$ue" ] || { log "$u: enablement not restored (was $ue, now ${now:-unknown})"; urc=1; }
+  done
+  return $urc
 }
 failed=0
 
@@ -49,29 +124,30 @@ failed=0
 
 # ---- 3/10 muster.file.services_permissions [risk none] [fail, high]
 # why: absent counts as fail: files.etc_services.uid is absent on this host
-# do:  chown root:root /etc/services; chmod 644 /etc/services
-# ko:  chown root:root /etc/services; chmod 644 /etc/services
+# do:  chown root:root /etc/services; chmod 644 /etc/services (the script only clears bits; a stricter file is left as it is)
+# ko:  chown root:root /etc/services; chmod 644 /etc/services (스크립트는 비트를 지우기만 하므로 더 엄격한 파일은 그대로 둡니다)
 # text only: the finding is an absent file
 
 # ---- 4/10 muster.file.shadow_permissions [risk none] [fail, high]
 # why: clause does not hold: files.etc_shadow.mode in [0 256]
-# do:  chown root /etc/shadow; chmod 400 /etc/shadow; setfacl -b /etc/shadow. On Debian and Ubuntu unix_chkpwd reads /etc/shadow through group shadow; a site that keeps 0640 relaxes allowed_modes, and the plan then leaves the script out.
-# ko:  chown root /etc/shadow; chmod 400 /etc/shadow; setfacl -b /etc/shadow. Debian과 Ubuntu에서는 unix_chkpwd가 shadow 그룹으로 /etc/shadow를 읽으므로, 0640을 유지하는 사이트는 allowed_modes를 완화하고 그러면 계획이 스크립트를 뺍니다.
+# do:  chown root /etc/shadow; chmod 400 /etc/shadow; setfacl -b /etc/shadow (the script only clears bits; a stricter file is left as it is). On Debian and Ubuntu unix_chkpwd reads /etc/shadow through group shadow; a site that keeps 0640 relaxes allowed_modes, and the plan then leaves the script out.
+# ko:  chown root /etc/shadow; chmod 400 /etc/shadow; setfacl -b /etc/shadow (스크립트는 비트를 지우기만 하므로 더 엄격한 파일은 그대로 둡니다). Debian과 Ubuntu에서는 unix_chkpwd가 shadow 그룹으로 /etc/shadow를 읽으므로, 0640을 유지하는 사이트는 allowed_modes를 완화하고 그러면 계획이 스크립트를 뺍니다.
 fix_muster_file_shadow_permissions() {
   backup /etc/shadow || { log "muster.file.shadow_permissions: backup failed, nothing changed"; return 1; }
   ( set -e
     [ -f /etc/shadow ]
     chown root /etc/shadow
-    chmod 400 /etc/shadow
     if command -v setfacl >/dev/null 2>&1; then setfacl -b /etc/shadow; fi
+    chmod u-wxs,g-rwxs,o-rwxt /etc/shadow
   ); rc=$?
   if [ "$rc" -ne 0 ]; then
     log "muster.file.shadow_permissions: script failed (rc $rc), rolling back"
     restore /etc/shadow || log "muster.file.shadow_permissions: ROLLBACK INCOMPLETE, backups in $MUSTER_BACKUP"
     return 1
   fi
+  # validate
   ( set -e
-    stat -c '%u %a' /etc/shadow | grep -qx '0 400'
+    case "$(stat -c '%u %a' /etc/shadow)" in '0 0'|'0 400') ;; *) false;; esac
   ); rc=$?
   if [ "$rc" -ne 0 ]; then
     log "muster.file.shadow_permissions: validate failed, rolling back"
@@ -103,22 +179,23 @@ fix_muster_file_shadow_permissions
 
 # ---- 8/10 muster.file.hosts_permissions [risk restart_service] [fail, high]
 # why: clause does not hold: files.etc_hosts.mode in [0 128 256 384]
-# do:  chown root:root /etc/hosts; chmod 600 /etc/hosts. At 0600 non-root processes can no longer read /etc/hosts, so services that resolve names through it fail; a site that keeps 0644 relaxes allowed_modes, and the plan then leaves the script out.
-# ko:  chown root:root /etc/hosts; chmod 600 /etc/hosts. 0600에서는 root가 아닌 프로세스가 /etc/hosts를 읽지 못해 그것으로 이름을 푸는 서비스가 실패합니다. 0644를 유지하는 사이트는 allowed_modes를 완화하고 그러면 계획이 스크립트를 뺍니다.
+# do:  chown root:root /etc/hosts; chmod 600 /etc/hosts (the script only clears bits; a stricter file is left as it is). At 0600 non-root processes can no longer read /etc/hosts, so services that resolve names through it fail; a site that keeps 0644 relaxes allowed_modes, and the plan then leaves the script out.
+# ko:  chown root:root /etc/hosts; chmod 600 /etc/hosts (스크립트는 비트를 지우기만 하므로 더 엄격한 파일은 그대로 둡니다). 0600에서는 root가 아닌 프로세스가 /etc/hosts를 읽지 못해 그것으로 이름을 푸는 서비스가 실패합니다. 0644를 유지하는 사이트는 allowed_modes를 완화하고 그러면 계획이 스크립트를 뺍니다.
 fix_muster_file_hosts_permissions() {
   backup /etc/hosts || { log "muster.file.hosts_permissions: backup failed, nothing changed"; return 1; }
   ( set -e
     [ -f /etc/hosts ]
     chown root:root /etc/hosts
-    chmod 600 /etc/hosts
+    chmod u-xs,g-rwxs,o-rwxt /etc/hosts
   ); rc=$?
   if [ "$rc" -ne 0 ]; then
     log "muster.file.hosts_permissions: script failed (rc $rc), rolling back"
     restore /etc/hosts || log "muster.file.hosts_permissions: ROLLBACK INCOMPLETE, backups in $MUSTER_BACKUP"
     return 1
   fi
+  # validate
   ( set -e
-    stat -c '%u %g %a' /etc/hosts | grep -qx '0 0 600'
+    case "$(stat -c '%u %g %a' /etc/hosts)" in '0 0 0'|'0 0 200'|'0 0 400'|'0 0 600') ;; *) false;; esac
   ); rc=$?
   if [ "$rc" -ne 0 ]; then
     log "muster.file.hosts_permissions: validate failed, rolling back"

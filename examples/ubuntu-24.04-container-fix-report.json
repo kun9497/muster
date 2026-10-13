@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
   "run": {
-    "muster_version": "7f79d8f",
-    "commit": "7f79d8f",
-    "controls_version": "kisa-unix-2026+2026.10.08",
-    "controls_digest": "sha256:0391129e9fb2ab8b86f88a710d40a0e1c7c9ddf7bfa38858ca10adbbdf164948",
+    "muster_version": "6503835",
+    "commit": "6503835",
+    "controls_version": "kisa-unix-2026+2026.10.13",
+    "controls_digest": "sha256:f19aabb3a5704b459246b30850f221e08d90369f7e043e16db157d39648342e1",
     "guide_edition": "kisa-unix-2026",
-    "collected_at": "2026-10-12T07:12:39Z",
+    "collected_at": "2026-10-13T08:25:27Z",
     "host": {
       "hostname": "ubuntu-container",
       "machine_id_hash": "",
@@ -36,18 +36,18 @@
       {
         "name": "accounts",
         "status": "ok",
-        "ms": 95
+        "ms": 38
       },
       {
         "name": "audit",
         "status": "ok",
-        "ms": 1,
+        "ms": 18,
         "cmd": "/usr/sbin/auditctl -l"
       },
       {
         "name": "banners",
         "status": "ok",
-        "ms": 6
+        "ms": 8
       },
       {
         "name": "boot",
@@ -57,12 +57,12 @@
       {
         "name": "coredump",
         "status": "ok",
-        "ms": 27
+        "ms": 59
       },
       {
         "name": "cron",
         "status": "ok",
-        "ms": 6,
+        "ms": 9,
         "cmd": "/usr/bin/systemctl list-unit-files --type=timer --no-legend --no-pager"
       },
       {
@@ -78,7 +78,7 @@
       {
         "name": "files",
         "status": "ok",
-        "ms": 4
+        "ms": 18
       },
       {
         "name": "fim",
@@ -131,23 +131,23 @@
       {
         "name": "os",
         "status": "ok",
-        "ms": 4
+        "ms": 9
       },
       {
         "name": "pam",
         "status": "ok",
-        "ms": 25
+        "ms": 9
       },
       {
         "name": "patch",
         "status": "ok",
-        "ms": 758,
+        "ms": 2423,
         "cmd": "/usr/bin/apt-get -s upgrade -o Debug::NoLocking=1"
       },
       {
         "name": "pkgverify",
         "status": "ok",
-        "ms": 8846,
+        "ms": 9287,
         "cmd": "/usr/bin/rpm -Va"
       },
       {
@@ -158,7 +158,7 @@
       {
         "name": "processes",
         "status": "ok",
-        "ms": 12,
+        "ms": 15,
         "cmd": "/usr/bin/rpm -qa --qf [%{=NAME}\t%{FILEMODES:octal}\t%{FILEUSERNAME}\t%{FILEGROUPNAME}\t%|FILECAPS?{%{FILECAPS}}|\t%{FILENAMES}\n]"
       },
       {
@@ -175,7 +175,7 @@
       {
         "name": "sockets",
         "status": "ok",
-        "ms": 7
+        "ms": 9
       },
       {
         "name": "sshd",
@@ -213,7 +213,7 @@
       {
         "name": "walk",
         "status": "ok",
-        "ms": 0,
+        "ms": 1,
         "cmd": "/usr/bin/rpm -qa --qf [%{=NAME}\t%{FILEMODES:octal}\t%{FILEUSERNAME}\t%{FILEGROUPNAME}\t%|FILECAPS?{%{FILECAPS}}|\t%{FILENAMES}\n]"
       }
     ],
@@ -226,11 +226,11 @@
     "partial_failures": []
   },
   "fix": {
-    "muster_version": "7f79d8f",
-    "commit": "7f79d8f",
-    "controls_version": "kisa-unix-2026+2026.10.08",
-    "controls_digest": "sha256:0391129e9fb2ab8b86f88a710d40a0e1c7c9ddf7bfa38858ca10adbbdf164948",
-    "snapshot_digest": "sha256:dddf62fe95d9077e06f94ba733ee491e716470009114d5e604fbcda1568e19b4",
+    "muster_version": "6503835",
+    "commit": "6503835",
+    "controls_version": "kisa-unix-2026+2026.10.13",
+    "controls_digest": "sha256:f19aabb3a5704b459246b30850f221e08d90369f7e043e16db157d39648342e1",
+    "snapshot_digest": "sha256:a631e7d6a0618ba46b83b1b7a57622de0625072441e4407250d263fdfb1ac389",
     "guide_edition": "kisa-unix-2026",
     "profile": {
       "name": "default",
@@ -250,7 +250,8 @@
       "unknown": 0,
       "expiring_soon": 0
     },
-    "max_risk": "lockout_risk"
+    "max_risk": "lockout_risk",
+    "host_guard": "off"
   },
   "items": [
     {
@@ -270,6 +271,7 @@
       "text_only_reason": "no_script",
       "rollback": "none",
       "backup": [],
+      "units": [],
       "validate": false,
       "planned": true
     },
@@ -290,6 +292,7 @@
       "text_only_reason": "no_script",
       "rollback": "none",
       "backup": [],
+      "units": [],
       "validate": false,
       "planned": true
     },
@@ -304,12 +307,13 @@
       "idempotent": true,
       "automation": "auto",
       "reason": "absent counts as fail: files.etc_services.uid is absent on this host",
-      "text_en": "chown root:root /etc/services; chmod 644 /etc/services",
-      "text_ko": "chown root:root /etc/services; chmod 644 /etc/services",
+      "text_en": "chown root:root /etc/services; chmod 644 /etc/services (the script only clears bits; a stricter file is left as it is)",
+      "text_ko": "chown root:root /etc/services; chmod 644 /etc/services (스크립트는 비트를 지우기만 하므로 더 엄격한 파일은 그대로 둡니다)",
       "script": false,
       "text_only_reason": "absent",
       "rollback": "none",
       "backup": [],
+      "units": [],
       "validate": false,
       "planned": true
     },
@@ -324,14 +328,15 @@
       "idempotent": true,
       "automation": "auto",
       "reason": "clause does not hold: files.etc_shadow.mode in [0 256]",
-      "text_en": "chown root /etc/shadow; chmod 400 /etc/shadow; setfacl -b /etc/shadow. On Debian and Ubuntu unix_chkpwd reads /etc/shadow through group shadow; a site that keeps 0640 relaxes allowed_modes, and the plan then leaves the script out.",
-      "text_ko": "chown root /etc/shadow; chmod 400 /etc/shadow; setfacl -b /etc/shadow. Debian과 Ubuntu에서는 unix_chkpwd가 shadow 그룹으로 /etc/shadow를 읽으므로, 0640을 유지하는 사이트는 allowed_modes를 완화하고 그러면 계획이 스크립트를 뺍니다.",
+      "text_en": "chown root /etc/shadow; chmod 400 /etc/shadow; setfacl -b /etc/shadow (the script only clears bits; a stricter file is left as it is). On Debian and Ubuntu unix_chkpwd reads /etc/shadow through group shadow; a site that keeps 0640 relaxes allowed_modes, and the plan then leaves the script out.",
+      "text_ko": "chown root /etc/shadow; chmod 400 /etc/shadow; setfacl -b /etc/shadow (스크립트는 비트를 지우기만 하므로 더 엄격한 파일은 그대로 둡니다). Debian과 Ubuntu에서는 unix_chkpwd가 shadow 그룹으로 /etc/shadow를 읽으므로, 0640을 유지하는 사이트는 allowed_modes를 완화하고 그러면 계획이 스크립트를 뺍니다.",
       "script": true,
       "text_only_reason": "",
       "rollback": "restore_backup",
       "backup": [
         "/etc/shadow"
       ],
+      "units": [],
       "validate": true,
       "planned": true
     },
@@ -352,6 +357,7 @@
       "text_only_reason": "no_script",
       "rollback": "none",
       "backup": [],
+      "units": [],
       "validate": false,
       "planned": true
     },
@@ -372,6 +378,7 @@
       "text_only_reason": "no_script",
       "rollback": "none",
       "backup": [],
+      "units": [],
       "validate": false,
       "planned": true
     },
@@ -392,6 +399,7 @@
       "text_only_reason": "no_script",
       "rollback": "none",
       "backup": [],
+      "units": [],
       "validate": false,
       "planned": true
     },
@@ -406,14 +414,15 @@
       "idempotent": true,
       "automation": "auto",
       "reason": "clause does not hold: files.etc_hosts.mode in [0 128 256 384]",
-      "text_en": "chown root:root /etc/hosts; chmod 600 /etc/hosts. At 0600 non-root processes can no longer read /etc/hosts, so services that resolve names through it fail; a site that keeps 0644 relaxes allowed_modes, and the plan then leaves the script out.",
-      "text_ko": "chown root:root /etc/hosts; chmod 600 /etc/hosts. 0600에서는 root가 아닌 프로세스가 /etc/hosts를 읽지 못해 그것으로 이름을 푸는 서비스가 실패합니다. 0644를 유지하는 사이트는 allowed_modes를 완화하고 그러면 계획이 스크립트를 뺍니다.",
+      "text_en": "chown root:root /etc/hosts; chmod 600 /etc/hosts (the script only clears bits; a stricter file is left as it is). At 0600 non-root processes can no longer read /etc/hosts, so services that resolve names through it fail; a site that keeps 0644 relaxes allowed_modes, and the plan then leaves the script out.",
+      "text_ko": "chown root:root /etc/hosts; chmod 600 /etc/hosts (스크립트는 비트를 지우기만 하므로 더 엄격한 파일은 그대로 둡니다). 0600에서는 root가 아닌 프로세스가 /etc/hosts를 읽지 못해 그것으로 이름을 푸는 서비스가 실패합니다. 0644를 유지하는 사이트는 allowed_modes를 완화하고 그러면 계획이 스크립트를 뺍니다.",
       "script": true,
       "text_only_reason": "",
       "rollback": "restore_backup",
       "backup": [
         "/etc/hosts"
       ],
+      "units": [],
       "validate": true,
       "planned": true
     },
@@ -434,6 +443,7 @@
       "text_only_reason": "no_script",
       "rollback": "none",
       "backup": [],
+      "units": [],
       "validate": false,
       "planned": true
     },
@@ -454,6 +464,7 @@
       "text_only_reason": "no_script",
       "rollback": "none",
       "backup": [],
+      "units": [],
       "validate": false,
       "planned": true
     }
