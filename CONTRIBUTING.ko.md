@@ -73,20 +73,51 @@ KISA 항목이 아닌 컨트롤은 `category: beyond`, id `muster.beyond.<name>`
 ### 조치 본문
 
 `fix --dry-run`은 컨트롤의 `script`, `validate`, `rollback`을 검토용 스크립트로 렌더링하므로
-이들은 코드입니다. `script`에는 `idempotent: true`와 되돌릴 길 — `rollback`, 비어 있지 않은
-`backup`, 또는 둘 다 — 이 필요합니다. 본문은 서브셸에서 `set -e` 아래 돕니다. 정당하게
+이들은 코드입니다. `script`에는 `idempotent: true`, `validate`, 그리고 되돌릴 길 — `rollback`,
+비어 있지 않은 `backup`, 둘 다, 또는 서비스 컨트롤이라면 `units` 하나(`units`는 `rollback`,
+`backup`과 함께 쓸 수 없음) — 이 필요합니다. 본문은 서브셸에서 `set -e` 아래 돕니다. 정당하게
 실패할 수 있는 명령은 자기 줄에 `|| true`로 그렇다고 말하고, 끝에 붙인 `; true`는 결코
 쓰지 않으며, 운영자가 봐야 할 오류를 `2>/dev/null`로 숨기지 않습니다. 파일에 작용하는
 본문은 먼저 그 파일이 있는지 확인하고, 선택적 도구를 부르는 본문은 `command -v`로
-감쌉니다. 서비스 본문은 `services.go`에 있는 논리 서비스의 `provesInstall` 유닛을 돌며
-(Linux 테스트가 그 목록을 정확히 고정), 각각을 `systemctl cat`으로 감싸고, disable은 엄격히,
-mask는 `|| true`로 합니다. 그 rollback은 모든 유닛을 unmask한 다음 모든 유닛을 enable합니다.
-유닛이 하나인 본문은 단어 하나짜리 `for`가 아니라 `if`를 씁니다. `validate`는 조건을
-`&&`로 이은 한 줄이며 스크립트가 설정한 것만 확인합니다. `backup` 경로는 절대·정규 경로이고
+감쌉니다. 서비스 컨트롤은 자기 유닛을 `units`에 선언합니다 — `services.go`에 있는 논리
+서비스의 `provesInstall` 유닛이며, 각 `<name>.socket`은 그 `<name>.service`보다 앞에 둡니다
+(Linux 테스트가 그 집합을 고정하고, validate도 같은 유닛을 이름으로 적습니다). 스크립트는
+유닛 이름을 직접 쓰지 않습니다. 템플릿이 `UNITS`를 설정하고, 본문 전에 각 유닛의 상태를
+기록했다가 실패하면 되돌려 놓으므로 손으로 쓴 rollback은 없습니다. 본문은 유닛이 하나여도
+`$UNITS`를 두 번에 걸쳐 돕니다:
+
+```sh
+todo=
+for u in $UNITS; do
+  systemctl cat "$u" >/dev/null 2>&1 || continue
+  [ "$(systemctl show -p Id --value "$u" 2>/dev/null)" = "$u" ] || continue
+  todo="$todo $u"
+done
+for u in $todo; do
+  systemctl --quiet disable --now "$u"
+  systemctl --quiet mask "$u" || true
+done
+```
+
+첫 번째 루프는 무엇이든 mask하기 전에 모든 이름을 해석하고, 목록에 있는 유닛의 별칭은
+건너뜁니다(Debian의 `nfs-kernel-server.service`는 `nfs-server.service`의 별칭이며, mask 뒤에
+그것을 disable하면 실패합니다). 목록에 없는 유닛의 별칭도 건너뛰므로 실제 유닛을
+선언하세요. 파일 본문은 금지된 비트를 기호 모드로 지우고(`chmod u-xs,g-rwxs,o-rwxt`; 절대
+모드를 쓰지 않으므로 더 엄격한 파일은 그대로 남음). ACL을 제거하는 본문(그렇게 하는 두 개:
+`passwd_permissions`, `shadow_permissions`)은 `chmod` 전에 `setfacl -b`를 실행합니다.
+`validate`는 한 줄 — `&&`로 이은 조건, 또는 마지막 갈래가 `*) false`인 `case` 하나(아무것도
+맞지 않는 `case`는 0으로 끝남) — 이며 스크립트가 설정한 것만 확인합니다. 파일 validate는
+컨트롤의 기본 허용 모드를 나열합니다. `backup` 경로는 절대·정규 경로이고
 `[A-Za-z0-9._@:+/-]` 안의 문자만 씁니다. here-document는 쓰지 않습니다. 스크립트는
 `umask 077` 아래 돌므로, 다른 사람이 읽는 파일을 만드는 본문은 그 모드를 설정합니다.
 `make shellcheck`와 `go test ./internal/remedy -run TestScriptGolden -update`
 (`all-scripted.sh` 골든이 배포되는 모든 본문을 렌더링)가 변경을 검사합니다.
+새 스크립트 컨트롤은 같은 커밋에서 `controls/testdata/_roundtrip.yaml`에도 들어갑니다:
+`ci/roundtrip/<key>.sh` 시드 스크립트가 그것을 느슨하게 하고 `seeded` 목록이 그것을 적는
+`fix-roundtrip` 행(`images`), 또는 어떤 행도 증명할 수 없는 이유(systemd 유닛 없음, 이미지의
+활성 저장소에 패키지 없음, 컨테이너에서 유닛을 돌릴 수 없음)를 적은 `unproven:`입니다.
+`TestEveryScriptedControlIsInTheRoundtripTable`이 그 표, 배포되는 집합, CI 매트릭스를 같게
+유지합니다.
 
 ## 팩트 추가
 
@@ -175,8 +206,11 @@ mask는 `|| true`로 합니다. 그 rollback은 모든 유닛을 unmask한 다�
   스냅샷으로 바꿔 넣지 마세요.
 - CI는 race 빌드, lint, coverage 검사, 러너 VM에서의 root 수집, 비root 수집, 컨테이너
   매트릭스(Ubuntu 22.04/24.04, Rocky 9, AlmaLinux 9, Debian 12는 카나리), 읽기 전용 계약
-  실행, 데몬 오라클, 검토용 스크립트에 대한 `sh -n`과 shellcheck, `fix-roundtrip` 잡(시드한
-  실패를 생성된 스크립트가 일회용 컨테이너에서 고침), 그리고 capability matrix(`docs/reference/capability-matrix.json`:
+  실행, 데몬 오라클, 검토용 스크립트와 `ci/roundtrip/*.sh`에 대한 `sh -n`과 shellcheck, `fix-roundtrip` 잡(시드한
+  실패를 생성된 스크립트가 Rocky 9, AlmaLinux 9, 잡 안에서 빌드한 Debian 12 init 이미지,
+  Ubuntu 22.04의 일회용 컨테이너에서 고침. 각 init 행에서는 두 번째 컨테이너가 guard 실행 —
+  첫 컨테이너에서 계획한 스크립트가 거부됨 — 과 failure 실행 — 모든 블록의 validate를 강제로
+  실패시키면 유닛과 파일이 기록한 대로 되돌아가야 함 — 을 증명), 그리고 capability matrix(`docs/reference/capability-matrix.json`:
   root 없이 `denied`여야 하는 팩트와 systemd 없이 `unsupported`여야 하는 팩트)를 돌립니다.
 
 ## 문서

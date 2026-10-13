@@ -16,13 +16,13 @@ checks:
   - { fact: files.etc_services.uid, op: eq, expected: 0 }
   - { fact: files.etc_services.mode, op: in, expected: "${allowed_modes}" }
 remediation:
-  text_en: chown root:root /etc/services; chmod 644 /etc/services
-  text_ko: chown root:root /etc/services; chmod 644 /etc/services
+  text_en: chown root:root /etc/services; chmod 644 /etc/services (the script only clears bits; a stricter file is left as it is)
+  text_ko: chown root:root /etc/services; chmod 644 /etc/services (스크립트는 비트를 지우기만 하므로 더 엄격한 파일은 그대로 둡니다)
   risk: none
   idempotent: true
   backup: [/etc/services]
   script: |
     [ -f /etc/services ]
     chown root:root /etc/services
-    chmod 644 /etc/services
-  validate: "stat -c '%u %g %a' /etc/services | grep -qx '0 0 644'"
+    chmod u-xs,g-wxs,o-wxt /etc/services
+  validate: "case \"$(stat -c '%u %g %a' /etc/services)\" in '0 0 0'|'0 0 4'|'0 0 40'|'0 0 44'|'0 0 200'|'0 0 204'|'0 0 240'|'0 0 244'|'0 0 400'|'0 0 404'|'0 0 440'|'0 0 444'|'0 0 600'|'0 0 604'|'0 0 640'|'0 0 644') ;; *) false;; esac"

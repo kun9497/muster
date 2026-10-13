@@ -24,20 +24,17 @@ remediation:
   text_ko: tftp 와 talk(ntalk 포함) 서비스·소켓을 중지·비활성화하거나 inetd/xinetd 의 해당 항목을 제거합니다. inetd나 xinetd가 띄우는 tftp, talk, ntalk는 스크립트가 멈추지 않습니다. 거기서 항목을 지우십시오.
   risk: restart_service
   idempotent: true
+  units: [tftp.socket, tftp.service, tftpd.service, tftpd-hpa.service, atftpd.socket, atftpd.service, talk.socket, ntalk.socket]
   script: |
-    for u in tftp.socket tftp.service tftpd.service tftpd-hpa.service atftpd.socket atftpd.service talk.socket ntalk.socket; do
+    todo=
+    for u in $UNITS; do
       systemctl cat "$u" >/dev/null 2>&1 || continue
-      systemctl disable --now "$u"
-      systemctl mask "$u" || true
+      [ "$(systemctl show -p Id --value "$u" 2>/dev/null)" = "$u" ] || continue
+      todo="$todo $u"
+    done
+    for u in $todo; do
+      systemctl --quiet disable --now "$u"
+      systemctl --quiet mask "$u" || true
     done
   validate: '! systemctl is-active --quiet tftp.socket && case "$(systemctl is-enabled tftp.socket 2>/dev/null)" in enabled|enabled-runtime) false;; esac && ! systemctl is-active --quiet tftp.service && case "$(systemctl is-enabled tftp.service 2>/dev/null)" in enabled|enabled-runtime) false;; esac && ! systemctl is-active --quiet tftpd.service && case "$(systemctl is-enabled tftpd.service 2>/dev/null)" in enabled|enabled-runtime) false;; esac && ! systemctl is-active --quiet tftpd-hpa.service && case "$(systemctl is-enabled tftpd-hpa.service 2>/dev/null)" in enabled|enabled-runtime) false;; esac && ! systemctl is-active --quiet atftpd.socket && case "$(systemctl is-enabled atftpd.socket 2>/dev/null)" in enabled|enabled-runtime) false;; esac && ! systemctl is-active --quiet atftpd.service && case "$(systemctl is-enabled atftpd.service 2>/dev/null)" in enabled|enabled-runtime) false;; esac && ! systemctl is-active --quiet talk.socket && case "$(systemctl is-enabled talk.socket 2>/dev/null)" in enabled|enabled-runtime) false;; esac && ! systemctl is-active --quiet ntalk.socket && case "$(systemctl is-enabled ntalk.socket 2>/dev/null)" in enabled|enabled-runtime) false;; esac'
-  rollback: |
-    for u in tftp.socket tftp.service tftpd.service tftpd-hpa.service atftpd.socket atftpd.service talk.socket ntalk.socket; do
-      systemctl cat "$u" >/dev/null 2>&1 || continue
-      systemctl unmask "$u"
-    done
-    for u in tftp.socket tftp.service tftpd.service tftpd-hpa.service atftpd.socket atftpd.service talk.socket ntalk.socket; do
-      systemctl cat "$u" >/dev/null 2>&1 || continue
-      systemctl enable --now "$u"
-    done
 decision: D19

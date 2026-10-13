@@ -19,20 +19,17 @@ remediation:
   text_ko: echo, discard, daytime, chargen 서비스를 비활성화·mask 하거나 inetd/xinetd 의 해당 항목을 제거합니다. inetd나 xinetd가 띄우는 echo, discard, daytime, chargen은 스크립트가 멈추지 않습니다. 거기서 항목을 지우십시오.
   risk: restart_service
   idempotent: true
+  units: [echo.socket, discard.socket, daytime.socket, chargen.socket]
   script: |
-    for u in echo.socket discard.socket daytime.socket chargen.socket; do
+    todo=
+    for u in $UNITS; do
       systemctl cat "$u" >/dev/null 2>&1 || continue
-      systemctl disable --now "$u"
-      systemctl mask "$u" || true
+      [ "$(systemctl show -p Id --value "$u" 2>/dev/null)" = "$u" ] || continue
+      todo="$todo $u"
+    done
+    for u in $todo; do
+      systemctl --quiet disable --now "$u"
+      systemctl --quiet mask "$u" || true
     done
   validate: '! systemctl is-active --quiet echo.socket && case "$(systemctl is-enabled echo.socket 2>/dev/null)" in enabled|enabled-runtime) false;; esac && ! systemctl is-active --quiet discard.socket && case "$(systemctl is-enabled discard.socket 2>/dev/null)" in enabled|enabled-runtime) false;; esac && ! systemctl is-active --quiet daytime.socket && case "$(systemctl is-enabled daytime.socket 2>/dev/null)" in enabled|enabled-runtime) false;; esac && ! systemctl is-active --quiet chargen.socket && case "$(systemctl is-enabled chargen.socket 2>/dev/null)" in enabled|enabled-runtime) false;; esac'
-  rollback: |
-    for u in echo.socket discard.socket daytime.socket chargen.socket; do
-      systemctl cat "$u" >/dev/null 2>&1 || continue
-      systemctl unmask "$u"
-    done
-    for u in echo.socket discard.socket daytime.socket chargen.socket; do
-      systemctl cat "$u" >/dev/null 2>&1 || continue
-      systemctl enable --now "$u"
-    done
 decision: D19

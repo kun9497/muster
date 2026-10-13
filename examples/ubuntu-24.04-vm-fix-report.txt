@@ -1,4 +1,4 @@
-muster 7f79d8f · controls kisa-unix-2026+2026.10.08 · guide kisa-unix-2026 · host github-runner · collected 2026-10-12T07:12:49Z
+muster 6503835 · controls kisa-unix-2026+2026.10.13 · guide kisa-unix-2026 · host github-runner · collected 2026-10-13T08:25:39Z
 fix --dry-run · profile default (117 controls) · max-risk lockout_risk
 planned 43 (script 2, text only 41) · above max-risk 0 · waived 0 · clean 66 · not planned: error 0, manual 7, warn_degraded 1
 by risk: none 32 · restart_service 5 · reboot_required 3 · lockout_risk 3
@@ -27,7 +27,7 @@ by risk: none 32 · restart_service 5 · reboot_required 3 · lockout_risk 3
    do:  먼저 파일을 복사한 뒤(cp -a <file> <file>.bak) visudo -f <file> 로 편집합니다. ALL 줄에서 NOPASSWD 를 빼거나 그 계정이 정말 필요한 명령으로 줄을 좁히고, Defaults !authenticate 줄을 지웁니다. NOPASSWD 를 잃기 전에 그 계정에 비밀번호나 키 기반 PAM 방식을 주어야 합니다. 그렇지 않으면 sudo 를 전혀 쓸 수 없습니다. cp -a <file>.bak <file> 로 되돌리며, visudo -c 로 결과를 검사합니다. (text only: no_script)
 8   none             muster.file.shadow_permissions                     fail    high    yes     restore_backup  /etc/shadow 가 root 소유이고 root 만 읽을 수 있다
    why: clause does not hold: files.etc_shadow.mode in [0 256]
-   do:  chown root /etc/shadow; chmod 400 /etc/shadow; setfacl -b /etc/shadow. Debian과 Ubuntu에서는 unix_chkpwd가 shadow 그룹으로 /etc/shadow를 읽으므로, 0640을 유지하는 사이트는 allowed_modes를 완화하고 그러면 계획이 스크립트를 뺍니다.
+   do:  chown root /etc/shadow; chmod 400 /etc/shadow; setfacl -b /etc/shadow (스크립트는 비트를 지우기만 하므로 더 엄격한 파일은 그대로 둡니다). Debian과 Ubuntu에서는 unix_chkpwd가 shadow 그룹으로 /etc/shadow를 읽으므로, 0640을 유지하는 사이트는 allowed_modes를 완화하고 그러면 계획이 스크립트를 뺍니다.
 9   none             muster.file.suid_sgid                              fail    high    no      -               setuid·setgid 파일은 모두 패키지가 그렇게 배포한 것이고, 쓰기 가능한 디렉터리에 sticky bit 가 빠지지 않았다
    why: clause does not hold: walk.sticky_missing none where path present
    do:  되돌릴 수 있도록 현재 모드를 먼저 기록합니다(stat -c '%a %n' <path>). 어떤 패키지도 선언하지 않은 setuid·setgid 파일은 chmod u-s <path> 또는 chmod g-s <path> 로 비트를 제거하거나, 필요 없다면 파일을 삭제합니다. 되돌릴 때는 chmod <기록한 모드> <path> 입니다. sticky 목록의 디렉터리는 chmod +t <path> 로 비트를 추가하고, chmod -t <path> 로 되돌립니다. (text only: no_script)
@@ -105,7 +105,7 @@ by risk: none 32 · restart_service 5 · reboot_required 3 · lockout_risk 3
    do:  먼저 그룹의 구성원과 소켓의 소유자, mode, ACL 을 기록합니다(getent group <group>; stat -c '%U:%G %a' <socket>; getfacl <socket>). 그다음 API 에 접근하면 안 되는 계정을 그룹에서 빼고(gpasswd -d <user> <group>), 런타임이 소켓을 root 소유 0660 에 ACL 없이 다시 만들게 합니다(setfacl -b <socket>, 또는 런타임의 socket unit 을 고친 뒤 다시 시작). 컨테이너가 필요한 계정은 rootless 런타임을 쓸 수 있습니다. gpasswd -a <user> <group> 와 기록한 설정으로 되돌리며, 뺀 구성원은 변경 전에 연 세션에서 로그아웃할 때까지 접근을 유지합니다. (text only: no_script)
 34  restart_service  muster.file.hosts_permissions                      fail    high    yes     restore_backup  /etc/hosts 가 root 소유이고 root 만 읽을 수 있다
    why: clause does not hold: files.etc_hosts.mode in [0 128 256 384]
-   do:  chown root:root /etc/hosts; chmod 600 /etc/hosts. 0600에서는 root가 아닌 프로세스가 /etc/hosts를 읽지 못해 그것으로 이름을 푸는 서비스가 실패합니다. 0644를 유지하는 사이트는 allowed_modes를 완화하고 그러면 계획이 스크립트를 뺍니다.
+   do:  chown root:root /etc/hosts; chmod 600 /etc/hosts (스크립트는 비트를 지우기만 하므로 더 엄격한 파일은 그대로 둡니다). 0600에서는 root가 아닌 프로세스가 /etc/hosts를 읽지 못해 그것으로 이름을 푸는 서비스가 실패합니다. 0644를 유지하는 사이트는 allowed_modes를 완화하고 그러면 계획이 스크립트를 뺍니다.
 35  restart_service  muster.beyond.dev_shm_mount_options                fail    medium  no      -               /dev/shm 이 nodev, nosuid, noexec 로 마운트된다
    why: clause does not hold: mounts.points each require options contains noexec
    do:  /etc/fstab 에 tmpfs 와 defaults,nodev,nosuid,noexec 로 /dev/shm 줄을 추가하거나 같은 옵션을 담은 /etc/systemd/system/dev-shm.mount 재정의를 놓고 다시 마운트합니다. /dev/shm 에서 실행 가능한 페이지를 매핑하는 소프트웨어는 noexec 아래에서 동작하지 않으므로, 변경을 끝난 것으로 보기 전에 스택을 재시작해 할당 실패가 없는지 확인하십시오. (text only: no_script)

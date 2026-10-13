@@ -93,21 +93,57 @@ the key present with its `effective` side `absent` when it means to be absent.
 ### Remediation bodies
 
 `fix --dry-run` renders a control's `script`, `validate` and `rollback` into a
-review script, so they are code. A `script` needs `idempotent: true` and a way
-back: a `rollback`, a non-empty `backup`, or both. Bodies run under `set -e` in
+review script, so they are code. A `script` needs `idempotent: true`, a
+`validate` and a way back: a `rollback`, a non-empty `backup`, both, or — for a
+service control — `units` alone (`units` excludes `rollback` and `backup`).
+Bodies run under `set -e` in
 a subshell: a command that may legitimately fail says so with `|| true` on its
 own line, never a trailing `; true`, and no `2>/dev/null` hides an error the
 operator should see. A body acting on a file checks it exists first; one calling
-an optional tool guards it with `command -v`. A service body loops over the
-logical service's `provesInstall` units in `services.go` (a Linux test pins the
-list exactly), guards each with `systemctl cat`, disables strictly and masks
-`|| true`; its rollback unmasks every unit, then enables every unit. A body with
-one unit uses `if`, not a one-word `for`. `validate` is one line, conditions
-joined with `&&`, and checks only what the script set. `backup` paths are
+an optional tool guards it with `command -v`. A service control declares its
+units in `units` — the logical service's `provesInstall` units in `services.go`,
+each `<name>.socket` before its `<name>.service` (a Linux test pins the set, and
+the validate names the same units) — and its script never names a unit: the
+template sets `UNITS`, records each unit's state before the body and puts it
+back on failure, so there is no hand-written rollback. The body loops over
+`$UNITS` in two passes, even for one unit:
+
+```sh
+todo=
+for u in $UNITS; do
+  systemctl cat "$u" >/dev/null 2>&1 || continue
+  [ "$(systemctl show -p Id --value "$u" 2>/dev/null)" = "$u" ] || continue
+  todo="$todo $u"
+done
+for u in $todo; do
+  systemctl --quiet disable --now "$u"
+  systemctl --quiet mask "$u" || true
+done
+```
+
+The first pass resolves every name before anything is masked and skips an
+alias of a listed unit (Debian's `nfs-kernel-server.service` is an alias of
+`nfs-server.service`; disabling it after the mask fails). An alias of a unit
+you did not list is skipped too, so declare the real unit. A file body clears
+the forbidden bits symbolically (`chmod u-xs,g-rwxs,o-rwxt`, never an absolute
+mode, so a stricter file stays as it is); a body that removes an ACL (the two
+that do: `passwd_permissions`, `shadow_permissions`) runs `setfacl -b` before
+`chmod`.
+`validate` is one line — conditions joined with `&&`, or a single `case` whose
+last arm is `*) false` (a `case` that matches nothing exits 0) — and checks only
+what the script set; a file validate lists the control's default allowed modes.
+`backup` paths are
 absolute and clean, in `[A-Za-z0-9._@:+/-]`. No here-document. The script runs
 under `umask 077`, so a body that creates a file others read sets its mode.
 `make shellcheck` and `go test ./internal/remedy -run TestScriptGolden -update`
 (the `all-scripted.sh` golden renders every shipped body) check your change.
+A new scripted control also enters `controls/testdata/_roundtrip.yaml` in the
+same commit: the `fix-roundtrip` rows (`images`) whose seed script in
+`ci/roundtrip/<key>.sh` loosens it and whose `seeded` list names it, or
+`unproven:` with the reason no row can (no systemd unit, no package in the
+image's enabled repositories, or the unit cannot run in a container);
+`TestEveryScriptedControlIsInTheRoundtripTable` holds the table, the shipped
+set and the CI matrix equal.
 
 ## Adding a fact
 
@@ -220,9 +256,14 @@ source (`Output.Source`).
 - CI runs the race build, the lint, the coverage check, a root collect on the
   runner VM, a non-root collect, the container matrix (Ubuntu 22.04/24.04,
   Rocky 9, AlmaLinux 9, Debian 12 as a canary), the read-only contract run,
-  the daemon oracles, `sh -n` and shellcheck over the review scripts, the
+  the daemon oracles, `sh -n` and shellcheck over the review scripts and
+  `ci/roundtrip/*.sh`, the
   `fix-roundtrip` job (seeded failures repaired by the generated script in
-  throwaway containers), and the capability matrix
+  throwaway containers on Rocky 9, AlmaLinux 9, a Debian 12 init image built in
+  the job and Ubuntu 22.04; on each init row a second container proves the guard
+  run — a script planned in the first container is refused — and the failure
+  run — every block's validate forced false must roll units and files back to
+  what was recorded), and the capability matrix
   (`docs/reference/capability-matrix.json`): facts that must be `denied`
   without root and `unsupported` without systemd.
 

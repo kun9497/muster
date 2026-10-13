@@ -2,12 +2,15 @@ package remedy
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"flag"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"sync"
@@ -58,6 +61,7 @@ func fullPlan(t *testing.T) *Plan {
 		row("muster.test.a_none", "FAIL", "clause does not hold: files.etc_hosts.mode in [0 420]", "", "low"),
 		row("muster.test.b_restart", "FAIL", "clause does not hold", "", "medium"),
 		row("muster.test.c_lockout", "FAIL", "clause does not hold", "", "high"),
+		row("muster.test.g_units", "FAIL", "clause does not hold", "", "medium"),
 		row("muster.test.d_reboot", "FAIL", "clause does not hold", "", "high"),
 		row("muster.test.e_param", "FAIL", "mode 777", "", "high"),
 		partial,
@@ -67,6 +71,8 @@ func fullPlan(t *testing.T) *Plan {
 		row("x.pass", "PASS", "", "", "high"),
 	)
 	rep.Check.ParamSources = map[string]map[string]string{"muster.test.e_param": {"mode": "tuning"}}
+	sum := sha256.Sum256([]byte("0123456789abcdef0123456789abcdef"))
+	rep.Run.Host.MachineIDHash = hex.EncodeToString(sum[:]) // T-8: the guard-on prologue
 	return mustBuild(t, rep, testSet(t), Options{})
 }
 
@@ -89,12 +95,30 @@ func emptyPlan(t *testing.T) *Plan {
 
 const poison = "\x1b[31m\n# $(id) `id`"
 
+// spelledSample is the format, separator and filler runes report.Escape spells
+// out (T-9): soft hyphen, ALM, ZWSP, ZWJ, RLO, LS, PS, LRI, BOM, Hangul filler
+// and a tag character.
+var spelledSample = []rune{0x00ad, 0x061c, 0x200b, 0x200d, 0x202e, 0x2028, 0x2029, 0x2066, 0xfeff, 0x3164, 0xe0001}
+
+// assertSpelled checks the sample is covered by report.SpelledOut and absent raw.
+func assertSpelled(t *testing.T, name string, out []byte) {
+	t.Helper()
+	for _, r := range spelledSample {
+		if !report.SpelledOut(r) {
+			t.Errorf("U+%04X is not spelled out by report.SpelledOut", r)
+		}
+		if bytes.ContainsRune(out, r) {
+			t.Errorf("%s: raw U+%04X reached the output", name, r)
+		}
+	}
+}
+
 // poisonControls carry ESC, BEL, a newline, '#' and command substitutions
 // in both texts (YAML's "\e" is ESC, "\a" BEL).
 var poisonControls = map[string]string{
 	"muster.test.p_script": `automation: auto
 remediation:
-  text_en: "do \e[31m\n# $(id) ` + "`id`" + `"
+  text_en: "do \e[31m\n# $(id) ` + "`id`" + `\u00ad\u061c\u200b\u200d\u202e\u2028\u2029\u2066\ufeff\u3164\U000E0001"
   text_ko: "조치 \e[31m\n# $(id)"
   risk: lockout_risk
   idempotent: true
@@ -111,6 +135,9 @@ remediation:
   idempotent: true
 `,
 }
+
+// poisonHash is 64 characters but not 64 hex: Build must leave the guard off.
+var poisonHash = "'; id; '" + strings.Repeat("a", 56)
 
 func setFrom(t *testing.T, ctl map[string]string) *controls.Set {
 	t.Helper()
@@ -133,12 +160,12 @@ func setFrom(t *testing.T, ctl map[string]string) *controls.Set {
 func poisonPlan(t *testing.T) *Plan {
 	var rows []report.Row
 	for _, id := range []string{"muster.test.p_script", "muster.test.p_text"} {
-		r := row(id, "FAIL", "value "+poison, "", "high")
+		r := row(id, "FAIL", "value "+poison+string(spelledSample), "", "high")
 		r.TitleEn, r.TitleKo = "title "+poison, "제목 "+poison
 		rows = append(rows, r)
 	}
 	// Not-planned rows carry snapshot text too: an ERROR and a degraded WARN.
-	errRow := row("muster.test.p_error", "ERROR", "value "+poison, "", "high")
+	errRow := row("muster.test.p_error", "ERROR", "value "+poison+string(spelledSample), "", "high")
 	errRow.ReasonCode = check.MissingFact
 	rows = append(rows, errRow,
 		row("muster.test.p_degraded", "WARN", check.ReasonDegradedPrefix+poison, poison, "low"))
@@ -147,7 +174,11 @@ func poisonPlan(t *testing.T) *Plan {
 	rep.Run.CollectedAt = "2026" + poison
 	rep.Check.ControlsVersion, rep.Check.ControlsDigest = "v"+poison, "d"+poison
 	rep.Check.Profile.Name, rep.Check.Profile.Digest = "p"+poison, "pd"+poison
+	rep.Run.Host.MachineIDHash = poisonHash
 	p := mustBuild(t, rep, setFrom(t, poisonControls), Options{})
+	if p.Fix.HostGuard != "off" {
+		t.Fatalf("a malformed machine-id hash set the guard %q, want off", p.Fix.HostGuard)
+	}
 	if len(p.Items) != 2 || !strings.ContainsRune(p.Items[0].TextEn+p.Items[1].TextEn, 0x1b) {
 		t.Fatal("poison controls carry no ESC: the fixture is not poisoned")
 	}
@@ -230,8 +261,8 @@ func TestScriptBlocksAreIndependent(t *testing.T) {
 			t.Errorf("%s: %d definitions, %d bare calls; want 1 and 1", fn, defs, calls)
 		}
 	}
-	if scripted != 3 {
-		t.Fatalf("full plan has %d planned scripted items, want 3", scripted)
+	if scripted != 4 {
+		t.Fatalf("full plan has %d planned scripted items, want 4", scripted)
 	}
 	for _, l := range ls {
 		if strings.HasPrefix(l, "fix_") {
@@ -305,11 +336,20 @@ func TestScriptFailurePathRollbackThenRestore(t *testing.T) {
 // the item's declared bodies at the indent the template gives them.
 func templateLines(p *Plan) map[string]bool {
 	ok := map[string]bool{"": true}
-	for _, l := range strings.Split(prologue+epilogue, "\n") {
+	for _, l := range strings.Split(prologue(p)+epilogue, "\n") {
 		ok[l] = true
 	}
 	for _, it := range p.Items {
 		id, fn, bk := it.ID, fnName(it.ID), strings.Join(it.Backup, " ")
+		if len(it.Units) > 0 {
+			us := strings.Join(it.Units, " ")
+			ok["  save_units "+us+` || { log "`+id+`: backup failed, nothing changed"; return 1; }`] = true
+			ok["    UNITS='"+us+"'"] = true
+			ok["    restore_units "+us+` || log "`+id+`: ROLLBACK INCOMPLETE, backups in $MUSTER_BACKUP"`] = true
+		}
+		if it.Validate {
+			ok["  # validate"] = true
+		}
 		for _, l := range []string{
 			fn + "() {", fn, callStatusLine, "}",
 			"  backup " + bk + ` || { log "` + id + `: backup failed, nothing changed"; return 1; }`,
@@ -344,6 +384,7 @@ func TestScriptEveryLineIsTemplateBodyOrComment(t *testing.T) {
 		if bytes.IndexByte(out, 0x1b) >= 0 || bytes.IndexByte(out, '\a') >= 0 || bytes.IndexByte(out, '\r') >= 0 {
 			t.Errorf("%s: a raw control byte reached the script", g.name)
 		}
+		assertSpelled(t, g.name, out)
 		ok := templateLines(p)
 		for i, l := range lines(out) {
 			if strings.HasPrefix(l, "#") {
@@ -355,9 +396,22 @@ func TestScriptEveryLineIsTemplateBodyOrComment(t *testing.T) {
 			if strings.Contains(l, "$(id)") || strings.Contains(l, "`id`") {
 				t.Errorf("%s line %d carries a derived command outside a comment: %q", g.name, i+1, l)
 			}
+			// D34 amended: the one snapshot value on a command line is the
+			// machine-id hash, as 64 hex on the MUSTER_SNAPSHOT_HOST= line.
+			if hex64.MatchString(l) && (p.Fix.MachineIDHash == "" || l != "MUSTER_SNAPSHOT_HOST="+p.Fix.MachineIDHash) {
+				t.Errorf("%s line %d carries a 64-hex run off the MUSTER_SNAPSHOT_HOST= line: %q", g.name, i+1, l)
+			}
+			if strings.Contains(l, poisonHash) {
+				t.Errorf("%s line %d carries the malformed hash: %q", g.name, i+1, l)
+			}
 		}
 	}
+	if !strings.Contains(string(Script(fullPlan(t))), "\nMUSTER_SNAPSHOT_HOST="+fullPlan(t).Fix.MachineIDHash+"\n") {
+		t.Error("full: no MUSTER_SNAPSHOT_HOST= line carrying the plan's hash")
+	}
 }
+
+var hex64 = regexp.MustCompile(`[0-9a-f]{64}`)
 
 // M-2: above the cap a blank body line is "#" alone (no trailing space), so
 // the commented block has no empty line and nothing after it runs; planned,
@@ -428,6 +482,61 @@ func TestScriptIsDeterministic(t *testing.T) {
 	}
 }
 
+func TestScriptGuardOffWithoutAHash(t *testing.T) {
+	s := string(Script(emptyPlan(t)))
+	if !strings.Contains(s, "\n# host guard: off (the snapshot has no machine id)\n") || strings.Contains(s, "muster_machine_id_hash") || strings.Contains(s, "MUSTER_SNAPSHOT_HOST") {
+		t.Fatalf("guard-off prologue wrong:\n%s", s)
+	}
+}
+
+func TestScriptPrologueOrder(t *testing.T) {
+	s := string(Script(fullPlan(t)))
+	order := []string{"set -u\n", "umask 077\n", "log() {", "muster_machine_id_hash() {", rootCheckLine, "MUSTER_SNAPSHOT_HOST=", `MUSTER_BACKUP="${MUSTER_BACKUP:-`, `mkdir -p "$MUSTER_BACKUP" || exit 2`, backupOwnerLine, "backup() {", "restore() {", "save_units() {", "restore_units() {", "failed=0\n"}
+	at := 0
+	for _, o := range order {
+		i := strings.Index(s[at:], o)
+		if i < 0 {
+			t.Fatalf("prologue: %q missing or out of order", o)
+		}
+		at += i + len(o)
+	}
+}
+
+func TestScriptUnitsBlockOrder(t *testing.T) {
+	ls := lines(Script(fullPlan(t)))
+	fn := fnName("muster.test.g_units")
+	in, saw := false, map[string]int{}
+	for i, l := range ls {
+		if l == fn+"() {" {
+			in = true
+		}
+		if !in {
+			continue
+		}
+		switch {
+		case strings.HasPrefix(l, "  save_units g.socket g.service || "):
+			saw["save"] = i
+		case l == "    UNITS='g.socket g.service'":
+			if ls[i-1] != "  ( set -e" {
+				t.Errorf("UNITS= not the first body line: after %q", ls[i-1])
+			}
+			saw["units"] = i
+		case strings.HasPrefix(l, "    restore_units g.socket g.service || log "):
+			saw["restore"]++
+		case l == "  # validate":
+			if ls[i+1] != "  ( set -e" {
+				t.Errorf("# validate not before the validate subshell")
+			}
+			saw["marker"] = i
+		case l == "}":
+			in = false
+		}
+	}
+	if saw["save"] == 0 || saw["units"] <= saw["save"] || saw["restore"] != 2 || saw["marker"] == 0 {
+		t.Fatalf("units block shape: %v", saw)
+	}
+}
+
 func TestScriptAllScriptedCoversTheShippedSet(t *testing.T) {
 	p := allScriptedPlan(t)
 	if len(p.Items) != 16 || p.Summary.WithScript != 16 {
@@ -456,7 +565,29 @@ func runScript(t *testing.T, p *Plan, dir, backupDir string) (string, int) {
 // working directory is dir, so a relative MUSTER_BACKUP stays inside it.
 func runScriptStreams(t *testing.T, p *Plan, dir, backupDir string) (string, string, int) {
 	t.Helper()
+	return runScriptWith(t, p, dir, backupDir, runOpts{})
+}
+
+// runOpts are runScriptWith's extra transformations (T-7).
+type runOpts struct {
+	replace    [][2]string // applied to the rendered script, each must change it
+	pathPrefix string      // prepended to PATH
+	env        []string
+}
+
+// runScriptWith is runScriptStreams with the script's text rewritten, a
+// directory put first on PATH and variables added to the environment. The
+// inherited environment never carries MUSTER_ANY_HOST.
+func runScriptWith(t *testing.T, p *Plan, dir, backupDir string, o runOpts) (all, stderr string, code int) {
+	t.Helper()
 	src := string(Script(p))
+	for _, r := range o.replace {
+		next := strings.Replace(src, r[0], r[1], 1)
+		if next == src {
+			t.Fatalf("the script carries no %q to replace", r[0])
+		}
+		src = next
+	}
 	// The test's transformations: drop the root check so sh runs it as any
 	// user (the bodies act only inside t.TempDir()), and, unless the test
 	// runs as root, the backup-owner check, which a non-root user's temp dir
@@ -477,19 +608,29 @@ func runScriptStreams(t *testing.T, p *Plan, dir, backupDir string) (string, str
 	}
 	cmd := exec.Command("sh", path)
 	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), "MUSTER_BACKUP="+backupDir)
+	var env []string
+	for _, e := range os.Environ() {
+		switch {
+		case strings.HasPrefix(e, "MUSTER_ANY_HOST="):
+		case o.pathPrefix != "" && strings.HasPrefix(e, "PATH="):
+			env = append(env, "PATH="+o.pathPrefix+string(os.PathListSeparator)+strings.TrimPrefix(e, "PATH="))
+		default:
+			env = append(env, e)
+		}
+	}
+	cmd.Env = append(append(env, "MUSTER_BACKUP="+backupDir), o.env...)
 	// os/exec copies stdout and stderr from two goroutines; both write all.
-	var all syncBuf
-	var stderr bytes.Buffer
-	cmd.Stdout = &all
-	cmd.Stderr = io.MultiWriter(&all, &stderr)
+	var both syncBuf
+	var errb bytes.Buffer
+	cmd.Stdout = &both
+	cmd.Stderr = io.MultiWriter(&both, &errb)
 	err := cmd.Run()
 	var ee *exec.ExitError
 	switch {
 	case err == nil:
-		return all.String(), stderr.String(), 0
+		return both.String(), errb.String(), 0
 	case errors.As(err, &ee):
-		return all.String(), stderr.String(), ee.ExitCode()
+		return both.String(), errb.String(), ee.ExitCode()
 	default:
 		t.Fatalf("sh: %v", err)
 		return "", "", -1

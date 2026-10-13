@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"unicode"
 
 	"github.com/kun9497/muster/internal/check"
 	"github.com/kun9497/muster/internal/facts"
@@ -68,9 +69,25 @@ func escapeRune(b *strings.Builder, r rune) {
 		b.WriteString(`\x1b`)
 	case r < 0x20 || (r >= 0x7f && r <= 0x9f):
 		fmt.Fprintf(b, `\u%04x`, r)
+	case SpelledOut(r) && r > 0xffff:
+		fmt.Fprintf(b, `\U%08x`, r)
+	case SpelledOut(r):
+		fmt.Fprintf(b, `\u%04x`, r)
 	default:
 		b.WriteRune(r)
 	}
+}
+
+// SpelledOut reports whether Escape writes r as an escape rather than the rune
+// itself, beyond the C0/C1 controls: every format rune (bidirectional controls,
+// zero-width runes, the tag block), the line and paragraph separators, and the
+// Hangul fillers that render as nothing (3D-2b Q-5).
+func SpelledOut(r rune) bool {
+	switch r {
+	case 0x115f, 0x1160, 0x3164, 0xffa0:
+		return true
+	}
+	return unicode.In(r, unicode.Cf, unicode.Zl, unicode.Zp)
 }
 
 // Escape neutralises anything a hostile snapshot could use to repaint the

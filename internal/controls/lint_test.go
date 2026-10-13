@@ -82,7 +82,7 @@ func TestLintRules(t *testing.T) {
 		{name: "text_en too long", yaml: rem(`remediation: { text_en: ` + strings.Repeat("a", 1001) + `, text_ko: 조치, risk: none, idempotent: true }`), rule: "remediation", msg: "text_en is longer than 1000 runes"},
 		{name: "title control char", yaml: strings.Replace(goodControl, "title_en: Good", `title_en: "t\u0007"`, 1), rule: "titles", msg: "title_en carries a line break or control character"},
 		{name: "script not idempotent", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: false, script: "true", rollback: "true" }`), rule: "remediation", msg: "script requires idempotent: true"},
-		{name: "script without way back", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true" }`), rule: "remediation", msg: "script without rollback or backup"},
+		{name: "script without way back", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true" }`), rule: "remediation", msg: "script without rollback, backup or units"},
 		{name: "backup without script", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, backup: [/etc/hosts] }`), rule: "remediation", msg: "backup without script"},
 		{name: "validate without script", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, validate: "true" }`), rule: "remediation", msg: "validate without script"},
 		{name: "backup relative", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true", backup: [etc/hosts] }`), rule: "remediation", msg: `backup path "etc/hosts" is not absolute`},
@@ -112,6 +112,23 @@ func TestLintRules(t *testing.T) {
   validate: |
     sshd -t`), rule: "remediation", absent: true},
 		{name: "accept empty script without rollback", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "" }`), rule: "remediation", absent: true},
+		{name: "units charset", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true", validate: "true", units: ["-x.service"] }`), rule: "units_charset", msg: `unit "-x.service"`},
+		{name: "units bare template", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true", validate: "true", units: ["foo@.service"] }`), rule: "units_charset", msg: `unit "foo@.service"`},
+		{name: "units quote", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true", validate: "true", units: ["x';id;'.service"] }`), rule: "units_charset"},
+		{name: "units duplicate", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true", validate: "true", units: [a.service, a.service] }`), rule: "units_charset", msg: `unit "a.service" is repeated`},
+		{name: "accept units instance", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true", validate: "true", units: ["getty@tty1.service"] }`), rule: "units_charset", absent: true},
+		{name: "units order", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true", validate: "true", units: [rpcbind.service, rpcbind.socket] }`), rule: "units_order", msg: "rpcbind.socket must precede rpcbind.service"},
+		{name: "accept units order", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true", validate: "true", units: [rpcbind.socket, rpcbind.service, other.service] }`), rule: "units_order", absent: true},
+		{name: "units without script", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, units: [a.service] }`), rule: "units_needs_script", msg: "units without script"},
+		{name: "units way back", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true", validate: "true", units: [a.service] }`), rule: "remediation", absent: true},
+		{name: "units with rollback", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true", validate: "true", rollback: "true", units: [a.service] }`), rule: "units_exclusive", msg: "units excludes rollback"},
+		{name: "units with backup", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true", validate: "true", backup: [/etc/hosts], units: [a.service] }`), rule: "units_exclusive", msg: "units excludes backup"},
+		{name: "UNITS without units", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "for u in $UNITS; do :; done", validate: "true", rollback: "true" }`), rule: "units_variable", msg: "script uses $UNITS without units"},
+		{name: "UNITS in validate", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true", validate: "echo ${UNITS}", units: [a.service] }`), rule: "units_variable", msg: "validate uses $UNITS"},
+		{name: "backup reserved exact", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true", validate: "true", backup: [/muster-units] }`), rule: "backup_reserved", msg: `backup path "/muster-units"`},
+		{name: "backup reserved under", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true", validate: "true", backup: [/muster-units/x] }`), rule: "backup_reserved"},
+		{name: "accept backup named like it", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true", validate: "true", backup: [/muster-unitsx] }`), rule: "backup_reserved", absent: true},
+		{name: "script without validate", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true", rollback: "true" }`), rule: "script_needs_validate", msg: "script without validate"},
 		{"bad id", `id: U-01
 title_en: t
 title_ko: 제목
@@ -1286,5 +1303,30 @@ func TestLintBeyondScope(t *testing.T) {
 		if ms := messagesOf(lintSet(t, LintOptions{KISA: inv}, c.yaml), "beyond_scope"); len(ms) != 0 {
 			t.Errorf("%s must be clean: %v", c.name, ms)
 		}
+	}
+}
+
+func TestLintSetRules(t *testing.T) {
+	scripted := func(id, extra string) string {
+		y := strings.Replace(goodControl, "id: muster.account.good", "id: "+id, 1)
+		return strings.Replace(y, "remediation: { text_en: t, text_ko: 조치, risk: lockout_risk, idempotent: true }",
+			"remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: \"true\", validate: \"true\", "+extra+" }", 1)
+	}
+	for _, c := range []struct {
+		name, a, b, rule, msg string
+	}{
+		{"backup shared", scripted("muster.account.aa", "backup: [/etc/hosts]"), scripted("muster.account.bb", "backup: [/etc/hosts]"), "backup_path_shared", `backup path "/etc/hosts" is also declared by muster.account.aa`},
+		{"units shared", scripted("muster.account.aa", "units: [x.service]"), scripted("muster.account.bb", "units: [x.service]"), "units_shared", `unit "x.service" is also declared by muster.account.aa`},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			ps := problemsOf(lintSet(t, LintOptions{CustomFuncs: map[string]bool{}}, c.b, c.a), c.rule)
+			if len(ps) != 1 || ps[0].ControlID != "muster.account.bb" || ps[0].Path == "" || !strings.Contains(ps[0].Message, c.msg) {
+				t.Fatalf("%s: problems %+v", c.rule, ps)
+			}
+		})
+	}
+	ps := lintSet(t, LintOptions{CustomFuncs: map[string]bool{}}, scripted("muster.account.aa", "backup: [/etc/a]"), scripted("muster.account.bb", "backup: [/etc/b]"))
+	if len(problemsOf(ps, "backup_path_shared")) != 0 {
+		t.Fatalf("distinct paths flagged: %+v", ps)
 	}
 }

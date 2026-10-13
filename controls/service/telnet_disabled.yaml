@@ -17,20 +17,17 @@ remediation:
   text_ko: telnet 소켓과 서비스를 중지·mask 하거나 telnet 서버 패키지를 제거하고, 대신 SSH 를 사용합니다. inetd나 xinetd가 띄우는 telnet은 스크립트가 멈추지 않습니다. 거기서 항목을 지우십시오.
   risk: restart_service
   idempotent: true
+  units: [telnet.socket, telnet.service, telnetd.service]
   script: |
-    for u in telnet.socket telnet.service telnetd.service; do
+    todo=
+    for u in $UNITS; do
       systemctl cat "$u" >/dev/null 2>&1 || continue
-      systemctl disable --now "$u"
-      systemctl mask "$u" || true
+      [ "$(systemctl show -p Id --value "$u" 2>/dev/null)" = "$u" ] || continue
+      todo="$todo $u"
+    done
+    for u in $todo; do
+      systemctl --quiet disable --now "$u"
+      systemctl --quiet mask "$u" || true
     done
   validate: '! systemctl is-active --quiet telnet.socket && case "$(systemctl is-enabled telnet.socket 2>/dev/null)" in enabled|enabled-runtime) false;; esac && ! systemctl is-active --quiet telnet.service && case "$(systemctl is-enabled telnet.service 2>/dev/null)" in enabled|enabled-runtime) false;; esac && ! systemctl is-active --quiet telnetd.service && case "$(systemctl is-enabled telnetd.service 2>/dev/null)" in enabled|enabled-runtime) false;; esac'
-  rollback: |
-    for u in telnet.socket telnet.service telnetd.service; do
-      systemctl cat "$u" >/dev/null 2>&1 || continue
-      systemctl unmask "$u"
-    done
-    for u in telnet.socket telnet.service telnetd.service; do
-      systemctl cat "$u" >/dev/null 2>&1 || continue
-      systemctl enable --now "$u"
-    done
 decision: D19

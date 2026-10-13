@@ -15,10 +15,37 @@ const rootCheckLine = `[ "$(id -u)" -eq 0 ] || { printf 'muster-fix: run as root
 // root, since a non-root user's temp dir is never root-owned.
 const backupOwnerLine = `[ -n "$(find "$MUSTER_BACKUP" -maxdepth 0 -type d -user 0 ! -perm /022 2>/dev/null)" ] || { printf 'muster-fix: MUSTER_BACKUP must be a root-owned directory that only root can write\n' >&2; exit 2; }`
 
-const prologue = `set -u
+// prologueHead opens every script; log() comes first so the guard can use it.
+const prologueHead = `set -u
 umask 077
-` + rootCheckLine + `
-MUSTER_BACKUP="${MUSTER_BACKUP:-/var/backups/muster/$(date +%Y%m%dT%H%M%S)}"
+log() { printf 'muster-fix: %s\n' "$*"; }`
+
+// MachineIDHashHelper computes the host identity the snapshot carries
+// (collectors.MachineIDHash): the sha256 of a 32-lowercase-hex machine id,
+// nothing for anything else. Its errors go nowhere: the guard's refusal is
+// the only line a failure prints (3D-2b §2).
+const MachineIDHashHelper = `muster_machine_id_hash() {
+  id=$( { tr -d '[:space:]' < "$1"; } 2>/dev/null ) || id=
+  case "$id" in *[!0-9a-f]*|'') return 0;; esac
+  [ "${#id}" -eq 32 ] || return 0
+  { printf '%s' "$id" | sha256sum | cut -d' ' -f1; } 2>/dev/null
+}`
+
+const guardOff = "# host guard: off (the snapshot has no machine id)"
+
+const guardBody = `here=$(muster_machine_id_hash /etc/machine-id)
+if [ "$here" != "$MUSTER_SNAPSHOT_HOST" ]; then
+  if [ "${MUSTER_ANY_HOST:-}" = 1 ]; then
+    log "warning: this host's machine id differs from the snapshot's; running because MUSTER_ANY_HOST=1"
+  else
+    printf 'muster-fix: planned for another host (machine id differs); set MUSTER_ANY_HOST=1 to run it anyway\n' >&2
+    exit 2
+  fi
+fi`
+
+// prologueBackup makes and checks MUSTER_BACKUP and defines backup() and
+// restore(); restore() keeps its status in brc, never the block's rc (T-6).
+const prologueBackup = `MUSTER_BACKUP="${MUSTER_BACKUP:-/var/backups/muster/$(date +%Y%m%dT%H%M%S)}"
 case "$MUSTER_BACKUP" in
   /|//*|*/.|*/..|*/./*|*/../*) printf 'muster-fix: MUSTER_BACKUP must be a clean absolute path\n' >&2; exit 2;;
   /?*) ;;
@@ -26,7 +53,6 @@ case "$MUSTER_BACKUP" in
 esac
 mkdir -p "$MUSTER_BACKUP" || exit 2
 ` + backupOwnerLine + `
-log() { printf 'muster-fix: %s\n' "$*"; }
 backup() {
   for p in "$@"; do
     { [ -e "$p" ] || [ -L "$p" ]; } || continue
@@ -35,17 +61,108 @@ backup() {
   done
 }
 restore() {
-  rc=0
+  brc=0
   for p in "$@"; do
     { [ -e "$MUSTER_BACKUP$p" ] || [ -L "$MUSTER_BACKUP$p" ]; } || continue
-    if [ -d "$p" ]; then log "restore: $p is now a directory, left as is"; rc=1; continue; fi
-    if [ -L "$p" ]; then rm -f "$p" || { log "restore: $p failed"; rc=1; continue; }; fi
-    cp -a "$MUSTER_BACKUP$p" "$p" || { log "restore: $p failed"; rc=1; }
+    if [ -d "$p" ]; then log "restore: $p is now a directory, left as is"; brc=1; continue; fi
+    if [ -L "$p" ]; then rm -f "$p" || { log "restore: $p failed"; brc=1; continue; }; fi
+    cp -a "$MUSTER_BACKUP$p" "$p" || { log "restore: $p failed"; brc=1; }
   done
-  return $rc
+  return $brc
+}`
+
+// unitHelpers record a block's declared units before its body runs and put
+// them back on a failure path, in seven passes (3D-2b §3).
+const unitHelpers = `save_units() {
+  mkdir -p "$MUSTER_BACKUP/muster-units" || return 1
+  for u in "$@"; do
+    f="$MUSTER_BACKUP/muster-units/$u"
+    if [ -f "$f" ] && ! grep -qx 'absent absent' "$f"; then log "$u: unit state exists, keeping the first"; continue; fi
+    if systemctl cat -- "$u" >/dev/null 2>&1; then
+      ue=$(systemctl is-enabled -- "$u" 2>/dev/null) || :
+      ua=$(systemctl is-active -- "$u" 2>/dev/null) || :
+      printf '%s %s\n' "${ue:-unknown}" "${ua:-unknown}" > "$f" || return 1
+      : > "$f.deps" || return 1
+      for d in $(systemctl show -p RequiredBy -p BoundBy -p ConsistsOf --value -- "$u" 2>/dev/null); do
+        if systemctl is-active --quiet -- "$d"; then printf '%s\n' "$d" >> "$f.deps" || return 1; fi
+      done
+    else
+      printf 'absent absent\n' > "$f" || return 1
+    fi
+  done
 }
-failed=0
-`
+restore_units() {
+  urc=0
+  for u in "$@"; do
+    [ -f "$MUSTER_BACKUP/muster-units/$u" ] || continue
+    read -r ue ua < "$MUSTER_BACKUP/muster-units/$u"
+    [ "$ue" = absent ] || systemctl --quiet unmask -- "$u" || urc=1
+  done
+  for u in "$@"; do
+    [ -f "$MUSTER_BACKUP/muster-units/$u" ] || continue
+    read -r ue ua < "$MUSTER_BACKUP/muster-units/$u"
+    case "$ue" in
+      enabled) systemctl --quiet enable -- "$u" || urc=1;;
+      enabled-runtime) systemctl --quiet enable --runtime -- "$u" || urc=1;;
+      linked|linked-runtime) log "$u: was $ue; the link is not restored"; urc=1;;
+    esac
+  done
+  for u in "$@"; do
+    [ -f "$MUSTER_BACKUP/muster-units/$u" ] || continue
+    read -r ue ua < "$MUSTER_BACKUP/muster-units/$u"
+    case "$ue" in
+      disabled) now=$(systemctl is-enabled -- "$u" 2>/dev/null) || :
+        case "$now" in
+          enabled) systemctl --quiet disable -- "$u" || urc=1;;
+          enabled-runtime) systemctl --quiet disable --runtime -- "$u" || urc=1;;
+        esac;;
+    esac
+  done
+  for u in "$@"; do
+    [ -f "$MUSTER_BACKUP/muster-units/$u" ] || continue
+    read -r ue ua < "$MUSTER_BACKUP/muster-units/$u"
+    case "$ue" in
+      masked) systemctl --quiet mask -- "$u" || urc=1;;
+      masked-runtime) systemctl --quiet mask --runtime -- "$u" || urc=1;;
+    esac
+  done
+  for u in "$@"; do
+    [ -f "$MUSTER_BACKUP/muster-units/$u" ] || continue
+    read -r ue ua < "$MUSTER_BACKUP/muster-units/$u"
+    case "$ue" in masked|masked-runtime) continue;; esac
+    case "$ua" in active|activating|reloading) systemctl --quiet start -- "$u" || urc=1;; esac
+  done
+  for u in "$@"; do
+    [ -f "$MUSTER_BACKUP/muster-units/$u.deps" ] || continue
+    while read -r d; do
+      systemctl is-active --quiet -- "$d" || systemctl --quiet start -- "$d" || urc=1
+    done < "$MUSTER_BACKUP/muster-units/$u.deps"
+  done
+  for u in "$@"; do
+    [ -f "$MUSTER_BACKUP/muster-units/$u" ] || continue
+    read -r ue ua < "$MUSTER_BACKUP/muster-units/$u"
+    [ "$ue" = absent ] && continue
+    now=$(systemctl is-enabled -- "$u" 2>/dev/null) || :
+    [ "${now:-unknown}" = "$ue" ] || { log "$u: enablement not restored (was $ue, now ${now:-unknown})"; urc=1; }
+  done
+  return $urc
+}`
+
+// prologue is the script's fixed part for this plan (3D-2b §2 order): the
+// guard and its helper only when the snapshot carried a well-formed hash,
+// re-checked here so a hand-built plan cannot put another value in the script.
+func prologue(p *Plan) string {
+	var b strings.Builder
+	b.WriteString(prologueHead + "\n")
+	if p.Fix.HostGuard == "on" && machineHashRe.MatchString(p.Fix.MachineIDHash) {
+		b.WriteString(MachineIDHashHelper + "\n" + rootCheckLine + "\n")
+		b.WriteString("MUSTER_SNAPSHOT_HOST=" + p.Fix.MachineIDHash + "\n" + guardBody + "\n")
+	} else {
+		b.WriteString(rootCheckLine + "\n" + guardOff + "\n")
+	}
+	b.WriteString(prologueBackup + "\n" + unitHelpers + "\nfailed=0\n")
+	return b.String()
+}
 
 const epilogue = `
 if [ "$failed" -eq 0 ]; then
@@ -77,7 +194,7 @@ func Script(p *Plan) []byte {
 	fmt.Fprintf(&b, "# profile %s (%s); max-risk %s\n", report.Escape(p.Fix.Profile.Name), report.Escape(p.Fix.Profile.Digest), p.Fix.MaxRisk)
 	fmt.Fprintf(&b, "# planned %d (script %d, text only %d); above max-risk %d; not planned: error %d, manual %d, warn_degraded %d\n",
 		s.Planned, s.WithScript, s.TextOnly, s.AboveMaxRisk, s.NotPlanned.Error, s.NotPlanned.Manual, s.NotPlanned.WarnDegraded)
-	b.WriteString(prologue)
+	b.WriteString(prologue(p))
 	if len(p.Items) == 0 {
 		b.WriteString("\n# nothing to fix\n")
 	}
@@ -113,6 +230,9 @@ func failurePath(it Item, pfx string) []string {
 		out = append(out, pfx+"); rrc=$?",
 			fmt.Sprintf(`%s[ "$rrc" -eq 0 ] || log "%s: rollback failed (rc $rrc)"`, pfx, it.ID))
 	}
+	if len(it.Units) > 0 {
+		out = append(out, fmt.Sprintf(`%srestore_units %s || log "%s: ROLLBACK INCOMPLETE, backups in $MUSTER_BACKUP"`, pfx, strings.Join(it.Units, " "), it.ID))
+	}
 	if len(it.Backup) > 0 {
 		out = append(out, fmt.Sprintf(`%srestore %s || log "%s: ROLLBACK INCOMPLETE, backups in $MUSTER_BACKUP"`, pfx, strings.Join(it.Backup, " "), it.ID))
 	}
@@ -143,14 +263,20 @@ func block(n, total int, it Item, maxRisk string) []string {
 		if len(it.Backup) > 0 {
 			lines = append(lines, fmt.Sprintf(`  backup %s || { log "%s: backup failed, nothing changed"; return 1; }`, strings.Join(it.Backup, " "), it.ID))
 		}
+		if len(it.Units) > 0 {
+			lines = append(lines, fmt.Sprintf(`  save_units %s || { log "%s: backup failed, nothing changed"; return 1; }`, strings.Join(it.Units, " "), it.ID))
+		}
 		lines = append(lines, "  ( set -e")
+		if len(it.Units) > 0 {
+			lines = append(lines, "    UNITS='"+strings.Join(it.Units, " ")+"'")
+		}
 		lines = append(lines, indent(it.ScriptBody, "    ")...)
 		lines = append(lines, "  ); rc=$?", `  if [ "$rc" -ne 0 ]; then`,
 			fmt.Sprintf(`    log "%s: script failed (rc $rc), rolling back"`, it.ID))
 		lines = append(lines, failurePath(it, "    ")...)
 		lines = append(lines, "    return 1", "  fi")
 		if it.Validate {
-			lines = append(lines, "  ( set -e", "    "+it.ValidateCmd, "  ); rc=$?", `  if [ "$rc" -ne 0 ]; then`,
+			lines = append(lines, "  # validate", "  ( set -e", "    "+it.ValidateCmd, "  ); rc=$?", `  if [ "$rc" -ne 0 ]; then`,
 				fmt.Sprintf(`    log "%s: validate failed, rolling back"`, it.ID))
 			lines = append(lines, failurePath(it, "    ")...)
 			lines = append(lines, "    return 1", "  fi")

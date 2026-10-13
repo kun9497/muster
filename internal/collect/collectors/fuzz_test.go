@@ -13,6 +13,7 @@ import (
 	"path"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -1116,6 +1117,19 @@ func FuzzListsRoot(f *testing.F) {
 	seeds(f, "testdata/ftpusers.*", "testdata/user_list.*")
 	f.Fuzz(func(t *testing.T, data []byte) {
 		fuzzBody(t, "listsRoot", func() any { return listsRoot(data) }, len(data))
+	})
+}
+
+func FuzzMachineIDHash(f *testing.F) {
+	for _, s := range []string{"0123456789abcdef0123456789abcdef\n", "0123456789abcdef0123456789abcdef\r\n", "uninitialized\n", "", "0123456789abcdef0123456789abcde", "0123456789abcdef 0123456789abcdef"} {
+		f.Add([]byte(s))
+	}
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "MachineIDHash", func() any { return MachineIDHash(data) }, len(data))
+		got := MachineIDHash(data)
+		if got != "" && !regexp.MustCompile(`^[0-9a-f]{64}$`).MatchString(got) {
+			t.Fatalf("MachineIDHash = %q: neither empty nor 64 lowercase hex", got)
+		}
 	})
 }
 

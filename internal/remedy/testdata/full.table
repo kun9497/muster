@@ -1,7 +1,7 @@
 muster  · controls test+1 · guide  · host host-a · collected 2026-10-08T00:00:00Z
 fix --dry-run · profile default (0 controls) · max-risk lockout_risk
-planned 6 (script 3, text only 3) · above max-risk 0 · waived 0 · clean 1 · not planned: error 1, manual 1, warn_degraded 1
-by risk: none 3 · restart_service 1 · reboot_required 1 · lockout_risk 1
+planned 7 (script 4, text only 3) · above max-risk 0 · waived 0 · clean 1 · not planned: error 1, manual 1, warn_degraded 1
+by risk: none 3 · restart_service 2 · reboot_required 1 · lockout_risk 1
 
 #  risk             id                     status  sev     script  rollback        title
 1  none             muster.test.e_param    fail    high    no      -               muster.test.e_param ko
@@ -16,10 +16,13 @@ by risk: none 3 · restart_service 1 · reboot_required 1 · lockout_risk 1
 4  restart_service  muster.test.b_restart  fail    medium  yes     declared        muster.test.b_restart ko
    why: clause does not hold
    do:  조치 b
-5  reboot_required  muster.test.d_reboot   fail    high    no      -               muster.test.d_reboot ko
+5  restart_service  muster.test.g_units    fail    medium  yes     units           muster.test.g_units ko
+   why: clause does not hold
+   do:  조치
+6  reboot_required  muster.test.d_reboot   fail    high    no      -               muster.test.d_reboot ko
    why: clause does not hold
    do:  조치 d (text only: no_script)
-6  lockout_risk     muster.test.c_lockout  fail    high    yes     both            muster.test.c_lockout ko
+7  lockout_risk     muster.test.c_lockout  fail    high    yes     both            muster.test.c_lockout ko
    why: clause does not hold
    do:  조치 c
 

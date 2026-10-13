@@ -62,7 +62,8 @@
       "unknown": 0,
       "expiring_soon": 0
     },
-    "max_risk": "lockout_risk"
+    "max_risk": "lockout_risk",
+    "host_guard": "off"
   },
   "items": [],
   "not_planned": [],
