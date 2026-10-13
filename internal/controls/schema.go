@@ -109,6 +109,7 @@ type Remediation struct {
 	Script     string   `yaml:"script,omitempty"`
 	Rollback   string   `yaml:"rollback,omitempty"`
 	Backup     []string `yaml:"backup,omitempty"`
+	Units      []string `yaml:"units,omitempty"`
 	Validate   string   `yaml:"validate,omitempty"`
 }
 

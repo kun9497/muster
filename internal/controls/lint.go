@@ -53,6 +53,7 @@ var (
 	kisaItemRe      = regexp.MustCompile(`^U-[0-9]{2}$`)
 	paramRefRe      = regexp.MustCompile(`^\$\{([a-z][a-z0-9_]*)\}$`)
 	backupPathRe    = regexp.MustCompile(`^/[A-Za-z0-9._@:+/-]+$`)
+	unitRe          = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:-]*(@[A-Za-z0-9._:-]+)?\.(service|socket)$`)
 
 	categories       = []string{"account", "file", "service", "patch", "log", "beyond"}
 	validCategory    = set(categories...)
@@ -73,6 +74,12 @@ var (
 // id_format lint applies, exported so controls new can refuse a bad id
 // before it writes a file the lint would then reject.
 func ValidControlID(id string) bool { return idRe.MatchString(id) }
+
+// ValidUnitName reports whether u is a unit name a remediation may declare
+// (3D-2b §3): it starts with a letter or digit, carries a non-empty instance
+// if it is a template, and ends .service or .socket. The review script puts
+// it on a command line, so remedy.Build checks it again.
+func ValidUnitName(u string) bool { return unitRe.MatchString(u) }
 
 // Categories returns the categories a control may declare (spec §6.2) in a
 // fixed order. controls new derives the category from the id's area, so it
@@ -130,8 +137,48 @@ func lintRemediation(r *Remediation, add func(rule, format string, args ...any))
 	if hasScript && !r.Idempotent {
 		add("remediation", "script requires idempotent: true")
 	}
-	if hasScript && strings.TrimSpace(r.Rollback) == "" && len(r.Backup) == 0 {
-		add("remediation", "script without rollback or backup")
+	if hasScript && strings.TrimSpace(r.Rollback) == "" && len(r.Backup) == 0 && len(r.Units) == 0 {
+		add("remediation", "script without rollback, backup or units")
+	}
+	if hasScript && r.Validate == "" {
+		add("script_needs_validate", "script without validate")
+	}
+	if len(r.Units) > 0 && !hasScript {
+		add("units_needs_script", "units without script")
+	}
+	if len(r.Units) > 0 && strings.TrimSpace(r.Rollback) != "" {
+		add("units_exclusive", "units excludes rollback: the unit state is the way back")
+	}
+	if len(r.Units) > 0 && len(r.Backup) > 0 {
+		add("units_exclusive", "units excludes backup: the unit state is the way back")
+	}
+	usesUnits := func(s string) bool { return strings.Contains(s, "$UNITS") || strings.Contains(s, "${UNITS") }
+	if usesUnits(r.Script) && len(r.Units) == 0 {
+		add("units_variable", "script uses $UNITS without units")
+	}
+	if usesUnits(r.Validate) {
+		add("units_variable", "validate uses $UNITS, which only the script subshell sets")
+	}
+	if usesUnits(r.Rollback) {
+		add("units_variable", "rollback uses $UNITS, which only the script subshell sets")
+	}
+	seenUnit, pos := map[string]bool{}, map[string]int{}
+	for i, u := range r.Units {
+		if !unitRe.MatchString(u) {
+			add("units_charset", "unit %q is not a unit name a script can carry", u)
+		}
+		if seenUnit[u] {
+			add("units_charset", "unit %q is repeated", u)
+		}
+		seenUnit[u] = true
+		pos[u] = i
+	}
+	for _, u := range r.Units {
+		if stem, ok := strings.CutSuffix(u, ".service"); ok {
+			if j, has := pos[stem+".socket"]; has && j > pos[u] {
+				add("units_order", "%s.socket must precede %s", stem, u)
+			}
+		}
 	}
 	if !hasScript && len(r.Backup) > 0 {
 		add("remediation", "backup without script")
@@ -152,11 +199,45 @@ func lintRemediation(r *Remediation, add func(rule, format string, args ...any))
 		case !backupPathRe.MatchString(p):
 			add("remediation", "backup path %q carries a character the script cannot carry", p)
 		}
+		if p == "/muster-units" || strings.HasPrefix(p, "/muster-units/") {
+			add("backup_reserved", "backup path %q is the script's unit-state directory", p)
+		}
 		if seen[p] {
 			add("remediation", "backup path %q is repeated", p)
 		}
 		seen[p] = true
 	}
+}
+
+// lintSharedRemediation refuses two scripted controls that declare the same
+// backup path or the same unit (3D-2b §3): the first-record rule would let one
+// block's restore undo the other's change. The Problem names the later
+// control in id order (the set is sorted by id), as beyond_scope does.
+func lintSharedRemediation(s *Set) []Problem {
+	var out []Problem
+	paths, units := map[string]string{}, map[string]string{}
+	for i := range s.Controls {
+		c := &s.Controls[i]
+		r := c.Remediation
+		if r == nil || strings.TrimSpace(r.Script) == "" {
+			continue
+		}
+		for _, p := range r.Backup {
+			if first, ok := paths[p]; ok {
+				out = append(out, Problem{ControlID: c.ID, Path: c.Path, Rule: "backup_path_shared", Message: fmt.Sprintf("backup path %q is also declared by %s", p, first)})
+				continue
+			}
+			paths[p] = c.ID
+		}
+		for _, u := range r.Units {
+			if first, ok := units[u]; ok {
+				out = append(out, Problem{ControlID: c.ID, Path: c.Path, Rule: "units_shared", Message: fmt.Sprintf("unit %q is also declared by %s", u, first)})
+				continue
+			}
+			units[u] = c.ID
+		}
+	}
+	return out
 }
 
 // Lint applies every rule of spec §6.8 to set and returns the problems sorted
@@ -350,6 +431,7 @@ func Lint(s *Set, reg *facts.Registry, opts LintOptions) []Problem {
 		}
 	}
 	out = append(out, lintKISACoverage(s, opts.KISA)...)
+	out = append(out, lintSharedRemediation(s)...)
 	// M13: several rules range over a map (params, references.kisa), whose
 	// iteration order Go randomises, so the message has to be part of the
 	// sort key or two problems of the same rule swap places between runs.
