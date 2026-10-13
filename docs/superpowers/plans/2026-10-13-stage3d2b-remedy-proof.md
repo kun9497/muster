@@ -1856,4 +1856,55 @@ The steps after the user says to merge:
 - The other folds: S3, S6, S7, S9–S18 and K1, in the tasks they name.
 
 
-(Filled in during execution: rulings T-20 onward, the probe's table, the CI times.)
+### Rulings settled during execution (T-20 …)
+
+- **T-20** Task 1 (the probe) ran as a subagent in parallel with Task 2. It touched only the lab's `/root/muster-probe` and the ignored workspace, never the repo.
+- **T-21** T-19 corrected. `TestExamplesLoadAndCheck` is red at Tasks 4–5: the plan JSON gains `host_guard`/`units` while the controls digest still matches, so the byte comparison runs. From Task 6 the digest moves and the gate skips under G-24. The merge-step refresh re-pins it; examples are never hand-edited.
+- **T-22** rocky9-init ships a populated `/etc/machine-id`, so two containers share it. `ci/roundtrip/rocky9-init.sh` begins with `rm -f /etc/machine-id; systemd-machine-id-setup`. almalinux9-init and the built debian12-init get distinct ids at boot.
+- **T-23** debian12-init seeds atftpd only, because tftpd-hpa conflicts with it.
+- **T-24** The ACL branch of `TestFileScriptsRepairOnARealFile` no longer skips silently. Under `CI=true` a missing `setfacl` is fatal, and the collect-root sudo step forwards `CI`.
+- **T-25** The round trip found that the 3D-2 nfs_server body fails on every Debian/Ubuntu NFS server.
+  - Cause: `nfs-kernel-server.service` aliases `nfs-server.service`. Once the real unit was masked, `disable --now` on the alias failed (`Unit … not loaded`).
+  - A one-line Id guard did not fix it, because the alias stops resolving once its target is masked.
+  - The fix: every service body is a two-pass loop. It resolves each name (`systemctl show -p Id`) before anything is masked, then disables and masks the non-aliases.
+  - nfs_server is proven on debian12-init again. The failure run records the alias as `alias active` and restores it byte for byte.
+- **T-26** (final review S8) `MachineIDHash` trims only ASCII whitespace, the set the helper's `tr -d '[:space:]'` deletes. Collector and helper now agree exactly, and an id wrapped in U+00A0/U+0085 leaves the guard off instead of refusing its own host.
+- **T-27** (final review K1) `prologue()` renders the guard only when `HostGuard == "on"` and the hash matches `^[0-9a-f]{64}$`.
+
+### The probe's table (as committed in `controls/testdata/_roundtrip.yaml`)
+
+| control | rows |
+|---|---|
+| file: `hosts_permissions`, `hosts_lpd_permissions`, `passwd_permissions`, `services_permissions` | rocky9-init, almalinux9-init, debian12-init, ubuntu2204 |
+| `shadow_permissions` | debian12-init, ubuntu2204 (EL stock `000` already passes) |
+| `root_remote_login` | rocky9-init, almalinux9-init |
+| `automount`, `nfs_server`, `rpcbind`, `snmp` | rocky9-init, almalinux9-init, debian12-init |
+| `nis` | debian12-init (all four units enable-only: they cannot start without a NIS domain) |
+| `telnet` | EL rows; unproven units `telnet.service` (no package) and `telnetd.service` (inetd-only) |
+| `tftp_talk` | EL rows and debian12-init; unproven units `tftpd.service`, `tftpd-hpa.service`, `talk.socket`, `ntalk.socket` |
+| `dos_services`, `finger`, `rservices` | unproven: no systemd unit on Debian (inetd only), no package in EL9's enabled repositories |
+
+### What the reviews found
+
+- **Spec.** Two fresh-review rounds: 145 agents (29 survivors, 7 critic findings) and 118 agents (28 and 6). Then a pre-flight of 82 agents (18 and 2), which reordered the template tasks before the body rewrite (T-14).
+- **Task reviews.**
+  - Task 6 had one fix round (T-24).
+  - Task 8 found the NFS alias bug on the lab hand run (T-25).
+  - Every other task review was clean, with minors in the ledger.
+- **Whole-branch review.** 52 agents: 15 findings, 8 survivors (all minor or nit), 7 refuted. The critic triaged the 23 deferred minors into one to fix (K1) and the rest to leave. One fix wave (`c34b4c6`) covered:
+  - S3: runtime re-disable in pass 3;
+  - S4: the stub treats a static unit as systemd does, and mask hides and unmask restores the enablement;
+  - S8 and K1 (above);
+  - five document corrections.
+
+### Lab hand runs of the job script (Task 8)
+
+- **debian12-init** (built image cached, nfs block planned): 84 s in total. Repair took 36 s, the second container 28 s, and the guard and failure runs 47 s. The guard exited 2; 11 of 11 blocks rolled back; the record was byte-equal.
+- **rocky9-init:** 84 s in total (repair 39 s, second container 32 s, guard and failure 45 s), with the same results.
+- **Not hand-run:** almalinux9-init and ubuntu2204. The Debian image's cold build time on CI is unmeasured. The first branch CI run records both.
+
+### Numbers
+
+- 17 commits over `7620fcb` before the examples refresh: the design and two folds, the plan and its pre-flight fold, nine tasks with one fix round and the NFS follow-up, two document commits and the final fix wave.
+- 73 files changed, +5768/−625.
+- `controls/VERSION` is `kisa-unix-2026+2026.10.13`. 117 controls, 16 with a script, and no verdict change.
