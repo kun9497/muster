@@ -265,9 +265,16 @@ restore_units() {
   변수 이름(`u`, `f`, `d`, `ue`, `ua`, `now`, `urc`)을 쓰고 블록의 `rc`를 건드리지 않습니다. 의존 유닛의 이름은 실행
   시점에 systemd에서 옵니다. 경로가 아니라 파일 내용으로만 저장하고, `--` 뒤에 따옴표로 감싸 넘깁니다.
 - **본문은 선언된 목록을 읽는다.** 유닛을 선언한 블록은 본문 subshell 안의 첫 줄로 `UNITS='<u1> <u2> …'`를
-  내보냅니다. 본문 10개는 모두 `for u in $UNITS; do … done` 루프이고, 유닛이 하나인 본문도 마찬가지입니다.
-  SC2043은 단어 하나짜리 리터럴 목록에서만 경고하므로 `if` 형태는 없앱니다. validate는 지금처럼 유닛 이름을
-  명시합니다(한 줄, 루프 없음).
+  내보냅니다. 본문 10개는 모두 `$UNITS`를 도는 루프이고, 유닛이 하나인 본문도 마찬가지입니다. SC2043은 단어
+  하나짜리 리터럴 목록에서만 경고하므로 `if` 형태는 없앱니다. validate는 지금처럼 유닛 이름을 명시합니다(한 줄,
+  루프 없음).
+- **만들어진 대로: 본문은 무엇이든 바꾸기 전에 모든 이름을 확인한다.** 왕복 검증(§4)은 3D-2의 본문이 모든 Debian과
+  Ubuntu NFS 서버에서 실패한다는 것을 찾았습니다. `nfs-kernel-server.service`는 `nfs-server.service`의 별칭이고,
+  루프가 실제 유닛을 mask하고 나면 별칭에 대한 `disable --now`가 실패했습니다(`Unit … not loaded`). 그래서 모든
+  본문은 두 번 돕니다. 1차는 `systemctl cat`이 찾고 `systemctl show -p Id --value`가 자기 자신과 같은 이름만
+  `todo`에 모읍니다. 무엇이든 mask하기 전에 확인하므로, 별칭은 아직 실제 유닛으로 풀릴 때 건너뛰고, 그 실제 유닛은
+  같은 목록에 있습니다. 2차는 `todo`에 대해 `systemctl --quiet disable --now`와 `systemctl --quiet mask … || true`를
+  실행합니다. debian12-init 실패 실행은 별칭을 `alias active`로 기록하고 바이트 단위로 그대로 복원합니다.
 - **collector와 validate에 고정한다.** `TestServiceScriptsNameTheCollectorsUnits`(Linux, 서비스 표 옆)는 서비스
   control마다 `units`를 집합으로서 `services.go`에서 그 control이 대응하는 행들의 `provesInstall` 유닛과
   비교합니다(`tftp_talk_disabled`는 두 행에 대응합니다). control의 `validate`에 있는 `.service`/`.socket` 토큰도 그

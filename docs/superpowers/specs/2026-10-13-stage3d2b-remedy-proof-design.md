@@ -270,9 +270,17 @@ restore_units() {
   block's `rc`. Dependant names come from systemd at run time. They are stored as file content, never as a
   path, and passed quoted after `--`.
 - **Bodies read the declared list.** A block that declares units emits `UNITS='<u1> <u2> …'` as the first
-  line inside the body subshell. All ten bodies are `for u in $UNITS; do … done` loops, the one-unit bodies
-  included: SC2043 fires only on a literal one-word list, so the `if` form is retired. The validates keep
-  their explicit unit names (one line, no loop).
+  line inside the body subshell. All ten bodies loop over `$UNITS`, the one-unit bodies included: SC2043
+  fires only on a literal one-word list, so the `if` form is retired. The validates keep their explicit unit
+  names (one line, no loop).
+- **As built: the body resolves every name before it changes any.** The round trip (§4) found that the 3D-2
+  body failed on every Debian and Ubuntu NFS server: `nfs-kernel-server.service` is an alias of
+  `nfs-server.service`, and once the loop had masked the real unit, `disable --now` on the alias failed
+  (`Unit … not loaded`). Every body is therefore two passes. Pass 1 collects into `todo` each name that
+  `systemctl cat` finds and whose `systemctl show -p Id --value` equals itself — resolved before anything is
+  masked, so an alias is skipped while it still resolves to its real unit, which is in the same list. Pass 2
+  runs `systemctl --quiet disable --now` and `systemctl --quiet mask … || true` over `todo`. The debian12-init
+  failure run records the alias as `alias active` and restores it byte for byte.
 - **Pinned to the collector and to the validate.** `TestServiceScriptsNameTheCollectorsUnits` (Linux, beside
   the services table) compares each service control's `units`, as a set, with the `provesInstall` units of the
   rows it maps to in `services.go` (`tftp_talk_disabled` maps to two rows). It requires the `.service`/`.socket`
