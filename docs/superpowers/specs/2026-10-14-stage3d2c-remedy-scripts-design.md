@@ -3,8 +3,9 @@
 Korean pair: `2026-10-14-stage3d2c-remedy-scripts-design.ko.md`. Main design: `2026-09-02-muster-design.md`
 (§6.2 schema, §6.8 lint, §7.5 `fix --dry-run`, §10.2 roadmap, D24, D34). The cycles it builds on:
 `2026-10-07-stage3d2-fix-dry-run-design.md` (X-1..X-10) and `2026-10-13-stage3d2b-remedy-proof-design.md`
-(Q-1..Q-6). Rulings of this design are the E list; E-8..E-12 came out of the spec review (five lenses, three
-refuters per finding, a critic) and are folded in place. The family map the bodies were written from is the
+(Q-1..Q-6). Rulings of this design are the E list; E-8..E-12 came out of the first spec review (five lenses,
+three refuters per finding, a critic) and E-13 out of the second (four lenses over the folded draft); both
+are folded in place. The family map the bodies were written from is the
 cycle's ignored workspace file `family-map.md`; its findings are restated here where they bind.
 
 ## 1. Scope and intent
@@ -36,7 +37,7 @@ and a way to record and restore state that is not a file's content — a mode, a
   account controls and one sshd control, written to the 3D-2b discipline: bits are cleared, never set; a
   drop-in is written, never a vendor file; a value the host must supply (an account name, a path under
   `/var/log`) is enumerated on the host by the script, never read from the snapshot (§4). One existing script
-  (`root_remote_login`) keeps its rollback (E-12).
+  (`root_remote_login`) keeps its rollback (E-11).
 - **E-5 — Absent is not always hopeless.** A control may declare `script_on_absent: true`: a FAIL the
   evaluator reached through `absent_means: fail` is then planned with its script, because the script writes
   the very line that is absent (`PASS_MIN_LEN`, a `ClientAliveInterval`). The 3D-2 rule (X-2, Z-6) stands for
@@ -47,25 +48,32 @@ and a way to record and restore state that is not a file's content — a mode, a
   run (one host); its failure run re-seeds the same VM and plans afresh (§5).
 - **E-7 — No verdict changes.** No `checks` or facts change. One list parameter's default order moves so that
   the first element is the value the guide names (`umask_policy.acceptable`); `op: in` does not care about
-  order. `controls/VERSION` moves. The plan JSON gains `script_params`, `script_on_absent`, `modes`, `sysctl`,
-  `modules` and the `state` rollback value; plan schema stays 1.
+  order. `controls/VERSION` moves. Four risks move: the two forwarding controls and `usb_storage_disabled`
+  to `restart_service`, `password_policy` to `lockout_risk`. The plan JSON gains `script_params`,
+  `script_on_absent`, `modes`, `sysctl`, `modules` and the `state` rollback value; plan schema stays 1.
 - **E-8 — A body writes a value only when the current one is outside the clause's accepted set.** A sysctl
   key judged `in [1,2]` or `gte 2` that already satisfies the clause is left alone; a `login.defs` line, a
-  `faillock` line or an account's ageing field is changed only in the tightening direction. The value written
-  when a write is needed is the guide's value, or the first element of the list in force. A body therefore
+  `faillock` line, a `pwquality` key or an account's ageing field is changed only in the tightening direction,
+  and the gate reads the value the way the collector does (first line of `login.defs`, last line of
+  `faillock.conf`, the merged `pwquality` chain). The value written when a write is needed is the guide's
+  value, or the first element of the list in force — except a one-way guide value, where the body writes the
+  list's reversible member (`unprivileged_bpf_disabled` 2, §4.1). A body therefore
   never loosens a stricter host, never tightens a key the clause already accepts (`rp_filter` 2 stays 2), and
   never touches a one-way value (`unprivileged_bpf_disabled` 1, `ptrace_scope` 3) that already passes. The
   validate proves set membership, not equality with the written value (§4.1, §4.4).
 - **E-9 — `find` discipline.** A `find` or `chmod` over a directory the host may lack runs under
-  `if [ -d <dir> ]; then …; fi`; every `find` that changes a mode carries `! -type l` or the type the control
-  judges (`-type f` on a spool); a validate's `find` tests the complement of the allowed bits (`-perm /7133`
-  for a `≤ 0640` set) and `! -user root` where the uid is judged; a body never chmods through a symlink (§4.3).
+  `if [ -d <dir> ] && [ ! -L <dir> ]; then …; fi`, and a single path under `if [ -f p ] && [ ! -L p ]`; every
+  `find` that changes a mode carries `! -type l` or the type the control judges (`-type f` on a spool); a
+  validate's `find` tests the complement of the allowed bits — 07777 minus the largest allowed mode (`≤ 0640`
+  → `-perm /7137`, `≤ 0600` → `/7177`, `≤ 0440` → `/7337`) — and `! -user root` where the uid is judged; a
+  body never chmods through a symlink (§4.3).
 - **E-10 — `password_policy` is `lockout_risk` and tightens only.** The ageing loop enumerates accounts by the
   collector's rule (a shadow field that is not empty and does not start with `!` or `*`), sets `-M` only on an
   account whose maximum is empty or larger than the parameter and `-m` only where the minimum is smaller,
   skips and logs an account whose password is already older than `max_days` (the write would expire it on
   the spot), and records each account's previous fields under `$MB` for a declared rollback that replays
-  them with `chage`. `/etc/shadow` is never copied (§4.4).
+  them with `chage`. `/etc/shadow` is never copied. Fields travel `:`-delimited end to end, so an empty field
+  is never lost (§4.4).
 - **E-11 — A declared rollback of a control whose script writes a file a daemon re-reads removes that file
   itself, then tests and reloads.** `restore`'s absent-marker pass is then a harmless second pass. The two
   sshd controls keep (and the new one gains) the `rm -f` line; the failure-path order of 3D-2 (declared
@@ -74,13 +82,19 @@ and a way to record and restore state that is not a file's content — a mode, a
   `restore_modules` that honours the `install … /bin/false` line `restore` has just put back could never
   reload it. The runner failure run therefore re-collects and re-plans after the re-seed, and the seed
   removes muster's drop-ins so the same blocks are planned (§3, §5).
+- **E-13 — A write's side effect on another judged key belongs to the writer.** Writing `net.ipv4.ip_forward`
+  makes the kernel set `net.ipv4.conf.all.accept_redirects` to the opposite value. The `ip_forwarding_disabled`
+  body reads that key before the write and puts it back after, at runtime and as a line after `ip_forward` in
+  its own drop-in; the key is in that control's `sysctl` list, and the pin test admits it as the one declared
+  companion key. The plan's probe records any other side effect among the sixteen controls' keys (§4.1).
 
 ## 2. Parameters in scripts (E-1, E-5)
 
 **Schema.** `Remediation` gains `ScriptParams []string` (`yaml:"script_params,omitempty"`) and
 `ScriptOnAbsent bool` (`yaml:"script_on_absent,omitempty"`). An entry is a parameter name. A list parameter is
 carried whole, its elements joined by one space; a body that needs the first element takes it with
-`set -- $P_<name>` and `$1`, and a validate that needs membership writes the one-`case` idiom
+`first=${P_<name>%% *}` (no `set --`, which shellcheck flags as SC2086), and a validate that needs
+membership writes the one-`case` idiom
 `case " $P_<name> " in *" $(…) "*) ;; *) false;; esac`. The block variable is `P_<name>`.
 
 **Lint** (per control; each a `TestLintRules` case):
@@ -161,7 +175,7 @@ backup() {
       rm -f "$MB/absent$p"
       mkdir -p "$MB/files$(dirname "$p")" && cp -a "$p" "$MB/files$p" || return 1
     else
-      [ -e "$MB/absent$p" ] && continue
+      if [ -e "$MB/absent$p" ] || [ -e "$MB/files$p" ] || [ -L "$MB/files$p" ]; then continue; fi
       mkdir -p "$MB/absent$(dirname "$p")" && : > "$MB/absent$p" || return 1
     fi
   done
@@ -183,12 +197,14 @@ restore() {
 }
 ```
 
-A marker and a copy never coexist for one path. A script that creates a drop-in gets the file removed on
+A marker and a copy never coexist for one path: a path copied on run 1 and gone on run 2 keeps its copy and
+gets no marker, so a failure restores it. A script that creates a drop-in gets the file removed on
 failure by `restore`; a control whose daemon re-reads that file still removes it in its own rollback first
 (E-11), because the declared rollback runs before `restore` and the reload must see the file gone.
 
 **`modes`.** An entry is an absolute clean path with zero, one or two trailing `/*` segments (lint
-`modes_charset`: `^/[A-Za-z0-9._@:+/-]+(/\*){0,2}$`, no duplicates, requires `script`). Lint
+`modes_charset`: `^/[A-Za-z0-9._@:+/-]+(/\*){0,2}$`, no duplicates; a `modes`, `sysctl` or `modules` list
+without a `script` is `state_needs_script`). Lint
 `modes_backup_overlap`: no `backup` path of the same control equals a `modes` entry or is matched by one
 (`/etc/sudoers` beside `modes: [/etc/sudoers.d/*]` is fine; `/etc/sudoers.d/x` beside it is not) — the two
 fields may otherwise coexist. The helpers expand an entry with `find <dir> -mindepth k -maxdepth k ! -type l`
@@ -212,7 +228,7 @@ save_modes() {
   [ -f "$MB/modes.list" ] || : > "$MB/modes.list" || return 1
   for spec in "$@"; do
     modes_paths "$spec" | while IFS= read -r p; do
-      awk -v p="$p" '{ q=$0; sub(/^[^ ]+ [^ ]+ [^ ]+ [^ ]+ /, "", q); if (q == p) f=1 } END { exit !f }' "$MB/modes.list" && continue
+      P="$p" awk '{ q=$0; sub(/^[^ ]+ [^ ]+ [^ ]+ [^ ]+ /, "", q); if (q == ENVIRON["P"]) f=1 } END { exit !f }' "$MB/modes.list" && continue
       if s=$(stat -c '%u %g %a' -- "$p" 2>/dev/null); then
         printf '%s %s %s\n' "$s" "$(modes_type "$p")" "$p" >> "$MB/modes.list" || exit 1
       elif [ -e "$p" ]; then
@@ -234,15 +250,17 @@ restore_modes() {
 }
 ```
 
-A path with a newline in its name is not supported (logged as a limit in the document; none of the
-declared trees carries one). Whitespace inside a path survives `read -r` because the path is the last field.
+A path with a newline in its name, or one that ends in a blank (`read` strips it), is not supported (logged
+as a limit in the document; none of the declared trees carries one). Whitespace inside a path survives
+`read -r` because the path is the last field. The dedupe passes the path through `ENVIRON`, not `awk -v`,
+which would process backslash escapes.
 A path that vanishes between `find` and `stat` (logrotate under `/var/log`) is logged and skipped, not a
 failed backup. `restore_modes` never writes through a symlink and never applies a file's record to a
 directory or the reverse: a recorded entry the host replaced during the block is logged and counts as
 incomplete, so a spool's owner cannot turn the record into a `chmod` on `/etc/shadow`.
 
-**`sysctl`.** Entries are kernel keys (lint `sysctl_charset`: `^[a-z0-9_]+(\.[a-z0-9_-]+)+$`, no duplicates,
-requires `script`). `sysctl` and `backup` go together: the file is the persisted side, the record the runtime
+**`sysctl`.** Entries are kernel keys (lint `sysctl_charset`: `^[a-z0-9_]+(\.[a-z0-9_-]+)+$`, no
+duplicates). `sysctl` and `backup` go together: the file is the persisted side, the record the runtime
 side.
 
 ```sh
@@ -265,8 +283,7 @@ restore_sysctl() {
 }
 ```
 
-**`modules`.** Entries are module names (lint `modules_charset`: `^[a-z0-9_-]+$`, no duplicates, requires
-`script`). The helpers fold `-` to `_` (kmod's rule) and read `/proc/modules`, whose first field is already
+**`modules`.** Entries are module names (lint `modules_charset`: `^[a-z0-9_-]+$`, no duplicates). The helpers fold `-` to `_` (kmod's rule) and read `/proc/modules`, whose first field is already
 folded. `restore_modules` reloads with `--ignore-install` (E-12): the record says "loaded", whatever
 modprobe.d says now — `restore` has just put muster's own `install … /bin/false` line back when the file
 existed at block start, and a vendor `install` line is bypassed the same way (said in the document).
@@ -305,8 +322,9 @@ markers), `restore_sysctl <k…>`, `restore_modules <m…>` — the runtime valu
 would persist the script's value is gone, and a module is reloaded after its `install … /bin/false` line is
 gone or put back. Each restore that fails logs `ROLLBACK INCOMPLETE`; the next one still runs. The helpers
 use their own variables (`spec`, `p`, `s`, `t`, `k`, `v`, `m`, `n`, `mrc`, `src`, `orc`) and never the block's
-`rc`. `TestScriptEveryLineIsTemplateBodyOrComment` admits the `P_` lines, the `MB` line, the five `save_`
-lines and the six restore lines.
+`rc`. `TestScriptEveryLineIsTemplateBodyOrComment` admits the `P_` lines, the `MB` line, the five record
+lines (`backup`, `save_units`, `save_modes`, `save_sysctl`, `save_modules`) and the five restore lines
+(`restore_units`, `restore_modes`, `restore`, `restore_sysctl`, `restore_modules`), each with its suffix.
 
 **Plan.** `Item` gains `Modes`, `Sysctl`, `Modules []string` (json `modes`, `sysctl`, `modules`, after
 `units`; `[]` when none, set only when `Script` is true). `Build` re-checks every entry against its lint
@@ -328,19 +346,25 @@ The table's column shows the word.
 directory entry, a two-level pattern, a pattern that matches nothing, a path with a space; first record kept
 on a rerun; a recorded file replaced by a symlink and by a directory left as is with `ROLLBACK INCOMPLETE`;
 `ROLLBACK INCOMPLETE` when a path is unwritable), and `backup`/`restore` over the marker cases (absent at run
-1 and present at run 2 → copied; absent both runs → removed on restore; a marker whose path is now a
-directory → logged). Stub `sysctl` and `modprobe` (as the 3D-2b `systemctl` stub, logging argv and answering
-from fixture files, with a fixture `/proc/modules` path handed through an environment variable the stub and
-the helper read) drive the other two: a readable key, an `absent` key, a key that refuses the write; a loaded
+1 and present at run 2 → copied; absent both runs → removed on restore; copied at run 1 and absent at run 2
+→ no marker, copy restored; a marker whose path is now a directory → logged). Stub `sysctl` and `modprobe`
+(as the 3D-2b `systemctl` stub, first on `PATH`, logging argv and answering from fixture files through an
+environment variable only the stubs read) drive the other two; the shipped helper keeps the literal
+`/proc/modules`, and the test rewrites that literal in the helper text it extracts from the Go constant
+(`strings.ReplaceAll`) to point at a fixture. Cases: a readable key, an `absent` key, a key that refuses the write; a loaded
 module reloaded with `--ignore-install` in argv, an unloaded one left alone, a `modprobe` that fails. A
-failure-path order test checks the six restore lines' order in a block that declares every kind. The 3D-2b
+failure-path order test checks the six failure-path steps' order (the rollback subshell and the five
+restores) in a block that declares every kind. The 3D-2b
 unit tests move to `$MB/units/`.
 
 ## 4. The bodies (E-4, E-8, E-9, E-10, E-11)
 
 Every body is POSIX `sh`, shellcheck-clean at the default severity, `set -e`-safe inside the body subshell,
 and uses only literal paths, `P_` variables and what it enumerates on the host. An existence guard is written
-as `if [ -e p ]; then …; fi`, never `[ -e p ] && …` (a false test as the last line fails the subshell). Every
+as `if [ -f p ] && [ ! -L p ]; then …; fi`, never `[ -f p ] && …` (a false test as the last line fails the
+subshell). A validate is `&&`-joined conditions, a single `case` whose last arm is `*) false`, or a single
+`for` over a literal list whose conditions each end `|| exit 1` (the module validates; CONTRIBUTING admits
+the third shape in this cycle). Every
 control gains `idempotent: true` (already true on all) and a one-line `validate` that proves the step for the
 value in force. Texts keep their sentences; where a script now exists the text names the file it writes.
 
@@ -374,15 +398,15 @@ never truncated. Risk `none` unless the table says otherwise. Shape, for `syn_co
 ```
 
 A multi-key body repeats the `case` per key (the accepted arms are the clause's list, or `[2-9]|[1-9][0-9]*`
-for a `gte`), and a parameter-driven one uses the list idiom of §2: `set -- $P_allowed_sysrq` for the target,
-`case " $P_allowed_sysrq " in *" $(sysctl -n kernel.sysrq) "*)` for the test.
+for a `gte`), and a parameter-driven one uses the list idiom of §2: `first=${P_allowed_sysrq%% *}` for the
+target, `case " $P_allowed_sysrq " in *" $(sysctl -n kernel.sysrq) "*)` for the test.
 
 | control | key → accepted set → value written when outside | params / risk |
 |---|---|---|
 | `aslr_and_link_protection` | `kernel.randomize_va_space` `{2}` → 2; `fs.protected_symlinks` `{1}` → 1; `fs.protected_hardlinks` `{1}` → 1; `fs.protected_fifos` `{1,2}` → 1; `fs.protected_regular` `{1,2}` → 2 | — |
 | `icmp_broadcast_and_bogus_ignored` | `net.ipv4.icmp_echo_ignore_broadcasts` `{1}` → 1; `net.ipv4.icmp_ignore_bogus_error_responses` `{1}` → 1 | — |
 | `icmp_redirects_ignored` | `net.ipv4.conf.{all,default}.{accept,secure,send}_redirects` `{0}` → 0 (six keys) | — |
-| `ip_forwarding_disabled` | `net.ipv4.ip_forward` `allowed_forward` → its first element | `script_params: [allowed_forward]`; risk `restart_service` |
+| `ip_forwarding_disabled` | `net.ipv4.ip_forward` `allowed_forward` → its first element; companion `net.ipv4.conf.all.accept_redirects` read before and put back after (E-13) | `script_params: [allowed_forward]`; `sysctl` lists both keys; risk `restart_service` |
 | `ipv6_forwarding_disabled` | `net.ipv6.conf.{all,default}.forwarding` `allowed_forward` → first | `script_params: [allowed_forward]`; risk `restart_service` |
 | `ipv6_redirects_ignored` | `net.ipv6.conf.{all,default}.accept_redirects` `{0}` → 0 | — |
 | `ipv6_router_advertisements_ignored` | `net.ipv6.conf.{all,default}.accept_ra` `allowed_accept_ra` → first | `script_params: [allowed_accept_ra]` |
@@ -394,7 +418,7 @@ for a `gte`), and a parameter-driven one uses the list idiom of §2: `set -- $P_
 | `suid_dumpable_disabled` | `fs.suid_dumpable` `{0}` → 0 | — |
 | `syn_cookies_enabled` | `net.ipv4.tcp_syncookies` `{1}` → 1 | — |
 | `sysrq_restricted` | `kernel.sysrq` `allowed_sysrq` → first | `script_params: [allowed_sysrq]` |
-| `unprivileged_bpf_restricted` | `kernel.unprivileged_bpf_disabled` `{1,2}` → 2; `net.core.bpf_jit_harden` `{2}` → 2 | — |
+| `unprivileged_bpf_restricted` | `kernel.unprivileged_bpf_disabled` `{1,2}` → 2; `net.core.bpf_jit_harden` `{1,2}` → 2 | — |
 
 - The accepted set of each key is the clause's list or bound, pinned by `TestSysctlScriptsNameTheControlsKeys`
   (§5) together with the key set. E-8 is what makes the one-way values safe: a host at
@@ -413,6 +437,12 @@ for a `gte`), and a parameter-driven one uses the list idiom of §2: `set -- $P_
   `absent_means: not_applicable`, so a host without the BPF JIT key is NOT_APPLICABLE and never planned.
 - `ip_forwarding_disabled` and `ipv6_forwarding_disabled` are `restart_service` in risk from now on: writing
   `0` on a router or a container host cuts forwarding at once. The others stay `none`.
+- E-13: the kernel sets `net.ipv4.conf.all.accept_redirects` to `!forwarding` whenever `ip_forward` changes.
+  On a docker host `all.accept_redirects` reads 0 (forwarding is on), so `icmp_redirects_ignored` passes that
+  key and leaves it alone under E-8; the forwarding block, which runs later in the plan, would then turn it
+  to 1. The forwarding body therefore saves the key, writes `ip_forward`, writes the saved value back, and
+  persists it as the line after `ip_forward` in its own drop-in (the boot-time `sysctl.d` pass applies the
+  lines in order, so the flip is undone there too). The pin test admits that one companion key.
 
 ### 4.2 Modules (3)
 
@@ -423,8 +453,9 @@ shipped. So a body writes the line and unloads the module. File: `/etc/modprobe.
 control's `where` list spells. kmod keeps the first `install` it reads in base-name order across the
 directories, so a vendor file with an `install` line for the module wins over `99-muster-…`; the validate
 reads the effective (first) `install` line, so such a block fails validate and rolls back, and the text names
-the case (none of the eleven modules has one on the images measured). Risk `restart_service` (an unloaded
-`usb-storage` drops a mounted USB disk).
+the case (none of the eleven modules has one on the images measured). Risk: `usb_storage_disabled` moves to
+`restart_service` (an unloaded `usb-storage` drops a mounted USB disk); the two uncommon-module controls stay
+`none`, because a module in use makes `modprobe -r` fail and the block roll back.
 
 ```yaml
   modules: [cramfs, freevxfs, jffs2, hfs, hfsplus, udf]
@@ -457,12 +488,12 @@ bits. In the table, "`find F …`" stands for `find <dir> -mindepth 1 -maxdepth 
 | control | record | body | validate |
 |---|---|---|---|
 | `sudoers_permissions` | `backup: [/etc/sudoers]`, `modes: [/etc/sudoers.d/*]` | `chown root /etc/sudoers; chmod u-wxs,g-wxs,o-rwxt /etc/sudoers`; `find F /etc/sudoers.d ! -name '*.*' ! -name '*~' -exec chmod go-w {} +` | `case` over `[0,40,400,440]` (the control judges uid only: format `%u %a`, prefix `0`) `&&` `find F … -perm /g+w,o+w` empty |
-| `nfs_export_access` | `backup: [/etc/exports]` | `if [ -f ]`: `chown root:root; chmod u-xs,g-wxs,o-wxt` | `case` over the 16 modes, `%u %g %a`, `0 0` |
+| `nfs_export_access` | `backup: [/etc/exports]` | `if [ -f ] && [ ! -L ]`: `chown root; chmod u-xs,g-wxs,o-wxt` (the control judges uid only) | `[ ! -f p ] \|\| [ -L p ] \|\|` a `case` over the 16 modes, `%u %a`, `0` — the guard keeps a host whose exports live only in `/etc/exports.d` from failing validate |
 | `bootloader_config_permissions` | `backup: [/boot/grub/grub.cfg, /boot/grub2/grub.cfg]` | for each that is a regular file and not a symlink: `chown root:root; chmod u-xs,g-rwxs,o-rwxt` | per path, `[ ! -f p ] \|\| [ -L p ] \|\|` a `case` over `[0,200,400,600]`, `0 0`, `&&`-joined |
-| `inetd_conf_permissions` | `backup: [/etc/inetd.conf, /etc/xinetd.conf]`, `modes: [/etc/xinetd.d/*]` | for each conf that exists: `chown root; chmod u-xs,g-rwxs,o-rwxt`; `find F /etc/xinetd.d -exec chmod go-w {} +` | the conf halves by `stat` bits (`g-w`, `o-r`, uid 0) where present, the fragments by `find F … -perm /g+w,o+w` empty |
+| `inetd_conf_permissions` | `backup: [/etc/inetd.conf, /etc/xinetd.conf]`, `modes: [/etc/xinetd.d/*]` | for each conf that exists: `chown root; chmod u-xs,g-rwxs,o-rwxt`; `find F /etc/xinetd.d -exec chmod go-w {} +` | `/etc/inetd.conf` where present by `stat` bits (`g-w`, `o-r`, uid 0), `/etc/xinetd.conf` where present by a `case` over `[0,200,400,600]` (`%u %a`, `0`), the fragments by `find F … -perm /g+w,o+w` empty |
 | `audit_log_permissions` | `modes: [/var/log/audit/audit.log, /var/log/audit]` — no `backup`: a live log is never copied | `if [ -f ]`: `chown root /var/log/audit/audit.log; chmod u-xs,g-wxs,o-rwxt …`; `if [ -d ]`: `chown root /var/log/audit; chmod g-w,o-rwx /var/log/audit` | `case` over the eight modes (`%u %a`, `0`) `&&` dir bits |
-| `syslog_conf_permissions` | `backup: [/etc/rsyslog.conf, /etc/systemd/journald.conf, /etc/syslog-ng/syslog-ng.conf]`, `modes: [/etc/rsyslog.d/*, /etc/systemd/journald.conf.d/*, /etc/syslog-ng/conf.d/*]` | each existing file: `chown root; chmod u-xs,g-wxs,o-rwxt`; each existing dir: `find F … -name '*.conf' -exec chown root {} + -exec chmod u-xs,g-wxs,o-rwxt {} +` | per file, `[ ! -f p ] \|\|` the `stat` test; per dir, `find F … -name '*.conf' \( -perm /7133 -o ! -user root \)` empty |
-| `cron_permissions` | `modes: [/etc/crontab, /etc/anacrontab, /etc/cron.allow, /etc/cron.deny, /etc/at.allow, /etc/at.deny, /etc/cron.d/*, /etc/cron.hourly, /etc/cron.daily, /etc/cron.weekly, /etc/cron.monthly, /etc/cron.hourly/*, /etc/cron.daily/*, /etc/cron.weekly/*, /etc/cron.monthly/*, /var/spool/cron/*, /var/spool/cron/crontabs/*, /var/spool/cron/atjobs/*, /var/spool/at/*, /etc/cron.d, /var/spool/cron, /var/spool/cron/crontabs, /var/spool/cron/atjobs, /var/spool/at]` | system and access files (`if [ -f ]`, `find F /etc/cron.d`): `chown root; chmod u-xs,g-wxs,o-rwxt`; periodic scripts (`find F` over the four dirs): `chown root; chmod o-w` (they keep `+x`: run-parts skips a non-executable); cron spools (`find F /var/spool/cron`, `find F /var/spool/cron/crontabs`): `chmod u-xs,g-wxs,o-rwxt` (a spool owned by uid ≥ 1000 is correct; the `crontabs`/`atjobs` DIRECTORIES under `/var/spool/cron` are never touched by the spool pass); at spools (`find F /var/spool/cron/atjobs`, `find F /var/spool/at`): `chmod g-wxs,o-rwxt` only — at marks a job runnable by `u+x`, and clearing it cancels the job; the nine directories (`if [ -d ]`): `chmod o-w` | system/access set `-perm /7133` empty `&&` `! -user root` empty; periodic `-perm /o+w -o ! -user root` empty; cron spools `-perm /7133` empty; at spools `-perm /7033` empty; dirs `-perm /o+w` empty — each a `find F`/`[ -d ]` guarded clause |
+| `syslog_conf_permissions` | `backup: [/etc/rsyslog.conf, /etc/systemd/journald.conf, /etc/syslog-ng/syslog-ng.conf]`, `modes: [/etc/rsyslog.d/*, /etc/systemd/journald.conf.d/*, /etc/syslog-ng/conf.d/*]` | each existing file: `chown root; chmod u-xs,g-wxs,o-rwxt`; each existing dir: `find F … -name '*.conf' -exec chown root {} + -exec chmod u-xs,g-wxs,o-rwxt {} +` | per file, `[ ! -f p ] \|\|` the `stat` test; per dir, `find F … -name '*.conf' \( -perm /7137 -o ! -user root \)` empty |
+| `cron_permissions` | `modes: [/etc/crontab, /etc/anacrontab, /etc/cron.allow, /etc/cron.deny, /etc/at.allow, /etc/at.deny, /etc/cron.d/*, /etc/cron.hourly, /etc/cron.daily, /etc/cron.weekly, /etc/cron.monthly, /etc/cron.hourly/*, /etc/cron.daily/*, /etc/cron.weekly/*, /etc/cron.monthly/*, /var/spool/cron/*, /var/spool/cron/crontabs/*, /var/spool/cron/atjobs/*, /var/spool/at/*, /etc/cron.d, /var/spool/cron, /var/spool/cron/crontabs, /var/spool/cron/atjobs, /var/spool/at]` | system and access files (`if [ -f ]`, `find F /etc/cron.d`): `chown root; chmod u-xs,g-wxs,o-rwxt`; periodic scripts (`find F` over the four dirs): `chown root; chmod o-w` (they keep `+x`: run-parts skips a non-executable); cron spools (`find F /var/spool/cron`, `find F /var/spool/cron/crontabs`): `chmod u-xs,g-wxs,o-rwxt` (a spool owned by uid ≥ 1000 is correct; the `crontabs`/`atjobs` DIRECTORIES under `/var/spool/cron` are never touched by the spool pass); at spools (`find F /var/spool/cron/atjobs`, `find F /var/spool/at`): `chmod g-wxs,o-rwxt` only — at marks a job runnable by `u+x`, and clearing it cancels the job; the nine directories (`if [ -d ]`): `chmod o-w` | system/access set `-perm /7137` empty `&&` `! -user root` empty; periodic `-perm /o+w -o ! -user root` empty; cron spools `-perm /7137` empty; at spools `-perm /7037` empty; dirs `-perm /o+w` empty — each a `find F`/`[ -d ]` guarded clause |
 | `log_dir_permissions` | `modes: [/var/log, /var/log/*, /var/log/*/*]` | `find /var/log -maxdepth 2 ! -type l -perm /o+w -exec chmod o-w {} +` — the other-writable half only; the group half (a group-writable entry in a group outside `allowed_groups`) stays text: `/var/log/postgresql` root:postgres 1775 is a daemon's own directory, and `chmod g-w` there stops its logging | the same `find` empty |
 | `ftpusers_permissions` | `backup: [/etc/ftpusers, /etc/vsftpd/ftpusers, /etc/vsftpd/user_list, /etc/vsftpd.user_list, /etc/vsftpd.ftpusers]` | for each that exists: `chown root:root; chmod u-xs,g-wxs,o-rwxt`; never create one (an empty allow list denies every login) | per path, `[ ! -f p ] \|\|` a `case` over the eight modes, `&&`-joined |
 
@@ -482,21 +513,26 @@ bits. In the table, "`find F …`" stands for `find <dir> -mindepth 1 -maxdepth 
   the control stays FAIL, and the text names that file as the operator's.
 - `cron_permissions`: a pending at job (0700 by at's contract) keeps the control FAIL after the script; the
   judgment of at spools is parked for a verdict cycle (§7).
-- `TestFileValidatesAcceptTheDefaultModes` selects by an explicit id table, not by category, and grows from
-  five to six: `hosts`, `hosts_lpd`, `passwd`, `services`, `shadow`, `nfs_export_access` — the controls whose
-  validate is exactly one `case` over `backup[0]` and the default `allowed_modes`. `sudoers_permissions`
-  (a `case` plus a `find`) and `bootloader_config_permissions` (two paths) are checked by lint and the round
-  trip; the test asserts that no other shipped scripted control has a pure-`case` validate.
-  `TestFileScriptsRepairOnARealFile` gains `nfs_export_access`.
+- A symlink at a fixed path the `files.*` collector reads is `error` by design (C4), so that item is ERROR and
+  never planned; the five 3D-2b file bodies keep their `[ -f ]` guard. Every new single-path body uses the
+  E-9 guard because its collector may judge the path a symlink names.
+- `TestFileValidatesAcceptTheDefaultModes` selects by an explicit id table, not by category, and stays at the
+  five 3D-2b controls (`hosts`, `hosts_lpd`, `passwd`, `services`, `shadow`) — the controls whose validate is
+  exactly one `case` over `backup[0]` and the default `allowed_modes`. `nfs_export_access` (guarded),
+  `sudoers_permissions` (a `case` plus a `find`) and `bootloader_config_permissions` (two paths) are checked
+  by lint and the round trip; the test asserts that no other shipped scripted control has a pure-`case`
+  validate. A second test derives every validate `find` mask from the control's `allowed_modes` (07777 minus
+  the largest allowed mode) and compares it with the shipped text. `TestFileScriptsRepairOnARealFile` gains
+  `nfs_export_access` and a symlinked-path case (left alone, validate skips it).
 
 ### 4.4 Accounts and sshd (4 new, 1 changed)
 
 | control | record | body | params / absent / risk |
 |---|---|---|---|
-| `password_policy` | `backup: [/etc/login.defs, /etc/security/pwquality.conf.d/99-muster.conf]`; `rollback` replays `$MB/ageing.list` | `login.defs`: for each of `PASS_MAX_DAYS`, `PASS_MIN_DAYS`, `PASS_MIN_LEN`, rewrite EVERY uncommented line (`sed -i -E "s|^([[:space:]]*PASS_MAX_DAYS)[[:space:]].*|\1 $P_max_days|"`; shadow-utils reads the last, muster the first) or append when none — but only when the current first value is missing or looser (E-8); `pwquality.conf.d/99-muster.conf`: `minlen = $P_min_len`, `minclass = $P_min_classes`; then for every account `awk -F: '$2 != "" && $2 !~ /^[!*]/ { print $1, $3, $4, $5 }' /etc/shadow` lists: skip and log it when field 3 is empty or `0` or when `today − field 3 > $P_max_days` (the write would expire it now); otherwise record `name min max` in `$MB/ageing.list` (first record kept) and run `chage -M "$P_max_days"` when field 5 is empty or greater, `chage -m "$P_min_days"` when field 4 is empty or smaller | `script_params: [max_days, min_days, min_len, min_classes]`; `script_on_absent: true`; risk `lockout_risk` (the `keep a second session open` header) |
-| `umask_policy` | `backup: [/etc/login.defs]` | `set -- $P_acceptable`; when the first uncommented `UMASK` value is not in `$P_acceptable`, rewrite every uncommented `UMASK` line to `UMASK $1` (append when none) | `script_params: [acceptable]`; default list reordered to `["027", "022", "077", "0027", "0022", "0077"]`; validate: the first uncommented value is in the list (the `case " $P_acceptable "` idiom) |
-| `lockout_threshold` | `backup: [/etc/security/faillock.conf]` | when the first uncommented `deny` value is missing or greater than `$P_max_attempts`, rewrite every uncommented `deny` line to `deny = $P_max_attempts` (append when none) | `script_params: [max_attempts]`; no `script_on_absent` (an absent `deny` means faillock is not stacked); validate: value ≤ `$P_max_attempts` |
-| `session_timeout` | `backup: [/etc/ssh/sshd_config.d/00-muster-session.conf]`; `rollback`: `rm -f` the drop-in, `sshd -t`, reload (E-11) | as `root_remote_login`: guarded by `command -v sshd`, write `ClientAliveInterval $P_max_interval` and `ClientAliveCountMax $P_max_count`, `chmod 644`, `sshd -t`, reload a running `sshd`/`ssh` | `script_params: [max_interval, max_count]`; `script_on_absent: true` (no mechanism applies ⇒ the drop-in makes one apply); validate: `sshd -T` persona values ≤ the two parameters |
+| `password_policy` | `backup: [/etc/login.defs, /etc/security/pwquality.conf.d/99-muster.conf]`; `rollback` replays `$MB/ageing.list` | `login.defs`: for each of `PASS_MAX_DAYS`, `PASS_MIN_DAYS`, `PASS_MIN_LEN`, rewrite EVERY uncommented line (`sed -i -E "s\|^([[:space:]]*PASS_MAX_DAYS)[[:space:]].*\|\1 $P_max_days\|"`; shadow-utils reads the last, muster the first) or append when none — only when the current first value is missing or looser (E-8); `pwquality`: `mkdir -p /etc/security/pwquality.conf.d` and `chmod 755` it (Debian ships none), then per key, write `minlen = $P_min_len` / `minclass = $P_min_classes` into `99-muster.conf` only when the merged value (`pwquality.conf`, then `conf.d/*.conf` in name order, last wins — the collector's read) is missing or smaller, `chmod 644`; then `today=$(( $(date +%s) / 86400 ))` and for every account `awk -F: -v OFS=: '$2 != "" && $2 !~ /^[!*]/ { print $1, $3, $4, $5 }' /etc/shadow` lists, read with `IFS=: read -r name last min max`: skip and log it when `last` is empty or `0` or `[ $((today - last)) -gt "$P_max_days" ]` (the write would expire it now); otherwise record `name:min:max` in `$MB/ageing.list` (an empty field written as `-1`, chage's "no limit"; first record kept) and run `chage -M "$P_max_days"` when `max` is empty or greater, `chage -m "$P_min_days"` when `min` is empty or smaller | `script_params: [max_days, min_days, min_len, min_classes]`; `script_on_absent: true`; risk `lockout_risk` (the `keep a second session open` header); validate: the first uncommented `PASS_MAX_DAYS` ≤ `$P_max_days`, `PASS_MIN_DAYS` ≥ `$P_min_days`, `PASS_MIN_LEN` ≥ `$P_min_len`, and the merged `minlen` ≥ `$P_min_len`, `minclass` ≥ `$P_min_classes` — `&&`-joined; the ageing loop is not validated (a skipped account is WARN on the next check, X-10) |
+| `umask_policy` | `backup: [/etc/login.defs]` | `first=${P_acceptable%% *}`; when the first uncommented `UMASK` value is not in `$P_acceptable`, rewrite every uncommented `UMASK` line to `UMASK $first` (append when none) | `script_params: [acceptable]`; default list reordered to `["027", "022", "077", "0027", "0022", "0077"]`; validate: the first uncommented value is in the list (the `case " $P_acceptable "` idiom) |
+| `lockout_threshold` | `backup: [/etc/security/faillock.conf]` | when the LAST uncommented `deny` value (the collector's and pam_faillock's read) is missing, below 1 or greater than `$P_max_attempts`, rewrite every uncommented `deny` line to `deny = $P_max_attempts` (append when none) | `script_params: [max_attempts]`; no `script_on_absent` (an absent `deny` means faillock is not stacked); validate: the last value is ≥ 1 and ≤ `$P_max_attempts`; a `deny=` argument on the pam_faillock lines wins over the file and stays text |
+| `session_timeout` | `backup: [/etc/ssh/sshd_config.d/00-muster-session.conf]`; `rollback`: `rm -f` the drop-in, `sshd -t`, reload (E-11) | as `root_remote_login`: guarded by `command -v sshd`, write `ClientAliveInterval $P_max_interval` and `ClientAliveCountMax $P_max_count`, `chmod 644`, `sshd -t`, reload a running `sshd`/`ssh` | `script_params: [max_interval, max_count]`; `script_on_absent: true` (no mechanism applies ⇒ the drop-in makes one apply); validate: `command -v sshd` `&&` plain `sshd -T` (no `-C`: the judged facts carry no persona) reads both values ≥ 1 and ≤ the parameters — so a host without sshd, where the TMOUT mechanism is the only way and stays text, fails validate instead of reporting `done`, and so does a host whose earlier value (before the `Include`, or a drop-in sorting before `00-`) beats the drop-in |
 | `root_remote_login` | unchanged: its rollback keeps the `rm -f` (E-11) | — | — |
 
 - `password_policy`'s runtime side (`pass_max_days`/`pass_min_days` are judged on both sides) needs the
@@ -517,15 +553,17 @@ bits. In the table, "`find F …`" stands for `find <dir> -mindepth 1 -maxdepth 
   longer hold (E-11). The init rows' failure run asserts the reload happened after the removal (the journal
   shows the reload after the `rm`, and `sshd -T` reads the pre-seed value).
 
-## 5. Proof (E-6, E-12)
+## 5. Proof (E-6, E-12, E-13)
 
 **The runner row.** `fix-roundtrip`'s matrix gains `{key: runner, kind: host, seeded: …}`; the container
 rows gain `kind: container`. The run block's `x()` runs `docker exec "$cid"` on a container row and `sudo` on
 the host row, and the paths differ by a prefix (`/m/muster` ↔ `./bin/muster`, `/out` ↔ `$d/repair`, `/ci`
 ↔ `ci/roundtrip`). The repair run is the same. The failure run has no second container: the job runs
-`ci/roundtrip/runner.sh` again (it is idempotent: it removes `/etc/sysctl.d/99-muster-*.conf` and
-`/etc/modprobe.d/99-muster-*.conf`, re-applies every seeded sysctl value with `sysctl -w`, reloads the seeded
-modules with `modprobe --ignore-install`, and re-seeds the files), collects and plans afresh (the 3D-2b rule:
+`ci/roundtrip/runner.sh` again (it is idempotent: it removes every file muster wrote —
+`/etc/sysctl.d/99-muster-*.conf`, `/etc/modprobe.d/99-muster-*.conf`,
+`/etc/ssh/sshd_config.d/00-muster-session.conf`, `/etc/security/pwquality.conf.d/99-muster.conf` — re-applies
+every sysctl seed with `sysctl -w`, reloads the seeded modules with `modprobe --ignore-install`, and applies
+every file seed unconditionally), collects and plans afresh (the 3D-2b rule:
 never reuse the repair run's script), records, runs the broken copy, and compares; the job asserts the
 failure plan's scripted ids equal the repair plan's. There is no guard run on this row; the job asserts
 `fix.host_guard` is `on` (the VM has a machine id). The row never starts docker (the `ip_forward` and
@@ -541,16 +579,31 @@ as they are; no planned control backs up a file a daemon appends to.
 
 | control | seed |
 |---|---|
-| the nine sysctl controls that FAIL at stock on the runner | none needed (stock FAILs); the script re-applies the stock values on the failure run |
-| the seven that PASS at stock | `sysctl -w` of one key per control to a value outside the set (`kernel.randomize_va_space=0`, `icmp_echo_ignore_broadcasts=0`, `accept_redirects=1`, `tcp_syncookies=0`, `kptr_restrict=0`, `fs.suid_dumpable=1`, `yama.ptrace_scope=0`) |
+| the sixteen sysctl controls | one failing value per control, written with `sysctl -w` on both runs whatever the stock reading (image-independent): `kernel.randomize_va_space=0`, `net.ipv4.icmp_echo_ignore_broadcasts=0`, `net.ipv4.conf.default.accept_redirects=1`, `net.ipv4.ip_forward=1`, `net.ipv6.conf.all.forwarding=1`, `net.ipv6.conf.default.accept_redirects=1`, `net.ipv6.conf.default.accept_ra=1`, `net.ipv6.conf.all.accept_source_route=1`, `kernel.kptr_restrict=0`, `kernel.yama.ptrace_scope=0`, `net.ipv4.conf.default.log_martians=0`, `net.ipv4.conf.default.accept_source_route=1`, `fs.suid_dumpable=2`, `net.ipv4.tcp_syncookies=0`, `kernel.sysrq=176`, `net.core.bpf_jit_harden=0` — the probe confirms each is writable and FAILs its control |
 | `uncommon_filesystems_disabled`, `uncommon_network_protocols_disabled` | `modprobe udf`, `modprobe sctp`, `modprobe tipc` (the modules the runner kernel ships; the rest are `unproven_units`) |
 | `usb_storage_disabled` | none: `unproven` (the kernel ships no `usb-storage`) |
 | `bootloader_config_permissions` | `chmod 644 /boot/grub/grub.cfg` |
-| `audit_log_permissions` | `chmod 640 /var/log/audit/audit.log` (mode only: the body never changes the group) |
-| `session_timeout` | `ClientAliveInterval 900` in `/etc/ssh/sshd_config.d/99-ci-session.conf` when the image sets no earlier value, else inserted before the `Include` in `sshd_config` (first value wins) |
+| `audit_log_permissions` | `chmod 644 /var/log/audit/audit.log` (0640 is an allowed mode; mode only: the body never changes the group) |
+| `session_timeout` | the image's own earliest `ClientAliveInterval` line rewritten in place to 900 (the runner image sets 120 in `/etc/ssh/sshd_config.d/50-cloudimg-settings.conf`, which sorts after `00-muster-session.conf`); the probe records where the value lives, and an image whose value sits before the `Include` is unprovable (no drop-in can win), not seedable |
 | `umask_policy` | `UMASK 002` |
-| `cron_permissions`, `syslog_conf_permissions`, `sudoers_permissions`, `inetd_conf_permissions` | as the container rows |
+| `cron_permissions`, `syslog_conf_permissions`, `sudoers_permissions`, `inetd_conf_permissions` | as the container rows (below) |
 | `password_policy` | only when the seed installs `libpam-pwquality` — the probe decides |
+
+**Container seeds** (`ci/roundtrip/<key>.sh`), per new control — the probe confirms each:
+
+| control | seed |
+|---|---|
+| `sudoers_permissions` | `sudo` installed on every image; `chmod 644 /etc/sudoers` |
+| `cron_permissions` | EL rows install `cronie`; `chmod 644 /etc/crontab` |
+| `syslog_conf_permissions` | `rsyslog` installed where the image lacks it, or `/etc/rsyslog.conf` planted on `ubuntu2204`; `chmod 644` on it |
+| `inetd_conf_permissions` | `install -m 644 /dev/null /etc/inetd.conf` |
+| `nfs_export_access` | `install -m 666 /dev/null /etc/exports` (init rows) |
+| `ftpusers_permissions` | `vsftpd` installed (the control gates on an FTP daemon); its access file `chmod 644` (init rows) |
+| `log_dir_permissions` | `install -m 666 /dev/null /var/log/ci.log` |
+| `umask_policy` | `UMASK 002` in `/etc/login.defs` |
+| `password_policy` | EL rows: a hashed account changed today; `PASS_MAX_DAYS 99999` |
+| `lockout_threshold` | EL rows: `authselect enable-feature with-faillock`, `deny = 99` |
+| `session_timeout` | EL rows: `ClientAliveInterval 900` in a drop-in sorting after `00-muster-session.conf` |
 
 **The table.** Every new scripted control enters `_roundtrip.yaml`. The hypothesis the plan's probe settles:
 
@@ -572,7 +625,8 @@ as they are; no planned control backs up a file a daemon appends to.
 
 **Pin tests.** `TestSysctlScriptsNameTheControlsKeys` (Linux, beside the sysctl leaf table): a control's
 `sysctl` list equals, as a set, the kernel keys of the facts its clauses judge, mapped through the leaf table
-plus `coredump.suid_dumpable → fs.suid_dumpable` (the coredump collector's constant); the test also renders
+plus `coredump.suid_dumpable → fs.suid_dumpable` (the coredump collector's constant), and admits
+`net.ipv4.conf.all.accept_redirects` as the one declared companion of `ip_forwarding_disabled` (E-13); the test also renders
 the body and checks that every accepted arm of each key's `case` is the clause's list or bound.
 `TestModuleScriptsNameTheControlsModules`: a control's `modules` list equals its `where` list after folding
 `-` to `_`. Both replace nothing; they are new.
@@ -592,12 +646,14 @@ per-kind `Build` refusal); the script tests of §3; the goldens regenerated (`fu
 and a state control; `all-scripted.sh` renders every new body); `TestScriptEveryLineIsTemplateBodyOrComment`
 admits the `P_` lines, the `MB` line, the quoted `save_modes` line and the record lines; the 3D-2b unit tests
 at the new path; the file-validate test over six controls by id table; `TestFileScriptsRepairOnARealFile`
-gains `nfs_export_access`; the parameter-placement grep over every shipped body; a grep that refuses a
-mode-changing `find` without a type predicate; the two pin tests; the table test. The mutation test leaves
+gains `nfs_export_access` and a symlinked path; the mask-derivation test; the parameter-placement grep over
+every shipped body; a grep that refuses a mode-changing `find` without a type predicate; the two pin tests;
+the table test. The mutation test leaves
 zero survivors.
 
 **CI.** The runner row, `ci/roundtrip/runner.sh`, `record()`'s three additions, shellcheck over the new
-script.
+script. The examples refresh (`make examples-fetch RUN=<id>` from the branch's `examples.yml` run) is
+mandatory before the merge: the plan fields, the new bodies and the prologue change every fix report.
 
 **Documents** (English and Korean in the same commit). Main design: D34 amended (§2) and §4.2's
 `internal/remedy` row (the hash and the `P_` assignments as the two admitted non-literal classes), §6.2 gains
@@ -605,13 +661,15 @@ the five fields and the rules, §6.8 loses the two set-wide rules, §7.5 gains t
 rollback words and the failure order, §10.2 marks 3D-2c merged and names 3D-2d (audit family,
 `account_inactivity_lock`, the content halves). `CLAUDE.md` Fix section; `CONTRIBUTING` pair (how to write a
 body: `P_` for a parameter and where it may stand, E-8's write-only-when-outside rule, E-9's `find`
-discipline, a record kind for the way back, a `modes` entry — never a `backup` — for a path the body only
+discipline and mask formula, the third validate shape (one `for` over literal names, each condition
+`|| exit 1`), E-13's side-effect rule, a record kind for the way back, a `modes` entry — never a `backup` — for a path the body only
 re-modes, E-11 for a daemon's file); README pair; `THREAT_MODEL.md` (a parameter value enters a command only
 under the charset; the unit-state path is `$MUSTER_BACKUP/blocks/<fn>/units/`); `CHANGELOG` — the Unreleased
 3D-2b bullets are rewritten in place (per-block record paths; the three lints never shipped in a release)
 rather than contradicted by a Changed line, and the entry gains: Added — parameters in scripts, the three
 record kinds, the runner row, 32 scripts; Changed — per-block backup directories, absent paths removed on
-restore, one default-list order, the forwarding controls' risk, `password_policy`'s risk; Controls:
+restore, one default-list order, the risks of the two forwarding controls, `usb_storage_disabled` and
+`password_policy`; Controls:
 `kisa-unix-2026+2026.10.14`, no verdict change.
 
 ## 7. Parked
