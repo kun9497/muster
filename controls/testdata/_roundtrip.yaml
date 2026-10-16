@@ -40,7 +40,13 @@
   unproven: "the runner row (Task 9) proves it; containers gate beyond controls out"
 - id: muster.beyond.sysrq_restricted
   unproven: "the runner row (Task 9) proves it; containers gate beyond controls out"
+- id: muster.beyond.uncommon_filesystems_disabled
+  unproven: "the runner row (Task 9) proves it; containers gate beyond controls out"
+- id: muster.beyond.uncommon_network_protocols_disabled
+  unproven: "the runner row (Task 9) proves it; containers gate beyond controls out"
 - id: muster.beyond.unprivileged_bpf_restricted
+  unproven: "the runner row (Task 9) proves it; containers gate beyond controls out"
+- id: muster.beyond.usb_storage_disabled
   unproven: "the runner row (Task 9) proves it; containers gate beyond controls out"
 - id: muster.file.hosts_lpd_permissions
   images: [almalinux9-init, debian12-init, rocky9-init, ubuntu2204]

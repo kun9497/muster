@@ -19,7 +19,24 @@ absent_means: fail
 checks:
   - { fact: kernel.modules, op: each, subject: name, where: { field: name, op: in, expected: ["usb-storage"] }, require: { field: disabled, op: eq, expected: true } }
 remediation:
-  text_en: Write install usb-storage /bin/false into a file under /etc/modprobe.d, for example /etc/modprobe.d/50-usb-storage.conf, and rebuild the initramfs so the setting applies during early boot as well. Check first that the host does not boot or install from USB media and that no operational procedure depends on a USB device for backups or recovery, because those stop working immediately. A USB keyboard, mouse or serial adapter is unaffected — this is the mass-storage driver alone, not USB support.
-  text_ko: /etc/modprobe.d 아래 파일(예를 들어 /etc/modprobe.d/50-usb-storage.conf)에 install usb-storage /bin/false 를 적고, 초기 부팅 단계에도 적용되도록 initramfs 를 다시 만듭니다. USB 매체로 부팅하거나 설치하지 않는지, 백업이나 복구 절차가 USB 장치에 의존하지 않는지 먼저 확인하십시오. 그런 것들은 즉시 동작을 멈춥니다. USB 키보드·마우스·시리얼 어댑터에는 영향이 없습니다. 이것은 USB 지원 전체가 아니라 대용량 저장 장치 드라이버 하나입니다.
-  risk: none
+  text_en: Write install usb-storage /bin/false into a file under /etc/modprobe.d, for example /etc/modprobe.d/99-muster-usb-storage-disabled.conf, and rebuild the initramfs (the review script does not) so the setting applies during early boot as well. A vendor file whose install line for the module loads it wins over this one; the review script's validate then fails and the block rolls back. The review script never follows a symlink; a 99-muster-usb-storage-disabled.conf that is a symlink (a mask) is left as is and the block stops. Check first that the host does not boot or install from USB media and that no operational procedure depends on a USB device for backups or recovery, because those stop working immediately. A USB keyboard, mouse or serial adapter is unaffected — this is the mass-storage driver alone, not USB support.
+  text_ko: /etc/modprobe.d 아래 파일(예를 들어 /etc/modprobe.d/99-muster-usb-storage-disabled.conf)에 install usb-storage /bin/false 를 적고, 초기 부팅 단계에도 적용되도록 initramfs 를 다시 만듭니다(검토 스크립트는 하지 않습니다). 모듈을 적재하는 install 줄을 둔 벤더 파일이 이 파일을 이기며, 그때 검토 스크립트의 validate가 실패해 블록이 롤백됩니다. 검토 스크립트는 심볼릭 링크를 따라가지 않으므로, 심볼릭 링크(마스크)인 99-muster-usb-storage-disabled.conf 는 그대로 두고 그 블록을 멈춥니다. USB 매체로 부팅하거나 설치하지 않는지, 백업이나 복구 절차가 USB 장치에 의존하지 않는지 먼저 확인하십시오. 그런 것들은 즉시 동작을 멈춥니다. USB 키보드·마우스·시리얼 어댑터에는 영향이 없습니다. 이것은 USB 지원 전체가 아니라 대용량 저장 장치 드라이버 하나입니다.
+  risk: restart_service
   idempotent: true
+  modules: [usb-storage]
+  backup: [/etc/modprobe.d/99-muster-usb-storage-disabled.conf]
+  script: |
+    f=/etc/modprobe.d/99-muster-usb-storage-disabled.conf
+    if [ -L "$f" ]; then log "muster.beyond.usb_storage_disabled: $f is a symlink (a mask), left as is"; exit 1; fi
+    mods='usb-storage'
+    for m in $mods; do
+      n=$(printf '%s' "$m" | tr - _)
+      case "$(modprobe --showconfig 2>/dev/null | awk -v m="$n" '$1 == "install" && $2 == m { print $3; exit }')" in
+        /bin/false|/bin/true|/usr/bin/false|/usr/bin/true|false|true) ;;
+        *) grep -q "^install $n " "$f" 2>/dev/null || printf 'install %s /bin/false\n' "$n" >> "$f";;
+      esac
+      if grep -q "^$n " /proc/modules; then modprobe -r -- "$n"; fi
+    done
+    if [ -f "$f" ]; then chmod 644 "$f"; fi
+  validate: |
+    mods='usb-storage'; for m in $mods; do n=$(printf '%s' "$m" | tr - _); case "$(modprobe --showconfig 2>/dev/null | awk -v m="$n" '$1 == "install" && $2 == m { print $3; exit }')" in /bin/false|/bin/true|/usr/bin/false|/usr/bin/true|false|true) ;; *) exit 1;; esac; ! grep -q "^$n " /proc/modules || exit 1; done

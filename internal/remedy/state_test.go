@@ -418,11 +418,15 @@ esac
 exit 0
 `
 
+// modprobeStub keeps the loaded set in $MODPROBE_STATE/modules (the
+// /proc/modules format) and answers --showconfig from conf/* in name order.
+// -r exits 1 for a module that is not loaded, as kmod does, and for any
+// module while the busy file exists (a module in use).
 const modprobeStub = `s="$MODPROBE_STATE"
 printf '%s\n' "$*" >> "$s/calls"
 case "$1" in
   --ignore-install) shift; [ "$1" = -- ] && shift; [ -f "$s/fail" ] && exit 1; printf '%s 16384 0 - Live 0x0\n' "$1" >> "$s/modules";;
-  -r) shift; [ "$1" = -- ] && shift; [ -f "$s/busy" ] && exit 1; grep -v "^$1 " "$s/modules" > "$s/m.new" || :; mv "$s/m.new" "$s/modules";;
+  -r) shift; [ "$1" = -- ] && shift; grep -q "^$1 " "$s/modules" || exit 1; [ -f "$s/busy" ] && exit 1; grep -v "^$1 " "$s/modules" > "$s/m.new" || :; mv "$s/m.new" "$s/modules";;
   --showconfig) cat "$s"/conf/* 2>/dev/null | awk '$1 == "install" { gsub(/-/, "_", $2) } { print }';;
   *) exit 2;;
 esac

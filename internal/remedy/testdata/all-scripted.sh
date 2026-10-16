@@ -3,7 +3,7 @@
 # muster fix --dry-run: review before running. muster never runs this file.
 # snapshot: host host-a, collected 2026-10-08T00:00:00Z; controls test+1 sha256:c0
 # profile default (sha256:p0); max-risk lockout_risk
-# planned 32 (script 32, text only 0); above max-risk 0; not planned: error 0, manual 0, warn_degraded 0
+# planned 35 (script 35, text only 0); above max-risk 0; not planned: error 0, manual 0, warn_degraded 0
 set -u
 umask 077
 log() { printf 'muster-fix: %s\n' "$*"; }
@@ -199,7 +199,7 @@ restore_modules() {
 }
 failed=0
 
-# ---- 1/32 muster.beyond.aslr_and_link_protection [risk none] [fail, high]
+# ---- 1/35 muster.beyond.aslr_and_link_protection [risk none] [fail, high]
 # why: clause does not hold
 # do:  Write kernel.randomize_va_space = 2, fs.protected_symlinks = 1, fs.protected_hardlinks = 1, fs.protected_fifos = 1 and fs.protected_regular = 2 into /etc/sysctl.d/99-muster-aslr-and-link-protection.conf and apply it with sysctl --system; if an existing hardening file lowers one of them, correct that file rather than adding a later one. All five take effect at once and need no reboot. A value set in /etc/sysctl.conf, or in a sysctl.d file that sorts after 99-muster-aslr-and-link-protection.conf, still wins at boot; correct it there. The review script never follows a symlink; a 99-muster-aslr-and-link-protection.conf that is a symlink (a mask) is left as is and the block stops.
 # ko:  /etc/sysctl.d/99-muster-aslr-and-link-protection.conf 에 kernel.randomize_va_space = 2, fs.protected_symlinks = 1, fs.protected_hardlinks = 1, fs.protected_fifos = 1, fs.protected_regular = 2 를 적고 sysctl --system 으로 적용합니다. 기존 하드닝 파일이 그중 하나를 낮추고 있다면 뒤에 파일을 더 얹지 말고 그 파일을 고치십시오. 다섯 값 모두 즉시 반영되며 재부팅이 필요 없습니다. /etc/sysctl.conf나 99-muster-aslr-and-link-protection.conf 뒤에 정렬되는 sysctl.d 파일에 둔 값이 부팅 때 여전히 이기므로 그 파일을 고치십시오. 검토 스크립트는 심볼릭 링크를 따라가지 않으므로, 심볼릭 링크(마스크)인 99-muster-aslr-and-link-protection.conf 는 그대로 두고 그 블록을 멈춥니다.
@@ -242,7 +242,7 @@ fix_muster_beyond_aslr_and_link_protection() {
 fix_muster_beyond_aslr_and_link_protection
 [ "$?" -eq 0 ] || failed=$((failed+1))
 
-# ---- 2/32 muster.file.passwd_permissions [risk none] [fail, high]
+# ---- 2/35 muster.file.passwd_permissions [risk none] [fail, high]
 # why: clause does not hold
 # do:  chown root:root /etc/passwd; chmod 644 /etc/passwd; setfacl -b /etc/passwd (the script only clears bits; a stricter file is left as it is)
 # ko:  chown root:root /etc/passwd; chmod 644 /etc/passwd; setfacl -b /etc/passwd (스크립트는 비트를 지우기만 하므로 더 엄격한 파일은 그대로 둡니다)
@@ -274,7 +274,7 @@ fix_muster_file_passwd_permissions() {
 fix_muster_file_passwd_permissions
 [ "$?" -eq 0 ] || failed=$((failed+1))
 
-# ---- 3/32 muster.file.services_permissions [risk none] [fail, high]
+# ---- 3/35 muster.file.services_permissions [risk none] [fail, high]
 # why: clause does not hold
 # do:  chown root:root /etc/services; chmod 644 /etc/services (the script only clears bits; a stricter file is left as it is)
 # ko:  chown root:root /etc/services; chmod 644 /etc/services (스크립트는 비트를 지우기만 하므로 더 엄격한 파일은 그대로 둡니다)
@@ -305,7 +305,7 @@ fix_muster_file_services_permissions() {
 fix_muster_file_services_permissions
 [ "$?" -eq 0 ] || failed=$((failed+1))
 
-# ---- 4/32 muster.file.shadow_permissions [risk none] [fail, high]
+# ---- 4/35 muster.file.shadow_permissions [risk none] [fail, high]
 # why: clause does not hold
 # do:  chown root /etc/shadow; chmod 400 /etc/shadow; setfacl -b /etc/shadow (the script only clears bits; a stricter file is left as it is). On Debian and Ubuntu unix_chkpwd reads /etc/shadow through group shadow; a site that keeps 0640 relaxes allowed_modes, and the plan then leaves the script out.
 # ko:  chown root /etc/shadow; chmod 400 /etc/shadow; setfacl -b /etc/shadow (스크립트는 비트를 지우기만 하므로 더 엄격한 파일은 그대로 둡니다). Debian과 Ubuntu에서는 unix_chkpwd가 shadow 그룹으로 /etc/shadow를 읽으므로, 0640을 유지하는 사이트는 allowed_modes를 완화하고 그러면 계획이 스크립트를 뺍니다.
@@ -337,7 +337,7 @@ fix_muster_file_shadow_permissions() {
 fix_muster_file_shadow_permissions
 [ "$?" -eq 0 ] || failed=$((failed+1))
 
-# ---- 5/32 muster.beyond.icmp_redirects_ignored [risk none] [fail, medium]
+# ---- 5/35 muster.beyond.icmp_redirects_ignored [risk none] [fail, medium]
 # why: clause does not hold
 # do:  Write the six values as 0 - net.ipv4.conf.all.accept_redirects, net.ipv4.conf.default.accept_redirects, the same two for secure_redirects and for send_redirects - into /etc/sysctl.d/99-muster-icmp-redirects-ignored.conf and apply it with sysctl --system; they take effect at once. A host that really routes for its link may need send_redirects; such a host waives the finding. A value set in /etc/sysctl.conf, or in a sysctl.d file that sorts after 99-muster-icmp-redirects-ignored.conf, still wins at boot; correct it there. The review script never follows a symlink; a 99-muster-icmp-redirects-ignored.conf that is a symlink (a mask) is left as is and the block stops.
 # ko:  net.ipv4.conf.all.accept_redirects, net.ipv4.conf.default.accept_redirects 와 secure_redirects, send_redirects 의 같은 두 값, 모두 여섯 값을 0 으로 /etc/sysctl.d/99-muster-icmp-redirects-ignored.conf 에 적고 sysctl --system 으로 적용합니다. 즉시 반영됩니다. 실제로 링크를 위해 라우팅하는 호스트는 send_redirects 가 필요할 수 있으며 그런 호스트는 예외(waiver)로 처리합니다. /etc/sysctl.conf나 99-muster-icmp-redirects-ignored.conf 뒤에 정렬되는 sysctl.d 파일에 둔 값이 부팅 때 여전히 이기므로 그 파일을 고치십시오. 검토 스크립트는 심볼릭 링크를 따라가지 않으므로, 심볼릭 링크(마스크)인 99-muster-icmp-redirects-ignored.conf 는 그대로 두고 그 블록을 멈춥니다.
@@ -381,7 +381,7 @@ fix_muster_beyond_icmp_redirects_ignored() {
 fix_muster_beyond_icmp_redirects_ignored
 [ "$?" -eq 0 ] || failed=$((failed+1))
 
-# ---- 6/32 muster.beyond.ipv6_redirects_ignored [risk none] [fail, medium]
+# ---- 6/35 muster.beyond.ipv6_redirects_ignored [risk none] [fail, medium]
 # why: clause does not hold
 # do:  Write net.ipv6.conf.all.accept_redirects = 0 and net.ipv6.conf.default.accept_redirects = 0 into /etc/sysctl.d/99-muster-ipv6-redirects-ignored.conf and apply it with sysctl --system; they take effect at once. A value set in /etc/sysctl.conf, or in a sysctl.d file that sorts after 99-muster-ipv6-redirects-ignored.conf, still wins at boot; correct it there. The review script never follows a symlink; a 99-muster-ipv6-redirects-ignored.conf that is a symlink (a mask) is left as is and the block stops.
 # ko:  /etc/sysctl.d/99-muster-ipv6-redirects-ignored.conf 에 net.ipv6.conf.all.accept_redirects = 0 과 net.ipv6.conf.default.accept_redirects = 0 을 적고 sysctl --system 으로 적용합니다. 즉시 반영됩니다. /etc/sysctl.conf나 99-muster-ipv6-redirects-ignored.conf 뒤에 정렬되는 sysctl.d 파일에 둔 값이 부팅 때 여전히 이기므로 그 파일을 고치십시오. 검토 스크립트는 심볼릭 링크를 따라가지 않으므로, 심볼릭 링크(마스크)인 99-muster-ipv6-redirects-ignored.conf 는 그대로 두고 그 블록을 멈춥니다.
@@ -421,7 +421,7 @@ fix_muster_beyond_ipv6_redirects_ignored() {
 fix_muster_beyond_ipv6_redirects_ignored
 [ "$?" -eq 0 ] || failed=$((failed+1))
 
-# ---- 7/32 muster.beyond.ipv6_router_advertisements_ignored [risk none] [fail, medium]
+# ---- 7/35 muster.beyond.ipv6_router_advertisements_ignored [risk none] [fail, medium]
 # why: clause does not hold
 # do:  On a host with a static IPv6 address, or none, write net.ipv6.conf.all.accept_ra = 0 and net.ipv6.conf.default.accept_ra = 0 into /etc/sysctl.d/99-muster-ipv6-router-advertisements-ignored.conf and apply it with sysctl --system. Check first how the host gets its IPv6 address - a host addressed by SLAAC loses its address and default route; it names 1 in params.allowed_accept_ra instead. A value set in /etc/sysctl.conf, or in a sysctl.d file that sorts after 99-muster-ipv6-router-advertisements-ignored.conf, still wins at boot; correct it there. The review script never follows a symlink; a 99-muster-ipv6-router-advertisements-ignored.conf that is a symlink (a mask) is left as is and the block stops.
 # ko:  정적 IPv6 주소를 쓰거나 IPv6 주소가 없는 호스트는 /etc/sysctl.d/99-muster-ipv6-router-advertisements-ignored.conf 에 net.ipv6.conf.all.accept_ra = 0 과 net.ipv6.conf.default.accept_ra = 0 을 적고 sysctl --system 으로 적용합니다. 먼저 호스트가 IPv6 주소를 어떻게 받는지 확인하십시오. SLAAC 로 주소를 받는 호스트는 주소와 기본 경로를 잃으므로 대신 params.allowed_accept_ra 에 1 을 적습니다. /etc/sysctl.conf나 99-muster-ipv6-router-advertisements-ignored.conf 뒤에 정렬되는 sysctl.d 파일에 둔 값이 부팅 때 여전히 이기므로 그 파일을 고치십시오. 검토 스크립트는 심볼릭 링크를 따라가지 않으므로, 심볼릭 링크(마스크)인 99-muster-ipv6-router-advertisements-ignored.conf 는 그대로 두고 그 블록을 멈춥니다.
@@ -463,7 +463,7 @@ fix_muster_beyond_ipv6_router_advertisements_ignored() {
 fix_muster_beyond_ipv6_router_advertisements_ignored
 [ "$?" -eq 0 ] || failed=$((failed+1))
 
-# ---- 8/32 muster.beyond.ipv6_source_routing_rejected [risk none] [fail, medium]
+# ---- 8/35 muster.beyond.ipv6_source_routing_rejected [risk none] [fail, medium]
 # why: clause does not hold
 # do:  Write net.ipv6.conf.all.accept_source_route = 0 and net.ipv6.conf.default.accept_source_route = 0 into /etc/sysctl.d/99-muster-ipv6-source-routing-rejected.conf and apply it with sysctl --system; they take effect at once. A value set in /etc/sysctl.conf, or in a sysctl.d file that sorts after 99-muster-ipv6-source-routing-rejected.conf, still wins at boot; correct it there. The review script never follows a symlink; a 99-muster-ipv6-source-routing-rejected.conf that is a symlink (a mask) is left as is and the block stops.
 # ko:  /etc/sysctl.d/99-muster-ipv6-source-routing-rejected.conf 에 net.ipv6.conf.all.accept_source_route = 0 과 net.ipv6.conf.default.accept_source_route = 0 을 적고 sysctl --system 으로 적용합니다. 즉시 반영됩니다. /etc/sysctl.conf나 99-muster-ipv6-source-routing-rejected.conf 뒤에 정렬되는 sysctl.d 파일에 둔 값이 부팅 때 여전히 이기므로 그 파일을 고치십시오. 검토 스크립트는 심볼릭 링크를 따라가지 않으므로, 심볼릭 링크(마스크)인 99-muster-ipv6-source-routing-rejected.conf 는 그대로 두고 그 블록을 멈춥니다.
@@ -503,7 +503,7 @@ fix_muster_beyond_ipv6_source_routing_rejected() {
 fix_muster_beyond_ipv6_source_routing_rejected
 [ "$?" -eq 0 ] || failed=$((failed+1))
 
-# ---- 9/32 muster.beyond.kernel_pointer_exposure [risk none] [fail, medium]
+# ---- 9/35 muster.beyond.kernel_pointer_exposure [risk none] [fail, medium]
 # why: clause does not hold
 # do:  Write kernel.kptr_restrict = 1 (or 2) and kernel.dmesg_restrict = 1 into /etc/sysctl.d/99-muster-kernel-pointer-exposure.conf and apply it with sysctl --system; both take effect at once and need no reboot. Check first that no monitoring or crash-reporting agent on the host reads dmesg as an unprivileged user. A value set in /etc/sysctl.conf, or in a sysctl.d file that sorts after 99-muster-kernel-pointer-exposure.conf, still wins at boot; correct it there. The review script never follows a symlink; a 99-muster-kernel-pointer-exposure.conf that is a symlink (a mask) is left as is and the block stops.
 # ko:  /etc/sysctl.d/99-muster-kernel-pointer-exposure.conf 에 kernel.kptr_restrict = 1(또는 2) 과 kernel.dmesg_restrict = 1 을 적고 sysctl --system 으로 적용합니다. 두 값 모두 즉시 반영되며 재부팅이 필요 없습니다. 적용 전에 호스트의 모니터링·크래시 리포트 에이전트가 비권한 사용자로 dmesg 를 읽고 있지 않은지 확인하십시오. /etc/sysctl.conf나 99-muster-kernel-pointer-exposure.conf 뒤에 정렬되는 sysctl.d 파일에 둔 값이 부팅 때 여전히 이기므로 그 파일을 고치십시오. 검토 스크립트는 심볼릭 링크를 따라가지 않으므로, 심볼릭 링크(마스크)인 99-muster-kernel-pointer-exposure.conf 는 그대로 두고 그 블록을 멈춥니다.
@@ -543,7 +543,7 @@ fix_muster_beyond_kernel_pointer_exposure() {
 fix_muster_beyond_kernel_pointer_exposure
 [ "$?" -eq 0 ] || failed=$((failed+1))
 
-# ---- 10/32 muster.beyond.ptrace_restriction [risk none] [fail, medium]
+# ---- 10/35 muster.beyond.ptrace_restriction [risk none] [fail, medium]
 # why: clause does not hold
 # do:  Write kernel.yama.ptrace_scope = 1 and kernel.perf_event_paranoid = 2 into /etc/sysctl.d/99-muster-ptrace-restriction.conf and apply it with sysctl --system; the review script writes a key only when its value is outside the accepted set, and leaves a host at kernel.yama.ptrace_scope = 3, which locks until reboot, alone. Confirm first that no debugger, profiler or crash handler on the host attaches to a process it did not start; 1 is the value that keeps gdb working on a program you launched yourself, and 3 cannot be undone without a reboot. A value set in /etc/sysctl.conf, or in a sysctl.d file that sorts after 99-muster-ptrace-restriction.conf, still wins at boot; correct it there. The review script never follows a symlink; a 99-muster-ptrace-restriction.conf that is a symlink (a mask) is left as is and the block stops.
 # ko:  /etc/sysctl.d/99-muster-ptrace-restriction.conf 에 kernel.yama.ptrace_scope = 1 과 kernel.perf_event_paranoid = 2 를 적고 sysctl --system 으로 적용합니다. 검토 스크립트는 값이 허용 범위 밖인 키만 쓰며, 재부팅 전까지 잠기는 kernel.yama.ptrace_scope = 3인 호스트는 그대로 둡니다. 호스트의 디버거·프로파일러·크래시 처리기가 자신이 띄우지 않은 프로세스에 붙지 않는지 먼저 확인하십시오. 직접 실행한 프로그램에 gdb 를 붙이는 용도는 값 1 에서 그대로 동작하며, 3 은 재부팅 없이는 되돌릴 수 없습니다. /etc/sysctl.conf나 99-muster-ptrace-restriction.conf 뒤에 정렬되는 sysctl.d 파일에 둔 값이 부팅 때 여전히 이기므로 그 파일을 고치십시오. 검토 스크립트는 심볼릭 링크를 따라가지 않으므로, 심볼릭 링크(마스크)인 99-muster-ptrace-restriction.conf 는 그대로 두고 그 블록을 멈춥니다.
@@ -583,7 +583,7 @@ fix_muster_beyond_ptrace_restriction() {
 fix_muster_beyond_ptrace_restriction
 [ "$?" -eq 0 ] || failed=$((failed+1))
 
-# ---- 11/32 muster.beyond.reverse_path_filtering [risk none] [fail, medium]
+# ---- 11/35 muster.beyond.reverse_path_filtering [risk none] [fail, medium]
 # why: clause does not hold
 # do:  Write net.ipv4.conf.all.log_martians = 1 and net.ipv4.conf.default.log_martians = 1, and rp_filter = 1 or 2 for all and default if they are 0, into /etc/sysctl.d/99-muster-reverse-path-filtering.conf and apply it with sysctl --system; they take effect at once. Choose 2 on a host with asymmetric routes (several uplinks, policy routing), where strict filtering drops legitimate replies. A value set in /etc/sysctl.conf, or in a sysctl.d file that sorts after 99-muster-reverse-path-filtering.conf, still wins at boot; correct it there. The review script never follows a symlink; a 99-muster-reverse-path-filtering.conf that is a symlink (a mask) is left as is and the block stops.
 # ko:  net.ipv4.conf.all.log_martians = 1 과 net.ipv4.conf.default.log_martians = 1 을, rp_filter 가 0 이면 all 과 default 에 1 또는 2 를 /etc/sysctl.d/99-muster-reverse-path-filtering.conf 에 적고 sysctl --system 으로 적용합니다. 즉시 반영됩니다. 비대칭 경로가 있는 호스트(여러 업링크, 정책 라우팅)에서는 strict 필터링이 정상 응답을 버리므로 2 를 고릅니다. /etc/sysctl.conf나 99-muster-reverse-path-filtering.conf 뒤에 정렬되는 sysctl.d 파일에 둔 값이 부팅 때 여전히 이기므로 그 파일을 고치십시오. 검토 스크립트는 심볼릭 링크를 따라가지 않으므로, 심볼릭 링크(마스크)인 99-muster-reverse-path-filtering.conf 는 그대로 두고 그 블록을 멈춥니다.
@@ -625,7 +625,7 @@ fix_muster_beyond_reverse_path_filtering() {
 fix_muster_beyond_reverse_path_filtering
 [ "$?" -eq 0 ] || failed=$((failed+1))
 
-# ---- 12/32 muster.beyond.source_routing_rejected [risk none] [fail, medium]
+# ---- 12/35 muster.beyond.source_routing_rejected [risk none] [fail, medium]
 # why: clause does not hold
 # do:  Write net.ipv4.conf.all.accept_source_route = 0 and net.ipv4.conf.default.accept_source_route = 0 into /etc/sysctl.d/99-muster-source-routing-rejected.conf and apply it with sysctl --system; they take effect at once. A value set in /etc/sysctl.conf, or in a sysctl.d file that sorts after 99-muster-source-routing-rejected.conf, still wins at boot; correct it there. The review script never follows a symlink; a 99-muster-source-routing-rejected.conf that is a symlink (a mask) is left as is and the block stops.
 # ko:  /etc/sysctl.d/99-muster-source-routing-rejected.conf 에 net.ipv4.conf.all.accept_source_route = 0 과 net.ipv4.conf.default.accept_source_route = 0 을 적고 sysctl --system 으로 적용합니다. 즉시 반영됩니다. /etc/sysctl.conf나 99-muster-source-routing-rejected.conf 뒤에 정렬되는 sysctl.d 파일에 둔 값이 부팅 때 여전히 이기므로 그 파일을 고치십시오. 검토 스크립트는 심볼릭 링크를 따라가지 않으므로, 심볼릭 링크(마스크)인 99-muster-source-routing-rejected.conf 는 그대로 두고 그 블록을 멈춥니다.
@@ -665,7 +665,7 @@ fix_muster_beyond_source_routing_rejected() {
 fix_muster_beyond_source_routing_rejected
 [ "$?" -eq 0 ] || failed=$((failed+1))
 
-# ---- 13/32 muster.beyond.suid_dumpable_disabled [risk none] [fail, medium]
+# ---- 13/35 muster.beyond.suid_dumpable_disabled [risk none] [fail, medium]
 # why: clause does not hold
 # do:  Write fs.suid_dumpable = 0 into /etc/sysctl.d/99-muster-suid-dumpable-disabled.conf and apply it with sysctl --system; it takes effect at once and needs no reboot. A crash-reporting tool that collects dumps from setuid programs stops receiving them, which is the intent. A value set in /etc/sysctl.conf, or in a sysctl.d file that sorts after 99-muster-suid-dumpable-disabled.conf, still wins at boot; correct it there. The review script never follows a symlink; a 99-muster-suid-dumpable-disabled.conf that is a symlink (a mask) is left as is and the block stops.
 # ko:  /etc/sysctl.d/99-muster-suid-dumpable-disabled.conf 에 fs.suid_dumpable = 0 을 적고 sysctl --system 으로 적용합니다. 즉시 반영되며 재부팅이 필요 없습니다. setuid 프로그램의 덤프를 수집하던 크래시 리포트 도구는 더 이상 그것을 받지 못하는데, 그것이 이 설정의 의도입니다. /etc/sysctl.conf나 99-muster-suid-dumpable-disabled.conf 뒤에 정렬되는 sysctl.d 파일에 둔 값이 부팅 때 여전히 이기므로 그 파일을 고치십시오. 검토 스크립트는 심볼릭 링크를 따라가지 않으므로, 심볼릭 링크(마스크)인 99-muster-suid-dumpable-disabled.conf 는 그대로 두고 그 블록을 멈춥니다.
@@ -704,7 +704,7 @@ fix_muster_beyond_suid_dumpable_disabled() {
 fix_muster_beyond_suid_dumpable_disabled
 [ "$?" -eq 0 ] || failed=$((failed+1))
 
-# ---- 14/32 muster.beyond.syn_cookies_enabled [risk none] [fail, medium]
+# ---- 14/35 muster.beyond.syn_cookies_enabled [risk none] [fail, medium]
 # why: clause does not hold
 # do:  Write net.ipv4.tcp_syncookies = 1 into /etc/sysctl.d/99-muster-syn-cookies-enabled.conf and apply it with sysctl --system; it takes effect at once. A value set in /etc/sysctl.conf, or in a sysctl.d file that sorts after 99-muster-syn-cookies-enabled.conf, still wins at boot; correct it there. The review script never follows a symlink; a 99-muster-syn-cookies-enabled.conf that is a symlink (a mask) is left as is and the block stops.
 # ko:  /etc/sysctl.d/99-muster-syn-cookies-enabled.conf 에 net.ipv4.tcp_syncookies = 1 을 적고 sysctl --system 으로 적용합니다. 즉시 반영됩니다. /etc/sysctl.conf나 99-muster-syn-cookies-enabled.conf 뒤에 정렬되는 sysctl.d 파일에 둔 값이 부팅 때 여전히 이기므로 그 파일을 고치십시오. 검토 스크립트는 심볼릭 링크를 따라가지 않으므로, 심볼릭 링크(마스크)인 99-muster-syn-cookies-enabled.conf 는 그대로 두고 그 블록을 멈춥니다.
@@ -743,7 +743,7 @@ fix_muster_beyond_syn_cookies_enabled() {
 fix_muster_beyond_syn_cookies_enabled
 [ "$?" -eq 0 ] || failed=$((failed+1))
 
-# ---- 15/32 muster.beyond.sysrq_restricted [risk none] [fail, medium]
+# ---- 15/35 muster.beyond.sysrq_restricted [risk none] [fail, medium]
 # why: clause does not hold
 # do:  Write kernel.sysrq = 0 into /etc/sysctl.d/99-muster-sysrq-restricted.conf and apply it with sysctl --system, or, if your operations team relies on the distribution's value, keep it and add that number to params.allowed_sysrq so the decision is recorded. A host whose console is physically controlled and whose recovery procedure uses SysRq is the case the parameter exists for. A value set in /etc/sysctl.conf, or in a sysctl.d file that sorts after 99-muster-sysrq-restricted.conf, still wins at boot; correct it there. The review script never follows a symlink; a 99-muster-sysrq-restricted.conf that is a symlink (a mask) is left as is and the block stops.
 # ko:  /etc/sysctl.d/99-muster-sysrq-restricted.conf 에 kernel.sysrq = 0 을 적고 sysctl --system 으로 적용합니다. 운영 절차가 배포판 값에 의존한다면 값을 유지하되 그 숫자를 params.allowed_sysrq 에 추가해 결정을 기록하십시오. 콘솔이 물리적으로 통제되고 복구 절차가 SysRq 를 쓰는 호스트가 바로 이 파라미터가 존재하는 이유입니다. /etc/sysctl.conf나 99-muster-sysrq-restricted.conf 뒤에 정렬되는 sysctl.d 파일에 둔 값이 부팅 때 여전히 이기므로 그 파일을 고치십시오. 검토 스크립트는 심볼릭 링크를 따라가지 않으므로, 심볼릭 링크(마스크)인 99-muster-sysrq-restricted.conf 는 그대로 두고 그 블록을 멈춥니다.
@@ -784,7 +784,50 @@ fix_muster_beyond_sysrq_restricted() {
 fix_muster_beyond_sysrq_restricted
 [ "$?" -eq 0 ] || failed=$((failed+1))
 
-# ---- 16/32 muster.beyond.icmp_broadcast_and_bogus_ignored [risk none] [fail, low]
+# ---- 16/35 muster.beyond.uncommon_network_protocols_disabled [risk none] [fail, medium]
+# why: clause does not hold
+# do:  Write one install <name> /bin/false line per protocol into a file under /etc/modprobe.d, for example /etc/modprobe.d/99-muster-uncommon-network-protocols-disabled.conf, and rebuild the initramfs (the review script does not). A vendor file whose install line for the module loads it wins over this one; the review script's validate then fails and the block rolls back. The review script never follows a symlink; a 99-muster-uncommon-network-protocols-disabled.conf that is a symlink (a mask) is left as is and the block stops. A module that is already loaded stays loaded until it is unloaded (modprobe -r) or the host reboots; the review script unloads it, and fails and rolls back when the module is in use. Hosts that genuinely speak one of these — an SCTP signalling gateway, a TIPC cluster member, an RDS fabric — should carry a waiver naming the module instead of leaving the control undecided for all four.
+# ko:  프로토콜마다 install <name> /bin/false 한 줄씩을 /etc/modprobe.d 아래 파일(예를 들어 /etc/modprobe.d/99-muster-uncommon-network-protocols-disabled.conf)에 적고 initramfs 를 다시 만듭니다(검토 스크립트는 하지 않습니다). 모듈을 적재하는 install 줄을 둔 벤더 파일이 이 파일을 이기며, 그때 검토 스크립트의 validate가 실패해 블록이 롤백됩니다. 검토 스크립트는 심볼릭 링크를 따라가지 않으므로, 심볼릭 링크(마스크)인 99-muster-uncommon-network-protocols-disabled.conf 는 그대로 두고 그 블록을 멈춥니다. 이미 적재된 모듈은 내리거나(modprobe -r) 재부팅할 때까지 남아 있습니다. 검토 스크립트는 이를 내리며, 모듈이 사용 중이면 실패하고 롤백합니다. 이들 중 하나를 실제로 쓰는 호스트(SCTP 신호 게이트웨이, TIPC 클러스터 구성원, RDS 패브릭 등)는 네 개 전부를 미결로 두지 말고 해당 모듈을 지목하는 waiver 를 두십시오.
+fix_muster_beyond_uncommon_network_protocols_disabled() {
+  MB="$MUSTER_BACKUP/blocks/fix_muster_beyond_uncommon_network_protocols_disabled"; mkdir -p "$MB" || { log "muster.beyond.uncommon_network_protocols_disabled: backup failed, nothing changed"; return 1; }
+  backup /etc/modprobe.d/99-muster-uncommon-network-protocols-disabled.conf || { log "muster.beyond.uncommon_network_protocols_disabled: backup failed, nothing changed"; return 1; }
+  save_modules dccp sctp rds tipc || { log "muster.beyond.uncommon_network_protocols_disabled: backup failed, nothing changed"; return 1; }
+  ( set -e
+    f=/etc/modprobe.d/99-muster-uncommon-network-protocols-disabled.conf
+    if [ -L "$f" ]; then log "muster.beyond.uncommon_network_protocols_disabled: $f is a symlink (a mask), left as is"; exit 1; fi
+    mods='dccp sctp rds tipc'
+    for m in $mods; do
+      n=$(printf '%s' "$m" | tr - _)
+      case "$(modprobe --showconfig 2>/dev/null | awk -v m="$n" '$1 == "install" && $2 == m { print $3; exit }')" in
+        /bin/false|/bin/true|/usr/bin/false|/usr/bin/true|false|true) ;;
+        *) grep -q "^install $n " "$f" 2>/dev/null || printf 'install %s /bin/false\n' "$n" >> "$f";;
+      esac
+      if grep -q "^$n " /proc/modules; then modprobe -r -- "$n"; fi
+    done
+    if [ -f "$f" ]; then chmod 644 "$f"; fi
+  ); rc=$?
+  if [ "$rc" -ne 0 ]; then
+    log "muster.beyond.uncommon_network_protocols_disabled: script failed (rc $rc), rolling back"
+    restore /etc/modprobe.d/99-muster-uncommon-network-protocols-disabled.conf || log "muster.beyond.uncommon_network_protocols_disabled: ROLLBACK INCOMPLETE, backups in $MUSTER_BACKUP"
+    restore_modules dccp sctp rds tipc || log "muster.beyond.uncommon_network_protocols_disabled: ROLLBACK INCOMPLETE, backups in $MUSTER_BACKUP"
+    return 1
+  fi
+  # validate
+  ( set -e
+    mods='dccp sctp rds tipc'; for m in $mods; do n=$(printf '%s' "$m" | tr - _); case "$(modprobe --showconfig 2>/dev/null | awk -v m="$n" '$1 == "install" && $2 == m { print $3; exit }')" in /bin/false|/bin/true|/usr/bin/false|/usr/bin/true|false|true) ;; *) exit 1;; esac; ! grep -q "^$n " /proc/modules || exit 1; done
+  ); rc=$?
+  if [ "$rc" -ne 0 ]; then
+    log "muster.beyond.uncommon_network_protocols_disabled: validate failed, rolling back"
+    restore /etc/modprobe.d/99-muster-uncommon-network-protocols-disabled.conf || log "muster.beyond.uncommon_network_protocols_disabled: ROLLBACK INCOMPLETE, backups in $MUSTER_BACKUP"
+    restore_modules dccp sctp rds tipc || log "muster.beyond.uncommon_network_protocols_disabled: ROLLBACK INCOMPLETE, backups in $MUSTER_BACKUP"
+    return 1
+  fi
+  log "muster.beyond.uncommon_network_protocols_disabled: done"
+}
+fix_muster_beyond_uncommon_network_protocols_disabled
+[ "$?" -eq 0 ] || failed=$((failed+1))
+
+# ---- 17/35 muster.beyond.icmp_broadcast_and_bogus_ignored [risk none] [fail, low]
 # why: clause does not hold
 # do:  Write net.ipv4.icmp_echo_ignore_broadcasts = 1 and net.ipv4.icmp_ignore_bogus_error_responses = 1 into /etc/sysctl.d/99-muster-icmp-broadcast-and-bogus-ignored.conf and apply it with sysctl --system; they take effect at once. A file that sets either to 0 is the one to find and fix first. A value set in /etc/sysctl.conf, or in a sysctl.d file that sorts after 99-muster-icmp-broadcast-and-bogus-ignored.conf, still wins at boot; correct it there. The review script never follows a symlink; a 99-muster-icmp-broadcast-and-bogus-ignored.conf that is a symlink (a mask) is left as is and the block stops.
 # ko:  /etc/sysctl.d/99-muster-icmp-broadcast-and-bogus-ignored.conf 에 net.ipv4.icmp_echo_ignore_broadcasts = 1 과 net.ipv4.icmp_ignore_bogus_error_responses = 1 을 적고 sysctl --system 으로 적용합니다. 즉시 반영됩니다. 둘 중 하나를 0 으로 설정한 파일을 먼저 찾아 고치십시오. /etc/sysctl.conf나 99-muster-icmp-broadcast-and-bogus-ignored.conf 뒤에 정렬되는 sysctl.d 파일에 둔 값이 부팅 때 여전히 이기므로 그 파일을 고치십시오. 검토 스크립트는 심볼릭 링크를 따라가지 않으므로, 심볼릭 링크(마스크)인 99-muster-icmp-broadcast-and-bogus-ignored.conf 는 그대로 두고 그 블록을 멈춥니다.
@@ -824,7 +867,50 @@ fix_muster_beyond_icmp_broadcast_and_bogus_ignored() {
 fix_muster_beyond_icmp_broadcast_and_bogus_ignored
 [ "$?" -eq 0 ] || failed=$((failed+1))
 
-# ---- 17/32 muster.beyond.unprivileged_bpf_restricted [risk none] [fail, low]
+# ---- 18/35 muster.beyond.uncommon_filesystems_disabled [risk none] [fail, low]
+# why: clause does not hold
+# do:  Write one install <name> /bin/false line per module into a file under /etc/modprobe.d, for example /etc/modprobe.d/99-muster-uncommon-filesystems-disabled.conf, and rebuild the initramfs (the review script does not) so the setting also applies during early boot. A vendor file whose install line for the module loads it wins over this one; the review script's validate then fails and the block rolls back. The review script never follows a symlink; a 99-muster-uncommon-filesystems-disabled.conf that is a symlink (a mask) is left as is and the block stops. A blacklist line alongside it does no harm but is not what muster credits. A module already built into the running kernel needs a kernel without it — the distribution kernels ship all six as modules, so this is rare — and a host that genuinely mounts one of these types, an optical drive reading UDF for instance, should carry a waiver naming the module rather than leaving the whole control undecided.
+# ko:  모듈마다 install <name> /bin/false 한 줄씩을 /etc/modprobe.d 아래 파일(예를 들어 /etc/modprobe.d/99-muster-uncommon-filesystems-disabled.conf)에 적고, 초기 부팅 단계에도 적용되도록 initramfs 를 다시 만듭니다(검토 스크립트는 하지 않습니다). 모듈을 적재하는 install 줄을 둔 벤더 파일이 이 파일을 이기며, 그때 검토 스크립트의 validate가 실패해 블록이 롤백됩니다. 검토 스크립트는 심볼릭 링크를 따라가지 않으므로, 심볼릭 링크(마스크)인 99-muster-uncommon-filesystems-disabled.conf 는 그대로 두고 그 블록을 멈춥니다. blacklist 줄을 함께 두어도 해롭지는 않지만 muster 가 인정하는 것은 아닙니다. 이미 실행 중인 커널에 내장된 모듈은 그것이 빠진 커널이 필요합니다. 배포판 커널은 여섯 개를 모두 모듈로 배포하므로 드문 경우입니다. UDF 를 읽는 광학 드라이브처럼 이 유형 중 하나를 실제로 마운트하는 호스트는 항목 전체를 미결로 두지 말고 해당 모듈을 지목하는 waiver 를 두십시오.
+fix_muster_beyond_uncommon_filesystems_disabled() {
+  MB="$MUSTER_BACKUP/blocks/fix_muster_beyond_uncommon_filesystems_disabled"; mkdir -p "$MB" || { log "muster.beyond.uncommon_filesystems_disabled: backup failed, nothing changed"; return 1; }
+  backup /etc/modprobe.d/99-muster-uncommon-filesystems-disabled.conf || { log "muster.beyond.uncommon_filesystems_disabled: backup failed, nothing changed"; return 1; }
+  save_modules cramfs freevxfs jffs2 hfs hfsplus udf || { log "muster.beyond.uncommon_filesystems_disabled: backup failed, nothing changed"; return 1; }
+  ( set -e
+    f=/etc/modprobe.d/99-muster-uncommon-filesystems-disabled.conf
+    if [ -L "$f" ]; then log "muster.beyond.uncommon_filesystems_disabled: $f is a symlink (a mask), left as is"; exit 1; fi
+    mods='cramfs freevxfs jffs2 hfs hfsplus udf'
+    for m in $mods; do
+      n=$(printf '%s' "$m" | tr - _)
+      case "$(modprobe --showconfig 2>/dev/null | awk -v m="$n" '$1 == "install" && $2 == m { print $3; exit }')" in
+        /bin/false|/bin/true|/usr/bin/false|/usr/bin/true|false|true) ;;
+        *) grep -q "^install $n " "$f" 2>/dev/null || printf 'install %s /bin/false\n' "$n" >> "$f";;
+      esac
+      if grep -q "^$n " /proc/modules; then modprobe -r -- "$n"; fi
+    done
+    if [ -f "$f" ]; then chmod 644 "$f"; fi
+  ); rc=$?
+  if [ "$rc" -ne 0 ]; then
+    log "muster.beyond.uncommon_filesystems_disabled: script failed (rc $rc), rolling back"
+    restore /etc/modprobe.d/99-muster-uncommon-filesystems-disabled.conf || log "muster.beyond.uncommon_filesystems_disabled: ROLLBACK INCOMPLETE, backups in $MUSTER_BACKUP"
+    restore_modules cramfs freevxfs jffs2 hfs hfsplus udf || log "muster.beyond.uncommon_filesystems_disabled: ROLLBACK INCOMPLETE, backups in $MUSTER_BACKUP"
+    return 1
+  fi
+  # validate
+  ( set -e
+    mods='cramfs freevxfs jffs2 hfs hfsplus udf'; for m in $mods; do n=$(printf '%s' "$m" | tr - _); case "$(modprobe --showconfig 2>/dev/null | awk -v m="$n" '$1 == "install" && $2 == m { print $3; exit }')" in /bin/false|/bin/true|/usr/bin/false|/usr/bin/true|false|true) ;; *) exit 1;; esac; ! grep -q "^$n " /proc/modules || exit 1; done
+  ); rc=$?
+  if [ "$rc" -ne 0 ]; then
+    log "muster.beyond.uncommon_filesystems_disabled: validate failed, rolling back"
+    restore /etc/modprobe.d/99-muster-uncommon-filesystems-disabled.conf || log "muster.beyond.uncommon_filesystems_disabled: ROLLBACK INCOMPLETE, backups in $MUSTER_BACKUP"
+    restore_modules cramfs freevxfs jffs2 hfs hfsplus udf || log "muster.beyond.uncommon_filesystems_disabled: ROLLBACK INCOMPLETE, backups in $MUSTER_BACKUP"
+    return 1
+  fi
+  log "muster.beyond.uncommon_filesystems_disabled: done"
+}
+fix_muster_beyond_uncommon_filesystems_disabled
+[ "$?" -eq 0 ] || failed=$((failed+1))
+
+# ---- 19/35 muster.beyond.unprivileged_bpf_restricted [risk none] [fail, low]
 # why: clause does not hold
 # do:  Write kernel.unprivileged_bpf_disabled = 2 (1 locks the setting until reboot, so the review script writes 2 and leaves a host already at 1 alone) and net.core.bpf_jit_harden = 2 into /etc/sysctl.d/99-muster-unprivileged-bpf-restricted.conf and apply it with sysctl --system. Check first whether any observability or container-networking agent on the host loads BPF programs as an unprivileged account; those agents normally run with CAP_BPF and are unaffected, and constant blinding costs throughput on a host whose packet path is BPF-based. A value set in /etc/sysctl.conf, or in a sysctl.d file that sorts after 99-muster-unprivileged-bpf-restricted.conf, still wins at boot; correct it there. The review script never follows a symlink; a 99-muster-unprivileged-bpf-restricted.conf that is a symlink (a mask) is left as is and the block stops.
 # ko:  /etc/sysctl.d/99-muster-unprivileged-bpf-restricted.conf 에 kernel.unprivileged_bpf_disabled = 2(1은 재부팅 전까지 설정을 잠그므로 검토 스크립트는 2를 쓰고, 이미 1인 호스트는 그대로 둡니다) 와 net.core.bpf_jit_harden = 2 를 적고 sysctl --system 으로 적용합니다. 호스트의 관측·컨테이너 네트워킹 에이전트가 비권한 계정으로 BPF 프로그램을 적재하지는 않는지 먼저 확인하십시오. 그런 에이전트는 보통 CAP_BPF 로 실행되어 영향을 받지 않으며, 상수 가림은 패킷 경로가 BPF 기반인 호스트에서 처리량 비용이 있습니다. /etc/sysctl.conf나 99-muster-unprivileged-bpf-restricted.conf 뒤에 정렬되는 sysctl.d 파일에 둔 값이 부팅 때 여전히 이기므로 그 파일을 고치십시오. 검토 스크립트는 심볼릭 링크를 따라가지 않으므로, 심볼릭 링크(마스크)인 99-muster-unprivileged-bpf-restricted.conf 는 그대로 두고 그 블록을 멈춥니다.
@@ -864,7 +950,7 @@ fix_muster_beyond_unprivileged_bpf_restricted() {
 fix_muster_beyond_unprivileged_bpf_restricted
 [ "$?" -eq 0 ] || failed=$((failed+1))
 
-# ---- 18/32 muster.file.hosts_lpd_permissions [risk none] [fail, low]
+# ---- 20/35 muster.file.hosts_lpd_permissions [risk none] [fail, low]
 # why: clause does not hold
 # do:  chown root:root /etc/hosts.lpd; chmod 600 /etc/hosts.lpd (the script only clears bits; a stricter file is left as it is)
 # ko:  chown root:root /etc/hosts.lpd; chmod 600 /etc/hosts.lpd (스크립트는 비트를 지우기만 하므로 더 엄격한 파일은 그대로 둡니다)
@@ -895,7 +981,7 @@ fix_muster_file_hosts_lpd_permissions() {
 fix_muster_file_hosts_lpd_permissions
 [ "$?" -eq 0 ] || failed=$((failed+1))
 
-# ---- 19/32 muster.file.hosts_permissions [risk restart_service] [fail, high]
+# ---- 21/35 muster.file.hosts_permissions [risk restart_service] [fail, high]
 # why: clause does not hold
 # do:  chown root:root /etc/hosts; chmod 600 /etc/hosts (the script only clears bits; a stricter file is left as it is). At 0600 non-root processes can no longer read /etc/hosts, so services that resolve names through it fail; a site that keeps 0644 relaxes allowed_modes, and the plan then leaves the script out.
 # ko:  chown root:root /etc/hosts; chmod 600 /etc/hosts (스크립트는 비트를 지우기만 하므로 더 엄격한 파일은 그대로 둡니다). 0600에서는 root가 아닌 프로세스가 /etc/hosts를 읽지 못해 그것으로 이름을 푸는 서비스가 실패합니다. 0644를 유지하는 사이트는 allowed_modes를 완화하고 그러면 계획이 스크립트를 뺍니다.
@@ -926,7 +1012,7 @@ fix_muster_file_hosts_permissions() {
 fix_muster_file_hosts_permissions
 [ "$?" -eq 0 ] || failed=$((failed+1))
 
-# ---- 20/32 muster.service.automount_disabled [risk restart_service] [fail, high]
+# ---- 22/35 muster.service.automount_disabled [risk restart_service] [fail, high]
 # why: clause does not hold
 # do:  Stop and disable autofs (systemctl disable --now autofs.service) unless the host genuinely relies on automounted shares.
 # ko:  이 호스트가 자동 마운트 공유에 실제로 의존하지 않는다면 autofs 를 중지·비활성화합니다 (systemctl disable --now autofs.service).
@@ -965,7 +1051,7 @@ fix_muster_service_automount_disabled() {
 fix_muster_service_automount_disabled
 [ "$?" -eq 0 ] || failed=$((failed+1))
 
-# ---- 21/32 muster.service.dos_services_disabled [risk restart_service] [fail, high]
+# ---- 23/35 muster.service.dos_services_disabled [risk restart_service] [fail, high]
 # why: clause does not hold
 # do:  Disable and mask the echo, discard, daytime and chargen services or remove their inetd/xinetd entries. An echo, discard, daytime or chargen started by inetd or xinetd is not stopped by the script; remove its entry there.
 # ko:  echo, discard, daytime, chargen 서비스를 비활성화·mask 하거나 inetd/xinetd 의 해당 항목을 제거합니다. inetd나 xinetd가 띄우는 echo, discard, daytime, chargen은 스크립트가 멈추지 않습니다. 거기서 항목을 지우십시오.
@@ -1004,7 +1090,7 @@ fix_muster_service_dos_services_disabled() {
 fix_muster_service_dos_services_disabled
 [ "$?" -eq 0 ] || failed=$((failed+1))
 
-# ---- 22/32 muster.service.finger_disabled [risk restart_service] [fail, high]
+# ---- 24/35 muster.service.finger_disabled [risk restart_service] [fail, high]
 # why: clause does not hold
 # do:  Disable and mask the finger service or remove the finger server package, and remove any inetd/xinetd finger entry. A finger started by inetd or xinetd is not stopped by the script; remove its entry there.
 # ko:  finger 서비스를 비활성화·mask 하거나 finger 서버 패키지를 제거하고, inetd/xinetd 의 finger 항목을 제거합니다. inetd나 xinetd가 띄우는 finger는 스크립트가 멈추지 않습니다. 거기서 항목을 지우십시오.
@@ -1043,7 +1129,7 @@ fix_muster_service_finger_disabled() {
 fix_muster_service_finger_disabled
 [ "$?" -eq 0 ] || failed=$((failed+1))
 
-# ---- 23/32 muster.service.nfs_server_disabled [risk restart_service] [fail, high]
+# ---- 25/35 muster.service.nfs_server_disabled [risk restart_service] [fail, high]
 # why: clause does not hold
 # do:  Stop and disable the NFS server (systemctl disable --now nfs-server.service) unless the host must actually export filesystems over NFS.
 # ko:  이 호스트가 실제로 NFS 로 파일시스템을 공유해야 하는 것이 아니라면 NFS 서버를 중지·비활성화합니다 (systemctl disable --now nfs-server.service).
@@ -1082,7 +1168,7 @@ fix_muster_service_nfs_server_disabled() {
 fix_muster_service_nfs_server_disabled
 [ "$?" -eq 0 ] || failed=$((failed+1))
 
-# ---- 24/32 muster.service.rpcbind_disabled [risk restart_service] [fail, high]
+# ---- 26/35 muster.service.rpcbind_disabled [risk restart_service] [fail, high]
 # why: clause does not hold
 # do:  Stop and mask rpcbind (systemctl disable --now rpcbind.service rpcbind.socket) unless another RPC service on this host genuinely requires it.
 # ko:  이 호스트의 다른 RPC 서비스가 실제로 필요로 하지 않는다면 rpcbind 를 중지·mask 합니다 (systemctl disable --now rpcbind.service rpcbind.socket).
@@ -1121,7 +1207,7 @@ fix_muster_service_rpcbind_disabled() {
 fix_muster_service_rpcbind_disabled
 [ "$?" -eq 0 ] || failed=$((failed+1))
 
-# ---- 25/32 muster.service.rservices_disabled [risk restart_service] [fail, high]
+# ---- 27/35 muster.service.rservices_disabled [risk restart_service] [fail, high]
 # why: clause does not hold
 # do:  Disable and mask the rsh, rlogin and rexec services or remove the r-services package, and remove any inetd/xinetd r-services entries. An rsh, rlogin or rexec started by inetd or xinetd is not stopped by the script; remove its entry there.
 # ko:  rsh, rlogin, rexec 서비스를 비활성화·mask 하거나 r-services 패키지를 제거하고, inetd/xinetd 의 r-services 항목을 제거합니다. inetd나 xinetd가 띄우는 rsh, rlogin, rexec는 스크립트가 멈추지 않습니다. 거기서 항목을 지우십시오.
@@ -1160,7 +1246,7 @@ fix_muster_service_rservices_disabled() {
 fix_muster_service_rservices_disabled
 [ "$?" -eq 0 ] || failed=$((failed+1))
 
-# ---- 26/32 muster.service.tftp_talk_disabled [risk restart_service] [fail, high]
+# ---- 28/35 muster.service.tftp_talk_disabled [risk restart_service] [fail, high]
 # why: clause does not hold
 # do:  Stop and disable the tftp and talk (and ntalk) services or sockets and remove their inetd/xinetd entries. A tftp, talk or ntalk started by inetd or xinetd is not stopped by the script; remove its entry there.
 # ko:  tftp 와 talk(ntalk 포함) 서비스·소켓을 중지·비활성화하거나 inetd/xinetd 의 해당 항목을 제거합니다. inetd나 xinetd가 띄우는 tftp, talk, ntalk는 스크립트가 멈추지 않습니다. 거기서 항목을 지우십시오.
@@ -1199,7 +1285,7 @@ fix_muster_service_tftp_talk_disabled() {
 fix_muster_service_tftp_talk_disabled
 [ "$?" -eq 0 ] || failed=$((failed+1))
 
-# ---- 27/32 muster.beyond.ip_forwarding_disabled [risk restart_service] [fail, medium]
+# ---- 29/35 muster.beyond.ip_forwarding_disabled [risk restart_service] [fail, medium]
 # why: clause does not hold
 # do:  Write net.ipv4.ip_forward = 0 into /etc/sysctl.d/99-muster-ip-forwarding-disabled.conf and apply it with sysctl --system; it takes effect at once. Check first that the host is not a router, VPN gateway or container host - turning forwarding off there cuts its clients and containers off the network; such a host names 1 in params.allowed_forward instead; writing 0 cuts forwarding at once on a router or a container host. The kernel resets net.ipv4.conf.all.accept_redirects whenever forwarding changes, so the review script puts back the value it read before the write and keeps it in the file only when that value is 0. A value set in /etc/sysctl.conf, or in a sysctl.d file that sorts after 99-muster-ip-forwarding-disabled.conf, still wins at boot; correct it there. The review script never follows a symlink; a 99-muster-ip-forwarding-disabled.conf that is a symlink (a mask) is left as is and the block stops.
 # ko:  /etc/sysctl.d/99-muster-ip-forwarding-disabled.conf 에 net.ipv4.ip_forward = 0 을 적고 sysctl --system 으로 적용합니다. 즉시 반영됩니다. 먼저 호스트가 라우터, VPN 게이트웨이, 컨테이너 호스트가 아닌지 확인하십시오. 그런 호스트에서 포워딩을 끄면 클라이언트와 컨테이너가 네트워크에서 끊기므로, 대신 params.allowed_forward 에 1 을 적습니다. 0을 쓰면 라우터나 컨테이너 호스트의 포워딩이 바로 끊깁니다. 커널은 포워딩이 바뀔 때마다 net.ipv4.conf.all.accept_redirects 를 다시 설정하므로, 검토 스크립트는 쓰기 전에 읽은 값을 되돌려 놓고 그 값이 0일 때만 파일에 남깁니다. /etc/sysctl.conf나 99-muster-ip-forwarding-disabled.conf 뒤에 정렬되는 sysctl.d 파일에 둔 값이 부팅 때 여전히 이기므로 그 파일을 고치십시오. 검토 스크립트는 심볼릭 링크를 따라가지 않으므로, 심볼릭 링크(마스크)인 99-muster-ip-forwarding-disabled.conf 는 그대로 두고 그 블록을 멈춥니다.
@@ -1246,7 +1332,7 @@ fix_muster_beyond_ip_forwarding_disabled() {
 fix_muster_beyond_ip_forwarding_disabled
 [ "$?" -eq 0 ] || failed=$((failed+1))
 
-# ---- 28/32 muster.beyond.ipv6_forwarding_disabled [risk restart_service] [fail, medium]
+# ---- 30/35 muster.beyond.ipv6_forwarding_disabled [risk restart_service] [fail, medium]
 # why: clause does not hold
 # do:  Write net.ipv6.conf.all.forwarding = 0 and net.ipv6.conf.default.forwarding = 0 into /etc/sysctl.d/99-muster-ipv6-forwarding-disabled.conf and apply it with sysctl --system; they take effect at once. A router, VPN gateway or container host names 1 in params.allowed_forward instead - turning forwarding off there cuts its clients off. A value set in /etc/sysctl.conf, or in a sysctl.d file that sorts after 99-muster-ipv6-forwarding-disabled.conf, still wins at boot; correct it there. The review script never follows a symlink; a 99-muster-ipv6-forwarding-disabled.conf that is a symlink (a mask) is left as is and the block stops.
 # ko:  /etc/sysctl.d/99-muster-ipv6-forwarding-disabled.conf 에 net.ipv6.conf.all.forwarding = 0 과 net.ipv6.conf.default.forwarding = 0 을 적고 sysctl --system 으로 적용합니다. 즉시 반영됩니다. 라우터, VPN 게이트웨이, 컨테이너 호스트는 포워딩을 끄면 클라이언트가 끊기므로 대신 params.allowed_forward 에 1 을 적습니다. /etc/sysctl.conf나 99-muster-ipv6-forwarding-disabled.conf 뒤에 정렬되는 sysctl.d 파일에 둔 값이 부팅 때 여전히 이기므로 그 파일을 고치십시오. 검토 스크립트는 심볼릭 링크를 따라가지 않으므로, 심볼릭 링크(마스크)인 99-muster-ipv6-forwarding-disabled.conf 는 그대로 두고 그 블록을 멈춥니다.
@@ -1288,7 +1374,50 @@ fix_muster_beyond_ipv6_forwarding_disabled() {
 fix_muster_beyond_ipv6_forwarding_disabled
 [ "$?" -eq 0 ] || failed=$((failed+1))
 
-# ---- 29/32 muster.service.snmp_disabled [risk restart_service] [fail, medium]
+# ---- 31/35 muster.beyond.usb_storage_disabled [risk restart_service] [fail, medium]
+# why: clause does not hold
+# do:  Write install usb-storage /bin/false into a file under /etc/modprobe.d, for example /etc/modprobe.d/99-muster-usb-storage-disabled.conf, and rebuild the initramfs (the review script does not) so the setting applies during early boot as well. A vendor file whose install line for the module loads it wins over this one; the review script's validate then fails and the block rolls back. The review script never follows a symlink; a 99-muster-usb-storage-disabled.conf that is a symlink (a mask) is left as is and the block stops. Check first that the host does not boot or install from USB media and that no operational procedure depends on a USB device for backups or recovery, because those stop working immediately. A USB keyboard, mouse or serial adapter is unaffected — this is the mass-storage driver alone, not USB support.
+# ko:  /etc/modprobe.d 아래 파일(예를 들어 /etc/modprobe.d/99-muster-usb-storage-disabled.conf)에 install usb-storage /bin/false 를 적고, 초기 부팅 단계에도 적용되도록 initramfs 를 다시 만듭니다(검토 스크립트는 하지 않습니다). 모듈을 적재하는 install 줄을 둔 벤더 파일이 이 파일을 이기며, 그때 검토 스크립트의 validate가 실패해 블록이 롤백됩니다. 검토 스크립트는 심볼릭 링크를 따라가지 않으므로, 심볼릭 링크(마스크)인 99-muster-usb-storage-disabled.conf 는 그대로 두고 그 블록을 멈춥니다. USB 매체로 부팅하거나 설치하지 않는지, 백업이나 복구 절차가 USB 장치에 의존하지 않는지 먼저 확인하십시오. 그런 것들은 즉시 동작을 멈춥니다. USB 키보드·마우스·시리얼 어댑터에는 영향이 없습니다. 이것은 USB 지원 전체가 아니라 대용량 저장 장치 드라이버 하나입니다.
+fix_muster_beyond_usb_storage_disabled() {
+  MB="$MUSTER_BACKUP/blocks/fix_muster_beyond_usb_storage_disabled"; mkdir -p "$MB" || { log "muster.beyond.usb_storage_disabled: backup failed, nothing changed"; return 1; }
+  backup /etc/modprobe.d/99-muster-usb-storage-disabled.conf || { log "muster.beyond.usb_storage_disabled: backup failed, nothing changed"; return 1; }
+  save_modules usb-storage || { log "muster.beyond.usb_storage_disabled: backup failed, nothing changed"; return 1; }
+  ( set -e
+    f=/etc/modprobe.d/99-muster-usb-storage-disabled.conf
+    if [ -L "$f" ]; then log "muster.beyond.usb_storage_disabled: $f is a symlink (a mask), left as is"; exit 1; fi
+    mods='usb-storage'
+    for m in $mods; do
+      n=$(printf '%s' "$m" | tr - _)
+      case "$(modprobe --showconfig 2>/dev/null | awk -v m="$n" '$1 == "install" && $2 == m { print $3; exit }')" in
+        /bin/false|/bin/true|/usr/bin/false|/usr/bin/true|false|true) ;;
+        *) grep -q "^install $n " "$f" 2>/dev/null || printf 'install %s /bin/false\n' "$n" >> "$f";;
+      esac
+      if grep -q "^$n " /proc/modules; then modprobe -r -- "$n"; fi
+    done
+    if [ -f "$f" ]; then chmod 644 "$f"; fi
+  ); rc=$?
+  if [ "$rc" -ne 0 ]; then
+    log "muster.beyond.usb_storage_disabled: script failed (rc $rc), rolling back"
+    restore /etc/modprobe.d/99-muster-usb-storage-disabled.conf || log "muster.beyond.usb_storage_disabled: ROLLBACK INCOMPLETE, backups in $MUSTER_BACKUP"
+    restore_modules usb-storage || log "muster.beyond.usb_storage_disabled: ROLLBACK INCOMPLETE, backups in $MUSTER_BACKUP"
+    return 1
+  fi
+  # validate
+  ( set -e
+    mods='usb-storage'; for m in $mods; do n=$(printf '%s' "$m" | tr - _); case "$(modprobe --showconfig 2>/dev/null | awk -v m="$n" '$1 == "install" && $2 == m { print $3; exit }')" in /bin/false|/bin/true|/usr/bin/false|/usr/bin/true|false|true) ;; *) exit 1;; esac; ! grep -q "^$n " /proc/modules || exit 1; done
+  ); rc=$?
+  if [ "$rc" -ne 0 ]; then
+    log "muster.beyond.usb_storage_disabled: validate failed, rolling back"
+    restore /etc/modprobe.d/99-muster-usb-storage-disabled.conf || log "muster.beyond.usb_storage_disabled: ROLLBACK INCOMPLETE, backups in $MUSTER_BACKUP"
+    restore_modules usb-storage || log "muster.beyond.usb_storage_disabled: ROLLBACK INCOMPLETE, backups in $MUSTER_BACKUP"
+    return 1
+  fi
+  log "muster.beyond.usb_storage_disabled: done"
+}
+fix_muster_beyond_usb_storage_disabled
+[ "$?" -eq 0 ] || failed=$((failed+1))
+
+# ---- 32/35 muster.service.snmp_disabled [risk restart_service] [fail, medium]
 # why: clause does not hold
 # do:  Stop and disable the SNMP agent (systemctl disable --now snmpd.service) unless it is required, in which case harden it under the U-59/U-60/U-61 controls.
 # ko:  SNMP 에이전트가 필요하지 않다면 중지·비활성화하고 (systemctl disable --now snmpd.service), 필요하다면 U-59/U-60/U-61 점검에 따라 강화합니다.
@@ -1327,7 +1456,7 @@ fix_muster_service_snmp_disabled() {
 fix_muster_service_snmp_disabled
 [ "$?" -eq 0 ] || failed=$((failed+1))
 
-# ---- 30/32 muster.service.telnet_disabled [risk restart_service] [fail, medium]
+# ---- 33/35 muster.service.telnet_disabled [risk restart_service] [fail, medium]
 # why: clause does not hold
 # do:  Stop and mask the telnet socket and service, or remove the telnet server package; use SSH instead. A telnet started by inetd or xinetd is not stopped by the script; remove its entry there.
 # ko:  telnet 소켓과 서비스를 중지·mask 하거나 telnet 서버 패키지를 제거하고, 대신 SSH 를 사용합니다. inetd나 xinetd가 띄우는 telnet은 스크립트가 멈추지 않습니다. 거기서 항목을 지우십시오.
@@ -1366,7 +1495,7 @@ fix_muster_service_telnet_disabled() {
 fix_muster_service_telnet_disabled
 [ "$?" -eq 0 ] || failed=$((failed+1))
 
-# ---- 31/32 muster.account.root_remote_login [risk lockout_risk] [fail, high]
+# ---- 34/35 muster.account.root_remote_login [risk lockout_risk] [fail, high]
 # keep a second session open; a lockout here needs console access
 # why: clause does not hold
 # do:  Set PermitRootLogin no in /etc/ssh/sshd_config.d/00-muster.conf, validate with sshd -t, then restart sshd while keeping a second session open. Where /etc/securetty lists pts/* entries instead, remove those lines so no pseudo-terminal can be used for a securetty-gated root login. sshd keeps the first value it reads: a drop-in that sorts before 00-muster.conf, or a PermitRootLogin line before the Include in sshd_config, still wins. The script reloads a running sshd; a Match block that sets PermitRootLogin for root also wins, and the validate then fails and rolls back.
@@ -1424,7 +1553,7 @@ fix_muster_account_root_remote_login() {
 fix_muster_account_root_remote_login
 [ "$?" -eq 0 ] || failed=$((failed+1))
 
-# ---- 32/32 muster.service.nis_disabled [risk lockout_risk] [fail, high]
+# ---- 35/35 muster.service.nis_disabled [risk lockout_risk] [fail, high]
 # keep a second session open; a lockout here needs console access
 # why: clause does not hold
 # do:  Stop and disable ypserv and ypbind (systemctl disable --now ypserv.service ypbind.service) and remove nis/nisplus from the passwd and group lines of /etc/nsswitch.conf. On a host whose accounts come from NIS, stopping ypbind cuts those accounts off; change nsswitch first.

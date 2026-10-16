@@ -3,6 +3,7 @@
 package remedy
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -351,6 +352,189 @@ func TestSysctlBodiesLeaveASymlinkedDropIn(t *testing.T) {
 				if failing[k] != v {
 					t.Errorf("wrote %s although the drop-in is a mask", w)
 				}
+			}
+		})
+	}
+}
+
+// moduleIDs are the three controls that declare modules.
+var moduleIDs = []string{"muster.beyond.usb_storage_disabled", "muster.beyond.uncommon_filesystems_disabled", "muster.beyond.uncommon_network_protocols_disabled"}
+
+// moduleRebase moves /etc/modprobe.d/ under st/conf (where the stub's
+// --showconfig reads) and /proc/modules to st/modules (the stub's loaded set).
+func moduleRebase(st string) func(string) string {
+	return func(s string) string {
+		return strings.ReplaceAll(strings.ReplaceAll(s, "/etc/modprobe.d/", filepath.Join(st, "conf")+"/"), "/proc/modules", filepath.Join(st, "modules"))
+	}
+}
+
+// moduleState makes the stub's state directory: an empty conf/ and every
+// module of the control loaded.
+func moduleState(t *testing.T, r *controls.Remediation) (bin, st, loaded string) {
+	t.Helper()
+	bin, st = t.TempDir(), t.TempDir()
+	writeStub(t, bin, "modprobe", modprobeStub)
+	if err := os.Mkdir(filepath.Join(st, "conf"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	var b strings.Builder
+	for _, m := range r.Modules {
+		fmt.Fprintf(&b, "%s 16384 0 - Live 0x0\n", strings.ReplaceAll(m, "-", "_"))
+	}
+	if err := os.WriteFile(filepath.Join(st, "modules"), []byte(b.String()), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return bin, st, b.String()
+}
+
+func TestModuleBodiesWriteFoldedLinesAndUnload(t *testing.T) {
+	needSh(t)
+	for _, id := range moduleIDs {
+		t.Run(id, func(t *testing.T) {
+			r := shippedControl(t, id).Remediation
+			bin, st, loaded := moduleState(t, r)
+			rebase := moduleRebase(st)
+			procModules := rebase("/proc/modules")
+			env := "MODPROBE_STATE=" + st
+			for run := 1; run <= 2; run++ { // the second run changes nothing
+				if out, code := runBody(t, st, bin, rebase(r.Script), env); code != 0 {
+					t.Fatalf("run %d: body %d %s", run, code, out)
+				}
+				if out, code := runBody(t, st, bin, rebase(r.Validate), env); code != 0 {
+					t.Fatalf("run %d: validate %d %s", run, code, out)
+				}
+			}
+			conf, _ := os.ReadFile(rebase(r.Backup[0]))
+			for _, m := range r.Modules {
+				line := "install " + strings.ReplaceAll(m, "-", "_") + " /bin/false\n"
+				if strings.Count(string(conf), line) != 1 {
+					t.Errorf("conf carries %q %d times:\n%s", line, strings.Count(string(conf), line), conf)
+				}
+			}
+			if m := mode(t, rebase(r.Backup[0])); m != "644" {
+				t.Errorf("the drop-in is mode %s, want 644", m)
+			}
+			if left, _ := os.ReadFile(procModules); len(strings.TrimSpace(string(left))) != 0 {
+				t.Errorf("modules still loaded: %s", left)
+			}
+			// a module in use fails the body, so the block rolls back
+			if err := os.WriteFile(procModules, []byte(loaded), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(st, "busy"), nil, 0o644); err != nil {
+				t.Fatal(err)
+			}
+			if _, code := runBody(t, st, bin, rebase(r.Script), env); code == 0 {
+				t.Error("a module in use did not fail the body")
+			}
+		})
+	}
+}
+
+// S-25: an earlier vendor file that already disables a module with any of
+// the collector's no-op commands is the effective install line; the body adds
+// no line of its own for that module and the validate accepts it. A vendor
+// line that loads the module wins over muster's file, and the validate fails.
+func TestModuleBodiesKeepAVendorInstallLine(t *testing.T) {
+	needSh(t)
+	r := shippedControl(t, "muster.beyond.uncommon_filesystems_disabled").Remediation
+	for _, tc := range []struct {
+		vendor string
+		ok     bool
+	}{
+		{"install cramfs /bin/true\n", true},
+		{"install cramfs false\n", true},
+		{"install cramfs /sbin/modprobe --ignore-install cramfs\n", false},
+	} {
+		t.Run(tc.vendor, func(t *testing.T) {
+			bin, st, _ := moduleState(t, r)
+			rebase := moduleRebase(st)
+			if err := os.WriteFile(filepath.Join(st, "conf", "00-vendor.conf"), []byte(tc.vendor), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			env := "MODPROBE_STATE=" + st
+			if out, code := runBody(t, st, bin, rebase(r.Script), env); code != 0 {
+				t.Fatalf("body %d %s", code, out)
+			}
+			_, code := runBody(t, st, bin, rebase(r.Validate), env)
+			if (code == 0) != tc.ok {
+				t.Errorf("validate exit %d, want success %v", code, tc.ok)
+			}
+			conf := readFile(t, rebase(r.Backup[0]))
+			if tc.ok == strings.Contains(conf, "install cramfs ") {
+				t.Errorf("muster's drop-in, with the vendor line %q:\n%s", tc.vendor, conf)
+			}
+			if !strings.Contains(conf, "install udf /bin/false\n") {
+				t.Errorf("the drop-in lacks the other modules:\n%s", conf)
+			}
+		})
+	}
+}
+
+// S-27: a drop-in that is a symlink (an operator's mask) fails the whole
+// block before any write; the link, its target's mode and content stay, and
+// no module is unloaded.
+func TestModuleBodiesLeaveASymlinkedDropIn(t *testing.T) {
+	needSh(t)
+	set, err := controls.LoadDefault()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range moduleIDs {
+		t.Run(id, func(t *testing.T) {
+			c, _ := set.ByID(id)
+			tmp := t.TempDir()
+			bin, st, loaded := moduleState(t, c.Remediation)
+			rebase := moduleRebase(st)
+			p := mustBuild(t, scriptReport(row(id, "FAIL", "clause does not hold", "", importanceSeverity[c.Importance])), set, Options{})
+			if len(p.Items) != 1 || !p.Items[0].Script || !p.Items[0].Planned {
+				t.Fatalf("plan %+v, want one planned scripted item", p.Items)
+			}
+			it := &p.Items[0]
+			for i := range it.Backup {
+				it.Backup[i] = rebase(it.Backup[i])
+			}
+			it.ScriptBody, it.ValidateCmd = rebase(it.ScriptBody), rebase(it.ValidateCmd)
+			victim := filepath.Join(tmp, "victim")
+			if err := os.WriteFile(victim, []byte("victim\n"), 0o666); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Chmod(victim, 0o666); err != nil {
+				t.Fatal(err)
+			}
+			link := it.Backup[0]
+			if err := os.Symlink(victim, link); err != nil {
+				t.Fatal(err)
+			}
+			out, _, code := runScriptWith(t, p, tmp, filepath.Join(tmp, "bk"), runOpts{
+				pathPrefix: bin, env: []string{"MODPROBE_STATE=" + st},
+				replace: [][2]string{{"/proc/modules", rebase("/proc/modules")}},
+			})
+			if code == 0 {
+				t.Fatalf("the block over a symlinked drop-in exited 0\n%s", out)
+			}
+			if !strings.Contains(out, id+": "+link+" is a symlink (a mask), left as is") {
+				t.Errorf("no symlink refusal in the log\n%s", out)
+			}
+			if got, err := os.Readlink(link); err != nil || got != victim {
+				t.Errorf("the drop-in is %q (%v) after the block, want the link to %s", got, err, victim)
+			}
+			if m := mode(t, victim); m != "666" {
+				t.Errorf("the link's target is mode %s, want 666", m)
+			}
+			if got := readFile(t, victim); got != "victim\n" {
+				t.Errorf("the link's target holds %q", got)
+			}
+			// restore_modules may load a recorded module again (the stub then
+			// lists it twice); every module must still be in the loaded set
+			got := readFile(t, rebase("/proc/modules"))
+			for _, l := range strings.SplitAfter(loaded, "\n") {
+				if !strings.Contains(got, l) {
+					t.Errorf("%q left the loaded set: %q", l, got)
+				}
+			}
+			if calls, _ := os.ReadFile(filepath.Join(st, "calls")); strings.Contains(string(calls), "-r ") {
+				t.Errorf("modprobe -r ran although the drop-in is a mask:\n%s", calls)
 			}
 		})
 	}
