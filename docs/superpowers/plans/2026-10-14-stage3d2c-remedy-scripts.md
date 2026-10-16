@@ -3013,4 +3013,18 @@ The branch's first CI run is the runner row's proof; until it is green, Task 9 i
 - The blocking ones: the runner's id-equality check could never hold (S-18); `record()`'s duplicate mode lines (S-19); the poison sentinel already in the hash (S-20); a `gte` glob that accepts `1` (S-21); SC2043 on the one-module loop (S-22); the bare-stat assertion catching two of its own task's validates (S-23).
 - Probe surprises folded: no authselect configuration on the EL images (S-29), no `/etc/pam.d/passwd` on rocky9 (S-29), Debian 12 without `pam_umask` and EL9 without `PASS_MIN_LEN` (S-44), `ipv6 all.forwarding` copying into `default.forwarding` (S-46).
 
-(Rulings settled during execution, review findings and the lab and CI runs go here as the tasks land.)
+### Rulings settled during execution (S-47 …)
+
+- **S-47** (Task 7 review, Important) `log_dir_permissions` and `cron_permissions`' at-spool pass change files only inside a directory `modes_trusted "$d/." 0` accepts, walking parents by shell glob; an untrusted directory is logged and left to the operator, and the validate checks the same set (a non-root owner of a `/var/log/<dir>` could otherwise swap a file for a symlink between `find`'s type test and `chmod`).
+- **S-48** (final review, critic) `password_policy`'s ageing loop skips uid 0, with a log line: an expired root password stops root's cron and at jobs, so root's ageing is the operator's. The text says any account's cron and at jobs stop once its password expires. (A first version dropped the loop; the fixer showed the check judges the effective ageing over every hashed account, `accounts.login_defs.pass_max_days` being `default_on: both`, so the control could never have passed — withdrawn.)
+- **S-49** (final review) A system crontab or sudoers file not owned by root is never chowned or re-moded: cron and sudo ignore it, and adopting it would activate content another user wrote. The body logs it, the validate fails and the block rolls back.
+- **S-50** (final review) `cron_permissions` and `audit_log_permissions` fix their directories first and gate every file pass on `modes_trusted`, as S-47 does.
+- S-21's premise was wrong (a glob `[1-9][0-9]*` needs two characters); the new arms stay as a clarity edit. `ipv6_forwarding_disabled` is left out of the one-write-per-key count (S-46). Built-in modules end `done` with the control FAIL. `reverse_path_filtering` is `restart_service`. Task 8 upgraded two minors to fixes (key case, the expiry-day `-ge`); a created `faillock.conf` is 0644.
+
+### What the reviews found
+
+- **Task reviews.** Tasks 2–6 approved on the first review. Task 7: one fix round (S-47). Task 8: one fix round (faillock mode, key case, expiry day). Task 9: one fix round (a broken round-trip floor line in the `test` job, C collation, `grep -F`, clear runner seed errors). The Task 4 review fell back from Fable to Opus on a usage limit.
+- **Whole branch.** One workflow, 51 agents (seven lenses, three refuters per finding, a minor triage over 41 deferred minors, a critic): 14 survivors (1 blocking — SC2002 under CI's shellcheck 0.9.0, which the lab's newer image missed; 3 important), 0 refuted, 5 triaged minors to fix, 2 critic findings. One fix wave.
+- **Lessons.** Pin the lab's shellcheck image to CI's version (`koalaman/shellcheck-alpine:v0.9.0`); `bash -n` cannot see a missing `]`. Three NFS-serving init containers on one host kernel interfere — run the harness rows one at a time.
+
+(The lab and CI runs go here as they land.)
