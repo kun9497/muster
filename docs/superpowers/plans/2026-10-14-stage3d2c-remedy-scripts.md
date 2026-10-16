@@ -22,8 +22,9 @@
 - Nothing in the Go suite touches the host's sysctls, modules, accounts or sshd: the helper and body tests run against stub `sysctl`, `modprobe`, `chage`, `sshd` and `systemctl` first on `PATH`, with every absolute path rebased under `t.TempDir()`.
 - Documents are English canonical with the `.ko.md` pair in the same commit where a pair exists. `THREAT_MODEL.md`, `CHANGELOG.md` and `examples/README.md` have no pair. Identifiers stay English.
 - Commits use the personal identity (pinned) and the trailer `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. Never push, amend, rebase or stash.
-- From Task 5 on, the control set's digest changes and the examples gate (`TestExamplesLoadAndCheck`) skips its byte comparison with a note (G-24). The merge-step refresh re-pins the examples. Tasks 3–4 change only `internal/remedy` while the set is unchanged, so the gate compares bytes there and goes red on the fix-report examples; that is expected and quoted once in each of those task reports (T-19 precedent), never "fixed" by editing `examples/`.
-- On Windows the `needSh`/Linux tests and `internal/collect/...` do not run; each task that adds one runs it on the lab (`lab-sync.sh` then `lab-run.sh 'cd /root/muster && go test ./internal/remedy/ -run <name>'`, as root for the root-only ones) and quotes the output.
+- From Task 3 on, the control set's digest changes (Task 3 bumps `controls/VERSION`, which the digest hashes; S-37) and the examples gate (`TestExamplesLoadAndCheck`) skips its byte comparison with a note (G-24). Every commit is green; the merge-step refresh re-pins the examples, which are never hand-edited.
+- On Windows the `needSh`/Linux tests and `internal/collect/...` do not run; each task that adds one runs it on the lab (`bash C:/Users/ssk/muster-lab/lab-sync.sh <worktree>` then `bash C:/Users/ssk/muster-lab/lab-run.sh 'go test ./internal/remedy/ -run <name>'`, as root for the root-only ones) and quotes the output. `lab-sync` puts the tree at `/root/muster-dev` and `lab-run` already runs there (S-28); there is no `/root/muster`.
+- Every body that is planned with a script at stock on a round-trip row (probe.md's per-row list) must end `done` there, even where the control stays FAIL: the repair run's script exits non-zero otherwise and the row goes red (S-44).
 
 ## Rulings carried from the code map (the spec as built)
 
@@ -45,13 +46,47 @@
 - **S-16** Remedy fixtures gain `muster.test.h_params` (an `int` and a `list<string>` `script_params`), `muster.test.i_state` (`modes`, `sysctl`, `modules`), `muster.test.j_absent` (`script_on_absent`) and `muster.test.k_both` (`backup` + `sysctl`). `fullPlan` gains rows for `h_params` and `i_state`; `poisonControls` gains `muster.test.p_params`.
 - **S-17** Documents: `THREAT_MODEL.md` has no pair; the §6.2 sentence loses "outside `/muster-units`"; §7.5's "proven on throwaway containers" and D34's "independent" are reworded; the CHANGELOG 10.14 Controls paragraph names the one default reorder (Task 10).
 
+## Rulings from the pre-flight and the probe (S-18 …)
+
+One fresh-review workflow over this plan (183 agents: eight lenses, three refuters per finding, a critic; 58 findings, 57 survived, 1 refuted, 4 critic findings; digest in the workspace `preflight.md` / `preflight-slim.md`) and Task 1's probe (`probe.md`). Each ruling below is folded into the task it names; where a task's text and a ruling disagree, the ruling wins.
+
+- **S-18** (blocking, runner) The runner's repair plan carries every stock-FAIL scripted control, not only the seeded ones (`hosts_permissions`, `shadow_permissions` today). `runner.sh` therefore also puts back the runner's stock modes of those paths (`chmod 644 /etc/hosts; chgrp shadow /etc/shadow; chmod 640 /etc/shadow`), both ids join the runner's `seeded`, and the host-row id check is two checks: every seeded id is a planned scripted item of the failure plan, and the failure plan's scripted ids are a subset of the repair plan's (`comm -13` empty). Equality is dropped: a stock-FAIL control whose body leaves the control FAIL (`log_dir_permissions` on the runner) is in both plans anyway, and one the repair fixed and the seed does not undo would otherwise break the row. Spec §5 and E-12 are corrected in Task 10.
+- **S-19** (blocking, CI) `record()`'s modes block ends `done | sort -u`: two entries that expand to the same path (`/var/spool/cron/*` and `/var/spool/cron/crontabs`; `audit_log` and `log_dir` on the runner) print one line, so `same()` cannot report a false difference.
+- **S-20** (blocking, Task 4) The `p_params` poison carries its own sentinel `'; uname -a; '`, which `poisonHash` does not contain; `TestScriptEveryLineIsTemplateBodyOrComment`'s new check and `TestJSONCarriesNoUnsafeParameter` assert on that sentinel, and the JSON test first asserts the `p_params` item is `params_unsafe` (so the row reached the plan). `poisonHash` is unchanged.
+- **S-21** (blocking, Task 5) A `gte N` arm is a shell glob, so `[1-9][0-9]*` matches `1`. The arms for `gte 2` are `[2-9]|[1-9][0-9]|[1-9][0-9][0-9]*`; `armsOf` builds that string, and spec §4.1 is corrected (Task 10). The stub-based test seeds `perf_event_paranoid` at `1` (fails) and `10` (passes).
+- **S-22** (blocking, Task 6) A literal one-word `for` list is shellcheck SC2043. Every module body and validate opens with `mods='<where list>'` and loops `for m in $mods; do`; `TestModuleScriptsNameTheControlsModules` pins the `mods='…'` assignment (the where list, space-joined) and the `for m in $mods; do` line in both fields.
+- **S-23** (blocking, Task 7) S-8's "no other bare stat case" assertion flags only a validate that is one stat `case` and nothing else: `v := strings.TrimSpace(r.Validate)`; flag when `strings.HasPrefix(v, `case "$(stat -c `)`, `strings.HasSuffix(v, "esac")`, `strings.Count(v, "esac") == 1` and `v` contains neither ` && ` nor ` || `. The case-plus-find validates of `sudoers_permissions` and `audit_log_permissions` are outside the owner table on purpose.
+- **S-24** (Task 4) `restore_modes`, per recorded entry: (1) skip an entry whose current `stat -c '%u %g %a'` and type equal the record (no chown that would clear `security.capability`); (2) refuse — log `restore_modes: <p> is under a directory others can write, left as is`, `mrc=1` — an entry with any ancestor directory up to `/` that is not root-owned or is other-writable, and an entry whose recorded uid is not 0 when its parent is group- or other-writable (its owner could swap it, sticky bit or not); a root-owned, group-writable ancestor (Ubuntu's `root:syslog 0775 /var/log`) is accepted, and THREAT_MODEL says the group of such a directory is trusted with the paths under it, the trust the host already gives it; (3) otherwise the existing symlink/type refusals, then `chown -h` and `chmod`. A refusal leaves the body's stricter mode in place (fail closed). Because (1) comes first, a block whose body changed nothing (the runner's `log_dir`) restores nothing and stays complete, and the runner's `audit_log` (root-owned entries under `/var/log`) restores. The rule is its own prologue helper `modes_trusted <path> <uid>` (after `restore_modes` in the prologue order and in `TestScriptPrologueOrder`'s list). `t.TempDir()` lives under the other-writable `/tmp`, so the record/restore tests that are not about trust redefine `modes_trusted() { return 0; }` after sourcing the helpers; the trust cases are a root-only test `TestModesHelpersTrustRule` (skip unless euid 0; the `collect-root` job's "sudo-run linux tests" step runs the whole `./internal/remedy/` package as root, `ci.yml:181`, and the lab run is as root) over a tree under `os.MkdirTemp("/", "muster-trust-")`: an other-writable parent, a non-root-owned grandparent, and a uid-1000 entry in a group-writable sticky parent (left as is, exit 1); a root-owned entry under a root-owned group-writable parent (restored, exit 0). The other tests: a recorded file replaced by a directory (`changed type, left as is`, exit 1); an unrestorable row (rewrite one row's uid to 0 when not root, `t.Skip` as root; the loop continues past it). Spec §3's sentence states the ancestor rule (Task 10).
+- **S-25** (Task 6) The module validate accepts the collector's whole `installNoops` set (`/bin/false|/bin/true|/usr/bin/false|/usr/bin/true|false|true`, `modules.go:55-58`) for the effective first `install` line, and the body appends its own line only for a module whose effective install is not already one of them (E-8). The stub gains a case with an earlier conf file carrying `install cramfs /bin/true` (exit 0, no rollback, no muster line for cramfs). The texts narrow "a vendor file" to "a vendor file whose install line for the module loads it".
+- **S-26** (Task 7) `cron_permissions`' access-file pass: when the file's gid is 0, `chgrp crontab` `/etc/cron.allow`/`/etc/cron.deny` if `getent group crontab` succeeds, and `chgrp daemon` `/etc/at.allow`/`/etc/at.deny` only when `at` is setgid `daemon` (EL has a `daemon` group but a setuid-root `at`, so its files keep group root; Debian's setgid `crontab`/`at` read them without root); the control judges owner and mode, not group, so the validate is unchanged. The four files are in the control's `modes` record (uid/gid/mode), so a failure restores the group too. The text says so (EN/KO).
+- **S-27** (Tasks 5, 6, 8) A body that writes a muster-owned drop-in (`/etc/sysctl.d/99-muster-*.conf`, `/etc/modprobe.d/99-muster-*.conf`, `/etc/security/pwquality.conf.d/99-muster.conf`, `/etc/ssh/sshd_config.d/00-muster-session.conf`) and finds that path a symlink (an operator's `/dev/null` mask, K-21) logs `<id>: <f> is a symlink (a mask), left as is` and fails the block before any write (`exit 1` in the body subshell). Every rollback that removes the drop-in (`rm -f`) skips a symlink (`[ -L "$f" ] || rm -f "$f"`). Tests per family: the drop-in is a symlink to a 0666 temp file; the block exits non-zero; the link, its target's mode and content are unchanged after the whole block. The texts say the review script never follows a symlink.
+- **S-28** (all lab steps) `/root/muster-dev` everywhere; the shellcheck image mounts `-v /root/muster-dev:/mnt`.
+- **S-29** (probe; Task 9) EL init images have no `local` authselect profile and no selected configuration (`enable-feature` exits 2, "No existing configuration detected"). The EL seed installs `sudo cronie rsyslog vsftpd authselect passwd` (`passwd` brings `/etc/pam.d/passwd`, without which every pwquality fact is absent on rocky9) and runs `authselect select minimal with-faillock --force` (stacks `pam_faillock` preauth/authfail/account and keeps `pam_pwquality`), then `deny = 99` in `/etc/security/faillock.conf`.
+- **S-30** (Tasks 5, 7) Two string-scan tests over the embedded set in `internal/controls` (they run on Windows): `TestShippedBodiesPlaceParametersSafely` (Task 5; no Script/Validate/Rollback line, trimmed, starts with `$P_`, `${P_`, `"$P_` or `"${P_`, and no `sed` `s/` expression carries `P_`), and `TestShippedFindsCarryATypePredicate` (Task 7; a `find` with `-exec chmod`/`-exec chown` carries `! -type l` or `-type f`/`-type d`). Each is shown red by a temporary edit (strip a `-type f`; rewrite one sed to `s/…$P_x/`).
+- **S-31** (Task 10) Spec §4.4's last sentence ("the init rows' failure run asserts the reload happened after the removal") becomes "the rollback text fixes the order; the failure run proves the files are restored, not the daemon's reload". No journal check is added.
+- **S-32** (Task 1) E-13's side-effect survey is measured on the lab in a throwaway network namespace (`unshare -n`) for the net.* keys, from stock and from forwarding on; the global kernel.*/fs.* keys are not written anywhere and are recorded as uncoupled with the reason. Any coupling found enters the companion maps of Task 5 before it is dispatched (probe.md, "Sysctl coupling").
+- **S-33** (Task 10) The spec corrections also cover: `sudoers_permissions` is container-only (the job's own `sudo` reads `/etc/sudoers`; dropped from §5's runner seed row and the table's `runner` cell); the mask-derivation test covers the masks derived from `allowed_modes` (syslog, cron); cron installed on debian12-init and ubuntu2204 and the round-trip floor 6 (S-15); the failure-order test checks rollback and the four record restores, `restore_units` separately (units exclude the record kinds); S-18's id checks; S-21's arms; S-24's ancestor rule; K2's rollback order (S-35); the at-spool chmod (S-40); the `backup`/`modes` rule wording (S-38); and every other S ruling that departs from the spec, one sentence each, EN and KO.
+- **S-34** (Task 1) The probe ran `muster collect` and `check` inside each container after the package additions and after the seeds (the critic's K1 is met as executed); Step 1's text says so.
+- **S-35** (Task 8) `session_timeout`'s rollback puts the recorded drop-in back itself before the reload: `f=/etc/ssh/sshd_config.d/00-muster-session.conf; if [ -L "$f" ]; then :; elif [ -e "$MB/files$f" ]; then cp -a "$MB/files$f" "$f"; else rm -f "$f"; fi`, then `sshd -t` and the reload of a running `sshd`/`ssh`. The later `restore` is then a no-op for that path, and the daemon never runs a configuration its files do not hold, also when an earlier run's drop-in existed. A Go case starts with a pre-existing drop-in (ClientAliveInterval 300) and a forced validate failure: the file is the 300 version after the block and the stub `systemctl` saw the reload after the copy. E-11's wording is corrected (Task 10).
+- **S-36** (Task 9) When the failure plan scripts `muster.account.password_policy`, `record()` adds `x awk -F: 'NF >= 8 && $1 !~ /^#/ && $1 != "" { print "ageing", $1, $4, $5 }' /etc/shadow` (name, min, max; never field 2). The job's header comment names the ageing comparison.
+- **S-37** (Task 3) `controls/VERSION` → `kisa-unix-2026+2026.10.14` moves from Task 5 to Task 3 (the digest hashes the VERSION bytes, `load.go`), so the examples gate skips from Task 3 on and no commit is red; T-21's "red and quoted" practice is not used on this branch.
+- **S-38** (Task 10) The CONTRIBUTING/spec rule reads "a path a daemon or the system writes to while the block runs (a live log) is a `modes` entry, never a `backup`"; a path a body only re-modes may use either. The six re-mode-only `backup` paths of Task 7 stay.
+- **S-39** (Task 7) `audit_log_permissions`' validate guards its file half (`{ [ ! -f /var/log/audit/audit.log ] || [ -L /var/log/audit/audit.log ] || case … esac; } && <dir clause>`), so a host whose `log_file` names another file ends `done` with the control still FAIL, as spec §4.3 says. The texts (EN/KO) of `audit_log_permissions` and `ftpusers_permissions` say a file named elsewhere (auditd.conf `log_file`; vsftpd `userlist_file` or a pam_listfile `file=` outside the five literals) is the operator's to fix.
+- **S-40** (Task 7) The at-spool pass is `chmod u-s,g-wxs,o-rwxt` (keeps `u+x`, at's runnable mark; clears `u+s`, which the `/7037` validate forbids). The temp-tree case seeds an atjobs file at 04700 and expects 0700. Spec §4.3 corrected (Task 10).
+- **S-41** (Task 8) `lockout_threshold`: the body reads `v=$(awk … "$fc" 2>/dev/null) || v=` and the validate reads `cat /etc/security/faillock.conf 2>/dev/null | awk …`, so a missing file is `deny = 3` on both sides (S-9). A missing-file case in `TestLineBodiesTightenOnly`: `max >= 3` creates no file and validates; `max < 3` creates the file with `deny = <max>`.
+- **S-42** (Task 8) `password_policy`'s ageing scan adds `$1 != ""` and skips, with a log line and before anything is recorded, a name `/etc/passwd` does not hold (`awk -F: -v n="$name" '$1 == n { f = 1 } END { exit !f }' /etc/passwd`). Its text (EN/KO) warns that an account with a hash that logs in by key only is made to change its password once the maximum age passes. A fixture row: a hashed shadow line with no passwd entry — no chage call for it, exit 0.
+- **S-43** (Task 5) The forwarding body persists the companion `net.ipv4.conf.all.accept_redirects` line only when the value it read before the write is 0 (a persisted 1 would override `icmp_redirects_ignored`'s earlier-sorting file at boot). The stub emulates the kernel's flip (a changing write to `net.ipv4.ip_forward` sets `all.accept_redirects` to its negation), so a body that reads the companion after the write goes red; a case with the companion at 1 asserts the drop-in holds the ip_forward line alone.
+- **S-44** (probe; Tasks 7, 8, 9) What the containers showed: `umask_policy` cannot PASS on debian12-init (Debian 12 stacks no `pam_umask`), so it leaves that row's images but is still planned there at stock and must end `done`; `password_policy` is absent-fail on every row (EL9 `login.defs` has no `PASS_MIN_LEN`) and is planned only through `script_on_absent`, also on rows without pwquality — the body ends `done` there; `session_timeout` is planned on every row and ends `done` without sshd (S-11). `chmod 644 /etc/crontab`, `chmod 644 /etc/rsyslog.conf` and Debian's `/etc/ftpusers` seed lines change nothing (stock already FAILs) and are dropped. `probe.md`'s `_roundtrip.yaml` table and per-row `seeded` lists replace Task 9's hypothesis.
+- **S-45** (minor folds) Task 2: keep the only `script without validate` lint case; write the four lint cases that reach the new helpers first and run them red before the helpers exist; after Step 9 delete the `ValidModesEntry`/`ScriptParamValue` calls from `lintRemediation` once and confirm the lint cases go red. Task 3: `plan_test.go` imports `regexp` and `internal/controls`; the `h_params` "Bad" case needs no fixture change; `mustJSONItem`'s comment names `g_units` as item 0; only `full.json` gains the five fields. Task 4: the backup-failure blocker is a regular file `a` under `$MB/files<tmp>/` (`mkdir -p` then fails); `unitHelpers` has sixteen `$MUSTER_BACKUP/muster-units` occurrences and `grep -c muster-units internal/remedy/script.go` prints 0 before the commit. Task 5: "the two risk lines"; every sysctl text gains "A value set in /etc/sysctl.conf, or in a sysctl.d file that sorts after 99-muster-<name>.conf, still wins at boot; correct it there." (KO pair). Task 6: the module stub's `-r` exits 1 for a module that is not loaded; `uncommon_network_protocols_disabled`'s loaded-module sentence is reworded, not kept. Task 7: single-path symlink cases (S-27's pattern) for `nfs_export_access`, `bootloader_config_permissions` (grub2 path), `inetd_conf_permissions`, `syslog_conf_permissions`, `ftpusers_permissions`, `cron_permissions`' `cron.allow` — the body leaves the link, validate exits 0, the victim stays 0666. Task 8: no `script_test.go` edit (Task 5's derived count reaches 48); Step 5 uses the existing `pass-mutant-umask-027.json`; a no-sshd case and an active-`ssh.service` reload case for `session_timeout`. Task 9: the EL session seed writes its own `99-ci-session.conf` (so `99-ci.conf` keeps `PermitRootLogin yes`); ubuntu2204 needs no `policy-rc.d` (no init). Merge: the check reports and snapshots change by `controls_version`, `controls_digest`, the profile digest and `umask_policy`'s parameter order, and no status.
+- **S-46** (probe coupling; Task 5) Measured in throwaway network namespaces (288 writes, the host's values unchanged): besides `ip_forward` → `all.accept_redirects`, writing `net.ipv6.conf.all.forwarding` copies its value into `net.ipv6.conf.default.forwarding`; no other judged key moves, and the global kernel.*/fs.* keys and `net.core.bpf_jit_harden` were not written (taken as uncoupled). `ipv6_forwarding_disabled` writes both keys to the same value, so the repair is unaffected, but its `sysctl` list, the body's write order, the drop-in's line order and `restore_sysctl`'s pass keep `all` before `default`, and nothing may sort a `sysctl` list (sorting would also put `all.accept_redirects` before `ip_forward` and break S-43). The pin test asserts the forwarding controls' lists in that order, and a stub case restores `all=1, default=0` exactly (the stub copies `all.forwarding` into `default.forwarding` on a write, like the kernel). The runner's recorded state after seeding shows the copied values (`default.forwarding=1`, `all.accept_redirects=0`).
+
 ## Review Focus
 
-1. **A host already stricter than the default** (`perf_event_paranoid = 4`, `kptr_restrict = 2`, `PASS_MAX_DAYS 60`, `UMASK 077`, `deny = 3`, `ClientAliveInterval 120`) whose control FAILs on another key. The body writes nothing for the passing keys and the validate accepts the stricter value. (Task 5: the "stricter" cases of `TestSysctlBodiesWriteOnlyOutsideTheSet`; Task 8: the stricter rows of `TestAccountBodies`.)
+1. **A host already stricter than the default** (`perf_event_paranoid = 4`, `kptr_restrict = 2`, `PASS_MAX_DAYS 60`, `UMASK 077`, `deny = 3`, `ClientAliveInterval 120`) whose control FAILs on another key. The body writes nothing for the passing keys and the validate accepts the stricter value. (Task 5: the "stricter" cases of `TestSysctlBodiesWriteOnlyOutsideTheSet`; Task 8: the stricter cases of `TestPasswordPolicyBodyTightensOnly` — including a `PASS_MAX_DAYS 60` / `PASS_MIN_DAYS 2` / `PASS_MIN_LEN 12` login.defs that stays byte-identical — `TestLineBodiesTightenOnly` and `TestSessionTimeoutKeepsAValueInRange`.)
 2. **A host at a one-way value** (`unprivileged_bpf_disabled = 1`, `yama.ptrace_scope = 3`) failing only the companion key. The body never writes the one-way key, so the block succeeds. (Task 5: the stub `sysctl` refuses writes to a key marked one-way and the case asserts exit 0.)
 3. **A re-run with the same `MUSTER_BACKUP` after the path changed**: absent at run 1 then present (copied on run 2), and copied at run 1 then gone (no marker, the copy is restored). (Task 4: `TestBackupMarkerCases`.)
 4. **A recorded mode entry replaced by a symlink to `/etc/shadow` between record and failure.** `restore_modes` leaves it, logs it and the block reports `ROLLBACK INCOMPLETE`. (Task 4: `TestModesHelpersRefuseASwappedEntry`.)
-5. **A tuned value that cannot be carried** (`'; id; '`, an empty list). The item is text-only `params_unsafe`, and the value appears on no non-comment line and nowhere in the JSON. (Task 3: `TestPlanParamsUnsafe`; Task 4: the poison assertions.)
+5. **A tuned value that cannot be carried** (`'; uname -a; '` — a sentinel the poison machine-id hash does not carry, S-20 — and an empty list). The item is text-only `params_unsafe`, and the value appears on no non-comment line and nowhere in the JSON. (Task 3: `TestPlanParamsUnsafe`; Task 4: the poison assertions.)
 
 ---
 
@@ -67,6 +102,8 @@ The spec's seed tables and row placements are a hypothesis (spec §5). This task
 - [ ] **Step 2: Run it.** Send both files over `lab-run`'s stdin (`lab-sync` excludes `.superpowers/`), e.g. `lab-run.sh 'mkdir -p /root/muster-probe && cat > /root/muster-probe/probe.sh' < .superpowers/sdd/2026-10-14-stage3d2c-remedy-scripts/probe.sh`, and build the Debian image from `ci/roundtrip/debian12-init.Dockerfile` the same way. Record the output verbatim in `probe.md`.
 - [ ] **Step 3: Decide.** In `probe.md` write, per container row: the package additions, the per-control seed lines (spec §5 container table), and which new controls FAIL at stock there (they will be planned with a script on that row even when not seeded — every such body must succeed on that row). Write the `_roundtrip.yaml` entries for the 32 controls (images or `unproven`/`unproven_units` with a reason). Decide `password_policy` on `runner` (only if `libpam-pwquality` is installable there; else the EL rows only). Confirm, from `examples/ubuntu-24.04-vm.json`, the runner's `ClientAliveInterval` file (`50-cloudimg-settings.conf`) and the modules it ships (`udf`, `sctp`, `tipc`).
 - [ ] **Step 4: Report** the table and every surprise to the user before Task 9 is dispatched.
+
+  As executed (2026-10-16, S-32, S-34): the container half also copied the branch's `bin/muster` in and ran `collect` and `check` after the package additions and after the seeds, so each row's stock-FAIL and seeded verdicts are measured, not inferred; a second pass measured E-13's side effects in throwaway network namespaces on the lab (probe.md "Sysctl coupling"). Results are folded as S-29, S-44 and S-46.
 
 ---
 
@@ -290,7 +327,7 @@ func ValidModuleName(m string) bool { return moduleNameRe.MatchString(m) }
 
 - [ ] **Step 7: Write the failing lint cases.** In `TestLintRules`:
   - Change the case `script without way back` to `msg: "script without rollback, backup, units, modes, sysctl or modules"`.
-  - Delete the three `backup reserved …` cases and the duplicate `script without validate` at the end of the keyed block (the first one stays).
+  - Delete the three `backup reserved …` cases (`lint_test.go:128-130`). Keep `script without validate` (`:131`), the only case of `script_needs_validate` (S-45).
   - Add, after `UNITS in validate`:
 
 ```go
@@ -498,7 +535,7 @@ git commit -m "controls: script_params, script_on_absent and the modes/sysctl/mo
 ```
 
 ---
-### Task 3: The plan — `ScriptParams`, `ScriptOnAbsent`, the state lists, the six rollback words
+### Task 3: The plan and `controls/VERSION` — `ScriptParams`, `ScriptOnAbsent`, the state lists, the six rollback words
 
 **Files:**
 - Modify: `internal/remedy/plan.go` (`Item` `:49-74`, the refusals `:181-185`, `item` `:224-263`)
@@ -663,12 +700,12 @@ func TestPlanRefusesAnUnsafeStateEntry(t *testing.T) {
 	}
 ```
 
-  with the helper (add `regexp` to the test imports):
+  with the helper (add `regexp` and `github.com/kun9497/muster/internal/controls` to `plan_test.go`'s imports — the Step 2 test names `controls.Remediation`; S-45):
 
 ```go
-// mustJSONItem returns item i of a marshalled plan, compact, in field order.
-// c_lockout is item 0 by risk order only when it is the one lockout item; the
-// test passes the index it means.
+// mustJSONItem returns item i of a marshalled plan, in field order. Every item
+// carries the same keys, so any index works; item 0 of TestPlanJSONShape is
+// g_units (restart_service sorts first).
 func mustJSONItem(t *testing.T, data []byte, i int) []byte {
 	t.Helper()
 	var p struct{ Items []json.RawMessage }
@@ -836,12 +873,12 @@ func recheck(id string, set *controls.Set, it Item) error {
 
   The unit refusal message changes from `unit %q is not a unit name a script can carry` to `unit %q is not one a script can carry`; `TestPlanRefusesAnUnsafeUnit` checks only the prefix `refusing to plan muster.test.g_units: unit "x';id;'.service"`, which still holds.
 
-- [ ] **Step 5: Run** `go test ./internal/remedy/ -run 'TestPlan|TestJSON'`. Expected: PASS. Then `go test ./internal/remedy/`: the script goldens and `TestScriptEveryLineIsTemplateBodyOrComment` do not move yet (no fixture row in `fullPlan` uses a new shape), and `TestJSONGolden`'s `full.json`/`empty.json` gain the five fields per item — regenerate with `go test ./internal/remedy -run 'TestJSONGolden' -update`, review the diff (five keys per item, nothing else), and re-run. `go test ./cmd/muster/`: `TestFixThreeFormats` decodes with `DisallowUnknownFields` into `remedy.Plan` and passes; the examples gate compares the fix-report JSON byte for byte while the control set is unchanged and goes red on `examples/*-fix-report.json` (the five new keys). Quote that failure in the report; do not edit `examples/`.
+- [ ] **Step 5: Run** `go test ./internal/remedy/ -run 'TestPlan|TestJSON'`. Expected: PASS. Then `go test ./internal/remedy/`: the script goldens and `TestScriptEveryLineIsTemplateBodyOrComment` do not move yet (no fixture row in `fullPlan` uses a new shape), and `TestJSONGolden`'s `full.json` gains the five fields per item (`empty.json`, `"items": []`, does not change) — regenerate with `go test ./internal/remedy -run 'TestJSONGolden' -update`, review the diff (five keys per item, nothing else), and re-run. Write `controls/VERSION` → `kisa-unix-2026+2026.10.14` (S-37). `go test ./cmd/muster/`: `TestFixThreeFormats` decodes with `DisallowUnknownFields` into `remedy.Plan` and passes; the examples gate now skips its byte comparison with the G-24 note (the digest moved with VERSION) — quote the note once; do not edit `examples/`. `go test ./...` is green.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add internal/remedy/plan.go internal/remedy/plan_test.go internal/remedy/fixture_test.go internal/remedy/render_test.go internal/remedy/testdata/full.json internal/remedy/testdata/empty.json
+git add controls/VERSION internal/remedy/plan.go internal/remedy/plan_test.go internal/remedy/fixture_test.go internal/remedy/render_test.go internal/remedy/testdata/full.json
 git commit -m "remedy: carry script_params values, script_on_absent and the state lists; six rollback words; re-check every name a script carries"
 ```
 
@@ -1210,9 +1247,9 @@ restore() {
 }`
 ```
 
-  In `unitHelpers`, replace every `$MUSTER_BACKUP/muster-units` with `$MB/units` (fourteen places; `mkdir -p "$MB/units" || return 1`).
+  In `unitHelpers`, replace every `$MUSTER_BACKUP/muster-units` with `$MB/units` (all sixteen places; `mkdir -p "$MB/units" || return 1`); before the commit `grep -c muster-units internal/remedy/script.go` prints 0.
 
-  Add `stateHelpers`, verbatim from spec §3 with the round-2 changes (`ENVIRON` dedupe, `case` in `restore_sysctl`, `grep` on `/proc/modules`, `--ignore-install`):
+  Add `stateHelpers`, verbatim from spec §3 with the round-2 changes (`ENVIRON` dedupe, `case` in `restore_sysctl`, `grep` on `/proc/modules`, `--ignore-install`) and S-24's `restore_modes` (skip an equal entry; the ancestor rule; `chown -h`):
 
 ```go
 // stateHelpers record and restore the three state kinds (3D-2c E-3): a
@@ -1248,9 +1285,20 @@ restore_modes() {
   while read -r uid gid mode t p; do
     if [ ! -e "$p" ] && [ ! -L "$p" ]; then continue; fi
     if [ -L "$p" ] || [ "$(modes_type "$p")" != "$t" ]; then log "restore_modes: $p changed type, left as is"; mrc=1; continue; fi
-    if chown -- "$uid:$gid" "$p"; then chmod -- "$mode" "$p" || mrc=1; else mrc=1; fi
+    [ "$(stat -c '%u %g %a' -- "$p" 2>/dev/null)" = "$uid $gid $mode" ] && continue
+    modes_trusted "$p" "$uid" || { log "restore_modes: $p is under a directory others can write, left as is"; mrc=1; continue; }
+    if chown -h -- "$uid:$gid" "$p"; then chmod -- "$mode" "$p" || mrc=1; else mrc=1; fi
   done < "$MB/modes.list"
   return $mrc
+}
+modes_trusted() { # modes_trusted <path> <recorded uid>: no one but root can swap <path> (S-24)
+  d=${1%/*}
+  if [ "$2" != 0 ] && [ -n "$(find "${d:-/}" -maxdepth 0 -perm /022 2>/dev/null)" ]; then return 1; fi
+  while :; do
+    [ -n "$(find "${d:-/}" -maxdepth 0 -user 0 ! -perm -002 2>/dev/null)" ] || return 1
+    [ -n "$d" ] || return 0
+    d=${d%/*}
+  done
 }
 save_sysctl() {
   [ -f "$MB/sysctl.list" ] || : > "$MB/sysctl.list" || return 1
@@ -1380,7 +1428,7 @@ func failurePath(it Item, pfx string) []string {
   In `TestScriptEveryLineIsTemplateBodyOrComment`'s line loop, add after the `poisonHash` check:
 
 ```go
-			if strings.Contains(l, "'; id; '") {
+			if strings.Contains(l, "'; uname -a; '") { // the p_params sentinel, not a prefix of poisonHash (S-20)
 				t.Errorf("%s line %d carries the unsafe parameter value: %q", g.name, i+1, l)
 			}
 ```
@@ -1405,19 +1453,32 @@ remediation:
 `,
 ```
 
-  and `poisonPlan` adds `"muster.test.p_params"` to its row loop, sets `rep.Check.Params = map[string]map[string]any{"muster.test.p_params": {"bad": "'; id; '"}}`, asserts `len(p.Items) != 3`, and asserts the `p_params` item is `params_unsafe`. Add to `render_test.go`:
+  and `poisonPlan` adds `"muster.test.p_params"` to its row loop, sets `rep.Check.Params = map[string]map[string]any{"muster.test.p_params": {"bad": "'; uname -a; '"}}`, asserts `len(p.Items) != 3`, and asserts the `p_params` item is `params_unsafe`. Add to `render_test.go`:
 
 ```go
 func TestJSONCarriesNoUnsafeParameter(t *testing.T) {
-	if bytes.Contains(JSON(poisonPlan(t)), []byte("'; id; '")) {
+	p := poisonPlan(t)
+	var found bool
+	for _, it := range p.Items {
+		if it.ID == "muster.test.p_params" {
+			found = true
+			if it.TextOnlyReason != "params_unsafe" {
+				t.Fatalf("p_params is %q, want params_unsafe", it.TextOnlyReason)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("the p_params row did not reach the plan")
+	}
+	if bytes.Contains(JSON(p), []byte("'; uname -a; '")) {
 		t.Fatal("the unsafe parameter value reached the plan JSON")
 	}
 }
 ```
 
-  `TestScriptBackupFailureStopsTheBlock` makes the copy fail at the new layout: the blocking file goes at `filepath.Join(bk, "blocks", "fix_muster_test_backup_fails", "files"+tmp, "a")` (create its parent as a directory and `a` as a directory so `cp -a` onto it fails), instead of `bk+tmp/a`. `TestScriptReusedBackupKeepsTheFirstCopy` and the other hand-built-item tests keep their assertions (their log lines are unchanged).
+  (Use the field names `remedy.Item` has for the id and the text-only reason.) `TestScriptBackupFailureStopsTheBlock` makes the copy fail at the new layout: `os.MkdirAll(filepath.Join(bk, "blocks", "fix_muster_test_backup_fails", "files"+tmp), 0o700)`, then `os.WriteFile(filepath.Join(bk, "blocks", "fix_muster_test_backup_fails", "files"+tmp, "a"), []byte("not a directory"), 0o600)` — `a` is a regular file, so `mkdir -p "$MB/files<tmp>/a"` fails and `backup` returns 1 (S-45); its doc comment says so. `TestScriptReusedBackupKeepsTheFirstCopy` and the other hand-built-item tests keep their assertions (their log lines are unchanged).
 
-- [ ] **Step 7: Run and regenerate.** `go test ./internal/remedy/` on Windows: everything but the goldens passes. Regenerate: `go test ./internal/remedy -run 'TestScriptGolden|TestTableGolden|TestJSONGolden' -update`. Review the diff: every block gains its `MB=` line; `full.sh` gains the `h_params` and `i_state` blocks (two `P_` lines; `save_modes '/etc/i.d/*' '/etc/i.conf'`, `save_sysctl kernel.i_key`, `save_modules i-mod` and their three restores); `poison.sh` gains a text-only `p_params` block reading `# text only: a parameter value cannot be carried safely; …`; the prologue gains `backup()`/`restore()` on `$MB` and the eight state helpers; `all-scripted.sh` changes only by the prologue and `MB=` lines (16 blocks). Then run the whole package on the lab with root (`lab-run.sh 'cd /root/muster && go test ./internal/remedy/'`) and `make shellcheck` there through the shellcheck image (`docker run --rm -v /root/muster:/mnt koalaman/shellcheck-alpine:stable sh -c 'cd /mnt && for f in internal/remedy/testdata/*.sh; do shellcheck -s sh "$f" || exit 1; done'`). Expected: PASS and clean. `go test ./cmd/muster/`: the examples gate is red on the fix reports (template change, set unchanged) — quote it once.
+- [ ] **Step 7: Run and regenerate.** `go test ./internal/remedy/` on Windows: everything but the goldens passes. Regenerate: `go test ./internal/remedy -run 'TestScriptGolden|TestTableGolden|TestJSONGolden' -update`. Review the diff: every block gains its `MB=` line; `full.sh` gains the `h_params` and `i_state` blocks (two `P_` lines; `save_modes '/etc/i.d/*' '/etc/i.conf'`, `save_sysctl kernel.i_key`, `save_modules i-mod` and their three restores); `poison.sh` gains a text-only `p_params` block reading `# text only: a parameter value cannot be carried safely; …`; the prologue gains `backup()`/`restore()` on `$MB` and the eight state helpers; `all-scripted.sh` changes only by the prologue and `MB=` lines (16 blocks). Then run the whole package on the lab with root (`lab-run.sh 'go test ./internal/remedy/'`) and `make shellcheck` there through the shellcheck image (`docker run --rm -v /root/muster-dev:/mnt koalaman/shellcheck-alpine:stable sh -c 'cd /mnt && for f in internal/remedy/testdata/*.sh; do shellcheck -s sh "$f" || exit 1; done'`). Expected: PASS and clean. `go test ./...` on Windows is green (the examples gate skips under G-24 since Task 3, S-37).
 
 - [ ] **Step 8: Commit**
 
@@ -1427,10 +1488,10 @@ git commit -m "remedy: per-block record directories, the modes/sysctl/modules he
 ```
 
 ---
-### Task 5: The sixteen sysctl bodies, their pin, and `controls/VERSION`
+### Task 5: The sixteen sysctl bodies and their pin
 
 **Files:**
-- Modify: the sixteen `controls/beyond/*.yaml` of spec §4.1 (their `remediation:` blocks), `controls/VERSION`
+- Modify: the sixteen `controls/beyond/*.yaml` of spec §4.1 (their `remediation:` blocks)
 - Create: `internal/collect/collectors/remediation_sysctl_test.go` (Linux), `internal/remedy/shipped_bodies_test.go` (Linux)
 - Modify: `controls/testdata/_roundtrip.yaml` (Step 6)
 
@@ -1485,7 +1546,7 @@ The keys, arms and values, in the order the `sysctl:` list, the `case` lines and
 | `ipv6_router_advertisements_ignored` | `net.ipv6.conf.all.accept_ra`, `net.ipv6.conf.default.accept_ra`: `$P_allowed_accept_ra` → `$first` | `script_params: [allowed_accept_ra]` |
 | `ipv6_source_routing_rejected` | `net.ipv6.conf.all.accept_source_route`, `net.ipv6.conf.default.accept_source_route`: `0` → 0 | — |
 | `kernel_pointer_exposure` | `kernel.kptr_restrict`: `1\|2` → 1; `kernel.dmesg_restrict`: `1` → 1 | — |
-| `ptrace_restriction` | `kernel.yama.ptrace_scope`: `1\|2\|3` → 1; `kernel.perf_event_paranoid`: `[2-9]\|[1-9][0-9]*` → 2 | — |
+| `ptrace_restriction` | `kernel.yama.ptrace_scope`: `1\|2\|3` → 1; `kernel.perf_event_paranoid`: `[2-9]\|[1-9][0-9]\|[1-9][0-9][0-9]*` → 2 (S-21) | — |
 | `reverse_path_filtering` | `net.ipv4.conf.all.rp_filter`, `net.ipv4.conf.default.rp_filter`: `1\|2` → 1; `net.ipv4.conf.all.log_martians`, `net.ipv4.conf.default.log_martians`: `1` → 1 | — |
 | `source_routing_rejected` | `net.ipv4.conf.all.accept_source_route`, `net.ipv4.conf.default.accept_source_route`: `0` → 0 | — |
 | `suid_dumpable_disabled` | `fs.suid_dumpable`: `0` → 0 | — |
@@ -1817,7 +1878,7 @@ func armsOf(t *testing.T, id string, cl controls.Clause) string {
 		return strings.Join(xs, "|")
 	case "gte":
 		if fmt.Sprint(cl.Expected) == "2" {
-			return "[2-9]|[1-9][0-9]*"
+			return "[2-9]|[1-9][0-9]|[1-9][0-9][0-9]*" // a glob: [1-9][0-9]* alone matches "1" (S-21)
 		}
 	}
 	t.Errorf("%s: no arms rule for op %s %v", id, cl.Op, cl.Expected)
@@ -1846,7 +1907,7 @@ func accepts(cl controls.Clause, v string) bool {
 
 - [ ] **Step 3: Run** on the lab: `go test ./internal/remedy/ -run 'TestSysctlBodies|TestIPForward'` and `go test ./internal/collect/collectors/ -run TestSysctlScriptsNameTheControlsKeys`. Expected: FAIL (`0 controls declare sysctl, want 16`).
 
-- [ ] **Step 4: Write the sixteen remediation blocks** as specified above, the four risk lines (`ip_forwarding_disabled` and `ipv6_forwarding_disabled` → `restart_service`), the texts, and `controls/VERSION` → `kisa-unix-2026+2026.10.14`.
+- [ ] **Step 4: Write the sixteen remediation blocks** as specified above, the two risk lines (`ip_forwarding_disabled` and `ipv6_forwarding_disabled` → `restart_service`) and the texts (`controls/VERSION` was bumped in Task 3, S-37). Fold S-21 (arms), S-27 (a symlinked drop-in fails the block; the body header's chmod guard is `[ -f "$f" ] && [ ! -L "$f" ]`), S-43 (the companion line persisted only when it read 0; the stub's flip), S-46 (list order) and S-45's sysctl.conf sentence; add `TestShippedBodiesPlaceParametersSafely` (S-30) in `internal/controls`.
 
 - [ ] **Step 5: Run.** Windows: `go test ./internal/controls/` (lint clean, `TestEveryMutantIsKilled` zero survivors), `go run ./cmd/muster controls lint --references docs/reference` and `--profile default`. Lab: the Step 3 tests, now PASS; `go test ./internal/remedy/ -run TestScriptGolden -update` regenerates `all-scripted.sh` (32 blocks) — review the diff, then the shellcheck image over `internal/remedy/testdata/*.sh`. `TestScriptAllScriptedCoversTheShippedSet` goes from 16 to 32 here (it becomes 48 at Task 8): derive it instead — replace the literal with a count of shipped controls whose `Remediation.Script` is not blank, and assert that count is ≥ 16. The examples gate now skips with the G-24 note (quote it once).
 
@@ -1855,7 +1916,7 @@ func accepts(cl controls.Clause, v string) bool {
 - [ ] **Step 7: Commit**
 
 ```bash
-git add controls/VERSION controls/beyond controls/testdata/_roundtrip.yaml internal/remedy/shipped_bodies_test.go internal/remedy/script_test.go internal/remedy/testdata/all-scripted.sh internal/collect/collectors/remediation_sysctl_test.go
+git add controls/beyond controls/testdata/_roundtrip.yaml internal/controls internal/remedy/shipped_bodies_test.go internal/remedy/script_test.go internal/remedy/testdata/all-scripted.sh internal/collect/collectors/remediation_sysctl_test.go
 git commit -m "controls: sixteen sysctl scripts that write only outside the accepted set, pinned to the collector's keys"
 ```
 
@@ -1878,15 +1939,22 @@ git commit -m "controls: sixteen sysctl scripts that write only outside the acce
   backup: [/etc/modprobe.d/99-muster-<name>.conf]
   script: |
     f=/etc/modprobe.d/99-muster-<name>.conf
-    for m in <list>; do
+    if [ -L "$f" ]; then log "<id>: $f is a symlink (a mask), left as is"; exit 1; fi
+    mods='<list>'
+    for m in $mods; do
       n=$(printf '%s' "$m" | tr - _)
-      grep -q "^install $n " "$f" 2>/dev/null || printf 'install %s /bin/false\n' "$n" >> "$f"
+      case "$(modprobe --showconfig 2>/dev/null | awk -v m="$n" '$1 == "install" && $2 == m { print $3; exit }')" in
+        /bin/false|/bin/true|/usr/bin/false|/usr/bin/true|false|true) ;;
+        *) grep -q "^install $n " "$f" 2>/dev/null || printf 'install %s /bin/false\n' "$n" >> "$f";;
+      esac
       if grep -q "^$n " /proc/modules; then modprobe -r -- "$n"; fi
     done
-    chmod 644 "$f"
+    if [ -f "$f" ]; then chmod 644 "$f"; fi
   validate: |
-    for m in <list>; do n=$(printf '%s' "$m" | tr - _); [ "$(modprobe --showconfig 2>/dev/null | awk -v m="$n" '$1 == "install" && $2 == m { print $3; exit }')" = /bin/false ] || exit 1; ! grep -q "^$n " /proc/modules || exit 1; done
+    mods='<list>'; for m in $mods; do n=$(printf '%s' "$m" | tr - _); case "$(modprobe --showconfig 2>/dev/null | awk -v m="$n" '$1 == "install" && $2 == m { print $3; exit }')" in /bin/false|/bin/true|/usr/bin/false|/usr/bin/true|false|true) ;; *) exit 1;; esac; ! grep -q "^$n " /proc/modules || exit 1; done
 ```
+
+  (S-22: a variable list, never a literal one-word `for`, SC2043; S-25: the collector's `installNoops` set on both sides, and no line appended for a module already disabled by any of them; S-27: a symlinked drop-in fails the block before any write. `<id>` is the control id. The file may not exist after a run that appended nothing, hence the `[ -f ]` before `chmod`.)
 
 | control | `<list>` | `<name>` | risk |
 |---|---|---|---|
@@ -1930,9 +1998,11 @@ func TestModuleScriptsNameTheControlsModules(t *testing.T) {
 		if strings.Join(r.Modules, " ") != strings.Join(where, " ") {
 			t.Errorf("%s: modules %v, where %v", c.ID, r.Modules, where)
 		}
-		loop := "for m in " + strings.Join(where, " ") + "; do"
-		if !strings.Contains(r.Script, loop) || !strings.Contains(r.Validate, loop) {
-			t.Errorf("%s: script or validate does not loop over %q", c.ID, loop)
+		list := "mods='" + strings.Join(where, " ") + "'"
+		for _, body := range []string{r.Script, r.Validate} {
+			if !strings.Contains(body, list) || !strings.Contains(body, "for m in $mods; do") {
+				t.Errorf("%s: script or validate does not set %s and loop over it", c.ID, list)
+			}
 		}
 	}
 	if n != 3 {
@@ -2000,7 +2070,7 @@ func TestModuleBodiesWriteFoldedLinesAndUnload(t *testing.T) {
 }
 ```
 
-  (add `fmt` to the file's imports).
+  (add `fmt` to the file's imports). Also, per S-25/S-27/S-45: the `modprobeStub`'s `-r` exits 1 for a module not in `$s/modules` (as kmod does), so a body that unloads unconditionally fails run 2; a case with an earlier conf file `00-vendor.conf` carrying `install cramfs /bin/true` (body and validate exit 0, no muster line for `cramfs`); a case where the drop-in is a symlink to a 0666 temp file (body exits non-zero; link, target mode and content unchanged). Texts: the "vendor file" sentence becomes "A vendor file whose install line for the module loads it wins over this one; …"; `uncommon_network_protocols_disabled`'s "A module that is already loaded stays loaded until the next boot …" becomes "A module that is already loaded stays loaded until it is unloaded (modprobe -r) or the host reboots; the review script unloads it, and fails and rolls back when the module is in use." (KO: "이미 적재된 모듈은 내리거나(modprobe -r) 재부팅할 때까지 남아 있습니다. 검토 스크립트는 이를 내리며, 모듈이 사용 중이면 실패하고 롤백합니다.")
 
 - [ ] **Step 2: Run** `go test ./internal/controls -run TestModuleScripts` (Windows) and the body test on the lab. Expected: FAIL (`0 controls declare modules`).
 - [ ] **Step 3: Write the three blocks**, the risk change and the texts.
@@ -2135,6 +2205,12 @@ Every body below is verbatim. A guard is `if [ -f p ] && [ ! -L p ]` for a file 
     for p in /etc/crontab /etc/anacrontab /etc/cron.allow /etc/cron.deny /etc/at.allow /etc/at.deny; do
       if [ -f "$p" ] && [ ! -L "$p" ]; then
         chown root "$p"
+        if [ "$(stat -c %g "$p")" = 0 ]; then
+          case "$p" in
+            /etc/cron.allow|/etc/cron.deny) if getent group crontab >/dev/null; then chgrp crontab "$p"; fi;;
+            /etc/at.allow|/etc/at.deny) a=$(command -v at || :); if [ -n "$a" ] && [ -g "$a" ] && [ "$(stat -c %G "$a")" = daemon ]; then chgrp daemon "$p"; fi;;
+          esac
+        fi
         chmod u-xs,g-wxs,o-rwxt "$p"
       fi
     done
@@ -2153,7 +2229,7 @@ Every body below is verbatim. A guard is `if [ -f p ] && [ ! -L p ]` for a file 
     done
     for d in /var/spool/cron/atjobs /var/spool/at; do
       if [ -d "$d" ] && [ ! -L "$d" ]; then
-        find "$d" -mindepth 1 -maxdepth 1 -type f -exec chmod g-wxs,o-rwxt {} +
+        find "$d" -mindepth 1 -maxdepth 1 -type f -exec chmod u-s,g-wxs,o-rwxt {} +
       fi
     done
     for d in /etc/cron.d /etc/cron.hourly /etc/cron.daily /etc/cron.weekly /etc/cron.monthly /var/spool/cron /var/spool/cron/crontabs /var/spool/cron/atjobs /var/spool/at; do
@@ -2163,7 +2239,7 @@ Every body below is verbatim. A guard is `if [ -f p ] && [ ! -L p ]` for a file 
     [ -z "$(find /etc/crontab /etc/anacrontab /etc/cron.allow /etc/cron.deny /etc/at.allow /etc/at.deny /etc/cron.d -maxdepth 1 -type f \( -perm /7137 -o ! -user root \) 2>/dev/null)" ] && [ -z "$(find /etc/cron.hourly /etc/cron.daily /etc/cron.weekly /etc/cron.monthly -mindepth 1 -maxdepth 1 -type f \( -perm /002 -o ! -user root \) 2>/dev/null)" ] && [ -z "$(find /var/spool/cron /var/spool/cron/crontabs -mindepth 1 -maxdepth 1 -type f -perm /7137 2>/dev/null)" ] && [ -z "$(find /var/spool/cron/atjobs /var/spool/at -mindepth 1 -maxdepth 1 -type f -perm /7037 2>/dev/null)" ] && [ -z "$(find /etc/cron.d /etc/cron.hourly /etc/cron.daily /etc/cron.weekly /etc/cron.monthly /var/spool/cron /var/spool/cron/crontabs /var/spool/cron/atjobs /var/spool/at -maxdepth 0 -type d -perm /002 2>/dev/null)" ]
 ```
 
-  `-type f` keeps the spool pass off the `crontabs`/`atjobs` directories under `/var/spool/cron` (spec §4.3). `modes_backup_overlap` holds (no `backup`).
+  `-type f` keeps the spool pass off the `crontabs`/`atjobs` directories under `/var/spool/cron` (spec §4.3). `modes_backup_overlap` holds (no `backup`). The access-file `chgrp` is S-26 (a root-group access file on Debian/Ubuntu gets the group its setgid reader runs as; the four files are `modes` entries, so a failure restores the group); its text sentence (EN/KO): "On Debian and Ubuntu an access file in group root is given group crontab (cron.allow, cron.deny) or daemon (at.allow, at.deny), which crontab and at read it as." The at-spool pass clears `u+s` too (S-40). The temp-tree case adds an atjobs file at 04700 (ends 0700) and a root:root 0644 `/etc/cron.allow` (needs a `crontab` group: skip the group assertion when `getent group crontab` fails on the test host).
 
 **`muster.file.log_dir_permissions`** (the other-writable half; the group half stays text — the text says so; no `script_params`)
 
@@ -2190,7 +2266,7 @@ Every body below is verbatim. A guard is `if [ -f p ] && [ ! -L p ]` for a file 
     for p in /etc/ftpusers /etc/vsftpd/ftpusers /etc/vsftpd/user_list /etc/vsftpd.user_list /etc/vsftpd.ftpusers; do [ ! -f "$p" ] || [ -L "$p" ] || case "$(stat -c '%u %a' "$p")" in '0 0'|'0 40'|'0 200'|'0 240'|'0 400'|'0 440'|'0 600'|'0 640') ;; *) exit 1;; esac; done
 ```
 
-The "symlink" sentence goes on `bootloader_config_permissions`, `inetd_conf_permissions`, `syslog_conf_permissions`, `cron_permissions`, `log_dir_permissions` and `ftpusers_permissions`.
+The "symlink" sentence goes on `bootloader_config_permissions`, `inetd_conf_permissions`, `syslog_conf_permissions`, `cron_permissions`, `log_dir_permissions` and `ftpusers_permissions`. Per S-39, `audit_log_permissions`' validate guards its file half (`{ [ ! -f /var/log/audit/audit.log ] || [ -L /var/log/audit/audit.log ] || case … esac; } && <dir clause>` — it then no longer starts with `case`, which S-23 allows either way), and the `audit_log_permissions` and `ftpusers_permissions` texts name a file found elsewhere as the operator's. Per S-30, add `TestShippedFindsCarryATypePredicate` to `internal/controls` in this task. Per S-45, the single-path symlink cases join `TestFileBodiesRepairATempTree` (an optional `links []string` per case pointing at a 0666 victim, never where the case already plants a regular file — grub2's path for `bootloader_config_permissions`): body and validate exit 0, the victim stays 0666, and deleting a `[ ! -L "$p" ]` guard or a validate's `[ -L "$p" ] ||` turns the case red (check it once by hand).
 
 - [ ] **Step 1: Rewrite the selection of `TestFileValidatesAcceptTheDefaultModes`** (S-8). Replace its category scan (`:26-40`) with:
 
@@ -2208,7 +2284,11 @@ The "symlink" sentence goes on `bootloader_config_permissions`, `inetd_conf_perm
 		if r == nil || strings.TrimSpace(r.Script) == "" || owners[c.ID] != [2]string{} {
 			continue
 		}
-		if strings.HasPrefix(strings.TrimSpace(r.Validate), `case "$(stat -c `) {
+		// S-23: only a validate that is one stat case and nothing else;
+		// sudoers and audit_log validate a case plus a find.
+		v := strings.TrimSpace(r.Validate)
+		if strings.HasPrefix(v, `case "$(stat -c `) && strings.HasSuffix(v, "esac") &&
+			strings.Count(v, "esac") == 1 && !strings.Contains(v, " && ") && !strings.Contains(v, " || ") {
 			t.Errorf("%s validates with a bare stat case: add it to the owner table", c.ID)
 		}
 	}
@@ -2357,7 +2437,7 @@ git commit -m "controls: nine file-permission scripts that never follow a symlin
 
 **Files:**
 - Modify: `controls/account/password_policy.yaml`, `umask_policy.yaml`, `lockout_threshold.yaml`, `session_timeout.yaml`; `controls/testdata/_roundtrip.yaml`; the `umask_policy` fixtures if the mutation test asks (Step 5)
-- Modify: `internal/remedy/shipped_bodies_test.go`, `internal/remedy/script_test.go` (`TestScriptAllScriptedCoversTheShippedSet` now counts 48)
+- Modify: `internal/remedy/shipped_bodies_test.go` (no `script_test.go` edit: Task 5's derived count now reaches 48 and `all-scripted.sh` holds 48 `fix_` functions; S-45)
 
 **Interfaces:**
 - Consumes: `shippedControl`, `pEnv`, `runBody`, `writeStub` (Tasks 5, 3D-2b).
@@ -2389,6 +2469,7 @@ git commit -m "controls: nine file-permission scripts that never follow a symlin
       done | awk -F= '{ k = $1; gsub(/[[:space:]]/, "", k); v = $2; gsub(/[[:space:]]/, "", v) } k ~ /^(minlen|minclass|dcredit|ucredit|lcredit|ocredit)$/ { x[k] = v } END { ml = ("minlen" in x) ? x["minlen"] + 0 : 8; rc = x["minclass"] + 0; n = 0; if (x["dcredit"] + 0 <= -1) n++; if (x["ucredit"] + 0 <= -1) n++; if (x["lcredit"] + 0 <= -1) n++; if (x["ocredit"] + 0 <= -1) n++; if (n > rc) rc = n; print ml, rc }'
     }
     pput() {
+      if [ -L "$pf" ]; then log "password_policy: $pf is a symlink (a mask), left as is"; exit 1; fi
       if [ ! -d /etc/security/pwquality.conf.d ]; then mkdir -p /etc/security/pwquality.conf.d; chmod 755 /etc/security/pwquality.conf.d; fi
       if grep -q "^$1 " "$pf" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$pf"; else printf '%s = %s\n' "$1" "$2" >> "$pf"; fi
       chmod 644 "$pf"
@@ -2397,8 +2478,9 @@ git commit -m "controls: nine file-permission scripts that never follow a symlin
     if [ "$1" -lt "$P_min_len" ]; then pput minlen "$P_min_len"; fi
     if [ "$2" -lt "$P_min_classes" ]; then pput minclass "$P_min_classes"; fi
     today=$(( $(date +%s) / 86400 ))
-    awk -F: -v OFS=: 'NF >= 8 && $1 !~ /^#/ && $2 != "" && $2 !~ /^[!*]/ { print $1, $3, $4, $5 }' /etc/shadow > "$MB/ageing.scan"
+    awk -F: -v OFS=: 'NF >= 8 && $1 !~ /^#/ && $1 != "" && $2 != "" && $2 !~ /^[!*]/ { print $1, $3, $4, $5 }' /etc/shadow > "$MB/ageing.scan"
     while IFS=: read -r name last min max; do
+      awk -F: -v n="$name" '$1 == n { f = 1 } END { exit !f }' /etc/passwd || { log "password_policy: $name: not in /etc/passwd, left as is"; continue; }
       case "$last" in ''|0|*[!0-9]*) log "password_policy: $name has no last-change day, left as is"; continue;; esac
       if [ $((today - last)) -gt "$P_max_days" ]; then log "password_policy: $name: password older than $P_max_days days, change it first"; continue; fi
       awk -F: -v n="$name" '$1 == n { f = 1 } END { exit !f }' "$MB/ageing.list" 2>/dev/null || printf '%s:%s:%s\n' "$name" "${min:--1}" "${max:--1}" >> "$MB/ageing.list"
@@ -2441,13 +2523,13 @@ git commit -m "controls: nine file-permission scripts that never follow a symlin
   backup: [/etc/security/faillock.conf]
   script: |
     fc=/etc/security/faillock.conf
-    v=$(awk -F= '{ k = $1; gsub(/[[:space:]]/, "", k) } k == "deny" { d = $2 } END { gsub(/[[:space:]]/, "", d); print d }' "$fc" 2>/dev/null)
+    v=$(awk -F= '{ k = $1; gsub(/[[:space:]]/, "", k) } k == "deny" { d = $2 } END { gsub(/[[:space:]]/, "", d); print d }' "$fc" 2>/dev/null) || v=
     case "$v" in ''|*[!0-9]*) v=3;; esac
     if [ "$v" -lt 1 ] || [ "$v" -gt "$P_max_attempts" ]; then
       if grep -Eq '^[[:space:]]*deny[[:space:]]*=' "$fc" 2>/dev/null; then sed -i -E "s|^([[:space:]]*deny)[[:space:]]*=.*|\1 = $P_max_attempts|" "$fc"; else printf 'deny = %s\n' "$P_max_attempts" >> "$fc"; fi
     fi
   validate: |
-    awk -F= '{ k = $1; gsub(/[[:space:]]/, "", k) } k == "deny" { d = $2 } END { gsub(/[[:space:]]/, "", d); if (d == "") d = 3; exit !(d + 0 >= 1 && d + 0 <= M) }' M="$P_max_attempts" /etc/security/faillock.conf
+    cat /etc/security/faillock.conf 2>/dev/null | awk -F= '{ k = $1; gsub(/[[:space:]]/, "", k) } k == "deny" { d = $2 } END { gsub(/[[:space:]]/, "", d); if (d == "") d = 3; exit !(d + 0 >= 1 && d + 0 <= M) }' M="$P_max_attempts"
 ```
 
 **`muster.account.session_timeout`** (S-11; text: "ClientAliveCountMax 1" becomes "a ClientAliveCountMax of at most params.max_count", and it gains "in /etc/ssh/sshd_config.d/00-muster-session.conf, keeping a value already in range; an earlier ClientAliveInterval before the Include beats any drop-in" — KO likewise)
@@ -2463,6 +2545,7 @@ git commit -m "controls: nine file-permission scripts that never follow a symlin
       c=$(sshd -T 2>/dev/null | awk '$1 == "clientalivecountmax" { print $2 }')
       case "$i" in ''|*[!0-9]*) i="$P_max_interval";; *) if [ "$i" -lt 1 ] || [ "$i" -gt "$P_max_interval" ]; then i="$P_max_interval"; fi;; esac
       case "$c" in ''|*[!0-9]*) c="$P_max_count";; *) if [ "$c" -lt 1 ] || [ "$c" -gt "$P_max_count" ]; then c="$P_max_count"; fi;; esac
+      if [ -L /etc/ssh/sshd_config.d/00-muster-session.conf ]; then log "session_timeout: /etc/ssh/sshd_config.d/00-muster-session.conf is a symlink (a mask), left as is"; exit 1; fi
       printf 'ClientAliveInterval %s\nClientAliveCountMax %s\n' "$i" "$c" > /etc/ssh/sshd_config.d/00-muster-session.conf
       chmod 644 /etc/ssh/sshd_config.d/00-muster-session.conf
       sshd -t
@@ -2470,7 +2553,8 @@ git commit -m "controls: nine file-permission scripts that never follow a symlin
       if systemctl is-active --quiet ssh.service; then systemctl reload ssh.service; fi
     fi
   rollback: |
-    rm -f /etc/ssh/sshd_config.d/00-muster-session.conf
+    f=/etc/ssh/sshd_config.d/00-muster-session.conf
+    if [ -L "$f" ]; then :; elif [ -e "$MB/files$f" ]; then cp -a "$MB/files$f" "$f"; else rm -f "$f"; fi
     if command -v sshd >/dev/null 2>&1; then
       sshd -t
       if systemctl is-active --quiet sshd.service; then systemctl reload sshd.service; fi
@@ -2479,6 +2563,8 @@ git commit -m "controls: nine file-permission scripts that never follow a symlin
   validate: |
     if command -v sshd >/dev/null 2>&1; then sshd -T 2>/dev/null | awk '$1 == "clientaliveinterval" { i = $2 } $1 == "clientalivecountmax" { c = $2 } END { exit !(i >= 1 && i <= I && c >= 1 && c <= C) }' I="$P_max_interval" C="$P_max_count"; fi
 ```
+
+  Pre-flight folds for this task (S-27, S-35, S-41, S-42, S-44, S-45): `password_policy`'s text (EN/KO) gains "An account that has a password hash but logs in only by SSH key will be made to change its password at login once the maximum age passes; an unattended session cannot, so exempt such accounts or lock their password first. An account with no last-change day, or one already set to change at next login (day 0), is left as is." (KO: "비밀번호 해시가 있지만 SSH 키로만 로그인하는 계정은 최대 기간이 지나면 로그인할 때 비밀번호를 바꾸라는 요구를 받습니다. 무인 세션은 바꿀 수 없으므로 그런 계정은 제외하거나 먼저 비밀번호를 잠그세요. 마지막 변경일이 없는 계정과 다음 로그인 때 바꾸도록 이미 설정된 계정(0일)은 그대로 둡니다."); the body must end `done` on a row without `pam_pwquality` (debian12-init, ubuntu2204: the pwquality half writes its file, the validate reads the merged files, the control stays FAIL on the PAM gate) and `session_timeout`'s on a row without `sshd`. The tests below gain: a stricter login.defs (`PASS_MAX_DAYS 60`, `PASS_MIN_DAYS 2`, `PASS_MIN_LEN 12`) that stays byte-identical; a hashed shadow row with no `/etc/passwd` entry (no chage call for it, exit 0); `pwquality.conf.d/99-muster.conf` and `00-muster-session.conf` as symlinks to a 0666 temp file (block exits non-zero; link, target mode and content unchanged); a missing `faillock.conf` (`max >= 3`: no file, validate 0; `max < 3`: the file is created with `deny = <max>`); `session_timeout` with no `sshd` on PATH (`t.Skip` when the host has its own sshd; body and validate 0, no drop-in), with `is-active --quiet ssh.service` true (`reload ssh.service` in the stub's log), and with a pre-existing drop-in at `ClientAliveInterval 300` and a forced validate failure (the 300 file is back after the block and the reload came after the copy).
 
 - [ ] **Step 1: Write the failing body tests** in `shipped_bodies_test.go`:
 
@@ -2634,12 +2720,12 @@ func TestSessionTimeoutKeepsAValueInRange(t *testing.T) {
 - [ ] **Step 2: Run** on the lab: `go test ./internal/remedy/ -run 'TestPasswordPolicyBody|TestLineBodies|TestSessionTimeout'`. Expected: FAIL (no script).
 - [ ] **Step 3: Write the four blocks**, the risk change, the default-list reorder and the texts.
 - [ ] **Step 4: Run** the Step 2 tests (PASS). Run `go test ./internal/remedy/ -run TestShippedRootLogin` (unchanged control, unchanged behaviour).
-- [ ] **Step 5: Mutation and fixtures.** `go test ./internal/controls/ -run TestEveryMutantIsKilled`. The reorder makes `umask_policy`'s `params.acceptable.default drop[0]` drop `"027"`: if it survives, add `controls/testdata/muster.account.umask_policy/fail-umask-027-dropped.json` — copy the existing `pass-*.json` fixture whose `accounts.login_defs.umask` is `"022"`, set it to `"027"`, and rename it `pass-umask-027.json` (a PASS at the default that the mutant turns FAIL kills it). Re-run until zero survivors.
+- [ ] **Step 5: Mutation and fixtures.** `go test ./internal/controls/ -run TestEveryMutantIsKilled`. The reorder makes `umask_policy`'s `params.acceptable.default drop[0]` drop `"027"`; the existing `pass-mutant-umask-027.json` (umask `"027"`, pam_umask enabled) kills it. Confirm zero survivors; if anything survives, add one fixture named `pass-<name>.json` (S-45).
 - [ ] **Step 6: Run** `go test ./...` (Windows), the two lint commands, regenerate `all-scripted.sh` (48 blocks), shellcheck it on the lab, and `go test ./internal/remedy/ ./internal/collect/collectors/ ./internal/controls/` on the lab as root. Add the four `_roundtrip.yaml` entries as `unproven: "the rows land in Task 9"`.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add controls/account/password_policy.yaml controls/account/umask_policy.yaml controls/account/lockout_threshold.yaml controls/account/session_timeout.yaml controls/testdata internal/remedy/shipped_bodies_test.go internal/remedy/script_test.go internal/remedy/testdata/all-scripted.sh
+git add controls/account/password_policy.yaml controls/account/umask_policy.yaml controls/account/lockout_threshold.yaml controls/account/session_timeout.yaml controls/testdata internal/remedy/shipped_bodies_test.go internal/remedy/testdata/all-scripted.sh
 git commit -m "controls: password, umask, lockout and session scripts that only tighten; password_policy is lockout_risk"
 ```
 
@@ -2700,7 +2786,7 @@ git commit -m "controls: password, umask, lockout and session scripts that only 
           - key: runner
             kind: host
             seeded: >-
-              muster.account.cron_permissions muster.account.session_timeout
+              muster.account.cron_permissions muster.account.password_policy muster.account.session_timeout
               muster.account.umask_policy muster.beyond.aslr_and_link_protection
               muster.beyond.audit_log_permissions muster.beyond.bootloader_config_permissions
               muster.beyond.icmp_broadcast_and_bogus_ignored muster.beyond.icmp_redirects_ignored
@@ -2711,11 +2797,11 @@ git commit -m "controls: password, umask, lockout and session scripts that only 
               muster.beyond.source_routing_rejected muster.beyond.suid_dumpable_disabled
               muster.beyond.syn_cookies_enabled muster.beyond.sysrq_restricted
               muster.beyond.uncommon_filesystems_disabled muster.beyond.uncommon_network_protocols_disabled
-              muster.beyond.unprivileged_bpf_restricted muster.file.inetd_conf_permissions
-              muster.file.syslog_conf_permissions
+              muster.beyond.unprivileged_bpf_restricted muster.file.hosts_permissions muster.file.inetd_conf_permissions
+              muster.file.shadow_permissions muster.file.syslog_conf_permissions
 ```
 
-  `sudoers_permissions` is NOT seeded on the runner: the job's own `sudo` reads `/etc/sudoers`, and a seed that loosens it could stop every later step. The container rows' `seeded` lists gain the new ids `probe.md` assigns them (hypothesis: the EL rows gain `cron_permissions`, `sudoers_permissions`, `umask_policy`, `password_policy`, `lockout_threshold`, `session_timeout`, `nfs_export_access`, `ftpusers_permissions`, `inetd_conf_permissions`, `syslog_conf_permissions`, `log_dir_permissions`; `debian12-init` gains the same minus `password_policy`, `lockout_threshold`, `session_timeout`; `ubuntu2204` gains `cron_permissions`, `sudoers_permissions`, `umask_policy`, `inetd_conf_permissions`, `syslog_conf_permissions`, `log_dir_permissions`).
+  `sudoers_permissions` is NOT seeded on the runner: the job's own `sudo` reads `/etc/sudoers`, and a seed that loosens it could stop every later step. The container rows' `seeded` lists gain the ids `probe.md` (Step 3) measured: the EL rows gain `cron_permissions`, `sudoers_permissions`, `umask_policy`, `password_policy`, `lockout_threshold`, `session_timeout`, `nfs_export_access`, `ftpusers_permissions`, `inetd_conf_permissions`, `syslog_conf_permissions`, `log_dir_permissions`; `debian12-init` gains `cron_permissions`, `sudoers_permissions`, `inetd_conf_permissions`, `log_dir_permissions`, `syslog_conf_permissions`, `ftpusers_permissions`, `nfs_export_access` (no `umask_policy`: Debian 12 stacks no `pam_umask`, S-44); `ubuntu2204` gains `cron_permissions`, `sudoers_permissions`, `umask_policy`, `inetd_conf_permissions`, `syslog_conf_permissions`, `log_dir_permissions`. The runner's list carries `hosts_permissions` and `shadow_permissions` (stock-FAIL scripted controls its seed puts back, S-18) and `password_policy` (probe: `libpam-pwquality` installs on 24.04; the image's one hashed account must be younger than 90 days, else the body skips it with a log line and the row reads FAIL — a rebuilt image is the fix, not a seed). A seed id whose control already FAILs at stock is still listed: the seed documents the intent.
 
 - [ ] **Step 4: The run step.** Add `env: { KIND: "${{ matrix.kind }}" }` to the step, and replace its `run:` with:
 
@@ -2780,8 +2866,11 @@ else
   [ "$g1" = on ] && [ "$g2" = on ] && [ -n "$h1" ] && [ "$h1" = "$h2" ] \
     || { echo "runner: the guard must be on and the machine id stable (guard $g1/$g2, hash $h1/$h2)"; exit 1; }
   ids() { jq -r '[.items[] | select(.planned and .script) | .id] | sort | .[]' "$1"; }
-  [ "$(ids "$d/repair/plan.json")" = "$(ids "$d/fail/plan.json")" ] \
-    || { echo "runner: the failure plan's scripted ids differ from the repair plan's"; ids "$d/repair/plan.json"; echo ---; ids "$d/fail/plan.json"; exit 1; }
+  for id in ${{ matrix.seeded }}; do
+    ids "$d/fail/plan.json" | grep -qx "$id" || { echo "runner: seeded $id is not a scripted item of the failure plan"; exit 1; }
+  done
+  extra=$(comm -13 <(ids "$d/repair/plan.json") <(ids "$d/fail/plan.json"))
+  [ -z "$extra" ] || { echo "runner: the failure plan scripts ids the repair plan did not: $extra"; exit 1; }
 fi
 sed -n '/^modes_paths() {/,/^}/p' "$d/fail/fix.sh" > "$d/fail/modes_paths.sh"
 record() { # unit states; backup-path stats, checksums and ACLs; sysctl values; module load states; modes-entry stats
@@ -2803,7 +2892,10 @@ record() { # unit states; backup-path stats, checksums and ACLs; sysctl values; 
   done
   jq -r '.items[] | select(.planned and .script) | .modes[]' "$d/fail/plan.json" | sort -u | while IFS= read -r e; do
     x sh -c '. "$1"; modes_paths "$2" | while IFS= read -r p; do printf "mode %s %s\n" "$p" "$(stat -c "%u %g %a" -- "$p")"; done' _ "$(out "$d/fail")/modes_paths.sh" "$e" < /dev/null
-  done | sort
+  done | sort -u
+  if jq -e '[.items[] | select(.planned and .script and .id == "muster.account.password_policy")] | length == 1' "$d/fail/plan.json" > /dev/null; then
+    x awk -F: 'NF >= 8 && $1 !~ /^#/ && $1 != "" { print "ageing", $1, $4, $5 }' /etc/shadow < /dev/null
+  fi
 }
 same() { # same <before> <after>: equal records, except that a modes-entry path gone since (a rotated log) is no difference
   diff <(grep -v '^mode ' "$1") <(grep -v '^mode ' "$2")
@@ -2833,7 +2925,7 @@ record > "$d/fail/record-after"
 same "$d/fail/record-before" "$d/fail/record-after"
 ```
 
-  The step runs under GitHub's default `bash -e` (`diff <(…)` needs bash); the header comment of the job (`:506-511`) gains "A host row (3D-2c) runs on the runner VM itself: no container, no guard run, and the failure run re-seeds the same VM." On the runner the repair plan also carries every stock-FAIL scripted control (for example `hosts_permissions` → 0600), so non-root `/etc/hosts` reads fail until the failure run restores it; the job's non-root steps (`jq`, `./bin/muster fix`) read only the run directory.
+  The step runs under GitHub's default `bash -e` (`diff <(…)` needs bash); the header comment of the job (`:506-511`) gains "A host row (3D-2c) runs on the runner VM itself: no container, no guard run, and the failure run re-seeds the same VM." On the runner the repair plan also carries every stock-FAIL scripted control (`hosts_permissions` → 0600, `shadow_permissions`), so non-root `/etc/hosts` reads fail between the repair run and the re-seed, which puts the stock modes back (S-18); the job's non-root steps (`jq`, `./bin/muster fix`) read only the run directory. The header comment also names the ageing comparison (S-36). `record()`'s ageing lines carry name, min and max only, never the hash field.
 
 - [ ] **Step 5: `ci/roundtrip/runner.sh`** (shellcheck-clean, `set -eu`):
 
@@ -2841,10 +2933,11 @@ same "$d/fail/record-before" "$d/fail/record-after"
 #!/bin/sh
 # runner.sh seeds the GitHub runner VM for the fix-roundtrip host row
 # (3D-2c §5). It is idempotent: it removes every file a review script wrote,
-# then applies every seed again, so the failure run plans the same blocks.
+# puts back the stock modes the repair run tightened, then applies every seed
+# again, so the failure run plans every seeded block (S-18).
 set -eu
 export DEBIAN_FRONTEND=noninteractive
-if ! command -v auditctl >/dev/null 2>&1; then apt-get update -q && apt-get install -y -q auditd; fi
+if ! command -v auditctl >/dev/null 2>&1 || ! dpkg -s libpam-pwquality >/dev/null 2>&1; then apt-get update -q && apt-get install -y -q auditd libpam-pwquality; fi
 rm -f /etc/sysctl.d/99-muster-*.conf /etc/modprobe.d/99-muster-*.conf \
   /etc/ssh/sshd_config.d/00-muster-session.conf /etc/security/pwquality.conf.d/99-muster.conf
 for kv in kernel.randomize_va_space=0 net.ipv4.icmp_echo_ignore_broadcasts=0 net.ipv4.conf.default.accept_redirects=1 \
@@ -2855,19 +2948,29 @@ for kv in kernel.randomize_va_space=0 net.ipv4.icmp_echo_ignore_broadcasts=0 net
   sysctl -q -w "$kv"
 done
 for m in udf sctp tipc; do modprobe --ignore-install "$m"; done
-chmod 644 /boot/grub/grub.cfg /var/log/audit/audit.log /etc/crontab /etc/rsyslog.conf
+chmod 644 /boot/grub/grub.cfg /var/log/audit/audit.log /etc/crontab /etc/rsyslog.conf /etc/hosts
+chgrp shadow /etc/shadow && chmod 640 /etc/shadow   # the stock-FAIL scripted controls the repair run fixed (S-18)
 install -m 644 /dev/null /etc/inetd.conf
 sed -i 's/^ClientAliveInterval .*/ClientAliveInterval 900/' /etc/ssh/sshd_config.d/50-cloudimg-settings.conf
 if grep -q '^UMASK' /etc/login.defs; then sed -i 's/^UMASK.*/UMASK 002/' /etc/login.defs; else printf 'UMASK 002\n' >> /etc/login.defs; fi
 ```
 
-  (The `sysctl` seed list, the module list and the `ClientAliveInterval` file are `probe.md`'s; if it found the value elsewhere, the seed rewrites that file.) Edit the four container seeds per `probe.md`: the package additions (EL: `sudo cronie rsyslog vsftpd`, and `authselect enable-feature with-faillock` plus `deny = 99` in `/etc/security/faillock.conf`; Debian/Ubuntu: `sudo cron rsyslog vsftpd` under the existing `policy-rc.d`), and the per-control seed lines of spec §5's container table (`chmod 644 /etc/sudoers /etc/crontab /etc/rsyslog.conf`, `install -m 644 /dev/null /etc/inetd.conf`, `install -m 666 /dev/null /etc/exports` on init rows, `chmod 644` on the vsftpd access file, `install -m 666 /dev/null /var/log/ci.log`, `UMASK 002`, on EL `PASS_MAX_DAYS 99999` and a hashed account changed today — `useradd -m ci && printf 'ci:%s
-' "$(od -An -N12 -tx1 /dev/urandom | tr -d ' 
-')" | chpasswd` (a random password: no literal for the secret scanner) — and `ClientAliveInterval 900` in `/etc/ssh/sshd_config.d/99-ci.conf`, which sorts after `00-muster-session.conf`).
+  (The `sysctl` seed list, the module list and the `ClientAliveInterval` file are `probe.md`'s; if it found the value elsewhere, the seed rewrites that file.) Edit the four container seeds per `probe.md` Step 3 (S-29, S-44), each line `rc=0` there:
+
+  - **EL** (`rocky9-init.sh`, `almalinux9-init.sh`): `dnf install -y -q sudo cronie rsyslog vsftpd authselect passwd`; then `chmod 644 /etc/sudoers`, `install -m 644 /dev/null /etc/inetd.conf`, `install -m 666 /dev/null /etc/exports`, `chmod 644 /etc/vsftpd/ftpusers`, `install -m 666 /dev/null /var/log/ci.log`, the `UMASK 002` sed, `authselect select minimal with-faillock --force`, `printf 'deny = 99\n' >> /etc/security/faillock.conf`, `printf 'ClientAliveInterval 900\n' > /etc/ssh/sshd_config.d/99-ci-session.conf` (its own file: `99-ci.conf` keeps `PermitRootLogin yes`; it sorts after `00-muster-session.conf`, so the drop-in wins), and a hashed account changed today with a random password (no literal for the secret scanner):
+
+```sh
+useradd -m ci
+printf 'ci:%s\n' "$(od -An -N12 -tx1 /dev/urandom | tr -d ' \n')" | chpasswd
+```
+
+  - **debian12-init**: `sudo cron rsyslog vsftpd` join the existing `apt-get install` inside its `policy-rc.d` window; then `chmod 644 /etc/sudoers`, `install -m 644 /dev/null /etc/inetd.conf`, `install -m 666 /dev/null /etc/exports`, `install -m 666 /dev/null /var/log/ci.log` (no UMASK seed, S-44).
+  - **ubuntu2204**: `apt-get install -y -q sudo cron rsyslog` (no init, so no `policy-rc.d`); then `chmod 644 /etc/sudoers`, `install -m 644 /dev/null /etc/inetd.conf`, `install -m 666 /dev/null /var/log/ci.log`, the `UMASK 002` sed.
+  - Dropped as no-ops (stock already FAILs; S-44): `chmod 644 /etc/crontab`, `chmod 644 /etc/rsyslog.conf`, Debian's `chmod 644 /etc/ftpusers`. Each init seed's settle check is unchanged.
 
 - [ ] **Step 6: The floors.** `ci.yml`'s round-trip loop floor `[ "$n" -ge 5 ]` becomes 6, as does the Makefile's (`roundtrip scripts checked, want at least 6`, and its comment).
 
-- [ ] **Step 7: The table.** In `_roundtrip.yaml`, the header's list of causes gains "or the kernel does not ship the module"; each of the 32 entries Tasks 5–8 wrote as `unproven: "… Task 9"` becomes its `probe.md` row list (`images: [runner]` for the beyond controls; `unproven_units` for each module the runner kernel does not ship — `cramfs`, `freevxfs`, `jffs2`, `hfs`, `hfsplus` and `dccp`, `rds`, with the reason "the runner kernel does not ship it"); `usb_storage_disabled` stays `unproven: "the runner kernel does not ship usb-storage"`; `bootloader_config_permissions` gains no note (its ESP class is in the spec's §7).
+- [ ] **Step 7: The table.** In `_roundtrip.yaml`, the header's list of causes gains "or the kernel does not ship the module"; each of the 32 entries Tasks 5–8 wrote as `unproven: "… Task 9"` becomes its row list from `probe.md`'s "Proposed `_roundtrip.yaml` entries" (that table is authoritative: `umask_policy` without debian12-init, `password_policy` on the EL rows and `runner`, `session_timeout` on the EL rows and `runner`, `sudoers_permissions` and `log_dir_permissions` on the four container rows); `hosts_permissions` and `shadow_permissions` gain `runner` in their images (S-18). The rest of the original instruction (`images: [runner]` for the beyond controls; `unproven_units` for each module the runner kernel does not ship — `cramfs`, `freevxfs`, `jffs2`, `hfs`, `hfsplus` and `dccp`, `rds`, with the reason "the runner kernel does not ship it"); `usb_storage_disabled` stays `unproven: "the runner kernel does not ship usb-storage"`; `bootloader_config_permissions` gains no note (its ESP class is in the spec's §7).
 
 - [ ] **Step 8: Run** `go test ./internal/controls/ -run TestEveryScriptedControlIsInTheRoundtripTable` (PASS), shellcheck `ci/roundtrip/*.sh` on the lab through the image, and `go test ./...` on Windows.
 
@@ -2886,7 +2989,7 @@ The branch's first CI run is the runner row's proof; until it is green, Task 9 i
 
 **Files:** the main design pair, `CLAUDE.md`, the `CONTRIBUTING` pair, the `README` pair, `THREAT_MODEL.md`, `CHANGELOG.md`, the 3D-2c spec pair. Line numbers from `code-map-docs.md`.
 
-- [ ] **Step 1: The 3D-2c spec pair** (the spec as built): §6 "the file-validate test over six controls" → five (S-8); §4.4 `lockout_threshold` → the missing-`deny` default of 3 and the `[1, max]` gate (S-9); `password_policy` → `required_classes` and the PAM-argument note (S-10); `session_timeout` → the per-keyword value-in-range rule and the guarded validate (S-11, reversing the round-2 wording); §4.3 `ftpusers`/`nfs` `chown root` (S-13); `modules_charset` start rule (S-7). One sentence each, EN and KO.
+- [ ] **Step 1: The 3D-2c spec pair** (the spec as built), including every correction S-33 lists (S-18, S-21, S-24, S-31, S-33, S-35, S-38, S-40, S-46 and the sudoers/runner, mask-test, cron-install and failure-order sentences): §6 "the file-validate test over six controls" → five (S-8); §4.4 `lockout_threshold` → the missing-`deny` default of 3 and the `[1, max]` gate (S-9); `password_policy` → `required_classes` and the PAM-argument note (S-10); `session_timeout` → the per-keyword value-in-range rule and the guarded validate (S-11, reversing the round-2 wording); §4.3 `ftpusers`/`nfs` `chown root` (S-13); `modules_charset` start rule (S-7). One sentence each, EN and KO.
 - [ ] **Step 2: Main design pair** (line-aligned, EN = KO line): `:552` D34 — after the hash clause, "a parameter's value is not a host value: it enters a command only as a `P_` assignment under the type charset (3D-2c)", and "independent" becomes "independent, each recording and restoring what it found"; `:94` the `internal/remedy` row names the hash and the `P_` assignments as the two admitted non-literal classes, both enforced by `templateLines`; `:282` §6.2 adds `script_params`, `script_on_absent`, `modes`, `sysctl`, `modules`, the way back of six kinds, drops "outside `/muster-units`", says units exclude the three record kinds, "stages 3D-2, 3D-2b and 3D-2c"; `:370` §6.8 replaces the shared-path sentence with "From stage 3D-2c each block records under its own directory, so two controls may declare the same path or unit."; `:414` §7.5 adds the `P_` lines, `$MUSTER_BACKUP/blocks/<fn>/`, the record kinds, the six rollback words and the failure order, rewords "proven on throwaway containers" to "proven in CI (containers, and the runner VM for what a container cannot judge)", and links the 3D-2c design; `:468` §10.2 marks 3D-2c merged with its design link and names 3D-2d (the audit family, `account_inactivity_lock`, the content halves).
 - [ ] **Step 3: `CLAUDE.md`** `## Fix` (`:173-252`) per the code map's table: the heading gains 3D-2c; the plan bullet (S-2's order, `params_unsafe`, `script_on_absent`, S-4's re-checks); the script bullet (the prologue's new helpers before `failed=0`, `MB=` and `P_` lines, the six-step failure order, `$MB/files`, `$MB/absent`); the host-guard bullet (`templateLines` also admits the `P_`, `MB` and record lines); the units bullet (`$MB/units/<u>`, the three deleted lints, `units_exclusive` over the record kinds, the six words); the bodies bullet (the way back of six kinds, the third validate shape, the three new charsets, E-8, E-9's guards and mask formula, E-11, E-13, the file-validate test by owner table, 48 shipped bodies); the round-trip bullets (`kind`, the `runner` host row and `ci/roundtrip/runner.sh`, `record()`'s three additions, `same`, floors 6); the risk bullet (the forwarding controls and `usb_storage_disabled` `restart_service`, `password_policy` `lockout_risk`). The build list's "five round-trip scripts" → six.
 - [ ] **Step 4: `CONTRIBUTING` pair** `### Remediation bodies`: the way back of six kinds; `P_<name>` and its five positions (never first on a line, never in an `s/` command — use `|`); E-8 (write only when outside the accepted set; validate set membership); E-9 (guards, `! -type l`/`-type f`, the mask formula); a `modes` entry, never a `backup`, for a path a body only re-modes; E-11 (a daemon's file is removed in the rollback before the reload); E-13 (a write's side effect on another judged key is the writer's); the third validate shape; the CI list in `## Tests` gains the runner row.
@@ -2898,10 +3001,16 @@ The branch's first CI run is the runner row's proof; until it is green, Task 9 i
 ## Merge (the user's word)
 
 1. The user says push: `git push -u origin stage3d2c-remedy-scripts`; dispatch `examples.yml` on the branch (`gh workflow run examples.yml --ref stage3d2c-remedy-scripts`).
-2. Download the artifact into an empty scratch directory (`gh run download <id> -n examples-<id> -D <scratch>`; `make examples-fetch` will not overwrite), copy the files over `examples/`, review the diff (the fix reports gain the five item fields, the `MB=` lines, the new helpers and the runner VM's stock-FAIL blocks; the check reports change only by `umask_policy`'s parameter order), update `examples/README.md`'s run number, and commit (`examples: refresh from the branch's examples run`).
+2. Download the artifact into an empty scratch directory (`gh run download <id> -n examples-<id> -D <scratch>`; `make examples-fetch` will not overwrite), copy the files over `examples/`, review the diff (the fix reports gain the five item fields, the `MB=` lines, the new helpers and the runner VM's stock-FAIL blocks; the check reports and both example snapshots change by `controls_version`, `controls_digest`, the profile digest and `umask_policy`'s parameter order — no status changes), update `examples/README.md`'s run number, and commit (`examples: refresh from the branch's examples run`).
 3. Open the PR (body ends with the Claude Code line); watch CI. The `fix-roundtrip` runner row is new: read its log whole on the first run, even when green.
 4. Merge on the user's word; remove the worktree and the branch; update the project memory.
 
 ## Execution notes
 
-(Rulings, review findings and the lab and CI runs go here as the tasks land.)
+### Pre-flight (one fresh-review workflow, 183 agents: eight lenses, three refuters per finding, a critic)
+
+- 58 findings: 57 survived (8 blocking, 18 important, 31 minor; about 40 distinct after duplicates), 1 refuted (a refused no-op sysctl write would not report `ROLLBACK INCOMPLETE`); 4 critic findings. All folded as S-18..S-46 together with the probe (Task 1) and its coupling pass.
+- The blocking ones: the runner's id-equality check could never hold (S-18); `record()`'s duplicate mode lines (S-19); the poison sentinel already in the hash (S-20); a `gte` glob that accepts `1` (S-21); SC2043 on the one-module loop (S-22); the bare-stat assertion catching two of its own task's validates (S-23).
+- Probe surprises folded: no authselect configuration on the EL images (S-29), no `/etc/pam.d/passwd` on rocky9 (S-29), Debian 12 without `pam_umask` and EL9 without `PASS_MIN_LEN` (S-44), `ipv6 all.forwarding` copying into `default.forwarding` (S-46).
+
+(Rulings settled during execution, review findings and the lab and CI runs go here as the tasks land.)
