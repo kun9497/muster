@@ -391,16 +391,31 @@ func TestBackupMarkerCases(t *testing.T) {
 
 // sysctlStub keeps one file per key under $SYSCTL_STATE; a key with a
 // .oneway file refuses a write once its value is in that file; every -w is
-// logged to $SYSCTL_STATE/calls.
+// logged to $SYSCTL_STATE/calls. Two writes move another key, as the kernel's
+// do (probe.md, "Sysctl coupling"): a changing write to net.ipv4.ip_forward
+// sets net.ipv4.conf.all.accept_redirects to its negation (E-13, S-43), and a
+// write to net.ipv6.conf.all.forwarding copies the value into
+// net.ipv6.conf.default.forwarding (S-46). Neither side effect is logged.
 const sysctlStub = `s="$SYSCTL_STATE"
 case "$1" in
   -n) shift; [ "$1" = -- ] && shift; f="$s/$1"; [ -f "$f" ] || exit 255; cat "$f";;
   -q) shift; [ "$1" = -w ] && shift; [ "$1" = -- ] && shift
       k=${1%%=*}; v=${1#*=}; [ -f "$s/$k" ] || exit 255
-      if [ -f "$s/$k.oneway" ] && grep -qx "$(cat "$s/$k")" "$s/$k.oneway"; then exit 1; fi
-      printf '%s\n' "$v" > "$s/$k"; printf 'w %s=%s\n' "$k" "$v" >> "$s/calls";;
+      old=$(cat "$s/$k")
+      if [ -f "$s/$k.oneway" ] && grep -qx "$old" "$s/$k.oneway"; then exit 1; fi
+      printf '%s\n' "$v" > "$s/$k"; printf 'w %s=%s\n' "$k" "$v" >> "$s/calls"
+      case "$k" in
+        net.ipv4.ip_forward)
+          if [ "$old" != "$v" ] && [ -f "$s/net.ipv4.conf.all.accept_redirects" ]; then
+            if [ "$v" = 0 ]; then n=1; else n=0; fi
+            printf '%s\n' "$n" > "$s/net.ipv4.conf.all.accept_redirects"
+          fi;;
+        net.ipv6.conf.all.forwarding)
+          if [ -f "$s/net.ipv6.conf.default.forwarding" ]; then printf '%s\n' "$v" > "$s/net.ipv6.conf.default.forwarding"; fi;;
+      esac;;
   *) exit 2;;
 esac
+exit 0
 `
 
 const modprobeStub = `s="$MODPROBE_STATE"

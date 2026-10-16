@@ -10,6 +10,38 @@
 # the ids whose `images` name that row. The fixture harness never loads this file.
 - id: muster.account.root_remote_login
   images: [almalinux9-init, rocky9-init]
+- id: muster.beyond.aslr_and_link_protection
+  unproven: "the runner row (Task 9) proves it; containers gate beyond controls out"
+- id: muster.beyond.icmp_broadcast_and_bogus_ignored
+  unproven: "the runner row (Task 9) proves it; containers gate beyond controls out"
+- id: muster.beyond.icmp_redirects_ignored
+  unproven: "the runner row (Task 9) proves it; containers gate beyond controls out"
+- id: muster.beyond.ip_forwarding_disabled
+  unproven: "the runner row (Task 9) proves it; containers gate beyond controls out"
+- id: muster.beyond.ipv6_forwarding_disabled
+  unproven: "the runner row (Task 9) proves it; containers gate beyond controls out"
+- id: muster.beyond.ipv6_redirects_ignored
+  unproven: "the runner row (Task 9) proves it; containers gate beyond controls out"
+- id: muster.beyond.ipv6_router_advertisements_ignored
+  unproven: "the runner row (Task 9) proves it; containers gate beyond controls out"
+- id: muster.beyond.ipv6_source_routing_rejected
+  unproven: "the runner row (Task 9) proves it; containers gate beyond controls out"
+- id: muster.beyond.kernel_pointer_exposure
+  unproven: "the runner row (Task 9) proves it; containers gate beyond controls out"
+- id: muster.beyond.ptrace_restriction
+  unproven: "the runner row (Task 9) proves it; containers gate beyond controls out"
+- id: muster.beyond.reverse_path_filtering
+  unproven: "the runner row (Task 9) proves it; containers gate beyond controls out"
+- id: muster.beyond.source_routing_rejected
+  unproven: "the runner row (Task 9) proves it; containers gate beyond controls out"
+- id: muster.beyond.suid_dumpable_disabled
+  unproven: "the runner row (Task 9) proves it; containers gate beyond controls out"
+- id: muster.beyond.syn_cookies_enabled
+  unproven: "the runner row (Task 9) proves it; containers gate beyond controls out"
+- id: muster.beyond.sysrq_restricted
+  unproven: "the runner row (Task 9) proves it; containers gate beyond controls out"
+- id: muster.beyond.unprivileged_bpf_restricted
+  unproven: "the runner row (Task 9) proves it; containers gate beyond controls out"
 - id: muster.file.hosts_lpd_permissions
   images: [almalinux9-init, debian12-init, rocky9-init, ubuntu2204]
 - id: muster.file.hosts_permissions

@@ -25,7 +25,25 @@ checks:
   - { fact: net.sysctl.ipv4_all_send_redirects, op: eq, expected: 0 }
   - { fact: net.sysctl.ipv4_default_send_redirects, op: eq, expected: 0 }
 remediation:
-  text_en: Write the six values as 0 - net.ipv4.conf.all.accept_redirects, net.ipv4.conf.default.accept_redirects, the same two for secure_redirects and for send_redirects - into a file under /etc/sysctl.d, for example /etc/sysctl.d/60-network-hardening.conf, and apply it with sysctl --system; they take effect at once. A host that really routes for its link may need send_redirects; such a host waives the finding.
-  text_ko: net.ipv4.conf.all.accept_redirects, net.ipv4.conf.default.accept_redirects 와 secure_redirects, send_redirects 의 같은 두 값, 모두 여섯 값을 0 으로 /etc/sysctl.d 아래 파일(예 /etc/sysctl.d/60-network-hardening.conf)에 적고 sysctl --system 으로 적용합니다. 즉시 반영됩니다. 실제로 링크를 위해 라우팅하는 호스트는 send_redirects 가 필요할 수 있으며 그런 호스트는 예외(waiver)로 처리합니다.
+  text_en: Write the six values as 0 - net.ipv4.conf.all.accept_redirects, net.ipv4.conf.default.accept_redirects, the same two for secure_redirects and for send_redirects - into /etc/sysctl.d/99-muster-icmp-redirects-ignored.conf and apply it with sysctl --system; they take effect at once. A host that really routes for its link may need send_redirects; such a host waives the finding. A value set in /etc/sysctl.conf, or in a sysctl.d file that sorts after 99-muster-icmp-redirects-ignored.conf, still wins at boot; correct it there. The review script never follows a symlink; a 99-muster-icmp-redirects-ignored.conf that is a symlink (a mask) is left as is and the block stops.
+  text_ko: net.ipv4.conf.all.accept_redirects, net.ipv4.conf.default.accept_redirects 와 secure_redirects, send_redirects 의 같은 두 값, 모두 여섯 값을 0 으로 /etc/sysctl.d/99-muster-icmp-redirects-ignored.conf 에 적고 sysctl --system 으로 적용합니다. 즉시 반영됩니다. 실제로 링크를 위해 라우팅하는 호스트는 send_redirects 가 필요할 수 있으며 그런 호스트는 예외(waiver)로 처리합니다. /etc/sysctl.conf나 99-muster-icmp-redirects-ignored.conf 뒤에 정렬되는 sysctl.d 파일에 둔 값이 부팅 때 여전히 이기므로 그 파일을 고치십시오. 검토 스크립트는 심볼릭 링크를 따라가지 않으므로, 심볼릭 링크(마스크)인 99-muster-icmp-redirects-ignored.conf 는 그대로 두고 그 블록을 멈춥니다.
   risk: none
   idempotent: true
+  sysctl: [net.ipv4.conf.all.accept_redirects, net.ipv4.conf.default.accept_redirects, net.ipv4.conf.all.secure_redirects, net.ipv4.conf.default.secure_redirects, net.ipv4.conf.all.send_redirects, net.ipv4.conf.default.send_redirects]
+  backup: [/etc/sysctl.d/99-muster-icmp-redirects-ignored.conf]
+  script: |
+    f=/etc/sysctl.d/99-muster-icmp-redirects-ignored.conf
+    if [ -L "$f" ]; then log "muster.beyond.icmp_redirects_ignored: $f is a symlink (a mask), left as is"; exit 1; fi
+    put() {
+      sysctl -q -w "$1=$2"
+      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else printf '%s = %s\n' "$1" "$2" >> "$f"; fi
+    }
+    case "$(sysctl -n net.ipv4.conf.all.accept_redirects)" in 0) ;; *) put net.ipv4.conf.all.accept_redirects 0;; esac
+    case "$(sysctl -n net.ipv4.conf.default.accept_redirects)" in 0) ;; *) put net.ipv4.conf.default.accept_redirects 0;; esac
+    case "$(sysctl -n net.ipv4.conf.all.secure_redirects)" in 0) ;; *) put net.ipv4.conf.all.secure_redirects 0;; esac
+    case "$(sysctl -n net.ipv4.conf.default.secure_redirects)" in 0) ;; *) put net.ipv4.conf.default.secure_redirects 0;; esac
+    case "$(sysctl -n net.ipv4.conf.all.send_redirects)" in 0) ;; *) put net.ipv4.conf.all.send_redirects 0;; esac
+    case "$(sysctl -n net.ipv4.conf.default.send_redirects)" in 0) ;; *) put net.ipv4.conf.default.send_redirects 0;; esac
+    if [ -f "$f" ] && [ ! -L "$f" ]; then chmod 644 "$f"; fi
+  validate: |
+    case "$(sysctl -n net.ipv4.conf.all.accept_redirects)" in 0) ;; *) false;; esac && case "$(sysctl -n net.ipv4.conf.default.accept_redirects)" in 0) ;; *) false;; esac && case "$(sysctl -n net.ipv4.conf.all.secure_redirects)" in 0) ;; *) false;; esac && case "$(sysctl -n net.ipv4.conf.default.secure_redirects)" in 0) ;; *) false;; esac && case "$(sysctl -n net.ipv4.conf.all.send_redirects)" in 0) ;; *) false;; esac && case "$(sysctl -n net.ipv4.conf.default.send_redirects)" in 0) ;; *) false;; esac

@@ -587,9 +587,22 @@ func TestScriptUnitsBlockOrder(t *testing.T) {
 }
 
 func TestScriptAllScriptedCoversTheShippedSet(t *testing.T) {
+	set, err := controls.LoadDefault()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := 0
+	for _, c := range set.Controls {
+		if c.Remediation != nil && strings.TrimSpace(c.Remediation.Script) != "" {
+			want++
+		}
+	}
+	if want < 16 {
+		t.Fatalf("%d shipped controls declare a script, want at least 16", want)
+	}
 	p := allScriptedPlan(t)
-	if len(p.Items) != 16 || p.Summary.WithScript != 16 {
-		t.Fatalf("all-scripted plan: %d items, %d with script; want 16 and 16", len(p.Items), p.Summary.WithScript)
+	if len(p.Items) != want || p.Summary.WithScript != want {
+		t.Fatalf("all-scripted plan: %d items, %d with script; want %d and %d", len(p.Items), p.Summary.WithScript, want, want)
 	}
 	defs := 0
 	for _, l := range lines(Script(p)) {
@@ -597,8 +610,8 @@ func TestScriptAllScriptedCoversTheShippedSet(t *testing.T) {
 			defs++
 		}
 	}
-	if defs != 16 {
-		t.Fatalf("all-scripted.sh defines %d functions, want 16", defs)
+	if defs != want {
+		t.Fatalf("all-scripted.sh defines %d functions, want %d", defs, want)
 	}
 }
 

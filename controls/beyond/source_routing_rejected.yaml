@@ -19,7 +19,21 @@ checks:
   - { fact: net.sysctl.ipv4_all_accept_source_route, op: eq, expected: 0 }
   - { fact: net.sysctl.ipv4_default_accept_source_route, op: eq, expected: 0 }
 remediation:
-  text_en: Write net.ipv4.conf.all.accept_source_route = 0 and net.ipv4.conf.default.accept_source_route = 0 into a file under /etc/sysctl.d and apply it with sysctl --system; they take effect at once.
-  text_ko: /etc/sysctl.d 아래 파일에 net.ipv4.conf.all.accept_source_route = 0 과 net.ipv4.conf.default.accept_source_route = 0 을 적고 sysctl --system 으로 적용합니다. 즉시 반영됩니다.
+  text_en: Write net.ipv4.conf.all.accept_source_route = 0 and net.ipv4.conf.default.accept_source_route = 0 into /etc/sysctl.d/99-muster-source-routing-rejected.conf and apply it with sysctl --system; they take effect at once. A value set in /etc/sysctl.conf, or in a sysctl.d file that sorts after 99-muster-source-routing-rejected.conf, still wins at boot; correct it there. The review script never follows a symlink; a 99-muster-source-routing-rejected.conf that is a symlink (a mask) is left as is and the block stops.
+  text_ko: /etc/sysctl.d/99-muster-source-routing-rejected.conf 에 net.ipv4.conf.all.accept_source_route = 0 과 net.ipv4.conf.default.accept_source_route = 0 을 적고 sysctl --system 으로 적용합니다. 즉시 반영됩니다. /etc/sysctl.conf나 99-muster-source-routing-rejected.conf 뒤에 정렬되는 sysctl.d 파일에 둔 값이 부팅 때 여전히 이기므로 그 파일을 고치십시오. 검토 스크립트는 심볼릭 링크를 따라가지 않으므로, 심볼릭 링크(마스크)인 99-muster-source-routing-rejected.conf 는 그대로 두고 그 블록을 멈춥니다.
   risk: none
   idempotent: true
+  sysctl: [net.ipv4.conf.all.accept_source_route, net.ipv4.conf.default.accept_source_route]
+  backup: [/etc/sysctl.d/99-muster-source-routing-rejected.conf]
+  script: |
+    f=/etc/sysctl.d/99-muster-source-routing-rejected.conf
+    if [ -L "$f" ]; then log "muster.beyond.source_routing_rejected: $f is a symlink (a mask), left as is"; exit 1; fi
+    put() {
+      sysctl -q -w "$1=$2"
+      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else printf '%s = %s\n' "$1" "$2" >> "$f"; fi
+    }
+    case "$(sysctl -n net.ipv4.conf.all.accept_source_route)" in 0) ;; *) put net.ipv4.conf.all.accept_source_route 0;; esac
+    case "$(sysctl -n net.ipv4.conf.default.accept_source_route)" in 0) ;; *) put net.ipv4.conf.default.accept_source_route 0;; esac
+    if [ -f "$f" ] && [ ! -L "$f" ]; then chmod 644 "$f"; fi
+  validate: |
+    case "$(sysctl -n net.ipv4.conf.all.accept_source_route)" in 0) ;; *) false;; esac && case "$(sysctl -n net.ipv4.conf.default.accept_source_route)" in 0) ;; *) false;; esac

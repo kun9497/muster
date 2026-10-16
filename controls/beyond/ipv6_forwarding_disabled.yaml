@@ -21,7 +21,23 @@ checks:
   - { fact: net.sysctl.ipv6_all_forwarding, op: in, expected: "${allowed_forward}" }
   - { fact: net.sysctl.ipv6_default_forwarding, op: in, expected: "${allowed_forward}" }
 remediation:
-  text_en: Write net.ipv6.conf.all.forwarding = 0 and net.ipv6.conf.default.forwarding = 0 into a file under /etc/sysctl.d and apply it with sysctl --system; they take effect at once. A router, VPN gateway or container host names 1 in params.allowed_forward instead - turning forwarding off there cuts its clients off.
-  text_ko: /etc/sysctl.d 아래 파일에 net.ipv6.conf.all.forwarding = 0 과 net.ipv6.conf.default.forwarding = 0 을 적고 sysctl --system 으로 적용합니다. 즉시 반영됩니다. 라우터, VPN 게이트웨이, 컨테이너 호스트는 포워딩을 끄면 클라이언트가 끊기므로 대신 params.allowed_forward 에 1 을 적습니다.
-  risk: none
+  text_en: Write net.ipv6.conf.all.forwarding = 0 and net.ipv6.conf.default.forwarding = 0 into /etc/sysctl.d/99-muster-ipv6-forwarding-disabled.conf and apply it with sysctl --system; they take effect at once. A router, VPN gateway or container host names 1 in params.allowed_forward instead - turning forwarding off there cuts its clients off. A value set in /etc/sysctl.conf, or in a sysctl.d file that sorts after 99-muster-ipv6-forwarding-disabled.conf, still wins at boot; correct it there. The review script never follows a symlink; a 99-muster-ipv6-forwarding-disabled.conf that is a symlink (a mask) is left as is and the block stops.
+  text_ko: /etc/sysctl.d/99-muster-ipv6-forwarding-disabled.conf 에 net.ipv6.conf.all.forwarding = 0 과 net.ipv6.conf.default.forwarding = 0 을 적고 sysctl --system 으로 적용합니다. 즉시 반영됩니다. 라우터, VPN 게이트웨이, 컨테이너 호스트는 포워딩을 끄면 클라이언트가 끊기므로 대신 params.allowed_forward 에 1 을 적습니다. /etc/sysctl.conf나 99-muster-ipv6-forwarding-disabled.conf 뒤에 정렬되는 sysctl.d 파일에 둔 값이 부팅 때 여전히 이기므로 그 파일을 고치십시오. 검토 스크립트는 심볼릭 링크를 따라가지 않으므로, 심볼릭 링크(마스크)인 99-muster-ipv6-forwarding-disabled.conf 는 그대로 두고 그 블록을 멈춥니다.
+  risk: restart_service
   idempotent: true
+  script_params: [allowed_forward]
+  sysctl: [net.ipv6.conf.all.forwarding, net.ipv6.conf.default.forwarding]
+  backup: [/etc/sysctl.d/99-muster-ipv6-forwarding-disabled.conf]
+  script: |
+    f=/etc/sysctl.d/99-muster-ipv6-forwarding-disabled.conf
+    if [ -L "$f" ]; then log "muster.beyond.ipv6_forwarding_disabled: $f is a symlink (a mask), left as is"; exit 1; fi
+    put() {
+      sysctl -q -w "$1=$2"
+      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else printf '%s = %s\n' "$1" "$2" >> "$f"; fi
+    }
+    first=${P_allowed_forward%% *}
+    case " $P_allowed_forward " in *" $(sysctl -n net.ipv6.conf.all.forwarding) "*) ;; *) put net.ipv6.conf.all.forwarding "$first";; esac
+    case " $P_allowed_forward " in *" $(sysctl -n net.ipv6.conf.default.forwarding) "*) ;; *) put net.ipv6.conf.default.forwarding "$first";; esac
+    if [ -f "$f" ] && [ ! -L "$f" ]; then chmod 644 "$f"; fi
+  validate: |
+    case " $P_allowed_forward " in *" $(sysctl -n net.ipv6.conf.all.forwarding) "*) ;; *) false;; esac && case " $P_allowed_forward " in *" $(sysctl -n net.ipv6.conf.default.forwarding) "*) ;; *) false;; esac
