@@ -689,7 +689,7 @@ restore, one default-list order, the risks of the two forwarding controls, `usb_
 
 ## 8. As built
 
-The implementation plan (`docs/superpowers/plans/2026-10-14-stage3d2c-remedy-scripts.md`, rulings S-1..S-47) and
+The implementation plan (`docs/superpowers/plans/2026-10-14-stage3d2c-remedy-scripts.md`, rulings S-1..S-50) and
 its reviews changed the following. Each line names the section it amends.
 
 - §2 A parameter never appears inside a `sed` `s` expression, whatever the delimiter: a body copies the value to
@@ -720,9 +720,26 @@ its reviews changed the following. Each line names the section it amends.
   collector's whole set of no-op install commands, and the body appends no line for a module one of them already
   disables (S-25). A built-in module cannot be unloaded: its block ends `done` and the control stays FAIL.
 - §4.3 `log_dir_permissions` and the at-spool pass of `cron_permissions` change files only inside a directory
-  `modes_trusted` accepts, walked by shell glob; a directory someone other than root could rename is logged and
+  `modes_trusted` accepts, walked by shell glob; a directory `modes_trusted` refuses (not root-owned, or other-writable, up to `/`) is logged and
   left to the operator, and the validate checks the same set, so the block ends `done` with the control FAIL
   (S-47).
+- §4.3 A system crontab (`/etc/crontab`, `/etc/anacrontab`, `/etc/cron.d/*`) or a sudoers file (`/etc/sudoers`,
+  an active `/etc/sudoers.d/*`) not owned by root is never chowned or re-moded: cron and sudo ignore such a file,
+  and adopting it would activate content another user wrote. The body logs `<id>: <path> is owned by uid N;
+  review it before chown root, left as is`, the validate fails and the block rolls back; root-owned files are
+  repaired as before (S-49).
+- §4.3 `cron_permissions` clears `o-w` on its directories first and `audit_log_permissions` fixes
+  `/var/log/audit` before its log; every file pass then runs only when `modes_trusted "$d/." 0` holds (logged
+  and left otherwise), and the validates mirror the gate (S-50).
+- §4.1 `reverse_path_filtering` keeps writing 1 (strict) and is `restart_service`: strict filtering drops
+  asymmetrically routed traffic, and such a host sets 2 (final review F2).
+- §4.1 A failed forwarding block puts back the global switch (`net.ipv4.ip_forward`, or IPv6's `all` and
+  `default`) only; every interface's forwarding then follows the global value, because the kernel copies it.
+  Both texts say so (final review F5).
+- §3 `restore_modes` runs `chown -h` only when the owner or group differs from the record, so a mode-only
+  restore keeps a file's `security.capability` (final review M1).
+- §4.4 `umask_policy` and `password_policy` refuse a symlinked `/etc/login.defs`: the block logs it and fails
+  before any write (final review K2).
 - §4.3 `cron_permissions` gives a root-group access file the group its setgid reader runs as (`crontab` for
   cron, `daemon` for a setgid-`daemon` `at`) (S-26); the at-spool pass is `chmod u-s,g-wxs,o-rwxt` (S-40).
 - §4.3 `audit_log_permissions` guards the file half of its validate; its text and `ftpusers_permissions`' name

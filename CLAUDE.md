@@ -181,9 +181,10 @@ regenerates them from public images and `-check` compares.
   order (S-2): `no_script` → `absent` (an absent-means-fail row, unless the control declares `script_on_absent: true`)
   → `params_tuned` (a profile or tuning value in force, only for a control without `script_params`) → `params_unsafe`
   (a `script_params` value in force — `check.ParamValues`, the default when the check block carries none — that
-  `controls.ScriptParamValue` refuses: `int` digits, `bool`, a `string`/list element in `^[A-Za-z0-9._/@:+,=-]+$`, a
-  list joined by one space, an empty list refused) → scripted. Items gain `script_params` (`[{name, value}]` by name),
-  `script_on_absent`, `modes`, `sysctl`, `modules` (after `units`; `[]`/`false` unless scripted); plan schema stays 1.
+  `controls.ScriptParamValue` refuses: `int` an optionally signed integer (`^-?[0-9]+$`), `bool`, a `string`/list element in `^[A-Za-z0-9._/@:+,=-]+$`, a
+  list joined by one space, an empty list refused) → scripted. Items gain `script_params` (`[{name, value}]` by name) and
+  `script_on_absent` after `text_only_reason` (before `rollback`), and `modes`, `sysctl`, `modules` after `units`
+  (`[]`/`false` unless scripted); plan schema stays 1.
   `Build` refuses an id outside the id grammar and re-checks (S-4) every unit, `backup` path (`ValidBackupPath`),
   `modes` entry, `sysctl` key, module and `script_params` name against its lint pattern (`refusing to plan <id>: <kind>
   %q is not one a script can carry`).
@@ -211,7 +212,7 @@ regenerates them from public images and `-check` compares.
   `install … /bin/false` line `restore` put back cannot stop the reload); each restore `|| log "<id>: ROLLBACK
   INCOMPLETE, backups in $MUSTER_BACKUP"`. `restore_modes` per row: skip a path now gone, refuse a symlink or a type
   change (`changed type, left as is`), skip a row whose `%u %g %a` already equals the record (no `chown` that would
-  clear `security.capability`), refuse a path `modes_trusted <path> <uid>` rejects, then `chown -h` and `chmod`.
+  clear `security.capability`), refuse a path `modes_trusted <path> <uid>` rejects, then `chown -h` only when the owner or group differs, and `chmod`.
   `modes_trusted` (S-24): every ancestor up to `/` root-owned and not other-writable (a root-owned group-writable one —
   Ubuntu's `root:syslog 0775 /var/log` — is accepted), and a non-root recorded uid needs a parent neither group- nor
   other-writable. A fixed `  # validate` line precedes every validate subshell (the round trip's failure run keys on
@@ -244,7 +245,9 @@ regenerates them from public images and `-check` compares.
   inactive dependants, read the enablement back (`enablement not restored` → 1). Go tests run the helpers and bodies
   only against stubs (`systemctl`, `sysctl`, `modprobe`, `chage`, `sshd`) first on `PATH`, every absolute path rebased
   under `t.TempDir()` (`TestUnitHelpersRestoreRecordedState`, `TestSysctlHelpersRecordAndRestore`,
-  `TestModulesHelpersRecordAndRestore`); `TestModesHelpersTrustRule` is root only, over a tree under `/`.
+  `TestModulesHelpersRecordAndRestore`), except `TestModesHelpersTrustRule` and `TestFileBodiesRepairATempTree`, which
+  are root only and build their tree with `os.MkdirTemp("/", …)` (`modes_trusted` refuses anything under the
+  other-writable `/tmp`).
 - Remediation bodies (lint + CONTRIBUTING): a `script` needs `idempotent: true`, a `validate` and a way back of six
   kinds — `rollback`, `backup`, `units`, `modes`, `sysctl`, `modules` (rule `remediation`); `script_params_declared`
   (each entry a declared param, `^[a-z][a-z0-9_]*$`, once), `script_params_used` (every `$P_x`/`${P_x` declared, every
@@ -268,7 +271,13 @@ regenerates them from public images and `-check` compares.
   `ipv6_forwarding_disabled` keeps `all` before `default` (the kernel copies `all.forwarding` into `default`), and no
   `sysctl` list is ever sorted. Trust (S-24, S-47): `log_dir_permissions` and `cron_permissions`' at-spool pass change
   files only inside a directory `modes_trusted "$d/." 0` accepts, else log `<d> is not root's, left as is`; the
-  validate checks the same set, so the block ends `done` and the control stays FAIL naming the path. S-27: a
+  validate checks the same set, so the block ends `done` and the control stays FAIL naming the path; S-50:
+  `cron_permissions` clears `o-w` on its directories and `audit_log_permissions` fixes `/var/log/audit` first, and every
+  file pass of the two is gated the same way. S-49: a system crontab (`/etc/crontab`, `/etc/anacrontab`,
+  `/etc/cron.d/*`) or a sudoers file (`/etc/sudoers`, an active `/etc/sudoers.d/*`) not owned by root is never chowned
+  or re-moded (cron and sudo ignore it; adopting it would activate another user's content): the body logs `<id>: <path>
+  is owned by uid N; review it before chown root, left as is`, the validate fails and the block rolls back. A symlinked
+  `/etc/login.defs` fails the `umask_policy` and `password_policy` blocks before any write (K2). S-27: a
   muster-owned drop-in (`99-muster-*.conf` under `sysctl.d`/`modprobe.d`, `pwquality.conf.d/99-muster.conf`,
   `00-muster-session.conf`) that is a symlink is logged `… is a symlink (a mask), left as is` and fails the block before
   any write; every rollback that removes it skips a symlink. A built-in module stays done-but-FAIL (no body can unload
@@ -313,14 +322,20 @@ regenerates them from public images and `-check` compares.
   `same()`, which forgives a `mode` path gone since (a rotated log). It is the only place a shipped service, sshd,
   account, sysctl or module body runs against real system paths; `TestFileScriptsRepairOnARealFile` (root only; CI's
   sudo step, where `CI=true` makes a missing `setfacl` fatal) runs the five 3D-2b file bodies and `nfs_export_access`
-  and their validates on temp files; `TestFileBodiesRepairATempTree` and the other remedy Linux tests run rendered
-  bodies under a temp dir. The examples gate byte-compares `examples/<snap>-fix-report.{json,txt,sh}` (script whole,
+  and their validates on temp files. The shipped-body tests (`TestFileBodiesRepairATempTree` and the sysctl, module,
+  line and account body tests) run the raw `script`/`validate` strings through `runBody` — path-rebased copies with
+  `log()`, the state helpers or the stubs prepended, not the rendered block; only the `Test*BodiesLeaveASymlinkedDropIn`
+  tests, `TestIPv6ForwardRestoreKeepsAllBeforeDefault` and `TestSessionTimeoutRollbackRestoresBeforeTheReload` run a
+  shipped body inside its rendered block (`Script()` over a one-item plan, under `t.TempDir()`). `rebaseRoot` rewrites
+  only `/etc/`, `/var/` and `/boot/` paths that follow a space, newline, `(`, `'` or `|`; a new file body spells its
+  paths that way, or the root-run tree test acts on the runner's real files. The examples gate byte-compares `examples/<snap>-fix-report.{json,txt,sh}` (script whole,
   JSON masked under `fix`, table without line 1), so a body or plan change needs an examples refresh from the branch's
   `examples.yml` run before the merge.
 - Risk is the operational impact, not the guide's: `hosts_permissions` is `restart_service` (0600 breaks non-root
   `/etc/hosts` reads), `ip_forwarding_disabled`/`ipv6_forwarding_disabled` are `restart_service` (forwarding off cuts a
-  router's or container host's clients at once), `usb_storage_disabled` is `restart_service` (USB backup or boot media
-  stop), `nis_disabled` is `lockout_risk` (stopping ypbind cuts NIS accounts), `password_policy` is `lockout_risk` (it
+  router's or container host's clients at once), `reverse_path_filtering` is `restart_service` (strict filtering drops
+  asymmetrically routed traffic; such a host sets 2), `usb_storage_disabled` is `restart_service` (USB backup or boot
+  media stop), `nis_disabled` is `lockout_risk` (stopping ypbind cuts NIS accounts), `password_policy` is `lockout_risk` (it
   sets ageing on every account with a password). The sshd body reloads a running `sshd`/`ssh` and validates persona root
   (`sshd -T -C user=root,…`). The script refuses a `MUSTER_BACKUP` that root does not own or others can write (a planted
   backup would be restored over `/etc/shadow`).

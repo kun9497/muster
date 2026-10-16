@@ -653,7 +653,7 @@ arm이 절의 목록이나 경계인지 확인합니다. `TestModuleScriptsNameT
 
 ## 8. 구현된 모습
 
-구현 계획(`docs/superpowers/plans/2026-10-14-stage3d2c-remedy-scripts.md`, 판정 S-1..S-47)과 그 리뷰가 다음을
+구현 계획(`docs/superpowers/plans/2026-10-14-stage3d2c-remedy-scripts.md`, 판정 S-1..S-50)과 그 리뷰가 다음을
 바꿨습니다. 줄마다 고치는 절을 적습니다.
 
 - §2 파라미터는 구분자가 무엇이든 `sed`의 `s` 식 안에 나타나지 않습니다. 본문은 값을 먼저 평범한 변수에
@@ -684,8 +684,25 @@ arm이 절의 목록이나 경계인지 확인합니다. `TestModuleScriptsNameT
   no-op install 명령 전체를 받아들이고, 본문은 그중 하나가 이미 끈 모듈에는 줄을 덧붙이지 않습니다(S-25). 빌트인
   모듈은 내릴 수 없으므로 그 블록은 `done`으로 끝나고 컨트롤은 FAIL로 남습니다.
 - §4.3 `log_dir_permissions`와 `cron_permissions`의 at 스풀 단계는 셸 glob으로 훑은, `modes_trusted`가 받아들이는
-  디렉터리 안의 파일만 바꿉니다. root가 아닌 누군가가 이름을 바꿀 수 있는 디렉터리는 로그로 남기고 운영자에게
+  디렉터리 안의 파일만 바꿉니다. `modes_trusted`가 거부하는 디렉터리(`/`까지 root 소유가 아니거나 다른 사용자가 쓸 수 있는 것)는 로그로 남기고 운영자에게
   맡기며, validate도 같은 집합을 확인하므로 블록은 `done`으로 끝나고 컨트롤은 FAIL로 남습니다(S-47).
+- §4.3 root 소유가 아닌 시스템 crontab(`/etc/crontab`, `/etc/anacrontab`, `/etc/cron.d/*`)이나 sudoers 파일
+  (`/etc/sudoers`, 활성 `/etc/sudoers.d/*`)은 chown하거나 모드를 바꾸지 않습니다. cron과 sudo는 그런 파일을
+  무시하며, 그 파일을 넘겨받으면 다른 사용자가 쓴 내용이 활성화됩니다. 본문은 `<id>: <path> is owned by uid N;
+  review it before chown root, left as is`를 로그로 남기고, validate가 실패해 블록이 되돌아갑니다. root 소유
+  파일은 전처럼 고칩니다(S-49).
+- §4.3 `cron_permissions`는 자기 디렉터리의 `o-w`를 먼저 지우고, `audit_log_permissions`는 로그보다
+  `/var/log/audit`를 먼저 고칩니다. 그다음 파일 단계는 `modes_trusted "$d/." 0`이 성립할 때만 돌고(그렇지 않으면
+  로그로 남기고 둠), validate도 같은 조건을 따릅니다(S-50).
+- §4.1 `reverse_path_filtering`은 계속 1(strict)을 쓰고 `restart_service`입니다. strict 필터링은 비대칭으로
+  라우팅되는 트래픽을 버리며, 그런 호스트는 2를 설정합니다(최종 리뷰 F2).
+- §4.1 실패한 forwarding 블록은 전역 스위치(`net.ipv4.ip_forward`, IPv6이면 `all`과 `default`)만 되돌립니다.
+  커널이 전역 값을 복사하므로 각 인터페이스의 forwarding은 그 값을 따릅니다. 두 안내문이 그렇게 말합니다(최종
+  리뷰 F5).
+- §3 `restore_modes`는 소유자나 그룹이 기록과 다를 때만 `chown -h`를 실행하므로, 모드만 되돌릴 때 파일의
+  `security.capability`가 남습니다(최종 리뷰 M1).
+- §4.4 `umask_policy`와 `password_policy`는 심볼릭 링크인 `/etc/login.defs`를 거부합니다. 블록은 그것을 로그로
+  남기고 무엇이든 쓰기 전에 실패합니다(최종 리뷰 K2).
 - §4.3 `cron_permissions`는 그룹이 root인 접근 파일에, 그것을 읽는 setgid 프로그램이 도는 그룹(cron이면
   `crontab`, setgid `daemon`인 `at`이면 `daemon`)을 줍니다(S-26). at 스풀 단계는 `chmod u-s,g-wxs,o-rwxt`입니다(S-40).
 - §4.3 `audit_log_permissions`는 validate의 파일 절반을 가드하고, 그 안내문과 `ftpusers_permissions`의 안내문은

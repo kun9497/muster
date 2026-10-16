@@ -14,8 +14,9 @@ verdict on an existing snapshot is at least a minor release and appears under
   `remediation.script_params` the parameters its script reads; the block opens
   with one `P_<name>='<value>'` line per entry, carrying the value in force
   (the default, a profile's or a tuning file's; a list joined by one space).
-  A value enters only when it passes its type's charset (`int` digits, `bool`,
-  a string or list element in `[A-Za-z0-9._/@:+,=-]`); any other value makes
+  A value enters only when it passes its type's charset (`int` an optionally
+  signed integer, `^-?[0-9]+$`; `bool`; a string or list element in
+  `[A-Za-z0-9._/@:+,=-]`); any other value makes
   the item text-only with `text_only_reason: params_unsafe`, and it appears on
   no command line and nowhere in the JSON. A control that declares
   `script_params` is no longer text-only because a profile or tuning set its
@@ -35,17 +36,18 @@ verdict on an existing snapshot is at least a minor release and appears under
   `save_modules`/`restore_modules`; a failed block runs its declared rollback,
   then `restore_units`, `restore_modes`, `restore`, `restore_sysctl` and
   `restore_modules`, in that order. `restore_modes` skips a path already as
-  recorded and refuses a symlink, a type change and a path under a directory
-  someone other than root could rename it in (a root-owned group-writable
-  directory is accepted); `restore_modules` reloads with `modprobe
+  recorded, chowns only when the owner or group differs (a mode-only restore
+  keeps `security.capability`), and refuses a symlink, a type change and a
+  path under a directory someone other than root could rename it in (a
+  root-owned group-writable directory is accepted); `restore_modules` reloads with `modprobe
   --ignore-install`. Each is a way back on its own. Lint gains
   `modes_charset`, `modes_backup_overlap`, `sysctl_charset`, `modules_charset`
   and `state_needs_script`; `units_exclusive` also forbids the three beside
-  `units`. The plan JSON gains each item's `script_params`,
-  `script_on_absent`, `modes`, `sysctl` and `modules` (after `units`) and the
-  rollback word `state`; plan schema stays 1. `Build` also refuses a backup
-  path, modes entry, sysctl key, module or script-param name outside its lint
-  pattern.
+  `units`. The plan JSON gains each item's `script_params` and
+  `script_on_absent` (after `text_only_reason`, before `rollback`) and its
+  `modes`, `sysctl` and `modules` (after `units`), and the rollback word
+  `state`; plan schema stays 1. `Build` also refuses a backup path, modes
+  entry, sysctl key, module or script-param name outside its lint pattern.
 - Review scripts for 32 more controls (48 in all; stage 3D-2c): sixteen kernel
   settings (a `99-muster-<name>.conf` drop-in under `/etc/sysctl.d` and the
   runtime value), three module controls (an `install <module> /bin/false`
@@ -57,7 +59,12 @@ verdict on an existing snapshot is at least a minor release and appears under
   `lockout_threshold`, `session_timeout`, `umask_policy`). Every body writes
   only when the host is outside what the control accepts, never loosens a
   stricter value, never follows a symlink, and leaves a muster drop-in that is
-  a symlink (a mask) as is and stops the block.
+  a symlink (a mask) as is and stops the block. A system crontab or a sudoers
+  file not owned by root is never chowned or re-moded (cron and sudo ignore it;
+  the block logs it and rolls back); `cron_permissions` and
+  `audit_log_permissions` fix their directories first and change files only in
+  a directory that is root-owned and not other-writable up to `/`; a symlinked
+  `/etc/login.defs` stops the `umask_policy` and `password_policy` blocks.
 - A `runner` row in `fix-roundtrip` (stage 3D-2c, `kind: host`): the GitHub
   runner VM itself is seeded by `ci/roundtrip/runner.sh`, repaired, re-seeded
   and failed, so the `beyond` scripts, which gate containers out, run against
@@ -140,10 +147,11 @@ verdict on an existing snapshot is at least a minor release and appears under
   declared path that did not exist gets an `absent/` marker, and a failure
   removes the file the block created there (it used to be left in place); two
   controls may now declare the same path or unit.
-- Four risks name the operational impact (stage 3D-2c):
-  `ip_forwarding_disabled`, `ipv6_forwarding_disabled` and
-  `usb_storage_disabled` are `restart_service`, `password_policy` is
-  `lockout_risk`.
+- Five risks name the operational impact (stage 3D-2c):
+  `ip_forwarding_disabled`, `ipv6_forwarding_disabled`,
+  `reverse_path_filtering` (strict filtering drops asymmetrically routed
+  traffic) and `usb_storage_disabled` are `restart_service`,
+  `password_policy` is `lockout_risk`.
 - The review script's prologue runs `set -u`, `umask 077`, `log()`, the hash
   helper, the root check, the host guard, the `MUSTER_BACKUP` checks and the
   helpers, in that order; its exit 2 now has three causes (not root, another
@@ -185,8 +193,8 @@ controls tighten `login.defs`, `faillock.conf`, `pwquality` and per-account
 ageing only, reading keys as the collector does. `umask_policy.acceptable`
 lists `027` first (the value its script writes); `op: in` does not depend on
 order, so only the digest moves. The risks of `ip_forwarding_disabled`,
-`ipv6_forwarding_disabled` and `usb_storage_disabled` become `restart_service`
-and that of `password_policy` `lockout_risk`.
+`ipv6_forwarding_disabled`, `reverse_path_filtering` and `usb_storage_disabled`
+become `restart_service` and that of `password_policy` `lockout_risk`.
 
 Control set `kisa-unix-2026+2026.10.13` (was `+2026.10.08`). Remediation
 blocks only; no `checks`, `params` or verdict changes. The ten service controls

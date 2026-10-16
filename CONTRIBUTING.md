@@ -170,7 +170,8 @@ back (or removes it) itself, then tests and reloads the daemon: the template's
 A control whose script needs a parameter's value in force declares it in
 `script_params`; the block then opens with `P_<name>='<value>'` (a list joined
 by one space; take the first element with `first=${P_<name>%% *}`). The value
-must pass its type's charset (`int` digits, `bool`, or a `string`/list element
+must pass its type's charset (`int` an optionally signed integer, `^-?[0-9]+$`;
+`bool`; or a `string`/list element
 in `[A-Za-z0-9._/@:+,=-]`), or the item is text-only (`params_unsafe`). Use it
 only as data: after `=` (`n=$P_max`), as an option's operand
 (`chage -M "$P_max_days"`) or after `--`, as a later operand, or as an awk
