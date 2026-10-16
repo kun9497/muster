@@ -561,10 +561,12 @@ type treeFile struct {
 }
 
 // TestFileBodiesRepairATempTree runs the nine file bodies of 3D-2c over a
-// tree under t.TempDir() (root only, to chown): the validate fails on the
-// loosened modes, the body passes it, a mode the body must keep is kept, and
-// no symlink — beside the set or at a single path the body names (S-45) — is
-// followed to its 0666 target.
+// tree under a root-owned directory made in / (root only, to chown; the
+// prologue's modes_trusted refuses anything under the other-writable /tmp):
+// the validate fails on the loosened modes, the body passes it, a mode the
+// body must keep is kept, and no symlink — beside the set or at a single path
+// the body names (S-45) — is followed to its 0666 target. A directory not
+// root's (S-47) is left with its files as they are and named in the log.
 func TestFileBodiesRepairATempTree(t *testing.T) {
 	needSh(t)
 	if os.Geteuid() != 0 {
@@ -576,6 +578,7 @@ func TestFileBodiesRepairATempTree(t *testing.T) {
 		kept     []treeFile // modes the body must not change
 		after    []treeFile // modes the body must leave (S-40)
 		links    []string   // single paths the body names, planted as symlinks to the victim (S-45)
+		foreign  []string   // directories chowned to uid 65534: the body leaves what they hold (S-47)
 	}{
 		{id: "muster.account.sudoers_permissions", loosened: []treeFile{{"/etc/sudoers", 0o644, false}, {"/etc/sudoers.d/a", 0o664, false}}, kept: []treeFile{{"/etc/sudoers.d/README.txt", 0o666, false}}},
 		{id: "muster.service.nfs_export_access", loosened: []treeFile{{"/etc/exports", 0o666, false}}},
@@ -589,13 +592,20 @@ func TestFileBodiesRepairATempTree(t *testing.T) {
 			kept:     []treeFile{{"/var/spool/cron/atjobs/a0001", 0o700, false}, {"/var/spool/cron/crontabs", 0o1730, true}},
 			after:    []treeFile{{"/etc/cron.allow", 0o640, false}, {"/var/spool/cron/atjobs/a0002", 0o700, false}}},
 		{id: "muster.account.cron_permissions", links: []string{"/etc/cron.allow"}},
-		{id: "muster.file.log_dir_permissions", loosened: []treeFile{{"/var/log/x.log", 0o666, false}, {"/var/log/sub/y.log", 0o646, false}}, kept: []treeFile{{"/var/log/grp.log", 0o664, false}}},
+		{id: "muster.file.log_dir_permissions", loosened: []treeFile{{"/var/log", 0o757, true}, {"/var/log/x.log", 0o666, false}, {"/var/log/sub/y.log", 0o646, false}}, kept: []treeFile{{"/var/log/grp.log", 0o664, false}}, after: []treeFile{{"/var/log", 0o755, true}, {"/var/log/x.log", 0o664, false}}},
+		{id: "muster.file.log_dir_permissions", loosened: []treeFile{{"/var/log/ok/a.log", 0o666, false}}, kept: []treeFile{{"/var/log/svc/b.log", 0o666, false}}, foreign: []string{"/var/log/svc"}},
+		{id: "muster.account.cron_permissions", kept: []treeFile{{"/var/spool/cron/atjobs/a0003", 0o4700, false}}, foreign: []string{"/var/spool/cron/atjobs"}},
 		{id: "muster.service.ftpusers_permissions", loosened: []treeFile{{"/etc/ftpusers", 0o644, false}}, links: []string{"/etc/vsftpd/user_list"}},
 	}
 	for _, c := range cases {
 		t.Run(c.id, func(t *testing.T) {
 			r := shippedControl(t, c.id).Remediation
-			root, bin := t.TempDir(), t.TempDir()
+			root, err := os.MkdirTemp("/", "muster-tree-")
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { os.RemoveAll(root) })
+			bin := t.TempDir()
 			mk := func(f treeFile) string {
 				p := filepath.Join(root, f.path)
 				if f.dir {
@@ -628,12 +638,25 @@ func TestFileBodiesRepairATempTree(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			body, val := rebaseRoot(" "+r.Script, root), rebaseRoot(" "+r.Validate, root)
+			for _, d := range c.foreign {
+				if err := os.Chown(filepath.Join(root, d), 65534, 65534); err != nil {
+					t.Fatal(err)
+				}
+			}
+			// the block runs with the prologue's log and modes_trusted defined
+			helpers := "log() { printf 'muster-fix: %s\\n' \"$*\"; }\n" + stateHelpers + "\n"
+			body, val := helpers+rebaseRoot(" "+r.Script, root), helpers+rebaseRoot(" "+r.Validate, root)
 			if _, code := runBody(t, root, bin, val); code == 0 && len(c.loosened) > 0 {
 				t.Error("validate passed on the loosened tree")
 			}
-			if out, code := runBody(t, root, bin, body); code != 0 {
+			out, code := runBody(t, root, bin, body)
+			if code != 0 {
 				t.Fatalf("body %d: %s", code, out)
+			}
+			for _, d := range c.foreign {
+				if want := c.id + ": " + filepath.Join(root, d) + " is not root's, left as is"; !strings.Contains(out, want) {
+					t.Errorf("the log does not name the skipped directory %q:\n%s", want, out)
+				}
 			}
 			if out, code := runBody(t, root, bin, val); code != 0 {
 				t.Fatalf("validate after the body %d: %s", code, out)
@@ -658,7 +681,7 @@ func TestFileBodiesRepairATempTree(t *testing.T) {
 			}
 			// S-26: a root-group cron access file is given group crontab where
 			// the host has one (Debian and Ubuntu)
-			if c.id == "muster.account.cron_permissions" && len(c.links) == 0 {
+			if c.id == "muster.account.cron_permissions" && len(c.links) == 0 && len(c.foreign) == 0 {
 				if err := exec.Command("getent", "group", "crontab").Run(); err != nil {
 					t.Log("no crontab group on this host: the access-file group was not checked")
 				} else if out, err := exec.Command("stat", "-c", "%G", filepath.Join(root, "/etc/cron.allow")).Output(); err != nil || strings.TrimSpace(string(out)) != "crontab" {
