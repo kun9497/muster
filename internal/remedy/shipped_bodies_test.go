@@ -748,8 +748,10 @@ func TestPasswordPolicyBodyTightensOnly(t *testing.T) {
 	today := int(time.Now().Unix() / 86400)
 	writeUnder(t, root, "/etc/login.defs", "#PASS_MAX_DAYS 1\nPASS_MAX_DAYS 99999\nPASS_MIN_DAYS 2\nPASS_MAX_DAYS 99999\n")
 	writeUnder(t, root, "/etc/security/pwquality.conf", "minlen = 14\n")
-	writeUnder(t, root, "/etc/passwd", "root:x:0:0::/root:/bin/sh\nfresh:x:1000:1000::/home/fresh:/bin/sh\nold:x:1001:1001::/home/old:/bin/sh\nstrict:x:1002:1002::/home/strict:/bin/sh\nlegacy:x:1003:1003::/home/legacy:/bin/sh\n")
-	writeUnder(t, root, "/etc/shadow", fmt.Sprintf("root:*:%d:0:99999:7:::\nfresh:$6$x:%d::99999:7:::\nold:$6$x:%d:0:99999:7:::\nstrict:$6$x:%d:5:30:7:::\nlegacy:abcDEF:%d:::7:::\nghost:$6$x:%d::99999:7:::\n#c:$6$x:1:0:1:::\n", today, today, today-400, today, today, today))
+	writeUnder(t, root, "/etc/passwd", "root:x:0:0::/root:/bin/sh\nfresh:x:1000:1000::/home/fresh:/bin/sh\nold:x:1001:1001::/home/old:/bin/sh\nstrict:x:1002:1002::/home/strict:/bin/sh\nlegacy:x:1003:1003::/home/legacy:/bin/sh\nedge:x:1004:1004::/home/edge:/bin/sh\n")
+	// edge changed its password exactly max_days ago: shadow's isexpired()
+	// counts now >= lastchg + max as expired, so it is skipped too (E-10)
+	writeUnder(t, root, "/etc/shadow", fmt.Sprintf("root:*:%d:0:99999:7:::\nfresh:$6$x:%d::99999:7:::\nold:$6$x:%d:0:99999:7:::\nstrict:$6$x:%d:5:30:7:::\nlegacy:abcDEF:%d:::7:::\nghost:$6$x:%d::99999:7:::\nedge:$6$x:%d::99999:7:::\n#c:$6$x:1:0:1:::\n", today, today, today-400, today, today, today, today-90))
 	mb := t.TempDir()
 	env := append(pEnv(t, c), "MB="+mb, "STUB="+stub, "ROOT="+root)
 	body := "log() { printf 'muster-fix: %s\\n' \"$*\"; }\n" + rebaseAccounts(r.Script, root)
@@ -770,13 +772,15 @@ func TestPasswordPolicyBodyTightensOnly(t *testing.T) {
 			t.Errorf("chage lacks %q:\n%s", w, got)
 		}
 	}
-	for _, never := range []string{"-- root\n", "-- old\n", "-M 90 -- strict\n", "-m 1 -- strict\n", "#c", "-- ghost\n"} {
+	for _, never := range []string{"-- root\n", "-- old\n", "-M 90 -- strict\n", "-m 1 -- strict\n", "#c", "-- ghost\n", "-- edge\n"} {
 		if strings.Contains(got, never) {
 			t.Errorf("chage carries %q:\n%s", never, got)
 		}
 	}
-	if !strings.Contains(out, "password_policy: old: password older than 90 days, change it first") {
-		t.Errorf("no skip log for old: %s", out)
+	for _, n := range []string{"old", "edge"} {
+		if !strings.Contains(out, "password_policy: "+n+": password at least 90 days old, change it first") {
+			t.Errorf("no skip log for %s: %s", n, out)
+		}
 	}
 	if !strings.Contains(out, "password_policy: ghost: not in "+root+"/etc/passwd, left as is") { // the log names the rebased path
 		t.Errorf("no skip log for ghost: %s", out)
@@ -800,11 +804,17 @@ func TestPasswordPolicyBodyTightensOnly(t *testing.T) {
 // parameters stay byte for byte; nothing is written and the validate holds.
 func TestPasswordPolicyBodyKeepsAStricterHost(t *testing.T) {
 	needSh(t)
+	for _, pwq := range []string{"minlen = 12\ndcredit = -1\nucredit = -1\nlcredit = -1\n", "MINLEN = 14\nMinClass = 3\n"} {
+		keepsAStricterHost(t, pwq)
+	}
+}
+
+func keepsAStricterHost(t *testing.T, pwq string) {
 	c := shippedControl(t, "muster.account.password_policy")
 	root, bin, stub := accountTree(t)
 	const defs = "PASS_MAX_DAYS 60\nPASS_MIN_DAYS 2\nPASS_MIN_LEN 12\n"
 	writeUnder(t, root, "/etc/login.defs", defs)
-	writeUnder(t, root, "/etc/security/pwquality.conf", "minlen = 12\ndcredit = -1\nucredit = -1\nlcredit = -1\n")
+	writeUnder(t, root, "/etc/security/pwquality.conf", pwq)
 	writeUnder(t, root, "/etc/passwd", "")
 	writeUnder(t, root, "/etc/shadow", "")
 	env := append(pEnv(t, c), "MB="+t.TempDir(), "STUB="+stub, "ROOT="+root)
@@ -816,7 +826,34 @@ func TestPasswordPolicyBodyKeepsAStricterHost(t *testing.T) {
 		t.Errorf("login.defs changed to %q", got)
 	}
 	if exists(filepath.Join(root, "/etc/security/pwquality.conf.d")) {
-		t.Error("a pwquality drop-in was written although the chain is stricter")
+		t.Errorf("%q: a pwquality drop-in was written although the chain is stricter", pwq)
+	}
+	if out, code := runBody(t, root, bin, rebaseAccounts(c.Remediation.Validate, root), env...); code != 0 {
+		t.Errorf("%q: validate %d: %s", pwq, code, out)
+	}
+}
+
+// The drop-in's own looser line is rewritten in place whatever its key's
+// case (the collector lower-cases keys), never left beside a second one.
+func TestPasswordPolicyBodyRewritesItsOwnLine(t *testing.T) {
+	needSh(t)
+	c := shippedControl(t, "muster.account.password_policy")
+	root, bin, stub := accountTree(t)
+	writeUnder(t, root, "/etc/login.defs", "PASS_MAX_DAYS 60\nPASS_MIN_DAYS 2\nPASS_MIN_LEN 12\n")
+	writeUnder(t, root, "/etc/security/pwquality.conf.d/99-muster.conf", "# site\nMinClass = 1\nMINLEN = 6\n")
+	writeUnder(t, root, "/etc/passwd", "")
+	writeUnder(t, root, "/etc/shadow", "")
+	env := append(pEnv(t, c), "MB="+t.TempDir(), "STUB="+stub, "ROOT="+root)
+	body := "umask 077\nlog() { printf 'muster-fix: %s\\n' \"$*\"; }\n" + rebaseAccounts(c.Remediation.Script, root)
+	if out, code := runBody(t, root, bin, body, env...); code != 0 {
+		t.Fatalf("body %d: %s", code, out)
+	}
+	f := filepath.Join(root, "/etc/security/pwquality.conf.d/99-muster.conf")
+	if got := readFile(t, f); got != "# site\nminclass = 3\nminlen = 8\n" {
+		t.Errorf("drop-in %q", got)
+	}
+	if m := mode(t, f); m != "644" {
+		t.Errorf("drop-in mode %s, want 644", m)
 	}
 	if out, code := runBody(t, root, bin, rebaseAccounts(c.Remediation.Validate, root), env...); code != 0 {
 		t.Errorf("validate %d: %s", code, out)
@@ -828,6 +865,7 @@ func TestLineBodiesTightenOnly(t *testing.T) {
 	for _, c := range []struct {
 		id, file, before, after string
 		absent, created         bool     // the file is missing before; the body creates it
+		mode                    string   // the file's mode after the body, when set
 		env                     []string // overrides of the defaults
 	}{
 		{id: "muster.account.umask_policy", file: "/etc/login.defs", before: "UMASK 002\n", after: "UMASK 027\n"},
@@ -837,22 +875,37 @@ func TestLineBodiesTightenOnly(t *testing.T) {
 		{id: "muster.account.lockout_threshold", file: "/etc/security/faillock.conf", before: "# deny = 3\n", after: "# deny = 3\n"},
 		{id: "muster.account.lockout_threshold", file: "/etc/security/faillock.conf", before: "deny = 0\n", after: "deny = 5\n"},
 		{id: "muster.account.lockout_threshold", file: "/etc/security/faillock.conf", before: "deny = 2\n", after: "deny = 2\n"},
+		// the collector lower-cases faillock.conf keys
+		{id: "muster.account.lockout_threshold", file: "/etc/security/faillock.conf", before: "DENY = 99\n", after: "deny = 5\n"},
+		{id: "muster.account.lockout_threshold", file: "/etc/security/faillock.conf", before: "  Deny=2\n", after: "  Deny=2\n"},
 		// S-41: a missing faillock.conf is deny 3 on both sides
 		{id: "muster.account.lockout_threshold", file: "/etc/security/faillock.conf", absent: true},
-		{id: "muster.account.lockout_threshold", file: "/etc/security/faillock.conf", absent: true, created: true, after: "deny = 2\n", env: []string{"P_max_attempts=2"}},
+		{id: "muster.account.lockout_threshold", file: "/etc/security/faillock.conf", absent: true, created: true, after: "deny = 2\n", mode: "644", env: []string{"P_max_attempts=2"}},
+		// an existing file keeps its mode
+		{id: "muster.account.lockout_threshold", file: "/etc/security/faillock.conf", before: "# none\n", after: "# none\ndeny = 2\n", mode: "600", env: []string{"P_max_attempts=2"}},
 	} {
 		ctl := shippedControl(t, c.id)
 		root, bin, stub := accountTree(t)
 		p := filepath.Join(root, c.file)
 		_ = os.MkdirAll(filepath.Dir(p), 0o755)
 		if !c.absent {
-			if err := os.WriteFile(p, []byte(c.before), 0o644); err != nil {
+			perm := os.FileMode(0o644)
+			if c.mode == "600" {
+				perm = 0o600
+			}
+			if err := os.WriteFile(p, []byte(c.before), perm); err != nil {
 				t.Fatal(err)
 			}
 		}
 		env := append(append(pEnv(t, ctl), "STUB="+stub, "ROOT="+root), c.env...)
-		if out, code := runBody(t, root, bin, rebaseAccounts(ctl.Remediation.Script, root), env...); code != 0 {
+		// the script runs every body under umask 077
+		if out, code := runBody(t, root, bin, "umask 077\n"+rebaseAccounts(ctl.Remediation.Script, root), env...); code != 0 {
 			t.Fatalf("%s %q: body %d %s", c.id, c.before, code, out)
+		}
+		if c.mode != "" {
+			if m := mode(t, p); m != c.mode {
+				t.Errorf("%s %q: mode %s, want %s", c.id, c.before, m, c.mode)
+			}
 		}
 		if c.absent && !c.created {
 			if exists(p) {

@@ -36,10 +36,12 @@ remediation:
   script: |
     fc=/etc/security/faillock.conf
     n=$P_max_attempts
-    v=$(awk -F= '{ k = $1; gsub(/[[:space:]]/, "", k) } k == "deny" { d = $2 } END { gsub(/[[:space:]]/, "", d); print d }' "$fc" 2>/dev/null) || v=
+    if [ -e "$fc" ]; then had=1; else had=0; fi
+    v=$(awk -F= '{ k = $1; gsub(/[[:space:]]/, "", k); k = tolower(k) } k == "deny" { d = $2 } END { gsub(/[[:space:]]/, "", d); print d }' "$fc" 2>/dev/null) || v=
     case "$v" in ''|*[!0-9]*) v=3;; esac
     if [ "$v" -lt 1 ] || [ "$v" -gt "$n" ]; then
-      if grep -Eq '^[[:space:]]*deny[[:space:]]*=' "$fc" 2>/dev/null; then sed -i -E "s|^([[:space:]]*deny)[[:space:]]*=.*|\1 = $n|" "$fc"; else printf 'deny = %s\n' "$n" >> "$fc"; fi
+      if grep -Eq '^[[:space:]]*[Dd][Ee][Nn][Yy][[:space:]]*=' "$fc" 2>/dev/null; then sed -i -E "s|^([[:space:]]*)[Dd][Ee][Nn][Yy][[:space:]]*=.*|\1deny = $n|" "$fc"; else printf 'deny = %s\n' "$n" >> "$fc"; fi
+      if [ "$had" = 0 ]; then chmod 644 "$fc"; fi
     fi
   validate: |
-    cat /etc/security/faillock.conf 2>/dev/null | awk -F= '{ k = $1; gsub(/[[:space:]]/, "", k) } k == "deny" { d = $2 } END { gsub(/[[:space:]]/, "", d); if (d == "") d = 3; exit !(d + 0 >= 1 && d + 0 <= M) }' M="$P_max_attempts"
+    cat /etc/security/faillock.conf 2>/dev/null | awk -F= '{ k = $1; gsub(/[[:space:]]/, "", k); k = tolower(k) } k == "deny" { d = $2 } END { gsub(/[[:space:]]/, "", d); if (d == "") d = 3; exit !(d + 0 >= 1 && d + 0 <= M) }' M="$P_max_attempts"
