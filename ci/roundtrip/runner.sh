@@ -16,6 +16,10 @@ for kv in kernel.randomize_va_space=0 net.ipv4.icmp_echo_ignore_broadcasts=0 net
   sysctl -q -w "$kv"
 done
 for m in udf sctp tipc; do modprobe --ignore-install "$m"; done
+systemctl is-active --quiet auditd || systemctl start auditd
+for f in /var/log/audit/audit.log /boot/grub/grub.cfg /etc/ssh/sshd_config.d/50-cloudimg-settings.conf; do
+  test -e "$f" || { echo "runner.sh: $f is missing (installed auditd; the runner image is expected to ship the rest)" >&2; exit 1; }
+done
 chmod 644 /boot/grub/grub.cfg /var/log/audit/audit.log /etc/crontab /etc/rsyslog.conf /etc/hosts
 chgrp shadow /etc/shadow && chmod 640 /etc/shadow   # the stock-FAIL scripted controls the repair run fixed (S-18)
 install -m 644 /dev/null /etc/inetd.conf

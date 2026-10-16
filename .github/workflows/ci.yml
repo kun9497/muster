@@ -47,7 +47,7 @@ jobs:
             shellcheck -s sh "$f"
             n=$((n+1))
           done
-          [ "$n" -ge 5 6
+          [ "$n" -ge 6 ]
       - name: controls lint
         run: go run ./cmd/muster controls lint --references docs/reference
       - name: controls lint, built-in profile
@@ -660,11 +660,11 @@ jobs:
           else
             [ "$g1" = on ] && [ "$g2" = on ] && [ -n "$h1" ] && [ "$h1" = "$h2" ] \
               || { echo "runner: the guard must be on and the machine id stable (guard $g1/$g2, hash $h1/$h2)"; exit 1; }
-            ids() { jq -r '[.items[] | select(.planned and .script) | .id] | sort | .[]' "$1"; }
+            ids() { jq -r '[.items[] | select(.planned and .script) | .id] | .[]' "$1" | LC_ALL=C sort; }
             for id in ${{ matrix.seeded }}; do
-              ids "$d/fail/plan.json" | grep -qx "$id" || { echo "runner: seeded $id is not a scripted item of the failure plan"; exit 1; }
+              ids "$d/fail/plan.json" | grep -Fqx "$id" || { echo "runner: seeded $id is not a scripted item of the failure plan"; exit 1; }
             done
-            extra=$(comm -13 <(ids "$d/repair/plan.json") <(ids "$d/fail/plan.json"))
+            extra=$(LC_ALL=C comm -13 <(ids "$d/repair/plan.json") <(ids "$d/fail/plan.json"))
             [ -z "$extra" ] || { echo "runner: the failure plan scripts ids the repair plan did not: $extra"; exit 1; }
           fi
           sed -n '/^modes_paths() {/,/^}/p' "$d/fail/fix.sh" > "$d/fail/modes_paths.sh"
