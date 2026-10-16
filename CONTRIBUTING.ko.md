@@ -73,13 +73,20 @@ KISA 항목이 아닌 컨트롤은 `category: beyond`, id `muster.beyond.<name>`
 ### 조치 본문
 
 `fix --dry-run`은 컨트롤의 `script`, `validate`, `rollback`을 검토용 스크립트로 렌더링하므로
-이들은 코드입니다. `script`에는 `idempotent: true`, `validate`, 그리고 되돌릴 길 — `rollback`,
-비어 있지 않은 `backup`, 둘 다, 또는 서비스 컨트롤이라면 `units` 하나(`units`는 `rollback`,
-`backup`과 함께 쓸 수 없음) — 이 필요합니다. 본문은 서브셸에서 `set -e` 아래 돕니다. 정당하게
+이들은 코드입니다. `script`에는 `idempotent: true`, `validate`, 그리고 여섯 종류 중 하나의 되돌릴
+길이 필요합니다: `rollback`, 비어 있지 않은 `backup`, 본문이 바꾸는 상태의 기록 — `modes`(경로와
+`/*`·`/*/*` 전개의 소유자·그룹·모드), `sysctl`(커널 키의 런타임 값), `modules`(각 모듈의 적재
+여부) — 이들의 조합, 또는 서비스 컨트롤이라면 `units` 하나(`units`는 다른 다섯과 함께 쓸 수
+없음). 템플릿은 본문이 돌기 전에 선언된 종류를 블록 자신의 디렉터리(`$MUSTER_BACKUP/blocks/<fn>/`)
+아래 기록하고, 본문이나 validate가 실패하면 선언된 `rollback`을 실행한 뒤 유닛, 모드, 파일, sysctl
+값, 모듈을 이 순서로 복원합니다. 블록이 도는 동안 데몬이나 시스템이 쓰는 경로(살아 있는 로그)는
+`backup`이 아니라 `modes` 항목입니다. `backup`은 그 내용을 되돌려 복사하기 때문입니다. 본문이
+모드만 바꾸는 경로는 어느 쪽을 써도 됩니다. 본문은 서브셸에서 `set -e` 아래 돕니다. 정당하게
 실패할 수 있는 명령은 자기 줄에 `|| true`로 그렇다고 말하고, 끝에 붙인 `; true`는 결코
 쓰지 않으며, 운영자가 봐야 할 오류를 `2>/dev/null`로 숨기지 않습니다. 파일에 작용하는
-본문은 먼저 그 파일이 있는지 확인하고, 선택적 도구를 부르는 본문은 `command -v`로
-감쌉니다. 서비스 컨트롤은 자기 유닛을 `units`에 선언합니다 — `services.go`에 있는 논리
+본문은 먼저 그 파일이 있는지 확인하고 — 호스트에 없을 수 있는 디렉터리는 `if [ -d <dir> ] &&
+[ ! -L <dir> ]; then …; fi` 안에서, 경로 하나는 `if [ -f <p> ] && [ ! -L <p> ]` 안에서 — 선택적
+도구를 부르는 본문은 `command -v`로 감쌉니다. 서비스 컨트롤은 자기 유닛을 `units`에 선언합니다 — `services.go`에 있는 논리
 서비스의 `provesInstall` 유닛이며, 각 `<name>.socket`은 그 `<name>.service`보다 앞에 둡니다
 (Linux 테스트가 그 집합을 고정하고, validate도 같은 유닛을 이름으로 적습니다). 스크립트는
 유닛 이름을 직접 쓰지 않습니다. 템플릿이 `UNITS`를 설정하고, 본문 전에 각 유닛의 상태를
@@ -102,22 +109,62 @@ done
 첫 번째 루프는 무엇이든 mask하기 전에 모든 이름을 해석하고, 목록에 있는 유닛의 별칭은
 건너뜁니다(Debian의 `nfs-kernel-server.service`는 `nfs-server.service`의 별칭이며, mask 뒤에
 그것을 disable하면 실패합니다). 목록에 없는 유닛의 별칭도 건너뛰므로 실제 유닛을
-선언하세요. 파일 본문은 금지된 비트를 기호 모드로 지우고(`chmod u-xs,g-rwxs,o-rwxt`; 절대
+선언하세요. 모듈 본문도 같은 이유로(shellcheck는 한 단어짜리 문자 그대로의 목록을 지적함)
+`mods='<모듈들>'`로 시작해 `for m in $mods`로 돕니다. 파일 본문은 금지된 비트를 기호 모드로 지우고(`chmod u-xs,g-rwxs,o-rwxt`; 절대
 모드를 쓰지 않으므로 더 엄격한 파일은 그대로 남음). ACL을 제거하는 본문(그렇게 하는 두 개:
-`passwd_permissions`, `shadow_permissions`)은 `chmod` 전에 `setfacl -b`를 실행합니다.
-`validate`는 한 줄 — `&&`로 이은 조건, 또는 마지막 갈래가 `*) false`인 `case` 하나(아무것도
-맞지 않는 `case`는 0으로 끝남) — 이며 스크립트가 설정한 것만 확인합니다. 파일 validate는
-컨트롤의 기본 허용 모드를 나열합니다. `backup` 경로는 절대·정규 경로이고
-`[A-Za-z0-9._@:+/-]` 안의 문자만 씁니다. here-document는 쓰지 않습니다. 스크립트는
+`passwd_permissions`, `shadow_permissions`)은 `chmod` 전에 `setfacl -b`를 실행합니다. 모드나
+소유자를 바꾸는 `find`는 `! -type l` 또는 컨트롤이 판정하는 종류(`-type f`)를 달아, `chmod`가
+심볼릭 링크를 따라가지 않게 합니다. root가 아닌 누군가가 소유할 수 있는 디렉터리(데몬의 로그
+디렉터리, `at`의 스풀) 아래 파일을 바꾸는 본문은 템플릿의 `modes_trusted "$d/." 0`이 성립하는
+곳에서만 작용합니다 — 모든 상위 디렉터리가 root 소유이고 other 쓰기가 불가능해야 하며, Ubuntu의
+`/var/log`처럼 root 소유이면서 그룹 쓰기가 가능한 디렉터리는 받아들입니다. 그 밖의 디렉터리는
+로그를 남기고 운영자에게 맡깁니다. 그 validate도 같은 집합을 확인하므로 블록은 `done`으로 끝나고
+다음 `check`가 여전히 그 경로를 짚습니다. muster가 소유하는 파일(`99-muster-*.conf` 드롭인)을
+쓰는 본문이 그 자리에서 심볼릭 링크 — 운영자의 마스크 — 를 만나면, 로그를 남기고 그대로 둔 채
+아무것도 쓰기 전에 블록을 실패시킵니다. 그 파일을 지우는 rollback은 심볼릭 링크를 건너뜁니다.
+
+본문은 현재 값이 컨트롤의 조건이 받아들이는 집합 밖에 있을 때만 값을 씁니다. 현재 값은
+수집기가 읽는 방식대로 읽습니다(`login.defs`는 첫 줄, `faillock.conf`는 마지막 줄,
+`pwquality`는 병합된 체인, 키는 대소문자를 가리지 않음). 그래서 더 엄격한 호스트를 느슨하게
+하지 않고 이미 통과하는 값을 다시 쓰지 않습니다. 써야 할 때 쓰는 값은 가이드의 값이거나 적용
+중인 목록의 첫 원소입니다. 쓰기가 판정되는 다른 키에 미치는 부작용은 쓴 쪽이 되돌려 놓습니다.
+`net.ipv4.ip_forward`를 쓰면 커널이 `net.ipv4.conf.all.accept_redirects`를 다시 설정하므로,
+`ip_forwarding_disabled`는 그 키를 먼저 읽고 나중에 되돌려 놓으며 `sysctl`에 적습니다. 자기가 쓴
+파일을 데몬이 다시 읽는 컨트롤의 rollback은 그 파일을 직접 되돌려 놓거나 지운 뒤 데몬을 시험하고
+reload합니다. 템플릿의 `restore`는 rollback 다음에 돌므로 reload에는 늦습니다.
+
+스크립트가 적용 중인 파라미터 값을 필요로 하는 컨트롤은 그것을 `script_params`에 선언합니다. 그러면
+블록은 `P_<name>='<value>'`로 시작합니다(목록은 공백 하나로 이어지며, 첫 원소는
+`first=${P_<name>%% *}`로 꺼냄). 값은 타입별 문자 집합(`int`는 숫자, `bool`, `string`이나 목록
+원소는 `[A-Za-z0-9._/@:+,=-]`)을 통과해야 하며, 그렇지 않으면 항목은 텍스트 전용(`params_unsafe`)이
+됩니다. 값은 데이터로만 씁니다: `=` 뒤(`n=$P_max`), 옵션의 피연산자(`chage -M "$P_max_days"`)나
+`--` 뒤, 뒤쪽 피연산자, awk의 `-v`/`VAR=` 대입. 줄의 맨 앞에 오지 않고 `sed` 식 안에 들어가지
+않습니다. 보통 변수에 옮겨 담고 구분자로 `|`를 씁니다(`sed -i "s|^deny .*|deny = $n|"`).
+`TestShippedBodiesPlaceParametersSafely`가 배포되는 모든 본문을 그렇게 묶습니다. 고침이
+`absent_means: fail` 발견이 가리키는 바로 그 줄을 쓰는 컨트롤은 `script_on_absent: true`를
+선언합니다. 그 밖의 absent 발견은 텍스트 전용으로 남습니다.
+
+`validate`는 한 줄이며 스크립트가 설정한 것만 확인하되, 쓴 값과 같은지가 아니라 집합에 드는지를
+증명합니다. 모양은 셋입니다: `&&`로 이은 조건, 마지막 갈래가 `*) false`인 `case` 하나(아무것도
+맞지 않는 `case`는 0으로 끝남), 또는 조건이 `exit 1`로 루프를 끝내는, 문자 그대로의 목록에 대한
+`for` 하나. 호스트에서 적용될 수 없는 본문은 validate도 같은 방식으로 감쌉니다(`if command -v
+sshd …; then …; fi`). 파일 validate는 컨트롤의 기본 허용 모드를 나열하고, validate 안의 `find`는
+허용 비트의 여집합 — 07777에서 가장 큰 허용 모드를 뺀 것(0640이면 `-perm /7137`, 0600이면
+`/7177`, 0440이면 `/7337`) — 과, 소유자를 판정하는 곳에서는 `! -user root`를 시험합니다.
+`backup` 경로와 `modes` 항목은 절대·정규 경로이고 `[A-Za-z0-9._@:+/-]` 안의 문자만 씁니다(항목은
+`/*`나 `/*/*`로 끝날 수 있음). `sysctl` 키는 `^[a-z0-9_]+(\.[a-z0-9_-]+)+$`에 맞고 결코 정렬하지
+않습니다(그 순서가 쓰기와 복원의 순서). `modules` 이름은 `^[a-z0-9][a-z0-9_-]*$`에 맞습니다.
+here-document는 쓰지 않습니다. 스크립트는
 `umask 077` 아래 돌므로, 다른 사람이 읽는 파일을 만드는 본문은 그 모드를 설정합니다.
 `make shellcheck`와 `go test ./internal/remedy -run TestScriptGolden -update`
 (`all-scripted.sh` 골든이 배포되는 모든 본문을 렌더링)가 변경을 검사합니다.
 새 스크립트 컨트롤은 같은 커밋에서 `controls/testdata/_roundtrip.yaml`에도 들어갑니다:
 `ci/roundtrip/<key>.sh` 시드 스크립트가 그것을 느슨하게 하고 `seeded` 목록이 그것을 적는
 `fix-roundtrip` 행(`images`), 또는 어떤 행도 증명할 수 없는 이유(systemd 유닛 없음, 이미지의
-활성 저장소에 패키지 없음, 컨테이너에서 유닛을 돌릴 수 없음)를 적은 `unproven:`입니다.
-`TestEveryScriptedControlIsInTheRoundtripTable`이 그 표, 배포되는 집합, CI 매트릭스를 같게
-유지합니다.
+활성 저장소에 패키지 없음, 컨테이너에서 유닛을 돌릴 수 없음, 커널이 그 모듈을 배포하지 않음)를
+적은 `unproven:`입니다. `beyond` 컨트롤은 컨테이너를 제외하므로 `runner` 행(`ci/roundtrip/runner.sh`가
+시드하는 GitHub 러너 VM)만 적습니다. `TestEveryScriptedControlIsInTheRoundtripTable`이 그 표,
+배포되는 집합, CI 매트릭스를 같게 유지합니다.
 
 ## 팩트 추가
 
@@ -208,9 +255,11 @@ done
   매트릭스(Ubuntu 22.04/24.04, Rocky 9, AlmaLinux 9, Debian 12는 카나리), 읽기 전용 계약
   실행, 데몬 오라클, 검토용 스크립트와 `ci/roundtrip/*.sh`에 대한 `sh -n`과 shellcheck, `fix-roundtrip` 잡(시드한
   실패를 생성된 스크립트가 Rocky 9, AlmaLinux 9, 잡 안에서 빌드한 Debian 12 init 이미지,
-  Ubuntu 22.04의 일회용 컨테이너에서 고침. 각 init 행에서는 두 번째 컨테이너가 guard 실행 —
+  Ubuntu 22.04의 일회용 컨테이너와, 컨테이너가 판정할 수 없는 `beyond` 컨트롤까지 증명하는
+  러너 VM 자체에서 고침. 각 init 행에서는 두 번째 컨테이너가 guard 실행 —
   첫 컨테이너에서 계획한 스크립트가 거부됨 — 과 failure 실행 — 모든 블록의 validate를 강제로
-  실패시키면 유닛과 파일이 기록한 대로 되돌아가야 함 — 을 증명), 그리고 capability matrix(`docs/reference/capability-matrix.json`:
+  실패시키면 유닛, 파일, 모드, sysctl 값, 모듈이 기록한 대로 되돌아가야 함 — 을 증명. 러너
+  행에는 guard 실행이 없고, failure 실행을 위해 같은 VM에 다시 시드함), 그리고 capability matrix(`docs/reference/capability-matrix.json`:
   root 없이 `denied`여야 하는 팩트와 systemd 없이 `unsupported`여야 하는 팩트)를 돌립니다.
 
 ## 문서
