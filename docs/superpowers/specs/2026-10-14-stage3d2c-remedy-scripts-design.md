@@ -6,7 +6,8 @@ Korean pair: `2026-10-14-stage3d2c-remedy-scripts-design.ko.md`. Main design: `2
 (Q-1..Q-6). Rulings of this design are the E list; E-8..E-12 came out of the first spec review (five lenses,
 three refuters per finding, a critic) and E-13 out of the second (four lenses over the folded draft); both
 are folded in place. The family map the bodies were written from is the
-cycle's ignored workspace file `family-map.md`; its findings are restated here where they bind.
+cycle's ignored workspace file `family-map.md`; its findings are restated here where they bind. Section 8 records where
+the build departs from this text; where they disagree, section 8 is the design as built.
 
 ## 1. Scope and intent
 
@@ -685,3 +686,63 @@ restore, one default-list order, the risks of the two forwarding controls, `usb_
   partition (its mode is the mount's).
 - A guard run for the runner row (one host).
 - Paths with a newline in `modes` trees.
+
+## 8. As built
+
+The implementation plan (`docs/superpowers/plans/2026-10-14-stage3d2c-remedy-scripts.md`, rulings S-1..S-47) and
+its reviews changed the following. Each line names the section it amends.
+
+- §3 `restore_modes` skips an entry whose owner, group, mode and type already match the record, refuses an entry
+  with an ancestor directory that is not root-owned or is other-writable, and refuses an entry whose recorded owner
+  is not root when its parent is group- or other-writable; a root-owned, group-writable directory (Ubuntu's
+  `root:syslog 0775 /var/log`) is accepted and its group trusted. The rule is the prologue helper
+  `modes_trusted`; a refusal leaves the stricter mode and the block reports `ROLLBACK INCOMPLETE` (S-24).
+- §3 `backup` replaces an absent marker with a copy when the path exists on a later run with the same
+  `MUSTER_BACKUP`, so that run's record holds the earlier run's file, not the path's absence.
+- §3, §6 The failure-order test checks the rollback and the four record restores in one block, and
+  `restore_units` in its own, since units exclude the record kinds.
+- §4.1 The `gte 2` arms are spelled `[2-9]|[1-9][0-9]|[1-9][0-9][0-9]*` for clarity; the shell glob
+  `[1-9][0-9]*` already needed two characters, so the accepted numbers are the same (S-21).
+- §4.1, E-13 The forwarding body persists the companion `net.ipv4.conf.all.accept_redirects` line only when it
+  read 0 before the write, so a persisted 1 never overrides `icmp_redirects_ignored` at boot (S-43). Writing
+  `net.ipv6.conf.all.forwarding` also copies its value into `default.forwarding`; the forwarding lists, writes,
+  drop-in lines and restores keep `all` before `default`, and no `sysctl` list is sorted (S-46). Every sysctl
+  text says a value in `/etc/sysctl.conf` or a later-sorting file still wins at boot.
+- §4.1, §4.2, §4.4 A body that finds its own drop-in path a symlink (an operator's `/dev/null` mask) logs it and
+  fails the block before any write; a rollback that removes the drop-in skips a symlink (S-27).
+- §4.2 Module bodies and validates loop over `mods='…'`, never a literal one-word list (S-22); both accept the
+  collector's whole set of no-op install commands, and the body appends no line for a module one of them already
+  disables (S-25). A built-in module cannot be unloaded: its block ends `done` and the control stays FAIL.
+- §4.3 `log_dir_permissions` and the at-spool pass of `cron_permissions` change files only inside a directory
+  `modes_trusted` accepts, walked by shell glob; a directory someone other than root could rename is logged and
+  left to the operator, and the validate checks the same set, so the block ends `done` with the control FAIL
+  (S-47).
+- §4.3 `cron_permissions` gives a root-group access file the group its setgid reader runs as (`crontab` for
+  cron, `daemon` for a setgid-`daemon` `at`) (S-26); the at-spool pass is `chmod u-s,g-wxs,o-rwxt` (S-40).
+- §4.3 `audit_log_permissions` guards the file half of its validate; its text and `ftpusers_permissions`' name
+  a file found elsewhere as the operator's (S-39). `ftpusers_permissions` and `nfs_export_access` run
+  `chown root` only (S-13).
+- §4.3, §6 The file-validate test stays at the five 3D-2b controls, selected by its owner table; its "no other
+  bare stat case" assertion flags only a validate that is one stat `case` and nothing else (S-8, S-23). The
+  mask-derivation test covers the masks derived from `allowed_modes` (syslog, cron).
+- §4.4 `lockout_threshold`: a missing `deny`, and a missing `faillock.conf`, read as 3 on both sides; the body
+  writes only outside `[1, max]`; a `faillock.conf` it creates is mode 0644 (S-9, S-41).
+- §4.4 `password_policy` computes the collector's `required_classes` over the merged file chain (S-10); both
+  account bodies read keys in any case, as the collector does; the ageing loop skips, with a log line, an account
+  whose password is at least `max_days` old (it would expire on the spot) and a name `/etc/passwd` does not hold
+  (S-42).
+- §4.4, E-11 `session_timeout` keeps, per keyword, a value already in `[1, max]` and its validate is guarded by
+  `command -v sshd`, so a host without sshd ends `done` (S-11, reversing the round-2 wording). Its rollback puts
+  the recorded drop-in back, or removes the new one, before `sshd -t` and the reload (S-35). The failure run
+  proves the files are restored, not the daemon's reload (S-31).
+- §5 The runner's re-seed also puts back the stock modes of the stock-FAIL scripted paths the repair run
+  tightened (`/etc/hosts`, `/etc/shadow`), and the host row checks that every seeded id is a scripted item of the
+  failure plan and that the failure plan's scripted ids are a subset of the repair plan's, not that they are
+  equal (S-18). `sudoers_permissions` is not seeded on the runner, whose own `sudo` reads `/etc/sudoers` (S-33).
+- §5 The EL seed installs `authselect` and `passwd` and runs `authselect select minimal with-faillock --force`:
+  the images have no selected configuration and rocky9 no `/etc/pam.d/passwd` (S-29). `umask_policy` is not
+  proven on debian12-init, which stacks no `pam_umask`; `cron` is installed on debian12-init and ubuntu2204, and
+  the round-trip script floor is 6 (S-15, S-44).
+- §6 A path a daemon or the system writes to while the block runs (a live log) is a `modes` entry, never a
+  `backup`; a path a body only re-modes may use either (S-38). The inetd and audit-directory bodies clear bits
+  their clause would accept, a stricter result than E-8 asks for.

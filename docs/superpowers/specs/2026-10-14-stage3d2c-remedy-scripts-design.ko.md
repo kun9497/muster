@@ -5,7 +5,8 @@
 `2026-10-07-stage3d2-fix-dry-run-design.ko.md`(X-1..X-10)와 `2026-10-13-stage3d2b-remedy-proof-design.ko.md`
 (Q-1..Q-6). 이 설계의 판정은 E 목록이며, E-8..E-12는 1차 스펙 리뷰(렌즈 다섯, 발견마다 반박자 셋, 크리틱)에서,
 E-13은 2차 리뷰(접은 초안에 대한 렌즈 넷)에서 나왔고 둘 다 제자리에 접어 넣었습니다. 본문을 쓸 때 참고한 묶음별 지도는 이 사이클의 무시되는 작업 공간 파일
-`family-map.md`이며, 구속력이 있는 사실은 여기에 다시 적었습니다.
+`family-map.md`이며, 구속력이 있는 사실은 여기에 다시 적었습니다. 8절은 구현이 이 글과 달라진 곳을 적으며, 둘이 어긋나면 8절이
+구현된 설계입니다.
 
 ## 1. 범위와 의도
 
@@ -649,3 +650,61 @@ arm이 절의 목록이나 경계인지 확인합니다. `TestModuleScriptsNameT
   것).
 - runner 행의 가드 실행(호스트 하나).
 - `modes` 트리에서 이름에 줄바꿈이 있는 경로.
+
+## 8. 구현된 모습
+
+구현 계획(`docs/superpowers/plans/2026-10-14-stage3d2c-remedy-scripts.md`, 판정 S-1..S-47)과 그 리뷰가 다음을
+바꿨습니다. 줄마다 고치는 절을 적습니다.
+
+- §3 `restore_modes`는 소유자·그룹·모드·종류가 이미 기록과 같은 항목은 건너뛰고, root 소유가 아니거나 다른
+  사용자가 쓸 수 있는 상위 디렉터리를 가진 항목과, 부모를 그룹이나 다른 사용자가 쓸 수 있을 때 기록된 소유자가
+  root가 아닌 항목을 거부합니다. root 소유이면서 그룹이 쓸 수 있는 디렉터리(Ubuntu의 `root:syslog 0775
+  /var/log`)는 받아들이며 그 그룹을 신뢰합니다. 이 규칙은 프롤로그 헬퍼 `modes_trusted`이고, 거부하면 더 엄격한
+  모드가 남고 블록은 `ROLLBACK INCOMPLETE`를 보고합니다(S-24).
+- §3 같은 `MUSTER_BACKUP`으로 나중에 실행할 때 경로가 있으면 `backup`은 absent 표식을 사본으로 바꾸므로, 그
+  실행의 기록은 경로가 없었다는 사실이 아니라 앞선 실행의 파일을 담습니다.
+- §3, §6 실패 순서 테스트는 한 블록에서 롤백과 기록 복원 넷을, 유닛은 기록 종류와 함께 쓸 수 없으므로
+  `restore_units`는 따로 확인합니다.
+- §4.1 `gte 2` arm은 명확하게 `[2-9]|[1-9][0-9]|[1-9][0-9][0-9]*`로 씁니다. 셸 glob `[1-9][0-9]*`도 이미 두
+  글자가 필요했으므로 받아들이는 숫자는 같습니다(S-21).
+- §4.1, E-13 forwarding 본문은 쓰기 전에 읽은 값이 0일 때만 짝 키 `net.ipv4.conf.all.accept_redirects` 줄을
+  저장하므로, 저장된 1이 부팅 때 `icmp_redirects_ignored`를 덮지 않습니다(S-43). `net.ipv6.conf.all.forwarding`을
+  쓰면 그 값이 `default.forwarding`에도 복사되므로, forwarding의 목록·쓰기·drop-in 줄·복원은 `all`을 `default`보다
+  앞에 두고, 어떤 `sysctl` 목록도 정렬하지 않습니다(S-46). 모든 sysctl 안내문은 `/etc/sysctl.conf`나 뒤에 정렬되는
+  파일의 값이 부팅 때 여전히 이긴다고 말합니다.
+- §4.1, §4.2, §4.4 자기 drop-in 경로가 심볼릭 링크(운영자의 `/dev/null` 마스크)인 것을 발견한 본문은 그것을
+  로그로 남기고 무엇이든 쓰기 전에 블록을 실패시킵니다. drop-in을 지우는 롤백은 심볼릭 링크를 건너뜁니다(S-27).
+- §4.2 모듈 본문과 validate는 글자 그대로의 한 낱말 목록이 아니라 `mods='…'`를 돌며(S-22), 둘 다 수집기의
+  no-op install 명령 전체를 받아들이고, 본문은 그중 하나가 이미 끈 모듈에는 줄을 덧붙이지 않습니다(S-25). 빌트인
+  모듈은 내릴 수 없으므로 그 블록은 `done`으로 끝나고 컨트롤은 FAIL로 남습니다.
+- §4.3 `log_dir_permissions`와 `cron_permissions`의 at 스풀 단계는 셸 glob으로 훑은, `modes_trusted`가 받아들이는
+  디렉터리 안의 파일만 바꿉니다. root가 아닌 누군가가 이름을 바꿀 수 있는 디렉터리는 로그로 남기고 운영자에게
+  맡기며, validate도 같은 집합을 확인하므로 블록은 `done`으로 끝나고 컨트롤은 FAIL로 남습니다(S-47).
+- §4.3 `cron_permissions`는 그룹이 root인 접근 파일에, 그것을 읽는 setgid 프로그램이 도는 그룹(cron이면
+  `crontab`, setgid `daemon`인 `at`이면 `daemon`)을 줍니다(S-26). at 스풀 단계는 `chmod u-s,g-wxs,o-rwxt`입니다(S-40).
+- §4.3 `audit_log_permissions`는 validate의 파일 절반을 가드하고, 그 안내문과 `ftpusers_permissions`의 안내문은
+  다른 곳에 있는 파일을 운영자의 몫으로 적습니다(S-39). `ftpusers_permissions`와 `nfs_export_access`는
+  `chown root`만 합니다(S-13).
+- §4.3, §6 파일 validate 테스트는 소유자 표로 고른 3D-2b의 다섯 컨트롤에 머물며, "다른 단순 stat case 없음"
+  단언은 stat `case` 하나뿐인 validate만 잡습니다(S-8, S-23). 마스크 도출 테스트는 `allowed_modes`에서 나온
+  마스크(syslog, cron)를 다룹니다.
+- §4.4 `lockout_threshold`: 없는 `deny`와 없는 `faillock.conf`는 양쪽에서 3으로 읽으며, 본문은 `[1, max]` 밖일
+  때만 쓰고, 본문이 만든 `faillock.conf`는 모드 0644입니다(S-9, S-41).
+- §4.4 `password_policy`는 합친 파일 사슬로 수집기의 `required_classes`를 계산합니다(S-10). 두 계정 본문은
+  수집기처럼 키를 대소문자 구분 없이 읽고, 기간 루프는 비밀번호가 이미 `max_days` 이상 된 계정(그 자리에서
+  만료될 것)과 `/etc/passwd`에 없는 이름을 로그를 남기고 건너뜁니다(S-42).
+- §4.4, E-11 `session_timeout`은 키워드마다 이미 `[1, max]` 안에 있는 값을 유지하고, validate는 `command -v
+  sshd`로 가드되므로 sshd가 없는 호스트는 `done`으로 끝납니다(S-11, 2차 리뷰의 문구를 뒤집음). 롤백은 `sshd -t`와
+  reload 전에 기록된 drop-in을 되돌리거나 새 것을 지웁니다(S-35). 실패 실행은 데몬의 reload가 아니라 파일이
+  복원되었음을 증명합니다(S-31).
+- §5 runner의 재시드는 수리 실행이 조인 기본 FAIL 스크립트 경로(`/etc/hosts`, `/etc/shadow`)의 기본 모드도
+  되돌리며, 호스트 행은 두 계획의 스크립트 id가 같은지가 아니라 시드한 id가 모두 실패 계획의 스크립트 항목인지와
+  실패 계획의 스크립트 id가 수리 계획의 부분집합인지를 확인합니다(S-18). `sudoers_permissions`는 자기 `sudo`가
+  `/etc/sudoers`를 읽는 runner에서 시드하지 않습니다(S-33).
+- §5 EL 시드는 `authselect`와 `passwd`를 설치하고 `authselect select minimal with-faillock --force`를 실행합니다.
+  이미지에는 선택된 구성이 없고 rocky9에는 `/etc/pam.d/passwd`가 없기 때문입니다(S-29). `umask_policy`는
+  `pam_umask`를 쌓지 않는 debian12-init에서 증명하지 않으며, debian12-init과 ubuntu2204에는 `cron`을 설치하고,
+  왕복 검증 스크립트의 하한은 6입니다(S-15, S-44).
+- §6 블록이 도는 동안 데몬이나 시스템이 쓰는 경로(동작 중인 로그)는 `backup`이 아니라 `modes` 항목입니다. 본문이
+  모드만 바꾸는 경로는 둘 중 무엇이든 됩니다(S-38). inetd와 감사 디렉터리 본문은 절이 받아들일 비트도 지우므로,
+  E-8이 요구하는 것보다 엄격한 결과를 냅니다.
