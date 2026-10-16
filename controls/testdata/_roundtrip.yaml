@@ -10,9 +10,17 @@
 # the ids whose `images` name that row. The fixture harness never loads this file.
 - id: muster.account.cron_permissions
   unproven: "the rows land in Task 9"
+- id: muster.account.lockout_threshold
+  unproven: "the rows land in Task 9"
+- id: muster.account.password_policy
+  unproven: "the rows land in Task 9"
 - id: muster.account.root_remote_login
   images: [almalinux9-init, rocky9-init]
+- id: muster.account.session_timeout
+  unproven: "the rows land in Task 9"
 - id: muster.account.sudoers_permissions
+  unproven: "the rows land in Task 9"
+- id: muster.account.umask_policy
   unproven: "the rows land in Task 9"
 - id: muster.beyond.aslr_and_link_protection
   unproven: "the runner row (Task 9) proves it; containers gate beyond controls out"

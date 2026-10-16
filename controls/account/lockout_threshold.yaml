@@ -27,7 +27,19 @@ checks:
   - { fact: pam.faillock.deny, op: gte, expected: 1 }
   - { fact: pam.faillock.deny, op: lte, expected: "${max_attempts}" }
 remediation:
-  text_en: RHEL family - authselect enable-feature with-faillock and set deny in /etc/security/faillock.conf; Debian family - add pam_faillock.so preauth and authfail lines to common-auth and a pam_faillock.so line to common-account (or use a pam-auth-update profile), then set deny in /etc/security/faillock.conf.
-  text_ko: RHEL 계열은 authselect enable-feature with-faillock 을 실행하고 /etc/security/faillock.conf 에 deny 를 설정하며, Debian 계열은 common-auth 에 pam_faillock.so preauth 와 authfail 줄, common-account 에 pam_faillock.so 줄을 추가하거나 pam-auth-update 프로파일을 쓴 뒤 /etc/security/faillock.conf 에 deny 를 설정합니다.
+  text_en: RHEL family - authselect enable-feature with-faillock and set deny in /etc/security/faillock.conf; Debian family - add pam_faillock.so preauth and authfail lines to common-auth and a pam_faillock.so line to common-account (or use a pam-auth-update profile), then set deny in /etc/security/faillock.conf. A deny= argument on the pam_faillock lines wins over the file; the review script edits the file only.
+  text_ko: RHEL 계열은 authselect enable-feature with-faillock 을 실행하고 /etc/security/faillock.conf 에 deny 를 설정하며, Debian 계열은 common-auth 에 pam_faillock.so preauth 와 authfail 줄, common-account 에 pam_faillock.so 줄을 추가하거나 pam-auth-update 프로파일을 쓴 뒤 /etc/security/faillock.conf 에 deny 를 설정합니다. pam_faillock 줄의 deny= 인자는 파일보다 우선하며, 검토 스크립트는 파일만 고칩니다.
   risk: lockout_risk
   idempotent: true
+  script_params: [max_attempts]
+  backup: [/etc/security/faillock.conf]
+  script: |
+    fc=/etc/security/faillock.conf
+    n=$P_max_attempts
+    v=$(awk -F= '{ k = $1; gsub(/[[:space:]]/, "", k) } k == "deny" { d = $2 } END { gsub(/[[:space:]]/, "", d); print d }' "$fc" 2>/dev/null) || v=
+    case "$v" in ''|*[!0-9]*) v=3;; esac
+    if [ "$v" -lt 1 ] || [ "$v" -gt "$n" ]; then
+      if grep -Eq '^[[:space:]]*deny[[:space:]]*=' "$fc" 2>/dev/null; then sed -i -E "s|^([[:space:]]*deny)[[:space:]]*=.*|\1 = $n|" "$fc"; else printf 'deny = %s\n' "$n" >> "$fc"; fi
+    fi
+  validate: |
+    cat /etc/security/faillock.conf 2>/dev/null | awk -F= '{ k = $1; gsub(/[[:space:]]/, "", k) } k == "deny" { d = $2 } END { gsub(/[[:space:]]/, "", d); if (d == "") d = 3; exit !(d + 0 >= 1 && d + 0 <= M) }' M="$P_max_attempts"

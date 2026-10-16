@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/kun9497/muster/internal/controls"
 )
@@ -689,5 +690,367 @@ func TestFileBodiesRepairATempTree(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// accountTree stubs chage, sshd and systemctl for the account bodies: chage
+// logs its argv; sshd -T answers from the muster drop-in when it exists (it
+// sorts first, and the first value wins) and from $STUB/sshd_T otherwise;
+// sshd -t succeeds; systemctl logs its argv, reports ssh.service active when
+// $STUB/ssh_active exists and nothing else active, and a reload logs the
+// drop-in as the daemon would read it.
+func accountTree(t *testing.T) (root, bin, stub string) {
+	root, bin, stub = t.TempDir(), t.TempDir(), t.TempDir()
+	writeStub(t, bin, "chage", `printf '%s\n' "$*" >> "$STUB/chage"`+"\n")
+	writeStub(t, bin, "systemctl", `printf '%s\n' "$*" >> "$STUB/systemctl"
+case "$*" in
+  "is-active --quiet ssh.service") [ -e "$STUB/ssh_active" ]; exit;;
+  is-active*) exit 1;;
+  reload*) cat "$ROOT/etc/ssh/sshd_config.d/00-muster-session.conf" >> "$STUB/systemctl" 2>/dev/null || echo "(no drop-in)" >> "$STUB/systemctl";;
+esac
+exit 0
+`)
+	writeStub(t, bin, "sshd", `case "$1" in
+  -t) exit 0;;
+  -T) d="$ROOT/etc/ssh/sshd_config.d/00-muster-session.conf"
+      if [ -f "$d" ]; then tr 'A-Z' 'a-z' < "$d"; else cat "$STUB/sshd_T"; fi;;
+esac
+`)
+	return root, bin, stub
+}
+
+func rebaseAccounts(s, root string) string {
+	for _, p := range []string{"/etc/login.defs", "/etc/security/", "/etc/shadow", "/etc/passwd", "/etc/ssh/", "/run/sshd"} {
+		s = strings.ReplaceAll(s, p, root+p)
+	}
+	return s
+}
+
+// writeUnder writes s at root+p, making its directories.
+func writeUnder(t *testing.T, root, p, s string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(filepath.Join(root, p)), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, p), []byte(s), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// S-10, S-42: login.defs and pwquality are tightened only where looser; the
+// ageing reaches every hashed account /etc/passwd holds, except one whose
+// password is already past the maximum; the record replays on rollback.
+func TestPasswordPolicyBodyTightensOnly(t *testing.T) {
+	needSh(t)
+	c := shippedControl(t, "muster.account.password_policy")
+	r := c.Remediation
+	root, bin, stub := accountTree(t)
+	today := int(time.Now().Unix() / 86400)
+	writeUnder(t, root, "/etc/login.defs", "#PASS_MAX_DAYS 1\nPASS_MAX_DAYS 99999\nPASS_MIN_DAYS 2\nPASS_MAX_DAYS 99999\n")
+	writeUnder(t, root, "/etc/security/pwquality.conf", "minlen = 14\n")
+	writeUnder(t, root, "/etc/passwd", "root:x:0:0::/root:/bin/sh\nfresh:x:1000:1000::/home/fresh:/bin/sh\nold:x:1001:1001::/home/old:/bin/sh\nstrict:x:1002:1002::/home/strict:/bin/sh\nlegacy:x:1003:1003::/home/legacy:/bin/sh\n")
+	writeUnder(t, root, "/etc/shadow", fmt.Sprintf("root:*:%d:0:99999:7:::\nfresh:$6$x:%d::99999:7:::\nold:$6$x:%d:0:99999:7:::\nstrict:$6$x:%d:5:30:7:::\nlegacy:abcDEF:%d:::7:::\nghost:$6$x:%d::99999:7:::\n#c:$6$x:1:0:1:::\n", today, today, today-400, today, today, today))
+	mb := t.TempDir()
+	env := append(pEnv(t, c), "MB="+mb, "STUB="+stub, "ROOT="+root)
+	body := "log() { printf 'muster-fix: %s\\n' \"$*\"; }\n" + rebaseAccounts(r.Script, root)
+	out, code := runBody(t, root, bin, body, env...)
+	if code != 0 {
+		t.Fatalf("body %d: %s", code, out)
+	}
+	ld := readFile(t, filepath.Join(root, "/etc/login.defs"))
+	if !strings.Contains(ld, "PASS_MAX_DAYS 90\nPASS_MIN_DAYS 2\nPASS_MAX_DAYS 90\n") || !strings.Contains(ld, "PASS_MIN_LEN 8\n") || !strings.Contains(ld, "#PASS_MAX_DAYS 1\n") {
+		t.Errorf("login.defs:\n%s", ld)
+	}
+	if pw := readFile(t, filepath.Join(root, "/etc/security/pwquality.conf.d/99-muster.conf")); pw != "minclass = 3\n" {
+		t.Errorf("drop-in %q: minlen 14 is stricter and stays; minclass is written", pw)
+	}
+	got := readFile(t, filepath.Join(stub, "chage"))
+	for _, w := range []string{"-M 90 -- fresh\n", "-m 1 -- fresh\n", "-M 90 -- legacy\n", "-m 1 -- legacy\n"} {
+		if !strings.Contains(got, w) {
+			t.Errorf("chage lacks %q:\n%s", w, got)
+		}
+	}
+	for _, never := range []string{"-- root\n", "-- old\n", "-M 90 -- strict\n", "-m 1 -- strict\n", "#c", "-- ghost\n"} {
+		if strings.Contains(got, never) {
+			t.Errorf("chage carries %q:\n%s", never, got)
+		}
+	}
+	if !strings.Contains(out, "password_policy: old: password older than 90 days, change it first") {
+		t.Errorf("no skip log for old: %s", out)
+	}
+	if !strings.Contains(out, "password_policy: ghost: not in "+root+"/etc/passwd, left as is") { // the log names the rebased path
+		t.Errorf("no skip log for ghost: %s", out)
+	}
+	rec := readFile(t, filepath.Join(mb, "ageing.list"))
+	if !strings.Contains(rec, "legacy:-1:-1\n") || !strings.Contains(rec, "fresh:-1:99999\n") || strings.Contains(rec, "ghost") || strings.Contains(rec, "old:") {
+		t.Errorf("ageing.list:\n%s", rec)
+	}
+	if out, code := runBody(t, root, bin, rebaseAccounts(r.Validate, root), env...); code != 0 {
+		t.Errorf("validate %d: %s", code, out)
+	}
+	if out, code := runBody(t, root, bin, rebaseAccounts(r.Rollback, root), env...); code != 0 {
+		t.Errorf("rollback %d: %s", code, out)
+	}
+	if calls := readFile(t, filepath.Join(stub, "chage")); !strings.Contains(calls, "-m -1 -M 99999 -- fresh\n") || !strings.Contains(calls, "-m -1 -M -1 -- legacy\n") {
+		t.Errorf("rollback replay:\n%s", calls)
+	}
+}
+
+// E-8: a login.defs and a pwquality chain already stricter than the
+// parameters stay byte for byte; nothing is written and the validate holds.
+func TestPasswordPolicyBodyKeepsAStricterHost(t *testing.T) {
+	needSh(t)
+	c := shippedControl(t, "muster.account.password_policy")
+	root, bin, stub := accountTree(t)
+	const defs = "PASS_MAX_DAYS 60\nPASS_MIN_DAYS 2\nPASS_MIN_LEN 12\n"
+	writeUnder(t, root, "/etc/login.defs", defs)
+	writeUnder(t, root, "/etc/security/pwquality.conf", "minlen = 12\ndcredit = -1\nucredit = -1\nlcredit = -1\n")
+	writeUnder(t, root, "/etc/passwd", "")
+	writeUnder(t, root, "/etc/shadow", "")
+	env := append(pEnv(t, c), "MB="+t.TempDir(), "STUB="+stub, "ROOT="+root)
+	body := "log() { printf 'muster-fix: %s\\n' \"$*\"; }\n" + rebaseAccounts(c.Remediation.Script, root)
+	if out, code := runBody(t, root, bin, body, env...); code != 0 {
+		t.Fatalf("body %d: %s", code, out)
+	}
+	if got := readFile(t, filepath.Join(root, "/etc/login.defs")); got != defs {
+		t.Errorf("login.defs changed to %q", got)
+	}
+	if exists(filepath.Join(root, "/etc/security/pwquality.conf.d")) {
+		t.Error("a pwquality drop-in was written although the chain is stricter")
+	}
+	if out, code := runBody(t, root, bin, rebaseAccounts(c.Remediation.Validate, root), env...); code != 0 {
+		t.Errorf("validate %d: %s", code, out)
+	}
+}
+
+func TestLineBodiesTightenOnly(t *testing.T) {
+	needSh(t)
+	for _, c := range []struct {
+		id, file, before, after string
+		absent, created         bool     // the file is missing before; the body creates it
+		env                     []string // overrides of the defaults
+	}{
+		{id: "muster.account.umask_policy", file: "/etc/login.defs", before: "UMASK 002\n", after: "UMASK 027\n"},
+		{id: "muster.account.umask_policy", file: "/etc/login.defs", before: "UMASK 077\n", after: "UMASK 077\n"},
+		{id: "muster.account.umask_policy", file: "/etc/login.defs", before: "# none\n", after: "# none\nUMASK 027\n"},
+		{id: "muster.account.lockout_threshold", file: "/etc/security/faillock.conf", before: "deny = 3\ndeny = 99\n", after: "deny = 5\ndeny = 5\n"},
+		{id: "muster.account.lockout_threshold", file: "/etc/security/faillock.conf", before: "# deny = 3\n", after: "# deny = 3\n"},
+		{id: "muster.account.lockout_threshold", file: "/etc/security/faillock.conf", before: "deny = 0\n", after: "deny = 5\n"},
+		{id: "muster.account.lockout_threshold", file: "/etc/security/faillock.conf", before: "deny = 2\n", after: "deny = 2\n"},
+		// S-41: a missing faillock.conf is deny 3 on both sides
+		{id: "muster.account.lockout_threshold", file: "/etc/security/faillock.conf", absent: true},
+		{id: "muster.account.lockout_threshold", file: "/etc/security/faillock.conf", absent: true, created: true, after: "deny = 2\n", env: []string{"P_max_attempts=2"}},
+	} {
+		ctl := shippedControl(t, c.id)
+		root, bin, stub := accountTree(t)
+		p := filepath.Join(root, c.file)
+		_ = os.MkdirAll(filepath.Dir(p), 0o755)
+		if !c.absent {
+			if err := os.WriteFile(p, []byte(c.before), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+		env := append(append(pEnv(t, ctl), "STUB="+stub, "ROOT="+root), c.env...)
+		if out, code := runBody(t, root, bin, rebaseAccounts(ctl.Remediation.Script, root), env...); code != 0 {
+			t.Fatalf("%s %q: body %d %s", c.id, c.before, code, out)
+		}
+		if c.absent && !c.created {
+			if exists(p) {
+				t.Errorf("%s: the body created %s although the default is in range", c.id, c.file)
+			}
+		} else if b, _ := os.ReadFile(p); string(b) != c.after {
+			t.Errorf("%s %q: file %q, want %q", c.id, c.before, b, c.after)
+		}
+		if out, code := runBody(t, root, bin, rebaseAccounts(ctl.Remediation.Validate, root), env...); code != 0 {
+			t.Errorf("%s %q: validate %d %s", c.id, c.before, code, out)
+		}
+	}
+}
+
+func TestSessionTimeoutKeepsAValueInRange(t *testing.T) {
+	needSh(t)
+	ctl := shippedControl(t, "muster.account.session_timeout")
+	for _, c := range []struct{ answer, want string }{
+		{"clientaliveinterval 900\nclientalivecountmax 3\n", "ClientAliveInterval 300\nClientAliveCountMax 3\n"},
+		{"clientaliveinterval 120\nclientalivecountmax 9\n", "ClientAliveInterval 120\nClientAliveCountMax 3\n"},
+		{"clientaliveinterval 0\nclientalivecountmax 3\n", "ClientAliveInterval 300\nClientAliveCountMax 3\n"},
+	} {
+		root, bin, stub := accountTree(t)
+		_ = os.MkdirAll(filepath.Join(root, "/etc/ssh/sshd_config.d"), 0o755)
+		if err := os.WriteFile(filepath.Join(stub, "sshd_T"), []byte(c.answer), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		env := append(pEnv(t, ctl), "STUB="+stub, "ROOT="+root)
+		if out, code := runBody(t, root, bin, rebaseAccounts(ctl.Remediation.Script, root), env...); code != 0 {
+			t.Fatalf("%q: body %d %s", c.answer, code, out)
+		}
+		if b, _ := os.ReadFile(filepath.Join(root, "/etc/ssh/sshd_config.d/00-muster-session.conf")); string(b) != c.want {
+			t.Errorf("%q: drop-in %q, want %q", c.answer, b, c.want)
+		}
+		if out, code := runBody(t, root, bin, rebaseAccounts(ctl.Remediation.Validate, root), env...); code != 0 {
+			t.Errorf("%q: validate %d %s", c.answer, code, out)
+		}
+		if calls := readFile(t, filepath.Join(stub, "systemctl")); strings.Contains(calls, "reload") {
+			t.Errorf("%q: reloaded a unit that is not active:\n%s", c.answer, calls)
+		}
+	}
+}
+
+// S-11, S-44: a host without sshd ends done with nothing written (the next
+// check still FAILs, naming the TMOUT mechanism).
+func TestSessionTimeoutWithoutSshdChangesNothing(t *testing.T) {
+	needSh(t)
+	if p, err := exec.LookPath("sshd"); err == nil {
+		t.Skipf("this host has its own sshd (%s); the case needs a PATH without one", p)
+	}
+	ctl := shippedControl(t, "muster.account.session_timeout")
+	root, bin, stub := accountTree(t)
+	if err := os.Remove(filepath.Join(bin, "sshd")); err != nil {
+		t.Fatal(err)
+	}
+	_ = os.MkdirAll(filepath.Join(root, "/etc/ssh/sshd_config.d"), 0o755)
+	env := append(pEnv(t, ctl), "STUB="+stub, "ROOT="+root)
+	for _, b := range []struct{ name, v string }{{"script", ctl.Remediation.Script}, {"validate", ctl.Remediation.Validate}} {
+		if out, code := runBody(t, root, bin, rebaseAccounts(b.v, root), env...); code != 0 {
+			t.Errorf("%s %d without sshd: %s", b.name, code, out)
+		}
+	}
+	if exists(filepath.Join(root, "/etc/ssh/sshd_config.d/00-muster-session.conf")) {
+		t.Error("a drop-in was written on a host without sshd")
+	}
+	if exists(filepath.Join(root, "/run/sshd")) {
+		t.Error("/run/sshd was made on a host without sshd")
+	}
+}
+
+// Z-30's pattern: only the active unit is reloaded, after the drop-in is
+// written.
+func TestSessionTimeoutReloadsTheActiveSshService(t *testing.T) {
+	needSh(t)
+	ctl := shippedControl(t, "muster.account.session_timeout")
+	root, bin, stub := accountTree(t)
+	_ = os.MkdirAll(filepath.Join(root, "/etc/ssh/sshd_config.d"), 0o755)
+	writeUnder(t, stub, "/sshd_T", "clientaliveinterval 0\nclientalivecountmax 3\n")
+	writeUnder(t, stub, "/ssh_active", "")
+	env := append(pEnv(t, ctl), "STUB="+stub, "ROOT="+root)
+	if out, code := runBody(t, root, bin, rebaseAccounts(ctl.Remediation.Script, root), env...); code != 0 {
+		t.Fatalf("body %d: %s", code, out)
+	}
+	calls := readFile(t, filepath.Join(stub, "systemctl"))
+	if !strings.Contains(calls, "reload ssh.service\nClientAliveInterval 300\n") {
+		t.Errorf("no reload of ssh.service over the new drop-in:\n%s", calls)
+	}
+	if strings.Contains(calls, "reload sshd.service") {
+		t.Errorf("reloaded the inactive sshd.service:\n%s", calls)
+	}
+}
+
+// accountBlock is the shipped control's planned block with its paths moved
+// under root, and validate forced to fail when failValidate is set.
+func accountBlock(t *testing.T, id, root string, failValidate bool) *Plan {
+	t.Helper()
+	set, err := controls.LoadDefault()
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, _ := set.ByID(id)
+	p := mustBuild(t, scriptReport(row(id, "FAIL", "clause does not hold", "", importanceSeverity[c.Importance])), set, Options{})
+	if len(p.Items) != 1 || !p.Items[0].Script || !p.Items[0].Planned {
+		t.Fatalf("%s: plan %+v, want one planned scripted item", id, p.Items)
+	}
+	it := &p.Items[0]
+	for i := range it.Backup {
+		it.Backup[i] = rebaseAccounts(it.Backup[i], root)
+	}
+	it.ScriptBody = rebaseAccounts(it.ScriptBody, root)
+	it.ValidateCmd = rebaseAccounts(it.ValidateCmd, root)
+	it.RollbackBody = rebaseAccounts(it.RollbackBody, root)
+	if failValidate {
+		it.ValidateCmd = "false"
+	}
+	return p
+}
+
+// S-27: a muster drop-in that is a symlink (an operator's mask) fails the
+// block before any write; the link, its target's mode and content are
+// unchanged after the whole block, and no account is touched.
+func TestAccountBodiesLeaveASymlinkedDropIn(t *testing.T) {
+	needSh(t)
+	for _, c := range []struct{ id, dropIn string }{
+		{"muster.account.password_policy", "/etc/security/pwquality.conf.d/99-muster.conf"},
+		{"muster.account.session_timeout", "/etc/ssh/sshd_config.d/00-muster-session.conf"},
+	} {
+		t.Run(c.id, func(t *testing.T) {
+			root, bin, stub := accountTree(t)
+			const defs = "PASS_MAX_DAYS 99999\n"
+			writeUnder(t, root, "/etc/login.defs", defs)
+			writeUnder(t, root, "/etc/passwd", "fresh:x:1000:1000::/home/fresh:/bin/sh\n")
+			writeUnder(t, root, "/etc/shadow", fmt.Sprintf("fresh:$6$x:%d::99999:7:::\n", time.Now().Unix()/86400))
+			writeUnder(t, stub, "/sshd_T", "clientaliveinterval 0\nclientalivecountmax 3\n")
+			victim := filepath.Join(root, "victim")
+			writeUnder(t, root, "/victim", "victim\n")
+			if err := os.Chmod(victim, 0o666); err != nil {
+				t.Fatal(err)
+			}
+			link := filepath.Join(root, c.dropIn)
+			if err := os.MkdirAll(filepath.Dir(link), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Symlink(victim, link); err != nil {
+				t.Fatal(err)
+			}
+			p := accountBlock(t, c.id, root, false)
+			out, _, code := runScriptWith(t, p, root, filepath.Join(root, "bk"), runOpts{pathPrefix: bin, env: []string{"STUB=" + stub, "ROOT=" + root}})
+			if code == 0 {
+				t.Fatalf("the block over a symlinked drop-in exited 0\n%s", out)
+			}
+			if !strings.Contains(out, c.id+": "+link+" is a symlink (a mask), left as is") {
+				t.Errorf("no symlink refusal in the log\n%s", out)
+			}
+			if got, err := os.Readlink(link); err != nil || got != victim {
+				t.Errorf("the drop-in is %q (%v) after the block, want the link to %s", got, err, victim)
+			}
+			if m := mode(t, victim); m != "666" {
+				t.Errorf("the link's target is mode %s, want 666", m)
+			}
+			if got := readFile(t, victim); got != "victim\n" {
+				t.Errorf("the link's target holds %q", got)
+			}
+			if got := readFile(t, filepath.Join(root, "/etc/login.defs")); got != defs {
+				t.Errorf("login.defs is %q after the block", got)
+			}
+			if exists(filepath.Join(stub, "chage")) {
+				t.Errorf("chage ran although the block stopped:\n%s", readFile(t, filepath.Join(stub, "chage")))
+			}
+		})
+	}
+}
+
+// S-35: on a failed validate the rollback puts the recorded drop-in back
+// itself before it reloads, so the daemon never runs a configuration its
+// files do not hold, also when an earlier run's drop-in existed.
+func TestSessionTimeoutRollbackRestoresBeforeTheReload(t *testing.T) {
+	needSh(t)
+	root, bin, stub := accountTree(t)
+	const before = "ClientAliveInterval 300\nClientAliveCountMax 9\n"
+	writeUnder(t, root, "/etc/ssh/sshd_config.d/00-muster-session.conf", before)
+	writeUnder(t, stub, "/ssh_active", "")
+	p := accountBlock(t, "muster.account.session_timeout", root, true)
+	out, _, code := runScriptWith(t, p, root, filepath.Join(root, "bk"), runOpts{pathPrefix: bin, env: []string{"STUB=" + stub, "ROOT=" + root}})
+	if code != 1 || !strings.Contains(out, "validate failed") {
+		t.Fatalf("exit %d, want 1 after a failed validate\n%s", code, out)
+	}
+	if strings.Contains(out, "ROLLBACK INCOMPLETE") || strings.Contains(out, "rollback failed") {
+		t.Errorf("the way back was incomplete\n%s", out)
+	}
+	if got := readFile(t, filepath.Join(root, "/etc/ssh/sshd_config.d/00-muster-session.conf")); got != before {
+		t.Errorf("the drop-in is %q after the block, want %q", got, before)
+	}
+	calls := readFile(t, filepath.Join(stub, "systemctl"))
+	if !strings.Contains(calls, "reload ssh.service\nClientAliveInterval 300\nClientAliveCountMax 3\n") {
+		t.Errorf("the body did not reload over its own drop-in:\n%s", calls)
+	}
+	if !strings.HasSuffix(calls, "reload ssh.service\n"+before) {
+		t.Errorf("the last reload did not read the restored drop-in:\n%s", calls)
 	}
 }

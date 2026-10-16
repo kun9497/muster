@@ -14,7 +14,7 @@ references:
 requires_facts: ">=1"
 absent_means: fail
 params:
-  acceptable: { type: list<string>, default: ["022", "027", "077", "0022", "0027", "0077"], description: UMASK values that deny at least group and other write }
+  acceptable: { type: list<string>, default: ["027", "022", "077", "0027", "0022", "0077"], description: UMASK values that deny at least group and other write }
 checks:
   - { fact: accounts.login_defs.umask, op: in, expected: "${acceptable}" }
   - { fact: pam.umask_module.enabled, op: eq, expected: true }
@@ -23,3 +23,15 @@ remediation:
   text_ko: /etc/login.defs 에 UMASK 027 을 설정하고 로그인·비로그인 PAM 세션 스택에 "session optional pam_umask.so" 줄이 있게 합니다(Debian 은 pam-auth-update, RHEL 은 authselect).
   risk: none
   idempotent: true
+  script_params: [acceptable]
+  backup: [/etc/login.defs]
+  script: |
+    ld=/etc/login.defs
+    first=${P_acceptable%% *}
+    v=$(awk '$1 == "UMASK" { print $2; exit }' "$ld")
+    case " $P_acceptable " in
+      *" $v "*) ;;
+      *) if grep -Eq '^[[:space:]]*UMASK[[:space:]]' "$ld"; then sed -i -E "s|^([[:space:]]*UMASK)[[:space:]].*|\1 $first|" "$ld"; else printf 'UMASK %s\n' "$first" >> "$ld"; fi;;
+    esac
+  validate: |
+    case " $P_acceptable " in *" $(awk '$1 == "UMASK" { print $2; exit }' /etc/login.defs) "*) ;; *) false;; esac
