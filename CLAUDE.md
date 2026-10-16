@@ -336,7 +336,8 @@ regenerates them from public images and `-check` compares.
   router's or container host's clients at once), `reverse_path_filtering` is `restart_service` (strict filtering drops
   asymmetrically routed traffic; such a host sets 2), `usb_storage_disabled` is `restart_service` (USB backup or boot
   media stop), `nis_disabled` is `lockout_risk` (stopping ypbind cuts NIS accounts), `password_policy` is `lockout_risk` (it
-  sets ageing on every account with a password). The sshd body reloads a running `sshd`/`ssh` and validates persona root
+  sets ageing on every account with a password except root: uid 0 is skipped and logged, since an expired root password
+  stops root's cron and at jobs, S-48). The sshd body reloads a running `sshd`/`ssh` and validates persona root
   (`sshd -T -C user=root,…`). The script refuses a `MUSTER_BACKUP` that root does not own or others can write (a planted
   backup would be restored over `/etc/shadow`).
 

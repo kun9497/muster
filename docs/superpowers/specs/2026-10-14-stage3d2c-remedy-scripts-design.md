@@ -753,7 +753,9 @@ its reviews changed the following. Each line names the section it amends.
 - §4.4 `password_policy` computes the collector's `required_classes` over the merged file chain (S-10); both
   account bodies read keys in any case, as the collector does; the ageing loop skips, with a log line, an account
   whose password is at least `max_days` old (it would expire on the spot) and a name `/etc/passwd` does not hold
-  (S-42).
+  (S-42). It also skips, before anything is recorded, a name whose `/etc/passwd` uid is 0, logging that
+  root's ageing is left to the operator: once any account's password expires, that account's cron and at jobs stop; the
+  text says so (S-48).
 - §4.4, E-11 `session_timeout` keeps, per keyword, a value already in `[1, max]` and its validate is guarded by
   `command -v sshd`, so a host without sshd ends `done` (S-11, reversing the round-2 wording). Its rollback puts
   the recorded drop-in back, or removes the new one, before `sshd -t` and the reload (S-35). The failure run

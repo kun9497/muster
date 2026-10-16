@@ -715,7 +715,9 @@ arm이 절의 목록이나 경계인지 확인합니다. `TestModuleScriptsNameT
   때만 쓰고, 본문이 만든 `faillock.conf`는 모드 0644입니다(S-9, S-41).
 - §4.4 `password_policy`는 합친 파일 사슬로 수집기의 `required_classes`를 계산합니다(S-10). 두 계정 본문은
   수집기처럼 키를 대소문자 구분 없이 읽고, 기간 루프는 비밀번호가 이미 `max_days` 이상 된 계정(그 자리에서
-  만료될 것)과 `/etc/passwd`에 없는 이름을 로그를 남기고 건너뜁니다(S-42).
+  만료될 것)과 `/etc/passwd`에 없는 이름을 로그를 남기고 건너뜁니다(S-42). 또한 무엇이든 기록하기 전에 `/etc/passwd`의 uid가 0인 이름을
+  건너뛰고, root의 기간은 운영자에게 맡긴다고 로그로 남깁니다. 어떤 계정이든 비밀번호가 만료되면 그 계정의 cron과 at
+  작업이 멈춥니다. 안내문도 그렇게 말합니다(S-48).
 - §4.4, E-11 `session_timeout`은 키워드마다 이미 `[1, max]` 안에 있는 값을 유지하고, validate는 `command -v
   sshd`로 가드되므로 sshd가 없는 호스트는 `done`으로 끝납니다(S-11, 2차 리뷰의 문구를 뒤집음). 롤백은 `sshd -t`와
   reload 전에 기록된 drop-in을 되돌리거나 새 것을 지웁니다(S-35). 실패 실행은 데몬의 reload가 아니라 파일이

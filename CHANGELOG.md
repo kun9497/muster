@@ -151,7 +151,8 @@ verdict on an existing snapshot is at least a minor release and appears under
   `ip_forwarding_disabled`, `ipv6_forwarding_disabled`,
   `reverse_path_filtering` (strict filtering drops asymmetrically routed
   traffic) and `usb_storage_disabled` are `restart_service`,
-  `password_policy` is `lockout_risk`.
+  `password_policy` is `lockout_risk` (its ageing loop skips uid 0 and logs it:
+  an expired root password stops root's cron and at jobs).
 - The review script's prologue runs `set -u`, `umask 077`, `log()`, the hash
   helper, the root check, the host guard, the `MUSTER_BACKUP` checks and the
   helpers, in that order; its exit 2 now has three causes (not root, another
@@ -190,7 +191,7 @@ clear bits symbolically, declare `modes` for paths a body only re-modes or a
 daemon writes to, and change files under a directory only where no one but
 root (or a root-owned directory's group) can rename them; the four account
 controls tighten `login.defs`, `faillock.conf`, `pwquality` and per-account
-ageing only, reading keys as the collector does. `umask_policy.acceptable`
+ageing (root's excepted) only, reading keys as the collector does. `umask_policy.acceptable`
 lists `027` first (the value its script writes); `op: in` does not depend on
 order, so only the digest moves. The risks of `ip_forwarding_disabled`,
 `ipv6_forwarding_disabled`, `reverse_path_filtering` and `usb_storage_disabled`

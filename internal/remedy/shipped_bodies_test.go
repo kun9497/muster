@@ -770,8 +770,9 @@ func writeUnder(t *testing.T, root, p, s string) {
 	}
 }
 
-// S-10, S-42: login.defs and pwquality are tightened only where looser; the
-// ageing reaches every hashed account /etc/passwd holds, except one whose
+// S-10, S-42, S-48: login.defs and pwquality are tightened only where looser;
+// the ageing reaches every hashed account /etc/passwd holds, except root (uid
+// 0: an expired root password stops root's cron and at jobs) and one whose
 // password is already past the maximum; the record replays on rollback.
 func TestPasswordPolicyBodyTightensOnly(t *testing.T) {
 	needSh(t)
@@ -784,7 +785,7 @@ func TestPasswordPolicyBodyTightensOnly(t *testing.T) {
 	writeUnder(t, root, "/etc/passwd", "root:x:0:0::/root:/bin/sh\nfresh:x:1000:1000::/home/fresh:/bin/sh\nold:x:1001:1001::/home/old:/bin/sh\nstrict:x:1002:1002::/home/strict:/bin/sh\nlegacy:x:1003:1003::/home/legacy:/bin/sh\nedge:x:1004:1004::/home/edge:/bin/sh\n")
 	// edge changed its password exactly max_days ago: shadow's isexpired()
 	// counts now >= lastchg + max as expired, so it is skipped too (E-10)
-	writeUnder(t, root, "/etc/shadow", fmt.Sprintf("root:*:%d:0:99999:7:::\nfresh:$6$x:%d::99999:7:::\nold:$6$x:%d:0:99999:7:::\nstrict:$6$x:%d:5:30:7:::\nlegacy:abcDEF:%d:::7:::\nghost:$6$x:%d::99999:7:::\nedge:$6$x:%d::99999:7:::\n#c:$6$x:1:0:1:::\n", today, today, today-400, today, today, today, today-90))
+	writeUnder(t, root, "/etc/shadow", fmt.Sprintf("root:$6$x:%d:0:99999:7:::\nfresh:$6$x:%d::99999:7:::\nold:$6$x:%d:0:99999:7:::\nstrict:$6$x:%d:5:30:7:::\nlegacy:abcDEF:%d:::7:::\nghost:$6$x:%d::99999:7:::\nedge:$6$x:%d::99999:7:::\n#c:$6$x:1:0:1:::\n", today, today, today-400, today, today, today, today-90))
 	mb := t.TempDir()
 	env := append(pEnv(t, c), "MB="+mb, "STUB="+stub, "ROOT="+root)
 	body := "log() { printf 'muster-fix: %s\\n' \"$*\"; }\n" + rebaseAccounts(r.Script, root)
@@ -815,11 +816,14 @@ func TestPasswordPolicyBodyTightensOnly(t *testing.T) {
 			t.Errorf("no skip log for %s: %s", n, out)
 		}
 	}
+	if !strings.Contains(out, "password_policy: root: root's password ageing is left to the operator: an expired root password stops root's cron and at jobs") {
+		t.Errorf("no skip log for the hashed root: %s", out)
+	}
 	if !strings.Contains(out, "password_policy: ghost: not in "+root+"/etc/passwd, left as is") { // the log names the rebased path
 		t.Errorf("no skip log for ghost: %s", out)
 	}
 	rec := readFile(t, filepath.Join(mb, "ageing.list"))
-	if !strings.Contains(rec, "legacy:-1:-1\n") || !strings.Contains(rec, "fresh:-1:99999\n") || strings.Contains(rec, "ghost") || strings.Contains(rec, "old:") {
+	if !strings.Contains(rec, "legacy:-1:-1\n") || !strings.Contains(rec, "fresh:-1:99999\n") || strings.Contains(rec, "ghost") || strings.Contains(rec, "old:") || strings.Contains(rec, "root:") {
 		t.Errorf("ageing.list:\n%s", rec)
 	}
 	if out, code := runBody(t, root, bin, rebaseAccounts(r.Validate, root), env...); code != 0 {
