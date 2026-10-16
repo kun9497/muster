@@ -692,6 +692,12 @@ restore, one default-list order, the risks of the two forwarding controls, `usb_
 The implementation plan (`docs/superpowers/plans/2026-10-14-stage3d2c-remedy-scripts.md`, rulings S-1..S-47) and
 its reviews changed the following. Each line names the section it amends.
 
+- §2 A parameter never appears inside a `sed` `s` expression, whatever the delimiter: a body copies the value to
+  a plain variable first. `TestShippedBodiesPlaceParametersSafely` enforces it and the line-start rule; it lives
+  in `internal/controls` and runs on every platform (S-30).
+- §3 The ageing record's rows are `name:min:max`.
+- §4.3, §6 `TestFileScriptsRepairOnARealFile` gains `nfs_export_access` only; the symlinked-path cases are the
+  `links` of `TestFileBodiesRepairATempTree` and the `Test*BodiesLeaveASymlinkedDropIn` tests.
 - §3 `restore_modes` skips an entry whose owner, group, mode and type already match the record, refuses an entry
   with an ancestor directory that is not root-owned or is other-writable, and refuses an entry whose recorded owner
   is not root when its parent is group- or other-writable; a root-owned, group-writable directory (Ubuntu's

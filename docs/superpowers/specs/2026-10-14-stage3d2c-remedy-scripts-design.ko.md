@@ -656,6 +656,12 @@ arm이 절의 목록이나 경계인지 확인합니다. `TestModuleScriptsNameT
 구현 계획(`docs/superpowers/plans/2026-10-14-stage3d2c-remedy-scripts.md`, 판정 S-1..S-47)과 그 리뷰가 다음을
 바꿨습니다. 줄마다 고치는 절을 적습니다.
 
+- §2 파라미터는 구분자가 무엇이든 `sed`의 `s` 식 안에 나타나지 않습니다. 본문은 값을 먼저 평범한 변수에
+  복사합니다. `TestShippedBodiesPlaceParametersSafely`가 이것과 줄 첫머리 규칙을 강제하며, 이 테스트는
+  `internal/controls`에 있고 모든 플랫폼에서 돕니다(S-30).
+- §3 기간 기록의 행은 `name:min:max`입니다.
+- §4.3, §6 `TestFileScriptsRepairOnARealFile`은 `nfs_export_access`만 더합니다. 심볼릭 링크 경로 사례는
+  `TestFileBodiesRepairATempTree`의 `links`와 `Test*BodiesLeaveASymlinkedDropIn` 테스트에 있습니다.
 - §3 `restore_modes`는 소유자·그룹·모드·종류가 이미 기록과 같은 항목은 건너뛰고, root 소유가 아니거나 다른
   사용자가 쓸 수 있는 상위 디렉터리를 가진 항목과, 부모를 그룹이나 다른 사용자가 쓸 수 있을 때 기록된 소유자가
   root가 아닌 항목을 거부합니다. root 소유이면서 그룹이 쓸 수 있는 디렉터리(Ubuntu의 `root:syslog 0775
