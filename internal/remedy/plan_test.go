@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/kun9497/muster/internal/check"
+	"github.com/kun9497/muster/internal/controls"
 	"github.com/kun9497/muster/internal/facts"
 	"github.com/kun9497/muster/internal/report"
 )
@@ -158,6 +160,9 @@ func TestPlanRollbackVocabulary(t *testing.T) {
 		row("muster.test.d_reboot", "FAIL", "r", "", "high"),
 		row("muster.test.e_param", "FAIL", "r", "", "high"),
 		row("muster.test.g_units", "FAIL", "r", "", "high"),
+		row("muster.test.h_params", "FAIL", "r", "", "high"),
+		row("muster.test.i_state", "FAIL", "r", "", "high"),
+		row("muster.test.k_both", "FAIL", "r", "", "high"),
 	)
 	rep.Check.ParamSources = map[string]map[string]string{"muster.test.e_param": {"mode": "default"}}
 	p := build(t, rep, Options{})
@@ -174,6 +179,9 @@ func TestPlanRollbackVocabulary(t *testing.T) {
 		"muster.test.d_reboot":  {"none", []string{}, false, false},
 		"muster.test.e_param":   {"restore_backup", []string{"/etc/group"}, true, false},
 		"muster.test.g_units":   {"units", []string{}, true, true},
+		"muster.test.h_params":  {"restore_backup", []string{"/etc/h.conf"}, true, true},
+		"muster.test.i_state":   {"state", []string{}, true, true},
+		"muster.test.k_both":    {"both", []string{"/etc/k.conf"}, true, true},
 	}
 	for id, w := range want {
 		it := itemByID(t, p, id)
@@ -363,6 +371,7 @@ func TestPlanItemCopiesEveryField(t *testing.T) {
 		TextOnlyReason: "", Rollback: "both", Backup: []string{"/etc/ssh/sshd_config"}, Validate: true, Planned: true,
 		SourceStatus: check.FAIL, ScriptBody: "sed -i s/a/b/ /etc/ssh/sshd_config", ValidateCmd: "sshd -t",
 		RollbackBody: "systemctl reload ssh", Units: []string{},
+		ScriptParams: []ParamValue{}, ScriptOnAbsent: false, Modes: []string{}, Sysctl: []string{}, Modules: []string{},
 	}
 	if !reflect.DeepEqual(it, want) {
 		t.Fatalf("item:\n got %+v\nwant %+v", it, want)
@@ -442,6 +451,23 @@ func TestPlanJSONShape(t *testing.T) {
 	if u := string(d["units"]); u != "[]" {
 		t.Errorf("text-only units %s, want []", u)
 	}
+	for _, k := range []string{"script_params", "modes", "sysctl", "modules"} {
+		if v := string(d[k]); v != "[]" {
+			t.Errorf("text-only %s %s, want []", k, v)
+		}
+	}
+	if v := string(d["script_on_absent"]); v != "false" {
+		t.Errorf("text-only script_on_absent %s, want false", v)
+	}
+	keys := regexp.MustCompile(`"([a-z_]+)":`).FindAllStringSubmatch(string(mustJSONItem(t, data, 0)), -1)
+	var order []string
+	for _, k := range keys {
+		order = append(order, k[1])
+	}
+	wantOrder := "id title_en title_ko status severity severity_source risk idempotent automation reason text_en text_ko script text_only_reason script_params script_on_absent rollback backup units modes sysctl modules validate planned"
+	if strings.Join(order, " ") != wantOrder {
+		t.Errorf("item field order:\n got %s\nwant %s", strings.Join(order, " "), wantOrder)
+	}
 	if u := string(g["units"]); u != `["g.socket","g.service"]` {
 		t.Errorf("g_units units %s", u)
 	}
@@ -489,5 +515,94 @@ func TestPlanRefusesAnUnsafeUnit(t *testing.T) {
 	_, err := Build(testReport(row("muster.test.g_units", "FAIL", "r", "", "high")), set, Options{})
 	if err == nil || !strings.Contains(err.Error(), `refusing to plan muster.test.g_units: unit "x';id;'.service"`) {
 		t.Fatalf("err = %v", err)
+	}
+}
+
+// mustJSONItem returns item i of a marshalled plan, in field order. Every item
+// carries the same keys, so any index works; item 0 of TestPlanJSONShape is
+// g_units (restart_service sorts first).
+func mustJSONItem(t *testing.T, data []byte, i int) []byte {
+	t.Helper()
+	var p struct{ Items []json.RawMessage }
+	if err := json.Unmarshal(data, &p); err != nil || len(p.Items) <= i {
+		t.Fatalf("items: %v (%d)", err, len(p.Items))
+	}
+	return p.Items[i]
+}
+
+func TestPlanScriptParamsCarryTheValueInForce(t *testing.T) {
+	rep := testReport(row("muster.test.h_params", "FAIL", "r", "", "high"))
+	// no Check.Params: the defaults are in force (S-1)
+	it := itemByID(t, build(t, rep, Options{}), "muster.test.h_params")
+	want := []ParamValue{{Name: "limit", Value: "5"}, {Name: "names", Value: "a b"}}
+	if !it.Script || !reflect.DeepEqual(it.ScriptParams, want) {
+		t.Fatalf("defaults: script %v, params %+v; want %+v", it.Script, it.ScriptParams, want)
+	}
+	rep.Check.Params = map[string]map[string]any{"muster.test.h_params": {"limit": 9, "names": []any{"x"}}}
+	rep.Check.ParamSources = map[string]map[string]string{"muster.test.h_params": {"limit": "tuning", "names": "profile"}}
+	it = itemByID(t, build(t, rep, Options{}), "muster.test.h_params")
+	want = []ParamValue{{Name: "limit", Value: "9"}, {Name: "names", Value: "x"}}
+	if !it.Script || it.TextOnlyReason != "" || !reflect.DeepEqual(it.ScriptParams, want) {
+		t.Fatalf("tuned: script %v, reason %q, params %+v; want %+v (a control with script_params is never params_tuned)", it.Script, it.TextOnlyReason, it.ScriptParams, want)
+	}
+}
+
+func TestPlanParamsUnsafe(t *testing.T) {
+	for _, bad := range []map[string]any{
+		{"limit": 5, "names": []any{"'; id; '"}},
+		{"limit": 5, "names": []any{}},
+		{"limit": "5", "names": []any{"a"}},
+	} {
+		rep := testReport(row("muster.test.h_params", "FAIL", "r", "", "high"))
+		rep.Check.Params = map[string]map[string]any{"muster.test.h_params": bad}
+		it := itemByID(t, build(t, rep, Options{}), "muster.test.h_params")
+		if it.Script || it.TextOnlyReason != "params_unsafe" || len(it.ScriptParams) != 0 || it.ScriptParams == nil {
+			t.Errorf("%v: script %v, reason %q, params %#v; want text-only params_unsafe with []", bad, it.Script, it.TextOnlyReason, it.ScriptParams)
+		}
+	}
+}
+
+func TestPlanScriptOnAbsent(t *testing.T) {
+	rep := testReport(
+		row("muster.test.j_absent", "FAIL", check.ReasonAbsentFailPrefix+"no PASS_MIN_LEN", "", "high"),
+		row("muster.test.a_none", "FAIL", check.ReasonAbsentFailPrefix+"no file", "", "high"),
+	)
+	p := build(t, rep, Options{})
+	if j := itemByID(t, p, "muster.test.j_absent"); !j.Script || !j.ScriptOnAbsent || j.TextOnlyReason != "" {
+		t.Errorf("j_absent: script %v, on_absent %v, reason %q", j.Script, j.ScriptOnAbsent, j.TextOnlyReason)
+	}
+	if a := itemByID(t, p, "muster.test.a_none"); a.Script || a.ScriptOnAbsent || a.TextOnlyReason != "absent" {
+		t.Errorf("a_none: script %v, on_absent %v, reason %q", a.Script, a.ScriptOnAbsent, a.TextOnlyReason)
+	}
+}
+
+func TestPlanCopiesTheStateLists(t *testing.T) {
+	it := itemByID(t, build(t, testReport(row("muster.test.i_state", "FAIL", "r", "", "high")), Options{}), "muster.test.i_state")
+	if !reflect.DeepEqual(it.Modes, []string{"/etc/i.d/*", "/etc/i.conf"}) || !reflect.DeepEqual(it.Sysctl, []string{"kernel.i_key"}) || !reflect.DeepEqual(it.Modules, []string{"i-mod"}) {
+		t.Fatalf("i_state lists: %v %v %v", it.Modes, it.Sysctl, it.Modules)
+	}
+}
+
+func TestPlanRefusesAnUnsafeStateEntry(t *testing.T) {
+	for _, c := range []struct {
+		id, want string
+		mutate   func(*controls.Remediation)
+	}{
+		{"muster.test.i_state", `modes entry "/etc/x';id;'"`, func(r *controls.Remediation) { r.Modes = []string{"/etc/x';id;'"} }},
+		{"muster.test.i_state", `sysctl key "k;id"`, func(r *controls.Remediation) { r.Sysctl = []string{"k;id"} }},
+		{"muster.test.i_state", `module "m id"`, func(r *controls.Remediation) { r.Modules = []string{"m id"} }},
+		{"muster.test.a_none", `backup path "/etc/a b"`, func(r *controls.Remediation) { r.Backup = []string{"/etc/a b"} }},
+		{"muster.test.h_params", `script param "Bad"`, func(r *controls.Remediation) { r.ScriptParams = []string{"Bad"} }},
+	} {
+		set := testSet(t)
+		for i := range set.Controls {
+			if set.Controls[i].ID == c.id {
+				c.mutate(set.Controls[i].Remediation)
+			}
+		}
+		_, err := Build(testReport(row(c.id, "FAIL", "r", "", "high")), set, Options{})
+		if err == nil || !strings.Contains(err.Error(), "refusing to plan "+c.id+": "+c.want) {
+			t.Errorf("%s: err = %v, want %q", c.id, err, c.want)
+		}
 	}
 }

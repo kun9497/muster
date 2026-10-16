@@ -43,29 +43,42 @@ type FixBlock struct {
 	MachineIDHash   string              `json:"-"`          // the snapshot's, when well formed; the script's guard compares it
 }
 
+// ParamValue is one parameter a script reads as P_<Name> (3D-2c E-1), with
+// the value in force formatted for the script. A slice of these, sorted by
+// name, keeps the plan free of maps.
+type ParamValue struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
 // Item is one FAIL or WARN row the plan addresses, with its control's
 // remediation. Script is true only when the script will be emitted; the
 // unexported-to-JSON bodies are what the script renderer writes.
 type Item struct {
-	ID             string   `json:"id"`
-	TitleEn        string   `json:"title_en"`
-	TitleKo        string   `json:"title_ko"`
-	Status         string   `json:"status"` // fail | warn
-	Severity       string   `json:"severity"`
-	SeveritySource string   `json:"severity_source"`
-	Risk           string   `json:"risk"`
-	Idempotent     bool     `json:"idempotent"`
-	Automation     string   `json:"automation"`
-	Reason         string   `json:"reason"` // report.ReasonLine(row)
-	TextEn         string   `json:"text_en"`
-	TextKo         string   `json:"text_ko"`
-	Script         bool     `json:"script"`
-	TextOnlyReason string   `json:"text_only_reason"` // "" | no_script | absent | params_tuned
-	Rollback       string   `json:"rollback"`         // none | declared | restore_backup | units | both
-	Backup         []string `json:"backup"`
-	Units          []string `json:"units"`
-	Validate       bool     `json:"validate"`
-	Planned        bool     `json:"planned"`
+	ID             string       `json:"id"`
+	TitleEn        string       `json:"title_en"`
+	TitleKo        string       `json:"title_ko"`
+	Status         string       `json:"status"` // fail | warn
+	Severity       string       `json:"severity"`
+	SeveritySource string       `json:"severity_source"`
+	Risk           string       `json:"risk"`
+	Idempotent     bool         `json:"idempotent"`
+	Automation     string       `json:"automation"`
+	Reason         string       `json:"reason"` // report.ReasonLine(row)
+	TextEn         string       `json:"text_en"`
+	TextKo         string       `json:"text_ko"`
+	Script         bool         `json:"script"`
+	TextOnlyReason string       `json:"text_only_reason"` // "" | no_script | absent | params_tuned | params_unsafe
+	ScriptParams   []ParamValue `json:"script_params"`    // [] unless scripted (E-1)
+	ScriptOnAbsent bool         `json:"script_on_absent"` // the control's declaration, when scripted (E-5)
+	Rollback       string       `json:"rollback"`         // none | declared | restore_backup | units | state | both
+	Backup         []string     `json:"backup"`
+	Units          []string     `json:"units"`
+	Modes          []string     `json:"modes"` // [] unless scripted (E-3)
+	Sysctl         []string     `json:"sysctl"`
+	Modules        []string     `json:"modules"`
+	Validate       bool         `json:"validate"`
+	Planned        bool         `json:"planned"`
 
 	SourceStatus check.Status `json:"-"` // for the table's status colour
 	ScriptBody   string       `json:"-"`
@@ -178,10 +191,8 @@ func Build(rep *report.Report, set *controls.Set, opts Options) (*Plan, error) {
 				return nil, fmt.Errorf("refusing to plan %q: not a control id (muster.<category>.<name>)", row.ID)
 			}
 			p.Items = append(p.Items, item(row, set, cb, maxRank))
-			for _, u := range p.Items[len(p.Items)-1].Units {
-				if !controls.ValidUnitName(u) {
-					return nil, fmt.Errorf("refusing to plan %s: unit %q is not a unit name a script can carry", row.ID, u)
-				}
+			if err := recheck(row.ID, set, p.Items[len(p.Items)-1]); err != nil {
+				return nil, err
 			}
 		}
 	}
@@ -224,7 +235,8 @@ func Build(rep *report.Report, set *controls.Set, opts Options) (*Plan, error) {
 func item(row report.Row, set *controls.Set, cb report.CheckBlock, maxRank int) Item {
 	it := Item{ID: row.ID, TitleEn: row.TitleEn, TitleKo: row.TitleKo, Status: strings.ToLower(string(row.Status)),
 		Severity: row.Severity, SeveritySource: row.SeveritySource, Automation: row.Automation,
-		Reason: report.ReasonLine(row), Risk: "none", Rollback: "none", Backup: []string{}, Units: []string{}, SourceStatus: row.Status}
+		Reason: report.ReasonLine(row), Risk: "none", Rollback: "none", Backup: []string{}, Units: []string{},
+		ScriptParams: []ParamValue{}, Modes: []string{}, Sysctl: []string{}, Modules: []string{}, SourceStatus: row.Status}
 	c, ok := set.ByID(row.ID)
 	if !ok || c.Remediation == nil {
 		it.TextOnlyReason = "no_script"
@@ -237,29 +249,107 @@ func item(row report.Row, set *controls.Set, cb report.CheckBlock, maxRank int) 
 	switch {
 	case strings.TrimSpace(r.Script) == "":
 		it.TextOnlyReason = "no_script"
-	case strings.HasPrefix(row.Reason, check.ReasonAbsentFailPrefix): // Z-6: the bare reason
+	case strings.HasPrefix(row.Reason, check.ReasonAbsentFailPrefix) && !r.ScriptOnAbsent: // Z-6: the bare reason
 		it.TextOnlyReason = "absent"
-	case tuned(cb.ParamSources[row.ID]):
+	case len(r.ScriptParams) == 0 && tuned(cb.ParamSources[row.ID]):
 		it.TextOnlyReason = "params_tuned"
 	default:
+		vals, ok := scriptParams(c, cb.Params[row.ID])
+		if !ok {
+			it.TextOnlyReason = "params_unsafe"
+			break
+		}
 		it.Script = true
 		it.ScriptBody, it.ValidateCmd, it.RollbackBody = r.Script, strings.TrimSuffix(r.Validate, "\n"), r.Rollback
+		it.ScriptParams, it.ScriptOnAbsent = vals, r.ScriptOnAbsent
 		it.Backup = append([]string{}, r.Backup...)
 		it.Validate = r.Validate != ""
 		it.Units = append([]string{}, r.Units...)
-		hasRB, hasBK, hasU := strings.TrimSpace(r.Rollback) != "", len(r.Backup) > 0, len(r.Units) > 0
-		switch {
-		case hasRB && hasBK:
-			it.Rollback = "both"
-		case hasU:
-			it.Rollback = "units"
-		case hasRB:
-			it.Rollback = "declared"
-		default:
-			it.Rollback = "restore_backup"
-		}
+		it.Modes = append([]string{}, r.Modes...)
+		it.Sysctl = append([]string{}, r.Sysctl...)
+		it.Modules = append([]string{}, r.Modules...)
+		it.Rollback = rollbackWord(r)
 	}
 	return it
+}
+
+// scriptParams formats the value in force of each script_params entry (S-1:
+// the default when the check block carries none), sorted by name; false when
+// any value cannot be carried.
+func scriptParams(c *controls.Control, inForce map[string]any) ([]ParamValue, bool) {
+	vals := check.ParamValues(c, inForce)
+	names := append([]string(nil), c.Remediation.ScriptParams...)
+	sort.Strings(names)
+	out := []ParamValue{}
+	for _, n := range names {
+		p, ok := c.Params[n]
+		if !ok {
+			return nil, false
+		}
+		s, ok := controls.ScriptParamValue(p.Type, vals[n])
+		if !ok {
+			return nil, false
+		}
+		out = append(out, ParamValue{Name: n, Value: s})
+	}
+	return out, true
+}
+
+// rollbackWord names the way back a scripted item declares (3D-2c §3): units
+// alone; two or more of rollback, backup and state; or the one it has.
+func rollbackWord(r *controls.Remediation) string {
+	if len(r.Units) > 0 {
+		return "units"
+	}
+	hasRB, hasBK := strings.TrimSpace(r.Rollback) != "", len(r.Backup) > 0
+	hasST := len(r.Modes)+len(r.Sysctl)+len(r.Modules) > 0
+	n := 0
+	for _, b := range []bool{hasRB, hasBK, hasST} {
+		if b {
+			n++
+		}
+	}
+	switch {
+	case n >= 2:
+		return "both"
+	case hasST:
+		return "state"
+	case hasRB:
+		return "declared"
+	}
+	return "restore_backup"
+}
+
+// recheck refuses a plan whose declared names the script would put on a
+// command line outside their lint patterns (3D-2b T-3, 3D-2c S-4): the set
+// may be hand-built.
+func recheck(id string, set *controls.Set, it Item) error {
+	kinds := []struct {
+		kind  string
+		list  []string
+		valid func(string) bool
+	}{
+		{"unit", it.Units, controls.ValidUnitName},
+		{"backup path", it.Backup, controls.ValidBackupPath},
+		{"modes entry", it.Modes, controls.ValidModesEntry},
+		{"sysctl key", it.Sysctl, controls.ValidSysctlKey},
+		{"module", it.Modules, controls.ValidModuleName},
+	}
+	if c, ok := set.ByID(id); ok && c.Remediation != nil {
+		kinds = append(kinds, struct {
+			kind  string
+			list  []string
+			valid func(string) bool
+		}{"script param", c.Remediation.ScriptParams, controls.ValidParamName})
+	}
+	for _, k := range kinds {
+		for _, v := range k.list {
+			if !k.valid(v) {
+				return fmt.Errorf("refusing to plan %s: %s %q is not one a script can carry", id, k.kind, v)
+			}
+		}
+	}
+	return nil
 }
 
 // tuned reports whether any parameter of a control is in force from a

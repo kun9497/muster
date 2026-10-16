@@ -213,6 +213,14 @@ func TestJSONEmptyListsAreArrays(t *testing.T) {
 			if string(it["backup"]) != "[]" {
 				t.Fatalf("text-only item backup = %s, want []", it["backup"])
 			}
+			for _, k := range []string{"script_params", "modes", "sysctl", "modules"} {
+				if string(it[k]) != "[]" {
+					t.Fatalf("text-only item %s = %s, want []", k, it[k])
+				}
+			}
+			if string(it["script_on_absent"]) != "false" {
+				t.Fatalf("text-only item script_on_absent = %s, want false", it["script_on_absent"])
+			}
 		}
 	}
 	if !found {
