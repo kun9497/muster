@@ -8,10 +8,18 @@
 # TestEveryScriptedControlIsInTheRoundtripTable (internal/controls) pins this file to
 # the fix-roundtrip job of .github/workflows/ci.yml: every row's `seeded` list equals
 # the ids whose `images` name that row. The fixture harness never loads this file.
+- id: muster.account.cron_permissions
+  unproven: "the rows land in Task 9"
 - id: muster.account.root_remote_login
   images: [almalinux9-init, rocky9-init]
+- id: muster.account.sudoers_permissions
+  unproven: "the rows land in Task 9"
 - id: muster.beyond.aslr_and_link_protection
   unproven: "the runner row (Task 9) proves it; containers gate beyond controls out"
+- id: muster.beyond.audit_log_permissions
+  unproven: "the rows land in Task 9"
+- id: muster.beyond.bootloader_config_permissions
+  unproven: "the rows land in Task 9"
 - id: muster.beyond.icmp_broadcast_and_bogus_ignored
   unproven: "the runner row (Task 9) proves it; containers gate beyond controls out"
 - id: muster.beyond.icmp_redirects_ignored
@@ -52,18 +60,28 @@
   images: [almalinux9-init, debian12-init, rocky9-init, ubuntu2204]
 - id: muster.file.hosts_permissions
   images: [almalinux9-init, debian12-init, rocky9-init, ubuntu2204]
+- id: muster.file.inetd_conf_permissions
+  unproven: "the rows land in Task 9"
+- id: muster.file.log_dir_permissions
+  unproven: "the rows land in Task 9"
 - id: muster.file.passwd_permissions
   images: [almalinux9-init, debian12-init, rocky9-init, ubuntu2204]
 - id: muster.file.services_permissions
   images: [almalinux9-init, debian12-init, rocky9-init, ubuntu2204]
 - id: muster.file.shadow_permissions
   images: [debian12-init, ubuntu2204]
+- id: muster.file.syslog_conf_permissions
+  unproven: "the rows land in Task 9"
 - id: muster.service.automount_disabled
   images: [almalinux9-init, debian12-init, rocky9-init]
 - id: muster.service.dos_services_disabled
   unproven: no systemd unit on Debian (echo, discard, daytime and chargen ship only for inetd) and no package in the EL9 images' enabled repositories
 - id: muster.service.finger_disabled
   unproven: no systemd unit on Debian (fingerd ships only for inetd) and no package in the EL9 images' enabled repositories
+- id: muster.service.ftpusers_permissions
+  unproven: "the rows land in Task 9"
+- id: muster.service.nfs_export_access
+  unproven: "the rows land in Task 9"
 - id: muster.service.nfs_server_disabled
   images: [almalinux9-init, debian12-init, rocky9-init]
 - id: muster.service.nis_disabled

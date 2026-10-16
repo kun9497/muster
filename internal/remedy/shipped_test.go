@@ -174,6 +174,7 @@ func TestFileScriptsRepairOnARealFile(t *testing.T) {
 		{"muster.file.passwd_permissions", []uint32{0, 0o4, 0o40, 0o44, 0o200, 0o204, 0o240, 0o244, 0o400, 0o404, 0o440, 0o444, 0o600, 0o604, 0o640, 0o644}, []uint32{0o664, 0o666, 0o755}, 0o444},
 		{"muster.file.services_permissions", []uint32{0, 0o4, 0o40, 0o44, 0o200, 0o204, 0o240, 0o244, 0o400, 0o404, 0o440, 0o444, 0o600, 0o604, 0o640, 0o644}, []uint32{0o666, 0o744}, 0o400},
 		{"muster.file.shadow_permissions", []uint32{0, 0o400}, []uint32{0o640, 0o600, 0o4400}, 0},
+		{"muster.service.nfs_export_access", []uint32{0, 0o4, 0o40, 0o44, 0o200, 0o204, 0o240, 0o244, 0o400, 0o404, 0o440, 0o444, 0o600, 0o604, 0o640, 0o644}, []uint32{0o666, 0o664, 0o4644}, 0o600},
 	}
 	for _, c := range cases {
 		t.Run(c.id, func(t *testing.T) {

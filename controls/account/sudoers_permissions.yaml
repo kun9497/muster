@@ -26,3 +26,15 @@ remediation:
   text_ko: /etc/sudoers 에 chmod 0440 을 적용하고 root 로 chown 하며, /etc/sudoers.d 아래 활성 파일에 chmod go-w 를 적용합니다.
   risk: none
   idempotent: true
+  backup: [/etc/sudoers]
+  modes: ["/etc/sudoers.d/*"]
+  script: |
+    if [ -f /etc/sudoers ] && [ ! -L /etc/sudoers ]; then
+      chown root /etc/sudoers
+      chmod u-wxs,g-wxs,o-rwxt /etc/sudoers
+    fi
+    if [ -d /etc/sudoers.d ] && [ ! -L /etc/sudoers.d ]; then
+      find /etc/sudoers.d -mindepth 1 -maxdepth 1 -type f ! -name '*.*' ! -name '*~' -exec chmod go-w {} +
+    fi
+  validate: |
+    case "$(stat -c '%u %a' /etc/sudoers)" in '0 0'|'0 40'|'0 400'|'0 440') ;; *) false;; esac && [ -z "$(find /etc/sudoers.d -mindepth 1 -maxdepth 1 -type f ! -name '*.*' ! -name '*~' -perm /022 2>/dev/null)" ]

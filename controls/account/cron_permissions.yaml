@@ -25,7 +25,44 @@ checks:
   - { fact: cron.files, op: each, subject: path, where: { field: scope, op: eq, expected: "periodic" }, require: { field: owner_ok, op: eq, expected: true } }
   - { fact: cron.dirs, op: none, subject: path, where: { field: other_writable, op: eq, expected: true } }
 remediation:
-  text_en: chmod 0640 the crontab-FORMAT files (/etc/crontab, /etc/cron.d/* and the per-user spools), chown the system files to root, and chmod go-w (not 0640, which would break run-parts) the /etc/cron.{hourly,daily,weekly,monthly} periodic-script directories and their scripts; chmod o-w the cron directories.
-  text_ko: crontab 형식 파일(/etc/crontab, /etc/cron.d/*, 사용자별 스풀)에 chmod 0640 을 적용하고 시스템 파일을 root 로 chown 하며, /etc/cron.{hourly,daily,weekly,monthly} 주기 스크립트 디렉터리와 그 스크립트에는 (run-parts 를 깨뜨리는 0640 이 아니라) chmod go-w 를 적용하고, cron 디렉터리에 chmod o-w 를 적용합니다.
+  text_en: chmod 0640 the crontab-FORMAT files (/etc/crontab, /etc/cron.d/* and the per-user spools), chown the system files to root, and chmod go-w (not 0640, which would break run-parts) the /etc/cron.{hourly,daily,weekly,monthly} periodic-script directories and their scripts; chmod o-w the cron directories. A pending at job keeps the execute bit at uses to mark it runnable, so this control stays FAIL until the job has run; the review script never clears it. On Debian and Ubuntu an access file in group root is given group crontab (cron.allow, cron.deny) or daemon (at.allow, at.deny), which crontab and at read it as. The review script never follows a symlink.
+  text_ko: crontab 형식 파일(/etc/crontab, /etc/cron.d/*, 사용자별 스풀)에 chmod 0640 을 적용하고 시스템 파일을 root 로 chown 하며, /etc/cron.{hourly,daily,weekly,monthly} 주기 스크립트 디렉터리와 그 스크립트에는 (run-parts 를 깨뜨리는 0640 이 아니라) chmod go-w 를 적용하고, cron 디렉터리에 chmod o-w 를 적용합니다. 대기 중인 at 작업은 실행 가능 표시인 실행 비트를 유지하므로, 그 작업이 실행될 때까지 이 control은 FAIL로 남습니다. 검토 스크립트는 그 비트를 지우지 않습니다. Debian 과 Ubuntu 에서는 그룹이 root 인 접근 제어 파일에 crontab(cron.allow, cron.deny) 또는 daemon(at.allow, at.deny) 그룹을 주며, crontab 과 at 은 그 그룹으로 파일을 읽습니다. 검토 스크립트는 심볼릭 링크를 따라가지 않습니다.
   risk: none
   idempotent: true
+  modes: [/etc/crontab, /etc/anacrontab, /etc/cron.allow, /etc/cron.deny, /etc/at.allow, /etc/at.deny, "/etc/cron.d/*", /etc/cron.d, /etc/cron.hourly, /etc/cron.daily, /etc/cron.weekly, /etc/cron.monthly, "/etc/cron.hourly/*", "/etc/cron.daily/*", "/etc/cron.weekly/*", "/etc/cron.monthly/*", /var/spool/cron, "/var/spool/cron/*", /var/spool/cron/crontabs, "/var/spool/cron/crontabs/*", /var/spool/cron/atjobs, "/var/spool/cron/atjobs/*", /var/spool/at, "/var/spool/at/*"]
+  script: |
+    for p in /etc/crontab /etc/anacrontab /etc/cron.allow /etc/cron.deny /etc/at.allow /etc/at.deny; do
+      if [ -f "$p" ] && [ ! -L "$p" ]; then
+        chown root "$p"
+        if [ "$(stat -c %g "$p")" = 0 ]; then
+          case "$p" in
+            /etc/cron.allow|/etc/cron.deny) if getent group crontab >/dev/null; then chgrp crontab "$p"; fi;;
+            /etc/at.allow|/etc/at.deny) a=$(command -v at || :); if [ -n "$a" ] && [ -g "$a" ] && [ "$(stat -c %G "$a")" = daemon ]; then chgrp daemon "$p"; fi;;
+          esac
+        fi
+        chmod u-xs,g-wxs,o-rwxt "$p"
+      fi
+    done
+    if [ -d /etc/cron.d ] && [ ! -L /etc/cron.d ]; then
+      find /etc/cron.d -mindepth 1 -maxdepth 1 -type f -exec chown root {} + -exec chmod u-xs,g-wxs,o-rwxt {} +
+    fi
+    for d in /etc/cron.hourly /etc/cron.daily /etc/cron.weekly /etc/cron.monthly; do
+      if [ -d "$d" ] && [ ! -L "$d" ]; then
+        find "$d" -mindepth 1 -maxdepth 1 -type f -exec chown root {} + -exec chmod o-w {} +
+      fi
+    done
+    for d in /var/spool/cron /var/spool/cron/crontabs; do
+      if [ -d "$d" ] && [ ! -L "$d" ]; then
+        find "$d" -mindepth 1 -maxdepth 1 -type f -exec chmod u-xs,g-wxs,o-rwxt {} +
+      fi
+    done
+    for d in /var/spool/cron/atjobs /var/spool/at; do
+      if [ -d "$d" ] && [ ! -L "$d" ]; then
+        find "$d" -mindepth 1 -maxdepth 1 -type f -exec chmod u-s,g-wxs,o-rwxt {} +
+      fi
+    done
+    for d in /etc/cron.d /etc/cron.hourly /etc/cron.daily /etc/cron.weekly /etc/cron.monthly /var/spool/cron /var/spool/cron/crontabs /var/spool/cron/atjobs /var/spool/at; do
+      if [ -d "$d" ] && [ ! -L "$d" ]; then chmod o-w "$d"; fi
+    done
+  validate: |
+    [ -z "$(find /etc/crontab /etc/anacrontab /etc/cron.allow /etc/cron.deny /etc/at.allow /etc/at.deny /etc/cron.d -maxdepth 1 -type f \( -perm /7137 -o ! -user root \) 2>/dev/null)" ] && [ -z "$(find /etc/cron.hourly /etc/cron.daily /etc/cron.weekly /etc/cron.monthly -mindepth 1 -maxdepth 1 -type f \( -perm /002 -o ! -user root \) 2>/dev/null)" ] && [ -z "$(find /var/spool/cron /var/spool/cron/crontabs -mindepth 1 -maxdepth 1 -type f -perm /7137 2>/dev/null)" ] && [ -z "$(find /var/spool/cron/atjobs /var/spool/at -mindepth 1 -maxdepth 1 -type f -perm /7037 2>/dev/null)" ] && [ -z "$(find /etc/cron.d /etc/cron.hourly /etc/cron.daily /etc/cron.weekly /etc/cron.monthly /var/spool/cron /var/spool/cron/crontabs /var/spool/cron/atjobs /var/spool/at -maxdepth 0 -type d -perm /002 2>/dev/null)" ]

@@ -48,3 +48,34 @@ func TestShippedBodiesPlaceParametersSafely(t *testing.T) {
 		t.Fatal("no shipped body reads a parameter; the scan proves nothing")
 	}
 }
+
+// TestShippedFindsCarryATypePredicate (S-30): a find that runs chmod or chown
+// names the type it acts on (-type f, -type d) or excludes links (! -type l),
+// so it never changes a symlink's target, which chmod(1) would follow.
+func TestShippedFindsCarryATypePredicate(t *testing.T) {
+	set, err := controls.LoadDefault()
+	if err != nil {
+		t.Fatal(err)
+	}
+	finds := 0
+	for _, c := range set.Controls {
+		r := c.Remediation
+		if r == nil {
+			continue
+		}
+		for _, b := range []struct{ name, v string }{{"script", r.Script}, {"rollback", r.Rollback}} {
+			for i, l := range strings.Split(b.v, "\n") {
+				if !strings.Contains(l, "find ") || (!strings.Contains(l, "-exec chmod") && !strings.Contains(l, "-exec chown")) {
+					continue
+				}
+				finds++
+				if !strings.Contains(l, "! -type l") && !strings.Contains(l, "-type f") && !strings.Contains(l, "-type d") {
+					t.Errorf("%s %s line %d runs chmod or chown from a find with no type predicate: %s", c.ID, b.name, i+1, strings.TrimSpace(l))
+				}
+			}
+		}
+	}
+	if finds == 0 {
+		t.Fatal("no shipped body runs chmod or chown from a find; the scan proves nothing")
+	}
+}

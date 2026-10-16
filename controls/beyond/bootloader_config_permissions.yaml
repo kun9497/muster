@@ -22,7 +22,17 @@ checks:
   - { fact: boot.grub_cfg.uid, op: eq, expected: 0 }
   - { fact: boot.grub_cfg.gid, op: eq, expected: 0 }
 remediation:
-  text_en: chmod 0600 and chown root:root the grub.cfg your distribution uses (/boot/grub/grub.cfg on Debian and Ubuntu, /boot/grub2/grub.cfg on the EL family, plus the EFI copy where one exists). Regenerating the file with grub-mkconfig keeps the mode, so the change survives a kernel update; a grub.cfg on a FAT EFI system partition cannot carry a Unix mode at all and is governed by the mount options of /boot/efi instead.
-  text_ko: 배포판이 쓰는 grub.cfg(Debian·Ubuntu 는 /boot/grub/grub.cfg, EL 계열은 /boot/grub2/grub.cfg, EFI 사본이 있으면 그것도)에 chmod 0600 과 chown root:root 을 적용합니다. grub-mkconfig 로 파일을 다시 생성해도 mode 가 유지되므로 커널 업데이트 후에도 설정이 남습니다. FAT 인 EFI 시스템 파티션의 grub.cfg 는 Unix mode 를 가질 수 없으므로 대신 /boot/efi 의 마운트 옵션이 그 역할을 합니다.
+  text_en: chmod 0600 and chown root:root the grub.cfg your distribution uses (/boot/grub/grub.cfg on Debian and Ubuntu, /boot/grub2/grub.cfg on the EL family, plus the EFI copy where one exists). Regenerating the file with grub-mkconfig keeps the mode, so the change survives a kernel update; a grub.cfg on a FAT EFI system partition cannot carry a Unix mode at all and is governed by the mount options of /boot/efi instead. A grub.cfg on the EFI system partition takes its mode from the mount's fmask, set in fstab (fmask=0177); the review script leaves it. The review script never follows a symlink.
+  text_ko: 배포판이 쓰는 grub.cfg(Debian·Ubuntu 는 /boot/grub/grub.cfg, EL 계열은 /boot/grub2/grub.cfg, EFI 사본이 있으면 그것도)에 chmod 0600 과 chown root:root 을 적용합니다. grub-mkconfig 로 파일을 다시 생성해도 mode 가 유지되므로 커널 업데이트 후에도 설정이 남습니다. FAT 인 EFI 시스템 파티션의 grub.cfg 는 Unix mode 를 가질 수 없으므로 대신 /boot/efi 의 마운트 옵션이 그 역할을 합니다. EFI 시스템 파티션의 grub.cfg는 마운트의 fmask에서 모드를 받으므로 fstab에서 정합니다(fmask=0177). 검토 스크립트는 그대로 둡니다. 검토 스크립트는 심볼릭 링크를 따라가지 않습니다.
   risk: none
   idempotent: true
+  backup: [/boot/grub/grub.cfg, /boot/grub2/grub.cfg]
+  script: |
+    for p in /boot/grub/grub.cfg /boot/grub2/grub.cfg; do
+      if [ -f "$p" ] && [ ! -L "$p" ]; then
+        chown root:root "$p"
+        chmod u-xs,g-rwxs,o-rwxt "$p"
+      fi
+    done
+  validate: |
+    for p in /boot/grub/grub.cfg /boot/grub2/grub.cfg; do [ ! -f "$p" ] || [ -L "$p" ] || case "$(stat -c '%u %g %a' "$p")" in '0 0 0'|'0 0 200'|'0 0 400'|'0 0 600') ;; *) exit 1;; esac; done

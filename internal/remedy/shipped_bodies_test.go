@@ -5,7 +5,9 @@ package remedy
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -535,6 +537,133 @@ func TestModuleBodiesLeaveASymlinkedDropIn(t *testing.T) {
 			}
 			if calls, _ := os.ReadFile(filepath.Join(st, "calls")); strings.Contains(string(calls), "-r ") {
 				t.Errorf("modprobe -r ran although the drop-in is a mask:\n%s", calls)
+			}
+		})
+	}
+}
+
+// rebaseRoot moves every absolute path a file body names under root.
+func rebaseRoot(s, root string) string {
+	for _, pre := range []string{"/etc/", "/var/", "/boot/"} {
+		s = strings.ReplaceAll(s, " "+pre, " "+root+pre)
+		s = strings.ReplaceAll(s, "\n"+pre, "\n"+root+pre)
+		s = strings.ReplaceAll(s, "("+pre, "("+root+pre)
+		s = strings.ReplaceAll(s, "'"+pre, "'"+root+pre)
+		s = strings.ReplaceAll(s, "|"+pre, "|"+root+pre) // a case arm's second pattern
+	}
+	return s
+}
+
+type treeFile struct {
+	path string
+	mode os.FileMode
+	dir  bool
+}
+
+// TestFileBodiesRepairATempTree runs the nine file bodies of 3D-2c over a
+// tree under t.TempDir() (root only, to chown): the validate fails on the
+// loosened modes, the body passes it, a mode the body must keep is kept, and
+// no symlink — beside the set or at a single path the body names (S-45) — is
+// followed to its 0666 target.
+func TestFileBodiesRepairATempTree(t *testing.T) {
+	needSh(t)
+	if os.Geteuid() != 0 {
+		t.Skip("needs root to chown under the temp tree")
+	}
+	cases := []struct {
+		id       string
+		loosened []treeFile // modes the control FAILs on
+		kept     []treeFile // modes the body must not change
+		after    []treeFile // modes the body must leave (S-40)
+		links    []string   // single paths the body names, planted as symlinks to the victim (S-45)
+	}{
+		{id: "muster.account.sudoers_permissions", loosened: []treeFile{{"/etc/sudoers", 0o644, false}, {"/etc/sudoers.d/a", 0o664, false}}, kept: []treeFile{{"/etc/sudoers.d/README.txt", 0o666, false}}},
+		{id: "muster.service.nfs_export_access", loosened: []treeFile{{"/etc/exports", 0o666, false}}},
+		{id: "muster.service.nfs_export_access", links: []string{"/etc/exports"}},
+		{id: "muster.beyond.bootloader_config_permissions", loosened: []treeFile{{"/boot/grub/grub.cfg", 0o644, false}}, links: []string{"/boot/grub2/grub.cfg"}},
+		{id: "muster.file.inetd_conf_permissions", loosened: []treeFile{{"/etc/inetd.conf", 0o644, false}, {"/etc/xinetd.d/x", 0o666, false}}, links: []string{"/etc/xinetd.conf"}},
+		{id: "muster.beyond.audit_log_permissions", loosened: []treeFile{{"/var/log/audit", 0o755, true}, {"/var/log/audit/audit.log", 0o644, false}}},
+		{id: "muster.file.syslog_conf_permissions", loosened: []treeFile{{"/etc/rsyslog.conf", 0o644, false}, {"/etc/rsyslog.d/50.conf", 0o644, false}}, kept: []treeFile{{"/etc/rsyslog.d/notes.txt", 0o644, false}}, links: []string{"/etc/systemd/journald.conf"}},
+		{id: "muster.account.cron_permissions",
+			loosened: []treeFile{{"/etc/crontab", 0o644, false}, {"/etc/cron.allow", 0o644, false}, {"/etc/cron.d/x", 0o644, false}, {"/etc/cron.daily/y", 0o757, false}, {"/var/spool/cron/crontabs/u", 0o644, false}, {"/var/spool/cron/atjobs/a0002", 0o4700, false}},
+			kept:     []treeFile{{"/var/spool/cron/atjobs/a0001", 0o700, false}, {"/var/spool/cron/crontabs", 0o1730, true}},
+			after:    []treeFile{{"/etc/cron.allow", 0o640, false}, {"/var/spool/cron/atjobs/a0002", 0o700, false}}},
+		{id: "muster.account.cron_permissions", links: []string{"/etc/cron.allow"}},
+		{id: "muster.file.log_dir_permissions", loosened: []treeFile{{"/var/log/x.log", 0o666, false}, {"/var/log/sub/y.log", 0o646, false}}, kept: []treeFile{{"/var/log/grp.log", 0o664, false}}},
+		{id: "muster.service.ftpusers_permissions", loosened: []treeFile{{"/etc/ftpusers", 0o644, false}}, links: []string{"/etc/vsftpd/user_list"}},
+	}
+	for _, c := range cases {
+		t.Run(c.id, func(t *testing.T) {
+			r := shippedControl(t, c.id).Remediation
+			root, bin := t.TempDir(), t.TempDir()
+			mk := func(f treeFile) string {
+				p := filepath.Join(root, f.path)
+				if f.dir {
+					if err := os.MkdirAll(p, 0o755); err != nil {
+						t.Fatal(err)
+					}
+				} else {
+					if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+						t.Fatal(err)
+					}
+					if err := os.WriteFile(p, []byte("x\n"), 0o600); err != nil {
+						t.Fatal(err)
+					}
+				}
+				if out, err := exec.Command("chmod", strconv.FormatUint(uint64(f.mode), 8), p).CombinedOutput(); err != nil {
+					t.Fatalf("chmod %s: %v %s", p, err, out) // chmod(1), so the setgid and sticky bits land too
+				}
+				return p
+			}
+			for _, f := range append(append([]treeFile{}, c.loosened...), c.kept...) {
+				mk(f)
+			}
+			// a symlink beside the set is never followed
+			victim := mk(treeFile{"/victim", 0o666, false})
+			for _, l := range append([]string{"/var/log/link", "/etc/cron.d/link", "/etc/sudoers.d/link"}, c.links...) {
+				if err := os.MkdirAll(filepath.Dir(filepath.Join(root, l)), 0o755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Symlink(victim, filepath.Join(root, l)); err != nil {
+					t.Fatal(err)
+				}
+			}
+			body, val := rebaseRoot(" "+r.Script, root), rebaseRoot(" "+r.Validate, root)
+			if _, code := runBody(t, root, bin, val); code == 0 && len(c.loosened) > 0 {
+				t.Error("validate passed on the loosened tree")
+			}
+			if out, code := runBody(t, root, bin, body); code != 0 {
+				t.Fatalf("body %d: %s", code, out)
+			}
+			if out, code := runBody(t, root, bin, val); code != 0 {
+				t.Fatalf("validate after the body %d: %s", code, out)
+			}
+			for _, f := range c.kept {
+				if got := mode(t, filepath.Join(root, f.path)); got != strconv.FormatUint(uint64(f.mode&0o7777), 8) {
+					t.Errorf("%s changed to %s", f.path, got)
+				}
+			}
+			for _, f := range c.after {
+				if got := mode(t, filepath.Join(root, f.path)); got != strconv.FormatUint(uint64(f.mode&0o7777), 8) {
+					t.Errorf("%s is %s after the body, want %o", f.path, got, f.mode)
+				}
+			}
+			if got := mode(t, victim); got != "666" {
+				t.Errorf("a body followed a symlink: the victim is %s", got)
+			}
+			for _, l := range c.links {
+				if got, err := os.Readlink(filepath.Join(root, l)); err != nil || got != victim {
+					t.Errorf("%s is %q (%v) after the body, want the link to the victim", l, got, err)
+				}
+			}
+			// S-26: a root-group cron access file is given group crontab where
+			// the host has one (Debian and Ubuntu)
+			if c.id == "muster.account.cron_permissions" && len(c.links) == 0 {
+				if err := exec.Command("getent", "group", "crontab").Run(); err != nil {
+					t.Log("no crontab group on this host: the access-file group was not checked")
+				} else if out, err := exec.Command("stat", "-c", "%G", filepath.Join(root, "/etc/cron.allow")).Output(); err != nil || strings.TrimSpace(string(out)) != "crontab" {
+					t.Errorf("/etc/cron.allow is in group %q (%v), want crontab", strings.TrimSpace(string(out)), err)
+				}
 			}
 		})
 	}
