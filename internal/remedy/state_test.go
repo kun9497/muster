@@ -330,6 +330,35 @@ func TestModesHelpersSkipAnEqualEntry(t *testing.T) {
 	}
 }
 
+// An entry whose owner and group still match the record is put back with
+// chmod alone: a chown would clear its security.capability, which the
+// record does not hold. A stub chown first on PATH logs any call.
+func TestModesHelpersRestoreAModeOnlyChangeWithoutChown(t *testing.T) {
+	needSh(t)
+	root, mb, bin := t.TempDir(), t.TempDir(), t.TempDir()
+	f := filepath.Join(root, "f")
+	if err := os.WriteFile(f, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	calls := filepath.Join(bin, "calls")
+	writeStub(t, bin, "chown", `printf 'chown %s\n' "$*" >> "$CALLS"`)
+	if out, code := runSh(t, helperScript(mb, "save_modes "+shQuote(f)+" || exit 9"), bin, "CALLS="+calls); code != 0 {
+		t.Fatalf("save: %d %s", code, out)
+	}
+	if err := os.Chmod(f, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if out, code := runSh(t, helperScript(mb, trustAll+"restore_modes"), bin, "CALLS="+calls); code != 0 {
+		t.Fatalf("restore: %d %s", code, out)
+	}
+	if got := mode(t, f); got != "644" {
+		t.Errorf("mode restored to %s, want 644", got)
+	}
+	if exists(calls) {
+		t.Errorf("a mode-only change was re-owned:\n%s", readFile(t, calls))
+	}
+}
+
 func TestBackupMarkerCases(t *testing.T) {
 	needSh(t)
 	root, mb := t.TempDir(), t.TempDir()

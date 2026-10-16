@@ -37,19 +37,23 @@ checks:
   - { fact: audit.log_dir.other_writable, op: eq, expected: false }
   - { fact: audit.log_dir.group_writable, op: eq, expected: false }
 remediation:
-  text_en: chown root the audit log and its directory, chmod 0600 the log (0640 where log_group in auditd.conf names an administrators' group such as adm) and chmod 0700 the directory (0750 with such a group). auditd creates each rotated file with the mode and log_group its configuration gives, so set log_group to root or to a group only administrators belong to, rather than fixing the files alone. The review script changes owner and mode only; a log in a group outside params.allowed_groups needs chgrp or the group named in the parameter. A log_file that auditd.conf names elsewhere is yours to fix, as the review script changes /var/log/audit/audit.log and its directory alone.
-  text_ko: 감사 로그와 그 디렉터리를 chown root 하고, 로그는 chmod 0600(auditd.conf 의 log_group 이 adm 같은 관리자 그룹을 지정하면 0640), 디렉터리는 chmod 0700(그런 그룹이면 0750)으로 둡니다. auditd 는 순환할 때마다 설정이 주는 mode 와 log_group 으로 새 파일을 만들므로 파일만 고치지 말고 log_group 을 root 나 관리자만 속한 그룹으로 설정하십시오. 검토 스크립트는 소유자와 모드만 바꿉니다. params.allowed_groups 밖 그룹의 로그는 chgrp하거나 그 그룹을 파라미터에 적어야 합니다. auditd.conf 의 log_file 이 다른 곳을 가리키면 그 파일은 운영자가 고쳐야 하며, 검토 스크립트는 /var/log/audit/audit.log 와 그 디렉터리만 바꿉니다.
+  text_en: chown root the audit log and its directory, chmod 0600 the log (0640 where log_group in auditd.conf names an administrators' group such as adm) and chmod 0700 the directory (0750 with such a group). auditd creates each rotated file with the mode and log_group its configuration gives, so set log_group to root or to a group only administrators belong to, rather than fixing the files alone. The review script changes owner and mode only; a log in a group outside params.allowed_groups needs chgrp or the group named in the parameter. A log_file that auditd.conf names elsewhere is yours to fix, as the review script changes /var/log/audit/audit.log and its directory alone. It fixes the directory first and changes the log only when the directories up to / are root-owned and not world-writable; otherwise the log is left to the operator.
+  text_ko: 감사 로그와 그 디렉터리를 chown root 하고, 로그는 chmod 0600(auditd.conf 의 log_group 이 adm 같은 관리자 그룹을 지정하면 0640), 디렉터리는 chmod 0700(그런 그룹이면 0750)으로 둡니다. auditd 는 순환할 때마다 설정이 주는 mode 와 log_group 으로 새 파일을 만들므로 파일만 고치지 말고 log_group 을 root 나 관리자만 속한 그룹으로 설정하십시오. 검토 스크립트는 소유자와 모드만 바꿉니다. params.allowed_groups 밖 그룹의 로그는 chgrp하거나 그 그룹을 파라미터에 적어야 합니다. auditd.conf 의 log_file 이 다른 곳을 가리키면 그 파일은 운영자가 고쳐야 하며, 검토 스크립트는 /var/log/audit/audit.log 와 그 디렉터리만 바꿉니다. 디렉터리를 먼저 고치고, / 까지의 디렉터리가 root 소유이며 전체 쓰기가 불가능할 때만 로그를 바꿉니다. 그렇지 않으면 로그는 운영자에게 맡깁니다.
   risk: none
   idempotent: true
   modes: [/var/log/audit/audit.log, /var/log/audit]
   script: |
-    if [ -f /var/log/audit/audit.log ] && [ ! -L /var/log/audit/audit.log ]; then
-      chown root /var/log/audit/audit.log
-      chmod u-xs,g-wxs,o-rwxt /var/log/audit/audit.log
-    fi
     if [ -d /var/log/audit ] && [ ! -L /var/log/audit ]; then
       chown root /var/log/audit
       chmod g-w,o-rwx /var/log/audit
     fi
+    if [ -f /var/log/audit/audit.log ] && [ ! -L /var/log/audit/audit.log ]; then
+      if modes_trusted /var/log/audit/. 0; then
+        chown root /var/log/audit/audit.log
+        chmod u-xs,g-wxs,o-rwxt /var/log/audit/audit.log
+      else
+        log "muster.beyond.audit_log_permissions: /var/log/audit is not root's, left as is"
+      fi
+    fi
   validate: |
-    { [ ! -f /var/log/audit/audit.log ] || [ -L /var/log/audit/audit.log ] || case "$(stat -c '%u %a' /var/log/audit/audit.log)" in '0 0'|'0 200'|'0 400'|'0 600'|'0 40'|'0 240'|'0 440'|'0 640') ;; *) false;; esac; } && [ -z "$(find /var/log/audit -maxdepth 0 \( -perm /026 -o ! -user root \))" ]
+    { [ ! -f /var/log/audit/audit.log ] || [ -L /var/log/audit/audit.log ] || ! modes_trusted /var/log/audit/. 0 || case "$(stat -c '%u %a' /var/log/audit/audit.log)" in '0 0'|'0 200'|'0 400'|'0 600'|'0 40'|'0 240'|'0 440'|'0 640') ;; *) false;; esac; } && [ -z "$(find /var/log/audit -maxdepth 0 \( -perm /026 -o ! -user root \))" ]

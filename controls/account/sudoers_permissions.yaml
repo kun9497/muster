@@ -22,19 +22,24 @@ checks:
   - { fact: files.sudoers_d_entries, op: each, subject: path, where: { field: ignored, op: eq, expected: false }, require: { field: group_writable, op: eq, expected: false } }
   - { fact: files.sudoers_d_entries, op: none, subject: path, where: { field: reason, op: present } }
 remediation:
-  text_en: chmod 0440 /etc/sudoers and chown it to root; chmod go-w each active file under /etc/sudoers.d.
-  text_ko: /etc/sudoers 에 chmod 0440 을 적용하고 root 로 chown 하며, /etc/sudoers.d 아래 활성 파일에 chmod go-w 를 적용합니다.
+  text_en: chmod 0440 /etc/sudoers and chown it to root; chmod go-w each active file under /etc/sudoers.d. A sudoers file (/etc/sudoers or an active file under /etc/sudoers.d) not owned by root is never chowned or re-moded - sudo refuses it today, and adopting it would activate rules another user wrote; the review script logs it and the block fails and rolls back, so review its content and chown it by hand.
+  text_ko: /etc/sudoers 에 chmod 0440 을 적용하고 root 로 chown 하며, /etc/sudoers.d 아래 활성 파일에 chmod go-w 를 적용합니다. root 소유가 아닌 sudoers 파일(/etc/sudoers 나 /etc/sudoers.d 아래 활성 파일)은 chown 하거나 모드를 바꾸지 않습니다. sudo 는 지금 그 파일을 거부하며, 그 파일을 넘겨받으면 다른 사용자가 쓴 규칙이 활성화됩니다. 검토 스크립트는 이를 기록하고 블록은 실패해 되돌아가므로, 내용을 검토한 뒤 직접 chown 하십시오.
   risk: none
   idempotent: true
   backup: [/etc/sudoers]
   modes: ["/etc/sudoers.d/*"]
   script: |
     if [ -f /etc/sudoers ] && [ ! -L /etc/sudoers ]; then
-      chown root /etc/sudoers
-      chmod u-wxs,g-wxs,o-rwxt /etc/sudoers
+      u=$(stat -c %u /etc/sudoers)
+      if [ "$u" = 0 ]; then
+        chmod u-wxs,g-wxs,o-rwxt /etc/sudoers
+      else
+        log "muster.account.sudoers_permissions: /etc/sudoers is owned by uid $u; review it before chown root, left as is"
+      fi
     fi
     if [ -d /etc/sudoers.d ] && [ ! -L /etc/sudoers.d ]; then
-      find /etc/sudoers.d -mindepth 1 -maxdepth 1 -type f ! -name '*.*' ! -name '*~' -exec chmod go-w {} +
+      find /etc/sudoers.d -mindepth 1 -maxdepth 1 -type f ! -name '*.*' ! -name '*~' ! -user root -printf '%U %p\n' | while read -r u f; do log "muster.account.sudoers_permissions: $f is owned by uid $u; review it before chown root, left as is"; done
+      find /etc/sudoers.d -mindepth 1 -maxdepth 1 -type f ! -name '*.*' ! -name '*~' -user root -exec chmod go-w {} +
     fi
   validate: |
-    case "$(stat -c '%u %a' /etc/sudoers)" in '0 0'|'0 40'|'0 400'|'0 440') ;; *) false;; esac && [ -z "$(find /etc/sudoers.d -mindepth 1 -maxdepth 1 -type f ! -name '*.*' ! -name '*~' -perm /022 2>/dev/null)" ]
+    case "$(stat -c '%u %a' /etc/sudoers)" in '0 0'|'0 40'|'0 400'|'0 440') ;; *) false;; esac && [ -z "$(find /etc/sudoers.d -mindepth 1 -maxdepth 1 -type f ! -name '*.*' ! -name '*~' \( ! -user root -o -perm /022 \) 2>/dev/null)" ]

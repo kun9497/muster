@@ -52,9 +52,10 @@ var (
 
 // ScriptParamValue formats a parameter value for a review script's
 // P_<name>='<value>' line (3D-2c E-1) and reports whether the value can be
-// carried: an int as digits, a bool as true/false, a string or each list
-// element in a charset with no quote, blank, $, backtick, ;, |, & or \, and
-// a list as its elements joined by one space. An empty list cannot be.
+// carried: an int as an optionally signed integer (^-?[0-9]+$), a bool as
+// true/false, a string or each list element in a charset with no quote,
+// blank, $, backtick, ;, |, & or \, and a list as its elements joined by one
+// space. An empty list cannot be.
 func ScriptParamValue(typ string, v any) (string, bool) {
 	switch typ {
 	case "int":

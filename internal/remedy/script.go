@@ -196,9 +196,11 @@ restore_modes() {
   while read -r uid gid mode t p; do
     if [ ! -e "$p" ] && [ ! -L "$p" ]; then continue; fi
     if [ -L "$p" ] || [ "$(modes_type "$p")" != "$t" ]; then log "restore_modes: $p changed type, left as is"; mrc=1; continue; fi
-    [ "$(stat -c '%u %g %a' -- "$p" 2>/dev/null)" = "$uid $gid $mode" ] && continue
+    cur=$(stat -c '%u %g %a' -- "$p" 2>/dev/null) || cur=
+    [ "$cur" = "$uid $gid $mode" ] && continue
     modes_trusted "$p" "$uid" || { log "restore_modes: $p is under a directory others can write, left as is"; mrc=1; continue; }
-    if chown -h -- "$uid:$gid" "$p"; then chmod -- "$mode" "$p" || mrc=1; else mrc=1; fi
+    if [ "${cur% *}" != "$uid $gid" ]; then chown -h -- "$uid:$gid" "$p" || { mrc=1; continue; }; fi # a chown drops security.capability
+    chmod -- "$mode" "$p" || mrc=1
   done < "$MB/modes.list"
   return $mrc
 }
@@ -283,8 +285,10 @@ var textOnlyPhrase = map[string]string{
 // Script renders p as the POSIX sh review script (spec §5): a fixed
 // template, one independent block per item in plan order. Snapshot- and
 // control-derived text lands only in '#' comment lines; commands are the
-// template, the declared bodies, the control id and declared backup paths.
-// muster never runs it.
+// template, the declared bodies, the control id, the declared backup, units,
+// modes, sysctl and modules names (each re-checked by recheck) and the
+// P_<name>='<value>' lines of the parameter values controls.ScriptParamValue
+// admits. muster never runs it.
 func Script(p *Plan) []byte {
 	var b strings.Builder
 	s := p.Summary

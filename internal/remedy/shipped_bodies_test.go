@@ -138,7 +138,9 @@ func runSysctlBody(t *testing.T, c *controls.Control, state map[string]string, o
 	seedSysctl(t, st, state, oneway)
 	r := c.Remediation
 	env := append(pEnv(t, c), "SYSCTL_STATE="+st)
-	if out, code := runBody(t, dir, bin, rebaseSysctlD(r.Script, dir), env...); code != 0 {
+	// the script runs every body under umask 077; the drop-in must still be
+	// 0644, or a non-root collect reads it as an error (C3)
+	if out, code := runBody(t, dir, bin, "umask 077\n"+rebaseSysctlD(r.Script, dir), env...); code != 0 {
 		body = code
 		t.Logf("%s body: %s", c.ID, out)
 	}
@@ -146,6 +148,9 @@ func runSysctlBody(t *testing.T, c *controls.Control, state map[string]string, o
 	calls = sysctlCalls(st)
 	if b, err := os.ReadFile(rebaseSysctlD(r.Backup[0], dir)); err == nil {
 		file = strings.Split(strings.TrimSpace(string(b)), "\n")
+		if m := mode(t, rebaseSysctlD(r.Backup[0], dir)); m != "644" {
+			t.Errorf("%s: the drop-in is mode %s, want 644", c.ID, m)
+		}
 	}
 	return calls, file, body, validate
 }
@@ -400,7 +405,8 @@ func TestModuleBodiesWriteFoldedLinesAndUnload(t *testing.T) {
 			procModules := rebase("/proc/modules")
 			env := "MODPROBE_STATE=" + st
 			for run := 1; run <= 2; run++ { // the second run changes nothing
-				if out, code := runBody(t, st, bin, rebase(r.Script), env); code != 0 {
+				// under the script's umask 077, so the 644 below is the body's chmod
+				if out, code := runBody(t, st, bin, "umask 077\n"+rebase(r.Script), env); code != 0 {
 					t.Fatalf("run %d: body %d %s", run, code, out)
 				}
 				if out, code := runBody(t, st, bin, rebase(r.Validate), env); code != 0 {
@@ -580,6 +586,7 @@ func TestFileBodiesRepairATempTree(t *testing.T) {
 		after    []treeFile // modes the body must leave (S-40)
 		links    []string   // single paths the body names, planted as symlinks to the victim (S-45)
 		foreign  []string   // directories chowned to uid 65534: the body leaves what they hold (S-47)
+		refused  []treeFile // crontab or sudoers files chowned to uid 65534: never adopted, the validate fails (S-49)
 	}{
 		{id: "muster.account.sudoers_permissions", loosened: []treeFile{{"/etc/sudoers", 0o644, false}, {"/etc/sudoers.d/a", 0o664, false}}, kept: []treeFile{{"/etc/sudoers.d/README.txt", 0o666, false}}},
 		{id: "muster.service.nfs_export_access", loosened: []treeFile{{"/etc/exports", 0o666, false}}},
@@ -597,6 +604,16 @@ func TestFileBodiesRepairATempTree(t *testing.T) {
 		{id: "muster.file.log_dir_permissions", loosened: []treeFile{{"/var/log/ok/a.log", 0o666, false}}, kept: []treeFile{{"/var/log/svc/b.log", 0o666, false}}, foreign: []string{"/var/log/svc"}},
 		{id: "muster.account.cron_permissions", kept: []treeFile{{"/var/spool/cron/atjobs/a0003", 0o4700, false}}, foreign: []string{"/var/spool/cron/atjobs"}},
 		{id: "muster.service.ftpusers_permissions", loosened: []treeFile{{"/etc/ftpusers", 0o644, false}}, links: []string{"/etc/vsftpd/user_list"}},
+		// S-49: a crontab or sudoers file not owned by root is left as it is
+		{id: "muster.account.cron_permissions", loosened: []treeFile{{"/etc/cron.d/x", 0o644, false}}, refused: []treeFile{{"/etc/cron.d/u", 0o644, false}}},
+		{id: "muster.account.cron_permissions", refused: []treeFile{{"/etc/crontab", 0o644, false}}},
+		{id: "muster.account.sudoers_permissions", loosened: []treeFile{{"/etc/sudoers", 0o644, false}}, refused: []treeFile{{"/etc/sudoers.d/b", 0o664, false}}},
+		{id: "muster.account.sudoers_permissions", refused: []treeFile{{"/etc/sudoers", 0o644, false}}},
+		// S-50: the directory is fixed first, and its files only when it is
+		// root's; an other-writable parent holds a planted symlink
+		{id: "muster.account.cron_permissions", loosened: []treeFile{{"/etc/cron.d", 0o757, true}, {"/etc/cron.d/x", 0o644, false}}, after: []treeFile{{"/etc/cron.d", 0o755, true}, {"/etc/cron.d/x", 0o640, false}}},
+		{id: "muster.account.cron_permissions", kept: []treeFile{{"/etc/cron.d/z", 0o646, false}, {"/etc/cron.daily/y", 0o757, false}}, foreign: []string{"/etc/cron.d", "/etc/cron.daily"}},
+		{id: "muster.beyond.audit_log_permissions", loosened: []treeFile{{"/var/log/audit", 0o777, true}}, links: []string{"/var/log/audit/audit.log"}},
 	}
 	for _, c := range cases {
 		t.Run(c.id, func(t *testing.T) {
@@ -644,6 +661,11 @@ func TestFileBodiesRepairATempTree(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
+			for _, f := range c.refused {
+				if err := os.Chown(mk(f), 65534, 65534); err != nil {
+					t.Fatal(err)
+				}
+			}
 			// the block runs with the prologue's log and modes_trusted defined
 			helpers := "log() { printf 'muster-fix: %s\\n' \"$*\"; }\n" + stateHelpers + "\n"
 			body, val := helpers+rebaseRoot(" "+r.Script, root), helpers+rebaseRoot(" "+r.Validate, root)
@@ -659,8 +681,19 @@ func TestFileBodiesRepairATempTree(t *testing.T) {
 					t.Errorf("the log does not name the skipped directory %q:\n%s", want, out)
 				}
 			}
-			if out, code := runBody(t, root, bin, val); code != 0 {
+			if out, code := runBody(t, root, bin, val); len(c.refused) == 0 && code != 0 {
 				t.Fatalf("validate after the body %d: %s", code, out)
+			} else if len(c.refused) > 0 && code == 0 {
+				t.Errorf("validate passed although a file not root's was left as is: the block would not roll back")
+			}
+			for _, f := range c.refused {
+				p := filepath.Join(root, f.path)
+				if want := c.id + ": " + p + " is owned by uid 65534; review it before chown root, left as is"; !strings.Contains(out, want) {
+					t.Errorf("the log does not name the refused file %q:\n%s", want, out)
+				}
+				if got, err := exec.Command("stat", "-c", "%u %a", p).Output(); err != nil || strings.TrimSpace(string(got)) != "65534 "+strconv.FormatUint(uint64(f.mode&0o7777), 8) {
+					t.Errorf("%s is %q (%v) after the body, want it untouched", f.path, strings.TrimSpace(string(got)), err)
+				}
 			}
 			for _, f := range c.kept {
 				if got := mode(t, filepath.Join(root, f.path)); got != strconv.FormatUint(uint64(f.mode&0o7777), 8) {
@@ -682,7 +715,7 @@ func TestFileBodiesRepairATempTree(t *testing.T) {
 			}
 			// S-26: a root-group cron access file is given group crontab where
 			// the host has one (Debian and Ubuntu)
-			if c.id == "muster.account.cron_permissions" && len(c.links) == 0 && len(c.foreign) == 0 {
+			if c.id == "muster.account.cron_permissions" && exists(filepath.Join(root, "/etc/cron.allow")) && len(c.links) == 0 {
 				if err := exec.Command("getent", "group", "crontab").Run(); err != nil {
 					t.Log("no crontab group on this host: the access-file group was not checked")
 				} else if out, err := exec.Command("stat", "-c", "%G", filepath.Join(root, "/etc/cron.allow")).Output(); err != nil || strings.TrimSpace(string(out)) != "crontab" {
@@ -1026,17 +1059,23 @@ func accountBlock(t *testing.T, id, root string, failValidate bool) *Plan {
 
 // S-27: a muster drop-in that is a symlink (an operator's mask) fails the
 // block before any write; the link, its target's mode and content are
-// unchanged after the whole block, and no account is touched.
+// unchanged after the whole block, and no account is touched. A symlinked
+// /etc/login.defs is refused the same way (K2).
 func TestAccountBodiesLeaveASymlinkedDropIn(t *testing.T) {
 	needSh(t)
-	for _, c := range []struct{ id, dropIn string }{
-		{"muster.account.password_policy", "/etc/security/pwquality.conf.d/99-muster.conf"},
-		{"muster.account.session_timeout", "/etc/ssh/sshd_config.d/00-muster-session.conf"},
+	for _, c := range []struct{ id, dropIn, what string }{
+		{"muster.account.password_policy", "/etc/security/pwquality.conf.d/99-muster.conf", "is a symlink (a mask), left as is"},
+		{"muster.account.session_timeout", "/etc/ssh/sshd_config.d/00-muster-session.conf", "is a symlink (a mask), left as is"},
+		// K2: login.defs is written only when it is no symlink
+		{"muster.account.password_policy", "/etc/login.defs", "is a symlink, left as is"},
+		{"muster.account.umask_policy", "/etc/login.defs", "is a symlink, left as is"},
 	} {
-		t.Run(c.id, func(t *testing.T) {
+		t.Run(c.id+c.dropIn, func(t *testing.T) {
 			root, bin, stub := accountTree(t)
 			const defs = "PASS_MAX_DAYS 99999\n"
-			writeUnder(t, root, "/etc/login.defs", defs)
+			if c.dropIn != "/etc/login.defs" {
+				writeUnder(t, root, "/etc/login.defs", defs)
+			}
 			writeUnder(t, root, "/etc/passwd", "fresh:x:1000:1000::/home/fresh:/bin/sh\n")
 			writeUnder(t, root, "/etc/shadow", fmt.Sprintf("fresh:$6$x:%d::99999:7:::\n", time.Now().Unix()/86400))
 			writeUnder(t, stub, "/sshd_T", "clientaliveinterval 0\nclientalivecountmax 3\n")
@@ -1055,13 +1094,13 @@ func TestAccountBodiesLeaveASymlinkedDropIn(t *testing.T) {
 			p := accountBlock(t, c.id, root, false)
 			out, _, code := runScriptWith(t, p, root, filepath.Join(root, "bk"), runOpts{pathPrefix: bin, env: []string{"STUB=" + stub, "ROOT=" + root}})
 			if code == 0 {
-				t.Fatalf("the block over a symlinked drop-in exited 0\n%s", out)
+				t.Fatalf("the block over a symlinked %s exited 0\n%s", c.dropIn, out)
 			}
-			if !strings.Contains(out, c.id+": "+link+" is a symlink (a mask), left as is") {
+			if !strings.Contains(out, c.id+": "+link+" "+c.what) {
 				t.Errorf("no symlink refusal in the log\n%s", out)
 			}
 			if got, err := os.Readlink(link); err != nil || got != victim {
-				t.Errorf("the drop-in is %q (%v) after the block, want the link to %s", got, err, victim)
+				t.Errorf("%s is %q (%v) after the block, want the link to %s", c.dropIn, got, err, victim)
 			}
 			if m := mode(t, victim); m != "666" {
 				t.Errorf("the link's target is mode %s, want 666", m)
@@ -1069,8 +1108,10 @@ func TestAccountBodiesLeaveASymlinkedDropIn(t *testing.T) {
 			if got := readFile(t, victim); got != "victim\n" {
 				t.Errorf("the link's target holds %q", got)
 			}
-			if got := readFile(t, filepath.Join(root, "/etc/login.defs")); got != defs {
-				t.Errorf("login.defs is %q after the block", got)
+			if c.dropIn != "/etc/login.defs" {
+				if got := readFile(t, filepath.Join(root, "/etc/login.defs")); got != defs {
+					t.Errorf("login.defs is %q after the block", got)
+				}
 			}
 			if exists(filepath.Join(stub, "chage")) {
 				t.Errorf("chage ran although the block stopped:\n%s", readFile(t, filepath.Join(stub, "chage")))

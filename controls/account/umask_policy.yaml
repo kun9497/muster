@@ -19,14 +19,15 @@ checks:
   - { fact: accounts.login_defs.umask, op: in, expected: "${acceptable}" }
   - { fact: pam.umask_module.enabled, op: eq, expected: true }
 remediation:
-  text_en: Set UMASK 027 in /etc/login.defs and ensure a "session optional pam_umask.so" line is present in the login and non-login PAM session stacks (pam-auth-update on Debian, authselect on RHEL).
-  text_ko: /etc/login.defs 에 UMASK 027 을 설정하고 로그인·비로그인 PAM 세션 스택에 "session optional pam_umask.so" 줄이 있게 합니다(Debian 은 pam-auth-update, RHEL 은 authselect).
+  text_en: Set UMASK 027 in /etc/login.defs and ensure a "session optional pam_umask.so" line is present in the login and non-login PAM session stacks (pam-auth-update on Debian, authselect on RHEL). The review script sets UMASK in /etc/login.defs only and never edits a PAM stack, so on a host without a pam_umask line the block ends done and the control still FAILs. A symlinked /etc/login.defs is never followed; the block stops.
+  text_ko: /etc/login.defs 에 UMASK 027 을 설정하고 로그인·비로그인 PAM 세션 스택에 "session optional pam_umask.so" 줄이 있게 합니다(Debian 은 pam-auth-update, RHEL 은 authselect). 검토 스크립트는 /etc/login.defs 의 UMASK 만 고치며 PAM 스택은 건드리지 않으므로, pam_umask 줄이 없는 호스트에서는 블록이 done 으로 끝나도 이 control은 FAIL로 남습니다. 심볼릭 링크인 /etc/login.defs 는 따라가지 않고 그 블록을 멈춥니다.
   risk: none
   idempotent: true
   script_params: [acceptable]
   backup: [/etc/login.defs]
   script: |
     ld=/etc/login.defs
+    if [ -L "$ld" ]; then log "muster.account.umask_policy: $ld is a symlink, left as is"; exit 1; fi
     first=${P_acceptable%% *}
     v=$(awk '$1 == "UMASK" { print $2; exit }' "$ld")
     case " $P_acceptable " in
