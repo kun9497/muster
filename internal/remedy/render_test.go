@@ -257,3 +257,23 @@ func TestTableNotPlannedOnlyWhenNonEmpty(t *testing.T) {
 		t.Fatalf("capped table does not mark items above max-risk:\n%s", capped)
 	}
 }
+
+// S-20: a value the formatter refused never reaches the plan JSON.
+func TestJSONCarriesNoUnsafeParameter(t *testing.T) {
+	p := poisonPlan(t)
+	var found bool
+	for _, it := range p.Items {
+		if it.ID == "muster.test.p_params" {
+			found = true
+			if it.TextOnlyReason != "params_unsafe" {
+				t.Fatalf("p_params is %q, want params_unsafe", it.TextOnlyReason)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("the p_params row did not reach the plan")
+	}
+	if bytes.Contains(JSON(p), []byte("'; uname -a; '")) {
+		t.Fatal("the unsafe parameter value reached the plan JSON")
+	}
+}

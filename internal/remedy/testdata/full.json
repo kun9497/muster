@@ -119,6 +119,76 @@
       "planned": true
     },
     {
+      "id": "muster.test.h_params",
+      "title_en": "muster.test.h_params en",
+      "title_ko": "muster.test.h_params ko",
+      "status": "fail",
+      "severity": "medium",
+      "severity_source": "importance",
+      "risk": "none",
+      "idempotent": true,
+      "automation": "auto",
+      "reason": "clause does not hold",
+      "text_en": "fix h",
+      "text_ko": "조치 h",
+      "script": true,
+      "text_only_reason": "",
+      "script_params": [
+        {
+          "name": "limit",
+          "value": "5"
+        },
+        {
+          "name": "names",
+          "value": "a b"
+        }
+      ],
+      "script_on_absent": false,
+      "rollback": "restore_backup",
+      "backup": [
+        "/etc/h.conf"
+      ],
+      "units": [],
+      "modes": [],
+      "sysctl": [],
+      "modules": [],
+      "validate": true,
+      "planned": true
+    },
+    {
+      "id": "muster.test.i_state",
+      "title_en": "muster.test.i_state en",
+      "title_ko": "muster.test.i_state ko",
+      "status": "fail",
+      "severity": "medium",
+      "severity_source": "importance",
+      "risk": "none",
+      "idempotent": true,
+      "automation": "auto",
+      "reason": "clause does not hold",
+      "text_en": "fix i",
+      "text_ko": "조치 i",
+      "script": true,
+      "text_only_reason": "",
+      "script_params": [],
+      "script_on_absent": false,
+      "rollback": "state",
+      "backup": [],
+      "units": [],
+      "modes": [
+        "/etc/i.d/*",
+        "/etc/i.conf"
+      ],
+      "sysctl": [
+        "kernel.i_key"
+      ],
+      "modules": [
+        "i-mod"
+      ],
+      "validate": true,
+      "planned": true
+    },
+    {
       "id": "muster.test.a_none",
       "title_en": "muster.test.a_none en",
       "title_ko": "muster.test.a_none ko",
@@ -274,9 +344,9 @@
     }
   ],
   "summary": {
-    "planned": 7,
+    "planned": 9,
     "above_max_risk": 0,
-    "with_script": 4,
+    "with_script": 6,
     "text_only": 3,
     "waived": 0,
     "clean": 1,
@@ -286,7 +356,7 @@
       "warn_degraded": 1
     },
     "by_risk": {
-      "none": 3,
+      "none": 5,
       "restart_service": 2,
       "reboot_required": 1,
       "lockout_risk": 1
