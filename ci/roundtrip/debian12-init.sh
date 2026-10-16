@@ -4,13 +4,14 @@
 # conflicts with it. The four NIS units are enable-only: they cannot start without a NIS
 # domain. nfs-kernel-server.service is an alias of nfs-server.service, so the settle list
 # names the real unit (the body skips the alias; the alias name is still recorded).
+# No UMASK seed: Debian 12 stacks no pam_umask, so umask_policy cannot pass here.
 # The image ships /etc/machine-id empty (see the Dockerfile).
 set -eu
 START_UNITS="autofs.service nfs-server.service rpcbind.socket rpcbind.service snmpd.service atftpd.socket atftpd.service"
 ENABLE_ONLY_UNITS="ypserv.service ypbind.service ypxfrd.service yppasswdd.service"
 printf '#!/bin/sh\nexit 101\n' > /usr/sbin/policy-rc.d; chmod 755 /usr/sbin/policy-rc.d
 apt-get update -qq
-DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends autofs nfs-kernel-server rpcbind nis snmpd atftpd
+DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends autofs nfs-kernel-server rpcbind nis snmpd atftpd sudo cron rsyslog vsftpd
 rm -f /usr/sbin/policy-rc.d
 systemctl reset-failed
 for u in $START_UNITS; do systemctl enable --now "$u"; done
@@ -19,6 +20,10 @@ chmod 664 /etc/passwd
 chmod 666 /etc/services
 install -m 644 /dev/null /etc/hosts.lpd
 chmod 644 /etc/hosts
+chmod 644 /etc/sudoers
+install -m 644 /dev/null /etc/inetd.conf
+install -m 666 /dev/null /etc/exports
+install -m 666 /dev/null /var/log/ci.log
 bad=0
 for u in $START_UNITS; do s=$(systemctl is-active "$u" 2>/dev/null) || :; [ "$s" = active ] || { echo "seed: $u is ${s:-unknown}, want active" >&2; bad=1; }; done
 for u in $ENABLE_ONLY_UNITS; do s=$(systemctl is-active "$u" 2>/dev/null) || :; [ "$s" = inactive ] || { echo "seed: $u is ${s:-unknown}, want inactive" >&2; bad=1; }; done

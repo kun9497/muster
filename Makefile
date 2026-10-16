@@ -48,12 +48,12 @@ suidindex-check:
 
 # sh -n and shellcheck over the review scripts (the remedy goldens and the
 # committed fix examples) and the round trip's CI scripts (ci/roundtrip: the
-# seeds and wait.sh). At least the five remedy goldens and the five round-trip
+# seeds and wait.sh). At least the five remedy goldens and the six round-trip
 # scripts must be checked; only the examples glob may match nothing.
 shellcheck:
 	@n=0; for f in internal/remedy/testdata/*.sh; do sh -n "$$f" || exit 1; shellcheck -s sh "$$f" || exit 1; n=$$((n+1)); done; [ "$$n" -ge 5 ] || { echo "shellcheck: $$n remedy goldens checked, want at least 5"; exit 1; }
 	@for f in examples/*-fix-report.sh; do [ -e "$$f" ] || continue; sh -n "$$f" || exit 1; shellcheck -s sh "$$f" || exit 1; done
-	@n=0; for f in ci/roundtrip/*.sh; do sh -n "$$f" || exit 1; shellcheck -s sh "$$f" || exit 1; n=$$((n+1)); done; [ "$$n" -ge 5 ] || { echo "shellcheck: $$n roundtrip scripts checked, want at least 5"; exit 1; }
+	@n=0; for f in ci/roundtrip/*.sh; do sh -n "$$f" || exit 1; shellcheck -s sh "$$f" || exit 1; n=$$((n+1)); done; [ "$$n" -ge 6 ] || { echo "shellcheck: $$n roundtrip scripts checked, want at least 6"; exit 1; }
 
 # One fuzz target for a short time; the seed corpus already runs in `make
 # test`, so this is for the target you are working on. The nightly fuzz

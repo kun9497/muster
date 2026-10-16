@@ -47,7 +47,7 @@ jobs:
             shellcheck -s sh "$f"
             n=$((n+1))
           done
-          [ "$n" -ge 5 ]
+          [ "$n" -ge 5 6
       - name: controls lint
         run: go run ./cmd/muster controls lint --references docs/reference
       - name: controls lint, built-in profile
@@ -503,12 +503,19 @@ jobs:
               | (.facts | getpath($p) | (.status // .effective.status))
               | select(. != "unsupported") ] | length == 0' "$RUNNER_TEMP/muster/containers/c.json"
 
-  # The round trip (3D-2b §4). Each row seeds the controls its `seeded` names
-  # (pinned to controls/testdata/_roundtrip.yaml by
+  # The round trip (3D-2b §4, 3D-2c §5). Each row seeds the controls its `seeded`
+  # names (pinned to controls/testdata/_roundtrip.yaml by
   # TestEveryScriptedControlIsInTheRoundtripTable), plans, runs the review
   # script and checks again. On init rows a second container then proves the
   # guard (the first container's script is refused) and the failure path (a
-  # validate forced false in every block leaves units and files as they were).
+  # validate forced false in every block leaves units, files, sysctl values,
+  # module load states, modes-entry stats and, when password_policy is
+  # scripted, every account's ageing fields (name, min, max) as they were).
+  # A host row (3D-2c) runs on the runner VM itself: no container, no guard
+  # run, and the failure run re-seeds the same VM. Its repair run also fixes
+  # every stock-FAIL scripted control (/etc/hosts goes to 0600, so non-root
+  # reads of it fail until the re-seed puts the stock modes back); the job's
+  # non-root steps read only the run directory.
   fix-roundtrip:
     runs-on: ubuntu-24.04
     needs: test
@@ -518,43 +525,68 @@ jobs:
       matrix:
         include:
           - key: rocky9-init
+            kind: container
             image: rockylinux/rockylinux:9-ubi-init
             init: "true"
             seeded: >-
-              muster.account.root_remote_login muster.file.hosts_lpd_permissions
-              muster.file.hosts_permissions muster.file.passwd_permissions
-              muster.file.services_permissions muster.service.automount_disabled
-              muster.service.nfs_server_disabled muster.service.rpcbind_disabled
-              muster.service.snmp_disabled muster.service.telnet_disabled
+              muster.account.cron_permissions muster.account.lockout_threshold muster.account.password_policy
+              muster.account.root_remote_login muster.account.session_timeout muster.account.sudoers_permissions
+              muster.account.umask_policy muster.file.hosts_lpd_permissions muster.file.hosts_permissions
+              muster.file.inetd_conf_permissions muster.file.log_dir_permissions muster.file.passwd_permissions
+              muster.file.services_permissions muster.file.syslog_conf_permissions muster.service.automount_disabled
+              muster.service.ftpusers_permissions muster.service.nfs_export_access muster.service.nfs_server_disabled
+              muster.service.rpcbind_disabled muster.service.snmp_disabled muster.service.telnet_disabled
               muster.service.tftp_talk_disabled
           - key: almalinux9-init
+            kind: container
             image: almalinux/9-init
             init: "true"
             seeded: >-
-              muster.account.root_remote_login muster.file.hosts_lpd_permissions
-              muster.file.hosts_permissions muster.file.passwd_permissions
-              muster.file.services_permissions muster.service.automount_disabled
-              muster.service.nfs_server_disabled muster.service.rpcbind_disabled
-              muster.service.snmp_disabled muster.service.telnet_disabled
+              muster.account.cron_permissions muster.account.lockout_threshold muster.account.password_policy
+              muster.account.root_remote_login muster.account.session_timeout muster.account.sudoers_permissions
+              muster.account.umask_policy muster.file.hosts_lpd_permissions muster.file.hosts_permissions
+              muster.file.inetd_conf_permissions muster.file.log_dir_permissions muster.file.passwd_permissions
+              muster.file.services_permissions muster.file.syslog_conf_permissions muster.service.automount_disabled
+              muster.service.ftpusers_permissions muster.service.nfs_export_access muster.service.nfs_server_disabled
+              muster.service.rpcbind_disabled muster.service.snmp_disabled muster.service.telnet_disabled
               muster.service.tftp_talk_disabled
           - key: debian12-init
+            kind: container
             image: muster-ci/debian12-init
             build: debian12-init
             init: "true"
             seeded: >-
-              muster.file.hosts_lpd_permissions muster.file.hosts_permissions
-              muster.file.passwd_permissions muster.file.services_permissions
-              muster.file.shadow_permissions muster.service.automount_disabled
-              muster.service.nfs_server_disabled muster.service.nis_disabled
-              muster.service.rpcbind_disabled muster.service.snmp_disabled
+              muster.account.cron_permissions muster.account.sudoers_permissions muster.file.hosts_lpd_permissions
+              muster.file.hosts_permissions muster.file.inetd_conf_permissions muster.file.log_dir_permissions
+              muster.file.passwd_permissions muster.file.services_permissions muster.file.shadow_permissions
+              muster.file.syslog_conf_permissions muster.service.automount_disabled
+              muster.service.ftpusers_permissions muster.service.nfs_export_access muster.service.nfs_server_disabled
+              muster.service.nis_disabled muster.service.rpcbind_disabled muster.service.snmp_disabled
               muster.service.tftp_talk_disabled
           - key: ubuntu2204
+            kind: container
             image: ubuntu:22.04
             init: "false"
             seeded: >-
-              muster.file.hosts_lpd_permissions muster.file.hosts_permissions
-              muster.file.passwd_permissions muster.file.services_permissions
-              muster.file.shadow_permissions
+              muster.account.cron_permissions muster.account.sudoers_permissions muster.account.umask_policy
+              muster.file.hosts_lpd_permissions muster.file.hosts_permissions muster.file.inetd_conf_permissions
+              muster.file.log_dir_permissions muster.file.passwd_permissions muster.file.services_permissions
+              muster.file.shadow_permissions muster.file.syslog_conf_permissions
+          - key: runner
+            kind: host
+            seeded: >-
+              muster.account.cron_permissions muster.account.password_policy muster.account.session_timeout
+              muster.account.umask_policy muster.beyond.aslr_and_link_protection muster.beyond.audit_log_permissions
+              muster.beyond.bootloader_config_permissions muster.beyond.icmp_broadcast_and_bogus_ignored
+              muster.beyond.icmp_redirects_ignored muster.beyond.ip_forwarding_disabled
+              muster.beyond.ipv6_forwarding_disabled muster.beyond.ipv6_redirects_ignored
+              muster.beyond.ipv6_router_advertisements_ignored muster.beyond.ipv6_source_routing_rejected
+              muster.beyond.kernel_pointer_exposure muster.beyond.ptrace_restriction
+              muster.beyond.reverse_path_filtering muster.beyond.source_routing_rejected
+              muster.beyond.suid_dumpable_disabled muster.beyond.syn_cookies_enabled muster.beyond.sysrq_restricted
+              muster.beyond.uncommon_filesystems_disabled muster.beyond.uncommon_network_protocols_disabled
+              muster.beyond.unprivileged_bpf_restricted muster.file.hosts_permissions
+              muster.file.inetd_conf_permissions muster.file.shadow_permissions muster.file.syslog_conf_permissions
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -566,6 +598,8 @@ jobs:
         if: matrix.build != ''
         run: docker build -t muster-ci/debian12-init -f ci/roundtrip/debian12-init.Dockerfile ci/roundtrip
       - name: seed, plan, run the script, check again; then the guard and failure runs
+        env:
+          KIND: "${{ matrix.kind }}"
         run: |
           set -eu
           d="$RUNNER_TEMP/rt"; mkdir -m 700 "$d" "$d/repair" "$d/fail"
@@ -576,67 +610,114 @@ jobs:
               docker run -d -v "$PWD/bin:/m:ro" -v "$PWD/ci/roundtrip:/ci:ro" -v "$1:/out" "${{ matrix.image }}" sleep infinity
             fi
           }
-          c1=$(start "$d/repair"); c2=
-          trap 'docker rm -f $c1 $c2 >/dev/null 2>&1 || true' EXIT
-          [ "${{ matrix.init }}" = "true" ] && sh ci/roundtrip/wait.sh "$c1" "${{ matrix.key }}"
-          docker exec "$c1" sh /ci/${{ matrix.key }}.sh
-          plan() { # plan <cid> <dir>: collect, then the JSON plan and the script into <dir>
-            docker exec "$1" /m/muster collect --out /out/before.json || true
-            sudo chown "$(id -u)" "$2/before.json"
-            ./bin/muster fix --dry-run --facts "$2/before.json" --format json > "$2/plan.json"
-            ./bin/muster fix --dry-run --facts "$2/before.json" --format script > "$2/fix.sh"
-            test -s "$2/plan.json"; test -s "$2/fix.sh"
+          c1=; c2=; cid=
+          trap '[ -z "$c1$c2" ] || docker rm -f $c1 $c2 >/dev/null 2>&1 || true' EXIT
+          # x runs a command on the system under test: the container, or the runner VM itself (3D-2c §5)
+          x() { if [ "$KIND" = host ]; then sudo "$@"; else docker exec "$cid" "$@"; fi; }
+          if [ "$KIND" = host ]; then M=./bin/muster; S=ci/roundtrip; else M=/m/muster; S=/ci; fi
+          out() { if [ "$KIND" = host ]; then printf '%s' "$1"; else printf /out; fi; } # out <dir>: <dir> as the system under test sees it
+          seed() { x sh "$S/${{ matrix.key }}.sh"; }
+          plan() { # plan <dir>: collect, then the JSON plan and the script into <dir>
+            x "$M" collect --out "$(out "$1")/before.json" || true
+            sudo chown "$(id -u)" "$1/before.json"
+            ./bin/muster fix --dry-run --facts "$1/before.json" --format json > "$1/plan.json"
+            ./bin/muster fix --dry-run --facts "$1/before.json" --format script > "$1/fix.sh"
+            test -s "$1/plan.json"; test -s "$1/fix.sh"
           }
-          plan "$c1" "$d/repair"
+          runfix() { # runfix <dir> <script>: run <dir>/<script> with that run's own backup directory
+            x env MUSTER_BACKUP="/var/backups/muster/ci-$(basename "$1")" sh "$(out "$1")/$2"
+          }
+          if [ "$KIND" = container ]; then
+            c1=$(start "$d/repair"); cid=$c1
+            [ "${{ matrix.init }}" = "true" ] && sh ci/roundtrip/wait.sh "$c1" "${{ matrix.key }}"
+          fi
+          seed
+          plan "$d/repair"
           for id in ${{ matrix.seeded }}; do
             jq -e --arg id "$id" '[.items[] | select(.id == $id and .planned and .script)] | length == 1' "$d/repair/plan.json" > /dev/null \
               || { echo "seeded $id is not a planned scripted item"; jq '.items[] | {id, planned, script, text_only_reason}' "$d/repair/plan.json"; exit 1; }
           done
-          docker exec "$c1" sh /out/fix.sh
-          docker exec "$c1" /m/muster collect --out /out/after.json || true
+          runfix "$d/repair" fix.sh
+          x "$M" collect --out "$(out "$d/repair")/after.json" || true
           sudo chown "$(id -u)" "$d/repair/after.json"
           set +e; ./bin/muster check --facts "$d/repair/after.json" --format json > "$d/repair/after-report.json"; set -e
           for id in ${{ matrix.seeded }}; do
             jq -e --arg id "$id" '[.results[] | select(.id == $id and (.status == "PASS" or .status == "NOT_APPLICABLE"))] | length == 1' "$d/repair/after-report.json" > /dev/null \
               || { echo "$id did not pass after the script"; jq --arg id "$id" '.results[] | select(.id == $id)' "$d/repair/after-report.json"; exit 1; }
           done
-          [ "${{ matrix.init }}" = "true" ] || exit 0
-          # failure and guard runs (3D-2b §4)
-          c2=$(start "$d/fail"); sh ci/roundtrip/wait.sh "$c2" "${{ matrix.key }}"
-          docker exec "$c2" sh /ci/${{ matrix.key }}.sh
-          plan "$c2" "$d/fail"
+          [ "$KIND" = host ] || [ "${{ matrix.init }}" = "true" ] || exit 0
+          # failure and guard runs (3D-2b §4); the host row re-seeds the same VM and has no guard run (3D-2c §5)
+          if [ "$KIND" = container ]; then
+            c2=$(start "$d/fail"); cid=$c2; sh ci/roundtrip/wait.sh "$c2" "${{ matrix.key }}"
+          fi
+          seed
+          plan "$d/fail"
           h1=$(jq -r .run.host.machine_id_hash "$d/repair/plan.json"); h2=$(jq -r .run.host.machine_id_hash "$d/fail/plan.json")
           g1=$(jq -r .fix.host_guard "$d/repair/plan.json"); g2=$(jq -r .fix.host_guard "$d/fail/plan.json")
-          [ "$g1" = on ] && [ "$g2" = on ] && [ -n "$h1" ] && [ "$h1" != "$h2" ] \
-            || { echo "${{ matrix.key }}: the two containers need distinct machine ids (guard $g1/$g2, hash $h1/$h2)"; exit 1; }
-          record() { # record <cid>: unit states and backup-path stats/checksums/ACLs of the planned scripted items
+          if [ "$KIND" = container ]; then
+            [ "$g1" = on ] && [ "$g2" = on ] && [ -n "$h1" ] && [ "$h1" != "$h2" ] \
+              || { echo "${{ matrix.key }}: the two containers need distinct machine ids (guard $g1/$g2, hash $h1/$h2)"; exit 1; }
+          else
+            [ "$g1" = on ] && [ "$g2" = on ] && [ -n "$h1" ] && [ "$h1" = "$h2" ] \
+              || { echo "runner: the guard must be on and the machine id stable (guard $g1/$g2, hash $h1/$h2)"; exit 1; }
+            ids() { jq -r '[.items[] | select(.planned and .script) | .id] | sort | .[]' "$1"; }
+            for id in ${{ matrix.seeded }}; do
+              ids "$d/fail/plan.json" | grep -qx "$id" || { echo "runner: seeded $id is not a scripted item of the failure plan"; exit 1; }
+            done
+            extra=$(comm -13 <(ids "$d/repair/plan.json") <(ids "$d/fail/plan.json"))
+            [ -z "$extra" ] || { echo "runner: the failure plan scripts ids the repair plan did not: $extra"; exit 1; }
+          fi
+          sed -n '/^modes_paths() {/,/^}/p' "$d/fail/fix.sh" > "$d/fail/modes_paths.sh"
+          record() { # unit states; backup-path stats, checksums and ACLs; sysctl values; module load states; modes-entry stats
             jq -r '.items[] | select(.planned and .script) | .units[]' "$d/fail/plan.json" | sort -u > "$d/fail/units"
             : > "$d/fail/deps"
-            while read -r u; do docker exec "$1" systemctl show -p RequiredBy -p BoundBy -p ConsistsOf --value -- "$u" | tr ' ' '\n' >> "$d/fail/deps" || :; done < "$d/fail/units"
+            while read -r u; do x systemctl show -p RequiredBy -p BoundBy -p ConsistsOf --value -- "$u" < /dev/null | tr ' ' '\n' >> "$d/fail/deps" || :; done < "$d/fail/units"
             sort -u "$d/fail/units" "$d/fail/deps" | sed '/^$/d' | while read -r u; do
-              printf '%s %s %s\n' "$u" "$(docker exec "$1" systemctl is-enabled -- "$u" 2>/dev/null || :)" "$(docker exec "$1" systemctl is-active -- "$u" 2>/dev/null || :)"
+              printf '%s %s %s\n' "$u" "$(x systemctl is-enabled -- "$u" < /dev/null 2>/dev/null || :)" "$(x systemctl is-active -- "$u" < /dev/null 2>/dev/null || :)"
             done
             jq -r '.items[] | select(.planned and .script) | .backup[]' "$d/fail/plan.json" | sort -u | while read -r p; do
-              docker exec "$1" sh -c 'p=$1; if [ -e "$p" ] || [ -L "$p" ]; then printf "%s %s %s\n" "$p" "$(stat -c "%u %g %a" "$p")" "$(sha256sum < "$p" | cut -d" " -f1)"; if command -v getfacl >/dev/null; then getfacl -cp "$p" 2>/dev/null || :; fi; else printf "%s absent\n" "$p"; fi' _ "$p"
+              x sh -c 'p=$1; if [ -e "$p" ] || [ -L "$p" ]; then printf "%s %s %s\n" "$p" "$(stat -c "%u %g %a" "$p")" "$(sha256sum < "$p" | cut -d" " -f1)"; if command -v getfacl >/dev/null; then getfacl -cp "$p" 2>/dev/null || :; fi; else printf "%s absent\n" "$p"; fi' _ "$p" < /dev/null
+            done
+            jq -r '.items[] | select(.planned and .script) | .sysctl[]' "$d/fail/plan.json" | sort -u | while read -r k; do
+              printf 'sysctl %s %s\n' "$k" "$(x sysctl -n -- "$k" < /dev/null 2>/dev/null || echo absent)"
+            done
+            jq -r '.items[] | select(.planned and .script) | .modules[]' "$d/fail/plan.json" | sort -u | while read -r m; do
+              n=$(printf '%s' "$m" | tr - _)
+              if x grep -q "^$n " /proc/modules < /dev/null; then printf 'module %s loaded\n' "$n"; else printf 'module %s not-loaded\n' "$n"; fi
+            done
+            jq -r '.items[] | select(.planned and .script) | .modes[]' "$d/fail/plan.json" | sort -u | while IFS= read -r e; do
+              x sh -c '. "$1"; modes_paths "$2" | while IFS= read -r p; do printf "mode %s %s\n" "$p" "$(stat -c "%u %g %a" -- "$p")"; done' _ "$(out "$d/fail")/modes_paths.sh" "$e" < /dev/null
+            done | sort -u
+            if jq -e '[.items[] | select(.planned and .script and .id == "muster.account.password_policy")] | length == 1' "$d/fail/plan.json" > /dev/null; then
+              x awk -F: 'NF >= 8 && $1 !~ /^#/ && $1 != "" { print "ageing", $1, $4, $5 }' /etc/shadow < /dev/null
+            fi
+          }
+          same() { # same <before> <after>: equal records, except that a modes-entry path gone since (a rotated log) is no difference
+            diff <(grep -v '^mode ' "$1") <(grep -v '^mode ' "$2")
+            grep '^mode ' "$1" | while read -r _ p rest; do
+              a=$(grep -F "mode $p " "$2" || :)
+              [ -z "$a" ] || [ "$a" = "mode $p $rest" ] || { echo "mode of $p: before $rest, after ${a#mode "$p" }"; exit 1; }
             done
           }
-          record "$c2" > "$d/fail/record-before"
-          cp "$d/repair/fix.sh" "$d/fail/repair-fix.sh"
-          set +e; docker exec "$c2" sh /out/repair-fix.sh > "$d/fail/guard.out" 2>&1; gc=$?; set -e
-          [ "$gc" -eq 2 ] && grep -qx 'muster-fix: planned for another host (machine id differs); set MUSTER_ANY_HOST=1 to run it anyway' "$d/fail/guard.out" \
-            || { echo "guard run: exit $gc"; cat "$d/fail/guard.out"; exit 1; }
-          record "$c2" > "$d/fail/record-guard"; diff "$d/fail/record-before" "$d/fail/record-guard"
+          record > "$d/fail/record-before"
+          if [ "$KIND" = container ]; then
+            cp "$d/repair/fix.sh" "$d/fail/repair-fix.sh"
+            set +e; runfix "$d/fail" repair-fix.sh > "$d/fail/guard.out" 2>&1; gc=$?; set -e
+            [ "$gc" -eq 2 ] && grep -qx 'muster-fix: planned for another host (machine id differs); set MUSTER_ANY_HOST=1 to run it anyway' "$d/fail/guard.out" \
+              || { echo "guard run: exit $gc"; cat "$d/fail/guard.out"; exit 1; }
+            record > "$d/fail/record-guard"; same "$d/fail/record-before" "$d/fail/record-guard"
+          fi
           awk 'prev == "  # validate" { print; getline; print "    false"; prev = ""; next } { print; prev = $0 }' "$d/fail/fix.sh" > "$d/fail/broken.sh"
           blocks=$(jq '[.items[] | select(.planned and .script)] | length' "$d/fail/plan.json")
           changed=$(diff "$d/fail/fix.sh" "$d/fail/broken.sh" | grep -c '^>' || :)
           [ "$changed" -eq "$blocks" ] || { echo "rewrite changed $changed lines for $blocks blocks"; exit 1; }
-          set +e; docker exec "$c2" sh /out/broken.sh > "$d/fail/broken.out" 2>&1; bc=$?; set -e
+          set +e; runfix "$d/fail" broken.sh > "$d/fail/broken.out" 2>&1; bc=$?; set -e
           cat "$d/fail/broken.out"
           [ "$bc" -eq 1 ] || { echo "failure run: exit $bc, want 1"; exit 1; }
           [ "$(grep -c 'validate failed, rolling back' "$d/fail/broken.out")" -eq "$blocks" ] || { echo "not every block rolled back"; exit 1; }
           ! grep -qE 'ROLLBACK INCOMPLETE|not restored|rollback failed' "$d/fail/broken.out" || { echo "a rollback was incomplete"; exit 1; }
-          record "$c2" > "$d/fail/record-after"
-          diff "$d/fail/record-before" "$d/fail/record-after"
+          record > "$d/fail/record-after"
+          same "$d/fail/record-before" "$d/fail/record-after"
 
   collect-contract:
     runs-on: ubuntu-24.04
