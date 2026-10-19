@@ -696,15 +696,28 @@ jobs:
               x sh -c '. "$1"; modes_paths "$2" | while IFS= read -r p; do printf "mode %s %s\n" "$p" "$(stat -c "%u %g %a" -- "$p")"; done' _ "$(out "$d/fail")/modes_paths.sh" "$e" < /dev/null
             done | sort -u
             if jq -e '[.items[] | select(.planned and .script and (.id == "muster.beyond.audit_rules_loaded" or .id == "muster.beyond.auditd_active" or .id == "muster.beyond.audit_disk_actions"))] | length > 0' "$d/fail/plan.json" > /dev/null; then
-              x sh -c 'LC_ALL=C auditctl -l' < /dev/null | sed 's/^/auditrule /'
-              x sh -c 'LC_ALL=C auditctl -s' < /dev/null | awk '$1 == "enabled" || $1 == "failure" || $1 == "backlog_limit" || $1 == "backlog_wait_time" || $1 == "rate_limit" || $1 == "loginuid_immutable" { print "audit", $1, $2 }'
+              # each producer is captured first, so a failed tool (or sudo, or docker exec) fails the step
+              # instead of leaving an empty record on both sides of a diff (O-84)
+              al=$(x sh -c 'LC_ALL=C auditctl -l' < /dev/null) || { echo "record: auditctl -l failed" >&2; exit 1; }
+              [ -n "$al" ] || { echo "record: auditctl -l printed nothing" >&2; exit 1; }
+              as=$(x sh -c 'LC_ALL=C auditctl -s' < /dev/null) || { echo "record: auditctl -s failed" >&2; exit 1; }
+              as=$(printf '%s\n' "$as" | awk '$1 == "enabled" || $1 == "failure" || $1 == "backlog_limit" || $1 == "backlog_wait_time" || $1 == "rate_limit" || $1 == "loginuid_immutable" { print "audit", $1, $2 }')
+              printf '%s\n' "$as" | grep -q '^audit enabled ' || { echo "record: auditctl -s printed no enabled line" >&2; exit 1; }
+              printf '%s\n' "$al" | sed 's/^/auditrule /'
+              printf '%s\n' "$as"
             fi
             if jq -e '[.items[] | select(.planned and .script and (.id == "muster.account.password_policy" or .id == "muster.beyond.account_inactivity_lock"))] | length > 0' "$d/fail/plan.json" > /dev/null; then
-              x awk -F: 'NF >= 8 && $1 !~ /^#/ && $1 != "" { print "ageing", $1, $4, $5, $7 }' /etc/shadow < /dev/null
-              printf 'shadow-rest %s\n' "$(x awk -F: 'BEGIN { OFS = ":" } NF >= 8 { $4 = ""; $5 = ""; $7 = "" } { print }' /etc/shadow < /dev/null | sha256sum | cut -d' ' -f1)"
+              ag=$(x awk -F: 'NF >= 8 && $1 !~ /^#/ && $1 != "" { print "ageing", $1, $4, $5, $7 }' /etc/shadow < /dev/null) || { echo "record: reading the ageing fields of /etc/shadow failed" >&2; exit 1; }
+              printf '%s\n' "$ag" | grep -q '^ageing ' || { echo "record: /etc/shadow gave no ageing line" >&2; exit 1; }
+              sr=$(x awk -F: 'BEGIN { OFS = ":" } NF >= 8 { $4 = ""; $5 = ""; $7 = "" } { print }' /etc/shadow < /dev/null) || { echo "record: reading the rest of /etc/shadow failed" >&2; exit 1; }
+              printf '%s\n' "$ag"
+              printf 'shadow-rest %s\n' "$(printf '%s\n' "$sr" | sha256sum | cut -d' ' -f1)"
             fi
             if jq -e '[.items[] | select(.planned and .script and (.id == "muster.service.nfs_export_access"))] | length > 0' "$d/fail/plan.json" > /dev/null; then
-              x exportfs -s < /dev/null | LC_ALL=C sort | sed 's/^/export /'
+              ex=$(x exportfs -s < /dev/null) || { echo "record: exportfs -s failed" >&2; exit 1; }
+              ex=$(printf '%s\n' "$ex" | LC_ALL=C sort | sed '/^$/d; s/^/export /')
+              printf '%s\n' "$ex" | grep -q '^export ' || { echo "record: exportfs -s printed no export" >&2; exit 1; }
+              printf '%s\n' "$ex"
             fi
             if jq -e '[.items[] | select(.planned and .script and (.id == "muster.service.ftp_banner" or .id == "muster.service.ftp_anonymous"))] | length > 0' "$d/fail/plan.json" > /dev/null; then
               printf 'vsftpd %s\n' "$(x systemctl is-active vsftpd.service < /dev/null 2>/dev/null || :)"
