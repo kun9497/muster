@@ -23,19 +23,25 @@ func TestFileValidatesAcceptTheDefaultModes(t *testing.T) {
 		"muster.file.services_permissions":  {"%u %g %a", "0 0"},
 		"muster.file.shadow_permissions":    {"%u %a", "0"},
 	}
-	shipped := map[string]bool{}
-	for i := range set.Controls {
-		c := &set.Controls[i]
-		if c.Category == "file" && c.Remediation != nil && strings.TrimSpace(c.Remediation.Script) != "" {
-			shipped[c.ID] = true
+	// S-8: the owner table is the set; every other shipped scripted control
+	// must not validate with a bare stat case, so a new one is added here.
+	for id := range owners {
+		c, ok := set.ByID(id)
+		if !ok || c.Remediation == nil || strings.TrimSpace(c.Remediation.Script) == "" {
+			t.Fatalf("%s: not a shipped scripted control", id)
 		}
 	}
-	if len(shipped) != 5 || len(owners) != 5 {
-		t.Fatalf("scripted file controls %v, want exactly the five of the owner table", shipped)
-	}
-	for id := range shipped {
-		if _, ok := owners[id]; !ok {
-			t.Errorf("%s: scripted file control missing from the owner table", id)
+	for _, c := range set.Controls {
+		r := c.Remediation
+		if r == nil || strings.TrimSpace(r.Script) == "" || owners[c.ID] != [2]string{} {
+			continue
+		}
+		// S-23: only a validate that is one stat case and nothing else;
+		// sudoers and audit_log validate a case plus a find.
+		v := strings.TrimSpace(r.Validate)
+		if strings.HasPrefix(v, `case "$(stat -c `) && strings.HasSuffix(v, "esac") &&
+			strings.Count(v, "esac") == 1 && !strings.Contains(v, " && ") && !strings.Contains(v, " || ") {
+			t.Errorf("%s validates with a bare stat case: add it to the owner table", c.ID)
 		}
 	}
 	for id, o := range owners {
@@ -59,6 +65,28 @@ func TestFileValidatesAcceptTheDefaultModes(t *testing.T) {
 		want := `case "$(stat -c '` + o[0] + `' ` + c.Remediation.Backup[0] + `)" in ` + strings.Join(pats, "|") + ") ;; *) false;; esac"
 		if got := strings.TrimSuffix(c.Remediation.Validate, "\n"); got != want {
 			t.Errorf("%s:\n got %s\nwant %s", id, got, want)
+		}
+	}
+}
+
+// E-9: a validate's find mask over an allowed_modes set is 07777 minus the
+// largest default mode, so a bit the clause forbids is never missed.
+func TestFileValidateMasksDeriveFromTheDefaultModes(t *testing.T) {
+	set, err := controls.LoadDefault()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{"muster.file.syslog_conf_permissions", "muster.account.cron_permissions"} {
+		c, _ := set.ByID(id)
+		max := int64(0)
+		for _, m := range c.Params["allowed_modes"].Default.([]any) {
+			if v := int64(toInt(t, m)); v > max {
+				max = v
+			}
+		}
+		mask := "-perm /" + strconv.FormatInt(0o7777&^max, 8)
+		if c.Remediation == nil || !strings.Contains(c.Remediation.Validate, mask) {
+			t.Errorf("%s: validate lacks %q (largest allowed mode %o)", id, mask, max)
 		}
 	}
 }

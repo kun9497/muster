@@ -14,7 +14,20 @@ absent_means: fail
 checks:
   - { fact: coredump.suid_dumpable, op: eq, expected: 0 }
 remediation:
-  text_en: Write fs.suid_dumpable = 0 into a file under /etc/sysctl.d, for example /etc/sysctl.d/60-kernel-hardening.conf, and apply it with sysctl --system; it takes effect at once and needs no reboot. A crash-reporting tool that collects dumps from setuid programs stops receiving them, which is the intent.
-  text_ko: /etc/sysctl.d 아래 파일(예 /etc/sysctl.d/60-kernel-hardening.conf)에 fs.suid_dumpable = 0 을 적고 sysctl --system 으로 적용합니다. 즉시 반영되며 재부팅이 필요 없습니다. setuid 프로그램의 덤프를 수집하던 크래시 리포트 도구는 더 이상 그것을 받지 못하는데, 그것이 이 설정의 의도입니다.
+  text_en: Write fs.suid_dumpable = 0 into /etc/sysctl.d/99-muster-suid-dumpable-disabled.conf and apply it with sysctl --system; it takes effect at once and needs no reboot. A crash-reporting tool that collects dumps from setuid programs stops receiving them, which is the intent. A value set in /etc/sysctl.conf, or in a sysctl.d file that sorts after 99-muster-suid-dumpable-disabled.conf, still wins at boot; correct it there. On an Ubuntu host running apport, apport writes 2 to fs.suid_dumpable each time it starts, so the value returns at boot; disable apport or the fix does not last. The review script never follows a symlink; a 99-muster-suid-dumpable-disabled.conf that is a symlink (a mask) is left as is and the block stops.
+  text_ko: /etc/sysctl.d/99-muster-suid-dumpable-disabled.conf 에 fs.suid_dumpable = 0 을 적고 sysctl --system 으로 적용합니다. 즉시 반영되며 재부팅이 필요 없습니다. setuid 프로그램의 덤프를 수집하던 크래시 리포트 도구는 더 이상 그것을 받지 못하는데, 그것이 이 설정의 의도입니다. /etc/sysctl.conf나 99-muster-suid-dumpable-disabled.conf 뒤에 정렬되는 sysctl.d 파일에 둔 값이 부팅 때 여전히 이기므로 그 파일을 고치십시오. apport 가 실행되는 Ubuntu 호스트에서는 apport 가 시작할 때마다 fs.suid_dumpable 에 2 를 쓰므로 부팅 때 값이 되돌아옵니다. apport 를 끄지 않으면 이 수정은 유지되지 않습니다. 검토 스크립트는 심볼릭 링크를 따라가지 않으므로, 심볼릭 링크(마스크)인 99-muster-suid-dumpable-disabled.conf 는 그대로 두고 그 블록을 멈춥니다.
   risk: none
   idempotent: true
+  sysctl: [fs.suid_dumpable]
+  backup: [/etc/sysctl.d/99-muster-suid-dumpable-disabled.conf]
+  script: |
+    f=/etc/sysctl.d/99-muster-suid-dumpable-disabled.conf
+    if [ -L "$f" ]; then log "muster.beyond.suid_dumpable_disabled: $f is a symlink (a mask), left as is"; exit 1; fi
+    put() {
+      sysctl -q -w "$1=$2"
+      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else printf '%s = %s\n' "$1" "$2" >> "$f"; fi
+    }
+    case "$(sysctl -n fs.suid_dumpable)" in 0) ;; *) put fs.suid_dumpable 0;; esac
+    if [ -f "$f" ] && [ ! -L "$f" ]; then chmod 644 "$f"; fi
+  validate: |
+    case "$(sysctl -n fs.suid_dumpable)" in 0) ;; *) false;; esac

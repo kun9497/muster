@@ -24,8 +24,18 @@ checks:
   - { fact: ftp.access_files, op: each, subject: path, where: { field: exists, op: eq, expected: true }, require: { field: uid, op: eq, expected: 0 } }
   - { fact: ftp.access_files, op: each, subject: path, where: { field: exists, op: eq, expected: true }, require: { field: mode, op: in, expected: "${allowed_modes}" } }
 remediation:
-  text_en: Create the access-control file the daemon names if it does not exist, then chown root:root and chmod 640 each of /etc/ftpusers, the pam_listfile list and vsftpd's userlist_file.
-  text_ko: 데몬이 지정한 접근 제어 파일이 없으면 만든 뒤, /etc/ftpusers 와 pam_listfile 목록, vsftpd 의 userlist_file 각각에 chown root:root 와 chmod 640 을 적용합니다.
+  text_en: Create the access-control file the daemon names if it does not exist, then chown root:root and chmod 640 each of /etc/ftpusers, the pam_listfile list and vsftpd's userlist_file. The review script changes the owner and mode of those of /etc/ftpusers, /etc/vsftpd/ftpusers, /etc/vsftpd/user_list, /etc/vsftpd.user_list and /etc/vsftpd.ftpusers that exist and never creates a file; a list that vsftpd's userlist_file or a pam_listfile file= names elsewhere is yours to fix. The review script never follows a symlink.
+  text_ko: 데몬이 지정한 접근 제어 파일이 없으면 만든 뒤, /etc/ftpusers 와 pam_listfile 목록, vsftpd 의 userlist_file 각각에 chown root:root 와 chmod 640 을 적용합니다. 검토 스크립트는 /etc/ftpusers, /etc/vsftpd/ftpusers, /etc/vsftpd/user_list, /etc/vsftpd.user_list, /etc/vsftpd.ftpusers 중 존재하는 파일의 소유자와 mode 만 바꾸며 파일을 만들지 않습니다. vsftpd 의 userlist_file 이나 pam_listfile 의 file= 이 다른 곳을 가리키는 목록은 운영자가 고쳐야 합니다. 검토 스크립트는 심볼릭 링크를 따라가지 않습니다.
   risk: none
   idempotent: true
+  backup: [/etc/ftpusers, /etc/vsftpd/ftpusers, /etc/vsftpd/user_list, /etc/vsftpd.user_list, /etc/vsftpd.ftpusers]
+  script: |
+    for p in /etc/ftpusers /etc/vsftpd/ftpusers /etc/vsftpd/user_list /etc/vsftpd.user_list /etc/vsftpd.ftpusers; do
+      if [ -f "$p" ] && [ ! -L "$p" ]; then
+        chown root "$p"
+        chmod u-xs,g-wxs,o-rwxt "$p"
+      fi
+    done
+  validate: |
+    for p in /etc/ftpusers /etc/vsftpd/ftpusers /etc/vsftpd/user_list /etc/vsftpd.user_list /etc/vsftpd.ftpusers; do [ ! -f "$p" ] || [ -L "$p" ] || case "$(stat -c '%u %a' "$p")" in '0 0'|'0 40'|'0 200'|'0 240'|'0 400'|'0 440'|'0 600'|'0 640') ;; *) exit 1;; esac; done
 decision: D09

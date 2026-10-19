@@ -62,6 +62,8 @@ func fullPlan(t *testing.T) *Plan {
 		row("muster.test.b_restart", "FAIL", "clause does not hold", "", "medium"),
 		row("muster.test.c_lockout", "FAIL", "clause does not hold", "", "high"),
 		row("muster.test.g_units", "FAIL", "clause does not hold", "", "medium"),
+		row("muster.test.h_params", "FAIL", "clause does not hold", "", "medium"),
+		row("muster.test.i_state", "FAIL", "clause does not hold", "", "medium"),
 		row("muster.test.d_reboot", "FAIL", "clause does not hold", "", "high"),
 		row("muster.test.e_param", "FAIL", "mode 777", "", "high"),
 		partial,
@@ -134,6 +136,19 @@ remediation:
   risk: none
   idempotent: true
 `,
+	"muster.test.p_params": `automation: auto
+params:
+  bad: { type: string, default: ok, description: d }
+remediation:
+  text_en: fix p
+  text_ko: 조치 p
+  risk: none
+  idempotent: true
+  script_params: [bad]
+  script: printf '%s\n' "$P_bad" > /etc/p.conf
+  backup: [/etc/p.conf]
+  validate: "true"
+`,
 }
 
 // poisonHash is 64 characters but not 64 hex: Build must leave the guard off.
@@ -159,7 +174,7 @@ func setFrom(t *testing.T, ctl map[string]string) *controls.Set {
 
 func poisonPlan(t *testing.T) *Plan {
 	var rows []report.Row
-	for _, id := range []string{"muster.test.p_script", "muster.test.p_text"} {
+	for _, id := range []string{"muster.test.p_script", "muster.test.p_text", "muster.test.p_params"} {
 		r := row(id, "FAIL", "value "+poison+string(spelledSample), "", "high")
 		r.TitleEn, r.TitleKo = "title "+poison, "제목 "+poison
 		rows = append(rows, r)
@@ -175,12 +190,17 @@ func poisonPlan(t *testing.T) *Plan {
 	rep.Check.ControlsVersion, rep.Check.ControlsDigest = "v"+poison, "d"+poison
 	rep.Check.Profile.Name, rep.Check.Profile.Digest = "p"+poison, "pd"+poison
 	rep.Run.Host.MachineIDHash = poisonHash
+	// S-20: its own sentinel, which poisonHash does not contain.
+	rep.Check.Params = map[string]map[string]any{"muster.test.p_params": {"bad": "'; uname -a; '"}}
 	p := mustBuild(t, rep, setFrom(t, poisonControls), Options{})
 	if p.Fix.HostGuard != "off" {
 		t.Fatalf("a malformed machine-id hash set the guard %q, want off", p.Fix.HostGuard)
 	}
-	if len(p.Items) != 2 || !strings.ContainsRune(p.Items[0].TextEn+p.Items[1].TextEn, 0x1b) {
+	if len(p.Items) != 3 || !strings.ContainsRune(p.Items[0].TextEn+p.Items[1].TextEn+p.Items[2].TextEn, 0x1b) {
 		t.Fatal("poison controls carry no ESC: the fixture is not poisoned")
+	}
+	if it := itemByID(t, p, "muster.test.p_params"); it.Script || it.TextOnlyReason != "params_unsafe" {
+		t.Fatalf("p_params: script %v, reason %q; want text only, params_unsafe", it.Script, it.TextOnlyReason)
 	}
 	if len(p.NotPlanned) != 2 {
 		t.Fatalf("poison not-planned rows = %d, want 2 (error, warn_degraded)", len(p.NotPlanned))
@@ -261,8 +281,8 @@ func TestScriptBlocksAreIndependent(t *testing.T) {
 			t.Errorf("%s: %d definitions, %d bare calls; want 1 and 1", fn, defs, calls)
 		}
 	}
-	if scripted != 4 {
-		t.Fatalf("full plan has %d planned scripted items, want 4", scripted)
+	if scripted != 6 {
+		t.Fatalf("full plan has %d planned scripted items, want 6", scripted)
 	}
 	for _, l := range ls {
 		if strings.HasPrefix(l, "fix_") {
@@ -347,6 +367,30 @@ func templateLines(p *Plan) map[string]bool {
 			ok["    UNITS='"+us+"'"] = true
 			ok["    restore_units "+us+` || log "`+id+`: ROLLBACK INCOMPLETE, backups in $MUSTER_BACKUP"`] = true
 		}
+		stop := ` || { log "` + id + `: backup failed, nothing changed"; return 1; }`
+		incomplete := ` || log "` + id + `: ROLLBACK INCOMPLETE, backups in $MUSTER_BACKUP"`
+		ok[`  MB="$MUSTER_BACKUP/blocks/`+fn+`"; mkdir -p "$MB"`+stop] = true
+		for _, pv := range it.ScriptParams {
+			ok["  P_"+pv.Name+"='"+pv.Value+"'"] = true
+		}
+		if len(it.Modes) > 0 {
+			q := make([]string, len(it.Modes))
+			for i, e := range it.Modes {
+				q[i] = "'" + e + "'"
+			}
+			ok["  save_modes "+strings.Join(q, " ")+stop] = true
+			ok["    restore_modes"+incomplete] = true
+		}
+		if len(it.Sysctl) > 0 {
+			ks := strings.Join(it.Sysctl, " ")
+			ok["  save_sysctl "+ks+stop] = true
+			ok["    restore_sysctl "+ks+incomplete] = true
+		}
+		if len(it.Modules) > 0 {
+			ms := strings.Join(it.Modules, " ")
+			ok["  save_modules "+ms+stop] = true
+			ok["    restore_modules "+ms+incomplete] = true
+		}
 		if it.Validate {
 			ok["  # validate"] = true
 		}
@@ -403,6 +447,9 @@ func TestScriptEveryLineIsTemplateBodyOrComment(t *testing.T) {
 			}
 			if strings.Contains(l, poisonHash) {
 				t.Errorf("%s line %d carries the malformed hash: %q", g.name, i+1, l)
+			}
+			if strings.Contains(l, "'; uname -a; '") { // the p_params sentinel, not a prefix of poisonHash (S-20)
+				t.Errorf("%s line %d carries the unsafe parameter value: %q", g.name, i+1, l)
 			}
 		}
 	}
@@ -491,7 +538,9 @@ func TestScriptGuardOffWithoutAHash(t *testing.T) {
 
 func TestScriptPrologueOrder(t *testing.T) {
 	s := string(Script(fullPlan(t)))
-	order := []string{"set -u\n", "umask 077\n", "log() {", "muster_machine_id_hash() {", rootCheckLine, "MUSTER_SNAPSHOT_HOST=", `MUSTER_BACKUP="${MUSTER_BACKUP:-`, `mkdir -p "$MUSTER_BACKUP" || exit 2`, backupOwnerLine, "backup() {", "restore() {", "save_units() {", "restore_units() {", "failed=0\n"}
+	order := []string{"set -u\n", "umask 077\n", "log() {", "muster_machine_id_hash() {", rootCheckLine, "MUSTER_SNAPSHOT_HOST=", `MUSTER_BACKUP="${MUSTER_BACKUP:-`, `mkdir -p "$MUSTER_BACKUP" || exit 2`, backupOwnerLine, "backup() {", "restore() {", "save_units() {", "restore_units() {",
+		"modes_paths() {", "modes_type() {", "save_modes() {", "restore_modes() {", "modes_trusted() {",
+		"save_sysctl() {", "restore_sysctl() {", "save_modules() {", "restore_modules() {", "failed=0\n"}
 	at := 0
 	for _, o := range order {
 		i := strings.Index(s[at:], o)
@@ -538,9 +587,22 @@ func TestScriptUnitsBlockOrder(t *testing.T) {
 }
 
 func TestScriptAllScriptedCoversTheShippedSet(t *testing.T) {
+	set, err := controls.LoadDefault()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := 0
+	for _, c := range set.Controls {
+		if c.Remediation != nil && strings.TrimSpace(c.Remediation.Script) != "" {
+			want++
+		}
+	}
+	if want < 16 {
+		t.Fatalf("%d shipped controls declare a script, want at least 16", want)
+	}
 	p := allScriptedPlan(t)
-	if len(p.Items) != 16 || p.Summary.WithScript != 16 {
-		t.Fatalf("all-scripted plan: %d items, %d with script; want 16 and 16", len(p.Items), p.Summary.WithScript)
+	if len(p.Items) != want || p.Summary.WithScript != want {
+		t.Fatalf("all-scripted plan: %d items, %d with script; want %d and %d", len(p.Items), p.Summary.WithScript, want, want)
 	}
 	defs := 0
 	for _, l := range lines(Script(p)) {
@@ -548,8 +610,8 @@ func TestScriptAllScriptedCoversTheShippedSet(t *testing.T) {
 			defs++
 		}
 	}
-	if defs != 16 {
-		t.Fatalf("all-scripted.sh defines %d functions, want 16", defs)
+	if defs != want {
+		t.Fatalf("all-scripted.sh defines %d functions, want %d", defs, want)
 	}
 }
 
@@ -661,9 +723,10 @@ func exists(path string) bool {
 }
 
 // I-1(a): a backup that cannot be made stops the block before its body. The
-// first declared path cannot be copied (its backup directory is a regular
-// file); the second can, so a backup() that went on past the first failure
-// would return 0 and the body would run.
+// first declared path cannot be copied: its backup directory
+// $MB/files<tmp>/a is a regular file, so mkdir -p fails (S-45); the second
+// can, so a backup() that went on past the first failure would return 0 and
+// the body would run.
 func TestScriptBackupFailureStopsTheBlock(t *testing.T) {
 	needSh(t)
 	tmp := t.TempDir()
@@ -679,10 +742,10 @@ func TestScriptBackupFailureStopsTheBlock(t *testing.T) {
 		}
 	}
 	bk := filepath.Join(tmp, "bk")
-	if err := os.MkdirAll(bk+tmp, 0o700); err != nil {
+	if err := os.MkdirAll(filepath.Join(bk, "blocks", "fix_muster_test_backup_fails", "files"+tmp), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(bk+filepath.Join(tmp, "a"), []byte("not a directory"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(bk, "blocks", "fix_muster_test_backup_fails", "files"+tmp, "a"), []byte("not a directory"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	marker := filepath.Join(tmp, "ran")
@@ -934,5 +997,33 @@ func TestScriptReusedBackupKeepsTheFirstCopy(t *testing.T) {
 	}
 	if !strings.Contains(out, "backup exists, keeping the first") {
 		t.Errorf("second run did not say it kept the first copy:\n%s", out)
+	}
+}
+
+// 3D-2c §3: the block head records in a fixed order and the failure path
+// undoes them in its own (rollback, modes, files, sysctl, modules).
+func TestScriptFailurePathOrder(t *testing.T) {
+	it := Item{ID: "muster.test.order", Status: "fail", Severity: "high", Risk: "none", Planned: true, Script: true,
+		ScriptBody: "true", Validate: true, ValidateCmd: "true", RollbackBody: "true", Rollback: "both",
+		Backup: []string{"/etc/o.conf"}, Modes: []string{"/etc/o.d/*"}, Sysctl: []string{"kernel.o"}, Modules: []string{"o"},
+		ScriptParams: []ParamValue{}}
+	text := strings.Join(block(1, 1, it, "lockout_risk"), "\n")
+	branch := text[strings.Index(text, `log "muster.test.order: validate failed, rolling back"`):]
+	last := -1
+	for _, step := range []string{"    ( set -e", "    restore_modes ||", "    restore /etc/o.conf ||", "    restore_sysctl kernel.o ||", "    restore_modules o ||"} {
+		i := strings.Index(branch, step)
+		if i <= last {
+			t.Fatalf("%q out of order in the failure path:\n%s", step, branch)
+		}
+		last = i
+	}
+	head := text[:strings.Index(text, "  ( set -e")]
+	last = -1
+	for _, step := range []string{`  MB="$MUSTER_BACKUP/blocks/fix_muster_test_order"; mkdir -p "$MB" ||`, "  backup /etc/o.conf ||", "  save_modes '/etc/o.d/*' ||", "  save_sysctl kernel.o ||", "  save_modules o ||"} {
+		i := strings.Index(head, step)
+		if i <= last {
+			t.Fatalf("%q out of order in the block head:\n%s", step, head)
+		}
+		last = i
 	}
 }

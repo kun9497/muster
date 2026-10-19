@@ -51,4 +51,12 @@ remediation:
   text_ko: /etc/exports 의 와일드카드 클라이언트를 공유가 필요한 호스트나 네트워크로 바꾸고, 옵션에서 no_root_squash 를 제거한 뒤, chown root:root /etc/exports 와 chmod 644 /etc/exports 를 적용하고 exportfs -ra 로 반영합니다.
   risk: restart_service
   idempotent: true
+  backup: [/etc/exports]
+  script: |
+    if [ -f /etc/exports ] && [ ! -L /etc/exports ]; then
+      chown root /etc/exports
+      chmod u-xs,g-wxs,o-wxt /etc/exports
+    fi
+  validate: |
+    [ ! -f /etc/exports ] || [ -L /etc/exports ] || case "$(stat -c '%u %a' /etc/exports)" in '0 0'|'0 4'|'0 40'|'0 44'|'0 200'|'0 204'|'0 240'|'0 244'|'0 400'|'0 404'|'0 440'|'0 444'|'0 600'|'0 604'|'0 640'|'0 644') ;; *) false;; esac
 decision: D09

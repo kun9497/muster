@@ -94,13 +94,24 @@ the key present with its `effective` side `absent` when it means to be absent.
 
 `fix --dry-run` renders a control's `script`, `validate` and `rollback` into a
 review script, so they are code. A `script` needs `idempotent: true`, a
-`validate` and a way back: a `rollback`, a non-empty `backup`, both, or — for a
-service control — `units` alone (`units` excludes `rollback` and `backup`).
-Bodies run under `set -e` in
+`validate` and a way back, of six kinds: a `rollback`, a non-empty `backup`, a
+record of the state the body changes — `modes` (the owner, group and mode of
+paths and of `/*` or `/*/*` expansions), `sysctl` (kernel keys' runtime values)
+or `modules` (whether each module is loaded) — any of these together, or — for
+a service control — `units` alone (`units` excludes all five others). The
+template records each declared kind under the block's own directory
+(`$MUSTER_BACKUP/blocks/<fn>/`) before the body runs and, when the body or the
+validate fails, runs the declared `rollback`, then restores units, modes,
+files, sysctl values and modules, in that order. A path a daemon or the system
+writes to while the block runs (a live log) is a `modes` entry, never a
+`backup`, which would copy its contents back; a path a body only re-modes may
+use either. Bodies run under `set -e` in
 a subshell: a command that may legitimately fail says so with `|| true` on its
 own line, never a trailing `; true`, and no `2>/dev/null` hides an error the
-operator should see. A body acting on a file checks it exists first; one calling
-an optional tool guards it with `command -v`. A service control declares its
+operator should see. A body acting on a file checks it exists first — a
+directory the host may lack under `if [ -d <dir> ] && [ ! -L <dir> ]; then …;
+fi`, one path under `if [ -f <p> ] && [ ! -L <p> ]` — and one calling an
+optional tool guards it with `command -v`. A service control declares its
 units in `units` — the logical service's `provesInstall` units in `services.go`,
 each `<name>.socket` before its `<name>.service` (a Linux test pins the set, and
 the validate names the same units) — and its script never names a unit: the
@@ -124,16 +135,67 @@ done
 The first pass resolves every name before anything is masked and skips an
 alias of a listed unit (Debian's `nfs-kernel-server.service` is an alias of
 `nfs-server.service`; disabling it after the mask fails). An alias of a unit
-you did not list is skipped too, so declare the real unit. A file body clears
+you did not list is skipped too, so declare the real unit. A module body opens
+with `mods='<the modules>'` and loops `for m in $mods`, for the same reason
+(shellcheck flags a literal one-word list). A file body clears
 the forbidden bits symbolically (`chmod u-xs,g-rwxs,o-rwxt`, never an absolute
 mode, so a stricter file stays as it is); a body that removes an ACL (the two
 that do: `passwd_permissions`, `shadow_permissions`) runs `setfacl -b` before
-`chmod`.
-`validate` is one line — conditions joined with `&&`, or a single `case` whose
-last arm is `*) false` (a `case` that matches nothing exits 0) — and checks only
-what the script set; a file validate lists the control's default allowed modes.
-`backup` paths are
-absolute and clean, in `[A-Za-z0-9._@:+/-]`. No here-document. The script runs
+`chmod`. A `find` that changes a mode or an owner carries `! -type l` or the
+type the control judges (`-type f`), so `chmod` never follows a symlink. A body
+that changes files under a directory someone other than root may own (a
+daemon's log directory, `at`'s spool) acts only where the template's
+`modes_trusted "$d/." 0` holds — every ancestor root-owned and not
+other-writable; a root-owned group-writable one, as Ubuntu's `/var/log`, is
+accepted — and logs and leaves any other directory to the operator; its
+validate checks the same set, so the block ends `done` and the next `check`
+still names the path. A body that writes a file muster owns (a
+`99-muster-*.conf` drop-in) and finds a symlink there — an operator's mask —
+logs it, leaves it, and fails the block before writing anything; a rollback that
+removes that file skips a symlink.
+
+A body writes a value only when the current one is outside the set the
+control's clause accepts, read the way the collector reads it (the first
+`login.defs` line, the last `faillock.conf` line, the merged `pwquality`
+chain, keys in any case), so it never loosens a stricter host and never
+rewrites a value that already passes; the value it writes is the guide's, or
+the first element of the list in force. A write's side effect on another
+judged key is the writer's to put back: writing `net.ipv4.ip_forward` makes the
+kernel reset `net.ipv4.conf.all.accept_redirects`, so `ip_forwarding_disabled`
+reads that key first, restores it afterwards, and lists it in `sysctl`. A
+rollback of a control whose daemon re-reads the file it wrote puts that file
+back (or removes it) itself, then tests and reloads the daemon: the template's
+`restore` runs after the rollback, too late for the reload.
+
+A control whose script needs a parameter's value in force declares it in
+`script_params`; the block then opens with `P_<name>='<value>'` (a list joined
+by one space; take the first element with `first=${P_<name>%% *}`). The value
+must pass its type's charset (`int` an optionally signed integer, `^-?[0-9]+$`;
+`bool`; or a `string`/list element
+in `[A-Za-z0-9._/@:+,=-]`), or the item is text-only (`params_unsafe`). Use it
+only as data: after `=` (`n=$P_max`), as an option's operand
+(`chage -M "$P_max_days"`) or after `--`, as a later operand, or as an awk
+`-v`/`VAR=` assignment. It never stands first on a line and never inside a
+`sed` expression: copy it to a plain variable and use `|` as the delimiter
+(`sed -i "s|^deny .*|deny = $n|"`). `TestShippedBodiesPlaceParametersSafely`
+holds every shipped body to that. A control whose fix writes the very line an
+`absent_means: fail` finding names declares `script_on_absent: true`; any other
+absent finding stays text-only.
+
+`validate` is one line and checks only what the script set, proving set
+membership, not equality with the value written. Three shapes: conditions
+joined with `&&`; a single `case` whose last arm is `*) false` (a `case` that
+matches nothing exits 0); or one `for` over a literal list whose conditions
+end the loop with `exit 1`. A body that cannot apply on a host guards its
+validate the same way (`if command -v sshd …; then …; fi`). A file validate
+lists the control's default allowed modes, and a `find` in a validate tests the
+complement of the allowed bits — 07777 minus the largest allowed mode
+(`-perm /7137` for 0640, `/7177` for 0600, `/7337` for 0440) — and `! -user
+root` where the owner is judged. `backup` paths and `modes` entries are
+absolute and clean, in `[A-Za-z0-9._@:+/-]` (an entry may end in `/*` or
+`/*/*`); `sysctl` keys match `^[a-z0-9_]+(\.[a-z0-9_-]+)+$` and are never
+sorted (the order is the write and restore order); `modules` names match
+`^[a-z0-9][a-z0-9_-]*$`. No here-document. The script runs
 under `umask 077`, so a body that creates a file others read sets its mode.
 `make shellcheck` and `go test ./internal/remedy -run TestScriptGolden -update`
 (the `all-scripted.sh` golden renders every shipped body) check your change.
@@ -141,9 +203,11 @@ A new scripted control also enters `controls/testdata/_roundtrip.yaml` in the
 same commit: the `fix-roundtrip` rows (`images`) whose seed script in
 `ci/roundtrip/<key>.sh` loosens it and whose `seeded` list names it, or
 `unproven:` with the reason no row can (no systemd unit, no package in the
-image's enabled repositories, or the unit cannot run in a container);
-`TestEveryScriptedControlIsInTheRoundtripTable` holds the table, the shipped
-set and the CI matrix equal.
+image's enabled repositories, the unit cannot run in a container, or the
+kernel does not ship the module). A `beyond` control gates containers out, so
+it names only the `runner` row (the GitHub runner VM, seeded by
+`ci/roundtrip/runner.sh`); `TestEveryScriptedControlIsInTheRoundtripTable`
+holds the table, the shipped set and the CI matrix equal.
 
 ## Adding a fact
 
@@ -260,10 +324,13 @@ source (`Output.Source`).
   `ci/roundtrip/*.sh`, the
   `fix-roundtrip` job (seeded failures repaired by the generated script in
   throwaway containers on Rocky 9, AlmaLinux 9, a Debian 12 init image built in
-  the job and Ubuntu 22.04; on each init row a second container proves the guard
-  run — a script planned in the first container is refused — and the failure
-  run — every block's validate forced false must roll units and files back to
-  what was recorded), and the capability matrix
+  the job and Ubuntu 22.04, and on the runner VM itself, which also proves the
+  `beyond` controls a container cannot judge; on each init row a second container
+  proves the guard run — a script planned in the first container is refused —
+  and the failure run — every block's validate forced false must roll units,
+  files, modes, sysctl values and modules back to what was recorded; the runner
+  row has no guard run and re-seeds the same VM for its failure run), and the
+  capability matrix
   (`docs/reference/capability-matrix.json`): facts that must be `denied`
   without root and `unsupported` without systemd.
 

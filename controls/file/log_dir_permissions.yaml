@@ -25,7 +25,21 @@ checks:
   - { fact: files.log_files, op: each, subject: path, where: { field: group_writable, op: eq, expected: true }, require: { field: group, op: in, expected: "${allowed_groups}" } }
   - { fact: files.log_files, op: none, subject: path, where: { field: reason, op: present } }
 remediation:
-  text_en: chmod o-w each world-writable log path; for a group-writable path owned by an unexpected group, chown it to root or a logging group, or add that group to the parameter if it is legitimate.
-  text_ko: 전체 쓰기 가능한 로그 경로에 chmod o-w 를 적용하고, 예상치 못한 그룹이 소유한 그룹-쓰기 경로는 root 나 로깅 그룹으로 chown 하거나, 정당하면 그 그룹을 파라미터에 추가합니다.
+  text_en: chmod o-w each world-writable log path; for a group-writable path owned by an unexpected group, chown it to root or a logging group, or add that group to the parameter if it is legitimate. The review script clears the others' write bit only; a group-writable path in a group outside params.allowed_groups is left for you to change. The review script never follows a symlink. It changes files only in a directory that is root-owned and not world-writable up to /; a root-owned group-writable directory such as /var/log is trusted with its group; any other directory is left to the operator and named in the log.
+  text_ko: 전체 쓰기 가능한 로그 경로에 chmod o-w 를 적용하고, 예상치 못한 그룹이 소유한 그룹-쓰기 경로는 root 나 로깅 그룹으로 chown 하거나, 정당하면 그 그룹을 파라미터에 추가합니다. 검토 스크립트는 다른 사용자의 쓰기 비트만 지웁니다. params.allowed_groups 밖 그룹의 그룹-쓰기 경로는 직접 바꿔야 합니다. 검토 스크립트는 심볼릭 링크를 따라가지 않습니다. / 까지 root 소유이고 전체 쓰기가 불가능한 디렉터리 안의 파일만 바꿉니다. /var/log 처럼 root 소유이면서 그룹 쓰기가 가능한 디렉터리는 그 그룹과 함께 신뢰합니다. 그 밖의 디렉터리는 운영자에게 맡기고 로그에 이름을 남깁니다.
   risk: none
   idempotent: true
+  modes: [/var/log, "/var/log/*", "/var/log/*/*"]
+  script: |
+    if [ -d /var/log ] && [ ! -L /var/log ] && modes_trusted /var/log 0 && [ -n "$(find /var/log -maxdepth 0 -perm /002)" ]; then chmod o-w /var/log; fi
+    for l in /var/log /var/log/* /var/log/.[!.]* /var/log/..?*; do
+      if [ -d "$l" ] && [ ! -L "$l" ]; then
+        if modes_trusted "$l/." 0; then
+          find "$l" -mindepth 1 -maxdepth 1 ! -type l -perm /002 -exec chmod o-w {} +
+        elif [ -n "$(find "$l" -mindepth 1 -maxdepth 1 ! -type l -perm /002 2>/dev/null)" ]; then
+          log "muster.file.log_dir_permissions: $l is not root's, left as is"
+        fi
+      fi
+    done
+  validate: |
+    if [ -d /var/log ] && [ ! -L /var/log ] && modes_trusted /var/log 0 && [ -n "$(find /var/log -maxdepth 0 -perm /002)" ]; then exit 1; fi; for l in /var/log /var/log/* /var/log/.[!.]* /var/log/..?*; do if [ -d "$l" ] && [ ! -L "$l" ] && modes_trusted "$l/." 0 && [ -n "$(find "$l" -mindepth 1 -maxdepth 1 ! -type l -perm /002 2>/dev/null)" ]; then exit 1; fi; done

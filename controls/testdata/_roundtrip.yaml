@@ -1,31 +1,106 @@
-# The round-trip table (3D-2b §4): one entry per scripted control, sorted by id.
+# The round-trip table (3D-2b §4, 3D-2c §5): one entry per scripted control, sorted by id.
 # `images` names the fix-roundtrip matrix rows (their `key`) that seed the control,
 # run its review script and check it again; `unproven_units` names the declared units
-# those rows do not exercise; `unproven` says why no row exercises the control at all.
-# Each reason names one of three causes: no systemd unit (the server ships only for
-# inetd), no package in the image's enabled repositories, or the unit cannot run in a
-# container. The assignments are the Task 1 probe's measurements.
+# or modules those rows do not exercise; `unproven` says why no row exercises the
+# control at all. Each reason names one of four causes: no systemd unit (the server
+# ships only for inetd), no package in the image's enabled repositories, the unit
+# cannot run in a container, or the kernel does not ship the module. A `beyond`
+# control gates containers out, so it names host rows only (`runner`, the GitHub
+# runner VM). The assignments are the Task 1 probes' measurements.
 # TestEveryScriptedControlIsInTheRoundtripTable (internal/controls) pins this file to
 # the fix-roundtrip job of .github/workflows/ci.yml: every row's `seeded` list equals
 # the ids whose `images` name that row. The fixture harness never loads this file.
+- id: muster.account.cron_permissions
+  images: [almalinux9-init, debian12-init, rocky9-init, runner, ubuntu2204]
+- id: muster.account.lockout_threshold
+  images: [almalinux9-init, rocky9-init]
+- id: muster.account.password_policy
+  images: [almalinux9-init, rocky9-init, runner]
 - id: muster.account.root_remote_login
   images: [almalinux9-init, rocky9-init]
+- id: muster.account.session_timeout
+  images: [almalinux9-init, rocky9-init, runner]
+- id: muster.account.sudoers_permissions
+  images: [almalinux9-init, debian12-init, rocky9-init, ubuntu2204]
+- id: muster.account.umask_policy
+  images: [almalinux9-init, rocky9-init, runner, ubuntu2204]
+- id: muster.beyond.aslr_and_link_protection
+  images: [runner]
+- id: muster.beyond.audit_log_permissions
+  images: [runner]
+- id: muster.beyond.bootloader_config_permissions
+  images: [runner]
+- id: muster.beyond.icmp_broadcast_and_bogus_ignored
+  images: [runner]
+- id: muster.beyond.icmp_redirects_ignored
+  images: [runner]
+- id: muster.beyond.ip_forwarding_disabled
+  images: [runner]
+- id: muster.beyond.ipv6_forwarding_disabled
+  images: [runner]
+- id: muster.beyond.ipv6_redirects_ignored
+  images: [runner]
+- id: muster.beyond.ipv6_router_advertisements_ignored
+  images: [runner]
+- id: muster.beyond.ipv6_source_routing_rejected
+  images: [runner]
+- id: muster.beyond.kernel_pointer_exposure
+  images: [runner]
+- id: muster.beyond.ptrace_restriction
+  images: [runner]
+- id: muster.beyond.reverse_path_filtering
+  images: [runner]
+- id: muster.beyond.source_routing_rejected
+  images: [runner]
+- id: muster.beyond.suid_dumpable_disabled
+  images: [runner]
+- id: muster.beyond.syn_cookies_enabled
+  images: [runner]
+- id: muster.beyond.sysrq_restricted
+  images: [runner]
+- id: muster.beyond.uncommon_filesystems_disabled
+  images: [runner]
+  unproven_units:
+    cramfs: the runner kernel does not ship it
+    freevxfs: the runner kernel does not ship it
+    hfs: the runner kernel does not ship it
+    hfsplus: the runner kernel does not ship it
+    jffs2: the runner kernel does not ship it
+- id: muster.beyond.uncommon_network_protocols_disabled
+  images: [runner]
+  unproven_units:
+    dccp: the runner kernel does not ship it
+    rds: the runner kernel does not ship it
+- id: muster.beyond.unprivileged_bpf_restricted
+  images: [runner]
+- id: muster.beyond.usb_storage_disabled
+  unproven: "the runner kernel does not ship usb-storage"
 - id: muster.file.hosts_lpd_permissions
   images: [almalinux9-init, debian12-init, rocky9-init, ubuntu2204]
 - id: muster.file.hosts_permissions
+  images: [almalinux9-init, debian12-init, rocky9-init, runner, ubuntu2204]
+- id: muster.file.inetd_conf_permissions
+  images: [almalinux9-init, debian12-init, rocky9-init, runner, ubuntu2204]
+- id: muster.file.log_dir_permissions
   images: [almalinux9-init, debian12-init, rocky9-init, ubuntu2204]
 - id: muster.file.passwd_permissions
   images: [almalinux9-init, debian12-init, rocky9-init, ubuntu2204]
 - id: muster.file.services_permissions
   images: [almalinux9-init, debian12-init, rocky9-init, ubuntu2204]
 - id: muster.file.shadow_permissions
-  images: [debian12-init, ubuntu2204]
+  images: [debian12-init, runner, ubuntu2204]
+- id: muster.file.syslog_conf_permissions
+  images: [almalinux9-init, debian12-init, rocky9-init, runner, ubuntu2204]
 - id: muster.service.automount_disabled
   images: [almalinux9-init, debian12-init, rocky9-init]
 - id: muster.service.dos_services_disabled
   unproven: no systemd unit on Debian (echo, discard, daytime and chargen ship only for inetd) and no package in the EL9 images' enabled repositories
 - id: muster.service.finger_disabled
   unproven: no systemd unit on Debian (fingerd ships only for inetd) and no package in the EL9 images' enabled repositories
+- id: muster.service.ftpusers_permissions
+  images: [almalinux9-init, debian12-init, rocky9-init]
+- id: muster.service.nfs_export_access
+  images: [almalinux9-init, debian12-init, rocky9-init]
 - id: muster.service.nfs_server_disabled
   images: [almalinux9-init, debian12-init, rocky9-init]
 - id: muster.service.nis_disabled

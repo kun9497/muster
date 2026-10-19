@@ -14,7 +14,7 @@ waiver keys, output format.
 - `make lint-controls` — `go run ./cmd/muster controls lint` (passes `--references docs/reference`, so
   STIG/NIST ids must be in the generated index), then once more with `--profile default`.
 - `make shellcheck` — `sh -n` and `shellcheck -s sh` over `internal/remedy/testdata/*.sh`, `examples/*-fix-report.sh`
-  and `ci/roundtrip/*.sh` (at least five remedy goldens and five round-trip scripts; CI runs the same step in the
+  and `ci/roundtrip/*.sh` (at least five remedy goldens and six round-trip scripts; CI runs the same step in the
   `test` job).
 - `make fmt` — `gofmt -l -w .` to fix formatting in place.
 - `make coverage` — `go run ./tools/coverage` regenerates `docs/reference/coverage.md`; CI runs
@@ -170,86 +170,176 @@ regenerates them from public images and `-check` compares.
   selection) share the same resolution. The examples gate byte-compares reports, so a change to the `check` block
   needs an examples refresh from the branch's `examples.yml` run before the merge.
 
-## Fix (stages 3D-2, 3D-2b)
+## Fix (stages 3D-2, 3D-2b, 3D-2c)
 
 - `fix --dry-run` (mandatory; anything else is `fix never applies a remediation (D24); run fix --dry-run`, exit 2) runs
   `runCheck`'s own helpers (`openFacts` → set/registry → `resolveSelection` → `loadWaivers` → `newCheckBlock` →
   `report.Build`) and hands the report to `remedy.Build`; `--format table|json|script`, `--max-risk` the one knob. It
   exits 0 with findings (judging is check's) and 2 when no plan could be made, a failing stdout included. Items are
   FAIL/WARN rows after waivers, ordered risk → severity in force → id; a degraded pass (`Reason ==
-  check.ReasonDegradedPrefix + Degraded`), ERROR and MANUAL are `not_planned`; an absent-means-fail row and a control
-  whose parameter the profile or tuning set are text-only. `Build` refuses an id outside the id grammar.
+  check.ReasonDegradedPrefix + Degraded`), ERROR and MANUAL are `not_planned`. `item()` decides text-only in this
+  order (S-2): `no_script` → `absent` (an absent-means-fail row, unless the control declares `script_on_absent: true`)
+  → `params_tuned` (a profile or tuning value in force, only for a control without `script_params`) → `params_unsafe`
+  (a `script_params` value in force — `check.ParamValues`, the default when the check block carries none — that
+  `controls.ScriptParamValue` refuses: `int` an optionally signed integer (`^-?[0-9]+$`), `bool`, a `string`/list element in `^[A-Za-z0-9._/@:+,=-]+$`, a
+  list joined by one space, an empty list refused) → scripted. Items gain `script_params` (`[{name, value}]` by name) and
+  `script_on_absent` after `text_only_reason` (before `rollback`), and `modes`, `sysctl`, `modules` after `units`
+  (`[]`/`false` unless scripted); plan schema stays 1.
+  `Build` refuses an id outside the id grammar and re-checks (S-4) every unit, `backup` path (`ValidBackupPath`),
+  `modes` entry, `sysctl` key, module and `script_params` name against its lint pattern (`refusing to plan <id>: <kind>
+  %q is not one a script can carry`).
 - The script: `# shellcheck disable=SC2181` on line 2; prologue order `set -u`, `umask 077`, `log()`, the hash helper,
-  the root check, the host guard, the `MUSTER_BACKUP` default and case, `mkdir`, the owner check, `backup()`/`restore()`/
-  `save_units()`/`restore_units()`, `failed=0`. Exit 2 has three causes, nothing run in any: not root, another host
-  (the guard), an unusable backup directory (`/`, `//…`, `.` and `..` components, relative, not root-owned or
-  group/other-writable). `backup` skips absent paths, keeps a first copy, returns 1 on a failed copy and
+  the root check, the host guard, the `MUSTER_BACKUP` default and case, `mkdir`, the owner check, `backup()`/`restore()`,
+  `save_units()`/`restore_units()`, `modes_paths()`/`modes_type()`/`save_modes()`/`restore_modes()`/`modes_trusted()`,
+  `save_sysctl()`/`restore_sysctl()`, `save_modules()`/`restore_modules()`, `failed=0` (`TestScriptPrologueOrder`). Exit
+  2 has three causes, nothing run in any: not root, another host (the guard), an unusable backup directory (`/`, `//…`,
+  `.` and `..` components, relative, not root-owned or group/other-writable). A block function opens with one
+  `  P_<name>='<value>'` line per `script_params` entry (name order; the body, validate and rollback subshells inherit
+  them), then `  MB="$MUSTER_BACKUP/blocks/<fn>"; mkdir -p "$MB"`, then the records it declares in the order `backup`,
+  `save_units`, `save_modes` (entries single-quoted, so the shell never expands `*`), `save_sysctl`, `save_modules` —
+  each `|| { log "<id>: backup failed, nothing changed"; return 1; }`. Every record lives under the block's own `$MB`
+  (two controls may declare the same path or unit): `files<path>` (`cp -a`), `absent<path>` (an empty marker for a
+  declared path that did not exist; `restore` removes the path, refusing a directory), `units/<u>`, `modes.list` (`<uid>
+  <gid> <mode> <f|d|o> <path>`), `sysctl.list` (`<key> <value>`, `absent` when unreadable), `modules.list` (`<name>
+  loaded|not-loaded`), and a body's own files (`password_policy`'s `ageing.list`). Each kind keeps its first record per
+  block across runs with the same `MUSTER_BACKUP`, except an absent marker, which `backup` replaces with a copy once the
+  path exists (a re-run after run 1 created a drop-in restores run 1's file). `backup` returns 1 on a failed copy and
   the block stops; each body runs in `( set -e … ); rc=$?` and each block function is called as a bare line followed by
-  `[ "$?" -eq 0 ] || failed=$((failed+1))` — POSIX turns `-e` off for anything run as an operand of `||`/`&&`/`if`/`!`;
-  on failure the declared `rollback` runs, then `restore` (which never writes through a destination symlink and refuses
-  a directory), or `restore_units` for a units block. A fixed `  # validate` line precedes every validate subshell (the
-  round trip's failure run keys on it). Snapshot text lives only in `#` comments (`report.Escape`), control text
-  through `report.EscapeNoCut`; `Escape` spells out C0/C1, every `unicode.Cf` rune, U+2028/U+2029 and the Hangul
-  fillers U+115F/U+1160/U+3164/U+FFA0 as `\u%04x` / `\U%08x`.
+  `[ "$?" -eq 0 ] || failed=$((failed+1))` — POSIX turns `-e` off for anything run as an operand of `||`/`&&`/`if`/`!`.
+  On failure, in this order (`TestScriptFailurePathOrder`): the declared `rollback` subshell, `restore_units`,
+  `restore_modes`, `restore` (never writes through a destination symlink, refuses a directory), `restore_sysctl`
+  (after the file that would persist the value is gone), `restore_modules` (`modprobe --ignore-install`, so the
+  `install … /bin/false` line `restore` put back cannot stop the reload); each restore `|| log "<id>: ROLLBACK
+  INCOMPLETE, backups in $MUSTER_BACKUP"`. `restore_modes` per row: skip a path now gone, refuse a symlink or a type
+  change (`changed type, left as is`), skip a row whose `%u %g %a` already equals the record (no `chown` that would
+  clear `security.capability`), refuse a path `modes_trusted <path> <uid>` rejects, then `chown -h` only when the owner or group differs, and `chmod`.
+  `modes_trusted` (S-24): every ancestor up to `/` root-owned and not other-writable (a root-owned group-writable one —
+  Ubuntu's `root:syslog 0775 /var/log` — is accepted), and a non-root recorded uid needs a parent neither group- nor
+  other-writable. A fixed `  # validate` line precedes every validate subshell (the round trip's failure run keys on
+  it). Snapshot text lives only in `#` comments (`report.Escape`), control text through `report.EscapeNoCut`; `Escape`
+  spells out C0/C1, every `unicode.Cf` rune, U+2028/U+2029 and the Hangul fillers U+115F/U+1160/U+3164/U+FFA0 as
+  `\u%04x` / `\U%08x`.
 - Host guard (Q-1): `remedy.Build` copies `run.host.machine_id_hash` into the plan only when it is 64 lowercase hex
-  (the one host value D34 admits into a command; `TestScriptEveryLineIsTemplateBodyOrComment` admits exactly one
-  `MUSTER_SNAPSHOT_HOST=<64 hex>` line); `fix.host_guard` is `on`/`off`. On: `MachineIDHashHelper` (`tr -d '[:space:]'`,
-  32 lowercase hex, `sha256sum`) hashes `/etc/machine-id` and a mismatch or an unreadable id exits 2 with one stderr
-  line; `MUSTER_ANY_HOST=1` (read only when the hashes differ) runs with a warning. Off: one comment line
-  `# host guard: off (the snapshot has no machine id)`. The collector's `MachineIDHash` hashes only a
-  32-lowercase-hex id trimmed of ASCII whitespace only (`strings.Trim(…, " \t\n\r\v\f")`, the set the helper's `tr`
-  deletes; else `""`); `TestHostGuardHashMatchesTheCollector` pins the two together.
+  (the one host value D34 admits into a command; a parameter value is policy, not a host value, and enters only as a
+  `P_` line); `TestScriptEveryLineIsTemplateBodyOrComment`'s `templateLines` admits exactly one
+  `MUSTER_SNAPSHOT_HOST=<64 hex>` line, the rendered `P_` lines, the `MB=` line and each declared record and restore
+  line (the `p_params` poison's `'; uname -a; '` reaches no command line and no JSON, S-20); `fix.host_guard` is
+  `on`/`off`. On: `MachineIDHashHelper` (`tr -d '[:space:]'`, 32 lowercase hex, `sha256sum`) hashes `/etc/machine-id`
+  and a mismatch or an unreadable id exits 2 with one stderr line; `MUSTER_ANY_HOST=1` (read only when the hashes
+  differ) runs with a warning. Off: one comment line `# host guard: off (the snapshot has no machine id)`. The
+  collector's `MachineIDHash` hashes only a 32-lowercase-hex id trimmed of ASCII whitespace only (`strings.Trim(…, "
+  \t\n\r\v\f")`, the set the helper's `tr` deletes; else `""`); `TestHostGuardHashMatchesTheCollector` pins the two
+  together.
 - Units (Q-2): `remediation.units` lists `.service`/`.socket` names; lint `units_charset` (pattern, no duplicates; a
   template unit needs an instance), `units_order` (`<n>.socket` before `<n>.service`), `units_needs_script`,
-  `units_exclusive` (no `rollback`, no `backup` beside units), `units_variable` (`$UNITS` only in a `script` that
-  declares units), `backup_reserved` (no backup at or under `/muster-units`), `script_needs_validate`; set-level
-  (`TestLintSetRules`, Problem on the later id) `backup_path_shared` and `units_shared`. `Build` re-checks the charset;
-  `items[].units` follows `backup`; rollback vocabulary `none | declared | restore_backup | units | both`. The block
-  calls `save_units <u…>` where `backup` would stand and `restore_units <u…>` on every failure path, and emits
-  `UNITS='<u…>'` first in the body subshell. `save_units` writes `$MUSTER_BACKUP/muster-units/<u>` (`<is-enabled>
-  <is-active>`, or `absent absent`) and `<u>.deps` (active reverse `Requires=`/`BindsTo=`/`PartOf=` units), keeping a
-  first record except `absent`. `restore_units` runs seven passes: unmask (all but `absent`), enable
-  `enabled`/`enabled-runtime` (log `linked*` not restored), re-disable a `disabled` unit an `Also=` turned on, re-mask
-  `masked`/`masked-runtime`, start what was active (not a re-masked one), start inactive dependants, read the enablement
-  back (`enablement not restored` → 1). Go tests run it only against a stub `systemctl` first on `PATH`
-  (`TestUnitHelpersRestoreRecordedState`).
-- Remediation bodies (lint + CONTRIBUTING): a `script` needs `idempotent: true`, a `rollback`, `backup` or `units`, and
-  a `validate`; `validate` is one line — `&&`-joined conditions or a single `case` whose last arm is `*) false` (a `case`
-  matching nothing exits 0); no here-document; `backup` paths absolute, clean, `^/[A-Za-z0-9._@:+/-]+$`. The ten service
-  controls declare `units` (as a set, the `provesInstall` units of their rows in `services.go`; the validate names the
-  same units literally and the script none — `TestServiceScriptsNameTheCollectorsUnits`, Linux) and loop over `$UNITS`
-  in two passes: pass 1 adds to `todo` every name `systemctl cat` finds whose `systemctl show -p Id --value` equals
-  itself (an alias of a listed unit is skipped while it still resolves — Debian's `nfs-kernel-server.service` aliases
-  `nfs-server.service`), pass 2 runs `systemctl --quiet disable --now` strictly and `systemctl --quiet mask … || true`
-  over `todo`; no hand-written rollback (the unit state is the way back), and one-unit bodies loop too (SC2043 fires
-  only on a literal one-word list). The five file controls clear bits symbolically (`chmod u-xs,g-rwxs,o-rwxt` and
-  kin, so a stricter file is never loosened) — the two that remove an ACL (`passwd_permissions`,
-  `shadow_permissions`) run `setfacl -b` before `chmod` — and validate with a `case` over the
-  default `allowed_modes` (`TestFileValidatesAcceptTheDefaultModes` regenerates them byte for byte). Bodies are
-  shellcheck-clean at the default severity; `all-scripted.sh` renders every shipped body.
+  `units_exclusive` (no `rollback`, `backup`, `modes`, `sysctl` or `modules` beside units), `units_variable` (`$UNITS`
+  only in a `script` that declares units), `script_needs_validate`. `backup_reserved`, `backup_path_shared` and
+  `units_shared` are gone (3D-2c: per-block records). `items[].units` follows `backup`; rollback vocabulary `none |
+  declared | restore_backup | units | state | both` (`units` alone; `state` for `modes`/`sysctl`/`modules` alone;
+  `both` for two or more of a rollback, a backup and a record kind). The block calls `save_units <u…>` and
+  `restore_units <u…>` on every failure path, and emits `UNITS='<u…>'` first in the body subshell. `save_units` writes
+  `$MB/units/<u>` (`<is-enabled> <is-active>`, or `absent absent`) and `<u>.deps` (active reverse
+  `Requires=`/`BindsTo=`/`PartOf=` units), keeping a first record except `absent`. `restore_units` runs seven passes:
+  unmask (all but `absent`), enable `enabled`/`enabled-runtime` (log `linked*` not restored), re-disable a `disabled`
+  unit an `Also=` turned on, re-mask `masked`/`masked-runtime`, start what was active (not a re-masked one), start
+  inactive dependants, read the enablement back (`enablement not restored` → 1). Go tests run the helpers and bodies
+  only against stubs (`systemctl`, `sysctl`, `modprobe`, `chage`, `sshd`) first on `PATH`, every absolute path rebased
+  under `t.TempDir()` (`TestUnitHelpersRestoreRecordedState`, `TestSysctlHelpersRecordAndRestore`,
+  `TestModulesHelpersRecordAndRestore`), except `TestModesHelpersTrustRule` and `TestFileBodiesRepairATempTree`, which
+  are root only and build their tree with `os.MkdirTemp("/", …)` (`modes_trusted` refuses anything under the
+  other-writable `/tmp`).
+- Remediation bodies (lint + CONTRIBUTING): a `script` needs `idempotent: true`, a `validate` and a way back of six
+  kinds — `rollback`, `backup`, `units`, `modes`, `sysctl`, `modules` (rule `remediation`); `script_params_declared`
+  (each entry a declared param, `^[a-z][a-z0-9_]*$`, once), `script_params_used` (every `$P_x`/`${P_x` declared, every
+  entry used in `script`), `script_params_default_safe`, `script_params_needs_script`, `script_on_absent_needs_script`,
+  `state_needs_script`, `modes_charset` (`^/[A-Za-z0-9._@:+/-]+(/\*){0,2}$`, base clean and not `/`, no duplicates),
+  `modes_backup_overlap` (no `backup` path an entry covers), `sysctl_charset` (`^[a-z0-9_]+(\.[a-z0-9_-]+)+$`),
+  `modules_charset` (`^[a-z0-9][a-z0-9_-]*$`). `validate` is one line (lint), by convention `&&`-joined conditions, a
+  single `case` whose last arm is `*) false` (a `case` matching nothing exits 0), or one `for` over a literal list
+  whose conditions `exit 1`; no here-document; `backup` paths absolute, clean, `^/[A-Za-z0-9._@:+/-]+$`. A `P_` value
+  never starts a line and never enters a `sed` expression (copy it to a plain variable first;
+  `TestShippedBodiesPlaceParametersSafely`, in `internal/controls`). E-8: a body writes only when the current value is
+  outside the clause's accepted set, read the collector's way (first `login.defs` line, last `faillock.conf` `deny`
+  defaulting to 3, the merged `pwquality` chain, keys in any case), and the validate proves set membership; a `gte`
+  arm is a glob list (`[2-9]|[1-9][0-9]|[1-9][0-9][0-9]*`). E-9: a directory the host may lack runs under `if [ -d d ]
+  && [ ! -L d ]`, one path under `[ -f p ] && [ ! -L p ]`, a mode-changing `find` carries `! -type l` or `-type f`/`-type
+  d` (`TestShippedFindsCarryATypePredicate`), and a validate's `find` mask is 07777 minus the largest allowed mode
+  (`/7137`, `/7177`, `/7337`; `TestFileValidateMasksDeriveFromTheDefaultModes`). E-11: a rollback whose daemon re-reads
+  the file puts it back (or removes it) itself before `sshd -t` and the reload (`session_timeout` copies `$MB/files$f`
+  back, S-35). E-13: a write's side effect on another judged key is the writer's — `ip_forwarding_disabled` reads
+  `net.ipv4.conf.all.accept_redirects` before the write, puts it back and persists it only when it was 0 (S-43);
+  `ipv6_forwarding_disabled` keeps `all` before `default` (the kernel copies `all.forwarding` into `default`), and no
+  `sysctl` list is ever sorted. Trust (S-24, S-47): `log_dir_permissions` and `cron_permissions`' at-spool pass change
+  files only inside a directory `modes_trusted "$d/." 0` accepts, else log `<d> is not root's, left as is`; the
+  validate checks the same set, so the block ends `done` and the control stays FAIL naming the path; S-50:
+  `cron_permissions` clears `o-w` on its directories and `audit_log_permissions` fixes `/var/log/audit` first, and every
+  file pass of the two is gated the same way. S-49: a system crontab (`/etc/crontab`, `/etc/anacrontab`,
+  `/etc/cron.d/*`) or a sudoers file (`/etc/sudoers`, an active `/etc/sudoers.d/*`) not owned by root is never chowned
+  or re-moded (cron and sudo ignore it; adopting it would activate another user's content): the body logs `<id>: <path>
+  is owned by uid N; review it before chown root, left as is`, the validate fails and the block rolls back. A symlinked
+  `/etc/login.defs` fails the `umask_policy` and `password_policy` blocks before any write (K2). S-27: a
+  muster-owned drop-in (`99-muster-*.conf` under `sysctl.d`/`modprobe.d`, `pwquality.conf.d/99-muster.conf`,
+  `00-muster-session.conf`) that is a symlink is logged `… is a symlink (a mask), left as is` and fails the block before
+  any write; every rollback that removes it skips a symlink. A built-in module stays done-but-FAIL (no body can unload
+  it). The ten service controls declare `units` (as a set, the `provesInstall` units of their rows in `services.go`;
+  the validate names the same units literally and the script none — `TestServiceScriptsNameTheCollectorsUnits`, Linux)
+  and loop over `$UNITS` in two passes: pass 1 adds to `todo` every name `systemctl cat` finds whose `systemctl show -p
+  Id --value` equals itself (an alias of a listed unit is skipped while it still resolves — Debian's
+  `nfs-kernel-server.service` aliases `nfs-server.service`), pass 2 runs `systemctl --quiet disable --now` strictly and
+  `systemctl --quiet mask … || true` over `todo`; no hand-written rollback, and one-unit bodies loop too (SC2043 fires
+  only on a literal one-word list; module bodies open `mods='<list>'; for m in $mods`, pinned by
+  `TestModuleScriptsNameTheControlsModules`). File bodies clear bits symbolically (`chmod u-xs,g-rwxs,o-rwxt` and kin,
+  so a stricter file is never loosened) — the two that remove an ACL (`passwd_permissions`, `shadow_permissions`) run
+  `setfacl -b` before `chmod`. `TestFileValidatesAcceptTheDefaultModes` regenerates, byte for byte, the bare stat-`case`
+  validates of the five 3D-2b file controls in its owner table, and fails on any other shipped validate that is one
+  `case "$(stat -c …` and nothing else. 48 bodies ship (the sixteen of 3D-2 plus 16 sysctl, 3 module, 9 file-permission
+  and 4 account bodies); they are shellcheck-clean at the default severity and `all-scripted.sh` renders them all.
 - `controls/testdata/_roundtrip.yaml` (ignored by the fixture harness) names, per scripted control sorted by id, the
-  matrix rows (`images`, by `key`) that prove it, `unproven_units` with a reason, or `unproven: <reason>` (no systemd
-  unit / no package in the enabled repositories / cannot run in a container; `dos_services`, `finger`, `rservices`
-  are unproven). `TestEveryScriptedControlIsInTheRoundtripTable` holds it equal to the shipped scripted set and to
-  `fix-roundtrip`'s matrix (`seeded` per row, no `muster.service.*` on a non-init row). A new scripted control enters
-  the table in the same commit.
-- The `fix-roundtrip` CI job (timeout 40 min) runs rows `rocky9-init`, `almalinux9-init`, `debian12-init` (built from
-  `ci/roundtrip/debian12-init.Dockerfile`, empty machine id) and `ubuntu2204`; init rows boot through
-  `ci/roundtrip/wait.sh`, seeds are `ci/roundtrip/<key>.sh` mounted at `/ci` (`rocky9-init` regenerates the machine id
-  its image ships; Debian installs under a `policy-rc.d` that exits 101; each init seed ends with a settle check over `START_UNITS`/`ENABLE_ONLY_UNITS`). The
-  repair run plans, runs the script, re-collects and requires the seeded ids PASS/NA. Each init row then starts a
-  second container and runs the guard run (the first container's script must exit 2 and change nothing) and the
-  failure run (every validate's first command rewritten to `false` in a copy: exit 1, one `validate failed` per block,
-  no `ROLLBACK INCOMPLETE`/`not restored`, unit states, stat, checksums and ACLs equal to the record). It is the only
-  place a shipped service or sshd body runs against real system paths; `TestFileScriptsRepairOnARealFile` (root only;
-  CI's sudo step, where `CI=true` makes a missing `setfacl` fatal) runs the five shipped file bodies and validates on
-  temp files; the other remedy Linux tests run rendered synthetic plans under a temp dir. The examples gate
-  byte-compares `examples/<snap>-fix-report.{json,txt,sh}` (script whole, JSON masked under `fix`, table without line 1),
-  so a body or plan change needs an examples refresh from the branch's `examples.yml` run before the merge.
+  matrix rows (`images`, by `key`) that prove it, `unproven_units` (keys in `units`, `modules` or `sysctl`) with a
+  reason, or `unproven: <reason>` (no systemd unit / no package in the enabled repositories / cannot run in a container /
+  the kernel does not ship the module; `dos_services`, `finger`, `rservices` and `usb_storage` are unproven).
+  `TestEveryScriptedControlIsInTheRoundtripTable` holds it equal to the shipped scripted set and to `fix-roundtrip`'s
+  matrix: every row has `kind` `container` (with an `image`) or `host` (no `image`, `init` or `build`), `seeded` equals
+  the table per row, no `muster.service.*` on a non-init row, `muster.beyond.*` on host rows only. A new scripted control
+  enters the table in the same commit.
+- The `fix-roundtrip` CI job (timeout 40 min) runs container rows `rocky9-init`, `almalinux9-init`, `debian12-init`
+  (built from `ci/roundtrip/debian12-init.Dockerfile`, empty machine id) and `ubuntu2204`, and the host row `runner`
+  (the GitHub runner VM itself; `x()` runs through `sudo`). Init rows boot through `ci/roundtrip/wait.sh`, container
+  seeds are `ci/roundtrip/<key>.sh` mounted at `/ci` (`rocky9-init` regenerates the machine id its image ships; Debian
+  installs under a `policy-rc.d` that exits 101; each init seed ends with a settle check over
+  `START_UNITS`/`ENABLE_ONLY_UNITS`). `ci/roundtrip/runner.sh` is idempotent: it removes every muster drop-in, puts back
+  the stock modes the repair run tightened (`/etc/hosts`, `/etc/shadow` and the rest), then seeds again (one failing
+  value per sysctl control, `udf` loaded with `--ignore-install` (a loaded `sctp` is held in use on the runner), `UMASK 002`, …). The repair run plans,
+  requires every seeded id planned and scripted, runs the script with its own `MUSTER_BACKUP`
+  (`/var/backups/muster/ci-repair`), re-collects and requires the seeded ids PASS/NA. Each init row then starts a second
+  container; the host row re-seeds the same VM and plans afresh (no guard run: the guard must be on and the hash stable,
+  every seeded id a scripted item of the failure plan, and the failure plan's scripted ids a subset of the repair
+  plan's — S-18). The guard run (containers): the first container's script must exit 2 and change nothing. The failure
+  run (every validate's first command rewritten to `false` in a copy): exit 1, one `validate failed` per block, no
+  `ROLLBACK INCOMPLETE`/`not restored`/`rollback failed`, and `record()` equal before and after — unit states; backup
+  paths' stat, checksums and ACLs; `sysctl <k> <v>`; `module <n> loaded|not-loaded`; `mode <path> <u g a>` over each
+  `modes` entry's expansion (`| sort -u`); `ageing <name> <min> <max>` when `password_policy` is scripted — compared by
+  `same()`, which forgives a `mode` path gone since (a rotated log). It is the only place a shipped service, sshd,
+  account, sysctl or module body runs against real system paths; `TestFileScriptsRepairOnARealFile` (root only; CI's
+  sudo step, where `CI=true` makes a missing `setfacl` fatal) runs the five 3D-2b file bodies and `nfs_export_access`
+  and their validates on temp files. The shipped-body tests (`TestFileBodiesRepairATempTree` and the sysctl, module,
+  line and account body tests) run the raw `script`/`validate` strings through `runBody` — path-rebased copies with
+  `log()`, the state helpers or the stubs prepended, not the rendered block; only the `Test*BodiesLeaveASymlinkedDropIn`
+  tests, `TestIPv6ForwardRestoreKeepsAllBeforeDefault` and `TestSessionTimeoutRollbackRestoresBeforeTheReload` run a
+  shipped body inside its rendered block (`Script()` over a one-item plan, under `t.TempDir()`). `rebaseRoot` rewrites
+  only `/etc/`, `/var/` and `/boot/` paths that follow a space, newline, `(`, `'` or `|`; a new file body spells its
+  paths that way, or the root-run tree test acts on the runner's real files. The examples gate byte-compares `examples/<snap>-fix-report.{json,txt,sh}` (script whole,
+  JSON masked under `fix`, table without line 1), so a body or plan change needs an examples refresh from the branch's
+  `examples.yml` run before the merge.
 - Risk is the operational impact, not the guide's: `hosts_permissions` is `restart_service` (0600 breaks non-root
-  `/etc/hosts` reads), `nis_disabled` is `lockout_risk` (stopping ypbind cuts NIS accounts). The sshd body reloads a
-  running `sshd`/`ssh` and validates persona root (`sshd -T -C user=root,…`). The script refuses a `MUSTER_BACKUP` that
-  root does not own or others can write (a planted backup would be restored over `/etc/shadow`).
+  `/etc/hosts` reads), `ip_forwarding_disabled`/`ipv6_forwarding_disabled` are `restart_service` (forwarding off cuts a
+  router's or container host's clients at once), `reverse_path_filtering` is `restart_service` (strict filtering drops
+  asymmetrically routed traffic; such a host sets 2), `usb_storage_disabled` is `restart_service` (USB backup or boot
+  media stop), `nis_disabled` is `lockout_risk` (stopping ypbind cuts NIS accounts), `password_policy` is `lockout_risk` (it
+  sets ageing on every account with a password except root: uid 0 is skipped and logged, since an expired root password
+  stops root's cron and at jobs, S-48). The sshd body reloads a running `sshd`/`ssh` and validates persona root
+  (`sshd -T -C user=root,…`). The script refuses a `MUSTER_BACKUP` that root does not own or others can write (a planted
+  backup would be restored over `/etc/shadow`).
 
 ## Stage-2 conventions
 

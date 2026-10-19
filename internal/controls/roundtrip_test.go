@@ -18,7 +18,7 @@ type roundtripEntry struct {
 }
 
 type matrixRow struct {
-	Key, Image, Init, Seeded, Build string
+	Key, Kind, Image, Init, Seeded, Build string
 }
 
 func TestEveryScriptedControlIsInTheRoundtripTable(t *testing.T) {
@@ -49,6 +49,32 @@ func TestEveryScriptedControlIsInTheRoundtripTable(t *testing.T) {
 		t.Fatal(err)
 	}
 	rows := wf.Jobs["fix-roundtrip"].Strategy.Matrix.Include
+	hostRow := map[string]bool{}
+	for _, r := range rows {
+		switch r.Kind {
+		case "container":
+			if r.Image == "" {
+				t.Errorf("matrix row %q: a container row needs an image", r.Key)
+			}
+		case "host":
+			hostRow[r.Key] = true
+			if r.Image != "" || r.Init != "" || r.Build != "" {
+				t.Errorf("matrix row %q: a host row carries no image, init or build", r.Key)
+			}
+		default:
+			t.Errorf("matrix row %q: kind %q, want container or host", r.Key, r.Kind)
+		}
+	}
+	for _, e := range table {
+		if !strings.HasPrefix(e.ID, "muster.beyond.") {
+			continue
+		}
+		for _, img := range e.Images {
+			if !hostRow[img] {
+				t.Errorf("%s: a beyond control gates containers out, so it may name host rows only, not %q", e.ID, img)
+			}
+		}
+	}
 	set, err := controls.LoadDefault()
 	if err != nil {
 		t.Fatal(err)
@@ -71,8 +97,8 @@ func TestEveryScriptedControlIsInTheRoundtripTable(t *testing.T) {
 		}
 		r := scripted[e.ID]
 		for u := range e.UnprovenUnits {
-			if r == nil || !contains(r.Units, u) {
-				t.Errorf("%s: unproven unit %s is not declared", e.ID, u)
+			if r == nil || !(contains(r.Units, u) || contains(r.Modules, u) || contains(r.Sysctl, u)) {
+				t.Errorf("%s: unproven unit %q is not declared in units, modules or sysctl", e.ID, u)
 			}
 		}
 		seen := map[string]bool{}
@@ -104,7 +130,7 @@ func TestEveryScriptedControlIsInTheRoundtripTable(t *testing.T) {
 	keys := map[string]matrixRow{}
 	for _, r := range rows {
 		if r.Key == "" || strings.TrimSpace(r.Seeded) == "" {
-			t.Errorf("matrix row %q: needs key and seeded", r.Image)
+			t.Errorf("matrix row %q: needs key and seeded", r.Key)
 		}
 		keys[r.Key] = r
 	}

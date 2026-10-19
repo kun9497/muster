@@ -10,6 +10,68 @@ verdict on an existing snapshot is at least a minor release and appears under
 ## [Unreleased]
 
 ### Added
+- Parameters in review scripts (stage 3D-2c). A control lists in
+  `remediation.script_params` the parameters its script reads; the block opens
+  with one `P_<name>='<value>'` line per entry, carrying the value in force
+  (the default, a profile's or a tuning file's; a list joined by one space).
+  A value enters only when it passes its type's charset (`int` an optionally
+  signed integer, `^-?[0-9]+$`; `bool`; a string or list element in
+  `[A-Za-z0-9._/@:+,=-]`); any other value makes
+  the item text-only with `text_only_reason: params_unsafe`, and it appears on
+  no command line and nowhere in the JSON. A control that declares
+  `script_params` is no longer text-only because a profile or tuning set its
+  parameter (`params_tuned` stays for the others). D34 is amended: a parameter
+  value is policy, not a host value, and the hash and the `P_` lines are the
+  two non-literal classes on a command line. `remediation.script_on_absent:
+  true` scripts an `absent_means: fail` finding whose fix writes the absent
+  line. Lint gains `script_params_declared`, `script_params_used`,
+  `script_params_default_safe`, `script_params_needs_script` and
+  `script_on_absent_needs_script`.
+- Three state records (stage 3D-2c): `remediation.modes` (paths, or `/*` and
+  `/*/*` expansions, whose owner, group, mode and type the block records),
+  `remediation.sysctl` (kernel keys whose runtime values it records) and
+  `remediation.modules` (modules whose load state it records). The prologue
+  gains `save_modes`/`restore_modes` (with `modes_paths`, `modes_type` and
+  `modes_trusted`), `save_sysctl`/`restore_sysctl` and
+  `save_modules`/`restore_modules`; a failed block runs its declared rollback,
+  then `restore_units`, `restore_modes`, `restore`, `restore_sysctl` and
+  `restore_modules`, in that order. `restore_modes` skips a path already as
+  recorded, chowns only when the owner or group differs (a mode-only restore
+  keeps `security.capability`), and refuses a symlink, a type change and a
+  path under a directory someone other than root could rename it in (a
+  root-owned group-writable directory is accepted); `restore_modules` reloads with `modprobe
+  --ignore-install`. Each is a way back on its own. Lint gains
+  `modes_charset`, `modes_backup_overlap`, `sysctl_charset`, `modules_charset`
+  and `state_needs_script`; `units_exclusive` also forbids the three beside
+  `units`. The plan JSON gains each item's `script_params` and
+  `script_on_absent` (after `text_only_reason`, before `rollback`) and its
+  `modes`, `sysctl` and `modules` (after `units`), and the rollback word
+  `state`; plan schema stays 1. `Build` also refuses a backup path, modes
+  entry, sysctl key, module or script-param name outside its lint pattern.
+- Review scripts for 32 more controls (48 in all; stage 3D-2c): sixteen kernel
+  settings (a `99-muster-<name>.conf` drop-in under `/etc/sysctl.d` and the
+  runtime value), three module controls (an `install <module> /bin/false`
+  line under `/etc/modprobe.d`, then an unload), nine file and directory
+  permissions (`cron_permissions`, `sudoers_permissions`,
+  `syslog_conf_permissions`, `inetd_conf_permissions`, `log_dir_permissions`,
+  `ftpusers_permissions`, `nfs_export_access`, `bootloader_config_permissions`,
+  `audit_log_permissions`) and four account policies (`password_policy`,
+  `lockout_threshold`, `session_timeout`, `umask_policy`). Every body writes
+  only when the host is outside what the control accepts, never loosens a
+  stricter value, never follows a symlink, and leaves a muster drop-in that is
+  a symlink (a mask) as is and stops the block. A system crontab or a sudoers
+  file not owned by root is never chowned or re-moded (cron and sudo ignore it;
+  the block logs it and rolls back); `cron_permissions` and
+  `audit_log_permissions` fix their directories first and change files only in
+  a directory that is root-owned and not other-writable up to `/`; a symlinked
+  `/etc/login.defs` stops the `umask_policy` and `password_policy` blocks.
+- A `runner` row in `fix-roundtrip` (stage 3D-2c, `kind: host`): the GitHub
+  runner VM itself is seeded by `ci/roundtrip/runner.sh`, repaired, re-seeded
+  and failed, so the `beyond` scripts, which gate containers out, run against
+  a real kernel. It has no guard run (one host); its failure run re-plans
+  after the re-seed. Every matrix row now names its `kind` (`container` or
+  `host`), and `usb_storage_disabled` is unproven (the runner kernel does not
+  ship the module).
 - The review script's host guard (stage 3D-2b). The script carries the
   snapshot's `run.host.machine_id_hash` and, before it changes anything,
   hashes the running host's `/etc/machine-id`: a different or unreadable id
@@ -20,17 +82,15 @@ verdict on an existing snapshot is at least a minor release and appears under
   hex characters.
 - `remediation.units` (stage 3D-2b): a service control declares the units it
   acts on, and the script records each unit's enablement and activity, and the
-  active units that stopping it would stop, under
-  `$MUSTER_BACKUP/muster-units/` before the block runs (`save_units`). On
+  active units that stopping it would stop, under the block's
+  `$MUSTER_BACKUP/blocks/<fn>/units/` before the block runs (`save_units`). On
   failure `restore_units` puts that state back in seven passes — unmask,
   enable what was enabled, re-disable an `Also=` partner, re-mask what was
   masked, start what was active, start the stopped dependants, read the
-  enablement back — and logs every unit it could not restore. A first record is
-  kept across runs with the same `MUSTER_BACKUP`, except an `absent` one. Lint
-  gains `units_charset`, `units_order`, `units_needs_script`,
-  `units_exclusive`, `units_variable`, `backup_reserved` and
-  `script_needs_validate` per control, and `backup_path_shared` and
-  `units_shared` over the set.
+  enablement back — and logs every unit it could not restore. A block's first
+  record is kept across runs with the same `MUSTER_BACKUP`, except an `absent`
+  one. Lint gains `units_charset`, `units_order`, `units_needs_script`,
+  `units_exclusive`, `units_variable` and `script_needs_validate`.
 - The round-trip table `controls/testdata/_roundtrip.yaml`: every scripted
   control names the `fix-roundtrip` rows that seed and repair it, the declared
   units those rows do not exercise, or why no row can
@@ -77,8 +137,22 @@ verdict on an existing snapshot is at least a minor release and appears under
   wherever text is escaped: check's and fix's tables, the review script's
   comments, waiver, profile, tuning and control text. Output changes only where
   such a rune occurs; no shipped control text carries one.
-- The plan's rollback vocabulary gains `units` (`none | declared |
-  restore_backup | units | both`).
+- The plan's rollback vocabulary has six words: `none | declared |
+  restore_backup | units | state | both` (`units` in 3D-2b; `state`, a
+  `modes`, `sysctl` or `modules` record alone, in 3D-2c; `both` is two or more
+  of a rollback, a backup and a state record).
+- Each block keeps its records under its own `$MUSTER_BACKUP/blocks/<fn>/`
+  (stage 3D-2c): file copies under `files/` (they used to sit at
+  `$MUSTER_BACKUP<path>`), unit states under `units/`, and the state lists. A
+  declared path that did not exist gets an `absent/` marker, and a failure
+  removes the file the block created there (it used to be left in place); two
+  controls may now declare the same path or unit.
+- Five risks name the operational impact (stage 3D-2c):
+  `ip_forwarding_disabled`, `ipv6_forwarding_disabled`,
+  `reverse_path_filtering` (strict filtering drops asymmetrically routed
+  traffic) and `usb_storage_disabled` are `restart_service`,
+  `password_policy` is `lockout_risk` (its ageing loop skips uid 0 and logs it:
+  an expired root password stops root's cron and at jobs).
 - The review script's prologue runs `set -u`, `umask 077`, `log()`, the hash
   helper, the root check, the host guard, the `MUSTER_BACKUP` checks and the
   helpers, in that order; its exit 2 now has three causes (not root, another
@@ -91,8 +165,9 @@ verdict on an existing snapshot is at least a minor release and appears under
 - The plan JSON gains `fix.host_guard` (`on` | `off`, after `fix.max_risk`) and
   each item's `units` (after `backup`; `[]` when none). Plan schema stays 1.
 - `controls lint` checks the remediation block: `text_en`/`text_ko` one line and
-  at most 1000 runes, titles free of control characters, a `rollback`, `backup`
-  or `units` and a `validate` for every `script` (widened in 3D-2b), `idempotent: true` with a `script`, a one-line `validate`,
+  at most 1000 runes, titles free of control characters, a way back (`rollback`,
+  `backup`, `units`, `modes`, `sysctl` or `modules`; widened in 3D-2b and
+  3D-2c) and a `validate` for every `script`, `idempotent: true` with a `script`, a one-line `validate`,
   no here-document in a body, and absolute, clean, shell-safe `backup` paths.
   `check`'s output is unchanged.
 - `controls list` takes flags (`--profile <name|path>`) and refuses an unknown
@@ -104,6 +179,23 @@ verdict on an existing snapshot is at least a minor release and appears under
   ignore the rest.
 
 ### Controls
+
+Control set `kisa-unix-2026+2026.10.14` (was `+2026.10.13`). Remediation blocks
+and one parameter default order; no `checks` or verdict changes. Thirty-two
+controls gain a review script (48 in all): the sixteen sysctl controls declare
+their keys in `sysctl` and write a `99-muster-<name>.conf` drop-in only for a
+key outside the accepted set; the three module controls declare `modules` and
+append an `install … /bin/false` line only where the effective first `install`
+line does not already disable the module; nine file and directory controls
+clear bits symbolically, declare `modes` for paths a body only re-modes or a
+daemon writes to, and change files under a directory only where no one but
+root (or a root-owned directory's group) can rename them; the four account
+controls tighten `login.defs`, `faillock.conf`, `pwquality` and per-account
+ageing (root's excepted) only, reading keys as the collector does. `umask_policy.acceptable`
+lists `027` first (the value its script writes); `op: in` does not depend on
+order, so only the digest moves. The risks of `ip_forwarding_disabled`,
+`ipv6_forwarding_disabled`, `reverse_path_filtering` and `usb_storage_disabled`
+become `restart_service` and that of `password_policy` `lockout_risk`.
 
 Control set `kisa-unix-2026+2026.10.13` (was `+2026.10.08`). Remediation
 blocks only; no `checks`, `params` or verdict changes. The ten service controls
@@ -498,6 +590,20 @@ configuration walk stopped at an `Include` outside the declaration (below).
   Found by the nightly fuzz workflow; the input is committed as its seed.
 
 ### Tooling
+- The `fix-roundtrip` job gains the `runner` host row (stage 3D-2c): `x()`
+  runs a command on the system under test (`docker exec`, or `sudo` on the
+  VM), each run gets its own `MUSTER_BACKUP`, and `ci/roundtrip/runner.sh`
+  seeds the VM (idempotent: it removes muster's drop-ins and puts back the
+  stock modes the repair run tightened before seeding again). The host row
+  checks that every seeded id is scripted in the failure plan and that the
+  failure plan scripts nothing the repair plan did not. The failure run's
+  `record()` also compares sysctl values, module load states, the stat of
+  every `modes` path and, when `password_policy` is scripted, each account's
+  ageing fields. The container seeds install what the new scripts judge
+  (`sudo`, `cron`/`cronie`, `rsyslog`, and `vsftpd` on the init rows; the EL
+  rows also `authselect` and `passwd`, selecting `minimal with-faillock`). `make
+  shellcheck` and the CI step want at least six `ci/roundtrip/*.sh`.
+  `TestFileScriptsRepairOnARealFile` also runs `nfs_export_access`'s body.
 - `make shellcheck` and the CI shellcheck step also cover `ci/roundtrip/*.sh`
   (at least five). The `fix-roundtrip` job keys its rows (`rocky9-init`,
   `almalinux9-init`, `debian12-init` built from

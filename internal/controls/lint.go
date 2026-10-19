@@ -54,6 +54,11 @@ var (
 	paramRefRe      = regexp.MustCompile(`^\$\{([a-z][a-z0-9_]*)\}$`)
 	backupPathRe    = regexp.MustCompile(`^/[A-Za-z0-9._@:+/-]+$`)
 	unitRe          = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:-]*(@[A-Za-z0-9._:-]+)?\.(service|socket)$`)
+	modesEntryRe    = regexp.MustCompile(`^/[A-Za-z0-9._@:+/-]+(/\*){0,2}$`)
+	sysctlKeyRe     = regexp.MustCompile(`^[a-z0-9_]+(\.[a-z0-9_-]+)+$`)
+	moduleNameRe    = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]*$`)
+	paramNameRe     = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
+	pVarRe          = regexp.MustCompile(`\$\{?P_([A-Za-z0-9_]+)`)
 
 	categories       = []string{"account", "file", "service", "patch", "log", "beyond"}
 	validCategory    = set(categories...)
@@ -80,6 +85,39 @@ func ValidControlID(id string) bool { return idRe.MatchString(id) }
 // if it is a template, and ends .service or .socket. The review script puts
 // it on a command line, so remedy.Build checks it again.
 func ValidUnitName(u string) bool { return unitRe.MatchString(u) }
+
+// ValidParamName reports whether n can name a P_<n> block variable (3D-2c S-1).
+func ValidParamName(n string) bool { return paramNameRe.MatchString(n) }
+
+// ValidBackupPath reports whether p is an absolute clean path in the charset
+// the review script carries (the backup lint's rule; remedy.Build re-checks it).
+func ValidBackupPath(p string) bool { return backupPathRe.MatchString(p) && path.Clean(p) == p }
+
+// modesBase splits a modes entry into its base path and its number of /*
+// segments.
+func modesBase(e string) (string, int) {
+	k := 0
+	for k < 2 && strings.HasSuffix(e, "/*") {
+		e, k = strings.TrimSuffix(e, "/*"), k+1
+	}
+	return e, k
+}
+
+// ValidModesEntry reports whether e is an absolute clean path followed by at
+// most two /* segments (3D-2c E-3, S-7).
+func ValidModesEntry(e string) bool {
+	if !modesEntryRe.MatchString(e) {
+		return false
+	}
+	base, _ := modesBase(e)
+	return base != "/" && path.Clean(base) == base
+}
+
+// ValidSysctlKey reports whether k is a dotted kernel key (3D-2c E-3).
+func ValidSysctlKey(k string) bool { return sysctlKeyRe.MatchString(k) }
+
+// ValidModuleName reports whether m is a module name the helpers carry.
+func ValidModuleName(m string) bool { return moduleNameRe.MatchString(m) }
 
 // Categories returns the categories a control may declare (spec §6.2) in a
 // fixed order. controls new derives the category from the id's area, so it
@@ -108,7 +146,8 @@ func hasControlRune(s string) bool {
 // whether a line break is left.
 func oneLine(s string) bool { return !strings.ContainsAny(strings.TrimSuffix(s, "\n"), "\r\n") }
 
-func lintRemediation(r *Remediation, add func(rule, format string, args ...any)) {
+func lintRemediation(c *Control, add func(rule, format string, args ...any)) {
+	r := c.Remediation
 	if !validRisk[r.Risk] {
 		add("remediation", "unknown remediation risk %q", r.Risk)
 	}
@@ -134,11 +173,12 @@ func lintRemediation(r *Remediation, add func(rule, format string, args ...any))
 		}
 	}
 	hasScript := strings.TrimSpace(r.Script) != ""
+	hasState := len(r.Modes) > 0 || len(r.Sysctl) > 0 || len(r.Modules) > 0
 	if hasScript && !r.Idempotent {
 		add("remediation", "script requires idempotent: true")
 	}
-	if hasScript && strings.TrimSpace(r.Rollback) == "" && len(r.Backup) == 0 && len(r.Units) == 0 {
-		add("remediation", "script without rollback, backup or units")
+	if hasScript && strings.TrimSpace(r.Rollback) == "" && len(r.Backup) == 0 && len(r.Units) == 0 && !hasState {
+		add("remediation", "script without rollback, backup, units, modes, sysctl or modules")
 	}
 	if hasScript && r.Validate == "" {
 		add("script_needs_validate", "script without validate")
@@ -146,11 +186,24 @@ func lintRemediation(r *Remediation, add func(rule, format string, args ...any))
 	if len(r.Units) > 0 && !hasScript {
 		add("units_needs_script", "units without script")
 	}
-	if len(r.Units) > 0 && strings.TrimSpace(r.Rollback) != "" {
-		add("units_exclusive", "units excludes rollback: the unit state is the way back")
+	if hasState && !hasScript {
+		add("state_needs_script", "modes, sysctl or modules without script")
 	}
-	if len(r.Units) > 0 && len(r.Backup) > 0 {
-		add("units_exclusive", "units excludes backup: the unit state is the way back")
+	if len(r.ScriptParams) > 0 && !hasScript {
+		add("script_params_needs_script", "script_params without script")
+	}
+	if r.ScriptOnAbsent && !hasScript {
+		add("script_on_absent_needs_script", "script_on_absent without script")
+	}
+	if len(r.Units) > 0 {
+		for _, x := range []struct {
+			name string
+			has  bool
+		}{{"rollback", strings.TrimSpace(r.Rollback) != ""}, {"backup", len(r.Backup) > 0}, {"modes", len(r.Modes) > 0}, {"sysctl", len(r.Sysctl) > 0}, {"modules", len(r.Modules) > 0}} {
+			if x.has {
+				add("units_exclusive", "units excludes %s: the unit state is the way back", x.name)
+			}
+		}
 	}
 	usesUnits := func(s string) bool { return strings.Contains(s, "$UNITS") || strings.Contains(s, "${UNITS") }
 	if usesUnits(r.Script) && len(r.Units) == 0 {
@@ -189,6 +242,8 @@ func lintRemediation(r *Remediation, add func(rule, format string, args ...any))
 	if r.Validate != "" && !oneLine(r.Validate) {
 		add("remediation", "validate must be one line")
 	}
+	lintScriptParams(c, add)
+	lintStateEntries(r, add)
 	seen := map[string]bool{}
 	for _, p := range r.Backup {
 		switch {
@@ -199,9 +254,6 @@ func lintRemediation(r *Remediation, add func(rule, format string, args ...any))
 		case !backupPathRe.MatchString(p):
 			add("remediation", "backup path %q carries a character the script cannot carry", p)
 		}
-		if p == "/muster-units" || strings.HasPrefix(p, "/muster-units/") {
-			add("backup_reserved", "backup path %q is the script's unit-state directory", p)
-		}
 		if seen[p] {
 			add("remediation", "backup path %q is repeated", p)
 		}
@@ -209,35 +261,83 @@ func lintRemediation(r *Remediation, add func(rule, format string, args ...any))
 	}
 }
 
-// lintSharedRemediation refuses two scripted controls that declare the same
-// backup path or the same unit (3D-2b §3): the first-record rule would let one
-// block's restore undo the other's change. The Problem names the later
-// control in id order (the set is sorted by id), as beyond_scope does.
-func lintSharedRemediation(s *Set) []Problem {
-	var out []Problem
-	paths, units := map[string]string{}, map[string]string{}
-	for i := range s.Controls {
-		c := &s.Controls[i]
-		r := c.Remediation
-		if r == nil || strings.TrimSpace(r.Script) == "" {
+// lintScriptParams holds script_params to the control's declared params and
+// to the bodies that read them (3D-2c E-1).
+func lintScriptParams(c *Control, add func(rule, format string, args ...any)) {
+	r := c.Remediation
+	declared := map[string]bool{}
+	for _, n := range r.ScriptParams {
+		switch {
+		case !ValidParamName(n):
+			add("script_params_declared", "script param %q is not a parameter name", n)
+			continue
+		case declared[n]:
+			add("script_params_declared", "script param %q is repeated", n)
 			continue
 		}
-		for _, p := range r.Backup {
-			if first, ok := paths[p]; ok {
-				out = append(out, Problem{ControlID: c.ID, Path: c.Path, Rule: "backup_path_shared", Message: fmt.Sprintf("backup path %q is also declared by %s", p, first)})
-				continue
-			}
-			paths[p] = c.ID
+		declared[n] = true
+		p, ok := c.Params[n]
+		if !ok {
+			add("script_params_declared", "script param %q is not a declared parameter", n)
+			continue
 		}
-		for _, u := range r.Units {
-			if first, ok := units[u]; ok {
-				out = append(out, Problem{ControlID: c.ID, Path: c.Path, Rule: "units_shared", Message: fmt.Sprintf("unit %q is also declared by %s", u, first)})
-				continue
-			}
-			units[u] = c.ID
+		if _, safe := ScriptParamValue(p.Type, p.Default); !safe {
+			add("script_params_default_safe", "script param %q default %v cannot be carried by a script", n, p.Default)
 		}
 	}
-	return out
+	usedInScript := map[string]bool{}
+	for _, b := range []struct{ name, v string }{{"script", r.Script}, {"validate", r.Validate}, {"rollback", r.Rollback}} {
+		for _, m := range pVarRe.FindAllStringSubmatch(b.v, -1) {
+			if b.name == "script" {
+				usedInScript[m[1]] = true
+			}
+			if !declared[m[1]] {
+				add("script_params_used", "%s uses $P_%s, which script_params does not declare", b.name, m[1])
+			}
+		}
+	}
+	for _, n := range r.ScriptParams {
+		if declared[n] && !usedInScript[n] {
+			add("script_params_used", "script param %q is not used in script", n)
+		}
+	}
+}
+
+// lintStateEntries checks the modes, sysctl and modules lists (3D-2c E-3).
+func lintStateEntries(r *Remediation, add func(rule, format string, args ...any)) {
+	seen := map[string]bool{}
+	for _, e := range r.Modes {
+		if !ValidModesEntry(e) {
+			add("modes_charset", "modes entry %q is not an absolute clean path with at most two /* segments", e)
+		}
+		if seen[e] {
+			add("modes_charset", "modes entry %q is repeated", e)
+		}
+		seen[e] = true
+		base, k := modesBase(e)
+		for _, b := range r.Backup {
+			rest, under := strings.CutPrefix(b, base+"/")
+			if (k == 0 && b == base) || (k > 0 && under && strings.Count(rest, "/") == k-1) {
+				add("modes_backup_overlap", "backup path %q is also covered by modes entry %q", b, e)
+			}
+		}
+	}
+	for _, x := range []struct {
+		rule, kind string
+		list       []string
+		valid      func(string) bool
+	}{{"sysctl_charset", "sysctl key", r.Sysctl, ValidSysctlKey}, {"modules_charset", "module", r.Modules, ValidModuleName}} {
+		seen := map[string]bool{}
+		for _, v := range x.list {
+			if !x.valid(v) {
+				add(x.rule, "%s %q is not one a script can carry", x.kind, v)
+			}
+			if seen[v] {
+				add(x.rule, "%s %q is repeated", x.kind, v)
+			}
+			seen[v] = true
+		}
+	}
 }
 
 // Lint applies every rule of spec §6.8 to set and returns the problems sorted
@@ -276,7 +376,7 @@ func Lint(s *Set, reg *facts.Registry, opts LintOptions) []Problem {
 			add("remediation", "%s controls must carry remediation", c.Automation)
 		}
 		if c.Remediation != nil {
-			lintRemediation(c.Remediation, add)
+			lintRemediation(c, add)
 		}
 		judgments := 0
 		if len(c.Checks) > 0 {
@@ -431,7 +531,6 @@ func Lint(s *Set, reg *facts.Registry, opts LintOptions) []Problem {
 		}
 	}
 	out = append(out, lintKISACoverage(s, opts.KISA)...)
-	out = append(out, lintSharedRemediation(s)...)
 	// M13: several rules range over a map (params, references.kisa), whose
 	// iteration order Go randomises, so the message has to be part of the
 	// sort key or two problems of the same rule swap places between runs.

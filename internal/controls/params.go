@@ -1,6 +1,11 @@
 package controls
 
-import "fmt"
+import (
+	"fmt"
+	"regexp"
+	"strconv"
+	"strings"
+)
 
 // CheckParamValue reports whether v has the shape a parameter of type typ
 // takes: yaml.v3's own decoding of a scalar or a sequence (int, string,
@@ -38,4 +43,55 @@ func CheckParamValue(typ string, v any) error {
 		return fmt.Errorf("value %v is not of type %s", v, typ)
 	}
 	return nil
+}
+
+var (
+	scriptIntRe = regexp.MustCompile(`^-?[0-9]+$`)
+	scriptStrRe = regexp.MustCompile(`^[A-Za-z0-9._/@:+,=-]+$`)
+)
+
+// ScriptParamValue formats a parameter value for a review script's
+// P_<name>='<value>' line (3D-2c E-1) and reports whether the value can be
+// carried: an int as an optionally signed integer (^-?[0-9]+$), a bool as
+// true/false, a string or each list element in a charset with no quote,
+// blank, $, backtick, ;, |, & or \, and a list as its elements joined by one
+// space. An empty list cannot be.
+func ScriptParamValue(typ string, v any) (string, bool) {
+	switch typ {
+	case "int":
+		n, ok := v.(int)
+		if !ok {
+			return "", false
+		}
+		s := strconv.Itoa(n)
+		return s, scriptIntRe.MatchString(s)
+	case "bool":
+		b, ok := v.(bool)
+		if !ok {
+			return "", false
+		}
+		return strconv.FormatBool(b), true
+	case "string":
+		s, ok := v.(string)
+		if !ok || !scriptStrRe.MatchString(s) {
+			return "", false
+		}
+		return s, true
+	case "list<int>", "list<string>":
+		xs, ok := v.([]any)
+		if !ok || len(xs) == 0 {
+			return "", false
+		}
+		elem := strings.TrimSuffix(strings.TrimPrefix(typ, "list<"), ">")
+		parts := make([]string, 0, len(xs))
+		for _, x := range xs {
+			s, ok := ScriptParamValue(elem, x)
+			if !ok {
+				return "", false
+			}
+			parts = append(parts, s)
+		}
+		return strings.Join(parts, " "), true
+	}
+	return "", false
 }

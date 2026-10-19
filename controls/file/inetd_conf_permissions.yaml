@@ -28,7 +28,21 @@ mechanisms:
       - { fact: files.xinetd_d, op: none, subject: path, where: { field: group_writable, op: eq, expected: true } }
       - { fact: files.xinetd_d, op: none, subject: path, where: { field: reason, op: present } }
 remediation:
-  text_en: chmod 0600 /etc/inetd.conf or /etc/xinetd.conf and its fragments, chown them to root, and prefer removing the super-server if no service needs it.
-  text_ko: /etc/inetd.conf 또는 /etc/xinetd.conf 와 그 조각에 chmod 0600 을 적용하고 root 로 chown 하며, 필요한 서비스가 없으면 슈퍼서버 제거를 우선합니다.
+  text_en: chmod 0600 /etc/inetd.conf or /etc/xinetd.conf and its fragments, chown them to root, and prefer removing the super-server if no service needs it. The review script never follows a symlink.
+  text_ko: /etc/inetd.conf 또는 /etc/xinetd.conf 와 그 조각에 chmod 0600 을 적용하고 root 로 chown 하며, 필요한 서비스가 없으면 슈퍼서버 제거를 우선합니다. 검토 스크립트는 심볼릭 링크를 따라가지 않습니다.
   risk: none
   idempotent: true
+  backup: [/etc/inetd.conf, /etc/xinetd.conf]
+  modes: ["/etc/xinetd.d/*"]
+  script: |
+    for p in /etc/inetd.conf /etc/xinetd.conf; do
+      if [ -f "$p" ] && [ ! -L "$p" ]; then
+        chown root "$p"
+        chmod u-xs,g-rwxs,o-rwxt "$p"
+      fi
+    done
+    if [ -d /etc/xinetd.d ] && [ ! -L /etc/xinetd.d ]; then
+      find /etc/xinetd.d -mindepth 1 -maxdepth 1 -type f -exec chmod go-w {} +
+    fi
+  validate: |
+    { [ ! -f /etc/inetd.conf ] || [ -L /etc/inetd.conf ] || [ -z "$(find /etc/inetd.conf \( -perm /024 -o ! -user root \))" ]; } && { [ ! -f /etc/xinetd.conf ] || [ -L /etc/xinetd.conf ] || case "$(stat -c '%u %a' /etc/xinetd.conf)" in '0 0'|'0 200'|'0 400'|'0 600') ;; *) false;; esac; } && [ -z "$(find /etc/xinetd.d -mindepth 1 -maxdepth 1 -type f -perm /022 2>/dev/null)" ]

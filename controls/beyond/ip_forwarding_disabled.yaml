@@ -19,7 +19,28 @@ params:
 checks:
   - { fact: net.sysctl.ipv4_ip_forward, op: in, expected: "${allowed_forward}" }
 remediation:
-  text_en: Write net.ipv4.ip_forward = 0 into a file under /etc/sysctl.d, for example /etc/sysctl.d/60-network-hardening.conf, and apply it with sysctl --system; it takes effect at once. Check first that the host is not a router, VPN gateway or container host - turning forwarding off there cuts its clients and containers off the network; such a host names 1 in params.allowed_forward instead.
-  text_ko: /etc/sysctl.d 아래 파일(예 /etc/sysctl.d/60-network-hardening.conf)에 net.ipv4.ip_forward = 0 을 적고 sysctl --system 으로 적용합니다. 즉시 반영됩니다. 먼저 호스트가 라우터, VPN 게이트웨이, 컨테이너 호스트가 아닌지 확인하십시오. 그런 호스트에서 포워딩을 끄면 클라이언트와 컨테이너가 네트워크에서 끊기므로, 대신 params.allowed_forward 에 1 을 적습니다.
-  risk: none
+  text_en: Write net.ipv4.ip_forward = 0 into /etc/sysctl.d/99-muster-ip-forwarding-disabled.conf and apply it with sysctl --system; it takes effect at once. Check first that the host is not a router, VPN gateway or container host - turning forwarding off there cuts its clients and containers off the network; such a host names 1 in params.allowed_forward instead. The kernel resets net.ipv4.conf.all.accept_redirects whenever forwarding changes, so the review script puts back the value it read before the write and keeps it in the file only when that value is 0. A failed block puts back net.ipv4.ip_forward only; every interface's forwarding then follows that global value, because the kernel copies it. A value set in /etc/sysctl.conf, or in a sysctl.d file that sorts after 99-muster-ip-forwarding-disabled.conf, still wins at boot; correct it there. The review script never follows a symlink; a 99-muster-ip-forwarding-disabled.conf that is a symlink (a mask) is left as is and the block stops.
+  text_ko: /etc/sysctl.d/99-muster-ip-forwarding-disabled.conf 에 net.ipv4.ip_forward = 0 을 적고 sysctl --system 으로 적용합니다. 즉시 반영됩니다. 먼저 호스트가 라우터, VPN 게이트웨이, 컨테이너 호스트가 아닌지 확인하십시오. 그런 호스트에서 포워딩을 끄면 클라이언트와 컨테이너가 네트워크에서 끊기므로, 대신 params.allowed_forward 에 1 을 적습니다. 커널은 포워딩이 바뀔 때마다 net.ipv4.conf.all.accept_redirects 를 다시 설정하므로, 검토 스크립트는 쓰기 전에 읽은 값을 되돌려 놓고 그 값이 0일 때만 파일에 남깁니다. 실패한 블록은 net.ipv4.ip_forward 만 되돌리며, 커널이 그 값을 복사하므로 각 인터페이스의 포워딩은 그 전역 값을 따릅니다. /etc/sysctl.conf나 99-muster-ip-forwarding-disabled.conf 뒤에 정렬되는 sysctl.d 파일에 둔 값이 부팅 때 여전히 이기므로 그 파일을 고치십시오. 검토 스크립트는 심볼릭 링크를 따라가지 않으므로, 심볼릭 링크(마스크)인 99-muster-ip-forwarding-disabled.conf 는 그대로 두고 그 블록을 멈춥니다.
+  risk: restart_service
   idempotent: true
+  script_params: [allowed_forward]
+  sysctl: [net.ipv4.ip_forward, net.ipv4.conf.all.accept_redirects]
+  backup: [/etc/sysctl.d/99-muster-ip-forwarding-disabled.conf]
+  script: |
+    f=/etc/sysctl.d/99-muster-ip-forwarding-disabled.conf
+    if [ -L "$f" ]; then log "muster.beyond.ip_forwarding_disabled: $f is a symlink (a mask), left as is"; exit 1; fi
+    put() {
+      sysctl -q -w "$1=$2"
+      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else printf '%s = %s\n' "$1" "$2" >> "$f"; fi
+    }
+    first=${P_allowed_forward%% *}
+    case " $P_allowed_forward " in
+      *" $(sysctl -n net.ipv4.ip_forward) "*) ;;
+      *) r=$(sysctl -n net.ipv4.conf.all.accept_redirects)
+         put net.ipv4.ip_forward "$first"
+         if [ "$r" = 0 ]; then put net.ipv4.conf.all.accept_redirects 0
+         elif [ "$(sysctl -n net.ipv4.conf.all.accept_redirects)" != "$r" ]; then sysctl -q -w "net.ipv4.conf.all.accept_redirects=$r"; fi;;
+    esac
+    if [ -f "$f" ] && [ ! -L "$f" ]; then chmod 644 "$f"; fi
+  validate: |
+    case " $P_allowed_forward " in *" $(sysctl -n net.ipv4.ip_forward) "*) ;; *) false;; esac

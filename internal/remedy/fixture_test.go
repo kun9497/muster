@@ -38,7 +38,7 @@ checks:
   - { fact: sshd.options.permit_root_login, on: effective, op: in, expected: ["no"] }
 `
 
-// testControls are the six shapes the planner distinguishes.
+// testControls are the shapes the planner distinguishes.
 var testControls = map[string]string{
 	"muster.test.a_none": `automation: auto
 remediation:
@@ -98,6 +98,55 @@ remediation:
   script: |
     for u in $UNITS; do systemctl --quiet disable --now "$u"; done
   validate: "! systemctl is-active --quiet g.service"
+`,
+	"muster.test.h_params": `automation: auto
+params:
+  limit: { type: int, default: 5, description: d }
+  names: { type: list<string>, default: ["a", "b"], description: d }
+remediation:
+  text_en: fix h
+  text_ko: 조치 h
+  risk: none
+  idempotent: true
+  script_params: [names, limit]
+  script: |
+    for n in $P_names; do printf '%s %s\n' "$n" "$P_limit" >> /etc/h.conf; done
+  backup: [/etc/h.conf]
+  validate: '[ "$P_limit" -ge 1 ]'
+`,
+	"muster.test.i_state": `automation: auto
+remediation:
+  text_en: fix i
+  text_ko: 조치 i
+  risk: none
+  idempotent: true
+  modes: ["/etc/i.d/*", /etc/i.conf]
+  sysctl: [kernel.i_key]
+  modules: [i-mod]
+  script: chmod o-w /etc/i.conf
+  validate: "true"
+`,
+	"muster.test.j_absent": `automation: auto
+remediation:
+  text_en: fix j
+  text_ko: 조치 j
+  risk: none
+  idempotent: true
+  script_on_absent: true
+  script: printf 'J 1\n' >> /etc/j.conf
+  backup: [/etc/j.conf]
+  validate: grep -q '^J 1$' /etc/j.conf
+`,
+	"muster.test.k_both": `automation: auto
+remediation:
+  text_en: fix k
+  text_ko: 조치 k
+  risk: none
+  idempotent: true
+  sysctl: [kernel.k_key]
+  backup: [/etc/k.conf]
+  script: printf 'kernel.k_key = 1\n' > /etc/k.conf
+  validate: "true"
 `,
 	"muster.test.f_partial": `automation: partial
 remediation:

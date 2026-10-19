@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
   "run": {
-    "muster_version": "6503835",
-    "commit": "6503835",
-    "controls_version": "kisa-unix-2026+2026.10.13",
-    "controls_digest": "sha256:f19aabb3a5704b459246b30850f221e08d90369f7e043e16db157d39648342e1",
+    "muster_version": "69ad0db",
+    "commit": "69ad0db",
+    "controls_version": "kisa-unix-2026+2026.10.14",
+    "controls_digest": "sha256:10c22486c23977609714514cb0938b2989e61e1d20394998533a7dd565f09c96",
     "guide_edition": "kisa-unix-2026",
-    "collected_at": "2026-10-13T08:25:27Z",
+    "collected_at": "2026-10-19T01:02:53Z",
     "host": {
       "hostname": "ubuntu-container",
       "machine_id_hash": "",
@@ -36,18 +36,18 @@
       {
         "name": "accounts",
         "status": "ok",
-        "ms": 38
+        "ms": 0
       },
       {
         "name": "audit",
         "status": "ok",
-        "ms": 18,
+        "ms": 0,
         "cmd": "/usr/sbin/auditctl -l"
       },
       {
         "name": "banners",
         "status": "ok",
-        "ms": 8
+        "ms": 0
       },
       {
         "name": "boot",
@@ -57,12 +57,12 @@
       {
         "name": "coredump",
         "status": "ok",
-        "ms": 59
+        "ms": 0
       },
       {
         "name": "cron",
         "status": "ok",
-        "ms": 9,
+        "ms": 0,
         "cmd": "/usr/bin/systemctl list-unit-files --type=timer --no-legend --no-pager"
       },
       {
@@ -73,12 +73,12 @@
       {
         "name": "env",
         "status": "ok",
-        "ms": 17
+        "ms": 0
       },
       {
         "name": "files",
         "status": "ok",
-        "ms": 18
+        "ms": 2
       },
       {
         "name": "fim",
@@ -131,23 +131,23 @@
       {
         "name": "os",
         "status": "ok",
-        "ms": 9
+        "ms": 0
       },
       {
         "name": "pam",
         "status": "ok",
-        "ms": 9
+        "ms": 0
       },
       {
         "name": "patch",
         "status": "ok",
-        "ms": 2423,
+        "ms": 23,
         "cmd": "/usr/bin/apt-get -s upgrade -o Debug::NoLocking=1"
       },
       {
         "name": "pkgverify",
         "status": "ok",
-        "ms": 9287,
+        "ms": 166,
         "cmd": "/usr/bin/rpm -Va"
       },
       {
@@ -158,7 +158,7 @@
       {
         "name": "processes",
         "status": "ok",
-        "ms": 15,
+        "ms": 13,
         "cmd": "/usr/bin/rpm -qa --qf [%{=NAME}\t%{FILEMODES:octal}\t%{FILEUSERNAME}\t%{FILEGROUPNAME}\t%|FILECAPS?{%{FILECAPS}}|\t%{FILENAMES}\n]"
       },
       {
@@ -213,7 +213,7 @@
       {
         "name": "walk",
         "status": "ok",
-        "ms": 1,
+        "ms": 0,
         "cmd": "/usr/bin/rpm -qa --qf [%{=NAME}\t%{FILEMODES:octal}\t%{FILEUSERNAME}\t%{FILEGROUPNAME}\t%|FILECAPS?{%{FILECAPS}}|\t%{FILENAMES}\n]"
       }
     ],
@@ -226,11 +226,11 @@
     "partial_failures": []
   },
   "check": {
-    "muster_version": "6503835",
-    "commit": "6503835",
-    "controls_version": "kisa-unix-2026+2026.10.13",
-    "controls_digest": "sha256:f19aabb3a5704b459246b30850f221e08d90369f7e043e16db157d39648342e1",
-    "snapshot_digest": "sha256:a631e7d6a0618ba46b83b1b7a57622de0625072441e4407250d263fdfb1ac389",
+    "muster_version": "69ad0db",
+    "commit": "69ad0db",
+    "controls_version": "kisa-unix-2026+2026.10.14",
+    "controls_digest": "sha256:10c22486c23977609714514cb0938b2989e61e1d20394998533a7dd565f09c96",
+    "snapshot_digest": "sha256:e1d742f57e63840975349ef560d4b9541299d6e9affa87a169d5ad2056c4b888",
     "guide_edition": "kisa-unix-2026",
     "profile": {
       "name": "default",
@@ -319,11 +319,11 @@
       },
       "muster.account.umask_policy": {
         "acceptable": [
-          "022",
           "027",
+          "022",
           "077",
-          "0022",
           "0027",
+          "0022",
           "0077"
         ]
       },

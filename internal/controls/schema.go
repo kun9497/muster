@@ -102,15 +102,20 @@ type References struct {
 }
 
 type Remediation struct {
-	TextEn     string   `yaml:"text_en"`
-	TextKo     string   `yaml:"text_ko"`
-	Risk       string   `yaml:"risk"` // none | restart_service | reboot_required | lockout_risk
-	Idempotent bool     `yaml:"idempotent"`
-	Script     string   `yaml:"script,omitempty"`
-	Rollback   string   `yaml:"rollback,omitempty"`
-	Backup     []string `yaml:"backup,omitempty"`
-	Units      []string `yaml:"units,omitempty"`
-	Validate   string   `yaml:"validate,omitempty"`
+	TextEn         string   `yaml:"text_en"`
+	TextKo         string   `yaml:"text_ko"`
+	Risk           string   `yaml:"risk"` // none | restart_service | reboot_required | lockout_risk
+	Idempotent     bool     `yaml:"idempotent"`
+	Script         string   `yaml:"script,omitempty"`
+	ScriptParams   []string `yaml:"script_params,omitempty"`    // 3D-2c E-1: params the script reads as $P_<name>
+	ScriptOnAbsent bool     `yaml:"script_on_absent,omitempty"` // 3D-2c E-5: an absent-means-fail row is scripted
+	Rollback       string   `yaml:"rollback,omitempty"`
+	Backup         []string `yaml:"backup,omitempty"`
+	Units          []string `yaml:"units,omitempty"`
+	Modes          []string `yaml:"modes,omitempty"`  // 3D-2c E-3: paths whose owner, group and mode are recorded
+	Sysctl         []string `yaml:"sysctl,omitempty"` // 3D-2c E-3: kernel keys whose runtime value is recorded
+	Modules        []string `yaml:"modules,omitempty"`
+	Validate       string   `yaml:"validate,omitempty"`
 }
 
 // Control is one YAML file (spec §6.2).

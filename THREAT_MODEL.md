@@ -21,9 +21,31 @@ The contracts here are tested; the design specification (section 8) is the sourc
   the id itself) as its one host value in a command, admitted only as 64 lowercase hex characters, which
   carry no shell syntax. Before it changes anything, as root, it hashes the running host's
   `/etc/machine-id` and exits 2 when the hashes differ or the id cannot be read; `MUSTER_ANY_HOST=1` runs it
-  anyway with a warning. A service block records each unit's enablement and activity under
-  `$MUSTER_BACKUP/muster-units/` and, when the block fails, restores that state rather than enabling every
-  unit; the script refuses a backup directory root does not own or others can write.
+  anyway with a warning. A profile's or tuning's parameter value is policy, not a host value: it enters a
+  command only as a `P_<name>='<value>'` assignment at the head of its block, and only when it passes its
+  type's charset (an optionally signed integer, `^-?[0-9]+$`; `true`/`false`; or `[A-Za-z0-9._/@:+,=-]` per
+  element), which holds no quote, blank, `$`, backtick, `;`, `|`, `&` or `\`; any other value leaves the
+  item text-only. Each block records what it changes under its own `$MUSTER_BACKUP/blocks/<fn>/` — file copies and absent-path markers, unit
+  enablement and activity (`units/`), owners, groups and modes (`modes.list`), kernel values
+  (`sysctl.list`), module load states (`modules.list`) — and, when the block fails, runs its declared
+  rollback and restores that state rather than enabling every unit. Neither restore writes through a
+  symlink: `restore` replaces a symlink found at a destination with the copy and leaves a path that became
+  a directory, and `restore_modes` logs and leaves a path that has become a symlink or changed type (a
+  file now a directory). `restore_modes` also refuses a path whose directories up to `/` are not all
+  root-owned and not other-writable, or a path recorded as non-root-owned in a group- or other-writable
+  directory, so
+  its `chown`/`chmod` cannot be redirected by someone who can rename entries there; a root-owned
+  group-writable directory (Ubuntu's `root:syslog 0775 /var/log`) is accepted, which trusts that group with
+  the paths under it — the trust the host already gives it. The bodies that change files under such
+  directories (`log_dir_permissions`; every file pass of `cron_permissions` and `audit_log_permissions`,
+  which fix their directories first) apply the same rule and leave an untrusted directory to the operator.
+  A system crontab or sudoers file not owned by root is never chowned or re-moded: cron and sudo ignore
+  it, and adopting it would activate content another user wrote, so the block logs it and rolls back.
+  `restore_modules` reloads a module that was loaded with `modprobe --ignore-install`, bypassing the
+  `install … /bin/false` line the restore has just put back (and any vendor `install` line for that module). A block's first record
+  is kept across runs with the same `MUSTER_BACKUP`, except an absent-path marker: when a later run finds the path (an earlier run
+  created it), it records that file, and a failure restores it rather than removing it. The script
+  refuses a backup directory root does not own or others can write.
 - Controls are embedded in the binary. An external control directory is opt-in, logged with digests and
   refused on id collision.
 

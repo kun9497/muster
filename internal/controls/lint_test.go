@@ -82,7 +82,7 @@ func TestLintRules(t *testing.T) {
 		{name: "text_en too long", yaml: rem(`remediation: { text_en: ` + strings.Repeat("a", 1001) + `, text_ko: 조치, risk: none, idempotent: true }`), rule: "remediation", msg: "text_en is longer than 1000 runes"},
 		{name: "title control char", yaml: strings.Replace(goodControl, "title_en: Good", `title_en: "t\u0007"`, 1), rule: "titles", msg: "title_en carries a line break or control character"},
 		{name: "script not idempotent", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: false, script: "true", rollback: "true" }`), rule: "remediation", msg: "script requires idempotent: true"},
-		{name: "script without way back", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true" }`), rule: "remediation", msg: "script without rollback, backup or units"},
+		{name: "script without way back", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true" }`), rule: "remediation", msg: "script without rollback, backup, units, modes, sysctl or modules"},
 		{name: "backup without script", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, backup: [/etc/hosts] }`), rule: "remediation", msg: "backup without script"},
 		{name: "validate without script", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, validate: "true" }`), rule: "remediation", msg: "validate without script"},
 		{name: "backup relative", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true", backup: [etc/hosts] }`), rule: "remediation", msg: `backup path "etc/hosts" is not absolute`},
@@ -125,9 +125,31 @@ func TestLintRules(t *testing.T) {
 		{name: "units with backup", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true", validate: "true", backup: [/etc/hosts], units: [a.service] }`), rule: "units_exclusive", msg: "units excludes backup"},
 		{name: "UNITS without units", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "for u in $UNITS; do :; done", validate: "true", rollback: "true" }`), rule: "units_variable", msg: "script uses $UNITS without units"},
 		{name: "UNITS in validate", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true", validate: "echo ${UNITS}", units: [a.service] }`), rule: "units_variable", msg: "validate uses $UNITS"},
-		{name: "backup reserved exact", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true", validate: "true", backup: [/muster-units] }`), rule: "backup_reserved", msg: `backup path "/muster-units"`},
-		{name: "backup reserved under", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true", validate: "true", backup: [/muster-units/x] }`), rule: "backup_reserved"},
-		{name: "accept backup named like it", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true", validate: "true", backup: [/muster-unitsx] }`), rule: "backup_reserved", absent: true},
+		{name: "accept state as the way back", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true", validate: "true", sysctl: [kernel.sysrq] }`), rule: "remediation", absent: true},
+		{name: "state without script", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, modules: [udf] }`), rule: "state_needs_script", msg: "modes, sysctl or modules without script"},
+		{name: "units with modes", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true", validate: "true", units: [a.service], modes: [/etc/x] }`), rule: "units_exclusive", msg: "units excludes modes"},
+		{name: "units with sysctl", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true", validate: "true", units: [a.service], sysctl: [kernel.sysrq] }`), rule: "units_exclusive", msg: "units excludes sysctl"},
+		{name: "units with modules", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true", validate: "true", units: [a.service], modules: [udf] }`), rule: "units_exclusive", msg: "units excludes modules"},
+		{name: "modes charset", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true", validate: "true", modes: ["/etc/x/*/*/*"] }`), rule: "modes_charset", msg: `modes entry "/etc/x/*/*/*"`},
+		{name: "modes unclean", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true", validate: "true", modes: ["/etc/x//*"] }`), rule: "modes_charset"},
+		{name: "modes repeated", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true", validate: "true", modes: [/etc/x, /etc/x] }`), rule: "modes_charset", msg: `modes entry "/etc/x" is repeated`},
+		{name: "modes overlap exact", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true", validate: "true", backup: [/etc/x], modes: [/etc/x] }`), rule: "modes_backup_overlap", msg: `backup path "/etc/x" is also covered by modes entry "/etc/x"`},
+		{name: "modes overlap glob", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true", validate: "true", backup: [/etc/x.d/a], modes: ["/etc/x.d/*"] }`), rule: "modes_backup_overlap"},
+		{name: "accept modes beside a backup", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true", validate: "true", backup: [/etc/sudoers], modes: ["/etc/sudoers.d/*"] }`), rule: "modes_backup_overlap", absent: true},
+		{name: "accept a deeper backup beside a one-level glob", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true", validate: "true", backup: [/etc/x.d/a/b], modes: ["/etc/x.d/*"] }`), rule: "modes_backup_overlap", absent: true},
+		{name: "sysctl charset", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true", validate: "true", sysctl: ["kernel.sysrq=1"] }`), rule: "sysctl_charset", msg: `sysctl key "kernel.sysrq=1"`},
+		{name: "sysctl repeated", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true", validate: "true", sysctl: [kernel.sysrq, kernel.sysrq] }`), rule: "sysctl_charset", msg: "is repeated"},
+		{name: "modules charset", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true", validate: "true", modules: ["Bad Mod"] }`), rule: "modules_charset", msg: `module "Bad Mod"`},
+		{name: "modules repeated", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true", validate: "true", modules: [udf, udf] }`), rule: "modules_charset", msg: "is repeated"},
+		{name: "script_params without script", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script_params: [allowed] }`), rule: "script_params_needs_script", msg: "script_params without script"},
+		{name: "script_on_absent without script", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script_on_absent: true }`), rule: "script_on_absent_needs_script", msg: "script_on_absent without script"},
+		{name: "script_params undeclared", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "echo $P_nope", validate: "true", rollback: "true", script_params: [nope] }`), rule: "script_params_declared", msg: `script param "nope" is not a declared parameter`},
+		{name: "script_params bad name", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true", validate: "true", rollback: "true", script_params: [Bad] }`), rule: "script_params_declared", msg: `script param "Bad" is not a parameter name`},
+		{name: "script_params repeated", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "echo $P_allowed", validate: "true", rollback: "true", script_params: [allowed, allowed] }`), rule: "script_params_declared", msg: "is repeated"},
+		{name: "script_params unused", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true", validate: "true", rollback: "true", script_params: [allowed] }`), rule: "script_params_used", msg: `script param "allowed" is not used in script`},
+		{name: "P_ undeclared in validate", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "echo $P_allowed", validate: "test ${P_other}", rollback: "true", script_params: [allowed] }`), rule: "script_params_used", msg: "validate uses $P_other"},
+		{name: "accept P_ in validate and rollback", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "echo $P_allowed", validate: "test -n \"$P_allowed\"", rollback: "echo ${P_allowed}", script_params: [allowed] }`), rule: "script_params_used", absent: true},
+		{name: "script_params default unsafe", yaml: strings.Replace(rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "echo $P_allowed", validate: "true", rollback: "true", script_params: [allowed] }`), `default: ["no"]`, `default: ["a b"]`, 1), rule: "script_params_default_safe", msg: `script param "allowed" default`},
 		{name: "script without validate", yaml: rem(`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true", rollback: "true" }`), rule: "script_needs_validate", msg: "script without validate"},
 		{"bad id", `id: U-01
 title_en: t
@@ -1306,27 +1328,23 @@ func TestLintBeyondScope(t *testing.T) {
 	}
 }
 
-func TestLintSetRules(t *testing.T) {
+// E-2: blocks record per block, so two scripted controls may declare the
+// same backup path or the same unit; the set lints clean.
+func TestLintSetAllowsSharedRemediation(t *testing.T) {
 	scripted := func(id, extra string) string {
-		y := strings.Replace(goodControl, "id: muster.account.good", "id: "+id, 1)
-		return strings.Replace(y, "remediation: { text_en: t, text_ko: 조치, risk: lockout_risk, idempotent: true }",
-			"remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: \"true\", validate: \"true\", "+extra+" }", 1)
+		c := strings.Replace(goodControl, "id: muster.account.good", "id: "+id, 1)
+		return strings.Replace(c, "remediation: { text_en: t, text_ko: 조치, risk: lockout_risk, idempotent: true }",
+			`remediation: { text_en: t, text_ko: 조치, risk: none, idempotent: true, script: "true", validate: "true", `+extra+` }`, 1)
 	}
-	for _, c := range []struct {
-		name, a, b, rule, msg string
-	}{
-		{"backup shared", scripted("muster.account.aa", "backup: [/etc/hosts]"), scripted("muster.account.bb", "backup: [/etc/hosts]"), "backup_path_shared", `backup path "/etc/hosts" is also declared by muster.account.aa`},
-		{"units shared", scripted("muster.account.aa", "units: [x.service]"), scripted("muster.account.bb", "units: [x.service]"), "units_shared", `unit "x.service" is also declared by muster.account.aa`},
+	for _, c := range []struct{ name, extra string }{
+		{"backup shared", "backup: [/etc/hosts]"},
+		{"units shared", "units: [a.service]"},
 	} {
-		t.Run(c.name, func(t *testing.T) {
-			ps := problemsOf(lintSet(t, LintOptions{CustomFuncs: map[string]bool{}}, c.b, c.a), c.rule)
-			if len(ps) != 1 || ps[0].ControlID != "muster.account.bb" || ps[0].Path == "" || !strings.Contains(ps[0].Message, c.msg) {
-				t.Fatalf("%s: problems %+v", c.rule, ps)
+		ps := lintSet(t, LintOptions{CustomFuncs: map[string]bool{}}, scripted("muster.account.aa", c.extra), scripted("muster.account.bb", c.extra))
+		for _, p := range ps {
+			if p.Rule == "backup_path_shared" || p.Rule == "units_shared" {
+				t.Errorf("%s: %v", c.name, p)
 			}
-		})
-	}
-	ps := lintSet(t, LintOptions{CustomFuncs: map[string]bool{}}, scripted("muster.account.aa", "backup: [/etc/a]"), scripted("muster.account.bb", "backup: [/etc/b]"))
-	if len(problemsOf(ps, "backup_path_shared")) != 0 {
-		t.Fatalf("distinct paths flagged: %+v", ps)
+		}
 	}
 }
