@@ -533,10 +533,10 @@ jobs:
               muster.account.root_remote_login muster.account.session_timeout muster.account.sudoers_permissions
               muster.account.umask_policy muster.file.hosts_lpd_permissions muster.file.hosts_permissions
               muster.file.inetd_conf_permissions muster.file.log_dir_permissions muster.file.passwd_permissions
-              muster.file.services_permissions muster.file.syslog_conf_permissions muster.service.automount_disabled
-              muster.service.ftpusers_permissions muster.service.nfs_export_access muster.service.nfs_server_disabled
-              muster.service.rpcbind_disabled muster.service.snmp_disabled muster.service.telnet_disabled
-              muster.service.tftp_talk_disabled
+              muster.file.rhosts_forbidden muster.file.services_permissions muster.file.syslog_conf_permissions
+              muster.service.automount_disabled muster.service.ftpusers_permissions muster.service.nfs_export_access
+              muster.service.nfs_server_disabled muster.service.rpcbind_disabled muster.service.snmp_disabled
+              muster.service.telnet_disabled muster.service.tftp_talk_disabled
           - key: almalinux9-init
             kind: container
             image: almalinux/9-init
@@ -546,10 +546,10 @@ jobs:
               muster.account.root_remote_login muster.account.session_timeout muster.account.sudoers_permissions
               muster.account.umask_policy muster.file.hosts_lpd_permissions muster.file.hosts_permissions
               muster.file.inetd_conf_permissions muster.file.log_dir_permissions muster.file.passwd_permissions
-              muster.file.services_permissions muster.file.syslog_conf_permissions muster.service.automount_disabled
-              muster.service.ftpusers_permissions muster.service.nfs_export_access muster.service.nfs_server_disabled
-              muster.service.rpcbind_disabled muster.service.snmp_disabled muster.service.telnet_disabled
-              muster.service.tftp_talk_disabled
+              muster.file.rhosts_forbidden muster.file.services_permissions muster.file.syslog_conf_permissions
+              muster.service.automount_disabled muster.service.ftpusers_permissions muster.service.nfs_export_access
+              muster.service.nfs_server_disabled muster.service.rpcbind_disabled muster.service.snmp_disabled
+              muster.service.telnet_disabled muster.service.tftp_talk_disabled
           - key: debian12-init
             kind: container
             image: muster-ci/debian12-init
@@ -558,8 +558,8 @@ jobs:
             seeded: >-
               muster.account.cron_permissions muster.account.sudoers_permissions muster.file.hosts_lpd_permissions
               muster.file.hosts_permissions muster.file.inetd_conf_permissions muster.file.log_dir_permissions
-              muster.file.passwd_permissions muster.file.services_permissions muster.file.shadow_permissions
-              muster.file.syslog_conf_permissions muster.service.automount_disabled
+              muster.file.passwd_permissions muster.file.rhosts_forbidden muster.file.services_permissions
+              muster.file.shadow_permissions muster.file.syslog_conf_permissions muster.service.automount_disabled
               muster.service.ftpusers_permissions muster.service.nfs_export_access muster.service.nfs_server_disabled
               muster.service.nis_disabled muster.service.rpcbind_disabled muster.service.snmp_disabled
               muster.service.tftp_talk_disabled
@@ -570,8 +570,8 @@ jobs:
             seeded: >-
               muster.account.cron_permissions muster.account.sudoers_permissions muster.account.umask_policy
               muster.file.hosts_lpd_permissions muster.file.hosts_permissions muster.file.inetd_conf_permissions
-              muster.file.log_dir_permissions muster.file.passwd_permissions muster.file.services_permissions
-              muster.file.shadow_permissions muster.file.syslog_conf_permissions
+              muster.file.log_dir_permissions muster.file.passwd_permissions muster.file.rhosts_forbidden
+              muster.file.services_permissions muster.file.shadow_permissions muster.file.syslog_conf_permissions
           - key: runner
             kind: host
             seeded: >-

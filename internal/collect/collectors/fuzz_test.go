@@ -1389,6 +1389,13 @@ func FuzzGrubPasswordSet(f *testing.F) {
 	})
 }
 
+func FuzzHostsEquivLines(f *testing.F) {
+	seeds(f, "testdata/hosts_equiv", "testdata/home_alice_rhosts")
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "hostsEquivLines", func() any { return hostsEquivLines(data) }, len(data))
+	})
+}
+
 func FuzzSecureBootFromEfivar(f *testing.F) {
 	seeds(f, "testdata/SecureBoot.*")
 	f.Fuzz(func(t *testing.T, data []byte) {

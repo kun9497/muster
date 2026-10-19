@@ -275,6 +275,21 @@ func writeRootHome(b *collect.Builder, a collect.Access, p string) {
 	b.Set("files.root_home.acl_present", collect.OK(present, src))
 }
 
+// hostsEquivLines is the line list of a hosts.equiv: each line trimmed of
+// surrounding white space, blank and "#"-prefixed lines dropped. It never
+// returns nil (R50: an empty file yields [], never null). The review script's
+// rd_plus reader agrees with it line for line (remediation_parity_test.go).
+func hostsEquivLines(data []byte) []any {
+	lines := []any{}
+	for _, l := range splitLines(data) {
+		l = strings.TrimSpace(l)
+		if l != "" && !strings.HasPrefix(l, "#") {
+			lines = append(lines, l)
+		}
+	}
+	return lines
+}
+
 // writeHostsEquiv records /etc/hosts.equiv's mode and uid and its non-comment
 // lines from a single read. R177: a file that does not exist is compliant, so
 // files.etc_hosts_equiv_lines is an OK empty list (never absent — absent would
@@ -290,14 +305,7 @@ func writeHostsEquiv(b *collect.Builder, a collect.Access) {
 		src := &facts.Source{Kind: "file", Path: hostsEquivPath}
 		b.Set("files.etc_hosts_equiv.mode", collect.OKRead(int(meta.Mode), src, meta))
 		b.Set("files.etc_hosts_equiv.uid", collect.OKRead(int(meta.UID), src, meta))
-		lines := []any{} // R50: an empty file yields [], never null
-		for _, l := range splitLines(data) {
-			l = strings.TrimSpace(l)
-			if l != "" && !strings.HasPrefix(l, "#") {
-				lines = append(lines, l)
-			}
-		}
-		b.Set("files.etc_hosts_equiv_lines", collect.OKRead(lines, src, meta))
+		b.Set("files.etc_hosts_equiv_lines", collect.OKRead(hostsEquivLines(data), src, meta))
 	case errors.Is(err, fs.ErrNotExist):
 		absent := collect.Absent("/etc/hosts.equiv does not exist")
 		b.Set("files.etc_hosts_equiv.mode", absent)

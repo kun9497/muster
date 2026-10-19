@@ -85,6 +85,8 @@
   images: [almalinux9-init, debian12-init, rocky9-init, ubuntu2204]
 - id: muster.file.passwd_permissions
   images: [almalinux9-init, debian12-init, rocky9-init, ubuntu2204]
+- id: muster.file.rhosts_forbidden
+  images: [almalinux9-init, debian12-init, rocky9-init, ubuntu2204]
 - id: muster.file.services_permissions
   images: [almalinux9-init, debian12-init, rocky9-init, ubuntu2204]
 - id: muster.file.shadow_permissions
