@@ -1214,14 +1214,21 @@ func TestAuditRulesRollbackDeletesOnlyWhatThisRunLoaded(t *testing.T) {
 				t.Errorf("the earlier run's %s survived the rerun", m)
 			}
 		}
+		// The template's backup keeps a first FILE copy, but an "absent"
+		// record is replaced by a copy once the path exists (backup()'s
+		// rm -f "$MB/absent$p"), so the rerun's way back is the drop-in as
+		// the first run left it: the persisted floor and the kernel's agree.
+		if got := readIf(t, filepath.Join(root, "/etc/audit/rules.d/50-muster.rules")); got != floorWant(root) {
+			t.Errorf("50-muster.rules after the rerun's rollback %q, want the first run's floor", got)
+		}
 	})
 }
 
 // §4.1, O-3, O-5, O-23: the auditd_active block unmasks and enables the
 // unit, and starts it only when it is inactive, its kernel list is empty
-// (auditctl -l exits 0 and prints No rules) and no lock is pending unless
-// the runtime is already locked (an auditctl -s that cannot tell counts as
-// unlocked); a refusal fails the block and restore_units puts the unit's
+// (auditctl -l exits 0 and prints No rules) and no lock is pending in the
+// rules files, whatever the runtime lock state (O-74: neither enabled 2 nor
+// loginuid_immutable 1 lifts it); a refusal fails the block and restore_units puts the unit's
 // enablement back; a missing unit is the operator's install.
 func TestAuditdActiveStartBranch(t *testing.T) {
 	needSh(t)
@@ -1234,16 +1241,20 @@ func TestAuditdActiveStartBranch(t *testing.T) {
 		started                bool
 	}{
 		{name: "active, pending lock, disabled", state: "disabled active", persisted: "-e 2", after: "enabled active"},
-		{name: "inactive, runtime locked", state: "disabled inactive", persisted: "-e 2",
-			seed: func(t *testing.T, stub string) { setStatus(t, stub, "enabled", "enabled 2") }, after: "enabled active", started: true},
-		{name: "inactive, loginuid locked", state: "disabled inactive", persisted: "--loginuid-immutable",
+		{name: "inactive, enabled 2, -e 2 persisted", state: "disabled inactive", persisted: "-e 2",
+			seed: func(t *testing.T, stub string) { setStatus(t, stub, "enabled", "enabled 2") }, code: 1, line: refused, after: "disabled inactive"},
+		{name: "inactive, loginuid locked, enabled 1, -e 2 persisted", state: "disabled inactive", persisted: "-e 2",
 			seed: func(t *testing.T, stub string) {
 				setStatus(t, stub, "loginuid_immutable", "loginuid_immutable 1 locked")
 			},
-			after: "enabled active", started: true},
+			code: 1, line: refused, after: "disabled inactive"},
+		{name: "inactive, loginuid locked, --loginuid-immutable persisted", state: "disabled inactive", persisted: "--loginuid-immutable",
+			seed: func(t *testing.T, stub string) {
+				setStatus(t, stub, "loginuid_immutable", "loginuid_immutable 1 locked")
+			},
+			code: 1, line: refused, after: "disabled inactive"},
 		{name: "inactive, unlocked, -e2 persisted", state: "disabled inactive", persisted: "-e2", code: 1, line: refused, after: "disabled inactive"},
-		{name: "inactive, pending lock, auditctl -s fails", state: "disabled inactive", persisted: "-b 8192 -e 2",
-			seed: func(t *testing.T, stub string) { writeUnder(t, stub, "/status_rc", "1\n") }, code: 1, line: refused, after: "disabled inactive"},
+		{name: "inactive, -b 8192 -e 2 persisted", state: "disabled inactive", persisted: "-b 8192 -e 2", code: 1, line: refused, after: "disabled inactive"},
 		{name: "inactive, kernel holds rules", state: "disabled inactive",
 			seed: func(t *testing.T, stub string) { writeUnder(t, stub, "/rules", "-w /var/log/live -p wa -k live\n") },
 			line: activeID + ": kernel holds rules a start would replace; start left to the operator", after: "enabled inactive"},
@@ -1288,6 +1299,9 @@ func TestAuditdActiveStartBranch(t *testing.T) {
 			calls := readIf(t, filepath.Join(stub, "calls"))
 			if got := strings.Contains(calls, "--quiet start auditd.service\n"); got != c.started {
 				t.Errorf("started %v, want %v; calls %q", got, c.started, calls)
+			}
+			if strings.Contains("\n"+readIf(t, filepath.Join(stub, "auditctl")), "\n-s\n") {
+				t.Error("the start gate read auditctl -s; a pending lock refuses whatever the runtime says (O-74)")
 			}
 		})
 	}

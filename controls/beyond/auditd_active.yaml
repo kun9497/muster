@@ -22,8 +22,8 @@ checks:
   - { fact: services.auditd.active, op: eq, expected: true }
   - { fact: services.auditd.enabled, op: eq, expected: true }
 remediation:
-  text_en: 'Install the audit daemon (the audit package on the EL family, auditd on Debian and Ubuntu) and run systemctl enable --now auditd, which starts it now and at every boot. Check that the kernel command line does not carry audit=0, which keeps the unit from starting; the unit auditd ships refuses a manual stop (RefuseManualStop), so a restart after a configuration change is service auditd restart rather than systemctl restart. The review script unmasks and enables the unit and starts it when it is stopped; the package install and the audit=0 check stay the operator''s. It does not start auditd over a kernel rule list that is not empty (the unit''s rule load would delete it), nor while -e 2 or --loginuid-immutable is pending in the rules files and not yet in force. Starting auditd applies the host''s configured disk actions at once, single and halt included. A failed block leaves a started daemon running, with the persisted control settings its load applied.'
-  text_ko: '감사 데몬(EL 계열은 audit 패키지, Debian·Ubuntu 는 auditd)을 설치하고 systemctl enable --now auditd 를 실행하면 지금 시작되고 매 부팅 시에도 시작됩니다. 커널 명령줄에 유닛의 시작을 막는 audit=0 이 없는지 확인하십시오. auditd 가 배포하는 유닛은 수동 중지를 거부하므로(RefuseManualStop) 설정 변경 후 재시작은 systemctl restart 대신 service auditd restart 로 합니다. 검토 스크립트는 유닛의 mask 를 풀고 활성화하며, 멈춰 있으면 시작합니다. 패키지 설치와 audit=0 확인은 운영자의 몫입니다. 커널 규칙 목록이 비어 있지 않으면(유닛의 규칙 적재가 그것을 지웁니다) auditd 를 시작하지 않고, 규칙 파일에 -e 2 나 --loginuid-immutable 이 대기 중인데 아직 적용되지 않았을 때도 시작하지 않습니다. auditd 를 시작하면 호스트에 설정된 디스크 조치가 single 과 halt 를 포함해 곧바로 적용됩니다. 실패한 블록은 시작된 데몬을 실행 중인 채로 남기며, 그 적재가 적용한 저장된 제어 설정도 남습니다.'
+  text_en: 'Install the audit daemon (the audit package on the EL family, auditd on Debian and Ubuntu) and run systemctl enable --now auditd, which starts it now and at every boot. Check that the kernel command line does not carry audit=0, which keeps the unit from starting; the unit auditd ships refuses a manual stop (RefuseManualStop), so a restart after a configuration change is service auditd restart rather than systemctl restart. The review script unmasks and enables the unit and starts it when it is stopped; the package install and the audit=0 check stay the operator''s. It does not start auditd over a kernel rule list that is not empty (the unit''s rule load would delete it), nor while -e 2 or --loginuid-immutable stands in the rules files, whatever the kernel''s lock state. Starting auditd applies the host''s configured disk actions at once, single and halt included. A failed block leaves a started daemon running, with the persisted control settings its load applied.'
+  text_ko: '감사 데몬(EL 계열은 audit 패키지, Debian·Ubuntu 는 auditd)을 설치하고 systemctl enable --now auditd 를 실행하면 지금 시작되고 매 부팅 시에도 시작됩니다. 커널 명령줄에 유닛의 시작을 막는 audit=0 이 없는지 확인하십시오. auditd 가 배포하는 유닛은 수동 중지를 거부하므로(RefuseManualStop) 설정 변경 후 재시작은 systemctl restart 대신 service auditd restart 로 합니다. 검토 스크립트는 유닛의 mask 를 풀고 활성화하며, 멈춰 있으면 시작합니다. 패키지 설치와 audit=0 확인은 운영자의 몫입니다. 커널 규칙 목록이 비어 있지 않으면(유닛의 규칙 적재가 그것을 지웁니다) auditd 를 시작하지 않고, 규칙 파일에 -e 2 나 --loginuid-immutable 이 있으면 커널의 잠금 상태와 관계없이 시작하지 않습니다. auditd 를 시작하면 호스트에 설정된 디스크 조치가 single 과 halt 를 포함해 곧바로 적용됩니다. 실패한 블록은 시작된 데몬을 실행 중인 채로 남기며, 그 적재가 적용한 저장된 제어 설정도 남습니다.'
   risk: restart_service
   idempotent: true
   units: [auditd.service]
@@ -42,8 +42,7 @@ remediation:
         log "muster.beyond.auditd_active: kernel holds rules a start would replace; start left to the operator"
         continue
       fi
-      s=$(LC_ALL=C auditctl -s 2>/dev/null) || s=
-      if ! printf '%s\n' "$s" | LC_ALL=C awk '($1 == "enabled" && $2 == "2") || ($1 == "loginuid_immutable" && $2 == "1") { f = 1 } END { exit !f }' && rd_lock /etc/audit/rules.d/*.rules /etc/audit/audit.rules; then
+      if rd_lock /etc/audit/rules.d/*.rules /etc/audit/audit.rules; then
         log "muster.beyond.auditd_active: a one-way audit setting is pending (-e 2 or --loginuid-immutable); start refused"
         exit 1
       fi
