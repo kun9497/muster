@@ -736,6 +736,10 @@ configuration walk stopped at an `Include` outside the declaration (below).
 - `CONTRIBUTING.md` (with its Korean pair) describes the workflow.
 
 ### Fixed
+- vsftpd's greeting is read in vsftpd's own order: a non-empty `banner_file`
+  wins over `ftpd_banner` (a clean `ftpd_banner` beside a disclosing banner
+  file read PASS), and an empty banner file falls through (stage 3D-2d,
+  O-14).
 - `nfs_server_disabled`'s script failed on every Debian and Ubuntu NFS server:
   `nfs-kernel-server.service` is an alias of `nfs-server.service` there, and
   the body disabled the alias after masking the unit (`Unit not loaded`, exit

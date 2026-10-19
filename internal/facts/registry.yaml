@@ -2319,13 +2319,13 @@ keys:
     collector: ftp
   - key: ftp.banner_source
     type: string
-    description: What configures the greeting a client is shown before it authenticates - ftpd_banner or banner_file for vsftpd, serverident for proftpd's ServerIdent, default when nothing is configured and the daemon sends its compiled greeting, none when a daemon sends no greeting at all. Absent on pure-ftpd, whose greeting is not configurable in this version's model.
+    description: What configures the greeting a client is shown before it authenticates - for vsftpd, banner_file when it is set and the file is not empty, else ftpd_banner, else default; serverident for proftpd's ServerIdent; default when nothing is configured and the daemon sends its compiled greeting; none when a daemon sends no greeting at all. Absent on pure-ftpd, whose greeting is not configurable in this version's model.
     since: 1
     sensitivity: public
     collector: ftp
   - key: ftp.banner_text
     type: string
-    description: The configured greeting text - the ftpd_banner value, the content of banner_file, or the string of a proftpd ServerIdent on. A daemon's COMPILED greeting is not invented here - the source is then default and this text is empty, with the reason naming the product whose greeting is served. Absent when the configured banner file is outside this collector's declaration, is a symbolic link or another non-regular file this collector does not follow, could not be read, or was cut at the read limit.
+    description: The configured greeting text - the content of banner_file, the ftpd_banner value, or the string of a proftpd ServerIdent on. An empty banner_file (zero bytes) falls through to ftpd_banner, and without one to the compiled greeting, as vsftpd does. A daemon's COMPILED greeting is not invented here - the source is then default and this text is empty, with the reason naming the product whose greeting is served. Absent when the configured banner file is outside this collector's declaration, is a symbolic link or another non-regular file this collector does not follow, could not be read, or was cut at the read limit.
     since: 1
     sensitivity: internal
     collector: ftp
