@@ -170,7 +170,7 @@ regenerates them from public images and `-check` compares.
   selection) share the same resolution. The examples gate byte-compares reports, so a change to the `check` block
   needs an examples refresh from the branch's `examples.yml` run before the merge.
 
-## Fix (stages 3D-2, 3D-2b, 3D-2c)
+## Fix (stages 3D-2, 3D-2b, 3D-2c, 3D-2d)
 
 - `fix --dry-run` (mandatory; anything else is `fix never applies a remediation (D24); run fix --dry-run`, exit 2) runs
   `runCheck`'s own helpers (`openFacts` → set/registry → `resolveSelection` → `loadWaivers` → `newCheckBlock` →
@@ -201,9 +201,12 @@ regenerates them from public images and `-check` compares.
   (two controls may declare the same path or unit): `files<path>` (`cp -a`), `absent<path>` (an empty marker for a
   declared path that did not exist; `restore` removes the path, refusing a directory), `units/<u>`, `modes.list` (`<uid>
   <gid> <mode> <f|d|o> <path>`), `sysctl.list` (`<key> <value>`, `absent` when unreadable), `modules.list` (`<name>
-  loaded|not-loaded`), and a body's own files (`password_policy`'s `ageing.list`). Each kind keeps its first record per
+  loaded|not-loaded`), and a body's own files (`password_policy`'s `ageing.list`, `account_inactivity_lock`'s
+  `inactive.list`). Each kind keeps its first record per
   block across runs with the same `MUSTER_BACKUP`, except an absent marker, which `backup` replaces with a copy once the
-  path exists (a re-run after run 1 created a drop-in restores run 1's file). `backup` returns 1 on a failed copy and
+  path exists (a re-run after run 1 created a drop-in restores run 1's file). Records that describe one run (3D-2d
+  O-16: `audit.loaded`, `audit.status`, `disk.keys`, `inactive.run`, `<d>.was-running`, `<d>.edited`) are removed as the
+  body's first action and written fresh, never first-kept. `backup` returns 1 on a failed copy and
   the block stops; each body runs in `( set -e … ); rc=$?` and each block function is called as a bare line followed by
   `[ "$?" -eq 0 ] || failed=$((failed+1))` — POSIX turns `-e` off for anything run as an operand of `||`/`&&`/`if`/`!`.
   On failure, in this order (`TestScriptFailurePathOrder`): the declared `rollback` subshell, `restore_units`,
@@ -242,8 +245,11 @@ regenerates them from public images and `-check` compares.
   `Requires=`/`BindsTo=`/`PartOf=` units), keeping a first record except `absent`. `restore_units` runs seven passes:
   unmask (all but `absent`), enable `enabled`/`enabled-runtime` (log `linked*` not restored), re-disable a `disabled`
   unit an `Also=` turned on, re-mask `masked`/`masked-runtime`, start what was active (not a re-masked one), start
-  inactive dependants, read the enablement back (`enablement not restored` → 1). Go tests run the helpers and bodies
-  only against stubs (`systemctl`, `sysctl`, `modprobe`, `chage`, `sshd`) first on `PATH`, every absolute path rebased
+  inactive dependants, read the enablement back (`enablement not restored` → 1). `restore_units` never stops a unit: the
+  one enabling units body (`auditd_active`, 3D-2d) leaves a started daemon running after a failed block, and its text
+  says so. Go tests run the helpers and bodies
+  only against stubs (`systemctl`, `sysctl`, `modprobe`, `chage`, `sshd`, `auditctl`, `augenrules`, `postconf`,
+  `postfix`, `exportfs`, `date`; an unmodelled tool fails closed with exit 99) first on `PATH`, every absolute path rebased
   under `t.TempDir()` (`TestUnitHelpersRestoreRecordedState`, `TestSysctlHelpersRecordAndRestore`,
   `TestModulesHelpersRecordAndRestore`), except `TestModesHelpersTrustRule` and `TestFileBodiesRepairATempTree`, which
   are root only and build their tree with `os.MkdirTemp("/", …)` (`modes_trusted` refuses anything under the
@@ -256,7 +262,8 @@ regenerates them from public images and `-check` compares.
   `modes_backup_overlap` (no `backup` path an entry covers), `sysctl_charset` (`^[a-z0-9_]+(\.[a-z0-9_-]+)+$`),
   `modules_charset` (`^[a-z0-9][a-z0-9_-]*$`). `validate` is one line (lint), by convention `&&`-joined conditions, a
   single `case` whose last arm is `*) false` (a `case` matching nothing exits 0), or one `for` over a literal list
-  whose conditions `exit 1`; no here-document; `backup` paths absolute, clean, `^/[A-Za-z0-9._@:+/-]+$`. A `P_` value
+  whose conditions `exit 1` — or a guarded line (`[ guard ] || …`, `{ …; } || { …; }`) that accepts a leave the body
+  logs (X-10); no here-document; `backup` paths absolute, clean, `^/[A-Za-z0-9._@:+/-]+$`. A `P_` value
   never starts a line and never enters a `sed` expression (copy it to a plain variable first;
   `TestShippedBodiesPlaceParametersSafely`, in `internal/controls`). E-8: a body writes only when the current value is
   outside the clause's accepted set, read the collector's way (first `login.defs` line, last `faillock.conf` `deny`
@@ -266,7 +273,17 @@ regenerates them from public images and `-check` compares.
   d` (`TestShippedFindsCarryATypePredicate`), and a validate's `find` mask is 07777 minus the largest allowed mode
   (`/7137`, `/7177`, `/7337`; `TestFileValidateMasksDeriveFromTheDefaultModes`). E-11: a rollback whose daemon re-reads
   the file puts it back (or removes it) itself before `sshd -t` and the reload (`session_timeout` copies `$MB/files$f`
-  back, S-35). E-13: a write's side effect on another judged key is the writer's — `ip_forwarding_disabled` reads
+  back, S-35); 3D-2d O-9: a rollback may call the prologue's `restore <path>` first, then runs the daemon's test and
+  reload or restart only when `$MB/<d>.edited` (touched before the first write) and `$MB/<d>.was-running` (written
+  before any edit) exist, never on "running now". O-6: the value written is the first member of the list in force that
+  the target accepts and that keeps the host up (`audit_disk_actions` never writes `email`, `exec`, `single`, `halt`).
+  O-2/O-3/O-74: no body makes a one-way runtime change; no body loads audit rules into, or starts auditd over, a pending
+  `-e 2`/`--loginuid-immutable` (matched anywhere on a line of `rules.d/*.rules` or `audit.rules`), whatever the runtime
+  lock state, and the only reload is `auditctl --signal reload`. O-8: a new body comments a disqualifying line out
+  (`# muster: `), never deletes it. Every command whose output a body, validate or rollback parses runs under `LC_ALL=C`;
+  `restorecon` runs only on a file a tool replaced or created (`postconf -e`, a created file), never after `sed -i` or
+  `restore`. O-10: each body's file reader is a one-line `rd_<what>()` function compared with the Go parser by
+  `remediation_parity_test.go` (Linux). E-13: a write's side effect on another judged key is the writer's — `ip_forwarding_disabled` reads
   `net.ipv4.conf.all.accept_redirects` before the write, puts it back and persists it only when it was 0 (S-43);
   `ipv6_forwarding_disabled` keeps `all` before `default` (the kernel copies `all.forwarding` into `default`), and no
   `sysctl` list is ever sorted. Trust (S-24, S-47): `log_dir_permissions` and `cron_permissions`' at-spool pass change
@@ -280,10 +297,12 @@ regenerates them from public images and `-check` compares.
   `/etc/login.defs` fails the `umask_policy` and `password_policy` blocks before any write (K2). S-27: a
   muster-owned drop-in (`99-muster-*.conf` under `sysctl.d`/`modprobe.d`, `pwquality.conf.d/99-muster.conf`,
   `00-muster-session.conf`) that is a symlink is logged `… is a symlink (a mask), left as is` and fails the block before
-  any write; every rollback that removes it skips a symlink. A built-in module stays done-but-FAIL (no body can unload
-  it). The ten service controls declare `units` (as a set, the `provesInstall` units of their rows in `services.go`;
-  the validate names the same units literally and the script none — `TestServiceScriptsNameTheCollectorsUnits`, Linux)
-  and loop over `$UNITS` in two passes: pass 1 adds to `todo` every name `systemctl cat` finds whose `systemctl show -p
+  any write; every rollback that removes it skips a symlink (3D-2d O-11: `lockout_threshold`'s `faillock.conf` and
+  `root_remote_login`'s `/etc/securetty` are vendor files, K2; its `00-muster.conf` is a drop-in). A built-in module stays done-but-FAIL (no body can unload
+  it). Eleven controls declare `units` (as a set, the `provesInstall` units of their rows in `services.go`;
+  the validate names the same units literally and the script none — `TestServiceScriptsNameTheCollectorsUnits`, Linux):
+  `auditd_active` enables (unmask, enable, start only an inactive unit over an empty kernel list with no lock pending),
+  and the ten service controls disable, looping over `$UNITS` in two passes: pass 1 adds to `todo` every name `systemctl cat` finds whose `systemctl show -p
   Id --value` equals itself (an alias of a listed unit is skipped while it still resolves — Debian's
   `nfs-kernel-server.service` aliases `nfs-server.service`), pass 2 runs `systemctl --quiet disable --now` strictly and
   `systemctl --quiet mask … || true` over `todo`; no hand-written rollback, and one-unit bodies loop too (SC2043 fires
@@ -292,8 +311,8 @@ regenerates them from public images and `-check` compares.
   so a stricter file is never loosened) — the two that remove an ACL (`passwd_permissions`, `shadow_permissions`) run
   `setfacl -b` before `chmod`. `TestFileValidatesAcceptTheDefaultModes` regenerates, byte for byte, the bare stat-`case`
   validates of the five 3D-2b file controls in its owner table, and fails on any other shipped validate that is one
-  `case "$(stat -c …` and nothing else. 48 bodies ship (the sixteen of 3D-2 plus 16 sysctl, 3 module, 9 file-permission
-  and 4 account bodies); they are shellcheck-clean at the default severity and `all-scripted.sh` renders them all.
+  `case "$(stat -c …` and nothing else. 56 bodies ship (the sixteen of 3D-2 plus 16 sysctl, 3 module, 9 file-permission
+  and 4 account bodies of 3D-2c, and the 3 audit, 1 inactivity and 4 content bodies of 3D-2d); they are shellcheck-clean at the default severity and `all-scripted.sh` renders them all.
 - `controls/testdata/_roundtrip.yaml` (ignored by the fixture harness) names, per scripted control sorted by id, the
   matrix rows (`images`, by `key`) that prove it, `unproven_units` (keys in `units`, `modules` or `sysctl`) with a
   reason, or `unproven: <reason>` (no systemd unit / no package in the enabled repositories / cannot run in a container /
@@ -309,7 +328,12 @@ regenerates them from public images and `-check` compares.
   installs under a `policy-rc.d` that exits 101; each init seed ends with a settle check over
   `START_UNITS`/`ENABLE_ONLY_UNITS`). `ci/roundtrip/runner.sh` is idempotent: it removes every muster drop-in, puts back
   the stock modes the repair run tightened (`/etc/hosts`, `/etc/shadow` and the rest), then seeds again (one failing
-  value per sysctl control, `udf` loaded with `--ignore-install` (a loaded `sctp` is held in use on the runner), `UMASK 002`, …). The repair run plans,
+  value per sysctl control, `udf` loaded with `--ignore-install` (a loaded `sctp` is held in use on the runner), `UMASK 002`,
+  auditd disabled but kept running, muster's `50-muster.rules` removed and the stock set loaded then `auditctl -b 4321`,
+  pristine `auditd.conf` and `/etc/default/useradd` copies from `/var/lib/muster-ci` with `disk_full_action = suspend`,
+  `chage -I -1` over the local login-capable accounts, …; it never writes `-e 2` or `--loginuid-immutable`). The init
+  seeds start vsftpd and postfix (IPv4 only; Debian settles on `postfix@-.service`), set `anonymous_enable=YES`, export
+  a tmpfs `/srv/ci … no_root_squash,fsid=1`, and every container seed puts a `+` line in `/etc/hosts.equiv`. The repair run plans,
   requires every seeded id planned and scripted, runs the script with its own `MUSTER_BACKUP`
   (`/var/backups/muster/ci-repair`), re-collects and requires the seeded ids PASS/NA. Each init row then starts a second
   container; the host row re-seeds the same VM and plans afresh (no guard run: the guard must be on and the hash stable,
@@ -318,7 +342,10 @@ regenerates them from public images and `-check` compares.
   run (every validate's first command rewritten to `false` in a copy): exit 1, one `validate failed` per block, no
   `ROLLBACK INCOMPLETE`/`not restored`/`rollback failed`, and `record()` equal before and after — unit states; backup
   paths' stat, checksums and ACLs; `sysctl <k> <v>`; `module <n> loaded|not-loaded`; `mode <path> <u g a>` over each
-  `modes` entry's expansion (`| sort -u`); `ageing <name> <min> <max>` when `password_policy` is scripted — compared by
+  `modes` entry's expansion (`| sort -u`); `ageing <name> <f4> <f5> <f7>` and `shadow-rest <sha256>` (shadow with those
+  fields blanked) when `password_policy` or `account_inactivity_lock` is scripted; `auditrule …` and six `audit <key>
+  <v>` lines of `auditctl -s` (keys matched whole) when an audit body is; `export …` (`exportfs -s`); `vsftpd
+  <is-active>`; `postfix-status <rc>` — compared by
   `same()`, which forgives a `mode` path gone since (a rotated log). It is the only place a shipped service, sshd,
   account, sysctl or module body runs against real system paths; `TestFileScriptsRepairOnARealFile` (root only; CI's
   sudo step, where `CI=true` makes a missing `setfacl` fatal) runs the five 3D-2b file bodies and `nfs_export_access`
@@ -332,7 +359,10 @@ regenerates them from public images and `-check` compares.
   JSON masked under `fix`, table without line 1), so a body or plan change needs an examples refresh from the branch's
   `examples.yml` run before the merge.
 - Risk is the operational impact, not the guide's: `hosts_permissions` is `restart_service` (0600 breaks non-root
-  `/etc/hosts` reads), `ip_forwarding_disabled`/`ipv6_forwarding_disabled` are `restart_service` (forwarding off cuts a
+  `/etc/hosts` reads), `auditd_active` is `restart_service` (a start loads the persisted rules and disk actions),
+  `rhosts_forbidden` is `restart_service` (as `rservices_disabled`), `account_inactivity_lock` is `lockout_risk` (root
+  included; an account it would disable now is skipped and named), `audit_immutable` (text) is `reboot_required`,
+  `ip_forwarding_disabled`/`ipv6_forwarding_disabled` are `restart_service` (forwarding off cuts a
   router's or container host's clients at once), `reverse_path_filtering` is `restart_service` (strict filtering drops
   asymmetrically routed traffic; such a host sets 2), `usb_storage_disabled` is `restart_service` (USB backup or boot
   media stop), `nis_disabled` is `lockout_risk` (stopping ypbind cuts NIS accounts), `password_policy` is `lockout_risk` (it

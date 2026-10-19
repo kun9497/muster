@@ -10,6 +10,30 @@ verdict on an existing snapshot is at least a minor release and appears under
 ## [Unreleased]
 
 ### Added
+- Review scripts for eight more controls and the `no_root_squash` half of
+  `nfs_export_access` (56 in all; stage 3D-2d). `auditd_active` unmasks,
+  enables and starts auditd, but starts it only over an empty kernel list with
+  no `-e 2` or `--loginuid-immutable` pending in a rules file, whatever the
+  kernel's lock state. `audit_rules_loaded` writes a floor of seven watches to
+  `/etc/audit/rules.d/50-muster.rules` only where the host persists no rule,
+  loads only into an empty kernel list while auditd runs, and on failure puts
+  back the kernel audit settings it changed and deletes only what it loaded.
+  `audit_disk_actions` rewrites a disk action outside its list with the first
+  listed value auditd accepts for that key that keeps the host up (never
+  `email`, `exec`, `single` or `halt`) and reloads with `auditctl --signal
+  reload`. `account_inactivity_lock` bounds `INACTIVE=` in
+  `/etc/default/useradd` and runs `chage -I` over every local login-capable
+  account, root included, skipping and naming every account the bound would
+  disable at once. `rhosts_forbidden` comments out `/etc/hosts.equiv`'s `+`
+  lines; `mail_expn_vrfy` sets postfix's `disable_vrfy_command`; `ftp_banner`
+  and `ftp_anonymous` write vsftpd's `ftpd_banner=FTP server ready.` and
+  `anonymous_enable=NO`; `nfs_export_access` swaps `no_root_squash` for
+  `root_squash` in `/etc/exports` option lists. Each daemon is reloaded or
+  restarted only when this run recorded it running and wrote; each body's file
+  reader is pinned to the Go parser by a parity test. The `fix-roundtrip` seeds
+  start vsftpd and postfix on the init rows, export a tmpfs, and seed the
+  runner VM's auditd and accounts; `record()` adds the kernel audit state,
+  shadow field 7, the export table and the daemons' run state.
 - Parameters in review scripts (stage 3D-2c). A control lists in
   `remediation.script_params` the parameters its script reads; the block opens
   with one `P_<name>='<value>'` line per entry, carrying the value in force
@@ -130,6 +154,14 @@ verdict on an existing snapshot is at least a minor release and appears under
   under `docs/examples/profiles/`. No control changes: `controls/VERSION` stays.
 
 ### Changed
+- Four risks name the operational impact (stage 3D-2d): `auditd_active`
+  becomes `restart_service`, `account_inactivity_lock` `lockout_risk`,
+  `rhosts_forbidden` `restart_service`, and the text-only `audit_immutable`
+  `reboot_required`. `lockout_threshold` and `root_remote_login` refuse a
+  symlinked `faillock.conf`, `/etc/securetty` or `00-muster.conf` before any
+  write, and the latter's rollback leaves a symlinked drop-in in place.
+  `password_hash_algorithm`'s text says locking an account does not clear the
+  finding.
 - `Escape` and `EscapeNoCut` spell out every format rune (`unicode.Cf`: the
   soft hyphen, the bidirectional controls, the zero-width runes, the tag
   block), the line and paragraph separators U+2028/U+2029 and the Hangul
@@ -179,6 +211,13 @@ verdict on an existing snapshot is at least a minor release and appears under
   ignore the rest.
 
 ### Controls
+
+Control set `kisa-unix-2026+2026.10.19` (was `+2026.10.14`). Three verdicts
+change, as collector fixes (see Fixed): vsftpd's greeting order, an auditd
+`exec` action, an exports default option list. Eight controls gain a review
+script and `nfs_export_access` a second half (56 in all); four risks move; the
+texts of the scripted controls name what the script writes and the half it
+leaves to the operator. No parameter default changes.
 
 Control set `kisa-unix-2026+2026.10.14` (was `+2026.10.13`). Remediation blocks
 and one parameter default order; no `checks` or verdict changes. Thirty-two
@@ -747,7 +786,8 @@ configuration walk stopped at an `Include` outside the declaration (below).
   it: `/srv -no_root_squash host` read root_squash true (stage 3D-2d, O-18).
   A line whose only tokens after the path are default lists (`/srv -rw`) is
   now a world record (client `*`), which `nfs_export_access`'s wildcard
-  clause FAILs; it was skipped and minted no record.
+  clause FAILs; it was skipped and minted no record. A later default list on
+  the same line is added to the earlier one, as nfs-utils does.
 - `nfs_server_disabled`'s script failed on every Debian and Ubuntu NFS server:
   `nfs-kernel-server.service` is an alias of `nfs-server.service` there, and
   the body disabled the alias after masking the unit (`Unit not loaded`, exit

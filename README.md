@@ -14,17 +14,17 @@ the Linux server asset class: KISA is the primary standard, and global
 benchmarks (CIS Benchmarks, DISA STIG, NIST SP 800-53) are attached as
 references and, later, offered as selectable profiles.
 
-> **Status: stage 3D-2c merged (October 2026).** Stage 1 — the skeleton:
+> **Status: stage 3D-2d merged (October 2026).** Stage 1 — the skeleton:
 > `collect`, `check`, waivers, exit codes, eight controls end to end — stage 2
 > — every automatable KISA item, from the foundations with DISA STIG and NIST
 > SP 800-53 references through accounts, PAM, sshd, home directories, system
 > files, services, the firewall, logging, NFS, SNMP, patch hygiene, FTP, mail
 > and DNS to the closing coverage-and-reference gate — and stages 3A, 3B,
-> 3C-1, 3C-2a, 3C-2b, 3D-1, 3D-2, 3D-2b and 3D-2c — the deep filesystem walk, the first checks
+> 3C-1, 3C-2a, 3C-2b, 3D-1, 3D-2, 3D-2b, 3D-2c and 3D-2d — the deep filesystem walk, the first checks
 > beyond the guide, audit pipeline health and package integrity, who holds
 > root's power without being root, exposure, profiles and tuning, and the
 > `fix --dry-run` review script, its proof on real hosts and scripts for the
-> controls beyond the first sixteen — are merged. 67 of the 67 items are enrolled (68 controls:
+> controls beyond the first sixteen, the audit family and what a file says — are merged. 67 of the 67 items are enrolled (68 controls:
 > 57 auto, 7 partial, 4 manual with the evidence attached),
 > and 49 beyond the guide. `collect --deep`
 > walks the local filesystems once, under a time and entry budget, without
@@ -221,6 +221,16 @@ titles, never their discussion, check and fix text. See
    values and module states it changes under its own block's directory, so a failed
    block puts them back; the GitHub runner VM joins the round-trip rows to prove
    what a container cannot judge.
+   3D-2d (merged): 56 controls now carry a review script — the audit daemon started
+   and enabled, a floor of audit watches persisted where the host keeps none and loaded
+   only into an empty kernel list, auditd's disk actions set to values that keep the
+   host up, the inactivity bound over every account that can log in (root included,
+   skipping any account it would disable at once), and what a file says: `+` lines in
+   `/etc/hosts.equiv`, postfix's VRFY, vsftpd's greeting and anonymous login, and
+   `no_root_squash` in exports. No script makes a change only a reboot undoes, and none
+   starts auditd or loads rules over a pending `-e 2`. Three collector readings those
+   files exposed were fixed first: vsftpd's greeting order, an auditd `exec` action and
+   an exports default option list.
    3C-2b (merged): exposure — every listening socket's owners and packages, deleted
    executables still running, the exposure cross-check against the firewall's folded
    rule table, the network sysctls — thirteen controls. 3C-2a (merged): privilege — file capabilities judged against the package's
@@ -228,9 +238,7 @@ titles, never their discussion, check and fix text. See
    container-runtime sockets and their groups, passwordless `ALL` in sudoers,
    the inactivity policy over every interactive account, root's authorized keys
    and SSH key quality — eight controls from three extended collectors and three
-   new ones. Next: 3D-2d, scripts for the audit family, `account_inactivity_lock` and
-   the content halves (what a file says, where today's script fixes only its owner
-   and mode); 3D-1b, the `cis-<distro>-l1` profile over an index of CIS
+   new ones. Next: 3D-1b, the `cis-<distro>-l1` profile over an index of CIS
    recommendation numbers (`references.cis` on every selected control); then 3D-3
    (`--anonymize`, `--max-age`). `kisa-unix-2026` stays
    the default profile.

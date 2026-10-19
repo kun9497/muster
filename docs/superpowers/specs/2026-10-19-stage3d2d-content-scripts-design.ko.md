@@ -561,3 +561,55 @@ Fixed — vsftpd의 인사말 우선순위(O-14), auditd의 `exec` 동작(O-17),
 - CI에서의 SELinux 레이블 증명(SELinux를 돌리는 행이 없음. 그동안은 §3.11이 규칙).
 - 공유 "키 설정" 헬퍼(파일마다 문법이 다름: 첫 줄이 이김, 마지막 줄이 이김, 대소문자, 구분자)와 쓰는 모든 경로가
   가드되고 `backup`에 있다는 lint(O-10/O-11의 테스트가 이 사이클의 답).
+
+## 8. 구현된 모습
+
+이 절과 §1–§7이 어긋나는 곳에서는 이 절이 구현된 설계입니다. 계획 판정 O-19..O-63(계획, 사전 점검, 탐침)과
+O-64..O-78(실행, 이 사이클의 장부)은 `docs/superpowers/plans/2026-10-19-stage3d2d-content-scripts.md`의 Execution
+notes에 있습니다. 이 글을 바꾸는 것은 다음과 같습니다.
+
+- **O-74는 O-5의 "또는 runtime이 이미 잠겨 있을 때"와 §4.1 3단계의 잠긴 runtime 아래 시작을 대체합니다.**
+  `auditd_active`는 runtime 잠금 상태가 무엇이든 `rules.d/*.rules`나 `audit.rules`에 잠금이 대기 중이면 언제나
+  시작을 거부하며, 더 이상 `auditctl -s`를 읽지 않습니다. `loginuid_immutable`은 자기 기능만 잠그므로(규칙 목록은
+  계속 쓸 수 있어서 시작의 적재가 대기 중인 `-e 2`를 적용함), `enabled 2` 아래에서 시작이 아무 효과도 없는지는
+  측정된 적이 없습니다. O-3의 "auditd_active는 시작 전에만 두 절반을 모두 실행한다"는 이제 "시작 전에만 대기 중인
+  절반을 실행한다"로 읽습니다.
+- **O-41: 잠금 패턴은 줄의 어디에서든 맞습니다**(`-b 8192 -e 2`도 잠금을 적용함). O-3이 이제 그렇게 적습니다.
+- **O-57: auditctl은 `-e`를 문자열 `0`, `1`, `2`에 대해서만 받아들입니다**(getopt를 거친 `-e2` 포함). 수집기의
+  `lastEnableValue`는 auditctl이 거부하는 `-e 02`와 `-e +2`를 더 넓게 읽습니다. 안전한 쪽으로 기록된 차이입니다.
+- **O-56과 O-29: reload는 `auditctl --signal reload`뿐입니다**(audit 3.0.7, 3.0.9, 3.1.5 모두 갖춤). EL의
+  `service auditd reload`는 먼저 `augenrules --load`를 실행하므로 결코 쓰지 않습니다. **O-71:** `auditctl --signal`은
+  죽은 데몬에서 실패합니다. 그런 데몬을 만난 롤백은 `rollback failed`를 로그로 남기고 auditd를 결코 시작하지 않습니다.
+- **O-72(정정): `audit_rules_loaded`의 재실행이 실패하면 첫 실행의 하한을 담은 `50-muster.rules`를 복원합니다**
+  (`backup()`은 경로가 생기면 없음 표식을 사본으로 한 번 바꿈). 그래서 파일과 커널이 일치합니다.
+- **O-73, O-75, 중복 행 줄:** §4가 적지 않은 로그 줄 셋 — `auditctl -l failed; refused`,
+  `<name>: password ageing fields are not numbers, left as is`(`max`가 -1 미만일 때도, O-77),
+  `<name>: more than one /etc/shadow entry, left as is`.
+- **O-77: 비활성 본문은 `max`가 -1 미만인 계정도 건너뛰고 이름을 적습니다**(pam_unix의 유일한 가드는
+  `max != -1`이고, shadow의 `isexpired`는 `>= 0`을 가드함). **그리고 shadow 행이 둘 이상인 이름도 그렇게 합니다**
+  (`chage`와 pam_unix는 첫 행을, 수집기와 본문은 마지막 행을 읽음).
+- **O-64: 잇따른 exports `-opts` 기본 목록은 누적됩니다**(rocky9-init에서 측정: `-no_root_squash X -rw Y`는 Y를
+  `rw,no_root_squash`로 내보냄). O-18의 수집기 수정은 나중 목록을 앞 목록에 더합니다. **O-60:** 기본
+  `no_root_squash` 뒤에 클라이언트 자신의 `root_squash`가 오면 호스트에서 squash합니다. 수집기의 부분 문자열 검사는
+  이를 FAIL로 읽습니다(보수적, O-50).
+- **O-69: exports ERE는 경로의 이름을 바꿀 수 있습니다.** 마지막 구성 요소가 공백 앞에서 `,no_root_squash`나
+  `(no_root_squash`로 끝나는 경로, 또는 ` -no_root_squash `를 담은 따옴표 경로입니다. 받아들인 병적인 구석입니다(첫
+  토큰 너머로 고정하면 이어지는 행이 깨짐).
+- **O-67: 실제 `postconf -e`(postfix 3.7.11)는 줄바꿈이 없는 마지막 줄에 자기 줄을 이어 붙입니다.** 그래서 postfix
+  본문은 그 앞에 §3.7의 끝 줄바꿈 가드를 실행합니다.
+- **O-59: vsftpd는 거듭된 restart에서 systemd의 시작 한도에 걸립니다.** 그래서 본문과 롤백의 모든 restart 앞에
+  `systemctl reset-failed vsftpd.service 2>/dev/null || :`가 옵니다. `banner_file`이 `-`나 `/dev/stdin`이면 운영자가
+  정한 것으로 다룹니다(읽기는 표준 입력을 결코 읽지 않음).
+- **O-68:** NFS 본문은 실행별 표식을 `/etc/exports` 가드 바깥, 맨 위에서 지웁니다.
+- **O-65와 vsftpd의 대소문자 접기:** 유니코드 공백으로 시작하는 줄과, U+212A나 U+017F로 철자한 제품 이름은 Go
+  수집기(유니코드 인식)와 `LC_ALL=C` 셸 읽기가 다르게 읽습니다. 기록된 차이이며, 블록은 `done`으로 끝나고 다음
+  check가 그 줄을 적습니다.
+- **`rhosts_forbidden`의 validate**는 개수 형식(`[ "$(LC_ALL=C grep -Ec … || :)" = 0 ]`)이며, §4.5의
+  `! grep -Eq`와 같습니다.
+- **O-49(§5):** NFS 롤백의 `exportfs -ra`는 모든 init 행의 실패 실행에서 돕니다(거기서는 서버가 active). 그것에
+  대한 O-12의 "stub만" 문구는 철회합니다.
+- **O-60, O-37, O-58(§5 시드):** init 행은 tmpfs를 내보내고(`/srv/ci … fsid=1`. overlay 루트는 내보낼 수 없음),
+  EL과 Debian 모두에 IPv6 우회를 적용하며, Debian은 `postfix@-.service`에서 안정됩니다.
+- **브랜치 시점의 증명:** 네 컨테이너 행의 수리·가드·실패 실행은 랩의 docker에서 다시 돌려 녹색이었습니다(Task 12).
+  runner 행, CI docker의 IPv6, runner의 계정과 `auditctl -s` 키, HUP이 디스크 처리 키 다섯을 적용하는지는 PR의 CI
+  실행만이 증명합니다(O-34).

@@ -578,3 +578,54 @@ half; Changed — the four risks, the symlink guards, the `password_hash_algorit
 - SELinux label proof in CI (no row runs SELinux; §3.11 is the rule meanwhile).
 - A shared "set a key" helper (each file's grammar differs: first wins, last wins, case, separators) and a lint that
   every written path is guarded and in `backup` (O-10/O-11's tests are this cycle's answer).
+
+## 8. As built
+
+Where this section and §1–§7 disagree, this section is the design as built. Plan rulings O-19..O-63 (the plan, the
+pre-flight and the probe) and O-64..O-78 (execution, the cycle's ledger) are in
+`docs/superpowers/plans/2026-10-19-stage3d2d-content-scripts.md`'s Execution notes; the ones that change this text:
+
+- **O-74 supersedes O-5's "or the runtime is already locked" and §4.1 step 3's locked-runtime start.** `auditd_active`
+  refuses a start whenever a lock is pending in `rules.d/*.rules` or `audit.rules`, whatever the runtime lock state,
+  and no longer reads `auditctl -s`. `loginuid_immutable` locks only its own feature (the rule list stays writable, so
+  a start's load applies a pending `-e 2`), and a start's inertness under `enabled 2` was never measured. O-3's
+  "auditd_active runs both halves only before a start" now reads "runs the pending half only before a start".
+- **O-41: the lock pattern matches anywhere on a line** (`-b 8192 -e 2` applies the lock too), as O-3 now spells it.
+- **O-57: auditctl accepts `-e` only for the strings `0`, `1` and `2`** (`-e2` through getopt). The collector's
+  `lastEnableValue` over-reads `-e 02` and `-e +2`, which auditctl rejects: a recorded divergence in the safe direction.
+- **O-56 and O-29: the reload is `auditctl --signal reload` only** (audit 3.0.7, 3.0.9 and 3.1.5 all carry it); EL's
+  `service auditd reload` runs `augenrules --load` first and is never used. **O-71:** `auditctl --signal` fails on a
+  dead daemon; a rollback that meets one logs `rollback failed` and never starts auditd.
+- **O-72 (corrected): a failed rerun of `audit_rules_loaded` restores `50-muster.rules` holding the first run's floor**
+  (`backup()` replaces an absent marker with a copy once the path exists), so the file and the kernel agree.
+- **O-73, O-75, the duplicate-row line:** three log lines §4 did not name — `auditctl -l failed; refused`,
+  `<name>: password ageing fields are not numbers, left as is` (also a `max` below -1, O-77) and
+  `<name>: more than one /etc/shadow entry, left as is`.
+- **O-77: the inactivity body also skips and names an account whose `max` is below -1** (pam_unix's only guard is
+  `max != -1`; shadow's `isexpired` guards `>= 0`) **and any name with more than one shadow row** (`chage` and pam_unix
+  read the first row; the collector and the body the last).
+- **O-64: successive exports `-opts` default lists accumulate** (measured on rocky9-init: `-no_root_squash X -rw Y`
+  exports Y with `rw,no_root_squash`); O-18's collector fix adds a later list to the earlier one. **O-60:** a client's
+  own `root_squash` after a default `no_root_squash` squashes on the host; the collector's substring test reads it FAIL
+  (conservative, O-50).
+- **O-69: the exports ERE can rename a path** whose last component ends in `,no_root_squash` or `(no_root_squash`
+  before a blank, or a quoted path holding ` -no_root_squash `: an accepted pathological corner (anchoring past the
+  first token would break continuation rows).
+- **O-67: real `postconf -e` (postfix 3.7.11) glues its line onto a final line that lacks a newline**, so the postfix
+  body runs §3.7's final-newline guard before it.
+- **O-59: vsftpd hits systemd's start limit on repeated restarts**, so every restart in a body or rollback is preceded
+  by `systemctl reset-failed vsftpd.service 2>/dev/null || :`. A `banner_file` of `-` or `/dev/stdin` is treated as
+  operator-set (the reader never reads standard input).
+- **O-68:** the NFS body removes its per-run markers at the top, outside the `/etc/exports` guard.
+- **O-65 and the vsftpd case folding:** a line led by a Unicode space, and a product name spelled with U+212A or U+017F,
+  are read differently by the Go collector (Unicode-aware) and the `LC_ALL=C` shell readers: recorded divergences; the
+  block ends `done` and the next check names the line.
+- **The `rhosts_forbidden` validate** is the count form (`[ "$(LC_ALL=C grep -Ec … || :)" = 0 ]`), equivalent to §4.5's
+  `! grep -Eq`.
+- **O-49 (§5):** the NFS rollback's `exportfs -ra` runs on every init row's failure run (the server is active there);
+  O-12's "stub-only" wording for it is withdrawn.
+- **O-60, O-37 and O-58 (§5 seeds):** the init rows export a tmpfs (`/srv/ci … fsid=1`; the overlay root cannot be
+  exported), apply the IPv6 workaround on EL and Debian alike, and Debian settles on `postfix@-.service`.
+- **Proof as of the branch:** the four container rows' repair, guard and failure runs were replayed green on the lab's
+  docker (Task 12); the runner row, IPv6 in the CI docker, the runner's accounts and `auditctl -s` keys, and whether a
+  HUP applies the five disk-action keys are proven only by the PR's CI run (O-34).

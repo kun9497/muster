@@ -45,7 +45,23 @@ The contracts here are tested; the design specification (section 8) is the sourc
   `install … /bin/false` line the restore has just put back (and any vendor `install` line for that module). A block's first record
   is kept across runs with the same `MUSTER_BACKUP`, except an absent-path marker: when a later run finds the path (an earlier run
   created it), it records that file, and a failure restores it rather than removing it. The script
-  refuses a backup directory root does not own or others can write.
+  refuses a backup directory root does not own or others can write. Records that describe one run — whether
+  a daemon was running before the edit, whether this run wrote, which keys or accounts it changed, whether it
+  loaded audit rules — are removed first and written fresh, so a rerun never restarts a daemon the operator
+  stopped since, or replays an earlier run's settings.
+- No review script makes a runtime change only a reboot undoes. None loads audit rules into the kernel, or
+  starts auditd (whose unit loads them), while an `-e 2` or `--loginuid-immutable` stands in any persisted rules
+  file, whatever the kernel's lock state, and none loads into a kernel list that already holds rules. The one
+  body that loads rules records the kernel audit settings the load can change and, on failure, puts them back
+  and deletes only what that run loaded (`auditctl -D` runs only when that run's own marker says it loaded into
+  an empty list). auditd is reloaded only with `auditctl --signal reload`, never by signalling a pid read from a
+  file. Effects a rollback cannot take back are said in the control's text: a started auditd stays running,
+  `exportfs -ra` resyncs the kernel's export table to the files, a postfix reload applies a pending
+  `master.cf` edit.
+- The account-inactivity body skips and names every account the bound would disable at once — a password
+  expired for the bound's length or more, an unset or must-change last change with a real maximum, a maximum
+  below -1, more than one shadow entry, a field it cannot read — and logs the date it will disable the rest
+  that have a real maximum, root included.
 - Controls are embedded in the binary. An external control directory is opt-in, logged with digests and
   refused on id collision.
 

@@ -90,8 +90,10 @@ KISA 항목이 아닌 컨트롤은 `category: beyond`, id `muster.beyond.<name>`
 서비스의 `provesInstall` 유닛이며, 각 `<name>.socket`은 그 `<name>.service`보다 앞에 둡니다
 (Linux 테스트가 그 집합을 고정하고, validate도 같은 유닛을 이름으로 적습니다). 스크립트는
 유닛 이름을 직접 쓰지 않습니다. 템플릿이 `UNITS`를 설정하고, 본문 전에 각 유닛의 상태를
-기록했다가 실패하면 되돌려 놓으므로 손으로 쓴 rollback은 없습니다. 본문은 유닛이 하나여도
-`$UNITS`를 두 번에 걸쳐 돕니다:
+기록했다가 실패하면 되돌려 놓으므로 손으로 쓴 rollback은 없습니다. 그 기록은 활성화와 mask를
+되돌려 놓지만 유닛을 멈추지는 않습니다. enable하는 본문(지금은 `auditd_active` 하나)은 동작
+중이 아닌 유닛만 unmask하고 enable하고 시작하며, 그 텍스트는 실패한 블록이 시작된 유닛을 동작
+중인 채로 남긴다고 말합니다. disable하는 본문은 유닛이 하나여도 `$UNITS`를 두 번에 걸쳐 돕니다:
 
 ```sh
 todo=
@@ -165,6 +167,47 @@ here-document는 쓰지 않습니다. 스크립트는
 적은 `unproven:`입니다. `beyond` 컨트롤은 컨테이너를 제외하므로 `runner` 행(`ci/roundtrip/runner.sh`가
 시드하는 GitHub 러너 VM)만 적습니다. `TestEveryScriptedControlIsInTheRoundtripTable`이 그 표,
 배포되는 집합, CI 매트릭스를 같게 유지합니다.
+
+파일이 말하는 내용을 고치는 본문(3D-2d 단계)은 다음 규칙을 더합니다:
+
+- **일방향 런타임 변경 금지.** 본문은 재부팅만 되돌리는 변경을 결코 하지 않으며 — `-e 2`도,
+  `--loginuid-immutable`도 없음 — 커널의 잠금 상태가 무엇이든, 어느 규칙 파일에든 그런 설정이
+  대기 중이면 그 위에 감사 규칙을 적재하거나 auditd를 시작하지 않습니다. 그 밖의 모든 런타임
+  효과는 `$MB` 아래 기록되어 rollback이 되돌려 놓거나, 실패한 블록 뒤에도 남는다고 컨트롤의
+  텍스트에 적힙니다.
+- **데몬은 이번 실행이 기록한 것에 대해서만 건드립니다.** 본문은 무엇이든 고치기 전에 데몬이
+  돌고 있으면 `$MB/<daemon>.was-running`을 쓰고, 첫 쓰기 직전에 `$MB/<daemon>.edited`를
+  만듭니다. 본문의 reload나 restart, 그리고 rollback의 그것은 두 표식이 모두 있어야 합니다.
+  rollback은 프롤로그의 `restore <path>`를 먼저 부를 수 있습니다. 한 번의 실행을 서술하는
+  기록(이 표식들, 쓴 키의 목록, 바꾼 계정의 목록)은 본문의 첫 동작으로 지우고 새로 씁니다.
+  파일 백업과 rollback이 다시 재생하는 목록만 첫 사본을 유지합니다.
+- **쓰는 값**은 적용 중인 목록에서 대상이 받아들이고 호스트를 살려 두는 첫 원소입니다
+  (`audit_disk_actions`는 `email`, `exec`, `single`, `halt`를 결코 쓰지 않음). 내용을 금지하기만
+  하는 절은 고정된 중립 문자열(`FTP server ready.`)로 충족할 수 있으며, 법적 고지문으로는 결코
+  충족하지 않습니다.
+- **지우지 말고 주석 처리.** 본문이 부적격으로 판정한 줄에는 `# muster: `를 앞에 붙이고, 그
+  파일은 `backup`에 둡니다. 자기 파일을 쓰는 도구는 수집기와 같은 방식으로 파일을 읽는 곳에서
+  씁니다(`postconf -e`). 키 하나보다 많이 다시 쓰는 도구(`useradd -D`)는 쓰지 않습니다.
+- **안전하게 덧붙이기.** 끝 줄바꿈이 없을 수 있는 파일에 덧붙이기 전에:
+  `if [ -s "$f" ] && [ -n "$(tail -c1 "$f")" ]; then echo >> "$f"; fi`.
+- **수집기의 방식으로 읽고, 그것을 증명하기.** 본문의 읽기는 한 줄짜리
+  `rd_<what>() { LC_ALL=C …; }` 함수입니다. validate가 그 판정을 다시 증명할 때는 같은 프로그램을
+  되풀이하며, `internal/collect/collectors/remediation_parity_test.go`(Linux)가 각 읽기를 파서의
+  fixture에 대해 실행해 Go 파서와 비교합니다. 본문, validate, rollback이 출력을 파싱하는 모든
+  명령은 `LC_ALL=C` 아래 돕니다.
+- **가드된 validate.** 세 모양 외에, validate는 본문이 로그로 남기는 남겨 둠을 한 줄의
+  `[ guard ] || …`나 `{ …; } || { …; }` 묶음으로 받아들일 수 있습니다. 블록은 `done`으로 끝나고
+  다음 `check`가 남겨 둔 것을 짚습니다.
+- **SELinux.** `restorecon`은 도구가 바꿔 놓았거나 만든 파일(`postconf -e`, 새로 만든 파일)에서만
+  돌고, `sed -i`나 `restore` 뒤에는 결코 돌지 않으며, `if command -v selinuxenabled >/dev/null
+  2>&1 && selinuxenabled && command -v restorecon >/dev/null 2>&1; then restorecon -- "$f"; fi`로
+  씁니다.
+- **업그레이드.** 본문이 제자리에서 고친 벤더 설정 파일은 다음 업그레이드 때 드러납니다 — dpkg(또는
+  ucf)는 고친 conffile에 대해 묻고, rpm은 고친 내용을 두고 `.rpmnew`를 씁니다 — 그리고 패키지가
+  설정 파일로 표시한 파일에 대해서는 텍스트가 그렇게 말합니다.
+- **행이 줄 수 없는 증명.** 어떤 왕복 검증 행도 restart 경로를 돌릴 수 없는 데몬은 계획과 그
+  단계의 설계에서 증명되지 않은 것으로 적고 stub 테스트를 두며, `_roundtrip.yaml`에는 적지
+  않습니다(그 `unproven_units`는 선언된 유닛만 적음).
 
 ## 팩트 추가
 
