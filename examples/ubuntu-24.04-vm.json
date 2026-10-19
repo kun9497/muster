@@ -1,15 +1,15 @@
 {
   "schema_version": 1,
   "run": {
-    "muster_version": "6503835",
-    "commit": "6503835",
-    "controls_version": "kisa-unix-2026+2026.10.13",
-    "controls_digest": "sha256:f19aabb3a5704b459246b30850f221e08d90369f7e043e16db157d39648342e1",
+    "muster_version": "69ad0db",
+    "commit": "69ad0db",
+    "controls_version": "kisa-unix-2026+2026.10.14",
+    "controls_digest": "sha256:10c22486c23977609714514cb0938b2989e61e1d20394998533a7dd565f09c96",
     "guide_edition": "kisa-unix-2026",
-    "collected_at": "2026-10-13T08:25:39Z",
+    "collected_at": "2026-10-19T01:02:53Z",
     "host": {
       "hostname": "github-runner",
-      "machine_id_hash": "c0fe69bdd4f04f3a67964c2595a9f17ab726e115e5a90ca116969c55aa7235a8",
+      "machine_id_hash": "399794935aded36b418e3630a41ef1d23f027811adf388b70d95a72238bc049b",
       "kernel": "",
       "os_release": {
         "id": "ubuntu",
@@ -39,7 +39,7 @@
       {
         "name": "accounts",
         "status": "ok",
-        "ms": 5
+        "ms": 0
       },
       {
         "name": "audit",
@@ -55,17 +55,17 @@
       {
         "name": "boot",
         "status": "ok",
-        "ms": 10
+        "ms": 22
       },
       {
         "name": "coredump",
         "status": "ok",
-        "ms": 5
+        "ms": 0
       },
       {
         "name": "cron",
         "status": "ok",
-        "ms": 874,
+        "ms": 644,
         "cmd": "/usr/bin/systemctl list-unit-files --type=timer --no-legend --no-pager"
       },
       {
@@ -76,23 +76,23 @@
       {
         "name": "env",
         "status": "ok",
-        "ms": 8
+        "ms": 21
       },
       {
         "name": "files",
         "status": "ok",
-        "ms": 20
+        "ms": 13
       },
       {
         "name": "fim",
         "status": "ok",
-        "ms": 9,
+        "ms": 7,
         "cmd": "/usr/bin/systemctl list-timers --all --no-legend --no-pager"
       },
       {
         "name": "firewall",
         "status": "ok",
-        "ms": 25,
+        "ms": 15,
         "cmd": "/usr/sbin/nft list ruleset"
       },
       {
@@ -113,7 +113,7 @@
       {
         "name": "modules",
         "status": "ok",
-        "ms": 14
+        "ms": 18
       },
       {
         "name": "mounts",
@@ -139,18 +139,18 @@
       {
         "name": "pam",
         "status": "ok",
-        "ms": 2
+        "ms": 1
       },
       {
         "name": "patch",
         "status": "ok",
-        "ms": 5883,
+        "ms": 1312,
         "cmd": "/usr/bin/apt-get -s upgrade -o Debug::NoLocking=1"
       },
       {
         "name": "pkgverify",
         "status": "ok",
-        "ms": 558701,
+        "ms": 448681,
         "cmd": "/usr/bin/rpm -Va"
       },
       {
@@ -161,13 +161,13 @@
       {
         "name": "processes",
         "status": "ok",
-        "ms": 156,
+        "ms": 95,
         "cmd": "/usr/bin/rpm -qa --qf [%{=NAME}\t%{FILEMODES:octal}\t%{FILEUSERNAME}\t%{FILEGROUPNAME}\t%|FILECAPS?{%{FILECAPS}}|\t%{FILENAMES}\n]"
       },
       {
         "name": "services",
         "status": "ok",
-        "ms": 334,
+        "ms": 211,
         "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState atftpd.service"
       },
       {
@@ -178,12 +178,12 @@
       {
         "name": "sockets",
         "status": "ok",
-        "ms": 12
+        "ms": 8
       },
       {
         "name": "sshd",
         "status": "ok",
-        "ms": 14,
+        "ms": 9,
         "cmd": "/usr/sbin/sshd -G"
       },
       {
@@ -204,19 +204,19 @@
       {
         "name": "timesync",
         "status": "ok",
-        "ms": 54,
+        "ms": 47,
         "cmd": "/usr/bin/timedatectl show-timesync --all"
       },
       {
         "name": "units",
         "status": "ok",
-        "ms": 56,
+        "ms": 34,
         "cmd": "/usr/bin/systemctl list-units --type=service --state=active --plain --no-legend"
       },
       {
         "name": "walk",
         "status": "ok",
-        "ms": 12005,
+        "ms": 14743,
         "cmd": "/usr/bin/rpm -qa --qf [%{=NAME}\t%{FILEMODES:octal}\t%{FILEUSERNAME}\t%{FILEGROUPNAME}\t%|FILECAPS?{%{FILECAPS}}|\t%{FILENAMES}\n]"
       }
     ],
@@ -2086,7 +2086,7 @@
             "hash_algo": "",
             "home": "/var/run/sphinxsearch",
             "inactive": -1,
-            "last_change": 20730,
+            "last_change": 20738,
             "locked": true,
             "max": -1,
             "min": -1,
@@ -2107,7 +2107,7 @@
             "hash_algo": "",
             "home": "/",
             "inactive": -1,
-            "last_change": 20730,
+            "last_change": 20738,
             "locked": true,
             "max": -1,
             "min": -1,
@@ -2128,7 +2128,7 @@
             "hash_algo": "",
             "home": "/nonexistent",
             "inactive": -1,
-            "last_change": 20730,
+            "last_change": 20738,
             "locked": true,
             "max": -1,
             "min": -1,
@@ -2149,7 +2149,7 @@
             "hash_algo": "",
             "home": "/var/lib/postgresql",
             "inactive": -1,
-            "last_change": 20730,
+            "last_change": 20738,
             "locked": true,
             "max": -1,
             "min": -1,
@@ -2170,7 +2170,7 @@
             "hash_algo": "$6$",
             "home": "/home/packer",
             "inactive": -1,
-            "last_change": 20730,
+            "last_change": 20738,
             "locked": false,
             "max": 99999,
             "min": 0,
@@ -2191,7 +2191,7 @@
             "hash_algo": "",
             "home": "/home/runner",
             "inactive": -1,
-            "last_change": 20730,
+            "last_change": 20738,
             "locked": true,
             "max": 99999,
             "min": 0,
@@ -3381,7 +3381,7 @@
             "family": "v4",
             "name": "systemd-network",
             "package": "systemd",
-            "pid": 720,
+            "pid": 641,
             "port": 68,
             "proto": "udp",
             "rule_chain": "",
@@ -3493,7 +3493,7 @@
                 "name": "systemd-network",
                 "package": "systemd",
                 "package_status": "packaged",
-                "pid": 720,
+                "pid": 641,
                 "uid": 998
               }
             ],
@@ -3644,22 +3644,6 @@
           },
           {
             "fstype": "devtmpfs",
-            "kind": "dir",
-            "mode": 493,
-            "name": "bsg",
-            "path": "/dev/bsg",
-            "uid": 0
-          },
-          {
-            "fstype": "devtmpfs",
-            "kind": "chardev",
-            "mode": 384,
-            "name": "0:0:0:0",
-            "path": "/dev/bsg/0:0:0:0",
-            "uid": 0
-          },
-          {
-            "fstype": "devtmpfs",
             "kind": "chardev",
             "mode": 384,
             "name": "btrfs-control",
@@ -3806,14 +3790,6 @@
             "fstype": "devtmpfs",
             "kind": "dir",
             "mode": 493,
-            "name": "cloud",
-            "path": "/dev/disk/cloud",
-            "uid": 0
-          },
-          {
-            "fstype": "devtmpfs",
-            "kind": "dir",
-            "mode": 493,
             "name": "dma_heap",
             "path": "/dev/dma_heap",
             "uid": 0
@@ -3928,6 +3904,14 @@
             "mode": 438,
             "name": "uverbs0",
             "path": "/dev/infiniband/uverbs0",
+            "uid": 0
+          },
+          {
+            "fstype": "devtmpfs",
+            "kind": "chardev",
+            "mode": 438,
+            "name": "uverbs1",
+            "path": "/dev/infiniband/uverbs1",
             "uid": 0
           },
           {
@@ -4133,6 +4117,14 @@
           {
             "fstype": "devtmpfs",
             "kind": "chardev",
+            "mode": 384,
+            "name": "ng0n1",
+            "path": "/dev/ng0n1",
+            "uid": 0
+          },
+          {
+            "fstype": "devtmpfs",
+            "kind": "chardev",
             "mode": 438,
             "name": "null",
             "path": "/dev/null",
@@ -4144,6 +4136,54 @@
             "mode": 384,
             "name": "nvme-fabrics",
             "path": "/dev/nvme-fabrics",
+            "uid": 0
+          },
+          {
+            "fstype": "devtmpfs",
+            "kind": "chardev",
+            "mode": 384,
+            "name": "nvme0",
+            "path": "/dev/nvme0",
+            "uid": 0
+          },
+          {
+            "fstype": "devtmpfs",
+            "kind": "blockdev",
+            "mode": 432,
+            "name": "nvme0n1",
+            "path": "/dev/nvme0n1",
+            "uid": 0
+          },
+          {
+            "fstype": "devtmpfs",
+            "kind": "blockdev",
+            "mode": 432,
+            "name": "nvme0n1p1",
+            "path": "/dev/nvme0n1p1",
+            "uid": 0
+          },
+          {
+            "fstype": "devtmpfs",
+            "kind": "blockdev",
+            "mode": 432,
+            "name": "nvme0n1p14",
+            "path": "/dev/nvme0n1p14",
+            "uid": 0
+          },
+          {
+            "fstype": "devtmpfs",
+            "kind": "blockdev",
+            "mode": 432,
+            "name": "nvme0n1p15",
+            "path": "/dev/nvme0n1p15",
+            "uid": 0
+          },
+          {
+            "fstype": "devtmpfs",
+            "kind": "blockdev",
+            "mode": 432,
+            "name": "nvme0n1p16",
+            "path": "/dev/nvme0n1p16",
             "uid": 0
           },
           {
@@ -4195,14 +4235,6 @@
             "uid": 0
           },
           {
-            "fstype": "devtmpfs",
-            "kind": "chardev",
-            "mode": 384,
-            "name": "ptp1",
-            "path": "/dev/ptp1",
-            "uid": 0
-          },
-          {
             "fstype": "devpts",
             "kind": "dir",
             "mode": 493,
@@ -4248,54 +4280,6 @@
             "mode": 384,
             "name": "rtc0",
             "path": "/dev/rtc0",
-            "uid": 0
-          },
-          {
-            "fstype": "devtmpfs",
-            "kind": "blockdev",
-            "mode": 432,
-            "name": "sda",
-            "path": "/dev/sda",
-            "uid": 0
-          },
-          {
-            "fstype": "devtmpfs",
-            "kind": "blockdev",
-            "mode": 432,
-            "name": "sda1",
-            "path": "/dev/sda1",
-            "uid": 0
-          },
-          {
-            "fstype": "devtmpfs",
-            "kind": "blockdev",
-            "mode": 432,
-            "name": "sda14",
-            "path": "/dev/sda14",
-            "uid": 0
-          },
-          {
-            "fstype": "devtmpfs",
-            "kind": "blockdev",
-            "mode": 432,
-            "name": "sda15",
-            "path": "/dev/sda15",
-            "uid": 0
-          },
-          {
-            "fstype": "devtmpfs",
-            "kind": "blockdev",
-            "mode": 432,
-            "name": "sda16",
-            "path": "/dev/sda16",
-            "uid": 0
-          },
-          {
-            "fstype": "devtmpfs",
-            "kind": "chardev",
-            "mode": 432,
-            "name": "sg0",
-            "path": "/dev/sg0",
             "uid": 0
           },
           {
@@ -6040,7 +6024,7 @@
             "group_writable": false,
             "mode": 1517,
             "other_writable": false,
-            "path": "/var/log/journal/566c0bdf92524f1b88cd2c41fc67b242",
+            "path": "/var/log/journal/2d791d5cce6240faa3c626058b1ffc7d",
             "uid": 0
           },
           {
@@ -6356,7 +6340,7 @@
             "group_writable": false,
             "mode": 420,
             "other_writable": false,
-            "path": "/var/log/sysstat/sa04",
+            "path": "/var/log/sysstat/sa12",
             "uid": 0
           },
           {
@@ -6365,7 +6349,7 @@
             "group_writable": false,
             "mode": 420,
             "other_writable": false,
-            "path": "/var/log/sysstat/sa13",
+            "path": "/var/log/sysstat/sa19",
             "uid": 0
           },
           {
@@ -9667,12 +9651,12 @@
         "status": "ok",
         "value": [
           {
-            "content": "table ip security {\n\tchain OUTPUT {\n\t\ttype filter hook output priority 150; policy accept;\n\t\tip daddr 168.63.129.16 tcp dport 53 counter packets 0 bytes 0 accept\n\t\tip daddr 168.63.129.16 ip protocol tcp skuid 0 counter packets 987 bytes 349079 accept\n\t\tip daddr 168.63.129.16 ip protocol tcp ct state invalid,new counter packets 0 bytes 0 drop\n\t}\n}\ntable ip nat {\n\tchain DOCKER {\n\t\tiifname \"docker0\" counter packets 0 bytes 0 return\n\t}\n\n\tchain PREROUTING {\n\t\ttype nat hook prerouting priority dstnat; policy accept;\n\t\tfib daddr type local counter packets 0 bytes 0 jump DOCKER\n\t}\n\n\tchain OUTPUT {\n\t\ttype nat hook output priority dstnat; policy accept;\n\t\tip daddr != 127.0.0.0/8 fib daddr type local counter packets 0 bytes 0 jump DOCKER\n\t}\n\n\tchain POSTROUTING {\n\t\ttype nat hook postrouting priority srcnat; policy accept;\n\t\tip saddr 198.51.100.0/16 oifname != \"docker0\" counter packets 0 bytes 0 masquerade\n\t}\n}\ntable ip filter {\n\tchain DOCKER {\n\t\tiifname != \"docker0\" oifname \"docker0\" counter packets 0 bytes 0 drop\n\t}\n\n\tchain DOCKER-FORWARD {\n\t\tcounter packets 0 bytes 0 jump DOCKER-CT\n\t\tcounter packets 0 bytes 0 jump DOCKER-ISOLATION-STAGE-1\n\t\tcounter packets 0 bytes 0 jump DOCKER-BRIDGE\n\t\tiifname \"docker0\" counter packets 0 bytes 0 accept\n\t}\n\n\tchain DOCKER-BRIDGE {\n\t\toifname \"docker0\" counter packets 0 bytes 0 jump DOCKER\n\t}\n\n\tchain DOCKER-CT {\n\t\toifname \"docker0\" ct state related,established counter packets 0 bytes 0 accept\n\t}\n\n\tchain DOCKER-ISOLATION-STAGE-1 {\n\t\tiifname \"docker0\" oifname != \"docker0\" counter packets 0 bytes 0 jump DOCKER-ISOLATION-STAGE-2\n\t}\n\n\tchain DOCKER-ISOLATION-STAGE-2 {\n\t\toifname \"docker0\" counter packets 0 bytes 0 drop\n\t}\n\n\tchain FORWARD {\n\t\ttype filter hook forward priority filter; policy drop;\n\t\tcounter packets 0 bytes 0 jump DOCKER-USER\n\t\tcounter packets 0 bytes 0 jump DOCKER-FORWARD\n\t}\n\n\tchain DOCKER-USER {\n\t\tcounter packets 0 bytes 0 return\n\t}\n}\ntable ip6 nat {\n\tchain DOCKER {\n\t}\n\n\tchain PREROUTING {\n\t\ttype nat hook prerouting priority dstnat; policy accept;\n\t\tfib daddr type local counter packets 0 bytes 0 jump DOCKER\n\t}\n\n\tchain OUTPUT {\n\t\ttype nat hook output priority dstnat; policy accept;\n\t\tip6 daddr != ::1 fib daddr type local counter packets 0 bytes 0 jump DOCKER\n\t}\n}\ntable ip6 filter {\n\tchain DOCKER {\n\t}\n\n\tchain DOCKER-FORWARD {\n\t\tcounter packets 0 bytes 0 jump DOCKER-CT\n\t\tcounter packets 0 bytes 0 jump DOCKER-ISOLATION-STAGE-1\n\t\tcounter packets 0 bytes 0 jump DOCKER-BRIDGE\n\t}\n\n\tchain DOCKER-BRIDGE {\n\t}\n\n\tchain DOCKER-CT {\n\t}\n\n\tchain DOCKER-ISOLATION-STAGE-1 {\n\t}\n\n\tchain DOCKER-ISOLATION-STAGE-2 {\n\t}\n\n\tchain FORWARD {\n\t\ttype filter hook forward priority filter; policy accept;\n\t\tcounter packets 0 bytes 0 jump DOCKER-USER\n\t\tcounter packets 0 bytes 0 jump DOCKER-FORWARD\n\t}\n\n\tchain DOCKER-USER {\n\t\tcounter packets 0 bytes 0 return\n\t}\n}\n",
+            "content": "table ip security {\n\tchain OUTPUT {\n\t\ttype filter hook output priority 150; policy accept;\n\t\tip daddr 168.63.129.16 tcp dport 53 counter packets 0 bytes 0 accept\n\t\tip daddr 168.63.129.16 ip protocol tcp skuid 0 counter packets 299 bytes 148891 accept\n\t\tip daddr 168.63.129.16 ip protocol tcp ct state invalid,new counter packets 0 bytes 0 drop\n\t}\n}\ntable ip nat {\n\tchain DOCKER {\n\t\tiifname \"docker0\" counter packets 0 bytes 0 return\n\t}\n\n\tchain PREROUTING {\n\t\ttype nat hook prerouting priority dstnat; policy accept;\n\t\tfib daddr type local counter packets 0 bytes 0 jump DOCKER\n\t}\n\n\tchain OUTPUT {\n\t\ttype nat hook output priority dstnat; policy accept;\n\t\tip daddr != 127.0.0.0/8 fib daddr type local counter packets 0 bytes 0 jump DOCKER\n\t}\n\n\tchain POSTROUTING {\n\t\ttype nat hook postrouting priority srcnat; policy accept;\n\t\tip saddr 198.51.100.0/16 oifname != \"docker0\" counter packets 0 bytes 0 masquerade\n\t}\n}\ntable ip filter {\n\tchain DOCKER {\n\t\tiifname != \"docker0\" oifname \"docker0\" counter packets 0 bytes 0 drop\n\t}\n\n\tchain DOCKER-FORWARD {\n\t\tcounter packets 0 bytes 0 jump DOCKER-CT\n\t\tcounter packets 0 bytes 0 jump DOCKER-ISOLATION-STAGE-1\n\t\tcounter packets 0 bytes 0 jump DOCKER-BRIDGE\n\t\tiifname \"docker0\" counter packets 0 bytes 0 accept\n\t}\n\n\tchain DOCKER-BRIDGE {\n\t\toifname \"docker0\" counter packets 0 bytes 0 jump DOCKER\n\t}\n\n\tchain DOCKER-CT {\n\t\toifname \"docker0\" ct state related,established counter packets 0 bytes 0 accept\n\t}\n\n\tchain DOCKER-ISOLATION-STAGE-1 {\n\t\tiifname \"docker0\" oifname != \"docker0\" counter packets 0 bytes 0 jump DOCKER-ISOLATION-STAGE-2\n\t}\n\n\tchain DOCKER-ISOLATION-STAGE-2 {\n\t\toifname \"docker0\" counter packets 0 bytes 0 drop\n\t}\n\n\tchain FORWARD {\n\t\ttype filter hook forward priority filter; policy drop;\n\t\tcounter packets 0 bytes 0 jump DOCKER-USER\n\t\tcounter packets 0 bytes 0 jump DOCKER-FORWARD\n\t}\n\n\tchain DOCKER-USER {\n\t\tcounter packets 0 bytes 0 return\n\t}\n}\ntable ip6 nat {\n\tchain DOCKER {\n\t}\n\n\tchain PREROUTING {\n\t\ttype nat hook prerouting priority dstnat; policy accept;\n\t\tfib daddr type local counter packets 0 bytes 0 jump DOCKER\n\t}\n\n\tchain OUTPUT {\n\t\ttype nat hook output priority dstnat; policy accept;\n\t\tip6 daddr != ::1 fib daddr type local counter packets 0 bytes 0 jump DOCKER\n\t}\n}\ntable ip6 filter {\n\tchain DOCKER {\n\t}\n\n\tchain DOCKER-FORWARD {\n\t\tcounter packets 0 bytes 0 jump DOCKER-CT\n\t\tcounter packets 0 bytes 0 jump DOCKER-ISOLATION-STAGE-1\n\t\tcounter packets 0 bytes 0 jump DOCKER-BRIDGE\n\t}\n\n\tchain DOCKER-BRIDGE {\n\t}\n\n\tchain DOCKER-CT {\n\t}\n\n\tchain DOCKER-ISOLATION-STAGE-1 {\n\t}\n\n\tchain DOCKER-ISOLATION-STAGE-2 {\n\t}\n\n\tchain FORWARD {\n\t\ttype filter hook forward priority filter; policy accept;\n\t\tcounter packets 0 bytes 0 jump DOCKER-USER\n\t\tcounter packets 0 bytes 0 jump DOCKER-FORWARD\n\t}\n\n\tchain DOCKER-USER {\n\t\tcounter packets 0 bytes 0 return\n\t}\n}\n",
             "source": "/usr/sbin/nft list ruleset",
             "truncated": false
           },
           {
-            "content": "# Generated by iptables-save v1.8.10 (nf_tables) on Tue Oct 13 08:25:40 2026\n*security\n:INPUT ACCEPT [0:0]\n:FORWARD ACCEPT [0:0]\n:OUTPUT ACCEPT [10059:875274]\n-A OUTPUT -d 168.63.129.16/32 -p tcp -m tcp --dport 53 -j ACCEPT\n-A OUTPUT -d 168.63.129.16/32 -p tcp -m owner --uid-owner 0 -j ACCEPT\n-A OUTPUT -d 168.63.129.16/32 -p tcp -m conntrack --ctstate INVALID,NEW -j DROP\nCOMMIT\n# Completed on Tue Oct 13 08:25:40 2026\n# Generated by iptables-save v1.8.10 (nf_tables) on Tue Oct 13 08:25:40 2026\n*filter\n:INPUT ACCEPT [0:0]\n:FORWARD DROP [0:0]\n:OUTPUT ACCEPT [0:0]\n:DOCKER - [0:0]\n:DOCKER-BRIDGE - [0:0]\n:DOCKER-CT - [0:0]\n:DOCKER-FORWARD - [0:0]\n:DOCKER-ISOLATION-STAGE-1 - [0:0]\n:DOCKER-ISOLATION-STAGE-2 - [0:0]\n:DOCKER-USER - [0:0]\n-A FORWARD -j DOCKER-USER\n-A FORWARD -j DOCKER-FORWARD\n-A DOCKER ! -i docker0 -o docker0 -j DROP\n-A DOCKER-BRIDGE -o docker0 -j DOCKER\n-A DOCKER-CT -o docker0 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT\n-A DOCKER-FORWARD -j DOCKER-CT\n-A DOCKER-FORWARD -j DOCKER-ISOLATION-STAGE-1\n-A DOCKER-FORWARD -j DOCKER-BRIDGE\n-A DOCKER-FORWARD -i docker0 -j ACCEPT\n-A DOCKER-ISOLATION-STAGE-1 -i docker0 ! -o docker0 -j DOCKER-ISOLATION-STAGE-2\n-A DOCKER-ISOLATION-STAGE-2 -o docker0 -j DROP\n-A DOCKER-USER -j RETURN\nCOMMIT\n# Completed on Tue Oct 13 08:25:40 2026\n# Generated by iptables-save v1.8.10 (nf_tables) on Tue Oct 13 08:25:40 2026\n*nat\n:PREROUTING ACCEPT [0:0]\n:INPUT ACCEPT [0:0]\n:OUTPUT ACCEPT [349:24466]\n:POSTROUTING ACCEPT [349:24466]\n:DOCKER - [0:0]\n-A PREROUTING -m addrtype --dst-type LOCAL -j DOCKER\n-A OUTPUT ! -d 127.0.0.0/8 -m addrtype --dst-type LOCAL -j DOCKER\n-A POSTROUTING -s 198.51.100.0/16 ! -o docker0 -j MASQUERADE\n-A DOCKER -i docker0 -j RETURN\nCOMMIT\n# Completed on Tue Oct 13 08:25:40 2026\n",
+            "content": "# Generated by iptables-save v1.8.10 (nf_tables) on Mon Oct 19 01:02:54 2026\n*security\n:INPUT ACCEPT [0:0]\n:FORWARD ACCEPT [0:0]\n:OUTPUT ACCEPT [9495:829158]\n-A OUTPUT -d 168.63.129.16/32 -p tcp -m tcp --dport 53 -j ACCEPT\n-A OUTPUT -d 168.63.129.16/32 -p tcp -m owner --uid-owner 0 -j ACCEPT\n-A OUTPUT -d 168.63.129.16/32 -p tcp -m conntrack --ctstate INVALID,NEW -j DROP\nCOMMIT\n# Completed on Mon Oct 19 01:02:54 2026\n# Generated by iptables-save v1.8.10 (nf_tables) on Mon Oct 19 01:02:54 2026\n*filter\n:INPUT ACCEPT [0:0]\n:FORWARD DROP [0:0]\n:OUTPUT ACCEPT [0:0]\n:DOCKER - [0:0]\n:DOCKER-BRIDGE - [0:0]\n:DOCKER-CT - [0:0]\n:DOCKER-FORWARD - [0:0]\n:DOCKER-ISOLATION-STAGE-1 - [0:0]\n:DOCKER-ISOLATION-STAGE-2 - [0:0]\n:DOCKER-USER - [0:0]\n-A FORWARD -j DOCKER-USER\n-A FORWARD -j DOCKER-FORWARD\n-A DOCKER ! -i docker0 -o docker0 -j DROP\n-A DOCKER-BRIDGE -o docker0 -j DOCKER\n-A DOCKER-CT -o docker0 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT\n-A DOCKER-FORWARD -j DOCKER-CT\n-A DOCKER-FORWARD -j DOCKER-ISOLATION-STAGE-1\n-A DOCKER-FORWARD -j DOCKER-BRIDGE\n-A DOCKER-FORWARD -i docker0 -j ACCEPT\n-A DOCKER-ISOLATION-STAGE-1 -i docker0 ! -o docker0 -j DOCKER-ISOLATION-STAGE-2\n-A DOCKER-ISOLATION-STAGE-2 -o docker0 -j DROP\n-A DOCKER-USER -j RETURN\nCOMMIT\n# Completed on Mon Oct 19 01:02:54 2026\n# Generated by iptables-save v1.8.10 (nf_tables) on Mon Oct 19 01:02:54 2026\n*nat\n:PREROUTING ACCEPT [0:0]\n:INPUT ACCEPT [0:0]\n:OUTPUT ACCEPT [179:13690]\n:POSTROUTING ACCEPT [176:13510]\n:DOCKER - [0:0]\n-A PREROUTING -m addrtype --dst-type LOCAL -j DOCKER\n-A OUTPUT ! -d 127.0.0.0/8 -m addrtype --dst-type LOCAL -j DOCKER\n-A POSTROUTING -s 198.51.100.0/16 ! -o docker0 -j MASQUERADE\n-A DOCKER -i docker0 -j RETURN\nCOMMIT\n# Completed on Mon Oct 19 01:02:54 2026\n",
             "source": "/usr/sbin/iptables-save",
             "truncated": false
           }
@@ -11155,7 +11139,7 @@
               "relatime"
             ],
             "separate": true,
-            "source": "/dev/sda16",
+            "source": "/dev/nvme0n1p16",
             "target": "/boot"
           },
           {
@@ -11981,7 +11965,7 @@
               },
               {
                 "kind": "proc",
-                "path": "/proc/sys/net/ipv6/conf/enP47439s1/disable_ipv6"
+                "path": "/proc/sys/net/ipv6/conf/ens1/disable_ipv6"
               },
               {
                 "kind": "proc",
@@ -12063,22 +12047,22 @@
           {
             "arch": "amd64",
             "name": "apache2",
-            "version": "2.4.58-1ubuntu8.15"
+            "version": "2.4.58-1ubuntu8.16"
           },
           {
             "arch": "amd64",
             "name": "apache2-bin",
-            "version": "2.4.58-1ubuntu8.15"
+            "version": "2.4.58-1ubuntu8.16"
           },
           {
             "arch": "all",
             "name": "apache2-data",
-            "version": "2.4.58-1ubuntu8.15"
+            "version": "2.4.58-1ubuntu8.16"
           },
           {
             "arch": "amd64",
             "name": "apache2-utils",
-            "version": "2.4.58-1ubuntu8.15"
+            "version": "2.4.58-1ubuntu8.16"
           },
           {
             "arch": "amd64",
@@ -12143,7 +12127,7 @@
           {
             "arch": "amd64",
             "name": "azure-cli",
-            "version": "2.90.0-1~noble"
+            "version": "2.91.0-1~noble"
           },
           {
             "arch": "amd64",
@@ -12398,7 +12382,7 @@
           {
             "arch": "amd64",
             "name": "containerd.io",
-            "version": "2.3.6-1~ubuntu.24.04~noble"
+            "version": "2.4.1-2~ubuntu.24.04~noble"
           },
           {
             "arch": "amd64",
@@ -13003,12 +12987,12 @@
           {
             "arch": "amd64",
             "name": "google-chrome-stable",
-            "version": "154.0.8037.97-1"
+            "version": "155.0.8059.39-1"
           },
           {
             "arch": "amd64",
             "name": "google-cloud-cli",
-            "version": "587.0.0-0"
+            "version": "588.0.0-0"
           },
           {
             "arch": "amd64",
@@ -13278,7 +13262,7 @@
           {
             "arch": "amd64",
             "name": "kubectl",
-            "version": "1.37.1-1.1"
+            "version": "1.37.1-ubuntu24.04u2"
           },
           {
             "arch": "amd64",
@@ -13353,7 +13337,7 @@
           {
             "arch": "amd64",
             "name": "libarchive13t64",
-            "version": "3.7.2-2ubuntu0.8"
+            "version": "3.7.2-2ubuntu0.9"
           },
           {
             "arch": "amd64",
@@ -13983,7 +13967,7 @@
           {
             "arch": "amd64",
             "name": "libfreetype6",
-            "version": "2.13.2+dfsg-1ubuntu0.1"
+            "version": "2.13.2+dfsg-1ubuntu0.2"
           },
           {
             "arch": "amd64",
@@ -14858,7 +14842,7 @@
           {
             "arch": "amd64",
             "name": "libopeniscsiusr",
-            "version": "2.1.9-3ubuntu5.4"
+            "version": "2.1.9-3ubuntu5.5"
           },
           {
             "arch": "amd64",
@@ -15003,7 +14987,7 @@
           {
             "arch": "amd64",
             "name": "libpng16-16t64",
-            "version": "1.6.43-5ubuntu0.6"
+            "version": "1.6.43-5ubuntu0.7"
           },
           {
             "arch": "amd64",
@@ -15233,7 +15217,7 @@
           {
             "arch": "amd64",
             "name": "libsgutils2-1.46-2",
-            "version": "1.46-3ubuntu4"
+            "version": "1.46-3ubuntu4.1"
           },
           {
             "arch": "amd64",
@@ -15638,7 +15622,7 @@
           {
             "arch": "amd64",
             "name": "libwbclient0",
-            "version": "2:4.19.5+dfsg-4ubuntu9.7"
+            "version": "2:4.19.5+dfsg-4ubuntu9.8"
           },
           {
             "arch": "amd64",
@@ -15663,17 +15647,17 @@
           {
             "arch": "amd64",
             "name": "libx11-6",
-            "version": "2:1.8.7-1build1"
+            "version": "2:1.8.7-1ubuntu0.1"
           },
           {
             "arch": "all",
             "name": "libx11-data",
-            "version": "2:1.8.7-1build1"
+            "version": "2:1.8.7-1ubuntu0.1"
           },
           {
             "arch": "amd64",
             "name": "libx11-xcb1",
-            "version": "2:1.8.7-1build1"
+            "version": "2:1.8.7-1ubuntu0.1"
           },
           {
             "arch": "amd64",
@@ -15813,12 +15797,12 @@
           {
             "arch": "amd64",
             "name": "libxml2",
-            "version": "2.9.14+dfsg-1.3ubuntu3.9"
+            "version": "2.9.14+dfsg-1.3ubuntu3.10"
           },
           {
             "arch": "amd64",
             "name": "libxml2-dev",
-            "version": "2.9.14+dfsg-1.3ubuntu3.9"
+            "version": "2.9.14+dfsg-1.3ubuntu3.10"
           },
           {
             "arch": "amd64",
@@ -16273,7 +16257,7 @@
           {
             "arch": "amd64",
             "name": "microsoft-edge-stable",
-            "version": "154.0.4258.53-1"
+            "version": "155.0.4283.45-1"
           },
           {
             "arch": "amd64",
@@ -16438,7 +16422,7 @@
           {
             "arch": "amd64",
             "name": "open-iscsi",
-            "version": "2.1.9-3ubuntu5.4"
+            "version": "2.1.9-3ubuntu5.5"
           },
           {
             "arch": "amd64",
@@ -17533,17 +17517,17 @@
           {
             "arch": "amd64",
             "name": "session-manager-plugin",
-            "version": "1.2.835.0-1"
+            "version": "1.2.896.0-1"
           },
           {
             "arch": "amd64",
             "name": "sg3-utils",
-            "version": "1.46-3ubuntu4"
+            "version": "1.46-3ubuntu4.1"
           },
           {
             "arch": "all",
             "name": "sg3-utils-udev",
-            "version": "1.46-3ubuntu4"
+            "version": "1.46-3ubuntu4.1"
           },
           {
             "arch": "all",
@@ -17648,7 +17632,7 @@
           {
             "arch": "amd64",
             "name": "sudo",
-            "version": "1.9.15p5-3ubuntu5.24.04.3"
+            "version": "1.9.15p5-3ubuntu5.24.04.4"
           },
           {
             "arch": "amd64",
@@ -18230,7 +18214,7 @@
           "value": {
             "dpkg_path_excludes": [],
             "dpkg_path_excludes_error": [],
-            "duration_ms": 558689,
+            "duration_ms": 448673,
             "exit_code": 0,
             "lines": 10,
             "packages_without_digests": 1,
@@ -19896,7 +19880,7 @@
       },
       "metadata_age_s": {
         "status": "ok",
-        "value": 729142,
+        "value": 530614,
         "source": {
           "kind": "file",
           "path": "/var/lib/apt/periodic/update-success-stamp"
@@ -20081,9 +20065,9 @@
         "status": "ok",
         "value": [
           {
-            "exe": "/tmp/provjobd1254645064",
-            "name": "provjobd1254645",
-            "pid": 2094,
+            "exe": "/tmp/provjobd3559381429",
+            "name": "provjobd3559381",
+            "pid": 1892,
             "uid": 0
           }
         ],
@@ -20222,11 +20206,11 @@
             "exe_read_status": "",
             "kind": "kernel",
             "mnt_ns": "",
-            "name": "kworker/0:0-events",
+            "name": "kworker/0:0H-events_highpri",
             "ns_read_status": "",
             "package": "",
             "package_status": "",
-            "pid": 9,
+            "pid": 10,
             "ppid": 2,
             "uid": 0
           },
@@ -20237,11 +20221,11 @@
             "exe_read_status": "",
             "kind": "kernel",
             "mnt_ns": "",
-            "name": "kworker/0:0H-events_highpri",
+            "name": "kworker/0:1-events",
             "ns_read_status": "",
             "package": "",
             "package_status": "",
-            "pid": 10,
+            "pid": 11,
             "ppid": 2,
             "uid": 0
           },
@@ -20507,22 +20491,7 @@
             "exe_read_status": "",
             "kind": "kernel",
             "mnt_ns": "",
-            "name": "kworker/1:0-cgroup_free",
-            "ns_read_status": "",
-            "package": "",
-            "package_status": "",
-            "pid": 31,
-            "ppid": 2,
-            "uid": 0
-          },
-          {
-            "cmd": "",
-            "exe": "",
-            "exe_deleted": false,
-            "exe_read_status": "",
-            "kind": "kernel",
-            "mnt_ns": "",
-            "name": "kworker/1:0H-events_highpri",
+            "name": "kworker/1:0H-kblockd",
             "ns_read_status": "",
             "package": "",
             "package_status": "",
@@ -20587,21 +20556,6 @@
             "package": "",
             "package_status": "",
             "pid": 36,
-            "ppid": 2,
-            "uid": 0
-          },
-          {
-            "cmd": "",
-            "exe": "",
-            "exe_deleted": false,
-            "exe_read_status": "",
-            "kind": "kernel",
-            "mnt_ns": "",
-            "name": "kworker/3:0-cgroup_free",
-            "ns_read_status": "",
-            "package": "",
-            "package_status": "",
-            "pid": 37,
             "ppid": 2,
             "uid": 0
           },
@@ -20717,7 +20671,7 @@
             "exe_read_status": "",
             "kind": "kernel",
             "mnt_ns": "",
-            "name": "kworker/u16:1-events_power_efficient",
+            "name": "kworker/u16:1-events_unbound",
             "ns_read_status": "",
             "package": "",
             "package_status": "",
@@ -20882,11 +20836,26 @@
             "exe_read_status": "",
             "kind": "kernel",
             "mnt_ns": "",
-            "name": "kworker/2:1-events",
+            "name": "kworker/2:1-mm_percpu_wq",
             "ns_read_status": "",
             "package": "",
             "package_status": "",
             "pid": 56,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/1:1-events",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 57,
             "ppid": 2,
             "uid": 0
           },
@@ -21092,7 +21061,7 @@
             "exe_read_status": "",
             "kind": "kernel",
             "mnt_ns": "",
-            "name": "kworker/2:1H-kblockd",
+            "name": "kworker/3:1H-kblockd",
             "ns_read_status": "",
             "package": "",
             "package_status": "",
@@ -21182,7 +21151,7 @@
             "exe_read_status": "",
             "kind": "kernel",
             "mnt_ns": "",
-            "name": "scsi_eh_1",
+            "name": "kworker/R-scsi_tmf_0",
             "ns_read_status": "",
             "package": "",
             "package_status": "",
@@ -21197,7 +21166,7 @@
             "exe_read_status": "",
             "kind": "kernel",
             "mnt_ns": "",
-            "name": "kworker/R-scsi_tmf_0",
+            "name": "kworker/R-nvme-wq",
             "ns_read_status": "",
             "package": "",
             "package_status": "",
@@ -21212,7 +21181,7 @@
             "exe_read_status": "",
             "kind": "kernel",
             "mnt_ns": "",
-            "name": "kworker/R-scsi_tmf_1",
+            "name": "kworker/R-nvme-reset-wq",
             "ns_read_status": "",
             "package": "",
             "package_status": "",
@@ -21227,7 +21196,7 @@
             "exe_read_status": "",
             "kind": "kernel",
             "mnt_ns": "",
-            "name": "kworker/R-nvme-wq",
+            "name": "kworker/R-nvme-delete-wq",
             "ns_read_status": "",
             "package": "",
             "package_status": "",
@@ -21242,7 +21211,7 @@
             "exe_read_status": "",
             "kind": "kernel",
             "mnt_ns": "",
-            "name": "kworker/R-nvme-reset-wq",
+            "name": "kworker/R-nvme-auth-wq",
             "ns_read_status": "",
             "package": "",
             "package_status": "",
@@ -21257,7 +21226,7 @@
             "exe_read_status": "",
             "kind": "kernel",
             "mnt_ns": "",
-            "name": "kworker/R-nvme-delete-wq",
+            "name": "kworker/0:2-mm_percpu_wq",
             "ns_read_status": "",
             "package": "",
             "package_status": "",
@@ -21272,7 +21241,7 @@
             "exe_read_status": "",
             "kind": "kernel",
             "mnt_ns": "",
-            "name": "kworker/R-nvme-auth-wq",
+            "name": "kworker/u16:3-events_power_efficient",
             "ns_read_status": "",
             "package": "",
             "package_status": "",
@@ -21287,7 +21256,7 @@
             "exe_read_status": "",
             "kind": "kernel",
             "mnt_ns": "",
-            "name": "kworker/u16:4-events_power_efficient",
+            "name": "kworker/u16:5-events_power_efficient",
             "ns_read_status": "",
             "package": "",
             "package_status": "",
@@ -21302,11 +21271,11 @@
             "exe_read_status": "",
             "kind": "kernel",
             "mnt_ns": "",
-            "name": "hv_balloon",
+            "name": "kworker/u16:6-flush-259:0",
             "ns_read_status": "",
             "package": "",
             "package_status": "",
-            "pid": 87,
+            "pid": 86,
             "ppid": 2,
             "uid": 0
           },
@@ -21321,7 +21290,7 @@
             "ns_read_status": "",
             "package": "",
             "package_status": "",
-            "pid": 88,
+            "pid": 87,
             "ppid": 2,
             "uid": 0
           },
@@ -21336,7 +21305,7 @@
             "ns_read_status": "",
             "package": "",
             "package_status": "",
-            "pid": 89,
+            "pid": 88,
             "ppid": 2,
             "uid": 0
           },
@@ -21347,11 +21316,11 @@
             "exe_read_status": "",
             "kind": "kernel",
             "mnt_ns": "",
-            "name": "kworker/3:1H-kblockd",
+            "name": "hv_balloon",
             "ns_read_status": "",
             "package": "",
             "package_status": "",
-            "pid": 90,
+            "pid": 89,
             "ppid": 2,
             "uid": 0
           },
@@ -21366,7 +21335,7 @@
             "ns_read_status": "",
             "package": "",
             "package_status": "",
-            "pid": 91,
+            "pid": 90,
             "ppid": 2,
             "uid": 0
           },
@@ -21381,7 +21350,7 @@
             "ns_read_status": "",
             "package": "",
             "package_status": "",
-            "pid": 93,
+            "pid": 92,
             "ppid": 2,
             "uid": 0
           },
@@ -21396,7 +21365,7 @@
             "ns_read_status": "",
             "package": "",
             "package_status": "",
-            "pid": 104,
+            "pid": 103,
             "ppid": 2,
             "uid": 0
           },
@@ -21407,11 +21376,11 @@
             "exe_read_status": "",
             "kind": "kernel",
             "mnt_ns": "",
-            "name": "jbd2/sda1-8",
+            "name": "jbd2/nvme0n1p1-8",
             "ns_read_status": "",
             "package": "",
             "package_status": "",
-            "pid": 105,
+            "pid": 104,
             "ppid": 2,
             "uid": 0
           },
@@ -21426,6 +21395,21 @@
             "ns_read_status": "",
             "package": "",
             "package_status": "",
+            "pid": 105,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/3:2-events",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
             "pid": 106,
             "ppid": 2,
             "uid": 0
@@ -21437,11 +21421,11 @@
             "exe_read_status": "",
             "kind": "kernel",
             "mnt_ns": "",
-            "name": "kworker/2:2-events",
+            "name": "kworker/2:1H-kblockd",
             "ns_read_status": "",
             "package": "",
             "package_status": "",
-            "pid": 107,
+            "pid": 132,
             "ppid": 2,
             "uid": 0
           },
@@ -21456,7 +21440,7 @@
             "ns_read_status": "",
             "package": "",
             "package_status": "",
-            "pid": 108,
+            "pid": 141,
             "ppid": 2,
             "uid": 0
           },
@@ -21471,7 +21455,7 @@
             "ns_read_status": "ok",
             "package": "systemd",
             "package_status": "packaged",
-            "pid": 157,
+            "pid": 158,
             "ppid": 1,
             "uid": 0
           },
@@ -21512,7 +21496,22 @@
             "exe_read_status": "",
             "kind": "kernel",
             "mnt_ns": "",
-            "name": "kworker/0:3-events",
+            "name": "kworker/2:2-events",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 181,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/2:3-events",
             "ns_read_status": "",
             "package": "",
             "package_status": "",
@@ -21527,11 +21526,11 @@
             "exe_read_status": "",
             "kind": "kernel",
             "mnt_ns": "",
-            "name": "kworker/1:3-cgroup_release",
+            "name": "kworker/1:2-events",
             "ns_read_status": "",
             "package": "",
             "package_status": "",
-            "pid": 200,
+            "pid": 217,
             "ppid": 2,
             "uid": 0
           },
@@ -21546,7 +21545,7 @@
             "ns_read_status": "ok",
             "package": "multipath-tools",
             "package_status": "packaged",
-            "pid": 223,
+            "pid": 221,
             "ppid": 1,
             "uid": 0
           },
@@ -21561,7 +21560,7 @@
             "ns_read_status": "ok",
             "package": "udev",
             "package_status": "packaged",
-            "pid": 227,
+            "pid": 226,
             "ppid": 1,
             "uid": 0
           },
@@ -21576,7 +21575,7 @@
             "ns_read_status": "",
             "package": "",
             "package_status": "",
-            "pid": 239,
+            "pid": 238,
             "ppid": 2,
             "uid": 0
           },
@@ -21591,7 +21590,7 @@
             "ns_read_status": "ok",
             "package": "linux-azure-6.17-cloud-tools-6.17.0-1022",
             "package_status": "packaged",
-            "pid": 384,
+            "pid": 299,
             "ppid": 1,
             "uid": 0
           },
@@ -21602,11 +21601,11 @@
             "exe_read_status": "",
             "kind": "kernel",
             "mnt_ns": "",
-            "name": "jbd2/sda16-8",
+            "name": "jbd2/nvme0n1p16-8",
             "ns_read_status": "",
             "package": "",
             "package_status": "",
-            "pid": 407,
+            "pid": 332,
             "ppid": 2,
             "uid": 0
           },
@@ -21621,7 +21620,7 @@
             "ns_read_status": "",
             "package": "",
             "package_status": "",
-            "pid": 408,
+            "pid": 333,
             "ppid": 2,
             "uid": 0
           },
@@ -21636,7 +21635,7 @@
             "ns_read_status": "ok",
             "package": "systemd-resolved",
             "package_status": "packaged",
-            "pid": 492,
+            "pid": 424,
             "ppid": 1,
             "uid": 991
           },
@@ -21651,353 +21650,8 @@
             "ns_read_status": "ok",
             "package": "haveged",
             "package_status": "packaged",
-            "pid": 580,
+            "pid": 490,
             "ppid": 1,
-            "uid": 0
-          },
-          {
-            "cmd": "/usr/lib/systemd/systemd-networkd",
-            "exe": "/usr/lib/systemd/systemd-networkd",
-            "exe_deleted": false,
-            "exe_read_status": "ok",
-            "kind": "user",
-            "mnt_ns": "host",
-            "name": "systemd-network",
-            "ns_read_status": "ok",
-            "package": "systemd",
-            "package_status": "packaged",
-            "pid": 720,
-            "ppid": 1,
-            "uid": 998
-          },
-          {
-            "cmd": "@dbus-daemon",
-            "exe": "/usr/bin/dbus-daemon",
-            "exe_deleted": false,
-            "exe_read_status": "ok",
-            "kind": "user",
-            "mnt_ns": "host",
-            "name": "dbus-daemon",
-            "ns_read_status": "ok",
-            "package": "dbus-daemon",
-            "package_status": "packaged",
-            "pid": 1003,
-            "ppid": 1,
-            "uid": 101
-          },
-          {
-            "cmd": "/usr/bin/python3",
-            "exe": "/usr/bin/python3.12",
-            "exe_deleted": false,
-            "exe_read_status": "ok",
-            "kind": "user",
-            "mnt_ns": "host",
-            "name": "networkd-dispat",
-            "ns_read_status": "ok",
-            "package": "python3.12-minimal",
-            "package_status": "packaged",
-            "pid": 1009,
-            "ppid": 1,
-            "uid": 0
-          },
-          {
-            "cmd": "php-fpm: master process (/etc/php/8.3/fpm/php-fpm.conf)",
-            "exe": "/usr/sbin/php-fpm8.3",
-            "exe_deleted": false,
-            "exe_read_status": "ok",
-            "kind": "user",
-            "mnt_ns": "host",
-            "name": "php-fpm8.3",
-            "ns_read_status": "ok",
-            "package": "php8.3-fpm",
-            "package_status": "packaged",
-            "pid": 1011,
-            "ppid": 1,
-            "uid": 0
-          },
-          {
-            "cmd": "/usr/lib/polkit-1/polkitd",
-            "exe": "/usr/lib/polkit-1/polkitd",
-            "exe_deleted": false,
-            "exe_read_status": "ok",
-            "kind": "user",
-            "mnt_ns": "host",
-            "name": "polkitd",
-            "ns_read_status": "ok",
-            "package": "polkitd",
-            "package_status": "packaged",
-            "pid": 1015,
-            "ppid": 1,
-            "uid": 989
-          },
-          {
-            "cmd": "/usr/lib/systemd/systemd-logind",
-            "exe": "/usr/lib/systemd/systemd-logind",
-            "exe_deleted": false,
-            "exe_read_status": "ok",
-            "kind": "user",
-            "mnt_ns": "host",
-            "name": "systemd-logind",
-            "ns_read_status": "ok",
-            "package": "systemd",
-            "package_status": "packaged",
-            "pid": 1041,
-            "ppid": 1,
-            "uid": 0
-          },
-          {
-            "cmd": "/usr/libexec/udisks2/udisksd",
-            "exe": "/usr/libexec/udisks2/udisksd",
-            "exe_deleted": false,
-            "exe_read_status": "ok",
-            "kind": "user",
-            "mnt_ns": "host",
-            "name": "udisksd",
-            "ns_read_status": "ok",
-            "package": "udisks2",
-            "package_status": "packaged",
-            "pid": 1043,
-            "ppid": 1,
-            "uid": 0
-          },
-          {
-            "cmd": "/usr/bin/python3",
-            "exe": "/usr/bin/python3.12",
-            "exe_deleted": false,
-            "exe_read_status": "ok",
-            "kind": "user",
-            "mnt_ns": "host",
-            "name": "python3",
-            "ns_read_status": "ok",
-            "package": "python3.12-minimal",
-            "package_status": "packaged",
-            "pid": 1044,
-            "ppid": 1,
-            "uid": 0
-          },
-          {
-            "cmd": "/usr/sbin/cron",
-            "exe": "/usr/sbin/cron",
-            "exe_deleted": false,
-            "exe_read_status": "ok",
-            "kind": "user",
-            "mnt_ns": "host",
-            "name": "cron",
-            "ns_read_status": "ok",
-            "package": "cron",
-            "package_status": "packaged",
-            "pid": 1080,
-            "ppid": 1,
-            "uid": 0
-          },
-          {
-            "cmd": "/usr/bin/containerd",
-            "exe": "/usr/bin/containerd",
-            "exe_deleted": false,
-            "exe_read_status": "ok",
-            "kind": "user",
-            "mnt_ns": "host",
-            "name": "containerd",
-            "ns_read_status": "ok",
-            "package": "containerd.io",
-            "package_status": "packaged",
-            "pid": 1116,
-            "ppid": 1,
-            "uid": 0
-          },
-          {
-            "cmd": "/sbin/agetty",
-            "exe": "/usr/sbin/agetty",
-            "exe_deleted": false,
-            "exe_read_status": "ok",
-            "kind": "user",
-            "mnt_ns": "host",
-            "name": "agetty",
-            "ns_read_status": "ok",
-            "package": "util-linux",
-            "package_status": "packaged",
-            "pid": 1141,
-            "ppid": 1,
-            "uid": 0
-          },
-          {
-            "cmd": "/usr/sbin/chronyd",
-            "exe": "/usr/sbin/chronyd",
-            "exe_deleted": false,
-            "exe_read_status": "ok",
-            "kind": "user",
-            "mnt_ns": "host",
-            "name": "chronyd",
-            "ns_read_status": "ok",
-            "package": "chrony",
-            "package_status": "packaged",
-            "pid": 1153,
-            "ppid": 1,
-            "uid": 109
-          },
-          {
-            "cmd": "/sbin/agetty",
-            "exe": "/usr/sbin/agetty",
-            "exe_deleted": false,
-            "exe_read_status": "ok",
-            "kind": "user",
-            "mnt_ns": "host",
-            "name": "agetty",
-            "ns_read_status": "ok",
-            "package": "util-linux",
-            "package_status": "packaged",
-            "pid": 1166,
-            "ppid": 1,
-            "uid": 0
-          },
-          {
-            "cmd": "/usr/sbin/chronyd",
-            "exe": "/usr/sbin/chronyd",
-            "exe_deleted": false,
-            "exe_read_status": "ok",
-            "kind": "user",
-            "mnt_ns": "host",
-            "name": "chronyd",
-            "ns_read_status": "ok",
-            "package": "chrony",
-            "package_status": "packaged",
-            "pid": 1170,
-            "ppid": 1153,
-            "uid": 109
-          },
-          {
-            "cmd": "/usr/sbin/rsyslogd",
-            "exe": "/usr/sbin/rsyslogd",
-            "exe_deleted": false,
-            "exe_read_status": "ok",
-            "kind": "user",
-            "mnt_ns": "host",
-            "name": "rsyslogd",
-            "ns_read_status": "ok",
-            "package": "rsyslog",
-            "package_status": "packaged",
-            "pid": 1182,
-            "ppid": 1,
-            "uid": 102
-          },
-          {
-            "cmd": "/usr/sbin/ModemManager",
-            "exe": "/usr/sbin/ModemManager",
-            "exe_deleted": false,
-            "exe_read_status": "ok",
-            "kind": "user",
-            "mnt_ns": "host",
-            "name": "ModemManager",
-            "ns_read_status": "ok",
-            "package": "modemmanager",
-            "package_status": "packaged",
-            "pid": 1201,
-            "ppid": 1,
-            "uid": 0
-          },
-          {
-            "cmd": "/usr/bin/dockerd",
-            "exe": "/usr/bin/dockerd",
-            "exe_deleted": false,
-            "exe_read_status": "ok",
-            "kind": "user",
-            "mnt_ns": "host",
-            "name": "dockerd",
-            "ns_read_status": "ok",
-            "package": "docker-ce",
-            "package_status": "packaged",
-            "pid": 1236,
-            "ppid": 1,
-            "uid": 0
-          },
-          {
-            "cmd": "/usr/lib/systemd/systemd",
-            "exe": "/usr/lib/systemd/systemd",
-            "exe_deleted": false,
-            "exe_read_status": "ok",
-            "kind": "user",
-            "mnt_ns": "host",
-            "name": "systemd",
-            "ns_read_status": "ok",
-            "package": "systemd",
-            "package_status": "packaged",
-            "pid": 1248,
-            "ppid": 1,
-            "uid": 1001
-          },
-          {
-            "cmd": "(sd-pam)",
-            "exe": "/usr/lib/systemd/systemd-executor",
-            "exe_deleted": false,
-            "exe_read_status": "ok",
-            "kind": "user",
-            "mnt_ns": "host",
-            "name": "(sd-pam)",
-            "ns_read_status": "ok",
-            "package": "systemd",
-            "package_status": "packaged",
-            "pid": 1290,
-            "ppid": 1248,
-            "uid": 1001
-          },
-          {
-            "cmd": "php-fpm: pool www",
-            "exe": "/usr/sbin/php-fpm8.3",
-            "exe_deleted": false,
-            "exe_read_status": "ok",
-            "kind": "user",
-            "mnt_ns": "host",
-            "name": "php-fpm8.3",
-            "ns_read_status": "ok",
-            "package": "php8.3-fpm",
-            "package_status": "packaged",
-            "pid": 1297,
-            "ppid": 1011,
-            "uid": 33
-          },
-          {
-            "cmd": "php-fpm: pool www",
-            "exe": "/usr/sbin/php-fpm8.3",
-            "exe_deleted": false,
-            "exe_read_status": "ok",
-            "kind": "user",
-            "mnt_ns": "host",
-            "name": "php-fpm8.3",
-            "ns_read_status": "ok",
-            "package": "php8.3-fpm",
-            "package_status": "packaged",
-            "pid": 1303,
-            "ppid": 1011,
-            "uid": 33
-          },
-          {
-            "cmd": "",
-            "exe": "",
-            "exe_deleted": false,
-            "exe_read_status": "",
-            "kind": "kernel",
-            "mnt_ns": "",
-            "name": "kworker/R-tls-strp",
-            "ns_read_status": "",
-            "package": "",
-            "package_status": "",
-            "pid": 1322,
-            "ppid": 2,
-            "uid": 0
-          },
-          {
-            "cmd": "/usr/bin/python3",
-            "exe": "/usr/bin/python3.12",
-            "exe_deleted": false,
-            "exe_read_status": "ok",
-            "kind": "user",
-            "mnt_ns": "host",
-            "name": "python3",
-            "ns_read_status": "ok",
-            "package": "python3.12-minimal",
-            "package_status": "packaged",
-            "pid": 1434,
-            "ppid": 1044,
             "uid": 0
           },
           {
@@ -22007,191 +21661,11 @@
             "exe_read_status": "",
             "kind": "kernel",
             "mnt_ns": "",
-            "name": "psimon",
+            "name": "kworker/R-mana_per_port_queue_reset_wq",
             "ns_read_status": "",
             "package": "",
             "package_status": "",
-            "pid": 2071,
-            "ppid": 2,
-            "uid": 0
-          },
-          {
-            "cmd": "/opt/hca/hosted-compute-agent",
-            "exe": "/opt/hca/hosted-compute-agent",
-            "exe_deleted": false,
-            "exe_read_status": "ok",
-            "kind": "user",
-            "mnt_ns": "host",
-            "name": "hosted-compute-",
-            "ns_read_status": "ok",
-            "package": "",
-            "package_status": "unpackaged",
-            "pid": 2074,
-            "ppid": 1,
-            "uid": 1001
-          },
-          {
-            "cmd": "sudo",
-            "exe": "/usr/bin/sudo",
-            "exe_deleted": false,
-            "exe_read_status": "ok",
-            "kind": "user",
-            "mnt_ns": "host",
-            "name": "sudo",
-            "ns_read_status": "ok",
-            "package": "sudo",
-            "package_status": "packaged",
-            "pid": 2092,
-            "ppid": 2074,
-            "uid": 1001
-          },
-          {
-            "cmd": "/tmp/provjobd1254645064",
-            "exe": "/tmp/provjobd1254645064",
-            "exe_deleted": true,
-            "exe_read_status": "ok",
-            "kind": "user",
-            "mnt_ns": "host",
-            "name": "provjobd1254645",
-            "ns_read_status": "ok",
-            "package": "",
-            "package_status": "unpackaged",
-            "pid": 2094,
-            "ppid": 2092,
-            "uid": 0
-          },
-          {
-            "cmd": "",
-            "exe": "",
-            "exe_deleted": false,
-            "exe_read_status": "",
-            "kind": "kernel",
-            "mnt_ns": "",
-            "name": "kworker/R-mlx5_cmd_b94f:00:02.0",
-            "ns_read_status": "",
-            "package": "",
-            "package_status": "",
-            "pid": 2129,
-            "ppid": 2,
-            "uid": 0
-          },
-          {
-            "cmd": "",
-            "exe": "",
-            "exe_deleted": false,
-            "exe_read_status": "",
-            "kind": "kernel",
-            "mnt_ns": "",
-            "name": "kworker/R-mlx5_healthb94f:00:02.0",
-            "ns_read_status": "",
-            "package": "",
-            "package_status": "",
-            "pid": 2132,
-            "ppid": 2,
-            "uid": 0
-          },
-          {
-            "cmd": "",
-            "exe": "",
-            "exe_deleted": false,
-            "exe_read_status": "",
-            "kind": "kernel",
-            "mnt_ns": "",
-            "name": "kworker/R-mlx5_page_allocator",
-            "ns_read_status": "",
-            "package": "",
-            "package_status": "",
-            "pid": 2133,
-            "ppid": 2,
-            "uid": 0
-          },
-          {
-            "cmd": "",
-            "exe": "",
-            "exe_deleted": false,
-            "exe_read_status": "",
-            "kind": "kernel",
-            "mnt_ns": "",
-            "name": "kworker/R-mlx5_events",
-            "ns_read_status": "",
-            "package": "",
-            "package_status": "",
-            "pid": 2134,
-            "ppid": 2,
-            "uid": 0
-          },
-          {
-            "cmd": "",
-            "exe": "",
-            "exe_deleted": false,
-            "exe_read_status": "",
-            "kind": "kernel",
-            "mnt_ns": "",
-            "name": "ptp1",
-            "ns_read_status": "",
-            "package": "",
-            "package_status": "",
-            "pid": 2135,
-            "ppid": 2,
-            "uid": 0
-          },
-          {
-            "cmd": "",
-            "exe": "",
-            "exe_deleted": false,
-            "exe_read_status": "",
-            "kind": "kernel",
-            "mnt_ns": "",
-            "name": "kworker/R-mlx5_fc",
-            "ns_read_status": "",
-            "package": "",
-            "package_status": "",
-            "pid": 2136,
-            "ppid": 2,
-            "uid": 0
-          },
-          {
-            "cmd": "",
-            "exe": "",
-            "exe_deleted": false,
-            "exe_read_status": "",
-            "kind": "kernel",
-            "mnt_ns": "",
-            "name": "kworker/R-mlx5_hv_vhca",
-            "ns_read_status": "",
-            "package": "",
-            "package_status": "",
-            "pid": 2137,
-            "ppid": 2,
-            "uid": 0
-          },
-          {
-            "cmd": "",
-            "exe": "",
-            "exe_deleted": false,
-            "exe_read_status": "",
-            "kind": "kernel",
-            "mnt_ns": "",
-            "name": "kworker/R-mlx5e",
-            "ns_read_status": "",
-            "package": "",
-            "package_status": "",
-            "pid": 2138,
-            "ppid": 2,
-            "uid": 0
-          },
-          {
-            "cmd": "",
-            "exe": "",
-            "exe_deleted": false,
-            "exe_read_status": "",
-            "kind": "kernel",
-            "mnt_ns": "",
-            "name": "kworker/R-mlx5e_arfs",
-            "ns_read_status": "",
-            "package": "",
-            "package_status": "",
-            "pid": 2139,
+            "pid": 552,
             "ppid": 2,
             "uid": 0
           },
@@ -22206,7 +21680,7 @@
             "ns_read_status": "",
             "package": "",
             "package_status": "",
-            "pid": 2151,
+            "pid": 560,
             "ppid": 2,
             "uid": 0
           },
@@ -22221,7 +21695,7 @@
             "ns_read_status": "",
             "package": "",
             "package_status": "",
-            "pid": 2152,
+            "pid": 561,
             "ppid": 2,
             "uid": 0
           },
@@ -22236,7 +21710,7 @@
             "ns_read_status": "",
             "package": "",
             "package_status": "",
-            "pid": 2153,
+            "pid": 562,
             "ppid": 2,
             "uid": 0
           },
@@ -22251,7 +21725,7 @@
             "ns_read_status": "",
             "package": "",
             "package_status": "",
-            "pid": 2154,
+            "pid": 563,
             "ppid": 2,
             "uid": 0
           },
@@ -22262,57 +21736,387 @@
             "exe_read_status": "",
             "kind": "kernel",
             "mnt_ns": "",
-            "name": "kworker/R-mkey_cache",
+            "name": "kworker/R-ib_mad1",
             "ns_read_status": "",
             "package": "",
             "package_status": "",
-            "pid": 2155,
+            "pid": 564,
             "ppid": 2,
             "uid": 0
           },
           {
-            "cmd": "/home/runner/actions-runner/cached/2.337.0/bin/Runner.Listener",
-            "exe": "/home/runner/actions-runner/cached/2.337.0/bin/Runner.Listener",
+            "cmd": "/usr/lib/systemd/systemd-networkd",
+            "exe": "/usr/lib/systemd/systemd-networkd",
             "exe_deleted": false,
             "exe_read_status": "ok",
             "kind": "user",
             "mnt_ns": "host",
-            "name": "Runner.Listener",
+            "name": "systemd-network",
             "ns_read_status": "ok",
-            "package": "",
-            "package_status": "unpackaged",
-            "pid": 2163,
-            "ppid": 2074,
-            "uid": 1001
-          },
-          {
-            "cmd": "/home/runner/actions-runner/cached/2.337.0/bin/Runner.Worker",
-            "exe": "/home/runner/actions-runner/cached/2.337.0/bin/Runner.Worker",
-            "exe_deleted": false,
-            "exe_read_status": "ok",
-            "kind": "user",
-            "mnt_ns": "host",
-            "name": "Runner.Worker",
-            "ns_read_status": "ok",
-            "package": "",
-            "package_status": "unpackaged",
-            "pid": 2182,
-            "ppid": 2163,
-            "uid": 1001
-          },
-          {
-            "cmd": "/usr/bin/bash",
-            "exe": "/usr/bin/bash",
-            "exe_deleted": false,
-            "exe_read_status": "ok",
-            "kind": "user",
-            "mnt_ns": "host",
-            "name": "bash",
-            "ns_read_status": "ok",
-            "package": "bash",
+            "package": "systemd",
             "package_status": "packaged",
-            "pid": 2696,
-            "ppid": 2182,
+            "pid": 641,
+            "ppid": 1,
+            "uid": 998
+          },
+          {
+            "cmd": "@dbus-daemon",
+            "exe": "/usr/bin/dbus-daemon",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "dbus-daemon",
+            "ns_read_status": "ok",
+            "package": "dbus-daemon",
+            "package_status": "packaged",
+            "pid": 807,
+            "ppid": 1,
+            "uid": 101
+          },
+          {
+            "cmd": "/usr/bin/python3",
+            "exe": "/usr/bin/python3.12",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "networkd-dispat",
+            "ns_read_status": "ok",
+            "package": "python3.12-minimal",
+            "package_status": "packaged",
+            "pid": 812,
+            "ppid": 1,
+            "uid": 0
+          },
+          {
+            "cmd": "php-fpm: master process (/etc/php/8.3/fpm/php-fpm.conf)",
+            "exe": "/usr/sbin/php-fpm8.3",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "php-fpm8.3",
+            "ns_read_status": "ok",
+            "package": "php8.3-fpm",
+            "package_status": "packaged",
+            "pid": 815,
+            "ppid": 1,
+            "uid": 0
+          },
+          {
+            "cmd": "/usr/lib/polkit-1/polkitd",
+            "exe": "/usr/lib/polkit-1/polkitd",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "polkitd",
+            "ns_read_status": "ok",
+            "package": "polkitd",
+            "package_status": "packaged",
+            "pid": 819,
+            "ppid": 1,
+            "uid": 989
+          },
+          {
+            "cmd": "/usr/lib/systemd/systemd-logind",
+            "exe": "/usr/lib/systemd/systemd-logind",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "systemd-logind",
+            "ns_read_status": "ok",
+            "package": "systemd",
+            "package_status": "packaged",
+            "pid": 829,
+            "ppid": 1,
+            "uid": 0
+          },
+          {
+            "cmd": "/usr/libexec/udisks2/udisksd",
+            "exe": "/usr/libexec/udisks2/udisksd",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "udisksd",
+            "ns_read_status": "ok",
+            "package": "udisks2",
+            "package_status": "packaged",
+            "pid": 847,
+            "ppid": 1,
+            "uid": 0
+          },
+          {
+            "cmd": "/usr/bin/python3",
+            "exe": "/usr/bin/python3.12",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "python3",
+            "ns_read_status": "ok",
+            "package": "python3.12-minimal",
+            "package_status": "packaged",
+            "pid": 848,
+            "ppid": 1,
+            "uid": 0
+          },
+          {
+            "cmd": "/usr/sbin/cron",
+            "exe": "/usr/sbin/cron",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "cron",
+            "ns_read_status": "ok",
+            "package": "cron",
+            "package_status": "packaged",
+            "pid": 873,
+            "ppid": 1,
+            "uid": 0
+          },
+          {
+            "cmd": "/usr/bin/containerd",
+            "exe": "/usr/bin/containerd",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "containerd",
+            "ns_read_status": "ok",
+            "package": "containerd.io",
+            "package_status": "packaged",
+            "pid": 893,
+            "ppid": 1,
+            "uid": 0
+          },
+          {
+            "cmd": "/sbin/agetty",
+            "exe": "/usr/sbin/agetty",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "agetty",
+            "ns_read_status": "ok",
+            "package": "util-linux",
+            "package_status": "packaged",
+            "pid": 896,
+            "ppid": 1,
+            "uid": 0
+          },
+          {
+            "cmd": "/sbin/agetty",
+            "exe": "/usr/sbin/agetty",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "agetty",
+            "ns_read_status": "ok",
+            "package": "util-linux",
+            "package_status": "packaged",
+            "pid": 923,
+            "ppid": 1,
+            "uid": 0
+          },
+          {
+            "cmd": "/usr/sbin/chronyd",
+            "exe": "/usr/sbin/chronyd",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "chronyd",
+            "ns_read_status": "ok",
+            "package": "chrony",
+            "package_status": "packaged",
+            "pid": 943,
+            "ppid": 1,
+            "uid": 109
+          },
+          {
+            "cmd": "/usr/sbin/chronyd",
+            "exe": "/usr/sbin/chronyd",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "chronyd",
+            "ns_read_status": "ok",
+            "package": "chrony",
+            "package_status": "packaged",
+            "pid": 945,
+            "ppid": 943,
+            "uid": 109
+          },
+          {
+            "cmd": "/usr/sbin/rsyslogd",
+            "exe": "/usr/sbin/rsyslogd",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "rsyslogd",
+            "ns_read_status": "ok",
+            "package": "rsyslog",
+            "package_status": "packaged",
+            "pid": 990,
+            "ppid": 1,
+            "uid": 102
+          },
+          {
+            "cmd": "/usr/sbin/ModemManager",
+            "exe": "/usr/sbin/ModemManager",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "ModemManager",
+            "ns_read_status": "ok",
+            "package": "modemmanager",
+            "package_status": "packaged",
+            "pid": 997,
+            "ppid": 1,
+            "uid": 0
+          },
+          {
+            "cmd": "/usr/lib/systemd/systemd",
+            "exe": "/usr/lib/systemd/systemd",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "systemd",
+            "ns_read_status": "ok",
+            "package": "systemd",
+            "package_status": "packaged",
+            "pid": 1027,
+            "ppid": 1,
+            "uid": 1001
+          },
+          {
+            "cmd": "(sd-pam)",
+            "exe": "/usr/lib/systemd/systemd-executor",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "(sd-pam)",
+            "ns_read_status": "ok",
+            "package": "systemd",
+            "package_status": "packaged",
+            "pid": 1046,
+            "ppid": 1027,
+            "uid": 1001
+          },
+          {
+            "cmd": "/usr/bin/dockerd",
+            "exe": "/usr/bin/dockerd",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "dockerd",
+            "ns_read_status": "ok",
+            "package": "docker-ce",
+            "package_status": "packaged",
+            "pid": 1105,
+            "ppid": 1,
+            "uid": 0
+          },
+          {
+            "cmd": "php-fpm: pool www",
+            "exe": "/usr/sbin/php-fpm8.3",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "php-fpm8.3",
+            "ns_read_status": "ok",
+            "package": "php8.3-fpm",
+            "package_status": "packaged",
+            "pid": 1180,
+            "ppid": 815,
+            "uid": 33
+          },
+          {
+            "cmd": "php-fpm: pool www",
+            "exe": "/usr/sbin/php-fpm8.3",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "php-fpm8.3",
+            "ns_read_status": "ok",
+            "package": "php8.3-fpm",
+            "package_status": "packaged",
+            "pid": 1183,
+            "ppid": 815,
+            "uid": 33
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/R-tls-strp",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 1204,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "/usr/bin/python3",
+            "exe": "/usr/bin/python3.12",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "python3",
+            "ns_read_status": "ok",
+            "package": "python3.12-minimal",
+            "package_status": "packaged",
+            "pid": 1247,
+            "ppid": 848,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "psimon",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 1876,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "/opt/hca/hosted-compute-agent",
+            "exe": "/opt/hca/hosted-compute-agent",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "hosted-compute-",
+            "ns_read_status": "ok",
+            "package": "",
+            "package_status": "unpackaged",
+            "pid": 1877,
+            "ppid": 1,
             "uid": 1001
           },
           {
@@ -22326,8 +22130,83 @@
             "ns_read_status": "ok",
             "package": "sudo",
             "package_status": "packaged",
-            "pid": 2698,
-            "ppid": 2696,
+            "pid": 1890,
+            "ppid": 1877,
+            "uid": 1001
+          },
+          {
+            "cmd": "/tmp/provjobd3559381429",
+            "exe": "/tmp/provjobd3559381429",
+            "exe_deleted": true,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "provjobd3559381",
+            "ns_read_status": "ok",
+            "package": "",
+            "package_status": "unpackaged",
+            "pid": 1892,
+            "ppid": 1890,
+            "uid": 0
+          },
+          {
+            "cmd": "/home/runner/actions-runner/cached/2.337.0/bin/Runner.Listener",
+            "exe": "/home/runner/actions-runner/cached/2.337.0/bin/Runner.Listener",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "Runner.Listener",
+            "ns_read_status": "ok",
+            "package": "",
+            "package_status": "unpackaged",
+            "pid": 1928,
+            "ppid": 1877,
+            "uid": 1001
+          },
+          {
+            "cmd": "/home/runner/actions-runner/cached/2.337.0/bin/Runner.Worker",
+            "exe": "/home/runner/actions-runner/cached/2.337.0/bin/Runner.Worker",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "Runner.Worker",
+            "ns_read_status": "ok",
+            "package": "",
+            "package_status": "unpackaged",
+            "pid": 1949,
+            "ppid": 1928,
+            "uid": 1001
+          },
+          {
+            "cmd": "/usr/bin/bash",
+            "exe": "/usr/bin/bash",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "bash",
+            "ns_read_status": "ok",
+            "package": "bash",
+            "package_status": "packaged",
+            "pid": 2467,
+            "ppid": 1949,
+            "uid": 1001
+          },
+          {
+            "cmd": "sudo",
+            "exe": "/usr/bin/sudo",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "sudo",
+            "ns_read_status": "ok",
+            "package": "sudo",
+            "package_status": "packaged",
+            "pid": 2469,
+            "ppid": 2467,
             "uid": 1001
           },
           {
@@ -22341,8 +22220,8 @@
             "ns_read_status": "ok",
             "package": "",
             "package_status": "unpackaged",
-            "pid": 2699,
-            "ppid": 2698,
+            "pid": 2470,
+            "ppid": 2469,
             "uid": 0
           },
           {
@@ -22352,11 +22231,11 @@
             "exe_read_status": "",
             "kind": "kernel",
             "mnt_ns": "",
-            "name": "kworker/3:2-events",
+            "name": "kworker/0:0-cgroup_free",
             "ns_read_status": "",
             "package": "",
             "package_status": "",
-            "pid": 2800,
+            "pid": 2575,
             "ppid": 2,
             "uid": 0
           },
@@ -22367,11 +22246,11 @@
             "exe_read_status": "",
             "kind": "kernel",
             "mnt_ns": "",
-            "name": "kworker/1:1-events",
+            "name": "kworker/1:0-events",
             "ns_read_status": "",
             "package": "",
             "package_status": "",
-            "pid": 2843,
+            "pid": 2585,
             "ppid": 2,
             "uid": 0
           },
@@ -22382,26 +22261,11 @@
             "exe_read_status": "",
             "kind": "kernel",
             "mnt_ns": "",
-            "name": "kworker/u16:0-events_power_efficient",
+            "name": "kworker/3:0-cgroup_free",
             "ns_read_status": "",
             "package": "",
             "package_status": "",
-            "pid": 2845,
-            "ppid": 2,
-            "uid": 0
-          },
-          {
-            "cmd": "",
-            "exe": "",
-            "exe_deleted": false,
-            "exe_read_status": "",
-            "kind": "kernel",
-            "mnt_ns": "",
-            "name": "kworker/u16:3-events_power_efficient",
-            "ns_read_status": "",
-            "package": "",
-            "package_status": "",
-            "pid": 2848,
+            "pid": 2645,
             "ppid": 2,
             "uid": 0
           }
@@ -22417,7 +22281,7 @@
           {
             "addr": "0.0.0.0",
             "family": "v4",
-            "inode": 6720,
+            "inode": 5841,
             "link_local": false,
             "loopback": false,
             "owner_status": "ok",
@@ -22440,7 +22304,7 @@
           {
             "addr": "::",
             "family": "v6",
-            "inode": 6722,
+            "inode": 5843,
             "link_local": false,
             "loopback": false,
             "owner_status": "ok",
@@ -22463,7 +22327,7 @@
           {
             "addr": "127.0.0.53",
             "family": "v4",
-            "inode": 6410,
+            "inode": 5406,
             "link_local": false,
             "loopback": true,
             "owner_status": "ok",
@@ -22475,7 +22339,7 @@
                 "name": "systemd-resolve",
                 "package": "systemd-resolved",
                 "package_status": "packaged",
-                "pid": 492,
+                "pid": 424,
                 "uid": 991
               }
             ],
@@ -22486,7 +22350,7 @@
           {
             "addr": "127.0.0.54",
             "family": "v4",
-            "inode": 6412,
+            "inode": 5408,
             "link_local": false,
             "loopback": true,
             "owner_status": "ok",
@@ -22498,7 +22362,7 @@
                 "name": "systemd-resolve",
                 "package": "systemd-resolved",
                 "package_status": "packaged",
-                "pid": 492,
+                "pid": 424,
                 "uid": 991
               }
             ],
@@ -22509,7 +22373,7 @@
           {
             "addr": "127.0.0.53",
             "family": "v4",
-            "inode": 6409,
+            "inode": 5405,
             "link_local": false,
             "loopback": true,
             "owner_status": "ok",
@@ -22521,7 +22385,7 @@
                 "name": "systemd-resolve",
                 "package": "systemd-resolved",
                 "package_status": "packaged",
-                "pid": 492,
+                "pid": 424,
                 "uid": 991
               }
             ],
@@ -22532,7 +22396,7 @@
           {
             "addr": "127.0.0.54",
             "family": "v4",
-            "inode": 6411,
+            "inode": 5407,
             "link_local": false,
             "loopback": true,
             "owner_status": "ok",
@@ -22544,7 +22408,7 @@
                 "name": "systemd-resolve",
                 "package": "systemd-resolved",
                 "package_status": "packaged",
-                "pid": 492,
+                "pid": 424,
                 "uid": 991
               }
             ],
@@ -22555,7 +22419,7 @@
           {
             "addr": "192.0.2.1",
             "family": "v4",
-            "inode": 5766,
+            "inode": 4873,
             "link_local": false,
             "loopback": false,
             "owner_status": "ok",
@@ -22567,7 +22431,7 @@
                 "name": "systemd-network",
                 "package": "systemd",
                 "package_status": "packaged",
-                "pid": 720,
+                "pid": 641,
                 "uid": 998
               }
             ],
@@ -22578,7 +22442,7 @@
           {
             "addr": "127.0.0.1",
             "family": "v4",
-            "inode": 6128,
+            "inode": 6050,
             "link_local": false,
             "loopback": true,
             "owner_status": "ok",
@@ -22590,7 +22454,7 @@
                 "name": "chronyd",
                 "package": "chrony",
                 "package_status": "packaged",
-                "pid": 1153,
+                "pid": 943,
                 "uid": 109
               }
             ],
@@ -22601,7 +22465,7 @@
           {
             "addr": "::1",
             "family": "v6",
-            "inode": 6129,
+            "inode": 6051,
             "link_local": false,
             "loopback": true,
             "owner_status": "ok",
@@ -22613,7 +22477,7 @@
                 "name": "chronyd",
                 "package": "chrony",
                 "package_status": "packaged",
-                "pid": 1153,
+                "pid": 943,
                 "uid": 109
               }
             ],
@@ -22647,14 +22511,14 @@
       "stats": {
         "status": "ok",
         "value": {
-          "count": 154,
+          "count": 146,
           "denied": 0,
-          "elapsed_ms": 156,
-          "fd_reads": 1030,
+          "elapsed_ms": 95,
+          "fd_reads": 920,
           "foreign_ns": 0,
-          "index_ms": 108,
+          "index_ms": 61,
           "index_source": "dpkg",
-          "kernel_threads": 117,
+          "kernel_threads": 109,
           "vanished": 0,
           "zombies": 0
         },
@@ -23752,64 +23616,64 @@
         "status": "ok",
         "value": [
           {
+            "addr": "0.0.0.0",
+            "inode": 5841,
+            "loopback": false,
+            "port": 22,
+            "proto": "tcp"
+          },
+          {
             "addr": "127.0.0.53",
-            "inode": 6410,
+            "inode": 5406,
             "loopback": true,
             "port": 53,
             "proto": "tcp"
           },
           {
             "addr": "127.0.0.54",
-            "inode": 6412,
+            "inode": 5408,
             "loopback": true,
             "port": 53,
             "proto": "tcp"
           },
           {
-            "addr": "0.0.0.0",
-            "inode": 6720,
-            "loopback": false,
-            "port": 22,
-            "proto": "tcp"
-          },
-          {
             "addr": "::",
-            "inode": 6722,
+            "inode": 5843,
             "loopback": false,
             "port": 22,
             "proto": "tcp6"
           },
           {
             "addr": "127.0.0.54",
-            "inode": 6411,
+            "inode": 5407,
             "loopback": true,
             "port": 53,
             "proto": "udp"
           },
           {
             "addr": "127.0.0.53",
-            "inode": 6409,
+            "inode": 5405,
             "loopback": true,
             "port": 53,
             "proto": "udp"
           },
           {
             "addr": "192.0.2.1",
-            "inode": 5766,
+            "inode": 4873,
             "loopback": false,
             "port": 68,
             "proto": "udp"
           },
           {
             "addr": "127.0.0.1",
-            "inode": 6128,
+            "inode": 6050,
             "loopback": true,
             "port": 323,
             "proto": "udp"
           },
           {
             "addr": "::1",
-            "inode": 6129,
+            "inode": 6051,
             "loopback": true,
             "port": 323,
             "proto": "udp6"
@@ -24081,7 +23945,7 @@
             "keys": [
               {
                 "bits": 2048,
-                "fingerprint": "SHA256:qrFoVivrbkTVPxI9CTobRh8Wf6Ekb4ADxkQdc6l7ADA",
+                "fingerprint": "SHA256:xO+4vRvh4P7AiGKWaW7acKQec4s4KXTFQOtI2FKbDVg",
                 "line": 1,
                 "options": [],
                 "restricted": false,
@@ -24168,7 +24032,7 @@
             "keys": [
               {
                 "bits": 2048,
-                "fingerprint": "SHA256:pHpylroFHl5tMcRQUQhXfJtcsMTOLvYOTNPMbU2XVQs",
+                "fingerprint": "SHA256:cJBZ/ToGyy3jaxBGexsoVisyPUao/xjbY+tg0BnLxXQ",
                 "line": 1,
                 "options": [
                   "no-port-forwarding",
@@ -24181,7 +24045,7 @@
               },
               {
                 "bits": 2048,
-                "fingerprint": "SHA256:qrFoVivrbkTVPxI9CTobRh8Wf6Ekb4ADxkQdc6l7ADA",
+                "fingerprint": "SHA256:xO+4vRvh4P7AiGKWaW7acKQec4s4KXTFQOtI2FKbDVg",
                 "line": 2,
                 "options": [
                   "no-port-forwarding",
@@ -32450,7 +32314,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/aws-cli/v2/2.37.9/dist/awscli/botocore/.changes",
+            "path": "/usr/local/aws-cli/v2/2.37.13/dist/awscli/botocore/.changes",
             "reference": "unpackaged",
             "uid": 0
           },
@@ -32459,7 +32323,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/aws-sam-cli/1.166.2/dist/_internal/samcli/lib/init/templates/cookiecutter-aws-sam-hello-dotnet/.gitignore",
+            "path": "/usr/local/aws-sam-cli/1.168.0/dist/_internal/samcli/lib/init/templates/cookiecutter-aws-sam-hello-dotnet/.gitignore",
             "reference": "unpackaged",
             "uid": 0
           },
@@ -32468,7 +32332,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/aws-sam-cli/1.166.2/dist/_internal/samcli/lib/init/templates/cookiecutter-aws-sam-hello-dotnet/{{cookiecutter.project_name}}/.gitignore",
+            "path": "/usr/local/aws-sam-cli/1.168.0/dist/_internal/samcli/lib/init/templates/cookiecutter-aws-sam-hello-dotnet/{{cookiecutter.project_name}}/.gitignore",
             "reference": "unpackaged",
             "uid": 0
           },
@@ -32477,7 +32341,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/aws-sam-cli/1.166.2/dist/_internal/samcli/lib/init/templates/cookiecutter-aws-sam-hello-nodejs/.gitignore",
+            "path": "/usr/local/aws-sam-cli/1.168.0/dist/_internal/samcli/lib/init/templates/cookiecutter-aws-sam-hello-nodejs/.gitignore",
             "reference": "unpackaged",
             "uid": 0
           },
@@ -32486,7 +32350,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/aws-sam-cli/1.166.2/dist/_internal/samcli/lib/init/templates/cookiecutter-aws-sam-hello-nodejs/{{cookiecutter.project_name}}/.gitignore",
+            "path": "/usr/local/aws-sam-cli/1.168.0/dist/_internal/samcli/lib/init/templates/cookiecutter-aws-sam-hello-nodejs/{{cookiecutter.project_name}}/.gitignore",
             "reference": "unpackaged",
             "uid": 0
           },
@@ -32495,7 +32359,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/aws-sam-cli/1.166.2/dist/_internal/samcli/lib/init/templates/cookiecutter-aws-sam-hello-nodejs/{{cookiecutter.project_name}}/hello-world/.npmignore",
+            "path": "/usr/local/aws-sam-cli/1.168.0/dist/_internal/samcli/lib/init/templates/cookiecutter-aws-sam-hello-nodejs/{{cookiecutter.project_name}}/hello-world/.npmignore",
             "reference": "unpackaged",
             "uid": 0
           },
@@ -32504,7 +32368,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/aws-sam-cli/1.166.2/dist/_internal/samcli/lib/init/templates/cookiecutter-aws-sam-hello-python/.gitignore",
+            "path": "/usr/local/aws-sam-cli/1.168.0/dist/_internal/samcli/lib/init/templates/cookiecutter-aws-sam-hello-python/.gitignore",
             "reference": "unpackaged",
             "uid": 0
           },
@@ -32513,7 +32377,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/aws-sam-cli/1.166.2/dist/_internal/samcli/lib/init/templates/cookiecutter-aws-sam-hello-python/{{cookiecutter.project_name}}/.gitignore",
+            "path": "/usr/local/aws-sam-cli/1.168.0/dist/_internal/samcli/lib/init/templates/cookiecutter-aws-sam-hello-python/{{cookiecutter.project_name}}/.gitignore",
             "reference": "unpackaged",
             "uid": 0
           },
@@ -32522,7 +32386,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/aws-sam-cli/1.166.2/dist/_internal/samcli/lib/init/templates/cookiecutter-aws-sam-hello-ruby/.gitignore",
+            "path": "/usr/local/aws-sam-cli/1.168.0/dist/_internal/samcli/lib/init/templates/cookiecutter-aws-sam-hello-ruby/.gitignore",
             "reference": "unpackaged",
             "uid": 0
           },
@@ -32531,7 +32395,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/usr/local/aws-sam-cli/1.166.2/dist/_internal/samcli/lib/init/templates/cookiecutter-aws-sam-hello-ruby/{{cookiecutter.project_name}}/.gitignore",
+            "path": "/usr/local/aws-sam-cli/1.168.0/dist/_internal/samcli/lib/init/templates/cookiecutter-aws-sam-hello-ruby/{{cookiecutter.project_name}}/.gitignore",
             "reference": "unpackaged",
             "uid": 0
           },
@@ -33674,7 +33538,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/var/lib/gems/3.2.0/gems/fastlane-2.240.1/.yardopts",
+            "path": "/var/lib/gems/3.2.0/gems/fastlane-2.241.0/.yardopts",
             "reference": "unpackaged",
             "uid": 0
           },
@@ -33683,7 +33547,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/var/lib/gems/3.2.0/gems/fastlane-2.240.1/fastlane/lib/fastlane/plugins/template/.github",
+            "path": "/var/lib/gems/3.2.0/gems/fastlane-2.241.0/fastlane/lib/fastlane/plugins/template/.github",
             "reference": "unpackaged",
             "uid": 0
           },
@@ -33692,7 +33556,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/var/lib/gems/3.2.0/gems/fastlane-2.240.1/fastlane/lib/fastlane/plugins/template/.gitignore",
+            "path": "/var/lib/gems/3.2.0/gems/fastlane-2.241.0/fastlane/lib/fastlane/plugins/template/.gitignore",
             "reference": "unpackaged",
             "uid": 0
           },
@@ -33701,7 +33565,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/var/lib/gems/3.2.0/gems/fastlane-2.240.1/fastlane/lib/fastlane/plugins/template/.rspec",
+            "path": "/var/lib/gems/3.2.0/gems/fastlane-2.241.0/fastlane/lib/fastlane/plugins/template/.rspec",
             "reference": "unpackaged",
             "uid": 0
           },
@@ -33710,7 +33574,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/var/lib/gems/3.2.0/gems/fastlane-2.240.1/fastlane/lib/fastlane/plugins/template/.rubocop.yml",
+            "path": "/var/lib/gems/3.2.0/gems/fastlane-2.241.0/fastlane/lib/fastlane/plugins/template/.rubocop.yml",
             "reference": "unpackaged",
             "uid": 0
           },
@@ -33818,7 +33682,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/var/lib/gems/3.2.0/gems/google-apis-core-1.2.5/.yardopts",
+            "path": "/var/lib/gems/3.2.0/gems/google-apis-core-1.3.1/.yardopts",
             "reference": "unpackaged",
             "uid": 0
           },
@@ -33845,7 +33709,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/var/lib/gems/3.2.0/gems/google-apis-storage_v1-0.68.0/.yardopts",
+            "path": "/var/lib/gems/3.2.0/gems/google-apis-storage_v1-0.69.0/.yardopts",
             "reference": "unpackaged",
             "uid": 0
           },
@@ -33863,7 +33727,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/var/lib/gems/3.2.0/gems/google-cloud-env-2.3.1/.yardopts",
+            "path": "/var/lib/gems/3.2.0/gems/google-cloud-env-2.4.1/.yardopts",
             "reference": "unpackaged",
             "uid": 0
           },
@@ -34070,7 +33934,16 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/var/lib/gems/3.2.0/gems/net-http-0.9.1/.document",
+            "path": "/var/lib/gems/3.2.0/gems/net-http-0.10.0/.document",
+            "reference": "unpackaged",
+            "uid": 0
+          },
+          {
+            "allowlisted": false,
+            "kind": "regular",
+            "package": "",
+            "package_declared": false,
+            "path": "/var/lib/gems/3.2.0/gems/net-protocol-0.4.0/.document",
             "reference": "unpackaged",
             "uid": 0
           },
@@ -34914,9 +34787,9 @@
         "value": {
           "allowlisted_hidden": 204,
           "config_unreadable": [],
-          "dirs": 36878,
-          "entries": 259211,
-          "files": 216955,
+          "dirs": 34782,
+          "entries": 248225,
+          "files": 208071,
           "home_roots": [
             {
               "kind": "user",
@@ -35054,11 +34927,11 @@
           "mnt_id_fallback": false,
           "nice_applied": true,
           "stop_reason": "",
-          "symlinks": 5372,
+          "symlinks": 5366,
           "truncated_counts": {
             "acl_grants": 0,
             "capabilities": 4,
-            "hidden": 166,
+            "hidden": 167,
             "skipped": 85,
             "sticky_missing": 34,
             "suid_sgid": 24,
@@ -36756,6 +36629,16 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
+            "path": "/opt/actionarchivecache/actions_setup-node/54337e0d02de9202d0948aaff36ad556375497b9.tar.gz",
+            "reference": "unpackaged",
+            "sticky": false,
+            "uid": 1001
+          },
+          {
+            "gid": 1001,
+            "kind": "regular",
+            "package": "",
+            "package_declared": false,
             "path": "/opt/actionarchivecache/actions_setup-node/56337c425554a6be30cdef71bf441f15be286854.tar.gz",
             "reference": "unpackaged",
             "sticky": false,
@@ -36817,16 +36700,6 @@
             "package": "",
             "package_declared": false,
             "path": "/opt/actionarchivecache/actions_setup-node/64ed1c7eab4cce3362f8c340dee64e5eaeef8f7c.tar.gz",
-            "reference": "unpackaged",
-            "sticky": false,
-            "uid": 1001
-          },
-          {
-            "gid": 1001,
-            "kind": "regular",
-            "package": "",
-            "package_declared": false,
-            "path": "/opt/actionarchivecache/actions_setup-node/7f84f1d52d0c56afb45c62fee31a93b843cea4d6.tar.gz",
             "reference": "unpackaged",
             "sticky": false,
             "uid": 1001
@@ -37726,7 +37599,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/opt/actionarchivecache/github_codeql-action/7b6a151fb55e03ce158c75249f8880ea01aabebf.tar.gz",
+            "path": "/opt/actionarchivecache/github_codeql-action/b6d38e563b1e0a61fa4ebfaab8128732f5ed1bd4.tar.gz",
             "reference": "unpackaged",
             "sticky": false,
             "uid": 1001
@@ -37746,7 +37619,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/opt/actionarchivecache/github_gh-aw-actions/2fbab69bfca02bebd76cd0fc43f2d12acfed994f.tar.gz",
+            "path": "/opt/actionarchivecache/github_gh-aw-actions/7c1d4b7ab319216ef4a931cc3dcb0d7245144ff1.tar.gz",
             "reference": "unpackaged",
             "sticky": false,
             "uid": 1001
@@ -37756,7 +37629,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/opt/actionarchivecache/github_gh-aw-actions/924af5fdc64061cfbf66fb584c8b07e2ac230c60.tar.gz",
+            "path": "/opt/actionarchivecache/github_gh-aw-actions/8a5b99ba734d5cb564e3a0c85ea0580d881002e0.tar.gz",
             "reference": "unpackaged",
             "sticky": false,
             "uid": 1001
@@ -37766,7 +37639,7 @@
             "kind": "regular",
             "package": "",
             "package_declared": false,
-            "path": "/opt/actionarchivecache/github_gh-aw-actions/925900cb40de9cb7652268d0cd14e00f9b7d2189.tar.gz",
+            "path": "/opt/actionarchivecache/github_gh-aw-actions/a65c3ae1e11016c37f426bb3847a6f5e1a7d58df.tar.gz",
             "reference": "unpackaged",
             "sticky": false,
             "uid": 1001
@@ -40666,7 +40539,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/tmp/systemd-private-523c3d7953fe4b8abb46dde03b2519ec-ModemManager.service-Dr5Qrs/tmp",
+            "path": "/tmp/systemd-private-7e7c620c5f7c4677a767bb2272f935a2-ModemManager.service-AaXxDj/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -40676,7 +40549,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/tmp/systemd-private-523c3d7953fe4b8abb46dde03b2519ec-chrony.service-9MkDOQ/tmp",
+            "path": "/tmp/systemd-private-7e7c620c5f7c4677a767bb2272f935a2-chrony.service-7Wny2y/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -40686,7 +40559,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/tmp/systemd-private-523c3d7953fe4b8abb46dde03b2519ec-haveged.service-z8f7rN/tmp",
+            "path": "/tmp/systemd-private-7e7c620c5f7c4677a767bb2272f935a2-haveged.service-rr5CY9/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -40696,7 +40569,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/tmp/systemd-private-523c3d7953fe4b8abb46dde03b2519ec-polkit.service-VCqwkW/tmp",
+            "path": "/tmp/systemd-private-7e7c620c5f7c4677a767bb2272f935a2-polkit.service-qO5zyj/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -40706,7 +40579,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/tmp/systemd-private-523c3d7953fe4b8abb46dde03b2519ec-systemd-logind.service-ViCWco/tmp",
+            "path": "/tmp/systemd-private-7e7c620c5f7c4677a767bb2272f935a2-systemd-logind.service-8CkzQW/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -40716,7 +40589,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/tmp/systemd-private-523c3d7953fe4b8abb46dde03b2519ec-systemd-resolved.service-GlRN2y/tmp",
+            "path": "/tmp/systemd-private-7e7c620c5f7c4677a767bb2272f935a2-systemd-resolved.service-LYN5BP/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -40726,7 +40599,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/tmp/systemd-private-523c3d7953fe4b8abb46dde03b2519ec-systemd-timedated.service-u8b5r6/tmp",
+            "path": "/tmp/systemd-private-7e7c620c5f7c4677a767bb2272f935a2-systemd-timedated.service-D1yHmb/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -41046,7 +40919,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/var/tmp/systemd-private-523c3d7953fe4b8abb46dde03b2519ec-ModemManager.service-Tp33of/tmp",
+            "path": "/var/tmp/systemd-private-7e7c620c5f7c4677a767bb2272f935a2-ModemManager.service-41XoG3/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -41056,7 +40929,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/var/tmp/systemd-private-523c3d7953fe4b8abb46dde03b2519ec-chrony.service-qSvZ1e/tmp",
+            "path": "/var/tmp/systemd-private-7e7c620c5f7c4677a767bb2272f935a2-chrony.service-Y92y7D/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -41066,7 +40939,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/var/tmp/systemd-private-523c3d7953fe4b8abb46dde03b2519ec-haveged.service-pPEIKQ/tmp",
+            "path": "/var/tmp/systemd-private-7e7c620c5f7c4677a767bb2272f935a2-haveged.service-kn3z2E/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -41076,7 +40949,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/var/tmp/systemd-private-523c3d7953fe4b8abb46dde03b2519ec-polkit.service-8CvW1X/tmp",
+            "path": "/var/tmp/systemd-private-7e7c620c5f7c4677a767bb2272f935a2-polkit.service-5hH6em/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -41086,7 +40959,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/var/tmp/systemd-private-523c3d7953fe4b8abb46dde03b2519ec-systemd-logind.service-dhxqgT/tmp",
+            "path": "/var/tmp/systemd-private-7e7c620c5f7c4677a767bb2272f935a2-systemd-logind.service-eTgbVX/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -41096,7 +40969,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/var/tmp/systemd-private-523c3d7953fe4b8abb46dde03b2519ec-systemd-resolved.service-44f6ti/tmp",
+            "path": "/var/tmp/systemd-private-7e7c620c5f7c4677a767bb2272f935a2-systemd-resolved.service-RsXr7P/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -41106,7 +40979,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/var/tmp/systemd-private-523c3d7953fe4b8abb46dde03b2519ec-systemd-timedated.service-A9CgpC/tmp",
+            "path": "/var/tmp/systemd-private-7e7c620c5f7c4677a767bb2272f935a2-systemd-timedated.service-YQlvY9/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0

@@ -1,8 +1,8 @@
-muster 6503835 · controls kisa-unix-2026+2026.10.13 · guide kisa-unix-2026 · host github-runner · collected 2026-10-13T08:25:39Z
+muster 69ad0db · controls kisa-unix-2026+2026.10.14 · guide kisa-unix-2026 · host github-runner · collected 2026-10-19T01:02:53Z
 profile default (117 controls)
-automatic  high 21/15/1  medium 17/17/0  low 4/4/0  (pass/fail/warn)
-manual review 14  ·  undecidable error 0 / n-a 24 / waived 0  ·  facts failed 0  ·  waivers expiring within 30d 0
-KISA 2026 (68 controls): pass 28 fail 13 warn 1 manual 10 n/a 16 error 0 waived 0
+automatic  high 22/15/1  medium 17/17/0  low 4/4/0  (pass/fail/warn)
+manual review 13  ·  undecidable error 0 / n-a 24 / waived 0  ·  facts failed 0  ·  waivers expiring within 30d 0
+KISA 2026 (68 controls): pass 29 fail 13 warn 1 manual 9 n/a 16 error 0 waived 0
 beyond the guide (49 controls): pass 14 fail 23 warn 0 manual 4 n/a 8 error 0 waived 0
 
 FAIL           high   muster.account.cron_permissions                    cron 설정 파일이 0640 이하로 …
@@ -118,11 +118,7 @@ WARN           high   muster.file.world_writable                         예상�
     file:/opt/actionarchivecache/actions_cache/0057852bfaa89a56745cba8c7296529d2fc39830.tar.gz: expected true, actual false (fail)
     file:/opt/actionarchivecache/actions_cache/0400d5f644dc74513175e3cd8d07132dd4860809.tar.gz: expected true, actual false (fail)
     (+516 more, use --all)
-WARN           high   muster.patch.security_updates                      캐시된 패키지 메타데이터에 대…
-    reason: clause does not hold: patch.metadata_age_s lte 604800
-    patch.manager = apt  (/var/lib/dpkg/status)
-    patch.metadata_age_s = 729142  (/var/lib/apt/periodic/update-success-stamp)
-    patch.pending_security_count = 0  (/usr/bin/apt-get -s upgrade -o Debug::NoLocking=1)
+PASS           high   muster.patch.security_updates                      캐시된 패키지 메타데이터에 대…
 PASS           high   muster.service.automount_disabled                  automount 서비스가 활성화되어 …
 NOT_APPLICABLE high   muster.service.dns_version                         네임서버가 벤더가 패치한 수준…
     reason: applies_when does not hold: services.dns.installed eq true
@@ -200,13 +196,13 @@ WARN           low    muster.account.unnecessary_accounts                불필�
     user:uucp: expected not in [lp uucp nuucp], actual uucp (fail)
 WARN           low    muster.file.hidden_entries                         홈 디렉터리 밖의 숨김 파일과 …
     reason: clause does not hold: walk.hidden each require package_declared eq true
-    walk.hidden = 370 elements; 166 selected; failing: file:/etc/.java, file:/etc/skel/.bash_profile, file:/etc/skel/.cargo, file:/etc/skel/.composer, file:/etc/skel/.config, +102 more  (/var/lib/dpkg/info)
+    walk.hidden = 371 elements; 167 selected; failing: file:/etc/.java, file:/etc/skel/.bash_profile, file:/etc/skel/.cargo, file:/etc/skel/.composer, file:/etc/skel/.config, +103 more  (/var/lib/dpkg/info)
     file:/etc/.java: expected true, actual false (fail)
     file:/etc/skel/.bash_profile: expected true, actual false (fail)
     file:/etc/skel/.cargo: expected true, actual false (fail)
     file:/etc/skel/.composer: expected true, actual false (fail)
     file:/etc/skel/.config: expected true, actual false (fail)
-    (+102 more, use --all)
+    (+103 more, use --all)
 PASS           low    muster.file.hosts_lpd_permissions                  /etc/hosts.lpd 가 존재하면 roo…
     reason: absent counts as pass: files.etc_hosts_lpd.uid is absent on this host
 NOT_APPLICABLE low    muster.service.ftp_banner                          FTP 접속 안내 문구가 서비스 소…
@@ -325,8 +321,8 @@ PASS           medium muster.beyond.listeners_packaged                   수신 
 FAIL           medium muster.beyond.no_deleted_executables               시작된 뒤 삭제되거나 교체된 파…
     reason: clause does not hold: processes.deleted_executables none where pid gte 0
     env.container = none  (/proc/1/comm)
-    processes.deleted_executables = 1 elements; matching: item:2094  (/proc)
-    item:2094: expected not gte 0, actual 2094 (fail)
+    processes.deleted_executables = 1 elements; matching: item:1892  (/proc)
+    item:1892: expected not gte 0, actual 1892 (fail)
 PASS           medium muster.beyond.ptrace_restriction                   한 프로세스가 자신이 띄우지 않…
 FAIL           medium muster.beyond.reverse_path_filtering               호스트는 들어온 인터페이스로 …
     reason: clause does not hold: net.sysctl.ipv4_all_log_martians eq 1
