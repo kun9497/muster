@@ -579,14 +579,15 @@ jobs:
             kind: host
             seeded: >-
               muster.account.cron_permissions muster.account.password_policy muster.account.session_timeout
-              muster.account.umask_policy muster.beyond.aslr_and_link_protection muster.beyond.audit_log_permissions
-              muster.beyond.bootloader_config_permissions muster.beyond.icmp_broadcast_and_bogus_ignored
-              muster.beyond.icmp_redirects_ignored muster.beyond.ip_forwarding_disabled
-              muster.beyond.ipv6_forwarding_disabled muster.beyond.ipv6_redirects_ignored
-              muster.beyond.ipv6_router_advertisements_ignored muster.beyond.ipv6_source_routing_rejected
-              muster.beyond.kernel_pointer_exposure muster.beyond.ptrace_restriction
-              muster.beyond.reverse_path_filtering muster.beyond.source_routing_rejected
-              muster.beyond.suid_dumpable_disabled muster.beyond.syn_cookies_enabled muster.beyond.sysrq_restricted
+              muster.account.umask_policy muster.beyond.aslr_and_link_protection muster.beyond.audit_disk_actions
+              muster.beyond.audit_log_permissions muster.beyond.bootloader_config_permissions
+              muster.beyond.icmp_broadcast_and_bogus_ignored muster.beyond.icmp_redirects_ignored
+              muster.beyond.ip_forwarding_disabled muster.beyond.ipv6_forwarding_disabled
+              muster.beyond.ipv6_redirects_ignored muster.beyond.ipv6_router_advertisements_ignored
+              muster.beyond.ipv6_source_routing_rejected muster.beyond.kernel_pointer_exposure
+              muster.beyond.ptrace_restriction muster.beyond.reverse_path_filtering
+              muster.beyond.source_routing_rejected muster.beyond.suid_dumpable_disabled
+              muster.beyond.syn_cookies_enabled muster.beyond.sysrq_restricted
               muster.beyond.uncommon_filesystems_disabled muster.beyond.uncommon_network_protocols_disabled
               muster.beyond.unprivileged_bpf_restricted muster.file.hosts_permissions
               muster.file.inetd_conf_permissions muster.file.shadow_permissions muster.file.syslog_conf_permissions

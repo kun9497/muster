@@ -26,6 +26,8 @@
   images: [almalinux9-init, rocky9-init, runner, ubuntu2204]
 - id: muster.beyond.aslr_and_link_protection
   images: [runner]
+- id: muster.beyond.audit_disk_actions
+  images: [runner]
 - id: muster.beyond.audit_log_permissions
   images: [runner]
 - id: muster.beyond.bootloader_config_permissions

@@ -361,3 +361,55 @@ func TestPostfixAndExportsReadersMatchTheCollector(t *testing.T) {
 		}
 	})
 }
+
+// TestAuditdConfReaderMatchesTheCollector (§4.3, O-17, O-19, O-28): rd_action
+// prints the action auditd.conf sets for one key as parseAuditdConf reads it
+// (comment lines skipped, the key case blind, the last line wins, the value's
+// first word lower-cased; "" for a key the file does not set), so the body
+// rewrites exactly the keys check FAILs on and leaves an `exec <path>`
+// action whose first word is in the list. The reader and why it is not
+// repeated in the validate:
+//
+//	rd_action  inValidate false: the validate checks the lists in force over
+//	           the keys this run wrote ($MB/disk.keys) in one awk program of
+//	           its own, the same reading over every key at once
+func TestAuditdConfReaderMatchesTheCollector(t *testing.T) {
+	fn := readerLine(t, shippedBody(t, "muster.beyond.audit_disk_actions"), "rd_action", false)
+	rows := []struct{ name, conf string }{
+		{"spaced upper key", "Space_Left_Action = SYSLOG\n"},
+		{"later override", "space_left_action = suspend\nspace_left_action = email\n"},
+		{"earlier in the list, later outside", "disk_full_action = halt\ndisk_full_action = SUSPEND\n"},
+		{"tab separator", "disk_error_action\t=\tHALT\n"},
+		{"no spaces", "max_log_file_action=keep_logs\n"},
+		{"indented", "   admin_space_left_action = single\n"},
+		{"commented", "# space_left_action = ignore\nspace_left_action = rotate\n#space_left_action = suspend\n"},
+		{"exec with a path", "space_left_action = exec /usr/local/sbin/x\n"},
+		{"EXEC upper", "disk_error_action = EXEC /x\n"},
+		{"empty value", "disk_full_action =\n"},
+		{"blank value", "disk_full_action =   \n"},
+		{"crlf", "space_left_action = SYSLOG\r\nmax_log_file_action = ROTATE\r\n"},
+		{"trailing blanks", "space_left_action = syslog   \n"},
+		{"no equals", "space_left_action syslog\n"},
+		{"another key's suffix", "admin_space_left_action = halt\n"},
+		{"a value with an equals sign", "space_left_action = exec /x=y\n"},
+		{"missing", "log_file = /var/log/audit/audit.log\n"},
+	}
+	for _, f := range []string{"auditd.conf.sample", "auditd.conf.exec"} {
+		b, err := os.ReadFile(filepath.Join("testdata", f))
+		if err != nil {
+			t.Fatal(err)
+		}
+		rows = append(rows, struct{ name, conf string }{f, string(b)})
+	}
+	for _, row := range rows {
+		t.Run(row.name, func(t *testing.T) {
+			m := parseAuditdConf([]byte(row.conf))
+			for _, k := range []string{"space_left_action", "admin_space_left_action", "disk_full_action", "disk_error_action", "max_log_file_action"} {
+				got, code := runReader(t, fn, "rd_action {root}/etc/audit/auditd.conf "+k, map[string][]byte{"/etc/audit/auditd.conf": []byte(row.conf)})
+				if code != 0 || got != m[k] {
+					t.Errorf("%s: rd_action printed %q (exit %d); parseAuditdConf reads %q", k, got, code, m[k])
+				}
+			}
+		})
+	}
+}
