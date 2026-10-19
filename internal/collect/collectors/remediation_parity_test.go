@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -498,4 +499,167 @@ func TestAuditRulesReadersMatchTheCollector(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestInactivityReadersMatchTheCollector (§4.4, O-38, O-28): the two readers
+// of account_inactivity_lock against the collector.
+//
+//	rd_inactive inValidate true: the validate repeats it over
+//	            /etc/default/useradd. It prints the value parseUseraddDefaults
+//	            reads (the last column-one INACTIVE= line as C strtol base 0,
+//	            digits parsed by hand; -1 for missing, junk or below -1), so
+//	            the body rewrites the line exactly where the useradd clauses
+//	            FAIL and the validate agrees with check after it.
+//	rd_login    inValidate false: the enumeration; the validate reads
+//	            inactive.run, the names this run changed. It prints the names
+//	            of accounts.login_capable (uid 0 first, then passwd order;
+//	            compared sorted, duplicates kept), so the body bounds every
+//	            row the field-7 clauses judge and no other.
+func TestInactivityReadersMatchTheCollector(t *testing.T) {
+	r := shippedBody(t, "muster.beyond.account_inactivity_lock")
+	inactive := readerLine(t, r, "rd_inactive", true)
+	login := readerLine(t, r, "rd_login", false)
+
+	t.Run("useradd", func(t *testing.T) {
+		rows := map[string]string{
+			"octal 08":         "INACTIVE=08\n",
+			"leading blank":    "INACTIVE= 30\n",
+			"leading tab":      "INACTIVE=\t7\n",
+			"CR":               "INACTIVE=30\r\n",
+			"bare 0x":          "INACTIVE=0x\n",
+			"signed bare 0x":   "INACTIVE=+0x\n",
+			"junk":             "INACTIVE=abc\n",
+			"octal 030":        "INACTIVE=030\n",
+			"hex 0x1F":         "INACTIVE=0x1F\n",
+			"hex 0X1f":         "INACTIVE=0X1f\n",
+			"hex 0x30":         "INACTIVE=0x30\n",
+			"below -1":         "INACTIVE=-2\n",
+			"-1":               "INACTIVE=-1\n",
+			"-0":               "INACTIVE=-0\n",
+			"+5":               "INACTIVE=+5\n",
+			"zero":             "INACTIVE=0\n",
+			"octal 09":         "INACTIVE=09\n",
+			"trailing blank":   "INACTIVE=5 \n",
+			"digits then junk": "INACTIVE=1a\n",
+			"empty value":      "INACTIVE=\n",
+			"a later line":     "INACTIVE=10\nGROUP=100\nINACTIVE=20\n",
+			"a later bad line": "INACTIVE=07\nINACTIVE=bad\n",
+			"indented":         " INACTIVE=5\n",
+			"commented":        "# INACTIVE=5\n",
+			"no final newline": "INACTIVE=7",
+			"empty file":       "",
+			"lower case":       "inactive=5\n",
+		}
+		for _, f := range []string{"useradd.default.35", "useradd.default.el9", "useradd.default.ubuntu"} {
+			b, err := os.ReadFile(filepath.Join("testdata", f))
+			if err != nil {
+				t.Fatal(err)
+			}
+			rows[f] = string(b)
+		}
+		names := make([]string, 0, len(rows))
+		for n := range rows {
+			names = append(names, n)
+		}
+		sort.Strings(names)
+		for _, n := range names {
+			t.Run(n, func(t *testing.T) {
+				want, _ := parseUseraddDefaults([]byte(rows[n]))
+				got, code := runReader(t, inactive, "rd_inactive {root}/etc/default/useradd", map[string][]byte{"/etc/default/useradd": []byte(rows[n])})
+				if code != 0 || got != strconv.Itoa(want) {
+					t.Errorf("rd_inactive %q (exit %d); parseUseraddDefaults reads %d from %q", got, code, want, rows[n])
+				}
+			})
+		}
+	})
+
+	t.Run("login", func(t *testing.T) {
+		fixture := func(f string) string {
+			b, err := os.ReadFile(filepath.Join("testdata", f))
+			if err != nil {
+				t.Fatal(err)
+			}
+			return string(b)
+		}
+		passwds := map[string]string{
+			"inline login": loginPasswd,
+			"edges": "root:x:0:0::/root:/bin/bash\r\n" +
+				"  #c:x:1:1::/:/bin/sh\n" +
+				"#x:x:2000:1::/:/bin/sh\n" +
+				"\n   \n" +
+				"sp:x: 1500 :1::/:/bin/sh\n" +
+				"plus:x:+1:1::/:/bin/sh\n" +
+				"plusbig:x:+1001:1::/:/bin/sh\n" +
+				"neg:x:-5:1::/:/bin/sh\n" +
+				"zerozero:x:00:0::/:/bin/sh\n" +
+				"hexuid:x:0x10:1::/:/bin/sh\n" +
+				"noshell:x:1600:1::/:\n" +
+				"false:x:1700:1::/:/bin/false\n" +
+				"nologin:x:1701:1::/:/sbin/nologin\n" +
+				"extra:x:1800:1::/:/bin/sh:more\n" +
+				":x:1900:1::/:/bin/sh\n" +
+				"short:x:2000\n" +
+				"padshell:x:2100:1::/: /bin/sh\n" +
+				"unlisted:x:2200:1::/:/bin/zsh\n" +
+				"sys:x:999:1::/:/bin/sh\n" +
+				"edge:x:1000:1::/:/bin/sh\n",
+		}
+		for _, f := range []string{"passwd", "passwd_2b", "passwd_2b_ghost", "passwd_home", "passwd_home_deep", "passwd_home_nested", "passwd_home_undeclared", "passwd.homes"} {
+			passwds[f] = fixture(f)
+		}
+		shellsSets := map[string]string{
+			"shells_2b":   fixture("shells_2b"),
+			"shells_home": fixture("shells_home"),
+			"EL shape":    loginShellsFile,
+			"padded":      "\t/bin/bash \r\n /bin/sh\n#/bin/zsh\n",
+		}
+		defsSets := map[string]*string{
+			"login.defs":         ptr(fixture("login.defs")),
+			"login.defs_2b":      ptr(fixture("login.defs_2b")),
+			"missing":            nil,
+			"500":                ptr("UID_MIN 500\n"),
+			"first junk wins":    ptr("UID_MIN abc\nUID_MIN 10\n"),
+			"comment, tab, CR":   ptr("#UID_MIN 1\n  UID_MIN\t1500\r\n"),
+			"valueless then set": ptr("UID_MIN\nUID_MIN 1001\n"),
+			"signed":             ptr("UID_MIN +1001\n"),
+			"prefix key":         ptr("UID_MINX 5\nUID_MIN 3\n"),
+		}
+		for _, pn := range sortedKeys(passwds) {
+			for _, sn := range sortedKeys(shellsSets) {
+				for _, dn := range sortedKeys(defsSets) {
+					t.Run(pn+"/"+sn+"/"+dn, func(t *testing.T) {
+						a := &fsAccess{contents: map[string][]byte{
+							"/etc/passwd": []byte(passwds[pn]),
+							"/etc/shadow": {},
+							"/etc/shells": []byte(shellsSets[sn]),
+						}}
+						files := map[string][]byte{"/etc/passwd": a.contents["/etc/passwd"], "/etc/shells": a.contents["/etc/shells"]}
+						defs := "/dev/null"
+						if d := defsSets[dn]; d != nil {
+							a.contents["/etc/login.defs"] = []byte(*d)
+							files["/etc/login.defs"] = []byte(*d)
+							defs = "{root}/etc/login.defs"
+						}
+						var want []string
+						for _, row := range okList(t, build(t, "accounts", a), "accounts.login_capable") {
+							want = append(want, row.(map[string]any)["name"].(string))
+						}
+						out, code := runReader(t, login, "rd_login "+defs+" {root}/etc/shells {root}/etc/passwd", files)
+						if code != 0 {
+							t.Fatalf("rd_login exit %d", code)
+						}
+						var got []string
+						if out != "" {
+							got = strings.Split(out, "\n")
+						}
+						sort.Strings(got)
+						sort.Strings(want)
+						if strings.Join(got, ",") != strings.Join(want, ",") {
+							t.Errorf("rd_login names %v; loginCapable names %v", got, want)
+						}
+					})
+				}
+			}
+		}
+	})
 }

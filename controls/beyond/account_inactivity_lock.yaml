@@ -24,7 +24,69 @@ checks:
   - { fact: accounts.useradd.inactive, op: gte, expected: 0 }
   - { fact: accounts.useradd.inactive, op: lte, expected: "${max_inactive_days}" }
 remediation:
-  text_en: Set the default for new accounts with useradd -D -f 35 (it writes INACTIVE=35 to /etc/default/useradd), then give each existing account the same bound with chage --inactive 35 <user>, root included. Record the current value first (chage -l <user>) and restore it with chage --inactive <old> <user>, or -1 to clear it. The lock only acts once the password expires, so password ageing (PASS_MAX_DAYS) has to be in force as well.
-  text_ko: useradd -D -f 35 로 새 계정의 기본값을 설정하고(/etc/default/useradd 에 INACTIVE=35 를 기록합니다), root 를 포함한 기존 계정마다 chage --inactive 35 <user> 로 같은 기한을 줍니다. 먼저 현재 값을 기록하고(chage -l <user>) chage --inactive <이전 값> <user> 로, 지우려면 -1 로 되돌립니다. 잠금은 비밀번호가 만료된 뒤에야 작동하므로 비밀번호 사용 기한(PASS_MAX_DAYS)도 적용되어 있어야 합니다.
-  risk: none
+  text_en: 'The review script writes INACTIVE=<max_inactive_days> to /etc/default/useradd when its value is unset or above the bound (a symlink stops the block), then runs chage -I on each local login-capable account, root included, whose field is unset or above it. It logs the day each account with a real maximum age will be disabled unless its password changes, root first: on a host that ages root, root''s key login stops that day. It skips and names an account with no /etc/shadow entry, a field that is not a number, one that must change its password at next login (day 0, or no last-change day under a real maximum), and one whose password expired max_inactive_days or more days ago, which the bound would disable at once: change it first. Accounts only a remote NSS source holds are left. The rollback replays the old values. /etc/default/useradd is a package configuration file: at the next upgrade dpkg (Debian, Ubuntu) asks about the edit, and rpm (EL) writes the package''s version as .rpmnew.'
+  text_ko: '검토 스크립트는 /etc/default/useradd 의 값이 설정되지 않았거나 기한보다 크면 INACTIVE=<max_inactive_days> 를 쓰고(심볼릭 링크이면 블록을 멈춥니다), root 를 포함한 로컬의 로그인 가능한 계정 중 필드가 비어 있거나 기한보다 큰 계정마다 chage -I 를 실행합니다. 실제 최대 사용 기간이 있는 계정은 비밀번호를 바꾸지 않으면 비활성화되는 날짜를 root 부터 기록합니다. root 에 사용 기간을 두는 호스트에서는 그날부터 root 의 키 로그인도 멈춥니다. /etc/shadow 항목이 없는 계정, 필드가 숫자가 아닌 계정, 다음 로그인 때 비밀번호를 바꿔야 하는 계정(0일, 또는 실제 최대 기간이 있는데 마지막 변경일이 없는 계정), 비밀번호가 만료된 지 max_inactive_days 일 이상 지나 기한을 주면 곧바로 비활성화될 계정은 건너뛰고 이름을 남깁니다. 이런 계정은 먼저 비밀번호를 바꾸세요. 원격 NSS 소스에만 있는 계정은 그대로 둡니다. 롤백은 이전 값을 되돌립니다. /etc/default/useradd 는 패키지 설정 파일이므로, 다음 업그레이드 때 dpkg(Debian, Ubuntu)는 수정된 파일을 어떻게 할지 묻고, rpm(EL)은 패키지의 버전을 .rpmnew 로 씁니다.'
+  risk: lockout_risk
   idempotent: true
+  script_params: [max_inactive_days]
+  backup: [/etc/default/useradd]
+  script: |
+    n=$P_max_inactive_days
+    rm -f "$MB/inactive.run"
+    : > "$MB/inactive.run"
+    if [ "$n" -lt 0 ]; then log "muster.beyond.account_inactivity_lock: max_inactive_days is negative; refused"; exit 1; fi
+    f=/etc/default/useradd
+    if [ -L "$f" ]; then log "muster.beyond.account_inactivity_lock: $f is a symlink, left as is"; exit 1; fi
+    rd_inactive() { LC_ALL=C awk 'function num(s,  i, n, g, b, v, d, st) { n = length(s); i = 1; while (i <= n && index(" \t\n\v\f\r", substr(s, i, 1))) i++; g = 1; if (i <= n && (substr(s, i, 1) == "+" || substr(s, i, 1) == "-")) { if (substr(s, i, 1) == "-") g = -1; i++ } b = 10; if (i + 2 <= n && substr(s, i, 2) ~ /^0[xX]$/ && index("0123456789abcdefABCDEF", substr(s, i + 2, 1))) { b = 16; i += 2 } else if (substr(s, i, 1) == "0") b = 8; st = i; v = 0; for (; i <= n; i++) { d = index("0123456789abcdef", tolower(substr(s, i, 1))) - 1; if (d < 0 || d >= b) break; v = v * b + d } if (i == st || i <= n) return -1; if (g < 0) return (v == 0) ? 0 : -1; return v } BEGIN { v = -1 } /^INACTIVE=/ { v = num(substr($0, 10)) } END { print v }' "$1"; }
+    rd_login() { LC_ALL=C awk -F: 'FILENAME == ARGV[1] { if (!got) { l = $0; gsub(/[[:space:]]+/, " ", l); sub(/^ /, "", l); if (l != "" && l !~ /^#/ && split(l, w, " ") >= 2 && w[1] == "UID_MIN") { got = 1; m = (w[2] ~ /^[+-]?[0-9]+$/) ? w[2] + 0 : 1000 } } next } FILENAME == ARGV[2] { l = $0; sub(/^[[:space:]]+/, "", l); sub(/[[:space:]]+$/, "", l); if (l != "" && l !~ /^#/) sh[l] = 1; next } { sub(/\r$/, "") } $0 ~ /^#/ || NF < 7 || $1 == "" { next } { u = $3; sub(/^[[:space:]]+/, "", u); sub(/[[:space:]]+$/, "", u); u = (u ~ /^[+-]?[0-9]+$/) ? u + 0 : -1; if (u > 0 && u < (got ? m : 1000)) next; if ($7 == "" || $7 ~ /\/(nologin|false)$/ || !($7 in sh)) next; if (u == 0) print $1; else r[++c] = $1 } END { for (i = 1; i <= c; i++) print r[i] }' "$1" "$2" "$3"; }
+    v=-1
+    if [ -f "$f" ]; then v=$(rd_inactive "$f"); fi
+    case "$v" in ''|*[!0-9-]*|??????????*) v=-1;; esac
+    if [ "$v" -lt 0 ] || [ "$v" -gt "$n" ]; then
+      if [ ! -e "$f" ]; then
+        printf 'INACTIVE=%s\n' "$n" > "$f"
+        chmod 644 "$f"
+        if command -v selinuxenabled >/dev/null 2>&1 && selinuxenabled && command -v restorecon >/dev/null 2>&1; then restorecon -- "$f"; fi
+      elif LC_ALL=C grep -q '^INACTIVE=' "$f"; then
+        sed -i "s/^INACTIVE=.*/INACTIVE=$n/" "$f"
+      else
+        if [ -s "$f" ] && [ -n "$(tail -c1 "$f")" ]; then echo >> "$f"; fi
+        printf 'INACTIVE=%s\n' "$n" >> "$f"
+      fi
+    fi
+    ld=/etc/login.defs
+    if [ ! -f "$ld" ]; then ld=/dev/null; fi
+    sf=/etc/shadow
+    if [ ! -f "$sf" ]; then sf=/dev/null; fi
+    rd_login "$ld" /etc/shells /etc/passwd > "$MB/inactive.scan"
+    LC_ALL=C awk -F: 'function d(v,  g) { if (v == "") return -1; if (v !~ /^-?[0-9]+$/) return "x"; g = ""; if (v ~ /^-/) { g = "-"; v = substr(v, 2) } sub(/^0+/, "", v); if (v == "") return 0; if (length(v) > 9) return "x"; return g v } FILENAME == ARGV[1] { sub(/\r$/, ""); if (NF >= 8 && $1 != "" && $1 !~ /^#/) s[$1] = d($3) ":" d($5) ":" d($7); next } !seen[$0]++ { print $0 ":" (($0 in s) ? "1:" s[$0] : "0:::") }' "$sf" "$MB/inactive.scan" > "$MB/inactive.rows"
+    today=$(( $(date +%s) / 86400 ))
+    : >> "$MB/inactive.list"
+    while IFS=: read -r name has last max old; do
+      if [ "$has" != 1 ]; then log "muster.beyond.account_inactivity_lock: $name: no /etc/shadow entry, left as is"; continue; fi
+      if [ "$old" != x ] && [ "$old" != -1 ] && [ "$old" -le "$n" ]; then continue; fi
+      if [ "$old" = x ]; then log "muster.beyond.account_inactivity_lock: $name: inactivity field is not a number, left as is"; continue; fi
+      if [ "$last" = x ] || [ "$max" = x ]; then log "muster.beyond.account_inactivity_lock: $name: password ageing fields are not numbers, left as is"; continue; fi
+      aged=
+      if [ "$max" -ge 0 ] && [ "$max" -ne 99999 ]; then aged=1; fi
+      if [ "$last" -eq 0 ] || { [ "$last" -lt 0 ] && [ -n "$aged" ]; }; then log "muster.beyond.account_inactivity_lock: $name: must change its password at next login, left as is"; continue; fi
+      if [ "$last" -gt 0 ] && [ "$max" -ge 0 ] && [ $((today - last)) -ge $((max + n)) ]; then
+        log "muster.beyond.account_inactivity_lock: $name: password expired $((today - last - max)) days ago; the bound would disable it now; change its password first"
+        continue
+      fi
+      if [ -n "$aged" ] && [ "$last" -gt 0 ]; then log "muster.beyond.account_inactivity_lock: $name will be disabled on $(date -u -d "@$(( (last + max + n) * 86400 ))" +%F) unless its password changes"; fi
+      k=$name LC_ALL=C awk -F: '$1 == ENVIRON["k"] { f = 1 } END { exit !f }' "$MB/inactive.list" || printf '%s:%s\n' "$name" "$old" >> "$MB/inactive.list"
+      printf '%s\n' "$name" >> "$MB/inactive.run"
+      chage -I "$n" -- "$name"
+    done < "$MB/inactive.rows"
+  rollback: |
+    rc=0
+    if [ -f "$MB/inactive.run" ]; then
+      while IFS= read -r name; do
+        old=$(k=$name LC_ALL=C awk -F: '$1 == ENVIRON["k"] { print $2; exit }' "$MB/inactive.list")
+        chage -I "$old" -- "$name" || rc=1
+      done < "$MB/inactive.run"
+    fi
+    exit "$rc"
+  validate: |
+    v=$(LC_ALL=C awk 'function num(s,  i, n, g, b, v, d, st) { n = length(s); i = 1; while (i <= n && index(" \t\n\v\f\r", substr(s, i, 1))) i++; g = 1; if (i <= n && (substr(s, i, 1) == "+" || substr(s, i, 1) == "-")) { if (substr(s, i, 1) == "-") g = -1; i++ } b = 10; if (i + 2 <= n && substr(s, i, 2) ~ /^0[xX]$/ && index("0123456789abcdefABCDEF", substr(s, i + 2, 1))) { b = 16; i += 2 } else if (substr(s, i, 1) == "0") b = 8; st = i; v = 0; for (; i <= n; i++) { d = index("0123456789abcdef", tolower(substr(s, i, 1))) - 1; if (d < 0 || d >= b) break; v = v * b + d } if (i == st || i <= n) return -1; if (g < 0) return (v == 0) ? 0 : -1; return v } BEGIN { v = -1 } /^INACTIVE=/ { v = num(substr($0, 10)) } END { print v }' /etc/default/useradd) && [ "$v" -ge 0 ] && [ "$v" -le "$P_max_inactive_days" ] && { [ ! -s "$MB/inactive.run" ] || LC_ALL=C awk -F: -v N="$P_max_inactive_days" 'FILENAME == ARGV[1] { w[$0] = 1; next } { sub(/\r$/, "") } ($1 in w) && NF >= 8 { x[$1] = $7 } END { for (k in w) if ((k in x) && !(x[k] ~ /^[0-9]+$/ && x[k] + 0 <= N + 0)) exit 1 }' "$MB/inactive.run" /etc/shadow; }

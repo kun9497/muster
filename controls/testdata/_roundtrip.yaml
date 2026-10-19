@@ -24,6 +24,8 @@
   images: [almalinux9-init, debian12-init, rocky9-init, ubuntu2204]
 - id: muster.account.umask_policy
   images: [almalinux9-init, rocky9-init, runner, ubuntu2204]
+- id: muster.beyond.account_inactivity_lock
+  images: [runner]
 - id: muster.beyond.aslr_and_link_protection
   images: [runner]
 - id: muster.beyond.audit_disk_actions
