@@ -3,7 +3,9 @@
 package remedy
 
 import (
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -30,9 +32,20 @@ import (
 //     (O-33: a restart that fails once and succeeds after), and while
 //     $STUB/restart_dies exists it exits 0 but leaves the unit inactive (a
 //     daemon that dies right after its start);
-//   - postfix: check (0), reload (0);
+//   - postfix: check (0, or 1 while $STUB/check_fails exists), status (0
+//     iff $STUB/postfix_running exists), reload (0);
+//   - postconf: only with -c <dir>, over <dir>/main.cf: -h
+//     disable_vrfy_command prints the value as postconf reads it (a name is
+//     matched case-sensitively, a line led by white space continues the one
+//     above, the last assignment wins, the compiled default is no; another
+//     key is not modelled), and -e '<key> = <value>' rewrites every
+//     assignment of key in place and drops their continuation lines, or
+//     appends the line after the file's last byte (postconf 3.7 adds no
+//     newline a file lacks), through a new file renamed over main.cf with
+//     its mode (postconf's own replace, O-58; measured against postfix
+//     3.7.11); a missing main.cf exits 1;
 //   - exportfs: any arguments (0);
-//   - postconf, restorecon: not modelled (99);
+//   - restorecon: not modelled (99);
 //   - selinuxenabled: exit 1 (SELinux off).
 //
 // A reload, restart or exportfs appends its argv and then the content of the
@@ -65,20 +78,53 @@ exit 99
 `)
 	writeStub(t, bin, "postfix", `printf '%s\n' "$*" >> "$STUB/postfix"
 `+reads+`case "$*" in
-  check) exit 0;;
+  check) [ ! -e "$STUB/check_fails" ]; exit;;
+  status) [ -e "$STUB/postfix_running" ]; exit;;
   reload) printf 'postfix %s\n' "$*" >> "$STUB/calls"; reads postfix >> "$STUB/calls"; exit 0;;
 esac
 exit 99
+`)
+	writeStub(t, bin, "postconf", `printf '%s\n' "$*" >> "$STUB/postconf"
+dir=; op=; arg=
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    -c) [ "$#" -ge 2 ] || exit 99; dir=$2; shift 2;;
+    -h|-e) [ "$#" -ge 2 ] && [ -z "$op" ] || exit 99; op=$1; arg=$2; shift 2;;
+    *) exit 99;;
+  esac
+done
+[ -n "$dir" ] && [ -n "$op" ] || exit 99
+f=$dir/main.cf
+[ -f "$f" ] || { echo "postconf: fatal: open $f: No such file or directory" >&2; exit 1; }
+case "$op" in
+  -h) [ "$arg" = disable_vrfy_command ] || exit 99
+    awk -v k="$arg" '
+      /^[ \t]*(#|$)/ { next }
+      /^[ \t]/ { if (cur) { s = $0; sub(/^[ \t]+/, "", s); v = v " " s }; next }
+      { cur = 0; i = index($0, "="); if (i == 0) next; n = substr($0, 1, i - 1); sub(/[ \t]+$/, "", n)
+        if (n == k) { cur = 1; found = 1; v = substr($0, i + 1); sub(/^[ \t]+/, "", v) } }
+      END { if (!found) v = "no"; sub(/^[ \t]+/, "", v); sub(/[ \t]+$/, "", v); print v }' "$f";;
+  -e) k=${arg%%=*}; k=${k%"${k##*[! ]}"}
+    if awk -v k="$k" '{ i = index($0, "="); if (i && $0 !~ /^[ \t]/) { n = substr($0, 1, i - 1); sub(/[ \t]+$/, "", n); if (n == k) f = 1 } } END { exit !f }' "$f"; then
+      awk -v k="$k" -v line="$arg" '
+        /^[ \t]*(#|$)/ { skip = 0; print; next }
+        /^[ \t]/ { if (!skip) print; next }
+        { skip = 0; i = index($0, "="); n = ""; if (i) { n = substr($0, 1, i - 1); sub(/[ \t]+$/, "", n) }
+          if (i && n == k) { print line; skip = 1; next }
+          print }' "$f" > "$f.postconf-new"
+    else
+      { cat "$f"; printf '%s\n' "$arg"; } > "$f.postconf-new"
+    fi &&
+      chmod "$(stat -c %a "$f")" "$f.postconf-new" && mv -f "$f.postconf-new" "$f";;
+esac
 `)
 	writeStub(t, bin, "exportfs", `printf '%s\n' "$*" >> "$STUB/exportfs"
 `+reads+`printf 'exportfs %s\n' "$*" >> "$STUB/calls"; reads exports >> "$STUB/calls"
 exit 0
 `)
-	for _, tool := range []string{"postconf", "restorecon"} {
-		writeStub(t, bin, tool, `printf '%s\n' "$*" >> "$STUB/`+tool+`"
+	writeStub(t, bin, "restorecon", `printf '%s\n' "$*" >> "$STUB/restorecon"
 exit 99
 `)
-	}
 	writeStub(t, bin, "selinuxenabled", "exit 1\n")
 	return root, bin, stub
 }
@@ -166,6 +212,15 @@ func TestContentTreeStubsFailClosed(t *testing.T) {
 		{"systemctl is-active --quiet vsftpd.service", 0},
 		{`: > "$STUB/restart_dies"; systemctl restart vsftpd.service`, 0},
 		{`rm "$STUB/restart_dies"; systemctl is-active --quiet vsftpd.service`, 1},
+		{"postfix check", 0},
+		{"postfix status", 1},
+		{`: > "$STUB/check_fails"; postfix check`, 1},
+		{`rm "$STUB/check_fails"; : > "$STUB/postfix_running"; postfix status`, 0},
+		{`postconf -c "$ROOT/etc/postfix" -h disable_vrfy_command`, 1},
+		{`mkdir -p "$ROOT/etc/postfix"; : > "$ROOT/etc/postfix/main.cf"; postconf -c "$ROOT/etc/postfix" -h disable_vrfy_command`, 0},
+		{`postconf -c "$ROOT/etc/postfix" -h smtpd_banner`, 99},
+		{`postconf -c "$ROOT/etc/postfix" -n`, 99},
+		{`postconf -e 'disable_vrfy_command = yes'`, 99},
 	} {
 		if out, code := runBody(t, root, bin, c.cmd, env...); code != c.code {
 			t.Errorf("%s: exit %d, want %d\n%s", c.cmd, code, c.code, out)
@@ -679,5 +734,612 @@ func TestVsftpdValidateNeedsTheRestartedUnitActive(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+const postfixID = "muster.service.mail_expn_vrfy"
+
+// readIf is the file's content, or "" when it does not exist.
+func readIf(t *testing.T, path string) string {
+	t.Helper()
+	if !exists(path) {
+		return ""
+	}
+	return readFile(t, path)
+}
+
+// postconfEdits counts the postconf -e calls the stub logged.
+func postconfEdits(t *testing.T, stub string) int {
+	t.Helper()
+	n := 0
+	for _, l := range strings.Split(readIf(t, filepath.Join(stub, "postconf")), "\n") {
+		if strings.Contains(l, " -e ") {
+			n++
+		}
+	}
+	return n
+}
+
+// The postconf stub reads and writes main.cf the way postconf 3.7.11 does
+// (measured in debian:12, O-58): names are case-sensitive, a
+// white-space-led line continues the one above, the last assignment wins
+// over the compiled no, and -e rewrites every assignment in place, or
+// appends after the last byte (a missing final newline is not added),
+// through a new file that keeps the mode.
+func TestContentTreePostconfReadsAsPostconf(t *testing.T) {
+	needSh(t)
+	const yes = "disable_vrfy_command = yes\n"
+	for _, c := range []struct{ name, conf, h, e string }{
+		{"empty", "", "no", yes},
+		{"upper value", "disable_vrfy_command = YES\n", "YES", yes},
+		{"continued", "disable_vrfy_command =\n    no\nb = 2\n", "no", yes + "b = 2\n"},
+		{"continued yes", "disable_vrfy_command =\n    yes\n", "yes", yes},
+		{"last wins", "disable_vrfy_command = no\ndisable_vrfy_command = yes\n", "yes", yes + yes},
+		{"case-folded name", "Disable_Vrfy_Command = yes\n", "no", "Disable_Vrfy_Command = yes\n" + yes},
+		{"in place", "a = 1\n# disable_vrfy_command = yes\ndisable_vrfy_command = no\nb = 2\n", "no", "a = 1\n# disable_vrfy_command = yes\n" + yes + "b = 2\n"},
+		{"no final newline", "a = 1", "no", "a = 1" + yes},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			root, bin, stub := contentTree(t)
+			writeUnder(t, root, "/etc/postfix/main.cf", c.conf)
+			f := filepath.Join(root, "/etc/postfix/main.cf")
+			env := []string{"STUB=" + stub, "ROOT=" + root}
+			if out, code := runBody(t, root, bin, `postconf -c "$ROOT/etc/postfix" -h disable_vrfy_command`, env...); code != 0 || out != c.h+"\n" {
+				t.Errorf("-h printed %q (exit %d), want %q", out, code, c.h)
+			}
+			fi0, err := os.Stat(f)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if out, code := runBody(t, root, bin, `postconf -c "$ROOT/etc/postfix" -e 'disable_vrfy_command = yes'`, env...); code != 0 {
+				t.Fatalf("-e exit %d\n%s", code, out)
+			}
+			if got := readFile(t, f); got != c.e {
+				t.Errorf("-e left %q, want %q", got, c.e)
+			}
+			fi1, err := os.Stat(f)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if os.SameFile(fi0, fi1) || fi1.Mode().Perm() != 0o644 {
+				t.Errorf("-e kept the inode (%v) or changed the mode to %v; postconf renames a new file with the mode", os.SameFile(fi0, fi1), fi1.Mode())
+			}
+		})
+	}
+}
+
+// §4.6, O-25, O-58: postfix check runs first; postfix status before any edit
+// writes this run's was-running marker; a disable_vrfy_command postconf does
+// not read as yes (case blind) is set with one postconf -e, checked again,
+// and reloaded only when postfix was running. A value already yes is left.
+func TestPostfixSetsVrfyOnce(t *testing.T) {
+	needSh(t)
+	r := shippedRemediation(t, postfixID)
+	const yes = "disable_vrfy_command = yes\n"
+	for _, c := range []struct {
+		name, conf string
+		want       string // main.cf after the body; "" when it is left as it was
+		running    bool
+	}{
+		{"no, running", "inet_interfaces = all\ndisable_vrfy_command = no\n", "inet_interfaces = all\n" + yes, true},
+		{"no, stopped", "disable_vrfy_command = no\n", yes, false},
+		{"unset", "inet_interfaces = all\n", "inet_interfaces = all\n" + yes, true},
+		// §3.7: postconf -e appends after the last byte, so the body ends
+		// the last line first
+		{"unset, no final newline", "inet_interfaces = all", "inet_interfaces = all\n" + yes, true},
+		{"later override", "disable_vrfy_command = yes\ndisable_vrfy_command = no\n", yes + yes, true},
+		// The recorded divergence (O-25): the collector folds the name and
+		// reads yes, so check PASSes there and the row is never planned;
+		// postconf matches names case-sensitively and reads the compiled no,
+		// and the body acts on what postconf reads.
+		{"case-folded name", "Disable_Vrfy_Command = yes\n", "Disable_Vrfy_Command = yes\n" + yes, false},
+		{"YES", "disable_vrfy_command = YES\n", "", true},
+		{"yes continued", "disable_vrfy_command =\n    yes\n", "", true},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			root, bin, stub := contentTree(t)
+			writeUnder(t, root, "/etc/postfix/main.cf", c.conf)
+			if c.running {
+				writeUnder(t, stub, "/postfix_running", "")
+			}
+			mb := t.TempDir()
+			out, code := runContentBodyIn(t, r, root, bin, stub, mb)
+			if code != 0 {
+				t.Fatalf("body exit %d\n%s", code, out)
+			}
+			edits := c.want != ""
+			want := c.want
+			if !edits {
+				want = c.conf
+			}
+			f := filepath.Join(root, "/etc/postfix/main.cf")
+			if got := readFile(t, f); got != want {
+				t.Errorf("main.cf is %q, want %q", got, want)
+			}
+			if fi, err := os.Stat(f); err != nil || fi.Mode().Perm() != 0o644 {
+				t.Errorf("main.cf mode %v (%v), want 0644 kept", fi.Mode(), err)
+			}
+			if n := postconfEdits(t, stub); edits && n != 1 || !edits && n != 0 {
+				t.Errorf("postconf -e ran %d times (edit %v)\n%s", n, edits, readIf(t, filepath.Join(stub, "postconf")))
+			}
+			wantPostfix := "check\nstatus\n"
+			if edits {
+				wantPostfix += "check\n"
+				if c.running {
+					wantPostfix += "reload\n"
+				}
+			}
+			if got := readIf(t, filepath.Join(stub, "postfix")); got != wantPostfix {
+				t.Errorf("postfix ran %q, want %q (a check before and after the edit, the reload only when running)", got, wantPostfix)
+			}
+			if got := readIf(t, filepath.Join(stub, "calls")); edits && c.running && got != "postfix reload\n"+want || !(edits && c.running) && got != "" {
+				t.Errorf("calls %q (edit %v, running %v)", got, edits, c.running)
+			}
+			if exists(filepath.Join(mb, "postfix.edited")) != edits || exists(filepath.Join(mb, "postfix.was-running")) != c.running {
+				t.Errorf("markers: edited %v (want %v), was-running %v (want %v)", exists(filepath.Join(mb, "postfix.edited")), edits,
+					exists(filepath.Join(mb, "postfix.was-running")), c.running)
+			}
+			if out, code := runContentBodyIn(t, r, root, bin, stub, t.TempDir()); code != 0 {
+				t.Fatalf("second run exit %d\n%s", code, out)
+			}
+			if n := postconfEdits(t, stub); edits && n != 1 || !edits && n != 0 {
+				t.Errorf("the second run edited again: postconf -e ran %d times", n)
+			}
+			if out, code := runBody(t, root, bin, rebaseContent(r.Validate, root), "STUB="+stub, "ROOT="+root); code != 0 {
+				t.Errorf("validate exit %d after the body\n%s", code, out)
+			}
+		})
+	}
+	t.Run("validate fails before the body", func(t *testing.T) {
+		root, bin, stub := contentTree(t)
+		writeUnder(t, root, "/etc/postfix/main.cf", "disable_vrfy_command = no\n")
+		if out, code := runBody(t, root, bin, rebaseContent(r.Validate, root), "STUB="+stub, "ROOT="+root); code == 0 {
+			t.Errorf("the validate passes over disable_vrfy_command = no\n%s", out)
+		}
+	})
+	t.Run("rerun with an earlier marker", func(t *testing.T) {
+		root, bin, stub := contentTree(t)
+		writeUnder(t, root, "/etc/postfix/main.cf", "disable_vrfy_command = no\n")
+		mb := t.TempDir()
+		writeUnder(t, mb, "/postfix.was-running", "")
+		if out, code := runContentBodyIn(t, r, root, bin, stub, mb); code != 0 {
+			t.Fatalf("body exit %d\n%s", code, out)
+		}
+		if exists(filepath.Join(stub, "calls")) {
+			t.Errorf("an earlier run's marker reloaded a stopped postfix: %s", readFile(t, filepath.Join(stub, "calls")))
+		}
+		if exists(filepath.Join(mb, "postfix.was-running")) {
+			t.Error("the earlier run's was-running marker survived this run")
+		}
+	})
+	// O-36: postconf -e replaces main.cf, so restorecon runs on it after the
+	// edit when SELinux is enabled, and never without an edit.
+	for _, edit := range []bool{true, false} {
+		t.Run(fmt.Sprintf("selinux, edit %v", edit), func(t *testing.T) {
+			root, bin, stub := contentTree(t)
+			writeStub(t, bin, "selinuxenabled", "exit 0\n")
+			writeStub(t, bin, "restorecon", `printf '%s\n' "$*" >> "$STUB/restorecon"
+grep -q '^disable_vrfy_command = yes$' "$2"
+`)
+			conf := "disable_vrfy_command = yes\n"
+			if edit {
+				conf = "disable_vrfy_command = no\n"
+			}
+			writeUnder(t, root, "/etc/postfix/main.cf", conf)
+			if out, code := runContentBody(t, r, root, bin, stub); code != 0 {
+				t.Fatalf("body exit %d\n%s", code, out)
+			}
+			want := ""
+			if edit {
+				want = "-- " + filepath.Join(root, "/etc/postfix/main.cf") + "\n"
+			}
+			if got := readIf(t, filepath.Join(stub, "restorecon")); got != want {
+				t.Errorf("restorecon ran %q, want %q (after the edit only)", got, want)
+			}
+		})
+	}
+}
+
+// §4.6, O-23: a configuration postfix check already refuses is never
+// edited: the body refuses before any change, and the block's way back is
+// clean (the edited marker is absent, so the rollback neither checks nor
+// reloads).
+func TestPostfixRefusesABrokenConfig(t *testing.T) {
+	needSh(t)
+	root, bin, stub := contentTree(t)
+	const before = "disable_vrfy_command = no\n"
+	writeUnder(t, root, "/etc/postfix/main.cf", before)
+	writeUnder(t, stub, "/check_fails", "")
+	writeUnder(t, stub, "/postfix_running", "")
+	p := contentBlock(t, postfixID, root, false)
+	out, _, code := runScriptWith(t, p, root, filepath.Join(root, "bk"), runOpts{pathPrefix: bin, env: []string{"STUB=" + stub, "ROOT=" + root}})
+	if code != 1 || !strings.Contains(out, postfixID+": script failed") {
+		t.Fatalf("exit %d, want 1 after the refusal\n%s", code, out)
+	}
+	if !strings.Contains(out, postfixID+": postfix check fails before any change; refused") {
+		t.Errorf("the refusal is not logged\n%s", out)
+	}
+	for _, bad := range []string{"ROLLBACK INCOMPLETE", "rollback failed"} {
+		if strings.Contains(out, bad) {
+			t.Errorf("the output carries %q\n%s", bad, out)
+		}
+	}
+	if n := postconfEdits(t, stub); n != 0 {
+		t.Errorf("postconf -e ran %d times over a broken configuration", n)
+	}
+	if got := readIf(t, filepath.Join(stub, "postfix")); got != "check\n" {
+		t.Errorf("postfix ran %q, want the one refused check", got)
+	}
+	if exists(filepath.Join(stub, "calls")) {
+		t.Errorf("something was reloaded: %s", readFile(t, filepath.Join(stub, "calls")))
+	}
+	if got := readFile(t, filepath.Join(root, "/etc/postfix/main.cf")); got != before {
+		t.Errorf("main.cf is %q, want %q", got, before)
+	}
+}
+
+// O-9, O-32: the declared rollback restores main.cf, checks it, and reloads
+// a postfix this run found running over the restored file.
+func TestPostfixRollbackReloadsTheRestoredFile(t *testing.T) {
+	needSh(t)
+	for _, running := range []bool{true, false} {
+		t.Run(fmt.Sprintf("running %v", running), func(t *testing.T) {
+			root, bin, stub := contentTree(t)
+			const before = "inet_interfaces = all\ndisable_vrfy_command = no\n"
+			writeUnder(t, root, "/etc/postfix/main.cf", before)
+			if running {
+				writeUnder(t, stub, "/postfix_running", "")
+			}
+			p := contentBlock(t, postfixID, root, true)
+			out, _, code := runScriptWith(t, p, root, filepath.Join(root, "bk"), runOpts{pathPrefix: bin, env: []string{"STUB=" + stub, "ROOT=" + root}})
+			if code != 1 || !strings.Contains(out, postfixID+": validate failed") {
+				t.Fatalf("exit %d, want 1 after a failed validate\n%s", code, out)
+			}
+			for _, bad := range []string{"ROLLBACK INCOMPLETE", "rollback failed", "restore: "} {
+				if strings.Contains(out, bad) {
+					t.Errorf("the output carries %q\n%s", bad, out)
+				}
+			}
+			if got := readFile(t, filepath.Join(root, "/etc/postfix/main.cf")); got != before {
+				t.Errorf("main.cf is %q after the block, want %q", got, before)
+			}
+			calls := readIf(t, filepath.Join(stub, "calls"))
+			pf := readIf(t, filepath.Join(stub, "postfix"))
+			if running {
+				if want := "postfix reload\ninet_interfaces = all\ndisable_vrfy_command = yes\npostfix reload\n" + before; calls != want {
+					t.Errorf("calls %q, want the body's reload over the edit, then the rollback's over the restored file %q", calls, want)
+				}
+				if !strings.HasSuffix(pf, "check\nreload\n") {
+					t.Errorf("postfix ran %q; the rollback checks before it reloads", pf)
+				}
+			} else {
+				if calls != "" {
+					t.Errorf("a stopped postfix was reloaded: %s", calls)
+				}
+				if !strings.HasSuffix(pf, "check\ncheck\n") {
+					t.Errorf("postfix ran %q; the rollback checks the restored file", pf)
+				}
+			}
+		})
+	}
+}
+
+// §4 intro, K2: a symlinked main.cf is refused before any write; the link
+// and its target are untouched.
+func TestPostfixRefusesASymlinkedMainCf(t *testing.T) {
+	needSh(t)
+	r := shippedRemediation(t, postfixID)
+	root, bin, stub := contentTree(t)
+	victim := filepath.Join(root, "victim")
+	writeUnder(t, root, "/victim", "disable_vrfy_command = no\n")
+	link := filepath.Join(root, "/etc/postfix/main.cf")
+	if err := os.MkdirAll(filepath.Dir(link), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(victim, link); err != nil {
+		t.Fatal(err)
+	}
+	mb := t.TempDir()
+	out, code := runContentBodyIn(t, r, root, bin, stub, mb)
+	if code == 0 {
+		t.Fatalf("the body accepted a symlinked main.cf\n%s", out)
+	}
+	if want := postfixID + ": " + link + " is a symlink, left as is"; !strings.Contains(out, want) {
+		t.Errorf("the log does not carry %q\n%s", want, out)
+	}
+	if got, err := os.Readlink(link); err != nil || got != victim {
+		t.Errorf("main.cf is %q (%v), want the link to %s", got, err, victim)
+	}
+	if got := readFile(t, victim); got != "disable_vrfy_command = no\n" {
+		t.Errorf("the link's target holds %q", got)
+	}
+	if postconfEdits(t, stub) != 0 || exists(filepath.Join(mb, "postfix.edited")) {
+		t.Error("the body edited through the link")
+	}
+}
+
+// §4.6, O-23, O-32: a host without postconf (sendmail alone) is the
+// operator's: the body logs it and changes nothing, and the validate
+// passes. PATH holds only the plain tools a body needs, so no postconf can
+// be found anywhere.
+func TestPostfixAbsentLeavesTheSendmailHalf(t *testing.T) {
+	needSh(t)
+	r := shippedRemediation(t, postfixID)
+	bin := t.TempDir()
+	for _, tool := range []string{"sh", "awk", "grep", "sed", "cat", "rm", "tail", "printf", "stat", "chown", "chmod"} {
+		p, err := exec.LookPath(tool)
+		if err != nil {
+			t.Fatalf("%s: %v", tool, err)
+		}
+		if err := os.Symlink(p, filepath.Join(bin, tool)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	root, mb := t.TempDir(), t.TempDir()
+	const conf = "disable_vrfy_command = no\n"
+	writeUnder(t, root, "/etc/postfix/main.cf", conf)
+	run := func(script string) (string, int) {
+		t.Helper()
+		cmd := exec.Command(filepath.Join(bin, "sh"), "-ec", script)
+		cmd.Dir = root
+		cmd.Env = []string{"PATH=" + bin, "MB=" + mb, "HOME=" + root}
+		out, err := cmd.CombinedOutput()
+		if ee, ok := err.(*exec.ExitError); ok {
+			return string(out), ee.ExitCode()
+		} else if err != nil {
+			t.Fatalf("sh: %v", err)
+		}
+		return string(out), 0
+	}
+	if out, code := run("command -v postconf"); code == 0 {
+		t.Fatalf("postconf is on the minimal PATH: %s", out)
+	}
+	out, code := run("umask 077\nlog() { printf 'muster-fix: %s\\n' \"$*\"; }\n" + rebaseContent(r.Script, root))
+	if code != 0 {
+		t.Fatalf("body exit %d\n%s", code, out)
+	}
+	if want := postfixID + ": postconf is missing; the sendmail half is the operator's"; !strings.Contains(out, want) {
+		t.Errorf("the log does not carry %q\n%s", want, out)
+	}
+	if got := readFile(t, filepath.Join(root, "/etc/postfix/main.cf")); got != conf {
+		t.Errorf("main.cf is %q, want it untouched", got)
+	}
+	if exists(filepath.Join(mb, "postfix.edited")) || exists(filepath.Join(mb, "postfix.was-running")) {
+		t.Error("the body wrote a marker without postconf")
+	}
+	if out, code := run(rebaseContent(r.Validate, root)); code != 0 {
+		t.Errorf("validate exit %d without postconf\n%s", code, out)
+	}
+}
+
+const nfsID = "muster.service.nfs_export_access"
+
+// nfsBefore holds no_root_squash as an option token (in a client's list, or
+// in a default list a blank-led "-" opens, the line's end included), in a
+// path, in a client name, in a comment and behind a continuation (O-26,
+// O-60, O-64); nfsAfter is what the swap leaves: only the option tokens
+// change.
+const nfsBefore = "/srv/no_root_squash_area 192.0.2.1(rw,no_root_squash,sync)\n" +
+	"/b 192.0.2.2(no_root_squash)\n" +
+	"/c 192.0.2.3(rw,no_root_squash,no_root_squash)\n" +
+	"/d -no_root_squash 192.0.2.4\n" +
+	"/e 192.0.2.5(rw) # no_root_squash\n" +
+	"/srv/x-no_root_squash 192.0.2.9(rw) 192.0.2.10(no_root_squash)\n" +
+	"#/g 192.0.2.7(no_root_squash)\n" +
+	"/f 192.0.2.6(rw) # (no_root_squash)\n" +
+	"/t\t-no_root_squash 192.0.2.4\n" +
+	"/h \\\n\t192.0.2.11(rw,no_root_squash)\n" +
+	"/srv/ci 192.0.2.0/24(rw,no_root_squash,fsid=1)\n" +
+	"/s -no_root_squash 192.0.2.7 -rw 192.0.2.8\n" +
+	"/s -no_root_squash -rw 192.0.2.9\n" +
+	"/z 192.0.2.12 -no_root_squash\n" +
+	"/p no_root_squash(rw)\n"
+
+const nfsAfter = "/srv/no_root_squash_area 192.0.2.1(rw,root_squash,sync)\n" +
+	"/b 192.0.2.2(root_squash)\n" +
+	"/c 192.0.2.3(rw,root_squash,root_squash)\n" +
+	"/d -root_squash 192.0.2.4\n" +
+	"/e 192.0.2.5(rw) # no_root_squash\n" +
+	"/srv/x-no_root_squash 192.0.2.9(rw) 192.0.2.10(root_squash)\n" +
+	"#/g 192.0.2.7(no_root_squash)\n" +
+	"/f 192.0.2.6(rw) # (no_root_squash)\n" +
+	"/t\t-root_squash 192.0.2.4\n" +
+	"/h \\\n\t192.0.2.11(rw,root_squash)\n" +
+	"/srv/ci 192.0.2.0/24(rw,root_squash,fsid=1)\n" +
+	"/s -root_squash 192.0.2.7 -rw 192.0.2.8\n" +
+	"/s -root_squash -rw 192.0.2.9\n" +
+	"/z 192.0.2.12 -root_squash\n" +
+	"/p no_root_squash(rw)\n"
+
+// §4.9, O-26, O-30: the swap changes only no_root_squash option tokens to
+// root_squash; exportfs -ra runs only when this run swapped and found the
+// server active; a host whose exports live only in /etc/exports.d and a
+// symlinked /etc/exports are left, and the validate passes over both.
+func TestNfsSwapsOnlyOptionTokens(t *testing.T) {
+	needSh(t)
+	if os.Geteuid() != 0 {
+		t.Skip("root: the body chowns")
+	}
+	r := shippedRemediation(t, nfsID)
+	validate := func(t *testing.T, root, bin, stub string) int {
+		t.Helper()
+		_, code := runBody(t, root, bin, rebaseContent(r.Validate, root), "STUB="+stub, "ROOT="+root)
+		return code
+	}
+	run := func(t *testing.T, conf string, active bool, mb string) (root, bin, stub string) {
+		t.Helper()
+		root, bin, stub = contentTree(t)
+		writeUnder(t, root, "/etc/exports", conf)
+		if active {
+			writeUnder(t, stub, "/active/nfs-server.service", "")
+		}
+		if out, code := runContentBodyIn(t, r, root, bin, stub, mb); code != 0 {
+			t.Fatalf("body exit %d\n%s", code, out)
+		}
+		return root, bin, stub
+	}
+	t.Run("stopped", func(t *testing.T) {
+		mb := t.TempDir()
+		root, bin, stub := run(t, nfsBefore, false, mb)
+		f := filepath.Join(root, "/etc/exports")
+		if got := readFile(t, f); got != nfsAfter {
+			t.Errorf("exports is\n%q\nwant\n%q", got, nfsAfter)
+		}
+		if fi, err := os.Stat(f); err != nil || fi.Mode().Perm() != 0o644 {
+			t.Errorf("exports mode %v (%v), want 0644 kept", fi.Mode(), err)
+		}
+		if exists(filepath.Join(stub, "calls")) {
+			t.Errorf("a stopped server was re-exported: %s", readFile(t, filepath.Join(stub, "calls")))
+		}
+		if !exists(filepath.Join(mb, "nfs.edited")) || exists(filepath.Join(mb, "nfs.was-running")) {
+			t.Error("markers: want edited and no was-running")
+		}
+		if code := validate(t, root, bin, stub); code != 0 {
+			t.Errorf("validate exit %d after the body", code)
+		}
+		if out, code := runContentBody(t, r, root, bin, stub); code != 0 {
+			t.Fatalf("second run exit %d\n%s", code, out)
+		}
+		if got := readFile(t, f); got != nfsAfter {
+			t.Errorf("the second run changed exports to %q", got)
+		}
+	})
+	t.Run("validate fails before the body", func(t *testing.T) {
+		root, bin, stub := contentTree(t)
+		writeUnder(t, root, "/etc/exports", nfsBefore)
+		if code := validate(t, root, bin, stub); code == 0 {
+			t.Error("the validate passes over no_root_squash")
+		}
+	})
+	t.Run("running", func(t *testing.T) {
+		mb := t.TempDir()
+		_, _, stub := run(t, nfsBefore, true, mb)
+		if got, want := readIf(t, filepath.Join(stub, "calls")), "exportfs -ra\n"+nfsAfter; got != want {
+			t.Errorf("calls %q, want one exportfs -ra over the swapped file %q", got, want)
+		}
+		if !exists(filepath.Join(mb, "nfs.edited")) || !exists(filepath.Join(mb, "nfs.was-running")) {
+			t.Error("markers: want edited and was-running")
+		}
+	})
+	t.Run("running, nothing to swap", func(t *testing.T) {
+		mb := t.TempDir()
+		_, _, stub := run(t, nfsAfter, true, mb)
+		if exists(filepath.Join(stub, "calls")) {
+			t.Errorf("an unchanged exports was re-exported: %s", readFile(t, filepath.Join(stub, "calls")))
+		}
+		if exists(filepath.Join(mb, "nfs.edited")) {
+			t.Error("an edited marker without a swap")
+		}
+	})
+	t.Run("rerun with an earlier marker", func(t *testing.T) {
+		mb := t.TempDir()
+		writeUnder(t, mb, "/nfs.edited", "")
+		writeUnder(t, mb, "/nfs.was-running", "")
+		_, _, stub := run(t, nfsAfter, true, mb)
+		if exists(filepath.Join(stub, "calls")) {
+			t.Errorf("an earlier run's marker re-exported: %s", readFile(t, filepath.Join(stub, "calls")))
+		}
+		if exists(filepath.Join(mb, "nfs.edited")) {
+			t.Error("the earlier run's edited marker survived this run")
+		}
+	})
+	t.Run("eleven on one line", func(t *testing.T) {
+		// the loop is bounded at ten passes: what is left fails the validate
+		conf := "/q 192.0.2.14(" + strings.Repeat("no_root_squash,", 10) + "no_root_squash)\n"
+		root, bin, stub := run(t, conf, false, t.TempDir())
+		if got, want := readFile(t, filepath.Join(root, "/etc/exports")), "/q 192.0.2.14(no_root_squash,"+strings.Repeat("root_squash,", 9)+"root_squash)\n"; got != want {
+			t.Errorf("exports is %q, want %q", got, want)
+		}
+		if code := validate(t, root, bin, stub); code == 0 {
+			t.Error("the validate passes over a no_root_squash the bound left")
+		}
+	})
+	t.Run("exports.d only", func(t *testing.T) {
+		root, bin, stub := contentTree(t)
+		const frag = "/x 192.0.2.1(no_root_squash)\n"
+		writeUnder(t, root, "/etc/exports.d/a.exports", frag)
+		writeUnder(t, stub, "/active/nfs-server.service", "")
+		if out, code := runContentBody(t, r, root, bin, stub); code != 0 {
+			t.Fatalf("body exit %d\n%s", code, out)
+		}
+		if got := readFile(t, filepath.Join(root, "/etc/exports.d/a.exports")); got != frag {
+			t.Errorf("the fragment is %q, want it left to the operator", got)
+		}
+		if exists(filepath.Join(root, "/etc/exports")) || exists(filepath.Join(stub, "calls")) {
+			t.Error("the body created /etc/exports or re-exported")
+		}
+		if code := validate(t, root, bin, stub); code != 0 {
+			t.Errorf("validate exit %d on an exports.d-only host", code)
+		}
+	})
+	t.Run("symlink", func(t *testing.T) {
+		root, bin, stub := contentTree(t)
+		const target = "/x 192.0.2.1(no_root_squash)\n"
+		victim := filepath.Join(root, "victim")
+		writeUnder(t, root, "/victim", target)
+		link := filepath.Join(root, "/etc/exports")
+		if err := os.MkdirAll(filepath.Dir(link), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Symlink(victim, link); err != nil {
+			t.Fatal(err)
+		}
+		writeUnder(t, stub, "/active/nfs-server.service", "")
+		mb := t.TempDir()
+		if out, code := runContentBodyIn(t, r, root, bin, stub, mb); code != 0 {
+			t.Fatalf("body exit %d\n%s", code, out)
+		}
+		if got, err := os.Readlink(link); err != nil || got != victim {
+			t.Errorf("exports is %q (%v), want the link to %s", got, err, victim)
+		}
+		if got := readFile(t, victim); got != target {
+			t.Errorf("the link's target holds %q", got)
+		}
+		if exists(filepath.Join(mb, "nfs.edited")) || exists(filepath.Join(stub, "calls")) {
+			t.Error("the body swapped or re-exported through the link")
+		}
+		if code := validate(t, root, bin, stub); code != 0 {
+			t.Errorf("validate exit %d over the link", code)
+		}
+	})
+}
+
+// O-9, O-30, O-32: the declared rollback restores /etc/exports and, when
+// this run swapped and found the server active, re-exports the restored
+// file; a stopped server is never re-exported.
+func TestNfsRollbackReexports(t *testing.T) {
+	needSh(t)
+	if os.Geteuid() != 0 {
+		t.Skip("root: the body chowns")
+	}
+	for _, active := range []bool{true, false} {
+		t.Run(fmt.Sprintf("active %v", active), func(t *testing.T) {
+			root, bin, stub := contentTree(t)
+			writeUnder(t, root, "/etc/exports", nfsBefore)
+			if active {
+				writeUnder(t, stub, "/active/nfs-server.service", "")
+			}
+			p := contentBlock(t, nfsID, root, true)
+			out, _, code := runScriptWith(t, p, root, filepath.Join(root, "bk"), runOpts{pathPrefix: bin, env: []string{"STUB=" + stub, "ROOT=" + root}})
+			if code != 1 || !strings.Contains(out, nfsID+": validate failed") {
+				t.Fatalf("exit %d, want 1 after a failed validate\n%s", code, out)
+			}
+			for _, bad := range []string{"ROLLBACK INCOMPLETE", "rollback failed", "restore: "} {
+				if strings.Contains(out, bad) {
+					t.Errorf("the output carries %q\n%s", bad, out)
+				}
+			}
+			if got := readFile(t, filepath.Join(root, "/etc/exports")); got != nfsBefore {
+				t.Errorf("exports is %q after the block, want %q", got, nfsBefore)
+			}
+			calls := readIf(t, filepath.Join(stub, "calls"))
+			if active {
+				if want := "exportfs -ra\n" + nfsAfter + "exportfs -ra\n" + nfsBefore; calls != want {
+					t.Errorf("calls %q, want the body's exportfs over the swap, then the rollback's over the restored file %q", calls, want)
+				}
+			} else if calls != "" {
+				t.Errorf("a stopped server was re-exported: %s", calls)
+			}
+		})
 	}
 }

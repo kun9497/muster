@@ -47,16 +47,31 @@ mechanisms:
       - { fact: nfs.exports, op: each, subject: path, require: { field: wildcard, op: eq, expected: false } }
       - { fact: nfs.exports, op: each, subject: path, require: { field: root_squash, op: eq, expected: true } }
 remediation:
-  text_en: Replace every wildcard client in /etc/exports with the hosts or networks that need the share, remove no_root_squash from its options, then chown root:root /etc/exports and chmod 644 /etc/exports, and apply the result with exportfs -ra.
-  text_ko: /etc/exports 의 와일드카드 클라이언트를 공유가 필요한 호스트나 네트워크로 바꾸고, 옵션에서 no_root_squash 를 제거한 뒤, chown root:root /etc/exports 와 chmod 644 /etc/exports 를 적용하고 exportfs -ra 로 반영합니다.
+  text_en: 'Replace every wildcard client in /etc/exports with the hosts or networks that need the share, remove no_root_squash from its options, then chown root:root /etc/exports and chmod 644 /etc/exports, and apply the result with exportfs -ra. The review script backs up /etc/exports and, in a regular file, makes it root''s, clears every mode bit outside 0644 and swaps no_root_squash for root_squash where it is an option in a client''s or a -options default list (a path, client name or comment is untouched); a symlink is left. When it swapped and nfs-server.service was active, it runs exportfs -ra, which resyncs the kernel''s table to every export file: pending /etc/exports.d edits apply, exports made only at run time drop, and a rollback restores the files'' view. Wildcard clients and /etc/exports.d/*.exports stay the operator''s. On the EL family /etc/exports is a package configuration file (rpm keeps the edit and writes .rpmnew at the next upgrade); on Debian and Ubuntu it is not a dpkg conffile.'
+  text_ko: '/etc/exports 의 와일드카드 클라이언트를 공유가 필요한 호스트나 네트워크로 바꾸고, 옵션에서 no_root_squash 를 제거한 뒤, chown root:root /etc/exports 와 chmod 644 /etc/exports 를 적용하고 exportfs -ra 로 반영합니다. 검토 스크립트는 /etc/exports 를 백업한 뒤, 일반 파일이면 root 소유로 바꾸고 0644 밖의 권한 비트를 모두 지우며, 클라이언트의 옵션 목록이나 -options 기본 목록에 옵션으로 들어 있는 no_root_squash 를 root_squash 로 바꿉니다(그 낱말을 담은 경로, 클라이언트 이름, 주석은 그대로 둡니다). 심볼릭 링크는 그대로 둡니다. 바꾼 것이 있고 nfs-server.service 가 활성 상태였으면 exportfs -ra 를 실행하는데, 이는 커널의 공유 테이블을 모든 공유 파일에 다시 맞추므로 아직 반영되지 않은 /etc/exports.d 수정도 적용하고 실행 중에만 만든 공유는 없앱니다. 롤백도 손으로 만든 실행 중 테이블이 아니라 파일 기준의 상태를 되돌립니다. 와일드카드 클라이언트와 /etc/exports.d/*.exports 는 운영자가 정리합니다. EL 계열에서 /etc/exports 는 패키지 설정 파일이므로 다음 업그레이드 때 rpm 은 수정본을 유지한 채 패키지의 버전을 옆에 .rpmnew 로 쓰고, Debian 과 Ubuntu 에서는 dpkg conffile 이 아닙니다.'
   risk: restart_service
   idempotent: true
   backup: [/etc/exports]
   script: |
+    rm -f "$MB/nfs.was-running" "$MB/nfs.edited"
+    rd_nrs() { LC_ALL=C grep -Ec '^[^#]*([(,]|[[:space:]]-)no_root_squash([,)[:space:]]|$)' "$1" || :; }
     if [ -f /etc/exports ] && [ ! -L /etc/exports ]; then
+      if LC_ALL=C systemctl is-active --quiet nfs-server.service; then : > "$MB/nfs.was-running"; fi
       chown root /etc/exports
       chmod u-xs,g-wxs,o-wxt /etc/exports
+      if [ "$(rd_nrs /etc/exports)" != 0 ]; then
+        : > "$MB/nfs.edited"
+        n=0
+        while [ "$(rd_nrs /etc/exports)" != 0 ] && [ "$n" -lt 10 ]; do
+          LC_ALL=C sed -i -E 's/^([^#]*)([(,]|[[:space:]]-)no_root_squash([,)[:space:]]|$)/\1\2root_squash\3/' /etc/exports
+          n=$((n+1))
+        done
+      fi
+      if [ -f "$MB/nfs.edited" ] && [ -f "$MB/nfs.was-running" ]; then exportfs -ra; fi
     fi
   validate: |
-    [ ! -f /etc/exports ] || [ -L /etc/exports ] || case "$(stat -c '%u %a' /etc/exports)" in '0 0'|'0 4'|'0 40'|'0 44'|'0 200'|'0 204'|'0 240'|'0 244'|'0 400'|'0 404'|'0 440'|'0 444'|'0 600'|'0 604'|'0 640'|'0 644') ;; *) false;; esac
+    [ ! -f /etc/exports ] || [ -L /etc/exports ] || { case "$(stat -c '%u %a' /etc/exports)" in '0 0'|'0 4'|'0 40'|'0 44'|'0 200'|'0 204'|'0 240'|'0 244'|'0 400'|'0 404'|'0 440'|'0 444'|'0 600'|'0 604'|'0 640'|'0 644') ;; *) false;; esac && [ "$(LC_ALL=C grep -Ec '^[^#]*([(,]|[[:space:]]-)no_root_squash([,)[:space:]]|$)' /etc/exports || :)" = 0 ]; }
+  rollback: |
+    restore /etc/exports
+    if [ -f "$MB/nfs.edited" ] && [ -f "$MB/nfs.was-running" ]; then exportfs -ra; fi
 decision: D09

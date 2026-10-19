@@ -180,7 +180,24 @@ func TestFileScriptsRepairOnARealFile(t *testing.T) {
 		t.Run(c.id, func(t *testing.T) {
 			r := shippedRemediation(t, c.id)
 			orig := r.Backup[0]
-			bin := t.TempDir() // runBody prepends it to PATH; nothing is stubbed here
+			// runBody prepends bin to PATH. The NFS body asks systemctl whether
+			// the server runs and may re-export (O-45): systemctl answers
+			// inactive and exportfs only logs, so no run reaches the host's
+			// own; every run gets its record directory MB.
+			bin, stub := t.TempDir(), t.TempDir()
+			writeStub(t, bin, "systemctl", `printf '%s\n' "$*" >> "$STUB/systemctl"
+case "$1" in is-active) exit 3;; esac
+exit 99
+`)
+			writeStub(t, bin, "exportfs", `printf '%s\n' "$*" >> "$STUB/exportfs"
+`)
+			env := []string{"STUB=" + stub}
+			defer func() {
+				// the temp file holds no no_root_squash, so nothing is re-exported
+				if _, err := os.Stat(filepath.Join(stub, "exportfs")); err == nil {
+					t.Errorf("%s re-exported a file it did not swap", c.id)
+				}
+			}()
 			// run sets the temp file to mode (and a wide ACL when acl), runs the
 			// validate, the body and the validate again, and returns both exits
 			// and the mode %a prints afterwards.
@@ -203,11 +220,12 @@ func TestFileScriptsRepairOnARealFile(t *testing.T) {
 				}
 				body := strings.ReplaceAll(r.Script, orig, f)
 				val := strings.ReplaceAll(r.Validate, orig, f)
-				_, pre = runBody(t, dir, bin, val)
-				if out, code := runBody(t, dir, bin, body); code != 0 {
+				e := append([]string{"MB=" + t.TempDir()}, env...)
+				_, pre = runBody(t, dir, bin, val, e...)
+				if out, code := runBody(t, dir, bin, body, e...); code != 0 {
 					t.Fatalf("body exit %d at %o: %s", code, mode, out)
 				}
-				_, post = runBody(t, dir, bin, val)
+				_, post = runBody(t, dir, bin, val, e...)
 				out, err := exec.Command("stat", "-c", "%a", f).Output()
 				if err != nil {
 					t.Fatal(err)

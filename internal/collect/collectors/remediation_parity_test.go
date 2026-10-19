@@ -245,3 +245,119 @@ func TestVsftpdReadersMatchTheCollector(t *testing.T) {
 }
 
 func strp(s string) *string { return &s }
+
+// TestPostfixAndExportsReadersMatchTheCollector (§4.6, §4.9, O-25, O-26,
+// O-28). The readers and why each is or is not repeated in its validate:
+//
+//	rd_vrfy  inValidate false: a tool call (postconf -h), not a program; the
+//	         validate inlines the same `LC_ALL=C postconf -c /etc/postfix -h`
+//	rd_nrs   inValidate true: the O-26 ERE, repeated under the same grep
+//
+// rd_vrfy reads disable_vrfy_command through postconf over the row's main.cf
+// (-c names the row's directory, never the host's): where the collector
+// reads yes (parsePostfixInto + postfixYes), the body reads yes, case blind.
+// The one recorded divergence: the collector folds the parameter name to
+// lower case, postconf does not, so Disable_Vrfy_Command = yes reads yes to
+// the collector (check PASSes; the row is never planned) and the compiled
+// no to postconf. Without postconf on PATH (CI's test job) the postfix rows
+// skip, and the TestPostfix* stub tests pin the body alone.
+//
+// rd_nrs counts the lines of /etc/exports that hold no_root_squash as an
+// option token. The comparison is one-sided: wherever parseExportsContent
+// reads root_squash false through a no_root_squash option token, rd_nrs
+// counts the line, so the swap leaves nothing check still judges. The
+// reverse need not hold (a trailing default list applies to no client; the
+// swap changes it harmlessly), so each row also names its count.
+func TestPostfixAndExportsReadersMatchTheCollector(t *testing.T) {
+	t.Run("postfix", func(t *testing.T) {
+		r := shippedBody(t, "muster.service.mail_expn_vrfy")
+		fn := readerLine(t, r, "rd_vrfy", false)
+		if !strings.Contains(r.Validate, "LC_ALL=C postconf -c /etc/postfix -h disable_vrfy_command") {
+			t.Fatalf("the validate does not inline rd_vrfy's call:\n%s", r.Validate)
+		}
+		if _, err := exec.LookPath("postconf"); err != nil {
+			t.Skip("no postconf on PATH: the postfix half is pinned by the TestPostfix* stub tests only (O-25)")
+		}
+		for _, row := range []struct {
+			name, conf string
+			diverges   bool // the case-folded name: postconf reads its own default
+		}{
+			{"yes", "disable_vrfy_command = yes\n", false},
+			{"YES", "disable_vrfy_command = YES\n", false},
+			{"no", "disable_vrfy_command = no\n", false},
+			{"continued", "disable_vrfy_command =\n    yes\n", false},
+			{"later override", "disable_vrfy_command = yes\ndisable_vrfy_command = no\n", false},
+			{"absent", "inet_interfaces = all\n", false},
+			{"case-folded name", "Disable_Vrfy_Command = yes\n", true},
+		} {
+			t.Run(row.name, func(t *testing.T) {
+				m := map[string]string{}
+				parsePostfixInto(m, []byte(row.conf))
+				collector, _ := postfixYes(m["disable_vrfy_command"])
+				got, code := runReader(t, fn, "rd_vrfy {root}", map[string][]byte{"/main.cf": []byte(row.conf)})
+				body := strings.EqualFold(got, "yes")
+				if code != 0 {
+					t.Fatalf("rd_vrfy exit %d (printed %q)", code, got)
+				}
+				if row.diverges {
+					if !collector || body || got != "no" {
+						t.Errorf("the recorded divergence moved: the collector reads %v, postconf printed %q", collector, got)
+					}
+					return
+				}
+				if body != collector {
+					t.Errorf("rd_vrfy printed %q; the collector reads disable_vrfy_command as %v", got, collector)
+				}
+			})
+		}
+	})
+	t.Run("exports", func(t *testing.T) {
+		r := shippedBody(t, "muster.service.nfs_export_access")
+		fn := readerLine(t, r, "rd_nrs", true)
+		for _, row := range []struct {
+			name, file string
+			n          int // the lines rd_nrs counts
+		}{
+			{"path and option", "/srv/no_root_squash_area 192.0.2.1(rw,no_root_squash,sync)\n", 1},
+			{"alone", "/b 192.0.2.2(no_root_squash)\n", 1},
+			{"twice", "/c 192.0.2.3(rw,no_root_squash,no_root_squash)\n", 1},
+			{"default list", "/d -no_root_squash 192.0.2.4\n", 1},
+			{"comment", "/e 192.0.2.5(rw) # no_root_squash\n", 0},
+			{"path only", "/srv/x-no_root_squash 192.0.2.9(rw)\n", 0},
+			{"path beside a violation", "/srv/x-no_root_squash 192.0.2.9(rw) 192.0.2.10(no_root_squash)\n", 1},
+			{"commented line", "#/g 192.0.2.7(no_root_squash)\n", 0},
+			{"parenthesised comment", "/f 192.0.2.6(rw) # (no_root_squash)\n", 0},
+			{"tab before the default list", "/t\t-no_root_squash 192.0.2.4\n", 1},
+			{"continuation", "/h \\\n\t192.0.2.11(rw,no_root_squash)\n", 1},
+			{"seed export", "/srv/ci 192.0.2.0/24(rw,no_root_squash,fsid=1)\n", 1},
+			{"accumulated default lists", "/s -no_root_squash 192.0.2.7 -rw 192.0.2.8\n", 1},
+			{"two default lists", "/s -no_root_squash -rw 192.0.2.9\n", 1},
+			{"trailing default list", "/z 192.0.2.12 -no_root_squash\n", 1},
+			{"client override", "/srv -no_root_squash 192.0.2.10(root_squash)\n", 1},
+			{"client named so", "/p no_root_squash(rw)\n", 0},
+			{"crlf", "/b 192.0.2.2(no_root_squash)\r\n", 1},
+			{"after the swap", "/b 192.0.2.2(root_squash)\n/d -root_squash 192.0.2.4\n/c 192.0.2.3(rw,root_squash,root_squash)\n", 0},
+			{"empty", "", 0},
+			// The token opens the second physical line, so the line-scoped ERE
+			// does not count it; the collector splits the joined line at the
+			// blank and reads two bare clients, so it reads no false either.
+			{"option list across a continuation", "/i 192.0.2.13(rw,\\\nno_root_squash)\n", 0},
+		} {
+			t.Run(row.name, func(t *testing.T) {
+				collectorFalse := false
+				for _, rec := range parseExportsContent([]byte(row.file)) {
+					if rec.(map[string]any)["root_squash"] == false {
+						collectorFalse = true
+					}
+				}
+				got, code := runReader(t, fn, "rd_nrs {root}/etc/exports", map[string][]byte{"/etc/exports": []byte(row.file)})
+				if code != 0 || got != strconv.Itoa(row.n) {
+					t.Fatalf("rd_nrs printed %q (exit %d), want %d", got, code, row.n)
+				}
+				if collectorFalse && row.n == 0 {
+					t.Errorf("the collector reads root_squash false over %q, and rd_nrs counts no line", row.file)
+				}
+			})
+		}
+	})
+}

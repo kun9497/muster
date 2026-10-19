@@ -623,7 +623,18 @@ func TestFileBodiesRepairATempTree(t *testing.T) {
 				t.Fatal(err)
 			}
 			t.Cleanup(func() { os.RemoveAll(root) })
-			bin := t.TempDir()
+			// The NFS body asks systemctl whether the server runs and may
+			// re-export (O-45): systemctl answers inactive and exportfs only
+			// logs, so no run reaches the host's own; MB is the run's record
+			// directory.
+			bin, stub := t.TempDir(), t.TempDir()
+			writeStub(t, bin, "systemctl", `printf '%s\n' "$*" >> "$STUB/systemctl"
+case "$1" in is-active) exit 3;; esac
+exit 99
+`)
+			writeStub(t, bin, "exportfs", `printf '%s\n' "$*" >> "$STUB/exportfs"
+`)
+			env := []string{"MB=" + t.TempDir(), "STUB=" + stub}
 			mk := func(f treeFile) string {
 				p := filepath.Join(root, f.path)
 				if f.dir {
@@ -669,19 +680,22 @@ func TestFileBodiesRepairATempTree(t *testing.T) {
 			// the block runs with the prologue's log and modes_trusted defined
 			helpers := "log() { printf 'muster-fix: %s\\n' \"$*\"; }\n" + stateHelpers + "\n"
 			body, val := helpers+rebaseRoot(" "+r.Script, root), helpers+rebaseRoot(" "+r.Validate, root)
-			if _, code := runBody(t, root, bin, val); code == 0 && len(c.loosened) > 0 {
+			if _, code := runBody(t, root, bin, val, env...); code == 0 && len(c.loosened) > 0 {
 				t.Error("validate passed on the loosened tree")
 			}
-			out, code := runBody(t, root, bin, body)
+			out, code := runBody(t, root, bin, body, env...)
 			if code != 0 {
 				t.Fatalf("body %d: %s", code, out)
+			}
+			if exists(filepath.Join(stub, "exportfs")) {
+				t.Errorf("the body re-exported a tree that holds no no_root_squash: %s", readFile(t, filepath.Join(stub, "exportfs")))
 			}
 			for _, d := range c.foreign {
 				if want := c.id + ": " + filepath.Join(root, d) + " is not root's, left as is"; !strings.Contains(out, want) {
 					t.Errorf("the log does not name the skipped directory %q:\n%s", want, out)
 				}
 			}
-			if out, code := runBody(t, root, bin, val); len(c.refused) == 0 && code != 0 {
+			if out, code := runBody(t, root, bin, val, env...); len(c.refused) == 0 && code != 0 {
 				t.Fatalf("validate after the body %d: %s", code, out)
 			} else if len(c.refused) > 0 && code == 0 {
 				t.Errorf("validate passed although a file not root's was left as is: the block would not roll back")

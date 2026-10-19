@@ -105,6 +105,8 @@
   images: [almalinux9-init, debian12-init, rocky9-init]
 - id: muster.service.ftpusers_permissions
   images: [almalinux9-init, debian12-init, rocky9-init]
+- id: muster.service.mail_expn_vrfy
+  images: [almalinux9-init, debian12-init, rocky9-init]
 - id: muster.service.nfs_export_access
   images: [almalinux9-init, debian12-init, rocky9-init]
 - id: muster.service.nfs_server_disabled
