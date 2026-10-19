@@ -504,15 +504,17 @@ func TestAuditdConfAbsentKeysAndDefaultLogFile(t *testing.T) {
 
 // O-17/O-19: an action's verdict is its first word, lower-cased. auditd.conf(5)
 // writes an exec action as "exec /path-to-script"; the path is the daemon's
-// argument, not part of the value a control compares. log_file keeps its
-// case and its whole value.
+// argument, not part of the value a control compares. The words are split on
+// the space only, as auditd splits them (O-83): a tab inside the value keeps
+// it whole. log_file keeps its case and its whole value.
 func TestAuditdConfActionIsItsFirstWord(t *testing.T) {
 	for _, c := range []struct {
 		line, key, want string
 	}{
 		{"space_left_action = exec /usr/local/sbin/x", "space_left_action", "exec"},
 		{"disk_error_action = EXEC /x", "disk_error_action", "exec"},
-		{"admin_space_left_action =\texec\t/y", "admin_space_left_action", "exec"},
+		{"admin_space_left_action =\texec\t/y", "admin_space_left_action", "exec\t/y"},
+		{"space_left_action = syslog extra words", "space_left_action", "syslog"},
 		{"disk_full_action =", "disk_full_action", ""},
 		{"log_file = /Var/Log/A.log", "log_file", "/Var/Log/A.log"},
 		{"max_log_file_action = ROTATE", "max_log_file_action", "rotate"},

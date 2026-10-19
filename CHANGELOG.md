@@ -25,7 +25,8 @@ verdict on an existing snapshot is at least a minor release and appears under
   `/etc/default/useradd` and runs `chage -I` over every local login-capable
   account, root included, skipping and naming every account the bound would
   disable at once. `rhosts_forbidden` comments out `/etc/hosts.equiv`'s `+`
-  lines; `mail_expn_vrfy` sets postfix's `disable_vrfy_command`; `ftp_banner`
+  lines, and refuses (exit 1, the file untouched) one whose `+` line denies a
+  user with a `-user` or `-@netgroup` field; `mail_expn_vrfy` sets postfix's `disable_vrfy_command`; `ftp_banner`
   and `ftp_anonymous` write vsftpd's `ftpd_banner=FTP server ready.` and
   `anonymous_enable=NO`; `nfs_export_access` swaps `no_root_squash` for
   `root_squash` in `/etc/exports` option lists. Each daemon is reloaded or
@@ -779,15 +780,20 @@ configuration walk stopped at an `Include` outside the declaration (below).
   wins over `ftpd_banner` (a clean `ftpd_banner` beside a disclosing banner
   file read PASS), and an empty banner file falls through (stage 3D-2d,
   O-14).
-- An auditd `exec <path>` disk action is judged by its first word: it read
-  FAIL because the whole value, path included, was compared (stage 3D-2d,
-  O-17).
+- An auditd `exec <path>` disk action is judged by its first space-separated
+  word: it read FAIL because the whole value, path included, was compared
+  (stage 3D-2d, O-17). A tab inside the value keeps it whole, as auditd
+  refuses it (O-83).
 - An exports line's `-options` default list is applied to the clients after
   it: `/srv -no_root_squash host` read root_squash true (stage 3D-2d, O-18).
   A line whose only tokens after the path are default lists (`/srv -rw`) is
   now a world record (client `*`), which `nfs_export_access`'s wildcard
   clause FAILs; it was skipped and minted no record. A later default list on
-  the same line is added to the earlier one, as nfs-utils does.
+  the same line, past a client, is added to the earlier one, as nfs-utils
+  does; a `-` token right after a list is a host name nfs-utils cannot
+  resolve and is ignored (O-80). A line whose last token is a default list
+  (`/srv host -no_root_squash`) also exports to the world under it, as
+  nfs-utils does; it read PASS (O-79).
 - `nfs_server_disabled`'s script failed on every Debian and Ubuntu NFS server:
   `nfs-kernel-server.service` is an alias of `nfs-server.service` there, and
   the body disabled the alias after masking the unit (`Unit not loaded`, exit

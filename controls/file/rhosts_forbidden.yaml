@@ -22,14 +22,15 @@ checks:
   - { fact: files.user_rhosts, op: none, subject: path, where: { field: has_plus, op: eq, expected: true } }
   - { fact: files.etc_hosts_equiv_lines, op: none, where: { op: matches, expected: "^\\+" } }
 remediation:
-  text_en: 'Remove the "+" entries from the offending ~/.rhosts, ~/.shosts and /etc/hosts.equiv, or remove the files entirely if r-command trust is not in use. The review script backs up /etc/hosts.equiv and comments out every line of it whose first non-blank character is "+" - a bare "+", "+host" and "+@netgroup" alike - by prefixing the line with "# muster: "; a /etc/hosts.equiv that is a symlink is left as is. ~/.rhosts and ~/.shosts remain for the operator to edit: they sit in homes their accounts own, which the review script does not write.'
-  text_ko: '문제되는 ~/.rhosts, ~/.shosts, /etc/hosts.equiv 에서 "+" 항목을 제거하거나, r-command 신뢰를 쓰지 않으면 파일을 아예 삭제합니다. 검토 스크립트는 /etc/hosts.equiv 를 백업한 뒤, 공백이 아닌 첫 글자가 "+" 인 모든 줄(단독 "+", "+host", "+@netgroup" 모두)의 앞에 "# muster: " 를 붙여 주석 처리합니다. 심볼릭 링크인 /etc/hosts.equiv 는 그대로 둡니다. ~/.rhosts 와 ~/.shosts 는 각 계정이 소유한 홈에 있어 검토 스크립트가 쓰지 않으므로 운영자가 직접 정리합니다.'
+  text_en: 'Remove the "+" entries from the offending ~/.rhosts, ~/.shosts and /etc/hosts.equiv, or remove the files entirely if r-command trust is not in use. The review script backs up /etc/hosts.equiv and comments out every line of it whose first non-blank character is "+" - a bare "+", "+host" and "+@netgroup" alike - by prefixing the line with "# muster: "; a file holding a "+" line whose user field is "-user" or "-@netgroup" is refused and left for a hand edit, since the first matching line decides and commenting that denial out would widen trust; a /etc/hosts.equiv that is a symlink is left as is. ~/.rhosts and ~/.shosts remain for the operator to edit: they sit in homes their accounts own, which the review script does not write.'
+  text_ko: '문제되는 ~/.rhosts, ~/.shosts, /etc/hosts.equiv 에서 "+" 항목을 제거하거나, r-command 신뢰를 쓰지 않으면 파일을 아예 삭제합니다. 검토 스크립트는 /etc/hosts.equiv 를 백업한 뒤, 공백이 아닌 첫 글자가 "+" 인 모든 줄(단독 "+", "+host", "+@netgroup" 모두)의 앞에 "# muster: " 를 붙여 주석 처리합니다. 사용자 필드가 "-user" 나 "-@netgroup" 인 "+" 줄이 있는 파일은 손대지 않고 거부하며 운영자가 직접 고칩니다. 처음 일치하는 줄이 결정하므로 그 거부 줄을 주석 처리하면 신뢰가 넓어지기 때문입니다. 심볼릭 링크인 /etc/hosts.equiv 는 그대로 둡니다. ~/.rhosts 와 ~/.shosts 는 각 계정이 소유한 홈에 있어 검토 스크립트가 쓰지 않으므로 운영자가 직접 정리합니다.'
   risk: restart_service
   idempotent: true
   backup: [/etc/hosts.equiv]
   script: |
     rd_plus() { LC_ALL=C grep -Ec '^[[:space:]]*\+' "$1" || :; }
     if [ -f /etc/hosts.equiv ] && [ ! -L /etc/hosts.equiv ]; then
+      if LC_ALL=C grep -Eq '^[[:space:]]*\+[^[:space:]]*[[:space:]]+-' /etc/hosts.equiv; then log "muster.file.rhosts_forbidden: /etc/hosts.equiv has a '+' line that denies a user; edit it by hand"; exit 1; fi
       if [ "$(rd_plus /etc/hosts.equiv)" != 0 ]; then LC_ALL=C sed -i 's/^\([[:space:]]*+\)/# muster: \1/' /etc/hosts.equiv; fi
     fi
   validate: |

@@ -3,6 +3,7 @@
 package collectors
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -10,8 +11,10 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 
+	"github.com/kun9497/muster/internal/collect"
 	"github.com/kun9497/muster/internal/controls"
 	"github.com/kun9497/muster/internal/facts"
 )
@@ -96,6 +99,13 @@ func readerLine(t *testing.T, r *controls.Remediation, name string, inValidate b
 // compares by exit code), never a test failure.
 func runReader(t *testing.T, fn, call string, files map[string][]byte) (stdout string, code int) {
 	t.Helper()
+	return runReaderWith(t, fn, call, files, nil)
+}
+
+// runReaderWith is runReader with setup run over the temporary root after
+// the files are written (a FIFO or a symlink a row needs), when not nil.
+func runReaderWith(t *testing.T, fn, call string, files map[string][]byte, setup func(root string)) (stdout string, code int) {
+	t.Helper()
 	if _, err := exec.LookPath("sh"); err != nil {
 		t.Skip("no sh")
 	}
@@ -111,6 +121,9 @@ func runReader(t *testing.T, fn, call string, files map[string][]byte) (stdout s
 		if err := os.WriteFile(f, []byte(strings.ReplaceAll(string(data), "{root}", root)), 0o644); err != nil {
 			t.Fatal(err)
 		}
+	}
+	if setup != nil {
+		setup(root)
 	}
 	cmd := exec.Command("sh", "-c", fn+"\n"+strings.ReplaceAll(call, "{root}", root))
 	cmd.Dir = root
@@ -167,48 +180,62 @@ func TestRhostsReaderMatchesTheCollector(t *testing.T) {
 }
 
 // TestVsftpdReadersMatchTheCollector (§4.7, §4.8, O-14, O-28): rd_greeting
-// reads the greeting in vsftpd's order and prints `file` where a non-empty
-// banner_file sets it (the collector's banner_source is banner_file),
-// otherwise `disclose` or `clean` as the collector's
-// ftp.banner_discloses_version reads ftpd_banner or the compiled greeting;
+// reads the greeting in vsftpd's order and prints `file` where banner_file
+// names a non-empty regular file that is not a symlink (the collector's
+// banner_source is banner_file), otherwise `disclose` or `clean` as the
+// collector's ftp.banner_discloses_version reads ftpd_banner or the compiled
+// greeting. The reader never opens banner_file (O-82): a FIFO or a symlink
+// there is a greeting the collector reads absent (MANUAL, never planned), and
+// with no ftpd_banner the reader reads it as the compiled greeting, disclose;
 // rd_anon prints `yes` or `no` as ftp.anonymous_enabled. The collector only
 // reads the paths it declares, so its fake fsAccess keeps the banner file at
 // /etc/issue.net, and the shell side gets the same bytes at
 // {root}/etc/issue.net, which the row's conf names.
 func TestVsftpdReadersMatchTheCollector(t *testing.T) {
-	banner := readerLine(t, shippedBody(t, "muster.service.ftp_banner"), "rd_greeting", true)
+	ftpBanner := shippedBody(t, "muster.service.ftp_banner")
+	banner := readerLine(t, ftpBanner, "rd_greeting", true)
+	// O-82: the awk program prints the verdict for ftpd_banner and the
+	// banner_file value, and the shell alone decides whether that names a
+	// greeting file; both validate copies decide it the same way.
+	const decide = ` | { read -r g bf; if [ -f "$bf" ] && [ ! -L "$bf" ] && [ -s "$bf" ]; then echo file; else echo "$g"; fi; }`
+	if strings.Contains(banner, "getline") || !strings.Contains(banner, `"$1"`+decide) || strings.Count(ftpBanner.Validate, decide) != 2 {
+		t.Fatalf("rd_greeting must not open banner_file and its validate copies must decide as it does:\n%s\n%s", banner, ftpBanner.Validate)
+	}
 	anon := readerLine(t, shippedBody(t, "muster.service.ftp_anonymous"), "rd_anon", true)
 	const bf = "banner_file={root}/etc/issue.net\n"
 	for _, row := range []struct {
 		name, conf string
 		issue      *string
+		special    string // "fifo" or "symlink": /etc/issue.net is not a regular file
 	}{
-		{"PureFTPd ready", "ftpd_banner=PureFTPd ready\n", nil},
-		{"myvsftpd", "ftpd_banner=myvsftpd\n", nil},
-		{"vsFTPd version", "ftpd_banner=vsFTPd 3.0.5 ready\n", nil},
-		{"wu-ftpd", "ftpd_banner=(wu-ftpd)\n", nil},
-		{"version number only", "ftpd_banner=Server 3.0.5 ready\n", nil},
-		{"upper key", "  FTPD_BANNER = vsFTPd\n", nil},
-		{"empty value", "ftpd_banner=\n", nil},
-		{"missing key", "listen=YES\n", nil},
-		{"commented", "#ftpd_banner=Welcome\n", nil},
-		{"clean", "ftpd_banner=Welcome\n", nil},
-		{"crlf", "ftpd_banner=Welcome\r\nanonymous_enable=NO\r\n", nil},
-		{"last wins", "ftpd_banner=Welcome\nftpd_banner=ProFTPD\n", nil},
-		{"clean banner, disclosing file", "ftpd_banner=Welcome\n" + bf, strp("220 vsFTPd 3.0.5\n")},
-		{"disclosing banner, clean file", "ftpd_banner=vsFTPd 3.0.5\n" + bf, strp("Authorized use only.\n")},
-		{"empty banner file", "ftpd_banner=vsFTPd 3.0.5\n" + bf, strp("")},
-		{"empty banner file, clean banner", "ftpd_banner=Welcome\n" + bf, strp("")},
-		{"empty banner file alone", bf, strp("")},
-		{"newline-only banner file", "ftpd_banner=vsFTPd\n" + bf, strp("\n")},
-		{"empty banner_file value", "ftpd_banner=Welcome\nbanner_file=\n", nil},
-		{"anonymous FALSE", "anonymous_enable=FALSE\n", nil},
-		{"anonymous 0", "anonymous_enable=0\n", nil},
-		{"anonymous No spaced", " Anonymous_Enable = No \n", nil},
-		{"anonymous YES", "anonymous_enable=YES\n", nil},
-		{"anonymous 1", "anonymous_enable=1\n", nil},
-		{"anonymous last wins", "anonymous_enable=NO\nanonymous_enable=YES\n", nil},
-		{"anonymous commented", "#anonymous_enable=NO\n", nil},
+		{"PureFTPd ready", "ftpd_banner=PureFTPd ready\n", nil, ""},
+		{"myvsftpd", "ftpd_banner=myvsftpd\n", nil, ""},
+		{"vsFTPd version", "ftpd_banner=vsFTPd 3.0.5 ready\n", nil, ""},
+		{"wu-ftpd", "ftpd_banner=(wu-ftpd)\n", nil, ""},
+		{"version number only", "ftpd_banner=Server 3.0.5 ready\n", nil, ""},
+		{"upper key", "  FTPD_BANNER = vsFTPd\n", nil, ""},
+		{"empty value", "ftpd_banner=\n", nil, ""},
+		{"missing key", "listen=YES\n", nil, ""},
+		{"commented", "#ftpd_banner=Welcome\n", nil, ""},
+		{"clean", "ftpd_banner=Welcome\n", nil, ""},
+		{"crlf", "ftpd_banner=Welcome\r\nanonymous_enable=NO\r\n", nil, ""},
+		{"last wins", "ftpd_banner=Welcome\nftpd_banner=ProFTPD\n", nil, ""},
+		{"clean banner, disclosing file", "ftpd_banner=Welcome\n" + bf, strp("220 vsFTPd 3.0.5\n"), ""},
+		{"disclosing banner, clean file", "ftpd_banner=vsFTPd 3.0.5\n" + bf, strp("Authorized use only.\n"), ""},
+		{"empty banner file", "ftpd_banner=vsFTPd 3.0.5\n" + bf, strp(""), ""},
+		{"empty banner file, clean banner", "ftpd_banner=Welcome\n" + bf, strp(""), ""},
+		{"empty banner file alone", bf, strp(""), ""},
+		{"newline-only banner file", "ftpd_banner=vsFTPd\n" + bf, strp("\n"), ""},
+		{"empty banner_file value", "ftpd_banner=Welcome\nbanner_file=\n", nil, ""},
+		{"anonymous FALSE", "anonymous_enable=FALSE\n", nil, ""},
+		{"anonymous 0", "anonymous_enable=0\n", nil, ""},
+		{"anonymous No spaced", " Anonymous_Enable = No \n", nil, ""},
+		{"anonymous YES", "anonymous_enable=YES\n", nil, ""},
+		{"anonymous 1", "anonymous_enable=1\n", nil, ""},
+		{"anonymous last wins", "anonymous_enable=NO\nanonymous_enable=YES\n", nil, ""},
+		{"anonymous commented", "#anonymous_enable=NO\n", nil, ""},
+		{"FIFO banner file", bf, nil, "fifo"},
+		{"symlinked banner file", bf, nil, "symlink"},
 	} {
 		t.Run(row.name, func(t *testing.T) {
 			a := ftpAccess(nil)
@@ -219,26 +246,57 @@ func TestVsftpdReadersMatchTheCollector(t *testing.T) {
 				a.contents["/etc/issue.net"] = []byte(*row.issue)
 				files["/etc/issue.net"] = []byte(*row.issue)
 			}
+			var setup func(root string)
+			switch row.special {
+			case "fifo":
+				a.fails["/etc/issue.net"] = fmt.Errorf("%s: %w", "/etc/issue.net", collect.ErrNotRegular)
+				setup = func(root string) {
+					if err := syscall.Mkfifo(filepath.Join(root, "etc", "issue.net"), 0o644); err != nil {
+						t.Fatal(err)
+					}
+				}
+			case "symlink":
+				a.fails["/etc/issue.net"] = fmt.Errorf("%s: %w", "/etc/issue.net", collect.ErrSymlink)
+				setup = func(root string) {
+					target := filepath.Join(root, "banner")
+					if err := os.WriteFile(target, []byte("220 vsFTPd 3.0.5\n"), 0o644); err != nil {
+						t.Fatal(err)
+					}
+					if err := os.Symlink(target, filepath.Join(root, "etc", "issue.net")); err != nil {
+						t.Fatal(err)
+					}
+				}
+			}
 			b := buildBegun(t, "ftp", a)
 			src, disc, anonEnv := env(t, b, "ftp.banner_source"), env(t, b, "ftp.banner_discloses_version"), env(t, b, "ftp.anonymous_enabled")
-			if src.Status != facts.StatusOK || disc.Status != facts.StatusOK || anonEnv.Status != facts.StatusOK {
-				t.Fatalf("the collector did not judge the row: source %+v, discloses %+v, anonymous %+v", src, disc, anonEnv)
-			}
 			want := "clean"
-			switch {
-			case src.Value == "banner_file":
-				want = "file"
-			case disc.Value == true:
+			if row.special != "" {
+				// The collector reads the greeting absent: MANUAL, never
+				// planned; the reader, which opens nothing, reads the
+				// compiled greeting.
+				if src.Status != facts.StatusOK || src.Value != "banner_file" || disc.Status != facts.StatusAbsent || anonEnv.Status != facts.StatusOK {
+					t.Fatalf("the collector read the %s banner file as source %+v, discloses %+v, anonymous %+v; want banner_file and absent", row.special, src, disc, anonEnv)
+				}
 				want = "disclose"
+			} else {
+				if src.Status != facts.StatusOK || disc.Status != facts.StatusOK || anonEnv.Status != facts.StatusOK {
+					t.Fatalf("the collector did not judge the row: source %+v, discloses %+v, anonymous %+v", src, disc, anonEnv)
+				}
+				switch {
+				case src.Value == "banner_file":
+					want = "file"
+				case disc.Value == true:
+					want = "disclose"
+				}
 			}
-			if got, code := runReader(t, banner, "rd_greeting {root}/etc/vsftpd.conf", files); code != 0 || got != want {
+			if got, code := runReaderWith(t, banner, "rd_greeting {root}/etc/vsftpd.conf", files, setup); code != 0 || got != want {
 				t.Errorf("rd_greeting printed %q (exit %d); the collector reads source %v, discloses %v: want %q", got, code, src.Value, disc.Value, want)
 			}
 			wantAnon := "no"
 			if anonEnv.Value == true {
 				wantAnon = "yes"
 			}
-			if got, code := runReader(t, anon, "rd_anon {root}/etc/vsftpd.conf", files); code != 0 || got != wantAnon {
+			if got, code := runReaderWith(t, anon, "rd_anon {root}/etc/vsftpd.conf", files, setup); code != 0 || got != wantAnon {
 				t.Errorf("rd_anon printed %q (exit %d); the collector reads anonymous_enabled %v", got, code, anonEnv.Value)
 			}
 		})
@@ -267,8 +325,11 @@ func strp(s string) *string { return &s }
 // option token. The comparison is one-sided: wherever parseExportsContent
 // reads root_squash false through a no_root_squash option token, rd_nrs
 // counts the line, so the swap leaves nothing check still judges. The
-// reverse need not hold (a trailing default list applies to no client; the
-// swap changes it harmlessly), so each row also names its count.
+// reverse need not hold (a "-no_root_squash" token right after another list
+// is a host name nfs-utils cannot resolve and the collector ignores, O-80; the
+// swap changes it harmlessly), so each row also names its count. A trailing
+// default list exports the path to the world under it as well (O-79), so the
+// collector reads root_squash false there and rd_nrs counts the line.
 func TestPostfixAndExportsReadersMatchTheCollector(t *testing.T) {
 	t.Run("postfix", func(t *testing.T) {
 		r := shippedBody(t, "muster.service.mail_expn_vrfy")
@@ -333,6 +394,8 @@ func TestPostfixAndExportsReadersMatchTheCollector(t *testing.T) {
 			{"seed export", "/srv/ci 192.0.2.0/24(rw,no_root_squash,fsid=1)\n", 1},
 			{"accumulated default lists", "/s -no_root_squash 192.0.2.7 -rw 192.0.2.8\n", 1},
 			{"two default lists", "/s -no_root_squash -rw 192.0.2.9\n", 1},
+			{"a list after a list, squashed first", "/s -root_squash -no_root_squash 192.0.2.9\n", 1},
+			{"a list after a list, squashed second", "/s -no_root_squash -root_squash 192.0.2.9\n", 1},
 			{"trailing default list", "/z 192.0.2.12 -no_root_squash\n", 1},
 			{"client override", "/srv -no_root_squash 192.0.2.10(root_squash)\n", 1},
 			{"client named so", "/p no_root_squash(rw)\n", 0},
@@ -366,7 +429,8 @@ func TestPostfixAndExportsReadersMatchTheCollector(t *testing.T) {
 // TestAuditdConfReaderMatchesTheCollector (§4.3, O-17, O-19, O-28): rd_action
 // prints the action auditd.conf sets for one key as parseAuditdConf reads it
 // (comment lines skipped, the key case blind, the last line wins, the value's
-// first word lower-cased; "" for a key the file does not set), so the body
+// first space-separated word lower-cased, O-83; "" for a key the file does
+// not set), so the body
 // rewrites exactly the keys check FAILs on and leaves an `exec <path>`
 // action whose first word is in the list. The reader and why it is not
 // repeated in the validate:
@@ -381,6 +445,9 @@ func TestAuditdConfReaderMatchesTheCollector(t *testing.T) {
 		{"later override", "space_left_action = suspend\nspace_left_action = email\n"},
 		{"earlier in the list, later outside", "disk_full_action = halt\ndisk_full_action = SUSPEND\n"},
 		{"tab separator", "disk_error_action\t=\tHALT\n"},
+		{"tab inside the value", "admin_space_left_action =\texec\t/y\n"},
+		{"syslog extra words", "space_left_action = syslog extra words\n"},
+		{"tab then a space", "disk_full_action = syslog\t extra\n"},
 		{"no spaces", "max_log_file_action=keep_logs\n"},
 		{"indented", "   admin_space_left_action = single\n"},
 		{"commented", "# space_left_action = ignore\nspace_left_action = rotate\n#space_left_action = suspend\n"},

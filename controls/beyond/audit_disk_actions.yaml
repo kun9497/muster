@@ -45,7 +45,7 @@ remediation:
     f=/etc/audit/auditd.conf
     if [ -L "$f" ]; then log "muster.beyond.audit_disk_actions: $f is a symlink, left as is"; exit 1; fi
     if LC_ALL=C systemctl is-active --quiet auditd.service; then : > "$MB/auditd.was-running"; fi
-    rd_action() { LC_ALL=C awk -v k="$2" '{ l = $0; sub(/^[[:space:]]+/, "", l); if (l == "" || substr(l, 1, 1) == "#") next; i = index(l, "="); if (i == 0) next; n = substr(l, 1, i - 1); sub(/[[:space:]]+$/, "", n); if (tolower(n) != k) next; v = substr(l, i + 1); sub(/^[[:space:]]+/, "", v); sub(/[[:space:]].*$/, "", v); a = tolower(v) } END { print a }' "$1"; }
+    rd_action() { LC_ALL=C awk -v k="$2" '{ l = $0; sub(/^[[:space:]]+/, "", l); if (l == "" || substr(l, 1, 1) == "#") next; i = index(l, "="); if (i == 0) next; n = substr(l, 1, i - 1); sub(/[[:space:]]+$/, "", n); if (tolower(n) != k) next; v = substr(l, i + 1); sub(/^[[:space:]]+/, "", v); sub(/[[:space:]]+$/, "", v); sub(/ .*$/, "", v); a = tolower(v) } END { print a }' "$1"; }
     one() {
       v=$(rd_action "$f" "$1")
       if [ -n "$v" ]; then
@@ -74,7 +74,7 @@ remediation:
     one max_log_file_action "$ro" 'rotate keep_logs syslog'
     if [ -f "$MB/auditd.edited" ] && [ -f "$MB/auditd.was-running" ]; then auditctl --signal reload; fi
   validate: |
-    LC_ALL=C awk -v sp="$P_allowed_space_actions" -v fu="$P_allowed_disk_full_actions" -v er="$P_allowed_disk_error_actions" -v ro="$P_allowed_rotate_actions" -v keys="$(cat "$MB/disk.keys" 2>/dev/null)" 'BEGIN { L["space_left_action"] = sp; L["admin_space_left_action"] = sp; L["disk_full_action"] = fu; L["disk_error_action"] = er; L["max_log_file_action"] = ro } { l = $0; sub(/^[[:space:]]+/, "", l); if (l == "" || substr(l, 1, 1) == "#") next; i = index(l, "="); if (i == 0) next; n = substr(l, 1, i - 1); sub(/[[:space:]]+$/, "", n); n = tolower(n); v = substr(l, i + 1); sub(/^[[:space:]]+/, "", v); sub(/[[:space:]].*$/, "", v); a[n] = tolower(v) } END { m = split(keys, K, /[[:space:]]+/); bad = 0; for (j = 1; j <= m; j++) { k = K[j]; if (index(" " L[k] " ", " " a[k] " ") == 0) bad = 1 } exit bad }' /etc/audit/auditd.conf && { [ ! -f "$MB/auditd.was-running" ] || systemctl is-active --quiet auditd.service; }
+    LC_ALL=C awk -v sp="$P_allowed_space_actions" -v fu="$P_allowed_disk_full_actions" -v er="$P_allowed_disk_error_actions" -v ro="$P_allowed_rotate_actions" -v keys="$(cat "$MB/disk.keys" 2>/dev/null)" 'BEGIN { L["space_left_action"] = sp; L["admin_space_left_action"] = sp; L["disk_full_action"] = fu; L["disk_error_action"] = er; L["max_log_file_action"] = ro } { l = $0; sub(/^[[:space:]]+/, "", l); if (l == "" || substr(l, 1, 1) == "#") next; i = index(l, "="); if (i == 0) next; n = substr(l, 1, i - 1); sub(/[[:space:]]+$/, "", n); n = tolower(n); v = substr(l, i + 1); sub(/^[[:space:]]+/, "", v); sub(/[[:space:]]+$/, "", v); sub(/ .*$/, "", v); a[n] = tolower(v) } END { m = split(keys, K, /[[:space:]]+/); bad = 0; for (j = 1; j <= m; j++) { k = K[j]; if (index(" " L[k] " ", " " a[k] " ") == 0) bad = 1 } exit bad }' /etc/audit/auditd.conf && { [ ! -f "$MB/auditd.was-running" ] || systemctl is-active --quiet auditd.service; }
   rollback: |
     restore /etc/audit/auditd.conf
     if [ -f "$MB/auditd.edited" ] && [ -f "$MB/auditd.was-running" ]; then auditctl --signal reload; fi

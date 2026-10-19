@@ -67,7 +67,7 @@ remediation:
       if [ "$has" != 1 ]; then log "muster.beyond.account_inactivity_lock: $name: more than one /etc/shadow entry, left as is"; continue; fi
       if [ "$old" != x ] && [ "$old" != -1 ] && [ "$old" -le "$n" ]; then continue; fi
       if [ "$old" = x ]; then log "muster.beyond.account_inactivity_lock: $name: inactivity field is not a number, left as is"; continue; fi
-      if [ "$last" = x ] || [ "$max" = x ]; then log "muster.beyond.account_inactivity_lock: $name: password ageing fields are not numbers, left as is"; continue; fi
+      if [ "$last" = x ] || [ "$max" = x ]; then log "muster.beyond.account_inactivity_lock: $name: password ageing fields are not numbers or the maximum is below -1, left as is"; continue; fi
       aged=
       if [ "$max" -ge 0 ] && [ "$max" -ne 99999 ]; then aged=1; fi
       if [ "$last" -eq 0 ] || { [ "$last" -lt 0 ] && [ -n "$aged" ]; }; then log "muster.beyond.account_inactivity_lock: $name: must change its password at next login, left as is"; continue; fi

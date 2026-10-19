@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 
 	"github.com/kun9497/muster/internal/controls"
@@ -288,6 +289,40 @@ func TestRhostsBodyCommentsOutPlusLines(t *testing.T) {
 	}
 }
 
+// O-81: ruserok uses the first matching line, and a "+" line whose user
+// field is "-user" or "-@netgroup" denies that user; commenting it out would
+// let a later line admit them. The body refuses such a file (logs, exit 1)
+// and leaves it byte for byte; the block fails and changes nothing.
+func TestRhostsBodyRefusesADenyLine(t *testing.T) {
+	needSh(t)
+	r := shippedRemediation(t, "muster.file.rhosts_forbidden")
+	for _, before := range []string{
+		"+ -alice\ntrusted.example\n",
+		"  +@ops\t-@contractors\n+\n",
+		"+host-a -bob\n",
+	} {
+		t.Run(before, func(t *testing.T) {
+			root, bin, stub := contentTree(t)
+			writeUnder(t, root, "/etc/hosts.equiv", before)
+			out, code := runContentBody(t, r, root, bin, stub)
+			if code != 1 || !strings.Contains(out, "muster.file.rhosts_forbidden: "+filepath.Join(root, "/etc/hosts.equiv")+" has a '+' line that denies a user; edit it by hand") {
+				t.Fatalf("body exit %d, want 1 and the refusal\n%s", code, out)
+			}
+			if got := readFile(t, filepath.Join(root, "/etc/hosts.equiv")); got != before {
+				t.Errorf("hosts.equiv is %q, want %q untouched", got, before)
+			}
+			p := contentBlock(t, "muster.file.rhosts_forbidden", root, false)
+			out, _, code = runScriptWith(t, p, root, filepath.Join(root, "bk"), runOpts{pathPrefix: bin, env: []string{"STUB=" + stub, "ROOT=" + root}})
+			if code != 1 || strings.Contains(out, "ROLLBACK INCOMPLETE") || strings.Contains(out, "rollback failed") {
+				t.Fatalf("block exit %d, want 1 with a complete way back\n%s", code, out)
+			}
+			if got := readFile(t, filepath.Join(root, "/etc/hosts.equiv")); got != before {
+				t.Errorf("hosts.equiv is %q after the block, want %q", got, before)
+			}
+		})
+	}
+}
+
 // §4 intro, C4: the collector reads a symlinked /etc/hosts.equiv as an
 // error, so the row is never planned; the body skips the path and the link's
 // target is untouched. A missing file is compliant: nothing to do.
@@ -376,6 +411,7 @@ type vsftpdRow struct {
 	want       string
 	leave      bool   // the O-23 banner_file line is logged
 	leavePath  string // the path the leave line names; {root}/etc/issue.net when empty
+	special    string // "fifo" or "symlink": /etc/issue.net is made so (O-82)
 }
 
 func strp(s string) *string { return &s }
@@ -397,6 +433,18 @@ func runVsftpdRows(t *testing.T, id string, rows []vsftpdRow) {
 				}
 				if row.issue != nil {
 					writeUnder(t, root, "/etc/issue.net", *row.issue)
+				}
+				switch row.special {
+				case "fifo":
+					writeUnder(t, root, "/etc/.keep", "")
+					if err := syscall.Mkfifo(filepath.Join(root, "/etc/issue.net"), 0o644); err != nil {
+						t.Fatal(err)
+					}
+				case "symlink":
+					writeUnder(t, root, "/banner", "Authorized use only.\n")
+					if err := os.Symlink(filepath.Join(root, "/banner"), filepath.Join(root, "/etc/issue.net")); err != nil {
+						t.Fatal(err)
+					}
 				}
 				out, code := runContentBody(t, r, root, bin, stub)
 				if code != 0 {
@@ -468,13 +516,16 @@ func TestVsftpdBannerWritesOnlyADisclosure(t *testing.T) {
 		{name: "empty banner file", conf: "ftpd_banner=vsFTPd 3.0.5\n" + bf, issue: strp(""),
 			want: ready + bf},
 		{name: "empty banner file alone", conf: bf, issue: strp(""), want: bf + ready},
-		// getline from "-" or /dev/stdin would read the script's standard
-		// input (the body and the validate would block on a terminal): both
-		// are the operator's to settle, never read.
-		{name: "banner file is stdin", conf: "ftpd_banner=vsFTPd\nbanner_file=-\n",
-			want: "ftpd_banner=vsFTPd\nbanner_file=-\n", leave: true, leavePath: "-"},
-		{name: "banner file is /dev/stdin", conf: "ftpd_banner=vsFTPd\nbanner_file=/dev/stdin\n",
-			want: "ftpd_banner=vsFTPd\nbanner_file=/dev/stdin\n", leave: true, leavePath: "/dev/stdin"},
+		// O-82: the body never opens banner_file; the shell names a greeting
+		// file only for a non-empty regular file that is not a symlink, as the
+		// collector does. "-" (a relative name), /dev/stdin (a symlink), a
+		// FIFO and a symlink are no greeting file to the body, so a disclosing
+		// ftpd_banner beside them is rewritten; the collector reads each of
+		// them absent (MANUAL), so the row is never planned there.
+		{name: "banner file is stdin", conf: "ftpd_banner=vsFTPd\nbanner_file=-\n", want: ready + "banner_file=-\n"},
+		{name: "banner file is /dev/stdin", conf: "ftpd_banner=vsFTPd\nbanner_file=/dev/stdin\n", want: ready + "banner_file=/dev/stdin\n"},
+		{name: "banner file is a FIFO", conf: "ftpd_banner=vsFTPd\n" + bf, want: ready + bf, special: "fifo"},
+		{name: "banner file is a symlink", conf: "ftpd_banner=vsFTPd\n" + bf, want: ready + bf, special: "symlink"},
 	})
 }
 

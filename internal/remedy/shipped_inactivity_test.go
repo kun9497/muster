@@ -237,9 +237,9 @@ func TestInactivityBodySkipsAndNames(t *testing.T) {
 		ail + "nolast: must change its password at next login, left as is",
 		ail + "junk: inactivity field is not a number, left as is",
 		ail + "ghost: no " + root + "/etc/shadow entry, left as is", // the log names the rebased path
-		ail + "agejunk: password ageing fields are not numbers, left as is",
-		ail + "negmax: password ageing fields are not numbers, left as is",
-		ail + "negmax2: password ageing fields are not numbers, left as is",
+		ail + "agejunk: password ageing fields are not numbers or the maximum is below -1, left as is",
+		ail + "negmax: password ageing fields are not numbers or the maximum is below -1, left as is",
+		ail + "negmax2: password ageing fields are not numbers or the maximum is below -1, left as is",
 		ail + "dup: more than one " + root + "/etc/shadow entry, left as is",
 	} {
 		if !strings.Contains(out, w+"\n") {

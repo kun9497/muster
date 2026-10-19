@@ -158,12 +158,21 @@ func nfsRuntimeCollected(ctx context.Context, a collect.Access) facts.Envelope {
 // is honoured) and every remaining token is a client spec
 // `client(options)` or a default option list `-options`. exports(5): a
 // `-options` token sets the line's default options for the client specs
-// after it (nfs-utils reads it so, O-60); a later `-options` token on the
-// line is added to the earlier default, never a replacement for it (nfs-utils
-// accumulates them, O-64). A client's record carries the defaults, a comma,
-// then its own options, either part omitted when empty. A path with no client spec at all
-// exports to the world — under the kernel's own defaults (ro, root_squash),
-// or under the line's default list when it carries one.
+// after it (nfs-utils reads it so, O-60); a later `-options` token separated
+// from the earlier one by a client is added to the earlier default, never a
+// replacement for it (nfs-utils accumulates them, O-64). A `-` token directly
+// after a `-options` list is not a second list: nfs-utils reads it as a host
+// name, which fails to resolve and exports nothing, so the collector ignores
+// it — no record, no join — and the clients after it carry only the defaults
+// so far (measured on rocky9-init, O-80). A client's record carries the
+// defaults, a comma, then its own options, either part omitted when empty. A
+// path with no client spec at all exports to the world — under the kernel's
+// own defaults (ro, root_squash), or under the line's default list when it
+// carries one — and so does a line whose last token is a default list: nfs-utils
+// exports the path to the world under it as well as to the clients before it
+// (measured on rocky9-init, O-79). A line whose only tokens after the path are
+// a list and an ignored token reads as a world export under the list, where
+// nfs-utils exports nothing: the conservative reading.
 func parseExportsContent(data []byte) []any {
 	recs := []any{}
 	raw := splitLines(data)
@@ -185,14 +194,23 @@ func parseExportsContent(data []byte) []any {
 			continue
 		}
 		path := toks[0]
-		defaults, minted := "", false
+		defaults, minted, lastWasDefault := "", false, false
 		for _, ct := range toks[1:] {
 			if strings.HasPrefix(ct, "-") {
+				if lastWasDefault {
+					// O-80: nfs-utils reads a "-" token right after a list as
+					// a host name that does not resolve; it exports nothing
+					// and the list is not extended by it.
+					lastWasDefault = false
+					continue
+				}
 				// O-18/O-20: a default option list, never a client; O-64: it
 				// is added to the line's earlier default.
 				defaults = joinOptions(defaults, ct[1:])
+				lastWasDefault = true
 				continue
 			}
+			lastWasDefault = false
 			minted = true
 			client, own := splitClientSpec(ct)
 			options := joinOptions(defaults, own)
@@ -207,7 +225,8 @@ func parseExportsContent(data []byte) []any {
 			}
 			recs = append(recs, exportRecord(path, client, options))
 		}
-		if !minted {
+		if !minted || lastWasDefault {
+			// O-79: a trailing default list exports the path to the world.
 			recs = append(recs, exportRecord(path, "*", defaults))
 		}
 	}

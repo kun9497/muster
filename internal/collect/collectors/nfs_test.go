@@ -199,11 +199,14 @@ func TestNfsTrailingCommentIsNotAClient(t *testing.T) {
 
 // O-18/O-20: a "-options" token sets the line's default options for the
 // client tokens after it (exports(5); nfs-utils read it so on the wire, O-60).
-// A later "-options" token on the line is added to the earlier default, never
+// A later "-options" token past a client is added to the earlier default, never
 // a replacement for it (nfs-utils accumulates them, measured on rocky9-init,
-// O-64). A client's options are the defaults, a comma, then its own; a line
-// whose only tokens after the path are default lists exports to the world
-// with them. root_squash stays the
+// O-64); a "-" token right after a list is a host name nfs-utils cannot
+// resolve, so it is neither a record nor joined (O-80: /srv9, /srv9a, both
+// orders measured). A client's options are the defaults, a comma, then its
+// own; a line whose only token after the path is a default list, or whose
+// last token is one, exports to the world with it (O-79: /srv4, /srv9b).
+// root_squash stays the
 // absence of no_root_squash in the joined options, so a client's own
 // root_squash after a default no_root_squash still reads false — the
 // kernel squashes there; the collector's reading is the conservative one
@@ -228,7 +231,10 @@ func TestNfsDefaultOptionListAppliesToItsClients(t *testing.T) {
 		{"/srv7", "198.51.100.15", "no_root_squash,rw", false, false},
 		{"/srv8", "198.51.100.16", "no_root_squash,rw", false, false},
 		{"/srv8", "198.51.100.17", "no_root_squash,rw,ro", false, false},
-		{"/srv9", "198.51.100.18", "no_root_squash,rw", false, false},
+		{"/srv9", "198.51.100.18", "no_root_squash", false, false},
+		{"/srv9a", "198.51.100.19", "root_squash", false, true},
+		{"/srv9b", "*", "no_root_squash", true, false},
+		{"/srv9b", "198.51.100.20", "", false, true},
 	}
 	recs := okList(t, b, "nfs.exports")
 	got := make([]row, 0, len(recs))
