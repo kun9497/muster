@@ -158,9 +158,10 @@ func nfsRuntimeCollected(ctx context.Context, a collect.Access) facts.Envelope {
 // is honoured) and every remaining token is a client spec
 // `client(options)` or a default option list `-options`. exports(5): a
 // `-options` token sets the line's default options for the client specs
-// after it (replacing an earlier default on that line; nfs-utils reads it so,
-// O-60), and a client's record carries the defaults, a comma, then its own
-// options, either part omitted when empty. A path with no client spec at all
+// after it (nfs-utils reads it so, O-60); a later `-options` token on the
+// line is added to the earlier default, never a replacement for it (nfs-utils
+// accumulates them, O-64). A client's record carries the defaults, a comma,
+// then its own options, either part omitted when empty. A path with no client spec at all
 // exports to the world — under the kernel's own defaults (ro, root_squash),
 // or under the line's default list when it carries one.
 func parseExportsContent(data []byte) []any {
@@ -187,8 +188,9 @@ func parseExportsContent(data []byte) []any {
 		defaults, minted := "", false
 		for _, ct := range toks[1:] {
 			if strings.HasPrefix(ct, "-") {
-				// O-18/O-20: a default option list, never a client.
-				defaults = ct[1:]
+				// O-18/O-20: a default option list, never a client; O-64: it
+				// is added to the line's earlier default.
+				defaults = joinOptions(defaults, ct[1:])
 				continue
 			}
 			minted = true
@@ -212,8 +214,9 @@ func parseExportsContent(data []byte) []any {
 	return recs
 }
 
-// joinOptions is a client's option string under a line's default list: the
-// defaults, a comma, then the client's own, either part omitted when empty.
+// joinOptions is a client's option string under a line's default list, and
+// a line's default list after a later `-options` token: the earlier part, a
+// comma, then the later one, either part omitted when empty.
 func joinOptions(defaults, own string) string {
 	switch {
 	case defaults == "":

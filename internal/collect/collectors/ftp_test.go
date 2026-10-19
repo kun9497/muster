@@ -1336,7 +1336,8 @@ func TestFtpBannerDisclosure(t *testing.T) {
 
 	// An undeclared banner_file keeps its absence even with ftpd_banner set:
 	// vsftpd sends the file nobody opened.
-	undeclBoth := ftpAccess(map[string]string{"/etc/vsftpd.conf": "vsftpd.conf.banner-file-undeclared"})
+	undeclBoth := ftpAccess(nil)
+	undeclBoth.stats[vsftpdBin] = statResult{mode: 0o755, kind: "regular"}
 	undeclBoth.contents = map[string][]byte{"/etc/vsftpd.conf": []byte(
 		"anonymous_enable=NO\nlocal_enable=YES\npam_service_name=vsftpd\n" +
 			"ftpd_banner=Welcome. Authorized use only.\nbanner_file=/srv/ftp/welcome.txt\n")}
