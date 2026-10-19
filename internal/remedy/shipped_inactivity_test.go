@@ -158,7 +158,7 @@ func inactivityHost(t *testing.T, root string) {
 	writeUnder(t, root, "/etc/default/useradd", "GROUP=100\nINACTIVE=-1\n")
 	passwd := []string{"zed:x:1009", "root:x:0", "toor:x:0", "edge:x:1001", "edge1:x:1002", "zero:x:1003", "nolast:x:1004",
 		"nolast2:x:1005", "nomax:x:1006", "in20:x:1007", "neg5:x:1008", "junk:x:1010", "ghost:x:1011", "big:x:1013",
-		"agejunk:x:1014", "lockd:x:1015"}
+		"agejunk:x:1014", "lockd:x:1015", "negmax:x:1017", "negmax2:x:1018", "dup:x:1019"}
 	var pw strings.Builder
 	for _, p := range passwd {
 		pw.WriteString(p + ":100::/home/x:/bin/bash\n")
@@ -183,8 +183,15 @@ func inactivityHost(t *testing.T, root string) {
 		"agejunk:$6$x:1x:0:60:7:::\n"+ // ageing not numbers: skipped
 		"lockd:!:%d:0:99999:7:::\n"+ // a locked password is login-capable too
 		"svc:*:%d:0:99999:7:::\n"+ // nologin: not enumerated
-		"sys:$6$x:%d:0:99999:7:::\n", // 0 < uid < UID_MIN: not enumerated
-		d-5, d-10, d-1000, d-95, d-94, d-500, d, d, d, d, d, d, d)
+		"sys:$6$x:%d:0:99999:7:::\n"+ // 0 < uid < UID_MIN: not enumerated
+		// O-77: pam_unix guards only max != -1, so a max below -1 still
+		// expires the password; with the bound set it disables at once
+		"negmax:$6$x:%d:0:-2:7:::\n"+
+		"negmax2:$6$x::0:-2:7:::\n"+
+		// O-77: chage and pam_unix read the first row, the body the last
+		"dup:$6$x:%d:0:60:7:::\n"+
+		"dup:$6$x:%d:0:99999:7:::\n",
+		d-5, d-10, d-1000, d-95, d-94, d-500, d, d, d, d, d, d, d, d-100, d-500, d)
 	writeUnder(t, root, "/etc/shadow", shadow)
 }
 
@@ -214,7 +221,7 @@ func TestInactivityBodySkipsAndNames(t *testing.T) {
 			t.Errorf("%s field 7 %q after the body, want 35", n, v)
 		}
 	}
-	for n, v := range map[string]string{"in20": "20", "neg5": "-5", "junk": "abc", "edge": "", "zero": "", "nolast": "", "agejunk": "", "svc": "", "sys": ""} {
+	for n, v := range map[string]string{"in20": "20", "neg5": "-5", "junk": "abc", "edge": "", "zero": "", "nolast": "", "agejunk": "", "negmax": "", "negmax2": "", "dup": "", "svc": "", "sys": ""} {
 		if got, _ := field7(t, root, n); got != v {
 			t.Errorf("%s field 7 %q, want %q (left)", n, got, v)
 		}
@@ -231,6 +238,9 @@ func TestInactivityBodySkipsAndNames(t *testing.T) {
 		ail + "junk: inactivity field is not a number, left as is",
 		ail + "ghost: no " + root + "/etc/shadow entry, left as is", // the log names the rebased path
 		ail + "agejunk: password ageing fields are not numbers, left as is",
+		ail + "negmax: password ageing fields are not numbers, left as is",
+		ail + "negmax2: password ageing fields are not numbers, left as is",
+		ail + "dup: more than one " + root + "/etc/shadow entry, left as is",
 	} {
 		if !strings.Contains(out, w+"\n") {
 			t.Errorf("no log line %q:\n%s", w, out)

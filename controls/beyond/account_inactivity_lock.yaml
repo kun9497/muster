@@ -59,11 +59,12 @@ remediation:
     sf=/etc/shadow
     if [ ! -f "$sf" ]; then sf=/dev/null; fi
     rd_login "$ld" /etc/shells /etc/passwd > "$MB/inactive.scan"
-    LC_ALL=C awk -F: 'function d(v,  g) { if (v == "") return -1; if (v !~ /^-?[0-9]+$/) return "x"; g = ""; if (v ~ /^-/) { g = "-"; v = substr(v, 2) } sub(/^0+/, "", v); if (v == "") return 0; if (length(v) > 9) return "x"; return g v } FILENAME == ARGV[1] { sub(/\r$/, ""); if (NF >= 8 && $1 != "" && $1 !~ /^#/) s[$1] = d($3) ":" d($5) ":" d($7); next } !seen[$0]++ { print $0 ":" (($0 in s) ? "1:" s[$0] : "0:::") }' "$sf" "$MB/inactive.scan" > "$MB/inactive.rows"
+    LC_ALL=C awk -F: 'function d(v,  g) { if (v == "") return -1; if (v !~ /^-?[0-9]+$/) return "x"; g = ""; if (v ~ /^-/) { g = "-"; v = substr(v, 2) } sub(/^0+/, "", v); if (v == "") return 0; if (length(v) > 9) return "x"; return g v } FILENAME == ARGV[1] { sub(/\r$/, ""); if (NF >= 8 && $1 != "" && $1 !~ /^#/) { m = d($5); if (m != "x" && m + 0 < -1) m = "x"; s[$1] = d($3) ":" m ":" d($7); c[$1]++ } next } !seen[$0]++ { print $0 ":" (($0 in s) ? (c[$0] > 1 ? "2:" : "1:") s[$0] : "0:::") }' "$sf" "$MB/inactive.scan" > "$MB/inactive.rows"
     today=$(( $(date +%s) / 86400 ))
     : >> "$MB/inactive.list"
     while IFS=: read -r name has last max old; do
-      if [ "$has" != 1 ]; then log "muster.beyond.account_inactivity_lock: $name: no /etc/shadow entry, left as is"; continue; fi
+      if [ "$has" = 0 ]; then log "muster.beyond.account_inactivity_lock: $name: no /etc/shadow entry, left as is"; continue; fi
+      if [ "$has" != 1 ]; then log "muster.beyond.account_inactivity_lock: $name: more than one /etc/shadow entry, left as is"; continue; fi
       if [ "$old" != x ] && [ "$old" != -1 ] && [ "$old" -le "$n" ]; then continue; fi
       if [ "$old" = x ]; then log "muster.beyond.account_inactivity_lock: $name: inactivity field is not a number, left as is"; continue; fi
       if [ "$last" = x ] || [ "$max" = x ]; then log "muster.beyond.account_inactivity_lock: $name: password ageing fields are not numbers, left as is"; continue; fi
