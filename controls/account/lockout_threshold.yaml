@@ -35,6 +35,7 @@ remediation:
   backup: [/etc/security/faillock.conf]
   script: |
     fc=/etc/security/faillock.conf
+    if [ -L "$fc" ]; then log "muster.account.lockout_threshold: $fc is a symlink, left as is"; exit 1; fi
     n=$P_max_attempts
     if [ -e "$fc" ]; then had=1; else had=0; fi
     v=$(awk -F= '{ k = $1; gsub(/[[:space:]]/, "", k); k = tolower(k) } k == "deny" { d = $2 } END { gsub(/[[:space:]]/, "", d); print d }' "$fc" 2>/dev/null) || v=

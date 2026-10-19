@@ -37,6 +37,8 @@ remediation:
   idempotent: true
   backup: [/etc/ssh/sshd_config.d/00-muster.conf, /etc/securetty]
   script: |
+    if [ -L /etc/ssh/sshd_config.d/00-muster.conf ]; then log "muster.account.root_remote_login: /etc/ssh/sshd_config.d/00-muster.conf is a symlink (a mask), left as is"; exit 1; fi
+    if [ -L /etc/securetty ]; then log "muster.account.root_remote_login: /etc/securetty is a symlink, left as is"; exit 1; fi
     if command -v sshd >/dev/null 2>&1; then
       [ -d /run/sshd ] || mkdir -p /run/sshd
       printf 'PermitRootLogin no\n' > /etc/ssh/sshd_config.d/00-muster.conf
@@ -50,7 +52,7 @@ remediation:
     fi
   validate: "if command -v sshd >/dev/null 2>&1; then sshd -T -C user=root,host=localhost,addr=127.0.0.1 2>/dev/null | grep -qx 'permitrootlogin no'; fi"
   rollback: |
-    rm -f /etc/ssh/sshd_config.d/00-muster.conf
+    [ -L /etc/ssh/sshd_config.d/00-muster.conf ] || rm -f /etc/ssh/sshd_config.d/00-muster.conf
     if command -v sshd >/dev/null 2>&1; then sshd -t; fi
     if command -v sshd >/dev/null 2>&1; then
       if systemctl is-active --quiet sshd.service; then systemctl reload sshd.service; fi

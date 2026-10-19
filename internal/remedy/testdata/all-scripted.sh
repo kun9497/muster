@@ -1993,6 +1993,7 @@ fix_muster_account_lockout_threshold() {
   backup /etc/security/faillock.conf || { log "muster.account.lockout_threshold: backup failed, nothing changed"; return 1; }
   ( set -e
     fc=/etc/security/faillock.conf
+    if [ -L "$fc" ]; then log "muster.account.lockout_threshold: $fc is a symlink, left as is"; exit 1; fi
     n=$P_max_attempts
     if [ -e "$fc" ]; then had=1; else had=0; fi
     v=$(awk -F= '{ k = $1; gsub(/[[:space:]]/, "", k); k = tolower(k) } k == "deny" { d = $2 } END { gsub(/[[:space:]]/, "", d); print d }' "$fc" 2>/dev/null) || v=
@@ -2117,6 +2118,8 @@ fix_muster_account_root_remote_login() {
   MB="$MUSTER_BACKUP/blocks/fix_muster_account_root_remote_login"; mkdir -p "$MB" || { log "muster.account.root_remote_login: backup failed, nothing changed"; return 1; }
   backup /etc/ssh/sshd_config.d/00-muster.conf /etc/securetty || { log "muster.account.root_remote_login: backup failed, nothing changed"; return 1; }
   ( set -e
+    if [ -L /etc/ssh/sshd_config.d/00-muster.conf ]; then log "muster.account.root_remote_login: /etc/ssh/sshd_config.d/00-muster.conf is a symlink (a mask), left as is"; exit 1; fi
+    if [ -L /etc/securetty ]; then log "muster.account.root_remote_login: /etc/securetty is a symlink, left as is"; exit 1; fi
     if command -v sshd >/dev/null 2>&1; then
       [ -d /run/sshd ] || mkdir -p /run/sshd
       printf 'PermitRootLogin no\n' > /etc/ssh/sshd_config.d/00-muster.conf
@@ -2132,7 +2135,7 @@ fix_muster_account_root_remote_login() {
   if [ "$rc" -ne 0 ]; then
     log "muster.account.root_remote_login: script failed (rc $rc), rolling back"
     ( set -e
-      rm -f /etc/ssh/sshd_config.d/00-muster.conf
+      [ -L /etc/ssh/sshd_config.d/00-muster.conf ] || rm -f /etc/ssh/sshd_config.d/00-muster.conf
       if command -v sshd >/dev/null 2>&1; then sshd -t; fi
       if command -v sshd >/dev/null 2>&1; then
         if systemctl is-active --quiet sshd.service; then systemctl reload sshd.service; fi
@@ -2150,7 +2153,7 @@ fix_muster_account_root_remote_login() {
   if [ "$rc" -ne 0 ]; then
     log "muster.account.root_remote_login: validate failed, rolling back"
     ( set -e
-      rm -f /etc/ssh/sshd_config.d/00-muster.conf
+      [ -L /etc/ssh/sshd_config.d/00-muster.conf ] || rm -f /etc/ssh/sshd_config.d/00-muster.conf
       if command -v sshd >/dev/null 2>&1; then sshd -t; fi
       if command -v sshd >/dev/null 2>&1; then
         if systemctl is-active --quiet sshd.service; then systemctl reload sshd.service; fi
