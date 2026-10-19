@@ -12,4 +12,5 @@ chmod 644 /etc/hosts
 chmod 644 /etc/sudoers
 install -m 644 /dev/null /etc/inetd.conf
 install -m 666 /dev/null /var/log/ci.log
+printf '+\n' > /etc/hosts.equiv; chmod 644 /etc/hosts.equiv
 sed -i -E 's/^([[:space:]]*UMASK[[:space:]]+)[0-9]+/\1002/' /etc/login.defs

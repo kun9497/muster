@@ -6,10 +6,16 @@ set -eu
 # The image ships a populated /etc/machine-id, so two containers would share one id and
 # the failure run could not tell them apart: give this container its own first.
 rm -f /etc/machine-id; systemd-machine-id-setup
-START_UNITS="sshd.service autofs.service nfs-server.service rpcbind.socket rpcbind.service snmpd.service telnet.socket tftp.socket tftp.service"
+START_UNITS="sshd.service autofs.service nfs-server.service rpcbind.socket rpcbind.service snmpd.service telnet.socket tftp.socket tftp.service vsftpd.service postfix.service"
 ENABLE_ONLY_UNITS=""
-dnf install -y -q openssh-server autofs nfs-utils rpcbind net-snmp telnet-server tftp-server acl
+dnf install -y -q openssh-server autofs nfs-utils rpcbind net-snmp telnet-server tftp-server acl vsftpd postfix
 ssh-keygen -A
+# 3D-2d: vsftpd allows anonymous logins (stock is NO) and both daemons listen on
+# IPv4 only, whatever IPv6 the docker gives the container (O-37, O-59).
+for kv in anonymous_enable=YES listen=YES listen_ipv6=NO; do
+  if grep -q "^${kv%%=*}=" /etc/vsftpd/vsftpd.conf; then sed -i "s/^${kv%%=*}=.*/$kv/" /etc/vsftpd/vsftpd.conf; else printf '%s\n' "$kv" >> /etc/vsftpd/vsftpd.conf; fi
+done
+postconf -e inet_protocols=ipv4
 for u in $START_UNITS; do systemctl enable --now "$u"; done
 for u in $ENABLE_ONLY_UNITS; do systemctl enable "$u"; done
 printf 'PermitRootLogin yes\n' > /etc/ssh/sshd_config.d/99-ci.conf
@@ -17,10 +23,17 @@ chmod 664 /etc/passwd
 chmod 666 /etc/services
 install -m 644 /dev/null /etc/hosts.lpd
 chmod 644 /etc/hosts
-dnf install -y -q sudo cronie rsyslog vsftpd authselect passwd
+dnf install -y -q sudo cronie rsyslog authselect passwd
 chmod 644 /etc/sudoers
 install -m 644 /dev/null /etc/inetd.conf
+# 3D-2d: a no_root_squash export (O-60: the overlay root cannot be exported, a
+# tmpfs can), at mode 666 so the mode half still runs.
+mkdir -p /srv/ci
+mountpoint -q /srv/ci || mount -t tmpfs tmpfs /srv/ci
 install -m 666 /dev/null /etc/exports
+printf '/srv/ci 192.0.2.0/24(rw,no_root_squash,fsid=1)\n' > /etc/exports
+exportfs -ra
+printf '+\n' > /etc/hosts.equiv; chmod 644 /etc/hosts.equiv
 chmod 644 /etc/vsftpd/ftpusers
 install -m 666 /dev/null /var/log/ci.log
 sed -i -E 's/^([[:space:]]*UMASK[[:space:]]+)[0-9]+/\1002/' /etc/login.defs

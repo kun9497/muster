@@ -509,8 +509,10 @@ jobs:
   # script and checks again. On init rows a second container then proves the
   # guard (the first container's script is refused) and the failure path (a
   # validate forced false in every block leaves units, files, sysctl values,
-  # module load states, modes-entry stats and, when password_policy is
-  # scripted, every account's ageing fields (name, min, max) as they were).
+  # module load states, modes-entry stats and, when their controls are
+  # scripted, every account's ageing fields (name, min, max, inactive) with a
+  # checksum of the rest of /etc/shadow, the kernel audit rules and status
+  # settings, the NFS exports, vsftpd's state and postfix's as they were).
   # A host row (3D-2c) runs on the runner VM itself: no container, no guard
   # run, and the failure run re-seeds the same VM. Its repair run also fixes
   # every stock-FAIL scripted control (/etc/hosts goes to 0600, so non-root
@@ -673,7 +675,7 @@ jobs:
             [ -z "$extra" ] || { echo "runner: the failure plan scripts ids the repair plan did not: $extra"; exit 1; }
           fi
           sed -n '/^modes_paths() {/,/^}/p' "$d/fail/fix.sh" > "$d/fail/modes_paths.sh"
-          record() { # unit states; backup-path stats, checksums and ACLs; sysctl values; module load states; modes-entry stats
+          record() { # unit states; backup-path stats, checksums and ACLs; sysctl values; module load states; modes-entry stats; per-control state (3D-2d §5)
             jq -r '.items[] | select(.planned and .script) | .units[]' "$d/fail/plan.json" | sort -u > "$d/fail/units"
             : > "$d/fail/deps"
             while read -r u; do x systemctl show -p RequiredBy -p BoundBy -p ConsistsOf --value -- "$u" < /dev/null | tr ' ' '\n' >> "$d/fail/deps" || :; done < "$d/fail/units"
@@ -693,8 +695,22 @@ jobs:
             jq -r '.items[] | select(.planned and .script) | .modes[]' "$d/fail/plan.json" | sort -u | while IFS= read -r e; do
               x sh -c '. "$1"; modes_paths "$2" | while IFS= read -r p; do printf "mode %s %s\n" "$p" "$(stat -c "%u %g %a" -- "$p")"; done' _ "$(out "$d/fail")/modes_paths.sh" "$e" < /dev/null
             done | sort -u
-            if jq -e '[.items[] | select(.planned and .script and .id == "muster.account.password_policy")] | length == 1' "$d/fail/plan.json" > /dev/null; then
-              x awk -F: 'NF >= 8 && $1 !~ /^#/ && $1 != "" { print "ageing", $1, $4, $5 }' /etc/shadow < /dev/null
+            if jq -e '[.items[] | select(.planned and .script and (.id == "muster.beyond.audit_rules_loaded" or .id == "muster.beyond.auditd_active" or .id == "muster.beyond.audit_disk_actions"))] | length > 0' "$d/fail/plan.json" > /dev/null; then
+              x sh -c 'LC_ALL=C auditctl -l' < /dev/null | sed 's/^/auditrule /'
+              x sh -c 'LC_ALL=C auditctl -s' < /dev/null | awk '$1 == "enabled" || $1 == "failure" || $1 == "backlog_limit" || $1 == "backlog_wait_time" || $1 == "rate_limit" || $1 == "loginuid_immutable" { print "audit", $1, $2 }'
+            fi
+            if jq -e '[.items[] | select(.planned and .script and (.id == "muster.account.password_policy" or .id == "muster.beyond.account_inactivity_lock"))] | length > 0' "$d/fail/plan.json" > /dev/null; then
+              x awk -F: 'NF >= 8 && $1 !~ /^#/ && $1 != "" { print "ageing", $1, $4, $5, $7 }' /etc/shadow < /dev/null
+              printf 'shadow-rest %s\n' "$(x awk -F: 'BEGIN { OFS = ":" } NF >= 8 { $4 = ""; $5 = ""; $7 = "" } { print }' /etc/shadow < /dev/null | sha256sum | cut -d' ' -f1)"
+            fi
+            if jq -e '[.items[] | select(.planned and .script and (.id == "muster.service.nfs_export_access"))] | length > 0' "$d/fail/plan.json" > /dev/null; then
+              x exportfs -s < /dev/null | LC_ALL=C sort | sed 's/^/export /'
+            fi
+            if jq -e '[.items[] | select(.planned and .script and (.id == "muster.service.ftp_banner" or .id == "muster.service.ftp_anonymous"))] | length > 0' "$d/fail/plan.json" > /dev/null; then
+              printf 'vsftpd %s\n' "$(x systemctl is-active vsftpd.service < /dev/null 2>/dev/null || :)"
+            fi
+            if jq -e '[.items[] | select(.planned and .script and (.id == "muster.service.mail_expn_vrfy"))] | length > 0' "$d/fail/plan.json" > /dev/null; then
+              rc=0; x postfix status >/dev/null 2>&1 </dev/null || rc=$?; printf 'postfix-status %s\n' "$rc"
             fi
           }
           same() { # same <before> <after>: equal records, except that a modes-entry path gone since (a rotated log) is no difference
