@@ -34,8 +34,10 @@ const diskID = "muster.beyond.audit_disk_actions"
 //     $STUB/status_rc (0 without it); -D empties $STUB/rules; one or more
 //     of -f, -b, -r, -e, --backlog_wait_time <n> rewrite the status key
 //     (failure, backlog_limit, rate_limit, enabled, backlog_wait_time);
-//     --signal reload signals the daemon (while $STUB/reload_dies exists the
-//     daemon dies: auditd.service's state becomes inactive). -D, the
+//     --signal reload signals the daemon: it exits 1 unless auditd.service's
+//     state is active (no daemon to signal, O-71), and while
+//     $STUB/reload_dies exists the daemon dies on it (the state becomes
+//     inactive). -D, the
 //     settings and the reload also append to $STUB/calls (see below).
 //     Anything else (--loginuid-immutable, -R, -w, a glued -e2, another
 //     signal) exits 99;
@@ -46,11 +48,12 @@ const diskID = "muster.beyond.audit_disk_actions"
 //     then copies the result's -w/-a/-A lines into $STUB/rules (the load's
 //     -D replaces the kernel list). A missing rules.d exits 1; any other
 //     argument 99;
-//   - systemctl: a wrapper (O-33). On start auditd.service it runs the
-//     augenrules --load stub (the unit's ExecStartPost) and then, like every
-//     other call, units_test.go's systemctlStub, held unchanged as
-//     bin/systemctl-units: unit state in $STUB/state/<u> ("<enabled>
-//     <active>"), every call appended to $STUB/calls;
+//   - systemctl: a wrapper (O-33) over units_test.go's systemctlStub, held
+//     unchanged as bin/systemctl-units: unit state in $STUB/state/<u>
+//     ("<enabled> <active>"), every call appended to $STUB/calls. On start
+//     auditd.service it runs the augenrules --load stub (the unit's
+//     ExecStartPost) only after a start that succeeded (O-70): a masked or
+//     missing unit starts nothing and loads nothing;
 //   - service, restorecon, chcon, auditd, pkill, killall: not modelled (99);
 //   - selinuxenabled: exit 1 (SELinux off).
 //
@@ -82,6 +85,8 @@ case "$1" in
   -D) [ "$#" -eq 1 ] || exit 99
     : > "$STUB/rules"; echo "auditctl -D" >> "$STUB/calls"; exit 0;;
   --signal) [ "$#" -eq 2 ] && [ "$2" = reload ] || exit 99
+    sa=; if [ -f "$STUB/state/auditd.service" ]; then read -r se sa < "$STUB/state/auditd.service"; fi
+    [ "$sa" = active ] || { echo "auditctl: no audit daemon to signal" >&2; exit 1; }
     echo "auditctl --signal reload" >> "$STUB/calls"
     cat "$ROOT/etc/audit/auditd.conf" >> "$STUB/calls" 2>/dev/null || echo "(no auditd.conf)" >> "$STUB/calls"
     if [ -e "$STUB/reload_dies" ] && [ -f "$STUB/state/auditd.service" ]; then
@@ -127,7 +132,11 @@ exit 0
 	writeStub(t, bin, "systemctl-units", systemctlStub)
 	writeStub(t, bin, "systemctl", `verb=; u=
 for a in "$@"; do case "$a" in -*) ;; *) if [ -z "$verb" ]; then verb=$a; else u=$a; fi;; esac; done
-if [ "$verb" = start ] && [ "$u" = auditd.service ]; then '`+filepath.Join(bin, "augenrules")+`' --load || :; fi
+if [ "$verb" = start ] && [ "$u" = auditd.service ]; then
+  '`+filepath.Join(bin, "systemctl-units")+`' "$@" || exit
+  '`+filepath.Join(bin, "augenrules")+`' --load || :
+  exit 0
+fi
 exec '`+filepath.Join(bin, "systemctl-units")+`' "$@"
 `)
 	for _, tool := range []string{"service", "restorecon", "chcon", "auditd", "pkill", "killall"} {
@@ -223,7 +232,7 @@ func TestAuditTreeStubsFailClosed(t *testing.T) {
 		{"auditctl --loginuid-immutable", 99, ""},
 		{"auditctl -R /etc/audit/audit.rules", 99, ""},
 		{"auditctl --signal stop", 99, ""},
-		{"auditctl --signal reload", 0, ""},
+		{"auditctl --signal reload", 1, ""},
 		{"augenrules", 0, ""},
 		{"augenrules", 0, "augenrules: No change\n"},
 		{"augenrules --check", 99, ""},
@@ -234,6 +243,11 @@ func TestAuditTreeStubsFailClosed(t *testing.T) {
 		{`: > "$STUB/list_fails"; auditctl -l`, 1, ""},
 		{`rm "$STUB/list_fails"; auditctl -D; auditctl -l`, 0, "No rules\n"},
 		{`: > "$STUB/reload_dies"; auditctl --signal reload; systemctl is-active --quiet auditd.service`, 1, ""},
+		{"auditctl --signal reload", 1, ""},
+		{`printf 'masked inactive\n' > "$STUB/state/auditd.service"; systemctl start auditd.service`, 1, ""},
+		{"auditctl -l", 0, "No rules\n"},
+		{`rm "$STUB/state/auditd.service"; systemctl start auditd.service`, 1, ""},
+		{"auditctl -l", 0, "No rules\n"},
 		{"service auditd reload", 99, ""},
 		{"restorecon -- /etc/audit/auditd.conf", 99, ""},
 		{"pkill -HUP auditd", 99, ""},
@@ -248,9 +262,10 @@ func TestAuditTreeStubsFailClosed(t *testing.T) {
 		t.Errorf("audit.rules %q", got)
 	}
 	const conf = "disk_full_action = syslog\n"
-	want := "auditctl -b 4321 -f 2\nauditctl --signal reload\n" + conf +
-		"augenrules --load\n-w /etc/passwd -p wa -k x\nstart auditd.service\nis-active --quiet auditd.service\n" +
-		"auditctl -D\nauditctl --signal reload\n" + conf + "is-active --quiet auditd.service\n"
+	want := "auditctl -b 4321 -f 2\n" +
+		"start auditd.service\naugenrules --load\n-w /etc/passwd -p wa -k x\nis-active --quiet auditd.service\n" +
+		"auditctl -D\nauditctl --signal reload\n" + conf + "is-active --quiet auditd.service\n" +
+		"start auditd.service\nstart auditd.service\n"
 	if got := readFile(t, filepath.Join(stub, "calls")); got != want {
 		t.Errorf("calls\n%q\nwant\n%q", got, want)
 	}
@@ -659,7 +674,9 @@ func TestDiskActionsRerunBlockIsDone(t *testing.T) {
 // auditd.conf and only then sends the reload, so the daemon rereads the file
 // as it was; an inactive daemon is never signalled; the template's restore
 // that follows is a harmless second pass. A daemon that dies on the reload
-// fails the validate's liveness half, and the way back is the same.
+// fails the validate's liveness half; the rollback restores the file and its
+// reload then finds no daemon (O-71), so the block reports rollback failed
+// and the rollback never starts auditd.
 func TestDiskActionsRollbackRestoresThenReloads(t *testing.T) {
 	needSh(t)
 	for _, c := range []struct {
@@ -686,6 +703,12 @@ func TestDiskActionsRollbackRestoresThenReloads(t *testing.T) {
 				t.Fatalf("exit %d, want 1 after a failed validate\n%s", code, out)
 			}
 			for _, bad := range []string{"ROLLBACK INCOMPLETE", "rollback failed", "restore: "} {
+				if c.dies && bad == "rollback failed" {
+					if !strings.Contains(out, diskID+": rollback failed") {
+						t.Errorf("the rollback's reload of a dead daemon did not fail the rollback\n%s", out)
+					}
+					continue
+				}
 				if strings.Contains(out, bad) {
 					t.Errorf("the output carries %q\n%s", bad, out)
 				}
@@ -705,6 +728,15 @@ func TestDiskActionsRollbackRestoresThenReloads(t *testing.T) {
 			}
 			if !strings.Contains(calls, "auditctl --signal reload\n"+el9Fixed(t)) {
 				t.Errorf("the body did not reload over its edit:\n%s", calls)
+			}
+			if c.dies {
+				if strings.Contains(calls, "start auditd.service") || state(t, stub, "auditd.service") != "enabled inactive" {
+					t.Errorf("the rollback started auditd: %s, calls %q", state(t, stub, "auditd.service"), calls)
+				}
+				if !strings.HasSuffix(calls, "auditctl --signal reload\n"+el9Fixed(t)+"is-active --quiet auditd.service\n") {
+					t.Errorf("calls %q, want nothing after the validate's liveness check", calls)
+				}
+				return
 			}
 			if !strings.HasSuffix(calls, "auditctl --signal reload\n"+before) {
 				t.Errorf("calls %q, want the rollback's reload over the restored file last", calls)
