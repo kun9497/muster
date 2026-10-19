@@ -244,8 +244,9 @@ The bodies that edit what a file says (stage 3D-2d) add these rules:
   verdict it repeats the same program, and
   `internal/collect/collectors/remediation_parity_test.go` (Linux) runs each
   reader over the parser's fixtures and compares with the Go parser. Every
-  command whose output a body, validate or rollback parses runs under
-  `LC_ALL=C`.
+  command whose text output a body, validate or rollback parses runs under
+  `LC_ALL=C` (output that does not depend on the locale — `date +%s`, numeric
+  `stat -c` fields, the `tail -c1` test — needs none).
 - **A guarded validate.** Beside the three shapes, a validate may accept a
   leave the body logs, as `[ guard ] || …` or a `{ …; } || { …; }` grouping on
   one line; the block ends `done` and the next `check` names what was left.

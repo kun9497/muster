@@ -626,6 +626,18 @@ pre-flight and the probe) and O-64..O-78 (execution, the cycle's ledger) are in
   O-12's "stub-only" wording for it is withdrawn.
 - **O-60, O-37 and O-58 (§5 seeds):** the init rows export a tmpfs (`/srv/ci … fsid=1`; the overlay root cannot be
   exported), apply the IPv6 workaround on EL and Debian alike, and Debian settles on `postfix@-.service`.
-- **Proof as of the branch:** the four container rows' repair, guard and failure runs were replayed green on the lab's
-  docker (Task 12); the runner row, IPv6 in the CI docker, the runner's accounts and `auditctl -s` keys, and whether a
+- **The whole-branch review's fixes (O-79..O-84).** O-79: a trailing default list (`/srv 192.0.2.8 -no_root_squash`)
+  also exports to the world (measured), so the collector mints a `*` record for it — it read a false PASS. O-80: a `-`
+  token right after a `-` list is a host name to nfs-utils (it fails to resolve and exports nothing), so the collector
+  ignores it and does not join it; lists separated by a client still accumulate (O-64). O-81: `rhosts_forbidden`
+  refuses a `+` line that carries a `-user` or `-@netgroup` field (the first matching line decides, so commenting out a
+  denial would widen trust) — the block fails and the file is left. O-82: `ftp_banner`'s reader never opens
+  `banner_file`; the shell counts it only as a regular, non-symlink, non-empty file (the collector's rule), which replaces
+  O-59's `-`/`/dev/stdin` case. O-83: an auditd action is reduced on the ASCII space only (a tab-joined value, which
+  auditd refuses, stays whole and FAILs). O-84: `record()` fails loudly when an audit, export or shadow producer fails
+  or comes back empty for a planned id.
+- **The inactivity log line for a `max` below -1** reads `password ageing fields are not numbers or the maximum is
+  below -1, left as is`.
+- **Proof as of the branch:** the four container rows' repair runs and the three init rows' guard and failure runs were
+  replayed green on the lab's docker (Task 12); the runner row, IPv6 in the CI docker, the runner's accounts and `auditctl -s` keys, and whether a
   HUP applies the five disk-action keys are proven only by the PR's CI run (O-34).

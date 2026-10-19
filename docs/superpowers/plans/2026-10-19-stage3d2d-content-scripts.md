@@ -402,4 +402,51 @@ Raw output: `.superpowers/sdd/2026-10-19-stage3d2d-content-scripts/probe-out.txt
 - **O-63 — SELinux.** The EL containers ship `selinuxenabled`/`restorecon` with SELinux disabled (`selinuxenabled` exits 1); Debian and Ubuntu ship neither. O-36's guard never fires in CI (§7 parks label proof).
 - **Open until the draft PR's run (O-34):** whether a HUP applies the five action keys on the runner (auditd's reconfigure line in the journal); `auditctl -s`'s key names on the azure kernel; the runner's login-capable accounts and shadow fields; IPv6 in the fix-roundtrip docker; that no other scripted control plans because vsftpd or postfix runs on an init row.
 
-(Rulings settled during execution, what the reviews found, and CI go here as they land.)
+### Rulings settled during execution (O-64 …)
+
+Each ends with what it costs if wrong. O-72 is given in its corrected form (the first form assumed a failed rerun removes
+`50-muster.rules`; `backup()` in fact replaces an absent marker with a copy once the path exists).
+
+- **O-64** — successive exports default lists ACCUMULATE (measured on rocky9-init: "/srv/ci -no_root_squash 192.0.2.7 -rw 192.0.2.8" gives 192.0.2.8 rw,no_root_squash; "-no_root_squash,rw … -ro" gives ro,no_root_squash): a later `-` list is appended to the defaults, never replaces them — the replace rule reads a real no_root_squash as squashed (false PASS) — if wrong, the collector over-reads no_root_squash (conservative)
+- **O-65** — a hosts.equiv line led by a Unicode space (U+00A0, U+0085, U+2000–U+200A) FAILs in the collector (strings.TrimSpace) but the LC_ALL=C body leaves it: a recorded divergence, the block ends done and check names it (X-10); an ASCII-only trim in the collector is deferred to §7 — if wrong, an operator sees a done block with a FAIL on an exotic file
+- **O-66** — rhosts_forbidden plans on ubuntu2204 once seeded: the stock container reads files.user_rhosts ok [] and PASSes (examples/ubuntu-24.04-container.json) — if wrong, the seed run shows MANUAL and the row drops the id
+- **O-67** — postconf -e (postfix 3.7.11, measured in debian:12) appends without a newline to a main.cf lacking a final one, gluing the new line onto the last; the mail_expn_vrfy body runs the §3.7 final-newline guard before postconf -e (tested) — design §8 records it — if wrong, a harmless extra newline
+- **O-68** — the NFS body removes its per-run markers at the top, outside the /etc/exports guard (implementer deviation accepted: a rerun over a vanished or symlinked exports must not leave stale markers) — matches O-16 — if wrong, none
+- **O-69** — the O-26 ERE can rewrite a path whose last component ends in ",no_root_squash"/"(no_root_squash" before a blank, or a quoted path holding " -no_root_squash ": accepted as a pathological corner (anchoring past the first token breaks continuation rows); design §8 names it and the text claim is softened in the final wave — if wrong, such an export path is renamed by the swap
+- **O-70** — auditTree's systemctl wrapper must run the augenrules --load stub only AFTER a successful start (systemd runs ExecStartPost after ExecStart succeeds; a masked unit loads nothing); Task 10 fixes the order because its start-branch tests depend on it — if wrong, a masked-unit test reads a floor as loaded
+- **O-71** — auditctl --signal fails when auditd is not running; the audit stub models it (Task 10), and a rollback whose reload meets a dead daemon logs rollback failed honestly; the rollback never starts auditd (a start runs augenrules --load, O-3) — if wrong, an operator sees rollback failed on a host where the file was in fact restored
+- **O-72 (corrected)** — backup() replaces an absent marker with a copy once the path exists (script.go backupHelpers), so a failed rerun of audit_rules_loaded restores 50-muster.rules holding the first run's floor; file and kernel agree; the rerun test pins that (78f9080) — the earlier O-72 premise was wrong — if wrong, none
+- **O-73** — audit_rules_loaded logs "auditctl -l failed; refused" for a failing auditctl -l (O-23 had no line for it) — if wrong, one log string
+- **O-74** — auditd_active refuses a start whenever a lock is pending (O-3 pending half), whatever the runtime lock state; the locked-runtime exemption of design O-5/§4.1 is withdrawn (loginuid_immutable locks only its feature, the rule list stays writable, so a start loads a pending -e 2; and inertness under enabled 2 is unprobed) — supersedes O-5's "or the runtime is already locked"; design §8 records it — if wrong, a STIG host with a locked kernel and an inactive auditd gets a failed block instead of a started daemon (safe)
+- **O-75** — account_inactivity_lock logs "<name>: password ageing fields are not numbers, left as is" for a junk or over-long last/max (skipped, safe side; O-23 had no line) — if wrong, one log string
+- **O-76 (O-51 walk, by reading seeds against bodies)** — on the runner after runner.sh: audit_rules_loaded (sorted first) hits case (c) (nothing persisted, kernel No rules, auditd active): writes the floor and --load; auditd_active finds the unit active+disabled: enables only, never starts; audit_disk_actions writes syslog over the seeded suspend and reloads (was-running). Failure run: re-seed rm 50-muster.rules, augenrules --load (stock -D clears the floor), auditctl -b 4321; rollbacks restore No rules, -b 4321, disabled, the stock conf — record() lines equal. The draft PR run confirms — if wrong, the runner row shows which case it hit
+- **O-77** — account_inactivity_lock skips and names an account whose field 5 is below -1 (pam_unix treats any max other than -1 as real; shadow isexpired guards >= 0) and any name with more than one shadow row (chage and pam read the first row, the collector the last); design §4.4 note in §8 — if wrong, a hand-edited account keeps no inactivity bound
+- **O-78** — the failure run replaces the whole one-line validate with "false" (ci.yml awk), so mail_expn_vrfy's guarded validate is rewritten like any other — the Task 8 note is settled — if wrong, the blocks count check fails visibly
+- **O-79 (F1, measured on rocky9-init)** — "/srv/ci 192.0.2.8 -no_root_squash" exports 192.0.2.8 AND <world> with no_root_squash: a trailing default list mints a world record; the collector emits exportRecord(path, "*", defaults) when the last token is a default list — today it reads a false PASS — if wrong, a conservative extra world record
+- **O-80 (F8, measured)** — a "-" token directly after a "-" list is not a second default list: nfs-utils reads it as a host name, which fails to resolve and exports nothing ("Failed to resolve -rw"); the clients after it carry only the defaults so far ("-no_root_squash -rw X" exports X ro,no_root_squash; "-root_squash -no_root_squash X" exports X root_squash); the collector ignores such a token and does not join it — amends O-64 (which stands for lists separated by a client) — if wrong, a conservative FAIL on an odd line
+- **O-81 (F4)** — rhosts_forbidden refuses (logs, exit 1, file untouched) a hosts.equiv "+" line carrying a "-user"/"-@netgroup" field: commenting out a first-match denial would widen trust (ruserok uses the first matching line) — if wrong, an operator edits such a file by hand
+- **O-82 (F5)** — ftp_banner's awk no longer opens banner_file; the shell treats it as set only when [ -f ] && [ ! -L ] && [ -s ] (the collector's regular, non-empty rule), replacing the - and /dev/stdin special case — a FIFO, tty or special path is never opened as root — if wrong, a banner_file the collector reads absent is rewritten over (the row would read MANUAL, so unreachable via check)
+- **O-83 (F7)** — an auditd action value is reduced on the ASCII SPACE only (auditd splits on spaces; a tab-joined "exec	/y" is refused by auditd and now stays whole and FAILs); "syslog extra words" and "email # note" stay honoured as their first word (auditd logs "Wrong number of arguments" and reads the first value) — if wrong, a tab-joined action reads FAIL
+- **O-84 (F3)** — record() captures each producer (auditctl -l/-s, exportfs -s, the shadow awk) into a variable and exits 1 when it fails, and requires a non-empty result when the matching id is planned; no blanket pipefail — if wrong, a record step fails loudly instead of passing empty
+
+### What the reviews found
+
+- **Task reviews.** Tasks 2–4 were reviewed as one batch: Task 4 replaced an earlier default list where nfs-utils adds
+  to it (O-64, measured) — one fix round. Task 7: the vsftpd symlink skip and the running-unit validate were untested,
+  and a `banner_file=-` would read standard input — one fix round. Task 10: **critical** — `auditd_active` started auditd
+  over a pending `-e 2` when only `loginuid_immutable` was locked; the design's locked-runtime exemption was wrong (O-74)
+  — one fix round. Task 11: a `max` below -1 read as no maximum while pam_unix treats it as real (a lockout), and
+  duplicate shadow rows (O-77) — one fix round. Tasks 5, 6, 8, 9 and 12 were clean on the first review.
+- **Whole branch.** One workflow (89 agents: seven lenses, three refuters per finding, a critic): 27 findings, 19
+  upheld, merged into 12 (F1 a trailing exports default list read a false PASS, O-79; F2 these rulings were only in the
+  ignored ledger; F3–F12 minor). One fix wave applied F1 and F3–F12 (O-79..O-84); the controller applied F2 and the
+  documents.
+- **Lessons.** Measure a daemon's grammar before writing a parser rule against it: three of this cycle's corrections
+  (O-64, O-79, O-80) were nfs-utils readings no one had measured. A ruling that exempts a locked state must name which
+  lock: `loginuid_immutable` and `enabled 2` lock different things (O-74). A stub that runs a unit's post-start hook
+  before the start hides the masked-unit case (O-70). A probe container that starts the kernel NFS server can wedge on
+  `rpcbind` in D state at removal; stop nfs-server inside it first, or kill the stuck pid from the host.
+
+### CI
+
+(The draft PR's runs go here as they land.)

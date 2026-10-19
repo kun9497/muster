@@ -610,6 +610,17 @@ notes에 있습니다. 이 글을 바꾸는 것은 다음과 같습니다.
   대한 O-12의 "stub만" 문구는 철회합니다.
 - **O-60, O-37, O-58(§5 시드):** init 행은 tmpfs를 내보내고(`/srv/ci … fsid=1`. overlay 루트는 내보낼 수 없음),
   EL과 Debian 모두에 IPv6 우회를 적용하며, Debian은 `postfix@-.service`에서 안정됩니다.
-- **브랜치 시점의 증명:** 네 컨테이너 행의 수리·가드·실패 실행은 랩의 docker에서 다시 돌려 녹색이었습니다(Task 12).
+- **브랜치 전체 리뷰의 고침(O-79..O-84).** O-79: 끝에 오는 기본 목록(`/srv 192.0.2.8 -no_root_squash`)은 world에도
+  내보내므로(측정함) collector가 그것에 `*` 기록을 만듭니다 — 전에는 거짓 PASS로 읽혔습니다. O-80: `-` 목록 바로 뒤의
+  `-` 토큰은 nfs-utils에게 호스트 이름이라(해석에 실패해 아무것도 내보내지 않음) collector가 무시하고 이어 붙이지
+  않습니다. 클라이언트로 갈라진 목록은 여전히 쌓입니다(O-64). O-81: `rhosts_forbidden`은 `-user`나 `-@netgroup` 필드를 단
+  `+` 줄을 거부합니다(처음 맞는 줄이 결정하므로 거부 줄을 주석 처리하면 신뢰가 넓어짐) — 블록이 실패하고 파일은 그대로
+  둡니다. O-82: `ftp_banner`의 reader는 `banner_file`을 열지 않습니다. 셸은 그것을 일반 파일이고 심볼릭 링크가 아니며
+  비어 있지 않을 때만 셉니다(collector의 규칙). 이것이 O-59의 `-`/`/dev/stdin` 경우를 대신합니다. O-83: auditd 처리값은
+  ASCII 공백에서만 줄입니다(auditd가 거부하는 탭으로 이어진 값은 통째로 남아 FAIL). O-84: 계획된 id에 대해 audit,
+  export, shadow 생산자가 실패하거나 빈 결과를 내면 `record()`가 크게 실패합니다.
+- **`max`가 -1보다 작을 때의 비활성 로그 줄**은 `password ageing fields are not numbers or the maximum is below -1,
+  left as is`입니다.
+- **브랜치 시점의 증명:** 네 컨테이너 행의 수리 실행과 세 init 행의 가드·실패 실행은 랩의 docker에서 다시 돌려 녹색이었습니다(Task 12).
   runner 행, CI docker의 IPv6, runner의 계정과 `auditctl -s` 키, HUP이 디스크 처리 키 다섯을 적용하는지는 PR의 CI
   실행만이 증명합니다(O-34).

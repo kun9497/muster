@@ -193,8 +193,9 @@ here-document는 쓰지 않습니다. 스크립트는
 - **수집기의 방식으로 읽고, 그것을 증명하기.** 본문의 읽기는 한 줄짜리
   `rd_<what>() { LC_ALL=C …; }` 함수입니다. validate가 그 판정을 다시 증명할 때는 같은 프로그램을
   되풀이하며, `internal/collect/collectors/remediation_parity_test.go`(Linux)가 각 읽기를 파서의
-  fixture에 대해 실행해 Go 파서와 비교합니다. 본문, validate, rollback이 출력을 파싱하는 모든
-  명령은 `LC_ALL=C` 아래 돕니다.
+  fixture에 대해 실행해 Go 파서와 비교합니다. 본문, validate, rollback이 텍스트 출력을 파싱하는
+  모든 명령은 `LC_ALL=C` 아래 돕니다(로캘과 무관한 출력 — `date +%s`, 숫자 `stat -c` 필드, `tail -c1`
+  검사 — 은 필요 없음).
 - **가드된 validate.** 세 모양 외에, validate는 본문이 로그로 남기는 남겨 둠을 한 줄의
   `[ guard ] || …`나 `{ …; } || { …; }` 묶음으로 받아들일 수 있습니다. 블록은 `done`으로 끝나고
   다음 `check`가 남겨 둔 것을 짚습니다.

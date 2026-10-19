@@ -280,7 +280,8 @@ regenerates them from public images and `-check` compares.
   O-2/O-3/O-74: no body makes a one-way runtime change; no body loads audit rules into, or starts auditd over, a pending
   `-e 2`/`--loginuid-immutable` (matched anywhere on a line of `rules.d/*.rules` or `audit.rules`), whatever the runtime
   lock state, and the only reload is `auditctl --signal reload`. O-8: a new body comments a disqualifying line out
-  (`# muster: `), never deletes it. Every command whose output a body, validate or rollback parses runs under `LC_ALL=C`;
+  (`# muster: `), never deletes it. Every command whose text output a body, validate or rollback parses runs under `LC_ALL=C`
+  (not needed for locale-independent output: `date +%s`, numeric `stat -c` fields, `tail -c1`);
   `restorecon` runs only on a file a tool replaced or created (`postconf -e`, a created file), never after `sed -i` or
   `restore`. O-10: each body's file reader is a one-line `rd_<what>()` function compared with the Go parser by
   `remediation_parity_test.go` (Linux). E-13: a write's side effect on another judged key is the writer's — `ip_forwarding_disabled` reads
