@@ -45,9 +45,10 @@ var firstSingleQuoted = regexp.MustCompile(`'[^']*'`)
 // is none or more than one, or when the function's command does not start
 // with LC_ALL=C (O-47: the locale is the reader's own, not the caller's).
 // With inValidate, the function's first single-quoted string (its awk
-// program or grep/sed pattern) must appear verbatim in r.Validate, and the
-// validate must set LC_ALL=C too: the validate runs in its own subshell and
-// cannot call the body's function, so it repeats the program.
+// program or grep/sed pattern) must appear verbatim in r.Validate, every copy
+// run as the reader runs it (`LC_ALL=C <command word> [options] ` right before
+// the program): the validate runs in its own subshell and cannot call the
+// body's function, so it repeats the program under the same locale.
 func readerLine(t *testing.T, r *controls.Remediation, name string, inValidate bool) string {
 	t.Helper()
 	def := regexp.MustCompile(`^\s*` + regexp.QuoteMeta(name) + `\(\) \{(.*)\}$`)
@@ -70,11 +71,16 @@ func readerLine(t *testing.T, r *controls.Remediation, name string, inValidate b
 		if prog == "" {
 			t.Fatalf("%s's command %q carries no single-quoted program", name, command)
 		}
-		if !strings.Contains(r.Validate, prog) {
+		n := strings.Count(r.Validate, prog)
+		if n == 0 {
 			t.Fatalf("the validate does not repeat %s's program %s verbatim:\n%s", name, prog, r.Validate)
 		}
-		if !strings.Contains(r.Validate, "LC_ALL=C ") {
-			t.Fatalf("the validate repeats %s's program without LC_ALL=C:\n%s", name, r.Validate)
+		// The locale is tied to the program: every copy in the validate is
+		// run by the reader's own command word and options, immediately
+		// preceded by LC_ALL=C (an LC_ALL=C elsewhere on the line is not it).
+		lead := command[:strings.Index(command, prog)]
+		if got := strings.Count(r.Validate, lead+prog); got != n {
+			t.Fatalf("%d of the validate's %d copies of %s's program are not run as %q:\n%s", n-got, n, name, lead, r.Validate)
 		}
 	}
 	return found[0]

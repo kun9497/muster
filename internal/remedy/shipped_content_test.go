@@ -75,12 +75,13 @@ exit 99
 }
 
 // rebaseContent prefixes root to every host path a content body names, in
-// one pass (O-31): /etc/vsftpd covers /etc/vsftpd.conf and /etc/vsftpd/.
+// one pass (O-31): /etc/vsftpd covers /etc/vsftpd.conf and /etc/vsftpd/, and
+// /etc/postfix covers the directory a `postconf -c /etc/postfix` names.
 func rebaseContent(s, root string) string {
 	return strings.NewReplacer(
 		"/etc/hosts.equiv", root+"/etc/hosts.equiv",
 		"/etc/vsftpd", root+"/etc/vsftpd",
-		"/etc/postfix/", root+"/etc/postfix/",
+		"/etc/postfix", root+"/etc/postfix",
 		"/etc/exports", root+"/etc/exports",
 	).Replace(s)
 }
@@ -94,7 +95,10 @@ func contentBlock(t *testing.T, id, root string, failValidate bool) *Plan {
 	if err != nil {
 		t.Fatal(err)
 	}
-	c, _ := set.ByID(id)
+	c, ok := set.ByID(id)
+	if !ok {
+		t.Fatalf("%s: no such control in the shipped set", id)
+	}
 	p := mustBuild(t, scriptReport(row(id, "FAIL", "clause does not hold", "", importanceSeverity[c.Importance])), set, Options{})
 	if len(p.Items) != 1 || !p.Items[0].Script || !p.Items[0].Planned {
 		t.Fatalf("%s: plan %+v, want one planned scripted item", id, p.Items)
@@ -119,8 +123,8 @@ func contentBlock(t *testing.T, id, root string, failValidate bool) *Plan {
 
 func TestRebaseContentRebasesEachPathOnce(t *testing.T) {
 	const root = "/tmp/r"
-	in := "/etc/hosts.equiv /etc/vsftpd.conf /etc/vsftpd/vsftpd.conf /etc/postfix/main.cf /etc/exports /etc/passwd"
-	want := "/tmp/r/etc/hosts.equiv /tmp/r/etc/vsftpd.conf /tmp/r/etc/vsftpd/vsftpd.conf /tmp/r/etc/postfix/main.cf /tmp/r/etc/exports /etc/passwd"
+	in := "/etc/hosts.equiv /etc/vsftpd.conf /etc/vsftpd/vsftpd.conf /etc/postfix/main.cf postconf -c /etc/postfix -h x /etc/exports /etc/passwd"
+	want := "/tmp/r/etc/hosts.equiv /tmp/r/etc/vsftpd.conf /tmp/r/etc/vsftpd/vsftpd.conf /tmp/r/etc/postfix/main.cf postconf -c /tmp/r/etc/postfix -h x /tmp/r/etc/exports /etc/passwd"
 	got := rebaseContent(in, root)
 	if got != want || strings.Contains(got, root+root) {
 		t.Errorf("rebaseContent:\n got %s\nwant %s", got, want)
