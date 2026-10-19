@@ -1,8 +1,8 @@
 id: muster.beyond.audit_rules_loaded
 title_en: The kernel has audit rules loaded, and the host keeps rules for the next boot
 title_ko: 커널에 감사 규칙이 적재되어 있고 다음 부팅을 위한 규칙도 저장되어 있다
-description_en: A running audit daemon records only what its rules select. With no rule loaded the kernel emits no system-call or file-watch record at all, and the trail holds only the messages user-space programs such as PAM and sudo send on their own — the daemon runs and audits nothing. Rules live in two homes. The runtime home is the kernel's rule list, which auditctl -l prints (auditctl(8)); the persisted home is what the next boot will load, which on a systemd host is decided by augenrules(8) — the unit runs augenrules --load after the daemon starts, and augenrules merges the *.rules files of /etc/audit/rules.d in version order into /etc/audit/audit.rules and loads that; the daemon never reads audit.rules itself. When rules.d is missing augenrules loads /etc/audit/audit.rules as it stands, and muster reads it as the persisted home with a reason saying so; with neither there is nothing to load. muster requires at least one watch or system-call rule in each home, judged as two separate clauses rather than as one two-sided reading. It counts rules and does not judge what they select, so a -a never rule counts like any other. Rules loaded by hand and lost at reboot, or in a file the daemon never loaded, are each a FAIL; the reason names the home — an absent persisted side reads "absent counts as fail", and the evidence rows carry the side and the rules.d reason. It is rated 상 because a host whose audit trail is empty cannot answer the questions an incident asks, and an active daemon hides that. A stock EL9 host ships a rules.d/audit.rules with only control lines (-D, -b, -f) and fails; a stock Ubuntu host has no auditd and reads NOT_APPLICABLE, where auditd_active fires instead. A kernel booted with audit=0 reads NOT_APPLICABLE here (auditctl reports that audit support is not in the kernel) and auditd_active is the control that fires. A run without root cannot list the kernel's rules and reads ERROR.
-description_ko: 실행 중인 감사 데몬은 규칙이 선택한 것만 기록합니다. 적재된 규칙이 하나도 없으면 커널은 시스템 호출이나 파일 감시 기록을 전혀 내보내지 않고, 기록에는 PAM·sudo 같은 사용자 공간 프로그램이 스스로 보내는 메시지만 남습니다. 데몬은 돌지만 아무것도 감사하지 않는 것입니다. 규칙은 두 곳에 있습니다. 런타임 쪽은 auditctl -l 이 출력하는 커널의 규칙 목록이고(auditctl(8)), 저장 쪽은 다음 부팅이 적재할 규칙으로 systemd 호스트에서는 augenrules(8) 가 그것을 결정합니다. 유닛은 데몬이 시작된 뒤 augenrules --load 를 실행하고, augenrules 는 /etc/audit/rules.d 의 *.rules 파일을 버전 순서로 합쳐 /etc/audit/audit.rules 를 만든 다음 그것을 적재합니다. 데몬은 audit.rules 를 직접 읽지 않습니다. rules.d 가 없으면 augenrules 는 /etc/audit/audit.rules 를 있는 그대로 적재하므로 muster 는 그 파일을 저장 쪽으로 읽고 그렇다는 사유를 남기며, 둘 다 없으면 적재할 것이 없습니다. muster 는 두 곳 모두에 감시 규칙이나 시스템 호출 규칙이 하나 이상 있을 것을 요구하며, 양쪽을 함께 보는 하나의 판정이 아니라 두 개의 독립된 조건으로 판정합니다. 규칙의 개수만 세고 규칙이 무엇을 선택하는지는 판정하지 않으므로 -a never 규칙도 다른 규칙과 똑같이 셉니다. 손으로 적재했다가 재부팅 때 사라지는 규칙도, 데몬이 한 번도 적재하지 않은 파일 속 규칙도 각각 FAIL 이며, 사유가 어느 쪽인지 알려 줍니다. 저장 쪽이 absent 이면 사유는 "absent counts as fail" 로 시작하고, 증거 행에 해당 쪽과 rules.d 관련 사유가 담깁니다. 감사 기록이 비어 있는 호스트는 사고 조사가 묻는 질문에 답할 수 없고 활성 상태의 데몬이 그 사실을 가리므로 중요도는 상 입니다. EL9 기본 설치는 제어 줄(-D, -b, -f)만 있는 rules.d/audit.rules 를 배포하므로 실패하고, Ubuntu 기본 설치는 auditd 가 없어 NOT_APPLICABLE 이며 대신 auditd_active 가 경고합니다. audit=0 으로 부팅한 커널은 여기서 NOT_APPLICABLE 이며(auditctl 이 커널에 감사 지원이 없다고 보고) 경고하는 것은 auditd_active 입니다. root 가 아닌 실행은 커널의 규칙을 나열할 수 없으므로 ERROR 입니다.
+description_en: A running audit daemon records only what its rules select. With no rule loaded the kernel emits no system-call or file-watch record at all, and the trail holds only the messages user-space programs such as PAM and sudo send on their own — the daemon runs and audits nothing. Rules live in two homes. The runtime home is the kernel's rule list, which auditctl -l prints (auditctl(8)); the persisted home is what the next boot will load, which on a systemd host is decided by augenrules(8) — the unit runs augenrules --load after the daemon starts, and augenrules merges the *.rules files of /etc/audit/rules.d in version order into /etc/audit/audit.rules and loads that; the daemon never reads audit.rules itself. When rules.d is missing augenrules loads /etc/audit/audit.rules as it stands, and muster reads it as the persisted home with a reason saying so; with neither there is nothing to load. muster requires at least one watch or system-call rule in each home, judged as two separate clauses rather than as one two-sided reading. It counts rules and does not judge what they select, so a -a never rule counts like any other. Rules loaded by hand and lost at reboot, or in a file the daemon never loaded, are each a FAIL; the reason names the home — an absent persisted side reads "absent counts as fail", and the evidence rows carry the side and the rules.d reason. It is rated 상 because a host whose audit trail is empty cannot answer the questions an incident asks, and an active daemon hides that. A stock EL9 host ships a rules.d/audit.rules with only control lines (-D, -b, -f) and fails; a stock Ubuntu host has no auditd and reads NOT_APPLICABLE, where auditd_active fires instead. A kernel booted with audit=0 reads NOT_APPLICABLE here (auditctl reports that audit support is not in the kernel) and auditd_active is the control that fires. A run without root cannot list the kernel's rules and reads ERROR. A rule added with auditctl alone is gone at the next reboot, a hand edit of /etc/audit/audit.rules is overwritten the next time augenrules runs while rules.d exists, and a configuration already locked with -e 2 takes a new set only after a reboot.
+description_ko: 실행 중인 감사 데몬은 규칙이 선택한 것만 기록합니다. 적재된 규칙이 하나도 없으면 커널은 시스템 호출이나 파일 감시 기록을 전혀 내보내지 않고, 기록에는 PAM·sudo 같은 사용자 공간 프로그램이 스스로 보내는 메시지만 남습니다. 데몬은 돌지만 아무것도 감사하지 않는 것입니다. 규칙은 두 곳에 있습니다. 런타임 쪽은 auditctl -l 이 출력하는 커널의 규칙 목록이고(auditctl(8)), 저장 쪽은 다음 부팅이 적재할 규칙으로 systemd 호스트에서는 augenrules(8) 가 그것을 결정합니다. 유닛은 데몬이 시작된 뒤 augenrules --load 를 실행하고, augenrules 는 /etc/audit/rules.d 의 *.rules 파일을 버전 순서로 합쳐 /etc/audit/audit.rules 를 만든 다음 그것을 적재합니다. 데몬은 audit.rules 를 직접 읽지 않습니다. rules.d 가 없으면 augenrules 는 /etc/audit/audit.rules 를 있는 그대로 적재하므로 muster 는 그 파일을 저장 쪽으로 읽고 그렇다는 사유를 남기며, 둘 다 없으면 적재할 것이 없습니다. muster 는 두 곳 모두에 감시 규칙이나 시스템 호출 규칙이 하나 이상 있을 것을 요구하며, 양쪽을 함께 보는 하나의 판정이 아니라 두 개의 독립된 조건으로 판정합니다. 규칙의 개수만 세고 규칙이 무엇을 선택하는지는 판정하지 않으므로 -a never 규칙도 다른 규칙과 똑같이 셉니다. 손으로 적재했다가 재부팅 때 사라지는 규칙도, 데몬이 한 번도 적재하지 않은 파일 속 규칙도 각각 FAIL 이며, 사유가 어느 쪽인지 알려 줍니다. 저장 쪽이 absent 이면 사유는 "absent counts as fail" 로 시작하고, 증거 행에 해당 쪽과 rules.d 관련 사유가 담깁니다. 감사 기록이 비어 있는 호스트는 사고 조사가 묻는 질문에 답할 수 없고 활성 상태의 데몬이 그 사실을 가리므로 중요도는 상 입니다. EL9 기본 설치는 제어 줄(-D, -b, -f)만 있는 rules.d/audit.rules 를 배포하므로 실패하고, Ubuntu 기본 설치는 auditd 가 없어 NOT_APPLICABLE 이며 대신 auditd_active 가 경고합니다. audit=0 으로 부팅한 커널은 여기서 NOT_APPLICABLE 이며(auditctl 이 커널에 감사 지원이 없다고 보고) 경고하는 것은 auditd_active 입니다. root 가 아닌 실행은 커널의 규칙을 나열할 수 없으므로 ERROR 입니다. auditctl 만으로 추가한 규칙은 다음 재부팅 때 사라지고, rules.d 가 있는 동안 /etc/audit/audit.rules 를 손으로 고친 내용은 augenrules 가 다음에 실행될 때 덮어써지며, 이미 -e 2 로 잠긴 설정은 재부팅 후에야 새 규칙을 받습니다.
 category: beyond
 importance: 상
 automation: auto
@@ -17,7 +17,66 @@ checks:
   - { fact: audit.rules.present, op: eq, expected: true, on: runtime }
   - { fact: audit.rules.present, op: eq, expected: true, on: persisted }
 remediation:
-  text_en: Write the rules into a file under /etc/audit/rules.d whose name ends in .rules, then run augenrules --load, which regenerates /etc/audit/audit.rules from rules.d and loads it into the kernel — the same step the unit runs at every boot. A rule added with auditctl alone is gone at the next reboot, and a hand edit of /etc/audit/audit.rules is overwritten the next time augenrules runs while rules.d exists. If the rules are already locked with -e 2, the new set takes effect only after a reboot.
-  text_ko: /etc/audit/rules.d 아래 이름이 .rules 로 끝나는 파일에 규칙을 적고 augenrules --load 를 실행합니다. 이 명령은 rules.d 에서 /etc/audit/audit.rules 를 다시 만들어 커널에 적재하며, 유닛이 매 부팅마다 실행하는 단계와 같습니다. auditctl 만으로 추가한 규칙은 다음 재부팅 때 사라지고, rules.d 가 있는 동안 /etc/audit/audit.rules 를 손으로 고친 내용은 augenrules 가 다음에 실행될 때 덮어써집니다. 규칙이 이미 -e 2 로 잠겨 있으면 새 규칙은 재부팅 후에야 적용됩니다.
+  text_en: 'Write the rules into a file under /etc/audit/rules.d whose name ends in .rules, then run augenrules --load, which regenerates /etc/audit/audit.rules from rules.d and loads it into the kernel. The review script acts in three cases. With no rule persisted and none loaded it writes muster''s minimum watch set to /etc/audit/rules.d/50-muster.rules (mode 0640): wa watches on /etc/passwd, /etc/group, /etc/shadow, /etc/gshadow, /etc/sudoers, /etc/sudoers.d/ and /etc/audit/ under muster-* keys, for the paths that exist; replace it with the site''s own rules. With rules persisted and the kernel list empty it runs augenrules --load while auditd runs, else augenrules alone. With rules loaded and none persisted it leaves them: persist your own set. It refuses a missing or symlinked rules.d, never loads while -e 2 or --loginuid-immutable is pending or in force, and on rollback deletes only rules this run loaded and puts back the kernel settings it recorded.'
+  text_ko: '/etc/audit/rules.d 아래 이름이 .rules 로 끝나는 파일에 규칙을 적고 augenrules --load 를 실행합니다. 이 명령은 rules.d 에서 /etc/audit/audit.rules 를 다시 만들어 커널에 적재합니다. 검토 스크립트는 세 경우에만 움직입니다. 저장된 규칙도 적재된 규칙도 없으면 muster 의 최소 감시 규칙을 /etc/audit/rules.d/50-muster.rules(모드 0640)에 씁니다. /etc/passwd, /etc/group, /etc/shadow, /etc/gshadow, /etc/sudoers, /etc/sudoers.d/, /etc/audit/ 가운데 존재하는 경로에 muster-* 키로 wa 감시를 겁니다. 이 파일은 사이트 자체 규칙으로 바꾸십시오. 저장된 규칙이 있고 커널 목록이 비어 있으면 auditd 가 실행 중일 때 augenrules --load 를, 아니면 augenrules 만 실행합니다. 적재된 규칙만 있고 저장된 규칙이 없으면 그대로 둡니다. 직접 규칙을 저장하십시오. rules.d 가 없거나 심볼릭 링크이면 거부하고, -e 2 나 --loginuid-immutable 이 대기 중이거나 적용된 상태에서는 적재하지 않으며, 롤백은 이번 실행이 적재한 규칙만 지우고 기록해 둔 커널 설정을 되돌립니다.'
   risk: restart_service
   idempotent: true
+  backup: [/etc/audit/rules.d/50-muster.rules, /etc/audit/audit.rules]
+  script: |
+    rm -f "$MB/audit.loaded" "$MB/audit.status" "$MB/auditd.edited"
+    d=/etc/audit/rules.d
+    f=/etc/audit/rules.d/50-muster.rules
+    if [ ! -d "$d" ] || [ -L "$d" ]; then log "muster.beyond.audit_rules_loaded: $d is missing or a symlink; refused"; exit 1; fi
+    if [ -L "$f" ]; then log "muster.beyond.audit_rules_loaded: $f is a symlink (a mask), left as is"; exit 1; fi
+    rd_present() { LC_ALL=C grep -Esq '^[[:space:]]*-[waA]' "$@"; }
+    rd_lock() { LC_ALL=C grep -Esq '(^|[[:space:]])(-e[[:space:]]*\+?0*2([[:space:]]|$)|--loginuid-immutable([[:space:]]|$))' "$@"; }
+    s=$(LC_ALL=C auditctl -s) || { log "muster.beyond.audit_rules_loaded: auditctl -s cannot tell the lock state; refused"; exit 1; }
+    e=$(printf '%s\n' "$s" | LC_ALL=C awk '$1 == "enabled" { v = $2 } END { print v }')
+    if [ -z "$e" ]; then log "muster.beyond.audit_rules_loaded: auditctl -s cannot tell the lock state; refused"; exit 1; fi
+    if printf '%s\n' "$s" | LC_ALL=C awk '($1 == "enabled" && $2 == "2") || ($1 == "loginuid_immutable" && $2 == "1") { f = 1 } END { exit !f }' || rd_lock "$d"/*.rules /etc/audit/audit.rules; then
+      log "muster.beyond.audit_rules_loaded: a one-way audit setting is pending or in force; refused"
+      exit 1
+    fi
+    l=$(LC_ALL=C auditctl -l) || { log "muster.beyond.audit_rules_loaded: auditctl -l failed; refused"; exit 1; }
+    if rd_present "$d"/*.rules; then pr=1; else pr=; fi
+    if [ -z "$pr" ] && [ "$l" != "No rules" ]; then
+      log "muster.beyond.audit_rules_loaded: kernel rules are not persisted; persist your own set"
+      exit 0
+    fi
+    if [ -z "$pr" ]; then
+      new=
+      if [ ! -e "$f" ]; then new=1; fi
+      : > "$MB/auditd.edited"
+      for w in /etc/passwd=muster-identity /etc/group=muster-identity /etc/shadow=muster-identity /etc/gshadow=muster-identity /etc/sudoers=muster-privilege /etc/sudoers.d/=muster-privilege /etc/audit/=muster-audit-config; do
+        if [ -e "${w%%=*}" ]; then printf -- '-w %s -p wa -k %s\n' "${w%%=*}" "${w#*=}"; fi
+      done > "$f"
+      chmod 0640 "$f"
+      if [ -n "$new" ]; then
+        if command -v selinuxenabled >/dev/null 2>&1 && selinuxenabled && command -v restorecon >/dev/null 2>&1; then restorecon -- "$f"; fi
+      fi
+    fi
+    if LC_ALL=C systemctl is-active --quiet auditd.service && [ "$l" = "No rules" ]; then
+      printf '%s\n' "$s" | LC_ALL=C awk '$1 == "enabled" || $1 == "failure" || $1 == "backlog_limit" || $1 == "backlog_wait_time" || $1 == "rate_limit" { print $1, $2 }' > "$MB/audit.status"
+      : > "$MB/audit.loaded"
+      augenrules --load
+    else
+      augenrules
+    fi
+  validate: 'if LC_ALL=C grep -Esq ''^[[:space:]]*-[waA]'' /etc/audit/rules.d/*.rules; then ! LC_ALL=C systemctl is-active --quiet auditd.service || { l=$(LC_ALL=C auditctl -l) && [ "$l" != "No rules" ]; }; else l=$(LC_ALL=C auditctl -l) && [ "$l" != "No rules" ]; fi'
+  rollback: |
+    restore /etc/audit/rules.d/50-muster.rules /etc/audit/audit.rules
+    if [ -f "$MB/audit.loaded" ]; then
+      s=$(LC_ALL=C auditctl -s 2>/dev/null) || s=
+      if ! printf '%s\n' "$s" | LC_ALL=C awk '($1 == "enabled" && $2 == "2") || ($1 == "loginuid_immutable" && $2 == "1") { f = 1 } END { exit !f }'; then
+        e='' fm='' b='' w='' r=''
+        while read -r k v; do
+          case "$k" in enabled) e=$v;; failure) fm=$v;; backlog_limit) b=$v;; backlog_wait_time) w=$v;; rate_limit) r=$v;; esac
+        done < "$MB/audit.status"
+        if [ -n "$e" ] && [ "$e" != 2 ]; then auditctl -e "$e"; fi
+        if [ -n "$fm" ]; then auditctl -f "$fm"; fi
+        if [ -n "$b" ]; then auditctl -b "$b"; fi
+        if [ -n "$w" ]; then auditctl --backlog_wait_time "$w"; fi
+        if [ -n "$r" ]; then auditctl -r "$r"; fi
+        auditctl -D
+      fi
+    fi

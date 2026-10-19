@@ -14,11 +14,12 @@ import (
 // unitToken is a systemd unit name a remediation body can carry.
 var unitToken = regexp.MustCompile(`[A-Za-z0-9@_.-]+\.(service|socket)`)
 
-// TestServiceScriptsNameTheCollectorsUnits pins 3D-2b §3: a service control
-// declares as units exactly the provesInstall units of its rows (as a set;
-// the order is the control's, socket before service), its validate names
-// exactly those, its script names none literally (it loops over $UNITS), and
-// it has no rollback (the unit state is the way back).
+// TestServiceScriptsNameTheCollectorsUnits pins 3D-2b §3 for every
+// units-declaring control (eleven: ten disable, one enables, 3D-2d O-5): it
+// declares as units exactly the provesInstall units of its services rows (as
+// a set; the order is the control's, socket before service), its validate
+// names exactly those, its script names none literally (it loops over
+// $UNITS), and it has no rollback (the unit state is the way back).
 func TestServiceScriptsNameTheCollectorsUnits(t *testing.T) {
 	set, err := controls.LoadDefault()
 	if err != nil {
@@ -35,6 +36,7 @@ func TestServiceScriptsNameTheCollectorsUnits(t *testing.T) {
 		"muster.service.nis_disabled":          {"nis"},
 		"muster.service.tftp_talk_disabled":    {"tftp", "talk"},
 		"muster.service.snmp_disabled":         {"snmp"},
+		"muster.beyond.auditd_active":          {"auditd"},
 	}
 	byName := map[string]logicalService{}
 	for _, s := range services {
@@ -49,8 +51,8 @@ func TestServiceScriptsNameTheCollectorsUnits(t *testing.T) {
 			}
 		}
 	}
-	if declaring != 10 || len(rows) != 10 {
-		t.Fatalf("%d controls declare units, %d mapped; want 10 and 10", declaring, len(rows))
+	if declaring != 11 || len(rows) != 11 {
+		t.Fatalf("%d controls declare units, %d mapped; want 11 and 11", declaring, len(rows))
 	}
 	for id, names := range rows {
 		c, ok := set.ByID(id)

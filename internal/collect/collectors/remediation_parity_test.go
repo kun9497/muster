@@ -413,3 +413,89 @@ func TestAuditdConfReaderMatchesTheCollector(t *testing.T) {
 		})
 	}
 }
+
+// TestAuditRulesReadersMatchTheCollector (§4.2, O-3, O-41, O-57): the rules
+// bodies read a persisted rules file twice, and the readers compare by exit
+// code (0 = present / locked):
+//
+//	rd_present  inValidate true: the validate repeats it over rules.d. It
+//	            exits 0 exactly when parseAuditRules finds a watch or a
+//	            syscall rule (auditKind of the getopt-read first option),
+//	            so the body writes the floor only where the persisted
+//	            clause FAILs and the validate agrees with check after it.
+//	rd_lock     inValidate false: a refusal guard the validate never needs.
+//	            One-sided: wherever lastEnableValue reads 2 the body reads a
+//	            lock; the body also refuses where the collector reads none
+//	            (the token later on a line, -e 02 and -e +2, which auditctl
+//	            rejects, --loginuid-immutable), the safe direction. Both
+//	            bodies carry the same line.
+func TestAuditRulesReadersMatchTheCollector(t *testing.T) {
+	r := shippedBody(t, "muster.beyond.audit_rules_loaded")
+	present := readerLine(t, r, "rd_present", true)
+	lock := readerLine(t, r, "rd_lock", false)
+	if other := readerLine(t, shippedBody(t, "muster.beyond.auditd_active"), "rd_lock", false); other != lock {
+		t.Errorf("the two bodies' rd_lock differ:\n%s\n%s", lock, other)
+	}
+	rows := []struct {
+		name, rules string
+		noLock      bool // neither side reads a lock
+	}{
+		{"glued watch", "-w/etc/passwd -p wa\n", true},
+		{"glued syscall", "-aalways,exit -S all\n", true},
+		{"spaced watch", "-w /etc/passwd -p wa -k identity\n", true},
+		{"indented syscall", "\t  -a always,exit -S execve\n", true},
+		{"prepend", "-A exclude,always -F msgtype=CWD\n", true},
+		{"commented watch", "# -w /etc/passwd -p wa\n#-a always,exit\n", true},
+		{"watch removal", "-W /etc/passwd\n", true},
+		{"crlf watch", "-w /etc/passwd -p wa\r\n", true},
+		{"glued lock", "-e2\n", false},
+		{"two blanks", "-e  2\n", false},
+		{"lock with a comment", "-e 2 # c\n", false},
+		{"zero-padded", "-e 02\n", false},
+		{"signed", "-e +2\n", false},
+		{"loginuid lock", "--loginuid-immutable\n", false},
+		{"later on the line", "-b 8192 -e 2\n", false},
+		{"enable 1", "-e 1\n", true},
+		{"enable 0", "-e 0\n", true},
+		{"enable 12", "-e 12\n", true},
+		{"enable 20", "-e 20\n", true},
+		{"backlog", "-b 8192\n", true},
+		{"lock then enable", "-e 2\n-e 1\n", false},
+	}
+	for _, f := range []string{"audit.rules.sample", "audit.rules.d-50-watch.rules", "audit.rules.d-99-finalize.rules"} {
+		b, err := os.ReadFile(filepath.Join("testdata", f))
+		if err != nil {
+			t.Fatal(err)
+		}
+		rows = append(rows, struct {
+			name, rules string
+			noLock      bool
+		}{f, string(b), f != "audit.rules.d-99-finalize.rules"})
+	}
+	const file = "/etc/audit/rules.d/x.rules"
+	for _, row := range rows {
+		t.Run(row.name, func(t *testing.T) {
+			rules := parseAuditRules([]byte(row.rules), file)
+			n := 0
+			for _, x := range rules {
+				if x.kind == "watch" || x.kind == "syscall" {
+					n++
+				}
+			}
+			files := map[string][]byte{file: []byte(row.rules)}
+			if _, code := runReader(t, present, "rd_present {root}"+file, files); (code == 0) != (n > 0) {
+				t.Errorf("rd_present exit %d; parseAuditRules finds %d watch or syscall rules", code, n)
+			}
+			_, code := runReader(t, lock, "rd_lock {root}"+file, files)
+			if v, _, found := lastEnableValue(rules); found && v == 2 && code != 0 {
+				t.Errorf("lastEnableValue reads the lock and rd_lock exits %d", code)
+			}
+			if row.noLock && code == 0 {
+				t.Errorf("rd_lock reads a lock in %q", row.rules)
+			}
+			if !row.noLock && code != 0 {
+				t.Errorf("rd_lock exit %d over %q, want a lock", code, row.rules)
+			}
+		})
+	}
+}

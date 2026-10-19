@@ -30,6 +30,10 @@
   images: [runner]
 - id: muster.beyond.audit_log_permissions
   images: [runner]
+- id: muster.beyond.audit_rules_loaded
+  images: [runner]
+- id: muster.beyond.auditd_active
+  images: [runner]
 - id: muster.beyond.bootloader_config_permissions
   images: [runner]
 - id: muster.beyond.icmp_broadcast_and_bogus_ignored

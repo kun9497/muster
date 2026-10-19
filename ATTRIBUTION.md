@@ -71,6 +71,9 @@ Checks beyond the KISA list (for example mount options, kernel self-protection
 sysctls, audit pipeline health) are written from primary sources — kernel
 documentation, man pages, distribution documentation — in muster's own wording,
 and reproduce no benchmark text.
+The rule lines muster's `audit_rules_loaded` script writes to
+`/etc/audit/rules.d/50-muster.rules` are auditctl(8) syntax with muster's own
+keys, chosen from the man page, not taken from any benchmark or STIG text.
 
 ## Contributions
 
