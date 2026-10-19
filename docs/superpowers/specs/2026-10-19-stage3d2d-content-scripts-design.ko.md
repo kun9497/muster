@@ -53,7 +53,7 @@
   - **runtime 잠금**: `auditctl -s`가 `enabled 2`나 `loginuid_immutable 1`을 보고합니다(키는 접두어가 아니라
     통째로 맞춤).
   - **대기 중인 잠금**: `/etc/audit/rules.d/*.rules`나 `/etc/audit/audit.rules`의 어떤 줄이든
-    `^[[:space:]]*-e[[:space:]]*\+?0*2([[:space:]]|$)`나 `^[[:space:]]*--loginuid-immutable`에 맞는 것. 이
+    `(^|[[:space:]])(-e[[:space:]]*\+?0*2([[:space:]]|$)|--loginuid-immutable([[:space:]]|$))`에 맞는 것(토큰은 줄의 어디에 있어도 됨: `-b 8192 -e 2`도 잠금을 적용함). 이
     검사는 augenrules의 "마지막 `-e`가 이김"보다 넓고 적어도 collector의 `lastEnableValue`만큼 넓습니다. 거부의
     값은 control이 FAIL로 남는 실패한 블록이고, 잘못된 추측의 값은 잠긴 커널입니다.
   거부는 로그를 남기고, 어떤 쓰기보다 먼저 1로 끝나며, 블록이 실패합니다(복원이 돌지만 바뀐 것은 없음). 본문별로:
@@ -235,8 +235,10 @@
    `cron_permissions` validate가 이미 쓰는 모양입니다.
 10. **읽기 대조 테스트(O-10).** 파일에서 읽은 값으로 가드하는 본문은 대조 테스트의 표에 그 읽기를 이름
     붙입니다.
-11. **SELinux.** `selinuxenabled`가 성공하는 곳에서는 본문이 다시 쓴 각 경로(`sed -i`, `postconf -e`, 파일을 만든
-    덧붙이기)에 `restorecon`을 실행하고, 그 rollback도 `restore` 뒤에 똑같이 합니다.
+11. **SELinux.** 본문은 도구가 바꿔 놓거나 만든 파일(`postconf -e`, 새로 만든 `/etc/default/useradd`나
+    `50-muster.rules`)에만 `restorecon`을 실행합니다. `sed -i` 뒤(GNU sed는 컨텍스트를 지킴)와 `restore` 뒤(`cp -a`가
+    지킴)에는 절대 하지 않으며, 표기는 `if command -v selinuxenabled >/dev/null 2>&1 && selinuxenabled && command -v
+    restorecon >/dev/null 2>&1; then restorecon -- "$f"; fi`입니다.
 12. **업그레이드.** 본문이 제자리에서 고치는 벤더 설정 파일은 다음 업그레이드 때 패키지 관리자가 보고합니다.
     Debian과 Ubuntu에서는 dpkg(또는 ucf)가 고쳐진 conffile에 대해 묻고, EL 계열에서는 rpm이 고친 것을 유지하고
     패키지의 판을 그 옆에 `.rpmnew`로 씁니다. 텍스트는 control마다 한 번 그렇게 말하며, 사전 점검이 패키지 소유
@@ -322,8 +324,8 @@
   값을 보통 변수에 옮겨 담고, 그 키의 모든 줄을 `sed -i`로 다시 씁니다. `space_left_action`이
   `admin_space_left_action`을 절대 건드리지 않도록 고정합니다. 없는 키는 절대 더하지 않습니다. 그 행은 FAIL이 아니라
   MANUAL이라 본문이 만나지 않습니다.
-- reload: `was-running` 표지가 있으면 auditctl에 있을 때 `auditctl --signal reload`, 아니면 `/run/auditd.pid`의 pid에
-  `kill -HUP`(사전 점검이 계열마다, 그리고 HUP가 다섯 키를 적용하는지를 정함 — runner에서 저널의 auditd
+- reload: `was-running` 표지가 있으면 `auditctl --signal reload`만 씁니다. pid 파일로 `kill`하지 않습니다(오래된
+  pid 파일은 재사용된 pid를 가리킬 수 있음)(사전 점검이 모든 계열에서 `--signal`을, 그리고 HUP가 다섯 키를 적용하는지를 확인함 — runner에서 저널의 auditd
   reconfigure 줄로 읽음. 적용하지 않으면 텍스트가 다음 시작 때 적용된다고 말함). restart는 절대 하지 않습니다
   (restart는 augenrules를 다시 실행함, O-3).
 - validate(한 줄): 네 목록을 `-v`로 넘긴 파일 위의 `awk`로 collector의 읽기를 따르며, `$MB/disk.keys`의 키만
@@ -352,7 +354,9 @@
      - 필드 7이 -1이 아니고 `n` 이하인 십진 정수(-1보다 작은 음수 포함: 절이 받아들임) → 둠;
      - 필드 7이 비어 있지 않고 십진 정수가 아님 → 건너뛰고 이름을 남김(본문이 그 텍스트를 복원할 수 없음);
      - `last = 0` → 건너뛰고 이름을 남김(다음 로그인 때 바꿔야 함. pam_unix는 거기에 비활성을 적용하지 않으므로
-       이는 안전한 쪽으로 더 건너뜀);
+       이는 안전한 쪽으로 더 건너뜀); `max`가 설정되어 있고 99999가 아닌데 `last`가 비었거나 음수 → 건너뛰고 이름을
+       남김(pam_unix의 만료 검사에는 설정되지 않은 마지막 변경일을 막는 가드가 없어, 필드 7이 설정되면 계정이 만료로
+       읽힘); `last <= 0`일 때는 날짜 줄을 절대 찍지 않음;
      - `last > 0`, `max >= 0`, 그리고 `today - last >= max + n`(today = `$(( $(date +%s) / 86400 ))`; `>=`는
        shadow의 `isexpired` 경계이며 pam_unix의 `>`보다 보수적인 쪽) → 건너뛰고 이름을 남김(`change its password
        first`);
@@ -434,10 +438,10 @@
 ### 4.9 `muster.service.nfs_export_access` — `no_root_squash` 쪽 (상, 위험도 `restart_service`)
 
 - 배포된 본문(`/etc/exports`의 소유자와 모드, `backup: [/etc/exports]`)이 기존 가드 안에서, 줄의 첫 `#` 앞
-  텍스트의 옵션 목록으로 범위를 정한 바꾸기를 얻습니다. `(`, `,`, 또는 기본 목록을 여는 `-`(O-18)가 앞에 있고
-  `,`, `)`, 또는 공백이 뒤에 있는 `no_root_squash`가 `root_squash`가 되며, 안정될 때까지 되풀이합니다(인접한 맞춤은
-  쉼표를 공유함). 그 단어를 담기만 한 경로나 클라이언트 이름은 건드리지 않습니다. 가드, validate, 대조 행은 같은
-  맞춤을 씁니다.
+  텍스트의 옵션 목록으로 범위를 정한 바꾸기를 얻습니다. `(`, `,`, 또는 기본 목록을 여는 공백 뒤의 `-`(O-18)가 앞에
+  있고 `,`, `)`, 공백, 또는 줄 끝이 뒤에 있는 `no_root_squash`가 `root_squash`가 되며, 남은 것이 없을 때까지 한 번에
+  하나씩 바꿉니다(인접한 맞춤은 쉼표를 공유함). 그 단어를 담기만 한 경로나 클라이언트 이름은 건드리지 않습니다.
+  가드, validate, 대조 행, 바꾸기는 하나의 ERE를 함께 씁니다: `^[^#]*([(,]|[[:space:]]-)no_root_squash([,)[:space:]]|$)`.
 - 표지(O-16): `nfs-server.service`가 active이면 `$MB/nfs.was-running`(Debian의 `nfs-kernel-server`는 별칭);
   바꾸기 앞에 `$MB/nfs.edited`; 둘 다 있으면 `exportfs -ra`. 그 `exportfs`는 살아 있는 서버 위에서 돌고, 다음 블록
   `nfs_server_disabled`가 이어서 그것을 멈춥니다(§2).
@@ -469,7 +473,7 @@ drop-in을 지웁니다. `rhosts_forbidden`은 runner에 없습니다. VM의 `fi
 `nfs_export_access`(시드 `/srv 192.0.2.0/24(rw,no_root_squash)`, RFC 5737 범위, 그다음 `exportfs -ra`)는 init 행
 셋에서 돕니다. `ubuntu2204`에는 systemd가 없어 거기서 services 가드는 NOT_APPLICABLE로 읽힙니다. 시드 방식:
 
-- EL 시드는 첫 `dnf` 줄에서 `vsftpd`와 `postfix`를 설치하고, 시작 루프 앞에 설정 시드(`anonymous_enable=YES`)를
+- 아래의 IPv6 우회는 EL과 Debian 시드에 똑같이 적용됩니다. EL 시드는 첫 `dnf` 줄에서 `vsftpd`와 `postfix`를 설치하고, 시작 루프 앞에 설정 시드(`anonymous_enable=YES`)를
   씁니다. Debian은 사전 점검이 정한 debconf 답으로 `postfix`를 비대화식으로 설치합니다;
 - `vsftpd.service`와 `postfix.service`가 각 init 행의 `START_UNITS`에 들어갑니다. `postfix.service`가 `/bin/true`
   래퍼인 Debian에서는 정착 검사가 `postfix@-.service`(또는 `postfix status`)를 읽습니다;

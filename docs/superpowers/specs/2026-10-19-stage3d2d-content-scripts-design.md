@@ -54,7 +54,7 @@ one-way runtime write, a package install, a PAM stack edit, or an `automation: m
   - **runtime lock**: `auditctl -s` reports `enabled 2` or `loginuid_immutable 1` (keys matched whole, never by
     prefix);
   - **pending lock**: any line of `/etc/audit/rules.d/*.rules` or `/etc/audit/audit.rules` matching
-    `^[[:space:]]*-e[[:space:]]*\+?0*2([[:space:]]|$)` or `^[[:space:]]*--loginuid-immutable`. The test is broader
+    `(^|[[:space:]])(-e[[:space:]]*\+?0*2([[:space:]]|$)|--loginuid-immutable([[:space:]]|$))` (the token may stand anywhere on the line: `-b 8192 -e 2` applies the lock too). The test is broader
     than augenrules' "last `-e` wins" and at least as broad as the collector's `lastEnableValue`: a refusal costs a
     failed block whose control stays FAIL; a wrong guess costs a locked kernel.
   A refusal logs, exits 1 before any write, and the block fails (the restores run; nothing changed). Per body:
@@ -240,8 +240,10 @@ These go into CONTRIBUTING's "Remediation bodies" section, English and Korean.
    `cron_permissions` validates already use.
 10. **The reader parity test (O-10).** A body that gates on a value read from a file names that reader in the
     parity test's table.
-11. **SELinux.** Where `selinuxenabled` succeeds, a body runs `restorecon` on each path it rewrote (`sed -i`,
-    `postconf -e`, an append that created the file), and its rollback does the same after `restore`.
+11. **SELinux.** A body runs `restorecon` only on a file a tool replaced or created (`postconf -e`, a created
+    `/etc/default/useradd` or `50-muster.rules`), never after `sed -i` (GNU sed keeps the context) and never after
+    `restore` (`cp -a` keeps it), spelled `if command -v selinuxenabled >/dev/null 2>&1 && selinuxenabled && command -v
+    restorecon >/dev/null 2>&1; then restorecon -- "$f"; fi`.
 12. **Upgrades.** A vendor configuration file a body edits in place is reported by the package manager at the next
     upgrade: on Debian and Ubuntu dpkg (or ucf) asks about an edited conffile; on the EL family rpm keeps the edit
     and writes the package's version beside it as `.rpmnew`. The text says so once per control, naming only the
@@ -328,8 +330,8 @@ overflow. Sketches fix the shape; the plan writes the bodies.
   before the first write, copies the value to a plain variable, and rewrites every line of that key with `sed -i`,
   anchored so `space_left_action` never touches `admin_space_left_action`. A missing key is never added: that row is
   MANUAL, not FAIL, so the body never meets it.
-- Reload: with the `was-running` marker, `auditctl --signal reload` where auditctl has it, else `kill -HUP` the pid
-  in `/run/auditd.pid` (the probe settles each family, and whether a HUP applies the five keys — read from auditd's
+- Reload: with the `was-running` marker, `auditctl --signal reload` and nothing else — no pid-file `kill`, which a
+  stale pid file can aim at a reused pid (the probe confirms `--signal` on every family, and whether a HUP applies the five keys — read from auditd's
   reconfigure line in the journal on the runner; if it does not, the text says they apply at the next start).
   Never a restart (a restart re-runs augenrules, O-3).
 - Validate (one line): an `awk` over the file with the four lists passed by `-v`, the collector's reading, checking
@@ -362,7 +364,9 @@ overflow. Sketches fix the shape; the plan writes the bodies.
        them) → leave;
      - field 7 non-empty and not a decimal integer → skip, named (the body cannot restore its text);
      - `last = 0` → skip, named (must change at next login; pam_unix never applies inactivity to it, so this
-       over-skips, on the safe side);
+       over-skips, on the safe side); an empty or negative `last` while `max` is set and not 99999 → skip, named
+       (pam_unix's expiry check has no guard for an unset last change: once field 7 is set the account reads
+       expired); no date line is ever printed when `last <= 0`;
      - `last > 0`, `max >= 0`, and `today - last >= max + n` (today = `$(( $(date +%s) / 86400 ))`; `>=` is
        shadow's `isexpired` bound, the conservative side of pam_unix's `>`) → skip, named (`change its password
        first`);
@@ -445,10 +449,11 @@ overflow. Sketches fix the shape; the plan writes the bodies.
 ### 4.9 `muster.service.nfs_export_access` — the `no_root_squash` half (상, risk `restart_service`)
 
 - The shipped body (owner and mode of `/etc/exports`, `backup: [/etc/exports]`) gains, inside its existing guard, a
-  swap scoped to option lists in the text before a line's first `#`: `no_root_squash` preceded by `(`, `,` or the
-  `-` that opens a default list (O-18), and followed by `,`, `)` or a blank, becomes `root_squash`, repeated until
-  stable (adjacent matches share a comma). A path or client name that merely contains the word is untouched. The
-  guard, the validate and the parity rows use the same match.
+  swap scoped to option lists in the text before a line's first `#`: `no_root_squash` preceded by `(`, `,` or a
+  blank-led `-` that opens a default list (O-18), and followed by `,`, `)`, a blank or the line's end, becomes
+  `root_squash`, one match per pass until none is left (adjacent matches share a comma). A path or client name that
+  merely contains the word is untouched. The guard, the validate, the parity rows and the swap share one ERE:
+  `^[^#]*([(,]|[[:space:]]-)no_root_squash([,)[:space:]]|$)`.
 - Markers (O-16): `$MB/nfs.was-running` when `nfs-server.service` is active (Debian's `nfs-kernel-server` is an
   alias); `$MB/nfs.edited` before the swap; with both, `exportfs -ra`. Its `exportfs` runs on the live server,
   which the next block, `nfs_server_disabled`, then stops (§2).
@@ -479,7 +484,7 @@ account's home outside the declaration), so the row is MANUAL and never planned.
 and `nfs_export_access` (seed `/srv 192.0.2.0/24(rw,no_root_squash)`, an RFC 5737 range, then `exportfs -ra`) run on
 the three init rows; `ubuntu2204` has no systemd, so the services gates read NOT_APPLICABLE there. Seed mechanics:
 
-- the EL seeds install `vsftpd` and `postfix` in their first `dnf` line, and write the config seeds
+- the IPv6 workaround below applies to the EL and Debian seeds alike; the EL seeds install `vsftpd` and `postfix` in their first `dnf` line, and write the config seeds
   (`anonymous_enable=YES`) before the start loop; Debian installs `postfix` non-interactively with the debconf
   answers the probe settles;
 - `vsftpd.service` and `postfix.service` join each init row's `START_UNITS`; on Debian, whose `postfix.service` is
