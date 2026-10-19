@@ -4854,7 +4854,7 @@
     {
       "Key": "audit.conf.max_log_file_action",
       "Type": "string",
-      "Description": "The max_log_file_action of /etc/audit/auditd.conf, lower-cased; absent when no line sets it, never the daemon's compiled default.",
+      "Description": "The max_log_file_action of /etc/audit/auditd.conf - the value's first word, lower-cased (an exec action's path is not part of the value); absent when no line sets it, never the daemon's compiled default.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "audit",
@@ -4864,7 +4864,7 @@
     {
       "Key": "audit.conf.space_left_action",
       "Type": "string",
-      "Description": "The space_left_action of /etc/audit/auditd.conf, lower-cased; absent when no line sets it, never the daemon's compiled default.",
+      "Description": "The space_left_action of /etc/audit/auditd.conf - the value's first word, lower-cased (an exec action's path is not part of the value); absent when no line sets it, never the daemon's compiled default.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "audit",
@@ -4874,7 +4874,7 @@
     {
       "Key": "audit.conf.admin_space_left_action",
       "Type": "string",
-      "Description": "The admin_space_left_action of /etc/audit/auditd.conf, lower-cased; absent when no line sets it, never the daemon's compiled default.",
+      "Description": "The admin_space_left_action of /etc/audit/auditd.conf - the value's first word, lower-cased (an exec action's path is not part of the value); absent when no line sets it, never the daemon's compiled default.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "audit",
@@ -4884,7 +4884,7 @@
     {
       "Key": "audit.conf.disk_full_action",
       "Type": "string",
-      "Description": "The disk_full_action of /etc/audit/auditd.conf, lower-cased; absent when no line sets it, never the daemon's compiled default.",
+      "Description": "The disk_full_action of /etc/audit/auditd.conf - the value's first word, lower-cased (an exec action's path is not part of the value); absent when no line sets it, never the daemon's compiled default.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "audit",
@@ -4894,7 +4894,7 @@
     {
       "Key": "audit.conf.disk_error_action",
       "Type": "string",
-      "Description": "The disk_error_action of /etc/audit/auditd.conf, lower-cased; absent when no line sets it, never the daemon's compiled default.",
+      "Description": "The disk_error_action of /etc/audit/auditd.conf - the value's first word, lower-cased (an exec action's path is not part of the value); absent when no line sets it, never the daemon's compiled default.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "audit",

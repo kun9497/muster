@@ -236,10 +236,14 @@ func isDigit(c byte) bool { return c >= '0' && c <= '9' }
 // first non-blank character is "#" is a comment (the shipped file's
 // "##name = mydomain" is one), a line without "=" sets nothing, and a later
 // line for the same keyword replaces an earlier one. Keywords are
-// lower-cased, as the daemon matches them case-insensitively; so are the
-// action values, which auditd.conf(5) reads case-insensitively. log_file is
-// a path and log_group a group name — the daemon passes both to the kernel
-// and getgrnam as written — so those two keep their case.
+// lower-cased, as the daemon matches them case-insensitively. Every other
+// keyword's value is its first whitespace-separated word, lower-cased ("" for
+// an empty value): auditd.conf(5) reads the action values case-insensitively,
+// and an exec action is "exec /path-to-script", whose path is the daemon's
+// argument, not part of the value a control compares (O-17, O-19). log_file
+// is a path and log_group a group name — the daemon passes both to the kernel
+// and getgrnam as written — so those two keep their case and their whole
+// value.
 func parseAuditdConf(data []byte) map[string]string {
 	out := map[string]string{}
 	for _, l := range splitLines(data) {
@@ -257,7 +261,11 @@ func parseAuditdConf(data []byte) map[string]string {
 		}
 		v = strings.TrimSpace(v)
 		if k != "log_file" && k != "log_group" {
-			v = strings.ToLower(v)
+			if f := strings.Fields(v); len(f) > 0 {
+				v = strings.ToLower(f[0])
+			} else {
+				v = ""
+			}
 		}
 		out[k] = sourceRaw(v)
 	}

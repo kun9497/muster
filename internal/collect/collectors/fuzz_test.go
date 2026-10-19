@@ -1493,7 +1493,7 @@ func FuzzParseAuditRules(f *testing.F) {
 }
 
 func FuzzParseAuditdConf(f *testing.F) {
-	seeds(f, "testdata/auditd.conf.sample")
+	seeds(f, "testdata/auditd.conf.*")
 	f.Fuzz(func(t *testing.T, data []byte) {
 		fuzzBody(t, "parseAuditdConf", func() any { return parseAuditdConf(data) }, len(data))
 	})
