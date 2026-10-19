@@ -583,7 +583,7 @@ notes에 있습니다. 이 글을 바꾸는 것은 다음과 같습니다.
 - **O-72(정정): `audit_rules_loaded`의 재실행이 실패하면 첫 실행의 하한을 담은 `50-muster.rules`를 복원합니다**
   (`backup()`은 경로가 생기면 없음 표식을 사본으로 한 번 바꿈). 그래서 파일과 커널이 일치합니다.
 - **O-73, O-75, 중복 행 줄:** §4가 적지 않은 로그 줄 셋 — `auditctl -l failed; refused`,
-  `<name>: password ageing fields are not numbers, left as is`(`max`가 -1 미만일 때도, O-77),
+  `<name>: password ageing fields are not numbers, left as is`(`max`가 -1 미만일 때는 수정 웨이브가 넓힌 줄, O-77),
   `<name>: more than one /etc/shadow entry, left as is`.
 - **O-77: 비활성 본문은 `max`가 -1 미만인 계정도 건너뛰고 이름을 적습니다**(pam_unix의 유일한 가드는
   `max != -1`이고, shadow의 `isexpired`는 `>= 0`을 가드함). **그리고 shadow 행이 둘 이상인 이름도 그렇게 합니다**

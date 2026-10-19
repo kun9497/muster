@@ -599,7 +599,7 @@ pre-flight and the probe) and O-64..O-78 (execution, the cycle's ledger) are in
 - **O-72 (corrected): a failed rerun of `audit_rules_loaded` restores `50-muster.rules` holding the first run's floor**
   (`backup()` replaces an absent marker with a copy once the path exists), so the file and the kernel agree.
 - **O-73, O-75, the duplicate-row line:** three log lines §4 did not name — `auditctl -l failed; refused`,
-  `<name>: password ageing fields are not numbers, left as is` (also a `max` below -1, O-77) and
+  `<name>: password ageing fields are not numbers, left as is` (the fix wave widened it for a `max` below -1, O-77) and
   `<name>: more than one /etc/shadow entry, left as is`.
 - **O-77: the inactivity body also skips and names an account whose `max` is below -1** (pam_unix's only guard is
   `max != -1`; shadow's `isexpired` guards `>= 0`) **and any name with more than one shadow row** (`chage` and pam_unix
