@@ -156,8 +156,13 @@ func nfsRuntimeCollected(ctx context.Context, a collect.Access) facts.Envelope {
 // Comments and blank lines are skipped, a trailing backslash continues the
 // line, the first token is the path (a quoted path with an embedded space
 // is honoured) and every remaining token is a client spec
-// `client(options)`; a path with no client spec at all exports to the world
-// under the kernel's own defaults (ro, root_squash).
+// `client(options)` or a default option list `-options`. exports(5): a
+// `-options` token sets the line's default options for the client specs
+// after it (replacing an earlier default on that line; nfs-utils reads it so,
+// O-60), and a client's record carries the defaults, a comma, then its own
+// options, either part omitted when empty. A path with no client spec at all
+// exports to the world — under the kernel's own defaults (ro, root_squash),
+// or under the line's default list when it carries one.
 func parseExportsContent(data []byte) []any {
 	recs := []any{}
 	raw := splitLines(data)
@@ -179,33 +184,44 @@ func parseExportsContent(data []byte) []any {
 			continue
 		}
 		path := toks[0]
-		clients := toks[1:]
-		if len(clients) == 0 {
-			recs = append(recs, exportRecord(path, "*", ""))
-			continue
-		}
-		for _, ct := range clients {
+		defaults, minted := "", false
+		for _, ct := range toks[1:] {
 			if strings.HasPrefix(ct, "-") {
-				// Round-1 review finding 3 (LOW): BSD exportfs's
-				// "-options,root=host" defaults-line syntax is not valid
-				// exports(5) on Linux; skip it rather than mint a bogus
-				// client named "-rw".
+				// O-18/O-20: a default option list, never a client.
+				defaults = ct[1:]
 				continue
 			}
-			client, options := splitClientSpec(ct)
+			minted = true
+			client, own := splitClientSpec(ct)
+			options := joinOptions(defaults, own)
 			if client == "" {
 				// Round-1 review finding 2: exportfs's classic space-before-'('
 				// trap. tokenizeExportLine already split "client (options)" on
 				// the space into TWO tokens, so a token that is bare
 				// "(options)" is a SECOND, separate client spec — the world —
 				// not the preceding host's options. Normalise it the same way
-				// the no-client-spec branch above already does.
+				// the no-client-spec case below does.
 				client = "*"
 			}
 			recs = append(recs, exportRecord(path, client, options))
 		}
+		if !minted {
+			recs = append(recs, exportRecord(path, "*", defaults))
+		}
 	}
 	return recs
+}
+
+// joinOptions is a client's option string under a line's default list: the
+// defaults, a comma, then the client's own, either part omitted when empty.
+func joinOptions(defaults, own string) string {
+	switch {
+	case defaults == "":
+		return own
+	case own == "":
+		return defaults
+	}
+	return defaults + "," + own
 }
 
 // stripComment removes everything from the first unquoted '#' onward:

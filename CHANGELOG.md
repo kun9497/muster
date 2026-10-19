@@ -743,6 +743,11 @@ configuration walk stopped at an `Include` outside the declaration (below).
 - An auditd `exec <path>` disk action is judged by its first word: it read
   FAIL because the whole value, path included, was compared (stage 3D-2d,
   O-17).
+- An exports line's `-options` default list is applied to the clients after
+  it: `/srv -no_root_squash host` read root_squash true (stage 3D-2d, O-18).
+  A line whose only tokens after the path are default lists (`/srv -rw`) is
+  now a world record (client `*`), which `nfs_export_access`'s wildcard
+  clause FAILs; it was skipped and minted no record.
 - `nfs_server_disabled`'s script failed on every Debian and Ubuntu NFS server:
   `nfs-kernel-server.service` is an alias of `nfs-server.service` there, and
   the body disabled the alias after masking the unit (`Unit not loaded`, exit

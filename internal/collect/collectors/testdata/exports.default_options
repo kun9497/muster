@@ -1,0 +1,8 @@
+# synthetic: exports(5) "-options" default lists, applied to the clients after them
+/srv -no_root_squash 198.51.100.7
+/srv2 -no_root_squash 198.51.100.8(rw)
+/srv3 -rw 198.51.100.9(no_root_squash) 198.51.100.10
+/srv4 -rw
+/srv5 198.51.100.11 -no_root_squash 198.51.100.12
+/srv6 -no_root_squash 198.51.100.13(root_squash)
+/srv7 -no_root_squash 198.51.100.14 -rw 198.51.100.15
