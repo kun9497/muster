@@ -15,7 +15,10 @@ for kv in kernel.randomize_va_space=0 net.ipv4.icmp_echo_ignore_broadcasts=0 net
   fs.suid_dumpable=2 net.ipv4.tcp_syncookies=0 kernel.sysrq=176 net.core.bpf_jit_harden=0; do
   sysctl -q -w "$kv"
 done
-for m in udf sctp tipc; do modprobe --ignore-install "$m"; done
+# Only udf is loaded: the network-protocol control FAILs on an available,
+# install-enabled module without a load, and a loaded sctp is held in use on
+# the runner, so its unload fails the block (CI run 39184265939).
+modprobe --ignore-install udf
 systemctl is-active --quiet auditd || systemctl start auditd
 for f in /var/log/audit/audit.log /boot/grub/grub.cfg /etc/ssh/sshd_config.d/50-cloudimg-settings.conf; do
   test -e "$f" || { echo "runner.sh: $f is missing (installed auditd; the runner image is expected to ship the rest)" >&2; exit 1; }

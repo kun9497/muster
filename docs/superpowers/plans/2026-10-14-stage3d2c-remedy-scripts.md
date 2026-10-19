@@ -3027,4 +3027,8 @@ The branch's first CI run is the runner row's proof; until it is green, Task 9 i
 - **Whole branch.** One workflow, 51 agents (seven lenses, three refuters per finding, a minor triage over 41 deferred minors, a critic): 14 survivors (1 blocking — SC2002 under CI's shellcheck 0.9.0, which the lab's newer image missed; 3 important), 0 refuted, 5 triaged minors to fix, 2 critic findings. One fix wave.
 - **Lessons.** Pin the lab's shellcheck image to CI's version (`koalaman/shellcheck-alpine:v0.9.0`); `bash -n` cannot see a missing `]`. Three NFS-serving init containers on one host kernel interfere — run the harness rows one at a time.
 
-(The lab and CI runs go here as they land.)
+### CI
+
+- PR #24's first run (39184265939): every job green but the `runner` row. Its repair run failed one block: `modprobe: FATAL: Module sctp is in use` — the seed had loaded `sctp` with `--ignore-install` and the runner held it, so `uncommon_network_protocols_disabled`'s `modprobe -r` failed and the block rolled back as designed. The seed now loads only `udf`; the network-protocol control FAILs at stock on an available, install-enabled module without a load. Every other runner block ended `done` on the first run (sysctl writes on the azure kernel included).
+
+(Later CI runs go here as they land.)

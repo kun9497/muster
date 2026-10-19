@@ -309,7 +309,7 @@ regenerates them from public images and `-check` compares.
   installs under a `policy-rc.d` that exits 101; each init seed ends with a settle check over
   `START_UNITS`/`ENABLE_ONLY_UNITS`). `ci/roundtrip/runner.sh` is idempotent: it removes every muster drop-in, puts back
   the stock modes the repair run tightened (`/etc/hosts`, `/etc/shadow` and the rest), then seeds again (one failing
-  value per sysctl control, `udf`/`sctp`/`tipc` loaded with `--ignore-install`, `UMASK 002`, …). The repair run plans,
+  value per sysctl control, `udf` loaded with `--ignore-install` (a loaded `sctp` is held in use on the runner), `UMASK 002`, …). The repair run plans,
   requires every seeded id planned and scripted, runs the script with its own `MUSTER_BACKUP`
   (`/var/backups/muster/ci-repair`), re-collects and requires the seeded ids PASS/NA. Each init row then starts a second
   container; the host row re-seeds the same VM and plans afresh (no guard run: the guard must be on and the hash stable,
