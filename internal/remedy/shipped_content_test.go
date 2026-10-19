@@ -27,7 +27,9 @@ import (
 //     (0, O-59), reload/restart/try-restart/reload-or-restart (0); a restart
 //     leaves the unit active, except that while $STUB/restart_fail_once
 //     exists the restart removes it, leaves the unit inactive and exits 1
-//     (O-33: a restart that fails once and succeeds after);
+//     (O-33: a restart that fails once and succeeds after), and while
+//     $STUB/restart_dies exists it exits 0 but leaves the unit inactive (a
+//     daemon that dies right after its start);
 //   - postfix: check (0), reload (0);
 //   - exportfs: any arguments (0);
 //   - postconf, restorecon: not modelled (99);
@@ -55,6 +57,7 @@ case "$1" in
   reset-failed) exit 0;;
   reload|restart|try-restart|reload-or-restart) printf '%s\n' "$*" >> "$STUB/calls"; reads "$u" >> "$STUB/calls"
     if [ "$1" = restart ] && [ -e "$STUB/restart_fail_once" ]; then rm -f "$STUB/restart_fail_once" "$STUB/active/$u"; exit 1; fi
+    if [ "$1" = restart ] && [ -e "$STUB/restart_dies" ]; then rm -f "$STUB/active/$u"; exit 0; fi
     if [ "$1" = restart ]; then mkdir -p "$STUB/active" && : > "$STUB/active/$u"; fi
     exit 0;;
 esac
@@ -161,13 +164,15 @@ func TestContentTreeStubsFailClosed(t *testing.T) {
 		{"systemctl is-active --quiet vsftpd.service", 1},
 		{"systemctl restart vsftpd.service", 0},
 		{"systemctl is-active --quiet vsftpd.service", 0},
+		{`: > "$STUB/restart_dies"; systemctl restart vsftpd.service`, 0},
+		{`rm "$STUB/restart_dies"; systemctl is-active --quiet vsftpd.service`, 1},
 	} {
 		if out, code := runBody(t, root, bin, c.cmd, env...); code != c.code {
 			t.Errorf("%s: exit %d, want %d\n%s", c.cmd, code, c.code, out)
 		}
 	}
 	if got, want := readFile(t, filepath.Join(stub, "calls")), "restart vsftpd.service\nlisten=YES\nexportfs -ra\n(no exports)\n"+
-		"restart vsftpd.service\nlisten=YES\nrestart vsftpd.service\nlisten=YES\n"; got != want {
+		"restart vsftpd.service\nlisten=YES\nrestart vsftpd.service\nlisten=YES\nrestart vsftpd.service\nlisten=YES\n"; got != want {
 		t.Errorf("calls %q, want %q", got, want)
 	}
 }
@@ -314,7 +319,8 @@ type vsftpdRow struct {
 	name, conf string
 	issue      *string
 	want       string
-	leave      bool // the O-23 banner_file line is logged
+	leave      bool   // the O-23 banner_file line is logged
+	leavePath  string // the path the leave line names; {root}/etc/issue.net when empty
 }
 
 func strp(s string) *string { return &s }
@@ -352,7 +358,11 @@ func runVsftpdRows(t *testing.T, id string, rows []vsftpdRow) {
 						t.Errorf("%s mode %v, want 0644 kept", c, fi.Mode())
 					}
 				}
-				leave := id + ": banner_file " + root + "/etc/issue.net sets the greeting; left to the operator"
+				lp := row.leavePath
+				if lp == "" {
+					lp = "{root}/etc/issue.net"
+				}
+				leave := id + ": banner_file " + sub(lp) + " sets the greeting; left to the operator"
 				if n := strings.Count(out, leave); row.leave && n != len(lay.confs) || !row.leave && n != 0 {
 					t.Errorf("the leave line %q appears %d times (leave %v, %d confs)\n%s", leave, n, row.leave, len(lay.confs), out)
 				}
@@ -403,6 +413,13 @@ func TestVsftpdBannerWritesOnlyADisclosure(t *testing.T) {
 		{name: "empty banner file", conf: "ftpd_banner=vsFTPd 3.0.5\n" + bf, issue: strp(""),
 			want: ready + bf},
 		{name: "empty banner file alone", conf: bf, issue: strp(""), want: bf + ready},
+		// getline from "-" or /dev/stdin would read the script's standard
+		// input (the body and the validate would block on a terminal): both
+		// are the operator's to settle, never read.
+		{name: "banner file is stdin", conf: "ftpd_banner=vsFTPd\nbanner_file=-\n",
+			want: "ftpd_banner=vsFTPd\nbanner_file=-\n", leave: true, leavePath: "-"},
+		{name: "banner file is /dev/stdin", conf: "ftpd_banner=vsFTPd\nbanner_file=/dev/stdin\n",
+			want: "ftpd_banner=vsFTPd\nbanner_file=/dev/stdin\n", leave: true, leavePath: "/dev/stdin"},
 	})
 }
 
@@ -570,6 +587,95 @@ func TestContentRollbackDoubleRestoreIsHarmless(t *testing.T) {
 				}
 				if calls := readFile(t, filepath.Join(stub, "calls")); !strings.HasSuffix(calls, "restart vsftpd.service\n"+before) {
 					t.Errorf("calls %q, want the rollback's restart over the restored conf", calls)
+				}
+			})
+		}
+	}
+}
+
+// §4 intro, C4: the collector reads a symlinked vsftpd.conf as an error, so
+// the row is never planned; the body skips the path (GNU sed -i would turn
+// the operator's link into a regular file), the link and its target are
+// untouched, and the validate passes over it.
+func TestVsftpdBodiesSkipASymlinkedConf(t *testing.T) {
+	needSh(t)
+	for _, v := range vsftpdIDs {
+		t.Run(v.id, func(t *testing.T) {
+			r := shippedRemediation(t, v.id)
+			root, bin, stub := contentTree(t)
+			victim := filepath.Join(root, "victim")
+			writeUnder(t, root, "/victim", v.conf)
+			link := filepath.Join(root, "/etc/vsftpd.conf")
+			if err := os.MkdirAll(filepath.Dir(link), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Symlink(victim, link); err != nil {
+				t.Fatal(err)
+			}
+			writeUnder(t, stub, "/active/vsftpd.service", "")
+			mb := t.TempDir()
+			if out, code := runContentBodyIn(t, r, root, bin, stub, mb); code != 0 {
+				t.Fatalf("body exit %d\n%s", code, out)
+			}
+			if fi, err := os.Lstat(link); err != nil || fi.Mode()&os.ModeSymlink == 0 {
+				t.Fatalf("vsftpd.conf is no longer a symlink (%v, %v)", fi, err)
+			}
+			if got, err := os.Readlink(link); err != nil || got != victim {
+				t.Errorf("vsftpd.conf links to %q (%v), want %s", got, err, victim)
+			}
+			if got := readFile(t, victim); got != v.conf {
+				t.Errorf("the link's target holds %q, want %q", got, v.conf)
+			}
+			if exists(filepath.Join(mb, "vsftpd.edited")) || exists(filepath.Join(stub, "calls")) {
+				t.Error("the body wrote or restarted over a symlinked conf")
+			}
+			if out, code := runBody(t, root, bin, rebaseContent(r.Validate, root), "MB="+mb, "STUB="+stub, "ROOT="+root); code != 0 {
+				t.Errorf("validate exit %d over the link\n%s", code, out)
+			}
+		})
+	}
+}
+
+// §4.7 validate: after a restart the unit this run found running must be
+// active again. A whole block over a running vsftpd ends done; a restart
+// that exits 0 but leaves the unit inactive fails the validate, and the
+// way back restores the conf.
+func TestVsftpdValidateNeedsTheRestartedUnitActive(t *testing.T) {
+	needSh(t)
+	for _, v := range vsftpdIDs {
+		for _, dies := range []bool{false, true} {
+			name := v.id + "/stays up"
+			if dies {
+				name = v.id + "/dies after the restart"
+			}
+			t.Run(name, func(t *testing.T) {
+				root, bin, stub := contentTree(t)
+				before := "listen=YES\n" + v.conf
+				writeUnder(t, root, "/etc/vsftpd.conf", before)
+				writeUnder(t, stub, "/active/vsftpd.service", "")
+				if dies {
+					writeUnder(t, stub, "/restart_dies", "")
+				}
+				p := contentBlock(t, v.id, root, false)
+				out, _, code := runScriptWith(t, p, root, filepath.Join(root, "bk"), runOpts{pathPrefix: bin, env: []string{"STUB=" + stub, "ROOT=" + root}})
+				conf := readFile(t, filepath.Join(root, "/etc/vsftpd.conf"))
+				if !dies {
+					if code != 0 || !strings.Contains(out, v.id+": done") {
+						t.Fatalf("exit %d, want 0 and done\n%s", code, out)
+					}
+					if conf != "listen=YES\n"+v.edited {
+						t.Errorf("conf %q, want the edit kept", conf)
+					}
+					return
+				}
+				if code != 1 || !strings.Contains(out, v.id+": validate failed") {
+					t.Fatalf("exit %d, want 1 after the validate saw the unit down\n%s", code, out)
+				}
+				if strings.Contains(out, "ROLLBACK INCOMPLETE") || strings.Contains(out, "rollback failed") {
+					t.Errorf("the way back was incomplete\n%s", out)
+				}
+				if conf != before {
+					t.Errorf("conf %q after the block, want %q", conf, before)
 				}
 			})
 		}
