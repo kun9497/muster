@@ -47,7 +47,10 @@ const diskID = "muster.beyond.audit_disk_actions"
 //     $ROOT/etc/audit/audit.rules, or prints "No change" and leaves the file
 //     when the result equals it (O-55); --load regenerates the same way and
 //     then copies the result's -w/-a/-A lines into $STUB/rules (the load's
-//     -D replaces the kernel list). A missing rules.d exits 1; any other
+//     -D replaces the kernel list) and applies its -b, -f, -r and
+//     --backlog_wait_time lines to $STUB/status as auditctl -R does, copying
+//     the status after the load to $STUB/status.at-load (a status key the
+//     file does not already hold is not added). A missing rules.d exits 1; any other
 //     argument 99;
 //   - systemctl: a wrapper (O-33) over units_test.go's systemctlStub, held
 //     unchanged as bin/systemctl-units: unit state in $STUB/state/<u>
@@ -128,6 +131,11 @@ else
 fi
 if [ "$1" = --load ]; then
   grep -E '^[[:space:]]*-[waA]' "$out" > "$STUB/rules" || :
+  awk 'BEGIN { m["-b"] = "backlog_limit"; m["-f"] = "failure"; m["-r"] = "rate_limit"; m["--backlog_wait_time"] = "backlog_wait_time" }
+    FILENAME == ARGV[1] { if (($1 in m) && $2 ~ /^[0-9]+$/) v[m[$1]] = $2; next }
+    ($1 in v) { print $1 " " v[$1]; next } { print }' "$out" "$STUB/status" > "$STUB/status.new" &&
+    mv -f "$STUB/status.new" "$STUB/status"
+  cp "$STUB/status" "$STUB/status.at-load"
   echo "augenrules --load" >> "$STUB/calls"; cat "$STUB/rules" >> "$STUB/calls"
 fi
 exit 0
@@ -218,6 +226,55 @@ func TestRebaseAuditRebasesEachPathOnce(t *testing.T) {
 	}
 }
 
+// watchRule is an audit watch's path argument, `-w <path>`: rule data the
+// rules body writes into a file, never a path it opens.
+var watchRule = regexp.MustCompile(`-w /[^ \t\n'"]*`)
+
+// assertEveryHostPathRebased fails when a shipped body, validate or rollback
+// of one of ids still names a host path under /etc/, /var/ or /run/ after
+// rebase moved it under root (the shipped_inactivity_test pattern): the
+// collect-root job runs these tests as root on a live VM, where a path the
+// replacer missed would be the runner's real file. An audit `-w <path>`
+// argument is rule data and is skipped.
+func assertEveryHostPathRebased(t *testing.T, ids []string, rebase func(s, root string) string) {
+	t.Helper()
+	const root = "/tmp/r"
+	for _, id := range ids {
+		r := shippedRemediation(t, id)
+		for _, s := range []string{r.Script, r.Validate, r.Rollback} {
+			got := rebase(s, root)
+			if strings.Contains(got, root+root) {
+				t.Errorf("%s: rebased twice:\n%s", id, got)
+			}
+			rest := watchRule.ReplaceAllString(strings.ReplaceAll(got, root+"/", ""), "")
+			for _, p := range []string{"/etc/", "/var/", "/run/"} {
+				if i := strings.Index(rest, p); i >= 0 {
+					end := min(len(rest), i+60)
+					t.Errorf("%s: an unrebased %s path is left: %q", id, p, rest[i:end])
+				}
+			}
+		}
+	}
+}
+
+func TestContentBodiesNameOnlyRebasedPaths(t *testing.T) {
+	assertEveryHostPathRebased(t, []string{
+		"muster.file.rhosts_forbidden",
+		"muster.service.ftp_anonymous",
+		"muster.service.ftp_banner",
+		"muster.service.mail_expn_vrfy",
+		"muster.service.nfs_export_access",
+	}, rebaseContent)
+}
+
+func TestAuditBodiesNameOnlyRebasedPaths(t *testing.T) {
+	assertEveryHostPathRebased(t, []string{
+		"muster.beyond.audit_disk_actions",
+		"muster.beyond.audit_rules_loaded",
+		"muster.beyond.auditd_active",
+	}, rebaseAudit)
+}
+
 // O-32, O-33: the audit stubs answer what the audit tests model, fail
 // closed on anything else, and log the changes to the one calls file.
 func TestAuditTreeStubsFailClosed(t *testing.T) {
@@ -250,6 +307,7 @@ func TestAuditTreeStubsFailClosed(t *testing.T) {
 		{"systemctl start auditd.service", 0, ""},
 		{"systemctl is-active --quiet auditd.service", 0, ""},
 		{"auditctl -l", 0, "-w /etc/passwd -p wa -k x\n"},
+		{"auditctl -s | grep -E '^(backlog_limit|failure) '", 0, "failure 2\nbacklog_limit 8192\n"},
 		{`: > "$STUB/list_fails"; auditctl -l`, 1, ""},
 		{`rm "$STUB/list_fails"; auditctl -D; auditctl -l`, 0, "No rules\n"},
 		{`: > "$STUB/reload_dies"; auditctl --signal reload; systemctl is-active --quiet auditd.service`, 1, ""},
@@ -1159,7 +1217,12 @@ func TestAuditRulesRollbackDeletesOnlyWhatThisRunLoaded(t *testing.T) {
 		setStatus(t, stub, "backlog_limit", "backlog_limit 4321")
 		const before = "-D\n-b 8192\n"
 		writeUnder(t, root, "/etc/audit/audit.rules", before)
-		out, code := auditRun(t, auditBlock(t, rulesID, root, true), root, bin, stub, filepath.Join(root, "bk"))
+		// F10: a persisted control line the load applies, so the kernel's
+		// backlog_limit after the load (8192) differs from the one before it
+		// (4321) that the body must have recorded.
+		writeUnder(t, root, "/etc/audit/rules.d/10-b.rules", "-b 8192\n")
+		bk := filepath.Join(root, "bk")
+		out, code := auditRun(t, auditBlock(t, rulesID, root, true), root, bin, stub, bk)
 		if code != 1 || !strings.Contains(out, rulesID+": validate failed") {
 			t.Fatalf("exit %d, want 1 after a failed validate\n%s", code, out)
 		}
@@ -1188,6 +1251,12 @@ func TestAuditRulesRollbackDeletesOnlyWhatThisRunLoaded(t *testing.T) {
 		}
 		if !strings.Contains(readFile(t, filepath.Join(stub, "status")), "\nbacklog_limit 4321\n") {
 			t.Error("the recorded backlog_limit was not put back")
+		}
+		if got := readFile(t, filepath.Join(stub, "status.at-load")); !strings.Contains(got, "\nbacklog_limit 8192\n") {
+			t.Errorf("the load did not apply -b 8192: status after it %q", got)
+		}
+		if got := readFile(t, filepath.Join(rulesMB(bk), "audit.status")); !strings.Contains(got, "backlog_limit 4321\n") || strings.Contains(got, "8192") {
+			t.Errorf("audit.status %q, want the status from before the load (backlog_limit 4321)", got)
 		}
 	})
 	t.Run("a rerun over a loaded kernel", func(t *testing.T) {
