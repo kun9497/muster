@@ -15,8 +15,41 @@ applies_when:
 checks:
   - { fact: ftp.banner_discloses_version, op: eq, expected: false }
 remediation:
-  text_en: Set ftpd_banner to a notice that names no product in vsftpd.conf (or point banner_file at such a file), or set ServerIdent on "<notice>" in proftpd.conf, then restart the daemon.
-  text_ko: vsftpd.conf 의 ftpd_banner 를 제품명이 없는 안내 문구로 설정하거나(또는 banner_file 이 그런 파일을 가리키게 하고), proftpd.conf 에 ServerIdent on "<안내 문구>" 를 설정한 뒤 데몬을 재시작합니다.
+  text_en: 'Set ftpd_banner to a notice that names no product in vsftpd.conf (or point banner_file at such a file), or set ServerIdent on "<notice>" in proftpd.conf, then restart the daemon. The review script backs up /etc/vsftpd.conf and /etc/vsftpd/vsftpd.conf and, in each that is a regular file whose greeting names a product or is vsftpd''s compiled one, writes ftpd_banner=FTP server ready. - every ftpd_banner line is rewritten, or one is appended; a non-empty banner_file sets the greeting and is left to the operator, and a symlink is left as is. When it changed a file and vsftpd was running, it restarts vsftpd.service. proftpd''s ServerIdent stays the operator''s, and a pure-ftpd host is reviewed by hand. vsftpd.conf is a package configuration file on both families: at the next upgrade dpkg (Debian, Ubuntu) asks about the edited file, and rpm (EL) keeps the edit and writes the package''s version beside it as .rpmnew.'
+  text_ko: 'vsftpd.conf 의 ftpd_banner 를 제품명이 없는 안내 문구로 설정하거나(또는 banner_file 이 그런 파일을 가리키게 하고), proftpd.conf 에 ServerIdent on "<안내 문구>" 를 설정한 뒤 데몬을 재시작합니다. 검토 스크립트는 /etc/vsftpd.conf 와 /etc/vsftpd/vsftpd.conf 를 백업한 뒤, 일반 파일이면서 접속 문구가 제품명을 담거나 vsftpd 의 컴파일 기본 문구인 파일마다 ftpd_banner=FTP server ready. 를 씁니다(모든 ftpd_banner 줄을 고쳐 쓰고, 없으면 한 줄을 덧붙입니다). 비어 있지 않은 banner_file 이 문구를 정하는 경우는 운영자에게 맡기고, 심볼릭 링크는 그대로 둡니다. 파일을 바꾸었고 vsftpd 가 실행 중이었으면 vsftpd.service 를 재시작합니다. proftpd 의 ServerIdent 는 운영자가 정리하며, pure-ftpd 호스트는 수동으로 검토합니다. vsftpd.conf 는 두 계열 모두에서 패키지 설정 파일이므로, 다음 업그레이드 때 dpkg(Debian, Ubuntu)는 수정된 파일을 어떻게 할지 묻고, rpm(EL)은 수정본을 유지한 채 패키지의 버전을 옆에 .rpmnew 로 씁니다.'
   risk: restart_service
   idempotent: true
+  backup: [/etc/vsftpd.conf, /etc/vsftpd/vsftpd.conf]
+  script: |
+    rm -f "$MB/vsftpd.was-running" "$MB/vsftpd.edited"
+    if LC_ALL=C systemctl is-active --quiet vsftpd.service; then : > "$MB/vsftpd.was-running"; fi
+    rd_greeting() { LC_ALL=C awk '{ l = $0; sub(/^[[:space:]]+/, "", l); if (l == "" || substr(l, 1, 1) == "#") next; i = index(l, "="); if (i == 0) next; k = substr(l, 1, i - 1); sub(/[[:space:]]+$/, "", k); k = tolower(k); v = substr(l, i + 1); sub(/^[[:space:]]+/, "", v); sub(/[[:space:]]+$/, "", v); if (k == "ftpd_banner") b = v; if (k == "banner_file") f = v } END { if (f != "" && (getline x < f) != 0) print "file"; else if (b == "" || tolower(b) ~ /(^|[^[:alnum:]_])(vsftpd|proftpd|pure-?ftpd|wu-?ftpd)([^[:alnum:]_]|$)/) print "disclose"; else print "clean" }' "$1"; }
+    for f in /etc/vsftpd.conf /etc/vsftpd/vsftpd.conf; do
+      if [ -f "$f" ] && [ ! -L "$f" ]; then
+        case "$(rd_greeting "$f")" in
+          file) log "muster.service.ftp_banner: banner_file $(LC_ALL=C sed -n -E 's/^[[:space:]]*banner_file[[:space:]]*=[[:space:]]*//Ip' "$f" | tail -n 1) sets the greeting; left to the operator";;
+          disclose)
+            : > "$MB/vsftpd.edited"
+            if LC_ALL=C grep -Eiq '^[[:space:]]*ftpd_banner[[:space:]]*=' "$f"; then
+              LC_ALL=C sed -i -E 's/^[[:space:]]*ftpd_banner[[:space:]]*=.*/ftpd_banner=FTP server ready./I' "$f"
+            else
+              if [ -s "$f" ] && [ -n "$(tail -c1 "$f")" ]; then echo >> "$f"; fi
+              echo 'ftpd_banner=FTP server ready.' >> "$f"
+            fi
+            ;;
+        esac
+      fi
+    done
+    if [ -f "$MB/vsftpd.edited" ] && [ -f "$MB/vsftpd.was-running" ]; then
+      systemctl reset-failed vsftpd.service 2>/dev/null || :
+      systemctl restart vsftpd.service
+    fi
+  validate: |
+    { [ ! -f /etc/vsftpd.conf ] || [ -L /etc/vsftpd.conf ] || case "$(LC_ALL=C awk '{ l = $0; sub(/^[[:space:]]+/, "", l); if (l == "" || substr(l, 1, 1) == "#") next; i = index(l, "="); if (i == 0) next; k = substr(l, 1, i - 1); sub(/[[:space:]]+$/, "", k); k = tolower(k); v = substr(l, i + 1); sub(/^[[:space:]]+/, "", v); sub(/[[:space:]]+$/, "", v); if (k == "ftpd_banner") b = v; if (k == "banner_file") f = v } END { if (f != "" && (getline x < f) != 0) print "file"; else if (b == "" || tolower(b) ~ /(^|[^[:alnum:]_])(vsftpd|proftpd|pure-?ftpd|wu-?ftpd)([^[:alnum:]_]|$)/) print "disclose"; else print "clean" }' /etc/vsftpd.conf)" in clean|file) true;; *) false;; esac; } && { [ ! -f /etc/vsftpd/vsftpd.conf ] || [ -L /etc/vsftpd/vsftpd.conf ] || case "$(LC_ALL=C awk '{ l = $0; sub(/^[[:space:]]+/, "", l); if (l == "" || substr(l, 1, 1) == "#") next; i = index(l, "="); if (i == 0) next; k = substr(l, 1, i - 1); sub(/[[:space:]]+$/, "", k); k = tolower(k); v = substr(l, i + 1); sub(/^[[:space:]]+/, "", v); sub(/[[:space:]]+$/, "", v); if (k == "ftpd_banner") b = v; if (k == "banner_file") f = v } END { if (f != "" && (getline x < f) != 0) print "file"; else if (b == "" || tolower(b) ~ /(^|[^[:alnum:]_])(vsftpd|proftpd|pure-?ftpd|wu-?ftpd)([^[:alnum:]_]|$)/) print "disclose"; else print "clean" }' /etc/vsftpd/vsftpd.conf)" in clean|file) true;; *) false;; esac; } && { [ ! -f "$MB/vsftpd.was-running" ] || systemctl is-active --quiet vsftpd.service; }
+  rollback: |
+    restore /etc/vsftpd.conf /etc/vsftpd/vsftpd.conf
+    if [ -f "$MB/vsftpd.edited" ] && [ -f "$MB/vsftpd.was-running" ]; then
+      systemctl reset-failed vsftpd.service 2>/dev/null || :
+      systemctl restart vsftpd.service
+    fi
 decision: D09

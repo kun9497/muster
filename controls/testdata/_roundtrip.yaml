@@ -99,6 +99,10 @@
   unproven: no systemd unit on Debian (echo, discard, daytime and chargen ship only for inetd) and no package in the EL9 images' enabled repositories
 - id: muster.service.finger_disabled
   unproven: no systemd unit on Debian (fingerd ships only for inetd) and no package in the EL9 images' enabled repositories
+- id: muster.service.ftp_anonymous
+  images: [almalinux9-init, debian12-init, rocky9-init]
+- id: muster.service.ftp_banner
+  images: [almalinux9-init, debian12-init, rocky9-init]
 - id: muster.service.ftpusers_permissions
   images: [almalinux9-init, debian12-init, rocky9-init]
 - id: muster.service.nfs_export_access

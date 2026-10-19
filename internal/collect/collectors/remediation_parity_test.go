@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/kun9497/muster/internal/controls"
+	"github.com/kun9497/muster/internal/facts"
 )
 
 // The reader parity test (3D-2d §3.10, O-10, O-21, O-28): a review-script body
@@ -163,3 +164,84 @@ func TestRhostsReaderMatchesTheCollector(t *testing.T) {
 		})
 	}
 }
+
+// TestVsftpdReadersMatchTheCollector (§4.7, §4.8, O-14, O-28): rd_greeting
+// reads the greeting in vsftpd's order and prints `file` where a non-empty
+// banner_file sets it (the collector's banner_source is banner_file),
+// otherwise `disclose` or `clean` as the collector's
+// ftp.banner_discloses_version reads ftpd_banner or the compiled greeting;
+// rd_anon prints `yes` or `no` as ftp.anonymous_enabled. The collector only
+// reads the paths it declares, so its fake fsAccess keeps the banner file at
+// /etc/issue.net, and the shell side gets the same bytes at
+// {root}/etc/issue.net, which the row's conf names.
+func TestVsftpdReadersMatchTheCollector(t *testing.T) {
+	banner := readerLine(t, shippedBody(t, "muster.service.ftp_banner"), "rd_greeting", true)
+	anon := readerLine(t, shippedBody(t, "muster.service.ftp_anonymous"), "rd_anon", true)
+	const bf = "banner_file={root}/etc/issue.net\n"
+	for _, row := range []struct {
+		name, conf string
+		issue      *string
+	}{
+		{"PureFTPd ready", "ftpd_banner=PureFTPd ready\n", nil},
+		{"myvsftpd", "ftpd_banner=myvsftpd\n", nil},
+		{"vsFTPd version", "ftpd_banner=vsFTPd 3.0.5 ready\n", nil},
+		{"wu-ftpd", "ftpd_banner=(wu-ftpd)\n", nil},
+		{"version number only", "ftpd_banner=Server 3.0.5 ready\n", nil},
+		{"upper key", "  FTPD_BANNER = vsFTPd\n", nil},
+		{"empty value", "ftpd_banner=\n", nil},
+		{"missing key", "listen=YES\n", nil},
+		{"commented", "#ftpd_banner=Welcome\n", nil},
+		{"clean", "ftpd_banner=Welcome\n", nil},
+		{"crlf", "ftpd_banner=Welcome\r\nanonymous_enable=NO\r\n", nil},
+		{"last wins", "ftpd_banner=Welcome\nftpd_banner=ProFTPD\n", nil},
+		{"clean banner, disclosing file", "ftpd_banner=Welcome\n" + bf, strp("220 vsFTPd 3.0.5\n")},
+		{"disclosing banner, clean file", "ftpd_banner=vsFTPd 3.0.5\n" + bf, strp("Authorized use only.\n")},
+		{"empty banner file", "ftpd_banner=vsFTPd 3.0.5\n" + bf, strp("")},
+		{"empty banner file, clean banner", "ftpd_banner=Welcome\n" + bf, strp("")},
+		{"empty banner file alone", bf, strp("")},
+		{"newline-only banner file", "ftpd_banner=vsFTPd\n" + bf, strp("\n")},
+		{"empty banner_file value", "ftpd_banner=Welcome\nbanner_file=\n", nil},
+		{"anonymous FALSE", "anonymous_enable=FALSE\n", nil},
+		{"anonymous 0", "anonymous_enable=0\n", nil},
+		{"anonymous No spaced", " Anonymous_Enable = No \n", nil},
+		{"anonymous YES", "anonymous_enable=YES\n", nil},
+		{"anonymous 1", "anonymous_enable=1\n", nil},
+		{"anonymous last wins", "anonymous_enable=NO\nanonymous_enable=YES\n", nil},
+		{"anonymous commented", "#anonymous_enable=NO\n", nil},
+	} {
+		t.Run(row.name, func(t *testing.T) {
+			a := ftpAccess(nil)
+			a.stats[vsftpdBin] = statResult{mode: 0o755, kind: "regular"}
+			a.contents = map[string][]byte{vsftpdDebianConf: []byte(strings.ReplaceAll(row.conf, "{root}", ""))}
+			files := map[string][]byte{vsftpdDebianConf: []byte(row.conf)}
+			if row.issue != nil {
+				a.contents["/etc/issue.net"] = []byte(*row.issue)
+				files["/etc/issue.net"] = []byte(*row.issue)
+			}
+			b := buildBegun(t, "ftp", a)
+			src, disc, anonEnv := env(t, b, "ftp.banner_source"), env(t, b, "ftp.banner_discloses_version"), env(t, b, "ftp.anonymous_enabled")
+			if src.Status != facts.StatusOK || disc.Status != facts.StatusOK || anonEnv.Status != facts.StatusOK {
+				t.Fatalf("the collector did not judge the row: source %+v, discloses %+v, anonymous %+v", src, disc, anonEnv)
+			}
+			want := "clean"
+			switch {
+			case src.Value == "banner_file":
+				want = "file"
+			case disc.Value == true:
+				want = "disclose"
+			}
+			if got, code := runReader(t, banner, "rd_greeting {root}/etc/vsftpd.conf", files); code != 0 || got != want {
+				t.Errorf("rd_greeting printed %q (exit %d); the collector reads source %v, discloses %v: want %q", got, code, src.Value, disc.Value, want)
+			}
+			wantAnon := "no"
+			if anonEnv.Value == true {
+				wantAnon = "yes"
+			}
+			if got, code := runReader(t, anon, "rd_anon {root}/etc/vsftpd.conf", files); code != 0 || got != wantAnon {
+				t.Errorf("rd_anon printed %q (exit %d); the collector reads anonymous_enabled %v", got, code, anonEnv.Value)
+			}
+		})
+	}
+}
+
+func strp(s string) *string { return &s }
