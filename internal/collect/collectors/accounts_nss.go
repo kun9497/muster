@@ -116,7 +116,7 @@ func writeNSS(a collect.Access, b *collect.Builder) {
 			b.Set("accounts.nss.remote", collect.OK(false, derived))
 			return
 		}
-		e.Reason = nsswitchPath + ": " + e.Reason
+		e = pathReason(nsswitchPath, e)
 		b.Set("accounts.nss.passwd_sources", e)
 		b.Set("accounts.nss.group_sources", e)
 		b.Set("accounts.nss.remote", e)

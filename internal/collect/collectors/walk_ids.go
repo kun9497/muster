@@ -163,7 +163,7 @@ func loadIDTables(a collect.Access) (idTables, map[string]facts.Envelope) {
 	// and its delegated range would read as unaccounted for.
 	if rows, meta, err := groupIdents(a); err != nil {
 		e := collect.FromReadError(err, meta)
-		e.Reason = groupPath + ": " + e.Reason
+		e = pathReason(groupPath, e)
 		failures[groupPath] = e
 	} else {
 		note(groupPath, meta)

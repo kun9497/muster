@@ -102,7 +102,7 @@ func runPAM(_ context.Context, a collect.Access, b *collect.Builder) error {
 		e := collect.Absent(pamDir + " has no readable entries")
 		if err != nil {
 			e = collect.FromReadError(err, collect.ReadMeta{})
-			e.Reason = pamDir + ": " + e.Reason
+			e = pathReason(pamDir, e)
 		}
 		b.Set("pam.stacks", e)
 		b.Set("pam.managing_layer", e)

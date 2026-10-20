@@ -286,7 +286,7 @@ func runAccounts(_ context.Context, a collect.Access, b *collect.Builder) error 
 	}
 	groupErr := func() facts.Envelope {
 		e := collect.FromReadError(gerr, gmeta)
-		e.Reason = groupPath + ": " + e.Reason
+		e = pathReason(groupPath, e)
 		return e
 	}
 	if perr != nil {

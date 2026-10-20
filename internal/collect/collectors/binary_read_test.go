@@ -22,6 +22,10 @@ func binaryReason(t *testing.T, key string, e facts.Envelope, path string) {
 	if e.Status != facts.StatusError || !strings.HasPrefix(e.Reason, path+": ") || !strings.Contains(e.Reason, "binary") {
 		t.Errorf("%s = %+v, want error naming %s as binary", key, e, path)
 	}
+	// D16: the path is written once, though the primitive's error carries it.
+	if strings.Count(e.Reason, path+": ") != 1 {
+		t.Errorf("%s reason %q names %s more than once", key, e.Reason, path)
+	}
 }
 
 func TestAccountsBinaryPasswdIsAnErrorOnEveryPasswdKey(t *testing.T) {

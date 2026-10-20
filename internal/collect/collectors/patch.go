@@ -490,7 +490,7 @@ func aptRebootRequired(a collect.Access, b *collect.Builder) facts.Envelope {
 			continue
 		default:
 			e := collect.FromReadError(err, meta)
-			e.Reason = p + ": " + e.Reason
+			e = pathReason(p, e)
 			return e
 		}
 	}
@@ -510,7 +510,7 @@ func aptAutoUpdate(a collect.Access) facts.Envelope {
 				continue
 			}
 			e := collect.FromReadError(err, meta)
-			e.Reason = p + ": " + e.Reason
+			e = pathReason(p, e)
 			return e
 		}
 		if v, ok := aptPeriodicUnattended(data); ok {
@@ -627,7 +627,7 @@ func dpkgDaysSinceLastInstall(a collect.Access, now time.Time) facts.Envelope {
 			return collect.Absent(dpkgLogPath + " does not exist")
 		}
 		e := collect.FromReadError(err, meta)
-		e.Reason = dpkgLogPath + ": " + e.Reason
+		e = pathReason(dpkgLogPath, e)
 		return e
 	}
 	newest, ok := newestDpkgInstall(data)
@@ -889,7 +889,7 @@ func dnfAutoUpdate(a collect.Access) facts.Envelope {
 			return collect.OK(false, &facts.Source{Kind: "file", Path: dnfAutomaticConf})
 		}
 		e := collect.FromReadError(err, meta)
-		e.Reason = dnfAutomaticConf + ": " + e.Reason
+		e = pathReason(dnfAutomaticConf, e)
 		return e
 	}
 	applies, found := dnfAutomaticApply(data)

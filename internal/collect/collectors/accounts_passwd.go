@@ -73,7 +73,7 @@ func loginShells(a collect.Access) (map[string]bool, facts.Envelope) {
 			return set, e
 		}
 		e := collect.FromReadError(err, meta)
-		e.Reason = shellsPath + ": " + e.Reason
+		e = pathReason(shellsPath, e)
 		return set, e
 	}
 	set := map[string]bool{}
