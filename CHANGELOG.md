@@ -214,7 +214,7 @@ verdict on an existing snapshot is at least a minor release and appears under
 ### Controls
 
 Control set `kisa-unix-2026+2026.10.20` (was `+2026.10.19`). Fixes from an
-external review; five verdicts can change:
+external reviews; these verdicts can change:
 - A waiver naming observations no longer waives a control a separate clause
   fails: `sudo_nopasswd_all` with every `user:` subject waived stays FAIL when
   `Defaults !authenticate` is set, naming the clause, with a stderr warning;
@@ -229,8 +229,9 @@ external review; five verdicts can change:
   that key, so `password_policy` reads ERROR (`missing_fact`) and `check` exits
   2 on it until the host is collected again (or `--allow-error`).
 - `pwquality.conf`, its drop-ins, `faillock.conf` and `pwhistory.conf` are
-  read as their modules read them: a `#` ends the line wherever it is, and
-  `name value` counts as `name = value`. pwquality names match in any case,
+  read as their modules read them: a `#` ends the line wherever it is,
+  `name value` counts as `name = value`, and one `=` at most is skipped
+  (`minlen == 14` is a line libpwquality refuses). pwquality names match in any case,
   faillock names only in lower case. A faillock number is its leading digits,
   and `never` is 0. A line libpwquality refuses (an unknown name, a bad
   number) stops it. A drop-in that stops skips every later file, the main
@@ -241,12 +242,21 @@ external review; five verdicts can change:
   refuses. A pwquality line of 1023 bytes or more, or one holding a NUL byte,
   is such a line. The drop-ins are the names libpwquality reads, hidden ones
   included and `x.conf.conf` excluded, in byte order. A body that appends
-  to a file without a final newline starts its own line.
+  to a file without a final newline starts its own line. The `password_policy`
+  review script rewrites a key the main file sets in place, backs
+  `pwquality.conf` up and refuses it as a symlink.
+- A `conf=` argument on a `pam_faillock.so` or `pam_pwquality.so` line points
+  the module at a file muster does not read, so the faillock or pwquality
+  values read `absent` naming the line, and `lockout_threshold` or
+  `password_policy` FAILs instead of judging `/etc/security/faillock.conf` or
+  `pwquality.conf` the module never reads.
+- A `/etc/login.defs` that exists but cannot be read is the answer for
+  `accounts.users` and `accounts.login_capable` too, so the account controls
+  read ERROR instead of judging accounts against a guessed `UID_MIN` of 1000.
 - `fix --dry-run` plans a row that keeps FAIL or WARN beside a subject waiver
   as text only (`subject_waived`), because no review script knows which
   subjects were waived; `account_inactivity_lock` used to run `chage -I` on the
-  waived account too. The review script rewrites a key the main file
-  sets in place, backs `pwquality.conf` up and refuses it as a symlink.
+  waived account too.
 - `lockout_threshold` judges every login-facing PAM service (login and sshd)
   and the weakest value across them: an sshd stack with `deny=0` beside a
   login stack with `deny=5` now FAILs, the reason naming the services and
@@ -839,6 +849,8 @@ configuration walk stopped at an `Include` outside the declaration (below).
 - `check` and `fix --dry-run` refuse a `--facts` file that holds anything but
   whitespace after its JSON value (exit 2): two concatenated snapshots used
   to be judged by the first alone.
+- modprobe.d lines are split on space and tab, as kmod splits them, and an
+  `install` command on sh's blanks; other Unicode whitespace is part of a word.
 - A read-error reason names the path once (`/etc/group: …`, not
   `/etc/group: /etc/group: …`).
 - `root_remote_login`'s review script, on a failed block, removed
