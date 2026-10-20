@@ -166,3 +166,61 @@ func TestFixPlansARowASubjectWaiverLeavesFailing(t *testing.T) {
 		})
 	}
 }
+
+// H-8: a scripted control whose row carries a waived observation is planned
+// text only (subject_waived) — no body knows which subjects were waived, so a
+// script would act on the waived account too. Without the waiver the same
+// snapshot is scripted.
+func TestFixPlansASubjectWaivedRowTextOnly(t *testing.T) {
+	const id = "muster.beyond.account_inactivity_lock"
+	snap := filepath.Join("..", "..", "controls", "testdata", id, "fail-stock-ubuntu.json")
+	dir := t.TempDir()
+	prof := filepath.Join(dir, "p.yaml")
+	if err := os.WriteFile(prof, []byte("profile: p\ninclude: ["+id+"]\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	wf := filepath.Join(dir, "waivers.yaml")
+	entry := "waivers:\n  - control: " + id + "\n    subject: user:root\n    reason: recorded on purpose\n    expires: 2099-12-31\n"
+	if err := os.WriteFile(wf, []byte(entry), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct {
+		name        string
+		waivers     []string
+		reason      string
+		script      bool
+		scriptHasFn bool
+	}{
+		{"waived", []string{"--waivers", wf}, "subject_waived", false, false},
+		{"unwaived", nil, "", true, true},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			args := append([]string{"--dry-run", "--facts", snap, "--profile", prof}, c.waivers...)
+			code, out, errb := runFixArgs(t, append(args, "--format", "json")...)
+			if code != exitOK {
+				t.Fatalf("exit %d, stderr %s", code, errb)
+			}
+			p := decodePlan(t, out)
+			var found bool
+			for _, it := range p.Items {
+				if it.ID != id {
+					continue
+				}
+				found = true
+				if it.TextOnlyReason != c.reason || it.Script != c.script {
+					t.Errorf("text_only_reason %q script %v, want %q %v", it.TextOnlyReason, it.Script, c.reason, c.script)
+				}
+			}
+			if !found {
+				t.Fatalf("no item %s in %+v", id, p.Items)
+			}
+			code, sh, errb := runFixArgs(t, append(args, "--format", "script")...)
+			if code != exitOK {
+				t.Fatalf("script exit %d, stderr %s", code, errb)
+			}
+			if got := strings.Contains(string(sh), "fix_muster_beyond_account_inactivity_lock() {"); got != c.scriptHasFn {
+				t.Errorf("script carries the body = %v, want %v", got, c.scriptHasFn)
+			}
+		})
+	}
+}

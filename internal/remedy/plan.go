@@ -68,7 +68,7 @@ type Item struct {
 	TextEn         string       `json:"text_en"`
 	TextKo         string       `json:"text_ko"`
 	Script         bool         `json:"script"`
-	TextOnlyReason string       `json:"text_only_reason"` // "" | no_script | absent | params_tuned | params_unsafe
+	TextOnlyReason string       `json:"text_only_reason"` // "" | no_script | absent | params_tuned | params_unsafe | subject_waived
 	ScriptParams   []ParamValue `json:"script_params"`    // [] unless scripted (E-1)
 	ScriptOnAbsent bool         `json:"script_on_absent"` // the control's declaration, when scripted (E-5)
 	Rollback       string       `json:"rollback"`         // none | declared | restore_backup | units | state | both
@@ -232,6 +232,17 @@ func Build(rep *report.Report, set *controls.Set, opts Options) (*Plan, error) {
 	return p, nil
 }
 
+// hasWaivedObservation reports whether a subject waiver was applied to one of
+// the row's observations (waiver.Apply sets its verdict to "waived").
+func hasWaivedObservation(row report.Row) bool {
+	for _, o := range row.Observations {
+		if o.Verdict == "waived" {
+			return true
+		}
+	}
+	return false
+}
+
 func item(row report.Row, set *controls.Set, cb report.CheckBlock, maxRank int) Item {
 	it := Item{ID: row.ID, TitleEn: row.TitleEn, TitleKo: row.TitleKo, Status: strings.ToLower(string(row.Status)),
 		Severity: row.Severity, SeveritySource: row.SeveritySource, Automation: row.Automation,
@@ -249,6 +260,8 @@ func item(row report.Row, set *controls.Set, cb report.CheckBlock, maxRank int) 
 	switch {
 	case strings.TrimSpace(r.Script) == "":
 		it.TextOnlyReason = "no_script"
+	case hasWaivedObservation(row): // H-8: no body knows which subjects were waived
+		it.TextOnlyReason = "subject_waived"
 	case strings.HasPrefix(row.Reason, check.ReasonAbsentFailPrefix) && !r.ScriptOnAbsent: // Z-6: the bare reason
 		it.TextOnlyReason = "absent"
 	case len(r.ScriptParams) == 0 && tuned(cb.ParamSources[row.ID]):
