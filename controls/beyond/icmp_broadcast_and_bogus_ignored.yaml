@@ -30,7 +30,7 @@ remediation:
     if [ -L "$f" ]; then log "muster.beyond.icmp_broadcast_and_bogus_ignored: $f is a symlink (a mask), left as is"; exit 1; fi
     put() {
       sysctl -q -w "$1=$2"
-      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else printf '%s = %s\n' "$1" "$2" >> "$f"; fi
+      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else { if [ -s "$f" ] && [ -n "$(tail -c1 "$f")" ]; then echo >> "$f"; fi; printf '%s = %s\n' "$1" "$2" >> "$f"; }; fi
     }
     case "$(sysctl -n net.ipv4.icmp_echo_ignore_broadcasts)" in 1) ;; *) put net.ipv4.icmp_echo_ignore_broadcasts 1;; esac
     case "$(sysctl -n net.ipv4.icmp_ignore_bogus_error_responses)" in 1) ;; *) put net.ipv4.icmp_ignore_bogus_error_responses 1;; esac

@@ -32,7 +32,7 @@ remediation:
     v=$(awk '$1 == "UMASK" { print $2; exit }' "$ld")
     case " $P_acceptable " in
       *" $v "*) ;;
-      *) if grep -Eq '^[[:space:]]*UMASK[[:space:]]' "$ld"; then sed -i -E "s|^([[:space:]]*UMASK)[[:space:]].*|\1 $first|" "$ld"; else printf 'UMASK %s\n' "$first" >> "$ld"; fi;;
+      *) if grep -Eq '^[[:space:]]*UMASK[[:space:]]' "$ld"; then sed -i -E "s|^([[:space:]]*UMASK)[[:space:]].*|\1 $first|" "$ld"; else { if [ -s "$ld" ] && [ -n "$(tail -c1 "$ld")" ]; then echo >> "$ld"; fi; printf 'UMASK %s\n' "$first" >> "$ld"; }; fi;;
     esac
   validate: |
     case " $P_acceptable " in *" $(awk '$1 == "UMASK" { print $2; exit }' /etc/login.defs) "*) ;; *) false;; esac

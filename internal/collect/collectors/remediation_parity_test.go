@@ -740,13 +740,28 @@ var pwqualityStopAt = regexp.MustCompile(`^libpwquality stops reading at (.+):([
 // repeats its program. It prints `<minlen> <required classes> <enforcing>` as
 // the collector publishes pam.pwquality.minlen, required_classes and
 // enforcing over the same files (the stack's line sets none of them), or
-// `stop <name> <file>:<line>` where the collector takes them absent naming
+// `stop <file>:<line> stops libpwquality (<name>)` where the collector takes them absent naming
 // that line, so the body never writes over a chain libpwquality stops and
 // the validate agrees with check after it.
+//
+// H-9: the file list is part of the reading. The body and the validate hand
+// rd_pwq the main file (or "") and every regular file the three globs match,
+// and rd_pwq keeps the names filter_conf keeps, in strcmp order — so the
+// glob's locale order and its skipping of hidden names do not matter. The
+// loop is pinned here, in both, and run as written.
 func TestPwqualityReaderMatchesTheCollector(t *testing.T) {
 	r := shippedBody(t, "muster.account.password_policy")
 	fn := readerLine(t, r, "rd_pwq", true)
-	const call = `set --; for f in {root}/etc/security/pwquality.conf.d/*.conf {root}/etc/security/pwquality.conf; do if [ -f "$f" ]; then set -- "$@" "$f"; fi; done; rd_pwq "$@"`
+	const loop = `for f in /etc/security/pwquality.conf.d/*.conf /etc/security/pwquality.conf.d/.*.conf /etc/security/pwquality.conf.d/.conf; do if [ -f "$f" ]; then set -- "$@" "$f"; fi; done`
+	if !strings.Contains(r.Script, "set -- \"\"\nif [ -f \"$pc\" ]; then set -- \"$pc\"; fi\n"+loop+"\n") {
+		t.Fatalf("the body does not build rd_pwq's list as pinned here:\n%s", r.Script)
+	}
+	if !strings.Contains(r.Validate, "set -- \"\" && if [ -f /etc/security/pwquality.conf ]; then set -- /etc/security/pwquality.conf; fi && "+loop+" && ") {
+		t.Fatalf("the validate does not build rd_pwq's list as pinned here:\n%s", r.Validate)
+	}
+	call := `set -- ""; if [ -f {root}/etc/security/pwquality.conf ]; then set -- {root}/etc/security/pwquality.conf; fi; ` +
+		strings.ReplaceAll(loop, "/etc/", "{root}/etc/") + `; rd_pwq "$@"`
+	long := func(n int) string { return "badwords = " + strings.Repeat("x", n-len("badwords = ")) }
 	type row struct {
 		main    string // "" leaves the main file out
 		dropins map[string]string
@@ -782,6 +797,24 @@ func TestPwqualityReaderMatchesTheCollector(t *testing.T) {
 		"Kelvin":                  {main: "usercheck = 1\nminlen = 10\nuserchecK = 1\n"},
 		"blank and comment lines": {main: "\n   \n# minlen = 4\n\t# x\nminlen = 9\n"},
 		"no final newline":        {main: "minlen = 13"},
+		// H-9: fgets' 1023-byte limit and NUL bytes
+		"1023-byte line":       {main: "minlen = 14\n", dropins: map[string]string{"10-words.conf": long(1023) + "\n"}},
+		"1022-byte line":       {main: "minlen = 14\n", dropins: map[string]string{"10-words.conf": long(1022) + "\n"}},
+		"1023-byte last line":  {main: long(1023)},
+		"1022-byte last line":  {main: "minlen = 9\n" + long(1022)},
+		"NUL":                  {main: "minlen = 14\n", dropins: map[string]string{"10-a.conf": "# a\nminlen = 9\nx\x00y\n"}},
+		"NUL first":            {main: "\x00minlen = 9\n"},
+		"NUL in the last line": {main: "minlen = 9\nminclass = 1\x00"},
+		// H-9: filter_conf and strcmp order
+		"hidden drop-in":          {dropins: map[string]string{".old.conf": "minlen = 20\n"}},
+		"hidden drop-in stops":    {main: "minlen = 12\n", dropins: map[string]string{".old.conf": "bogus\n"}},
+		"x.conf.conf":             {dropins: map[string]string{"x.conf.conf": "minlen = 30\n"}},
+		"x.conf.conf never stops": {main: "minlen = 12\n", dropins: map[string]string{"x.conf.conf": "bogus\n"}},
+		"-a.conf before .b.conf":  {dropins: map[string]string{"-a.conf": "minlen = 11\n", ".b.conf": "minlen = 12\n"}},
+		".b.conf before -a.conf?": {dropins: map[string]string{"-a.conf": "minlen = 12\n", ".b.conf": "minlen = 11\n"}},
+		"B.conf before a.conf":    {dropins: map[string]string{"a.conf": "minlen = 9\n", "B.conf": "minlen = 13\n"}},
+		".conf alone":             {dropins: map[string]string{".conf": "minlen = 15\n"}},
+		"a newline in a name":     {dropins: map[string]string{"new\nline.conf": "minlen = 16\n", "z.conf": "minclass = 2\n"}},
 	}
 	for _, f := range []string{"pam/rocky/pwquality.conf", "pam/ubuntu/pwquality.conf", "pam/rocky/credits.conf", "pam/rocky/dropin-30-reset.conf"} {
 		b, err := os.ReadFile(filepath.Join("testdata", f))
@@ -805,13 +838,15 @@ func TestPwqualityReaderMatchesTheCollector(t *testing.T) {
 				want = fmt.Sprintf("%v %v %v", minlen.Value, env(t, b, "pam.pwquality.required_classes").Value, env(t, b, "pam.pwquality.enforcing").Value)
 			} else if m := pwqualityStopAt.FindStringSubmatch(minlen.Reason); m != nil {
 				name := m[3]
-				for i := 0; i < len(name); i++ {
-					if cSpace(name[i]) || name[i] == '=' {
-						name = name[:i]
-						break
+				if name != "NUL byte" && name != "line longer than 1023 bytes" {
+					for i := 0; i < len(name); i++ {
+						if cSpace(name[i]) || name[i] == '=' {
+							name = name[:i]
+							break
+						}
 					}
 				}
-				want = "stop " + name + " {root}" + m[1] + ":" + m[2]
+				want = "stop {root}" + m[1] + ":" + m[2] + " stops libpwquality (" + name + ")"
 			} else {
 				t.Fatalf("minlen %+v: neither a value nor a stop", minlen)
 			}

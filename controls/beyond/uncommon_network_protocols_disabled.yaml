@@ -32,7 +32,7 @@ remediation:
       n=$(printf '%s' "$m" | tr - _)
       case "$(modprobe --showconfig 2>/dev/null | awk -v m="$n" '$1 == "install" && $2 == m { print $3; exit }')" in
         /bin/false|/bin/true|/usr/bin/false|/usr/bin/true|false|true) ;;
-        *) grep -q "^install $n " "$f" 2>/dev/null || printf 'install %s /bin/false\n' "$n" >> "$f";;
+        *) if ! grep -q "^install $n " "$f" 2>/dev/null; then if [ -s "$f" ] && [ -n "$(tail -c1 "$f")" ]; then echo >> "$f"; fi; printf 'install %s /bin/false\n' "$n" >> "$f"; fi;;
       esac
       if grep -q "^$n " /proc/modules; then modprobe -r -- "$n"; fi
     done

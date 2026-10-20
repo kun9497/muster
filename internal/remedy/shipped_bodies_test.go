@@ -1076,6 +1076,9 @@ func TestLineBodiesTightenOnly(t *testing.T) {
 		{id: "muster.account.umask_policy", file: "/etc/login.defs", before: "UMASK 002\n", after: "UMASK 027\n"},
 		{id: "muster.account.umask_policy", file: "/etc/login.defs", before: "UMASK 077\n", after: "UMASK 077\n"},
 		{id: "muster.account.umask_policy", file: "/etc/login.defs", before: "# none\n", after: "# none\nUMASK 027\n"},
+		// Minor 7: an append starts a line of its own after a last line with no newline
+		{id: "muster.account.umask_policy", file: "/etc/login.defs", before: "# none", after: "# none\nUMASK 027\n"},
+		{id: "muster.account.lockout_threshold", file: "/etc/security/faillock.conf", before: "even_deny_root", after: "even_deny_root\ndeny = 2\n", env: []string{"P_max_attempts=2"}},
 		{id: "muster.account.lockout_threshold", file: "/etc/security/faillock.conf", before: "deny = 3\ndeny = 99\n", after: "deny = 5\ndeny = 5\n"},
 		{id: "muster.account.lockout_threshold", file: "/etc/security/faillock.conf", before: "# deny = 3\n", after: "# deny = 3\n"},
 		{id: "muster.account.lockout_threshold", file: "/etc/security/faillock.conf", before: "deny = 0\n", after: "deny = 5\n"},
@@ -1452,6 +1455,11 @@ func TestPasswordPolicyBodyStopsOnARefusedLine(t *testing.T) {
 		{"a drop-in's unknown name", "minlen = 6\n", map[string]string{"50-site.conf": "minlen = 14\nunknownkey = 1\n"}, "/etc/security/pwquality.conf.d/50-site.conf:2", "unknownkey"},
 		{"an integer muster does not judge", "", map[string]string{"10-a.conf": "difok = x\n"}, "/etc/security/pwquality.conf.d/10-a.conf:1", "difok"},
 		{"the main file after a good line", "minlen = 12\nBogus = 1\n", nil, "/etc/security/pwquality.conf:2", "Bogus"},
+		// H-9: fgets cannot hand over a line of 1023 bytes or more, or one a
+		// NUL byte cuts short (PWQ_ERROR_CFGFILE_MALFORMED)
+		{"a drop-in's long line", "minlen = 6\n", map[string]string{"10-words.conf": "badwords = " + strings.Repeat("x", 1012) + "\n"}, "/etc/security/pwquality.conf.d/10-words.conf:1", "line longer than 1023 bytes"},
+		{"a NUL byte", "minlen = 6\n", map[string]string{"10-a.conf": "# a\nminlen\x00 = 14\n"}, "/etc/security/pwquality.conf.d/10-a.conf:2", "NUL byte"},
+		{"a hidden drop-in", "minlen = 6\n", map[string]string{".old.conf": "bogus\n"}, "/etc/security/pwquality.conf.d/.old.conf:1", "bogus"},
 	} {
 		t.Run(row.name, func(t *testing.T) {
 			root, bin, stub := accountTree(t)
@@ -1511,5 +1519,125 @@ func TestPasswordPolicyBodyRewritesASpelledKey(t *testing.T) {
 		if exists(filepath.Join(root, "/etc/security/pwquality.conf.d")) {
 			t.Errorf("%q: a drop-in was written although the main file sets the key", main)
 		}
+	}
+}
+
+// H-9: the body reads the drop-ins libpwquality reads (filter_conf: a hidden
+// name is read, a.conf.conf is not) in strcmp order, whatever the caller's
+// locale and shell glob order, so it writes where the check FAILs and leaves
+// what libpwquality never reads.
+func TestPasswordPolicyBodyReadsTheDropinsLibpwqualityReads(t *testing.T) {
+	needSh(t)
+	// a hidden drop-in's minlen 6 is enforced: the body raises it in
+	// 99-muster.conf, which sorts after it
+	root, _ := pwPolicyBody(t, "", map[string]string{".old.conf": "minlen = 6\nminclass = 3\n"})
+	if got := readFile(t, filepath.Join(root, "/etc/security/pwquality.conf.d/99-muster.conf")); got != "minlen = 8\n" {
+		t.Errorf("99-muster.conf %q, want the hidden drop-in's minlen raised", got)
+	}
+	// a.conf.conf is never read: its bad line stops nothing
+	root, _ = pwPolicyBody(t, "minlen = 12\nminclass = 3\n", map[string]string{"a.conf.conf": "bogus\n"})
+	if exists(filepath.Join(root, "/etc/security/pwquality.conf.d/99-muster.conf")) {
+		t.Error("a drop-in was written although the chain passes")
+	}
+	// bytewise: "-a.conf" (0x2d) before ".b.conf" (0x2e), so .b.conf's 6 is
+	// the last word; LC_ALL=en_US.UTF-8 must not change that
+	c := shippedControl(t, "muster.account.password_policy")
+	r, bin, stub := accountTree(t)
+	writeUnder(t, r, "/etc/login.defs", "PASS_MAX_DAYS 60\nPASS_MIN_DAYS 2\nPASS_MIN_LEN 12\n")
+	writeUnder(t, r, "/etc/security/pwquality.conf.d/-a.conf", "minlen = 12\nminclass = 3\n")
+	writeUnder(t, r, "/etc/security/pwquality.conf.d/.b.conf", "minlen = 6\n")
+	writeUnder(t, r, "/etc/passwd", "")
+	writeUnder(t, r, "/etc/shadow", "")
+	env := append(pEnv(t, c), "MB="+t.TempDir(), "STUB="+stub, "ROOT="+r, "LC_ALL=en_US.UTF-8")
+	body := "umask 077\nlog() { printf 'muster-fix: %s\\n' \"$*\"; }\n" + rebaseAccounts(c.Remediation.Script, r)
+	if out, code := runBody(t, r, bin, body, env...); code != 0 {
+		t.Fatalf("body %d: %s", code, out)
+	}
+	if got := readFile(t, filepath.Join(r, "/etc/security/pwquality.conf.d/99-muster.conf")); got != "minlen = 8\n" {
+		t.Errorf("99-muster.conf %q, want .b.conf's minlen 6 raised", got)
+	}
+	if out, code := runBody(t, r, bin, rebaseAccounts(c.Remediation.Validate, r), env...); code != 0 {
+		t.Errorf("validate %d: %s", code, out)
+	}
+}
+
+// Minor 7: login.defs and 99-muster.conf without a final newline get one
+// before the body appends, so the new key is a line of its own.
+func TestPasswordPolicyBodyAppendsOnANewLine(t *testing.T) {
+	needSh(t)
+	c := shippedControl(t, "muster.account.password_policy")
+	root, bin, stub := accountTree(t)
+	writeUnder(t, root, "/etc/login.defs", "PASS_MAX_DAYS 60\nPASS_MIN_DAYS 2")
+	writeUnder(t, root, "/etc/security/pwquality.conf", "minlen = 12\n")
+	writeUnder(t, root, "/etc/security/pwquality.conf.d/99-muster.conf", "# site")
+	writeUnder(t, root, "/etc/passwd", "")
+	writeUnder(t, root, "/etc/shadow", "")
+	env := append(pEnv(t, c), "MB="+t.TempDir(), "STUB="+stub, "ROOT="+root)
+	body := "umask 077\nlog() { printf 'muster-fix: %s\\n' \"$*\"; }\n" + rebaseAccounts(c.Remediation.Script, root)
+	if out, code := runBody(t, root, bin, body, env...); code != 0 {
+		t.Fatalf("body %d: %s", code, out)
+	}
+	if got := readFile(t, filepath.Join(root, "/etc/login.defs")); got != "PASS_MAX_DAYS 60\nPASS_MIN_DAYS 2\nPASS_MIN_LEN 8\n" {
+		t.Errorf("login.defs %q", got)
+	}
+	if got := readFile(t, filepath.Join(root, "/etc/security/pwquality.conf.d/99-muster.conf")); got != "# site\nminclass = 3\n" {
+		t.Errorf("99-muster.conf %q", got)
+	}
+	if out, code := runBody(t, root, bin, rebaseAccounts(c.Remediation.Validate, root), env...); code != 0 {
+		t.Errorf("validate %d: %s", code, out)
+	}
+}
+
+// Minor 7: a sysctl or modprobe drop-in muster wrote and an operator left
+// without a final newline gets one before the body appends.
+func TestDropinBodiesAppendOnANewLine(t *testing.T) {
+	needSh(t)
+	for _, c := range sysctlControls(t) {
+		t.Run(c.ID, func(t *testing.T) {
+			bin, st, dir := t.TempDir(), t.TempDir(), t.TempDir()
+			writeStub(t, bin, "sysctl", sysctlStub)
+			failing := map[string]string{}
+			for _, k := range c.Remediation.Sysctl {
+				failing[k] = sysctlKeys[k][0]
+			}
+			if k := companion[c.ID]; k != "" {
+				failing[k] = "0"
+			}
+			seedSysctl(t, st, failing, nil)
+			f := rebaseSysctlD(c.Remediation.Backup[0], dir)
+			if err := os.WriteFile(f, []byte("# site"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			env := append(pEnv(t, c), "SYSCTL_STATE="+st)
+			if out, code := runBody(t, dir, bin, "umask 077\n"+rebaseSysctlD(c.Remediation.Script, dir), env...); code != 0 {
+				t.Fatalf("body %d: %s", code, out)
+			}
+			if got := readFile(t, f); !strings.HasPrefix(got, "# site\n") || !strings.HasSuffix(got, "\n") {
+				t.Errorf("drop-in %q, want the comment on its own line", got)
+			}
+			if out, code := runBody(t, dir, bin, rebaseSysctlD(c.Remediation.Validate, dir), env...); code != 0 {
+				t.Errorf("validate %d: %s", code, out)
+			}
+		})
+	}
+	for _, id := range moduleIDs {
+		t.Run(id, func(t *testing.T) {
+			r := shippedControl(t, id).Remediation
+			bin, st, _ := moduleState(t, r)
+			rebase := moduleRebase(st)
+			if err := os.WriteFile(rebase(r.Backup[0]), []byte("# site"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			env := "MODPROBE_STATE=" + st
+			if out, code := runBody(t, st, bin, "umask 077\n"+rebase(r.Script), env); code != 0 {
+				t.Fatalf("body %d: %s", code, out)
+			}
+			if got := readFile(t, rebase(r.Backup[0])); !strings.HasPrefix(got, "# site\ninstall ") {
+				t.Errorf("drop-in %q, want the comment on its own line", got)
+			}
+			if out, code := runBody(t, st, bin, rebase(r.Validate), env); code != 0 {
+				t.Errorf("validate %d: %s", code, out)
+			}
+		})
 	}
 }

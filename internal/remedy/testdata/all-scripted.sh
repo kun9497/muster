@@ -296,7 +296,7 @@ fix_muster_beyond_aslr_and_link_protection() {
     if [ -L "$f" ]; then log "muster.beyond.aslr_and_link_protection: $f is a symlink (a mask), left as is"; exit 1; fi
     put() {
       sysctl -q -w "$1=$2"
-      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else printf '%s = %s\n' "$1" "$2" >> "$f"; fi
+      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else { if [ -s "$f" ] && [ -n "$(tail -c1 "$f")" ]; then echo >> "$f"; fi; printf '%s = %s\n' "$1" "$2" >> "$f"; }; fi
     }
     case "$(sysctl -n kernel.randomize_va_space)" in 2) ;; *) put kernel.randomize_va_space 2;; esac
     case "$(sysctl -n fs.protected_symlinks)" in 1) ;; *) put fs.protected_symlinks 1;; esac
@@ -595,7 +595,7 @@ fix_muster_account_umask_policy() {
     v=$(awk '$1 == "UMASK" { print $2; exit }' "$ld")
     case " $P_acceptable " in
       *" $v "*) ;;
-      *) if grep -Eq '^[[:space:]]*UMASK[[:space:]]' "$ld"; then sed -i -E "s|^([[:space:]]*UMASK)[[:space:]].*|\1 $first|" "$ld"; else printf 'UMASK %s\n' "$first" >> "$ld"; fi;;
+      *) if grep -Eq '^[[:space:]]*UMASK[[:space:]]' "$ld"; then sed -i -E "s|^([[:space:]]*UMASK)[[:space:]].*|\1 $first|" "$ld"; else { if [ -s "$ld" ] && [ -n "$(tail -c1 "$ld")" ]; then echo >> "$ld"; fi; printf 'UMASK %s\n' "$first" >> "$ld"; }; fi;;
     esac
   ); rc=$?
   if [ "$rc" -ne 0 ]; then
@@ -670,7 +670,7 @@ fix_muster_beyond_icmp_redirects_ignored() {
     if [ -L "$f" ]; then log "muster.beyond.icmp_redirects_ignored: $f is a symlink (a mask), left as is"; exit 1; fi
     put() {
       sysctl -q -w "$1=$2"
-      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else printf '%s = %s\n' "$1" "$2" >> "$f"; fi
+      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else { if [ -s "$f" ] && [ -n "$(tail -c1 "$f")" ]; then echo >> "$f"; fi; printf '%s = %s\n' "$1" "$2" >> "$f"; }; fi
     }
     case "$(sysctl -n net.ipv4.conf.all.accept_redirects)" in 0) ;; *) put net.ipv4.conf.all.accept_redirects 0;; esac
     case "$(sysctl -n net.ipv4.conf.default.accept_redirects)" in 0) ;; *) put net.ipv4.conf.default.accept_redirects 0;; esac
@@ -714,7 +714,7 @@ fix_muster_beyond_ipv6_redirects_ignored() {
     if [ -L "$f" ]; then log "muster.beyond.ipv6_redirects_ignored: $f is a symlink (a mask), left as is"; exit 1; fi
     put() {
       sysctl -q -w "$1=$2"
-      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else printf '%s = %s\n' "$1" "$2" >> "$f"; fi
+      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else { if [ -s "$f" ] && [ -n "$(tail -c1 "$f")" ]; then echo >> "$f"; fi; printf '%s = %s\n' "$1" "$2" >> "$f"; }; fi
     }
     case "$(sysctl -n net.ipv6.conf.all.accept_redirects)" in 0) ;; *) put net.ipv6.conf.all.accept_redirects 0;; esac
     case "$(sysctl -n net.ipv6.conf.default.accept_redirects)" in 0) ;; *) put net.ipv6.conf.default.accept_redirects 0;; esac
@@ -755,7 +755,7 @@ fix_muster_beyond_ipv6_router_advertisements_ignored() {
     if [ -L "$f" ]; then log "muster.beyond.ipv6_router_advertisements_ignored: $f is a symlink (a mask), left as is"; exit 1; fi
     put() {
       sysctl -q -w "$1=$2"
-      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else printf '%s = %s\n' "$1" "$2" >> "$f"; fi
+      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else { if [ -s "$f" ] && [ -n "$(tail -c1 "$f")" ]; then echo >> "$f"; fi; printf '%s = %s\n' "$1" "$2" >> "$f"; }; fi
     }
     first=${P_allowed_accept_ra%% *}
     case " $P_allowed_accept_ra " in *" $(sysctl -n net.ipv6.conf.all.accept_ra) "*) ;; *) put net.ipv6.conf.all.accept_ra "$first";; esac
@@ -796,7 +796,7 @@ fix_muster_beyond_ipv6_source_routing_rejected() {
     if [ -L "$f" ]; then log "muster.beyond.ipv6_source_routing_rejected: $f is a symlink (a mask), left as is"; exit 1; fi
     put() {
       sysctl -q -w "$1=$2"
-      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else printf '%s = %s\n' "$1" "$2" >> "$f"; fi
+      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else { if [ -s "$f" ] && [ -n "$(tail -c1 "$f")" ]; then echo >> "$f"; fi; printf '%s = %s\n' "$1" "$2" >> "$f"; }; fi
     }
     case "$(sysctl -n net.ipv6.conf.all.accept_source_route)" in 0) ;; *) put net.ipv6.conf.all.accept_source_route 0;; esac
     case "$(sysctl -n net.ipv6.conf.default.accept_source_route)" in 0) ;; *) put net.ipv6.conf.default.accept_source_route 0;; esac
@@ -836,7 +836,7 @@ fix_muster_beyond_kernel_pointer_exposure() {
     if [ -L "$f" ]; then log "muster.beyond.kernel_pointer_exposure: $f is a symlink (a mask), left as is"; exit 1; fi
     put() {
       sysctl -q -w "$1=$2"
-      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else printf '%s = %s\n' "$1" "$2" >> "$f"; fi
+      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else { if [ -s "$f" ] && [ -n "$(tail -c1 "$f")" ]; then echo >> "$f"; fi; printf '%s = %s\n' "$1" "$2" >> "$f"; }; fi
     }
     case "$(sysctl -n kernel.kptr_restrict)" in 1|2) ;; *) put kernel.kptr_restrict 1;; esac
     case "$(sysctl -n kernel.dmesg_restrict)" in 1) ;; *) put kernel.dmesg_restrict 1;; esac
@@ -876,7 +876,7 @@ fix_muster_beyond_ptrace_restriction() {
     if [ -L "$f" ]; then log "muster.beyond.ptrace_restriction: $f is a symlink (a mask), left as is"; exit 1; fi
     put() {
       sysctl -q -w "$1=$2"
-      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else printf '%s = %s\n' "$1" "$2" >> "$f"; fi
+      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else { if [ -s "$f" ] && [ -n "$(tail -c1 "$f")" ]; then echo >> "$f"; fi; printf '%s = %s\n' "$1" "$2" >> "$f"; }; fi
     }
     case "$(sysctl -n kernel.yama.ptrace_scope)" in 1|2|3) ;; *) put kernel.yama.ptrace_scope 1;; esac
     case "$(sysctl -n kernel.perf_event_paranoid)" in [2-9]|[1-9][0-9]|[1-9][0-9][0-9]*) ;; *) put kernel.perf_event_paranoid 2;; esac
@@ -916,7 +916,7 @@ fix_muster_beyond_source_routing_rejected() {
     if [ -L "$f" ]; then log "muster.beyond.source_routing_rejected: $f is a symlink (a mask), left as is"; exit 1; fi
     put() {
       sysctl -q -w "$1=$2"
-      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else printf '%s = %s\n' "$1" "$2" >> "$f"; fi
+      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else { if [ -s "$f" ] && [ -n "$(tail -c1 "$f")" ]; then echo >> "$f"; fi; printf '%s = %s\n' "$1" "$2" >> "$f"; }; fi
     }
     case "$(sysctl -n net.ipv4.conf.all.accept_source_route)" in 0) ;; *) put net.ipv4.conf.all.accept_source_route 0;; esac
     case "$(sysctl -n net.ipv4.conf.default.accept_source_route)" in 0) ;; *) put net.ipv4.conf.default.accept_source_route 0;; esac
@@ -956,7 +956,7 @@ fix_muster_beyond_suid_dumpable_disabled() {
     if [ -L "$f" ]; then log "muster.beyond.suid_dumpable_disabled: $f is a symlink (a mask), left as is"; exit 1; fi
     put() {
       sysctl -q -w "$1=$2"
-      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else printf '%s = %s\n' "$1" "$2" >> "$f"; fi
+      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else { if [ -s "$f" ] && [ -n "$(tail -c1 "$f")" ]; then echo >> "$f"; fi; printf '%s = %s\n' "$1" "$2" >> "$f"; }; fi
     }
     case "$(sysctl -n fs.suid_dumpable)" in 0) ;; *) put fs.suid_dumpable 0;; esac
     if [ -f "$f" ] && [ ! -L "$f" ]; then chmod 644 "$f"; fi
@@ -995,7 +995,7 @@ fix_muster_beyond_syn_cookies_enabled() {
     if [ -L "$f" ]; then log "muster.beyond.syn_cookies_enabled: $f is a symlink (a mask), left as is"; exit 1; fi
     put() {
       sysctl -q -w "$1=$2"
-      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else printf '%s = %s\n' "$1" "$2" >> "$f"; fi
+      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else { if [ -s "$f" ] && [ -n "$(tail -c1 "$f")" ]; then echo >> "$f"; fi; printf '%s = %s\n' "$1" "$2" >> "$f"; }; fi
     }
     case "$(sysctl -n net.ipv4.tcp_syncookies)" in 1) ;; *) put net.ipv4.tcp_syncookies 1;; esac
     if [ -f "$f" ] && [ ! -L "$f" ]; then chmod 644 "$f"; fi
@@ -1035,7 +1035,7 @@ fix_muster_beyond_sysrq_restricted() {
     if [ -L "$f" ]; then log "muster.beyond.sysrq_restricted: $f is a symlink (a mask), left as is"; exit 1; fi
     put() {
       sysctl -q -w "$1=$2"
-      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else printf '%s = %s\n' "$1" "$2" >> "$f"; fi
+      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else { if [ -s "$f" ] && [ -n "$(tail -c1 "$f")" ]; then echo >> "$f"; fi; printf '%s = %s\n' "$1" "$2" >> "$f"; }; fi
     }
     first=${P_allowed_sysrq%% *}
     case " $P_allowed_sysrq " in *" $(sysctl -n kernel.sysrq) "*) ;; *) put kernel.sysrq "$first";; esac
@@ -1078,7 +1078,7 @@ fix_muster_beyond_uncommon_network_protocols_disabled() {
       n=$(printf '%s' "$m" | tr - _)
       case "$(modprobe --showconfig 2>/dev/null | awk -v m="$n" '$1 == "install" && $2 == m { print $3; exit }')" in
         /bin/false|/bin/true|/usr/bin/false|/usr/bin/true|false|true) ;;
-        *) grep -q "^install $n " "$f" 2>/dev/null || printf 'install %s /bin/false\n' "$n" >> "$f";;
+        *) if ! grep -q "^install $n " "$f" 2>/dev/null; then if [ -s "$f" ] && [ -n "$(tail -c1 "$f")" ]; then echo >> "$f"; fi; printf 'install %s /bin/false\n' "$n" >> "$f"; fi;;
       esac
       if grep -q "^$n " /proc/modules; then modprobe -r -- "$n"; fi
     done
@@ -1219,7 +1219,7 @@ fix_muster_beyond_icmp_broadcast_and_bogus_ignored() {
     if [ -L "$f" ]; then log "muster.beyond.icmp_broadcast_and_bogus_ignored: $f is a symlink (a mask), left as is"; exit 1; fi
     put() {
       sysctl -q -w "$1=$2"
-      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else printf '%s = %s\n' "$1" "$2" >> "$f"; fi
+      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else { if [ -s "$f" ] && [ -n "$(tail -c1 "$f")" ]; then echo >> "$f"; fi; printf '%s = %s\n' "$1" "$2" >> "$f"; }; fi
     }
     case "$(sysctl -n net.ipv4.icmp_echo_ignore_broadcasts)" in 1) ;; *) put net.ipv4.icmp_echo_ignore_broadcasts 1;; esac
     case "$(sysctl -n net.ipv4.icmp_ignore_bogus_error_responses)" in 1) ;; *) put net.ipv4.icmp_ignore_bogus_error_responses 1;; esac
@@ -1262,7 +1262,7 @@ fix_muster_beyond_uncommon_filesystems_disabled() {
       n=$(printf '%s' "$m" | tr - _)
       case "$(modprobe --showconfig 2>/dev/null | awk -v m="$n" '$1 == "install" && $2 == m { print $3; exit }')" in
         /bin/false|/bin/true|/usr/bin/false|/usr/bin/true|false|true) ;;
-        *) grep -q "^install $n " "$f" 2>/dev/null || printf 'install %s /bin/false\n' "$n" >> "$f";;
+        *) if ! grep -q "^install $n " "$f" 2>/dev/null; then if [ -s "$f" ] && [ -n "$(tail -c1 "$f")" ]; then echo >> "$f"; fi; printf 'install %s /bin/false\n' "$n" >> "$f"; fi;;
       esac
       if grep -q "^$n " /proc/modules; then modprobe -r -- "$n"; fi
     done
@@ -1302,7 +1302,7 @@ fix_muster_beyond_unprivileged_bpf_restricted() {
     if [ -L "$f" ]; then log "muster.beyond.unprivileged_bpf_restricted: $f is a symlink (a mask), left as is"; exit 1; fi
     put() {
       sysctl -q -w "$1=$2"
-      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else printf '%s = %s\n' "$1" "$2" >> "$f"; fi
+      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else { if [ -s "$f" ] && [ -n "$(tail -c1 "$f")" ]; then echo >> "$f"; fi; printf '%s = %s\n' "$1" "$2" >> "$f"; }; fi
     }
     case "$(sysctl -n kernel.unprivileged_bpf_disabled)" in 1|2) ;; *) put kernel.unprivileged_bpf_disabled 2;; esac
     case "$(sysctl -n net.core.bpf_jit_harden)" in 1|2) ;; *) put net.core.bpf_jit_harden 2;; esac
@@ -2091,7 +2091,7 @@ fix_muster_beyond_ip_forwarding_disabled() {
     if [ -L "$f" ]; then log "muster.beyond.ip_forwarding_disabled: $f is a symlink (a mask), left as is"; exit 1; fi
     put() {
       sysctl -q -w "$1=$2"
-      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else printf '%s = %s\n' "$1" "$2" >> "$f"; fi
+      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else { if [ -s "$f" ] && [ -n "$(tail -c1 "$f")" ]; then echo >> "$f"; fi; printf '%s = %s\n' "$1" "$2" >> "$f"; }; fi
     }
     first=${P_allowed_forward%% *}
     case " $P_allowed_forward " in
@@ -2138,7 +2138,7 @@ fix_muster_beyond_ipv6_forwarding_disabled() {
     if [ -L "$f" ]; then log "muster.beyond.ipv6_forwarding_disabled: $f is a symlink (a mask), left as is"; exit 1; fi
     put() {
       sysctl -q -w "$1=$2"
-      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else printf '%s = %s\n' "$1" "$2" >> "$f"; fi
+      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else { if [ -s "$f" ] && [ -n "$(tail -c1 "$f")" ]; then echo >> "$f"; fi; printf '%s = %s\n' "$1" "$2" >> "$f"; }; fi
     }
     first=${P_allowed_forward%% *}
     case " $P_allowed_forward " in *" $(sysctl -n net.ipv6.conf.all.forwarding) "*) ;; *) put net.ipv6.conf.all.forwarding "$first";; esac
@@ -2179,7 +2179,7 @@ fix_muster_beyond_reverse_path_filtering() {
     if [ -L "$f" ]; then log "muster.beyond.reverse_path_filtering: $f is a symlink (a mask), left as is"; exit 1; fi
     put() {
       sysctl -q -w "$1=$2"
-      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else printf '%s = %s\n' "$1" "$2" >> "$f"; fi
+      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else { if [ -s "$f" ] && [ -n "$(tail -c1 "$f")" ]; then echo >> "$f"; fi; printf '%s = %s\n' "$1" "$2" >> "$f"; }; fi
     }
     case "$(sysctl -n net.ipv4.conf.all.rp_filter)" in 1|2) ;; *) put net.ipv4.conf.all.rp_filter 1;; esac
     case "$(sysctl -n net.ipv4.conf.default.rp_filter)" in 1|2) ;; *) put net.ipv4.conf.default.rp_filter 1;; esac
@@ -2224,7 +2224,7 @@ fix_muster_beyond_usb_storage_disabled() {
       n=$(printf '%s' "$m" | tr - _)
       case "$(modprobe --showconfig 2>/dev/null | awk -v m="$n" '$1 == "install" && $2 == m { print $3; exit }')" in
         /bin/false|/bin/true|/usr/bin/false|/usr/bin/true|false|true) ;;
-        *) grep -q "^install $n " "$f" 2>/dev/null || printf 'install %s /bin/false\n' "$n" >> "$f";;
+        *) if ! grep -q "^install $n " "$f" 2>/dev/null; then if [ -s "$f" ] && [ -n "$(tail -c1 "$f")" ]; then echo >> "$f"; fi; printf 'install %s /bin/false\n' "$n" >> "$f"; fi;;
       esac
       if grep -q "^$n " /proc/modules; then modprobe -r -- "$n"; fi
     done
@@ -2480,7 +2480,7 @@ fix_muster_account_lockout_threshold() {
     v=$(rd_deny "$fc")
     case "$v" in ''|*[!0-9]*) v=3;; esac
     if [ "$v" -lt 1 ] || [ "$v" -gt "$n" ]; then
-      if LC_ALL=C grep -Eq '^[[:space:]]*deny([[:space:]=#]|$)' "$fc" 2>/dev/null; then sed -i -E "s|^([[:space:]]*)deny([[:space:]=#].*)?$|\1deny = $n|" "$fc"; else printf 'deny = %s\n' "$n" >> "$fc"; fi
+      if LC_ALL=C grep -Eq '^[[:space:]]*deny([[:space:]=#]|$)' "$fc" 2>/dev/null; then sed -i -E "s|^([[:space:]]*)deny([[:space:]=#].*)?$|\1deny = $n|" "$fc"; else { if [ -s "$fc" ] && [ -n "$(tail -c1 "$fc")" ]; then echo >> "$fc"; fi; printf 'deny = %s\n' "$n" >> "$fc"; }; fi
       if [ "$had" = 0 ]; then chmod 644 "$fc"; fi
     fi
   ); rc=$?
@@ -2522,15 +2522,16 @@ fix_muster_account_password_policy() {
     if [ -L "$ld" ]; then log "muster.account.password_policy: $ld is a symlink, left as is"; exit 1; fi
     if [ -L "$pc" ]; then log "muster.account.password_policy: $pc is a symlink, left as is"; exit 1; fi
     if [ -L "$pf" ]; then log "muster.account.password_policy: $pf is a symlink (a mask), left as is"; exit 1; fi
-    # minlen, required classes and enforcing over the chain in libpwquality's order (the drop-ins, then pwquality.conf), read as its read_config_file reads a line (cut at the first #, the name ends at a blank or =, names case-blind); a line it refuses (an unknown name, a bad integer) stops it and prints stop <name> <file>:<line>
-    rd_pwq() { LC_ALL=C awk 'function bad(v, a) { if (v !~ /^[+-]?[0-9]+$/) return 1; a = v; sub(/^[+-]/, "", a); sub(/^0+/, "", a); if (length(a) > 10) return 1; return (v + 0 >= 2147483647 || v + 0 <= -2147483648) } BEGIN { n = split("difok minlen dcredit ucredit lcredit ocredit minclass maxrepeat maxclassrepeat maxsequence gecoscheck dictcheck usercheck usersubstr enforcing retry", w, " "); for (i = 1; i <= n; i++) t[w[i]] = 1; n = split("badwords dictpath allowclasses enforce_for_root local_users_only", w, " "); for (i = 1; i <= n; i++) t[w[i]] = 2; for (i = 1; i < ARGC && s == ""; i++) { f = ARGV[i]; ln = 0; while (s == "" && (getline l < f) > 0) { ln++; sub(/#.*/, "", l); sub(/^[[:space:]]+/, "", l); sub(/[[:space:]]+$/, "", l); if (l == "") continue; k = l; sub(/[[:space:]=].*/, "", k); v = substr(l, length(k) + 1); sub(/^[[:space:]=]+/, "", v); lk = tolower(k); if (!(lk in t) || (t[lk] == 1 && bad(v))) s = k " " f ":" ln; else if (t[lk] == 1) x[lk] = v + 0 } close(f) } if (s != "") { print "stop " s; exit } ml = ("minlen" in x) ? x["minlen"] : 8; rc = x["minclass"] + 0; c = 0; if (x["dcredit"] + 0 <= -1) c++; if (x["ucredit"] + 0 <= -1) c++; if (x["lcredit"] + 0 <= -1) c++; if (x["ocredit"] + 0 <= -1) c++; if (c > rc) rc = c; en = ("enforcing" in x) ? x["enforcing"] : 1; print ml, rc, en }' "$@"; }
-    set --
-    for f in /etc/security/pwquality.conf.d/*.conf "$pc"; do if [ -f "$f" ]; then set -- "$@" "$f"; fi; done
+    # minlen, required classes and enforcing over the chain in libpwquality's order, read as its read_config_file reads a line (cut at the first #, the name ends at a blank or =, names case-blind); its arguments are pwquality.conf (or "") and every regular file the three globs match, of which it keeps the names filter_conf keeps (the first .conf ends the name, hidden names too) in strcmp order, then pwquality.conf; a line it refuses (an unknown name, a bad integer, 1023 bytes or more, a NUL byte) stops it and prints stop <file>:<line> stops libpwquality (<what>)
+    rd_pwq() { LC_ALL=C awk 'function bad(v, a) { if (v !~ /^[+-]?[0-9]+$/) return 1; a = v; sub(/^[+-]/, "", a); sub(/^0+/, "", a); if (length(a) > 10) return 1; return (v + 0 >= 2147483647 || v + 0 <= -2147483648) } BEGIN { z = sprintf("%c", 0); if (length(z) != 1) { print "stop this awk cannot see a NUL byte"; exit } n = split("difok minlen dcredit ucredit lcredit ocredit minclass maxrepeat maxclassrepeat maxsequence gecoscheck dictcheck usercheck usersubstr enforcing retry", w, " "); for (i = 1; i <= n; i++) t[w[i]] = 1; n = split("badwords dictpath allowclasses enforce_for_root local_users_only", w, " "); for (i = 1; i <= n; i++) t[w[i]] = 2; m = 0; for (i = 2; i < ARGC; i++) { b = ARGV[i]; sub(/.*\//, "", b); p = index(b, ".conf"); if (p > 0 && p == length(b) - 4) { m++; q[m] = ARGV[i]; bn[m] = b } } for (i = 2; i <= m; i++) for (j = i; j > 1 && bn[j - 1] > bn[j]; j--) { y = bn[j]; bn[j] = bn[j - 1]; bn[j - 1] = y; y = q[j]; q[j] = q[j - 1]; q[j - 1] = y } if (ARGV[1] != "") q[++m] = ARGV[1]; for (i = 1; i <= m && s == ""; i++) { f = q[i]; ln = 0; while (s == "" && (getline l < f) > 0) { ln++; if (index(l, z)) { s = f ":" ln " stops libpwquality (NUL byte)"; break } if (length(l) >= 1023) { s = f ":" ln " stops libpwquality (line longer than 1023 bytes)"; break } sub(/#.*/, "", l); sub(/^[[:space:]]+/, "", l); sub(/[[:space:]]+$/, "", l); if (l == "") continue; k = l; sub(/[[:space:]=].*/, "", k); v = substr(l, length(k) + 1); sub(/^[[:space:]=]+/, "", v); lk = tolower(k); if (!(lk in t) || (t[lk] == 1 && bad(v))) s = f ":" ln " stops libpwquality (" k ")"; else if (t[lk] == 1) x[lk] = v + 0 } close(f) } if (s != "") { print "stop " s; exit } ml = ("minlen" in x) ? x["minlen"] : 8; rc = x["minclass"] + 0; c = 0; if (x["dcredit"] + 0 <= -1) c++; if (x["ucredit"] + 0 <= -1) c++; if (x["lcredit"] + 0 <= -1) c++; if (x["ocredit"] + 0 <= -1) c++; if (c > rc) rc = c; en = ("enforcing" in x) ? x["enforcing"] : 1; print ml, rc, en }' "$@"; }
+    set -- ""
+    if [ -f "$pc" ]; then set -- "$pc"; fi
+    for f in /etc/security/pwquality.conf.d/*.conf /etc/security/pwquality.conf.d/.*.conf /etc/security/pwquality.conf.d/.conf; do if [ -f "$f" ]; then set -- "$@" "$f"; fi; done
     pwq=$(rd_pwq "$@")
-    case "$pwq" in stop\ *) s=${pwq#stop }; log "muster.account.password_policy: ${s#* } stops libpwquality (${s%% *}), left as is"; exit 1;; esac
+    case "$pwq" in stop\ *) log "muster.account.password_policy: ${pwq#stop }, left as is"; exit 1;; esac
     first_val() { awk -v k="$1" '$1 == k { print $2; exit }' "$ld"; }
     set_key() {
-      if grep -Eq "^[[:space:]]*$1[[:space:]]" "$ld"; then sed -i -E "s|^([[:space:]]*$1)[[:space:]].*|\1 $2|" "$ld"; else printf '%s %s\n' "$1" "$2" >> "$ld"; fi
+      if grep -Eq "^[[:space:]]*$1[[:space:]]" "$ld"; then sed -i -E "s|^([[:space:]]*$1)[[:space:]].*|\1 $2|" "$ld"; else { if [ -s "$ld" ] && [ -n "$(tail -c1 "$ld")" ]; then echo >> "$ld"; fi; printf '%s %s\n' "$1" "$2" >> "$ld"; }; fi
     }
     v=$(first_val PASS_MAX_DAYS)
     case "$v" in ''|*[!0-9]*) set_key PASS_MAX_DAYS "$P_max_days";; *) if [ "$v" -gt "$P_max_days" ]; then set_key PASS_MAX_DAYS "$P_max_days"; fi;; esac
@@ -2548,7 +2549,10 @@ fix_muster_account_password_policy() {
       if [ -f "$pf" ] && LC_ALL=C awk -v k="$1" '{ x = $0; sub(/#.*/, "", x); sub(/^[[:space:]]+/, "", x); sub(/[[:space:]=].*/, "", x) } tolower(x) == k { f = 1 } END { exit !f }' "$pf"; then
         LC_ALL=C awk -v k="$1" -v v="$2" '{ x = $0; sub(/#.*/, "", x); sub(/^[[:space:]]+/, "", x); sub(/[[:space:]=].*/, "", x) } tolower(x) == k { print k " = " v; next } { print }' "$pf" > "$MB/pwquality.tmp"
         cat "$MB/pwquality.tmp" > "$pf"
-      else printf '%s = %s\n' "$1" "$2" >> "$pf"; fi
+      else
+        if [ -s "$pf" ] && [ -n "$(tail -c1 "$pf")" ]; then echo >> "$pf"; fi
+        printf '%s = %s\n' "$1" "$2" >> "$pf"
+      fi
       chmod 644 "$pf"
     }
     # shellcheck disable=SC2086
@@ -2581,7 +2585,7 @@ fix_muster_account_password_policy() {
   fi
   # validate
   ( set -e
-    awk '$1 == "PASS_MAX_DAYS" && a == "" { a = $2 } $1 == "PASS_MIN_DAYS" && b == "" { b = $2 } $1 == "PASS_MIN_LEN" && c == "" { c = $2 } END { exit !(a != "" && a + 0 <= M && b + 0 >= m && c + 0 >= l) }' M="$P_max_days" m="$P_min_days" l="$P_min_len" /etc/login.defs && set -- && for f in /etc/security/pwquality.conf.d/*.conf /etc/security/pwquality.conf; do if [ -f "$f" ]; then set -- "$@" "$f"; fi; done && LC_ALL=C awk 'function bad(v, a) { if (v !~ /^[+-]?[0-9]+$/) return 1; a = v; sub(/^[+-]/, "", a); sub(/^0+/, "", a); if (length(a) > 10) return 1; return (v + 0 >= 2147483647 || v + 0 <= -2147483648) } BEGIN { n = split("difok minlen dcredit ucredit lcredit ocredit minclass maxrepeat maxclassrepeat maxsequence gecoscheck dictcheck usercheck usersubstr enforcing retry", w, " "); for (i = 1; i <= n; i++) t[w[i]] = 1; n = split("badwords dictpath allowclasses enforce_for_root local_users_only", w, " "); for (i = 1; i <= n; i++) t[w[i]] = 2; for (i = 1; i < ARGC && s == ""; i++) { f = ARGV[i]; ln = 0; while (s == "" && (getline l < f) > 0) { ln++; sub(/#.*/, "", l); sub(/^[[:space:]]+/, "", l); sub(/[[:space:]]+$/, "", l); if (l == "") continue; k = l; sub(/[[:space:]=].*/, "", k); v = substr(l, length(k) + 1); sub(/^[[:space:]=]+/, "", v); lk = tolower(k); if (!(lk in t) || (t[lk] == 1 && bad(v))) s = k " " f ":" ln; else if (t[lk] == 1) x[lk] = v + 0 } close(f) } if (s != "") { print "stop " s; exit } ml = ("minlen" in x) ? x["minlen"] : 8; rc = x["minclass"] + 0; c = 0; if (x["dcredit"] + 0 <= -1) c++; if (x["ucredit"] + 0 <= -1) c++; if (x["lcredit"] + 0 <= -1) c++; if (x["ocredit"] + 0 <= -1) c++; if (c > rc) rc = c; en = ("enforcing" in x) ? x["enforcing"] : 1; print ml, rc, en }' "$@" | awk '$1 != "stop" && $1 + 0 >= L && $2 + 0 >= C && $3 + 0 != 0 { f = 1 } END { exit !f }' L="$P_min_len" C="$P_min_classes"
+    awk '$1 == "PASS_MAX_DAYS" && a == "" { a = $2 } $1 == "PASS_MIN_DAYS" && b == "" { b = $2 } $1 == "PASS_MIN_LEN" && c == "" { c = $2 } END { exit !(a != "" && a + 0 <= M && b + 0 >= m && c + 0 >= l) }' M="$P_max_days" m="$P_min_days" l="$P_min_len" /etc/login.defs && set -- "" && if [ -f /etc/security/pwquality.conf ]; then set -- /etc/security/pwquality.conf; fi && for f in /etc/security/pwquality.conf.d/*.conf /etc/security/pwquality.conf.d/.*.conf /etc/security/pwquality.conf.d/.conf; do if [ -f "$f" ]; then set -- "$@" "$f"; fi; done && LC_ALL=C awk 'function bad(v, a) { if (v !~ /^[+-]?[0-9]+$/) return 1; a = v; sub(/^[+-]/, "", a); sub(/^0+/, "", a); if (length(a) > 10) return 1; return (v + 0 >= 2147483647 || v + 0 <= -2147483648) } BEGIN { z = sprintf("%c", 0); if (length(z) != 1) { print "stop this awk cannot see a NUL byte"; exit } n = split("difok minlen dcredit ucredit lcredit ocredit minclass maxrepeat maxclassrepeat maxsequence gecoscheck dictcheck usercheck usersubstr enforcing retry", w, " "); for (i = 1; i <= n; i++) t[w[i]] = 1; n = split("badwords dictpath allowclasses enforce_for_root local_users_only", w, " "); for (i = 1; i <= n; i++) t[w[i]] = 2; m = 0; for (i = 2; i < ARGC; i++) { b = ARGV[i]; sub(/.*\//, "", b); p = index(b, ".conf"); if (p > 0 && p == length(b) - 4) { m++; q[m] = ARGV[i]; bn[m] = b } } for (i = 2; i <= m; i++) for (j = i; j > 1 && bn[j - 1] > bn[j]; j--) { y = bn[j]; bn[j] = bn[j - 1]; bn[j - 1] = y; y = q[j]; q[j] = q[j - 1]; q[j - 1] = y } if (ARGV[1] != "") q[++m] = ARGV[1]; for (i = 1; i <= m && s == ""; i++) { f = q[i]; ln = 0; while (s == "" && (getline l < f) > 0) { ln++; if (index(l, z)) { s = f ":" ln " stops libpwquality (NUL byte)"; break } if (length(l) >= 1023) { s = f ":" ln " stops libpwquality (line longer than 1023 bytes)"; break } sub(/#.*/, "", l); sub(/^[[:space:]]+/, "", l); sub(/[[:space:]]+$/, "", l); if (l == "") continue; k = l; sub(/[[:space:]=].*/, "", k); v = substr(l, length(k) + 1); sub(/^[[:space:]=]+/, "", v); lk = tolower(k); if (!(lk in t) || (t[lk] == 1 && bad(v))) s = f ":" ln " stops libpwquality (" k ")"; else if (t[lk] == 1) x[lk] = v + 0 } close(f) } if (s != "") { print "stop " s; exit } ml = ("minlen" in x) ? x["minlen"] : 8; rc = x["minclass"] + 0; c = 0; if (x["dcredit"] + 0 <= -1) c++; if (x["ucredit"] + 0 <= -1) c++; if (x["lcredit"] + 0 <= -1) c++; if (x["ocredit"] + 0 <= -1) c++; if (c > rc) rc = c; en = ("enforcing" in x) ? x["enforcing"] : 1; print ml, rc, en }' "$@" | awk '$1 != "stop" && $1 + 0 >= L && $2 + 0 >= C && $3 + 0 != 0 { f = 1 } END { exit !f }' L="$P_min_len" C="$P_min_classes"
   ); rc=$?
   if [ "$rc" -ne 0 ]; then
     log "muster.account.password_policy: validate failed, rolling back"
