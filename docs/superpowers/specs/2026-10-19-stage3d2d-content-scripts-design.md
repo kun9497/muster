@@ -638,6 +638,12 @@ pre-flight and the probe) and O-64..O-78 (execution, the cycle's ledger) are in
   or comes back empty for a planned id.
 - **The inactivity log line for a `max` below -1** reads `password ageing fields are not numbers or the maximum is
   below -1, left as is`.
+- **O-85 and O-86 (the draft PR's first run).** GitHub's ubuntu-24.04 image 20261015.610 ships
+  `/etc/profile.d/debuginfod.sh` as a symlink into `/usr/share/libdebuginfod-common/` (Ubuntu's postinst, under ucf);
+  the env collector's no-follow read made all seven `env.shell.*` keys an error and `collect-root` failed — on main
+  too. The collector now reads a profile.d entry linked to an absolute clean `/usr/share/<pkg>/<file>` through one
+  level (the target opened no-follow, regular), and declines any other symlinked entry: the seven keys read absent
+  naming it (C4), which the three env controls (`absent_means: fail`) read FAIL.
 - **Proof as of the branch:** the four container rows' repair runs and the three init rows' guard and failure runs were
   replayed green on the lab's docker (Task 12); the runner row, IPv6 in the CI docker, the runner's accounts and `auditctl -s` keys, and whether a
   HUP applies the five disk-action keys are proven only by the PR's CI run (O-34).

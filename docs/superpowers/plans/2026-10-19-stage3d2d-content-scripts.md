@@ -429,6 +429,9 @@ Each ends with what it costs if wrong. O-72 is given in its corrected form (the 
 - **O-83 (F7)** — an auditd action value is reduced on the ASCII SPACE only (auditd splits on spaces; a tab-joined "exec	/y" is refused by auditd and now stays whole and FAILs); "syslog extra words" and "email # note" stay honoured as their first word (auditd logs "Wrong number of arguments" and reads the first value) — if wrong, a tab-joined action reads FAIL
 - **O-84 (F3)** — record() captures each producer (auditctl -l/-s, exportfs -s, the shadow awk) into a variable and exits 1 when it fails, and requires a non-empty result when the matching id is planned; no blanket pipefail — if wrong, a record step fails loudly instead of passing empty
 
+- **O-85 (the draft PR's first CI run)** — the env collector reads a symlinked /etc/profile.d entry through one level when its target is an absolute clean `/usr/share/<pkg>/<file>` (runner image 20261015.610 links `debuginfod.sh` there, Ubuntu's libdebuginfod-common postinst; `collect-root` failed on this PR and on main); any other symlinked entry is declined — the seven env.shell keys read absent naming it (C4), never error — if wrong, a host whose profile.d links elsewhere reads FAIL on the env controls
+- **O-86** — a declined link makes the env.shell leaves absent, which session_timeout, umask_policy and root_home_and_path read as FAIL (absent_means: fail); a dangling /usr/share link contributes nothing, like a missing entry — accepted (both non-PASS, an odd host shape) — if wrong, such a host reads FAIL where it might pass
+
 ### What the reviews found
 
 - **Task reviews.** Tasks 2–4 were reviewed as one batch: Task 4 replaced an earlier default list where nfs-utils adds
@@ -449,4 +452,6 @@ Each ends with what it costs if wrong. O-72 is given in its corrected form (the 
 
 ### CI
 
-(The draft PR's runs go here as they land.)
+- **Draft PR #25, run 39355425181** — every fix-roundtrip row green, the runner row included: the four runner bodies ran on the VM for the first time, repair and failure runs, records equal. `collect-root` failed: runner image 20261015.610's `/etc/profile.d/debuginfod.sh` symlink (O-85; main is broken by the same image). The nightly fuzz shard that failed on main (39226064170) is `FuzzParseAideConf … context deadline exceeded` at 60 s with no failing input: the known deadline-race flake.
+
+(Later runs go here as they land.)

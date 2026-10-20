@@ -783,7 +783,8 @@ configuration walk stopped at an `Include` outside the declaration (below).
   all seven `env.shell.*` keys an error, so `collect --require-complete`
   failed and the env controls read ERROR on every such host. A link anywhere
   else (relative, outside that shape, chained, or to a non-regular file) is
-  declined: the keys are `absent` naming the entry and its target. A symlink
+  declined: the keys are `absent` naming the entry and its target (the env
+  controls, `absent_means: fail`, read FAIL there; O-86). A symlink
   at `/etc/profile` or another main file stays an error (stage 3D-2d, O-85).
 - vsftpd's greeting is read in vsftpd's own order: a non-empty `banner_file`
   wins over `ftpd_banner` (a clean `ftpd_banner` beside a disclosing banner

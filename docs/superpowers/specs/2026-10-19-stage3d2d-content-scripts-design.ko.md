@@ -621,6 +621,12 @@ notes에 있습니다. 이 글을 바꾸는 것은 다음과 같습니다.
   export, shadow 생산자가 실패하거나 빈 결과를 내면 `record()`가 크게 실패합니다.
 - **`max`가 -1보다 작을 때의 비활성 로그 줄**은 `password ageing fields are not numbers or the maximum is below -1,
   left as is`입니다.
+- **O-85와 O-86(draft PR의 첫 실행).** GitHub의 ubuntu-24.04 이미지 20261015.610은 `/etc/profile.d/debuginfod.sh`를
+  `/usr/share/libdebuginfod-common/`로 가는 심볼릭 링크로 실어 보냅니다(Ubuntu의 postinst, ucf 아래). env collector의
+  링크를 따르지 않는 읽기가 `env.shell.*` 키 일곱을 모두 error로 만들어 `collect-root`가 실패했습니다 — main에서도.
+  이제 collector는 절대 경로이고 정리된 `/usr/share/<pkg>/<file>`로 링크된 profile.d 항목을 한 단계만 따라 읽고(대상은
+  링크를 따르지 않고 열며 일반 파일), 그 밖의 링크된 항목은 거절합니다: 일곱 키는 그것을 이름 붙인 absent로 읽히고(C4),
+  세 env control(`absent_means: fail`)은 그것을 FAIL로 읽습니다.
 - **브랜치 시점의 증명:** 네 컨테이너 행의 수리 실행과 세 init 행의 가드·실패 실행은 랩의 docker에서 다시 돌려 녹색이었습니다(Task 12).
   runner 행, CI docker의 IPv6, runner의 계정과 `auditctl -s` 키, HUP이 디스크 처리 키 다섯을 적용하는지는 PR의 CI
   실행만이 증명합니다(O-34).
