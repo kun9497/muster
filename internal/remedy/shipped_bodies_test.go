@@ -860,7 +860,7 @@ func TestPasswordPolicyBodyTightensOnly(t *testing.T) {
 // parameters stay byte for byte; nothing is written and the validate holds.
 func TestPasswordPolicyBodyKeepsAStricterHost(t *testing.T) {
 	needSh(t)
-	for _, pwq := range []string{"minlen = 12\ndcredit = -1\nucredit = -1\nlcredit = -1\n", "MINLEN = 14\nMinClass = 3\n"} {
+	for _, pwq := range []string{"minlen = 12\ndcredit = -1\nucredit = -1\nlcredit = -1\n", "MINLEN = 14\nMinClass = 3\n", "minlen 12 # site\nminclass\t3\n"} {
 		keepsAStricterHost(t, pwq)
 	}
 }
@@ -1080,9 +1080,23 @@ func TestLineBodiesTightenOnly(t *testing.T) {
 		{id: "muster.account.lockout_threshold", file: "/etc/security/faillock.conf", before: "# deny = 3\n", after: "# deny = 3\n"},
 		{id: "muster.account.lockout_threshold", file: "/etc/security/faillock.conf", before: "deny = 0\n", after: "deny = 5\n"},
 		{id: "muster.account.lockout_threshold", file: "/etc/security/faillock.conf", before: "deny = 2\n", after: "deny = 2\n"},
-		// the collector lower-cases faillock.conf keys
-		{id: "muster.account.lockout_threshold", file: "/etc/security/faillock.conf", before: "DENY = 99\n", after: "deny = 5\n"},
+		// H-6: pam_faillock's set_conf_opt matches names case-sensitively, so
+		// DENY and Deny are ignored (deny stays 3, in range) and left alone
+		{id: "muster.account.lockout_threshold", file: "/etc/security/faillock.conf", before: "DENY = 99\n", after: "DENY = 99\n"},
 		{id: "muster.account.lockout_threshold", file: "/etc/security/faillock.conf", before: "  Deny=2\n", after: "  Deny=2\n"},
+		{id: "muster.account.lockout_threshold", file: "/etc/security/faillock.conf", before: "deny = 2\nDENY = 99\n", after: "deny = 2\nDENY = 99\n"},
+		// "#" cuts wherever it is, the "=" is optional, and sscanf reads the
+		// leading digits (a value with none leaves deny unchanged)
+		{id: "muster.account.lockout_threshold", file: "/etc/security/faillock.conf", before: "deny = 10 # x\n", after: "deny = 5\n"},
+		{id: "muster.account.lockout_threshold", file: "/etc/security/faillock.conf", before: "deny 9\n", after: "deny = 5\n"},
+		{id: "muster.account.lockout_threshold", file: "/etc/security/faillock.conf", before: "deny = 0abc\n", after: "deny = 5\n"},
+		{id: "muster.account.lockout_threshold", file: "/etc/security/faillock.conf", before: "deny = 4abc\n", after: "deny = 4abc\n"},
+		{id: "muster.account.lockout_threshold", file: "/etc/security/faillock.conf", before: "deny = abc\n", after: "deny = abc\n"},
+		{id: "muster.account.lockout_threshold", file: "/etc/security/faillock.conf", before: "deny = 4\ndeny = abc\n", after: "deny = 4\ndeny = abc\n"},
+		{id: "muster.account.lockout_threshold", file: "/etc/security/faillock.conf", before: "deny = 99\ndeny = abc\n", after: "deny = 5\ndeny = 5\n"},
+		// "%hu" keeps the low 16 bits: 65541 locks after 5
+		{id: "muster.account.lockout_threshold", file: "/etc/security/faillock.conf", before: "deny = 65541\n", after: "deny = 65541\n"},
+		{id: "muster.account.lockout_threshold", file: "/etc/security/faillock.conf", before: "deny = -1\n", after: "deny = 5\n"},
 		// S-41: a missing faillock.conf is deny 3 on both sides
 		{id: "muster.account.lockout_threshold", file: "/etc/security/faillock.conf", absent: true},
 		{id: "muster.account.lockout_threshold", file: "/etc/security/faillock.conf", absent: true, created: true, after: "deny = 2\n", mode: "644", env: []string{"P_max_attempts=2"}},
@@ -1418,5 +1432,84 @@ func TestSessionTimeoutRollbackRestoresBeforeTheReload(t *testing.T) {
 	}
 	if !strings.HasSuffix(calls, "reload ssh.service\n"+before) {
 		t.Errorf("the last reload did not read the restored drop-in:\n%s", calls)
+	}
+}
+
+// H-7: a line libpwquality refuses (an unknown name, or an integer
+// set_name_value rejects) stops it, and what it enforces then depends on what
+// was applied before the stop. The body names the line and fails before ANY
+// write - login.defs and the ageing included - so the block rolls back and the
+// check keeps failing on the line; the validate refuses the same chain.
+func TestPasswordPolicyBodyStopsOnARefusedLine(t *testing.T) {
+	needSh(t)
+	c := shippedControl(t, "muster.account.password_policy")
+	for _, row := range []struct {
+		name, main string
+		dropins    map[string]string
+		at, key    string
+	}{
+		{"a drop-in's bad integer", "minlen = 6\n", map[string]string{"50-site.conf": "# site\nminlen = 14chars\n"}, "/etc/security/pwquality.conf.d/50-site.conf:2", "minlen"},
+		{"a drop-in's unknown name", "minlen = 6\n", map[string]string{"50-site.conf": "minlen = 14\nunknownkey = 1\n"}, "/etc/security/pwquality.conf.d/50-site.conf:2", "unknownkey"},
+		{"an integer muster does not judge", "", map[string]string{"10-a.conf": "difok = x\n"}, "/etc/security/pwquality.conf.d/10-a.conf:1", "difok"},
+		{"the main file after a good line", "minlen = 12\nBogus = 1\n", nil, "/etc/security/pwquality.conf:2", "Bogus"},
+	} {
+		t.Run(row.name, func(t *testing.T) {
+			root, bin, stub := accountTree(t)
+			const defs = "PASS_MAX_DAYS 99999\nPASS_MIN_DAYS 0\nPASS_MIN_LEN 5\n"
+			writeUnder(t, root, "/etc/login.defs", defs)
+			if row.main != "" {
+				writeUnder(t, root, "/etc/security/pwquality.conf", row.main)
+			}
+			for n, b := range row.dropins {
+				writeUnder(t, root, "/etc/security/pwquality.conf.d/"+n, b)
+			}
+			writeUnder(t, root, "/etc/passwd", "fresh:x:1000:1000::/home/fresh:/bin/sh\n")
+			writeUnder(t, root, "/etc/shadow", fmt.Sprintf("fresh:$6$x:%d::99999:7:::\n", time.Now().Unix()/86400))
+			env := append(pEnv(t, c), "MB="+t.TempDir(), "STUB="+stub, "ROOT="+root)
+			body := "umask 077\nlog() { printf 'muster-fix: %s\\n' \"$*\"; }\n" + rebaseAccounts(c.Remediation.Script, root)
+			out, code := runBody(t, root, bin, body, env...)
+			if code != 1 {
+				t.Fatalf("body exit %d, want 1: %s", code, out)
+			}
+			if want := "muster-fix: muster.account.password_policy: " + root + row.at + " stops libpwquality (" + row.key + "), left as is\n"; !strings.Contains(out, want) {
+				t.Errorf("no %q in:\n%s", want, out)
+			}
+			if got := readFile(t, filepath.Join(root, "/etc/login.defs")); got != defs {
+				t.Errorf("login.defs written before the stop was found: %q", got)
+			}
+			if row.main != "" {
+				if got := readFile(t, filepath.Join(root, "/etc/security/pwquality.conf")); got != row.main {
+					t.Errorf("pwquality.conf written: %q", got)
+				}
+			}
+			if exists(filepath.Join(root, "/etc/security/pwquality.conf.d/99-muster.conf")) {
+				t.Error("99-muster.conf written")
+			}
+			if exists(filepath.Join(stub, "chage")) {
+				t.Errorf("chage ran: %s", readFile(t, filepath.Join(stub, "chage")))
+			}
+			// The validate refuses the same chain even where every value it
+			// could read passes.
+			writeUnder(t, root, "/etc/login.defs", "PASS_MAX_DAYS 60\nPASS_MIN_DAYS 2\nPASS_MIN_LEN 12\n")
+			if out, code := runBody(t, root, bin, rebaseAccounts(c.Remediation.Validate, root), env...); code == 0 {
+				t.Errorf("validate passed over a chain libpwquality stops: %s", out)
+			}
+		})
+	}
+}
+
+// H-7: pput rewrites the main file's line for a key however libpwquality
+// reads it - without "=", in any case, with a trailing comment - as
+// "<key> = <value>", the comment not kept.
+func TestPasswordPolicyBodyRewritesASpelledKey(t *testing.T) {
+	needSh(t)
+	for _, main := range []string{"minlen 6\n", "MinLen=6\n", "minlen = 6 # site\n", "  MINLEN\t6\r\n"} {
+		root, _ := pwPolicyBody(t, main+"minclass 3\n", nil)
+		if got := readFile(t, filepath.Join(root, "/etc/security/pwquality.conf")); got != "minlen = 8\nminclass 3\n" {
+			t.Errorf("%q: pwquality.conf %q, want the line rewritten in place", main, got)
+		}
+		if exists(filepath.Join(root, "/etc/security/pwquality.conf.d")) {
+			t.Errorf("%q: a drop-in was written although the main file sets the key", main)
+		}
 	}
 }

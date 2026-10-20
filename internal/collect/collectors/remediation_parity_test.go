@@ -730,3 +730,178 @@ func TestInactivityReadersMatchTheCollector(t *testing.T) {
 		}
 	})
 }
+
+// pwqualityStopAt reads the file, line and text out of the reason H-5 gives
+// every pwquality value leaf when a file stops the chain.
+var pwqualityStopAt = regexp.MustCompile(`^libpwquality stops reading at (.+):([0-9]+) \((.*)\); the (files|lines) after it are not applied$`)
+
+// TestPwqualityReaderMatchesTheCollector (H-5, H-7, O-10): rd_pwq is
+// password_policy's one reader of the pwquality chain, and the validate
+// repeats its program. It prints `<minlen> <required classes> <enforcing>` as
+// the collector publishes pam.pwquality.minlen, required_classes and
+// enforcing over the same files (the stack's line sets none of them), or
+// `stop <name> <file>:<line>` where the collector takes them absent naming
+// that line, so the body never writes over a chain libpwquality stops and
+// the validate agrees with check after it.
+func TestPwqualityReaderMatchesTheCollector(t *testing.T) {
+	r := shippedBody(t, "muster.account.password_policy")
+	fn := readerLine(t, r, "rd_pwq", true)
+	const call = `set --; for f in {root}/etc/security/pwquality.conf.d/*.conf {root}/etc/security/pwquality.conf; do if [ -f "$f" ]; then set -- "$@" "$f"; fi; done; rd_pwq "$@"`
+	type row struct {
+		main    string // "" leaves the main file out
+		dropins map[string]string
+	}
+	rows := map[string]row{
+		"no files":                {},
+		"main only":               {main: "minlen = 12\nminclass = 3\n"},
+		"no =":                    {main: "minlen 6\n"},
+		"enforcing 0":             {main: "enforcing 0\n"},
+		"trailing comment":        {main: "minlen = 12 # site\n"},
+		"upper case":              {main: "MINLEN=12\n"},
+		"run of = and blanks":     {main: "  MinLen\t=\t= 11\r\n"},
+		"sign":                    {main: "minlen = +9\ndcredit = -1\nocredit=-2\n"},
+		"hash in the value":       {main: "minlen=7#x\n"},
+		"strings and flags":       {main: "minclass = 2\nbadwords = a=b c\nenforce_for_root = yes\nlocal_users_only\ndictpath =\n"},
+		"credits":                 {main: "minclass = 1\ndcredit = -1\nucredit = -1\nocredit = -1\nlcredit = 1\n"},
+		"zeros":                   {main: "minlen = 0000000000014\n"},
+		"just below INT_MAX":      {main: "minlen = 2147483646\nminclass = -2147483647\n"},
+		"main last":               {main: "minlen = 6\n", dropins: map[string]string{"99-hardening.conf": "minlen = 14\n"}},
+		"drop-in order":           {dropins: map[string]string{"10-a.conf": "minlen = 10\nenforcing = 0\n", "20-b.conf": "minlen = 16\n"}},
+		"drop-in bad integer":     {main: "minlen = 14\nminclass = 4\n", dropins: map[string]string{"50-site.conf": "# site\n\nminlen = 14chars\n"}},
+		"drop-in unknown name":    {main: "minlen = 6\n", dropins: map[string]string{"50-site.conf": "minlen = 14\nunknownkey = 1\n"}},
+		"first drop-in stops":     {main: "minlen = 14\n", dropins: map[string]string{"10-a.conf": "difok = x\n", "20-b.conf": "bogus\n"}},
+		"main after a good line":  {main: "minlen = 12\nBogus = 1\n"},
+		"INT_MAX":                 {main: "minlen = 2147483647\n"},
+		"INT_MIN":                 {main: "minclass = -2147483648\n"},
+		"overflow":                {main: "minlen = 99999999999999999999\n"},
+		"empty integer":           {main: "minlen =\n"},
+		"bare integer":            {main: "minlen\n"},
+		"hex":                     {main: "minlen = 0x10\n"},
+		"two words":               {main: "minlen = 12 34\n"},
+		"empty name":              {main: "= 5\n"},
+		"Kelvin":                  {main: "usercheck = 1\nminlen = 10\nuserchecK = 1\n"},
+		"blank and comment lines": {main: "\n   \n# minlen = 4\n\t# x\nminlen = 9\n"},
+		"no final newline":        {main: "minlen = 13"},
+	}
+	for _, f := range []string{"pam/rocky/pwquality.conf", "pam/ubuntu/pwquality.conf", "pam/rocky/credits.conf", "pam/rocky/dropin-30-reset.conf"} {
+		b, err := os.ReadFile(filepath.Join("testdata", f))
+		if err != nil {
+			t.Fatal(err)
+		}
+		rows[f] = row{main: string(b)}
+	}
+	names := make([]string, 0, len(rows))
+	for n := range rows {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	for _, n := range names {
+		t.Run(n, func(t *testing.T) {
+			c := rows[n]
+			b := build(t, "pam", pwqualityChain(c.main, c.dropins))
+			minlen := env(t, b, "pam.pwquality.minlen")
+			var want string
+			if minlen.Status == facts.StatusOK {
+				want = fmt.Sprintf("%v %v %v", minlen.Value, env(t, b, "pam.pwquality.required_classes").Value, env(t, b, "pam.pwquality.enforcing").Value)
+			} else if m := pwqualityStopAt.FindStringSubmatch(minlen.Reason); m != nil {
+				name := m[3]
+				for i := 0; i < len(name); i++ {
+					if cSpace(name[i]) || name[i] == '=' {
+						name = name[:i]
+						break
+					}
+				}
+				want = "stop " + name + " {root}" + m[1] + ":" + m[2]
+			} else {
+				t.Fatalf("minlen %+v: neither a value nor a stop", minlen)
+			}
+			files := map[string][]byte{}
+			if c.main != "" {
+				files[pwqualityConf] = []byte(c.main)
+			}
+			for d, s := range c.dropins {
+				files[pwqualityConfDir+"/"+d] = []byte(s)
+			}
+			var root string
+			got, code := runReaderWith(t, fn, call, files, func(r string) { root = r })
+			if code != 0 || got != strings.ReplaceAll(want, "{root}", root) {
+				t.Errorf("rd_pwq printed %q (exit %d); the collector reads %q", got, code, want)
+			}
+		})
+	}
+}
+
+// TestFaillockReaderMatchesTheCollector (H-6, H-7, O-10): rd_deny is
+// lockout_threshold's reader of faillock.conf, and the validate repeats its
+// program. It prints the deny the collector publishes as pam.faillock.deny
+// over the same file (the stack's lines set no deny), so the body rewrites
+// exactly where the check FAILs and the validate agrees with it.
+func TestFaillockReaderMatchesTheCollector(t *testing.T) {
+	r := shippedBody(t, "muster.account.lockout_threshold")
+	fn := readerLine(t, r, "rd_deny", true)
+	rows := map[string]string{
+		"trailing comment":   "deny = 10   # site\n",
+		"no =":               "deny 0\n",
+		"upper case":         "DENY = 0\n",
+		"upper case later":   "deny = 4\nDENY = 0\n",
+		"Deny":               "  Deny=2\n",
+		"leading digits":     "deny = 5abc\n",
+		"no digits":          "deny = abc\n",
+		"no digits later":    "deny = 4\ndeny = abc\n",
+		"last wins":          "deny = 4\ndeny = 7\n",
+		"tight =":            "deny=8\n",
+		"two =":              "deny = = 5\n",
+		"= then =":           "deny==5\n",
+		"= then blank =":     "deny= =5\n",
+		"blank = blank":      "deny\t=\t6\r\n",
+		"16 bits":            "deny = 65541\n",
+		"65536":              "deny = 65536\n",
+		"minus one":          "deny = -1\n",
+		"minus zero":         "deny = -0\n",
+		"plus":               "deny = +5\n",
+		"minus 65541":        "deny = -65541\n",
+		"ULONG_MAX":          "deny = 18446744073709551615\n",
+		"ULONG_MAX - 4":      "deny = 18446744073709551611\n",
+		"over ULONG_MAX":     "deny = 18446744073709551616\n",
+		"far over":           "deny = 99999999999999999999999\n",
+		"minus far over":     "deny = -99999999999999999999999\n",
+		"zeros":              "deny = 0000000000000000000000000005\n",
+		"bare":               "deny\n",
+		"denyx":              "denyx = 1\n",
+		"hash cut":           "deny#=1\n",
+		"commented":          "# deny = 1\n",
+		"other keys":         "unlock_time = never\neven_deny_root\nfail_interval = 900\n",
+		"empty file":         "",
+		"no final newline":   "deny = 9",
+		"stock rocky sample": "",
+	}
+	b, err := os.ReadFile("testdata/pam/rocky/faillock.conf")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows["stock rocky sample"] = string(b)
+	names := make([]string, 0, len(rows))
+	for n := range rows {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	for _, n := range names {
+		t.Run(n, func(t *testing.T) {
+			e := env(t, build(t, "pam", faillockConfStack(rows[n])), "pam.faillock.deny")
+			if e.Status != facts.StatusOK {
+				t.Fatalf("deny %+v", e)
+			}
+			got, code := runReader(t, fn, "rd_deny {root}/etc/security/faillock.conf", map[string][]byte{faillockConf: []byte(rows[n])})
+			if code != 0 || got != fmt.Sprint(e.Value) {
+				t.Errorf("rd_deny printed %q (exit %d); the collector reads deny %v from %q", got, code, e.Value, rows[n])
+			}
+		})
+	}
+	// No faillock.conf at all: the default on both sides.
+	a := faillockConfStack("")
+	delete(a.contents, faillockConf)
+	e := env(t, build(t, "pam", a), "pam.faillock.deny")
+	if got, code := runReader(t, fn, "rd_deny {root}/etc/security/faillock.conf", nil); code != 0 || got != fmt.Sprint(e.Value) {
+		t.Errorf("rd_deny over a missing file printed %q (exit %d); the collector reads %v", got, code, e.Value)
+	}
+}
