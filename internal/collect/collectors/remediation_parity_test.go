@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -938,5 +939,42 @@ func TestFaillockReaderMatchesTheCollector(t *testing.T) {
 	e := env(t, build(t, "pam", a), "pam.faillock.deny")
 	if got, code := runReader(t, fn, "rd_deny {root}/etc/security/faillock.conf", nil); code != 0 || got != fmt.Sprint(e.Value) {
 		t.Errorf("rd_deny over a missing file printed %q (exit %d); the collector reads %v", got, code, e.Value)
+	}
+}
+
+// TestInstallReadersMatchTheCollector (H-14, f8): each module body's
+// rd_install reads the first install line modprobe --showconfig prints for its argument
+// and prints its command when that command is one no-op word (a comment word
+// may follow), else "compound". Its case list is installNoops, so the body
+// writes its own line, and the validate fails, exactly when installDisables
+// says the line does not disable the module. Nothing here runs the command.
+func TestInstallReadersMatchTheCollector(t *testing.T) {
+	commands := []string{
+		"/bin/false", "/bin/true", "/usr/bin/false", "/usr/bin/true", "false", "true",
+		"/bin/false # never", "/bin/false #never", "  /usr/bin/true  ",
+		"/bin/true && modprobe --ignore-install usb_storage",
+		"/bin/false || /sbin/modprobe --ignore-install cramfs",
+		"true ; modprobe --ignore-install sctp", "/bin/true;modprobe sctp",
+		"/bin/true | x", "/bin/true & x", "/bin/true $(modprobe x)", "/bin/true `x`",
+		"/bin/false > /tmp/x", "/bin/true $CMDLINE_OPTS", "exec /bin/false", `"/bin/false"`,
+		"/bin/false# x", "/sbin/modprobe --ignore-install cramfs", "logger false", "/opt/false",
+	}
+	for _, id := range []string{"muster.beyond.usb_storage_disabled", "muster.beyond.uncommon_filesystems_disabled", "muster.beyond.uncommon_network_protocols_disabled"} {
+		fn := readerLine(t, shippedBody(t, id), "rd_install", true)
+		for _, c := range commands {
+			// The first line for the module wins; another module's line and a
+			// later line for the same one are never read.
+			conf := "install other /bin/false\ninstall mod_x " + c + "\ninstall mod_x /bin/false\n"
+			got, code := runReader(t, fn, "rd_install mod_x < {root}/showconfig", map[string][]byte{"/showconfig": []byte(conf)})
+			if code != 0 {
+				t.Fatalf("%s: rd_install exit %d over %q", id, code, c)
+			}
+			if disables := slices.Contains(installNoops, got); disables != installDisables(c) {
+				t.Errorf("%s: rd_install printed %q for %q; installDisables says %v", id, got, c, installDisables(c))
+			}
+		}
+		if got, _ := runReader(t, fn, "rd_install mod_x < {root}/showconfig", map[string][]byte{"/showconfig": []byte("install other /bin/false\n")}); got != "" {
+			t.Errorf("%s: rd_install printed %q with no line for the module", id, got)
+		}
 	}
 }

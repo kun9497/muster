@@ -480,6 +480,61 @@ func TestModuleBodiesKeepAVendorInstallLine(t *testing.T) {
 	}
 }
 
+// H-14 (f8): a vendor install line whose first word is a no-op but which
+// chains more shell (`/bin/true && modprobe --ignore-install m`) loads the
+// module, so it is not one to keep. The body writes its own line; kmod's
+// first match still wins when the vendor file sorts first, so the validate
+// fails (and the block rolls back), and passes once muster's line sorts first.
+// The stub only cats conf/*, so nothing runs the vendor command.
+func TestModuleBodiesDoNotKeepACompoundInstallLine(t *testing.T) {
+	needSh(t)
+	for _, id := range moduleIDs {
+		r := shippedControl(t, id).Remediation
+		n := strings.ReplaceAll(r.Modules[0], "-", "_")
+		for _, tc := range []struct {
+			file, vendor  string
+			before, after bool // validate success before and after the body
+			muster        bool // the body writes install n /bin/false
+		}{
+			{"00-vendor.conf", "install " + n + " /bin/true && /sbin/modprobe --ignore-install " + n + "\n", false, false, true},
+			{"zz-vendor.conf", "install " + n + " /bin/true && /sbin/modprobe --ignore-install " + n + "\n", false, true, true},
+			{"00-vendor.conf", "install " + n + " /bin/false\n", true, true, false},
+		} {
+			t.Run(id+"/"+tc.file+"/"+tc.vendor, func(t *testing.T) {
+				bin, st, _ := moduleState(t, r)
+				rebase := moduleRebase(st)
+				if err := os.WriteFile(filepath.Join(st, "conf", tc.file), []byte(tc.vendor), 0o644); err != nil {
+					t.Fatal(err)
+				}
+				env := "MODPROBE_STATE=" + st
+				// The plain case starts unloaded too, so only the install line decides.
+				if !tc.muster {
+					if err := os.WriteFile(filepath.Join(st, "modules"), nil, 0o644); err != nil {
+						t.Fatal(err)
+					}
+				}
+				if _, code := runBody(t, st, bin, rebase(r.Validate), env); (code == 0) != tc.before && len(r.Modules) == 1 {
+					t.Errorf("validate before the body exit %d, want success %v", code, tc.before)
+				}
+				if out, code := runBody(t, st, bin, rebase(r.Script), env); code != 0 {
+					t.Fatalf("body %d %s", code, out)
+				}
+				if _, code := runBody(t, st, bin, rebase(r.Validate), env); (code == 0) != tc.after {
+					t.Errorf("validate after the body exit %d, want success %v", code, tc.after)
+				}
+				b, err := os.ReadFile(rebase(r.Backup[0]))
+				if err != nil && !os.IsNotExist(err) {
+					t.Fatal(err)
+				}
+				conf := string(b)
+				if got := strings.Contains(conf, "install "+n+" /bin/false\n"); got != tc.muster {
+					t.Errorf("muster's drop-in, beside %s %q:\n%s", tc.file, tc.vendor, conf)
+				}
+			})
+		}
+	}
+}
+
 // S-27: a drop-in that is a symlink (an operator's mask) fails the whole
 // block before any write; the link, its target's mode and content stay, and
 // no module is unloaded.

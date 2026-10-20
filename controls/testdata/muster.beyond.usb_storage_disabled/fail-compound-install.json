@@ -1,0 +1,41 @@
+{
+  "synthetic": true,
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none"
+      }
+    },
+    "kernel": {
+      "modules": {
+        "status": "ok",
+        "value": [
+          {
+            "available": true,
+            "blacklisted": false,
+            "builtin": false,
+            "disabled": false,
+            "install_disabled": false,
+            "loaded": false,
+            "name": "usb-storage",
+            "sources": [
+              "/etc/modprobe.d/50-site.conf"
+            ]
+          }
+        ],
+        "source": {
+          "kind": "derived",
+          "inputs": [
+            {
+              "kind": "file",
+              "path": "/etc/modprobe.d/50-site.conf"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

@@ -1073,10 +1073,14 @@ fix_muster_beyond_uncommon_network_protocols_disabled() {
   ( set -e
     f=/etc/modprobe.d/99-muster-uncommon-network-protocols-disabled.conf
     if [ -L "$f" ]; then log "muster.beyond.uncommon_network_protocols_disabled: $f is a symlink (a mask), left as is"; exit 1; fi
+    # rd_install <module> reads modprobe --showconfig on stdin: the command of
+    # the first install line for it when that is one no-op word (a comment
+    # word may follow), else compound (H-14). m= is set before stdin is read.
+    rd_install() { LC_ALL=C awk '$1 == "install" && $2 == m { c = 0; for (i = 3; i <= NF; i++) { if (substr($i, 1, 1) == "#") break; c++ }; print (c == 1 ? $3 : "compound"); exit }' m="$1"; }
     mods='dccp sctp rds tipc'
     for m in $mods; do
       n=$(printf '%s' "$m" | tr - _)
-      case "$(modprobe --showconfig 2>/dev/null | awk -v m="$n" '$1 == "install" && $2 == m { print $3; exit }')" in
+      case "$(modprobe --showconfig 2>/dev/null | rd_install "$n")" in
         /bin/false|/bin/true|/usr/bin/false|/usr/bin/true|false|true) ;;
         *) if ! grep -q "^install $n " "$f" 2>/dev/null; then if [ -s "$f" ] && [ -n "$(tail -c1 "$f")" ]; then echo >> "$f"; fi; printf 'install %s /bin/false\n' "$n" >> "$f"; fi;;
       esac
@@ -1092,7 +1096,7 @@ fix_muster_beyond_uncommon_network_protocols_disabled() {
   fi
   # validate
   ( set -e
-    mods='dccp sctp rds tipc'; for m in $mods; do n=$(printf '%s' "$m" | tr - _); case "$(modprobe --showconfig 2>/dev/null | awk -v m="$n" '$1 == "install" && $2 == m { print $3; exit }')" in /bin/false|/bin/true|/usr/bin/false|/usr/bin/true|false|true) ;; *) exit 1;; esac; ! grep -q "^$n " /proc/modules || exit 1; done
+    mods='dccp sctp rds tipc'; for m in $mods; do n=$(printf '%s' "$m" | tr - _); case "$(modprobe --showconfig 2>/dev/null | LC_ALL=C awk '$1 == "install" && $2 == m { c = 0; for (i = 3; i <= NF; i++) { if (substr($i, 1, 1) == "#") break; c++ }; print (c == 1 ? $3 : "compound"); exit }' m="$n")" in /bin/false|/bin/true|/usr/bin/false|/usr/bin/true|false|true) ;; *) exit 1;; esac; ! grep -q "^$n " /proc/modules || exit 1; done
   ); rc=$?
   if [ "$rc" -ne 0 ]; then
     log "muster.beyond.uncommon_network_protocols_disabled: validate failed, rolling back"
@@ -1257,10 +1261,14 @@ fix_muster_beyond_uncommon_filesystems_disabled() {
   ( set -e
     f=/etc/modprobe.d/99-muster-uncommon-filesystems-disabled.conf
     if [ -L "$f" ]; then log "muster.beyond.uncommon_filesystems_disabled: $f is a symlink (a mask), left as is"; exit 1; fi
+    # rd_install <module> reads modprobe --showconfig on stdin: the command of
+    # the first install line for it when that is one no-op word (a comment
+    # word may follow), else compound (H-14). m= is set before stdin is read.
+    rd_install() { LC_ALL=C awk '$1 == "install" && $2 == m { c = 0; for (i = 3; i <= NF; i++) { if (substr($i, 1, 1) == "#") break; c++ }; print (c == 1 ? $3 : "compound"); exit }' m="$1"; }
     mods='cramfs freevxfs jffs2 hfs hfsplus udf'
     for m in $mods; do
       n=$(printf '%s' "$m" | tr - _)
-      case "$(modprobe --showconfig 2>/dev/null | awk -v m="$n" '$1 == "install" && $2 == m { print $3; exit }')" in
+      case "$(modprobe --showconfig 2>/dev/null | rd_install "$n")" in
         /bin/false|/bin/true|/usr/bin/false|/usr/bin/true|false|true) ;;
         *) if ! grep -q "^install $n " "$f" 2>/dev/null; then if [ -s "$f" ] && [ -n "$(tail -c1 "$f")" ]; then echo >> "$f"; fi; printf 'install %s /bin/false\n' "$n" >> "$f"; fi;;
       esac
@@ -1276,7 +1284,7 @@ fix_muster_beyond_uncommon_filesystems_disabled() {
   fi
   # validate
   ( set -e
-    mods='cramfs freevxfs jffs2 hfs hfsplus udf'; for m in $mods; do n=$(printf '%s' "$m" | tr - _); case "$(modprobe --showconfig 2>/dev/null | awk -v m="$n" '$1 == "install" && $2 == m { print $3; exit }')" in /bin/false|/bin/true|/usr/bin/false|/usr/bin/true|false|true) ;; *) exit 1;; esac; ! grep -q "^$n " /proc/modules || exit 1; done
+    mods='cramfs freevxfs jffs2 hfs hfsplus udf'; for m in $mods; do n=$(printf '%s' "$m" | tr - _); case "$(modprobe --showconfig 2>/dev/null | LC_ALL=C awk '$1 == "install" && $2 == m { c = 0; for (i = 3; i <= NF; i++) { if (substr($i, 1, 1) == "#") break; c++ }; print (c == 1 ? $3 : "compound"); exit }' m="$n")" in /bin/false|/bin/true|/usr/bin/false|/usr/bin/true|false|true) ;; *) exit 1;; esac; ! grep -q "^$n " /proc/modules || exit 1; done
   ); rc=$?
   if [ "$rc" -ne 0 ]; then
     log "muster.beyond.uncommon_filesystems_disabled: validate failed, rolling back"
@@ -2219,10 +2227,14 @@ fix_muster_beyond_usb_storage_disabled() {
   ( set -e
     f=/etc/modprobe.d/99-muster-usb-storage-disabled.conf
     if [ -L "$f" ]; then log "muster.beyond.usb_storage_disabled: $f is a symlink (a mask), left as is"; exit 1; fi
+    # rd_install <module> reads modprobe --showconfig on stdin: the command of
+    # the first install line for it when that is one no-op word (a comment
+    # word may follow), else compound (H-14). m= is set before stdin is read.
+    rd_install() { LC_ALL=C awk '$1 == "install" && $2 == m { c = 0; for (i = 3; i <= NF; i++) { if (substr($i, 1, 1) == "#") break; c++ }; print (c == 1 ? $3 : "compound"); exit }' m="$1"; }
     mods='usb-storage'
     for m in $mods; do
       n=$(printf '%s' "$m" | tr - _)
-      case "$(modprobe --showconfig 2>/dev/null | awk -v m="$n" '$1 == "install" && $2 == m { print $3; exit }')" in
+      case "$(modprobe --showconfig 2>/dev/null | rd_install "$n")" in
         /bin/false|/bin/true|/usr/bin/false|/usr/bin/true|false|true) ;;
         *) if ! grep -q "^install $n " "$f" 2>/dev/null; then if [ -s "$f" ] && [ -n "$(tail -c1 "$f")" ]; then echo >> "$f"; fi; printf 'install %s /bin/false\n' "$n" >> "$f"; fi;;
       esac
@@ -2238,7 +2250,7 @@ fix_muster_beyond_usb_storage_disabled() {
   fi
   # validate
   ( set -e
-    mods='usb-storage'; for m in $mods; do n=$(printf '%s' "$m" | tr - _); case "$(modprobe --showconfig 2>/dev/null | awk -v m="$n" '$1 == "install" && $2 == m { print $3; exit }')" in /bin/false|/bin/true|/usr/bin/false|/usr/bin/true|false|true) ;; *) exit 1;; esac; ! grep -q "^$n " /proc/modules || exit 1; done
+    mods='usb-storage'; for m in $mods; do n=$(printf '%s' "$m" | tr - _); case "$(modprobe --showconfig 2>/dev/null | LC_ALL=C awk '$1 == "install" && $2 == m { c = 0; for (i = 3; i <= NF; i++) { if (substr($i, 1, 1) == "#") break; c++ }; print (c == 1 ? $3 : "compound"); exit }' m="$n")" in /bin/false|/bin/true|/usr/bin/false|/usr/bin/true|false|true) ;; *) exit 1;; esac; ! grep -q "^$n " /proc/modules || exit 1; done
   ); rc=$?
   if [ "$rc" -ne 0 ]; then
     log "muster.beyond.usb_storage_disabled: validate failed, rolling back"

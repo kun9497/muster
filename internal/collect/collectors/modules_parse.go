@@ -183,10 +183,22 @@ func unescapeModprobeLine(line string) (string, bool) {
 // and reading it as disabled would pass a host on which the module loads
 // exactly as before.
 //
-// Only the command's FIRST word is judged: that is the program modprobe's
-// shell runs, and a `false` that appears as an argument to something else
-// does not stop anything.
+// The whole command must be one no-op word; anything else the shell would
+// also run (H-14). kmod hands the command to /bin/sh -c, so `/bin/true &&
+// modprobe --ignore-install m`, a `;`, `|`, `&`, `$(…)`, a backtick, a
+// redirection, `$CMDLINE_OPTS`, an argument or a quoted word all leave a
+// command that may load the module, and a `false` that is an argument to
+// something else stops nothing. A word that begins with `#` starts a shell
+// comment, so `/bin/false # never` still disables. This judges the text only;
+// the command is never run or evaluated. At worst a false FAIL, never a
+// false PASS.
 func installDisables(command string) bool {
 	fields := strings.Fields(command)
-	return len(fields) > 0 && slices.Contains(installNoops, fields[0])
+	for i, f := range fields {
+		if strings.HasPrefix(f, "#") {
+			fields = fields[:i]
+			break
+		}
+	}
+	return len(fields) == 1 && slices.Contains(installNoops, fields[0])
 }
