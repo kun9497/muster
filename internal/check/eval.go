@@ -148,7 +148,11 @@ func evalOne(e *env, c *controls.Control) (r Result) {
 		if !ok {
 			return fail(r, ERROR, InternalError, "custom function "+c.Custom+" is not registered")
 		}
-		return finish(r, c, fn(e, c))
+		out := fn(e, c)
+		if !out.Holds && !hasFailingObservation(out.Observations) {
+			out.UnobservedFail = true
+		}
+		return finish(r, c, out)
 	}
 	keys := clauseFacts(checks)
 	// Steps 9-10a (R2, D30): the deep gate runs before the fact-status
@@ -198,6 +202,11 @@ func evalOne(e *env, c *controls.Control) (r Result) {
 		all.Observations = append(all.Observations, out.Observations...)
 		if !out.Holds {
 			all.Holds = false
+			// A failing clause no observation carries cannot be waived by a
+			// subject-scoped waiver (spec §6.4): record it for waiver.Apply.
+			if !hasFailingObservation(out.Observations) {
+				all.UnobservedFail = true
+			}
 			// C2: a clause that fails without a side-mismatch degradation
 			// fails outright — on every side the clause selected. Recording
 			// it separately from Degraded is what stops another clause's
@@ -310,6 +319,16 @@ func (e *env) remoteNSS(cls []controls.Clause) bool {
 	return remote
 }
 
+// hasFailingObservation reports whether any observation reads "fail".
+func hasFailingObservation(obs []Observation) bool {
+	for _, o := range obs {
+		if o.Verdict == "fail" {
+			return true
+		}
+	}
+	return false
+}
+
 // finish applies steps 11-14 to the combined clause outcome.
 func finish(r Result, c *controls.Control, all clauseOutcome) Result {
 	r.Evidence = append(r.Evidence, all.Evidence...)
@@ -319,6 +338,7 @@ func finish(r Result, c *controls.Control, all clauseOutcome) Result {
 	}
 	if !all.Holds {
 		r.Degraded = all.Degraded
+		r.UnobservedFail = all.UnobservedFail
 		// C2: "holds on one side only" is a verdict of its own only when
 		// every failing clause was a side mismatch. One clause failing on
 		// every side it selected is step 12, and the degradation survives

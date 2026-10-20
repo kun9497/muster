@@ -243,8 +243,13 @@ func (f *File) Apply(results []check.Result, known, excluded map[string]bool, no
 						remaining++
 					}
 				}
-				if remaining == 0 {
+				// A subject waiver covers its observation and nothing else
+				// (spec §6.4): a failing scalar clause carries no observation,
+				// so the row keeps its verdict, and says so (D12).
+				if remaining == 0 && !r.UnobservedFail {
 					r.Status = check.WAIVED
+				} else if r.UnobservedFail {
+					warn(fmt.Sprintf("waiver for %s#%s applied to its observation; %s stays %s on a scalar clause no observation carries", r.ID, strings.Join(appliedSubjects, ", "), r.ID, r.Status))
 				}
 			}
 		}

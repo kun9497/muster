@@ -36,6 +36,9 @@ type clauseOutcome struct {
 	Vacuous      string
 	Count        int
 	Err          error
+	// UnobservedFail: a clause that does not hold carried no observation
+	// with verdict "fail" (see Result.UnobservedFail).
+	UnobservedFail bool
 }
 
 // personasCollected reads sshd.personas_collected; false when absent.

@@ -246,3 +246,34 @@ func TestApplyCountsAnExcludedWaiverAsNotApplied(t *testing.T) {
 		}
 	}
 }
+
+// A subject waiver covers its observation and nothing else (spec §6.4): a
+// row that also fails a clause no observation carries keeps its status, FAIL
+// or WARN, with every matching observation waived, the applied tally counted
+// and one warning naming the control.
+func TestApplySubjectWaiverLeavesAnUnobservedFailure(t *testing.T) {
+	for _, st := range []check.Status{check.FAIL, check.WARN} {
+		f, _ := Load(strings.NewReader("waivers:\n  - control: muster.a.obs\n    subject: file:/a\n    reason: r\n  - control: muster.a.obs\n    subject: file:/b\n    reason: r\n"), "w.yaml")
+		rs := results()
+		rs[2].Status = st
+		rs[2].UnobservedFail = true
+		var warnings []string
+		a := f.Apply(rs, map[string]bool{"muster.a.obs": true}, nil, now, func(s string) { warnings = append(warnings, s) })
+		if rs[2].Status != st {
+			t.Errorf("%s: status %s, want it kept", st, rs[2].Status)
+		}
+		if rs[2].Observations[0].Verdict != "waived" || rs[2].Observations[1].Verdict != "waived" {
+			t.Errorf("%s: observations %+v, want both waived", st, rs[2].Observations)
+		}
+		if rs[2].Waiver == nil || !rs[2].Waiver.Applied || rs[2].Waiver.Subject != "file:/a, file:/b" {
+			t.Errorf("%s: waiver %+v", st, rs[2].Waiver)
+		}
+		if a.Applied != 2 || a.NotApplied != 0 {
+			t.Errorf("%s: tally %+v", st, a)
+		}
+		want := "waiver for muster.a.obs#file:/a, file:/b applied to its observation; muster.a.obs stays " + string(st) + " on a scalar clause no observation carries"
+		if len(warnings) != 1 || warnings[0] != want {
+			t.Errorf("%s: warnings %q, want [%q]", st, warnings, want)
+		}
+	}
+}
