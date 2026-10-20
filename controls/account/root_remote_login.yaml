@@ -31,8 +31,8 @@ mechanisms:
     checks:
       - { fact: files.etc_securetty_lines, op: none, where: { op: matches, expected: "^pts/" } }
 remediation:
-  text_en: 'Set PermitRootLogin no in /etc/ssh/sshd_config.d/00-muster.conf, validate with sshd -t, then restart sshd while keeping a second session open. Where /etc/securetty lists pts/* entries instead, remove those lines so no pseudo-terminal can be used for a securetty-gated root login. sshd keeps the first value it reads: a drop-in that sorts before 00-muster.conf, or a PermitRootLogin line before the Include in sshd_config, still wins. The script reloads a running sshd; a Match block that sets PermitRootLogin for root also wins, and the validate then fails and rolls back.'
-  text_ko: /etc/ssh/sshd_config.d/00-muster.conf 파일에 PermitRootLogin no 를 넣고 sshd -t 로 검증한 뒤, 다른 세션을 열어 둔 채 sshd 를 재시작합니다. 대신 /etc/securetty 에 pts/* 항목이 있다면 그 줄을 제거하여 securetty 로 통제되는 root 로그인에 가상 터미널을 쓸 수 없게 합니다. sshd는 처음 읽은 값을 지키므로 00-muster.conf보다 먼저 정렬되는 드롭인이나 sshd_config의 Include 앞 PermitRootLogin 줄이 여전히 이깁니다. 스크립트는 실행 중인 sshd를 다시 읽게 합니다. root에 PermitRootLogin을 정하는 Match 블록도 이기며, 그러면 validate가 실패하고 롤백합니다.
+  text_en: 'Set PermitRootLogin no in /etc/ssh/sshd_config.d/00-muster.conf, validate with sshd -t, then restart sshd while keeping a second session open. Where /etc/securetty lists pts/* entries instead, remove those lines so no pseudo-terminal can be used for a securetty-gated root login. sshd keeps the first value it reads: a drop-in that sorts before 00-muster.conf, or a PermitRootLogin line before the Include in sshd_config, still wins. The script reloads a running sshd; a Match block that sets PermitRootLogin for root also wins, and the validate then fails and rolls back. The script replaces a pre-existing 00-muster.conf whole with that one line; a rollback puts the recorded file back before it reloads.'
+  text_ko: /etc/ssh/sshd_config.d/00-muster.conf 파일에 PermitRootLogin no 를 넣고 sshd -t 로 검증한 뒤, 다른 세션을 열어 둔 채 sshd 를 재시작합니다. 대신 /etc/securetty 에 pts/* 항목이 있다면 그 줄을 제거하여 securetty 로 통제되는 root 로그인에 가상 터미널을 쓸 수 없게 합니다. sshd는 처음 읽은 값을 지키므로 00-muster.conf보다 먼저 정렬되는 드롭인이나 sshd_config의 Include 앞 PermitRootLogin 줄이 여전히 이깁니다. 스크립트는 실행 중인 sshd를 다시 읽게 합니다. root에 PermitRootLogin을 정하는 Match 블록도 이기며, 그러면 validate가 실패하고 롤백합니다. 스크립트는 이미 있던 00-muster.conf를 그 한 줄로 통째로 바꾸며, 롤백은 다시 읽게 하기 전에 기록해 둔 파일을 되돌립니다.
   risk: lockout_risk
   idempotent: true
   backup: [/etc/ssh/sshd_config.d/00-muster.conf, /etc/securetty]
@@ -52,7 +52,7 @@ remediation:
     fi
   validate: "if command -v sshd >/dev/null 2>&1; then sshd -T -C user=root,host=localhost,addr=127.0.0.1 2>/dev/null | grep -qx 'permitrootlogin no'; fi"
   rollback: |
-    [ -L /etc/ssh/sshd_config.d/00-muster.conf ] || rm -f /etc/ssh/sshd_config.d/00-muster.conf
+    [ -L /etc/ssh/sshd_config.d/00-muster.conf ] || restore /etc/ssh/sshd_config.d/00-muster.conf
     if command -v sshd >/dev/null 2>&1; then sshd -t; fi
     if command -v sshd >/dev/null 2>&1; then
       if systemctl is-active --quiet sshd.service; then systemctl reload sshd.service; fi

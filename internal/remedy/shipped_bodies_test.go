@@ -746,7 +746,9 @@ exit 99
 // sshd -t succeeds; systemctl logs its argv, reports ssh.service active when
 // $STUB/ssh_active exists and nothing else active, and a reload logs the
 // drop-in as the daemon would read it, and "(00-muster.conf is a link)" when
-// root_remote_login's drop-in is a symlink.
+// root_remote_login's drop-in is a symlink. Each reload also appends RELOAD and
+// root_remote_login's drop-in (or "(absent)") to $STUB/muster_reloads; with
+// $STUB/sshd_t_fail_first present the first sshd -t fails.
 func accountTree(t *testing.T) (root, bin, stub string) {
 	root, bin, stub = t.TempDir(), t.TempDir(), t.TempDir()
 	writeStub(t, bin, "chage", `printf '%s\n' "$*" >> "$STUB/chage"`+"\n")
@@ -755,12 +757,13 @@ case "$*" in
   "is-active --quiet ssh.service") [ -e "$STUB/ssh_active" ]; exit;;
   is-active*) exit 1;;
   reload*) cat "$ROOT/etc/ssh/sshd_config.d/00-muster-session.conf" >> "$STUB/systemctl" 2>/dev/null || echo "(no drop-in)" >> "$STUB/systemctl"
+    { echo RELOAD; cat "$ROOT/etc/ssh/sshd_config.d/00-muster.conf" 2>/dev/null || echo "(absent)"; } >> "$STUB/muster_reloads"
     if [ -L "$ROOT/etc/ssh/sshd_config.d/00-muster.conf" ]; then echo "(00-muster.conf is a link)" >> "$STUB/systemctl"; fi;;
 esac
 exit 0
 `)
 	writeStub(t, bin, "sshd", `case "$1" in
-  -t) exit 0;;
+  -t) if [ -e "$STUB/sshd_t_fail_first" ] && [ ! -e "$STUB/sshd_t_seen" ]; then : > "$STUB/sshd_t_seen"; exit 1; fi; exit 0;;
   -T) d="$ROOT/etc/ssh/sshd_config.d/00-muster-session.conf"
       if [ -f "$d" ]; then tr 'A-Z' 'a-z' < "$d"; else cat "$STUB/sshd_T"; fi;;
 esac
@@ -1331,6 +1334,61 @@ func TestRootLoginRollbackSkipsASymlinkedDropIn(t *testing.T) {
 	calls := readFile(t, filepath.Join(stub, "systemctl"))
 	if !strings.Contains(calls, "reload ssh.service\n") || !strings.HasSuffix(calls, "(00-muster.conf is a link)\n") {
 		t.Errorf("want a reload of ssh.service that sees the link; calls:\n%s", calls)
+	}
+}
+
+// E-11, the root_remote_login counterpart of S-35: the rollback puts the
+// recorded 00-muster.conf back (or removes it, when the run created it) before
+// sshd -t and the reload, so the daemon never runs a configuration its files do
+// not hold. A drop-in an earlier run left must come back, not be deleted.
+func TestRootLoginRollbackRestoresBeforeTheReload(t *testing.T) {
+	needSh(t)
+	const before = "PermitRootLogin no\nAllowGroups wheel\n"
+	for _, c := range []struct {
+		name         string
+		existing     bool
+		failValidate bool
+		failSshdT    bool
+	}{
+		{"validate fails, drop-in existed", true, true, false},
+		{"validate fails, no drop-in", false, true, false},
+		{"body fails, drop-in existed", true, false, true},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			root, bin, stub := accountTree(t)
+			dropIn := filepath.Join(root, "/etc/ssh/sshd_config.d/00-muster.conf")
+			if c.existing {
+				writeUnder(t, root, "/etc/ssh/sshd_config.d/00-muster.conf", before)
+			}
+			writeUnder(t, stub, "/ssh_active", "")
+			if c.failSshdT {
+				writeUnder(t, stub, "/sshd_t_fail_first", "")
+			}
+			p := accountBlock(t, "muster.account.root_remote_login", root, c.failValidate)
+			out, _, code := runScriptWith(t, p, root, filepath.Join(root, "bk"), runOpts{pathPrefix: bin, env: []string{"STUB=" + stub, "ROOT=" + root}})
+			if code != 1 {
+				t.Fatalf("exit %d, want 1 after a failed block\n%s", code, out)
+			}
+			if strings.Contains(out, "ROLLBACK INCOMPLETE") || strings.Contains(out, "rollback failed") {
+				t.Errorf("the way back was incomplete\n%s", out)
+			}
+			want := "(absent)\n"
+			if c.existing {
+				want = before
+			}
+			reloads := strings.Split(readFile(t, filepath.Join(stub, "muster_reloads")), "RELOAD\n")
+			if last := reloads[len(reloads)-1]; last != want {
+				t.Errorf("the last reload read %q, want %q (all: %q)", last, want, reloads)
+			}
+			got, err := os.ReadFile(dropIn)
+			if c.existing {
+				if err != nil || string(got) != before {
+					t.Errorf("the drop-in is %q (%v) after the block, want %q", got, err, before)
+				}
+			} else if err == nil {
+				t.Errorf("the drop-in exists after the block: %q", got)
+			}
+		})
 	}
 }
 
