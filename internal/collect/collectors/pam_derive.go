@@ -36,9 +36,7 @@ func readConf(a collect.Access, p string) ([]byte, *facts.Source, error) {
 // file could have set carries, with the path named exactly once in front of
 // the reason (D16).
 func readErrorEnv(p string, err error) facts.Envelope {
-	e := collect.FromReadError(err, collect.ReadMeta{})
-	e.Reason = p + ": " + e.Reason
-	return e
+	return pathReason(p, collect.FromReadError(err, collect.ReadMeta{}))
 }
 
 // applyInt overrides dst[key] with kv[key] when libpwquality's

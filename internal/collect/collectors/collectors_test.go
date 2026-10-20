@@ -169,7 +169,7 @@ func (a *fsAccess) readFile(p string, limit int64, keepBinary bool) ([]byte, col
 	if bytes.IndexByte(b, 0) >= 0 {
 		meta.Binary = true
 		if !keepBinary {
-			return nil, meta, nil
+			return nil, meta, fmt.Errorf("%s: %w", p, collect.ErrBinary)
 		}
 	}
 	return b, meta, nil

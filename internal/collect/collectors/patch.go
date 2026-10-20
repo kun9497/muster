@@ -673,9 +673,7 @@ func newestDpkgInstall(data []byte) (time.Time, bool) {
 func dpkgPackages(a collect.Access) facts.Envelope {
 	data, meta, err := a.ReadFile(dpkgStatusPath, patchReadLimit)
 	if err != nil {
-		e := collect.FromReadError(err, meta)
-		e.Reason = dpkgStatusPath + ": " + e.Reason
-		return e
+		return pathReason(dpkgStatusPath, collect.FromReadError(err, meta))
 	}
 	return collect.OKRead(parseDpkgStatus(data), &facts.Source{Kind: "file", Path: dpkgStatusPath}, meta)
 }

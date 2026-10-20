@@ -637,7 +637,7 @@ func TestPkgverifyUnchangedRowIsDropped(t *testing.T) {
 }
 
 // A dpkg.cfg fragment read only in part (the read cap) or refused as binary
-// (a NUL byte: the primitive returns no data and no error) is as unreadable
+// (a NUL byte: the primitive's ErrBinary, H-11) is as unreadable
 // as a denied one: its filters are not known, so the rule is dropped and the
 // reason recorded.
 func TestPkgverifyPartialExcludesDropTheRule(t *testing.T) {
@@ -650,7 +650,8 @@ func TestPkgverifyPartialExcludesDropTheRule(t *testing.T) {
 			a.files["/etc/dpkg/dpkg.cfg.d/cut"] = "dpkg.cfg.d-globs"
 			a.truncated = map[string]bool{"/etc/dpkg/dpkg.cfg.d/cut": true}
 		}},
-		{"binary", "binary", func(a *fsAccess) {
+		// H-11: the primitive's ErrBinary, with the path written once.
+		{"binary", "binary content (NUL byte)", func(a *fsAccess) {
 			a.contents = map[string][]byte{"/etc/dpkg/dpkg.cfg.d/cut": []byte("path-exclude=/opt/vendor/*\x00\n")}
 		}},
 	} {

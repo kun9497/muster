@@ -19,6 +19,9 @@ import (
 var (
 	ErrNotRegular = errors.New("not a regular file")
 	ErrSymlink    = errors.New("symbolic link in path")
+	// ErrBinary is a text read whose bytes hold a NUL (H-11): the read's
+	// error, wrapped with the path, never an empty file (spec §7.1).
+	ErrBinary = errors.New("binary content (NUL byte)")
 )
 
 const openFlags = unix.O_RDONLY | unix.O_NOFOLLOW | unix.O_CLOEXEC | unix.O_NONBLOCK
@@ -116,8 +119,13 @@ func openComponentwise(p string, flags int) (int, string, error) {
 
 // ReadFile reads a regular file with a size cap. A symlink anywhere in the
 // path, a FIFO, device or socket, or a relative path is an error; a file
-// over the limit is returned truncated and flagged; a NUL byte marks the
-// file binary and its content is not returned.
+// over the limit is returned truncated and flagged; a NUL byte in the bytes
+// read marks the file binary, withholds its content and is the error
+// ErrBinary wrapped with the path (H-11, spec §7.1: binary is `error`). It
+// was once a nil error with no bytes, and every text parser read that as an
+// empty file: /etc/passwd with one NUL held no users, so a second uid-0
+// account passed. A caller now takes the same error path as for any file
+// that exists and cannot be read (C3).
 func ReadFile(p string, limit int64) ([]byte, ReadMeta, error) {
 	return readFile(p, limit, false)
 }
@@ -137,6 +145,11 @@ func ReadFile(p string, limit int64) ([]byte, ReadMeta, error) {
 // It is not a way around the NUL rule for a text parser: nothing this
 // returns has been shown to be text, and a collector that hands the bytes to
 // a line splitter would be parsing whatever the file happens to contain.
+// The one text reader that uses it is libpwquality's chain (H-9,
+// chainReader.binary): libpwquality itself stops at the line that holds a
+// NUL, keeping the lines before it, so that parser must see the NUL to cite
+// the stop where the module does. ReadFile would answer ErrBinary for the
+// whole file, which is a chain failure, not the stop the module makes.
 func ReadFileBinary(p string, limit int64) ([]byte, ReadMeta, error) {
 	return readFile(p, limit, true)
 }
@@ -174,7 +187,7 @@ func readFile(p string, limit int64, keepBinary bool) ([]byte, ReadMeta, error) 
 	if bytes.IndexByte(data, 0) >= 0 {
 		meta.Binary = true
 		if !keepBinary {
-			return nil, meta, nil
+			return nil, meta, fmt.Errorf("%s: %w", p, ErrBinary)
 		}
 	}
 	return data, meta, nil

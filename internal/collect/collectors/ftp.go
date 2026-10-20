@@ -1625,7 +1625,7 @@ func (p *ftpParse) publishVsftpdBannerFile(b *collect.Builder, src *facts.Source
 	case meta.Truncated:
 		e := collect.Absent(clean + " was cut at the read limit; what is past the cap cannot be judged")
 		p.setBanner(b, source, e, e)
-	case len(data) == 0 && !meta.Binary:
+	case len(data) == 0:
 		// An empty banner file: vsftpd sends the next greeting in its order.
 		return false
 	default:

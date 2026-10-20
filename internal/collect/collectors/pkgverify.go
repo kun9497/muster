@@ -259,14 +259,10 @@ func dpkgPathFilters(a collect.Access) (verifyFilter, []any, []any) {
 			}
 			continue
 		}
-		// A read that came back cut at readLimit, or refused as binary (no
-		// data and no error), leaves this file's filters unknown: that is a
-		// failure like any other, not a file that sets nothing.
-		switch {
-		case meta.Binary:
-			failures = append(failures, p+": binary")
-			continue
-		case meta.Truncated:
+		// A read that came back cut at readLimit leaves this file's filters
+		// unknown: that is a failure like any other, not a file that sets
+		// nothing. A file holding a NUL is the read's ErrBinary above (H-11).
+		if meta.Truncated {
 			failures = append(failures, p+": truncated")
 			continue
 		}

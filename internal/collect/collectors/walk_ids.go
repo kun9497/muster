@@ -128,8 +128,7 @@ func loadIDTables(a collect.Access) (idTables, map[string]facts.Envelope) {
 	read := func(path string) ([]byte, bool) {
 		data, meta, err := a.ReadFile(path, readLimit)
 		if err != nil {
-			e := collect.FromReadError(err, meta)
-			e.Reason = path + ": " + e.Reason
+			e := pathReason(path, collect.FromReadError(err, meta))
 			failures[path] = e
 			return nil, false
 		}

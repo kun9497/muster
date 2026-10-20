@@ -1,0 +1,1 @@
+{"synthetic": true, "_expect":{"reason_code":"parse_error","exit_code":2}, "schema_version":1,"run":{},"facts":{"accounts":{"users":{"status":"error","reason":"/etc/passwd: binary content (NUL byte)"}}}}

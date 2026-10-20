@@ -71,7 +71,20 @@ func memMeta(data []byte) collect.ReadMeta {
 // Without that, the truncated branch every caller has — parseSshdConfig
 // stores meta on the envelope it returns — would be unreachable through this
 // double whatever the fuzzer produced.
+//
+// The NUL rule is the host primitive's too (H-11): a NUL in the bytes read is
+// ErrBinary for ReadFile, so the fuzzer drives the error branch every caller
+// takes on a host, not a parse of bytes the host never hands over.
 func (m *memAccess) ReadFile(p string, limit int64) ([]byte, collect.ReadMeta, error) {
+	return m.read(p, limit, false)
+}
+
+// ReadFileBinary serves the bytes whatever they hold, as the host's does.
+func (m *memAccess) ReadFileBinary(p string, limit int64) ([]byte, collect.ReadMeta, error) {
+	return m.read(p, limit, true)
+}
+
+func (m *memAccess) read(p string, limit int64, keepBinary bool) ([]byte, collect.ReadMeta, error) {
 	data, ok := m.files[p]
 	if !ok {
 		return nil, collect.ReadMeta{}, &fs.PathError{Op: "open", Path: p, Err: fs.ErrNotExist}
@@ -81,13 +94,13 @@ func (m *memAccess) ReadFile(p string, limit int64) ([]byte, collect.ReadMeta, e
 		data = data[:limit]
 		meta.Truncated = true
 	}
+	if bytes.IndexByte(data, 0) >= 0 {
+		meta.Binary = true
+		if !keepBinary {
+			return nil, meta, fmt.Errorf("%s: %w", p, collect.ErrBinary)
+		}
+	}
 	return data, meta, nil
-}
-
-// ReadFileBinary serves the same bytes: a fuzz corpus is arbitrary bytes
-// already, so there is no NUL rule to get past here.
-func (m *memAccess) ReadFileBinary(p string, limit int64) ([]byte, collect.ReadMeta, error) {
-	return m.ReadFile(p, limit)
 }
 
 func (m *memAccess) Stat(p string) (collect.ReadMeta, error) {

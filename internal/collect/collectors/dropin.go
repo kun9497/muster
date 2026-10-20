@@ -77,7 +77,8 @@ type chainReader struct {
 	// cited). nil keeps every match.
 	keep func(base string) bool
 	// binary reads each file with ReadFileBinary, so a file holding a NUL
-	// byte reaches parse instead of coming back empty (the NUL rule), and the
+	// byte reaches parse instead of failing the chain with the ErrBinary
+	// ReadFile answers (the NUL rule, H-11), and the
 	// parser itself judges the line that holds it (H-9: for libpwquality that
 	// line stops the chain). parse must then treat a NUL byte as such.
 	binary bool

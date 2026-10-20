@@ -570,12 +570,17 @@ func TestFromReadErrorMapsStatuses(t *testing.T) {
 		{"fs.ErrPermission sentinel", errAccessOS(), facts.StatusDenied},
 		{"ErrSymlink", ErrSymlink, facts.StatusError},
 		{"ErrNotRegular", ErrNotRegular, facts.StatusError},
+		// H-11: a NUL-bearing text file is the read's error, never absent or denied.
+		{"ErrBinary", fmt.Errorf("/etc/passwd: %w", ErrBinary), facts.StatusError},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			e := FromReadError(c.err, ReadMeta{})
 			if e.Status != c.want {
 				t.Errorf("FromReadError(%v) status = %v, want %v", c.err, e.Status, c.want)
+			}
+			if c.name == "ErrBinary" && e.Reason != "/etc/passwd: binary content (NUL byte)" {
+				t.Errorf("ErrBinary reason = %q, want the path then the cause", e.Reason)
 			}
 			if c.want == facts.StatusDenied && e.Reason == "" {
 				t.Errorf("denied envelope missing reason")

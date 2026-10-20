@@ -436,11 +436,10 @@ func (r *unitsRun) unit(unit string, enabled, active bool) (map[string]any, int,
 		r.cite(p)
 		switch {
 		case err != nil:
+			// A unit file holding a NUL is ErrBinary here (H-11), so it
+			// fails the unit like any other unreadable file.
 			e := readErrorEnv(p, err)
 			fail(string(e.Status), e.Reason)
-			continue
-		case rmeta.Binary:
-			fail("error", p+": binary content")
 			continue
 		}
 		if p == l.path && len(data) == 0 && !rmeta.Truncated {

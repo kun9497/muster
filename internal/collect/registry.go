@@ -28,8 +28,10 @@ type Access interface {
 	// ReadFileBinary reads a file whose content is binary by design — an
 	// efivarfs variable, whose attribute word is NUL bytes — and hands the
 	// caller those bytes to decode a value from (K-30). It is licensed by
-	// Declaration.Reads exactly like ReadFile, and is never the right call
-	// for a file a collector is going to parse as text.
+	// Declaration.Reads exactly like ReadFile, and is not the call for a
+	// file a collector parses as text — ReadFile answers ErrBinary for a
+	// NUL there (H-11) — except where the daemon's own reader stops at the
+	// NUL line and the parser must find it (libpwquality, H-9).
 	ReadFileBinary(path string, limit int64) ([]byte, ReadMeta, error)
 
 	Stat(path string) (ReadMeta, error)
