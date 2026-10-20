@@ -95,15 +95,27 @@ func argsKV(args []string) map[string]string {
 	return kv
 }
 
-// passwordKeys is the fixed order the password-stack keys are written in.
-var passwordKeys = []string{
-	"pam.pwquality.enabled", "pam.pwquality.local_users_only", "pam.pwquality.minlen", "pam.pwquality.minclass",
+// pwqualityValueKeys are the pam.pwquality.* keys derived from the conf chain
+// and the module line: every pwquality key but enabled. They go absent
+// together when the module is not stacked and carry the same read error when
+// a conf file cannot be read (R148).
+var pwqualityValueKeys = []string{
+	"pam.pwquality.local_users_only", "pam.pwquality.minlen", "pam.pwquality.minclass",
 	"pam.pwquality.dcredit", "pam.pwquality.ucredit", "pam.pwquality.lcredit", "pam.pwquality.ocredit",
-	"pam.pwquality.required_classes", "pam.pwquality.enforce_for_root",
-	"pam.password.unix_hash", "pam.password.remember",
+	"pam.pwquality.required_classes", "pam.pwquality.enforce_for_root", "pam.pwquality.enforcing",
 }
 
-var pwqualityInts = []string{"minlen", "minclass", "dcredit", "ucredit", "lcredit", "ocredit"}
+// passwordKeys is the fixed order the password-stack keys are written in.
+var passwordKeys = slices.Concat(
+	[]string{"pam.pwquality.enabled"},
+	pwqualityValueKeys,
+	[]string{"pam.password.unix_hash", "pam.password.remember"},
+)
+
+// pwqualityInts are libpwquality's integer settings muster reads. enforcing
+// is one of them (settings.c): 0 makes pam_pwquality warn about a weak
+// password and accept it anyway.
+var pwqualityInts = []string{"minlen", "minclass", "dcredit", "ucredit", "lcredit", "ocredit", "enforcing"}
 
 // unixHashArgs are pam_unix's hashing arguments. It is a membership set,
 // not an order: the line is read left to right and the last of these wins
@@ -143,12 +155,13 @@ func pwqualityFacts(s pamStacks, a collect.Access) map[string]facts.Envelope {
 		e := collect.OK(false, pamSource(s.x))
 		e.Reason = "pam_pwquality.so is not stacked in passwd's password stack with an enforcing control"
 		out["pam.pwquality.enabled"] = e
-		for _, k := range passwordKeys[1:10] {
+		for _, k := range pwqualityValueKeys {
 			out[k] = collect.Absent("pwquality is not enabled")
 		}
 		return out
 	}
-	vals := map[string]int{"minlen": 8, "minclass": 0, "dcredit": 0, "ucredit": 0, "lcredit": 0, "ocredit": 0}
+	// libpwquality's compiled-in defaults; enforcing defaults to 1 (reject).
+	vals := map[string]int{"minlen": 8, "minclass": 0, "dcredit": 0, "ucredit": 0, "lcredit": 0, "ocredit": 0, "enforcing": 1}
 	flags := map[string]bool{}
 	var inputs []facts.Source
 	// readErr is the first conf file the module can read but this process
@@ -193,7 +206,7 @@ func pwqualityFacts(s pamStacks, a collect.Access) map[string]facts.Envelope {
 	src := func() *facts.Source { return &facts.Source{Kind: "derived", Inputs: slices.Clone(inputs)} }
 	out["pam.pwquality.enabled"] = collect.OK(true, src())
 	if readErr != nil {
-		for _, k := range passwordKeys[1:10] {
+		for _, k := range pwqualityValueKeys {
 			out[k] = *readErr
 		}
 		return out
@@ -226,7 +239,7 @@ func pwqualityFacts(s pamStacks, a collect.Access) map[string]facts.Envelope {
 	}
 	required := vals["minclass"]
 	negative := 0
-	for _, k := range []string{"dcredit", "ucredit", "lcredit", "ocredit"} {
+	for _, k := range []string{"dcredit", "ucredit", "lcredit", "ocredit", "enforcing"} {
 		if vals[k] <= -1 {
 			negative++
 		}
@@ -238,7 +251,7 @@ func pwqualityFacts(s pamStacks, a collect.Access) map[string]facts.Envelope {
 	// unparseable one of those five would make the derived number a guess, so it
 	// goes absent with the offender. minlen is not one of its inputs.
 	out["pam.pwquality.required_classes"] = collect.OK(required, src())
-	for _, k := range []string{"minclass", "dcredit", "ucredit", "lcredit", "ocredit"} {
+	for _, k := range []string{"minclass", "dcredit", "ucredit", "lcredit", "ocredit", "enforcing"} {
 		if e, bad := unparseable(k); bad {
 			out["pam.pwquality.required_classes"] = e
 			break

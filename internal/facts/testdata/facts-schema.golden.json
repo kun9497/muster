@@ -2494,7 +2494,7 @@
     {
       "Key": "pam.pwquality.minlen",
       "Type": "int",
-      "Description": "Effective minlen - the default 8, then pwquality.conf, then pwquality.conf.d/*.conf in name order, then the module arguments, each overriding the last.",
+      "Description": "Effective minlen - the default 8, then pwquality.conf.d/*.conf in name order, then pwquality.conf (libpwquality reads it last), then the module arguments, each overriding the last.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "pam",
@@ -2565,6 +2565,16 @@
       "Key": "pam.pwquality.enforce_for_root",
       "Type": "bool",
       "Description": "enforce_for_root is set in a conf file or as a module argument.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pam",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
+      "Key": "pam.pwquality.enforcing",
+      "Type": "int",
+      "Description": "Effective enforcing - the default 1, then the conf chain in libpwquality order, then the module arguments; 0 only warns about a weak password and accepts it.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "pam",

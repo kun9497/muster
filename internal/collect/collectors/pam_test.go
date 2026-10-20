@@ -342,7 +342,7 @@ func TestPAMPwqualityNotStackedIsNotEnabled(t *testing.T) {
 	if got := sourcePaths(t, env(t, b, "pam.pwquality.enabled")); !slices.Contains(got, "/etc/pam.d/common-password") {
 		t.Errorf("inputs %v", got)
 	}
-	for _, k := range []string{"minlen", "minclass", "dcredit", "ucredit", "lcredit", "ocredit", "required_classes", "enforce_for_root", "local_users_only"} {
+	for _, k := range []string{"minlen", "minclass", "dcredit", "ucredit", "lcredit", "ocredit", "required_classes", "enforce_for_root", "local_users_only", "enforcing"} {
 		if e := env(t, b, "pam.pwquality."+k); e.Status != facts.StatusAbsent {
 			t.Errorf("%s = %+v, want absent", k, e)
 		}
@@ -436,6 +436,76 @@ func TestPAMPwqualityPrecedence(t *testing.T) {
 	}
 }
 
+// f4: enforcing is libpwquality's integer setting with default 1; at 0
+// pam_pwquality only warns about a weak password and accepts it. It resolves
+// like minlen: the conf chain in libpwquality's order, then the module
+// argument, which wins over the files in both directions.
+func TestPwqualityEnforcing(t *testing.T) {
+	stack := func(t *testing.T, args string) *fsAccess {
+		t.Helper()
+		a := rockyPAM()
+		data, err := os.ReadFile("testdata/pam/rocky/authselect-password-auth")
+		if err != nil {
+			t.Fatal(err)
+		}
+		line := "pam_pwquality.so local_users_only"
+		if !strings.Contains(string(data), line+"\n") {
+			t.Fatalf("the fixture carries no %q line", line)
+		}
+		delete(a.files, "/etc/authselect/system-auth")
+		a.contents = map[string][]byte{
+			"/etc/authselect/system-auth": []byte(strings.Replace(string(data), line+"\n", line+args+"\n", 1)),
+		}
+		return a
+	}
+	// (a) nothing sets it: the compiled-in 1, cited to the stack line.
+	e := env(t, build(t, "pam", stack(t, "")), "pam.pwquality.enforcing")
+	if e.Status != facts.StatusOK || e.Value != 1 {
+		t.Errorf("default %+v, want 1", e)
+	}
+	// (b) a drop-in sets 0, and it is cited.
+	a := stack(t, "")
+	a.contents["/etc/security/pwquality.conf.d/50-rollout.conf"] = []byte("enforcing = 0\n")
+	e = env(t, build(t, "pam", a), "pam.pwquality.enforcing")
+	if e.Status != facts.StatusOK || e.Value != 0 {
+		t.Errorf("drop-in enforcing = 0: %+v, want 0", e)
+	}
+	if got := sourcePaths(t, e); !slices.Equal(got, []string{"/etc/security/pwquality.conf.d/50-rollout.conf", "/etc/authselect/system-auth"}) {
+		t.Errorf("inputs %v", got)
+	}
+	// ... and the main file, read last, overrides that drop-in.
+	a = stack(t, "")
+	a.contents["/etc/security/pwquality.conf.d/50-rollout.conf"] = []byte("enforcing = 0\n")
+	a.contents[pwqualityConf] = []byte("Enforcing = 1\n")
+	if e := env(t, build(t, "pam", a), "pam.pwquality.enforcing"); e.Status != facts.StatusOK || e.Value != 1 {
+		t.Errorf("main enforcing = 1 over a drop-in's 0: %+v, want 1", e)
+	}
+	// (c) the module argument beats the file, both ways.
+	a = stack(t, " enforcing=0")
+	a.contents[pwqualityConf] = []byte("enforcing = 1\n")
+	if e := env(t, build(t, "pam", a), "pam.pwquality.enforcing"); e.Status != facts.StatusOK || e.Value != 0 {
+		t.Errorf("argument enforcing=0 over the file's 1: %+v, want 0", e)
+	}
+	a = stack(t, " enforcing=1")
+	a.contents[pwqualityConf] = []byte("enforcing = 0\n")
+	if e := env(t, build(t, "pam", a), "pam.pwquality.enforcing"); e.Status != facts.StatusOK || e.Value != 1 {
+		t.Errorf("argument enforcing=1 over the file's 0: %+v, want 1", e)
+	}
+	// (d) M-50: a value libpwquality would reject is absent, naming it.
+	a = stack(t, "")
+	a.contents[pwqualityConf] = []byte("enforcing = x\n")
+	if e := env(t, build(t, "pam", a), "pam.pwquality.enforcing"); e.Status != facts.StatusAbsent || !strings.Contains(e.Reason, `enforcing = "x"`) {
+		t.Errorf("enforcing = x: %+v, want absent naming it", e)
+	}
+	// (e) R148: an unreadable conf file is the answer.
+	a = stack(t, "")
+	a.contents[pwqualityConf] = []byte("enforcing = 1\n")
+	a.fails[pwqualityConf] = os.ErrPermission
+	if e := env(t, build(t, "pam", a), "pam.pwquality.enforcing"); e.Status != facts.StatusDenied || !strings.HasPrefix(e.Reason, pwqualityConf+": ") {
+		t.Errorf("unreadable conf: %+v, want its denied read", e)
+	}
+}
+
 // R148: a conf file that exists but cannot be read is the answer for every
 // value it could have set — never the defaults dressed up as ok. The stack
 // still says whether pwquality runs at all.
@@ -446,7 +516,7 @@ func TestPAMPwqualityUnreadableConfIsTheAnswer(t *testing.T) {
 	if e := env(t, b, "pam.pwquality.enabled"); e.Status != facts.StatusOK || e.Value != true {
 		t.Errorf("enabled must still follow the stack: %+v", e)
 	}
-	for _, k := range passwordKeys[1:10] {
+	for _, k := range pwqualityValueKeys {
 		e := env(t, b, k)
 		if e.Status != facts.StatusDenied || !strings.HasPrefix(e.Reason, pwqualityConf+": ") {
 			t.Errorf("%s = %+v", k, e)
@@ -458,7 +528,7 @@ func TestPAMPwqualityUnreadableConfIsTheAnswer(t *testing.T) {
 	if e := env(t, b, "pam.pwquality.enabled"); e.Status != facts.StatusOK || e.Value != true {
 		t.Errorf("enabled %+v", e)
 	}
-	for _, k := range passwordKeys[1:10] {
+	for _, k := range pwqualityValueKeys {
 		e := env(t, b, k)
 		if e.Status != facts.StatusError || !strings.HasPrefix(e.Reason, pwqualityConfD+": ") {
 			t.Errorf("%s = %+v", k, e)
@@ -964,7 +1034,7 @@ func TestPwqualityDropinsMergeLikeLibpwquality(t *testing.T) {
 	a := chain()
 	a.fails["/etc/security/pwquality.conf.d/10-a.conf"] = os.ErrPermission
 	b = build(t, "pam", a)
-	for _, k := range passwordKeys[1:10] {
+	for _, k := range pwqualityValueKeys {
 		e := env(t, b, k)
 		if e.Status != facts.StatusDenied || !strings.HasPrefix(e.Reason, "/etc/security/pwquality.conf.d/10-a.conf: ") {
 			t.Errorf("%s = %+v, want the unreadable drop-in's denied read", k, e)
@@ -1007,7 +1077,7 @@ func TestPwqualityDropinsMergeLikeLibpwquality(t *testing.T) {
 	a = chain()
 	a.fails["/etc/security/pwquality.conf.d/10-a.conf"] = collect.ErrSymlink
 	b = build(t, "pam", a)
-	for _, k := range passwordKeys[1:10] {
+	for _, k := range pwqualityValueKeys {
 		g := env(t, b, k)
 		if g.Status != facts.StatusError || !strings.HasPrefix(g.Reason, "/etc/security/pwquality.conf.d/10-a.conf: ") {
 			t.Errorf("%s = %+v, want the symlinked drop-in's error", k, g)

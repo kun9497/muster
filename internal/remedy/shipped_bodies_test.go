@@ -769,7 +769,7 @@ esac
 }
 
 func rebaseAccounts(s, root string) string {
-	for _, p := range []string{"/etc/login.defs", "/etc/security/", "/etc/shadow", "/etc/passwd", "/etc/ssh/", "/run/sshd", "/etc/securetty"} {
+	for _, p := range []string{"/etc/login.defs", "/etc/security/", "/etc/shadow", "/etc/passwd", "/etc/ssh/", "/run/sshd", "/etc/securetty", "/etc/pam.d/"} {
 		s = strings.ReplaceAll(s, p, root+p)
 	}
 	return s
@@ -986,6 +986,51 @@ func TestPasswordPolicyValidateReadsTheMainFileLast(t *testing.T) {
 	writeUnder(t, root, "/etc/security/pwquality.conf.d/99-muster.conf", "minlen = 6\nminclass = 3\n")
 	if out, code := runBody(t, root, bin, rebaseAccounts(c.Remediation.Validate, root), env...); code != 0 {
 		t.Errorf("validate %d over a main file's minlen 14: %s", code, out)
+	}
+}
+
+// f4: enforcing = 0 makes pam_pwquality warn and accept a weak password. The
+// body sets 1 through the same writer — in pwquality.conf when it sets the
+// key, else in 99-muster.conf — and the validate requires it non-zero in the
+// files and no enforcing=0 argument on a pam_pwquality.so line, which the
+// body cannot rewrite.
+func TestPasswordPolicyBodyRepairsEnforcing(t *testing.T) {
+	needSh(t)
+	root, _ := pwPolicyBody(t, "", map[string]string{"50-rollout.conf": "enforcing = 0\n"})
+	if got := readFile(t, filepath.Join(root, "/etc/security/pwquality.conf.d/99-muster.conf")); got != "minclass = 3\nenforcing = 1\n" {
+		t.Errorf("99-muster.conf %q, want enforcing = 1 after the rollout drop-in", got)
+	}
+	root, _ = pwPolicyBody(t, "minclass = 3\nEnforcing=0\n", nil)
+	if got := readFile(t, filepath.Join(root, "/etc/security/pwquality.conf")); got != "minclass = 3\nenforcing = 1\n" {
+		t.Errorf("pwquality.conf %q, want its enforcing rewritten", got)
+	}
+	if exists(filepath.Join(root, "/etc/security/pwquality.conf.d")) {
+		t.Error("a drop-in was written although the main file sets every key the body changed")
+	}
+
+	c := shippedControl(t, "muster.account.password_policy")
+	root, bin, stub := accountTree(t)
+	writeUnder(t, root, "/etc/login.defs", "PASS_MAX_DAYS 60\nPASS_MIN_DAYS 2\nPASS_MIN_LEN 12\n")
+	writeUnder(t, root, "/etc/security/pwquality.conf", "minclass = 3\nenforcing = 0\n")
+	env := append(pEnv(t, c), "MB="+t.TempDir(), "STUB="+stub, "ROOT="+root)
+	validate := func() int {
+		_, code := runBody(t, root, bin, rebaseAccounts(c.Remediation.Validate, root), env...)
+		return code
+	}
+	if validate() == 0 {
+		t.Error("validate passed over enforcing = 0 left in pwquality.conf")
+	}
+	writeUnder(t, root, "/etc/security/pwquality.conf", "minclass = 3\nenforcing = 1\n")
+	if code := validate(); code != 0 {
+		t.Errorf("validate %d over enforcing = 1", code)
+	}
+	writeUnder(t, root, "/etc/pam.d/common-password", "# password requisite pam_pwquality.so enforcing=0\npassword requisite pam_pwquality.so retry=3 enforcing=0\n")
+	if validate() == 0 {
+		t.Error("validate passed over an enforcing=0 argument on the pam_pwquality.so line")
+	}
+	writeUnder(t, root, "/etc/pam.d/common-password", "# password requisite pam_pwquality.so enforcing=0\npassword requisite pam_pwquality.so retry=3 enforcing=1\n")
+	if code := validate(); code != 0 {
+		t.Errorf("validate %d with only a commented enforcing=0 and an enforcing=1 argument", code)
 	}
 }
 
