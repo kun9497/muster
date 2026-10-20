@@ -394,8 +394,8 @@ func faillockComplete(lines []pamLine) (preauth, authfail *pamLine, ok bool) {
 // deny 0 never locks (check_tally locks only when deny is set and the count
 // reaches it), so it is weaker than any count, and otherwise the larger count
 // is the weaker. unlock_time 0 never unlocks, so the shorter non-zero wait is
-// the weaker. fail_interval is reduced to the larger window (as the f5
-// hotfix ruled; no control reads it).
+// the weaker. check_tally counts only the failures inside fail_interval, so
+// the shorter window is the weaker (H-3; no control reads it).
 func weakerFaillock(k string, a, b int) int {
 	switch k {
 	case "deny":
@@ -411,8 +411,10 @@ func weakerFaillock(k string, a, b int) int {
 			return a
 		}
 		return min(a, b)
+	case "fail_interval":
+		return min(a, b)
 	default:
-		return max(a, b)
+		panic("weakerFaillock: unknown setting " + k)
 	}
 }
 

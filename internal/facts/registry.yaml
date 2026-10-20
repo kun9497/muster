@@ -1509,7 +1509,7 @@ keys:
     collector: pam
   - key: pam.faillock.fail_interval
     type: int
-    description: Effective fail_interval in seconds (default 900), resolved like deny with the longest interval kept.
+    description: Effective fail_interval in seconds (default 900), resolved like deny with the shortest interval kept.
     since: 1
     sensitivity: public
     collector: pam

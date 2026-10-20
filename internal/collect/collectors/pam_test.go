@@ -833,6 +833,7 @@ func TestPAMFaillockServicesDisagree(t *testing.T) {
 		{"login deny 0", "authselect-password-auth-deny0", "authselect-password-auth", "deny", 0, "login and sshd disagree on deny (0 vs 5)"},
 		{"sshd unlock 60", "authselect-system-auth", "authselect-password-auth-unlock60", "unlock_time", 60, "login and sshd disagree on unlock_time (900 vs 60)"},
 		{"sshd unlock 0", "authselect-system-auth", "authselect-password-auth-unlock0", "unlock_time", 900, "login and sshd disagree on unlock_time (900 vs 0)"},
+		{"sshd fail_interval 60", "authselect-system-auth", "authselect-password-auth-interval60", "fail_interval", 60, "login and sshd disagree on fail_interval (900 vs 60)"},
 		{"login even_deny_root only", "authselect-system-auth-evendenyroot", "authselect-password-auth", "even_deny_root", false, "login and sshd disagree on even_deny_root (true vs false)"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

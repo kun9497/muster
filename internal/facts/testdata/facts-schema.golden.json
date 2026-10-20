@@ -2634,7 +2634,7 @@
     {
       "Key": "pam.faillock.fail_interval",
       "Type": "int",
-      "Description": "Effective fail_interval in seconds (default 900), resolved like deny with the longest interval kept.",
+      "Description": "Effective fail_interval in seconds (default 900), resolved like deny with the shortest interval kept.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "pam",
