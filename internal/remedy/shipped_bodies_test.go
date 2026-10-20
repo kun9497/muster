@@ -992,8 +992,10 @@ func TestPasswordPolicyValidateReadsTheMainFileLast(t *testing.T) {
 // f4: enforcing = 0 makes pam_pwquality warn and accept a weak password. The
 // body sets 1 through the same writer — in pwquality.conf when it sets the
 // key, else in 99-muster.conf — and the validate requires it non-zero in the
-// files and no enforcing=0 argument on a pam_pwquality.so line, which the
-// body cannot rewrite.
+// files. It reads only the files (H-1): an enforcing=0 argument on the
+// pam_pwquality.so line is the operator's to remove, and failing the validate
+// on it would roll back the body's correct writes; the check keeps failing on
+// it instead.
 func TestPasswordPolicyBodyRepairsEnforcing(t *testing.T) {
 	needSh(t)
 	root, _ := pwPolicyBody(t, "", map[string]string{"50-rollout.conf": "enforcing = 0\n"})
@@ -1024,13 +1026,9 @@ func TestPasswordPolicyBodyRepairsEnforcing(t *testing.T) {
 	if code := validate(); code != 0 {
 		t.Errorf("validate %d over enforcing = 1", code)
 	}
-	writeUnder(t, root, "/etc/pam.d/common-password", "# password requisite pam_pwquality.so enforcing=0\npassword requisite pam_pwquality.so retry=3 enforcing=0\n")
-	if validate() == 0 {
-		t.Error("validate passed over an enforcing=0 argument on the pam_pwquality.so line")
-	}
-	writeUnder(t, root, "/etc/pam.d/common-password", "# password requisite pam_pwquality.so enforcing=0\npassword requisite pam_pwquality.so retry=3 enforcing=1\n")
+	writeUnder(t, root, "/etc/pam.d/common-password", "password requisite pam_pwquality.so retry=3 enforcing=0\n")
 	if code := validate(); code != 0 {
-		t.Errorf("validate %d with only a commented enforcing=0 and an enforcing=1 argument", code)
+		t.Errorf("validate %d with an enforcing=0 argument on the PAM line: it must read only the files", code)
 	}
 }
 

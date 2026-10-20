@@ -494,8 +494,25 @@ func TestPwqualityEnforcing(t *testing.T) {
 	// (d) M-50: a value libpwquality would reject is absent, naming it.
 	a = stack(t, "")
 	a.contents[pwqualityConf] = []byte("enforcing = x\n")
-	if e := env(t, build(t, "pam", a), "pam.pwquality.enforcing"); e.Status != facts.StatusAbsent || !strings.Contains(e.Reason, `enforcing = "x"`) {
+	b := build(t, "pam", a)
+	if e := env(t, b, "pam.pwquality.enforcing"); e.Status != facts.StatusAbsent || !strings.Contains(e.Reason, `enforcing = "x"`) {
 		t.Errorf("enforcing = x: %+v, want absent naming it", e)
+	}
+	// enforcing is not a credit and not an input of required_classes: an
+	// unparseable one leaves required_classes ok ...
+	if e := env(t, b, "pam.pwquality.required_classes"); e.Status != facts.StatusOK || e.Value != 0 {
+		t.Errorf("required_classes with enforcing = x: %+v, want ok 0", e)
+	}
+	// ... and enforcing = -1 (which still enforces) is not one more negative
+	// credit: with dcredit = -1 alone, one class is required.
+	a = stack(t, "")
+	a.contents[pwqualityConf] = []byte("enforcing = -1\ndcredit = -1\n")
+	b = build(t, "pam", a)
+	if e := env(t, b, "pam.pwquality.enforcing"); e.Status != facts.StatusOK || e.Value != -1 {
+		t.Errorf("enforcing = -1: %+v, want -1", e)
+	}
+	if e := env(t, b, "pam.pwquality.required_classes"); e.Status != facts.StatusOK || e.Value != 1 {
+		t.Errorf("required_classes with enforcing = -1 and dcredit = -1: %+v, want 1", e)
 	}
 	// (e) R148: an unreadable conf file is the answer.
 	a = stack(t, "")

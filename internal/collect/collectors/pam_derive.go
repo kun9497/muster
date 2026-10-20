@@ -239,7 +239,7 @@ func pwqualityFacts(s pamStacks, a collect.Access) map[string]facts.Envelope {
 	}
 	required := vals["minclass"]
 	negative := 0
-	for _, k := range []string{"dcredit", "ucredit", "lcredit", "ocredit", "enforcing"} {
+	for _, k := range []string{"dcredit", "ucredit", "lcredit", "ocredit"} {
 		if vals[k] <= -1 {
 			negative++
 		}
@@ -249,9 +249,9 @@ func pwqualityFacts(s pamStacks, a collect.Access) map[string]facts.Envelope {
 	}
 	// required_classes is derived from minclass and the four credits; an
 	// unparseable one of those five would make the derived number a guess, so it
-	// goes absent with the offender. minlen is not one of its inputs.
+	// goes absent with the offender. minlen and enforcing are not among its inputs.
 	out["pam.pwquality.required_classes"] = collect.OK(required, src())
-	for _, k := range []string{"minclass", "dcredit", "ucredit", "lcredit", "ocredit", "enforcing"} {
+	for _, k := range []string{"minclass", "dcredit", "ucredit", "lcredit", "ocredit"} {
 		if e, bad := unparseable(k); bad {
 			out["pam.pwquality.required_classes"] = e
 			break
