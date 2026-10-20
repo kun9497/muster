@@ -768,13 +768,22 @@ func TestPwqualityReaderMatchesTheCollector(t *testing.T) {
 		dropins map[string]string
 	}
 	rows := map[string]row{
-		"no files":                {},
-		"main only":               {main: "minlen = 12\nminclass = 3\n"},
-		"no =":                    {main: "minlen 6\n"},
-		"enforcing 0":             {main: "enforcing 0\n"},
-		"trailing comment":        {main: "minlen = 12 # site\n"},
-		"upper case":              {main: "MINLEN=12\n"},
-		"run of = and blanks":     {main: "  MinLen\t=\t= 11\r\n"},
+		"no files":         {},
+		"main only":        {main: "minlen = 12\nminclass = 3\n"},
+		"no =":             {main: "minlen 6\n"},
+		"enforcing 0":      {main: "enforcing 0\n"},
+		"trailing comment": {main: "minlen = 12 # site\n"},
+		"upper case":       {main: "MINLEN=12\n"},
+		"blanks around =":  {main: "  MinLen\t=\t11\r\n"},
+		// H-16: at most one "=" is skipped; a second one is the value's
+		"two = after blanks":      {main: "  MinLen\t=\t= 11\r\n"},
+		"minlen==14":              {main: "minlen==14\n"},
+		"minlen == 14":            {main: "minlen == 14\n"},
+		"minlen = = 14":           {main: "minlen = = 14\n"},
+		"minclass==3":             {main: "minlen = 12\nminclass==3\n"},
+		"minlen =14":              {main: "minlen =14\n"},
+		"minlen= 14":              {main: "minlen= 14\n"},
+		"string keeps a second =": {main: "minlen = 9\nbadwords = =x\ndictpath==y\n"},
 		"sign":                    {main: "minlen = +9\ndcredit = -1\nocredit=-2\n"},
 		"hash in the value":       {main: "minlen=7#x\n"},
 		"strings and flags":       {main: "minclass = 2\nbadwords = a=b c\nenforce_for_root = yes\nlocal_users_only\ndictpath =\n"},
@@ -839,7 +848,7 @@ func TestPwqualityReaderMatchesTheCollector(t *testing.T) {
 				want = fmt.Sprintf("%v %v %v", minlen.Value, env(t, b, "pam.pwquality.required_classes").Value, env(t, b, "pam.pwquality.enforcing").Value)
 			} else if m := pwqualityStopAt.FindStringSubmatch(minlen.Reason); m != nil {
 				name := m[3]
-				if name != "NUL byte" && name != "line longer than 1023 bytes" {
+				if name != "NUL byte" && name != "line of 1023 bytes or more" {
 					for i := 0; i < len(name); i++ {
 						if cSpace(name[i]) || name[i] == '=' {
 							name = name[:i]

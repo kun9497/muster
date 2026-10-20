@@ -1368,24 +1368,31 @@ func TestPwqualityChainFollowsLibpwquality(t *testing.T) {
 		[]string{"/etc/security/pwquality.conf", "/etc/authselect/system-auth"})
 	// strtol's limits: INT_MAX and INT_MIN themselves are refused, and so is
 	// an empty integer or one with trailing characters.
-	for _, line := range []string{"minlen = 2147483647", "minlen = -2147483648", "minlen = 99999999999999999999", "minlen =", "minlen", "minlen = 0x10", "minlen = 12 34"} {
+	// H-16: read_config_file skips blanks and at most ONE "=", so a second
+	// "=" is the value's first character and strtol refuses it.
+	for _, line := range []string{"minlen = 2147483647", "minlen = -2147483648", "minlen = 99999999999999999999", "minlen =", "minlen", "minlen = 0x10", "minlen = 12 34",
+		"minlen == 14", "minlen = = 14", "minlen==14", "minclass==3", "  MinLen\t=\t= 11\r"} {
 		b = build(t, "pam", pwqualityChain(line+"\n", nil))
 		if e := env(t, b, "pam.pwquality.minlen"); e.Status != facts.StatusAbsent || !strings.HasPrefix(e.Reason, "libpwquality stops reading at /etc/security/pwquality.conf:1 (") {
 			t.Errorf("%q: %+v, want a stop", line, e)
 		}
 	}
-	// The tokenizer: no "=", a trailing comment, any case, a sign, a run of
-	// "=" and blanks, CR line ends.
+	// The tokenizer: no "=", a trailing comment, any case, a sign, blanks on
+	// either side of the one "=", CR line ends.
 	for _, c := range []struct {
 		main, key string
 		want      int
 	}{
-		{"minlen 6\n", "minlen", 6},             // (c)
-		{"enforcing 0\n", "enforcing", 0},       // (d)
-		{"minlen = 12 # site\n", "minlen", 12},  // (e)
-		{"MINLEN=12\n", "minlen", 12},           // (f)
-		{"  MinLen\t=\t= 11\r\n", "minlen", 11}, // a run of blanks and "=" before the value
-		{"minlen = +9\n", "minlen", 9},          // strtol takes a sign
+		{"minlen 6\n", "minlen", 6},            // (c)
+		{"enforcing 0\n", "enforcing", 0},      // (d)
+		{"minlen = 12 # site\n", "minlen", 12}, // (e)
+		{"MINLEN=12\n", "minlen", 12},          // (f)
+		{"  MinLen\t=\t11\r\n", "minlen", 11},  // blanks around the one "="
+		{"minlen =14\n", "minlen", 14},
+		{"minlen= 14\n", "minlen", 14},
+		{"minlen 14\n", "minlen", 14},
+		{"minclass = 2\nbadwords = =x\n", "minclass", 2}, // a string keeps its second "="
+		{"minlen = +9\n", "minlen", 9},                   // strtol takes a sign
 		{"minlen = 2147483646\n", "minlen", 2147483646},
 		{"minlen=7#x\n", "minlen", 7},                                               // "#" cuts wherever it is
 		{"minclass = 2\nbadwords = a=b c\nenforce_for_root = yes\n", "minclass", 2}, // a string and a flag are no stop
@@ -1493,7 +1500,7 @@ func TestPwqualityLongLineAndNULStop(t *testing.T) {
 	long := func(n int) string { return "badwords = " + strings.Repeat("x", n-len("badwords = ")) }
 	b := build(t, "pam", pwqualityChain("minlen = 14\nminclass = 4\n", map[string]string{"10-words.conf": "# words\n" + long(1023) + "\n"}))
 	for _, k := range pwqualityStopKeys {
-		want := "libpwquality stops reading at /etc/security/pwquality.conf.d/10-words.conf:2 (line longer than 1023 bytes); the files after it are not applied"
+		want := "libpwquality stops reading at /etc/security/pwquality.conf.d/10-words.conf:2 (line of 1023 bytes or more); the files after it are not applied"
 		if e := env(t, b, k); e.Status != facts.StatusAbsent || e.Reason != want {
 			t.Errorf("%s = %+v, want absent with %q", k, e, want)
 		}
@@ -1508,7 +1515,7 @@ func TestPwqualityLongLineAndNULStop(t *testing.T) {
 	// The limit holds for a last line with no "\n" too: the buffer fills
 	// before fgets sees EOF.
 	b = build(t, "pam", pwqualityChain(long(1023), nil))
-	if e := env(t, b, "pam.pwquality.minlen"); e.Status != facts.StatusAbsent || e.Reason != "libpwquality stops reading at /etc/security/pwquality.conf:1 (line longer than 1023 bytes); the lines after it are not applied" {
+	if e := env(t, b, "pam.pwquality.minlen"); e.Status != facts.StatusAbsent || e.Reason != "libpwquality stops reading at /etc/security/pwquality.conf:1 (line of 1023 bytes or more); the lines after it are not applied" {
 		t.Errorf("a final 1023-byte line: %+v", e)
 	}
 	// A NUL byte anywhere, the first byte and the last line included.

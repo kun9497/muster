@@ -144,8 +144,8 @@ func pwqualityInt(v string) (int, bool) {
 // parsePwqualityInto applies one pwquality conf file to kv the way
 // libpwquality's read_config_file (settings.c) reads it: each line is cut at
 // its first "#" and trimmed, a blank line is skipped, the name ends at the
-// first blank or "=", the run of blanks and "=" after it is skipped and the
-// rest is the value. Names are stored ASCII lower-cased (set_name_value uses
+// first blank or "=", and the blanks and at most one "=" after it are skipped
+// (splitNameValue, H-16); the rest is the value. Names are stored ASCII lower-cased (set_name_value uses
 // strcasecmp); an integer is stored in its decimal form, a flag with an empty
 // value. The first line whose name is unknown or whose integer set_name_value
 // refuses stops the file: the lines before it stay applied, and the line is
@@ -164,22 +164,15 @@ func parsePwqualityInto(data []byte, kv map[string]string) *lineStop {
 			return &lineStop{Line: i + 1, Why: "NUL byte"}
 		}
 		if len(raw) >= pwqualityMaxLine {
-			return &lineStop{Line: i + 1, Why: "line longer than " + strconv.Itoa(pwqualityMaxLine) + " bytes"}
+			return &lineStop{Line: i + 1, Why: "line of " + strconv.Itoa(pwqualityMaxLine) + " bytes or more"}
 		}
 		l, _, _ := strings.Cut(raw, "#")
 		l = trimCSpace(l)
 		if l == "" {
 			continue
 		}
-		end := 0
-		for end < len(l) && !cSpace(l[end]) && l[end] != '=' {
-			end++
-		}
-		name := asciiLower(l[:end])
-		v := l[end:]
-		for len(v) > 0 && (cSpace(v[0]) || v[0] == '=') {
-			v = v[1:]
-		}
+		name, v := splitNameValue(l)
+		name = asciiLower(name)
 		switch pwqualityNames[name] {
 		case pwqInt:
 			n, ok := pwqualityInt(v)
@@ -196,6 +189,32 @@ func parsePwqualityInto(data []byte, kv map[string]string) *lineStop {
 		}
 	}
 	return nil
+}
+
+// splitNameValue splits a comment-cut, trimmed, non-blank line the way both
+// libpwquality's and pam_faillock's read_config_file do (H-16): the name ends
+// at the first blank or "=" (eq records an "="), then blanks are skipped
+// along with at most ONE "=" — only when the name did not already end at one
+// — and the value is everything after that. A second "=" is the value's
+// first character: "minlen == 14" has the value "= 14".
+func splitNameValue(l string) (name, value string) {
+	end := 0
+	for end < len(l) && !cSpace(l[end]) && l[end] != '=' {
+		end++
+	}
+	name, v := l[:end], l[end:]
+	eq := false
+	if v != "" {
+		eq = v[0] == '='
+		v = v[1:]
+	}
+	for len(v) > 0 && (cSpace(v[0]) || (v[0] == '=' && !eq)) {
+		if v[0] == '=' {
+			eq = true
+		}
+		v = v[1:]
+	}
+	return name, v
 }
 
 // confSetting is one name and value in file order.
@@ -216,22 +235,7 @@ func parseFaillockConf(data []byte) []confSetting {
 		if l == "" {
 			continue
 		}
-		end := 0
-		for end < len(l) && !cSpace(l[end]) && l[end] != '=' {
-			end++
-		}
-		name, v := l[:end], l[end:]
-		eq := false
-		if v != "" {
-			eq = v[0] == '='
-			v = v[1:]
-		}
-		for len(v) > 0 && (cSpace(v[0]) || (v[0] == '=' && !eq)) {
-			if v[0] == '=' {
-				eq = true
-			}
-			v = v[1:]
-		}
+		name, v := splitNameValue(l)
 		out = append(out, confSetting{name, v})
 	}
 	return out

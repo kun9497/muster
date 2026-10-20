@@ -1512,7 +1512,7 @@ func TestPasswordPolicyBodyStopsOnARefusedLine(t *testing.T) {
 		{"the main file after a good line", "minlen = 12\nBogus = 1\n", nil, "/etc/security/pwquality.conf:2", "Bogus"},
 		// H-9: fgets cannot hand over a line of 1023 bytes or more, or one a
 		// NUL byte cuts short (PWQ_ERROR_CFGFILE_MALFORMED)
-		{"a drop-in's long line", "minlen = 6\n", map[string]string{"10-words.conf": "badwords = " + strings.Repeat("x", 1012) + "\n"}, "/etc/security/pwquality.conf.d/10-words.conf:1", "line longer than 1023 bytes"},
+		{"a drop-in's long line", "minlen = 6\n", map[string]string{"10-words.conf": "badwords = " + strings.Repeat("x", 1012) + "\n"}, "/etc/security/pwquality.conf.d/10-words.conf:1", "line of 1023 bytes or more"},
 		{"a NUL byte", "minlen = 6\n", map[string]string{"10-a.conf": "# a\nminlen\x00 = 14\n"}, "/etc/security/pwquality.conf.d/10-a.conf:2", "NUL byte"},
 		{"a hidden drop-in", "minlen = 6\n", map[string]string{".old.conf": "bogus\n"}, "/etc/security/pwquality.conf.d/.old.conf:1", "bogus"},
 	} {
