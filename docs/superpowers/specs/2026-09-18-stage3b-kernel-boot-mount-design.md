@@ -142,7 +142,10 @@ without a separate `/tmp` gets NOT_APPLICABLE; the description points at control
 is where that host's finding is.
 
 **B-7 — what "disabled" means for a module.** `install <name> /bin/false` (or `/bin/true`)
-is what disables a module; `blacklist <name>` only stops automatic loading by alias and is
+is what disables a module — the whole command one such word, optionally followed by a `#`
+comment (stage-3 hotfix: `/bin/true && modprobe --ignore-install <name>` loads it; muster
+never runs the command, and a review script whose own line an earlier compound line would
+shadow fails its validate and rolls back); `blacklist <name>` only stops automatic loading by alias and is
 recorded, not credited. A loaded module is never disabled. A module the tree does not ship
 is disabled by absence. A built-in one cannot be disabled, fails, and says so.
 

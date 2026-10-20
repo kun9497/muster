@@ -274,7 +274,7 @@ remediation:
     fi
   validate: "if command -v sshd >/dev/null 2>&1; then sshd -T -C user=root,host=localhost,addr=127.0.0.1 2>/dev/null | grep -qx 'permitrootlogin no'; fi"
   rollback: |
-    rm -f /etc/ssh/sshd_config.d/00-muster.conf
+    [ -L /etc/ssh/sshd_config.d/00-muster.conf ] || restore /etc/ssh/sshd_config.d/00-muster.conf
     if command -v sshd >/dev/null 2>&1; then sshd -t; fi
 decision: D09
 ```
@@ -291,7 +291,7 @@ decision: D09
 
 **설정.** `setting` 팩트에서는 `on`이 `runtime`, `persisted`, `effective`, `both` 중 하나를 고르며, 기본값은 그 키에 대한 레지스트리의 `default_on`입니다(5.3절). `both`에서는 양쪽 모두 절을 충족해야 합니다. 한쪽만 충족하면 `WARN`이며, 사유는 "재부팅하면 되돌아감"(runtime만 충족) 또는 "적용되지 않음"(persisted만 충족)입니다.
 
-**페르소나.** `persona`는 sshd의 Match 페르소나(`root`, `user`, `invalid`)를 고르며, `sshd.options.*`에서만 의미가 있습니다. 스냅샷의 sshd 섹션에 `personas_collected: false`가 있으면 절은 전역 값에 대해 평가되고, 그 컨트롤의 수집은 저하된 것으로 칩니다(6.5절).
+**페르소나.** `persona`는 sshd의 Match 페르소나(`root`, `user`, `invalid`)를 고르며, `sshd.options.*`에서만 의미가 있습니다. 스냅샷의 sshd 섹션에 `personas_collected: false`가 있으면 절은 전역 값에 대해 평가되고, 그 컨트롤의 수집은 저하된 것으로 칩니다(6.5절). 읽기 한도에서 잘린 페르소나 출력은 수집되지 않은 것으로 칩니다. 절이 쓰는 페르소나 값은 다른 팩트 잎처럼 검사합니다: `ok`가 아니거나 잘렸으면 결코 `PASS`가 되지 않습니다(stage-3 hotfix).
 
 **컬렉션.** `each`와 `none`은 `list<record>`나 `list<string>` 팩트에 적용되며 관찰을 만들어 냅니다(6.4절). `each`는 `subject`와, 선택적인 `where`(필터 절. 이를 충족하지 않는 원소는 무시합니다)와, 필수인 `require`(남은 모든 원소가 충족해야 하는 절)를 받습니다. `none`은 선택적인 `subject`와 필수인 `where`를 받으며, 어떤 원소도 이를 충족해서는 안 됩니다. `require`를 충족하지 못하는 원소가 하나라도 있거나 `none`의 `where`를 충족하는 원소가 하나라도 있으면 절은 실패합니다.
 
@@ -363,7 +363,7 @@ waivers:
     expires: 2026-12-31                    # 선택, 해당일 포함
 ```
 
-사유가 없거나, 알 수 없는 키가 있거나, 일치 필드가 없는 waiver는 로드 시점에 거부됩니다. 만료된 waiver는 면제를 멈추고 경고합니다. 존재하지 않는 컨트롤 id를 지정한 waiver는 경고합니다. 프로파일이 제외한 컨트롤을 지정한 waiver는 적용되지 않음으로 세고 경고합니다 — 결코 unknown도 침묵도 아니며 어느 행도 싣지 않습니다(3D-1). waiver는 `FAIL`과 `WARN`만 억제합니다(6.5절). 상태가 `ERROR`인 컨트롤은 결코 면제되지 않습니다. waiver는 적용되지 않았다고 기록되고 종료 코드는 2로 남으며, 오류를 종료 코드에서 빼는 방법은 `--allow-error`뿐입니다. 면제된 발견 사항은 `WAIVED`로 옮겨집니다. 종료 코드에서는 빠지지만 요약에는 항상 나옵니다("면제 N건, 그중 M건은 30일 안에 만료"). 관찰 대상을 지정한 waiver는 실패한 관찰을 모두 덮고 그 밖에 실패한 것이 없을 때만 컨트롤을 면제합니다. 그 대상으로 설명되지 않는 절 — 대상 옆의 스칼라 설정 — 은 행을 `FAIL`로 남기고, 그 절을 밝히며 경고합니다. `check`를 root로 실행할 때, root 소유가 아니거나 group/other 쓰기가 가능한 waiver·프로파일·튜닝 파일은 거부됩니다 (D12).
+사유가 없거나, 알 수 없는 키가 있거나, 일치 필드가 없는 waiver는 로드 시점에 거부됩니다. 만료된 waiver는 면제를 멈추고 경고합니다. 존재하지 않는 컨트롤 id를 지정한 waiver는 경고합니다. 프로파일이 제외한 컨트롤을 지정한 waiver는 적용되지 않음으로 세고 경고합니다 — 결코 unknown도 침묵도 아니며 어느 행도 싣지 않습니다(3D-1). waiver는 `FAIL`과 `WARN`만 억제합니다(6.5절). 상태가 `ERROR`인 컨트롤은 결코 면제되지 않습니다. waiver는 적용되지 않았다고 기록되고 종료 코드는 2로 남으며, 오류를 종료 코드에서 빼는 방법은 `--allow-error`뿐입니다. 면제된 발견 사항은 `WAIVED`로 옮겨집니다. 종료 코드에서는 빠지지만 요약에는 항상 나옵니다("면제 N건, 그중 M건은 30일 안에 만료"). 관찰 대상을 지정한 waiver는 실패한 관찰을 모두 덮고 그 밖에 실패한 것이 없을 때만 컨트롤을 면제합니다. 그 대상으로 설명되지 않는 절 — 대상 옆의 스칼라 설정 — 은 행의 상태(`FAIL` 또는 `WARN`)를 그대로 두고, 그 절을 밝히며 경고합니다. `check`를 root로 실행할 때, root 소유가 아니거나 group/other 쓰기가 가능한 waiver·프로파일·튜닝 파일은 거부됩니다 (D12).
 
 ### 6.8 Lint
 
@@ -393,7 +393,7 @@ waivers:
 
 ### 7.2 check
 
-입력은 신뢰할 수 없습니다. 파싱에 실패하거나, 디코드 크기나 중첩 한도를 넘거나, `schema_version`이 더 높은 스냅샷은 결과를 만들지 않고 2로 종료합니다(`schema_mismatch`). 더 낮은 버전은 빠진 키를 `missing`으로 삼아 읽습니다(5.2절). 로드에 실패한 외부 컨트롤 디렉터리, 그리고 사유가 없거나 알 수 없는 키가 있거나 일치 필드가 없는 waiver 파일은 2로 종료입니다(내장 컨트롤은 CI가 lint하므로 런타임에 실패할 수 없습니다). 알 수 없는 컨트롤 id를 지정한 waiver는 결과에 기록되는 경고입니다. 거부된 프로파일·튜닝 파일 — 알 수 없는 키, 안 맞거나 잘못된 패턴, 미지 컨트롤·파라미터, 타입이 틀린 값, 순환이나 너무 긴 `extends` 체인, 빈 선택, 미지 내장 이름 — 은 2로 종료입니다(3D-1).
+입력은 신뢰할 수 없습니다. 파싱에 실패하거나, 하나의 JSON 값 뒤에 공백 말고 다른 것이 있거나, 디코드 크기나 중첩 한도를 넘거나, `schema_version`이 더 높은 스냅샷은 결과를 만들지 않고 2로 종료합니다(버전은 `schema_mismatch`). 더 낮은 버전은 빠진 키를 `missing`으로 삼아 읽습니다(5.2절). 로드에 실패한 외부 컨트롤 디렉터리, 그리고 사유가 없거나 알 수 없는 키가 있거나 일치 필드가 없는 waiver 파일은 2로 종료입니다(내장 컨트롤은 CI가 lint하므로 런타임에 실패할 수 없습니다). 알 수 없는 컨트롤 id를 지정한 waiver는 결과에 기록되는 경고입니다. 거부된 프로파일·튜닝 파일 — 알 수 없는 키, 안 맞거나 잘못된 패턴, 미지 컨트롤·파라미터, 타입이 틀린 값, 순환이나 너무 긴 `extends` 체인, 빈 선택, 미지 내장 이름 — 은 2로 종료입니다(3D-1).
 
 컨트롤들도 서로 격리됩니다. 어떤 컨트롤의 평가 중 패닉(대개 custom 함수)이 나면 그 컨트롤은 `ERROR(internal_error)`가 되고 나머지는 평가됩니다. 최상위 recover는 마지막 방어선이며 2로 종료합니다.
 

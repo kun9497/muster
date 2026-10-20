@@ -274,7 +274,7 @@ remediation:
     fi
   validate: "if command -v sshd >/dev/null 2>&1; then sshd -T -C user=root,host=localhost,addr=127.0.0.1 2>/dev/null | grep -qx 'permitrootlogin no'; fi"
   rollback: |
-    rm -f /etc/ssh/sshd_config.d/00-muster.conf
+    [ -L /etc/ssh/sshd_config.d/00-muster.conf ] || restore /etc/ssh/sshd_config.d/00-muster.conf
     if command -v sshd >/dev/null 2>&1; then sshd -t; fi
 decision: D09
 ```
@@ -291,7 +291,7 @@ Fields: `id`, `title_en`, `title_ko`, `description_en`, `description_ko` (own wo
 
 **Settings.** On a `setting` fact, `on` selects `runtime`, `persisted`, `effective` or `both`, defaulting to the registry's `default_on` for that key (section 5.3). With `both`, both sides must satisfy the clause; one side satisfying it and the other not is a `WARN` with reason "reverts on reboot" (runtime only) or "not applied" (persisted only).
 
-**Personas.** `persona` selects an sshd Match persona — `root`, `user` or `invalid` — and is meaningful only on `sshd.options.*`. When the snapshot's sshd section has `personas_collected: false`, the clause is evaluated against the global value and the control's collection counts as degraded (section 6.5).
+**Personas.** `persona` selects an sshd Match persona — `root`, `user` or `invalid` — and is meaningful only on `sshd.options.*`. When the snapshot's sshd section has `personas_collected: false`, the clause is evaluated against the global value and the control's collection counts as degraded (section 6.5); a persona dump cut at the read limit counts as not collected. A persona value the clause uses is screened like any fact leaf: not `ok`, or truncated, never produces `PASS` (stage-3 hotfix).
 
 **Collections.** `each` and `none` apply to a `list<record>` or `list<string>` fact and produce observations (section 6.4). `each` takes `subject`, an optional `where` (a filter clause; elements that do not satisfy it are ignored) and a required `require` (a clause every remaining element must satisfy). `none` takes an optional `subject` and a required `where`; no element may satisfy it. One element that fails `require`, or one that satisfies `none`'s `where`, makes the clause fail.
 
@@ -363,7 +363,7 @@ waivers:
     expires: 2026-12-31                    # optional, inclusive
 ```
 
-A waiver without a reason, with an unknown key, or with no match field is refused at load. An expired waiver stops waiving and warns. A waiver naming a control id that does not exist warns. A waiver naming a control the profile excludes is counted as not applied and warned — it is never unknown and never silent, and no row carries it (3D-1). A waiver suppresses only `FAIL` and `WARN` (section 6.5): a control whose status is `ERROR` is never waived — the waiver is recorded as not applied and the exit code stays 2, and `--allow-error` is the only way to take errors out of the exit code. A waived finding moves to `WAIVED`: it is out of the exit code and always in the summary ("waived N, of which M expire within 30 days"). A waiver that names observations waives the control only when it covers every failing observation and nothing outside them fails: a clause its subjects do not explain — a scalar setting beside them — keeps the row `FAIL`, names that clause and warns. When `check` runs as root, a waiver, profile or tuning file that is not root-owned or is group/other-writable is refused (D12).
+A waiver without a reason, with an unknown key, or with no match field is refused at load. An expired waiver stops waiving and warns. A waiver naming a control id that does not exist warns. A waiver naming a control the profile excludes is counted as not applied and warned — it is never unknown and never silent, and no row carries it (3D-1). A waiver suppresses only `FAIL` and `WARN` (section 6.5): a control whose status is `ERROR` is never waived — the waiver is recorded as not applied and the exit code stays 2, and `--allow-error` is the only way to take errors out of the exit code. A waived finding moves to `WAIVED`: it is out of the exit code and always in the summary ("waived N, of which M expire within 30 days"). A waiver that names observations waives the control only when it covers every failing observation and nothing outside them fails: a clause its subjects do not explain — a scalar setting beside them — keeps the row's status (`FAIL` or `WARN`), names that clause and warns. When `check` runs as root, a waiver, profile or tuning file that is not root-owned or is group/other-writable is refused (D12).
 
 ### 6.8 Lint
 
@@ -393,7 +393,7 @@ Exit codes for `collect`: `0` complete snapshot; `1` snapshot written but incomp
 
 ### 7.2 check
 
-Input is untrusted. A snapshot that fails to parse, exceeds decode size or nesting limits, or has a higher `schema_version` produces no result and exit 2 (`schema_mismatch`). A lower version is read with missing keys as `missing` (section 5.2). A failing external control directory, or a waiver file with a missing reason, unknown key or no match field, is exit 2 (embedded controls cannot fail at runtime because CI lints them). A waiver naming an unknown control id is a warning recorded in the result. A profile or tuning file that is refused — an unknown key, an unmatched or malformed pattern, an unknown control or parameter, a mistyped value, a cycle or an over-long `extends` chain, an empty selection, an unknown built-in name — is exit 2 (3D-1).
+Input is untrusted. A snapshot that fails to parse, holds anything but whitespace after its one JSON value, exceeds decode size or nesting limits, or has a higher `schema_version` produces no result and exit 2 (`schema_mismatch` for the version). A lower version is read with missing keys as `missing` (section 5.2). A failing external control directory, or a waiver file with a missing reason, unknown key or no match field, is exit 2 (embedded controls cannot fail at runtime because CI lints them). A waiver naming an unknown control id is a warning recorded in the result. A profile or tuning file that is refused — an unknown key, an unmatched or malformed pattern, an unknown control or parameter, a mistyped value, a cycle or an over-long `extends` chain, an empty selection, an unknown built-in name — is exit 2 (3D-1).
 
 Controls are isolated: a panic inside one control's evaluation (typically a custom function) makes that control `ERROR(internal_error)`; the rest are evaluated. The top-level recover is the last line and exits 2.
 

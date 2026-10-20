@@ -291,7 +291,9 @@ LXD의 `lxd-agent` 같은 `/run/*` 에이전트와 `/var/lib/*` 바이너리는 
   쓸 수 있는 실행파일(`why: parent_writable` — 부모가 uid 0 소유가 아니거나 group/other-writable; Debian의
   `root:staff` 2775 `/usr/local/*`은 사실대로 FAIL을 읽음), 소유 uid가 0이 아니거나,
   group-writable이거나, other-writable인 실행파일(`why` ∈ `owner`, `group_writable`, `other_writable`),
-  그리고 같은 세 성질의 유닛 파일이나 drop-in(`why`에 `unit_file:` 접두). `unit`, `path` 정렬. 범위 안의
+  그리고 같은 세 성질의 유닛 파일이나 drop-in(`why`에 `unit_file:` 접두), 또는 root 소유가 아니거나 group·other가
+  쓸 수 있는 디렉터리에 있는 유닛 파일이나 drop-in(`unit_file:parent_writable`, stage-3 hotfix. 빈 `<name>.d`
+  디렉터리와 유닛보다 앞서는 쓰기 가능한 검색 디렉터리는 판정하지 않음). `unit`, `path` 정렬. 범위 안의
   유닛 파일이나 drop-in이 존재하는데 읽을 수 없으면 유닛과 경로를 적은 **`absent`**: 읽을 수 없는 파일이
   결정하는 `ExecStart`를 품을 수 있으므로 답은 모르는 것이고 컨트롤은 MANUAL(원칙 2; J-40 모양).
 - `units.exec_unresolved` — `int`: `resolved: false`인 행 수와 `unit_file`이 `symlink`나 `missing`인 유닛
