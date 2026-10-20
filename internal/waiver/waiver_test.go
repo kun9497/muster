@@ -257,6 +257,8 @@ func TestApplySubjectWaiverLeavesAnUnobservedFailure(t *testing.T) {
 		rs := results()
 		rs[2].Status = st
 		rs[2].UnobservedFail = true
+		rs[2].Reason = "clause does not hold: the waived one"
+		rs[2].UnobservedReason = "clause does not hold: x eq false"
 		var warnings []string
 		a := f.Apply(rs, map[string]bool{"muster.a.obs": true}, nil, now, func(s string) { warnings = append(warnings, s) })
 		if rs[2].Status != st {
@@ -271,9 +273,27 @@ func TestApplySubjectWaiverLeavesAnUnobservedFailure(t *testing.T) {
 		if a.Applied != 2 || a.NotApplied != 0 {
 			t.Errorf("%s: tally %+v", st, a)
 		}
-		want := "waiver for muster.a.obs#file:/a, file:/b applied to its observation; muster.a.obs stays " + string(st) + " on a scalar clause no observation carries"
+		if rs[2].Reason != "clause does not hold: x eq false" {
+			t.Errorf("%s: reason %q, want the unobserved clause", st, rs[2].Reason)
+		}
+		want := "waiver for muster.a.obs#file:/a, file:/b applied; muster.a.obs stays " + string(st) + " on a clause no subject waiver covers (clause does not hold: x eq false)"
 		if len(warnings) != 1 || warnings[0] != want {
 			t.Errorf("%s: warnings %q, want [%q]", st, warnings, want)
 		}
+	}
+}
+
+// With a failing observation left, the row stays failing on it as before:
+// its reason is kept and no warning is added, unobserved clause or not.
+func TestApplySubjectWaiverWithObservationsLeftKeepsTheReason(t *testing.T) {
+	f, _ := Load(strings.NewReader("waivers:\n  - control: muster.a.obs\n    subject: file:/a\n    reason: r\n"), "w.yaml")
+	rs := results()
+	rs[2].Reason = "clause does not hold: the first one"
+	rs[2].UnobservedFail = true
+	rs[2].UnobservedReason = "clause does not hold: x eq false"
+	var warnings []string
+	f.Apply(rs, map[string]bool{"muster.a.obs": true}, nil, now, func(s string) { warnings = append(warnings, s) })
+	if rs[2].Status != check.WARN || rs[2].Reason != "clause does not hold: the first one" || len(warnings) != 0 {
+		t.Errorf("status %s reason %q warnings %q", rs[2].Status, rs[2].Reason, warnings)
 	}
 }

@@ -112,4 +112,8 @@ type Result struct {
 	// nothing else, so such a row is never promoted to WAIVED by one (spec
 	// §6.4). It is never rendered: no output byte depends on it.
 	UnobservedFail bool `json:"-"`
+	// UnobservedReason is the reason of the first such clause, built as
+	// Reason is; waiver.Apply puts it in Reason when a subject waiver waived
+	// every observation and the row still fails on it. Never rendered.
+	UnobservedReason string `json:"-"`
 }

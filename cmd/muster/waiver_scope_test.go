@@ -39,6 +39,7 @@ func sudoSnapshot(t *testing.T, authDisabled bool) string {
 type scopeRow struct {
 	ID           string `json:"id"`
 	Status       string `json:"status"`
+	Reason       string `json:"reason"`
 	Observations []struct {
 		Subject string `json:"subject"`
 		Verdict string `json:"verdict"`
@@ -96,7 +97,12 @@ func TestCheckSubjectWaiverDoesNotWaiveAScalarClause(t *testing.T) {
 	if row.Waiver == nil || !row.Waiver.Applied || row.Waiver.Subject != "user:ubuntu" {
 		t.Errorf("waiver %+v, want applied to user:ubuntu", row.Waiver)
 	}
-	want := "waiver for " + sudoNopasswdAll + "#user:ubuntu applied to its observation; " + sudoNopasswdAll + " stays FAIL on a scalar clause no observation carries"
+	// The reason names the clause the row still fails on, not the waived one.
+	const reason = "clause does not hold: sudo.authenticate_disabled eq false"
+	if row.Reason != reason {
+		t.Errorf("reason %q, want %q", row.Reason, reason)
+	}
+	want := "waiver for " + sudoNopasswdAll + "#user:ubuntu applied; " + sudoNopasswdAll + " stays FAIL on a clause no subject waiver covers (" + reason + ")"
 	if !strings.Contains(stderr, want) {
 		t.Errorf("stderr %q, want %q", stderr, want)
 	}
@@ -116,7 +122,47 @@ func TestCheckSubjectWaiverWaivesWhenOnlyItsObservationFails(t *testing.T) {
 	if code != exitOK || row.Status != "WAIVED" {
 		t.Errorf("exit %d status %s, want %d WAIVED", code, row.Status, exitOK)
 	}
-	if strings.Contains(stderr, "scalar clause") {
+	if strings.Contains(stderr, "no subject waiver covers") {
 		t.Errorf("stderr %q warns about a scalar clause that holds", stderr)
+	}
+}
+
+// fix --dry-run reads the same waived report: a row a subject waiver leaves
+// FAIL on an unobserved clause stays in the plan; a control-level waiver
+// takes it out.
+func TestFixPlansARowASubjectWaiverLeavesFailing(t *testing.T) {
+	snap := sudoSnapshot(t, true)
+	for _, c := range []struct {
+		name, entry string
+		planned     bool
+	}{
+		{"subject", subjectWaiver, true},
+		{"control", controlWaiver, false},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			dir := t.TempDir()
+			prof := filepath.Join(dir, "sudo-only.yaml")
+			wf := filepath.Join(dir, "waivers.yaml")
+			if err := os.WriteFile(prof, []byte("profile: sudo-only\ninclude: ["+sudoNopasswdAll+"]\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(wf, []byte("waivers:\n"+c.entry), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			code, out, errb := runFixArgs(t, "--dry-run", "--facts", snap, "--profile", prof, "--waivers", wf, "--format", "json")
+			if code != exitOK {
+				t.Fatalf("exit %d, stderr %s", code, errb)
+			}
+			p := decodePlan(t, out)
+			planned := false
+			for _, it := range p.Items {
+				if it.ID == sudoNopasswdAll {
+					planned = true
+				}
+			}
+			if planned != c.planned {
+				t.Errorf("planned %v, want %v (items %+v)", planned, c.planned, p.Items)
+			}
+		})
 	}
 }

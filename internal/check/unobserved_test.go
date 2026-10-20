@@ -58,32 +58,43 @@ func TestUnobservedFailMarksOnlyAFailingScalarClause(t *testing.T) {
 		r          func() Result
 		wantStatus Status
 		want       bool
+		// reason is the UnobservedReason wanted; "=" means the row's own
+		// Reason (the first failing clause is the unobserved one).
+		reason string
 	}{
 		{"collection clause alone fails", func() Result {
 			return Evaluate(fixtureSnap(t, sudo, "fail-cloud-init.json", nil), one(ctrl), reg, Options{})[0]
-		}, FAIL, false},
+		}, FAIL, false, ""},
 		{"scalar clause alone fails", func() Result {
 			return Evaluate(fixtureSnap(t, sudo, "fail-authenticate-disabled.json", nil), one(ctrl), reg, Options{})[0]
-		}, FAIL, true},
+		}, FAIL, true, "="},
 		{"collection and scalar clauses fail", func() Result {
 			return Evaluate(fixtureSnap(t, sudo, "fail-cloud-init.json", authOn), one(ctrl), reg, Options{})[0]
-		}, FAIL, true},
+		}, FAIL, true, "clause does not hold: sudo.authenticate_disabled eq false"},
 		{"holds", func() Result {
 			return Evaluate(fixtureSnap(t, sudo, "pass-stock-ubuntu.json", nil), one(ctrl), reg, Options{})[0]
-		}, PASS, false},
+		}, PASS, false, ""},
 		{"none clause fails", func() Result {
 			return evalSingle(t, `{"accounts":{"users":{"status":"ok","value":[{"name":"x","password_status":"nopass"}]}}}`, nopassControl())
-		}, FAIL, false},
-		{"scalar side mismatch is WARN", func() Result { return sideOnlyResult(t) }, WARN, true},
+		}, FAIL, false, ""},
+		{"scalar side mismatch is WARN", func() Result { return sideOnlyResult(t) }, WARN, true, "="},
+		{"degraded suffix", func() Result { return hardFailWithDegradation(t) }, FAIL, true, "="},
 		{"mechanism scalar clause fails", func() Result {
 			return evalSingle(t, `{"services":{"telnet":{"reachable":{"status":"ok","value":true}}},`+
 				`"accounts":{"login_defs":{"pass_max_days":{"runtime":{"status":"ok","value":99999},"persisted":{"status":"ok","value":99999}}}}}`, mech)
-		}, FAIL, true},
+		}, FAIL, true, "clause does not hold: accounts.login_defs.pass_max_days lte 90"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			r := c.r()
 			if r.Status != c.wantStatus || r.UnobservedFail != c.want {
 				t.Errorf("status %s UnobservedFail %v, want %s %v (%s: %s)", r.Status, r.UnobservedFail, c.wantStatus, c.want, r.ReasonCode, r.Reason)
+			}
+			want := c.reason
+			if want == "=" {
+				want = r.Reason
+			}
+			if r.UnobservedReason != want {
+				t.Errorf("UnobservedReason %q, want %q", r.UnobservedReason, want)
 			}
 		})
 	}

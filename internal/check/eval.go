@@ -149,6 +149,10 @@ func evalOne(e *env, c *controls.Control) (r Result) {
 			return fail(r, ERROR, InternalError, "custom function "+c.Custom+" is not registered")
 		}
 		out := fn(e, c)
+		// A custom outcome is judged as a whole: it is unobserved only when
+		// it carries no failing observation at all. A CustomFunc that mixes
+		// per-subject failures with a failure no observation carries must
+		// set UnobservedFail itself, or a subject waiver would waive the row.
 		if !out.Holds && !hasFailingObservation(out.Observations) {
 			out.UnobservedFail = true
 		}
@@ -204,7 +208,8 @@ func evalOne(e *env, c *controls.Control) (r Result) {
 			all.Holds = false
 			// A failing clause no observation carries cannot be waived by a
 			// subject-scoped waiver (spec §6.4): record it for waiver.Apply.
-			if !hasFailingObservation(out.Observations) {
+			unobserved := !hasFailingObservation(out.Observations)
+			if unobserved {
 				all.UnobservedFail = true
 			}
 			// C2: a clause that fails without a side-mismatch degradation
@@ -216,15 +221,20 @@ func evalOne(e *env, c *controls.Control) (r Result) {
 				all.HardFail = true
 			}
 			all.Err = nil
+			// M-5: a clause that knows WHY it failed — an element whose
+			// judged field the snapshot lacks — says so; otherwise the
+			// clause itself is the explanation.
+			why := out.Reason
+			if why == "" {
+				why = e.describe(cl)
+			}
 			if r.Reason == "" {
-				// M-5: a clause that knows WHY it failed — an element whose
-				// judged field the snapshot lacks — says so; otherwise the
-				// clause itself is the explanation.
-				why := out.Reason
-				if why == "" {
-					why = e.describe(cl)
-				}
 				r.Reason = "clause does not hold: " + why
+			}
+			// The first failing clause no observation carries is the reason
+			// a row keeps when a subject waiver waives every observation.
+			if unobserved && r.UnobservedReason == "" {
+				r.UnobservedReason = "clause does not hold: " + why
 			}
 		}
 		if out.Degraded != "" && all.Degraded == "" {
@@ -346,6 +356,7 @@ func finish(r Result, c *controls.Control, all clauseOutcome) Result {
 		if !all.HardFail && sideMismatch(all.Degraded) {
 			r.Status = WARN
 			r.Reason = ReasonSideOnlyPrefix + all.Degraded
+			r.UnobservedReason = r.Reason
 			return r
 		}
 		if c.Automation == "partial" {
@@ -361,6 +372,9 @@ func finish(r Result, c *controls.Control, all clauseOutcome) Result {
 		}
 		if all.Degraded != "" {
 			r.Reason += "; " + ReasonDegradedPrefix + all.Degraded
+			if r.UnobservedReason != "" {
+				r.UnobservedReason += "; " + ReasonDegradedPrefix + all.Degraded
+			}
 		}
 		return r
 	}
