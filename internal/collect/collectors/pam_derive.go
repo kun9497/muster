@@ -73,7 +73,11 @@ func pwqualityStopReason(s *chainStop) string {
 	if s.Path == pwqualityConf {
 		after = "the lines after it are not applied"
 	}
-	return "libpwquality stops reading at " + s.Path + ":" + strconv.Itoa(s.Line) + " (" + sourceRaw(s.Text) + "); " + after
+	what := s.Why
+	if what == "" {
+		what = sourceRaw(s.Text)
+	}
+	return "libpwquality stops reading at " + s.Path + ":" + strconv.Itoa(s.Line) + " (" + what + "); " + after
 }
 
 // pwqualityValueKeys are the pam.pwquality.* keys derived from the conf chain
@@ -167,7 +171,9 @@ func pwqualityFacts(s pamStacks, a collect.Access) map[string]facts.Envelope {
 	// exists but cannot be read comes back as the error and poisons every value
 	// below (R148); a file that is simply not there is not one, and only the
 	// files actually read are cited.
-	kv, confInputs, stop, err := mergeDropinsWith(a, pwqualityConf, []string{pwqualityConfDir}, "*.conf", parsePwqualityInto, mainLast)
+	kv, confInputs, stop, err := mergeDropinsWith(a, pwqualityConf, []string{pwqualityConfDir}, "*.conf", chainReader{
+		parse: parsePwqualityInto, order: mainLast, keep: pwqualityDropinName, binary: true,
+	})
 	if err != nil {
 		e := dropinEnvelope(err)
 		readErr = &e
@@ -270,8 +276,16 @@ func rememberFact(pw, unix []pamLine, a collect.Access) facts.Envelope {
 		// H-6: the first remember line is the answer (pam_modutil_search_key);
 		// one whose value does not convert leaves the module's default.
 		if data != nil {
-			if n, _, found, ok := pwhistoryRemember(data); found && ok {
+			n, line, found, ok := pwhistoryRemember(data)
+			if found && ok {
 				return derived(n, *src)
+			}
+			if found {
+				// C3: the file decided that the default stands, so it is cited
+				// at that line beside the stack line.
+				return collect.OK(pwhistoryDefaultRemember, &facts.Source{Kind: "derived", Inputs: []facts.Source{
+					{Kind: "file", Path: pwhistoryConf, Line: line}, lineSource(hist[0]),
+				}})
 			}
 		}
 		return derived(pwhistoryDefaultRemember, lineSource(hist[0]))

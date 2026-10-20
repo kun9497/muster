@@ -45,10 +45,13 @@ func dropinEnvelope(err error) facts.Envelope {
 // systemd does — it is stored as "", never dropped, so the reset survives
 // last-write-wins.
 func mergeDropins(a collect.Access, main string, dirs []string, glob string) (map[string]string, []facts.Source, error) {
-	values, inputs, _, err := mergeDropinsWith(a, main, dirs, glob, func(data []byte, values map[string]string) *lineStop {
-		parseDropin(data, values) // systemd never stops reading a chain
-		return nil
-	}, mainFirst)
+	values, inputs, _, err := mergeDropinsWith(a, main, dirs, glob, chainReader{
+		parse: func(data []byte, values map[string]string) *lineStop {
+			parseDropin(data, values) // systemd never stops reading a chain
+			return nil
+		},
+		order: mainFirst,
+	})
 	return values, inputs, err
 }
 
@@ -62,6 +65,23 @@ const (
 	mainFirst chainOrder = iota // systemd: main, then the drop-ins
 	mainLast                    // libpwquality: the drop-ins, then main
 )
+
+// chainReader is how one daemon reads its chain: its line parser, where its
+// main file goes, which glob matches it actually reads, and whether the parser
+// is handed a file's NUL bytes.
+type chainReader struct {
+	parse func([]byte, map[string]string) *lineStop
+	order chainOrder
+	// keep, when set, is the daemon's own test of a matched basename; a name
+	// it refuses is not part of the chain (it never shadows, is never read or
+	// cited). nil keeps every match.
+	keep func(base string) bool
+	// binary reads each file with ReadFileBinary, so a file holding a NUL
+	// byte reaches parse instead of coming back empty (the NUL rule), and the
+	// parser itself judges the line that holds it (H-9: for libpwquality that
+	// line stops the chain). parse must then treat a NUL byte as such.
+	binary bool
+}
 
 // mergeDropinsWith merges a main configuration file with its drop-in
 // directories, the way systemd itself resolves one, with the line parser and
@@ -93,7 +113,7 @@ const (
 //
 // The caller declares the main file and each dir's glob in its own
 // Declaration.Reads — this helper never widens the declaration.
-func mergeDropinsWith(a collect.Access, main string, dirs []string, glob string, parse func([]byte, map[string]string) *lineStop, order chainOrder) (map[string]string, []facts.Source, *chainStop, error) {
+func mergeDropinsWith(a collect.Access, main string, dirs []string, glob string, r chainReader) (map[string]string, []facts.Source, *chainStop, error) {
 	values := map[string]string{}
 	var inputs []facts.Source
 	var readErr error
@@ -107,7 +127,11 @@ func mergeDropinsWith(a collect.Access, main string, dirs []string, glob string,
 		if stop != nil {
 			return
 		}
-		data, _, err := a.ReadFile(p, readLimit)
+		readFile := a.ReadFile
+		if r.binary {
+			readFile = a.ReadFileBinary
+		}
+		data, _, err := readFile(p, readLimit)
 		if err != nil {
 			// chainReadFailed is the one classification every merged chain
 			// uses: absent is not part of this host's chain, a /dev/null link
@@ -121,14 +145,14 @@ func mergeDropinsWith(a collect.Access, main string, dirs []string, glob string,
 			}
 			return
 		}
-		if ls := parse(data, values); ls != nil {
-			stop = &chainStop{Path: p, Line: ls.Line, Text: ls.Text}
+		if ls := r.parse(data, values); ls != nil {
+			stop = &chainStop{Path: p, Line: ls.Line, Text: ls.Text, Why: ls.Why}
 			inputs = append(inputs, facts.Source{Kind: "file", Path: p, Line: ls.Line})
 			return
 		}
 		inputs = append(inputs, facts.Source{Kind: "file", Path: p})
 	}
-	if order == mainFirst {
+	if r.order == mainFirst {
 		read(main)
 	}
 
@@ -145,6 +169,9 @@ func mergeDropinsWith(a collect.Access, main string, dirs []string, glob string,
 		slices.Sort(matches)
 		for _, m := range matches {
 			base := path.Base(m)
+			if r.keep != nil && !r.keep(base) {
+				continue
+			}
 			if _, dup := chosen[base]; dup {
 				continue
 			}
@@ -156,7 +183,7 @@ func mergeDropinsWith(a collect.Access, main string, dirs []string, glob string,
 	for _, base := range bases {
 		read(chosen[base])
 	}
-	if order == mainLast {
+	if r.order == mainLast {
 		read(main)
 	}
 	return values, inputs, stop, readErr
@@ -167,6 +194,7 @@ type chainStop struct {
 	Path string
 	Line int
 	Text string
+	Why  string // set when the line is refused for its shape, not its text (lineStop.Why)
 }
 
 // parseDropin parses systemd-style "Key=Value" lines into values, last write

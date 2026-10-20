@@ -1482,3 +1482,100 @@ func TestPwhistoryConfFollowsSearchKey(t *testing.T) {
 		}
 	}
 }
+
+// H-9: libpwquality's read_config_file reads a line with fgets into a
+// 1024-byte buffer (PWQSETTINGS_MAX_LINELEN 1023); a chunk that does not end
+// in "\n" before EOF is PWQ_ERROR_CFGFILE_MALFORMED, which stops the chain
+// like an unknown name. A line of 1023 bytes or more before its "\n" is such
+// a chunk, and so is a line a NUL byte cuts short (strlen); any NUL is taken
+// as a stop. The reason names the line and says which.
+func TestPwqualityLongLineAndNULStop(t *testing.T) {
+	long := func(n int) string { return "badwords = " + strings.Repeat("x", n-len("badwords = ")) }
+	b := build(t, "pam", pwqualityChain("minlen = 14\nminclass = 4\n", map[string]string{"10-words.conf": "# words\n" + long(1023) + "\n"}))
+	for _, k := range pwqualityStopKeys {
+		want := "libpwquality stops reading at /etc/security/pwquality.conf.d/10-words.conf:2 (line longer than 1023 bytes); the files after it are not applied"
+		if e := env(t, b, k); e.Status != facts.StatusAbsent || e.Reason != want {
+			t.Errorf("%s = %+v, want absent with %q", k, e, want)
+		}
+	}
+	// 1022 bytes fit, and so does a last line of 1022 bytes with no "\n".
+	for _, words := range []string{long(1022) + "\n", long(1022)} {
+		b = build(t, "pam", pwqualityChain("minlen = 14\n", map[string]string{"10-words.conf": words}))
+		if e := env(t, b, "pam.pwquality.minlen"); e.Status != facts.StatusOK || e.Value != 14 {
+			t.Errorf("a %d-byte line: minlen %+v, want 14", len(strings.TrimSuffix(words, "\n")), e)
+		}
+	}
+	// The limit holds for a last line with no "\n" too: the buffer fills
+	// before fgets sees EOF.
+	b = build(t, "pam", pwqualityChain(long(1023), nil))
+	if e := env(t, b, "pam.pwquality.minlen"); e.Status != facts.StatusAbsent || e.Reason != "libpwquality stops reading at /etc/security/pwquality.conf:1 (line longer than 1023 bytes); the lines after it are not applied" {
+		t.Errorf("a final 1023-byte line: %+v", e)
+	}
+	// A NUL byte anywhere, the first byte and the last line included.
+	for _, c := range []struct {
+		file string
+		line int
+	}{
+		{"# a\nminlen = 9\nx\x00y\n", 3},
+		{"\x00minlen = 9\n", 1},
+		{"minlen = 9\nminclass = 1\x00", 2},
+	} {
+		b = build(t, "pam", pwqualityChain("minlen = 14\n", map[string]string{"10-a.conf": c.file}))
+		want := "libpwquality stops reading at /etc/security/pwquality.conf.d/10-a.conf:" + strconv.Itoa(c.line) + " (NUL byte); the files after it are not applied"
+		for _, k := range pwqualityStopKeys {
+			if e := env(t, b, k); e.Status != facts.StatusAbsent || e.Reason != want {
+				t.Errorf("%q: %s = %+v, want absent with %q", c.file, k, e, want)
+			}
+		}
+	}
+}
+
+// H-9: pwquality_read_config lists pwquality.conf.d with scandir, filter_conf
+// and comp_func: an entry is read when the FIRST ".conf" in its name ends the
+// name (a hidden name included), in strcmp order.
+func TestPwqualityDropinSelection(t *testing.T) {
+	for _, c := range []struct {
+		dropins map[string]string
+		want    int
+	}{
+		{map[string]string{".old.conf": "minlen = 20\n"}, 20},                                   // hidden, read
+		{map[string]string{"a.conf.conf": "minlen = 30\n"}, 8},                                  // the first .conf does not end it
+		{map[string]string{"a.conf.conf": "bogus\n"}, 8},                                        // ... so it never stops anything
+		{map[string]string{"-a.conf": "minlen = 11\n", ".b.conf": "minlen = 12\n"}, 12},         // '-' < '.' bytewise
+		{map[string]string{"B.conf": "minlen = 13\n", "a.conf": "minlen = 9\n"}, 9},             // 'B' < 'a' bytewise
+		{map[string]string{".conf": "minlen = 15\n"}, 15},                                       // the name is ".conf" alone
+		{map[string]string{"10-a.conf": "minlen = 10\n", "9-z.conf.conf": "minlen = 31\n"}, 10}, // the skipped one is never applied last
+	} {
+		b := build(t, "pam", pwqualityChain("", c.dropins))
+		if e := env(t, b, "pam.pwquality.minlen"); e.Status != facts.StatusOK || e.Value != c.want {
+			t.Errorf("%v: minlen %+v, want %d", c.dropins, e, c.want)
+		}
+	}
+	// A directory named like a drop-in is skipped, as before (glibc's fopen
+	// opens it and fgets reads nothing, so libpwquality skips it too).
+	a := pwqualityChain("minlen = 14\n", nil)
+	a.dirs = map[string]bool{pwqualityConfDir + "/sub.conf": true}
+	if e := env(t, build(t, "pam", a), "pam.pwquality.minlen"); e.Status != facts.StatusOK || e.Value != 14 {
+		t.Errorf("a directory drop-in: minlen %+v, want 14", e)
+	}
+}
+
+// Minor 4 (C3): when pwhistory.conf's first remember line does not convert,
+// the module keeps its default, and the file that decided that is cited at
+// that line beside the stack line.
+func TestPwhistoryUnconvertedRememberCitesTheFile(t *testing.T) {
+	a := ubuntuPAM()
+	a.files["/etc/pam.d/common-password"] = "pam/ubuntu/common-password-pwhistory"
+	a.contents = map[string][]byte{pwhistoryConf: []byte("# c\nremember = x\nremember = 5\n")}
+	e := env(t, build(t, "pam", a), "pam.password.remember")
+	if e.Status != facts.StatusOK || e.Value != 10 {
+		t.Fatalf("remember %+v, want the default 10", e)
+	}
+	var got []string
+	for _, in := range e.Source.Inputs {
+		got = append(got, in.Path+":"+strconv.Itoa(in.Line))
+	}
+	if !slices.Contains(got, pwhistoryConf+":2") {
+		t.Errorf("inputs %v, want %s:2 cited", got, pwhistoryConf)
+	}
+}

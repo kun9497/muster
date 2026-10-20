@@ -85,10 +85,28 @@ func scanUnsigned(s string, bits uint) (uint64, bool) {
 }
 
 // lineStop is the line at which a reader stops reading a file: its number and
-// its text after the comment is cut and the blanks trimmed.
+// its text after the comment is cut and the blanks trimmed, or, for a line
+// refused for its shape (too long, a NUL byte), Why says which instead.
 type lineStop struct {
 	Line int
 	Text string
+	Why  string
+}
+
+// pwqualityMaxLine is libpwquality's PWQSETTINGS_MAX_LINELEN: read_config_file
+// reads a line with fgets into a buffer one byte longer, so a line of this
+// many bytes or more before its "\n" fills the buffer without its newline,
+// and that chunk is PWQ_ERROR_CFGFILE_MALFORMED.
+const pwqualityMaxLine = 1023
+
+// pwqualityDropinName is libpwquality's filter_conf (settings.c), which
+// scandir applies to pwquality.conf.d: an entry is read when the FIRST
+// ".conf" in its name ends the name. A hidden name is read too ("." starts
+// no exclusion there); "a.conf.conf" is not. comp_func orders the survivors
+// with strcmp, which is the bytewise sort mergeDropinsWith already does.
+func pwqualityDropinName(base string) bool {
+	i := strings.Index(base, ".conf")
+	return i >= 0 && i+len(".conf") == len(base)
 }
 
 // pwqualityKind is how libpwquality's set_name_value treats a setting.
@@ -133,8 +151,21 @@ func pwqualityInt(v string) (int, bool) {
 // refuses stops the file: the lines before it stay applied, and the line is
 // returned so pwquality_read_config's caller can skip every later file. nil
 // means the whole file was read.
+//
+// A line fgets cannot hand over whole stops the file the same way (H-9,
+// PWQ_ERROR_CFGFILE_MALFORMED): one of pwqualityMaxLine bytes or more, and
+// one holding a NUL byte, which strlen cuts short of its newline. Any NUL is
+// taken as a stop — on a last line at EOF libpwquality would read the part
+// before it, so this is the conservative side. The caller reads the chain
+// with ReadFileBinary so the NUL reaches this test (chainReader.binary).
 func parsePwqualityInto(data []byte, kv map[string]string) *lineStop {
 	for i, raw := range confLines(data) {
+		if strings.IndexByte(raw, 0) >= 0 {
+			return &lineStop{Line: i + 1, Why: "NUL byte"}
+		}
+		if len(raw) >= pwqualityMaxLine {
+			return &lineStop{Line: i + 1, Why: "line longer than " + strconv.Itoa(pwqualityMaxLine) + " bytes"}
+		}
 		l, _, _ := strings.Cut(raw, "#")
 		l = trimCSpace(l)
 		if l == "" {
@@ -245,8 +276,11 @@ func (o *faillockOpts) set(name, value string) {
 		if name == "root_unlock_time" {
 			o.denyRoot = true
 		}
-		n, ok := uint64(0), name != "fail_interval" && value == "never"
-		if !ok {
+		var n uint64
+		var ok bool
+		if value == "never" && name != "fail_interval" {
+			n, ok = 0, true
+		} else {
 			n, ok = scanUnsigned(value, 32)
 			ok = ok && n <= faillockMaxTime
 		}
