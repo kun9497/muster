@@ -5,6 +5,7 @@ package pkgindex
 import (
 	"errors"
 	"io/fs"
+	"strings"
 
 	"github.com/kun9497/muster/internal/collect"
 	"github.com/kun9497/muster/internal/facts"
@@ -70,7 +71,7 @@ func (r *dpkgReader) read(p string, optional bool) ([]byte, bool) {
 			return nil, false
 		}
 		e := collect.FromReadError(err, meta)
-		e.Reason = p + ": " + e.Reason
+		e.Reason = p + ": " + strings.TrimPrefix(e.Reason, p+": ") // the primitive may already name the path (ErrBinary, ErrSymlink)
 		r.fail(e)
 		return nil, false
 	}
