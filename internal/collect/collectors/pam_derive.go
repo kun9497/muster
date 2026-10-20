@@ -121,8 +121,10 @@ func lineSource(l pamLine) facts.Source {
 }
 
 // pwqualityFacts derives pam.pwquality.* from passwd's password stack and
-// the conf files. Precedence: defaults, pwquality.conf, pwquality.conf.d
-// in name order, then the module arguments of the enabled line.
+// the conf files. Precedence is libpwquality's (pwquality_read_config, then
+// the module's own argument parsing): defaults, pwquality.conf.d in name
+// order, pwquality.conf LAST of the files, then the module arguments of the
+// enabled line.
 func pwqualityFacts(s pamStacks, a collect.Access) map[string]facts.Envelope {
 	out := map[string]facts.Envelope{}
 	pw := s.byName["passwd"]
@@ -172,12 +174,13 @@ func pwqualityFacts(s pamStacks, a collect.Access) map[string]facts.Envelope {
 		}
 	}
 	// pwquality.conf and its conf.d drop-ins resolve through the shared drop-in
-	// helper (M-14), with pwquality's own parser rather than systemd's (M-23):
-	// the main file first, then the directory in lexicographic order, the last
-	// file to set a key winning. The first file that exists but cannot be read
+	// helper (M-14), with pwquality's own parser rather than systemd's (M-23)
+	// and libpwquality's order rather than systemd's: the directory in
+	// lexicographic order first, then pwquality.conf, the last file to set a key
+	// winning — so the main file beats every drop-in. The first file that exists but cannot be read
 	// comes back as the error and poisons every value below (R148); a file that
 	// is simply not there is not one, and only the files actually read are cited.
-	kv, confInputs, err := mergeDropinsWith(a, pwqualityConf, []string{pwqualityConfDir}, "*.conf", parseKVInto)
+	kv, confInputs, err := mergeDropinsWith(a, pwqualityConf, []string{pwqualityConfDir}, "*.conf", parseKVInto, mainLast)
 	if err != nil {
 		e := dropinEnvelope(err)
 		readErr = &e

@@ -45,17 +45,30 @@ func dropinEnvelope(err error) facts.Envelope {
 // systemd does — it is stored as "", never dropped, so the reset survives
 // last-write-wins.
 func mergeDropins(a collect.Access, main string, dirs []string, glob string) (map[string]string, []facts.Source, error) {
-	return mergeDropinsWith(a, main, dirs, glob, parseDropin)
+	return mergeDropinsWith(a, main, dirs, glob, parseDropin, mainFirst)
 }
 
+// chainOrder says where a chain's main file is applied relative to its
+// drop-ins. systemd applies the main file first, so every drop-in overrides
+// it; libpwquality's pwquality_read_config reads "<cfgfile>.d/*.conf" first
+// and the main file LAST, so the main file overrides every drop-in.
+type chainOrder int
+
+const (
+	mainFirst chainOrder = iota // systemd: main, then the drop-ins
+	mainLast                    // libpwquality: the drop-ins, then main
+)
+
 // mergeDropinsWith merges a main configuration file with its drop-in
-// directories, exactly the way systemd itself resolves one, with the line
-// parser as a parameter so a chain whose file syntax is not systemd's resolves
-// through the same code (M-23: pwquality's conf files carry bare-word flags
-// such as enforce_for_root that parseDropin discards, so that caller passes
-// parseKVInto):
+// directories, the way systemd itself resolves one, with the line parser and
+// the main file's place as parameters so a chain whose file syntax or order is
+// not systemd's resolves through the same code (M-23: pwquality's conf files
+// carry bare-word flags such as enforce_for_root that parseDropin discards, so
+// that caller passes parseKVInto; and libpwquality reads its main file after
+// the drop-ins, so that caller passes mainLast):
 //
-//   - the main file is applied first — a main file that is not there is not
+//   - the main file is applied first (mainFirst, systemd) or after every
+//     drop-in (mainLast, libpwquality) — a main file that is not there is not
 //     an error, since the daemon's compiled-in defaults then apply;
 //   - dirs are given in DESCENDING precedence (/etc, /run, /usr/local/lib,
 //     /usr/lib): a file in an EARLIER directory SHADOWS a same-named file in
@@ -71,7 +84,7 @@ func mergeDropins(a collect.Access, main string, dirs []string, glob string) (ma
 //
 // The caller declares the main file and each dir's glob in its own
 // Declaration.Reads — this helper never widens the declaration.
-func mergeDropinsWith(a collect.Access, main string, dirs []string, glob string, parse func([]byte, map[string]string)) (map[string]string, []facts.Source, error) {
+func mergeDropinsWith(a collect.Access, main string, dirs []string, glob string, parse func([]byte, map[string]string), order chainOrder) (map[string]string, []facts.Source, error) {
 	values := map[string]string{}
 	var inputs []facts.Source
 	var readErr error
@@ -98,7 +111,9 @@ func mergeDropinsWith(a collect.Access, main string, dirs []string, glob string,
 		parse(data, values)
 		inputs = append(inputs, facts.Source{Kind: "file", Path: p})
 	}
-	read(main)
+	if order == mainFirst {
+		read(main)
+	}
 
 	// Shadowing: the first directory that offers a basename owns it.
 	chosen := map[string]string{}
@@ -123,6 +138,9 @@ func mergeDropinsWith(a collect.Access, main string, dirs []string, glob string,
 	slices.Sort(bases)
 	for _, base := range bases {
 		read(chosen[base])
+	}
+	if order == mainLast {
+		read(main)
 	}
 	return values, inputs, readErr
 }

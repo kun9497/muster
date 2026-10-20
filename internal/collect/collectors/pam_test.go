@@ -377,8 +377,9 @@ func TestPAMPwqualityStackedOnDebian(t *testing.T) {
 	}
 }
 
-// Module arguments override the conf files, and a conf.d drop-in
-// overrides pwquality.conf; a credit of -1 counts as a required class.
+// Module arguments override the conf files, and pwquality.conf overrides a
+// conf.d drop-in (libpwquality reads the drop-ins first and the main file
+// last); a credit of -1 counts as a required class.
 func TestPAMPwqualityPrecedence(t *testing.T) {
 	a := rockyPAM()
 	a.files["/etc/security/pwquality.conf"] = "pam/rocky/pwquality.conf"
@@ -395,8 +396,11 @@ func TestPAMPwqualityPrecedence(t *testing.T) {
 			t.Errorf("%s = %+v, want %v", k, e, want)
 		}
 	}
-	if e := env(t, b, "pam.pwquality.minlen"); len(e.Source.Inputs) != 3 || e.Source.Inputs[0].Path != "/etc/security/pwquality.conf" || e.Source.Inputs[1].Path != "/etc/security/pwquality.conf.d/90-local.conf" || e.Source.Inputs[2].Path != "/etc/authselect/system-auth" {
-		t.Errorf("inputs %+v", e.Source.Inputs)
+	// The inputs follow the apply order: the drop-in, the main file, the line.
+	if got := sourcePaths(t, env(t, b, "pam.pwquality.minlen")); !slices.Equal(got, []string{
+		"/etc/security/pwquality.conf.d/90-local.conf", "/etc/security/pwquality.conf", "/etc/authselect/system-auth",
+	}) {
+		t.Errorf("inputs %v", got)
 	}
 	if e := env(t, b, "pam.password.unix_hash"); e.Value != "sha512" {
 		t.Errorf("%+v", e)
@@ -404,13 +408,25 @@ func TestPAMPwqualityPrecedence(t *testing.T) {
 	if e := env(t, b, "pam.password.remember"); e.Value != 5 {
 		t.Errorf("%+v", e)
 	}
-	// Without the module argument the drop-in's 15 wins over the conf's 8.
+	// Without the module argument the conf's 8 wins over the drop-in's 15:
+	// libpwquality reads pwquality.conf after its drop-ins.
 	a = rockyPAM()
 	a.files["/etc/authselect/system-auth"] = "pam/rocky/authselect-password-auth"
 	a.files["/etc/security/pwquality.conf"] = "pam/rocky/pwquality.conf"
 	a.files["/etc/security/pwquality.conf.d/90-local.conf"] = "pam/rocky/90-local.conf"
-	if e := env(t, build(t, "pam", a), "pam.pwquality.minlen"); e.Value != 15 {
-		t.Errorf("drop-in must override the conf: %+v", e)
+	if e := env(t, build(t, "pam", a), "pam.pwquality.minlen"); e.Value != 8 {
+		t.Errorf("the conf must override the drop-in: %+v", e)
+	}
+	// The shape pwscore reproduced on EL9 and Ubuntu 22.04: a main file that
+	// weakens minlen to 6 beats a hardening drop-in's 14, so 6 is enforced.
+	a = rockyPAM()
+	a.files["/etc/authselect/system-auth"] = "pam/rocky/authselect-password-auth"
+	a.contents = map[string][]byte{
+		"/etc/security/pwquality.conf":                     []byte("minlen = 6\n"),
+		"/etc/security/pwquality.conf.d/99-hardening.conf": []byte("minlen = 14\n"),
+	}
+	if e := env(t, build(t, "pam", a), "pam.pwquality.minlen"); e.Status != facts.StatusOK || e.Value != 6 {
+		t.Errorf("main minlen=6 over a drop-in's 14 must read 6: %+v", e)
 	}
 	// A credit of -1 is a required class even when minclass is lower.
 	a = rockyPAM()
@@ -891,13 +907,13 @@ func TestPAMAccessFactsFollowTheStackStatus(t *testing.T) {
 }
 
 // M-14/M-23: pwquality's conf and its conf.d drop-ins merge through the SHARED
-// drop-in helper, so the chain resolves the way every other drop-in reader in
-// this collector resolves one — the main file first, then the directory in
-// lexicographic basename order, last write wins per key — with pwquality's own
+// drop-in helper in libpwquality's order (pwquality_read_config): the directory
+// in lexicographic basename order first, then the main file LAST, last write
+// wins per key — so pwquality.conf beats every drop-in — with pwquality's own
 // parser, in which a bare word is a flag (parseDropin would drop the line).
 // R148 still holds: the first file that exists but cannot be read is the answer
 // for every value the chain could set.
-func TestPwqualityDropinsMergeLikeSystemd(t *testing.T) {
+func TestPwqualityDropinsMergeLikeLibpwquality(t *testing.T) {
 	chain := func() *fsAccess {
 		a := rockyPAM()
 		// The stack without a minlen= argument, so the files decide (the module
@@ -912,22 +928,32 @@ func TestPwqualityDropinsMergeLikeSystemd(t *testing.T) {
 	for _, c := range []struct {
 		key  string
 		want int
-	}{{"minlen", 16}, {"minclass", 3}, {"ucredit", -1}, {"dcredit", 0}} {
+	}{{"minlen", 8}, {"minclass", 4}, {"ucredit", -1}, {"dcredit", 0}} {
+		// minlen: 10 then 16 from the drop-ins, then the main file's 8; minclass:
+		// 3 then the main file's 4; ucredit only in 10-a.
 		if e := env(t, b, "pam.pwquality."+c.key); e.Status != facts.StatusOK || e.Value != c.want {
-			t.Errorf("%s = %+v, want %d (the last file to set a key wins)", c.key, e, c.want)
+			t.Errorf("%s = %+v, want %d (the main file is read last and wins)", c.key, e, c.want)
 		}
+	}
+	// Between drop-ins the later basename still wins: without the main file's
+	// minlen, 20-b's 16 beats 10-a's 10.
+	ab := chain()
+	ab.files[pwqualityConf] = "pam/rocky/credits.conf" // no minlen
+	if e := env(t, build(t, "pam", ab), "pam.pwquality.minlen"); e.Status != facts.StatusOK || e.Value != 16 {
+		t.Errorf("minlen = %+v, want 20-b's 16 over 10-a's 10", e)
 	}
 	// M-23: a bare word is a flag in pwquality's syntax; a merge that used the
 	// systemd parser would drop the line and read the flag as unset.
 	if e := env(t, b, "pam.pwquality.enforce_for_root"); e.Status != facts.StatusOK || e.Value != true {
 		t.Errorf("a bare enforce_for_root line in a drop-in sets the flag: %+v", e)
 	}
-	// The inputs are the files actually read, in the order they were applied,
-	// then the stack line the module was loaded from.
+	// The inputs are the files actually read, in the order they were applied
+	// (the drop-ins, then the main file), then the stack line the module was
+	// loaded from.
 	wantInputs := []string{
-		pwqualityConf,
 		"/etc/security/pwquality.conf.d/10-a.conf",
 		"/etc/security/pwquality.conf.d/20-b.conf",
+		pwqualityConf,
 		"/etc/authselect/system-auth",
 	}
 	if got := sourcePaths(t, env(t, b, "pam.pwquality.minlen")); !slices.Equal(got, wantInputs) {
@@ -998,9 +1024,11 @@ func TestPwqualityUnparseableIntegerIsAbsent(t *testing.T) {
 	chain := func(bad string) *fsAccess {
 		a := rockyPAM()
 		a.files["/etc/authselect/system-auth"] = "pam/rocky/authselect-password-auth"
-		a.files[pwqualityConf] = "pam/rocky/pwquality.conf"                                // minlen 8, minclass 4, dcredit 0
-		a.files["/etc/security/pwquality.conf.d/10-a.conf"] = "pam/rocky/dropin-10-a.conf" // minlen 10, minclass 3, ucredit -1
-		a.files["/etc/security/pwquality.conf.d/30-bad.conf"] = bad
+		a.files["/etc/security/pwquality.conf.d/05-base.conf"] = "pam/rocky/pwquality.conf" // minlen 8, minclass 4, dcredit 0
+		a.files["/etc/security/pwquality.conf.d/10-a.conf"] = "pam/rocky/dropin-10-a.conf"  // minlen 10, minclass 3, ucredit -1
+		// The main file is read last (libpwquality's order), so the bad value
+		// sits there to be the last word.
+		a.files[pwqualityConf] = bad
 		return a
 	}
 	// minlen = wat, last in the chain, over two files that set it to a number.
