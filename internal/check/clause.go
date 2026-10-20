@@ -106,6 +106,11 @@ func (e *env) evalSetting(cl controls.Clause, r facts.Resolved, expected any) cl
 		if env.Status != facts.StatusOK {
 			return false, Evidence{Fact: cl.Fact, Status: env.Status, Side: name, Source: env.Source}, fmt.Errorf("fact %s side %s has status %s", cl.Fact, name, env.Status)
 		}
+		if env.Truncated {
+			// H-15 backstop: worstStatus screens a truncated side or
+			// persona with its own code first; a clause never holds on one.
+			return false, Evidence{Fact: cl.Fact, Status: env.Status, Side: name, Source: env.Source}, fmt.Errorf("fact %s side %s was truncated at the read limit", cl.Fact, name)
+		}
 		ok, err := compare(cl.Op, env.Value, expected, r.Entry.Type)
 		if err != nil {
 			// I3: an ERROR(internal_error) must name the key it came from,

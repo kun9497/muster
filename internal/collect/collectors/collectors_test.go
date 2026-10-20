@@ -586,6 +586,51 @@ func TestSshdOnePersonaFailureLeavesFlagFalse(t *testing.T) {
 	}
 }
 
+// H-15 (f10): a persona dump cut at the output cap is an incomplete answer,
+// not a "no override" one: an override is recorded only when it differs from
+// the global value, so a lost PermitRootLogin line would read as no override.
+// The personas are then not collected, and every persona clause degrades.
+func TestSshdTruncatedPersonaOutputIsNotCollected(t *testing.T) {
+	const rootCmd = "/usr/sbin/sshd -T -C user=root,host=localhost,addr=127.0.0.1,lport=22"
+	for _, tc := range []struct {
+		name      string
+		root      cmdResult
+		collected bool
+		override  any
+	}{
+		{"truncated with the keyword", cmdResult{stdout: []byte("maxauthtries 6\npermitrootlogin no\n"), truncated: true}, false, nil},
+		{"truncated without the keyword", cmdResult{stdout: []byte("maxauthtries 6\n"), truncated: true}, false, nil},
+		// The normal condition: a whole dump records the override.
+		{"whole", cmdResult{stdout: []byte("maxauthtries 6\npermitrootlogin no\n")}, true, "no"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			a := &fsAccess{
+				files: map[string]string{"/etc/ssh/sshd_config": "sshd_config"},
+				cmds: map[string]cmdResult{
+					"/usr/sbin/sshd -G": {exitCode: 1, stderr: "unknown option\n"},
+					"/usr/sbin/sshd -T": {stdout: []byte("maxauthtries 6\npermitrootlogin yes\n")},
+					"/usr/sbin/sshd -V": {stderr: "OpenSSH_8.9p1\n", exitCode: 1},
+					rootCmd:             tc.root,
+					"/usr/sbin/sshd -T -C user=nobody,host=localhost,addr=127.0.0.1,lport=22":         {stdout: []byte("maxauthtries 6\npermitrootlogin yes\n")},
+					"/usr/sbin/sshd -T -C user=muster-nx-user,host=localhost,addr=127.0.0.1,lport=22": {stdout: []byte("maxauthtries 6\npermitrootlogin yes\n")},
+				},
+			}
+			b := build(t, "sshd", a)
+			if got := env(t, b, "sshd.personas_collected").Value; got != tc.collected {
+				t.Errorf("personas_collected %v, want %v", got, tc.collected)
+			}
+			s := setting(t, b, "sshd.options.permit_root_login")
+			if tc.override == nil {
+				if s.Personas != nil {
+					t.Errorf("personas %+v, want none recorded", s.Personas)
+				}
+			} else if s.Personas == nil || s.Personas["root"] == nil || s.Personas["root"].Value != tc.override {
+				t.Errorf("personas %+v, want root %v", s.Personas, tc.override)
+			}
+		})
+	}
+}
+
 // Parse fallback: no daemon output at all. Options come from the files, the
 // method is "parse", personas are not collected, version is absent.
 func TestSshdParseFallbackFillsEveryOption(t *testing.T) {

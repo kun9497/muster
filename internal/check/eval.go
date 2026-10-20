@@ -419,6 +419,22 @@ func (e *env) worstStatus(cls []controls.Clause) screening {
 			}
 			continue
 		}
+		// H-15: a persona clause is decided by the override envelope when
+		// the daemon reported one (evalSetting), so that envelope is
+		// screened by the same rules as a side: denied/timeout/error keep
+		// their code, ok-but-truncated is Truncated. The collector never
+		// writes an absent or unsupported override; one is an internal
+		// error, not a silent FAIL. The global side is screened after.
+		if cl.Persona != "" && e.personas && res.Setting.Personas != nil {
+			if pv := res.Setting.Personas[cl.Persona]; pv != nil {
+				name := cl.Fact + " persona " + cl.Persona
+				if s, hard := screenEnvelope(name, pv); hard {
+					return s
+				} else if s.status != "" {
+					return screening{hard: true, code: InternalError, reason: fmt.Sprintf("%s: persona override with status %s", name, pv.Status)}
+				}
+			}
+		}
 		on := cl.On
 		if on == "" {
 			on = res.Entry.DefaultOn
