@@ -2704,7 +2704,7 @@
     {
       "Key": "pam.umask_module.enabled",
       "Type": "bool",
-      "Description": "pam_umask.so is in the session stack of login (else sshd, else other), which applies a umask where /etc/profile never runs.",
+      "Description": "pam_umask.so is in the session stack of every existing login-facing service (login, sshd; other when neither exists), which applies a umask where /etc/profile never runs; a false names each service that lacks it.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "pam",
@@ -2714,7 +2714,7 @@
     {
       "Key": "pam.umask_module.args",
       "Type": "list\u003cstring\u003e",
-      "Description": "The arguments of the first pam_umask.so session line; absent when the module is not stacked.",
+      "Description": "The arguments of the first pam_umask.so session line of the first service judged (login, else sshd, else other); absent when the module is not stacked.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "pam",

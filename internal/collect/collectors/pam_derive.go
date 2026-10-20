@@ -635,31 +635,55 @@ func suFacts(s pamStacks) map[string]facts.Envelope {
 	return out
 }
 
-// umaskFacts derives pam.umask_module.* from the first existing service
-// among login, sshd and other.
+// umaskFacts derives pam.umask_module.* . A session runs only its own
+// service's stack - a non-login SSH session never reaches login's - so the
+// module counts as enabled only when every existing login-facing service
+// (login, sshd) stacks it in its session phase; other stands in only when
+// neither exists. The evidence is each service's first pam_umask.so line,
+// args are the first service's line, and a false names every service that
+// lacks the module.
 func umaskFacts(s pamStacks) map[string]facts.Envelope {
 	out := map[string]facts.Envelope{}
-	for _, svc := range []string{"login", "sshd", "other"} {
-		if !s.has(svc) {
-			continue
+	var services []string
+	for _, svc := range faillockServices {
+		if s.has(svc) {
+			services = append(services, svc)
 		}
-		lines := linesOf(s.byName[svc], "session", "pam_umask.so")
-		if len(lines) == 0 {
-			e := collect.OK(false, pamSource(s.x))
-			e.Reason = "no pam_umask.so line in " + svc + "'s session stack"
-			out["pam.umask_module.enabled"] = e
-			out["pam.umask_module.args"] = collect.Absent("pam_umask.so is not stacked")
-			return out
-		}
-		src := func() *facts.Source {
-			return &facts.Source{Kind: "derived", Inputs: []facts.Source{lineSource(lines[0])}}
-		}
-		out["pam.umask_module.enabled"] = collect.OK(true, src())
-		out["pam.umask_module.args"] = collect.OK(argsList(lines[0].Args), src())
+	}
+	if len(services) == 0 && s.has("other") {
+		services = []string{"other"}
+	}
+	if len(services) == 0 {
+		out["pam.umask_module.enabled"] = collect.Absent("no login, sshd or other PAM service file")
+		out["pam.umask_module.args"] = collect.Absent("no login, sshd or other PAM service file")
 		return out
 	}
-	out["pam.umask_module.enabled"] = collect.Absent("no login, sshd or other PAM service file")
-	out["pam.umask_module.args"] = collect.Absent("no login, sshd or other PAM service file")
+	var first []pamLine
+	var lacking []string
+	for _, svc := range services {
+		lines := linesOf(s.byName[svc], "session", "pam_umask.so")
+		if len(lines) == 0 {
+			lacking = append(lacking, svc+"'s")
+			continue
+		}
+		first = append(first, lines[0])
+	}
+	if len(lacking) > 0 {
+		e := collect.OK(false, pamSource(s.x))
+		e.Reason = "no pam_umask.so line in " + strings.Join(lacking, " or ") + " session stack"
+		out["pam.umask_module.enabled"] = e
+		out["pam.umask_module.args"] = collect.Absent("pam_umask.so is not stacked")
+		return out
+	}
+	var inputs []facts.Source
+	for _, l := range first {
+		if ls := lineSource(l); !slices.ContainsFunc(inputs, func(in facts.Source) bool { return in.Path == ls.Path && in.Line == ls.Line }) {
+			inputs = append(inputs, ls)
+		}
+	}
+	src := func() *facts.Source { return &facts.Source{Kind: "derived", Inputs: slices.Clone(inputs)} }
+	out["pam.umask_module.enabled"] = collect.OK(true, src())
+	out["pam.umask_module.args"] = collect.OK(argsList(first[0].Args), &facts.Source{Kind: "derived", Inputs: []facts.Source{lineSource(first[0])}})
 	return out
 }
 

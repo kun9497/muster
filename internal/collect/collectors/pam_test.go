@@ -1079,6 +1079,50 @@ func TestPAMUmaskAndSecuretty(t *testing.T) {
 	}
 }
 
+// pam_umask must be stacked in every login-facing service that exists: a
+// non-login SSH session runs sshd's session stack only, so login's line does
+// not cover it.
+func TestPAMUmaskEveryLoginFacingService(t *testing.T) {
+	a := rockyPAM()
+	a.files["/etc/pam.d/sshd"] = "pam/rocky/sshd-nopostlogin"
+	b := build(t, "pam", a)
+	e := env(t, b, "pam.umask_module.enabled")
+	if e.Status != facts.StatusOK || e.Value != false || e.Reason != "no pam_umask.so line in sshd's session stack" {
+		t.Errorf("login stacks pam_umask, sshd does not: %+v", e)
+	}
+	if e := env(t, b, "pam.umask_module.args"); e.Status != facts.StatusAbsent {
+		t.Errorf("%+v", e)
+	}
+	// Both services stack it: enabled, citing each service's line.
+	a = ubuntuPAM()
+	a.files["/etc/pam.d/sshd"] = "pam/ubuntu/sshd-faillock"
+	b = build(t, "pam", a)
+	e = env(t, b, "pam.umask_module.enabled")
+	if e.Value != true {
+		t.Fatalf("%+v", e)
+	}
+	if got := sourcePaths(t, e); !slices.Equal(got, []string{"/etc/pam.d/common-session"}) {
+		t.Errorf("one shared line is cited once: %v", got)
+	}
+	// sshd stacks its own line ahead of common-session's: both are cited,
+	// login's first, and args stay login's.
+	a.files["/etc/pam.d/sshd"] = "pam/ubuntu/sshd-umask"
+	b = build(t, "pam", a)
+	e = env(t, b, "pam.umask_module.enabled")
+	if e.Value != true || len(e.Source.Inputs) != 2 || e.Source.Inputs[0].Path != "/etc/pam.d/common-session" ||
+		e.Source.Inputs[1].Path != "/etc/pam.d/sshd" || e.Source.Inputs[1].Line != 4 {
+		t.Errorf("each service's line is cited: %+v", e.Source)
+	}
+	if l := env(t, b, "pam.umask_module.args").Value.([]any); len(l) != 0 {
+		t.Errorf("args are login's line's: %v", l)
+	}
+	// rocky: both services reach postlogin's one line.
+	b = build(t, "pam", rockyPAM())
+	if got := sourcePaths(t, env(t, b, "pam.umask_module.enabled")); !slices.Equal(got, []string{"/etc/pam.d/postlogin"}) {
+		t.Errorf("inputs %v", got)
+	}
+}
+
 func TestPAMAccessFactsFollowTheStackStatus(t *testing.T) {
 	a := rockyPAM()
 	delete(a.files, "/etc/authselect/system-auth")

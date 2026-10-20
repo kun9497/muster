@@ -1,0 +1,5 @@
+{"synthetic": true, "_expect":{"status":"FAIL"}, "schema_version":1,"run":{},"facts":{
+  "accounts":{"login_defs":{"umask":{"status":"ok","value":"022"}}},
+  "pam":{"umask_module":{
+    "enabled":{"status":"ok","value":false,"reason":"no pam_umask.so line in sshd's session stack"},
+    "args":{"status":"absent","reason":"pam_umask.so is not stacked"}}}}}
