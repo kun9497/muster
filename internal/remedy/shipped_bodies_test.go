@@ -913,6 +913,112 @@ func TestPasswordPolicyBodyRewritesItsOwnLine(t *testing.T) {
 	}
 }
 
+// pwPolicyBody runs password_policy's body over a tree whose login.defs
+// already passes, with pwquality.conf and the given drop-ins, and returns the
+// tree's root and the environment the validate needs.
+func pwPolicyBody(t *testing.T, main string, dropins map[string]string) (root string, env []string) {
+	t.Helper()
+	c := shippedControl(t, "muster.account.password_policy")
+	root, bin, stub := accountTree(t)
+	writeUnder(t, root, "/etc/login.defs", "PASS_MAX_DAYS 60\nPASS_MIN_DAYS 2\nPASS_MIN_LEN 12\n")
+	if main != "" {
+		writeUnder(t, root, "/etc/security/pwquality.conf", main)
+	}
+	for n, s := range dropins {
+		writeUnder(t, root, "/etc/security/pwquality.conf.d/"+n, s)
+	}
+	writeUnder(t, root, "/etc/passwd", "")
+	writeUnder(t, root, "/etc/shadow", "")
+	env = append(pEnv(t, c), "MB="+t.TempDir(), "STUB="+stub, "ROOT="+root)
+	body := "umask 077\nlog() { printf 'muster-fix: %s\\n' \"$*\"; }\n" + rebaseAccounts(c.Remediation.Script, root)
+	if out, code := runBody(t, root, bin, body, env...); code != 0 {
+		t.Fatalf("body %d: %s", code, out)
+	}
+	if out, code := runBody(t, root, bin, rebaseAccounts(c.Remediation.Validate, root), env...); code != 0 {
+		t.Errorf("validate %d after the body: %s", code, out)
+	}
+	return root, env
+}
+
+// f3: libpwquality reads pwquality.conf.d/*.conf first and pwquality.conf
+// LAST, so a key the main file sets is rewritten there — every uncommented
+// line that sets it, its key matched case-blind as the collector reads it —
+// and a key it does not set goes to 99-muster.conf. A drop-in muster wrote
+// would lose to the main file's value; the validate reads the same order.
+func TestPasswordPolicyBodyRewritesTheMainFile(t *testing.T) {
+	needSh(t)
+	// main 6 alone: the main file is rewritten, minclass (unset there) goes to
+	// the drop-in.
+	const main = "# site\n# minlen = 4\nMinLen = 6\nminlen=7\ndictcheck = 1\n"
+	root, _ := pwPolicyBody(t, main, nil)
+	if got := readFile(t, filepath.Join(root, "/etc/security/pwquality.conf")); got != "# site\n# minlen = 4\nminlen = 8\nminlen = 8\ndictcheck = 1\n" {
+		t.Errorf("pwquality.conf %q", got)
+	}
+	if got := readFile(t, filepath.Join(root, "/etc/security/pwquality.conf.d/99-muster.conf")); got != "minclass = 3\n" {
+		t.Errorf("99-muster.conf %q, want only the minclass the main file does not set", got)
+	}
+	// main 6 over an earlier run's drop-in at 14: libpwquality enforces 6, so
+	// the main file is rewritten and the old drop-in left as it was.
+	root, _ = pwPolicyBody(t, "minlen = 6\nminclass = 3\n", map[string]string{"99-muster.conf": "minlen = 14\n"})
+	if got := readFile(t, filepath.Join(root, "/etc/security/pwquality.conf")); got != "minlen = 8\nminclass = 3\n" {
+		t.Errorf("pwquality.conf %q, want the main file's minlen rewritten", got)
+	}
+	if got := readFile(t, filepath.Join(root, "/etc/security/pwquality.conf.d/99-muster.conf")); got != "minlen = 14\n" {
+		t.Errorf("99-muster.conf %q, want it unchanged", got)
+	}
+}
+
+// f3: the validate fails when only a drop-in holds the value the main file
+// overrides — the shape the old order certified as repaired.
+func TestPasswordPolicyValidateReadsTheMainFileLast(t *testing.T) {
+	needSh(t)
+	c := shippedControl(t, "muster.account.password_policy")
+	root, bin, stub := accountTree(t)
+	writeUnder(t, root, "/etc/login.defs", "PASS_MAX_DAYS 60\nPASS_MIN_DAYS 2\nPASS_MIN_LEN 12\n")
+	writeUnder(t, root, "/etc/security/pwquality.conf", "minlen = 6\n")
+	writeUnder(t, root, "/etc/security/pwquality.conf.d/99-muster.conf", "minlen = 14\nminclass = 3\n")
+	env := append(pEnv(t, c), "MB="+t.TempDir(), "STUB="+stub, "ROOT="+root)
+	if out, code := runBody(t, root, bin, rebaseAccounts(c.Remediation.Validate, root), env...); code == 0 {
+		t.Errorf("validate passed over a main file's minlen 6 that libpwquality reads last: %s", out)
+	}
+	// The same values with the main file stricter pass.
+	writeUnder(t, root, "/etc/security/pwquality.conf", "minlen = 14\n")
+	writeUnder(t, root, "/etc/security/pwquality.conf.d/99-muster.conf", "minlen = 6\nminclass = 3\n")
+	if out, code := runBody(t, root, bin, rebaseAccounts(c.Remediation.Validate, root), env...); code != 0 {
+		t.Errorf("validate %d over a main file's minlen 14: %s", code, out)
+	}
+}
+
+// f3: pwquality.conf is in the block's backup, so a failed validate puts it
+// back byte for byte after the body rewrote it in place.
+func TestPasswordPolicyRollbackRestoresTheMainFile(t *testing.T) {
+	needSh(t)
+	root, bin, stub := accountTree(t)
+	const main = "# site\nMinLen = 6\n\tminclass=1  \n"
+	writeUnder(t, root, "/etc/login.defs", "PASS_MAX_DAYS 60\nPASS_MIN_DAYS 2\nPASS_MIN_LEN 12\n")
+	writeUnder(t, root, "/etc/security/pwquality.conf", main)
+	writeUnder(t, root, "/etc/passwd", "")
+	writeUnder(t, root, "/etc/shadow", "")
+	pc := filepath.Join(root, "/etc/security/pwquality.conf")
+	if err := os.Chmod(pc, 0o640); err != nil {
+		t.Fatal(err)
+	}
+	p := accountBlock(t, "muster.account.password_policy", root, true)
+	out, _, code := runScriptWith(t, p, root, filepath.Join(root, "bk"), runOpts{pathPrefix: bin, env: []string{"STUB=" + stub, "ROOT=" + root}})
+	if code != 1 || !strings.Contains(out, "validate failed") {
+		t.Fatalf("exit %d, want 1 after a failed validate\n%s", code, out)
+	}
+	if strings.Contains(out, "ROLLBACK INCOMPLETE") || strings.Contains(out, "rollback failed") {
+		t.Errorf("the way back was incomplete\n%s", out)
+	}
+	if got := readFile(t, pc); got != main {
+		t.Errorf("pwquality.conf is %q after the block, want %q", got, main)
+	}
+	if m := mode(t, pc); m != "640" {
+		t.Errorf("pwquality.conf mode %s after the block, want 640", m)
+	}
+}
+
 func TestLineBodiesTightenOnly(t *testing.T) {
 	needSh(t)
 	for _, c := range []struct {
@@ -1088,6 +1194,9 @@ func TestAccountBodiesLeaveASymlinkedDropIn(t *testing.T) {
 		{"muster.account.session_timeout", "/etc/ssh/sshd_config.d/00-muster-session.conf", "is a symlink (a mask), left as is"},
 		// K2: login.defs is written only when it is no symlink
 		{"muster.account.password_policy", "/etc/login.defs", "is a symlink, left as is"},
+		// f3: pwquality.conf is rewritten in place when it sets a key, so a
+		// symlinked one is refused like login.defs (K2)
+		{"muster.account.password_policy", "/etc/security/pwquality.conf", "is a symlink, left as is"},
 		{"muster.account.umask_policy", "/etc/login.defs", "is a symlink, left as is"},
 		// O-11: faillock.conf and securetty are vendor files (K2); 00-muster.conf
 		// is muster's own drop-in (S-27)

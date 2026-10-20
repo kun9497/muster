@@ -22,14 +22,17 @@ done
 modprobe --ignore-install udf
 systemctl is-active --quiet auditd || systemctl start auditd
 # 3D-2d: the first run keeps the pristine auditd.conf and /etc/default/useradd
-# where no body writes; every run puts them back before seeding again.
+# where no body writes; every run puts them back before seeding again. The same
+# for pwquality.conf, which password_policy rewrites in place when it sets a key.
 s=/var/lib/muster-ci
 mkdir -p "$s"
 [ -e "$s/auditd.conf" ] || cp -p /etc/audit/auditd.conf "$s/auditd.conf"
+[ -e "$s/pwquality.conf" ] || cp -p /etc/security/pwquality.conf "$s/pwquality.conf"
 if [ ! -e "$s/useradd" ] && [ ! -e "$s/useradd.absent" ]; then
   if [ -e /etc/default/useradd ]; then cp -p /etc/default/useradd "$s/useradd"; else : > "$s/useradd.absent"; fi
 fi
 cp -p "$s/auditd.conf" /etc/audit/auditd.conf
+cp -p "$s/pwquality.conf" /etc/security/pwquality.conf
 if [ -e "$s/useradd.absent" ]; then rm -f /etc/default/useradd; else cp -p "$s/useradd" /etc/default/useradd; fi
 # audit_rules_loaded: the stock set loaded (its -D leaves the kernel list
 # empty), then a backlog limit no persisted file carries, so only the
