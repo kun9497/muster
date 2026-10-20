@@ -18,8 +18,39 @@ applies_when:
 checks:
   - { fact: mail.expn_vrfy_restricted, op: eq, expected: true }
 remediation:
-  text_en: Set disable_vrfy_command = yes in postfix's main.cf, or add novrfy and noexpn to the PrivacyOptions line of sendmail.cf, then restart the mail transfer agent.
-  text_ko: postfix 는 main.cf 에 disable_vrfy_command = yes 를 설정하고, sendmail 은 sendmail.cf 의 PrivacyOptions 줄에 novrfy 와 noexpn 을 추가한 뒤 메일 서버를 재시작합니다.
+  text_en: 'Set disable_vrfy_command = yes in postfix''s main.cf, or add novrfy and noexpn to the PrivacyOptions line of sendmail.cf, then restart the mail transfer agent. The review script acts on postfix only: it backs up /etc/postfix/main.cf, refuses a symlinked main.cf and a configuration postfix check already rejects, and, where postconf does not read disable_vrfy_command as yes, sets it with postconf -e, runs postfix check again and, when postfix was running, postfix reload; the reload also applies any master.cf edit still pending. A host without postconf is left as it is: the sendmail half stays the operator''s. On the EL family main.cf is a package configuration file: at the next upgrade rpm keeps the edit and writes the package''s version beside it as .rpmnew; on Debian and Ubuntu it is not a dpkg conffile.'
+  text_ko: 'postfix 는 main.cf 에 disable_vrfy_command = yes 를 설정하고, sendmail 은 sendmail.cf 의 PrivacyOptions 줄에 novrfy 와 noexpn 을 추가한 뒤 메일 서버를 재시작합니다. 검토 스크립트는 postfix 만 다룹니다. /etc/postfix/main.cf 를 백업하고, main.cf 가 심볼릭 링크이거나 postfix check 가 이미 거부하는 설정이면 거부하며, postconf 가 disable_vrfy_command 를 yes 로 읽지 않으면 postconf -e 로 설정한 뒤 postfix check 를 다시 실행하고, postfix 가 실행 중이었으면 postfix reload 를 실행합니다. 이 reload 는 아직 반영되지 않은 master.cf 수정도 함께 적용합니다. postconf 가 없는 호스트는 그대로 두며, sendmail 쪽은 운영자가 정리합니다. EL 계열에서 main.cf 는 패키지 설정 파일이므로 다음 업그레이드 때 rpm 은 수정본을 유지한 채 패키지의 버전을 옆에 .rpmnew 로 쓰고, Debian 과 Ubuntu 에서는 dpkg conffile 이 아닙니다.'
   risk: restart_service
   idempotent: true
+  backup: [/etc/postfix/main.cf]
+  script: |
+    rm -f "$MB/postfix.was-running" "$MB/postfix.edited"
+    if ! command -v postconf >/dev/null 2>&1; then
+      log "muster.service.mail_expn_vrfy: postconf is missing; the sendmail half is the operator's"
+      exit 0
+    fi
+    if [ -L /etc/postfix/main.cf ]; then log "muster.service.mail_expn_vrfy: /etc/postfix/main.cf is a symlink, left as is"; exit 1; fi
+    if ! postfix check; then log "muster.service.mail_expn_vrfy: postfix check fails before any change; refused"; exit 1; fi
+    if postfix status >/dev/null 2>&1; then : > "$MB/postfix.was-running"; fi
+    rd_vrfy() { LC_ALL=C postconf -c "$1" -h disable_vrfy_command; }
+    case "$(rd_vrfy /etc/postfix)" in
+      [Yy][Ee][Ss]) ;;
+      *)
+        : > "$MB/postfix.edited"
+        f=/etc/postfix/main.cf
+        if [ -s "$f" ] && [ -n "$(tail -c1 "$f")" ]; then echo >> "$f"; fi
+        postconf -c /etc/postfix -e 'disable_vrfy_command = yes'
+        if command -v selinuxenabled >/dev/null 2>&1 && selinuxenabled && command -v restorecon >/dev/null 2>&1; then restorecon -- "$f"; fi
+        postfix check
+        if [ -f "$MB/postfix.was-running" ]; then postfix reload; fi
+        ;;
+    esac
+  validate: |
+    if command -v postconf >/dev/null 2>&1; then case "$(LC_ALL=C postconf -c /etc/postfix -h disable_vrfy_command)" in [Yy][Ee][Ss]) postfix check ;; *) false ;; esac; fi
+  rollback: |
+    restore /etc/postfix/main.cf
+    if [ -f "$MB/postfix.edited" ]; then
+      postfix check
+      if [ -f "$MB/postfix.was-running" ]; then postfix reload; fi
+    fi
 decision: D09

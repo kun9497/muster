@@ -1560,12 +1560,24 @@ func (p *ftpParse) setBanner(b *collect.Builder, source, text, discloses facts.E
 	b.Set("ftp.banner_discloses_version", discloses)
 }
 
-// publishVsftpdBanner follows vsftpd's own precedence: ftpd_banner wins over
-// banner_file, and neither set means the compiled greeting. That greeting's
-// text is NOT invented here — the source says "default", the text is empty
-// with a reason naming the product, and the disclosure verdict is true
-// because every build's compiled greeting names vsftpd.
+// publishVsftpdBanner follows vsftpd's own precedence. vsftpd.conf(5) says
+// banner_file "overrides the banner string provided by the ftpd_banner
+// option", so a set banner_file is read first; every way that read can fail
+// (undeclared, non-regular, unreadable, cut at the cap, oversized) keeps its
+// envelope even when ftpd_banner is set, because what vsftpd sends then is
+// the file nobody opened. vsftpd falls back to ftpd_banner only when the
+// file it read is empty (zero bytes; a lone newline is a greeting), and the
+// probe saw exactly that on the wire (O-59). Neither key yielding a greeting
+// means the compiled one. That greeting's text is NOT invented here — the
+// source says "default", the text is empty with a reason naming the
+// product, and the disclosure verdict is true because every build's
+// compiled greeting names vsftpd.
 func (p *ftpParse) publishVsftpdBanner(b *collect.Builder, src *facts.Source) {
+	if file := strings.TrimSpace(p.vsftpd["banner_file"]); file != "" {
+		if p.publishVsftpdBannerFile(b, src, file) {
+			return
+		}
+	}
 	if v := strings.TrimSpace(p.vsftpd["ftpd_banner"]); v != "" {
 		source := collect.OK("ftpd_banner", src)
 		if oversized(v) {
@@ -1576,21 +1588,24 @@ func (p *ftpParse) publishVsftpdBanner(b *collect.Builder, src *facts.Source) {
 		p.setBanner(b, source, collect.OK(v, src), collect.OK(ftpProductRe.MatchString(v), src))
 		return
 	}
-	file := strings.TrimSpace(p.vsftpd["banner_file"])
-	if file == "" {
-		text := collect.OK("", src)
-		text.Reason = "neither ftpd_banner nor banner_file is set, so vsftpd serves its compiled greeting; this collector does not invent that text"
-		discloses := collect.OK(true, src)
-		discloses.Reason = "vsftpd's compiled greeting names the product"
-		p.setBanner(b, collect.OK("default", src), text, discloses)
-		return
-	}
+	text := collect.OK("", src)
+	text.Reason = "neither ftpd_banner nor a non-empty banner_file is set, so vsftpd serves its compiled greeting; this collector does not invent that text"
+	discloses := collect.OK(true, src)
+	discloses.Reason = "vsftpd's compiled greeting names the product"
+	p.setBanner(b, collect.OK("default", src), text, discloses)
+}
+
+// publishVsftpdBannerFile publishes the greeting banner_file names and
+// reports whether it did. It returns false only for a file read whole that
+// holds no bytes, which vsftpd skips for ftpd_banner or its compiled
+// greeting.
+func (p *ftpParse) publishVsftpdBannerFile(b *collect.Builder, src *facts.Source, file string) bool {
 	source := collect.OK("banner_file", src)
 	clean := path.Clean(file)
 	if !declared(p.a, clean) {
 		e := collect.Absent("banner_file " + clean + " is outside this collector's declaration and was not read")
 		p.setBanner(b, source, e, e)
-		return
+		return true
 	}
 	data, meta, err := p.a.ReadFile(clean, readLimit)
 	switch {
@@ -1610,16 +1625,20 @@ func (p *ftpParse) publishVsftpdBanner(b *collect.Builder, src *facts.Source) {
 	case meta.Truncated:
 		e := collect.Absent(clean + " was cut at the read limit; what is past the cap cannot be judged")
 		p.setBanner(b, source, e, e)
+	case len(data) == 0 && !meta.Binary:
+		// An empty banner file: vsftpd sends the next greeting in its order.
+		return false
 	default:
 		text := strings.TrimRight(string(data), "\n")
 		if oversized(text) {
 			e := collect.Absent(clean + " is longer than this collector stores")
 			p.setBanner(b, source, e, e)
-			return
+			return true
 		}
 		fsrc := &facts.Source{Kind: "file", Path: clean}
 		p.setBanner(b, source, collect.OK(text, fsrc), collect.OK(ftpProductRe.MatchString(text), fsrc))
 	}
+	return true
 }
 
 // publishProftpdBanner reads ServerIdent, whose argument is on or off and,

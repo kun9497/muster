@@ -24,9 +24,17 @@
   images: [almalinux9-init, debian12-init, rocky9-init, ubuntu2204]
 - id: muster.account.umask_policy
   images: [almalinux9-init, rocky9-init, runner, ubuntu2204]
+- id: muster.beyond.account_inactivity_lock
+  images: [runner]
 - id: muster.beyond.aslr_and_link_protection
   images: [runner]
+- id: muster.beyond.audit_disk_actions
+  images: [runner]
 - id: muster.beyond.audit_log_permissions
+  images: [runner]
+- id: muster.beyond.audit_rules_loaded
+  images: [runner]
+- id: muster.beyond.auditd_active
   images: [runner]
 - id: muster.beyond.bootloader_config_permissions
   images: [runner]
@@ -74,7 +82,7 @@
 - id: muster.beyond.unprivileged_bpf_restricted
   images: [runner]
 - id: muster.beyond.usb_storage_disabled
-  unproven: "the runner kernel does not ship usb-storage"
+  unproven: "the runner kernel ships usb-storage on some runner VMs and not on others, so no row plans it reliably"
 - id: muster.file.hosts_lpd_permissions
   images: [almalinux9-init, debian12-init, rocky9-init, ubuntu2204]
 - id: muster.file.hosts_permissions
@@ -84,6 +92,8 @@
 - id: muster.file.log_dir_permissions
   images: [almalinux9-init, debian12-init, rocky9-init, ubuntu2204]
 - id: muster.file.passwd_permissions
+  images: [almalinux9-init, debian12-init, rocky9-init, ubuntu2204]
+- id: muster.file.rhosts_forbidden
   images: [almalinux9-init, debian12-init, rocky9-init, ubuntu2204]
 - id: muster.file.services_permissions
   images: [almalinux9-init, debian12-init, rocky9-init, ubuntu2204]
@@ -97,7 +107,13 @@
   unproven: no systemd unit on Debian (echo, discard, daytime and chargen ship only for inetd) and no package in the EL9 images' enabled repositories
 - id: muster.service.finger_disabled
   unproven: no systemd unit on Debian (fingerd ships only for inetd) and no package in the EL9 images' enabled repositories
+- id: muster.service.ftp_anonymous
+  images: [almalinux9-init, debian12-init, rocky9-init]
+- id: muster.service.ftp_banner
+  images: [almalinux9-init, debian12-init, rocky9-init]
 - id: muster.service.ftpusers_permissions
+  images: [almalinux9-init, debian12-init, rocky9-init]
+- id: muster.service.mail_expn_vrfy
   images: [almalinux9-init, debian12-init, rocky9-init]
 - id: muster.service.nfs_export_access
   images: [almalinux9-init, debian12-init, rocky9-init]

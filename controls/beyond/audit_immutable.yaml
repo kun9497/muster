@@ -22,5 +22,5 @@ checks:
 remediation:
   text_en: Put -e 2 on the last line of the last file augenrules loads — a name such as /etc/audit/rules.d/99-finalize.rules sorts after the others — and run augenrules --load, or reboot, so the kernel is locked with the rules in place. From then on every rule change needs a reboot to take effect, so settle the rule set first; a host that must change rules at runtime has to accept the unlocked state and record that in a waiver.
   text_ko: augenrules 가 마지막으로 적재하는 파일의 마지막 줄에 -e 2 를 둡니다. /etc/audit/rules.d/99-finalize.rules 같은 이름이면 다른 파일보다 뒤에 정렬됩니다. 그런 다음 augenrules --load 를 실행하거나 재부팅하면 규칙이 적재된 상태로 커널이 잠깁니다. 그 뒤로는 규칙을 바꿀 때마다 재부팅해야 적용되므로 규칙 구성을 먼저 확정하십시오. 런타임에 규칙을 바꿔야 하는 호스트는 잠기지 않은 상태를 받아들이고 waiver 로 그 사실을 남겨야 합니다.
-  risk: restart_service
+  risk: reboot_required
   idempotent: true

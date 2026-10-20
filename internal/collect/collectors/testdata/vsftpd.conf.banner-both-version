@@ -1,0 +1,8 @@
+# synthetic vsftpd configuration that sets both greeting keys: an
+# ftpd_banner naming the product beside a banner_file, which vsftpd reads
+# first.
+anonymous_enable=NO
+local_enable=YES
+pam_service_name=vsftpd
+ftpd_banner=vsFTPd 3.0.5 ready
+banner_file=/etc/issue.net

@@ -1213,9 +1213,10 @@ func TestFtpAccessFileStatOkButReadDenied(t *testing.T) {
 	}
 }
 
-// The greeting: ftpd_banner wins over banner_file, a custom line that does not
-// name the product is not a disclosure, and an unset banner is the compiled
-// greeting, whose text is NOT invented.
+// The greeting: a non-empty banner_file wins over ftpd_banner, an empty one
+// falls through, a custom line that does not name the product is not a
+// disclosure, and an unset banner is the compiled greeting, whose text is NOT
+// invented.
 func TestFtpBannerDisclosure(t *testing.T) {
 	unset := buildBegun(t, "ftp", ftpAccess(map[string]string{
 		"/etc/vsftpd.conf":  "vsftpd.conf.debian",
@@ -1292,6 +1293,77 @@ func TestFtpBannerDisclosure(t *testing.T) {
 	}
 	if slices.Contains(site.reads, "/srv/ftp/welcome.txt") {
 		t.Error("an undeclared banner file must be recorded, never read")
+	}
+
+	// O-14: banner_file overrides ftpd_banner (vsftpd.conf(5)). A clean
+	// ftpd_banner beside a disclosing file is the file's greeting...
+	both := buildBegun(t, "ftp", ftpAccess(map[string]string{
+		"/etc/vsftpd.conf": "vsftpd.conf.banner-both",
+		"/etc/issue.net":   "vsftpd.banner.version",
+	}))
+	ftpBannerIs(t, both, "banner_file", true)
+	if e := env(t, both, "ftp.banner_text"); e.Value != "220 vsFTPd 3.0.5 server ready." ||
+		e.Source == nil || e.Source.Path != "/etc/issue.net" {
+		t.Errorf("banner_text %+v, want the file's text sourced from the file", e)
+	}
+	// ...and a disclosing ftpd_banner beside a clean file is not a disclosure.
+	bothClean := buildBegun(t, "ftp", ftpAccess(map[string]string{
+		"/etc/vsftpd.conf": "vsftpd.conf.banner-both-version",
+		"/etc/issue.net":   "issue_net",
+	}))
+	ftpBannerIs(t, bothClean, "banner_file", false)
+
+	// An empty banner file falls through to ftpd_banner, then to the
+	// compiled greeting (O-59 measured both on the wire).
+	emptyBoth := ftpAccess(map[string]string{"/etc/vsftpd.conf": "vsftpd.conf.banner-both-version"})
+	emptyBoth.contents = map[string][]byte{"/etc/issue.net": {}}
+	eb := buildBegun(t, "ftp", emptyBoth)
+	ftpBannerIs(t, eb, "ftpd_banner", true)
+	if e := env(t, eb, "ftp.banner_text"); e.Value != "vsFTPd 3.0.5 ready" {
+		t.Errorf("banner_text %+v, want ftpd_banner's text", e)
+	}
+	emptyOnly := ftpAccess(map[string]string{"/etc/vsftpd.conf": "vsftpd.conf.banner-file"})
+	emptyOnly.contents = map[string][]byte{"/etc/issue.net": {}}
+	eo := buildBegun(t, "ftp", emptyOnly)
+	ftpBannerIs(t, eo, "default", true)
+	if e := env(t, eo, "ftp.banner_text"); e.Status != facts.StatusOK || e.Value != "" {
+		t.Errorf("banner_text %+v, want an ok empty string: the compiled text is not invented", e)
+	}
+	// A lone newline is not empty: the file is the greeting.
+	newline := ftpAccess(map[string]string{"/etc/vsftpd.conf": "vsftpd.conf.banner-both-version"})
+	newline.contents = map[string][]byte{"/etc/issue.net": []byte("\n")}
+	ftpBannerIs(t, buildBegun(t, "ftp", newline), "banner_file", false)
+
+	// An undeclared banner_file keeps its absence even with ftpd_banner set:
+	// vsftpd sends the file nobody opened.
+	undeclBoth := ftpAccess(nil)
+	undeclBoth.stats[vsftpdBin] = statResult{mode: 0o755, kind: "regular"}
+	undeclBoth.contents = map[string][]byte{"/etc/vsftpd.conf": []byte(
+		"anonymous_enable=NO\nlocal_enable=YES\npam_service_name=vsftpd\n" +
+			"ftpd_banner=Welcome. Authorized use only.\nbanner_file=/srv/ftp/welcome.txt\n")}
+	ub := buildBegun(t, "ftp", undeclBoth)
+	if e := env(t, ub, "ftp.banner_source"); e.Status != facts.StatusOK || e.Value != "banner_file" {
+		t.Errorf("banner_source %+v, want ok banner_file", e)
+	}
+	for _, k := range []string{"ftp.banner_text", "ftp.banner_discloses_version"} {
+		e := env(t, ub, k)
+		if e.Status != facts.StatusAbsent || !strings.Contains(e.Reason, "/srv/ftp/welcome.txt") {
+			t.Errorf("%s %+v, want absent naming the file it did not read", k, e)
+		}
+	}
+	if slices.Contains(undeclBoth.reads, "/srv/ftp/welcome.txt") {
+		t.Error("an undeclared banner file must be recorded, never read")
+	}
+}
+
+// ftpBannerIs asserts the greeting's source and its disclosure verdict.
+func ftpBannerIs(t *testing.T, b *collect.Builder, source string, discloses bool) {
+	t.Helper()
+	if e := env(t, b, "ftp.banner_source"); e.Status != facts.StatusOK || e.Value != source {
+		t.Errorf("banner_source %+v, want ok %s", e, source)
+	}
+	if e := env(t, b, "ftp.banner_discloses_version"); e.Status != facts.StatusOK || e.Value != discloses {
+		t.Errorf("banner_discloses_version %+v, want ok %v", e, discloses)
 	}
 }
 

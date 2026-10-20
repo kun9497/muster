@@ -623,7 +623,18 @@ func TestFileBodiesRepairATempTree(t *testing.T) {
 				t.Fatal(err)
 			}
 			t.Cleanup(func() { os.RemoveAll(root) })
-			bin := t.TempDir()
+			// The NFS body asks systemctl whether the server runs and may
+			// re-export (O-45): systemctl answers inactive and exportfs only
+			// logs, so no run reaches the host's own; MB is the run's record
+			// directory.
+			bin, stub := t.TempDir(), t.TempDir()
+			writeStub(t, bin, "systemctl", `printf '%s\n' "$*" >> "$STUB/systemctl"
+case "$1" in is-active) exit 3;; esac
+exit 99
+`)
+			writeStub(t, bin, "exportfs", `printf '%s\n' "$*" >> "$STUB/exportfs"
+`)
+			env := []string{"MB=" + t.TempDir(), "STUB=" + stub}
 			mk := func(f treeFile) string {
 				p := filepath.Join(root, f.path)
 				if f.dir {
@@ -669,19 +680,22 @@ func TestFileBodiesRepairATempTree(t *testing.T) {
 			// the block runs with the prologue's log and modes_trusted defined
 			helpers := "log() { printf 'muster-fix: %s\\n' \"$*\"; }\n" + stateHelpers + "\n"
 			body, val := helpers+rebaseRoot(" "+r.Script, root), helpers+rebaseRoot(" "+r.Validate, root)
-			if _, code := runBody(t, root, bin, val); code == 0 && len(c.loosened) > 0 {
+			if _, code := runBody(t, root, bin, val, env...); code == 0 && len(c.loosened) > 0 {
 				t.Error("validate passed on the loosened tree")
 			}
-			out, code := runBody(t, root, bin, body)
+			out, code := runBody(t, root, bin, body, env...)
 			if code != 0 {
 				t.Fatalf("body %d: %s", code, out)
+			}
+			if exists(filepath.Join(stub, "exportfs")) {
+				t.Errorf("the body re-exported a tree that holds no no_root_squash: %s", readFile(t, filepath.Join(stub, "exportfs")))
 			}
 			for _, d := range c.foreign {
 				if want := c.id + ": " + filepath.Join(root, d) + " is not root's, left as is"; !strings.Contains(out, want) {
 					t.Errorf("the log does not name the skipped directory %q:\n%s", want, out)
 				}
 			}
-			if out, code := runBody(t, root, bin, val); len(c.refused) == 0 && code != 0 {
+			if out, code := runBody(t, root, bin, val, env...); len(c.refused) == 0 && code != 0 {
 				t.Fatalf("validate after the body %d: %s", code, out)
 			} else if len(c.refused) > 0 && code == 0 {
 				t.Errorf("validate passed although a file not root's was left as is: the block would not roll back")
@@ -731,7 +745,8 @@ func TestFileBodiesRepairATempTree(t *testing.T) {
 // sorts first, and the first value wins) and from $STUB/sshd_T otherwise;
 // sshd -t succeeds; systemctl logs its argv, reports ssh.service active when
 // $STUB/ssh_active exists and nothing else active, and a reload logs the
-// drop-in as the daemon would read it.
+// drop-in as the daemon would read it, and "(00-muster.conf is a link)" when
+// root_remote_login's drop-in is a symlink.
 func accountTree(t *testing.T) (root, bin, stub string) {
 	root, bin, stub = t.TempDir(), t.TempDir(), t.TempDir()
 	writeStub(t, bin, "chage", `printf '%s\n' "$*" >> "$STUB/chage"`+"\n")
@@ -739,7 +754,8 @@ func accountTree(t *testing.T) (root, bin, stub string) {
 case "$*" in
   "is-active --quiet ssh.service") [ -e "$STUB/ssh_active" ]; exit;;
   is-active*) exit 1;;
-  reload*) cat "$ROOT/etc/ssh/sshd_config.d/00-muster-session.conf" >> "$STUB/systemctl" 2>/dev/null || echo "(no drop-in)" >> "$STUB/systemctl";;
+  reload*) cat "$ROOT/etc/ssh/sshd_config.d/00-muster-session.conf" >> "$STUB/systemctl" 2>/dev/null || echo "(no drop-in)" >> "$STUB/systemctl"
+    if [ -L "$ROOT/etc/ssh/sshd_config.d/00-muster.conf" ]; then echo "(00-muster.conf is a link)" >> "$STUB/systemctl"; fi;;
 esac
 exit 0
 `)
@@ -753,7 +769,7 @@ esac
 }
 
 func rebaseAccounts(s, root string) string {
-	for _, p := range []string{"/etc/login.defs", "/etc/security/", "/etc/shadow", "/etc/passwd", "/etc/ssh/", "/run/sshd"} {
+	for _, p := range []string{"/etc/login.defs", "/etc/security/", "/etc/shadow", "/etc/passwd", "/etc/ssh/", "/run/sshd", "/etc/securetty"} {
 		s = strings.ReplaceAll(s, p, root+p)
 	}
 	return s
@@ -1073,6 +1089,11 @@ func TestAccountBodiesLeaveASymlinkedDropIn(t *testing.T) {
 		// K2: login.defs is written only when it is no symlink
 		{"muster.account.password_policy", "/etc/login.defs", "is a symlink, left as is"},
 		{"muster.account.umask_policy", "/etc/login.defs", "is a symlink, left as is"},
+		// O-11: faillock.conf and securetty are vendor files (K2); 00-muster.conf
+		// is muster's own drop-in (S-27)
+		{"muster.account.lockout_threshold", "/etc/security/faillock.conf", "is a symlink, left as is"},
+		{"muster.account.root_remote_login", "/etc/securetty", "is a symlink, left as is"},
+		{"muster.account.root_remote_login", "/etc/ssh/sshd_config.d/00-muster.conf", "is a symlink (a mask), left as is"},
 	} {
 		t.Run(c.id+c.dropIn, func(t *testing.T) {
 			root, bin, stub := accountTree(t)
@@ -1121,6 +1142,43 @@ func TestAccountBodiesLeaveASymlinkedDropIn(t *testing.T) {
 				t.Errorf("chage ran although the block stopped:\n%s", readFile(t, filepath.Join(stub, "chage")))
 			}
 		})
+	}
+}
+
+// O-11, O-45: root_remote_login's rollback never removes a symlinked
+// 00-muster.conf. In a whole block the body's guard refuses the link before any
+// write and the rollback then runs with the link in place; restore would put a
+// removed link back afterwards, so only the rollback alone shows whether it
+// was removed: the reload it sends must still see the link.
+func TestRootLoginRollbackSkipsASymlinkedDropIn(t *testing.T) {
+	needSh(t)
+	r := shippedRemediation(t, "muster.account.root_remote_login")
+	root, bin, stub := accountTree(t)
+	const target = "PermitRootLogin yes\n"
+	victim := filepath.Join(root, "victim")
+	writeUnder(t, root, "/victim", target)
+	link := filepath.Join(root, "/etc/ssh/sshd_config.d/00-muster.conf")
+	if err := os.MkdirAll(filepath.Dir(link), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(victim, link); err != nil {
+		t.Fatal(err)
+	}
+	writeUnder(t, stub, "/ssh_active", "")
+	body := "log() { printf 'muster-fix: %s\\n' \"$*\"; }\n" + rebaseAccounts(r.Rollback, root)
+	out, code := runBody(t, root, bin, body, "STUB="+stub, "ROOT="+root)
+	if code != 0 {
+		t.Fatalf("rollback %d: %s", code, out)
+	}
+	if got, err := os.Readlink(link); err != nil || got != victim {
+		t.Errorf("00-muster.conf is %q (%v) after the rollback, want the link to %s", got, err, victim)
+	}
+	if got := readFile(t, victim); got != target {
+		t.Errorf("the link's target holds %q", got)
+	}
+	calls := readFile(t, filepath.Join(stub, "systemctl"))
+	if !strings.Contains(calls, "reload ssh.service\n") || !strings.HasSuffix(calls, "(00-muster.conf is a link)\n") {
+		t.Errorf("want a reload of ssh.service that sees the link; calls:\n%s", calls)
 	}
 }
 

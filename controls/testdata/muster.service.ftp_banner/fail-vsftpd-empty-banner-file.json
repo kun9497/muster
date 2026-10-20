@@ -1,0 +1,8 @@
+{"synthetic": true, "schema_version":1,"run":{},"facts":{
+  "services":{"ftp":{"installed":{"status":"ok","value":true}}},
+  "ftp":{
+    "banner_source":{"status":"ok","value":"ftpd_banner","source":{"kind":"file","path":"/etc/vsftpd.conf"}},
+    "banner_text":{"status":"ok","value":"vsFTPd 3.0.5 ready","source":{"kind":"file","path":"/etc/vsftpd.conf"}},
+    "banner_discloses_version":{"status":"ok","value":true,"source":{"kind":"file","path":"/etc/vsftpd.conf"}}
+  }
+}}

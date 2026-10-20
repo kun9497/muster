@@ -509,8 +509,10 @@ jobs:
   # script and checks again. On init rows a second container then proves the
   # guard (the first container's script is refused) and the failure path (a
   # validate forced false in every block leaves units, files, sysctl values,
-  # module load states, modes-entry stats and, when password_policy is
-  # scripted, every account's ageing fields (name, min, max) as they were).
+  # module load states, modes-entry stats and, when their controls are
+  # scripted, every account's ageing fields (name, min, max, inactive) with a
+  # checksum of the rest of /etc/shadow, the kernel audit rules and status
+  # settings, the NFS exports, vsftpd's state and postfix's as they were).
   # A host row (3D-2c) runs on the runner VM itself: no container, no guard
   # run, and the failure run re-seeds the same VM. Its repair run also fixes
   # every stock-FAIL scripted control (/etc/hosts goes to 0600, so non-root
@@ -533,10 +535,11 @@ jobs:
               muster.account.root_remote_login muster.account.session_timeout muster.account.sudoers_permissions
               muster.account.umask_policy muster.file.hosts_lpd_permissions muster.file.hosts_permissions
               muster.file.inetd_conf_permissions muster.file.log_dir_permissions muster.file.passwd_permissions
-              muster.file.services_permissions muster.file.syslog_conf_permissions muster.service.automount_disabled
-              muster.service.ftpusers_permissions muster.service.nfs_export_access muster.service.nfs_server_disabled
-              muster.service.rpcbind_disabled muster.service.snmp_disabled muster.service.telnet_disabled
-              muster.service.tftp_talk_disabled
+              muster.file.rhosts_forbidden muster.file.services_permissions muster.file.syslog_conf_permissions
+              muster.service.automount_disabled muster.service.ftp_anonymous muster.service.ftp_banner
+              muster.service.ftpusers_permissions muster.service.mail_expn_vrfy muster.service.nfs_export_access
+              muster.service.nfs_server_disabled muster.service.rpcbind_disabled muster.service.snmp_disabled
+              muster.service.telnet_disabled muster.service.tftp_talk_disabled
           - key: almalinux9-init
             kind: container
             image: almalinux/9-init
@@ -546,10 +549,11 @@ jobs:
               muster.account.root_remote_login muster.account.session_timeout muster.account.sudoers_permissions
               muster.account.umask_policy muster.file.hosts_lpd_permissions muster.file.hosts_permissions
               muster.file.inetd_conf_permissions muster.file.log_dir_permissions muster.file.passwd_permissions
-              muster.file.services_permissions muster.file.syslog_conf_permissions muster.service.automount_disabled
-              muster.service.ftpusers_permissions muster.service.nfs_export_access muster.service.nfs_server_disabled
-              muster.service.rpcbind_disabled muster.service.snmp_disabled muster.service.telnet_disabled
-              muster.service.tftp_talk_disabled
+              muster.file.rhosts_forbidden muster.file.services_permissions muster.file.syslog_conf_permissions
+              muster.service.automount_disabled muster.service.ftp_anonymous muster.service.ftp_banner
+              muster.service.ftpusers_permissions muster.service.mail_expn_vrfy muster.service.nfs_export_access
+              muster.service.nfs_server_disabled muster.service.rpcbind_disabled muster.service.snmp_disabled
+              muster.service.telnet_disabled muster.service.tftp_talk_disabled
           - key: debian12-init
             kind: container
             image: muster-ci/debian12-init
@@ -558,9 +562,10 @@ jobs:
             seeded: >-
               muster.account.cron_permissions muster.account.sudoers_permissions muster.file.hosts_lpd_permissions
               muster.file.hosts_permissions muster.file.inetd_conf_permissions muster.file.log_dir_permissions
-              muster.file.passwd_permissions muster.file.services_permissions muster.file.shadow_permissions
-              muster.file.syslog_conf_permissions muster.service.automount_disabled
-              muster.service.ftpusers_permissions muster.service.nfs_export_access muster.service.nfs_server_disabled
+              muster.file.passwd_permissions muster.file.rhosts_forbidden muster.file.services_permissions
+              muster.file.shadow_permissions muster.file.syslog_conf_permissions muster.service.automount_disabled
+              muster.service.ftp_anonymous muster.service.ftp_banner muster.service.ftpusers_permissions
+              muster.service.mail_expn_vrfy muster.service.nfs_export_access muster.service.nfs_server_disabled
               muster.service.nis_disabled muster.service.rpcbind_disabled muster.service.snmp_disabled
               muster.service.tftp_talk_disabled
           - key: ubuntu2204
@@ -570,20 +575,22 @@ jobs:
             seeded: >-
               muster.account.cron_permissions muster.account.sudoers_permissions muster.account.umask_policy
               muster.file.hosts_lpd_permissions muster.file.hosts_permissions muster.file.inetd_conf_permissions
-              muster.file.log_dir_permissions muster.file.passwd_permissions muster.file.services_permissions
-              muster.file.shadow_permissions muster.file.syslog_conf_permissions
+              muster.file.log_dir_permissions muster.file.passwd_permissions muster.file.rhosts_forbidden
+              muster.file.services_permissions muster.file.shadow_permissions muster.file.syslog_conf_permissions
           - key: runner
             kind: host
             seeded: >-
               muster.account.cron_permissions muster.account.password_policy muster.account.session_timeout
-              muster.account.umask_policy muster.beyond.aslr_and_link_protection muster.beyond.audit_log_permissions
-              muster.beyond.bootloader_config_permissions muster.beyond.icmp_broadcast_and_bogus_ignored
-              muster.beyond.icmp_redirects_ignored muster.beyond.ip_forwarding_disabled
-              muster.beyond.ipv6_forwarding_disabled muster.beyond.ipv6_redirects_ignored
-              muster.beyond.ipv6_router_advertisements_ignored muster.beyond.ipv6_source_routing_rejected
-              muster.beyond.kernel_pointer_exposure muster.beyond.ptrace_restriction
-              muster.beyond.reverse_path_filtering muster.beyond.source_routing_rejected
-              muster.beyond.suid_dumpable_disabled muster.beyond.syn_cookies_enabled muster.beyond.sysrq_restricted
+              muster.account.umask_policy muster.beyond.account_inactivity_lock muster.beyond.aslr_and_link_protection
+              muster.beyond.audit_disk_actions muster.beyond.audit_log_permissions muster.beyond.audit_rules_loaded
+              muster.beyond.auditd_active muster.beyond.bootloader_config_permissions
+              muster.beyond.icmp_broadcast_and_bogus_ignored muster.beyond.icmp_redirects_ignored
+              muster.beyond.ip_forwarding_disabled muster.beyond.ipv6_forwarding_disabled
+              muster.beyond.ipv6_redirects_ignored muster.beyond.ipv6_router_advertisements_ignored
+              muster.beyond.ipv6_source_routing_rejected muster.beyond.kernel_pointer_exposure
+              muster.beyond.ptrace_restriction muster.beyond.reverse_path_filtering
+              muster.beyond.source_routing_rejected muster.beyond.suid_dumpable_disabled
+              muster.beyond.syn_cookies_enabled muster.beyond.sysrq_restricted
               muster.beyond.uncommon_filesystems_disabled muster.beyond.uncommon_network_protocols_disabled
               muster.beyond.unprivileged_bpf_restricted muster.file.hosts_permissions
               muster.file.inetd_conf_permissions muster.file.shadow_permissions muster.file.syslog_conf_permissions
@@ -668,7 +675,7 @@ jobs:
             [ -z "$extra" ] || { echo "runner: the failure plan scripts ids the repair plan did not: $extra"; exit 1; }
           fi
           sed -n '/^modes_paths() {/,/^}/p' "$d/fail/fix.sh" > "$d/fail/modes_paths.sh"
-          record() { # unit states; backup-path stats, checksums and ACLs; sysctl values; module load states; modes-entry stats
+          record() { # unit states; backup-path stats, checksums and ACLs; sysctl values; module load states; modes-entry stats; per-control state (3D-2d §5)
             jq -r '.items[] | select(.planned and .script) | .units[]' "$d/fail/plan.json" | sort -u > "$d/fail/units"
             : > "$d/fail/deps"
             while read -r u; do x systemctl show -p RequiredBy -p BoundBy -p ConsistsOf --value -- "$u" < /dev/null | tr ' ' '\n' >> "$d/fail/deps" || :; done < "$d/fail/units"
@@ -688,8 +695,35 @@ jobs:
             jq -r '.items[] | select(.planned and .script) | .modes[]' "$d/fail/plan.json" | sort -u | while IFS= read -r e; do
               x sh -c '. "$1"; modes_paths "$2" | while IFS= read -r p; do printf "mode %s %s\n" "$p" "$(stat -c "%u %g %a" -- "$p")"; done' _ "$(out "$d/fail")/modes_paths.sh" "$e" < /dev/null
             done | sort -u
-            if jq -e '[.items[] | select(.planned and .script and .id == "muster.account.password_policy")] | length == 1' "$d/fail/plan.json" > /dev/null; then
-              x awk -F: 'NF >= 8 && $1 !~ /^#/ && $1 != "" { print "ageing", $1, $4, $5 }' /etc/shadow < /dev/null
+            if jq -e '[.items[] | select(.planned and .script and (.id == "muster.beyond.audit_rules_loaded" or .id == "muster.beyond.auditd_active" or .id == "muster.beyond.audit_disk_actions"))] | length > 0' "$d/fail/plan.json" > /dev/null; then
+              # each producer is captured first, so a failed tool (or sudo, or docker exec) fails the step
+              # instead of leaving an empty record on both sides of a diff (O-84)
+              al=$(x sh -c 'LC_ALL=C auditctl -l' < /dev/null) || { echo "record: auditctl -l failed" >&2; exit 1; }
+              [ -n "$al" ] || { echo "record: auditctl -l printed nothing" >&2; exit 1; }
+              as=$(x sh -c 'LC_ALL=C auditctl -s' < /dev/null) || { echo "record: auditctl -s failed" >&2; exit 1; }
+              as=$(printf '%s\n' "$as" | awk '$1 == "enabled" || $1 == "failure" || $1 == "backlog_limit" || $1 == "backlog_wait_time" || $1 == "rate_limit" || $1 == "loginuid_immutable" { print "audit", $1, $2 }')
+              printf '%s\n' "$as" | grep -q '^audit enabled ' || { echo "record: auditctl -s printed no enabled line" >&2; exit 1; }
+              printf '%s\n' "$al" | sed 's/^/auditrule /'
+              printf '%s\n' "$as"
+            fi
+            if jq -e '[.items[] | select(.planned and .script and (.id == "muster.account.password_policy" or .id == "muster.beyond.account_inactivity_lock"))] | length > 0' "$d/fail/plan.json" > /dev/null; then
+              ag=$(x awk -F: 'NF >= 8 && $1 !~ /^#/ && $1 != "" { print "ageing", $1, $4, $5, $7 }' /etc/shadow < /dev/null) || { echo "record: reading the ageing fields of /etc/shadow failed" >&2; exit 1; }
+              printf '%s\n' "$ag" | grep -q '^ageing ' || { echo "record: /etc/shadow gave no ageing line" >&2; exit 1; }
+              sr=$(x awk -F: 'BEGIN { OFS = ":" } NF >= 8 { $4 = ""; $5 = ""; $7 = "" } { print }' /etc/shadow < /dev/null) || { echo "record: reading the rest of /etc/shadow failed" >&2; exit 1; }
+              printf '%s\n' "$ag"
+              printf 'shadow-rest %s\n' "$(printf '%s\n' "$sr" | sha256sum | cut -d' ' -f1)"
+            fi
+            if jq -e '[.items[] | select(.planned and .script and (.id == "muster.service.nfs_export_access"))] | length > 0' "$d/fail/plan.json" > /dev/null; then
+              ex=$(x exportfs -s < /dev/null) || { echo "record: exportfs -s failed" >&2; exit 1; }
+              ex=$(printf '%s\n' "$ex" | LC_ALL=C sort | sed '/^$/d; s/^/export /')
+              printf '%s\n' "$ex" | grep -q '^export ' || { echo "record: exportfs -s printed no export" >&2; exit 1; }
+              printf '%s\n' "$ex"
+            fi
+            if jq -e '[.items[] | select(.planned and .script and (.id == "muster.service.ftp_banner" or .id == "muster.service.ftp_anonymous"))] | length > 0' "$d/fail/plan.json" > /dev/null; then
+              printf 'vsftpd %s\n' "$(x systemctl is-active vsftpd.service < /dev/null 2>/dev/null || :)"
+            fi
+            if jq -e '[.items[] | select(.planned and .script and (.id == "muster.service.mail_expn_vrfy"))] | length > 0' "$d/fail/plan.json" > /dev/null; then
+              rc=0; x postfix status >/dev/null 2>&1 </dev/null || rc=$?; printf 'postfix-status %s\n' "$rc"
             fi
           }
           same() { # same <before> <after>: equal records, except that a modes-entry path gone since (a rotated log) is no difference

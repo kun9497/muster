@@ -5,6 +5,7 @@ package collectors
 import (
 	"errors"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 
@@ -180,20 +181,70 @@ func TestNfsNoExportsIsEmptyNotMissing(t *testing.T) {
 }
 
 // exports(5): '#' introduces a comment anywhere on a line, not only at its
-// start, and a BSD-style "-options" defaults line (no client, options
-// prefixed with "-") is not valid Linux exports(5) syntax. Round-1 review
-// finding 1 (BLOCKING) + finding 3 (LOW).
+// start. Round-1 review finding 1 (BLOCKING). The "-options" default list
+// that used to share this fixture is TestNfsDefaultOptionListAppliesToItsClients's.
 func TestNfsTrailingCommentIsNotAClient(t *testing.T) {
 	a := nfsAccess(map[string]string{"/etc/exports": "exports.trailing_comment"}, nil)
 	b := buildBegun(t, "nfs", a)
 	recs := okList(t, b, "nfs.exports")
 	if len(recs) != 1 {
-		t.Fatalf("exports %v, want exactly 1 record (a trailing comment must not mint phantom clients, and the BSD-style \"-rw\" line must not mint a bogus one)", recs)
+		t.Fatalf("exports %v, want exactly 1 record (a trailing comment must not mint phantom clients)", recs)
 	}
 	rec := recs[0].(map[string]any)
 	if rec["path"] != "/srv5" || rec["client"] != "gss/krb5" || rec["options"] != "rw" ||
 		rec["wildcard"] != false || rec["root_squash"] != true {
 		t.Errorf("record %v", rec)
+	}
+}
+
+// O-18/O-20: a "-options" token sets the line's default options for the
+// client tokens after it (exports(5); nfs-utils read it so on the wire, O-60).
+// A later "-options" token past a client is added to the earlier default, never
+// a replacement for it (nfs-utils accumulates them, measured on rocky9-init,
+// O-64); a "-" token right after a list is a host name nfs-utils cannot
+// resolve, so it is neither a record nor joined (O-80: /srv9, /srv9a, both
+// orders measured). A client's options are the defaults, a comma, then its
+// own; a line whose only token after the path is a default list, or whose
+// last token is one, exports to the world with it (O-79: /srv4, /srv9b).
+// root_squash stays the
+// absence of no_root_squash in the joined options, so a client's own
+// root_squash after a default no_root_squash still reads false — the
+// kernel squashes there; the collector's reading is the conservative one
+// (O-50's recorded divergence).
+func TestNfsDefaultOptionListAppliesToItsClients(t *testing.T) {
+	a := nfsAccess(map[string]string{"/etc/exports": "exports.default_options"}, nil)
+	b := buildBegun(t, "nfs", a)
+	type row struct {
+		path, client, options string
+		wildcard, rootSquash  bool
+	}
+	want := []row{
+		{"/srv", "198.51.100.7", "no_root_squash", false, false},
+		{"/srv2", "198.51.100.8", "no_root_squash,rw", false, false},
+		{"/srv3", "198.51.100.10", "rw", false, true},
+		{"/srv3", "198.51.100.9", "rw,no_root_squash", false, false},
+		{"/srv4", "*", "rw", true, true},
+		{"/srv5", "198.51.100.11", "", false, true},
+		{"/srv5", "198.51.100.12", "no_root_squash", false, false},
+		{"/srv6", "198.51.100.13", "no_root_squash,root_squash", false, false},
+		{"/srv7", "198.51.100.14", "no_root_squash", false, false},
+		{"/srv7", "198.51.100.15", "no_root_squash,rw", false, false},
+		{"/srv8", "198.51.100.16", "no_root_squash,rw", false, false},
+		{"/srv8", "198.51.100.17", "no_root_squash,rw,ro", false, false},
+		{"/srv9", "198.51.100.18", "no_root_squash", false, false},
+		{"/srv9a", "198.51.100.19", "root_squash", false, true},
+		{"/srv9b", "*", "no_root_squash", true, false},
+		{"/srv9b", "198.51.100.20", "", false, true},
+	}
+	recs := okList(t, b, "nfs.exports")
+	got := make([]row, 0, len(recs))
+	for _, r := range recs {
+		m := r.(map[string]any)
+		got = append(got, row{m["path"].(string), m["client"].(string), m["options"].(string),
+			m["wildcard"].(bool), m["root_squash"].(bool)})
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("exports\n got %+v\nwant %+v", got, want)
 	}
 }
 

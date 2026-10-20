@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"io/fs"
+	"path"
 	"sort"
 	"strconv"
 	"strings"
@@ -20,6 +21,12 @@ const (
 	bashBashrc   = "/etc/bash.bashrc" // Debian family
 	etcBashrc    = "/etc/bashrc"      // RHEL family
 	cshCshrc     = "/etc/csh.cshrc"
+
+	// profileDLinkTargets is where a distribution's package data lives when
+	// a /etc/profile.d entry is shipped as a symbolic link to it (O-85:
+	// Ubuntu 24.04's libdebuginfod-common links debuginfod.sh to
+	// /usr/share/libdebuginfod-common/). A link to anything else is declined.
+	profileDLinkTargets = "/usr/share/*/*"
 )
 
 // rootDotfiles is the root account's login files, read after the system-wide
@@ -38,7 +45,7 @@ var pathCandidateDirs = []string{
 var envCollector = collect.Collector{
 	Name: "env",
 	Declare: collect.Declaration{
-		Reads: append(append([]string{etcProfile, profileDGlob, bashBashrc, etcBashrc, cshCshrc}, rootDotfiles...), pathCandidateDirs...),
+		Reads: append(append([]string{etcProfile, profileDGlob, profileDLinkTargets, bashBashrc, etcBashrc, cshCshrc}, rootDotfiles...), pathCandidateDirs...),
 		Needs: "none",
 	},
 	Run: runEnv,
@@ -70,6 +77,16 @@ func runEnv(_ context.Context, a collect.Access, b *collect.Builder) error {
 	}
 	for _, p := range order {
 		data, _, err := a.ReadFile(p, readLimit)
+		if err != nil && errors.Is(err, collect.ErrSymlink) && isProfileDEntry(p) {
+			var answer *facts.Envelope
+			data, answer, err = readProfileDLink(a, p)
+			if answer != nil {
+				for _, k := range envShellKeys {
+					b.Set(k, *answer)
+				}
+				return nil
+			}
+		}
 		if err != nil {
 			if errors.Is(err, fs.ErrNotExist) {
 				continue // a profile file that simply does not exist contributes nothing
@@ -109,6 +126,58 @@ func profileReadOrder(a collect.Access) ([]string, error) {
 	out = append(out, bashBashrc, etcBashrc, cshCshrc)
 	out = append(out, rootDotfiles...)
 	return out, nil
+}
+
+// isProfileDEntry reports whether p is one of the /etc/profile.d drop-ins
+// the Glob listed, as opposed to a main configuration file, where a symlink
+// stays the read's error (C4).
+func isProfileDEntry(p string) bool {
+	ok, _ := path.Match(profileDGlob, p)
+	return ok
+}
+
+// readProfileDLink reads a /etc/profile.d entry that is a symbolic link
+// through that one level, when its target is a distribution's package data:
+// an absolute, clean /usr/share/<package>/<file> (O-85). The target is opened
+// no-follow like every read, so a chained link is refused. The returned
+// content is parsed as the entry's own (the shell sources the entry). Any
+// other link — relative, elsewhere, chained, or to something that is not a
+// regular file — is declined: the returned envelope is absent, naming the
+// entry and its target (C4), never an error. A target that exists but cannot
+// be read is that read's status (C3), also returned as the envelope. A target
+// that does not exist is returned as err (fs.ErrNotExist) and contributes
+// nothing, as an absent entry does; so is a failed Readlink, which the caller
+// treats as a failed read of the entry.
+func readProfileDLink(a collect.Access, p string) ([]byte, *facts.Envelope, error) {
+	target, err := a.Readlink(p)
+	if err != nil {
+		return nil, nil, err
+	}
+	decline := func(why string) *facts.Envelope {
+		e := collect.Absent(p + ": a symbolic link to " + target + why + ", outside what this collector reads")
+		return &e
+	}
+	if !path.IsAbs(target) || path.Clean(target) != target {
+		return nil, decline(""), nil
+	}
+	if ok, _ := path.Match(profileDLinkTargets, target); !ok {
+		return nil, decline(""), nil
+	}
+	data, _, err := a.ReadFile(target, readLimit)
+	switch {
+	case err == nil:
+		return data, nil, nil
+	case errors.Is(err, collect.ErrSymlink):
+		return nil, decline(" (itself a symbolic link)"), nil
+	case errors.Is(err, collect.ErrNotRegular):
+		return nil, decline(" (not a regular file)"), nil
+	case errors.Is(err, fs.ErrNotExist):
+		return nil, nil, err
+	}
+	// C3: a package-data target that exists but cannot be read is the
+	// read's status for every value, naming the entry and the target.
+	e := readErrorEnv(p+" (a symbolic link to "+target+")", err)
+	return nil, &e, nil
 }
 
 func writeTMOUT(b *collect.Builder, all []shellAssignment) {

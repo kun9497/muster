@@ -1,15 +1,15 @@
 {
   "schema_version": 1,
   "run": {
-    "muster_version": "69ad0db",
-    "commit": "69ad0db",
-    "controls_version": "kisa-unix-2026+2026.10.14",
-    "controls_digest": "sha256:10c22486c23977609714514cb0938b2989e61e1d20394998533a7dd565f09c96",
+    "muster_version": "30af2a4",
+    "commit": "30af2a4",
+    "controls_version": "kisa-unix-2026+2026.10.19",
+    "controls_digest": "sha256:46be3e952588b21dda1314a9bc002f6f2ef777dc9b57a441e2ee68a9c2f159ef",
     "guide_edition": "kisa-unix-2026",
-    "collected_at": "2026-10-19T01:02:53Z",
+    "collected_at": "2026-10-20T02:41:54Z",
     "host": {
       "hostname": "github-runner",
-      "machine_id_hash": "399794935aded36b418e3630a41ef1d23f027811adf388b70d95a72238bc049b",
+      "machine_id_hash": "e7244411fdd82f17ae61972eb64a50c3df21d38725238f76d6ce6064a1bc4701",
       "kernel": "",
       "os_release": {
         "id": "ubuntu",
@@ -39,7 +39,7 @@
       {
         "name": "accounts",
         "status": "ok",
-        "ms": 0
+        "ms": 7
       },
       {
         "name": "audit",
@@ -55,7 +55,7 @@
       {
         "name": "boot",
         "status": "ok",
-        "ms": 22
+        "ms": 3
       },
       {
         "name": "coredump",
@@ -65,7 +65,7 @@
       {
         "name": "cron",
         "status": "ok",
-        "ms": 644,
+        "ms": 575,
         "cmd": "/usr/bin/systemctl list-unit-files --type=timer --no-legend --no-pager"
       },
       {
@@ -76,12 +76,12 @@
       {
         "name": "env",
         "status": "ok",
-        "ms": 21
+        "ms": 22
       },
       {
         "name": "files",
         "status": "ok",
-        "ms": 13
+        "ms": 34
       },
       {
         "name": "fim",
@@ -92,7 +92,7 @@
       {
         "name": "firewall",
         "status": "ok",
-        "ms": 15,
+        "ms": 9,
         "cmd": "/usr/sbin/nft list ruleset"
       },
       {
@@ -113,7 +113,7 @@
       {
         "name": "modules",
         "status": "ok",
-        "ms": 18
+        "ms": 47
       },
       {
         "name": "mounts",
@@ -144,13 +144,13 @@
       {
         "name": "patch",
         "status": "ok",
-        "ms": 1312,
+        "ms": 1550,
         "cmd": "/usr/bin/apt-get -s upgrade -o Debug::NoLocking=1"
       },
       {
         "name": "pkgverify",
         "status": "ok",
-        "ms": 448681,
+        "ms": 667721,
         "cmd": "/usr/bin/rpm -Va"
       },
       {
@@ -161,13 +161,13 @@
       {
         "name": "processes",
         "status": "ok",
-        "ms": 95,
+        "ms": 109,
         "cmd": "/usr/bin/rpm -qa --qf [%{=NAME}\t%{FILEMODES:octal}\t%{FILEUSERNAME}\t%{FILEGROUPNAME}\t%|FILECAPS?{%{FILECAPS}}|\t%{FILENAMES}\n]"
       },
       {
         "name": "services",
         "status": "ok",
-        "ms": 211,
+        "ms": 220,
         "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState atftpd.service"
       },
       {
@@ -178,12 +178,12 @@
       {
         "name": "sockets",
         "status": "ok",
-        "ms": 8
+        "ms": 0
       },
       {
         "name": "sshd",
         "status": "ok",
-        "ms": 9,
+        "ms": 10,
         "cmd": "/usr/sbin/sshd -G"
       },
       {
@@ -199,24 +199,24 @@
       {
         "name": "sysctl",
         "status": "ok",
-        "ms": 2
+        "ms": 1
       },
       {
         "name": "timesync",
         "status": "ok",
-        "ms": 47,
+        "ms": 42,
         "cmd": "/usr/bin/timedatectl show-timesync --all"
       },
       {
         "name": "units",
         "status": "ok",
-        "ms": 34,
+        "ms": 35,
         "cmd": "/usr/bin/systemctl list-units --type=service --state=active --plain --no-legend"
       },
       {
         "name": "walk",
         "status": "ok",
-        "ms": 14743,
+        "ms": 14308,
         "cmd": "/usr/bin/rpm -qa --qf [%{=NAME}\t%{FILEMODES:octal}\t%{FILEUSERNAME}\t%{FILEGROUPNAME}\t%|FILECAPS?{%{FILECAPS}}|\t%{FILENAMES}\n]"
       }
     ],
@@ -229,11 +229,11 @@
     "partial_failures": []
   },
   "fix": {
-    "muster_version": "69ad0db",
-    "commit": "69ad0db",
-    "controls_version": "kisa-unix-2026+2026.10.14",
-    "controls_digest": "sha256:10c22486c23977609714514cb0938b2989e61e1d20394998533a7dd565f09c96",
-    "snapshot_digest": "sha256:cbd16887d2a17680e6e7fd59ca1ddd214f25a5acb33b1bb021880cf15feafeac",
+    "muster_version": "30af2a4",
+    "commit": "30af2a4",
+    "controls_version": "kisa-unix-2026+2026.10.19",
+    "controls_digest": "sha256:46be3e952588b21dda1314a9bc002f6f2ef777dc9b57a441e2ee68a9c2f159ef",
+    "snapshot_digest": "sha256:9a7d50c27b4c171b1e7777e0ef38dcfd24b2fdefabf935a7c5c46b585ab1d986",
     "guide_edition": "kisa-unix-2026",
     "profile": {
       "name": "default",
@@ -321,32 +321,6 @@
       "reason": "clause does not hold: env.shell.root_path_entries none where is_dot eq true",
       "text_en": "chown root:root /root, chmod 700 /root, and remove any empty, \".\", relative, or world-writable entry from root's PATH in /etc/profile and root's shell startup files.",
       "text_ko": "chown root:root /root, chmod 700 /root 를 적용하고, /etc/profile 과 root 의 셸 시작 파일에서 root PATH 의 빈 요소, \".\", 상대 경로, 전체 쓰기 가능 항목을 제거합니다.",
-      "script": false,
-      "text_only_reason": "no_script",
-      "script_params": [],
-      "script_on_absent": false,
-      "rollback": "none",
-      "backup": [],
-      "units": [],
-      "modes": [],
-      "sysctl": [],
-      "modules": [],
-      "validate": false,
-      "planned": true
-    },
-    {
-      "id": "muster.beyond.auditd_active",
-      "title_en": "The audit daemon is installed, running and started at boot",
-      "title_ko": "감사 데몬이 설치되어 실행 중이며 부팅 시 시작된다",
-      "status": "fail",
-      "severity": "high",
-      "severity_source": "importance",
-      "risk": "none",
-      "idempotent": true,
-      "automation": "auto",
-      "reason": "clause does not hold: services.auditd.installed eq true",
-      "text_en": "Install the audit daemon (the audit package on the EL family, auditd on Debian and Ubuntu) and run systemctl enable --now auditd, which starts it now and at every boot. Check that the kernel command line does not carry audit=0, which keeps the unit from starting; the unit auditd ships refuses a manual stop (RefuseManualStop), so a restart after a configuration change is service auditd restart rather than systemctl restart.",
-      "text_ko": "감사 데몬(EL 계열은 audit 패키지, Debian·Ubuntu 는 auditd)을 설치하고 systemctl enable --now auditd 를 실행하면 지금 시작되고 매 부팅 시에도 시작됩니다. 커널 명령줄에 유닛의 시작을 막는 audit=0 이 없는지 확인하십시오. auditd 가 배포하는 유닛은 수동 중지를 거부하므로(RefuseManualStop) 설정 변경 후 재시작은 systemctl restart 대신 service auditd restart 로 합니다.",
       "script": false,
       "text_only_reason": "no_script",
       "script_params": [],
@@ -589,34 +563,8 @@
       "idempotent": true,
       "automation": "auto",
       "reason": "clause does not hold: accounts.users each require hash_algo in [$5$ $6$ $y$ $gy$ $7$ $2b$ $2y$ $2a$]",
-      "text_en": "Set ENCRYPT_METHOD SHA512 (or YESCRYPT) in /etc/login.defs, make the PAM password stack use the same algorithm, and have every listed account change its password so the hash is regenerated.",
-      "text_ko": "/etc/login.defs 에 ENCRYPT_METHOD SHA512 (또는 YESCRYPT) 를 설정하고 PAM password 스택이 같은 알고리즘을 쓰게 한 뒤, 나열된 계정의 비밀번호를 변경해 해시를 다시 생성합니다.",
-      "script": false,
-      "text_only_reason": "no_script",
-      "script_params": [],
-      "script_on_absent": false,
-      "rollback": "none",
-      "backup": [],
-      "units": [],
-      "modes": [],
-      "sysctl": [],
-      "modules": [],
-      "validate": false,
-      "planned": true
-    },
-    {
-      "id": "muster.beyond.account_inactivity_lock",
-      "title_en": "Accounts that can log in are disabled a bounded number of days after their password expires, and useradd gives new accounts the same bound",
-      "title_ko": "로그인할 수 있는 계정은 비밀번호가 만료된 뒤 정해진 날짜 안에 비활성화되고, useradd 도 새 계정에 같은 기한을 준다",
-      "status": "fail",
-      "severity": "medium",
-      "severity_source": "importance",
-      "risk": "none",
-      "idempotent": true,
-      "automation": "auto",
-      "reason": "clause does not hold: accounts.login_capable none where inactive_unset eq true",
-      "text_en": "Set the default for new accounts with useradd -D -f 35 (it writes INACTIVE=35 to /etc/default/useradd), then give each existing account the same bound with chage --inactive 35 <user>, root included. Record the current value first (chage -l <user>) and restore it with chage --inactive <old> <user>, or -1 to clear it. The lock only acts once the password expires, so password ageing (PASS_MAX_DAYS) has to be in force as well.",
-      "text_ko": "useradd -D -f 35 로 새 계정의 기본값을 설정하고(/etc/default/useradd 에 INACTIVE=35 를 기록합니다), root 를 포함한 기존 계정마다 chage --inactive 35 <user> 로 같은 기한을 줍니다. 먼저 현재 값을 기록하고(chage -l <user>) chage --inactive <이전 값> <user> 로, 지우려면 -1 로 되돌립니다. 잠금은 비밀번호가 만료된 뒤에야 작동하므로 비밀번호 사용 기한(PASS_MAX_DAYS)도 적용되어 있어야 합니다.",
+      "text_en": "Set ENCRYPT_METHOD SHA512 (or YESCRYPT) in /etc/login.defs, make the PAM password stack use the same algorithm, and have every listed account change its password so the hash is regenerated. Locking the account does not clear the finding, and never blank the password field.",
+      "text_ko": "/etc/login.defs 에 ENCRYPT_METHOD SHA512 (또는 YESCRYPT) 를 설정하고 PAM password 스택이 같은 알고리즘을 쓰게 한 뒤, 나열된 계정의 비밀번호를 변경해 해시를 다시 생성합니다. 계정을 잠가도 이 항목은 해소되지 않으며, 비밀번호 필드를 비워 두어서는 안 됩니다.",
       "script": false,
       "text_only_reason": "no_script",
       "script_params": [],
@@ -1114,6 +1062,34 @@
       "planned": true
     },
     {
+      "id": "muster.beyond.auditd_active",
+      "title_en": "The audit daemon is installed, running and started at boot",
+      "title_ko": "감사 데몬이 설치되어 실행 중이며 부팅 시 시작된다",
+      "status": "fail",
+      "severity": "high",
+      "severity_source": "importance",
+      "risk": "restart_service",
+      "idempotent": true,
+      "automation": "auto",
+      "reason": "clause does not hold: services.auditd.installed eq true",
+      "text_en": "Install the audit daemon (the audit package on the EL family, auditd on Debian and Ubuntu) and run systemctl enable --now auditd, which starts it now and at every boot. Check that the kernel command line does not carry audit=0, which keeps the unit from starting; the EL unit refuses a manual stop (RefuseManualStop), so there a restart after a configuration change is service auditd restart rather than systemctl restart. The review script unmasks and enables the unit and starts it when it is stopped; the package install and the audit=0 check stay the operator's. It does not start auditd over a kernel rule list that is not empty (the unit's rule load would delete it), nor while -e 2 or --loginuid-immutable stands in the rules files, whatever the kernel's lock state. Starting auditd applies the host's configured disk actions at once, single and halt included. A failed block leaves a started daemon running, with the persisted control settings its load applied.",
+      "text_ko": "감사 데몬(EL 계열은 audit 패키지, Debian·Ubuntu 는 auditd)을 설치하고 systemctl enable --now auditd 를 실행하면 지금 시작되고 매 부팅 시에도 시작됩니다. 커널 명령줄에 유닛의 시작을 막는 audit=0 이 없는지 확인하십시오. EL 계열의 유닛은 수동 중지를 거부하므로(RefuseManualStop) 그곳에서 설정 변경 후 재시작은 systemctl restart 대신 service auditd restart 로 합니다. 검토 스크립트는 유닛의 mask 를 풀고 활성화하며, 멈춰 있으면 시작합니다. 패키지 설치와 audit=0 확인은 운영자의 몫입니다. 커널 규칙 목록이 비어 있지 않으면(유닛의 규칙 적재가 그것을 지웁니다) auditd 를 시작하지 않고, 규칙 파일에 -e 2 나 --loginuid-immutable 이 있으면 커널의 잠금 상태와 관계없이 시작하지 않습니다. auditd 를 시작하면 호스트에 설정된 디스크 조치가 single 과 halt 를 포함해 곧바로 적용됩니다. 실패한 블록은 시작된 데몬을 실행 중인 채로 남기며, 그 적재가 적용한 저장된 제어 설정도 남습니다.",
+      "script": true,
+      "text_only_reason": "",
+      "script_params": [],
+      "script_on_absent": false,
+      "rollback": "units",
+      "backup": [],
+      "units": [
+        "auditd.service"
+      ],
+      "modes": [],
+      "sysctl": [],
+      "modules": [],
+      "validate": true,
+      "planned": true
+    },
+    {
       "id": "muster.beyond.container_runtime_access",
       "title_en": "No account other than root can reach a container runtime's API socket",
       "title_ko": "root 가 아닌 어떤 계정도 컨테이너 런타임의 API 소켓에 접근할 수 없다",
@@ -1285,6 +1261,36 @@
         "net.ipv4.conf.default.log_martians"
       ],
       "modules": [],
+      "validate": true,
+      "planned": true
+    },
+    {
+      "id": "muster.beyond.usb_storage_disabled",
+      "title_en": "The USB mass-storage driver cannot be loaded",
+      "title_ko": "USB 대용량 저장 장치 드라이버를 적재할 수 없다",
+      "status": "fail",
+      "severity": "medium",
+      "severity_source": "importance",
+      "risk": "restart_service",
+      "idempotent": true,
+      "automation": "auto",
+      "reason": "clause does not hold: kernel.modules each require disabled eq true",
+      "text_en": "Write install usb-storage /bin/false into a file under /etc/modprobe.d, for example /etc/modprobe.d/99-muster-usb-storage-disabled.conf, and rebuild the initramfs (the review script does not) so the setting applies during early boot as well. A vendor file whose install line for the module loads it wins over this one; the review script's validate then fails and the block rolls back. The review script never follows a symlink; a 99-muster-usb-storage-disabled.conf that is a symlink (a mask) is left as is and the block stops. Check first that the host does not boot or install from USB media and that no operational procedure depends on a USB device for backups or recovery, because those stop working immediately. A USB keyboard, mouse or serial adapter is unaffected — this is the mass-storage driver alone, not USB support.",
+      "text_ko": "/etc/modprobe.d 아래 파일(예를 들어 /etc/modprobe.d/99-muster-usb-storage-disabled.conf)에 install usb-storage /bin/false 를 적고, 초기 부팅 단계에도 적용되도록 initramfs 를 다시 만듭니다(검토 스크립트는 하지 않습니다). 모듈을 적재하는 install 줄을 둔 벤더 파일이 이 파일을 이기며, 그때 검토 스크립트의 validate가 실패해 블록이 롤백됩니다. 검토 스크립트는 심볼릭 링크를 따라가지 않으므로, 심볼릭 링크(마스크)인 99-muster-usb-storage-disabled.conf 는 그대로 두고 그 블록을 멈춥니다. USB 매체로 부팅하거나 설치하지 않는지, 백업이나 복구 절차가 USB 장치에 의존하지 않는지 먼저 확인하십시오. 그런 것들은 즉시 동작을 멈춥니다. USB 키보드·마우스·시리얼 어댑터에는 영향이 없습니다. 이것은 USB 지원 전체가 아니라 대용량 저장 장치 드라이버 하나입니다.",
+      "script": true,
+      "text_only_reason": "",
+      "script_params": [],
+      "script_on_absent": false,
+      "rollback": "both",
+      "backup": [
+        "/etc/modprobe.d/99-muster-usb-storage-disabled.conf"
+      ],
+      "units": [],
+      "modes": [],
+      "sysctl": [],
+      "modules": [
+        "usb-storage"
+      ],
       "validate": true,
       "planned": true
     },
@@ -1489,6 +1495,39 @@
       "modules": [],
       "validate": false,
       "planned": true
+    },
+    {
+      "id": "muster.beyond.account_inactivity_lock",
+      "title_en": "Accounts that can log in are disabled a bounded number of days after their password expires, and useradd gives new accounts the same bound",
+      "title_ko": "로그인할 수 있는 계정은 비밀번호가 만료된 뒤 정해진 날짜 안에 비활성화되고, useradd 도 새 계정에 같은 기한을 준다",
+      "status": "fail",
+      "severity": "medium",
+      "severity_source": "importance",
+      "risk": "lockout_risk",
+      "idempotent": true,
+      "automation": "auto",
+      "reason": "clause does not hold: accounts.login_capable none where inactive_unset eq true",
+      "text_en": "The review script writes INACTIVE=<max_inactive_days> to /etc/default/useradd when its value is unset or above the bound (a symlink stops the block), then runs chage -I on each local login-capable account, root included, whose field is unset or above it. It logs the day each account with a real maximum age will be disabled unless its password changes, root first: on a host that ages root, root's key login stops that day. It skips and names an account with no /etc/shadow entry, a field that is not a number, one that must change its password at next login (day 0, or no last-change day under a real maximum), and one whose password expired max_inactive_days or more days ago, which the bound would disable at once: change it first. Accounts only a remote NSS source holds are left. The rollback replays the old values. /etc/default/useradd is a package configuration file: at the next upgrade dpkg (Debian, Ubuntu) asks about the edit, and rpm (EL) writes the package's version as .rpmnew.",
+      "text_ko": "검토 스크립트는 /etc/default/useradd 의 값이 설정되지 않았거나 기한보다 크면 INACTIVE=<max_inactive_days> 를 쓰고(심볼릭 링크이면 블록을 멈춥니다), root 를 포함한 로컬의 로그인 가능한 계정 중 필드가 비어 있거나 기한보다 큰 계정마다 chage -I 를 실행합니다. 실제 최대 사용 기간이 있는 계정은 비밀번호를 바꾸지 않으면 비활성화되는 날짜를 root 부터 기록합니다. root 에 사용 기간을 두는 호스트에서는 그날부터 root 의 키 로그인도 멈춥니다. /etc/shadow 항목이 없는 계정, 필드가 숫자가 아닌 계정, 다음 로그인 때 비밀번호를 바꿔야 하는 계정(0일, 또는 실제 최대 기간이 있는데 마지막 변경일이 없는 계정), 비밀번호가 만료된 지 max_inactive_days 일 이상 지나 기한을 주면 곧바로 비활성화될 계정은 건너뛰고 이름을 남깁니다. 이런 계정은 먼저 비밀번호를 바꾸세요. 원격 NSS 소스에만 있는 계정은 그대로 둡니다. 롤백은 이전 값을 되돌립니다. /etc/default/useradd 는 패키지 설정 파일이므로, 다음 업그레이드 때 dpkg(Debian, Ubuntu)는 수정된 파일을 어떻게 할지 묻고, rpm(EL)은 패키지의 버전을 .rpmnew 로 씁니다.",
+      "script": true,
+      "text_only_reason": "",
+      "script_params": [
+        {
+          "name": "max_inactive_days",
+          "value": "35"
+        }
+      ],
+      "script_on_absent": false,
+      "rollback": "both",
+      "backup": [
+        "/etc/default/useradd"
+      ],
+      "units": [],
+      "modes": [],
+      "sysctl": [],
+      "modules": [],
+      "validate": true,
+      "planned": true
     }
   ],
   "not_planned": [
@@ -1534,22 +1573,22 @@
     }
   ],
   "summary": {
-    "planned": 42,
+    "planned": 43,
     "above_max_risk": 0,
-    "with_script": 17,
-    "text_only": 25,
+    "with_script": 20,
+    "text_only": 23,
     "waived": 0,
-    "clean": 67,
+    "clean": 66,
     "not_planned": {
       "error": 0,
       "manual": 7,
       "warn_degraded": 1
     },
     "by_risk": {
-      "none": 29,
-      "restart_service": 7,
+      "none": 27,
+      "restart_service": 9,
       "reboot_required": 2,
-      "lockout_risk": 4
+      "lockout_risk": 5
     }
   }
 }

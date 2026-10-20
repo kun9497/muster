@@ -57,6 +57,7 @@ var fuzzTargets = []string{
 	"FuzzFirstSettingLine",
 	"FuzzFoldChains",
 	"FuzzGrubPasswordSet",
+	"FuzzHostsEquivLines",
 	"FuzzListsRoot",
 	"FuzzMachineIDHash",
 	"FuzzModuleStates",

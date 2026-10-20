@@ -116,8 +116,11 @@ units in `units` — the logical service's `provesInstall` units in `services.go
 each `<name>.socket` before its `<name>.service` (a Linux test pins the set, and
 the validate names the same units) — and its script never names a unit: the
 template sets `UNITS`, records each unit's state before the body and puts it
-back on failure, so there is no hand-written rollback. The body loops over
-`$UNITS` in two passes, even for one unit:
+back on failure, so there is no hand-written rollback. The record puts back
+enablement and masking, but it never stops a unit: a body that enables (the
+one today is `auditd_active`) unmasks, enables and starts only an inactive
+unit, and its text says a failed block leaves the started unit running. A
+body that disables loops over `$UNITS` in two passes, even for one unit:
 
 ```sh
 todo=
@@ -208,6 +211,57 @@ kernel does not ship the module). A `beyond` control gates containers out, so
 it names only the `runner` row (the GitHub runner VM, seeded by
 `ci/roundtrip/runner.sh`); `TestEveryScriptedControlIsInTheRoundtripTable`
 holds the table, the shipped set and the CI matrix equal.
+
+The bodies that edit what a file says (stage 3D-2d) add these rules:
+
+- **No one-way runtime change.** A body never makes a change only a reboot
+  undoes — no `-e 2`, no `--loginuid-immutable` — and it never loads audit
+  rules into, or starts auditd over, such a setting pending in any rules file,
+  whatever the kernel's lock state. Every other runtime effect is either
+  recorded under `$MB` and put back by the rollback, or named in the control's
+  text as staying after a failed block.
+- **A daemon is touched only on what this run recorded.** Before any edit the
+  body writes `$MB/<daemon>.was-running` when the daemon runs, and touches
+  `$MB/<daemon>.edited` just before its first write. Its reload or restart, and
+  the rollback's, need both markers; the rollback may call the prologue's
+  `restore <path>` first. Records that describe one run (these markers, a list
+  of the keys written, a list of the accounts changed) are removed as the
+  body's first action and written fresh; only file backups and the lists a
+  rollback replays keep their first copy.
+- **The value written** is the first member of the list in force that the
+  target accepts and that keeps the host up (`audit_disk_actions` never writes
+  `email`, `exec`, `single` or `halt`); a clause that only forbids content may
+  be met with a fixed neutral string (`FTP server ready.`), never a legal
+  notice.
+- **Comment out, never delete.** A line the body disqualifies is prefixed
+  `# muster: `, and the file is in `backup`. A tool that writes its own file is
+  used where it reads the file the way the collector does (`postconf -e`); one
+  that rewrites more than the one key (`useradd -D`) is not.
+- **Append safely.** Before appending to a file that may lack a final newline:
+  `if [ -s "$f" ] && [ -n "$(tail -c1 "$f")" ]; then echo >> "$f"; fi`.
+- **Read the collector's way, and prove it.** A body's reader is a one-line
+  `rd_<what>() { LC_ALL=C …; }` function; when the validate re-proves its
+  verdict it repeats the same program, and
+  `internal/collect/collectors/remediation_parity_test.go` (Linux) runs each
+  reader over the parser's fixtures and compares with the Go parser. Every
+  command whose text output a body, validate or rollback parses runs under
+  `LC_ALL=C` (output that does not depend on the locale — `date +%s`, numeric
+  `stat -c` fields, the `tail -c1` test — needs none).
+- **A guarded validate.** Beside the three shapes, a validate may accept a
+  leave the body logs, as `[ guard ] || …` or a `{ …; } || { …; }` grouping on
+  one line; the block ends `done` and the next `check` names what was left.
+- **SELinux.** `restorecon` runs only on a file a tool replaced or created
+  (`postconf -e`, a newly created file), never after `sed -i` or `restore`,
+  spelled `if command -v selinuxenabled >/dev/null 2>&1 && selinuxenabled &&
+  command -v restorecon >/dev/null 2>&1; then restorecon -- "$f"; fi`.
+- **Upgrades.** A vendor configuration file a body edits in place is reported
+  at the next upgrade — dpkg (or ucf) asks about an edited conffile, rpm keeps
+  the edit and writes `.rpmnew` — and the text says so for the files the
+  package marks as configuration.
+- **Proof a row cannot give.** A daemon whose restart path no round-trip row
+  can run is named unproven in the plan and in the stage's design, with a
+  stub test, not in `_roundtrip.yaml` (whose `unproven_units` names only
+  declared units).
 
 ## Adding a fact
 
