@@ -300,8 +300,15 @@ func runControls(args []string, stdout, stderr io.Writer) int {
 			}
 			sub = sel.Subset
 		}
+		// The rows go out in one write whose error is exit 2, as check's
+		// report does: the list is piped into tooling.
+		var buf bytes.Buffer
 		for _, c := range sub.Controls {
-			fmt.Fprintf(stdout, "%s\t%s\t%s\t%s\n", c.ID, c.Importance, c.Automation, c.TitleEn)
+			fmt.Fprintf(&buf, "%s\t%s\t%s\t%s\n", c.ID, c.Importance, c.Automation, c.TitleEn)
+		}
+		if _, err := stdout.Write(buf.Bytes()); err != nil {
+			fmt.Fprintf(stderr, "muster: write: %v\n", err)
+			return exitError
 		}
 		return exitOK
 	default:

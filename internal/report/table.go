@@ -1,6 +1,7 @@
 package report
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"strings"
@@ -180,7 +181,12 @@ func hidden(o TableOptions, s check.Status) bool {
 }
 
 // WriteTable renders the summary block and one row per result (spec §9).
-func WriteTable(w io.Writer, r *Report, o TableOptions) error {
+// The table is rendered whole before the one write, so a writer that fails
+// (a full disk, a quota) is the returned error and the caller's exit 2,
+// never a truncated report under the verdict's exit code.
+func WriteTable(out io.Writer, r *Report, o TableOptions) error {
+	var buf bytes.Buffer
+	w := &buf
 	if o.Width <= 0 {
 		o.Width = 100
 	}
@@ -266,7 +272,8 @@ func WriteTable(w io.Writer, r *Report, o TableOptions) error {
 			}
 		}
 	}
-	return nil
+	_, err := out.Write(buf.Bytes())
+	return err
 }
 
 // actualText renders an observation's actual value. M-5's missing-field

@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -101,5 +103,68 @@ func TestParseCheckArgsRepeatedProfileAndTuningKeepTheLast(t *testing.T) {
 	// Fix wave item 1: an empty value is given, not absent.
 	if f, err = parseCheckArgs([]string{"--facts", "s", "--tuning", ""}); err != nil || f.tuning != "" || !f.tuningGiven {
 		t.Errorf("--tuning \"\": tuning %q given %v err %v, want an empty value that was given", f.tuning, f.tuningGiven, err)
+	}
+}
+
+// partWriter accepts its first n bytes and fails every byte after them, as a
+// disk that fills up partway through the report does.
+type partWriter struct {
+	n   int
+	got bytes.Buffer
+}
+
+func (p *partWriter) Write(b []byte) (int, error) {
+	room := p.n - p.got.Len()
+	if room >= len(b) {
+		p.got.Write(b)
+		return len(b), nil
+	}
+	if room < 0 {
+		room = 0
+	}
+	p.got.Write(b[:room])
+	return room, errors.New("no space left")
+}
+
+// A report that cannot be written is exit 2 with `muster: write:` on stderr,
+// whatever the verdict and whatever the format (f6): the exit code alone
+// must never stand in for a report nobody received.
+func TestCheckFailingStdoutIsExit2(t *testing.T) {
+	for _, snap := range []string{"testdata/full-pass.json", fullFail} {
+		for _, format := range []string{"table", "json"} {
+			for _, w := range []struct {
+				name string
+				mk   func() io.Writer
+				msg  string
+			}{
+				{"closed", func() io.Writer { return failWriter{} }, "muster: write: closed\n"},
+				{"partway", func() io.Writer { return &partWriter{n: 300} }, "muster: write: no space left\n"},
+			} {
+				t.Run(snap+"/"+format+"/"+w.name, func(t *testing.T) {
+					var errb bytes.Buffer
+					code := run([]string{"check", "--facts", snap, "--format", format, "--color", "never"}, w.mk(), &errb)
+					if code != exitError {
+						t.Errorf("exit %d, want %d", code, exitError)
+					}
+					if !strings.Contains(errb.String(), w.msg) {
+						t.Errorf("stderr %q, want %q", errb.String(), w.msg)
+					}
+				})
+			}
+		}
+	}
+}
+
+// controls list rows feed tooling (`controls list --profile … | …`): a list
+// that cannot be written is exit 2, not an empty success (f6).
+func TestControlsListFailingStdoutIsExit2(t *testing.T) {
+	for _, args := range [][]string{{"list"}, {"list", "--profile", "default"}} {
+		var errb bytes.Buffer
+		if code := runControls(args, failWriter{}, &errb); code != exitError {
+			t.Errorf("%v: exit %d, want %d", args, code, exitError)
+		}
+		if !strings.Contains(errb.String(), "muster: write: closed\n") {
+			t.Errorf("%v: stderr %q", args, errb.String())
+		}
 	}
 }
