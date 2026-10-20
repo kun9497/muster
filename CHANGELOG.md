@@ -213,6 +213,30 @@ verdict on an existing snapshot is at least a minor release and appears under
 
 ### Controls
 
+Control set `kisa-unix-2026+2026.10.20` (was `+2026.10.19`). Fixes from an
+external review; five verdicts can change:
+- A waiver naming observations no longer waives a control a separate clause
+  fails: `sudo_nopasswd_all` with every `user:` subject waived stays FAIL when
+  `Defaults !authenticate` is set, naming the clause, with a stderr warning;
+  `ssh_key_quality` no longer waives a DSA key count through a fingerprint
+  waiver. A FAIL that was `WAIVED` (exit 0) can now exit 1.
+- `password_policy` reads the pwquality chain in libpwquality's order, the
+  `pwquality.conf.d` drop-ins first and `/etc/security/pwquality.conf` last,
+  so a `minlen` the main file sets wins (it used to be overridden by a
+  drop-in). An `enforcing=0` in the files or on the `pam_pwquality.so` line
+  makes the policy advisory and the control FAIL (new key
+  `pam.pwquality.enforcing`). The review script rewrites a key the main file
+  sets in place, backs `pwquality.conf` up and refuses it as a symlink.
+- `lockout_threshold` judges every login-facing PAM service (login and sshd)
+  and the weakest value across them: an sshd stack with `deny=0` beside a
+  login stack with `deny=5` now FAILs, the reason naming the services and
+  values.
+- `umask_policy` counts `pam_umask` only when every login-facing service
+  (login and sshd) stacks it; one missing from sshd's session stack now FAILs.
+- `root_remote_login`'s rollback restores a drop-in an earlier run left before
+  `sshd -t` and the reload, instead of removing it and putting it back after
+  the reload (see Fixed).
+
 Control set `kisa-unix-2026+2026.10.19` (was `+2026.10.14`). Three verdicts
 change, as collector fixes (see Fixed): vsftpd's greeting order, an auditd
 `exec` action, an exports default option list. Eight controls gain a review
@@ -776,6 +800,19 @@ configuration walk stopped at an `Include` outside the declaration (below).
 - `CONTRIBUTING.md` (with its Korean pair) describes the workflow.
 
 ### Fixed
+- `root_remote_login`'s review script, on a failed block, removed
+  `/etc/ssh/sshd_config.d/00-muster.conf` and reloaded sshd before the backup
+  put an existing drop-in back; the disk then read `PermitRootLogin no` while
+  the running daemon no longer applied it. The rollback restores the recorded
+  file before `sshd -t` and the reload.
+- `check`, `fix --dry-run` and `controls list` exit 2 when writing the table
+  fails (a closed pipe, a full disk); the table renderer used to drop write
+  errors and exit by the verdicts.
+- pam_faillock settings are read per PAM service; `pam.faillock.*` carries the
+  weakest across login and sshd (deny 0 over any count, the larger count, the
+  shorter non-zero unlock time, the shorter `fail_interval`, `even_deny_root`
+  only when every service sets it) and cites every service's lines. sshd's own
+  stack used to be hidden behind login's.
 - An `/etc/profile.d` entry a distribution ships as a symbolic link to its
   package data (Ubuntu 24.04's `debuginfod.sh` ->
   `/usr/share/libdebuginfod-common/debuginfod.sh`) is read through that one
