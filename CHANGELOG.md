@@ -776,6 +776,15 @@ configuration walk stopped at an `Include` outside the declaration (below).
 - `CONTRIBUTING.md` (with its Korean pair) describes the workflow.
 
 ### Fixed
+- An `/etc/profile.d` entry a distribution ships as a symbolic link to its
+  package data (Ubuntu 24.04's `debuginfod.sh` ->
+  `/usr/share/libdebuginfod-common/debuginfod.sh`) is read through that one
+  level, as `/usr/share/<package>/<file>`, and parsed as the entry: it made
+  all seven `env.shell.*` keys an error, so `collect --require-complete`
+  failed and the env controls read ERROR on every such host. A link anywhere
+  else (relative, outside that shape, chained, or to a non-regular file) is
+  declined: the keys are `absent` naming the entry and its target. A symlink
+  at `/etc/profile` or another main file stays an error (stage 3D-2d, O-85).
 - vsftpd's greeting is read in vsftpd's own order: a non-empty `banner_file`
   wins over `ftpd_banner` (a clean `ftpd_banner` beside a disclosing banner
   file read PASS), and an empty banner file falls through (stage 3D-2d,
