@@ -454,4 +454,7 @@ Each ends with what it costs if wrong. O-72 is given in its corrected form (the 
 
 - **Draft PR #25, run 39355425181** — every fix-roundtrip row green, the runner row included: the four runner bodies ran on the VM for the first time, repair and failure runs, records equal. `collect-root` failed: runner image 20261015.610's `/etc/profile.d/debuginfod.sh` symlink (O-85; main is broken by the same image). The nightly fuzz shard that failed on main (39226064170) is `FuzzParseAideConf … context deadline exceeded` at 60 s with no failing input: the known deadline-race flake.
 
+- **Run 39360274618 (f507ae7, the O-85 fix)** — every job green, `collect-root` included. The runner row's repair run ended all 33 blocks `done` (the four new runner bodies included; `usb_storage_disabled` was planned there too, unseeded) and the failure run rolled all 33 back with records equal; the new record() checks (O-84) passed; the inactivity body logged the image's `packer` account with its disable date (a real maximum) and skipped none. Examples refreshed from examples run 39360280961: the one status change is the VM's `usb_storage_disabled` PASS → FAIL, from the image's kernel shipping usb-storage.
+- **Run 39362159321 (4226cbc, O-87)** — the runner row failed `seeded muster.beyond.usb_storage_disabled is not a planned scripted item`: that VM did not ship usb-storage. Runner VMs of one image differ on the module, so O-87 is withdrawn (d6d9e5f reverts it; the entry stays `unproven` with that reason).
+
 (Later runs go here as they land.)
