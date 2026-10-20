@@ -168,3 +168,55 @@ func TestControlsListFailingStdoutIsExit2(t *testing.T) {
 		}
 	}
 }
+
+// H-12 (f11): two snapshots in one stream are refused, never judged by the
+// first alone. PASS then FAIL read PASS (exit 0) before the fix.
+func TestFactsWithASecondJSONValueIsExit2(t *testing.T) {
+	dir := t.TempDir()
+	td := filepath.Join("..", "..", "controls", "testdata", "muster.account.root_only_uid_zero")
+	pass, err := os.ReadFile(filepath.Join(td, "pass-root-only.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	failSnap, err := os.ReadFile(filepath.Join(td, "fail-absent.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	prof := filepath.Join(dir, "one.yaml")
+	if err := os.WriteFile(prof, []byte("profile: one\ninclude: [muster.account.root_only_uid_zero]\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	write := func(name string, b []byte) string {
+		p := filepath.Join(dir, name)
+		if err := os.WriteFile(p, b, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	passNL := write("pass.json", append(append([]byte{}, pass...), '\n'))
+	failOnly := write("fail.json", failSnap)
+	both := write("both.json", append(append(append([]byte{}, pass...), '\n'), failSnap...))
+
+	// The normal condition: each snapshot alone reads as itself.
+	var out, errb bytes.Buffer
+	if code := run([]string{"check", "--facts", passNL, "--profile", prof}, &out, &errb); code != exitOK {
+		t.Fatalf("pass alone: code %d stderr %q", code, errb.String())
+	}
+	out.Reset()
+	errb.Reset()
+	if code := run([]string{"check", "--facts", failOnly, "--profile", prof}, &out, &errb); code != exitFindings {
+		t.Fatalf("fail alone: code %d stderr %q", code, errb.String())
+	}
+	for _, args := range [][]string{
+		{"check", "--facts", both, "--profile", prof},
+		{"fix", "--dry-run", "--facts", both},
+		{"snapshot", "extract", "--facts", both, "--control", "muster.account.root_only_uid_zero", "--out", filepath.Join(dir, "x.json")},
+	} {
+		out.Reset()
+		errb.Reset()
+		if code := run(args, &out, &errb); code != exitError || out.Len() != 0 ||
+			!strings.Contains(errb.String(), "parse snapshot: unexpected data after the snapshot") {
+			t.Errorf("%v: code %d stdout %q stderr %q; want exit 2, nothing on stdout, the parse error", args[0], code, out.String(), errb.String())
+		}
+	}
+}

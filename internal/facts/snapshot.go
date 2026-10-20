@@ -24,6 +24,10 @@ var (
 	ErrSchemaMismatch = errors.New("schema_mismatch")
 	ErrTooLarge       = errors.New("snapshot exceeds size limit")
 	ErrTooDeep        = errors.New("snapshot exceeds nesting limit")
+	// ErrTrailingData is a stream that holds more than the one snapshot
+	// (H-12): `cat a.json b.json` or a second `collect >>` must not be judged
+	// by its first value alone. Only whitespace may follow the snapshot.
+	ErrTrailingData = errors.New("parse snapshot: unexpected data after the snapshot (one JSON value expected)")
 )
 
 type OSRelease struct {
@@ -110,6 +114,9 @@ func Load(r io.Reader) (*Snapshot, error) {
 	if err := dec.Decode(&s); err != nil {
 		return nil, fmt.Errorf("parse snapshot: %w", err)
 	}
+	if !AtEnd(dec) {
+		return nil, ErrTrailingData
+	}
 	if s.SchemaVersion < 1 {
 		return nil, fmt.Errorf("%w: snapshot has no valid schema_version", ErrSchemaMismatch)
 	}
@@ -120,6 +127,14 @@ func Load(r io.Reader) (*Snapshot, error) {
 		s.Facts = map[string]any{}
 	}
 	return &s, nil
+}
+
+// AtEnd reports whether dec has nothing left but whitespace: Token skips it
+// and answers io.EOF at a clean end. dec.More is not this test — it is false
+// before a closing ] or } as well.
+func AtEnd(dec *json.Decoder) bool {
+	_, err := dec.Token()
+	return err == io.EOF
 }
 
 // checkDepth walks the token stream and rejects nesting beyond max without
