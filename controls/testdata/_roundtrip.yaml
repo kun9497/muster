@@ -82,7 +82,7 @@
 - id: muster.beyond.unprivileged_bpf_restricted
   images: [runner]
 - id: muster.beyond.usb_storage_disabled
-  unproven: "the runner kernel does not ship usb-storage"
+  images: [runner]
 - id: muster.file.hosts_lpd_permissions
   images: [almalinux9-init, debian12-init, rocky9-init, ubuntu2204]
 - id: muster.file.hosts_permissions
