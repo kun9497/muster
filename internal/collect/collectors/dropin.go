@@ -45,7 +45,11 @@ func dropinEnvelope(err error) facts.Envelope {
 // systemd does — it is stored as "", never dropped, so the reset survives
 // last-write-wins.
 func mergeDropins(a collect.Access, main string, dirs []string, glob string) (map[string]string, []facts.Source, error) {
-	return mergeDropinsWith(a, main, dirs, glob, parseDropin, mainFirst)
+	values, inputs, _, err := mergeDropinsWith(a, main, dirs, glob, func(data []byte, values map[string]string) *lineStop {
+		parseDropin(data, values) // systemd never stops reading a chain
+		return nil
+	}, mainFirst)
+	return values, inputs, err
 }
 
 // chainOrder says where a chain's main file is applied relative to its
@@ -64,7 +68,8 @@ const (
 // the main file's place as parameters so a chain whose file syntax or order is
 // not systemd's resolves through the same code (M-23: pwquality's conf files
 // carry bare-word flags such as enforce_for_root that parseDropin discards, so
-// that caller passes parseKVInto; and libpwquality reads its main file after
+// that caller passes parsePwqualityInto, which also stops a file the way
+// libpwquality does; and libpwquality reads its main file after
 // the drop-ins, so that caller passes mainLast):
 //
 //   - the main file is applied first (mainFirst, systemd) or after every
@@ -78,22 +83,30 @@ const (
 //
 // parse is handed each file's bytes and the shared values map, in the order the
 // files are applied, so the last file to set a key wins whatever the syntax.
-// inputs lists the files actually read, in the order they were applied. readErr
-// is the FIRST read error of a file that exists (R148: it poisons every value
-// derived from the chain); a file that is simply absent is not one.
+// A parse that returns a line stops the chain there (H-5: libpwquality's
+// pwquality_read_config skips every later drop-in and the main file once one
+// file fails): that file is cited at that line and no later file is opened,
+// and the stop comes back as the third value. inputs lists the files actually
+// read, in the order they were applied. readErr is the FIRST read error of a
+// file that exists (R148: it poisons every value derived from the chain); a
+// file that is simply absent is not one.
 //
 // The caller declares the main file and each dir's glob in its own
 // Declaration.Reads — this helper never widens the declaration.
-func mergeDropinsWith(a collect.Access, main string, dirs []string, glob string, parse func([]byte, map[string]string), order chainOrder) (map[string]string, []facts.Source, error) {
+func mergeDropinsWith(a collect.Access, main string, dirs []string, glob string, parse func([]byte, map[string]string) *lineStop, order chainOrder) (map[string]string, []facts.Source, *chainStop, error) {
 	values := map[string]string{}
 	var inputs []facts.Source
 	var readErr error
+	var stop *chainStop
 	fail := func(p string, err error) {
 		if readErr == nil {
 			readErr = &dropinReadError{Path: p, Err: err}
 		}
 	}
 	read := func(p string) {
+		if stop != nil {
+			return
+		}
 		data, _, err := a.ReadFile(p, readLimit)
 		if err != nil {
 			// chainReadFailed is the one classification every merged chain
@@ -108,7 +121,11 @@ func mergeDropinsWith(a collect.Access, main string, dirs []string, glob string,
 			}
 			return
 		}
-		parse(data, values)
+		if ls := parse(data, values); ls != nil {
+			stop = &chainStop{Path: p, Line: ls.Line, Text: ls.Text}
+			inputs = append(inputs, facts.Source{Kind: "file", Path: p, Line: ls.Line})
+			return
+		}
 		inputs = append(inputs, facts.Source{Kind: "file", Path: p})
 	}
 	if order == mainFirst {
@@ -142,7 +159,14 @@ func mergeDropinsWith(a collect.Access, main string, dirs []string, glob string,
 	if order == mainLast {
 		read(main)
 	}
-	return values, inputs, readErr
+	return values, inputs, stop, readErr
+}
+
+// chainStop is the file and line at which a chain's reader stopped (H-5).
+type chainStop struct {
+	Path string
+	Line int
+	Text string
 }
 
 // parseDropin parses systemd-style "Key=Value" lines into values, last write

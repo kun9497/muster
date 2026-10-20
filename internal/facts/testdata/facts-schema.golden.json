@@ -2494,7 +2494,7 @@
     {
       "Key": "pam.pwquality.minlen",
       "Type": "int",
-      "Description": "Effective minlen - the default 8, then pwquality.conf.d/*.conf in name order, then pwquality.conf (libpwquality reads it last), then the module arguments, each overriding the last.",
+      "Description": "Effective minlen - the default 8, then pwquality.conf.d/*.conf in name order, then pwquality.conf (libpwquality reads it last), then the module arguments, each overriding the last. Each file is read as libpwquality reads it (a line is cut at its first '#', the name ends at a blank or '=' and matches case-blind); a line whose name libpwquality does not know or whose integer it refuses stops that file and every later one, and then every pam.pwquality integer and required_classes is absent naming the file and line.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "pam",
@@ -2594,7 +2594,7 @@
     {
       "Key": "pam.password.remember",
       "Type": "int",
-      "Description": "How many previous passwords a new one is checked against - remember= on pam_pwhistory.so (argument, else pwhistory.conf, else the module default 10) or on pam_unix.so; absent when neither module sets it.",
+      "Description": "How many previous passwords a new one is checked against - remember= on pam_pwhistory.so (argument, else the first remember line of pwhistory.conf, matched case-blind with its leading digits read, else the module default 10) or on pam_unix.so; absent when neither module sets it.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "pam",
@@ -2614,7 +2614,7 @@
     {
       "Key": "pam.faillock.deny",
       "Type": "int",
-      "Description": "Effective deny, the weakest the login-facing services enforce - each service's preauth and authfail line is resolved on its own (the default 3, then faillock.conf, then that line's arguments) and the weaker of the two kept, then the weakest service; 0 disables the lockout and is weaker than any count, otherwise the larger count is the weaker. When a service's two lines or the services disagree, pam.faillock.enabled says so in its reason. A conf= argument naming another file is not handled.",
+      "Description": "Effective deny, the weakest the login-facing services enforce - each service's preauth and authfail line is resolved on its own (the default 3, then faillock.conf, then that line's arguments; read as pam_faillock reads them - names case-sensitive, a line cut at its first '#', a number's leading digits, a value with none ignored, the last line winning) and the weaker of the two kept, then the weakest service; 0 disables the lockout and is weaker than any count, otherwise the larger count is the weaker. When a service's two lines or the services disagree, pam.faillock.enabled says so in its reason. A conf= argument naming another file is not handled.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "pam",

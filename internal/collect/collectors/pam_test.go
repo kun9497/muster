@@ -314,16 +314,22 @@ func (g *globFailure) Glob(p string) ([]string, error) {
 	return g.fsAccess.Glob(p)
 }
 
-func TestPAMParseKV(t *testing.T) {
-	kv := parseKV([]byte("# c\nminlen = 12\nenforce_for_root\n  dcredit=-1  \nbad line here\n"))
+func TestParsePwqualityInto(t *testing.T) {
+	kv := map[string]string{}
+	stop := parsePwqualityInto([]byte("# c\nminlen = 12\nenforce_for_root\n  dcredit=-1  \nbad line here\nminclass = 4\n"), kv)
 	if kv["minlen"] != "12" || kv["dcredit"] != "-1" {
 		t.Errorf("%v", kv)
 	}
 	if v, ok := kv["enforce_for_root"]; !ok || v != "" {
 		t.Errorf("a bare flag is present with an empty value: %v", kv)
 	}
-	if _, ok := kv["bad line here"]; ok {
-		t.Errorf("a line without = and with spaces is not a key: %v", kv)
+	// H-5: "bad" is no name libpwquality knows, so the file stops there and
+	// the line after it is never applied.
+	if stop == nil || stop.Line != 5 || stop.Text != "bad line here" {
+		t.Errorf("stop %+v, want line 5", stop)
+	}
+	if _, ok := kv["minclass"]; ok {
+		t.Errorf("a line after the stop was applied: %v", kv)
 	}
 }
 
@@ -492,20 +498,20 @@ func TestPwqualityEnforcing(t *testing.T) {
 	if e := env(t, build(t, "pam", a), "pam.pwquality.enforcing"); e.Status != facts.StatusOK || e.Value != 1 {
 		t.Errorf("argument enforcing=1 over the file's 0: %+v, want 1", e)
 	}
-	// (d) M-50: a value libpwquality would reject is absent, naming it.
+	// (d) H-5 (M-50 folded in): a value libpwquality would reject stops the
+	// file, and every value leaf is absent naming the line - required_classes
+	// too, although enforcing is not one of its inputs, because what
+	// libpwquality applies after a stop is not a value.
 	a = stack(t, "")
 	a.contents[pwqualityConf] = []byte("enforcing = x\n")
 	b := build(t, "pam", a)
-	if e := env(t, b, "pam.pwquality.enforcing"); e.Status != facts.StatusAbsent || !strings.Contains(e.Reason, `enforcing = "x"`) {
-		t.Errorf("enforcing = x: %+v, want absent naming it", e)
+	for _, k := range []string{"pam.pwquality.enforcing", "pam.pwquality.required_classes"} {
+		if e := env(t, b, k); e.Status != facts.StatusAbsent || e.Reason != "libpwquality stops reading at "+pwqualityConf+":1 (enforcing = x); the lines after it are not applied" {
+			t.Errorf("enforcing = x: %s = %+v, want absent naming the line", k, e)
+		}
 	}
-	// enforcing is not a credit and not an input of required_classes: an
-	// unparseable one leaves required_classes ok ...
-	if e := env(t, b, "pam.pwquality.required_classes"); e.Status != facts.StatusOK || e.Value != 0 {
-		t.Errorf("required_classes with enforcing = x: %+v, want ok 0", e)
-	}
-	// ... and enforcing = -1 (which still enforces) is not one more negative
-	// credit: with dcredit = -1 alone, one class is required.
+	// enforcing = -1 (which still enforces) is not one more negative credit:
+	// with dcredit = -1 alone, one class is required.
 	a = stack(t, "")
 	a.contents[pwqualityConf] = []byte("enforcing = -1\ndcredit = -1\n")
 	b = build(t, "pam", a)
@@ -1250,12 +1256,14 @@ func TestPwqualityDropinsMergeLikeLibpwquality(t *testing.T) {
 	}
 }
 
-// M-50: a value libpwquality would reject is not a value. applyInt used to drop
-// it silently, which published the compiled-in default as ok over a file that
-// plainly says something else - the most confident kind of wrong answer. The
-// key is absent instead, naming key and value, and any derived key that reads
-// it goes absent with it.
-func TestPwqualityUnparseableIntegerIsAbsent(t *testing.T) {
+// M-50, folded into H-5: a value libpwquality would reject is not a value.
+// applyInt used to drop it silently, which published the compiled-in default
+// as ok over a file that plainly says something else; M-50 made that one key
+// absent. libpwquality itself stops reading the file at that line and skips
+// every later file, so what it enforces depends on what was applied before
+// the stop: every value leaf is absent, naming the line, and the files read up
+// to it are cited.
+func TestPwqualityRefusedIntegerStopsTheChain(t *testing.T) {
 	chain := func(bad string) *fsAccess {
 		a := rockyPAM()
 		a.files["/etc/authselect/system-auth"] = "pam/rocky/authselect-password-auth"
@@ -1266,55 +1274,211 @@ func TestPwqualityUnparseableIntegerIsAbsent(t *testing.T) {
 		a.files[pwqualityConf] = bad
 		return a
 	}
-	// minlen = wat, last in the chain, over two files that set it to a number.
-	b := build(t, "pam", chain("pam/rocky/dropin-30-bad-minlen.conf"))
-	e := env(t, b, "pam.pwquality.minlen")
-	if e.Status != facts.StatusAbsent {
-		t.Errorf("minlen %+v, want absent - the compiled-in 8 would be a guess over a file that says otherwise", e)
+	for _, c := range []struct{ fixture, line string }{
+		{"pam/rocky/dropin-30-bad-minlen.conf", "minlen = wat"},
+		{"pam/rocky/dropin-30-bad-credit.conf", "ucredit = plenty"},
+		// "minlen =" (an empty value) is refused; the bare "minclass" after it
+		// is never read.
+		{"pam/rocky/dropin-30-reset.conf", "minlen ="},
+	} {
+		b := build(t, "pam", chain(c.fixture))
+		want := "libpwquality stops reading at " + pwqualityConf + ":2 (" + c.line + "); the lines after it are not applied"
+		for _, k := range pwqualityStopKeys {
+			if e := env(t, b, k); e.Status != facts.StatusAbsent || e.Reason != want {
+				t.Errorf("%s: %s = %+v, want absent with %q", c.fixture, k, e, want)
+			}
+		}
+		e := env(t, b, "pam.pwquality.minlen")
+		if got := sourcePaths(t, e); !slices.Equal(got, []string{
+			"/etc/security/pwquality.conf.d/05-base.conf", "/etc/security/pwquality.conf.d/10-a.conf", pwqualityConf, "/etc/authselect/system-auth",
+		}) {
+			t.Errorf("%s: an absent value still cites every file that was read: %v", c.fixture, got)
+		}
+		if g := env(t, b, "pam.pwquality.enabled"); g.Status != facts.StatusOK || g.Value != true {
+			t.Errorf("enabled follows the stack, not the values: %+v", g)
+		}
 	}
-	if e.Reason != `minlen = "wat" is not an integer; libpwquality rejects the configuration` {
-		t.Errorf("minlen reason %q must name the key and the value it could not read", e.Reason)
+}
+
+// pwqualityChain is rocky's stack with a pam_pwquality.so line that sets no
+// integer (local_users_only only), so the conf chain alone decides, over the
+// given main file and drop-ins (name -> content); "" leaves the main file out.
+func pwqualityChain(main string, dropins map[string]string) *fsAccess {
+	a := rockyPAM()
+	a.files["/etc/authselect/system-auth"] = "pam/rocky/authselect-password-auth"
+	a.contents = map[string][]byte{}
+	if main != "" {
+		a.contents[pwqualityConf] = []byte(main)
 	}
-	if got := sourcePaths(t, e); len(got) != 4 {
-		t.Errorf("an absent value still cites every file that was read: %v", got)
+	for n, s := range dropins {
+		a.contents[pwqualityConfDir+"/"+n] = []byte(s)
 	}
+	return a
+}
+
+// pwqualityStopKeys are the leaves H-5 takes absent when a file stops the
+// chain: every integer muster publishes and the derived classes.
+var pwqualityStopKeys = []string{
+	"pam.pwquality.minlen", "pam.pwquality.minclass", "pam.pwquality.dcredit", "pam.pwquality.ucredit",
+	"pam.pwquality.lcredit", "pam.pwquality.ocredit", "pam.pwquality.enforcing", "pam.pwquality.required_classes",
+}
+
+// H-5: libpwquality's read_config_file (settings.c) cuts a line at the first
+// "#", ends the name at whitespace or "=", matches it case-blind against its
+// 21 names and reads an integer with strtol; an unknown name or a bad integer
+// stops that file, and pwquality_read_config then skips every later file. The
+// chain is read the same way, and a stop takes every value leaf absent with
+// the line named.
+func TestPwqualityChainFollowsLibpwquality(t *testing.T) {
+	stopped := func(t *testing.T, b *collect.Builder, reason string, cited []string) {
+		t.Helper()
+		for _, k := range pwqualityStopKeys {
+			e := env(t, b, k)
+			if e.Status != facts.StatusAbsent || e.Reason != reason {
+				t.Errorf("%s = %+v, want absent with %q", k, e, reason)
+			}
+		}
+		if got := sourcePaths(t, env(t, b, "pam.pwquality.minlen")); !slices.Equal(got, cited) {
+			t.Errorf("inputs %v, want %v (the stopping file is cited, the files after it are not)", got, cited)
+		}
+		if e := env(t, b, "pam.pwquality.enabled"); e.Status != facts.StatusOK || e.Value != true {
+			t.Errorf("enabled follows the stack: %+v", e)
+		}
+	}
+	// (a) a drop-in's minlen = 14chars stops it, and the main file after it is
+	// never applied: the main file's 14 is not what libpwquality enforces.
+	b := build(t, "pam", pwqualityChain("minlen = 14\nminclass = 4\n", map[string]string{"50-site.conf": "# site\n\nminlen = 14chars\n"}))
+	stopped(t, b, "libpwquality stops reading at /etc/security/pwquality.conf.d/50-site.conf:3 (minlen = 14chars); the files after it are not applied",
+		[]string{"/etc/security/pwquality.conf.d/50-site.conf", "/etc/authselect/system-auth"})
+	if in := env(t, b, "pam.pwquality.minlen").Source.Inputs[0]; in.Line != 3 {
+		t.Errorf("the stopping file is cited at its line: %+v", in)
+	}
+	// (b) an unknown name in a drop-in stops it and the main file.
+	b = build(t, "pam", pwqualityChain("minlen = 6\n", map[string]string{"50-site.conf": "minlen = 14\nunknownkey = 1\n"}))
+	stopped(t, b, "libpwquality stops reading at /etc/security/pwquality.conf.d/50-site.conf:2 (unknownkey = 1); the files after it are not applied",
+		[]string{"/etc/security/pwquality.conf.d/50-site.conf", "/etc/authselect/system-auth"})
+	// An integer muster does not publish stops the file too.
+	b = build(t, "pam", pwqualityChain("minlen = 14\n", map[string]string{"10-a.conf": "difok = x\n"}))
+	stopped(t, b, "libpwquality stops reading at /etc/security/pwquality.conf.d/10-a.conf:1 (difok = x); the files after it are not applied",
+		[]string{"/etc/security/pwquality.conf.d/10-a.conf", "/etc/authselect/system-auth"})
+	// (g) an error line in the main file after minlen = 12: the main file is
+	// the last file, so the reason says the lines after it.
+	b = build(t, "pam", pwqualityChain("minlen = 12\nbogus\n", nil))
+	stopped(t, b, "libpwquality stops reading at /etc/security/pwquality.conf:2 (bogus); the lines after it are not applied",
+		[]string{"/etc/security/pwquality.conf", "/etc/authselect/system-auth"})
+	// strtol's limits: INT_MAX and INT_MIN themselves are refused, and so is
+	// an empty integer or one with trailing characters.
+	for _, line := range []string{"minlen = 2147483647", "minlen = -2147483648", "minlen = 99999999999999999999", "minlen =", "minlen", "minlen = 0x10", "minlen = 12 34"} {
+		b = build(t, "pam", pwqualityChain(line+"\n", nil))
+		if e := env(t, b, "pam.pwquality.minlen"); e.Status != facts.StatusAbsent || !strings.HasPrefix(e.Reason, "libpwquality stops reading at /etc/security/pwquality.conf:1 (") {
+			t.Errorf("%q: %+v, want a stop", line, e)
+		}
+	}
+	// The tokenizer: no "=", a trailing comment, any case, a sign, a run of
+	// "=" and blanks, CR line ends.
 	for _, c := range []struct {
-		key  string
+		main, key string
+		want      int
+	}{
+		{"minlen 6\n", "minlen", 6},             // (c)
+		{"enforcing 0\n", "enforcing", 0},       // (d)
+		{"minlen = 12 # site\n", "minlen", 12},  // (e)
+		{"MINLEN=12\n", "minlen", 12},           // (f)
+		{"  MinLen\t=\t= 11\r\n", "minlen", 11}, // a run of blanks and "=" before the value
+		{"minlen = +9\n", "minlen", 9},          // strtol takes a sign
+		{"minlen = 2147483646\n", "minlen", 2147483646},
+		{"minlen=7#x\n", "minlen", 7},                                               // "#" cuts wherever it is
+		{"minclass = 2\nbadwords = a=b c\nenforce_for_root = yes\n", "minclass", 2}, // a string and a flag are no stop
+	} {
+		b = build(t, "pam", pwqualityChain(c.main, nil))
+		if e := env(t, b, "pam.pwquality."+c.key); e.Status != facts.StatusOK || e.Value != c.want {
+			t.Errorf("%q: %s = %+v, want %d", c.main, c.key, e, c.want)
+		}
+	}
+	// Names match ASCII case-blind only, as strcasecmp does in the C locale:
+	// the Kelvin sign is not a k.
+	b = build(t, "pam", pwqualityChain("usercheck = 1\nminlen = 10\nuserchecK = 1\n", nil))
+	if e := env(t, b, "pam.pwquality.minlen"); e.Status != facts.StatusAbsent {
+		t.Errorf("a non-ASCII name is unknown: %+v", e)
+	}
+	// A flag set before the stop is applied, as libpwquality applies it.
+	b = build(t, "pam", pwqualityChain("enforce_for_root\nbogus = 1\n", nil))
+	if e := env(t, b, "pam.pwquality.enforce_for_root"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("enforce_for_root before the stop: %+v", e)
+	}
+}
+
+// faillockConfStack is Debian's login and sshd with pam_faillock.so lines that
+// carry no argument, so faillock.conf alone decides.
+func faillockConfStack(conf string) *fsAccess {
+	a := ubuntuPAM()
+	stack := []byte("auth required pam_faillock.so preauth\n@include common-auth\nauth [default=die] pam_faillock.so authfail\naccount required pam_faillock.so\n@include common-account\n")
+	a.contents = map[string][]byte{"/etc/pam.d/login": stack, "/etc/pam.d/sshd": stack, faillockConf: []byte(conf)}
+	return a
+}
+
+// H-6: pam_faillock's read_config_file (faillock_config.c) cuts at the first
+// "#", ends the key at whitespace or "=", matches it case-sensitively in
+// set_conf_opt, reads deny with sscanf "%hu" and the times with "%u" (leading
+// digits; no digits leaves the field unchanged; never is 0 for the unlock
+// times), and the last line wins.
+func TestFaillockConfFollowsPamFaillock(t *testing.T) {
+	for _, c := range []struct {
+		conf, key string
+		want      any
+	}{
+		{"deny = 10   # site\n", "deny", 10},
+		{"deny 0\n", "deny", 0},
+		{"DENY = 0\n", "deny", 3},
+		{"deny = 4\nDENY = 0\n", "deny", 4},
+		{"unlock_time = never\n", "unlock_time", 0},
+		{"deny = 5abc\n", "deny", 5},
+		{"deny = abc\n", "deny", 3},
+		{"deny = 4\ndeny = abc\n", "deny", 4},
+		{"deny = 4\ndeny = 7\n", "deny", 7},
+		{"deny=8\n", "deny", 8},
+		{"deny = = 5\n", "deny", 3},   // one "=" is skipped, not two
+		{"deny = 65541\n", "deny", 5}, // "%hu" keeps the low 16 bits
+		{"deny = -1\n", "deny", 65535},
+		{"fail_interval = 604801\n", "fail_interval", 900}, // over MAX_TIME_INTERVAL: unchanged
+		{"fail_interval = 604800\n", "fail_interval", 604800},
+		{"root_unlock_time = never\nunlock_time = 60\n", "root_unlock_time", 0},
+		{"root_unlock_time = x\nunlock_time = 60\n", "root_unlock_time", 60}, // unchanged: falls back to unlock_time
+		{"Even_Deny_Root\n", "even_deny_root", false},
+		{"even_deny_root\n", "even_deny_root", true},
+	} {
+		b := build(t, "pam", faillockConfStack(c.conf))
+		if e := env(t, b, "pam.faillock.enabled"); e.Status != facts.StatusOK || e.Value != true {
+			t.Fatalf("%q: enabled %+v", c.conf, e)
+		}
+		if e := env(t, b, "pam.faillock."+c.key); e.Status != facts.StatusOK || e.Value != c.want {
+			t.Errorf("%q: %s = %+v, want %v", c.conf, c.key, e, c.want)
+		}
+	}
+}
+
+// H-6: pam_pwhistory reads remember through pam_modutil_search_key
+// (pam_modutil_searchkey.c): "#" cuts, the key ends at a blank or "=", it
+// matches case-blind and the FIRST matching line wins; pwhistory_config.c
+// reads it with sscanf "%u", and no digits keeps the default 10.
+func TestPwhistoryConfFollowsSearchKey(t *testing.T) {
+	for _, c := range []struct {
+		conf string
 		want int
-	}{{"minclass", 3}, {"ucredit", -1}} {
-		if g := env(t, b, "pam.pwquality."+c.key); g.Status != facts.StatusOK || g.Value != c.want {
-			t.Errorf("%s = %+v, want %d - one unreadable key must not poison the rest", c.key, g, c.want)
+	}{
+		{"remember = 2 # x\n", 2},
+		{"remember = 3\nremember = 9\n", 3},
+		{"REMEMBER 7\n", 7},
+		{"remember = 12abc\n", 12},
+		{"remember = x\nremember = 5\n", 10}, // the first match wins even when it does not convert
+		{"# remember = 4\n", 10},
+		{"remember\t=\t=6\n", 6},
+	} {
+		a := ubuntuPAM()
+		a.files["/etc/pam.d/common-password"] = "pam/ubuntu/common-password-pwhistory"
+		a.contents = map[string][]byte{pwhistoryConf: []byte(c.conf)}
+		if e := env(t, build(t, "pam", a), "pam.password.remember"); e.Status != facts.StatusOK || e.Value != c.want {
+			t.Errorf("%q: remember %+v, want %d", c.conf, e, c.want)
 		}
-	}
-	if g := env(t, b, "pam.pwquality.required_classes"); g.Status != facts.StatusOK || g.Value != 3 {
-		t.Errorf("required_classes %+v, want 3 - minlen is not one of its inputs", g)
-	}
-	if g := env(t, b, "pam.pwquality.enabled"); g.Status != facts.StatusOK || g.Value != true {
-		t.Errorf("enabled follows the stack, not the values: %+v", g)
-	}
-	// A credit IS one of required_classes' five inputs, so the derived key goes
-	// absent with the offender rather than publishing a number derived from a
-	// default nobody wrote.
-	b = build(t, "pam", chain("pam/rocky/dropin-30-bad-credit.conf"))
-	for _, k := range []string{"pam.pwquality.ucredit", "pam.pwquality.required_classes"} {
-		g := env(t, b, k)
-		if g.Status != facts.StatusAbsent || !strings.Contains(g.Reason, `ucredit = "plenty"`) {
-			t.Errorf("%s = %+v, want absent naming ucredit", k, g)
-		}
-	}
-	if g := env(t, b, "pam.pwquality.minlen"); g.Status != facts.StatusOK || g.Value != 10 {
-		t.Errorf("minlen %+v, want the 10 the readable drop-in set", g)
-	}
-	// "minlen =" (an empty reset) and a bare "minclass" line are one shape: the
-	// merged map cannot tell them apart, and neither is an integer.
-	b = build(t, "pam", chain("pam/rocky/dropin-30-reset.conf"))
-	for _, k := range []string{"minlen", "minclass"} {
-		g := env(t, b, "pam.pwquality."+k)
-		if g.Status != facts.StatusAbsent || !strings.Contains(g.Reason, k+` = ""`) {
-			t.Errorf("%s = %+v, want absent naming the empty value", k, g)
-		}
-	}
-	if g := env(t, b, "pam.pwquality.required_classes"); g.Status != facts.StatusAbsent {
-		t.Errorf("required_classes %+v, want absent - minclass is one of its inputs", g)
 	}
 }

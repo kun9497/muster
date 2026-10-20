@@ -838,11 +838,38 @@ func FuzzParsePAMFile(f *testing.F) {
 	})
 }
 
-func FuzzParseKV(f *testing.F) {
-	seeds(f, "testdata/pam/*/pwquality.conf", "testdata/pam/rocky/faillock.conf",
-		"testdata/pam/rocky/dropin-*.conf", "testdata/pam/ubuntu/pwhistory.conf")
+func FuzzParsePwqualityInto(f *testing.F) {
+	seeds(f, "testdata/pam/*/pwquality.conf", "testdata/pam/rocky/dropin-*.conf", "testdata/pam/rocky/90-local.conf",
+		"testdata/pam/rocky/credits.conf")
 	f.Fuzz(func(t *testing.T, data []byte) {
-		fuzzBody(t, "parseKV", func() any { return parseKV(data) }, len(data))
+		fuzzBody(t, "parsePwqualityInto", func() any {
+			kv := map[string]string{}
+			stop := parsePwqualityInto(data, kv)
+			return []any{kv, stop}
+		}, len(data))
+	})
+}
+
+func FuzzParseFaillockConf(f *testing.F) {
+	seeds(f, "testdata/pam/rocky/faillock.conf")
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "parseFaillockConf", func() any {
+			o := faillockOpts{vals: map[string]int{}}
+			for _, c := range parseFaillockConf(data) {
+				o.set(c.name, c.value)
+			}
+			return o.vals
+		}, len(data))
+	})
+}
+
+func FuzzPwhistoryRemember(f *testing.F) {
+	seeds(f, "testdata/pam/ubuntu/pwhistory.conf")
+	f.Fuzz(func(t *testing.T, data []byte) {
+		fuzzBody(t, "pwhistoryRemember", func() any {
+			n, line, found, ok := pwhistoryRemember(data)
+			return []any{n, line, found, ok}
+		}, len(data))
 	})
 }
 
