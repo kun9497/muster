@@ -1586,3 +1586,61 @@ func TestPwhistoryUnconvertedRememberCitesTheFile(t *testing.T) {
 		t.Errorf("inputs %v, want %s:2 cited", got, pwhistoryConf)
 	}
 }
+
+// H-17: pam_faillock and pam_pwquality read another file when a stack line
+// names one with conf=. muster reads only the default files, so a value it
+// published from those would be a guess about a file it never read: the
+// value leaves are absent, naming the line and the argument. enabled still
+// follows the stacks.
+func TestConfArgumentMakesTheValuesAbsent(t *testing.T) {
+	a := ubuntuPAM()
+	stack := "auth required pam_faillock.so preauth\n@include common-auth\nauth [default=die] pam_faillock.so authfail\naccount required pam_faillock.so\n@include common-account\n"
+	a.contents = map[string][]byte{
+		"/etc/pam.d/login": []byte(stack),
+		"/etc/pam.d/sshd":  []byte(strings.Replace(stack, "authfail\n", "authfail conf=/etc/security/faillock-sshd.conf\n", 1)),
+		faillockConf:       []byte("deny = 5\n"),
+	}
+	b := build(t, "pam", a)
+	if e := env(t, b, "pam.faillock.enabled"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("enabled %+v, want the stacks' true", e)
+	}
+	want := "/etc/pam.d/sshd:3 names conf=/etc/security/faillock-sshd.conf; muster reads only /etc/security/faillock.conf"
+	for _, k := range accessKeys[1:6] {
+		if e := env(t, b, k); e.Status != facts.StatusAbsent || e.Reason != want {
+			t.Errorf("%s = %+v, want absent with %q", k, e, want)
+		}
+	}
+	// conf= on the account line counts too: it is a pam_faillock.so line of a
+	// judged service.
+	a.contents["/etc/pam.d/sshd"] = []byte(strings.Replace(stack, "account required pam_faillock.so\n", "account required pam_faillock.so conf=/etc/x.conf\n", 1))
+	if e := env(t, build(t, "pam", a), "pam.faillock.deny"); e.Status != facts.StatusAbsent || e.Reason != "/etc/pam.d/sshd:4 names conf=/etc/x.conf; muster reads only /etc/security/faillock.conf" {
+		t.Errorf("account-line conf=: deny %+v", e)
+	}
+
+	// pam_pwquality: the enabled line's conf= makes every value leaf absent.
+	p := rockyPAM()
+	data, err := os.ReadFile("testdata/pam/rocky/authselect-password-auth")
+	if err != nil {
+		t.Fatal(err)
+	}
+	const line = "pam_pwquality.so local_users_only"
+	if !strings.Contains(string(data), line+"\n") {
+		t.Fatalf("the fixture carries no %q line", line)
+	}
+	delete(p.files, "/etc/authselect/system-auth")
+	p.contents = map[string][]byte{
+		"/etc/authselect/system-auth": []byte(strings.Replace(string(data), line+"\n", line+" conf=/etc/security/pwq-site.conf\n", 1)),
+		pwqualityConf:                 []byte("minlen = 14\nminclass = 4\n"),
+	}
+	b = build(t, "pam", p)
+	if e := env(t, b, "pam.pwquality.enabled"); e.Status != facts.StatusOK || e.Value != true {
+		t.Errorf("pwquality enabled %+v", e)
+	}
+	for _, k := range pwqualityValueKeys {
+		e := env(t, b, k)
+		if e.Status != facts.StatusAbsent || !strings.HasPrefix(e.Reason, "/etc/authselect/system-auth:") ||
+			!strings.HasSuffix(e.Reason, " names conf=/etc/security/pwq-site.conf; muster reads only /etc/security/pwquality.conf and its drop-ins") {
+			t.Errorf("%s = %+v, want absent naming the conf= line", k, e)
+		}
+	}
+}

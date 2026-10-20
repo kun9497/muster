@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io/fs"
 	"maps"
+	"path"
 	"slices"
 	"strconv"
 	"strings"
@@ -60,6 +61,28 @@ func argsKV(args []string) map[string]string {
 		kv[asciiLower(k)] = v
 	}
 	return kv
+}
+
+// confArgument finds the first line of module among lines, in stack order,
+// whose arguments include conf=<file>, and that argument.
+func confArgument(lines []pamLine, module string) (pamLine, string, bool) {
+	for _, l := range lines {
+		if path.Base(l.Module) != module {
+			continue
+		}
+		for _, a := range l.Args {
+			if strings.HasPrefix(a, "conf=") {
+				return l, a, true
+			}
+		}
+	}
+	return pamLine{}, "", false
+}
+
+// confArgumentReason is H-17's reason: the line, its conf= argument, and the
+// file muster reads instead.
+func confArgumentReason(l pamLine, arg, reads string) string {
+	return l.Path + ":" + strconv.Itoa(l.Line) + " names " + arg + "; muster reads only " + reads
 }
 
 // pwqualityStopReason is the reason every value leaf carries when a file
@@ -186,6 +209,16 @@ func pwqualityFacts(s pamStacks, a collect.Access) map[string]facts.Envelope {
 	// A fresh Source per key, so no two envelopes share one pointer (R147).
 	src := func() *facts.Source { return &facts.Source{Kind: "derived", Inputs: slices.Clone(inputs)} }
 	out["pam.pwquality.enabled"] = collect.OK(true, src())
+	// H-17: conf= on the enabled line points libpwquality at another file,
+	// which muster does not read: every value leaf is absent, naming the line.
+	if _, arg, ok := confArgument([]pamLine{*enabled}, "pam_pwquality.so"); ok {
+		for _, k := range pwqualityValueKeys {
+			e := collect.Absent(confArgumentReason(*enabled, arg, pwqualityConf+" and its drop-ins"))
+			e.Source = src()
+			out[k] = e
+		}
+		return out
+	}
 	if readErr != nil {
 		for _, k := range pwqualityValueKeys {
 			out[k] = *readErr
@@ -504,6 +537,19 @@ func faillockFacts(s pamStacks, a collect.Access) map[string]facts.Envelope {
 	enabled := collect.OK(true, src())
 	enabled.Reason = faillockDisagreement(services)
 	out["pam.faillock.enabled"] = enabled
+	// H-17: a pam_faillock.so line that names another file with conf= makes
+	// the module read that file instead of faillock.conf, and muster never
+	// reads it, so the values would be a guess: absent, naming the line.
+	for _, svc := range faillockServices {
+		if l, arg, ok := confArgument(s.byName[svc], "pam_faillock.so"); ok {
+			for _, k := range accessKeys[1:6] {
+				e := collect.Absent(confArgumentReason(l, arg, faillockConf))
+				e.Source = src()
+				out[k] = e
+			}
+			return out
+		}
+	}
 	if confErr != nil {
 		for _, k := range accessKeys[1:6] {
 			out[k] = *confErr

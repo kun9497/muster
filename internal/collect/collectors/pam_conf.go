@@ -310,6 +310,10 @@ func (o *faillockOpts) setArgs(args []string) {
 		case "preauth", "authfail", "authsucc":
 			continue
 		}
+		if name == "conf" {
+			// another conf file: faillockFacts takes the values absent (H-17)
+			continue
+		}
 		o.set(name, value)
 	}
 }
