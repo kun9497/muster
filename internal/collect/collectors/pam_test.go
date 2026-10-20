@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -720,8 +721,16 @@ func TestPAMFaillockEnabledWithPrecedence(t *testing.T) {
 			t.Errorf("%s = %+v, want %v", k, e, want)
 		}
 	}
-	if e := env(t, b, "pam.faillock.deny"); len(e.Source.Inputs) != 3 || e.Source.Inputs[0].Path != "/etc/security/faillock.conf" || e.Source.Inputs[1].Line != 3 || e.Source.Inputs[2].Line != 5 {
-		t.Errorf("inputs: conf, preauth line, authfail line - got %+v", e.Source.Inputs)
+	// f5: the conf file, then each service's preauth and authfail line
+	// (login through system-auth, sshd through password-auth).
+	want := []string{"/etc/security/faillock.conf:0", "/etc/authselect/system-auth:3", "/etc/authselect/system-auth:5",
+		"/etc/authselect/password-auth:3", "/etc/authselect/password-auth:5"}
+	var got []string
+	for _, in := range env(t, b, "pam.faillock.deny").Source.Inputs {
+		got = append(got, in.Path+":"+strconv.Itoa(in.Line))
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("inputs: conf, then each service's preauth and authfail line - got %v", got)
 	}
 	// sshd's stack (password-auth) without faillock: not enabled, values absent.
 	a = rockyPAM()
@@ -769,14 +778,16 @@ func TestPAMFaillockUnreadableConfIsTheAnswer(t *testing.T) {
 	}
 }
 
-// R150: the preauth and authfail lines may carry different values. The
-// authfail line is the one reported, and enabled says they disagree.
+// R150: the preauth and authfail lines may carry different values. Each line
+// is resolved on its own and the weaker of the two is reported (preauth
+// deny=3 with authfail deny=5 locks at 5 at the earliest); enabled says they
+// disagree.
 func TestPAMFaillockPreauthAndAuthfailDisagree(t *testing.T) {
 	a := rockyPAM()
 	a.files["/etc/authselect/system-auth"] = "pam/rocky/authselect-system-auth-mismatch"
 	b := build(t, "pam", a)
 	if e := env(t, b, "pam.faillock.deny"); e.Status != facts.StatusOK || e.Value != 5 {
-		t.Errorf("the authfail value is the one reported: %+v", e)
+		t.Errorf("the larger deny is the one reported: %+v", e)
 	}
 	e := env(t, b, "pam.faillock.enabled")
 	if e.Status != facts.StatusOK || e.Value != true || !strings.Contains(e.Reason, "disagree on deny") {
@@ -784,6 +795,93 @@ func TestPAMFaillockPreauthAndAuthfailDisagree(t *testing.T) {
 	}
 	if strings.Contains(e.Reason, "unlock_time") {
 		t.Errorf("only the keys that differ are named: %+v", e)
+	}
+	// preauth deny=0 never refuses a locked account before pam_unix runs, so
+	// authfail's deny=5 is no lockout: the weaker value, 0, is the fact.
+	a = rockyPAM()
+	a.files["/etc/authselect/system-auth"] = "pam/rocky/authselect-system-auth-preauth-deny0"
+	b = build(t, "pam", a)
+	if e := env(t, b, "pam.faillock.deny"); e.Status != facts.StatusOK || e.Value != 0 {
+		t.Errorf("preauth deny=0 with authfail deny=5 is no lockout: %+v", e)
+	}
+	if e := env(t, b, "pam.faillock.enabled"); !strings.Contains(e.Reason, "preauth and authfail disagree on deny") {
+		t.Errorf("%+v", e)
+	}
+}
+
+// f5: pam_faillock resolves its options per stack line and per service, and
+// sshd authenticates through its own stack, so every login-facing service is
+// judged and the weakest value is the fact - login at deny=5 must not hide
+// sshd at deny=0 (never locks) or deny=99.
+func TestPAMFaillockServicesDisagree(t *testing.T) {
+	cites := func(e facts.Envelope, path string, lines ...int) bool {
+		for _, l := range lines {
+			if !slices.ContainsFunc(e.Source.Inputs, func(s facts.Source) bool { return s.Path == path && s.Line == l }) {
+				return false
+			}
+		}
+		return true
+	}
+	for _, tc := range []struct {
+		name, systemAuth, passwordAuth string
+		key                            string
+		want                           any
+		reason                         string
+	}{
+		{"sshd deny 0", "authselect-system-auth", "authselect-password-auth-deny0", "deny", 0, "login and sshd disagree on deny (5 vs 0)"},
+		{"sshd deny 99", "authselect-system-auth", "authselect-password-auth-deny99", "deny", 99, "login and sshd disagree on deny (5 vs 99)"},
+		{"login deny 0", "authselect-password-auth-deny0", "authselect-password-auth", "deny", 0, "login and sshd disagree on deny (0 vs 5)"},
+		{"sshd unlock 60", "authselect-system-auth", "authselect-password-auth-unlock60", "unlock_time", 60, "login and sshd disagree on unlock_time (900 vs 60)"},
+		{"sshd unlock 0", "authselect-system-auth", "authselect-password-auth-unlock0", "unlock_time", 900, "login and sshd disagree on unlock_time (900 vs 0)"},
+		{"login even_deny_root only", "authselect-system-auth-evendenyroot", "authselect-password-auth", "even_deny_root", false, "login and sshd disagree on even_deny_root (true vs false)"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			a := rockyPAM()
+			a.files["/etc/authselect/system-auth"] = "pam/rocky/" + tc.systemAuth
+			a.files["/etc/authselect/password-auth"] = "pam/rocky/" + tc.passwordAuth
+			b := build(t, "pam", a)
+			e := env(t, b, "pam.faillock."+tc.key)
+			if e.Status != facts.StatusOK || e.Value != tc.want {
+				t.Errorf("%s = %+v, want %v", tc.key, e, tc.want)
+			}
+			if !cites(e, "/etc/authselect/system-auth", 3, 5) || !cites(e, "/etc/authselect/password-auth", 3, 5) {
+				t.Errorf("both services' lines are the evidence: %+v", e.Source.Inputs)
+			}
+			en := env(t, b, "pam.faillock.enabled")
+			if en.Value != true || !strings.Contains(en.Reason, tc.reason) {
+				t.Errorf("enabled %+v, want a reason containing %q", en, tc.reason)
+			}
+		})
+	}
+	// Identical values in both services: no disagreement is reported, and
+	// both services' lines are still cited.
+	b := build(t, "pam", rockyPAM())
+	if e := env(t, b, "pam.faillock.enabled"); e.Reason != "" {
+		t.Errorf("identical stacks disagree on nothing: %+v", e)
+	}
+	// Debian: sshd carries its own faillock lines beside @include
+	// common-auth; they are read from /etc/pam.d/sshd and judged.
+	a := ubuntuPAM()
+	a.files["/etc/pam.d/login"] = "pam/ubuntu/login-faillock"
+	a.files["/etc/pam.d/sshd"] = "pam/ubuntu/sshd-faillock-deny0"
+	b = build(t, "pam", a)
+	e := env(t, b, "pam.faillock.deny")
+	if e.Status != facts.StatusOK || e.Value != 0 {
+		t.Errorf("deny %+v", e)
+	}
+	if !cites(e, "/etc/pam.d/login", 3, 5) || !cites(e, "/etc/pam.d/sshd", 1, 3) {
+		t.Errorf("inputs %+v", e.Source.Inputs)
+	}
+	if en := env(t, b, "pam.faillock.enabled"); en.Value != true || !strings.Contains(en.Reason, "login and sshd disagree on deny (5 vs 0)") {
+		t.Errorf("%+v", en)
+	}
+	a.files["/etc/pam.d/sshd"] = "pam/ubuntu/sshd-faillock"
+	b = build(t, "pam", a)
+	if e := env(t, b, "pam.faillock.deny"); e.Value != 5 {
+		t.Errorf("deny %+v", e)
+	}
+	if en := env(t, b, "pam.faillock.enabled"); en.Value != true || en.Reason != "" {
+		t.Errorf("%+v", en)
 	}
 }
 
@@ -859,13 +957,17 @@ func TestPAMSuWheel(t *testing.T) {
 // it - so even_deny_root=0 names the option too - and root_unlock_time set
 // anywhere implies even_deny_root (pam_faillock(8)).
 func TestPAMFaillockEvenDenyRootFollowsTheModule(t *testing.T) {
+	// Both services carry the line: even_deny_root holds only when every
+	// login-facing service denies root (f5; TestPAMFaillockServicesDisagree).
 	a := rockyPAM()
 	a.files["/etc/authselect/system-auth"] = "pam/rocky/authselect-system-auth-evendenyroot0"
+	a.files["/etc/authselect/password-auth"] = "pam/rocky/authselect-system-auth-evendenyroot0"
 	if e := env(t, build(t, "pam", a), "pam.faillock.even_deny_root"); e.Status != facts.StatusOK || e.Value != true {
 		t.Errorf("%+v (even_deny_root=0 still names the option)", e)
 	}
 	a = rockyPAM()
 	a.files["/etc/authselect/system-auth"] = "pam/rocky/authselect-system-auth-evendenyroot"
+	a.files["/etc/authselect/password-auth"] = "pam/rocky/authselect-system-auth-evendenyroot"
 	if e := env(t, build(t, "pam", a), "pam.faillock.even_deny_root"); e.Status != facts.StatusOK || e.Value != true {
 		t.Errorf("%+v", e)
 	}
@@ -879,6 +981,7 @@ func TestPAMFaillockEvenDenyRootFollowsTheModule(t *testing.T) {
 	// module locks root out too, so the fact says so.
 	a = rockyPAM()
 	a.files["/etc/authselect/system-auth"] = "pam/rocky/authselect-system-auth-rootunlock"
+	a.files["/etc/authselect/password-auth"] = "pam/rocky/authselect-system-auth-rootunlock"
 	b := build(t, "pam", a)
 	if e := env(t, b, "pam.faillock.even_deny_root"); e.Status != facts.StatusOK || e.Value != true {
 		t.Errorf("%+v (root_unlock_time implies even_deny_root)", e)

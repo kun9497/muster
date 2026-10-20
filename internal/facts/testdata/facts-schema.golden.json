@@ -2614,7 +2614,7 @@
     {
       "Key": "pam.faillock.deny",
       "Type": "int",
-      "Description": "Effective deny - the default 3, then faillock.conf, then the preauth arguments, then the authfail arguments; 0 disables the lockout. What is published is the merge of faillock.conf, the preauth arguments and the authfail arguments, the authfail line applied last; when the two lines disagree pam.faillock.enabled says so in its reason. A conf= argument naming another file is not handled.",
+      "Description": "Effective deny, the weakest the login-facing services enforce - each service's preauth and authfail line is resolved on its own (the default 3, then faillock.conf, then that line's arguments) and the weaker of the two kept, then the weakest service; 0 disables the lockout and is weaker than any count, otherwise the larger count is the weaker. When a service's two lines or the services disagree, pam.faillock.enabled says so in its reason. A conf= argument naming another file is not handled.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "pam",
@@ -2624,7 +2624,7 @@
     {
       "Key": "pam.faillock.unlock_time",
       "Type": "int",
-      "Description": "Effective unlock_time in seconds (default 600), resolved like deny; 0 means the account stays locked until an administrator releases it.",
+      "Description": "Effective unlock_time in seconds (default 600), resolved like deny with the shortest non-zero wait the weakest; 0 means the account stays locked until an administrator releases it, and is reported only when every line has it.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "pam",
@@ -2634,7 +2634,7 @@
     {
       "Key": "pam.faillock.fail_interval",
       "Type": "int",
-      "Description": "Effective fail_interval in seconds (default 900), resolved like deny.",
+      "Description": "Effective fail_interval in seconds (default 900), resolved like deny with the longest interval kept.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "pam",
@@ -2644,7 +2644,7 @@
     {
       "Key": "pam.faillock.even_deny_root",
       "Type": "bool",
-      "Description": "even_deny_root is set in faillock.conf or as a module argument (with or without a value), or root_unlock_time is set, which implies it.",
+      "Description": "even_deny_root is set in faillock.conf or as an argument of a service's preauth or authfail line (with or without a value), or root_unlock_time is set, which implies it - in every login-facing service.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "pam",
@@ -2654,7 +2654,7 @@
     {
       "Key": "pam.faillock.root_unlock_time",
       "Type": "int",
-      "Description": "Effective root_unlock_time in seconds, resolved like deny; unlock_time when not set.",
+      "Description": "Effective root_unlock_time in seconds, resolved like unlock_time; a line's unlock_time when not set.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "pam",

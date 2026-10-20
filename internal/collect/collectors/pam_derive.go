@@ -389,14 +389,59 @@ func faillockComplete(lines []pamLine) (preauth, authfail *pamLine, ok bool) {
 	return preauth, authfail, preauth != nil && authfail != nil && reset
 }
 
+// weakerFaillock is the weaker of two values of one pam_faillock setting:
+// what the less strict of two stack lines, or of two services, enforces.
+// deny 0 never locks (check_tally locks only when deny is set and the count
+// reaches it), so it is weaker than any count, and otherwise the larger count
+// is the weaker. unlock_time 0 never unlocks, so the shorter non-zero wait is
+// the weaker. fail_interval is reduced to the larger window (as the f5
+// hotfix ruled; no control reads it).
+func weakerFaillock(k string, a, b int) int {
+	switch k {
+	case "deny":
+		if a == 0 || b == 0 {
+			return 0
+		}
+		return max(a, b)
+	case "unlock_time", "root_unlock_time":
+		if a == 0 {
+			return b
+		}
+		if b == 0 {
+			return a
+		}
+		return min(a, b)
+	default:
+		return max(a, b)
+	}
+}
+
+// faillockService is one complete service's lockout, resolved.
+type faillockService struct {
+	name           string
+	vals           map[string]int
+	evenDenyRoot   bool
+	preauthDiffers []string
+}
+
 // faillockFacts derives pam.faillock.* . enabled requires the whole set in
 // every existing login-facing service — a mention of the module is not a
-// lockout. Values come from faillock.conf, then the preauth arguments,
-// then the authfail arguments of the first complete service, each
-// overriding the last.
+// lockout. pam_faillock resolves its options on every call from the line
+// that made it (defaults, faillock.conf, that line's arguments), and sshd
+// authenticates through its own stack, so every complete service is
+// resolved on its own: its preauth and its authfail line each on top of the
+// conf file, the weaker of the two kept (R150). The facts are the weakest
+// values across the services (weakerFaillock; even_deny_root only when every
+// service denies root), the evidence is every service's two lines, and a
+// disagreement — between a service's two lines or between services — is
+// named in enabled's reason.
 func faillockFacts(s pamStacks, a collect.Access) map[string]facts.Envelope {
 	out := map[string]facts.Envelope{}
-	var preauth, authfail *pamLine
+	type pair struct {
+		svc       string
+		pre, fail *pamLine
+	}
+	var pairs []pair
 	missing := ""
 	seen := false
 	for _, svc := range faillockServices {
@@ -411,9 +456,7 @@ func faillockFacts(s pamStacks, a collect.Access) map[string]facts.Envelope {
 			}
 			continue
 		}
-		if preauth == nil {
-			preauth, authfail = pre, fail
-		}
+		pairs = append(pairs, pair{svc, pre, fail})
 	}
 	if !seen {
 		for _, k := range accessKeys[:6] {
@@ -433,9 +476,9 @@ func faillockFacts(s pamStacks, a collect.Access) map[string]facts.Envelope {
 		}
 		return out
 	}
-	vals := map[string]int{"deny": 3, "unlock_time": 600, "fail_interval": 900, "root_unlock_time": 0}
-	evenDenyRoot := false
-	rootSet := false
+	base := map[string]int{"deny": 3, "unlock_time": 600, "fail_interval": 900, "root_unlock_time": 0}
+	confDenyRoot := false
+	confRootSet := false
 	var inputs []facts.Source
 	// R148: faillock.conf exists and the module reads it, so a value taken
 	// from the defaults instead would be a guess about a file nobody here
@@ -445,41 +488,54 @@ func faillockFacts(s pamStacks, a collect.Access) map[string]facts.Envelope {
 		e := readErrorEnv(faillockConf, err)
 		confErr = &e
 	} else if kv != nil {
-		rootSet = applyFaillock(vals, kv) || rootSet
+		confRootSet = applyFaillock(base, kv)
 		if _, ok := kv["even_deny_root"]; ok {
-			evenDenyRoot = true
+			confDenyRoot = true
 		}
 		inputs = append(inputs, *src)
 	}
-	// R150: each line resolved on its own, so a disagreement is about the
-	// values the two halves would enforce, not about the text.
-	preEff := faillockEffective(vals, rootSet, preauth.Args)
-	failEff := faillockEffective(vals, rootSet, authfail.Args)
-	var differ []string
-	for _, k := range faillockInts {
-		if preEff[k] != failEff[k] {
-			differ = append(differ, k)
+	var services []faillockService
+	for _, p := range pairs {
+		// R150: each line resolved on its own, so a disagreement is about
+		// the values the two halves would enforce, not about the text.
+		preEff := faillockEffective(base, confRootSet, p.pre.Args)
+		failEff := faillockEffective(base, confRootSet, p.fail.Args)
+		svc := faillockService{name: p.svc, vals: map[string]int{}}
+		for _, k := range faillockInts {
+			if preEff[k] != failEff[k] {
+				svc.preauthDiffers = append(svc.preauthDiffers, k)
+			}
+			svc.vals[k] = weakerFaillock(k, preEff[k], failEff[k])
+		}
+		// R160: args_parse splits every argument that is not preauth,
+		// authfail or authsucc at "=" and hands the name to set_conf_opt,
+		// which sets this flag for even_deny_root whatever value follows it
+		// - so even_deny_root=0 sets it, exactly as the conf file does.
+		// root_unlock_time, wherever it was set, implies even_deny_root as
+		// well (pam_faillock(8)).
+		_, preRoot := argsKV(p.pre.Args)["root_unlock_time"]
+		_, failRoot := argsKV(p.fail.Args)["root_unlock_time"]
+		svc.evenDenyRoot = confDenyRoot || hasArg(p.pre.Args, "even_deny_root") || hasArg(p.fail.Args, "even_deny_root") ||
+			confRootSet || preRoot || failRoot
+		services = append(services, svc)
+		for _, l := range []pamLine{*p.pre, *p.fail} {
+			if ls := lineSource(l); !slices.ContainsFunc(inputs, func(in facts.Source) bool { return in.Path == ls.Path && in.Line == ls.Line }) {
+				inputs = append(inputs, ls)
+			}
 		}
 	}
-	rootSet = applyFaillock(vals, argsKV(preauth.Args)) || rootSet
-	inputs = append(inputs, lineSource(*preauth))
-	rootSet = applyFaillock(vals, argsKV(authfail.Args)) || rootSet
-	inputs = append(inputs, lineSource(*authfail))
-	// R160: args_parse splits every argument that is not preauth, authfail or
-	// authsucc at "=" and hands the name to set_conf_opt, which sets this flag
-	// for even_deny_root whatever value follows it - so even_deny_root=0 sets
-	// it, exactly as the conf file does. root_unlock_time, wherever it was
-	// set, implies even_deny_root as well (pam_faillock(8)).
-	evenDenyRoot = evenDenyRoot || hasArg(preauth.Args, "even_deny_root") || hasArg(authfail.Args, "even_deny_root") || rootSet
-	if !rootSet {
-		vals["root_unlock_time"] = vals["unlock_time"]
+	vals := maps.Clone(services[0].vals)
+	evenDenyRoot := services[0].evenDenyRoot
+	for _, svc := range services[1:] {
+		for _, k := range faillockInts {
+			vals[k] = weakerFaillock(k, vals[k], svc.vals[k])
+		}
+		evenDenyRoot = evenDenyRoot && svc.evenDenyRoot
 	}
 	// A fresh Source per key, so no two envelopes share one pointer (R147).
 	src := func() *facts.Source { return &facts.Source{Kind: "derived", Inputs: slices.Clone(inputs)} }
 	enabled := collect.OK(true, src())
-	if len(differ) > 0 {
-		enabled.Reason = "preauth and authfail disagree on " + strings.Join(differ, ", ")
-	}
+	enabled.Reason = faillockDisagreement(services)
 	out["pam.faillock.enabled"] = enabled
 	if confErr != nil {
 		for _, k := range accessKeys[1:6] {
@@ -493,6 +549,50 @@ func faillockFacts(s pamStacks, a collect.Access) map[string]facts.Envelope {
 	out["pam.faillock.even_deny_root"] = collect.OK(evenDenyRoot, src())
 	out["pam.faillock.root_unlock_time"] = collect.OK(vals["root_unlock_time"], src())
 	return out
+}
+
+// faillockDisagreement names what the lockout's lines disagree on: a
+// service whose preauth and authfail lines resolve differently (R150; when
+// every service's lines differ on the same settings the text names no
+// service), then each setting the services resolve differently, with every
+// service's value in service order, e.g. "login and sshd disagree on deny
+// (5 vs 0)". It is "" when nothing disagrees.
+func faillockDisagreement(services []faillockService) string {
+	var parts []string
+	same := true
+	for _, svc := range services[1:] {
+		if !slices.Equal(svc.preauthDiffers, services[0].preauthDiffers) {
+			same = false
+		}
+	}
+	for _, svc := range services {
+		if len(svc.preauthDiffers) == 0 {
+			continue
+		}
+		if same {
+			parts = append(parts, "preauth and authfail disagree on "+strings.Join(svc.preauthDiffers, ", "))
+			break
+		}
+		parts = append(parts, svc.name+"'s preauth and authfail disagree on "+strings.Join(svc.preauthDiffers, ", "))
+	}
+	names := make([]string, len(services))
+	for i, svc := range services {
+		names[i] = svc.name
+	}
+	for _, k := range append(slices.Clone(faillockInts), "even_deny_root") {
+		values := make([]string, len(services))
+		for i, svc := range services {
+			if k == "even_deny_root" {
+				values[i] = strconv.FormatBool(svc.evenDenyRoot)
+			} else {
+				values[i] = strconv.Itoa(svc.vals[k])
+			}
+		}
+		if slices.ContainsFunc(values, func(v string) bool { return v != values[0] }) {
+			parts = append(parts, strings.Join(names, " and ")+" disagree on "+k+" ("+strings.Join(values, " vs ")+")")
+		}
+	}
+	return strings.Join(parts, "; ")
 }
 
 // suFacts derives pam.su.* from su's auth stack: the first pam_wheel.so
