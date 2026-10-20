@@ -317,7 +317,7 @@ regenerates them from public images and `-check` compares.
 - `controls/testdata/_roundtrip.yaml` (ignored by the fixture harness) names, per scripted control sorted by id, the
   matrix rows (`images`, by `key`) that prove it, `unproven_units` (keys in `units`, `modules` or `sysctl`) with a
   reason, or `unproven: <reason>` (no systemd unit / no package in the enabled repositories / cannot run in a container /
-  the kernel does not ship the module; `dos_services`, `finger`, `rservices` are unproven).
+  the kernel does not ship the module; `dos_services`, `finger`, `rservices` and `usb_storage` are unproven).
   `TestEveryScriptedControlIsInTheRoundtripTable` holds it equal to the shipped scripted set and to `fix-roundtrip`'s
   matrix: every row has `kind` `container` (with an `image`) or `host` (no `image`, `init` or `build`), `seeded` equals
   the table per row, no `muster.service.*` on a non-init row, `muster.beyond.*` on host rows only. A new scripted control

@@ -592,8 +592,7 @@ jobs:
               muster.beyond.source_routing_rejected muster.beyond.suid_dumpable_disabled
               muster.beyond.syn_cookies_enabled muster.beyond.sysrq_restricted
               muster.beyond.uncommon_filesystems_disabled muster.beyond.uncommon_network_protocols_disabled
-              muster.beyond.unprivileged_bpf_restricted muster.beyond.usb_storage_disabled
-              muster.file.hosts_permissions
+              muster.beyond.unprivileged_bpf_restricted muster.file.hosts_permissions
               muster.file.inetd_conf_permissions muster.file.shadow_permissions muster.file.syslog_conf_permissions
     steps:
       - uses: actions/checkout@v4
