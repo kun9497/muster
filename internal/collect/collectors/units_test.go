@@ -690,3 +690,43 @@ func TestUnitsPastTheCapFlagsNothing(t *testing.T) {
 		t.Errorf("%d rows", len(rows))
 	}
 }
+
+// H-13 (f7): whoever may write a unit file's directory may replace the file,
+// whatever the file's own owner and mode (rename(2) and unlink(2) need write
+// on the directory), and systemd loads the replacement as root's. The real
+// Stat already sets ParentUntrusted; the unit-file loop never read it.
+func TestUnitsUnitFileInAnUntrustedDirectory(t *testing.T) {
+	const unit, drop = etcUnits + "/app.service", etcUnits + "/app.service.d/override.conf"
+	seed := func(unitParent, dropParent bool, body string) *fsAccess {
+		a := unitsAccess("app.service")
+		unitText(a, unit, "[Service]\n"+body+"ExecStart=/usr/bin/app\n")
+		a.stats[unit] = statResult{mode: 0o644, kind: "regular", parentUntrusted: unitParent}
+		unitText(a, drop, "[Service]\nEnvironment=A=1\n")
+		a.stats[drop] = statResult{mode: 0o644, kind: "regular", parentUntrusted: dropParent}
+		exe(a, "/usr/bin/app", 0o755, 0, 0)
+		return a
+	}
+	for _, tc := range []struct {
+		name                   string
+		unitParent, dropParent bool
+		body                   string
+		want                   []string
+	}{
+		{"unit file", true, false, "", []string{"app.service " + unit + " unit_file:parent_writable"}},
+		{"drop-in", false, true, "", []string{"app.service " + drop + " unit_file:parent_writable"}},
+		// The normal condition: both directories root's and closed.
+		{"trusted", false, false, "", nil},
+		// Out of scope: a unit that runs as another user leaves before judging.
+		{"not root's unit", false, true, "User=nobody\n", nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			b := build(t, "units", seed(tc.unitParent, tc.dropParent, tc.body))
+			if e := env(t, b, "units.exec_writable"); e.Status != facts.StatusOK {
+				t.Fatalf("exec_writable %+v", e)
+			}
+			if got := writableRows(t, b); !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("exec_writable %v, want %v", got, tc.want)
+			}
+		})
+	}
+}

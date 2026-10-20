@@ -470,6 +470,12 @@ func (r *unitsRun) unit(unit string, enabled, active bool) (map[string]any, int,
 	}
 	for _, p := range append([]string{l.path}, dropins...) {
 		r.judge(unit, p, "unit_file:", metas[p], false)
+		if metas[p].ParentUntrusted {
+			// H-13: whoever may write the directory may replace the file
+			// (V-46, as for an executable). Not folded into judge, which
+			// the executable path shares and which flags this itself there.
+			r.flag(unit, p, "unit_file:parent_writable")
+		}
 	}
 
 	var execs []any
