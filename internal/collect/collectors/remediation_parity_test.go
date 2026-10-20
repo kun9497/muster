@@ -967,6 +967,10 @@ func TestInstallReadersMatchTheCollector(t *testing.T) {
 		"/bin/true | x", "/bin/true & x", "/bin/true $(modprobe x)", "/bin/true `x`",
 		"/bin/false > /tmp/x", "/bin/true $CMDLINE_OPTS", "exec /bin/false", `"/bin/false"`,
 		"/bin/false# x", "/sbin/modprobe --ignore-install cramfs", "logger false", "/opt/false",
+		// sh splits words on space, tab and newline only: \v, \f and U+00A0
+		// are part of the word, so none of these is a no-op word
+		"/bin/false\v", "/bin/false\f", "/bin/false\u00a0", "\v/bin/false", "/bin/false\vx", "\u00a0/bin/true",
+		"\t/bin/false\t",
 	}
 	for _, id := range []string{"muster.beyond.usb_storage_disabled", "muster.beyond.uncommon_filesystems_disabled", "muster.beyond.uncommon_network_protocols_disabled"} {
 		fn := readerLine(t, shippedBody(t, id), "rd_install", true)

@@ -692,3 +692,39 @@ func TestModulesCompoundInstallIsNotDisabled(t *testing.T) {
 		})
 	}
 }
+
+// Minor (H-19 review): kmod splits a modprobe.d line with strtok on " \t",
+// and the install command is then split by sh on space, tab and newline;
+// neither treats \v, \f or U+00A0 as a blank, as strings.Fields would.
+func TestModprobeWordsSplitOnKmodAndShellBlanks(t *testing.T) {
+	for _, c := range []struct {
+		line string
+		want []modprobeDirective
+	}{
+		{"install\vm /bin/false\n", []modprobeDirective{}},
+		{"install\u00a0m /bin/false\n", []modprobeDirective{}},
+		{"blacklist\fm\n", []modprobeDirective{}},
+		{"install m\t/bin/false\n", []modprobeDirective{{kind: "install", module: "m", command: "/bin/false"}}},
+		{"install m\v/bin/false\n", []modprobeDirective{{kind: "install", module: "m\v/bin/false"}}}, // one word to strtok
+	} {
+		got := parseModprobeD([]byte(c.line))
+		if len(got) != len(c.want) || (len(got) == 1 && got[0] != c.want[0]) {
+			t.Errorf("%q: %+v, want %+v", c.line, got, c.want)
+		}
+	}
+	for _, c := range []struct {
+		command string
+		want    bool
+	}{
+		{"/bin/false", true},
+		{"\t/bin/false\t", true},
+		{"/bin/false\v", false},
+		{"/bin/false\f", false},
+		{"/bin/false\u00a0", false},
+		{"\u00a0/bin/true", false},
+	} {
+		if got := installDisables(c.command); got != c.want {
+			t.Errorf("installDisables(%q) = %v, want %v", c.command, got, c.want)
+		}
+	}
+}

@@ -135,7 +135,7 @@ func parseModprobeD(data []byte) []modprobeDirective {
 		if strings.HasPrefix(line, "#") {
 			continue
 		}
-		fields := strings.Fields(line)
+		fields := splitOn(line, kmodBlanks)
 		if len(fields) < 2 || !modprobeModuleFirst[fields[0]] {
 			continue
 		}
@@ -146,6 +146,20 @@ func parseModprobeD(data []byte) []modprobeDirective {
 		out = append(out, d)
 	}
 	return out
+}
+
+// kmodBlanks are the bytes kmod's strtok splits a modprobe.d line on, and
+// shBlanks the ones sh splits the install command's words on. Neither is
+// strings.Fields' Unicode whitespace: a \v, a \f or a U+00A0 is part of a
+// word to both, so "/bin/false\v" is not the no-op word /bin/false.
+const (
+	kmodBlanks = " \t"
+	shBlanks   = " \t\n"
+)
+
+// splitOn splits s into the non-empty runs of bytes not in seps.
+func splitOn(s, seps string) []string {
+	return strings.FieldsFunc(s, func(r rune) bool { return r < 0x80 && strings.ContainsRune(seps, r) })
 }
 
 // modprobeEscape is the character kmod reads as an escape.
@@ -193,7 +207,7 @@ func unescapeModprobeLine(line string) (string, bool) {
 // the command is never run or evaluated. At worst a false FAIL, never a
 // false PASS.
 func installDisables(command string) bool {
-	fields := strings.Fields(command)
+	fields := splitOn(command, shBlanks)
 	for i, f := range fields {
 		if strings.HasPrefix(f, "#") {
 			fields = fields[:i]
