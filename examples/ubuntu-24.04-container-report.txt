@@ -1,4 +1,4 @@
-muster 69ad0db · controls kisa-unix-2026+2026.10.14 · guide kisa-unix-2026 · host ubuntu-container · collected 2026-10-19T01:02:53Z
+muster 30af2a4 · controls kisa-unix-2026+2026.10.19 · guide kisa-unix-2026 · host ubuntu-container · collected 2026-10-20T02:41:54Z
 profile default (117 controls)
 automatic  high 10/7/0  medium 8/0/0  low 3/1/0  (pass/fail/warn)
 manual review 4  ·  undecidable error 0 / n-a 84 / waived 0  ·  facts failed 0  ·  waivers expiring within 30d 0

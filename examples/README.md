@@ -30,7 +30,7 @@ replaying that script anywhere exits 2 unless `MUSTER_ANY_HOST=1` is set. The co
 snapshot has no machine id (`machine_id_hash` is empty), so its plan reads `host_guard: off`
 and its script carries `# host guard: off (the snapshot has no machine id)` instead.
 
-Produced by run [`39183480151`](https://github.com/kun9497/muster/actions/runs/39183480151) of [`.github/workflows/examples.yml`](../.github/workflows/examples.yml).
+Produced by run [`39360280961`](https://github.com/kun9497/muster/actions/runs/39360280961) of [`.github/workflows/examples.yml`](../.github/workflows/examples.yml).
 The snapshot headers carry the rest of the provenance: `muster_version`, `commit`,
 `collected_at` and `host.os_release` — the workflow builds the binary with `make build`, so those
 are the real version and commit and not the unstamped defaults.
