@@ -1,4 +1,4 @@
-muster 30af2a4 · controls kisa-unix-2026+2026.10.19 · guide kisa-unix-2026 · host ubuntu-container · collected 2026-10-20T02:41:54Z
+muster ca08d60 · controls kisa-unix-2026+2026.10.20 · guide kisa-unix-2026 · host ubuntu-container · collected 2026-10-21T02:03:16Z
 profile default (117 controls)
 automatic  high 10/7/0  medium 8/0/0  low 3/1/0  (pass/fail/warn)
 manual review 4  ·  undecidable error 0 / n-a 84 / waived 0  ·  facts failed 0  ·  waivers expiring within 30d 0
@@ -28,6 +28,7 @@ FAIL           high   muster.account.password_policy                     비밀�
     pam.pwquality.enabled = false
     pam.pwquality.minlen: absent
     pam.pwquality.required_classes: absent
+    pam.pwquality.enforcing: absent
 PASS           high   muster.account.root_home_and_path                  root 홈 디렉터리와 PATH 가 안…
 PASS           high   muster.account.root_only_uid_zero                  uid 0 인 계정은 root 뿐이다
 NOT_APPLICABLE high   muster.account.root_remote_login                   root 계정이 SSH로 직접 로그인…
