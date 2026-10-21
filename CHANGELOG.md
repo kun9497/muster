@@ -213,6 +213,76 @@ verdict on an existing snapshot is at least a minor release and appears under
 
 ### Controls
 
+Control set `kisa-unix-2026+2026.10.20` (was `+2026.10.19`). Fixes from an
+external reviews; these verdicts can change:
+- A waiver naming observations no longer waives a control a separate clause
+  fails: `sudo_nopasswd_all` with every `user:` subject waived stays FAIL when
+  `Defaults !authenticate` is set, naming the clause, with a stderr warning;
+  `ssh_key_quality` no longer waives a DSA key count through a fingerprint
+  waiver. A FAIL that was `WAIVED` (exit 0) can now exit 1.
+- `password_policy` reads the pwquality chain in libpwquality's order, the
+  `pwquality.conf.d` drop-ins first and `/etc/security/pwquality.conf` last,
+  so a `minlen` the main file sets wins (it used to be overridden by a
+  drop-in). An `enforcing=0` in the files or on the `pam_pwquality.so` line
+  makes the policy advisory and the control FAIL (new key
+  `pam.pwquality.enforcing`). A snapshot collected by an earlier release lacks
+  that key, so `password_policy` reads ERROR (`missing_fact`) and `check` exits
+  2 on it until the host is collected again (or `--allow-error`).
+- `pwquality.conf`, its drop-ins, `faillock.conf` and `pwhistory.conf` are
+  read as their modules read them: a `#` ends the line wherever it is,
+  `name value` counts as `name = value`, and one `=` at most is skipped
+  (`minlen == 14` is a line libpwquality refuses). pwquality names match in any case,
+  faillock names only in lower case. A faillock number is its leading digits,
+  and `never` is 0. A line libpwquality refuses (an unknown name, a bad
+  number) stops it. A drop-in that stops skips every later file, the main
+  file included, so the pwquality values read `absent` naming that line and
+  `password_policy` FAILs. A `deny = 10   # site` that used to read as the
+  default 3 now FAILs `lockout_threshold`. The two review scripts read the
+  files the same way and stop, with nothing changed, on a line libpwquality
+  refuses. A pwquality line of 1023 bytes or more, or one holding a NUL byte,
+  is such a line. The drop-ins are the names libpwquality reads, hidden ones
+  included and `x.conf.conf` excluded, in byte order. A body that appends
+  to a file without a final newline starts its own line. The `password_policy`
+  review script rewrites a key the main file sets in place, backs
+  `pwquality.conf` up and refuses it as a symlink.
+- A `conf=` argument on a `pam_faillock.so` or `pam_pwquality.so` line points
+  the module at a file muster does not read, so the faillock or pwquality
+  values read `absent` naming the line, and `lockout_threshold` or
+  `password_policy` FAILs instead of judging `/etc/security/faillock.conf` or
+  `pwquality.conf` the module never reads.
+- A `/etc/login.defs` that exists but cannot be read is the answer for
+  `accounts.users` and `accounts.login_capable` too, so the account controls
+  read ERROR instead of judging accounts against a guessed `UID_MIN` of 1000.
+- `fix --dry-run` plans a row that keeps FAIL or WARN beside a subject waiver
+  as text only (`subject_waived`), because no review script knows which
+  subjects were waived; `account_inactivity_lock` used to run `chage -I` on the
+  waived account too.
+- `lockout_threshold` judges every login-facing PAM service (login and sshd)
+  and the weakest value across them: an sshd stack with `deny=0` beside a
+  login stack with `deny=5` now FAILs, the reason naming the services and
+  values.
+- `umask_policy` counts `pam_umask` only when every login-facing service
+  (login and sshd) stacks it; one missing from sshd's session stack now FAILs.
+- `root_unit_exec_writable` fails a root service whose unit file or drop-in
+  sits in a directory that is not root's or that its group or others can
+  write (`unit_file:parent_writable`): whoever writes the directory can
+  replace the file.
+- `usb_storage_disabled`, `uncommon_filesystems_disabled` and
+  `uncommon_network_protocols_disabled` credit an `install` line only when its
+  whole command is `/bin/false` or `/bin/true` (a `#` comment may follow):
+  `install usb_storage /bin/true && modprobe --ignore-install usb_storage`
+  loads the module and now FAILs. Their review scripts fail the validate and
+  roll back when such an earlier line would shadow the one they write.
+- A text file muster reads that holds a NUL byte is an error for every value
+  read from it: a NUL in `/etc/passwd` used to read as no accounts, so
+  `root_only_uid_zero` and the other account controls passed.
+- An sshd per-user (`-C`) value is checked like the global one: a truncated
+  or unreadable override reads ERROR instead of PASS, and a truncated
+  per-user dump counts as not collected.
+- `root_remote_login`'s rollback restores a drop-in an earlier run left before
+  `sshd -t` and the reload, instead of removing it and putting it back after
+  the reload (see Fixed).
+
 Control set `kisa-unix-2026+2026.10.19` (was `+2026.10.14`). Three verdicts
 change, as collector fixes (see Fixed): vsftpd's greeting order, an auditd
 `exec` action, an exports default option list. Eight controls gain a review
@@ -776,6 +846,26 @@ configuration walk stopped at an `Include` outside the declaration (below).
 - `CONTRIBUTING.md` (with its Korean pair) describes the workflow.
 
 ### Fixed
+- `check` and `fix --dry-run` refuse a `--facts` file that holds anything but
+  whitespace after its JSON value (exit 2): two concatenated snapshots used
+  to be judged by the first alone.
+- modprobe.d lines are split on space and tab, as kmod splits them, and an
+  `install` command on sh's blanks; other Unicode whitespace is part of a word.
+- A read-error reason names the path once (`/etc/group: …`, not
+  `/etc/group: /etc/group: …`).
+- `root_remote_login`'s review script, on a failed block, removed
+  `/etc/ssh/sshd_config.d/00-muster.conf` and reloaded sshd before the backup
+  put an existing drop-in back; the disk then read `PermitRootLogin no` while
+  the running daemon no longer applied it. The rollback restores the recorded
+  file before `sshd -t` and the reload.
+- `check` (table format) and `controls list` exit 2 when writing stdout fails
+  (a full disk, an I/O error); the table renderer and the list used to drop
+  write errors and exit by the verdicts. `fix --dry-run` already did.
+- pam_faillock settings are read per PAM service; `pam.faillock.*` carries the
+  weakest across login and sshd (deny 0 over any count, the larger count, the
+  shorter non-zero unlock time, the shorter `fail_interval`, `even_deny_root`
+  only when every service sets it) and cites every service's lines. sshd's own
+  stack used to be hidden behind login's.
 - An `/etc/profile.d` entry a distribution ships as a symbolic link to its
   package data (Ubuntu 24.04's `debuginfod.sh` ->
   `/usr/share/libdebuginfod-common/debuginfod.sh`) is read through that one

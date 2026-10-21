@@ -106,4 +106,14 @@ type Result struct {
 	Observations []Observation `json:"observations,omitempty"`
 	Waiver       *WaiverNote   `json:"waiver,omitempty"`
 	Mechanism    int           `json:"mechanism,omitempty"` // 1-based index of the mechanism judged; 0 when checks/custom
+	// UnobservedFail is set when a clause that does not hold produced no
+	// failing observation — a scalar clause (eq, in, gte, …) has no subject a
+	// waiver could name. A subject-scoped waiver covers its observation and
+	// nothing else, so such a row is never promoted to WAIVED by one (spec
+	// §6.4). It is never rendered: no output byte depends on it.
+	UnobservedFail bool `json:"-"`
+	// UnobservedReason is the reason of the first such clause, built as
+	// Reason is; waiver.Apply puts it in Reason when a subject waiver waived
+	// every observation and the row still fails on it. Never rendered.
+	UnobservedReason string `json:"-"`
 }

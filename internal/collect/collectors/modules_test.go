@@ -621,6 +621,23 @@ func TestInstallDisablesEverySpellingOfANoop(t *testing.T) {
 		{"/opt/false", false},
 		{"logger false", false},
 		{"", false},
+		// H-14 (f8): kmod runs the whole command through /bin/sh -c, so a
+		// no-op first word chained to more shell loads the module anyway.
+		// Only one no-op word, optionally followed by a comment, disables.
+		{"/bin/true && modprobe --ignore-install usb_storage", false},
+		{"/bin/false || /sbin/modprobe --ignore-install cramfs", false},
+		{"true ; modprobe --ignore-install sctp", false},
+		{"/bin/true;modprobe sctp", false},
+		{"/bin/true | x", false},
+		{"/bin/true & x", false},
+		{"/bin/true $(modprobe x)", false},
+		{"/bin/true `x`", false},
+		{"/bin/false > /tmp/x", false},
+		{"/bin/true $CMDLINE_OPTS", false},
+		{"exec /bin/false", false},
+		{`"/bin/false"`, false},
+		{"/bin/false #never", true},
+		{"/bin/false# x", false},
 	} {
 		if got := installDisables(tc.command); got != tc.want {
 			t.Errorf("installDisables(%q) = %v, want %v", tc.command, got, tc.want)
@@ -642,6 +659,72 @@ func TestModulesInstallNoopThroughTheCollector(t *testing.T) {
 		row := moduleRow(t, rows, name)
 		if !rowFlag(t, row, "install_disabled") || !rowFlag(t, row, "disabled") {
 			t.Errorf("%s = %v, want install_disabled and disabled", name, row)
+		}
+	}
+}
+
+// H-14 (f8): the first install line for a module wins in kmod, and a compound
+// one is not a no-op, so the row a control reads is not disabled even when a
+// later file says /bin/false.
+func TestModulesCompoundInstallIsNotDisabled(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		conf  map[string]string
+		wantD bool
+	}{
+		{"compound", map[string]string{"/etc/modprobe.d/50-site.conf": "install cramfs /bin/true && modprobe --ignore-install cramfs\n"}, false},
+		{"plain no-op", map[string]string{"/etc/modprobe.d/50-site.conf": "install cramfs /bin/false\n"}, true},
+		{"compound first, no-op later", map[string]string{
+			"/etc/modprobe.d/00-vendor.conf":       "install cramfs /bin/false || /sbin/modprobe --ignore-install cramfs\n",
+			"/etc/modprobe.d/99-muster-extra.conf": "install cramfs /bin/false\n",
+		}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			a := moduleDouble(withConf(moduleTreeFiles(usrTree), nil))
+			a.contents = map[string][]byte{}
+			for p, c := range tc.conf {
+				a.contents[p] = []byte(c)
+			}
+			row := moduleRow(t, okList(t, build(t, "modules", a), modulesKey), "cramfs")
+			if rowFlag(t, row, "install_disabled") != tc.wantD || rowFlag(t, row, "disabled") != tc.wantD {
+				t.Errorf("cramfs = %v, want install_disabled and disabled %v", row, tc.wantD)
+			}
+		})
+	}
+}
+
+// Minor (H-19 review): kmod splits a modprobe.d line with strtok on " \t",
+// and the install command is then split by sh on space, tab and newline;
+// neither treats \v, \f or U+00A0 as a blank, as strings.Fields would.
+func TestModprobeWordsSplitOnKmodAndShellBlanks(t *testing.T) {
+	for _, c := range []struct {
+		line string
+		want []modprobeDirective
+	}{
+		{"install\vm /bin/false\n", []modprobeDirective{}},
+		{"install\u00a0m /bin/false\n", []modprobeDirective{}},
+		{"blacklist\fm\n", []modprobeDirective{}},
+		{"install m\t/bin/false\n", []modprobeDirective{{kind: "install", module: "m", command: "/bin/false"}}},
+		{"install m\v/bin/false\n", []modprobeDirective{{kind: "install", module: "m\v/bin/false"}}}, // one word to strtok
+	} {
+		got := parseModprobeD([]byte(c.line))
+		if len(got) != len(c.want) || (len(got) == 1 && got[0] != c.want[0]) {
+			t.Errorf("%q: %+v, want %+v", c.line, got, c.want)
+		}
+	}
+	for _, c := range []struct {
+		command string
+		want    bool
+	}{
+		{"/bin/false", true},
+		{"\t/bin/false\t", true},
+		{"/bin/false\v", false},
+		{"/bin/false\f", false},
+		{"/bin/false\u00a0", false},
+		{"\u00a0/bin/true", false},
+	} {
+		if got := installDisables(c.command); got != c.want {
+			t.Errorf("installDisables(%q) = %v, want %v", c.command, got, c.want)
 		}
 	}
 }

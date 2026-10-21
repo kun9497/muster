@@ -2314,7 +2314,7 @@
     {
       "Key": "accounts.users",
       "Type": "list\u003crecord\u003e",
-      "Description": "Local accounts in /etc/passwd order with name, uid, gid, home, shell, system (0 \u003c uid \u003c UID_MIN, where UID_MIN is login.defs' value or 1000 when it is unset or unreadable; nobody is not a system account), shadowed (passwd field is x), uid_duplicate, name_duplicate, shell_valid (shell listed in /etc/shells) and, when /etc/shadow was read or does not exist, password_status (hashed | locked | nopass | noshadow), locked, hash_algo (\"$6$\"-style id, \"legacy\" for a hash without one, \"\" when there is no hash) and the ageing fields; no hashes. Ageing fields are -1 when the shadow field is empty, and uid/gid are -1 when the passwd field is unparsable.",
+      "Description": "Local accounts in /etc/passwd order with name, uid, gid, home, shell, system (0 \u003c uid \u003c UID_MIN, where UID_MIN is login.defs' value or 1000 when the file does not exist or does not set it - a login.defs that exists but cannot be read makes this leaf and accounts.login_capable that read's status; nobody is not a system account), shadowed (passwd field is x), uid_duplicate, name_duplicate, shell_valid (shell listed in /etc/shells) and, when /etc/shadow was read or does not exist, password_status (hashed | locked | nopass | noshadow), locked, hash_algo (\"$6$\"-style id, \"legacy\" for a hash without one, \"\" when there is no hash) and the ageing fields; no hashes. Ageing fields are -1 when the shadow field is empty, and uid/gid are -1 when the passwd field is unparsable.",
       "Since": 1,
       "Sensitivity": "internal",
       "Collector": "accounts",
@@ -2494,7 +2494,7 @@
     {
       "Key": "pam.pwquality.minlen",
       "Type": "int",
-      "Description": "Effective minlen - the default 8, then pwquality.conf, then pwquality.conf.d/*.conf in name order, then the module arguments, each overriding the last.",
+      "Description": "Effective minlen - the default 8, then pwquality.conf.d/*.conf in name order, then pwquality.conf (libpwquality reads it last), then the module arguments, each overriding the last. Each file is read as libpwquality reads it (a line is cut at its first '#', the name ends at a blank or '=' and matches case-blind); a line whose name libpwquality does not know or whose integer it refuses stops that file and every later one, and then every pam.pwquality integer and required_classes is absent naming the file and line. A conf= argument on the pam_pwquality.so line makes every pam.pwquality value absent, naming the line.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "pam",
@@ -2572,6 +2572,16 @@
       "SubjectKind": ""
     },
     {
+      "Key": "pam.pwquality.enforcing",
+      "Type": "int",
+      "Description": "Effective enforcing - the default 1, then the conf chain in libpwquality order, then the module arguments; 0 only warns about a weak password and accepts it.",
+      "Since": 1,
+      "Sensitivity": "public",
+      "Collector": "pam",
+      "DefaultOn": "",
+      "SubjectKind": ""
+    },
+    {
       "Key": "pam.password.unix_hash",
       "Type": "string",
       "Description": "The hashing argument on pam_unix.so in passwd's password stack (md5, bigcrypt, sha256, sha512, blowfish, gost_yescrypt or yescrypt); empty when none is given and login.defs ENCRYPT_METHOD decides; absent when the stack has no pam_unix line.",
@@ -2584,7 +2594,7 @@
     {
       "Key": "pam.password.remember",
       "Type": "int",
-      "Description": "How many previous passwords a new one is checked against - remember= on pam_pwhistory.so (argument, else pwhistory.conf, else the module default 10) or on pam_unix.so; absent when neither module sets it.",
+      "Description": "How many previous passwords a new one is checked against - remember= on pam_pwhistory.so (argument, else the first remember line of pwhistory.conf, matched case-blind with its leading digits read, else the module default 10) or on pam_unix.so; absent when neither module sets it.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "pam",
@@ -2604,7 +2614,7 @@
     {
       "Key": "pam.faillock.deny",
       "Type": "int",
-      "Description": "Effective deny - the default 3, then faillock.conf, then the preauth arguments, then the authfail arguments; 0 disables the lockout. What is published is the merge of faillock.conf, the preauth arguments and the authfail arguments, the authfail line applied last; when the two lines disagree pam.faillock.enabled says so in its reason. A conf= argument naming another file is not handled.",
+      "Description": "Effective deny, the weakest the login-facing services enforce - each service's preauth and authfail line is resolved on its own (the default 3, then faillock.conf, then that line's arguments; read as pam_faillock reads them - names case-sensitive, a line cut at its first '#', a number's leading digits, a value with none ignored, the last line winning) and the weaker of the two kept, then the weakest service; 0 disables the lockout and is weaker than any count, otherwise the larger count is the weaker. When a service's two lines or the services disagree, pam.faillock.enabled says so in its reason. A conf= argument on any pam_faillock.so line of a login-facing service makes this and the other pam.faillock values absent, naming the line (muster reads only faillock.conf).",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "pam",
@@ -2614,7 +2624,7 @@
     {
       "Key": "pam.faillock.unlock_time",
       "Type": "int",
-      "Description": "Effective unlock_time in seconds (default 600), resolved like deny; 0 means the account stays locked until an administrator releases it.",
+      "Description": "Effective unlock_time in seconds (default 600), resolved like deny with the shortest non-zero wait the weakest; 0 means the account stays locked until an administrator releases it, and is reported only when every line has it.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "pam",
@@ -2624,7 +2634,7 @@
     {
       "Key": "pam.faillock.fail_interval",
       "Type": "int",
-      "Description": "Effective fail_interval in seconds (default 900), resolved like deny.",
+      "Description": "Effective fail_interval in seconds (default 900), resolved like deny with the shortest interval kept.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "pam",
@@ -2634,7 +2644,7 @@
     {
       "Key": "pam.faillock.even_deny_root",
       "Type": "bool",
-      "Description": "even_deny_root is set in faillock.conf or as a module argument (with or without a value), or root_unlock_time is set, which implies it.",
+      "Description": "even_deny_root is set in faillock.conf or as an argument of a service's preauth or authfail line (with or without a value), or root_unlock_time is set, which implies it - in every login-facing service.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "pam",
@@ -2644,7 +2654,7 @@
     {
       "Key": "pam.faillock.root_unlock_time",
       "Type": "int",
-      "Description": "Effective root_unlock_time in seconds, resolved like deny; unlock_time when not set.",
+      "Description": "Effective root_unlock_time in seconds, resolved like unlock_time; a line's unlock_time when not set.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "pam",
@@ -2694,7 +2704,7 @@
     {
       "Key": "pam.umask_module.enabled",
       "Type": "bool",
-      "Description": "pam_umask.so is in the session stack of login (else sshd, else other), which applies a umask where /etc/profile never runs.",
+      "Description": "pam_umask.so is in the session stack of every existing login-facing service (login, sshd; other when neither exists), which applies a umask where /etc/profile never runs; a false names each service that lacks it.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "pam",
@@ -2704,7 +2714,7 @@
     {
       "Key": "pam.umask_module.args",
       "Type": "list\u003cstring\u003e",
-      "Description": "The arguments of the first pam_umask.so session line; absent when the module is not stacked.",
+      "Description": "The arguments of the first pam_umask.so session line of the first service judged (login, else sshd, else other); absent when the module is not stacked.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "pam",
@@ -5184,7 +5194,7 @@
     {
       "Key": "units.exec_writable",
       "Type": "list\u003crecord\u003e",
-      "Description": "The judged subset of units.root_services, sorted by unit, path and why: an executable owned by a uid other than 0, group-writable or other-writable, or in a directory that is not root-owned or is group/other-writable (why owner, group_writable, other_writable or parent_writable; a symlinked executable judged by its owner and its directory, and by its target one hop on), and a unit file or drop-in owned by a uid other than 0, group-writable or other-writable (why unit_file:owner, unit_file:group_writable or unit_file:other_writable; its directory is not judged). Absent, naming the unit and path, when an in-scope unit file or drop-in exists and cannot be read, a unit file is a symlink not followed, an active unit has no unit file, or an executable (or its symlink target) is outside the collector's declaration or cannot be stat-ed.",
+      "Description": "The judged subset of units.root_services, sorted by unit, path and why: an executable owned by a uid other than 0, group-writable or other-writable, or in a directory that is not root-owned or is group/other-writable (why owner, group_writable, other_writable or parent_writable; a symlinked executable judged by its owner and its directory, and by its target one hop on), and a unit file or drop-in owned by a uid other than 0, group-writable or other-writable or in a directory that is not root-owned or is group/other-writable (why unit_file:owner, unit_file:group_writable, unit_file:other_writable or unit_file:parent_writable; only a directory that holds a unit file or drop-in is judged: an empty \u003cname\u003e.d a non-root user could fill, and a writable search directory above the one the unit was found in, are a documented limit). Absent, naming the unit and path, when an in-scope unit file or drop-in exists and cannot be read, a unit file is a symlink not followed, an active unit has no unit file, or an executable (or its symlink target) is outside the collector's declaration or cannot be stat-ed.",
       "Since": 1,
       "Sensitivity": "public",
       "Collector": "units",

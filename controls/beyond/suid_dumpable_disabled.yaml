@@ -25,7 +25,7 @@ remediation:
     if [ -L "$f" ]; then log "muster.beyond.suid_dumpable_disabled: $f is a symlink (a mask), left as is"; exit 1; fi
     put() {
       sysctl -q -w "$1=$2"
-      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else printf '%s = %s\n' "$1" "$2" >> "$f"; fi
+      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else { if [ -s "$f" ] && [ -n "$(tail -c1 "$f")" ]; then echo >> "$f"; fi; printf '%s = %s\n' "$1" "$2" >> "$f"; }; fi
     }
     case "$(sysctl -n fs.suid_dumpable)" in 0) ;; *) put fs.suid_dumpable 0;; esac
     if [ -f "$f" ] && [ ! -L "$f" ]; then chmod 644 "$f"; fi

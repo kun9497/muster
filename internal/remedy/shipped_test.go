@@ -121,6 +121,7 @@ func TestShippedRootLoginReloadsTheRunningSshd(t *testing.T) {
 	for _, v := range []struct{ name, body string }{{"script", r.Script}, {"rollback", r.Rollback}} {
 		t.Run(v.name, func(t *testing.T) {
 			tmp, bin, log, body := rootLoginStubs(t, v.body)
+			body = "restore() { :; }\n" + body // the prologue helper; the real one runs in TestRootLoginRollbackRestoresBeforeTheReload
 			if out, code := runBody(t, tmp, bin, body, "CALLS="+log, "ROOT_VALUE=no"); code != 0 {
 				t.Fatalf("exit %d\n%s", code, out)
 			}

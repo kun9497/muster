@@ -1,0 +1,10 @@
+auth       optional   pam_faildelay.so  delay=3000000
+auth       requisite  pam_nologin.so
+auth       required   pam_faillock.so preauth deny=5
+@include common-auth
+auth       [default=die] pam_faillock.so authfail deny=5
+auth       optional   pam_group.so
+account    required   pam_faillock.so
+@include common-account
+@include common-session
+@include common-password

@@ -27,7 +27,10 @@ type ReadMeta struct {
 	Size int64
 
 	Truncated bool
-	Binary    bool
+	// Binary is set when the bytes read hold a NUL. ReadFile then also
+	// returns ErrBinary and no bytes; ReadFileBinary returns the bytes
+	// with a nil error (K-30).
+	Binary bool
 
 	// Mode is the raw POSIX permission bits (0o7777 mask: permissions
 	// plus setuid/setgid/sticky) as fstat reported them. os.FileMode

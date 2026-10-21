@@ -354,7 +354,9 @@ scope: its executables run without root's power.
   or group/other-writable; Debian's `root:staff` 2775 `/usr/local/*` reads FAIL truthfully), an
   executable owned by a uid other than 0, or group-writable, or other-writable (`why` ∈
   `owner`, `group_writable`, `other_writable`), and a unit file or drop-in with the same
-  three properties (`why` prefixed `unit_file:`). Sorted by `unit`, `path`. **`absent`**,
+  three properties (`why` prefixed `unit_file:`), or one in a directory that is not root-owned or is group- or
+  other-writable (`unit_file:parent_writable`, stage-3 hotfix; an empty `<name>.d` directory and a writable
+  search directory above the unit's are not judged). Sorted by `unit`, `path`. **`absent`**,
   naming the unit and path, when any in-scope unit file or drop-in exists and cannot be read:
   the unreadable file could carry the `ExecStart` that decides, so the answer is unknown and
   the control reads MANUAL (principle 2; the J-40 shape).

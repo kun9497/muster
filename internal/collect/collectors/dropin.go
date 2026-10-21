@@ -45,17 +45,56 @@ func dropinEnvelope(err error) facts.Envelope {
 // systemd does — it is stored as "", never dropped, so the reset survives
 // last-write-wins.
 func mergeDropins(a collect.Access, main string, dirs []string, glob string) (map[string]string, []facts.Source, error) {
-	return mergeDropinsWith(a, main, dirs, glob, parseDropin)
+	values, inputs, _, err := mergeDropinsWith(a, main, dirs, glob, chainReader{
+		parse: func(data []byte, values map[string]string) *lineStop {
+			parseDropin(data, values) // systemd never stops reading a chain
+			return nil
+		},
+		order: mainFirst,
+	})
+	return values, inputs, err
+}
+
+// chainOrder says where a chain's main file is applied relative to its
+// drop-ins. systemd applies the main file first, so every drop-in overrides
+// it; libpwquality's pwquality_read_config reads "<cfgfile>.d/*.conf" first
+// and the main file LAST, so the main file overrides every drop-in.
+type chainOrder int
+
+const (
+	mainFirst chainOrder = iota // systemd: main, then the drop-ins
+	mainLast                    // libpwquality: the drop-ins, then main
+)
+
+// chainReader is how one daemon reads its chain: its line parser, where its
+// main file goes, which glob matches it actually reads, and whether the parser
+// is handed a file's NUL bytes.
+type chainReader struct {
+	parse func([]byte, map[string]string) *lineStop
+	order chainOrder
+	// keep, when set, is the daemon's own test of a matched basename; a name
+	// it refuses is not part of the chain (it never shadows, is never read or
+	// cited). nil keeps every match.
+	keep func(base string) bool
+	// binary reads each file with ReadFileBinary, so a file holding a NUL
+	// byte reaches parse instead of failing the chain with the ErrBinary
+	// ReadFile answers (the NUL rule, H-11), and the
+	// parser itself judges the line that holds it (H-9: for libpwquality that
+	// line stops the chain). parse must then treat a NUL byte as such.
+	binary bool
 }
 
 // mergeDropinsWith merges a main configuration file with its drop-in
-// directories, exactly the way systemd itself resolves one, with the line
-// parser as a parameter so a chain whose file syntax is not systemd's resolves
-// through the same code (M-23: pwquality's conf files carry bare-word flags
-// such as enforce_for_root that parseDropin discards, so that caller passes
-// parseKVInto):
+// directories, the way systemd itself resolves one, with the line parser and
+// the main file's place as parameters so a chain whose file syntax or order is
+// not systemd's resolves through the same code (M-23: pwquality's conf files
+// carry bare-word flags such as enforce_for_root that parseDropin discards, so
+// that caller passes parsePwqualityInto, which also stops a file the way
+// libpwquality does; and libpwquality reads its main file after
+// the drop-ins, so that caller passes mainLast):
 //
-//   - the main file is applied first — a main file that is not there is not
+//   - the main file is applied first (mainFirst, systemd) or after every
+//     drop-in (mainLast, libpwquality) — a main file that is not there is not
 //     an error, since the daemon's compiled-in defaults then apply;
 //   - dirs are given in DESCENDING precedence (/etc, /run, /usr/local/lib,
 //     /usr/lib): a file in an EARLIER directory SHADOWS a same-named file in
@@ -65,23 +104,35 @@ func mergeDropins(a collect.Access, main string, dirs []string, glob string) (ma
 //
 // parse is handed each file's bytes and the shared values map, in the order the
 // files are applied, so the last file to set a key wins whatever the syntax.
-// inputs lists the files actually read, in the order they were applied. readErr
-// is the FIRST read error of a file that exists (R148: it poisons every value
-// derived from the chain); a file that is simply absent is not one.
+// A parse that returns a line stops the chain there (H-5: libpwquality's
+// pwquality_read_config skips every later drop-in and the main file once one
+// file fails): that file is cited at that line and no later file is opened,
+// and the stop comes back as the third value. inputs lists the files actually
+// read, in the order they were applied. readErr is the FIRST read error of a
+// file that exists (R148: it poisons every value derived from the chain); a
+// file that is simply absent is not one.
 //
 // The caller declares the main file and each dir's glob in its own
 // Declaration.Reads — this helper never widens the declaration.
-func mergeDropinsWith(a collect.Access, main string, dirs []string, glob string, parse func([]byte, map[string]string)) (map[string]string, []facts.Source, error) {
+func mergeDropinsWith(a collect.Access, main string, dirs []string, glob string, r chainReader) (map[string]string, []facts.Source, *chainStop, error) {
 	values := map[string]string{}
 	var inputs []facts.Source
 	var readErr error
+	var stop *chainStop
 	fail := func(p string, err error) {
 		if readErr == nil {
 			readErr = &dropinReadError{Path: p, Err: err}
 		}
 	}
 	read := func(p string) {
-		data, _, err := a.ReadFile(p, readLimit)
+		if stop != nil {
+			return
+		}
+		readFile := a.ReadFile
+		if r.binary {
+			readFile = a.ReadFileBinary
+		}
+		data, _, err := readFile(p, readLimit)
 		if err != nil {
 			// chainReadFailed is the one classification every merged chain
 			// uses: absent is not part of this host's chain, a /dev/null link
@@ -95,10 +146,16 @@ func mergeDropinsWith(a collect.Access, main string, dirs []string, glob string,
 			}
 			return
 		}
-		parse(data, values)
+		if ls := r.parse(data, values); ls != nil {
+			stop = &chainStop{Path: p, Line: ls.Line, Text: ls.Text, Why: ls.Why}
+			inputs = append(inputs, facts.Source{Kind: "file", Path: p, Line: ls.Line})
+			return
+		}
 		inputs = append(inputs, facts.Source{Kind: "file", Path: p})
 	}
-	read(main)
+	if r.order == mainFirst {
+		read(main)
+	}
 
 	// Shadowing: the first directory that offers a basename owns it.
 	chosen := map[string]string{}
@@ -113,6 +170,9 @@ func mergeDropinsWith(a collect.Access, main string, dirs []string, glob string,
 		slices.Sort(matches)
 		for _, m := range matches {
 			base := path.Base(m)
+			if r.keep != nil && !r.keep(base) {
+				continue
+			}
 			if _, dup := chosen[base]; dup {
 				continue
 			}
@@ -124,7 +184,18 @@ func mergeDropinsWith(a collect.Access, main string, dirs []string, glob string,
 	for _, base := range bases {
 		read(chosen[base])
 	}
-	return values, inputs, readErr
+	if r.order == mainLast {
+		read(main)
+	}
+	return values, inputs, stop, readErr
+}
+
+// chainStop is the file and line at which a chain's reader stopped (H-5).
+type chainStop struct {
+	Path string
+	Line int
+	Text string
+	Why  string // set when the line is refused for its shape, not its text (lineStop.Why)
 }
 
 // parseDropin parses systemd-style "Key=Value" lines into values, last write

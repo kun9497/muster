@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -101,5 +103,120 @@ func TestParseCheckArgsRepeatedProfileAndTuningKeepTheLast(t *testing.T) {
 	// Fix wave item 1: an empty value is given, not absent.
 	if f, err = parseCheckArgs([]string{"--facts", "s", "--tuning", ""}); err != nil || f.tuning != "" || !f.tuningGiven {
 		t.Errorf("--tuning \"\": tuning %q given %v err %v, want an empty value that was given", f.tuning, f.tuningGiven, err)
+	}
+}
+
+// partWriter accepts its first n bytes and fails every byte after them, as a
+// disk that fills up partway through the report does.
+type partWriter struct {
+	n   int
+	got bytes.Buffer
+}
+
+func (p *partWriter) Write(b []byte) (int, error) {
+	room := p.n - p.got.Len()
+	if room >= len(b) {
+		p.got.Write(b)
+		return len(b), nil
+	}
+	if room < 0 {
+		room = 0
+	}
+	p.got.Write(b[:room])
+	return room, errors.New("no space left")
+}
+
+// A report that cannot be written is exit 2 with `muster: write:` on stderr,
+// whatever the verdict and whatever the format (f6): the exit code alone
+// must never stand in for a report nobody received.
+func TestCheckFailingStdoutIsExit2(t *testing.T) {
+	for _, snap := range []string{"testdata/full-pass.json", fullFail} {
+		for _, format := range []string{"table", "json"} {
+			for _, w := range []struct {
+				name string
+				mk   func() io.Writer
+				msg  string
+			}{
+				{"closed", func() io.Writer { return failWriter{} }, "muster: write: closed\n"},
+				{"partway", func() io.Writer { return &partWriter{n: 300} }, "muster: write: no space left\n"},
+			} {
+				t.Run(snap+"/"+format+"/"+w.name, func(t *testing.T) {
+					var errb bytes.Buffer
+					code := run([]string{"check", "--facts", snap, "--format", format, "--color", "never"}, w.mk(), &errb)
+					if code != exitError {
+						t.Errorf("exit %d, want %d", code, exitError)
+					}
+					if !strings.Contains(errb.String(), w.msg) {
+						t.Errorf("stderr %q, want %q", errb.String(), w.msg)
+					}
+				})
+			}
+		}
+	}
+}
+
+// controls list rows feed tooling (`controls list --profile … | …`): a list
+// that cannot be written is exit 2, not an empty success (f6).
+func TestControlsListFailingStdoutIsExit2(t *testing.T) {
+	for _, args := range [][]string{{"list"}, {"list", "--profile", "default"}} {
+		var errb bytes.Buffer
+		if code := runControls(args, failWriter{}, &errb); code != exitError {
+			t.Errorf("%v: exit %d, want %d", args, code, exitError)
+		}
+		if !strings.Contains(errb.String(), "muster: write: closed\n") {
+			t.Errorf("%v: stderr %q", args, errb.String())
+		}
+	}
+}
+
+// H-12 (f11): two snapshots in one stream are refused, never judged by the
+// first alone. PASS then FAIL read PASS (exit 0) before the fix.
+func TestFactsWithASecondJSONValueIsExit2(t *testing.T) {
+	dir := t.TempDir()
+	td := filepath.Join("..", "..", "controls", "testdata", "muster.account.root_only_uid_zero")
+	pass, err := os.ReadFile(filepath.Join(td, "pass-root-only.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	failSnap, err := os.ReadFile(filepath.Join(td, "fail-absent.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	prof := filepath.Join(dir, "one.yaml")
+	if err := os.WriteFile(prof, []byte("profile: one\ninclude: [muster.account.root_only_uid_zero]\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	write := func(name string, b []byte) string {
+		p := filepath.Join(dir, name)
+		if err := os.WriteFile(p, b, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	passNL := write("pass.json", append(append([]byte{}, pass...), '\n'))
+	failOnly := write("fail.json", failSnap)
+	both := write("both.json", append(append(append([]byte{}, pass...), '\n'), failSnap...))
+
+	// The normal condition: each snapshot alone reads as itself.
+	var out, errb bytes.Buffer
+	if code := run([]string{"check", "--facts", passNL, "--profile", prof}, &out, &errb); code != exitOK {
+		t.Fatalf("pass alone: code %d stderr %q", code, errb.String())
+	}
+	out.Reset()
+	errb.Reset()
+	if code := run([]string{"check", "--facts", failOnly, "--profile", prof}, &out, &errb); code != exitFindings {
+		t.Fatalf("fail alone: code %d stderr %q", code, errb.String())
+	}
+	for _, args := range [][]string{
+		{"check", "--facts", both, "--profile", prof},
+		{"fix", "--dry-run", "--facts", both},
+		{"snapshot", "extract", "--facts", both, "--control", "muster.account.root_only_uid_zero", "--out", filepath.Join(dir, "x.json")},
+	} {
+		out.Reset()
+		errb.Reset()
+		if code := run(args, &out, &errb); code != exitError || out.Len() != 0 ||
+			!strings.Contains(errb.String(), "parse snapshot: unexpected data after the snapshot") {
+			t.Errorf("%v: code %d stdout %q stderr %q; want exit 2, nothing on stdout, the parse error", args[0], code, out.String(), errb.String())
+		}
 	}
 }

@@ -91,9 +91,11 @@ func filesSource(files []string) *facts.Source {
 // denied read names itself rather than leaving the reader to guess which of
 // the several files a collector opens could not be opened. Shared by the
 // nfs and patch collectors, both of which read a set of files discovered by
-// a glob.
+// a glob. The path is written exactly once (D16): a reason the primitive
+// already opened with it (ErrSymlink, ErrNotRegular, ErrBinary wrap the
+// path) is not prefixed a second time.
 func pathReason(p string, e facts.Envelope) facts.Envelope {
-	e.Reason = p + ": " + e.Reason
+	e.Reason = p + ": " + strings.TrimPrefix(e.Reason, p+": ")
 	return e
 }
 

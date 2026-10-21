@@ -1,7 +1,7 @@
 #!/bin/sh
 # shellcheck disable=SC2181
 # muster fix --dry-run: review before running. muster never runs this file.
-# snapshot: host ubuntu-container, collected 2026-10-20T02:41:54Z; controls kisa-unix-2026+2026.10.19 sha256:46be3e952588b21dda1314a9bc002f6f2ef777dc9b57a441e2ee68a9c2f159ef
+# snapshot: host ubuntu-container, collected 2026-10-21T02:03:16Z; controls kisa-unix-2026+2026.10.20 sha256:ed4e6ebc66e5ad2c8ec0110ba5caee5ae2539df7d9d88100325eb5a7065cc51a
 # profile default (sha256:f4db63e671d12ad73cca111ca4132cb5459983bc32409b21c571067674bf9c78); max-risk lockout_risk
 # planned 10 (script 5, text only 5); above max-risk 0; not planned: error 0, manual 2, warn_degraded 0
 set -u
@@ -430,30 +430,39 @@ fix_muster_file_hosts_permissions
 # ---- 8/10 muster.account.lockout_threshold [risk lockout_risk] [fail, high]
 # keep a second session open; a lockout here needs console access
 # why: absent counts as fail: pam.faillock.deny is absent on this host
-# do:  RHEL family - authselect enable-feature with-faillock and set deny in /etc/security/faillock.conf; Debian family - add pam_faillock.so preauth and authfail lines to common-auth and a pam_faillock.so line to common-account (or use a pam-auth-update profile), then set deny in /etc/security/faillock.conf. A deny= argument on the pam_faillock lines wins over the file; the review script edits the file only.
-# ko:  RHEL 계열은 authselect enable-feature with-faillock 을 실행하고 /etc/security/faillock.conf 에 deny 를 설정하며, Debian 계열은 common-auth 에 pam_faillock.so preauth 와 authfail 줄, common-account 에 pam_faillock.so 줄을 추가하거나 pam-auth-update 프로파일을 쓴 뒤 /etc/security/faillock.conf 에 deny 를 설정합니다. pam_faillock 줄의 deny= 인자는 파일보다 우선하며, 검토 스크립트는 파일만 고칩니다.
+# do:  RHEL family - authselect enable-feature with-faillock and set deny in /etc/security/faillock.conf; Debian family - add pam_faillock.so preauth and authfail lines to common-auth and a pam_faillock.so line to common-account (or use a pam-auth-update profile), then set deny in /etc/security/faillock.conf. A deny= argument on the pam_faillock lines wins over the file; the review script edits the file only. pam_faillock reads only a lower-case deny (DENY or Deny is ignored), and the script rewrites only such lines.
+# ko:  RHEL 계열은 authselect enable-feature with-faillock 을 실행하고 /etc/security/faillock.conf 에 deny 를 설정하며, Debian 계열은 common-auth 에 pam_faillock.so preauth 와 authfail 줄, common-account 에 pam_faillock.so 줄을 추가하거나 pam-auth-update 프로파일을 쓴 뒤 /etc/security/faillock.conf 에 deny 를 설정합니다. pam_faillock 줄의 deny= 인자는 파일보다 우선하며, 검토 스크립트는 파일만 고칩니다. pam_faillock 은 소문자 deny 만 읽으며(DENY, Deny 는 무시), 스크립트도 그런 줄만 고쳐 씁니다.
 # text only: the finding is an absent file
 
 # ---- 9/10 muster.account.password_policy [risk lockout_risk] [fail, high]
 # keep a second session open; a lockout here needs console access
 # why: absent counts as fail: accounts.login_defs.pass_min_len is absent on this host
-# do:  Install libpam-pwquality (Debian family) or keep pam_pwquality in the authselect profile (RHEL family). The review script tightens PASS_* in /etc/login.defs, writes minlen/minclass to /etc/security/pwquality.conf.d/99-muster.conf only where the merged value is looser, and applies the ageing with chage to every account with a password hash except root (uid 0, left to you) and one whose password has already reached the maximum age (it would expire on the spot; change it first). Arguments on the pam_pwquality.so line win over the files. Once an account's password expires, that account's cron and at jobs stop, and an account that logs in only by SSH key is made to change its password at login, which an unattended session cannot; exempt such accounts or lock their password first. An account with no last-change day, or set to change at next login (day 0), is left as is. A symlinked /etc/login.defs, or a 99-muster.conf that is a symlink (a mask), is never followed; the block stops.
-# ko:  libpam-pwquality 를 설치하거나 (Debian 계열) authselect 프로파일에 pam_pwquality 를 유지합니다 (RHEL 계열). 검토 스크립트는 /etc/login.defs의 PASS_* 값을 조이고, 합친 값이 더 느슨할 때만 minlen/minclass를 /etc/security/pwquality.conf.d/99-muster.conf에 쓰며, 비밀번호 해시가 있는 모든 계정에 chage로 기간을 적용합니다. 단, root(uid 0)는 운영자에게 맡기고, 비밀번호가 이미 최대 기간에 이른 계정은 그 자리에서 만료되므로 건너뜁니다(먼저 비밀번호를 바꾸세요). pam_pwquality.so 줄의 인자는 파일보다 우선합니다. 계정의 비밀번호가 만료되면 그 계정의 cron 과 at 작업이 멈추며, SSH 키로만 로그인하는 계정은 로그인할 때 비밀번호를 바꾸라는 요구를 받는데 무인 세션은 바꿀 수 없습니다. 그런 계정은 제외하거나 먼저 비밀번호를 잠그세요. 마지막 변경일이 없는 계정과 다음 로그인 때 바꾸도록 이미 설정된 계정(0일)은 그대로 둡니다. 심볼릭 링크인 /etc/login.defs 와 심볼릭 링크(마스크)인 99-muster.conf 는 따라가지 않고 그 블록을 멈춥니다.
+# do:  Install libpam-pwquality (Debian) or keep pam_pwquality in the authselect profile (RHEL). The script tightens PASS_* in /etc/login.defs and minlen/minclass only where looser and sets enforcing = 1 where the files say 0 (0 only warns); libpwquality reads /etc/security/pwquality.conf after the drop-ins, so a key the main file sets is rewritten there, others go to pwquality.conf.d/99-muster.conf (a later-sorting drop-in still wins and fails the validate). An enforcing=0 on the pam_pwquality.so line wins over the files and is yours to remove; the check keeps failing, naming it. chage ages every hashed account except root (yours), one past the maximum age (change it first), and one with no last-change day or due at next login (day 0). An expired password stops the account's cron and at jobs, and an SSH-key-only account must change it at login; exempt or lock unattended accounts first. A symlinked login.defs, pwquality.conf or 99-muster.conf (a mask) is never followed; the block stops.
+# ko:  libpam-pwquality 를 설치하거나 (Debian 계열) authselect 프로파일에 pam_pwquality 를 유지합니다 (RHEL 계열). 검토 스크립트는 /etc/login.defs의 PASS_* 값과 minlen/minclass를 더 느슨할 때만 조이고, 파일이 enforcing 을 0(경고만 하고 통과시킴)으로 두면 1로 바꿉니다. libpwquality 는 pwquality.conf.d 드롭인을 읽은 뒤 /etc/security/pwquality.conf 를 마지막에 읽으므로, 주 파일이 정한 키는 그 자리에서 고쳐 쓰고 나머지는 pwquality.conf.d/99-muster.conf에 씁니다(이름순으로 그 뒤에 오는 드롭인이 있으면 그 값이 이기고, 검증이 실패합니다). pam_pwquality.so 줄의 enforcing=0 은 파일보다 우선하며 운영자가 직접 지워야 합니다. 그동안 점검은 그 인자를 짚으며 계속 실패합니다. 또한 비밀번호 해시가 있는 모든 계정에 chage로 기간을 적용합니다. 단, root(uid 0)는 운영자에게 맡기고, 비밀번호가 이미 최대 기간에 이른 계정은 그 자리에서 만료되므로 건너뜁니다(먼저 비밀번호를 바꾸세요). 계정의 비밀번호가 만료되면 그 계정의 cron 과 at 작업이 멈추며, SSH 키로만 로그인하는 계정은 로그인할 때 비밀번호를 바꾸라는 요구를 받는데 무인 세션은 바꿀 수 없습니다. 그런 계정은 제외하거나 먼저 비밀번호를 잠그세요. 마지막 변경일이 없는 계정과 다음 로그인 때 바꾸도록 이미 설정된 계정(0일)은 그대로 둡니다. 심볼릭 링크인 /etc/login.defs·pwquality.conf 와 심볼릭 링크(마스크)인 99-muster.conf 는 따라가지 않고 그 블록을 멈춥니다.
 fix_muster_account_password_policy() {
   P_max_days='90'
   P_min_classes='3'
   P_min_days='1'
   P_min_len='8'
   MB="$MUSTER_BACKUP/blocks/fix_muster_account_password_policy"; mkdir -p "$MB" || { log "muster.account.password_policy: backup failed, nothing changed"; return 1; }
-  backup /etc/login.defs /etc/security/pwquality.conf.d/99-muster.conf || { log "muster.account.password_policy: backup failed, nothing changed"; return 1; }
+  backup /etc/login.defs /etc/security/pwquality.conf /etc/security/pwquality.conf.d/99-muster.conf || { log "muster.account.password_policy: backup failed, nothing changed"; return 1; }
   ( set -e
     ld=/etc/login.defs
+    pc=/etc/security/pwquality.conf
     pf=/etc/security/pwquality.conf.d/99-muster.conf
     if [ -L "$ld" ]; then log "muster.account.password_policy: $ld is a symlink, left as is"; exit 1; fi
+    if [ -L "$pc" ]; then log "muster.account.password_policy: $pc is a symlink, left as is"; exit 1; fi
     if [ -L "$pf" ]; then log "muster.account.password_policy: $pf is a symlink (a mask), left as is"; exit 1; fi
+    # minlen, required classes and enforcing over the chain in libpwquality's order, read as its read_config_file reads a line (cut at the first #, the name ends at a blank or =, blanks and at most one = skipped, names case-blind); its arguments are pwquality.conf (or "") and every regular file the three globs match, of which it keeps the names filter_conf keeps (the first .conf ends the name, hidden names too) in strcmp order, then pwquality.conf; a line it refuses (an unknown name, a bad integer, 1023 bytes or more, a NUL byte) stops it and prints stop <file>:<line> stops libpwquality (<what>)
+    rd_pwq() { LC_ALL=C awk 'function bad(v, a) { if (v !~ /^[+-]?[0-9]+$/) return 1; a = v; sub(/^[+-]/, "", a); sub(/^0+/, "", a); if (length(a) > 10) return 1; return (v + 0 >= 2147483647 || v + 0 <= -2147483648) } BEGIN { z = sprintf("%c", 0); if (length(z) != 1) { print "stop this awk cannot see a NUL byte"; exit } n = split("difok minlen dcredit ucredit lcredit ocredit minclass maxrepeat maxclassrepeat maxsequence gecoscheck dictcheck usercheck usersubstr enforcing retry", w, " "); for (i = 1; i <= n; i++) t[w[i]] = 1; n = split("badwords dictpath allowclasses enforce_for_root local_users_only", w, " "); for (i = 1; i <= n; i++) t[w[i]] = 2; m = 0; for (i = 2; i < ARGC; i++) { b = ARGV[i]; sub(/.*\//, "", b); p = index(b, ".conf"); if (p > 0 && p == length(b) - 4) { m++; q[m] = ARGV[i]; bn[m] = b } } for (i = 2; i <= m; i++) for (j = i; j > 1 && bn[j - 1] > bn[j]; j--) { y = bn[j]; bn[j] = bn[j - 1]; bn[j - 1] = y; y = q[j]; q[j] = q[j - 1]; q[j - 1] = y } if (ARGV[1] != "") q[++m] = ARGV[1]; for (i = 1; i <= m && s == ""; i++) { f = q[i]; ln = 0; while (s == "" && (getline l < f) > 0) { ln++; if (index(l, z)) { s = f ":" ln " stops libpwquality (NUL byte)"; break } if (length(l) >= 1023) { s = f ":" ln " stops libpwquality (line of 1023 bytes or more)"; break } sub(/#.*/, "", l); sub(/^[[:space:]]+/, "", l); sub(/[[:space:]]+$/, "", l); if (l == "") continue; k = l; sub(/[[:space:]=].*/, "", k); v = substr(l, length(k) + 1); e = (v ~ /^=/); v = substr(v, 2); while (v ~ /^[[:space:]]/ || (v ~ /^=/ && !e)) { if (v ~ /^=/) e = 1; v = substr(v, 2) } lk = tolower(k); if (!(lk in t) || (t[lk] == 1 && bad(v))) s = f ":" ln " stops libpwquality (" k ")"; else if (t[lk] == 1) x[lk] = v + 0 } close(f) } if (s != "") { print "stop " s; exit } ml = ("minlen" in x) ? x["minlen"] : 8; rc = x["minclass"] + 0; c = 0; if (x["dcredit"] + 0 <= -1) c++; if (x["ucredit"] + 0 <= -1) c++; if (x["lcredit"] + 0 <= -1) c++; if (x["ocredit"] + 0 <= -1) c++; if (c > rc) rc = c; en = ("enforcing" in x) ? x["enforcing"] : 1; print ml, rc, en }' "$@"; }
+    set -- ""
+    if [ -f "$pc" ]; then set -- "$pc"; fi
+    for f in /etc/security/pwquality.conf.d/*.conf /etc/security/pwquality.conf.d/.*.conf /etc/security/pwquality.conf.d/.conf; do if [ -f "$f" ]; then set -- "$@" "$f"; fi; done
+    pwq=$(rd_pwq "$@")
+    case "$pwq" in stop\ *) log "muster.account.password_policy: ${pwq#stop }, left as is"; exit 1;; esac
     first_val() { awk -v k="$1" '$1 == k { print $2; exit }' "$ld"; }
     set_key() {
-      if grep -Eq "^[[:space:]]*$1[[:space:]]" "$ld"; then sed -i -E "s|^([[:space:]]*$1)[[:space:]].*|\1 $2|" "$ld"; else printf '%s %s\n' "$1" "$2" >> "$ld"; fi
+      if grep -Eq "^[[:space:]]*$1[[:space:]]" "$ld"; then sed -i -E "s|^([[:space:]]*$1)[[:space:]].*|\1 $2|" "$ld"; else { if [ -s "$ld" ] && [ -n "$(tail -c1 "$ld")" ]; then echo >> "$ld"; fi; printf '%s %s\n' "$1" "$2" >> "$ld"; }; fi
     }
     v=$(first_val PASS_MAX_DAYS)
     case "$v" in ''|*[!0-9]*) set_key PASS_MAX_DAYS "$P_max_days";; *) if [ "$v" -gt "$P_max_days" ]; then set_key PASS_MAX_DAYS "$P_max_days"; fi;; esac
@@ -461,23 +470,27 @@ fix_muster_account_password_policy() {
     case "$v" in ''|*[!0-9]*) set_key PASS_MIN_DAYS "$P_min_days";; *) if [ "$v" -lt "$P_min_days" ]; then set_key PASS_MIN_DAYS "$P_min_days"; fi;; esac
     v=$(first_val PASS_MIN_LEN)
     case "$v" in ''|*[!0-9]*) set_key PASS_MIN_LEN "$P_min_len";; *) if [ "$v" -lt "$P_min_len" ]; then set_key PASS_MIN_LEN "$P_min_len"; fi;; esac
-    merged() { # minlen and required classes over the file chain, last wins (the collector's read)
-      for f in /etc/security/pwquality.conf /etc/security/pwquality.conf.d/*.conf; do
-        if [ -f "$f" ]; then cat "$f"; fi
-      done | awk -F= '{ k = $1; gsub(/[[:space:]]/, "", k); k = tolower(k); v = $2; gsub(/[[:space:]]/, "", v) } k ~ /^(minlen|minclass|dcredit|ucredit|lcredit|ocredit)$/ { x[k] = v } END { ml = ("minlen" in x) ? x["minlen"] + 0 : 8; rc = x["minclass"] + 0; n = 0; if (x["dcredit"] + 0 <= -1) n++; if (x["ucredit"] + 0 <= -1) n++; if (x["lcredit"] + 0 <= -1) n++; if (x["ocredit"] + 0 <= -1) n++; if (n > rc) rc = n; print ml, rc }'
-    }
-    pput() {
+    pput() { # pwquality.conf is read last: a key it sets is rewritten there as "<key> = <value>", on every line whose name (libpwquality's tokenizer) is the key; any other goes to 99-muster.conf
+      if [ -f "$pc" ] && LC_ALL=C awk -v k="$1" '{ x = $0; sub(/#.*/, "", x); sub(/^[[:space:]]+/, "", x); sub(/[[:space:]=].*/, "", x) } tolower(x) == k { f = 1 } END { exit !f }' "$pc"; then
+        LC_ALL=C awk -v k="$1" -v v="$2" '{ x = $0; sub(/#.*/, "", x); sub(/^[[:space:]]+/, "", x); sub(/[[:space:]=].*/, "", x) } tolower(x) == k { print k " = " v; next } { print }' "$pc" > "$MB/pwquality.tmp"
+        cat "$MB/pwquality.tmp" > "$pc"
+        return 0
+      fi
       if [ ! -d /etc/security/pwquality.conf.d ]; then mkdir -p /etc/security/pwquality.conf.d; chmod 755 /etc/security/pwquality.conf.d; fi
-      if [ -f "$pf" ] && awk -F= -v k="$1" '{ x = $1; gsub(/[[:space:]]/, "", x) } tolower(x) == k { f = 1 } END { exit !f }' "$pf"; then
-        awk -F= -v k="$1" -v v="$2" '{ x = $1; gsub(/[[:space:]]/, "", x) } tolower(x) == k { print k " = " v; next } { print }' "$pf" > "$MB/pwquality.tmp"
+      if [ -f "$pf" ] && LC_ALL=C awk -v k="$1" '{ x = $0; sub(/#.*/, "", x); sub(/^[[:space:]]+/, "", x); sub(/[[:space:]=].*/, "", x) } tolower(x) == k { f = 1 } END { exit !f }' "$pf"; then
+        LC_ALL=C awk -v k="$1" -v v="$2" '{ x = $0; sub(/#.*/, "", x); sub(/^[[:space:]]+/, "", x); sub(/[[:space:]=].*/, "", x) } tolower(x) == k { print k " = " v; next } { print }' "$pf" > "$MB/pwquality.tmp"
         cat "$MB/pwquality.tmp" > "$pf"
-      else printf '%s = %s\n' "$1" "$2" >> "$pf"; fi
+      else
+        if [ -s "$pf" ] && [ -n "$(tail -c1 "$pf")" ]; then echo >> "$pf"; fi
+        printf '%s = %s\n' "$1" "$2" >> "$pf"
+      fi
       chmod 644 "$pf"
     }
-    # shellcheck disable=SC2046
-    set -- $(merged)
+    # shellcheck disable=SC2086
+    set -- $pwq
     if [ "$1" -lt "$P_min_len" ]; then pput minlen "$P_min_len"; fi
     if [ "$2" -lt "$P_min_classes" ]; then pput minclass "$P_min_classes"; fi
+    if [ "$3" -eq 0 ]; then pput enforcing 1; fi
     today=$(( $(date +%s) / 86400 ))
     awk -F: -v OFS=: 'NF >= 8 && $1 !~ /^#/ && $1 != "" && $2 != "" && $2 !~ /^[!*]/ { print $1, $3, $4, $5 }' /etc/shadow > "$MB/ageing.scan"
     while IFS=: read -r name last min max; do
@@ -498,12 +511,12 @@ fix_muster_account_password_policy() {
       fi
     ); rrc=$?
     [ "$rrc" -eq 0 ] || log "muster.account.password_policy: rollback failed (rc $rrc)"
-    restore /etc/login.defs /etc/security/pwquality.conf.d/99-muster.conf || log "muster.account.password_policy: ROLLBACK INCOMPLETE, backups in $MUSTER_BACKUP"
+    restore /etc/login.defs /etc/security/pwquality.conf /etc/security/pwquality.conf.d/99-muster.conf || log "muster.account.password_policy: ROLLBACK INCOMPLETE, backups in $MUSTER_BACKUP"
     return 1
   fi
   # validate
   ( set -e
-    awk '$1 == "PASS_MAX_DAYS" && a == "" { a = $2 } $1 == "PASS_MIN_DAYS" && b == "" { b = $2 } $1 == "PASS_MIN_LEN" && c == "" { c = $2 } END { exit !(a != "" && a + 0 <= M && b + 0 >= m && c + 0 >= l) }' M="$P_max_days" m="$P_min_days" l="$P_min_len" /etc/login.defs && for f in /etc/security/pwquality.conf /etc/security/pwquality.conf.d/*.conf; do if [ -f "$f" ]; then cat "$f"; fi; done | awk -F= '{ k = $1; gsub(/[[:space:]]/, "", k); k = tolower(k); v = $2; gsub(/[[:space:]]/, "", v) } k ~ /^(minlen|minclass|dcredit|ucredit|lcredit|ocredit)$/ { x[k] = v } END { ml = ("minlen" in x) ? x["minlen"] + 0 : 8; rc = x["minclass"] + 0; n = 0; if (x["dcredit"] + 0 <= -1) n++; if (x["ucredit"] + 0 <= -1) n++; if (x["lcredit"] + 0 <= -1) n++; if (x["ocredit"] + 0 <= -1) n++; if (n > rc) rc = n; exit !(ml >= L && rc >= C) }' L="$P_min_len" C="$P_min_classes"
+    awk '$1 == "PASS_MAX_DAYS" && a == "" { a = $2 } $1 == "PASS_MIN_DAYS" && b == "" { b = $2 } $1 == "PASS_MIN_LEN" && c == "" { c = $2 } END { exit !(a != "" && a + 0 <= M && b + 0 >= m && c + 0 >= l) }' M="$P_max_days" m="$P_min_days" l="$P_min_len" /etc/login.defs && set -- "" && if [ -f /etc/security/pwquality.conf ]; then set -- /etc/security/pwquality.conf; fi && for f in /etc/security/pwquality.conf.d/*.conf /etc/security/pwquality.conf.d/.*.conf /etc/security/pwquality.conf.d/.conf; do if [ -f "$f" ]; then set -- "$@" "$f"; fi; done && LC_ALL=C awk 'function bad(v, a) { if (v !~ /^[+-]?[0-9]+$/) return 1; a = v; sub(/^[+-]/, "", a); sub(/^0+/, "", a); if (length(a) > 10) return 1; return (v + 0 >= 2147483647 || v + 0 <= -2147483648) } BEGIN { z = sprintf("%c", 0); if (length(z) != 1) { print "stop this awk cannot see a NUL byte"; exit } n = split("difok minlen dcredit ucredit lcredit ocredit minclass maxrepeat maxclassrepeat maxsequence gecoscheck dictcheck usercheck usersubstr enforcing retry", w, " "); for (i = 1; i <= n; i++) t[w[i]] = 1; n = split("badwords dictpath allowclasses enforce_for_root local_users_only", w, " "); for (i = 1; i <= n; i++) t[w[i]] = 2; m = 0; for (i = 2; i < ARGC; i++) { b = ARGV[i]; sub(/.*\//, "", b); p = index(b, ".conf"); if (p > 0 && p == length(b) - 4) { m++; q[m] = ARGV[i]; bn[m] = b } } for (i = 2; i <= m; i++) for (j = i; j > 1 && bn[j - 1] > bn[j]; j--) { y = bn[j]; bn[j] = bn[j - 1]; bn[j - 1] = y; y = q[j]; q[j] = q[j - 1]; q[j - 1] = y } if (ARGV[1] != "") q[++m] = ARGV[1]; for (i = 1; i <= m && s == ""; i++) { f = q[i]; ln = 0; while (s == "" && (getline l < f) > 0) { ln++; if (index(l, z)) { s = f ":" ln " stops libpwquality (NUL byte)"; break } if (length(l) >= 1023) { s = f ":" ln " stops libpwquality (line of 1023 bytes or more)"; break } sub(/#.*/, "", l); sub(/^[[:space:]]+/, "", l); sub(/[[:space:]]+$/, "", l); if (l == "") continue; k = l; sub(/[[:space:]=].*/, "", k); v = substr(l, length(k) + 1); e = (v ~ /^=/); v = substr(v, 2); while (v ~ /^[[:space:]]/ || (v ~ /^=/ && !e)) { if (v ~ /^=/) e = 1; v = substr(v, 2) } lk = tolower(k); if (!(lk in t) || (t[lk] == 1 && bad(v))) s = f ":" ln " stops libpwquality (" k ")"; else if (t[lk] == 1) x[lk] = v + 0 } close(f) } if (s != "") { print "stop " s; exit } ml = ("minlen" in x) ? x["minlen"] : 8; rc = x["minclass"] + 0; c = 0; if (x["dcredit"] + 0 <= -1) c++; if (x["ucredit"] + 0 <= -1) c++; if (x["lcredit"] + 0 <= -1) c++; if (x["ocredit"] + 0 <= -1) c++; if (c > rc) rc = c; en = ("enforcing" in x) ? x["enforcing"] : 1; print ml, rc, en }' "$@" | awk '$1 != "stop" && $1 + 0 >= L && $2 + 0 >= C && $3 + 0 != 0 { f = 1 } END { exit !f }' L="$P_min_len" C="$P_min_classes"
   ); rc=$?
   if [ "$rc" -ne 0 ]; then
     log "muster.account.password_policy: validate failed, rolling back"
@@ -513,7 +526,7 @@ fix_muster_account_password_policy() {
       fi
     ); rrc=$?
     [ "$rrc" -eq 0 ] || log "muster.account.password_policy: rollback failed (rc $rrc)"
-    restore /etc/login.defs /etc/security/pwquality.conf.d/99-muster.conf || log "muster.account.password_policy: ROLLBACK INCOMPLETE, backups in $MUSTER_BACKUP"
+    restore /etc/login.defs /etc/security/pwquality.conf /etc/security/pwquality.conf.d/99-muster.conf || log "muster.account.password_policy: ROLLBACK INCOMPLETE, backups in $MUSTER_BACKUP"
     return 1
   fi
   log "muster.account.password_policy: done"

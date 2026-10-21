@@ -243,8 +243,26 @@ func (f *File) Apply(results []check.Result, known, excluded map[string]bool, no
 						remaining++
 					}
 				}
-				if remaining == 0 {
+				// A subject waiver covers its observation and nothing else
+				// (spec §6.4): a failing scalar clause carries no observation,
+				// so the row keeps its verdict, and says so (D12). Its reason
+				// becomes that clause, not the clause just waived. With
+				// failing observations left the row stays failing on them as
+				// before and no warning is added; its reason is unchanged, so
+				// it is the FIRST failing clause's, which may be a clause
+				// whose observations were all just waived rather than one
+				// that still fails (a known gap, parked as a follow-up).
+				switch {
+				case remaining > 0:
+				case !r.UnobservedFail:
 					r.Status = check.WAIVED
+				default:
+					msg := fmt.Sprintf("waiver for %s#%s applied; %s stays %s on a clause no subject waiver covers", r.ID, strings.Join(appliedSubjects, ", "), r.ID, r.Status)
+					if r.UnobservedReason != "" {
+						r.Reason = r.UnobservedReason
+						msg += " (" + r.UnobservedReason + ")"
+					}
+					warn(msg)
 				}
 			}
 		}

@@ -276,10 +276,11 @@ log "a block's done means its commands ran and its check held; run muster collec
 `
 
 var textOnlyPhrase = map[string]string{
-	"no_script":     "no script declared",
-	"absent":        "the finding is an absent file",
-	"params_tuned":  "params tuned, see muster check --format json: check.param_sources",
-	"params_unsafe": "a parameter value cannot be carried safely; see muster check --format json: check.params",
+	"no_script":      "no script declared",
+	"absent":         "the finding is an absent file",
+	"params_tuned":   "params tuned, see muster check --format json: check.param_sources",
+	"subject_waived": "a subject waiver covers part of the finding; a script would act on the waived subject too",
+	"params_unsafe":  "a parameter value cannot be carried safely; see muster check --format json: check.params",
 }
 
 // Script renders p as the POSIX sh review script (spec §5): a fixed

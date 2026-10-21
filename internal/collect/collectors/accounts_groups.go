@@ -148,7 +148,7 @@ func shadowInUse(users []passwdRow, serr error, smeta, pmeta collect.ReadMeta) f
 			return e
 		}
 		e := collect.FromReadError(serr, smeta)
-		e.Reason = shadowPath + ": " + e.Reason
+		e = pathReason(shadowPath, e)
 		return e
 	}
 	e := collect.OK(true, derived)

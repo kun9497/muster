@@ -170,7 +170,7 @@ func mountinfoFailure(err error) facts.Envelope {
 		return collect.ErrorEnv(err.Error())
 	}
 	e := collect.FromReadError(err, collect.ReadMeta{})
-	e.Reason = mountinfoPath + ": " + e.Reason
+	e = pathReason(mountinfoPath, e)
 	return e
 }
 

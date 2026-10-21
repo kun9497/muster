@@ -575,3 +575,48 @@ func TestAccountsNSSSssCountsOnlyWhenConfigured(t *testing.T) {
 		t.Errorf("%+v (sssd.conf present: sss now counts)", e)
 	}
 }
+
+// H-18 (C3): a login.defs that exists but cannot be read is the answer for
+// what UID_MIN would have decided — accounts.users' system flags and
+// accounts.login_capable — never the shadow-utils default 1000 dressed up as
+// ok. A missing login.defs, or one with UID_MIN unset, keeps the default.
+func TestAccountsUnreadableLoginDefsIsTheAnswer(t *testing.T) {
+	for _, c := range []struct {
+		name   string
+		setup  func(a *fsAccess)
+		status facts.Status
+	}{
+		{"a NUL byte", func(a *fsAccess) { a.contents = map[string][]byte{"/etc/login.defs": []byte("UID_MIN 500\n\x00\n")} }, facts.StatusError},
+		{"denied", func(a *fsAccess) { a.fails = map[string]error{"/etc/login.defs": os.ErrPermission} }, facts.StatusDenied},
+	} {
+		a := accounts2B()
+		c.setup(a)
+		b := build(t, "accounts", a)
+		for _, k := range []string{"accounts.users", "accounts.login_capable"} {
+			e := env(t, b, k)
+			if e.Status != c.status || !strings.HasPrefix(e.Reason, "/etc/login.defs: ") || strings.Count(e.Reason, "/etc/login.defs") != 1 {
+				t.Errorf("%s: %s = %+v, want %s naming /etc/login.defs once", c.name, k, e, c.status)
+			}
+		}
+	}
+	// Missing, or UID_MIN unset: the default 1000, so svc (uid 998) is a
+	// system account and alice (1000) is not.
+	for _, defs := range []*string{nil, strp("# no UID_MIN here\n")} {
+		a := accounts2B()
+		delete(a.files, "/etc/login.defs")
+		if defs != nil {
+			a.contents = map[string][]byte{"/etc/login.defs": []byte(*defs)}
+		}
+		e := env(t, build(t, "accounts", a), "accounts.users")
+		if e.Status != facts.StatusOK {
+			t.Fatalf("users %+v, want ok", e)
+		}
+		users := e.Value.([]any)
+		if svc := userNamed(t, users, "svc", 0); svc["system"] != true {
+			t.Errorf("svc %v, want system under the default UID_MIN 1000", svc)
+		}
+		if alice := userNamed(t, users, "alice", 0); alice["system"] != false {
+			t.Errorf("alice %v, want not system", alice)
+		}
+	}
+}

@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -729,4 +730,264 @@ func TestInactivityReadersMatchTheCollector(t *testing.T) {
 			}
 		}
 	})
+}
+
+// pwqualityStopAt reads the file, line and text out of the reason H-5 gives
+// every pwquality value leaf when a file stops the chain.
+var pwqualityStopAt = regexp.MustCompile(`^libpwquality stops reading at (.+):([0-9]+) \((.*)\); the (files|lines) after it are not applied$`)
+
+// TestPwqualityReaderMatchesTheCollector (H-5, H-7, O-10): rd_pwq is
+// password_policy's one reader of the pwquality chain, and the validate
+// repeats its program. It prints `<minlen> <required classes> <enforcing>` as
+// the collector publishes pam.pwquality.minlen, required_classes and
+// enforcing over the same files (the stack's line sets none of them), or
+// `stop <file>:<line> stops libpwquality (<name>)` where the collector takes them absent naming
+// that line, so the body never writes over a chain libpwquality stops and
+// the validate agrees with check after it.
+//
+// H-9: the file list is part of the reading. The body and the validate hand
+// rd_pwq the main file (or "") and every regular file the three globs match,
+// and rd_pwq keeps the names filter_conf keeps, in strcmp order — so the
+// glob's locale order and its skipping of hidden names do not matter. The
+// loop is pinned here, in both, and run as written.
+func TestPwqualityReaderMatchesTheCollector(t *testing.T) {
+	r := shippedBody(t, "muster.account.password_policy")
+	fn := readerLine(t, r, "rd_pwq", true)
+	const loop = `for f in /etc/security/pwquality.conf.d/*.conf /etc/security/pwquality.conf.d/.*.conf /etc/security/pwquality.conf.d/.conf; do if [ -f "$f" ]; then set -- "$@" "$f"; fi; done`
+	if !strings.Contains(r.Script, "set -- \"\"\nif [ -f \"$pc\" ]; then set -- \"$pc\"; fi\n"+loop+"\n") {
+		t.Fatalf("the body does not build rd_pwq's list as pinned here:\n%s", r.Script)
+	}
+	if !strings.Contains(r.Validate, "set -- \"\" && if [ -f /etc/security/pwquality.conf ]; then set -- /etc/security/pwquality.conf; fi && "+loop+" && ") {
+		t.Fatalf("the validate does not build rd_pwq's list as pinned here:\n%s", r.Validate)
+	}
+	call := `set -- ""; if [ -f {root}/etc/security/pwquality.conf ]; then set -- {root}/etc/security/pwquality.conf; fi; ` +
+		strings.ReplaceAll(loop, "/etc/", "{root}/etc/") + `; rd_pwq "$@"`
+	long := func(n int) string { return "badwords = " + strings.Repeat("x", n-len("badwords = ")) }
+	type row struct {
+		main    string // "" leaves the main file out
+		dropins map[string]string
+	}
+	rows := map[string]row{
+		"no files":         {},
+		"main only":        {main: "minlen = 12\nminclass = 3\n"},
+		"no =":             {main: "minlen 6\n"},
+		"enforcing 0":      {main: "enforcing 0\n"},
+		"trailing comment": {main: "minlen = 12 # site\n"},
+		"upper case":       {main: "MINLEN=12\n"},
+		"blanks around =":  {main: "  MinLen\t=\t11\r\n"},
+		// H-16: at most one "=" is skipped; a second one is the value's
+		"two = after blanks":      {main: "  MinLen\t=\t= 11\r\n"},
+		"minlen==14":              {main: "minlen==14\n"},
+		"minlen == 14":            {main: "minlen == 14\n"},
+		"minlen = = 14":           {main: "minlen = = 14\n"},
+		"minclass==3":             {main: "minlen = 12\nminclass==3\n"},
+		"minlen =14":              {main: "minlen =14\n"},
+		"minlen= 14":              {main: "minlen= 14\n"},
+		"string keeps a second =": {main: "minlen = 9\nbadwords = =x\ndictpath==y\n"},
+		"sign":                    {main: "minlen = +9\ndcredit = -1\nocredit=-2\n"},
+		"hash in the value":       {main: "minlen=7#x\n"},
+		"strings and flags":       {main: "minclass = 2\nbadwords = a=b c\nenforce_for_root = yes\nlocal_users_only\ndictpath =\n"},
+		"credits":                 {main: "minclass = 1\ndcredit = -1\nucredit = -1\nocredit = -1\nlcredit = 1\n"},
+		"zeros":                   {main: "minlen = 0000000000014\n"},
+		"just below INT_MAX":      {main: "minlen = 2147483646\nminclass = -2147483647\n"},
+		"main last":               {main: "minlen = 6\n", dropins: map[string]string{"99-hardening.conf": "minlen = 14\n"}},
+		"drop-in order":           {dropins: map[string]string{"10-a.conf": "minlen = 10\nenforcing = 0\n", "20-b.conf": "minlen = 16\n"}},
+		"drop-in bad integer":     {main: "minlen = 14\nminclass = 4\n", dropins: map[string]string{"50-site.conf": "# site\n\nminlen = 14chars\n"}},
+		"drop-in unknown name":    {main: "minlen = 6\n", dropins: map[string]string{"50-site.conf": "minlen = 14\nunknownkey = 1\n"}},
+		"first drop-in stops":     {main: "minlen = 14\n", dropins: map[string]string{"10-a.conf": "difok = x\n", "20-b.conf": "bogus\n"}},
+		"main after a good line":  {main: "minlen = 12\nBogus = 1\n"},
+		"INT_MAX":                 {main: "minlen = 2147483647\n"},
+		"INT_MIN":                 {main: "minclass = -2147483648\n"},
+		"overflow":                {main: "minlen = 99999999999999999999\n"},
+		"empty integer":           {main: "minlen =\n"},
+		"bare integer":            {main: "minlen\n"},
+		"hex":                     {main: "minlen = 0x10\n"},
+		"two words":               {main: "minlen = 12 34\n"},
+		"empty name":              {main: "= 5\n"},
+		"Kelvin":                  {main: "usercheck = 1\nminlen = 10\nuserchecK = 1\n"},
+		"blank and comment lines": {main: "\n   \n# minlen = 4\n\t# x\nminlen = 9\n"},
+		"no final newline":        {main: "minlen = 13"},
+		// H-9: fgets' 1023-byte limit and NUL bytes
+		"1023-byte line":       {main: "minlen = 14\n", dropins: map[string]string{"10-words.conf": long(1023) + "\n"}},
+		"1022-byte line":       {main: "minlen = 14\n", dropins: map[string]string{"10-words.conf": long(1022) + "\n"}},
+		"1023-byte last line":  {main: long(1023)},
+		"1022-byte last line":  {main: "minlen = 9\n" + long(1022)},
+		"NUL":                  {main: "minlen = 14\n", dropins: map[string]string{"10-a.conf": "# a\nminlen = 9\nx\x00y\n"}},
+		"NUL first":            {main: "\x00minlen = 9\n"},
+		"NUL in the last line": {main: "minlen = 9\nminclass = 1\x00"},
+		// H-9: filter_conf and strcmp order
+		"hidden drop-in":          {dropins: map[string]string{".old.conf": "minlen = 20\n"}},
+		"hidden drop-in stops":    {main: "minlen = 12\n", dropins: map[string]string{".old.conf": "bogus\n"}},
+		"x.conf.conf":             {dropins: map[string]string{"x.conf.conf": "minlen = 30\n"}},
+		"x.conf.conf never stops": {main: "minlen = 12\n", dropins: map[string]string{"x.conf.conf": "bogus\n"}},
+		"-a.conf before .b.conf":  {dropins: map[string]string{"-a.conf": "minlen = 11\n", ".b.conf": "minlen = 12\n"}},
+		".b.conf before -a.conf?": {dropins: map[string]string{"-a.conf": "minlen = 12\n", ".b.conf": "minlen = 11\n"}},
+		"B.conf before a.conf":    {dropins: map[string]string{"a.conf": "minlen = 9\n", "B.conf": "minlen = 13\n"}},
+		".conf alone":             {dropins: map[string]string{".conf": "minlen = 15\n"}},
+		"a newline in a name":     {dropins: map[string]string{"new\nline.conf": "minlen = 16\n", "z.conf": "minclass = 2\n"}},
+	}
+	for _, f := range []string{"pam/rocky/pwquality.conf", "pam/ubuntu/pwquality.conf", "pam/rocky/credits.conf", "pam/rocky/dropin-30-reset.conf"} {
+		b, err := os.ReadFile(filepath.Join("testdata", f))
+		if err != nil {
+			t.Fatal(err)
+		}
+		rows[f] = row{main: string(b)}
+	}
+	names := make([]string, 0, len(rows))
+	for n := range rows {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	for _, n := range names {
+		t.Run(n, func(t *testing.T) {
+			c := rows[n]
+			b := build(t, "pam", pwqualityChain(c.main, c.dropins))
+			minlen := env(t, b, "pam.pwquality.minlen")
+			var want string
+			if minlen.Status == facts.StatusOK {
+				want = fmt.Sprintf("%v %v %v", minlen.Value, env(t, b, "pam.pwquality.required_classes").Value, env(t, b, "pam.pwquality.enforcing").Value)
+			} else if m := pwqualityStopAt.FindStringSubmatch(minlen.Reason); m != nil {
+				name := m[3]
+				if name != "NUL byte" && name != "line of 1023 bytes or more" {
+					for i := 0; i < len(name); i++ {
+						if cSpace(name[i]) || name[i] == '=' {
+							name = name[:i]
+							break
+						}
+					}
+				}
+				want = "stop {root}" + m[1] + ":" + m[2] + " stops libpwquality (" + name + ")"
+			} else {
+				t.Fatalf("minlen %+v: neither a value nor a stop", minlen)
+			}
+			files := map[string][]byte{}
+			if c.main != "" {
+				files[pwqualityConf] = []byte(c.main)
+			}
+			for d, s := range c.dropins {
+				files[pwqualityConfDir+"/"+d] = []byte(s)
+			}
+			var root string
+			got, code := runReaderWith(t, fn, call, files, func(r string) { root = r })
+			if code != 0 || got != strings.ReplaceAll(want, "{root}", root) {
+				t.Errorf("rd_pwq printed %q (exit %d); the collector reads %q", got, code, want)
+			}
+		})
+	}
+}
+
+// TestFaillockReaderMatchesTheCollector (H-6, H-7, O-10): rd_deny is
+// lockout_threshold's reader of faillock.conf, and the validate repeats its
+// program. It prints the deny the collector publishes as pam.faillock.deny
+// over the same file (the stack's lines set no deny), so the body rewrites
+// exactly where the check FAILs and the validate agrees with it.
+func TestFaillockReaderMatchesTheCollector(t *testing.T) {
+	r := shippedBody(t, "muster.account.lockout_threshold")
+	fn := readerLine(t, r, "rd_deny", true)
+	rows := map[string]string{
+		"trailing comment":   "deny = 10   # site\n",
+		"no =":               "deny 0\n",
+		"upper case":         "DENY = 0\n",
+		"upper case later":   "deny = 4\nDENY = 0\n",
+		"Deny":               "  Deny=2\n",
+		"leading digits":     "deny = 5abc\n",
+		"no digits":          "deny = abc\n",
+		"no digits later":    "deny = 4\ndeny = abc\n",
+		"last wins":          "deny = 4\ndeny = 7\n",
+		"tight =":            "deny=8\n",
+		"two =":              "deny = = 5\n",
+		"= then =":           "deny==5\n",
+		"= then blank =":     "deny= =5\n",
+		"blank = blank":      "deny\t=\t6\r\n",
+		"16 bits":            "deny = 65541\n",
+		"65536":              "deny = 65536\n",
+		"minus one":          "deny = -1\n",
+		"minus zero":         "deny = -0\n",
+		"plus":               "deny = +5\n",
+		"minus 65541":        "deny = -65541\n",
+		"ULONG_MAX":          "deny = 18446744073709551615\n",
+		"ULONG_MAX - 4":      "deny = 18446744073709551611\n",
+		"over ULONG_MAX":     "deny = 18446744073709551616\n",
+		"far over":           "deny = 99999999999999999999999\n",
+		"minus far over":     "deny = -99999999999999999999999\n",
+		"zeros":              "deny = 0000000000000000000000000005\n",
+		"bare":               "deny\n",
+		"denyx":              "denyx = 1\n",
+		"hash cut":           "deny#=1\n",
+		"commented":          "# deny = 1\n",
+		"other keys":         "unlock_time = never\neven_deny_root\nfail_interval = 900\n",
+		"empty file":         "",
+		"no final newline":   "deny = 9",
+		"stock rocky sample": "",
+	}
+	b, err := os.ReadFile("testdata/pam/rocky/faillock.conf")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows["stock rocky sample"] = string(b)
+	names := make([]string, 0, len(rows))
+	for n := range rows {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	for _, n := range names {
+		t.Run(n, func(t *testing.T) {
+			e := env(t, build(t, "pam", faillockConfStack(rows[n])), "pam.faillock.deny")
+			if e.Status != facts.StatusOK {
+				t.Fatalf("deny %+v", e)
+			}
+			got, code := runReader(t, fn, "rd_deny {root}/etc/security/faillock.conf", map[string][]byte{faillockConf: []byte(rows[n])})
+			if code != 0 || got != fmt.Sprint(e.Value) {
+				t.Errorf("rd_deny printed %q (exit %d); the collector reads deny %v from %q", got, code, e.Value, rows[n])
+			}
+		})
+	}
+	// No faillock.conf at all: the default on both sides.
+	a := faillockConfStack("")
+	delete(a.contents, faillockConf)
+	e := env(t, build(t, "pam", a), "pam.faillock.deny")
+	if got, code := runReader(t, fn, "rd_deny {root}/etc/security/faillock.conf", nil); code != 0 || got != fmt.Sprint(e.Value) {
+		t.Errorf("rd_deny over a missing file printed %q (exit %d); the collector reads %v", got, code, e.Value)
+	}
+}
+
+// TestInstallReadersMatchTheCollector (H-14, f8): each module body's
+// rd_install reads the first install line modprobe --showconfig prints for its argument
+// and prints its command when that command is one no-op word (a comment word
+// may follow), else "compound". Its case list is installNoops, so the body
+// writes its own line, and the validate fails, exactly when installDisables
+// says the line does not disable the module. Nothing here runs the command.
+func TestInstallReadersMatchTheCollector(t *testing.T) {
+	commands := []string{
+		"/bin/false", "/bin/true", "/usr/bin/false", "/usr/bin/true", "false", "true",
+		"/bin/false # never", "/bin/false #never", "  /usr/bin/true  ",
+		"/bin/true && modprobe --ignore-install usb_storage",
+		"/bin/false || /sbin/modprobe --ignore-install cramfs",
+		"true ; modprobe --ignore-install sctp", "/bin/true;modprobe sctp",
+		"/bin/true | x", "/bin/true & x", "/bin/true $(modprobe x)", "/bin/true `x`",
+		"/bin/false > /tmp/x", "/bin/true $CMDLINE_OPTS", "exec /bin/false", `"/bin/false"`,
+		"/bin/false# x", "/sbin/modprobe --ignore-install cramfs", "logger false", "/opt/false",
+		// sh splits words on space, tab and newline only: \v, \f and U+00A0
+		// are part of the word, so none of these is a no-op word
+		"/bin/false\v", "/bin/false\f", "/bin/false\u00a0", "\v/bin/false", "/bin/false\vx", "\u00a0/bin/true",
+		"\t/bin/false\t",
+	}
+	for _, id := range []string{"muster.beyond.usb_storage_disabled", "muster.beyond.uncommon_filesystems_disabled", "muster.beyond.uncommon_network_protocols_disabled"} {
+		fn := readerLine(t, shippedBody(t, id), "rd_install", true)
+		for _, c := range commands {
+			// The first line for the module wins; another module's line and a
+			// later line for the same one are never read.
+			conf := "install other /bin/false\ninstall mod_x " + c + "\ninstall mod_x /bin/false\n"
+			got, code := runReader(t, fn, "rd_install mod_x < {root}/showconfig", map[string][]byte{"/showconfig": []byte(conf)})
+			if code != 0 {
+				t.Fatalf("%s: rd_install exit %d over %q", id, code, c)
+			}
+			if disables := slices.Contains(installNoops, got); disables != installDisables(c) {
+				t.Errorf("%s: rd_install printed %q for %q; installDisables says %v", id, got, c, installDisables(c))
+			}
+		}
+		if got, _ := runReader(t, fn, "rd_install mod_x < {root}/showconfig", map[string][]byte{"/showconfig": []byte("install other /bin/false\n")}); got != "" {
+			t.Errorf("%s: rd_install printed %q with no line for the module", id, got)
+		}
+	}
 }

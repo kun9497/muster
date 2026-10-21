@@ -178,7 +178,8 @@ regenerates them from public images and `-check` compares.
   exits 0 with findings (judging is check's) and 2 when no plan could be made, a failing stdout included. Items are
   FAIL/WARN rows after waivers, ordered risk → severity in force → id; a degraded pass (`Reason ==
   check.ReasonDegradedPrefix + Degraded`), ERROR and MANUAL are `not_planned`. `item()` decides text-only in this
-  order (S-2): `no_script` → `absent` (an absent-means-fail row, unless the control declares `script_on_absent: true`)
+  order (S-2): `no_script` → `subject_waived` (a row a subject waiver left FAIL/WARN: an observation's verdict is
+  `waived`, and no body knows which subjects were waived; hotfix H-8) → `absent` (an absent-means-fail row, unless the control declares `script_on_absent: true`)
   → `params_tuned` (a profile or tuning value in force, only for a control without `script_params`) → `params_unsafe`
   (a `script_params` value in force — `check.ParamValues`, the default when the check block carries none — that
   `controls.ScriptParamValue` refuses: `int` an optionally signed integer (`^-?[0-9]+$`), `bool`, a `string`/list element in `^[A-Za-z0-9._/@:+,=-]+$`, a
@@ -267,7 +268,9 @@ regenerates them from public images and `-check` compares.
   never starts a line and never enters a `sed` expression (copy it to a plain variable first;
   `TestShippedBodiesPlaceParametersSafely`, in `internal/controls`). E-8: a body writes only when the current value is
   outside the clause's accepted set, read the collector's way (first `login.defs` line, last `faillock.conf` `deny`
-  defaulting to 3, the merged `pwquality` chain, keys in any case), and the validate proves set membership; a `gte`
+  defaulting to 3 — names in lower case only, `#` ends a line anywhere, a number is its leading digits — and the merged
+  `pwquality` chain in libpwquality's order, drop-ins then `pwquality.conf`, names in any case, a refused line stopping
+  the chain and the block before any write; hotfix H-5..H-7), and the validate proves set membership; a `gte`
   arm is a glob list (`[2-9]|[1-9][0-9]|[1-9][0-9][0-9]*`). E-9: a directory the host may lack runs under `if [ -d d ]
   && [ ! -L d ]`, one path under `[ -f p ] && [ ! -L p ]`, a mode-changing `find` carries `! -type l` or `-type f`/`-type
   d` (`TestShippedFindsCarryATypePredicate`), and a validate's `find` mask is 07777 minus the largest allowed mode

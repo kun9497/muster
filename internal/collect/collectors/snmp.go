@@ -278,7 +278,7 @@ func (p *snmpParse) readFile(file string, depth int) {
 			return
 		}
 		e := collect.FromReadError(err, meta)
-		e.Reason = file + ": " + e.Reason
+		e = pathReason(file, e)
 		p.fail(e)
 		return
 	}

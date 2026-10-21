@@ -101,6 +101,20 @@ func (d loginDefs) intOr(key string, def int) int {
 	return n
 }
 
+// uidMin is UID_MIN for the records it classifies (H-18, C3): the value
+// login.defs sets, else shadow-utils' default 1000 when the file does not
+// exist or does not set it (or sets something that is not a number, which
+// getdef_num also answers with its default). A login.defs that exists but
+// could not be read is no default: the read's envelope, path-prefixed, comes
+// back for every leaf UID_MIN would have decided.
+func (d loginDefs) uidMin() (int, *facts.Envelope) {
+	if d.err != nil && !errors.Is(d.err, fs.ErrNotExist) {
+		e := pathReason(loginDefsPath, collect.FromReadError(d.err, d.meta))
+		return 0, &e
+	}
+	return d.intOr("UID_MIN", 1000), nil
+}
+
 // shadowRow is one /etc/shadow entry reduced to what a snapshot may hold:
 // the ageing fields and the hash ALGORITHM id. The hash itself never leaves
 // parseShadow, and no part of it is ever stored (spec §5.6).
@@ -286,7 +300,7 @@ func runAccounts(_ context.Context, a collect.Access, b *collect.Builder) error 
 	}
 	groupErr := func() facts.Envelope {
 		e := collect.FromReadError(gerr, gmeta)
-		e.Reason = groupPath + ": " + e.Reason
+		e = pathReason(groupPath, e)
 		return e
 	}
 	if perr != nil {
@@ -320,14 +334,20 @@ func runAccounts(_ context.Context, a collect.Access, b *collect.Builder) error 
 	// all. A denied or otherwise unreadable shadow is genuinely unread:
 	// haveShadow stays false and rows keep no shadow-derived fields.
 	haveShadow := serr == nil || errors.Is(serr, fs.ErrNotExist)
-	users := deriveUsers(prows, byName, haveShadow, defs.intOr("UID_MIN", 1000), shells)
+	uidMin, uidMinErr := defs.uidMin()
+	users := deriveUsers(prows, byName, haveShadow, uidMin, shells)
 	// A record joins two files, so it is partial when either read was cut
 	// short: a truncated /etc/shadow leaves rows whose password_status was
 	// derived from a shadow this process never saw the end of (R131).
 	ue := collect.OKRead(users, &facts.Source{Kind: "file", Path: passwdPath}, pmeta)
 	ue.Truncated = ue.Truncated || (serr == nil && smeta.Truncated)
-	b.Set("accounts.users", ue)
-	b.Set("accounts.login_capable", loginCapableEnv(prows, byName, haveShadow, serr, smeta, pmeta, defs.intOr("UID_MIN", 1000), shells, shellsEnv))
+	if uidMinErr != nil {
+		b.Set("accounts.users", *uidMinErr)
+		b.Set("accounts.login_capable", *uidMinErr)
+	} else {
+		b.Set("accounts.users", ue)
+		b.Set("accounts.login_capable", loginCapableEnv(prows, byName, haveShadow, serr, smeta, pmeta, uidMin, shells, shellsEnv))
+	}
 	b.Set("accounts.useradd.inactive", useraddInactive(a))
 	b.Set("accounts.lastlog", lastlogRows(a, prows, pmeta))
 	joined := &facts.Source{Kind: "derived", Inputs: []facts.Source{{Kind: "file", Path: passwdPath}, {Kind: "file", Path: groupPath}}}

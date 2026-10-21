@@ -77,8 +77,7 @@ func runSshkeys(_ context.Context, a collect.Access, b *collect.Builder) error {
 	keys := []string{sshAuthorizedKeys, sshRootKeyCount, sshDSAKeyCount, sshRSAKeys}
 	data, meta, err := a.ReadFile(passwdPath, readLimit)
 	if err != nil {
-		e := collect.FromReadError(err, meta)
-		e.Reason = passwdPath + ": " + e.Reason
+		e := pathReason(passwdPath, collect.FromReadError(err, meta))
 		for _, k := range keys {
 			b.Set(k, e)
 		}

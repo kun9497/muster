@@ -1,6 +1,7 @@
 package facts
 
 import (
+	"bytes"
 	"errors"
 	"strings"
 	"testing"
@@ -68,4 +69,62 @@ func TestDigestIsStableAndPrefixed(t *testing.T) {
 	if a.Digest() != b.Digest() || !strings.HasPrefix(a.Digest(), "sha256:") {
 		t.Fatalf("digests %q %q", a.Digest(), b.Digest())
 	}
+}
+
+// H-12 (f11): a snapshot is ONE JSON value. checkDepth walks every value in
+// the stream and Decode read only the first, so `cat pass.json fail.json`
+// judged the first snapshot and dropped the rest without a word.
+func TestLoadRefusesTrailingJSONValues(t *testing.T) {
+	for name, tail := range map[string]string{
+		"second snapshot after a newline": "\n" + minimalSnapshot,
+		"second snapshot, no separator":   minimalSnapshot,
+		"object":                          " {}",
+		"array":                           " []",
+		"number":                          " 1",
+		"string":                          ` "x"`,
+		"null":                            " null",
+	} {
+		t.Run(name, func(t *testing.T) {
+			s, err := Load(strings.NewReader(minimalSnapshot + tail))
+			if err == nil || s != nil {
+				t.Fatalf("Load = %v, %v; want a refusal", s, err)
+			}
+			if errors.Is(err, ErrSchemaMismatch) || errors.Is(err, ErrTooDeep) || errors.Is(err, ErrTooLarge) {
+				t.Errorf("err %v must be a plain parse error", err)
+			}
+			if want := "parse snapshot: unexpected data after the snapshot (one JSON value expected)"; err.Error() != want {
+				t.Errorf("err %q, want %q", err, want)
+			}
+		})
+	}
+	for name, tail := range map[string]string{"none": "", "newline": "\n", "crlf": "\r\n", "mixed whitespace": "\n\n\t  "} {
+		t.Run("accepts "+name, func(t *testing.T) {
+			s, err := Load(strings.NewReader(minimalSnapshot + tail))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, ok := s.Facts["services"]; !ok || s.Run.Host.Hostname != "web-01" {
+				t.Errorf("snapshot decoded badly: %+v", s)
+			}
+		})
+	}
+}
+
+// FuzzLoad: Load takes untrusted bytes (spec §7.2). It never panics, and an
+// accepted snapshot always carries a facts tree and a supported version.
+func FuzzLoad(f *testing.F) {
+	f.Add([]byte(minimalSnapshot))
+	f.Add([]byte(minimalSnapshot + minimalSnapshot))
+	f.Add([]byte(minimalSnapshot + " 1"))
+	f.Add([]byte(minimalSnapshot + "\r\n"))
+	f.Add([]byte(`{"schema_version": 1}`))
+	f.Fuzz(func(t *testing.T, data []byte) {
+		s, err := Load(bytes.NewReader(data))
+		if (s == nil) == (err == nil) {
+			t.Fatalf("Load = %v, %v: exactly one of the two must be set", s, err)
+		}
+		if err == nil && (s.Facts == nil || s.SchemaVersion < 1 || s.SchemaVersion > SchemaVersion) {
+			t.Fatalf("accepted snapshot %+v", s)
+		}
+	})
 }

@@ -263,7 +263,11 @@ func sshdPersonas(ctx context.Context, a collect.Access, method string) (map[str
 	out := map[string]map[string]string{}
 	for _, p := range personaOrder {
 		r := a.Run(ctx, p.cmd)
-		if r.Err != nil || r.TimedOut || r.ExitCode != 0 {
+		// H-15: a dump cut at the output cap is an incomplete answer, not
+		// a "no override" one. An override is recorded only where it
+		// differs from the global value, so a lost line would read as the
+		// global's; the personas are then not collected at all.
+		if r.Err != nil || r.TimedOut || r.ExitCode != 0 || r.Truncated {
 			return out, false
 		}
 		m := parseDaemonDump(r.Stdout)

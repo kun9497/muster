@@ -2,6 +2,7 @@ package report
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -519,5 +520,26 @@ func TestEscapeNoCutKeepsLength(t *testing.T) {
 	}
 	if Escape(long) == got {
 		t.Fatal("Escape must still cut at MaxCell")
+	}
+}
+
+type errWriter struct {
+	err    error
+	writes int
+}
+
+func (e *errWriter) Write([]byte) (int, error) { e.writes++; return 0, e.err }
+
+// f6: the writer's error is WriteTable's error, and the table goes out in one
+// write, so a failure is never a half-printed report.
+func TestWriteTableReturnsTheWritersError(t *testing.T) {
+	sentinel := errors.New("disk full")
+	w := &errWriter{err: sentinel}
+	err := WriteTable(w, sampleReport(t), TableOptions{})
+	if !errors.Is(err, sentinel) {
+		t.Fatalf("WriteTable returned %v, want %v", err, sentinel)
+	}
+	if w.writes != 1 {
+		t.Errorf("%d writes, want 1", w.writes)
 	}
 }

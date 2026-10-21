@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
   "run": {
-    "muster_version": "30af2a4",
-    "commit": "30af2a4",
-    "controls_version": "kisa-unix-2026+2026.10.19",
-    "controls_digest": "sha256:46be3e952588b21dda1314a9bc002f6f2ef777dc9b57a441e2ee68a9c2f159ef",
+    "muster_version": "ca08d60",
+    "commit": "ca08d60",
+    "controls_version": "kisa-unix-2026+2026.10.20",
+    "controls_digest": "sha256:ed4e6ebc66e5ad2c8ec0110ba5caee5ae2539df7d9d88100325eb5a7065cc51a",
     "guide_edition": "kisa-unix-2026",
-    "collected_at": "2026-10-20T02:41:54Z",
+    "collected_at": "2026-10-21T02:03:16Z",
     "host": {
       "hostname": "ubuntu-container",
       "machine_id_hash": "",
@@ -141,13 +141,13 @@
       {
         "name": "patch",
         "status": "ok",
-        "ms": 28,
+        "ms": 31,
         "cmd": "/usr/bin/apt-get -s upgrade -o Debug::NoLocking=1"
       },
       {
         "name": "pkgverify",
         "status": "ok",
-        "ms": 169,
+        "ms": 208,
         "cmd": "/usr/bin/rpm -Va"
       },
       {
@@ -158,7 +158,7 @@
       {
         "name": "processes",
         "status": "ok",
-        "ms": 4,
+        "ms": 14,
         "cmd": "/usr/bin/rpm -qa --qf [%{=NAME}\t%{FILEMODES:octal}\t%{FILEUSERNAME}\t%{FILEGROUPNAME}\t%|FILECAPS?{%{FILECAPS}}|\t%{FILENAMES}\n]"
       },
       {
@@ -175,7 +175,7 @@
       {
         "name": "sockets",
         "status": "ok",
-        "ms": 0
+        "ms": 9
       },
       {
         "name": "sshd",
@@ -196,7 +196,7 @@
       {
         "name": "sysctl",
         "status": "ok",
-        "ms": 1
+        "ms": 2
       },
       {
         "name": "timesync",
@@ -226,11 +226,11 @@
     "partial_failures": []
   },
   "fix": {
-    "muster_version": "30af2a4",
-    "commit": "30af2a4",
-    "controls_version": "kisa-unix-2026+2026.10.19",
-    "controls_digest": "sha256:46be3e952588b21dda1314a9bc002f6f2ef777dc9b57a441e2ee68a9c2f159ef",
-    "snapshot_digest": "sha256:2793125964f25e103af8df7fc2408e1392e7611ba793a89e07970ed1e32d0131",
+    "muster_version": "ca08d60",
+    "commit": "ca08d60",
+    "controls_version": "kisa-unix-2026+2026.10.20",
+    "controls_digest": "sha256:ed4e6ebc66e5ad2c8ec0110ba5caee5ae2539df7d9d88100325eb5a7065cc51a",
+    "snapshot_digest": "sha256:de7600b432360bfb2afbaadd84ed45a0d57bbfc20de51328c09cd3c1e91c1d64",
     "guide_edition": "kisa-unix-2026",
     "profile": {
       "name": "default",
@@ -487,8 +487,8 @@
       "idempotent": true,
       "automation": "auto",
       "reason": "absent counts as fail: pam.faillock.deny is absent on this host",
-      "text_en": "RHEL family - authselect enable-feature with-faillock and set deny in /etc/security/faillock.conf; Debian family - add pam_faillock.so preauth and authfail lines to common-auth and a pam_faillock.so line to common-account (or use a pam-auth-update profile), then set deny in /etc/security/faillock.conf. A deny= argument on the pam_faillock lines wins over the file; the review script edits the file only.",
-      "text_ko": "RHEL 계열은 authselect enable-feature with-faillock 을 실행하고 /etc/security/faillock.conf 에 deny 를 설정하며, Debian 계열은 common-auth 에 pam_faillock.so preauth 와 authfail 줄, common-account 에 pam_faillock.so 줄을 추가하거나 pam-auth-update 프로파일을 쓴 뒤 /etc/security/faillock.conf 에 deny 를 설정합니다. pam_faillock 줄의 deny= 인자는 파일보다 우선하며, 검토 스크립트는 파일만 고칩니다.",
+      "text_en": "RHEL family - authselect enable-feature with-faillock and set deny in /etc/security/faillock.conf; Debian family - add pam_faillock.so preauth and authfail lines to common-auth and a pam_faillock.so line to common-account (or use a pam-auth-update profile), then set deny in /etc/security/faillock.conf. A deny= argument on the pam_faillock lines wins over the file; the review script edits the file only. pam_faillock reads only a lower-case deny (DENY or Deny is ignored), and the script rewrites only such lines.",
+      "text_ko": "RHEL 계열은 authselect enable-feature with-faillock 을 실행하고 /etc/security/faillock.conf 에 deny 를 설정하며, Debian 계열은 common-auth 에 pam_faillock.so preauth 와 authfail 줄, common-account 에 pam_faillock.so 줄을 추가하거나 pam-auth-update 프로파일을 쓴 뒤 /etc/security/faillock.conf 에 deny 를 설정합니다. pam_faillock 줄의 deny= 인자는 파일보다 우선하며, 검토 스크립트는 파일만 고칩니다. pam_faillock 은 소문자 deny 만 읽으며(DENY, Deny 는 무시), 스크립트도 그런 줄만 고쳐 씁니다.",
       "script": false,
       "text_only_reason": "absent",
       "script_params": [],
@@ -513,8 +513,8 @@
       "idempotent": true,
       "automation": "auto",
       "reason": "absent counts as fail: accounts.login_defs.pass_min_len is absent on this host",
-      "text_en": "Install libpam-pwquality (Debian family) or keep pam_pwquality in the authselect profile (RHEL family). The review script tightens PASS_* in /etc/login.defs, writes minlen/minclass to /etc/security/pwquality.conf.d/99-muster.conf only where the merged value is looser, and applies the ageing with chage to every account with a password hash except root (uid 0, left to you) and one whose password has already reached the maximum age (it would expire on the spot; change it first). Arguments on the pam_pwquality.so line win over the files. Once an account's password expires, that account's cron and at jobs stop, and an account that logs in only by SSH key is made to change its password at login, which an unattended session cannot; exempt such accounts or lock their password first. An account with no last-change day, or set to change at next login (day 0), is left as is. A symlinked /etc/login.defs, or a 99-muster.conf that is a symlink (a mask), is never followed; the block stops.",
-      "text_ko": "libpam-pwquality 를 설치하거나 (Debian 계열) authselect 프로파일에 pam_pwquality 를 유지합니다 (RHEL 계열). 검토 스크립트는 /etc/login.defs의 PASS_* 값을 조이고, 합친 값이 더 느슨할 때만 minlen/minclass를 /etc/security/pwquality.conf.d/99-muster.conf에 쓰며, 비밀번호 해시가 있는 모든 계정에 chage로 기간을 적용합니다. 단, root(uid 0)는 운영자에게 맡기고, 비밀번호가 이미 최대 기간에 이른 계정은 그 자리에서 만료되므로 건너뜁니다(먼저 비밀번호를 바꾸세요). pam_pwquality.so 줄의 인자는 파일보다 우선합니다. 계정의 비밀번호가 만료되면 그 계정의 cron 과 at 작업이 멈추며, SSH 키로만 로그인하는 계정은 로그인할 때 비밀번호를 바꾸라는 요구를 받는데 무인 세션은 바꿀 수 없습니다. 그런 계정은 제외하거나 먼저 비밀번호를 잠그세요. 마지막 변경일이 없는 계정과 다음 로그인 때 바꾸도록 이미 설정된 계정(0일)은 그대로 둡니다. 심볼릭 링크인 /etc/login.defs 와 심볼릭 링크(마스크)인 99-muster.conf 는 따라가지 않고 그 블록을 멈춥니다.",
+      "text_en": "Install libpam-pwquality (Debian) or keep pam_pwquality in the authselect profile (RHEL). The script tightens PASS_* in /etc/login.defs and minlen/minclass only where looser and sets enforcing = 1 where the files say 0 (0 only warns); libpwquality reads /etc/security/pwquality.conf after the drop-ins, so a key the main file sets is rewritten there, others go to pwquality.conf.d/99-muster.conf (a later-sorting drop-in still wins and fails the validate). An enforcing=0 on the pam_pwquality.so line wins over the files and is yours to remove; the check keeps failing, naming it. chage ages every hashed account except root (yours), one past the maximum age (change it first), and one with no last-change day or due at next login (day 0). An expired password stops the account's cron and at jobs, and an SSH-key-only account must change it at login; exempt or lock unattended accounts first. A symlinked login.defs, pwquality.conf or 99-muster.conf (a mask) is never followed; the block stops.",
+      "text_ko": "libpam-pwquality 를 설치하거나 (Debian 계열) authselect 프로파일에 pam_pwquality 를 유지합니다 (RHEL 계열). 검토 스크립트는 /etc/login.defs의 PASS_* 값과 minlen/minclass를 더 느슨할 때만 조이고, 파일이 enforcing 을 0(경고만 하고 통과시킴)으로 두면 1로 바꿉니다. libpwquality 는 pwquality.conf.d 드롭인을 읽은 뒤 /etc/security/pwquality.conf 를 마지막에 읽으므로, 주 파일이 정한 키는 그 자리에서 고쳐 쓰고 나머지는 pwquality.conf.d/99-muster.conf에 씁니다(이름순으로 그 뒤에 오는 드롭인이 있으면 그 값이 이기고, 검증이 실패합니다). pam_pwquality.so 줄의 enforcing=0 은 파일보다 우선하며 운영자가 직접 지워야 합니다. 그동안 점검은 그 인자를 짚으며 계속 실패합니다. 또한 비밀번호 해시가 있는 모든 계정에 chage로 기간을 적용합니다. 단, root(uid 0)는 운영자에게 맡기고, 비밀번호가 이미 최대 기간에 이른 계정은 그 자리에서 만료되므로 건너뜁니다(먼저 비밀번호를 바꾸세요). 계정의 비밀번호가 만료되면 그 계정의 cron 과 at 작업이 멈추며, SSH 키로만 로그인하는 계정은 로그인할 때 비밀번호를 바꾸라는 요구를 받는데 무인 세션은 바꿀 수 없습니다. 그런 계정은 제외하거나 먼저 비밀번호를 잠그세요. 마지막 변경일이 없는 계정과 다음 로그인 때 바꾸도록 이미 설정된 계정(0일)은 그대로 둡니다. 심볼릭 링크인 /etc/login.defs·pwquality.conf 와 심볼릭 링크(마스크)인 99-muster.conf 는 따라가지 않고 그 블록을 멈춥니다.",
       "script": true,
       "text_only_reason": "",
       "script_params": [
@@ -539,6 +539,7 @@
       "rollback": "both",
       "backup": [
         "/etc/login.defs",
+        "/etc/security/pwquality.conf",
         "/etc/security/pwquality.conf.d/99-muster.conf"
       ],
       "units": [],

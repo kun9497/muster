@@ -480,6 +480,61 @@ func TestModuleBodiesKeepAVendorInstallLine(t *testing.T) {
 	}
 }
 
+// H-14 (f8): a vendor install line whose first word is a no-op but which
+// chains more shell (`/bin/true && modprobe --ignore-install m`) loads the
+// module, so it is not one to keep. The body writes its own line; kmod's
+// first match still wins when the vendor file sorts first, so the validate
+// fails (and the block rolls back), and passes once muster's line sorts first.
+// The stub only cats conf/*, so nothing runs the vendor command.
+func TestModuleBodiesDoNotKeepACompoundInstallLine(t *testing.T) {
+	needSh(t)
+	for _, id := range moduleIDs {
+		r := shippedControl(t, id).Remediation
+		n := strings.ReplaceAll(r.Modules[0], "-", "_")
+		for _, tc := range []struct {
+			file, vendor  string
+			before, after bool // validate success before and after the body
+			muster        bool // the body writes install n /bin/false
+		}{
+			{"00-vendor.conf", "install " + n + " /bin/true && /sbin/modprobe --ignore-install " + n + "\n", false, false, true},
+			{"zz-vendor.conf", "install " + n + " /bin/true && /sbin/modprobe --ignore-install " + n + "\n", false, true, true},
+			{"00-vendor.conf", "install " + n + " /bin/false\n", true, true, false},
+		} {
+			t.Run(id+"/"+tc.file+"/"+tc.vendor, func(t *testing.T) {
+				bin, st, _ := moduleState(t, r)
+				rebase := moduleRebase(st)
+				if err := os.WriteFile(filepath.Join(st, "conf", tc.file), []byte(tc.vendor), 0o644); err != nil {
+					t.Fatal(err)
+				}
+				env := "MODPROBE_STATE=" + st
+				// The plain case starts unloaded too, so only the install line decides.
+				if !tc.muster {
+					if err := os.WriteFile(filepath.Join(st, "modules"), nil, 0o644); err != nil {
+						t.Fatal(err)
+					}
+				}
+				if _, code := runBody(t, st, bin, rebase(r.Validate), env); (code == 0) != tc.before && len(r.Modules) == 1 {
+					t.Errorf("validate before the body exit %d, want success %v", code, tc.before)
+				}
+				if out, code := runBody(t, st, bin, rebase(r.Script), env); code != 0 {
+					t.Fatalf("body %d %s", code, out)
+				}
+				if _, code := runBody(t, st, bin, rebase(r.Validate), env); (code == 0) != tc.after {
+					t.Errorf("validate after the body exit %d, want success %v", code, tc.after)
+				}
+				b, err := os.ReadFile(rebase(r.Backup[0]))
+				if err != nil && !os.IsNotExist(err) {
+					t.Fatal(err)
+				}
+				conf := string(b)
+				if got := strings.Contains(conf, "install "+n+" /bin/false\n"); got != tc.muster {
+					t.Errorf("muster's drop-in, beside %s %q:\n%s", tc.file, tc.vendor, conf)
+				}
+			})
+		}
+	}
+}
+
 // S-27: a drop-in that is a symlink (an operator's mask) fails the whole
 // block before any write; the link, its target's mode and content stay, and
 // no module is unloaded.
@@ -746,7 +801,9 @@ exit 99
 // sshd -t succeeds; systemctl logs its argv, reports ssh.service active when
 // $STUB/ssh_active exists and nothing else active, and a reload logs the
 // drop-in as the daemon would read it, and "(00-muster.conf is a link)" when
-// root_remote_login's drop-in is a symlink.
+// root_remote_login's drop-in is a symlink. Each reload also appends RELOAD and
+// root_remote_login's drop-in (or "(absent)") to $STUB/muster_reloads; with
+// $STUB/sshd_t_fail_first present the first sshd -t fails.
 func accountTree(t *testing.T) (root, bin, stub string) {
 	root, bin, stub = t.TempDir(), t.TempDir(), t.TempDir()
 	writeStub(t, bin, "chage", `printf '%s\n' "$*" >> "$STUB/chage"`+"\n")
@@ -755,12 +812,13 @@ case "$*" in
   "is-active --quiet ssh.service") [ -e "$STUB/ssh_active" ]; exit;;
   is-active*) exit 1;;
   reload*) cat "$ROOT/etc/ssh/sshd_config.d/00-muster-session.conf" >> "$STUB/systemctl" 2>/dev/null || echo "(no drop-in)" >> "$STUB/systemctl"
+    { echo RELOAD; cat "$ROOT/etc/ssh/sshd_config.d/00-muster.conf" 2>/dev/null || echo "(absent)"; } >> "$STUB/muster_reloads"
     if [ -L "$ROOT/etc/ssh/sshd_config.d/00-muster.conf" ]; then echo "(00-muster.conf is a link)" >> "$STUB/systemctl"; fi;;
 esac
 exit 0
 `)
 	writeStub(t, bin, "sshd", `case "$1" in
-  -t) exit 0;;
+  -t) if [ -e "$STUB/sshd_t_fail_first" ] && [ ! -e "$STUB/sshd_t_seen" ]; then : > "$STUB/sshd_t_seen"; exit 1; fi; exit 0;;
   -T) d="$ROOT/etc/ssh/sshd_config.d/00-muster-session.conf"
       if [ -f "$d" ]; then tr 'A-Z' 'a-z' < "$d"; else cat "$STUB/sshd_T"; fi;;
 esac
@@ -769,7 +827,7 @@ esac
 }
 
 func rebaseAccounts(s, root string) string {
-	for _, p := range []string{"/etc/login.defs", "/etc/security/", "/etc/shadow", "/etc/passwd", "/etc/ssh/", "/run/sshd", "/etc/securetty"} {
+	for _, p := range []string{"/etc/login.defs", "/etc/security/", "/etc/shadow", "/etc/passwd", "/etc/ssh/", "/run/sshd", "/etc/securetty", "/etc/pam.d/"} {
 		s = strings.ReplaceAll(s, p, root+p)
 	}
 	return s
@@ -857,7 +915,7 @@ func TestPasswordPolicyBodyTightensOnly(t *testing.T) {
 // parameters stay byte for byte; nothing is written and the validate holds.
 func TestPasswordPolicyBodyKeepsAStricterHost(t *testing.T) {
 	needSh(t)
-	for _, pwq := range []string{"minlen = 12\ndcredit = -1\nucredit = -1\nlcredit = -1\n", "MINLEN = 14\nMinClass = 3\n"} {
+	for _, pwq := range []string{"minlen = 12\ndcredit = -1\nucredit = -1\nlcredit = -1\n", "MINLEN = 14\nMinClass = 3\n", "minlen 12 # site\nminclass\t3\n"} {
 		keepsAStricterHost(t, pwq)
 	}
 }
@@ -913,6 +971,155 @@ func TestPasswordPolicyBodyRewritesItsOwnLine(t *testing.T) {
 	}
 }
 
+// pwPolicyBody runs password_policy's body over a tree whose login.defs
+// already passes, with pwquality.conf and the given drop-ins, and returns the
+// tree's root and the environment the validate needs.
+func pwPolicyBody(t *testing.T, main string, dropins map[string]string) (root string, env []string) {
+	t.Helper()
+	c := shippedControl(t, "muster.account.password_policy")
+	root, bin, stub := accountTree(t)
+	writeUnder(t, root, "/etc/login.defs", "PASS_MAX_DAYS 60\nPASS_MIN_DAYS 2\nPASS_MIN_LEN 12\n")
+	if main != "" {
+		writeUnder(t, root, "/etc/security/pwquality.conf", main)
+	}
+	for n, s := range dropins {
+		writeUnder(t, root, "/etc/security/pwquality.conf.d/"+n, s)
+	}
+	writeUnder(t, root, "/etc/passwd", "")
+	writeUnder(t, root, "/etc/shadow", "")
+	env = append(pEnv(t, c), "MB="+t.TempDir(), "STUB="+stub, "ROOT="+root)
+	body := "umask 077\nlog() { printf 'muster-fix: %s\\n' \"$*\"; }\n" + rebaseAccounts(c.Remediation.Script, root)
+	if out, code := runBody(t, root, bin, body, env...); code != 0 {
+		t.Fatalf("body %d: %s", code, out)
+	}
+	if out, code := runBody(t, root, bin, rebaseAccounts(c.Remediation.Validate, root), env...); code != 0 {
+		t.Errorf("validate %d after the body: %s", code, out)
+	}
+	return root, env
+}
+
+// f3: libpwquality reads pwquality.conf.d/*.conf first and pwquality.conf
+// LAST, so a key the main file sets is rewritten there — every uncommented
+// line that sets it, its key matched case-blind as the collector reads it —
+// and a key it does not set goes to 99-muster.conf. A drop-in muster wrote
+// would lose to the main file's value; the validate reads the same order.
+func TestPasswordPolicyBodyRewritesTheMainFile(t *testing.T) {
+	needSh(t)
+	// main 6 alone: the main file is rewritten, minclass (unset there) goes to
+	// the drop-in.
+	const main = "# site\n# minlen = 4\nMinLen = 6\nminlen=7\ndictcheck = 1\n"
+	root, _ := pwPolicyBody(t, main, nil)
+	if got := readFile(t, filepath.Join(root, "/etc/security/pwquality.conf")); got != "# site\n# minlen = 4\nminlen = 8\nminlen = 8\ndictcheck = 1\n" {
+		t.Errorf("pwquality.conf %q", got)
+	}
+	if got := readFile(t, filepath.Join(root, "/etc/security/pwquality.conf.d/99-muster.conf")); got != "minclass = 3\n" {
+		t.Errorf("99-muster.conf %q, want only the minclass the main file does not set", got)
+	}
+	// main 6 over an earlier run's drop-in at 14: libpwquality enforces 6, so
+	// the main file is rewritten and the old drop-in left as it was.
+	root, _ = pwPolicyBody(t, "minlen = 6\nminclass = 3\n", map[string]string{"99-muster.conf": "minlen = 14\n"})
+	if got := readFile(t, filepath.Join(root, "/etc/security/pwquality.conf")); got != "minlen = 8\nminclass = 3\n" {
+		t.Errorf("pwquality.conf %q, want the main file's minlen rewritten", got)
+	}
+	if got := readFile(t, filepath.Join(root, "/etc/security/pwquality.conf.d/99-muster.conf")); got != "minlen = 14\n" {
+		t.Errorf("99-muster.conf %q, want it unchanged", got)
+	}
+}
+
+// f3: the validate fails when only a drop-in holds the value the main file
+// overrides — the shape the old order certified as repaired.
+func TestPasswordPolicyValidateReadsTheMainFileLast(t *testing.T) {
+	needSh(t)
+	c := shippedControl(t, "muster.account.password_policy")
+	root, bin, stub := accountTree(t)
+	writeUnder(t, root, "/etc/login.defs", "PASS_MAX_DAYS 60\nPASS_MIN_DAYS 2\nPASS_MIN_LEN 12\n")
+	writeUnder(t, root, "/etc/security/pwquality.conf", "minlen = 6\n")
+	writeUnder(t, root, "/etc/security/pwquality.conf.d/99-muster.conf", "minlen = 14\nminclass = 3\n")
+	env := append(pEnv(t, c), "MB="+t.TempDir(), "STUB="+stub, "ROOT="+root)
+	if out, code := runBody(t, root, bin, rebaseAccounts(c.Remediation.Validate, root), env...); code == 0 {
+		t.Errorf("validate passed over a main file's minlen 6 that libpwquality reads last: %s", out)
+	}
+	// The same values with the main file stricter pass.
+	writeUnder(t, root, "/etc/security/pwquality.conf", "minlen = 14\n")
+	writeUnder(t, root, "/etc/security/pwquality.conf.d/99-muster.conf", "minlen = 6\nminclass = 3\n")
+	if out, code := runBody(t, root, bin, rebaseAccounts(c.Remediation.Validate, root), env...); code != 0 {
+		t.Errorf("validate %d over a main file's minlen 14: %s", code, out)
+	}
+}
+
+// f4: enforcing = 0 makes pam_pwquality warn and accept a weak password. The
+// body sets 1 through the same writer — in pwquality.conf when it sets the
+// key, else in 99-muster.conf — and the validate requires it non-zero in the
+// files. It reads only the files (H-1): an enforcing=0 argument on the
+// pam_pwquality.so line is the operator's to remove, and failing the validate
+// on it would roll back the body's correct writes; the check keeps failing on
+// it instead.
+func TestPasswordPolicyBodyRepairsEnforcing(t *testing.T) {
+	needSh(t)
+	root, _ := pwPolicyBody(t, "", map[string]string{"50-rollout.conf": "enforcing = 0\n"})
+	if got := readFile(t, filepath.Join(root, "/etc/security/pwquality.conf.d/99-muster.conf")); got != "minclass = 3\nenforcing = 1\n" {
+		t.Errorf("99-muster.conf %q, want enforcing = 1 after the rollout drop-in", got)
+	}
+	root, _ = pwPolicyBody(t, "minclass = 3\nEnforcing=0\n", nil)
+	if got := readFile(t, filepath.Join(root, "/etc/security/pwquality.conf")); got != "minclass = 3\nenforcing = 1\n" {
+		t.Errorf("pwquality.conf %q, want its enforcing rewritten", got)
+	}
+	if exists(filepath.Join(root, "/etc/security/pwquality.conf.d")) {
+		t.Error("a drop-in was written although the main file sets every key the body changed")
+	}
+
+	c := shippedControl(t, "muster.account.password_policy")
+	root, bin, stub := accountTree(t)
+	writeUnder(t, root, "/etc/login.defs", "PASS_MAX_DAYS 60\nPASS_MIN_DAYS 2\nPASS_MIN_LEN 12\n")
+	writeUnder(t, root, "/etc/security/pwquality.conf", "minclass = 3\nenforcing = 0\n")
+	env := append(pEnv(t, c), "MB="+t.TempDir(), "STUB="+stub, "ROOT="+root)
+	validate := func() int {
+		_, code := runBody(t, root, bin, rebaseAccounts(c.Remediation.Validate, root), env...)
+		return code
+	}
+	if validate() == 0 {
+		t.Error("validate passed over enforcing = 0 left in pwquality.conf")
+	}
+	writeUnder(t, root, "/etc/security/pwquality.conf", "minclass = 3\nenforcing = 1\n")
+	if code := validate(); code != 0 {
+		t.Errorf("validate %d over enforcing = 1", code)
+	}
+	writeUnder(t, root, "/etc/pam.d/common-password", "password requisite pam_pwquality.so retry=3 enforcing=0\n")
+	if code := validate(); code != 0 {
+		t.Errorf("validate %d with an enforcing=0 argument on the PAM line: it must read only the files", code)
+	}
+}
+
+// f3: pwquality.conf is in the block's backup, so a failed validate puts it
+// back byte for byte after the body rewrote it in place.
+func TestPasswordPolicyRollbackRestoresTheMainFile(t *testing.T) {
+	needSh(t)
+	root, bin, stub := accountTree(t)
+	const main = "# site\nMinLen = 6\n\tminclass=1  \n"
+	writeUnder(t, root, "/etc/login.defs", "PASS_MAX_DAYS 60\nPASS_MIN_DAYS 2\nPASS_MIN_LEN 12\n")
+	writeUnder(t, root, "/etc/security/pwquality.conf", main)
+	writeUnder(t, root, "/etc/passwd", "")
+	writeUnder(t, root, "/etc/shadow", "")
+	pc := filepath.Join(root, "/etc/security/pwquality.conf")
+	if err := os.Chmod(pc, 0o640); err != nil {
+		t.Fatal(err)
+	}
+	p := accountBlock(t, "muster.account.password_policy", root, true)
+	out, _, code := runScriptWith(t, p, root, filepath.Join(root, "bk"), runOpts{pathPrefix: bin, env: []string{"STUB=" + stub, "ROOT=" + root}})
+	if code != 1 || !strings.Contains(out, "validate failed") {
+		t.Fatalf("exit %d, want 1 after a failed validate\n%s", code, out)
+	}
+	if strings.Contains(out, "ROLLBACK INCOMPLETE") || strings.Contains(out, "rollback failed") {
+		t.Errorf("the way back was incomplete\n%s", out)
+	}
+	if got := readFile(t, pc); got != main {
+		t.Errorf("pwquality.conf is %q after the block, want %q", got, main)
+	}
+	if m := mode(t, pc); m != "640" {
+		t.Errorf("pwquality.conf mode %s after the block, want 640", m)
+	}
+}
+
 func TestLineBodiesTightenOnly(t *testing.T) {
 	needSh(t)
 	for _, c := range []struct {
@@ -924,13 +1131,30 @@ func TestLineBodiesTightenOnly(t *testing.T) {
 		{id: "muster.account.umask_policy", file: "/etc/login.defs", before: "UMASK 002\n", after: "UMASK 027\n"},
 		{id: "muster.account.umask_policy", file: "/etc/login.defs", before: "UMASK 077\n", after: "UMASK 077\n"},
 		{id: "muster.account.umask_policy", file: "/etc/login.defs", before: "# none\n", after: "# none\nUMASK 027\n"},
+		// Minor 7: an append starts a line of its own after a last line with no newline
+		{id: "muster.account.umask_policy", file: "/etc/login.defs", before: "# none", after: "# none\nUMASK 027\n"},
+		{id: "muster.account.lockout_threshold", file: "/etc/security/faillock.conf", before: "even_deny_root", after: "even_deny_root\ndeny = 2\n", env: []string{"P_max_attempts=2"}},
 		{id: "muster.account.lockout_threshold", file: "/etc/security/faillock.conf", before: "deny = 3\ndeny = 99\n", after: "deny = 5\ndeny = 5\n"},
 		{id: "muster.account.lockout_threshold", file: "/etc/security/faillock.conf", before: "# deny = 3\n", after: "# deny = 3\n"},
 		{id: "muster.account.lockout_threshold", file: "/etc/security/faillock.conf", before: "deny = 0\n", after: "deny = 5\n"},
 		{id: "muster.account.lockout_threshold", file: "/etc/security/faillock.conf", before: "deny = 2\n", after: "deny = 2\n"},
-		// the collector lower-cases faillock.conf keys
-		{id: "muster.account.lockout_threshold", file: "/etc/security/faillock.conf", before: "DENY = 99\n", after: "deny = 5\n"},
+		// H-6: pam_faillock's set_conf_opt matches names case-sensitively, so
+		// DENY and Deny are ignored (deny stays 3, in range) and left alone
+		{id: "muster.account.lockout_threshold", file: "/etc/security/faillock.conf", before: "DENY = 99\n", after: "DENY = 99\n"},
 		{id: "muster.account.lockout_threshold", file: "/etc/security/faillock.conf", before: "  Deny=2\n", after: "  Deny=2\n"},
+		{id: "muster.account.lockout_threshold", file: "/etc/security/faillock.conf", before: "deny = 2\nDENY = 99\n", after: "deny = 2\nDENY = 99\n"},
+		// "#" cuts wherever it is, the "=" is optional, and sscanf reads the
+		// leading digits (a value with none leaves deny unchanged)
+		{id: "muster.account.lockout_threshold", file: "/etc/security/faillock.conf", before: "deny = 10 # x\n", after: "deny = 5\n"},
+		{id: "muster.account.lockout_threshold", file: "/etc/security/faillock.conf", before: "deny 9\n", after: "deny = 5\n"},
+		{id: "muster.account.lockout_threshold", file: "/etc/security/faillock.conf", before: "deny = 0abc\n", after: "deny = 5\n"},
+		{id: "muster.account.lockout_threshold", file: "/etc/security/faillock.conf", before: "deny = 4abc\n", after: "deny = 4abc\n"},
+		{id: "muster.account.lockout_threshold", file: "/etc/security/faillock.conf", before: "deny = abc\n", after: "deny = abc\n"},
+		{id: "muster.account.lockout_threshold", file: "/etc/security/faillock.conf", before: "deny = 4\ndeny = abc\n", after: "deny = 4\ndeny = abc\n"},
+		{id: "muster.account.lockout_threshold", file: "/etc/security/faillock.conf", before: "deny = 99\ndeny = abc\n", after: "deny = 5\ndeny = 5\n"},
+		// "%hu" keeps the low 16 bits: 65541 locks after 5
+		{id: "muster.account.lockout_threshold", file: "/etc/security/faillock.conf", before: "deny = 65541\n", after: "deny = 65541\n"},
+		{id: "muster.account.lockout_threshold", file: "/etc/security/faillock.conf", before: "deny = -1\n", after: "deny = 5\n"},
 		// S-41: a missing faillock.conf is deny 3 on both sides
 		{id: "muster.account.lockout_threshold", file: "/etc/security/faillock.conf", absent: true},
 		{id: "muster.account.lockout_threshold", file: "/etc/security/faillock.conf", absent: true, created: true, after: "deny = 2\n", mode: "644", env: []string{"P_max_attempts=2"}},
@@ -1088,6 +1312,9 @@ func TestAccountBodiesLeaveASymlinkedDropIn(t *testing.T) {
 		{"muster.account.session_timeout", "/etc/ssh/sshd_config.d/00-muster-session.conf", "is a symlink (a mask), left as is"},
 		// K2: login.defs is written only when it is no symlink
 		{"muster.account.password_policy", "/etc/login.defs", "is a symlink, left as is"},
+		// f3: pwquality.conf is rewritten in place when it sets a key, so a
+		// symlinked one is refused like login.defs (K2)
+		{"muster.account.password_policy", "/etc/security/pwquality.conf", "is a symlink, left as is"},
 		{"muster.account.umask_policy", "/etc/login.defs", "is a symlink, left as is"},
 		// O-11: faillock.conf and securetty are vendor files (K2); 00-muster.conf
 		// is muster's own drop-in (S-27)
@@ -1182,6 +1409,61 @@ func TestRootLoginRollbackSkipsASymlinkedDropIn(t *testing.T) {
 	}
 }
 
+// E-11, the root_remote_login counterpart of S-35: the rollback puts the
+// recorded 00-muster.conf back (or removes it, when the run created it) before
+// sshd -t and the reload, so the daemon never runs a configuration its files do
+// not hold. A drop-in an earlier run left must come back, not be deleted.
+func TestRootLoginRollbackRestoresBeforeTheReload(t *testing.T) {
+	needSh(t)
+	const before = "PermitRootLogin no\nAllowGroups wheel\n"
+	for _, c := range []struct {
+		name         string
+		existing     bool
+		failValidate bool
+		failSshdT    bool
+	}{
+		{"validate fails, drop-in existed", true, true, false},
+		{"validate fails, no drop-in", false, true, false},
+		{"body fails, drop-in existed", true, false, true},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			root, bin, stub := accountTree(t)
+			dropIn := filepath.Join(root, "/etc/ssh/sshd_config.d/00-muster.conf")
+			if c.existing {
+				writeUnder(t, root, "/etc/ssh/sshd_config.d/00-muster.conf", before)
+			}
+			writeUnder(t, stub, "/ssh_active", "")
+			if c.failSshdT {
+				writeUnder(t, stub, "/sshd_t_fail_first", "")
+			}
+			p := accountBlock(t, "muster.account.root_remote_login", root, c.failValidate)
+			out, _, code := runScriptWith(t, p, root, filepath.Join(root, "bk"), runOpts{pathPrefix: bin, env: []string{"STUB=" + stub, "ROOT=" + root}})
+			if code != 1 {
+				t.Fatalf("exit %d, want 1 after a failed block\n%s", code, out)
+			}
+			if strings.Contains(out, "ROLLBACK INCOMPLETE") || strings.Contains(out, "rollback failed") {
+				t.Errorf("the way back was incomplete\n%s", out)
+			}
+			want := "(absent)\n"
+			if c.existing {
+				want = before
+			}
+			reloads := strings.Split(readFile(t, filepath.Join(stub, "muster_reloads")), "RELOAD\n")
+			if last := reloads[len(reloads)-1]; last != want {
+				t.Errorf("the last reload read %q, want %q (all: %q)", last, want, reloads)
+			}
+			got, err := os.ReadFile(dropIn)
+			if c.existing {
+				if err != nil || string(got) != before {
+					t.Errorf("the drop-in is %q (%v) after the block, want %q", got, err, before)
+				}
+			} else if err == nil {
+				t.Errorf("the drop-in exists after the block: %q", got)
+			}
+		})
+	}
+}
+
 // S-35: on a failed validate the rollback puts the recorded drop-in back
 // itself before it reloads, so the daemon never runs a configuration its
 // files do not hold, also when an earlier run's drop-in existed.
@@ -1208,5 +1490,209 @@ func TestSessionTimeoutRollbackRestoresBeforeTheReload(t *testing.T) {
 	}
 	if !strings.HasSuffix(calls, "reload ssh.service\n"+before) {
 		t.Errorf("the last reload did not read the restored drop-in:\n%s", calls)
+	}
+}
+
+// H-7: a line libpwquality refuses (an unknown name, or an integer
+// set_name_value rejects) stops it, and what it enforces then depends on what
+// was applied before the stop. The body names the line and fails before ANY
+// write - login.defs and the ageing included - so the block rolls back and the
+// check keeps failing on the line; the validate refuses the same chain.
+func TestPasswordPolicyBodyStopsOnARefusedLine(t *testing.T) {
+	needSh(t)
+	c := shippedControl(t, "muster.account.password_policy")
+	for _, row := range []struct {
+		name, main string
+		dropins    map[string]string
+		at, key    string
+	}{
+		{"a drop-in's bad integer", "minlen = 6\n", map[string]string{"50-site.conf": "# site\nminlen = 14chars\n"}, "/etc/security/pwquality.conf.d/50-site.conf:2", "minlen"},
+		{"a drop-in's unknown name", "minlen = 6\n", map[string]string{"50-site.conf": "minlen = 14\nunknownkey = 1\n"}, "/etc/security/pwquality.conf.d/50-site.conf:2", "unknownkey"},
+		{"an integer muster does not judge", "", map[string]string{"10-a.conf": "difok = x\n"}, "/etc/security/pwquality.conf.d/10-a.conf:1", "difok"},
+		{"the main file after a good line", "minlen = 12\nBogus = 1\n", nil, "/etc/security/pwquality.conf:2", "Bogus"},
+		// H-9: fgets cannot hand over a line of 1023 bytes or more, or one a
+		// NUL byte cuts short (PWQ_ERROR_CFGFILE_MALFORMED)
+		{"a drop-in's long line", "minlen = 6\n", map[string]string{"10-words.conf": "badwords = " + strings.Repeat("x", 1012) + "\n"}, "/etc/security/pwquality.conf.d/10-words.conf:1", "line of 1023 bytes or more"},
+		{"a NUL byte", "minlen = 6\n", map[string]string{"10-a.conf": "# a\nminlen\x00 = 14\n"}, "/etc/security/pwquality.conf.d/10-a.conf:2", "NUL byte"},
+		{"a hidden drop-in", "minlen = 6\n", map[string]string{".old.conf": "bogus\n"}, "/etc/security/pwquality.conf.d/.old.conf:1", "bogus"},
+	} {
+		t.Run(row.name, func(t *testing.T) {
+			root, bin, stub := accountTree(t)
+			const defs = "PASS_MAX_DAYS 99999\nPASS_MIN_DAYS 0\nPASS_MIN_LEN 5\n"
+			writeUnder(t, root, "/etc/login.defs", defs)
+			if row.main != "" {
+				writeUnder(t, root, "/etc/security/pwquality.conf", row.main)
+			}
+			for n, b := range row.dropins {
+				writeUnder(t, root, "/etc/security/pwquality.conf.d/"+n, b)
+			}
+			writeUnder(t, root, "/etc/passwd", "fresh:x:1000:1000::/home/fresh:/bin/sh\n")
+			writeUnder(t, root, "/etc/shadow", fmt.Sprintf("fresh:$6$x:%d::99999:7:::\n", time.Now().Unix()/86400))
+			env := append(pEnv(t, c), "MB="+t.TempDir(), "STUB="+stub, "ROOT="+root)
+			body := "umask 077\nlog() { printf 'muster-fix: %s\\n' \"$*\"; }\n" + rebaseAccounts(c.Remediation.Script, root)
+			out, code := runBody(t, root, bin, body, env...)
+			if code != 1 {
+				t.Fatalf("body exit %d, want 1: %s", code, out)
+			}
+			if want := "muster-fix: muster.account.password_policy: " + root + row.at + " stops libpwquality (" + row.key + "), left as is\n"; !strings.Contains(out, want) {
+				t.Errorf("no %q in:\n%s", want, out)
+			}
+			if got := readFile(t, filepath.Join(root, "/etc/login.defs")); got != defs {
+				t.Errorf("login.defs written before the stop was found: %q", got)
+			}
+			if row.main != "" {
+				if got := readFile(t, filepath.Join(root, "/etc/security/pwquality.conf")); got != row.main {
+					t.Errorf("pwquality.conf written: %q", got)
+				}
+			}
+			if exists(filepath.Join(root, "/etc/security/pwquality.conf.d/99-muster.conf")) {
+				t.Error("99-muster.conf written")
+			}
+			if exists(filepath.Join(stub, "chage")) {
+				t.Errorf("chage ran: %s", readFile(t, filepath.Join(stub, "chage")))
+			}
+			// The validate refuses the same chain even where every value it
+			// could read passes.
+			writeUnder(t, root, "/etc/login.defs", "PASS_MAX_DAYS 60\nPASS_MIN_DAYS 2\nPASS_MIN_LEN 12\n")
+			if out, code := runBody(t, root, bin, rebaseAccounts(c.Remediation.Validate, root), env...); code == 0 {
+				t.Errorf("validate passed over a chain libpwquality stops: %s", out)
+			}
+		})
+	}
+}
+
+// H-7: pput rewrites the main file's line for a key however libpwquality
+// reads it - without "=", in any case, with a trailing comment - as
+// "<key> = <value>", the comment not kept.
+func TestPasswordPolicyBodyRewritesASpelledKey(t *testing.T) {
+	needSh(t)
+	for _, main := range []string{"minlen 6\n", "MinLen=6\n", "minlen = 6 # site\n", "  MINLEN\t6\r\n"} {
+		root, _ := pwPolicyBody(t, main+"minclass 3\n", nil)
+		if got := readFile(t, filepath.Join(root, "/etc/security/pwquality.conf")); got != "minlen = 8\nminclass 3\n" {
+			t.Errorf("%q: pwquality.conf %q, want the line rewritten in place", main, got)
+		}
+		if exists(filepath.Join(root, "/etc/security/pwquality.conf.d")) {
+			t.Errorf("%q: a drop-in was written although the main file sets the key", main)
+		}
+	}
+}
+
+// H-9: the body reads the drop-ins libpwquality reads (filter_conf: a hidden
+// name is read, a.conf.conf is not) in strcmp order, whatever the caller's
+// locale and shell glob order, so it writes where the check FAILs and leaves
+// what libpwquality never reads.
+func TestPasswordPolicyBodyReadsTheDropinsLibpwqualityReads(t *testing.T) {
+	needSh(t)
+	// a hidden drop-in's minlen 6 is enforced: the body raises it in
+	// 99-muster.conf, which sorts after it
+	root, _ := pwPolicyBody(t, "", map[string]string{".old.conf": "minlen = 6\nminclass = 3\n"})
+	if got := readFile(t, filepath.Join(root, "/etc/security/pwquality.conf.d/99-muster.conf")); got != "minlen = 8\n" {
+		t.Errorf("99-muster.conf %q, want the hidden drop-in's minlen raised", got)
+	}
+	// a.conf.conf is never read: its bad line stops nothing
+	root, _ = pwPolicyBody(t, "minlen = 12\nminclass = 3\n", map[string]string{"a.conf.conf": "bogus\n"})
+	if exists(filepath.Join(root, "/etc/security/pwquality.conf.d/99-muster.conf")) {
+		t.Error("a drop-in was written although the chain passes")
+	}
+	// bytewise: "-a.conf" (0x2d) before ".b.conf" (0x2e), so .b.conf's 6 is
+	// the last word; LC_ALL=en_US.UTF-8 must not change that
+	c := shippedControl(t, "muster.account.password_policy")
+	r, bin, stub := accountTree(t)
+	writeUnder(t, r, "/etc/login.defs", "PASS_MAX_DAYS 60\nPASS_MIN_DAYS 2\nPASS_MIN_LEN 12\n")
+	writeUnder(t, r, "/etc/security/pwquality.conf.d/-a.conf", "minlen = 12\nminclass = 3\n")
+	writeUnder(t, r, "/etc/security/pwquality.conf.d/.b.conf", "minlen = 6\n")
+	writeUnder(t, r, "/etc/passwd", "")
+	writeUnder(t, r, "/etc/shadow", "")
+	env := append(pEnv(t, c), "MB="+t.TempDir(), "STUB="+stub, "ROOT="+r, "LC_ALL=en_US.UTF-8")
+	body := "umask 077\nlog() { printf 'muster-fix: %s\\n' \"$*\"; }\n" + rebaseAccounts(c.Remediation.Script, r)
+	if out, code := runBody(t, r, bin, body, env...); code != 0 {
+		t.Fatalf("body %d: %s", code, out)
+	}
+	if got := readFile(t, filepath.Join(r, "/etc/security/pwquality.conf.d/99-muster.conf")); got != "minlen = 8\n" {
+		t.Errorf("99-muster.conf %q, want .b.conf's minlen 6 raised", got)
+	}
+	if out, code := runBody(t, r, bin, rebaseAccounts(c.Remediation.Validate, r), env...); code != 0 {
+		t.Errorf("validate %d: %s", code, out)
+	}
+}
+
+// Minor 7: login.defs and 99-muster.conf without a final newline get one
+// before the body appends, so the new key is a line of its own.
+func TestPasswordPolicyBodyAppendsOnANewLine(t *testing.T) {
+	needSh(t)
+	c := shippedControl(t, "muster.account.password_policy")
+	root, bin, stub := accountTree(t)
+	writeUnder(t, root, "/etc/login.defs", "PASS_MAX_DAYS 60\nPASS_MIN_DAYS 2")
+	writeUnder(t, root, "/etc/security/pwquality.conf", "minlen = 12\n")
+	writeUnder(t, root, "/etc/security/pwquality.conf.d/99-muster.conf", "# site")
+	writeUnder(t, root, "/etc/passwd", "")
+	writeUnder(t, root, "/etc/shadow", "")
+	env := append(pEnv(t, c), "MB="+t.TempDir(), "STUB="+stub, "ROOT="+root)
+	body := "umask 077\nlog() { printf 'muster-fix: %s\\n' \"$*\"; }\n" + rebaseAccounts(c.Remediation.Script, root)
+	if out, code := runBody(t, root, bin, body, env...); code != 0 {
+		t.Fatalf("body %d: %s", code, out)
+	}
+	if got := readFile(t, filepath.Join(root, "/etc/login.defs")); got != "PASS_MAX_DAYS 60\nPASS_MIN_DAYS 2\nPASS_MIN_LEN 8\n" {
+		t.Errorf("login.defs %q", got)
+	}
+	if got := readFile(t, filepath.Join(root, "/etc/security/pwquality.conf.d/99-muster.conf")); got != "# site\nminclass = 3\n" {
+		t.Errorf("99-muster.conf %q", got)
+	}
+	if out, code := runBody(t, root, bin, rebaseAccounts(c.Remediation.Validate, root), env...); code != 0 {
+		t.Errorf("validate %d: %s", code, out)
+	}
+}
+
+// Minor 7: a sysctl or modprobe drop-in muster wrote and an operator left
+// without a final newline gets one before the body appends.
+func TestDropinBodiesAppendOnANewLine(t *testing.T) {
+	needSh(t)
+	for _, c := range sysctlControls(t) {
+		t.Run(c.ID, func(t *testing.T) {
+			bin, st, dir := t.TempDir(), t.TempDir(), t.TempDir()
+			writeStub(t, bin, "sysctl", sysctlStub)
+			failing := map[string]string{}
+			for _, k := range c.Remediation.Sysctl {
+				failing[k] = sysctlKeys[k][0]
+			}
+			if k := companion[c.ID]; k != "" {
+				failing[k] = "0"
+			}
+			seedSysctl(t, st, failing, nil)
+			f := rebaseSysctlD(c.Remediation.Backup[0], dir)
+			if err := os.WriteFile(f, []byte("# site"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			env := append(pEnv(t, c), "SYSCTL_STATE="+st)
+			if out, code := runBody(t, dir, bin, "umask 077\n"+rebaseSysctlD(c.Remediation.Script, dir), env...); code != 0 {
+				t.Fatalf("body %d: %s", code, out)
+			}
+			if got := readFile(t, f); !strings.HasPrefix(got, "# site\n") || !strings.HasSuffix(got, "\n") {
+				t.Errorf("drop-in %q, want the comment on its own line", got)
+			}
+			if out, code := runBody(t, dir, bin, rebaseSysctlD(c.Remediation.Validate, dir), env...); code != 0 {
+				t.Errorf("validate %d: %s", code, out)
+			}
+		})
+	}
+	for _, id := range moduleIDs {
+		t.Run(id, func(t *testing.T) {
+			r := shippedControl(t, id).Remediation
+			bin, st, _ := moduleState(t, r)
+			rebase := moduleRebase(st)
+			if err := os.WriteFile(rebase(r.Backup[0]), []byte("# site"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			env := "MODPROBE_STATE=" + st
+			if out, code := runBody(t, st, bin, "umask 077\n"+rebase(r.Script), env); code != 0 {
+				t.Fatalf("body %d: %s", code, out)
+			}
+			if got := readFile(t, rebase(r.Backup[0])); !strings.HasPrefix(got, "# site\ninstall ") {
+				t.Errorf("drop-in %q, want the comment on its own line", got)
+			}
+			if out, code := runBody(t, st, bin, rebase(r.Validate), env); code != 0 {
+				t.Errorf("validate %d: %s", code, out)
+			}
+		})
 	}
 }

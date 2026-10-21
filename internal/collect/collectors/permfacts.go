@@ -103,7 +103,7 @@ func writePermFacts(b *collect.Builder, a collect.Access, prefix, path string, g
 	b.Set(prefix+".gid", collect.OK(int(meta.GID), src))
 	if groupErr != nil {
 		e := collect.FromReadError(groupErr, groupMeta)
-		e.Reason = groupPath + ": " + e.Reason
+		e = pathReason(groupPath, e)
 		b.Set(prefix+".group", e)
 	} else {
 		b.Set(prefix+".group", collect.OKRead(groups[int(meta.GID)], &facts.Source{Kind: "file", Path: groupPath}, groupMeta))

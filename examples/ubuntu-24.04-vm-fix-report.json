@@ -1,15 +1,15 @@
 {
   "schema_version": 1,
   "run": {
-    "muster_version": "30af2a4",
-    "commit": "30af2a4",
-    "controls_version": "kisa-unix-2026+2026.10.19",
-    "controls_digest": "sha256:46be3e952588b21dda1314a9bc002f6f2ef777dc9b57a441e2ee68a9c2f159ef",
+    "muster_version": "ca08d60",
+    "commit": "ca08d60",
+    "controls_version": "kisa-unix-2026+2026.10.20",
+    "controls_digest": "sha256:ed4e6ebc66e5ad2c8ec0110ba5caee5ae2539df7d9d88100325eb5a7065cc51a",
     "guide_edition": "kisa-unix-2026",
-    "collected_at": "2026-10-20T02:41:54Z",
+    "collected_at": "2026-10-21T02:03:16Z",
     "host": {
       "hostname": "github-runner",
-      "machine_id_hash": "e7244411fdd82f17ae61972eb64a50c3df21d38725238f76d6ce6064a1bc4701",
+      "machine_id_hash": "399794935aded36b418e3630a41ef1d23f027811adf388b70d95a72238bc049b",
       "kernel": "",
       "os_release": {
         "id": "ubuntu",
@@ -39,7 +39,7 @@
       {
         "name": "accounts",
         "status": "ok",
-        "ms": 7
+        "ms": 1
       },
       {
         "name": "audit",
@@ -55,17 +55,17 @@
       {
         "name": "boot",
         "status": "ok",
-        "ms": 3
+        "ms": 14
       },
       {
         "name": "coredump",
         "status": "ok",
-        "ms": 0
+        "ms": 1
       },
       {
         "name": "cron",
         "status": "ok",
-        "ms": 575,
+        "ms": 888,
         "cmd": "/usr/bin/systemctl list-unit-files --type=timer --no-legend --no-pager"
       },
       {
@@ -76,23 +76,23 @@
       {
         "name": "env",
         "status": "ok",
-        "ms": 22
+        "ms": 9
       },
       {
         "name": "files",
         "status": "ok",
-        "ms": 34
+        "ms": 18
       },
       {
         "name": "fim",
         "status": "ok",
-        "ms": 7,
+        "ms": 11,
         "cmd": "/usr/bin/systemctl list-timers --all --no-legend --no-pager"
       },
       {
         "name": "firewall",
         "status": "ok",
-        "ms": 9,
+        "ms": 13,
         "cmd": "/usr/sbin/nft list ruleset"
       },
       {
@@ -113,7 +113,7 @@
       {
         "name": "modules",
         "status": "ok",
-        "ms": 47
+        "ms": 13
       },
       {
         "name": "mounts",
@@ -139,18 +139,18 @@
       {
         "name": "pam",
         "status": "ok",
-        "ms": 1
+        "ms": 2
       },
       {
         "name": "patch",
         "status": "ok",
-        "ms": 1550,
+        "ms": 3996,
         "cmd": "/usr/bin/apt-get -s upgrade -o Debug::NoLocking=1"
       },
       {
         "name": "pkgverify",
         "status": "ok",
-        "ms": 667721,
+        "ms": 676645,
         "cmd": "/usr/bin/rpm -Va"
       },
       {
@@ -161,13 +161,13 @@
       {
         "name": "processes",
         "status": "ok",
-        "ms": 109,
+        "ms": 161,
         "cmd": "/usr/bin/rpm -qa --qf [%{=NAME}\t%{FILEMODES:octal}\t%{FILEUSERNAME}\t%{FILEGROUPNAME}\t%|FILECAPS?{%{FILECAPS}}|\t%{FILENAMES}\n]"
       },
       {
         "name": "services",
         "status": "ok",
-        "ms": 220,
+        "ms": 322,
         "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState atftpd.service"
       },
       {
@@ -178,12 +178,12 @@
       {
         "name": "sockets",
         "status": "ok",
-        "ms": 0
+        "ms": 12
       },
       {
         "name": "sshd",
         "status": "ok",
-        "ms": 10,
+        "ms": 13,
         "cmd": "/usr/sbin/sshd -G"
       },
       {
@@ -199,24 +199,24 @@
       {
         "name": "sysctl",
         "status": "ok",
-        "ms": 1
+        "ms": 2
       },
       {
         "name": "timesync",
         "status": "ok",
-        "ms": 42,
+        "ms": 51,
         "cmd": "/usr/bin/timedatectl show-timesync --all"
       },
       {
         "name": "units",
         "status": "ok",
-        "ms": 35,
+        "ms": 56,
         "cmd": "/usr/bin/systemctl list-units --type=service --state=active --plain --no-legend"
       },
       {
         "name": "walk",
         "status": "ok",
-        "ms": 14308,
+        "ms": 15998,
         "cmd": "/usr/bin/rpm -qa --qf [%{=NAME}\t%{FILEMODES:octal}\t%{FILEUSERNAME}\t%{FILEGROUPNAME}\t%|FILECAPS?{%{FILECAPS}}|\t%{FILENAMES}\n]"
       }
     ],
@@ -229,11 +229,11 @@
     "partial_failures": []
   },
   "fix": {
-    "muster_version": "30af2a4",
-    "commit": "30af2a4",
-    "controls_version": "kisa-unix-2026+2026.10.19",
-    "controls_digest": "sha256:46be3e952588b21dda1314a9bc002f6f2ef777dc9b57a441e2ee68a9c2f159ef",
-    "snapshot_digest": "sha256:9a7d50c27b4c171b1e7777e0ef38dcfd24b2fdefabf935a7c5c46b585ab1d986",
+    "muster_version": "ca08d60",
+    "commit": "ca08d60",
+    "controls_version": "kisa-unix-2026+2026.10.20",
+    "controls_digest": "sha256:ed4e6ebc66e5ad2c8ec0110ba5caee5ae2539df7d9d88100325eb5a7065cc51a",
+    "snapshot_digest": "sha256:41b449a55f79ed283c14a3f5635288434b23ae28f208a918be974e23176c9e67",
     "guide_edition": "kisa-unix-2026",
     "profile": {
       "name": "default",
@@ -1265,36 +1265,6 @@
       "planned": true
     },
     {
-      "id": "muster.beyond.usb_storage_disabled",
-      "title_en": "The USB mass-storage driver cannot be loaded",
-      "title_ko": "USB 대용량 저장 장치 드라이버를 적재할 수 없다",
-      "status": "fail",
-      "severity": "medium",
-      "severity_source": "importance",
-      "risk": "restart_service",
-      "idempotent": true,
-      "automation": "auto",
-      "reason": "clause does not hold: kernel.modules each require disabled eq true",
-      "text_en": "Write install usb-storage /bin/false into a file under /etc/modprobe.d, for example /etc/modprobe.d/99-muster-usb-storage-disabled.conf, and rebuild the initramfs (the review script does not) so the setting applies during early boot as well. A vendor file whose install line for the module loads it wins over this one; the review script's validate then fails and the block rolls back. The review script never follows a symlink; a 99-muster-usb-storage-disabled.conf that is a symlink (a mask) is left as is and the block stops. Check first that the host does not boot or install from USB media and that no operational procedure depends on a USB device for backups or recovery, because those stop working immediately. A USB keyboard, mouse or serial adapter is unaffected — this is the mass-storage driver alone, not USB support.",
-      "text_ko": "/etc/modprobe.d 아래 파일(예를 들어 /etc/modprobe.d/99-muster-usb-storage-disabled.conf)에 install usb-storage /bin/false 를 적고, 초기 부팅 단계에도 적용되도록 initramfs 를 다시 만듭니다(검토 스크립트는 하지 않습니다). 모듈을 적재하는 install 줄을 둔 벤더 파일이 이 파일을 이기며, 그때 검토 스크립트의 validate가 실패해 블록이 롤백됩니다. 검토 스크립트는 심볼릭 링크를 따라가지 않으므로, 심볼릭 링크(마스크)인 99-muster-usb-storage-disabled.conf 는 그대로 두고 그 블록을 멈춥니다. USB 매체로 부팅하거나 설치하지 않는지, 백업이나 복구 절차가 USB 장치에 의존하지 않는지 먼저 확인하십시오. 그런 것들은 즉시 동작을 멈춥니다. USB 키보드·마우스·시리얼 어댑터에는 영향이 없습니다. 이것은 USB 지원 전체가 아니라 대용량 저장 장치 드라이버 하나입니다.",
-      "script": true,
-      "text_only_reason": "",
-      "script_params": [],
-      "script_on_absent": false,
-      "rollback": "both",
-      "backup": [
-        "/etc/modprobe.d/99-muster-usb-storage-disabled.conf"
-      ],
-      "units": [],
-      "modes": [],
-      "sysctl": [],
-      "modules": [
-        "usb-storage"
-      ],
-      "validate": true,
-      "planned": true
-    },
-    {
       "id": "muster.beyond.remote_log_forwarding",
       "title_en": "Log messages are forwarded to another host as they are written",
       "title_ko": "로그 메시지가 기록되는 즉시 다른 호스트로 전달된다",
@@ -1307,6 +1277,32 @@
       "reason": "clause does not hold: logging.rsyslog.forwards_remote eq true",
       "text_en": "Add a forwarding action to a file under /etc/rsyslog.d/ — for example *.* @@logs.example.com:514, or action(type=\"omfwd\" target=\"logs.example.com\" port=\"514\" protocol=\"tcp\") — and restart rsyslog; or install systemd-journal-upload, set URL= under [Upload] in /etc/systemd/journal-upload.conf and run systemctl enable --now systemd-journal-upload.service. Make sure the receiving host accepts and stores the messages first. Restarting the logger can drop the messages sent while it restarts.",
       "text_ko": "/etc/rsyslog.d/ 아래 파일에 전달 액션(예 *.* @@logs.example.com:514, 또는 action(type=\"omfwd\" target=\"logs.example.com\" port=\"514\" protocol=\"tcp\"))을 추가하고 rsyslog 를 재시작하거나, systemd-journal-upload 를 설치하고 /etc/systemd/journal-upload.conf 의 [Upload] 에 URL= 을 설정한 뒤 systemctl enable --now systemd-journal-upload.service 를 실행합니다. 받는 호스트가 메시지를 받아 저장하는지 먼저 확인하십시오. 로거를 재시작하는 동안 보낸 메시지는 유실될 수 있습니다.",
+      "script": false,
+      "text_only_reason": "no_script",
+      "script_params": [],
+      "script_on_absent": false,
+      "rollback": "none",
+      "backup": [],
+      "units": [],
+      "modes": [],
+      "sysctl": [],
+      "modules": [],
+      "validate": false,
+      "planned": true
+    },
+    {
+      "id": "muster.patch.security_updates",
+      "title_en": "No security updates are pending in the cached package metadata",
+      "title_ko": "캐시된 패키지 메타데이터에 대기 중인 보안 업데이트가 없다",
+      "status": "warn",
+      "severity": "high",
+      "severity_source": "importance",
+      "risk": "reboot_required",
+      "idempotent": true,
+      "automation": "partial",
+      "reason": "clause does not hold: patch.metadata_age_s lte 604800",
+      "text_en": "Refresh the package metadata (apt update, or dnf makecache) and apply the pending security updates (apt upgrade with the -security sources, or dnf update --security), then reboot if a kernel or core library changed.",
+      "text_ko": "패키지 메타데이터를 갱신하고(apt update 또는 dnf makecache) 대기 중인 보안 업데이트를 적용합니다(-security 소스를 포함한 apt upgrade, 또는 dnf update --security). 커널이나 핵심 라이브러리가 바뀌었다면 재부팅합니다.",
       "script": false,
       "text_only_reason": "no_script",
       "script_params": [],
@@ -1383,8 +1379,8 @@
       "idempotent": true,
       "automation": "auto",
       "reason": "absent counts as fail: pam.faillock.deny is absent on this host",
-      "text_en": "RHEL family - authselect enable-feature with-faillock and set deny in /etc/security/faillock.conf; Debian family - add pam_faillock.so preauth and authfail lines to common-auth and a pam_faillock.so line to common-account (or use a pam-auth-update profile), then set deny in /etc/security/faillock.conf. A deny= argument on the pam_faillock lines wins over the file; the review script edits the file only.",
-      "text_ko": "RHEL 계열은 authselect enable-feature with-faillock 을 실행하고 /etc/security/faillock.conf 에 deny 를 설정하며, Debian 계열은 common-auth 에 pam_faillock.so preauth 와 authfail 줄, common-account 에 pam_faillock.so 줄을 추가하거나 pam-auth-update 프로파일을 쓴 뒤 /etc/security/faillock.conf 에 deny 를 설정합니다. pam_faillock 줄의 deny= 인자는 파일보다 우선하며, 검토 스크립트는 파일만 고칩니다.",
+      "text_en": "RHEL family - authselect enable-feature with-faillock and set deny in /etc/security/faillock.conf; Debian family - add pam_faillock.so preauth and authfail lines to common-auth and a pam_faillock.so line to common-account (or use a pam-auth-update profile), then set deny in /etc/security/faillock.conf. A deny= argument on the pam_faillock lines wins over the file; the review script edits the file only. pam_faillock reads only a lower-case deny (DENY or Deny is ignored), and the script rewrites only such lines.",
+      "text_ko": "RHEL 계열은 authselect enable-feature with-faillock 을 실행하고 /etc/security/faillock.conf 에 deny 를 설정하며, Debian 계열은 common-auth 에 pam_faillock.so preauth 와 authfail 줄, common-account 에 pam_faillock.so 줄을 추가하거나 pam-auth-update 프로파일을 쓴 뒤 /etc/security/faillock.conf 에 deny 를 설정합니다. pam_faillock 줄의 deny= 인자는 파일보다 우선하며, 검토 스크립트는 파일만 고칩니다. pam_faillock 은 소문자 deny 만 읽으며(DENY, Deny 는 무시), 스크립트도 그런 줄만 고쳐 씁니다.",
       "script": false,
       "text_only_reason": "absent",
       "script_params": [],
@@ -1409,8 +1405,8 @@
       "idempotent": true,
       "automation": "auto",
       "reason": "absent counts as fail: accounts.login_defs.pass_min_len is absent on this host",
-      "text_en": "Install libpam-pwquality (Debian family) or keep pam_pwquality in the authselect profile (RHEL family). The review script tightens PASS_* in /etc/login.defs, writes minlen/minclass to /etc/security/pwquality.conf.d/99-muster.conf only where the merged value is looser, and applies the ageing with chage to every account with a password hash except root (uid 0, left to you) and one whose password has already reached the maximum age (it would expire on the spot; change it first). Arguments on the pam_pwquality.so line win over the files. Once an account's password expires, that account's cron and at jobs stop, and an account that logs in only by SSH key is made to change its password at login, which an unattended session cannot; exempt such accounts or lock their password first. An account with no last-change day, or set to change at next login (day 0), is left as is. A symlinked /etc/login.defs, or a 99-muster.conf that is a symlink (a mask), is never followed; the block stops.",
-      "text_ko": "libpam-pwquality 를 설치하거나 (Debian 계열) authselect 프로파일에 pam_pwquality 를 유지합니다 (RHEL 계열). 검토 스크립트는 /etc/login.defs의 PASS_* 값을 조이고, 합친 값이 더 느슨할 때만 minlen/minclass를 /etc/security/pwquality.conf.d/99-muster.conf에 쓰며, 비밀번호 해시가 있는 모든 계정에 chage로 기간을 적용합니다. 단, root(uid 0)는 운영자에게 맡기고, 비밀번호가 이미 최대 기간에 이른 계정은 그 자리에서 만료되므로 건너뜁니다(먼저 비밀번호를 바꾸세요). pam_pwquality.so 줄의 인자는 파일보다 우선합니다. 계정의 비밀번호가 만료되면 그 계정의 cron 과 at 작업이 멈추며, SSH 키로만 로그인하는 계정은 로그인할 때 비밀번호를 바꾸라는 요구를 받는데 무인 세션은 바꿀 수 없습니다. 그런 계정은 제외하거나 먼저 비밀번호를 잠그세요. 마지막 변경일이 없는 계정과 다음 로그인 때 바꾸도록 이미 설정된 계정(0일)은 그대로 둡니다. 심볼릭 링크인 /etc/login.defs 와 심볼릭 링크(마스크)인 99-muster.conf 는 따라가지 않고 그 블록을 멈춥니다.",
+      "text_en": "Install libpam-pwquality (Debian) or keep pam_pwquality in the authselect profile (RHEL). The script tightens PASS_* in /etc/login.defs and minlen/minclass only where looser and sets enforcing = 1 where the files say 0 (0 only warns); libpwquality reads /etc/security/pwquality.conf after the drop-ins, so a key the main file sets is rewritten there, others go to pwquality.conf.d/99-muster.conf (a later-sorting drop-in still wins and fails the validate). An enforcing=0 on the pam_pwquality.so line wins over the files and is yours to remove; the check keeps failing, naming it. chage ages every hashed account except root (yours), one past the maximum age (change it first), and one with no last-change day or due at next login (day 0). An expired password stops the account's cron and at jobs, and an SSH-key-only account must change it at login; exempt or lock unattended accounts first. A symlinked login.defs, pwquality.conf or 99-muster.conf (a mask) is never followed; the block stops.",
+      "text_ko": "libpam-pwquality 를 설치하거나 (Debian 계열) authselect 프로파일에 pam_pwquality 를 유지합니다 (RHEL 계열). 검토 스크립트는 /etc/login.defs의 PASS_* 값과 minlen/minclass를 더 느슨할 때만 조이고, 파일이 enforcing 을 0(경고만 하고 통과시킴)으로 두면 1로 바꿉니다. libpwquality 는 pwquality.conf.d 드롭인을 읽은 뒤 /etc/security/pwquality.conf 를 마지막에 읽으므로, 주 파일이 정한 키는 그 자리에서 고쳐 쓰고 나머지는 pwquality.conf.d/99-muster.conf에 씁니다(이름순으로 그 뒤에 오는 드롭인이 있으면 그 값이 이기고, 검증이 실패합니다). pam_pwquality.so 줄의 enforcing=0 은 파일보다 우선하며 운영자가 직접 지워야 합니다. 그동안 점검은 그 인자를 짚으며 계속 실패합니다. 또한 비밀번호 해시가 있는 모든 계정에 chage로 기간을 적용합니다. 단, root(uid 0)는 운영자에게 맡기고, 비밀번호가 이미 최대 기간에 이른 계정은 그 자리에서 만료되므로 건너뜁니다(먼저 비밀번호를 바꾸세요). 계정의 비밀번호가 만료되면 그 계정의 cron 과 at 작업이 멈추며, SSH 키로만 로그인하는 계정은 로그인할 때 비밀번호를 바꾸라는 요구를 받는데 무인 세션은 바꿀 수 없습니다. 그런 계정은 제외하거나 먼저 비밀번호를 잠그세요. 마지막 변경일이 없는 계정과 다음 로그인 때 바꾸도록 이미 설정된 계정(0일)은 그대로 둡니다. 심볼릭 링크인 /etc/login.defs·pwquality.conf 와 심볼릭 링크(마스크)인 99-muster.conf 는 따라가지 않고 그 블록을 멈춥니다.",
       "script": true,
       "text_only_reason": "",
       "script_params": [
@@ -1435,6 +1431,7 @@
       "rollback": "both",
       "backup": [
         "/etc/login.defs",
+        "/etc/security/pwquality.conf",
         "/etc/security/pwquality.conf.d/99-muster.conf"
       ],
       "units": [],
@@ -1575,8 +1572,8 @@
   "summary": {
     "planned": 43,
     "above_max_risk": 0,
-    "with_script": 20,
-    "text_only": 23,
+    "with_script": 19,
+    "text_only": 24,
     "waived": 0,
     "clean": 66,
     "not_planned": {
@@ -1586,8 +1583,8 @@
     },
     "by_risk": {
       "none": 27,
-      "restart_service": 9,
-      "reboot_required": 2,
+      "restart_service": 8,
+      "reboot_required": 3,
       "lockout_risk": 5
     }
   }

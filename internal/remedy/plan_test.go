@@ -606,3 +606,25 @@ func TestPlanRefusesAnUnsafeStateEntry(t *testing.T) {
 		}
 	}
 }
+
+// H-8: a FAIL/WARN row with a waived observation is text only, because no
+// body knows which subjects were waived; one without stays scripted; a
+// control with no script stays no_script.
+func TestPlanSubjectWaivedIsTextOnly(t *testing.T) {
+	waived := row("muster.test.e_param", "FAIL", "mode 777", "", "high")
+	waived.Observations = []check.Observation{{Subject: "user:a", Verdict: "waived"}, {Subject: "user:b", Verdict: "fail"}}
+	plain := row("muster.test.a_none", "FAIL", "mode 777", "", "high")
+	plain.Observations = []check.Observation{{Subject: "user:a", Verdict: "fail"}}
+	noScript := row("muster.test.d_reboot", "FAIL", "x", "", "high")
+	noScript.Observations = []check.Observation{{Subject: "user:a", Verdict: "waived"}}
+	p := build(t, testReport(waived, plain, noScript), Options{})
+	if it := itemByID(t, p, "muster.test.e_param"); it.TextOnlyReason != "subject_waived" || it.Script || it.ScriptBody != "" || it.Rollback != "none" {
+		t.Errorf("waived: reason %q script %v body %q rollback %q", it.TextOnlyReason, it.Script, it.ScriptBody, it.Rollback)
+	}
+	if it := itemByID(t, p, "muster.test.d_reboot"); it.TextOnlyReason != "no_script" {
+		t.Errorf("no-script control: reason %q, want no_script", it.TextOnlyReason)
+	}
+	if it := itemByID(t, p, "muster.test.a_none"); it.TextOnlyReason != "" || !it.Script {
+		t.Errorf("a row without a waived observation: reason %q script %v, want scripted", it.TextOnlyReason, it.Script)
+	}
+}

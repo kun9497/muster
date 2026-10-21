@@ -128,8 +128,7 @@ func loadIDTables(a collect.Access) (idTables, map[string]facts.Envelope) {
 	read := func(path string) ([]byte, bool) {
 		data, meta, err := a.ReadFile(path, readLimit)
 		if err != nil {
-			e := collect.FromReadError(err, meta)
-			e.Reason = path + ": " + e.Reason
+			e := pathReason(path, collect.FromReadError(err, meta))
 			failures[path] = e
 			return nil, false
 		}
@@ -164,7 +163,7 @@ func loadIDTables(a collect.Access) (idTables, map[string]facts.Envelope) {
 	// and its delegated range would read as unaccounted for.
 	if rows, meta, err := groupIdents(a); err != nil {
 		e := collect.FromReadError(err, meta)
-		e.Reason = groupPath + ": " + e.Reason
+		e = pathReason(groupPath, e)
 		failures[groupPath] = e
 	} else {
 		note(groupPath, meta)

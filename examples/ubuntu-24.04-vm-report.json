@@ -1,15 +1,15 @@
 {
   "schema_version": 1,
   "run": {
-    "muster_version": "30af2a4",
-    "commit": "30af2a4",
-    "controls_version": "kisa-unix-2026+2026.10.19",
-    "controls_digest": "sha256:46be3e952588b21dda1314a9bc002f6f2ef777dc9b57a441e2ee68a9c2f159ef",
+    "muster_version": "ca08d60",
+    "commit": "ca08d60",
+    "controls_version": "kisa-unix-2026+2026.10.20",
+    "controls_digest": "sha256:ed4e6ebc66e5ad2c8ec0110ba5caee5ae2539df7d9d88100325eb5a7065cc51a",
     "guide_edition": "kisa-unix-2026",
-    "collected_at": "2026-10-20T02:41:54Z",
+    "collected_at": "2026-10-21T02:03:16Z",
     "host": {
       "hostname": "github-runner",
-      "machine_id_hash": "e7244411fdd82f17ae61972eb64a50c3df21d38725238f76d6ce6064a1bc4701",
+      "machine_id_hash": "399794935aded36b418e3630a41ef1d23f027811adf388b70d95a72238bc049b",
       "kernel": "",
       "os_release": {
         "id": "ubuntu",
@@ -39,7 +39,7 @@
       {
         "name": "accounts",
         "status": "ok",
-        "ms": 7
+        "ms": 1
       },
       {
         "name": "audit",
@@ -55,17 +55,17 @@
       {
         "name": "boot",
         "status": "ok",
-        "ms": 3
+        "ms": 14
       },
       {
         "name": "coredump",
         "status": "ok",
-        "ms": 0
+        "ms": 1
       },
       {
         "name": "cron",
         "status": "ok",
-        "ms": 575,
+        "ms": 888,
         "cmd": "/usr/bin/systemctl list-unit-files --type=timer --no-legend --no-pager"
       },
       {
@@ -76,23 +76,23 @@
       {
         "name": "env",
         "status": "ok",
-        "ms": 22
+        "ms": 9
       },
       {
         "name": "files",
         "status": "ok",
-        "ms": 34
+        "ms": 18
       },
       {
         "name": "fim",
         "status": "ok",
-        "ms": 7,
+        "ms": 11,
         "cmd": "/usr/bin/systemctl list-timers --all --no-legend --no-pager"
       },
       {
         "name": "firewall",
         "status": "ok",
-        "ms": 9,
+        "ms": 13,
         "cmd": "/usr/sbin/nft list ruleset"
       },
       {
@@ -113,7 +113,7 @@
       {
         "name": "modules",
         "status": "ok",
-        "ms": 47
+        "ms": 13
       },
       {
         "name": "mounts",
@@ -139,18 +139,18 @@
       {
         "name": "pam",
         "status": "ok",
-        "ms": 1
+        "ms": 2
       },
       {
         "name": "patch",
         "status": "ok",
-        "ms": 1550,
+        "ms": 3996,
         "cmd": "/usr/bin/apt-get -s upgrade -o Debug::NoLocking=1"
       },
       {
         "name": "pkgverify",
         "status": "ok",
-        "ms": 667721,
+        "ms": 676645,
         "cmd": "/usr/bin/rpm -Va"
       },
       {
@@ -161,13 +161,13 @@
       {
         "name": "processes",
         "status": "ok",
-        "ms": 109,
+        "ms": 161,
         "cmd": "/usr/bin/rpm -qa --qf [%{=NAME}\t%{FILEMODES:octal}\t%{FILEUSERNAME}\t%{FILEGROUPNAME}\t%|FILECAPS?{%{FILECAPS}}|\t%{FILENAMES}\n]"
       },
       {
         "name": "services",
         "status": "ok",
-        "ms": 220,
+        "ms": 322,
         "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState atftpd.service"
       },
       {
@@ -178,12 +178,12 @@
       {
         "name": "sockets",
         "status": "ok",
-        "ms": 0
+        "ms": 12
       },
       {
         "name": "sshd",
         "status": "ok",
-        "ms": 10,
+        "ms": 13,
         "cmd": "/usr/sbin/sshd -G"
       },
       {
@@ -199,24 +199,24 @@
       {
         "name": "sysctl",
         "status": "ok",
-        "ms": 1
+        "ms": 2
       },
       {
         "name": "timesync",
         "status": "ok",
-        "ms": 42,
+        "ms": 51,
         "cmd": "/usr/bin/timedatectl show-timesync --all"
       },
       {
         "name": "units",
         "status": "ok",
-        "ms": 35,
+        "ms": 56,
         "cmd": "/usr/bin/systemctl list-units --type=service --state=active --plain --no-legend"
       },
       {
         "name": "walk",
         "status": "ok",
-        "ms": 14308,
+        "ms": 15998,
         "cmd": "/usr/bin/rpm -qa --qf [%{=NAME}\t%{FILEMODES:octal}\t%{FILEUSERNAME}\t%{FILEGROUPNAME}\t%|FILECAPS?{%{FILECAPS}}|\t%{FILENAMES}\n]"
       }
     ],
@@ -229,11 +229,11 @@
     "partial_failures": []
   },
   "check": {
-    "muster_version": "30af2a4",
-    "commit": "30af2a4",
-    "controls_version": "kisa-unix-2026+2026.10.19",
-    "controls_digest": "sha256:46be3e952588b21dda1314a9bc002f6f2ef777dc9b57a441e2ee68a9c2f159ef",
-    "snapshot_digest": "sha256:9a7d50c27b4c171b1e7777e0ef38dcfd24b2fdefabf935a7c5c46b585ab1d986",
+    "muster_version": "ca08d60",
+    "commit": "ca08d60",
+    "controls_version": "kisa-unix-2026+2026.10.20",
+    "controls_digest": "sha256:ed4e6ebc66e5ad2c8ec0110ba5caee5ae2539df7d9d88100325eb5a7065cc51a",
+    "snapshot_digest": "sha256:41b449a55f79ed283c14a3f5635288434b23ae28f208a918be974e23176c9e67",
     "guide_edition": "kisa-unix-2026",
     "profile": {
       "name": "default",
@@ -693,13 +693,13 @@
   "summary": {
     "automatic": {
       "high": {
-        "pass": 22,
+        "pass": 21,
         "fail": 15,
         "warn": 1
       },
       "medium": {
-        "pass": 16,
-        "fail": 18,
+        "pass": 17,
+        "fail": 17,
         "warn": 0
       },
       "low": {
@@ -708,7 +708,7 @@
         "warn": 0
       }
     },
-    "manual_review": 13,
+    "manual_review": 14,
     "undecidable": {
       "error": 0,
       "not_applicable": 24,
@@ -721,7 +721,7 @@
         "controls": 68,
         "automatic": {
           "high": {
-            "pass": 17,
+            "pass": 16,
             "fail": 10,
             "warn": 1
           },
@@ -736,7 +736,7 @@
             "warn": 0
           }
         },
-        "manual_review": 9,
+        "manual_review": 10,
         "undecidable": {
           "error": 0,
           "not_applicable": 16,
@@ -752,8 +752,8 @@
             "warn": 0
           },
           "medium": {
-            "pass": 7,
-            "fail": 16,
+            "pass": 8,
+            "fail": 15,
             "warn": 0
           },
           "low": {
@@ -1252,6 +1252,10 @@
         },
         {
           "fact": "pam.pwquality.required_classes",
+          "status": "absent"
+        },
+        {
+          "fact": "pam.pwquality.enforcing",
           "status": "absent"
         }
       ],
@@ -3136,7 +3140,7 @@
         {
           "fact": "walk.world_writable",
           "status": "ok",
-          "value": "545 elements; 522 selected; failing: file:/opt, file:/opt/actionarchivecache, file:/opt/actionarchivecache/actions_cache, file:/opt/actionarchivecache/actions_cache/0057852bfaa89a56745cba8c7296529d2fc39830.tar.gz, file:/opt/actionarchivecache/actions_cache/0400d5f644dc74513175e3cd8d07132dd4860809.tar.gz, +517 more",
+          "value": "544 elements; 521 selected; failing: file:/opt, file:/opt/actionarchivecache, file:/opt/actionarchivecache/actions_cache, file:/opt/actionarchivecache/actions_cache/0057852bfaa89a56745cba8c7296529d2fc39830.tar.gz, file:/opt/actionarchivecache/actions_cache/0400d5f644dc74513175e3cd8d07132dd4860809.tar.gz, +516 more",
           "source": {
             "kind": "file",
             "path": "/var/lib/dpkg/info"
@@ -3793,6 +3797,12 @@
           "verdict": "fail"
         },
         {
+          "subject": "file:/opt/actionarchivecache/actions_setup-node/54337e0d02de9202d0948aaff36ad556375497b9.tar.gz",
+          "expected": true,
+          "actual": false,
+          "verdict": "fail"
+        },
+        {
           "subject": "file:/opt/actionarchivecache/actions_setup-node/56337c425554a6be30cdef71bf441f15be286854.tar.gz",
           "expected": true,
           "actual": false,
@@ -3848,12 +3858,6 @@
         },
         {
           "subject": "file:/opt/actionarchivecache/actions_setup-node/8f152de45cc393bb48ce5d89d36b731f54556e65.tar.gz",
-          "expected": true,
-          "actual": false,
-          "verdict": "fail"
-        },
-        {
-          "subject": "file:/opt/actionarchivecache/actions_setup-node/949feb2413d6458794dcd2491c4babbbce0c15c1.tar.gz",
           "expected": true,
           "actual": false,
           "verdict": "fail"
@@ -4351,12 +4355,6 @@
           "verdict": "fail"
         },
         {
-          "subject": "file:/opt/actionarchivecache/actions_upload-artifact/cf430e030ddbb5b0abf93d22962f4752f3646cd9.tar.gz",
-          "expected": true,
-          "actual": false,
-          "verdict": "fail"
-        },
-        {
           "subject": "file:/opt/actionarchivecache/actions_upload-artifact/ea165f8d65b6e75b540449e92b4886f43607fa02.tar.gz",
           "expected": true,
           "actual": false,
@@ -4369,7 +4367,7 @@
           "verdict": "fail"
         },
         {
-          "subject": "file:/opt/actionarchivecache/github_codeql-action/24c54180a607b1449ed407dd24f251e4e9147c8d.tar.gz",
+          "subject": "file:/opt/actionarchivecache/github_codeql-action/1c5b675653bb5c22dbe9b12b556ec555138e09fd.tar.gz",
           "expected": true,
           "actual": false,
           "verdict": "fail"
@@ -4381,7 +4379,7 @@
           "verdict": "fail"
         },
         {
-          "subject": "file:/opt/actionarchivecache/github_codeql-action/e4e9b269fe9e43436f85977fce7d47d4d4d94fdd.tar.gz",
+          "subject": "file:/opt/actionarchivecache/github_codeql-action/b6d38e563b1e0a61fa4ebfaab8128732f5ed1bd4.tar.gz",
           "expected": true,
           "actual": false,
           "verdict": "fail"
@@ -4393,19 +4391,19 @@
           "verdict": "fail"
         },
         {
-          "subject": "file:/opt/actionarchivecache/github_gh-aw-actions/13f59f7032b1e9a26305dada85d6b99fa2a5e649.tar.gz",
+          "subject": "file:/opt/actionarchivecache/github_gh-aw-actions/7c1d4b7ab319216ef4a931cc3dcb0d7245144ff1.tar.gz",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/opt/actionarchivecache/github_gh-aw-actions/7a073567000cd18a81b85d31527ac08d414c9599.tar.gz",
+          "subject": "file:/opt/actionarchivecache/github_gh-aw-actions/8a5b99ba734d5cb564e3a0c85ea0580d881002e0.tar.gz",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/opt/actionarchivecache/github_gh-aw-actions/866158eb5c6cbfd3c614104e3d3d6634e246d220.tar.gz",
+          "subject": "file:/opt/actionarchivecache/github_gh-aw-actions/a65c3ae1e11016c37f426bb3847a6f5e1a7d58df.tar.gz",
           "expected": true,
           "actual": false,
           "verdict": "fail"
@@ -6287,7 +6285,8 @@
       "category": "patch",
       "importance": "상",
       "automation": "partial",
-      "status": "PASS",
+      "status": "WARN",
+      "reason": "clause does not hold: patch.metadata_age_s lte 604800",
       "evidence": [
         {
           "fact": "patch.manager",
@@ -6301,7 +6300,7 @@
         {
           "fact": "patch.metadata_age_s",
           "status": "ok",
-          "value": 104827,
+          "value": 707037,
           "source": {
             "kind": "file",
             "path": "/var/lib/apt/periodic/update-success-stamp"
@@ -8271,7 +8270,7 @@
         {
           "fact": "walk.hidden",
           "status": "ok",
-          "value": "377 elements; 172 selected; failing: file:/etc/.java, file:/etc/skel/.bash_profile, file:/etc/skel/.cargo, file:/etc/skel/.composer, file:/etc/skel/.config, +103 more",
+          "value": "371 elements; 167 selected; failing: file:/etc/.java, file:/etc/skel/.bash_profile, file:/etc/skel/.cargo, file:/etc/skel/.composer, file:/etc/skel/.config, +103 more",
           "source": {
             "kind": "file",
             "path": "/var/lib/dpkg/info"
@@ -8640,7 +8639,7 @@
           "verdict": "pass"
         },
         {
-          "subject": "file:/usr/lib/modules/7.0.0-1017-azure/vdso/.build-id",
+          "subject": "file:/usr/lib/modules/6.17.0-1022-azure/vdso/.build-id",
           "expected": true,
           "actual": true,
           "verdict": "pass"
@@ -8670,133 +8669,133 @@
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/aws-cli/v2/2.38.1/dist/awscli/botocore/.changes",
+          "subject": "file:/usr/local/aws-cli/v2/2.37.13/dist/awscli/botocore/.changes",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.13.2/share/doc/julia/html/en/.documenter-siteinfo.json",
+          "subject": "file:/usr/local/julia1.13.1/share/doc/julia/html/en/.documenter-siteinfo.json",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.13.2/share/julia/base/JuliaSyntax/.mailmap",
+          "subject": "file:/usr/local/julia1.13.1/share/julia/base/JuliaSyntax/.mailmap",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.13.2/share/julia/stdlib/v1.13/ArgTools/.ci",
+          "subject": "file:/usr/local/julia1.13.1/share/julia/stdlib/v1.13/ArgTools/.ci",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.13.2/share/julia/stdlib/v1.13/DelimitedFiles/.ci",
+          "subject": "file:/usr/local/julia1.13.1/share/julia/stdlib/v1.13/DelimitedFiles/.ci",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.13.2/share/julia/stdlib/v1.13/DelimitedFiles/.codecov.yml",
+          "subject": "file:/usr/local/julia1.13.1/share/julia/stdlib/v1.13/DelimitedFiles/.codecov.yml",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.13.2/share/julia/stdlib/v1.13/Downloads/.ci",
+          "subject": "file:/usr/local/julia1.13.1/share/julia/stdlib/v1.13/Downloads/.ci",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.13.2/share/julia/stdlib/v1.13/LibCURL/.ci",
+          "subject": "file:/usr/local/julia1.13.1/share/julia/stdlib/v1.13/LibCURL/.ci",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.13.2/share/julia/stdlib/v1.13/LinearAlgebra/.buildkite",
+          "subject": "file:/usr/local/julia1.13.1/share/julia/stdlib/v1.13/LinearAlgebra/.buildkite",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.13.2/share/julia/stdlib/v1.13/LinearAlgebra/.codecov.yml",
+          "subject": "file:/usr/local/julia1.13.1/share/julia/stdlib/v1.13/LinearAlgebra/.codecov.yml",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.13.2/share/julia/stdlib/v1.13/NetworkOptions/.codecov.yml",
+          "subject": "file:/usr/local/julia1.13.1/share/julia/stdlib/v1.13/NetworkOptions/.codecov.yml",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.13.2/share/julia/stdlib/v1.13/Pkg/.codecov.yml",
+          "subject": "file:/usr/local/julia1.13.1/share/julia/stdlib/v1.13/Pkg/.codecov.yml",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.13.2/share/julia/stdlib/v1.13/Pkg/.git-blame-ignore-revs",
+          "subject": "file:/usr/local/julia1.13.1/share/julia/stdlib/v1.13/Pkg/.git-blame-ignore-revs",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.13.2/share/julia/stdlib/v1.13/Pkg/.pre-commit-config.yaml",
+          "subject": "file:/usr/local/julia1.13.1/share/julia/stdlib/v1.13/Pkg/.pre-commit-config.yaml",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.13.2/share/julia/stdlib/v1.13/Pkg/test/test_packages/AugmentedPlatform/.pkg",
+          "subject": "file:/usr/local/julia1.13.1/share/julia/stdlib/v1.13/Pkg/test/test_packages/AugmentedPlatform/.pkg",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.13.2/share/julia/stdlib/v1.13/SHA/.ci",
+          "subject": "file:/usr/local/julia1.13.1/share/julia/stdlib/v1.13/SHA/.ci",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.13.2/share/julia/stdlib/v1.13/SparseArrays/.ci",
+          "subject": "file:/usr/local/julia1.13.1/share/julia/stdlib/v1.13/SparseArrays/.ci",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.13.2/share/julia/stdlib/v1.13/SparseArrays/.codecov.yml",
+          "subject": "file:/usr/local/julia1.13.1/share/julia/stdlib/v1.13/SparseArrays/.codecov.yml",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.13.2/share/julia/stdlib/v1.13/Statistics/.ci",
+          "subject": "file:/usr/local/julia1.13.1/share/julia/stdlib/v1.13/Statistics/.ci",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.13.2/share/julia/stdlib/v1.13/SuiteSparse/.ci",
+          "subject": "file:/usr/local/julia1.13.1/share/julia/stdlib/v1.13/SuiteSparse/.ci",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.13.2/share/julia/stdlib/v1.13/SuiteSparse/.devcontainer",
+          "subject": "file:/usr/local/julia1.13.1/share/julia/stdlib/v1.13/SuiteSparse/.devcontainer",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/local/julia1.13.2/share/julia/stdlib/v1.13/Tar/.ci",
+          "subject": "file:/usr/local/julia1.13.1/share/julia/stdlib/v1.13/Tar/.ci",
           "expected": true,
           "actual": false,
           "verdict": "fail"
@@ -8820,73 +8819,43 @@
           "verdict": "fail"
         },
         {
-          "subject": "file:/usr/src/linux-headers-7.0.0-1017-azure/.checked-atomic-arch-fallback.h",
+          "subject": "file:/usr/src/linux-headers-6.17.0-1022-azure/.checked-atomic-arch-fallback.h",
           "expected": true,
           "actual": true,
           "verdict": "pass"
         },
         {
-          "subject": "file:/usr/src/linux-headers-7.0.0-1017-azure/.checked-atomic-instrumented.h",
+          "subject": "file:/usr/src/linux-headers-6.17.0-1022-azure/.checked-atomic-instrumented.h",
           "expected": true,
           "actual": true,
           "verdict": "pass"
         },
         {
-          "subject": "file:/usr/src/linux-headers-7.0.0-1017-azure/.checked-atomic-long.h",
+          "subject": "file:/usr/src/linux-headers-6.17.0-1022-azure/.checked-atomic-long.h",
           "expected": true,
           "actual": true,
           "verdict": "pass"
         },
         {
-          "subject": "file:/usr/src/linux-headers-7.0.0-1017-azure/.config",
+          "subject": "file:/usr/src/linux-headers-6.17.0-1022-azure/.config",
           "expected": true,
           "actual": true,
           "verdict": "pass"
         },
         {
-          "subject": "file:/usr/src/linux-headers-7.0.0-1017-azure/.missing-syscalls.d",
+          "subject": "file:/usr/src/linux-headers-6.17.0-1022-azure/.missing-syscalls.d",
           "expected": true,
           "actual": true,
           "verdict": "pass"
         },
         {
-          "subject": "file:/usr/src/linux-headers-7.0.0-1017-azure/tools/bpf/resolve_btfids/.fixdep.o.d",
-          "expected": true,
-          "actual": true,
-          "verdict": "pass"
-        },
-        {
-          "subject": "file:/usr/src/linux-headers-7.0.0-1017-azure/tools/bpf/resolve_btfids/libbpf/staticobjs/.fixdep.o.d",
-          "expected": true,
-          "actual": true,
-          "verdict": "pass"
-        },
-        {
-          "subject": "file:/usr/src/linux-headers-7.0.0-1017-azure/tools/bpf/resolve_btfids/libsubcmd/.fixdep.o.d",
-          "expected": true,
-          "actual": true,
-          "verdict": "pass"
-        },
-        {
-          "subject": "file:/usr/src/linux-headers-7.0.0-1017-azure/tools/objtool/.fixdep.o.d",
-          "expected": true,
-          "actual": true,
-          "verdict": "pass"
-        },
-        {
-          "subject": "file:/usr/src/linux-headers-7.0.0-1017-azure/tools/objtool/libsubcmd/.fixdep.o.d",
-          "expected": true,
-          "actual": true,
-          "verdict": "pass"
-        },
-        {
-          "subject": "file:/var/cache/apparmor/8eeb6286.0/.features",
+          "subject": "file:/var/cache/apparmor/70b6ca72.0/.features",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/var/cache/apparmor/f6da0254.0/.features",
+          "subject": "file:/var/cache/apparmor/8eeb6286.0/.features",
           "expected": true,
           "actual": false,
           "verdict": "fail"
@@ -8976,25 +8945,25 @@
           "verdict": "fail"
         },
         {
-          "subject": "file:/var/lib/gems/3.2.0/gems/domain_name-0.7.20261007/.document",
+          "subject": "file:/var/lib/gems/3.2.0/gems/domain_name-0.6.20260921/.document",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/var/lib/gems/3.2.0/gems/fastlane-2.241.1/.yardopts",
+          "subject": "file:/var/lib/gems/3.2.0/gems/fastlane-2.241.0/.yardopts",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/var/lib/gems/3.2.0/gems/fastlane-2.241.1/fastlane/lib/fastlane/plugins/template/.rspec",
+          "subject": "file:/var/lib/gems/3.2.0/gems/fastlane-2.241.0/fastlane/lib/fastlane/plugins/template/.rspec",
           "expected": true,
           "actual": false,
           "verdict": "fail"
         },
         {
-          "subject": "file:/var/lib/gems/3.2.0/gems/fastlane-2.241.1/fastlane/lib/fastlane/plugins/template/.rubocop.yml",
+          "subject": "file:/var/lib/gems/3.2.0/gems/fastlane-2.241.0/fastlane/lib/fastlane/plugins/template/.rubocop.yml",
           "expected": true,
           "actual": false,
           "verdict": "fail"
@@ -9090,7 +9059,7 @@
           "verdict": "fail"
         },
         {
-          "subject": "file:/var/lib/gems/3.2.0/gems/googleauth-1.17.5/.yardopts",
+          "subject": "file:/var/lib/gems/3.2.0/gems/googleauth-1.17.4/.yardopts",
           "expected": true,
           "actual": false,
           "verdict": "fail"
@@ -9216,7 +9185,7 @@
           "verdict": "fail"
         },
         {
-          "subject": "file:/var/lib/gems/3.2.0/gems/signet-0.22.1/.yardopts",
+          "subject": "file:/var/lib/gems/3.2.0/gems/signet-0.22.0/.yardopts",
           "expected": true,
           "actual": false,
           "verdict": "fail"
@@ -11159,7 +11128,7 @@
               },
               {
                 "kind": "proc",
-                "path": "/proc/sys/net/ipv6/conf/ens1/disable_ipv6"
+                "path": "/proc/sys/net/ipv6/conf/enP21286s1/disable_ipv6"
               },
               {
                 "kind": "proc",
@@ -11232,7 +11201,7 @@
               },
               {
                 "kind": "proc",
-                "path": "/proc/sys/net/ipv6/conf/ens1/disable_ipv6"
+                "path": "/proc/sys/net/ipv6/conf/enP21286s1/disable_ipv6"
               },
               {
                 "kind": "proc",
@@ -11305,7 +11274,7 @@
               },
               {
                 "kind": "proc",
-                "path": "/proc/sys/net/ipv6/conf/ens1/disable_ipv6"
+                "path": "/proc/sys/net/ipv6/conf/enP21286s1/disable_ipv6"
               },
               {
                 "kind": "proc",
@@ -11377,7 +11346,7 @@
               },
               {
                 "kind": "proc",
-                "path": "/proc/sys/net/ipv6/conf/ens1/disable_ipv6"
+                "path": "/proc/sys/net/ipv6/conf/enP21286s1/disable_ipv6"
               },
               {
                 "kind": "proc",
@@ -11526,7 +11495,7 @@
         {
           "fact": "processes.deleted_executables",
           "status": "ok",
-          "value": "1 elements; matching: item:1899",
+          "value": "1 elements; matching: item:2085",
           "source": {
             "kind": "proc",
             "path": "/proc"
@@ -11535,9 +11504,9 @@
       ],
       "observations": [
         {
-          "subject": "item:1899",
+          "subject": "item:2085",
           "expected": "not gte 0",
-          "actual": 1899,
+          "actual": 2085,
           "verdict": "fail"
         }
       ],
@@ -12173,7 +12142,7 @@
         {
           "fact": "kernel.modules",
           "status": "ok",
-          "value": "11 elements; 4 selected; failing: module:sctp, module:rds, module:tipc",
+          "value": "11 elements; 4 selected; failing: module:sctp, module:tipc",
           "source": {
             "kind": "derived",
             "inputs": [
@@ -12183,11 +12152,11 @@
               },
               {
                 "kind": "file",
-                "path": "/usr/lib/modules/7.0.0-1017-azure/modules.dep"
+                "path": "/usr/lib/modules/6.17.0-1022-azure/modules.dep"
               },
               {
                 "kind": "file",
-                "path": "/usr/lib/modules/7.0.0-1017-azure/modules.builtin"
+                "path": "/usr/lib/modules/6.17.0-1022-azure/modules.builtin"
               },
               {
                 "kind": "file",
@@ -12223,7 +12192,7 @@
               },
               {
                 "kind": "file",
-                "path": "/usr/lib/modprobe.d/blacklist_linux-azure-7.0_7.0.0-1017-azure.conf"
+                "path": "/usr/lib/modprobe.d/blacklist_linux-azure-6.17_6.17.0-1022-azure.conf"
               },
               {
                 "kind": "file",
@@ -12265,8 +12234,8 @@
         {
           "subject": "module:rds",
           "expected": true,
-          "actual": false,
-          "verdict": "fail"
+          "actual": true,
+          "verdict": "pass"
         },
         {
           "subject": "module:tipc",
@@ -12285,8 +12254,7 @@
       "category": "beyond",
       "importance": "중",
       "automation": "auto",
-      "status": "FAIL",
-      "reason": "clause does not hold: kernel.modules each require disabled eq true",
+      "status": "PASS",
       "evidence": [
         {
           "fact": "env.container",
@@ -12300,7 +12268,7 @@
         {
           "fact": "kernel.modules",
           "status": "ok",
-          "value": "11 elements; 1 selected; failing: module:usb-storage",
+          "value": "11 elements; 1 selected",
           "source": {
             "kind": "derived",
             "inputs": [
@@ -12310,11 +12278,11 @@
               },
               {
                 "kind": "file",
-                "path": "/usr/lib/modules/7.0.0-1017-azure/modules.dep"
+                "path": "/usr/lib/modules/6.17.0-1022-azure/modules.dep"
               },
               {
                 "kind": "file",
-                "path": "/usr/lib/modules/7.0.0-1017-azure/modules.builtin"
+                "path": "/usr/lib/modules/6.17.0-1022-azure/modules.builtin"
               },
               {
                 "kind": "file",
@@ -12350,7 +12318,7 @@
               },
               {
                 "kind": "file",
-                "path": "/usr/lib/modprobe.d/blacklist_linux-azure-7.0_7.0.0-1017-azure.conf"
+                "path": "/usr/lib/modprobe.d/blacklist_linux-azure-6.17_6.17.0-1022-azure.conf"
               },
               {
                 "kind": "file",
@@ -12380,8 +12348,8 @@
         {
           "subject": "module:usb-storage",
           "expected": true,
-          "actual": false,
-          "verdict": "fail"
+          "actual": true,
+          "verdict": "pass"
         }
       ],
       "severity": "medium",
@@ -12573,7 +12541,7 @@
         {
           "fact": "kernel.modules",
           "status": "ok",
-          "value": "11 elements; 6 selected; failing: module:cramfs, module:freevxfs, module:jffs2, module:hfs, module:hfsplus, +1 more",
+          "value": "11 elements; 6 selected; failing: module:udf",
           "source": {
             "kind": "derived",
             "inputs": [
@@ -12583,11 +12551,11 @@
               },
               {
                 "kind": "file",
-                "path": "/usr/lib/modules/7.0.0-1017-azure/modules.dep"
+                "path": "/usr/lib/modules/6.17.0-1022-azure/modules.dep"
               },
               {
                 "kind": "file",
-                "path": "/usr/lib/modules/7.0.0-1017-azure/modules.builtin"
+                "path": "/usr/lib/modules/6.17.0-1022-azure/modules.builtin"
               },
               {
                 "kind": "file",
@@ -12623,7 +12591,7 @@
               },
               {
                 "kind": "file",
-                "path": "/usr/lib/modprobe.d/blacklist_linux-azure-7.0_7.0.0-1017-azure.conf"
+                "path": "/usr/lib/modprobe.d/blacklist_linux-azure-6.17_6.17.0-1022-azure.conf"
               },
               {
                 "kind": "file",
@@ -12653,32 +12621,32 @@
         {
           "subject": "module:cramfs",
           "expected": true,
-          "actual": false,
-          "verdict": "fail"
+          "actual": true,
+          "verdict": "pass"
         },
         {
           "subject": "module:freevxfs",
           "expected": true,
-          "actual": false,
-          "verdict": "fail"
+          "actual": true,
+          "verdict": "pass"
         },
         {
           "subject": "module:jffs2",
           "expected": true,
-          "actual": false,
-          "verdict": "fail"
+          "actual": true,
+          "verdict": "pass"
         },
         {
           "subject": "module:hfs",
           "expected": true,
-          "actual": false,
-          "verdict": "fail"
+          "actual": true,
+          "verdict": "pass"
         },
         {
           "subject": "module:hfsplus",
           "expected": true,
-          "actual": false,
-          "verdict": "fail"
+          "actual": true,
+          "verdict": "pass"
         },
         {
           "subject": "module:udf",

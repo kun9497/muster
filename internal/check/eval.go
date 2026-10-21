@@ -148,7 +148,15 @@ func evalOne(e *env, c *controls.Control) (r Result) {
 		if !ok {
 			return fail(r, ERROR, InternalError, "custom function "+c.Custom+" is not registered")
 		}
-		return finish(r, c, fn(e, c))
+		out := fn(e, c)
+		// A custom outcome is judged as a whole: it is unobserved only when
+		// it carries no failing observation at all. A CustomFunc that mixes
+		// per-subject failures with a failure no observation carries must
+		// set UnobservedFail itself, or a subject waiver would waive the row.
+		if !out.Holds && !hasFailingObservation(out.Observations) {
+			out.UnobservedFail = true
+		}
+		return finish(r, c, out)
 	}
 	keys := clauseFacts(checks)
 	// Steps 9-10a (R2, D30): the deep gate runs before the fact-status
@@ -198,6 +206,12 @@ func evalOne(e *env, c *controls.Control) (r Result) {
 		all.Observations = append(all.Observations, out.Observations...)
 		if !out.Holds {
 			all.Holds = false
+			// A failing clause no observation carries cannot be waived by a
+			// subject-scoped waiver (spec §6.4): record it for waiver.Apply.
+			unobserved := !hasFailingObservation(out.Observations)
+			if unobserved {
+				all.UnobservedFail = true
+			}
 			// C2: a clause that fails without a side-mismatch degradation
 			// fails outright — on every side the clause selected. Recording
 			// it separately from Degraded is what stops another clause's
@@ -207,15 +221,20 @@ func evalOne(e *env, c *controls.Control) (r Result) {
 				all.HardFail = true
 			}
 			all.Err = nil
+			// M-5: a clause that knows WHY it failed — an element whose
+			// judged field the snapshot lacks — says so; otherwise the
+			// clause itself is the explanation.
+			why := out.Reason
+			if why == "" {
+				why = e.describe(cl)
+			}
 			if r.Reason == "" {
-				// M-5: a clause that knows WHY it failed — an element whose
-				// judged field the snapshot lacks — says so; otherwise the
-				// clause itself is the explanation.
-				why := out.Reason
-				if why == "" {
-					why = e.describe(cl)
-				}
 				r.Reason = "clause does not hold: " + why
+			}
+			// The first failing clause no observation carries is the reason
+			// a row keeps when a subject waiver waives every observation.
+			if unobserved && r.UnobservedReason == "" {
+				r.UnobservedReason = "clause does not hold: " + why
 			}
 		}
 		if out.Degraded != "" && all.Degraded == "" {
@@ -310,6 +329,16 @@ func (e *env) remoteNSS(cls []controls.Clause) bool {
 	return remote
 }
 
+// hasFailingObservation reports whether any observation reads "fail".
+func hasFailingObservation(obs []Observation) bool {
+	for _, o := range obs {
+		if o.Verdict == "fail" {
+			return true
+		}
+	}
+	return false
+}
+
 // finish applies steps 11-14 to the combined clause outcome.
 func finish(r Result, c *controls.Control, all clauseOutcome) Result {
 	r.Evidence = append(r.Evidence, all.Evidence...)
@@ -319,6 +348,7 @@ func finish(r Result, c *controls.Control, all clauseOutcome) Result {
 	}
 	if !all.Holds {
 		r.Degraded = all.Degraded
+		r.UnobservedFail = all.UnobservedFail
 		// C2: "holds on one side only" is a verdict of its own only when
 		// every failing clause was a side mismatch. One clause failing on
 		// every side it selected is step 12, and the degradation survives
@@ -326,6 +356,7 @@ func finish(r Result, c *controls.Control, all clauseOutcome) Result {
 		if !all.HardFail && sideMismatch(all.Degraded) {
 			r.Status = WARN
 			r.Reason = ReasonSideOnlyPrefix + all.Degraded
+			r.UnobservedReason = r.Reason
 			return r
 		}
 		if c.Automation == "partial" {
@@ -341,6 +372,9 @@ func finish(r Result, c *controls.Control, all clauseOutcome) Result {
 		}
 		if all.Degraded != "" {
 			r.Reason += "; " + ReasonDegradedPrefix + all.Degraded
+			if r.UnobservedReason != "" {
+				r.UnobservedReason += "; " + ReasonDegradedPrefix + all.Degraded
+			}
 		}
 		return r
 	}
@@ -384,6 +418,22 @@ func (e *env) worstStatus(cls []controls.Clause) screening {
 				soft = mergeSoft(soft, s)
 			}
 			continue
+		}
+		// H-15: a persona clause is decided by the override envelope when
+		// the daemon reported one (evalSetting), so that envelope is
+		// screened by the same rules as a side: denied/timeout/error keep
+		// their code, ok-but-truncated is Truncated. The collector never
+		// writes an absent or unsupported override; one is an internal
+		// error, not a silent FAIL. The global side is screened after.
+		if cl.Persona != "" && e.personas && res.Setting.Personas != nil {
+			if pv := res.Setting.Personas[cl.Persona]; pv != nil {
+				name := cl.Fact + " persona " + cl.Persona
+				if s, hard := screenEnvelope(name, pv); hard {
+					return s
+				} else if s.status != "" {
+					return screening{hard: true, code: InternalError, reason: fmt.Sprintf("%s: persona override with status %s", name, pv.Status)}
+				}
+			}
 		}
 		on := cl.On
 		if on == "" {

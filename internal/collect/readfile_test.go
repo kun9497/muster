@@ -95,8 +95,26 @@ func TestReadFileTruncatesAndFlagsBinary(t *testing.T) {
 	bin := filepath.Join(dir, "bin")
 	mkfile(t, bin, "abc\x00def", 0o644)
 	data, meta, err = ReadFile(bin, 100)
-	if err != nil || len(data) != 0 || !meta.Binary {
-		t.Errorf("binary: len=%d meta=%+v err=%v", len(data), meta, err)
+	// H-11 (f9): a text read that found a NUL is an ERROR naming the path,
+	// never a nil error with no bytes, which every caller parsed as an empty
+	// file (an empty /etc/passwd held no second uid-0 account).
+	if !errors.Is(err, ErrBinary) || len(data) != 0 || !meta.Binary {
+		t.Errorf("binary: len=%d meta=%+v err=%v; want ErrBinary, no bytes, Binary", len(data), meta, err)
+	}
+	if err != nil && !strings.HasPrefix(err.Error(), bin+": ") {
+		t.Errorf("binary: err %q does not name the path first", err)
+	}
+	// Only the bytes actually read count: a NUL past the cap is not seen.
+	late := filepath.Join(dir, "late")
+	mkfile(t, late, strings.Repeat("a", 100)+"\x00", 0o644)
+	data, meta, err = ReadFile(late, 100)
+	if err != nil || len(data) != 100 || !meta.Truncated || meta.Binary {
+		t.Errorf("NUL past the cap: len=%d meta=%+v err=%v; want 100 bytes, truncated, not binary", len(data), meta, err)
+	}
+	text := filepath.Join(dir, "text")
+	mkfile(t, text, "root:x:0:0::/root:/bin/sh\n", 0o644)
+	if data, meta, err = ReadFile(text, 100); err != nil || len(data) == 0 || meta.Binary {
+		t.Errorf("text: len=%d meta=%+v err=%v; want the bytes and a nil error", len(data), meta, err)
 	}
 }
 
@@ -111,8 +129,8 @@ func TestReadFileBinaryReturnsTheBytesReadFileWithholds(t *testing.T) {
 	efivar := filepath.Join(dir, "SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c")
 	mkfile(t, efivar, "\x06\x00\x00\x00\x01", 0o644)
 
-	if data, meta, err := ReadFile(efivar, 100); err != nil || len(data) != 0 || !meta.Binary {
-		t.Errorf("ReadFile: len=%d meta=%+v err=%v; want no bytes and Binary", len(data), meta, err)
+	if data, meta, err := ReadFile(efivar, 100); !errors.Is(err, ErrBinary) || len(data) != 0 || !meta.Binary {
+		t.Errorf("ReadFile: len=%d meta=%+v err=%v; want ErrBinary, no bytes and Binary", len(data), meta, err)
 	}
 	data, meta, err := ReadFileBinary(efivar, 100)
 	if err != nil {

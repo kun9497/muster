@@ -33,7 +33,7 @@ remediation:
     if [ -L "$f" ]; then log "muster.beyond.ipv6_forwarding_disabled: $f is a symlink (a mask), left as is"; exit 1; fi
     put() {
       sysctl -q -w "$1=$2"
-      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else printf '%s = %s\n' "$1" "$2" >> "$f"; fi
+      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else { if [ -s "$f" ] && [ -n "$(tail -c1 "$f")" ]; then echo >> "$f"; fi; printf '%s = %s\n' "$1" "$2" >> "$f"; }; fi
     }
     first=${P_allowed_forward%% *}
     case " $P_allowed_forward " in *" $(sysctl -n net.ipv6.conf.all.forwarding) "*) ;; *) put net.ipv6.conf.all.forwarding "$first";; esac

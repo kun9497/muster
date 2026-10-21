@@ -1,9 +1,9 @@
 #!/bin/sh
 # shellcheck disable=SC2181
 # muster fix --dry-run: review before running. muster never runs this file.
-# snapshot: host github-runner, collected 2026-10-20T02:41:54Z; controls kisa-unix-2026+2026.10.19 sha256:46be3e952588b21dda1314a9bc002f6f2ef777dc9b57a441e2ee68a9c2f159ef
+# snapshot: host github-runner, collected 2026-10-21T02:03:16Z; controls kisa-unix-2026+2026.10.20 sha256:ed4e6ebc66e5ad2c8ec0110ba5caee5ae2539df7d9d88100325eb5a7065cc51a
 # profile default (sha256:f4db63e671d12ad73cca111ca4132cb5459983bc32409b21c571067674bf9c78); max-risk lockout_risk
-# planned 43 (script 20, text only 23); above max-risk 0; not planned: error 0, manual 7, warn_degraded 1
+# planned 43 (script 19, text only 24); above max-risk 0; not planned: error 0, manual 7, warn_degraded 1
 set -u
 umask 077
 log() { printf 'muster-fix: %s\n' "$*"; }
@@ -14,7 +14,7 @@ muster_machine_id_hash() {
   { printf '%s' "$id" | sha256sum | cut -d' ' -f1; } 2>/dev/null
 }
 [ "$(id -u)" -eq 0 ] || { printf 'muster-fix: run as root\n' >&2; exit 2; }
-MUSTER_SNAPSHOT_HOST=e7244411fdd82f17ae61972eb64a50c3df21d38725238f76d6ce6064a1bc4701
+MUSTER_SNAPSHOT_HOST=399794935aded36b418e3630a41ef1d23f027811adf388b70d95a72238bc049b
 here=$(muster_machine_id_hash /etc/machine-id)
 if [ "$here" != "$MUSTER_SNAPSHOT_HOST" ]; then
   if [ "${MUSTER_ANY_HOST:-}" = 1 ]; then
@@ -445,7 +445,7 @@ fix_muster_beyond_icmp_redirects_ignored() {
     if [ -L "$f" ]; then log "muster.beyond.icmp_redirects_ignored: $f is a symlink (a mask), left as is"; exit 1; fi
     put() {
       sysctl -q -w "$1=$2"
-      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else printf '%s = %s\n' "$1" "$2" >> "$f"; fi
+      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else { if [ -s "$f" ] && [ -n "$(tail -c1 "$f")" ]; then echo >> "$f"; fi; printf '%s = %s\n' "$1" "$2" >> "$f"; }; fi
     }
     case "$(sysctl -n net.ipv4.conf.all.accept_redirects)" in 0) ;; *) put net.ipv4.conf.all.accept_redirects 0;; esac
     case "$(sysctl -n net.ipv4.conf.default.accept_redirects)" in 0) ;; *) put net.ipv4.conf.default.accept_redirects 0;; esac
@@ -489,7 +489,7 @@ fix_muster_beyond_ipv6_redirects_ignored() {
     if [ -L "$f" ]; then log "muster.beyond.ipv6_redirects_ignored: $f is a symlink (a mask), left as is"; exit 1; fi
     put() {
       sysctl -q -w "$1=$2"
-      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else printf '%s = %s\n' "$1" "$2" >> "$f"; fi
+      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else { if [ -s "$f" ] && [ -n "$(tail -c1 "$f")" ]; then echo >> "$f"; fi; printf '%s = %s\n' "$1" "$2" >> "$f"; }; fi
     }
     case "$(sysctl -n net.ipv6.conf.all.accept_redirects)" in 0) ;; *) put net.ipv6.conf.all.accept_redirects 0;; esac
     case "$(sysctl -n net.ipv6.conf.default.accept_redirects)" in 0) ;; *) put net.ipv6.conf.default.accept_redirects 0;; esac
@@ -530,7 +530,7 @@ fix_muster_beyond_ipv6_router_advertisements_ignored() {
     if [ -L "$f" ]; then log "muster.beyond.ipv6_router_advertisements_ignored: $f is a symlink (a mask), left as is"; exit 1; fi
     put() {
       sysctl -q -w "$1=$2"
-      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else printf '%s = %s\n' "$1" "$2" >> "$f"; fi
+      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else { if [ -s "$f" ] && [ -n "$(tail -c1 "$f")" ]; then echo >> "$f"; fi; printf '%s = %s\n' "$1" "$2" >> "$f"; }; fi
     }
     first=${P_allowed_accept_ra%% *}
     case " $P_allowed_accept_ra " in *" $(sysctl -n net.ipv6.conf.all.accept_ra) "*) ;; *) put net.ipv6.conf.all.accept_ra "$first";; esac
@@ -571,7 +571,7 @@ fix_muster_beyond_source_routing_rejected() {
     if [ -L "$f" ]; then log "muster.beyond.source_routing_rejected: $f is a symlink (a mask), left as is"; exit 1; fi
     put() {
       sysctl -q -w "$1=$2"
-      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else printf '%s = %s\n' "$1" "$2" >> "$f"; fi
+      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else { if [ -s "$f" ] && [ -n "$(tail -c1 "$f")" ]; then echo >> "$f"; fi; printf '%s = %s\n' "$1" "$2" >> "$f"; }; fi
     }
     case "$(sysctl -n net.ipv4.conf.all.accept_source_route)" in 0) ;; *) put net.ipv4.conf.all.accept_source_route 0;; esac
     case "$(sysctl -n net.ipv4.conf.default.accept_source_route)" in 0) ;; *) put net.ipv4.conf.default.accept_source_route 0;; esac
@@ -611,7 +611,7 @@ fix_muster_beyond_suid_dumpable_disabled() {
     if [ -L "$f" ]; then log "muster.beyond.suid_dumpable_disabled: $f is a symlink (a mask), left as is"; exit 1; fi
     put() {
       sysctl -q -w "$1=$2"
-      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else printf '%s = %s\n' "$1" "$2" >> "$f"; fi
+      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else { if [ -s "$f" ] && [ -n "$(tail -c1 "$f")" ]; then echo >> "$f"; fi; printf '%s = %s\n' "$1" "$2" >> "$f"; }; fi
     }
     case "$(sysctl -n fs.suid_dumpable)" in 0) ;; *) put fs.suid_dumpable 0;; esac
     if [ -f "$f" ] && [ ! -L "$f" ]; then chmod 644 "$f"; fi
@@ -651,7 +651,7 @@ fix_muster_beyond_sysrq_restricted() {
     if [ -L "$f" ]; then log "muster.beyond.sysrq_restricted: $f is a symlink (a mask), left as is"; exit 1; fi
     put() {
       sysctl -q -w "$1=$2"
-      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else printf '%s = %s\n' "$1" "$2" >> "$f"; fi
+      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else { if [ -s "$f" ] && [ -n "$(tail -c1 "$f")" ]; then echo >> "$f"; fi; printf '%s = %s\n' "$1" "$2" >> "$f"; }; fi
     }
     first=${P_allowed_sysrq%% *}
     case " $P_allowed_sysrq " in *" $(sysctl -n kernel.sysrq) "*) ;; *) put kernel.sysrq "$first";; esac
@@ -689,12 +689,16 @@ fix_muster_beyond_uncommon_network_protocols_disabled() {
   ( set -e
     f=/etc/modprobe.d/99-muster-uncommon-network-protocols-disabled.conf
     if [ -L "$f" ]; then log "muster.beyond.uncommon_network_protocols_disabled: $f is a symlink (a mask), left as is"; exit 1; fi
+    # rd_install <module> reads modprobe --showconfig on stdin: the command of
+    # the first install line for it when that is one no-op word (a comment
+    # word may follow), else compound (H-14). m= is set before stdin is read.
+    rd_install() { LC_ALL=C awk '$1 == "install" && $2 == m { c = 0; for (i = 3; i <= NF; i++) { if (substr($i, 1, 1) == "#") break; c++ }; print (c == 1 ? $3 : "compound"); exit }' m="$1"; }
     mods='dccp sctp rds tipc'
     for m in $mods; do
       n=$(printf '%s' "$m" | tr - _)
-      case "$(modprobe --showconfig 2>/dev/null | awk -v m="$n" '$1 == "install" && $2 == m { print $3; exit }')" in
+      case "$(modprobe --showconfig 2>/dev/null | rd_install "$n")" in
         /bin/false|/bin/true|/usr/bin/false|/usr/bin/true|false|true) ;;
-        *) grep -q "^install $n " "$f" 2>/dev/null || printf 'install %s /bin/false\n' "$n" >> "$f";;
+        *) if ! grep -q "^install $n " "$f" 2>/dev/null; then if [ -s "$f" ] && [ -n "$(tail -c1 "$f")" ]; then echo >> "$f"; fi; printf 'install %s /bin/false\n' "$n" >> "$f"; fi;;
       esac
       if grep -q "^$n " /proc/modules; then modprobe -r -- "$n"; fi
     done
@@ -708,7 +712,7 @@ fix_muster_beyond_uncommon_network_protocols_disabled() {
   fi
   # validate
   ( set -e
-    mods='dccp sctp rds tipc'; for m in $mods; do n=$(printf '%s' "$m" | tr - _); case "$(modprobe --showconfig 2>/dev/null | awk -v m="$n" '$1 == "install" && $2 == m { print $3; exit }')" in /bin/false|/bin/true|/usr/bin/false|/usr/bin/true|false|true) ;; *) exit 1;; esac; ! grep -q "^$n " /proc/modules || exit 1; done
+    mods='dccp sctp rds tipc'; for m in $mods; do n=$(printf '%s' "$m" | tr - _); case "$(modprobe --showconfig 2>/dev/null | LC_ALL=C awk '$1 == "install" && $2 == m { c = 0; for (i = 3; i <= NF; i++) { if (substr($i, 1, 1) == "#") break; c++ }; print (c == 1 ? $3 : "compound"); exit }' m="$n")" in /bin/false|/bin/true|/usr/bin/false|/usr/bin/true|false|true) ;; *) exit 1;; esac; ! grep -q "^$n " /proc/modules || exit 1; done
   ); rc=$?
   if [ "$rc" -ne 0 ]; then
     log "muster.beyond.uncommon_network_protocols_disabled: validate failed, rolling back"
@@ -782,12 +786,16 @@ fix_muster_beyond_uncommon_filesystems_disabled() {
   ( set -e
     f=/etc/modprobe.d/99-muster-uncommon-filesystems-disabled.conf
     if [ -L "$f" ]; then log "muster.beyond.uncommon_filesystems_disabled: $f is a symlink (a mask), left as is"; exit 1; fi
+    # rd_install <module> reads modprobe --showconfig on stdin: the command of
+    # the first install line for it when that is one no-op word (a comment
+    # word may follow), else compound (H-14). m= is set before stdin is read.
+    rd_install() { LC_ALL=C awk '$1 == "install" && $2 == m { c = 0; for (i = 3; i <= NF; i++) { if (substr($i, 1, 1) == "#") break; c++ }; print (c == 1 ? $3 : "compound"); exit }' m="$1"; }
     mods='cramfs freevxfs jffs2 hfs hfsplus udf'
     for m in $mods; do
       n=$(printf '%s' "$m" | tr - _)
-      case "$(modprobe --showconfig 2>/dev/null | awk -v m="$n" '$1 == "install" && $2 == m { print $3; exit }')" in
+      case "$(modprobe --showconfig 2>/dev/null | rd_install "$n")" in
         /bin/false|/bin/true|/usr/bin/false|/usr/bin/true|false|true) ;;
-        *) grep -q "^install $n " "$f" 2>/dev/null || printf 'install %s /bin/false\n' "$n" >> "$f";;
+        *) if ! grep -q "^install $n " "$f" 2>/dev/null; then if [ -s "$f" ] && [ -n "$(tail -c1 "$f")" ]; then echo >> "$f"; fi; printf 'install %s /bin/false\n' "$n" >> "$f"; fi;;
       esac
       if grep -q "^$n " /proc/modules; then modprobe -r -- "$n"; fi
     done
@@ -801,7 +809,7 @@ fix_muster_beyond_uncommon_filesystems_disabled() {
   fi
   # validate
   ( set -e
-    mods='cramfs freevxfs jffs2 hfs hfsplus udf'; for m in $mods; do n=$(printf '%s' "$m" | tr - _); case "$(modprobe --showconfig 2>/dev/null | awk -v m="$n" '$1 == "install" && $2 == m { print $3; exit }')" in /bin/false|/bin/true|/usr/bin/false|/usr/bin/true|false|true) ;; *) exit 1;; esac; ! grep -q "^$n " /proc/modules || exit 1; done
+    mods='cramfs freevxfs jffs2 hfs hfsplus udf'; for m in $mods; do n=$(printf '%s' "$m" | tr - _); case "$(modprobe --showconfig 2>/dev/null | LC_ALL=C awk '$1 == "install" && $2 == m { c = 0; for (i = 3; i <= NF; i++) { if (substr($i, 1, 1) == "#") break; c++ }; print (c == 1 ? $3 : "compound"); exit }' m="$n")" in /bin/false|/bin/true|/usr/bin/false|/usr/bin/true|false|true) ;; *) exit 1;; esac; ! grep -q "^$n " /proc/modules || exit 1; done
   ); rc=$?
   if [ "$rc" -ne 0 ]; then
     log "muster.beyond.uncommon_filesystems_disabled: validate failed, rolling back"
@@ -827,7 +835,7 @@ fix_muster_beyond_unprivileged_bpf_restricted() {
     if [ -L "$f" ]; then log "muster.beyond.unprivileged_bpf_restricted: $f is a symlink (a mask), left as is"; exit 1; fi
     put() {
       sysctl -q -w "$1=$2"
-      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else printf '%s = %s\n' "$1" "$2" >> "$f"; fi
+      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else { if [ -s "$f" ] && [ -n "$(tail -c1 "$f")" ]; then echo >> "$f"; fi; printf '%s = %s\n' "$1" "$2" >> "$f"; }; fi
     }
     case "$(sysctl -n kernel.unprivileged_bpf_disabled)" in 1|2) ;; *) put kernel.unprivileged_bpf_disabled 2;; esac
     case "$(sysctl -n net.core.bpf_jit_harden)" in 1|2) ;; *) put net.core.bpf_jit_harden 2;; esac
@@ -972,7 +980,7 @@ fix_muster_beyond_ip_forwarding_disabled() {
     if [ -L "$f" ]; then log "muster.beyond.ip_forwarding_disabled: $f is a symlink (a mask), left as is"; exit 1; fi
     put() {
       sysctl -q -w "$1=$2"
-      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else printf '%s = %s\n' "$1" "$2" >> "$f"; fi
+      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else { if [ -s "$f" ] && [ -n "$(tail -c1 "$f")" ]; then echo >> "$f"; fi; printf '%s = %s\n' "$1" "$2" >> "$f"; }; fi
     }
     first=${P_allowed_forward%% *}
     case " $P_allowed_forward " in
@@ -1024,7 +1032,7 @@ fix_muster_beyond_reverse_path_filtering() {
     if [ -L "$f" ]; then log "muster.beyond.reverse_path_filtering: $f is a symlink (a mask), left as is"; exit 1; fi
     put() {
       sysctl -q -w "$1=$2"
-      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else printf '%s = %s\n' "$1" "$2" >> "$f"; fi
+      if grep -q "^$1 " "$f" 2>/dev/null; then sed -i "s|^$1 .*|$1 = $2|" "$f"; else { if [ -s "$f" ] && [ -n "$(tail -c1 "$f")" ]; then echo >> "$f"; fi; printf '%s = %s\n' "$1" "$2" >> "$f"; }; fi
     }
     case "$(sysctl -n net.ipv4.conf.all.rp_filter)" in 1|2) ;; *) put net.ipv4.conf.all.rp_filter 1;; esac
     case "$(sysctl -n net.ipv4.conf.default.rp_filter)" in 1|2) ;; *) put net.ipv4.conf.default.rp_filter 1;; esac
@@ -1053,53 +1061,16 @@ fix_muster_beyond_reverse_path_filtering() {
 fix_muster_beyond_reverse_path_filtering
 [ "$?" -eq 0 ] || failed=$((failed+1))
 
-# ---- 35/43 muster.beyond.usb_storage_disabled [risk restart_service] [fail, medium]
-# why: clause does not hold: kernel.modules each require disabled eq true
-# do:  Write install usb-storage /bin/false into a file under /etc/modprobe.d, for example /etc/modprobe.d/99-muster-usb-storage-disabled.conf, and rebuild the initramfs (the review script does not) so the setting applies during early boot as well. A vendor file whose install line for the module loads it wins over this one; the review script's validate then fails and the block rolls back. The review script never follows a symlink; a 99-muster-usb-storage-disabled.conf that is a symlink (a mask) is left as is and the block stops. Check first that the host does not boot or install from USB media and that no operational procedure depends on a USB device for backups or recovery, because those stop working immediately. A USB keyboard, mouse or serial adapter is unaffected — this is the mass-storage driver alone, not USB support.
-# ko:  /etc/modprobe.d 아래 파일(예를 들어 /etc/modprobe.d/99-muster-usb-storage-disabled.conf)에 install usb-storage /bin/false 를 적고, 초기 부팅 단계에도 적용되도록 initramfs 를 다시 만듭니다(검토 스크립트는 하지 않습니다). 모듈을 적재하는 install 줄을 둔 벤더 파일이 이 파일을 이기며, 그때 검토 스크립트의 validate가 실패해 블록이 롤백됩니다. 검토 스크립트는 심볼릭 링크를 따라가지 않으므로, 심볼릭 링크(마스크)인 99-muster-usb-storage-disabled.conf 는 그대로 두고 그 블록을 멈춥니다. USB 매체로 부팅하거나 설치하지 않는지, 백업이나 복구 절차가 USB 장치에 의존하지 않는지 먼저 확인하십시오. 그런 것들은 즉시 동작을 멈춥니다. USB 키보드·마우스·시리얼 어댑터에는 영향이 없습니다. 이것은 USB 지원 전체가 아니라 대용량 저장 장치 드라이버 하나입니다.
-fix_muster_beyond_usb_storage_disabled() {
-  MB="$MUSTER_BACKUP/blocks/fix_muster_beyond_usb_storage_disabled"; mkdir -p "$MB" || { log "muster.beyond.usb_storage_disabled: backup failed, nothing changed"; return 1; }
-  backup /etc/modprobe.d/99-muster-usb-storage-disabled.conf || { log "muster.beyond.usb_storage_disabled: backup failed, nothing changed"; return 1; }
-  save_modules usb-storage || { log "muster.beyond.usb_storage_disabled: backup failed, nothing changed"; return 1; }
-  ( set -e
-    f=/etc/modprobe.d/99-muster-usb-storage-disabled.conf
-    if [ -L "$f" ]; then log "muster.beyond.usb_storage_disabled: $f is a symlink (a mask), left as is"; exit 1; fi
-    mods='usb-storage'
-    for m in $mods; do
-      n=$(printf '%s' "$m" | tr - _)
-      case "$(modprobe --showconfig 2>/dev/null | awk -v m="$n" '$1 == "install" && $2 == m { print $3; exit }')" in
-        /bin/false|/bin/true|/usr/bin/false|/usr/bin/true|false|true) ;;
-        *) grep -q "^install $n " "$f" 2>/dev/null || printf 'install %s /bin/false\n' "$n" >> "$f";;
-      esac
-      if grep -q "^$n " /proc/modules; then modprobe -r -- "$n"; fi
-    done
-    if [ -f "$f" ]; then chmod 644 "$f"; fi
-  ); rc=$?
-  if [ "$rc" -ne 0 ]; then
-    log "muster.beyond.usb_storage_disabled: script failed (rc $rc), rolling back"
-    restore /etc/modprobe.d/99-muster-usb-storage-disabled.conf || log "muster.beyond.usb_storage_disabled: ROLLBACK INCOMPLETE, backups in $MUSTER_BACKUP"
-    restore_modules usb-storage || log "muster.beyond.usb_storage_disabled: ROLLBACK INCOMPLETE, backups in $MUSTER_BACKUP"
-    return 1
-  fi
-  # validate
-  ( set -e
-    mods='usb-storage'; for m in $mods; do n=$(printf '%s' "$m" | tr - _); case "$(modprobe --showconfig 2>/dev/null | awk -v m="$n" '$1 == "install" && $2 == m { print $3; exit }')" in /bin/false|/bin/true|/usr/bin/false|/usr/bin/true|false|true) ;; *) exit 1;; esac; ! grep -q "^$n " /proc/modules || exit 1; done
-  ); rc=$?
-  if [ "$rc" -ne 0 ]; then
-    log "muster.beyond.usb_storage_disabled: validate failed, rolling back"
-    restore /etc/modprobe.d/99-muster-usb-storage-disabled.conf || log "muster.beyond.usb_storage_disabled: ROLLBACK INCOMPLETE, backups in $MUSTER_BACKUP"
-    restore_modules usb-storage || log "muster.beyond.usb_storage_disabled: ROLLBACK INCOMPLETE, backups in $MUSTER_BACKUP"
-    return 1
-  fi
-  log "muster.beyond.usb_storage_disabled: done"
-}
-fix_muster_beyond_usb_storage_disabled
-[ "$?" -eq 0 ] || failed=$((failed+1))
-
-# ---- 36/43 muster.beyond.remote_log_forwarding [risk restart_service] [fail, low]
+# ---- 35/43 muster.beyond.remote_log_forwarding [risk restart_service] [fail, low]
 # why: clause does not hold: logging.rsyslog.forwards_remote eq true
 # do:  Add a forwarding action to a file under /etc/rsyslog.d/ — for example *.* @@logs.example.com:514, or action(type="omfwd" target="logs.example.com" port="514" protocol="tcp") — and restart rsyslog; or install systemd-journal-upload, set URL= under [Upload] in /etc/systemd/journal-upload.conf and run systemctl enable --now systemd-journal-upload.service. Make sure the receiving host accepts and stores the messages first. Restarting the logger can drop the messages sent while it restarts.
 # ko:  /etc/rsyslog.d/ 아래 파일에 전달 액션(예 *.* @@logs.example.com:514, 또는 action(type="omfwd" target="logs.example.com" port="514" protocol="tcp"))을 추가하고 rsyslog 를 재시작하거나, systemd-journal-upload 를 설치하고 /etc/systemd/journal-upload.conf 의 [Upload] 에 URL= 을 설정한 뒤 systemctl enable --now systemd-journal-upload.service 를 실행합니다. 받는 호스트가 메시지를 받아 저장하는지 먼저 확인하십시오. 로거를 재시작하는 동안 보낸 메시지는 유실될 수 있습니다.
+# text only: no script declared
+
+# ---- 36/43 muster.patch.security_updates [risk reboot_required] [warn, high]
+# why: clause does not hold: patch.metadata_age_s lte 604800
+# do:  Refresh the package metadata (apt update, or dnf makecache) and apply the pending security updates (apt upgrade with the -security sources, or dnf update --security), then reboot if a kernel or core library changed.
+# ko:  패키지 메타데이터를 갱신하고(apt update 또는 dnf makecache) 대기 중인 보안 업데이트를 적용합니다(-security 소스를 포함한 apt upgrade, 또는 dnf update --security). 커널이나 핵심 라이브러리가 바뀌었다면 재부팅합니다.
 # text only: no script declared
 
 # ---- 37/43 muster.beyond.secure_boot_enabled [risk reboot_required] [fail, medium]
@@ -1117,30 +1088,39 @@ fix_muster_beyond_usb_storage_disabled
 # ---- 39/43 muster.account.lockout_threshold [risk lockout_risk] [fail, high]
 # keep a second session open; a lockout here needs console access
 # why: absent counts as fail: pam.faillock.deny is absent on this host
-# do:  RHEL family - authselect enable-feature with-faillock and set deny in /etc/security/faillock.conf; Debian family - add pam_faillock.so preauth and authfail lines to common-auth and a pam_faillock.so line to common-account (or use a pam-auth-update profile), then set deny in /etc/security/faillock.conf. A deny= argument on the pam_faillock lines wins over the file; the review script edits the file only.
-# ko:  RHEL 계열은 authselect enable-feature with-faillock 을 실행하고 /etc/security/faillock.conf 에 deny 를 설정하며, Debian 계열은 common-auth 에 pam_faillock.so preauth 와 authfail 줄, common-account 에 pam_faillock.so 줄을 추가하거나 pam-auth-update 프로파일을 쓴 뒤 /etc/security/faillock.conf 에 deny 를 설정합니다. pam_faillock 줄의 deny= 인자는 파일보다 우선하며, 검토 스크립트는 파일만 고칩니다.
+# do:  RHEL family - authselect enable-feature with-faillock and set deny in /etc/security/faillock.conf; Debian family - add pam_faillock.so preauth and authfail lines to common-auth and a pam_faillock.so line to common-account (or use a pam-auth-update profile), then set deny in /etc/security/faillock.conf. A deny= argument on the pam_faillock lines wins over the file; the review script edits the file only. pam_faillock reads only a lower-case deny (DENY or Deny is ignored), and the script rewrites only such lines.
+# ko:  RHEL 계열은 authselect enable-feature with-faillock 을 실행하고 /etc/security/faillock.conf 에 deny 를 설정하며, Debian 계열은 common-auth 에 pam_faillock.so preauth 와 authfail 줄, common-account 에 pam_faillock.so 줄을 추가하거나 pam-auth-update 프로파일을 쓴 뒤 /etc/security/faillock.conf 에 deny 를 설정합니다. pam_faillock 줄의 deny= 인자는 파일보다 우선하며, 검토 스크립트는 파일만 고칩니다. pam_faillock 은 소문자 deny 만 읽으며(DENY, Deny 는 무시), 스크립트도 그런 줄만 고쳐 씁니다.
 # text only: the finding is an absent file
 
 # ---- 40/43 muster.account.password_policy [risk lockout_risk] [fail, high]
 # keep a second session open; a lockout here needs console access
 # why: absent counts as fail: accounts.login_defs.pass_min_len is absent on this host
-# do:  Install libpam-pwquality (Debian family) or keep pam_pwquality in the authselect profile (RHEL family). The review script tightens PASS_* in /etc/login.defs, writes minlen/minclass to /etc/security/pwquality.conf.d/99-muster.conf only where the merged value is looser, and applies the ageing with chage to every account with a password hash except root (uid 0, left to you) and one whose password has already reached the maximum age (it would expire on the spot; change it first). Arguments on the pam_pwquality.so line win over the files. Once an account's password expires, that account's cron and at jobs stop, and an account that logs in only by SSH key is made to change its password at login, which an unattended session cannot; exempt such accounts or lock their password first. An account with no last-change day, or set to change at next login (day 0), is left as is. A symlinked /etc/login.defs, or a 99-muster.conf that is a symlink (a mask), is never followed; the block stops.
-# ko:  libpam-pwquality 를 설치하거나 (Debian 계열) authselect 프로파일에 pam_pwquality 를 유지합니다 (RHEL 계열). 검토 스크립트는 /etc/login.defs의 PASS_* 값을 조이고, 합친 값이 더 느슨할 때만 minlen/minclass를 /etc/security/pwquality.conf.d/99-muster.conf에 쓰며, 비밀번호 해시가 있는 모든 계정에 chage로 기간을 적용합니다. 단, root(uid 0)는 운영자에게 맡기고, 비밀번호가 이미 최대 기간에 이른 계정은 그 자리에서 만료되므로 건너뜁니다(먼저 비밀번호를 바꾸세요). pam_pwquality.so 줄의 인자는 파일보다 우선합니다. 계정의 비밀번호가 만료되면 그 계정의 cron 과 at 작업이 멈추며, SSH 키로만 로그인하는 계정은 로그인할 때 비밀번호를 바꾸라는 요구를 받는데 무인 세션은 바꿀 수 없습니다. 그런 계정은 제외하거나 먼저 비밀번호를 잠그세요. 마지막 변경일이 없는 계정과 다음 로그인 때 바꾸도록 이미 설정된 계정(0일)은 그대로 둡니다. 심볼릭 링크인 /etc/login.defs 와 심볼릭 링크(마스크)인 99-muster.conf 는 따라가지 않고 그 블록을 멈춥니다.
+# do:  Install libpam-pwquality (Debian) or keep pam_pwquality in the authselect profile (RHEL). The script tightens PASS_* in /etc/login.defs and minlen/minclass only where looser and sets enforcing = 1 where the files say 0 (0 only warns); libpwquality reads /etc/security/pwquality.conf after the drop-ins, so a key the main file sets is rewritten there, others go to pwquality.conf.d/99-muster.conf (a later-sorting drop-in still wins and fails the validate). An enforcing=0 on the pam_pwquality.so line wins over the files and is yours to remove; the check keeps failing, naming it. chage ages every hashed account except root (yours), one past the maximum age (change it first), and one with no last-change day or due at next login (day 0). An expired password stops the account's cron and at jobs, and an SSH-key-only account must change it at login; exempt or lock unattended accounts first. A symlinked login.defs, pwquality.conf or 99-muster.conf (a mask) is never followed; the block stops.
+# ko:  libpam-pwquality 를 설치하거나 (Debian 계열) authselect 프로파일에 pam_pwquality 를 유지합니다 (RHEL 계열). 검토 스크립트는 /etc/login.defs의 PASS_* 값과 minlen/minclass를 더 느슨할 때만 조이고, 파일이 enforcing 을 0(경고만 하고 통과시킴)으로 두면 1로 바꿉니다. libpwquality 는 pwquality.conf.d 드롭인을 읽은 뒤 /etc/security/pwquality.conf 를 마지막에 읽으므로, 주 파일이 정한 키는 그 자리에서 고쳐 쓰고 나머지는 pwquality.conf.d/99-muster.conf에 씁니다(이름순으로 그 뒤에 오는 드롭인이 있으면 그 값이 이기고, 검증이 실패합니다). pam_pwquality.so 줄의 enforcing=0 은 파일보다 우선하며 운영자가 직접 지워야 합니다. 그동안 점검은 그 인자를 짚으며 계속 실패합니다. 또한 비밀번호 해시가 있는 모든 계정에 chage로 기간을 적용합니다. 단, root(uid 0)는 운영자에게 맡기고, 비밀번호가 이미 최대 기간에 이른 계정은 그 자리에서 만료되므로 건너뜁니다(먼저 비밀번호를 바꾸세요). 계정의 비밀번호가 만료되면 그 계정의 cron 과 at 작업이 멈추며, SSH 키로만 로그인하는 계정은 로그인할 때 비밀번호를 바꾸라는 요구를 받는데 무인 세션은 바꿀 수 없습니다. 그런 계정은 제외하거나 먼저 비밀번호를 잠그세요. 마지막 변경일이 없는 계정과 다음 로그인 때 바꾸도록 이미 설정된 계정(0일)은 그대로 둡니다. 심볼릭 링크인 /etc/login.defs·pwquality.conf 와 심볼릭 링크(마스크)인 99-muster.conf 는 따라가지 않고 그 블록을 멈춥니다.
 fix_muster_account_password_policy() {
   P_max_days='90'
   P_min_classes='3'
   P_min_days='1'
   P_min_len='8'
   MB="$MUSTER_BACKUP/blocks/fix_muster_account_password_policy"; mkdir -p "$MB" || { log "muster.account.password_policy: backup failed, nothing changed"; return 1; }
-  backup /etc/login.defs /etc/security/pwquality.conf.d/99-muster.conf || { log "muster.account.password_policy: backup failed, nothing changed"; return 1; }
+  backup /etc/login.defs /etc/security/pwquality.conf /etc/security/pwquality.conf.d/99-muster.conf || { log "muster.account.password_policy: backup failed, nothing changed"; return 1; }
   ( set -e
     ld=/etc/login.defs
+    pc=/etc/security/pwquality.conf
     pf=/etc/security/pwquality.conf.d/99-muster.conf
     if [ -L "$ld" ]; then log "muster.account.password_policy: $ld is a symlink, left as is"; exit 1; fi
+    if [ -L "$pc" ]; then log "muster.account.password_policy: $pc is a symlink, left as is"; exit 1; fi
     if [ -L "$pf" ]; then log "muster.account.password_policy: $pf is a symlink (a mask), left as is"; exit 1; fi
+    # minlen, required classes and enforcing over the chain in libpwquality's order, read as its read_config_file reads a line (cut at the first #, the name ends at a blank or =, blanks and at most one = skipped, names case-blind); its arguments are pwquality.conf (or "") and every regular file the three globs match, of which it keeps the names filter_conf keeps (the first .conf ends the name, hidden names too) in strcmp order, then pwquality.conf; a line it refuses (an unknown name, a bad integer, 1023 bytes or more, a NUL byte) stops it and prints stop <file>:<line> stops libpwquality (<what>)
+    rd_pwq() { LC_ALL=C awk 'function bad(v, a) { if (v !~ /^[+-]?[0-9]+$/) return 1; a = v; sub(/^[+-]/, "", a); sub(/^0+/, "", a); if (length(a) > 10) return 1; return (v + 0 >= 2147483647 || v + 0 <= -2147483648) } BEGIN { z = sprintf("%c", 0); if (length(z) != 1) { print "stop this awk cannot see a NUL byte"; exit } n = split("difok minlen dcredit ucredit lcredit ocredit minclass maxrepeat maxclassrepeat maxsequence gecoscheck dictcheck usercheck usersubstr enforcing retry", w, " "); for (i = 1; i <= n; i++) t[w[i]] = 1; n = split("badwords dictpath allowclasses enforce_for_root local_users_only", w, " "); for (i = 1; i <= n; i++) t[w[i]] = 2; m = 0; for (i = 2; i < ARGC; i++) { b = ARGV[i]; sub(/.*\//, "", b); p = index(b, ".conf"); if (p > 0 && p == length(b) - 4) { m++; q[m] = ARGV[i]; bn[m] = b } } for (i = 2; i <= m; i++) for (j = i; j > 1 && bn[j - 1] > bn[j]; j--) { y = bn[j]; bn[j] = bn[j - 1]; bn[j - 1] = y; y = q[j]; q[j] = q[j - 1]; q[j - 1] = y } if (ARGV[1] != "") q[++m] = ARGV[1]; for (i = 1; i <= m && s == ""; i++) { f = q[i]; ln = 0; while (s == "" && (getline l < f) > 0) { ln++; if (index(l, z)) { s = f ":" ln " stops libpwquality (NUL byte)"; break } if (length(l) >= 1023) { s = f ":" ln " stops libpwquality (line of 1023 bytes or more)"; break } sub(/#.*/, "", l); sub(/^[[:space:]]+/, "", l); sub(/[[:space:]]+$/, "", l); if (l == "") continue; k = l; sub(/[[:space:]=].*/, "", k); v = substr(l, length(k) + 1); e = (v ~ /^=/); v = substr(v, 2); while (v ~ /^[[:space:]]/ || (v ~ /^=/ && !e)) { if (v ~ /^=/) e = 1; v = substr(v, 2) } lk = tolower(k); if (!(lk in t) || (t[lk] == 1 && bad(v))) s = f ":" ln " stops libpwquality (" k ")"; else if (t[lk] == 1) x[lk] = v + 0 } close(f) } if (s != "") { print "stop " s; exit } ml = ("minlen" in x) ? x["minlen"] : 8; rc = x["minclass"] + 0; c = 0; if (x["dcredit"] + 0 <= -1) c++; if (x["ucredit"] + 0 <= -1) c++; if (x["lcredit"] + 0 <= -1) c++; if (x["ocredit"] + 0 <= -1) c++; if (c > rc) rc = c; en = ("enforcing" in x) ? x["enforcing"] : 1; print ml, rc, en }' "$@"; }
+    set -- ""
+    if [ -f "$pc" ]; then set -- "$pc"; fi
+    for f in /etc/security/pwquality.conf.d/*.conf /etc/security/pwquality.conf.d/.*.conf /etc/security/pwquality.conf.d/.conf; do if [ -f "$f" ]; then set -- "$@" "$f"; fi; done
+    pwq=$(rd_pwq "$@")
+    case "$pwq" in stop\ *) log "muster.account.password_policy: ${pwq#stop }, left as is"; exit 1;; esac
     first_val() { awk -v k="$1" '$1 == k { print $2; exit }' "$ld"; }
     set_key() {
-      if grep -Eq "^[[:space:]]*$1[[:space:]]" "$ld"; then sed -i -E "s|^([[:space:]]*$1)[[:space:]].*|\1 $2|" "$ld"; else printf '%s %s\n' "$1" "$2" >> "$ld"; fi
+      if grep -Eq "^[[:space:]]*$1[[:space:]]" "$ld"; then sed -i -E "s|^([[:space:]]*$1)[[:space:]].*|\1 $2|" "$ld"; else { if [ -s "$ld" ] && [ -n "$(tail -c1 "$ld")" ]; then echo >> "$ld"; fi; printf '%s %s\n' "$1" "$2" >> "$ld"; }; fi
     }
     v=$(first_val PASS_MAX_DAYS)
     case "$v" in ''|*[!0-9]*) set_key PASS_MAX_DAYS "$P_max_days";; *) if [ "$v" -gt "$P_max_days" ]; then set_key PASS_MAX_DAYS "$P_max_days"; fi;; esac
@@ -1148,23 +1128,27 @@ fix_muster_account_password_policy() {
     case "$v" in ''|*[!0-9]*) set_key PASS_MIN_DAYS "$P_min_days";; *) if [ "$v" -lt "$P_min_days" ]; then set_key PASS_MIN_DAYS "$P_min_days"; fi;; esac
     v=$(first_val PASS_MIN_LEN)
     case "$v" in ''|*[!0-9]*) set_key PASS_MIN_LEN "$P_min_len";; *) if [ "$v" -lt "$P_min_len" ]; then set_key PASS_MIN_LEN "$P_min_len"; fi;; esac
-    merged() { # minlen and required classes over the file chain, last wins (the collector's read)
-      for f in /etc/security/pwquality.conf /etc/security/pwquality.conf.d/*.conf; do
-        if [ -f "$f" ]; then cat "$f"; fi
-      done | awk -F= '{ k = $1; gsub(/[[:space:]]/, "", k); k = tolower(k); v = $2; gsub(/[[:space:]]/, "", v) } k ~ /^(minlen|minclass|dcredit|ucredit|lcredit|ocredit)$/ { x[k] = v } END { ml = ("minlen" in x) ? x["minlen"] + 0 : 8; rc = x["minclass"] + 0; n = 0; if (x["dcredit"] + 0 <= -1) n++; if (x["ucredit"] + 0 <= -1) n++; if (x["lcredit"] + 0 <= -1) n++; if (x["ocredit"] + 0 <= -1) n++; if (n > rc) rc = n; print ml, rc }'
-    }
-    pput() {
+    pput() { # pwquality.conf is read last: a key it sets is rewritten there as "<key> = <value>", on every line whose name (libpwquality's tokenizer) is the key; any other goes to 99-muster.conf
+      if [ -f "$pc" ] && LC_ALL=C awk -v k="$1" '{ x = $0; sub(/#.*/, "", x); sub(/^[[:space:]]+/, "", x); sub(/[[:space:]=].*/, "", x) } tolower(x) == k { f = 1 } END { exit !f }' "$pc"; then
+        LC_ALL=C awk -v k="$1" -v v="$2" '{ x = $0; sub(/#.*/, "", x); sub(/^[[:space:]]+/, "", x); sub(/[[:space:]=].*/, "", x) } tolower(x) == k { print k " = " v; next } { print }' "$pc" > "$MB/pwquality.tmp"
+        cat "$MB/pwquality.tmp" > "$pc"
+        return 0
+      fi
       if [ ! -d /etc/security/pwquality.conf.d ]; then mkdir -p /etc/security/pwquality.conf.d; chmod 755 /etc/security/pwquality.conf.d; fi
-      if [ -f "$pf" ] && awk -F= -v k="$1" '{ x = $1; gsub(/[[:space:]]/, "", x) } tolower(x) == k { f = 1 } END { exit !f }' "$pf"; then
-        awk -F= -v k="$1" -v v="$2" '{ x = $1; gsub(/[[:space:]]/, "", x) } tolower(x) == k { print k " = " v; next } { print }' "$pf" > "$MB/pwquality.tmp"
+      if [ -f "$pf" ] && LC_ALL=C awk -v k="$1" '{ x = $0; sub(/#.*/, "", x); sub(/^[[:space:]]+/, "", x); sub(/[[:space:]=].*/, "", x) } tolower(x) == k { f = 1 } END { exit !f }' "$pf"; then
+        LC_ALL=C awk -v k="$1" -v v="$2" '{ x = $0; sub(/#.*/, "", x); sub(/^[[:space:]]+/, "", x); sub(/[[:space:]=].*/, "", x) } tolower(x) == k { print k " = " v; next } { print }' "$pf" > "$MB/pwquality.tmp"
         cat "$MB/pwquality.tmp" > "$pf"
-      else printf '%s = %s\n' "$1" "$2" >> "$pf"; fi
+      else
+        if [ -s "$pf" ] && [ -n "$(tail -c1 "$pf")" ]; then echo >> "$pf"; fi
+        printf '%s = %s\n' "$1" "$2" >> "$pf"
+      fi
       chmod 644 "$pf"
     }
-    # shellcheck disable=SC2046
-    set -- $(merged)
+    # shellcheck disable=SC2086
+    set -- $pwq
     if [ "$1" -lt "$P_min_len" ]; then pput minlen "$P_min_len"; fi
     if [ "$2" -lt "$P_min_classes" ]; then pput minclass "$P_min_classes"; fi
+    if [ "$3" -eq 0 ]; then pput enforcing 1; fi
     today=$(( $(date +%s) / 86400 ))
     awk -F: -v OFS=: 'NF >= 8 && $1 !~ /^#/ && $1 != "" && $2 != "" && $2 !~ /^[!*]/ { print $1, $3, $4, $5 }' /etc/shadow > "$MB/ageing.scan"
     while IFS=: read -r name last min max; do
@@ -1185,12 +1169,12 @@ fix_muster_account_password_policy() {
       fi
     ); rrc=$?
     [ "$rrc" -eq 0 ] || log "muster.account.password_policy: rollback failed (rc $rrc)"
-    restore /etc/login.defs /etc/security/pwquality.conf.d/99-muster.conf || log "muster.account.password_policy: ROLLBACK INCOMPLETE, backups in $MUSTER_BACKUP"
+    restore /etc/login.defs /etc/security/pwquality.conf /etc/security/pwquality.conf.d/99-muster.conf || log "muster.account.password_policy: ROLLBACK INCOMPLETE, backups in $MUSTER_BACKUP"
     return 1
   fi
   # validate
   ( set -e
-    awk '$1 == "PASS_MAX_DAYS" && a == "" { a = $2 } $1 == "PASS_MIN_DAYS" && b == "" { b = $2 } $1 == "PASS_MIN_LEN" && c == "" { c = $2 } END { exit !(a != "" && a + 0 <= M && b + 0 >= m && c + 0 >= l) }' M="$P_max_days" m="$P_min_days" l="$P_min_len" /etc/login.defs && for f in /etc/security/pwquality.conf /etc/security/pwquality.conf.d/*.conf; do if [ -f "$f" ]; then cat "$f"; fi; done | awk -F= '{ k = $1; gsub(/[[:space:]]/, "", k); k = tolower(k); v = $2; gsub(/[[:space:]]/, "", v) } k ~ /^(minlen|minclass|dcredit|ucredit|lcredit|ocredit)$/ { x[k] = v } END { ml = ("minlen" in x) ? x["minlen"] + 0 : 8; rc = x["minclass"] + 0; n = 0; if (x["dcredit"] + 0 <= -1) n++; if (x["ucredit"] + 0 <= -1) n++; if (x["lcredit"] + 0 <= -1) n++; if (x["ocredit"] + 0 <= -1) n++; if (n > rc) rc = n; exit !(ml >= L && rc >= C) }' L="$P_min_len" C="$P_min_classes"
+    awk '$1 == "PASS_MAX_DAYS" && a == "" { a = $2 } $1 == "PASS_MIN_DAYS" && b == "" { b = $2 } $1 == "PASS_MIN_LEN" && c == "" { c = $2 } END { exit !(a != "" && a + 0 <= M && b + 0 >= m && c + 0 >= l) }' M="$P_max_days" m="$P_min_days" l="$P_min_len" /etc/login.defs && set -- "" && if [ -f /etc/security/pwquality.conf ]; then set -- /etc/security/pwquality.conf; fi && for f in /etc/security/pwquality.conf.d/*.conf /etc/security/pwquality.conf.d/.*.conf /etc/security/pwquality.conf.d/.conf; do if [ -f "$f" ]; then set -- "$@" "$f"; fi; done && LC_ALL=C awk 'function bad(v, a) { if (v !~ /^[+-]?[0-9]+$/) return 1; a = v; sub(/^[+-]/, "", a); sub(/^0+/, "", a); if (length(a) > 10) return 1; return (v + 0 >= 2147483647 || v + 0 <= -2147483648) } BEGIN { z = sprintf("%c", 0); if (length(z) != 1) { print "stop this awk cannot see a NUL byte"; exit } n = split("difok minlen dcredit ucredit lcredit ocredit minclass maxrepeat maxclassrepeat maxsequence gecoscheck dictcheck usercheck usersubstr enforcing retry", w, " "); for (i = 1; i <= n; i++) t[w[i]] = 1; n = split("badwords dictpath allowclasses enforce_for_root local_users_only", w, " "); for (i = 1; i <= n; i++) t[w[i]] = 2; m = 0; for (i = 2; i < ARGC; i++) { b = ARGV[i]; sub(/.*\//, "", b); p = index(b, ".conf"); if (p > 0 && p == length(b) - 4) { m++; q[m] = ARGV[i]; bn[m] = b } } for (i = 2; i <= m; i++) for (j = i; j > 1 && bn[j - 1] > bn[j]; j--) { y = bn[j]; bn[j] = bn[j - 1]; bn[j - 1] = y; y = q[j]; q[j] = q[j - 1]; q[j - 1] = y } if (ARGV[1] != "") q[++m] = ARGV[1]; for (i = 1; i <= m && s == ""; i++) { f = q[i]; ln = 0; while (s == "" && (getline l < f) > 0) { ln++; if (index(l, z)) { s = f ":" ln " stops libpwquality (NUL byte)"; break } if (length(l) >= 1023) { s = f ":" ln " stops libpwquality (line of 1023 bytes or more)"; break } sub(/#.*/, "", l); sub(/^[[:space:]]+/, "", l); sub(/[[:space:]]+$/, "", l); if (l == "") continue; k = l; sub(/[[:space:]=].*/, "", k); v = substr(l, length(k) + 1); e = (v ~ /^=/); v = substr(v, 2); while (v ~ /^[[:space:]]/ || (v ~ /^=/ && !e)) { if (v ~ /^=/) e = 1; v = substr(v, 2) } lk = tolower(k); if (!(lk in t) || (t[lk] == 1 && bad(v))) s = f ":" ln " stops libpwquality (" k ")"; else if (t[lk] == 1) x[lk] = v + 0 } close(f) } if (s != "") { print "stop " s; exit } ml = ("minlen" in x) ? x["minlen"] : 8; rc = x["minclass"] + 0; c = 0; if (x["dcredit"] + 0 <= -1) c++; if (x["ucredit"] + 0 <= -1) c++; if (x["lcredit"] + 0 <= -1) c++; if (x["ocredit"] + 0 <= -1) c++; if (c > rc) rc = c; en = ("enforcing" in x) ? x["enforcing"] : 1; print ml, rc, en }' "$@" | awk '$1 != "stop" && $1 + 0 >= L && $2 + 0 >= C && $3 + 0 != 0 { f = 1 } END { exit !f }' L="$P_min_len" C="$P_min_classes"
   ); rc=$?
   if [ "$rc" -ne 0 ]; then
     log "muster.account.password_policy: validate failed, rolling back"
@@ -1200,7 +1184,7 @@ fix_muster_account_password_policy() {
       fi
     ); rrc=$?
     [ "$rrc" -eq 0 ] || log "muster.account.password_policy: rollback failed (rc $rrc)"
-    restore /etc/login.defs /etc/security/pwquality.conf.d/99-muster.conf || log "muster.account.password_policy: ROLLBACK INCOMPLETE, backups in $MUSTER_BACKUP"
+    restore /etc/login.defs /etc/security/pwquality.conf /etc/security/pwquality.conf.d/99-muster.conf || log "muster.account.password_policy: ROLLBACK INCOMPLETE, backups in $MUSTER_BACKUP"
     return 1
   fi
   log "muster.account.password_policy: done"

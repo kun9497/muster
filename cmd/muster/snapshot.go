@@ -153,6 +153,12 @@ func runSnapshotExtract(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "muster: parse snapshot: %v\n", err)
 		return exitError
 	}
+	if !facts.AtEnd(dec) {
+		// openFacts already refused a second value (H-12); this decode reads
+		// the same bytes, so it holds itself to the same rule.
+		fmt.Fprintf(stderr, "muster: %v\n", facts.ErrTrailingData)
+		return exitError
+	}
 	set, err := controls.LoadDefault()
 	if err != nil {
 		fmt.Fprintf(stderr, "muster: %v\n", err)
