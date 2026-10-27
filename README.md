@@ -153,17 +153,24 @@ guide is included, and the guide itself is not included. CIS Benchmark
 references are benchmark name, version and recommendation number only, and
 muster judges no CIS compliance. See [ATTRIBUTION.md](ATTRIBUTION.md).
 
-Global benchmarks are cross-references, not a second rulebook. Of the 68
-controls, 25 carry DISA STIG rule ids, 20 carry NIST SP 800-53 control ids and
-13 carry CIS Benchmark recommendation numbers; the mappings are still being
-filled in, and a control gets one only where the benchmark judges the same
-criterion. `muster controls lint` refuses a STIG or
-NIST id that is not in the committed index and cross-checks every KISA item
+Global benchmarks are cross-references, not a second rulebook. Of the 117
+controls, 58 carry DISA STIG rule ids, 65 carry NIST SP 800-53 control ids and
+69 carry CIS Benchmark recommendation numbers; a control gets one only where
+the benchmark judges the same criterion. `muster controls lint` refuses a STIG,
+NIST or CIS reference that is not in the committed index and cross-checks every KISA item
 number against the 67-item inventory, so an item can be neither forgotten nor
 mis-claimed (an item may be judged by more than one control, as U-23 is, but
 every citation must name a real item). Since stage 3D-1 a profile (`check --profile`)
-selects controls and parameters from the same collector; the `cis-<distro>-l1` profile
-waits for an index of CIS recommendation numbers (3D-1b). muster records the
+selects controls and parameters from the same collector, and since 3D-1b three built-ins,
+`cis-ubuntu2204-l1`, `cis-ubuntu2404-l1` and `cis-rhel9-l1`, select the controls that
+carry a Level 1 – Server recommendation of their benchmark
+(`muster check --facts snap.json --profile cis-ubuntu2204-l1`). The `cis-<distro>-l1` profiles select muster's own controls that carry a CIS
+Benchmark recommendation number at Level 1 – Server; their results are
+muster's verdicts on muster's controls, not a CIS assessment, and muster is an
+independent publication not authorized, sponsored or otherwise approved by the
+Center for Internet Security. The
+recommendation numbers are generated into `docs/reference/cis/` by `tools/cisindex`
+from ComplianceAsCode's public control files (BSD-3-Clause; see NOTICE). muster records the
 numbers, never the benchmark text, and certifies no level of CIS or STIG
 compliance. The STIG and NIST identifiers a control may cite are generated
 into `docs/reference/stig/` from DISA's public files by `tools/refindex`.
@@ -238,8 +245,9 @@ titles, never their discussion, check and fix text. See
    container-runtime sockets and their groups, passwordless `ALL` in sudoers,
    the inactivity policy over every interactive account, root's authorized keys
    and SSH key quality — eight controls from three extended collectors and three
-   new ones. Next: 3D-1b, the `cis-<distro>-l1` profile over an index of CIS
-   recommendation numbers (`references.cis` on every selected control); then 3D-3
+   new ones. 3D-1b (merged): the `cis-<distro>-l1` profiles for Ubuntu 22.04, Ubuntu 24.04
+   and the RHEL 9 family over an index of CIS recommendation numbers
+   (`references.cis` on every selected control). Next: 3D-3
    (`--anonymize`, `--max-age`). `kisa-unix-2026` stays
    the default profile.
 4. **Public release.** Snapshot diff, SARIF, bilingual docs, signed reproducible

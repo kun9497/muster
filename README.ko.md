@@ -133,14 +133,20 @@ AlmaLinux 9**를 대상으로 합니다. 처음부터 둘 다 지원해야 배�
 벤치마크 참조는 벤치마크 이름·버전·권고 번호뿐이고 muster는 CIS 준수 여부를
 판정하지 않습니다. [ATTRIBUTION.md](ATTRIBUTION.md)를 보세요.
 
-글로벌 벤치마크는 두 번째 규칙집이 아니라 교차 참조입니다. 68개 컨트롤 중 25개가
-DISA STIG 규칙 id, 20개가 NIST SP 800-53 통제 id, 13개가 CIS 벤치마크 권고 번호를
-답니다. 매핑은 아직 채워 가는 중이며, 벤치마크가 같은 기준을 판정하는 곳에만 붙입니다.
-`muster controls lint`는 커밋된 색인에 없는 STIG·NIST id를 거부하고, 모든 KISA
+글로벌 벤치마크는 두 번째 규칙집이 아니라 교차 참조입니다. 117개 컨트롤 중 58개가
+DISA STIG 규칙 id, 65개가 NIST SP 800-53 통제 id, 69개가 CIS 벤치마크 권고 번호를
+답니다. 벤치마크가 같은 기준을 판정하는 곳에만 붙입니다.
+`muster controls lint`는 커밋된 색인에 없는 STIG·NIST·CIS 참조를 거부하고, 모든 KISA
 항목 번호를 67개 항목 인벤토리와 교차 검사하므로 항목이 빠지거나 잘못 등재될 수
 없습니다(U-23처럼 한 항목을 여러 컨트롤이 판정할 수는 있지만, 모든 인용은 실재하는
 항목이어야 합니다). 3D-1단계부터는 같은 수집기 위에서 프로파일(`check --profile`)이 컨트롤과
-파라미터를 고르며, `cis-<배포판>-l1` 프로파일은 CIS 권고 번호 색인을 기다립니다(3D-1b).
+파라미터를 고르며, 3D-1b부터는 내장 셋 `cis-ubuntu2204-l1`, `cis-ubuntu2404-l1`,
+`cis-rhel9-l1`이 그 벤치마크의 Level 1 – Server 권고를 싣는 컨트롤을 고릅니다
+(`muster check --facts snap.json --profile cis-ubuntu2204-l1`). `cis-<distro>-l1` 프로파일은 Level 1 – Server의 CIS Benchmark 권고 번호를 싣는 muster 자신의
+컨트롤을 고릅니다. 그 결과는 muster 컨트롤에 대한 muster의 판정이지 CIS 평가가 아니며, muster는
+Center for Internet Security가 허가·후원하거나 달리 승인하지 않은 독립 발행물입니다. 권고 번호는
+ComplianceAsCode의 공개 컨트롤 파일(BSD-3-Clause; NOTICE 참고)로부터 `tools/cisindex`가
+`docs/reference/cis/`에 생성합니다.
 muster는 번호만 기록하고 벤치마크 본문은 담지 않으며,
 CIS나 STIG 준수 여부를 인증하지 않습니다. 컨트롤이 인용할 수 있는 STIG·NIST
 식별자는 DISA의 공개 파일로부터 `tools/refindex`가 `docs/reference/stig/`에
@@ -201,8 +207,9 @@ CIS나 STIG 준수 여부를 인증하지 않습니다. 컨트롤이 인용할 �
    vsftpd 인사말 순서, auditd `exec` 처리, exports 기본 옵션 목록 — 을 먼저 고쳤습니다.
    3C-2b(병합): 노출 — 모든 리스닝 소켓의 소유자와 패키지, 삭제된 바이너리로 도는
    프로세스, 접힌 방화벽 규칙 표에 대한 노출 교차 판정, 네트워크 sysctl — 컨트롤 열셋.
-   다음: 3D-1b, CIS 권고 번호 색인 위의 `cis-<배포판>-l1` 프로파일(고르는 모든 컨트롤에
-   `references.cis`); 그다음 3D-3(`--anonymize`, `--max-age`).
+   3D-1b(병합): CIS 권고 번호 색인 위의 Ubuntu 22.04, Ubuntu 24.04, RHEL 9 계열
+   `cis-<배포판>-l1` 프로파일(고르는 모든 컨트롤에 `references.cis`). 다음: 3D-3
+   (`--anonymize`, `--max-age`).
    `kisa-unix-2026`이 기본 프로파일로 남습니다.
 4. **공개 릴리스.** 스냅샷 diff, SARIF, 한/영 문서, SBOM이 붙은 서명·재현 빌드,
    deb/rpm 패키지, Lynis와의 차분 비교.

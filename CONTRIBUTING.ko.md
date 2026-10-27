@@ -62,8 +62,8 @@ muster는 Linux 호스트를 KISA 2026 Unix 서버 가이드에 대조해 점검
 ### 가이드 밖의 컨트롤
 
 KISA 항목이 아닌 컨트롤은 `category: beyond`, id `muster.beyond.<name>`이고
-`references.kisa`가 없으며(lint 규칙 `beyond_scope`가 둘을 나란히 유지) CIS 권고 번호도
-달지 않습니다. 1차 출처 — 커널 문서, man 페이지, 배포판 자체 문서 — 에서 muster의
+`references.kisa`가 없으며(lint 규칙 `beyond_scope`가 둘을 나란히 유지), CIS 권고 번호는
+색인을 통해서만 답니다("컨트롤을 CIS에 매핑하기" 참고; 매핑은 독자적으로 도출합니다). 1차 출처 — 커널 문서, man 페이지, 배포판 자체 문서 — 에서 muster의
 표현으로 쓰고, 설명이 그 중요도를 매긴 이유를 한 문장으로 말합니다. 이런 컨트롤은 모두
 `env.container eq none`을 문지기로 둡니다: 컨테이너 안에서 이 팩트들은 호스트를
 묘사합니다. `go run ./cmd/muster controls new muster.beyond.<name> --importance 중`이
@@ -209,6 +209,26 @@ here-document는 쓰지 않습니다. 스크립트는
 - **행이 줄 수 없는 증명.** 어떤 왕복 검증 행도 restart 경로를 돌릴 수 없는 데몬은 계획과 그
   단계의 설계에서 증명되지 않은 것으로 적고 stub 테스트를 두며, `_roundtrip.yaml`에는 적지
   않습니다(그 `unproven_units`는 선언된 유닛만 적음).
+
+### 컨트롤을 CIS에 매핑하기
+
+컨트롤의 `references.cis`는 Benchmark를 보고 손으로 쓰지 않습니다. 그것은 `docs/reference/cis/`의
+커밋된 색인을 렌더링한 것이고, `TestEveryCISReferenceIsTheIndex`가 붙여 넣을 블록을 출력합니다.
+컨트롤을 매핑하려면 `docs/reference/cis/map.yaml`의 그 행을 더하거나 고칩니다:
+
+- `rules:` 컨트롤의 절이 판정하는 것을 검사하는 ComplianceAsCode 규칙 id. 절에 대조해 검토하며,
+  조인에서 온 씨앗은 출발점일 뿐 검토 없이 커밋하지 않습니다.
+- `recs:`(벤치마크마다) 규칙 id를 나열하지 않는 항목에만 쓰고, 이유는 컨트롤을 설명하며 결코 제목이나
+  권고를 설명하지 않습니다.
+- `vars:` 스펙 CB-8에 따라: 도달한 Level 1 – Server 항목에서 선택된 모든 변수를 지목하며, `as: int`,
+  키가 자기 값을 철자로 말하는 `{selected: value}` 표, 또는 `param: none`과 이유를 씁니다.
+- `docs/reference/cis/review.yaml`은 컨트롤의 판정이 권고를 정직하게 대신할 수 없는 곳 — 권고를
+  충족하는 호스트가 muster 기본값에서 그 컨트롤을 실패하는 곳을 포함 — 에서 후보를 프로파일에서
+  빼며, 각각 이유 하나를 답니다.
+
+그다음 `make cisindex`(`go run ./tools/cisindex`; 관리자 실행, 고정된 파일을 `.cache/cisindex/`나
+네트워크에서 읽음)를 돌려 재생성한 색인과 `internal/profile/builtin/cis-*.yaml`을 매핑 변경과 함께
+커밋하고, `TestEveryCISReferenceIsTheIndex`가 출력한 블록을 붙여 넣습니다.
 
 ## 팩트 추가
 

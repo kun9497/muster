@@ -12,7 +12,8 @@ waiver keys, output format.
   `go test ./...` and rely on CI, which runs on Linux, for the race build).
 - `make lint` — `gofmt -l .` then `go vet ./...`.
 - `make lint-controls` — `go run ./cmd/muster controls lint` (passes `--references docs/reference`, so
-  STIG/NIST ids must be in the generated index), then once more with `--profile default`.
+  STIG/NIST/CIS references must be in the generated indexes), then once more with `--profile default` and with each of
+  the three CIS profiles.
 - `make shellcheck` — `sh -n` and `shellcheck -s sh` over `internal/remedy/testdata/*.sh`, `examples/*-fix-report.sh`
   and `ci/roundtrip/*.sh` (at least five remedy goldens and six round-trip scripts; CI runs the same step in the
   `test` job).
@@ -22,6 +23,8 @@ waiver keys, output format.
   regenerates `docs/reference/stig/*.json` from the pinned DISA files (network; caches downloads under
   `.cache/refindex/`, git-ignored). `make refindex-check` — `go run ./tools/refindex -check`; CI does not
   run either `refindex` target and instead lints against the committed index (see `make lint-controls`).
+  `make cisindex` / `make cisindex-check` — `go run ./tools/cisindex [-check]` regenerates or verifies
+  `docs/reference/cis/*.json` and `internal/profile/builtin/cis-*.yaml` (maintainer-run; see "CIS profiles").
   `make suidindex` / `make suidindex-check` — `go run ./tools/suidindex [-check]` regenerates or verifies
   `docs/reference/suid/*.json` from the public images pinned in `sources.json` (docker and network;
   maintainer-run; CI reads the committed lists through the embedded `suid` package).
@@ -169,6 +172,26 @@ regenerates them from public images and `-check` compares.
   (full lint + the profile line; CI runs it with `default`) and `controls list --profile` (the four-column rows of the
   selection) share the same resolution. The examples gate byte-compares reports, so a change to the `check` block
   needs an examples refresh from the branch's `examples.yml` run before the merge.
+
+## CIS profiles (stage 3D-1b)
+
+- Built-ins `cis-ubuntu2204-l1`, `cis-ubuntu2404-l1`, `cis-rhel9-l1` (`internal/profile/builtin/*.yaml`, embedded with
+  `default.yaml`; the alias `kisa-unix-2026` stays in Go). They are GENERATED: `make cisindex` (`go run ./tools/cisindex`,
+  maintainer-run) decodes ComplianceAsCode v0.1.82's pinned control files (`tools/cisindex/sources.json`; ids, literal
+  levels and rule ids only — never a title) and `docs/reference/cis/{map.yaml,review.yaml}` (muster's own) into
+  `docs/reference/cis/<product>-<version>.json` and the three profiles; `cisindex -check` byte-compares. The cache is
+  `.cache/cisindex/<sha256>`; raw.githubusercontent.com may be unreachable from a dev host — fill the cache from a
+  verified copy (`gh api … -H 'Accept: application/vnd.github.raw'`), the pin check still guards.
+- Pure logic lives in `internal/cisindex` (imports no muster package, no os/os/exec/net/syscall; held by
+  `TestCISIndexImportsNoHostPackages`): `recs:` only on an entry with no rule id; `rules` word all/some/none; membership =
+  rows with literal `l1_server` minus review; `vars:` names every variable selected on a reached L1 entry (`as: int`, a
+  `{selected: value}` table with self-describing keys, or `param: none`). A control whose default fails a host that
+  meets the mapped recommendation is reviewed out on that profile.
+- `references.cis` is `{benchmark: <product key>, version, rec}` and equals the index (`TestEveryCISReferenceIsTheIndex`
+  prints the block to paste); lint `references_cis` checks shape always and the index under `--references`.
+  `controls lint --profile cis-…` runs Y-1 (every selected control carries an L1 entry on the benchmark).
+  `TestCISProfilesMatchTheIndex` and `TestCISMapAndReviewMatchTheIndex` (cmd/muster) are CI's offline gate.
+  `check`/`fix --dry-run` warn when the chain root is a CIS built-in and `run.host.os_release` is not its benchmark.
 
 ## Fix (stages 3D-2, 3D-2b, 3D-2c, 3D-2d)
 
