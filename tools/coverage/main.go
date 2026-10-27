@@ -30,7 +30,7 @@ func run(args []string, stderr io.Writer) int {
 	fs.SetOutput(stderr)
 	out := fs.String("out", "docs/reference/coverage.md", "file to write")
 	kisaDir := fs.String("kisa-dir", "docs/reference/kisa", "directory holding the KISA item inventory")
-	readmeDir := fs.String("readme-dir", ".", "directory holding README.md and README.ko.md, whose roadmap sentence -check verifies")
+	readmeDir := fs.String("readme-dir", ".", "directory holding README.md and README.ko.md (whose roadmap sentence -check verifies) and NOTICE and ATTRIBUTION.md (which, with README.md, must carry the CIS disclaimer)")
 	references := fs.String("references", "docs/reference", "directory holding the committed reference indexes; cis/*.json feeds the CIS recs column")
 	check := fs.Bool("check", false, "exit 1 if the committed file differs instead of writing")
 	if err := fs.Parse(args); err != nil {
@@ -85,6 +85,15 @@ func run(args []string, stderr io.Writer) int {
 	return 0
 }
 
+// cisDisclaimer is the CB-13 sentence: README.md, NOTICE and ATTRIBUTION.md
+// state the boundary of the cis-<distro>-l1 profiles in these words. The dash
+// is U+2013. README.ko.md carries the Korean rendering and is not checked.
+const cisDisclaimer = "The `cis-<distro>-l1` profiles select muster's own controls that " +
+	"carry a CIS Benchmark recommendation number at Level 1 – Server; their results " +
+	"are muster's verdicts on muster's controls, not a CIS assessment, and muster is an " +
+	"independent publication not authorized, sponsored or otherwise approved by the " +
+	"Center for Internet Security."
+
 // checkREADMEs verifies that the roadmap sentence of both READMEs still
 // carries the live coverage numbers (M-20). The sentence is a claim about
 // what muster judges, and a stale claim is worse than none; the generated
@@ -95,8 +104,9 @@ func run(args []string, stderr io.Writer) int {
 // still matches, and reflowing a paragraph never fails the gate.
 func checkREADMEs(stderr io.Writer, dir string, n coverageNumbers) int {
 	for _, f := range []struct {
-		name      string
-		fragments []string
+		name       string
+		fragments  []string
+		disclaimer bool
 	}{
 		// G-2: the automation triple beside the enrolled number is the same
 		// kind of claim and goes stale the same way -- a control moving from
@@ -111,12 +121,14 @@ func checkREADMEs(stderr io.Writer, dir string, n coverageNumbers) int {
 			fmt.Sprintf("%d of the %d items", n.enrolled, n.total),
 			fmt.Sprintf("%d auto, %d partial, %d manual", n.auto, n.partial, n.manual),
 			fmt.Sprintf("and %d beyond the guide", n.beyond),
-		}},
+		}, true},
 		{"README.ko.md", []string{
 			fmt.Sprintf("%d개 중 %d개", n.total, n.enrolled),
 			fmt.Sprintf("auto %d, partial %d, manual %d", n.auto, n.partial, n.manual),
 			fmt.Sprintf("그리고 가이드 밖 %d개", n.beyond),
-		}},
+		}, false},
+		{"NOTICE", nil, true},
+		{"ATTRIBUTION.md", nil, true},
 	} {
 		data, err := os.ReadFile(filepath.Join(dir, f.name))
 		if err != nil {
@@ -128,6 +140,10 @@ func checkREADMEs(stderr io.Writer, dir string, n coverageNumbers) int {
 				fmt.Fprintf(stderr, "coverage: %s does not mention %q; update the roadmap sentence\n", f.name, frag)
 				return 1
 			}
+		}
+		if f.disclaimer && !strings.Contains(text, normalizeSpace(cisDisclaimer)) {
+			fmt.Fprintf(stderr, "coverage: %s does not carry the CIS disclaimer; restore the sentence of CB-13\n", f.name)
+			return 1
 		}
 	}
 	return 0
