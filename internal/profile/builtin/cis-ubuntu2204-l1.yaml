@@ -8,7 +8,6 @@ include:
   - muster.account.system_account_shells
   - muster.account.umask_policy
   - muster.account.unique_uids
-  - muster.beyond.account_inactivity_lock
   - muster.beyond.aslr_and_link_protection
   - muster.beyond.bootloader_config_permissions
   - muster.beyond.bootloader_password
@@ -27,13 +26,10 @@ include:
   - muster.beyond.suid_dumpable_disabled
   - muster.beyond.syn_cookies_enabled
   - muster.beyond.tmp_mount_options
-  - muster.beyond.uncommon_filesystems_disabled
   - muster.beyond.usb_storage_disabled
   - muster.beyond.var_tmp_mount_options
   - muster.file.home_dir_exists
   - muster.file.passwd_permissions
-  - muster.file.shadow_permissions
-  - muster.file.suid_sgid
   - muster.file.suid_sgid_unverified
   - muster.file.unowned_files
   - muster.file.world_writable
@@ -55,5 +51,3 @@ params:
       - "077"
       - "0027"
       - "0077"
-  muster.beyond.account_inactivity_lock:
-    max_inactive_days: 45
