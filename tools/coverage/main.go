@@ -12,8 +12,10 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
+	"github.com/kun9497/muster/internal/cisindex"
 	"github.com/kun9497/muster/internal/controls"
 	"github.com/kun9497/muster/internal/facts"
 )
@@ -29,6 +31,7 @@ func run(args []string, stderr io.Writer) int {
 	out := fs.String("out", "docs/reference/coverage.md", "file to write")
 	kisaDir := fs.String("kisa-dir", "docs/reference/kisa", "directory holding the KISA item inventory")
 	readmeDir := fs.String("readme-dir", ".", "directory holding README.md and README.ko.md, whose roadmap sentence -check verifies")
+	references := fs.String("references", "docs/reference", "directory holding the committed reference indexes; cis/*.json feeds the CIS recs column")
 	check := fs.Bool("check", false, "exit 1 if the committed file differs instead of writing")
 	if err := fs.Parse(args); err != nil {
 		// -h and -help print the usage and are not a failure to determine
@@ -51,7 +54,11 @@ func run(args []string, stderr io.Writer) int {
 	if err != nil {
 		return fatal(stderr, err)
 	}
-	got := []byte(render(items, inventory.Deferred, controls.FactUsage(set, reg), set.Controls))
+	cis, err := loadCIS(*references)
+	if err != nil {
+		return fatal(stderr, err)
+	}
+	got := []byte(render(items, inventory.Deferred, controls.FactUsage(set, reg), set.Controls, cis))
 	if *check {
 		// Both halves of the gate run every time and the worst code wins,
 		// so a contributor who is stale in the table and in the prose
@@ -169,4 +176,33 @@ func unifiedDiff(path string, have, want []byte) string {
 		fmt.Fprintf(&b, "+%s\n", l)
 	}
 	return b.String()
+}
+
+// loadCIS reads <dir>/cis/*.json through cisindex.DecodeIndex. A directory
+// that does not exist is an error; one without cis/ (or with no file in it)
+// yields no index, and the CIS cells render an em dash.
+func loadCIS(dir string) ([]*cisindex.Index, error) {
+	if st, err := os.Stat(dir); err != nil {
+		return nil, err
+	} else if !st.IsDir() {
+		return nil, fmt.Errorf("%s is not a directory", dir)
+	}
+	paths, err := filepath.Glob(filepath.Join(dir, "cis", "*.json"))
+	if err != nil {
+		return nil, err
+	}
+	sort.Strings(paths)
+	var out []*cisindex.Index
+	for _, p := range paths {
+		data, err := os.ReadFile(p)
+		if err != nil {
+			return nil, err
+		}
+		ix, err := cisindex.DecodeIndex(data)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", p, err)
+		}
+		out = append(out, ix)
+	}
+	return out, nil
 }
