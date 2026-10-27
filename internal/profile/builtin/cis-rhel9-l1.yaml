@@ -7,6 +7,7 @@ include:
   - muster.account.root_only_uid_zero
   - muster.account.shadow_passwords
   - muster.account.system_account_shells
+  - muster.account.umask_policy
   - muster.account.unique_uids
   - muster.beyond.aslr_and_link_protection
   - muster.beyond.bootloader_config_permissions
@@ -40,3 +41,9 @@ include:
 params:
   muster.account.lockout_threshold:
     max_attempts: 5
+  muster.account.umask_policy:
+    acceptable:
+      - "027"
+      - "077"
+      - "0027"
+      - "0077"
