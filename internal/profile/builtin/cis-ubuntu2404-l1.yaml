@@ -34,7 +34,6 @@ include:
   - muster.service.nfs_server_disabled
   - muster.service.rpcbind_disabled
   - muster.service.snmp_disabled
-  - muster.service.tftp_talk_disabled
 params:
   muster.account.lockout_threshold:
     max_attempts: 4

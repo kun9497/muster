@@ -13,7 +13,7 @@ verdict on an existing snapshot is at least a minor release and appears under
 - Three built-in CIS profiles, `cis-ubuntu2204-l1`, `cis-ubuntu2404-l1` and
   `cis-rhel9-l1` (stage 3D-1b), each selecting muster's controls that carry a
   Level 1 – Server recommendation of its benchmark, minus a review list
-  (34, 34 and 30 controls). The recommendation numbers come from an index
+  (33, 33 and 30 controls). The recommendation numbers come from an index
   generated from ComplianceAsCode v0.1.82's control files
   (`docs/reference/cis/`, `tools/cisindex`); 69 controls now carry
   `references.cis` spelled with the product key (`ubuntu2204`, `ubuntu2404`,

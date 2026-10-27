@@ -293,12 +293,12 @@ func (t cisTable) cell(id string) string {
 	return strings.Join(groups, "; ")
 }
 
-// renderCIS is one line per benchmark in product order; nothing without an
-// index. It states counts only: no percentage, no score (CB-6).
 // cisMapNote says what the CIS section counts: muster's map, not a profile's
 // selection, which drops the controls review.yaml names (CB-7).
 const cisMapNote = "The counts below and the CIS recs cells cover muster's map of controls to recommendations (`docs/reference/cis/map.yaml`); each `cis-<product>-l1` profile drops the controls `docs/reference/cis/review.yaml` names."
 
+// renderCIS is one line per benchmark in product order; nothing without an
+// index. It states counts only: no percentage, no score (CB-6).
 func renderCIS(cis []*cisindex.Index) string {
 	if len(cis) == 0 {
 		return ""
