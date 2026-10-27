@@ -6,9 +6,7 @@ include:
   - muster.account.root_only_uid_zero
   - muster.account.shadow_passwords
   - muster.account.system_account_shells
-  - muster.account.umask_policy
   - muster.account.unique_uids
-  - muster.beyond.bootloader_config_permissions
   - muster.beyond.bootloader_password
   - muster.beyond.dev_shm_mount_options
   - muster.beyond.file_integrity_tool
@@ -27,25 +25,16 @@ include:
   - muster.beyond.usb_storage_disabled
   - muster.beyond.var_tmp_mount_options
   - muster.file.home_dir_exists
-  - muster.file.passwd_permissions
   - muster.file.suid_sgid_unverified
   - muster.file.unowned_files
   - muster.file.world_writable
-  - muster.log.time_sync
   - muster.patch.security_updates
   - muster.service.automount_disabled
   - muster.service.login_banner
   - muster.service.nfs_server_disabled
-  - muster.service.nis_disabled
   - muster.service.rpcbind_disabled
   - muster.service.snmp_disabled
   - muster.service.tftp_talk_disabled
 params:
   muster.account.lockout_threshold:
     max_attempts: 4
-  muster.account.umask_policy:
-    acceptable:
-      - "027"
-      - "077"
-      - "0027"
-      - "0077"

@@ -3,11 +3,9 @@ profile: cis-rhel9-l1
 include:
   - muster.account.lockout_threshold
   - muster.account.primary_group_exists
-  - muster.account.root_home_and_path
   - muster.account.root_only_uid_zero
   - muster.account.shadow_passwords
   - muster.account.system_account_shells
-  - muster.account.umask_policy
   - muster.account.unique_uids
   - muster.beyond.bootloader_config_permissions
   - muster.beyond.bootloader_password
@@ -25,23 +23,14 @@ include:
   - muster.beyond.usb_storage_disabled
   - muster.beyond.var_tmp_mount_options
   - muster.file.home_dir_exists
-  - muster.file.passwd_permissions
   - muster.file.suid_sgid_unverified
   - muster.file.unowned_files
   - muster.file.world_writable
-  - muster.log.time_sync
   - muster.patch.security_updates
   - muster.service.automount_disabled
   - muster.service.login_banner
   - muster.service.nfs_server_disabled
-  - muster.service.nis_disabled
   - muster.service.rpcbind_disabled
 params:
   muster.account.lockout_threshold:
     max_attempts: 5
-  muster.account.umask_policy:
-    acceptable:
-      - "027"
-      - "077"
-      - "0027"
-      - "0077"
