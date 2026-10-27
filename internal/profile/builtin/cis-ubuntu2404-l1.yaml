@@ -8,7 +8,6 @@ include:
   - muster.account.system_account_shells
   - muster.account.umask_policy
   - muster.account.unique_uids
-  - muster.beyond.aslr_and_link_protection
   - muster.beyond.bootloader_config_permissions
   - muster.beyond.bootloader_password
   - muster.beyond.dev_shm_mount_options
@@ -21,7 +20,6 @@ include:
   - muster.beyond.ipv6_redirects_ignored
   - muster.beyond.ipv6_router_advertisements_ignored
   - muster.beyond.ipv6_source_routing_rejected
-  - muster.beyond.ptrace_restriction
   - muster.beyond.source_routing_rejected
   - muster.beyond.suid_dumpable_disabled
   - muster.beyond.syn_cookies_enabled
