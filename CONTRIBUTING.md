@@ -285,9 +285,10 @@ add or edit its row in `docs/reference/cis/map.yaml`:
   muster's default.
 
 Then run `make cisindex` (`go run ./tools/cisindex`; maintainer-run, it reads the
-pinned files from `.cache/cisindex/` or the network) and commit the regenerated
-index and `internal/profile/builtin/cis-*.yaml` with the map change, then paste
-the blocks `TestEveryCISReferenceIsTheIndex` prints.
+pinned files from `.cache/cisindex/` or the network) and paste the blocks
+`TestEveryCISReferenceIsTheIndex` prints, then commit the regenerated index,
+`internal/profile/builtin/cis-*.yaml` and the pasted references with the map
+change in one commit.
 
 ## Adding a fact
 

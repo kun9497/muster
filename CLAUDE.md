@@ -1,7 +1,7 @@
 # muster — working notes for Claude
 
 Design: `docs/superpowers/specs/2026-09-02-muster-design.md` (English canonical, Korean pair). It is also the
-decision log (D01–D34). Read it before changing any contract: facts schema, control ids, exit codes,
+decision log (D01–D35). Read it before changing any contract: facts schema, control ids, exit codes,
 waiver keys, output format.
 
 ## Build and test
@@ -169,7 +169,7 @@ regenerates them from public images and `-check` compares.
   `profile`); the table's second line is `profile <name> (<selected> of <total>, <excluded> excluded[; tuning <path>])`
   or `profile <name> (<total> controls[; tuning <path>])`. `waiver.Apply(results, known, excluded, …)` counts a waiver on an excluded control
   `not_applied` (warned, no row). The exit code and `--fail-on` read statuses, not severity. `controls lint --profile`
-  (full lint + the profile line; CI runs it with `default`) and `controls list --profile` (the four-column rows of the
+  (full lint + the profile line; CI runs it with `default` and the three CIS profiles) and `controls list --profile` (the four-column rows of the
   selection) share the same resolution. The examples gate byte-compares reports, so a change to the `check` block
   needs an examples refresh from the branch's `examples.yml` run before the merge.
 

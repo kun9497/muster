@@ -45,8 +45,8 @@ rationale are muster's own wording. The guide itself is linked, not included.
 
 Accordingly:
 
-- Controls may reference a CIS recommendation only as benchmark key, benchmark
-  version and recommendation number. No recommendation title, text or audit
+- Controls may reference a CIS recommendation only as benchmark name (its
+  product key), benchmark version and recommendation number. No recommendation title, text or audit
   procedure is stored; the control schema has no field for them.
 - **What this repository reproduces:** the version, the number and the literal
   levels of the recommendations muster maps, and the count of Level 1 – Server

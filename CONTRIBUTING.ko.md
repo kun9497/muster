@@ -227,8 +227,9 @@ here-document는 쓰지 않습니다. 스크립트는
   빼며, 각각 이유 하나를 답니다.
 
 그다음 `make cisindex`(`go run ./tools/cisindex`; 관리자 실행, 고정된 파일을 `.cache/cisindex/`나
-네트워크에서 읽음)를 돌려 재생성한 색인과 `internal/profile/builtin/cis-*.yaml`을 매핑 변경과 함께
-커밋하고, `TestEveryCISReferenceIsTheIndex`가 출력한 블록을 붙여 넣습니다.
+네트워크에서 읽음)를 돌려 `TestEveryCISReferenceIsTheIndex`가 출력한 블록을 붙여 넣은 뒤, 재생성한 색인,
+`internal/profile/builtin/cis-*.yaml`, 붙여 넣은 참조를 매핑 변경과 함께 한 커밋으로
+커밋합니다.
 
 ## 팩트 추가
 

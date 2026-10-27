@@ -9,16 +9,16 @@
 
 국내 보안 실무에서 이런 점검을 CCE 점검(CVE와 대비되는 설정 취약점 점검)이라고
 부릅니다. muster는 리눅스 서버 자산군을 위한 CCE 점검 도구입니다. KISA 가이드가
-1차 기준이고, 글로벌 벤치마크(CIS Benchmarks, DISA STIG, NIST SP 800-53)는
+1차 기준이고, 글로벌 벤치마크(CIS Benchmarks®, DISA STIG, NIST SP 800-53)는
 참조로 붙이며 이후에는 선택 가능한 프로파일로 제공합니다.
 
-> **상태: 3D-2d단계 병합 (2026년 10월).** 1단계 — 뼈대: `collect`, `check`,
+> **상태: 3D-1b단계 병합 (2026년 10월).** 1단계 — 뼈대: `collect`, `check`,
 > waiver, 종료 코드, 끝까지 흐르는 컨트롤 여덟 개 — 와 2단계 — 자동 판정 가능한
 > KISA 항목 전체: DISA STIG·NIST SP 800-53 참조를 갖춘 기반 작업부터 계정, PAM,
 > sshd, 홈 디렉터리, 시스템 파일, 서비스, 방화벽, 로깅, NFS·SNMP·패치 위생,
-> FTP·메일·DNS, 마무리 커버리지·참조 게이트까지 — 그리고 3A·3B·3C-1·3C-2a·3C-2b·3D-1·3D-2·3D-2b·3D-2c·3D-2d단계 — 심층
+> FTP·메일·DNS, 마무리 커버리지·참조 게이트까지 — 그리고 3A·3B·3C-1·3C-2a·3C-2b·3D-1·3D-2·3D-2b·3D-2c·3D-2d·3D-1b단계 — 심층
 > 파일시스템 워크, 가이드 밖의 첫 점검들, 감사 파이프라인 상태와 패키지 무결성, root가
-> 아닌 채 root의 힘을 가진 것들, 노출, 프로파일과 튜닝, `fix --dry-run` 검토용 스크립트, 실제 호스트에서의 그 증명, 처음 열여섯 너머 컨트롤의 스크립트, 감사 계열과 파일이 말하는 내용 — 이 병합되었습니다. 67개 중 67개 항목이 등재되어 있습니다(컨트롤 68개:
+> 아닌 채 root의 힘을 가진 것들, 노출, 프로파일과 튜닝, `fix --dry-run` 검토용 스크립트, 실제 호스트에서의 그 증명, 처음 열여섯 너머 컨트롤의 스크립트, 감사 계열과 파일이 말하는 내용, 권고 번호 색인 위의 CIS Level 1 프로파일 — 이 병합되었습니다. 67개 중 67개 항목이 등재되어 있습니다(컨트롤 68개:
 > auto 57, partial 7, manual 4 — manual은 근거를 함께 제시),
 > 그리고 가이드 밖 49개가 더 있습니다. `collect --deep`은
 > 로컬 파일시스템을 시간·항목 예산 안에서 한 번 걷되 심링크를 따라가지 않고 원격
@@ -39,7 +39,7 @@
 > 남은 3·4단계 항목은 계획이지 약속이 아닙니다.
 
 > **공식 도구가 아닙니다.** muster는 비공식 개인 프로젝트입니다. KISA나 Center for
-> Internet Security의 승인·인증과 무관하며, CIS 벤치마크 본문을 포함하지 않고(권고
+> Internet Security®(CIS)의 승인·인증과 무관하며, CIS 벤치마크 본문을 포함하지 않고(권고
 > 번호만 참조), CIS 준수 여부를 판정하지 않으며, 공식 취약점 분석·평가를 대체하지
 > 않습니다.
 
@@ -142,7 +142,8 @@ DISA STIG 규칙 id, 65개가 NIST SP 800-53 통제 id, 69개가 CIS 벤치마�
 항목이어야 합니다). 3D-1단계부터는 같은 수집기 위에서 프로파일(`check --profile`)이 컨트롤과
 파라미터를 고르며, 3D-1b부터는 내장 셋 `cis-ubuntu2204-l1`, `cis-ubuntu2404-l1`,
 `cis-rhel9-l1`이 그 벤치마크의 Level 1 – Server 권고를 싣는 컨트롤을 고릅니다
-(`muster check --facts snap.json --profile cis-ubuntu2204-l1`). `cis-<distro>-l1` 프로파일은 Level 1 – Server의 CIS Benchmark 권고 번호를 싣는 muster 자신의
+(`muster check --facts snap.json --profile cis-ubuntu2204-l1`).
+`cis-<distro>-l1` 프로파일은 Level 1 – Server의 CIS Benchmark 권고 번호를 싣는 muster 자신의
 컨트롤을 고릅니다. 그 결과는 muster 컨트롤에 대한 muster의 판정이지 CIS 평가가 아니며, muster는
 Center for Internet Security가 허가·후원하거나 달리 승인하지 않은 독립 발행물입니다. 권고 번호는
 ComplianceAsCode의 공개 컨트롤 파일(BSD-3-Clause; NOTICE 참고)로부터 `tools/cisindex`가
@@ -208,7 +209,7 @@ CIS나 STIG 준수 여부를 인증하지 않습니다. 컨트롤이 인용할 �
    3C-2b(병합): 노출 — 모든 리스닝 소켓의 소유자와 패키지, 삭제된 바이너리로 도는
    프로세스, 접힌 방화벽 규칙 표에 대한 노출 교차 판정, 네트워크 sysctl — 컨트롤 열셋.
    3D-1b(병합): CIS 권고 번호 색인 위의 Ubuntu 22.04, Ubuntu 24.04, RHEL 9 계열
-   `cis-<배포판>-l1` 프로파일(고르는 모든 컨트롤에 `references.cis`). 다음: 3D-3
+   `cis-<distro>-l1` 프로파일(고르는 모든 컨트롤에 `references.cis`). 다음: 3D-3
    (`--anonymize`, `--max-age`).
    `kisa-unix-2026`이 기본 프로파일로 남습니다.
 4. **공개 릴리스.** 스냅샷 diff, SARIF, 한/영 문서, SBOM이 붙은 서명·재현 빌드,

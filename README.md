@@ -5,7 +5,7 @@
 **Does this Linux server pass muster?** `muster` collects the facts of a host as
 root, then evaluates them — offline, from the snapshot alone — against the Unix
 server items (U-xx) of the KISA technical vulnerability assessment guide for
-critical information infrastructure, with CIS Benchmark, DISA STIG and NIST SP
+critical information infrastructure, with CIS Benchmarks®, DISA STIG and NIST SP
 800-53 numbers attached as cross-references where a mapping is filed.
 
 In Korean security practice this kind of check is called a CCE assessment
@@ -14,17 +14,18 @@ the Linux server asset class: KISA is the primary standard, and global
 benchmarks (CIS Benchmarks, DISA STIG, NIST SP 800-53) are attached as
 references and, later, offered as selectable profiles.
 
-> **Status: stage 3D-2d merged (October 2026).** Stage 1 — the skeleton:
+> **Status: stage 3D-1b merged (October 2026).** Stage 1 — the skeleton:
 > `collect`, `check`, waivers, exit codes, eight controls end to end — stage 2
 > — every automatable KISA item, from the foundations with DISA STIG and NIST
 > SP 800-53 references through accounts, PAM, sshd, home directories, system
 > files, services, the firewall, logging, NFS, SNMP, patch hygiene, FTP, mail
 > and DNS to the closing coverage-and-reference gate — and stages 3A, 3B,
-> 3C-1, 3C-2a, 3C-2b, 3D-1, 3D-2, 3D-2b, 3D-2c and 3D-2d — the deep filesystem walk, the first checks
+> 3C-1, 3C-2a, 3C-2b, 3D-1, 3D-2, 3D-2b, 3D-2c, 3D-2d and 3D-1b — the deep filesystem walk, the first checks
 > beyond the guide, audit pipeline health and package integrity, who holds
 > root's power without being root, exposure, profiles and tuning, and the
 > `fix --dry-run` review script, its proof on real hosts and scripts for the
-> controls beyond the first sixteen, the audit family and what a file says — are merged. 67 of the 67 items are enrolled (68 controls:
+> controls beyond the first sixteen, the audit family and what a file says, and the
+> CIS Level 1 profiles over an index of recommendation numbers — are merged. 67 of the 67 items are enrolled (68 controls:
 > 57 auto, 7 partial, 4 manual with the evidence attached),
 > and 49 beyond the guide. `collect --deep`
 > walks the local filesystems once, under a time and entry budget, without
@@ -48,7 +49,7 @@ references and, later, offered as selectable profiles.
 > The remaining stage-3 and stage-4 items below are the plan, not a promise.
 
 > **Not affiliated.** muster is an unofficial personal project. It is not
-> endorsed by KISA or by the Center for Internet Security, it contains no CIS
+> endorsed by KISA or by the Center for Internet Security® (CIS), it contains no CIS
 > Benchmark text (only recommendation numbers), it does not claim any level of
 > CIS compliance, and it does not replace an official vulnerability assessment.
 
@@ -164,7 +165,8 @@ every citation must name a real item). Since stage 3D-1 a profile (`check --prof
 selects controls and parameters from the same collector, and since 3D-1b three built-ins,
 `cis-ubuntu2204-l1`, `cis-ubuntu2404-l1` and `cis-rhel9-l1`, select the controls that
 carry a Level 1 – Server recommendation of their benchmark
-(`muster check --facts snap.json --profile cis-ubuntu2204-l1`). The `cis-<distro>-l1` profiles select muster's own controls that carry a CIS
+(`muster check --facts snap.json --profile cis-ubuntu2204-l1`).
+The `cis-<distro>-l1` profiles select muster's own controls that carry a CIS
 Benchmark recommendation number at Level 1 – Server; their results are
 muster's verdicts on muster's controls, not a CIS assessment, and muster is an
 independent publication not authorized, sponsored or otherwise approved by the
