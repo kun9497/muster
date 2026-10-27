@@ -367,3 +367,18 @@ func TestRenderProfileParsesAsAProfile(t *testing.T) {
 		t.Errorf("empty profile:\n%s %v", empty, err)
 	}
 }
+
+func TestBuildRefusesAnEnvWithoutFunctions(t *testing.T) {
+	src := fixture()
+	for name, mut := range map[string]func(*Env){
+		"Check":     func(e *Env) { e.Check = nil },
+		"ParamType": func(e *Env) { e.ParamType = nil },
+	} {
+		env := testEnv()
+		mut(&env)
+		ix, p, err := Build(bench(src), unionOf(src), nil, nil, env)
+		if err == nil || !strings.Contains(err.Error(), name) || ix != nil || p != nil {
+			t.Errorf("%s nil: got %v %v %v", name, ix, p, err)
+		}
+	}
+}

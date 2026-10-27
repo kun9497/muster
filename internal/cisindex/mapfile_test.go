@@ -113,3 +113,13 @@ func TestCheckReviewProfiles(t *testing.T) {
 		t.Fatalf("unknown profile: %v", err)
 	}
 }
+
+func TestDecodeMapReportsTheFirstBadProductInSortedOrder(t *testing.T) {
+	doc := "- id: muster.a\n  rules: [x]\n  recs:\n    zz: [{rec: '', reason: r}]\n    aa: [{rec: '', reason: r}]\n    mm: [{rec: '', reason: r}]\n"
+	for i := 0; i < 20; i++ {
+		_, err := DecodeMap([]byte(doc))
+		if err == nil || !strings.Contains(err.Error(), "recs: aa:") {
+			t.Fatalf("run %d: error %v does not name product aa", i, err)
+		}
+	}
+}

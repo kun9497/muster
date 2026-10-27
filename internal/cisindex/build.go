@@ -60,6 +60,15 @@ func Build(b Benchmark, union map[string]bool, rows []MapRow, review []ReviewRow
 		fail("no source file")
 		return nil, nil, errors.Join(errs...)
 	}
+	if env.Check == nil {
+		fail("env.Check is nil")
+	}
+	if env.ParamType == nil {
+		fail("env.ParamType is nil")
+	}
+	if len(errs) > 0 {
+		return nil, nil, errors.Join(errs...)
+	}
 	entries := map[string]*Entry{}
 	for i := range b.Src.Entries {
 		entries[b.Src.Entries[i].ID] = &b.Src.Entries[i]

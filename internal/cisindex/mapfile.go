@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sort"
 
 	"gopkg.in/yaml.v3"
 )
@@ -85,7 +86,13 @@ func DecodeMap(data []byte) ([]MapRow, error) {
 			}
 			vars[v.Var] = true
 		}
-		for product, recs := range r.Recs {
+		products := make([]string, 0, len(r.Recs))
+		for product := range r.Recs {
+			products = append(products, product)
+		}
+		sort.Strings(products)
+		for _, product := range products {
+			recs := r.Recs[product]
 			if product == "" {
 				return nil, fmt.Errorf("map: %s: recs: with no product", r.ID)
 			}
