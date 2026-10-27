@@ -1,0 +1,3 @@
+# muster's built-in default: every control of the set (kisa-unix-2026 is its alias).
+profile: default
+include: ["muster.*"]

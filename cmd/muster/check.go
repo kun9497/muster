@@ -20,7 +20,8 @@ const checkUsage = `usage: muster check --facts <snapshot.json|-> [flags]
 flags:
   --format table|json        output format (default table)
   --waivers <file>           waiver file (reason mandatory, expiry optional)
-  --profile <name|path>      which controls to evaluate: a built-in (default, kisa-unix-2026)
+  --profile <name|path>      which controls to evaluate: a built-in (default, cis-rhel9-l1,
+                             cis-ubuntu2204-l1, cis-ubuntu2404-l1, kisa-unix-2026)
                              or a profile file (default: the built-in default)
   --tuning <file>            site parameter values, over the profile's and the controls' defaults
   --allow-error              compute the exit code from findings even when controls are ERROR
@@ -28,7 +29,15 @@ flags:
   --quiet                    hide PASS, NOT_APPLICABLE, WAIVED and MANUAL rows
   --all                      show every failing observation
   --color auto|always|never  colour (default auto); --no-color = never
-`
+
+` + cisDisclaimer + "\n"
+
+// cisDisclaimer is CB-13's sentence, in the words README.md, NOTICE and
+// ATTRIBUTION.md carry; check's usage names the CIS built-ins, so it says it.
+const cisDisclaimer = "The `cis-<distro>-l1` profiles select muster's own controls that carry a CIS Benchmark " +
+	"recommendation number at Level 1 – Server; their results are muster's verdicts on muster's controls, not a CIS " +
+	"assessment, and muster is an independent publication not authorized, sponsored or otherwise approved by the " +
+	"Center for Internet Security."
 
 type checkFlags struct {
 	facts, format, waivers, failOn, color string
@@ -243,6 +252,8 @@ func runCheck(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "muster: %v\n", err)
 		return exitError
 	}
+	// CB-11: a CIS profile on a host its benchmark does not cover still evaluates; stderr says so.
+	hostWarning(sel.Profile.Extends, snap.Run.Host.OSRelease, warn)
 	wf, err := loadWaivers(f.waivers)
 	if err != nil {
 		fmt.Fprintf(stderr, "muster: %v\n", err)

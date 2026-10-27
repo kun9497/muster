@@ -28,6 +28,9 @@ lint:
 lint-controls:
 	go run $(PKG) controls lint --references docs/reference
 	go run $(PKG) controls lint --references docs/reference --profile default
+	go run $(PKG) controls lint --references docs/reference --profile cis-ubuntu2204-l1
+	go run $(PKG) controls lint --references docs/reference --profile cis-ubuntu2404-l1
+	go run $(PKG) controls lint --references docs/reference --profile cis-rhel9-l1
 
 coverage:
 	go run ./tools/coverage

@@ -269,6 +269,15 @@ func runControls(args []string, stdout, stderr io.Writer) int {
 				fmt.Fprintf(stderr, "muster: %v\n", err)
 				return exitError
 			}
+			// Y-1 (CB-10): a profile rooted in a CIS built-in selects only
+			// controls that carry a reference on its benchmark.
+			if cis := lintCISProfile(sel, refIndex); len(cis) > 0 {
+				for _, p := range cis {
+					fmt.Fprintln(stderr, p)
+				}
+				fmt.Fprintf(stderr, "muster: %d lint problem(s)\n", len(cis))
+				return exitError
+			}
 			fmt.Fprintf(stdout, "ok: profile %s selects %d of %d controls, %d excluded\n", sel.Profile.Name, sel.Profile.Selected, len(set.Controls), sel.Profile.Excluded)
 		}
 		return exitOK

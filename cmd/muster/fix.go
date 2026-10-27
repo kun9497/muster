@@ -18,7 +18,9 @@ const fixUsage = `usage: muster fix --dry-run --facts <snapshot.json|-> [flags]
 flags:
   --format table|json|script   output format (default table)
   --waivers <file>             waiver file, as check
-  --profile <name|path>        the profile in force, as check (default: the built-in default)
+  --profile <name|path>        the profile in force, as check: a built-in (default, cis-rhel9-l1,
+                               cis-ubuntu2204-l1, cis-ubuntu2404-l1, kisa-unix-2026) or a profile
+                               file (default: the built-in default)
   --tuning <file>              site parameter values, as check
   --max-risk none|restart_service|reboot_required|lockout_risk
                                the highest risk the script will run (default lockout_risk: everything)
@@ -142,6 +144,8 @@ func runFix(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "muster: %v\n", err)
 		return exitError
 	}
+	// CB-11: a CIS profile on a host its benchmark does not cover still evaluates; stderr says so.
+	hostWarning(sel.Profile.Extends, snap.Run.Host.OSRelease, warn)
 	wf, err := loadWaivers(f.waivers)
 	if err != nil {
 		fmt.Fprintf(stderr, "muster: %v\n", err)
