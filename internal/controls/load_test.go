@@ -18,7 +18,7 @@ func TestLoadFSDecodesEveryField(t *testing.T) {
 	if !ok {
 		t.Fatal("control not loaded")
 	}
-	if c.Importance != "상" || c.Automation != "auto" || c.References.KISA["2026"][0] != "U-01" || c.References.CIS[0].Rec != "5.1.20" {
+	if c.Importance != "상" || c.Automation != "auto" || c.References.KISA["2026"][0] != "U-01" || c.References.CIS[0].Rec != "1.1.1" {
 		t.Errorf("scalar fields: %+v", c)
 	}
 	if len(c.AppliesWhen) != 1 || c.AppliesWhen[0].Fact != "services.ssh.installed" {

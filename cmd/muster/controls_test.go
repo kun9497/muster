@@ -192,7 +192,7 @@ func TestControlsLintRejectsAnUnknownFlag(t *testing.T) {
 // cross-check needs, and a missing directory is an error the way a missing
 // fixture directory is (R35), never a silently skipped rule.
 func TestControlsLintNotesAndKisaFlag(t *testing.T) {
-	const shapeOnlyNote = "note: stig and nist_800_53 references checked for shape only; pass --references docs/reference to check them against the index"
+	const shapeOnlyNote = "note: stig, nist_800_53 and cis references checked for shape only; pass --references docs/reference to check them against the index"
 
 	var out, errb bytes.Buffer
 	if code := runControls([]string{"lint", "--fixtures", repoFixtures, "--kisa", repoKisa}, &out, &errb); code != exitOK {

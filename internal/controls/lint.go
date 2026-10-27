@@ -10,8 +10,12 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/kun9497/muster/internal/cisindex"
 	"github.com/kun9497/muster/internal/facts"
 )
+
+// cisBenchmarkRE is the shape of a CIS benchmark name in references.cis.
+var cisBenchmarkRE = regexp.MustCompile(`^[a-z0-9]+$`)
 
 // Problem is one lint finding. Rule is a stable name CI can match on.
 type Problem struct {
@@ -474,9 +478,32 @@ func Lint(s *Set, reg *facts.Registry, opts LintOptions) []Problem {
 				add("evidence", "evidence key %q is not registered", k)
 			}
 		}
+		seenCIS := map[string]bool{}
 		for _, r := range c.References.CIS {
-			if r.Benchmark == "" || r.Version == "" || r.Rec == "" {
+			switch {
+			case r.Benchmark == "" || r.Version == "" || r.Rec == "":
 				add("references_cis", "cis references need benchmark, version and rec")
+			case !cisBenchmarkRE.MatchString(r.Benchmark):
+				add("references_cis", "cis reference benchmark %q must look like ubuntu2204", r.Benchmark)
+			case !cisindex.ValidRec(r.Rec):
+				add("references_cis", "cis reference rec %q must look like 5.1.20", r.Rec)
+			case opts.References != nil:
+				product, alias, ok := opts.References.CISProduct(r.Benchmark)
+				switch {
+				case !ok:
+					add("references_cis", "cis benchmark %q is not in %s", r.Benchmark, filepath.Join(opts.References.Dir, "cis"))
+				case alias:
+					add("references_cis", "cis benchmark %s is an alias of %s; write %s", r.Benchmark, product, product)
+				case !opts.References.HasCIS(product, r.Version, r.Rec):
+					add("references_cis", "cis reference %s@%s %s is not in %s", r.Benchmark, r.Version, r.Rec, filepath.Join(opts.References.Dir, "cis"))
+				}
+			}
+			if r.Benchmark != "" && r.Version != "" && r.Rec != "" {
+				k := r.Benchmark + "|" + r.Version + "|" + r.Rec
+				if seenCIS[k] {
+					add("references_cis", "cis reference %s@%s %s is listed twice", r.Benchmark, r.Version, r.Rec)
+				}
+				seenCIS[k] = true
 			}
 		}
 		for _, r := range c.References.STIG {

@@ -51,7 +51,7 @@ importance: 상
 automation: auto
 references:
   kisa: { "2026": ["U-01"] }
-  cis: [{ benchmark: ubuntu-22.04, version: "2.0.0", rec: "5.1.20" }]
+  cis: [{ benchmark: mini, version: "1.0.0", rec: "1.1.1" }]
 requires_facts: ">=1"
 absent_means: not_applicable
 params:
@@ -337,7 +337,7 @@ importance: 상
 automation: manual
 manual_reason: r
 requires_facts: ">=1"
-references: { cis: [{ benchmark: ubuntu-22.04, version: "2.0.0" }] }
+references: { cis: [{ benchmark: mini, version: "1.0.0" }] }
 `, "references_cis", "", false},
 		{"unknown custom func", `id: muster.account.x
 title_en: t
@@ -1345,6 +1345,56 @@ func TestLintSetAllowsSharedRemediation(t *testing.T) {
 			if p.Rule == "backup_path_shared" || p.Rule == "units_shared" {
 				t.Errorf("%s: %v", c.name, p)
 			}
+		}
+	}
+}
+
+func TestLintReferencesCIS(t *testing.T) {
+	x, err := LoadReferenceIndex("testdata/refs")
+	if err != nil {
+		t.Fatal(err)
+	}
+	withCIS := func(entries string) string {
+		return strings.Replace(goodControl, `cis: [{ benchmark: mini, version: "1.0.0", rec: "1.1.1" }]`, "cis: "+entries, 1)
+	}
+	idx := filepath.Join("testdata/refs", "cis")
+	cases := []struct {
+		name    string
+		entries string
+		index   bool
+		want    string // exact message, "" for none
+	}{
+		{"valid", `[{ benchmark: mini, version: "1.0.0", rec: "1.1.1" }]`, true, ""},
+		{"valid without index", `[{ benchmark: mini, version: "1.0.0", rec: "1.1.1" }]`, false, ""},
+		{"missing field", `[{ benchmark: mini, version: "1.0.0" }]`, true, "cis references need benchmark, version and rec"},
+		{"bad benchmark shape", `[{ benchmark: ubuntu-22.04, version: "1.0.0", rec: "1.1.1" }]`, false, `cis reference benchmark "ubuntu-22.04" must look like ubuntu2204`},
+		{"bad rec shape", `[{ benchmark: mini, version: "1.0.0", rec: "x.1" }]`, false, `cis reference rec "x.1" must look like 5.1.20`},
+		{"duplicate", `[{ benchmark: mini, version: "1.0.0", rec: "1.1.1" }, { benchmark: mini, version: "1.0.0", rec: "1.1.1" }]`, false, "cis reference mini@1.0.0 1.1.1 is listed twice"},
+		{"alias", `[{ benchmark: minialias, version: "1.0.0", rec: "1.1.1" }]`, true, "cis benchmark minialias is an alias of mini; write mini"},
+		{"unknown benchmark", `[{ benchmark: nope, version: "1.0.0", rec: "1.1.1" }]`, true, `cis benchmark "nope" is not in ` + idx},
+		{"unknown version", `[{ benchmark: mini, version: "9.9.9", rec: "1.1.1" }]`, true, "cis reference mini@9.9.9 1.1.1 is not in " + idx},
+		{"unknown rec", `[{ benchmark: mini, version: "1.0.0", rec: "7.7" }]`, true, "cis reference mini@1.0.0 7.7 is not in " + idx},
+		{"unknown benchmark without index", `[{ benchmark: nope, version: "1.0.0", rec: "1.1.1" }]`, false, ""},
+	}
+	for _, c := range cases {
+		opts := LintOptions{}
+		if c.index {
+			opts.References = x
+		}
+		var got []string
+		for _, p := range lintOne(t, withCIS(c.entries), opts) {
+			if p.Rule == "references_cis" {
+				got = append(got, p.Message)
+			}
+		}
+		if c.want == "" {
+			if len(got) != 0 {
+				t.Errorf("%s: want no references_cis problem, got %v", c.name, got)
+			}
+			continue
+		}
+		if len(got) != 1 || got[0] != c.want {
+			t.Errorf("%s: want [%s], got %v", c.name, c.want, got)
 		}
 	}
 }

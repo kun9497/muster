@@ -22,8 +22,8 @@ const controlsUsage = `usage: muster controls <lint|list|new> [flags]
 
 flags (lint):
   --fixtures <dir>     directory holding the control fixtures (default controls/testdata)
-  --references <dir>   directory holding the generated STIG/NIST reference index (dir/stig/*.json,
-                        see docs/reference); without this flag, stig and nist_800_53 references are
+  --references <dir>   directory holding the generated STIG/NIST/CIS reference index (dir/stig/*.json,
+                        dir/cis/*.json, see docs/reference); without this flag, stig, nist_800_53 and cis references are
                         checked for shape only, never for existence in the index; with it, every id
                         must exist in the index
   --kisa <dir>         directory holding the KISA item inventory (default docs/reference/kisa); every
@@ -125,10 +125,10 @@ const scaffoldHeader = `# Scaffolded by "muster controls new". Every TODO below 
 const fixtureStub = `{"synthetic": true, "schema_version": 1, "run": {}, "facts": {}, "_expect": {}}
 `
 
-// shapeOnlyNote tells the reader that the stig and nist_800_53 ids in this
+// shapeOnlyNote tells the reader that the stig, nist_800_53 and cis ids in this
 // run were checked for shape only. Without it a clean lint reads as though
 // every id had been verified against the index (M-4).
-const shapeOnlyNote = "note: stig and nist_800_53 references checked for shape only; pass --references docs/reference to check them against the index"
+const shapeOnlyNote = "note: stig, nist_800_53 and cis references checked for shape only; pass --references docs/reference to check them against the index"
 
 // usageNote renders the fact-key report of spec §11 as the one line lint
 // prints: how many registered keys a control reads, how many the engine
