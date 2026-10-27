@@ -7,6 +7,25 @@ category: beyond
 importance: 하
 automation: auto
 references:
+  cis:
+    - { benchmark: rhel9, version: "2.0.0", rec: "1.1.1.1" }
+    - { benchmark: rhel9, version: "2.0.0", rec: "1.1.1.2" }
+    - { benchmark: rhel9, version: "2.0.0", rec: "1.1.1.3" }
+    - { benchmark: rhel9, version: "2.0.0", rec: "1.1.1.4" }
+    - { benchmark: rhel9, version: "2.0.0", rec: "1.1.1.5" }
+    - { benchmark: rhel9, version: "2.0.0", rec: "1.1.1.7" }
+    - { benchmark: ubuntu2204, version: "2.0.0", rec: "1.1.1.1" }
+    - { benchmark: ubuntu2204, version: "2.0.0", rec: "1.1.1.2" }
+    - { benchmark: ubuntu2204, version: "2.0.0", rec: "1.1.1.3" }
+    - { benchmark: ubuntu2204, version: "2.0.0", rec: "1.1.1.4" }
+    - { benchmark: ubuntu2204, version: "2.0.0", rec: "1.1.1.5" }
+    - { benchmark: ubuntu2204, version: "2.0.0", rec: "1.1.1.7" }
+    - { benchmark: ubuntu2404, version: "1.0.0", rec: "1.1.1.1" }
+    - { benchmark: ubuntu2404, version: "1.0.0", rec: "1.1.1.2" }
+    - { benchmark: ubuntu2404, version: "1.0.0", rec: "1.1.1.3" }
+    - { benchmark: ubuntu2404, version: "1.0.0", rec: "1.1.1.4" }
+    - { benchmark: ubuntu2404, version: "1.0.0", rec: "1.1.1.5" }
+    - { benchmark: ubuntu2404, version: "1.0.0", rec: "1.1.1.8" }
   stig:
     - { benchmark: rhel9, version: V2R9, id: RHEL-09-231195 }
   nist_800_53: ["CM-7"]

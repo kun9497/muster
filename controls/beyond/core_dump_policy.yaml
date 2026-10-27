@@ -7,6 +7,11 @@ category: beyond
 importance: 중
 automation: partial
 references:
+  cis:
+    - { benchmark: rhel9, version: "2.0.0", rec: "1.5.3" }
+    - { benchmark: rhel9, version: "2.0.0", rec: "1.5.4" }
+    - { benchmark: ubuntu2204, version: "2.0.0", rec: "1.5.3" }
+    - { benchmark: ubuntu2404, version: "1.0.0", rec: "1.5.3" }
   stig:
     - { benchmark: rhel9, version: V2R9, id: RHEL-09-213040 }
     - { benchmark: rhel9, version: V2R9, id: RHEL-09-213085 }

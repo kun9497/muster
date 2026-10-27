@@ -8,6 +8,10 @@ importance: 상
 automation: partial
 references:
   kisa: { "2026": ["U-64"], "2021": ["U-42"] }
+  cis:
+    - { benchmark: rhel9, version: "2.0.0", rec: "1.2.2.1" }
+    - { benchmark: ubuntu2204, version: "2.0.0", rec: "1.2.2.1" }
+    - { benchmark: ubuntu2404, version: "1.0.0", rec: "1.2.2.1" }
   stig:
     - { benchmark: rhel9, version: V2R9, id: RHEL-09-211015 }
 requires_facts: ">=1"

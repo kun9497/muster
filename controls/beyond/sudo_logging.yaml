@@ -6,7 +6,12 @@ description_ko: sudo 는 관리자 자신의 계정이 root 가 되는 통로이
 category: beyond
 importance: 중
 automation: auto
-references: { nist_800_53: ["AU-3"] }
+references:
+  cis:
+    - { benchmark: rhel9, version: "2.0.0", rec: "5.2.3" }
+    - { benchmark: ubuntu2204, version: "2.0.0", rec: "5.2.3" }
+    - { benchmark: ubuntu2404, version: "1.0.0", rec: "5.2.3" }
+  nist_800_53: ["AU-3"]
 requires_facts: ">=1"
 applies_when:
   - { fact: env.container, op: eq, expected: none }

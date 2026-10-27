@@ -7,6 +7,10 @@ category: file
 importance: 상
 automation: auto
 references:
+  cis:
+    - { benchmark: rhel9, version: "2.0.0", rec: "7.1.12" }
+    - { benchmark: ubuntu2204, version: "2.0.0", rec: "7.1.12" }
+    - { benchmark: ubuntu2404, version: "1.0.0", rec: "7.1.12" }
   kisa:
     "2021":
       - U-06

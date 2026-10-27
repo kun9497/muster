@@ -8,6 +8,10 @@ importance: 하
 automation: auto
 references:
   kisa: { "2026": ["U-09"], "2021": ["U-51"] }
+  cis:
+    - { benchmark: rhel9, version: "2.0.0", rec: "7.2.3" }
+    - { benchmark: ubuntu2204, version: "2.0.0", rec: "7.2.3" }
+    - { benchmark: ubuntu2404, version: "1.0.0", rec: "7.2.3" }
 requires_facts: ">=1"
 absent_means: fail
 checks:

@@ -6,7 +6,10 @@ description_ko: fs.suid_dumpable 은 0 이어야 하며, 그래야 setuid·setgi
 category: beyond
 importance: 중
 automation: auto
-references: {}
+references:
+  cis:
+    - { benchmark: ubuntu2204, version: "2.0.0", rec: "1.5.3" }
+    - { benchmark: ubuntu2404, version: "1.0.0", rec: "1.5.3" }
 requires_facts: ">=1"
 applies_when:
   - { fact: env.container, op: eq, expected: none }

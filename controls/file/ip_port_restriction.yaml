@@ -8,6 +8,13 @@ importance: 상
 automation: auto
 references:
   kisa: { "2026": ["U-28"], "2021": ["U-18"] }
+  cis:
+    - { benchmark: ubuntu2204, version: "2.0.0", rec: "4.1.7" }
+    - { benchmark: ubuntu2204, version: "2.0.0", rec: "4.2.8" }
+    - { benchmark: ubuntu2204, version: "2.0.0", rec: "4.3.2.1" }
+    - { benchmark: ubuntu2404, version: "1.0.0", rec: "4.2.7" }
+    - { benchmark: ubuntu2404, version: "1.0.0", rec: "4.3.8" }
+    - { benchmark: ubuntu2404, version: "1.0.0", rec: "4.4.2.1" }
 requires_facts: ">=1"
 absent_means: manual
 applies_when:
