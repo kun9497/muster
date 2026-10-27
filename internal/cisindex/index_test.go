@@ -58,3 +58,18 @@ func TestDecodeIndexIsStrict(t *testing.T) {
 		t.Errorf("good refused: %v", err)
 	}
 }
+
+func TestRenderIndexSpellsNilListsEmpty(t *testing.T) {
+	ix := sampleIndex()
+	ix.Recs[0].Levels, ix.Recs[0].Controls = nil, nil
+	out, err := RenderIndex(ix)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(out), "null") || strings.Count(string(out), "[]") != 3 {
+		t.Fatalf("render:\n%s", out)
+	}
+	if ix.Recs[0].Levels != nil {
+		t.Error("RenderIndex modified its input")
+	}
+}

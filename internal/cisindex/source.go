@@ -87,6 +87,7 @@ func DecodeControls(data []byte) (*Source, error) {
 		return nil, fmt.Errorf("control file: no version")
 	}
 	src := &Source{Version: raw.Version}
+	ids := map[string]bool{}
 	for i, c := range raw.Controls {
 		if c.ID == "" {
 			return nil, fmt.Errorf("control file: entry %d has no id", i)
@@ -94,12 +95,19 @@ func DecodeControls(data []byte) (*Source, error) {
 		if !ValidRec(c.ID) {
 			continue
 		}
+		if ids[c.ID] {
+			return nil, fmt.Errorf("control file: entry %s appears twice", c.ID)
+		}
+		ids[c.ID] = true
 		e := Entry{ID: c.ID, Levels: c.Levels}
 		seen := map[string]bool{}
 		for _, r := range c.Rules {
 			if v, val, ok := strings.Cut(r, "="); ok {
-				if v == "" {
-					return nil, fmt.Errorf("control %s: rule element %q has no variable", c.ID, r)
+				if !ValidRuleID(v) {
+					return nil, fmt.Errorf("control %s: rule element %q: variable %q is not a variable name", c.ID, r, v)
+				}
+				if val == "" {
+					return nil, fmt.Errorf("control %s: rule element %q selects no value", c.ID, r)
 				}
 				e.Selections = append(e.Selections, Selection{Var: v, Value: val})
 				continue

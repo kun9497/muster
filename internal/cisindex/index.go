@@ -49,11 +49,21 @@ type Index struct {
 }
 
 // RenderIndex is the index's canonical bytes: two-space indent, trailing
-// newline, a nil AppliesTo spelled [].
+// newline, a nil AppliesTo, row Levels or row Controls spelled [].
 func RenderIndex(ix *Index) ([]byte, error) {
 	c := *ix
 	if c.AppliesTo == nil {
 		c.AppliesTo = []string{}
+	}
+	c.Recs = make([]Row, len(ix.Recs))
+	for i, r := range ix.Recs {
+		if r.Levels == nil {
+			r.Levels = []string{}
+		}
+		if r.Controls == nil {
+			r.Controls = []string{}
+		}
+		c.Recs[i] = r
 	}
 	b, err := json.MarshalIndent(&c, "", "  ")
 	if err != nil {

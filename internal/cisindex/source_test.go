@@ -146,3 +146,21 @@ func TestHasLevelAndRuleUnion(t *testing.T) {
 		t.Errorf("union %v", u)
 	}
 }
+
+func TestDecodeControlsRefusesDuplicateIDs(t *testing.T) {
+	_, err := DecodeControls([]byte("version: v1\ncontrols:\n  - id: '1.2'\n  - id: 1.3\n  - id: '1.2'\n"))
+	if err == nil || !strings.Contains(err.Error(), "1.2") {
+		t.Fatalf("duplicate id: %v", err)
+	}
+}
+
+func TestDecodeControlsRefusesBadSelections(t *testing.T) {
+	for _, bad := range []string{`"A=1"`, `"a b=1"`, `"x="`, `"-x=1"`} {
+		if _, err := DecodeControls([]byte("version: v1\ncontrols:\n  - id: '1.2'\n    rules: [" + bad + "]\n")); err == nil {
+			t.Errorf("selection %s accepted", bad)
+		}
+	}
+	if _, err := DecodeControls([]byte("version: v1\ncontrols:\n  - id: '1.2'\n    rules: [var_x=a=b]\n")); err != nil {
+		t.Errorf("a value holding = refused: %v", err)
+	}
+}
