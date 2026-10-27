@@ -295,6 +295,10 @@ func (t cisTable) cell(id string) string {
 
 // renderCIS is one line per benchmark in product order; nothing without an
 // index. It states counts only: no percentage, no score (CB-6).
+// cisMapNote says what the CIS section counts: muster's map, not a profile's
+// selection, which drops the controls review.yaml names (CB-7).
+const cisMapNote = "The counts below and the CIS recs cells cover muster's map of controls to recommendations (`docs/reference/cis/map.yaml`); each `cis-<product>-l1` profile drops the controls `docs/reference/cis/review.yaml` names."
+
 func renderCIS(cis []*cisindex.Index) string {
 	if len(cis) == 0 {
 		return ""
@@ -303,6 +307,7 @@ func renderCIS(cis []*cisindex.Index) string {
 	sort.Slice(sorted, func(i, j int) bool { return sorted[i].Product < sorted[j].Product })
 	var b strings.Builder
 	b.WriteString("\n## CIS Benchmarks\n\n")
+	b.WriteString(cisMapNote + "\n\n")
 	for _, ix := range sorted {
 		ctl := map[string]bool{}
 		rows := 0

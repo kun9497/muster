@@ -172,6 +172,8 @@
 
 ## CIS Benchmarks
 
+The counts below and the CIS recs cells cover muster's map of controls to recommendations (`docs/reference/cis/map.yaml`); each `cis-<product>-l1` profile drops the controls `docs/reference/cis/review.yaml` names.
+
 - 59 controls map 81 of 235 Level 1 – Server recommendations (CIS Red Hat Enterprise Linux 9 Benchmark v2.0.0, via ComplianceAsCode v0.1.82)
   On AlmaLinux and Rocky hosts the profile carries RHEL 9's coverage words and parameter values.
 - 63 controls map 85 of 240 Level 1 – Server recommendations (CIS Ubuntu Linux 22.04 LTS Benchmark v2.0.0, via ComplianceAsCode v0.1.82)
