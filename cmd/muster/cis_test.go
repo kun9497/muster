@@ -303,9 +303,10 @@ func TestControlsLintCISProfiles(t *testing.T) {
 		}
 	}
 	// A control whose rhel9 entries all sit off Level 1 – Server passes the
-	// shape-only rule and fails the indexed one.
+	// shape-only rule and fails the indexed one. The committed data may
+	// carry no such control; TestLintCISProfileLevelRule pins the rule on a
+	// synthetic index either way.
 	if offLevel == "" {
-		t.Log("no control carries a rhel9 reference off Level 1 – Server; the level case is not exercised")
 		return
 	}
 	if err := os.WriteFile(site, []byte("profile: site\nextends: cis-rhel9-l1\ninclude: ["+offLevel+"]\n"), 0o600); err != nil {
@@ -316,6 +317,58 @@ func TestControlsLintCISProfiles(t *testing.T) {
 	}
 	if code, _, errb := lintWithProfile(t, true, site); code != exitError || !strings.Contains(errb, "profile site selects "+offLevel+", which carries no rhel9 CIS reference at Level 1 – Server\n") {
 		t.Errorf("indexed, %s: exit %d, stderr %s", offLevel, code, errb)
+	}
+}
+
+// TestLintCISProfileLevelRule drives Y-1's indexed half from a synthetic
+// reference directory, so the Level 1 – Server check is exercised whatever
+// the committed index and map hold: a control whose only rhel9 entry is
+// Level 2 passes shape-only and fails with the index.
+func TestLintCISProfileLevelRule(t *testing.T) {
+	dir := t.TempDir()
+	stig := `{"product": "mini", "benchmark": "Mini STIG", "version": "V1R1", "rules": [{"stig_id": "MINI-00-000010", "nist": ["CM-6"]}]}`
+	cis := `{"product": "rhel9", "benchmark": "Synthetic", "version": "2.0.0",
+  "source": {"repo": "r", "tag": "t", "commit": "c", "path": "p", "sha256": "s"},
+  "counts": {"l1_server": 1},
+  "recs": [
+    {"rec": "1.1.1", "levels": ["l1_server", "l1_workstation"], "controls": ["muster.x.level1"], "rules": "all"},
+    {"rec": "2.1", "levels": ["l2_server", "l2_workstation"], "controls": ["muster.x.level2"], "rules": "all"}
+  ]}`
+	for name, body := range map[string]string{"stig/mini-v1r1.json": stig, "cis/rhel9-2.0.0.json": cis} {
+		p := filepath.Join(dir, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	idx, err := controls.LoadReferenceIndex(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ref := func(rec string) controls.References {
+		return controls.References{CIS: []controls.CISRef{{Benchmark: "rhel9", Version: "2.0.0", Rec: rec}}}
+	}
+	sel := &Selection{
+		Subset: &controls.Set{Controls: []controls.Control{
+			{ID: "muster.x.level1", References: ref("1.1.1")},
+			{ID: "muster.x.level2", References: ref("2.1")},
+			{ID: "muster.x.bare"},
+		}},
+	}
+	sel.Profile.Name = "site"
+	sel.Profile.Extends = []string{"builtin:cis-rhel9-l1", "/site.yaml"}
+	if got, want := lintCISProfile(sel, nil), []string{
+		"profile site selects muster.x.bare, which carries no rhel9 CIS reference",
+	}; !slices.Equal(got, want) {
+		t.Errorf("shape-only: got %q, want %q", got, want)
+	}
+	if got, want := lintCISProfile(sel, idx), []string{
+		"profile site selects muster.x.level2, which carries no rhel9 CIS reference at Level 1 – Server",
+		"profile site selects muster.x.bare, which carries no rhel9 CIS reference at Level 1 – Server",
+	}; !slices.Equal(got, want) {
+		t.Errorf("indexed: got %q, want %q", got, want)
 	}
 }
 
