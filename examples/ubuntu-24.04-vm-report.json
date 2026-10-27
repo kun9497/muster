@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
   "run": {
-    "muster_version": "ca08d60",
-    "commit": "ca08d60",
-    "controls_version": "kisa-unix-2026+2026.10.20",
-    "controls_digest": "sha256:ed4e6ebc66e5ad2c8ec0110ba5caee5ae2539df7d9d88100325eb5a7065cc51a",
+    "muster_version": "5bfae2a",
+    "commit": "5bfae2a",
+    "controls_version": "kisa-unix-2026+2026.10.27",
+    "controls_digest": "sha256:eb73ab574efab7e0a50e4e2f9d54091beecf896bfe01ab6d0fe7444d53301523",
     "guide_edition": "kisa-unix-2026",
-    "collected_at": "2026-10-21T02:03:16Z",
+    "collected_at": "2026-10-27T09:00:28Z",
     "host": {
       "hostname": "github-runner",
       "machine_id_hash": "399794935aded36b418e3630a41ef1d23f027811adf388b70d95a72238bc049b",
@@ -39,7 +39,7 @@
       {
         "name": "accounts",
         "status": "ok",
-        "ms": 1
+        "ms": 0
       },
       {
         "name": "audit",
@@ -55,17 +55,17 @@
       {
         "name": "boot",
         "status": "ok",
-        "ms": 14
+        "ms": 15
       },
       {
         "name": "coredump",
         "status": "ok",
-        "ms": 1
+        "ms": 0
       },
       {
         "name": "cron",
         "status": "ok",
-        "ms": 888,
+        "ms": 684,
         "cmd": "/usr/bin/systemctl list-unit-files --type=timer --no-legend --no-pager"
       },
       {
@@ -76,23 +76,23 @@
       {
         "name": "env",
         "status": "ok",
-        "ms": 9
+        "ms": 15
       },
       {
         "name": "files",
         "status": "ok",
-        "ms": 18
+        "ms": 14
       },
       {
         "name": "fim",
         "status": "ok",
-        "ms": 11,
+        "ms": 7,
         "cmd": "/usr/bin/systemctl list-timers --all --no-legend --no-pager"
       },
       {
         "name": "firewall",
         "status": "ok",
-        "ms": 13,
+        "ms": 31,
         "cmd": "/usr/sbin/nft list ruleset"
       },
       {
@@ -113,7 +113,7 @@
       {
         "name": "modules",
         "status": "ok",
-        "ms": 13
+        "ms": 27
       },
       {
         "name": "mounts",
@@ -139,18 +139,18 @@
       {
         "name": "pam",
         "status": "ok",
-        "ms": 2
+        "ms": 1
       },
       {
         "name": "patch",
         "status": "ok",
-        "ms": 3996,
+        "ms": 944,
         "cmd": "/usr/bin/apt-get -s upgrade -o Debug::NoLocking=1"
       },
       {
         "name": "pkgverify",
         "status": "ok",
-        "ms": 676645,
+        "ms": 445076,
         "cmd": "/usr/bin/rpm -Va"
       },
       {
@@ -161,13 +161,13 @@
       {
         "name": "processes",
         "status": "ok",
-        "ms": 161,
+        "ms": 107,
         "cmd": "/usr/bin/rpm -qa --qf [%{=NAME}\t%{FILEMODES:octal}\t%{FILEUSERNAME}\t%{FILEGROUPNAME}\t%|FILECAPS?{%{FILECAPS}}|\t%{FILENAMES}\n]"
       },
       {
         "name": "services",
         "status": "ok",
-        "ms": 322,
+        "ms": 236,
         "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState atftpd.service"
       },
       {
@@ -178,12 +178,12 @@
       {
         "name": "sockets",
         "status": "ok",
-        "ms": 12
+        "ms": 9
       },
       {
         "name": "sshd",
         "status": "ok",
-        "ms": 13,
+        "ms": 10,
         "cmd": "/usr/sbin/sshd -G"
       },
       {
@@ -199,24 +199,24 @@
       {
         "name": "sysctl",
         "status": "ok",
-        "ms": 2
+        "ms": 1
       },
       {
         "name": "timesync",
         "status": "ok",
-        "ms": 51,
+        "ms": 49,
         "cmd": "/usr/bin/timedatectl show-timesync --all"
       },
       {
         "name": "units",
         "status": "ok",
-        "ms": 56,
+        "ms": 37,
         "cmd": "/usr/bin/systemctl list-units --type=service --state=active --plain --no-legend"
       },
       {
         "name": "walk",
         "status": "ok",
-        "ms": 15998,
+        "ms": 14605,
         "cmd": "/usr/bin/rpm -qa --qf [%{=NAME}\t%{FILEMODES:octal}\t%{FILEUSERNAME}\t%{FILEGROUPNAME}\t%|FILECAPS?{%{FILECAPS}}|\t%{FILENAMES}\n]"
       }
     ],
@@ -229,11 +229,11 @@
     "partial_failures": []
   },
   "check": {
-    "muster_version": "ca08d60",
-    "commit": "ca08d60",
-    "controls_version": "kisa-unix-2026+2026.10.20",
-    "controls_digest": "sha256:ed4e6ebc66e5ad2c8ec0110ba5caee5ae2539df7d9d88100325eb5a7065cc51a",
-    "snapshot_digest": "sha256:41b449a55f79ed283c14a3f5635288434b23ae28f208a918be974e23176c9e67",
+    "muster_version": "5bfae2a",
+    "commit": "5bfae2a",
+    "controls_version": "kisa-unix-2026+2026.10.27",
+    "controls_digest": "sha256:eb73ab574efab7e0a50e4e2f9d54091beecf896bfe01ab6d0fe7444d53301523",
+    "snapshot_digest": "sha256:77dc4a8aba332470a232cc34fb298b2a5e08d1b6fe050af97216837717b99cd9",
     "guide_edition": "kisa-unix-2026",
     "profile": {
       "name": "default",
@@ -6300,7 +6300,7 @@
         {
           "fact": "patch.metadata_age_s",
           "status": "ok",
-          "value": 707037,
+          "value": 1250469,
           "source": {
             "kind": "file",
             "path": "/var/lib/apt/periodic/update-success-stamp"
@@ -7384,7 +7384,7 @@
         {
           "fact": "files.log_files",
           "status": "ok",
-          "value": "30 elements; none matching",
+          "value": "32 elements; none matching",
           "source": {
             "kind": "file",
             "path": "/var/log"
@@ -7393,7 +7393,7 @@
         {
           "fact": "files.log_files",
           "status": "ok",
-          "value": "30 elements; 3 selected",
+          "value": "32 elements; 3 selected",
           "source": {
             "kind": "file",
             "path": "/var/log"
@@ -11128,7 +11128,7 @@
               },
               {
                 "kind": "proc",
-                "path": "/proc/sys/net/ipv6/conf/enP21286s1/disable_ipv6"
+                "path": "/proc/sys/net/ipv6/conf/ens1/disable_ipv6"
               },
               {
                 "kind": "proc",
@@ -11201,7 +11201,7 @@
               },
               {
                 "kind": "proc",
-                "path": "/proc/sys/net/ipv6/conf/enP21286s1/disable_ipv6"
+                "path": "/proc/sys/net/ipv6/conf/ens1/disable_ipv6"
               },
               {
                 "kind": "proc",
@@ -11274,7 +11274,7 @@
               },
               {
                 "kind": "proc",
-                "path": "/proc/sys/net/ipv6/conf/enP21286s1/disable_ipv6"
+                "path": "/proc/sys/net/ipv6/conf/ens1/disable_ipv6"
               },
               {
                 "kind": "proc",
@@ -11346,7 +11346,7 @@
               },
               {
                 "kind": "proc",
-                "path": "/proc/sys/net/ipv6/conf/enP21286s1/disable_ipv6"
+                "path": "/proc/sys/net/ipv6/conf/ens1/disable_ipv6"
               },
               {
                 "kind": "proc",
@@ -11495,7 +11495,7 @@
         {
           "fact": "processes.deleted_executables",
           "status": "ok",
-          "value": "1 elements; matching: item:2085",
+          "value": "1 elements; matching: item:1849",
           "source": {
             "kind": "proc",
             "path": "/proc"
@@ -11504,9 +11504,9 @@
       ],
       "observations": [
         {
-          "subject": "item:2085",
+          "subject": "item:1849",
           "expected": "not gte 0",
-          "actual": 2085,
+          "actual": 1849,
           "verdict": "fail"
         }
       ],

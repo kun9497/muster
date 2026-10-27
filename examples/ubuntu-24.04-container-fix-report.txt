@@ -1,4 +1,4 @@
-muster ca08d60 · controls kisa-unix-2026+2026.10.20 · guide kisa-unix-2026 · host ubuntu-container · collected 2026-10-21T02:03:16Z
+muster 5bfae2a · controls kisa-unix-2026+2026.10.27 · guide kisa-unix-2026 · host ubuntu-container · collected 2026-10-27T09:00:28Z
 fix --dry-run · profile default (117 controls) · max-risk lockout_risk
 planned 10 (script 5, text only 5) · above max-risk 0 · waived 0 · clean 105 · not planned: error 0, manual 2, warn_degraded 0
 by risk: none 6 · restart_service 1 · reboot_required 0 · lockout_risk 3

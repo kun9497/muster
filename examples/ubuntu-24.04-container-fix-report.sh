@@ -1,7 +1,7 @@
 #!/bin/sh
 # shellcheck disable=SC2181
 # muster fix --dry-run: review before running. muster never runs this file.
-# snapshot: host ubuntu-container, collected 2026-10-21T02:03:16Z; controls kisa-unix-2026+2026.10.20 sha256:ed4e6ebc66e5ad2c8ec0110ba5caee5ae2539df7d9d88100325eb5a7065cc51a
+# snapshot: host ubuntu-container, collected 2026-10-27T09:00:28Z; controls kisa-unix-2026+2026.10.27 sha256:eb73ab574efab7e0a50e4e2f9d54091beecf896bfe01ab6d0fe7444d53301523
 # profile default (sha256:f4db63e671d12ad73cca111ca4132cb5459983bc32409b21c571067674bf9c78); max-risk lockout_risk
 # planned 10 (script 5, text only 5); above max-risk 0; not planned: error 0, manual 2, warn_degraded 0
 set -u
