@@ -141,7 +141,8 @@ DISA STIG 규칙 id, 65개가 NIST SP 800-53 통제 id, 69개가 CIS 벤치마�
 없습니다(U-23처럼 한 항목을 여러 컨트롤이 판정할 수는 있지만, 모든 인용은 실재하는
 항목이어야 합니다). 3D-1단계부터는 같은 수집기 위에서 프로파일(`check --profile`)이 컨트롤과
 파라미터를 고르며, 3D-1b부터는 내장 셋 `cis-ubuntu2204-l1`, `cis-ubuntu2404-l1`,
-`cis-rhel9-l1`이 그 벤치마크의 Level 1 – Server 권고를 싣는 컨트롤을 고릅니다
+`cis-rhel9-l1`이 그 벤치마크의 Level 1 – Server 권고를 싣는 컨트롤에서 커밋된 검토 목록
+(`docs/reference/cis/review.yaml`)을 뺀 것을 고릅니다
 (`muster check --facts snap.json --profile cis-ubuntu2204-l1`).
 `cis-<distro>-l1` 프로파일은 Level 1 – Server의 CIS Benchmark 권고 번호를 싣는 muster 자신의
 컨트롤을 고릅니다. 그 결과는 muster 컨트롤에 대한 muster의 판정이지 CIS 평가가 아니며, muster는

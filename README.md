@@ -164,7 +164,8 @@ mis-claimed (an item may be judged by more than one control, as U-23 is, but
 every citation must name a real item). Since stage 3D-1 a profile (`check --profile`)
 selects controls and parameters from the same collector, and since 3D-1b three built-ins,
 `cis-ubuntu2204-l1`, `cis-ubuntu2404-l1` and `cis-rhel9-l1`, select the controls that
-carry a Level 1 – Server recommendation of their benchmark
+carry a Level 1 – Server recommendation of their benchmark, minus a committed review
+list (`docs/reference/cis/review.yaml`)
 (`muster check --facts snap.json --profile cis-ubuntu2204-l1`).
 The `cis-<distro>-l1` profiles select muster's own controls that carry a CIS
 Benchmark recommendation number at Level 1 – Server; their results are
