@@ -11,7 +11,7 @@ LDFLAGS := -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.dat
 TIME    ?= 60s
 FUZZPKG ?= ./internal/collect/collectors/
 
-.PHONY: build test lint fmt tidy lint-controls coverage refindex refindex-check suidindex suidindex-check fuzz shellcheck examples-fetch clean
+.PHONY: build test lint fmt tidy lint-controls coverage refindex refindex-check cisindex cisindex-check suidindex suidindex-check fuzz shellcheck examples-fetch clean
 
 build:
 	CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)" -o bin/$(BINARY) $(PKG)
@@ -28,6 +28,9 @@ lint:
 lint-controls:
 	go run $(PKG) controls lint --references docs/reference
 	go run $(PKG) controls lint --references docs/reference --profile default
+	go run $(PKG) controls lint --references docs/reference --profile cis-ubuntu2204-l1
+	go run $(PKG) controls lint --references docs/reference --profile cis-ubuntu2404-l1
+	go run $(PKG) controls lint --references docs/reference --profile cis-rhel9-l1
 
 coverage:
 	go run ./tools/coverage
@@ -37,6 +40,12 @@ refindex:
 
 refindex-check:
 	go run ./tools/refindex -check
+
+cisindex:
+	go run ./tools/cisindex
+
+cisindex-check:
+	go run ./tools/cisindex -check
 
 # Needs a container runtime and the network; CI runs neither and reads the
 # committed docs/reference/suid/*.json instead.

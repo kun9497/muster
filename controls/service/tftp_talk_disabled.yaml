@@ -8,6 +8,9 @@ importance: 상
 automation: auto
 references:
   kisa: { "2026": ["U-44"], "2021": ["U-29"] }
+  cis:
+    - { benchmark: ubuntu2204, version: "2.0.0", rec: "2.1.16" }
+    - { benchmark: ubuntu2404, version: "1.0.0", rec: "2.1.16" }
   stig:
     - { benchmark: rhel9, version: "V2R9", id: "RHEL-09-215060" }
 requires_facts: ">=1"

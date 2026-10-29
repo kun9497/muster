@@ -3,132 +3,132 @@
 
 67 of 67 items enrolled; 68 controls (auto 57, partial 7, manual 4).
 
-| ID | Item (KISA) | Imp. | Control | Automation | Status |
-|---|---|---|---|---|---|
-| U-01 | root 계정 원격 접속 제한 | 상 | muster.account.root_remote_login | auto | enrolled |
-| U-02 | 비밀번호 관리정책 설정 | 상 | muster.account.password_policy | auto | enrolled |
-| U-03 | 계정 잠금 임계값 설정 | 상 | muster.account.lockout_threshold | auto | enrolled |
-| U-04 | 비밀번호 파일 보호 | 상 | muster.account.shadow_passwords | auto | enrolled |
-| U-05 | root 이외의 UID가 ‘0’ 금지 | 상 | muster.account.root_only_uid_zero | auto | enrolled |
-| U-06 | 사용자 계정 su 기능 제한 | 상 | muster.account.su_restricted | auto | enrolled |
-| U-07 | 불필요한 계정 제거 | 하 | muster.account.unnecessary_accounts | partial | enrolled |
-| U-08 | 관리자 그룹에 최소한의 계정 포함 | 중 | muster.account.admin_group_minimal | partial | enrolled |
-| U-09 | 계정이 존재하지 않는 GID 금지 | 하 | muster.account.primary_group_exists | auto | enrolled |
-| U-10 | 동일한 UID 금지 | 중 | muster.account.unique_uids | auto | enrolled |
-| U-11 | 사용자 Shell 점검 | 하 | muster.account.system_account_shells | auto | enrolled |
-| U-12 | 세션 종료 시간 설정 | 하 | muster.account.session_timeout | auto | enrolled |
-| U-13 | 안전한 비밀번호 암호화 알고리즘 사용 | 중 | muster.account.password_hash_algorithm | auto | enrolled |
-| U-14 | root 홈, 패스 디렉터리 권한 및 패스 설정 | 상 | muster.account.root_home_and_path | auto | enrolled |
-| U-15 | 파일 및 디렉터리 소유자 설정 | 상 | muster.file.unowned_files | auto | enrolled |
-| U-16 | /etc/passwd 파일 소유자 및 권한 설정 | 상 | muster.file.passwd_permissions | auto | enrolled |
-| U-17 | 시스템 시작 스크립트 권한 설정 | 상 | muster.file.startup_script_permissions | auto | enrolled |
-| U-18 | /etc/shadow 파일 소유자 및 권한 설정 | 상 | muster.file.shadow_permissions | auto | enrolled |
-| U-19 | /etc/hosts 파일 소유자 및 권한 설정 | 상 | muster.file.hosts_permissions | auto | enrolled |
-| U-20 | /etc/(x)inetd.conf 파일 소유자 및 권한 설정 | 상 | muster.file.inetd_conf_permissions | auto | enrolled |
-| U-21 | /etc/(r)syslog.conf 파일 소유자 및 권한 설정 | 상 | muster.file.syslog_conf_permissions | auto | enrolled |
-| U-22 | /etc/services 파일 소유자 및 권한 설정 | 상 | muster.file.services_permissions | auto | enrolled |
-| U-23 | SUID, SGID, Sticky bit 설정 파일 점검 | 상 | muster.file.suid_sgid | auto | enrolled |
-| U-23 | SUID, SGID, Sticky bit 설정 파일 점검 | 상 | muster.file.suid_sgid_unverified | partial | enrolled |
-| U-24 | 사용자, 시스템 환경변수 파일 소유자 및 권한 설정 | 상 | muster.file.env_file_permissions | auto | enrolled |
-| U-25 | world writable 파일 점검 | 상 | muster.file.world_writable | partial | enrolled |
-| U-26 | /dev에 존재하지 않는 device 파일 점검 | 상 | muster.file.dev_no_stale_files | auto | enrolled |
-| U-27 | $HOME/.rhosts, hosts.equiv 사용 금지 | 상 | muster.file.rhosts_forbidden | auto | enrolled |
-| U-28 | 접속 IP 및 포트 제한 | 상 | muster.file.ip_port_restriction | auto | enrolled |
-| U-29 | hosts.lpd 파일 소유자 및 권한 설정 | 하 | muster.file.hosts_lpd_permissions | auto | enrolled |
-| U-30 | UMASK 설정 관리 | 중 | muster.account.umask_policy | auto | enrolled |
-| U-31 | 홈 디렉토리 소유자 및 권한 설정 | 중 | muster.file.home_dir_permissions | auto | enrolled |
-| U-32 | 홈 디렉토리로 지정한 디렉토리의 존재 관리 | 중 | muster.file.home_dir_exists | auto | enrolled |
-| U-33 | 숨겨진 파일 및 디렉토리 검색 및 제거 | 하 | muster.file.hidden_entries | partial | enrolled |
-| U-34 | Finger 서비스 비활성화 | 상 | muster.service.finger_disabled | auto | enrolled |
-| U-35 | 공유 서비스에 대한 익명 접근 제한 설정 | 상 | muster.service.ftp_anonymous | auto | enrolled |
-| U-36 | r 계열 서비스 비활성화 | 상 | muster.service.rservices_disabled | auto | enrolled |
-| U-37 | crontab 설정파일 권한 설정 미흡 | 상 | muster.account.cron_permissions | auto | enrolled |
-| U-38 | DoS 공격에 취약한 서비스 비활성화 | 상 | muster.service.dos_services_disabled | auto | enrolled |
-| U-39 | 불필요한 NFS 서비스 비활성화 | 상 | muster.service.nfs_server_disabled | auto | enrolled |
-| U-40 | NFS 접근 통제 | 상 | muster.service.nfs_export_access | auto | enrolled |
-| U-41 | 불필요한 automountd 제거 | 상 | muster.service.automount_disabled | auto | enrolled |
-| U-42 | 불필요한 RPC 서비스 비활성화 | 상 | muster.service.rpcbind_disabled | auto | enrolled |
-| U-43 | NIS, NIS+ 점검 | 상 | muster.service.nis_disabled | auto | enrolled |
-| U-44 | tftp, talk 서비스 비활성화 | 상 | muster.service.tftp_talk_disabled | auto | enrolled |
-| U-45 | 메일 서비스 버전 점검 | 상 | muster.service.mail_version | manual | enrolled |
-| U-46 | 일반 사용자의 메일 서비스 실행 방지 | 상 | muster.service.mail_user_execution | manual | enrolled |
-| U-47 | 스팸 메일 릴레이 제한 | 상 | muster.service.mail_relay | manual | enrolled |
-| U-48 | expn, vrfy 명령어 제한 | 중 | muster.service.mail_expn_vrfy | auto | enrolled |
-| U-49 | DNS 보안 버전 패치 | 상 | muster.service.dns_version | manual | enrolled |
-| U-50 | DNS Zone Transfer 설정 | 상 | muster.service.dns_zone_transfer | auto | enrolled |
-| U-51 | DNS 서비스의 취약한 동적 업데이트 설정 금지 | 중 | muster.service.dns_dynamic_update | auto | enrolled |
-| U-52 | Telnet 서비스 비활성화 | 중 | muster.service.telnet_disabled | auto | enrolled |
-| U-53 | FTP 서비스 정보 노출 제한 | 하 | muster.service.ftp_banner | auto | enrolled |
-| U-54 | 암호화되지 않는 FTP 서비스 비활성화 | 중 | muster.service.ftp_unencrypted | auto | enrolled |
-| U-55 | FTP 계정 Shell 제한 | 중 | muster.service.ftp_account_shell | auto | enrolled |
-| U-56 | FTP 서비스 접근 제어 설정 | 하 | muster.service.ftpusers_permissions | auto | enrolled |
-| U-57 | Ftpusers 파일 설정 | 중 | muster.service.ftpusers_root | auto | enrolled |
-| U-58 | 불필요한 SNMP 서비스 구동 점검 | 중 | muster.service.snmp_disabled | auto | enrolled |
-| U-59 | 안전한 SNMP 버전 사용 | 상 | muster.service.snmp_version | auto | enrolled |
-| U-60 | SNMP Community String 복잡성 설정 | 중 | muster.service.snmp_community_strength | auto | enrolled |
-| U-61 | SNMP Access Control 설정 | 상 | muster.service.snmp_access_control | auto | enrolled |
-| U-62 | 로그인 시 경고 메시지 설정 | 하 | muster.service.login_banner | partial | enrolled |
-| U-63 | sudo 명령어 접근 관리 | 중 | muster.account.sudoers_permissions | auto | enrolled |
-| U-64 | 주기적 보안 패치 및 벤더 권고사항 적용 | 상 | muster.patch.security_updates | partial | enrolled |
-| U-65 | NTP 및 시각 동기화 설정 | 중 | muster.log.time_sync | auto | enrolled |
-| U-66 | 정책에 따른 시스템 로깅 설정 | 중 | muster.log.syslog_policy | auto | enrolled |
-| U-67 | 로그 디렉터리 소유자 및 권한 설정 | 중 | muster.file.log_dir_permissions | auto | enrolled |
+| ID | Item (KISA) | Imp. | Control | Automation | CIS recs | Status |
+|---|---|---|---|---|---|---|
+| U-01 | root 계정 원격 접속 제한 | 상 | muster.account.root_remote_login | auto | rhel9 5.1.20; ubuntu2204 5.1.20; ubuntu2404 5.1.20 | enrolled |
+| U-02 | 비밀번호 관리정책 설정 | 상 | muster.account.password_policy | auto | rhel9 5.3.2.3 (none), 5.3.3.2.2, 5.3.3.2.3, 5.4.1.1 (some), 5.4.1.2 (some); ubuntu2204 5.3.2.3, 5.3.3.2.2, 5.3.3.2.3, 5.3.3.2.7, 5.4.1.1 (some), 5.4.1.2 (some); ubuntu2404 5.3.2.3, 5.3.3.2.2, 5.3.3.2.3, 5.3.3.2.7, 5.4.1.1 (some), 5.4.1.2 (some) | enrolled |
+| U-03 | 계정 잠금 임계값 설정 | 상 | muster.account.lockout_threshold | auto | rhel9 5.3.2.2, 5.3.3.1.1; ubuntu2204 5.3.2.2, 5.3.3.1.1; ubuntu2404 5.3.2.2, 5.3.3.1.1 | enrolled |
+| U-04 | 비밀번호 파일 보호 | 상 | muster.account.shadow_passwords | auto | rhel9 7.2.1, 7.2.2; ubuntu2204 7.2.1, 7.2.2; ubuntu2404 7.2.1, 7.2.2 | enrolled |
+| U-05 | root 이외의 UID가 ‘0’ 금지 | 상 | muster.account.root_only_uid_zero | auto | rhel9 5.4.2.1; ubuntu2204 5.4.2.1; ubuntu2404 5.4.2.1 | enrolled |
+| U-06 | 사용자 계정 su 기능 제한 | 상 | muster.account.su_restricted | auto | rhel9 5.2.7 (some); ubuntu2204 5.2.7 (some); ubuntu2404 5.2.7 (some) | enrolled |
+| U-07 | 불필요한 계정 제거 | 하 | muster.account.unnecessary_accounts | partial | — | enrolled |
+| U-08 | 관리자 그룹에 최소한의 계정 포함 | 중 | muster.account.admin_group_minimal | partial | — | enrolled |
+| U-09 | 계정이 존재하지 않는 GID 금지 | 하 | muster.account.primary_group_exists | auto | rhel9 7.2.3; ubuntu2204 7.2.3; ubuntu2404 7.2.3 | enrolled |
+| U-10 | 동일한 UID 금지 | 중 | muster.account.unique_uids | auto | rhel9 7.2.4; ubuntu2204 7.2.5; ubuntu2404 7.2.5 | enrolled |
+| U-11 | 사용자 Shell 점검 | 하 | muster.account.system_account_shells | auto | rhel9 5.4.2.7 (some); ubuntu2204 5.4.2.7; ubuntu2404 5.4.2.7 | enrolled |
+| U-12 | 세션 종료 시간 설정 | 하 | muster.account.session_timeout | auto | rhel9 5.1.9, 5.4.3.2; ubuntu2204 5.1.7, 5.4.3.2; ubuntu2404 5.1.7, 5.4.3.2 | enrolled |
+| U-13 | 안전한 비밀번호 암호화 알고리즘 사용 | 중 | muster.account.password_hash_algorithm | auto | rhel9 5.3.3.4.3, 5.4.1.4 (some); ubuntu2204 5.3.3.4.3, 5.4.1.4; ubuntu2404 5.3.3.4.3, 5.4.1.4 | enrolled |
+| U-14 | root 홈, 패스 디렉터리 권한 및 패스 설정 | 상 | muster.account.root_home_and_path | auto | rhel9 5.4.2.5 (some); ubuntu2204 5.4.2.5 (some); ubuntu2404 5.4.2.5 (some) | enrolled |
+| U-15 | 파일 및 디렉터리 소유자 설정 | 상 | muster.file.unowned_files | auto | rhel9 7.1.12; ubuntu2204 7.1.12; ubuntu2404 7.1.12 | enrolled |
+| U-16 | /etc/passwd 파일 소유자 및 권한 설정 | 상 | muster.file.passwd_permissions | auto | rhel9 7.1.1; ubuntu2204 7.1.1; ubuntu2404 7.1.1 | enrolled |
+| U-17 | 시스템 시작 스크립트 권한 설정 | 상 | muster.file.startup_script_permissions | auto | — | enrolled |
+| U-18 | /etc/shadow 파일 소유자 및 권한 설정 | 상 | muster.file.shadow_permissions | auto | rhel9 7.1.5 (some); ubuntu2204 7.1.5 (some); ubuntu2404 7.1.5 (some) | enrolled |
+| U-19 | /etc/hosts 파일 소유자 및 권한 설정 | 상 | muster.file.hosts_permissions | auto | — | enrolled |
+| U-20 | /etc/(x)inetd.conf 파일 소유자 및 권한 설정 | 상 | muster.file.inetd_conf_permissions | auto | — | enrolled |
+| U-21 | /etc/(r)syslog.conf 파일 소유자 및 권한 설정 | 상 | muster.file.syslog_conf_permissions | auto | — | enrolled |
+| U-22 | /etc/services 파일 소유자 및 권한 설정 | 상 | muster.file.services_permissions | auto | — | enrolled |
+| U-23 | SUID, SGID, Sticky bit 설정 파일 점검 | 상 | muster.file.suid_sgid | auto | rhel9 7.1.11, 7.1.13 (none); ubuntu2204 7.1.13 (none); ubuntu2404 7.1.13 (none) | enrolled |
+| U-23 | SUID, SGID, Sticky bit 설정 파일 점검 | 상 | muster.file.suid_sgid_unverified | partial | rhel9 7.1.13 (none); ubuntu2204 7.1.13 (none); ubuntu2404 7.1.13 (none) | enrolled |
+| U-24 | 사용자, 시스템 환경변수 파일 소유자 및 권한 설정 | 상 | muster.file.env_file_permissions | auto | rhel9 7.2.9 (some); ubuntu2204 7.2.10 (some); ubuntu2404 7.2.10 (some) | enrolled |
+| U-25 | world writable 파일 점검 | 상 | muster.file.world_writable | partial | rhel9 7.1.11; ubuntu2204 7.1.11; ubuntu2404 7.1.11 | enrolled |
+| U-26 | /dev에 존재하지 않는 device 파일 점검 | 상 | muster.file.dev_no_stale_files | auto | — | enrolled |
+| U-27 | $HOME/.rhosts, hosts.equiv 사용 금지 | 상 | muster.file.rhosts_forbidden | auto | rhel9 7.2.9 (some); ubuntu2204 7.2.10 (some); ubuntu2404 7.2.10 (some) | enrolled |
+| U-28 | 접속 IP 및 포트 제한 | 상 | muster.file.ip_port_restriction | auto | ubuntu2204 4.1.7, 4.2.8, 4.3.2.1; ubuntu2404 4.2.7, 4.3.8, 4.4.2.1 | enrolled |
+| U-29 | hosts.lpd 파일 소유자 및 권한 설정 | 하 | muster.file.hosts_lpd_permissions | auto | — | enrolled |
+| U-30 | UMASK 설정 관리 | 중 | muster.account.umask_policy | auto | rhel9 5.4.3.3 (some); ubuntu2204 5.4.3.3 (some); ubuntu2404 5.4.3.3 (some) | enrolled |
+| U-31 | 홈 디렉토리 소유자 및 권한 설정 | 중 | muster.file.home_dir_permissions | auto | rhel9 7.2.8; ubuntu2204 7.2.9 (some); ubuntu2404 7.2.9 (some) | enrolled |
+| U-32 | 홈 디렉토리로 지정한 디렉토리의 존재 관리 | 중 | muster.file.home_dir_exists | auto | rhel9 7.2.8; ubuntu2204 7.2.9 (some); ubuntu2404 7.2.9 (some) | enrolled |
+| U-33 | 숨겨진 파일 및 디렉토리 검색 및 제거 | 하 | muster.file.hidden_entries | partial | — | enrolled |
+| U-34 | Finger 서비스 비활성화 | 상 | muster.service.finger_disabled | auto | — | enrolled |
+| U-35 | 공유 서비스에 대한 익명 접근 제한 설정 | 상 | muster.service.ftp_anonymous | auto | — | enrolled |
+| U-36 | r 계열 서비스 비활성화 | 상 | muster.service.rservices_disabled | auto | — | enrolled |
+| U-37 | crontab 설정파일 권한 설정 미흡 | 상 | muster.account.cron_permissions | auto | rhel9 2.4.1.2 (some), 2.4.1.8 (some), 2.4.2.1 (some); ubuntu2204 2.4.1.2 (some), 2.4.1.8 (some), 2.4.2.1 (some); ubuntu2404 2.4.1.2 (some), 2.4.1.8 (some), 2.4.2.1 (some) | enrolled |
+| U-38 | DoS 공격에 취약한 서비스 비활성화 | 상 | muster.service.dos_services_disabled | auto | — | enrolled |
+| U-39 | 불필요한 NFS 서비스 비활성화 | 상 | muster.service.nfs_server_disabled | auto | rhel9 2.1.9; ubuntu2204 2.1.9 (some); ubuntu2404 2.1.9 (some) | enrolled |
+| U-40 | NFS 접근 통제 | 상 | muster.service.nfs_export_access | auto | — | enrolled |
+| U-41 | 불필요한 automountd 제거 | 상 | muster.service.automount_disabled | auto | rhel9 2.1.1; ubuntu2204 2.1.1 (some); ubuntu2404 2.1.1 (some) | enrolled |
+| U-42 | 불필요한 RPC 서비스 비활성화 | 상 | muster.service.rpcbind_disabled | auto | rhel9 2.1.12; ubuntu2204 2.1.12 (some); ubuntu2404 2.1.12 (some) | enrolled |
+| U-43 | NIS, NIS+ 점검 | 상 | muster.service.nis_disabled | auto | rhel9 2.1.10 (none); ubuntu2204 2.1.10 (some); ubuntu2404 2.1.10 (some) | enrolled |
+| U-44 | tftp, talk 서비스 비활성화 | 상 | muster.service.tftp_talk_disabled | auto | ubuntu2204 2.1.16 (some); ubuntu2404 2.1.16 (some) | enrolled |
+| U-45 | 메일 서비스 버전 점검 | 상 | muster.service.mail_version | manual | — | enrolled |
+| U-46 | 일반 사용자의 메일 서비스 실행 방지 | 상 | muster.service.mail_user_execution | manual | — | enrolled |
+| U-47 | 스팸 메일 릴레이 제한 | 상 | muster.service.mail_relay | manual | — | enrolled |
+| U-48 | expn, vrfy 명령어 제한 | 중 | muster.service.mail_expn_vrfy | auto | — | enrolled |
+| U-49 | DNS 보안 버전 패치 | 상 | muster.service.dns_version | manual | — | enrolled |
+| U-50 | DNS Zone Transfer 설정 | 상 | muster.service.dns_zone_transfer | auto | — | enrolled |
+| U-51 | DNS 서비스의 취약한 동적 업데이트 설정 금지 | 중 | muster.service.dns_dynamic_update | auto | — | enrolled |
+| U-52 | Telnet 서비스 비활성화 | 중 | muster.service.telnet_disabled | auto | — | enrolled |
+| U-53 | FTP 서비스 정보 노출 제한 | 하 | muster.service.ftp_banner | auto | — | enrolled |
+| U-54 | 암호화되지 않는 FTP 서비스 비활성화 | 중 | muster.service.ftp_unencrypted | auto | — | enrolled |
+| U-55 | FTP 계정 Shell 제한 | 중 | muster.service.ftp_account_shell | auto | — | enrolled |
+| U-56 | FTP 서비스 접근 제어 설정 | 하 | muster.service.ftpusers_permissions | auto | — | enrolled |
+| U-57 | Ftpusers 파일 설정 | 중 | muster.service.ftpusers_root | auto | — | enrolled |
+| U-58 | 불필요한 SNMP 서비스 구동 점검 | 중 | muster.service.snmp_disabled | auto | ubuntu2204 2.1.15 (some); ubuntu2404 2.1.15 (some) | enrolled |
+| U-59 | 안전한 SNMP 버전 사용 | 상 | muster.service.snmp_version | auto | — | enrolled |
+| U-60 | SNMP Community String 복잡성 설정 | 중 | muster.service.snmp_community_strength | auto | — | enrolled |
+| U-61 | SNMP Access Control 설정 | 상 | muster.service.snmp_access_control | auto | — | enrolled |
+| U-62 | 로그인 시 경고 메시지 설정 | 하 | muster.service.login_banner | partial | rhel9 5.1.8; ubuntu2204 5.1.5; ubuntu2404 5.1.5 | enrolled |
+| U-63 | sudo 명령어 접근 관리 | 중 | muster.account.sudoers_permissions | auto | — | enrolled |
+| U-64 | 주기적 보안 패치 및 벤더 권고사항 적용 | 상 | muster.patch.security_updates | partial | rhel9 1.2.2.1 (none); ubuntu2204 1.2.2.1 (none); ubuntu2404 1.2.2.1 (none) | enrolled |
+| U-65 | NTP 및 시각 동기화 설정 | 중 | muster.log.time_sync | auto | rhel9 2.3.2; ubuntu2204 2.3.1.1 (some); ubuntu2404 2.3.1.1 (some) | enrolled |
+| U-66 | 정책에 따른 시스템 로깅 설정 | 중 | muster.log.syslog_policy | auto | rhel9 6.2.3.2 (none), 6.2.3.5 (none); ubuntu2404 6.1.3.2, 6.1.3.5 (none) | enrolled |
+| U-67 | 로그 디렉터리 소유자 및 권한 설정 | 중 | muster.file.log_dir_permissions | auto | ubuntu2204 6.2.2.1 (some); ubuntu2404 6.1.4.1 (some) | enrolled |
 
 ## Beyond the guide
 
 49 controls muster checks that the guide does not ask for.
 
-| Control | Imp. | Automation | Fact keys read | STIG ids |
-|---|---|---|---|---|
-| muster.beyond.account_inactivity_lock | 중 | auto | accounts.login_capable, accounts.useradd.inactive, env.container | RHEL-09-411050, UBTU-22-411035, UBTU-24-200260 |
-| muster.beyond.aslr_and_link_protection | 상 | auto | env.container, kernel.sysctl.protected_fifos, kernel.sysctl.protected_hardlinks, kernel.sysctl.protected_regular, kernel.sysctl.protected_symlinks, kernel.sysctl.randomize_va_space | RHEL-09-213030, RHEL-09-213035, RHEL-09-213070, UBTU-22-213020, UBTU-24-700310 |
-| muster.beyond.audit_disk_actions | 중 | auto | audit.conf.admin_space_left_action, audit.conf.disk_error_action, audit.conf.disk_full_action, audit.conf.max_log_file_action, audit.conf.space_left_action, env.container, services.auditd.installed | RHEL-09-653020, RHEL-09-653025, RHEL-09-653040, RHEL-09-653050, RHEL-09-653055, UBTU-22-653030, UBTU-22-653040, UBTU-24-900960 |
-| muster.beyond.audit_immutable | 중 | auto | audit.immutable, env.container, services.auditd.installed | RHEL-09-654275, UBTU-24-909000 |
-| muster.beyond.audit_log_permissions | 중 | auto | audit.log_dir.group_writable, audit.log_dir.other_readable, audit.log_dir.other_writable, audit.log_dir.uid, audit.log_file.group, audit.log_file.mode, audit.log_file.uid, env.container, services.auditd.installed | RHEL-09-653080, RHEL-09-653085, RHEL-09-653090, UBTU-22-653045, UBTU-22-653050, UBTU-22-653055, UBTU-22-653060, UBTU-24-901300, UBTU-24-901310, UBTU-24-901350, UBTU-24-901380 |
-| muster.beyond.audit_rules_loaded | 상 | auto | audit.rules.present, env.container, services.auditd.installed | — |
-| muster.beyond.auditd_active | 상 | auto | env.container, services.auditd.active, services.auditd.enabled, services.auditd.installed | RHEL-09-653010, RHEL-09-653015, UBTU-22-653010, UBTU-24-100400 |
-| muster.beyond.bootloader_config_permissions | 상 | auto | boot.grub_cfg.gid, boot.grub_cfg.mode, boot.grub_cfg.uid, env.container | RHEL-09-212025, RHEL-09-212030 |
-| muster.beyond.bootloader_password | 중 | auto | boot.grub_password_set, env.container | RHEL-09-212010, UBTU-22-212010, UBTU-24-102000 |
-| muster.beyond.container_runtime_access | 상 | auto | env.container, privilege.runtime_group_members, privilege.runtime_sockets | — |
-| muster.beyond.core_dump_policy | 중 | partial | coredump.core_pattern, coredump.limits.hard_core, coredump.systemd.process_size_max, coredump.systemd.storage, env.container | RHEL-09-213040, RHEL-09-213085, RHEL-09-213090, RHEL-09-213095 |
-| muster.beyond.dev_shm_mount_options | 중 | auto | env.container, mounts.dev_shm.separate, mounts.points | RHEL-09-231110, RHEL-09-231115, RHEL-09-231120 |
-| muster.beyond.exposed_listeners_allowed | 상 | auto | env.container, exposure.exposed | — |
-| muster.beyond.file_capabilities_declared | 상 | auto | env.container, walk.capabilities | — |
-| muster.beyond.file_integrity_tool | 중 | auto | env.container, fim.aide.database_present, fim.aide.scheduled, fim.tool | RHEL-09-651010, RHEL-09-651015, UBTU-22-651010, UBTU-22-651015, UBTU-22-651025, UBTU-24-100100, UBTU-24-100110, UBTU-24-100120 |
-| muster.beyond.home_mount_options | 하 | auto | env.container, mounts.home.separate, mounts.points | RHEL-09-231045, RHEL-09-231050 |
-| muster.beyond.icmp_broadcast_and_bogus_ignored | 하 | auto | env.container, net.sysctl.ipv4_icmp_echo_ignore_broadcasts, net.sysctl.ipv4_icmp_ignore_bogus_error_responses | RHEL-09-253055, RHEL-09-253060 |
-| muster.beyond.icmp_redirects_ignored | 중 | auto | env.container, net.sysctl.ipv4_all_accept_redirects, net.sysctl.ipv4_all_secure_redirects, net.sysctl.ipv4_all_send_redirects, net.sysctl.ipv4_default_accept_redirects, net.sysctl.ipv4_default_secure_redirects, net.sysctl.ipv4_default_send_redirects | RHEL-09-253015, RHEL-09-253040, RHEL-09-253065, RHEL-09-253070 |
-| muster.beyond.ip_forwarding_disabled | 중 | auto | env.container, net.sysctl.ipv4_ip_forward | RHEL-09-253075 |
-| muster.beyond.ipv6_forwarding_disabled | 중 | auto | env.container, net.sysctl.ipv6_all_forwarding, net.sysctl.ipv6_default_forwarding, net.sysctl.ipv6_disabled | RHEL-09-254025 |
-| muster.beyond.ipv6_redirects_ignored | 중 | auto | env.container, net.sysctl.ipv6_all_accept_redirects, net.sysctl.ipv6_default_accept_redirects, net.sysctl.ipv6_disabled | RHEL-09-254015, RHEL-09-254035 |
-| muster.beyond.ipv6_router_advertisements_ignored | 중 | auto | env.container, net.sysctl.ipv6_all_accept_ra, net.sysctl.ipv6_default_accept_ra, net.sysctl.ipv6_disabled | RHEL-09-254010, RHEL-09-254030 |
-| muster.beyond.ipv6_source_routing_rejected | 중 | auto | env.container, net.sysctl.ipv6_all_accept_source_route, net.sysctl.ipv6_default_accept_source_route, net.sysctl.ipv6_disabled | RHEL-09-254020, RHEL-09-254040 |
-| muster.beyond.kernel_pointer_exposure | 중 | auto | env.container, kernel.sysctl.dmesg_restrict, kernel.sysctl.kptr_restrict | RHEL-09-213010, RHEL-09-213025, UBTU-22-213010, UBTU-24-600140 |
-| muster.beyond.ld_so_preload_empty | 상 | auto | env.container, privilege.ld_so_preload | — |
-| muster.beyond.listeners_packaged | 중 | auto | env.container, processes.unpackaged_listeners | — |
-| muster.beyond.no_deleted_executables | 중 | auto | env.container, processes.deleted_executables | — |
-| muster.beyond.package_files_unmodified | 상 | auto | env.container, packages.verify.modified | — |
-| muster.beyond.ptrace_restriction | 중 | auto | env.container, kernel.sysctl.perf_event_paranoid, kernel.sysctl.yama_ptrace_scope | RHEL-09-213015, RHEL-09-213080 |
-| muster.beyond.remote_log_forwarding | 하 | auto | env.container, logging.journal_upload.url, logging.rsyslog.forwards_remote, services.journal_upload.active, services.journal_upload.enabled, services.syslog.active | RHEL-09-652055 |
-| muster.beyond.reverse_path_filtering | 중 | auto | env.container, net.sysctl.ipv4_all_log_martians, net.sysctl.ipv4_all_rp_filter, net.sysctl.ipv4_default_log_martians, net.sysctl.ipv4_default_rp_filter | RHEL-09-253025, RHEL-09-253030, RHEL-09-253035, RHEL-09-253050 |
-| muster.beyond.root_authorized_keys | 중 | auto | env.container, ssh.root_key_count, sshd.options.permit_root_login | — |
-| muster.beyond.root_unit_exec_writable | 상 | auto | env.container, env.has_systemd, units.exec_writable | — |
-| muster.beyond.secure_boot_enabled | 중 | auto | boot.firmware, boot.secure_boot, env.container | — |
-| muster.beyond.separate_partitions | 중 | partial | env.container, mounts.points | RHEL-09-231010, RHEL-09-231015, RHEL-09-231020, RHEL-09-231025, RHEL-09-231030, RHEL-09-231035 |
-| muster.beyond.source_routing_rejected | 중 | auto | env.container, net.sysctl.ipv4_all_accept_source_route, net.sysctl.ipv4_default_accept_source_route | RHEL-09-253020, RHEL-09-253045 |
-| muster.beyond.ssh_key_quality | 중 | auto | env.container, ssh.dsa_key_count, ssh.rsa_keys | — |
-| muster.beyond.sudo_logging | 중 | auto | env.container, sudo.installed, sudo.log.logfile, sudo.log.syslog | — |
-| muster.beyond.sudo_nopasswd_all | 상 | auto | env.container, sudo.authenticate_disabled, sudo.installed, sudo.nopasswd_all | RHEL-09-432025, UBTU-22-432010, UBTU-24-300021 |
-| muster.beyond.suid_dumpable_disabled | 중 | auto | coredump.suid_dumpable, env.container | — |
-| muster.beyond.swap_encrypted | 중 | auto | env.container, swap.encrypted | — |
-| muster.beyond.syn_cookies_enabled | 중 | auto | env.container, net.sysctl.ipv4_tcp_syncookies | RHEL-09-253010, UBTU-22-253010, UBTU-24-600190 |
-| muster.beyond.sysrq_restricted | 중 | auto | env.container, kernel.sysctl.sysrq | — |
-| muster.beyond.tmp_mount_options | 중 | auto | env.container, mounts.points, mounts.tmp.separate | RHEL-09-231125, RHEL-09-231130, RHEL-09-231135 |
-| muster.beyond.uncommon_filesystems_disabled | 하 | auto | env.container, kernel.modules | RHEL-09-231195 |
-| muster.beyond.uncommon_network_protocols_disabled | 중 | auto | env.container, kernel.modules | RHEL-09-213060, RHEL-09-213065 |
-| muster.beyond.unprivileged_bpf_restricted | 하 | auto | env.container, kernel.sysctl.bpf_jit_harden, kernel.sysctl.unprivileged_bpf_disabled | RHEL-09-213075 |
-| muster.beyond.usb_storage_disabled | 중 | auto | env.container, kernel.modules | RHEL-09-291010, UBTU-22-291010, UBTU-24-300039 |
-| muster.beyond.var_tmp_mount_options | 중 | auto | env.container, mounts.points, mounts.var_tmp.separate | RHEL-09-231175, RHEL-09-231180, RHEL-09-231185 |
+| Control | Imp. | Automation | Fact keys read | STIG ids | CIS recs |
+|---|---|---|---|---|---|
+| muster.beyond.account_inactivity_lock | 중 | auto | accounts.login_capable, accounts.useradd.inactive, env.container | RHEL-09-411050, UBTU-22-411035, UBTU-24-200260 | rhel9 5.4.1.5; ubuntu2204 5.4.1.5; ubuntu2404 5.4.1.5 |
+| muster.beyond.aslr_and_link_protection | 상 | auto | env.container, kernel.sysctl.protected_fifos, kernel.sysctl.protected_hardlinks, kernel.sysctl.protected_regular, kernel.sysctl.protected_symlinks, kernel.sysctl.randomize_va_space | RHEL-09-213030, RHEL-09-213035, RHEL-09-213070, UBTU-22-213020, UBTU-24-700310 | rhel9 1.5.1; ubuntu2204 1.5.1; ubuntu2404 1.5.1 |
+| muster.beyond.audit_disk_actions | 중 | auto | audit.conf.admin_space_left_action, audit.conf.disk_error_action, audit.conf.disk_full_action, audit.conf.max_log_file_action, audit.conf.space_left_action, env.container, services.auditd.installed | RHEL-09-653020, RHEL-09-653025, RHEL-09-653040, RHEL-09-653050, RHEL-09-653055, UBTU-22-653030, UBTU-22-653040, UBTU-24-900960 | rhel9 6.3.2.2, 6.3.2.3, 6.3.2.4 (some); ubuntu2204 6.3.2.2, 6.3.2.3, 6.3.2.4 (some); ubuntu2404 6.2.2.2, 6.2.2.3, 6.2.2.4 (some) |
+| muster.beyond.audit_immutable | 중 | auto | audit.immutable, env.container, services.auditd.installed | RHEL-09-654275, UBTU-24-909000 | rhel9 6.3.3.20; ubuntu2204 6.3.3.20; ubuntu2404 6.2.3.20 |
+| muster.beyond.audit_log_permissions | 중 | auto | audit.log_dir.group_writable, audit.log_dir.other_readable, audit.log_dir.other_writable, audit.log_dir.uid, audit.log_file.group, audit.log_file.mode, audit.log_file.uid, env.container, services.auditd.installed | RHEL-09-653080, RHEL-09-653085, RHEL-09-653090, UBTU-22-653045, UBTU-22-653050, UBTU-22-653055, UBTU-22-653060, UBTU-24-901300, UBTU-24-901310, UBTU-24-901350, UBTU-24-901380 | rhel9 6.3.4.1, 6.3.4.2, 6.3.4.3, 6.3.4.4; ubuntu2204 6.3.4.1, 6.3.4.2, 6.3.4.3, 6.3.4.4; ubuntu2404 6.2.4.1, 6.2.4.2, 6.2.4.3, 6.2.4.4 |
+| muster.beyond.audit_rules_loaded | 상 | auto | audit.rules.present, env.container, services.auditd.installed | — | — |
+| muster.beyond.auditd_active | 상 | auto | env.container, services.auditd.active, services.auditd.enabled, services.auditd.installed | RHEL-09-653010, RHEL-09-653015, UBTU-22-653010, UBTU-24-100400 | rhel9 6.3.1.1 (some), 6.3.1.4; ubuntu2204 6.3.1.1 (some), 6.3.1.2; ubuntu2404 6.2.1.1 (some), 6.2.1.2 |
+| muster.beyond.bootloader_config_permissions | 상 | auto | boot.grub_cfg.gid, boot.grub_cfg.mode, boot.grub_cfg.uid, env.container | RHEL-09-212025, RHEL-09-212030 | rhel9 1.4.2 (some); ubuntu2204 1.4.2; ubuntu2404 1.4.2 |
+| muster.beyond.bootloader_password | 중 | auto | boot.grub_password_set, env.container | RHEL-09-212010, UBTU-22-212010, UBTU-24-102000 | rhel9 1.4.1; ubuntu2204 1.4.1; ubuntu2404 1.4.1 |
+| muster.beyond.container_runtime_access | 상 | auto | env.container, privilege.runtime_group_members, privilege.runtime_sockets | — | — |
+| muster.beyond.core_dump_policy | 중 | partial | coredump.core_pattern, coredump.limits.hard_core, coredump.systemd.process_size_max, coredump.systemd.storage, env.container | RHEL-09-213040, RHEL-09-213085, RHEL-09-213090, RHEL-09-213095 | rhel9 1.5.3, 1.5.4; ubuntu2204 1.5.3; ubuntu2404 1.5.3 |
+| muster.beyond.dev_shm_mount_options | 중 | auto | env.container, mounts.dev_shm.separate, mounts.points | RHEL-09-231110, RHEL-09-231115, RHEL-09-231120 | rhel9 1.1.2.2.2, 1.1.2.2.3, 1.1.2.2.4; ubuntu2204 1.1.2.2.2, 1.1.2.2.3, 1.1.2.2.4; ubuntu2404 1.1.2.2.2, 1.1.2.2.3, 1.1.2.2.4 |
+| muster.beyond.exposed_listeners_allowed | 상 | auto | env.container, exposure.exposed | — | — |
+| muster.beyond.file_capabilities_declared | 상 | auto | env.container, walk.capabilities | — | — |
+| muster.beyond.file_integrity_tool | 중 | auto | env.container, fim.aide.database_present, fim.aide.scheduled, fim.tool | RHEL-09-651010, RHEL-09-651015, UBTU-22-651010, UBTU-22-651015, UBTU-22-651025, UBTU-24-100100, UBTU-24-100110, UBTU-24-100120 | rhel9 6.1.1, 6.1.2; ubuntu2204 6.1.1, 6.1.2; ubuntu2404 6.3.1, 6.3.2 |
+| muster.beyond.home_mount_options | 하 | auto | env.container, mounts.home.separate, mounts.points | RHEL-09-231045, RHEL-09-231050 | rhel9 1.1.2.3.2, 1.1.2.3.3; ubuntu2204 1.1.2.3.2, 1.1.2.3.3; ubuntu2404 1.1.2.3.2, 1.1.2.3.3 |
+| muster.beyond.icmp_broadcast_and_bogus_ignored | 하 | auto | env.container, net.sysctl.ipv4_icmp_echo_ignore_broadcasts, net.sysctl.ipv4_icmp_ignore_bogus_error_responses | RHEL-09-253055, RHEL-09-253060 | rhel9 3.3.3, 3.3.4; ubuntu2204 3.3.3, 3.3.4; ubuntu2404 3.3.3, 3.3.4 |
+| muster.beyond.icmp_redirects_ignored | 중 | auto | env.container, net.sysctl.ipv4_all_accept_redirects, net.sysctl.ipv4_all_secure_redirects, net.sysctl.ipv4_all_send_redirects, net.sysctl.ipv4_default_accept_redirects, net.sysctl.ipv4_default_secure_redirects, net.sysctl.ipv4_default_send_redirects | RHEL-09-253015, RHEL-09-253040, RHEL-09-253065, RHEL-09-253070 | rhel9 3.3.2, 3.3.5, 3.3.6; ubuntu2204 3.3.2, 3.3.5, 3.3.6; ubuntu2404 3.3.2, 3.3.5, 3.3.6 |
+| muster.beyond.ip_forwarding_disabled | 중 | auto | env.container, net.sysctl.ipv4_ip_forward | RHEL-09-253075 | rhel9 3.3.1; ubuntu2204 3.3.1; ubuntu2404 3.3.1 |
+| muster.beyond.ipv6_forwarding_disabled | 중 | auto | env.container, net.sysctl.ipv6_all_forwarding, net.sysctl.ipv6_default_forwarding, net.sysctl.ipv6_disabled | RHEL-09-254025 | rhel9 3.3.1; ubuntu2204 3.3.1; ubuntu2404 3.3.1 |
+| muster.beyond.ipv6_redirects_ignored | 중 | auto | env.container, net.sysctl.ipv6_all_accept_redirects, net.sysctl.ipv6_default_accept_redirects, net.sysctl.ipv6_disabled | RHEL-09-254015, RHEL-09-254035 | rhel9 3.3.5; ubuntu2204 3.3.5; ubuntu2404 3.3.5 |
+| muster.beyond.ipv6_router_advertisements_ignored | 중 | auto | env.container, net.sysctl.ipv6_all_accept_ra, net.sysctl.ipv6_default_accept_ra, net.sysctl.ipv6_disabled | RHEL-09-254010, RHEL-09-254030 | rhel9 3.3.11; ubuntu2204 3.3.11; ubuntu2404 3.3.11 |
+| muster.beyond.ipv6_source_routing_rejected | 중 | auto | env.container, net.sysctl.ipv6_all_accept_source_route, net.sysctl.ipv6_default_accept_source_route, net.sysctl.ipv6_disabled | RHEL-09-254020, RHEL-09-254040 | rhel9 3.3.8; ubuntu2204 3.3.8; ubuntu2404 3.3.8 |
+| muster.beyond.kernel_pointer_exposure | 중 | auto | env.container, kernel.sysctl.dmesg_restrict, kernel.sysctl.kptr_restrict | RHEL-09-213010, RHEL-09-213025, UBTU-22-213010, UBTU-24-600140 | — |
+| muster.beyond.ld_so_preload_empty | 상 | auto | env.container, privilege.ld_so_preload | — | — |
+| muster.beyond.listeners_packaged | 중 | auto | env.container, processes.unpackaged_listeners | — | — |
+| muster.beyond.no_deleted_executables | 중 | auto | env.container, processes.deleted_executables | — | — |
+| muster.beyond.package_files_unmodified | 상 | auto | env.container, packages.verify.modified | — | — |
+| muster.beyond.ptrace_restriction | 중 | auto | env.container, kernel.sysctl.perf_event_paranoid, kernel.sysctl.yama_ptrace_scope | RHEL-09-213015, RHEL-09-213080 | rhel9 1.5.2; ubuntu2204 1.5.2; ubuntu2404 1.5.2 |
+| muster.beyond.remote_log_forwarding | 하 | auto | env.container, logging.journal_upload.url, logging.rsyslog.forwards_remote, services.journal_upload.active, services.journal_upload.enabled, services.syslog.active | RHEL-09-652055 | rhel9 6.2.2.1.3 (none), 6.2.3.6 (none); ubuntu2204 6.2.1.2.2 (some), 6.2.1.2.3; ubuntu2404 6.1.2.1.2 (some), 6.1.2.1.3, 6.1.3.6 (none) |
+| muster.beyond.reverse_path_filtering | 중 | auto | env.container, net.sysctl.ipv4_all_log_martians, net.sysctl.ipv4_all_rp_filter, net.sysctl.ipv4_default_log_martians, net.sysctl.ipv4_default_rp_filter | RHEL-09-253025, RHEL-09-253030, RHEL-09-253035, RHEL-09-253050 | rhel9 3.3.7, 3.3.9; ubuntu2204 3.3.7, 3.3.9; ubuntu2404 3.3.7, 3.3.9 |
+| muster.beyond.root_authorized_keys | 중 | auto | env.container, ssh.root_key_count, sshd.options.permit_root_login | — | — |
+| muster.beyond.root_unit_exec_writable | 상 | auto | env.container, env.has_systemd, units.exec_writable | — | — |
+| muster.beyond.secure_boot_enabled | 중 | auto | boot.firmware, boot.secure_boot, env.container | — | — |
+| muster.beyond.separate_partitions | 중 | partial | env.container, mounts.points | RHEL-09-231010, RHEL-09-231015, RHEL-09-231020, RHEL-09-231025, RHEL-09-231030, RHEL-09-231035 | rhel9 1.1.2.1.1, 1.1.2.3.1, 1.1.2.4.1, 1.1.2.5.1, 1.1.2.6.1, 1.1.2.7.1; ubuntu2204 1.1.2.1.1, 1.1.2.3.1, 1.1.2.4.1, 1.1.2.5.1, 1.1.2.6.1, 1.1.2.7.1; ubuntu2404 1.1.2.1.1, 1.1.2.3.1, 1.1.2.4.1, 1.1.2.5.1, 1.1.2.6.1, 1.1.2.7.1 |
+| muster.beyond.source_routing_rejected | 중 | auto | env.container, net.sysctl.ipv4_all_accept_source_route, net.sysctl.ipv4_default_accept_source_route | RHEL-09-253020, RHEL-09-253045 | rhel9 3.3.8; ubuntu2204 3.3.8; ubuntu2404 3.3.8 |
+| muster.beyond.ssh_key_quality | 중 | auto | env.container, ssh.dsa_key_count, ssh.rsa_keys | — | — |
+| muster.beyond.sudo_logging | 중 | auto | env.container, sudo.installed, sudo.log.logfile, sudo.log.syslog | — | rhel9 5.2.3; ubuntu2204 5.2.3; ubuntu2404 5.2.3 |
+| muster.beyond.sudo_nopasswd_all | 상 | auto | env.container, sudo.authenticate_disabled, sudo.installed, sudo.nopasswd_all | RHEL-09-432025, UBTU-22-432010, UBTU-24-300021 | rhel9 5.2.5; ubuntu2204 5.2.5; ubuntu2404 5.2.5 |
+| muster.beyond.suid_dumpable_disabled | 중 | auto | coredump.suid_dumpable, env.container | — | ubuntu2204 1.5.3; ubuntu2404 1.5.3 |
+| muster.beyond.swap_encrypted | 중 | auto | env.container, swap.encrypted | — | — |
+| muster.beyond.syn_cookies_enabled | 중 | auto | env.container, net.sysctl.ipv4_tcp_syncookies | RHEL-09-253010, UBTU-22-253010, UBTU-24-600190 | rhel9 3.3.10; ubuntu2204 3.3.10; ubuntu2404 3.3.10 |
+| muster.beyond.sysrq_restricted | 중 | auto | env.container, kernel.sysctl.sysrq | — | — |
+| muster.beyond.tmp_mount_options | 중 | auto | env.container, mounts.points, mounts.tmp.separate | RHEL-09-231125, RHEL-09-231130, RHEL-09-231135 | rhel9 1.1.2.1.2, 1.1.2.1.3, 1.1.2.1.4; ubuntu2204 1.1.2.1.2, 1.1.2.1.3, 1.1.2.1.4; ubuntu2404 1.1.2.1.2, 1.1.2.1.3, 1.1.2.1.4 |
+| muster.beyond.uncommon_filesystems_disabled | 하 | auto | env.container, kernel.modules | RHEL-09-231195 | rhel9 1.1.1.1, 1.1.1.2, 1.1.1.3, 1.1.1.4, 1.1.1.5, 1.1.1.7; ubuntu2204 1.1.1.1, 1.1.1.2, 1.1.1.3, 1.1.1.4, 1.1.1.5, 1.1.1.7; ubuntu2404 1.1.1.1, 1.1.1.2, 1.1.1.3, 1.1.1.4, 1.1.1.5, 1.1.1.8 |
+| muster.beyond.uncommon_network_protocols_disabled | 중 | auto | env.container, kernel.modules | RHEL-09-213060, RHEL-09-213065 | rhel9 3.2.1, 3.2.2, 3.2.3, 3.2.4; ubuntu2204 3.2.1, 3.2.2, 3.2.3, 3.2.4; ubuntu2404 3.2.1, 3.2.2, 3.2.3, 3.2.4 |
+| muster.beyond.unprivileged_bpf_restricted | 하 | auto | env.container, kernel.sysctl.bpf_jit_harden, kernel.sysctl.unprivileged_bpf_disabled | RHEL-09-213075 | — |
+| muster.beyond.usb_storage_disabled | 중 | auto | env.container, kernel.modules | RHEL-09-291010, UBTU-22-291010, UBTU-24-300039 | rhel9 1.1.1.8; ubuntu2204 1.1.1.8; ubuntu2404 1.1.1.9 |
+| muster.beyond.var_tmp_mount_options | 중 | auto | env.container, mounts.points, mounts.var_tmp.separate | RHEL-09-231175, RHEL-09-231180, RHEL-09-231185 | rhel9 1.1.2.5.2, 1.1.2.5.3, 1.1.2.5.4; ubuntu2204 1.1.2.5.2, 1.1.2.5.3, 1.1.2.5.4; ubuntu2404 1.1.2.5.2, 1.1.2.5.3, 1.1.2.5.4 |
 
 ## Fact keys used by controls
 
@@ -169,3 +169,12 @@
 | units | 3 | 1 | 0 | units.root_services, units.exec_unresolved |
 | sshkeys | 4 | 3 | 0 | ssh.authorized_keys |
 | privilege | 3 | 3 | 0 | — |
+
+## CIS Benchmarks
+
+The counts below and the CIS recs cells cover muster's map of controls to recommendations (`docs/reference/cis/map.yaml`); each `cis-<product>-l1` profile drops the controls `docs/reference/cis/review.yaml` names.
+
+- 59 controls map 81 of 235 Level 1 – Server recommendations (CIS Red Hat Enterprise Linux 9 Benchmark v2.0.0, via ComplianceAsCode v0.1.82)
+  On AlmaLinux and Rocky hosts the profile carries RHEL 9's coverage words and parameter values.
+- 63 controls map 85 of 240 Level 1 – Server recommendations (CIS Ubuntu Linux 22.04 LTS Benchmark v2.0.0, via ComplianceAsCode v0.1.82)
+- 64 controls map 88 of 251 Level 1 – Server recommendations (CIS Ubuntu Linux 24.04 LTS Benchmark v1.0.0, via ComplianceAsCode v0.1.82)

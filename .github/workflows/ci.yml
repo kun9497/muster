@@ -52,6 +52,11 @@ jobs:
         run: go run ./cmd/muster controls lint --references docs/reference
       - name: controls lint, built-in profile
         run: go run ./cmd/muster controls lint --references docs/reference --profile default
+      - name: controls lint, CIS built-in profiles
+        run: |
+          go run ./cmd/muster controls lint --references docs/reference --profile cis-ubuntu2204-l1
+          go run ./cmd/muster controls lint --references docs/reference --profile cis-ubuntu2404-l1
+          go run ./cmd/muster controls lint --references docs/reference --profile cis-rhel9-l1
       - name: coverage table is current
         run: go run ./tools/coverage -check
       - name: build

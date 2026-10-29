@@ -31,14 +31,44 @@ rationale are muster's own wording. The guide itself is linked, not included.
 
 ## CIS Benchmarks
 
-CIS publishes non-member Benchmarks under CC BY-NC-SA 4.0, and its Terms of Use
-additionally prohibit creating derivative works based directly on a non-member
-product and representing a particular level of compliance. Accordingly:
+- **Publisher:** the Center for Internet Security®, Inc. (CIS). "CIS Benchmarks®"
+  is a registered mark of CIS.
+- **Benchmarks referenced (linked, not included):** CIS Ubuntu Linux 22.04 LTS
+  Benchmark v2.0.0, CIS Ubuntu Linux 24.04 LTS Benchmark v1.0.0 and CIS Red Hat
+  Enterprise Linux 9 Benchmark v2.0.0, at https://www.cisecurity.org/cis-benchmarks.
+  These are the versions the pinned ComplianceAsCode files encode; CIS lists newer
+  ones (22.04 v3.0.0, 24.04 v2.0.0), which the index does not cover.
+- **Licence and terms:** CIS publishes non-member Benchmarks under CC BY-NC-SA 4.0,
+  and its Terms of Use additionally prohibit creating derivative works based
+  directly on a non-member product and representing a particular level of
+  compliance.
 
-- Controls may reference a CIS recommendation only as benchmark name, benchmark
-  version and recommendation number. No recommendation title, text or audit
+Accordingly:
+
+- Controls may reference a CIS recommendation only as benchmark name (its
+  product key), benchmark version and recommendation number. No recommendation title, text or audit
   procedure is stored; the control schema has no field for them.
+- **What this repository reproduces:** the version, the number and the literal
+  levels of the recommendations muster maps, and the count of Level 1 – Server
+  entries, in `docs/reference/cis/`, decoded from ComplianceAsCode's pinned
+  control files by `tools/cisindex` (see NOTICE, "ComplianceAsCode"); the product
+  key, display name and `applies_to` are muster's own, in
+  `tools/cisindex/sources.json`.
+- **What it does not reproduce:** titles, descriptions, rationale, audit or
+  remediation text, and the complete list or order of any Benchmark's
+  recommendations.
+- **The RHEL 9 family:** `rhel9` is applied to AlmaLinux 9 because the generator
+  proves the AlmaLinux OS 9 file's recommendation ids and literal levels equal
+  RHEL 9's (its rule lists differ and are not read), and to Rocky Linux 9 as a
+  documented inference, like the STIG references: CIS publishes a Rocky 9
+  Benchmark that no public source indexes.
 - muster judges no CIS compliance and claims no CIS compliance level.
+  The `cis-<distro>-l1` profiles select muster's own controls that carry a CIS
+  Benchmark recommendation number at Level 1 – Server; their results are
+  muster's verdicts on muster's controls, not a CIS assessment, and muster is an
+  independent publication not authorized, sponsored or otherwise approved by the
+  Center for Internet Security.
+- The ComplianceAsCode attribution and licence are in NOTICE.
 
 ## DISA STIGs and the CCI list
 

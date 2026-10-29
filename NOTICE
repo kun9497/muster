@@ -5,7 +5,8 @@ Licensed under the Apache License, Version 2.0. See LICENSE.
 
 muster is an unofficial personal project. It is not affiliated with, endorsed by,
 or certified by the Korea Internet & Security Agency (KISA) or the Center for
-Internet Security (CIS), and it does not replace an official assessment.
+Internet Security® (CIS), and it does not replace an official assessment.
+CIS Benchmarks® is a registered mark of CIS.
 
 From the KISA guide (주요정보통신기반시설 기술적 취약점 분석·평가 방법 상세가이드) this
 repository reproduces only item codes, item names, categories, importance levels
@@ -17,7 +18,55 @@ CIS Benchmark references are benchmark name, version and recommendation number
 only. No CIS Benchmark text is included and no CIS compliance level is claimed.
 See ATTRIBUTION.md.
 
+The `cis-<distro>-l1` profiles select muster's own controls that carry a CIS
+Benchmark recommendation number at Level 1 – Server; their results are
+muster's verdicts on muster's controls, not a CIS assessment, and muster is an
+independent publication not authorized, sponsored or otherwise approved by the
+Center for Internet Security.
+
 DISA STIG and CCI identifiers are drawn from works of the United States
 Government, not subject to copyright in the United States (17 U.S.C. § 105).
 This repository reproduces only STIG and CCI identifiers, severities and
 titles, never their discussion, check and fix text. See ATTRIBUTION.md.
+
+ComplianceAsCode
+
+The CIS recommendation numbers and levels in docs/reference/cis/, the
+ComplianceAsCode rule ids in docs/reference/cis/map.yaml and the cis-*-l1
+profiles generated from them (embedded in the binary) are derived from
+ComplianceAsCode/content (https://github.com/ComplianceAsCode/content), tag
+v0.1.82, commit 3da954fbccfb4ca611da86c9be9205d83c38bfc7, files
+controls/cis_ubuntu2204.yml, controls/cis_ubuntu2404.yml,
+products/rhel9/controls/cis_rhel9.yml and controls/cis_almalinux9.yml.
+From each pinned file `tools/cisindex` decodes exactly the header's `version`
+and each entry's `id`, `levels` and `rules`; `title`, `notes`, `status`,
+`related_rules` and every other field never leave its decoder, and no
+Benchmark text is stored.
+This attribution is not an endorsement: muster is not built on, and is not
+endorsed by, SCAP Security Guide or its authors. The licence of those files:
+
+SPDX license identifier: BSD-3-Clause
+Copyright (c) 2012-2017, Red Hat, Inc.
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+    * Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+    * Neither the name of the Red Hat nor the
+      names of its contributors may be used to endorse or promote products
+      derived from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY
+DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.

@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
   "run": {
-    "muster_version": "ca08d60",
-    "commit": "ca08d60",
-    "controls_version": "kisa-unix-2026+2026.10.20",
-    "controls_digest": "sha256:ed4e6ebc66e5ad2c8ec0110ba5caee5ae2539df7d9d88100325eb5a7065cc51a",
+    "muster_version": "5bfae2a",
+    "commit": "5bfae2a",
+    "controls_version": "kisa-unix-2026+2026.10.27",
+    "controls_digest": "sha256:eb73ab574efab7e0a50e4e2f9d54091beecf896bfe01ab6d0fe7444d53301523",
     "guide_edition": "kisa-unix-2026",
-    "collected_at": "2026-10-21T02:03:16Z",
+    "collected_at": "2026-10-27T09:00:28Z",
     "host": {
       "hostname": "github-runner",
       "machine_id_hash": "399794935aded36b418e3630a41ef1d23f027811adf388b70d95a72238bc049b",
@@ -39,7 +39,7 @@
       {
         "name": "accounts",
         "status": "ok",
-        "ms": 1
+        "ms": 0
       },
       {
         "name": "audit",
@@ -55,17 +55,17 @@
       {
         "name": "boot",
         "status": "ok",
-        "ms": 14
+        "ms": 15
       },
       {
         "name": "coredump",
         "status": "ok",
-        "ms": 1
+        "ms": 0
       },
       {
         "name": "cron",
         "status": "ok",
-        "ms": 888,
+        "ms": 684,
         "cmd": "/usr/bin/systemctl list-unit-files --type=timer --no-legend --no-pager"
       },
       {
@@ -76,23 +76,23 @@
       {
         "name": "env",
         "status": "ok",
-        "ms": 9
+        "ms": 15
       },
       {
         "name": "files",
         "status": "ok",
-        "ms": 18
+        "ms": 14
       },
       {
         "name": "fim",
         "status": "ok",
-        "ms": 11,
+        "ms": 7,
         "cmd": "/usr/bin/systemctl list-timers --all --no-legend --no-pager"
       },
       {
         "name": "firewall",
         "status": "ok",
-        "ms": 13,
+        "ms": 31,
         "cmd": "/usr/sbin/nft list ruleset"
       },
       {
@@ -113,7 +113,7 @@
       {
         "name": "modules",
         "status": "ok",
-        "ms": 13
+        "ms": 27
       },
       {
         "name": "mounts",
@@ -139,18 +139,18 @@
       {
         "name": "pam",
         "status": "ok",
-        "ms": 2
+        "ms": 1
       },
       {
         "name": "patch",
         "status": "ok",
-        "ms": 3996,
+        "ms": 944,
         "cmd": "/usr/bin/apt-get -s upgrade -o Debug::NoLocking=1"
       },
       {
         "name": "pkgverify",
         "status": "ok",
-        "ms": 676645,
+        "ms": 445076,
         "cmd": "/usr/bin/rpm -Va"
       },
       {
@@ -161,13 +161,13 @@
       {
         "name": "processes",
         "status": "ok",
-        "ms": 161,
+        "ms": 107,
         "cmd": "/usr/bin/rpm -qa --qf [%{=NAME}\t%{FILEMODES:octal}\t%{FILEUSERNAME}\t%{FILEGROUPNAME}\t%|FILECAPS?{%{FILECAPS}}|\t%{FILENAMES}\n]"
       },
       {
         "name": "services",
         "status": "ok",
-        "ms": 322,
+        "ms": 236,
         "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState atftpd.service"
       },
       {
@@ -178,12 +178,12 @@
       {
         "name": "sockets",
         "status": "ok",
-        "ms": 12
+        "ms": 9
       },
       {
         "name": "sshd",
         "status": "ok",
-        "ms": 13,
+        "ms": 10,
         "cmd": "/usr/sbin/sshd -G"
       },
       {
@@ -199,24 +199,24 @@
       {
         "name": "sysctl",
         "status": "ok",
-        "ms": 2
+        "ms": 1
       },
       {
         "name": "timesync",
         "status": "ok",
-        "ms": 51,
+        "ms": 49,
         "cmd": "/usr/bin/timedatectl show-timesync --all"
       },
       {
         "name": "units",
         "status": "ok",
-        "ms": 56,
+        "ms": 37,
         "cmd": "/usr/bin/systemctl list-units --type=service --state=active --plain --no-legend"
       },
       {
         "name": "walk",
         "status": "ok",
-        "ms": 15998,
+        "ms": 14605,
         "cmd": "/usr/bin/rpm -qa --qf [%{=NAME}\t%{FILEMODES:octal}\t%{FILEUSERNAME}\t%{FILEGROUPNAME}\t%|FILECAPS?{%{FILECAPS}}|\t%{FILENAMES}\n]"
       }
     ],
@@ -2170,7 +2170,7 @@
             "hash_algo": "$6$",
             "home": "/home/packer",
             "inactive": -1,
-            "last_change": 20738,
+            "last_change": 20749,
             "locked": false,
             "max": 99999,
             "min": 0,
@@ -2191,7 +2191,7 @@
             "hash_algo": "",
             "home": "/home/runner",
             "inactive": -1,
-            "last_change": 20738,
+            "last_change": 20749,
             "locked": true,
             "max": 99999,
             "min": 0,
@@ -3381,7 +3381,7 @@
             "family": "v4",
             "name": "systemd-network",
             "package": "systemd",
-            "pid": 721,
+            "pid": 642,
             "port": 68,
             "proto": "udp",
             "rule_chain": "",
@@ -3493,7 +3493,7 @@
                 "name": "systemd-network",
                 "package": "systemd",
                 "package_status": "packaged",
-                "pid": 721,
+                "pid": 642,
                 "uid": 998
               }
             ],
@@ -3644,22 +3644,6 @@
           },
           {
             "fstype": "devtmpfs",
-            "kind": "dir",
-            "mode": 493,
-            "name": "bsg",
-            "path": "/dev/bsg",
-            "uid": 0
-          },
-          {
-            "fstype": "devtmpfs",
-            "kind": "chardev",
-            "mode": 384,
-            "name": "0:0:0:0",
-            "path": "/dev/bsg/0:0:0:0",
-            "uid": 0
-          },
-          {
-            "fstype": "devtmpfs",
             "kind": "chardev",
             "mode": 384,
             "name": "btrfs-control",
@@ -3806,14 +3790,6 @@
             "fstype": "devtmpfs",
             "kind": "dir",
             "mode": 493,
-            "name": "cloud",
-            "path": "/dev/disk/cloud",
-            "uid": 0
-          },
-          {
-            "fstype": "devtmpfs",
-            "kind": "dir",
-            "mode": 493,
             "name": "dma_heap",
             "path": "/dev/dma_heap",
             "uid": 0
@@ -3928,6 +3904,14 @@
             "mode": 438,
             "name": "uverbs0",
             "path": "/dev/infiniband/uverbs0",
+            "uid": 0
+          },
+          {
+            "fstype": "devtmpfs",
+            "kind": "chardev",
+            "mode": 438,
+            "name": "uverbs1",
+            "path": "/dev/infiniband/uverbs1",
             "uid": 0
           },
           {
@@ -4133,6 +4117,14 @@
           {
             "fstype": "devtmpfs",
             "kind": "chardev",
+            "mode": 384,
+            "name": "ng0n1",
+            "path": "/dev/ng0n1",
+            "uid": 0
+          },
+          {
+            "fstype": "devtmpfs",
+            "kind": "chardev",
             "mode": 438,
             "name": "null",
             "path": "/dev/null",
@@ -4144,6 +4136,54 @@
             "mode": 384,
             "name": "nvme-fabrics",
             "path": "/dev/nvme-fabrics",
+            "uid": 0
+          },
+          {
+            "fstype": "devtmpfs",
+            "kind": "chardev",
+            "mode": 384,
+            "name": "nvme0",
+            "path": "/dev/nvme0",
+            "uid": 0
+          },
+          {
+            "fstype": "devtmpfs",
+            "kind": "blockdev",
+            "mode": 432,
+            "name": "nvme0n1",
+            "path": "/dev/nvme0n1",
+            "uid": 0
+          },
+          {
+            "fstype": "devtmpfs",
+            "kind": "blockdev",
+            "mode": 432,
+            "name": "nvme0n1p1",
+            "path": "/dev/nvme0n1p1",
+            "uid": 0
+          },
+          {
+            "fstype": "devtmpfs",
+            "kind": "blockdev",
+            "mode": 432,
+            "name": "nvme0n1p14",
+            "path": "/dev/nvme0n1p14",
+            "uid": 0
+          },
+          {
+            "fstype": "devtmpfs",
+            "kind": "blockdev",
+            "mode": 432,
+            "name": "nvme0n1p15",
+            "path": "/dev/nvme0n1p15",
+            "uid": 0
+          },
+          {
+            "fstype": "devtmpfs",
+            "kind": "blockdev",
+            "mode": 432,
+            "name": "nvme0n1p16",
+            "path": "/dev/nvme0n1p16",
             "uid": 0
           },
           {
@@ -4195,14 +4235,6 @@
             "uid": 0
           },
           {
-            "fstype": "devtmpfs",
-            "kind": "chardev",
-            "mode": 384,
-            "name": "ptp1",
-            "path": "/dev/ptp1",
-            "uid": 0
-          },
-          {
             "fstype": "devpts",
             "kind": "dir",
             "mode": 493,
@@ -4248,54 +4280,6 @@
             "mode": 384,
             "name": "rtc0",
             "path": "/dev/rtc0",
-            "uid": 0
-          },
-          {
-            "fstype": "devtmpfs",
-            "kind": "blockdev",
-            "mode": 432,
-            "name": "sda",
-            "path": "/dev/sda",
-            "uid": 0
-          },
-          {
-            "fstype": "devtmpfs",
-            "kind": "blockdev",
-            "mode": 432,
-            "name": "sda1",
-            "path": "/dev/sda1",
-            "uid": 0
-          },
-          {
-            "fstype": "devtmpfs",
-            "kind": "blockdev",
-            "mode": 432,
-            "name": "sda14",
-            "path": "/dev/sda14",
-            "uid": 0
-          },
-          {
-            "fstype": "devtmpfs",
-            "kind": "blockdev",
-            "mode": 432,
-            "name": "sda15",
-            "path": "/dev/sda15",
-            "uid": 0
-          },
-          {
-            "fstype": "devtmpfs",
-            "kind": "blockdev",
-            "mode": 432,
-            "name": "sda16",
-            "path": "/dev/sda16",
-            "uid": 0
-          },
-          {
-            "fstype": "devtmpfs",
-            "kind": "chardev",
-            "mode": 432,
-            "name": "sg0",
-            "path": "/dev/sg0",
             "uid": 0
           },
           {
@@ -6311,6 +6295,15 @@
             "group_writable": false,
             "mode": 416,
             "other_writable": false,
+            "path": "/var/log/mysql/error.log.1.gz",
+            "uid": 111
+          },
+          {
+            "gid": 4,
+            "group": "adm",
+            "group_writable": false,
+            "mode": 416,
+            "other_writable": false,
             "path": "/var/log/nginx/access.log",
             "uid": 33
           },
@@ -6365,7 +6358,16 @@
             "group_writable": false,
             "mode": 420,
             "other_writable": false,
-            "path": "/var/log/sysstat/sa21",
+            "path": "/var/log/sysstat/sa23",
+            "uid": 0
+          },
+          {
+            "gid": 0,
+            "group": "root",
+            "group_writable": false,
+            "mode": 420,
+            "other_writable": false,
+            "path": "/var/log/sysstat/sa27",
             "uid": 0
           },
           {
@@ -9667,12 +9669,12 @@
         "status": "ok",
         "value": [
           {
-            "content": "table ip security {\n\tchain OUTPUT {\n\t\ttype filter hook output priority 150; policy accept;\n\t\tip daddr 168.63.129.16 tcp dport 53 counter packets 0 bytes 0 accept\n\t\tip daddr 168.63.129.16 ip protocol tcp skuid 0 counter packets 279 bytes 143805 accept\n\t\tip daddr 168.63.129.16 ip protocol tcp ct state invalid,new counter packets 0 bytes 0 drop\n\t}\n}\ntable ip nat {\n\tchain DOCKER {\n\t\tiifname \"docker0\" counter packets 0 bytes 0 return\n\t}\n\n\tchain PREROUTING {\n\t\ttype nat hook prerouting priority dstnat; policy accept;\n\t\tfib daddr type local counter packets 0 bytes 0 jump DOCKER\n\t}\n\n\tchain OUTPUT {\n\t\ttype nat hook output priority dstnat; policy accept;\n\t\tip daddr != 127.0.0.0/8 fib daddr type local counter packets 0 bytes 0 jump DOCKER\n\t}\n\n\tchain POSTROUTING {\n\t\ttype nat hook postrouting priority srcnat; policy accept;\n\t\tip saddr 198.51.100.0/16 oifname != \"docker0\" counter packets 0 bytes 0 masquerade\n\t}\n}\ntable ip filter {\n\tchain DOCKER {\n\t\tiifname != \"docker0\" oifname \"docker0\" counter packets 0 bytes 0 drop\n\t}\n\n\tchain DOCKER-FORWARD {\n\t\tcounter packets 0 bytes 0 jump DOCKER-CT\n\t\tcounter packets 0 bytes 0 jump DOCKER-ISOLATION-STAGE-1\n\t\tcounter packets 0 bytes 0 jump DOCKER-BRIDGE\n\t\tiifname \"docker0\" counter packets 0 bytes 0 accept\n\t}\n\n\tchain DOCKER-BRIDGE {\n\t\toifname \"docker0\" counter packets 0 bytes 0 jump DOCKER\n\t}\n\n\tchain DOCKER-CT {\n\t\toifname \"docker0\" ct state related,established counter packets 0 bytes 0 accept\n\t}\n\n\tchain DOCKER-ISOLATION-STAGE-1 {\n\t\tiifname \"docker0\" oifname != \"docker0\" counter packets 0 bytes 0 jump DOCKER-ISOLATION-STAGE-2\n\t}\n\n\tchain DOCKER-ISOLATION-STAGE-2 {\n\t\toifname \"docker0\" counter packets 0 bytes 0 drop\n\t}\n\n\tchain FORWARD {\n\t\ttype filter hook forward priority filter; policy drop;\n\t\tcounter packets 0 bytes 0 jump DOCKER-USER\n\t\tcounter packets 0 bytes 0 jump DOCKER-FORWARD\n\t}\n\n\tchain DOCKER-USER {\n\t\tcounter packets 0 bytes 0 return\n\t}\n}\ntable ip6 nat {\n\tchain DOCKER {\n\t}\n\n\tchain PREROUTING {\n\t\ttype nat hook prerouting priority dstnat; policy accept;\n\t\tfib daddr type local counter packets 0 bytes 0 jump DOCKER\n\t}\n\n\tchain OUTPUT {\n\t\ttype nat hook output priority dstnat; policy accept;\n\t\tip6 daddr != ::1 fib daddr type local counter packets 0 bytes 0 jump DOCKER\n\t}\n}\ntable ip6 filter {\n\tchain DOCKER {\n\t}\n\n\tchain DOCKER-FORWARD {\n\t\tcounter packets 0 bytes 0 jump DOCKER-CT\n\t\tcounter packets 0 bytes 0 jump DOCKER-ISOLATION-STAGE-1\n\t\tcounter packets 0 bytes 0 jump DOCKER-BRIDGE\n\t}\n\n\tchain DOCKER-BRIDGE {\n\t}\n\n\tchain DOCKER-CT {\n\t}\n\n\tchain DOCKER-ISOLATION-STAGE-1 {\n\t}\n\n\tchain DOCKER-ISOLATION-STAGE-2 {\n\t}\n\n\tchain FORWARD {\n\t\ttype filter hook forward priority filter; policy accept;\n\t\tcounter packets 0 bytes 0 jump DOCKER-USER\n\t\tcounter packets 0 bytes 0 jump DOCKER-FORWARD\n\t}\n\n\tchain DOCKER-USER {\n\t\tcounter packets 0 bytes 0 return\n\t}\n}\n",
+            "content": "table ip security {\n\tchain OUTPUT {\n\t\ttype filter hook output priority 150; policy accept;\n\t\tip daddr 168.63.129.16 tcp dport 53 counter packets 0 bytes 0 accept\n\t\tip daddr 168.63.129.16 ip protocol tcp skuid 0 counter packets 318 bytes 153765 accept\n\t\tip daddr 168.63.129.16 ip protocol tcp ct state invalid,new counter packets 0 bytes 0 drop\n\t}\n}\ntable ip nat {\n\tchain DOCKER {\n\t\tiifname \"docker0\" counter packets 0 bytes 0 return\n\t}\n\n\tchain PREROUTING {\n\t\ttype nat hook prerouting priority dstnat; policy accept;\n\t\tfib daddr type local counter packets 0 bytes 0 jump DOCKER\n\t}\n\n\tchain OUTPUT {\n\t\ttype nat hook output priority dstnat; policy accept;\n\t\tip daddr != 127.0.0.0/8 fib daddr type local counter packets 0 bytes 0 jump DOCKER\n\t}\n\n\tchain POSTROUTING {\n\t\ttype nat hook postrouting priority srcnat; policy accept;\n\t\tip saddr 198.51.100.0/16 oifname != \"docker0\" counter packets 0 bytes 0 masquerade\n\t}\n}\ntable ip filter {\n\tchain DOCKER {\n\t\tiifname != \"docker0\" oifname \"docker0\" counter packets 0 bytes 0 drop\n\t}\n\n\tchain DOCKER-FORWARD {\n\t\tcounter packets 0 bytes 0 jump DOCKER-CT\n\t\tcounter packets 0 bytes 0 jump DOCKER-ISOLATION-STAGE-1\n\t\tcounter packets 0 bytes 0 jump DOCKER-BRIDGE\n\t\tiifname \"docker0\" counter packets 0 bytes 0 accept\n\t}\n\n\tchain DOCKER-BRIDGE {\n\t\toifname \"docker0\" counter packets 0 bytes 0 jump DOCKER\n\t}\n\n\tchain DOCKER-CT {\n\t\toifname \"docker0\" ct state related,established counter packets 0 bytes 0 accept\n\t}\n\n\tchain DOCKER-ISOLATION-STAGE-1 {\n\t\tiifname \"docker0\" oifname != \"docker0\" counter packets 0 bytes 0 jump DOCKER-ISOLATION-STAGE-2\n\t}\n\n\tchain DOCKER-ISOLATION-STAGE-2 {\n\t\toifname \"docker0\" counter packets 0 bytes 0 drop\n\t}\n\n\tchain FORWARD {\n\t\ttype filter hook forward priority filter; policy drop;\n\t\tcounter packets 0 bytes 0 jump DOCKER-USER\n\t\tcounter packets 0 bytes 0 jump DOCKER-FORWARD\n\t}\n\n\tchain DOCKER-USER {\n\t\tcounter packets 0 bytes 0 return\n\t}\n}\ntable ip6 nat {\n\tchain DOCKER {\n\t}\n\n\tchain PREROUTING {\n\t\ttype nat hook prerouting priority dstnat; policy accept;\n\t\tfib daddr type local counter packets 0 bytes 0 jump DOCKER\n\t}\n\n\tchain OUTPUT {\n\t\ttype nat hook output priority dstnat; policy accept;\n\t\tip6 daddr != ::1 fib daddr type local counter packets 0 bytes 0 jump DOCKER\n\t}\n}\ntable ip6 filter {\n\tchain DOCKER {\n\t}\n\n\tchain DOCKER-FORWARD {\n\t\tcounter packets 0 bytes 0 jump DOCKER-CT\n\t\tcounter packets 0 bytes 0 jump DOCKER-ISOLATION-STAGE-1\n\t\tcounter packets 0 bytes 0 jump DOCKER-BRIDGE\n\t}\n\n\tchain DOCKER-BRIDGE {\n\t}\n\n\tchain DOCKER-CT {\n\t}\n\n\tchain DOCKER-ISOLATION-STAGE-1 {\n\t}\n\n\tchain DOCKER-ISOLATION-STAGE-2 {\n\t}\n\n\tchain FORWARD {\n\t\ttype filter hook forward priority filter; policy accept;\n\t\tcounter packets 0 bytes 0 jump DOCKER-USER\n\t\tcounter packets 0 bytes 0 jump DOCKER-FORWARD\n\t}\n\n\tchain DOCKER-USER {\n\t\tcounter packets 0 bytes 0 return\n\t}\n}\n",
             "source": "/usr/sbin/nft list ruleset",
             "truncated": false
           },
           {
-            "content": "# Generated by iptables-save v1.8.10 (nf_tables) on Wed Oct 21 02:03:17 2026\n*security\n:INPUT ACCEPT [0:0]\n:FORWARD ACCEPT [0:0]\n:OUTPUT ACCEPT [5004:578263]\n-A OUTPUT -d 168.63.129.16/32 -p tcp -m tcp --dport 53 -j ACCEPT\n-A OUTPUT -d 168.63.129.16/32 -p tcp -m owner --uid-owner 0 -j ACCEPT\n-A OUTPUT -d 168.63.129.16/32 -p tcp -m conntrack --ctstate INVALID,NEW -j DROP\nCOMMIT\n# Completed on Wed Oct 21 02:03:17 2026\n# Generated by iptables-save v1.8.10 (nf_tables) on Wed Oct 21 02:03:17 2026\n*filter\n:INPUT ACCEPT [0:0]\n:FORWARD DROP [0:0]\n:OUTPUT ACCEPT [0:0]\n:DOCKER - [0:0]\n:DOCKER-BRIDGE - [0:0]\n:DOCKER-CT - [0:0]\n:DOCKER-FORWARD - [0:0]\n:DOCKER-ISOLATION-STAGE-1 - [0:0]\n:DOCKER-ISOLATION-STAGE-2 - [0:0]\n:DOCKER-USER - [0:0]\n-A FORWARD -j DOCKER-USER\n-A FORWARD -j DOCKER-FORWARD\n-A DOCKER ! -i docker0 -o docker0 -j DROP\n-A DOCKER-BRIDGE -o docker0 -j DOCKER\n-A DOCKER-CT -o docker0 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT\n-A DOCKER-FORWARD -j DOCKER-CT\n-A DOCKER-FORWARD -j DOCKER-ISOLATION-STAGE-1\n-A DOCKER-FORWARD -j DOCKER-BRIDGE\n-A DOCKER-FORWARD -i docker0 -j ACCEPT\n-A DOCKER-ISOLATION-STAGE-1 -i docker0 ! -o docker0 -j DOCKER-ISOLATION-STAGE-2\n-A DOCKER-ISOLATION-STAGE-2 -o docker0 -j DROP\n-A DOCKER-USER -j RETURN\nCOMMIT\n# Completed on Wed Oct 21 02:03:17 2026\n# Generated by iptables-save v1.8.10 (nf_tables) on Wed Oct 21 02:03:17 2026\n*nat\n:PREROUTING ACCEPT [0:0]\n:INPUT ACCEPT [0:0]\n:OUTPUT ACCEPT [147:11424]\n:POSTROUTING ACCEPT [147:11424]\n:DOCKER - [0:0]\n-A PREROUTING -m addrtype --dst-type LOCAL -j DOCKER\n-A OUTPUT ! -d 127.0.0.0/8 -m addrtype --dst-type LOCAL -j DOCKER\n-A POSTROUTING -s 198.51.100.0/16 ! -o docker0 -j MASQUERADE\n-A DOCKER -i docker0 -j RETURN\nCOMMIT\n# Completed on Wed Oct 21 02:03:17 2026\n",
+            "content": "# Generated by iptables-save v1.8.10 (nf_tables) on Tue Oct 27 09:00:29 2026\n*security\n:INPUT ACCEPT [0:0]\n:FORWARD ACCEPT [0:0]\n:OUTPUT ACCEPT [9716:841693]\n-A OUTPUT -d 168.63.129.16/32 -p tcp -m tcp --dport 53 -j ACCEPT\n-A OUTPUT -d 168.63.129.16/32 -p tcp -m owner --uid-owner 0 -j ACCEPT\n-A OUTPUT -d 168.63.129.16/32 -p tcp -m conntrack --ctstate INVALID,NEW -j DROP\nCOMMIT\n# Completed on Tue Oct 27 09:00:29 2026\n# Generated by iptables-save v1.8.10 (nf_tables) on Tue Oct 27 09:00:29 2026\n*filter\n:INPUT ACCEPT [0:0]\n:FORWARD DROP [0:0]\n:OUTPUT ACCEPT [0:0]\n:DOCKER - [0:0]\n:DOCKER-BRIDGE - [0:0]\n:DOCKER-CT - [0:0]\n:DOCKER-FORWARD - [0:0]\n:DOCKER-ISOLATION-STAGE-1 - [0:0]\n:DOCKER-ISOLATION-STAGE-2 - [0:0]\n:DOCKER-USER - [0:0]\n-A FORWARD -j DOCKER-USER\n-A FORWARD -j DOCKER-FORWARD\n-A DOCKER ! -i docker0 -o docker0 -j DROP\n-A DOCKER-BRIDGE -o docker0 -j DOCKER\n-A DOCKER-CT -o docker0 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT\n-A DOCKER-FORWARD -j DOCKER-CT\n-A DOCKER-FORWARD -j DOCKER-ISOLATION-STAGE-1\n-A DOCKER-FORWARD -j DOCKER-BRIDGE\n-A DOCKER-FORWARD -i docker0 -j ACCEPT\n-A DOCKER-ISOLATION-STAGE-1 -i docker0 ! -o docker0 -j DOCKER-ISOLATION-STAGE-2\n-A DOCKER-ISOLATION-STAGE-2 -o docker0 -j DROP\n-A DOCKER-USER -j RETURN\nCOMMIT\n# Completed on Tue Oct 27 09:00:29 2026\n# Generated by iptables-save v1.8.10 (nf_tables) on Tue Oct 27 09:00:29 2026\n*nat\n:PREROUTING ACCEPT [0:0]\n:INPUT ACCEPT [0:0]\n:OUTPUT ACCEPT [185:14200]\n:POSTROUTING ACCEPT [178:13780]\n:DOCKER - [0:0]\n-A PREROUTING -m addrtype --dst-type LOCAL -j DOCKER\n-A OUTPUT ! -d 127.0.0.0/8 -m addrtype --dst-type LOCAL -j DOCKER\n-A POSTROUTING -s 198.51.100.0/16 ! -o docker0 -j MASQUERADE\n-A DOCKER -i docker0 -j RETURN\nCOMMIT\n# Completed on Tue Oct 27 09:00:29 2026\n",
             "source": "/usr/sbin/iptables-save",
             "truncated": false
           }
@@ -11155,7 +11157,7 @@
               "relatime"
             ],
             "separate": true,
-            "source": "/dev/sda16",
+            "source": "/dev/nvme0n1p16",
             "target": "/boot"
           },
           {
@@ -11981,7 +11983,7 @@
               },
               {
                 "kind": "proc",
-                "path": "/proc/sys/net/ipv6/conf/enP21286s1/disable_ipv6"
+                "path": "/proc/sys/net/ipv6/conf/ens1/disable_ipv6"
               },
               {
                 "kind": "proc",
@@ -18230,7 +18232,7 @@
           "value": {
             "dpkg_path_excludes": [],
             "dpkg_path_excludes_error": [],
-            "duration_ms": 676633,
+            "duration_ms": 445068,
             "exit_code": 0,
             "lines": 10,
             "packages_without_digests": 1,
@@ -19900,7 +19902,7 @@
       },
       "metadata_age_s": {
         "status": "ok",
-        "value": 707037,
+        "value": 1250469,
         "source": {
           "kind": "file",
           "path": "/var/lib/apt/periodic/update-success-stamp"
@@ -20085,9 +20087,9 @@
         "status": "ok",
         "value": [
           {
-            "exe": "/tmp/provjobd2024068484",
-            "name": "provjobd2024068",
-            "pid": 2085,
+            "exe": "/tmp/provjobd3757035416",
+            "name": "provjobd3757035",
+            "pid": 1849,
             "uid": 0
           }
         ],
@@ -20226,7 +20228,7 @@
             "exe_read_status": "",
             "kind": "kernel",
             "mnt_ns": "",
-            "name": "kworker/0:0-events",
+            "name": "kworker/0:0-mm_percpu_wq",
             "ns_read_status": "",
             "package": "",
             "package_status": "",
@@ -20246,21 +20248,6 @@
             "package": "",
             "package_status": "",
             "pid": 10,
-            "ppid": 2,
-            "uid": 0
-          },
-          {
-            "cmd": "",
-            "exe": "",
-            "exe_deleted": false,
-            "exe_read_status": "",
-            "kind": "kernel",
-            "mnt_ns": "",
-            "name": "kworker/u16:0-events_power_efficient",
-            "ns_read_status": "",
-            "package": "",
-            "package_status": "",
-            "pid": 12,
             "ppid": 2,
             "uid": 0
           },
@@ -20706,7 +20693,7 @@
             "exe_read_status": "",
             "kind": "kernel",
             "mnt_ns": "",
-            "name": "kworker/u16:1-kvfree_rcu_reclaim",
+            "name": "oom_reaper",
             "ns_read_status": "",
             "package": "",
             "package_status": "",
@@ -20721,11 +20708,26 @@
             "exe_read_status": "",
             "kind": "kernel",
             "mnt_ns": "",
-            "name": "oom_reaper",
+            "name": "kworker/u16:1-ipv6_addrconf",
             "ns_read_status": "",
             "package": "",
             "package_status": "",
             "pid": 46,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/u16:2-events_unbound",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 47,
             "ppid": 2,
             "uid": 0
           },
@@ -20846,6 +20848,21 @@
             "package": "",
             "package_status": "",
             "pid": 55,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/2:1-events",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 57,
             "ppid": 2,
             "uid": 0
           },
@@ -21036,7 +21053,7 @@
             "exe_read_status": "",
             "kind": "kernel",
             "mnt_ns": "",
-            "name": "kworker/2:1H-kblockd",
+            "name": "kworker/0:1H-kblockd",
             "ns_read_status": "",
             "package": "",
             "package_status": "",
@@ -21126,7 +21143,7 @@
             "exe_read_status": "",
             "kind": "kernel",
             "mnt_ns": "",
-            "name": "scsi_eh_1",
+            "name": "kworker/R-scsi_tmf_0",
             "ns_read_status": "",
             "package": "",
             "package_status": "",
@@ -21141,7 +21158,7 @@
             "exe_read_status": "",
             "kind": "kernel",
             "mnt_ns": "",
-            "name": "kworker/R-scsi_tmf_0",
+            "name": "kworker/R-nvme-wq",
             "ns_read_status": "",
             "package": "",
             "package_status": "",
@@ -21156,7 +21173,7 @@
             "exe_read_status": "",
             "kind": "kernel",
             "mnt_ns": "",
-            "name": "kworker/R-scsi_tmf_1",
+            "name": "kworker/R-nvme-reset-wq",
             "ns_read_status": "",
             "package": "",
             "package_status": "",
@@ -21171,7 +21188,7 @@
             "exe_read_status": "",
             "kind": "kernel",
             "mnt_ns": "",
-            "name": "kworker/u16:3-mlx5_fc",
+            "name": "kworker/R-nvme-delete-wq",
             "ns_read_status": "",
             "package": "",
             "package_status": "",
@@ -21186,7 +21203,7 @@
             "exe_read_status": "",
             "kind": "kernel",
             "mnt_ns": "",
-            "name": "kworker/R-nvme-wq",
+            "name": "kworker/R-nvme-auth-wq",
             "ns_read_status": "",
             "package": "",
             "package_status": "",
@@ -21201,7 +21218,7 @@
             "exe_read_status": "",
             "kind": "kernel",
             "mnt_ns": "",
-            "name": "kworker/R-nvme-reset-wq",
+            "name": "kworker/u16:3-events_power_efficient",
             "ns_read_status": "",
             "package": "",
             "package_status": "",
@@ -21216,22 +21233,7 @@
             "exe_read_status": "",
             "kind": "kernel",
             "mnt_ns": "",
-            "name": "kworker/R-nvme-delete-wq",
-            "ns_read_status": "",
-            "package": "",
-            "package_status": "",
-            "pid": 83,
-            "ppid": 2,
-            "uid": 0
-          },
-          {
-            "cmd": "",
-            "exe": "",
-            "exe_deleted": false,
-            "exe_read_status": "",
-            "kind": "kernel",
-            "mnt_ns": "",
-            "name": "kworker/R-nvme-auth-wq",
+            "name": "kworker/u16:5-events_power_efficient",
             "ns_read_status": "",
             "package": "",
             "package_status": "",
@@ -21250,6 +21252,21 @@
             "ns_read_status": "",
             "package": "",
             "package_status": "",
+            "pid": 85,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/2:1H-kblockd",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
             "pid": 86,
             "ppid": 2,
             "uid": 0
@@ -21261,7 +21278,7 @@
             "exe_read_status": "",
             "kind": "kernel",
             "mnt_ns": "",
-            "name": "kworker/1:1H-kblockd",
+            "name": "kworker/R-ipv6_addrconf",
             "ns_read_status": "",
             "package": "",
             "package_status": "",
@@ -21276,7 +21293,7 @@
             "exe_read_status": "",
             "kind": "kernel",
             "mnt_ns": "",
-            "name": "kworker/R-ipv6_addrconf",
+            "name": "kworker/0:2-events",
             "ns_read_status": "",
             "package": "",
             "package_status": "",
@@ -21336,7 +21353,7 @@
             "exe_read_status": "",
             "kind": "kernel",
             "mnt_ns": "",
-            "name": "kworker/0:1H-kblockd",
+            "name": "jbd2/nvme0n1p1-8",
             "ns_read_status": "",
             "package": "",
             "package_status": "",
@@ -21351,7 +21368,7 @@
             "exe_read_status": "",
             "kind": "kernel",
             "mnt_ns": "",
-            "name": "jbd2/sda1-8",
+            "name": "kworker/R-ext4-rsv-conversion",
             "ns_read_status": "",
             "package": "",
             "package_status": "",
@@ -21366,7 +21383,7 @@
             "exe_read_status": "",
             "kind": "kernel",
             "mnt_ns": "",
-            "name": "kworker/R-ext4-rsv-conversion",
+            "name": "kworker/2:2-events",
             "ns_read_status": "",
             "package": "",
             "package_status": "",
@@ -21381,7 +21398,7 @@
             "exe_read_status": "",
             "kind": "kernel",
             "mnt_ns": "",
-            "name": "kworker/0:2-events",
+            "name": "kworker/3:1H-kblockd",
             "ns_read_status": "",
             "package": "",
             "package_status": "",
@@ -21396,11 +21413,11 @@
             "exe_read_status": "",
             "kind": "kernel",
             "mnt_ns": "",
-            "name": "kworker/3:1H-kblockd",
+            "name": "kworker/1:1H-kblockd",
             "ns_read_status": "",
             "package": "",
             "package_status": "",
-            "pid": 132,
+            "pid": 108,
             "ppid": 2,
             "uid": 0
           },
@@ -21417,6 +21434,21 @@
             "package_status": "packaged",
             "pid": 156,
             "ppid": 1,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/1:2-events",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 177,
+            "ppid": 2,
             "uid": 0
           },
           {
@@ -21456,26 +21488,11 @@
             "exe_read_status": "",
             "kind": "kernel",
             "mnt_ns": "",
-            "name": "kworker/1:2-events",
+            "name": "kworker/0:3-events",
             "ns_read_status": "",
             "package": "",
             "package_status": "",
-            "pid": 180,
-            "ppid": 2,
-            "uid": 0
-          },
-          {
-            "cmd": "",
-            "exe": "",
-            "exe_deleted": false,
-            "exe_read_status": "",
-            "kind": "kernel",
-            "mnt_ns": "",
-            "name": "kworker/3:2-cgroup_free",
-            "ns_read_status": "",
-            "package": "",
-            "package_status": "",
-            "pid": 212,
+            "pid": 197,
             "ppid": 2,
             "uid": 0
           },
@@ -21490,7 +21507,7 @@
             "ns_read_status": "ok",
             "package": "multipath-tools",
             "package_status": "packaged",
-            "pid": 220,
+            "pid": 221,
             "ppid": 1,
             "uid": 0
           },
@@ -21520,23 +21537,8 @@
             "ns_read_status": "",
             "package": "",
             "package_status": "",
-            "pid": 236,
+            "pid": 238,
             "ppid": 2,
-            "uid": 0
-          },
-          {
-            "cmd": "/usr/lib/linux-tools/6.17.0-1022-azure/hv_kvp_daemon",
-            "exe": "/usr/lib/linux-azure-6.17-tools-6.17.0-1022/hv_kvp_daemon",
-            "exe_deleted": false,
-            "exe_read_status": "ok",
-            "kind": "user",
-            "mnt_ns": "host",
-            "name": "hv_kvp_daemon",
-            "ns_read_status": "ok",
-            "package": "linux-azure-6.17-cloud-tools-6.17.0-1022",
-            "package_status": "packaged",
-            "pid": 338,
-            "ppid": 1,
             "uid": 0
           },
           {
@@ -21546,11 +21548,11 @@
             "exe_read_status": "",
             "kind": "kernel",
             "mnt_ns": "",
-            "name": "jbd2/sda16-8",
+            "name": "jbd2/nvme0n1p16-8",
             "ns_read_status": "",
             "package": "",
             "package_status": "",
-            "pid": 415,
+            "pid": 301,
             "ppid": 2,
             "uid": 0
           },
@@ -21565,202 +21567,22 @@
             "ns_read_status": "",
             "package": "",
             "package_status": "",
-            "pid": 416,
+            "pid": 302,
             "ppid": 2,
             "uid": 0
           },
           {
-            "cmd": "/usr/lib/systemd/systemd-resolved",
-            "exe": "/usr/lib/systemd/systemd-resolved",
+            "cmd": "/usr/lib/linux-tools/6.17.0-1022-azure/hv_kvp_daemon",
+            "exe": "/usr/lib/linux-azure-6.17-tools-6.17.0-1022/hv_kvp_daemon",
             "exe_deleted": false,
             "exe_read_status": "ok",
             "kind": "user",
             "mnt_ns": "host",
-            "name": "systemd-resolve",
+            "name": "hv_kvp_daemon",
             "ns_read_status": "ok",
-            "package": "systemd-resolved",
+            "package": "linux-azure-6.17-cloud-tools-6.17.0-1022",
             "package_status": "packaged",
-            "pid": 534,
-            "ppid": 1,
-            "uid": 991
-          },
-          {
-            "cmd": "/usr/sbin/haveged",
-            "exe": "/usr/sbin/haveged",
-            "exe_deleted": false,
-            "exe_read_status": "ok",
-            "kind": "user",
-            "mnt_ns": "host",
-            "name": "haveged",
-            "ns_read_status": "ok",
-            "package": "haveged",
-            "package_status": "packaged",
-            "pid": 579,
-            "ppid": 1,
-            "uid": 0
-          },
-          {
-            "cmd": "",
-            "exe": "",
-            "exe_deleted": false,
-            "exe_read_status": "",
-            "kind": "kernel",
-            "mnt_ns": "",
-            "name": "kworker/2:3-mm_percpu_wq",
-            "ns_read_status": "",
-            "package": "",
-            "package_status": "",
-            "pid": 580,
-            "ppid": 2,
-            "uid": 0
-          },
-          {
-            "cmd": "",
-            "exe": "",
-            "exe_deleted": false,
-            "exe_read_status": "",
-            "kind": "kernel",
-            "mnt_ns": "",
-            "name": "kworker/2:4-cgroup_free",
-            "ns_read_status": "",
-            "package": "",
-            "package_status": "",
-            "pid": 581,
-            "ppid": 2,
-            "uid": 0
-          },
-          {
-            "cmd": "/usr/lib/systemd/systemd-networkd",
-            "exe": "/usr/lib/systemd/systemd-networkd",
-            "exe_deleted": false,
-            "exe_read_status": "ok",
-            "kind": "user",
-            "mnt_ns": "host",
-            "name": "systemd-network",
-            "ns_read_status": "ok",
-            "package": "systemd",
-            "package_status": "packaged",
-            "pid": 721,
-            "ppid": 1,
-            "uid": 998
-          },
-          {
-            "cmd": "@dbus-daemon",
-            "exe": "/usr/bin/dbus-daemon",
-            "exe_deleted": false,
-            "exe_read_status": "ok",
-            "kind": "user",
-            "mnt_ns": "host",
-            "name": "dbus-daemon",
-            "ns_read_status": "ok",
-            "package": "dbus-daemon",
-            "package_status": "packaged",
-            "pid": 1004,
-            "ppid": 1,
-            "uid": 101
-          },
-          {
-            "cmd": "/usr/bin/python3",
-            "exe": "/usr/bin/python3.12",
-            "exe_deleted": false,
-            "exe_read_status": "ok",
-            "kind": "user",
-            "mnt_ns": "host",
-            "name": "networkd-dispat",
-            "ns_read_status": "ok",
-            "package": "python3.12-minimal",
-            "package_status": "packaged",
-            "pid": 1009,
-            "ppid": 1,
-            "uid": 0
-          },
-          {
-            "cmd": "php-fpm: master process (/etc/php/8.3/fpm/php-fpm.conf)",
-            "exe": "/usr/sbin/php-fpm8.3",
-            "exe_deleted": false,
-            "exe_read_status": "ok",
-            "kind": "user",
-            "mnt_ns": "host",
-            "name": "php-fpm8.3",
-            "ns_read_status": "ok",
-            "package": "php8.3-fpm",
-            "package_status": "packaged",
-            "pid": 1011,
-            "ppid": 1,
-            "uid": 0
-          },
-          {
-            "cmd": "/usr/lib/polkit-1/polkitd",
-            "exe": "/usr/lib/polkit-1/polkitd",
-            "exe_deleted": false,
-            "exe_read_status": "ok",
-            "kind": "user",
-            "mnt_ns": "host",
-            "name": "polkitd",
-            "ns_read_status": "ok",
-            "package": "polkitd",
-            "package_status": "packaged",
-            "pid": 1016,
-            "ppid": 1,
-            "uid": 989
-          },
-          {
-            "cmd": "/usr/lib/systemd/systemd-logind",
-            "exe": "/usr/lib/systemd/systemd-logind",
-            "exe_deleted": false,
-            "exe_read_status": "ok",
-            "kind": "user",
-            "mnt_ns": "host",
-            "name": "systemd-logind",
-            "ns_read_status": "ok",
-            "package": "systemd",
-            "package_status": "packaged",
-            "pid": 1023,
-            "ppid": 1,
-            "uid": 0
-          },
-          {
-            "cmd": "/usr/libexec/udisks2/udisksd",
-            "exe": "/usr/libexec/udisks2/udisksd",
-            "exe_deleted": false,
-            "exe_read_status": "ok",
-            "kind": "user",
-            "mnt_ns": "host",
-            "name": "udisksd",
-            "ns_read_status": "ok",
-            "package": "udisks2",
-            "package_status": "packaged",
-            "pid": 1025,
-            "ppid": 1,
-            "uid": 0
-          },
-          {
-            "cmd": "/usr/bin/python3",
-            "exe": "/usr/bin/python3.12",
-            "exe_deleted": false,
-            "exe_read_status": "ok",
-            "kind": "user",
-            "mnt_ns": "host",
-            "name": "python3",
-            "ns_read_status": "ok",
-            "package": "python3.12-minimal",
-            "package_status": "packaged",
-            "pid": 1026,
-            "ppid": 1,
-            "uid": 0
-          },
-          {
-            "cmd": "/usr/sbin/cron",
-            "exe": "/usr/sbin/cron",
-            "exe_deleted": false,
-            "exe_read_status": "ok",
-            "kind": "user",
-            "mnt_ns": "host",
-            "name": "cron",
-            "ns_read_status": "ok",
-            "package": "cron",
-            "package_status": "packaged",
-            "pid": 1058,
+            "pid": 320,
             "ppid": 1,
             "uid": 0
           },
@@ -21775,442 +21597,67 @@
             "ns_read_status": "",
             "package": "",
             "package_status": "",
-            "pid": 1103,
+            "pid": 389,
             "ppid": 2,
             "uid": 0
           },
           {
-            "cmd": "/sbin/agetty",
-            "exe": "/usr/sbin/agetty",
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/3:4-events",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 394,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "/usr/lib/systemd/systemd-resolved",
+            "exe": "/usr/lib/systemd/systemd-resolved",
             "exe_deleted": false,
             "exe_read_status": "ok",
             "kind": "user",
             "mnt_ns": "host",
-            "name": "agetty",
+            "name": "systemd-resolve",
             "ns_read_status": "ok",
-            "package": "util-linux",
+            "package": "systemd-resolved",
             "package_status": "packaged",
-            "pid": 1108,
+            "pid": 472,
+            "ppid": 1,
+            "uid": 991
+          },
+          {
+            "cmd": "/usr/sbin/haveged",
+            "exe": "/usr/sbin/haveged",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "haveged",
+            "ns_read_status": "ok",
+            "package": "haveged",
+            "package_status": "packaged",
+            "pid": 490,
             "ppid": 1,
             "uid": 0
           },
           {
-            "cmd": "/usr/sbin/rsyslogd",
-            "exe": "/usr/sbin/rsyslogd",
-            "exe_deleted": false,
-            "exe_read_status": "ok",
-            "kind": "user",
-            "mnt_ns": "host",
-            "name": "rsyslogd",
-            "ns_read_status": "ok",
-            "package": "rsyslog",
-            "package_status": "packaged",
-            "pid": 1112,
-            "ppid": 1,
-            "uid": 102
-          },
-          {
-            "cmd": "/usr/bin/containerd",
-            "exe": "/usr/bin/containerd",
-            "exe_deleted": false,
-            "exe_read_status": "ok",
-            "kind": "user",
-            "mnt_ns": "host",
-            "name": "containerd",
-            "ns_read_status": "ok",
-            "package": "containerd.io",
-            "package_status": "packaged",
-            "pid": 1113,
-            "ppid": 1,
-            "uid": 0
-          },
-          {
-            "cmd": "/sbin/agetty",
-            "exe": "/usr/sbin/agetty",
-            "exe_deleted": false,
-            "exe_read_status": "ok",
-            "kind": "user",
-            "mnt_ns": "host",
-            "name": "agetty",
-            "ns_read_status": "ok",
-            "package": "util-linux",
-            "package_status": "packaged",
-            "pid": 1122,
-            "ppid": 1,
-            "uid": 0
-          },
-          {
-            "cmd": "/usr/lib/systemd/systemd",
-            "exe": "/usr/lib/systemd/systemd",
-            "exe_deleted": false,
-            "exe_read_status": "ok",
-            "kind": "user",
-            "mnt_ns": "host",
-            "name": "systemd",
-            "ns_read_status": "ok",
-            "package": "systemd",
-            "package_status": "packaged",
-            "pid": 1147,
-            "ppid": 1,
-            "uid": 1001
-          },
-          {
-            "cmd": "/usr/sbin/ModemManager",
-            "exe": "/usr/sbin/ModemManager",
-            "exe_deleted": false,
-            "exe_read_status": "ok",
-            "kind": "user",
-            "mnt_ns": "host",
-            "name": "ModemManager",
-            "ns_read_status": "ok",
-            "package": "modemmanager",
-            "package_status": "packaged",
-            "pid": 1159,
-            "ppid": 1,
-            "uid": 0
-          },
-          {
-            "cmd": "(sd-pam)",
-            "exe": "/usr/lib/systemd/systemd-executor",
-            "exe_deleted": false,
-            "exe_read_status": "ok",
-            "kind": "user",
-            "mnt_ns": "host",
-            "name": "(sd-pam)",
-            "ns_read_status": "ok",
-            "package": "systemd",
-            "package_status": "packaged",
-            "pid": 1164,
-            "ppid": 1147,
-            "uid": 1001
-          },
-          {
-            "cmd": "/usr/sbin/chronyd",
-            "exe": "/usr/sbin/chronyd",
-            "exe_deleted": false,
-            "exe_read_status": "ok",
-            "kind": "user",
-            "mnt_ns": "host",
-            "name": "chronyd",
-            "ns_read_status": "ok",
-            "package": "chrony",
-            "package_status": "packaged",
-            "pid": 1166,
-            "ppid": 1,
-            "uid": 109
-          },
-          {
-            "cmd": "/usr/sbin/chronyd",
-            "exe": "/usr/sbin/chronyd",
-            "exe_deleted": false,
-            "exe_read_status": "ok",
-            "kind": "user",
-            "mnt_ns": "host",
-            "name": "chronyd",
-            "ns_read_status": "ok",
-            "package": "chrony",
-            "package_status": "packaged",
-            "pid": 1169,
-            "ppid": 1166,
-            "uid": 109
-          },
-          {
             "cmd": "",
             "exe": "",
             "exe_deleted": false,
             "exe_read_status": "",
             "kind": "kernel",
             "mnt_ns": "",
-            "name": "kworker/R-tls-strp",
+            "name": "kworker/R-mana_per_port_queue_reset_wq",
             "ns_read_status": "",
             "package": "",
             "package_status": "",
-            "pid": 1334,
-            "ppid": 2,
-            "uid": 0
-          },
-          {
-            "cmd": "/usr/bin/python3",
-            "exe": "/usr/bin/python3.12",
-            "exe_deleted": false,
-            "exe_read_status": "ok",
-            "kind": "user",
-            "mnt_ns": "host",
-            "name": "python3",
-            "ns_read_status": "ok",
-            "package": "python3.12-minimal",
-            "package_status": "packaged",
-            "pid": 1371,
-            "ppid": 1026,
-            "uid": 0
-          },
-          {
-            "cmd": "/usr/bin/dockerd",
-            "exe": "/usr/bin/dockerd",
-            "exe_deleted": false,
-            "exe_read_status": "ok",
-            "kind": "user",
-            "mnt_ns": "host",
-            "name": "dockerd",
-            "ns_read_status": "ok",
-            "package": "docker-ce",
-            "package_status": "packaged",
-            "pid": 1410,
-            "ppid": 1,
-            "uid": 0
-          },
-          {
-            "cmd": "php-fpm: pool www",
-            "exe": "/usr/sbin/php-fpm8.3",
-            "exe_deleted": false,
-            "exe_read_status": "ok",
-            "kind": "user",
-            "mnt_ns": "host",
-            "name": "php-fpm8.3",
-            "ns_read_status": "ok",
-            "package": "php8.3-fpm",
-            "package_status": "packaged",
-            "pid": 1431,
-            "ppid": 1011,
-            "uid": 33
-          },
-          {
-            "cmd": "php-fpm: pool www",
-            "exe": "/usr/sbin/php-fpm8.3",
-            "exe_deleted": false,
-            "exe_read_status": "ok",
-            "kind": "user",
-            "mnt_ns": "host",
-            "name": "php-fpm8.3",
-            "ns_read_status": "ok",
-            "package": "php8.3-fpm",
-            "package_status": "packaged",
-            "pid": 1435,
-            "ppid": 1011,
-            "uid": 33
-          },
-          {
-            "cmd": "",
-            "exe": "",
-            "exe_deleted": false,
-            "exe_read_status": "",
-            "kind": "kernel",
-            "mnt_ns": "",
-            "name": "psimon",
-            "ns_read_status": "",
-            "package": "",
-            "package_status": "",
-            "pid": 2063,
-            "ppid": 2,
-            "uid": 0
-          },
-          {
-            "cmd": "/opt/hca/hosted-compute-agent",
-            "exe": "/opt/hca/hosted-compute-agent",
-            "exe_deleted": false,
-            "exe_read_status": "ok",
-            "kind": "user",
-            "mnt_ns": "host",
-            "name": "hosted-compute-",
-            "ns_read_status": "ok",
-            "package": "",
-            "package_status": "unpackaged",
-            "pid": 2065,
-            "ppid": 1,
-            "uid": 1001
-          },
-          {
-            "cmd": "sudo",
-            "exe": "/usr/bin/sudo",
-            "exe_deleted": false,
-            "exe_read_status": "ok",
-            "kind": "user",
-            "mnt_ns": "host",
-            "name": "sudo",
-            "ns_read_status": "ok",
-            "package": "sudo",
-            "package_status": "packaged",
-            "pid": 2083,
-            "ppid": 2065,
-            "uid": 1001
-          },
-          {
-            "cmd": "/tmp/provjobd2024068484",
-            "exe": "/tmp/provjobd2024068484",
-            "exe_deleted": true,
-            "exe_read_status": "ok",
-            "kind": "user",
-            "mnt_ns": "host",
-            "name": "provjobd2024068",
-            "ns_read_status": "ok",
-            "package": "",
-            "package_status": "unpackaged",
-            "pid": 2085,
-            "ppid": 2083,
-            "uid": 0
-          },
-          {
-            "cmd": "/home/runner/actions-runner/cached/2.337.0/bin/Runner.Listener",
-            "exe": "/home/runner/actions-runner/cached/2.337.0/bin/Runner.Listener",
-            "exe_deleted": false,
-            "exe_read_status": "ok",
-            "kind": "user",
-            "mnt_ns": "host",
-            "name": "Runner.Listener",
-            "ns_read_status": "ok",
-            "package": "",
-            "package_status": "unpackaged",
-            "pid": 2118,
-            "ppid": 2065,
-            "uid": 1001
-          },
-          {
-            "cmd": "/home/runner/actions-runner/cached/2.337.0/bin/Runner.Worker",
-            "exe": "/home/runner/actions-runner/cached/2.337.0/bin/Runner.Worker",
-            "exe_deleted": false,
-            "exe_read_status": "ok",
-            "kind": "user",
-            "mnt_ns": "host",
-            "name": "Runner.Worker",
-            "ns_read_status": "ok",
-            "package": "",
-            "package_status": "unpackaged",
-            "pid": 2139,
-            "ppid": 2118,
-            "uid": 1001
-          },
-          {
-            "cmd": "",
-            "exe": "",
-            "exe_deleted": false,
-            "exe_read_status": "",
-            "kind": "kernel",
-            "mnt_ns": "",
-            "name": "kworker/R-mlx5_cmd_5326:00:02.0",
-            "ns_read_status": "",
-            "package": "",
-            "package_status": "",
-            "pid": 2300,
-            "ppid": 2,
-            "uid": 0
-          },
-          {
-            "cmd": "",
-            "exe": "",
-            "exe_deleted": false,
-            "exe_read_status": "",
-            "kind": "kernel",
-            "mnt_ns": "",
-            "name": "kworker/R-mlx5_health5326:00:02.0",
-            "ns_read_status": "",
-            "package": "",
-            "package_status": "",
-            "pid": 2301,
-            "ppid": 2,
-            "uid": 0
-          },
-          {
-            "cmd": "",
-            "exe": "",
-            "exe_deleted": false,
-            "exe_read_status": "",
-            "kind": "kernel",
-            "mnt_ns": "",
-            "name": "kworker/R-mlx5_page_allocator",
-            "ns_read_status": "",
-            "package": "",
-            "package_status": "",
-            "pid": 2302,
-            "ppid": 2,
-            "uid": 0
-          },
-          {
-            "cmd": "",
-            "exe": "",
-            "exe_deleted": false,
-            "exe_read_status": "",
-            "kind": "kernel",
-            "mnt_ns": "",
-            "name": "kworker/R-mlx5_events",
-            "ns_read_status": "",
-            "package": "",
-            "package_status": "",
-            "pid": 2303,
-            "ppid": 2,
-            "uid": 0
-          },
-          {
-            "cmd": "",
-            "exe": "",
-            "exe_deleted": false,
-            "exe_read_status": "",
-            "kind": "kernel",
-            "mnt_ns": "",
-            "name": "ptp1",
-            "ns_read_status": "",
-            "package": "",
-            "package_status": "",
-            "pid": 2304,
-            "ppid": 2,
-            "uid": 0
-          },
-          {
-            "cmd": "",
-            "exe": "",
-            "exe_deleted": false,
-            "exe_read_status": "",
-            "kind": "kernel",
-            "mnt_ns": "",
-            "name": "kworker/R-mlx5_fc",
-            "ns_read_status": "",
-            "package": "",
-            "package_status": "",
-            "pid": 2305,
-            "ppid": 2,
-            "uid": 0
-          },
-          {
-            "cmd": "",
-            "exe": "",
-            "exe_deleted": false,
-            "exe_read_status": "",
-            "kind": "kernel",
-            "mnt_ns": "",
-            "name": "kworker/R-mlx5_hv_vhca",
-            "ns_read_status": "",
-            "package": "",
-            "package_status": "",
-            "pid": 2306,
-            "ppid": 2,
-            "uid": 0
-          },
-          {
-            "cmd": "",
-            "exe": "",
-            "exe_deleted": false,
-            "exe_read_status": "",
-            "kind": "kernel",
-            "mnt_ns": "",
-            "name": "kworker/R-mlx5e",
-            "ns_read_status": "",
-            "package": "",
-            "package_status": "",
-            "pid": 2307,
-            "ppid": 2,
-            "uid": 0
-          },
-          {
-            "cmd": "",
-            "exe": "",
-            "exe_deleted": false,
-            "exe_read_status": "",
-            "kind": "kernel",
-            "mnt_ns": "",
-            "name": "kworker/R-mlx5e_arfs",
-            "ns_read_status": "",
-            "package": "",
-            "package_status": "",
-            "pid": 2308,
+            "pid": 553,
             "ppid": 2,
             "uid": 0
           },
@@ -22225,7 +21672,7 @@
             "ns_read_status": "",
             "package": "",
             "package_status": "",
-            "pid": 2320,
+            "pid": 558,
             "ppid": 2,
             "uid": 0
           },
@@ -22240,7 +21687,7 @@
             "ns_read_status": "",
             "package": "",
             "package_status": "",
-            "pid": 2321,
+            "pid": 559,
             "ppid": 2,
             "uid": 0
           },
@@ -22255,7 +21702,7 @@
             "ns_read_status": "",
             "package": "",
             "package_status": "",
-            "pid": 2322,
+            "pid": 560,
             "ppid": 2,
             "uid": 0
           },
@@ -22270,7 +21717,7 @@
             "ns_read_status": "",
             "package": "",
             "package_status": "",
-            "pid": 2323,
+            "pid": 561,
             "ppid": 2,
             "uid": 0
           },
@@ -22281,11 +21728,461 @@
             "exe_read_status": "",
             "kind": "kernel",
             "mnt_ns": "",
-            "name": "kworker/R-mkey_cache",
+            "name": "kworker/R-ib_mad1",
             "ns_read_status": "",
             "package": "",
             "package_status": "",
-            "pid": 2324,
+            "pid": 562,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "/usr/lib/systemd/systemd-networkd",
+            "exe": "/usr/lib/systemd/systemd-networkd",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "systemd-network",
+            "ns_read_status": "ok",
+            "package": "systemd",
+            "package_status": "packaged",
+            "pid": 642,
+            "ppid": 1,
+            "uid": 998
+          },
+          {
+            "cmd": "@dbus-daemon",
+            "exe": "/usr/bin/dbus-daemon",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "dbus-daemon",
+            "ns_read_status": "ok",
+            "package": "dbus-daemon",
+            "package_status": "packaged",
+            "pid": 796,
+            "ppid": 1,
+            "uid": 101
+          },
+          {
+            "cmd": "/usr/bin/python3",
+            "exe": "/usr/bin/python3.12",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "networkd-dispat",
+            "ns_read_status": "ok",
+            "package": "python3.12-minimal",
+            "package_status": "packaged",
+            "pid": 801,
+            "ppid": 1,
+            "uid": 0
+          },
+          {
+            "cmd": "php-fpm: master process (/etc/php/8.3/fpm/php-fpm.conf)",
+            "exe": "/usr/sbin/php-fpm8.3",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "php-fpm8.3",
+            "ns_read_status": "ok",
+            "package": "php8.3-fpm",
+            "package_status": "packaged",
+            "pid": 804,
+            "ppid": 1,
+            "uid": 0
+          },
+          {
+            "cmd": "/usr/lib/polkit-1/polkitd",
+            "exe": "/usr/lib/polkit-1/polkitd",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "polkitd",
+            "ns_read_status": "ok",
+            "package": "polkitd",
+            "package_status": "packaged",
+            "pid": 808,
+            "ppid": 1,
+            "uid": 989
+          },
+          {
+            "cmd": "/usr/lib/systemd/systemd-logind",
+            "exe": "/usr/lib/systemd/systemd-logind",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "systemd-logind",
+            "ns_read_status": "ok",
+            "package": "systemd",
+            "package_status": "packaged",
+            "pid": 833,
+            "ppid": 1,
+            "uid": 0
+          },
+          {
+            "cmd": "/usr/libexec/udisks2/udisksd",
+            "exe": "/usr/libexec/udisks2/udisksd",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "udisksd",
+            "ns_read_status": "ok",
+            "package": "udisks2",
+            "package_status": "packaged",
+            "pid": 835,
+            "ppid": 1,
+            "uid": 0
+          },
+          {
+            "cmd": "/usr/bin/python3",
+            "exe": "/usr/bin/python3.12",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "python3",
+            "ns_read_status": "ok",
+            "package": "python3.12-minimal",
+            "package_status": "packaged",
+            "pid": 837,
+            "ppid": 1,
+            "uid": 0
+          },
+          {
+            "cmd": "/usr/sbin/cron",
+            "exe": "/usr/sbin/cron",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "cron",
+            "ns_read_status": "ok",
+            "package": "cron",
+            "package_status": "packaged",
+            "pid": 862,
+            "ppid": 1,
+            "uid": 0
+          },
+          {
+            "cmd": "/usr/bin/containerd",
+            "exe": "/usr/bin/containerd",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "containerd",
+            "ns_read_status": "ok",
+            "package": "containerd.io",
+            "package_status": "packaged",
+            "pid": 875,
+            "ppid": 1,
+            "uid": 0
+          },
+          {
+            "cmd": "/sbin/agetty",
+            "exe": "/usr/sbin/agetty",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "agetty",
+            "ns_read_status": "ok",
+            "package": "util-linux",
+            "package_status": "packaged",
+            "pid": 906,
+            "ppid": 1,
+            "uid": 0
+          },
+          {
+            "cmd": "/sbin/agetty",
+            "exe": "/usr/sbin/agetty",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "agetty",
+            "ns_read_status": "ok",
+            "package": "util-linux",
+            "package_status": "packaged",
+            "pid": 914,
+            "ppid": 1,
+            "uid": 0
+          },
+          {
+            "cmd": "/usr/sbin/chronyd",
+            "exe": "/usr/sbin/chronyd",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "chronyd",
+            "ns_read_status": "ok",
+            "package": "chrony",
+            "package_status": "packaged",
+            "pid": 957,
+            "ppid": 1,
+            "uid": 109
+          },
+          {
+            "cmd": "/usr/sbin/chronyd",
+            "exe": "/usr/sbin/chronyd",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "chronyd",
+            "ns_read_status": "ok",
+            "package": "chrony",
+            "package_status": "packaged",
+            "pid": 960,
+            "ppid": 957,
+            "uid": 109
+          },
+          {
+            "cmd": "/usr/sbin/rsyslogd",
+            "exe": "/usr/sbin/rsyslogd",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "rsyslogd",
+            "ns_read_status": "ok",
+            "package": "rsyslog",
+            "package_status": "packaged",
+            "pid": 961,
+            "ppid": 1,
+            "uid": 102
+          },
+          {
+            "cmd": "/usr/lib/systemd/systemd",
+            "exe": "/usr/lib/systemd/systemd",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "systemd",
+            "ns_read_status": "ok",
+            "package": "systemd",
+            "package_status": "packaged",
+            "pid": 1036,
+            "ppid": 1,
+            "uid": 1001
+          },
+          {
+            "cmd": "/usr/bin/dockerd",
+            "exe": "/usr/bin/dockerd",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "dockerd",
+            "ns_read_status": "ok",
+            "package": "docker-ce",
+            "package_status": "packaged",
+            "pid": 1050,
+            "ppid": 1,
+            "uid": 0
+          },
+          {
+            "cmd": "(sd-pam)",
+            "exe": "/usr/lib/systemd/systemd-executor",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "(sd-pam)",
+            "ns_read_status": "ok",
+            "package": "systemd",
+            "package_status": "packaged",
+            "pid": 1053,
+            "ppid": 1036,
+            "uid": 1001
+          },
+          {
+            "cmd": "/usr/sbin/ModemManager",
+            "exe": "/usr/sbin/ModemManager",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "ModemManager",
+            "ns_read_status": "ok",
+            "package": "modemmanager",
+            "package_status": "packaged",
+            "pid": 1063,
+            "ppid": 1,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/R-tls-strp",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 1092,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "php-fpm: pool www",
+            "exe": "/usr/sbin/php-fpm8.3",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "php-fpm8.3",
+            "ns_read_status": "ok",
+            "package": "php8.3-fpm",
+            "package_status": "packaged",
+            "pid": 1113,
+            "ppid": 804,
+            "uid": 33
+          },
+          {
+            "cmd": "php-fpm: pool www",
+            "exe": "/usr/sbin/php-fpm8.3",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "php-fpm8.3",
+            "ns_read_status": "ok",
+            "package": "php8.3-fpm",
+            "package_status": "packaged",
+            "pid": 1114,
+            "ppid": 804,
+            "uid": 33
+          },
+          {
+            "cmd": "/usr/bin/python3",
+            "exe": "/usr/bin/python3.12",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "python3",
+            "ns_read_status": "ok",
+            "package": "python3.12-minimal",
+            "package_status": "packaged",
+            "pid": 1142,
+            "ppid": 837,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "psimon",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 1831,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "/opt/hca/hosted-compute-agent",
+            "exe": "/opt/hca/hosted-compute-agent",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "hosted-compute-",
+            "ns_read_status": "ok",
+            "package": "",
+            "package_status": "unpackaged",
+            "pid": 1833,
+            "ppid": 1,
+            "uid": 1001
+          },
+          {
+            "cmd": "sudo",
+            "exe": "/usr/bin/sudo",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "sudo",
+            "ns_read_status": "ok",
+            "package": "sudo",
+            "package_status": "packaged",
+            "pid": 1846,
+            "ppid": 1833,
+            "uid": 1001
+          },
+          {
+            "cmd": "/tmp/provjobd3757035416",
+            "exe": "/tmp/provjobd3757035416",
+            "exe_deleted": true,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "provjobd3757035",
+            "ns_read_status": "ok",
+            "package": "",
+            "package_status": "unpackaged",
+            "pid": 1849,
+            "ppid": 1846,
+            "uid": 0
+          },
+          {
+            "cmd": "/home/runner/actions-runner/cached/2.338.0/bin/Runner.Listener",
+            "exe": "/home/runner/actions-runner/cached/2.338.0/bin/Runner.Listener",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "Runner.Listener",
+            "ns_read_status": "ok",
+            "package": "",
+            "package_status": "unpackaged",
+            "pid": 1907,
+            "ppid": 1833,
+            "uid": 1001
+          },
+          {
+            "cmd": "/home/runner/actions-runner/cached/2.338.0/bin/Runner.Worker",
+            "exe": "/home/runner/actions-runner/cached/2.338.0/bin/Runner.Worker",
+            "exe_deleted": false,
+            "exe_read_status": "ok",
+            "kind": "user",
+            "mnt_ns": "host",
+            "name": "Runner.Worker",
+            "ns_read_status": "ok",
+            "package": "",
+            "package_status": "unpackaged",
+            "pid": 1926,
+            "ppid": 1907,
+            "uid": 1001
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/1:3-events",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 2364,
             "ppid": 2,
             "uid": 0
           },
@@ -22300,8 +22197,8 @@
             "ns_read_status": "ok",
             "package": "bash",
             "package_status": "packaged",
-            "pid": 2683,
-            "ppid": 2139,
+            "pid": 2449,
+            "ppid": 1926,
             "uid": 1001
           },
           {
@@ -22315,8 +22212,8 @@
             "ns_read_status": "ok",
             "package": "sudo",
             "package_status": "packaged",
-            "pid": 2685,
-            "ppid": 2683,
+            "pid": 2451,
+            "ppid": 2449,
             "uid": 1001
           },
           {
@@ -22330,8 +22227,8 @@
             "ns_read_status": "ok",
             "package": "",
             "package_status": "unpackaged",
-            "pid": 2686,
-            "ppid": 2685,
+            "pid": 2452,
+            "ppid": 2451,
             "uid": 0
           },
           {
@@ -22341,11 +22238,41 @@
             "exe_read_status": "",
             "kind": "kernel",
             "mnt_ns": "",
-            "name": "kworker/1:0-cgroup_free",
+            "name": "kworker/3:0-events",
             "ns_read_status": "",
             "package": "",
             "package_status": "",
-            "pid": 2860,
+            "pid": 2550,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/2:0-events",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 2557,
+            "ppid": 2,
+            "uid": 0
+          },
+          {
+            "cmd": "",
+            "exe": "",
+            "exe_deleted": false,
+            "exe_read_status": "",
+            "kind": "kernel",
+            "mnt_ns": "",
+            "name": "kworker/1:0-events",
+            "ns_read_status": "",
+            "package": "",
+            "package_status": "",
+            "pid": 2565,
             "ppid": 2,
             "uid": 0
           }
@@ -22361,7 +22288,7 @@
           {
             "addr": "0.0.0.0",
             "family": "v4",
-            "inode": 6657,
+            "inode": 7601,
             "link_local": false,
             "loopback": false,
             "owner_status": "ok",
@@ -22384,7 +22311,7 @@
           {
             "addr": "::",
             "family": "v6",
-            "inode": 6659,
+            "inode": 4954,
             "link_local": false,
             "loopback": false,
             "owner_status": "ok",
@@ -22407,7 +22334,7 @@
           {
             "addr": "127.0.0.53",
             "family": "v4",
-            "inode": 3984,
+            "inode": 5548,
             "link_local": false,
             "loopback": true,
             "owner_status": "ok",
@@ -22419,7 +22346,7 @@
                 "name": "systemd-resolve",
                 "package": "systemd-resolved",
                 "package_status": "packaged",
-                "pid": 534,
+                "pid": 472,
                 "uid": 991
               }
             ],
@@ -22430,7 +22357,7 @@
           {
             "addr": "127.0.0.54",
             "family": "v4",
-            "inode": 3986,
+            "inode": 5550,
             "link_local": false,
             "loopback": true,
             "owner_status": "ok",
@@ -22442,7 +22369,7 @@
                 "name": "systemd-resolve",
                 "package": "systemd-resolved",
                 "package_status": "packaged",
-                "pid": 534,
+                "pid": 472,
                 "uid": 991
               }
             ],
@@ -22453,7 +22380,7 @@
           {
             "addr": "127.0.0.53",
             "family": "v4",
-            "inode": 3983,
+            "inode": 5547,
             "link_local": false,
             "loopback": true,
             "owner_status": "ok",
@@ -22465,7 +22392,7 @@
                 "name": "systemd-resolve",
                 "package": "systemd-resolved",
                 "package_status": "packaged",
-                "pid": 534,
+                "pid": 472,
                 "uid": 991
               }
             ],
@@ -22476,7 +22403,7 @@
           {
             "addr": "127.0.0.54",
             "family": "v4",
-            "inode": 3985,
+            "inode": 5549,
             "link_local": false,
             "loopback": true,
             "owner_status": "ok",
@@ -22488,7 +22415,7 @@
                 "name": "systemd-resolve",
                 "package": "systemd-resolved",
                 "package_status": "packaged",
-                "pid": 534,
+                "pid": 472,
                 "uid": 991
               }
             ],
@@ -22499,7 +22426,7 @@
           {
             "addr": "192.0.2.1",
             "family": "v4",
-            "inode": 6007,
+            "inode": 5711,
             "link_local": false,
             "loopback": false,
             "owner_status": "ok",
@@ -22511,7 +22438,7 @@
                 "name": "systemd-network",
                 "package": "systemd",
                 "package_status": "packaged",
-                "pid": 721,
+                "pid": 642,
                 "uid": 998
               }
             ],
@@ -22522,7 +22449,7 @@
           {
             "addr": "127.0.0.1",
             "family": "v4",
-            "inode": 8661,
+            "inode": 8255,
             "link_local": false,
             "loopback": true,
             "owner_status": "ok",
@@ -22534,7 +22461,7 @@
                 "name": "chronyd",
                 "package": "chrony",
                 "package_status": "packaged",
-                "pid": 1166,
+                "pid": 957,
                 "uid": 109
               }
             ],
@@ -22545,7 +22472,7 @@
           {
             "addr": "::1",
             "family": "v6",
-            "inode": 8662,
+            "inode": 8256,
             "link_local": false,
             "loopback": true,
             "owner_status": "ok",
@@ -22557,7 +22484,7 @@
                 "name": "chronyd",
                 "package": "chrony",
                 "package_status": "packaged",
-                "pid": 1166,
+                "pid": 957,
                 "uid": 109
               }
             ],
@@ -22591,14 +22518,14 @@
       "stats": {
         "status": "ok",
         "value": {
-          "count": 150,
+          "count": 145,
           "denied": 0,
-          "elapsed_ms": 161,
-          "fd_reads": 1061,
+          "elapsed_ms": 107,
+          "fd_reads": 1112,
           "foreign_ns": 0,
-          "index_ms": 114,
+          "index_ms": 69,
           "index_source": "dpkg",
-          "kernel_threads": 113,
+          "kernel_threads": 108,
           "vanished": 0,
           "zombies": 0
         },
@@ -23696,64 +23623,64 @@
         "status": "ok",
         "value": [
           {
+            "addr": "127.0.0.53",
+            "inode": 5548,
+            "loopback": true,
+            "port": 53,
+            "proto": "tcp"
+          },
+          {
+            "addr": "127.0.0.54",
+            "inode": 5550,
+            "loopback": true,
+            "port": 53,
+            "proto": "tcp"
+          },
+          {
             "addr": "0.0.0.0",
-            "inode": 6657,
+            "inode": 7601,
             "loopback": false,
             "port": 22,
             "proto": "tcp"
           },
           {
-            "addr": "127.0.0.54",
-            "inode": 3986,
-            "loopback": true,
-            "port": 53,
-            "proto": "tcp"
-          },
-          {
-            "addr": "127.0.0.53",
-            "inode": 3984,
-            "loopback": true,
-            "port": 53,
-            "proto": "tcp"
-          },
-          {
             "addr": "::",
-            "inode": 6659,
+            "inode": 4954,
             "loopback": false,
             "port": 22,
             "proto": "tcp6"
           },
           {
             "addr": "127.0.0.54",
-            "inode": 3985,
+            "inode": 5549,
             "loopback": true,
             "port": 53,
             "proto": "udp"
           },
           {
             "addr": "127.0.0.53",
-            "inode": 3983,
+            "inode": 5547,
             "loopback": true,
             "port": 53,
             "proto": "udp"
           },
           {
             "addr": "192.0.2.1",
-            "inode": 6007,
+            "inode": 5711,
             "loopback": false,
             "port": 68,
             "proto": "udp"
           },
           {
             "addr": "127.0.0.1",
-            "inode": 8661,
+            "inode": 8255,
             "loopback": true,
             "port": 323,
             "proto": "udp"
           },
           {
             "addr": "::1",
-            "inode": 8662,
+            "inode": 8256,
             "loopback": true,
             "port": 323,
             "proto": "udp6"
@@ -24025,7 +23952,7 @@
             "keys": [
               {
                 "bits": 2048,
-                "fingerprint": "SHA256:xO+4vRvh4P7AiGKWaW7acKQec4s4KXTFQOtI2FKbDVg",
+                "fingerprint": "SHA256:77UMh4QWhQ3TInU8GWITULaVh7Kvmmf/V3eHsODCVPo",
                 "line": 1,
                 "options": [],
                 "restricted": false,
@@ -24125,7 +24052,7 @@
               },
               {
                 "bits": 2048,
-                "fingerprint": "SHA256:xO+4vRvh4P7AiGKWaW7acKQec4s4KXTFQOtI2FKbDVg",
+                "fingerprint": "SHA256:77UMh4QWhQ3TInU8GWITULaVh7Kvmmf/V3eHsODCVPo",
                 "line": 2,
                 "options": [
                   "no-port-forwarding",
@@ -31020,7 +30947,2630 @@
     "walk": {
       "acl_grants": {
         "status": "ok",
-        "value": [],
+        "value": [
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/A-server.jar"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/build-label.txt"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/daemonize"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/MODULE.bazel"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/WORKSPACE"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/ASSEMBLY_EXCEPTION"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/DISCLAIMER"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/bin/java"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/bin/keytool"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/conf/jaxp-strict.properties.template"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/conf/jaxp.properties"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/conf/logging.properties"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/conf/net.properties"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/conf/sdp/sdp.conf.template"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/conf/security/java.security"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/conf/security/policy/README.txt"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/conf/security/policy/limited/default_US_export.policy"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/conf/security/policy/limited/default_local.policy"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/conf/security/policy/limited/exempt_local.policy"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/conf/security/policy/unlimited/default_US_export.policy"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/conf/security/policy/unlimited/default_local.policy"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/java.base/ADDITIONAL_LICENSE_INFO"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/java.base/ASSEMBLY_EXCEPTION"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/java.base/LICENSE"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/java.base/aes.md"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/java.base/c-libutl.md"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/java.base/cldr.md"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/java.base/icu.md"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/java.base/public_suffix.md"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/java.base/siphash.md"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/java.base/unicode.md"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/java.compiler/ADDITIONAL_LICENSE_INFO"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/java.compiler/ASSEMBLY_EXCEPTION"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/java.compiler/LICENSE"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/java.instrument/ADDITIONAL_LICENSE_INFO"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/java.instrument/ASSEMBLY_EXCEPTION"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/java.instrument/LICENSE"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/java.logging/ADDITIONAL_LICENSE_INFO"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/java.logging/ASSEMBLY_EXCEPTION"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/java.logging/LICENSE"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/java.management/ADDITIONAL_LICENSE_INFO"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/java.management/ASSEMBLY_EXCEPTION"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/java.management/LICENSE"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/java.naming/ADDITIONAL_LICENSE_INFO"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/java.naming/ASSEMBLY_EXCEPTION"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/java.naming/LICENSE"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/java.security.sasl/ADDITIONAL_LICENSE_INFO"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/java.security.sasl/ASSEMBLY_EXCEPTION"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/java.security.sasl/LICENSE"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/java.sql/ADDITIONAL_LICENSE_INFO"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/java.sql/ASSEMBLY_EXCEPTION"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/java.sql/LICENSE"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/java.transaction.xa/ADDITIONAL_LICENSE_INFO"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/java.transaction.xa/ASSEMBLY_EXCEPTION"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/java.transaction.xa/LICENSE"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/java.xml/ADDITIONAL_LICENSE_INFO"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/java.xml/ASSEMBLY_EXCEPTION"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/java.xml/LICENSE"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/java.xml/bcel.md"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/java.xml/dom.md"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/java.xml/jcup.md"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/java.xml/schema10part1.md"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/java.xml/schema10part2.md"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/java.xml/xalan.md"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/java.xml/xerces.md"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/java.xml/xhtml10.md"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/java.xml/xhtml10schema.md"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/java.xml/xhtml11.md"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/java.xml/xhtml11schema.md"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/java.xml/xmlspec.md"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/java.xml/xmlxsd.md"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/jdk.crypto.ec/ADDITIONAL_LICENSE_INFO"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/jdk.crypto.ec/ASSEMBLY_EXCEPTION"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/jdk.crypto.ec/LICENSE"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/jdk.management/ADDITIONAL_LICENSE_INFO"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/jdk.management/ASSEMBLY_EXCEPTION"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/jdk.management/LICENSE"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/jdk.net/ADDITIONAL_LICENSE_INFO"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/jdk.net/ASSEMBLY_EXCEPTION"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/jdk.net/LICENSE"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/jdk.unsupported/ADDITIONAL_LICENSE_INFO"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/jdk.unsupported/ASSEMBLY_EXCEPTION"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/legal/jdk.unsupported/LICENSE"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/lib/classlist"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/lib/jexec"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/lib/jrt-fs.jar"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/lib/jspawnhelper"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/lib/jvm.cfg"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/lib/libdt_socket.so"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/lib/libextnet.so"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/lib/libinstrument.so"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/lib/libjava.so"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/lib/libjdwp.so"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/lib/libjimage.so"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/lib/libjli.so"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/lib/libjsig.so"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/lib/libmanagement.so"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/lib/libmanagement_ext.so"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/lib/libnet.so"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/lib/libnio.so"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/lib/libsimdsort.so"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/lib/libsyslookup.so"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/lib/libverify.so"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/lib/libzip.so"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/lib/modules"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/lib/security/blocked.certs"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/lib/security/cacerts"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/lib/security/public_suffix_list.dat"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/lib/server/libjsig.so"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/lib/server/libjvm.so"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/lib/tzdb.dat"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/readme.txt"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/jdk/release"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/conditions/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/java_tools/buildjar/java/com/google/devtools/build/buildjar/jarhelper/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/java_tools/buildjar/java/com/google/devtools/build/buildjar/jarhelper/JarCreator.java"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/java_tools/buildjar/java/com/google/devtools/build/buildjar/jarhelper/JarHelper.java"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/java_tools/import_deps_checker/java/com/google/devtools/build/importdeps/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/cpp/util/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/cpp/util/bazel_log_handler.cc"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/cpp/util/bazel_log_handler.h"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/cpp/util/errors.h"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/cpp/util/errors_posix.cc"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/cpp/util/errors_windows.cc"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/cpp/util/exit_code.h"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/cpp/util/file.cc"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/cpp/util/file.h"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/cpp/util/file_platform.h"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/cpp/util/file_posix.cc"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/cpp/util/file_windows.cc"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/cpp/util/logging.cc"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/cpp/util/logging.h"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/cpp/util/md5.cc"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/cpp/util/md5.h"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/cpp/util/numbers.cc"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/cpp/util/numbers.h"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/cpp/util/path.cc"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/cpp/util/path.h"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/cpp/util/path_platform.h"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/cpp/util/path_posix.cc"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/cpp/util/path_windows.cc"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/cpp/util/port.cc"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/cpp/util/port.h"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/cpp/util/strings.cc"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/cpp/util/strings.h"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/native/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/native/windows/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/native/windows/file-jni.cc"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/native/windows/file.cc"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/native/windows/file.h"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/native/windows/jni-util.cc"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/native/windows/jni-util.h"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/native/windows/process.cc"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/native/windows/process.h"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/native/windows/processes-jni.cc"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/native/windows/sleep_prevention_jni.cc"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/native/windows/system_cpu_speed_monitor_jni.cc"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/native/windows/system_disk_space_monitor_jni.cc"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/native/windows/system_load_advisory_monitor_jni.cc"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/native/windows/system_memory_pressure_jni.cc"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/native/windows/system_network_stats.cc"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/native/windows/system_suspension_monitor_jni.cc"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/native/windows/system_thermal_monitor_jni.cc"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/native/windows/util.cc"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/native/windows/util.h"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/protobuf/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/protobuf/action_cache.proto"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/protobuf/analysis_v2.proto"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/protobuf/bazel_flags.proto"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/protobuf/bazel_output_service.proto"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/protobuf/bazel_output_service_rev2.proto"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/protobuf/build.proto"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/protobuf/builtin.proto"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/protobuf/cache_salt.proto"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/protobuf/command_line.proto"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/protobuf/command_server.proto"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/protobuf/crash_debugging.proto"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/protobuf/crosstool_config.proto"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/protobuf/deps.proto"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/protobuf/desugar_deps.proto"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/protobuf/execution_graph.proto"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/protobuf/execution_statistics.proto"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/protobuf/extra_actions_base.proto"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/protobuf/failure_details.proto"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/protobuf/file_invalidation_data.proto"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/protobuf/invocation_policy.proto"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/protobuf/java_compilation.proto"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/protobuf/memory_pressure.proto"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/protobuf/option_filters.proto"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/protobuf/project/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/protobuf/project/buildable_unit.proto"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/protobuf/project/enforcement_policy.proto"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/protobuf/project/project.proto"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/protobuf/project/project_proto.scl"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/protobuf/remote_execution_log.proto"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/protobuf/remote_scrubbing.proto"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/protobuf/spawn.proto"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/protobuf/stardoc_output.proto"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/protobuf/strategy_policy.proto"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/protobuf/test_status.proto"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/protobuf/worker_protocol.proto"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/main/protobuf/xcode_config.proto"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/tools/launcher/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/tools/launcher/bash_launcher.cc"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/tools/launcher/bash_launcher.h"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/tools/launcher/dummy.cc"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/tools/launcher/java_launcher.cc"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/tools/launcher/java_launcher.h"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/tools/launcher/launcher.cc"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/tools/launcher/launcher.h"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/tools/launcher/launcher_main.cc"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/tools/launcher/launcher_maker.cc"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/tools/launcher/launcher_maker_test.bzl"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/tools/launcher/launcher_maker_test.cc"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/tools/launcher/python_launcher.cc"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/tools/launcher/python_launcher.h"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/tools/launcher/util/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/tools/launcher/util/data_parser.cc"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/tools/launcher/util/data_parser.h"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/tools/launcher/util/data_parser_test.cc"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/tools/launcher/util/dummy.cc"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/tools/launcher/util/launcher_util.cc"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/tools/launcher/util/launcher_util.h"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/tools/launcher/util/launcher_util_test.cc"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/tools/launcher/win_manifest.xml"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/tools/launcher/win_resources.rc"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/src/tools/launcher/win_rules.bzl"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/third_party/def_parser/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/third_party/def_parser/Copyright.txt"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/third_party/def_parser/def_parser.cc"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/third_party/def_parser/def_parser.h"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/third_party/def_parser/def_parser.patch"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/third_party/def_parser/def_parser_main.cc"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/third_party/def_parser/def_parser_test.py"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/third_party/def_parser/empty_test.py"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/third_party/ijar/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/third_party/ijar/common.h"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/third_party/ijar/mapped_file.h"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/third_party/ijar/mapped_file_unix.cc"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/third_party/ijar/mapped_file_windows.cc"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/third_party/ijar/platform_utils.cc"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/third_party/ijar/platform_utils.h"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/third_party/ijar/zip.cc"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/third_party/ijar/zip.h"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/third_party/ijar/zip_main.cc"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/third_party/ijar/zlib_client.cc"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/third_party/ijar/zlib_client.h"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/third_party/py/abseil/AUTHORS"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/third_party/py/abseil/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/third_party/py/abseil/LICENSE"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/third_party/py/abseil/MANIFEST.in"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/third_party/py/abseil/PKG-INFO"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/third_party/py/abseil/README.md"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/third_party/py/abseil/absl/__init__.py"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/third_party/py/abseil/absl/app.py"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/third_party/py/abseil/absl/command_name.py"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/third_party/py/abseil/absl/flags/__init__.py"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/third_party/py/abseil/absl/flags/_argument_parser.py"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/third_party/py/abseil/absl/flags/_defines.py"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/third_party/py/abseil/absl/flags/_exceptions.py"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/third_party/py/abseil/absl/flags/_flag.py"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/third_party/py/abseil/absl/flags/_flagvalues.py"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/third_party/py/abseil/absl/flags/_helpers.py"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/third_party/py/abseil/absl/flags/_validators.py"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/third_party/py/abseil/absl/flags/_validators_classes.py"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/third_party/py/abseil/absl/flags/argparse_flags.py"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/third_party/py/abseil/absl/logging/__init__.py"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/third_party/py/abseil/absl/logging/converter.py"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/third_party/py/abseil/absl/testing/__init__.py"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/third_party/py/abseil/absl/testing/_bazelize_command.py"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/third_party/py/abseil/absl/testing/_pretty_print_reporter.py"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/third_party/py/abseil/absl/testing/absltest.py"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/third_party/py/abseil/absl/testing/flagsaver.py"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/third_party/py/abseil/absl/testing/parameterized.py"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/third_party/py/abseil/absl/testing/xml_reporter.py"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/third_party/py/abseil/absl_py.egg-info/PKG-INFO"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/third_party/py/abseil/absl_py.egg-info/SOURCES.txt"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/third_party/py/abseil/absl_py.egg-info/dependency_links.txt"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/third_party/py/abseil/absl_py.egg-info/top_level.txt"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/third_party/py/abseil/setup.cfg"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/third_party/py/abseil/setup.py"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/allowlists/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/allowlists/config_feature_flag/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/allowlists/dormant_dependency_allowlist/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/allowlists/extend_rule_allowlist/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/allowlists/function_transition_allowlist/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/allowlists/initializer_allowlist/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/allowlists/skip_validations_allowlist/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/allowlists/subrules_allowlist/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/android/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/android/android_extensions.bzl"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/bash/runfiles/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/build_defs.bzl"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/build_defs/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/build_defs/build_info/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/build_defs/build_info/bazel_cc_build_info.bzl"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/build_defs/build_info/bazel_java_build_info.bzl"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/build_defs/build_info/templates/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/build_defs/build_info/templates/non_volatile_file.h.template"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/build_defs/build_info/templates/non_volatile_file.properties.template"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/build_defs/build_info/templates/redacted_file.h.template"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/build_defs/build_info/templates/redacted_file.properties.template"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/build_defs/build_info/templates/volatile_file.h.template"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/build_defs/build_info/templates/volatile_file.properties.template"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/build_defs/cc/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/build_defs/cc/action_names.bzl"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/build_defs/cc/cc_import.bzl"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/build_defs/cc/whitelists/parse_headers_and_layering_check/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/build_defs/cc/whitelists/starlark_hdrs_check/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/build_defs/hash/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/build_defs/hash/hash.bzl"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/build_defs/hash/sha256.py"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/build_defs/pkg/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/build_defs/pkg/archive.py"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/build_defs/pkg/build_tar.py"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/build_defs/pkg/path.bzl"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/build_defs/pkg/pkg.bzl"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/build_defs/repo/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/build_defs/repo/cache.bzl"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/build_defs/repo/git.bzl"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/build_defs/repo/git_worker.bzl"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/build_defs/repo/http.bzl"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/build_defs/repo/java.bzl"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/build_defs/repo/jvm.bzl"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/build_defs/repo/local.bzl"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/build_defs/repo/utils.bzl"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/build_rules/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/build_rules/java_rules_skylark.bzl"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/build_rules/test_rules.bzl"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/build_rules/test_rules_private.bzl"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/build_rules/utilities.bzl"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/buildstamp/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/buildstamp/get_workspace_status"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/coverage/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/coverage/collect-coverage.sh"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/coverage/dummy_coverage_report_generator"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/cpp/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/cpp/build_info_entry_set.cc"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/cpp/build_info_entry_set.h"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/cpp/build_info_translation_helper.cc"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/cpp/build_info_translation_helper.h"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/cpp/build_info_translation_helper_test.cc"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/cpp/cc_configure.bzl"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/cpp/cc_flags_supplier.bzl"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/cpp/cc_toolchain_config_lib.bzl"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/cpp/compiler_flag.bzl"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/cpp/lib_cc_configure.bzl"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/cpp/modules_tools/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/cpp/modules_tools/aggregate-ddi"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/cpp/modules_tools/generate-modmap"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/cpp/runfiles/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/cpp/runfiles/runfiles.h"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/cpp/test_data/correct_file_format.txt"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/cpp/test_data/duplicated_key.txt"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/cpp/test_data/no_separator.txt"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/cpp/toolchain_utils.bzl"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/cpp/unix_cc_toolchain_config.bzl"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/cpp/windows_cc_configure.bzl"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/def_parser/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/def_parser/no_op.bat"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/genrule/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/genrule/genrule-setup.sh"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/java/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/java/runfiles/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/jdk/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/jdk/BUILD.java_tools"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/jdk/BUILD.java_tools_prebuilt"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/jdk/default_java_toolchain.bzl"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/jdk/java_toolchain_alias.bzl"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/jdk/launcher_flag_alias.bzl"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/jdk/local_java_repository.bzl"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/jdk/nosystemjdk/README"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/jdk/proguard_allowlister.py"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/jdk/proguard_allowlister_test.py"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/jdk/proguard_allowlister_test_input.pgcfg"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/jdk/remote_java_repository.bzl"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/jdk/toolchain_utils.bzl"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/launcher/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/launcher/BUILD.bootstrap"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/launcher/empty.sh"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/objc/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/objc/dummy.c"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/objc/gcov_stub"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/objc/mcov_stub"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/objc/objc_dummy.mm"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/osx/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/osx/xcode_configure.bzl"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/osx/xcode_locator.m"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/osx/xcode_locator_stub.sh"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/osx/xcode_version_flag.bzl"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/proto/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/python/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/python/private/py_test_alias.bzl"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/python/python_bootstrap_template.txt"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/python/python_version.bzl"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/python/pywrapper_template.txt"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/python/pywrapper_test.py"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/python/runfiles/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/python/runfiles/runfiles.py"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/python/srcs_version.bzl"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/python/toolchain.bzl"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/python/utils.bzl"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/res/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/res/win_res.bzl"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/res/winsdk_configure.bzl"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/res/winsdk_toolchain.bzl"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/sh/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/sh/sh_toolchain.bzl"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/test/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/test/CoverageOutputGenerator/java/com/google/devtools/coverageoutputgenerator/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/test/collect_cc_coverage.sh"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/test/collect_coverage.sh"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/test/default_test_toolchain.bzl"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/test/dummy.sh"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/test/extensions.bzl"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/test/generate-xml.sh"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/test/test-setup.sh"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/whitelists/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/whitelists/config_feature_flag/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/whitelists/function_transition_whitelist/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/zip/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/embedded_tools/tools/zip/zipper/zipper"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/install_base_key"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/libcpu_profiler.so"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/linux-sandbox"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/platforms/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/platforms/WORKSPACE"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/platforms/cpu/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/platforms/host/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/platforms/host/constraints.bzl"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/platforms/host/extension.bzl"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/platforms/os/BUILD"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/process-wrapper"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazel/_bazel_packer/install/1fa1a41c88a552221379e9a42f282033/xcode-locator"
+          },
+          {
+            "entries": [
+              "user:1001:rwx"
+            ],
+            "path": "/home/packer/.cache/bazelisk/downloads/sha256/7f775b54bbec487efaf0f49ccda1d2ed02cd34f582edfdd6aeeec76e39ef585c/bin/bazel"
+          }
+        ],
         "source": {
           "kind": "derived"
         }
@@ -34867,9 +37417,9 @@
         "value": {
           "allowlisted_hidden": 204,
           "config_unreadable": [],
-          "dirs": 34782,
-          "entries": 248273,
-          "files": 208119,
+          "dirs": 30791,
+          "entries": 226713,
+          "files": 190558,
           "home_roots": [
             {
               "kind": "user",
@@ -35007,9 +37557,9 @@
           "mnt_id_fallback": false,
           "nice_applied": true,
           "stop_reason": "",
-          "symlinks": 5366,
+          "symlinks": 5358,
           "truncated_counts": {
-            "acl_grants": 0,
+            "acl_grants": 437,
             "capabilities": 4,
             "hidden": 167,
             "skipped": 85,
@@ -40619,7 +43169,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/tmp/systemd-private-44f11c6e39504f3c81703062f86e2b80-ModemManager.service-3b3h4K/tmp",
+            "path": "/tmp/systemd-private-8ccca990deb746a3a22dea0a6fb0ec5f-ModemManager.service-38pyAt/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -40629,7 +43179,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/tmp/systemd-private-44f11c6e39504f3c81703062f86e2b80-chrony.service-qEpUxl/tmp",
+            "path": "/tmp/systemd-private-8ccca990deb746a3a22dea0a6fb0ec5f-chrony.service-HqwecO/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -40639,7 +43189,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/tmp/systemd-private-44f11c6e39504f3c81703062f86e2b80-haveged.service-58Hbgp/tmp",
+            "path": "/tmp/systemd-private-8ccca990deb746a3a22dea0a6fb0ec5f-haveged.service-5YKcSJ/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -40649,7 +43199,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/tmp/systemd-private-44f11c6e39504f3c81703062f86e2b80-polkit.service-u3oeKF/tmp",
+            "path": "/tmp/systemd-private-8ccca990deb746a3a22dea0a6fb0ec5f-polkit.service-FtnmVl/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -40659,7 +43209,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/tmp/systemd-private-44f11c6e39504f3c81703062f86e2b80-systemd-logind.service-iQ324M/tmp",
+            "path": "/tmp/systemd-private-8ccca990deb746a3a22dea0a6fb0ec5f-systemd-logind.service-0DqtA2/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -40669,7 +43219,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/tmp/systemd-private-44f11c6e39504f3c81703062f86e2b80-systemd-resolved.service-6S4mlG/tmp",
+            "path": "/tmp/systemd-private-8ccca990deb746a3a22dea0a6fb0ec5f-systemd-resolved.service-cu5NeB/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -40679,7 +43229,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/tmp/systemd-private-44f11c6e39504f3c81703062f86e2b80-systemd-timedated.service-FIZq2n/tmp",
+            "path": "/tmp/systemd-private-8ccca990deb746a3a22dea0a6fb0ec5f-systemd-timedated.service-xhW6Fc/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -40999,7 +43549,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/var/tmp/systemd-private-44f11c6e39504f3c81703062f86e2b80-ModemManager.service-FP4Cpf/tmp",
+            "path": "/var/tmp/systemd-private-8ccca990deb746a3a22dea0a6fb0ec5f-ModemManager.service-pCbMbI/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -41009,7 +43559,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/var/tmp/systemd-private-44f11c6e39504f3c81703062f86e2b80-chrony.service-AtBFOX/tmp",
+            "path": "/var/tmp/systemd-private-8ccca990deb746a3a22dea0a6fb0ec5f-chrony.service-hk5Nqf/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -41019,7 +43569,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/var/tmp/systemd-private-44f11c6e39504f3c81703062f86e2b80-haveged.service-qtK8Wg/tmp",
+            "path": "/var/tmp/systemd-private-8ccca990deb746a3a22dea0a6fb0ec5f-haveged.service-vtr8QX/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -41029,7 +43579,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/var/tmp/systemd-private-44f11c6e39504f3c81703062f86e2b80-polkit.service-6o7yla/tmp",
+            "path": "/var/tmp/systemd-private-8ccca990deb746a3a22dea0a6fb0ec5f-polkit.service-BxjGV7/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -41039,7 +43589,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/var/tmp/systemd-private-44f11c6e39504f3c81703062f86e2b80-systemd-logind.service-IFOiop/tmp",
+            "path": "/var/tmp/systemd-private-8ccca990deb746a3a22dea0a6fb0ec5f-systemd-logind.service-eHu0eO/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -41049,7 +43599,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/var/tmp/systemd-private-44f11c6e39504f3c81703062f86e2b80-systemd-resolved.service-XrCeY7/tmp",
+            "path": "/var/tmp/systemd-private-8ccca990deb746a3a22dea0a6fb0ec5f-systemd-resolved.service-7Y5xeN/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0
@@ -41059,7 +43609,7 @@
             "kind": "dir",
             "package": "",
             "package_declared": false,
-            "path": "/var/tmp/systemd-private-44f11c6e39504f3c81703062f86e2b80-systemd-timedated.service-Wyf8Cb/tmp",
+            "path": "/var/tmp/systemd-private-8ccca990deb746a3a22dea0a6fb0ec5f-systemd-timedated.service-7fIP13/tmp",
             "reference": "unpackaged",
             "sticky": true,
             "uid": 0

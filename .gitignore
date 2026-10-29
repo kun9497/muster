@@ -12,6 +12,8 @@
 /coverage.exe
 /refindex
 /refindex.exe
+/cisindex
+/cisindex.exe
 /suidindex
 /suidindex.exe
 *.test

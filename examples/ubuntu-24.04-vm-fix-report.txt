@@ -1,4 +1,4 @@
-muster ca08d60 · controls kisa-unix-2026+2026.10.20 · guide kisa-unix-2026 · host github-runner · collected 2026-10-21T02:03:16Z
+muster 5bfae2a · controls kisa-unix-2026+2026.10.27 · guide kisa-unix-2026 · host github-runner · collected 2026-10-27T09:00:28Z
 fix --dry-run · profile default (117 controls) · max-risk lockout_risk
 planned 43 (script 19, text only 24) · above max-risk 0 · waived 0 · clean 66 · not planned: error 0, manual 7, warn_degraded 1
 by risk: none 27 · restart_service 8 · reboot_required 3 · lockout_risk 5

@@ -10,6 +10,10 @@ importance: 상
 automation: auto
 references:
   kisa: { "2026": ["U-27"], "2021": ["U-17"] }
+  cis:
+    - { benchmark: rhel9, version: "2.0.0", rec: "7.2.9" }
+    - { benchmark: ubuntu2204, version: "2.0.0", rec: "7.2.10" }
+    - { benchmark: ubuntu2404, version: "1.0.0", rec: "7.2.10" }
 requires_facts: ">=1"
 # manual, not pass (M-52, MR-2, MR-4): files.user_rhosts is absent only when an
 # interactive home was outside the declaration or reachable only through a

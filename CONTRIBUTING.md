@@ -81,8 +81,9 @@ are changing before you change it. Korean: `CONTRIBUTING.ko.md`.
 
 A control that is not a KISA item has `category: beyond`, an id
 `muster.beyond.<name>`, no `references.kisa` (the lint rule `beyond_scope`
-keeps the two in step) and no CIS recommendation number: it is written from a
-primary source — kernel documentation, a man page, the distribution's own
+keeps the two in step), and a CIS recommendation number only through the
+index (see "Mapping a control to CIS"; the mapping is independently derived): it
+is written from a primary source — kernel documentation, a man page, the distribution's own
 documentation — in muster's own words, and its description says in one
 sentence why it has the importance it has. Every such control gates on
 `env.container eq none`: inside a container these facts describe the host.
@@ -262,6 +263,32 @@ The bodies that edit what a file says (stage 3D-2d) add these rules:
   can run is named unproven in the plan and in the stage's design, with a
   stub test, not in `_roundtrip.yaml` (whose `unproven_units` names only
   declared units).
+
+### Mapping a control to CIS
+
+A control's `references.cis` is never written by hand from a Benchmark: it is the
+rendering of the committed index in `docs/reference/cis/`, and
+`TestEveryCISReferenceIsTheIndex` prints the block to paste. To map a control,
+add or edit its row in `docs/reference/cis/map.yaml`:
+
+- `rules:` the ComplianceAsCode rule ids that check what the control's clauses
+  judge, reviewed against the clauses; a seed from a join is a starting point,
+  never committed unreviewed.
+- `recs:` (per benchmark) only for an entry that lists no rule id, with a reason
+  that describes the control, never a title or the recommendation.
+- `vars:` per spec CB-8: every variable selected on a reached Level 1 – Server
+  entry is named, with `as: int`, a `{selected: value}` table whose keys spell
+  their own value, or `param: none` and a reason.
+- `docs/reference/cis/review.yaml` takes a candidate out of a profile, one reason
+  each, where its judgment cannot honestly stand for the recommendation —
+  including where a host meeting the recommendation would fail the control at
+  muster's default.
+
+Then run `make cisindex` (`go run ./tools/cisindex`; maintainer-run, it reads the
+pinned files from `.cache/cisindex/` or the network) and paste the blocks
+`TestEveryCISReferenceIsTheIndex` prints, then commit the regenerated index,
+`internal/profile/builtin/cis-*.yaml` and the pasted references with the map
+change in one commit.
 
 ## Adding a fact
 

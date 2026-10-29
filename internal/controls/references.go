@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+
+	"github.com/kun9497/muster/internal/cisindex"
 )
 
 // ReferenceIndex is what tools/refindex generated under docs/reference/stig:
@@ -23,6 +25,12 @@ type ReferenceIndex struct {
 	stig     map[string]map[string]bool // product -> id set
 	nist     map[string]bool
 	from     map[string]string // product or alias -> the file that claimed it
+
+	// The CIS namespace (CB-16): a name may be a STIG product and a CIS
+	// product at once, so none of these maps is shared with the STIG ones.
+	cisProducts map[string]string // product or alias -> product
+	cisIndex    map[string]*cisindex.Index
+	cisFrom     map[string]string
 }
 
 var (
@@ -85,7 +93,97 @@ func LoadReferenceIndex(dir string) (*ReferenceIndex, error) {
 		}
 		x.stig[doc.Product] = ids
 	}
+	cisFiles, err := filepath.Glob(filepath.Join(dir, "cis", "*.json"))
+	if err != nil {
+		return nil, err
+	}
+	sort.Strings(cisFiles)
+	if err := loadCIS(x, cisFiles, os.ReadFile); err != nil {
+		return nil, err
+	}
 	return x, nil
+}
+
+// parseCISIndex decodes one CIS index file strictly.
+func parseCISIndex(data []byte) (*cisindex.Index, error) { return cisindex.DecodeIndex(data) }
+
+// loadCIS adds the CIS index files (already sorted) to x. M-4 holds within
+// the CIS family only: a product or alias two files claim is refused.
+func loadCIS(x *ReferenceIndex, files []string, read func(string) ([]byte, error)) error {
+	x.cisProducts = map[string]string{}
+	x.cisIndex = map[string]*cisindex.Index{}
+	x.cisFrom = map[string]string{}
+	for _, f := range files {
+		data, err := read(f)
+		if err != nil {
+			return err
+		}
+		ix, err := parseCISIndex(data)
+		if err != nil {
+			return fmt.Errorf("%s: %w", f, err)
+		}
+		for _, name := range append([]string{ix.Product}, ix.AppliesTo...) {
+			if prev, ok := x.cisFrom[name]; ok && prev != f {
+				return fmt.Errorf("duplicate CIS index for product %s: %s and %s", name, prev, f)
+			}
+			x.cisFrom[name] = f
+			x.cisProducts[name] = ix.Product
+		}
+		x.cisIndex[ix.Product] = ix
+	}
+	return nil
+}
+
+// HasCIS reports whether rec exists in the indexed release of the canonical
+// CIS product (an alias is not resolved here).
+func (x *ReferenceIndex) HasCIS(product, version, rec string) bool {
+	_, ok := x.CISLevels(product, version, rec)
+	return ok
+}
+
+// CISProduct resolves a product or applies_to alias to the canonical CIS
+// product; alias reports that name was an alias.
+func (x *ReferenceIndex) CISProduct(name string) (product string, alias bool, ok bool) {
+	p, ok := x.cisProducts[name]
+	if !ok {
+		return "", false, false
+	}
+	return p, p != name, true
+}
+
+// CISLevels returns the levels of rec in the indexed release of a canonical
+// CIS product.
+func (x *ReferenceIndex) CISLevels(product, version, rec string) ([]string, bool) {
+	ix := x.cisIndex[product]
+	if ix == nil || ix.Version != version {
+		return nil, false
+	}
+	for _, r := range ix.Recs {
+		if r.Rec == rec {
+			return r.Levels, true
+		}
+	}
+	return nil, false
+}
+
+// CISRows returns a copy of the product's rows sorted by recommendation
+// number; an unknown product returns nil.
+func (x *ReferenceIndex) CISRows(product string) []cisindex.Row {
+	ix := x.cisIndex[product]
+	if ix == nil {
+		return nil
+	}
+	rows := append([]cisindex.Row(nil), ix.Recs...)
+	sort.SliceStable(rows, func(i, j int) bool { return cisindex.CompareRec(rows[i].Rec, rows[j].Rec) < 0 })
+	return rows
+}
+
+// CISVersion is the indexed version of a canonical CIS product, or "".
+func (x *ReferenceIndex) CISVersion(product string) string {
+	if ix := x.cisIndex[product]; ix != nil {
+		return ix.Version
+	}
+	return ""
 }
 
 // HasSTIG reports whether id exists in the indexed release of benchmark (a

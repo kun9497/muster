@@ -8,7 +8,7 @@ importance: 상
 automation: auto
 references:
   kisa: { "2026": ["U-01"], "2021": ["U-01"] }
-  cis: [{ benchmark: ubuntu-22.04, version: "2.0.0", rec: "5.1.20" }]
+  cis: [{ benchmark: mini, version: "1.0.0", rec: "1.1.1" }]
 requires_facts: ">=1"
 applies_when: { fact: services.ssh.installed, op: eq, expected: true }
 absent_means: not_applicable

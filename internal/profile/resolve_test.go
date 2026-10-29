@@ -173,7 +173,7 @@ func TestResolveRefusals(t *testing.T) {
 	}
 	neverOpen := neverOpenT(t)
 	for _, name := range []string{"nope", "Default", "site_web"} {
-		if _, err := Resolve(set(), Source{Name: name}, neverOpen, func(string) {}); err == nil || !strings.Contains(err.Error(), "default, kisa-unix-2026") {
+		if _, err := Resolve(set(), Source{Name: name}, neverOpen, func(string) {}); err == nil || !strings.Contains(err.Error(), "default, cis-rhel9-l1, cis-ubuntu2204-l1, cis-ubuntu2404-l1, kisa-unix-2026") {
 			t.Errorf("%s: an unknown built-in name must list the built-ins: %v", name, err)
 		}
 	}

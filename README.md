@@ -5,7 +5,7 @@
 **Does this Linux server pass muster?** `muster` collects the facts of a host as
 root, then evaluates them — offline, from the snapshot alone — against the Unix
 server items (U-xx) of the KISA technical vulnerability assessment guide for
-critical information infrastructure, with CIS Benchmark, DISA STIG and NIST SP
+critical information infrastructure, with CIS Benchmarks®, DISA STIG and NIST SP
 800-53 numbers attached as cross-references where a mapping is filed.
 
 In Korean security practice this kind of check is called a CCE assessment
@@ -14,17 +14,18 @@ the Linux server asset class: KISA is the primary standard, and global
 benchmarks (CIS Benchmarks, DISA STIG, NIST SP 800-53) are attached as
 references and, later, offered as selectable profiles.
 
-> **Status: stage 3D-2d merged (October 2026).** Stage 1 — the skeleton:
+> **Status: stage 3D-1b merged (October 2026).** Stage 1 — the skeleton:
 > `collect`, `check`, waivers, exit codes, eight controls end to end — stage 2
 > — every automatable KISA item, from the foundations with DISA STIG and NIST
 > SP 800-53 references through accounts, PAM, sshd, home directories, system
 > files, services, the firewall, logging, NFS, SNMP, patch hygiene, FTP, mail
 > and DNS to the closing coverage-and-reference gate — and stages 3A, 3B,
-> 3C-1, 3C-2a, 3C-2b, 3D-1, 3D-2, 3D-2b, 3D-2c and 3D-2d — the deep filesystem walk, the first checks
+> 3C-1, 3C-2a, 3C-2b, 3D-1, 3D-2, 3D-2b, 3D-2c, 3D-2d and 3D-1b — the deep filesystem walk, the first checks
 > beyond the guide, audit pipeline health and package integrity, who holds
 > root's power without being root, exposure, profiles and tuning, and the
 > `fix --dry-run` review script, its proof on real hosts and scripts for the
-> controls beyond the first sixteen, the audit family and what a file says — are merged. 67 of the 67 items are enrolled (68 controls:
+> controls beyond the first sixteen, the audit family and what a file says, and the
+> CIS Level 1 profiles over an index of recommendation numbers — are merged. 67 of the 67 items are enrolled (68 controls:
 > 57 auto, 7 partial, 4 manual with the evidence attached),
 > and 49 beyond the guide. `collect --deep`
 > walks the local filesystems once, under a time and entry budget, without
@@ -48,7 +49,7 @@ references and, later, offered as selectable profiles.
 > The remaining stage-3 and stage-4 items below are the plan, not a promise.
 
 > **Not affiliated.** muster is an unofficial personal project. It is not
-> endorsed by KISA or by the Center for Internet Security, it contains no CIS
+> endorsed by KISA or by the Center for Internet Security® (CIS), it contains no CIS
 > Benchmark text (only recommendation numbers), it does not claim any level of
 > CIS compliance, and it does not replace an official vulnerability assessment.
 
@@ -153,17 +154,26 @@ guide is included, and the guide itself is not included. CIS Benchmark
 references are benchmark name, version and recommendation number only, and
 muster judges no CIS compliance. See [ATTRIBUTION.md](ATTRIBUTION.md).
 
-Global benchmarks are cross-references, not a second rulebook. Of the 68
-controls, 25 carry DISA STIG rule ids, 20 carry NIST SP 800-53 control ids and
-13 carry CIS Benchmark recommendation numbers; the mappings are still being
-filled in, and a control gets one only where the benchmark judges the same
-criterion. `muster controls lint` refuses a STIG or
-NIST id that is not in the committed index and cross-checks every KISA item
+Global benchmarks are cross-references, not a second rulebook. Of the 117
+controls, 58 carry DISA STIG rule ids, 65 carry NIST SP 800-53 control ids and
+69 carry CIS Benchmark recommendation numbers; a control gets one only where
+the benchmark judges the same criterion. `muster controls lint` refuses a STIG,
+NIST or CIS reference that is not in the committed index and cross-checks every KISA item
 number against the 67-item inventory, so an item can be neither forgotten nor
 mis-claimed (an item may be judged by more than one control, as U-23 is, but
 every citation must name a real item). Since stage 3D-1 a profile (`check --profile`)
-selects controls and parameters from the same collector; the `cis-<distro>-l1` profile
-waits for an index of CIS recommendation numbers (3D-1b). muster records the
+selects controls and parameters from the same collector, and since 3D-1b three built-ins,
+`cis-ubuntu2204-l1`, `cis-ubuntu2404-l1` and `cis-rhel9-l1`, select the controls that
+carry a Level 1 – Server recommendation of their benchmark, minus a committed review
+list (`docs/reference/cis/review.yaml`)
+(`muster check --facts snap.json --profile cis-ubuntu2204-l1`).
+The `cis-<distro>-l1` profiles select muster's own controls that carry a CIS
+Benchmark recommendation number at Level 1 – Server; their results are
+muster's verdicts on muster's controls, not a CIS assessment, and muster is an
+independent publication not authorized, sponsored or otherwise approved by the
+Center for Internet Security. The
+recommendation numbers are generated into `docs/reference/cis/` by `tools/cisindex`
+from ComplianceAsCode's public control files (BSD-3-Clause; see NOTICE). muster records the
 numbers, never the benchmark text, and certifies no level of CIS or STIG
 compliance. The STIG and NIST identifiers a control may cite are generated
 into `docs/reference/stig/` from DISA's public files by `tools/refindex`.
@@ -238,8 +248,9 @@ titles, never their discussion, check and fix text. See
    container-runtime sockets and their groups, passwordless `ALL` in sudoers,
    the inactivity policy over every interactive account, root's authorized keys
    and SSH key quality — eight controls from three extended collectors and three
-   new ones. Next: 3D-1b, the `cis-<distro>-l1` profile over an index of CIS
-   recommendation numbers (`references.cis` on every selected control); then 3D-3
+   new ones. 3D-1b (merged): the `cis-<distro>-l1` profiles for Ubuntu 22.04, Ubuntu 24.04
+   and the RHEL 9 family over an index of CIS recommendation numbers
+   (`references.cis` on every selected control). Next: 3D-3
    (`--anonymize`, `--max-age`). `kisa-unix-2026` stays
    the default profile.
 4. **Public release.** Snapshot diff, SARIF, bilingual docs, signed reproducible

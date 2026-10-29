@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
   "run": {
-    "muster_version": "ca08d60",
-    "commit": "ca08d60",
-    "controls_version": "kisa-unix-2026+2026.10.20",
-    "controls_digest": "sha256:ed4e6ebc66e5ad2c8ec0110ba5caee5ae2539df7d9d88100325eb5a7065cc51a",
+    "muster_version": "5bfae2a",
+    "commit": "5bfae2a",
+    "controls_version": "kisa-unix-2026+2026.10.27",
+    "controls_digest": "sha256:eb73ab574efab7e0a50e4e2f9d54091beecf896bfe01ab6d0fe7444d53301523",
     "guide_edition": "kisa-unix-2026",
-    "collected_at": "2026-10-21T02:03:16Z",
+    "collected_at": "2026-10-27T09:00:28Z",
     "host": {
       "hostname": "ubuntu-container",
       "machine_id_hash": "",
@@ -141,13 +141,13 @@
       {
         "name": "patch",
         "status": "ok",
-        "ms": 31,
+        "ms": 24,
         "cmd": "/usr/bin/apt-get -s upgrade -o Debug::NoLocking=1"
       },
       {
         "name": "pkgverify",
         "status": "ok",
-        "ms": 208,
+        "ms": 162,
         "cmd": "/usr/bin/rpm -Va"
       },
       {
@@ -158,7 +158,7 @@
       {
         "name": "processes",
         "status": "ok",
-        "ms": 14,
+        "ms": 13,
         "cmd": "/usr/bin/rpm -qa --qf [%{=NAME}\t%{FILEMODES:octal}\t%{FILEUSERNAME}\t%{FILEGROUPNAME}\t%|FILECAPS?{%{FILECAPS}}|\t%{FILENAMES}\n]"
       },
       {
@@ -196,7 +196,7 @@
       {
         "name": "sysctl",
         "status": "ok",
-        "ms": 2
+        "ms": 1
       },
       {
         "name": "timesync",
@@ -226,11 +226,11 @@
     "partial_failures": []
   },
   "check": {
-    "muster_version": "ca08d60",
-    "commit": "ca08d60",
-    "controls_version": "kisa-unix-2026+2026.10.20",
-    "controls_digest": "sha256:ed4e6ebc66e5ad2c8ec0110ba5caee5ae2539df7d9d88100325eb5a7065cc51a",
-    "snapshot_digest": "sha256:de7600b432360bfb2afbaadd84ed45a0d57bbfc20de51328c09cd3c1e91c1d64",
+    "muster_version": "5bfae2a",
+    "commit": "5bfae2a",
+    "controls_version": "kisa-unix-2026+2026.10.27",
+    "controls_digest": "sha256:eb73ab574efab7e0a50e4e2f9d54091beecf896bfe01ab6d0fe7444d53301523",
+    "snapshot_digest": "sha256:f7384f6fd14bbf48bf641174e988cf3b230b9d524775637c8ca418bdd32f1c7f",
     "guide_edition": "kisa-unix-2026",
     "profile": {
       "name": "default",

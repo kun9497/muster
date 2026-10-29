@@ -19,7 +19,8 @@
   `kisa-unix-2026`은 그 별칭)이고, `cis-<distro>-l1`은 `docs/reference/cis/` 아래 CIS 권고 ↔ 컨트롤 색인(번호와
   버전만 — CIS 본문은 결코 복사하지 않음, ATTRIBUTION.md)이 생기는 다음 사이클입니다. 이 문서는 그 사이클을
   위해 이름 규약과 검사 가능한 규칙 하나만 정합니다: 그런 프로파일이 고르는 모든 컨트롤은 `references.cis`
-  항목을 가진다(3D-1b의 lint 규칙).
+  항목을 가진다(3D-1b의 lint 규칙). 3D-1b에서 실현됨(`2026-10-20-stage3d1b-cis-profiles-design.ko.md`):
+  `cis-ubuntu2204-l1`, `cis-ubuntu2404-l1`, `cis-rhel9-l1`이며, 그 규칙은 `controls lint --profile`이 검사합니다.
 - **Y-2 — 제외된 컨트롤은 평가하지 않고 싣지도 않는다.** 결과는 프로파일(이름, 출처, 다이제스트, 체인)과
   제외된 id를 기록합니다; 새 상태 없음, 추가 행 필드 하나(`severity_source`), 종료 코드 규칙 불변. waiver
   규칙은 한 곳만 바뀝니다: 제외된 컨트롤을 대는 waiver는 `unknown`이 아니라 `not_applied`(excluded by
@@ -288,6 +289,6 @@ params:
 
 ## 8. 보류
 
-- `cis-<distro>-l1`과 그 색인(3D-1b); 프로파일이 쓸 수 없는 수집기 건너뛰기; 패키지 설치용 프로파일
+- (3D-1b에서 완료: `cis-<distro>-l1`과 그 색인.) 프로파일이 쓸 수 없는 수집기 건너뛰기; 패키지 설치용 프로파일
   디렉터리(4단계); 프로파일 범위의 waiver; 컨트롤별 글롭이 너무 장황하면 심각도 클래스(`importance → level`
   재매핑); `automation`이나 `importance`로 `include`; 신뢰 파일의 심볼릭 링크 규칙(waiver에도 적용될 것).

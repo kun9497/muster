@@ -58,7 +58,7 @@ func TestResolveSelectionRefusesAnUnknownName(t *testing.T) {
 	if err == nil || sel != nil {
 		t.Fatalf("sel %v err %v, want a refusal", sel, err)
 	}
-	if !strings.Contains(err.Error(), `unknown profile "Default"; the built-ins are default, kisa-unix-2026`) {
+	if !strings.Contains(err.Error(), `unknown profile "Default"; the built-ins are default, cis-rhel9-l1, cis-ubuntu2204-l1, cis-ubuntu2404-l1, kisa-unix-2026`) {
 		t.Errorf("err %q", err)
 	}
 }

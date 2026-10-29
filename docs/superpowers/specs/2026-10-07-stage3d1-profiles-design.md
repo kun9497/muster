@@ -21,7 +21,9 @@ check-side work that runs on every platform, and `fix --dry-run` (3D-2) then has
   CIS recommendation ↔ control index exists under `docs/reference/cis/` (numbers and versions only
   — CIS text is never copied, ATTRIBUTION.md). This document fixes only the naming and one
   checkable rule for that cycle: every control such a profile selects carries a `references.cis`
-  entry (a lint rule of 3D-1b).
+  entry (a lint rule of 3D-1b). Realised in 3D-1b (`2026-10-20-stage3d1b-cis-profiles-design.md`):
+  `cis-ubuntu2204-l1`, `cis-ubuntu2404-l1` and `cis-rhel9-l1`, with the rule checked by
+  `controls lint --profile`.
 - **Y-2 — An excluded control is not evaluated and not listed.** The result records the profile
   (name, source, digest, chain) and the excluded ids; no new status, one additive row field
   (`severity_source`), the exit-code rule unchanged. The waiver rule changes in one place only: a
@@ -336,7 +338,7 @@ asked. Its digest is `sha256` of the file's bytes, as the waiver file's is.
 
 ## 8. Parked
 
-- `cis-<distro>-l1` and its index (3D-1b); skipping collectors a profile cannot use; a profile
+- (Done in 3D-1b: `cis-<distro>-l1` and its index.) Skipping collectors a profile cannot use; a profile
   directory for packaged installs (stage 4); profile-scoped waivers; severity classes
   (`importance → level` remapping) if per-control globs prove too verbose; `include` by `automation`
   or `importance`; a symlink rule for the trusted files (would apply to waivers too).

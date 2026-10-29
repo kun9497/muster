@@ -12,10 +12,23 @@ import (
 )
 
 var (
-	repoRoot     = filepath.Join("..", "..")
-	repoCoverage = filepath.Join(repoRoot, "docs", "reference", "coverage.md")
-	repoKISA     = filepath.Join(repoRoot, "docs", "reference", "kisa")
+	repoRoot       = filepath.Join("..", "..")
+	repoCoverage   = filepath.Join(repoRoot, "docs", "reference", "coverage.md")
+	repoKISA       = filepath.Join(repoRoot, "docs", "reference", "kisa")
+	repoReferences = filepath.Join(repoRoot, "docs", "reference")
 )
+
+// disclaimerCIS is the CB-13 sentence, spelled out here on purpose: the test
+// must not read the constant it checks. The dash is U+2013.
+const disclaimerCIS = "The `cis-<distro>-l1` profiles select muster's own controls that carry a CIS Benchmark recommendation number at Level 1 – Server; their results are muster's verdicts on muster's controls, not a CIS assessment, and muster is an independent publication not authorized, sponsored or otherwise approved by the Center for Internet Security."
+
+// writeDisclaimerDocs writes NOTICE and ATTRIBUTION.md, each carrying the
+// CB-13 sentence, into a -readme-dir fixture.
+func writeDisclaimerDocs(t *testing.T, dir string) {
+	t.Helper()
+	write(t, filepath.Join(dir, "NOTICE"), "notice\n"+disclaimerCIS+"\n")
+	write(t, filepath.Join(dir, "ATTRIBUTION.md"), "attribution\n"+disclaimerCIS+"\n")
+}
 
 // liveCounts is what the guard demands of the READMEs today: how many items
 // of the committed inventory the committed set enrols, how many items there
@@ -59,7 +72,7 @@ func TestCheckVerifiesTheReadmeCountFragments(t *testing.T) {
 		staleBeyondEN = fmt.Sprintf("and %d beyond the guide", n.beyond-1)
 		staleBeyondKO = fmt.Sprintf("그리고 가이드 밖 %d개", n.beyond-1)
 		stale         = enrolled - 1
-		goodEN        = fmt.Sprintf("and Rocky; %s judged automatically or with automatic\nevidence (%s), %s, the rest waiting for stage 3.\n", fragEN, tripleEN, beyondEN)
+		goodEN        = fmt.Sprintf("and Rocky; %s judged automatically or with automatic\nevidence (%s), %s, the rest waiting for stage 3.\n%s\n", fragEN, tripleEN, beyondEN, disclaimerCIS)
 		goodKO        = fmt.Sprintf("Ubuntu와 Rocky 수집기. %d개 중\n   %d개를 자동 판정하거나 자동 근거를 붙이고(%s), %s, 나머지는 3단계.\n", total, enrolled, tripleKO, beyondKO)
 	)
 	cases := []struct {
@@ -120,14 +133,29 @@ func TestCheckVerifiesTheReadmeCountFragments(t *testing.T) {
 			ko:       goodKO,
 			wantCode: 0,
 		},
+		// CB-13: the disclaimer stands in README.md, NOTICE and ATTRIBUTION.md.
+		{
+			name:     "english lacks the disclaimer",
+			en:       strings.Replace(goodEN, disclaimerCIS, "", 1),
+			ko:       goodKO,
+			wantCode: 1,
+			wantErr:  "coverage: README.md does not carry the CIS disclaimer",
+		},
+		{
+			name:     "english wraps the disclaimer",
+			en:       strings.Replace(goodEN, disclaimerCIS, strings.Replace(disclaimerCIS, " Benchmark ", "\n   Benchmark ", 1), 1),
+			ko:       goodKO,
+			wantCode: 0,
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()
 			write(t, filepath.Join(dir, "README.md"), tc.en)
 			write(t, filepath.Join(dir, "README.ko.md"), tc.ko)
+			writeDisclaimerDocs(t, dir)
 			var errb bytes.Buffer
-			code := run([]string{"-check", "-out", repoCoverage, "-kisa-dir", repoKISA, "-readme-dir", dir}, &errb)
+			code := run([]string{"-check", "-out", repoCoverage, "-kisa-dir", repoKISA, "-references", repoReferences, "-readme-dir", dir}, &errb)
 			if code != tc.wantCode {
 				t.Fatalf("exit %d, want %d; stderr %q", code, tc.wantCode, errb.String())
 			}
@@ -141,11 +169,40 @@ func TestCheckVerifiesTheReadmeCountFragments(t *testing.T) {
 	}
 }
 
+// CB-13: NOTICE and ATTRIBUTION.md each hold the sentence; README.ko.md is
+// not asked for it.
+func TestCheckHoldsTheDisclaimerInNoticeAndAttribution(t *testing.T) {
+	n := liveCounts(t)
+	readme := fmt.Sprintf("%d of the %d items, %d auto, %d partial, %d manual, and %d beyond the guide\n%s\n",
+		n.enrolled, n.total, n.auto, n.partial, n.manual, n.beyond, disclaimerCIS)
+	readmeKO := fmt.Sprintf("%d개 중 %d개 auto %d, partial %d, manual %d 그리고 가이드 밖 %d개\n", n.total, n.enrolled, n.auto, n.partial, n.manual, n.beyond)
+	for _, file := range []string{"NOTICE", "ATTRIBUTION.md"} {
+		t.Run(file, func(t *testing.T) {
+			dir := t.TempDir()
+			write(t, filepath.Join(dir, "README.md"), readme)
+			write(t, filepath.Join(dir, "README.ko.md"), readmeKO)
+			writeDisclaimerDocs(t, dir)
+			var okb bytes.Buffer
+			if code := run([]string{"-check", "-out", repoCoverage, "-kisa-dir", repoKISA, "-references", repoReferences, "-readme-dir", dir}, &okb); code != 0 {
+				t.Fatalf("with all three, exit %d, want 0; stderr %q", code, okb.String())
+			}
+			write(t, filepath.Join(dir, file), "no sentence here\n")
+			var errb bytes.Buffer
+			if code := run([]string{"-check", "-out", repoCoverage, "-kisa-dir", repoKISA, "-references", repoReferences, "-readme-dir", dir}, &errb); code != 1 {
+				t.Fatalf("exit %d, want 1; stderr %q", code, errb.String())
+			}
+			if want := "coverage: " + file + " does not carry the CIS disclaimer"; !strings.Contains(errb.String(), want) {
+				t.Errorf("stderr %q lacks %q", errb.String(), want)
+			}
+		})
+	}
+}
+
 // The committed tree is what CI checks: the table is current and both
 // READMEs carry the live number.
 func TestCheckPassesOnTheCommittedTree(t *testing.T) {
 	var errb bytes.Buffer
-	if code := run([]string{"-check", "-out", repoCoverage, "-kisa-dir", repoKISA, "-readme-dir", repoRoot}, &errb); code != 0 {
+	if code := run([]string{"-check", "-out", repoCoverage, "-kisa-dir", repoKISA, "-references", repoReferences, "-readme-dir", repoRoot}, &errb); code != 0 {
 		t.Fatalf("exit %d, want 0; stderr:\n%s", code, errb.String())
 	}
 }
@@ -155,7 +212,7 @@ func TestCheckReportsAStaleTable(t *testing.T) {
 	stale := filepath.Join(t.TempDir(), "coverage.md")
 	write(t, stale, "<!-- Generated by go run ./tools/coverage; do not edit. -->\nnothing like the real thing\n")
 	var errb bytes.Buffer
-	if code := run([]string{"-check", "-out", stale, "-kisa-dir", repoKISA, "-readme-dir", repoRoot}, &errb); code != 1 {
+	if code := run([]string{"-check", "-out", stale, "-kisa-dir", repoKISA, "-references", repoReferences, "-readme-dir", repoRoot}, &errb); code != 1 {
 		t.Fatalf("exit %d, want 1; stderr %q", code, errb.String())
 	}
 	if !strings.Contains(errb.String(), "out of date") || !strings.Contains(errb.String(), "@@") {
@@ -174,9 +231,10 @@ func TestCheckReportsTheTableAndTheReadmeTogether(t *testing.T) {
 	write(t, stale, "<!-- Generated by go run ./tools/coverage; do not edit. -->\nnothing like the real thing\n")
 	write(t, filepath.Join(dir, "README.md"), fmt.Sprintf("%d of the %d items\n", enrolled-1, total))
 	write(t, filepath.Join(dir, "README.ko.md"), fmt.Sprintf("%d개 중 %d개\n", total, enrolled))
+	writeDisclaimerDocs(t, dir)
 
 	var errb bytes.Buffer
-	if code := run([]string{"-check", "-out", stale, "-kisa-dir", repoKISA, "-readme-dir", dir}, &errb); code != 1 {
+	if code := run([]string{"-check", "-out", stale, "-kisa-dir", repoKISA, "-references", repoReferences, "-readme-dir", dir}, &errb); code != 1 {
 		t.Fatalf("exit %d, want 1; stderr %q", code, errb.String())
 	}
 	if !strings.Contains(errb.String(), "is out of date") {
@@ -191,7 +249,7 @@ func TestCheckReportsTheTableAndTheReadmeTogether(t *testing.T) {
 		t.Fatal(err)
 	}
 	var errb2 bytes.Buffer
-	if code := run([]string{"-check", "-out", stale, "-kisa-dir", repoKISA, "-readme-dir", dir}, &errb2); code != 2 {
+	if code := run([]string{"-check", "-out", stale, "-kisa-dir", repoKISA, "-references", repoReferences, "-readme-dir", dir}, &errb2); code != 2 {
 		t.Fatalf("exit %d, want 2; stderr %q", code, errb2.String())
 	}
 	if !strings.Contains(errb2.String(), "is out of date") {
@@ -255,5 +313,26 @@ func write(t *testing.T, path, content string) {
 	t.Helper()
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestMissingReferencesDirectoryIsAnError(t *testing.T) {
+	var errb bytes.Buffer
+	missing := filepath.Join(t.TempDir(), "nope")
+	if code := run([]string{"-check", "-out", repoCoverage, "-kisa-dir", repoKISA, "-references", missing, "-readme-dir", repoRoot}, &errb); code != 2 {
+		t.Fatalf("exit %d, want 2; stderr %q", code, errb.String())
+	}
+}
+
+func TestReferencesWithoutCISRendersDashes(t *testing.T) {
+	dir := t.TempDir()
+	out := filepath.Join(dir, "c.md")
+	var errb bytes.Buffer
+	if code := run([]string{"-out", out, "-kisa-dir", repoKISA, "-references", dir, "-readme-dir", repoRoot}, &errb); code != 0 {
+		t.Fatalf("exit %d; stderr %q", code, errb.String())
+	}
+	data, _ := os.ReadFile(out)
+	if strings.Contains(string(data), "## CIS Benchmarks") {
+		t.Error("no cis/ directory, no section")
 	}
 }

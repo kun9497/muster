@@ -10,6 +10,19 @@ verdict on an existing snapshot is at least a minor release and appears under
 ## [Unreleased]
 
 ### Added
+- Three built-in CIS profiles, `cis-ubuntu2204-l1`, `cis-ubuntu2404-l1` and
+  `cis-rhel9-l1` (stage 3D-1b), each selecting muster's controls that carry a
+  Level 1 – Server recommendation of its benchmark, minus a review list
+  (33, 33 and 30 controls). The recommendation numbers come from an index
+  generated from ComplianceAsCode v0.1.82's control files
+  (`docs/reference/cis/`, `tools/cisindex`); 69 controls now carry
+  `references.cis` spelled with the product key (`ubuntu2204`, `ubuntu2404`,
+  `rhel9`), held equal to the index. `controls lint` checks every CIS
+  reference and, with `--profile cis-…`, that every selected control carries
+  one; `check` and `fix --dry-run` warn on a snapshot whose OS release the
+  profile's benchmark does not cover. The coverage page gains a CIS column and
+  one line per benchmark. No verdict changes; `controls/VERSION` moves to
+  `kisa-unix-2026+2026.10.27`.
 - Review scripts for eight more controls and the `no_root_squash` half of
   `nfs_export_access` (56 in all; stage 3D-2d). `auditd_active` unmasks,
   enables and starts auditd, but starts it only over an empty kernel list with

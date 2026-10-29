@@ -43,8 +43,10 @@ jobs:
           pkgindex=$(go test -list '^Fuzz' ./internal/pkgindex/ | grep '^Fuzz')
           profile=$(go test -list '^Fuzz' ./internal/profile/ | grep '^Fuzz')
           tuning=$(go test -list '^Fuzz' ./internal/tuning/ | grep '^Fuzz')
+          cisindex=$(go test -list '^Fuzz' ./internal/cisindex/ | grep '^Fuzz')
+          controlspkg=$(go test -list '^Fuzz' ./internal/controls/ | grep '^Fuzz')
           factspkg=$(go test -list '^Fuzz' ./internal/facts/ | grep '^Fuzz')
-          targets=$( { echo "$collectors" | sed 's#^#./internal/collect/collectors/ #'; echo "$pkgfiles" | sed 's#^#./internal/pkgfiles/ #'; echo "$pkgindex" | sed 's#^#./internal/pkgindex/ #'; echo "$profile" | sed 's#^#./internal/profile/ #'; echo "$tuning" | sed 's#^#./internal/tuning/ #'; echo "$factspkg" | sed 's#^#./internal/facts/ #'; } | sort )
+          targets=$( { echo "$collectors" | sed 's#^#./internal/collect/collectors/ #'; echo "$pkgfiles" | sed 's#^#./internal/pkgfiles/ #'; echo "$pkgindex" | sed 's#^#./internal/pkgindex/ #'; echo "$profile" | sed 's#^#./internal/profile/ #'; echo "$tuning" | sed 's#^#./internal/tuning/ #'; echo "$factspkg" | sed 's#^#./internal/facts/ #'; echo "$cisindex" | sed 's#^#./internal/cisindex/ #'; echo "$controlspkg" | sed 's#^#./internal/controls/ #'; } | sort )
           i=0; ran=0; failed=0
           while read -r pkg name; do
             if [ $((i % 4)) -eq ${{ matrix.shard }} ]; then

@@ -1,0 +1,12 @@
+{
+  "product": "mini",
+  "benchmark": "Mini",
+  "version": "1.0.0",
+  "applies_to": ["minialias"],
+  "source": {"repo": "r", "tag": "t", "commit": "c", "path": "p", "sha256": "s"},
+  "counts": {"l1_server": 1},
+  "recs": [
+    {"rec": "1.1.1", "levels": ["l1_server"], "controls": ["muster.x.a"], "rules": "all"},
+    {"rec": "2.1", "levels": ["l2_server"], "controls": ["muster.x.b"], "rules": "some"}
+  ]
+}

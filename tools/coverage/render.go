@@ -2,9 +2,11 @@ package main
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
+	"github.com/kun9497/muster/internal/cisindex"
 	"github.com/kun9497/muster/internal/controls"
 )
 
@@ -112,7 +114,8 @@ func countBeyond(set []controls.Control) int {
 // later stage says so and names the stage; a control citing an item that is
 // not in the inventory is listed separately so a typo in references.kisa is
 // visible.
-func render(items []controls.KISAItem, deferred []controls.Deferral, usage []controls.CollectorUsage, set []controls.Control) string {
+func render(items []controls.KISAItem, deferred []controls.Deferral, usage []controls.CollectorUsage, set []controls.Control, cis []*cisindex.Index) string {
+	cells := cisCells(cis)
 	byItem, stage, unknown := join(items, deferred, set)
 	sorted := append([]controls.KISAItem(nil), items...)
 	sort.Slice(sorted, func(i, j int) bool { return sorted[i].ID < sorted[j].ID })
@@ -122,17 +125,17 @@ func render(items []controls.KISAItem, deferred []controls.Deferral, usage []con
 	var rows []string
 	for _, it := range sorted {
 		if st, isDeferred := stage[it.ID]; isDeferred {
-			rows = append(rows, fmt.Sprintf("| %s | %s | %s | — | — | deferred (stage %s) |", it.ID, it.NameKo, it.Importance, st))
+			rows = append(rows, fmt.Sprintf("| %s | %s | %s | — | — | — | deferred (stage %s) |", it.ID, it.NameKo, it.Importance, st))
 			continue
 		}
 		cs := byItem[it.ID]
 		if len(cs) == 0 {
-			rows = append(rows, fmt.Sprintf("| %s | %s | %s | — | — | not enrolled |", it.ID, it.NameKo, it.Importance))
+			rows = append(rows, fmt.Sprintf("| %s | %s | %s | — | — | — | not enrolled |", it.ID, it.NameKo, it.Importance))
 			continue
 		}
 		sort.Slice(cs, func(i, j int) bool { return cs[i].ID < cs[j].ID })
 		for _, c := range cs {
-			rows = append(rows, fmt.Sprintf("| %s | %s | %s | %s | %s | enrolled |", it.ID, it.NameKo, it.Importance, c.ID, c.Automation))
+			rows = append(rows, fmt.Sprintf("| %s | %s | %s | %s | %s | %s | enrolled |", it.ID, it.NameKo, it.Importance, c.ID, c.Automation, cells.cell(c.ID)))
 		}
 	}
 	auto, partial, manual := countAutomation(items, byItem, stage)
@@ -142,7 +145,7 @@ func render(items []controls.KISAItem, deferred []controls.Deferral, usage []con
 	// controls total is stated beside it.
 	fmt.Fprintf(&b, "%d of %d items enrolled; %d controls (auto %d, partial %d, manual %d).\n\n",
 		countEnrolled(items, byItem, stage), len(sorted), auto+partial+manual, auto, partial, manual)
-	b.WriteString("| ID | Item (KISA) | Imp. | Control | Automation | Status |\n|---|---|---|---|---|---|\n")
+	b.WriteString("| ID | Item (KISA) | Imp. | Control | Automation | CIS recs | Status |\n|---|---|---|---|---|---|---|\n")
 	b.WriteString(strings.Join(rows, "\n"))
 	b.WriteString("\n")
 	if len(unknown) > 0 {
@@ -151,8 +154,9 @@ func render(items []controls.KISAItem, deferred []controls.Deferral, usage []con
 		b.WriteString(strings.Join(unknown, "\n"))
 		b.WriteString("\n")
 	}
-	b.WriteString(renderBeyond(set))
+	b.WriteString(renderBeyond(set, cells))
 	b.WriteString(renderUsage(usage))
+	b.WriteString(renderCIS(cis))
 	return b.String()
 }
 
@@ -167,14 +171,14 @@ func render(items []controls.KISAItem, deferred []controls.Deferral, usage []con
 // The fact keys come from controls.FactKeys, the same walk the fact-usage
 // section folds over the whole set, so the two can never disagree about what
 // a control reads.
-func renderBeyond(set []controls.Control) string {
+func renderBeyond(set []controls.Control, cells cisTable) string {
 	var rows []string
 	for _, c := range set {
 		if c.Category != "beyond" {
 			continue
 		}
-		rows = append(rows, fmt.Sprintf("| %s | %s | %s | %s | %s |",
-			c.ID, c.Importance, c.Automation, orDash(controls.FactKeys(&c)), orDash(stigIDs(c))))
+		rows = append(rows, fmt.Sprintf("| %s | %s | %s | %s | %s | %s |",
+			c.ID, c.Importance, c.Automation, orDash(controls.FactKeys(&c)), orDash(stigIDs(c)), cells.cell(c.ID)))
 	}
 	var b strings.Builder
 	b.WriteString("\n## Beyond the guide\n\n")
@@ -184,7 +188,7 @@ func renderBeyond(set []controls.Control) string {
 	}
 	sort.Strings(rows)
 	fmt.Fprintf(&b, "%d controls muster checks that the guide does not ask for.\n\n", len(rows))
-	b.WriteString("| Control | Imp. | Automation | Fact keys read | STIG ids |\n|---|---|---|---|---|\n")
+	b.WriteString("| Control | Imp. | Automation | Fact keys read | STIG ids | CIS recs |\n|---|---|---|---|---|---|\n")
 	b.WriteString(strings.Join(rows, "\n"))
 	b.WriteString("\n")
 	return b.String()
@@ -234,6 +238,93 @@ func renderUsage(usage []controls.CollectorUsage) string {
 			cell = strings.Join(u.Unused, ", ")
 		}
 		fmt.Fprintf(&b, "| %s | %d | %d | %d | %s |\n", u.Collector, u.Registered, u.Used, u.Engine, cell)
+	}
+	return b.String()
+}
+
+// cisRow is one mapped recommendation seen from a control.
+type cisRow struct{ rec, rules string }
+
+// cisTable maps a control id to its recommendations per product.
+type cisTable map[string]map[string][]cisRow
+
+func cisCells(cis []*cisindex.Index) cisTable {
+	t := cisTable{}
+	for _, ix := range cis {
+		for _, r := range ix.Recs {
+			for _, id := range r.Controls {
+				if t[id] == nil {
+					t[id] = map[string][]cisRow{}
+				}
+				t[id][ix.Product] = append(t[id][ix.Product], cisRow{r.Rec, r.Rules})
+			}
+		}
+	}
+	return t
+}
+
+// cell is the CIS recs cell of a control: products in lexical order, each
+// `<product> <rec>[ (some|none)]…`, joined `; `; an em dash when none. A row
+// that `all` its rule ids carries no marker, and no number is a percentage.
+func (t cisTable) cell(id string) string {
+	byProduct := t[id]
+	if len(byProduct) == 0 {
+		return "—"
+	}
+	products := make([]string, 0, len(byProduct))
+	for p := range byProduct {
+		products = append(products, p)
+	}
+	sort.Strings(products)
+	groups := make([]string, 0, len(products))
+	for _, p := range products {
+		rows := byProduct[p]
+		sort.Slice(rows, func(i, j int) bool { return cisindex.CompareRec(rows[i].rec, rows[j].rec) < 0 })
+		recs := make([]string, 0, len(rows))
+		for _, r := range rows {
+			s := r.rec
+			if r.rules == "some" || r.rules == "none" {
+				s += " (" + r.rules + ")"
+			}
+			recs = append(recs, s)
+		}
+		groups = append(groups, p+" "+strings.Join(recs, ", "))
+	}
+	return strings.Join(groups, "; ")
+}
+
+// cisMapNote says what the CIS section counts: muster's map, not a profile's
+// selection, which drops the controls review.yaml names (CB-7).
+const cisMapNote = "The counts below and the CIS recs cells cover muster's map of controls to recommendations (`docs/reference/cis/map.yaml`); each `cis-<product>-l1` profile drops the controls `docs/reference/cis/review.yaml` names."
+
+// renderCIS is one line per benchmark in product order; nothing without an
+// index. It states counts only: no percentage, no score (CB-6).
+func renderCIS(cis []*cisindex.Index) string {
+	if len(cis) == 0 {
+		return ""
+	}
+	sorted := append([]*cisindex.Index(nil), cis...)
+	sort.Slice(sorted, func(i, j int) bool { return sorted[i].Product < sorted[j].Product })
+	var b strings.Builder
+	b.WriteString("\n## CIS Benchmarks\n\n")
+	b.WriteString(cisMapNote + "\n\n")
+	for _, ix := range sorted {
+		ctl := map[string]bool{}
+		rows := 0
+		for _, r := range ix.Recs {
+			if !slices.Contains(r.Levels, "l1_server") {
+				continue
+			}
+			rows++
+			for _, c := range r.Controls {
+				ctl[c] = true
+			}
+		}
+		fmt.Fprintf(&b, "- %d controls map %d of %d Level 1 – Server recommendations (%s v%s, via ComplianceAsCode %s)\n",
+			len(ctl), rows, ix.Counts.L1Server, ix.Benchmark, ix.Version, ix.Source.Tag)
+		if ix.EqualTo != nil {
+			b.WriteString("  On AlmaLinux and Rocky hosts the profile carries RHEL 9's coverage words and parameter values.\n")
+		}
 	}
 	return b.String()
 }

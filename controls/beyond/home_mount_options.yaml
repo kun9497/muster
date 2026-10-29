@@ -7,6 +7,13 @@ category: beyond
 importance: 하
 automation: auto
 references:
+  cis:
+    - { benchmark: rhel9, version: "2.0.0", rec: "1.1.2.3.2" }
+    - { benchmark: rhel9, version: "2.0.0", rec: "1.1.2.3.3" }
+    - { benchmark: ubuntu2204, version: "2.0.0", rec: "1.1.2.3.2" }
+    - { benchmark: ubuntu2204, version: "2.0.0", rec: "1.1.2.3.3" }
+    - { benchmark: ubuntu2404, version: "1.0.0", rec: "1.1.2.3.2" }
+    - { benchmark: ubuntu2404, version: "1.0.0", rec: "1.1.2.3.3" }
   stig:
     - { benchmark: rhel9, version: V2R9, id: RHEL-09-231045 }
     - { benchmark: rhel9, version: V2R9, id: RHEL-09-231050 }

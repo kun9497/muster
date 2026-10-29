@@ -56,16 +56,9 @@ func SourceOf(s string) Source {
 	return Source{Name: s}
 }
 
-// builtins holds the embedded profiles as Go literals; kisa-unix-2026 is an
-// alias of default (Y-1).
-var builtins = map[string]*File{
-	"default": {Profile: "default", Include: []string{"muster.*"}},
-}
-
+// builtinAliases names the built-ins that are another one's: kisa-unix-2026 is
+// default (Y-1). The aliases stay in Go; the files are embedded (builtins.go).
 var builtinAliases = map[string]string{"kisa-unix-2026": "default"}
-
-// Builtins lists the built-in names, canonical names first, for refusals.
-func Builtins() []string { return []string{"default", "kisa-unix-2026"} }
 
 func builtin(name string) (*File, string, bool) {
 	if canon, ok := builtinAliases[name]; ok {

@@ -1186,7 +1186,7 @@ func TestCheckProfileUnknownNameNamesTheBuiltins(t *testing.T) {
 		if out.Len() != 0 {
 			t.Errorf("--profile %s: stdout %q, want empty", name, out.String())
 		}
-		if !strings.Contains(errb.String(), "default, kisa-unix-2026") || !strings.Contains(errb.String(), `"`+name+`"`) {
+		if !strings.Contains(errb.String(), "default, cis-rhel9-l1, cis-ubuntu2204-l1, cis-ubuntu2404-l1, kisa-unix-2026") || !strings.Contains(errb.String(), `"`+name+`"`) {
 			t.Errorf("--profile %s: stderr %q does not name it and the built-ins", name, errb.String())
 		}
 	}
