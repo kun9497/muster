@@ -17,6 +17,7 @@ const fixUsage = `usage: muster fix --dry-run --facts <snapshot.json|-> [flags]
 
 flags:
   --format table|json|script   output format (default table)
+                               (script refuses an anonymised snapshot: plan from the original)
   --waivers <file>             waiver file, as check
   --profile <name|path>        the profile in force, as check: a built-in (default, cis-rhel9-l1,
                                cis-ubuntu2204-l1, cis-ubuntu2404-l1, kisa-unix-2026) or a profile
