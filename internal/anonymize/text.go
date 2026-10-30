@@ -192,13 +192,16 @@ func (w *walker) path(dp, s string) string {
 	if w.collect {
 		return s
 	}
-	out, names := w.k.mapPath(s, w.homes)
+	out, names, ids := w.k.mapPath(s, w.homes)
 	for _, n := range names {
 		if Kept(n) {
 			w.note(dp, ClassKept, n, n)
 		} else {
 			w.note(dp, ClassAccount, n, w.k.Account(n))
 		}
+	}
+	for _, id := range ids {
+		w.note(dp, ClassMachineID, id.in, id.out)
 	}
 	w.note(dp, ClassPath, s, out)
 	return out

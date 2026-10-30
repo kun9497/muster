@@ -2,6 +2,7 @@ package anonymize
 
 import (
 	"bytes"
+	"strings"
 	"testing"
 )
 
@@ -138,6 +139,51 @@ func TestMountTargetsAreTheClosedList(t *testing.T) {
 	for i := 1; i < len(MountTargets); i++ {
 		if MountTargets[i-1] >= MountTargets[i] {
 			t.Errorf("MountTargets not sorted at %q", MountTargets[i])
+		}
+	}
+}
+
+// AX-6's machine-id positions: the journal directory, the BLS layout under
+// /boot, /boot/loader/entries and /efi, and the boot id of systemd's
+// PrivateTmp directories under /tmp and /var/tmp map their 32 hex by the
+// machine-id sub-key; nothing else does.
+func TestMapPathMachineIDPositions(t *testing.T) {
+	k := key7(t)
+	const id = "0123456789abcdef0123456789abcdef"
+	m, b := k.hostID(idLabel, id), k.hostID(bootLabel, id)
+	if !isHex32(m) || !isHex32(b) || m == id || b == id || m == b {
+		t.Fatalf("hostID gives %q (id) and %q (boot) for %q", m, b, id)
+	}
+	if m == k.MachineIDHash(id)[:32] {
+		t.Fatalf("the path mapping shares the header's derivation")
+	}
+	cases := []struct{ in, want string }{
+		{"/var/log/journal/" + id, "/var/log/journal/" + m},
+		{"/var/log/journal/" + id + "/system.journal", "/var/log/journal/" + m + "/system.journal"},
+		{"/run/log/journal/" + id, "/run/log/journal/" + m},
+		{"/var/log//journal/" + id, "/var/log//journal/" + m},
+		{"/var/log/journal/./" + id, "/var/log/journal/./" + m},
+		{"/boot/loader/entries/" + id + "-6.8.0-45-generic.conf", "/boot/loader/entries/" + m + "-6.8.0-45-generic.conf"},
+		{"/boot/loader/entries/" + id + ".conf", "/boot/loader/entries/" + id + ".conf"},
+		{"/boot/" + id + "/6.8.0-45-generic/linux", "/boot/" + m + "/6.8.0-45-generic/linux"},
+		{"/efi/" + id, "/efi/" + m},
+		{"/efi/loader/entries/" + id + "-6.8.conf", "/efi/loader/entries/" + m + "-6.8.conf"},
+		// not a machine-id position, or not 32 lowercase hex
+		{"/var/log/journal/" + strings.ToUpper(id), "/var/log/journal/" + strings.ToUpper(id)},
+		{"/var/log/journal/" + id + "0", "/var/log/journal/" + id + "0"},
+		{"/var/log/journal/remote", "/var/log/journal/remote"},
+		{"/var/log/" + id, "/var/log/" + id},
+		{"/etc/" + id, "/etc/" + id},
+		{"/boot/" + id + "0", "/boot/" + id + "0"},
+		{"/boot/grub/" + id, "/boot/grub/" + id},
+		{"/tmp/" + id, "/tmp/" + id},
+		{"/tmp/systemd-private-" + id, "/tmp/systemd-private-" + id},
+		{"/home/x/systemd-private-" + id + "-a-b", "/home/" + k.Account("x") + "/systemd-private-" + id + "-a-b"},
+	}
+	var h Homes
+	for _, c := range cases {
+		if got := k.MapPath(c.in, h); got != c.want {
+			t.Errorf("MapPath(%q) = %q, want %q", c.in, got, c.want)
 		}
 	}
 }

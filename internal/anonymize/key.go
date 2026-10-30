@@ -132,6 +132,33 @@ func (k *Key) MachineIDHash(h string) string {
 	return hex.EncodeToString(mac(k.sub(ClassMachineID), h))
 }
 
+// The derivation labels of a raw 32-hex host identifier found in a path
+// (AX-6's machine-id positions): the machine id itself and the boot id.
+// Neither is a 64-hex string, so neither input can equal the header hash
+// MachineIDHash maps under the same sub-key.
+const (
+	idLabel   = "id:"
+	bootLabel = "boot:"
+)
+
+// hostID maps a raw 32-hex machine id or boot id to 32 lowercase hex under
+// the machine-id sub-key, label first.
+func (k *Key) hostID(label, raw string) string {
+	return hex.EncodeToString(mac(k.sub(ClassMachineID), label+raw))[:32]
+}
+
+func isHex32(s string) bool {
+	if len(s) != 32 {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		if !(s[i] >= '0' && s[i] <= '9' || s[i] >= 'a' && s[i] <= 'f') {
+			return false
+		}
+	}
+	return true
+}
+
 // Ledger records every (class, input -> output) and refuses a collision (AX-9).
 type Ledger struct {
 	byClass map[string]map[string]string // class -> out -> in

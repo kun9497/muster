@@ -405,6 +405,72 @@ func TestAnonymisedHomesNestedSharedAndExempt(t *testing.T) {
 	}
 }
 
+// exampleStrings returns every string of the VM example and of its
+// anonymisation under the invariant key, and the example's header hash.
+func exampleStrings(t *testing.T) (orig, anon []string, header string) {
+	t.Helper()
+	const ex = "../../examples/ubuntu-24.04-vm.json"
+	data := mustRead(t, ex)
+	var hdr struct {
+		Run struct {
+			Host struct {
+				MachineIDHash string `json:"machine_id_hash"`
+			} `json:"host"`
+		} `json:"run"`
+	}
+	if err := json.Unmarshal(data, &hdr); err != nil {
+		t.Fatal(err)
+	}
+	var walk func(v any, out *[]string)
+	walk = func(v any, out *[]string) {
+		switch x := v.(type) {
+		case map[string]any:
+			for _, e := range x {
+				walk(e, out)
+			}
+		case []any:
+			for _, e := range x {
+				walk(e, out)
+			}
+		case string:
+			*out = append(*out, x)
+		}
+	}
+	strs := func(doc []byte) []string {
+		var tree any
+		if err := json.Unmarshal(doc, &tree); err != nil {
+			t.Fatal(err)
+		}
+		var out []string
+		walk(tree, &out)
+		return out
+	}
+	return strs(data), strs(anonymizeBytes(t, ex, data, invariantKey(t))), hdr.Run.Host.MachineIDHash
+}
+
+// AX-6's machine-id positions over the VM example: its journal directory is
+// named by the raw machine id, whose sha256 is the header's
+// machine_id_hash. After anonymisation no path component hashes to it.
+func TestAnonymisedPathsCarryNoMachineID(t *testing.T) {
+	orig, anon, header := exampleStrings(t)
+	byID := func(ss []string) (n int) {
+		for _, s := range ss {
+			for _, c := range strings.Split(s, "/") {
+				if sum := sha256.Sum256([]byte(c)); c != "" && fmt.Sprintf("%x", sum) == header {
+					n++
+				}
+			}
+		}
+		return n
+	}
+	if n := byID(orig); n == 0 {
+		t.Fatal("no path component of the example hashes to its machine_id_hash: the test proves nothing")
+	}
+	if n := byID(anon); n != 0 {
+		t.Errorf("%d path components of the anonymised example hash to the original machine_id_hash", n)
+	}
+}
+
 // canarySnap builds, at test time, the synthetic host of §4's canary sweep:
 // a document with every registry key present and, in every location the
 // table classifies as anything but kept, a unique canary of that location's
@@ -434,6 +500,10 @@ const (
 	canaryShort   = "qzshortname"
 	canarySudoer  = "qzsudoer"
 	canarySpooler = "qzspooler"
+	// canaryMachineID is the host's raw machine id: the journal directory
+	// and the BLS entries are named by it, and its sha256 is the header's
+	// machine_id_hash.
+	canaryMachineID = "0c0ffee00c0ffee00c0ffee00c0ffee0"
 )
 
 func newCanarySnap(tb testing.TB) *canarySnap {
@@ -537,7 +607,8 @@ func (c *canarySnap) hostForm(form string) string {
 }
 
 // pathForms are AX-6's positions.
-var pathForms = []string{"home", "sudoers.d", "mail-el", "mail", "crontab", "cron-el", "linger", "accountsservice", "cron.d"}
+var pathForms = []string{"home", "sudoers.d", "mail-el", "mail", "crontab", "cron-el", "linger", "accountsservice", "cron.d",
+	"journal", "bls"}
 
 func (c *canarySnap) pathForm(i int) string {
 	form := pathForms[i%len(pathForms)]
@@ -561,6 +632,10 @@ func (c *canarySnap) pathForm(i int) string {
 		return "/var/lib/AccountsService/users/" + canarySudoer
 	case "cron.d":
 		return "/etc/cron.d/" + canarySpooler
+	case "journal":
+		return "/var/log/journal/" + canaryMachineID
+	case "bls":
+		return "/boot/loader/entries/" + canaryMachineID + "-6.8.0-45-generic.conf"
 	}
 	return ""
 }
@@ -811,7 +886,8 @@ func (c *canarySnap) document() map[string]any {
 	c.words = append(c.words, canarySudoer, canarySpooler, canaryShort, "qzsitedom",
 		"/etc/sudoers.d/"+canarySudoer, "/var/spool/mail/"+canarySpooler, "987654321")
 
-	machineID := c.leaf(anonymize.ClassMachineID, 0, nil)
+	machineID := fmt.Sprintf("%x", sha256.Sum256([]byte(canaryMachineID)))
+	c.words = append(c.words, canaryMachineID, machineID)
 	return map[string]any{
 		"synthetic":      true,
 		"_notes":         []any{c.text()},

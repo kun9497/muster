@@ -105,31 +105,70 @@ var namePositions = map[string]bool{
 	"/etc/cron.d":                    true,
 }
 
+// journalDirs are the directories whose direct child journald names by the
+// raw machine id; blsDirs are the Boot Loader Specification's, whose direct
+// child is the machine id or <machine id>-<rest> (an entry, a kernel
+// directory). The id's sha256 is the header's machine_id_hash, so the id is
+// mapped too (AX-6's machine-id positions).
+var (
+	journalDirs = map[string]bool{"/var/log/journal": true, "/run/log/journal": true}
+	blsDirs     = map[string]bool{"/boot": true, "/boot/loader/entries": true, "/efi": true, "/efi/loader/entries": true}
+)
+
+// idNote is one raw host identifier a path held: in is the label and the
+// raw 32 hex, out its 32-hex pseudonym.
+type idNote struct{ in, out string }
+
+// hostIDComponent maps component c under the cleaned directory parent when
+// c sits at a machine-id position.
+func (k *Key) hostIDComponent(parent, c string) (string, *idNote, bool) {
+	switch {
+	case journalDirs[parent] && isHex32(c):
+		return k.idComponent(idLabel, c, "")
+	case blsDirs[parent] && isHex32(c):
+		return k.idComponent(idLabel, c, "")
+	case blsDirs[parent] && len(c) > 33 && c[32] == '-' && isHex32(c[:32]):
+		return k.idComponent(idLabel, c[:32], c[32:])
+	}
+	return "", nil, false
+}
+
+func (k *Key) idComponent(label, raw, rest string) (string, *idNote, bool) {
+	out := k.hostID(label, raw)
+	return out + rest, &idNote{label + raw, out}, true
+}
+
 // MapPath rewrites p at AX-6's positions only: the last component of every
 // non-kept account's home that is p or a prefix of it (unless the home is /,
 // /tmp, /var/tmp, /dev/null, /nonexistent, a mount target or of fewer than two
 // components); the component after /home/ (an account's name or not); a
 // component directly under a name position (the cron spools, the mail spools,
 // linger, AccountsService, /etc/sudoers.d, /etc/cron.d) that is a mapped
-// account name, whether it ends the path or is a parent in it. Positions are
+// account name, whether it ends the path or is a parent in it; and, by the
+// machine-id sub-key, the raw machine id that names a component directly
+// under /var/log/journal or /run/log/journal (the whole component), or
+// under /boot, /boot/loader/entries, /efi or /efi/loader/entries (the whole
+// component or the 32 hex before its first "-"). Positions are
 // decided on the cleaned prefix up to each component, and the rewrite is made
 // in place on the components as written: each rewritten component becomes its
 // account pseudonym, and "", "." and ".." are never rewritten. So two
 // spellings of one file stay two strings, and a ".." never hides a name. A
 // relative path is kept.
 func (k *Key) MapPath(p string, homes Homes) string {
-	out, _ := k.mapPath(p, homes)
+	out, _, _ := k.mapPath(p, homes)
 	return out
 }
 
-// mapPath also returns the component names it mapped by the account rule.
-func (k *Key) mapPath(p string, homes Homes) (string, []string) {
+// mapPath also returns the component names it mapped by the account rule
+// and the host identifiers it mapped by the machine-id sub-key.
+func (k *Key) mapPath(p string, homes Homes) (string, []string, []idNote) {
 	if !strings.HasPrefix(p, "/") {
-		return p, nil
+		return p, nil, nil
 	}
 	raw := strings.Split(p, "/") // raw[0] == ""
 	comps := append([]string(nil), raw...)
 	var names []string
+	var ids []idNote
 	changed := false
 	for i := 1; i < len(comps); i++ {
 		c := comps[i]
@@ -137,6 +176,12 @@ func (k *Key) mapPath(p string, homes Homes) (string, []string) {
 			continue
 		}
 		parent := path.Clean("/" + strings.Join(raw[1:i], "/"))
+		if out, n, ok := k.hostIDComponent(parent, c); ok {
+			ids = append(ids, *n)
+			comps[i] = out
+			changed = true
+			continue
+		}
 		if parent != "/home" && !(homes.names[c] && namePositions[parent]) && !homeEligible(path.Join(parent, c), c, homes) {
 			continue
 		}
@@ -145,9 +190,9 @@ func (k *Key) mapPath(p string, homes Homes) (string, []string) {
 		changed = true
 	}
 	if !changed {
-		return p, nil
+		return p, nil, nil
 	}
-	return strings.Join(comps, "/"), names
+	return strings.Join(comps, "/"), names, ids
 }
 
 func homeEligible(home, last string, homes Homes) bool {

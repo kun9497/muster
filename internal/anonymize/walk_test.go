@@ -718,3 +718,30 @@ func TestTransformTwoSpellingsOfOnePath(t *testing.T) {
 		}
 	}
 }
+
+// A raw machine id in a path is noted in the machine-id class: with the
+// header hash empty, the class is still listed because the path mapped one.
+func TestTransformNotesAHostIDInAPath(t *testing.T) {
+	k := key7(t)
+	const id = "0123456789abcdef0123456789abcdef"
+	doc := testDoc()
+	doc["run"].(map[string]any)["host"].(map[string]any)["machine_id_hash"] = ""
+	ww := doc["facts"].(map[string]any)["walk"].(map[string]any)["world_writable"].(map[string]any)
+	ww["value"] = append(ww["value"].([]any), rec("path", "/var/log/journal/"+id))
+	out, rep, err := Transform(doc, testTable(), k, "keyed")
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, r := range get(t, out, "facts", "walk", "world_writable", "value").([]any) {
+		if r.(map[string]any)["path"] == "/var/log/journal/"+k.hostID(idLabel, id) {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("the journal path was not mapped")
+	}
+	if i := sort.SearchStrings(rep.Classes, ClassMachineID); i == len(rep.Classes) || rep.Classes[i] != ClassMachineID {
+		t.Errorf("classes = %v, want machine_id_hash listed", rep.Classes)
+	}
+}
