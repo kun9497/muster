@@ -11,8 +11,12 @@ const (
 	ClassMachineID   = "machine_id_hash"
 	ClassPath        = "path"
 
-	ClassHostOrAddr  = "host_or_address"
-	ClassPlaceholder = "placeholder"
+	ClassHostOrAddr = "host_or_address"
+	// ClassHostOrNetgroup is a host-or-address value whose leading "@" names
+	// a netgroup, mapped by the account rule, rather than rsyslog's forward
+	// sigil (hosts.equiv's first token, an NFS client).
+	ClassHostOrNetgroup = "host_or_netgroup"
+	ClassPlaceholder    = "placeholder"
 	// ClassBlank empties a value: a string becomes "", a number 0, presence
 	// is kept; its paths enter run.anonymization.replaced.
 	ClassBlank   = "blank"

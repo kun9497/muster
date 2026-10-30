@@ -1,0 +1,127 @@
+package anonymize
+
+import (
+	"bytes"
+	"testing"
+)
+
+func key7(t testing.TB) *Key {
+	t.Helper()
+	k, err := NewKey(bytes.Repeat([]byte{7}, 32))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return k
+}
+
+func testHomes() Homes {
+	var h Homes
+	h.AddHome("/home/alice", "alice")
+	h.AddHome("/srv/app", "app", "appsvc") // shared: the last component names one of them
+	h.AddHome("/srv/app/bob", "bob")       // nested under another home
+	h.AddHome("/srv/www", "nginx", "www-data")
+	h.AddHome("/tmp", "tmp")
+	h.AddHome("/var/log", "log") // a mount target a control names
+	h.AddHome("/dev/shm", "shm") // a mount target a control names
+	h.AddHome("/dev/null", "null")
+	h.AddHome("/nonexistent", "nonexistent")
+	h.AddHome("/opt", "opt") // fewer than two components
+	h.AddHome("/srv/ftp", "ftp")
+	h.AddHome("/srv/root", "root")
+	h.AddName("carol")    // a sudo principal or a crontab owner, in no passwd row
+	h.AddName("+@devs")   // sigils are stripped
+	h.AddName("crontabs") // a user named like a directory
+	return h
+}
+
+// AX-6: every position and every exception.
+func TestMapPathPositions(t *testing.T) {
+	k := key7(t)
+	a := k.Account
+	cases := []struct{ in, want string }{
+		{"", ""},
+		{"relative/alice", "relative/alice"},
+		{"/", "/"},
+		// the component after /home/, an account or not
+		{"/home/alice", "/home/" + a("alice")},
+		{"/home/alice/.ssh/authorized_keys", "/home/" + a("alice") + "/.ssh/authorized_keys"},
+		{"/home/lost+found", "/home/" + a("lost+found")},
+		{"/home/zed/x", "/home/" + a("zed") + "/x"},
+		{"/home/root/x", "/home/root/x"},
+		{"/home", "/home"},
+		// a home's last component, the path under it as a prefix
+		{"/srv/app", "/srv/" + a("app")},
+		{"/srv/app/data/f", "/srv/" + a("app") + "/data/f"},
+		{"/srv/application", "/srv/application"},
+		// nested homes: the longest matching home wins
+		{"/srv/app/bob", "/srv/app/" + a("bob")},
+		{"/srv/app/bob/.profile", "/srv/app/" + a("bob") + "/.profile"},
+		// a shared home whose last component names none of its accounts
+		{"/srv/www/index.html", "/srv/www/index.html"},
+		// exceptions: /tmp, mount targets, /dev/null, /nonexistent, one component, a kept account
+		{"/tmp/x", "/tmp/x"},
+		{"/var/log", "/var/log"},
+		{"/var/log/syslog", "/var/log/syslog"},
+		{"/dev/shm/f", "/dev/shm/f"},
+		{"/dev/null", "/dev/null"},
+		{"/nonexistent", "/nonexistent"},
+		{"/opt/x", "/opt/x"},
+		{"/srv/ftp/pub", "/srv/ftp/pub"},
+		{"/srv/root/x", "/srv/root/x"},
+		// name positions
+		{"/var/spool/cron/crontabs/carol", "/var/spool/cron/crontabs/" + a("carol")},
+		{"/var/spool/cron/carol", "/var/spool/cron/" + a("carol")},
+		{"/var/mail/carol", "/var/mail/" + a("carol")},
+		{"/var/spool/mail/carol", "/var/spool/mail/" + a("carol")},
+		{"/var/lib/systemd/linger/carol", "/var/lib/systemd/linger/" + a("carol")},
+		{"/var/lib/AccountsService/users/carol", "/var/lib/AccountsService/users/" + a("carol")},
+		{"/var/lib/AccountsService/users/devs", "/var/lib/AccountsService/users/" + a("devs")},
+		{"/var/spool/cron/crontabs/dave", "/var/spool/cron/crontabs/dave"},
+		{"/var/spool/cron/crontabs/root", "/var/spool/cron/crontabs/root"},
+		{"/var/mail/carol/x", "/var/mail/carol/x"},
+		// a user named crontabs: the directory at the name position is that name
+		{"/var/spool/cron/crontabs", "/var/spool/cron/" + a("crontabs")},
+		// base names directly under sudoers.d and cron.d
+		{"/etc/sudoers.d/carol", "/etc/sudoers.d/" + a("carol")},
+		{"/etc/cron.d/carol", "/etc/cron.d/" + a("carol")},
+		{"/etc/sudoers.d/README", "/etc/sudoers.d/README"},
+		{"/etc/cron.d/x/carol", "/etc/cron.d/x/carol"},
+		// never by component equality elsewhere
+		{"/etc/carol", "/etc/carol"},
+		{"/usr/share/alice/carol", "/usr/share/alice/carol"},
+		{"/var/spool/carol", "/var/spool/carol"},
+	}
+	h := testHomes()
+	for _, c := range cases {
+		if got := k.MapPath(c.in, h); got != c.want {
+			t.Errorf("MapPath(%q) = %q, want %q", c.in, got, c.want)
+		}
+	}
+}
+
+// A user called log leaves /var/log alone even with no home record: no
+// position rule names it.
+func TestMapPathNeverByComponentEquality(t *testing.T) {
+	k := key7(t)
+	var h Homes
+	h.AddName("log")
+	h.AddName("etc")
+	for _, p := range []string{"/var/log", "/var/log/audit/audit.log", "/etc/passwd"} {
+		if got := k.MapPath(p, h); got != p {
+			t.Errorf("MapPath(%q) = %q", p, got)
+		}
+	}
+}
+
+func TestMountTargetsAreTheClosedList(t *testing.T) {
+	for _, m := range []string{"/tmp", "/var", "/var/tmp", "/var/log", "/var/log/audit", "/home", "/dev/shm", "/boot"} {
+		if !isMountTarget(m) {
+			t.Errorf("%s is not a mount target", m)
+		}
+	}
+	for i := 1; i < len(MountTargets); i++ {
+		if MountTargets[i-1] >= MountTargets[i] {
+			t.Errorf("MountTargets not sorted at %q", MountTargets[i])
+		}
+	}
+}

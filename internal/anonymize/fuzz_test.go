@@ -9,7 +9,7 @@ import (
 )
 
 func FuzzHost(f *testing.F) {
-	for _, s := range []string{"", "a", "web.corp.test", "WEB.Corp.", "..", ".a.", "a..b", "xn--bcher-kva.example"} {
+	for _, s := range []string{"", "*", "ALL", "root", "a", "web.corp.test", "WEB.Corp.", "..", ".a.", "a..b", "xn--bcher-kva.example"} {
 		f.Add(s)
 	}
 	k, _ := NewKey(bytes.Repeat([]byte{7}, 32))
@@ -24,7 +24,7 @@ func FuzzHost(f *testing.F) {
 		if strings.HasSuffix(s, ".") != strings.HasSuffix(got, ".") {
 			t.Fatalf("trailing dot: %q -> %q", s, got)
 		}
-		if got != strings.ToLower(got) {
+		if got != strings.ToLower(got) && !Kept(s) {
 			t.Fatalf("upper case in %q", got)
 		}
 		if Kept(s) && got != s {
@@ -90,6 +90,54 @@ func FuzzAddrToken(f *testing.F) {
 			if err != nil || q.Bits() != p.Bits() {
 				t.Fatalf("%q -> %q: length", s, got)
 			}
+		}
+	})
+}
+
+func FuzzMapPath(f *testing.F) {
+	for _, s := range []string{"", "/", "/home/alice/x", "/home//a", "/srv/app/bob/f", "/var/spool/cron/crontabs/carol",
+		"/etc/cron.d/carol", "relative/x", "/home/", "/var/log", "//"} {
+		f.Add(s)
+	}
+	k, _ := NewKey(bytes.Repeat([]byte{7}, 32))
+	h := testHomes()
+	f.Fuzz(func(t *testing.T, s string) {
+		got := k.MapPath(s, h)
+		if got != k.MapPath(s, h) {
+			t.Fatal("not deterministic")
+		}
+		if !strings.HasPrefix(s, "/") && got != s {
+			t.Fatalf("relative path changed: %q -> %q", s, got)
+		}
+		in, out := strings.Split(s, "/"), strings.Split(got, "/")
+		if len(in) != len(out) {
+			t.Fatalf("component count: %q -> %q", s, got)
+		}
+		for i := range in {
+			if in[i] != out[i] && out[i] != k.Account(in[i]) {
+				t.Fatalf("component %d of %q -> %q is not its account pseudonym", i, s, got)
+			}
+		}
+	})
+}
+
+func FuzzHostOrAddr(f *testing.F) {
+	for _, s := range []string{"", "*", "@ng", "@@(o)log.example:514", "udp:h:161", "*.corp.example", ":0", "a.b.", "[::1]:53", "@", "@("} {
+		f.Add(s, false)
+		f.Add(s, true)
+	}
+	k, _ := NewKey(bytes.Repeat([]byte{7}, 32))
+	f.Fuzz(func(t *testing.T, s string, netgroup bool) {
+		w := &walker{k: k, ledger: NewLedger(), classes: map[string]bool{}, replaced: map[string]bool{}}
+		got := w.hostOrAddr("f", s, netgroup)
+		if got != (&walker{k: k, ledger: NewLedger(), classes: map[string]bool{}, replaced: map[string]bool{}}).hostOrAddr("f", s, netgroup) {
+			t.Fatal("not deterministic")
+		}
+		if (got == Placeholder) != w.replaced["f"] {
+			t.Fatalf("%q -> %q: replaced %v", s, got, w.replaced["f"])
+		}
+		if s == "" && got != "" {
+			t.Fatal("empty")
 		}
 	})
 }

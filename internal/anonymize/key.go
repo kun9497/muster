@@ -78,10 +78,11 @@ func allDigits(s string) bool {
 // base32 characters, the final label and a trailing dot are kept, and a
 // single-label name maps whole. The input is lower-cased first: callers must
 // note the lower-cased input in the Ledger, or two spellings of one name would
-// look like a collision.
+// look like a collision. A kept name is kept: keeping wins across classes
+// (AX-5).
 func (k *Key) Host(name string) string {
-	if name == "" {
-		return ""
+	if name == "" || Kept(name) {
+		return name
 	}
 	name = strings.ToLower(name)
 	dot := ""
