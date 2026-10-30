@@ -113,7 +113,13 @@ var namePositions = map[string]bool{
 var (
 	journalDirs = map[string]bool{"/var/log/journal": true, "/run/log/journal": true}
 	blsDirs     = map[string]bool{"/boot": true, "/boot/loader/entries": true, "/efi": true, "/efi/loader/entries": true}
+	// privateTmpDirs hold systemd's PrivateTmp directories,
+	// systemd-private-<boot id>-<unit>-<random>: the boot id the header
+	// blanks is mapped by the same sub-key under its own label.
+	privateTmpDirs = map[string]bool{"/tmp": true, "/var/tmp": true}
 )
+
+const privateTmpPrefix = "systemd-private-"
 
 // idNote is one raw host identifier a path held: in is the label and the
 // raw 32 hex, out its 32-hex pseudonym.
@@ -129,6 +135,12 @@ func (k *Key) hostIDComponent(parent, c string) (string, *idNote, bool) {
 		return k.idComponent(idLabel, c, "")
 	case blsDirs[parent] && len(c) > 33 && c[32] == '-' && isHex32(c[:32]):
 		return k.idComponent(idLabel, c[:32], c[32:])
+	case privateTmpDirs[parent] && strings.HasPrefix(c, privateTmpPrefix):
+		rest := c[len(privateTmpPrefix):]
+		if len(rest) > 33 && rest[32] == '-' && isHex32(rest[:32]) {
+			out, n, ok := k.idComponent(bootLabel, rest[:32], rest[32:])
+			return privateTmpPrefix + out, n, ok
+		}
 	}
 	return "", nil, false
 }
@@ -148,7 +160,9 @@ func (k *Key) idComponent(label, raw, rest string) (string, *idNote, bool) {
 // machine-id sub-key, the raw machine id that names a component directly
 // under /var/log/journal or /run/log/journal (the whole component), or
 // under /boot, /boot/loader/entries, /efi or /efi/loader/entries (the whole
-// component or the 32 hex before its first "-"). Positions are
+// component or the 32 hex before its first "-"); and the boot id of a
+// systemd-private-<boot id>-<rest> component directly under /tmp or /var/tmp,
+// under its own label. Positions are
 // decided on the cleaned prefix up to each component, and the rewrite is made
 // in place on the components as written: each rewritten component becomes its
 // account pseudonym, and "", "." and ".." are never rewritten. So two

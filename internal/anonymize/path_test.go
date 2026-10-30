@@ -168,6 +168,12 @@ func TestMapPathMachineIDPositions(t *testing.T) {
 		{"/boot/" + id + "/6.8.0-45-generic/linux", "/boot/" + m + "/6.8.0-45-generic/linux"},
 		{"/efi/" + id, "/efi/" + m},
 		{"/efi/loader/entries/" + id + "-6.8.conf", "/efi/loader/entries/" + m + "-6.8.conf"},
+		// systemd's PrivateTmp directories carry the boot id
+		{"/tmp/systemd-private-" + id + "-chrony.service-HqwecO/tmp", "/tmp/systemd-private-" + b + "-chrony.service-HqwecO/tmp"},
+		{"/var/tmp/systemd-private-" + id + "-polkit.service-BxjGV7", "/var/tmp/systemd-private-" + b + "-polkit.service-BxjGV7"},
+		{"/var//tmp/systemd-private-" + id + "-a.service-x", "/var//tmp/systemd-private-" + b + "-a.service-x"},
+		{"/tmp/systemd-private-" + id + "-", "/tmp/systemd-private-" + id + "-"},
+		{"/var/log/journal/systemd-private-" + id + "-a-b", "/var/log/journal/systemd-private-" + id + "-a-b"},
 		// not a machine-id position, or not 32 lowercase hex
 		{"/var/log/journal/" + strings.ToUpper(id), "/var/log/journal/" + strings.ToUpper(id)},
 		{"/var/log/journal/" + id + "0", "/var/log/journal/" + id + "0"},

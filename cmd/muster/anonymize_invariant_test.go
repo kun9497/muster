@@ -471,6 +471,34 @@ func TestAnonymisedPathsCarryNoMachineID(t *testing.T) {
 	}
 }
 
+// The VM example's PrivateTmp directories (/tmp and /var/tmp
+// systemd-private-<boot id>-<unit>-<random>) carry the boot id the header
+// blanks; none of them is left after anonymisation.
+func TestAnonymisedPathsCarryNoBootID(t *testing.T) {
+	orig, anon, _ := exampleStrings(t)
+	private := regexp.MustCompile(`systemd-private-([0-9a-f]{32})-`)
+	boots := map[string]bool{}
+	for _, s := range orig {
+		for _, m := range private.FindAllStringSubmatch(s, -1) {
+			boots[m[1]] = true
+		}
+	}
+	if len(boots) == 0 {
+		t.Fatal("the example names no PrivateTmp directory: the test proves nothing")
+	}
+	n := 0
+	for _, s := range anon {
+		for b := range boots {
+			if strings.Contains(s, b) {
+				n++
+			}
+		}
+	}
+	if n != 0 {
+		t.Errorf("%d strings of the anonymised example carry an original boot id", n)
+	}
+}
+
 // canarySnap builds, at test time, the synthetic host of §4's canary sweep:
 // a document with every registry key present and, in every location the
 // table classifies as anything but kept, a unique canary of that location's
@@ -504,6 +532,8 @@ const (
 	// and the BLS entries are named by it, and its sha256 is the header's
 	// machine_id_hash.
 	canaryMachineID = "0c0ffee00c0ffee00c0ffee00c0ffee0"
+	// canaryBootID is the boot id systemd's PrivateTmp directories carry.
+	canaryBootID = "0b007b007b007b007b007b007b007b00"
 )
 
 func newCanarySnap(tb testing.TB) *canarySnap {
@@ -608,7 +638,7 @@ func (c *canarySnap) hostForm(form string) string {
 
 // pathForms are AX-6's positions.
 var pathForms = []string{"home", "sudoers.d", "mail-el", "mail", "crontab", "cron-el", "linger", "accountsservice", "cron.d",
-	"journal", "bls"}
+	"journal", "bls", "private-tmp"}
 
 func (c *canarySnap) pathForm(i int) string {
 	form := pathForms[i%len(pathForms)]
@@ -636,6 +666,8 @@ func (c *canarySnap) pathForm(i int) string {
 		return "/var/log/journal/" + canaryMachineID
 	case "bls":
 		return "/boot/loader/entries/" + canaryMachineID + "-6.8.0-45-generic.conf"
+	case "private-tmp":
+		return "/tmp/systemd-private-" + canaryBootID + "-chrony.service-HqwecO/tmp"
 	}
 	return ""
 }
@@ -887,7 +919,7 @@ func (c *canarySnap) document() map[string]any {
 		"/etc/sudoers.d/"+canarySudoer, "/var/spool/mail/"+canarySpooler, "987654321")
 
 	machineID := fmt.Sprintf("%x", sha256.Sum256([]byte(canaryMachineID)))
-	c.words = append(c.words, canaryMachineID, machineID)
+	c.words = append(c.words, canaryMachineID, machineID, canaryBootID)
 	return map[string]any{
 		"synthetic":      true,
 		"_notes":         []any{c.text()},
