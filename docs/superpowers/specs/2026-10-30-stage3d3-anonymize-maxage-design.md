@@ -64,7 +64,7 @@ What the scope work established, and what drives the shape below:
   | host-or-netgroup (hosts.equiv hosts, NFS clients) | a leading `@` names a netgroup mapped by the account rule; otherwise the host-or-address rule |
   | unit (unit names) | a name without `@` kept; a template instance `<name>@<instance>.<suffix>` keeps `<name>@` and `.<suffix>` and maps the instance to `i` + 12 base32 of HMAC |
   | blank (`boot_id`, `uptime_s`, firewall raw dumps) | a string becomes `""`, a number `0`; presence kept |
-  | option list (mount and NFS export options) | comma tokens kept byte for byte, except the values of `username`, `user`, `domain`, `addr`, `ip`, `clientaddr`, `mountaddr`, `mounthost`, `credentials`, `cred`, export `mp`, `mountpoint`, `refer`, `replicas` (mapped by their class) and `password`, `pass` (placeholder) |
+  | option list (mount and NFS export options) | comma tokens kept byte for byte, except the values of `username`, `user`, `uname`, `domain`, `addr`, `ip`, `clientaddr`, `mountaddr`, `srcaddr`, `mounthost`, `credentials`, `cred`, `prefixpath`, `aname`, export `mp`, `mountpoint`, `refer`, `replicas` (mapped by their class) and `password`, `pass` (placeholder) |
   | url | scheme, port and `user@` kept as syntax, query, fragment and password `[anonymised]`, host by the host or address rule, user by the account rule, path by AX-6 |
   | fingerprint (SSH key fingerprints) | `SHA256:` + 43 base64 characters (no padding) of HMAC |
   | machine id hash | keyed 64 lowercase hex (AX-11) |

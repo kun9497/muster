@@ -58,7 +58,7 @@ D34). 이 설계의 결정은 AX 목록입니다(한 글자 접두어는 앞 단
   | host-or-netgroup(hosts.equiv의 호스트, NFS 클라이언트) | 앞의 `@`는 account 규칙으로 매핑하는 넷그룹; 그 밖은 host-or-address 규칙 |
   | unit(유닛 이름) | `@` 없는 이름은 유지; 템플릿 인스턴스 `<name>@<instance>.<suffix>`는 `<name>@`와 `.<suffix>`를 유지하고 인스턴스를 `i` + HMAC의 base32 12자로 매핑 |
   | blank(`boot_id`, `uptime_s`, 방화벽 원본 덤프) | 문자열은 `""`, 숫자는 `0`; 존재는 유지 |
-  | option list(마운트와 NFS export 옵션) | 쉼표 토큰은 바이트 그대로, 단 `username`, `user`, `domain`, `addr`, `ip`, `clientaddr`, `mountaddr`, `mounthost`, `credentials`, `cred`, export의 `mp`, `mountpoint`, `refer`, `replicas` 값은 각 분류로 매핑하고 `password`, `pass` 값은 자리표시자 |
+  | option list(마운트와 NFS export 옵션) | 쉼표 토큰은 바이트 그대로, 단 `username`, `user`, `uname`, `domain`, `addr`, `ip`, `clientaddr`, `mountaddr`, `srcaddr`, `mounthost`, `credentials`, `cred`, `prefixpath`, `aname`, export의 `mp`, `mountpoint`, `refer`, `replicas` 값은 각 분류로 매핑하고 `password`, `pass` 값은 자리표시자 |
   | url | 스킴, 포트, `user@`는 문법으로 유지, 쿼리·프래그먼트·비밀번호는 `[anonymised]`, 호스트는 host 또는 address 규칙, 사용자는 account 규칙, 경로는 AX-6 |
   | fingerprint(SSH 키 지문) | `SHA256:` + HMAC의 base64 43자(패딩 없음) |
   | machine id hash | 키를 쓴 소문자 16진 64자(AX-11) |

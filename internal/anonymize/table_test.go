@@ -596,6 +596,7 @@ func TestMountAndExportOptions(t *testing.T) {
 			"credentials=/home/alice/.smb", "domain=corp.example", "password=hunter2", "uid=1000", "",
 			"clientaddr=" + addr, "mountaddr=" + addr2, "mounthost=nfs.corp.example", "mounthost=" + addr2,
 			"vers=4.2,proto=tcp,clientaddr=" + addr,
+			"srcaddr=" + addr, "prefixpath=/home/alice/share", "uname=alice", "aname=/home/alice/9p",
 		}}}),
 		fact("nfs.exports", []any{map[string]any{"path": "/srv", "client": "*",
 			"options": "rw,sync,no_root_squash,refer=/srv/a@nfs1.corp.example+" + addr + ":/srv/b@nfs2,mp=/home/alice,mountpoint=/srv/x"},
@@ -612,6 +613,7 @@ func TestMountAndExportOptions(t *testing.T) {
 		"uid=1000", "",
 		"clientaddr=" + mapped, "mountaddr=" + mapped2, "mounthost=" + k.Host("nfs.corp.example"), "mounthost=" + mapped2,
 		"vers=4.2,proto=tcp,clientaddr=" + mapped,
+		"srcaddr=" + mapped, "prefixpath=/home/" + alice + "/share", "uname=" + alice, "aname=/home/" + alice + "/9p",
 	}
 	got := valueAt(t, out, "mounts.points").([]any)[0].(map[string]any)["options"]
 	if !reflect.DeepEqual(got, want) {

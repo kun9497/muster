@@ -26,7 +26,9 @@ var (
 )
 
 // optionValues are the option keys whose values name an account, a host, an
-// address or a file (mount.cifs(8), nfs(5) and kin); every other option word is kept
+// address or a file (mount.cifs(8), nfs(5), the kernel's 9p options and kin;
+// srcaddr, prefixpath, uname and aname are among the ones the kernel prints
+// back in /proc/self/mountinfo); every other option word is kept
 // byte for byte, so a clause's contains nodev still finds it. A password the
 // kernel shows is placeholdered. A value never holds a comma: the kernel's
 // mount table prints one address or host per option and exports(5) splits on
@@ -34,8 +36,9 @@ var (
 var optionValues = map[string]Class{
 	"username": ClassAccount, "user": ClassAccount, "domain": ClassHost,
 	"addr": ClassAddress, "ip": ClassAddress, "clientaddr": ClassAddress, "mountaddr": ClassAddress,
+	"srcaddr": ClassAddress, "uname": ClassAccount,
 	"mounthost":   ClassHostOrAddr,
-	"credentials": ClassPath, "cred": ClassPath,
+	"credentials": ClassPath, "cred": ClassPath, "prefixpath": ClassPath, "aname": ClassPath,
 	"password": ClassPlaceholder, "pass": ClassPlaceholder,
 }
 
