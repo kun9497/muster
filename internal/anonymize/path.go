@@ -1,6 +1,9 @@
 package anonymize
 
-import "strings"
+import (
+	path "path"
+	"strings"
+)
 
 // MountTargets is the closed list of mount targets the control set names
 // (AX-6): a home equal to one is never rewritten. internal/anonymize never
@@ -44,7 +47,7 @@ func (h *Homes) AddName(name string) {
 // AddHome records home as the home of each account (their names recorded as
 // by AddName); a kept account's home is not one AX-6 rewrites.
 func (h *Homes) AddHome(home string, accounts ...string) {
-	home = trimSlash(home)
+	home = cleanPath(home)
 	for _, a := range accounts {
 		core, ok := accountCore(a)
 		if !ok || Kept(core) {
@@ -61,11 +64,12 @@ func (h *Homes) AddHome(home string, accounts ...string) {
 	}
 }
 
-func trimSlash(p string) string {
-	for len(p) > 1 && strings.HasSuffix(p, "/") {
-		p = p[:len(p)-1]
+// cleanPath cleans an absolute path by path.Clean; anything else is kept.
+func cleanPath(p string) string {
+	if !strings.HasPrefix(p, "/") {
+		return p
 	}
-	return p
+	return path.Clean(p)
 }
 
 // accountCore strips the sigils Account keeps (%, +, -, @, and # before a
@@ -88,8 +92,8 @@ func accountCore(name string) (string, bool) {
 	return "", false
 }
 
-// namePositions are the parent directories whose direct child file is named
-// after an account (AX-6).
+// namePositions are the directories whose direct child is named after an
+// account (AX-6).
 var namePositions = map[string]bool{
 	"/var/spool/cron/crontabs":       true,
 	"/var/spool/cron":                true,
@@ -101,14 +105,17 @@ var namePositions = map[string]bool{
 	"/etc/cron.d":                    true,
 }
 
-// MapPath rewrites p at AX-6's positions only: the last component of a
-// non-kept account's home (unless the home is /, /tmp, /var/tmp, /dev/null,
-// /nonexistent, a mount target or of fewer than two components), the
-// longest such home a prefix of p; the component after /home/ (an account's
-// name or not); the last component of a path directly under a name position
-// or under /etc/sudoers.d or /etc/cron.d, when it is a mapped account name.
-// Each rewritten component becomes its account pseudonym. Anything else,
-// relative paths included, is kept.
+// MapPath rewrites p at AX-6's positions only, matched on the cleaned path:
+// the last component of every non-kept account's home that is p or a prefix
+// of it (unless the home is /, /tmp, /var/tmp, /dev/null, /nonexistent, a
+// mount target or of fewer than two components); the component after /home/
+// (an account's name or not); a component directly under a name position
+// (the cron spools, the mail spools, linger, AccountsService, /etc/sudoers.d,
+// /etc/cron.d) that is a mapped account name, whether it ends the path or is
+// a parent in it. Each rewritten component becomes its account pseudonym, so
+// a path maps the same standing alone or as a prefix. A rewritten path comes
+// back cleaned (a trailing "/" kept); one with nothing to rewrite, and any
+// relative path, comes back as it was.
 func (k *Key) MapPath(p string, homes Homes) string {
 	out, _ := k.mapPath(p, homes)
 	return out
@@ -119,35 +126,40 @@ func (k *Key) mapPath(p string, homes Homes) (string, []string) {
 	if !strings.HasPrefix(p, "/") {
 		return p, nil
 	}
-	comps := strings.Split(p, "/") // comps[0] == ""
+	c := path.Clean(p)
+	if c == "/" {
+		return p, nil
+	}
+	comps := strings.Split(c, "/") // comps[0] == ""; no other empty component
 	at := map[int]bool{}
-	// the longest eligible home that is p or a prefix of it
-	for n := len(comps) - 1; n >= 2; n-- {
-		h := strings.Join(comps[:n+1], "/")
-		if comps[n] == "" || !homeEligible(h, comps[n], homes) {
-			continue
+	for n := 2; n < len(comps); n++ {
+		parent := strings.Join(comps[:n], "/")
+		if homeEligible(parent+"/"+comps[n], comps[n], homes) {
+			at[n] = true
 		}
-		at[n] = true
-		break
+		if homes.names[comps[n]] && namePositions[parent] {
+			at[n] = true
+		}
 	}
 	if len(comps) >= 3 && comps[1] == "home" {
 		at[2] = true
-	}
-	if last := len(comps) - 1; last >= 2 && homes.names[comps[last]] && namePositions[strings.Join(comps[:last], "/")] {
-		at[last] = true
 	}
 	if len(at) == 0 {
 		return p, nil
 	}
 	var names []string
 	for i := range comps {
-		if !at[i] || comps[i] == "" {
+		if !at[i] {
 			continue
 		}
 		names = append(names, comps[i])
 		comps[i] = k.Account(comps[i])
 	}
-	return strings.Join(comps, "/"), names
+	out := strings.Join(comps, "/")
+	if strings.HasSuffix(p, "/") {
+		out += "/"
+	}
+	return out, names
 }
 
 func homeEligible(home, last string, homes Homes) bool {

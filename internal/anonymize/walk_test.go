@@ -68,7 +68,7 @@ func testTable() Table {
 		"sudo.principals[]":              {Class: ClassAccount},
 		"pam.mode":                       {Class: ClassKept},
 		"files.etc_hosts_equiv_lines":    {Order: OrderKept},
-		"files.etc_hosts_equiv_lines[]":  {Class: ClassGrammar, Grammar: whitespace(ClassKept, ClassHostOrNetgroup, ClassAccount)},
+		"files.etc_hosts_equiv_lines[]":  {Class: ClassGrammar, Grammar: whitespace(ClassPlaceholder, ClassHostOrNetgroup, ClassAccount)},
 		"files.etc_securetty_lines":      {Order: OrderKept},
 		"files.etc_securetty_lines[]":    {Class: ClassGrammar, Grammar: whitespace(ClassKept, ClassKept)},
 		"time_sync.servers":              {Order: OrderKept},
@@ -83,7 +83,9 @@ func testTable() Table {
 		"firewall.rules":                 {Order: OrderKept},
 		"firewall.rules[].saddr":         {Class: ClassAddress},
 		"mounts.points":                  {Order: OrderKept},
-		"mounts.points[].target":         {Class: ClassKept},
+		"mounts.points[].target":         {Class: ClassPath},
+		"logging.urls":                   {Order: OrderKept},
+		"logging.urls[]":                 {Class: ClassURL},
 		"walk.world_writable":            {Order: OrderKept},
 		"walk.world_writable[].path":     {Class: ClassPath},
 		"cron.files":                     {Order: OrderKept},
@@ -130,6 +132,7 @@ func testDoc() map[string]any {
 					rec("name", "root", "uid", json.Number("0"), "home", "/root"),
 					rec("name", "app", "uid", json.Number("998"), "home", "/srv/app"),
 					rec("name", "none", "uid", json.Number("1002"), "home", "/nonexistent"),
+					rec("name", "alice", "uid", json.Number("1003"), "home", "/home/alice"),
 				)),
 				"lastlog": env(list(
 					rec("name", "alice", "host", ip4(10, 1, 2, 3)),
@@ -154,7 +157,7 @@ func testDoc() map[string]any {
 				"raw_dumps": env(list(rec("content", "table inet filter { }", "truncated", true))),
 				"rules":     env(list(rec("saddr", ip4(10, 0, 0, 0)+"/8"), rec("saddr", "not an address"))),
 			},
-			"mounts": map[string]any{"points": env(list(rec("target", "/var/log"), rec("target", "/tmp")))},
+			"mounts": map[string]any{"points": env(list(rec("target", "/var/log"), rec("target", "/tmp"), rec("target", "/home/alice"), rec("target", "/home")))},
 			"walk": map[string]any{"world_writable": env(list(
 				rec("path", "/srv/app/data"),
 				rec("path", "/var/spool/cron/crontabs/carol"),
@@ -326,8 +329,16 @@ func TestTransformPaths(t *testing.T) {
 			t.Errorf("%v = %v, want %v", c.path, got, c.want)
 		}
 	}
-	if got := get(t, out, "facts", "mounts", "points", "value", 0, "target"); got != "/var/log" {
-		t.Errorf("mount target = %v", got)
+	// mount targets are paths: the control-named ones never change, and a
+	// home mounted on its own maps as the home does
+	targets := get(t, out, "facts", "mounts", "points", "value").([]any)
+	for i, w := range []string{"/var/log", "/tmp", "/home/" + a("alice"), "/home"} {
+		if got := targets[i].(map[string]any)["target"]; got != w {
+			t.Errorf("mount target %d = %v, want %v", i, got, w)
+		}
+	}
+	if home := get(t, out, "facts", "accounts", "users", "value", 4, "home"); home != targets[2].(map[string]any)["target"] {
+		t.Errorf("alice's home %v and her mount target %v differ", home, targets[2])
 	}
 }
 
@@ -356,7 +367,7 @@ func TestTransformReadText(t *testing.T) {
 		"+@" + a("ng") + " -" + a("bob"),
 		"+",
 		"-",
-		h("host") + "  " + a("user") + "  extra",
+		h("host") + "  " + a("user") + "  " + Placeholder,
 	}
 	for i, w := range want {
 		if lines[i] != w {
@@ -503,6 +514,7 @@ func TestTransformReport(t *testing.T) {
 		"facts.cron.files.source.inputs[].inputs[].raw",
 		"facts.cron.files.source.inputs[].raw",
 		"facts.cron.files.value[].reason",
+		"facts.files.etc_hosts_equiv_lines.value[]",
 		"facts.firewall.raw_dumps.value[].content",
 		"facts.firewall.rules.value[].saddr",
 		"facts.sshd.banner.persisted.reason",
@@ -606,5 +618,74 @@ func TestTransformRefusesBadInput(t *testing.T) {
 	tab["files.etc_securetty_lines[]"] = FieldRule{Class: ClassGrammar, Grammar: &Grammar{Split: "comma"}}
 	if _, _, err := Transform(testDoc(), tab, k, "keyed"); err == nil {
 		t.Error("an unknown grammar split was accepted")
+	}
+}
+
+// The ledger notes an address by its canonical spelling and a URL by its
+// parts, so neither a case variant nor a URL differing only in a
+// placeholdered part is a collision.
+func TestTransformNotesCanonicalInputs(t *testing.T) {
+	k := key7(t)
+	d := testDoc()
+	d["facts"].(map[string]any)["time_sync"].(map[string]any)["servers"] = env(list("FD00::1", "fd00::1", "[FD00::1]:123", "udp:Fd00::1"))
+	d["facts"].(map[string]any)["logging"].(map[string]any)["urls"] = env(list(
+		"https://logs.example/x?a=1", "https://logs.example/x?b=2", "https://u:p@logs.example/", "https://u:q@logs.example/",
+		"https://LOGS.example/", "https://logs.example/", "https://[FD00::1]:1/", "https://[fd00::1]:1/"))
+	out, _, err := Transform(d, testTable(), k, "keyed")
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := get(t, out, "facts", "time_sync", "servers", "value").([]any)
+	if srv[0] != srv[1] {
+		t.Errorf("FD00::1 and fd00::1 map apart: %v", srv)
+	}
+	urls := get(t, out, "facts", "logging", "urls", "value").([]any)
+	if urls[0] != urls[1] || urls[4] != urls[5] || urls[6] != urls[7] {
+		t.Errorf("urls = %v", urls)
+	}
+}
+
+func TestTableValidateRefuses(t *testing.T) {
+	cases := []struct {
+		name string
+		edit func(Table)
+	}{
+		{"unknown class on a string", func(t Table) { t["pam.mode"] = FieldRule{Class: "bogus"} }},
+		{"unknown class on a number", func(t Table) { t["accounts.users[].uid"] = FieldRule{Class: "bogus"} }},
+		{"grammar without class grammar", func(t Table) {
+			t["pam.mode"] = FieldRule{Class: ClassKept, Grammar: &Grammar{Split: SplitWhitespace, Rest: ClassKept}}
+		}},
+		{"class grammar without a grammar", func(t Table) { t["pam.mode"] = FieldRule{Class: ClassGrammar} }},
+		{"grammar split", func(t Table) {
+			t["pam.mode"] = FieldRule{Class: ClassGrammar, Grammar: &Grammar{Split: "comma", Rest: ClassKept}}
+		}},
+		{"grammar token class", func(t Table) {
+			t["pam.mode"] = FieldRule{Class: ClassGrammar, Grammar: &Grammar{Split: SplitWhitespace, Tokens: []Class{"bogus"}, Rest: ClassKept}}
+		}},
+		{"grammar with no rest", func(t Table) {
+			t["pam.mode"] = FieldRule{Class: ClassGrammar, Grammar: &Grammar{Split: SplitWhitespace}}
+		}},
+		{"Home off a path row", func(t Table) { t["accounts.users[].name"] = FieldRule{Class: ClassAccount, Home: true} }},
+		{"list with no row", func(t Table) { delete(t, "accounts.users") }},
+		{"list with no order", func(t Table) { t["accounts.users"] = FieldRule{} }},
+		{"sorted list with no sort", func(t Table) { t["accounts.users"] = FieldRule{Order: OrderSorted} }},
+		{"kept list with a sort", func(t Table) {
+			t["accounts.users"] = FieldRule{Order: OrderKept, Sort: &SortSpec{Keys: []SortKey{{Field: "name"}}}}
+		}},
+		{"sort with no key", func(t Table) { t["accounts.users"] = FieldRule{Order: OrderSorted, Sort: &SortSpec{}} }},
+		{"order on a non-list row", func(t Table) { t["pam.mode"] = FieldRule{Class: ClassKept, Order: OrderKept} }},
+	}
+	for _, c := range cases {
+		tab := testTable()
+		c.edit(tab)
+		if err := tab.Validate(); err == nil {
+			t.Errorf("%s: accepted", c.name)
+		}
+		if _, _, err := Transform(testDoc(), tab, key7(t), "keyed"); err == nil {
+			t.Errorf("%s: Transform accepted the table", c.name)
+		}
+	}
+	if err := testTable().Validate(); err != nil {
+		t.Errorf("the test table: %v", err)
 	}
 }

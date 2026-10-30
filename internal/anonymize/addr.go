@@ -181,26 +181,38 @@ var transports = []string{"udp6:", "tcp6:", "udp:", "tcp:"}
 // udp6:, tcp6:), a range a-b, or an nft set { a, b } of addresses, CIDRs and
 // ranges with its separators kept. It reports false, and "", when s is none of
 // them; the empty string maps to itself (AX-4).
-func (k *Key) AddrToken(s string) (string, bool) {
+func (k *Key) AddrToken(s string) (string, bool) { return addrMap(k.Addr).token(s) }
+
+// canonAddrToken spells s, an AddrToken form, as AddrToken would with every
+// address unmapped: the input the ledger notes, so two spellings of one
+// address (FD00::1, fd00::1) are one input.
+func canonAddrToken(s string) (string, bool) {
+	return addrMap(func(a netip.Addr) netip.Addr { return a }).token(s)
+}
+
+// addrMap is the address map AddrToken's forms are rewritten by.
+type addrMap func(netip.Addr) netip.Addr
+
+func (m addrMap) token(s string) (string, bool) {
 	if s == "" {
 		return "", true
 	}
 	if strings.HasPrefix(s, "{") {
-		return k.set(s)
+		return m.set(s)
 	}
 	for _, t := range transports {
 		if rest, ok := strings.CutPrefix(s, t); ok {
-			out, ok := k.hostPort(rest)
+			out, ok := m.hostPort(rest)
 			if !ok {
 				return "", false
 			}
 			return t + out, true
 		}
 	}
-	return k.hostPort(s)
+	return m.hostPort(s)
 }
 
-func (k *Key) set(s string) (string, bool) {
+func (m addrMap) set(s string) (string, bool) {
 	inner, ok := strings.CutSuffix(s[1:], "}")
 	if !ok {
 		return "", false
@@ -211,7 +223,7 @@ func (k *Key) set(s string) (string, bool) {
 		if core == "" {
 			return "", false
 		}
-		out, ok := k.element(core)
+		out, ok := m.element(core)
 		if !ok {
 			return "", false
 		}
@@ -222,7 +234,7 @@ func (k *Key) set(s string) (string, bool) {
 }
 
 // hostPort: an element, [v6]:port, or IPv4:port.
-func (k *Key) hostPort(s string) (string, bool) {
+func (m addrMap) hostPort(s string) (string, bool) {
 	if strings.HasPrefix(s, "[") {
 		end := strings.IndexByte(s, ']')
 		if end < 0 {
@@ -236,9 +248,9 @@ func (k *Key) hostPort(s string) (string, bool) {
 		if !strings.HasPrefix(rest, ":") || !validPort(rest[1:]) {
 			return "", false
 		}
-		return "[" + k.Addr(a).String() + "]" + rest, true
+		return "[" + m(a).String() + "]" + rest, true
 	}
-	if out, ok := k.element(s); ok {
+	if out, ok := m.element(s); ok {
 		return out, true
 	}
 	i := strings.LastIndexByte(s, ':')
@@ -249,25 +261,25 @@ func (k *Key) hostPort(s string) (string, bool) {
 	if !ok || !a.Is4() {
 		return "", false
 	}
-	return k.Addr(a).String() + s[i:], true
+	return m(a).String() + s[i:], true
 }
 
 // element: an address, a CIDR, an IPv4 address with a dotted netmask, or a
 // range of two unzoned addresses of one family.
-func (k *Key) element(s string) (string, bool) {
+func (m addrMap) element(s string) (string, bool) {
 	if a, ok := parseAddr(s); ok {
-		return k.Addr(a).String(), true
+		return m(a).String(), true
 	}
 	if l, r, ok := strings.Cut(s, "/"); ok {
 		if p, err := netip.ParsePrefix(s); err == nil {
-			return k.Prefix(p).String(), true
+			return netip.PrefixFrom(m(p.Addr()), p.Bits()).String(), true
 		}
 		a, err1 := netip.ParseAddr(l)
-		m, err2 := netip.ParseAddr(r)
-		if err1 != nil || err2 != nil || !a.Is4() || !m.Is4() || !contiguous(m.As4()) {
+		mask, err2 := netip.ParseAddr(r)
+		if err1 != nil || err2 != nil || !a.Is4() || !mask.Is4() || !contiguous(mask.As4()) {
 			return "", false
 		}
-		return k.Addr(a).String() + "/" + r, true
+		return m(a).String() + "/" + r, true
 	}
 	if l, r, ok := strings.Cut(s, "-"); ok {
 		a, ok1 := parseAddr(l)
@@ -275,7 +287,7 @@ func (k *Key) element(s string) (string, bool) {
 		if !ok1 || !ok2 || a.Zone() != "" || b.Zone() != "" || a.BitLen() != b.BitLen() {
 			return "", false
 		}
-		return k.Addr(a).String() + "-" + k.Addr(b).String(), true
+		return m(a).String() + "-" + m(b).String(), true
 	}
 	return "", false
 }

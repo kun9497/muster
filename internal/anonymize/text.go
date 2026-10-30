@@ -86,6 +86,16 @@ func (w *walker) note(dp, class, in, out string) {
 	}
 }
 
+// noteAddr notes an address form by its canonical spelling (AddrToken's
+// output with every address unmapped), so two spellings of one address are
+// one input.
+func (w *walker) noteAddr(dp, in, out string) {
+	if c, ok := canonAddrToken(in); ok {
+		in = c
+	}
+	w.note(dp, ClassAddress, in, out)
+}
+
 func (w *walker) replace(dp string) {
 	if !w.collect {
 		w.replaced[dp] = true
@@ -170,7 +180,7 @@ func (w *walker) address(dp, s string) string {
 	if !ok {
 		return w.placeholder(dp, s)
 	}
-	w.note(dp, ClassAddress, s, out)
+	w.noteAddr(dp, s, out)
 	return out
 }
 
@@ -207,7 +217,7 @@ func (w *walker) hostOrAddr(dp, s string, netgroupFirst bool) string {
 		return w.account(dp, s)
 	}
 	if out, ok := w.k.AddrToken(s); ok {
-		w.note(dp, ClassAddress, s, out)
+		w.noteAddr(dp, s, out)
 		return out
 	}
 	if out, ok := w.hostForm(dp, s); ok {
@@ -256,7 +266,7 @@ func (w *walker) hostForm(dp, s string) (string, bool) {
 			pre, rest = pre+rest[:j+1], rest[j+1:]
 		}
 		if out, ok := w.k.AddrToken(rest); ok && rest != "" {
-			w.note(dp, ClassAddress, rest, out)
+			w.noteAddr(dp, rest, out)
 			return pre + out, true
 		}
 		if out, ok := w.hostPort(dp, rest); ok {
@@ -281,7 +291,8 @@ func (w *walker) hostPort(dp, s string) (string, bool) {
 	return "", false
 }
 
-// dnsName: letter-digit-hyphen labels of 1 to 63 characters, a trailing dot
+// dnsName: letter-digit-hyphen labels of 1 to 63 characters, none all
+// digits (a dotted quad that is no address is not a host), a trailing dot
 // allowed.
 func dnsName(s string) bool {
 	s = strings.TrimSuffix(s, ".")
@@ -289,7 +300,7 @@ func dnsName(s string) bool {
 		return false
 	}
 	for _, l := range strings.Split(s, ".") {
-		if l == "" || len(l) > 63 {
+		if l == "" || len(l) > 63 || allDigits(l) {
 			return false
 		}
 		for i := 0; i < len(l); i++ {
@@ -351,7 +362,7 @@ func (w *walker) url(dp, s string) string {
 		b.WriteString(hostport)
 	default:
 		if out, ok := w.k.AddrToken(hostport); ok {
-			w.note(dp, ClassAddress, hostport, out)
+			w.noteAddr(dp, hostport, out)
 			b.WriteString(out)
 		} else if out, ok := w.hostPort(dp, hostport); ok {
 			b.WriteString(out)
@@ -367,8 +378,12 @@ func (w *walker) url(dp, s string) string {
 	if q < len(tail) {
 		b.WriteString(tail[q:q+1] + w.placeholder(dp, tail[q+1:]))
 	}
+	// The URL is not noted whole: its account, host, address and path parts
+	// are, and a whole-URL note would collide over a placeholdered part.
 	out := b.String()
-	w.note(dp, ClassURL, s, out)
+	if out != s && !w.collect {
+		w.classes[ClassURL] = true
+	}
 	return out
 }
 

@@ -42,6 +42,10 @@ func TestHostOrAddressForms(t *testing.T) {
 		{"bad_name!", false, Placeholder},
 		{"@@(unclosed", false, Placeholder},
 		{"loghost:99999", false, Placeholder},
+		{"10.0.0.256", false, Placeholder},
+		{"1.2.3", false, Placeholder},
+		{"udp:10.0.0.256:161", false, Placeholder},
+		{"web1.123.example", false, Placeholder},
 	}
 	for _, c := range cases {
 		w := secondPass(k)

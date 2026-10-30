@@ -29,6 +29,9 @@ func Transform(doc map[string]any, t Table, k *Key, mode string) (map[string]any
 	if mode != "keyed" && mode != "ephemeral" {
 		return nil, Report{}, fmt.Errorf("anonymization mode %q is neither keyed nor ephemeral", mode)
 	}
+	if err := t.Validate(); err != nil {
+		return nil, Report{}, err
+	}
 	if run, ok := doc["run"].(map[string]any); ok {
 		if _, marked := run["anonymization"]; marked {
 			return nil, Report{}, ErrAlreadyAnonymized

@@ -19,7 +19,8 @@ func testHomes() Homes {
 	h.AddHome("/home/alice", "alice")
 	h.AddHome("/srv/app", "app", "appsvc") // shared: the last component names one of them
 	h.AddHome("/srv/app/bob", "bob")       // nested under another home
-	h.AddHome("/srv/www", "nginx", "www-data")
+	h.AddHome("/srv/www/", "nginx", "www-data")
+	h.AddHome("/srv//app", "appsvc")
 	h.AddHome("/tmp", "tmp")
 	h.AddHome("/var/log", "log") // a mount target a control names
 	h.AddHome("/dev/shm", "shm") // a mount target a control names
@@ -53,9 +54,14 @@ func TestMapPathPositions(t *testing.T) {
 		{"/srv/app", "/srv/" + a("app")},
 		{"/srv/app/data/f", "/srv/" + a("app") + "/data/f"},
 		{"/srv/application", "/srv/application"},
-		// nested homes: the longest matching home wins
-		{"/srv/app/bob", "/srv/app/" + a("bob")},
-		{"/srv/app/bob/.profile", "/srv/app/" + a("bob") + "/.profile"},
+		// nested homes: every home on the path maps its last component
+		{"/srv/app/bob", "/srv/" + a("app") + "/" + a("bob")},
+		{"/srv/app/bob/.profile", "/srv/" + a("app") + "/" + a("bob") + "/.profile"},
+		// paths and homes are cleaned before matching
+		{"/srv//app/data", "/srv/" + a("app") + "/data"},
+		{"/srv/app/./bob/", "/srv/" + a("app") + "/" + a("bob") + "/"},
+		{"/home/x/../alice/f", "/home/" + a("alice") + "/f"},
+		{"/srv//www", "/srv//www"},
 		// a shared home whose last component names none of its accounts
 		{"/srv/www/index.html", "/srv/www/index.html"},
 		// exceptions: /tmp, mount targets, /dev/null, /nonexistent, one component, a kept account
@@ -69,18 +75,18 @@ func TestMapPathPositions(t *testing.T) {
 		{"/srv/ftp/pub", "/srv/ftp/pub"},
 		{"/srv/root/x", "/srv/root/x"},
 		// name positions
-		{"/var/spool/cron/crontabs/carol", "/var/spool/cron/crontabs/" + a("carol")},
 		{"/var/spool/cron/carol", "/var/spool/cron/" + a("carol")},
 		{"/var/mail/carol", "/var/mail/" + a("carol")},
 		{"/var/spool/mail/carol", "/var/spool/mail/" + a("carol")},
 		{"/var/lib/systemd/linger/carol", "/var/lib/systemd/linger/" + a("carol")},
 		{"/var/lib/AccountsService/users/carol", "/var/lib/AccountsService/users/" + a("carol")},
 		{"/var/lib/AccountsService/users/devs", "/var/lib/AccountsService/users/" + a("devs")},
-		{"/var/spool/cron/crontabs/dave", "/var/spool/cron/crontabs/dave"},
-		{"/var/spool/cron/crontabs/root", "/var/spool/cron/crontabs/root"},
-		{"/var/mail/carol/x", "/var/mail/carol/x"},
+		// a name position maps as a prefix too
+		{"/var/mail/carol/x", "/var/mail/" + a("carol") + "/x"},
 		// a user named crontabs: the directory at the name position is that name
 		{"/var/spool/cron/crontabs", "/var/spool/cron/" + a("crontabs")},
+		{"/var/spool/cron/crontabs/carol", "/var/spool/cron/" + a("crontabs") + "/" + a("carol")},
+		{"/var/spool/cron/crontabs/dave", "/var/spool/cron/" + a("crontabs") + "/dave"},
 		// base names directly under sudoers.d and cron.d
 		{"/etc/sudoers.d/carol", "/etc/sudoers.d/" + a("carol")},
 		{"/etc/cron.d/carol", "/etc/cron.d/" + a("carol")},

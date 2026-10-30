@@ -1,5 +1,11 @@
 package anonymize
 
+import (
+	"fmt"
+	"sort"
+	"strings"
+)
+
 // Class names the rule a value is rewritten by (AX-4). The Class* constants
 // are its values; the first seven are also the tokens of
 // run.anonymization.classes (AX-10).
@@ -98,4 +104,78 @@ var genericRoots = map[string]bool{"envelope": true, "setting": true, "source": 
 var reportClasses = map[string]bool{
 	ClassAccount: true, ClassHost: true, ClassAddress: true, ClassURL: true,
 	ClassFingerprint: true, ClassMachineID: true, ClassPath: true,
+}
+
+var knownClasses = map[Class]bool{
+	"": true, ClassAccount: true, ClassHost: true, ClassAddress: true, ClassURL: true, ClassFingerprint: true,
+	ClassMachineID: true, ClassPath: true, ClassHostOrAddr: true, ClassHostOrNetgroup: true, ClassPlaceholder: true,
+	ClassBlank: true, ClassKept: true, ClassGrammar: true,
+}
+
+// Validate checks the table's own shape: every class is known; a Grammar is
+// set exactly on a ClassGrammar row, splits on whitespace and gives each
+// token a value class; Home marks only a path row; every list (a row that
+// some row continues with []) has its own row with an Order, and a Sort
+// exactly when the order is sorted; no other row carries an Order or a Sort.
+func (t Table) Validate() error {
+	lists := map[string]bool{}
+	for key := range t {
+		for i := strings.Index(key, "[]"); i >= 0; {
+			lists[key[:i]] = true
+			j := strings.Index(key[i+2:], "[]")
+			if j < 0 {
+				break
+			}
+			i += 2 + j
+		}
+	}
+	keys := make([]string, 0, len(t)+len(lists))
+	for key := range t {
+		keys = append(keys, key)
+	}
+	for l := range lists {
+		if _, ok := t[l]; !ok {
+			keys = append(keys, l)
+		}
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		r, ok := t[key]
+		fail := func(why string) error { return fmt.Errorf("anonymization table: %s: %s", key, why) }
+		switch {
+		case !ok:
+			return fail("a list needs its own row with an Order")
+		case !knownClasses[r.Class]:
+			return fail(fmt.Sprintf("unknown class %q", r.Class))
+		case (r.Grammar != nil) != (r.Class == ClassGrammar):
+			return fail("a Grammar goes with class grammar and only there")
+		case r.Home && r.Class != ClassPath:
+			return fail("Home marks a path row")
+		}
+		if g := r.Grammar; g != nil {
+			if g.Split != SplitWhitespace {
+				return fail(fmt.Sprintf("unknown grammar split %q", g.Split))
+			}
+			for _, c := range append(append([]Class(nil), g.Tokens...), g.Rest) {
+				if c == "" || c == ClassGrammar || !knownClasses[c] {
+					return fail(fmt.Sprintf("grammar token class %q is not a value class", c))
+				}
+			}
+		}
+		if !lists[key] {
+			if r.Order != "" || r.Sort != nil {
+				return fail("an Order or a Sort on a row that is no list")
+			}
+			continue
+		}
+		switch {
+		case r.Order != OrderKept && r.Order != OrderSorted:
+			return fail(fmt.Sprintf("a list needs Order %q or %q, not %q", OrderKept, OrderSorted, r.Order))
+		case (r.Sort != nil) != (r.Order == OrderSorted):
+			return fail("a Sort goes with the sorted order and only there")
+		case r.Sort != nil && len(r.Sort.Keys) == 0:
+			return fail("a Sort needs at least one key")
+		}
+	}
+	return nil
 }

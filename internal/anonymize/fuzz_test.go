@@ -3,6 +3,7 @@ package anonymize
 import (
 	"bytes"
 	"net/netip"
+	"path"
 	"regexp"
 	"strings"
 	"testing"
@@ -109,7 +110,14 @@ func FuzzMapPath(f *testing.F) {
 		if !strings.HasPrefix(s, "/") && got != s {
 			t.Fatalf("relative path changed: %q -> %q", s, got)
 		}
-		in, out := strings.Split(s, "/"), strings.Split(got, "/")
+		want := s
+		if got != s { // a rewritten path comes back cleaned, its trailing "/" kept
+			want = path.Clean(s)
+			if strings.HasSuffix(s, "/") {
+				want += "/"
+			}
+		}
+		in, out := strings.Split(want, "/"), strings.Split(got, "/")
 		if len(in) != len(out) {
 			t.Fatalf("component count: %q -> %q", s, got)
 		}
