@@ -151,23 +151,65 @@ func runPlanBytes(t *testing.T) []byte {
 func TestMaxAgeBadValueIsUsageError(t *testing.T) {
 	for _, v := range []string{"", "0s", "1.5d"} {
 		var out, errb bytes.Buffer
-		if code := run([]string{"check", "--facts", fullFail, "--max-age", v}, &out, &errb); code != exitError || out.Len() != 0 {
-			t.Errorf("check %q: %d", v, code)
+		if code := run([]string{"check", "--facts", fullFail, "--max-age", v}, &out, &errb); code != exitError || out.Len() != 0 || !strings.Contains(errb.String(), "--max-age") {
+			t.Errorf("check %q: %d %q", v, code, errb.String())
 		}
-		if code, o, _ := runFixArgs(t, "--dry-run", "--facts", fullFail, "--max-age", v); code != exitError || len(o) != 0 {
-			t.Errorf("fix %q: %d", v, code)
+		if code, o, e := runFixArgs(t, "--dry-run", "--facts", fullFail, "--max-age", v); code != exitError || len(o) != 0 || !strings.Contains(string(e), "--max-age") {
+			t.Errorf("fix %q: %d %q", v, code, e)
 		}
 	}
 }
 
-func TestWaiverExpiryUsesTheCommandClock(t *testing.T) {
-	// One reading per command: the pinned clock decides expiry, not time.Now.
-	src, err := os.ReadFile("check.go")
-	if err != nil {
+// TestWaiverExpiryFollowsTheCommandClock: the one pinned reading decides
+// expiry in check and in fix, with and without --max-age. The waiver ends
+// 2026-09-05, long before the real wall clock, so only a pinned earlier day
+// can keep it alive.
+func TestWaiverExpiryFollowsTheCommandClock(t *testing.T) {
+	wf := filepath.Join(t.TempDir(), "w.yaml")
+	body := "waivers:\n  - control: muster.account.root_remote_login\n    reason: clock test\n    expires: 2026-09-05\n"
+	if err := os.WriteFile(wf, []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(string(src), "time.Now()") {
-		t.Error("check.go reads the wall clock directly")
+	type blocks struct {
+		Check, Fix struct {
+			Waivers struct {
+				Expired int `json:"expired"`
+				Applied int `json:"applied"`
+			} `json:"waivers"`
+		}
+	}
+	expired := func(cmd string, extra []string) int {
+		t.Helper()
+		var b blocks
+		var out, errb bytes.Buffer
+		args := append([]string{"--facts", fullFail, "--waivers", wf, "--format", "json"}, extra...)
+		if cmd == "fix" {
+			args = append([]string{"fix", "--dry-run"}, args...)
+		} else {
+			args = append([]string{"check"}, args...)
+		}
+		if code := run(args, &out, &errb); code == exitError {
+			t.Fatalf("%s %v: %s", cmd, extra, errb.String())
+		}
+		if err := json.Unmarshal(out.Bytes(), &b); err != nil {
+			t.Fatal(err)
+		}
+		if cmd == "fix" {
+			return b.Fix.Waivers.Expired
+		}
+		return b.Check.Waivers.Expired
+	}
+	for _, cmd := range []string{"check", "fix"} {
+		for _, extra := range [][]string{nil, {"--max-age", "30d"}} {
+			pinNow(t, time.Date(2026, 9, 4, 12, 0, 0, 0, time.UTC))
+			if n := expired(cmd, extra); n != 0 {
+				t.Errorf("%s %v: expired = %d under a clock before the expiry", cmd, extra, n)
+			}
+			pinNow(t, time.Date(2026, 9, 12, 12, 0, 0, 0, time.UTC))
+			if n := expired(cmd, extra); n != 1 {
+				t.Errorf("%s %v: expired = %d under a clock after the expiry", cmd, extra, n)
+			}
+		}
 	}
 }
 
