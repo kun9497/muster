@@ -411,15 +411,26 @@ func (w *walker) unit(dp, s string) string {
 }
 
 // fsLocations maps an exports(5) refer=/replicas= value,
-// path@host[+host][:path@host[+host]].
+// path@host[+host][:path@host[+host]]: each path by the path rule, each host
+// by the host-or-address rule. A value that does not parse cleanly into such
+// items — an absolute path, "@", and hosts that are each a DNS name or an
+// address — is replaced whole: an IPv6 host split at its colons would
+// otherwise let its fragments through.
 func (w *walker) fsLocations(dp, s string) string {
 	items := strings.Split(s, ":")
-	for i, item := range items {
+	for _, item := range items {
 		p, hosts, ok := strings.Cut(item, "@")
-		if !ok {
-			items[i] = w.path(dp, item)
-			continue
+		if !ok || !strings.HasPrefix(p, "/") {
+			return w.placeholder(dp, s)
 		}
+		for _, h := range strings.Split(hosts, "+") {
+			if _, isAddr := w.k.AddrToken(h); !isAddr && !dnsName(h) {
+				return w.placeholder(dp, s)
+			}
+		}
+	}
+	for i, item := range items {
+		p, hosts, _ := strings.Cut(item, "@")
 		hs := strings.Split(hosts, "+")
 		for j, h := range hs {
 			hs[j] = w.hostOrAddr(dp, h, false)

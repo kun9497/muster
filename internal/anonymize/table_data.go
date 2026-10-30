@@ -26,21 +26,25 @@ var (
 )
 
 // optionValues are the option keys whose values name an account, a host, an
-// address or a file (mount.cifs(8) and kin); every other option word is kept
+// address or a file (mount.cifs(8), nfs(5) and kin); every other option word is kept
 // byte for byte, so a clause's contains nodev still finds it. A password the
 // kernel shows is placeholdered.
 var optionValues = map[string]Class{
 	"username": ClassAccount, "user": ClassAccount, "domain": ClassHost,
-	"addr": ClassAddress, "ip": ClassAddress,
+	"addr": ClassAddress, "ip": ClassAddress, "clientaddr": ClassAddress, "mountaddr": ClassAddress,
+	"mounthost":   ClassHostOrAddr,
 	"credentials": ClassPath, "cred": ClassPath,
 	"password": ClassPlaceholder, "pass": ClassPlaceholder,
 }
 
 // rMountOptions is one mount option list element; rExportOptions an
-// exports(5) option string, whose refer= and replicas= name hosts.
+// exports(5) option string, whose refer= and replicas= name paths and hosts
+// and whose mp= and mountpoint= name a path.
 var (
 	rMountOptions  = rOptions(nil)
-	rExportOptions = rOptions(map[string]Class{"refer": ClassFSLocations, "replicas": ClassFSLocations})
+	rExportOptions = rOptions(map[string]Class{
+		"refer": ClassFSLocations, "replicas": ClassFSLocations, "mp": ClassPath, "mountpoint": ClassPath,
+	})
 )
 
 func rOptions(extra map[string]Class) FieldRule {

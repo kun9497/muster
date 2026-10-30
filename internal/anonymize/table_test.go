@@ -586,14 +586,20 @@ func TestMountAndExportOptions(t *testing.T) {
 	k, _ := anonymize.NewKey(bytes.Repeat([]byte{3}, 32))
 	addr := ip(10, 1, 2, 3)
 	mapped, _ := k.AddrToken(addr)
+	addr2 := ip(172, 16, 0, 9)
+	mapped2, _ := k.AddrToken(addr2)
+	v6 := netip.AddrFrom16([16]byte{0x20, 0x01, 0x0d, 0xb8, 15: 5}).String()
 	doc := map[string]any{"facts": merge(
 		fact("accounts.users", []any{map[string]any{"name": "alice", "home": "/home/alice"}}),
 		fact("mounts.points", []any{map[string]any{"target": "/srv/share", "options": []any{
 			"nodev", "nosuid", "nodev,nosuid", "rw,relatime", "username=alice", "addr=" + addr,
 			"credentials=/home/alice/.smb", "domain=corp.example", "password=hunter2", "uid=1000", "",
+			"clientaddr=" + addr, "mountaddr=" + addr2, "mounthost=nfs.corp.example", "mounthost=" + addr2,
+			"vers=4.2,proto=tcp,clientaddr=" + addr,
 		}}}),
 		fact("nfs.exports", []any{map[string]any{"path": "/srv", "client": "*",
-			"options": "rw,sync,no_root_squash,refer=/srv/a@nfs1.corp.example+" + addr + ":/srv/b@nfs2"}}),
+			"options": "rw,sync,no_root_squash,refer=/srv/a@nfs1.corp.example+" + addr + ":/srv/b@nfs2,mp=/home/alice,mountpoint=/srv/x"},
+			map[string]any{"path": "/srv2", "client": "*", "options": "rw,refer=/srv/a@" + v6 + ",replicas=/srv/c"}}),
 	)}
 	out, rep, err := anonymize.Transform(doc, anonymize.Default, k, "keyed")
 	if err != nil {
@@ -604,14 +610,24 @@ func TestMountAndExportOptions(t *testing.T) {
 		"nodev", "nosuid", "nodev,nosuid", "rw,relatime", "username=" + alice, "addr=" + mapped,
 		"credentials=/home/" + alice + "/.smb", "domain=" + k.Host("corp.example"), "password=" + anonymize.Placeholder,
 		"uid=1000", "",
+		"clientaddr=" + mapped, "mountaddr=" + mapped2, "mounthost=" + k.Host("nfs.corp.example"), "mounthost=" + mapped2,
+		"vers=4.2,proto=tcp,clientaddr=" + mapped,
 	}
 	got := valueAt(t, out, "mounts.points").([]any)[0].(map[string]any)["options"]
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("mount options\n got %q\nwant %q", got, want)
 	}
-	wantExport := "rw,sync,no_root_squash,refer=/srv/a@" + k.Host("nfs1.corp.example") + "+" + mapped + ":/srv/b@" + k.Host("nfs2")
-	if got := valueAt(t, out, "nfs.exports").([]any)[0].(map[string]any)["options"]; got != wantExport {
+	exports := valueAt(t, out, "nfs.exports").([]any)
+	wantExport := "rw,sync,no_root_squash,refer=/srv/a@" + k.Host("nfs1.corp.example") + "+" + mapped + ":/srv/b@" + k.Host("nfs2") +
+		",mp=/home/" + alice + ",mountpoint=/srv/x"
+	if got := exports[0].(map[string]any)["options"]; got != wantExport {
 		t.Errorf("export options %q, want %q", got, wantExport)
+	}
+	// An IPv6 host split at its colons, or a location without "@", is not a
+	// clean location list: the whole value is replaced, no fragment kept.
+	wantV6 := "rw,refer=" + anonymize.Placeholder + ",replicas=" + anonymize.Placeholder
+	if got := exports[1].(map[string]any)["options"]; got != wantV6 {
+		t.Errorf("export options %q, want %q", got, wantV6)
 	}
 	if !strings.Contains(strings.Join(rep.Replaced, " "), "facts.mounts.points.value[].options[]") {
 		t.Errorf("replaced %v does not name the placeholdered password", rep.Replaced)
