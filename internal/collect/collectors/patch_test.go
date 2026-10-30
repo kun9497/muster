@@ -188,6 +188,7 @@ func buildPatch(t *testing.T, a collect.Access, collectedAt, container string) *
 	if v := g.Violations(); len(v) != 0 {
 		t.Fatalf("patch touched undeclared targets: %v", v)
 	}
+	recordTree(b)
 	return b
 }
 

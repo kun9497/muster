@@ -37,19 +37,7 @@ func Transform(doc map[string]any, t Table, k *Key, mode string) (map[string]any
 			return nil, Report{}, ErrAlreadyAnonymized
 		}
 	}
-	w := &walker{t: t, k: k, prefixes: map[string]bool{}, collect: true}
-	for key := range t {
-		for i := 0; i < len(key); i++ {
-			if key[i] == '.' || strings.HasPrefix(key[i:], "[]") {
-				w.prefixes[key[:i]] = true
-			}
-		}
-		w.prefixes[key] = true
-		if base, ok := strings.CutSuffix(key, ".*"); ok {
-			w.wildcards = append(w.wildcards, base)
-		}
-	}
-	sort.Strings(w.wildcards)
+	w := newWalker(t, k)
 	w.document(doc)
 	if w.err != nil {
 		return nil, Report{}, w.err
@@ -65,12 +53,60 @@ func Transform(doc map[string]any, t Table, k *Key, mode string) (map[string]any
 	return out, Report{Classes: sortedKeys(w.classes), Replaced: sortedKeys(w.replaced)}, nil
 }
 
+// Unclassified lists, sorted, every document path of doc that t does not
+// classify (spelled as UnclassifiedError spells them), walking on past each
+// one, so a test can name every gap at once; nil when there is none. An
+// unclassified node's subtree is not entered. The table itself must
+// validate.
+func Unclassified(doc map[string]any, t Table) ([]string, error) {
+	if err := t.Validate(); err != nil {
+		return nil, err
+	}
+	var zero [32]byte
+	k, err := NewKey(zero[:])
+	if err != nil {
+		return nil, err
+	}
+	w := newWalker(t, k)
+	w.gaps = map[string]bool{}
+	w.document(doc)
+	if w.err != nil {
+		return nil, w.err
+	}
+	if len(w.gaps) == 0 {
+		return nil, nil
+	}
+	return sortedKeys(w.gaps), nil
+}
+
+// Sorted reports whether l is already in the order s re-sorts it into, with
+// no two neighbours equal under every key when s deduplicates.
+func (s *SortSpec) Sorted(l []any) bool {
+	for i := 1; i < len(l); i++ {
+		c := s.compare(l[i-1], l[i])
+		if c > 0 || c == 0 && s.Dedup {
+			return false
+		}
+	}
+	return true
+}
+
+func (s *SortSpec) compare(a, b any) int {
+	for _, key := range s.Keys {
+		if c := compareField(fieldOf(a, key.Field), fieldOf(b, key.Field), key.Numeric); c != 0 {
+			return c
+		}
+	}
+	return 0
+}
+
 type walker struct {
 	t         Table
 	k         *Key
 	prefixes  map[string]bool
 	wildcards []string
-	collect   bool // first pass: gather names and homes, write nothing
+	collect   bool            // first pass: gather names and homes, write nothing
+	gaps      map[string]bool // Unclassified: every unclassified path, the walk going on past each
 	homes     Homes
 	ledger    *Ledger
 	classes   map[string]bool
@@ -78,7 +114,28 @@ type walker struct {
 	err       error
 }
 
+func newWalker(t Table, k *Key) *walker {
+	w := &walker{t: t, k: k, prefixes: map[string]bool{}, collect: true}
+	for key := range t {
+		for i := 0; i < len(key); i++ {
+			if key[i] == '.' || strings.HasPrefix(key[i:], "[]") {
+				w.prefixes[key[:i]] = true
+			}
+		}
+		w.prefixes[key] = true
+		if base, ok := strings.CutSuffix(key, ".*"); ok {
+			w.wildcards = append(w.wildcards, base)
+		}
+	}
+	sort.Strings(w.wildcards)
+	return w
+}
+
 func (w *walker) fail(path string) {
+	if w.gaps != nil {
+		w.gaps[path] = true
+		return
+	}
 	if w.err == nil {
 		w.err = &UnclassifiedError{Path: path}
 	}
@@ -125,7 +182,7 @@ func (w *walker) document(doc map[string]any) map[string]any {
 			m, ok := doc[key].(map[string]any)
 			if !ok {
 				w.fail(key)
-				return nil
+				continue
 			}
 			out[key] = w.facts("", m)
 		case headerRoots[key]:
@@ -150,7 +207,7 @@ func (w *walker) facts(prefix string, m map[string]any) map[string]any {
 		dp := "facts." + q
 		if reservedRoot(q) || strings.Contains(q, "[]") {
 			w.fail(dp)
-			return nil
+			continue
 		}
 		if _, isKey := w.t[q]; isKey {
 			out[key] = w.fact(q, dp, m[key])
@@ -159,7 +216,7 @@ func (w *walker) facts(prefix string, m map[string]any) map[string]any {
 		sub, ok := m[key].(map[string]any)
 		if !ok || !w.prefixes[q] {
 			w.fail(dp)
-			return nil
+			continue
 		}
 		out[key] = w.facts(q, sub)
 	}
@@ -186,7 +243,7 @@ func (w *walker) envelope(key, dp string, m map[string]any) map[string]any {
 		}
 		if _, ok := w.t["envelope."+f]; !ok {
 			w.fail(dp + "." + f)
-			return nil
+			continue
 		}
 		switch f {
 		case "value":
@@ -217,7 +274,7 @@ func (w *walker) setting(key, dp string, m map[string]any) map[string]any {
 		}
 		if _, ok := w.t["setting."+f]; !ok {
 			w.fail(dp + "." + f)
-			return nil
+			continue
 		}
 		v := m[f]
 		switch f {
@@ -225,7 +282,7 @@ func (w *walker) setting(key, dp string, m map[string]any) map[string]any {
 			side, ok := v.(map[string]any)
 			if !ok && v != nil {
 				w.fail(dp + "." + f)
-				return nil
+				continue
 			}
 			if ok {
 				out[f] = w.envelope(key, dp+"."+f, side)
@@ -238,7 +295,7 @@ func (w *walker) setting(key, dp string, m map[string]any) map[string]any {
 			ps, ok := v.(map[string]any)
 			if !ok && v != nil {
 				w.fail(dp + "." + f)
-				return nil
+				continue
 			}
 			if !ok {
 				out[f] = nil
@@ -250,7 +307,7 @@ func (w *walker) setting(key, dp string, m map[string]any) map[string]any {
 				pm, ok := ps[p].(map[string]any)
 				if !isPersona(p) || !ok {
 					w.fail(pd)
-					return nil
+					continue
 				}
 				po[p] = w.envelope(key, pd, pm)
 			}
@@ -279,7 +336,7 @@ func (w *walker) source(dp string, v any) any {
 		}
 		if _, ok := w.t["source."+f]; !ok {
 			w.fail(dp + "." + f)
-			return nil
+			continue
 		}
 		if f != "inputs" {
 			out[f] = w.value("source."+f, dp+"."+f, m[f])
@@ -288,7 +345,7 @@ func (w *walker) source(dp string, v any) any {
 		in, ok := m[f].([]any)
 		if !ok && m[f] != nil {
 			w.fail(dp + ".inputs")
-			return nil
+			continue
 		}
 		if !ok {
 			out[f] = nil
@@ -399,14 +456,7 @@ func (w *walker) collectHome(rp string, m map[string]any) {
 }
 
 func sortList(l []any, s *SortSpec) []any {
-	cmp := func(a, b any) int {
-		for _, key := range s.Keys {
-			if c := compareField(fieldOf(a, key.Field), fieldOf(b, key.Field), key.Numeric); c != 0 {
-				return c
-			}
-		}
-		return 0
-	}
+	cmp := s.compare
 	sort.SliceStable(l, func(i, j int) bool { return cmp(l[i], l[j]) < 0 })
 	if !s.Dedup || len(l) == 0 {
 		return l
