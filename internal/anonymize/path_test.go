@@ -193,3 +193,31 @@ func TestMapPathMachineIDPositions(t *testing.T) {
 		}
 	}
 }
+
+// A home whose last component is any mapped account name is eligible, not
+// only one of that home's own accounts: carol living at /srv/bob would
+// otherwise publish bob's name.
+func TestMapPathHomeNamedAfterAnotherAccount(t *testing.T) {
+	k := key7(t)
+	a := k.Account
+	var h Homes
+	h.AddHome("/srv/bob", "carol")
+	h.AddHome("/home/bob", "bob")
+	h.AddHome("/srv/www", "dave") // www is no account: kept
+	h.AddHome("/tmp", "bob")      // the exceptions hold
+	h.AddHome("/var/log", "bob")
+	cases := []struct{ in, want string }{
+		{"/srv/bob", "/srv/" + a("bob")},
+		{"/srv/bob/.profile", "/srv/" + a("bob") + "/.profile"},
+		{"/home/bob", "/home/" + a("bob")},
+		{"/srv/www/x", "/srv/www/x"},
+		{"/opt/bob", "/opt/bob"}, // no home there
+		{"/tmp/x", "/tmp/x"},
+		{"/var/log/x", "/var/log/x"},
+	}
+	for _, c := range cases {
+		if got := k.MapPath(c.in, h); got != c.want {
+			t.Errorf("MapPath(%q) = %q, want %q", c.in, got, c.want)
+		}
+	}
+}

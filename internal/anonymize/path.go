@@ -150,10 +150,10 @@ func (k *Key) idComponent(label, raw, rest string) (string, *idNote, bool) {
 	return out + rest, &idNote{label + raw, out}, true
 }
 
-// MapPath rewrites p at AX-6's positions only: the last component of every
-// non-kept account's home that is p or a prefix of it (unless the home is /,
-// /tmp, /var/tmp, /dev/null, /nonexistent, a mount target or of fewer than two
-// components); the component after /home/ (an account's name or not); a
+// MapPath rewrites p at AX-6's positions only: the last component, when it
+// is a mapped account name, of every non-kept account's home that is p or a
+// prefix of it (unless the home is /, /tmp, /var/tmp, /dev/null,
+// /nonexistent, a mount target or of fewer than two components); the component after /home/ (an account's name or not); a
 // component directly under a name position (the cron spools, the mail spools,
 // linger, AccountsService, /etc/sudoers.d, /etc/cron.d) that is a mapped
 // account name, whether it ends the path or is a parent in it; and, by the
@@ -209,9 +209,13 @@ func (k *Key) mapPath(p string, homes Homes) (string, []string, []idNote) {
 	return strings.Join(comps, "/"), names, ids
 }
 
+// homeEligible: home is a non-kept account's home and its last component
+// is a mapped account name — any one, not only one of the home's own
+// accounts, so a home named after another account never publishes that
+// name — and home is none of the exceptions.
 func homeEligible(home, last string, homes Homes) bool {
 	accts := homes.homes[home]
-	if accts == nil || !accts[last] || homeExceptions[home] || isMountTarget(home) {
+	if accts == nil || !homes.names[last] || homeExceptions[home] || isMountTarget(home) {
 		return false
 	}
 	return strings.Count(home, "/") >= 2
