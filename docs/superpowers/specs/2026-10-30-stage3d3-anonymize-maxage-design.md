@@ -91,10 +91,15 @@ What the scope work established, and what drives the shape below:
   `/var/mail/<n>`, `/var/spool/mail/<n>`, `/var/lib/systemd/linger/<n>` and `/var/lib/AccountsService/users/<n>`, and
   the base name of a file directly under `/etc/sudoers.d/` or `/etc/cron.d/` that equals a mapped account name; a path
   under such a home is rewritten as a prefix. Every eligible home on the path has its last component rewritten, a component's position is decided on the
-  cleaned prefix before it, and the path is rewritten in place, never returned cleaned; a home's last component that equals the
-  name of any account sharing the home is replaced by that name's pseudonym; `/home/<x>` whose `<x>` is no account maps
+  cleaned prefix before it, and the path is rewritten in place, never returned cleaned; a home's last component that equals any
+  mapped account name is replaced by that name's pseudonym; `/home/<x>` whose `<x>` is no account maps
   `<x>` in the account class. Never a mount target, never by component equality elsewhere. The same function maps every
-  path in the snapshot, so a file's subject stays one string.
+  path in the snapshot, so a file's subject stays one string. Host identifiers have positions too: a raw machine id
+  (a whole 32-hex component under `/var/log/journal/` or `/run/log/journal/`, a whole one or the leading 32 hex of
+  `<id>-<rest>` under `/boot/`, `/boot/loader/entries/`, `/efi/` and `/efi/loader/entries/`) maps to 32 hex of the
+  machine-id sub-key over `id:` and the id, and the boot id of `systemd-private-<32 hex>-<rest>` under `/tmp/` or
+  `/var/tmp/` to 32 hex over `boot:` and the id, the rest of the component kept — so no component hashes to the original
+  `machine_id_hash`.
 - **AX-7 — Free text that no clause reads is replaced, not scanned.** A `text` value — the envelope `reason`, every
   `Source` (top level, `winner`, a setting's sides, nested `inputs`) `raw` and `cmd`,
   `run.collectors[].reason`, `partial_failures`, and every raw-text record field the table marks — becomes the fixed
