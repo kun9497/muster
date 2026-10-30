@@ -32,6 +32,10 @@ flags:
 // positional word (X-1): muster never applies a remediation (D24).
 const x1Refusal = "fix never applies a remediation (D24); run fix --dry-run"
 
+// anonScriptRefusal is fix --format script's answer to an anonymised
+// snapshot (AX-11).
+const anonScriptRefusal = "plan the script from the original snapshot"
+
 // fixValueFlags are the flags that take a value (Z-12); the pre-pass skips
 // that value, whatever it is, and an unknown flag takes none.
 var fixValueFlags = map[string]bool{"--facts": true, "--format": true, "--waivers": true, "--profile": true, "--tuning": true, "--max-risk": true, "--max-age": true, "--color": true}
@@ -131,6 +135,12 @@ func runFix(args []string, stdout, stderr io.Writer) int {
 	snap, _, err := openFacts(f.facts)
 	if err != nil {
 		fmt.Fprintf(stderr, "muster: %v\n", err)
+		return exitError
+	}
+	// AX-11: a script from an anonymised snapshot would carry a keyed host
+	// hash and mapped names; table and json stay, for a reviewer.
+	if f.format == "script" && snap.Run.Anonymization != nil {
+		fmt.Fprintln(stderr, "muster: "+anonScriptRefusal)
 		return exitError
 	}
 	if f.maxAgeFlag != "" {
