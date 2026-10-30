@@ -141,3 +141,27 @@ func BenchmarkTransform(b *testing.B) {
 		}
 	}
 }
+
+// A negated sudo command (!/path, !!/path) keeps its "!" run as a sigil and
+// maps the path behind it; a bare "!" stays.
+func TestGrammarTokenKeepsNegation(t *testing.T) {
+	k := key7(t)
+	w := newWalker(Default, k)
+	w.collect, w.ledger, w.classes, w.replaced = false, NewLedger(), map[string]bool{}, map[string]bool{}
+	g := Default["sudo.rules[].commands[]"].Grammar
+	a := k.Account
+	for in, want := range map[string]string{
+		"!/home/alice/bin/x":      "!/home/" + a("alice") + "/bin/x",
+		"!!/home/alice/y":         "!!/home/" + a("alice") + "/y",
+		"!":                       "!",
+		"/home/alice/bin/x":       "/home/" + a("alice") + "/bin/x",
+		"!/home/alice/bin/x -v x": "!/home/" + a("alice") + "/bin/x -" + Placeholder + " " + Placeholder,
+	} {
+		if got := w.grammar("facts.sudo.rules.value[].commands[]", g, in); got != want {
+			t.Errorf("%q -> %q, want %q", in, got, want)
+		}
+	}
+	if w.err != nil {
+		t.Fatal(w.err)
+	}
+}

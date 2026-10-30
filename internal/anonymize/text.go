@@ -492,6 +492,8 @@ func (w *walker) grammar(dp string, g *Grammar, s string) string {
 	return b.String()
 }
 
+// token maps one grammar token by class c; a leading "+" or "-" and a
+// leading run of "!" are kept as sigils.
 func (w *walker) token(dp string, c Class, tok string) string {
 	if c == ClassKept || tok == "" || tok == "+" || tok == "-" {
 		return tok
@@ -501,6 +503,15 @@ func (w *walker) token(dp string, c Class, tok string) string {
 			w.err = fmt.Errorf("anonymization table: %s: a grammar token needs a value class", dp)
 		}
 		return tok
+	}
+	if tok[0] == '!' {
+		// sudoers' negation (!/path, !!/path) is a kept sigil; a bare run
+		// of "!" stays.
+		rest := strings.TrimLeft(tok, "!")
+		if rest == "" {
+			return tok
+		}
+		return tok[:len(tok)-len(rest)] + w.token(dp, c, rest)
 	}
 	if tok[0] == '+' || tok[0] == '-' {
 		return tok[:1] + w.text(c, nil, dp, tok[1:])
