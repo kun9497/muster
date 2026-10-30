@@ -68,9 +68,76 @@ The contracts here are tested; the design specification (section 8) is the sourc
 ## What the snapshot contains and does not
 
 By default: derived attributes instead of secrets — hash algorithm rather than hash, key fingerprint
-rather than key, whether an SNMP community is a default value rather than the string. `--include-secrets`
-records itself in the snapshot header. Files are 0600 in a 0700 directory, written atomically, never
-under `/tmp` by default.
+rather than key, whether an SNMP community is a default value rather than the string. No flag stores a
+secret: `run.redaction.include_secrets` is always false, and `snapshot anonymize` refuses a snapshot that
+says otherwise. Files are 0600 in a 0700 directory, written atomically, never under `/tmp` by default.
+
+## Anonymised snapshots
+
+`muster snapshot anonymize` writes a copy of a snapshot for sharing (D36). It runs offline, needs no root,
+and reads only the snapshot and, with `--key`, a 32-byte key file (through the same ownership rule as
+waivers when root). The scheme, `muster-anon-v1`:
+
+- Each value class has its own sub-key, `HMAC-SHA256(key, "muster/anon/v1/<class>")`. User and group
+  names become `u` + 12 base32 characters, host labels `h` + 10 (the last label of a dotted name kept),
+  key fingerprints and the machine-id hash keyed values of the same shape, a template unit's instance
+  `i` + 12. Path components are mapped only at known positions: a home directory's last component, a
+  name the path is known to carry. A component that only looks like a name is left alone.
+- Addresses stay in their class. Loopback, multicast, unspecified and the documentation ranges are kept;
+  a private, shared, link-local or benchmarking address keeps its range prefix and maps the rest; a public
+  address maps by a prefix-preserving tree, so a CIDR keeps its length and containment.
+- A closed keep set (`root`, the system accounts and groups the controls compare against, `ALL`, `*`)
+  and every derived field (modes, counts, booleans, enums, versions) stay as they are; a test holds the
+  keep set to every name a built-in control compares against.
+- Free text that no clause reads by value is not scanned. It becomes `[anonymised]`: reasons, sources,
+  raw lines and command output. Firewall dumps become empty.
+- Every path in the document is classified. A path the table does not know refuses the whole input,
+  so a field added by a newer collector cannot pass through in clear.
+- `run.anonymization` records the scheme, the mode, a `key_id` (16 hex characters of a keyed hash, so two
+  files can be checked for sharing a key; empty for `--ephemeral`), the classes that mapped, and the
+  paths that were replaced. An already anonymised input is refused. `fix --format script` refuses an
+  anonymised snapshot: its machine-id hash is keyed, so the host guard would never match. A script is
+  planned from the original.
+
+What it resists:
+
+- Inverting a pseudonym by dictionary: without the key, `u…` and `h…` reveal nothing about the name.
+- Searching a shared file for a known name, address or fingerprint.
+- Linking two files anonymised under different keys, or under `--ephemeral`.
+
+What it does not resist:
+
+- Key compromise. With the key, every pseudonym can be recomputed from a guessed name. Keep the key
+  with the original, not with the copy.
+- Linkage within one key. Every file made with one key shares its pseudonyms; that is the point of
+  `--key`.
+- Quasi-identifiers: the OS release, kernel, package list and versions, interface names, mount
+  layout, enabled services, listening ports, counts, and the shape of the configuration all stay.
+  Together they may identify a host to someone who knows it.
+- Address structure. The range of a private address is kept, and so are the bits a public address shares
+  with a kept or mapped range near those boundaries. Two addresses in one subnet stay in one subnet.
+- Order. A list kept in the collector's order but sorted by a mapped field (home roots, cron files)
+  leaks the alphabetical order of the real names.
+- Some known leftovers in v1: a template unit's instance inside a path field (a drop-in directory, a
+  file-integrity schedule path) stays in clear; an IPv6 host in an NFS `refer=` list becomes the
+  placeholder rather than a pseudonym; an SNMP v3 security name in a group row is mapped as a host.
+- Site files. Tuning, waivers and site profiles are not mapped. A waiver subject or a parameter that
+  names a real user or path no longer matches the copy, and sharing the site file shares the name.
+- Timing. `collected_at` and every timestamp stay.
+- What the original is. The copy carries no secret the original did not, but it is not proven free of
+  identity: a name in an unclassified position the table missed is a bug (see `SECURITY.md`).
+
+The verdict invariant is tested on every control fixture, the whole-host readings and the example snapshots: under every built-in
+profile with no tuning, waiver or site profile, the original and the copy give the same id, status,
+reason code, mechanism and exit code.
+
+## Snapshot age
+
+`check --max-age` and `fix --max-age` refuse a snapshot whose `collected_at` is older than the bound, more
+than five minutes in the future, or not a usable timestamp, before anything is evaluated. The age
+compares the collecting host's clock with the reading host's. It attests nothing: a snapshot can carry
+any `collected_at`, and a wrong clock on either side moves the age. It catches a stale file, not a
+forged one.
 
 ## Reads and the filesystem walk
 

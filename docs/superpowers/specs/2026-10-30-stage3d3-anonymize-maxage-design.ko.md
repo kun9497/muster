@@ -7,6 +7,8 @@ D34). 이 설계의 결정은 AX 목록입니다(한 글자 접두어는 앞 단
 리뷰(`design-review-r1.md`, 33건)는 자유 텍스트를 토큰 치환에서 자리표시자로 바꾸고, 사이트 파일 매핑을 보류하고,
 주소의 cycle-walk를 대체했습니다. 둘째(`design-review-r2.md`, 20건)는 AX-6의 이름 위치를 넓히고 읽기 규칙을 필드와
 연산자 단위로 고정했고, 셋째(`design-review-r3.md`, 8건)는 호스트-또는-주소 분기를 순서 있는 한 규칙으로 만들었습니다.
+구현 중 내린 결정(계획의 원장)도 반영했습니다: 경로 위의 모든 홈을 다시 쓰고, 경로는 제자리에서 다시 쓰며, 마운트
+대상은 경로이고, 분류 넷(`host_or_netgroup`, `unit`, `blank`, 옵션 문법)을 더했습니다.
 
 ## 1. 범위와 의도
 
@@ -53,14 +55,18 @@ D34). 이 설계의 결정은 AX 목록입니다(한 글자 접두어는 앞 단
   | host(DNS 이름) | 소문자로, 라벨마다 `h` + base32 10자; 마지막 라벨 유지; 라벨 하나인 이름은 통째로 매핑 |
   | address | 아래 §1.1 |
   | host-or-address(둘 중 하나를 담는 필드: NTP 서버, syslog 대상, NFS 클라이언트, lastlog 호스트) | 순서 있는 한 결정: (1) §1.1의 주소 형태; (2) 호스트 형태 — 문자·숫자·하이픈 라벨의 DNS 이름(끝의 점 유지), `host:port`, `transport:host[:port]`, syslog의 `[@\|@@][(opts)]host[:port]`, `*.`로 시작하는 와일드카드(`*` 유지), `@netgroup`(이름은 account 규칙) — 호스트 부분은 host 규칙, 나머지는 문법으로 유지; (3) 그 밖은 `[anonymised]` |
-  | url | 스킴, 포트, `user@`는 문법으로 유지, 호스트는 host 또는 address 규칙, 사용자는 account 규칙, 경로는 AX-6 |
+  | host-or-netgroup(hosts.equiv의 호스트, NFS 클라이언트) | 앞의 `@`는 account 규칙으로 매핑하는 넷그룹; 그 밖은 host-or-address 규칙 |
+  | unit(유닛 이름) | `@` 없는 이름은 유지; 템플릿 인스턴스 `<name>@<instance>.<suffix>`는 `<name>@`와 `.<suffix>`를 유지하고 인스턴스를 `i` + HMAC의 base32 12자로 매핑 |
+  | blank(`boot_id`, `uptime_s`, 방화벽 원본 덤프) | 문자열은 `""`, 숫자는 `0`; 존재는 유지 |
+  | option list(마운트와 NFS export 옵션) | 쉼표 토큰은 바이트 그대로, 단 `username`, `user`, `domain`, `addr`, `ip`, `clientaddr`, `mountaddr`, `mounthost`, `credentials`, `cred`, export의 `mp`, `mountpoint`, `refer`, `replicas` 값은 각 분류로 매핑하고 `password`, `pass` 값은 자리표시자 |
+  | url | 스킴, 포트, `user@`는 문법으로 유지, 쿼리·프래그먼트·비밀번호는 `[anonymised]`, 호스트는 host 또는 address 규칙, 사용자는 account 규칙, 경로는 AX-6 |
   | fingerprint(SSH 키 지문) | `SHA256:` + HMAC의 base64 43자(패딩 없음) |
   | machine id hash | 키를 쓴 소문자 16진 64자(AX-11) |
   | path | AX-6 |
   | placeholder(어떤 절도 읽지 않는 자유 텍스트) | AX-7 |
-  | kept | uid, gid, 포트, 모드, 패키지 이름과 버전, 커널 릴리스, 인터페이스 이름, 마운트 대상과 옵션, 열거값, bool, 숫자, `collected_at`, 상태, 목록 길이, 모든 도출 필드 |
+  | kept | uid, gid, 포트, 모드, 패키지 이름과 버전, 커널 릴리스, 인터페이스 이름, 열거값, bool, 숫자, `collected_at`, 상태, 목록 길이, 모든 도출 필드 |
 
-  kept 행은 계약의 일부입니다: 판정이 그 값들을 읽습니다(`uid eq 0`, 숫자 ACL 한정자, `target eq "/tmp"`, 패키지
+  kept 행은 계약의 일부입니다: 판정이 그 값들을 읽습니다(`uid eq 0`, 숫자 ACL 한정자, `target eq "/tmp"` — 마운트 대상은 경로이고, AX-6은 컨트롤이 이름 짓는 것을 결코 다시 쓰지 않음 —, 패키지
   조인, `--max-age`). 그것들은 준식별자이며, 문서가 그렇게 말합니다(§5).
 - **AX-5 — 유지 집합은 닫힌 목록이고, 컨트롤 세트에 고정된다.** 이름은 `internal/anonymize`의 닫힌 목록에 있을 때만
   유지됩니다: `root`; 컨트롤 세트가 이름 짓는 시스템 계정과 그룹(`ftp`, `lp`, `uucp`, `nuucp`, `adm`, `syslog`,
@@ -76,7 +82,8 @@ D34). 이 설계의 결정은 AX 목록입니다(한 글자 접두어는 앞 단
   적으면 제외), `/home/` 다음 구성 요소일 때, `/var/spool/cron/crontabs/<n>`, `/var/spool/cron/<n>`, `/var/mail/<n>`,
   `/var/spool/mail/<n>`, `/var/lib/systemd/linger/<n>`, `/var/lib/AccountsService/users/<n>`의 이름 위치일 때, 그리고
   `/etc/sudoers.d/`나 `/etc/cron.d/` 바로 아래 파일의 기본 이름이 매핑된 계정 이름과 같을 때 그 가명으로 바뀝니다;
-  그런 홈 아래의 경로는 접두어로 다시 씁니다. 가장 긴 홈이 이기고; 홈을 공유하는 어느 계정의 이름과 같은 홈의 마지막
+  그런 홈 아래의 경로는 접두어로 다시 씁니다. 경로 위의 모든 적격 홈이 그 마지막 구성 요소를 다시 쓰고, 구성 요소의 위치는 그 앞의 정리된 접두어로 정하며, 경로는
+  정리된 형태로 돌려주지 않고 제자리에서 다시 쓰고; 홈을 공유하는 어느 계정의 이름과 같은 홈의 마지막
   구성 요소는 그 이름의 가명으로 바뀌며; `<x>`가 계정이 아닌 `/home/<x>`는 `<x>`를 account 분류로 매핑합니다. 마운트
   대상은 결코, 다른 곳에서 구성 요소 일치로는 결코 다시 쓰지 않습니다. 같은 함수가 스냅샷의 모든 경로를 매핑하므로
   파일의 주체는 한 문자열로 남습니다.
@@ -113,7 +120,7 @@ D34). 이 설계의 결정은 AX 목록입니다(한 글자 접두어는 앞 단
 - **AX-10 — 출력은 자신이 무엇인지 말한다.** `run.anonymization {scheme: "muster-anon-v1", mode: "keyed" |
   "ephemeral", key_id, keep_set, classes, replaced}`(omitempty): `key_id`는 `HMAC(key, "muster/anon/v1/key-id")`의
   앞 16진 16자(ephemeral 모드에서는 비어 있음)로, 받는 쪽이 두 파일이 키를 공유하는지 알 수 있게 합니다; `classes`는
-  토큰 `account`, `host`, `address`, `url`, `fingerprint`, `machine_id_hash`, `path` 중 값을 하나라도 매핑한 분류의
+  토큰 `account`, `host`, `address`, `url`, `fingerprint`, `machine_id_hash`, `path`, `unit` 중 값을 하나라도 매핑한 분류의
   정렬된 목록; `replaced`는 자리표시자가 되거나 비워진 값의 문서 경로를 목록 인덱스마다 `[]`로 쓴 정렬된 목록입니다 —
   예: `facts.cron.files.value[].reason`, `facts.firewall.raw_dumps.value[].content`, `run.collectors[].reason`.
   `check`와 `fix`는 `run`을 실어 나르듯 그것을 실어 나르고, 이미 표시된 입력은 거부합니다. 이 필드를 더해도

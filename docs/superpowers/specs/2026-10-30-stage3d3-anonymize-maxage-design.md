@@ -8,7 +8,9 @@ stages). The scope maps it was written from are the cycle's ignored workspace
 first review round (`design-review-r1.md`, 33 findings) is folded in: it moved free text from a token pass to a
 placeholder, parked the mapping of site files, and replaced the address cycle-walk. A second
 (`design-review-r2.md`, 20 findings) widened AX-6's name positions and pinned the read rule per field and op; a
-third (`design-review-r3.md`, 8 findings) made the host-or-address dispatch one ordered rule.
+third (`design-review-r3.md`, 8 findings) made the host-or-address dispatch one ordered rule. Rulings made while
+building it (the plan's ledger) are folded in: every home on a path is rewritten, paths are rewritten in place,
+mount targets are paths, and four classes were added (`host_or_netgroup`, `unit`, `blank`, option grammars).
 
 ## 1. Scope and intent
 
@@ -53,22 +55,25 @@ What the scope work established, and what drives the shape below:
   differ on every run. Exactly one of the two is required.
 - **AX-4 — Each value class has one rule; the empty string maps to itself in every class.**
 
-  | Class | Rule | |---|---| | account (user and group names, one namespace) | `u` + 12 base32 characters (lower case,
-  no padding) of HMAC; case-sensitive; a sigil before it (`%`, `+`, `-`, `@`, `#` before a non-number) is kept | | host
-  (DNS names) | lower-cased, label by label, `h` + 10 base32 per label; the final label kept; a single-label name maps
-  whole | | address | §1.1 below | | host-or-address (a field that holds either: an NTP server, a syslog target, an NFS
-  client, a lastlog host) | one ordered decision: (1) an address form of §1.1; (2) a host form — a DNS name of
-  letter-digit-hyphen labels (a trailing dot kept), `host:port`, `transport:host[:port]`, syslog's
-  `[@\|@@][(opts)]host[:port]`, a `*.`-prefixed wildcard (`*` kept), `@netgroup` (the name by the account rule) — with
-  the host part by the host rule and the rest kept as syntax; (3) anything else `[anonymised]` | | url | scheme, port
-  and `user@` kept as syntax, host by the host or address rule, user by the account rule, path by AX-6 | | fingerprint
-  (SSH key fingerprints) | `SHA256:` + 43 base64 characters (no padding) of HMAC | | machine id hash | keyed 64
-  lowercase hex (AX-11) | | path | AX-6 | | placeholder (free text no clause reads) | AX-7 | | kept | uids, gids, ports,
-  modes, package names and versions, kernel release, interface names, mount targets and options, enums, booleans,
-  numbers, `collected_at`, statuses, list lengths, every derived field |
+  | Class | Rule |
+  |---|---|
+  | account (user and group names, one namespace) | `u` + 12 base32 characters (lower case, no padding) of HMAC; case-sensitive; a sigil before it (`%`, `+`, `-`, `@`, `#` before a non-number) is kept |
+  | host (DNS names) | lower-cased, label by label, `h` + 10 base32 per label; the final label kept; a single-label name maps whole |
+  | address | §1.1 below |
+  | host-or-address (a field that holds either: an NTP server, a syslog target, an NFS client, a lastlog host) | one ordered decision: (1) an address form of §1.1; (2) a host form — a DNS name of letter-digit-hyphen labels (a trailing dot kept), `host:port`, `transport:host[:port]`, syslog's `[@\|@@][(opts)]host[:port]`, a `*.`-prefixed wildcard (`*` kept), `@netgroup` (the name by the account rule) — with the host part by the host rule and the rest kept as syntax; (3) anything else `[anonymised]` |
+  | host-or-netgroup (hosts.equiv hosts, NFS clients) | a leading `@` names a netgroup mapped by the account rule; otherwise the host-or-address rule |
+  | unit (unit names) | a name without `@` kept; a template instance `<name>@<instance>.<suffix>` keeps `<name>@` and `.<suffix>` and maps the instance to `i` + 12 base32 of HMAC |
+  | blank (`boot_id`, `uptime_s`, firewall raw dumps) | a string becomes `""`, a number `0`; presence kept |
+  | option list (mount and NFS export options) | comma tokens kept byte for byte, except the values of `username`, `user`, `domain`, `addr`, `ip`, `clientaddr`, `mountaddr`, `mounthost`, `credentials`, `cred`, export `mp`, `mountpoint`, `refer`, `replicas` (mapped by their class) and `password`, `pass` (placeholder) |
+  | url | scheme, port and `user@` kept as syntax, query, fragment and password `[anonymised]`, host by the host or address rule, user by the account rule, path by AX-6 |
+  | fingerprint (SSH key fingerprints) | `SHA256:` + 43 base64 characters (no padding) of HMAC |
+  | machine id hash | keyed 64 lowercase hex (AX-11) |
+  | path | AX-6 |
+  | placeholder (free text no clause reads) | AX-7 |
+  | kept | uids, gids, ports, modes, package names and versions, kernel release, interface names, enums, booleans, numbers, `collected_at`, statuses, list lengths, every derived field |
 
   The kept row is part of the contract: verdicts read those values (`uid eq 0`, the numeric ACL qualifier, `target eq
-  "/tmp"`, package joins, `--max-age`). They are quasi-identifiers, and the documents say so (§5).
+  "/tmp"` — mount targets are paths, and AX-6 never rewrites the ones a control names —, package joins, `--max-age`). They are quasi-identifiers, and the documents say so (§5).
 - **AX-5 — The keep set is a closed list, pinned to the control set.** A name is kept only when it is in a closed list
   in `internal/anonymize`: `root`; the system accounts and groups the control set names (`ftp`, `lp`, `uucp`,
   `nuucp`, `adm`, `syslog`, `utmp`, `wheel`, `sudo`, `admin`, …); the sudo and NFS tokens `ALL`, `*`. Every other
@@ -85,7 +90,8 @@ What the scope work established, and what drives the shape below:
   the component after `/home/`, the name position of `/var/spool/cron/crontabs/<n>`, `/var/spool/cron/<n>`,
   `/var/mail/<n>`, `/var/spool/mail/<n>`, `/var/lib/systemd/linger/<n>` and `/var/lib/AccountsService/users/<n>`, and
   the base name of a file directly under `/etc/sudoers.d/` or `/etc/cron.d/` that equals a mapped account name; a path
-  under such a home is rewritten as a prefix. The longest matching home wins; a home's last component that equals the
+  under such a home is rewritten as a prefix. Every eligible home on the path has its last component rewritten, a component's position is decided on the
+  cleaned prefix before it, and the path is rewritten in place, never returned cleaned; a home's last component that equals the
   name of any account sharing the home is replaced by that name's pseudonym; `/home/<x>` whose `<x>` is no account maps
   `<x>` in the account class. Never a mount target, never by component equality elsewhere. The same function maps every
   path in the snapshot, so a file's subject stays one string.
@@ -126,7 +132,7 @@ What the scope work established, and what drives the shape below:
 - **AX-10 — The output says what it is.** `run.anonymization {scheme: "muster-anon-v1", mode: "keyed" | "ephemeral",
   key_id, keep_set, classes, replaced}` (omitempty): `key_id` is the first 16 hex characters of `HMAC(key,
   "muster/anon/v1/key-id")` (empty in ephemeral mode), so a receiver can tell whether two files share a key; `classes`
-  is the sorted list, from the tokens `account`, `host`, `address`, `url`, `fingerprint`, `machine_id_hash`, `path`, of
+  is the sorted list, from the tokens `account`, `host`, `address`, `url`, `fingerprint`, `machine_id_hash`, `path`, `unit`, of
   the classes that mapped at least one value; `replaced` is the sorted list of document paths whose values were
   placeholdered or emptied, written with `[]` for any list index — for example `facts.cron.files.value[].reason`,
   `facts.firewall.raw_dumps.value[].content`, `run.collectors[].reason`. `check` and `fix` carry it as they carry `run`;
