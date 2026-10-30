@@ -36,10 +36,10 @@ func TestKeyIDIs16Hex(t *testing.T) {
 
 func TestDeterministicPerKeyAndDifferingAcrossKeys(t *testing.T) {
 	a, b := testKey(t, 1), testKey(t, 2)
-	if a.Account("alice") != a.Account("alice") || a.Account("alice") == b.Account("alice") {
+	if a.Account("alice") != testKey(t, 1).Account("alice") || a.Account("alice") == b.Account("alice") {
 		t.Error("account determinism")
 	}
-	if a.Host("web.corp.test") != a.Host("web.corp.test") || a.Host("web.corp.test") == b.Host("web.corp.test") {
+	if a.Host("web.corp.test") != testKey(t, 1).Host("web.corp.test") || a.Host("web.corp.test") == b.Host("web.corp.test") {
 		t.Error("host determinism")
 	}
 	if a.Fingerprint("SHA256:x") == b.Fingerprint("SHA256:x") {

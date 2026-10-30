@@ -376,8 +376,7 @@ func TestReadByValueIsNeverPlaceholder(t *testing.T) {
 	read := func(row, id, op string, expected any) {
 		reads[row] = append(reads[row], readRef{id, op, expected})
 	}
-	var clause func(c controls.Clause, id string)
-	clause = func(c controls.Clause, id string) {
+	clause := func(c controls.Clause, id string) {
 		if c.Fact == "" {
 			return
 		}

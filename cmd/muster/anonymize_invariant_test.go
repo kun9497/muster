@@ -383,11 +383,18 @@ func TestAnonymisedHomesNestedSharedAndExempt(t *testing.T) {
 	}
 
 	tree := anonFacts(t, "testdata/anonymize/log-home-tmp.json")
+	exempt := 0
 	for _, r := range listAt(t, tree, "accounts.users") {
 		m := r.(map[string]any)
-		if n := m["name"].(string); n == a("log") && m["home"] != "/tmp" || n == a("var") && m["home"] != "/var/tmp" {
-			t.Errorf("an exempt home was rewritten: %v", m)
+		if n := m["name"].(string); n == a("log") || n == a("var") {
+			exempt++
+			if n == a("log") && m["home"] != "/tmp" || n == a("var") && m["home"] != "/var/tmp" {
+				t.Errorf("an exempt home was rewritten: %v", m)
+			}
 		}
+	}
+	if exempt != 2 {
+		t.Fatalf("found %d of the log and var accounts, want 2", exempt)
 	}
 	var targets []string
 	for _, r := range listAt(t, tree, "mounts.points") {
@@ -1198,12 +1205,17 @@ func TestAddressMappedBeforeExposureIsDerived(t *testing.T) {
 		t.Errorf("Transform's output reads %s, want the original's PASS", got)
 	}
 	socks := listAt(t, anonDoc["facts"].(map[string]any), "sockets.listening")
+	seen := 0
 	for _, s := range socks {
 		row := s.(map[string]any)
 		if row["port"] == json.Number("5432") || row["port"] == float64(5432) {
+			seen++
 			if row["loopback"] != true {
 				t.Errorf("Transform changed the derived loopback boolean: %v", row)
 			}
 		}
+	}
+	if seen == 0 {
+		t.Fatal("no listener on port 5432 in the anonymised snapshot")
 	}
 }
