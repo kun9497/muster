@@ -15,10 +15,13 @@ func TestAnonymizeImportsNoHostPackages(t *testing.T) {
 	}
 	for _, imp := range strings.Split(strings.TrimSpace(string(out)), "\n") {
 		switch imp {
-		case "os", "os/exec", "net", "syscall",
-			"github.com/kun9497/muster/internal/collect",
-			"github.com/kun9497/muster/internal/controls":
+		case "os", "os/exec", "net", "syscall":
 			t.Errorf("internal/anonymize imports %s", imp)
+		}
+		for _, p := range []string{"github.com/kun9497/muster/internal/collect", "github.com/kun9497/muster/internal/controls"} {
+			if strings.HasPrefix(imp, p) {
+				t.Errorf("internal/anonymize imports %s", imp)
+			}
 		}
 	}
 }

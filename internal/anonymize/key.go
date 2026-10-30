@@ -76,7 +76,9 @@ func allDigits(s string) bool {
 
 // Host maps a DNS name: lower-cased, each label but the last becomes "h" + 10
 // base32 characters, the final label and a trailing dot are kept, and a
-// single-label name maps whole.
+// single-label name maps whole. The input is lower-cased first: callers must
+// note the lower-cased input in the Ledger, or two spellings of one name would
+// look like a collision.
 func (k *Key) Host(name string) string {
 	if name == "" {
 		return ""
@@ -158,7 +160,7 @@ func (l *Ledger) Note(field, class, in, out string) error {
 		f = map[string]ledgerEntry{}
 		l.byField[field] = f
 	}
-	if prev, ok := f[out]; ok && (prev.class != class || prev.in != in) {
+	if prev, ok := f[out]; ok && prev.in != in {
 		return errors.New("anonymization collision in class " + class + " (field " + field + "): output equals class " + prev.class + "'s output for another input")
 	}
 	f[out] = ledgerEntry{class, in}

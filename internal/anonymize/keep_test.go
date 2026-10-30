@@ -73,6 +73,14 @@ func TestLedgerRefusesAnotherClassesOutputInOneField(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), ClassHost) || !strings.Contains(err.Error(), "f") {
 		t.Errorf("cross-class equal output: %v", err)
 	}
+	if err := NewLedger().Note("f", ClassHost, "alice", "uxyz"); err != nil {
+		t.Fatal(err)
+	}
+	l2 := NewLedger()
+	_ = l2.Note("f", ClassAccount, "alice", "uxyz")
+	if err := l2.Note("f", ClassHost, "alice", "uxyz"); err != nil {
+		t.Errorf("same input and output under two classes: %v", err)
+	}
 	if err := l.Note("other", ClassHost, "web", "uxyz"); err != nil {
 		t.Errorf("different field must not collide: %v", err)
 	}
