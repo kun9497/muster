@@ -593,13 +593,13 @@ func TestMountAndExportOptions(t *testing.T) {
 		fact("accounts.users", []any{map[string]any{"name": "alice", "home": "/home/alice"}}),
 		fact("mounts.points", []any{map[string]any{"target": "/srv/share", "options": []any{
 			"nodev", "nosuid", "nodev,nosuid", "rw,relatime", "username=alice", "addr=" + addr,
-			"credentials=/home/alice/.smb", "domain=corp.example", "password=hunter2", "uid=1000", "",
-			"clientaddr=" + addr, "mountaddr=" + addr2, "mounthost=nfs.corp.example", "mounthost=" + addr2,
+			"credentials=/home/alice/.smb", "domain=site.example", "password=hunter2", "uid=1000", "",
+			"clientaddr=" + addr, "mountaddr=" + addr2, "mounthost=nfs.site.example", "mounthost=" + addr2,
 			"vers=4.2,proto=tcp,clientaddr=" + addr,
 			"srcaddr=" + addr, "prefixpath=/home/alice/share", "uname=alice", "aname=/home/alice/9p",
 		}}}),
 		fact("nfs.exports", []any{map[string]any{"path": "/srv", "client": "*",
-			"options": "rw,sync,no_root_squash,refer=/srv/a@nfs1.corp.example+" + addr + ":/srv/b@nfs2,mp=/home/alice,mountpoint=/srv/x"},
+			"options": "rw,sync,no_root_squash,refer=/srv/a@nfs1.site.example+" + addr + ":/srv/b@nfs2,mp=/home/alice,mountpoint=/srv/x"},
 			map[string]any{"path": "/srv2", "client": "*", "options": "rw,refer=/srv/a@" + v6 + ",replicas=/srv/c"}}),
 	)}
 	out, rep, err := anonymize.Transform(doc, anonymize.Default, k, "keyed")
@@ -609,9 +609,9 @@ func TestMountAndExportOptions(t *testing.T) {
 	alice := k.Account("alice")
 	want := []any{
 		"nodev", "nosuid", "nodev,nosuid", "rw,relatime", "username=" + alice, "addr=" + mapped,
-		"credentials=/home/" + alice + "/.smb", "domain=" + k.Host("corp.example"), "password=" + anonymize.Placeholder,
+		"credentials=/home/" + alice + "/.smb", "domain=" + k.Host("site.example"), "password=" + anonymize.Placeholder,
 		"uid=1000", "",
-		"clientaddr=" + mapped, "mountaddr=" + mapped2, "mounthost=" + k.Host("nfs.corp.example"), "mounthost=" + mapped2,
+		"clientaddr=" + mapped, "mountaddr=" + mapped2, "mounthost=" + k.Host("nfs.site.example"), "mounthost=" + mapped2,
 		"vers=4.2,proto=tcp,clientaddr=" + mapped,
 		"srcaddr=" + mapped, "prefixpath=/home/" + alice + "/share", "uname=" + alice, "aname=/home/" + alice + "/9p",
 	}
@@ -620,7 +620,7 @@ func TestMountAndExportOptions(t *testing.T) {
 		t.Errorf("mount options\n got %q\nwant %q", got, want)
 	}
 	exports := valueAt(t, out, "nfs.exports").([]any)
-	wantExport := "rw,sync,no_root_squash,refer=/srv/a@" + k.Host("nfs1.corp.example") + "+" + mapped + ":/srv/b@" + k.Host("nfs2") +
+	wantExport := "rw,sync,no_root_squash,refer=/srv/a@" + k.Host("nfs1.site.example") + "+" + mapped + ":/srv/b@" + k.Host("nfs2") +
 		",mp=/home/" + alice + ",mountpoint=/srv/x"
 	if got := exports[0].(map[string]any)["options"]; got != wantExport {
 		t.Errorf("export options %q, want %q", got, wantExport)

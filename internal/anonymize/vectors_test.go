@@ -24,7 +24,7 @@ func TestKnownAnswers(t *testing.T) {
 	cases := []struct{ name, got, want string }{
 		{"ID", k.ID(), "e045a03cec53e005"},
 		{"Account", k.Account("alice"), "ugzc5yjlf3ksg"},
-		{"Host multi", k.Host("Web01.Corp.org"), "h4b7vf4mmhb.h5fd6ln2jdu.org"},
+		{"Host multi", k.Host("Web01.Example.org"), "h4b7vf4mmhb.hagk2xy5oqd.org"},
 		{"Host single", k.Host("solo"), "h6qg7wfjicz"},
 		{"Fingerprint", k.Fingerprint("SHA256:abc"), "SHA256:RMoVhzYgFlxv4P401kT9yUF6lA+tFxTyAnvUrCK0jHI"},
 		{"MachineIDHash", k.MachineIDHash(string(bytes.Repeat([]byte("a"), 64))), "fda774bac21ee93d9497f70261833f12c1f4c968c17536c577874e552310ceb8"},

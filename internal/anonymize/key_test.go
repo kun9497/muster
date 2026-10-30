@@ -39,7 +39,7 @@ func TestDeterministicPerKeyAndDifferingAcrossKeys(t *testing.T) {
 	if a.Account("alice") != testKey(t, 1).Account("alice") || a.Account("alice") == b.Account("alice") {
 		t.Error("account determinism")
 	}
-	if a.Host("web.corp.test") != testKey(t, 1).Host("web.corp.test") || a.Host("web.corp.test") == b.Host("web.corp.test") {
+	if a.Host("web.site.example.test") != testKey(t, 1).Host("web.site.example.test") || a.Host("web.site.example.test") == b.Host("web.site.example.test") {
 		t.Error("host determinism")
 	}
 	if a.Fingerprint("SHA256:x") == b.Fingerprint("SHA256:x") {
@@ -112,7 +112,7 @@ func TestAccountKeepsTheKeepSet(t *testing.T) {
 func TestHostRules(t *testing.T) {
 	k := testKey(t, 1)
 	lab := regexp.MustCompile(`^h[a-z2-7]{10}$`)
-	got := k.Host("Web01.Corp.Example.org")
+	got := k.Host("Web01.Site.Example.org")
 	parts := strings.Split(got, ".")
 	if len(parts) != 4 || parts[3] != "org" {
 		t.Fatalf("Host = %q", got)
@@ -122,14 +122,14 @@ func TestHostRules(t *testing.T) {
 			t.Errorf("label %q", p)
 		}
 	}
-	if got != k.Host("web01.corp.example.org") {
+	if got != k.Host("web01.site.example.org") {
 		t.Error("not case-folded")
 	}
 	// A label maps the same wherever it stands.
 	if strings.Split(k.Host("web01.other.net"), ".")[0] != parts[0] {
 		t.Error("label mapping not per label")
 	}
-	if g := k.Host("web01.corp.example.org."); g != got+"." {
+	if g := k.Host("web01.site.example.org."); g != got+"." {
 		t.Errorf("trailing dot: %q", g)
 	}
 	if g := k.Host("Solo"); !lab.MatchString(g) {

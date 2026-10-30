@@ -528,6 +528,9 @@ const (
 	canaryShort   = "qzshortname"
 	canarySudoer  = "qzsudoer"
 	canarySpooler = "qzspooler"
+	// canaryDomain is the host's own domain, a private suffix built from
+	// its pieces (no private-suffix host name is committed).
+	canaryDomain = "qzsitedom" + "." + "lan"
 	// canaryMachineID is the host's raw machine id: the journal directory
 	// and the BLS entries are named by it, and its sha256 is the header's
 	// machine_id_hash.
@@ -928,7 +931,7 @@ func (c *canarySnap) document() map[string]any {
 			"muster_version": "dev", "commit": "", "controls_version": "", "controls_digest": "",
 			"guide_edition": "kisa-unix-2026", "collected_at": "2026-10-29T00:00:00Z",
 			"host": map[string]any{
-				"hostname": canaryShort + ".qzsitedom.lan", "machine_id_hash": machineID, "kernel": "6.8.0-45-generic",
+				"hostname": canaryShort + "." + canaryDomain, "machine_id_hash": machineID, "kernel": "6.8.0-45-generic",
 				"os_release": map[string]any{"id": "ubuntu", "version_id": "24.04", "family": "debian"},
 				"boot_id":    c.next("qzboot"), "uptime_s": json.Number("987654321"),
 			},

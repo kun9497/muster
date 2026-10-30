@@ -136,7 +136,7 @@ func testDoc() map[string]any {
 				)),
 				"lastlog": env(list(
 					rec("name", "alice", "host", ip4(10, 1, 2, 3)),
-					rec("name", "bob", "host", "ws1.corp.example"),
+					rec("name", "bob", "host", "ws1.site.example"),
 					rec("name", "carol", "host", ":0"),
 					rec("name", "dave", "host", ""),
 				)),
@@ -148,9 +148,9 @@ func testDoc() map[string]any {
 				"etc_hosts_equiv_lines": env(list("+ alice", "alice-host bob", "+@ng -bob", "+", "-", "host  user  extra")),
 				"etc_securetty_lines":   env(list("pts/0", "tty1")),
 			},
-			"time_sync": map[string]any{"servers": env(list(ip4(10, 9, 8, 7), "ntp.corp.example", "pool.ntp.org:123", "bad_name!", "*"))},
+			"time_sync": map[string]any{"servers": env(list(ip4(10, 9, 8, 7), "ntp.site.example", "pool.ntp.org:123", "bad_name!", "*"))},
 			"logging": map[string]any{"journal_upload": map[string]any{
-				"url": env("https://alice@logs.corp.example:19532/home/alice/up"),
+				"url": env("https://alice@logs.site.example:19532/home/alice/up"),
 			}},
 			"ssh": map[string]any{"rsa_keys": env(list(rec("fingerprint", "SHA256:abc", "path", "/home/alice/.ssh/authorized_keys")))},
 			"firewall": map[string]any{
@@ -389,7 +389,7 @@ func TestTransformReadText(t *testing.T) {
 func TestTransformHostOrAddress(t *testing.T) {
 	out, _, k := transform(t)
 	addr, _ := k.AddrToken(ip4(10, 9, 8, 7))
-	want := []string{addr, k.Host("ntp.corp.example"), k.Host("pool.ntp.org") + ":123", Placeholder, "*"}
+	want := []string{addr, k.Host("ntp.site.example"), k.Host("pool.ntp.org") + ":123", Placeholder, "*"}
 	got := get(t, out, "facts", "time_sync", "servers", "value").([]any)
 	for i, w := range want {
 		if got[i] != w {
@@ -406,7 +406,7 @@ func TestTransformHostOrAddress(t *testing.T) {
 		byName[r.(map[string]any)["name"].(string)] = r.(map[string]any)["host"]
 	}
 	a10, _ := k.AddrToken(ip4(10, 1, 2, 3))
-	for name, w := range map[string]string{"alice": a10, "bob": k.Host("ws1.corp.example"), "carol": Placeholder, "dave": ""} {
+	for name, w := range map[string]string{"alice": a10, "bob": k.Host("ws1.site.example"), "carol": Placeholder, "dave": ""} {
 		if byName[k.Account(name)] != w {
 			t.Errorf("lastlog %s host = %v, want %v", name, byName[k.Account(name)], w)
 		}
@@ -422,7 +422,7 @@ func TestTransformHostOrAddress(t *testing.T) {
 
 func TestTransformURLAndFingerprint(t *testing.T) {
 	out, _, k := transform(t)
-	want := "https://" + k.Account("alice") + "@" + k.Host("logs.corp.example") + ":19532/home/" + k.Account("alice") + "/up"
+	want := "https://" + k.Account("alice") + "@" + k.Host("logs.site.example") + ":19532/home/" + k.Account("alice") + "/up"
 	if got := get(t, out, "facts", "logging", "journal_upload", "url", "value"); got != want {
 		t.Errorf("url = %v, want %v", got, want)
 	}

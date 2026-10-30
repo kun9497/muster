@@ -10,7 +10,7 @@ import (
 )
 
 func FuzzHost(f *testing.F) {
-	for _, s := range []string{"", "*", "ALL", "root", "a", "web.corp.test", "WEB.Corp.", "..", ".a.", "a..b", "xn--bcher-kva.example"} {
+	for _, s := range []string{"", "*", "ALL", "root", "a", "web.site.example.test", "WEB.Site.Example.", "..", ".a.", "a..b", "xn--bcher-kva.example"} {
 		f.Add(s)
 	}
 	k, _ := NewKey(bytes.Repeat([]byte{7}, 32))
@@ -131,7 +131,7 @@ func FuzzMapPath(f *testing.F) {
 }
 
 func FuzzHostOrAddr(f *testing.F) {
-	for _, s := range []string{"", "*", "@ng", "@@(o)log.example:514", "udp:h:161", "*.corp.example", ":0", "a.b.", "[::1]:53", "@", "@("} {
+	for _, s := range []string{"", "*", "@ng", "@@(o)log.example:514", "udp:h:161", "*.site.example", ":0", "a.b.", "[::1]:53", "@", "@("} {
 		f.Add(s, false)
 		f.Add(s, true)
 	}

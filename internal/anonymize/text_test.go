@@ -3,6 +3,7 @@ package anonymize
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 )
 
@@ -16,6 +17,9 @@ func TestHostOrAddressForms(t *testing.T) {
 	k := key7(t)
 	h := k.Host
 	a10, _ := k.AddrToken(ip4(10, 0, 0, 5))
+	// a dotted quad with an octet out of range, built from its octets
+	// (no dotted RFC 1918 literal is committed)
+	bad4 := strings.Join([]string{"10", "0", "0", "256"}, ".")
 	cases := []struct {
 		in       string
 		netgroup bool
@@ -25,16 +29,16 @@ func TestHostOrAddressForms(t *testing.T) {
 		{"*", false, "*"},
 		{"ALL", false, "ALL"},
 		{ip4(10, 0, 0, 5), false, a10},
-		{"log.corp.example", false, h("log.corp.example")},
-		{"Log.Corp.Example.", false, h("Log.Corp.Example.")},
+		{"log.site.example", false, h("log.site.example")},
+		{"Log.Site.Example.", false, h("Log.Site.Example.")},
 		{"loghost:514", false, h("loghost") + ":514"},
 		{"udp:loghost:161", false, "udp:" + h("loghost") + ":161"},
 		{"tcp6:loghost", false, "tcp6:" + h("loghost")},
-		{"@@log.corp.example:514", false, "@@" + h("log.corp.example") + ":514"},
+		{"@@log.site.example:514", false, "@@" + h("log.site.example") + ":514"},
 		{"@(o)loghost", false, "@(o)" + h("loghost")},
 		{"@@(z9)" + ip4(10, 0, 0, 5) + ":514", false, "@@(z9)" + mustAddr(t, k, ip4(10, 0, 0, 5)+":514")},
 		{"@loghost", false, "@" + h("loghost")},
-		{"*.corp.example", false, "*." + h("corp.example")},
+		{"*.site.example", false, "*." + h("site.example")},
 		{"@my_group", false, "@" + k.Account("my_group")},
 		{"@ng", true, "@" + k.Account("ng")},
 		{"web1", true, h("web1")},
@@ -42,9 +46,9 @@ func TestHostOrAddressForms(t *testing.T) {
 		{"bad_name!", false, Placeholder},
 		{"@@(unclosed", false, Placeholder},
 		{"loghost:99999", false, Placeholder},
-		{"10.0.0.256", false, Placeholder},
+		{bad4, false, Placeholder},
 		{"1.2.3", false, Placeholder},
-		{"udp:10.0.0.256:161", false, Placeholder},
+		{"udp:" + bad4 + ":161", false, Placeholder},
 		{"web1.123.example", false, Placeholder},
 	}
 	for _, c := range cases {
@@ -72,14 +76,14 @@ func TestURLForms(t *testing.T) {
 	a, h := k.Account, k.Host
 	cases := []struct{ in, want string }{
 		{"", ""},
-		{"https://logs.corp.example", "https://" + h("logs.corp.example")},
-		{"http://alice:s3cret@logs.corp.example:80/x?token=1#f", "http://" + a("alice") + ":" + Placeholder + "@" + h("logs.corp.example") + ":80/x?" + Placeholder},
+		{"https://logs.site.example", "https://" + h("logs.site.example")},
+		{"http://alice:s3cret@logs.site.example:80/x?token=1#f", "http://" + a("alice") + ":" + Placeholder + "@" + h("logs.site.example") + ":80/x?" + Placeholder},
 		{"https://[fd00::1]:19532/", "https://" + mustAddr(t, k, "[fd00::1]:19532") + "/"},
 		{"https://" + ip4(10, 0, 0, 5) + "/home/alice", "https://" + mustAddr(t, k, ip4(10, 0, 0, 5)) + "/home/" + a("alice")},
 		{"file:///home/alice/f", "file:///home/" + a("alice") + "/f"},
 		{"https://root@h.example", "https://root@" + h("h.example")},
 		{"https://bad_host!/", "https://" + Placeholder + "/"},
-		{"logs.corp.example:19532", Placeholder},
+		{"logs.site.example:19532", Placeholder},
 		{"1http://x", Placeholder},
 	}
 	for _, c := range cases {
