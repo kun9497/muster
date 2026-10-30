@@ -150,3 +150,32 @@ func FuzzHostOrAddr(f *testing.F) {
 		}
 	})
 }
+
+// FuzzNewKey: NewKey accepts exactly 32 bytes, keeps a copy (a later change
+// to the input moves nothing) and derives one key id from one input.
+func FuzzNewKey(f *testing.F) {
+	for _, s := range [][]byte{nil, {}, {0}, bytes.Repeat([]byte{7}, 31), bytes.Repeat([]byte{7}, 32),
+		bytes.Repeat([]byte{0xff}, 32), bytes.Repeat([]byte{7}, 33), bytes.Repeat([]byte{1}, 64)} {
+		f.Add(s)
+	}
+	f.Fuzz(func(t *testing.T, raw []byte) {
+		k, err := NewKey(raw)
+		if (err == nil) != (len(raw) == 32) {
+			t.Fatalf("len %d: err %v", len(raw), err)
+		}
+		if err != nil {
+			if k != nil {
+				t.Fatal("a refused key is not nil")
+			}
+			return
+		}
+		id := k.ID()
+		if len(id) != 16 {
+			t.Fatalf("key id %q", id)
+		}
+		raw[0] ^= 0xff
+		if k.ID() != id {
+			t.Fatal("the key aliases its input")
+		}
+	})
+}
