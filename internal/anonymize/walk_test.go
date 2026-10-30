@@ -657,7 +657,13 @@ func TestTableValidateRefuses(t *testing.T) {
 		}},
 		{"class grammar without a grammar", func(t Table) { t["pam.mode"] = FieldRule{Class: ClassGrammar} }},
 		{"grammar split", func(t Table) {
-			t["pam.mode"] = FieldRule{Class: ClassGrammar, Grammar: &Grammar{Split: "comma", Rest: ClassKept}}
+			t["pam.mode"] = FieldRule{Class: ClassGrammar, Grammar: &Grammar{Split: "semicolon", Rest: ClassKept}}
+		}},
+		{"grammar value class", func(t Table) {
+			t["pam.mode"] = FieldRule{Class: ClassGrammar, Grammar: &Grammar{Split: SplitComma, Rest: ClassKept, Values: map[string]Class{"user": ClassGrammar}}}
+		}},
+		{"grammar value key", func(t Table) {
+			t["pam.mode"] = FieldRule{Class: ClassGrammar, Grammar: &Grammar{Split: SplitComma, Rest: ClassKept, Values: map[string]Class{"a=b": ClassAccount}}}
 		}},
 		{"grammar token class", func(t Table) {
 			t["pam.mode"] = FieldRule{Class: ClassGrammar, Grammar: &Grammar{Split: SplitWhitespace, Tokens: []Class{"bogus"}, Rest: ClassKept}}

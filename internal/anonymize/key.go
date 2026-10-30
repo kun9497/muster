@@ -115,6 +115,15 @@ func (k *Key) Fingerprint(fp string) string {
 	return "SHA256:" + base64.RawStdEncoding.EncodeToString(mac(k.sub(ClassFingerprint), fp))
 }
 
+// UnitInstance maps a systemd template unit's instance to "i" + 12 base32
+// characters; the empty instance stays empty.
+func (k *Key) UnitInstance(inst string) string {
+	if inst == "" {
+		return ""
+	}
+	return "i" + k.token(ClassUnit, inst, 12)
+}
+
 // MachineIDHash maps a machine-id hash to 64 lowercase hex characters.
 func (k *Key) MachineIDHash(h string) string {
 	if h == "" {

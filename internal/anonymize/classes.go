@@ -1,6 +1,6 @@
 package anonymize
 
-// Value classes (AX-4, AX-10). The first seven are the tokens of
+// Value classes (AX-4, AX-10). The first eight are the tokens of
 // run.anonymization.classes; the rest steer the walker and never appear there.
 const (
 	ClassAccount     = "account"
@@ -10,6 +10,15 @@ const (
 	ClassFingerprint = "fingerprint"
 	ClassMachineID   = "machine_id_hash"
 	ClassPath        = "path"
+	// ClassUnit is a systemd unit name: a name without "@" is kept; a
+	// template instance <name>@<instance>.<suffix> keeps <name>@ and
+	// .<suffix> and maps <instance> (Key.UnitInstance).
+	ClassUnit = "unit"
+
+	// ClassFSLocations is an exports(5) refer=/replicas= value,
+	// path@host[+host][:path@host[+host]]: each path by the path rule, each
+	// host by the host-or-address rule.
+	ClassFSLocations = "fs_locations"
 
 	ClassHostOrAddr = "host_or_address"
 	// ClassHostOrNetgroup is a host-or-address value whose leading "@" names

@@ -21,17 +21,25 @@ const (
 	OrderSorted = "sorted"
 )
 
-// SplitWhitespace is the one tokenizer of a read-text grammar: runs of spaces
-// and tabs separate tokens, and are kept as they were.
-const SplitWhitespace = "whitespace"
+// The tokenizers of a read-text grammar. SplitWhitespace: runs of spaces and
+// tabs separate tokens, and are kept as they were. SplitComma: every ","
+// separates two tokens (an option list such as a mount's or an export's).
+const (
+	SplitWhitespace = "whitespace"
+	SplitComma      = "comma"
+)
 
 // Grammar rewrites a read-text value token by token (AX-7): token i by
 // Tokens[i], every token past them by Rest. A bare "+" or "-" is kept; a
 // leading "+" or "-" before a name is kept and the name mapped by the class.
+// A token key=value whose key Values names maps its value by that class and
+// keeps "key=" (an option such as username= or addr=); Values applies before
+// Tokens and Rest.
 type Grammar struct {
 	Split  string
 	Tokens []Class
 	Rest   Class
+	Values map[string]Class
 }
 
 // SortKey is one key of a sort spec: a record field ("" for the element
@@ -103,13 +111,13 @@ var genericRoots = map[string]bool{"envelope": true, "setting": true, "source": 
 // reportClasses are the classes run.anonymization.classes may list.
 var reportClasses = map[string]bool{
 	ClassAccount: true, ClassHost: true, ClassAddress: true, ClassURL: true,
-	ClassFingerprint: true, ClassMachineID: true, ClassPath: true,
+	ClassFingerprint: true, ClassMachineID: true, ClassPath: true, ClassUnit: true,
 }
 
 var knownClasses = map[Class]bool{
 	"": true, ClassAccount: true, ClassHost: true, ClassAddress: true, ClassURL: true, ClassFingerprint: true,
 	ClassMachineID: true, ClassPath: true, ClassHostOrAddr: true, ClassHostOrNetgroup: true, ClassPlaceholder: true,
-	ClassBlank: true, ClassKept: true, ClassGrammar: true,
+	ClassBlank: true, ClassKept: true, ClassGrammar: true, ClassUnit: true, ClassFSLocations: true,
 }
 
 // Validate checks the table's own shape: every class is known; a Grammar is
@@ -153,10 +161,22 @@ func (t Table) Validate() error {
 			return fail("Home marks a path row")
 		}
 		if g := r.Grammar; g != nil {
-			if g.Split != SplitWhitespace {
+			if g.Split != SplitWhitespace && g.Split != SplitComma {
 				return fail(fmt.Sprintf("unknown grammar split %q", g.Split))
 			}
-			for _, c := range append(append([]Class(nil), g.Tokens...), g.Rest) {
+			classes := append(append([]Class(nil), g.Tokens...), g.Rest)
+			names := make([]string, 0, len(g.Values))
+			for n := range g.Values {
+				names = append(names, n)
+			}
+			sort.Strings(names)
+			for _, n := range names {
+				if n == "" || strings.ContainsAny(n, "=,") {
+					return fail(fmt.Sprintf("grammar value key %q", n))
+				}
+				classes = append(classes, g.Values[n])
+			}
+			for _, c := range classes {
 				if c == "" || c == ClassGrammar || !knownClasses[c] {
 					return fail(fmt.Sprintf("grammar token class %q is not a value class", c))
 				}

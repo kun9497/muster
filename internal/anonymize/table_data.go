@@ -20,22 +20,49 @@ var (
 	rURL            = FieldRule{Class: ClassURL}
 	rFingerprint    = FieldRule{Class: ClassFingerprint}
 	rMachineID      = FieldRule{Class: ClassMachineID}
+	rUnit           = FieldRule{Class: ClassUnit}
 	rNode           = FieldRule{}
 	rList           = FieldRule{Order: OrderKept}
 )
 
+// optionValues are the option keys whose values name an account, a host, an
+// address or a file (mount.cifs(8) and kin); every other option word is kept
+// byte for byte, so a clause's contains nodev still finds it. A password the
+// kernel shows is placeholdered.
+var optionValues = map[string]Class{
+	"username": ClassAccount, "user": ClassAccount, "domain": ClassHost,
+	"addr": ClassAddress, "ip": ClassAddress,
+	"credentials": ClassPath, "cred": ClassPath,
+	"password": ClassPlaceholder, "pass": ClassPlaceholder,
+}
+
+// rMountOptions is one mount option list element; rExportOptions an
+// exports(5) option string, whose refer= and replicas= name hosts.
+var (
+	rMountOptions  = rOptions(nil)
+	rExportOptions = rOptions(map[string]Class{"refer": ClassFSLocations, "replicas": ClassFSLocations})
+)
+
+func rOptions(extra map[string]Class) FieldRule {
+	values := map[string]Class{}
+	for k, c := range optionValues {
+		values[k] = c
+	}
+	for k, c := range extra {
+		values[k] = c
+	}
+	return FieldRule{Class: ClassGrammar, Grammar: &Grammar{Split: SplitComma, Rest: ClassKept, Values: values}}
+}
+
 func by(field string) SortKey  { return SortKey{Field: field} }
 func num(field string) SortKey { return SortKey{Field: field, Numeric: true} }
 
-// rSorted is a list the collector sorted by keys, re-sorted after mapping;
-// rSortedDedup also drops a neighbour equal under every key, as the
-// collector's sort-and-compact does.
+// rSorted is a list the collector sorted by keys, re-sorted after mapping.
+// It never deduplicates: the collector's list is already unique, and after
+// mapping only two placeholdered values could compare equal, which must not
+// shorten the list (AX-4 keeps list lengths).
 func rSorted(keys ...SortKey) FieldRule {
 	return FieldRule{Order: OrderSorted, Sort: &SortSpec{Keys: keys}}
-}
-
-func rSortedDedup(keys ...SortKey) FieldRule {
-	return FieldRule{Order: OrderSorted, Sort: &SortSpec{Keys: keys, Dedup: true}}
 }
 
 // rGrammar is read text rewritten token by token (AX-7): token i by toks[i],
@@ -264,7 +291,7 @@ var Default = Table{
 	"boot.grub_cfg.uid":                                    rKept,
 	"boot.grub_password_set":                               rKept,
 	"boot.secure_boot":                                     rKept,
-	"coredump.core_pattern":                                rKept,
+	"coredump.core_pattern":                                rPath,
 	"coredump.limits.hard_core":                            rKept,
 	"coredump.limits.sources":                              rList,
 	"coredump.limits.sources[]":                            rPath,
@@ -296,7 +323,7 @@ var Default = Table{
 	"cron.files[].user":                                    rAccount,
 	"cron.timers":                                          rList,
 	"cron.timers[]":                                        rNode,
-	"cron.timers[].name":                                   rKept,
+	"cron.timers[].name":                                   rUnit,
 	"cron.timers[].state":                                  rKept,
 	"dns.config_files":                                     rList,
 	"dns.config_files[]":                                   rPath,
@@ -309,7 +336,7 @@ var Default = Table{
 	"dns.zones[]":                                          rNode,
 	"dns.zones[].allow_transfer":                           rText,
 	"dns.zones[].allow_update":                             rText,
-	"dns.zones[].file":                                     rPath,
+	"dns.zones[].file":                                     rText,
 	"dns.zones[].name":                                     rHost,
 	"dns.zones[].transfer_restricted":                      rKept,
 	"dns.zones[].type":                                     rKept,
@@ -756,7 +783,7 @@ var Default = Table{
 	"logging.rsyslog.coverage[].persistent":                rKept,
 	"logging.rsyslog.coverage[].priority_floor":            rKept,
 	"logging.rsyslog.coverage[].reason":                    rText,
-	"logging.rsyslog.coverage[].target":                    rPath,
+	"logging.rsyslog.coverage[].target":                    rText,
 	"logging.rsyslog.forwards_remote":                      rKept,
 	"logging.rsyslog.parse_complete":                       rKept,
 	"logging.rsyslog.property_filters":                     rKept,
@@ -792,7 +819,7 @@ var Default = Table{
 	"mounts.points[].fstype":                               rKept,
 	"mounts.points[].mounted_by":                           rPath,
 	"mounts.points[].options":                              rList,
-	"mounts.points[].options[]":                            rKept,
+	"mounts.points[].options[]":                            rMountOptions,
 	"mounts.points[].separate":                             rKept,
 	"mounts.points[].source":                               rText,
 	"mounts.points[].target":                               rPath,
@@ -829,7 +856,7 @@ var Default = Table{
 	"nfs.exports":                                          rSorted(by("path"), by("client")),
 	"nfs.exports[]":                                        rNode,
 	"nfs.exports[].client":                                 rHostOrNetgroup,
-	"nfs.exports[].options":                                rKept,
+	"nfs.exports[].options":                                rExportOptions,
 	"nfs.exports[].path":                                   rPath,
 	"nfs.exports[].root_squash":                            rKept,
 	"nfs.exports[].wildcard":                               rKept,
@@ -1198,7 +1225,7 @@ var Default = Table{
 	"sudo.installed":                                       rKept,
 	"sudo.log.logfile":                                     rPath,
 	"sudo.log.syslog":                                      rKept,
-	"sudo.nopasswd_all":                                    rSortedDedup(by("")),
+	"sudo.nopasswd_all":                                    rSorted(by("")),
 	"sudo.nopasswd_all[]":                                  rAccount,
 	"sudo.rules":                                           rSorted(by("file"), num("line")),
 	"sudo.rules[]":                                         rNode,
@@ -1216,7 +1243,7 @@ var Default = Table{
 	"sudo.secure_path":                                     rText,
 	"swap.devices":                                         rList,
 	"swap.devices[]":                                       rNode,
-	"swap.devices[].backing":                               rKept,
+	"swap.devices[].backing":                               rText,
 	"swap.devices[].encrypted":                             rKept,
 	"swap.devices[].path":                                  rPath,
 	"swap.devices[].reason":                                rText,
@@ -1225,16 +1252,16 @@ var Default = Table{
 	"swap.present":                                         rKept,
 	"time_sync.provider":                                   rKept,
 	"time_sync.server_count":                               rKept,
-	"time_sync.servers":                                    rSortedDedup(by("")),
+	"time_sync.servers":                                    rSorted(by("")),
 	"time_sync.servers[]":                                  rHostOrAddr,
 	"time_sync.synchronized":                               rKept,
 	"units.exec_unresolved":                                rKept,
 	"units.exec_writable":                                  rSorted(by("unit"), by("path"), by("why")),
 	"units.exec_writable[]":                                rNode,
 	"units.exec_writable[].path":                           rPath,
-	"units.exec_writable[].unit":                           rKept,
+	"units.exec_writable[].unit":                           rUnit,
 	"units.exec_writable[].why":                            rKept,
-	"units.root_services":                                  rList,
+	"units.root_services":                                  rSorted(by("unit")),
 	"units.root_services[]":                                rNode,
 	"units.root_services[].active":                         rKept,
 	"units.root_services[].enabled":                        rKept,
@@ -1260,7 +1287,7 @@ var Default = Table{
 	"units.root_services[].files[].uid":                    rKept,
 	"units.root_services[].read_status":                    rKept,
 	"units.root_services[].reason":                         rText,
-	"units.root_services[].unit":                           rKept,
+	"units.root_services[].unit":                           rUnit,
 	"units.root_services[].unit_file":                      rKept,
 	"units.root_services[].user":                           rAccount,
 	"walk.acl_grants":                                      rSorted(by("path")),

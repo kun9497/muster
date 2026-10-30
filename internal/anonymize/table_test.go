@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -277,25 +278,34 @@ func TestHeaderAndEnvelopeReflection(t *testing.T) {
 func TestHeaderTextClasses(t *testing.T) {
 	d := anonymize.Default
 	for row, want := range map[string]anonymize.Class{
-		"run.host.hostname":            anonymize.ClassHost,
-		"run.host.machine_id_hash":     anonymize.ClassMachineID,
-		"run.host.boot_id":             anonymize.ClassBlank,
-		"run.host.uptime_s":            anonymize.ClassBlank,
-		"run.collected_at":             anonymize.ClassKept,
-		"run.collectors[].reason":      anonymize.ClassPlaceholder,
-		"run.partial_failures[]":       anonymize.ClassPlaceholder,
-		"envelope.reason":              anonymize.ClassPlaceholder,
-		"envelope.status":              anonymize.ClassKept,
-		"envelope.truncated":           anonymize.ClassKept,
-		"source.raw":                   anonymize.ClassPlaceholder,
-		"source.cmd":                   anonymize.ClassPlaceholder,
-		"source.path":                  anonymize.ClassPath,
-		"synthetic":                    anonymize.ClassKept,
-		"_expect.*":                    anonymize.ClassKept,
-		"_provenance.*":                anonymize.ClassKept,
-		"_notes":                       anonymize.ClassPlaceholder,
-		"_notes[]":                     anonymize.ClassPlaceholder,
-		"firewall.raw_dumps[].content": anonymize.ClassBlank,
+		"run.host.hostname":                 anonymize.ClassHost,
+		"run.host.machine_id_hash":          anonymize.ClassMachineID,
+		"run.host.boot_id":                  anonymize.ClassBlank,
+		"run.host.uptime_s":                 anonymize.ClassBlank,
+		"run.collected_at":                  anonymize.ClassKept,
+		"run.collectors[].reason":           anonymize.ClassPlaceholder,
+		"run.partial_failures[]":            anonymize.ClassPlaceholder,
+		"envelope.reason":                   anonymize.ClassPlaceholder,
+		"envelope.status":                   anonymize.ClassKept,
+		"envelope.truncated":                anonymize.ClassKept,
+		"source.raw":                        anonymize.ClassPlaceholder,
+		"source.cmd":                        anonymize.ClassPlaceholder,
+		"source.path":                       anonymize.ClassPath,
+		"synthetic":                         anonymize.ClassKept,
+		"_expect.*":                         anonymize.ClassKept,
+		"_provenance.*":                     anonymize.ClassKept,
+		"_notes":                            anonymize.ClassPlaceholder,
+		"_notes[]":                          anonymize.ClassPlaceholder,
+		"firewall.raw_dumps[].content":      anonymize.ClassBlank,
+		"logging.rsyslog.coverage[].target": anonymize.ClassPlaceholder,
+		"dns.zones[].file":                  anonymize.ClassPlaceholder,
+		"swap.devices[].backing":            anonymize.ClassPlaceholder,
+		"coredump.core_pattern":             anonymize.ClassPath,
+		"units.root_services[].unit":        anonymize.ClassUnit,
+		"units.exec_writable[].unit":        anonymize.ClassUnit,
+		"cron.timers[].name":                anonymize.ClassUnit,
+		"mounts.points[].options[]":         anonymize.ClassGrammar,
+		"nfs.exports[].options":             anonymize.ClassGrammar,
 	} {
 		if got := d[row].Class; got != want {
 			t.Errorf("%s: class %q, want %q", row, got, want)
@@ -342,17 +352,29 @@ var valueOps = map[string]bool{
 
 var collectionOps = map[string]bool{"each": true, "none": true}
 
+// readRef is one read of a table row: the control, the op (subject for a
+// subject field) and the expected value.
+type readRef struct {
+	id, op   string
+	expected any
+}
+
 // A path a clause, an applies_when or a mechanism's when reads by value is
 // never placeholdered or blanked (AX-7, AX-8), and neither is a subject field
-// (a placeholdered subject would merge observations).
+// (a placeholdered subject would merge observations). A grammar row read by
+// value has no placeholder at a token position the read sees: an anchored
+// matches sees token 0, any other read every token. No clause compares a
+// unit-class value with a template instance (ClassUnit maps instances).
 func TestReadByValueIsNeverPlaceholder(t *testing.T) {
 	set, err := controls.LoadDefault()
 	if err != nil {
 		t.Fatal(err)
 	}
 	reg := registry(t)
-	reads := map[string][]string{} // table row -> controls reading it
-	read := func(row, id string) { reads[row] = append(reads[row], id) }
+	reads := map[string][]readRef{}
+	read := func(row, id, op string, expected any) {
+		reads[row] = append(reads[row], readRef{id, op, expected})
+	}
 	var clause func(c controls.Clause, id string)
 	clause = func(c controls.Clause, id string) {
 		if c.Fact == "" {
@@ -369,17 +391,17 @@ func TestReadByValueIsNeverPlaceholder(t *testing.T) {
 				if sub.Field != "" {
 					p += "." + sub.Field
 				}
-				read(p, id)
+				read(p, id, sub.Op, sub.Expected)
 			}
 			if c.Subject != "" {
-				read(elem+"."+c.Subject, id)
+				read(elem+"."+c.Subject, id, "subject", nil)
 			}
 		case valueOps[c.Op]:
 			p := c.Fact
 			if c.Field != "" {
 				p += "." + c.Field
 			}
-			read(p, id)
+			read(p, id, c.Op, c.Expected)
 		}
 	}
 	for i := range set.Controls {
@@ -392,7 +414,7 @@ func TestReadByValueIsNeverPlaceholder(t *testing.T) {
 			clause(cl, c.ID)
 		}
 		for _, k := range controls.EngineKeys(c, reg) {
-			read(k, c.ID+" (engine)")
+			read(k, c.ID+" (engine)", "eq", nil)
 		}
 	}
 	if len(reads) < 50 {
@@ -404,15 +426,37 @@ func TestReadByValueIsNeverPlaceholder(t *testing.T) {
 	}
 	sort.Strings(rows)
 	for _, row := range rows {
+		refs := reads[row]
+		var ids []string
+		for _, ref := range refs {
+			ids = append(ids, ref.id)
+		}
+		by := strings.Join(ids, ", ")
 		r, ok := anonymize.Default[row]
 		if !ok {
-			t.Errorf("%s (read by %s) has no row", row, strings.Join(reads[row], ", "))
+			t.Errorf("%s (read by %s) has no row", row, by)
 			continue
 		}
 		check := func(row string, r anonymize.FieldRule) {
 			switch r.Class {
 			case anonymize.ClassPlaceholder, anonymize.ClassBlank:
-				t.Errorf("%s is %s but %s reads it by value", row, r.Class, strings.Join(reads[row], ", "))
+				t.Errorf("%s is %s but %s reads it by value", row, r.Class, by)
+			case anonymize.ClassGrammar:
+				for _, ref := range refs {
+					for _, c := range readPositions(r.Grammar, ref) {
+						if c == anonymize.ClassPlaceholder || c == anonymize.ClassBlank {
+							t.Errorf("%s: %s reads (%s) a token position the grammar makes %s", row, ref.id, ref.op, c)
+						}
+					}
+				}
+			case anonymize.ClassUnit:
+				for _, ref := range refs {
+					for _, v := range expectedStrings(ref.expected) {
+						if strings.Contains(v, "@") {
+							t.Errorf("%s: %s compares a template instance %q, which ClassUnit maps", row, ref.id, v)
+						}
+					}
+				}
 			}
 		}
 		check(row, r)
@@ -420,6 +464,34 @@ func TestReadByValueIsNeverPlaceholder(t *testing.T) {
 			check(row+"[]", e)
 		}
 	}
+}
+
+// readPositions is the class of every grammar token position a read sees: an
+// anchored matches or not_matches sees token 0, anything else every token.
+func readPositions(g *anonymize.Grammar, ref readRef) []anonymize.Class {
+	if p, ok := ref.expected.(string); ok && (ref.op == "matches" || ref.op == "not_matches") && strings.HasPrefix(p, "^") {
+		if len(g.Tokens) > 0 {
+			return []anonymize.Class{g.Tokens[0]}
+		}
+		return []anonymize.Class{g.Rest}
+	}
+	return append(append([]anonymize.Class(nil), g.Tokens...), g.Rest)
+}
+
+func expectedStrings(v any) []string {
+	switch x := v.(type) {
+	case string:
+		return []string{x}
+	case []any:
+		var out []string
+		for _, e := range x {
+			if s, ok := e.(string); ok {
+				out = append(out, s)
+			}
+		}
+		return out
+	}
+	return nil
 }
 
 // The walker's refusal names a path the table lacks; the table is not the
@@ -460,5 +532,159 @@ func TestSortSpecSorted(t *testing.T) {
 	dedup := &anonymize.SortSpec{Keys: []anonymize.SortKey{{}}, Dedup: true}
 	if dedup.Sorted([]any{"a", "a"}) || !dedup.Sorted([]any{"a", "b"}) || !dedup.Sorted(nil) {
 		t.Error("dedup: equal neighbours must fail, distinct ones pass")
+	}
+}
+
+func fact(path string, value any) map[string]any {
+	parts := strings.Split(path, ".")
+	var node any = map[string]any{"status": "ok", "value": value}
+	for i := len(parts) - 1; i >= 0; i-- {
+		node = map[string]any{parts[i]: node}
+	}
+	return node.(map[string]any)
+}
+
+func merge(ms ...map[string]any) map[string]any {
+	out := map[string]any{}
+	var into func(dst, src map[string]any)
+	into = func(dst, src map[string]any) {
+		for k, v := range src {
+			if d, ok := dst[k].(map[string]any); ok {
+				if sm, ok := v.(map[string]any); ok {
+					into(d, sm)
+					continue
+				}
+			}
+			dst[k] = v
+		}
+	}
+	for _, m := range ms {
+		into(out, m)
+	}
+	return out
+}
+
+func valueAt(t *testing.T, out map[string]any, path string) any {
+	t.Helper()
+	var node any = out["facts"]
+	for _, s := range strings.Split(path, ".") {
+		m, ok := node.(map[string]any)
+		if !ok {
+			t.Fatalf("%s: no %s", path, s)
+		}
+		node = m[s]
+	}
+	return node.(map[string]any)["value"]
+}
+
+func ip(a, b, c, d byte) string { return netip.AddrFrom4([4]byte{a, b, c, d}).String() }
+
+// Option lists keep every option word byte for byte (a clause's contains
+// nodev) and map the values that name an account, a host, an address or a
+// file; an export's refer= and replicas= map their paths and hosts.
+func TestMountAndExportOptions(t *testing.T) {
+	k, _ := anonymize.NewKey(bytes.Repeat([]byte{3}, 32))
+	addr := ip(10, 1, 2, 3)
+	mapped, _ := k.AddrToken(addr)
+	doc := map[string]any{"facts": merge(
+		fact("accounts.users", []any{map[string]any{"name": "alice", "home": "/home/alice"}}),
+		fact("mounts.points", []any{map[string]any{"target": "/srv/share", "options": []any{
+			"nodev", "nosuid", "nodev,nosuid", "rw,relatime", "username=alice", "addr=" + addr,
+			"credentials=/home/alice/.smb", "domain=corp.example", "password=hunter2", "uid=1000", "",
+		}}}),
+		fact("nfs.exports", []any{map[string]any{"path": "/srv", "client": "*",
+			"options": "rw,sync,no_root_squash,refer=/srv/a@nfs1.corp.example+" + addr + ":/srv/b@nfs2"}}),
+	)}
+	out, rep, err := anonymize.Transform(doc, anonymize.Default, k, "keyed")
+	if err != nil {
+		t.Fatal(err)
+	}
+	alice := k.Account("alice")
+	want := []any{
+		"nodev", "nosuid", "nodev,nosuid", "rw,relatime", "username=" + alice, "addr=" + mapped,
+		"credentials=/home/" + alice + "/.smb", "domain=" + k.Host("corp.example"), "password=" + anonymize.Placeholder,
+		"uid=1000", "",
+	}
+	got := valueAt(t, out, "mounts.points").([]any)[0].(map[string]any)["options"]
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("mount options\n got %q\nwant %q", got, want)
+	}
+	wantExport := "rw,sync,no_root_squash,refer=/srv/a@" + k.Host("nfs1.corp.example") + "+" + mapped + ":/srv/b@" + k.Host("nfs2")
+	if got := valueAt(t, out, "nfs.exports").([]any)[0].(map[string]any)["options"]; got != wantExport {
+		t.Errorf("export options %q, want %q", got, wantExport)
+	}
+	if !strings.Contains(strings.Join(rep.Replaced, " "), "facts.mounts.points.value[].options[]") {
+		t.Errorf("replaced %v does not name the placeholdered password", rep.Replaced)
+	}
+}
+
+// A unit name without "@" is kept; a template instance keeps <name>@ and the
+// suffix and maps the instance, injectively, the empty instance kept.
+func TestUnitInstances(t *testing.T) {
+	k, _ := anonymize.NewKey(bytes.Repeat([]byte{4}, 32))
+	doc := map[string]any{"facts": merge(
+		fact("units.exec_writable", []any{
+			map[string]any{"unit": "getty@tty1.service", "path": "/x", "why": "owner"},
+			map[string]any{"unit": "getty@tty2.service", "path": "/x", "why": "owner"},
+			map[string]any{"unit": "sshd.service", "path": "/x", "why": "owner"},
+			map[string]any{"unit": "getty@.service", "path": "/x", "why": "owner"},
+		}),
+		fact("cron.timers", []any{map[string]any{"name": "backup@alice.timer", "state": "enabled"}}),
+	)}
+	out, rep, err := anonymize.Transform(doc, anonymize.Default, k, "keyed")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var units []string
+	for _, r := range valueAt(t, out, "units.exec_writable").([]any) {
+		units = append(units, r.(map[string]any)["unit"].(string))
+	}
+	want := []string{"getty@" + k.UnitInstance("tty1") + ".service", "getty@" + k.UnitInstance("tty2") + ".service", "sshd.service", "getty@.service"}
+	sort.Strings(want) // the list re-sorts by unit
+	if !reflect.DeepEqual(units, want) {
+		t.Errorf("units %q, want %q", units, want)
+	}
+	if k.UnitInstance("tty1") == k.UnitInstance("tty2") || k.UnitInstance("") != "" || !strings.HasPrefix(k.UnitInstance("tty1"), "i") || len(k.UnitInstance("tty1")) != 13 {
+		t.Errorf("UnitInstance shape: %q %q", k.UnitInstance("tty1"), k.UnitInstance(""))
+	}
+	if got := valueAt(t, out, "cron.timers").([]any)[0].(map[string]any)["name"]; got != "backup@"+k.UnitInstance("alice")+".timer" {
+		t.Errorf("timer %q", got)
+	}
+	if !reflect.DeepEqual(rep.Classes, []string{"unit"}) {
+		t.Errorf("classes %v, want [unit]", rep.Classes)
+	}
+}
+
+// A re-sorted list never deduplicates: two values that both became the
+// placeholder stay two (AX-4 keeps list lengths).
+func TestSortedListsNeverDeduplicate(t *testing.T) {
+	for row, r := range anonymize.Default {
+		if r.Sort != nil && r.Sort.Dedup {
+			t.Errorf("%s deduplicates", row)
+		}
+	}
+	k, _ := anonymize.NewKey(bytes.Repeat([]byte{5}, 32))
+	doc := map[string]any{"facts": fact("time_sync.servers", []any{"refclock:PHC:/dev/ptp0", "refclock:SHM:0", "ntp.example.org"})}
+	out, _, err := anonymize.Transform(doc, anonymize.Default, k, "keyed")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := valueAt(t, out, "time_sync.servers").([]any); len(got) != 3 {
+		t.Errorf("servers %v: the length changed", got)
+	}
+}
+
+// core_pattern is a path row: a pipe or a relative pattern is left alone, so
+// the matches ^| clause still reads what it read.
+func TestCorePatternKeepsItsShape(t *testing.T) {
+	k, _ := anonymize.NewKey(bytes.Repeat([]byte{6}, 32))
+	for _, p := range []string{"|/usr/lib/systemd/systemd-coredump %P %u %g", "core.%e.%p", "/var/crash/core.%e"} {
+		out, _, err := anonymize.Transform(map[string]any{"facts": fact("coredump.core_pattern", p)}, anonymize.Default, k, "keyed")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := valueAt(t, out, "coredump.core_pattern"); got != p {
+			t.Errorf("core_pattern %q -> %q", p, got)
+		}
 	}
 }

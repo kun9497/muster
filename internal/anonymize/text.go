@@ -62,6 +62,10 @@ func (w *walker) text(c Class, g *Grammar, dp, s string) string {
 		return w.mapped(dp, ClassFingerprint, s, w.k.Fingerprint)
 	case ClassMachineID:
 		return w.mapped(dp, ClassMachineID, s, w.k.MachineIDHash)
+	case ClassUnit:
+		return w.unit(dp, s)
+	case ClassFSLocations:
+		return w.fsLocations(dp, s)
 	case ClassPath:
 		return w.path(dp, s)
 	case ClassGrammar:
@@ -387,8 +391,61 @@ func (w *walker) url(dp, s string) string {
 	return out
 }
 
+// unit maps a template unit's instance: <name>@<instance>.<suffix> keeps
+// <name>@ and .<suffix>; a name without "@" and an empty instance are kept.
+func (w *walker) unit(dp, s string) string {
+	at := strings.IndexByte(s, '@')
+	if at < 0 {
+		return s
+	}
+	inst, suffix := s[at+1:], ""
+	if dot := strings.LastIndexByte(inst, '.'); dot >= 0 {
+		inst, suffix = inst[:dot], inst[dot:]
+	}
+	if inst == "" {
+		return s
+	}
+	out := w.k.UnitInstance(inst)
+	w.note(dp, ClassUnit, inst, out)
+	return s[:at+1] + out + suffix
+}
+
+// fsLocations maps an exports(5) refer=/replicas= value,
+// path@host[+host][:path@host[+host]].
+func (w *walker) fsLocations(dp, s string) string {
+	items := strings.Split(s, ":")
+	for i, item := range items {
+		p, hosts, ok := strings.Cut(item, "@")
+		if !ok {
+			items[i] = w.path(dp, item)
+			continue
+		}
+		hs := strings.Split(hosts, "+")
+		for j, h := range hs {
+			hs[j] = w.hostOrAddr(dp, h, false)
+		}
+		items[i] = w.path(dp, p) + "@" + strings.Join(hs, "+")
+	}
+	return strings.Join(items, ":")
+}
+
 // grammar rewrites read text token by token (AX-7).
 func (w *walker) grammar(dp string, g *Grammar, s string) string {
+	if g != nil && g.Split == SplitComma {
+		toks := strings.Split(s, ",")
+		for i, tok := range toks {
+			if k, v, ok := strings.Cut(tok, "="); ok && g.Values[k] != "" {
+				toks[i] = k + "=" + w.text(g.Values[k], nil, dp, v)
+				continue
+			}
+			c := g.Rest
+			if i < len(g.Tokens) {
+				c = g.Tokens[i]
+			}
+			toks[i] = w.token(dp, c, tok)
+		}
+		return strings.Join(toks, ",")
+	}
 	if g == nil || g.Split != SplitWhitespace {
 		if w.err == nil {
 			w.err = fmt.Errorf("anonymization table: %s has no whitespace grammar", dp)
@@ -422,7 +479,7 @@ func (w *walker) grammar(dp string, g *Grammar, s string) string {
 }
 
 func (w *walker) token(dp string, c Class, tok string) string {
-	if c == ClassKept || tok == "+" || tok == "-" {
+	if c == ClassKept || tok == "" || tok == "+" || tok == "-" {
 		return tok
 	}
 	if c == "" || c == ClassGrammar {

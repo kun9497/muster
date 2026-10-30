@@ -5,6 +5,7 @@ package collectors
 import (
 	"bytes"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"os"
 	"sort"
@@ -138,9 +139,13 @@ func checkSortSpecsMatchCollectors() []string {
 	for b := range bad {
 		out = append(out, "    "+b)
 	}
-	for _, row := range rows {
-		if seen[row] == 0 {
-			fmt.Fprintf(os.Stderr, "TestSortSpecsMatchCollectors: no recorded tree holds %s\n", row)
+	// A spec no test exercised is named (not failed) on a full run only: a
+	// -run filter leaves most collectors unrun.
+	if f := flag.Lookup("test.run"); f == nil || f.Value.String() == "" {
+		for _, row := range rows {
+			if seen[row] == 0 {
+				fmt.Fprintf(os.Stderr, "TestSortSpecsMatchCollectors: unexercised sort spec %s\n", row)
+			}
 		}
 	}
 	if len(out) == 0 {
