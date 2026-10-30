@@ -132,6 +132,16 @@ var Default = Table{
 	"run.complete":                    rKept,
 	"run.partial_failures":            rList,
 	"run.partial_failures[]":          rText,
+	// AX-10: an input already marked is refused before Transform; the rows
+	// classify the mark for the header reflection test and the corpus.
+	"run.anonymization.scheme":     rKept,
+	"run.anonymization.mode":       rKept,
+	"run.anonymization.key_id":     rKept,
+	"run.anonymization.keep_set":   rKept,
+	"run.anonymization.classes":    rList,
+	"run.anonymization.classes[]":  rKept,
+	"run.anonymization.replaced":   rList,
+	"run.anonymization.replaced[]": rKept,
 
 	// Every fact's envelope, a setting's sides, and every Source (top level,
 	// winner, a side's, a persona's, and inputs at any depth).

@@ -86,6 +86,24 @@ type Run struct {
 	Deep            bool           `json:"deep"`
 	Complete        bool           `json:"complete"`
 	PartialFailures []string       `json:"partial_failures"`
+	// Anonymization marks a snapshot `muster snapshot anonymize` rewrote
+	// (AX-10); nil, and absent from the JSON, on a collected one. It stays
+	// the last field: the anonymiser writes run in this field order.
+	Anonymization *Anonymization `json:"anonymization,omitempty"`
+}
+
+// Anonymization is what the anonymiser did (AX-10): its scheme, whether the
+// key was a file (keyed, KeyID names it) or thrown away (ephemeral, KeyID
+// empty), the keep-set version, the classes that mapped at least one value
+// and the document paths whose values were placeholdered or emptied ([] for
+// any list index), both sorted.
+type Anonymization struct {
+	Scheme   string   `json:"scheme"`
+	Mode     string   `json:"mode"`
+	KeyID    string   `json:"key_id"`
+	KeepSet  string   `json:"keep_set"`
+	Classes  []string `json:"classes"`
+	Replaced []string `json:"replaced"`
 }
 
 // Snapshot is one facts file. Facts is the decoded JSON tree; leaves are
