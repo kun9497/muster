@@ -163,30 +163,12 @@ func runSnapshotAnonymize(args []string, stdout, stderr io.Writer) int {
 		return refuse("refusing a snapshot collected with run.redaction.include_secrets true: it carries secrets no rule maps")
 	}
 
-	out, rep, err := anonymize.Transform(doc, anonymize.Default, key, mode)
+	body, err := anonymizeDocument(doc, key, mode)
 	if err != nil {
 		var unc *anonymize.UnclassifiedError
 		if errors.As(err, &unc) {
 			return refuse("%s", unclassifiedMessage(snap.Run.MusterVersion, version, unc.Path))
 		}
-		return refuse("%v", err)
-	}
-	mark := &facts.Anonymization{
-		Scheme: anonScheme, Mode: mode, KeepSet: anonymize.KeepSetVersion,
-		Classes: nonNil(rep.Classes), Replaced: nonNil(rep.Replaced),
-	}
-	if mode == "keyed" {
-		mark.KeyID = key.ID()
-	}
-	run, _ := out["run"].(map[string]any)
-	if run == nil {
-		run = map[string]any{}
-		out["run"] = run
-	}
-	run["anonymization"] = mark
-
-	body, err := encodeSnapshot(out)
-	if err != nil {
 		return refuse("%v", err)
 	}
 	if f.out == "-" {
@@ -205,6 +187,32 @@ func runSnapshotAnonymize(args []string, stdout, stderr io.Writer) int {
 		return refuse("%v", err)
 	}
 	return exitOK
+}
+
+// anonymizeDocument is the transform the command runs between the refusals
+// and the write: the document rewritten by the default table under key,
+// marked with run.anonymization (AX-10) and encoded the way collect writes a
+// snapshot. The invariant and canary tests run every corpus snapshot through
+// it, so what they prove is what the command writes.
+func anonymizeDocument(doc map[string]any, key *anonymize.Key, mode string) ([]byte, error) {
+	out, rep, err := anonymize.Transform(doc, anonymize.Default, key, mode)
+	if err != nil {
+		return nil, err
+	}
+	mark := &facts.Anonymization{
+		Scheme: anonScheme, Mode: mode, KeepSet: anonymize.KeepSetVersion,
+		Classes: nonNil(rep.Classes), Replaced: nonNil(rep.Replaced),
+	}
+	if mode == "keyed" {
+		mark.KeyID = key.ID()
+	}
+	run, _ := out["run"].(map[string]any)
+	if run == nil {
+		run = map[string]any{}
+		out["run"] = run
+	}
+	run["anonymization"] = mark
+	return encodeSnapshot(out)
 }
 
 func nonNil(s []string) []string {

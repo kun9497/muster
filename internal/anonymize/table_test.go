@@ -124,14 +124,15 @@ func factKeyOf(row string, keys map[string]bool) string {
 }
 
 // corpus is the invariant corpus of spec §4 as it stands: every control
-// fixture, the whole-host readings, the cmd/muster full fixtures and the two
-// example snapshots.
+// fixture, the whole-host readings, the cmd/muster full and anonymisation
+// fixtures and the two example snapshots.
 func corpus(t *testing.T) []string {
 	t.Helper()
 	var files []string
 	for _, g := range []string{
 		"../../controls/testdata/*/*.json",
 		"../../cmd/muster/testdata/full-*.json",
+		"../../cmd/muster/testdata/anonymize/*.json",
 		"../../examples/ubuntu-24.04-vm.json",
 		"../../examples/ubuntu-24.04-container.json",
 	} {

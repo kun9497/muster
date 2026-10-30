@@ -1,0 +1,36 @@
+{
+  "synthetic": true,
+  "_notes": [
+    "ftp_account_shell with a mapped name: no account is named ftp (PASS)."
+  ],
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "accounts": {
+      "shells": {
+        "status": "ok",
+        "value": [
+          "/bin/sh",
+          "/bin/bash"
+        ],
+        "source": {
+          "kind": "file",
+          "path": "/etc/shells"
+        }
+      },
+      "users": {
+        "status": "ok",
+        "value": [
+          {
+            "name": "root",
+            "shell_valid": true
+          },
+          {
+            "name": "ftpuser",
+            "shell_valid": true
+          }
+        ]
+      }
+    }
+  }
+}
