@@ -58,10 +58,20 @@ func TestMapPathPositions(t *testing.T) {
 		{"/srv/app/bob", "/srv/" + a("app") + "/" + a("bob")},
 		{"/srv/app/bob/.profile", "/srv/" + a("app") + "/" + a("bob") + "/.profile"},
 		// paths and homes are cleaned before matching
-		{"/srv//app/data", "/srv/" + a("app") + "/data"},
-		{"/srv/app/./bob/", "/srv/" + a("app") + "/" + a("bob") + "/"},
-		{"/home/x/../alice/f", "/home/" + a("alice") + "/f"},
+		// positions are decided on the cleaned prefix, rewritten in place on
+		// the raw components: two spellings stay two strings, and a ..
+		// never hides a name
+		{"/srv//app/data", "/srv//" + a("app") + "/data"},
+		{"/srv/app/./bob/", "/srv/" + a("app") + "/./" + a("bob") + "/"},
+		{"/home/x/../alice/f", "/home/" + a("x") + "/../" + a("alice") + "/f"},
 		{"/srv//www", "/srv//www"},
+		{"/home/alice/..", "/home/" + a("alice") + "/.."},
+		{"/home/alice/./x", "/home/" + a("alice") + "/./x"},
+		{"/home/alice/../../etc/x", "/home/" + a("alice") + "/../../etc/x"},
+		{"/var/mail/carol/..", "/var/mail/" + a("carol") + "/.."},
+		{"/var/mail/./carol", "/var/mail/./" + a("carol")},
+		{"/tmp/../tmp/x", "/tmp/../tmp/x"},
+		{"/home/..", "/home/.."},
 		// a shared home whose last component names none of its accounts
 		{"/srv/www/index.html", "/srv/www/index.html"},
 		// exceptions: /tmp, mount targets, /dev/null, /nonexistent, one component, a kept account

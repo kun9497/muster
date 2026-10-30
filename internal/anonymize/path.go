@@ -105,17 +105,18 @@ var namePositions = map[string]bool{
 	"/etc/cron.d":                    true,
 }
 
-// MapPath rewrites p at AX-6's positions only, matched on the cleaned path:
-// the last component of every non-kept account's home that is p or a prefix
-// of it (unless the home is /, /tmp, /var/tmp, /dev/null, /nonexistent, a
-// mount target or of fewer than two components); the component after /home/
-// (an account's name or not); a component directly under a name position
-// (the cron spools, the mail spools, linger, AccountsService, /etc/sudoers.d,
-// /etc/cron.d) that is a mapped account name, whether it ends the path or is
-// a parent in it. Each rewritten component becomes its account pseudonym, so
-// a path maps the same standing alone or as a prefix. A rewritten path comes
-// back cleaned (a trailing "/" kept); one with nothing to rewrite, and any
-// relative path, comes back as it was.
+// MapPath rewrites p at AX-6's positions only: the last component of every
+// non-kept account's home that is p or a prefix of it (unless the home is /,
+// /tmp, /var/tmp, /dev/null, /nonexistent, a mount target or of fewer than two
+// components); the component after /home/ (an account's name or not); a
+// component directly under a name position (the cron spools, the mail spools,
+// linger, AccountsService, /etc/sudoers.d, /etc/cron.d) that is a mapped
+// account name, whether it ends the path or is a parent in it. Positions are
+// decided on the cleaned prefix up to each component, and the rewrite is made
+// in place on the components as written: each rewritten component becomes its
+// account pseudonym, and "", "." and ".." are never rewritten. So two
+// spellings of one file stay two strings, and a ".." never hides a name. A
+// relative path is kept.
 func (k *Key) MapPath(p string, homes Homes) string {
 	out, _ := k.mapPath(p, homes)
 	return out
@@ -126,40 +127,27 @@ func (k *Key) mapPath(p string, homes Homes) (string, []string) {
 	if !strings.HasPrefix(p, "/") {
 		return p, nil
 	}
-	c := path.Clean(p)
-	if c == "/" {
-		return p, nil
-	}
-	comps := strings.Split(c, "/") // comps[0] == ""; no other empty component
-	at := map[int]bool{}
-	for n := 2; n < len(comps); n++ {
-		parent := strings.Join(comps[:n], "/")
-		if homeEligible(parent+"/"+comps[n], comps[n], homes) {
-			at[n] = true
-		}
-		if homes.names[comps[n]] && namePositions[parent] {
-			at[n] = true
-		}
-	}
-	if len(comps) >= 3 && comps[1] == "home" {
-		at[2] = true
-	}
-	if len(at) == 0 {
-		return p, nil
-	}
+	raw := strings.Split(p, "/") // raw[0] == ""
+	comps := append([]string(nil), raw...)
 	var names []string
-	for i := range comps {
-		if !at[i] {
+	changed := false
+	for i := 1; i < len(comps); i++ {
+		c := comps[i]
+		if c == "" || c == "." || c == ".." {
 			continue
 		}
-		names = append(names, comps[i])
-		comps[i] = k.Account(comps[i])
+		parent := path.Clean("/" + strings.Join(raw[1:i], "/"))
+		if parent != "/home" && !(homes.names[c] && namePositions[parent]) && !homeEligible(path.Join(parent, c), c, homes) {
+			continue
+		}
+		names = append(names, c)
+		comps[i] = k.Account(c)
+		changed = true
 	}
-	out := strings.Join(comps, "/")
-	if strings.HasSuffix(p, "/") {
-		out += "/"
+	if !changed {
+		return p, nil
 	}
-	return out, names
+	return strings.Join(comps, "/"), names
 }
 
 func homeEligible(home, last string, homes Homes) bool {

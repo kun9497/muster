@@ -689,3 +689,26 @@ func TestTableValidateRefuses(t *testing.T) {
 		t.Errorf("the test table: %v", err)
 	}
 }
+
+// Two spellings of one file are two inputs and two outputs: the ledger,
+// which notes raw paths, stays injective.
+func TestTransformTwoSpellingsOfOnePath(t *testing.T) {
+	k := key7(t)
+	d := testDoc()
+	d["facts"].(map[string]any)["walk"].(map[string]any)["world_writable"] = env(list(
+		rec("path", "/srv/app/data"), rec("path", "/srv//app/data"),
+		rec("path", "/home/alice/x"), rec("path", "/home/alice/./x"), rec("path", "/home/alice/.."),
+	))
+	out, _, err := Transform(d, testTable(), k, "keyed")
+	if err != nil {
+		t.Fatal(err)
+	}
+	a := k.Account
+	want := []string{"/srv/" + a("app") + "/data", "/srv//" + a("app") + "/data",
+		"/home/" + a("alice") + "/x", "/home/" + a("alice") + "/./x", "/home/" + a("alice") + "/.."}
+	for i, w := range want {
+		if got := get(t, out, "facts", "walk", "world_writable", "value", i, "path"); got != w {
+			t.Errorf("path %d = %v, want %v", i, got, w)
+		}
+	}
+}

@@ -110,20 +110,21 @@ func FuzzMapPath(f *testing.F) {
 		if !strings.HasPrefix(s, "/") && got != s {
 			t.Fatalf("relative path changed: %q -> %q", s, got)
 		}
-		want := s
-		if got != s { // a rewritten path comes back cleaned, its trailing "/" kept
-			want = path.Clean(s)
-			if strings.HasSuffix(s, "/") {
-				want += "/"
-			}
-		}
-		in, out := strings.Split(want, "/"), strings.Split(got, "/")
+		in, out := strings.Split(s, "/"), strings.Split(got, "/")
 		if len(in) != len(out) {
 			t.Fatalf("component count: %q -> %q", s, got)
 		}
 		for i := range in {
 			if in[i] != out[i] && out[i] != k.Account(in[i]) {
 				t.Fatalf("component %d of %q -> %q is not its account pseudonym", i, s, got)
+			}
+			if i == 0 || !strings.HasPrefix(s, "/") || in[i] == "" || in[i] == "." || in[i] == ".." {
+				continue
+			}
+			parent := path.Clean("/" + strings.Join(in[1:i], "/"))
+			at := parent == "/home" || namePositions[parent] || homeEligible(path.Join(parent, in[i]), in[i], h)
+			if at && h.names[out[i]] {
+				t.Fatalf("component %d of %q -> %q: a mapped name in clear at an AX-6 position", i, s, got)
 			}
 		}
 	})
