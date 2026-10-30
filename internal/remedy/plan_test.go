@@ -628,3 +628,19 @@ func TestPlanSubjectWaivedIsTextOnly(t *testing.T) {
 		t.Errorf("a row without a waived observation: reason %q script %v, want scripted", it.TextOnlyReason, it.Script)
 	}
 }
+
+func TestBuildCopiesMaxAgeFromTheCheckBlock(t *testing.T) {
+	rep := testReport()
+	rep.Check.MaxAgeS = 604800
+	p, err := Build(rep, testSet(t), Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Fix.MaxAgeS != 604800 {
+		t.Errorf("fix.max_age_s = %d, want 604800", p.Fix.MaxAgeS)
+	}
+	q, err := Build(testReport(), testSet(t), Options{})
+	if err != nil || q.Fix.MaxAgeS != 0 {
+		t.Errorf("without the flag: %d, %v", q.Fix.MaxAgeS, err)
+	}
+}

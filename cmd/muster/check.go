@@ -28,6 +28,7 @@ flags:
   --fail-on fail|warn|manual|none   what exits 1 (default fail)
   --quiet                    hide PASS, NOT_APPLICABLE, WAIVED and MANUAL rows
   --all                      show every failing observation
+  --max-age <duration>       refuse a snapshot collected longer ago than this (7d, 2w, 1d12h, 90m; default: no limit)
   --color auto|always|never  colour (default auto); --no-color = never
 
 ` + cisDisclaimer + "\n"
@@ -44,6 +45,8 @@ type checkFlags struct {
 	profile, tuning                       string
 	tuningGiven                           bool // --tuning was given, even as ""
 	allowError, quiet, all                bool
+	maxAgeFlag                            string
+	maxAge                                int64 // seconds; 0 without --max-age
 }
 
 func parseCheckArgs(args []string) (checkFlags, error) {
@@ -70,6 +73,11 @@ func parseCheckArgs(args []string) (checkFlags, error) {
 		case "--tuning":
 			f.tuning, err = next()
 			f.tuningGiven = true
+		case "--max-age":
+			f.maxAgeFlag, err = next()
+			if err == nil {
+				f.maxAge, err = parseMaxAge(f.maxAgeFlag)
+			}
 		case "--fail-on":
 			f.failOn, err = next()
 		case "--color":
@@ -149,7 +157,7 @@ func openFacts(path string) (*facts.Snapshot, []byte, error) {
 // through this function. A committed report is only evidence that this
 // binary produces it if the bytes the test compares came through the same
 // code, so there is one implementation and not two that can drift.
-func newCheckBlock(sel *Selection, snap *facts.Snapshot, reg *facts.Registry, wf *waiver.File, warn func(string)) ([]check.Result, report.CheckBlock) {
+func newCheckBlock(sel *Selection, snap *facts.Snapshot, reg *facts.Registry, wf *waiver.File, nowT time.Time, warn func(string)) ([]check.Result, report.CheckBlock) {
 	set := sel.Subset
 	opts := check.Options{Params: sel.Params}
 	results := check.Evaluate(snap, set, reg, opts)
@@ -184,7 +192,7 @@ func newCheckBlock(sel *Selection, snap *facts.Snapshot, reg *facts.Registry, wf
 	if wf != nil {
 		// A waiver on a control the profile excludes is not_applied, never
 		// unknown: known is the subset, excluded the rest of the loaded set.
-		tally := wf.Apply(results, sel.Known, sel.Excluded, time.Now().UTC(), warn)
+		tally := wf.Apply(results, sel.Known, sel.Excluded, nowT, warn)
 		cb.Waivers = report.WaiversBlock{Path: wf.Path, Digest: wf.Digest, Applied: tally.Applied, NotApplied: tally.NotApplied, Expired: tally.Expired, Unknown: tally.Unknown, ExpiringSoon: tally.ExpiringSoon}
 	}
 	return results, cb
@@ -225,10 +233,17 @@ func runCheck(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "muster: %v\n%s", err, checkUsage)
 		return exitError
 	}
+	nowT := commandClock()
 	snap, _, err := openFacts(f.facts)
 	if err != nil {
 		fmt.Fprintf(stderr, "muster: %v\n", err)
 		return exitError
+	}
+	if f.maxAgeFlag != "" {
+		if err := enforceMaxAge(snap.Run.CollectedAt, f.maxAgeFlag, f.maxAge, nowT); err != nil {
+			fmt.Fprintf(stderr, "%v\n", err)
+			return exitError
+		}
 	}
 	set, err := controls.LoadDefault()
 	if err != nil {
@@ -263,7 +278,8 @@ func runCheck(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "muster: warning: check does not need root")
 	}
 
-	results, cb := newCheckBlock(sel, snap, reg, wf, warn)
+	results, cb := newCheckBlock(sel, snap, reg, wf, nowT, warn)
+	cb.MaxAgeS = f.maxAge
 	rep := report.Build(snap, results, cb, sel.SeverityByID)
 
 	switch f.format {

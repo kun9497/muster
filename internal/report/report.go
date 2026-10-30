@@ -71,6 +71,7 @@ type CheckBlock struct {
 	Waivers         WaiversBlock                 `json:"waivers"`
 	Params          map[string]map[string]any    `json:"params,omitempty"`
 	ParamSources    map[string]map[string]string `json:"param_sources,omitempty"`
+	MaxAgeS         int64                        `json:"max_age_s,omitempty"` // --max-age in whole seconds; absent without it
 }
 
 type StatusCounts struct {
