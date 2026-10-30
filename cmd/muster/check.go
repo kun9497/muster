@@ -233,12 +233,15 @@ func runCheck(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "muster: %v\n%s", err, checkUsage)
 		return exitError
 	}
-	nowT := commandClock()
 	snap, _, err := openFacts(f.facts)
 	if err != nil {
 		fmt.Fprintf(stderr, "muster: %v\n", err)
 		return exitError
 	}
+	// AX-14: the one clock reading, taken once the snapshot is read (a slow
+	// --facts - producer must not make its own snapshot look ahead of this
+	// clock); it serves the age test and waiver expiry alike.
+	nowT := commandClock()
 	if f.maxAgeFlag != "" {
 		if err := enforceMaxAge(snap.Run.CollectedAt, f.maxAgeFlag, f.maxAge, nowT); err != nil {
 			fmt.Fprintf(stderr, "%v\n", err)

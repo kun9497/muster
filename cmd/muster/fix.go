@@ -132,12 +132,14 @@ func runFix(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "muster: %v\n%s", err, fixUsage)
 		return exitError
 	}
-	nowT := commandClock()
 	snap, _, err := openFacts(f.facts)
 	if err != nil {
 		fmt.Fprintf(stderr, "muster: %v\n", err)
 		return exitError
 	}
+	// AX-14: the one clock reading, taken once the snapshot is read; it
+	// serves the age test and waiver expiry alike (as in runCheck).
+	nowT := commandClock()
 	// AX-11: a script from an anonymised snapshot would carry a keyed host
 	// hash and mapped names; table and json stay, for a reviewer.
 	if f.format == "script" && snap.Run.Anonymization != nil {

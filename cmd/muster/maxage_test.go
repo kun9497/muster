@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -235,5 +236,48 @@ func TestFixValueFlagsMatchParser(t *testing.T) {
 	}
 	if len(cases) != len(fixValueFlags) {
 		t.Errorf("parser takes %d value flags, fixValueFlags has %d", len(cases), len(fixValueFlags))
+	}
+}
+
+// TestClockIsReadAfterTheSnapshot: the one clock reading comes after the
+// snapshot is read, so a --facts - producer that finishes writing a
+// snapshot collected after the command started is not refused as "in the
+// future". The clock reads 1h before collected_at until the producer has
+// written every byte and 1h after it from then on; the snapshot is padded
+// past any pipe buffer, so the producer cannot finish before the command
+// reads it.
+func TestClockIsReadAfterTheSnapshot(t *testing.T) {
+	data, err := os.ReadFile(fullFail)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data = append(data, bytes.Repeat([]byte(" "), 8<<20)...)
+	collected := time.Date(2026, 9, 2, 6, 0, 0, 0, time.UTC)
+	for _, cmd := range [][]string{{"check"}, {"fix", "--dry-run"}} {
+		r, w, err := os.Pipe()
+		if err != nil {
+			t.Fatal(err)
+		}
+		var written atomic.Bool
+		old, oldIn := now, os.Stdin
+		now = func() time.Time {
+			if written.Load() {
+				return collected.Add(time.Hour)
+			}
+			return collected.Add(-time.Hour)
+		}
+		os.Stdin = r
+		go func() {
+			w.Write(data)
+			written.Store(true)
+			w.Close()
+		}()
+		var out, errb bytes.Buffer
+		code := run(append(cmd, "--facts", "-", "--format", "json", "--max-age", "1d"), &out, &errb)
+		now, os.Stdin = old, oldIn
+		r.Close()
+		if code == exitError || out.Len() == 0 {
+			t.Errorf("%v: exit %d, stderr %q", cmd, code, errb.String())
+		}
 	}
 }
