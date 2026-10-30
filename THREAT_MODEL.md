@@ -89,8 +89,8 @@ waivers when root). The scheme, `muster-anon-v1`:
 - A closed keep set (`root`, the system accounts and groups the controls compare against, `ALL`, `*`)
   and every derived field (modes, counts, booleans, enums, versions) stay as they are; a test holds the
   keep set to every name a built-in control compares against.
-- Free text that no clause reads by value is not scanned. It becomes `[anonymised]`: reasons, sources,
-  raw lines and command output. Firewall dumps become empty.
+- Free text that no clause reads by value is not scanned. It becomes `[anonymised]`: reasons, the raw text
+  and command of every source, and the raw-text record fields. Firewall dumps become empty.
 - Every path in the document is classified. A path the table does not know refuses the whole input,
   so a field added by a newer collector cannot pass through in clear.
 - `run.anonymization` records the scheme, the mode, a `key_id` (16 hex characters of a keyed hash, so two
