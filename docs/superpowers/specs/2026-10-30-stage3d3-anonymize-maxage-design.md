@@ -95,8 +95,10 @@ What the scope work established, and what drives the shape below:
   mapped account name is replaced by that name's pseudonym; `/home/<x>` whose `<x>` is no account maps
   `<x>` in the account class. Never a mount target, never by component equality elsewhere. The same function maps every
   path in the snapshot, so a file's subject stays one string. Host identifiers have positions too: a raw machine id
-  (a whole 32-hex component under `/var/log/journal/` or `/run/log/journal/`, a whole one or the leading 32 hex of
-  `<id>-<rest>` under `/boot/`, `/boot/loader/entries/`, `/efi/` and `/efi/loader/entries/`) maps to 32 hex of the
+  (a whole 32-hex component, or the leading 32 hex of a journald namespace `<id>.<namespace>`, under
+  `/var/log/journal/` or `/run/log/journal/`; a whole one or the leading 32 hex of
+  `<id>-<rest>` under `/boot/`, `/boot/loader/entries/`, `/efi/` and `/efi/loader/entries/`; the trailing 32 hex of the EL rescue images
+  `/boot/vmlinuz-0-rescue-<id>` and `/boot/initramfs-0-rescue-<id>.img`) maps to 32 hex of the
   machine-id sub-key over `id:` and the id, and the boot id of `systemd-private-<32 hex>-<rest>` under `/tmp/` or
   `/var/tmp/` to 32 hex over `boot:` and the id, the rest of the component kept — so no component hashes to the original
   `machine_id_hash`.
@@ -111,7 +113,7 @@ What the scope work established, and what drives the shape below:
   was: an absent field stays absent, a present one stays present, `""` stays `""`. A text value that a clause reads
   by value (`eq`, `ne`, `in`, `not_in`, `matches`, `not_matches`, `contains`, a comparison: `hosts.equiv` lines and
   their `^\+`, securetty's `^pts/`) is rewritten token by token under a grammar the table declares for that field
-  (whitespace tokens; each token by its declared class; sigils kept); the pin of AX-8 lists them.
+  (whitespace tokens; each token by its declared class; sigils kept, a leading run of `!` among them); the pin of AX-8 lists them.
 - **AX-8 — Every path in the document is classified; an unclassified one refuses the input.** A table in
   `internal/anonymize` names the class of every run-header field, every envelope field (`status`, `value`, `source.*`,
   `truncated`, `reason`; a setting's `runtime`, `persisted` and `effective` sides, its `winner` and persona keys), every

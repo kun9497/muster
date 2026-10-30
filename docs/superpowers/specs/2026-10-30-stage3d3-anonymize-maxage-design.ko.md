@@ -87,8 +87,9 @@ D34). 이 설계의 결정은 AX 목록입니다(한 글자 접두어는 앞 단
   구성 요소는 그 이름의 가명으로 바뀌며; `<x>`가 계정이 아닌 `/home/<x>`는 `<x>`를 account 분류로 매핑합니다. 마운트
   대상은 결코, 다른 곳에서 구성 요소 일치로는 결코 다시 쓰지 않습니다. 같은 함수가 스냅샷의 모든 경로를 매핑하므로
   파일의 주체는 한 문자열로 남습니다. 호스트 식별자에도 위치가 있습니다: 원본 machine id(`/var/log/journal/`나
-  `/run/log/journal/` 아래의 16진 32자 구성 요소 전체, `/boot/`, `/boot/loader/entries/`, `/efi/`, `/efi/loader/entries/`
-  아래의 그런 구성 요소 전체나 `<id>-<rest>`의 앞 16진 32자)는 `id:`와 그 id에 대한 machine-id 하위 키의 16진 32자로,
+  `/run/log/journal/` 아래의 16진 32자 구성 요소 전체나 journald 이름공간 `<id>.<namespace>`의 앞 16진 32자, `/boot/`, `/boot/loader/entries/`, `/efi/`, `/efi/loader/entries/`
+  아래의 그런 구성 요소 전체나 `<id>-<rest>`의 앞 16진 32자, EL 복구 이미지 `/boot/vmlinuz-0-rescue-<id>`와
+  `/boot/initramfs-0-rescue-<id>.img`의 끝 16진 32자)는 `id:`와 그 id에 대한 machine-id 하위 키의 16진 32자로,
   `/tmp/`나 `/var/tmp/` 아래 `systemd-private-<16진 32자>-<rest>`의 boot id는 `boot:`와 그 id에 대한 16진 32자로
   매핑하고 구성 요소의 나머지는 유지합니다 — 그래서 어떤 구성 요소도 원래의 `machine_id_hash`로 해시되지 않습니다.
 - **AX-7 — 어떤 절도 읽지 않는 자유 텍스트는 훑지 않고 바꾼다.** `text` 값 — 엔벨로프 `reason`, 모든 `Source`(최상위,
@@ -100,7 +101,7 @@ D34). 이 설계의 결정은 AX 목록입니다(한 글자 접두어는 앞 단
   이름이 있는 키도 다른 것처럼 자리표시자가 됩니다(어떤 판정도 그 텍스트를 읽지 않음). 자리표시자는 존재를 그대로
   둡니다: 없는 필드는 없는 채로, 있는 필드는 있는 채로, `""`는 `""`로. 절이 값으로 읽는 텍스트 값(`eq`, `ne`, `in`,
   `not_in`, `matches`, `not_matches`, `contains`, 비교: `hosts.equiv` 줄과 그 `^\+`, securetty의 `^pts/`)은 표가 그
-  필드에 선언한 문법으로 토큰마다 다시 씁니다(공백 토큰; 각 토큰은 선언된 분류로; 시길 유지); AX-8의 고정 테스트가
+  필드에 선언한 문법으로 토큰마다 다시 씁니다(공백 토큰; 각 토큰은 선언된 분류로; 시길 유지, 앞에 이어진 `!`도 그중 하나); AX-8의 고정 테스트가
   그것들을 나열합니다.
 - **AX-8 — 문서의 모든 경로는 분류되고, 분류되지 않은 경로는 입력을 거부한다.** `internal/anonymize`의 표는 모든 실행
   헤더 필드, 모든 엔벨로프 필드(`status`, `value`, `source.*`, `truncated`, `reason`; 설정의 `runtime`, `persisted`,

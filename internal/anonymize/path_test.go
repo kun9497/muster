@@ -168,6 +168,16 @@ func TestMapPathMachineIDPositions(t *testing.T) {
 		{"/boot/" + id + "/6.8.0-45-generic/linux", "/boot/" + m + "/6.8.0-45-generic/linux"},
 		{"/efi/" + id, "/efi/" + m},
 		{"/efi/loader/entries/" + id + "-6.8.conf", "/efi/loader/entries/" + m + "-6.8.conf"},
+		// a journald namespace directory is <machine id>.<namespace>
+		{"/var/log/journal/" + id + ".web", "/var/log/journal/" + m + ".web"},
+		{"/run/log/journal/" + id + ".web/system.journal", "/run/log/journal/" + m + ".web/system.journal"},
+		{"/var/log/journal/" + id + ".", "/var/log/journal/" + id + "."},
+		{"/boot/" + id + ".web", "/boot/" + id + ".web"},
+		// the EL dracut rescue images end in the machine id
+		{"/boot/vmlinuz-0-rescue-" + id, "/boot/vmlinuz-0-rescue-" + m},
+		{"/boot/initramfs-0-rescue-" + id + ".img", "/boot/initramfs-0-rescue-" + m + ".img"},
+		{"/boot/vmlinuz-0-rescue-" + id + "0", "/boot/vmlinuz-0-rescue-" + id + "0"},
+		{"/var/log/vmlinuz-0-rescue-" + id, "/var/log/vmlinuz-0-rescue-" + id},
 		// systemd's PrivateTmp directories carry the boot id
 		{"/tmp/systemd-private-" + id + "-chrony.service-HqwecO/tmp", "/tmp/systemd-private-" + b + "-chrony.service-HqwecO/tmp"},
 		{"/var/tmp/systemd-private-" + id + "-polkit.service-BxjGV7", "/var/tmp/systemd-private-" + b + "-polkit.service-BxjGV7"},

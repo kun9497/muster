@@ -121,6 +121,25 @@ var (
 
 const privateTmpPrefix = "systemd-private-"
 
+// rescueImage returns the prefix of an EL dracut rescue image under /boot
+// whose name ends in the machine id (vmlinuz-0-rescue-<id>,
+// initramfs-0-rescue-<id>.img), or "".
+func rescueImage(c string) string {
+	for _, pre := range []string{"vmlinuz-0-rescue-", "initramfs-0-rescue-"} {
+		rest, ok := strings.CutPrefix(c, pre)
+		if !ok {
+			continue
+		}
+		if pre == "initramfs-0-rescue-" {
+			rest = strings.TrimSuffix(rest, ".img")
+		}
+		if isHex32(rest) {
+			return pre
+		}
+	}
+	return ""
+}
+
 // idNote is one raw host identifier a path held: in is the label and the
 // raw 32 hex, out its 32-hex pseudonym.
 type idNote struct{ in, out string }
@@ -131,10 +150,17 @@ func (k *Key) hostIDComponent(parent, c string) (string, *idNote, bool) {
 	switch {
 	case journalDirs[parent] && isHex32(c):
 		return k.idComponent(idLabel, c, "")
+	case journalDirs[parent] && len(c) > 33 && c[32] == '.' && isHex32(c[:32]):
+		// a journald namespace: <machine id>.<namespace>
+		return k.idComponent(idLabel, c[:32], c[32:])
 	case blsDirs[parent] && isHex32(c):
 		return k.idComponent(idLabel, c, "")
 	case blsDirs[parent] && len(c) > 33 && c[32] == '-' && isHex32(c[:32]):
 		return k.idComponent(idLabel, c[:32], c[32:])
+	case parent == "/boot" && rescueImage(c) != "":
+		pre := rescueImage(c)
+		out, n, ok := k.idComponent(idLabel, c[len(pre):len(pre)+32], c[len(pre)+32:])
+		return pre + out, n, ok
 	case privateTmpDirs[parent] && strings.HasPrefix(c, privateTmpPrefix):
 		rest := c[len(privateTmpPrefix):]
 		if len(rest) > 33 && rest[32] == '-' && isHex32(rest[:32]) {
@@ -158,9 +184,11 @@ func (k *Key) idComponent(label, raw, rest string) (string, *idNote, bool) {
 // linger, AccountsService, /etc/sudoers.d, /etc/cron.d) that is a mapped
 // account name, whether it ends the path or is a parent in it; and, by the
 // machine-id sub-key, the raw machine id that names a component directly
-// under /var/log/journal or /run/log/journal (the whole component), or
-// under /boot, /boot/loader/entries, /efi or /efi/loader/entries (the whole
-// component or the 32 hex before its first "-"); and the boot id of a
+// under /var/log/journal or /run/log/journal (the whole component, or the
+// 32 hex before the "." of a journald namespace), under /boot,
+// /boot/loader/entries, /efi or /efi/loader/entries (the whole component or
+// the 32 hex before its first "-"), or ending an EL rescue image under /boot;
+// and the boot id of a
 // systemd-private-<boot id>-<rest> component directly under /tmp or /var/tmp,
 // under its own label. Positions are
 // decided on the cleaned prefix up to each component, and the rewrite is made

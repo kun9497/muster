@@ -79,10 +79,11 @@ and reads only the snapshot and, with `--key`, a 32-byte key file (through the s
 waivers when root). The scheme, `muster-anon-v1`:
 
 - Each value class has its own sub-key, `HMAC-SHA256(key, "muster/anon/v1/<class>")`. User and group
-  names become `u` + 12 base32 characters, host labels `h` + 10 (the last label of a dotted name kept),
+  names become `u` + 12 base32 characters, host labels `h` + 10 (the last label of a dotted name kept, a single-label name mapped whole),
   key fingerprints and the machine-id hash keyed values of the same shape, a template unit's instance
   `i` + 12. Path components are mapped only at known positions: a home directory's last component, a
-  name the path is known to carry. A component that only looks like a name is left alone.
+  name the path is known to carry, and the machine id or boot id that journal, boot-loader, rescue-image
+  and PrivateTmp names carry. A component that only looks like a name is left alone.
 - Addresses stay in their class. Loopback, multicast, unspecified and the documentation ranges are kept;
   a private, shared, link-local or benchmarking address keeps its range prefix and maps the rest; a public
   address maps by a prefix-preserving tree, so a CIDR keeps its length and containment.

@@ -403,10 +403,12 @@ regenerates them from public images and `-check` compares.
 - `snapshot anonymize --facts <in|-> (--key <file> | --ephemeral) --out <file|-> [--force]` (D36, AX-1..AX-14) is pure
   `internal/anonymize` (no `os`, `os/exec`, `net`, `syscall`, no `internal/collect` or `internal/controls`;
   `imports_test.go`) behind `cmd/muster/anonymize.go`. Sub-keys `HMAC-SHA256(key, "muster/anon/v1/<class>")`; classes
-  account (`u`+12 base32), host (`h`+10 per label, the last label kept), address (kept / in-range / public tree,
+  account (`u`+12 base32), host (`h`+10 per label, the last label of a dotted name kept, a single label mapped whole), address (kept / in-range / public tree,
   spec §1.1), host-or-address, host-or-netgroup, url, fingerprint (`SHA256:`+43), machine id (64 hex), unit (a template
   instance `i`+12), path (AX-6: every eligible home's last component and the known name positions, a position decided
-  on the cleaned prefix, the path rewritten in place on its raw components), placeholder `[anonymised]`, blank, kept,
+  on the cleaned prefix, the path rewritten in place on its raw components; a raw machine id under the journal
+  directories (`<id>` or `<id>.<namespace>`), the BLS directories and the EL rescue images, and the boot id of a
+  `systemd-private-` directory, map to 32 keyed hex; a leading run of `!` is a sigil), placeholder `[anonymised]`, blank, kept,
   and the positional/option grammars of read-by-value text. `""` maps to `""` in every class; the `Ledger` refuses a
   collision. The keep set (`keep.go`) and the mount targets are closed lists held to the controls by
   `TestKeepSetCoversControlLiterals` and `TestMountTargetsCoverControls` (`internal/controls`, external package).
