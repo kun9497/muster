@@ -6,7 +6,7 @@ deferred list, D13, D16, D28). Rulings of this design are the RL list (single le
 The brainstorm that produced it is summarised in §1.1; the choices the brainstorm left to the author are marked
 "author's call" where they appear, and collected in §10.
 
-**Date** 2026-11-02 · **Status** builder check folded (RL-28..RL-39); awaiting the user's approval.
+**Date** 2026-11-02 · **Status** approved by the user on 2026-11-02; 4A executed (its rulings RA-1..RA-44 are in the plan's Execution notes and folded here where they correct a sentence).
 
 ## 1. Scope and intent
 
@@ -70,7 +70,7 @@ example report is a defect (the examples gate holds).
    configuration file or starts a process; a subcommand that changes a setting. muster's first promise (§8) is that
    `collect` writes one file and nothing else is written; the package keeps the same promise.
 2. **A downloaded file cannot be verified**, or the README's verification commands fail on a published release.
-3. **The same source gives different bytes.** If `scripts/reproduce.sh v0.1.0` does not reproduce the published
+3. **The same source gives different bytes.** If `scripts/reproduce.sh --ref v0.1.0 --version 0.1.0 <archive>` does not reproduce the published
    binary, "reproducible build" is a false claim and is removed from the README until it is true.
 4. **`snapshot diff` reports a muster upgrade as a server change.** The operator must never be sent to fix a host
    because the rules moved (§5.4).
@@ -139,7 +139,7 @@ Added, because assay has neither: SBOMs (§4.4), the `.deb` and `.rpm` packages 
 
 ### 4.3 Reproducibility
 
-`scripts/reproduce.sh <tag> [<archive>]` checks out the tag in a temporary worktree, verifies the toolchain equals
+`scripts/reproduce.sh --ref <tag> --version <X.Y.Z> [--arch amd64|arm64] <artefact>` (RA-22, RA-25: the artefact is a tar.gz, a `.deb`, an `.rpm` or a bare binary; `--version` is the verbatim release string) checks out the ref in a temporary detached worktree, selects the toolchain `go.mod` names through `GOTOOLCHAIN`, verifies it equals
 the `go.mod` line, builds with the exact flags of §4.2 for the host's architecture (or `GOARCH` given), and prints
 the binary's sha256 beside the one inside the downloaded archive or package, exiting 0 only when they match. The
 same script runs in CI's `release-dry-run` job (§4.7) against GoReleaser's own snapshot build, so a change that
@@ -203,7 +203,7 @@ package because the ComplianceAsCode-derived CIS index is BSD-3-Clause and the C
   check and diff.
 - Package metadata: `Maintainer`/`Packager` is the commit identity `.mailmap` and `NOTICE` use,
   `seonggyun.seo <40746364+kun9497@users.noreply.github.com>` (RL-39; the user's choice of the recommended form),
-  `Homepage` the repository, `Description` the README's first sentence. The `.deb` carries `Priority: optional`; the
+  `Homepage` the repository, `Description`/`Summary` the README's two opening sentences (RA-41). The `.deb` carries `Priority: optional`; the
   `.rpm` `Release: 1`. The install contract (§4.7) asserts these fields.
 
 ### 4.7 CI proves the package on every PR
@@ -213,7 +213,7 @@ artefact of §4.4 (the attestation and signing steps need the tag and are skippe
 
 - `scripts/reproduce.sh` against the amd64 snapshot binary (§4.3);
 - `scripts/release-vulncheck.sh` ran as the post hook (the dry run fails on a finding, as the release would);
-- an **install contract** matrix over `ubuntu:22.04`, `ubuntu:24.04`, `debian:12` (`.deb`), `rockylinux:9`,
+- an **install contract** matrix over `ubuntu:22.04`, `ubuntu:24.04`, `debian:12` (`.deb`), `rockylinux/rockylinux:9`,
   `almalinux:9` (`.rpm`): install the package, assert the installed file list equals §4.6 exactly (`dpkg -L` /
   `rpm -ql` against the committed lists `ci/release/contract-files.deb.txt` and `.rpm.txt` — two, because dpkg and rpm print different rows: dpkg no `/.`, rpm no directories at all (RA-34); compared by string equality since the EL images lack `diff`), assert no unit was enabled
   (`systemctl list-unit-files 'muster*'` empty or the container has no systemd), assert no muster process ran and
@@ -281,7 +281,9 @@ pipeline is exercised before a tag, so the plan writes it in the same task as `.
 - **RL-18 — the trust rule for a directory muster deletes in.** The same rule the collector's writer applies to the
   directory it writes in (`trustedDir`: the directory itself, `lstat`-ed, is not a symlink and not other-writable),
   plus ownership by the caller and not group-writable; the components above it are not walked, so writer and
-  remover agree and a host that can `collect` into a directory can prune it. The directory is opened once with
+  remover agree and a host that can `collect` into a directory can prune it. The lock is `collect`'s helper over the
+  same path (the shared lock file on the default directory, the directory's own flock elsewhere — one extra open by
+  path, accepted in the Task 4 ruling). For listing and removal the directory is opened once with
   `O_NOFOLLOW|O_DIRECTORY`, and every listing and removal goes through that fd (`unlinkat`), never by a path that
   could be re-pointed between listing and removal; a symlink inside the directory is never followed and never
   removed by `prune` (it is listed by `ls` under the header's count). A full path given to `rm` outside the directory
@@ -597,7 +599,7 @@ order of the three plans' tasks; which `releases/` and `ci/` paths join the shel
 - **RL-5** Reproducible by construction: commit timestamp and date (`format-local:` under `TZ=UTC`), `-trimpath`, `-buildvcs=false`, exact toolchain.
 - **RL-6** Tags are cut from `main` and never moved or deleted; a failed tag stays and is noted.
 - **RL-7** The README claims only what `reproduce.sh` proves.
-- **RL-8** SBOMs in SPDX JSON by pinned syft, one per archive and package.
+- **RL-8** SBOMs in SPDX JSON by pinned syft, one per archive and package; an archive's SBOM lists the binary's modules, a package's SBOM describes the package itself (syft reads a `.deb`/`.rpm` header, not the payload).
 - **RL-9** Keyless signature over the checksums file, Sigstore bundle (`--new-bundle-format`), identity = the release workflow at the tag.
 - **RL-10** Attestation stated as SLSA Build L2, with what it does not prove.
 - **RL-11** Packages install the binary and documents and start nothing; nothing under `/etc`, `/var`, `/usr/lib/systemd`.

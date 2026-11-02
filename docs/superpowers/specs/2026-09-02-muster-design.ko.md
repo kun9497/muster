@@ -90,7 +90,7 @@ muster fix --dry-run --facts host.json --format script > fix.sh   # 검토용 �
 | `internal/waiver` | waiver 파일 로딩과 매칭 | 평가 전에 `check`가 참조하는 것 — 억제는 그 뒤의 단계 |
 | `internal/profile` | 프로파일 파일: 파싱, 이름/경로 분류, 컨트롤 세트에 대한 `extends` 체인 해결, 튜닝 병합(3D-1) | 호스트를 건드리거나 stderr에 쓰는 것 — 파일은 호출자의 `open`으로, 경고는 `warn`으로 |
 | `internal/tuning` | 컨트롤 세트에 대해 검증된 사이트의 파라미터 값(3D-1) | 호스트를 건드리는 것, 선택을 보는 것(제외 경고는 병합의 몫) |
-| `internal/report` | 테이블과 JSON 렌더러(4단계에서 SARIF), 결정성, 이스케이프 | 판정 계산 |
+| `internal/report` | 테이블과 JSON 렌더러(SARIF는 유보, 10.3절), 결정성, 이스케이프 | 판정 계산 |
 | `internal/remedy` | 리포트로부터 만드는 조치 계획과 그 테이블, JSON, 검토 스크립트 렌더러(3D-2) | `os`, `os/exec`, `net`, `syscall`, `time` import, 무엇이든 실행하는 것, 리터럴이 아닌 것을 명령에 넣는 것 — 리터럴이 아닌 것은 두 부류만 허용되며 둘 다 `templateLines`를 거침(테스트로 강제): 스냅샷의 machine-id 해시는 호스트 가드 줄에서 소문자 16진수 64자일 때만(D34, 3D-2b), 파라미터의 값은 타입 문자 집합을 통과한 `P_<name>='<value>'` 대입으로만(3D-2c) |
 
 ### 4.3 데이터 흐름
@@ -216,7 +216,7 @@ source = {kind: file|command|proc|sys|derived, path, line, raw, cmd, exit_code}
 
 ### 5.9 수명 주기
 
-기본 출력은 `/var/lib/muster/snapshots/<hostname>-<UTC 타임스탬프>-<짧은 다이제스트>.json`이며(디렉터리 0700, 파일 0600), 임시 파일에 쓴 뒤 이름을 바꿉니다. `--out <path>`와 `--out -`로 덮어쓸 수 있습니다. `latest` 심볼릭 링크는 원자적으로 교체합니다. `/var/lib/muster/.lock`의 잠금 덕분에 두 번째 `collect`가 동시에 돌면 실행 중인 PID를 알리며 2로 종료합니다. 쓰기 전에 여유 공간을 확인합니다. 4A단계부터 `snapshot ls`는 그 디렉터리를 나열하고(행마다 `ok`, 더 새 바이너리가 쓴 `newer`, 또는 `unreadable`; 스냅샷이 아닌 이름은 세기만 하고 절대 열지 않음), `snapshot rm`은 이름 붙인 파일을 지우고, `snapshot prune --keep N --keep-days D`는 경계 밖의 읽을 수 있는 스냅샷을 지우되 가장 새 것은 절대 지우지 않습니다. 둘 다 호출자가 소유하고 그룹·타인 쓰기가 불가능한 디렉터리의 디스크립터 하나를 통해 동작하고, `collect`의 잠금을 잡고, `latest`의 대상이 사라지면 다시 가리킵니다. 예시 타이머 유닛은 패키지의 문서 디렉터리에 실리고 유닛 경로에는 절대 놓이지 않습니다 (D13, D37).
+기본 출력은 `/var/lib/muster/snapshots/<hostname>-<UTC 타임스탬프>-<짧은 다이제스트>.json`이며(디렉터리 0700, 파일 0600), 임시 파일에 쓴 뒤 이름을 바꿉니다. `--out <path>`와 `--out -`로 덮어쓸 수 있습니다. `latest` 심볼릭 링크는 원자적으로 교체합니다. `/var/lib/muster/.lock`의 잠금 덕분에 두 번째 `collect`가 동시에 돌면 실행 중인 PID를 알리며 2로 종료합니다. 쓰기 전에 여유 공간을 확인합니다. 4A단계부터 `snapshot ls`는 그 디렉터리를 나열하고(행마다 `ok`, 더 새 바이너리가 쓴 `newer`, 또는 `unreadable`; 스냅샷이 아닌 이름은 세기만 하고 절대 열지 않음), `snapshot rm`은 이름 붙인 파일을 지우고, `snapshot prune --keep N --keep-days D`는 경계 밖의 읽을 수 있는 스냅샷을 지우되 가장 새 것은 절대 지우지 않습니다. 둘 다 호출자가 소유하고 그룹·타인 쓰기가 불가능한 디렉터리의 디스크립터 하나를 통해 동작하고, `collect`의 잠금을 잡고(기본 디렉터리로의 `collect --out`은 공유 잠금 파일이 아닌 그 디렉터리의 flock을 잡으므로 둘은 서로를 배제하지 않습니다. 그런 실행은 `latest`를 쓰지 않고 `prune`이 나열한 파일도 쓰지 않습니다), `latest`의 대상이 사라지면 다시 가리킵니다. 예시 타이머 유닛은 패키지의 문서 디렉터리에 실리고 유닛 경로에는 절대 놓이지 않습니다 (D13, D37).
 
 ## 6. 컨트롤 형식
 
@@ -433,9 +433,9 @@ muster는 남의 프로덕션 호스트에서 root로 돌고, 그 출력은 공�
 
 ## 9. 출력과 UX 계약
 
-- 사람을 위한 테이블 출력, 나머지 모두를 위한 JSON, 4단계의 SARIF입니다.
+- 사람을 위한 테이블 출력, 나머지 모두를 위한 JSON입니다. SARIF는 소비자가 생길 때까지 4단계 너머로 유보합니다(10.3절).
 - 같은 스냅샷, 같은 컨트롤 세트, 같은 파라미터 → 바이트 단위로 동일한 JSON입니다. 변동하는 값(시각, 호스트, 소요 시간, 버전)은 `run` 아래에만 있습니다. 결과는 심각도 다음 id 순으로 정렬합니다. 로케일과 시간대는 출력에 영향을 주지 않습니다.
-- **심각도**는 `high`, `medium`, `low`이며, 프로파일의 `severity` 항목이 덮어쓰지 않는 한 KISA 중요도에서 파생합니다(상 → `high`, 중 → `medium`, 하 → `low`)(3D-1); 각 행은 `severity_source`를 싣습니다. 정렬 키이자 `--severity` 필터 키(2단계)이자 SARIF level(4단계)입니다.
+- **심각도**는 `high`, `medium`, `low`이며, 프로파일의 `severity` 항목이 덮어쓰지 않는 한 KISA 중요도에서 파생합니다(상 → `high`, 중 → `medium`, 하 → `low`)(3D-1); 각 행은 `severity_source`를 싣습니다. 정렬 키이자 `--severity` 필터 키(2단계)이자 SARIF가 도착하면 SARIF level(10.3절)입니다.
 - **결과의 출처 정보.** 모든 결과는 스냅샷의 `run` 블록을 그대로 담고, 여기에 `check` 블록을 더합니다. 평가한 바이너리의 버전과 커밋, 그 `controls_version`과 `controls_digest`, `snapshot_digest`, `profile: {name, source, digest, extends, selected, excluded, excluded_ids}`, 주어졌을 때 `tuning: {path, digest}`, `waivers: {path, digest, applied, not_applied}`, 적용된 파라미터 값, 그리고 값마다 어디서 왔는지 대는 `param_sources`입니다(3D-1); `check.max_age_s`는 `--max-age` 한도를, `run.anonymization`은 익명화된 입력을 기록합니다(3D-3).
 - **요약.** 테이블 앞에는 언제나 요약 블록이 오며 세 부분으로 나뉩니다. 심각도별 자동 판정(`PASS`, `FAIL`, `WARN`), 수동 검토 대상(`MANUAL`과 partial 컨트롤의 `WARN`), 판정할 수 없는 항목(`ERROR`, `NOT_APPLICABLE`, `WAIVED`)입니다. 그 뒤에 수집에 실패한 팩트의 개수와 30일 안에 만료되는 waiver가 따릅니다. 3B부터 요약은 `scopes`도 실습니다: 같은 세 부분을 가이드(KISA 참조가 있는 모든 컨트롤)에 대해 한 번, 가이드 밖(`beyond` 카테고리)에 대해 한 번 — 둘의 합이 전체이며, 테이블은 범위마다 한 줄과 가이드 밖 첫 행 앞의 구분선을 찍고, 행은 심각도보다 범위로 먼저 정렬됩니다(D29). 단일 하드닝 점수는 없습니다. 비율을 보여 준다면 분모를 밝히고 `MANUAL`과 `NOT_APPLICABLE`을 제외합니다 (D18).
 - `NO_COLOR`, `TERM=dumb`, 비 TTY는 색과 박스 그리기를 끕니다. `--no-color` / `--color=always`가 이를 덮어씁니다. 한글 항목명은 동아시아 폭 2로 배치합니다.
@@ -475,7 +475,7 @@ muster는 남의 프로덕션 호스트에서 root로 돌고, 그 출력은 공�
 
 ### 10.3 이후 릴리스로 미룬 것
 
-서비스별 설정 항목(메일, DNS, FTP 데몬 설정 — deferred 9개 항목), 다중 호스트 집계, 에이전트 없는 SSH 모드, 파일 무결성 기준선, 인증서 만료, OS 수명 종료 탐지, 클라우드 VM 항목, ISMS-P 매핑(`references` 키는 예약해 두었습니다), 설정 파일, 커널 lockdown과 커맨드라인 점검, Ansible 출력, APT/YUM 저장소, Homebrew, Docker 이미지, macOS와 Windows용 check 전용 빌드.
+서비스별 설정 항목(메일, DNS, FTP 데몬 설정 — deferred 9개 항목), 다중 호스트 집계, 에이전트 없는 SSH 모드, 파일 무결성 기준선, 인증서 만료, OS 수명 종료 탐지, 클라우드 VM 항목, ISMS-P 매핑(`references` 키는 예약해 두었습니다), 설정 파일, 커널 lockdown과 커맨드라인 점검, Ansible 출력, APT/YUM 저장소, Homebrew, Docker 이미지, macOS와 Windows용 check 전용 빌드, SARIF 출력, `--controls-dir`, DCO 사인오프와 PR 템플릿, Lynis 차분 비교(4단계 설계 `2026-11-02-stage4-public-release-design.ko.md` §9가 4단계에서 유보).
 
 ### 10.4 하지 않을 것
 
@@ -491,7 +491,7 @@ assay에서 얻은 두 교훈은 "헬퍼는 커버되는데 아무도 호출하�
 
 **계약 테스트(1단계).** `internal/check`는 `os/exec`도 `net`도 import하지 않습니다(`go list -deps`). `collect`는 레지스트리 밖의 경로를 읽거나 명령을 실행할 수 없습니다(파일과 exec 접근은 테스트가 대체하는 인터페이스 뒤에 있습니다). 읽기 프리미티브는 아무것도 흘리지 않고 병적인 트리에서도 결코 블록되지 않습니다. 심볼릭 링크 순환, 경로의 모든 위치에 놓인 `/etc/shadow`로 향하는 심볼릭 링크, FIFO, 크기 초과 파일, 개행이 든 이름, 만 개짜리 디렉터리가 대상입니다. 스냅샷 writer는 0600, 원자성, 덮어쓰기 거부를 지킵니다. 리플렉션 스키마 골든과 옛 스냅샷 코퍼스가 5.7절을 강제하며, 스냅샷을 뜬 뒤에 추가된 키가 `missing`으로 읽혀 `PASS`가 아니라 `ERROR`를 낳는다는 것도 여기에 포함됩니다.
 
-**골든 출력과 결정성.** 테이블과 JSON 렌더러는 `-update` 골든 테스트를 갖습니다. 같은 입력·프로파일·튜닝에는 바이트 단위로 같은 출력. 변동 필드는 `run` 아래에만. 안정적인 정렬. 로케일과 TZ 독립성. 동아시아 폭, 40칸, `NO_COLOR`, 비 TTY 변형. SARIF는 4단계에서 2.1.0 스키마로 검증합니다.
+**골든 출력과 결정성.** 테이블과 JSON 렌더러는 `-update` 골든 테스트를 갖습니다. 같은 입력·프로파일·튜닝에는 바이트 단위로 같은 출력. 변동 필드는 `run` 아래에만. 안정적인 정렬. 로케일과 TZ 독립성. 동아시아 폭, 40칸, `NO_COLOR`, 비 TTY 변형. SARIF는 도착하면(10.3절) 2.1.0 스키마로 검증합니다.
 
 **CI에서의 lint(1단계).** 6.8절에 더해, 첫 픽스처 커밋부터 `testdata/`에 대해 `gitleaks`를 돌립니다. 규칙은 개인키 블록, `$6$`/`$y$` 비밀번호 해시, `ssh-rsa AAAA` 키, 그리고 개인용이 아닌 이메일 도메인과 내부 호스트명 형태를 대상으로 합니다. 규칙 패턴 자체는 일반적이며, 어떤 조직의 이름이나 도메인도 커밋하지 않습니다.
 

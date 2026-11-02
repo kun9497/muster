@@ -5,7 +5,7 @@
 설계의 판정은 RL 목록이다(한 글자 접두어는 이전 단계와 충돌한다). 이 문서를 낳은 브레인스토밍은 §1.1에 요약했고,
 브레인스토밍이 저자에게 맡긴 선택은 나오는 자리마다 "저자의 선택"으로 표시하고 §10에 모았다.
 
-**날짜** 2026-11-02 · **상태** 빌더 검토 반영(RL-28..RL-39); 사용자의 승인 대기.
+**날짜** 2026-11-02 · **상태** 2026-11-02 사용자 승인; 4A 실행됨(그 판정 RA-1..RA-44는 플랜의 Execution notes에 있고, 문장을 고치는 것은 여기에 반영됨).
 
 ## 1. 범위와 의도
 
@@ -64,7 +64,7 @@ Windows 빌드 없음(check 전용 빌드는 기준 설계 §10.3에 남는다).
    스크립트. 설정을 바꾸는 하위 명령. muster의 첫 약속(§8)은 `collect`가 파일 하나를 쓰고 그 밖에는 아무것도 쓰지
    않는다는 것이며, 패키지도 같은 약속을 지킨다.
 2. **받은 파일을 검증할 수 없다**, 또는 README의 검증 명령이 게시된 릴리스에서 실패한다.
-3. **같은 소스에서 다른 바이트가 나온다.** `scripts/reproduce.sh v0.1.0`이 게시된 바이너리를 재현하지 못하면
+3. **같은 소스에서 다른 바이트가 나온다.** `scripts/reproduce.sh --ref v0.1.0 --version 0.1.0 <archive>`가 게시된 바이너리를 재현하지 못하면
    "재현 가능한 빌드"는 거짓 주장이고, 참이 될 때까지 README에서 뺀다.
 4. **`snapshot diff`가 muster 업그레이드를 서버 변화로 보고한다.** 규칙이 움직였다는 이유로 운영자를 호스트 고치러
    보내서는 안 된다(§5.4).
@@ -108,7 +108,7 @@ main.version/commit/date` 변수(muster의 Makefile이 이미 같은 셋을 넣�
 ### 4.2 빌드
 
 - **RL-4 — 툴체인은 하나, `go.mod`에 이름이 있다.** `go.mod`는 `go 1.25`를 언어 버전으로 유지하고, 지원되는 Go 라인의 최신 패치를 이름 붙인 `toolchain goX.Y.Z` 줄이 생긴다(4A에서 go1.26.10; RA-17 — 1.25는 더 이상 수정을 받지 않으므로 "권고에 줄을 올린다"에는 아직 움직이는 라인이 필요하다; CI가 오늘 고정하는
-  버전은 1.25.5이고, 플랜은 그 시점의 최신 1.25 패치로 올린다). `release.yml`과 `ci.yml`은 `go-version-file: go.mod`로
+  버전은 4A 전에 1.25.5였다). `release.yml`과 `ci.yml`은 `go-version-file: go.mod`로
   Go를 설치하고 `scripts/check-go-toolchain.sh`를 돌린다. CI에서는 이 줄이 하한이고(더 새 패치는 통과), 릴리스 잡에서는
   같아야 한다(`--exact`). 패치가 다르면 바이트가 달라져 §4.3이 실패하기 때문이다. 줄을 올리는 것은 보통 커밋이다.
   수정이 있는 stdlib 권고는 다음 태그 전에 줄을 올린다.
@@ -126,7 +126,7 @@ main.version/commit/date` 변수(muster의 Makefile이 이미 같은 셋을 넣�
 
 ### 4.3 재현성
 
-`scripts/reproduce.sh <tag> [<archive>]`는 임시 워크트리에 태그를 체크아웃하고, 툴체인이 `go.mod` 줄과 같은지 확인하고,
+`scripts/reproduce.sh --ref <tag> --version <X.Y.Z> [--arch amd64|arm64] <artefact>`(RA-22, RA-25: 아티팩트는 tar.gz, `.deb`, `.rpm` 또는 맨 바이너리; `--version`은 릴리스 문자열 그대로)는 임시 분리 워크트리에 ref를 체크아웃하고, `go.mod`가 이름 붙인 툴체인을 `GOTOOLCHAIN`으로 고르고, 그것이 `go.mod` 줄과 같은지 확인하고,
 호스트 아키텍처(또는 주어진 `GOARCH`)로 §4.2의 정확한 플래그로 빌드하고, 바이너리의 sha256을 받은 아카이브나 패키지
 안의 것과 나란히 찍고, 일치할 때만 0으로 끝난다. 같은 스크립트가 CI의 `release-dry-run` 잡(§4.7)에서 GoReleaser 자신의
 스냅샷 빌드에 대해 돌아서, 재현성을 깨는 변경은 태그가 아니라 PR을 실패시킨다. README의 "Reproduce the build" 절은 이
@@ -186,7 +186,7 @@ main.version/commit/date` 변수(muster의 Makefile이 이미 같은 셋을 넣�
   `controls_version`은 다음 check와 diff에 나타난다.
 - 패키지 메타데이터: `Maintainer`/`Packager`는 `.mailmap`과 `NOTICE`가 쓰는 커밋 신원 `seonggyun.seo
   <40746364+kun9497@users.noreply.github.com>`(RL-39; 권장 형태를 사용자가 택함), `Homepage`는 저장소,
-  `Description`은 README의 첫 문장. `.deb`는 `Priority: optional`, `.rpm`은 `Release: 1`. 설치 계약(§4.7)이 이
+  `Description`/`Summary`는 README의 첫 두 문장(RA-41). `.deb`는 `Priority: optional`, `.rpm`은 `Release: 1`. 설치 계약(§4.7)이 이
   필드들을 단언한다.
 
 ### 4.7 CI가 모든 PR에서 패키지를 증명한다
@@ -196,7 +196,7 @@ main.version/commit/date` 변수(muster의 Makefile이 이미 같은 셋을 넣�
 
 - amd64 스냅샷 바이너리에 대한 `scripts/reproduce.sh`(§4.3);
 - post 훅으로 돌아간 `scripts/release-vulncheck.sh`(dry run은 릴리스처럼 발견에서 실패한다);
-- `ubuntu:22.04`, `ubuntu:24.04`, `debian:12`(`.deb`), `rockylinux:9`, `almalinux:9`(`.rpm`)에 대한 **설치 계약**
+- `ubuntu:22.04`, `ubuntu:24.04`, `debian:12`(`.deb`), `rockylinux/rockylinux:9`, `almalinux:9`(`.rpm`)에 대한 **설치 계약**
   매트릭스: 패키지를 설치하고, 설치된 파일 목록이 §4.6과 정확히 같은지(`dpkg -L` / `rpm -ql`을 커밋된 목록
   커밋된 목록 `ci/release/contract-files.deb.txt`와 `.rpm.txt`와 비교 — 둘인 이유는 dpkg와 rpm이 다른 행을 찍기 때문이다: dpkg는 `/.`가 없고 rpm은 디렉터리 행이 전혀 없다(RA-34); EL 이미지에 `diff`가 없어 문자열 동등으로 비교), 유닛이 하나도 켜지지 않았는지(`systemctl list-unit-files 'muster*'`가
   비었거나 컨테이너에 systemd가 없음), muster 프로세스가 돌지 않았고 `/var/lib/muster`가 없는지 단언하고, `muster
@@ -256,7 +256,9 @@ main.version/commit/date` 변수(muster의 Makefile이 이미 같은 셋을 넣�
 - **RL-18 — muster가 삭제하는 디렉터리의 신뢰 규칙.** 수집기 작성기가 자기가 쓰는 디렉터리에 적용하는 것과 같은
   규칙(`trustedDir`: 디렉터리 자체를 `lstat`해서 심볼릭 링크가 아니고 타인 쓰기 불가), 더하여 호출자 소유이고 그룹 쓰기
   불가. 위의 구성 요소들은 걷지 않는다. 그래서 작성기와 삭제기가 일치하고, `collect`할 수 있는 디렉터리는 prune할 수
-  있다. 디렉터리는 `O_NOFOLLOW|O_DIRECTORY`로 한 번 열고, 모든 나열과 삭제는 그 fd를 통한다(`unlinkat`). 나열과 삭제
+  있다. 잠금은 같은 경로에 대한 `collect`의 도우미다(기본 디렉터리에서는 공유 잠금 파일, 그 밖에서는 디렉터리 자체의
+  flock — 경로로 한 번 더 여는 것이며, Task 4 판정에서 받아들였다). 나열과 삭제를 위해 디렉터리는 `O_NOFOLLOW|O_DIRECTORY`로
+  한 번 열고, 모든 나열과 삭제는 그 fd를 통한다(`unlinkat`). 나열과 삭제
   사이에 다시 가리켜질 수 있는 경로로는 절대 지우지 않는다. 디렉터리 안의 심볼릭 링크는 절대 따르지 않고 `prune`이 절대
   지우지 않는다(`ls`는 헤더의 수에 넣어 나열한다). 디렉터리 밖의 전체 경로를 `rm`에 주면 그 부모에 같은 규칙을 적용한다.
   세 명령은 디렉터리의 소유자로 돈다 — 기본 배치에서는 root — 소유하지 않는 디렉터리는 거부하고(종료 2) 다른 사용자의
@@ -534,7 +536,7 @@ GoReleaser와 nfpm의 필드 이름과 정확한 고정 버전; `scripts/`와 `c
 - **RL-5** 구성상 재현 가능: 커밋 타임스탬프와 날짜(`TZ=UTC` 아래 `format-local:`), `-trimpath`, `-buildvcs=false`, 정확한 툴체인.
 - **RL-6** 태그는 `main`에서 끊고 절대 옮기거나 지우지 않는다. 실패한 태그는 남고 메모된다.
 - **RL-7** README는 `reproduce.sh`가 증명하는 것만 주장한다.
-- **RL-8** SBOM은 고정 syft의 SPDX JSON, 아카이브와 패키지마다 하나.
+- **RL-8** SBOM은 고정 syft의 SPDX JSON, 아카이브와 패키지마다 하나. 아카이브의 SBOM은 바이너리의 모듈을 나열하고, 패키지의 SBOM은 패키지 자체를 기술한다(syft는 `.deb`/`.rpm`의 헤더를 읽고 페이로드는 읽지 않는다).
 - **RL-9** checksums 파일에 대한 keyless 서명, Sigstore 번들(`--new-bundle-format`), 신원 = 태그 시점의 릴리스 워크플로.
 - **RL-10** 증명은 SLSA Build L2로 말하고, 증명하지 않는 것도 말한다.
 - **RL-11** 패키지는 바이너리와 문서를 설치하고 아무것도 시작하지 않는다. `/etc`, `/var`, `/usr/lib/systemd` 아래에는 아무것도 없다.

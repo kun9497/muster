@@ -21,7 +21,8 @@ verdict on an existing snapshot is at least a minor release and appears under
   are 0 and 2; stdout carries only the listing or the `--dry-run` plan.
 - `muster version` prints five lines: version, full commit, the commit's date,
   the control set version and the facts schema version. The Makefile stamps the
-  commit's date instead of the build's, so `make build` reproduces a release.
+  commit's date instead of the build's, as the release does; `scripts/reproduce.sh`
+  rebuilds a release's bytes from its tag.
 
 ### Tooling
 - The release pipeline (stage 4A, D37): `.goreleaser.yaml` builds `linux/amd64`
@@ -37,9 +38,9 @@ verdict on an existing snapshot is at least a minor release and appears under
   packages in five images against committed file lists. Every GitHub Action is
   pinned by commit SHA and dependabot proposes the moves.
 
-The sections below record every change before the first release.
-
 ## History before 0.1.0
+
+Every change before the first release, by stage.
 
 ### Added
 - `muster snapshot anonymize` (stage 3D-3, D36) writes a copy of a snapshot

@@ -475,13 +475,17 @@ regenerates them from public images and `-check` compares.
   proposes action moves monthly; `goreleaser-action`'s `version:` is the one input dependabot does not track.
 - `snapshot ls|rm|prune` (`cmd/muster/snapshotls.go`, `snapshotrm.go`; the Linux layer `snapshotdir_linux.go` with a
   `!linux` stub; pure selection in `internal/snapshots`; `facts.LoadHeader` decodes a header without comparing the
-  schema): the directory is opened once (`O_RDONLY|O_DIRECTORY|O_NOFOLLOW|O_CLOEXEC`), refused unless owned by the
+  schema): the directory is opened once for listing and removal (`O_RDONLY|O_DIRECTORY|O_NOFOLLOW|O_CLOEXEC`; the lock
+  is `collect`'s helper over the same path — the shared lock file on the default directory, the directory's own flock
+  elsewhere — and a `collect --out` into the default directory holds that flock, not the lock file, so the two do not
+  exclude each other: such a run writes no `latest` and no file `prune` has listed), refused unless owned by the
   caller and not group/other-writable (the writer's `trustedDir` rule plus ownership; components above are not
   walked), and every `Fstatat`/`Openat`/`Readlinkat`/`Unlinkat`/`Symlinkat`/`Renameat` goes through that fd. Rows are
   `ok`, `newer` (schema above the binary's) or `unreadable`; a pattern-matching regular file is opened `O_NOFOLLOW`
   and identity-checked (dev/ino) before `LoadHeader`; a `latest` symlink is reported, never counted or followed;
   everything else is counted in `other`, never opened. `prune` removes only `ok` rows outside `--keep N`/`--keep-days D`
-  (strictly older than `now - D*24h`, one `commandClock()` read after the listing), never the newest `ok` row, never
+  (strictly older than `now` minus `D` UTC days by `AddDate`, `D` at most 36500 — a `time.Duration` product overflows past
+  106751 days, one `commandClock()` read after the listing), never the newest `ok` row, never
   `newer`/`unreadable` (those go by `rm`, by name); `rm` pre-checks every name (`latest` → its own message, then
   `validRmName`, then `stat` = regular) before the first `Unlinkat`; a full path must be clean and absolute and share
   one directory, never beside a bare name or `--dir`. Both take `collect`'s lock (`AcquireLock(LockPath)` on the
