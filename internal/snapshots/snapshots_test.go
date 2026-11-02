@@ -178,6 +178,9 @@ func TestPruneBounds(t *testing.T) {
 		{"keep 4 and keep-days 7", Bounds{Keep: 4, KeepDays: 7, HasKeep: true, HasKeepDays: true}, []Entry{d30}},
 		{"keep 0", Bounds{Keep: 0, HasKeep: true}, []Entry{d3, d7, d7s, d30}},
 		{"keep-days 0", Bounds{KeepDays: 0, HasKeepDays: true}, []Entry{d3, d7, d7s, d30}},
+		// A day count whose nanoseconds overflow time.Duration must keep
+		// everything, never wrap the cutoff into the future.
+		{"keep-days 999999", Bounds{KeepDays: 999999, HasKeepDays: true}, nil},
 	} {
 		got, err := Prune(slices.Clone(entries), tc.b, now)
 		if err != nil {

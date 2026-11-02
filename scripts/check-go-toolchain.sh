@@ -54,6 +54,10 @@ if [ -n "$exact" ]; then
   echo "Go $have is go$want ($mod)"
   exit 0
 fi
+sort -V </dev/null >/dev/null 2>&1 || {
+  echo "error: sort -V is not available" >&2
+  exit 1
+}
 lowest=$(printf '%s\n%s\n' "$want" "$have" | sort -V | head -n 1)
 if [ "$lowest" != "$want" ]; then
   echo "error: Go $have is older than go$want, the toolchain $mod requires" >&2

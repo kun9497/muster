@@ -5,6 +5,10 @@ starts it weekly (`OnCalendar=weekly`, `Persistent=true`, with up to an hour of
 random delay). Each run writes a snapshot under `/var/lib/muster`, the default
 `--out`.
 
+`collect` exits 1 when a collector could not finish, so the unit shows
+`failed` although the partial snapshot was written; `journalctl -u
+muster-collect` names the collector.
+
 The muster package does not install these units on the unit search path and
 never enables them: they ship as documentation under
 `/usr/share/doc/muster/examples/systemd/` (and under `examples/systemd/` in the

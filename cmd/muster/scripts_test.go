@@ -54,6 +54,9 @@ func TestCheckGoToolchainScript(t *testing.T) {
 		errPath   bool   // stderr also names the go.mod read
 	}{
 		{name: "floor below", toolchain: "go1.0.1", wantExit: 0},
+		// sort -V puts 1.9.9 below 1.26.x; a lexical sort would put it above
+		// ('9' > '2'), so this case fails without -V.
+		{name: "floor two-digit minor", toolchain: "go1.9.9", wantExit: 0},
 		{name: "floor above", toolchain: "go99.0.0", wantExit: 1, wantErr: "Go " + have + " is older than go99.0.0, the toolchain ", errPath: true},
 		{name: "exact running", toolchain: "go" + have, exact: true, wantExit: 0},
 		{name: "exact other", toolchain: "go1.0.1", exact: true, wantExit: 1, wantErr: "Go " + have + " is not go1.0.1 (--exact)"},
@@ -165,15 +168,21 @@ func requireCleanCheckout(t *testing.T) {
 			t.Skipf("%s not on PATH", tool)
 		}
 	}
-	if err := exec.Command("git", "rev-parse", "--git-dir").Run(); err != nil {
-		t.Skipf("not a git checkout (git rev-parse --git-dir: %v); reproduce.sh builds a git ref", err)
+	// The skip names git's own words: as root in CI's sudo step git refuses
+	// the runner's checkout as "dubious ownership", not a missing .git.
+	if out, err := exec.Command("git", "rev-parse", "--git-dir").CombinedOutput(); err != nil {
+		t.Skipf("no usable .git (git rev-parse --git-dir: %v: %s); reproduce.sh builds a git ref", err, bytes.TrimSpace(out))
 	}
 	out, err := exec.Command("git", "--no-optional-locks", "status", "--porcelain").Output()
 	if err != nil {
+		var ee *exec.ExitError
+		if errors.As(err, &ee) {
+			t.Skipf("git status --porcelain: %v: %s", err, bytes.TrimSpace(ee.Stderr))
+		}
 		t.Skipf("git status --porcelain: %v", err)
 	}
 	if len(bytes.TrimSpace(out)) != 0 {
-		t.Skip("the working tree differs from HEAD; reproduce.sh builds the committed HEAD")
+		t.Skip("dirty tree: the working tree differs from HEAD; reproduce.sh builds the committed HEAD")
 	}
 }
 

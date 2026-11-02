@@ -107,9 +107,12 @@ type pruneFlags struct {
 	b      snapshots.Bounds
 }
 
+// maxKeepDays is --keep-days' ceiling: --max-age's 100 years (AX-14), in days.
+const maxKeepDays = maxAgeLimit / 86400
+
 // parsePruneArgs reads --keep and --keep-days (non-negative integers, each
-// at most once), --dir and --dry-run; with neither bound it returns
-// snapshots.ErrNoBounds.
+// at most once; --keep-days at most maxKeepDays), --dir and --dry-run; with
+// neither bound it returns snapshots.ErrNoBounds.
 func parsePruneArgs(args []string) (pruneFlags, error) {
 	f := pruneFlags{dir: snapshots.DefaultDir}
 	dirSet := false
@@ -125,7 +128,7 @@ func parsePruneArgs(args []string) (pruneFlags, error) {
 			}
 			return args[i], nil
 		}
-		bound := func(n *int, has *bool) error {
+		bound := func(n *int, has *bool, most int) error {
 			if *has {
 				return fmt.Errorf("flag %s given twice", a)
 			}
@@ -137,15 +140,18 @@ func parsePruneArgs(args []string) (pruneFlags, error) {
 			if err != nil || k < 0 {
 				return fmt.Errorf("flag %s needs a non-negative integer", a)
 			}
+			if most > 0 && k > most {
+				return fmt.Errorf("flag %s must be at most %d", a, most)
+			}
 			*n, *has = k, true
 			return nil
 		}
 		var err error
 		switch a {
 		case "--keep":
-			err = bound(&f.b.Keep, &f.b.HasKeep)
+			err = bound(&f.b.Keep, &f.b.HasKeep, 0)
 		case "--keep-days":
-			err = bound(&f.b.KeepDays, &f.b.HasKeepDays)
+			err = bound(&f.b.KeepDays, &f.b.HasKeepDays, maxKeepDays)
 		case "--dir":
 			if dirSet {
 				return f, fmt.Errorf("flag %s given twice", a)

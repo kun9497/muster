@@ -3,13 +3,17 @@
 # -- the install contract (spec §4.6 RL-11, RL-13; §4.7). It runs inside a bare
 # distribution image, as root, with no network and no package installation:
 # CI's install-contract job mounts dist/ at /dist, ci/release/ at /ci and
-# examples/ at /ex. It installs the artefact (dpkg -i, rpm -U, or tar -xzf into
+# examples/ at /ex. It installs the artefact (dpkg -i, rpm -U --replacepkgs --
+# RA-42: rpm -U of an installed NEVRA exits 2 -- or tar -xzf into
 # /opt/muster-tar) and asserts what the package does and does not do:
-#   - the installed file list (dpkg -L / rpm -ql, sorted) equals the committed
-#     ci/release/contract-files.<deb|rpm>.txt exactly;
+#   - the installed file list (dpkg -L / rpm -ql, or the archive's tar -tzf,
+#     sorted) equals the committed ci/release/contract-files.<deb|rpm|tar>.txt
+#     exactly, compared with comm, since the EL images carry no diff;
+#   - deb/rpm: /usr/bin/muster is mode 755, owned by 0:0;
 #   - the package metadata and version (nfpm's spelling: - becomes ~, plus -1);
-#   - no muster unit under /etc/systemd/system or /usr/lib/systemd/system, no
-#     process named muster, no /var/lib/muster;
+#   - nothing named muster* anywhere under /etc/systemd, /usr/lib/systemd or
+#     /lib/systemd (a unit or a *.wants/ enablement link), no process named
+#     muster, no /var/lib/muster;
 #   - muster version prints five lines, the first `muster <version>`;
 #   - muster check over the example snapshot exits with <expected exit>;
 # then installs the same package again (the upgrade) and asserts the same;
@@ -112,11 +116,20 @@ assert_installed() {
 		rpm -ql muster | LC_ALL=C sort >/tmp/contract-files.txt
 		same_list "$here/contract-files.rpm.txt" "rpm -ql muster"
 		;;
+	tar)
+		tar -tzf "$pkg" | LC_ALL=C sort >/tmp/contract-files.txt
+		same_list "$here/contract-files.tar.txt" "tar -tzf $(basename "$pkg")"
+		;;
 	esac
 	[ -f "$bin" ] && [ -x "$bin" ] || fail "$bin is not an executable file"
-	for u in /etc/systemd/system/muster* /usr/lib/systemd/system/muster*; do
-		[ ! -e "$u" ] && [ ! -L "$u" ] || fail "a unit was installed: $u"
-	done
+	if [ "$kind" != tar ]; then
+		got=$(stat -c '%a %u %g' "$bin")
+		[ "$got" = "755 0 0" ] || fail "$bin is '$got' (mode uid gid), want '755 0 0'"
+	fi
+	# An enabling maintainer script would leave a *.wants/ link that no file
+	# list records; look under every systemd tree, at any depth.
+	found=$(find /etc/systemd /usr/lib/systemd /lib/systemd -name 'muster*' 2>/dev/null || true)
+	[ -z "$found" ] || fail "a unit or an enablement link was installed: $found"
 	for c in /proc/[0-9]*/comm; do
 		[ "$(cat "$c" 2>/dev/null)" != muster ] || fail "a process named muster runs ($c)"
 	done

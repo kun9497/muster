@@ -59,6 +59,9 @@ func TestPruneParsesArgs(t *testing.T) {
 	if got, err := parsePruneArgs([]string{"--keep-days", "7"}); err != nil || got.dir != snapshots.DefaultDir || got.b != (snapshots.Bounds{KeepDays: 7, HasKeepDays: true}) {
 		t.Errorf("--keep-days 7: %+v, %v", got, err)
 	}
+	if got, err := parsePruneArgs([]string{"--keep-days", "36500"}); err != nil || got.b != (snapshots.Bounds{KeepDays: 36500, HasKeepDays: true}) {
+		t.Errorf("--keep-days 36500: %+v, %v", got, err)
+	}
 	if _, err := parsePruneArgs(nil); !errors.Is(err, snapshots.ErrNoBounds) {
 		t.Errorf("no bound: err = %v, want ErrNoBounds", err)
 	}
@@ -68,6 +71,7 @@ func TestPruneParsesArgs(t *testing.T) {
 	}{
 		{[]string{"--keep", "-1"}, "flag --keep needs a non-negative integer"},
 		{[]string{"--keep-days", "-2"}, "flag --keep-days needs a non-negative integer"},
+		{[]string{"--keep-days", "36501"}, "flag --keep-days must be at most 36500"},
 		{[]string{"--keep", "x"}, "flag --keep needs a non-negative integer"},
 		{[]string{"--keep", "1", "--keep", "2"}, "flag --keep given twice"},
 		{[]string{"--keep-days", "1", "--keep-days", "2"}, "flag --keep-days given twice"},

@@ -192,14 +192,16 @@ type Bounds struct {
 // Prune selects the entries to remove, in Sort order. Only ok entries are
 // candidates and the newest ok one never is (RL-17). With both bounds set an
 // entry goes only when it is beyond the newest Keep ok entries and collected
-// strictly before now - KeepDays*24h; with one set, that bound alone.
+// strictly before now - KeepDays*24h; with one set, that bound alone. The
+// cutoff is a calendar step back (AddDate), so no KeepDays wraps it into the
+// future; now and every parsed CollectedAt are UTC, where a day is 86400 s.
 func Prune(entries []Entry, b Bounds, now time.Time) ([]Entry, error) {
 	if !b.HasKeep && !b.HasKeepDays {
 		return nil, ErrNoBounds
 	}
 	sorted := slices.Clone(entries)
 	Sort(sorted)
-	cutoff := now.Add(-time.Duration(b.KeepDays) * 24 * time.Hour)
+	cutoff := now.AddDate(0, 0, -b.KeepDays)
 	var out []Entry
 	rank := 0 // position among ok entries, newest is 0
 	for _, e := range sorted {

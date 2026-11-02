@@ -267,6 +267,20 @@ func TestRepointLatestWritesARelativeLinkAtomically(t *testing.T) {
 	if body, err := os.ReadFile(filepath.Join(dir, "latest")); err != nil || string(body) != "not a link" {
 		t.Errorf("a regular latest changed: %q, %v", body, err)
 	}
+	// A non-empty target is refused over a regular latest, never renamed over it.
+	if err := d.repointLatest("b.json"); err == nil || !strings.Contains(err.Error(), "is not a symlink, left as is") {
+		t.Errorf("repointLatest over a regular latest: err = %v, want a refusal", err)
+	}
+	fi, err := os.Lstat(filepath.Join(dir, "latest"))
+	if err != nil || !fi.Mode().IsRegular() {
+		t.Errorf("latest after the refusal: %v, %v; want a regular file", fi, err)
+	}
+	if body, err := os.ReadFile(filepath.Join(dir, "latest")); err != nil || string(body) != "not a link" {
+		t.Errorf("a regular latest changed by the refusal: %q, %v", body, err)
+	}
+	if left, _ := filepath.Glob(filepath.Join(dir, ".latest.tmp-*")); len(left) != 0 {
+		t.Errorf("temporary links left after the refusal: %v", left)
+	}
 }
 
 // A second lock on the same directory is refused while the first is held.

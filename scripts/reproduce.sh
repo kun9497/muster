@@ -1,9 +1,10 @@
 #!/bin/sh
 # Rebuilds a git ref of muster the way the release builds it and compares the
-# binary's bytes with a published artefact's (spec §4.3 RL-8). The release is
-# reproducible because every input is the commit's: the toolchain named by its
-# go.mod, -trimpath and -buildvcs=false, and -X values that are the version,
-# the full commit and the commit date in UTC (RA-1) -- never the build's clock.
+# binary's bytes with a published artefact's (spec §4.3, RL-5, RL-7). The
+# release is reproducible because every input is the commit's: the toolchain
+# named by its go.mod, -trimpath and -buildvcs=false, and -X values that are
+# the version, the full commit and the commit date in UTC (RA-1) -- never the
+# build's clock.
 #
 #   sh scripts/reproduce.sh --ref <git ref> --version <string> [--arch amd64|arm64] <artefact>
 #   sh scripts/reproduce.sh --print-date --ref <git ref>
@@ -112,7 +113,10 @@ export GOTOOLCHAIN
 mkdir "$tmp/out" "$tmp/x" || fail "cannot make directories under $tmp"
 (
 	cd "$src" &&
-		CGO_ENABLED=0 GOOS=linux GOARCH=$arch GOAMD64=v1 GOARM64=v8.0 GOFLAGS=-mod=readonly 			go build -trimpath -buildvcs=false 			-ldflags "-s -w -X main.version=$version -X main.commit=$sha -X main.date=$date" 			-o "$tmp/out/muster" ./cmd/muster
+		CGO_ENABLED=0 GOOS=linux GOARCH=$arch GOAMD64=v1 GOARM64=v8.0 GOFLAGS=-mod=readonly \
+			go build -trimpath -buildvcs=false \
+			-ldflags "-s -w -X main.version=$version -X main.commit=$sha -X main.date=$date" \
+			-o "$tmp/out/muster" ./cmd/muster
 ) || fail "go build of $ref failed"
 
 # Only the one member that holds the binary is extracted.

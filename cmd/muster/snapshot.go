@@ -86,9 +86,9 @@ ok snapshot left. --dry-run prints what would go.
 exit codes: 0 removed (or would remove); 2 refused or an I/O error.
 
 prune removes the ok snapshots outside the newest N (--keep) and older than D
-days (--keep-days); with one bound, that bound alone. It never removes the
-newest ok snapshot, a newer or an unreadable one, and re-points latest as rm
-does. --dry-run prints what would go.
+days (--keep-days, at most 36500); with one bound, that bound alone. It never
+removes the newest ok snapshot, a newer or an unreadable one, and re-points
+latest as rm does. --dry-run prints what would go.
 
 exit codes: 0 pruned (or would prune); 2 no bound, refused or an I/O error.
 `

@@ -18,7 +18,7 @@ case "${1:-}" in
 			rm -f "$d" || echo "muster: could not remove the symlink $d" >&2
 		elif [ -d "$d" ]; then
 			own=$(stat -c %d "$d" 2>/dev/null) || own=''
-			parent=$(stat -c %d /var/lib 2>/dev/null) || parent=''
+			parent=$(stat -L -c %d /var/lib 2>/dev/null) || parent=''
 			if [ -z "$own" ] || [ -z "$parent" ]; then
 				echo "muster: could not stat $d or /var/lib; $d left for the operator" >&2
 			elif [ "$own" != "$parent" ]; then

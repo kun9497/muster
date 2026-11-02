@@ -831,13 +831,15 @@ jobs:
           sh scripts/check-go-toolchain.sh --exact
           test "$(go env GOVERSION)" = "go$(sed -n 's/^toolchain go//p' go.mod)"
       # RL-14: the release job's notes step, both ways: a section prints, and
-      # a version that will never exist fails on the real CHANGELOG.md. The
-      # `!` line stays last: bash's -e ignores a `!` command's status, so only
-      # as the step's final command does its status become the step's.
+      # a version that will never exist is refused (exit 1, "has no section")
+      # on the real CHANGELOG.md.
       - name: release notes from the changelog
         run: |
           sh scripts/release-notes.sh v0.1.0 ci/release/testdata/CHANGELOG.sample.md >/dev/null
-          ! sh scripts/release-notes.sh v0.0.0 CHANGELOG.md
+          rc=0
+          sh scripts/release-notes.sh v0.0.0 CHANGELOG.md >/dev/null 2>"$RUNNER_TEMP/notes.err" || rc=$?
+          cat "$RUNNER_TEMP/notes.err"
+          [ "$rc" -eq 1 ] && grep -q 'has no section' "$RUNNER_TEMP/notes.err"
       # RA-21: the version is explicit, so the log and the diff name it.
       - uses: anchore/sbom-action/download-syft@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
         with:
@@ -858,9 +860,17 @@ jobs:
         run: goreleaser release --snapshot --clean --skip=publish,sign
       - name: the amd64 binary reproduces
         run: sh scripts/reproduce.sh --ref HEAD --version "$(jq -r .version dist/metadata.json)" "$(jq -r '.[] | select(.type=="Binary" and .goarch=="amd64") | .path' dist/artifacts.json)"
-      # RA-19: the packages carry their conventional names.
-      - name: the amd64 .deb is where artifacts.json says
-        run: test -e "dist/$(jq -r '.[] | select(.type=="Linux Package" and .goarch=="amd64" and (.name|endswith(".deb"))) | .name' dist/artifacts.json)"
+      # RA-19: the packages carry their conventional names (nfpm's spelling
+      # of the version: - becomes ~, release 1).
+      - name: the amd64 .deb and .rpm are where artifacts.json says
+        run: |
+          v=$(jq -r .version dist/metadata.json | tr - '~')
+          for want in "muster_${v}-1_amd64.deb" "muster-${v}-1.x86_64.rpm"; do
+            ext=${want##*.}
+            n=$(jq -r --arg ext ".$ext" '.[] | select(.type=="Linux Package" and .goarch=="amd64" and (.name|endswith($ext))) | .name' dist/artifacts.json)
+            { [ -n "$n" ] && test -f "dist/$n"; } || { echo "no amd64 .$ext in artifacts.json/dist: '$n'"; exit 1; }
+            [ "$n" = "$want" ] || { echo "amd64 .$ext is $n, want $want"; exit 1; }
+          done
       # RA-20: syft saw the Go module list inside the archive's binary.
       - name: every archive SBOM lists the binary's modules
         run: |
@@ -871,6 +881,17 @@ jobs:
             n=$((n+1))
           done
           [ "$n" -eq 2 ]
+      # A package SBOM describes the package (syft catalogues the .deb/.rpm
+      # header); the archive SBOM of the same architecture lists the modules.
+      - name: every package SBOM describes the muster package
+        run: |
+          n=0
+          for f in dist/*.deb.spdx.json dist/*.rpm.spdx.json; do
+            [ -e "$f" ] || continue
+            jq -e '(.packages|length) >= 1 and any(.packages[]; .name=="muster")' "$f"
+            n=$((n+1))
+          done
+          [ "$n" -eq 4 ]
       # RA-15: no brace globs (@actions/glob has none). Task 7's install
       # contract reads artifacts.json from this artifact.
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -927,7 +948,7 @@ jobs:
             tar) sel='.type=="Archive" and .goarch=="amd64"' ;;
           esac
           artefact=$(jq -r ".[] | select($sel) | .name" dist/artifacts.json)
-          [ -n "$artefact" ] && [ "$(printf '%s\n' "$artefact" | wc -l)" -eq 1 ] && [ -f "dist/$artefact" ]
+          { [ -n "$artefact" ] && [ "$(printf '%s\n' "$artefact" | wc -l)" -eq 1 ] && [ -f "dist/$artefact" ]; } || { echo "want one $KIND artefact, got: $artefact"; exit 1; }
           version=$(jq -r .version dist/metadata.json)
           expected=$(sh ci/release/expected-exit.sh examples/ubuntu-24.04-vm-report.json)
           echo "artefact $artefact, version $version, expected exit $expected"
