@@ -13,5 +13,9 @@ govulncheck pinned by version, as GoReleaser's post-build hook (§4.2);
 prints the `-X main.date` value it would use);
 `release-notes.sh vX.Y.Z` extracts a version's `CHANGELOG.md` section as the
 release notes (§4.8 RL-14). All are POSIX `sh`, shellcheck-clean, and checked
-by `make shellcheck` and CI's shellcheck step, as is the Debian package's
-`postrm` under `ci/release/` (§4.6 RL-13).
+by `make shellcheck` and CI's shellcheck step, as are the scripts under
+`ci/release/`: the Debian package's `postrm` (§4.6 RL-13), the install
+contract `contract.sh` and `expected-exit.sh` the CI matrix runs inside each
+image (§4.7), and `ops-alert.sh`, which opens, updates or closes the pinned
+issue the release workflow's `alert` job keeps (§4.10). `sort -V`, which the
+toolchain check relies on, is a GNU and busybox extension.

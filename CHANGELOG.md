@@ -10,6 +10,38 @@ verdict on an existing snapshot is at least a minor release and appears under
 ## [Unreleased]
 
 ### Added
+- `muster snapshot ls`, `snapshot rm` and `snapshot prune --keep N --keep-days D`
+  (stage 4A, D13, D37) list and remove the snapshots under
+  `/var/lib/muster/snapshots`: `ls` shows every row as `ok`, `newer` (written by
+  a newer muster) or `unreadable` and counts, without opening, whatever else the
+  directory holds; `prune` removes only readable snapshots outside the bounds and
+  never the newest one; `rm` removes any named regular file after checking every
+  name first. Both work through one descriptor of a directory the caller owns,
+  take `collect`'s lock, and re-point `latest` when its target goes. Exit codes
+  are 0 and 2; stdout carries only the listing or the `--dry-run` plan.
+- `muster version` prints five lines: version, full commit, the commit's date,
+  the control set version and the facts schema version. The Makefile stamps the
+  commit's date instead of the build's, so `make build` reproduces a release.
+
+### Tooling
+- The release pipeline (stage 4A, D37): `.goreleaser.yaml` builds `linux/amd64`
+  and `linux/arm64` under the one toolchain `go.mod` names (`toolchain
+  go1.26.10`) into tar.gz archives and `.deb`/`.rpm` packages that install the
+  binary and the documents and start nothing; `release.yml` runs on a `v*` tag
+  cut from `main`, signs the checksums keyless with cosign, attests build
+  provenance, attaches SPDX SBOMs, takes the release notes from this file's
+  section for the version, and opens a pinned issue when it fails. CI gains
+  `govulncheck` on the sources, a toolchain check, a `release-dry-run` job that
+  builds everything without publishing and proves `scripts/reproduce.sh`
+  rebuilds the same bytes, and an `install-contract` matrix that installs the
+  packages in five images against committed file lists. Every GitHub Action is
+  pinned by commit SHA and dependabot proposes the moves.
+
+The sections below record every change before the first release.
+
+## History before 0.1.0
+
+### Added
 - `muster snapshot anonymize` (stage 3D-3, D36) writes a copy of a snapshot
   for sharing. User and group names, host names, addresses, key fingerprints,
   the machine-id hash, template unit instances and the names inside paths
@@ -941,7 +973,7 @@ configuration walk stopped at an `Include` outside the declaration (below).
   is a row with an empty path and the reason; it no longer carries the
   symlink flag `unfollowed`.
 
-## Stage 1 (2026-09-03)
+### Stage 1 (2026-09-03)
 
 `collect` and `check`, the facts schema, table and JSON output, exit codes,
 waivers, the snapshot lifecycle, `controls lint` and the fixture convention,

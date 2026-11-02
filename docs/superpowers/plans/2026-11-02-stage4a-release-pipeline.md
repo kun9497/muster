@@ -353,4 +353,16 @@ Pre-flight (2026-11-02, a workflow of three fresh finders by lens and one refute
 - **RA-33** The lifecycle exit codes get `### 7.6` in the main design; the Stage 1 section joins the history heading.
 - **RA-34** Two contract file lists; spec §4.7's sentence and "three lines" → five are corrected.
 
-(rulings RA-35.. are appended here during execution)
+Execution (2026-11-02, subagent-driven; ledger `.superpowers/sdd/2026-11-02-stage4a-release-pipeline/progress.md`):
+
+- **RA-35** `report.Escape` spells a newline as `\n`, not `\u000a`; the `ls` tests follow Escape (Task 3).
+- **RA-36** staticcheck U1000 on `dirKind`/`stat`/`dirLock` was accepted as transient between Tasks 3 and 4 (plan-mandated placement); clean after Task 4.
+- **RA-37** The RL-16 warning reads `<name> (<class>) is newer than the newest readable snapshot <newest>` (the brief's form read "is newer and newer than" for the `newer` class).
+- **RA-38** The dry run and the release run GoReleaser through the action's `install-only: true` and a `run:` step, so shell variables are available and the two builds are the same command.
+- **RA-39** nfpm's `type: doc` is rpm-only (v2.47 drops typed entries for deb), so each document is listed untyped for deb and `doc` for rpm.
+- **RA-40** Debian `postrm purge`: a symlinked `/var/lib/muster` loses the link; a mount point (device differs from `/var/lib`'s) is left with a stderr note; otherwise `rm -rf --one-file-system`; the purge never fails on the script. GNU `rm --one-file-system` protects only mounts below the argument, so the original RA-27 wording was wrong; a bind mount of the same filesystem is not detected.
+- **RA-41** nfpm `description`/`rpm.summary` keep the README's two-sentence opening (the question alone is uninformative).
+- **RA-42** `rpm -U` of an installed NEVRA exits 2, so the contract's upgrade step uses `rpm -U --replacepkgs` (RA-28 corrected). `reproduce.sh` extracts rpm payloads with `cpio --no-absolute-filenames` (nfpm writes absolute paths) and names the member as both `usr/bin/muster` and `./usr/bin/muster` (GNU cpio matches without the leading `./`).
+- **RA-43** `ops-alert.sh` treats `cancelled` as a failure (a job that hits `timeout-minutes` reports cancelled) and `skipped` as a no-op — applied in the final fix wave.
+- **RA-44** A pre-release tag (`vX.Y.Z-…`) is refused by `release.yml`'s first step while the project is `0.x` (`release.prerelease` is false, so an rc would publish as Latest) — applied in the final fix wave; `RELEASING.md` (4C) states it.
+- Lessons: an implementer that rewrites a whole test file drops its neighbours (Task 1) — briefs say "edit in place"; the lab copy has no `.git` and pins `GOTOOLCHAIN=go1.25.5`, so `reproduce.sh`'s own-build test skips there and CI's `test` job is its proof; the Node-20 retirement forced `actions/checkout`→v7, `upload-artifact`→v7, `download-artifact`→v8, `gitleaks-action`→v3 when pinning.

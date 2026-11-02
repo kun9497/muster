@@ -107,14 +107,14 @@ main.version/commit/date` 변수(muster의 Makefile이 이미 같은 셋을 넣�
 
 ### 4.2 빌드
 
-- **RL-4 — 툴체인은 하나, `go.mod`에 이름이 있다.** `go.mod`에 `toolchain go1.25.x` 줄이 생긴다(CI가 오늘 고정하는
+- **RL-4 — 툴체인은 하나, `go.mod`에 이름이 있다.** `go.mod`는 `go 1.25`를 언어 버전으로 유지하고, 지원되는 Go 라인의 최신 패치를 이름 붙인 `toolchain goX.Y.Z` 줄이 생긴다(4A에서 go1.26.10; RA-17 — 1.25는 더 이상 수정을 받지 않으므로 "권고에 줄을 올린다"에는 아직 움직이는 라인이 필요하다; CI가 오늘 고정하는
   버전은 1.25.5이고, 플랜은 그 시점의 최신 1.25 패치로 올린다). `release.yml`과 `ci.yml`은 `go-version-file: go.mod`로
   Go를 설치하고 `scripts/check-go-toolchain.sh`를 돌린다. CI에서는 이 줄이 하한이고(더 새 패치는 통과), 릴리스 잡에서는
   같아야 한다(`--exact`). 패치가 다르면 바이트가 달라져 §4.3이 실패하기 때문이다. 줄을 올리는 것은 보통 커밋이다.
   수정이 있는 stdlib 권고는 다음 태그 전에 줄을 올린다.
 - **RL-5 — 빌드는 구성상 재현 가능하다.** GoReleaser의 빌드는 `mod_timestamp: '{{ .CommitTimestamp }}'`, `-X
   main.date={{ .CommitDate }}`(빌드 날짜가 아닌 커밋 날짜 — 따라서 `muster version`은 소스가 커밋된 때를 찍고,
-  Makefile의 `DATE`는 `git log -1 --format=%cI`로 바뀌어 `make build`와 일치한다), `-X main.version={{ .Version }}`(`v`
+  Makefile의 `DATE`는 `TZ=UTC git log -1 --format=%cd --date=format-local:%Y-%m-%dT%H:%M:%SZ`로 바뀐다 — `{{ .CommitDate }}`와 같은 유일한 표기이며, `%cI`는 커미터의 오프셋을 찍고 보통 `format:`은 그것을 가짜 `Z`와 함께 그린다(RA-1) — 그래서 `make build`와 일치한다), `-X main.version={{ .Version }}`(`v`
   없는 태그), `-X main.commit={{ .FullCommit }}`(Makefile의 짧은 해시가 전체 해시가 된다; `muster version`은 전처럼
   두 형태를 찍는다)를 설정한다. `-buildvcs=false`를 두어 바이너리가 이 변수들 외의 VCS 스탬프를 들지 않게 한다.
   아카이브와 패키지는 커밋 타임스탬프에서 `SOURCE_DATE_EPOCH`를 설정한다.
@@ -139,7 +139,7 @@ main.version/commit/date` 변수(muster의 Makefile이 이미 같은 셋을 넣�
 | 파일 | 내용 |
 |---|---|
 | `muster_X.Y.Z_linux_<arch>.tar.gz` | `muster`, `LICENSE`, `NOTICE`, `ATTRIBUTION.md`, `README.md`, `README.ko.md`, `THREAT_MODEL.md`, `SECURITY.md`, `CHANGELOG.md`, `examples/systemd/` (§4.6) |
-| `muster_X.Y.Z_linux_<arch>.deb`, `muster-X.Y.Z-1.<rpmarch>.rpm` | §4.6 |
+| `muster_X.Y.Z-1_<amd64|arm64>.deb`, `muster-X.Y.Z-1.<x86_64|aarch64>.rpm` (nfpm의 관례 이름, RA-19) | §4.6 |
 | `muster_X.Y.Z_checksums.txt` | 위 모든 파일의 sha256 |
 | `muster_X.Y.Z_checksums.txt.sigstore.json` | checksums 파일에 대한 keyless 서명 번들 (§4.5) |
 | `muster_X.Y.Z_linux_<arch>.tar.gz.spdx.json`, `.deb`/`.rpm`마다 하나 | SBOM, SPDX JSON, 고정 버전 syft (RL-8) |
@@ -151,7 +151,7 @@ main.version/commit/date` 변수(muster의 Makefile이 이미 같은 셋을 넣�
 
 ### 4.5 서명과 증명
 
-- **RL-9 — keyless, 번들 형식.** 잡의 OIDC 토큰(`id-token: write`) 아래에서 `cosign sign-blob --bundle
+- **RL-9 — keyless, Sigstore 번들.** 잡의 OIDC 토큰(`id-token: write`) 아래에서 `cosign sign-blob --new-bundle-format --bundle
   <checksums>.sigstore.json <checksums>`. cosign은 assay가 고정하는 대로 v2.4 라인으로 고정한다. 서명 신원은 태그
   시점의 워크플로다: `https://github.com/kun9497/muster/.github/workflows/release.yml@refs/tags/vX.Y.Z`, 발급자
   `https://token.actions.githubusercontent.com`. 항목은 공개 투명성 로그에 들어간다. 저장소가 공개라 로그는 Releases
@@ -178,7 +178,7 @@ main.version/commit/date` 변수(muster의 Makefile이 이미 같은 셋을 넣�
   (`OnCalendar=weekly`, `Persistent=true`)는 저자의 선택이다. 운영자가 말한 지평이 한 달이고 한 주면 그 안에 네 점이
   생기기 때문이다. 유닛은 README의 첫 실행과 같은 명령인 `--deep` 없는 `collect`를 돌려서 주간 스냅샷들이 통째로
   비교된다(§5.4). walk를 원하는 운영자는 유닛을 고치고, 그러면 모든 스냅샷이 deep이 된다.
-- **RL-13 — 관리자 스크립트.** `preinst`, `postinst`, `prerm` 없음. Debian의 `postrm`: `purge`에서만
+- **RL-13 — 관리자 스크립트.** `preinst`, `postinst`, `prerm` 없음. Debian의 `postrm`(RA-27, RA-40): `purge`에서만 — 심볼릭 링크인 `/var/lib/muster`는 링크만 사라지고, 마운트 지점인 `/var/lib/muster`(`/var/lib`와 장치가 다름; 같은 파일시스템의 바인드 마운트는 감지되지 않음)는 stderr 메모와 함께 운영자에게 남기고, 그 밖에는 `rm -rf --one-file-system`이 지운다 — 그리고 purge는 이 스크립트 때문에 절대 실패하지 않는다. 그 밖에는
   `/var/lib/muster`(스냅샷, 락, `latest`)를 지우고 그 밖에는 아무것도 지우지 않는다. `remove`에서는 남긴다. rpm에는
   purge가 없다: `%postun`은 아무것도 하지 않고, erase는 `/var/lib/muster`를 남기며, README가 손으로 지우는 법을 말한다.
   패키지 스크립트는 `systemctl`을 절대 부르지 않고, 사용자나 디렉터리를 절대 만들지 않는다(`collect`가
@@ -198,9 +198,9 @@ main.version/commit/date` 변수(muster의 Makefile이 이미 같은 셋을 넣�
 - post 훅으로 돌아간 `scripts/release-vulncheck.sh`(dry run은 릴리스처럼 발견에서 실패한다);
 - `ubuntu:22.04`, `ubuntu:24.04`, `debian:12`(`.deb`), `rockylinux:9`, `almalinux:9`(`.rpm`)에 대한 **설치 계약**
   매트릭스: 패키지를 설치하고, 설치된 파일 목록이 §4.6과 정확히 같은지(`dpkg -L` / `rpm -ql`을 커밋된 목록
-  `ci/release/contract-files.txt`와 비교), 유닛이 하나도 켜지지 않았는지(`systemctl list-unit-files 'muster*'`가
+  커밋된 목록 `ci/release/contract-files.deb.txt`와 `.rpm.txt`와 비교 — 둘인 이유는 dpkg와 rpm이 다른 행을 찍기 때문이다: dpkg는 `/.`가 없고 rpm은 디렉터리 행이 전혀 없다(RA-34); EL 이미지에 `diff`가 없어 문자열 동등으로 비교), 유닛이 하나도 켜지지 않았는지(`systemctl list-unit-files 'muster*'`가
   비었거나 컨테이너에 systemd가 없음), muster 프로세스가 돌지 않았고 `/var/lib/muster`가 없는지 단언하고, `muster
-  version`을 돌려 세 줄을 스냅샷 버전과 비교하고, `muster check --facts <예제 스냅샷>`을 돌려 종료 코드를 예제의 것과
+  version`을 돌려 다섯 줄을 비교하고(1행은 `muster <version>` 그대로; 패키지 자체의 `Version` 필드는 nfpm의 `X.Y.Z-1` 형태로, 스냅샷 버전의 `-`는 `~`가 된다) 메타데이터 필드(`Maintainer`/`Packager`, `Homepage`/`URL`, 섹션/그룹, 우선순위/릴리스, RA-23)를 비교하고, `muster check --facts <예제 스냅샷>`을 돌려 종료 코드를 예제의 것과
   비교하고, 자기 위에 업그레이드하고, remove 뒤 심어 둔 `/var/lib/muster`가 남는지, purge(Debian) 뒤 사라지는지 단언한다;
 - tar.gz: 풀고 같은 `muster version`과 `check` 단언;
 - **README의 설치 블록이 돈다**(RL-28): README Install 절의 펜스 블록은 실행 가능한 템플릿이고 — `vX.Y.Z`, 아키텍처,
@@ -234,12 +234,13 @@ main.version/commit/date` 변수(muster의 Makefile이 이미 같은 셋을 넣�
 - `muster snapshot ls [--dir <d>] [--format table|json]`은 디렉터리(기본 `/var/lib/muster/snapshots`)의 스냅샷을
   나열한다: 파일 이름, `collected_at`, 호스트 이름, `muster_version`, `controls_version`, 크기, `latest`가 가리키는
   것. `collected_at` 내림차순, 이름 자체의 UTC 타임스탬프가 동점을 가른다. 작성기의 패턴(`<hostname>-<UTC
-  timestamp>-<short digest>.json`)과 맞는 이름의 일반 파일만 나열한다. 디렉터리 안의 그 밖의 것은 끝줄 하나에서 수를
+  timestamp>-<short digest>.json`)과 맞는 이름의 일반 파일만 나열한다. 디렉터리 안의 그 밖의 것은 헤더 줄에서(RA-9) 수를
   세고 절대 열지 않는다. **RL-16 — 행은 세 종류다.** 스냅샷으로 디코드되는 파일은 `ok`; `schema_version`이
   바이너리보다 새 파일은 `newer`(헤더 필드 `collected_at`과 버전들은 헤더만 느슨하게 디코드해 읽어서, 운영자가 어느
   바이너리가 썼는지 본다); 어느 쪽으로도 디코드되지 않는 파일은 `unreadable`이고 이름의 UTC 타임스탬프로 정렬한다. 두
   표시 모두 나열하고 절대 건너뛰지 않는다. 운영자는 무엇이 공간을 차지하는지 봐야 한다. "가장 새 스냅샷" — 아래 RL-17과
-  `diff`의 선택(RL-19)에서 — 은 가장 새 `ok` 행을 뜻한다. 그보다 새 `newer`나 `unreadable` 행은 stderr 경고에 이름이 난다.
+  `diff`의 선택(RL-19)에서 — 은 가장 새 `ok` 행을 뜻한다. 그보다 새 `newer`나 `unreadable` 행은 `prune`과 `rm`의 재지정이
+  stderr 경고로 이름을 대고 `ls`는 대지 않는다(RA-4): `<name> (<class>) is newer than the newest readable snapshot <newest>`(RA-37).
 - `muster snapshot rm <name|path>…`는 이름 붙인 파일을 지운다: 디렉터리 안의 어떤 일반 파일이든 이름으로(패턴에
   맞든 아니든, `ok`든 `newer`든 `unreadable`이든 — `rm`은 `prune`이 건드리지 않는 것을 위한 명시적 길이다), 또는 어디의
   파일이든 전체 경로로(`rm`은 디렉터리를 절대 추측하지 않는다). `rm latest`는 거부한다("latest는 링크다; 가리키는
@@ -257,7 +258,7 @@ main.version/commit/date` 변수(muster의 Makefile이 이미 같은 셋을 넣�
   불가. 위의 구성 요소들은 걷지 않는다. 그래서 작성기와 삭제기가 일치하고, `collect`할 수 있는 디렉터리는 prune할 수
   있다. 디렉터리는 `O_NOFOLLOW|O_DIRECTORY`로 한 번 열고, 모든 나열과 삭제는 그 fd를 통한다(`unlinkat`). 나열과 삭제
   사이에 다시 가리켜질 수 있는 경로로는 절대 지우지 않는다. 디렉터리 안의 심볼릭 링크는 절대 따르지 않고 `prune`이 절대
-  지우지 않는다(`ls`는 끝줄 수에 넣어 나열한다). 디렉터리 밖의 전체 경로를 `rm`에 주면 그 부모에 같은 규칙을 적용한다.
+  지우지 않는다(`ls`는 헤더의 수에 넣어 나열한다). 디렉터리 밖의 전체 경로를 `rm`에 주면 그 부모에 같은 규칙을 적용한다.
   세 명령은 디렉터리의 소유자로 돈다 — 기본 배치에서는 root — 소유하지 않는 디렉터리는 거부하고(종료 2) 다른 사용자의
   파일에 `sudo`로 행동하지 않는다. `collect`는 바뀌지 않는다.
 - 기준 설계 §8의 "스냅샷은 `collect`가 쓰는 유일한 파일이다" 문장은 `snapshot rm`과 `prune`을 파일을 지우는 유일한
@@ -529,16 +530,16 @@ GoReleaser와 nfpm의 필드 이름과 정확한 고정 버전; `scripts/`와 `c
 - **RL-1** `v0.1.0`이 처음. 운영자 피드백을 읽기 전까지 `0.x`.
 - **RL-2** 대상은 `linux/amd64`, `linux/arm64`만.
 - **RL-3** 설치 스크립트 없음. 릴리스 잡은 `main`에 절대 푸시하지 않는다.
-- **RL-4** `go.mod`에 이름 붙인 툴체인 하나. CI는 하한, 릴리스는 정확히.
-- **RL-5** 구성상 재현 가능: 커밋 타임스탬프와 날짜, `-trimpath`, `-buildvcs=false`, 정확한 툴체인.
+- **RL-4** `go.mod`에 이름 붙인 툴체인 하나(지원되는 라인의 최신 패치; `go 1.25`는 그대로). CI는 하한, 릴리스는 정확히.
+- **RL-5** 구성상 재현 가능: 커밋 타임스탬프와 날짜(`TZ=UTC` 아래 `format-local:`), `-trimpath`, `-buildvcs=false`, 정확한 툴체인.
 - **RL-6** 태그는 `main`에서 끊고 절대 옮기거나 지우지 않는다. 실패한 태그는 남고 메모된다.
 - **RL-7** README는 `reproduce.sh`가 증명하는 것만 주장한다.
 - **RL-8** SBOM은 고정 syft의 SPDX JSON, 아카이브와 패키지마다 하나.
-- **RL-9** checksums 파일에 대한 keyless 서명, 번들 형식, 신원 = 태그 시점의 릴리스 워크플로.
+- **RL-9** checksums 파일에 대한 keyless 서명, Sigstore 번들(`--new-bundle-format`), 신원 = 태그 시점의 릴리스 워크플로.
 - **RL-10** 증명은 SLSA Build L2로 말하고, 증명하지 않는 것도 말한다.
 - **RL-11** 패키지는 바이너리와 문서를 설치하고 아무것도 시작하지 않는다. `/etc`, `/var`, `/usr/lib/systemd` 아래에는 아무것도 없다.
 - **RL-12** 예시 유닛은 문서 디렉터리에. weekly.
-- **RL-13** pre/post-install 스크립트 없음. Debian purge는 `/var/lib/muster`를 지우고 rpm erase는 남긴다.
+- **RL-13** pre/post-install 스크립트 없음. Debian purge는 마운트 지점(메모와 함께 남김)이나 심볼릭 링크(링크만 사라짐)가 아닌 한 `/var/lib/muster`를 지우고 절대 실패하지 않는다. rpm erase는 남긴다.
 - **RL-14** 릴리스 노트는 CHANGELOG 절. 절이 없으면 릴리스가 실패한다.
 - **RL-15** `muster version`은 다섯 줄을 찍는다(version, commit, built, controls, schema).
 - **RL-16** `ls`의 행은 `ok`, `newer`, `unreadable`이고 절대 건너뛰지 않는다. 스냅샷이 아닌 이름은 세기만 하고 절대 열지 않는다.

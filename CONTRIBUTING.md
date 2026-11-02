@@ -414,6 +414,11 @@ source (`Output.Source`).
   capability matrix
   (`docs/reference/capability-matrix.json`): facts that must be `denied`
   without root and `unsupported` without systemd.
+- Release tooling: `scripts/*.sh` and `ci/release/*.sh` are POSIX `sh`, `set -eu`, with a header naming the
+  stage-4 spec section they serve, and `make shellcheck` enumerates them with a minimum count. Every GitHub
+  Action is pinned by commit SHA with the tag in a trailing comment (`uses: owner/repo@<sha> # vX.Y.Z`), and
+  GoReleaser's `version:` is an exact release; dependabot proposes the action moves. A packaging change touches
+  `ci/release/contract-files.{deb,rpm}.txt` in the same commit.
 
 ## Documentation
 

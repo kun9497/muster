@@ -118,14 +118,14 @@ Added, because assay has neither: SBOMs (§4.4), the `.deb` and `.rpm` packages 
 
 ### 4.2 The build
 
-- **RL-4 — one toolchain, named in `go.mod`.** `go.mod` gains a `toolchain go1.25.x` line (the version CI pins today
+- **RL-4 — one toolchain, named in `go.mod`.** `go.mod` keeps `go 1.25` as the language version and gains a `toolchain goX.Y.Z` line naming the newest patch of a supported Go line (go1.26.10 at 4A; RA-17 — 1.25 receives no more fixes, so "raise it on an advisory" needs a line that still moves; the version CI pins today
   is 1.25.5; the plan raises it to the latest 1.25 patch at the time). `release.yml` and `ci.yml` set up Go with
   `go-version-file: go.mod` and run `scripts/check-go-toolchain.sh`: in CI the line is a floor (a newer patch passes);
   in the release job it must be equal (`--exact`), because a different patch gives different bytes and §4.3 would fail.
   Raising the line is a normal commit; a stdlib advisory with a fix raises it before the next tag.
 - **RL-5 — the build is reproducible by construction.** GoReleaser's build sets `mod_timestamp:
   '{{ .CommitTimestamp }}'`, `-X main.date={{ .CommitDate }}` (the commit's date, not the build's — `muster version`
-  therefore prints when the source was committed, and the Makefile's `DATE` moves to `git log -1 --format=%cI` so
+  therefore prints when the source was committed, and the Makefile's `DATE` moves to `TZ=UTC git log -1 --format=%cd --date=format-local:%Y-%m-%dT%H:%M:%SZ` — the one spelling equal to `{{ .CommitDate }}`; `%cI` prints the committer's offset and plain `format:` renders it with a false `Z` (RA-1) — so
   `make build` agrees), `-X main.version={{ .Version }}` (the tag without `v`) and `-X main.commit={{ .FullCommit }}`
   (the Makefile's short hash becomes the full one; `muster version` prints both forms as before). `-buildvcs=false`
   is set so the binary carries no VCS stamp beyond those variables. Archives and packages set
@@ -153,7 +153,7 @@ For tag `vX.Y.Z` the GitHub Release carries, and nothing else:
 | File | Content |
 |---|---|
 | `muster_X.Y.Z_linux_<arch>.tar.gz` | `muster`, `LICENSE`, `NOTICE`, `ATTRIBUTION.md`, `README.md`, `README.ko.md`, `THREAT_MODEL.md`, `SECURITY.md`, `CHANGELOG.md`, `examples/systemd/` (§4.6) |
-| `muster_X.Y.Z_linux_<arch>.deb`, `muster-X.Y.Z-1.<rpmarch>.rpm` | §4.6 |
+| `muster_X.Y.Z-1_<amd64|arm64>.deb`, `muster-X.Y.Z-1.<x86_64|aarch64>.rpm` (nfpm's conventional names, RA-19) | §4.6 |
 | `muster_X.Y.Z_checksums.txt` | sha256 of every file above |
 | `muster_X.Y.Z_checksums.txt.sigstore.json` | the keyless signature bundle over the checksums file (§4.5) |
 | `muster_X.Y.Z_linux_<arch>.tar.gz.spdx.json`, one per `.deb`/`.rpm` | SBOM, SPDX JSON, by syft pinned (RL-8) |
@@ -166,7 +166,7 @@ package because the ComplianceAsCode-derived CIS index is BSD-3-Clause and the C
 
 ### 4.5 Signing and attestation
 
-- **RL-9 — keyless, bundle format.** `cosign sign-blob --bundle <checksums>.sigstore.json <checksums>` under the
+- **RL-9 — keyless, Sigstore bundle.** `cosign sign-blob --new-bundle-format --bundle <checksums>.sigstore.json <checksums>` (RA-18: on the cosign v2.4 line `--bundle` alone writes cosign's legacy JSON; the flag writes the Sigstore bundle that cosign v3, `gh` and sigstore-go read) under the
   job's OIDC token (`id-token: write`), cosign pinned to the v2.4 line as assay pins it. The signing identity is the
   workflow at the tag: `https://github.com/kun9497/muster/.github/workflows/release.yml@refs/tags/vX.Y.Z`, issuer
   `https://token.actions.githubusercontent.com`. The entry is in the public transparency log; the repository is
@@ -195,7 +195,7 @@ package because the ComplianceAsCode-derived CIS index is BSD-3-Clause and the C
   `Persistent=true`), because a month is the horizon the operator named and a week gives four points inside it.
   The unit runs `collect` without `--deep`, the same command the README's first run gives, so the weekly snapshots
   compare whole (§5.4); an operator who wants the walk edits the unit and then every snapshot is deep.
-- **RL-13 — maintainer scripts.** No `preinst`, `postinst` or `prerm`. `postrm` on Debian: on `purge` only, remove
+- **RL-13 — maintainer scripts.** No `preinst`, `postinst` or `prerm`. `postrm` on Debian (RA-27, RA-40): on `purge` only — a symlinked `/var/lib/muster` loses the link; a `/var/lib/muster` that is a mount point (device differs from `/var/lib`'s; a bind mount of the same filesystem is not detected) is left to the operator with a note on stderr; otherwise `rm -rf --one-file-system` removes it — and the purge never fails on this script. Otherwise, remove
   `/var/lib/muster` (snapshots, the lock, `latest`) and nothing else; on `remove` leave it. rpm has no purge: `%postun`
   does nothing, erase leaves `/var/lib/muster`, and the README says how to remove it by hand. A package script never
   calls `systemctl`, never creates a user or a directory (`collect` creates `/var/lib/muster` itself, 0700, D13).
@@ -215,9 +215,9 @@ artefact of §4.4 (the attestation and signing steps need the tag and are skippe
 - `scripts/release-vulncheck.sh` ran as the post hook (the dry run fails on a finding, as the release would);
 - an **install contract** matrix over `ubuntu:22.04`, `ubuntu:24.04`, `debian:12` (`.deb`), `rockylinux:9`,
   `almalinux:9` (`.rpm`): install the package, assert the installed file list equals §4.6 exactly (`dpkg -L` /
-  `rpm -ql` against a committed list, `ci/release/contract-files.txt`), assert no unit was enabled
+  `rpm -ql` against the committed lists `ci/release/contract-files.deb.txt` and `.rpm.txt` — two, because dpkg and rpm print different rows: dpkg no `/.`, rpm no directories at all (RA-34); compared by string equality since the EL images lack `diff`), assert no unit was enabled
   (`systemctl list-unit-files 'muster*'` empty or the container has no systemd), assert no muster process ran and
-  `/var/lib/muster` does not exist, run `muster version` and compare the three lines with the snapshot version,
+  `/var/lib/muster` does not exist, run `muster version` and compare its five lines (line 1 is `muster <version>` verbatim; the package's own `Version` field is nfpm's `X.Y.Z-1` form, `~` for a `-` in a snapshot version) and the metadata fields (`Maintainer`/`Packager`, `Homepage`/`URL`, section/group, priority/release, RA-23),
   run `muster check --facts <example snapshot>` and compare its exit code with the example's, upgrade over itself,
   remove and assert a seeded `/var/lib/muster` survives, purge (Debian) and assert it is gone;
 - the tar.gz: extract, same `muster version` and `check` assertions;
@@ -258,13 +258,14 @@ pipeline is exercised before a tag, so the plan writes it in the same task as `.
   `/var/lib/muster/snapshots`): file name, `collected_at`, host name, `muster_version`, `controls_version`, size,
   and which one `latest` points at; sorted by `collected_at` descending, the name's own UTC timestamp breaking ties.
   Only regular files whose name matches the writer's pattern (`<hostname>-<UTC timestamp>-<short digest>.json`) are
-  listed; anything else in the directory is counted in one trailing line and never opened. **RL-16 — three
+  listed; anything else in the directory is counted in the header line (RA-9) and never opened. **RL-16 — three
   classes of row.** A file that decodes as a snapshot is `ok`; one whose `schema_version` is newer than the binary
   is `newer` (its header fields `collected_at` and the versions are read by a lenient header-only decode, so the
   operator sees which binary wrote it); one that decodes as neither is `unreadable` and is ordered by its name's
   UTC timestamp. Both marks are listed, never skipped: the operator must see what is taking space. "The newest
   snapshot" — for RL-17 below and for `diff`'s selection (RL-19) — means the newest `ok` row; a `newer` or
-  `unreadable` row newer than it is named in a warning on stderr.
+  `unreadable` row newer than it is named in a warning on stderr by `prune` and by `rm`'s re-point, not by `ls`
+  (RA-4): `<name> (<class>) is newer than the newest readable snapshot <newest>` (RA-37).
 - `muster snapshot rm <name|path>…` removes the named files: any regular file inside the directory by its name
   (pattern-matching or not, `ok`, `newer` or `unreadable` — `rm` is the explicit path for what `prune` will not
   touch), or a file anywhere by its full path (`rm` never guesses a directory). `rm latest` is refused ("latest is a
@@ -283,7 +284,7 @@ pipeline is exercised before a tag, so the plan writes it in the same task as `.
   remover agree and a host that can `collect` into a directory can prune it. The directory is opened once with
   `O_NOFOLLOW|O_DIRECTORY`, and every listing and removal goes through that fd (`unlinkat`), never by a path that
   could be re-pointed between listing and removal; a symlink inside the directory is never followed and never
-  removed by `prune` (it is listed by `ls` under the trailing count). A full path given to `rm` outside the directory
+  removed by `prune` (it is listed by `ls` under the header's count). A full path given to `rm` outside the directory
   applies the same rule to its parent. The three commands run as whoever owns the directory — root, in the default
   layout — and refuse a directory they do not own (exit 2) rather than acting under `sudo` on another user's files.
   `collect` is unchanged.
@@ -592,16 +593,16 @@ order of the three plans' tasks; which `releases/` and `ci/` paths join the shel
 - **RL-1** `v0.1.0` first; `0.x` until operator feedback is read.
 - **RL-2** Targets `linux/amd64`, `linux/arm64` only.
 - **RL-3** No install script; the release job never pushes to `main`.
-- **RL-4** One toolchain named in `go.mod`; CI floor, release exact.
-- **RL-5** Reproducible by construction: commit timestamp and date, `-trimpath`, `-buildvcs=false`, exact toolchain.
+- **RL-4** One toolchain named in `go.mod` (the newest patch of a supported line; `go 1.25` stays); CI floor, release exact.
+- **RL-5** Reproducible by construction: commit timestamp and date (`format-local:` under `TZ=UTC`), `-trimpath`, `-buildvcs=false`, exact toolchain.
 - **RL-6** Tags are cut from `main` and never moved or deleted; a failed tag stays and is noted.
 - **RL-7** The README claims only what `reproduce.sh` proves.
 - **RL-8** SBOMs in SPDX JSON by pinned syft, one per archive and package.
-- **RL-9** Keyless signature over the checksums file, bundle format, identity = the release workflow at the tag.
+- **RL-9** Keyless signature over the checksums file, Sigstore bundle (`--new-bundle-format`), identity = the release workflow at the tag.
 - **RL-10** Attestation stated as SLSA Build L2, with what it does not prove.
 - **RL-11** Packages install the binary and documents and start nothing; nothing under `/etc`, `/var`, `/usr/lib/systemd`.
 - **RL-12** Example units in the documentation directory; weekly.
-- **RL-13** No pre/post-install scripts; Debian purge removes `/var/lib/muster`; rpm erase keeps it.
+- **RL-13** No pre/post-install scripts; Debian purge removes `/var/lib/muster` unless it is a mount point (left with a note) or a symlink (the link goes), and never fails; rpm erase keeps it.
 - **RL-14** Release notes are the CHANGELOG section; a missing section fails the release.
 - **RL-15** `muster version` prints five lines (version, commit, built, controls, schema).
 - **RL-16** `ls` rows are `ok`, `newer` or `unreadable`, never skipped; non-snapshot names are counted, never opened.

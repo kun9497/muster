@@ -14,9 +14,10 @@ waiver keys, output format.
 - `make lint-controls` — `go run ./cmd/muster controls lint` (passes `--references docs/reference`, so
   STIG/NIST/CIS references must be in the generated indexes), then once more with `--profile default` and with each of
   the three CIS profiles.
-- `make shellcheck` — `sh -n` and `shellcheck -s sh` over `internal/remedy/testdata/*.sh`, `examples/*-fix-report.sh`
-  and `ci/roundtrip/*.sh` (at least five remedy goldens and six round-trip scripts; CI runs the same step in the
-  `test` job).
+- `make shellcheck` — `sh -n` and `shellcheck -s sh` over `internal/remedy/testdata/*.sh`, `examples/*-fix-report.sh`,
+  `ci/roundtrip/*.sh`, `scripts/*.sh` and `ci/release/*.sh` (at least five remedy goldens, six round-trip scripts,
+  one release script and one `ci/release` script; CI runs the same step in the `test` job). The lab host has no
+  shellcheck binary: run it through the cached `koalaman/shellcheck-alpine:v0.9.0` image.
 - `make fmt` — `gofmt -l -w .` to fix formatting in place.
 - `make coverage` — `go run ./tools/coverage` regenerates `docs/reference/coverage.md`; CI runs
   `go run ./tools/coverage -check` and fails when it is stale. `make refindex` — `go run ./tools/refindex`
@@ -430,6 +431,66 @@ regenerates them from public images and `-check` compares.
   unusable snapshot is refused before evaluation (exit 2, empty stdout, not lifted by `--allow-error` or `--fail-on
   none`). One clock reading per command serves the age and waiver expiry. The bound, never the age, is recorded as
   `check.max_age_s` / `fix.max_age_s` (last field, omitempty); without the flag every byte is unchanged.
+
+## Release (stage 4A)
+
+- A release is a `v*` tag cut from `main` by a maintainer by hand — never push a tag from an agent session (RL-27).
+  `release.yml` refuses a tag that is not on `main`, builds with GoReleaser `v2.18.0` exactly (`.goreleaser.yaml`:
+  `linux/amd64` + `linux/arm64`, `CGO_ENABLED=0 -trimpath -buildvcs=false`, `-X main.version/commit/date` from the tag,
+  the full commit and `{{ .CommitDate }}`, `mod_timestamp` and every archive/package mtime from the commit), scans every
+  binary with `scripts/release-vulncheck.sh` (govulncheck `v1.9.0`, binary mode; an advisory blocks the release until
+  the toolchain moves), signs `muster_<v>_checksums.txt` keyless (`cosign sign-blob --new-bundle-format --bundle
+  <checksums>.sigstore.json`, cosign v2.4.3, identity = the workflow at the tag), attests provenance over
+  `dist/*.tar.gz dist/*.deb dist/*.rpm`, attaches SPDX SBOMs (syft) and takes the notes from `CHANGELOG.md`'s
+  `## [X.Y.Z] - YYYY-MM-DD` section (`scripts/release-notes.sh`; a missing section fails the release). A failed
+  release opens or updates one pinned `ops` issue (`ci/release/ops-alert.sh`); the next success closes it.
+- One toolchain: `go.mod` keeps `go 1.25` and names `toolchain go1.26.N` (the newest patch of a supported line);
+  `scripts/check-go-toolchain.sh [--exact] [go.mod]` is a floor in CI's `test` job and exact in `release-dry-run`,
+  `release.yml` and `scripts/reproduce.sh`; every `setup-go` uses `go-version-file: go.mod` on a major (v6+) that
+  honours the `toolchain` directive. The Makefile stamps `COMMIT` as the full hash and `DATE` as
+  `TZ=UTC git log -1 --format=%cd --date=format-local:%Y-%m-%dT%H:%M:%SZ` — the one spelling that equals GoReleaser's
+  `{{ .CommitDate }}` (plain `format:` renders the committer's offset with a false `Z`; `%cI` prints `+09:00`).
+  `scripts/reproduce.sh --ref <ref> --version <string> [--arch …] <artefact>` rebuilds the ref in a detached worktree
+  under its own `GOTOOLCHAIN` and compares sha256 with the binary inside a tar.gz, `.deb`, `.rpm` or a bare path
+  (one member extracted, `--no-absolute-filenames` for cpio); the README may claim only what it proves (RL-7).
+- Packages (nfpm, `{{ .ConventionalFileName }}`: `muster_X.Y.Z-1_<amd64|arm64>.deb`, `muster-X.Y.Z-1.<x86_64|aarch64>.rpm`)
+  install `/usr/bin/muster` and the documents under `/usr/share/doc/muster/` (the example units under
+  `examples/systemd/`, never on the unit path; deb also `copyright`, rpm also `/usr/share/licenses/muster/LICENSE`),
+  nothing under `/etc`, `/var` or `/usr/lib/systemd`; no `preinst`/`postinst`/`prerm`; Debian's `postrm` acts on
+  `purge` only — a symlinked `/var/lib/muster` loses the link, a mount point is left with a note, otherwise
+  `rm -rf --one-file-system` — and never fails the purge; rpm has no scripts. `Maintainer`/`Packager` is the commit
+  identity. The committed `ci/release/contract-files.{deb,rpm}.txt` are the exact sorted `dpkg -L`/`rpm -ql` output
+  (dpkg prints no `/.` row; rpm prints no directory rows): a packaging change touches the list in the same commit.
+- CI: `release-dry-run` (`goreleaser release --snapshot --clean --skip=publish,sign` with the action's
+  `install-only`, `go env GOVERSION` equal to the toolchain line, `reproduce.sh` against the amd64 binary, the deb
+  name from `dist/artifacts.json`, each archive SBOM naming the two modules, `release-notes.sh` on a sample and
+  failing on `v0.0.0`, a multi-line `upload-artifact` path list — `@actions/glob` has no brace expansion) and
+  `install-contract` (`needs: release-dry-run`, `download-artifact` into `dist/`, six rows: ubuntu 22.04/24.04 and
+  debian 12 deb, rocky/alma 9 rpm, ubuntu 24.04 tar; `ci/release/contract.sh` runs inside the image with
+  `--network none` and no package installation: `dpkg -i` / `rpm -U --replacepkgs` / tar, the file list by string
+  compare, metadata fields, the package version in nfpm's `0.0.1~next-1` form, five `muster version` lines, no unit
+  under the systemd paths, no process named muster via `/proc/[0-9]*/comm`, `/var/lib/muster` absent, `check`'s exit
+  equal to `ci/release/expected-exit.sh <report.json>`, upgrade, remove keeps a seeded snapshot, deb purge twice (a
+  real directory, a symlink)). Every `uses:` in every workflow is `owner/repo@<40-hex> # <tag>`; `.github/dependabot.yml`
+  proposes action moves monthly; `goreleaser-action`'s `version:` is the one input dependabot does not track.
+- `snapshot ls|rm|prune` (`cmd/muster/snapshotls.go`, `snapshotrm.go`; the Linux layer `snapshotdir_linux.go` with a
+  `!linux` stub; pure selection in `internal/snapshots`; `facts.LoadHeader` decodes a header without comparing the
+  schema): the directory is opened once (`O_RDONLY|O_DIRECTORY|O_NOFOLLOW|O_CLOEXEC`), refused unless owned by the
+  caller and not group/other-writable (the writer's `trustedDir` rule plus ownership; components above are not
+  walked), and every `Fstatat`/`Openat`/`Readlinkat`/`Unlinkat`/`Symlinkat`/`Renameat` goes through that fd. Rows are
+  `ok`, `newer` (schema above the binary's) or `unreadable`; a pattern-matching regular file is opened `O_NOFOLLOW`
+  and identity-checked (dev/ino) before `LoadHeader`; a `latest` symlink is reported, never counted or followed;
+  everything else is counted in `other`, never opened. `prune` removes only `ok` rows outside `--keep N`/`--keep-days D`
+  (strictly older than `now - D*24h`, one `commandClock()` read after the listing), never the newest `ok` row, never
+  `newer`/`unreadable` (those go by `rm`, by name); `rm` pre-checks every name (`latest` → its own message, then
+  `validRmName`, then `stat` = regular) before the first `Unlinkat`; a full path must be clean and absolute and share
+  one directory, never beside a bare name or `--dir`. Both take `collect`'s lock (`AcquireLock(LockPath)` on the
+  default directory, `AcquireDirLock` elsewhere; `collect.Lock` is named only in the Linux file — the untagged code
+  sees a `dirLock` interface), re-point `latest` (bare relative target, `.latest.tmp-<pid>` + `Renameat`) or remove the
+  link, and warn on stderr about a `newer`/`unreadable` row above the newest readable one
+  (`<name> (<class>) is newer than the newest readable snapshot <newest>`). Exit 0 or 2 only; stdout holds the listing
+  or the `would remove <name>` lines. Tests split per build tag (`_test.go`, `_linux_test.go`, `_other_test.go`); the
+  `!linux` files are proven on the Windows host only; root-only tests run in CI's sudo step and on the lab.
 
 ## Stage-2 conventions
 
