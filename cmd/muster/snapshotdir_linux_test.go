@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 
+	"golang.org/x/sys/unix"
+
 	"github.com/kun9497/muster/internal/snapshots"
 )
 
@@ -166,5 +168,51 @@ func TestListLatestDanglingAndOutside(t *testing.T) {
 		if want := (latestLink{present: true, target: tc.target, state: tc.state}); latest != want {
 			t.Errorf("latest = %+v, want %+v", latest, want)
 		}
+	}
+}
+
+// RA-6: a latest that is not a symlink is an other file, not a link.
+func TestListCountsARegularLatest(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.Chmod(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	writeSnapshot(t, filepath.Join(dir, seedOKNew), snapBody(1, "2026-09-02T06:00:00Z", "web01", seedMusterV, seedControlsV))
+	writeSnapshot(t, filepath.Join(dir, "latest"), seedOKNew)
+	entries, other, latest, err := openTestDir(t, dir).list()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 || other != 1 || latest != (latestLink{}) {
+		t.Errorf("%d entries, other %d, latest %+v; want 1, 1, not present", len(entries), other, latest)
+	}
+}
+
+// The file opened must be the one the listing stat-ed: another inode, or a
+// symlink in its place (ELOOP under O_NOFOLLOW), is an other file, never a
+// row.
+func TestReadEntryRefusesSwappedAndLinkedEntries(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.Chmod(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	writeSnapshot(t, filepath.Join(dir, seedOKNew), snapBody(1, "2026-09-02T06:00:00Z", "web01", seedMusterV, seedControlsV))
+	writeSnapshot(t, filepath.Join(dir, seedOKOld), snapBody(1, "2026-09-01T06:00:00Z", "db02", seedMusterV, seedControlsV))
+	if err := os.Symlink(seedOKNew, filepath.Join(dir, seedEmpty)); err != nil {
+		t.Fatal(err)
+	}
+	d := openTestDir(t, dir)
+	var stA unix.Stat_t
+	if err := unix.Fstatat(d.fd, seedOKNew, &stA, unix.AT_SYMLINK_NOFOLLOW); err != nil {
+		t.Fatal(err)
+	}
+	if _, out, err := d.readEntry(seedOKNew, stA); err != nil || out != entryRow {
+		t.Fatalf("the stat-ed file itself: outcome %d, err %v; want a row", out, err)
+	}
+	if _, out, err := d.readEntry(seedOKOld, stA); err != nil || out != entryOther {
+		t.Errorf("another inode: outcome %d, err %v; want other", out, err)
+	}
+	if _, out, err := d.readEntry(seedEmpty, stA); err != nil || out != entryOther {
+		t.Errorf("a symlink in the entry's place: outcome %d, err %v; want other", out, err)
 	}
 }

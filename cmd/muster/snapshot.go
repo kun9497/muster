@@ -69,7 +69,7 @@ class and which one latest points at, newest first. A file that reads as a
 snapshot is ok, one a newer schema wrote is newer, anything else matching the
 file name pattern is unreadable; every other name is counted and never opened.
 The directory must be owned by the caller and not group- or world-writable,
-and is read through one descriptor (RL-16, RL-18).
+and is read through one descriptor.
 
 flags:
   --dir <d>         the snapshot directory (default /var/lib/muster/snapshots)

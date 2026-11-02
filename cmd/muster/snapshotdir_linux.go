@@ -128,7 +128,7 @@ func (d *snapshotDir) list() (entries []snapshots.Entry, other int, latest lates
 			if errors.Is(err, unix.ENOENT) {
 				continue
 			}
-			return nil, 0, latestLink{}, fmt.Errorf("stat %s: %w", report.Escape(name), err)
+			return nil, 0, latestLink{}, fmt.Errorf("stat %s/%s: %w", d.path, report.Escape(name), err)
 		}
 		typ := st.Mode & unix.S_IFMT
 		if name == "latest" && typ == unix.S_IFLNK {
@@ -137,7 +137,7 @@ func (d *snapshotDir) list() (entries []snapshots.Entry, other int, latest lates
 				if errors.Is(err, unix.ENOENT) {
 					continue
 				}
-				return nil, 0, latestLink{}, fmt.Errorf("read latest: %w", err)
+				return nil, 0, latestLink{}, fmt.Errorf("read %s/latest: %w", d.path, err)
 			}
 			latest = latestLink{present: true, target: target}
 			continue
@@ -200,7 +200,7 @@ func (d *snapshotDir) readEntry(name string, st unix.Stat_t) (snapshots.Entry, e
 	defer f.Close()
 	var fst unix.Stat_t
 	if err := unix.Fstat(fd, &fst); err != nil {
-		return snapshots.Entry{}, entryRow, fmt.Errorf("stat %s: %w", report.Escape(name), err)
+		return snapshots.Entry{}, entryRow, fmt.Errorf("stat %s/%s: %w", d.path, report.Escape(name), err)
 	}
 	if fst.Mode&unix.S_IFMT != unix.S_IFREG || fst.Dev != st.Dev || fst.Ino != st.Ino {
 		return snapshots.Entry{}, entryOther, nil
