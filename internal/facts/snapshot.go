@@ -147,6 +147,45 @@ func Load(r io.Reader) (*Snapshot, error) {
 	return &s, nil
 }
 
+// Header is a snapshot's schema version and provenance, without its facts.
+type Header struct {
+	SchemaVersion int
+	Run           Run
+}
+
+// LoadHeader reads only schema_version and run from untrusted input, under
+// Load's size and nesting limits, so a snapshot a newer binary wrote can
+// still be listed (RL-16). It does not compare the schema version with
+// SchemaVersion — that classification is the caller's — and refuses only a
+// missing or non-positive one.
+func LoadHeader(r io.Reader) (Header, error) {
+	data, err := io.ReadAll(io.LimitReader(r, MaxSnapshotBytes+1))
+	if err != nil {
+		return Header{}, fmt.Errorf("read snapshot: %w", err)
+	}
+	if len(data) > MaxSnapshotBytes {
+		return Header{}, ErrTooLarge
+	}
+	if err := checkDepth(data, MaxDepth); err != nil {
+		return Header{}, err
+	}
+	var h struct {
+		SchemaVersion int `json:"schema_version"`
+		Run           Run `json:"run"`
+	}
+	dec := json.NewDecoder(bytes.NewReader(data))
+	if err := dec.Decode(&h); err != nil {
+		return Header{}, fmt.Errorf("parse snapshot: %w", err)
+	}
+	if !AtEnd(dec) {
+		return Header{}, ErrTrailingData
+	}
+	if h.SchemaVersion < 1 {
+		return Header{}, fmt.Errorf("%w: snapshot has no valid schema_version", ErrSchemaMismatch)
+	}
+	return Header{SchemaVersion: h.SchemaVersion, Run: h.Run}, nil
+}
+
 // AtEnd reports whether dec has nothing left but whitespace: Token skips it
 // and answers io.EOF at a clean end. dec.More is not this test — it is false
 // before a closing ] or } as well.
