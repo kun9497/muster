@@ -39,8 +39,9 @@ type FixBlock struct {
 	Tuning          *report.TuningBlock `json:"tuning,omitempty"`
 	Waivers         report.WaiversBlock `json:"waivers"`
 	MaxRisk         string              `json:"max_risk"`
-	HostGuard       string              `json:"host_guard"` // on | off (3D-2b Q-1)
-	MachineIDHash   string              `json:"-"`          // the snapshot's, when well formed; the script's guard compares it
+	HostGuard       string              `json:"host_guard"`          // on | off (3D-2b Q-1)
+	MachineIDHash   string              `json:"-"`                   // the snapshot's, when well formed; the script's guard compares it
+	MaxAgeS         int64               `json:"max_age_s,omitempty"` // --max-age in whole seconds; absent without it
 }
 
 // ParamValue is one parameter a script reads as P_<Name> (3D-2c E-1), with
@@ -157,7 +158,7 @@ func Build(rep *report.Report, set *controls.Set, opts Options) (*Plan, error) {
 		Fix: FixBlock{MusterVersion: cb.MusterVersion, Commit: cb.Commit, ControlsVersion: cb.ControlsVersion,
 			ControlsDigest: cb.ControlsDigest, SnapshotDigest: cb.SnapshotDigest, GuideEdition: cb.GuideEdition,
 			Profile: cb.Profile, Tuning: cb.Tuning, Waivers: cb.Waivers, MaxRisk: maxRisk,
-			HostGuard: guard, MachineIDHash: hash},
+			HostGuard: guard, MachineIDHash: hash, MaxAgeS: cb.MaxAgeS},
 		Items:      []Item{},
 		NotPlanned: []NotPlanned{},
 	}

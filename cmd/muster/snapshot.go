@@ -14,7 +14,9 @@ import (
 	"github.com/kun9497/muster/internal/facts"
 )
 
-const snapshotUsage = `usage: muster snapshot <extract> [flags]
+const snapshotUsage = `usage: muster snapshot <extract|anonymize> [flags]
+       muster snapshot extract --facts <file|-> --control <id> [--out <file>]
+       ` + anonymizeSynopsis + `
 
 extract cuts one control's fixture out of a snapshot: exactly the fact leaves
 that control reads -- its applies_when, its checks, every mechanism's when and
@@ -38,6 +40,25 @@ flags:
 
 exit codes: 0 wrote the skeleton; 1 refused (no such control in the embedded
 set, or --out names the snapshot itself); 2 bad flags or an I/O error.
+
+anonymize rewrites a snapshot for sharing: account and host names, addresses,
+URLs, fingerprints, the machine id and the paths that carry them become keyed
+pseudonyms, free text becomes a placeholder, and run.anonymization says what
+was done (AX-10). It reads the whole snapshot and refuses, writing nothing,
+an input that is not a snapshot of this schema, one already anonymised, one
+collected with include_secrets, one carrying a field it cannot classify, a
+key file that is not exactly 32 bytes, and an --out that names the input or
+the key. The same input and key give the same bytes; --ephemeral draws a
+throwaway key, so its output differs on every run.
+
+flags:
+  --facts <file>    the snapshot to anonymise; - reads stdin (required)
+  --key <file>      a file of exactly 32 bytes, as sensitive as the snapshot
+  --ephemeral       a random key that is never written (instead of --key)
+  --out <file>      the file to create, mode 0600; - writes stdout (required)
+  --force           replace an existing regular --out file
+
+exit codes: 0 wrote the snapshot; 2 refused or an I/O error.
 `
 
 // fixtureSkeleton is what extract writes: a snapshot cut down to the leaves
@@ -109,6 +130,8 @@ func runSnapshot(args []string, stdout, stderr io.Writer) int {
 	switch args[0] {
 	case "extract":
 		return runSnapshotExtract(args[1:], stdout, stderr)
+	case "anonymize":
+		return runSnapshotAnonymize(args[1:], stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "muster: unknown snapshot subcommand %q\n%s", args[0], snapshotUsage)
 		return exitError

@@ -67,6 +67,8 @@ paths = ['''^\.superpowers[/\\]''']
 # file, and the C4 case the control reads MANUAL on; the token the rule sees is
 # "sudoers.local". Allow that exact token only.
 regexes = ['''^snmpd\.local$''', '''^w\.priv$''', '''^conf\.local$''', '''^db\.local$''', '''^sudoers\.local$''']
+# 3D-3: these branch commits spelled host-rule test inputs under a .corp suffix (and the canary host's domain under .lan); the fix wave moved them under .example.test/.example.org and builds the canary domain at run time. The commits, not the literals, are allowlisted.
+commits = ['''06df4d6d2e3c8d04db548793e25ce946882fa2d7''', '''229bdc01eca2cc3bf25a39c914217ced6100a873''', '''272b52ec60f474cb82a89098a2bf9899707e647d''', '''828dfb43da5c2b16f11d68f0ae17734c6ba6cd39''', '''8e4b93375747d5d630bd0233275e7c79dd3f78a8''', '''c0ac4384143dc71191c534287298462572c5e62c''', '''d051d02d9e6b5b59fb11c775e8b407b529d9a79d''']
 
 [[rules]]
 id = "private-ipv4-address"
@@ -93,7 +95,8 @@ regexes = ['''^(?:10\.0\.0\.0|172\.16\.0\.0|172\.17\.0\.0|192\.168\.0\.0)$''']
 # test sketch (the brief those two parser cases were copied from); the plan's
 # text was moved to the RFC 5737 range at the end of the stage. The commit, not
 # the literal, is allowlisted.
-commits = ['''e916e0a54b53d99a7ddd95b7cbd25fd5a0d5fe13''', '''17c959e6be182dddb911ad164b497b9570dda531''', '''f64f5ed9c20620468bc2ae07cafcac9502b80472''']
+# 3D-3: one branch commit spelled an out-of-range dotted quad in 10/8 (an address the parser must refuse) in two test cases; the fix wave builds it from its octets. The commit, not the literal, is allowlisted.
+commits = ['''e916e0a54b53d99a7ddd95b7cbd25fd5a0d5fe13''', '''17c959e6be182dddb911ad164b497b9570dda531''', '''f64f5ed9c20620468bc2ae07cafcac9502b80472''', '''72d064ca60e7ad4e4d94b89118a6ad144561f356''']
 
 [[rules]]
 id = "non-personal-email"
@@ -108,6 +111,8 @@ regexes = [
   '''@users\.noreply\.github\.com''',
   '''@example\.(com|org|net)''',
 ]
+# 3D-3: these branch commits spelled URL and NFS-location userinfo against a .corp host, whose ".co" prefix the rule reads as a domain; the fix wave moved the hosts under .example. The commits, not the literals, are allowlisted.
+commits = ['''06df4d6d2e3c8d04db548793e25ce946882fa2d7''', '''828dfb43da5c2b16f11d68f0ae17734c6ba6cd39''', '''8e4b93375747d5d630bd0233275e7c79dd3f78a8''']
 
 # R79. gitleaks' own `generic-api-key` rule fires on the synthetic fact-key
 # literal that commit 04d93f8 introduced in internal/collect/registry_test.go

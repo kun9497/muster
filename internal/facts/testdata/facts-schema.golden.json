@@ -1,6 +1,32 @@
 {
   "schema_version": 1,
   "run": {
+    "Anonymization": [
+      {
+        "json": "scheme",
+        "type": "string"
+      },
+      {
+        "json": "mode",
+        "type": "string"
+      },
+      {
+        "json": "key_id",
+        "type": "string"
+      },
+      {
+        "json": "keep_set",
+        "type": "string"
+      },
+      {
+        "json": "classes",
+        "type": "[]string"
+      },
+      {
+        "json": "replaced",
+        "type": "[]string"
+      }
+    ],
     "CollectorRun": [
       {
         "json": "name",
@@ -167,6 +193,10 @@
       {
         "json": "partial_failures",
         "type": "[]string"
+      },
+      {
+        "json": "anonymization",
+        "type": "*facts.Anonymization"
       }
     ]
   },

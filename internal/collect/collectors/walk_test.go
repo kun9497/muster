@@ -99,6 +99,7 @@ func deepWalk(ctx context.Context, t *testing.T, a collect.Access, opts collect.
 	if v := g.Violations(); len(v) != 0 {
 		t.Fatalf("walk touched undeclared targets: %v", v)
 	}
+	recordTree(b)
 	return b, runErr
 }
 

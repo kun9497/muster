@@ -48,6 +48,7 @@ func buildBegun(t *testing.T, name string, a collect.Access) *collect.Builder {
 	if v := g.Violations(); len(v) != 0 {
 		t.Fatalf("%s touched undeclared targets: %v", name, v)
 	}
+	recordTree(b)
 	return b
 }
 

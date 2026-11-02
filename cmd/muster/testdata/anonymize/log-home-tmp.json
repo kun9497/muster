@@ -1,0 +1,196 @@
+{
+  "synthetic": true,
+  "_notes": [
+    "A human account named log with its home at /tmp, and one named var at /var/tmp: /var/log is not separate (separate_partitions WARN, a partial control).",
+    "A path rule that rewrote by component equality would turn the /var/log target into another name and the WARN into a PASS."
+  ],
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none",
+        "source": {
+          "kind": "file",
+          "path": "/proc/1/cgroup"
+        }
+      }
+    },
+    "accounts": {
+      "users": {
+        "status": "ok",
+        "value": [
+          {
+            "name": "root",
+            "uid": 0,
+            "home": "/root",
+            "shell": "/bin/bash"
+          },
+          {
+            "name": "log",
+            "uid": 1001,
+            "home": "/tmp",
+            "shell": "/bin/bash"
+          },
+          {
+            "name": "var",
+            "uid": 1002,
+            "home": "/var/tmp",
+            "shell": "/bin/bash"
+          }
+        ]
+      }
+    },
+    "mounts": {
+      "points": {
+        "status": "ok",
+        "value": [
+          {
+            "target": "/",
+            "separate": true,
+            "mounted_by": "/",
+            "source": "/dev/vda1",
+            "fstype": "ext4",
+            "options": [
+              "rw",
+              "relatime"
+            ]
+          },
+          {
+            "target": "/boot",
+            "separate": true,
+            "mounted_by": "/boot",
+            "source": "/dev/vda1",
+            "fstype": "ext4",
+            "options": [
+              "rw",
+              "relatime"
+            ]
+          },
+          {
+            "target": "/home",
+            "separate": true,
+            "mounted_by": "/home",
+            "source": "/dev/vda1",
+            "fstype": "ext4",
+            "options": [
+              "rw",
+              "relatime"
+            ]
+          },
+          {
+            "target": "/tmp",
+            "separate": true,
+            "mounted_by": "/tmp",
+            "source": "/dev/vda1",
+            "fstype": "ext4",
+            "options": [
+              "rw",
+              "relatime"
+            ]
+          },
+          {
+            "target": "/var",
+            "separate": true,
+            "mounted_by": "/var",
+            "source": "/dev/vda1",
+            "fstype": "ext4",
+            "options": [
+              "rw",
+              "relatime"
+            ]
+          },
+          {
+            "target": "/var/tmp",
+            "separate": true,
+            "mounted_by": "/var/tmp",
+            "source": "/dev/vda1",
+            "fstype": "ext4",
+            "options": [
+              "rw",
+              "relatime"
+            ]
+          },
+          {
+            "target": "/var/log",
+            "separate": false,
+            "mounted_by": "/var",
+            "source": "/dev/vda1",
+            "fstype": "ext4",
+            "options": [
+              "rw",
+              "relatime"
+            ]
+          },
+          {
+            "target": "/var/log/audit",
+            "separate": true,
+            "mounted_by": "/var/log/audit",
+            "source": "/dev/vda1",
+            "fstype": "ext4",
+            "options": [
+              "rw",
+              "relatime"
+            ]
+          },
+          {
+            "target": "/dev/shm",
+            "separate": true,
+            "mounted_by": "/dev/shm",
+            "source": "/dev/vda1",
+            "fstype": "ext4",
+            "options": [
+              "rw",
+              "relatime"
+            ]
+          }
+        ],
+        "source": {
+          "kind": "proc",
+          "path": "/proc/self/mountinfo"
+        }
+      },
+      "home": {
+        "separate": {
+          "status": "ok",
+          "value": true,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/self/mountinfo"
+          }
+        }
+      },
+      "tmp": {
+        "separate": {
+          "status": "ok",
+          "value": true,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/self/mountinfo"
+          }
+        }
+      },
+      "var_tmp": {
+        "separate": {
+          "status": "ok",
+          "value": true,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/self/mountinfo"
+          }
+        }
+      },
+      "dev_shm": {
+        "separate": {
+          "status": "ok",
+          "value": true,
+          "source": {
+            "kind": "proc",
+            "path": "/proc/self/mountinfo"
+          }
+        }
+      }
+    }
+  }
+}

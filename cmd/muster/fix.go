@@ -17,11 +17,13 @@ const fixUsage = `usage: muster fix --dry-run --facts <snapshot.json|-> [flags]
 
 flags:
   --format table|json|script   output format (default table)
+                               (script refuses an anonymised snapshot: plan from the original)
   --waivers <file>             waiver file, as check
   --profile <name|path>        the profile in force, as check: a built-in (default, cis-rhel9-l1,
                                cis-ubuntu2204-l1, cis-ubuntu2404-l1, kisa-unix-2026) or a profile
                                file (default: the built-in default)
   --tuning <file>              site parameter values, as check
+  --max-age <duration>         refuse a snapshot collected longer ago than this, as check
   --max-risk none|restart_service|reboot_required|lockout_risk
                                the highest risk the script will run (default lockout_risk: everything)
   --color auto|always|never    colour (default auto); --no-color = never
@@ -31,13 +33,19 @@ flags:
 // positional word (X-1): muster never applies a remediation (D24).
 const x1Refusal = "fix never applies a remediation (D24); run fix --dry-run"
 
+// anonScriptRefusal is fix --format script's answer to an anonymised
+// snapshot (AX-11).
+const anonScriptRefusal = "plan the script from the original snapshot"
+
 // fixValueFlags are the flags that take a value (Z-12); the pre-pass skips
 // that value, whatever it is, and an unknown flag takes none.
-var fixValueFlags = map[string]bool{"--facts": true, "--format": true, "--waivers": true, "--profile": true, "--tuning": true, "--max-risk": true, "--color": true}
+var fixValueFlags = map[string]bool{"--facts": true, "--format": true, "--waivers": true, "--profile": true, "--tuning": true, "--max-risk": true, "--max-age": true, "--color": true}
 
 type fixFlags struct {
 	facts, format, waivers, color, profile, tuning, maxRisk string
 	tuningGiven                                             bool
+	maxAgeFlag                                              string
+	maxAge                                                  int64
 }
 
 func parseFixArgs(args []string) (fixFlags, error) {
@@ -82,6 +90,11 @@ func parseFixArgs(args []string) (fixFlags, error) {
 			f.tuningGiven = true
 		case "--max-risk":
 			f.maxRisk, err = next()
+		case "--max-age":
+			f.maxAgeFlag, err = next()
+			if err == nil {
+				f.maxAge, err = parseMaxAge(f.maxAgeFlag)
+			}
 		case "--color":
 			f.color, err = next()
 		case "--no-color":
@@ -124,6 +137,21 @@ func runFix(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "muster: %v\n", err)
 		return exitError
 	}
+	// AX-14: the one clock reading, taken once the snapshot is read; it
+	// serves the age test and waiver expiry alike (as in runCheck).
+	nowT := commandClock()
+	// AX-11: a script from an anonymised snapshot would carry a keyed host
+	// hash and mapped names; table and json stay, for a reviewer.
+	if f.format == "script" && snap.Run.Anonymization != nil {
+		fmt.Fprintln(stderr, "muster: "+anonScriptRefusal)
+		return exitError
+	}
+	if f.maxAgeFlag != "" {
+		if err := enforceMaxAge(snap.Run.CollectedAt, f.maxAgeFlag, f.maxAge, nowT); err != nil {
+			fmt.Fprintf(stderr, "%v\n", err)
+			return exitError
+		}
+	}
 	set, err := controls.LoadDefault()
 	if err != nil {
 		fmt.Fprintf(stderr, "muster: %v\n", err)
@@ -154,7 +182,8 @@ func runFix(args []string, stdout, stderr io.Writer) int {
 	if os.Geteuid() == 0 {
 		fmt.Fprintln(stderr, "muster: warning: fix does not need root")
 	}
-	results, cb := newCheckBlock(sel, snap, reg, wf, warn)
+	results, cb := newCheckBlock(sel, snap, reg, wf, nowT, warn)
+	cb.MaxAgeS = f.maxAge
 	rep := report.Build(snap, results, cb, sel.SeverityByID)
 	p, err := remedy.Build(rep, set, remedy.Options{MaxRisk: f.maxRisk})
 	if err != nil {

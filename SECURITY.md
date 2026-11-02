@@ -16,4 +16,6 @@ Until 1.0, only the latest tagged release receives fixes.
 The threat model is in `THREAT_MODEL.md`. In scope: anything that makes `collect` write, execute or
 transmit more than it declares; anything that makes `check` execute content from a snapshot, control or
 waiver file; a data file turning an `ERROR` into a clean exit; a snapshot storing a secret that the
-redaction policy says it must not.
+redaction policy says it must not; an anonymised snapshot carrying in clear a name, address, fingerprint
+or path component the anonymisation policy (`THREAT_MODEL.md`) says it maps or replaces, beyond the
+leftovers that policy names.
