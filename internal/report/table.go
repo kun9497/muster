@@ -211,7 +211,7 @@ func WriteTable(out io.Writer, r *Report, o TableOptions) error {
 
 	idWidth := 12
 	for _, row := range r.Results {
-		if l := displayWidth(Escape(row.ID)); l > idWidth {
+		if l := DisplayWidth(Escape(row.ID)); l > idWidth {
 			idWidth = l
 		}
 	}
@@ -233,8 +233,8 @@ func WriteTable(out io.Writer, r *Report, o TableOptions) error {
 			separated = true
 		}
 		title := Title(row.TitleKo, row.TitleEn)
-		status := Paint(o.Color, StatusColor(row.Status), padRight(Escape(string(row.Status)), 14))
-		fmt.Fprintf(w, "%s %s %s  %s\n", status, padRight(Escape(row.Severity), 6), padRight(Escape(row.ID), idWidth), truncateWidth(Escape(title), titleWidth))
+		status := Paint(o.Color, StatusColor(row.Status), PadRight(Escape(string(row.Status)), 14))
+		fmt.Fprintf(w, "%s %s %s  %s\n", status, PadRight(Escape(row.Severity), 6), PadRight(Escape(row.ID), idWidth), truncateWidth(Escape(title), titleWidth))
 		if row.Reason != "" {
 			fmt.Fprintf(w, "    reason: %s\n", Escape(ReasonLine(row)))
 		}

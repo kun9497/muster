@@ -22,7 +22,9 @@ func runeWidth(r rune) int {
 	return 1
 }
 
-func displayWidth(s string) int {
+// DisplayWidth is the terminal width of s: East Asian wide and fullwidth
+// runes count 2, combining marks 0, everything else 1.
+func DisplayWidth(s string) int {
 	w := 0
 	for _, r := range s {
 		w += runeWidth(r)
@@ -30,8 +32,10 @@ func displayWidth(s string) int {
 	return w
 }
 
-func padRight(s string, width int) string {
-	if d := width - displayWidth(s); d > 0 {
+// PadRight pads s with spaces to width display columns; a wider s is
+// returned as is.
+func PadRight(s string, width int) string {
+	if d := width - DisplayWidth(s); d > 0 {
 		return s + strings.Repeat(" ", d)
 	}
 	return s
@@ -39,7 +43,7 @@ func padRight(s string, width int) string {
 
 // truncateWidth cuts s so it fits width, appending "…" if anything was cut.
 func truncateWidth(s string, width int) string {
-	if displayWidth(s) <= width {
+	if DisplayWidth(s) <= width {
 		return s
 	}
 	var b strings.Builder
