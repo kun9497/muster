@@ -1,7 +1,7 @@
 # muster — working notes for Claude
 
 Design: `docs/superpowers/specs/2026-09-02-muster-design.md` (English canonical, Korean pair). It is also the
-decision log (D01–D35). Read it before changing any contract: facts schema, control ids, exit codes,
+decision log (D01–D36). Read it before changing any contract: facts schema, control ids, exit codes,
 waiver keys, output format.
 
 ## Build and test
@@ -397,6 +397,39 @@ regenerates them from public images and `-check` compares.
   stops root's cron and at jobs, S-48). The sshd body reloads a running `sshd`/`ssh` and validates persona root
   (`sshd -T -C user=root,…`). The script refuses a `MUSTER_BACKUP` that root does not own or others can write (a planted
   backup would be restored over `/etc/shadow`).
+
+## Anonymise and max-age (stage 3D-3)
+
+- `snapshot anonymize --facts <in|-> (--key <file> | --ephemeral) --out <file|-> [--force]` (D36, AX-1..AX-14) is pure
+  `internal/anonymize` (no `os`, `os/exec`, `net`, `syscall`, no `internal/collect` or `internal/controls`;
+  `imports_test.go`) behind `cmd/muster/anonymize.go`. Sub-keys `HMAC-SHA256(key, "muster/anon/v1/<class>")`; classes
+  account (`u`+12 base32), host (`h`+10 per label, the last label of a dotted name kept, a single label mapped whole), address (kept / in-range / public tree,
+  spec §1.1), host-or-address, host-or-netgroup, url, fingerprint (`SHA256:`+43), machine id (64 hex), unit (a template
+  instance `i`+12), path (AX-6: every eligible home's last component and the known name positions, a position decided
+  on the cleaned prefix, the path rewritten in place on its raw components; a raw machine id under the journal
+  directories (`<id>` or `<id>.<namespace>`), the BLS directories and the EL rescue images, and the boot id of a
+  `systemd-private-` directory, map to 32 keyed hex; a leading run of `!` is a sigil), placeholder `[anonymised]`, blank, kept,
+  and the positional/option grammars of read-by-value text. `""` maps to `""` in every class; the `Ledger` refuses a
+  collision. The keep set (`keep.go`) and the mount targets are closed lists held to the controls by
+  `TestKeepSetCoversControlLiterals` and `TestMountTargetsCoverControls` (`internal/controls`, external package).
+- Every document path is in `anonymize.Default` (`table_data.go`, `TableVersion`); an unclassified path refuses the
+  input with an upgrade-or-bug message decided by the `vMAJOR.MINOR.PATCH[-N-g<hash>][-dirty]` order. A new fact key,
+  record field or header field needs its table row in the same commit: `TestEveryRegistryKeyIsClassified`,
+  `TestEveryCorpusFieldIsClassified`, `TestHeaderAndEnvelopeReflection`, and the Linux `TestMain` recorder in
+  `internal/collect/collectors/anonymize_table_test.go` (every tree a collector test builds, and every re-sorted
+  list's sort spec) hold it. A field a clause reads by value never maps to the placeholder
+  (`TestReadByValueIsNeverPlaceholder`).
+- `run.anonymization {scheme, mode, key_id, keep_set, classes, replaced}` is the last field of `facts.Run`; an input
+  already carrying it, or `include_secrets: true`, is refused; `fix --format script` refuses an anonymised snapshot
+  (`muster: plan the script from the original snapshot`). The invariant (`cmd/muster/anonymize_invariant_test.go`):
+  every control fixture, `_hosts`, `full-{pass,fail}.json`, the example snapshots and the synthetic fixtures under
+  `cmd/muster/testdata/anonymize/` give equal `(id, status, reason_code)`, mechanism, observation-verdict multiset and
+  exit code under every built-in profile with no site file. Canaries are built from octets in Go (gitleaks).
+- `check --max-age <d>` / `fix --max-age <d>`: `w d h m s`, descending, each unit once, whole numbers, 1 s to
+  3,153,600,000 s; `collected_at` strictly `YYYY-MM-DDTHH:MM:SSZ`; 5 min of future skew is age 0. A stale, future or
+  unusable snapshot is refused before evaluation (exit 2, empty stdout, not lifted by `--allow-error` or `--fail-on
+  none`). One clock reading per command serves the age and waiver expiry. The bound, never the age, is recorded as
+  `check.max_age_s` / `fix.max_age_s` (last field, omitempty); without the flag every byte is unchanged.
 
 ## Stage-2 conventions
 

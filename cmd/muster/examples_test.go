@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/kun9497/muster/internal/controls"
 	"github.com/kun9497/muster/internal/facts"
@@ -53,7 +54,7 @@ func checkReportFor(t *testing.T, snap *facts.Snapshot, set *controls.Set) *repo
 	if err != nil {
 		t.Fatalf("resolve default profile: %v", err)
 	}
-	results, cb := newCheckBlock(sel, snap, reg, nil, func(msg string) { t.Logf("check warning: %s", msg) })
+	results, cb := newCheckBlock(sel, snap, reg, nil, time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), func(msg string) { t.Logf("check warning: %s", msg) })
 	return report.Build(snap, results, cb, sel.SeverityByID)
 }
 

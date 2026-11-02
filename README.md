@@ -14,18 +14,19 @@ the Linux server asset class: KISA is the primary standard, and global
 benchmarks (CIS Benchmarks, DISA STIG, NIST SP 800-53) are attached as
 references and, later, offered as selectable profiles.
 
-> **Status: stage 3D-1b merged (October 2026).** Stage 1 — the skeleton:
+> **Status: stage 3D-3 merged (October 2026).** Stage 1 — the skeleton:
 > `collect`, `check`, waivers, exit codes, eight controls end to end — stage 2
 > — every automatable KISA item, from the foundations with DISA STIG and NIST
 > SP 800-53 references through accounts, PAM, sshd, home directories, system
 > files, services, the firewall, logging, NFS, SNMP, patch hygiene, FTP, mail
 > and DNS to the closing coverage-and-reference gate — and stages 3A, 3B,
-> 3C-1, 3C-2a, 3C-2b, 3D-1, 3D-2, 3D-2b, 3D-2c, 3D-2d and 3D-1b — the deep filesystem walk, the first checks
+> 3C-1, 3C-2a, 3C-2b, 3D-1, 3D-2, 3D-2b, 3D-2c, 3D-2d, 3D-1b and 3D-3 — the deep filesystem walk, the first checks
 > beyond the guide, audit pipeline health and package integrity, who holds
 > root's power without being root, exposure, profiles and tuning, and the
 > `fix --dry-run` review script, its proof on real hosts and scripts for the
 > controls beyond the first sixteen, the audit family and what a file says, and the
-> CIS Level 1 profiles over an index of recommendation numbers — are merged. 67 of the 67 items are enrolled (68 controls:
+> CIS Level 1 profiles over an index of recommendation numbers, and anonymised snapshots for sharing with a
+> bound on a snapshot's age — are merged. 67 of the 67 items are enrolled (68 controls:
 > 57 auto, 7 partial, 4 manual with the evidence attached),
 > and 49 beyond the guide. `collect --deep`
 > walks the local filesystems once, under a time and entry budget, without
@@ -62,6 +63,8 @@ muster check --facts host.json --format json
 muster check --facts host.json --profile docs/examples/profiles/exclude-beyond.yaml   # the KISA guide alone
 muster check --facts host.json --tuning docs/examples/profiles/tuning.yaml            # a site's parameter values
 muster fix --dry-run --facts host.json --format script > fix.sh                       # a review script; muster never runs it
+muster check --facts host.json --max-age 7d                                           # refuse a snapshot older than a week
+muster snapshot anonymize --facts host.json --key site.key --out shared.json          # a copy to share; same verdicts
 muster controls lint --references docs/reference   # the control set's own gate
 ```
 
@@ -87,6 +90,23 @@ muster controls lint --references docs/reference   # the control set's own gate
 - **Waivers** live in a file with a mandatory reason and an optional expiry.
   A waived finding is counted and shown, never silently dropped, and a waiver
   never covers an `ERROR`.
+- **`snapshot anonymize`** writes a copy of a snapshot that can leave the
+  site: user and group names, host names, addresses, key fingerprints, the
+  machine-id hash and the names inside paths become keyed pseudonyms (`u…`,
+  `h…`, an address in its own range), and free text no control reads by value
+  becomes `[anonymised]`. `--key <file>` (32 bytes) gives the same output for
+  the same input, so files made with one key can be compared; `--ephemeral`
+  throws the key away. Under every built-in profile, with no tuning, waiver or
+  site profile, the copy gives the same statuses, reason codes and exit code
+  as the original. Its evidence is harder to read — reasons and raw lines are
+  placeholders — and `fix --format script` refuses it (plan from the
+  original). An anonymised snapshot is not secret-free beyond what collect
+  already removes, not unidentifiable (the OS, packages, services and layout
+  stay), and not harmless to publish; `THREAT_MODEL.md` says what it resists.
+- **`--max-age <d>`** on `check` and `fix` refuses, before evaluating, a
+  snapshot older than the bound (`7d`, `1d12h`, `90m`), dated more than five
+  minutes ahead, or without a usable `collected_at`: exit 2 and nothing on
+  stdout. It compares two clocks and proves nothing about the host.
 - **Exit codes** are a contract: `2` (could not run or cannot be trusted)
   outranks `1` (findings) outranks `0` (clean). `MANUAL` items do not fail the
   run unless you ask them to. A FAIL beyond the guide counts like any other:
@@ -250,9 +270,9 @@ titles, never their discussion, check and fix text. See
    and SSH key quality — eight controls from three extended collectors and three
    new ones. 3D-1b (merged): the `cis-<distro>-l1` profiles for Ubuntu 22.04, Ubuntu 24.04
    and the RHEL 9 family over an index of CIS recommendation numbers
-   (`references.cis` on every selected control). Next: 3D-3
-   (`--anonymize`, `--max-age`). `kisa-unix-2026` stays
-   the default profile.
+   (`references.cis` on every selected control). `kisa-unix-2026` stays
+   the default profile. 3D-3 (merged): `snapshot anonymize`, keyed pseudonyms
+   with the verdicts held equal under the built-in profiles, and `--max-age`.
 4. **Public release.** Snapshot diff, SARIF, bilingual docs, signed reproducible
    builds with SBOM, deb/rpm packages, and a differential comparison against
    Lynis.

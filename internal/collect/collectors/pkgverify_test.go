@@ -41,6 +41,7 @@ func pkgverifyRun(t *testing.T, a collect.Access, arm bool) *collect.Builder {
 	if v := g.Violations(); len(v) != 0 {
 		t.Fatalf("pkgverify touched undeclared targets: %v", v)
 	}
+	recordTree(b)
 	return b
 }
 

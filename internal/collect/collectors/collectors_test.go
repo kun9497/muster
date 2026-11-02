@@ -435,6 +435,7 @@ func buildOn(t *testing.T, name string, a collect.Access, b *collect.Builder) *c
 	if v := g.Violations(); len(v) != 0 {
 		t.Fatalf("%s touched undeclared targets: %v", name, v)
 	}
+	recordTree(b)
 	return b
 }
 
@@ -2753,6 +2754,7 @@ func TestEveryCollectorStaysInsideItsDeclaration(t *testing.T) {
 				t.Errorf("%s: %v", c.Name, err)
 			}
 		}()
+		recordTree(b)
 		if v := g.Violations(); len(v) != 0 {
 			t.Errorf("%s touched undeclared targets: %v", c.Name, v)
 		}

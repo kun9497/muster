@@ -1,0 +1,36 @@
+{
+  "synthetic": true,
+  "_notes": [
+    "unnecessary_accounts with the preserved names lp, uucp, nuucp (WARN, a partial control)."
+  ],
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "accounts": {
+      "users": {
+        "status": "ok",
+        "value": [
+          {
+            "name": "root"
+          },
+          {
+            "name": "lp"
+          },
+          {
+            "name": "uucp"
+          },
+          {
+            "name": "nuucp"
+          },
+          {
+            "name": "alice"
+          }
+        ],
+        "source": {
+          "kind": "file",
+          "path": "/etc/passwd"
+        }
+      }
+    }
+  }
+}

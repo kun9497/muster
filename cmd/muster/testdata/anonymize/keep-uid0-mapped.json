@@ -1,0 +1,33 @@
+{
+  "synthetic": true,
+  "_notes": [
+    "root_only_uid_zero with a mapped name: toor also has uid 0 (FAIL); its pseudonym is still not root."
+  ],
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "accounts": {
+      "users": {
+        "status": "ok",
+        "value": [
+          {
+            "name": "root",
+            "uid": 0
+          },
+          {
+            "name": "toor",
+            "uid": 0
+          },
+          {
+            "name": "alice",
+            "uid": 1000
+          }
+        ],
+        "source": {
+          "kind": "file",
+          "path": "/etc/passwd"
+        }
+      }
+    }
+  }
+}

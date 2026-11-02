@@ -10,6 +10,25 @@ verdict on an existing snapshot is at least a minor release and appears under
 ## [Unreleased]
 
 ### Added
+- `muster snapshot anonymize` (stage 3D-3, D36) writes a copy of a snapshot
+  for sharing. User and group names, host names, addresses, key fingerprints,
+  the machine-id hash, template unit instances and the names inside paths
+  become HMAC-SHA256 pseudonyms under a 32-byte `--key` (the same input gives
+  the same bytes) or an `--ephemeral` key. Addresses stay in their range, a
+  closed keep set (`root` and the system names the controls compare) and every
+  derived field stay, and free text no clause reads by value becomes
+  `[anonymised]`. Every document path is classified; an unknown one refuses
+  the input. `run.anonymization` records the scheme, mode, key id, classes and
+  replaced paths. Under every built-in profile with no tuning, waiver or site
+  profile, the copy gives the same statuses, reason codes and exit code as the
+  original, which a test holds over every fixture and example snapshot.
+  `fix --format script` refuses an anonymised snapshot.
+- `check --max-age <d>` and `fix --max-age <d>` (`7d`, `1d12h`, `90m`) refuse a
+  snapshot older than the bound, dated more than five minutes ahead, or with
+  no usable `collected_at`, before evaluating: exit 2, nothing on stdout. The
+  bound is recorded as `check.max_age_s` / `fix.max_age_s`; the age and waiver
+  expiry read one clock. Without the flag, output is unchanged. No verdict
+  changes.
 - Three built-in CIS profiles, `cis-ubuntu2204-l1`, `cis-ubuntu2404-l1` and
   `cis-rhel9-l1` (stage 3D-1b), each selecting muster's controls that carry a
   Level 1 – Server recommendation of its benchmark, minus a review list

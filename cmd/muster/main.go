@@ -39,7 +39,7 @@ commands:
   check      evaluate a facts snapshot against the embedded controls
   fix        plan the remediation of a snapshot's failures (--dry-run only)
   controls   lint, list or scaffold the embedded controls
-  snapshot   extract the leaves a control reads from a snapshot into a fixture skeleton
+  snapshot   cut a control's leaves into a fixture skeleton, or anonymise a snapshot
   version    print version, commit and build date
   help       print this message
 `

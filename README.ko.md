@@ -12,13 +12,13 @@
 1차 기준이고, 글로벌 벤치마크(CIS Benchmarks®, DISA STIG, NIST SP 800-53)는
 참조로 붙이며 이후에는 선택 가능한 프로파일로 제공합니다.
 
-> **상태: 3D-1b단계 병합 (2026년 10월).** 1단계 — 뼈대: `collect`, `check`,
+> **상태: 3D-3단계 병합 (2026년 10월).** 1단계 — 뼈대: `collect`, `check`,
 > waiver, 종료 코드, 끝까지 흐르는 컨트롤 여덟 개 — 와 2단계 — 자동 판정 가능한
 > KISA 항목 전체: DISA STIG·NIST SP 800-53 참조를 갖춘 기반 작업부터 계정, PAM,
 > sshd, 홈 디렉터리, 시스템 파일, 서비스, 방화벽, 로깅, NFS·SNMP·패치 위생,
-> FTP·메일·DNS, 마무리 커버리지·참조 게이트까지 — 그리고 3A·3B·3C-1·3C-2a·3C-2b·3D-1·3D-2·3D-2b·3D-2c·3D-2d·3D-1b단계 — 심층
+> FTP·메일·DNS, 마무리 커버리지·참조 게이트까지 — 그리고 3A·3B·3C-1·3C-2a·3C-2b·3D-1·3D-2·3D-2b·3D-2c·3D-2d·3D-1b·3D-3단계 — 심층
 > 파일시스템 워크, 가이드 밖의 첫 점검들, 감사 파이프라인 상태와 패키지 무결성, root가
-> 아닌 채 root의 힘을 가진 것들, 노출, 프로파일과 튜닝, `fix --dry-run` 검토용 스크립트, 실제 호스트에서의 그 증명, 처음 열여섯 너머 컨트롤의 스크립트, 감사 계열과 파일이 말하는 내용, 권고 번호 색인 위의 CIS Level 1 프로파일 — 이 병합되었습니다. 67개 중 67개 항목이 등재되어 있습니다(컨트롤 68개:
+> 아닌 채 root의 힘을 가진 것들, 노출, 프로파일과 튜닝, `fix --dry-run` 검토용 스크립트, 실제 호스트에서의 그 증명, 처음 열여섯 너머 컨트롤의 스크립트, 감사 계열과 파일이 말하는 내용, 권고 번호 색인 위의 CIS Level 1 프로파일, 공유용 익명화 스냅샷과 스냅샷 나이의 한도 — 이 병합되었습니다. 67개 중 67개 항목이 등재되어 있습니다(컨트롤 68개:
 > auto 57, partial 7, manual 4 — manual은 근거를 함께 제시),
 > 그리고 가이드 밖 49개가 더 있습니다. `collect --deep`은
 > 로컬 파일시스템을 시간·항목 예산 안에서 한 번 걷되 심링크를 따라가지 않고 원격
@@ -52,6 +52,8 @@ muster check --facts host.json --format json
 muster check --facts host.json --profile docs/examples/profiles/exclude-beyond.yaml   # KISA 가이드만
 muster check --facts host.json --tuning docs/examples/profiles/tuning.yaml            # 사이트의 파라미터 값
 muster fix --dry-run --facts host.json --format script > fix.sh                       # 검토용 스크립트. muster는 결코 실행하지 않음
+muster check --facts host.json --max-age 7d                                           # 일주일보다 오래된 스냅샷 거부
+muster snapshot anonymize --facts host.json --key site.key --out shared.json          # 공유용 사본, 판정은 같음
 muster controls lint --references docs/reference   # 컨트롤 세트 자체의 게이트
 ```
 
@@ -72,6 +74,21 @@ muster controls lint --references docs/reference   # 컨트롤 세트 자체의 
   사실 위에 한 번만 씁니다.
 - **waiver**는 사유 필수, 만료 선택인 파일로 관리합니다. waive된 결과는 세어지고
   표시되며 조용히 사라지지 않고, waiver는 `ERROR`를 덮지 못합니다.
+- **`snapshot anonymize`**는 사이트 밖으로 나갈 수 있는 스냅샷 사본을 씁니다.
+  사용자와 그룹 이름, 호스트 이름, 주소, 키 지문, machine-id 해시, 경로 안의
+  이름은 키를 쓴 가명(`u…`, `h…`, 제 범위 안의 주소)이 되고, 어떤 컨트롤도 값으로
+  읽지 않는 자유 텍스트는 `[anonymised]`가 됩니다. `--key <file>`(32바이트)은 같은
+  입력에 같은 출력을 주므로 한 키로 만든 파일끼리 비교할 수 있고, `--ephemeral`은
+  키를 버립니다. 튜닝, waiver, 사이트 프로파일이 없으면 모든 내장 프로파일에서
+  사본은 원본과 같은 상태, reason 코드, 종료 코드를 냅니다. 근거는 읽기 어려워지고
+  — 이유와 원본 줄은 자리표시자 — `fix --format script`는 이를 거부합니다(원본에서
+  계획하십시오). 익명화한 스냅샷은 collect가 이미 빼는 것 이상으로 비밀이 없지도,
+  식별 불가능하지도(OS, 패키지, 서비스, 배치는 남음), 공개해도 무해하지도 않습니다.
+  무엇을 막는지는 `THREAT_MODEL.md`가 말합니다.
+- **`--max-age <d>`**는 `check`와 `fix`에서, 한도(`7d`, `1d12h`, `90m`)보다
+  오래되었거나 5분보다 더 미래이거나 쓸 수 있는 `collected_at`이 없는 스냅샷을
+  평가 전에 거부합니다: exit 2, stdout 없음. 두 시계를 비교할 뿐 호스트에 대해
+  아무것도 증명하지 않습니다.
 - **종료 코드**는 계약입니다. `2`(실행 불가 또는 신뢰 불가) > `1`(findings 있음)
   > `0`(clean). `MANUAL` 항목은 따로 요청하지 않는 한 실행을 실패시키지 않습니다.
   가이드 밖의 FAIL도 다른 FAIL과 같이 셉니다: 67항목에는 깨끗하지만 커널·부트·마운트
@@ -210,9 +227,9 @@ CIS나 STIG 준수 여부를 인증하지 않습니다. 컨트롤이 인용할 �
    3C-2b(병합): 노출 — 모든 리스닝 소켓의 소유자와 패키지, 삭제된 바이너리로 도는
    프로세스, 접힌 방화벽 규칙 표에 대한 노출 교차 판정, 네트워크 sysctl — 컨트롤 열셋.
    3D-1b(병합): CIS 권고 번호 색인 위의 Ubuntu 22.04, Ubuntu 24.04, RHEL 9 계열
-   `cis-<distro>-l1` 프로파일(고르는 모든 컨트롤에 `references.cis`). 다음: 3D-3
-   (`--anonymize`, `--max-age`).
-   `kisa-unix-2026`이 기본 프로파일로 남습니다.
+   `cis-<distro>-l1` 프로파일(고르는 모든 컨트롤에 `references.cis`).
+   `kisa-unix-2026`이 기본 프로파일로 남습니다. 3D-3(병합): `snapshot anonymize` —
+   내장 프로파일에서 판정을 같게 유지하는 키 가명 — 와 `--max-age`.
 4. **공개 릴리스.** 스냅샷 diff, SARIF, 한/영 문서, SBOM이 붙은 서명·재현 빌드,
    deb/rpm 패키지, Lynis와의 차분 비교.
 

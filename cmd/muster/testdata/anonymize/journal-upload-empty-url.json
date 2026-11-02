@@ -1,0 +1,117 @@
+{
+  "synthetic": true,
+  "_notes": [
+    "journal-upload active and enabled, URL empty, no rsyslog forward: the third mechanism judges (remote_log_forwarding FAIL).",
+    "An anonymiser that mapped the empty URL to a pseudonym would pick the second mechanism and PASS."
+  ],
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "env": {
+      "container": {
+        "status": "ok",
+        "value": "none",
+        "source": {
+          "kind": "file",
+          "path": "/proc/1/cgroup"
+        }
+      }
+    },
+    "logging": {
+      "rsyslog": {
+        "forwards_remote": {
+          "status": "ok",
+          "value": false,
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "file",
+                "path": "/etc/rsyslog.conf"
+              }
+            ]
+          }
+        },
+        "remote_targets": {
+          "status": "ok",
+          "value": [],
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "file",
+                "path": "/etc/rsyslog.conf"
+              }
+            ]
+          }
+        }
+      },
+      "journal_upload": {
+        "url": {
+          "status": "ok",
+          "value": "",
+          "source": {
+            "kind": "derived",
+            "inputs": [
+              {
+                "kind": "file",
+                "path": "/etc/systemd/journal-upload.conf"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "services": {
+      "syslog": {
+        "installed": {
+          "status": "ok",
+          "value": true,
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState rsyslog.service",
+            "exit_code": 0
+          }
+        },
+        "active": {
+          "status": "ok",
+          "value": true,
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState rsyslog.service",
+            "exit_code": 0
+          }
+        }
+      },
+      "journal_upload": {
+        "installed": {
+          "status": "ok",
+          "value": true,
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState systemd-journal-upload.service",
+            "exit_code": 0
+          }
+        },
+        "active": {
+          "status": "ok",
+          "value": true,
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState systemd-journal-upload.service",
+            "exit_code": 0
+          }
+        },
+        "enabled": {
+          "status": "ok",
+          "value": true,
+          "source": {
+            "kind": "command",
+            "cmd": "/usr/bin/systemctl show -p LoadState,ActiveState,UnitFileState,SubState systemd-journal-upload.service",
+            "exit_code": 0
+          }
+        }
+      }
+    }
+  }
+}

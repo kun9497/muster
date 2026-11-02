@@ -1,0 +1,33 @@
+{
+  "synthetic": true,
+  "_notes": [
+    "unnecessary_accounts with mapped names that only resemble lp and uucp (PASS)."
+  ],
+  "schema_version": 1,
+  "run": {},
+  "facts": {
+    "accounts": {
+      "users": {
+        "status": "ok",
+        "value": [
+          {
+            "name": "root"
+          },
+          {
+            "name": "lpadmin"
+          },
+          {
+            "name": "uucpd"
+          },
+          {
+            "name": "alice"
+          }
+        ],
+        "source": {
+          "kind": "file",
+          "path": "/etc/passwd"
+        }
+      }
+    }
+  }
+}
