@@ -442,7 +442,8 @@ regenerates them from public images and `-check` compares.
   the toolchain moves), signs `muster_<v>_checksums.txt` keyless (`cosign sign-blob --new-bundle-format --bundle
   <checksums>.sigstore.json`, cosign v2.4.3, identity = the workflow at the tag), attests provenance over
   `dist/*.tar.gz dist/*.deb dist/*.rpm`, attaches SPDX SBOMs (syft) and takes the notes from `CHANGELOG.md`'s
-  `## [X.Y.Z] - YYYY-MM-DD` section (`scripts/release-notes.sh`; a missing section fails the release). A failed
+  `## [X.Y.Z] - YYYY-MM-DD` section (`scripts/release-notes.sh`; a missing section fails the release; `changelog.disable`
+  stays unset in `.goreleaser.yaml` — set, GoReleaser discards the file). A failed (or cancelled — a timed-out job)
   release opens or updates one pinned `ops` issue (`ci/release/ops-alert.sh`); the next success closes it.
 - One toolchain: `go.mod` keeps `go 1.25` and names `toolchain go1.26.N` (the newest patch of a supported line);
   `scripts/check-go-toolchain.sh [--exact] [go.mod]` is a floor in CI's `test` job and exact in `release-dry-run`,

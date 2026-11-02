@@ -105,7 +105,7 @@ release time (the release builds the `go.sum` CI tested); a toolchain check that
 version `go.mod` names (assay's v0.12.0 shipped with GO-2026-6809 because `go-version: "1.26"` took the runner's
 older patch); a `govulncheck -mode=binary` post-build hook on every binary, pinned, that stops the release before
 anything is published; a `checksums.txt`; `actions/attest-build-provenance` over the published files; a job that
-opens or closes one pinned issue when the release job fails or recovers.
+opens or closes one pinned issue when the release job fails or recovers (a cancelled run — a job that hit its timeout reports `cancelled` — counts as a failure, RA-43; a skipped job is ignored).
 
 Changed: signing is keyless (§4.5), where assay signs with a project key off the transparency log because the same
 key signs its database artefact; the targets are `linux/amd64` and `linux/arm64` only (RL-2: `collect` is Linux-only
@@ -118,8 +118,8 @@ Added, because assay has neither: SBOMs (§4.4), the `.deb` and `.rpm` packages 
 
 ### 4.2 The build
 
-- **RL-4 — one toolchain, named in `go.mod`.** `go.mod` keeps `go 1.25` as the language version and gains a `toolchain goX.Y.Z` line naming the newest patch of a supported Go line (go1.26.10 at 4A; RA-17 — 1.25 receives no more fixes, so "raise it on an advisory" needs a line that still moves; the version CI pins today
-  is 1.25.5; the plan raises it to the latest 1.25 patch at the time). `release.yml` and `ci.yml` set up Go with
+- **RL-4 — one toolchain, named in `go.mod`.** `go.mod` keeps `go 1.25` as the language version and gains a `toolchain goX.Y.Z` line naming the newest patch of a supported Go line (go1.26.10 at 4A; RA-17 — 1.25 receives no more fixes, so "raise it on an advisory" needs a line that still moves; CI pinned 1.25.5
+  before 4A). `release.yml` and `ci.yml` set up Go with
   `go-version-file: go.mod` and run `scripts/check-go-toolchain.sh`: in CI the line is a floor (a newer patch passes);
   in the release job it must be equal (`--exact`), because a different patch gives different bytes and §4.3 would fail.
   Raising the line is a normal commit; a stdlib advisory with a fix raises it before the next tag.
@@ -183,8 +183,8 @@ package because the ComplianceAsCode-derived CIS index is BSD-3-Clause and the C
 - **RL-11 — the package installs the binary and the documents, and starts nothing.** nfpm through GoReleaser,
   package `muster`, `.deb` for amd64/arm64 and `.rpm` for x86_64/aarch64, licence Apache-2.0, no dependencies
   (static binary), `Section: admin` / `Group: Applications/System`. Contents: `/usr/bin/muster` (0755);
-  `/usr/share/doc/muster/` with the documents of §4.4; `/usr/share/doc/muster/examples/systemd/muster-collect.service`
-  and `muster-collect.timer` (RL-12); the licence at the distribution's conventional place
+  `/usr/share/doc/muster/` with the documents of §4.4; `/usr/share/doc/muster/examples/systemd/muster-collect.service`,
+  `muster-collect.timer` and their `README.md` (RL-12); the licence at the distribution's conventional place
   (`/usr/share/doc/muster/copyright` on Debian). Nothing under `/etc`, `/var`, `/usr/lib/systemd`.
 - **RL-12 — example units live in the documentation directory, not on the unit search path.** The user's words were
   "only the binary, nothing runs"; a unit file under `/usr/lib/systemd/system/` is inert on the RHEL family and on
@@ -235,7 +235,7 @@ pipeline is exercised before a tag, so the plan writes it in the same task as `.
 
 - **RL-14 — release notes are the `CHANGELOG.md` section.** `scripts/release-notes.sh vX.Y.Z` extracts the
   `## [X.Y.Z] - YYYY-MM-DD` section (Keep a Changelog) to a file GoReleaser publishes as the notes
-  (`release.header`/`--release-notes`); GoReleaser's own commit-derived changelog is disabled. The job fails when the
+  (`release.header`/`--release-notes`); GoReleaser uses that file verbatim and derives nothing from the commits — its changelog pipe returns as soon as the file is loaded, so `changelog.disable` must stay unset: set, it discards the file and publishes empty notes (whole-branch review). The job fails when the
   section is missing or still reads `[Unreleased]`, so cutting a release starts with the changelog commit. The
   `Controls` paragraph D16 requires stays where it is. The `[0.1.0]` section is a fresh, operator-facing page —
   what the release does, how to verify and install it, its limits, then the `Controls` paragraph — and the

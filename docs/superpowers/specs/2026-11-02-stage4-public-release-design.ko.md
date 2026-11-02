@@ -95,7 +95,7 @@ main.version/commit/date` 변수(muster의 Makefile이 이미 같은 셋을 넣�
 테스트한 `go.sum`을 빌드한다); `go.mod`가 이름 붙인 Go 버전보다 낮은 빌드를 거부하는 툴체인 검사(assay v0.12.0은
 `go-version: "1.26"`이 러너의 오래된 패치를 집어서 GO-2026-6809를 안고 나갔다); 바이너리마다 돌리는 고정 버전의
 `govulncheck -mode=binary` post-build 훅 — 무엇이 게시되기 전에 릴리스를 멈춘다; `checksums.txt`; 게시 파일에 대한
-`actions/attest-build-provenance`; 릴리스 잡이 실패하거나 회복하면 고정 이슈 하나를 열거나 닫는 잡.
+`actions/attest-build-provenance`; 릴리스 잡이 실패하거나 회복하면 고정 이슈 하나를 열거나 닫는 잡(취소된 실행 — 타임아웃에 걸린 잡은 `cancelled`로 보고한다 — 은 실패로 센다, RA-43; 건너뛴 잡은 무시한다).
 
 바꾸는 것: 서명은 keyless(§4.5)다. assay는 같은 키가 데이터베이스 아티팩트에도 서명하기 때문에 투명성 로그 밖에서
 프로젝트 키로 서명한다. 대상은 `linux/amd64`와 `linux/arm64`만(RL-2: `collect`는 리눅스 전용이고 다른 시스템의 check
@@ -168,7 +168,7 @@ main.version/commit/date` 변수(muster의 Makefile이 이미 같은 셋을 넣�
 - **RL-11 — 패키지는 바이너리와 문서를 설치하고 아무것도 시작하지 않는다.** GoReleaser를 통한 nfpm, 패키지 `muster`,
   amd64/arm64용 `.deb`와 x86_64/aarch64용 `.rpm`, 라이선스 Apache-2.0, 의존성 없음(정적 바이너리), `Section: admin` /
   `Group: Applications/System`. 내용: `/usr/bin/muster`(0755); §4.4의 문서가 든 `/usr/share/doc/muster/`;
-  `/usr/share/doc/muster/examples/systemd/muster-collect.service`와 `muster-collect.timer`(RL-12); 배포판의 관례
+  `/usr/share/doc/muster/examples/systemd/muster-collect.service`, `muster-collect.timer`와 그 `README.md`(RL-12); 배포판의 관례
   자리에 라이선스(Debian은 `/usr/share/doc/muster/copyright`). `/etc`, `/var`, `/usr/lib/systemd` 아래에는 아무것도 없다.
 - **RL-12 — 예시 유닛은 유닛 검색 경로가 아닌 문서 디렉터리에 산다.** 사용자의 말은 "바이너리만, 아무것도 돌지 않음"
   이었다. `/usr/lib/systemd/system/` 아래 유닛 파일은 RHEL 계열에서, 그리고 관리자 스크립트가 없는 Debian에서 비활성
@@ -216,7 +216,7 @@ main.version/commit/date` 변수(muster의 Makefile이 이미 같은 셋을 넣�
 
 - **RL-14 — 릴리스 노트는 `CHANGELOG.md`의 절이다.** `scripts/release-notes.sh vX.Y.Z`가 `## [X.Y.Z] - YYYY-MM-DD`
   절(Keep a Changelog)을 파일로 뽑아 GoReleaser가 노트로 게시한다(`release.header`/`--release-notes`). GoReleaser
-  자신의 커밋 기반 체인지로그는 꺼 둔다. 절이 없거나 아직 `[Unreleased]`로 읽히면 잡이 실패하므로, 릴리스를 끊는 일은
+  GoReleaser는 그 파일을 그대로 쓰고 커밋에서 아무것도 끌어내지 않는다 — 체인지로그 파이프는 파일을 읽는 즉시 돌아오므로 `changelog.disable`은 설정하지 않은 채여야 한다: 설정하면 파일을 버리고 빈 노트를 게시한다(전체 브랜치 리뷰). 절이 없거나 아직 `[Unreleased]`로 읽히면 잡이 실패하므로, 릴리스를 끊는 일은
   체인지로그 커밋으로 시작한다. D16이 요구하는 `Controls` 문단은 그 자리에 그대로다. `[0.1.0]` 절은 새로 쓴 운영자용
   한 쪽이다 — 릴리스가 하는 일, 검증과 설치 방법, 한계, 그 다음 `Controls` 문단 — 그리고 오늘 `[Unreleased]`인 누적된
   단계 이력은 통째로 파일에 남는 `## History before 0.1.0` 제목 아래로 옮긴다(RL-29). 이후의 절은 Keep a Changelog대로
