@@ -42,7 +42,7 @@ commands:
   check      evaluate a facts snapshot against the embedded controls
   fix        plan the remediation of a snapshot's failures (--dry-run only)
   controls   lint, list or scaffold the embedded controls
-  snapshot   cut a control's leaves into a fixture skeleton, or anonymise a snapshot
+  snapshot   cut a fixture, anonymise a snapshot, or list, remove or prune the snapshots muster keeps
   version    print version, commit, commit date, control set and schema versions
   help       print this message
 `

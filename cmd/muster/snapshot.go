@@ -14,9 +14,12 @@ import (
 	"github.com/kun9497/muster/internal/facts"
 )
 
-const snapshotUsage = `usage: muster snapshot <extract|anonymize> [flags]
+const snapshotUsage = `usage: muster snapshot <extract|anonymize|ls|rm|prune> [flags]
        muster snapshot extract --facts <file|-> --control <id> [--out <file>]
        ` + anonymizeSynopsis + `
+       muster snapshot ls [--dir <d>] [--format table|json]
+       muster snapshot rm [--dir <d>] [--dry-run] <name|path>...
+       muster snapshot prune [--keep N] [--keep-days D] [--dir <d>] [--dry-run]
 
 extract cuts one control's fixture out of a snapshot: exactly the fact leaves
 that control reads -- its applies_when, its checks, every mechanism's when and
@@ -59,6 +62,35 @@ flags:
   --force           replace an existing regular --out file
 
 exit codes: 0 wrote the snapshot; 2 refused or an I/O error.
+
+ls lists the snapshots in the directory (default /var/lib/muster/snapshots):
+file name, collected_at, host name, muster and controls versions, size, its
+class and which one latest points at, newest first. A file that reads as a
+snapshot is ok, one a newer schema wrote is newer, anything else matching the
+file name pattern is unreadable; every other name is counted and never opened.
+The directory must be owned by the caller and not group- or world-writable,
+and is read through one descriptor (RL-16, RL-18).
+
+flags:
+  --dir <d>         the snapshot directory (default /var/lib/muster/snapshots)
+  --format <f>      table (default) or json
+
+exit codes: 0 listed (an empty directory is a listing); 2 refused or an I/O
+error.
+
+rm removes the named files from the directory: any regular file by its name,
+or a file by its full path. It never removes latest, a directory or a
+symlink; removing the file latest points at re-points latest to the newest
+ok snapshot left. --dry-run prints what would go.
+
+exit codes: 0 removed (or would remove); 2 refused or an I/O error.
+
+prune removes the ok snapshots outside the newest N (--keep) and older than D
+days (--keep-days); with one bound, that bound alone. It never removes the
+newest ok snapshot, a newer or an unreadable one, and re-points latest as rm
+does. --dry-run prints what would go.
+
+exit codes: 0 pruned (or would prune); 2 no bound, refused or an I/O error.
 `
 
 // fixtureSkeleton is what extract writes: a snapshot cut down to the leaves
@@ -132,6 +164,8 @@ func runSnapshot(args []string, stdout, stderr io.Writer) int {
 		return runSnapshotExtract(args[1:], stdout, stderr)
 	case "anonymize":
 		return runSnapshotAnonymize(args[1:], stdout, stderr)
+	case "ls":
+		return runSnapshotLs(args[1:], stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "muster: unknown snapshot subcommand %q\n%s", args[0], snapshotUsage)
 		return exitError
