@@ -39,6 +39,9 @@ flags:
 			i++
 			break flags
 		case a == "--dir":
+			if dirSet {
+				return f, fmt.Errorf("flag %s given twice", a)
+			}
 			if i+1 >= len(args) {
 				return f, fmt.Errorf("flag %s needs a value", a)
 			}
@@ -48,6 +51,9 @@ flags:
 			}
 			f.dir, dirSet = args[i], true
 		case a == "--dry-run":
+			if f.dryRun {
+				return f, fmt.Errorf("flag %s given twice", a)
+			}
 			f.dryRun = true
 		case strings.HasPrefix(a, "-") && a != "-":
 			return f, fmt.Errorf("unknown flag %s", a)
@@ -69,6 +75,12 @@ flags:
 		}
 		if !strings.HasPrefix(n, "/") {
 			return f, fmt.Errorf("%s is not an absolute path; rm never guesses a directory", report.Escape(n))
+		}
+		// A trailing slash, "//", "." or ".." would make the split name
+		// another file than the one given; such a path is refused, never
+		// resolved lexically.
+		if path.Clean(n) != n {
+			return f, fmt.Errorf("%s is not a clean absolute path", report.Escape(n))
 		}
 		// Snapshot paths are Linux paths on every platform, so path, not
 		// path/filepath, splits them.
@@ -100,6 +112,7 @@ type pruneFlags struct {
 // snapshots.ErrNoBounds.
 func parsePruneArgs(args []string) (pruneFlags, error) {
 	f := pruneFlags{dir: snapshots.DefaultDir}
+	dirSet := false
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		next := func() (string, error) {
@@ -134,8 +147,15 @@ func parsePruneArgs(args []string) (pruneFlags, error) {
 		case "--keep-days":
 			err = bound(&f.b.KeepDays, &f.b.HasKeepDays)
 		case "--dir":
+			if dirSet {
+				return f, fmt.Errorf("flag %s given twice", a)
+			}
 			f.dir, err = next()
+			dirSet = true
 		case "--dry-run":
+			if f.dryRun {
+				return f, fmt.Errorf("flag %s given twice", a)
+			}
 			f.dryRun = true
 		default:
 			return f, fmt.Errorf("unknown flag %s", a)
@@ -194,7 +214,7 @@ func warnAboveNewest(stderr io.Writer, entries []snapshots.Entry) {
 			return
 		}
 		if e.Class == snapshots.ClassNewer || e.Class == snapshots.ClassUnreadable {
-			fmt.Fprintf(stderr, "muster: warning: %s is %s and newer than the newest readable snapshot %s\n",
+			fmt.Fprintf(stderr, "muster: warning: %s (%s) is newer than the newest readable snapshot %s\n",
 				report.Escape(e.Name), e.Class, report.Escape(newest.Name))
 		}
 	}

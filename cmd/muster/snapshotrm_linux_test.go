@@ -28,7 +28,7 @@ const (
 
 var rmNow = time.Date(2026, 10, 1, 7, 0, 0, 0, time.UTC) // c.collected_at + 1h
 
-const rmWarnN = "muster: warning: " + rmN + " is newer and newer than the newest readable snapshot "
+const rmWarnN = "muster: warning: " + rmN + " (newer) is newer than the newest readable snapshot "
 
 func seedRmDir(t *testing.T) string {
 	t.Helper()
@@ -187,6 +187,26 @@ func TestRmRemovesByNameAndRepointsLatest(t *testing.T) {
 	}
 }
 
+// With no ok snapshot left, the latest link is removed, not re-pointed.
+func TestRmRemovesLatestWhenNoOKSnapshotIsLeft(t *testing.T) {
+	dir := seedRmDir(t)
+	for _, name := range []string{rmA, rmB} {
+		if err := os.Remove(filepath.Join(dir, name)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	code, out, stderr := runSnap(t, "rm", "--dir", dir, rmC)
+	if code != exitOK || out != "" {
+		t.Fatalf("exit %d, stdout %q, stderr %q", code, out, stderr)
+	}
+	if exists(t, filepath.Join(dir, "latest")) {
+		t.Errorf("latest still there")
+	}
+	if !strings.HasSuffix(stderr, "muster: latest link removed\n") {
+		t.Errorf("stderr = %q, want it to end with the link removal", stderr)
+	}
+}
+
 func TestRmDryRunRemovesNothing(t *testing.T) {
 	dir := seedRmDir(t)
 	before := dirNames(t, dir)
@@ -320,7 +340,7 @@ func TestRmAndPruneRefuseALockedDirectory(t *testing.T) {
 		{"prune", "--dir", dir, "--keep", "1"},
 		{"rm", "--dir", dir, rmA},
 	} {
-		if code, _, stderr := runSnap(t, args...); code != exitError || !strings.Contains(stderr, "another muster holds the lock") {
+		if code, _, stderr := runSnap(t, args...); code != exitError || stderr != "muster: another muster holds the lock: "+dir+"\n" {
 			t.Errorf("%v: exit %d, stderr %q", args, code, stderr)
 		}
 	}

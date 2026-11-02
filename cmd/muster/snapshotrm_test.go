@@ -18,6 +18,7 @@ func TestRmParsesArgs(t *testing.T) {
 		{[]string{"--dir", "/srv/s", "--dry-run", "a.json", "b.json"}, rmFlags{dir: "/srv/s", dryRun: true, names: []string{"a.json", "b.json"}}},
 		{[]string{"/srv/s/a.json", "/srv/s/b.json"}, rmFlags{dir: "/srv/s", names: []string{"a.json", "b.json"}}},
 		{[]string{"--", "-x.json"}, rmFlags{dir: snapshots.DefaultDir, names: []string{"-x.json"}}},
+		{[]string{"/d/x.json"}, rmFlags{dir: "/d", names: []string{"x.json"}}},
 	} {
 		got, err := parseRmArgs(tc.args)
 		if err != nil || !reflect.DeepEqual(got, tc.want) {
@@ -37,6 +38,11 @@ func TestRmParsesArgs(t *testing.T) {
 		{[]string{"--dir", "/srv/s", "/srv/s/a.json"}, "not both"},
 		{[]string{"/srv/s/a.json", "b.json"}, "not both"},
 		{[]string{"/srv/s/a.json", "/srv/t/b.json"}, "not both"},
+		{[]string{"/d/x/"}, "/d/x/ is not a clean absolute path"},
+		{[]string{"/d//x.json"}, "/d//x.json is not a clean absolute path"},
+		{[]string{"/d/a/../b.json"}, "/d/a/../b.json is not a clean absolute path"},
+		{[]string{"--dir", "/a", "--dir", "/b", "x.json"}, "flag --dir given twice"},
+		{[]string{"--dry-run", "--dry-run", "x.json"}, "flag --dry-run given twice"},
 	} {
 		if _, err := parseRmArgs(tc.args); err == nil || !strings.Contains(err.Error(), tc.want) {
 			t.Errorf("%v: err = %v, want %q", tc.args, err, tc.want)
@@ -67,6 +73,8 @@ func TestPruneParsesArgs(t *testing.T) {
 		{[]string{"--keep-days", "1", "--keep-days", "2"}, "flag --keep-days given twice"},
 		{[]string{"--keep"}, "flag --keep needs a value"},
 		{[]string{"--keep", "1", "a.json"}, "unknown flag a.json"},
+		{[]string{"--keep", "1", "--dir", "/a", "--dir", "/b"}, "flag --dir given twice"},
+		{[]string{"--keep", "1", "--dry-run", "--dry-run"}, "flag --dry-run given twice"},
 	} {
 		if _, err := parsePruneArgs(tc.args); err == nil || !strings.Contains(err.Error(), tc.want) {
 			t.Errorf("%v: err = %v, want %q", tc.args, err, tc.want)
