@@ -1,0 +1,284 @@
+# GoReleaser builds muster's release: linux/amd64 and linux/arm64 binaries,
+# tar.gz archives, .deb and .rpm packages, one checksums file, SPDX SBOMs, and a
+# keyless signature over the checksums (spec
+# docs/superpowers/specs/2026-11-02-stage4-public-release-design.md §4). muster
+# is CGO_ENABLED=0 pure Go, so both targets cross-compile from one host.
+#
+# A release is cut by pushing a tag vX.Y.Z; .github/workflows/release.yml runs
+# this file. CI's release-dry-run job (and `make release-dry-run`) runs
+# `goreleaser release --snapshot --clean --skip=publish,sign` on every PR and
+# then scripts/reproduce.sh against the amd64 snapshot binary.
+version: 2
+
+project_name: muster
+
+# No `before:` hooks (no `go mod tidy`): a release builds the committed go.mod
+# and go.sum, the ones CI tested.
+
+# The metadata files (dist/metadata.json, dist/artifacts.json) carry the
+# commit's time too (RA-24).
+metadata:
+  mod_timestamp: "{{ .CommitTimestamp }}"
+
+builds:
+  - id: muster
+    main: ./cmd/muster
+    binary: muster
+    env:
+      - CGO_ENABLED=0
+    goos: [linux]
+    goarch: [amd64, arm64]
+    # RL-5: every input is the commit's, so scripts/reproduce.sh rebuilds the
+    # same bytes -- the toolchain go.mod names (the release job checks it with
+    # --exact), no VCS stamp, and -X values that are the version (the tag
+    # without v), the full commit and the commit date in UTC, never the build's
+    # clock. The same three variables the Makefile sets (cmd/muster/main.go).
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    flags:
+      - -trimpath
+      - -buildvcs=false
+    ldflags:
+      - -s -w -X main.version={{ .Version }} -X main.commit={{ .FullCommit }} -X main.date={{ .CommitDate }}
+    # Every binary is scanned for known Go vulnerabilities as it is built,
+    # before anything is archived, signed or published; a finding fails the
+    # hook, and the hook fails the release (§4.2).
+    hooks:
+      post:
+        - cmd: sh scripts/release-vulncheck.sh "{{ .Path }}"
+          output: true
+
+archives:
+  - id: muster
+    formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    # RA-24: the archive's entries carry the commit's time, so the archive
+    # bytes follow the commit as well; the proof CI runs is the binary's bytes.
+    builds_info:
+      mtime: "{{ .CommitDate }}"
+      mode: 0755
+    # §4.4: NOTICE and ATTRIBUTION.md travel with every archive and package
+    # (the ComplianceAsCode-derived CIS index is BSD-3-Clause; CB-13).
+    files:
+      - src: LICENSE
+        info: &doc_info
+          mtime: "{{ .CommitDate }}"
+          mode: 0644
+      - src: NOTICE
+        info: *doc_info
+      - src: ATTRIBUTION.md
+        info: *doc_info
+      - src: README.md
+        info: *doc_info
+      - src: README.ko.md
+        info: *doc_info
+      - src: THREAT_MODEL.md
+        info: *doc_info
+      - src: SECURITY.md
+        info: *doc_info
+      - src: CHANGELOG.md
+        info: *doc_info
+      - src: examples/systemd/*
+        dst: examples/systemd
+        strip_parent: true
+        info: *doc_info
+
+# §4.6 RL-11: the package installs the binary and the documents and starts
+# nothing. No dependencies (a static binary); nothing under /etc, /var or
+# /usr/lib/systemd; the example units are documentation (RL-12); the only
+# maintainer script is Debian's postrm, which removes /var/lib/muster on purge
+# (RL-13). rpm carries no script: erase keeps /var/lib/muster.
+nfpms:
+  - id: muster
+    package_name: muster
+    # RA-19: muster_<v>-1_<amd64|arm64>.deb and muster-<v>-1.<x86_64|aarch64>.rpm.
+    file_name_template: "{{ .ConventionalFileName }}"
+    vendor: kun9497
+    homepage: https://github.com/kun9497/muster
+    # RL-39: the commit identity .mailmap and NOTICE use.
+    maintainer: "seonggyun.seo <40746364+kun9497@users.noreply.github.com>"
+    description: "Does this Linux server pass muster? muster collects the facts of a host as root, then evaluates them offline against the KISA Unix server items."
+    license: Apache-2.0
+    formats: [deb, rpm]
+    section: admin
+    priority: optional
+    bindir: /usr/bin
+    release: "1"
+    mtime: "{{ .CommitDate }}"
+    # nfpm drops a `type: doc` entry from every packager but rpm (nfpm
+    # v2.47.0, files.go isRelevantForPackager), so each document is listed
+    # twice: untyped for deb, `type: doc` (%doc) for rpm. A minimal image may
+    # still skip /usr/share/doc (dpkg path-exclude, dnf tsflags=nodocs).
+    contents:
+      - src: LICENSE
+        dst: /usr/share/doc/muster/LICENSE
+        packager: deb
+        file_info: &pkg_doc
+          mode: 0644
+      - src: NOTICE
+        dst: /usr/share/doc/muster/NOTICE
+        packager: deb
+        file_info: *pkg_doc
+      - src: ATTRIBUTION.md
+        dst: /usr/share/doc/muster/ATTRIBUTION.md
+        packager: deb
+        file_info: *pkg_doc
+      - src: README.md
+        dst: /usr/share/doc/muster/README.md
+        packager: deb
+        file_info: *pkg_doc
+      - src: README.ko.md
+        dst: /usr/share/doc/muster/README.ko.md
+        packager: deb
+        file_info: *pkg_doc
+      - src: THREAT_MODEL.md
+        dst: /usr/share/doc/muster/THREAT_MODEL.md
+        packager: deb
+        file_info: *pkg_doc
+      - src: SECURITY.md
+        dst: /usr/share/doc/muster/SECURITY.md
+        packager: deb
+        file_info: *pkg_doc
+      - src: CHANGELOG.md
+        dst: /usr/share/doc/muster/CHANGELOG.md
+        packager: deb
+        file_info: *pkg_doc
+      - src: examples/systemd/muster-collect.service
+        dst: /usr/share/doc/muster/examples/systemd/muster-collect.service
+        packager: deb
+        file_info: *pkg_doc
+      - src: examples/systemd/muster-collect.timer
+        dst: /usr/share/doc/muster/examples/systemd/muster-collect.timer
+        packager: deb
+        file_info: *pkg_doc
+      - src: examples/systemd/README.md
+        dst: /usr/share/doc/muster/examples/systemd/README.md
+        packager: deb
+        file_info: *pkg_doc
+      - src: LICENSE
+        dst: /usr/share/doc/muster/LICENSE
+        type: doc
+        packager: rpm
+        file_info: *pkg_doc
+      - src: NOTICE
+        dst: /usr/share/doc/muster/NOTICE
+        type: doc
+        packager: rpm
+        file_info: *pkg_doc
+      - src: ATTRIBUTION.md
+        dst: /usr/share/doc/muster/ATTRIBUTION.md
+        type: doc
+        packager: rpm
+        file_info: *pkg_doc
+      - src: README.md
+        dst: /usr/share/doc/muster/README.md
+        type: doc
+        packager: rpm
+        file_info: *pkg_doc
+      - src: README.ko.md
+        dst: /usr/share/doc/muster/README.ko.md
+        type: doc
+        packager: rpm
+        file_info: *pkg_doc
+      - src: THREAT_MODEL.md
+        dst: /usr/share/doc/muster/THREAT_MODEL.md
+        type: doc
+        packager: rpm
+        file_info: *pkg_doc
+      - src: SECURITY.md
+        dst: /usr/share/doc/muster/SECURITY.md
+        type: doc
+        packager: rpm
+        file_info: *pkg_doc
+      - src: CHANGELOG.md
+        dst: /usr/share/doc/muster/CHANGELOG.md
+        type: doc
+        packager: rpm
+        file_info: *pkg_doc
+      - src: examples/systemd/muster-collect.service
+        dst: /usr/share/doc/muster/examples/systemd/muster-collect.service
+        type: doc
+        packager: rpm
+        file_info: *pkg_doc
+      - src: examples/systemd/muster-collect.timer
+        dst: /usr/share/doc/muster/examples/systemd/muster-collect.timer
+        type: doc
+        packager: rpm
+        file_info: *pkg_doc
+      - src: examples/systemd/README.md
+        dst: /usr/share/doc/muster/examples/systemd/README.md
+        type: doc
+        packager: rpm
+        file_info: *pkg_doc
+      # The licence at each distribution's conventional place.
+      - src: LICENSE
+        dst: /usr/share/doc/muster/copyright
+        packager: deb
+        file_info: *pkg_doc
+      - src: LICENSE
+        dst: /usr/share/licenses/muster/LICENSE
+        type: license
+        packager: rpm
+        file_info: *pkg_doc
+    overrides:
+      deb:
+        scripts:
+          postremove: ci/release/postrm.sh
+      rpm:
+        scripts: {}
+    rpm:
+      group: Applications/System
+      summary: "Does this Linux server pass muster? muster collects the facts of a host as root, then evaluates them offline against the KISA Unix server items."
+
+checksum:
+  name_template: "{{ .ProjectName }}_{{ .Version }}_checksums.txt"
+  algorithm: sha256
+
+# RL-8: one SPDX JSON SBOM per archive and per package, by syft (pinned by the
+# workflow that installs it). RA-14: two entries need distinct ids.
+sboms:
+  - id: archives
+    artifacts: archive
+    documents:
+      - "{{ .ArtifactName }}.spdx.json"
+    cmd: syft
+    args: ["$artifact", "--output", "spdx-json=$document"]
+  - id: packages
+    artifacts: package
+    documents:
+      - "{{ .ArtifactName }}.spdx.json"
+    cmd: syft
+    args: ["$artifact", "--output", "spdx-json=$document"]
+
+# §4.5 RL-9: keyless -- no --key; the release job's OIDC token signs, and the
+# entry goes to the public transparency log. RA-18: --new-bundle-format writes
+# the Sigstore bundle that .sigstore.json names (cosign v2's --bundle alone
+# writes its legacy JSON); cosign v3, gh and sigstore-go read it.
+signs:
+  - id: checksums
+    cmd: cosign
+    artifacts: checksum
+    signature: "${artifact}.sigstore.json"
+    args:
+      - sign-blob
+      - --new-bundle-format
+      - --bundle
+      - "${signature}"
+      - --yes
+      - "${artifact}"
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+# RL-14: the release notes are the CHANGELOG.md section, not a commit list.
+changelog:
+  disable: true
+
+# RL-30: an ordinary release, marked Latest, no pre-release flag. mode:
+# replace -- a re-run of the same tag writes the notes again, never appends.
+release:
+  github:
+    owner: kun9497
+    name: muster
+  draft: false
+  prerelease: false
+  mode: replace

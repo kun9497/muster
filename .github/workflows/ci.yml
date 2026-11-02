@@ -60,6 +60,13 @@ jobs:
             n=$((n+1))
           done
           [ "$n" -ge 1 ]
+          n=0
+          for f in ci/release/*.sh; do
+            sh -n "$f"
+            shellcheck -s sh "$f"
+            n=$((n+1))
+          done
+          [ "$n" -ge 1 ]
       - name: controls lint
         run: go run ./cmd/muster controls lint --references docs/reference
       - name: controls lint, built-in profile
@@ -802,3 +809,66 @@ jobs:
               | ($k | split(".")) as $p
               | (.facts | getpath($p) | (.status // .effective.status))
               | select(. != "unsupported") ] | length == 0' "$RUNNER_TEMP/muster/out/s.json"
+
+  # Spec §4.7: the release pipeline on every PR, without publishing or signing
+  # (the signature and the attestation need the tag's OIDC identity; Task 8's
+  # release.yml). The build's vulncheck hook runs here as it would on a tag.
+  release-dry-run:
+    runs-on: ubuntu-24.04
+    needs: test
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          check-latest: false
+      # RA-17: the build runs the toolchain go.mod names, exactly.
+      - name: toolchain is go.mod's, exactly
+        run: |
+          sh scripts/check-go-toolchain.sh --exact
+          test "$(go env GOVERSION)" = "go$(sed -n 's/^toolchain go//p' go.mod)"
+      # RA-21: the version is explicit, so the log and the diff name it.
+      - uses: anchore/sbom-action/download-syft@v0
+        with:
+          syft-version: v1.54.1
+      - uses: goreleaser/goreleaser-action@v7
+        with:
+          distribution: goreleaser
+          version: v2.18.0
+          install-only: true
+      - name: goreleaser version
+        run: goreleaser --version
+      - name: goreleaser snapshot build
+        run: goreleaser release --snapshot --clean --skip=publish,sign
+      - name: the amd64 binary reproduces
+        run: sh scripts/reproduce.sh --ref HEAD --version "$(jq -r .version dist/metadata.json)" "$(jq -r '.[] | select(.type=="Binary" and .goarch=="amd64") | .path' dist/artifacts.json)"
+      # RA-19: the packages carry their conventional names.
+      - name: the amd64 .deb is where artifacts.json says
+        run: test -e "dist/$(jq -r '.[] | select(.type=="Linux Package" and .goarch=="amd64" and (.name|endswith(".deb"))) | .name' dist/artifacts.json)"
+      # RA-20: syft saw the Go module list inside the archive's binary.
+      - name: every archive SBOM lists the binary's modules
+        run: |
+          n=0
+          for f in dist/*.tar.gz.spdx.json; do
+            [ -e "$f" ] || continue
+            jq -e '(.packages|length) >= 3 and any(.packages[]; .name=="gopkg.in/yaml.v3") and any(.packages[]; .name=="golang.org/x/sys")' "$f"
+            n=$((n+1))
+          done
+          [ "$n" -eq 2 ]
+      # RA-15: no brace globs (@actions/glob has none). Task 7's install
+      # contract reads artifacts.json from this artifact.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-dry-run-${{ github.run_id }}
+          path: |
+            dist/*.tar.gz
+            dist/*.deb
+            dist/*.rpm
+            dist/*checksums.txt
+            dist/*.spdx.json
+            dist/artifacts.json
+            dist/metadata.json
+          if-no-files-found: error

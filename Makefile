@@ -14,7 +14,7 @@ LDFLAGS := -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.dat
 TIME    ?= 60s
 FUZZPKG ?= ./internal/collect/collectors/
 
-.PHONY: build test lint fmt tidy lint-controls coverage refindex refindex-check cisindex cisindex-check suidindex suidindex-check fuzz shellcheck examples-fetch clean
+.PHONY: build test lint fmt tidy lint-controls coverage refindex refindex-check cisindex cisindex-check suidindex suidindex-check fuzz shellcheck release-dry-run examples-fetch clean
 
 build:
 	CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags "$(LDFLAGS)" -o bin/$(BINARY) $(PKG)
@@ -60,14 +60,23 @@ suidindex-check:
 
 # sh -n and shellcheck over the review scripts (the remedy goldens and the
 # committed fix examples) and the round trip's CI scripts (ci/roundtrip: the
-# seeds and wait.sh) and the release scripts (scripts/). At least the five
-# remedy goldens, the six round-trip scripts and one release script must be
-# checked; only the examples glob may match nothing.
+# seeds and wait.sh) and the release scripts (scripts/ and the package's
+# ci/release/). At least the five remedy goldens, the six round-trip scripts,
+# one release script and one package script must be checked; only the
+# examples glob may match nothing.
 shellcheck:
 	@n=0; for f in internal/remedy/testdata/*.sh; do sh -n "$$f" || exit 1; shellcheck -s sh "$$f" || exit 1; n=$$((n+1)); done; [ "$$n" -ge 5 ] || { echo "shellcheck: $$n remedy goldens checked, want at least 5"; exit 1; }
 	@for f in examples/*-fix-report.sh; do [ -e "$$f" ] || continue; sh -n "$$f" || exit 1; shellcheck -s sh "$$f" || exit 1; done
 	@n=0; for f in ci/roundtrip/*.sh; do sh -n "$$f" || exit 1; shellcheck -s sh "$$f" || exit 1; n=$$((n+1)); done; [ "$$n" -ge 6 ] || { echo "shellcheck: $$n roundtrip scripts checked, want at least 6"; exit 1; }
 	@n=0; for f in scripts/*.sh; do sh -n "$$f" || exit 1; shellcheck -s sh "$$f" || exit 1; n=$$((n+1)); done; [ "$$n" -ge 1 ] || { echo "shellcheck: $$n release scripts checked, want at least 1"; exit 1; }
+	@n=0; for f in ci/release/*.sh; do sh -n "$$f" || exit 1; shellcheck -s sh "$$f" || exit 1; n=$$((n+1)); done; [ "$$n" -ge 1 ] || { echo "shellcheck: $$n package scripts checked, want at least 1"; exit 1; }
+
+# What CI's release-dry-run job runs: GoReleaser's snapshot build of every
+# artefact (no publishing, no signing), then scripts/reproduce.sh against the
+# amd64 binary. Needs goreleaser v2.18.0, syft and jq on PATH.
+release-dry-run:
+	goreleaser release --snapshot --clean --skip=publish,sign
+	sh scripts/reproduce.sh --ref HEAD --version "$$(jq -r .version dist/metadata.json)" "$$(jq -r '.[] | select(.type=="Binary" and .goarch=="amd64") | .path' dist/artifacts.json)"
 
 # One fuzz target for a short time; the seed corpus already runs in `make
 # test`, so this is for the target you are working on. The nightly fuzz
