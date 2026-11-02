@@ -121,7 +121,7 @@ assert_installed() {
 		same_list "$here/contract-files.tar.txt" "tar -tzf $(basename "$pkg")"
 		;;
 	esac
-	[ -f "$bin" ] && [ -x "$bin" ] || fail "$bin is not an executable file"
+	{ [ -f "$bin" ] && [ -x "$bin" ]; } || fail "$bin is not an executable file"
 	if [ "$kind" != tar ]; then
 		got=$(stat -c '%a %u %g' "$bin")
 		[ "$got" = "755 0 0" ] || fail "$bin is '$got' (mode uid gid), want '755 0 0'"
@@ -133,7 +133,7 @@ assert_installed() {
 	for c in /proc/[0-9]*/comm; do
 		[ "$(cat "$c" 2>/dev/null)" != muster ] || fail "a process named muster runs ($c)"
 	done
-	[ ! -e /var/lib/muster ] && [ ! -L /var/lib/muster ] || fail "/var/lib/muster exists after install"
+	{ [ ! -e /var/lib/muster ] && [ ! -L /var/lib/muster ]; } || fail "/var/lib/muster exists after install"
 	"$bin" version >/tmp/contract-version.txt || fail "muster version exited $?"
 	n=$(wc -l </tmp/contract-version.txt)
 	[ "$n" -eq 5 ] || fail "muster version printed $n lines, want 5"
@@ -171,7 +171,7 @@ if [ "$kind" = deb ]; then
 	step "purge (a): a real /var/lib/muster"
 	dpkg -i "$pkg" >/dev/null
 	dpkg -P muster >/dev/null
-	[ ! -e /var/lib/muster ] && [ ! -L /var/lib/muster ] || fail "purge left /var/lib/muster"
+	{ [ ! -e /var/lib/muster ] && [ ! -L /var/lib/muster ]; } || fail "purge left /var/lib/muster"
 
 	step "purge (b): /var/lib/muster a symlink"
 	dpkg -i "$pkg" >/dev/null
@@ -179,8 +179,8 @@ if [ "$kind" = deb ]; then
 	touch /srv/muster-elsewhere/snapshots/keep.json
 	ln -s /srv/muster-elsewhere /var/lib/muster
 	dpkg -P muster >/dev/null
-	[ ! -e /var/lib/muster ] && [ ! -L /var/lib/muster ] || fail "purge left the /var/lib/muster symlink"
-	[ -d /srv/muster-elsewhere ] && [ ! -L /srv/muster-elsewhere ] || fail "purge removed the symlink's target"
+	{ [ ! -e /var/lib/muster ] && [ ! -L /var/lib/muster ]; } || fail "purge left the /var/lib/muster symlink"
+	{ [ -d /srv/muster-elsewhere ] && [ ! -L /srv/muster-elsewhere ]; } || fail "purge removed the symlink's target"
 	[ -f /srv/muster-elsewhere/snapshots/keep.json ] || fail "purge removed the file under the symlink's target"
 fi
 step "PASS"

@@ -16,7 +16,7 @@ usage() {
   echo "usage: sh scripts/release-notes.sh vX.Y.Z [CHANGELOG.md]" >&2
   exit 2
 }
-[ "$#" -ge 1 ] && [ "$#" -le 2 ] || usage
+{ [ "$#" -ge 1 ] && [ "$#" -le 2 ]; } || usage
 case "$1" in
   v*) ;;
   *) usage ;;

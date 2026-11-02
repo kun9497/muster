@@ -48,9 +48,9 @@ while [ "$#" -gt 0 ]; do
 done
 [ -n "$ref" ] || usage
 if [ -n "$print_date" ]; then
-	[ -z "$version_set" ] && [ -z "$artefact" ] || usage
+	{ [ -z "$version_set" ] && [ -z "$artefact" ]; } || usage
 else
-	[ -n "$version_set" ] && [ -n "$artefact" ] || usage
+	{ [ -n "$version_set" ] && [ -n "$artefact" ]; } || usage
 	case "$version" in
 		'' | *[[:space:]\"\']*) echo "error: --version must be non-empty, without whitespace or quotes" >&2; exit 2 ;;
 	esac
@@ -146,7 +146,7 @@ case "$artefact" in
 		;;
 	*) bin=$artefact ;;
 esac
-[ -f "$bin" ] && [ ! -L "$bin" ] || fail "$artefact holds no muster binary"
+{ [ -f "$bin" ] && [ ! -L "$bin" ]; } || fail "$artefact holds no muster binary"
 
 built=$(sha256sum "$tmp/out/muster" | sed 's/ .*//') || fail "cannot hash the build"
 have=$(sha256sum "$bin" | sed 's/ .*//') || fail "cannot hash the artefact's binary"

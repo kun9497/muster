@@ -24,7 +24,7 @@ usage() {
 workflow=$1
 result=$2
 url=$3
-[ -n "$workflow" ] && [ -n "$url" ] || usage
+{ [ -n "$workflow" ] && [ -n "$url" ]; } || usage
 title="$workflow failed"
 label=ops
 when=$(date -u +%Y-%m-%dT%H:%MZ)
