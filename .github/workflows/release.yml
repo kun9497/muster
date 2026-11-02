@@ -11,7 +11,8 @@
 #   2. wait for CI on that commit
 #   3. git tag vX.Y.Z <that commit> && git push origin vX.Y.Z
 #
-# A tag is cut from main and never moved (RL-6); this job never pushes to main
+# A tag is cut from main and never moved (RL-6), and only an exact vX.Y.Z tag
+# is released while the project is 0.x (RA-44); this job never pushes to main
 # (RL-3). The automatic GITHUB_TOKEN writes the release; no secret is stored.
 name: release
 
@@ -19,6 +20,12 @@ on:
   push:
     tags:
       - "v*"
+
+# Two tags pushed together queue, never interleave: one release publish, one
+# attestation and one alert job at a time.
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 permissions:
   contents: write
@@ -33,9 +40,16 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0 # GoReleaser reads the tags and the commit date
-      # RL-6: a tag whose commit is not on main's history publishes nothing.
-      - name: the tag is on main
-        run: git fetch origin main && git merge-base --is-ancestor "$GITHUB_SHA" origin/main || { echo "tag is not on main"; exit 1; }
+      # RA-44: only an exact vX.Y.Z tag is released; a pre-release suffix is
+      # refused while the project is 0.x (release.prerelease is false, so an
+      # rc would publish as Latest). RL-6: a tag whose commit is not on main's
+      # history publishes nothing. The fetch and the ancestry check fail with
+      # their own messages.
+      - name: the tag is vX.Y.Z and on main
+        run: |
+          printf '%s\n' "$GITHUB_REF_NAME" | grep -Eqx 'v[0-9]+\.[0-9]+\.[0-9]+' || { echo "tag $GITHUB_REF_NAME is not a vX.Y.Z release tag; pre-release tags are not cut while the project is 0.x"; exit 1; }
+          git fetch origin main || { echo "git fetch origin main failed"; exit 1; }
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main || { echo "tag is not on main"; exit 1; }
       # RA-17: setup-go v6+ honours go.mod's toolchain line; --exact holds the
       # release to it (RL-4, RL-5: scripts/reproduce.sh rebuilds with it).
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -51,6 +65,8 @@ jobs:
       - uses: anchore/sbom-action/download-syft@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
         with:
           syft-version: v1.54.1
+      - name: syft version
+        run: syft version
       # RL-14: the notes are the tag's CHANGELOG.md section; a missing section
       # or an [Unreleased] one fails the release before anything is built.
       - name: release notes from the changelog
@@ -80,7 +96,8 @@ jobs:
 
   # §4.10: one pinned "release failed" issue while the release fails, closed
   # by the next success. always(), so it runs when the job it watches failed;
-  # ci/release/ops-alert.sh ignores a cancelled or skipped run.
+  # ci/release/ops-alert.sh reports a cancelled run (a timeout-minutes hit, or a
+  # manual stop) as a failure (RA-43) and ignores a skipped one.
   alert:
     needs: [goreleaser]
     if: always()

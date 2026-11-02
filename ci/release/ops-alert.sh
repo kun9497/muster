@@ -9,7 +9,9 @@
 #            so a failed release is on the repository's front page, not only
 #            in the Actions tab.
 # success:   the open issue, if any, is unpinned and closed with the run URL.
-# cancelled, skipped: nothing (a person stopped the run, or the job never ran).
+# cancelled: a failure (RA-43): a job that hits timeout-minutes reports
+#            cancelled, as does a manual stop; the body names the raw result.
+# skipped:   nothing (the job never ran).
 #
 # One issue per workflow, found by its exact title. Needs GH_TOKEN with
 # issues: write and GH_REPO (the alert job passes both).
@@ -27,10 +29,15 @@ title="$workflow failed"
 label=ops
 when=$(date -u +%Y-%m-%dT%H:%MZ)
 
+raw=$result
 case "$result" in
   success | failure) ;;
-  cancelled | skipped)
-    echo "ops-alert: $workflow $result; nothing to do"
+  cancelled)
+    echo "ops-alert: $workflow cancelled (a timeout or a stop); treated as a failure (RA-43)"
+    result=failure
+    ;;
+  skipped)
+    echo "ops-alert: $workflow skipped; nothing to do"
     exit 0
     ;;
   *)
@@ -45,7 +52,7 @@ found=$(gh issue list --label "$label" --state open --limit 100 --json number,ti
   --jq ".[] | select(.title == \"$title\") | .number")
 open=$(printf '%s\n' "$found" | head -n 1)
 
-body="\`$workflow\` failed at $when.
+body="\`$workflow\` failed at $when (result: $raw).
 
 Run: $url
 

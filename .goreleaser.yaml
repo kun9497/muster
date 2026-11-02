@@ -269,9 +269,11 @@ signs:
 snapshot:
   version_template: "{{ incpatch .Version }}-next"
 
-# RL-14: the release notes are the CHANGELOG.md section, not a commit list.
-changelog:
-  disable: true
+# RL-14: the release notes are the CHANGELOG.md section release.yml passes with
+# --release-notes; GoReleaser uses that file verbatim and derives nothing from
+# the commits (its changelog pipe returns as soon as the file is loaded). No
+# changelog: block: `changelog.disable: true` skips the pipe and discards the
+# file, publishing empty notes. The snapshot dry run still skips the pipe.
 
 # RL-30: an ordinary release, marked Latest, no pre-release flag. mode:
 # replace -- a re-run of the same tag writes the notes again, never appends.
