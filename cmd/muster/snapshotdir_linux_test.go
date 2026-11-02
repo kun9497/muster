@@ -3,6 +3,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,6 +13,7 @@ import (
 
 	"golang.org/x/sys/unix"
 
+	"github.com/kun9497/muster/internal/collect"
 	"github.com/kun9497/muster/internal/snapshots"
 )
 
@@ -214,5 +216,71 @@ func TestReadEntryRefusesSwappedAndLinkedEntries(t *testing.T) {
 	}
 	if _, out, err := d.readEntry(seedEmpty, stA); err != nil || out != entryOther {
 		t.Errorf("a symlink in the entry's place: outcome %d, err %v; want other", out, err)
+	}
+}
+
+// remove unlinks a regular file through the directory fd and refuses
+// anything else, which stays where it is.
+func TestRemoveUnlinksOnlyRegularFiles(t *testing.T) {
+	dir := seedSnapshotDir(t)
+	d := openTestDir(t, dir)
+	if err := d.remove(seedOKOld); err != nil {
+		t.Fatalf("remove a regular file: %v", err)
+	}
+	if _, err := os.Lstat(filepath.Join(dir, seedOKOld)); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("%s still there after remove: %v", seedOKOld, err)
+	}
+	for _, name := range []string{"sub", "latest"} {
+		if err := d.remove(name); !errors.Is(err, errNotRegular) {
+			t.Errorf("remove(%s): err = %v, want errNotRegular", name, err)
+		}
+		if _, err := os.Lstat(filepath.Join(dir, name)); err != nil {
+			t.Errorf("%s gone after a refused remove: %v", name, err)
+		}
+	}
+}
+
+// latest is written as a relative bare name through a temporary link and a
+// rename; an empty target removes a link and leaves a regular latest alone.
+func TestRepointLatestWritesARelativeLinkAtomically(t *testing.T) {
+	dir := seedSnapshotDir(t)
+	d := openTestDir(t, dir)
+	if err := d.repointLatest("b.json"); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := os.Readlink(filepath.Join(dir, "latest")); err != nil || got != "b.json" {
+		t.Errorf("latest -> %q (%v), want b.json", got, err)
+	}
+	if left, _ := filepath.Glob(filepath.Join(dir, ".latest.tmp-*")); len(left) != 0 {
+		t.Errorf("temporary links left: %v", left)
+	}
+	if err := d.repointLatest(""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Lstat(filepath.Join(dir, "latest")); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("latest link still there after repointLatest(\"\"): %v", err)
+	}
+	writeSnapshot(t, filepath.Join(dir, "latest"), "not a link")
+	if err := d.repointLatest(""); err != nil {
+		t.Fatal(err)
+	}
+	if body, err := os.ReadFile(filepath.Join(dir, "latest")); err != nil || string(body) != "not a link" {
+		t.Errorf("a regular latest changed: %q, %v", body, err)
+	}
+}
+
+// A second lock on the same directory is refused while the first is held.
+func TestLockRefusesASecondHolder(t *testing.T) {
+	d := openTestDir(t, seedSnapshotDir(t))
+	l, err := d.lock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer l.Release()
+	if l2, err := d.lock(); !errors.Is(err, collect.ErrLocked) {
+		if l2 != nil {
+			l2.Release()
+		}
+		t.Fatalf("second lock: err = %v, want collect.ErrLocked", err)
 	}
 }

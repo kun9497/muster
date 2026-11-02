@@ -166,6 +166,10 @@ func runSnapshot(args []string, stdout, stderr io.Writer) int {
 		return runSnapshotAnonymize(args[1:], stdout, stderr)
 	case "ls":
 		return runSnapshotLs(args[1:], stdout, stderr)
+	case "rm":
+		return runSnapshotRm(args[1:], stdout, stderr)
+	case "prune":
+		return runSnapshotPrune(args[1:], stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "muster: unknown snapshot subcommand %q\n%s", args[0], snapshotUsage)
 		return exitError

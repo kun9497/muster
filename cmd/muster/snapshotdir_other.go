@@ -44,3 +44,9 @@ func (d *snapshotDir) list() ([]snapshots.Entry, int, latestLink, error) {
 func (d *snapshotDir) stat(string) (dirKind, error) { return kindAbsent, errSnapshotDirLinux }
 
 func (d *snapshotDir) close() {}
+
+func (d *snapshotDir) remove(string) error { return errSnapshotDirLinux }
+
+func (d *snapshotDir) repointLatest(string) error { return errSnapshotDirLinux }
+
+func (d *snapshotDir) lock() (dirLock, error) { return nil, errSnapshotDirLinux }
