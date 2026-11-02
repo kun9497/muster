@@ -30,7 +30,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
-        with: {go-version: "1.25.5", check-latest: false}
+        with: {go-version-file: go.mod, check-latest: false}
       - name: fuzz my share of the targets (60 s each nightly, 5 s on a pull request)
         run: |
           # One assignment per package, so a package that fails to build or

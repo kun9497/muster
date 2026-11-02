@@ -28,7 +28,7 @@ jobs:
         # the abbreviated commit.
         with: {fetch-depth: 0}
       - uses: actions/setup-go@v5
-        with: {go-version: "1.25.5", check-latest: false}
+        with: {go-version-file: go.mod, check-latest: false}
       - name: build muster the way a release is built
         # `make build` is CGO_ENABLED=0 go build -trimpath with the Makefile's
         # LDFLAGS, which stamp main.version, main.commit and main.date from
