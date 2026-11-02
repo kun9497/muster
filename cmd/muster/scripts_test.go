@@ -168,7 +168,7 @@ func requireCleanCheckout(t *testing.T) {
 	if err := exec.Command("git", "rev-parse", "--git-dir").Run(); err != nil {
 		t.Skipf("not a git checkout (git rev-parse --git-dir: %v); reproduce.sh builds a git ref", err)
 	}
-	out, err := exec.Command("git", "status", "--porcelain").Output()
+	out, err := exec.Command("git", "--no-optional-locks", "status", "--porcelain").Output()
 	if err != nil {
 		t.Skipf("git status --porcelain: %v", err)
 	}

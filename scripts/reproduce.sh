@@ -64,12 +64,19 @@ else
 	esac
 	case "$artefact" in
 		*.tar.gz) need tar ;;
-		*.deb) command -v dpkg-deb >/dev/null 2>&1 || need ar tar ;;
+		*.deb) need tar; command -v dpkg-deb >/dev/null 2>&1 || need ar ;;
 		*.rpm) need rpm2cpio cpio ;;
 	esac
-	need go sed sha256sum mktemp
+	need go sed head sha256sum mktemp
 fi
 need git
+
+# A step that fails after the arguments were accepted exits 1, never with the
+# failing tool's own status (2 is usage or a missing tool only).
+fail() {
+	echo "error: $*" >&2
+	exit 1
+}
 
 # The commit date in UTC, the value GoReleaser's {{ .CommitDate }} renders.
 # format-local under TZ=UTC: plain format: prints the committer's own offset
@@ -80,12 +87,12 @@ commit_date() {
 
 sha=$(git rev-parse --verify --quiet "$ref^{commit}") || { echo "error: $ref is not a commit in this repository" >&2; exit 1; }
 if [ -n "$print_date" ]; then
-	commit_date "$sha"
+	commit_date "$sha" || fail "cannot read the commit date of $ref"
 	exit 0
 fi
 
-date=$(commit_date "$sha")
-tmp=$(mktemp -d)
+date=$(commit_date "$sha") || fail "cannot read the commit date of $ref"
+tmp=$(mktemp -d) || fail "cannot make a temporary directory"
 src=$tmp/src
 cleanup() {
 	git worktree remove --force "$src" 2>/dev/null || :
@@ -94,47 +101,51 @@ cleanup() {
 trap cleanup EXIT
 trap 'exit 1' HUP INT TERM
 
-git worktree add --quiet --detach "$src" "$sha" >&2
+git worktree add --quiet --detach "$src" "$sha" >&2 || fail "git worktree add of $ref failed"
 toolchain=$(sed -n 's/^toolchain //p' "$src/go.mod" | head -n 1)
-[ -n "$toolchain" ] || { echo "error: $ref's go.mod names no toolchain line" >&2; exit 1; }
+[ -n "$toolchain" ] || fail "$ref's go.mod names no toolchain line"
 GOTOOLCHAIN=$toolchain
 export GOTOOLCHAIN
-(cd "$src" && sh scripts/check-go-toolchain.sh --exact "$src/go.mod") >&2
+(cd "$src" && sh scripts/check-go-toolchain.sh --exact "$src/go.mod") >&2 ||
+	fail "the toolchain is not $toolchain, the one $ref's go.mod names"
 
-mkdir "$tmp/out" "$tmp/x"
+mkdir "$tmp/out" "$tmp/x" || fail "cannot make directories under $tmp"
 (
-	cd "$src"
-	CGO_ENABLED=0 GOOS=linux GOARCH=$arch GOAMD64=v1 GOARM64=v8.0 GOFLAGS=-mod=readonly \
-		go build -trimpath -buildvcs=false \
-		-ldflags "-s -w -X main.version=$version -X main.commit=$sha -X main.date=$date" \
-		-o "$tmp/out/muster" ./cmd/muster
-)
+	cd "$src" &&
+		CGO_ENABLED=0 GOOS=linux GOARCH=$arch GOAMD64=v1 GOARM64=v8.0 GOFLAGS=-mod=readonly 			go build -trimpath -buildvcs=false 			-ldflags "-s -w -X main.version=$version -X main.commit=$sha -X main.date=$date" 			-o "$tmp/out/muster" ./cmd/muster
+) || fail "go build of $ref failed"
 
+# Only the one member that holds the binary is extracted.
 case "$artefact" in
 	*.tar.gz)
-		tar -xzf "$artefact" -C "$tmp/x"
+		tar -xzf "$artefact" -C "$tmp/x" muster || fail "cannot extract muster from $artefact"
 		bin=$tmp/x/muster
 		;;
 	*.deb)
 		if command -v dpkg-deb >/dev/null 2>&1; then
-			dpkg-deb -x "$artefact" "$tmp/x"
+			dpkg-deb --fsys-tarfile "$artefact" | tar -xf - -C "$tmp/x" ./usr/bin/muster ||
+				fail "cannot extract ./usr/bin/muster from $artefact"
 		else
-			(cd "$tmp/x" && ar x "$artefact" && tar -xf data.tar.*)
+			(cd "$tmp/x" && ar x "$artefact" && tar -xf data.tar.* ./usr/bin/muster) ||
+				fail "cannot extract ./usr/bin/muster from $artefact"
 		fi
 		bin=$tmp/x/usr/bin/muster
 		;;
 	*.rpm)
-		# nfpm's payload names are absolute (/usr/bin/muster) and GNU cpio
-		# writes them where they say unless told not to.
-		(cd "$tmp/x" && rpm2cpio "$artefact" | cpio -id --quiet --no-absolute-filenames)
+		# nfpm's payload names are absolute (/usr/bin/muster); GNU cpio
+		# writes them where they say unless told not to, and with
+		# --no-absolute-filenames matches the stripped usr/bin/muster
+		# (an rpmbuild payload names it ./usr/bin/muster).
+		(cd "$tmp/x" && rpm2cpio "$artefact" | cpio -id --quiet --no-absolute-filenames 'usr/bin/muster' './usr/bin/muster') ||
+			fail "cannot extract ./usr/bin/muster from $artefact"
 		bin=$tmp/x/usr/bin/muster
 		;;
 	*) bin=$artefact ;;
 esac
-[ -f "$bin" ] || { echo "error: $artefact holds no muster binary" >&2; exit 1; }
+[ -f "$bin" ] && [ ! -L "$bin" ] || fail "$artefact holds no muster binary"
 
-built=$(sha256sum "$tmp/out/muster" | sed 's/ .*//')
-have=$(sha256sum "$bin" | sed 's/ .*//')
+built=$(sha256sum "$tmp/out/muster" | sed 's/ .*//') || fail "cannot hash the build"
+have=$(sha256sum "$bin" | sed 's/ .*//') || fail "cannot hash the artefact's binary"
 echo "built   $built"
 echo "artefact $have"
-[ "$built" = "$have" ] || { echo "error: the build does not reproduce the artefact" >&2; exit 1; }
+[ "$built" = "$have" ] || fail "the build does not reproduce the artefact"
