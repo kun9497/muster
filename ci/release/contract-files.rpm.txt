@@ -1,0 +1,13 @@
+/usr/bin/muster
+/usr/share/doc/muster/ATTRIBUTION.md
+/usr/share/doc/muster/CHANGELOG.md
+/usr/share/doc/muster/LICENSE
+/usr/share/doc/muster/NOTICE
+/usr/share/doc/muster/README.ko.md
+/usr/share/doc/muster/README.md
+/usr/share/doc/muster/SECURITY.md
+/usr/share/doc/muster/THREAT_MODEL.md
+/usr/share/doc/muster/examples/systemd/README.md
+/usr/share/doc/muster/examples/systemd/muster-collect.service
+/usr/share/doc/muster/examples/systemd/muster-collect.timer
+/usr/share/licenses/muster/LICENSE

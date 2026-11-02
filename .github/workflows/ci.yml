@@ -872,3 +872,52 @@ jobs:
             dist/artifacts.json
             dist/metadata.json
           if-no-files-found: error
+
+  # §4.6/§4.7 RL-11, RL-13: the install contract. Each row installs the
+  # dry run's amd64 artefact in a bare image (no network, no package
+  # installation) and runs ci/release/contract.sh: the file list, the
+  # metadata, nothing started or enabled, muster version and check, the
+  # upgrade, the remove, and on Debian the purge. A separate job with
+  # fail-fast off, so one failing distribution does not hide the others
+  # (RA-15).
+  install-contract:
+    runs-on: ubuntu-24.04
+    needs: release-dry-run
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {image: "ubuntu:22.04", kind: deb}
+          - {image: "ubuntu:24.04", kind: deb}
+          - {image: "debian:12", kind: deb}
+          - {image: "rockylinux/rockylinux:9", kind: rpm}
+          - {image: "almalinux:9", kind: rpm}
+          - {image: "ubuntu:24.04", kind: tar}
+    steps:
+      - uses: actions/checkout@v4
+      # v4 restores the files directly under dist/.
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-dry-run-${{ github.run_id }}
+          path: dist
+      - name: the dry run's artifacts.json is here
+        run: test -s dist/artifacts.json
+      - name: install contract (${{ matrix.image }}, ${{ matrix.kind }})
+        env:
+          IMAGE: ${{ matrix.image }}
+          KIND: ${{ matrix.kind }}
+        run: |
+          case "$KIND" in
+            deb) sel='.type=="Linux Package" and .goarch=="amd64" and (.name|endswith(".deb"))' ;;
+            rpm) sel='.type=="Linux Package" and .goarch=="amd64" and (.name|endswith(".rpm"))' ;;
+            tar) sel='.type=="Archive" and .goarch=="amd64"' ;;
+          esac
+          artefact=$(jq -r ".[] | select($sel) | .name" dist/artifacts.json)
+          [ -n "$artefact" ] && [ "$(printf '%s\n' "$artefact" | wc -l)" -eq 1 ] && [ -f "dist/$artefact" ]
+          version=$(jq -r .version dist/metadata.json)
+          expected=$(sh ci/release/expected-exit.sh examples/ubuntu-24.04-vm-report.json)
+          echo "artefact $artefact, version $version, expected exit $expected"
+          docker run --rm --network none \
+            -v "$PWD/dist:/dist:ro" -v "$PWD/ci/release:/ci:ro" -v "$PWD/examples:/ex:ro" \
+            "$IMAGE" sh /ci/contract.sh "$KIND" "/dist/$artefact" /ex/ubuntu-24.04-vm.json "$expected" "$version"
