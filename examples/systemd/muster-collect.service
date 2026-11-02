@@ -1,0 +1,12 @@
+# An example unit: the muster package installs it under
+# /usr/share/doc/muster/examples/systemd/ and never enables it (RL-12).
+# It runs the same `collect` the README's first run gives, without --deep,
+# so the weekly snapshots compare whole.
+[Unit]
+Description=muster: collect a facts snapshot
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/muster collect
+Nice=10
+IOSchedulingClass=idle
