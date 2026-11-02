@@ -1,0 +1,9 @@
+# RL-31: every workflow's actions are pinned by commit SHA; dependabot
+# proposes the moves as pull requests (spec §4.10). It moves `uses:` pins
+# only: GoReleaser's, syft's and cosign's version inputs are raised by hand.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

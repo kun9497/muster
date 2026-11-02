@@ -325,3 +325,71 @@ func TestReproduceScriptUsage(t *testing.T) {
 		})
 	}
 }
+
+const releaseNotesScript = "../../scripts/release-notes.sh"
+
+// sampleNotes010 is the body of the sample's [0.1.0] section: every line from
+// the one after its heading to the one before the next "## " heading.
+const sampleNotes010 = `
+The first release.
+
+### Added
+- ` + "`muster check` and `muster collect`" + `.
+
+### Controls
+- 117 controls.
+
+`
+
+// TestReleaseNotesScript drives scripts/release-notes.sh (RL-14): a
+// version's section is printed byte for byte, a missing one, the
+// [Unreleased] heading and a malformed date fail the release, and the real
+// CHANGELOG.md fails for a version that will never exist (RA-31).
+func TestReleaseNotesScript(t *testing.T) {
+	if _, err := exec.LookPath("sh"); err != nil {
+		t.Skip("sh not on PATH")
+	}
+	const sample = "../../ci/release/testdata/CHANGELOG.sample.md"
+	badDate := filepath.Join(t.TempDir(), "CHANGELOG.md")
+	if err := os.WriteFile(badDate, []byte("# Changelog\n\n## [0.1.0] - 2026-11\n\nText.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cases := []struct {
+		name     string
+		args     []string
+		wantExit int
+		wantOut  string // exact stdout when wantExit is 0
+		wantErr  string // a substring of stderr otherwise
+	}{
+		{name: "section", args: []string{"v0.1.0", sample}, wantOut: sampleNotes010},
+		{name: "no section", args: []string{"v0.3.0", sample}, wantExit: 1, wantErr: "has no section for 0.3.0"},
+		{name: "unreleased is never a release", args: []string{"vUnreleased", sample}, wantExit: 1, wantErr: "error: "},
+		{name: "date not YYYY-MM-DD", args: []string{"v0.1.0", badDate}, wantExit: 1, wantErr: "YYYY-MM-DD"},
+		{name: "real changelog, never a version", args: []string{"v0.0.0", "../../CHANGELOG.md"}, wantExit: 1, wantErr: "has no section for 0.0.0"},
+		{name: "no arguments", args: nil, wantExit: 2, wantErr: "usage: "},
+		{name: "no v prefix", args: []string{"0.1.0", sample}, wantExit: 2, wantErr: "usage: "},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			code, stdout, stderr := runScript(t, "", nil, append([]string{releaseNotesScript}, c.args...)...)
+			if code != c.wantExit {
+				t.Fatalf("exit %d, want %d\nstdout: %s\nstderr: %s", code, c.wantExit, stdout, stderr)
+			}
+			if c.wantExit == 0 {
+				if stdout != c.wantOut {
+					t.Errorf("stdout = %q, want %q", stdout, c.wantOut)
+				}
+				if stderr != "" {
+					t.Errorf("stderr on success: %q", stderr)
+				}
+				return
+			}
+			if stdout != "" {
+				t.Errorf("stdout on failure: %q", stdout)
+			}
+			if !strings.Contains(stderr, c.wantErr) {
+				t.Errorf("stderr %q does not contain %q", stderr, c.wantErr)
+			}
+		})
+	}
+}

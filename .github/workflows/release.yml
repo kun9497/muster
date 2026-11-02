@@ -1,0 +1,100 @@
+# Cut a release from a pushed tag vX.Y.Z (spec
+# docs/superpowers/specs/2026-11-02-stage4-public-release-design.md §4.10):
+# GoReleaser builds the binaries, archives, .deb and .rpm packages, checksums
+# and SBOMs that .goreleaser.yaml names, signs the checksums keyless under this
+# job's OIDC token (RL-9) and publishes them as a GitHub release whose notes are
+# the tag's CHANGELOG.md section (RL-14); build provenance is attested over the
+# archives and packages (RL-10). The build is the one CI's release-dry-run job
+# runs on every PR, with --clean --release-notes in place of --snapshot --skip.
+#
+#   1. commit the `## [X.Y.Z] - YYYY-MM-DD` section of CHANGELOG.md to main
+#   2. wait for CI on that commit
+#   3. git tag vX.Y.Z <that commit> && git push origin vX.Y.Z
+#
+# A tag is cut from main and never moved (RL-6); this job never pushes to main
+# (RL-3). The automatic GITHUB_TOKEN writes the release; no secret is stored.
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  goreleaser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # GoReleaser reads the tags and the commit date
+      # RL-6: a tag whose commit is not on main's history publishes nothing.
+      - name: the tag is on main
+        run: git fetch origin main && git merge-base --is-ancestor "$GITHUB_SHA" origin/main || { echo "tag is not on main"; exit 1; }
+      # RA-17: setup-go v6+ honours go.mod's toolchain line; --exact holds the
+      # release to it (RL-4, RL-5: scripts/reproduce.sh rebuilds with it).
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          check-latest: false
+      - name: toolchain is go.mod's, exactly
+        run: sh scripts/check-go-toolchain.sh --exact
+      # RL-9: cosign on the v2.4 line signs the checksums keyless.
+      - uses: sigstore/cosign-installer@7e8b541eb2e61bf99390e1afd4be13a184e9ebc5 # v3.10.1
+        with:
+          cosign-release: v2.4.3
+      - uses: anchore/sbom-action/download-syft@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          syft-version: v1.54.1
+      # RL-14: the notes are the tag's CHANGELOG.md section; a missing section
+      # or an [Unreleased] one fails the release before anything is built.
+      - name: release notes from the changelog
+        run: sh scripts/release-notes.sh "$GITHUB_REF_NAME" > "$RUNNER_TEMP/notes.md"
+      # Dependabot moves the action's pin, never its version: input (nor
+      # syft-version or cosign-release above): GoReleaser's version is raised
+      # here by hand, with ci.yml's release-dry-run in the same commit.
+      - uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
+        with:
+          distribution: goreleaser
+          version: v2.18.0
+          install-only: true
+      - name: goreleaser version
+        run: goreleaser --version
+      - name: goreleaser release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: goreleaser release --clean --release-notes "$RUNNER_TEMP/notes.md"
+      # RL-10: SLSA Build L2 provenance in the repository's attestation store;
+      # `gh attestation verify <file> -R kun9497/muster` checks it.
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            dist/*.tar.gz
+            dist/*.deb
+            dist/*.rpm
+
+  # §4.10: one pinned "release failed" issue while the release fails, closed
+  # by the next success. always(), so it runs when the job it watches failed;
+  # ci/release/ops-alert.sh ignores a cancelled or skipped run.
+  alert:
+    needs: [goreleaser]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: open, update or close the release failed issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RESULT: ${{ needs.goreleaser.result }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: sh ci/release/ops-alert.sh release "$RESULT" "$RUN_URL"
