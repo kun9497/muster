@@ -520,7 +520,7 @@ unreleased, were:
   compiled-in default when nothing had set the key).
 
 Stage-2 history of the set (all merged to `main` before this version was cut;
-every plan is under `docs/superpowers/plans/`):
+each plan was under `docs/superpowers/plans/` until its merge and stays in the git history):
 
 | Plan | Merged | Items enrolled after the plan |
 |---|---|---|
