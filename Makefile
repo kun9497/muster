@@ -1,8 +1,11 @@
 BINARY  := muster
 PKG     := ./cmd/muster
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
-COMMIT  := $(shell git rev-parse --short HEAD 2>/dev/null || echo none)
-DATE    := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+COMMIT  := $(shell git rev-parse HEAD 2>/dev/null || echo none)
+# The build date is the commit date, so a rebuild of the same commit is byte-identical.
+# `format-local:` under TZ=UTC renders the commit instant in UTC; plain `format:` would
+# print the committer's own offset behind a false `Z`.
+DATE    := $(shell TZ=UTC git log -1 --format=%cd --date=format-local:%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo unknown)
 
 LDFLAGS := -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(DATE)
 
@@ -14,7 +17,7 @@ FUZZPKG ?= ./internal/collect/collectors/
 .PHONY: build test lint fmt tidy lint-controls coverage refindex refindex-check cisindex cisindex-check suidindex suidindex-check fuzz shellcheck examples-fetch clean
 
 build:
-	CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)" -o bin/$(BINARY) $(PKG)
+	CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags "$(LDFLAGS)" -o bin/$(BINARY) $(PKG)
 
 test:
 	go test -race ./...
