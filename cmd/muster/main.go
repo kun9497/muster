@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+
+	"github.com/kun9497/muster/internal/controls"
+	"github.com/kun9497/muster/internal/facts"
 )
 
 // Exit codes are a CLI contract (spec §7, D11): CI must be able to tell "ran
@@ -39,8 +42,8 @@ commands:
   check      evaluate a facts snapshot against the embedded controls
   fix        plan the remediation of a snapshot's failures (--dry-run only)
   controls   lint, list or scaffold the embedded controls
-  snapshot   cut a control's leaves into a fixture skeleton, or anonymise a snapshot
-  version    print version, commit and build date
+  snapshot   cut a fixture, anonymise a snapshot, or list, remove or prune the snapshots muster keeps
+  version    print version, commit, commit date, control set and schema versions
   help       print this message
 `
 
@@ -64,7 +67,13 @@ func run(args []string, stdout, stderr io.Writer) (code int) {
 	}
 	switch args[0] {
 	case "version":
-		fmt.Fprintf(stdout, "muster %s\ncommit %s\nbuilt %s\n", version, commit, date)
+		set, err := controls.LoadDefault()
+		if err != nil {
+			fmt.Fprintf(stderr, "muster: %v\n", err)
+			return exitError
+		}
+		fmt.Fprintf(stdout, "muster %s\ncommit %s\nbuilt %s\ncontrols %s\nschema %d\n",
+			version, commit, date, set.Version, facts.SchemaVersion)
 		return exitOK
 	case "help", "-h", "--help":
 		fmt.Fprint(stdout, usage)

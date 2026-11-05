@@ -16,10 +16,10 @@ import (
 )
 
 func TestDisplayWidthCountsHangulAsTwo(t *testing.T) {
-	if w := displayWidth("root 계정"); w != 9 { // 4 + 1 + 2*2
+	if w := DisplayWidth("root 계정"); w != 9 { // 4 + 1 + 2*2
 		t.Errorf("width %d", w)
 	}
-	if got := padRight("계정", 6); got != "계정  " {
+	if got := PadRight("계정", 6); got != "계정  " {
 		t.Errorf("%q", got)
 	}
 }
@@ -72,14 +72,14 @@ func TestTruncateWidth(t *testing.T) {
 	if !strings.HasSuffix(got, "…") {
 		t.Errorf("should end with ellipsis: %q", got)
 	}
-	if displayWidth(got) > 10 {
-		t.Errorf("truncated width should not exceed limit: got %d, want <= 10", displayWidth(got))
+	if DisplayWidth(got) > 10 {
+		t.Errorf("truncated width should not exceed limit: got %d, want <= 10", DisplayWidth(got))
 	}
 
-	// Hangul string is cut on rune boundary so displayWidth(result) <= limit
+	// Hangul string is cut on rune boundary so DisplayWidth(result) <= limit
 	got = truncateWidth("안녕하세요 세계", 8)
-	if displayWidth(got) > 8 {
-		t.Errorf("Hangul truncation exceeded limit: got %d, want <= 8", displayWidth(got))
+	if DisplayWidth(got) > 8 {
+		t.Errorf("Hangul truncation exceeded limit: got %d, want <= 8", DisplayWidth(got))
 	}
 
 	// String within limit is returned unchanged

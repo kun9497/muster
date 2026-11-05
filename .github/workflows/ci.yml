@@ -11,17 +11,22 @@ jobs:
   test:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: "1.25.5"
+          go-version-file: go.mod
           check-latest: false
+      - name: toolchain meets go.mod
+        run: sh scripts/check-go-toolchain.sh
       - name: gofmt
         run: test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
       - name: vet
         run: go vet ./...
+      # The same pinned version as GOVULNCHECK_VERSION in scripts/release-vulncheck.sh.
+      - name: govulncheck (source)
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
       - name: staticcheck
         run: go run honnef.co/go/tools/cmd/staticcheck@2025.1.1 ./...
       - name: test
@@ -48,6 +53,20 @@ jobs:
             n=$((n+1))
           done
           [ "$n" -ge 6 ]
+          n=0
+          for f in scripts/*.sh; do
+            sh -n "$f"
+            shellcheck -s sh "$f"
+            n=$((n+1))
+          done
+          [ "$n" -ge 1 ]
+          n=0
+          for f in ci/release/*.sh; do
+            sh -n "$f"
+            shellcheck -s sh "$f"
+            n=$((n+1))
+          done
+          [ "$n" -ge 1 ]
       - name: controls lint
         run: go run ./cmd/muster controls lint --references docs/reference
       - name: controls lint, built-in profile
@@ -64,10 +83,10 @@ jobs:
   secrets:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      - uses: gitleaks/gitleaks-action@v2
+      - uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_CONFIG: .gitleaks.toml
@@ -76,10 +95,10 @@ jobs:
     runs-on: ubuntu-24.04
     needs: test
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: "1.25.5"
+          go-version-file: go.mod
       - run: CGO_ENABLED=0 go build -trimpath -o bin/muster ./cmd/muster
       - name: list actions
         run: ./bin/muster collect --list-actions
@@ -193,7 +212,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/seeds/sshd" && sudo cp /etc/ssh/sshd_config "$RUNNER_TEMP/seeds/sshd/" && sudo cp -r /etc/ssh/sshd_config.d "$RUNNER_TEMP/seeds/sshd/" 2>/dev/null || true
           cp /etc/passwd /etc/group "$RUNNER_TEMP/seeds/" && cp /proc/self/mountinfo "$RUNNER_TEMP/seeds/mountinfo"
           sudo chown -R "$(id -u)" "$RUNNER_TEMP/seeds"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with: {name: seeds-runner, path: "${{ runner.temp }}/seeds"}
       - name: give the sshd oracle something to compare
         run: |
@@ -272,10 +291,10 @@ jobs:
     runs-on: ubuntu-24.04
     needs: test
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: "1.25.5"
+          go-version-file: go.mod
       - name: install cron, sudo and auditd
         run: sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq cron sudo auditd
       - run: CGO_ENABLED=0 go build -trimpath -o bin/muster ./cmd/muster
@@ -380,10 +399,10 @@ jobs:
             init: "false"
             canary: "true"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: "1.25.5"
+          go-version-file: go.mod
       - name: build muster and the collectors test binary
         run: |
           CGO_ENABLED=0 go build -trimpath -o bin/muster ./cmd/muster
@@ -480,7 +499,7 @@ jobs:
           fi
       # always(): the seeds are copied before the oracle runs precisely so a
       # mismatch can be triaged against the files it read.
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always() && matrix.init == 'true' && env.SEED_NAME != ''
         with: {name: "${{ env.SEED_NAME }}", path: "${{ runner.temp }}/muster/containers/seeds"}
       - name: unseen facts are ERROR or NOT_APPLICABLE, never PASS
@@ -600,10 +619,10 @@ jobs:
               muster.beyond.unprivileged_bpf_restricted muster.file.hosts_permissions
               muster.file.inetd_conf_permissions muster.file.shadow_permissions muster.file.syslog_conf_permissions
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: "1.25.5"
+          go-version-file: go.mod
       - name: build muster
         run: CGO_ENABLED=0 go build -trimpath -o bin/muster ./cmd/muster
       - name: build the init image
@@ -762,10 +781,10 @@ jobs:
     runs-on: ubuntu-24.04
     needs: test
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: "1.25.5"
+          go-version-file: go.mod
       - run: CGO_ENABLED=0 go build -trimpath -o bin/muster ./cmd/muster
       - name: no network, read-only root, one file written
         run: |
@@ -790,3 +809,149 @@ jobs:
               | ($k | split(".")) as $p
               | (.facts | getpath($p) | (.status // .effective.status))
               | select(. != "unsupported") ] | length == 0' "$RUNNER_TEMP/muster/out/s.json"
+
+  # Spec §4.7: the release pipeline on every PR, without publishing or signing
+  # (the signature and the attestation need the tag's OIDC identity; Task 8's
+  # release.yml). The build's vulncheck hook runs here as it would on a tag.
+  release-dry-run:
+    runs-on: ubuntu-24.04
+    needs: test
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          check-latest: false
+      # RA-17: the build runs the toolchain go.mod names, exactly.
+      - name: toolchain is go.mod's, exactly
+        run: |
+          sh scripts/check-go-toolchain.sh --exact
+          test "$(go env GOVERSION)" = "go$(sed -n 's/^toolchain go//p' go.mod)"
+      # RL-14: the release job's notes step, both ways: a section prints, and
+      # a version that will never exist is refused (exit 1, "has no section")
+      # on the real CHANGELOG.md.
+      - name: release notes from the changelog
+        run: |
+          sh scripts/release-notes.sh v0.1.0 ci/release/testdata/CHANGELOG.sample.md >/dev/null
+          rc=0
+          sh scripts/release-notes.sh v0.0.0 CHANGELOG.md >/dev/null 2>"$RUNNER_TEMP/notes.err" || rc=$?
+          cat "$RUNNER_TEMP/notes.err"
+          [ "$rc" -eq 1 ] && grep -q 'has no section' "$RUNNER_TEMP/notes.err"
+      # RA-21: the version is explicit, so the log and the diff name it.
+      - uses: anchore/sbom-action/download-syft@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          syft-version: v1.54.1
+      - name: syft version
+        run: syft version
+      # Dependabot moves the action's pin, never its version: input (nor
+      # syft-version above): GoReleaser's version is raised here by hand,
+      # with release.yml's in the same commit.
+      - uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
+        with:
+          distribution: goreleaser
+          version: v2.18.0
+          install-only: true
+      - name: goreleaser version
+        run: goreleaser --version
+      - name: goreleaser snapshot build
+        run: goreleaser release --snapshot --clean --skip=publish,sign
+      - name: the amd64 binary reproduces
+        run: sh scripts/reproduce.sh --ref HEAD --version "$(jq -r .version dist/metadata.json)" "$(jq -r '.[] | select(.type=="Binary" and .goarch=="amd64") | .path' dist/artifacts.json)"
+      # RA-19: the packages carry their conventional names (nfpm's spelling
+      # of the version: - becomes ~, release 1).
+      - name: the amd64 .deb and .rpm are where artifacts.json says
+        run: |
+          v=$(jq -r .version dist/metadata.json | tr - '~')
+          for want in "muster_${v}-1_amd64.deb" "muster-${v}-1.x86_64.rpm"; do
+            ext=${want##*.}
+            n=$(jq -r --arg ext ".$ext" '.[] | select(.type=="Linux Package" and .goarch=="amd64" and (.name|endswith($ext))) | .name' dist/artifacts.json)
+            { [ -n "$n" ] && test -f "dist/$n"; } || { echo "no amd64 .$ext in artifacts.json/dist: '$n'"; exit 1; }
+            [ "$n" = "$want" ] || { echo "amd64 .$ext is $n, want $want"; exit 1; }
+          done
+      # RA-20: syft saw the Go module list inside the archive's binary.
+      - name: every archive SBOM lists the binary's modules
+        run: |
+          n=0
+          for f in dist/*.tar.gz.spdx.json; do
+            [ -e "$f" ] || continue
+            jq -e '(.packages|length) >= 3 and any(.packages[]; .name=="gopkg.in/yaml.v3") and any(.packages[]; .name=="golang.org/x/sys")' "$f"
+            n=$((n+1))
+          done
+          [ "$n" -eq 2 ]
+      # A package SBOM describes the package (syft catalogues the .deb/.rpm
+      # header); the archive SBOM of the same architecture lists the modules.
+      - name: every package SBOM describes the muster package
+        run: |
+          n=0
+          for f in dist/*.deb.spdx.json dist/*.rpm.spdx.json; do
+            [ -e "$f" ] || continue
+            jq -e '(.packages|length) >= 1 and any(.packages[]; .name=="muster")' "$f"
+            n=$((n+1))
+          done
+          [ "$n" -eq 4 ]
+      # RA-15: no brace globs (@actions/glob has none). Task 7's install
+      # contract reads artifacts.json from this artifact.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-dry-run-${{ github.run_id }}
+          path: |
+            dist/*.tar.gz
+            dist/*.deb
+            dist/*.rpm
+            dist/*checksums.txt
+            dist/*.spdx.json
+            dist/artifacts.json
+            dist/metadata.json
+          if-no-files-found: error
+
+  # §4.6/§4.7 RL-11, RL-13: the install contract. Each row installs the
+  # dry run's amd64 artefact in a bare image (no network, no package
+  # installation) and runs ci/release/contract.sh: the file list, the
+  # metadata, nothing started or enabled, muster version and check, the
+  # upgrade, the remove, and on Debian the purge. A separate job with
+  # fail-fast off, so one failing distribution does not hide the others
+  # (RA-15).
+  install-contract:
+    runs-on: ubuntu-24.04
+    needs: release-dry-run
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {image: "ubuntu:22.04", kind: deb}
+          - {image: "ubuntu:24.04", kind: deb}
+          - {image: "debian:12", kind: deb}
+          - {image: "rockylinux/rockylinux:9", kind: rpm}
+          - {image: "almalinux:9", kind: rpm}
+          - {image: "ubuntu:24.04", kind: tar}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # A download by name restores the files directly under dist/.
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-dry-run-${{ github.run_id }}
+          path: dist
+      - name: the dry run's artifacts.json is here
+        run: test -s dist/artifacts.json
+      - name: install contract (${{ matrix.image }}, ${{ matrix.kind }})
+        env:
+          IMAGE: ${{ matrix.image }}
+          KIND: ${{ matrix.kind }}
+        run: |
+          case "$KIND" in
+            deb) sel='.type=="Linux Package" and .goarch=="amd64" and (.name|endswith(".deb"))' ;;
+            rpm) sel='.type=="Linux Package" and .goarch=="amd64" and (.name|endswith(".rpm"))' ;;
+            tar) sel='.type=="Archive" and .goarch=="amd64"' ;;
+          esac
+          artefact=$(jq -r ".[] | select($sel) | .name" dist/artifacts.json)
+          { [ -n "$artefact" ] && [ "$(printf '%s\n' "$artefact" | wc -l)" -eq 1 ] && [ -f "dist/$artefact" ]; } || { echo "want one $KIND artefact, got: $artefact"; exit 1; }
+          version=$(jq -r .version dist/metadata.json)
+          expected=$(sh ci/release/expected-exit.sh examples/ubuntu-24.04-vm-report.json)
+          echo "artefact $artefact, version $version, expected exit $expected"
+          docker run --rm --network none \
+            -v "$PWD/dist:/dist:ro" -v "$PWD/ci/release:/ci:ro" -v "$PWD/examples:/ex:ro" \
+            "$IMAGE" sh /ci/contract.sh "$KIND" "/dist/$artefact" /ex/ubuntu-24.04-vm.json "$expected" "$version"

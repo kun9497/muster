@@ -1,0 +1,12 @@
+# An example timer for muster-collect.service: weekly, caught up after a
+# host was down at the scheduled time (RL-12).
+[Unit]
+Description=muster: collect a facts snapshot weekly
+
+[Timer]
+OnCalendar=weekly
+Persistent=true
+RandomizedDelaySec=1h
+
+[Install]
+WantedBy=timers.target

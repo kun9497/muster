@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/kun9497/muster/internal/snapshots"
 )
 
 // maxAgeLimit is 100 years of 365 days, in seconds (AX-14).
@@ -73,13 +75,7 @@ func parseMaxAge(s string) (int64, error) {
 }
 
 // parseCollectedAt accepts only YYYY-MM-DDTHH:MM:SSZ, round-trip equal.
-func parseCollectedAt(s string) (time.Time, error) {
-	t, err := time.Parse(time.RFC3339, s)
-	if err != nil || t.UTC().Format("2006-01-02T15:04:05Z") != s {
-		return time.Time{}, errors.New("collected_at is not YYYY-MM-DDTHH:MM:SSZ")
-	}
-	return t.UTC(), nil
-}
+func parseCollectedAt(s string) (time.Time, error) { return snapshots.ParseCollectedAt(s) }
 
 // formatAge spells whole seconds as the full w d h m s decomposition, zero
 // terms omitted; 0 is "0s".

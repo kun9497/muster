@@ -9,7 +9,9 @@ The contracts here are tested; the design specification (section 8) is the sourc
 - `collect` runs as root. It reads only paths its collector registry declares and runs only commands on a
   fixed whitelist (absolute path, fixed arguments, timeout, output cap, no shell, rebuilt environment).
   It never parses a control file, a waiver file or a previous snapshot. It writes exactly one file: the
-  snapshot. It makes no network connection. Reading a POSIX ACL requires opening the file, so without
+  snapshot. The only subcommands that remove a file are `snapshot rm` and `snapshot prune`: they act on
+  regular files in a directory the caller owns, through that directory's descriptor, after checking every
+  name, and they share `collect`'s lock file on the default directory. It makes no network connection. Reading a POSIX ACL requires opening the file, so without
   root the `files` collector reports `/etc/shadow`'s ACL leaves as denied and the run is partial even
   though its mode and owner were read.
 - `check` does not need root and warns when run as root. It treats the snapshot as untrusted input
@@ -70,7 +72,9 @@ The contracts here are tested; the design specification (section 8) is the sourc
 By default: derived attributes instead of secrets — hash algorithm rather than hash, key fingerprint
 rather than key, whether an SNMP community is a default value rather than the string. No flag stores a
 secret: `run.redaction.include_secrets` is always false, and `snapshot anonymize` refuses a snapshot that
-says otherwise. Files are 0600 in a 0700 directory, written atomically, never under `/tmp` by default.
+says otherwise. Files are 0600 in a 0700 directory, written atomically, never under `/tmp` by default;
+`snapshot ls` lists that directory without following its `latest` link, `snapshot prune` keeps the newest
+readable snapshot whatever the bounds, and neither opens a file whose name is not a snapshot's.
 
 ## Anonymised snapshots
 

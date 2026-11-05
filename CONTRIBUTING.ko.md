@@ -326,6 +326,11 @@ here-document는 쓰지 않습니다. 스크립트는
   실패시키면 유닛, 파일, 모드, sysctl 값, 모듈이 기록한 대로 되돌아가야 함 — 을 증명. 러너
   행에는 guard 실행이 없고, failure 실행을 위해 같은 VM에 다시 시드함), 그리고 capability matrix(`docs/reference/capability-matrix.json`:
   root 없이 `denied`여야 하는 팩트와 systemd 없이 `unsupported`여야 하는 팩트)를 돌립니다.
+- 릴리스 도구: `scripts/*.sh`와 `ci/release/*.sh`는 POSIX `sh`, `set -eu`이며, 머리말에 그 스크립트가 섬기는
+  4단계 스펙 절을 적습니다. `make shellcheck`가 최소 개수와 함께 그것들을 열거합니다. 모든 GitHub Action은 끝에
+  태그 주석을 붙인 커밋 SHA로 고정하고(`uses: owner/repo@<sha> # vX.Y.Z`), GoReleaser의 `version:`은 정확한
+  릴리스입니다. dependabot이 액션 이동을 제안합니다. 패키징 변경은 같은 커밋에서
+  `ci/release/contract-files.{deb,rpm}.txt`를 함께 고칩니다.
 
 ## 문서
 
